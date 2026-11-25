@@ -407,22 +407,22 @@ M1–M3 通过后，调查方法不再改动。本节处理五个遗留问题：
 
 ### 10.2 一次请求怎样组装
 
-按 provider 建立缓存前缀的顺序（tools → instructions → input）列出各部分，以及它们在同一回合的相邻请求之间会不会变。行号对应本轮起点 `9abb7c3`。
+按 provider 建立缓存前缀的顺序（tools → instructions → input）列出各部分，以及它们在同一回合的相邻请求之间会不会变。分析基于本轮起点 `9abb7c3`，位置用当前代码的符号名标注。
 
 | 部分 | 来源 | 回合内会变吗 |
 |---|---|---|
-| tools | `RuntimeToolAssembly.ts` 中 `resolveRuntimeTools` 的装配顺序；已激活的 deferred 工具追加在末尾（`deferredTools.ts:79-108`） | `tool_search` 激活新工具时变（`ToolExecutorFactory.ts:396-400`）；只剩一次请求时发空工具表（`AgentLoop.ts:323`） |
-| instructions：core 四份文本、文件工具路由、Agent 正文、项目指令、预载 Skill、Skill 目录、工具能力表 | `PromptPlanBuilder.ts:100-177`，回合开始时冻结 | 不变 |
-| instructions：`runtime:facts`、`runtime:profile-limits`、`runtime:approved-execution-offer`、`runtime:request-plan`、`runtime:execution-limits` | `PromptPlanBuilder.ts:179-266`、`TurnPreparationService.ts:189` | 不变 |
-| instructions：`runtime:identity` | `PromptPlanRuntimeIdentity.ts:8-17` | 获批的 capture 切换或现场恢复后变，之后保持 |
+| tools | `RuntimeToolAssembly.ts` 中 `resolveRuntimeTools` 的装配顺序；已激活的 deferred 工具追加在末尾（`deferredTools.ts` 的 `partitionDeferredTools`） | `tool_search` 激活新工具时变（`ToolExecutorFactory.ts` 的 `activateDeferredTools`）；只剩一次请求时发空工具表（`AgentLoop.ts` 生成请求时传入的 `remainingTurns > 1`） |
+| instructions：core 四份文本、文件工具路由、Agent 正文、项目指令、预载 Skill、Skill 目录、工具能力表 | `PromptPlanBuilder.build` 中 `# Runtime Facts` 之前的各段，回合开始时冻结 | 不变 |
+| instructions：`runtime:facts`、`runtime:profile-limits`、`runtime:approved-execution-offer`、`runtime:request-plan`、`runtime:execution-limits` | `PromptPlanBuilder.build` 中从 `# Runtime Facts` 起的各段、`RdcTurnBindings.ts` 的 `freezeRdcTurnBinding` | 不变 |
+| instructions：`runtime:identity` | `PromptPlanRuntimeIdentity.ts` 的 `refreshPromptPlanRuntimeIdentity` | 获批的 capture 切换或现场恢复后变，之后保持 |
 | instructions：`runtime:continuation` | `RuntimeContinuationGuard.next`（`RuntimeContinuation.ts`）给出指令，`AgentLoop.ts` 的 `runtimeContinuationInstruction` 追加在末尾 | 只出现在"终答被运行时义务退回"后的那一次请求 |
-| instructions：`runtime:permission` | `RuntimePermissionContext.ts:9-20`，每次请求追加在末尾 | 用户切换权限挡位时变 |
-| input：历史消息 | 会话 journal；工具返回只追加不改写（`AgentLoop.ts:358-362`） | 只在末尾追加；压缩时重写窗口（`RecoverableContextWindow.ts:53-100`），之后稳定 |
-| input：临时尾消息 | 无进展提示、余量提醒（`AgentLoop.ts:298-310,380-386`），不落盘 | 只影响当次请求的末尾 |
+| instructions：`runtime:permission` | `RuntimePermissionContext.ts` 的 `appendRuntimePermissionContext`，每次请求追加在末尾 | 用户切换权限挡位时变 |
+| input：历史消息 | 会话 journal；工具返回只追加不改写（`AgentLoop.ts` 把 `toolResults.results` 依次追加到 `context.messages`） | 只在末尾追加；压缩时重写窗口（`RecoverableContextWindow.prepare`），之后稳定 |
+| input：临时尾消息 | 无进展提示、余量提醒（`AgentLoop.ts` 的 `turnBudgetInstruction` 与 `RUNTIME_NO_PROGRESS_INSTRUCTION`），不落盘 | 只影响当次请求的末尾 |
 
-一个回合内，instructions 与 tools 在上表列出的少数事件之外逐字节不变。跨回合时 PromptPlan 重建，tool-loop 内的 reasoning 项从 journal 丢弃（`SessionContextJournal.ts:104-106,237-246`），新回合的历史从上一回合第一条带工具调用的助手消息起与前一请求不同。
+一个回合内，instructions 与 tools 在上表列出的少数事件之外逐字节不变。跨回合时 PromptPlan 重建，tool-loop 内的 reasoning 项从 journal 丢弃（`SessionContextJournal.ts` 的 `canonicalizeTerminalContextMessages` 与 `sanitizeContinuationForJournal`），新回合的历史从上一回合第一条带工具调用的助手消息起与前一请求不同。
 
-缓存键与亲和：ChatGPT 账号路由沿用 `openai-responses` 协议的 `cache.mode: unknown`（`profiles/openai-responses.json:35`，`surfaces/chatgpt-account.json` 未覆盖），`PromptCacheCompiler.ts:30-33` 因此关闭缓存，请求既不带 `prompt_cache_key`，也不带 `session-id` 请求头（`responsesShared.ts:354-358`、`OpenAIResponsesProvider.ts:86-90`）。Codex CLI 对同一后端在请求体带 `prompt_cache_key`、请求头带 `session-id`，源码注释写明 ChatGPT 从 `session-id` 请求头推导缓存亲和（`openai/codex` 的 `codex-rs/core/src/client.rs`、`codex-rs/codex-api/src/requests/headers.rs`）。[源码]
+缓存键与亲和：ChatGPT 账号路由沿用 `openai-responses` 协议的 `cache.mode: unknown`（`profiles/openai-responses.json` 的 `cache.mode`，`surfaces/chatgpt-account.json` 未覆盖），`PromptCacheCompiler.compile` 因此关闭缓存，请求既不带 `prompt_cache_key`，也不带 `session-id` 请求头（`responsesShared.ts` 的 `buildResponsesRequestBody`、`OpenAIResponsesProvider.ts` 组装的请求头）。Codex CLI 对同一后端在请求体带 `prompt_cache_key`、请求头带 `session-id`，源码注释写明 ChatGPT 从 `session-id` 请求头推导缓存亲和（`openai/codex` 的 `codex-rs/core/src/client.rs`、`codex-rs/codex-api/src/requests/headers.rs`）。[源码]
 
 据此，命中约 25% 有两种可能的主因，交接单 A 用同一份统计区分：
 
