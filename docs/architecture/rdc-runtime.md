@@ -58,7 +58,7 @@ Memory 与 Knowledge 使用独立 scoped preload domain（`memory` / `knowledge`
 
 ## 原生 CLI、能力与执行回执
 
-`RdcCliInvokerService` 和 session service 是软件固定对接边界。安装验证读取同一 CLI 的版本与完整 catalog，校验 canonical envelope、catalog schema、内容指纹和软件必需操作的参数契约。生命周期代码生成确定 argv，覆盖本地/远端打开、连接、context 查询、清理关闭、daemon 状态、完整事件索引与原子观察。目录不从独立文件配置读取，机器调用统一 canonical JSON；不匹配时明确升级，不回退旧命令。
+`RdcCliInvokerService` 和 session service 是软件固定对接边界。安装验证读取同一 CLI 的版本与完整 catalog，校验 canonical envelope、catalog schema、内容指纹和软件必需操作的参数契约。生命周期代码生成确定 argv，覆盖本地/远端打开、连接、context 查询、清理关闭、daemon 状态、完整事件索引与原子观察。目录不从独立文件配置读取，机器调用统一 canonical JSON；不匹配时明确升级，不回退旧命令。安装必须在 `version --json` 里报告自己提供的 catalog（`catalog.fingerprint` / `tool_count`，RDC-Tool 1.1.3 起），该报告须与 `tools list` 实际提供的 catalog 一致，且须等于本构建随包的 `resources/agent-runtime/rdc-tool-catalog-identity.json`（由 `scripts/generate-rdc-tool-guides.mjs` 与 skill 指南一同生成）；未报告为 `RDC_UPGRADE_REQUIRED`，不一致为 `RDC_CATALOG_MISMATCH`，错误写明双方指纹。
 
 Settings 持久化保留 executable、argsPrefix、cwd、env 和 timeout，用户通过安装根目录选择配置前三项。main 解析真实路径，检测只访问已配置目录和 Tools 默认安装目录；验证草稿时读取同安装版本/catalog，成功后走既有 Settings 保存。选择取消、验证失败不覆盖原值。高级面保留 env/timeout。四个生命周期命令模板、模板变量、catalogPath 和 JSON 模式配置已移除。接口匹配根据软件所需契约判定，不把工具总数或包版本作为权限条件。
 

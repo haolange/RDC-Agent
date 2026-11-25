@@ -13,6 +13,9 @@ const catalogPath = path.resolve(catalogIndex >= 0 && args[catalogIndex + 1]
   ? args[catalogIndex + 1]
   : catalogSnapshotPath);
 const membersPath = path.join(repoRoot, 'resources', 'agent-runtime', 'rdc-tool-guide-members.json');
+// Shipped with the app: the catalog identity the guides were written against. The CLI invoker requires the installed
+// RDC-Tool to serve exactly this catalog.
+const identityPath = path.join(repoRoot, 'resources', 'agent-runtime', 'rdc-tool-catalog-identity.json');
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/u, ''));
@@ -142,6 +145,12 @@ for (const [profile, guideConfig] of Object.entries(members.guides ?? {})) {
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     fs.writeFileSync(outputPath, output, 'utf8');
   }
+}
+const identity = `${JSON.stringify({ schemaVersion: catalog.schema_version, fingerprint: catalog.fingerprint, toolCount: catalog.tool_count }, null, 2)}\n`;
+if (check) {
+  if (!fs.existsSync(identityPath) || fs.readFileSync(identityPath, 'utf8').replace(/^\uFEFF/u, '') !== identity) fail(`stale catalog identity: ${identityPath}`);
+} else {
+  fs.writeFileSync(identityPath, identity, 'utf8');
 }
 if (!check && catalogPath !== catalogSnapshotPath) {
   fs.writeFileSync(catalogSnapshotPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');

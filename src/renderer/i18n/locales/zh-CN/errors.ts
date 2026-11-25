@@ -30,6 +30,7 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.CAPTURE_REFERENCE_NOT_FOUND': '在原位置找不到该 capture 文件。',
   'errors.CAPTURE_REFERENCE_CHANGED': 'capture 文件已在磁盘上变化，请重新添加。',
   'errors.RDC_INSTALLATION_INVALID': 'RenderDoc 工具未正确配置，请在设置中检查。',
+  'errors.RDC_CATALOG_MISMATCH': '已安装的 RDC-Tool 与当前 RDC-Agent 不配套，请安装对应版本的 RDC-Tool。',
   'errors.RDC_UPGRADE_REQUIRED': 'RDC-Tool 需要更新。',
   'errors.RDC_HOST_UNSUPPORTED': '此电脑不支持该功能。',
   'errors.RDC_DEVICE_IN_USE': '该设备正被其他会话使用。',

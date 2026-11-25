@@ -33,6 +33,7 @@ export const enErrors = {
   'errors.CAPTURE_REFERENCE_NOT_FOUND': "The capture file can't be found where it was.",
   'errors.CAPTURE_REFERENCE_CHANGED': 'The capture file changed on disk. Add it again.',
   'errors.RDC_INSTALLATION_INVALID': "RenderDoc tooling isn't set up correctly. Check it in Settings.",
+  'errors.RDC_CATALOG_MISMATCH': 'The installed RDC-Tool does not match this RDC-Agent. Install the matching RDC-Tool release.',
   'errors.RDC_UPGRADE_REQUIRED': 'RDC-Tool needs to be updated.',
   'errors.RDC_HOST_UNSUPPORTED': "This isn't supported on this computer.",
   'errors.RDC_DEVICE_IN_USE': 'The device is in use by another session.',

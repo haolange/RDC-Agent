@@ -10,7 +10,9 @@ it('checks generated guides in an independent checkout and still rejects stale c
   const inputs = ['scripts/generate-rdc-tool-guides.mjs', 'scripts/fidelity/rdc-tool-guide-catalog.json',
     'resources/agent-runtime/rdc-tool-guide-members.json'];
   const members = JSON.parse(readFileSync(path.join(repo, inputs[2]), 'utf8')) as { guides: Record<string, { skillId: string }> };
+  // Generated outputs the check compares: every guide and the shipped catalog identity.
   const references = Object.values(members.guides).map(({ skillId }) => `resources/agent-runtime/skills/${skillId}/references/tools.md`);
+  references.push('resources/agent-runtime/rdc-tool-catalog-identity.json');
   try {
     for (const input of [...inputs, ...references]) {
       const target = path.join(root, input);

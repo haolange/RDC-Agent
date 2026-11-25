@@ -10,6 +10,7 @@ import { rdcInstallationFiles } from '../platform/rdcLayout';
 import { canonicalJson, deepFreeze, validateDefinitions, validateApplicationOperations } from './RdcOperationCatalog';
 import { assertRdcCliBinding } from './rdcCliBinding';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
+import { assertRdcCatalogIdentity, packagedRdcCatalogIdentity, type RdcCatalogIdentity } from './rdcCatalogIdentity';
 import { resolveRdcBatchInvocation } from './resolveRdcBatchInvocation';
 import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
@@ -43,7 +44,10 @@ export class RdcCliInvokerService {
   private versions = new Map<string, string>();
   private traceListeners = new Set<(trace: ToolTraceEntry) => void>();
 
-  constructor(private readonly shell: ShellInvocationService = shellInvocationService) {}
+  constructor(
+    private readonly shell: ShellInvocationService = shellInvocationService,
+    private readonly expectedCatalog: () => RdcCatalogIdentity = packagedRdcCatalogIdentity,
+  ) {}
 
   private getSettings(): RdcCliInvokerSettings {
     return settingsService.snapshot().user.tooling.rdcCli;
@@ -119,6 +123,8 @@ export class RdcCliInvokerService {
       if (envelope.schema_version !== '3.0.0' || envelope.data.schema_version !== '1') throw new AppError('RDC_UPGRADE_REQUIRED', 'unsupported catalog envelope schema.');
       const tools = validateDefinitions(envelope.data.tools, envelope.data.tool_count, envelope.data.fingerprint);
       validateApplicationOperations(tools);
+      assertRdcCatalogIdentity({ toolVersion: version.data.tool_version, versionCatalog: version.data.catalog,
+        served: { fingerprint: String(envelope.data.fingerprint), toolCount: tools.length } }, this.expectedCatalog());
       const namespaces: ToolCatalog['namespaces'] = {};
       for (const tool of tools) namespaces[tool.namespace] ??= { description: '', groups: [] };
       this.versions.set(key, version.data.tool_version);
