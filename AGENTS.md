@@ -115,6 +115,7 @@
 |---|---|
 | 局部 | 受影响单测、`pnpm run typecheck`、`pnpm run lint`、对应 `check:*` |
 | 会话投影 | 另加 `pnpm run check:session-projection` |
+| renderer 判空、可选链与分支 | `pnpm run lint` 执行 `no-unnecessary-condition`；豁免清单另加 `pnpm run check:unnecessary-condition`（在 `check:gates` 内） |
 | 右栏 | 另加 `pnpm run check:right-rail` |
 | 跨层（main / preload / renderer / shared） | 另加 `pnpm test`、`pnpm run check:contracts`、`pnpm run test:coverage`、`pnpm run check:coverage-ratchet`、`pnpm run check:gates`、`pnpm run build` |
 | 提交前 | `pnpm run check:git-diff`（需 `RDC_DIFF_BASE`） |

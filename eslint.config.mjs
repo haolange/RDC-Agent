@@ -163,6 +163,33 @@ const NODE_BUILTINS = [
 ];
 const mainTestFiles = ['src/main/**/*.test.ts', 'src/main/testing/**'];
 
+// Inside the renderer's boundaries the types are the contract (ARCHITECTURE.md Verification Gate): renderer production
+// code runs no-unnecessary-condition, so a null check, optional chain, fallback or branch the types already rule out is
+// an error. Its program adds noUncheckedIndexedAccess (src/renderer/tsconfig.lint.json), so a lookup that can miss
+// stays guarded. UNNECESSARY_CONDITION_PENDING names the files still exempt and why; the list only shrinks, and
+// scripts/check-unnecessary-condition.mjs fails while a listed file is clean, gone or outside the rule.
+export const rendererTypedLint = {
+  files: ['src/renderer/**/*.{ts,tsx}'],
+  ignores: ['src/renderer/**/*.test.{ts,tsx}', 'src/renderer/testing/**', 'src/renderer/**/*.d.ts'],
+  languageOptions: {
+    parserOptions: {
+      project: './src/renderer/tsconfig.lint.json',
+      tsconfigRootDir: import.meta.dirname,
+    },
+  },
+  rules: { '@typescript-eslint/no-unnecessary-condition': 'error' },
+};
+const BOOTSTRAP_PENDING = 'waits for the IPC boundary pass that owns src/renderer/app/bootstrap';
+export const UNNECESSARY_CONDITION_PENDING = {
+  'src/renderer/app/bootstrap/useCatalogBootstrap.ts': `optional chains on the installed bridge; ${BOOTSTRAP_PENDING}`,
+  'src/renderer/app/bootstrap/useIpcEventBridge.ts': `bridge presence check and fallbacks for required capture descriptors; ${BOOTSTRAP_PENDING}`,
+  'src/renderer/app/bootstrap/useProjectInputsBootstrap.ts': `bridge presence check and fallbacks for required project inputs; ${BOOTSTRAP_PENDING}`,
+  'src/renderer/app/bootstrap/useSessionSurfaceBootstrap.ts': `bridge presence checks and fallbacks for required history fields; ${BOOTSTRAP_PENDING}`,
+  'src/renderer/app/bootstrap/useShellBootstrap.ts': `bridge presence check; ${BOOTSTRAP_PENDING}`,
+  'src/renderer/features/transcript/workProcessTracePresentation.ts': 'stored loop items are read back without checking '
+    + 'thinking.kind (isStoredLoopItem in src/main/sessions/store/StoredWorkTrace.ts), so an unknown kind still reads as none',
+};
+
 export default [
   {
     ignores: ['out/**', 'release/**', 'node_modules/**', 'coverage/**', 'dist/**'],
@@ -363,6 +390,10 @@ export default [
     rules: {
       '@typescript-eslint/no-floating-promises': 'error',
     },
+  },
+  {
+    ...rendererTypedLint,
+    ignores: [...rendererTypedLint.ignores, ...Object.keys(UNNECESSARY_CONDITION_PENDING)],
   },
   {
     files: testSources,
