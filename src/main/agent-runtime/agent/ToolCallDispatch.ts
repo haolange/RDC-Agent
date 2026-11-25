@@ -6,7 +6,7 @@
 import { executeConcurrentToolGroups } from './ConcurrentToolScheduler';
 import type { ToolExecutor } from './AgentLoop';
 import type { EventStream } from '../core/EventStream';
-import type { AgentLoopEvent, AssistantMessage, Message, ToolCall, ToolResultMessage } from '../core/types';
+import type { AgentLoopEvent, AssistantMessage, Message, ToolCallContent, ToolResultMessage } from '../core/types';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 
 /** 内层循环工具执行结果。 */
@@ -15,7 +15,7 @@ export interface ExecuteToolCallsResult {
 }
 
 function createToolCallFailure(
-  toolCall: ToolCall,
+  toolCall: ToolCallContent,
   text: string,
   details?: Record<string, unknown>,
 ): ToolResultMessage {
@@ -42,10 +42,10 @@ export async function executeToolCalls(
   _maxConcurrency?: number,
 ): Promise<ExecuteToolCallsResult> {
   const toolCalls = assistantMessage.content.filter(
-    (c): c is ToolCall => c.type === 'toolCall',
+    (c): c is ToolCallContent => c.type === 'toolCall',
   );
 
-  const executeOne = async (toolCall: ToolCall, index: number): Promise<ToolResultMessage> => {
+  const executeOne = async (toolCall: ToolCallContent, index: number): Promise<ToolResultMessage> => {
     void index;
     let startTime: number | undefined;
     const onExecutionStart = (permissionState?: RuntimePermissionState) => {

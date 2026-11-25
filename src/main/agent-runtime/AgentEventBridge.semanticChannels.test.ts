@@ -5,7 +5,7 @@ import type {
   AssistantMessageEvent,
   ProviderOutputRef,
   ThinkingContent,
-  ToolCall,
+  ToolCallContent,
 } from './core/types';
 
 describe('run start identity', () => {
@@ -48,7 +48,7 @@ const thinking: ThinkingContent = {
 
   providerOutputRef: thinkingRef,
 };
-const toolCall: ToolCall = {
+const toolCall: ToolCallContent = {
   type: 'toolCall',
   id: 'call-1',
   name: 'read_file',

@@ -40,12 +40,13 @@ import type {
   Message,
   Model,
   StreamOptions,
-  ToolCall,
+  ToolCallContent,
   ToolDefinition,
   ToolResultMessage,
   UserMessage,
 } from '../core/types';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
+import type { ToolCall } from '@shared/types/tool';
 
 export type TransformContextResult = AgentMessage[] | CompressResult;
 
@@ -135,7 +136,7 @@ export interface ToolExecutor {
    * @param onExecutionStart 授权、前置检查及资源排队完成后，实际进入工具 effect 时通知一次。
    */
   execute(
-    toolCall: ToolCall,
+    toolCall: ToolCallContent,
     signal?: AbortSignal,
     onUpdate?: (partialResult: unknown) => void,
     onExecutionStart?: (permissionState?: RuntimePermissionState) => void,

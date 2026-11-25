@@ -10,7 +10,7 @@ import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 import type { ProviderContinuationArtifact } from '@shared/types/reasoning';
-import type { AssistantMessage, Message, ToolCall, ToolResultMessage } from '../core/types';
+import type { AssistantMessage, Message, ToolResultMessage } from '../core/types';
 
 /** Work-trace summary of a turn the app's exit interrupted before its terminal context entry was written. */
 export const INTERRUPTED_CONVERSATION_SUMMARY = '请求在应用退出后中断，需重新发起。';
@@ -105,7 +105,7 @@ export const canonicalizeTerminalContextMessages = (messages: Message[]): Messag
     }
     const content = message.content.reduce<AssistantMessage['content']>((blocks, block) => {
       if (block.type === 'toolCall') {
-        if (completedToolCalls.has((block as ToolCall).id)) blocks.push(block);
+        if (completedToolCalls.has(block.id)) blocks.push(block);
       } else if (block.type === 'thinking') {
         const continuation = sanitizeContinuationForJournal(block.continuation);
         if (continuation) blocks.push({ ...block, text: undefined, continuation });

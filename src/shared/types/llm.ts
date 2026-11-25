@@ -1,25 +1,5 @@
 import type { LlmAgentRoute, LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
 
-/** Provider-neutral tool call projection used by shared runtime events. */
-export interface ToolCall {
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
-}
-
-export interface LLMToolCallDelta {
-  id: string;
-  name?: string;
-  argumentsText?: string;
-}
-
-/** Canonical stream event contract shared with renderer projections. */
-export type LLMStreamEvent =
-  | { type: 'text-delta'; text: string }
-  | { type: 'tool-call-delta'; toolCall: LLMToolCallDelta }
-  | { type: 'done' }
-  | { type: 'error'; error: string };
-
 /** Runtime credentials and transport metadata. Model capability never lives here. */
 export interface LLMProviderConfig {
   id: LlmProviderId;

@@ -20,7 +20,7 @@ import {
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
 import type { CompiledPolicy } from '@shared/types/rdcRuntime';
 import type { AgentTool, ReplayLifecycleStep, ToolExecutionContext } from '../agent/AgentTool';
-import type { ToolCall } from '../core/types';
+import type { ToolCall } from '@shared/types/tool';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { ShellKind } from '../../runtime/ShellResolver';
 

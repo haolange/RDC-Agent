@@ -2,6 +2,7 @@ import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { CompiledPromptCache, DerivedContextMessageRef } from '@shared/types/semanticContext';
 import type { PromptSegment } from '@shared/types/rdcRuntime';
 import type { AssistantMessageDiagnostic } from '@shared/types/providerErrors';
+import type { ToolCall } from '@shared/types/tool';
 
 /**
  * Internal types for the provider/runtime boundary.
@@ -47,17 +48,15 @@ export interface ImageContent {
   mimeType: string;
 }
 
-export interface ToolCall {
+/** A tool call as an assistant content block: the shared `ToolCall` plus what only main's loop reads. */
+export interface ToolCallContent extends ToolCall {
   type: 'toolCall';
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
   /** The model's argument text when it was not a JSON object; `arguments` is then empty and the call is not run. */
   invalidArguments?: string;
   providerOutputRef?: ProviderOutputRef;
 }
 
-export type ContentBlock = TextContent | ThinkingContent | ImageContent | ToolCall;
+export type ContentBlock = TextContent | ThinkingContent | ImageContent | ToolCallContent;
 
 
 // =====================================================================
@@ -77,7 +76,7 @@ export interface UserMessage {
 /** 助手消息：包含文本、思考、工具调用等内容块。 */
 export interface AssistantMessage {
   role: 'assistant';
-  content: (TextContent | ThinkingContent | ToolCall)[];
+  content: (TextContent | ThinkingContent | ToolCallContent)[];
   /** 模型 id（与 `Model.id` 对应）。 */
   model: string;
   /** Provider id（与 `Model.provider` 对应）。 */
@@ -99,7 +98,7 @@ export interface AssistantMessage {
 /** 工具调用结果消息。 */
 export interface ToolResultMessage {
   role: 'toolResult';
-  /** 对应 `ToolCall.id`。 */
+  /** 对应 `ToolCallContent.id`。 */
   toolCallId: string;
   /** 工具名（冗余存储，便于日志/追踪）。 */
   toolName: string;
@@ -280,7 +279,7 @@ export type AssistantMessageEvent =
   | { type: 'thinking_end'; contentIndex: number; content: string; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
   | { type: 'toolcall_start'; contentIndex: number; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
   | { type: 'toolcall_delta'; contentIndex: number; delta: string; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'toolcall_end'; contentIndex: number; toolCall: ToolCall; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | { type: 'toolcall_end'; contentIndex: number; toolCall: ToolCallContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
   | { type: 'done'; reason: StopReason; message: AssistantMessage }
   | { type: 'error'; error: Error; message: AssistantMessage };
 

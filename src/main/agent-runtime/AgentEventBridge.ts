@@ -303,19 +303,15 @@ function translateAssistantMessageEvent(
         { text: ev.content, thinking: toSharedThinkingArtifact(ev.thinking), providerOutputRef: { ...ev.providerOutputRef } },
         context,
       );
-    case 'toolcall_end':
+    case 'toolcall_end': {
+      // The content block's tag and unparsed argument text are main's; the event carries the shared `ToolCall`.
+      const { id, name, arguments: args } = ev.toolCall;
       return buildSharedAgentEvent(
         'tool.requested',
-        {
-          toolCall: {
-            id: ev.toolCall.id,
-            name: ev.toolCall.name,
-            arguments: ev.toolCall.arguments,
-          },
-          providerOutputRef: { ...ev.providerOutputRef },
-        },
+        { toolCall: { id, name, arguments: args }, providerOutputRef: { ...ev.providerOutputRef } },
         context,
       );
+    }
     case 'start':
     case 'text_start':
     case 'thinking_start':

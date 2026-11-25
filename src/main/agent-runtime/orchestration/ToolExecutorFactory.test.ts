@@ -1050,23 +1050,21 @@ describe('ToolExecutorFactory', () => {
       effectivePlan: { toolAllowlist: ['read_file', 'shell'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
       policyBudget: budget,
     });
-    expect(executor.isConcurrencySafe?.({ type: 'toolCall', id: 'r1', name: 'read_file', arguments: {} })).toBe(true);
-    expect(executor.isConcurrencySafe?.({ type: 'toolCall', id: 's1', name: 'shell', arguments: { command: 'echo' } })).toBe(false);
+    expect(executor.isConcurrencySafe?.({ id: 'r1', name: 'read_file', arguments: {} })).toBe(true);
+    expect(executor.isConcurrencySafe?.({ id: 's1', name: 'shell', arguments: { command: 'echo' } })).toBe(false);
     expect(executor.isConcurrencySafe?.({
-      type: 'toolCall',
       id: 'off',
       name: 'subagent',
       arguments: {  },
     })).toBe(false); // absent tool metadata never grants concurrent dispatch
     expect(executor.isConcurrencySafe?.({
-      type: 'toolCall',
       id: 'live',
       name: 'subagent',
       arguments: { domainExtensions: { rdc: { requiresLease: true } } },
     })).toBe(false);
     expect(executor.reserveDispatchBudget?.([
-      { type: 'toolCall', id: 'g1', name: 'read_file', arguments: {} },
-      { type: 'toolCall', id: 'g2', name: 'read_file', arguments: {} },
+      { id: 'g1', name: 'read_file', arguments: {} },
+      { id: 'g2', name: 'read_file', arguments: {} },
     ])).toEqual({ ok: false, limit: 'maxToolCalls' });
     expect(budget.toolCalls).toBe(0);
     expect(read.execute).not.toHaveBeenCalled();

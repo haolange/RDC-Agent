@@ -5,7 +5,6 @@
  * src/main/agent-runtime/AgentEventBridge.ts before conversation and renderer projection.
  */
 import type { AgentRole } from './agent';
-import type { ToolCall } from './llm';
 import type { MCPTransport } from './mcp';
 import type { AgentPromptProfile, AgentToolPolicy } from './profile';
 import type { ProviderOutputRef, ThinkingArtifact } from './reasoning';
@@ -21,7 +20,7 @@ import type {
 } from './conversation';
 import type { ConversationPlanReview, PlanReviewDecision } from './planReview';
 import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
-import type { ToolCallResult } from './tool';
+import type { ToolCall, ToolCallResult } from './tool';
 
 export type ToolCallingMode = 'native-structured' | 'text-only' | 'disabled';
 
@@ -244,19 +243,6 @@ export interface ModelProviderCapabilityMatrix {
   local: boolean;
   toolCallFormat: 'openai-chat-completions' | 'openai-responses' | 'anthropic-messages' | 'google-gemini' | 'none';
   structuredReliability: 'native' | 'prompted' | 'unsupported';
-}
-
-export interface ModelTurnEvent {
-  providerId: LlmProviderId;
-  modelId: string;
-  type: 'started' | 'delta' | 'tool_call' | 'completed' | 'failed';
-  text?: string;
-  toolCall?: ToolCall;
-  usage?: {
-    inputTokens: number;
-    outputTokens: number;
-  };
-  error?: string;
 }
 
 export interface AgentRuntimeProfileDescriptor extends AgentPromptProfile {

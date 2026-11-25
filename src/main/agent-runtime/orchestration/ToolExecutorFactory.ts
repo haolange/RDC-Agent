@@ -40,7 +40,8 @@ import {
 } from './ToolCallAdmission';
 import type { RuntimeToolResolver, ToolExecutorRuntimeContext } from './orchestratorTypes';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import type { ToolCall, ToolResultMessage } from '../core/types';
+import type { ToolCallContent, ToolResultMessage } from '../core/types';
+import type { ToolCall } from '@shared/types/tool';
 import type { ToolExecutor } from '../agent/AgentLoop';
 import type { AgentTool, AgentToolResult, ToolExecutionContext } from '../agent/AgentTool';
 import type { HookEvent } from '@shared/types/rdcRuntime';
@@ -160,7 +161,7 @@ export class ToolExecutorFactory {
 
   private async executeToolCall(
     scope: ToolExecutorScope,
-    toolCall: ToolCall,
+    toolCall: ToolCallContent,
     signal?: AbortSignal,
     onUpdate?: (partialResult: unknown) => void,
     onExecutionStart?: (permissionState?: RuntimePermissionState) => void,
@@ -219,7 +220,7 @@ export class ToolExecutorFactory {
   ): Promise<ToolResultMessage> {
     const { agentId, plan, runtimeContext, sessionId, tools, activeSkillAllowlist } = scope;
     const { toolCall, tool, args: validatedArgs } = call;
-    const validatedToolCall: ToolCall = { ...toolCall, arguments: validatedArgs };
+    const validatedToolCall: ToolCallContent = { ...toolCall, arguments: validatedArgs };
     const executorSessionId = runtimeContext?.sessionId ?? sessionId ?? null;
     let sessionAttachmentsRoot: string | null = null;
     if (executorSessionId) {
@@ -414,7 +415,7 @@ export class ToolExecutorFactory {
   }
 
   async executeAskUserTool(
-    toolCall: ToolCall,
+    toolCall: ToolCallContent,
     agentId: AgentRole,
     runtimeContext: ToolExecutorRuntimeContext | undefined,
     signal?: AbortSignal,
@@ -476,7 +477,7 @@ export class ToolExecutorFactory {
   }
 
   async createPolicyDeniedToolResult(
-    toolCall: ToolCall,
+    toolCall: ToolCallContent,
     agentId: AgentRole,
     reason?: string,
     runtimeContext?: ToolExecutorRuntimeContext,
@@ -501,7 +502,7 @@ export class ToolExecutorFactory {
   }
 
   createApprovalRequiredToolResult(
-    toolCall: ToolCall,
+    toolCall: ToolCallContent,
     agentId: AgentRole,
     reason: string,
   ): ToolResultMessage {
@@ -518,7 +519,7 @@ export class ToolExecutorFactory {
     };
   }
 
-  agentToolResultToMessage(toolCall: ToolCall, result: AgentToolResult): ToolResultMessage {
+  agentToolResultToMessage(toolCall: ToolCallContent, result: AgentToolResult): ToolResultMessage {
     return {
       role: 'toolResult',
       toolCallId: toolCall.id,

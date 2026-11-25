@@ -1,4 +1,5 @@
-import type { JsonSchema, ToolCall, ToolDefinition } from './types';
+import type { JsonSchema, ToolDefinition } from './types';
+import type { ToolCall } from '@shared/types/tool';
 
 /**
  * 工具参数验证错误。

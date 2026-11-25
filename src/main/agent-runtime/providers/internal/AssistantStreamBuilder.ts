@@ -16,7 +16,7 @@ import type {
   StopReason,
   TextContent,
   ThinkingContent,
-  ToolCall,
+  ToolCallContent,
   Usage,
 } from '../../core/types';
 
@@ -465,7 +465,7 @@ export class AssistantStreamBuilder {
       });
       return;
     }
-    const toolCall: ToolCall = {
+    const toolCall: ToolCallContent = {
       type: 'toolCall',
       id: block.id,
       name: block.name,
@@ -535,7 +535,7 @@ export class AssistantStreamBuilder {
  * Arguments the model streamed for a tool call. Text that is not a JSON object stays visible as `invalidArguments`
  * so the executor can tell the model exactly that, instead of validating a fabricated object.
  */
-function toolCallArguments(raw: string): Pick<ToolCall, 'arguments' | 'invalidArguments'> {
+function toolCallArguments(raw: string): Pick<ToolCallContent, 'arguments' | 'invalidArguments'> {
   if (!raw.trim()) return { arguments: {} };
   try {
     const parsed: unknown = JSON.parse(raw);

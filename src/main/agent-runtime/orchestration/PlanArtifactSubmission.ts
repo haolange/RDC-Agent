@@ -17,13 +17,13 @@ import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../
 import { preparePlanTaskRequirements } from '../tasks/TaskExecutionRequirements';
 import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
 import type { AgentRole } from '@shared/types/agent';
-import type { ToolCall, ToolResultMessage } from '../core/types';
+import type { ToolCallContent, ToolResultMessage } from '../core/types';
 import type { TurnHandle } from './TurnCoordinator';
 import type { ActiveTurnLookup, ToolExecutorRuntimeContext } from './orchestratorTypes';
 
 /** One plan_artifact call: the call, the submitting Agent and the turn's runtime context. */
 export interface PlanArtifactToolCall {
-  toolCall: ToolCall;
+  toolCall: ToolCallContent;
   agentId: AgentRole;
   runtimeContext: ToolExecutorRuntimeContext | undefined;
   signal?: AbortSignal;

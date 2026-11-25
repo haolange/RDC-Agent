@@ -15,7 +15,8 @@ import type { ActiveTurnLookup, ToolExecutorRuntimeContext } from './orchestrato
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import type { AgentTool } from '../agent/AgentTool';
-import type { ToolCall, ToolResultMessage } from '../core/types';
+import type { ToolCallContent, ToolResultMessage } from '../core/types';
+import type { ToolCall } from '@shared/types/tool';
 import type { AgentRole } from '@shared/types/agent';
 
 /** The runtime allowlist checks a call passes before permission review (RuntimeToolAssembly). */
@@ -52,7 +53,7 @@ export interface ToolExecutorScope {
 
 /** One call that passed admission and argument validation. */
 export interface ValidatedToolCall {
-  toolCall: ToolCall;
+  toolCall: ToolCallContent;
   tool: AgentTool;
   args: Record<string, unknown>;
 }
@@ -122,7 +123,7 @@ export function reserveCallBudget(scope: ToolExecutorScope, toolCall: ToolCall):
   return null;
 }
 
-export function validateToolArguments(tool: AgentTool, toolCall: ToolCall): AdmissionGate<Record<string, unknown>> {
+export function validateToolArguments(tool: AgentTool, toolCall: ToolCallContent): AdmissionGate<Record<string, unknown>> {
   if (toolCall.invalidArguments !== undefined) {
     return { ok: false, result: errorToolResult(toolCall,
       `TOOL_ARGUMENTS_INVALID: the arguments were not a JSON object. Received: ${toolCall.invalidArguments.slice(0, 200)}`) };

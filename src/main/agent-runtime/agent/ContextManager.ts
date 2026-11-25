@@ -3,7 +3,7 @@ import { AppError } from '@shared/errors/appError';
 import { charsToTokens } from '@shared/utils/tokens';
 import { TokenizerService } from '../core/TokenizerService';
 import type { AgentMessage, AssistantMessage, ImageContent, Message, ProviderContinuationArtifact,
-  TextContent, ToolCall, ToolResultMessage, UserMessage } from '../core/types';
+  TextContent, ToolResultMessage, UserMessage } from '../core/types';
 
 export interface ContextManagerConfig {
   contextTokenLimit: number;
@@ -138,11 +138,10 @@ export class ContextManager {
         if (block.continuation) total += this.providerArtifactChars(block.continuation);
         else if (block.text) total += block.text.length;
       } else if (block.type === 'toolCall') {
-        const tc = block as ToolCall;
         try {
-          total += JSON.stringify(tc.arguments).length + tc.name.length;
+          total += JSON.stringify(block.arguments).length + block.name.length;
         } catch {
-          total += tc.name.length;
+          total += block.name.length;
         }
       }
     }

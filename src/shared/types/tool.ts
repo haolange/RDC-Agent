@@ -48,6 +48,13 @@ export interface ToolCallRequest {
   abortSignal?: AbortSignal;
 }
 
+/** A tool call the model requested: the one call shape main's loop and the shared runtime events use. */
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
 // 工具调用结果
 export interface ToolCallResult {
   ok: boolean;

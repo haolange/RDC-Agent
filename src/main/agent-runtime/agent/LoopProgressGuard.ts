@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { AssistantMessage, ToolCall, ToolDefinition, ToolResultMessage } from '../core/types';
+import type { AssistantMessage, ToolCallContent, ToolDefinition, ToolResultMessage } from '../core/types';
 
 export type AgentLoopTerminationCode =
   | 'AGENT_NO_PROGRESS'
@@ -61,7 +61,7 @@ export class LoopProgressGuard {
       runtimeRevision,
     );
     const toolCalls = assistantMessage.content.filter(
-      (block): block is ToolCall => block.type === 'toolCall',
+      (block): block is ToolCallContent => block.type === 'toolCall',
     );
     const definitions = new Map(toolDefinitions.map((definition) => [definition.name, definition]));
     const allPollable = toolCalls.length > 0 && toolCalls.every((toolCall) => (
@@ -97,7 +97,7 @@ export function createToolRoundFingerprint(
   runtimeRevision: number,
 ): string {
   const toolCalls = assistantMessage.content.filter(
-    (block): block is ToolCall => block.type === 'toolCall',
+    (block): block is ToolCallContent => block.type === 'toolCall',
   );
   const round = {
     runtimeRevision,
