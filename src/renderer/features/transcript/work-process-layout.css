@@ -173,6 +173,7 @@
   100% { transform: scale(1.6); opacity: 0; }
 }
 
+.work-process-family-stdout,
 .work-process-step-content {
   min-width: 0;
   display: flex;
@@ -197,7 +198,8 @@
   overflow-wrap: anywhere;
 }
 
-.work-process-diagnostic.severity-info .work-process-diagnostic-message {
+.work-process-diagnostic.severity-info .work-process-diagnostic-message,
+.work-process-task-snapshot-reason {
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-line);

@@ -33,7 +33,6 @@
   font-size: var(--type-body-size);
 }
 
-.settings-model-capability-source,
 .settings-model-capability-note {
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
@@ -46,15 +45,6 @@
 
 .settings-model-capability-note--error {
   color: var(--token-status-error);
-}
-
-.settings-model-capability-section-label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--token-text-primary);
-  font-size: var(--type-body-size);
-  font-weight: var(--font-semibold);
 }
 
 .settings-model-capability-tiers {

@@ -76,7 +76,6 @@
 .right-rail-artifact-list,
 .right-rail-investigation-list,
 .right-rail-context,
-.right-rail-resource-list,
 .right-rail-capture-panel {
   display: flex;
   flex-direction: column;

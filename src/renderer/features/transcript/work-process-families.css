@@ -4,16 +4,6 @@
   gap: var(--space-2);
 }
 
-.work-process-tool-card-body.family-interpreter,
-.work-process-tool-card-body.family-memory,
-.work-process-tool-card-body.family-skill,
-.work-process-tool-card-body.family-mcp,
-.work-process-tool-card-body.family-runtime {
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--space-2);
-}
-
 .work-process-highlighted-code {
   margin: 0;
   padding: var(--space-2) var(--space-3);
@@ -45,13 +35,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-width: 0;
-}
-
-.work-process-family-stdout {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
   min-width: 0;
 }
 

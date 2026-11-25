@@ -155,6 +155,11 @@
   padding: var(--space-2) var(--space-3);
 }
 
+.work-process-tool-card-body.family-interpreter,
+.work-process-tool-card-body.family-memory,
+.work-process-tool-card-body.family-skill,
+.work-process-tool-card-body.family-mcp,
+.work-process-tool-card-body.family-runtime,
 .work-process-tool-card-body.family-web {
   flex-direction: column;
   align-items: stretch;
@@ -220,24 +225,6 @@
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-line);
-}
-
-.work-process-tool-card-link {
-  color: var(--token-accent-primary);
-  font-size: var(--type-body-size);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  overflow-wrap: anywhere;
-}
-
-.work-process-tool-card-link:hover {
-  color: var(--token-text-primary);
-}
-
-.work-process-tool-card-link:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: var(--focus-ring-offset);
-  border-radius: var(--radius-sm);
 }
 
 .work-process-tool-card-copy {
@@ -311,6 +298,7 @@
   line-height: var(--leading-normal);
 }
 
+.markdown-mermaid-fallback,
 .work-process-tool-card-raw {
   display: flex;
   flex-direction: column;
@@ -404,6 +392,7 @@
   border-radius: var(--radius-sm);
   overflow: hidden;
 }
+.work-process-task-snapshot-list,
 .work-process-tool-hook-details ul {
   margin: 0;
   padding: var(--space-2) var(--space-3);
@@ -430,7 +419,8 @@
 .work-process-tool-card-body-text:focus-visible,
 .work-process-tool-card-body-list-item:focus-visible,
 .work-process-path-chip:focus-visible,
-.work-process-subagent-identifiers dd > span:focus-visible {
+.work-process-subagent-identifiers dd > span:focus-visible,
+a.work-process-web-item-title:focus-visible {
   border-radius: var(--radius-sm);
   outline: 2px solid var(--token-border-focus);
   outline-offset: var(--focus-ring-offset);

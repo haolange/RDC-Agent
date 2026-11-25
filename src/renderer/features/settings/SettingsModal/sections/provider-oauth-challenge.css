@@ -55,25 +55,11 @@
   line-height: var(--type-body-line);
 }
 
-.settings-oauth-step-description {
-  margin: 0;
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-  line-height: var(--leading-normal);
-}
-
 .settings-oauth-link-button {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   text-decoration: none;
-}
-
-.settings-provider-oauth-code-card {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 .settings-provider-oauth-code-card > code {
@@ -110,12 +96,6 @@
 
 .settings-oauth-browser-opened .button {
   margin-inline-start: auto;
-}
-
-.settings-provider-oauth-manual-code {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
 }
 
 .settings-provider-oauth-manual-code .input {

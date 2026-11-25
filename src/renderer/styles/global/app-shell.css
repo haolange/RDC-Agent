@@ -35,45 +35,6 @@
   z-index: var(--z-local-1);
 }
 
-.mode-switcher {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--token-bg-panel) 92%, transparent);
-}
-
-.mode-switcher-item {
-  min-width: 108px;
-  min-height: 34px;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--token-text-secondary);
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    color var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-
-.mode-switcher-item:hover,
-.mode-switcher-item:focus-visible {
-  color: var(--token-text-primary);
-}
-
-.mode-switcher-item.is-active {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--token-accent-primary) 18%, transparent), color-mix(in srgb, var(--token-accent-primary) 18%, transparent));
-  color: var(--token-text-primary);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--token-accent-primary) 24%, transparent);
-}
-
-.app-titlebar-session {
-  letter-spacing: var(--tracking-normal);
-}
-
 .app-titlebar-right {
   display: flex;
   align-items: center;

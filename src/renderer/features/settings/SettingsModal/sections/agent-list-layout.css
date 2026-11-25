@@ -46,13 +46,6 @@
 }
 
 /* The count gives way to the create button when labels run long (longer languages, pseudo-locale QA). */
-.settings-manifest-list-toolbar > .settings-manifest-count {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .settings-manifest-list-toolbar > :not(.settings-manifest-count) {
   flex: 0 0 auto;
 }

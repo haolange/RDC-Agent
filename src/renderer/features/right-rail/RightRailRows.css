@@ -1,11 +1,3 @@
-.right-rail-artifact-copy,
-.project-capture-input-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: var(--space-1);
-}
-
 .right-rail-artifact-copy strong,
 .project-capture-input-copy strong {
   overflow: hidden;

@@ -11,12 +11,6 @@
 
 .project-capture-header .ui-section-header-actions { gap: var(--space-1); }
 
-.project-capture-input-list {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
 .project-capture-input-copy strong {
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
@@ -28,28 +22,4 @@
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
   font-variant-numeric: tabular-nums;
-}
-
-.project-capture-import-error {
-  display: grid;
-  grid-template-columns: var(--space-2) minmax(0, 1fr);
-  align-items: center;
-  box-sizing: border-box;
-  inline-size: 100%;
-  margin-top: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border-block: 1px solid color-mix(in srgb, var(--token-status-error) 30%, var(--token-border-subtle));
-  color: var(--token-status-error);
-  font-size: var(--type-body-size);
-  font-weight: var(--font-normal);
-  line-height: var(--leading-normal);
-  overflow-wrap: anywhere;
-}
-
-.project-capture-import-error::before {
-  content: '';
-  inline-size: var(--space-2);
-  block-size: var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--token-status-error);
 }

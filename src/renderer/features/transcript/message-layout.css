@@ -178,6 +178,7 @@
   align-items: stretch;
 }
 
+.conversation-message-footer .conversation-message-time,
 .conversation-message-time {
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);

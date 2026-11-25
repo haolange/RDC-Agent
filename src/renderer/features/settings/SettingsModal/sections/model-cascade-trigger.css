@@ -52,14 +52,6 @@
   overflow-wrap: anywhere;
 }
 
-.settings-model-cascade-trigger span,
-.settings-model-cascade-trigger strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .settings-model-cascade-trigger strong {
   font-size: var(--type-body-size);
   font-weight: var(--font-normal);

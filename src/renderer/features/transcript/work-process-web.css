@@ -27,7 +27,7 @@
   line-height: var(--chip-height);
   text-decoration: none;
   transition: border-color var(--transition-fast), color var(--transition-fast);
-  animation: work-process-web-pill-enter var(--duration-base) var(--ease-decelerate) both;
+  animation: rise-in-2px var(--duration-base) var(--ease-decelerate) both;
 }
 
 a.work-process-web-pill:hover,
@@ -63,11 +63,6 @@ a.work-process-web-pill:focus-visible {
   overflow: hidden;
   text-overflow: clip;
   white-space: nowrap;
-}
-
-@keyframes work-process-web-pill-enter {
-  from { opacity: 0; transform: translateY(2px); }
-  to { opacity: 1; transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -113,12 +108,6 @@ a.work-process-web-pill:focus-visible {
 
 a.work-process-web-item-title:hover {
   text-decoration: underline;
-}
-
-a.work-process-web-item-title:focus-visible {
-  border-radius: var(--radius-sm);
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: var(--focus-ring-offset);
 }
 
 .work-process-web-item-url {

@@ -16,12 +16,6 @@
   white-space: nowrap;
 }
 
-.work-process-task-snapshot-list {
-  list-style: none;
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-}
-
 .work-process-task-snapshot-item {
   display: flex;
   align-items: flex-start;
@@ -47,12 +41,6 @@
   font-weight: var(--font-normal);
   overflow-wrap: anywhere;
   line-height: var(--leading-normal);
-}
-
-.work-process-task-snapshot-reason {
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  line-height: var(--type-meta-line);
 }
 
 /* Done stays readable (the green mark carries the state); only a cancelled title recedes. */

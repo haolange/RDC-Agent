@@ -28,13 +28,6 @@
   border-bottom: 1px solid var(--token-border-muted);
 }
 
-.settings-agent-route-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
 .settings-agent-route-panel .settings-section-title {
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);

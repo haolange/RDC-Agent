@@ -1,10 +1,4 @@
 /* MCP overview: a list of name · status · switch above the selected server. */
-.settings-runtime-scope[data-resource-kind='mcp'] .settings-resource-split {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
 .settings-runtime-scope[data-resource-kind='mcp'] .settings-resource-list-column {
   padding: 0;
   border: 0;

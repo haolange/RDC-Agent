@@ -28,9 +28,9 @@
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
   transition:
-    border-color var(--duration-base) var(--ease-standard),
-    box-shadow var(--duration-base) var(--ease-standard),
-    background var(--duration-base) var(--ease-standard);
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    background var(--transition-base);
 }
 
 .session-rename-popover-input:focus {
@@ -82,8 +82,8 @@
   text-align: left;
   cursor: pointer;
   transition:
-    background var(--duration-base) var(--ease-standard),
-    color var(--duration-base) var(--ease-standard);
+    background var(--transition-base),
+    color var(--transition-base);
 }
 
 .sidebar-context-menu-item svg {

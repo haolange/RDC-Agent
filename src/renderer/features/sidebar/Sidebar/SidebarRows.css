@@ -13,10 +13,10 @@
   text-align: left;
   cursor: pointer;
   transition:
-    background var(--duration-base) var(--ease-standard),
-    border-color var(--duration-base) var(--ease-standard),
-    transform var(--duration-base) var(--ease-standard),
-    box-shadow var(--duration-base) var(--ease-standard);
+    background var(--transition-base),
+    border-color var(--transition-base),
+    transform var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .project-item {
@@ -145,12 +145,12 @@
   color: var(--token-text-secondary);
   cursor: pointer;
   transition:
-    color var(--duration-base) var(--ease-standard),
-    background var(--duration-base) var(--ease-standard);
+    color var(--transition-base),
+    background var(--transition-base);
 }
 
 .project-item-chevron svg {
-  transition: transform var(--duration-base) var(--ease-standard);
+  transition: transform var(--transition-base);
 }
 
 .project-item-chevron.is-expanded svg {
@@ -163,7 +163,8 @@
 }
 
 /* Keyboard focus draws the ring; hover only lifts the surface, so the two never read alike. */
-.project-item-chevron:focus-visible {
+.project-item-chevron:focus-visible,
+.session-item-icon-button:focus-visible {
   color: var(--token-text-primary);
   outline: 2px solid var(--token-border-focus);
   outline-offset: var(--focus-ring-offset-inset);
@@ -174,7 +175,7 @@
   align-items: center;
   justify-content: center;
   color: color-mix(in srgb, var(--token-text-secondary) 80%, transparent);
-  transition: color var(--duration-base) var(--ease-standard);
+  transition: color var(--transition-base);
 }
 
 .session-subitem:hover .session-item-gutter,
@@ -194,7 +195,7 @@
   font-weight: var(--font-normal);
   letter-spacing: var(--tracking-normal);
   cursor: pointer;
-  transition: color var(--duration-base) var(--ease-standard);
+  transition: color var(--transition-base);
 }
 
 .session-list-toggle:hover {
@@ -242,10 +243,10 @@
   opacity: 0;
   transform: translateY(2px);
   transition:
-    opacity var(--duration-base) var(--ease-standard),
-    transform var(--duration-base) var(--ease-standard),
-    background var(--duration-base) var(--ease-standard),
-    color var(--duration-base) var(--ease-standard);
+    opacity var(--transition-base),
+    transform var(--transition-base),
+    background var(--transition-base),
+    color var(--transition-base);
 }
 
 .session-item:hover .session-item-icon-button,
@@ -260,22 +261,10 @@
   color: var(--token-text-primary);
 }
 
-.session-item-icon-button:focus-visible {
-  color: var(--token-text-primary);
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: var(--focus-ring-offset-inset);
-}
-
 .session-item-icon-button.danger:hover,
 .session-item-icon-button.danger:focus-visible {
   background: color-mix(in srgb, var(--token-status-error) 14%, transparent);
   color: var(--token-status-error);
-}
-
-.session-item-time {
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-  line-height: var(--leading-normal);
 }
 
 /* A reply in flight: one small accent dot that breathes; still under reduced motion. */

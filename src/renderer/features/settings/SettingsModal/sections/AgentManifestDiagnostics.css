@@ -4,7 +4,6 @@
 .agent-diagnostics-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); }
 .agent-diagnostics-item { min-width: 0; padding: var(--space-3); border: 1px solid var(--token-border-muted); border-radius: var(--radius-md); background: var(--token-surface-sunken); }
 .agent-diagnostics-item p { margin: var(--space-2) 0; }
-.agent-diagnostics-item-header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .agent-diagnostics-item-header .button { margin-inline-start: auto; }
 .agent-diagnostics-scope { color: var(--token-text-secondary); font-size: var(--type-meta-size); }
 .agent-diagnostics-path, .agent-diagnostics-item code { font-family: var(--font-mono); font-size: var(--type-meta-size); overflow-wrap: anywhere; }

@@ -23,12 +23,6 @@
   background: color-mix(in srgb, var(--composer-mode-accent) 8%, var(--token-interactive-hover));
 }
 
-.composer-agent-pill:focus-visible {
-  border-color: var(--token-border-focus);
-  box-shadow: 0 0 0 1px var(--token-border-focus);
-  outline: none;
-}
-
 .composer-agent-pill-icon {
   flex: 0 0 auto;
   display: inline-flex;
@@ -40,6 +34,7 @@
   color: var(--composer-mode-accent);
 }
 
+.composer-agent-menu-item-icon svg,
 .composer-agent-pill-icon svg {
   display: block;
   width: var(--space-4);

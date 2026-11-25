@@ -18,7 +18,8 @@
     color var(--transition-fast);
 }
 
-.dropdown-select-trigger-main {
+.dropdown-select-trigger-main,
+.dropdown-select-option-main {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -83,7 +84,7 @@
   color: var(--token-text-secondary);
   flex: 0 0 auto;
   transition:
-    transform var(--duration-base) var(--ease-standard),
+    transform var(--transition-base),
     color var(--transition-fast);
 }
 
@@ -193,14 +194,6 @@
   transition:
     background var(--transition-fast),
     color var(--transition-fast);
-}
-
-.dropdown-select-option-main {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  flex: 1 1 auto;
 }
 
 .dropdown-select-option:hover:not(:disabled),

@@ -104,12 +104,7 @@
   margin: 0;
   padding: var(--space-1) var(--space-3);
   color: var(--token-text-secondary);
-  animation: composer-transition-enter var(--duration-base) var(--ease-decelerate) both;
-}
-
-@keyframes composer-transition-enter {
-  from { opacity: 0; transform: translateY(2px); }
-  to { opacity: 1; transform: none; }
+  animation: rise-in-2px var(--duration-base) var(--ease-decelerate) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

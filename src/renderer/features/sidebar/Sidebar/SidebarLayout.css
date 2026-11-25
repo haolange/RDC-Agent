@@ -4,7 +4,7 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  transition: opacity var(--duration-base) var(--ease-standard);
+  transition: opacity var(--transition-base);
 }
 
 .sidebar-scroll {
@@ -33,12 +33,12 @@
   opacity: 1;
   transform: translateX(0);
   transition:
-    opacity var(--duration-base) var(--ease-standard),
-    transform var(--duration-base) var(--ease-standard),
-    border-top-color var(--duration-base) var(--ease-standard),
-    max-height var(--duration-base) var(--ease-standard),
-    margin-top var(--duration-base) var(--ease-standard),
-    padding-top var(--duration-base) var(--ease-standard);
+    opacity var(--transition-base),
+    transform var(--transition-base),
+    border-top-color var(--transition-base),
+    max-height var(--transition-base),
+    margin-top var(--transition-base),
+    padding-top var(--transition-base);
 }
 
 .session-section.hidden {
@@ -53,8 +53,7 @@
   border-top-color: transparent;
 }
 
-.session-section-header,
-.project-sessions-header {
+.session-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -62,8 +61,7 @@
   padding: 0 var(--space-1);
 }
 
-.session-section-heading,
-.project-sessions-heading {
+.session-section-heading {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -75,8 +73,7 @@
   gap: var(--space-1);
 }
 
-.session-section-title,
-.project-sessions-title {
+.session-section-title {
   font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
   color: var(--token-text-secondary);
@@ -110,11 +107,11 @@
   color: var(--token-text-secondary);
   cursor: pointer;
   transition:
-    background var(--duration-base) var(--ease-standard),
-    border-color var(--duration-base) var(--ease-standard),
-    color var(--duration-base) var(--ease-standard),
-    transform var(--duration-base) var(--ease-standard),
-    box-shadow var(--duration-base) var(--ease-standard);
+    background var(--transition-base),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    transform var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .session-section-action:hover,

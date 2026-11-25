@@ -13,6 +13,8 @@
   margin-top: var(--space-2);
 }
 
+/* The trace note marks a reply whose stored work process came from an older version. */
+.conversation-message-trace-note,
 .handoff-suggestion-row__label {
   margin: 0;
   color: var(--token-text-secondary);
@@ -38,11 +40,6 @@
 .work-process.is-collapsed .work-process-header:focus-visible .work-process-label:not(.is-active),
 .work-process.is-collapsed .work-process-header:focus-visible .work-process-meta {
   color: var(--token-text-secondary);
-}
-
-@keyframes work-process-result-pulse {
-  0%, 100% { opacity: 0.32; }
-  50% { opacity: 0.72; }
 }
 
 .work-process-section-list {
@@ -122,6 +119,7 @@
   transform: rotate(90deg);
 }
 
+.markdown-body li.task-list-item,
 .work-process-summary-line {
   display: flex;
   align-items: flex-start;

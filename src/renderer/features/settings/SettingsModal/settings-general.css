@@ -7,20 +7,12 @@
 }
 
 .settings-page-general .settings-profile-section,
-.settings-page-general .settings-language-section,
-.settings-page-general .settings-personalization-block {
+.settings-page-general .settings-language-section {
   display: flex;
   flex-direction: column;
   width: 100%;
   min-height: 0;
   height: auto;
-}
-
-.settings-profile-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
 }
 
 /* The avatar is the change-avatar button; hover lifts its ring. */
@@ -94,7 +86,7 @@
 
 .settings-save-mark-check {
   opacity: 0;
-  transition: opacity var(--duration-slow) var(--ease-standard);
+  transition: opacity var(--transition-slow);
 }
 
 .settings-save-mark-check.is-visible {
@@ -134,12 +126,6 @@
   padding-inline: var(--space-2);
   gap: var(--space-1);
   color: var(--token-text-secondary);
-}
-
-.work-process-choice-preview > span {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
 }
 
 .work-process-choice-preview > span::before,

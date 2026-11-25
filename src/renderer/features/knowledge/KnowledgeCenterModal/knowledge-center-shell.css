@@ -91,7 +91,8 @@
   background: var(--token-bg-shell);
 }
 
-.knowledge-center-topbar-actions {
+.knowledge-center-topbar-actions,
+.knowledge-task-progress {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);

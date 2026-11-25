@@ -137,12 +137,6 @@
   gap: var(--space-3);
 }
 
-.composer-user-input-hint {
-  color: var(--token-text-secondary);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--type-meta-size);
-}
-
 .composer-user-input-submit {
   min-width: var(--space-16);
 }

@@ -43,19 +43,6 @@
   display: block;
 }
 
-.work-process-thinking-label {
-  flex: 0 0 auto;
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-normal);
-}
-
-.work-process-thinking-text {
-  min-width: 0;
-  color: var(--token-text-secondary);
-  overflow-wrap: anywhere;
-}
-
 .work-process-thinking-state.kind-opaque,
 .work-process-thinking-state.visibility-hidden {
   color: var(--token-text-secondary);

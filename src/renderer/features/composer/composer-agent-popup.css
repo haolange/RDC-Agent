@@ -62,12 +62,6 @@
   line-height: 0;
 }
 
-.composer-agent-menu-item-icon svg {
-  display: block;
-  width: var(--space-4);
-  height: var(--space-4);
-}
-
 .composer-agent-menu-item-label {
   min-width: 0;
   overflow: hidden;

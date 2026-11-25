@@ -19,9 +19,7 @@
   min-width: 0;
 }
 
-.knowledge-center-document :is(p, blockquote, .knowledge-case-list),
-.knowledge-center-markdown > .knowledge-center-markdown-body > ul,
-.knowledge-center-markdown > .knowledge-center-markdown-body > ol {
+.knowledge-center-document :is(p, blockquote, .knowledge-case-list) {
   max-inline-size: 72ch;
 }
 
@@ -72,7 +70,6 @@
 .knowledge-case-tabs .ui-tabs-tab { flex: 0 0 auto; }
 .knowledge-case-section { scroll-margin-top: var(--space-5); color: var(--token-text-primary); font-size: var(--type-reading-size); line-height: var(--type-reading-line); }
 .knowledge-case-section > h2 { margin: 0 0 var(--space-3); color: var(--token-text-primary); font-size: var(--type-reading-size); font-weight: var(--font-semibold); line-height: var(--leading-tight); }
-.knowledge-case-section .knowledge-center-markdown-body,
 .knowledge-case-section p { margin: 0; }
 
 /* Facts: label in the secondary tone, value in the reading tone, aligned in two columns. */

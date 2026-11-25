@@ -6,8 +6,10 @@
  * Accent appears exactly twice: the current view's icon and the keyboard focus
  * ring. Everything else is grayscale, layered with 1px borders and solid fills. */
 
+.knowledge-import-item-copy,
 .knowledge-center-navigation,
-.knowledge-center-space-list {
+.knowledge-center-space-list,
+.knowledge-center-tree {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -19,8 +21,7 @@
  * carries the same transparent border to land on the exact same lane. */
 .knowledge-center-brand,
 .knowledge-center-spaces .knowledge-center-section-title,
-.knowledge-center-space-row.ui-checkbox,
-.knowledge-center-space-list .knowledge-center-empty-inline {
+.knowledge-center-space-row.ui-checkbox {
   border: 1px solid transparent;
 }
 
@@ -31,10 +32,6 @@
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   line-height: var(--type-meta-line);
-}
-
-.knowledge-center-space-list .knowledge-center-empty-inline {
-  padding-inline: var(--space-3);
 }
 
 /* ── View navigation: single select, marks the current view ── */

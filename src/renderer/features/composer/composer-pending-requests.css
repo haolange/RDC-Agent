@@ -43,7 +43,8 @@
 }
 
 .composer-user-input-kicker,
-.composer-tool-approval-kicker {
+.composer-tool-approval-kicker,
+.composer-user-input-hint {
   color: var(--token-text-secondary);
   font-variant-numeric: tabular-nums;
   font-size: var(--type-meta-size);
@@ -123,12 +124,7 @@
 .composer-shell-tool-approval,
 .composer-shell-plan-review,
 .composer-shell-user-input {
-  animation: composer-pending-enter var(--duration-slow) var(--ease-decelerate) both;
-}
-
-@keyframes composer-pending-enter {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
+  animation: rise-in-4px var(--duration-slow) var(--ease-decelerate) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

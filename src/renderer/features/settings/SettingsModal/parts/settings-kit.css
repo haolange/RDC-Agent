@@ -70,13 +70,10 @@
   }
 }
 
-.settings-field-label-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.settings-field-copy {
+.settings-field-copy,
+.settings-handoff-card-body .settings-field-control,
+.settings-agent-editor-copy,
+.settings-modal-heading {
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -129,7 +126,8 @@
   border-bottom: 1px solid var(--token-border-muted);
 }
 
-.settings-resource-toolbar-actions {
+.settings-resource-toolbar-actions,
+.settings-choice-group {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
@@ -213,13 +211,6 @@
   background: currentColor;
 }
 
-.settings-choice-group {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .settings-select-menu {
   z-index: calc(var(--z-modal) + 24);
 }
@@ -274,18 +265,6 @@
   overflow-wrap: anywhere;
 }
 
-.settings-scope-row-copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0-5);
-  min-width: 0;
-}
-
-.settings-scope-row-copy small {
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-}
-
 .settings-center-nav-item {
   min-height: var(--control-height-md);
   font-size: var(--type-body-size);
@@ -303,7 +282,9 @@
 }
 
 .settings-modal-close.icon-button:hover,
-.settings-modal-close.icon-button:focus-visible {
+.settings-modal-close.icon-button:focus-visible,
+.settings-modal-close:hover,
+.settings-modal-close:focus-visible {
   background: var(--token-interactive-hover);
   color: var(--token-text-primary);
   border-color: var(--token-border-muted);
@@ -320,16 +301,161 @@
   outline-offset: var(--focus-ring-offset-inset);
 }
 
-.settings-center-nav-item.is-active {
-  background: var(--token-interactive-active);
-  color: var(--token-text-primary);
-  font-weight: var(--font-semibold);
-  box-shadow: inset 2px 0 0 var(--token-border-focus);
-  border-color: var(--token-border-muted);
-}
-
 .settings-center-nav-item:hover .settings-center-nav-icon,
 .settings-center-nav-item:focus-visible .settings-center-nav-icon,
 .settings-center-nav-item.is-active .settings-center-nav-icon {
   opacity: 1;
+}
+
+/* Layouts and type shared by several settings parts. */
+.settings-model-capability-section-label,
+.settings-trust-block-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-semibold);
+}
+
+.settings-input-with-action,
+.settings-secret-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.settings-manifest-toolbar,
+.settings-model-section-header,
+.settings-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.settings-trust-change .ui-icon,
+.settings-runtime-editor-note .ui-icon {
+  flex: none;
+  margin-top: var(--space-0-5);
+  color: var(--token-status-warning);
+}
+
+.settings-agent-look-row,
+.settings-runtime-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.settings-capability-group-head strong,
+.settings-handoff-card-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--token-text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-agent-config-status-dot,
+.settings-provider-card-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--token-text-disabled);
+}
+
+.settings-oauth-step-description,
+.settings-modal-subtitle {
+  margin: 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  line-height: var(--leading-normal);
+}
+
+.settings-manifest-form-grid,
+.settings-permission-rules .settings-block-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.settings-manifest-list-toolbar > .settings-manifest-count,
+.settings-model-cascade-trigger span,
+.settings-model-cascade-trigger strong,
+.settings-center-nav-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-diagnostics-item-header,
+.appearance-chrome-actions,
+.settings-rdc-location,
+.settings-rdc-apply,
+.settings-provider-oauth-code-card,
+.settings-provider-oauth-actions,
+.settings-provider-probe-launcher,
+.settings-trust-block-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-capability-picker,
+.settings-handoff-editor,
+.settings-local-tool-form,
+.settings-provider-connect-body,
+.settings-runtime-detail {
+  display: flex;
+  min-width: 0;
+  gap: var(--space-4);
+  flex-direction: column;
+}
+
+.settings-handoff-list,
+.settings-agent-route-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-agent-editor-title,
+.settings-runtime-readonly,
+.settings-runtime-id-control {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-capability-bucket,
+.settings-model-group,
+.settings-provider-oauth-manual-code,
+.settings-center-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.settings-agent-identity-grid,
+.settings-local-tool-grid,
+.settings-runtime-scope[data-resource-kind='mcp'] .settings-resource-split {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-handoff-card-actions,
+.settings-model-preferences-heading,
+.work-process-choice-preview > span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
 }
