@@ -204,7 +204,8 @@ export function upsertLoopThinkingItem(
 /**
  * A new trace that shares every block with the old one. Updates copy only the block they change
  * (writableBlock), so a streaming delta costs one block, not the whole trace, and earlier snapshots
- * handed to the renderer or the store never change underneath them.
+ * handed to the renderer or the store never change underneath them. The message delta encoder relies on
+ * this: a block that is the same object it sent last time is unchanged.
  */
 function cloneTrace(trace: ConversationWorkTrace | null | undefined): ConversationWorkTrace {
   return trace

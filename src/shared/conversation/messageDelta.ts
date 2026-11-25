@@ -28,13 +28,20 @@ export interface ConversationMessageTraceDelta {
   blocks: ConversationWorkBlock[];
 }
 
+/** A value as it was last sent, with its serialized form for comparing a later value that is not the same object. */
+interface SentValue<T> {
+  value: T;
+  json: string;
+}
+
 interface EncoderEntry {
   seq: number;
   message: ConversationMessage;
-  fieldJson: Map<string, string>;
+  fields: Map<string, SentValue<unknown>>;
   traceMetaJson: string | null;
   blockIds: string[];
-  blockJson: Map<string, string>;
+  /** The last sent version of each block of the trace, by id; empty when the message has no trace. */
+  blocks: Map<string, SentValue<ConversationWorkBlock>>;
 }
 
 const traceMetaOf = (trace: ConversationWorkTrace): Omit<ConversationWorkTrace, 'blocks'> => {
@@ -42,9 +49,34 @@ const traceMetaOf = (trace: ConversationWorkTrace): Omit<ConversationWorkTrace, 
   return meta;
 };
 
-const sameOrder = (left: readonly string[], right: readonly string[]): boolean => (
-  left.length === right.length && left.every((id, index) => id === right[index])
+const sameBlockOrder = (ids: readonly string[], blocks: readonly ConversationWorkBlock[]): boolean => (
+  ids.length === blocks.length && blocks.every((block, index) => block.id === ids[index])
 );
+
+/**
+ * The fields of `message` as sent now, and which of them changed. A value that is the same object (or the same
+ * primitive) as the one sent last time is unchanged without being serialized again.
+ */
+function encodeFields(message: ConversationMessage, previous: EncoderEntry | undefined) {
+  const changed: Partial<ConversationMessage> = {};
+  const removed: Array<keyof ConversationMessage> = [];
+  const sent = new Map<string, SentValue<unknown>>();
+  for (const [key, value] of Object.entries(message) as Array<[keyof ConversationMessage, unknown]>) {
+    if (key === 'workTrace' || value === undefined) continue;
+    const before = previous?.fields.get(key);
+    if (before && before.value === value) {
+      sent.set(key, before);
+      continue;
+    }
+    const json = JSON.stringify(value);
+    sent.set(key, { value, json });
+    if (before?.json !== json) (changed as Record<string, unknown>)[key] = value;
+  }
+  for (const key of previous?.fields.keys() ?? []) {
+    if (!sent.has(key)) removed.push(key as keyof ConversationMessage);
+  }
+  return { changed, removed, sent };
+}
 
 export interface ConversationMessageDeltaEncoder {
   /** The delta for this message since the previous send, or `null` when nothing changed. */
@@ -55,41 +87,48 @@ export interface ConversationMessageDeltaEncoder {
   forget(messageId: string): void;
 }
 
+/**
+ * The work of one encode follows what changed, not the length of the message. Main updates a message by copying
+ * only what it edits and sharing everything else with the previous version (`ConversationWorkTrace` copies one block
+ * per edit); nothing already sent is mutated. So a block (or field value) that is the same object as the one sent
+ * last time is unchanged and is not serialized; only blocks that are new objects are serialized and compared with
+ * what was sent for the same id. A new object with the same content still counts as unchanged.
+ */
 export function createConversationMessageDeltaEncoder(): ConversationMessageDeltaEncoder {
   const entries = new Map<string, EncoderEntry>();
 
   return {
     encode(message) {
       const previous = entries.get(message.id);
-      const fields: Partial<ConversationMessage> = {};
-      const removed: Array<keyof ConversationMessage> = [];
-      const fieldJson = new Map<string, string>();
-      for (const [key, value] of Object.entries(message) as Array<[keyof ConversationMessage, unknown]>) {
-        if (key === 'workTrace' || value === undefined) continue;
-        const json = JSON.stringify(value);
-        fieldJson.set(key, json);
-        if (previous?.fieldJson.get(key) !== json) (fields as Record<string, unknown>)[key] = value;
-      }
-      for (const key of previous?.fieldJson.keys() ?? []) {
-        if (!fieldJson.has(key)) removed.push(key as keyof ConversationMessage);
-      }
+      const { changed: fields, removed, sent } = encodeFields(message, previous);
 
       let trace: ConversationMessageTraceDelta | null | undefined;
       let traceMetaJson: string | null = null;
       let blockIds: string[] = [];
-      const blockJson = new Map<string, string>();
+      let blocks = new Map<string, SentValue<ConversationWorkBlock>>();
       if (message.workTrace) {
         const meta = traceMetaOf(message.workTrace);
         traceMetaJson = JSON.stringify(meta);
-        blockIds = message.workTrace.blocks.map((block) => block.id);
+        const current = message.workTrace.blocks;
+        const sentBlocks = previous?.blocks ?? blocks;
+        const sameOrder = previous !== undefined && sameBlockOrder(previous.blockIds, current);
+        const orderChanged = !sameOrder;
+        blockIds = sameOrder ? previous.blockIds : current.map((block) => block.id);
+        // Same order: the previous map is updated in place. A changed order rebuilds it, so a removed block
+        // does not stay behind and a block that comes back is sent again.
+        blocks = sameOrder ? sentBlocks : new Map();
         const changedBlocks: ConversationWorkBlock[] = [];
-        for (const block of message.workTrace.blocks) {
+        for (const block of current) {
+          const before = sentBlocks.get(block.id);
+          if (before && before.value === block) {
+            if (orderChanged) blocks.set(block.id, before);
+            continue;
+          }
           const json = JSON.stringify(block);
-          blockJson.set(block.id, json);
-          if (previous?.blockJson.get(block.id) !== json) changedBlocks.push(block);
+          blocks.set(block.id, { value: block, json });
+          if (before?.json !== json) changedBlocks.push(block);
         }
         const metaChanged = previous?.traceMetaJson !== traceMetaJson;
-        const orderChanged = !previous || !sameOrder(previous.blockIds, blockIds);
         if (metaChanged || orderChanged || changedBlocks.length > 0) {
           trace = {
             ...(metaChanged ? { meta } : {}),
@@ -105,7 +144,7 @@ export function createConversationMessageDeltaEncoder(): ConversationMessageDelt
 
       if (previous && Object.keys(fields).length === 0 && removed.length === 0 && trace === undefined) return null;
       const seq = (previous?.seq ?? 0) + 1;
-      entries.set(message.id, { seq, message, fieldJson, traceMetaJson, blockIds, blockJson });
+      entries.set(message.id, { seq, message, fields: sent, traceMetaJson, blockIds, blocks });
       return {
         messageId: message.id,
         seq,
