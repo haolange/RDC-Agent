@@ -77,7 +77,8 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 | Appearance UI 验收 checklist | [`docs/ui/appearance-checklist.md`](docs/ui/appearance-checklist.md) |
 | 模块地图与数据流 | [`docs/architecture/`](docs/architecture/) |
 | 工作流与垂直调查执行计划 | [`docs/workflows/`](docs/workflows/) |
-| Agent 修改纪律与验证命令 | [`AGENTS.md`](AGENTS.md) |
+| 内置方法文本（`resources/agent-runtime`）的撰写规则 | [`docs/product/scoped-runtime-resources.md`](docs/product/scoped-runtime-resources.md) |
+| 编码 Agent 的修改纪律与验证命令 | [`AGENTS.md`](AGENTS.md) |
 
 文档描述稳定契约，不回写运行时代码规则。
 
