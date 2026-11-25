@@ -22,12 +22,16 @@ const fail = (message) => { console.error(`[visual-diff] ${message}`); process.e
 const electronBinary = () => process.env.VISUAL_DIFF_ELECTRON
   || path.join(repoRoot, 'node_modules', 'electron', 'dist', process.platform === 'win32' ? 'electron.exe' : 'electron');
 
-function runHost(args, capture = false) {
+function spawnHost(args) {
   const xvfb = process.platform === 'linux' && !process.env.DISPLAY;
   const command = xvfb ? 'xvfb-run' : electronBinary();
   const hostArgs = [path.join(here, 'host', 'main.mjs'), '--', ...args];
   const full = xvfb ? ['-a', '-s', '-screen 0 1920x1200x24', electronBinary(), ...hostArgs] : hostArgs;
-  const result = spawnSync(command, full, { cwd: repoRoot, encoding: 'utf8', timeout: 180_000 });
+  return spawnSync(command, full, { cwd: repoRoot, encoding: 'utf8', timeout: 180_000 });
+}
+
+function runHost(args, capture = false) {
+  const result = spawnHost(args);
   if (result.status !== 0) fail(`host failed (${args.join(' ')}):\n${(result.stderr || result.stdout || '').slice(-2000)}`);
   return capture ? result.stdout : undefined;
 }
@@ -134,17 +138,26 @@ function capture(outDir, buildRoot) {
   const scenarios = fs.readdirSync(scenarioDir).filter((name) => name !== 'shared.json' && name.endsWith('.json')).sort();
   if (!scenarios.length) fail('no recorded scenarios');
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-visual-diff-'));
+  const otherBuild = path.resolve(buildRoot) !== repoRoot;
+  const skipped = [];
   try {
     for (const name of scenarios) {
       const scenario = readJson(path.join(scenarioDir, name));
       const resolved = path.join(workDir, name);
       writeJson(resolved, { ...scenario, responses: internalize(scenario.responses, shared) });
-      runHost(['--mode', 'replay', '--scenario', resolved, '--out', path.resolve(outDir), '--build', path.resolve(buildRoot)]);
+      const args = ['--mode', 'replay', '--scenario', resolved, '--out', path.resolve(outDir), '--build', path.resolve(buildRoot)];
+      if (!otherBuild) { runHost(args); continue; }
+      // Another build (the comparison base) may predate the UI a newer scenario reaches; it then has no result and
+      // compare reports the scenario as new. The checkout's own build must render every scenario.
+      const result = spawnHost(args);
+      if (result.status === 0) continue;
+      skipped.push(scenario.id ?? name);
+      console.log(`[visual-diff] ${scenario.id ?? name}: not renderable in ${buildRoot}`);
     }
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true });
   }
-  console.log(`[visual-diff] captured ${scenarios.length} scenarios into ${outDir}`);
+  console.log(`[visual-diff] captured ${scenarios.length - skipped.length} scenarios into ${outDir}`);
 }
 
 /** Scenario ids declared by `Visual-Diff-Allow:` trailers on the commits under comparison. */
