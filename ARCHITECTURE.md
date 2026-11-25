@@ -656,7 +656,7 @@ Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件
 Right Rail 有两个按选择对象区分的表面：
 
 - 选中 Project 时**只**渲染项目级 `Import .rdc` 输入面与已导入 capture 列表，不读取 session runtime。
-- 选中 Session 时渲染五张不可折叠的圆角卡 `Tasks / Artifacts / Outputs / Context / Capture`。
+- 选中 Session 时渲染一条五个标签的标签栏 `Tasks / Artifacts / Outputs / Context / Capture`（共享 `Tabs`），一次显示所选标签对应的一张不可折叠圆角卡。
 
 Session 五卡：
 
