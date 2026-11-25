@@ -2,8 +2,6 @@ import { randomUUID } from 'crypto';
 import { isReasoningSelection } from '@shared/types/modelCapability';
 import { TOP_LEVEL_AGENT_IDS, isSafeAgentProfileId } from '@shared/types/agent';
 import {
-  createProviderEntryFromCatalog,
-  createProviderEntriesFromCatalog,
   getProviderAuthModeAvailability,
   getProviderCatalogModelSummaries,
   getProviderCatalogOwnership,
@@ -12,31 +10,19 @@ import {
   getProviderAccountAuth,
   getProviderModelSummaries,
   getProviderSurfaceSummary,
-  isBuiltinProviderId,
   isRetiredProviderModel,
 } from '../../provider-catalog/ProviderCatalogRegistry';
-import { appPathService } from '../../runtime/AppPathService';
-import { normalizeProviderCategory, normalizeProviderProtocol } from '../provider-catalog/providerCatalogNormalize';
 import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from '../provider-catalog/DiscoveryAdmission';
-import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
 import { secretStorageService } from './SecretStorageService';
 import type {
   LlmAgentRoute,
   LlmProviderAuthMode,
   LlmProviderAvailability,
-  LlmProviderConnectionStatus,
   LlmProviderConnectionSchema,
   LlmProviderEntry,
   LlmProviderModel,
   LlmProviderModelPreference,
 } from '@shared/types/settings';
-import type { PersistedLlmProviderEntry } from './settingsDefaults';
-
-export type ProviderCredentialView = 'runtime' | 'storage-metadata';
-
-export interface ProviderSanitizeOptions {
-  credentialView?: ProviderCredentialView;
-}
 
 /** A stored key is usable when it is non-empty and carries the prefix the provider's manifest declares. */
 export function isVendorSecretUsable(providerId: string, secret: string): boolean {
@@ -76,16 +62,6 @@ export function getProviderAccountSecretRef(
   return accountId
     ? secretStorageService.createProviderAccountSecretRef(providerId, accountId, kind)
     : undefined;
-}
-
-export function resolveProviderAuthMode(
-  provider: Partial<LlmProviderEntry>,
-  fallback: LlmProviderEntry,
-): LlmProviderAuthMode {
-  const options = fallback.authModeOptions ?? [fallback.authMode];
-  return typeof provider.authMode === 'string' && options.includes(provider.authMode)
-    ? provider.authMode
-    : fallback.authMode;
 }
 
 export function sanitizeAuthAccountIds(
@@ -312,35 +288,7 @@ function sanitizeRoute(entry: unknown): LlmAgentRoute | null {
   };
 }
 
-function pickProviderStatus(
-  previousStatus: LlmProviderConnectionStatus | undefined,
-  authUnavailable: boolean,
-  verifiedConnection: boolean,
-): LlmProviderConnectionStatus {
-  if (authUnavailable) {
-    return 'unavailable';
-  }
-  if (previousStatus === 'failed') {
-    return 'failed';
-  }
-  return verifiedConnection ? 'verified' : 'unconfigured';
-}
-
-export function isFixtureProvider(provider: Partial<LlmProviderEntry>): boolean {
-  const id = typeof provider.id === 'string' ? provider.id.trim() : '';
-  const baseUrl = typeof provider.baseUrl === 'string' ? provider.baseUrl.trim().toLowerCase() : '';
-
-  return (
-    /^provider-\d+$/i.test(id)
-    || id === 'acme'
-    || id === 'vendorx'
-    || baseUrl.includes('example.com')
-    || baseUrl.includes('acme.local')
-    || baseUrl.includes('vendorx.ai')
-  );
-}
-
-function cloneConnectionSchema(
+export function cloneConnectionSchema(
   schema: LlmProviderConnectionSchema | undefined,
 ): LlmProviderConnectionSchema | undefined {
   return schema
@@ -367,32 +315,6 @@ export function sanitizeConnectionValues(
         return [];
       }
       return [[fieldId, value.trim()]];
-    }),
-  );
-}
-
-function sanitizeConnectionSecretRefs(
-  providerId: string,
-  accountId: string | undefined,
-  schema: LlmProviderConnectionSchema | undefined,
-  refs: Record<string, string> | undefined,
-): Record<string, string> {
-  if (!accountId) {
-    return {};
-  }
-  const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(schema);
-  const secretFieldIds = new Set(
-    schema?.fields
-      .filter((field) => field.kind === 'secret' && field.id !== primarySecretFieldId)
-      .map((field) => field.id) ?? [],
-  );
-  return Object.fromEntries(
-    Object.entries(refs ?? {}).flatMap(([fieldId, secretRef]) => {
-      if (!secretFieldIds.has(fieldId) || typeof secretRef !== 'string') {
-        return [];
-      }
-      const expectedRef = secretStorageService.createProviderConnectionSecretRef(providerId, accountId, fieldId);
-      return secretRef.trim() === expectedRef ? [[fieldId, expectedRef]] : [];
     }),
   );
 }
@@ -425,267 +347,6 @@ export function isConnectionSchemaSatisfied(
       alternative.ambient === true
       || (alternative.fieldIds.length > 0 && alternative.fieldIds.every(isPresent))
     ));
-}
-
-export function sanitizeUserProvider(
-  provider: PersistedLlmProviderEntry,
-  workspaceRoot = appPathService.getUserRdcRoot(),
-  options: ProviderSanitizeOptions = {},
-): LlmProviderEntry | null {
-  const incomingId = typeof provider.id === 'string' ? provider.id.trim() : '';
-  const rawId = incomingId;
-  if (!rawId || !isBuiltinProviderId(rawId)) {
-    return null;
-  }
-
-  const builtinFallback = createProviderEntryFromCatalog(rawId);
-  const definition = builtinFallback;
-  const authMode = resolveProviderAuthMode(provider, builtinFallback);
-  const authAccountIds = sanitizeAuthAccountIds(provider, authMode);
-  const activeAccountId = authAccountIds[authMode];
-  const connectionSchema = cloneConnectionSchema(builtinFallback.connectionSchema);
-  const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(connectionSchema);
-  const connectionValues = sanitizeConnectionValues(connectionSchema, provider.connectionValues);
-  const secretRefs = sanitizeConnectionSecretRefs(
-    rawId,
-    authAccountIds['api-key'],
-    connectionSchema,
-    provider.secretRefs,
-  );
-  const secretRef = getProviderAccountSecretRef(rawId, authAccountIds['api-key'], 'api-key');
-  const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
-  const catalogOwnership = getProviderCatalogOwnership(rawId);
-  const apiKeySecret = getResolvedProviderSecret(rawId, secretRef, workspaceRoot);
-  const oauthSecret = secretStorageService.getSecret(
-    getProviderAccountSecretRef(rawId, authAccountIds.account, 'oauth'),
-    workspaceRoot,
-  );
-  const preserveStorageMetadata = options.credentialView === 'storage-metadata';
-  const persistedApiKeyPresence = preserveStorageMetadata && (
-    provider.hasStoredSecretByAuthMode?.['api-key'] === true
-    || (authMode === 'api-key' && provider.hasStoredSecret === true)
-  );
-  const hasStoredConnectionSecrets = Object.fromEntries(
-    (connectionSchema?.fields ?? [])
-      .filter((field) => field.kind === 'secret')
-      .map((field) => {
-        const present = field.id === primarySecretFieldId
-          ? Boolean(apiKeySecret) || persistedApiKeyPresence
-          : Boolean(secretStorageService.getSecret(secretRefs[field.id], workspaceRoot))
-            || (preserveStorageMetadata && (
-              secretStorageService.hasSecretRecord(secretRefs[field.id], workspaceRoot)
-              || provider.hasStoredConnectionSecrets?.[field.id] === true
-            ));
-        return [field.id, present];
-      }),
-  ) as Record<string, boolean>;
-  const apiKeyCredentialPresent = connectionSchema?.fields.length
-    ? isConnectionSchemaSatisfied(connectionSchema, connectionValues, hasStoredConnectionSecrets)
-    : Boolean(apiKeySecret) || persistedApiKeyPresence;
-  const hasStoredSecretByAuthMode = Object.fromEntries(
-    (builtinFallback.authModeOptions ?? [builtinFallback.authMode]).map((mode) => {
-      const persisted = preserveStorageMetadata && (
-        provider.hasStoredSecretByAuthMode?.[mode] === true
-        || (mode === authMode && provider.hasStoredSecret === true)
-      );
-      const present = mode === 'local' || mode === 'environment'
-        ? true
-        : mode === 'api-key'
-          ? apiKeyCredentialPresent
-          : Boolean(oauthSecret) || persisted;
-      return [mode, present];
-    }),
-  ) as Partial<Record<LlmProviderAuthMode, boolean>>;
-  const hasStoredSecret = hasStoredSecretByAuthMode[authMode] === true;
-  const persistedModels = resolveProviderModels(rawId, provider.models ?? []);
-  const structuralMetadataById = new Map(
-    getProviderCatalogModelSummaries(rawId).map((metadata) => [metadata.modelId, metadata]),
-  );
-  const structuralModels = getProviderModelSummaries(rawId)
-    .filter((model) => structuralMetadataById.get(model.id)?.presencePolicy === 'maintained');
-  const structuralModelsById = new Map(structuralModels.map((model) => [model.id, model]));
-  // Account discovery is scoped to the active identity. Once its credential is
-  // absent, retain only released structural rows and discard account-specific
-  // dynamic models and availability overlays.
-  const models = catalogOwnership !== 'user-managed' && (authMode !== 'account' || hasStoredSecretByAuthMode.account === true)
-    ? persistedModels
-    : authMode === 'account' && hasStoredSecretByAuthMode.account !== true
-    ? applyModelEnabledState(structuralModels, persistedModels).map((model) => {
-        const structural = structuralModelsById.get(model.id);
-        return {
-          ...model,
-          availability: structural?.availability,
-          availabilityReason: structural?.availabilityReason,
-        };
-      })
-    : persistedModels;
-  const selectedAvailability = resolveSelectedAuthAvailability(rawId, authMode, builtinFallback);
-  const configuredAuthMode = (builtinFallback.authModeOptions ?? [builtinFallback.authMode]).includes(provider.configuredAuthMode as LlmProviderAuthMode)
-    ? provider.configuredAuthMode
-    : provider.status === 'verified' || provider.isConfigured === true
-      ? authMode
-      : undefined;
-  const status = pickProviderStatus(
-    configuredAuthMode && configuredAuthMode !== authMode ? 'unconfigured' : provider.status,
-    selectedAvailability.state === 'unavailable',
-    configuredAuthMode === authMode && hasStoredSecret,
-  );
-  const hasEnabledModels = models.some((model) => model.enabled !== false);
-  const enabled = status === 'verified' && hasEnabledModels;
-  const label = builtinFallback.label;
-  const recommendedModels = builtinFallback.recommendedModels.filter((id) => models.some((model) =>
-    model.id === id && model.enabled !== false && model.availability !== 'unavailable'));
-  const docsUrl = builtinFallback.docsUrl;
-
-  return {
-    id: rawId,
-    activeAccountId,
-    authAccountIds,
-    protocol,
-    routeCount: builtinFallback.routeCount,
-    authMode,
-    authModeOptions: builtinFallback.authModeOptions,
-    authModeAvailability: builtinFallback.authModeAvailability,
-    hasStoredSecretByAuthMode,
-    configuredAuthMode,
-    lifecycleStatus: builtinFallback.lifecycleStatus,
-    providerAvailability: { ...builtinFallback.providerAvailability },
-    category: normalizeProviderCategory({ ...provider, id: rawId, authMode }),
-    catalogOwnership,
-    serviceOperator: builtinFallback.serviceOperator,
-    endpointClass: builtinFallback.endpointClass,
-    catalogProvenance: builtinFallback.catalogProvenance.map((entry) => ({ ...entry })),
-    label,
-    enabled,
-    apiKey: '',
-    secretRef,
-    secretRefs,
-    connectionValues,
-    hasStoredConnectionSecrets,
-    connectionSchema,
-    hasStoredSecret,
-    baseUrl: (() => {
-      const defaultBaseUrl = getProviderDefaultBaseUrl(rawId);
-      if (definition?.baseUrlEditable) {
-        return typeof provider.baseUrl === 'string' && provider.baseUrl.trim()
-          ? provider.baseUrl.trim()
-          : defaultBaseUrl ?? definition.baseUrl;
-      }
-      return definition?.baseUrl;
-    })(),
-    baseUrlEditable: definition?.baseUrlEditable,
-    models,
-    recommendedModels,
-    docsUrl,
-    status,
-    lastTestedAt: typeof provider.lastTestedAt === 'string' ? provider.lastTestedAt : undefined,
-    lastModelRefreshAt: typeof provider.lastModelRefreshAt === 'string' ? provider.lastModelRefreshAt : undefined,
-    lastError: status === 'failed' && typeof provider.lastError === 'string' ? provider.lastError : undefined,
-    accountLogin: definition?.accountLogin,
-    accountLabel: typeof provider.accountLabel === 'string' ? provider.accountLabel : undefined,
-    planLabel: typeof provider.planLabel === 'string' ? provider.planLabel : undefined,
-    oauthExpiresAt: typeof provider.oauthExpiresAt === 'string' ? provider.oauthExpiresAt : undefined,
-    oauthRefreshAvailable: typeof provider.oauthRefreshAvailable === 'boolean' ? provider.oauthRefreshAvailable : undefined,
-    unavailableReason: selectedAvailability.state === 'unavailable' ? selectedAvailability.reason : undefined,
-    isConfigured: status === 'verified',
-    capabilities: definition?.capabilities ? [...definition.capabilities] : undefined,
-  };
-}
-
-export function normalizeUserProviders(
-  providers: unknown,
-  workspaceRoot: string,
-  options: ProviderSanitizeOptions = {},
-): LlmProviderEntry[] {
-  const persistedProviders = new Map<string, LlmProviderEntry>();
-
-  for (const entry of Array.isArray(providers) ? providers : []) {
-    if (!entry || typeof entry !== 'object') {
-      continue;
-    }
-
-    const provider = sanitizeUserProvider(entry as Partial<LlmProviderEntry>, workspaceRoot, options);
-    if (!provider || persistedProviders.has(provider.id)) {
-      continue;
-    }
-
-    persistedProviders.set(provider.id, provider);
-  }
-
-  return createProviderEntriesFromCatalog()
-    .map((catalogProvider) => sanitizeUserProvider(
-      persistedProviders.get(catalogProvider.id) ?? catalogProvider,
-      workspaceRoot,
-      options,
-    ))
-    .filter((provider): provider is LlmProviderEntry => provider !== null);
-}
-
-export function hydrateProviderSecrets(
-  providers: LlmProviderEntry[],
-  workspaceRoot: string,
-): LlmProviderEntry[] {
-  return providers.map((provider) => {
-    const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(provider.connectionSchema);
-    const apiKeySecret = getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
-    const oauthSecret = secretStorageService.getSecret(
-      getProviderAccountSecretRef(provider.id, provider.authAccountIds?.account, 'oauth'),
-      workspaceRoot,
-    );
-    const hasStoredConnectionSecrets = Object.fromEntries(
-      (provider.connectionSchema?.fields ?? [])
-        .filter((field) => field.kind === 'secret')
-        .map((field) => [
-          field.id,
-          field.id === primarySecretFieldId
-            ? Boolean(apiKeySecret)
-            : Boolean(secretStorageService.getSecret(provider.secretRefs?.[field.id], workspaceRoot)),
-        ]),
-    ) as Record<string, boolean>;
-    const apiKeyCredentialPresent = provider.connectionSchema?.fields.length
-      ? isConnectionSchemaSatisfied(
-          provider.connectionSchema,
-          provider.connectionValues ?? {},
-          hasStoredConnectionSecrets,
-        )
-      : Boolean(apiKeySecret);
-    const hasStoredSecretByAuthMode = Object.fromEntries(
-      (provider.authModeOptions ?? [provider.authMode]).map((mode) => [
-        mode,
-        mode === 'local' || mode === 'environment'
-          ? true
-          : mode === 'api-key'
-            ? apiKeyCredentialPresent
-            : Boolean(oauthSecret),
-      ]),
-    ) as Partial<Record<LlmProviderAuthMode, boolean>>;
-    const hasStoredSecret = hasStoredSecretByAuthMode[provider.authMode] === true;
-    const canUseProvider = hasStoredSecret && provider.authModeAvailability?.[provider.authMode]?.state !== 'unavailable';
-    const hasEnabledModels = provider.models.some((model) => model.enabled !== false);
-    const status = provider.status === 'unavailable'
-      ? 'unavailable'
-      : provider.status === 'verified'
-        && provider.configuredAuthMode === provider.authMode
-        && canUseProvider
-        ? 'verified'
-        : provider.status === 'failed'
-          ? 'failed'
-          : 'unconfigured';
-    const isConfigured = status === 'verified';
-
-    return {
-      ...provider,
-      // The renderer only needs to know whether a secret exists.
-      // Keep plaintext secrets out of settings:get payloads.
-      apiKey: '',
-      hasStoredSecret,
-      hasStoredSecretByAuthMode,
-      hasStoredConnectionSecrets,
-      enabled: isConfigured && hasEnabledModels,
-      status,
-      isConfigured,
-    };
-  });
 }
 
 export function normalizeManifestRoutes(

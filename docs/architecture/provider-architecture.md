@@ -124,7 +124,7 @@ Structural capability, account entitlement, expiring execution evidence, and tra
 
 ## 凭据与请求事务
 
-版本见 `SETTINGS_SCHEMA_VERSION` / `EFFECTIVE_CATALOG_SCHEMA_VERSION`。运行时投影顺序字段不修改缓存 schema。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。稳定 provider/model/surface ID、secret ref 与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
+版本见 `SETTINGS_SCHEMA_VERSION` / `EFFECTIVE_CATALOG_SCHEMA_VERSION`。运行时投影顺序字段不修改缓存 schema。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。Settings 只存用户状态，provider/model 目录事实每次由 manifest 组合；稳定的 provider/model ID、账号 ID（secret ref 由它派生）与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
 
 发送 preflight 创建主进程内 opaque credential lease，冻结 provider 配置、typed connection values、认证 headers、OAuth/Vertex 短时 token 与 AWS Bedrock credentials。认证 header 不进入 `ModelRoute` 或 `RequestPlan`。Adapter 必须持有 lease handle 才能发送；运行中不允许回读 Settings。
 

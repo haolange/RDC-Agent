@@ -19,6 +19,9 @@ export const nativeEnglish = {
   trustAgent: 'Use project Agent "{id}" in this project?',
   mcpSource: 'Defined in: {value}', mcpTransport: 'Transport: {value}', mcpCommand: 'Runs: {value}', mcpUrl: 'Connects to: {value}',
   mcpEnvKeys: 'Environment variables it receives: {value}',
+  settingsUnusableTitle: 'RDC-Agent cannot start',
+  settingsUnusableMessage: 'The settings file is damaged, unreadable, or from a version this RDC-Agent does not read.',
+  settingsUnusableDetail: 'Delete this file, then start RDC-Agent again:\n{file}\n\nOn the next start RDC-Agent begins with default settings and recreates the file. Reconnect your model services and set your preferences again in Settings.',
 } as const;
 
 export type NativeMessageKey = keyof typeof nativeEnglish;
@@ -42,7 +45,15 @@ export const nativeChinese: Record<NativeMessageKey, string> = {
   trustAgent: '在这个项目里使用项目智能体「{id}」？',
   mcpSource: '定义文件：{value}', mcpTransport: '连接方式：{value}', mcpCommand: '运行命令：{value}', mcpUrl: '连接地址：{value}',
   mcpEnvKeys: '传入的环境变量：{value}',
+  settingsUnusableTitle: 'RDC-Agent 无法启动',
+  settingsUnusableMessage: '设置文件已损坏、无法读取，或来自当前 RDC-Agent 不读取的版本。',
+  settingsUnusableDetail: '请删除下面这个文件，然后重新启动 RDC-Agent：\n{file}\n\n下次启动时 RDC-Agent 会使用默认设置并重新创建该文件。请在设置中重新连接模型服务、重新设置偏好。',
 };
+
+/** The language of a native surface shown before settings can be read, from the system locale (`app.getLocale()`). */
+export function languageForLocale(locale: string): AppLanguage {
+  return /^zh/i.test(locale) ? 'zh-CN' : 'en';
+}
 
 export function nativeText(language: AppLanguage, key: NativeMessageKey, params?: Record<string, string | number>): string {
   const message = (language === 'en' ? nativeEnglish : nativeChinese)[key];

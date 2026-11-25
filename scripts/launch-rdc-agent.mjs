@@ -44,15 +44,12 @@ function parseArgs(argv) {
   let mode = 'desktop';
   let prepareOnly = false;
   let forcePrepare = false;
-  let rebuildSettingsOnly = false;
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--prepare-only') {
       prepareOnly = true;
     } else if (argument === '--force-prepare') {
       forcePrepare = true;
-    } else if (argument === '--rebuild-settings-only') {
-      rebuildSettingsOnly = true;
     } else if (argument === '--mode') {
       mode = argv[index + 1] ?? '';
       index += 1;
@@ -67,7 +64,6 @@ function parseArgs(argv) {
     mode,
     prepareOnly: prepareOnly || mode === 'prepare-only',
     forcePrepare,
-    rebuildSettingsOnly,
   };
 }
 
@@ -385,7 +381,7 @@ function ensureBuild(dependencyKey, env, forcePrepare) {
   }
 }
 
-function modeEnvironment(mode, rebuildSettingsOnly) {
+function modeEnvironment(mode) {
   const development = mode.endsWith('-dev');
   const headless = mode.startsWith('browser');
   const env = {
@@ -393,7 +389,6 @@ function modeEnvironment(mode, rebuildSettingsOnly) {
     NODE_ENV: development ? 'development' : 'production',
     RDC_AGENT_HEADLESS: headless ? '1' : '0',
     RDC_AGENT_BROWSER_QA: headless ? '1' : '0',
-    RDC_AGENT_REBUILD_SETTINGS_ONLY: rebuildSettingsOnly ? '1' : '0',
   };
   delete env.ELECTRON_RENDERER_URL;
   if (env.RDC_AGENT_USER_DATA?.trim()) mkdirSync(path.resolve(env.RDC_AGENT_USER_DATA), { recursive: true });
@@ -468,7 +463,7 @@ async function terminate(child) {
 }
 
 async function main() {
-  const { mode, prepareOnly, forcePrepare, rebuildSettingsOnly } = parseArgs(process.argv.slice(2));
+  const { mode, prepareOnly, forcePrepare } = parseArgs(process.argv.slice(2));
   assertNodeVersion();
   for (const requiredFile of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
     if (!existsSync(path.join(repoRoot, requiredFile))) fail(`Required repository file is missing: ${requiredFile} (${repoRoot}).`);
@@ -478,7 +473,7 @@ async function main() {
   const storePath = resolvePnpmStore(pnpm);
   const dependencyState = await ensureDependencies(pnpm, storePath, forcePrepare);
   const effectiveMode = mode === 'prepare-only' ? 'desktop' : mode;
-  const env = modeEnvironment(effectiveMode, rebuildSettingsOnly);
+  const env = modeEnvironment(effectiveMode);
 
   if (effectiveMode === 'desktop-dev' && !prepareOnly) {
     console.log('[RDC-Agent] Starting visible Electron app in development mode...');

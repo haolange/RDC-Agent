@@ -5,8 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { afterEach } from 'vitest';
 import { readPersistedRun } from '../run/sessionRunPersistence';
-import { assertPersistedSettingsSchemaVersion } from '../../settings/settings-core/settingsServiceHelpers';
-import { SETTINGS_SCHEMA_VERSION } from '../../settings/settings-core/settingsDefaults';
+import { createDefaultSettingsFile } from '../../settings/settings-core/settingsDefaults';
+import { parseSettingsFile, SETTINGS_SCHEMA_VERSION } from '../../settings/settings-core/settingsFileSchema';
+import { parseJsonWith, readValidatedSync } from '../../runtime/atomicFile';
 import { stringifyYaml } from '../../runtime/yaml';
 import {
   parseStoredDocument,
@@ -483,22 +484,11 @@ describe('storage schema store quartet', () => {
     {
       name: 'settings',
       file: 'config.json',
-      legal: { schemaVersion: SETTINGS_SCHEMA_VERSION, appearance: { theme: 'dark' } },
-      corrupt: { schemaVersion: SETTINGS_SCHEMA_VERSION, appearance: 12 },
-      missingOrLegacy: { appearance: { theme: 'dark' } },
-      higher: { schemaVersion: SETTINGS_SCHEMA_VERSION + 1, appearance: { theme: 'dark' } },
-      read: (filePath: string) => {
-        const raw = JSON.parse(fs.readFileSync(filePath, 'utf8')) as unknown;
-        assertPersistedSettingsSchemaVersion(raw, filePath);
-        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-          throw new Error(`STORAGE_SCHEMA: ${filePath} is not an object`);
-        }
-        const appearance = (raw as { appearance?: unknown }).appearance;
-        if (appearance != null && (typeof appearance !== 'object' || Array.isArray(appearance))) {
-          throw new Error(`STORAGE_CORRUPT: ${filePath} appearance is invalid`);
-        }
-        return raw;
-      },
+      legal: createDefaultSettingsFile(),
+      corrupt: { ...createDefaultSettingsFile(), appearance: 12 },
+      missingOrLegacy: { ...createDefaultSettingsFile(), schemaVersion: SETTINGS_SCHEMA_VERSION - 1 },
+      higher: { ...createDefaultSettingsFile(), schemaVersion: SETTINGS_SCHEMA_VERSION + 1 },
+      read: (filePath: string) => readValidatedSync(filePath, parseJsonWith(parseSettingsFile)),
     },
   ] as const;
 

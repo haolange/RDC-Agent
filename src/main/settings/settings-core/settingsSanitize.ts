@@ -28,13 +28,11 @@ import {
 import type {
   AgentPermissionSettings,
   AgentRuntimeContextSettings,
-  AgentRuntimeSettings,
   LayoutPreferences,
   RdcCliInvokerSettings,
   AgentShellSettings,
   CodeInterpreterSettings,
   SidebarLayoutPreference,
-  ToolingSettings,
   WindowLayoutPreference,
 } from '@shared/types/settings';
 
@@ -121,15 +119,6 @@ export function sanitizeAgentShellSettings(
   };
 }
 
-export function sanitizeToolingSettings(value: unknown): ToolingSettings {
-  const candidate = value && typeof value === 'object' ? value as Partial<ToolingSettings> : {};
-  return {
-    rdcCli: sanitizeRdcCliInvokerSettings(candidate.rdcCli),
-    codeInterpreter: sanitizeCodeInterpreterSettings(candidate.codeInterpreter),
-    shell: sanitizeAgentShellSettings(candidate.shell),
-  };
-}
-
 function sanitizePathList(value: unknown): string[] {
   return dedupeStrings(
     sanitizeStringArray(value).map((entry) => path.resolve(expandHomePath(entry))),
@@ -160,14 +149,6 @@ export function sanitizeAgentRuntimeContextSettings(
       candidate.compactionThresholdPercent,
       fallback.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
     ),
-  };
-}
-
-export function sanitizeAgentRuntimeSettings(value: unknown): AgentRuntimeSettings {
-  const candidate = value && typeof value === 'object' ? value as Partial<AgentRuntimeSettings> : {};
-  return {
-    permissions: sanitizeAgentPermissionSettings(candidate.permissions),
-    context: sanitizeAgentRuntimeContextSettings(candidate.context),
   };
 }
 

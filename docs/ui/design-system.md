@@ -154,7 +154,7 @@ Settings 页标题与正文共用面板内边距。用途与风险写在所属�
 - 唯一全局入口：`src/renderer/main.tsx` → `styles/global.css` → `design-system.css`。`design-system.css` 只按 token、motion、base、reduced-motion 顺序导入，不在入口文件里写规则。唯一的断点表在 `styles/global/breakpoints.css`：1280（设置导航收窄）/ 1100（终端活动表）/ 960（Settings / Knowledge 模态改为单列）/ 920（`RIGHT_RAIL_DRAWER_BREAKPOINT`，右栏改为覆盖式抽屉，见 `src/shared/constants/layout.ts`）/ 720 / 640 / 480，不得新增其他 max-width 断点。左右抽屉各自从所在一侧滑入。720 与侧栏折叠对齐；feature 选择器留在所属 feature 样式，不写进 global。
 - 禁止恢复 `styles/tokens/*` 或未接线的 `oklch-themes.css`。
 - 生产 CSP：`style-src 'self'`（无 `unsafe-inline`）+ `style-src-attr 'none'`。Appearance chrome（`applyChromeTheme`）与组件动态样式必须走 constructable stylesheet（`adoptedStyleSheets` / `useDynStyle` / `assignDynStyle`），禁止 `<style>.textContent` 或 `element.style` 注入。
-- 当前 Settings 只接受 `schemaVersion` **8**；合法的 `appearance.chromeThemes` 用户配置经主题校验保留，缺版本或旧版本明确报错并保留原文件。历史版本升级的主题重置不属于现行读取路径。
+- 当前 Settings 只接受 `schemaVersion` **9**；合法的 `appearance.chromeThemes` 用户配置经严格 schema 校验保留，缺版本或旧版本在启动时明确报错并保留原文件。历史版本升级的主题重置不属于现行读取路径。
 
 ## Token 使用规则
 

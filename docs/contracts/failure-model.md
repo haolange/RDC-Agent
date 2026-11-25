@@ -88,6 +88,7 @@
 | 工具写入应用自有文件（凭据、设置、trust、`state/**`） | Security | 任何挡位 `FILE_WRITE_PROTECTED`；仅 `sessions/**/artifacts/**` 可写 |
 | Storage schema 损坏 | Integrity | 每次读报 `STORAGE_CORRUPT`，原件留在原处并旁存一份损坏副本（见「存储原语」） |
 | Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，原件保留 |
+| Settings 文件（`config.json`）损坏、无法读取、结构不合法或不是 schemaVersion 9 | Integrity（启动 fail-fast） | 启动时主进程按 `app.getLocale()` 的语言弹原生错误框（headless / Browser QA 写 stderr），点名要删除的 `config.json`，说明下次启动以默认设置重建，经正常资源释放后以非零状态退出，不留活锁；不转换旧版本、不修复、不改写原件。provider secret 文件无需删除：凭据按 secretRef 寻址，重新连接时写入新条目。目录已不再列出的 provider 条目原样保留，不进运行时视图，记 `settings_provider_not_in_catalog` 设置诊断 |
 | Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 记录 owner 的进程身份（pid 与 birth），活 owner 永不抢锁；身份证明已退出（pid 不存在或 birth 不同）的锁经独占回收标记串行回收，owner 记录或身份无法读取、回收标记无法安全确认失主时等待并超时，避免抢占正在初始化或新取得的锁；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |
 | Session attachments.json | Integrity | 写入 `{ schemaVersion, attachments }`；缺版本纯数组仍 Zod 校验；未知更高 `schemaVersion` 不 quarantine |
 | Session shell-state.json | Integrity | 写入 `{ schemaVersion: '1', state: { cwd } }`；只存 cwd 不存 env；缺版本 / 损坏 quarantine 或 `STORAGE_SCHEMA`；未知更高 `schemaVersion` 不 quarantine |

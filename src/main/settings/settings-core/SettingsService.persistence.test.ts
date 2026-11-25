@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_APPEARANCE, DEFAULT_LAYOUT } from '@shared/constants/appSettingsDefaults';
 import { isolateHome } from '../../testing/isolatedHome';
 
 const electronMock = vi.hoisted(() => ({
@@ -55,38 +56,31 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     fs.rmSync(userDataRoot, { recursive: true, force: true });
   });
 
-  async function createVerifiedPersistedSettings(): Promise<{
-    settingsPath: string;
-    workspaceRoot: string;
-  }> {
-    const { createProviderEntryFromCatalog } = await import('../../provider-catalog/ProviderCatalogRegistry');
-    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
-    const settingsPath = path.join(workspaceRoot, 'config.json');
-    const provider = {
-      ...createProviderEntryFromCatalog('deepseek'),
-      enabled: true,
-      hasStoredSecret: true,
-      isConfigured: true,
-      secretRef: 'provider-deepseek-api-key',
-      status: 'verified' as const,
-      models: [
-        {
-          id: 'deepseek-flash',
-          label: 'DeepSeek V4.1 Flash',
-          enabled: true,
+  const settingsPathFor = () => path.join(userDataRoot, '.rdc-agent', 'config.json');
+
+  /** Writes a v9 settings file whose sections are the defaults, with the given overrides. */
+  async function writeSettingsFixture(overrides: Record<string, unknown> = {}): Promise<string> {
+    const { createDefaultSettingsFile } = await import('./settingsDefaults');
+    const settingsPath = settingsPathFor();
+    fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+    fs.writeFileSync(settingsPath, JSON.stringify({ ...createDefaultSettingsFile(), ...overrides }), 'utf8');
+    return settingsPath;
+  }
+
+  /** DeepSeek connected with an API key account whose secret is not in the secret store. */
+  async function createVerifiedPersistedSettings(): Promise<{ settingsPath: string }> {
+    const settingsPath = await writeSettingsFixture({
+      providers: {
+        deepseek: {
+          authMode: 'api-key',
+          authAccountIds: { 'api-key': 'account-stored' },
+          configuredAuthMode: 'api-key',
+          lastTestedAt: '2026-11-01T00:00:00.000Z',
+          models: { 'deepseek-flash': {} },
         },
-      ],
-    };
-
-    fs.mkdirSync(workspaceRoot, { recursive: true });
-    fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 8,
-      llm: {
-        providers: [provider],
       },
-    }, null, 2), 'utf8');
-
-    return { settingsPath, workspaceRoot };
+    });
+    return { settingsPath };
   }
 
   it('publishes permission mode only after durable settings commit and survives notification failures', async () => {
@@ -110,94 +104,168 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     } finally { stop(); stopBroken(); }
   });
 
-  it('keeps persisted provider metadata during startup rebuild when secrets are temporarily unavailable', async () => {
+  it('reads a configured provider without its secret as unconfigured and writes nothing at startup', async () => {
     const { settingsPath } = await createVerifiedPersistedSettings();
+    const before = fs.readFileSync(settingsPath, 'utf8');
+    const beforeMtime = fs.statSync(settingsPath).mtimeMs;
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
 
     const runtime = service.initialize();
-    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      llm: {
-        providers: Array<{ id: string; isConfigured: boolean; status: string; hasStoredSecret: boolean }>;
-      };
-    };
+    service.getAll();
 
-    const runtimeProvider = runtime.llm.providers.find((provider) => provider.id === 'deepseek');
-    const persistedProvider = persisted.llm.providers.find((provider) => provider.id === 'deepseek');
-
-    expect(runtimeProvider?.isConfigured).toBe(false);
-    expect(persistedProvider).toMatchObject({
-      isConfigured: true,
-      status: 'verified',
-      hasStoredSecret: true,
+    expect(runtime.llm.providers.find((provider) => provider.id === 'deepseek')).toMatchObject({
+      isConfigured: false, configuredAuthMode: 'api-key', activeAccountId: 'account-stored', lastTestedAt: '2026-11-01T00:00:00.000Z',
     });
-    expect(persisted.llm).not.toHaveProperty('agentRoutes');
+    expect(fs.readFileSync(settingsPath, 'utf8')).toBe(before);
+    expect(fs.statSync(settingsPath).mtimeMs).toBe(beforeMtime);
   });
 
-  it('does not persist credential demotion when saving an unrelated settings patch', async () => {
+  it('starts from defaults without creating the settings file', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const runtime = service.initialize();
+    service.getAll();
+
+    expect(runtime.appearance.theme).toBe('dark');
+    expect(runtime.llm.providers.length).toBeGreaterThan(0);
+    expect(fs.existsSync(settingsPathFor())).toBe(false);
+    service.setAll({ appearance: { theme: 'dark' } });
+    expect(fs.existsSync(settingsPathFor()), 'an unchanged patch writes nothing').toBe(false);
+    service.setAll({ appearance: { theme: 'light' } });
+    const written = fs.readFileSync(settingsPathFor(), 'utf8');
+    expect(written).not.toContain('\n');
+    expect(JSON.parse(written)).toMatchObject({ schemaVersion: 9, appearance: { theme: 'light' }, providers: {} });
+  });
+
+  it('keeps stored providers byte-identical when saving an unrelated settings patch', async () => {
     const { settingsPath } = await createVerifiedPersistedSettings();
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
 
     service.initialize();
-    const providersBefore = (JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { llm: { providers: unknown[] } }).llm.providers;
+    const providersBefore = (JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: unknown }).providers;
     service.setAll({ appearance: { theme: 'light' } });
 
-    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      appearance: { theme: string };
-      llm: {
-        providers: Array<{ id: string; isConfigured: boolean; status: string; hasStoredSecret: boolean }>;
-      };
-    };
-    const persistedProvider = persisted.llm.providers.find((provider) => provider.id === 'deepseek');
-
+    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { appearance: { theme: string }; providers: unknown };
     expect(persisted.appearance.theme).toBe('light');
-    // A single-section patch leaves every persisted provider field as it was.
-    expect(persisted.llm.providers).toEqual(providersBefore);
-    expect(persistedProvider).toMatchObject({
-      isConfigured: true,
-      status: 'verified',
-      hasStoredSecret: true,
-    });
-    expect(persisted.llm).not.toHaveProperty('agentRoutes');
+    expect(persisted.providers).toEqual(providersBefore);
   });
 
-  it('rejects removed persisted agentRoutes instead of silently using or deleting them', async () => {
-    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
-    const settingsPath = path.join(workspaceRoot, 'config.json');
-    fs.mkdirSync(workspaceRoot, { recursive: true });
-    fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 8,
-      llm: {
-        providers: [],
-        agentRoutes: [{ agentId: 'general', providerId: 'retired-provider', modelId: 'retired-model' }],
-      },
-    }), 'utf8');
+  it('keeps a provider the catalog no longer lists untouched and reports it', async () => {
+    const orphan = { authMode: 'api-key', configuredAuthMode: 'api-key', models: { 'retired-model': { label: 'Retired' } } };
+    const settingsPath = await writeSettingsFixture({ providers: { 'retired-provider': orphan } });
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
 
-    const original = fs.readFileSync(settingsPath, 'utf8');
-    expect(() => service.initialize()).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-    expect(fs.readFileSync(settingsPath, 'utf8')).toBe(original);
+    const runtime = service.initialize();
+    expect(runtime.llm.providers.some((provider) => provider.id === 'retired-provider')).toBe(false);
+    expect(runtime.resourceCatalog.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'settings_provider_not_in_catalog', severity: 'warning', path: settingsPath,
+    }));
+    service.setAll({ appearance: { theme: 'light' } });
+    service.saveProviderConnection('deepseek', 'sk-deepseek', [{ id: 'deepseek-flash', label: 'Flash', enabled: true }]);
+    expect((JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: Record<string, unknown> }).providers['retired-provider'])
+      .toEqual(orphan);
   });
 
-  it('never imports an unkeyed credential after the single-schema cutover', async () => {
-    const { createProviderEntryFromCatalog } = await import('../../provider-catalog/ProviderCatalogRegistry');
+  it('applies a provider list patch to changed providers only and resets the ones left out', async () => {
+    const { settingsPath } = await createVerifiedPersistedSettings();
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const providers = service.initialize().llm.providers;
+    const longcat = providers.find((entry) => entry.id === 'longcat')!;
+    const target = longcat.models[0]!;
+
+    service.setAll({ llm: { providers: providers.map((entry) => entry.id === 'longcat'
+      ? { ...entry, models: entry.models.map((model) => model.id === target.id ? { ...model, enabled: false } : model) }
+      : entry) } });
+    const afterEdit = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: Record<string, { models?: Record<string, unknown> }> };
+    expect(Object.keys(afterEdit.providers).sort()).toEqual(['deepseek', 'longcat']);
+    expect(afterEdit.providers.longcat?.models?.[target.id]).toEqual({ enabled: false });
+
+    service.setAll({ llm: { providers: service.getAll().llm.providers.filter((entry) => entry.id !== 'deepseek') } });
+    const afterRemove = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: Record<string, unknown> };
+    expect(Object.keys(afterRemove.providers)).toEqual(['longcat']);
+  });
+
+  it.each([
+    ['a top-level field', { llm: { providers: [] } }],
+    ['a field inside a section', { appearance: { ...DEFAULT_APPEARANCE, embedding: true } }],
+    ['a catalog fact on a provider', { providers: { deepseek: { authMode: 'api-key', label: 'DeepSeek' } } }],
+    ['a catalog fact on a model', { providers: { deepseek: { models: { 'deepseek-flash': { contextWindow: 128000 } } } } }],
+    ['a wrong type', { layout: { ...DEFAULT_LAYOUT, terminal: { height: '300' } } }],
+  ])('rejects %s as an unusable settings file without changing its bytes', async (_label, overrides) => {
+    const settingsPath = await writeSettingsFixture(overrides);
+    const raw = fs.readFileSync(settingsPath, 'utf8');
+    const { SettingsService } = await import('./SettingsService');
+    const { SettingsFileError } = await import('./settingsFileSchema');
+
+    const failure = (() => { try { new SettingsService().initialize(); } catch (error) { return error; } return null; })();
+    expect(failure).toBeInstanceOf(SettingsFileError);
+    expect(failure).toMatchObject({ code: 'STORAGE_CORRUPT', filePath: settingsPath, params: { file: 'config.json' } });
+    expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
+  });
+
+  it('takes a schema 8 file to the startup failure without converting it', async () => {
+    const settingsPath = settingsPathFor();
+    fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+    const raw = JSON.stringify({ schemaVersion: 8, appearance: { theme: 'dark' }, llm: { providers: [{ id: 'deepseek', label: 'DeepSeek' }] } }, null, 2);
+    fs.writeFileSync(settingsPath, raw, 'utf8');
+    const { SettingsService } = await import('./SettingsService');
+    const { SettingsFileError } = await import('./settingsFileSchema');
+
+    const failure = (() => { try { new SettingsService().initialize(); } catch (error) { return error; } return null; })();
+    expect(failure).toBeInstanceOf(SettingsFileError);
+    expect(failure).toMatchObject({ code: 'STORAGE_SCHEMA_UNSUPPORTED', filePath: settingsPath });
+    expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
+    expect(fs.readdirSync(path.dirname(settingsPath)).filter((name) => name.startsWith('config.json'))).toEqual(['config.json']);
+  });
+
+  it('keeps a configured standard install small and free of catalog facts', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const { getProviderModelSummaries } = await import('../../provider-catalog/ProviderCatalogRegistry');
+    const service = new SettingsService();
+    const settings = service.initialize();
+    service.saveProviderConnection('deepseek', 'sk-deepseek-test', getProviderModelSummaries('deepseek'));
+    service.saveProviderAccountConnection(
+      'chatgpt-account',
+      JSON.stringify({ providerId: 'chatgpt-account', accountId: 'acct-size', accessToken: 'token' }),
+      getProviderModelSummaries('chatgpt-account'),
+    );
+    service.setAll({
+      appearance: { theme: 'light' },
+      agentModels: { default: { model: 'deepseek:deepseek-flash', reasoningLevel: 'high' }, byAgent: {} },
+    });
+
+    const raw = fs.readFileSync(settings.paths.settingsPath, 'utf8');
+    expect(raw.length).toBeLessThan(8 * 1024);
+    const file = JSON.parse(raw) as { providers: Record<string, unknown> };
+    expect(Object.keys(file.providers).sort()).toEqual(['chatgpt-account', 'deepseek']);
+    const keys = new Set<string>();
+    const collect = (value: unknown): void => {
+      if (Array.isArray(value)) value.forEach(collect);
+      else if (value && typeof value === 'object') {
+        for (const [key, child] of Object.entries(value)) { keys.add(key); collect(child); }
+      }
+    };
+    collect(file.providers);
+    for (const catalogField of [
+      'label', 'displayName', 'contextWindow', 'protocol', 'catalogProvenance', 'connectionSchema', 'capabilities',
+      'docsUrl', 'serviceOperator', 'endpointClass', 'authModeOptions', 'recommendedModels', 'apiKey', 'secretRef',
+    ]) {
+      expect(keys.has(catalogField), catalogField).toBe(false);
+    }
+    expect(service.getAll().llm.providers.filter((provider) => provider.isConfigured).map((provider) => provider.id).sort())
+      .toEqual(['chatgpt-account', 'deepseek']);
+  });
+
+  it('never imports an unkeyed credential', async () => {
     const { secretStorageService } = await import('./SecretStorageService');
     const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
-    const settingsPath = path.join(workspaceRoot, 'config.json');
-    const provider = {
-      ...createProviderEntryFromCatalog('chatgpt-account'),
-      enabled: true,
-      hasStoredSecret: true,
-      isConfigured: true,
-      status: 'verified' as const,
-    };
-    fs.mkdirSync(workspaceRoot, { recursive: true });
-    fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 8,
-      llm: { providers: [provider] },
-    }), 'utf8');
+    await writeSettingsFixture({
+      providers: { 'chatgpt-account': { authMode: 'account', configuredAuthMode: 'account' } },
+    });
     const unkeyedRef = secretStorageService.createProviderOAuthSecretRef('chatgpt-account');
     secretStorageService.setSecret(unkeyedRef, JSON.stringify({ accessToken: 'unkeyed' }), workspaceRoot);
 
@@ -215,38 +283,22 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
   });
 
   it('does not advertise subscription models without account discovery', async () => {
-    const { createProviderEntryFromCatalog } = await import('../../provider-catalog/ProviderCatalogRegistry');
-    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
-    const settingsPath = path.join(workspaceRoot, 'config.json');
-    const provider = {
-      ...createProviderEntryFromCatalog('grok-account'),
-      models: [
-        { id: 'grok-4.5', label: 'Grok 4.5', enabled: true },
-        { id: 'grok-composer-2.5-fast', label: 'Composer 2.5', enabled: true },
-      ],
-      hasStoredSecret: false,
-      hasStoredSecretByAuthMode: { account: false },
-      status: 'unconfigured' as const,
-      isConfigured: false,
-    };
-    fs.mkdirSync(workspaceRoot, { recursive: true });
-    fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 8,
-      llm: { providers: [provider] },
-    }), 'utf8');
+    const settingsPath = await writeSettingsFixture({
+      providers: {
+        'grok-account': {
+          authMode: 'account',
+          models: { 'grok-4.5': {}, 'grok-composer-2.5-fast': {} },
+        },
+      },
+    });
+    const raw = fs.readFileSync(settingsPath, 'utf8');
 
     const { SettingsService } = await import('./SettingsService');
-    const service = new SettingsService();
-    const runtime = service.initialize();
-    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      llm: { providers: Array<{ id: string; models: unknown[] }> };
-    };
+    const runtime = new SettingsService().initialize();
 
-    const expectedIds: string[] = [];
     expect(runtime.llm.providers.find((entry) => entry.id === 'grok-account')?.models.map((model) => model.id))
-      .toEqual(expectedIds);
-    expect(persisted.llm.providers.find((entry) => entry.id === 'grok-account')?.models)
-      .toEqual(expect.arrayContaining(expectedIds.map((id) => expect.objectContaining({ id }))));
+      .toEqual([]);
+    expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
   });
 
   it('keeps only admitted live subscription models and excludes generated media', async () => {
@@ -509,7 +561,8 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
   it('returns the prior model choices and keeps config bytes after a provider commit fails', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
-    const settings = service.initialize();
+    service.initialize();
+    const settings = service.setAll({ appearance: { theme: 'light' } });
     const provider = settings.llm.providers.find((entry) => entry.id === 'deepseek')!;
     const filePath = path.join(settings.paths.userRdcRoot, 'config.json');
     const before = fs.readFileSync(filePath, 'utf8');
@@ -521,7 +574,7 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       });
       expect(result).toMatchObject({ status: 'failed', error: 'model preference commit failed', lastSuccessful: { provider } });
       expect(fs.readFileSync(filePath, 'utf8')).toBe(before);
-      expect(fs.existsSync(`${filePath}.${process.pid}.tmp`)).toBe(false);
+      expect(fs.readdirSync(settings.paths.userRdcRoot).some((name) => name.endsWith('.tmp'))).toBe(false);
     } finally {
       rename.mockRestore();
     }
@@ -650,8 +703,8 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     const saved = service.getAll().agents.definitions.find((definition) => definition.id === 'general');
     expect(saved?.compiledRoute).toEqual({ agentId: 'general', providerId: 'deepseek', modelId: 'model-c' });
     expect(fs.readdirSync(initialized.paths.agentsPath).some((entry) => entry.endsWith('.tmp'))).toBe(false);
-    const persisted = JSON.parse(fs.readFileSync(initialized.paths.settingsPath, 'utf8')) as { llm: Record<string, unknown> };
-    expect(persisted.llm).not.toHaveProperty('agentRoutes');
+    const persisted = JSON.parse(fs.readFileSync(initialized.paths.settingsPath, 'utf8')) as Record<string, unknown>;
+    expect(persisted).not.toHaveProperty('llm');
     expect(fs.readFileSync(initialized.paths.settingsPath, 'utf8')).toBe(settingsBeforeSave);
   });
 
@@ -693,17 +746,14 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     saveSpy.mockRestore();
   });
 
-  it('persistWindowLayout patches only layout.window without touching llm providers', async () => {
+  it('persistWindowLayout patches only layout.window without touching providers', async () => {
     const { settingsPath } = await createVerifiedPersistedSettings();
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
     service.initialize();
 
-    const before = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      llm: { providers: unknown[] };
-      layout?: { window?: unknown };
-    };
-    const providersBefore = JSON.stringify(before.llm.providers);
+    const before = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { providers: unknown };
+    const providersBefore = JSON.stringify(before.providers);
 
     service.persistWindowLayout({
       width: 1440,
@@ -714,11 +764,11 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     });
 
     const after = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      llm: { providers: unknown[] };
+      providers: unknown;
       layout: { window: { width: number; height: number; x: number; y: number; isMaximized: boolean } };
     };
 
-    expect(JSON.stringify(after.llm.providers)).toBe(providersBefore);
+    expect(JSON.stringify(after.providers)).toBe(providersBefore);
     expect(after.layout.window).toEqual({
       width: 1440,
       height: 900,
@@ -730,8 +780,6 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
 
   it('preserves valid custom chrome themes in the current settings schema', async () => {
     const { createDefaultChromeThemes } = await import('../../../shared/theme/presets');
-    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
-    const settingsPath = path.join(workspaceRoot, 'config.json');
     const custom = {
       ...createDefaultChromeThemes().dark,
       accent: '#ff0000',
@@ -739,35 +787,28 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
       ink: '#abcdef',
       presetId: 'dracula',
     };
-    fs.mkdirSync(workspaceRoot, { recursive: true });
-    fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 8,
-      appearance: {
-        theme: 'dark',
-        chromeThemes: { light: custom, dark: custom },
-      },
-      llm: { providers: [] },
-    }, null, 2), 'utf8');
+    const settingsPath = await writeSettingsFixture({
+      appearance: { ...DEFAULT_APPEARANCE, theme: 'dark', chromeThemes: { light: custom, dark: custom } },
+    });
+    const raw = fs.readFileSync(settingsPath, 'utf8');
 
     const { SettingsService } = await import('./SettingsService');
     const runtime = new SettingsService().initialize();
-    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      appearance: { chromeThemes: { light: { accent: string; presetId: string }; dark: { accent: string; presetId: string } } };
-    };
     expect(runtime.appearance.chromeThemes.dark.accent).toBe('#ff0000');
-    expect(persisted.appearance.chromeThemes.dark.accent).toBe('#ff0000');
-    expect(persisted.appearance.chromeThemes.light.presetId).toBe('dracula');
+    expect(runtime.appearance.chromeThemes.light.presetId).toBe('dracula');
+    expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
   });
 
-  it('rejects missing and older settings schema versions without changing source bytes', async () => {
-    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
-    const settingsPath = path.join(workspaceRoot, 'config.json');
-    fs.mkdirSync(workspaceRoot, { recursive: true });
+  it('rejects missing, older and newer settings schema versions without changing source bytes', async () => {
+    const settingsPath = settingsPathFor();
+    fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
 
-    for (const schemaVersion of [undefined, 0, 1, 2, 3, 4, 5, 6, 7]) {
+    for (const schemaVersion of [undefined, 0, 1, 2, 3, 4, 5, 6, 7, 8, 10]) {
       vi.resetModules();
       const label = schemaVersion === undefined ? 'missing' : String(schemaVersion);
-      const raw = JSON.stringify({ ...(schemaVersion === undefined ? {} : { schemaVersion }), llm: { providers: [] } }, null, 2);
+      const { createDefaultSettingsFile } = await import('./settingsDefaults');
+      const { schemaVersion: _current, ...sections } = createDefaultSettingsFile();
+      const raw = JSON.stringify({ ...(schemaVersion === undefined ? {} : { schemaVersion }), ...sections }, null, 2);
       fs.writeFileSync(settingsPath, raw, 'utf8');
       const { SettingsService } = await import('./SettingsService');
       expect(() => new SettingsService().initialize(), label).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
@@ -775,30 +816,11 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
     }
   });
 
-  it('rejects a retired embedding selection in current settings without changing source bytes', async () => {
-    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
-    const settingsPath = path.join(workspaceRoot, 'config.json');
-    fs.mkdirSync(workspaceRoot, { recursive: true });
-    const raw = JSON.stringify({
-      schemaVersion: 8,
-      llm: { providers: [], embedding: { providerId: 'openai' } },
-    }, null, 2);
-    fs.writeFileSync(settingsPath, raw, 'utf8');
-
-    const { SettingsService } = await import('./SettingsService');
-    expect(() => new SettingsService().initialize()).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-    expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
-  });
-
   it.each([30000, 60000, 180000])('preserves an explicit current RDC CLI timeout of %ims', async (timeoutMs) => {
-    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
-    const settingsPath = path.join(workspaceRoot, 'config.json');
-    fs.mkdirSync(workspaceRoot, { recursive: true });
-    fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 8,
-      tooling: { rdcCli: { timeoutMs } },
-      llm: { providers: [] },
-    }, null, 2), 'utf8');
+    const { DEFAULT_TOOLING } = await import('@shared/constants/appSettingsDefaults');
+    const settingsPath = await writeSettingsFixture({
+      tooling: { ...DEFAULT_TOOLING, rdcCli: { ...DEFAULT_TOOLING.rdcCli, timeoutMs } },
+    });
 
     const { SettingsService } = await import('./SettingsService');
     const runtime = new SettingsService().initialize();
@@ -807,30 +829,13 @@ describe('SettingsService provider persistence', { timeout: 20_000 }, () => {
   });
 
   it('rejects malformed settings JSON without replacing the file with defaults', async () => {
-    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
-    const settingsPath = path.join(workspaceRoot, 'config.json');
-    fs.mkdirSync(workspaceRoot, { recursive: true });
-    const raw = '{"schemaVersion":8,"llm":';
+    const settingsPath = settingsPathFor();
+    fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+    const raw = '{"schemaVersion":9,"providers":';
     fs.writeFileSync(settingsPath, raw, 'utf8');
 
     const { SettingsService } = await import('./SettingsService');
     expect(() => new SettingsService().initialize()).toThrow(/STORAGE_CORRUPT/);
     expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
-  });
-  it('fail-closes unknown higher settings schemaVersion without rewriting the file', async () => {
-    const workspaceRoot = path.join(userDataRoot, '.rdc-agent');
-    const settingsPath = path.join(workspaceRoot, 'config.json');
-    fs.mkdirSync(workspaceRoot, { recursive: true });
-    const future = {
-      schemaVersion: 9,
-      appearance: { theme: 'dark' },
-      llm: { providers: [] },
-    };
-    fs.writeFileSync(settingsPath, JSON.stringify(future, null, 2), 'utf8');
-
-    const { SettingsService } = await import('./SettingsService');
-    const service = new SettingsService();
-    expect(() => service.initialize()).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-    expect(JSON.parse(fs.readFileSync(settingsPath, 'utf8'))).toEqual(future);
   });
 });

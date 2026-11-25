@@ -19,6 +19,7 @@ import { storageAdapter } from './sessions/store/StorageAdapter';
 import { rdcSessionService } from './sessions';
 import { harvestOwnedRdcDaemons } from './rdc/OwnedRdcDaemonRegistry';
 import { settingsService } from './settings/settings-core/SettingsService';
+import { SettingsFileError } from './settings/settings-core/settingsFileSchema';
 import './rdc/rdcShellPermission';
 import './rdc/registerConversationRdcHost';
 import { rdcCliInvokerService } from './rdc/RdcCliInvokerService';
@@ -43,6 +44,7 @@ import {
   resolveWindowCreationOptions,
 } from './window/windowLayoutPersistence';
 import { bindProductIcon } from './window/productIcon';
+import { reportSettingsStartupFailure } from './window/settingsStartupFailure';
 import { resolvedAppearanceMode, windowBackgroundColor } from './window/appearanceChrome';
 import { isTrustedRendererUrl, openExternalHttps, trustRendererEntry } from './window/rendererTrust';
 import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
@@ -133,7 +135,6 @@ function registerShutdownDisposables(): void {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const isDev = isDevelopmentRun({ isPackaged: app.isPackaged, env: process.env });
-const isSettingsRebuildOnly = process.env.RDC_AGENT_REBUILD_SETTINGS_ONLY === '1';
 const isBrowserQa = shouldStartBrowserAppBridge();
 const isHeadlessMode = process.env.RDC_AGENT_HEADLESS === '1' || isBrowserQa;
 if (isHeadlessMode) {
@@ -266,9 +267,7 @@ function exitMainProcess(code: number): void {
 // Both carriers own the canonical userData lock above. The headless Browser
 // skips Electron's window-oriented single-instance redirect; instance.lock is
 // the cross-carrier boundary, while visible desktop instances keep both locks.
-const hasSingleInstanceLock = isSettingsRebuildOnly
-  || isHeadlessMode
-  || app.requestSingleInstanceLock();
+const hasSingleInstanceLock = isHeadlessMode || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   console.log('[RDC-Agent] Another instance is already running. Reusing the existing instance.');
   exitMainProcess(0);
@@ -464,17 +463,18 @@ function createMainWindow(): void {
 // App lifecycle.
 app.whenReady().then(async () => {
   installRendererSecurityPolicy();
-  const settings = settingsService.initialize();
-  settingsInitialized = true;
-  if (isSettingsRebuildOnly) {
-    console.log('[SettingsRebuildOnly]', JSON.stringify({
-      workspaceRoot: settings.paths.userRdcRoot,
-      settingsPath: settings.paths.settingsPath,
-      providerIds: settings.llm.providers.map((provider) => provider.id),
-    }));
-    exitMainProcess(0);
+  try {
+    settingsService.initialize();
+  } catch (error) {
+    if (!(error instanceof SettingsFileError)) throw error;
+    // An unusable settings file is never converted or repaired: the user deletes it and reconfigures in Settings.
+    console.error('[Main] Settings file cannot be used:', error);
+    reportSettingsStartupFailure(error.filePath, isHeadlessMode);
+    shutdownExitCode = 1;
+    app.quit();
     return;
   }
+  settingsInitialized = true;
 
   await storageAdapter.initializeWorkspace();
   onJsonlTailRepair((repair) => runtimeLogService.log({

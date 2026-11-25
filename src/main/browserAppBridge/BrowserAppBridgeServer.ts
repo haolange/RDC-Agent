@@ -17,7 +17,7 @@ import {
   getProviderCatalogRevision,
   listProviderSummaries,
 } from '../provider-catalog/ProviderCatalogRegistry';
-import { SETTINGS_SCHEMA_VERSION } from '../settings/settings-core/settingsDefaults';
+import { SETTINGS_SCHEMA_VERSION } from '../settings/settings-core/settingsFileSchema';
 import {
   attachDevRendererWebSocketProxy,
   proxyHttpToDevRenderer,

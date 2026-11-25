@@ -3,17 +3,11 @@ import {
   getProviderDefaultBaseUrl,
   isBuiltinProviderId,
 } from '../../provider-catalog/ProviderCatalogRegistry';
-import { appPathService } from '../../runtime/AppPathService';
 import { providerConnectionRevision } from '../provider-catalog/effectiveCatalogMerge';
 import { normalizeProviderProtocol } from '../provider-catalog/providerCatalogNormalize';
 import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
 import { providerConnectionError } from '../provider-auth/providerConnectionErrors';
 import { secretStorageService } from './SecretStorageService';
-import {
-  SETTINGS_SCHEMA_VERSION,
-  createDefaultPersistedSettings,
-  type PersistedSettingsPayload,
-} from './settingsDefaults';
 import {
   applyModelPreferences,
   createLocalAccountId,
@@ -23,21 +17,18 @@ import {
   resolveProviderModels,
   resolveSelectedAuthAvailability,
   sanitizeConnectionValues,
-  sanitizeUserProvider,
 } from './settingsProviderSanitize';
 import {
   deleteSecretsAfterCommit,
   hashProviderDefinition,
   nowIso,
-  normalizePersistedSettings,
-  readJsonFile,
-  writeSettings,
 } from './settingsServiceHelpers';
-import type { AppSettings, AppSettingsPatch, LlmProviderAuthMode, LlmProviderEntry, LlmProviderId, LlmProviderModel, LlmProviderModelPreference, ProviderDefinitionCommitSnapshot, ProviderDefinitionSaveRequest, ProviderDefinitionSaveResult } from '@shared/types/settings';
+import type { AppSettings, LlmProviderAuthMode, LlmProviderEntry, LlmProviderId, LlmProviderModel, LlmProviderModelPreference, ProviderDefinitionCommitSnapshot, ProviderDefinitionSaveRequest, ProviderDefinitionSaveResult } from '@shared/types/settings';
 
 export interface SettingsProviderOpsHost {
   getAll(): AppSettings;
-  setAll(patch: AppSettingsPatch): AppSettings;
+  /** Commits this provider's user state only; other providers are not rewritten. */
+  commitProvider(entry: LlmProviderEntry): AppSettings;
   getProviderConnectionValues(providerId: string, workspaceRoot?: string): Record<string, string>;
 }
 
@@ -83,29 +74,11 @@ export class SettingsProviderOps {
   }
 
   private persistProviderDefinition(provider: LlmProviderEntry): LlmProviderEntry {
-    const paths = appPathService.initializeRuntime();
-    const currentPersisted = normalizePersistedSettings(
-      readJsonFile<PersistedSettingsPayload>(paths.settingsPath) ?? createDefaultPersistedSettings(),
-      paths.userRdcRoot,
-      { credentialView: 'storage-metadata' },
-    );
-    const currentProviders = currentPersisted.llm.providers;
-    const current = currentProviders.find((entry) => entry.id === provider.id);
+    const current = this.host.getAll().llm.providers.find((entry) => entry.id === provider.id);
     if (!current) throw new Error(`Unknown provider: ${provider.id}`);
-    const sanitized = sanitizeUserProvider({
-      ...current,
-      models: provider.models,
-    }, paths.userRdcRoot, { credentialView: 'storage-metadata' });
-    if (!sanitized) throw new Error(`Provider ${provider.id} could not be sanitized.`);
-    writeSettings({
-      ...currentPersisted,
-      schemaVersion: SETTINGS_SCHEMA_VERSION,
-      llm: {
-        ...currentPersisted.llm,
-        providers: currentProviders.map((entry) => entry.id === provider.id ? sanitized : entry),
-      },
-    });
-    const committed = this.host.getAll().llm.providers.find((entry) => entry.id === provider.id);
+    // Only the model choices change; the commit keeps the user's part of the rows (see toUserProviderState).
+    const committed = this.host.commitProvider({ ...current, models: provider.models })
+      .llm.providers.find((entry) => entry.id === provider.id);
     if (!committed) throw new Error(`Provider ${provider.id} disappeared after commit.`);
     return committed;
   }
@@ -311,11 +284,7 @@ export class SettingsProviderOps {
   };
 
   try {
-    const nextSettings = this.host.setAll({
-      llm: {
-        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
-      },
-    });
+    const nextSettings = this.host.commitProvider(nextProvider);
     deleteSecretsAfterCommit(
       [...previousSecretRefs].filter((secretRef) => !retainedSecretRefs.has(secretRef)),
       current.paths.userRdcRoot,
@@ -381,11 +350,7 @@ export class SettingsProviderOps {
     isConfigured: true,
   };
 
-  const nextSettings = this.host.setAll({
-    llm: {
-      providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
-    },
-  });
+  const nextSettings = this.host.commitProvider(nextProvider);
   deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], current.paths.userRdcRoot);
   return nextSettings;
   }
@@ -421,24 +386,16 @@ export class SettingsProviderOps {
     oauthExpiresAt: accountSummary.oauthExpiresAt,
     oauthRefreshAvailable: accountSummary.oauthRefreshAvailable,
   };
-  const nextSettings = this.host.setAll({
-    llm: {
-      providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
-    },
-  });
+  const nextSettings = this.host.commitProvider(nextProvider);
   deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], current.paths.userRdcRoot);
   return nextSettings;
   }
 
   markProviderAccountRefreshFailure(providerId: LlmProviderId, message: string): AppSettings {
     const current = this.host.getAll();
-    return this.host.setAll({
-      llm: {
-        providers: current.llm.providers.map((provider) => provider.id === providerId
-          ? { ...provider, enabled: false, status: 'failed', isConfigured: false, lastError: message }
-          : provider),
-      },
-    });
+    const provider = current.llm.providers.find((entry) => entry.id === providerId);
+    if (!provider) return current;
+    return this.host.commitProvider({ ...provider, enabled: false, status: 'failed', isConfigured: false, lastError: message });
   }
 
   disconnectProvider(providerId: LlmProviderId, authModeDraft?: LlmProviderAuthMode): AppSettings {
@@ -467,13 +424,7 @@ export class SettingsProviderOps {
   }
 
   if (authMode !== provider.authMode) {
-    const nextSettings = this.host.setAll({
-      llm: {
-        providers: current.llm.providers.map((entry) => entry.id === providerId
-          ? { ...provider, authAccountIds, hasStoredSecretByAuthMode }
-          : entry),
-      },
-    });
+    const nextSettings = this.host.commitProvider({ ...provider, authAccountIds, hasStoredSecretByAuthMode });
     deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], current.paths.userRdcRoot);
     return nextSettings;
   }
@@ -500,11 +451,7 @@ export class SettingsProviderOps {
     isConfigured: false,
   };
 
-  const nextSettings = this.host.setAll({
-    llm: {
-      providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
-    },
-  });
+  const nextSettings = this.host.commitProvider(nextProvider);
   deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], current.paths.userRdcRoot);
   return nextSettings;
   }
