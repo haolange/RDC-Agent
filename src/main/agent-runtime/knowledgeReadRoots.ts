@@ -2,7 +2,7 @@
  * Canonical knowledge read-root resolution for prepareTurn.
  *
  * Frozen onto EffectiveRuntimePlan.knowledgeReadRoots. Policy and executor
- * may grant these roots only to read_file / read_image / glob / grep.
+ * grant these roots only to tools whose spec declares `knowledgeRoots: 'read-access'`.
  * Missing / non-directory candidates are omitted. A root that is itself a
  * symlink or junction is omitted and reported as a diagnostic.
  */
@@ -10,8 +10,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { resolvedPathKey } from '../platform/paths';
-
-export const KNOWLEDGE_READ_FILE_TOOLS = new Set(['read_file', 'read_image', 'glob', 'grep']);
 
 export type KnowledgeReadRootSkipReason =
   | 'missing'
@@ -33,10 +31,6 @@ export interface KnowledgeReadRootResolution {
 export interface ResolveKnowledgeReadRootsInput {
   userKnowledgePath: string;
   projectKnowledgePath?: string | null;
-}
-
-export function isKnowledgeReadFileTool(toolName: string): boolean {
-  return KNOWLEDGE_READ_FILE_TOOLS.has(toolName.trim().toLowerCase().replace(/[.-]/g, '_'));
 }
 
 function skip(

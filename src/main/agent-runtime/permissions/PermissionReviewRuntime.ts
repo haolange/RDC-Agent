@@ -8,6 +8,7 @@ import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { ErrorCode } from '@shared/errors/errorCodes';
+import type { AgentTool } from '../agent/AgentTool';
 
 export interface PermissionReviewVerdict { approved: boolean; reason: string }
 export class PermissionReviewError extends AppError {
@@ -22,7 +23,15 @@ export interface PermissionReviewAction {
   reason: string;
   facts?: Record<string, unknown>;
 }
-export type PermissionReviewer = (action: PermissionReviewAction, signal?: AbortSignal) => Promise<PermissionReviewVerdict>;
+/**
+ * Reviews one pending action. The action is what the review model reads; `tool` is the reviewed tool's declared spec,
+ * which the host reads to gather evidence and which is never sent.
+ */
+export type PermissionReviewer = (
+  action: PermissionReviewAction,
+  signal?: AbortSignal,
+  tool?: Pick<AgentTool, 'spec'>,
+) => Promise<PermissionReviewVerdict>;
 const SYSTEM = `You independently review one pending tool action. You have no tools and must not execute anything.
 Return ONLY a JSON object with exactly {"approved":boolean,"reason":string}; reason must be concise and specific.
 Approve only when the actual user request and approved plan authorize the exact action, its targets and effects.

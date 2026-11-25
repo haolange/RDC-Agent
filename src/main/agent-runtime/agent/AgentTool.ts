@@ -67,6 +67,9 @@ export interface AgentToolResultPresentation {
   readonly deliversNativeFailure?: boolean;
 }
 
+/** A call that changes the owning replay itself: select a frozen input, restore the entry position, or recover. */
+export type ReplayLifecycleStep = 'capture_select' | 'capture_restore' | 'capture_recover';
+
 /** The live capture a call reaches, read from its validated arguments. */
 export interface AgentToolCaptureAccess {
   /** The call reads or drives the live replay, so the approved capture controller must allow live access. */
@@ -75,6 +78,10 @@ export interface AgentToolCaptureAccess {
   readonly requiresApprovedScope: (args: Record<string, unknown>) => boolean;
   /** The call recovers a faulted capture: affected children are joined after authorization, before the resource claim. */
   readonly recovers?: (args: Record<string, unknown>) => boolean;
+  /** The call runs a native RDC operation through the turn binding; the registered RDC operation policy authorizes it. */
+  readonly nativeOperation?: (args: Record<string, unknown>) => boolean;
+  /** The replay lifecycle step the call performs, if any; permission review gates it as a change to the owning replay. */
+  readonly replayLifecycle?: (args: Record<string, unknown>) => ReplayLifecycleStep | null;
 }
 
 /**
@@ -101,6 +108,11 @@ export interface AgentToolSpec {
   readonly dispatchesSubagent?: boolean;
   /** A successful result names deferred tools that become active for the rest of the turn. */
   readonly activatesDeferredTools?: boolean;
+  /**
+   * The argument that holds host shell command text. Permission review applies the catastrophic-pattern hard deny,
+   * the file-tool bypass check, command prefix rules, the risk analyzer and the routine command set to it.
+   */
+  readonly shellCommand?: string;
 }
 
 /**

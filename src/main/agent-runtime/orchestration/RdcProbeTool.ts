@@ -113,6 +113,8 @@ export const RDC_PROBE_TOOL_SPEC: AgentToolSpec = {
     live: reachesLiveCapture,
     requiresApprovedScope: reachesLiveCapture,
     recovers: (args) => args.action === 'capture_recover',
+    replayLifecycle: (args) => args.action === 'capture_select' || args.action === 'capture_restore' || args.action === 'capture_recover'
+      ? args.action : null,
   },
   // A successful query keeps its URI/hash so it can be delegated as evidence.
   presentation: { pinEvidence: (args) => args.action === 'probe' },

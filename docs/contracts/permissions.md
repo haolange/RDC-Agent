@@ -51,7 +51,20 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 
 `read_file` 的显式 `mode: audit` 沿用该工具的冻结可用性与读取权限；`path` 和 `compareWith.path` 分别提取并审批，第一路径在工程内不自动授权第二路径。执行层对两者分别 realpath/根边界校验，且校验各自预期hash；不由模型脚本直接读磁盘，不增加新工具身份或向受限reviewer授予 `read_file`。审计只返回有界字节信息和整文件比较结果，不授予编辑前置读取资格。capture拒绝、8MiB输入上限和取消合同见 runtime-kernel。
 
-canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `knowledgeReadRoots = [realpath(~/.rdc-agent/knowledge), realpath(<projectRoot>/.rdc-agent/knowledge)]`（仅存在且为真实目录；根自身 symlink/junction → 排除 + 诊断）。`AgentPermissionPolicy` **仅**对 `read_file` / `read_image` / `glob` / `grep` 把它们并入免审批读根。`write` / `edit` / `delete` / `shell` / `code_interpreter` 在策略层与执行层双重拒绝。sibling 越界（如 `~/.rdc-agent/memory`、`~/.rdc-agent/agents`）拒。写入 Knowledge 仍只经 `knowledge_*` + human review。见 `ARCHITECTURE.md` 裁决 G。
+canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `knowledgeReadRoots = [realpath(~/.rdc-agent/knowledge), realpath(<projectRoot>/.rdc-agent/knowledge)]`（仅存在且为真实目录；根自身 symlink/junction → 排除 + 诊断）。`AgentPermissionPolicy` **仅**对 spec 声明 `knowledgeRoots: 'read-access'` 的工具（内置为 `read_file` / `read_image` / `glob` / `grep`）把它们并入免审批读根。`write` / `edit` / `delete` / `shell` / `code_interpreter` 在策略层与执行层双重拒绝。sibling 越界（如 `~/.rdc-agent/memory`、`~/.rdc-agent/agents`）拒。写入 Knowledge 仍只经 `knowledge_*` + human review。见 `ARCHITECTURE.md` 裁决 G。
+
+### 权限特征来自工具 spec
+
+权限层不按工具名分支，只读被评估工具自己声明的 `AgentTool.spec`（特征表见 runtime-kernel 契约「工具行为」），与执行器同一来源：
+
+| spec 特征 | 权限层的用法 |
+|---|---|
+| `shellCommand` | 该参数的命令文本先过灾难硬拒绝与文件工具绕行检查（任何模式都先于权限求值），再按自定义拒绝/允许前缀、风险分析、工作区外路径与例行命令集分级；内置只有 `shell` 声明 |
+| `capture.nativeOperation` | 原生 RDC 操作（`shell.rdc`）交给注册的 RDC 操作策略判定，再取 policy 审批下限 |
+| `capture.replayLifecycle` | 改变 owning 回放的步骤（`rdc_probe` 的 `capture_select` / `capture_restore` / `capture_recover`）要求 `full` 天花板，按模式审批，并把该步骤的冻结操作合同交给审核；`capture_restore` 的自动审核另附 owning 回合已验证的入口位置基线 |
+| `knowledgeRoots: 'read-access'` | 冻结的 Knowledge 读根并入本次调用的免审批读根 |
+
+自动审核把待审动作（工具名、参数、原因、事实）原样发给审核模型；宿主另外读取被审工具的 spec 收集证据，spec 本身不发送。工具访问分类（`src/shared/constants/toolAccess.ts`）与 policy 的工具名单仍按名称，它们是按名称声明的配置而非工具行为。
 
 ## Electron Sandbox
 

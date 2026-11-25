@@ -19,6 +19,8 @@ import { editFileTool as productionEditFile } from '../tools/primitives/EditFile
 import { webSearchTool as productionWebSearch } from '../tools/primitives/WebTools';
 import { deleteFileTool as productionDeleteFile } from '../tools/file/DeleteFileTool';
 import { moveFileTool as productionMoveFile } from '../tools/file/MoveFileTool';
+import { shellTool as productionShell } from '../tools/primitives/ShellTool';
+import { RDC_PROBE_TOOL_SPEC } from '../orchestration/RdcProbeTool';
 import { appPathService } from '../../runtime/AppPathService';
 import { AgentPermissionPolicyService, registerRdcShellBaseline } from './AgentPermissionPolicy';
 
@@ -61,8 +63,16 @@ vi.mock('../../tools/resolveConfiguredShell', () => ({
   }),
 }));
 
-/** The policy never reads the spec; fixtures declare the default class only to satisfy the tool contract. */
+/** A tool with no permission traits; fixtures of tools whose traits the policy reads declare the production spec. */
 const FIXTURE_SPEC = { concurrency: 'exclusive', isReadOnly: false, isDestructive: false } as const satisfies AgentToolSpec;
+
+/** The production specs whose Knowledge read access the policy reads. */
+const PRODUCTION_SPECS: Record<string, AgentToolSpec> = {
+  read_file: productionReadFile.spec,
+  read_image: productionReadImage.spec,
+  glob: productionGlob.spec,
+  grep: productionGrep.spec,
+};
 
 /** Fixtures keep the production effect declarations; the policy reads effects, never names. */
 const PRODUCTION_EFFECTS: Record<string, AgentTool['effects']> = {
@@ -80,7 +90,7 @@ const readFileTool: AgentTool = {
   name: 'read_file',
   description: 'read file',
   parameters: { type: 'object', properties: {} },
-  spec: FIXTURE_SPEC,
+  spec: productionReadFile.spec,
   permissionHint: 'readonly',
   effects: PRODUCTION_EFFECTS.read_file,
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
@@ -101,7 +111,7 @@ const shellTool: AgentTool = {
   description: 'shell',
   parameters: { type: 'object', properties: {} },
   permissionHint: 'mutation',
-  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: true, sideEffect: 'process', category: 'system', requiresApproval: true },
+  spec: productionShell.spec,
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
 };
 
@@ -117,7 +127,7 @@ const deleteFileTool: AgentTool = {
 
 it('classifies replay lifecycle separately from read-only probe queries', () => {
   const service = new AgentPermissionPolicyService();
-  const tool: AgentTool = { ...readFileTool, name: 'rdc_probe', effects: undefined };
+  const tool: AgentTool = { ...readFileTool, name: 'rdc_probe', effects: undefined, spec: RDC_PROBE_TOOL_SPEC };
   const decision = (action: string, mode: AgentPermissionMode, ceiling: 'full' | 'read-only', policy = {}) => service.evaluate({
     ...permissionInput({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] }),
     tool, toolCall: { type: 'toolCall', id: 'probe', name: 'rdc_probe', arguments: { action } },
@@ -710,7 +720,7 @@ describe('AgentPermissionPolicyService knowledge read roots', () => {
       name,
       description: name,
       parameters: { type: 'object', properties: {} },
-      spec: FIXTURE_SPEC,
+      spec: PRODUCTION_SPECS[name] ?? FIXTURE_SPEC,
       permissionHint: 'readonly',
       effects: PRODUCTION_EFFECTS[name],
       execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),

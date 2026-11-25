@@ -162,7 +162,9 @@ export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operati
     capture: {
       live: (args) => args.rdc !== undefined,
       requiresApprovedScope: (args) => isRecord(args.rdc) && 'operation' in args.rdc,
+      nativeOperation: (args) => args.rdc !== undefined,
     },
+    shellCommand: 'command',
     presentation: { pinEvidence: (_args, result) => isNativeRdcEvidence(result), deliversNativeFailure: true },
   },
   permissionHint: 'mutation',

@@ -43,7 +43,7 @@ export async function authorizeToolPermission(input: ToolPermissionAuthorization
       action: { tool: input.decision.toolCall.name, arguments: structuredClone(input.decision.toolCall.arguments),
         reason: decision.reason ?? 'Review required', facts: { ...decision.operationFacts,
           executionBudget: input.executionBudget ? { ...input.executionBudget, observedAt: Date.now() } : null } },
-      reviewer: input.reviewer, reason: decision.reason ?? 'Tool requires review.', risk: decision.risk, signal });
+      reviewer: input.reviewer, tool: input.decision.tool, reason: decision.reason ?? 'Tool requires review.', risk: decision.risk, signal });
     if (!verdict.approved) throw new ToolPermissionDenied(`AUTO_REVIEW_DENIED: risk=${decision.risk}; ${verdict.reason}`);
   }
   input.assertLive();

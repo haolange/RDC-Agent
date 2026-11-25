@@ -395,11 +395,11 @@ export class AgentTurnRunner {
       mcpPoolKey: mcpLease?.poolKey ?? null,
       effectivePlan,
       policyBudget: turnHandle.policyBudget,
-      reviewPermission: (action, signal) => executePermissionReview({
+      reviewPermission: (action, signal, tool) => executePermissionReview({
         sessionId: executionScopeId, plan: requestPlan, credentialHandle: preparedRuntime.credentialHandle,
         reasoning: routeCapability.reasoningContract, evidence: {
           ...permissionReviewEvidence(run.slot?.agent.messages ?? [], executionScopeId, action.arguments),
-          ...(action.tool === 'rdc_probe' && action.arguments.action === 'capture_restore'
+          ...(tool?.spec.capture?.replayLifecycle?.(action.arguments) === 'capture_restore'
             ? { captureBaseline: permissionReviewCaptureBaseline({ controller: turnHandle.captureControl, sessionId: executionScopeId,
               projectId: input.projectId, turnId: turnHandle.turnId, agentId: input.agentId, accessCeiling: effectivePlan.accessCeiling }) } : {}),
         },

@@ -185,14 +185,15 @@ Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only
 
 执行前先经 `toolValidator.validate` 和工具自身的语义参数校验，再进入 Permission/人工审批；两类校验失败都返回 `TOOL_SCHEMA_VIOLATION`，无效请求不展示审批。`shell` 的 provider 参数根保持普通 object，但只能提供非空 `command` 或 `rdc` 其中之一；同一规则在执行入口再次校验。`CompiledPolicy.deniedTools` 进入 Permission + Executor。非法 policy → fail-closed。
 
-工具行为只读工具自己声明的 `AgentTool.spec`（`src/main/agent-runtime/agent/AgentTool.ts`），执行器不按工具名分支；每个内置工具都声明 spec，MCP 工具共用声明的默认 `MCP_TOOL_SPEC`（`exclusive`）。spec 特征：
+工具行为只读工具自己声明的 `AgentTool.spec`（`src/main/agent-runtime/agent/AgentTool.ts`），执行器与权限层（`AgentPermissionPolicy`、权限审核证据）都不按工具名分支；每个内置工具都声明 spec，MCP 工具共用声明的默认 `MCP_TOOL_SPEC`（`exclusive`）。spec 特征：
 
 | 特征 | 含义 |
 |---|---|
 | `concurrency`（必填） | 并发类：`shared` 可与同组并行调用并发、取共享资源锁；`exclusive` 独占执行与资源锁；`orchestration-parallel` / `orchestration-serial` 只派发或等待，前者可并行、后者独占调度，二者都不取资源锁（委派出的效果自行取锁） |
 | `interaction` | 宿主代为发起的人工提问：`user-input`（`ask_user`）或 `plan-review`（`plan_artifact`，用户批准的结果结束规划回合） |
 | `presentation` | 结果呈现：`pinEvidence` 小于卸货阈值也保留证据 URI/hash；`keepErrorResults` 错误结果同样制品化；`deliversNativeFailure` 原生 RDC 失败的交付结果以证据制品返回 |
-| `capture` | 由已校验参数判定：`live` 触及实时回放、`requiresApprovedScope` 需要计划冻结的 capture scope、`recovers` 授权后取锁前 join 受影响子执行 |
+| `capture` | 由已校验参数判定：`live` 触及实时回放、`requiresApprovedScope` 需要计划冻结的 capture scope、`recovers` 授权后取锁前 join 受影响子执行、`nativeOperation` 原生 RDC 操作（由注册的 RDC 操作策略授权）、`replayLifecycle` 返回改变 owning 回放的步骤（`capture_select` / `capture_restore` / `capture_recover`） |
+| `shellCommand` | 持有宿主 shell 命令文本的参数名：灾难硬拒绝、文件工具绕行检查、命令前缀规则、风险分析与例行命令集都作用于它 |
 | `knowledgeRoots` | `read-access` 把冻结 Knowledge 根并入本次临时可读根；`reference` 只在执行上下文传入供引用格式化 |
 | `dispatchesSubagent` / `activatesDeferredTools` | 每次调用预留一个 subagent 预算 / 成功结果激活其列出的 deferred 工具 |
 

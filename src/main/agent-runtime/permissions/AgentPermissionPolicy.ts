@@ -5,7 +5,6 @@ import { expandHomePath } from '../../platform/paths';
 import { defaultShellKind } from '../../platform/shell';
 import { matchShellHardDeny } from '../tools/primitives/shellHardDeny';
 import { resolveConfiguredShell } from '../../tools/resolveConfiguredShell';
-import { isKnowledgeReadFileTool } from '../knowledgeReadRoots';
 import { isWithinRootAllowingAliases } from '../../runtime/toolFiles';
 import { safeResolvePath } from '../../runtime/toolFiles';
 import { fileOperationBoundary } from '../../runtime/FileOperationBoundary';
@@ -20,7 +19,7 @@ import {
 } from './PolicyCompiler';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
 import type { CompiledPolicy } from '@shared/types/rdcRuntime';
-import type { AgentTool, ToolExecutionContext } from '../agent/AgentTool';
+import type { AgentTool, ReplayLifecycleStep, ToolExecutionContext } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { ShellKind } from '../../runtime/ShellResolver';
@@ -34,11 +33,12 @@ import type { ShellKind } from '../../runtime/ShellResolver';
  */
 export type AgentPermissionDecisionAction = 'allow' | 'ask_user' | 'auto_review' | 'deny';
 
-const REPLAY_LIFECYCLE_CONTRACT = {
+/** The operation contract the reviewer receives for each replay lifecycle step a tool declares (`spec.capture`). */
+const REPLAY_LIFECYCLE_CONTRACT: Record<ReplayLifecycleStep, string> = {
   capture_select: 'Select the registered input named by inputId on the device frozen in the approved plan.',
   capture_restore: 'Verify the signed entry position and, if needed, restore only its owning replay, event and output target. Reopening can use only the recorded entry input and device. An empty entry position means closing the owning replay.',
   capture_recover: 'Release the faulted lease only after checking its owner and process identity, then reopen the same approved capture and device under a new replay context. The call supplies no replacement target.',
-} as const;
+};
 
 export interface AgentPermissionDecision {
   action: AgentPermissionDecisionAction;
@@ -365,9 +365,10 @@ export class AgentPermissionPolicyService {
       return denied(`Policy deniedTools blocked tool "${input.toolCall.name}".`, 'high');
     }
 
-    const probeAction = input.toolCall.arguments.action;
-    if (toolName === 'rdc_probe' && typeof probeAction === 'string' && Object.hasOwn(REPLAY_LIFECYCLE_CONTRACT, probeAction)) {
-      const replayAction = probeAction as keyof typeof REPLAY_LIFECYCLE_CONTRACT;
+    // Tool behaviour comes from the tool's declared spec, never from its name.
+    const { spec } = input.tool;
+    const replayAction = spec.capture?.replayLifecycle?.(input.toolCall.arguments) ?? null;
+    if (replayAction) {
       if (ceiling !== 'full') return denied('RDC_EXECUTION_DENIED: replay lifecycle requires a full access ceiling.');
       const baseline = mode === 'full-access'
         ? { action: 'allow' as const, risk: 'low' as const, temporaryPathRoots: [] }
@@ -380,7 +381,7 @@ export class AgentPermissionPolicyService {
       } }, floorAction(floor, input.toolCall.name));
     }
 
-    if (toolName === 'shell' && input.toolCall.arguments.rdc !== undefined) {
+    if (spec.capture?.nativeOperation?.(input.toolCall.arguments)) {
       if (!rdcShellBaseline) return denied('RDC_PERMISSION_UNREGISTERED: shell.rdc has no registered operation policy.', 'high');
       const rdcBaseline = rdcShellBaseline(input, mode, ceiling);
       if (!input.compiledPolicy) return rdcBaseline;
@@ -389,8 +390,8 @@ export class AgentPermissionPolicyService {
     }
 
     // Catastrophic shell patterns are hard-denied in every mode, including full-access.
-    if (toolName === 'shell') {
-      const command = extractStringArg(input.toolCall, 'command');
+    if (spec.shellCommand) {
+      const command = extractStringArg(input.toolCall, spec.shellCommand);
       const hardDeny = matchShellHardDeny(command, resolveShellKind());
       if (hardDeny) {
         return denied(`Shell command hard-denied (matched "${hardDeny}").`, 'high');
@@ -432,7 +433,8 @@ export class AgentPermissionPolicyService {
       allowedCommandPrefixes: [],
       deniedCommandPrefixes: [],
     };
-    if (toolName === 'shell' && isCommandDeniedByRule(extractStringArg(input.toolCall, 'command'), customRules)) {
+    const commandArgument = input.tool.spec.shellCommand;
+    if (commandArgument && isCommandDeniedByRule(extractStringArg(input.toolCall, commandArgument), customRules)) {
       return denied('Custom policy denied this command prefix (word-boundary match).');
     }
 
@@ -441,7 +443,7 @@ export class AgentPermissionPolicyService {
     const sessionAttachmentsRoot = input.sessionAttachmentsRoot
       ? path.resolve(input.sessionAttachmentsRoot)
       : null;
-    const knowledgeReadRoots = isKnowledgeReadFileTool(toolName)
+    const knowledgeReadRoots = input.tool.spec.knowledgeRoots === 'read-access'
       ? (input.knowledgeReadRoots ?? []).map((root) => path.resolve(root))
       : [];
     const readRoots = [
@@ -482,8 +484,8 @@ export class AgentPermissionPolicyService {
       );
     }
 
-    if (toolName === 'shell') {
-      const command = extractStringArg(input.toolCall, 'command');
+    if (commandArgument) {
+      const command = extractStringArg(input.toolCall, commandArgument);
       if (!command) return denied('Shell command is empty.', 'medium');
       if (isCommandAllowedByRule(command, customRules)) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: [] };

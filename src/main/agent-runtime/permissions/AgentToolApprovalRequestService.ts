@@ -7,6 +7,7 @@ import { PermissionReviewError } from './PermissionReviewRuntime';
 import type { PermissionReviewer, PermissionReviewAction, PermissionReviewVerdict } from './PermissionReviewRuntime';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentTool } from '../agent/AgentTool';
 
 export interface ToolApprovalRequestInput {
   agentId: AgentRole;
@@ -96,7 +97,9 @@ export class AgentToolApprovalRequestService {
     });
   }
 
-  async autoReview(input: ToolApprovalRequestInput & { action?: PermissionReviewAction; reviewer?: PermissionReviewer }): Promise<PermissionReviewVerdict> {
+  async autoReview(input: ToolApprovalRequestInput & {
+    action?: PermissionReviewAction; reviewer?: PermissionReviewer; tool?: Pick<AgentTool, 'spec'>;
+  }): Promise<PermissionReviewVerdict> {
     const reviewMethod = input.risk === 'low' ? 'rule' as const : 'model' as const;
     let errorCode: string | undefined;
     const approvalId = `auto-review-${input.toolCallId}-${randomUUID()}`;
@@ -131,7 +134,7 @@ export class AgentToolApprovalRequestService {
         verdict = { approved: true, reason: `RULE_APPROVED: ${input.reason}` };
       } else {
         if (!input.reviewer || !input.action) throw new PermissionReviewError('PERMISSION_REVIEW_UNAVAILABLE', 'no frozen reviewer is available.');
-        const result = await awaitReview(input.reviewer(input.action, input.signal), input.signal, (result) => { settledRejection = !result.approved; });
+        const result = await awaitReview(input.reviewer(input.action, input.signal, input.tool), input.signal, (result) => { settledRejection = !result.approved; });
         // Only the strict verdict crosses this boundary; route/failure metadata belongs to the host.
         verdict = { approved: result.approved, reason: result.reason };
       }
