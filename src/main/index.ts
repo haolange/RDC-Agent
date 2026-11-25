@@ -24,6 +24,7 @@ import './rdc/registerConversationRdcHost';
 import { rdcCliInvokerService } from './rdc/RdcCliInvokerService';
 import { replayDeviceService } from './rdc/captures/ReplayDeviceService';
 import { runtimeLogService } from './runtime/RuntimeLogService';
+import { installProcessFaultHandlers, reportProcessFault } from './runtime/processFaultHandlers';
 import { onJsonlTailRepair } from './runtime/jsonl';
 import { rendererEventHub } from './browserAppBridge/rendererEventHub';
 import {
@@ -216,6 +217,8 @@ if (useDisposableBrowserQaUserData) {
 }
 app.commandLine.appendSwitch('user-data-dir', userDataPath);
 app.setPath('userData', userDataPath);
+// Installed once userData is fixed, so the runtime log lands in this instance's log file.
+installProcessFaultHandlers();
 console.log('[RDC-Agent] Startup identity:', JSON.stringify({
   version: app.getVersion(),
   carrier: isHeadlessMode ? 'browser' : app.isPackaged ? 'packaged-desktop' : 'source-desktop',
@@ -401,12 +404,13 @@ function createMainWindow(): void {
     trustRendererEntry(rendererUrl);
     const entry = new URL(rendererUrl);
     entry.searchParams.set('theme', bootTheme);
-    mainWindow.loadURL(entry.href);
+    mainWindow.loadURL(entry.href).catch((error: unknown) => reportProcessFault('Renderer failed to load', error));
   } else {
     // Production mode loads the bundled renderer.
     const rendererEntry = path.join(__dirname, '../renderer/index.html');
     trustRendererEntry(pathToFileURL(rendererEntry).href);
-    mainWindow.loadFile(rendererEntry, { query: { theme: bootTheme } });
+    mainWindow.loadFile(rendererEntry, { query: { theme: bootTheme } })
+      .catch((error: unknown) => reportProcessFault('Renderer failed to load', error));
   }
 
   // Show after the window is ready.

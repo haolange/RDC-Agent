@@ -21,7 +21,7 @@ const { handlers, syncSessionSlots, abortBackgroundSession, storage, conversatio
     removeSession: vi.fn(),
     removeProject: vi.fn(),
     listSessions: vi.fn((): Array<{ sessionId: string }> => []),
-    setCurrentSessionId: vi.fn(async () => undefined),
+    setCurrentSessionId: vi.fn(),
     setCurrentProjectId: vi.fn(),
     getLatestRun: vi.fn((): RunSummary | null => null),
     updateRun: vi.fn(async () => undefined),

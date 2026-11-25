@@ -214,11 +214,14 @@ export default [
     },
   },
   {
+    // An unobserved rejection in main is an unreported failure: every promise is awaited, handled or explicitly voided.
     files: [
+      'src/main/**/*.ts',
       'src/shared/constants/blockers.ts',
       'src/shared/constants/blockers.test.ts',
       'src/shared/constants/rdcProbe.ts',
     ],
+    ignores: ['src/main/**/*.test.ts'],
     languageOptions: {
       parserOptions: {
         projectService: true,

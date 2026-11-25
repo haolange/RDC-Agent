@@ -270,11 +270,11 @@ export class ProjectWorkspaceStore {
     this.writeSelection(selection);
   }
 
-  async getCurrentSessionId(): Promise<string | null> {
+  getCurrentSessionId(): string | null {
     return this.readSelection().sessionId;
   }
 
-  async setCurrentSessionId(sessionId: string | null): Promise<void> {
+  setCurrentSessionId(sessionId: string | null): void {
     const selection = this.readSelection();
     selection.sessionId = sessionId;
     if (sessionId) {

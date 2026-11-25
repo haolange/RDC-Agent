@@ -246,7 +246,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       state.currentProjectId = session.projectId;
       state.currentSessionId = session.sessionId;
       state.currentRunId = null;
-      await storageAdapter.setCurrentSessionId(session.sessionId);
+      storageAdapter.setCurrentSessionId(session.sessionId);
       return { success: true, session };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -316,10 +316,10 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         state.currentRunId = nextSession?.lastRunId || null;
         state.currentProjectId = session.projectId;
         if (state.currentSessionId) {
-          await storageAdapter.setCurrentSessionId(state.currentSessionId);
+          storageAdapter.setCurrentSessionId(state.currentSessionId);
           nextRun = storageAdapter.getLatestRun(state.currentSessionId);
         } else {
-          await storageAdapter.setCurrentSessionId(null);
+          storageAdapter.setCurrentSessionId(null);
           storageAdapter.setCurrentProjectId(session.projectId);
         }
       }
@@ -345,7 +345,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       state.currentProjectId = session.projectId;
       const currentRun = await recoverStaleRunOnSelection(storageAdapter.getLatestRun(id));
       state.currentRunId = currentRun?.runId || session.lastRunId || null;
-      await storageAdapter.setCurrentSessionId(id);
+      storageAdapter.setCurrentSessionId(id);
       return {
         success: true,
         session: projectSessionForClient(session),

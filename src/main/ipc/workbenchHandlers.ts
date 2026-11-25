@@ -54,7 +54,7 @@ let nativeThemeSubscribed = false;
 
 export async function initializeIpcState(): Promise<void> {
   try {
-    state.currentSessionId = await storageAdapter.getCurrentSessionId();
+    state.currentSessionId = storageAdapter.getCurrentSessionId();
     state.currentProjectId = storageAdapter.getCurrentProjectId();
     state.currentRunId = state.currentSessionId
       ? storageAdapter.getLatestRun(state.currentSessionId)?.runId || null
@@ -163,7 +163,7 @@ async function selectCurrentProject(projectId: string | null): Promise<ProjectSe
   if (!selectedSession || selectedSession.projectId !== projectId) {
     state.currentSessionId = null;
     state.currentRunId = null;
-    await storageAdapter.setCurrentSessionId(null);
+    storageAdapter.setCurrentSessionId(null);
   } else {
     state.currentRunId = selectedSession.lastRunId || state.currentRunId;
   }

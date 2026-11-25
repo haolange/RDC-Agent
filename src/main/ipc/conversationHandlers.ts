@@ -66,7 +66,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       }
       if (result.session?.sessionId) {
         state.currentSessionId = result.session.sessionId;
-        await storageAdapter.setCurrentSessionId(result.session.sessionId);
+        storageAdapter.setCurrentSessionId(result.session.sessionId);
       }
       if (result.runUpdate?.runId) {
         state.currentRunId = result.runUpdate.runId;
@@ -100,7 +100,7 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
     }
     if (result.session?.sessionId) {
       state.currentSessionId = result.session.sessionId;
-      await storageAdapter.setCurrentSessionId(result.session.sessionId);
+      storageAdapter.setCurrentSessionId(result.session.sessionId);
     }
     if (result.runUpdate?.runId) {
       state.currentRunId = result.runUpdate.runId;

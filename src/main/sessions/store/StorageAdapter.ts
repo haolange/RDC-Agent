@@ -427,12 +427,12 @@ export class StorageAdapter implements StorageHost {
     return this.projects.setCurrentProjectId(projectId);
   }
 
-  async getCurrentSessionId(): Promise<string | null> {
+  getCurrentSessionId(): string | null {
     return this.projects.getCurrentSessionId();
   }
 
-  async setCurrentSessionId(sessionId: string | null): Promise<void> {
-    await this.projects.setCurrentSessionId(sessionId);
+  setCurrentSessionId(sessionId: string | null): void {
+    this.projects.setCurrentSessionId(sessionId);
     if (sessionId) {
       notifySessionArtifactsOpened(sessionId);
     }

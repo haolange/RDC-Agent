@@ -23,7 +23,7 @@ export class SessionResumeService {
   /** 获取可恢复的会话状态。若无历史会话，返回 null。 */
   async getResumableSession(): Promise<SessionResumeState | null> {
     try {
-      const sessionId = await storageAdapter.getCurrentSessionId();
+      const sessionId = storageAdapter.getCurrentSessionId();
       if (!sessionId) return null;
 
       const session = storageAdapter.readSession(sessionId);

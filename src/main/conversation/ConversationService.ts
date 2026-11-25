@@ -715,7 +715,7 @@ export class ConversationService {
 
   private async resolveContext(input: ConversationContextInput): Promise<ResolvedConversationContext> {
     const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
-    const persistedSessionId = await storageAdapter.getCurrentSessionId();
+    const persistedSessionId = storageAdapter.getCurrentSessionId();
     const resolvedSessionId = input.sessionId ?? input.fallbackSessionId ?? persistedSessionId ?? null;
     const session = resolvedSessionId ? storageAdapter.readSession(resolvedSessionId) : null;
     const currentRun = resolvedSessionId

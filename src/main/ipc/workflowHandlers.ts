@@ -57,7 +57,7 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
       });
       if (sessionId) {
         state.currentSessionId = sessionId;
-        await storageAdapter.setCurrentSessionId(sessionId);
+        storageAdapter.setCurrentSessionId(sessionId);
         state.currentRunId = storageAdapter.getLatestRun(sessionId)?.runId || null;
       }
       return { success: true };

@@ -172,6 +172,25 @@ describe('TurnCoordinator', () => {
     expect(coordinator.getActive('s')).toBe(second);
   });
 
+  it('serializes concurrent begins so exactly one turn stays active and every earlier one is aborted', async () => {
+    const [first, second, third] = await Promise.all(['t1', 't2', 't3'].map((turnId) => coordinator.beginTurn({ sessionKey: 's', turnId })));
+    expect([first.isAborted, second.isAborted, third.isAborted]).toEqual([true, true, false]);
+    expect(coordinator.getActive('s')).toBe(third);
+  });
+
+  it('a stop that finishes after a new turn began does not remove the new turn', async () => {
+    const first = await coordinator.beginTurn({ sessionKey: 's', turnId: 't1' });
+    let release!: () => void;
+    const producerDone = new Promise<void>((resolve) => { release = resolve; });
+    first.registerProducer({ id: 'p1', abort: () => undefined, join: () => producerDone });
+    const replacement = coordinator.beginTurn({ sessionKey: 's', turnId: 't2' });
+    await new Promise((resolve) => setImmediate(resolve)); // the replacement is now waiting for t1 to stop
+    const stopping = coordinator.abortSession('s');
+    release();
+    await stopping;
+    expect(coordinator.getActive('s')).toBe(await replacement);
+  });
+
   it('abortAll clears every session', async () => {
     await coordinator.beginTurn({ sessionKey: 'a', turnId: '1' });
     await coordinator.beginTurn({ sessionKey: 'b', turnId: '2' });

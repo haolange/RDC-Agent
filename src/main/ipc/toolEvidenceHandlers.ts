@@ -40,7 +40,7 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
 
   ipcMain.handle('evidence:getChain', async (_event, ...rawArgs: unknown[]) => {
     parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'evidence:getChain', maxBytes: 1024 });
-    const sessionId = await storageAdapter.getCurrentSessionId();
+    const sessionId = storageAdapter.getCurrentSessionId();
     if (!sessionId) {
       return { sessionId: '', runId: '', events: [], isValid: true };
     }

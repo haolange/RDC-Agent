@@ -561,11 +561,23 @@ export class TurnHandle {
   }
 }
 
+interface BeginTurnInput {
+  sessionKey: string;
+  turnId: string;
+  runId?: string | null;
+  parentSignal?: AbortSignal | null;
+  eventSink?: TurnEventSink | null;
+  subagentBudget?: SubagentBudgetState;
+  policyBudget?: PolicyBudgetState;
+}
+
 export class TurnCoordinator {
   private readonly activeBySession = new Map<string, TurnHandle>();
   /** Orphaned handles retained until producers fully settle. */
   private readonly orphanedBySession = new Map<string, TurnHandle>();
   private generationSeq = 0;
+  /** Begins for one session run one after another, so two concurrent sends cannot both become the active turn. */
+  private readonly beginQueue = new Map<string, Promise<unknown>>();
 
   getActive(sessionKey: string): TurnHandle | null {
     return this.activeBySession.get(sessionKey) ?? null;
@@ -576,15 +588,20 @@ export class TurnCoordinator {
   }
 
   /** Begin a turn for a session; aborts any previous active turn for that session. */
-  async beginTurn(input: {
-    sessionKey: string;
-    turnId: string;
-    runId?: string | null;
-    parentSignal?: AbortSignal | null;
-    eventSink?: TurnEventSink | null;
-    subagentBudget?: SubagentBudgetState;
-    policyBudget?: PolicyBudgetState;
-  }): Promise<TurnHandle> {
+  beginTurn(input: BeginTurnInput): Promise<TurnHandle> {
+    const begin = () => this.beginTurnNow(input);
+    const previous = this.beginQueue.get(input.sessionKey) ?? Promise.resolve();
+    // The previous begin's outcome belongs to its own caller; this one starts after it settles either way.
+    const next = previous.then(begin, begin);
+    this.beginQueue.set(input.sessionKey, next);
+    const release = () => {
+      if (this.beginQueue.get(input.sessionKey) === next) this.beginQueue.delete(input.sessionKey);
+    };
+    next.then(release, release);
+    return next;
+  }
+
+  private async beginTurnNow(input: BeginTurnInput): Promise<TurnHandle> {
     const orphaned = this.orphanedBySession.get(input.sessionKey);
     if (orphaned && !orphaned.isSettled) {
       throw new Error(
@@ -657,7 +674,8 @@ export class TurnCoordinator {
       this.retainOrphan(handle);
       return;
     }
-    this.activeBySession.delete(sessionKey);
+    // A turn begun while this one was stopping is the session's active turn now; only the aborted handle leaves.
+    if (this.activeBySession.get(sessionKey) === handle) this.activeBySession.delete(sessionKey);
   }
 
   async abortAll(reason: AbortReason = 'app_shutdown'): Promise<void> {

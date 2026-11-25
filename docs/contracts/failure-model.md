@@ -77,6 +77,7 @@
 | 配置文件单文件 invalid + diagnostics | Integrity | 逐文件隔离，不拖垮列表 |
 | Provider stream buffer 超限 | Integrity | 8MiB fail-closed 截断会话步 |
 | 用户 Stop / abortAndJoin | Availability | join producers；丢弃迟到 event |
+| main 进程未处理的 rejection / 未捕获异常 | Integrity | 写运行日志（含 stack）；未捕获异常另弹原生错误框，与 Electron 默认可见性一致；main 生产代码由 ESLint `no-floating-promises` 保证每个 promise 被 await、处理或显式 `void` |
 | ProcessSupervisor timeout/abort | Availability | terminate process tree; settle only after observed close/error; retain `unconfirmed_orphan` in registry for diagnostics |
 | ShutdownCoordinator 限时 shutdown | Availability | 尽量排空后退出；`release_owned_runtimes` 失败必须记错误并保留归属记录，不得假装 daemon 已停 |
 | Provider 网络/配额类错误 | Availability | 按 ErrorRecovery 契约；不发明 entitlement；429 与明确 `quota_exceeded` 的 402 只记录短期 quota |
