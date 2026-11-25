@@ -68,6 +68,8 @@ jobs:
           RDC_DIFF_BASE: ${{ steps.base.outputs.sha }}
         run: pnpm run check:git-diff
       - run: pnpm run build
+      - name: Renderer entry chunk budget
+        run: node scripts/check-bundle-deps.mjs --entry-chunk
 
   macos-shell:
     runs-on: macos-latest

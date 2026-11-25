@@ -41,6 +41,9 @@ importers:
       gitlab-ai-provider:
         specifier: 6.11.1
         version: 6.11.1(@ai-sdk/provider-utils@4.0.67(zod@4.6.7))(@ai-sdk/provider@3.0.14)(@aws-sdk/credential-provider-node@3.972.98)(@smithy/signature-v4@5.7.5)(encoding@0.1.13)(graphql@16.14.2)(ws@8.23.0)
+      gpt-tokenizer:
+        specifier: ^3.4.0
+        version: 3.4.0
       pdfjs-dist:
         specifier: ^6.5.438
         version: 6.5.438
@@ -117,9 +120,6 @@ importers:
       eslint-plugin-react-hooks:
         specifier: ^5.2.0
         version: 5.2.0(eslint@9.39.5(jiti@2.7.0))
-      gpt-tokenizer:
-        specifier: ^3.4.0
-        version: 3.4.0
       happy-dom:
         specifier: ^21.0.4
         version: 21.0.4

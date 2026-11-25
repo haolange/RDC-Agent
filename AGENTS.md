@@ -198,7 +198,7 @@ Session 右栏是 Tasks / Artifacts / Outputs / Context / Capture 单轨，投�
 
 - 构建与测试输出、日志、缓存、workspace 数据和临时文件不入库；根文件受 `check:repository-hygiene` 允许名单约束。
 - 依赖唯一 `pnpm@11.7.0`，保留 `pnpm-lock.yaml`；`pnpm-workspace.yaml` 固定 store。禁止 npm／Yarn fallback、根盘 store、第二 launcher。`node_modules`、`out`、`release`、下载缓存和 prepare state 仅本机；发布包不带包管理器、lockfile、源码 launcher 或开发缓存。
-- `dependencies` 只放 main / preload 在运行时 `require` 的包（electron-vite 把它们外置，electron-builder 随包发出）；只被 renderer 使用的包由 Vite 打进 bundle，放 `devDependencies`，不重复进安装包。同一个包在锁文件里只留一个版本，传递依赖的分叉与已知漏洞用 `pnpm-workspace.yaml` 的 `overrides` 收敛并写明原因。
+- `dependencies` 只放 main / preload 在运行时 `require` 的包（electron-vite 把它们外置，electron-builder 随包发出）；只被 renderer 使用的包由 Vite 打进 bundle，放 `devDependencies`，不重复进安装包。同一个包在锁文件里只留一个版本，传递依赖的分叉与已知漏洞用 `pnpm-workspace.yaml` 的 `overrides` 收敛并写明原因。`check:bundle-deps`（在 `check:gates` 内）按实际 import 校验这条归属（运行时依赖的必需 peer 算作被使用），CI `build` 另以 `--entry-chunk` 校验 renderer 入口 chunk 预算。
 - 禁止恢复独立 `cli/`、Playwright `e2e/`、`docs/handover/`。`designs` 只保留 `rdc-agent-design-system`。
 - 目录与文件按稳定职责命名，不用 v1/v2、new/old、final 等迭代标签建立并行路径；协议或存储版本只在确有语义需要的边界表达。已有带版本名且仍被引用的实现，先核对调用与契约再收敛。不提交乱码。
 - 用户资源根固定 `~/.rdc-agent`，项目资源根固定 `<project-root>/.rdc-agent`；不加可配置根、旧目录 fallback、双写或静默迁移。Project Scope 覆盖 agents／skills／MCP／hooks／policies／knowledge／memory；`plans/<sessionId>/` 只在用户点击「保存到项目」时写入。CLI executable、参数前缀、工作目录、环境、超时和 secret 是本机边界，project 不得覆盖。
