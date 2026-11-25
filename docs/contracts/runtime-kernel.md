@@ -221,7 +221,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 ## Hooks
 
-唯一引擎是 `HookEngine`。分发根：`resources/agent-runtime/hooks`（builtin）< `~/.rdc-agent/hooks` < `<project>/.rdc-agent/hooks`，与 `ScopedResourceResolver` 同序。Hook trust 指纹、builtin/user/project 信任规则与旧 trust 失效见 [permissions.md](permissions.md)「Hook Trust」。接线事件（12 canonical）：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。禁止第二套 `AgentHooks`。
+唯一引擎是 `HookEngine`。逐文件解析 `*.hook.yml`：单个文件格式不合法时只把它记入 `invalidFiles()` 并作为 Runtime overview 诊断显示，其余 hook 照常加载与分发。分发根：`resources/agent-runtime/hooks`（builtin）< `~/.rdc-agent/hooks` < `<project>/.rdc-agent/hooks`，与 `ScopedResourceResolver` 同序。Hook trust 指纹、builtin/user/project 信任规则与旧 trust 失效见 [permissions.md](permissions.md)「Hook Trust」。接线事件（12 canonical）：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。禁止第二套 `AgentHooks`。
 
 ## Declared Continue and Execution Offer
 

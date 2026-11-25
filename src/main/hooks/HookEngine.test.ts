@@ -41,6 +41,22 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     expect(engine.load(path.join(root, 'user-hooks'), project, isolatedBuiltin)[0].trust.trusted).toBe(false);
   });
 
+  it('loads the other hooks when one hook file is malformed and reports that file', () => {
+    const root = makeRoot();
+    const userHooks = path.join(root, 'user-hooks');
+    fs.mkdirSync(userHooks, { recursive: true });
+    fs.writeFileSync(path.join(userHooks, 'good.hook.yml'), YAML.stringify({
+      id: 'good', event: 'turn.before-start', command: process.execPath, failurePolicy: 'warn',
+    }));
+    fs.writeFileSync(path.join(userHooks, 'broken.hook.yml'), 'id: broken\nevent: [unclosed');
+    const engine = new HookEngine(path.join(root, 'trust.json'));
+    const loaded = engine.load(userHooks, undefined, emptyBuiltin());
+    expect(loaded.map((hook) => hook.definition.id)).toEqual(['good']);
+    expect(engine.invalidFiles()).toEqual([
+      expect.objectContaining({ scope: 'user', sourcePath: path.join(userHooks, 'broken.hook.yml') }),
+    ]);
+  });
+
   it('resolves builtin < user < project with the same ScopedResourceResolver order', async () => {
     const root = makeRoot();
     const builtin = path.join(root, 'builtin');

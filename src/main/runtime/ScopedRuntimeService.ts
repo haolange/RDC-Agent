@@ -136,6 +136,9 @@ export class ScopedRuntimeService {
         diagnostics.push(`hook/${hook.scope}/${hook.id}: ${hook.scope} hook is not trusted`);
       }
     }
+    for (const file of this.hooks.invalidFiles()) {
+      diagnostics.push(`hook/${file.scope}/${path.basename(file.sourcePath)}: ${file.reason}`);
+    }
     for (const server of mcpServers) {
       if (server.blockedReason) {
         diagnostics.push(`mcp/${server.scope}/${server.id}: ${server.blockedReason}`);

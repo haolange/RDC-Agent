@@ -36,6 +36,12 @@ export interface LoadedHook {
   trust: HookTrustState;
 }
 
+export interface InvalidHookFile {
+  scope: 'builtin' | 'user' | 'project';
+  sourcePath: string;
+  reason: string;
+}
+
 export interface HookExecutionResult {
   hookId: string;
   allowed: boolean;
@@ -77,6 +83,12 @@ export class HookEngine {
   }
 
   private loaded: LoadedHook[] = [];
+  private invalid: InvalidHookFile[] = [];
+
+  /** Hook files the last load could not parse; they are left out, not fatal. */
+  invalidFiles(): InvalidHookFile[] {
+    return [...this.invalid];
+  }
 
   load(
     userHooksPath: string,
@@ -91,13 +103,20 @@ export class HookEngine {
         .sort()
         .forEach((entry) => {
           const sourcePath = path.join(root, entry);
-          const value = parseHookFile(sourcePath);
-          candidates.push({ id: value.id, kind: 'hook', scope, sourcePath, value, enabled: value.enabled });
+          // One malformed file is reported on its own and never stops the other hooks from loading.
+          try {
+            const value = parseHookFile(sourcePath);
+            candidates.push({ id: value.id, kind: 'hook', scope, sourcePath, value, enabled: value.enabled });
+          } catch (error) {
+            invalid.push({ scope, sourcePath, reason: error instanceof Error ? error.message : String(error) });
+          }
         });
     };
+    const invalid: InvalidHookFile[] = [];
     addDirectory(builtinHooksPath, 'builtin');
     addDirectory(userHooksPath, 'user');
     if (projectRoot) addDirectory(appPathService.getProjectRdcPaths(projectRoot).hooksPath, 'project');
+    this.invalid = invalid;
 
     const trustStore = this.readTrustStore();
     this.loaded = scopedResourceResolver.resolve(candidates).resources.map((resource) => {
