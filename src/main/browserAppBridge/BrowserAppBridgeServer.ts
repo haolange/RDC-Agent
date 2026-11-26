@@ -7,14 +7,8 @@ import { URL } from 'url';
 import { AppError, IPC_ERROR_KEY, isIpcErrorResult } from '@shared/errors/appError';
 import { buildRendererCsp } from '@shared/utils/rendererCsp';
 import { invokeRegisteredIpcChannel } from '../ipc/invokeRegistry';
-import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/provider-catalog/effectiveCatalogTypes';
-import {
-  MODELS_DEV_IDENTITY_COUNT,
-  MODELS_DEV_SNAPSHOT_SHA256,
-  PROVIDER_CATALOG_SCHEMA_VERSION,
-} from '../provider-catalog/catalogCompiler';
+import { MODELS_DEV_IDENTITY_COUNT, MODELS_DEV_SNAPSHOT_SHA256 } from '../provider-catalog/catalogCompiler';
 import { getProviderCatalogRevision, listProviderSummaries } from '../provider-catalog/ProviderCatalogRegistry';
-import { SETTINGS_SCHEMA_VERSION } from '../settings/settings-core/settingsFileSchema';
 import { rendererEventHub } from '../runtime/rendererEventHub';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
 import { isBrowserQaRun } from '../runtime/browserQaRun';
@@ -44,11 +38,6 @@ interface BrowserHealthMetadata {
   buildFingerprint: string;
   rendererFingerprint: string;
   mainFingerprint: string;
-  schema: {
-    settings: number;
-    effectiveCatalog: number;
-    providerCatalog: number;
-  };
   catalogRevision: string;
   catalog: {
     source: 'models.dev';
@@ -95,11 +84,6 @@ function resolveHealthMetadata(options: BridgeOptions): BrowserHealthMetadata {
     buildFingerprint: sha256(`${options.appVersion}:${mainFingerprint}:${rendererFingerprint}`),
     rendererFingerprint,
     mainFingerprint,
-    schema: {
-      settings: SETTINGS_SCHEMA_VERSION,
-      effectiveCatalog: EFFECTIVE_CATALOG_SCHEMA_VERSION,
-      providerCatalog: PROVIDER_CATALOG_SCHEMA_VERSION,
-    },
     catalogRevision,
     catalog: {
       source: 'models.dev',

@@ -153,8 +153,6 @@ Structural capability, account entitlement, expiring execution evidence, and tra
 
 ## 凭据与请求事务
 
-版本见 `SETTINGS_SCHEMA_VERSION` / `EFFECTIVE_CATALOG_SCHEMA_VERSION`。
-
 - 运行时投影顺序字段不修改缓存 schema。
 - 版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。
 - Settings 只存用户状态，provider/model 目录事实由 manifest 组合：`SettingsService.providerConnections` 在内存里把冻结的目录事实、用户状态与凭据存在性组合一次，只在用户的 provider 状态或凭据 revision 变化时重组；目录 Registry 冻结一次后共享，不按调用克隆；稳定的 provider/model ID、账号 ID（secret ref 由它派生）与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。

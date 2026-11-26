@@ -194,7 +194,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
   - 生产 `connect-src 'self'`：renderer 只经 IPC 或同源 bridge 通信。
   - 生产 `script-src` 无 `unsafe-inline`；`style-src 'self'`（无 `unsafe-inline`）；`style-src-attr 'none'`；`img-src` 只放行 `'self' data: blob:`；`media-src 'self' blob:`。
   - 动态样式经 constructable stylesheet（`useDynStyle` / `assignDynStyle` / Appearance `applyChromeTheme`），不依赖 inline style attributes 或 `<style>` textContent 注入。
-  - Appearance chrome 权威见 [`docs/ui/design-system.md`](docs/ui/design-system.md)；Settings schema 9 保留经校验的用户主题配置。
+  - Appearance chrome 权威见 [`docs/ui/design-system.md`](docs/ui/design-system.md)；Settings 的严格 schema 保留经校验的用户主题配置。
 - **Browser Bridge（debug-only）**：只有未打包构建在 `RDC_AGENT_BROWSER_QA=1`（launcher browser/browser-dev）下才启动它；打包版从不启动。它永远不在发布默认路径上。
   - 每个请求都必须带 bridge 自己的 `Host`。权威入口是 launcher 打印的一次性 `/qa?qaBootstrap=...` URL；bootstrap 成功后签发 HttpOnly、`SameSite=Strict` 的 cookie（HTTPS 时加 `Secure`），并重定向到**同一 bridge origin** 上干净的 `/app`。
   - `browser-dev` 下 Vite 经 bridge 反向代理（含 HMR WebSocket）；浏览器从不直开 Vite 端口，URL query 里从不携带 bridge 凭证或 challenge。反代转发前剥离 `cookie` / `authorization` / `proxy-authorization` / `x-rdc-*`。
@@ -259,7 +259,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
   - 写入走原子持久写（temp + fsync + rename）；deepMerge 拒绝危险原型键。
   - 读取区分不存在、损坏和不支持的版本：损坏每次读都报 `STORAGE_CORRUPT` 且不读成空；不支持的版本报 `STORAGE_SCHEMA_UNSUPPORTED` 并保留原件。
   - Run 只读 run.json v3，run.yaml 是写入投影；attachments.json 只读 schemaVersion 1 的对象；usage.json 只读 schemaVersion 2 的对象。缺版本、旧版本和仅有 YAML 的 Run 明确报 `STORAGE_SCHEMA_UNSUPPORTED`，不自动迁移、改写或隔离原件；当前版本结构不合法报 `STORAGE_SCHEMA`。
-  - Settings 只接受 schemaVersion 9 的严格文档（见「Settings 持久化」）：旧版本同样报错并保留原文件，结构不合法报 `STORAGE_CORRUPT`。其他仍有版本升级责任的文档按各自契约处理。
+  - Settings 只接受当前格式的严格文档（见「Settings 持久化」）：不符合的文件（包括其他格式写下的）报 `STORAGE_CORRUPT` 并保留原文件，启动时提示删除整个数据目录与设置文件后重启。
   - 目录锁对活 pid 永不回收。owner 无法读取时可能仍在初始化，等待并在超时后报错；只自动回收可识别的死 pid 锁。跨进程回收以独占标记串行化，取得标记后重新读取 owner；标记本身不能安全确认失主时等待并超时，不抢占。
 - **结构化压缩**：仅自动压缩；产品不提供按钮、菜单、`/compact` 或 `/summary`。
   - 会话准备和执行途中复用 `PromptPlan → RequestEnvelope → adapter` 的单轮、无工具 model-generated `StructuredHandoff`（`derivation: 'model-generated'`）。
@@ -416,7 +416,7 @@ import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
 
 ### Settings 持久化
 
-Settings 只读 `schemaVersion` **9**（`src/main/settings/settings-core/settingsFileSchema.ts`），每一层都是严格 schema。Settings 读写流程的英文细节见 [`docs/architecture/data-flow.md`](docs/architecture/data-flow.md)「Settings Flow」与「Revisioned Intents」。
+Settings 文件不带格式版本（`src/main/settings/settings-core/settingsFileSchema.ts`），每一层都是严格 schema；其他格式写下的文件同样不符合 schema，在启动时失败。Settings 读写流程的英文细节见 [`docs/architecture/data-flow.md`](docs/architecture/data-flow.md)「Settings Flow」与「Revisioned Intents」。
 
 **文件内容**：
 
@@ -477,7 +477,7 @@ Settings 只读 `schemaVersion` **9**（`src/main/settings/settings-core/setting
   - `read-only` 天花板的 profile（内置 Debugger / Analyzer / Optimizer）不能使用 `shell` 或 `code_interpreter`；它们用 `runtime_context` 读取会话身份，在拥有 lease 时看到其中的 `rdc` 载荷，另用只读 `rdc_probe` 访问 RDC。Full access 不抬高天花板。
 - Knowledge 持久写入仅 human review；`FullAccess` 不可绕过；无自动 Memory / Knowledge / Candidate / Promote。
 - 新结构替代旧结构时直接收敛，不保留 legacy / deprecated shim。
-- 禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding` / `EmbeddingCatalog` / `EmbeddingExecutionService`；Discovery 剔除 embedding modality，Embedding 模型不进入 Agent / Composer / subagent picker，Settings schema 9 的严格 schema 拒绝 embedding 字段。
+- 禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding` / `EmbeddingCatalog` / `EmbeddingExecutionService`；Discovery 剔除 embedding modality，Embedding 模型不进入 Agent / Composer / subagent picker，Settings 的严格 schema 拒绝 embedding 字段。
 - 禁止恢复 ask/plan/edit 或 S0 specialist id 的运行通道与 custom manifest fallback。
 
 ### A. Builtin Profiles
@@ -497,7 +497,7 @@ Settings 只读 `schemaVersion` **9**（`src/main/settings/settings-core/setting
 
 ### C. 已废止：Independent Embedding Capability
 
-Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 六 lane（裁决 G）。`check:knowledge-system` 为六 lane，并要求 embedding runtime 零命中。Settings 当前 schema 9 不接受未知字段，已删除的 embedding 字段随之被拒绝；其他版本 fail-closed 并保留原件。禁止清单见「当前裁决」开头。
+Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 六 lane（裁决 G）。`check:knowledge-system` 为六 lane，并要求 embedding runtime 零命中。Settings 的严格 schema 不接受未知字段，已删除的 embedding 字段随之被拒绝，原件保留。禁止清单见「当前裁决」开头。
 
 ### D. Declared Continue and Execution Offer
 

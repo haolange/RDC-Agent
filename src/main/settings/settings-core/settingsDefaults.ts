@@ -14,7 +14,7 @@ import {
   RIGHT_PANEL_MIN_WIDTH,
   SIDEBAR_MAX_WIDTH,
 } from '@shared/constants/layout';
-import { SETTINGS_SCHEMA_VERSION, type SettingsFile } from './settingsFileSchema';
+import type { SettingsFile } from './settingsFileSchema';
 import type { AgentPermissionMode } from '@shared/types/settings';
 
 export const LEFT_DEFAULTS = {
@@ -36,7 +36,6 @@ export const VALID_PERMISSION_MODES: AgentPermissionMode[] = ['default', 'auto-r
 /** The settings a missing file stands for; nothing is written until the user changes something. */
 export function createDefaultSettingsFile(): SettingsFile {
   return {
-    schemaVersion: SETTINGS_SCHEMA_VERSION,
     appearance: DEFAULT_APPEARANCE,
     layout: DEFAULT_LAYOUT,
     profile: DEFAULT_PROFILE,

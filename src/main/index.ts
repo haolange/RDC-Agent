@@ -485,7 +485,7 @@ app
       settingsService.initialize();
     } catch (error) {
       if (!(error instanceof SettingsFileError)) throw error;
-      // An unusable settings file is never converted or repaired: the user deletes it and reconfigures in Settings.
+      // An unusable settings file is never converted or repaired: the user deletes the data directory and the file.
       console.error('[Main] Settings file cannot be used:', error);
       reportSettingsStartupFailure(error.filePath, isHeadlessMode);
       shutdownExitCode = 1;

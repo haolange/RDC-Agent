@@ -171,7 +171,7 @@ Settings 页标题与正文共用面板内边距。
   - 720 与侧栏折叠对齐；feature 选择器留在所属 feature 样式，不写进 global。
 - 禁止恢复 `styles/tokens/*` 或未接线的 `oklch-themes.css`。
 - 生产 CSP：`style-src 'self'`（无 `unsafe-inline`）+ `style-src-attr 'none'`。Appearance chrome（`applyChromeTheme`）与组件动态样式必须走 constructable stylesheet（`adoptedStyleSheets` / `useDynStyle` / `assignDynStyle`），禁止 `<style>.textContent` 或 `element.style` 注入。
-- 当前 Settings 只接受 `schemaVersion` **9**；合法的 `appearance.chromeThemes` 用户配置经严格 schema 校验保留，缺版本或旧版本在启动时明确报错并保留原文件。历史版本升级的主题重置不属于现行读取路径。
+- Settings 文件不带格式版本；合法的 `appearance.chromeThemes` 用户配置经严格 schema 校验保留，其他格式写下的文件在启动时明确报错并保留原文件。
 
 ## Token 使用规则
 

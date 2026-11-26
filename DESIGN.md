@@ -112,4 +112,4 @@ RDC-Agent 是现代精密工作台，参照 Linear / Raycast / Arc 的完成度�
 
 ## Appearance 与安全呈现
 
-Appearance chrome 和 Composer Agent accent 是两个明确体系。主题配置字段 chromeThemes、支持的 schemaVersion 与持久化约束见工程架构和 Appearance 文档。安全边界由主进程与 CSP 实施；style-src 禁止 inline，样式只走语义 token 和受控样式表（动态坐标经 CSSOM 写入），不以 UI 特效绕过安全要求。正文中的本地媒体与远程图片只经主进程受控通道换成 `blob:`，不放宽 `img-src`。
+Appearance chrome 和 Composer Agent accent 是两个明确体系。主题配置字段 chromeThemes 与持久化约束见工程架构和 Appearance 文档。安全边界由主进程与 CSP 实施；style-src 禁止 inline，样式只走语义 token 和受控样式表（动态坐标经 CSSOM 写入），不以 UI 特效绕过安全要求。正文中的本地媒体与远程图片只经主进程受控通道换成 `blob:`，不放宽 `img-src`。

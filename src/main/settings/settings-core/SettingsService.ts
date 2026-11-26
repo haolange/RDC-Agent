@@ -1,7 +1,7 @@
 /**
  * SettingsService — the single writer of the user's settings and the owner of their in-memory snapshot.
  *
- * Storage: `config.json` (schema v9, `settingsFileSchema.ts`) holds only user state. `initialize` reads it once into
+ * Storage: `config.json` (`settingsFileSchema.ts`) holds only user state. `initialize` reads it once into
  * a frozen `SettingsSnapshot { revision, user }`; every later read is in memory. `update` applies `settings:patch` ops
  * (sections and single Agent model fields; never provider state), sanitizes, writes (compact, atomic, only when the
  * document changed), bumps the revision and broadcasts `settings:changed { revision, sections }`. Provider state
