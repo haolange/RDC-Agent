@@ -47,7 +47,14 @@ const forbiddenTracked = tracked.filter((file) => existsSync(path.join(repoRoot,
 if (forbiddenTracked.length > 0) fail(`Generated/runtime files are tracked:\n${forbiddenTracked.join('\n')}`);
 
 const allowedTrackedRootDirectories = new Set(['.github', 'designs', 'docs', 'patches', 'resources', 'scripts', 'src']);
-const allowedTrackedRootDotFiles = new Set(['.cursorignore', '.eslintrc.cjs', '.gitattributes', '.gitignore']);
+const allowedTrackedRootDotFiles = new Set([
+  '.cursorignore',
+  '.git-blame-ignore-revs',
+  '.gitattributes',
+  '.gitignore',
+  '.prettierignore',
+  '.prettierrc.json',
+]);
 const unexpectedTrackedRoots = [...new Set(tracked.map((file) => file.split('/')[0]))].filter((entry) => {
   if (tracked.includes(entry)) return entry.startsWith('.') && !allowedTrackedRootDotFiles.has(entry);
   return !allowedTrackedRootDirectories.has(entry);

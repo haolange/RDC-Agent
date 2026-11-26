@@ -1,0 +1,17 @@
+# Prettier formats code and styles (AGENTS.md §5). Content whose bytes are part of a contract stays as authored.
+
+# Built-in agents, hooks and runtime resources: hashed byte for byte for trust.
+resources/
+# Recorded fixtures and patches are replayed or applied verbatim.
+**/__fixtures__/
+patches/
+# Data, documents and manifests: provider catalog JSON feeds fingerprints, Markdown and YAML are reviewed as prose
+# and configuration.
+pnpm-lock.yaml
+*.json
+*.md
+*.yml
+*.yaml
+*.html
+*.sse
+*.jsonl
