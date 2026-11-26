@@ -4,7 +4,7 @@ RDC Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测�
 
 ## 原生 CLI 配置与输出边界
 
-- RDC-Tool CLI 安装位置、参数前缀、工作目录、环境与超时是 User/Device 配置，Project 资源不能覆盖本机执行入口。
+- RDC-Tool CLI 安装位置、参数前缀、工作目录、环境与无进展等待是 User/Device 配置，Project 资源不能覆盖本机执行入口。
 - 桌面调用原生 CLI 时，若 Settings `env` 未写 `RDC_TOOL_INTERMEDIATE_ROOT`，主进程注入用户资源根下的 `rdc-tool-intermediate`。
   - Settings 已写则原样使用。
   - CLI 可执行文件仍只来自 Settings，不探测安装包或源码树，不把 Tools 默认 `intermediate` 当作产品 fallback。
@@ -45,14 +45,12 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 - 它不是整批未来空间预留、物理磁盘剩余量或未来写入成功保证；每次写入仍走既有原子预留、限额和事务。
 - 计划据此核算保守材料预算，实际失败时保留已发生效果并按恢复合同处理，不把一个 baseline 导出成功当后续容量证明。
 
-`cliProcess` 只在执行上下文与当前 session/project/context/lease version 的冻结绑定一致、CLI 已启用且 timeout 为有效正整数时提供冻结的 `timeoutMs`，不序列化 executable、argv、cwd 或环境。
+`operationBudget` 只在执行上下文与当前 session/project/context/lease version 的冻结绑定一致、CLI 已启用时提供冻结的 `noProgressTimeoutMs`，不序列化 executable、argv、cwd 或环境。
 
-- 其 scope 是一次 CLI invocation，`wholeOperationDeadline=false`、`nativeTerminationGuaranteed=false`；主进程的前置核验和调用后 replay observation 可能另调用 CLI，排队、模型、存储和后续恢复须另计，不将这个数冒充整个实验或整个操作的绝对墙钟上界。
+- 它是每个 RDC 操作的无进展耐心（`rule: no-progress`、`scope: each-rdc-operation`），不是进程墙钟：持续报告进展的操作没有总时长，静默超过它的操作被判定卡住，worker 被停止，owning context 被隔离（`stuckOutcome`）。
+- `wholeOperationDeadline=false`；主进程的前置核验和调用后 replay observation 可能另调用 CLI，排队、模型、存储和后续恢复须另计，不将这个数冒充整个实验的上界。
 - 缺失、漂移和读取失败显式 unavailable，不补默认零值。
-- 超时或结果不确定依旧隔离 owning context；没有 close/error 回执不能认定子进程退出。
-- Windows 树终止命令自身设置 5 秒 timeout；重复取消、timeout 与 shutdown 合并为一次初始终止和一次升级，保留首个中止原因。
-- `termination.maxTreeKillAttempts=2`，`joinTerminationAdditionalWaitMs=2×5000+2000+1000=13000`，均由同一 ProcessSupervisor 政策导出，供单 CLI join 等待规划；这不覆盖排队、spawn、模型、存储或事件循环停顿，也不承诺目标真实退出。
-- 终止命令返回仍不能替代 close/error。
+- 结果不确定依旧隔离 owning context；没有 close/error 回执不能认定子进程退出。
 
 真实进程连续性使用同一受控 CLI 的 `rd.session.get_context.data.process_identity` 和每次 canonical 结果的 `meta.process_identity`。
 
@@ -108,15 +106,16 @@ Memory 与 Knowledge 使用独立 scoped preload domain（`memory` / `knowledge`
 - 目录不从独立文件配置读取，机器调用统一 canonical JSON；不匹配时明确升级，不回退旧命令。
 - 安装必须在 `version --json` 里报告自己提供的 catalog（`catalog.fingerprint` / `tool_count`，RDC-Tool 1.1.3 起），该报告须与 `tools list` 实际提供的 catalog 一致，且须等于本构建随包的 `resources/agent-runtime/rdc-tool-catalog-identity.json`（由 `scripts/generate-rdc-tool-guides.mjs` 与 skill 指南一同生成）；未报告为 `RDC_UPGRADE_REQUIRED`，不一致为 `RDC_CATALOG_MISMATCH`，错误写明双方指纹。
 
-Settings 持久化保留 executable、argsPrefix、cwd、env 和 timeout，用户通过安装根目录选择配置前三项。main 解析真实路径，检测只访问已配置目录和 Tools 默认安装目录；验证草稿时读取同安装版本/catalog，成功后走既有 Settings 保存。选择取消、验证失败不覆盖原值。高级面保留 env/timeout。四个生命周期命令模板、模板变量、catalogPath 和 JSON 模式配置已移除。接口匹配根据软件所需契约判定，不把工具总数或包版本作为权限条件。
+Settings 持久化保留 executable、argsPrefix、cwd、env 和 `noProgressTimeoutMs`，用户通过安装根目录选择配置前三项。main 解析真实路径，检测只访问已配置目录和 Tools 默认安装目录；验证草稿时读取同安装版本/catalog，成功后走既有 Settings 保存。选择取消、验证失败不覆盖原值。高级面保留启用、无进展等待与 env。四个生命周期命令模板、模板变量、catalogPath 和 JSON 模式配置已移除。接口匹配根据软件所需契约判定，不把工具总数或包版本作为权限条件。
 
 正式安装来源按发布资产 SHA-256、`RELEASE_MANIFEST.json` / `SBOM.json` 的版本与 `source_revision`、安装文件哈希逐层核对，再通过实际主进程的运行摘要、catalog 和安装验证入口确认同安装绑定。升级使用已验证的正式包，不向安装目录混拷开发源码或重写发行清单；包版本用于来源诊断，不能替代实际能力校验。历史发行记录保留其当时版本和验证边界。
 
-RDC-Tool 的 session worker 对 `rd.session.*` 统一提供 60 秒操作预算，CLI transport 在此基础上增加 5 秒响应缓冲，实际传输门限为 65 秒；RDC-Agent 常规 CLI 调用的本机默认预算为 120 秒。
+RDC 操作不受固定时长约束，只受无进展预算约束（RDC-Tool 公共契约的「执行预算、进度与取消」）。Settings `tooling.rdcCli.noProgressTimeoutMs`（默认 300000，范围 30000–3600000，界面以秒编辑）是 RDC 操作的无进展耐心：操作多久没有报告进展就判定卡住；持续报告进展的操作没有总时长。
 
+- `prepareTurn` 把它冻结在 turn binding 中；`freezeRdcTurnBinding` 按冻结目录每个操作 `execution_budget` 的最小、最大值校验，超出为 `RDC_NO_PROGRESS_TIMEOUT_UNSUPPORTED`，错误写明可接受的秒数范围。
+- 设置文件严格校验范围；保存越界值报 `IPC_VALIDATION_ERROR`，不钳制、不迁移。
+- 不执行操作的控制命令（daemon start/stop/status、context clear/status、version、tools list、doctor）使用固定的 `RDC_CONTROL_TIMEOUT_MS`，覆盖 RDC-Tool 30 秒 daemon 启动锁、就绪与确认停止；安装验证同样使用它，不借用用户的无进展耐心。
 - Remote 准备没有自己的时长参数，和其它操作一样只受请求的无进展预算约束（见下文 Remote 准备预算）。
-- Settings 中显式保存的超时值原样保留，不做默认值迁移。
-- 各层门限由所属边界负责，普通 session 调用不传第二套 session timeout。
 
 `prepareTurn` 冻结 CLI 配置、完整操作定义及其指纹、owning session/context/replay lease 身份。在途 Settings 变化不影响该轮。General 使用已有 shell 的结构化 RDC 模式，普通 command 与 rdc 互斥；轻量发现只返回匹配操作或单个操作说明，不把完整 catalog 展开进每次模型请求。
 

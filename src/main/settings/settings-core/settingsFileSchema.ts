@@ -5,6 +5,7 @@ import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/mod
 import { isHexColor } from '@shared/theme/color';
 import { THEME_PRESET_IDS } from '@shared/theme/presets';
 import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
+import { RDC_NO_PROGRESS_TIMEOUT_RANGE_MS } from '@shared/constants/appSettingsDefaults';
 import { isSafeAgentProfileId } from '../agent-manifests/agentProfileId';
 import type {
   AgentModelSettings,
@@ -92,7 +93,9 @@ const ToolingSchema: z.ZodType<ToolingSettings> = z
         argsPrefix: stringList,
         workingDirectory: text,
         env: stringMap,
-        timeoutMs: integer.positive(),
+        noProgressTimeoutMs: integer
+          .min(RDC_NO_PROGRESS_TIMEOUT_RANGE_MS.min)
+          .max(RDC_NO_PROGRESS_TIMEOUT_RANGE_MS.max),
       })
       .strict(),
     codeInterpreter: z

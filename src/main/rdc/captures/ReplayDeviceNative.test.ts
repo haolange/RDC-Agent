@@ -8,7 +8,14 @@ import type { ReplayDeviceEntry } from '@shared/types/device';
 const execute = vi.hoisted(() => vi.fn());
 vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: {} }));
 vi.mock('../RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: execute } }));
-const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 };
+const cli = {
+  enabled: true,
+  command: 'rdc',
+  argsPrefix: [],
+  workingDirectory: '',
+  env: {},
+  noProgressTimeoutMs: 30_000,
+};
 const binding = freezeRdcTurnBinding(cli, [
   {
     name: 'rd.remote.connect',

@@ -1022,7 +1022,7 @@ describe('RuntimeToolAssembly', () => {
             argsPrefix: ['private-entry'],
             workingDirectory: 'private-directory',
             env: { SECRET: 'private-secret' },
-            timeoutMs: 20000,
+            noProgressTimeoutMs: 60_000,
           },
           [],
           {
@@ -1036,7 +1036,7 @@ describe('RuntimeToolAssembly', () => {
       expect(body.rdc.hostControls).toMatchObject({
         available: true,
         artifactCapacity: { remaining: { bytes: 22, toolOutputFiles: 1 }, isReservation: false },
-        cliProcess: { timeoutMs: 20000, wholeOperationDeadline: false, nativeTerminationGuaranteed: false },
+        operationBudget: { noProgressTimeoutMs: 60_000, rule: 'no-progress', wholeOperationDeadline: false },
       });
       expect(JSON.stringify(body)).not.toContain('private-');
     } finally {

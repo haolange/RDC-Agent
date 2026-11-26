@@ -28,7 +28,7 @@ const settings = {
   argsPrefix: [],
   workingDirectory: '',
   env: {},
-  timeoutMs: 1000,
+  noProgressTimeoutMs: 300_000,
 };
 function context() {
   const lease = setRdcRuntimeContextForSession(

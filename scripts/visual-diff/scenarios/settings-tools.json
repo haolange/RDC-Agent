@@ -23,12 +23,9 @@
  ],
  "settleMs": 1000,
  "responses": {
-  "settings:get": [
+  "settings:getProviderCatalog": [
    {
-    "ref": "418c435f80d076ecebf6dbba"
-   },
-   {
-    "ref": "418c435f80d076ecebf6dbba"
+    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "app:getMeta": [
@@ -45,8 +42,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-fa6663e043da-1795700892795",
-       "timestamp": 1795700892795,
+       "id": "rlog-ee3b6326c0fb-1795705507474",
+       "timestamp": 1795705507474,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -60,8 +57,8 @@
        }
       },
       {
-       "id": "rlog-f9b8ca5b348e-1795700892873",
-       "timestamp": 1795700892873,
+       "id": "rlog-d2dd730415eb-1795705507523",
+       "timestamp": 1795705507523,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -73,8 +70,8 @@
        "raw": null
       },
       {
-       "id": "rlog-af961f2c06e3-1795700892873",
-       "timestamp": 1795700892873,
+       "id": "rlog-8509490ee0aa-1795705507523",
+       "timestamp": 1795705507523,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -86,8 +83,8 @@
        "raw": null
       },
       {
-       "id": "rlog-6dba79fdbe06-1795700892888",
-       "timestamp": 1795700892888,
+       "id": "rlog-d94698f68686-1795705507540",
+       "timestamp": 1795705507540,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -132,9 +129,12 @@
     }
    }
   ],
-  "settings:getProviderCatalog": [
+  "settings:get": [
    {
-    "ref": "940d6477c7fd25814c9e78e0"
+    "ref": "c4dcce12b4067ce90568ef1a"
+   },
+   {
+    "ref": "c4dcce12b4067ce90568ef1a"
    }
   ],
   "project:list": [
@@ -146,7 +146,7 @@
   ],
   "rdc-runtime:overview": [
    {
-    "ref": "bdfd64b4712d2fc1d2fd0613"
+    "ref": "fa3f30e8ba6a47bf34aa4e64"
    }
   ],
   "mcp:getStatusSummary": [

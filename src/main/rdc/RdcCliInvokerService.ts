@@ -24,6 +24,14 @@ import type {
 import type { CLIResult } from '../tools/ShellInvocationService';
 import type { RdcOperationDefinition } from './RdcOperationCatalog';
 
+/**
+ * Commands that do no operation work (daemon start/stop/status, context clear/status, version, tools list, doctor) keep
+ * a fixed wall: long enough for RDC-Tool's 30 s daemon start lock, daemon readiness and a confirmed stop. Operation work
+ * is bounded by the frozen no-progress patience instead, never by this constant.
+ */
+export const RDC_CONTROL_TIMEOUT_MS = 60_000;
+const RDC_CONTROL_COMMANDS = new Set(['daemon', 'context', 'version', 'tools', 'doctor']);
+
 /** Artifacts RDC-Tool reports beside its data; fields this app does not read pass through. */
 const ToolArtifactsSchema: ZodType<ToolArtifact[] | undefined> = z
   .array(
@@ -312,7 +320,8 @@ export class RdcCliInvokerService {
       args: invocation.args,
       cwd: options.cwd || settings.workingDirectory || undefined,
       env: { ...settings.env, PYTHONHOME: undefined, PYTHONPATH: undefined },
-      timeoutMs: options.timeout ?? settings.timeoutMs,
+      timeoutMs:
+        options.timeout ?? (RDC_CONTROL_COMMANDS.has(command) ? RDC_CONTROL_TIMEOUT_MS : settings.noProgressTimeoutMs),
       outputBufferBytes: 8 * 1024 * 1024,
       runId: options.runId,
       contextId: options.contextId,
@@ -374,7 +383,6 @@ export class RdcCliInvokerService {
       }
 
       const result = await this.executeCLI('call', cliArgs, {
-        timeout: this.getSettings().timeoutMs,
         runId: request.runId,
         contextId: request.contextId,
         abortSignal: request.abortSignal,

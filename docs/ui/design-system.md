@@ -457,6 +457,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 | 产物 | Artifacts | 调查记录 |
 | 输出 | Outputs | 用户输出文件 |
 | 事件 | Event | 代替 EID |
+| 无进展 | No progress | RDC 操作多久没有报告进展；设置项「无进展等待」 |
 | 知识卡片 | Knowledge card | 知识中心条目 |
 
 ## 启动画面与窗口背景

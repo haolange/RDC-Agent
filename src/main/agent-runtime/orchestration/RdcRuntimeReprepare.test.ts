@@ -8,7 +8,14 @@ import type { RdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 it('rebuilds the next request from frozen authority and refuses catalog or prior-plan drift', () => {
-  const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };
+  const cli = {
+    enabled: true,
+    command: 'rdc',
+    argsPrefix: [],
+    workingDirectory: '',
+    env: {},
+    noProgressTimeoutMs: 300_000,
+  };
   const old = {
     ownerSessionId: 's',
     ownerProjectId: 'p',

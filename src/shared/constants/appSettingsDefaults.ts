@@ -52,13 +52,19 @@ export const DEFAULT_PROFILE: ProfileSettings = {
   avatarPath: '',
 };
 
+/**
+ * The range the RDC no-progress patience may take (`tooling.rdcCli.noProgressTimeoutMs`): the range every RDC-Tool
+ * catalog entry publishes in its `execution_budget`. A turn binding is still checked against its frozen catalog.
+ */
+export const RDC_NO_PROGRESS_TIMEOUT_RANGE_MS = Object.freeze({ min: 30_000, max: 3_600_000 });
+
 export const DEFAULT_RDC_CLI_INVOKER: RdcCliInvokerSettings = {
   enabled: false,
   command: '',
   argsPrefix: [],
   workingDirectory: '',
   env: {},
-  timeoutMs: 120000,
+  noProgressTimeoutMs: 300_000,
 };
 
 export const DEFAULT_CODE_INTERPRETER: CodeInterpreterSettings = {

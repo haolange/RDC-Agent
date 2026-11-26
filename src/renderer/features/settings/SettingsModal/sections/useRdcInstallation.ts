@@ -68,7 +68,11 @@ export function useRdcInstallation(draft: RdcCliInvokerSettings, onApplied: (set
     invalidate,
     choose: (value: string) =>
       run('select', async (current) => {
-        const result = await resolveRdcInstallation({ root: value, timeoutMs: draft.timeoutMs, env: draft.env });
+        const result = await resolveRdcInstallation({
+          root: value,
+          noProgressTimeoutMs: draft.noProgressTimeoutMs,
+          env: draft.env,
+        });
         if (current()) setRoot(result.workingDirectory);
       }),
     detect: () =>
@@ -83,12 +87,20 @@ export function useRdcInstallation(draft: RdcCliInvokerSettings, onApplied: (set
       run('select', async (current) => {
         const selected = await selectRdcInstallation();
         if (!selected || !current()) return;
-        const resolved = await resolveRdcInstallation({ root: selected, timeoutMs: draft.timeoutMs, env: draft.env });
+        const resolved = await resolveRdcInstallation({
+          root: selected,
+          noProgressTimeoutMs: draft.noProgressTimeoutMs,
+          env: draft.env,
+        });
         if (current()) setRoot(resolved.workingDirectory);
       }),
     apply: () =>
       run('apply', async (current) => {
-        const result = await validateRdcInstallation({ root, timeoutMs: draft.timeoutMs, env: draft.env });
+        const result = await validateRdcInstallation({
+          root,
+          noProgressTimeoutMs: draft.noProgressTimeoutMs,
+          env: draft.env,
+        });
         if (!current()) return;
         const saved = await useAppSettingsStore
           .getState()

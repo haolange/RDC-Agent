@@ -84,7 +84,14 @@ const contract: InvestigationPlanContract = {
     inputs: [{ inputId: 'a', fileName: 'a.rdc', contentSha256: 'a'.repeat(64) }],
   },
 };
-const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };
+const cli = {
+  enabled: true,
+  command: 'rdc',
+  argsPrefix: [],
+  workingDirectory: '',
+  env: {},
+  noProgressTimeoutMs: 300_000,
+};
 const destination = { inputId: 'a', contentSha256: 'a'.repeat(64), deviceId: 'local' };
 const processIdentity = {
   status: 'available' as const,

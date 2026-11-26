@@ -1,4 +1,5 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
+import { RDC_NO_PROGRESS_TIMEOUT_RANGE_MS } from '@shared/constants/appSettingsDefaults';
 import { Button } from '../../../../ui/Button';
 import { Details } from '../../../../ui/Details';
 import { Icon } from '../../../../ui/Icon';
@@ -107,17 +108,22 @@ export function RdcCliInvokerSettingsFields({ rdcCliDraft: draft, onRdcCliDraftC
               data-testid="settings-rdc-enabled"
             />
           </SettingsField>
-          <SettingsField label={t('settings.rdcCliTimeout')} htmlFor="settings-rdc-timeout" layout="row">
-            {/* Stored in milliseconds, edited in seconds. */}
+          <SettingsField
+            label={t('settings.rdcNoProgressTimeout')}
+            htmlFor="settings-rdc-no-progress-timeout"
+            description={t('settings.rdcNoProgressTimeoutHint')}
+            layout="row"
+          >
+            {/* Stored in milliseconds, edited in seconds within the range RDC-Tool accepts. */}
             <Input
-              id="settings-rdc-timeout"
+              id="settings-rdc-no-progress-timeout"
               type="number"
-              min={1}
-              max={600}
+              min={RDC_NO_PROGRESS_TIMEOUT_RANGE_MS.min / 1000}
+              max={RDC_NO_PROGRESS_TIMEOUT_RANGE_MS.max / 1000}
               step={1}
               disabled={installation.busy}
-              value={draft.timeoutMs / 1000}
-              onChange={(event) => patch({ timeoutMs: Math.round(Number(event.currentTarget.value) * 1000) })}
+              value={draft.noProgressTimeoutMs / 1000}
+              onChange={(event) => patch({ noProgressTimeoutMs: Math.round(Number(event.currentTarget.value) * 1000) })}
             />
           </SettingsField>
           <SettingsField

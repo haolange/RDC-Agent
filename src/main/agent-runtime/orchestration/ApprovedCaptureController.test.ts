@@ -6,7 +6,14 @@ import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { RdcLifecyclePoint, RdcLifecycleReceipt } from '../../rdc/RdcLifecycleReceipts';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 
-const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };
+const cli = {
+  enabled: true,
+  command: 'rdc',
+  argsPrefix: [],
+  workingDirectory: '',
+  env: {},
+  noProgressTimeoutMs: 300_000,
+};
 function point(inputId: string, eventId: number): RdcLifecyclePoint {
   const n = inputId === 'a' ? 1 : 2;
   return {

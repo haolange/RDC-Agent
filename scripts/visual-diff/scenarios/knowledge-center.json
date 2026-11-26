@@ -14,7 +14,7 @@
  "responses": {
   "settings:get": [
    {
-    "ref": "bd87c4a38a7d5b58606353ed"
+    "ref": "c4dcce12b4067ce90568ef1a"
    }
   ],
   "app:getMeta": [
@@ -26,18 +26,13 @@
     }
    }
   ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
-   }
-  ],
   "runtimeLog:list": [
    {
     "result": {
      "entries": [
       {
-       "id": "rlog-984c572e91e4-1795680999759",
-       "timestamp": 1795680999759,
+       "id": "rlog-fe102a474d7a-1795705238121",
+       "timestamp": 1795705238121,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -51,8 +46,8 @@
        }
       },
       {
-       "id": "rlog-60b1d453cb20-1795680999810",
-       "timestamp": 1795680999810,
+       "id": "rlog-32f8a10c8202-1795705238198",
+       "timestamp": 1795705238198,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -64,8 +59,8 @@
        "raw": null
       },
       {
-       "id": "rlog-3c6d2eb3e564-1795680999811",
-       "timestamp": 1795680999811,
+       "id": "rlog-3a0c04ce8a1f-1795705238198",
+       "timestamp": 1795705238198,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -77,8 +72,8 @@
        "raw": null
       },
       {
-       "id": "rlog-bf0b9529a2c7-1795680999825",
-       "timestamp": 1795680999825,
+       "id": "rlog-fe0f474c1082-1795705238218",
+       "timestamp": 1795705238218,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -94,6 +89,11 @@
       }
      ]
     }
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "runtime:getPermissionState": [
@@ -143,7 +143,7 @@
      ],
      "index": {
       "revision": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "builtAt": "2026-11-26T08:16:41.578Z",
+      "builtAt": "2026-11-26T15:00:40.115Z",
       "cardCount": 0,
       "cardsBySpace": {}
      }
@@ -190,7 +190,7 @@
    {
     "result": {
      "packId": "pack:e2b02937fd0c7754",
-     "compiledAt": "2026-11-26T08:16:41.607Z",
+     "compiledAt": "2026-11-26T15:00:40.159Z",
      "hits": [],
      "conflicts": []
     }

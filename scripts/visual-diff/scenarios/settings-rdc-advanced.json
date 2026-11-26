@@ -1,0 +1,189 @@
+{
+ "id": "settings-rdc-advanced",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+  },
+  {
+   "click": true,
+   "testId": "sidebar-user-settings-trigger"
+  },
+  {
+   "click": true,
+   "testId": "open-settings-entry"
+  },
+  {
+   "waitFor": "[data-testid=\"settings-nav-tools\"]"
+  },
+  {
+   "click": true,
+   "testId": "settings-nav-tools",
+   "waitMs": 600
+  },
+  {
+   "waitFor": "[data-testid=\"settings-rdc-block\"] > summary"
+  },
+  {
+   "click": true,
+   "selector": "[data-testid=\"settings-rdc-block\"] > summary",
+   "waitMs": 400
+  },
+  {
+   "waitFor": ".settings-rdc-advanced > summary"
+  },
+  {
+   "click": true,
+   "selector": ".settings-rdc-advanced > summary",
+   "waitMs": 400
+  },
+  {
+   "waitFor": "#settings-rdc-no-progress-timeout"
+  }
+ ],
+ "settleMs": 1000,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "c4dcce12b4067ce90568ef1a"
+   },
+   {
+    "ref": "c4dcce12b4067ce90568ef1a"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-f04330133f38-1795705209865",
+       "timestamp": 1795705209865,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-ff5ec6198fb0-1795705209924",
+       "timestamp": 1795705209924,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-73534abff63f-1795705209924",
+       "timestamp": 1795705209924,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-8d550f928464-1795705209941",
+       "timestamp": 1795705209941,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": []
+    }
+   }
+  ],
+  "rdc-runtime:overview": [
+   {
+    "ref": "fa3f30e8ba6a47bf34aa4e64"
+   }
+  ],
+  "mcp:getStatusSummary": [
+   {
+    "result": []
+   }
+  ],
+  "settings:getResolvedShell": [
+   {
+    "result": {
+     "ok": true,
+     "kind": "bash",
+     "version": "5.2.21(1)-release",
+     "versionMajor": 5,
+     "executable": "/bin/bash",
+     "label": "bash"
+    }
+   }
+  ]
+ }
+}

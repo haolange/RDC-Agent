@@ -344,7 +344,7 @@ describe('per-session capture lifecycle', () => {
       argsPrefix: [],
       workingDirectory: '',
       env: {},
-      timeoutMs: 1000,
+      noProgressTimeoutMs: 300_000,
     });
     mocks.saveSelection.mockImplementationOnce(async () => {
       await lifecycle.reconcile(project, inputs);
@@ -456,7 +456,7 @@ it('allows only the owning live turn to prepare its device with the frozen bindi
     argsPrefix: [],
     workingDirectory: '',
     env: {},
-    timeoutMs: 1000,
+    noProgressTimeoutMs: 300_000,
   });
   const authority = { binding, turnId: 'test', assertAuthorized: vi.fn() };
   const input = { ...scope, deviceId: 'android', bindingGeneration: 0 };
@@ -595,7 +595,7 @@ it('restores a saved event and target only under the owning turn and current rep
     { projectId: 'p' },
   )!;
   const binding = freezeRdcTurnBinding(
-    { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 },
+    { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, noProgressTimeoutMs: 300_000 },
     [],
     lease,
   );

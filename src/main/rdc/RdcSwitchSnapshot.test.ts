@@ -12,7 +12,14 @@ const processIdentity = {
   daemon: { pid: 10, start_generation: 'windows-filetime:1' },
   worker: { pid: 11, start_generation: 'windows-filetime:2' },
 };
-const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };
+const cli = {
+  enabled: true,
+  command: 'rdc',
+  argsPrefix: [],
+  workingDirectory: '',
+  env: {},
+  noProgressTimeoutMs: 300_000,
+};
 afterEach(clearRdcContextLeases);
 
 it('binds the native snapshot to the owning lease, capture, event and actual process identities', async () => {

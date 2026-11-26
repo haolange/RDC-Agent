@@ -216,7 +216,9 @@ export const enSettings = {
   'settings.rdcCliArgsPrefixHint':
     'Enter the path of the launcher script that ships with rdc-tool; spaces in the path are kept.',
   'settings.envLineHint': 'One NAME=value per line.',
-  'settings.rdcCliTimeout': 'Timeout (seconds)',
+  'settings.rdcNoProgressTimeout': 'Wait without progress (seconds)',
+  'settings.rdcNoProgressTimeoutHint':
+    'How long an RDC operation may go without reporting progress before it is treated as stuck and stopped. Operations that keep making progress are never cut off.',
   'settings.rdcCliEnv': 'Environment',
   'settings.disabled': 'Disabled',
   'settings.personalization': 'Personalization',

@@ -1057,17 +1057,22 @@ describe('SettingsService provider persistence', () => {
     expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
   });
 
-  it.each([30000, 60000, 180000])('preserves an explicit current RDC CLI timeout of %ims', async (timeoutMs) => {
-    const { DEFAULT_TOOLING } = await import('@shared/constants/appSettingsDefaults');
-    const settingsPath = await writeSettingsFixture({
-      tooling: { ...DEFAULT_TOOLING, rdcCli: { ...DEFAULT_TOOLING.rdcCli, timeoutMs } },
-    });
+  it.each([30_000, 600_000, 3_600_000])(
+    'preserves an explicit RDC no-progress patience of %ims',
+    async (noProgressTimeoutMs) => {
+      const { DEFAULT_TOOLING } = await import('@shared/constants/appSettingsDefaults');
+      const settingsPath = await writeSettingsFixture({
+        tooling: { ...DEFAULT_TOOLING, rdcCli: { ...DEFAULT_TOOLING.rdcCli, noProgressTimeoutMs } },
+      });
 
-    const { SettingsService } = await import('./SettingsService');
-    const runtime = started(new SettingsService());
-    expect(runtime.tooling.rdcCli.timeoutMs).toBe(timeoutMs);
-    expect(JSON.parse(fs.readFileSync(settingsPath, 'utf8')).tooling.rdcCli.timeoutMs).toBe(timeoutMs);
-  });
+      const { SettingsService } = await import('./SettingsService');
+      const runtime = started(new SettingsService());
+      expect(runtime.tooling.rdcCli.noProgressTimeoutMs).toBe(noProgressTimeoutMs);
+      expect(JSON.parse(fs.readFileSync(settingsPath, 'utf8')).tooling.rdcCli.noProgressTimeoutMs).toBe(
+        noProgressTimeoutMs,
+      );
+    },
+  );
 
   it('rejects malformed settings JSON without replacing the file with defaults', async () => {
     const settingsPath = settingsPathFor();

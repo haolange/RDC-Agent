@@ -33,7 +33,7 @@ async function setup() {
     argsPrefix: [],
     workingDirectory: root,
     env: { RDC_TOOL_ANDROID_ADB_PATH: '' },
-    timeoutMs: 1000,
+    noProgressTimeoutMs: 300_000,
   };
   return { adb, binary, cli };
 }

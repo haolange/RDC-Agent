@@ -261,7 +261,7 @@ Session 右栏是 Tasks / Artifacts / Outputs / Context / Capture 单轨，投�
   - `check:bundle-deps`（在 `check:gates` 内）按实际 import 校验这条归属（运行时依赖的必需 peer 算作被使用）；CI `build` 另以 `--entry-chunk` 校验 renderer 入口 chunk 预算。
 - 禁止恢复独立 `cli/`、Playwright `e2e/`、顶层 `test/`、`docs/handover/`（`check:repository-hygiene` 拒绝）。`designs` 只保留 `rdc-agent-design-system`。
 - 目录、文件、标识符与自有 id 按稳定职责命名，不用 v1/v2、new/old、final 等迭代标签建立并行路径；版本号只出现在外部名称与跨程序公开协议里（见 §2.3「持久化格式不带版本号」）。不提交乱码。
-- 用户资源根固定 `~/.rdc-agent`，项目资源根固定 `<project-root>/.rdc-agent`；不加可配置根、旧目录 fallback、双写或静默迁移。Project Scope 覆盖 agents／skills／MCP／hooks／policies／knowledge／memory；`plans/<sessionId>/` 只在用户点击「保存到项目」时写入。CLI executable、参数前缀、工作目录、环境、超时和 secret 是本机边界，project 不得覆盖。
+- 用户资源根固定 `~/.rdc-agent`，项目资源根固定 `<project-root>/.rdc-agent`；不加可配置根、旧目录 fallback、双写或静默迁移。Project Scope 覆盖 agents／skills／MCP／hooks／policies／knowledge／memory；`plans/<sessionId>/` 只在用户点击「保存到项目」时写入。CLI executable、参数前缀、工作目录、环境、超时（RDC 为无进展等待 `noProgressTimeoutMs`）和 secret 是本机边界，project 不得覆盖。
 
 ## 10. 本地整洁
 

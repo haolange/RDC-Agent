@@ -22,7 +22,7 @@ flowchart LR
   Trace --> Renderer
 ```
 
-RDC-Tool is independently distributed. Settings accepts its root directory; main derives bundled Python, the sole CLI entry argument and working directory. Environment and timeout remain local settings. The configured CLI supplies the complete catalog; there is no catalog-path setting or lifecycle command template.
+RDC-Tool is independently distributed. Settings accepts its root directory; main derives bundled Python, the sole CLI entry argument and working directory. Environment and the RDC no-progress patience (`noProgressTimeoutMs`) remain local settings. The configured CLI supplies the complete catalog; there is no catalog-path setting or lifecycle command template.
 
 ## Public Boundaries
 

@@ -3,6 +3,7 @@
  */
 import { z } from 'zod';
 import { REASONING_SELECTIONS, type ReasoningSelection } from '@shared/types/modelCapability';
+import { RDC_NO_PROGRESS_TIMEOUT_RANGE_MS } from '@shared/constants/appSettingsDefaults';
 import { ipcId, ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 
 export const MemoryScopeSchema = z.enum(['user', 'project']);
@@ -127,7 +128,12 @@ const toolingPatch = z
         argsPrefix: z.array(settingsString(1024)).max(64).optional(),
         workingDirectory: settingsString(4096).optional(),
         env: z.record(settingsString(200), settingsString(4096)).optional(),
-        timeoutMs: z.number().int().positive().max(3_600_000).optional(),
+        noProgressTimeoutMs: z
+          .number()
+          .int()
+          .min(RDC_NO_PROGRESS_TIMEOUT_RANGE_MS.min)
+          .max(RDC_NO_PROGRESS_TIMEOUT_RANGE_MS.max)
+          .optional(),
       })
       .strict()
       .optional(),

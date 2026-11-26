@@ -58,7 +58,14 @@ vi.mock('./RdcLifecycleReceipts', async (importOriginal) => ({
 
 import { captureRecoveryStatus, restorePreviousCapture } from './RdcCaptureRecovery';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
-const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };
+const cli = {
+  enabled: true,
+  command: 'rdc',
+  argsPrefix: [],
+  workingDirectory: '',
+  env: {},
+  noProgressTimeoutMs: 300_000,
+};
 const processIdentity = {
   status: 'available',
   daemon: { pid: 10, start_generation: 'windows-filetime:1' },

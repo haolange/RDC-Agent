@@ -87,7 +87,7 @@ const CLI_SETTINGS = {
   argsPrefix: [],
   workingDirectory: '',
   env: {},
-  timeoutMs: 1000,
+  noProgressTimeoutMs: 300_000,
 };
 
 afterEach(clearRdcContextLeases);

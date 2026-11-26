@@ -53,7 +53,7 @@ it('validates the selected draft before saving and reports success only after pe
   await useRdcInstallation(draft, applied).apply();
   expect(mock.verify).toHaveBeenCalledWith({
     root: draft.workingDirectory,
-    timeoutMs: draft.timeoutMs,
+    noProgressTimeoutMs: draft.noProgressTimeoutMs,
     env: draft.env,
   });
   expect(mock.verify.mock.invocationCallOrder[0]).toBeLessThan(mock.save.mock.invocationCallOrder[0]);

@@ -537,6 +537,9 @@ const ERROR_REGISTRY = {
   RDC_DEVICE_PREPARATION_CANCELLED: availability(),
   RDC_HOST_UNSUPPORTED: availability(),
   RDC_INTERACTION_LOCKED: availability(),
+  RDC_NO_PROGRESS_TIMEOUT_UNSUPPORTED: availability(
+    z.strictObject({ seconds: z.number(), minSeconds: z.number(), maxSeconds: z.number() }),
+  ),
   RDC_OPEN_FAILED: availability(),
   RDC_OWNERSHIP_BUSY: availability(),
   RDC_RECEIPT_KEY_UNAVAILABLE: availability(),

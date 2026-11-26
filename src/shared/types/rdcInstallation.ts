@@ -8,6 +8,6 @@ export interface RdcInstallationCandidate {
 
 export interface RdcInstallationRequest {
   root: string;
-  timeoutMs: RdcCliInvokerSettings['timeoutMs'];
+  noProgressTimeoutMs: RdcCliInvokerSettings['noProgressTimeoutMs'];
   env: RdcCliInvokerSettings['env'];
 }

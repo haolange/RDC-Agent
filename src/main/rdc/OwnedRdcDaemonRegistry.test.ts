@@ -12,7 +12,14 @@ vi.mock('../settings/settings-core/SettingsService', () => ({
       revision: 1,
       user: {
         tooling: {
-          rdcCli: { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1_000 },
+          rdcCli: {
+            enabled: true,
+            command: 'rdc',
+            argsPrefix: [],
+            workingDirectory: '',
+            env: {},
+            noProgressTimeoutMs: 300_000,
+          },
         },
       },
     }),
@@ -112,7 +119,14 @@ describe('OwnedRdcDaemonRegistry', () => {
       registryPath,
       intermediateRoot,
       execute: execute as never,
-      settings: { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1_000 },
+      settings: {
+        enabled: true,
+        command: 'rdc',
+        argsPrefix: [],
+        workingDirectory: '',
+        env: {},
+        noProgressTimeoutMs: 300_000,
+      },
     });
     expect(result.released.sort()).toEqual([otherId, contextId].sort());
     expect(result.failed).toEqual([]);

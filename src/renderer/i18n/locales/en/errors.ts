@@ -40,6 +40,8 @@ export const enErrors = {
   'errors.RDC_HOST_UNSUPPORTED': "This isn't supported on this computer.",
   'errors.RDC_DEVICE_IN_USE': 'The device is in use by another session.',
   'errors.RDC_OPEN_FAILED': "The capture couldn't be opened.",
+  'errors.RDC_NO_PROGRESS_TIMEOUT_UNSUPPORTED':
+    'The installed RDC-Tool accepts a no-progress wait of {minSeconds}–{maxSeconds} seconds, but Settings has {seconds}. Change it in Settings.',
   'errors.ADB_MISSING': "Android Debug Bridge (adb) wasn't found. Set its location in Settings.",
   'errors.ADB_INVALID': "The configured adb can't be used. Check its location in Settings.",
   'errors.KNOWLEDGE_VERSION_CHANGED': 'This card was changed elsewhere. Reopen it to see the latest version.',

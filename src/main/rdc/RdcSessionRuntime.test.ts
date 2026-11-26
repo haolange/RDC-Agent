@@ -105,7 +105,7 @@ describe('native owning runtime', () => {
         argsPrefix: [],
         workingDirectory: '',
         env: {},
-        timeoutMs: 30_000,
+        noProgressTimeoutMs: 30_000,
       },
       [],
     );
@@ -365,7 +365,7 @@ const remoteDevice: OpenProjectInputRequest['replayDevice'] = {
 };
 const remoteBinding = () =>
   freezeRdcTurnBinding(
-    { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 },
+    { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, noProgressTimeoutMs: 30_000 },
     [
       {
         name: 'rd.remote.connect',

@@ -634,6 +634,42 @@
    "settleMs": 1000
   },
   {
+   "id": "settings-rdc-advanced",
+   "steps": [
+    {
+     "preset": "open-settings"
+    },
+    {
+     "waitFor": "[data-testid=\"settings-nav-tools\"]"
+    },
+    {
+     "click": true,
+     "testId": "settings-nav-tools",
+     "waitMs": 600
+    },
+    {
+     "waitFor": "[data-testid=\"settings-rdc-block\"] > summary"
+    },
+    {
+     "click": true,
+     "selector": "[data-testid=\"settings-rdc-block\"] > summary",
+     "waitMs": 400
+    },
+    {
+     "waitFor": ".settings-rdc-advanced > summary"
+    },
+    {
+     "click": true,
+     "selector": ".settings-rdc-advanced > summary",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "#settings-rdc-no-progress-timeout"
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
    "id": "settings-hooks",
    "steps": [
     {

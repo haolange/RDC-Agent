@@ -230,7 +230,7 @@ async function stopOwnedDaemon(record: OwnedRdcDaemonRecord, options: OwnedRdcDa
   const binding = path.isAbsolute(command)
     ? resolveRdcInstallation({
         root: installationRootOfPython(command),
-        timeoutMs: current.timeoutMs,
+        noProgressTimeoutMs: current.noProgressTimeoutMs,
         env: current.env,
       })
     : current;

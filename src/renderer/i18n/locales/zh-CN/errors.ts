@@ -33,6 +33,8 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.RDC_HOST_UNSUPPORTED': '此电脑不支持该功能。',
   'errors.RDC_DEVICE_IN_USE': '该设备正被其他会话使用。',
   'errors.RDC_OPEN_FAILED': '无法打开该 capture。',
+  'errors.RDC_NO_PROGRESS_TIMEOUT_UNSUPPORTED':
+    '已安装的 RDC-Tool 只接受 {minSeconds}–{maxSeconds} 秒的无进展等待，设置里是 {seconds} 秒。请在设置中修改。',
   'errors.ADB_MISSING': '未找到 Android Debug Bridge（adb），请在设置中指定位置。',
   'errors.ADB_INVALID': '配置的 adb 无法使用，请在设置中检查位置。',
   'errors.KNOWLEDGE_VERSION_CHANGED': '该卡片已在别处修改，请重新打开查看最新版本。',

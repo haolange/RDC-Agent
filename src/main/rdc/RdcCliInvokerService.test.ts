@@ -16,7 +16,7 @@ vi.mock('../settings/settings-core/SettingsService', () => ({
             argsPrefix: [],
             workingDirectory: '',
             env: {},
-            timeoutMs: 30_000,
+            noProgressTimeoutMs: 30_000,
           },
         },
       },
@@ -92,7 +92,7 @@ const cli = {
   argsPrefix: [rdcInstallationFiles(roots[0]).entry],
   workingDirectory: '',
   env: {},
-  timeoutMs: 30000,
+  noProgressTimeoutMs: 30_000,
 };
 const operation = {
   name: 'rd.event.get_action_tree',

@@ -54,19 +54,11 @@ export interface ProcessExitInfo {
 }
 
 const DEFAULT_RING_BYTES = 256 * 1024;
-const PROCESS_TERMINATION_TIMING = Object.freeze({
+// One idempotent initial termination and one escalation; not a native-exit guarantee.
+const PROCESS_TERMINATION_POLICY = Object.freeze({
   treeKillTimeoutMs: 5_000,
   killEscalationDelayMs: 2_000,
   joinObservationSlackMs: 1_000,
-});
-export const PROCESS_TERMINATION_POLICY = Object.freeze({
-  ...PROCESS_TERMINATION_TIMING,
-  maxTreeKillAttempts: 2,
-  // One idempotent initial termination and one escalation; not a native-exit guarantee.
-  joinTerminationAdditionalWaitMs:
-    2 * PROCESS_TERMINATION_TIMING.treeKillTimeoutMs +
-    PROCESS_TERMINATION_TIMING.killEscalationDelayMs +
-    PROCESS_TERMINATION_TIMING.joinObservationSlackMs,
 });
 const DEFAULT_GRACE_MS = PROCESS_TERMINATION_POLICY.killEscalationDelayMs;
 

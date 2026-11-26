@@ -14,7 +14,7 @@
  "responses": {
   "settings:get": [
    {
-    "ref": "221737d5f04f1d5451400420"
+    "ref": "3283997cc3988c480204af24"
    }
   ],
   "settings:getProviderCatalog": [
@@ -36,8 +36,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-f0faaddc44bd-1795701118947",
-       "timestamp": 1795701118947,
+       "id": "rlog-7f75ece3a57e-1795705931438",
+       "timestamp": 1795705931438,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -51,8 +51,8 @@
        }
       },
       {
-       "id": "rlog-07d901216f00-1795701118990",
-       "timestamp": 1795701118990,
+       "id": "rlog-0a0234b48e87-1795705931491",
+       "timestamp": 1795705931491,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -64,8 +64,8 @@
        "raw": null
       },
       {
-       "id": "rlog-700bd59f48ae-1795701118990",
-       "timestamp": 1795701118990,
+       "id": "rlog-52a9633d5200-1795705931492",
+       "timestamp": 1795705931492,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -77,8 +77,8 @@
        "raw": null
       },
       {
-       "id": "rlog-d01adbae8768-1795701119004",
-       "timestamp": 1795701119004,
+       "id": "rlog-1e3f445f5d4b-1795705931509",
+       "timestamp": 1795705931509,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -93,19 +93,19 @@
        }
       },
       {
-       "id": "rlog-3f6011e9ab7a-1795701145306",
-       "timestamp": 1795701145306,
+       "id": "rlog-d1de336a85d2-1795705956892",
+       "timestamp": 1795705956892,
        "scope": "app",
        "namespace": "agent",
        "severity": "info",
        "title": "Debugger",
        "summary": "Status changed to thinking.",
-       "sessionId": "sess_184a6c3362e0",
+       "sessionId": "sess_ee26d69ada51",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "debugger",
-        "sessionId": "sess_184a6c3362e0",
+        "sessionId": "sess_ee26d69ada51",
         "status": "thinking"
        }
       }
@@ -116,19 +116,19 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-3f6011e9ab7a-1795701145306",
-       "timestamp": 1795701145306,
+       "id": "rlog-d1de336a85d2-1795705956892",
+       "timestamp": 1795705956892,
        "scope": "app",
        "namespace": "agent",
        "severity": "info",
        "title": "Debugger",
        "summary": "Status changed to thinking.",
-       "sessionId": "sess_184a6c3362e0",
+       "sessionId": "sess_ee26d69ada51",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "debugger",
-        "sessionId": "sess_184a6c3362e0",
+        "sessionId": "sess_ee26d69ada51",
         "status": "thinking"
        }
       }
@@ -139,19 +139,19 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-3f6011e9ab7a-1795701145306",
-       "timestamp": 1795701145306,
+       "id": "rlog-d1de336a85d2-1795705956892",
+       "timestamp": 1795705956892,
        "scope": "app",
        "namespace": "agent",
        "severity": "info",
        "title": "Debugger",
        "summary": "Status changed to thinking.",
-       "sessionId": "sess_184a6c3362e0",
+       "sessionId": "sess_ee26d69ada51",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "debugger",
-        "sessionId": "sess_184a6c3362e0",
+        "sessionId": "sess_ee26d69ada51",
         "status": "thinking"
        }
       }
@@ -211,10 +211,10 @@
   ],
   "settings:getEffectiveCatalog": [
    {
-    "ref": "07dce90b39d0d78db2eba473"
+    "ref": "cbc513adbc503deb0244b0bb"
    },
    {
-    "ref": "000d28f873ca2fd6a8e48ed5"
+    "ref": "46d38f8c3fd2fda2e521f28b"
    }
   ],
   "project:list": [
@@ -222,7 +222,7 @@
     "result": {
      "projects": [
       {
-       "projectId": "proj_3bf3b842b350",
+       "projectId": "proj_13990337518c",
        "name": "visual-diff-project",
        "rootPath": "/visual-diff/visual-diff-project",
        "slug": "visual-diff-project",
@@ -230,10 +230,10 @@
        "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
        "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
        "inputs": [],
-       "inputsUpdatedAt": 1795701169947,
-       "createdAt": 1795701120840,
-       "updatedAt": 1795701145297,
-       "lastSessionId": "sess_184a6c3362e0"
+       "inputsUpdatedAt": 1795705981570,
+       "createdAt": 1795705932314,
+       "updatedAt": 1795705956883,
+       "lastSessionId": "sess_ee26d69ada51"
       }
      ]
     }
@@ -243,7 +243,7 @@
    {
     "result": {
      "project": {
-      "projectId": "proj_3bf3b842b350",
+      "projectId": "proj_13990337518c",
       "name": "visual-diff-project",
       "rootPath": "/visual-diff/visual-diff-project",
       "slug": "visual-diff-project",
@@ -251,21 +251,21 @@
       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
       "inputs": [],
-      "inputsUpdatedAt": 1795701169947,
-      "createdAt": 1795701120840,
-      "updatedAt": 1795701145297,
-      "lastSessionId": "sess_184a6c3362e0"
+      "inputsUpdatedAt": 1795705981570,
+      "createdAt": 1795705932314,
+      "updatedAt": 1795705956883,
+      "lastSessionId": "sess_ee26d69ada51"
      },
      "currentSession": {
       "record": {
-       "sessionId": "sess_184a6c3362e0",
-       "projectId": "proj_3bf3b842b350",
+       "sessionId": "sess_ee26d69ada51",
+       "projectId": "proj_13990337518c",
        "title": "qa:plan 定位这一帧唯一的 draw 调用。",
        "goal": "qa:plan 定位这一帧唯一的 draw 调用。",
-       "sessionPath": "/visual-diff/state/sessions/proj_3bf3b842b350/sess_184a6c3362e0",
-       "createdAt": 1795701145239,
-       "updatedAt": 1795701145297,
-       "lastRunId": "run_bc0b45ee4fc8aa53",
+       "sessionPath": "/visual-diff/state/sessions/proj_13990337518c/sess_ee26d69ada51",
+       "createdAt": 1795705956799,
+       "updatedAt": 1795705956883,
+       "lastRunId": "run_803b890c72592fa2",
        "turnControls": {
         "reasoningLevel": "on",
         "maxContextMode": false,
@@ -274,20 +274,20 @@
        "agentId": "debugger"
       },
       "revision": {
-       "epoch": "33f670be-4254-4486-ae3c-efb62b761c84",
+       "epoch": "12c2913c-606a-49be-8121-eab292d84b72",
        "n": 4
       }
      },
      "currentRun": {
-      "runId": "run_bc0b45ee4fc8aa53",
-      "turnId": "turn-c8a1909e-d4d3-47b4-8c36-60dbfcf074f2",
-      "projectId": "proj_3bf3b842b350",
-      "sessionId": "sess_184a6c3362e0",
-      "caseId": "sess_184a6c3362e0",
+      "runId": "run_803b890c72592fa2",
+      "turnId": "turn-321328c2-eade-4261-a276-e3495c615124",
+      "projectId": "proj_13990337518c",
+      "sessionId": "sess_ee26d69ada51",
+      "caseId": "sess_ee26d69ada51",
       "profileId": "debugger",
       "goal": "qa:plan 定位这一帧唯一的 draw 调用。",
       "captures": [],
-      "startedAt": 1795701145261,
+      "startedAt": 1795705956823,
       "status": "running",
       "backend": "local",
       "kind": "mission",
@@ -302,14 +302,14 @@
      "sessions": [
       {
        "record": {
-        "sessionId": "sess_184a6c3362e0",
-        "projectId": "proj_3bf3b842b350",
+        "sessionId": "sess_ee26d69ada51",
+        "projectId": "proj_13990337518c",
         "title": "qa:plan 定位这一帧唯一的 draw 调用。",
         "goal": "qa:plan 定位这一帧唯一的 draw 调用。",
-        "sessionPath": "/visual-diff/state/sessions/proj_3bf3b842b350/sess_184a6c3362e0",
-        "createdAt": 1795701145239,
-        "updatedAt": 1795701145297,
-        "lastRunId": "run_bc0b45ee4fc8aa53",
+        "sessionPath": "/visual-diff/state/sessions/proj_13990337518c/sess_ee26d69ada51",
+        "createdAt": 1795705956799,
+        "updatedAt": 1795705956883,
+        "lastRunId": "run_803b890c72592fa2",
         "turnControls": {
          "reasoningLevel": "on",
          "maxContextMode": false,
@@ -318,7 +318,7 @@
         "agentId": "debugger"
        },
        "revision": {
-        "epoch": "33f670be-4254-4486-ae3c-efb62b761c84",
+        "epoch": "12c2913c-606a-49be-8121-eab292d84b72",
         "n": 4
        }
       }
@@ -328,14 +328,14 @@
   ],
   "session:open": [
    {
-    "ref": "a4ba8321a1e5eb5445683dc3"
+    "ref": "6c4419893c6d6337b9590487"
    }
   ],
   "capture:getReplayState": [
    {
     "result": {
-     "projectId": "proj_3bf3b842b350",
-     "sessionId": "sess_184a6c3362e0",
+     "projectId": "proj_13990337518c",
+     "sessionId": "sess_ee26d69ada51",
      "generation": 0,
      "revision": 0,
      "operationId": null,
@@ -374,20 +374,20 @@
   "workflow:getState": [
    {
     "result": {
-     "caseId": "sess_184a6c3362e0",
-     "runId": "run_bc0b45ee4fc8aa53",
-     "sessionId": "sess_184a6c3362e0",
+     "caseId": "sess_ee26d69ada51",
+     "runId": "run_803b890c72592fa2",
+     "sessionId": "sess_ee26d69ada51",
      "blockers": [],
      "reasoningSummaries": [],
-     "lastUpdated": "2026-11-26T13:52:52.578Z"
+     "lastUpdated": "2026-11-26T15:13:04.141Z"
     }
    }
   ],
   "evidence:getChain": [
    {
     "result": {
-     "sessionId": "sess_184a6c3362e0",
-     "runId": "run_bc0b45ee4fc8aa53",
+     "sessionId": "sess_ee26d69ada51",
+     "runId": "run_803b890c72592fa2",
      "events": [],
      "isValid": true
     }
@@ -397,7 +397,7 @@
    {
     "result": {
      "usage": {
-      "runId": "run_bc0b45ee4fc8aa53",
+      "runId": "run_803b890c72592fa2",
       "providerId": "ollama",
       "modelId": "qa-stub:4b",
       "inputTokens": 1200,
@@ -442,7 +442,7 @@
         "tokens": 31568
        }
       ],
-      "snapshotAt": 1795701145750
+      "snapshotAt": 1795705957349
      },
      "stale": false
     }
@@ -450,7 +450,7 @@
    {
     "result": {
      "usage": {
-      "runId": "run_bc0b45ee4fc8aa53",
+      "runId": "run_803b890c72592fa2",
       "providerId": "ollama",
       "modelId": "qa-stub:4b",
       "inputTokens": 1200,
@@ -495,7 +495,7 @@
         "tokens": 31568
        }
       ],
-      "snapshotAt": 1795701145750
+      "snapshotAt": 1795705957349
      },
      "stale": false
     }

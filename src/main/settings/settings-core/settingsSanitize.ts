@@ -14,7 +14,9 @@ import {
   DEFAULT_CODE_INTERPRETER,
   DEFAULT_RDC_CLI_INVOKER,
   DEFAULT_SHELL_TOOLING,
+  RDC_NO_PROGRESS_TIMEOUT_RANGE_MS,
 } from '@shared/constants/appSettingsDefaults';
+import { AppError } from '@shared/errors/appError';
 import { expandHomePath } from '../../platform/paths';
 import { assertRdcCliBinding } from '../../runtime/rdcCliBinding';
 import { LEFT_DEFAULTS, RIGHT_DEFAULTS, VALID_PERMISSION_MODES } from './settingsDefaults';
@@ -69,10 +71,18 @@ export function sanitizeRdcCliInvokerSettings(
   validate = false,
 ): RdcCliInvokerSettings {
   const candidate = value && typeof value === 'object' ? (value as Partial<RdcCliInvokerSettings>) : {};
-  const timeoutMs =
-    typeof candidate.timeoutMs === 'number' && Number.isFinite(candidate.timeoutMs)
-      ? clamp(Math.trunc(candidate.timeoutMs), 1000, 600000)
-      : fallback.timeoutMs;
+  const noProgressTimeoutMs = candidate.noProgressTimeoutMs ?? fallback.noProgressTimeoutMs;
+  if (
+    !Number.isSafeInteger(noProgressTimeoutMs) ||
+    noProgressTimeoutMs < RDC_NO_PROGRESS_TIMEOUT_RANGE_MS.min ||
+    noProgressTimeoutMs > RDC_NO_PROGRESS_TIMEOUT_RANGE_MS.max
+  ) {
+    throw new AppError(
+      'IPC_VALIDATION_ERROR',
+      `tooling.rdcCli.noProgressTimeoutMs must be an integer from ${RDC_NO_PROGRESS_TIMEOUT_RANGE_MS.min} to ` +
+        `${RDC_NO_PROGRESS_TIMEOUT_RANGE_MS.max}.`,
+    );
+  }
 
   const settings: RdcCliInvokerSettings = {
     enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : fallback.enabled,
@@ -81,7 +91,7 @@ export function sanitizeRdcCliInvokerSettings(
     workingDirectory:
       typeof candidate.workingDirectory === 'string' ? candidate.workingDirectory.trim() : fallback.workingDirectory,
     env: sanitizeStringRecord(candidate.env ?? fallback.env),
-    timeoutMs,
+    noProgressTimeoutMs,
   };
   if (validate && (settings.enabled || settings.command || settings.argsPrefix.length)) assertRdcCliBinding(settings);
   return settings;
