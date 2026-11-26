@@ -95,8 +95,8 @@ export function isAppRdcContextId(contextId: string): boolean {
   return APP_RDC_CONTEXT_ID.test(contextId.trim());
 }
 
-export function ownedRdcDaemonRegistryPath(appStateRoot?: string): string {
-  return path.join(appStateRoot ?? appPathService.getAppStatePaths().appStateRoot, REGISTRY_FILE);
+export function ownedRdcDaemonRegistryPath(): string {
+  return path.join(appPathService.getAppStatePaths().appStateRoot, REGISTRY_FILE);
 }
 
 export function listAppDaemonContextsInIntermediateRoot(intermediateRoot: string): string[] {

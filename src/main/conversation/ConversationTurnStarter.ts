@@ -359,7 +359,6 @@ async function prepareTurnRuntime(turn: TurnStart, route: TurnRoute, input: Turn
     agentId: conversationAgentId,
     routePreflight: { ...routePreflight, routeCapability: plannedRouteCapability },
     requestPlan: planning.plan,
-    effectiveModel,
     attachmentPaths: input.pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
     messageText: turn.rawMessage,
     preloadSkillIds: turn.preloadSkillIds,

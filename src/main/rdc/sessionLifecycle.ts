@@ -7,7 +7,6 @@ import { replayHistoryStore } from './captures/replay/ReplayHistoryStore';
 export async function createSessionWithHooks(
   projectId: string,
   title?: string,
-  goal = '',
 ) {
   const project = projectWorkspaceStore.getProjectById(projectId);
   if (!project) {
@@ -20,7 +19,7 @@ export async function createSessionWithHooks(
   if (!allowed) {
     throw new AppError('HOOK_DENIED', 'session.before-start');
   }
-  return sessionRecordStore.createSession(projectId, title, goal);
+  return sessionRecordStore.createSession(projectId, title, '');
 }
 
 export async function removeSessionWithHooks(sessionId: string): Promise<void> {

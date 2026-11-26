@@ -99,8 +99,8 @@ export class AgentOrchestrator {
     turnCoordinator.endTurn(handle);
   }
 
-  getMcpServerStatusSummary(projectRootPath?: string | null, query?: string): MCPServerStatusSummary[] {
-    return this.mcp.getMcpServerStatusSummary(projectRootPath, query);
+  getMcpServerStatusSummary(projectRootPath?: string | null): MCPServerStatusSummary[] {
+    return this.mcp.getMcpServerStatusSummary(projectRootPath);
   }
 
   async disconnectAllMcpServers(): Promise<void> {

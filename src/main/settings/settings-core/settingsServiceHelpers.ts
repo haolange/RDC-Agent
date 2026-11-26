@@ -29,7 +29,8 @@ export function nowIso(): string {
  * The one read of the settings file: missing is `null` (defaults, nothing written); anything that is not a valid v9
  * document is a `SettingsFileError` naming the file, whatever the storage primitive reported.
  */
-export function readSettingsFile(filePath = appPathService.getRuntimePaths().settingsPath): SettingsFile | null {
+export function readSettingsFile(): SettingsFile | null {
+  const filePath = appPathService.getRuntimePaths().settingsPath;
   try {
     return readValidatedSync(filePath, parseJsonWith(parseSettingsFile));
   } catch (error) {
@@ -42,8 +43,8 @@ export function readSettingsFile(filePath = appPathService.getRuntimePaths().set
 }
 
 /** Writes the whole document compactly and atomically; callers write only when something actually changed. */
-export function writeSettingsFile(file: SettingsFile, filePath = appPathService.getRuntimePaths().settingsPath): void {
-  writeFileAtomicSync(filePath, JSON.stringify(assertSettingsFile(file)));
+export function writeSettingsFile(file: SettingsFile): void {
+  writeFileAtomicSync(appPathService.getRuntimePaths().settingsPath, JSON.stringify(assertSettingsFile(file)));
 }
 
 export function deleteSecretsAfterCommit(secretRefs: Iterable<string>, workspaceRoot: string): void {

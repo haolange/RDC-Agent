@@ -68,8 +68,6 @@ export interface AgentPermissionDecisionInput {
   effectiveToolNames?: readonly string[];
   tool: AgentTool;
   toolCall: ToolCall;
-  /** Profile id, used only to resolve a declared access ceiling when one is not passed. */
-  agentId?: string | null;
   /** Frozen profile ceiling. Full access mode cannot exceed it. */
   accessCeiling?: AgentAccessCeiling;
   /** 当前激活项目根目录；权限边界以它为准，回退固定 User Scope。 */

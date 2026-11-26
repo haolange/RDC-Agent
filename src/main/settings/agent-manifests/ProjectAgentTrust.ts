@@ -15,8 +15,8 @@ export class ProjectAgentTrust {
   private readonly storePath: () => string;
   private revisionValue = 0;
 
-  constructor(explicitStorePath?: string) {
-    this.storePath = () => explicitStorePath ?? path.join(appPathService.getAppStatePaths().appStateRoot, 'agent-trust.json');
+  constructor() {
+    this.storePath = () => path.join(appPathService.getAppStatePaths().appStateRoot, 'agent-trust.json');
     this.store = new TrustStore(this.storePath);
   }
 

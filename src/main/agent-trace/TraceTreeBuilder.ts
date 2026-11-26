@@ -16,11 +16,10 @@ export class TraceTreeBuilder {
     let currentPhase: PhaseGroupNode | null = null;
     let seq = 0;
 
-    const pushNode = (node: TraceNode, parentId?: string) => {
+    const pushNode = (node: TraceNode) => {
       const withMeta = {
         ...node,
         seq: seq++,
-        parentId: parentId ?? node.parentId,
         // A stored payload passes only the kind/id check (isTraceNode), so its visibility may be missing.
         visibility: (node as Partial<TraceNode>).visibility ?? 'user',
       } as TraceNode;

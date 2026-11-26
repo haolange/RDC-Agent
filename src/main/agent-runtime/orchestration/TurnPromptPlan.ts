@@ -8,7 +8,7 @@ import { promptPlanBuilder, resolvePromptClock } from '../prompt';
 import { combineActiveSkillAllowlists, normalizeToolName } from './RuntimeToolPolicy';
 import type { AgentPermissionSettings } from '@shared/types/settings';
 import type { PromptPlan, PromptSegment } from '@shared/types/rdcRuntime';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { RequestPlan } from '@shared/types/providerCapability';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
@@ -31,7 +31,6 @@ export interface TurnPromptPlanInput {
   pendingSkillIds?: readonly string[];
   permissionConstraints: Omit<AgentPermissionSettings, 'mode'>;
   routeCapability: AgentRouteCapability;
-  effectiveModel?: EffectiveModel;
   requestPlan: RequestPlan;
   contextWindowTokens: number;
   extraSegments?: PromptSegment[];
@@ -90,7 +89,6 @@ export function buildTurnPromptPlan(input: TurnPromptPlanInput): TurnPromptPlan 
     sessionId: input.sessionId,
     approvedExecutionOffer,
     routeCapability: input.routeCapability,
-    effectiveModel: input.effectiveModel,
     requestPlan: input.requestPlan,
     permissionConstraints: input.permissionConstraints,
     currentDate: promptClock.currentDate,

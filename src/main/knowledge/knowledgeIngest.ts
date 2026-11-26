@@ -80,13 +80,8 @@ function identityConflictItem(input: {
   };
 }
 
-function fromItems(items: KnowledgeImportItem[], extra: Partial<KnowledgeImportResult> = {}): KnowledgeImportResult {
-  return {
-    candidateCreated: false,
-    verified: false,
-    items,
-    ...extra,
-  };
+function fromItems(items: KnowledgeImportItem[]): KnowledgeImportResult {
+  return { candidateCreated: false, verified: false, items };
 }
 
 export const KNOWLEDGE_IMPORT_MAX_BYTES = 2 * 1024 * 1024;

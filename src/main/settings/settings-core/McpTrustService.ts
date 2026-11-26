@@ -59,8 +59,8 @@ const mcpUntrustedDetail = (descriptorId: string): string => (
 export class McpTrustService {
   private readonly store: TrustStore;
 
-  constructor(explicitTrustStorePath?: string) {
-    this.store = new TrustStore(() => explicitTrustStorePath ?? path.join(appPathService.getAppStatePaths().appStateRoot, 'mcp-trust.json'));
+  constructor() {
+    this.store = new TrustStore(() => path.join(appPathService.getAppStatePaths().appStateRoot, 'mcp-trust.json'));
   }
 
   resolveProjectRealpath(projectRoot: string): string {

@@ -53,8 +53,8 @@ export function defaultAppDataDir(host: HostDescriptor = currentHost(), home: st
 }
 
 /** The Windows roaming profile directory (`%APPDATA%`); other hosts have none. */
-export function roamingAppDataDir(host: HostDescriptor = currentHost()): string | null {
-  if (!host.isWindows) return null;
+export function roamingAppDataDir(): string | null {
+  if (!currentHost().isWindows) return null;
   return process.env.APPDATA?.trim() || null;
 }
 

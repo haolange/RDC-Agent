@@ -105,9 +105,9 @@ export class RingBuffer {
     }
   }
 
-  toString(encoding: BufferEncoding = 'utf8'): string {
+  toString(): string {
     if (this.chunks.length === 0) return '';
-    return Buffer.concat(this.chunks, this.size).toString(encoding);
+    return Buffer.concat(this.chunks, this.size).toString('utf8');
   }
 
   byteLength(): number {

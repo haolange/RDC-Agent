@@ -19,8 +19,8 @@ export interface FrozenProviderRuntimeCredentialLease {
  */
 export async function freezeProviderRuntimeCredentials(
   providerId: LlmProviderId,
-  operation: ProviderRuntimeCredentialOperation = 'chat',
 ): Promise<FrozenProviderRuntimeCredentialLease> {
+  const operation: ProviderRuntimeCredentialOperation = 'chat';
   const surface = await loadProviderSurface(providerId);
   if (!surface) throw new Error(`Provider Catalog surface ${providerId} is unavailable.`);
 

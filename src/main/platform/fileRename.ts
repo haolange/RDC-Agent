@@ -30,15 +30,11 @@ export function renameWithRetrySync(source: string, target: string, host: HostDe
   }
 }
 
-export async function renameWithRetry(
-  source: string,
-  target: string,
-  host: HostDescriptor = currentHost(),
-  rename: (from: string, to: string) => Promise<void> = fs.promises.rename,
-): Promise<void> {
+export async function renameWithRetry(source: string, target: string): Promise<void> {
+  const host = currentHost();
   for (let attempt = 0; ; attempt += 1) {
     try {
-      await rename(source, target);
+      await fs.promises.rename(source, target);
       return;
     } catch (error) {
       if (!retryable(error, attempt, host)) throw error;
@@ -47,8 +43,8 @@ export async function renameWithRetry(
   }
 }
 
-export function syncDirectorySync(directory: string, host: HostDescriptor = currentHost()): void {
-  if (host.isWindows) return;
+export function syncDirectorySync(directory: string): void {
+  if (currentHost().isWindows) return;
   const fd = fs.openSync(directory, 'r');
   try {
     fs.fsyncSync(fd);
@@ -57,8 +53,8 @@ export function syncDirectorySync(directory: string, host: HostDescriptor = curr
   }
 }
 
-export async function syncDirectory(directory: string, host: HostDescriptor = currentHost()): Promise<void> {
-  if (host.isWindows) return;
+export async function syncDirectory(directory: string): Promise<void> {
+  if (currentHost().isWindows) return;
   const handle = await fs.promises.open(directory, 'r');
   try {
     await handle.sync();

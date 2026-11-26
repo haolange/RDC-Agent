@@ -168,7 +168,7 @@ describe('Agent turn completion boundary', () => {
       expect(validate).toHaveBeenCalledTimes(1);
       expect(validate).toHaveBeenCalledWith(expect.objectContaining({
         profileId: 'custom-planner', completionContract: 'investigation-report', investigationMission: 'debugger',
-        sessionId: scope, turnId: 'owning-turn', finalAnswerText: 'Canonical final answer', disposition: 'completed',
+        sessionId: scope, finalAnswerText: 'Canonical final answer', disposition: 'completed',
       }));
       expect(terminal.mock.calls[0]?.[1]).toBe('complete');
       expect(terminal.mock.calls[0]?.[5]).toEqual({ turnId: 'owning-turn', initialRuntimePlanFingerprint: 'frozen-plan',
@@ -268,7 +268,7 @@ describe('Agent turn completion boundary', () => {
     await run();
     expect(readiness).toHaveBeenCalledWith(expect.objectContaining({ profileId: 'custom-planner',
       completionContract: 'investigation-report', investigationMission: 'optimizer', sessionId: 'completion-approved-readiness',
-      turnId: 'owning-turn', disposition: 'completed', evidenceRefs: [] }));
+      disposition: 'completed', evidenceRefs: [] }));
   });
 
   it('marks an approved Mission without a frozen capture scope before its tools run', async () => {

@@ -2,7 +2,7 @@
  * AWS Bedrock Converse Stream Provider —— 适配 Bedrock Converse API 协议。
  *
  * Bedrock Converse uses a DIFFERENT wire format from OpenAI/Anthropic:
- * - Request: { system, messages, toolConfig, inferenceConfig, additionalModelRequestFields }
+ * - Request: { system, messages, toolConfig, inferenceConfig }
  * - Response streaming: messageStart, contentBlockStart, contentBlockDelta, contentBlockStop, messageStop events
  * - Cache: cachePoint: { type: 'default' } placed in system/messages
  * - SigV4 signing via ProviderRequestAuthorizer
@@ -98,7 +98,6 @@ interface BedrockConverseRequest {
   messages: BedrockMessage[];
   toolConfig?: BedrockToolConfig;
   inferenceConfig?: BedrockInferenceConfig;
-  additionalModelRequestFields?: Record<string, unknown>;
 }
 
 /** One Converse stream event; event kinds and fields this adapter does not read pass through. */

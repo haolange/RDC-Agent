@@ -162,7 +162,6 @@ export function commitInvestigationTxn(
 export function recoverInvestigationTxn(
   sessionId: string,
   io: InvestigationTxnIo,
-  hooks: InvestigationTxnHooks = {},
 ): InvestigationTxnRecovery {
   let sessionPath: string;
   try {
@@ -193,7 +192,7 @@ export function recoverInvestigationTxn(
       throw degraded('investigation journal and commit marker are inconsistent');
     }
     const texts = readStagingTexts(sessionPath, commit.mutations);
-    applyPlan(sessionId, texts, io, hooks, commit.txnId);
+    applyPlan(sessionId, texts, io, {}, commit.txnId);
     cleanupTxn(sessionPath);
     return 'rolled-forward';
   }

@@ -82,7 +82,6 @@ export class PromptPlanForTurn {
       pendingSkillIds: input.preloadSkillIds,
       permissionConstraints: plan?.permissionConstraints ?? settingsService.snapshot().user.agentRuntime.permissions,
       routeCapability: resolveAgentRouteCapability(provider, input.modelId, input.capability),
-      effectiveModel: input.capability,
       requestPlan: input.requestPlan,
       contextWindowTokens: input.contextWindowTokens,
       extraSegments: input.extraSegments,

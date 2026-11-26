@@ -289,7 +289,7 @@ describe('AgentPermissionPolicyService external reads', () => {
 describe('structured RDC semantic risk', () => {
   const service = new AgentPermissionPolicyService();
   const evaluate = (arguments_: Record<string, unknown>, mode: AgentPermissionMode = 'auto-review', floor = false) => service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
-    agentId: 'general', tool: shellTool, toolCall: { id: 'rdc-query', name: 'shell', arguments: arguments_ },
+    tool: shellTool, toolCall: { id: 'rdc-query', name: 'shell', arguments: arguments_ },
     projectRootPath: workspaceRoot, ...permissionInput({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] }),
     compiledPolicy: compileFixturePolicy(floor ? { approvalFloorByTool: { shell: 'user' } } : {}),
   });
@@ -638,7 +638,6 @@ describe('AgentPermissionPolicyService shell risk classifier', () => {
         name: 'shell',
         arguments: { command: 'echo ok' },
       },
-      agentId: 'debugger',
       accessCeiling: 'read-only',
       projectRootPath: workspaceRoot,
     });
@@ -863,7 +862,7 @@ describe('file routing across permission modes', () => {
       scope: 'replay', effects: [], evidence_kind: null, path_inputs: [], prerequisites: [{ requires: 'session_id' }] };
     const executionContext = { agentId: 'general', sessionId: 'session', projectId: 'project', turnId: 'turn', workspaceRoot, projectRootPath: workspaceRoot,
       rdcBinding: freezeRdcTurnBinding({ ...DEFAULT_RDC_CLI_INVOKER, enabled: true, command: 'native' }, [definition], lease) };
-    const evaluate = (args = {}, mode: AgentPermissionMode = 'auto-review') => service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions), tool: shellTool, agentId: 'general', executionContext,
+    const evaluate = (args = {}, mode: AgentPermissionMode = 'auto-review') => service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions), tool: shellTool, executionContext,
       toolCall: { id: 'native', name: 'shell', arguments: { rdc: { operation: definition.name, args } } },
       ...permissionInput({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] }) });
     expect(evaluate()).toMatchObject({ action: 'auto_review', risk: 'low', operationFacts: { effects: [], arguments: { session_id: 'replay' } } });
@@ -874,7 +873,7 @@ describe('file routing across permission modes', () => {
     });
     expect(evaluate({ session_id: 'forged' }, 'full-access').action).toBe('deny');
     expect(evaluate({ unknown: true }).action).toBe('deny');
-    const discovery = (kind: Record<string, unknown>) => service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions), tool: shellTool, agentId: 'general', executionContext,
+    const discovery = (kind: Record<string, unknown>) => service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions), tool: shellTool, executionContext,
       toolCall: { id: 'discovery', name: 'shell', arguments: { rdc: { discovery: kind } } },
       ...permissionInput({ mode: 'full-access', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] }) });
     expect(discovery({ kind: 'describe', operation: definition.name }).action).toBe('allow');
@@ -890,7 +889,7 @@ describe('file routing across permission modes', () => {
       rollbackContracts: [rollback],
     } });
     expect(discovery({ kind: 'describe', operation: unknownWriter.name }).action).toBe('allow');
-    expect(service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions), tool: shellTool, agentId: 'general', executionContext,
+    expect(service.evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions), tool: shellTool, executionContext,
       toolCall: { id: 'unknown-write', name: 'shell', arguments: { rdc: { operation: unknownWriter.name, args: {} } } },
       ...permissionInput({ mode: 'auto-review', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] }) }).action).toBe('deny');
     ownership.lease.mockReturnValue({ ...lease, version: 8 });
@@ -900,7 +899,7 @@ describe('file routing across permission modes', () => {
     for (const command of ['rg pattern', 'Get-Content file', 'type file', 'rdc-tool version']) {
       const decision = new AgentPermissionPolicyService().evaluate({ ...permissionInput(mockSettings.agentRuntime.permissions),
         tool: shellTool, toolCall: { id: 'route', name: 'shell', arguments: { command } },
-        agentId: 'general', effectiveToolNames: ['read_file', 'grep'],
+        effectiveToolNames: ['read_file', 'grep'],
         ...permissionInput({ mode, readableRoots: [], writableRoots: [], allowedCommandPrefixes: [command], deniedCommandPrefixes: [] }),
       });
       expect(decision.action).toBe('deny');

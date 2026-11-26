@@ -13,10 +13,10 @@ import type { EvidenceRef } from './traceNodes';
 import type { ReasoningConfidence } from './traceNodes';
 import type { VisibleReasoningMode } from './traceNodes';
 
-const toIso = (value: number | string | undefined, fallback = nowIso()): string => {
+const toIso = (value: number | string | undefined): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'number' && Number.isFinite(value)) return new Date(value).toISOString();
-  return fallback;
+  return nowIso();
 };
 
 const traceStatusFromAction = (event: ActionEvent): TraceStatus => {
@@ -61,14 +61,13 @@ export class TraceEventEmitter {
     return this.store.append(runId, 'phase.completed', { phaseId });
   }
 
-  emitTaskFrame(runId: string, userRequest: string, constraints?: string[]): TraceEvent {
+  emitTaskFrame(runId: string, userRequest: string): TraceEvent {
     const node: TaskFrameNode = {
       id: generateEventId('task'),
       runId,
       kind: 'task_frame',
       title: '本次任务',
       userRequest,
-      constraints,
       seq: 0,
       createdAt: nowIso(),
       visibility: 'user',
@@ -150,13 +149,13 @@ export class TraceEventEmitter {
     return this.store.append(runId, 'node.created', node);
   }
 
-  emitFinalResponse(runId: string, content: string, format: 'markdown' | 'plain' = 'markdown'): TraceEvent {
+  emitFinalResponse(runId: string, content: string): TraceEvent {
     const node: FinalResponseNode = {
       id: generateEventId('final'),
       runId,
       kind: 'final_response',
       content,
-      format,
+      format: 'markdown',
       seq: 0,
       createdAt: nowIso(),
       visibility: 'user',

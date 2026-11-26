@@ -56,7 +56,7 @@ export function installCompletionReadinessValidator(
       profileId: input.agentId,
       completionContract: preparedRuntime.approvedExecution?.investigation ? 'investigation-report' : preparedRuntime.effectivePlan.completionContract,
       investigationMission: preparedRuntime.approvedExecution?.investigation?.mission ?? preparedRuntime.effectivePlan.investigationMission ?? undefined,
-      sessionId: executionScopeId, turnId: turnHandle.turnId,
+      sessionId: executionScopeId,
       disposition: declaration.disposition, evidenceRefs: declaration.evidenceRefs,
       budgetEvidence: completionBudgetEvidence(turnHandle),
     });
@@ -136,7 +136,7 @@ export function createTerminalResponseGuard(
       const mission = preparedRuntime.approvedExecution?.investigation?.mission;
       if (!mission || !['completed', 'budget_paused'].includes(turnHandle.completionDeclaration?.disposition ?? '')) return;
       guards.validateCompletion({ profileId: input.agentId, completionContract: 'investigation-report', investigationMission: mission,
-        sessionId: executionScopeId, turnId: turnHandle.turnId, disposition: turnHandle.completionDeclaration!.disposition,
+        sessionId: executionScopeId, disposition: turnHandle.completionDeclaration!.disposition,
         evidenceRefs: turnHandle.completionDeclaration!.evidenceRefs, budgetEvidence: completionBudgetEvidence(turnHandle),
         finalAnswerText: message.content.filter(block => block.type === 'text').map(block => block.text).join('').trim() });
     });

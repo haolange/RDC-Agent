@@ -438,7 +438,6 @@ export async function awaitFirstCatalogLoad(
   providerId: string,
   providers: ProviderLookup,
   signal?: AbortSignal,
-  timeoutMs = FIRST_CATALOG_LOAD_WAIT_MS,
 ): Promise<void> {
   const provider = providers.get(providerId);
   if (!provider) return;
@@ -451,7 +450,7 @@ export async function awaitFirstCatalogLoad(
   try {
     await Promise.race([
       pending.then(() => undefined, () => undefined),
-      new Promise<void>((resolve) => { timer = setTimeout(resolve, timeoutMs); }),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, FIRST_CATALOG_LOAD_WAIT_MS); }),
       new Promise<void>((resolve) => {
         onAbort = resolve;
         signal?.addEventListener('abort', onAbort, { once: true });

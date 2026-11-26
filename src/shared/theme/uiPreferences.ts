@@ -34,8 +34,8 @@ export function createDefaultUiPreferences(): UiPreferences {
 
 export function sanitizeUiPreferences(
   candidate: unknown,
-  fallback: UiPreferences = createDefaultUiPreferences(),
 ): UiPreferences {
+  const fallback = createDefaultUiPreferences();
   const record = candidate && typeof candidate === 'object'
     ? candidate as Partial<UiPreferences> & Record<string, unknown>
     : {};

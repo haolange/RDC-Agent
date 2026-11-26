@@ -70,7 +70,7 @@ const emptyPreviewLoadResult = (): PreviewLoadResult => ({
   attempts: [],
 });
 
-export interface RdcLifecycleOptions extends RdcRemoteProgress { expectedGeneration?: number; expectedCaptureSha256?: string; onStage?: (stage: 'connecting' | 'opening' | 'transferring') => void; onDaemonStopped?: (receipt: { contextId: string; stopped: true }) => void | Promise<void>; contextId?: string; binding?: RdcTurnBinding; signal?: AbortSignal; expectedBindingIdentity?: string }
+export interface RdcLifecycleOptions extends RdcRemoteProgress { expectedGeneration?: number; expectedCaptureSha256?: string; onStage?: (stage: 'connecting' | 'opening' | 'transferring') => void; onDaemonStopped?: (receipt: { contextId: string; stopped: true }) => void | Promise<void>; binding?: RdcTurnBinding; signal?: AbortSignal; expectedBindingIdentity?: string }
 
 export class RdcSessionRuntime {
   private contextId: string | null = null;

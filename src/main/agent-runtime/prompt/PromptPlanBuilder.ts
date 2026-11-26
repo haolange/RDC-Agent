@@ -19,7 +19,7 @@ import type { EffectiveAgentProfile, SkillLoadResult } from '../../settings/agen
 import type { ScopedInstructionResolution } from '../../runtime/scopedResourceTypes';
 import type { ExecutionOffer } from '../../sessions/run/executionOffer';
 import type { AgentPermissionSettings } from '@shared/types/settings';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { RequestPlan } from '@shared/types/providerCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 
@@ -39,7 +39,6 @@ export interface PromptPlanInput {
   /** Main-process verified offer bound to this recipient and the approved plan. */
   approvedExecutionOffer?: ExecutionOffer | null;
   routeCapability: AgentRouteCapability;
-  effectiveModel?: EffectiveModel;
   /** Execution callers supply their resolved plan; offline prompt-cost builds have no provider request. */
   requestPlan?: RequestPlan;
   permissionConstraints: Omit<AgentPermissionSettings, 'mode'>;

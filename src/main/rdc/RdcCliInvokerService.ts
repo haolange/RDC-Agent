@@ -350,7 +350,6 @@ export interface ToolCallRequest {
   contextId?: string;
   runtimeOwner?: string;
   ownerLeaseId?: string;
-  captureRef?: string;
   runId?: string;
   abortSignal?: AbortSignal;
 }

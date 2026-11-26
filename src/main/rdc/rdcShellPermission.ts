@@ -16,8 +16,8 @@ function request(
   return { action: 'ask_user', reason, risk, temporaryPathRoots: [] };
 }
 
-function denied(reason: string, risk: AgentPermissionDecision['risk'] = 'high'): AgentPermissionDecision {
-  return { action: 'deny', reason, risk, temporaryPathRoots: [] };
+function denied(reason: string): AgentPermissionDecision {
+  return { action: 'deny', reason, risk: 'high', temporaryPathRoots: [] };
 }
 
 export function evaluateRdcShellBaseline(

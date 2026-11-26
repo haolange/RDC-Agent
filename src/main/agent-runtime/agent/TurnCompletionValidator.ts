@@ -8,7 +8,6 @@ export interface TurnCompletionInput {
   completionContract?: 'final-answer' | 'investigation-report';
   /** Mission declared by a preloaded skill when the contract is investigation-report. */
   investigationMission?: 'debugger' | 'analyzer' | 'optimizer';
-  turnId?: string;
   sessionId?: string | null;
   finalAnswerText: string;
   disposition?: CompletionDisposition;

@@ -25,10 +25,10 @@ import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
 import type { ActionEvent } from '@shared/types/evidence';
 
-const toIso = (value: number | string | undefined, fallback = nowIso()): string => {
+const toIso = (value: number | string | undefined): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'number' && Number.isFinite(value)) return new Date(value).toISOString();
-  return fallback;
+  return nowIso();
 };
 
 const collectExplicitThinking = (

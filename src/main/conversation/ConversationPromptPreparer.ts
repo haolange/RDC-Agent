@@ -21,7 +21,6 @@ export interface PrepareConversationPromptInput {
   agentId: import('@shared/types/agent').AgentRole;
   routePreflight: AgentRoutePreflightOk;
   requestPlan: import('@shared/types/providerCapability').RequestPlan;
-  effectiveModel: import('@shared/types/providerCapability').EffectiveModel | null;
   attachmentPaths: string[];
   messageText: string;
   preloadSkillIds?: string[];
@@ -54,7 +53,6 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     pendingSkillIds: input.preloadSkillIds,
     permissionConstraints: settingsService.snapshot().user.agentRuntime.permissions,
     routeCapability: input.routePreflight.routeCapability,
-    effectiveModel: input.effectiveModel ?? undefined,
     requestPlan: input.requestPlan,
     contextWindowTokens: input.requestPlan.contextWindowTokens,
     extraSegments: input.context.planSource ? [{ id: 'plan:revision-source', kind: 'plan-revision', scope: 'runtime',

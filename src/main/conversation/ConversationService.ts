@@ -422,12 +422,12 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
     }
     const activeController = existingPreparation?.controller ?? controller;
 
-    const releasePreparation = (releaseRegistry = ownsPreparation): void => {
+    const releasePreparation = (): void => {
       if (stagingDir) {
         fs.rmSync(stagingDir, { recursive: true, force: true });
         stagingDir = null;
       }
-      if (!releaseRegistry) return;
+      if (!ownsPreparation) return;
       const requestState = this.preparingRequests.get(idempotencyKey);
       if (requestState?.credentialHandle && !requestState.credentialLeaseTransferred) {
         agentOrchestrator.releaseProviderRuntimeCredentials(requestState.credentialHandle);

@@ -165,12 +165,12 @@ export class AgentPlanReviewRequestService {
   constructor(
     private readonly writer: PlanArtifactWriter = planArtifactWriter,
     private readonly store: PlanReviewStateStore = planReviewStateStore,
-    private readonly installTaskRevisions: (sessionId: string, tasks: readonly PlanTaskRequirement[], onChange: NonNullable<TaskRegistry['onTaskChange']>) => Promise<void>
-      = (sessionId, tasks, onChange) => {
-        const registry = new TaskRegistry(createSessionTaskStore(sessionId)); registry.onTaskChange = onChange;
-        return registry.installApprovedTaskRevisions(tasks);
-      },
   ) {}
+
+  private installTaskRevisions(sessionId: string, tasks: readonly PlanTaskRequirement[], onChange: NonNullable<TaskRegistry['onTaskChange']>): Promise<void> {
+    const registry = new TaskRegistry(createSessionTaskStore(sessionId)); registry.onTaskChange = onChange;
+    return registry.installApprovedTaskRevisions(tasks);
+  }
 
   async request(input: AgentPlanReviewRequestInput): Promise<string> {
     const turnId = input.turnId?.trim();

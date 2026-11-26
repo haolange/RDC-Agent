@@ -51,7 +51,6 @@ import type {
 import type { McpConnectionLease } from './McpConnectionCoordinator';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { EffectiveAgentProfile } from '../../settings/agent-manifests/agentRuntimeTypes';
 import type {
   Message,
   StreamOptions,
@@ -87,7 +86,6 @@ export interface AgentTurnInput {
   content: string;
   providerId: string;
   modelId: string;
-  temperature?: number;
   profileId: string;
   runId?: string;
   sessionId?: string | null;
@@ -97,9 +95,6 @@ export interface AgentTurnInput {
   projectRootPath?: string | null;
   projectId?: string | null;
   effectiveModel?: EffectiveModel;
-  effectiveProfile?: EffectiveAgentProfile | null;
-  effectiveProfileIds?: readonly string[];
-  credentialHandle?: string;
   contextWindow?: number;
   contextTokenLimit: number;
   initialMessages?: Message[];

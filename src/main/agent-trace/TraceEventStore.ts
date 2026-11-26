@@ -124,7 +124,6 @@ export class TraceEventStore {
     runId: string,
     type: TraceEvent['type'],
     payload: unknown,
-    visibility: TraceEvent['visibility'] = 'user',
   ): TraceEvent {
     const seq = this.nextSeq(runId);
     const event: TraceEvent = {
@@ -134,7 +133,7 @@ export class TraceEventStore {
       timestamp: nowIso(),
       type,
       payload,
-      visibility,
+      visibility: 'user',
     };
     appendJsonl(this.eventsPath(runId), event);
     return event;

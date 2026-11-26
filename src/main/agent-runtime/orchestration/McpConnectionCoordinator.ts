@@ -113,10 +113,10 @@ export function classifyMcpFailure(err: unknown): McpFailureKind {
   return 'retryable';
 }
 
-function computeNextRetryAt(attempts: number, now = Date.now()): number {
+function computeNextRetryAt(attempts: number): number {
   const exp = Math.max(0, attempts - 1);
   const delay = Math.min(MCP_RETRY_CAP_MS, MCP_RETRY_BASE_MS * (2 ** exp));
-  return now + delay;
+  return Date.now() + delay;
 }
 
 /** Re-read after the awaits in evictPool: quarantinePool may have run meanwhile. */
@@ -128,15 +128,12 @@ export class McpConnectionCoordinator {
   private readonly activePoolByProject = new Map<string, string>();
   private readonly orphanedPools = new Map<string, OrphanedPoolRecord>();
 
-  getAgentTools(projectRootPath?: string | null, poolKey?: string | null, projectId?: string | null): AgentTool[] {
+  getAgentTools(projectRootPath?: string | null, poolKey?: string | null): AgentTool[] {
     const pool = poolKey
       ? this.pools.get(poolKey)
-      : this.resolveActivePool(projectRootPath, projectId);
+      : this.resolveActivePool(projectRootPath);
     if (!pool || pool.closing || pool.quarantined) return [];
     if (poolKey && projectRootPath && pool.projectRootPath && this.projectKey(pool.projectRootPath) !== this.projectKey(projectRootPath)) {
-      return [];
-    }
-    if (poolKey && projectId && pool.projectId && pool.projectId !== projectId.trim()) {
       return [];
     }
     return pool.manager.getAgentTools();
@@ -147,13 +144,13 @@ export class McpConnectionCoordinator {
   }
 
   /** Settings / IPC status is scoped to the requested project and never merges pools. */
-  getMcpServerStatusSummary(projectRootPath?: string | null, query?: string, projectId?: string | null): MCPServerStatusSummary[] {
+  getMcpServerStatusSummary(projectRootPath?: string | null, query?: string): MCPServerStatusSummary[] {
     const normalizedQuery = query?.trim().toLowerCase() ?? '';
     const configured = agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
       .filter((server) => !normalizedQuery
         || (server.id + ' ' + server.name + ' ' + server.description).toLowerCase().includes(normalizedQuery));
     const runtimeById = new Map(
-      this.getRuntimeStatusSummary(projectRootPath, projectId).map((entry) => [entry.id, entry]),
+      this.getRuntimeStatusSummary(projectRootPath).map((entry) => [entry.id, entry]),
     );
     return configured.map((server) => {
       const runtime = runtimeById.get(server.id) ?? runtimeById.get(server.name);

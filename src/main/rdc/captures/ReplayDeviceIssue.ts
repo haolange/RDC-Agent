@@ -18,7 +18,7 @@ export function deviceInstallationIdentity(details: Record<string, unknown> | un
     ? { deviceSerial: action.device_serial, packageName: action.package_name, apkSha256: action.apk_sha256 } : undefined;
 }
 
-export function replayDeviceIssue(error: unknown, stage: DevicePreparationPhase = 'checking'): ReplayDeviceIssue {
+export function replayDeviceIssue(error: unknown): ReplayDeviceIssue {
   const native = error instanceof RdcNativeFailure ? error.nativeError : null;
   const remote = record(native?.details?.remote);
   const deviceAction = unconfirmedDeviceAction(native?.details);
@@ -26,7 +26,7 @@ export function replayDeviceIssue(error: unknown, stage: DevicePreparationPhase 
   const output = native?.details && Object.fromEntries(['command', 'returncode', 'stdout', 'stderr']
     .filter(key => native.details?.[key] !== undefined).map(key => [key, native.details![key]]));
   const diagnostic = error instanceof Error ? error.message : String(error);
-  return { code, stage: stages.has(remote?.stage as DevicePreparationPhase) ? remote!.stage as DevicePreparationPhase : stage,
+  return { code, stage: stages.has(remote?.stage as DevicePreparationPhase) ? remote!.stage as DevicePreparationPhase : 'checking',
     diagnostic: output && Object.keys(output).length ? `${diagnostic}\n${JSON.stringify(output, null, 2)}` : diagnostic,
     recovery: deviceAction ? deviceInstallationIdentity(native?.details) ? 'retry' : null : ['android_apk_missing', 'remote_apk_missing', 'RDC_CLI_CONTRACT_INVALID', 'RDC_REMOTE_UPGRADE_REQUIRED'].includes(code) ? 'configure_tools' : 'retry',
     ...(text(remote?.expected_version) ? { expectedVersion: text(remote?.expected_version) } : {}),

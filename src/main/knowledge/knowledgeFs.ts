@@ -172,12 +172,8 @@ export async function assertSafeKnowledgeWriteTarget(
   return lexical;
 }
 
-export async function writeKnowledgeCardAtomic(
-  absolutePath: string,
-  contents: string,
-  storage = new StorageIo(),
-): Promise<void> {
-  storage.writeUtf8Atomic(absolutePath, contents);
+export async function writeKnowledgeCardAtomic(absolutePath: string, contents: string): Promise<void> {
+  new StorageIo().writeUtf8Atomic(absolutePath, contents);
   const written = await fs.readFile(absolutePath, 'utf8');
   const expected = createHash('sha256').update(contents, 'utf8').digest('hex');
   const actual = createHash('sha256').update(written, 'utf8').digest('hex');

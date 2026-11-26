@@ -56,13 +56,8 @@ function createWorkBlock(
   return block;
 }
 
-export function createDraftWorkTrace(summary?: string, blocks: ConversationWorkBlock[] = []): ConversationWorkTrace {
-  return {
-    status: 'running',
-    summary,
-    blocks: blocks.map(cloneWorkBlock),
-    updatedAt: nowMs(),
-  };
+export function createDraftWorkTrace(): ConversationWorkTrace {
+  return { status: 'running', blocks: [], updatedAt: nowMs() };
 }
 
 function cloneToolCall(toolCall: ConversationToolCall): ConversationToolCall {

@@ -292,7 +292,7 @@ export class ToolExecutorFactory {
         authorize: (snapshot, approvalSignal) => authorizeToolPermission({
           decision: { executionContext: toolContext,
             effectiveToolNames: [...tools.keys()].filter(name => !activeSkillAllowlist || activeSkillAllowlist.has(name)),
-            tool, toolCall: validatedToolCall, agentId, projectRootPath, permissionConstraints,
+            tool, toolCall: validatedToolCall, projectRootPath, permissionConstraints,
             compiledPolicy: plan.policy, sessionAttachmentsRoot, knowledgeReadRoots },
           approval: runtimeContext?.eventContext && runtimeContext.turnId ? {
             agentId, sessionId: runtimeContext.sessionId ?? null, turnId: runtimeContext.turnId,
