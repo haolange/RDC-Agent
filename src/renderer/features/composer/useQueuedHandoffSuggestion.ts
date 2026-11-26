@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { isCurrentPlanReview, usePlanReviewStore } from '../../stores/planReviewStore';
+import { usePlanReviewStore } from '../../stores/planReviewStore';
 import {
   useComposerSessionContextStore,
   type HandoffSuggestionRequest,
@@ -22,18 +22,15 @@ function current(request: HandoffSuggestionRequest): boolean {
     useProjectStore.getState().currentSessionId !== request.sessionId
   )
     return false;
-  if (request.approvedPlan)
-    return (
-      usePlanReviewStore.getState().bySession[request.sessionId]?.approvedHandoff?.planHash ===
-      request.approvedPlan.hash
-    );
-  if (!request.approval) return true;
-  return isCurrentPlanReview({ sessionId: request.sessionId, reviewId: request.approval.reviewId }, 'approve');
+  if (!request.approvedPlan) return true;
+  return (
+    usePlanReviewStore.getState().bySession[request.sessionId]?.approvedHandoff?.planHash === request.approvedPlan.hash
+  );
 }
 
 /** A handoff that executes a reviewed plan says so, and main verifies the claim before accepting the message. */
 function executionReference(request: HandoffSuggestionRequest): Pick<HandoffSendPayload, 'planReference'> {
-  const plan = request.approval ?? request.approvedPlan;
+  const plan = request.approvedPlan;
   return plan
     ? {
         planReference: {
@@ -55,7 +52,6 @@ export function useQueuedHandoffSuggestion(input: {
   inspectRequest: (sessionId: string, requestId: string) => Promise<ComposerSendOutcome>;
 }) {
   const request = useComposerSessionContextStore((state) => state.handoffSuggestionRequest);
-  const review = usePlanReviewStore((state) => (request?.approval ? state.bySession[request.sessionId] : undefined));
   const activeTurn = useComposerSessionContextStore((state) => state.activeTurn);
   const isPromptSending = useComposerSessionContextStore((state) => state.isPromptSending);
   const [ready, setReady] = useState<Delivery | null>(null);
@@ -63,16 +59,6 @@ export function useQueuedHandoffSuggestion(input: {
   const retrying = useRef(false);
   const callbacks = useRef(input);
   callbacks.current = input;
-  useEffect(() => {
-    if (
-      request?.approval &&
-      !current(request) &&
-      useComposerSessionContextStore.getState().handoffSuggestionRequest === request
-    ) {
-      useComposerSessionContextStore.getState().clearHandoffSuggestion();
-      setReady(null);
-    }
-  }, [request, review]);
   useEffect(() => {
     if (!request || request.sessionId !== input.sessionId || !current(request)) {
       setReady(null);
@@ -89,11 +75,6 @@ export function useQueuedHandoffSuggestion(input: {
         useComposerSessionContextStore.getState().clearHandoffSuggestion();
       }
     };
-    // An approval already committed the switch in main; only suggestion rows and recovery apply it here.
-    if (request.approval) {
-      deliver(request.prompt);
-      return;
-    }
     let mounted = true;
     const live = () => mounted && current(request);
     void applyDeclaredHandoffOnClient(

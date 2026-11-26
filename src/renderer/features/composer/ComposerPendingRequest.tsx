@@ -2,6 +2,7 @@ import { ToolApprovalRequestPanel } from './ToolApprovalRequestPanel';
 import { PlanReviewRequestPanel } from './PlanReviewRequestPanel';
 import { UserInputRequestPanel } from './UserInputRequestPanel';
 import { composerPendingRequestKey, type ComposerPendingRequestState } from './pendingRequestSelection';
+import type { PlanReviewContinuation } from './usePlanReviewSubmit';
 import type { SessionRecord } from '@shared/types/session';
 import type { Ref } from 'react';
 
@@ -10,14 +11,14 @@ export function ComposerPendingRequest({
   composeAccentStyle,
   agentId,
   currentSession,
-  onReplan,
+  continuation,
   shellRef,
 }: {
   pending: ComposerPendingRequestState;
   composeAccentStyle: { 'data-dyn-style': string };
   agentId: string;
   currentSession: SessionRecord | null;
-  onReplan?: (payload: import('./composerHandoffSend').HandoffSendPayload) => Promise<unknown>;
+  continuation: PlanReviewContinuation;
   shellRef?: Ref<HTMLDivElement>;
 }) {
   if (pending.kind === 'tool-approval') {
@@ -35,7 +36,7 @@ export function ComposerPendingRequest({
           request={pending.request}
           agentId={agentId}
           currentSession={currentSession}
-          onReplan={onReplan}
+          continuation={continuation}
         />
       </div>
     );

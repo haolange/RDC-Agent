@@ -10,28 +10,47 @@ import { useTurnControlsStore } from '../../stores/turnControlsStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { readCompiledComposerRoute, resolveComposerEffectiveModel } from '../../lib/composerEffectiveModel';
 import { flushSessionModelSaves } from './sessionModelOverride';
+import { isComposerExecutionIdle } from './composerTurnIdle';
 import type { PendingPlanReviewRequest } from './planReviewRequestModel';
-import type {
-  ConversationAnswerPlanReviewRequest,
-  PlanReferenceRequest,
-  PlanReviewDecision,
-} from '@shared/types/planReview';
+import type { ComposerSendOutcome, HandoffSendPayload } from './composerHandoffSend';
+import type { ConversationAnswerPlanReviewRequest, PlanReviewDecision } from '@shared/types/planReview';
+
+/** How an answered review continues in the Composer: a replan or execute turn is sent, a non-sending one prefilled. */
+export interface PlanReviewContinuation {
+  send: (payload: HandoffSendPayload) => Promise<ComposerSendOutcome | undefined>;
+  prefill: (prompt: string) => void;
+}
+
+/**
+ * The owning turn is still running when it asks for review. Resolves true once it and every other turn has ended, or
+ * false as soon as the decision stops being the current one.
+ */
+function untilTurnIdle(live: () => boolean): Promise<boolean> {
+  return new Promise((resolve) => {
+    const offs: Array<() => void> = [];
+    let settled = false;
+    const check = () => {
+      if (settled) return;
+      const outcome = !live() ? false : isComposerExecutionIdle() ? true : null;
+      if (outcome === null) return;
+      settled = true;
+      offs.forEach((off) => off());
+      resolve(outcome);
+    };
+    offs.push(useComposerSessionContextStore.subscribe(check), useConversationStore.subscribe(check));
+    check();
+  });
+}
 
 /**
  * Answers a plan review with one call. An approval sends the reviewed hash, the declared handoff, the model and
  * controls shown in the panel and the session revision they were read from; main verifies all of it, runs the handoff
  * hooks and commits the plan, the offer and the session's Agent, model and controls together, or nothing. The
- * committed record and review come back with the declared continuation, which is queued as exactly one execute turn
- * (or prefilled when the declaration does not send).
+ * committed record and review come back with the declared continuation: once the owning turn has ended it is sent as
+ * exactly one execute turn, or prefilled when the declaration does not send. A send main does not accept leaves the
+ * approved plan unsent, which main projects as the explicit continuation row (`ApprovedPlanHandoff`).
  */
-export const usePlanReviewSubmit = (
-  onReplan?: (payload: {
-    sessionId: string;
-    agentId: string;
-    prompt: string;
-    planReference: PlanReferenceRequest;
-  }) => Promise<unknown>,
-) => {
+export const usePlanReviewSubmit = (continuation: PlanReviewContinuation) => {
   const api = useElectronApi();
   return useCallback(
     async (request: PendingPlanReviewRequest, decision: PlanReviewDecision): Promise<void> => {
@@ -88,8 +107,7 @@ export const usePlanReviewSubmit = (
         usePlanReviewStore.getState().accept(result.planReview);
         if (result.decision === 'reject') {
           if (result.replan && live()) {
-            if (!onReplan) throw new AppError('PLAN_REPLAN_UNAVAILABLE');
-            await onReplan({
+            await continuation.send({
               sessionId: request.sessionId,
               agentId: result.replan.agentId,
               prompt: result.replan.feedback,
@@ -100,17 +118,21 @@ export const usePlanReviewSubmit = (
         }
         acceptSessionSnapshot(result.session);
         if (decision.kind !== 'approve' || !live()) return;
-        useComposerSessionContextStore.getState().queueHandoffSuggestion({
+        if (!result.handoff.send) {
+          continuation.prefill(result.handoff.prompt);
+          return;
+        }
+        if (!(await untilTurnIdle(live))) return;
+        await continuation.send({
           sessionId: request.sessionId,
           agentId: decision.handoff.agent,
-          label: decision.handoff.label,
           prompt: result.handoff.prompt,
-          send: result.handoff.send,
-          approval: {
-            reviewId: request.reviewId,
+          planReference: {
+            intent: 'execute',
+            sessionId: request.sessionId,
             planId: request.planReview.planId,
             revision: request.planReview.revision,
-            hash: request.planReview.hash,
+            expectedHash: request.planReview.hash,
           },
         });
       } finally {
@@ -119,6 +141,6 @@ export const usePlanReviewSubmit = (
         offReview();
       }
     },
-    [api, onReplan],
+    [api, continuation],
   );
 };

@@ -231,10 +231,10 @@
       "params": 9
     },
     "src/renderer/features/composer/PlanReviewRequestPanel.tsx": {
-      "lines": 173
+      "lines": 156
     },
     "src/renderer/features/composer/useComposer.ts": {
-      "lines": 162
+      "lines": 159
     },
     "src/renderer/features/composer/useComposerAttachments.ts": {
       "lines": 168

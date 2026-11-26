@@ -124,18 +124,6 @@ it('reconciles uncertain delivery without sending again, including repeated chec
   expect(context.getState().handoffSuggestionRequest).toBeNull();
   expect(send).toHaveBeenCalledTimes(1);
 });
-it('does not send an approval that is no longer the current decision', async () => {
-  context.setState({
-    handoffSuggestionRequest: {
-      ...request(),
-      approval: { reviewId: 'review', planId: 'old', revision: 1, hash: 'old' },
-    },
-  });
-  await render();
-  expect(mock.apply).not.toHaveBeenCalled();
-  expect(send).not.toHaveBeenCalled();
-  expect(setPrompt).not.toHaveBeenCalled();
-});
 it('binds a recovered handoff to the currently projected approved hash', async () => {
   const approvedHandoff = {
     agent: 'general',
@@ -184,85 +172,4 @@ it('does not dispatch a recovered handoff when its projected approval changed', 
   await render();
   expect(mock.apply).not.toHaveBeenCalled();
   expect(send).not.toHaveBeenCalled();
-});
-it('releases the handoff queue when a dispatched execution retires its review', async () => {
-  const approval = { reviewId: 'review', planId: 'p', revision: 1, hash: 'h' };
-  usePlanReviewStore.getState().accept({
-    sessionId: 's',
-    projectionVersion: 1,
-    review: null,
-    recoverable: null,
-    decision: { reviewId: 'review', kind: 'approve' },
-  });
-  context.setState({ handoffSuggestionRequest: { ...request(), approval } });
-  send.mockImplementation(async () => {
-    usePlanReviewStore.getState().accept({ sessionId: 's', projectionVersion: 2, review: null, recoverable: null });
-    return { status: 'accepted', requestId: 'execution' };
-  });
-  await render();
-  expect(send).toHaveBeenCalledOnce();
-  expect(context.getState().handoffSuggestionRequest).toBeNull();
-  expect(controller.phase).toBeUndefined();
-});
-
-it('does not revive an earlier approved handoff when a later review has already ended', async () => {
-  const approval = { reviewId: 'review', planId: 'p', revision: 1, hash: 'h' };
-  context.setState({ handoffSuggestionRequest: { ...request(), approval } });
-  useConversationStore.setState({
-    conversationMessages: [
-      {
-        role: 'assistant',
-        sessionId: 's',
-        turnId: 't',
-        status: 'complete',
-        workTrace: {
-          blocks: [
-            {
-              toolCalls: [
-                { id: 'c', planReview: { planId: 'p', revision: 1, hash: 'h', status: 'approved' } },
-                { id: 'later', planReview: { planId: 'p', revision: 2, hash: 'h2', status: 'cancelled' } },
-              ],
-            },
-          ],
-        },
-      },
-    ] as never,
-  });
-  await render();
-  expect(send).not.toHaveBeenCalled();
-});
-
-it('sends an approved plan as one execute turn without applying the handoff again, and never regresses', async () => {
-  usePlanReviewStore.getState().accept({
-    sessionId: 's',
-    projectionVersion: 1,
-    review: null,
-    recoverable: null,
-    decision: { reviewId: 'review', kind: 'approve' },
-  });
-  let finish!: (value: unknown) => void;
-  send.mockImplementation(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
-  );
-  context.setState({
-    handoffSuggestionRequest: { ...request(), approval: { reviewId: 'review', planId: 'p', revision: 1, hash: 'h' } },
-  });
-  await render();
-  await render();
-  expect(controller.phase).toBe('preparing');
-  expect(mock.apply).not.toHaveBeenCalled();
-  await render(true);
-  await render(false);
-  expect(controller.phase).toBe('preparing');
-  await act(async () => finish({ status: 'accepted', requestId: 'confirmed' }));
-  expect(controller.phase).toBeUndefined();
-  expect(send).toHaveBeenCalledExactlyOnceWith({
-    sessionId: 's',
-    agentId: 'general',
-    prompt: 'execute',
-    planReference: { intent: 'execute', sessionId: 's', planId: 'p', revision: 1, expectedHash: 'h' },
-  });
 });

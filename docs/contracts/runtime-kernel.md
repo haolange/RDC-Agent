@@ -452,7 +452,7 @@ handoff 名称来自声明的 `label` 与可选 `labelTranslations`（`zh-CN` / 
 
 `send: true` 表示声明交接确认且原请求释放后，显式载荷经同一 Composer 发送链直接发送，不预填输入框；`send: false` 才预填。
 
-- 批准返回后 renderer 只排队一次带 `planReference: execute` 的执行回合；交接发送沿用会话已提交的 Agent、模型与参数，不再附 renderer 侧的配置提交。
+- 批准返回后 renderer 只发送一次带 `planReference: execute` 的执行回合；交接发送沿用会话已提交的 Agent、模型与参数，不再附 renderer 侧的配置提交。
 - 原草稿、附件与临时 Skill 不参与自动交接，失败也不被配套 prompt 覆盖。
 - 未提交才可重试，结果不明按 requestId 对账；迟到结果不得写进别的 session。
 - 手动改 Composer Agent pill 不写 offer、不预载调查 Skill。

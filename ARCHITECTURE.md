@@ -714,7 +714,7 @@ Mission 共用 investigation-planning 的计划结构，按规模填写。正文
 4. 按前像日志依序提交冻结计划、plan-state、execution offer 与会话的 Agent／模型／参数，任一步失败全部撤销；
 5. 提交后运行 `after-handoff`，失败只留诊断。
 
-renderer 只发一次调用，并按返回的 `send` 排队一个执行回合。
+renderer 只发一次调用，并按返回的 `send` 在规划回合结束后发送一个执行回合（或预填）。
 
 **计划版本与预载**：
 
@@ -771,6 +771,6 @@ Task 可通过通用 `executionRequirements` 声明必要的执行方式、必�
 计划批准由宿主确认的工具边界正常结束 owning 规划回合，不再请求规划模型补终答；已启动的执行仍须 join，未开始的调用记为 skipped。
 
 - Conversation 验证同回合的冻结计划和 execution offer 后接受该计划门退出，不冒充 Mission 完成，也不放宽普通 canonical final_answer 合同。
-- 批准与交接是同一主进程事务，执行回合沿发送队列只发一次，无新增的持久状态机。
+- 批准与交接是同一主进程事务，执行回合经 Composer 发送链只发一次，无新增的持久状态机。
 - 审批授权来自 main-owned PlanReviewProjection 与运行时 reviewId，以持久 plan-state/历史/文件证明来源，不依赖仍存活的 Promise 或历史 streaming。
 - 正常、重开和重启恢复共用决定链，不自动执行或复活旧回合；活跃反馈返回原循环，恢复反馈是携带已核验计划引用的新用户规划请求。恢复边界见 session-projection 契约。

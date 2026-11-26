@@ -214,7 +214,7 @@ TaskRailItem 与 ConversationTaskSnapshotItem 可带只读 waitingOn（taskId、
 
 Plan 批准的正常退出携带宿主 owning turn 的批准身份；主进程核对冻结制品、当前计划与 execution offer，普通缺失 final_answer 仍失败。
 
-- 批准是一次 renderer→main 调用：返回的会话记录（含 revision）与审批投影先被接受，Agent 胶囊随会话视图变为声明目标；`send: true` 时只排队一个带 `planReference: execute` 的执行回合，待规划回合释放后发送一次，`send: false` 只预填。
+- 批准是一次 renderer→main 调用：返回的会话记录（含 revision）与审批投影先被接受，Agent 胶囊随会话视图变为声明目标；`send: true` 时由 `usePlanReviewSubmit` 等规划回合与其他执行结束后，经 Composer 发送链直接发送一个带 `planReference: execute` 的执行回合（不经交接建议队列），`send: false` 只预填；主进程未接受的发送让计划保持“已批准未发送”，由 `ApprovedPlanHandoff` 行显式继续。
 - 该执行回合不再调用 `applyDeclaredHandoff`，也不附配置提交；回合结束的建议行与重启后的已批准交接仍经 `applyDeclaredHandoff`。
 - 批准确认到交接共用来源计划身份，迟到成功、Stop、会话切换与修订均不能重新发送；投递不确定只核查 requestId。
 - 准备时保留本次选择并标待确认，不能投影旧请求模型/参数。

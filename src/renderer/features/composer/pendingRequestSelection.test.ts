@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { resolveComposerPendingRequest } from './pendingRequestSelection';
 import { ComposerPendingRequest } from './ComposerPendingRequest';
 import type { ConversationMessage, ConversationToolCall } from '@shared/types/conversation';
+const continuation = { send: vi.fn(), prefill: vi.fn() };
 
 vi.mock('./ToolApprovalRequestPanel', () => ({ ToolApprovalRequestPanel: () => 'approval panel' }));
 vi.mock('./PlanReviewRequestPanel', () => ({ PlanReviewRequestPanel: () => 'plan panel' }));
@@ -90,6 +91,7 @@ describe('pending Composer request precedence', () => {
         composeAccentStyle: { 'data-dyn-style': 'accent-request' },
         agentId: 'general',
         currentSession: null,
+        continuation,
       }),
     );
     expect(html).toBe(

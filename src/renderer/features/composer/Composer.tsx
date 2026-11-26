@@ -137,7 +137,7 @@ export const Composer: React.FC<ComposerProps> = ({ composer, shellRef }) => {
                 composeAccentStyle={composeAccentStyle}
                 agentId={pendingRequest.kind === 'plan-review' ? selectedAgentId : (activeAgentId ?? selectedAgentId)}
                 currentSession={currentSession}
-                onReplan={composer.sendExplicitPrompt}
+                continuation={composer.planReviewContinuation}
               />
             ) : (
               <div

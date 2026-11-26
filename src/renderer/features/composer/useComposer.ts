@@ -20,6 +20,7 @@ import { useSelectedContextProfile } from './useSelectedContextProfile';
 import { useComposerDomEffects } from './useComposerDomEffects';
 import { persistSessionAgentId } from './sessionAgentId';
 import { useQueuedHandoffSuggestion } from './useQueuedHandoffSuggestion';
+import { isActiveRun } from './composerTurnIdle';
 import type { AgentMode, ModeConfig } from '@shared/types/layout';
 
 export function useComposer(options: {
@@ -64,10 +65,7 @@ export function useComposer(options: {
   const selectedDeviceEntry = usePreparedSessionDevice(currentProject?.projectId, currentSession?.sessionId);
   const { promptValue, setPromptValue } = useScopedPromptDraft(currentProject?.projectId, currentSession?.sessionId);
 
-  const hasActiveDebugRun = Boolean(
-    currentRun &&
-    ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status),
-  );
+  const hasActiveDebugRun = isActiveRun(currentRun);
 
   const attachments = useComposerAttachments({
     t,
@@ -190,7 +188,7 @@ export function useComposer(options: {
     setIsDropActive: attachments.setIsDropActive,
     handoff,
     handlePromptSend: send.handlePromptSend,
-    sendExplicitPrompt: send.sendHandoffPrompt,
+    planReviewContinuation: send.planReviewContinuation,
     handlePromptKeyDown: send.handlePromptKeyDown,
     setPromptValueDirect: setPromptValue,
   };

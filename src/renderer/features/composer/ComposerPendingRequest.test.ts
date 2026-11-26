@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ComposerPendingRequest } from './ComposerPendingRequest';
 import type { ComposerPendingRequestState } from './pendingRequestSelection';
+const continuation = { send: vi.fn(), prefill: vi.fn() };
 
 const mock = vi.hoisted(() => ({ approval: vi.fn(), answer: vi.fn() }));
 vi.mock('./useToolApprovalSubmit', () => ({ useToolApprovalSubmit: () => mock.approval }));
@@ -41,6 +42,7 @@ const render = (pending: ComposerPendingRequestState) =>
         composeAccentStyle: { 'data-dyn-style': 'test' },
         agentId: 'general',
         currentSession: null,
+        continuation,
       }),
     );
   });

@@ -2,10 +2,10 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { PlanReviewRequestPanel } from './PlanReviewRequestPanel';
 import { planReviewRequestKey, type PendingPlanReviewRequest } from './planReviewRequestModel';
 import type { CapabilityResolutionState } from '../../lib/capabilityResolution';
+const continuation = { send: vi.fn(), prefill: vi.fn() };
 
 const mock = vi.hoisted(() => ({
   language: 'en' as 'en' | 'zh-CN',
@@ -61,6 +61,7 @@ const render = (value = request) =>
         request: value,
         agentId: 'debugger',
         currentSession: null,
+        continuation,
       }),
     );
   });
@@ -78,7 +79,6 @@ beforeEach(() => {
       disconnect() {}
     },
   );
-  useComposerSessionContextStore.getState().clearHandoffSuggestion();
   mock.submit.mockReset().mockResolvedValue(undefined);
   mock.stop.mockReset().mockResolvedValue(undefined);
   mock.capabilityState = { status: 'ready' } as CapabilityResolutionState;
@@ -218,7 +218,9 @@ it('stops an awaiting plan without approving its handoff', async () => {
   );
   mock.stop.mockImplementation(onStop);
   await act(async () =>
-    root.render(createElement(PlanReviewRequestPanel, { request, agentId: 'debugger', currentSession: null })),
+    root.render(
+      createElement(PlanReviewRequestPanel, { request, agentId: 'debugger', currentSession: null, continuation }),
+    ),
   );
   const stop = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
     (button) => button.getAttribute('aria-label') === 'chat.planReviewStop',
@@ -283,6 +285,7 @@ it('holds approval while a model saves, retains failures and still allows stop',
         request,
         agentId: 'debugger',
         currentSession: null,
+        continuation,
       }),
     ),
   );
@@ -330,22 +333,21 @@ it('submits Enter once while Shift+Enter and IME remain editing input', async ()
   await act(async () => finish());
 });
 
-it('retains acknowledgement and locks decisions until the approval projection catches up, without locking a new revision', async () => {
+it('locks decisions while an approval and its continuation are in flight, without locking a new revision', async () => {
   await render();
-  await act(async () =>
-    useComposerSessionContextStore.getState().queueHandoffSuggestion({
-      sessionId: 's',
-      agentId: 'general',
-      label: 'Execute',
-      prompt: '',
-      send: true,
-      approval: { reviewId: 'review', planId: 'p', revision: 1, hash: 'h' },
-    }),
+  let finish!: () => void;
+  mock.submit.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
   );
-  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
-  expect(host.querySelector('[role="status"]')?.textContent).toBe('composer.handoff.switching');
   await click('.handoff-action-row__button');
-  expect(mock.submit).not.toHaveBeenCalled();
+  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
+  expect(host.querySelector('[role="status"]')?.textContent).toBe('composer.handoff.confirming');
+  await click('.handoff-action-row__button');
+  expect(mock.submit).toHaveBeenCalledOnce();
   await render({ ...request, planReview: { ...request.planReview, revision: 2 } });
   expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(false);
+  await act(async () => finish());
 });

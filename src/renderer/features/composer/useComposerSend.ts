@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react';
 import { getCurrentSessionView } from '../../stores/sessionRecordStore';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { conversationWriters, sendComposerConversationTurn } from './composerSendFlow';
@@ -7,6 +7,7 @@ import { executeSlashCommand } from './slashCommandExecutor';
 import { isConcurrentModelSwitchCommand, shouldClearSubmittedPrompt } from './composerCommandConcurrency';
 import { shouldSendComposerOnEnter } from './composerKeyboard';
 import { inspectHandoffRequest, type HandoffSendPayload } from './composerHandoffSend';
+import { isComposerExecutionIdle } from './composerTurnIdle';
 import type { PendingAttachmentDraft } from '../../types/attachments';
 import type { useI18n } from '../../i18n';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
@@ -60,7 +61,9 @@ export function useComposerSend(options: ComposerSendOptions) {
   const sendingRef = useRef(false);
   const performSend = useCallback(
     async (handoff?: HandoffSendPayload) => {
-      const { options: composer, isComposerBusy: busy } = latest.current;
+      const { options: composer } = latest.current;
+      // A handoff can start from a store subscription, before the render that ended the previous turn.
+      const busy = handoff ? !isComposerExecutionIdle() : latest.current.isComposerBusy;
       const { currentProject, currentSession: shown, selectedAgentId } = composer;
       const session = handoff ? getCurrentSessionView() : shown;
       if (handoff && session?.sessionId !== handoff.sessionId) return { status: 'cancelled' as const, requestId: '' };
@@ -134,6 +137,10 @@ export function useComposerSend(options: ComposerSendOptions) {
     await performSend();
   }, [performSend]);
   const sendHandoffPrompt = useCallback((payload: HandoffSendPayload) => performSend(payload), [performSend]);
+  const planReviewContinuation = useMemo(
+    () => ({ send: sendHandoffPrompt, prefill: setPromptValue }),
+    [sendHandoffPrompt, setPromptValue],
+  );
 
   const handlePromptKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -152,6 +159,7 @@ export function useComposerSend(options: ComposerSendOptions) {
     handlePrimaryStop,
     handlePromptSend,
     sendHandoffPrompt,
+    planReviewContinuation,
     inspectHandoff: inspectHandoffRequest,
     handlePromptKeyDown,
   };

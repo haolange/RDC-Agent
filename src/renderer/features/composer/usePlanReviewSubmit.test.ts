@@ -12,7 +12,10 @@ const mock = vi.hoisted(() => ({
   messages: [] as ConversationMessage[],
   answer: vi.fn(),
   history: vi.fn(),
-  queue: vi.fn(),
+  send: vi.fn(),
+  prefill: vi.fn(),
+  activeTurn: null as object | null,
+  contextListeners: new Set<() => void>(),
   flush: vi.fn(),
   accept: vi.fn(),
   sessionListeners: new Set<() => void>(),
@@ -63,9 +66,25 @@ vi.mock('../../stores/conversationStore', () => ({
 }));
 vi.mock('../../stores/composerSessionContextStore', () => ({
   useComposerSessionContextStore: {
-    getState: () => ({ queueHandoffSuggestion: mock.queue }),
+    getState: () => ({ activeTurn: mock.activeTurn, isPromptSending: false }),
+    subscribe: (fn: () => void) => {
+      mock.contextListeners.add(fn);
+      return () => mock.contextListeners.delete(fn);
+    },
   },
 }));
+const useTestSubmit = () => usePlanReviewSubmit({ send: mock.send, prefill: mock.prefill });
+const execute = {
+  sessionId: 's',
+  agentId: 'general',
+  prompt: 'Execute the frozen plan.',
+  planReference: { intent: 'execute', sessionId: 's', planId: 'p', revision: 1, expectedHash: 'h' },
+};
+/** Main ends the owning turn after it commits the approval. */
+function endOwningTurn() {
+  mock.messages = [{ ...trace('approved'), status: 'complete' }];
+  mock.activeTurn = null;
+}
 
 const request: PendingPlanReviewRequest = {
   reviewId: 'review',
@@ -168,12 +187,18 @@ beforeEach(() => {
   mock.flush.mockReturnValue(undefined);
   mock.sessionListeners.clear();
   mock.conversationListeners.clear();
-  mock.answer.mockImplementation(async () => approved());
+  mock.activeTurn = null;
+  mock.contextListeners.clear();
+  mock.send.mockResolvedValue({ status: 'accepted', requestId: 'execute' });
+  mock.answer.mockImplementation(async () => {
+    endOwningTurn();
+    return approved();
+  });
   mock.history.mockResolvedValue({ planReview: null });
 });
 
 it('approves in one call carrying the reviewed hash, the inherited route, every control and the base revision', async () => {
-  await usePlanReviewSubmit()(request, approve);
+  await useTestSubmit()(request, approve);
   expect(mock.answer).toHaveBeenCalledExactlyOnceWith({
     sessionId: 's',
     reviewId: 'review',
@@ -185,26 +210,48 @@ it('approves in one call carrying the reviewed hash, the inherited route, every 
   });
   expect(mock.accept).toHaveBeenCalledExactlyOnceWith(committed);
   expect(usePlanReviewStore.getState().bySession.s.decision).toEqual({ reviewId: 'review', kind: 'approve' });
-  expect(mock.queue).toHaveBeenCalledExactlyOnceWith({
-    sessionId: 's',
-    agentId: 'general',
-    label: 'Execute',
-    prompt: 'Execute the frozen plan.',
-    send: true,
-    approval: { reviewId: 'review', planId: 'p', revision: 1, hash: 'h' },
-  });
-  expect(mock.sessionListeners.size + mock.conversationListeners.size).toBe(0);
+  expect(mock.send).toHaveBeenCalledExactlyOnceWith(execute);
+  expect(mock.prefill).not.toHaveBeenCalled();
+  expect(mock.sessionListeners.size + mock.conversationListeners.size + mock.contextListeners.size).toBe(0);
+});
+
+it('sends the execute turn once, after the owning turn has ended', async () => {
+  mock.answer.mockImplementation(async () => approved());
+  mock.activeTurn = { sessionId: 's' };
+  const running = useTestSubmit()(request, approve);
+  await vi.waitFor(() => expect(mock.contextListeners.size).toBe(1));
+  expect(mock.send).not.toHaveBeenCalled();
+  mock.messages = [{ ...trace('approved'), status: 'complete' }];
+  mock.conversationListeners.forEach((fn) => fn());
+  expect(mock.send).not.toHaveBeenCalled();
+  mock.activeTurn = null;
+  mock.contextListeners.forEach((fn) => fn());
+  mock.conversationListeners.forEach((fn) => fn());
+  await running;
+  expect(mock.send).toHaveBeenCalledExactlyOnceWith(execute);
+  expect(mock.contextListeners.size).toBe(0);
+});
+
+it('drops the execute turn when the session changes before the owning turn ends', async () => {
+  mock.answer.mockImplementation(async () => approved());
+  const running = useTestSubmit()(request, approve);
+  await vi.waitFor(() => expect(mock.contextListeners.size).toBe(1));
+  mock.sessionId = 'other';
+  notify();
+  mock.contextListeners.forEach((fn) => fn());
+  await running;
+  expect(mock.send).not.toHaveBeenCalled();
 });
 
 it('approves with the saved Composer override instead of either Agent default', async () => {
   mock.modelOverride = { providerId: 'grok-account', modelId: 'grok-4.7' };
-  await usePlanReviewSubmit()(request, approve);
+  await useTestSubmit()(request, approve);
   expect(mock.answer.mock.calls[0]![0].model).toEqual({ providerId: 'grok-account', modelId: 'grok-4.7' });
 });
 
 it('needs a model before approving', async () => {
   mock.sourceRoute = undefined;
-  await expect(usePlanReviewSubmit()(request, approve)).rejects.toThrow('MODEL_UNAVAILABLE');
+  await expect(useTestSubmit()(request, approve)).rejects.toThrow('MODEL_UNAVAILABLE');
   expect(mock.answer).not.toHaveBeenCalled();
 });
 
@@ -215,7 +262,7 @@ it('waits for queued edits and approves with the latest model and controls', asy
       finish = resolve;
     }),
   );
-  const running = usePlanReviewSubmit()(request, approve);
+  const running = useTestSubmit()(request, approve);
   expect(mock.answer).not.toHaveBeenCalled();
   mock.modelOverride = { providerId: 'grok-account', modelId: 'grok-4.7' };
   const latest = { reasoningLevel: 'low' as const, fastModel: false, maxContextMode: true };
@@ -229,9 +276,9 @@ it('waits for queued edits and approves with the latest model and controls', asy
 
 it('does not approve after a queued edit failed to save', async () => {
   mock.flush.mockReturnValueOnce(Promise.reject(new Error('MODEL_SAVE_FAILED')));
-  await expect(usePlanReviewSubmit()(request, approve)).rejects.toThrow('MODEL_SAVE_FAILED');
+  await expect(useTestSubmit()(request, approve)).rejects.toThrow('MODEL_SAVE_FAILED');
   expect(mock.answer).not.toHaveBeenCalled();
-  expect(mock.queue).not.toHaveBeenCalled();
+  expect(mock.send).not.toHaveBeenCalled();
 });
 
 it.each(['session', 'stop', 'revision'])('does not approve when %s changes while queued edits save', async (change) => {
@@ -241,7 +288,7 @@ it.each(['session', 'stop', 'revision'])('does not approve when %s changes while
       finish = resolve;
     }),
   );
-  const running = usePlanReviewSubmit()(request, approve);
+  const running = useTestSubmit()(request, approve);
   if (change === 'session') mock.sessionId = 'other';
   if (change === 'stop') mock.messages[0].status = 'stopped';
   if (change === 'revision') mock.messages = [trace('awaiting', 2)];
@@ -249,7 +296,7 @@ it.each(['session', 'stop', 'revision'])('does not approve when %s changes while
   finish();
   await running;
   expect(mock.answer).not.toHaveBeenCalled();
-  expect(mock.queue).not.toHaveBeenCalled();
+  expect(mock.send).not.toHaveBeenCalled();
 });
 
 it.each(['session', 'stop', 'revision', 'superseded', 'removed'])(
@@ -262,7 +309,7 @@ it.each(['session', 'stop', 'revision', 'superseded', 'removed'])(
           finish = resolve;
         }),
     );
-    const running = usePlanReviewSubmit()(request, approve);
+    const running = useTestSubmit()(request, approve);
     await vi.waitFor(() => expect(mock.answer).toHaveBeenCalledOnce());
     if (reason === 'session') mock.sessionId = 'other';
     if (reason === 'stop') mock.messages[0].status = 'stopped';
@@ -275,17 +322,16 @@ it.each(['session', 'stop', 'revision', 'superseded', 'removed'])(
     notify();
     finish(approved());
     await running;
-    expect(mock.queue).not.toHaveBeenCalled();
+    expect(mock.send).not.toHaveBeenCalled();
     expect(mock.sessionListeners.size + mock.conversationListeners.size).toBe(0);
   },
 );
 
 it('prefills instead of sending when the declaration does not send', async () => {
   mock.answer.mockImplementation(async () => approved(false));
-  await usePlanReviewSubmit()(request, approve);
-  expect(mock.queue).toHaveBeenCalledExactlyOnceWith(
-    expect.objectContaining({ send: false, prompt: 'Execute the frozen plan.' }),
-  );
+  await useTestSubmit()(request, approve);
+  expect(mock.prefill).toHaveBeenCalledExactlyOnceWith('Execute the frozen plan.');
+  expect(mock.send).not.toHaveBeenCalled();
 });
 
 it('rejects with feedback without queuing a continuation', async () => {
@@ -299,13 +345,13 @@ it('rejects with feedback without queuing a continuation', async () => {
       decision: { reviewId: 'review', kind: 'reject' },
     },
   });
-  await usePlanReviewSubmit()(request, { kind: 'reject', feedback: 'Change scope' });
+  await useTestSubmit()(request, { kind: 'reject', feedback: 'Change scope' });
   expect(mock.answer).toHaveBeenCalledExactlyOnceWith({
     sessionId: 's',
     reviewId: 'review',
     decision: { kind: 'reject', feedback: 'Change scope' },
   });
-  expect(mock.queue).not.toHaveBeenCalled();
+  expect(mock.send).not.toHaveBeenCalled();
   expect(mock.accept).not.toHaveBeenCalled();
 });
 
@@ -320,10 +366,10 @@ it('reads authority after a lost approval response without replaying or executin
       decision: { reviewId: 'review', kind: 'approve' },
     },
   });
-  await expect(usePlanReviewSubmit()(request, approve)).rejects.toThrow('response lost');
+  await expect(useTestSubmit()(request, approve)).rejects.toThrow('response lost');
   expect(mock.answer).toHaveBeenCalledOnce();
   expect(mock.history).toHaveBeenCalledWith('s');
-  expect(mock.queue).not.toHaveBeenCalled();
+  expect(mock.send).not.toHaveBeenCalled();
   expect(usePlanReviewStore.getState().bySession.s.decision?.kind).toBe('approve');
 });
 
@@ -331,10 +377,10 @@ it('surfaces a refused approval and allows retry while releasing subscriptions',
   mock.answer.mockRejectedValueOnce(
     Object.assign(new Error('HOOK_DENIED: agent.before-handoff'), { code: 'HOOK_DENIED' }),
   );
-  const submit = usePlanReviewSubmit();
+  const submit = useTestSubmit();
   await expect(submit(request, approve)).rejects.toThrow('HOOK_DENIED');
-  expect(mock.queue).not.toHaveBeenCalled();
+  expect(mock.send).not.toHaveBeenCalled();
   expect(mock.sessionListeners.size + mock.conversationListeners.size).toBe(0);
   await submit(request, approve);
-  expect(mock.queue).toHaveBeenCalledOnce();
+  expect(mock.send).toHaveBeenCalledOnce();
 });

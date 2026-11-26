@@ -160,7 +160,7 @@ Active Signal：`active-signal-shimmer` clipped-gradient 能量扫光（`1.6s li
 - 计划不进 Right Rail。
 - 不得把计划写进 `final_answer` 冒充审阅门。
 - 只要本条 assistant 消息包含计划审阅交互，result 底部不显示“继续”及 handoff 按钮，主进程和 renderer 共用同一可见性规则；已有建议快照也按此规则呈现。
-- 计划执行入口仅在 Composer 待审区，批准后由既有队列发送一次。
+- 计划执行入口仅在 Composer 待审区，批准后经 Composer 发送链发送一次。
 - 普通非计划回复仍保留符合现有资格的声明建议，General 无声明即无建议行。
 - 建议行与计划门共用 `HandoffActionRow`；人点建议行后主进程 `applyDeclaredHandoff` 写/确认 offer 并 persist `session.agentId`，计划门那一击则由批准事务一并提交，`send: true` 才自动发。
 - 手动改 Agent pill 不写 offer。
@@ -393,7 +393,7 @@ Tasks 保持创建序，状态图标占独立列；标题最多两行（共享 `
 - 修改意见属于原审批交互，不新造 user 消息；新请求必须以实际 user 消息为锚点。
 - Browser 数据注入可走 Bridge，但新请求交互验收须通过真实 Composer 发送并核对主进程历史，外部调用仅返回结果不能代替 renderer 的消息对账。
 
-批准后的 handoff 队列必须等待发送器的活跃执行屏障（含主进程投影的活跃会话/Run，不将队列自身的忙碌反馈作为准入条件），不能只看内存 activeTurn；重载待审页后也须等原请求结算，再消费一次队列并经原发送链发起新请求，不新增定时重试。取消交互通过类型化 AbortError 和结构化 abort 回执保留真实原因，通用完成投影使用该原因归类 cancelled，完整原始回执只在详情展示。
+批准后的执行回合必须等待发送器的活跃执行屏障（`isComposerExecutionIdle`：在途发送、活跃回合、未终结的 assistant 消息与主进程投影的活跃 Run，按调用时的 store 读取），不能只看内存 activeTurn；交接建议队列同样等原请求结算，再经原发送链发起新请求，不新增定时重试。取消交互通过类型化 AbortError 和结构化 abort 回执保留真实原因，通用完成投影使用该原因归类 cancelled，完整原始回执只在详情展示。
 
 
 ### 图片工具与紧凑输入

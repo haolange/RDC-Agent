@@ -5,38 +5,26 @@ import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { InlineError } from '../../ui/InlineError';
 import { HandoffActionRow } from '../../patterns/HandoffActionRow/HandoffActionRow';
-import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { cancelPlanReview } from '../../services/planReviewService';
 import { useElectronApi } from '../../hooks/useElectronApi';
 import { errorDetail } from '../../lib/errorDetail';
 import { ComposerModelEffortControl, type ComposerModelSaveState } from './ComposerModelEffortControl';
 import { capabilityStatusPresentation } from './capabilityPresentation';
 import { useComposerTurnControls } from './ComposerTurnControlsContext';
-import { usePlanReviewSubmit } from './usePlanReviewSubmit';
+import { usePlanReviewSubmit, type PlanReviewContinuation } from './usePlanReviewSubmit';
 import { type PendingPlanReviewRequest } from './planReviewRequestModel';
 import type { SessionRecord } from '@shared/types/session';
-import type { HandoffSendPayload } from './composerHandoffSend';
 import './composer-plan-review.css';
 
 export const PlanReviewRequestPanel: React.FC<{
   request: PendingPlanReviewRequest;
   agentId: string;
   currentSession: SessionRecord | null;
-  onReplan?: (payload: HandoffSendPayload) => Promise<unknown>;
-}> = ({ request, agentId, currentSession, onReplan }) => {
+  continuation: PlanReviewContinuation;
+}> = ({ request, agentId, currentSession, continuation }) => {
   const { t } = useI18n();
   const api = useElectronApi();
-  const submit = usePlanReviewSubmit(onReplan);
-  const transition = useComposerSessionContextStore((state) => {
-    const queued = state.handoffSuggestionRequest;
-    return queued?.sessionId === request.sessionId &&
-      queued.approval?.reviewId === request.reviewId &&
-      queued.approval.planId === request.planReview.planId &&
-      queued.approval.revision === request.planReview.revision &&
-      queued.approval.hash === request.planReview.hash
-      ? queued
-      : null;
-  });
+  const submit = usePlanReviewSubmit(continuation);
   const { capabilityState, retryCapability } = useComposerTurnControls();
   const modelAvailable = capabilityState.status === 'ready' || capabilityState.status === 'refreshing';
   const modelStatus = capabilityStatusPresentation(capabilityState);
@@ -69,7 +57,6 @@ export const PlanReviewRequestPanel: React.FC<{
   const run = async (decision: Parameters<typeof submit>[1]) => {
     if (
       submitting.current ||
-      transition ||
       modelSave.saving ||
       (decision.kind === 'approve' && (modelSave.error || !modelAvailable)) ||
       (decision.kind === 'reject' && !decision.feedback.trim())
@@ -104,11 +91,7 @@ export const PlanReviewRequestPanel: React.FC<{
   };
 
   return (
-    <section
-      className="composer-plan-review"
-      data-testid="plan-review-request-panel"
-      aria-busy={isSubmitting || !!transition}
-    >
+    <section className="composer-plan-review" data-testid="plan-review-request-panel" aria-busy={isSubmitting}>
       <div className="composer-plan-review__header">
         <h2 className="composer-plan-review__title">{t('chat.planReviewImplement')}</h2>
         <IconButton
@@ -126,7 +109,7 @@ export const PlanReviewRequestPanel: React.FC<{
         <HandoffActionRow
           presentation="decisions"
           options={request.planReview.handoffOptions}
-          disabled={isSubmitting || !!transition || modelSave.saving || !!modelSave.error || !modelAvailable}
+          disabled={isSubmitting || modelSave.saving || !!modelSave.error || !modelAvailable}
           onSelect={({ agent, label }) => void run({ kind: 'approve', handoff: { agent, label } })}
         />
         <div className={`composer-plan-review__revision${multiline ? ' is-multiline' : ''}`}>
@@ -139,7 +122,7 @@ export const PlanReviewRequestPanel: React.FC<{
             value={feedback}
             minRows={1}
             maxRows={5}
-            disabled={isSubmitting || !!transition || modelSave.saving}
+            disabled={isSubmitting || modelSave.saving}
             placeholder={t('chat.planReviewFeedbackPlaceholder')}
             onChange={(event) => setFeedback(event.currentTarget.value)}
             onKeyDown={(event) => {
@@ -153,7 +136,7 @@ export const PlanReviewRequestPanel: React.FC<{
             type="button"
             size="sm"
             label={t('chat.planReviewReject')}
-            disabled={isSubmitting || !!transition || modelSave.saving || !canReject}
+            disabled={isSubmitting || modelSave.saving || !canReject}
             onClick={() => void run({ kind: 'reject', feedback: feedback.trim() })}
           >
             <Icon name="arrow-up" size={16} />
@@ -169,9 +152,7 @@ export const PlanReviewRequestPanel: React.FC<{
           </InlineError>
         ) : null}
         <span className="composer-transition-announcement" role="status">
-          {isSubmitting || transition
-            ? t(transition ? 'composer.handoff.switching' : 'composer.handoff.confirming')
-            : ''}
+          {isSubmitting ? t('composer.handoff.confirming') : ''}
         </span>
         {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
         {modelStatus.labelKey && (capabilityState.status === 'error' || capabilityState.status === 'unavailable') ? (
@@ -192,7 +173,7 @@ export const PlanReviewRequestPanel: React.FC<{
         <ComposerModelEffortControl
           agentId={agentId}
           currentSession={currentSession}
-          disabled={isSubmitting || !!transition}
+          disabled={isSubmitting}
           onSaveStateChange={setModelSave}
         />
       </div>
