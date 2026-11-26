@@ -77,3 +77,26 @@ it('shows the tooltip of a label inside a focused control and describes the cont
   expect(title.hasAttribute('aria-describedby')).toBe(false);
   await act(async () => root.unmount());
 });
+
+it('follows a tooltip that changes while it shows, so a settled state replaces the pending one', async () => {
+  vi.useFakeTimers();
+  const container = document.createElement('div');
+  document.body.append(container);
+  const pill = document.createElement('button');
+  pill.textContent = 'Custom';
+  pill.dataset.tooltip = 'Applying… · Custom';
+  document.body.append(pill);
+  const root = createRoot(container);
+  await act(async () => root.render(createElement(TooltipHost)));
+  await act(async () => {
+    pill.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
+    vi.advanceTimersByTime(500);
+  });
+  expect(document.querySelector('[role="tooltip"]')?.textContent).toBe('Applying… · Custom');
+  await act(async () => {
+    pill.dataset.tooltip = 'Custom · Your own rules';
+    await Promise.resolve();
+  });
+  expect(document.querySelector('[role="tooltip"]')?.textContent).toBe('Custom · Your own rules');
+  await act(async () => root.unmount());
+});

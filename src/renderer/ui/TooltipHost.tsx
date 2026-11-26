@@ -115,6 +115,21 @@ export function TooltipHost() {
     };
   }, [hide, show]);
 
+  // A control that changes its tooltip while it shows (a pending label that settles) is read from the attribute
+  // again, so the bubble never keeps describing a state that is over.
+  useEffect(() => {
+    if (!active) return undefined;
+    const { target } = active;
+    const observer = new MutationObserver(() => {
+      const text = target.dataset.tooltip?.trim();
+      if (!text || repeatsVisibleText(target, text)) hide();
+      else
+        setActive((current) => (current?.target === target && current.text !== text ? { ...current, text } : current));
+    });
+    observer.observe(target, { attributes: true, attributeFilter: ['data-tooltip'] });
+    return () => observer.disconnect();
+  }, [active, hide]);
+
   // The bubble keeps showing the last text while its exit plays.
   useEffect(() => {
     if (active) setShown(active);
