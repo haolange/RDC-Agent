@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "submodel",
   "name": "submodel",
   "npm": "@ai-sdk/openai-compatible",

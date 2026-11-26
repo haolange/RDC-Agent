@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "perplexity-agent",
   "name": "Perplexity Agent",
   "npm": "@ai-sdk/openai",

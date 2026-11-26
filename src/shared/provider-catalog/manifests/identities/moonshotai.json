@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "moonshotai",
   "name": "Moonshot AI",
   "npm": "@ai-sdk/openai-compatible",

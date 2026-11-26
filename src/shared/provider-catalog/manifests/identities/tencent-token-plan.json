@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "tencent-token-plan",
   "name": "Tencent Token Plan",
   "npm": "@ai-sdk/openai-compatible",

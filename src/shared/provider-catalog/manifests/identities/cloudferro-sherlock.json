@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "cloudferro-sherlock",
   "name": "CloudFerro Sherlock",
   "npm": "@ai-sdk/openai-compatible",

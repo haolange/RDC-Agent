@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "upstage",
   "name": "Upstage",
   "npm": "@ai-sdk/openai-compatible",

@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "qihang-ai",
   "name": "QiHang",
   "npm": "@ai-sdk/openai-compatible",

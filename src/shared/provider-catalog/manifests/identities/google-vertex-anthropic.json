@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "google-vertex-anthropic",
   "name": "Vertex (Anthropic)",
   "npm": "@ai-sdk/google-vertex/anthropic",

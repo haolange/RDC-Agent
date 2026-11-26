@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "hpc-ai",
   "name": "HPC-AI",
   "npm": "@ai-sdk/openai-compatible",

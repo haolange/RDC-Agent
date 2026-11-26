@@ -1,8 +1,6 @@
 import { z } from 'zod';
-import { AppError } from '@shared/errors/appError';
 import { isObject } from './effectiveCatalogMerge';
 import {
-  EFFECTIVE_CATALOG_SCHEMA_VERSION,
   type CatalogLayerContribution,
   type CatalogModelContribution,
   type PersistedCatalogState,
@@ -70,7 +68,6 @@ const CatalogLayerSchema = z.custom<CatalogLayerContribution>(
 
 const PersistedCatalogStateSchema = z
   .object({
-    schemaVersion: z.literal(EFFECTIVE_CATALOG_SCHEMA_VERSION),
     discoveries: z.record(z.string(), CatalogLayerSchema),
     entitlements: z.record(z.string(), CatalogLayerSchema),
     observed: z.record(z.string(), z.array(CatalogLayerSchema)),
@@ -78,17 +75,10 @@ const PersistedCatalogStateSchema = z
   .strict();
 
 /**
- * The parser for the catalog state file under `readValidatedSync`. Another schemaVersion (or none) is
- * `STORAGE_SCHEMA_UNSUPPORTED`; anything else that does not match throws, which the read reports as `STORAGE_CORRUPT`.
+ * The parser for the catalog state file under `readValidatedSync`. Anything that does not match the strict schema (a
+ * file written in another format included) throws, which the read reports as `STORAGE_CORRUPT`.
  */
 export function parsePersistedCatalogState(value: unknown): PersistedCatalogState {
-  if (!isObject(value)) throw new TypeError('catalog state must be a JSON object');
-  if (value.schemaVersion !== EFFECTIVE_CATALOG_SCHEMA_VERSION) {
-    throw new AppError(
-      'STORAGE_SCHEMA_UNSUPPORTED',
-      `catalog state schemaVersion ${String(value.schemaVersion)}; this build reads only ${EFFECTIVE_CATALOG_SCHEMA_VERSION}`,
-    );
-  }
   const parsed = PersistedCatalogStateSchema.safeParse(value);
   if (!parsed.success) throw new TypeError(z.prettifyError(parsed.error));
   return parsed.data;

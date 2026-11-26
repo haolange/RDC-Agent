@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "mistral",
   "name": "Mistral",
   "npm": "@ai-sdk/mistral",

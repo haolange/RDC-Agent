@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "cortecs",
   "name": "Cortecs",
   "npm": "@ai-sdk/openai-compatible",

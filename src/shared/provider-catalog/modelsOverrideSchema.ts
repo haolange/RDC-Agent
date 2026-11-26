@@ -61,7 +61,6 @@ export const ProviderOverrideSchema = z
 
 export const ModelsOverrideSchema = z
   .object({
-    schemaVersion: z.literal(1),
     providers: z.record(z.string(), ProviderOverrideSchema),
   })
   .strict();

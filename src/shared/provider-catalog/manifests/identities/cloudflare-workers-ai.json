@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "cloudflare-workers-ai",
   "name": "Cloudflare Workers AI",
   "npm": "@ai-sdk/openai-compatible",

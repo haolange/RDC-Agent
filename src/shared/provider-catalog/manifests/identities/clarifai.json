@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "clarifai",
   "name": "Clarifai",
   "npm": "@ai-sdk/openai-compatible",

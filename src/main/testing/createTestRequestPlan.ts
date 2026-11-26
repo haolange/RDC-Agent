@@ -37,7 +37,6 @@ export function createTestRequestPlan(input: TestRequestPlanInput): RequestPlan 
     reason: 'Test fixture local stateless replay.',
   };
   const identityBase: Omit<ExecutionIdentity, 'fingerprint'> = {
-    schemaVersion: 1,
     providerId: input.providerId,
     credentialScopeHash: 'test-credential-scope',
     endpointHash: 'test-endpoint',

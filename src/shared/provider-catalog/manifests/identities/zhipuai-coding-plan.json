@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "zhipuai-coding-plan",
   "name": "Zhipu AI Coding Plan",
   "npm": "@ai-sdk/openai-compatible",

@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "neon",
   "name": "Neon",
   "npm": "@ai-sdk/openai-compatible",

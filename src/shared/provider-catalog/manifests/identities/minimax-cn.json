@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "minimax-cn",
   "name": "MiniMax (minimaxi.com)",
   "npm": "@ai-sdk/anthropic",

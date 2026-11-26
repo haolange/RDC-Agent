@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "huggingface",
   "name": "Hugging Face",
   "npm": "@ai-sdk/openai-compatible",

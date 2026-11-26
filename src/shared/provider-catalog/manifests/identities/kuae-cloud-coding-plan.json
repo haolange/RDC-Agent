@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "kuae-cloud-coding-plan",
   "name": "KUAE Cloud Coding Plan",
   "npm": "@ai-sdk/openai-compatible",

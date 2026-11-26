@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "longcat",
   "name": "LongCat",
   "npm": "@ai-sdk/openai-compatible",

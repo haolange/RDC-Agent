@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "stackit",
   "name": "STACKIT",
   "npm": "@ai-sdk/openai-compatible",

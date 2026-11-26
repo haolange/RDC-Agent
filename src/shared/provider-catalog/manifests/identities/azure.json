@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "azure",
   "name": "Azure",
   "npm": "@ai-sdk/azure",

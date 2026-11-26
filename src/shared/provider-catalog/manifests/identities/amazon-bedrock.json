@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "amazon-bedrock",
   "name": "Amazon Bedrock",
   "npm": "@ai-sdk/amazon-bedrock",

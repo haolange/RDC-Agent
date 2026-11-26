@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "sap-ai-core",
   "name": "SAP AI Core",
   "npm": "@jerome-benoit/sap-ai-provider-v2",

@@ -429,7 +429,6 @@ function makeTerminalContextEntry(): SessionContextTurnEntry {
     branchId: 'branch-root',
     agentId: 'ask',
     executionIdentity: {
-      schemaVersion: 1,
       providerId: 'openai',
       credentialScopeHash: 'credential-scope',
       endpointHash: 'endpoint',

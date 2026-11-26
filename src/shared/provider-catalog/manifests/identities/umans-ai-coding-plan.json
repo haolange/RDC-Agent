@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "umans-ai-coding-plan",
   "name": "Umans AI Coding Plan",
   "npm": "@ai-sdk/openai-compatible",

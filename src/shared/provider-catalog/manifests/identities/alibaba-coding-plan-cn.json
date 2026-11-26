@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "alibaba-coding-plan-cn",
   "name": "Alibaba Coding Plan (China)",
   "npm": "@ai-sdk/openai-compatible",

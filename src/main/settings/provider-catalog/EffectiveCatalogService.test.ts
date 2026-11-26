@@ -580,7 +580,6 @@ describe('EffectiveCatalogService', () => {
     fs.writeFileSync(
       statePath,
       JSON.stringify({
-        schemaVersion: 4,
         discoveries: {
           historical: {
             source: 'discovery',
@@ -595,11 +594,9 @@ describe('EffectiveCatalogService', () => {
     );
     new EffectiveCatalogService({ statePath });
     const persisted = JSON.parse(fs.readFileSync(statePath, 'utf8')) as {
-      schemaVersion: number;
       discoveries: Record<string, { models: Array<{ modelId: string }> }>;
     };
-    expect(persisted.schemaVersion).toBe(9);
-    expect(persisted.discoveries).toEqual({});
+    expect(persisted.discoveries.historical?.models.map((model) => model.modelId)).toEqual(['grok-4.5']);
   });
 
   it('starts a damaged catalog state empty, rewrites it and keeps the damaged bytes beside it', async () => {
@@ -607,7 +604,6 @@ describe('EffectiveCatalogService', () => {
     const damagedPath = path.join(root, 'damaged', 'catalog.json');
     fs.mkdirSync(path.dirname(damagedPath), { recursive: true });
     const damaged = JSON.stringify({
-      schemaVersion: 9,
       discoveries: {
         broken: { source: 'discovery', observedAt: '2026-01-02T00:00:00.000Z', models: [{ label: 'no id' }] },
       },
@@ -617,7 +613,6 @@ describe('EffectiveCatalogService', () => {
     fs.writeFileSync(damagedPath, damaged, 'utf8');
     new EffectiveCatalogService({ statePath: damagedPath });
     expect(JSON.parse(fs.readFileSync(damagedPath, 'utf8'))).toEqual({
-      schemaVersion: 9,
       discoveries: {},
       entitlements: {},
       observed: {},

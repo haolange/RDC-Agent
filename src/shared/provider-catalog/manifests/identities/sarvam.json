@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "sarvam",
   "name": "Sarvam AI",
   "npm": "@ai-sdk/openai-compatible",

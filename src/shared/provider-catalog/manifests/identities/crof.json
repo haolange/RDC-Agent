@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "crof",
   "name": "CrofAI",
   "npm": "@ai-sdk/openai-compatible",

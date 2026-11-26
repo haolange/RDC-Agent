@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "io-net",
   "name": "IO.NET",
   "npm": "@ai-sdk/openai-compatible",

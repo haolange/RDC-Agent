@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "github-models",
   "name": "GitHub Models",
   "npm": "@ai-sdk/openai-compatible",

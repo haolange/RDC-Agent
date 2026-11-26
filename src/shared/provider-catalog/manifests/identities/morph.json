@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "morph",
   "name": "Morph",
   "npm": "@ai-sdk/openai-compatible",

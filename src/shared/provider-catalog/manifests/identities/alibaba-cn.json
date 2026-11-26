@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "alibaba-cn",
   "name": "Alibaba (China)",
   "npm": "@ai-sdk/openai-compatible",

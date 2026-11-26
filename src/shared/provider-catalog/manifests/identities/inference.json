@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "inference",
   "name": "Inference",
   "npm": "@ai-sdk/openai-compatible",

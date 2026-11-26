@@ -285,7 +285,6 @@ export const ProviderStreamingContractSchema = z
 
 export const SemanticContextContractSchema = z
   .object({
-    version: z.literal('semantic-context-v1'),
     history: z.literal('canonical-messages'),
     toolPairs: z.literal('strict'),
     attachments: z.literal('fail-closed'),

@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "anyapi",
   "name": "AnyAPI",
   "npm": "@ai-sdk/openai-compatible",

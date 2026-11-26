@@ -15,7 +15,6 @@ import type { LlmProviderCatalogOwnership, LlmProviderProtocol } from '@shared/t
 import type { ReasoningControl } from '@shared/types/modelCapability';
 
 export const DISCOVERY_TTL_MS = 24 * 60 * 60 * 1000;
-export const EFFECTIVE_CATALOG_SCHEMA_VERSION = 9 as const;
 
 export type PartialContextTier = Partial<ContextTier> & Pick<ContextTier, 'id'>;
 
@@ -106,7 +105,6 @@ export interface EffectiveCatalogRequest {
 }
 
 export interface PersistedCatalogState {
-  schemaVersion: typeof EFFECTIVE_CATALOG_SCHEMA_VERSION;
   discoveries: Record<string, CatalogLayerContribution>;
   entitlements: Record<string, CatalogLayerContribution>;
   observed: Record<string, CatalogLayerContribution[]>;

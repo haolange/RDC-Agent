@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "tinfoil",
   "name": "Tinfoil",
   "npm": "@ai-sdk/openai-compatible",

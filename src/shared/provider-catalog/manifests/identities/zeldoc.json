@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "zeldoc",
   "name": "Zeldoc",
   "npm": "@ai-sdk/openai-compatible",

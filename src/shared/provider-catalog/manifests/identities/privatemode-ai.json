@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "privatemode-ai",
   "name": "Privatemode AI",
   "npm": "@ai-sdk/openai-compatible",

@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "novita-ai",
   "name": "NovitaAI",
   "npm": "@ai-sdk/openai-compatible",

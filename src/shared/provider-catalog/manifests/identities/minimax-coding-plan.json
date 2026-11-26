@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "minimax-coding-plan",
   "name": "MiniMax Token Plan (minimax.io)",
   "npm": "@ai-sdk/anthropic",

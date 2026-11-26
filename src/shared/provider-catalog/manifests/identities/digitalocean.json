@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "digitalocean",
   "name": "DigitalOcean",
   "npm": "@ai-sdk/openai-compatible",

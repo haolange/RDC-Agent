@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "zai-coding-plan",
   "name": "Z.AI Coding Plan",
   "npm": "@ai-sdk/openai-compatible",

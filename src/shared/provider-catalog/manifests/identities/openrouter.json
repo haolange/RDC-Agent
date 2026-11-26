@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "openrouter",
   "name": "OpenRouter",
   "npm": "@openrouter/ai-sdk-provider",

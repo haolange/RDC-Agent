@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 2,
   "id": "google-vertex-anthropic",
   "identityIds": [
     "google-vertex-anthropic"

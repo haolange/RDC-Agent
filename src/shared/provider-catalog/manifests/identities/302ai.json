@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "302ai",
   "name": "302.AI",
   "npm": "@ai-sdk/openai-compatible",

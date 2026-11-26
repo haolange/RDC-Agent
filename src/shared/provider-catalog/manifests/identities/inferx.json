@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "inferx",
   "name": "InferX",
   "npm": "@ai-sdk/openai-compatible",

@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "fireworks-ai",
   "name": "Fireworks AI",
   "npm": "@ai-sdk/openai-compatible",

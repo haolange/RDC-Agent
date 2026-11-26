@@ -22,7 +22,7 @@ export class ModelsOverrideService extends EventEmitter {
     this.cache ??= readValidatedSync(
       this.getFilePath(),
       parseJsonWith((value) => ModelsOverrideSchema.parse(value)),
-    ) ?? { schemaVersion: 1, providers: {} };
+    ) ?? { providers: {} };
     return this.cache;
   }
 

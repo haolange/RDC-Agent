@@ -205,7 +205,6 @@ export const ProviderSurfaceRouteSchema = z
 
 export const ProviderSurfaceManifestSchema = z
   .object({
-    schemaVersion: z.literal(2),
     id: z.string().min(1),
     identityIds: z.array(z.string().min(1)),
     profileId: z.string().min(1),
@@ -325,7 +324,6 @@ export const ProviderSurfaceManifestSchema = z
 
 export const ProviderIdentityManifestSchema = z
   .object({
-    schemaVersion: z.literal(1),
     id: z.string().min(1),
     name: z.string().min(1),
     npm: z.string().min(1),
@@ -346,7 +344,6 @@ export const ProviderIdentityManifestSchema = z
 
 export const ProviderProfileManifestSchema = z
   .object({
-    schemaVersion: z.literal(1),
     id: z.string().min(1),
     routeMechanics: z
       .array(

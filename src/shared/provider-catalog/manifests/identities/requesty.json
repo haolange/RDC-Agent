@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "requesty",
   "name": "Requesty",
   "npm": "@ai-sdk/openai-compatible",

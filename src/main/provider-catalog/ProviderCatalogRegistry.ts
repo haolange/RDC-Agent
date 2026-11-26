@@ -8,7 +8,6 @@ import {
 } from '@shared/provider-catalog/catalogManifestSchema';
 import { deepFreeze } from '@shared/utils/deepFreeze';
 import {
-  PROVIDER_CATALOG_SCHEMA_VERSION,
   type CompiledProviderCatalogIndex,
   type CompiledProviderSurface,
   type ProviderSurfaceSummary,
@@ -37,7 +36,6 @@ function isCompiledIndex(value: unknown): value is CompiledProviderCatalogIndex 
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<CompiledProviderCatalogIndex>;
   return (
-    candidate.schemaVersion === PROVIDER_CATALOG_SCHEMA_VERSION &&
     typeof candidate.catalogRevision === 'string' &&
     Array.isArray(candidate.surfaces) &&
     typeof candidate.identityCount === 'number' &&
@@ -57,7 +55,7 @@ function loadCatalogIndex(): CompiledProviderCatalogIndex {
 function parseCompiledSurface(raw: unknown, expectedRevision: string): ProviderSurfaceManifest {
   if (!raw || typeof raw !== 'object') throw new Error('Compiled Provider surface is invalid.');
   const artifact = raw as Partial<CompiledProviderSurface>;
-  if (artifact.schemaVersion !== PROVIDER_CATALOG_SCHEMA_VERSION || artifact.catalogRevision !== expectedRevision) {
+  if (artifact.catalogRevision !== expectedRevision) {
     throw new Error('Compiled Provider surface revision does not match the Catalog index.');
   }
   return ProviderSurfaceManifestSchema.parse(artifact.surface);

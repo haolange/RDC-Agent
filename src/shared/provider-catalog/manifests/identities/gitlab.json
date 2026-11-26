@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "gitlab",
   "name": "GitLab Duo",
   "npm": "gitlab-ai-provider",

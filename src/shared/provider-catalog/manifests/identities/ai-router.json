@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "ai-router",
   "name": "AI-ROUTER",
   "npm": "@ai-sdk/openai-compatible",

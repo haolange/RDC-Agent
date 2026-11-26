@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "moark",
   "name": "Moark",
   "npm": "@ai-sdk/openai-compatible",

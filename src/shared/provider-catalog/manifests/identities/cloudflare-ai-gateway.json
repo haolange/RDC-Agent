@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "cloudflare-ai-gateway",
   "name": "Cloudflare AI Gateway",
   "npm": "ai-gateway-provider",
