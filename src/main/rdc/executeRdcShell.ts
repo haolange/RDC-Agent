@@ -20,6 +20,31 @@ import { rdcInvocationRecord } from './RdcInvocationRecord';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
 import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import type { RdcOperationDefinition } from './RdcOperationCatalog';
+import type { RdcCancellation } from './RdcOperationWatcher';
+
+/** The observed failure a quarantine records: the native code, or the leading code of an Agent failure. */
+function rdcFaultCode(error: unknown): string {
+  const reported =
+    error instanceof RdcNativeFailure
+      ? error.nativeError.code
+      : error instanceof Error
+        ? (/^[A-Z][A-Z0-9_]{0,127}/u.exec(error.message)?.[0] ?? error.name)
+        : 'unknown';
+  return /^[A-Za-z][A-Za-z0-9_]{0,127}$/u.test(reported) ? reported : 'unknown';
+}
+
+/** Why the lease is quarantined; a cancelled operation names what RDC-Tool's cancel receipt said. */
+function uncertainOutcomeReason(signal: AbortSignal | undefined, cancellation: RdcCancellation | undefined): string {
+  const recover = 'inspect and recover through the capture lifecycle before further execution.';
+  if (!signal?.aborted) return `Native operation outcome is uncertain; ${recover}`;
+  const exit = cancellation?.status === 'settled' ? cancellation.workerExit : undefined;
+  const receipt = !cancellation
+    ? 'no cancel receipt'
+    : cancellation.status === 'unconfirmed'
+      ? `cancel receipt unavailable: ${cancellation.reason}`
+      : `RDC-Tool ${cancellation.outcome}${exit ? `; worker ${exit.exitConfirmed ? 'exit confirmed' : 'exit unconfirmed'}` : ''}`;
+  return `Native operation was cancelled (${receipt}); ${recover}`;
+}
 
 function callableRdcDefinition(definition: RdcOperationDefinition): Record<string, unknown> {
   const inputSchema = structuredClone(definition.input_schema);
@@ -251,6 +276,8 @@ export async function executeRdcShell(
     };
     let originalEvent: number | undefined;
     let originalReplayState: typeof lastReplayState = null;
+    // The receipt `daemon cancel` settled the operation with, when the turn was cancelled while it ran.
+    let cancellation: RdcCancellation | undefined;
     try {
       const temporaryReplayRead = definition.effects.includes('replay_position_temporary');
       originalEvent =
@@ -278,6 +305,7 @@ export async function executeRdcShell(
         [input.operation, '--args-json', JSON.stringify(args), '--daemon-context', lease.contextId],
         { abortSignal: signal, contextId: lease.contextId, settings: cli },
       );
+      cancellation = result.cancellation;
       truncatedBufferRead = verifyTruncatedBufferRead && result.exitCode === 0 && result.stdoutTruncated === true;
       signal?.throwIfAborted();
       const payload = parseRdcNativeResult(result, undefined, input.operation);
@@ -493,18 +521,13 @@ export async function executeRdcShell(
         }
       }
       if (!nativeStateVerifiedSafe) {
-        const reportedCode =
-          error instanceof RdcNativeFailure
-            ? error.nativeError.code
-            : error instanceof Error
-              ? (/^[A-Z][A-Z0-9_]{0,127}/u.exec(error.message)?.[0] ?? error.name)
-              : 'unknown';
-        const code = /^[A-Za-z][A-Za-z0-9_]{0,127}$/u.test(reportedCode) ? reportedCode : 'unknown';
         quarantineRdcContext(
           sessionId,
           lease.version,
-          'Native operation outcome is uncertain; inspect and recover through the capture lifecycle before further execution.',
-          signal?.aborted ? undefined : { operation: input.operation, argsFingerprint: rdcDigest(input.args), code },
+          uncertainOutcomeReason(signal, cancellation),
+          signal?.aborted
+            ? undefined
+            : { operation: input.operation, argsFingerprint: rdcDigest(input.args), code: rdcFaultCode(error) },
         );
       }
       if (error instanceof RdcNativeFailure) {

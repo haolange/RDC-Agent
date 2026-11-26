@@ -102,7 +102,8 @@
 | 用户 Stop / abortAndJoin | Availability | join producers；丢弃迟到 event |
 | main 进程未处理的 rejection / 未捕获异常 | Integrity | 写运行日志（含 stack）并写生命周期账本 `fault`（脱敏、替换家目录与数据目录、按脱敏后的 stack 取指纹）；未捕获异常另弹原生错误框，与 Electron 默认可见性一致；main 生产代码由 ESLint `no-floating-promises` 保证每个 promise 被 await、处理或显式 `void` |
 | renderer / GPU / utility 等 Chromium 子进程死亡、worker 线程意外退出、受监管子进程异常退出 | Availability | 各写一条账本记录（`process_gone`、`worker_thread_exited`、`supervised_child_exited`；正常退出与应用主动的超时、中止不记）；renderer 按下文「renderer 崩溃策略」恢复 |
-| ProcessSupervisor timeout/abort | Availability | terminate process tree; settle only after observed close/error; retain `unconfirmed_orphan` in registry for diagnostics |
+| ProcessSupervisor timeout/abort | Availability | terminate process tree; settle only after observed close/error; abort opens a bounded observation window, so even an unbounded join resolves `unconfirmed_orphan` (kept in the registry) when close never arrives |
+| RDC 操作卡住、worker 丢失或无法启动、daemon 丢失或无响应、操作取消 | Availability | `RDC_OPERATION_STUCK` / `RDC_WORKER_LOST` / `RDC_WORKER_UNAVAILABLE` / `RDC_DAEMON_LOST` / `RDC_DAEMON_UNRESPONSIVE` / `RDC_OPERATION_CANCELLED`；只有无进展预算，没有墙钟；取消先 `daemon cancel` 并等回执再终止 CLI；结果未知的 owning context 隔离，不自动重试（`docs/architecture/rdc-runtime.md`） |
 | ShutdownCoordinator 限时 shutdown | Availability | 尽量排空后退出；`release_owned_runtimes` 失败必须记错误并保留归属记录，不得假装 daemon 已停。账本记录起因（`window-close` / `before-quit` / `update` / `renderer-failure`；SIGINT/SIGTERM 由 Electron 自己转成 quit，记为 `before-quit`）、超时的阶段及当时未完成的 disposable、是否超时；干净与超时两条路径走同一个退出 |
 | 关停时停止的回合 | Availability | 停止原因 `app-shutdown` 写在 stopped 消息的 `stopCause` 与 cancelled run 的 `stopReason` 上，界面写「应用关闭时已停止」，不显示成用户停止 |
 | 上次启动未正常结束（`instance.lock` 未释放） | Availability | 见下文「上次启动诊断」 |

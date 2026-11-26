@@ -114,7 +114,15 @@ RDC 操作不受固定时长约束，只受无进展预算约束（RDC-Tool 公�
 
 - `prepareTurn` 把它冻结在 turn binding 中；`freezeRdcTurnBinding` 按冻结目录每个操作 `execution_budget` 的最小、最大值校验，超出为 `RDC_NO_PROGRESS_TIMEOUT_UNSUPPORTED`，错误写明可接受的秒数范围。
 - 设置文件严格校验范围；保存越界值报 `IPC_VALIDATION_ERROR`，不钳制、不迁移。
-- 不执行操作的控制命令（daemon start/stop/status、context clear/status、version、tools list、doctor）使用固定的 `RDC_CONTROL_TIMEOUT_MS`，覆盖 RDC-Tool 30 秒 daemon 启动锁、就绪与确认停止；安装验证同样使用它，不借用用户的无进展耐心。
+- 不执行操作的控制命令（daemon start/stop/status、context clear/status、version、tools list、doctor）使用固定的 `RDC_CONTROL_TIMEOUT_MS`，覆盖 RDC-Tool 30 秒 daemon 启动锁、就绪与确认停止；安装验证同样使用它，不借用用户的无进展耐心。CLI 的只读快捷查询（event、pipeline、resource、vfs、session preview）不能输出帧，以冻结的无进展耐心为进程墙。
+
+`RdcCliInvokerService.executeCLI('call')` 是所有 RDC 操作的唯一入口，内置操作监视器 `RdcOperationWatcher`（调用方不变）：
+
+- 追加 `--no-progress-ms <冻结值> --request-id rdc-agent-<uuid> --progress-stream`，进程不设墙钟：静默的原生工作由 RDC-Tool 看门狗按冻结预算终止，以 `worker_stuck` 等规范错误返回。
+- stderr 的 NDJSON 帧（heartbeat、progress、native_call）经 zod 严格解析后交给 `onProgress`；声称是帧却不合规或属于别的 request id 记为 `RDC_CLI_PROTOCOL`（结果未知），普通 stderr 文本原样保留。
+- 首帧之前 CLI 在做控制工作（连接或启动 daemon），受 `RDC_CONTROL_TIMEOUT_MS` 约束；之后帧间隔超过 20 秒（`RDC_HEARTBEAT_GAP_MS`，daemon 每 2 秒心跳、CLI 自身 15 秒报 `daemon_unresponsive`）判为 `RDC_DAEMON_UNRESPONSIVE` 并终止 CLI，结果未知。
+- 中止不直接杀 CLI：先 `daemon cancel --request-id`（控制期限 `RDC_CANCEL_TIMEOUT_MS` 30 秒），等回执，再给 exec CLI 至多 5 秒输出信封并退出，仍未退出才终止；回执（cancelled、completed、terminated、not_found 或不可用原因）随结果返回，`executeRdcShell` 把它写进隔离记录。
+- `RdcNativeProtocol` 把进程级失败映射为各自的码并解析 details（`processFailure`）：`worker_stuck` → `RDC_OPERATION_STUCK`，`worker_lost` / `worker_request_failed` → `RDC_WORKER_LOST`，`worker_unavailable` → `RDC_WORKER_UNAVAILABLE`（未执行），`operation_cancelled` → `RDC_OPERATION_CANCELLED`，`daemon_lost` → `RDC_DAEMON_LOST`，`daemon_unresponsive` → `RDC_DAEMON_UNRESPONSIVE`；其余原生失败仍为 `RDC_NATIVE_FAILURE`。
 - Remote 准备没有自己的时长参数，和其它操作一样只受请求的无进展预算约束（见下文 Remote 准备预算）。
 
 `prepareTurn` 冻结 CLI 配置、完整操作定义及其指纹、owning session/context/replay lease 身份。在途 Settings 变化不影响该轮。General 使用已有 shell 的结构化 RDC 模式，普通 command 与 rdc 互斥；轻量发现只返回匹配操作或单个操作说明，不把完整 catalog 展开进每次模型请求。
@@ -195,7 +203,7 @@ shader replacement 返回一致的 `status=noop`（顶层与 replacement 的身�
 - `WorldState.replay.exclusiveLock` 在此受控范围内有该来源支撑，仍须三态分别保存并与阶段回执核对；不是整批 native mutex 或外部进程排除证明，不免除实际变更状态及恢复校验。
 - context 小结果沿既有制品路径保留 inline 正文和持久 URI/hash；不能据新的证明回填旧实验资格。
 
-远程打开期间通过冻结 CLI 查询所属 daemon 的 `active_operation`；只有原生 transfer stage 才显示传输阶段，查询失败不推测进度。足迹记录原生 `revision`、实际替换/恢复状态和显示参数。观察无法确认 EID 时保存无图片的失败事实；人工与 Agent 操作统一更新同一当前回放状态和图片，不再保留 Agent 专属图片镜像；实际 image EID 与 observation 元数据来自同一次原生观察。后台操作证据继续保存，不作为第二套回放 UI。
+远程打开的传输阶段来自 `rd.capture.open_file` 自己的进度帧：只有原生 transfer stage 才显示传输阶段，没有帧不推测进度，也不轮询 daemon status。足迹记录原生 `revision`、实际替换/恢复状态和显示参数。观察无法确认 EID 时保存无图片的失败事实；人工与 Agent 操作统一更新同一当前回放状态和图片，不再保留 Agent 专属图片镜像；实际 image EID 与 observation 元数据来自同一次原生观察。后台操作证据继续保存，不作为第二套回放 UI。
 
 live PNG 由 main 持有、projection 只含 token/尺寸/EID，renderer 经授权 IPC 取字节；关闭或替换时删除 live 文件。每个 session 历史通过 ReplayHistoryStore 原子提交，图片 hash 去重；回看不执行 native call。输入删除关闭所有关联绑定，正常 close 保留历史。
 
@@ -372,7 +380,7 @@ Settings 的显式验证执行同安装 doctor，检查 Python、RenderDoc、And
 
 已有 Capture 变更设备先显示一次确认，取消保持回放和画面；确认后先 clear_context、daemon stop 并核实释放，再连接新设备。准备失败保留目标；取消等待自有原生动作及清理，不声称撤回已完成的 APK 安装。目标辅助程序的必要替换由选择设备授权；未知归属服务和 busy 不抢占。页面切换不释放已准备连接，应用重启不自动连接；明确断开、真实离线、会话删除或退出时清理自有资源，borrowed helper 不关闭。查询发现失败不等于真实断连。
 
-准备阶段仅读取同一 owning daemon 的 status，核验 context、operation、起始时间和已观察 trace 后转发真实 checking/installing/starting/verifying；轮询不与自身重叠，完成或取消时停止并等待最后查询收口。取消后在释放 context 前通过 canonical rd.core.get_operation_history 读取对应已收口操作的安装回执；有事实才投影 installation，缺失回执表示未知，不表示安装回滚。
+准备阶段只读取 `rd.remote.connect` 自己的进度帧（属于本次 request id），转发真实 checking/installing/starting/verifying，不启动 status 轮询进程。取消时 Tools 在原生动作收口后发出最后的 `cancelled` 阶段，其 details 携带已提交的安装回执或未决 PackageManager 事实；有事实才投影 installation 与设备动作，缺失表示未知，不表示安装回滚。
 
 Remote 准备预算：`rd.remote.connect` 不再有 `timeout_ms` 参数或 timeout_policy，连接尝试受请求的执行预算约束。RDC-Tool 把 checking、installing、starting、verifying 与等待端点的每个阶段进度都当作进展，协作截止早于栈转储与 daemon 看门狗，所以静默的连接以结构化的 `remote_connect_timeout` 结束并清理已取得的资源。目录的每个条目都发布 `execution_budget`（`rule: no_progress` 与默认、最小、最大无进展毫秒数），`RdcOperationCatalog.validateDefinitions` 逐条严格校验，缺失或形状不符为 `RDC_UPGRADE_REQUIRED`。原生超时与进程退出是不同事实，必须允许原生先返回结构化结果并收口自有动作。
 

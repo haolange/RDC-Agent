@@ -13,6 +13,8 @@ interface ErrorDefinition {
 const NO_PARAMS: ErrorParamsSchema = z.strictObject({});
 /** The base name of the file a storage failure is about; never a full path. */
 const STORAGE_FILE: ErrorParamsSchema = z.strictObject({ file: z.string().optional() });
+/** The RDC operation (an `rd.*` name) whose worker, daemon or cancellation the failure is about. */
+const RDC_OPERATION: ErrorParamsSchema = z.strictObject({ operation: z.string() });
 
 const security = (params = NO_PARAMS): ErrorDefinition => ({ category: 'security', params });
 const integrity = (params = NO_PARAMS): ErrorDefinition => ({ category: 'integrity', params });
@@ -533,6 +535,8 @@ const ERROR_REGISTRY = {
   RDC_CATALOG_MISMATCH: availability(),
   RDC_CLI_FAILED: availability(),
   RDC_CLOSE_FAILED: availability(),
+  RDC_DAEMON_LOST: availability(RDC_OPERATION),
+  RDC_DAEMON_UNRESPONSIVE: availability(z.strictObject({ operation: z.string(), seconds: z.number() })),
   RDC_DEVICE_IN_USE: availability(),
   RDC_DEVICE_PREPARATION_CANCELLED: availability(),
   RDC_HOST_UNSUPPORTED: availability(),
@@ -541,6 +545,8 @@ const ERROR_REGISTRY = {
     z.strictObject({ seconds: z.number(), minSeconds: z.number(), maxSeconds: z.number() }),
   ),
   RDC_OPEN_FAILED: availability(),
+  RDC_OPERATION_CANCELLED: availability(RDC_OPERATION),
+  RDC_OPERATION_STUCK: availability(RDC_OPERATION),
   RDC_OWNERSHIP_BUSY: availability(),
   RDC_RECEIPT_KEY_UNAVAILABLE: availability(),
   RDC_RECOVERY_BLOCKED: availability(),
@@ -548,6 +554,8 @@ const ERROR_REGISTRY = {
   RDC_REMOTE_UPGRADE_REQUIRED: availability(),
   RDC_REPLAY_BUSY: availability(),
   RDC_UPGRADE_REQUIRED: availability(),
+  RDC_WORKER_LOST: availability(RDC_OPERATION),
+  RDC_WORKER_UNAVAILABLE: availability(RDC_OPERATION),
   REPLAY_STORE_BUSY: availability(),
   REQUEST_CANCELLED: availability(),
   SECRET_STORAGE_UNAVAILABLE: availability(),

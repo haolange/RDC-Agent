@@ -120,8 +120,8 @@
       "complexity": 90
     },
     "src/main/rdc/executeRdcShell.ts": {
-      "lines": 443,
-      "complexity": 131
+      "lines": 440,
+      "complexity": 126
     },
     "src/main/rdc/RdcCaptureRecovery.ts": {
       "lines": 151,
@@ -141,7 +141,7 @@
       "complexity": 44
     },
     "src/main/rdc/RdcSessionRuntime.ts": {
-      "lines": 172
+      "lines": 165
     },
     "src/main/rdc/RdcSessionService.ts": {
       "lines": 164,

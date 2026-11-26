@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { z, type ZodType } from 'zod';
@@ -12,6 +13,13 @@ import { canonicalJson, deepFreeze, validateDefinitions, validateApplicationOper
 import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { assertRdcCatalogIdentity, packagedRdcCatalogIdentity, type RdcCatalogIdentity } from './rdcCatalogIdentity';
 import { resolveRdcBatchInvocation } from './resolveRdcBatchInvocation';
+import {
+  RDC_CANCEL_TIMEOUT_MS,
+  RDC_CONTROL_TIMEOUT_MS,
+  watchRdcOperation,
+  type RdcOperationFrame,
+  type RdcOperationResult,
+} from './RdcOperationWatcher';
 import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type {
@@ -21,15 +29,8 @@ import type {
   ToolRuntimeSummary,
   ToolTraceEntry,
 } from '@shared/types/tool';
-import type { CLIResult } from '../tools/ShellInvocationService';
 import type { RdcOperationDefinition } from './RdcOperationCatalog';
 
-/**
- * Commands that do no operation work (daemon start/stop/status, context clear/status, version, tools list, doctor) keep
- * a fixed wall: long enough for RDC-Tool's 30 s daemon start lock, daemon readiness and a confirmed stop. Operation work
- * is bounded by the frozen no-progress patience instead, never by this constant.
- */
-export const RDC_CONTROL_TIMEOUT_MS = 60_000;
 const RDC_CONTROL_COMMANDS = new Set(['daemon', 'context', 'version', 'tools', 'doctor']);
 
 /** Artifacts RDC-Tool reports beside its data; fields this app does not read pass through. */
@@ -269,19 +270,26 @@ export class RdcCliInvokerService {
     ];
   }
 
+  /**
+   * The single choke point for RDC-Tool processes. `call` runs an operation under the operation watcher: it carries the
+   * frozen no-progress budget, a request id and the progress stream, has no process wall, and turns an abort into
+   * `daemon cancel`. Control commands keep RDC_CONTROL_TIMEOUT_MS; the CLI's read-only shortcut queries cannot stream
+   * frames, so the frozen patience is their wall.
+   */
   async executeCLI(
     command: string,
     args: string[] = [],
     options: {
-      timeout?: number;
       cwd?: string;
       env?: Record<string, string>;
       runId?: string;
       contextId?: string;
       abortSignal?: AbortSignal;
       settings?: RdcCliInvokerSettings;
+      /** Frames of a `call` (heartbeats, progress, native calls) as they arrive. */
+      onProgress?: (frame: RdcOperationFrame) => void;
     } = {},
-  ): Promise<CLIResult> {
+  ): Promise<RdcOperationResult> {
     const startTime = nowMs();
     const incoming = options.settings ?? this.getSettings();
     const settings = withRdcHostRuntimeEnv({
@@ -310,22 +318,49 @@ export class RdcCliInvokerService {
       }
     }
 
-    const invocation = resolveRdcBatchInvocation(
-      settings.command,
-      this.buildCommandArgs(settings, command, args, { contextId: options.contextId }),
-    );
-
-    return this.shell.invoke({
-      command: invocation.command,
-      args: invocation.args,
-      cwd: options.cwd || settings.workingDirectory || undefined,
-      env: { ...settings.env, PYTHONHOME: undefined, PYTHONPATH: undefined },
-      timeoutMs:
-        options.timeout ?? (RDC_CONTROL_COMMANDS.has(command) ? RDC_CONTROL_TIMEOUT_MS : settings.noProgressTimeoutMs),
-      outputBufferBytes: 8 * 1024 * 1024,
-      runId: options.runId,
-      contextId: options.contextId,
-      abortSignal: options.abortSignal,
+    const spawn = (cliCommand: string, cliArgs: string[]) => {
+      const invocation = resolveRdcBatchInvocation(
+        settings.command,
+        this.buildCommandArgs(settings, cliCommand, cliArgs, { contextId: options.contextId }),
+      );
+      return {
+        command: invocation.command,
+        args: invocation.args,
+        cwd: options.cwd || settings.workingDirectory || undefined,
+        env: { ...settings.env, PYTHONHOME: undefined, PYTHONPATH: undefined },
+        outputBufferBytes: 8 * 1024 * 1024,
+        runId: options.runId,
+        contextId: options.contextId,
+      };
+    };
+    if (command !== 'call') {
+      return this.shell.invoke({
+        ...spawn(command, args),
+        timeoutMs: RDC_CONTROL_COMMANDS.has(command) ? RDC_CONTROL_TIMEOUT_MS : settings.noProgressTimeoutMs,
+        abortSignal: options.abortSignal,
+      });
+    }
+    const requestId = `rdc-agent-${randomUUID()}`;
+    const context = options.contextId ? ['--daemon-context', options.contextId] : [];
+    return watchRdcOperation({
+      shell: this.shell,
+      invocation: spawn(command, [
+        ...args,
+        '--no-progress-ms',
+        String(settings.noProgressTimeoutMs),
+        '--request-id',
+        requestId,
+        '--progress-stream',
+      ]),
+      operation: args[0] ?? 'call',
+      requestId,
+      cancel: () =>
+        this.shell.invoke({
+          ...spawn('daemon', ['cancel', '--request-id', requestId, ...context]),
+          timeoutMs: RDC_CANCEL_TIMEOUT_MS,
+        }),
+      signal: options.abortSignal,
+      onProgress: options.onProgress,
     });
   }
 

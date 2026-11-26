@@ -145,7 +145,8 @@ describe('session-owned remote connection', () => {
       options: { transport: 'adb_android', device_serial: 'SERIAL-SELECTED' },
     });
     expect(argv.slice(-2)).toEqual(['--daemon-context', 'owned']);
-    expect(options).toEqual({ contextId: 'owned', abortSignal: undefined, settings: cli });
+    expect(options).toMatchObject({ contextId: 'owned', abortSignal: undefined, settings: cli });
+    expect(options.onProgress).toEqual(expect.any(Function));
   });
   it.each([
     [{ context_id: 'foreign', remote_id: 'remote' }, 'rd.remote.connect'],

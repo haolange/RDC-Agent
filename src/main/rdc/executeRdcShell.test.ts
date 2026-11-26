@@ -2063,3 +2063,79 @@ it.each([
     expect(mock.observe).not.toHaveBeenCalled();
   },
 );
+
+describe('stuck and cancelled operations', () => {
+  it('quarantines a stuck operation with its native cause and hands the model the stuck failure', async () => {
+    mock.execute.mockResolvedValueOnce({
+      exitCode: 1,
+      stdout: JSON.stringify({
+        schema_version: '3.0.0',
+        result_kind: input.operation,
+        ok: false,
+        error: {
+          code: 'worker_stuck',
+          category: 'runtime',
+          message: 'Worker reported no progress (no_progress); it was terminated',
+          details: {
+            failure_stage: 'worker_exec',
+            reason: 'no_progress',
+            outcome: 'unknown',
+            worker: { pid: 32, start_generation: 'windows-filetime:200' },
+            worker_exit_confirmed: true,
+            replay_requires_restart: true,
+            stack_log: { path: 'worker.log', tail: 'Thread 0x1' },
+            trace_id: 't',
+            request_id: 'r',
+            last_progress: { stage: null, native_call: null, at_ms: null },
+            no_progress_ms: 300_000,
+          },
+        },
+      }),
+    });
+    const failure = await executeRdcShell(input, 'stuck', undefined, context).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: 'RDC_OPERATION_STUCK', params: { operation: input.operation } });
+    expect(mock.quarantine).toHaveBeenCalledExactlyOnceWith(
+      'session',
+      7,
+      expect.stringContaining('outcome is uncertain'),
+      { operation: input.operation, argsFingerprint: expect.any(String), code: 'worker_stuck' },
+    );
+    const delivered = (failure as { deliveryResult?: { details: Record<string, unknown> } }).deliveryResult?.details;
+    expect(delivered).toMatchObject({
+      nativeFailure: { code: 'worker_stuck', details: { reason: 'no_progress', replay_requires_restart: true } },
+      mainValidation: { preservationVerified: false, leaseState: 'quarantined' },
+    });
+  });
+
+  it.each([
+    [
+      'a settled receipt',
+      { status: 'settled', outcome: 'terminated', traceId: 't', settledAtMs: 1, workerExit: { exitConfirmed: true } },
+      'RDC-Tool terminated; worker exit confirmed',
+    ],
+    ['an unconfirmed receipt', { status: 'unconfirmed', reason: 'daemon cancel timed out' }, 'daemon cancel timed out'],
+  ])('records %s when the turn is cancelled during the operation', async (_case, cancellation, recorded) => {
+    const controller = new AbortController();
+    mock.execute.mockImplementationOnce(async () => {
+      controller.abort();
+      return {
+        exitCode: 1,
+        stdout: JSON.stringify({
+          schema_version: '3.0.0',
+          result_kind: input.operation,
+          ok: false,
+          error: {
+            code: 'operation_cancelled',
+            category: 'runtime',
+            message: `${input.operation} was cancelled`,
+            details: { failure_stage: 'running', reason: 'cancel_requested', outcome: 'cancelled' },
+          },
+        }),
+        cancellation,
+      };
+    });
+    await expect(executeRdcShell(input, 'cancelled', controller.signal, context)).rejects.toThrow();
+    expect(mock.quarantine).toHaveBeenCalledExactlyOnceWith('session', 7, expect.stringContaining(recorded), undefined);
+    expect(mock.write).not.toHaveBeenCalled();
+  });
+});

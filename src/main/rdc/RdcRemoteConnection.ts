@@ -4,8 +4,71 @@ import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
 import { parseRemoteBootstrap } from './captures/replayDeviceParse';
+import {
+  deviceInstallationIdentity,
+  unconfirmedDeviceAction,
+  type DeviceInstallationIdentity,
+} from './captures/ReplayDeviceIssue';
+import type { RdcOperationFrame } from './RdcOperationWatcher';
 import type { RdcTurnBinding } from './RdcTurnBindings';
-import type { ReplayDeviceEntry, AndroidBootstrapMetadata } from '@shared/types/device';
+import type {
+  AndroidBootstrapMetadata,
+  DevicePreparationPhase,
+  RemoteInstallationReceipt,
+  ReplayDeviceEntry,
+  ReplayDeviceIssue,
+} from '@shared/types/device';
+
+/** What the owning connect reports while it runs, read from its own progress stream. */
+export interface RdcRemoteProgress {
+  onPreparationStage?: (stage: DevicePreparationPhase) => void;
+  onInstallation?: (receipt: RemoteInstallationReceipt) => void;
+  onDeviceAction?: (issue: ReplayDeviceIssue, identity?: DeviceInstallationIdentity) => void;
+}
+const PREPARATION_PHASES = new Set<string>(['checking', 'installing', 'starting', 'verifying']);
+const INSTALL_MODES = new Set<string>(['existing', 'install', 'update', 'force_replace']);
+const record = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+/**
+ * Maps the connect's progress frames onto the preparation UI. Only RDC-Tool's own stages are forwarded; a cancelled
+ * connect reports the facts it settled with (a committed installation, an unconfirmed PackageManager result) in its
+ * final `cancelled` stage, which is never read as a rollback.
+ */
+function remoteConnectProgress(progress: RdcRemoteProgress): (frame: RdcOperationFrame) => void {
+  return (frame) => {
+    if (frame.kind !== 'progress' || frame.operation !== 'rd.remote.connect') return;
+    if (PREPARATION_PHASES.has(frame.stage)) {
+      progress.onPreparationStage?.(frame.stage as DevicePreparationPhase);
+      return;
+    }
+    if (frame.stage !== 'cancelled') return;
+    const deviceAction = unconfirmedDeviceAction(frame.details);
+    const identity = deviceInstallationIdentity(frame.details);
+    if (deviceAction)
+      progress.onDeviceAction?.(
+        {
+          code: 'remote_install_unconfirmed',
+          stage: 'installing',
+          diagnostic: frame.message || 'Native PackageManager result remains unconfirmed.',
+          recovery: identity ? 'retry' : null,
+          deviceAction,
+        },
+        identity,
+      );
+    const receipt = record(frame.details.installation);
+    if (
+      typeof receipt?.installed_apk === 'boolean' &&
+      typeof receipt.uninstalled_existing === 'boolean' &&
+      INSTALL_MODES.has(String(receipt.install_mode))
+    )
+      progress.onInstallation?.({
+        installedApk: receipt.installed_apk,
+        uninstalledExisting: receipt.uninstalled_existing,
+        installMode: receipt.install_mode as RemoteInstallationReceipt['installMode'],
+      });
+  };
+}
 
 export interface RdcRemoteConnection {
   deviceId: string;
@@ -113,6 +176,7 @@ export async function connectSessionReplayDevice(
   contextId: string,
   binding: RdcTurnBinding,
   signal?: AbortSignal,
+  progress: RdcRemoteProgress = {},
 ): Promise<RdcRemoteConnection> {
   if (device.type !== 'android' || !device.serial || !contextId || contextId === 'default')
     throw new AppError('RDC_REMOTE_CONTEXT_REQUIRED');
@@ -137,7 +201,7 @@ export async function connectSessionReplayDevice(
         '--daemon-context',
         contextId,
       ],
-      { contextId, abortSignal: signal, settings: binding.cli },
+      { contextId, abortSignal: signal, settings: binding.cli, onProgress: remoteConnectProgress(progress) },
     ),
     contextId,
     'rd.remote.connect',

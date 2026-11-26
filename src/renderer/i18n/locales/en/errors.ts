@@ -40,6 +40,16 @@ export const enErrors = {
   'errors.RDC_HOST_UNSUPPORTED': "This isn't supported on this computer.",
   'errors.RDC_DEVICE_IN_USE': 'The device is in use by another session.',
   'errors.RDC_OPEN_FAILED': "The capture couldn't be opened.",
+  'errors.RDC_OPERATION_STUCK':
+    '{operation} stopped making progress, so RDC-Tool stopped its replay worker. Recover the capture before continuing.',
+  'errors.RDC_WORKER_LOST':
+    "RDC-Tool's replay worker ended while {operation} was running; the result is unknown. Recover the capture before continuing.",
+  'errors.RDC_WORKER_UNAVAILABLE': "RDC-Tool couldn't start a replay worker, so {operation} didn't run.",
+  'errors.RDC_OPERATION_CANCELLED': '{operation} was cancelled.',
+  'errors.RDC_DAEMON_LOST':
+    'RDC-Tool stopped while {operation} was running; the result is unknown. Recover the capture before continuing.',
+  'errors.RDC_DAEMON_UNRESPONSIVE':
+    "RDC-Tool didn't respond for {seconds} seconds while {operation} was running; the result is unknown. Recover the capture before continuing.",
   'errors.RDC_NO_PROGRESS_TIMEOUT_UNSUPPORTED':
     'The installed RDC-Tool accepts a no-progress wait of {minSeconds}–{maxSeconds} seconds, but Settings has {seconds}. Change it in Settings.',
   'errors.ADB_MISSING': "Android Debug Bridge (adb) wasn't found. Set its location in Settings.",

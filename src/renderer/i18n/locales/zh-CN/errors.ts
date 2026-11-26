@@ -33,6 +33,13 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.RDC_HOST_UNSUPPORTED': '此电脑不支持该功能。',
   'errors.RDC_DEVICE_IN_USE': '该设备正被其他会话使用。',
   'errors.RDC_OPEN_FAILED': '无法打开该 capture。',
+  'errors.RDC_OPERATION_STUCK': '{operation} 长时间没有进展，RDC-Tool 已停止它的回放进程。请先恢复 capture 再继续。',
+  'errors.RDC_WORKER_LOST': '{operation} 运行时 RDC-Tool 的回放进程退出了，结果未知。请先恢复 capture 再继续。',
+  'errors.RDC_WORKER_UNAVAILABLE': 'RDC-Tool 无法启动回放进程，{operation} 没有执行。',
+  'errors.RDC_OPERATION_CANCELLED': '{operation} 已取消。',
+  'errors.RDC_DAEMON_LOST': '{operation} 运行时 RDC-Tool 停止了，结果未知。请先恢复 capture 再继续。',
+  'errors.RDC_DAEMON_UNRESPONSIVE':
+    '{operation} 运行时 RDC-Tool {seconds} 秒没有响应，结果未知。请先恢复 capture 再继续。',
   'errors.RDC_NO_PROGRESS_TIMEOUT_UNSUPPORTED':
     '已安装的 RDC-Tool 只接受 {minSeconds}–{maxSeconds} 秒的无进展等待，设置里是 {seconds} 秒。请在设置中修改。',
   'errors.ADB_MISSING': '未找到 Android Debug Bridge（adb），请在设置中指定位置。',
