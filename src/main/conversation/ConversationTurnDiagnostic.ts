@@ -11,6 +11,7 @@ import {
   ProviderTimeoutError,
 } from '../agent-runtime/providers/internal/http';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
+import { RdcRecoveryBlockedError } from '../agent-runtime/orchestration/RdcProcessFaultRecovery';
 import { isMissionCompletionError } from '../investigation/missionCompletionContract';
 import { InvestigationError } from '../investigation/investigationErrors';
 import {
@@ -50,6 +51,17 @@ export function createTurnFailedDiagnostic(
             agent: label,
           })
         : diagnosticText('loopTurnLimit', { agent: label, turns: error.maxTurns ?? error.turn }),
+      providerId: route.providerId,
+      modelId: route.modelId,
+      technicalMessage: redactTechnicalMessage(error),
+    });
+  }
+  if (error instanceof RdcRecoveryBlockedError) {
+    return createConversationDiagnostic({
+      agentId: route.agentId,
+      code: 'CONVERSATION_RDC_RECOVERY_BLOCKED',
+      severity: 'error',
+      userMessage: diagnosticText('rdcRecoveryBlocked'),
       providerId: route.providerId,
       modelId: route.modelId,
       technicalMessage: redactTechnicalMessage(error),

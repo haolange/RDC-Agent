@@ -75,17 +75,15 @@ export async function inspectQuarantinedCapture(input: {
   )
     throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'the quarantined binding changed during observation.');
   const observed = rdcRecoveryObservation(status, point.native.replaySessionId);
+  const { attempts } = rdcLifecycleReceipts.recoveryAttempts(input.sessionId, input.projectId, destination);
   const classification = classifyRecovery({
     verified: point.native.processIdentity,
     replaySessionId: point.native.replaySessionId,
     status,
     deviceActionPending: !!state.preparation.issue?.deviceAction,
-    budget: {
-      attempts: rdcLifecycleReceipts.recoveryAttempts(input.sessionId, input.projectId, destination).attempts,
-      limit: RDC_RECOVERY_ATTEMPT_LIMIT,
-    },
+    budget: { attempts, limit: RDC_RECOVERY_ATTEMPT_LIMIT },
   });
-  return { cause: lease.quarantineCause, observed, classification };
+  return { cause: lease.quarantineCause, observed, classification, attempts };
 }
 
 /** Clear the quarantined context, confirm its daemon stopped, then prepare the same device and reopen the same input. */

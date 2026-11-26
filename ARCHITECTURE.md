@@ -641,6 +641,7 @@ Mission runtime allowlist：
   - `probe` 仅允许共享闭集内的只读查询（`context_status`、`resource_list`、`event_list`、`event_search`、`event_show`、`pipeline_show`、`vfs_ls`、`vfs_cat`），不接受任意 argv；`event_list` 按 `offset/limit` 分页，`event_search` 按名称、ActionFlags 与事件范围过滤。
 - 输出：结构化 JSON（exitCode、原生结果、world-state 戳）。`rdc_probe` 不截断原生结果，超阈值时整体制品化并返回 artifact ref，分页依据原生 `pagination.truncated`。raw `.rdc` bytes 永不进入模型上下文或 Provider。
 - capture 切换与恢复要经过当前权限和 policy、批准的输入与设备、资源释放、身份重准备及签名回执；只读 Mission 不获得这些生命周期权限。
+- 恢复准入只有 `classifyRecovery`（keep / rebuild / quarantined），Agent 的 `capture_recover` 与用户在 Capture 的恢复共用；它只读 `context status`（不拉起 worker），按身份链与签名回执里的持久次数预算判断。full 或 auto-review 权限下，获批 capture 上的 `RDC_OPERATION_STUCK` / `RDC_WORKER_LOST` 由工具后步骤在判 rebuild 时同轮自动恢复，否则以具体阻塞码结束该轮；其它模式只报告结论并提供 `capture_recover`（`docs/architecture/rdc-runtime.md`「身份链恢复」）。
 - General 需要 Live RDC mutate（shader replace、replay variant、timing experiment apply）时走 `shell` + Settings action，且必须持有 exclusive lease。
 
 Mission 的禁止面：`shell`、`code_interpreter`、`write` / `edit` / `git` / `file-manage`、`output_register`、`memory_write` / `memory_delete`、session create/delete/rewrite/branch、model/settings mutation、generic filesystem、MCP tools、project/output/external mutation，以及任意不在共享只读查询闭集中的 RDC action。

@@ -10,6 +10,8 @@ import {
 } from '../../rdc/RdcLifecycleReceipts';
 import { getRdcTurnBinding, type RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { observedRdcProcessIdentity } from '../../rdc/RdcProcessIdentity';
+import { lifecycleLedger, type LifecycleLedger } from '../../runtime/LifecycleLedger';
+import { RDC_RECOVERY_ATTEMPT_LIMIT } from '../../rdc/RdcRecoveryClassification';
 import type { InvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import type { TaskRuntimeEpoch } from '../tasks/taskExecutionSchemas';
@@ -26,6 +28,8 @@ export type RecoveryFacts = {
   cause: { operation: string; argsFingerprint: string; code: string };
   observed: RdcRecoveryObservation;
   classification: RdcRecoveryClassification;
+  /** Signed recovery attempts already made on this input, content and device. */
+  attempts: number;
 };
 export interface ApprovedCaptureHost {
   assertPlan(): void;
@@ -97,6 +101,7 @@ export class ApprovedCaptureController {
       captureScope: NonNullable<InvestigationPlanContract['captureScope']>;
       turn: TurnHandle;
       host: ApprovedCaptureHost;
+      ledger?: Pick<LifecycleLedger, 'record'>;
     },
   ) {}
 
@@ -313,6 +318,15 @@ export class ApprovedCaptureController {
     return { changed: true, receipt: transition.receipt };
   }
 
+  /** The admission decision a recovery would take now; read-only, nothing is signed or changed. */
+  async classifyFault(signal?: AbortSignal): Promise<RdcRecoveryClassification> {
+    this.assertReady();
+    this.input.host.assertPlan();
+    const from = this.verified();
+    if (!from) throw new AppError('RDC_RECOVERY_SCOPE_INVALID', 'no verified approved capture is available.');
+    return (await this.input.host.inspectRecovery(from, this.current().binding, signal)).classification;
+  }
+
   /** Join the faulted child before acquiring the shared unsafe-effects lock. */
   async prepareRecovery(permissionRevision: number, signal?: AbortSignal): Promise<void> {
     this.assertReady();
@@ -375,6 +389,7 @@ export class ApprovedCaptureController {
       destination,
       recovery: { cause: facts.cause, observed: facts.observed, classification: facts.classification },
     });
+    this.recordStep('classified', facts);
     if (facts.classification.decision === 'quarantined') {
       const refused = new AppError(facts.classification.code, facts.classification.reason);
       this.fail(intent, base, from, refused, true);
@@ -439,9 +454,11 @@ export class ApprovedCaptureController {
       this.input.turn.runtimeEpochs.push(epoch);
       this.lastVerified = to;
       this.pendingRecovery = false;
+      this.recordStep('recovered', facts);
       return { changed: true, receipt, current: to };
     } catch (error) {
       this.fail(intent, base, from, error, true);
+      this.recordStep('recovery-failed', facts, error);
       throw error;
     }
   }
@@ -564,6 +581,20 @@ export class ApprovedCaptureController {
     const code = /^[A-Z][A-Z0-9_]{0,127}/u.exec(message)?.[0] ?? 'RDC_SWITCH_FAILED';
     this.input.host.quarantineChanged(from, { cause: code, reason: message }, force);
     this.input.host.writeReceipt({ ...base, recordedAt: Date.now(), event: 'failed', intent, code });
+  }
+  /** One ledger fact per recovery step: the decision, the attempt it was and how it ended. */
+  private recordStep(step: string, facts: RecoveryFacts, error?: unknown): void {
+    const { classification } = facts;
+    const code = error instanceof Error ? /^[A-Z][A-Z0-9_]{0,127}/u.exec(error.message)?.[0] : undefined;
+    const errorCode = code ?? (classification.decision === 'quarantined' ? classification.code : undefined);
+    (this.input.ledger ?? lifecycleLedger).record({
+      kind: 'recovery_step',
+      sessionId: this.input.sessionId,
+      step,
+      decision: classification.decision,
+      reason: `attempt ${facts.attempts + 1} of ${RDC_RECOVERY_ATTEMPT_LIMIT}: ${classification.reason}`,
+      ...(errorCode ? { errorCode } : {}),
+    });
   }
   /** The last verified point, carrying the latest process identity a successful result reported for its context. */
   private verified(): RdcLifecyclePoint | null {

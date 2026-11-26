@@ -85,6 +85,7 @@
 | RDC 结果未知（原生故障、CLI 协议错误、取消、关闭或切换未确认） | Integrity | 唯一入口 `registerRdcFault`：隔离 owning lease，原因必填（操作、原生参数的 `rdcDigest`、观察到的码，取消为 `RDC_OPERATION_CANCELLED`），首个原因不被后续清理错误覆盖；probe 与 observe 路径登记每个没有无效果证明的原生故障与 CLI 协议错误，`executeRdcShell` 保留主进程复核安全的例外 |
 | 获批 capture 切换／恢复的身份或退出无法核实 | Security + Integrity | 停止现场操作并隔离；保留签名 baseline 和未恢复状态，不能将 context clear 当成 daemon 已退出，也不将新现场补入旧实验 |
 | RDC 恢复的进程变化无法由退出回执解释 | Integrity | `classifyRecovery` 判 `RDC_RECOVERY_PROCESS_UNEXPLAINED`：Agent 与用户恢复共用这一准入，只读 `context status`（不拉起 worker）；写 intent 与 failed 回执后停止，lease 保持隔离（`docs/architecture/rdc-runtime.md`「身份链恢复」） |
+| 获批 capture 上 RDC worker 卡死或丢失 | Availability | 故障照常登记并附栈日志；full-access / auto-review 下判 rebuild 即同轮自动恢复并继续，否则该轮以具体阻塞码结束（`CONVERSATION_RDC_RECOVERY_BLOCKED`，不报成模型请求失败）；其它模式报告结论并提供 `capture_recover` |
 | RDC 恢复次数用尽 | Availability | 同一 {输入、内容、设备} 的 Agent 恢复按签名回执计数，跨 turn 至多 2 次，之后 `RDC_RECOVERY_BUDGET_EXHAUSTED`；用户在 Capture 面板的恢复不计入 |
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
 | JSONL 末尾残行（追加中断） | Integrity | 读取时作为 `tornTail` 返回，之前的完整记录照常可读，会话不因此打不开；下一次追加或回合终态提交前，残行字节原样移入同目录 `<file>.torn-<ts>`（fsync 后）再截断，并经运行日志报告 `JSONL_TORN_TAIL`；只缺换行的完整记录补换行保留 |
@@ -106,7 +107,7 @@
 | main 进程未处理的 rejection / 未捕获异常 | Integrity | 写运行日志（含 stack）并写生命周期账本 `fault`（脱敏、替换家目录与数据目录、按脱敏后的 stack 取指纹）；未捕获异常另弹原生错误框，与 Electron 默认可见性一致；main 生产代码由 ESLint `no-floating-promises` 保证每个 promise 被 await、处理或显式 `void` |
 | renderer / GPU / utility 等 Chromium 子进程死亡、worker 线程意外退出、受监管子进程异常退出 | Availability | 各写一条账本记录（`process_gone`、`worker_thread_exited`、`supervised_child_exited`；正常退出与应用主动的超时、中止不记）；renderer 按下文「renderer 崩溃策略」恢复 |
 | ProcessSupervisor timeout/abort | Availability | terminate process tree; settle only after observed close/error; abort opens a bounded observation window, so even an unbounded join resolves `unconfirmed_orphan` (kept in the registry) when close never arrives |
-| RDC 操作卡住、worker 丢失或无法启动、daemon 丢失或无响应、操作取消 | Availability | `RDC_OPERATION_STUCK` / `RDC_WORKER_LOST` / `RDC_WORKER_UNAVAILABLE` / `RDC_DAEMON_LOST` / `RDC_DAEMON_UNRESPONSIVE` / `RDC_OPERATION_CANCELLED`；只有无进展预算，没有墙钟；取消先 `daemon cancel` 并等回执再终止 CLI；结果未知的 owning context 隔离，不自动重试（`docs/architecture/rdc-runtime.md`） |
+| RDC 操作卡住、worker 丢失或无法启动、daemon 丢失或无响应、操作取消 | Availability | `RDC_OPERATION_STUCK` / `RDC_WORKER_LOST` / `RDC_WORKER_UNAVAILABLE` / `RDC_DAEMON_LOST` / `RDC_DAEMON_UNRESPONSIVE` / `RDC_OPERATION_CANCELLED`；只有无进展预算，没有墙钟；取消先 `daemon cancel` 并等回执再终止 CLI；结果未知的 owning context 隔离，不重试原操作；获批 capture 上卡死或丢失的 worker 按「身份链恢复」处置（`docs/architecture/rdc-runtime.md`） |
 | ShutdownCoordinator 限时 shutdown | Availability | 尽量排空后退出；`release_owned_runtimes` 失败必须记错误并保留归属记录，不得假装 daemon 已停。账本记录起因（`window-close` / `before-quit` / `update` / `renderer-failure`；SIGINT/SIGTERM 由 Electron 自己转成 quit，记为 `before-quit`）、超时的阶段及当时未完成的 disposable、是否超时；干净与超时两条路径走同一个退出 |
 | 关停时停止的回合 | Availability | 停止原因 `app-shutdown` 写在 stopped 消息的 `stopCause` 与 cancelled run 的 `stopReason` 上，界面写「应用关闭时已停止」，不显示成用户停止 |
 | 上次启动未正常结束（`instance.lock` 未释放） | Availability | 见下文「上次启动诊断」 |

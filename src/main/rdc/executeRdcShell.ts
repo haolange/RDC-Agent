@@ -43,9 +43,16 @@ function ownsFrozenReplay(
 }
 
 /** Why the lease is quarantined; a cancelled operation names what RDC-Tool's cancel receipt said. */
-function uncertainOutcomeReason(signal: AbortSignal | undefined, cancellation: RdcCancellation | undefined): string {
+function uncertainOutcomeReason(
+  signal: AbortSignal | undefined,
+  cancellation: RdcCancellation | undefined,
+  error: unknown,
+): string {
   const recover = 'inspect and recover through the capture lifecycle before further execution.';
-  if (!signal?.aborted) return `Native operation outcome is uncertain; ${recover}`;
+  // A stuck or lost worker keeps the stack dump RDC-Tool wrote before stopping it.
+  const stack = error instanceof RdcNativeFailure ? error.processFailure?.stack_log?.path : undefined;
+  if (!signal?.aborted)
+    return `Native operation outcome is uncertain${stack ? ` (worker stack log: ${stack})` : ''}; ${recover}`;
   const exit = cancellation?.status === 'settled' ? cancellation.workerExit : undefined;
   const receipt = !cancellation
     ? 'no cancel receipt'
@@ -520,7 +527,7 @@ export async function executeRdcShell(
           operation: input.operation,
           nativeArgs: args,
           cause: signal?.aborted ? 'RDC_OPERATION_CANCELLED' : rdcFaultCode(error),
-          reason: uncertainOutcomeReason(signal, cancellation),
+          reason: uncertainOutcomeReason(signal, cancellation, error),
         });
       }
       if (error instanceof RdcNativeFailure) {

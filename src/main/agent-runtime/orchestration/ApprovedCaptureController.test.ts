@@ -6,6 +6,7 @@ import { ApprovedCaptureController, type ApprovedCaptureHost } from './ApprovedC
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { RdcLifecyclePoint, RdcLifecycleReceipt } from '../../rdc/RdcLifecycleReceipts';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
+import type { LifecycleEvent } from '../../runtime/LifecycleLedger';
 
 const cli = {
   enabled: true,
@@ -49,6 +50,7 @@ function fixture() {
   let quarantined: { contextId: string; leaseVersion: number } | null = null;
   let sequence = 1;
   const receipts: RdcLifecycleReceipt[] = [];
+  const ledger: LifecycleEvent[] = [];
   const host: ApprovedCaptureHost = {
     assertPlan: vi.fn(),
     pendingRecord: vi.fn(() => null),
@@ -82,6 +84,7 @@ function fixture() {
         replaySession: { isLive: true, requiresRestart: false, workerExit: null },
       },
       classification: { decision: 'keep' as const, reason: 'verified-processes-live' as const },
+      attempts: 0,
     })) as ApprovedCaptureHost['inspectRecovery'],
     reopenAfterFailure: vi.fn(async (destination, _binding, _signal, onStopped) => {
       if (current) onStopped(current.native.contextId);
@@ -121,8 +124,10 @@ function fixture() {
     },
     turn,
     host,
+    ledger: { record: (event: LifecycleEvent) => ledger.push(event) > 0 },
   });
   return {
+    ledger,
     controller,
     turn,
     host,
@@ -491,6 +496,7 @@ it('signs an unexplained process change as a failed recovery attempt without reo
       code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED',
       reason: 'a worker change has no confirmed exit receipt of the verified worker.',
     },
+    attempts: 1,
   });
   await f.controller.prepareRecovery(1);
   await expect(f.controller.recover()).rejects.toThrow('RDC_RECOVERY_PROCESS_UNEXPLAINED');
@@ -498,6 +504,16 @@ it('signs an unexplained process change as a failed recovery attempt without reo
   expect(f.receipts.map((value) => value.event)).toEqual(['baseline', 'intent', 'failed']);
   expect(f.receipts[1]).toMatchObject({ recovery: { classification: { decision: 'quarantined' } } });
   expect(f.receipts[2]).toMatchObject({ code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED' });
+  expect(f.ledger).toEqual([
+    {
+      kind: 'recovery_step',
+      sessionId: 's',
+      step: 'classified',
+      decision: 'quarantined',
+      reason: 'attempt 2 of 2: a worker change has no confirmed exit receipt of the verified worker.',
+      errorCode: 'RDC_RECOVERY_PROCESS_UNEXPLAINED',
+    },
+  ]);
   expect(f.host.quarantineChanged).toHaveBeenCalled();
 });
 
@@ -528,6 +544,7 @@ it('records what a rebuild lost with the old process without claiming a rollback
       replaySession: { isLive: false, requiresRestart: true, workerExit: null },
     },
     classification: { decision: 'rebuild', reason: 'worker-exited', lost: { workers: [worker] } },
+    attempts: 0,
   });
   await f.controller.prepareRecovery(1);
   await f.controller.recover();
@@ -541,4 +558,8 @@ it('records what a rebuild lost with the old process without claiming a rollback
       newBaselineRequired: true,
     },
   });
+  expect(f.ledger.map((event) => event.kind === 'recovery_step' && [event.step, event.decision])).toEqual([
+    ['classified', 'rebuild'],
+    ['recovered', 'rebuild'],
+  ]);
 });

@@ -23,6 +23,17 @@ import { ShutdownCoordinator } from '../../lifecycle/ShutdownCoordinator';
 import { writeTextFileNoFollow } from '../../runtime/toolFiles';
 import { hashAttachmentContents } from '../../agent-runtime/attachments/ConversationAttachmentHashing';
 import { ConversationHistoryStore } from '../../sessions/store/ConversationHistoryStore';
+import {
+  ApprovedCaptureController,
+  type ApprovedCaptureHost,
+} from '../../agent-runtime/orchestration/ApprovedCaptureController';
+import { settleRdcProcessFault } from '../../agent-runtime/orchestration/RdcProcessFaultRecovery';
+import { TurnHandle } from '../../agent-runtime/orchestration/TurnCoordinator';
+import { parseRdcNativeResult, RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
+import { classifyRecovery } from '../../rdc/RdcRecoveryClassification';
+import { rdcRecoveryObservation, type RdcContextStatus } from '../../rdc/RdcContextStatus';
+import { bindRdcTurn, freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
+import { liveContextStatus, stuckContextStatus } from '../rdcContextStatusFixture';
 
 const childState = vi.hoisted(() => {
   const listeners = new Map<string, (...args: unknown[]) => void>();
@@ -57,6 +68,10 @@ vi.mock('child_process', () => ({
 
 import { ProcessSupervisor } from '../../runtime/ProcessSupervisor';
 import type { ChildProcess } from 'node:child_process';
+import type { RdcLifecyclePoint, RdcLifecycleReceipt } from '../../rdc/RdcLifecycleReceipts';
+import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { LifecycleEvent } from '../../runtime/LifecycleLedger';
 import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
 
 function makeBuilder() {
@@ -374,5 +389,201 @@ describe('faultInjectionContract: shutdown with active producers', () => {
     expect(seen[0]).toBe('abort_all');
     expect(seen.slice(1).sort()).toEqual(['terminate_processes:mcp', 'terminate_processes:terminal']);
     expect(coordinator.getPhase()).toBe('exited');
+  });
+});
+
+describe('faultInjectionContract: stuck RDC worker on an approved capture', () => {
+  const cli = {
+    enabled: true,
+    command: 'rdc',
+    argsPrefix: [],
+    workingDirectory: '',
+    env: {},
+    noProgressTimeoutMs: 30_000,
+  };
+  const point = (contextId: string, eventId: number): RdcLifecyclePoint => ({
+    inputId: 'a',
+    contentSha256: 'a'.repeat(64),
+    deviceId: 'device',
+    target: null,
+    isFinalOutput: false,
+    native: {
+      contextId,
+      leaseVersion: contextId === 'ctx' ? 1 : 2,
+      replaySessionId: contextId === 'ctx' ? 'replay' : 'replay-new',
+      captureFileId: 'file',
+      eventId,
+      replacementCount: 0,
+      replacementFingerprint: '0'.repeat(64),
+      processIdentity: {
+        status: 'available',
+        daemon: { pid: contextId === 'ctx' ? 10 : 20, start_generation: 'windows-filetime:1' },
+        worker: { pid: contextId === 'ctx' ? 11 : 21, start_generation: 'windows-filetime:2' },
+      },
+    },
+  });
+  /** RDC-Tool's canonical worker_stuck failure after its watchdog dumped the stack and stopped the worker tree. */
+  function stuckFailure(): RdcNativeFailure {
+    try {
+      parseRdcNativeResult(
+        {
+          exitCode: 1,
+          stderr: '',
+          duration_ms: 1,
+          stdout: JSON.stringify({
+            ok: false,
+            schema_version: '3.0.0',
+            result_kind: 'rd.debug.run_to',
+            error: {
+              code: 'worker_stuck',
+              message: 'no progress for 30000 ms',
+              category: 'runtime',
+              details: {
+                failure_stage: 'execute',
+                reason: 'no_progress',
+                outcome: 'unknown',
+                operation: 'rd.debug.run_to',
+                worker: { pid: 11, start_generation: 'windows-filetime:2' },
+                worker_exit_confirmed: true,
+                replay_requires_restart: true,
+                stack_log: { path: '/state/worker.log', tail: 'Thread 0x1' },
+                trace_id: 'trace',
+                request_id: 'rdc-agent-1',
+                no_progress_ms: 30_000,
+              },
+            },
+          }),
+        },
+        undefined,
+        'rd.debug.run_to',
+      );
+    } catch (error) {
+      if (error instanceof RdcNativeFailure) return error;
+      throw error;
+    }
+    throw new Error('expected a native failure');
+  }
+  function approvedCapture(status: RdcContextStatus) {
+    const turn = new TurnHandle({ sessionKey: 's', turnId: 't', generation: 1 });
+    turn.runtimePlan = { fingerprint: '1'.repeat(24) } as EffectiveRuntimePlan;
+    turn.promptPlan = { systemPrompt: 'prompt' } as PromptPlan;
+    bindRdcTurn(turn.runtimePlan, freezeRdcTurnBinding(cli, [], null));
+    let current = point('ctx', 42);
+    const receipts: RdcLifecycleReceipt[] = [];
+    const ledger: LifecycleEvent[] = [];
+    const host: ApprovedCaptureHost = {
+      assertPlan: () => {},
+      pendingRecord: () => null,
+      quarantinedContext: () => null,
+      prepareReceipts: () => {},
+      quiescent: async () => ({ openExperiments: [{ experimentId: 'exp', status: 'running' }] }),
+      snapshot: async () => structuredClone(current),
+      verifyDestination: async () => {},
+      open: async () => {},
+      close: async () => {},
+      restorePosition: async () => {},
+      recoveryGuard: () => () => {},
+      joinRecoveryChild: async () => {},
+      inspectRecovery: async (from) => ({
+        cause: { operation: 'rd.debug.run_to', argsFingerprint: 'e'.repeat(64), code: 'worker_stuck' },
+        observed: rdcRecoveryObservation(status, from.native.replaySessionId),
+        classification: classifyRecovery({
+          verified: from.native.processIdentity,
+          replaySessionId: from.native.replaySessionId,
+          status,
+          deviceActionPending: false,
+          budget: { attempts: 0, limit: 2 },
+        }),
+        attempts: 0,
+      }),
+      reopenAfterFailure: vi.fn(async (_destination, _binding, _signal, onStopped) => {
+        onStopped('ctx');
+        current = point('ctx-new', 1);
+      }),
+      reprepare: async (previous) => {
+        const plan = { ...previous.plan, fingerprint: '2'.repeat(24) } as EffectiveRuntimePlan;
+        const binding = freezeRdcTurnBinding(cli, [], null);
+        bindRdcTurn(plan, binding);
+        return { plan, prompt: previous.prompt, binding };
+      },
+      appendEpoch: async () => {},
+      writeReceipt: (receipt) => {
+        receipts.push(receipt);
+        return { uri: `session://tool-outputs/${receipts.length}.json`, expectedHash: `sha256:${'a'.repeat(64)}` };
+      },
+      quarantineChanged: () => {},
+    };
+    const control = new ApprovedCaptureController({
+      sessionId: 's',
+      projectId: 'p',
+      planUri: 'session://plans/p.md',
+      planHash: 'f'.repeat(64),
+      captureScope: {
+        projectId: 'p',
+        deviceId: 'device',
+        comparisonGoal: 'compare',
+        inputs: [{ inputId: 'a', fileName: 'a.rdc', contentSha256: 'a'.repeat(64) }],
+      },
+      turn,
+      host,
+      ledger: { record: (event) => ledger.push(event) > 0 },
+    });
+    return { control, host, receipts, ledger, turn };
+  }
+  const exclusive = <T>(operation: () => Promise<T>) => operation();
+
+  it('rebuilds the replay in the same turn under full access when the worker exit explains the change', async () => {
+    const f = approvedCapture(stuckContextStatus());
+    await f.control.initialize();
+    const error = stuckFailure();
+    expect(error.code).toBe('RDC_OPERATION_STUCK');
+    expect(error.processFailure?.stack_log?.path).toBe('/state/worker.log');
+    const outcome = await settleRdcProcessFault({
+      error,
+      control: f.control,
+      permission: { mode: 'full-access', revision: 1 },
+      runExclusive: exclusive,
+    });
+    expect(outcome).toMatchObject({
+      status: 'rebuilt',
+      current: { inputId: 'a', deviceId: 'device', eventId: 1 },
+      newBaselineRequired: true,
+    });
+    expect(f.receipts.map((receipt) => receipt.event)).toEqual(['baseline', 'intent', 'daemon-stopped', 'transition']);
+    expect(f.receipts.at(-1)).toMatchObject({
+      lostWithProcess: { experiments: [{ experimentId: 'exp' }], workers: [{ pid: 11, reason: 'no_progress' }] },
+    });
+    expect(f.turn.runtimeEpochs).toHaveLength(1);
+    expect(f.ledger.map((event) => event.kind === 'recovery_step' && event.step)).toEqual(['classified', 'recovered']);
+  });
+
+  it('stops an autonomous turn on an unexplained change and only offers recovery in ask mode', async () => {
+    const replaced = liveContextStatus();
+    replaced.worker = { ...replaced.worker, pid: 99 };
+    replaced.sessions[0]!.is_live = false;
+    replaced.sessions[0]!.recovery = { ...replaced.sessions[0]!.recovery, requires_restart: true };
+    const blocked = approvedCapture(replaced);
+    await blocked.control.initialize();
+    expect(
+      await settleRdcProcessFault({
+        error: stuckFailure(),
+        control: blocked.control,
+        permission: { mode: 'auto-review', revision: 1 },
+        runExclusive: exclusive,
+      }),
+    ).toMatchObject({ status: 'blocked', code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED', stopsTurn: true });
+    expect(blocked.host.reopenAfterFailure).not.toHaveBeenCalled();
+    const ask = approvedCapture(stuckContextStatus());
+    await ask.control.initialize();
+    expect(
+      await settleRdcProcessFault({
+        error: stuckFailure(),
+        control: ask.control,
+        permission: { mode: 'default', revision: 1 },
+        runExclusive: exclusive,
+      }),
+    ).toEqual({ status: 'recovery-available', action: 'capture_recover', decision: 'rebuild' });
+    expect(ask.receipts.map((receipt) => receipt.event)).toEqual(['baseline']);
+    expect(ask.host.reopenAfterFailure).not.toHaveBeenCalled();
   });
 });

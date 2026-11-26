@@ -21,12 +21,14 @@ import { countSubagentDispatches, isConcurrencySafeSpec, resourceClaimOf } from 
 import { sessionRecordStore } from '../../sessions/store/sessionStores';
 import { artifactizeToolResult } from '../tools/ToolResultArtifactizer';
 import { RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
+import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { reserveDispatchBudget } from './TurnCoordinator';
 import { normalizeToolName } from './RuntimeToolPolicy';
 import { extractDeferredToolNamesFromToolSearchDetails } from './deferredTools';
 import { flushPolicyBudgetObservers } from './DelegationBudget';
 import { executePlanArtifact, type PlanArtifactToolCall } from './PlanArtifactSubmission';
 import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
+import { settleRdcProcessFault } from './RdcProcessFaultRecovery';
 import {
   admitToolCall,
   captureAccessDenial,
@@ -107,12 +109,13 @@ export class ToolExecutorFactory {
     const specOf = (toolName: string) => scope.tools.get(normalizeToolName(toolName))?.spec;
     return {
       shouldEndTurnAfterToolResult: (result) => {
-        const approved = this.deps.activeTurns.getActiveTurn(sessionId)?.approvedPlan;
+        const turn = this.deps.activeTurns.getActiveTurn(sessionId);
+        if (turn?.rdcRecoveryBlocker?.toolCallId === result.toolCallId) return true;
         // The result names the tool exactly as called; only the canonical name resolves.
         return (
           !result.isError &&
           scope.tools.get(result.toolName)?.spec.interaction === 'plan-review' &&
-          approved?.toolCallId === result.toolCallId
+          turn?.approvedPlan?.toolCallId === result.toolCallId
         );
       },
       isConcurrencySafe: (toolCall: ToolCall) => isConcurrencySafeSpec(specOf(toolCall.name)),
@@ -411,20 +414,56 @@ export class ToolExecutorFactory {
         toolCallId: toolCall.id,
         error: error instanceof Error ? error.message : String(error),
       });
-      if (tool.spec.presentation?.deliversNativeFailure && error instanceof RdcNativeFailure && error.deliveryResult) {
-        return this.agentToolResultToMessage(
-          toolCall,
-          artifactizeToolResult({
-            sessionId: runtimeContext?.sessionId ?? sessionId,
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            result: error.deliveryResult,
-            pinBelowThreshold: true,
-          }),
-        );
-      }
+      if (tool.spec.presentation?.deliversNativeFailure && error instanceof RdcNativeFailure && error.deliveryResult)
+        return this.deliverNativeFailure(scope, toolCall, toolContext, error, error.deliveryResult, signal);
       return errorToolResult(toolCall, error instanceof Error ? error.message : String(error));
     }
+  }
+
+  /**
+   * A native failure reaches the model as pinned evidence. A stuck or lost worker on an approved capture first gets
+   * the post-call recovery step, whose outcome rides on the same result; a blocker ends an autonomous turn.
+   */
+  private async deliverNativeFailure(
+    scope: ToolExecutorScope,
+    toolCall: ToolCallContent,
+    toolContext: ToolExecutionContext,
+    error: RdcNativeFailure,
+    delivered: AgentToolResult,
+    signal?: AbortSignal,
+  ): Promise<ToolResultMessage> {
+    const sessionId = scope.runtimeContext?.sessionId ?? scope.sessionId;
+    const projectRootPath = scope.runtimeContext?.projectRootPath ?? scope.plan?.projectRootPath ?? null;
+    const resourceKey = toolResourceKey(projectRootPath, rootScopeId(sessionId ?? 'ephemeral'));
+    const runtimeRecovery = await settleRdcProcessFault({
+      error,
+      control: toolContext.captureControl,
+      permission: runtimePermissionStateService.getSnapshot(),
+      runExclusive: (operation) => toolResourceArbiter.runExclusive(resourceKey, signal, operation),
+      signal,
+    });
+    let result = delivered;
+    if (runtimeRecovery) {
+      const details = { ...(result.details as Record<string, unknown>), runtimeRecovery };
+      result = { ...result, content: [{ type: 'text', text: JSON.stringify(details) }], details };
+      const turn = this.deps.activeTurns.getActiveTurn(toolContext.sessionId);
+      if (turn && runtimeRecovery.status === 'blocked' && runtimeRecovery.stopsTurn)
+        turn.rdcRecoveryBlocker = {
+          toolCallId: toolCall.id,
+          code: runtimeRecovery.code,
+          reason: runtimeRecovery.reason,
+        };
+    }
+    return this.agentToolResultToMessage(
+      toolCall,
+      artifactizeToolResult({
+        sessionId,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        result,
+        pinBelowThreshold: true,
+      }),
+    );
   }
 
   /** Error results stay inline unless the tool keeps them; the rest go through the session artifact path. */

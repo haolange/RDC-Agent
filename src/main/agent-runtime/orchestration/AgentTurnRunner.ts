@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
+import { isErrorCode } from '@shared/errors/errorCodes';
 /**
  * AgentTurnRunner — runs one prepared agent turn in named phases over an explicit AgentTurnRun:
  * begin (scope, hook, turn), setup (completion guards, tools, executor, slot), subscription
@@ -20,6 +21,7 @@ import { TokenizerService } from '../core/TokenizerService';
 import { isExplicitStructuredToolCallingRejection } from '../capabilities/RouteCapabilityResolver';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { assertApprovedExecutionCurrent } from '../../sessions/run/handoffSkills';
+import { RdcRecoveryBlockedError } from './RdcProcessFaultRecovery';
 import {
   turnCoordinator,
   createSubagentBudgetState,
@@ -565,6 +567,7 @@ export class AgentTurnRunner {
     let completionReceipt: TurnCompletionReceipt | undefined;
     try {
       await activeSlot.agent.prompt(setup.userMessage);
+      throwRdcRecoveryBlocker(turnHandle);
       if (!turnHandle.isAborted && setup.missionPlanningFeedback())
         throw new AppError('MISSION_PLAN_REQUIRED', 'the planning turn ended without a reviewed plan.');
       if (await settleDirectTasks(false))
@@ -723,4 +726,14 @@ export class AgentTurnRunner {
     }
     run.setupCleanupComplete = true;
   }
+}
+
+/** A stuck replay the runtime could not rebuild ends the autonomous turn under the blocker's own code. */
+function throwRdcRecoveryBlocker(turn: TurnHandle): void {
+  const blocker = turn.rdcRecoveryBlocker;
+  if (!blocker) return;
+  throw new RdcRecoveryBlockedError(
+    isErrorCode(blocker.code) ? blocker.code : 'RDC_RECOVERY_RESULT_UNVERIFIED',
+    `${blocker.reason} (stopped after tool call ${blocker.toolCallId})`,
+  );
 }

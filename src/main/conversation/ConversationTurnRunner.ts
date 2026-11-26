@@ -767,6 +767,8 @@ function outputSummary(llmDiagnostic: ConversationMessageDiagnostic | null, appr
       return 'Agent loop stopped at the configured turn limit.';
     case 'CONVERSATION_TASK_COMPLETION_DENIED':
       return 'An unfinished direct Task prevented turn completion.';
+    case 'CONVERSATION_RDC_RECOVERY_BLOCKED':
+      return 'A stuck replay could not be rebuilt automatically; the turn stopped on its blocker.';
     case 'CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION':
       return 'Provider stream protocol integrity check failed.';
     case 'MISSION_COMPLETION_DENIED':

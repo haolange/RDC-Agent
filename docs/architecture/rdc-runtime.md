@@ -356,6 +356,8 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 
 恢复的 transition 回执带 `lostWithProcess`，只记事实、从不声称回滚：旧 replay session 的全部 debug handle 失效；恢复时仍开着的实验（running/polluted）记为 `interrupted-by-infrastructure`，恢复不再等待模型先关闭它们，实验记录本身仍由模型更新；最近核验位置上的 replacement 数与指纹（`rolledBack: false`，随进程丢失）；rebuild 时已确认退出的 worker；`newBaselineRequired: true`。旧 baseline/intervention 回执仍绑定旧进程身份，五阶段验收要求同一 context 与 lease，所以重建后必须重新取 baseline，旧实验不会跨新旧现场拼接。
 
+**卡死的自主处置**：`executeRdcShell` 把 `RDC_OPERATION_STUCK` / `RDC_WORKER_LOST` 经 `registerRdcFault` 登记（原因写明 worker 栈日志路径）。失败交付给模型之前，`ToolExecutorFactory` 对获批 capture 运行 `settleRdcProcessFault`（`src/main/agent-runtime/orchestration/RdcProcessFaultRecovery.ts`）：权限为 full-access 或 auto-review 时，`classifyFault` 只读判定，结论为 rebuild 就以与 `capture_recover` 相同的 prepare + recover（独占资源、同样的签名回执与 runtime epoch）重建，并把 `runtimeRecovery`（新回执、当前位置、需要新 baseline）附在该次失败结果上，turn 继续；结论为 quarantined 或恢复失败时，结果带具体阻塞码，turn 在这次调用后结束，诊断为 `CONVERSATION_RDC_RECOVERY_BLOCKED`，复制详情含阻塞码。其它权限模式只附结论：rebuild/keep 时提示可用 `capture_recover`（照常经审批），quarantined 时报告阻塞码，turn 不中止。每一步恢复（判定、成功、失败）在生命周期账本写一条 `recovery_step`（结论、第几次尝试、阻塞码）。
+
 Agent 恢复的次数是持久预算：`RdcLifecycleReceipts.recoveryAttempts` 从会话里已签名的回执统计同一 {输入、内容 hash、设备} 的恢复 intent（每次尝试一条，失败的另有 failed 回执指向它），跨 turn 与重启有效；达到 `RDC_RECOVERY_ATTEMPT_LIMIT`（2）后 `classifyRecovery` 先于身份链判 `RDC_RECOVERY_BUDGET_EXHAUSTED`。没有内存里的"已恢复过"集合。用户在 Capture 面板发起的恢复每次都是人的明确操作，不计入、也不受此预算限制。
 
 获批调查的 `turn_complete` 在记录声明前检查入口位置是否恢复；现场无法核验时，把主进程观察到的错误返回工具调用，让模型据此如实声明 partial／blocked 及剩余恢复，而不是先接受声明再要求它猜测错误。终答仍重新核验恢复状态；已声明的 partial 不升级为成功，恢复回执仍以实际现场为准。
