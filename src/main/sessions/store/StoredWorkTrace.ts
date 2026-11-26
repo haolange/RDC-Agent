@@ -1,9 +1,10 @@
 import type {
   ConversationLoopItem,
+  ConversationToolCall,
   ConversationWorkBlock,
   ConversationWorkTrace,
 } from '@shared/types/conversation';
-import type { ProviderOutputRef } from '@shared/types/reasoning';
+import type { ProviderOutputRef, ThinkingArtifactKind } from '@shared/types/reasoning';
 
 /**
  * The storage boundary for work traces: what a stored trace must look like to be read back. Anything else
@@ -78,9 +79,11 @@ function hasProviderChannelCollision(block: ConversationWorkBlock): boolean {
 
 const LEGACY_BLOCK_FIELDS = ['thinking', 'thinkingStatus', 'thinkingDisplayOrder', 'outputItems'] as const;
 
+const THINKING_ARTIFACT_KINDS: readonly unknown[] = ['summary', 'raw', 'opaque', 'unknown'] satisfies ThinkingArtifactKind[];
+
 function isStoredLoopItem(item: unknown): item is ConversationLoopItem {
   if (!item || typeof item !== 'object') return false;
-  const candidate = item as Partial<ConversationLoopItem>;
+  const candidate = item as Record<string, unknown>;
   if (!isProviderOutputRef(candidate.providerOutputRef)) return false;
   if (!(candidate.status === 'streaming' || candidate.status === 'complete')) return false;
   if (!Number.isSafeInteger(candidate.displayOrder) || Number(candidate.displayOrder) < 1) return false;
@@ -88,7 +91,9 @@ function isStoredLoopItem(item: unknown): item is ConversationLoopItem {
     return typeof candidate.text === 'string'
       && (candidate.phase === undefined || candidate.phase === 'commentary' || candidate.phase === 'final_answer');
   }
-  return candidate.kind === 'thinking' && Boolean(candidate.thinking) && typeof candidate.thinking === 'object';
+  const thinking = candidate.thinking;
+  return candidate.kind === 'thinking' && Boolean(thinking) && typeof thinking === 'object'
+    && THINKING_ARTIFACT_KINDS.includes((thinking as Record<string, unknown>).kind);
 }
 
 /**
@@ -110,7 +115,8 @@ export function sanitizeStoredWorkTrace(
   if (!['idle', 'running', 'complete', 'error', 'stopped'].includes(trace.status)) return null;
   if (!Array.isArray(trace.blocks)) return null;
 
-  for (const block of trace.blocks) {
+  // The trace comes back from storage typed but unchecked, so any entry may be null or another value.
+  for (const block of trace.blocks as (ConversationWorkBlock | null)[]) {
     if (!block || typeof block !== 'object') return null;
     if (!normalizeWorkBlockKind(block.kind)) return null;
     if (typeof block.id !== 'string' || !block.id.trim()) return null;
@@ -122,13 +128,13 @@ export function sanitizeStoredWorkTrace(
     if (LEGACY_BLOCK_FIELDS.some((field) => field in block)) return null;
     if (block.result && 'text' in block.result) return null;
     if (block.items !== undefined && (!Array.isArray(block.items) || !block.items.every(isStoredLoopItem))) return null;
-    for (const call of block.toolCalls) {
+    for (const call of block.toolCalls as (ConversationToolCall | null)[]) {
       if (!call || typeof call !== 'object') return null;
       if (call.executionStartedAt !== undefined && (!Number.isFinite(call.executionStartedAt) || call.executionStartedAt < 0)) return null;
       if (call.displayOrder !== undefined && (!Number.isSafeInteger(call.displayOrder) || call.displayOrder < 1)) return null;
       if (call.hookDiagnostics !== undefined && (
         !Array.isArray(call.hookDiagnostics)
-        || !call.hookDiagnostics.every((diagnostic) => diagnostic
+        || !(call.hookDiagnostics as (NonNullable<ConversationToolCall['hookDiagnostics']>[number] | null)[]).every((diagnostic) => diagnostic
           && typeof diagnostic.id === 'string'
           && typeof diagnostic.code === 'string'
           && ['info', 'warning', 'error'].includes(diagnostic.severity)

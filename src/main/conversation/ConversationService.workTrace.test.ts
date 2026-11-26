@@ -146,6 +146,11 @@ describe('ConversationService work trace tool approvals', () => {
         result: { ...trace.blocks[0].result, providerOutputRefs: [thinkingRef] },
       }],
     })).toBeNull();
+    const [thinkingItem, textItem] = trace.blocks[0].items;
+    expect(sanitizeStoredWorkTrace({
+      ...trace,
+      blocks: [{ ...trace.blocks[0], items: [{ ...thinkingItem, thinking: { ...thinkingItem.thinking, kind: 'condensed' } }, textItem] }],
+    } as unknown as Parameters<typeof sanitizeStoredWorkTrace>[0])).toBeNull();
   });
 
   it('reads a process record in the older single-thinking shape as discarded, not as a trace', () => {

@@ -46,7 +46,6 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
-    if (!electronAPI) return;
     if (!sessionId) {
       useConversationStore.getState().setConversationSnapshot([], null);
       useConversationStore.getState().setTimeline([]);
@@ -64,7 +63,7 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
       useConversationStore.getState().setReasoningSummaries(workflow?.reasoningSummaries ?? []);
     }).catch(() => undefined);
     const evidence = electronAPI.evidence.getChain()
-      .then((result) => (result.events ?? []) as ActionEvent[])
+      .then((result) => result.events as ActionEvent[])
       .catch(() => [] as ActionEvent[]);
 
     const conversation = useConversationStore.getState();
@@ -87,7 +86,7 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
         useConversationStore.getState().setHistoryLoadingSessionId(null);
         hydrateLoadedSessionSurface({
           sessionId,
-          messages: applyEvidence(events, () => historyResult.messages ?? []),
+          messages: applyEvidence(events, () => historyResult.messages),
           branchState: historyResult.branchState ?? null,
           planReview: historyResult.planReview ?? null,
           tracePresentation: traceResult.presentation ?? null,
@@ -106,7 +105,7 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
-    if (!electronAPI || !sessionId) {
+    if (!sessionId) {
       clearUsageSnapshot();
       return undefined;
     }

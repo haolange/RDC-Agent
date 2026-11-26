@@ -22,12 +22,7 @@ const normalizeThinkingDedupKey = (value: string): string => (
 const resolveReasoningState = (block: ConversationWorkBlock): ConversationReasoningState => {
   if (block.reasoningState) return block.reasoningState;
   const thinking = lastLoopThinking(block);
-  if (!thinking) return 'none';
-  if (thinking.kind === 'raw') return 'raw';
-  if (thinking.kind === 'summary') return 'summary';
-  if (thinking.kind === 'unknown') return 'unknown';
-  if (thinking.kind === 'opaque') return 'opaque';
-  return 'none';
+  return thinking ? thinking.kind : 'none';
 };
 
 const isNonFinalStopReason = (stopReason?: ConversationLoopStopReason): boolean => (

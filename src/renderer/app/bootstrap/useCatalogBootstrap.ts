@@ -11,7 +11,7 @@ export function useCatalogBootstrap(): void {
   // Model choices follow the effective catalog in the renderer; a catalog change needs no settings read.
   useEffect(() => startCatalogProjection(), []);
 
-  useEffect(() => window.electronAPI?.events.onSettingsChanged(
+  useEffect(() => window.electronAPI.events.onSettingsChanged(
     (change) => useAppSettingsStore.getState().adoptSettingsChange(change),
   ), []);
 
@@ -22,7 +22,7 @@ export function useCatalogBootstrap(): void {
     }
   }, [currentSessionId]);
 
-  useEffect(() => window.electronAPI?.events.onPlanReviewChanged(projection => usePlanReviewStore.getState().accept(projection)), []);
+  useEffect(() => window.electronAPI.events.onPlanReviewChanged(projection => usePlanReviewStore.getState().accept(projection)), []);
 
   useEffect(() => {
     if (useAppSettingsStore.getState().hydrated) {

@@ -25,10 +25,6 @@ export function useShellBootstrap(options: {
     const initApp = async () => {
       try {
         const electronAPI = window.electronAPI;
-        if (!electronAPI) {
-          setConnectionStatus('offline');
-          return;
-        }
         // The one startup read of the settings view; the catalog's static provider facts come once with it.
         const [view, providerCatalog, appMeta, isMaximized] = await Promise.all([
           electronAPI.settings.get(),

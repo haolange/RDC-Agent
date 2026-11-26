@@ -25,14 +25,14 @@ import type { ContextSnapshot } from '@shared/types/session';
 
 export function useSyncCapturesFromSnapshot() {
   return useCallback((snapshot: ContextSnapshot) => {
-    if (!snapshot.captureDescriptors?.length) {
+    if (!snapshot.captureDescriptors.length) {
       useCaptureStore.getState().setCaptures([]);
       return;
     }
 
     const captureStore = useCaptureStore.getState();
     if (useSessionStore.getState().currentRun) {
-      captureStore.setCaptures(snapshot.captureDescriptors ?? []);
+      captureStore.setCaptures(snapshot.captureDescriptors);
       return;
     }
 
@@ -59,7 +59,6 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
-    if (!electronAPI) return;
 
 
     const unsubscribePermissionState = subscribePermissionState(electronAPI);
