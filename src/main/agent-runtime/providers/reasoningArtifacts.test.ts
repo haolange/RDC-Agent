@@ -54,7 +54,7 @@ function createPlan(input: PlanInput): RequestPlan {
   const contracts: ProviderContractBundle = {
     ...fallback,
     protocolDialect: input.protocol,
-    protocolVersion: 'test-v1',
+    protocolVersion: 'test-protocol',
     compatibilityGroup: input.reasoning.compatibilityGroup,
     reasoning: {
       ...input.reasoning,
@@ -120,7 +120,7 @@ const responsesPlan = createPlan({
     carrier: 'reasoning-item',
     artifactFormat: 'openai-responses-reasoning',
     artifactVersion: 'v1',
-    compatibilityGroup: 'openai-responses-v1',
+    compatibilityGroup: 'openai-responses-family',
     continuation: 'exact-execution',
   },
   toolLoop: { artifactPolicy: 'preserve-exact', artifactScope: 'all-assistant-turns', ordering: 'provider-native' },
@@ -137,7 +137,7 @@ const anthropicPlan = createPlan({
     carrier: 'signed-content-block',
     artifactFormat: 'anthropic-thinking-block',
     artifactVersion: 'v1',
-    compatibilityGroup: 'anthropic-messages-v1',
+    compatibilityGroup: 'anthropic-messages-family',
     continuation: 'exact-execution',
   },
   toolLoop: { artifactPolicy: 'preserve-exact', artifactScope: 'tool-call-turn', ordering: 'strict-block-order' },
@@ -154,7 +154,7 @@ const geminiPlan = createPlan({
     carrier: 'thought-signature',
     artifactFormat: 'gemini-thought-signature',
     artifactVersion: 'v1',
-    compatibilityGroup: 'gemini-generate-content-v1',
+    compatibilityGroup: 'gemini-generate-content-family',
     continuation: 'exact-execution',
   },
   toolLoop: {
@@ -175,7 +175,7 @@ const reasoningContentPlan = createPlan({
     carrier: 'reasoning-content',
     artifactFormat: 'reasoning-content',
     artifactVersion: 'v1',
-    compatibilityGroup: 'deepseek-reasoning-v1',
+    compatibilityGroup: 'deepseek-reasoning-family',
     continuation: 'same-provider-model',
   },
   toolLoop: {

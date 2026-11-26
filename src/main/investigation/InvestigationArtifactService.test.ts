@@ -241,13 +241,13 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
   });
   it('supersedes the previous manifest on version update', () => {
     const { service } = createInvestigationHarness();
-    const first = writeDraft(service, 'world_state', baselineWorld('ws-v1'));
+    const first = writeDraft(service, 'world_state', baselineWorld('ws-initial'));
     const second = service.writeRecord(SESSION_ID, {
       kind: 'world_state',
       mission: 'debugger',
       title: 'v2',
       summary: 'replaced',
-      record: baselineWorld('ws-v1'),
+      record: baselineWorld('ws-initial'),
       supersedes: first.manifest.artifactId,
       status: 'draft',
     });
@@ -1504,7 +1504,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       service,
       'claim_set',
       {
-        items: [hypothesisClaim('ws-agg-a', 'claim-set-v2')],
+        items: [hypothesisClaim('ws-agg-a', 'claim-set-next')],
       },
       { supersedes: set.manifest.artifactId },
     );
@@ -1512,15 +1512,15 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       service,
       'evidence_pack',
       {
-        items: [evidenceOf('ws-agg-c', note, 'ev-pack-v2')],
+        items: [evidenceOf('ws-agg-c', note, 'ev-pack-next')],
       },
       { supersedes: packed.manifest.artifactId },
     );
     const after = service.createLookup(SESSION_ID);
     expect(after.getClaim('claim-set-only')).toBeNull();
-    expect(after.getClaim('claim-set-v2')).toMatchObject({ claimId: 'claim-set-v2' });
+    expect(after.getClaim('claim-set-next')).toMatchObject({ claimId: 'claim-set-next' });
     expect(after.getEvidence('ev-pack-only')).toBeNull();
-    expect(after.getEvidence('ev-pack-v2')).toMatchObject({ evidenceId: 'ev-pack-v2' });
+    expect(after.getEvidence('ev-pack-next')).toMatchObject({ evidenceId: 'ev-pack-next' });
     expect(() =>
       writeDraft(service, 'claim', {
         ...hypothesisClaim('ws-agg-a', 'claim-uses-old-set'),
@@ -1533,7 +1533,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
         'experiment',
         recordedExperiment({
           experimentId: 'exp-old-pack',
-          hypothesisClaimId: 'claim-set-v2',
+          hypothesisClaimId: 'claim-set-next',
           baselineWorldStateId: 'ws-agg-a',
           variantWorldStateId: 'ws-agg-b',
           restoredWorldStateId: 'ws-agg-c',
@@ -1821,7 +1821,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeDraft(
       service,
       'claim_set',
-      { items: [hypothesisClaim('ws-a', 'claim-set-v2')] },
+      { items: [hypothesisClaim('ws-a', 'claim-set-next')] },
       {
         supersedes: set.manifest.artifactId,
       },
@@ -1829,7 +1829,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeDraft(
       service,
       'evidence_pack',
-      { items: [evidenceOf('ws-c', note, 'ev-pack-v2')] },
+      { items: [evidenceOf('ws-c', note, 'ev-pack-next')] },
       {
         supersedes: pack.manifest.artifactId,
       },
@@ -1837,8 +1837,8 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const after = service.createLookup(SESSION_ID);
     expect(after.getClaim('claim-set-only')).toBeNull();
     expect(after.getEvidence('ev-pack-only')).toBeNull();
-    expect(after.getClaim('claim-set-v2')).toMatchObject({ claimId: 'claim-set-v2' });
-    expect(after.getEvidence('ev-pack-v2')).toMatchObject({ evidenceId: 'ev-pack-v2' });
+    expect(after.getClaim('claim-set-next')).toMatchObject({ claimId: 'claim-set-next' });
+    expect(after.getEvidence('ev-pack-next')).toMatchObject({ evidenceId: 'ev-pack-next' });
     expect(() =>
       writeDraft(service, 'claim', {
         ...observedClaim('ws-a', 'claim-stale-set-ref'),
@@ -2171,7 +2171,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     expect(claimCase.service.readRecord(SESSION_ID, supporter.manifest.artifactId).record).toMatchObject({
       claimId: 'claim-supports-ctx',
     });
-    writeDraft(claimCase.service, 'claim', observedClaim('ws-claim-ctx', 'claim-target-v2'), {
+    writeDraft(claimCase.service, 'claim', observedClaim('ws-claim-ctx', 'claim-target-next'), {
       supersedes: target.manifest.artifactId,
     });
     expect(claimCase.service.readRecord(SESSION_ID, supporter.manifest.artifactId).manifest.status).toBe('stale');
@@ -2181,8 +2181,8 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
         .find((entry) => entry.artifactId === supporter.manifest.artifactId)?.status,
     ).toBe('stale');
     expect(() => claimCase.service.createLookup(SESSION_ID).getClaim('claim-supports-ctx')).toThrow(drifted);
-    expect(claimCase.service.createLookup(SESSION_ID).getClaim('claim-target-v2')).toMatchObject({
-      claimId: 'claim-target-v2',
+    expect(claimCase.service.createLookup(SESSION_ID).getClaim('claim-target-next')).toMatchObject({
+      claimId: 'claim-target-next',
     });
 
     const experimentCase = createInvestigationHarness();
@@ -2207,7 +2207,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     expect(experimentCase.service.readRecord(SESSION_ID, experiment.manifest.artifactId).record).toMatchObject({
       experimentId: 'exp-ctx',
     });
-    writeDraft(experimentCase.service, 'evidence', evidenceOf('ws-c', verifyNote, 'ev-verify-v2'), {
+    writeDraft(experimentCase.service, 'evidence', evidenceOf('ws-c', verifyNote, 'ev-verify-next'), {
       supersedes: verify.manifest.artifactId,
     });
     expect(experimentCase.service.readRecord(SESSION_ID, experiment.manifest.artifactId).manifest.status).toBe('stale');
@@ -2217,8 +2217,8 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
         .find((entry) => entry.artifactId === experiment.manifest.artifactId)?.status,
     ).toBe('stale');
     expect(experimentCase.service.createLookup(SESSION_ID).getExperiment('exp-ctx')).toBeNull();
-    expect(experimentCase.service.createLookup(SESSION_ID).getEvidence('ev-verify-v2')).toMatchObject({
-      evidenceId: 'ev-verify-v2',
+    expect(experimentCase.service.createLookup(SESSION_ID).getEvidence('ev-verify-next')).toMatchObject({
+      evidenceId: 'ev-verify-next',
     });
   });
 

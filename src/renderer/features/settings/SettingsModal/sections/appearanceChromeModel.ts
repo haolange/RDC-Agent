@@ -1,4 +1,4 @@
-import { parseRdcThemeV1, type RdcThemeV1Rejection } from '@shared/theme/rdcThemeV1';
+import { parseRdcTheme, type RdcThemeRejection } from '@shared/theme/rdcTheme';
 import type { ThemeChromeConfig, ThemeVariant } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 
@@ -6,7 +6,7 @@ export type AppearanceTranslate = ReturnType<typeof useI18n>['t'];
 
 export type ThemeImportPreview =
   | { state: 'empty' }
-  | { state: 'invalid'; reason: RdcThemeV1Rejection; error: string }
+  | { state: 'invalid'; reason: RdcThemeRejection; error: string }
   | { state: 'valid'; chrome: ThemeChromeConfig };
 
 /**
@@ -15,7 +15,7 @@ export type ThemeImportPreview =
  */
 export function previewThemeImport(text: string, variant: ThemeVariant): ThemeImportPreview {
   if (!text.trim()) return { state: 'empty' };
-  const result = parseRdcThemeV1(text, variant);
+  const result = parseRdcTheme(text, variant);
   return result.ok
     ? { state: 'valid', chrome: result.chrome }
     : { state: 'invalid', reason: result.reason, error: result.error };
@@ -27,8 +27,8 @@ const THEME_IMPORT_ERROR_COPY = {
   payload: 'settings.appearanceImportPayloadError',
   variant: 'settings.appearanceImportVariantError',
   target: 'settings.appearanceImportTargetError',
-} as const satisfies Record<RdcThemeV1Rejection, string>;
+} as const satisfies Record<RdcThemeRejection, string>;
 
-export function themeImportErrorMessage(reason: RdcThemeV1Rejection, t: AppearanceTranslate): string {
+export function themeImportErrorMessage(reason: RdcThemeRejection, t: AppearanceTranslate): string {
   return t(THEME_IMPORT_ERROR_COPY[reason]);
 }

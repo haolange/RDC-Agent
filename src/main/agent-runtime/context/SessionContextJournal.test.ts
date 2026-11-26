@@ -39,7 +39,7 @@ function createPlan(options: PlanOptions): RequestPlan {
   const contracts: ProviderContractBundle = {
     ...fallback,
     protocolDialect: options.protocol,
-    protocolVersion: 'test-v1',
+    protocolVersion: 'test-protocol',
     compatibilityGroup: options.compatibilityGroup,
     reasoning: {
       semantic: options.carrier === 'reasoning-content' ? 'raw' : 'opaque',
@@ -61,8 +61,8 @@ function createPlan(options: PlanOptions): RequestPlan {
   return createTestRequestPlan({
     providerId: options.providerId,
     adapterId: options.adapterId,
-    catalogRevision: 'catalog-v1',
-    routeRevision: 'route-v1',
+    catalogRevision: 'catalog-a',
+    routeRevision: 'route-a',
     selectedModelId: options.modelId,
     effectiveModelId: options.modelId,
     appliedBindingIds: [],
@@ -102,7 +102,7 @@ const responsesPlan = createPlan({
   continuation: 'exact-execution',
   artifactPolicy: 'preserve-exact',
   artifactScope: 'all-assistant-turns',
-  compatibilityGroup: 'openai-responses-v1',
+  compatibilityGroup: 'openai-responses-family',
 });
 
 function providerManagedResponsesPlan(): RequestPlan {
@@ -151,7 +151,7 @@ const anthropicPlan = createPlan({
   continuation: 'exact-execution',
   artifactPolicy: 'preserve-exact',
   artifactScope: 'tool-call-turn',
-  compatibilityGroup: 'anthropic-messages-v1',
+  compatibilityGroup: 'anthropic-messages-family',
 });
 
 const reasoningContentPlan = createPlan({
@@ -163,7 +163,7 @@ const reasoningContentPlan = createPlan({
   continuation: 'same-provider-model',
   artifactPolicy: 'preserve-reasoning-content',
   artifactScope: 'all-assistant-turns',
-  compatibilityGroup: 'deepseek-reasoning-v1',
+  compatibilityGroup: 'deepseek-reasoning-family',
 });
 
 const usage = { inputTokens: 1, outputTokens: 1, totalTokens: 2 };
@@ -229,7 +229,7 @@ describe('SessionContextJournal v2', () => {
         continuation: 'exact-execution' as const,
         artifactPolicy: 'preserve-exact' as const,
         artifactScope: 'all-assistant-turns' as const,
-        compatibilityGroup: 'openai-responses-v1',
+        compatibilityGroup: 'openai-responses-family',
       },
       modelId: 'gpt-5-mini',
     });

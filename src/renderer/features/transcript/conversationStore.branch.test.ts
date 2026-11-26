@@ -33,12 +33,12 @@ describe('conversationStore branch projection', () => {
     const branchState: ConversationBranchState = {
       sessionId: 'sess-1',
       rootBranchId: ROOT_BRANCH_ID,
-      activeLeafBranchId: 'branch-v2',
+      activeLeafBranchId: 'branch-retry',
       forks: [
         {
           forkId: 'msg-user-1',
           anchorMessageId: 'msg-user-1',
-          activeBranchId: 'branch-v2',
+          activeBranchId: 'branch-retry',
           branches: [
             {
               branchId: ROOT_BRANCH_ID,
@@ -48,7 +48,7 @@ describe('conversationStore branch projection', () => {
               rootTurnId: 'turn-1',
             },
             {
-              branchId: 'branch-v2',
+              branchId: 'branch-retry',
               parentBranchId: ROOT_BRANCH_ID,
               variantIndex: 1,
               anchorUserMessageId: 'msg-user-1b',
@@ -78,13 +78,13 @@ describe('conversationStore branch projection', () => {
     useConversationStore.getState().setBranchState(branchState);
     useConversationStore.getState().upsertConversationMessages([
       msg('msg-user-1b', 'turn-2', 'user', 'v2', {
-        branchId: 'branch-v2',
+        branchId: 'branch-retry',
         forkId: 'msg-user-1',
         variantIndex: 1,
         createdAt: now + 30,
       }),
       msg('msg-assistant-1b', 'turn-2', 'assistant', 'a2', {
-        branchId: 'branch-v2',
+        branchId: 'branch-retry',
         createdAt: now + 40,
       }),
     ]);
@@ -105,12 +105,12 @@ describe('conversationStore branch projection', () => {
     const branchState: ConversationBranchState = {
       sessionId: 'sess-1',
       rootBranchId: ROOT_BRANCH_ID,
-      activeLeafBranchId: 'branch-v2',
+      activeLeafBranchId: 'branch-retry',
       forks: [
         {
           forkId: 'fork-a',
           anchorMessageId: 'u1',
-          activeBranchId: 'branch-v2',
+          activeBranchId: 'branch-retry',
           branches: [
             {
               branchId: ROOT_BRANCH_ID,
@@ -120,7 +120,7 @@ describe('conversationStore branch projection', () => {
               rootTurnId: 't1',
             },
             {
-              branchId: 'branch-v2',
+              branchId: 'branch-retry',
               parentBranchId: ROOT_BRANCH_ID,
               variantIndex: 1,
               anchorUserMessageId: 'u1b',
@@ -135,7 +135,7 @@ describe('conversationStore branch projection', () => {
       .setConversationSnapshot(
         [
           msg('u1', 't1', 'user', 'old', { branchId: ROOT_BRANCH_ID, forkId: 'fork-a', createdAt: now }),
-          msg('u1b', 't2', 'user', 'new', { branchId: 'branch-v2', forkId: 'fork-a', createdAt: now + 1 }),
+          msg('u1b', 't2', 'user', 'new', { branchId: 'branch-retry', forkId: 'fork-a', createdAt: now + 1 }),
         ],
         branchState,
       );

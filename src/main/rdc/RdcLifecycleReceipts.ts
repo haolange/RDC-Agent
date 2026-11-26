@@ -117,7 +117,7 @@ export function sameRdcLifecyclePosition(left: RdcLifecyclePoint | null, right: 
         JSON.stringify(left.target) === JSON.stringify(right.target);
 }
 
-const KEY_REF = 'rdc-lifecycle-receipt-signing-v1';
+const KEY_REF = 'rdc-lifecycle-receipt-signing';
 function signingKey(): string {
   let key = secretStorageService.getSecret(KEY_REF);
   if (!key) {

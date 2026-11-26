@@ -31,13 +31,13 @@ const ProjectRecordSchema = z
   })
   .passthrough();
 
-export const ProjectRegistryV1Schema = z.object({
+export const ProjectRegistrySchema = z.object({
   schemaVersion: z.literal('1'),
   projects: z.array(ProjectRecordSchema),
 });
 
-export const PROJECT_REGISTRY_MIGRATIONS: StorageMigration<z.infer<typeof ProjectRegistryV1Schema>>[] = [
-  { schemaVersion: '1', schema: ProjectRegistryV1Schema },
+export const PROJECT_REGISTRY_MIGRATIONS: StorageMigration<z.infer<typeof ProjectRegistrySchema>>[] = [
+  { schemaVersion: '1', schema: ProjectRegistrySchema },
 ];
 
 export const SelectionStateSchema = z.object({

@@ -5,11 +5,11 @@ describe('discovery admission', () => {
   it.each([
     ['text model', { id: 'gpt-5.6', modality: 'text' }, true, undefined],
     ['embedding', { id: 'text-embedding-4' }, false, 'deny-pattern'],
-    ['image modality', { id: 'renderer-v2', modality: 'image' }, false, 'modality'],
-    ['nested embedding type', { id: 'vector-v2', capabilities: { type: 'embeddings' } }, false, 'modality'],
-    ['audio output', { id: 'voice-v2', output_modalities: ['audio'] }, false, 'modality'],
+    ['image modality', { id: 'renderer-pro', modality: 'image' }, false, 'modality'],
+    ['nested embedding type', { id: 'vector-large', capabilities: { type: 'embeddings' } }, false, 'modality'],
+    ['audio output', { id: 'voice-pro', output_modalities: ['audio'] }, false, 'modality'],
     ['video generation', { id: 'grok-imagine-video-1.5', output_modalities: ['video'] }, false, 'deny-pattern'],
-    ['video modality without name match', { id: 'vendor-media-v2', modality: 'video' }, false, 'modality'],
+    ['video modality without name match', { id: 'vendor-media-pro', modality: 'video' }, false, 'modality'],
     ['multimodal chat with video in id', { id: 'llava-video-7b', modality: 'text' }, true, undefined],
     [
       'vision chat',

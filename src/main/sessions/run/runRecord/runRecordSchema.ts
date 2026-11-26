@@ -1,5 +1,4 @@
 import { z, type ZodType } from 'zod';
-import { AppError } from '@shared/errors/appError';
 import type { MissionKind, RunRecord } from '@shared/types/session';
 import type { PersistedRunRecord } from '../../store/storageTypes';
 
@@ -64,37 +63,6 @@ const RunRecordBaseFields = {
   runtime: RuntimeSchema,
 };
 
-const RUN_V3_STAGE_ERA_KEYS = [
-  'lastStage',
-  'last_stage',
-  'workflow_stage',
-  'recommendedSpecialists',
-  'availableStages',
-  'currentStage',
-  'mode',
-] as const;
-
-function collectRunV3StageFields(record: Record<string, unknown>): string[] {
-  const leftovers: string[] = [];
-  for (const key of RUN_V3_STAGE_ERA_KEYS) {
-    if (key in record) leftovers.push(key);
-  }
-  const runtime = record.runtime;
-  if (runtime && typeof runtime === 'object' && !Array.isArray(runtime)) {
-    const runtimeRecord = runtime as Record<string, unknown>;
-    for (const key of RUN_V3_STAGE_ERA_KEYS) {
-      if (key in runtimeRecord) leftovers.push(`runtime.${key}`);
-    }
-  }
-  return leftovers;
-}
-
-export function assertNoRunV3StageFields(record: Record<string, unknown>, source: string): void {
-  const leftovers = collectRunV3StageFields(record);
-  if (leftovers.length === 0) return;
-  throw new AppError('STORAGE_SCHEMA', `RUN_V3_STAGE_FIELD: ${source} must not carry ${leftovers.join(', ')}`);
-}
-
 export const ConversationPersistedRunSchema = z
   .object({
     ...RunRecordBaseFields,
@@ -111,7 +79,7 @@ export const MissionPersistedRunSchema = z
   })
   .strict();
 
-export const PersistedRunRecordV3Schema: ZodType<PersistedRunRecord> = z.discriminatedUnion('kind', [
+export const PersistedRunRecordSchema: ZodType<PersistedRunRecord> = z.discriminatedUnion('kind', [
   ConversationPersistedRunSchema,
   MissionPersistedRunSchema,
 ]) as unknown as ZodType<PersistedRunRecord>;
@@ -132,7 +100,7 @@ export function classifyRunKind(
   return { kind: 'conversation' };
 }
 
-export function toPersistedRunV3(
+export function toPersistedRun(
   base: Omit<PersistedRunRecord, 'schemaVersion' | 'kind' | 'mission' | 'profileId' | 'diagnostics'> & {
     profileId: string;
     diagnostics?: string[];
@@ -146,7 +114,6 @@ export function toPersistedRunV3(
     investigationMission: base.investigationMission,
   });
   const runtime = { ...base.runtime };
-  assertNoRunV3StageFields({ ...(base as Record<string, unknown>), runtime }, 'toPersistedRunV3');
   const shared = {
     schemaVersion: '3' as const,
     runId: base.runId,

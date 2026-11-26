@@ -15,10 +15,10 @@ const {
   createDefaultUiPreferences,
   sanitizeUiPreferences,
   compileThemeChrome,
-  serializeRdcThemeV1,
-  parseRdcThemeV1,
+  serializeRdcTheme,
+  parseRdcTheme,
   deriveComposeAccentVars,
-  RDC_THEME_V1_PREFIX,
+  RDC_THEME_PREFIX,
 } = require('../src/shared/theme/index.ts');
 
 function assert(condition, message) {
@@ -83,13 +83,13 @@ assert(
   'dark/light surface-overlay must differ with chrome surface',
 );
 
-const encoded = serializeRdcThemeV1(chrome, 'dark');
-assert(encoded.startsWith(RDC_THEME_V1_PREFIX), 'export uses rdc-theme-v1 prefix');
-const parsed = parseRdcThemeV1(encoded, 'dark');
+const encoded = serializeRdcTheme(chrome, 'dark');
+assert(encoded.startsWith(RDC_THEME_PREFIX), 'export uses rdc-theme prefix');
+const parsed = parseRdcTheme(encoded, 'dark');
 assert(parsed.ok, `import round-trip failed: ${parsed.error ?? ''}`);
 assert(parsed.chrome.accent === chrome.accent, 'import preserves accent');
 
-const rejected = parseRdcThemeV1('codex-theme-v1:{"variant":"dark"}');
+const rejected = parseRdcTheme('codex-theme-v1:{"variant":"dark"}');
 assert(!rejected.ok, 'codex-theme-v1 must be rejected');
 
 const composeDark = deriveComposeAccentVars('#33d1ff', 'dark');

@@ -248,7 +248,7 @@ export function sampleCheckpoint(input: {
   return {
     checkpointId: input.checkpointId ?? 'cp-1',
     goal: 'Locate the first bad event and a qualifying counterfactual.',
-    planVersion: 'plan-v2',
+    planVersion: 'plan-revised',
     established: input.established ?? [],
     rejected: input.rejected ?? [],
     completedExperiments: input.completedExperiments ?? [],

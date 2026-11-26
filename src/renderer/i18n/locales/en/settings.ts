@@ -128,14 +128,14 @@ export const enSettings = {
   'settings.appearanceCopyFailed': 'Copy failed',
   'settings.appearanceApplyImport': 'Apply',
   'settings.appearanceImportTitle': 'Import theme',
-  'settings.appearanceImportHint': 'Paste an rdc-theme-v1 string. Apply stays disabled until it parses.',
+  'settings.appearanceImportHint': 'Paste an rdc-theme string. Apply stays disabled until it parses.',
   'settings.appearanceImportField': 'Theme content',
-  'settings.appearanceImportPlaceholder': 'Paste rdc-theme-v1 theme content',
+  'settings.appearanceImportPlaceholder': 'Paste rdc-theme theme content',
   'settings.appearanceImportEmpty': 'Waiting for theme content',
   'settings.appearanceImportValid': 'Valid. Ready to apply to this theme.',
   'settings.appearanceImportPalette':
     'Theme preview. Accent {accent}, background {surface}, text {ink}, contrast {contrast}.',
-  'settings.appearanceImportPrefixError': 'Paste the complete theme content starting with rdc-theme-v1:.',
+  'settings.appearanceImportPrefixError': 'Paste the complete theme content starting with rdc-theme:.',
   'settings.appearanceImportJsonError': 'The theme JSON is invalid. Check its brackets and quotation marks.',
   'settings.appearanceImportVariantError': 'The theme must declare a light or dark variant.',
   'settings.appearanceImportTargetError':

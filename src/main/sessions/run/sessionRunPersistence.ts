@@ -3,7 +3,7 @@ import * as path from 'path';
 import { AppError } from '@shared/errors/appError';
 import { stringifyYaml } from '../../runtime/yaml';
 import { readCurrentStoredJson, StorageSchemaError } from '../../runtime/storedDocument';
-import { PersistedRunRecordV3Schema } from './runV3/runRecordSchema';
+import { PersistedRunRecordSchema } from './runRecord/runRecordSchema';
 import type { RunSummary } from '@shared/types/session';
 import type { PersistedRunRecord } from '../store/storageTypes';
 import type { StorageIo } from '../../runtime/StorageIo';
@@ -14,11 +14,11 @@ export function toRunSummary(run: PersistedRunRecord): RunSummary {
 }
 
 export function writeRunFiles(io: StorageIo, runPath: string, run: PersistedRunRecord): void {
-  const parsed = PersistedRunRecordV3Schema.safeParse(run);
+  const parsed = PersistedRunRecordSchema.safeParse(run);
   if (!parsed.success) {
     throw new AppError(
       'STORAGE_SCHEMA',
-      `refused to write invalid Run v3: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`,
+      `refused to write an invalid run: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`,
     );
   }
   io.ensureDir(runPath);
@@ -35,11 +35,11 @@ export function readPersistedRun(
   const filePath = path.join(runPath, 'run.json');
   if (!fs.existsSync(filePath)) {
     if (fs.existsSync(path.join(runPath, 'run.yaml'))) {
-      throw new StorageSchemaError('STORAGE_SCHEMA_UNSUPPORTED', `${runPath} has run.yaml without a Run v3 run.json`);
+      throw new StorageSchemaError('STORAGE_SCHEMA_UNSUPPORTED', `${runPath} has run.yaml without run.json`);
     }
     return null;
   }
-  const parsed = readCurrentStoredJson(io, filePath, '3', PersistedRunRecordV3Schema);
+  const parsed = readCurrentStoredJson(io, filePath, '3', PersistedRunRecordSchema);
   if (parsed === null) return null;
   if (parsed.runId !== runId || parsed.sessionId !== sessionId || parsed.caseId !== sessionId) {
     throw new StorageSchemaError('STORAGE_SCHEMA', `${filePath} Run identity does not match its session or directory`);

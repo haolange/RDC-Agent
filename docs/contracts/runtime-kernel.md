@@ -304,7 +304,7 @@ Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（当前 57 ids，含 `shell` 
 
 `investigation_list` 的 `kind` / `status` 可选；传 `any` 或省略即包含全部对应值，其他允许值作精确过滤。工具目录列出允许值，未知值须明确拒绝，不能把错误输入解释成“本会话无调查产物”。
 
-Run 的 `schemaVersion` 为 `'3'`（`src/main/sessions/run/runV3/`）：discriminated union `kind: conversation|mission` + `profileId`，新写无 `mode` / `lastStage` / `runtime.workflow_stage`。
+Run 的 `schemaVersion` 为 `'3'`（`src/main/sessions/run/runRecord/`）：discriminated union `kind: conversation|mission` + `profileId`，新写无 `mode` / `lastStage` / `runtime.workflow_stage`。
 
 - 产品只读 `run.json` v3；仅有 `run.yaml`、缺版本、旧版本或未知版本时明确报 `STORAGE_SCHEMA_UNSUPPORTED`，保留源文件，不在读取时迁移。
 - `kind: mission` 来自冻结的 `completion-contract: investigation-report`，`mission` 来自预载 Skill 的 `investigation-mission`，不必等于 `profileId`。

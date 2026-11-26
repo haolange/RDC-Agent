@@ -2,9 +2,9 @@ import { sanitizeThemeChrome } from './sanitize';
 import { isThemePresetId } from './presets';
 import type { ThemeChromeConfig, ThemeVariant } from '../types/settings';
 
-export const RDC_THEME_V1_PREFIX = 'rdc-theme-v1:';
+export const RDC_THEME_PREFIX = 'rdc-theme:';
 
-export interface RdcThemeV1Payload {
+export interface RdcThemePayload {
   presetId: string;
   variant: ThemeVariant;
   theme: {
@@ -17,14 +17,14 @@ export interface RdcThemeV1Payload {
 }
 
 /** Why a theme string was rejected; the renderer words each reason, `error` is the technical text. */
-export type RdcThemeV1Rejection = 'prefix' | 'json' | 'payload' | 'variant' | 'target';
+export type RdcThemeRejection = 'prefix' | 'json' | 'payload' | 'variant' | 'target';
 
-export type RdcThemeV1ParseResult =
-  | { ok: true; payload: RdcThemeV1Payload; chrome: ThemeChromeConfig }
-  | { ok: false; reason: RdcThemeV1Rejection; error: string };
+export type RdcThemeParseResult =
+  | { ok: true; payload: RdcThemePayload; chrome: ThemeChromeConfig }
+  | { ok: false; reason: RdcThemeRejection; error: string };
 
-export function serializeRdcThemeV1(chrome: ThemeChromeConfig, variant: ThemeVariant): string {
-  const payload: RdcThemeV1Payload = {
+export function serializeRdcTheme(chrome: ThemeChromeConfig, variant: ThemeVariant): string {
+  const payload: RdcThemePayload = {
     presetId: chrome.presetId,
     variant,
     theme: {
@@ -38,23 +38,23 @@ export function serializeRdcThemeV1(chrome: ThemeChromeConfig, variant: ThemeVar
       },
     },
   };
-  return `${RDC_THEME_V1_PREFIX}${JSON.stringify(payload)}`;
+  return `${RDC_THEME_PREFIX}${JSON.stringify(payload)}`;
 }
 
-export function parseRdcThemeV1(raw: string, expectedVariant?: ThemeVariant): RdcThemeV1ParseResult {
+export function parseRdcTheme(raw: string, expectedVariant?: ThemeVariant): RdcThemeParseResult {
   const trimmed = raw.trim();
-  if (!trimmed.startsWith(RDC_THEME_V1_PREFIX)) {
+  if (!trimmed.startsWith(RDC_THEME_PREFIX)) {
     if (trimmed.startsWith('codex-theme-v1:')) {
-      return { ok: false, reason: 'prefix', error: 'codex-theme-v1 is not supported; use rdc-theme-v1:' };
+      return { ok: false, reason: 'prefix', error: 'codex-theme-v1 is not supported; use rdc-theme:' };
     }
-    return { ok: false, reason: 'prefix', error: 'Theme string must start with rdc-theme-v1:' };
+    return { ok: false, reason: 'prefix', error: 'Theme string must start with rdc-theme:' };
   }
-  const jsonPart = trimmed.slice(RDC_THEME_V1_PREFIX.length).trim();
+  const jsonPart = trimmed.slice(RDC_THEME_PREFIX.length).trim();
   let parsed: unknown;
   try {
     parsed = JSON.parse(jsonPart);
   } catch {
-    return { ok: false, reason: 'json', error: 'Invalid JSON after rdc-theme-v1: prefix' };
+    return { ok: false, reason: 'json', error: 'Invalid JSON after rdc-theme: prefix' };
   }
   if (!parsed || typeof parsed !== 'object') {
     return { ok: false, reason: 'payload', error: 'Theme payload must be an object' };

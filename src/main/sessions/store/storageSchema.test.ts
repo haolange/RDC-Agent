@@ -22,7 +22,7 @@ import {
   SessionAttachmentManifestSchema,
   toSessionAttachmentManifest,
   CURRENT_USAGE_SCHEMA_VERSION,
-  SessionUsageV2Schema,
+  SessionUsageSchema,
   SESSION_SHELL_STATE_MIGRATIONS,
   toSessionUsageManifest,
   toSessionShellStateManifest,
@@ -135,7 +135,7 @@ describe('session usage schema v2', () => {
   };
 
   it('accepts a current { schemaVersion, usage } document', () => {
-    expect(SessionUsageV2Schema.parse(toSessionUsageManifest(usage))).toEqual({ schemaVersion: '2', usage });
+    expect(SessionUsageSchema.parse(toSessionUsageManifest(usage))).toEqual({ schemaVersion: '2', usage });
   });
 
   it.each([undefined, '0', '1', '9'])('rejects usage version %s and preserves the source bytes', (version) => {
@@ -145,7 +145,7 @@ describe('session usage schema v2', () => {
     try {
       fs.writeFileSync(filePath, raw, 'utf8');
       expect(() =>
-        readCurrentStoredJson(new StorageIo(), filePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageV2Schema),
+        readCurrentStoredJson(new StorageIo(), filePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageSchema),
       ).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(raw);
     } finally {
@@ -155,7 +155,7 @@ describe('session usage schema v2', () => {
 
   it('rejects retired usage fields inside a v2 document', () => {
     expect(
-      SessionUsageV2Schema.safeParse({
+      SessionUsageSchema.safeParse({
         schemaVersion: '2',
         usage: { ...usage, outputReserveTokens: 384_000 },
       }).success,
@@ -476,8 +476,7 @@ describe('storage schema store quartet', () => {
       corrupt: { schemaVersion: '1', usage: { runId: 1 } },
       missingOrLegacy: toSessionUsageManifest(legalUsage),
       higher: { schemaVersion: '99', usage: legalUsage },
-      read: (filePath: string) =>
-        readCurrentStoredJson(io, filePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageV2Schema),
+      read: (filePath: string) => readCurrentStoredJson(io, filePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageSchema),
     },
     {
       name: 'turn-commit',

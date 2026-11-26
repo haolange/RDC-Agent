@@ -274,7 +274,7 @@ Model/Effort控制状态由Composer稳定父层唯一持有，普通输入区、
 
 ## Appearance（入口）
 
-Settings → Appearance 为权威。双体系：全局 chrome vs Composer agent accent。详见 [`design-system.md`](design-system.md)。禁止 translucent sidebar；分享串 `rdc-theme-v1:`（拒绝 `codex-theme-v1:`）。
+Settings → Appearance 为权威。双体系：全局 chrome vs Composer agent accent。详见 [`design-system.md`](design-system.md)。禁止 translucent sidebar；分享串 `rdc-theme:`（拒绝 `codex-theme-v1:`）。
 
 ## 验证
 

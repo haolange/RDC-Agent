@@ -604,7 +604,7 @@ describe('EffectiveCatalogService', () => {
 
   it('starts a damaged catalog state empty, rewrites it and keeps the damaged bytes beside it', async () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
-    const damagedPath = path.join(root, 'damaged', 'catalog-v4.json');
+    const damagedPath = path.join(root, 'damaged', 'catalog.json');
     fs.mkdirSync(path.dirname(damagedPath), { recursive: true });
     const damaged = JSON.stringify({
       schemaVersion: 9,

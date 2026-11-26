@@ -4,7 +4,7 @@ import { generateEventId, generateRunId, generateShortId, nowMs, sanitizeToken }
 import { AppError } from '@shared/errors/appError';
 import { ActionEventSchema } from '@shared/types/evidence';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/jsonl';
-import { assertNoRunV3StageFields, toPersistedRunV3 } from '../run/runV3/runRecordSchema';
+import { toPersistedRun } from '../run/runRecord/runRecordSchema';
 import { appPathService } from '../../runtime/AppPathService';
 import {
   readPersistedRun as loadPersistedRun,
@@ -506,7 +506,7 @@ export class SessionRecordStore {
     const backend =
       input.backend || (captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local');
     const startedAt = nowMs();
-    const persistedRun = toPersistedRunV3({
+    const persistedRun = toPersistedRun({
       runId,
       turnId: input.turnId,
       projectId: session.projectId,
@@ -555,9 +555,6 @@ export class SessionRecordStore {
       return;
     }
 
-    assertNoRunV3StageFields(data, 'run patch');
-    assertNoRunV3StageFields(existing as unknown as Record<string, unknown>, 'persisted run');
-
     const allowedTopLevel = new Set([
       'status',
       'stopReason',
@@ -605,7 +602,6 @@ export class SessionRecordStore {
     if (existing.kind !== 'mission') {
       delete (merged as { mission?: unknown }).mission;
     }
-    assertNoRunV3StageFields(merged as unknown as Record<string, unknown>, 'merged run');
     merged.updatedAt = nowMs();
 
     persistRunFiles(this.host.io, this.getRunPath(merged.sessionId, merged.runId), merged);

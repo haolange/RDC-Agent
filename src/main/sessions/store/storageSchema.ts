@@ -70,7 +70,7 @@ export const SessionRecordSchema: ZodType<SessionRecord> = z
   })
   .transform((value) => ({ ...value, schemaVersion: '1' as const })) as ZodType<SessionRecord>;
 
-export const ConversationTurnCommitV1Schema = z
+export const ConversationTurnCommitSchema = z
   .object({
     schemaVersion: z.literal('1'),
     requestId: z.string().min(1),
@@ -87,10 +87,10 @@ export const ConversationTurnCommitV1Schema = z
   .passthrough();
 
 export const CONVERSATION_TURN_COMMIT_MIGRATIONS: StorageMigration<ConversationTurnCommitJournal>[] = [
-  { schemaVersion: '1', schema: ConversationTurnCommitV1Schema as ZodType<ConversationTurnCommitJournal> },
+  { schemaVersion: '1', schema: ConversationTurnCommitSchema as ZodType<ConversationTurnCommitJournal> },
 ];
 
-export const ConversationTerminalCommitV1Schema = z
+export const ConversationTerminalSnapshotSchema = z
   .object({
     schemaVersion: z.literal('1'),
     requestId: z.string().min(1),
@@ -114,7 +114,7 @@ const TerminalAppendFileSchema = z
   })
   .strict();
 
-export const ConversationTerminalAppendV2Schema = z
+export const ConversationTerminalAppendSchema = z
   .object({
     schemaVersion: z.literal('2'),
     requestId: z.string().min(1),
@@ -128,11 +128,11 @@ export const ConversationTerminalAppendV2Schema = z
 export const CONVERSATION_TERMINAL_COMMIT_MIGRATIONS: StorageMigration<
   ConversationTerminalCommitJournal | ConversationTerminalAppendJournal
 >[] = [
-  { schemaVersion: '1', schema: ConversationTerminalCommitV1Schema as ZodType<ConversationTerminalCommitJournal> },
+  { schemaVersion: '1', schema: ConversationTerminalSnapshotSchema as ZodType<ConversationTerminalCommitJournal> },
   // Both versions are valid recovery protocols; no session-data migration occurs.
   {
     schemaVersion: '2',
-    schema: z.union([ConversationTerminalCommitV1Schema, ConversationTerminalAppendV2Schema]) as ZodType<
+    schema: z.union([ConversationTerminalSnapshotSchema, ConversationTerminalAppendSchema]) as ZodType<
       ConversationTerminalCommitJournal | ConversationTerminalAppendJournal
     >,
   },
@@ -177,8 +177,6 @@ export const SessionAttachmentManifestSchema = z
   .strict()
   .transform((document) => document.attachments) as ZodType<SessionAttachmentRecord[]>;
 
-export { PersistedRunRecordV3Schema as PersistedRunRecordSchema } from '../run/runV3/runRecordSchema';
-
 export interface SessionUsageDocument {
   schemaVersion: string;
   usage: RunContextUsageSummary;
@@ -186,7 +184,7 @@ export interface SessionUsageDocument {
 
 export const CURRENT_USAGE_SCHEMA_VERSION = '2';
 
-export const SessionUsageV2Schema = z
+export const SessionUsageSchema = z
   .object({
     schemaVersion: z.literal('2'),
     usage: RunContextUsageSummarySchema,
@@ -208,7 +206,7 @@ export interface SessionShellStateDocument {
 
 export const CURRENT_SHELL_STATE_SCHEMA_VERSION = '1';
 
-export const SessionShellStateV1Schema = z.object({
+export const SessionShellStateSchema = z.object({
   schemaVersion: z.literal('1'),
   state: z.object({
     cwd: z.string().min(1),
@@ -222,7 +220,7 @@ export function toSessionShellStateManifest(state: SessionShellState): SessionSh
 export const SESSION_SHELL_STATE_MIGRATIONS: StorageMigration<SessionShellStateDocument>[] = [
   {
     schemaVersion: '1',
-    schema: SessionShellStateV1Schema as ZodType<SessionShellStateDocument>,
+    schema: SessionShellStateSchema as ZodType<SessionShellStateDocument>,
   },
 ];
 

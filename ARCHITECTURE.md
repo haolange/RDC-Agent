@@ -128,7 +128,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 | 主题 | 权威位置 |
 | --- | --- |
 | 产品边界与本文件不变量 | 本文件 |
-| 当前裁决（Profile、Right Rail、Knowledge 六 lane、Handoff、Investigation、并发、Run schema v3、Mission plan-only、Hook trust、Mission 完成合同） | 本文件「当前裁决」A–L |
+| 当前裁决（Profile、Right Rail、Knowledge 六 lane、Handoff、Investigation、并发、Run 记录、Mission plan-only、Hook trust、Mission 完成合同） | 本文件「当前裁决」A–L |
 | 验收记录（真实运行证据） | [`docs/product/acceptance-ledger.md`](docs/product/acceptance-ledger.md) |
 | Runtime / Prompt / Provider / Tool / Session 契约 | [`docs/contracts/runtime-kernel.md`](docs/contracts/runtime-kernel.md) |
 | Session Projection（active UI / 后台 cache / Composer 恢复） | [`docs/contracts/session-projection.md`](docs/contracts/session-projection.md) |
@@ -599,9 +599,9 @@ Knowledge 位于 `src/main/knowledge/`。Knowledge Center 为三列 UI（Spaces 
 - `ErrorRecovery` 等 recoverable fallback 属 Availability 分类；`MCPManager` name-segment 在 `encode(decode(x)) !== x` 时 fail-closed，是 in-flight 协议需要。
 - 产品状态统一为 Provider `retiring`、Knowledge `retired`；外部模型 ID/来源网址及 OpenAI-compatible 协议名保留原始语义。门禁 `pnpm run check:legacy-residue` 与 `pnpm run check:acceptance-ledger`。
 
-### I. Run Schema v3
+### I. Run 记录
 
-唯一活跃 schema 为 `schemaVersion: '3'`（`src/main/sessions/run/runV3/`）。
+唯一活跃 schema 为 `schemaVersion: '3'`（`src/main/sessions/run/runRecord/`）。
 
 - Run 无 `lastStage`、`runtime.workflow_stage`、`WorkflowStage` / `WorkflowPhase`、stage constants / event / IPC / update API 与 `recommendedSpecialists`。
 - 职责划分：权限 = effective `profileId` + frozen allowlist；Mission 身份 = `run.kind + mission + profileId`；生命周期 = `RunStatus` + turn transaction；用户进度 = `TaskRegistry` / `taskProjection`；方法进度 = Investigation records / checkpoints；输出阶段 = canonical `outputPhase`。

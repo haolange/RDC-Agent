@@ -7,7 +7,7 @@ import {
   SESSION_SHELL_STATE_MIGRATIONS,
   CURRENT_USAGE_SCHEMA_VERSION,
   SessionContextTurnEntrySchema,
-  SessionUsageV2Schema,
+  SessionUsageSchema,
   toSessionShellStateManifest,
   toSessionUsageManifest,
 } from './storageSchema';
@@ -37,7 +37,7 @@ export class SessionContextStore {
     const usagePath = this.getSessionUsagePath(sessionId);
     if (!usagePath) return null;
     return (
-      readCurrentStoredJson(this.host.io, usagePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageV2Schema)?.usage ?? null
+      readCurrentStoredJson(this.host.io, usagePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageSchema)?.usage ?? null
     );
   }
 

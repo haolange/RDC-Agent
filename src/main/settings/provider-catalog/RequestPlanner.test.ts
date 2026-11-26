@@ -72,7 +72,7 @@ describe('planModelRequest', () => {
       observedAt: '2026-11-01T00:00:00.000Z',
       refreshedAt: '2026-11-01T00:00:00.000Z',
       expiresAt: '2026-11-02T00:00:00.000Z',
-      sourceRevision: 'catalog-v1',
+      sourceRevision: 'catalog-a',
       sourceHash: 'source-a',
     };
     const first = planModelRequest({

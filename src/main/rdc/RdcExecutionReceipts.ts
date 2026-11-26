@@ -85,7 +85,7 @@ function parseReceiptJson(text: string, code: ReceiptInvalidCode): unknown {
   }
 }
 
-const KEY_REF = 'rdc-execution-receipt-signing-v1';
+const KEY_REF = 'rdc-execution-receipt-signing';
 export const rdcDigest = (value: unknown): string => createHash('sha256').update(canonicalJson(value)).digest('hex');
 
 /** Main-owned key is never part of a tool result, IPC, prompt, or session artifact. */

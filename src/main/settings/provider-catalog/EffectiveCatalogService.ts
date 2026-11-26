@@ -113,8 +113,7 @@ export class EffectiveCatalogService {
 
   constructor(options: EffectiveCatalogServiceOptions = {}) {
     this.statePath =
-      options.statePath ??
-      path.join(appPathService.getRuntimePaths().appStateRoot, 'provider-catalog', 'catalog-v4.json');
+      options.statePath ?? path.join(appPathService.getRuntimePaths().appStateRoot, 'provider-catalog', 'catalog.json');
     this.now = options.now ?? (() => new Date());
     this.discoveryTtlMs = options.discoveryTtlMs ?? DISCOVERY_TTL_MS;
     const persisted = sanitizePersistedCatalogState(this.readState());

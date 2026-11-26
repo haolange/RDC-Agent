@@ -78,7 +78,7 @@ function plan(
     providerId: 'google-ai-studio',
     adapterId: 'google-interactions',
     catalogRevision: 'google-catalog',
-    routeRevision: 'google-interactions-v1',
+    routeRevision: 'google-interactions-route',
     selectedModelId: modelId,
     effectiveModelId: modelId,
     appliedBindingIds: [],

@@ -5,7 +5,7 @@
 实现与预览入口：
 
 - [`src/renderer/styles/design-system.css`](../../src/renderer/styles/design-system.css) 是样式入口；token 在 [`design-tokens.css`](../../src/renderer/styles/design-tokens.css)，动效在 [`design-motion.css`](../../src/renderer/styles/design-motion.css)，基础样式在 [`design-base.css`](../../src/renderer/styles/design-base.css)，系统减少动效在 [`design-reduced-motion.css`](../../src/renderer/styles/design-reduced-motion.css)。
-- [`src/shared/theme/`](../../src/shared/theme/)：preset catalog、`compileThemeChrome`、`rdc-theme-v1`、compose accent 派生。
+- [`src/shared/theme/`](../../src/shared/theme/)：preset catalog、`compileThemeChrome`、`rdc-theme`、compose accent 派生。
 - [`designs/rdc-agent-design-system/index.html`](../../designs/rdc-agent-design-system/index.html)：可交互预览。
 
 ## 视觉定位
@@ -159,7 +159,7 @@ Settings 页标题与正文共用面板内边距。
 
 - Light/Dark（含 system）影响两套体系的亮度调制。
 - 不提供 translucent sidebar。
-- 主题分享格式：`rdc-theme-v1:`（拒绝 `codex-theme-v1:`）。
+- 主题分享格式：`rdc-theme:`（拒绝 `codex-theme-v1:`）。
 - 预设：RDC（默认）+ Absolutely / Ayu / Catppuccin / Dracula / Everforest / GitHub / Gruvbox / Linear。
 
 ## CSS 入口
