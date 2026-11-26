@@ -1,5 +1,14 @@
 # Acceptance Ledger
 
+## 2026-11-26：收敛计划收尾 W6/W7 验收（结构瘦身、Prettier、函数预算；云端 Linux Browser QA，桩模型）
+
+- 提交：`1247621fdd7de9fde9289d4d737fc4226d8301bd`（分支 CI）；`fb38204a7e7dc1e96b245356a3234428bbdb95ae`（实测，只多一处差分 harness 修复）
+- 结果：分支 CI 全部 10 个 job 通过，含 windows-unit、desktop-smoke（pack 与 `check:release-package`）与 visual-diff（对 `33765a7039b315b3899463f51d52886f52e1d4f3` 零差异，覆盖 W6.6b 的 renderer 改动与 CSS 格式化）。
+- 结果：点击到稳定，W4/W5 实测 → 本次（ms）：切会话 115→59~176（6 次），切 Agent 38→27~37（热），权限 22→25，选模型 68→36，新建会话 106→72，Agent 默认模型 161→183，Provider 模型开关 38→37~60，主题 31→46／70，断开／重连 Provider 52／70→103／98。
+- 结果：长会话发送到回复完成 1326→994，提交计划 733→407，批准计划并交接 709→801（先切 Agent 再批准 781→884），均在桩模型流式回复的波动范围内。plan 门打开时切 Agent 仍由审阅面板接管 Composer。
+- 证据：https://github.com/haolange/RDC-Agent/actions/runs/45752903337；本地：`flock qa.lock ./run.sh <name> matrixA.mjs|matrixB.mjs|matrixC.mjs --base base5`（会话临时测量脚本，未入库）
+- 人工介入：无。流增量协议本轮未改，Working N 步事件量沿用 W4/W5 的数据，没有复测。
+
 ## 2026-11-25：收敛计划 W4/W5 卡顿实测（云端 Linux Browser QA，桩模型）
 
 - 提交：`37a3dbd511b17dc16a14f3254a52fcf3e889a149`（交互）；`cca1edab755859140e049763805a01f1ae749f03`（发送与批准、设置、Working）
