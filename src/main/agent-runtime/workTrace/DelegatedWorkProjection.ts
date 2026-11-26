@@ -50,8 +50,11 @@ function safeThinking(value: ThinkingArtifact | undefined): ThinkingArtifact | u
   };
 }
 
+/** What a delegation's trace keeps: every event except a running call's ephemeral progress. */
+export type TracedEvent = Exclude<AgentEvent, { type: 'tool.progress' }>;
+
 /** Pure visible-process reducer. Main and child execution use the same canonical block/upsert semantics. */
-export function projectDelegatedEvent(state: DelegatedProjectionState, event: AgentEvent): DelegatedProjectionState {
+export function projectDelegatedEvent(state: DelegatedProjectionState, event: TracedEvent): DelegatedProjectionState {
   let { trace, loop, loopText, hasTools, nextLoop } = state;
   const loopId = () => `loop-${loop}`;
   const beginContent = () => {

@@ -122,6 +122,7 @@ RDC 操作不受固定时长约束，只受无进展预算约束（RDC-Tool 公�
 - stderr 的 NDJSON 帧（heartbeat、progress、native_call）经 zod 严格解析后交给 `onProgress`；声称是帧却不合规或属于别的 request id 记为 `RDC_CLI_PROTOCOL`（结果未知），普通 stderr 文本原样保留。
 - 首帧之前 CLI 在做控制工作（连接或启动 daemon），受 `RDC_CONTROL_TIMEOUT_MS` 约束；之后帧间隔超过 20 秒（`RDC_HEARTBEAT_GAP_MS`，daemon 每 2 秒心跳、CLI 自身 15 秒报 `daemon_unresponsive`）判为 `RDC_DAEMON_UNRESPONSIVE` 并终止 CLI，结果未知。
 - 中止不直接杀 CLI：先 `daemon cancel --request-id`（控制期限 `RDC_CANCEL_TIMEOUT_MS` 30 秒），等回执，再给 exec CLI 至多 5 秒输出信封并退出，仍未退出才终止；回执（cancelled、completed、terminated、not_found 或不可用原因）随结果返回，`executeRdcShell` 把它写进隔离记录。
+- 帧还驱动 Working 行的进度：`shell.rdc` 把帧折叠成当前状态（每秒至多一次）作为工具的部分结果，`AgentEventBridge` 只把这种部分结果转成临时事件 `tool.progress`，经会话流送到渲染端，不进入持久化消息、委派轨迹或模型可见结果。
 - `RdcNativeProtocol` 把进程级失败映射为各自的码并解析 details（`processFailure`）：`worker_stuck` → `RDC_OPERATION_STUCK`，`worker_lost` / `worker_request_failed` → `RDC_WORKER_LOST`，`worker_unavailable` → `RDC_WORKER_UNAVAILABLE`（未执行），`operation_cancelled` → `RDC_OPERATION_CANCELLED`，`daemon_lost` → `RDC_DAEMON_LOST`，`daemon_unresponsive` → `RDC_DAEMON_UNRESPONSIVE`；其余原生失败仍为 `RDC_NATIVE_FAILURE`。
 - Remote 准备没有自己的时长参数，和其它操作一样只受请求的无进展预算约束（见下文 Remote 准备预算）。
 

@@ -20,7 +20,22 @@ import { rdcInvocationRecord } from './RdcInvocationRecord';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
 import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import type { RdcOperationDefinition } from './RdcOperationCatalog';
-import type { RdcCancellation } from './RdcOperationWatcher';
+import type { RdcCancellation, RdcOperationFrame } from './RdcOperationWatcher';
+
+/** The owning lease, its context and its replay/capture identity are still the ones this call was admitted with. */
+function ownsFrozenReplay(
+  scope: { sessionId: string; projectId: string },
+  lease: { version: number; contextId: string; runtimeContext: { replaySessionId?: string } },
+  frozenCaptureId: string | undefined,
+): boolean {
+  const current = assertRdcContextLeaseOwnership(scope);
+  return (
+    current?.version === lease.version &&
+    current.contextId === lease.contextId &&
+    current.runtimeContext.replaySessionId === lease.runtimeContext.replaySessionId &&
+    current.runtimeContext.captureFileId === frozenCaptureId
+  );
+}
 
 /** The observed failure a quarantine records: the native code, or the leading code of an Agent failure. */
 function rdcFaultCode(error: unknown): string {
@@ -128,6 +143,7 @@ export async function executeRdcShell(
   toolCallId: string,
   signal: AbortSignal | undefined,
   context?: ToolExecutionContext,
+  onProgress?: (frame: RdcOperationFrame) => void,
 ): Promise<
   AgentToolResult<{
     operation: string;
@@ -303,7 +319,7 @@ export async function executeRdcShell(
       const result = await rdcCliInvokerService.executeCLI(
         'call',
         [input.operation, '--args-json', JSON.stringify(args), '--daemon-context', lease.contextId],
-        { abortSignal: signal, contextId: lease.contextId, settings: cli },
+        { abortSignal: signal, contextId: lease.contextId, settings: cli, onProgress },
       );
       cancellation = result.cancellation;
       truncatedBufferRead = verifyTruncatedBufferRead && result.exitCode === 0 && result.stdoutTruncated === true;
@@ -428,12 +444,7 @@ export async function executeRdcShell(
         !signal?.aborted
       ) {
         try {
-          const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
-          nativeStateVerifiedSafe =
-            current?.version === lease.version &&
-            current.contextId === lease.contextId &&
-            current.runtimeContext.replaySessionId === replaySessionId &&
-            current.runtimeContext.captureFileId === frozenCaptureId;
+          nativeStateVerifiedSafe = ownsFrozenReplay({ sessionId, projectId }, lease, frozenCaptureId);
         } catch {
           /* An unverified lease remains quarantined. */
         }
@@ -451,12 +462,8 @@ export async function executeRdcShell(
         !signal?.aborted
       ) {
         try {
-          const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
           nativeStateVerifiedSafe =
-            current?.version === lease.version &&
-            current.contextId === lease.contextId &&
-            current.runtimeContext.replaySessionId === replaySessionId &&
-            current.runtimeContext.captureFileId === frozenCaptureId &&
+            ownsFrozenReplay({ sessionId, projectId }, lease, frozenCaptureId) &&
             (await readReplayEvent()) === originalEvent &&
             lastReplayState !== null &&
             rdcDigest(lastReplayState) === rdcDigest(originalReplayState);
@@ -476,12 +483,8 @@ export async function executeRdcShell(
         !signal?.aborted
       ) {
         try {
-          const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
           nativeStateVerifiedSafe =
-            current?.version === lease.version &&
-            current.contextId === lease.contextId &&
-            current.runtimeContext.replaySessionId === replaySessionId &&
-            current.runtimeContext.captureFileId === frozenCaptureId &&
+            ownsFrozenReplay({ sessionId, projectId }, lease, frozenCaptureId) &&
             (await readReplayEvent()) === originalEvent &&
             lastReplayState !== null &&
             rdcDigest(lastReplayState) === rdcDigest(originalReplayState);
@@ -492,12 +495,8 @@ export async function executeRdcShell(
       if (!nativeStateVerifiedSafe && truncatedBufferRead && originalReplayState && !signal?.aborted) {
         try {
           const event = await readReplayEvent();
-          const current = assertRdcContextLeaseOwnership({ sessionId, projectId });
           nativeStateVerifiedSafe =
-            current?.version === lease.version &&
-            current.contextId === lease.contextId &&
-            current.runtimeContext.replaySessionId === replaySessionId &&
-            current.runtimeContext.captureFileId === frozenCaptureId &&
+            ownsFrozenReplay({ sessionId, projectId }, lease, frozenCaptureId) &&
             lastReplayState !== null &&
             rdcDigest(lastReplayState) === rdcDigest(originalReplayState) &&
             (event === originalEvent || event === args.event_id);

@@ -89,6 +89,28 @@ interface AgentToolStartedPayload {
   args: Record<string, unknown>;
 }
 
+/**
+ * Where a running RDC operation stands, from its own progress stream. `operation` and `nativeCall` are technical
+ * names: they leave the product surface only through copy diagnostics. `lastProgressAt` moves with progress and
+ * native-call frames, never with heartbeats, so the renderer can tell a quiet operation from a busy one.
+ */
+export interface RdcOperationProgress {
+  operation: string;
+  state: 'queued' | 'running';
+  stage: string | null;
+  progressPct: number | null;
+  nativeCall: string | null;
+  startedAt: number;
+  lastProgressAt: number;
+}
+
+/** A running tool's progress: ephemeral, streamed to the renderer only, never persisted or shown to the model. */
+export interface AgentToolProgressPayload {
+  toolCallId: string;
+  toolName: string;
+  progress: RdcOperationProgress;
+}
+
 interface AgentToolCompletedPayload {
   toolCallId: string;
   toolName: string;
@@ -176,6 +198,7 @@ export interface AgentEventPayloadMap {
   'assistant.completed': AgentAssistantCompletedPayload;
   'tool.requested': AgentToolRequestedPayload;
   'tool.started': AgentToolStartedPayload;
+  'tool.progress': AgentToolProgressPayload;
   'tool.completed': AgentToolCompletedPayload;
   'tool.denied': AgentToolDeniedPayload;
   'task.created': AgentTaskEventPayload;

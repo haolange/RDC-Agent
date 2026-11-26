@@ -134,7 +134,7 @@
 
 **差分渲染**：先 `pnpm run build`，再依次运行 `node scripts/visual-diff/run.mjs capture <head>`、对本轮起点构建运行 `capture <base> --build <base 检出>`、`compare <base> <head>`。有意的可见变化在提交 trailer 写 `Visual-Diff-Allow: <场景 id,…>`。
   - 每个场景按深/浅 × 1440/720 四个变体渲染（场景可用 `variants` 收窄），变体的主题覆盖录制响应里的外观主题。三层比对：L1 DOM 与样式指纹、L2 位图、L3 交互过程——每个动作步骤逐帧采样焦点、浮层栈、`aria-expanded`、各 `data-testid` 元素的 rect 与滚动位置，比对步骤结束时的稳定状态和"闪回"（值回到已离开的旧值，只在屏上停留一帧的中间态不算）。
-  - 场景可以注入迟到响应（`respond`：`delayMs`、`hold` 配合 `release` 步骤，按 `call` 释放可模拟乱序）与失败响应（`error`，或用 `result` 替换某次回答，模拟失败写入后的状态）。产品自身的时序竞争只能用带 `reason` 的 `focus` 步骤或 `l3Ignore` 固定，原因写明竞争点。
+  - 场景可以注入迟到响应（`respond`：`delayMs`、`hold` 配合 `release` 步骤，按 `call` 释放可模拟乱序）与失败响应（`error`，或用 `result` 替换某次回答，模拟失败写入后的状态）；host 不转发主进程事件，需要时用 `emit` 步骤推送一个事件，载荷里的 id 绑定最近的应答或调用参数（见 `scripts/visual-diff/host/main.mjs` 的 `resolveEmit`）。产品自身的时序竞争只能用带 `reason` 的 `focus` 步骤或 `l3Ignore` 固定，原因写明竞争点。
   - IPC 契约变化或新增场景时用 `run.mjs record <id…>` 录制（启动一次性 Browser QA 实例，从真实后端取响应；设 `VISUAL_DIFF_ELECTRON` 时直接用该 Electron 运行当前构建）。定义在 `scripts/visual-diff/scenarios.json`，可复用的准备步骤放在 `presets`；用到 Ollama 的场景需要先运行 `node scripts/qa-ollama-stub.mjs`。
   - `capture` 默认并行 3 个 host（`VISUAL_DIFF_JOBS` 可调），渲染失败时把当时的画面存为 `<id>@<变体>.failed.png`。
 

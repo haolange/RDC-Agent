@@ -12,6 +12,7 @@ import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { usePlanReader } from './PlanReaderHost';
 import { isTrackActivity } from './workProcessTrack';
 import { toolHeadline } from './workProcessHeadline';
+import { useRdcProgressSlots } from './RdcProgressLine';
 
 const PlanReadAction: React.FC<{ plan: NonNullable<ToolRowModel['planReview']> }> = ({ plan }) => {
   const { t } = useI18n();
@@ -69,6 +70,7 @@ export const ToolRow: React.FC<{
   // Collapsed by default — including while running — so live CoT stays quiet;
   // users expand individual cards when they want detail / Raw.
   const [expanded, toggleDisclosure] = useScopedWorkDisclosure(`tool-${row.id}`, false);
+  const progress = useRdcProgressSlots(row.id, row.status === 'running');
   const verbLabel = toolHeadline(row, t);
   const approvalAttention =
     row.approval && row.approval.status !== 'approved'
@@ -123,6 +125,7 @@ export const ToolRow: React.FC<{
                 </span>
               ) : null
             }
+            preview={progress.line}
           />
 
           {(!isBackgroundWait || expanded) && !grouped ? <CardBody row={row} /> : null}
@@ -157,6 +160,7 @@ export const ToolRow: React.FC<{
           {expanded ? (
             <div className="work-process-tool-card-expand">
               {hasApproval ? <ToolApprovalCallout approval={row.approval!} /> : null}
+              {progress.diagnostics}
               {row.planReview ? <PlanReadAction plan={row.planReview} /> : null}
               <FamilyDetail row={row} />
               <RawPanel row={row} />

@@ -5,9 +5,6 @@
     "params": 6
   },
   "exceptions": {
-    "src/main/agent-runtime/AgentEventBridge.ts": {
-      "lines": 186
-    },
     "src/main/agent-runtime/context/ExecutionContextWindow.ts": {
       "lines": 169
     },
@@ -120,8 +117,8 @@
       "complexity": 90
     },
     "src/main/rdc/executeRdcShell.ts": {
-      "lines": 440,
-      "complexity": 126
+      "lines": 424,
+      "complexity": 110
     },
     "src/main/rdc/RdcCaptureRecovery.ts": {
       "lines": 151,

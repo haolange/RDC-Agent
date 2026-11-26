@@ -1093,6 +1093,181 @@
    "settleMs": 1200
   },
   {
+   "id": "working-rdc-progress",
+   "setup": [
+    {
+     "preset": "ollama"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": ".composer-textarea"
+    },
+    {
+     "type": "检查这一帧中心像素的历史。",
+     "selector": ".composer-textarea",
+     "waitMs": 300
+    },
+    {
+     "click": true,
+     "testId": "debugger-start-button",
+     "waitMs": 1500
+    },
+    {
+     "emit": {
+      "channel": "conversation:event",
+      "payload": {
+       "type": "message_patched",
+       "sessionId": "$conversation:sendMessage.turn.assistantDraftMessage.sessionId",
+       "turnId": {
+        "$concat": [
+         "turn-",
+         "$call:conversation:sendMessage.0.requestId"
+        ]
+       },
+       "message": {
+        "$merge": "$conversation:sendMessage.turn.assistantDraftMessage",
+        "workTrace": {
+         "status": "running",
+         "blocks": [
+          {
+           "id": "runtime-run",
+           "kind": "reasoning",
+           "title": "Start Agent Loop",
+           "stage": "preflight",
+           "status": "running",
+           "toolCalls": [],
+           "startedAt": {
+            "$now": -100000
+           },
+           "summary": "General started the model and tool loop."
+          },
+          {
+           "id": "runtime-loop-1",
+           "kind": "llm_turn",
+           "title": "LLM turn",
+           "stage": "model",
+           "status": "running",
+           "toolCalls": [
+            {
+             "id": "visual-diff-rdc-call",
+             "toolName": "shell",
+             "status": "running",
+             "argsPreview": "{\"rdc\": {\"operation\": \"rd.texture.get_pixel_history\", \"args\": {\"event_id\": 412, \"x\": 640, \"y\": 360}}}",
+             "executionStartedAt": {
+              "$now": -95000
+             },
+             "displayOrder": 1,
+             "startedAt": {
+              "$now": -95000
+             }
+            }
+           ],
+           "startedAt": {
+            "$now": -98000
+           },
+           "items": []
+          }
+         ]
+        },
+        "updatedAt": {
+         "$add": [
+          {
+           "$max": [
+            "$conversation:sendMessage.turn.assistantDraftMessage.updatedAt",
+            {
+             "$now": 0
+            }
+           ]
+          },
+          1
+         ]
+        },
+        "id": {
+         "$concat": [
+          "msga-",
+          "$call:conversation:sendMessage.0.requestId"
+         ]
+        },
+        "turnId": {
+         "$concat": [
+          "turn-",
+          "$call:conversation:sendMessage.0.requestId"
+         ]
+        },
+        "requestId": "$call:conversation:sendMessage.0.requestId",
+        "createdAt": {
+         "$add": [
+          {
+           "$max": [
+            "$conversation:sendMessage.turn.userMessage.createdAt",
+            {
+             "$now": 0
+            }
+           ]
+          },
+          1
+         ]
+        }
+       }
+      }
+     },
+     "waitMs": 400
+    },
+    {
+     "emit": {
+      "channel": "conversation:event",
+      "payload": {
+       "type": "agent_event",
+       "sessionId": "$conversation:sendMessage.turn.assistantDraftMessage.sessionId",
+       "turnId": {
+        "$concat": [
+         "turn-",
+         "$call:conversation:sendMessage.0.requestId"
+        ]
+       },
+       "event": {
+        "id": "visual-diff-progress",
+        "type": "tool.progress",
+        "timestamp": {
+         "$now": -42000
+        },
+        "sessionId": "$conversation:sendMessage.turn.assistantDraftMessage.sessionId",
+        "turnId": {
+         "$concat": [
+          "turn-",
+          "$call:conversation:sendMessage.0.requestId"
+         ]
+        },
+        "payload": {
+         "toolCallId": "visual-diff-rdc-call",
+         "toolName": "shell",
+         "progress": {
+          "operation": "rd.texture.get_pixel_history",
+          "state": "running",
+          "stage": "pixel_history_replay",
+          "progressPct": null,
+          "nativeCall": "PixelHistory",
+          "startedAt": {
+           "$now": -95000
+          },
+          "lastProgressAt": {
+           "$now": -42000
+          }
+         }
+        }
+       }
+      }
+     },
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"work-process-rdc-progress\"]"
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
    "id": "transcript-markdown",
    "setup": [
     {

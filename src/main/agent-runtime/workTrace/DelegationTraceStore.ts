@@ -13,6 +13,7 @@ import {
   createDelegatedProjectionState,
   projectDelegatedEvent,
   type DelegatedProjectionState,
+  type TracedEvent,
 } from './DelegatedWorkProjection';
 import type { ConversationWorkBlock } from '@shared/types/conversation';
 import type {
@@ -263,7 +264,7 @@ function persistBlocks(record: ActiveTrace, target: string): void {
   updateLatestAction(record);
 }
 
-function persistProjectedEvent(sessionId: string, record: ActiveTrace, target: string, event: AgentEvent): void {
+function persistProjectedEvent(sessionId: string, record: ActiveTrace, target: string, event: TracedEvent): void {
   if (event.type === 'tool.completed') {
     writeBody(target, 'tool_receipt', safeText(event.payload.result), event.payload.toolCallId);
   }
@@ -359,7 +360,8 @@ export const delegationTraceStore = {
   event(sessionId: string, callId: string, childIdentity: string, event: AgentEvent): void {
     const record = active.get(key(sessionId, callId));
     const target = location(sessionId, callId);
-    if (!record || record.identity !== childIdentity || !target) return;
+    // Progress is ephemeral: a delegation's trace keeps what happened, not where a running call stood.
+    if (!record || record.identity !== childIdentity || !target || event.type === 'tool.progress') return;
     if (event.type === 'assistant.delta') {
       const { payload } = event;
       if (!payload.text) return;

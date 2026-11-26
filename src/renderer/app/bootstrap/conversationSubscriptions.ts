@@ -2,6 +2,7 @@ import { useConversationStore } from '../../stores/conversationStore';
 import { isActiveSessionEvent } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useSessionStore } from '../../stores/sessionStore';
+import { useToolProgressStore } from '../../stores/toolProgressStore';
 import { createConversationEventBatcher } from './conversationEventBatcher';
 import { createConversationMessageAssembler } from './conversationMessageAssembler';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
@@ -85,6 +86,7 @@ export function subscribeConversation(electronAPI: ElectronAPI) {
       return;
     }
     if (event.type === 'agent_event') {
+      useToolProgressStore.getState().apply(event.event);
       if (event.event.type === 'diagnostic') {
         conversation.addTimelineEntry({
           id: event.event.id,
