@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useAppSettingsStore } from '../../../stores/appSettingsStore';
+import { useRuntimePermissionStore } from '../../../stores/runtimePermissionStore';
 import { errorDetail } from '../../../lib/errorDetail';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { diffKnowledgeCard, rollbackBasis } from './knowledgeCardDiff';
@@ -12,7 +12,6 @@ import {
   issueKnowledgeWrite,
   resolveWriteConfirmPack,
 } from './knowledgeWriteConfirm';
-import type { AgentPermissionMode } from '@shared/types/settings';
 import type { KnowledgeCardRecord, KnowledgePack, KnowledgeQueryRequest } from '@shared/types/knowledge';
 
 export function useKnowledgeWriteConfirm(options: {
@@ -23,9 +22,7 @@ export function useKnowledgeWriteConfirm(options: {
   onWritten: () => Promise<void>;
 }) {
   const request = useKnowledgeRequestScope(options.active);
-  const permissionMode = useAppSettingsStore(
-    (state) => state.settings.agentRuntime.permissions.mode,
-  ) as AgentPermissionMode;
+  const permissionMode = useRuntimePermissionStore((state) => state.snapshot?.mode ?? 'default');
   const [open, setOpen] = useState(false);
   const [action, setAction] = useState<KnowledgeWriteAction>('save');
   const [before, setBefore] = useState<KnowledgeCardRecord | null>(null);

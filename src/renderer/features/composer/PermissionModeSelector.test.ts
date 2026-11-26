@@ -15,13 +15,10 @@ const fixture = vi.hoisted(() => ({
   failedSwitch: null as { mode: AgentPermissionMode; detail: string } | null,
   language: 'en' as AppLanguage,
   refresh: vi.fn(),
-  setMode: vi.fn(() => Promise.resolve()),
+  saveMode: vi.fn(() => Promise.resolve()),
 }));
 vi.mock('../../stores/runtimePermissionStore', () => ({
   useRuntimePermissionStore: (select: (state: typeof fixture) => unknown) => select(fixture),
-}));
-vi.mock('../../stores/appSettingsStore', () => ({
-  useAppSettingsStore: (select: (state: object) => unknown) => select({ setAgentPermissionMode: fixture.setMode }),
 }));
 vi.mock('../../i18n', () => ({
   useI18n: () => ({
@@ -41,7 +38,7 @@ afterEach(() => {
     failedSwitch: null,
     language: 'en',
   });
-  fixture.setMode.mockClear();
+  fixture.saveMode.mockClear();
   vi.unstubAllGlobals();
 });
 
@@ -133,7 +130,7 @@ it('says in the footer which switch failed, keeps its detail for copying, and re
     await act(async () =>
       host.querySelector<HTMLButtonElement>('[data-testid="composer-permission-notice"] button')!.click(),
     );
-    expect(fixture.setMode).toHaveBeenCalledWith('full-access');
+    expect(fixture.saveMode).toHaveBeenCalledWith('full-access');
   } finally {
     await act(async () => root.unmount());
     host.remove();

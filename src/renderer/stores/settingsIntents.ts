@@ -94,12 +94,6 @@ export class SettingsIntents {
     return this.project();
   }
 
-  /** A change main confirmed through another command (the permission mode). */
-  confirm(commit: SettingsOverlay): AppSettings {
-    this.confirmed = commit(this.confirmed);
-    return this.project();
-  }
-
   begin(overlay: SettingsOverlay): { id: number; settings: AppSettings } {
     const id = ++this.sequence;
     this.pending.set(id, overlay);

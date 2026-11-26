@@ -1,6 +1,7 @@
 import { translate, type TranslationKey } from '../../i18n';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useRuntimePermissionStore } from '../../stores/runtimePermissionStore';
 import { acceptSessionSnapshot, receiveSessionList } from '../../stores/sessionRecordStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { applySessionSwitchHygiene } from '../../stores/sessionSwitchHygiene';
@@ -164,7 +165,7 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
         notify.warning(currentText('composer.commandPermissionInvalid'));
         return;
       }
-      await useAppSettingsStore.getState().setAgentPermissionMode(mode as AgentPermissionMode);
+      await useRuntimePermissionStore.getState().saveMode(mode as AgentPermissionMode);
       return;
     }
     case 'resume-session': {

@@ -5,7 +5,6 @@ import { Chevron } from '../../ui/Chevron';
 import { Pill } from '../../ui/Pill';
 import { useRuntimePermissionStore } from '../../stores/runtimePermissionStore';
 import { InlineError } from '../../ui/InlineError';
-import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useComposerMenu } from './useComposerMenuRegistry';
 import type { TranslationKey } from '../../i18n';
 import type { AgentPermissionMode } from '@shared/types/settings';
@@ -48,7 +47,7 @@ export const PermissionModeSelector: React.FC = () => {
   const error = useRuntimePermissionStore((state) => state.error);
   const refresh = useRuntimePermissionStore((state) => state.refresh);
   const mode = snapshot?.mode;
-  const setMode = useAppSettingsStore((state) => state.setAgentPermissionMode);
+  const setMode = useRuntimePermissionStore((state) => state.saveMode);
   const current = mode ?? 'default';
   // The label names the mode being applied while main confirms it; the pill's tone stays the confirmed mode's.
   const shown = pendingMode ?? current;
@@ -160,7 +159,7 @@ export const PermissionSwitchNotice: React.FC = () => {
   const { t } = useI18n();
   const failedSwitch = useRuntimePermissionStore((state) => state.failedSwitch);
   const pending = useRuntimePermissionStore((state) => state.pendingMode !== null);
-  const setMode = useAppSettingsStore((state) => state.setAgentPermissionMode);
+  const setMode = useRuntimePermissionStore((state) => state.saveMode);
   if (!failedSwitch) return null;
   return (
     <InlineError

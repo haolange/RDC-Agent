@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
-import { useRuntimePermissionStore } from './runtimePermissionStore';
 import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
 import { createSettingsDefinitionActions } from './appSettingsDefinitionActions';
 import { SettingsIntents, patchCommit, patchOverlay } from './settingsIntents';
@@ -76,24 +75,6 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => {
     ...createAppSettingsAppearanceActions(get, (contextBreakdownPreference) => set({ contextBreakdownPreference })),
     updateProfile: async (profile) => {
       await get().patchSettings([{ op: 'profile', value: profile }]);
-    },
-    setAgentPermissionMode: async (mode) => {
-      try {
-        await useRuntimePermissionStore.getState().saveMode(mode);
-      } finally {
-        const snapshot = useRuntimePermissionStore.getState().snapshot;
-        if (snapshot) {
-          show(
-            intents.confirm((settings) => ({
-              ...settings,
-              agentRuntime: {
-                ...settings.agentRuntime,
-                permissions: { ...settings.agentRuntime.permissions, mode: snapshot.mode },
-              },
-            })),
-          );
-        }
-      }
     },
     setCustomPermissionRules: async (rules) => {
       await get().patchSettings([{ op: 'agentRuntime', value: { permissions: rules } }]);

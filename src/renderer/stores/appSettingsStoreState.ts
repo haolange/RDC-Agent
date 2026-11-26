@@ -1,6 +1,5 @@
 import type {
   AppLanguage,
-  AgentPermissionMode,
   AppSettings,
   AppTheme,
   FontScale,
@@ -72,7 +71,6 @@ export interface AppSettingsState {
   saveProvider: (provider: LlmProviderEntry) => Promise<ProviderDefinitionSaveResult>;
   /** Waits for the provider's saves in flight (failing if the newest failed) and reads main's commit. */
   flushProviderSaves: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
-  setAgentPermissionMode: (mode: AgentPermissionMode) => Promise<void>;
   setCompactionThresholdPercent: (percent: number) => Promise<void>;
   setCustomPermissionRules: (rules: {
     readableRoots: string[];
