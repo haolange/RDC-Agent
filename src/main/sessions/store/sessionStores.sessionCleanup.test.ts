@@ -419,6 +419,29 @@ describe('sessionRecordStore.removeSession side-channel cleanup', () => {
     const persisted = await sessionRecordStore.readRun(session.sessionId, run.runId);
     expect(persisted?.captures).toEqual([]);
   });
+
+  it('appends action events without a format version and refuses a stored event that still carries one', async () => {
+    const { projectWorkspaceStore, sessionRecordStore } = await import('./sessionStores');
+    const projectRoot = path.join(tempRoot, 'action-chain-root');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const session = sessionRecordStore.createSession(project.projectId, 'Action chain');
+    const event = sessionRecordStore.createActionEvent({
+      runId: 'run-a',
+      sessionId: session.sessionId,
+      agentId: 'general',
+      eventType: 'user_message',
+      status: 'ok',
+      payload: { content: 'hi' },
+    });
+    await sessionRecordStore.appendActionEvent(session.sessionId, event);
+    expect(await sessionRecordStore.readActionChain(session.sessionId)).toEqual([event]);
+    expect(event).not.toHaveProperty('schema_version');
+
+    const chain = sessionRecordStore.getActionChainPath(session.sessionId);
+    fs.writeFileSync(chain, `${JSON.stringify({ ...event, schema_version: '2' })}\n`, 'utf8');
+    await expect(sessionRecordStore.readActionChain(session.sessionId)).rejects.toThrow();
+  });
 });
 function makeTerminalContextEntry(): SessionContextTurnEntry {
   return {

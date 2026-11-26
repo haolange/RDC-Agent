@@ -651,7 +651,6 @@ export class SessionRecordStore {
     refs?: string[];
   }): ActionEvent {
     return {
-      schema_version: '2',
       event_id: generateEventId('evt'),
       turn_id: input.turnId,
       ts_ms: nowMs(),

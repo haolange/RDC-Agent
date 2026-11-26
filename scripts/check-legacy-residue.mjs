@@ -275,6 +275,13 @@ const VERSION_SCAN_FILES = [
 const CODE_FILE = /\.(?:ts|tsx|js|mjs|cjs)$/;
 const TEST_FILE = /\.test\.(?:ts|tsx)$/;
 const FORMAT_MARKER = /\b(?:schema|record|format)Version\b|\b(?:[A-Z][A-Z0-9]*_)*SCHEMA_VERSION\b/;
+const PROTOCOL_MARKER = /\bschema_version\b/;
+// RDC-Tool's public protocol: the CLI envelope and the operation catalog carry schema_version.
+const RDC_TOOL_PROTOCOL_FILES = new Set([
+  'src/main/rdc/RdcCliInvokerService.ts',
+  'src/main/rdc/RdcNativeProtocol.ts',
+  'src/main/rdc/rdcCatalogIdentity.ts',
+]);
 const VERSIONED_IDENTIFIER = /\b[A-Za-z_$][\w$]*?(?:[a-z0-9]V|_V)\d+(?!\d)[\w$]*|\bv\d+[A-Z][\w$]*/g;
 const VERSIONED_ID = /(?<![\w/@.-])(?:[A-Za-z][A-Za-z0-9]*[-.])+v\d+(?!\d)(?:[-.:][\w.:-]*)?/g;
 const VERSIONED_NAMESPACE = /['"`][a-z][a-z0-9]*(?:[.-][a-z0-9]+)+\/\d+['"`]/g;
@@ -316,6 +323,8 @@ for (const rel of versionScanFiles) {
     .forEach((line, index) => {
       const where = `${rel}:${index + 1}`;
       if (checksMarkers && FORMAT_MARKER.test(line)) versionContentHits.push(`${where}: format version ${line.trim()}`);
+      if (checksMarkers && !RDC_TOOL_PROTOCOL_FILES.has(rel) && PROTOCOL_MARKER.test(line))
+        versionContentHits.push(`${where}: format version ${line.trim()}`);
       if (!code) return;
       for (const match of line.matchAll(VERSIONED_IDENTIFIER)) {
         if (!EXTERNAL_IDENTIFIERS.some((allowed) => allowed.test(match[0])))
