@@ -586,6 +586,41 @@ describe('SessionContextJournal v2', () => {
     expect(JSON.stringify(result.messages)).not.toContain('Unverified partial answer');
   });
 
+  it('recovers an interrupted turn that also carries a system notice by selecting messages by role', () => {
+    const journal = new SessionContextJournal();
+    vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([]);
+    const base = { turnId: 'interrupted-turn', sessionId: 'session-1', projectId: 'project-1' };
+    vi.spyOn(conversationHistoryStore, 'readConversationHistory').mockReturnValue([
+      { ...base, id: 'user-1', role: 'user', content: 'Inspect event 42', createdAt: 1 },
+      {
+        ...base,
+        id: 'notice-1',
+        role: 'system',
+        content: 'Model switched.',
+        status: 'complete',
+        createdAt: 1,
+        diagnostic: { code: 'MODEL_CONTINUATION_DROPPED', severity: 'warning', userMessage: 'Model switched.' },
+      },
+      {
+        ...base,
+        id: 'assistant-1',
+        role: 'assistant',
+        content: 'Unverified partial answer',
+        status: 'error',
+        createdAt: 2,
+        updatedAt: 3,
+        diagnostic: { code: 'CONVERSATION_INTERRUPTED', severity: 'error', userMessage: 'Interrupted' },
+      },
+    ] as ConversationMessage[]);
+
+    const result = journal.materialize('session-1', ['interrupted-turn'], responsesPlan);
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages[0]).toMatchObject({ role: 'user', content: 'Inspect event 42' });
+    expect(JSON.stringify(result.messages)).toContain('interrupted before its context journal committed');
+    expect(JSON.stringify(result.messages)).not.toContain('Model switched.');
+    expect(JSON.stringify(result.messages)).not.toContain('Unverified partial answer');
+  });
+
   it('does not recover an unrelated missing terminal entry', () => {
     const journal = new SessionContextJournal();
     vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([]);

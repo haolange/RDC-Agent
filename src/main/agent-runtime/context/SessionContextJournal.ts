@@ -171,10 +171,13 @@ export class SessionContextJournal {
     const history = conversationHistoryStore.readConversationHistory(sessionId);
     const recovered = new Map<string, Message[]>();
     for (const turnId of missingTurnIds) {
-      const pair = history.filter((message) => message.turnId === turnId && message.sessionId === sessionId);
-      if (pair.length !== 2) continue;
-      const user = pair.find((message) => message.role === 'user');
-      const assistant = pair.find((message) => message.role === 'assistant');
+      // System notices (such as the model-switch continuation notice) share the turn id and are not prompt facts.
+      const turnMessages = history.filter((message) => message.turnId === turnId && message.sessionId === sessionId);
+      const users = turnMessages.filter((message) => message.role === 'user');
+      const assistants = turnMessages.filter((message) => message.role === 'assistant');
+      if (users.length !== 1 || assistants.length !== 1) continue;
+      const [user] = users;
+      const [assistant] = assistants;
       if (!user || !assistant || normalizeBranchId(user.branchId) !== normalizeBranchId(assistant.branchId)) continue;
       // A process crash can persist a visible, interrupted turn before its
       // terminal context transaction. Replay only the user's actual text and
