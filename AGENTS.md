@@ -94,7 +94,7 @@
 - **Zero Fake-Pass**。不用 mock、硬编码打桩、跳过编译、注释报错代码或旧缓存结果冒充当前代码路径通过。受控 fixture、真实模型请求、真实 RDC 回放是三种不同的证据，互不替代。改动使原有验证失效后重新跑通。
 - **失败先判对错**。测试失败时对照权威合同判断代码、测试或环境哪一方有误。不为通过测试恢复已撤回的行为，不删除仍有效的负向约束。
 - **格式**。Prettier 拥有代码与样式的排版（`.prettierrc.json`：120 列、单引号、分号、两空格缩进、尾逗号、LF）：
-  - `pnpm run lint` 在 ESLint 之后执行 `check:format`（`prettier --check`），CI `build` 的 lint 步骤因此也校验格式；改完代码运行 `pnpm run format`，不手工对齐，也不为排版写 ESLint 规则。
+  - `pnpm run lint` 在 ESLint 之后执行 `check:format`（`prettier --check`），`check:gates` 也串联它，CI `build` 的 lint 与门禁步骤因此都校验格式；改完代码运行 `pnpm run format`，不手工对齐，也不为排版写 ESLint 规则。
   - `.prettierignore` 排除字节即契约的内容：`resources/`（内置 agent 与 hook 按原始字节算信任 hash）、`__fixtures__/` 与 `patches/`（逐字回放或应用），以及 JSON、Markdown、YAML、HTML 等数据与文档。
   - 只改格式的提交单独提交，并把 SHA 追加进 `.git-blame-ignore-revs`；本地 `git config blame.ignoreRevsFile .git-blame-ignore-revs` 后 blame 跳过它们。
 - **文档引用**。`check:gates` 含 `check-doc-references`：
@@ -143,7 +143,7 @@
 | 测试 | `test`、`test:watch`、`test:coverage`、`test:coverage:renderer` |
 | 类型、lint 与格式 | `typecheck`、`lint`（含 `check:format`）、`check:format`、`format` |
 | 门禁总线 | `check:gates` |
-| `check:gates` 串联的仓库与架构门禁 | `check:readme-version`、`check:bundle-deps`、`check:indexed-access`、`check:unnecessary-condition`、`check:module-graph`、`check:function-budgets`、`check:repository-hygiene`、`check:architecture`、`check:orchestrator-facade`、`check:qa-ids`、`check:legacy-residue`、`check:acceptance-ledger`、`check:release-config`、`check:identity`、`check:secrets` |
+| `check:gates` 串联的仓库与架构门禁 | `check:readme-version`、`check:format`、`check:bundle-deps`、`check:indexed-access`、`check:unnecessary-condition`、`check:module-graph`、`check:function-budgets`、`check:repository-hygiene`、`check:architecture`、`check:orchestrator-facade`、`check:qa-ids`、`check:legacy-residue`、`check:acceptance-ledger`、`check:release-config`、`check:identity`、`check:secrets` |
 | `check:gates` 串联的领域与 UI 门禁 | `check:work-process-tool-coverage`、`check:agent-runtime`、`check:tool-system`、`check:session-projection`、`check:right-rail`、`check:knowledge-system`、`check:investigation-system`、`check:provider-system`、`check:design-tokens`、`check:ui-contract`、`check:renderer-structure`、`check:rdc-tool-guides` |
 | 行为门禁（`behaviorChecks.test.ts` 的子集） | `check:work-process`、`check:conversation-branch`、`check:reasoning-delivery`、`check:browser-capability`、`check:settings-agents`、`check:i18n`、`check:appearance`、`check:host-platform` |
 | 聚焦 vitest（随 `test` / `test:coverage` 运行） | `check:contracts`、`check:scoped-resources`、`check:project-instructions`、`check:prompt-plan-snapshot`、`check:skills`、`check:hooks`、`check:memory-policy`、`check:provider-catalog` |

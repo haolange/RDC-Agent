@@ -398,7 +398,7 @@ import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
 | `visual-diff` | 差分渲染：同一组录制场景在 base 与 head 构建上各渲染一次，比对 DOM 指纹与位图，未经 `Visual-Diff-Allow` trailer 声明的差异即失败；push 事件不运行，`src/renderer` / `src/shared` / `src/preload` / `scripts/visual-diff` 无变化时跳过 |
 | `release` / `prerelease` | tag 触发，见「发布面与运行面」 |
 
-- 代码与样式的排版由 Prettier 决定（`.prettierrc.json`，范围见 `.prettierignore`）；`lint` 在 ESLint 之后执行 `check:format`。只改格式的提交列在 `.git-blame-ignore-revs`。
+- 代码与样式的排版由 Prettier 决定（`.prettierrc.json`，范围见 `.prettierignore`）；`lint` 在 ESLint 之后执行 `check:format`，`check:gates` 也串联它。只改格式的提交列在 `.git-blame-ignore-revs`。
 - `check:gates` 串联 hygiene、架构与 façade、行为门禁、各领域 `check:*`、文档引用、设计 token 与 UI 契约等静态门禁，精确清单以 `package.json` 为准。`check:contracts` 等聚焦的 vitest 门禁在 `test:coverage` 内运行。
 - `check:coverage-ratchet` 是固定底线（基线 `scripts/fidelity/coverage-ratchet.json` 与 renderer 的 `scripts/fidelity/coverage-ratchet-renderer.json`），只在大幅回退时失败。
 - `check:module-graph`：`src/` 下每个生产模块都要能从发布入口或构建、脚本、设计系统预览经 import 到达，只被测试引用的放进 `testing/` 或 `fixtures/`；转发层（多数方法原样转给成员的类、每个导出函数都原样转给 import 的模块）被拒绝。
