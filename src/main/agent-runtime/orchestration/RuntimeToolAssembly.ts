@@ -203,7 +203,7 @@ export class RuntimeToolAssembly implements RuntimeToolResolver, RuntimeToolPoli
         await new TaskRegistry(createSessionTaskStore(sessionId)).assertApprovedTasksCompleted();
       }
       if (turnHandle?.requiresApprovedGoalClosure && ['partial', 'blocked', 'budget_paused'].includes(declaration.disposition)
-        && (!declaration.result?.summary?.trim() || !declaration.result.unresolved.some(item => item.blocker !== 'not_required'))) {
+        && (!declaration.result?.summary.trim() || !declaration.result.unresolved.some(item => item.blocker !== 'not_required'))) {
         throw new AppError('TURN_COMPLETION_INVALID', 'partial, blocked and budget-paused goals require a summary and at least one unresolved item whose blocker prevents the work now (capability, permission, budget, strategy or external). If nothing blocks a remaining item, continue it instead of stopping.');
       }
       if (turnHandle?.requiresApprovedGoalClosure && declaration.disposition === 'budget_paused' && !completionBudgetEvidence(turnHandle)) {

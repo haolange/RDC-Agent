@@ -169,7 +169,7 @@ export class ProfileTurnRunner {
     if (credentialProviderId) {
       scope.ownedCredentialHandle = await this.deps.credentials.refresh(credentialProviderId);
       const refreshed = this.enabledProfile(request.agentId, this.effectiveProfiles(request.projectRootPath));
-      route = refreshed?.compiledRoute?.providerId ? refreshed.compiledRoute : route;
+      route = refreshed?.compiledRoute.providerId ? refreshed.compiledRoute : route;
     }
     return this.completeRoute(request, scope, snapshot, route);
   }

@@ -114,7 +114,7 @@ export function collectStalePropagation(
     }
     if (entry.kind !== 'evidence_pack') continue;
     const pack = reader.readRecordBodyOf(entry, 'EvidencePack');
-    let changed = false;
+    let changed = false as boolean;
     const items = pack.items.map((evidence) => {
       if (evidence.worldStateId !== worldStateId || evidence.stale) return evidence;
       changed = true;

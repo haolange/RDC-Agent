@@ -52,7 +52,7 @@ function slugPath(title: string): string {
 /** Declared conditions only; an axis the card does not declare is unknown, not a match. */
 function formatKnowledgeScope(scope: KnowledgeScope | undefined): string {
   const applies = Object.entries(scope ?? {}).flatMap(([axis, value]) => axis !== 'exclusions' && typeof value === 'string' && value.trim() ? [`${axis}=${value}`] : []);
-  const excludes = Object.entries(scope?.exclusions ?? {}).flatMap(([axis, values]) => (values ?? []).map(value => `${axis}=${value}`));
+  const excludes = Object.entries(scope?.exclusions ?? {}).flatMap(([axis, values]) => values.map(value => `${axis}=${value}`));
   if (!applies.length && !excludes.length) return 'applies to: not declared';
   return `applies to: ${applies.length ? applies.join(', ') : 'not declared'}${excludes.length ? ` · excludes: ${excludes.join(', ')}` : ''}`;
 }

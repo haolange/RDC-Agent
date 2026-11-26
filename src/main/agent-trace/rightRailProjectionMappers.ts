@@ -61,7 +61,7 @@ export function mapRightRailOutputs(input: {
   runs: RunSummary[];
 }): OutputsPanelViewModel {
   const latestRunId = input.runs
-    .slice().sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))[0]?.runId;
+    .slice().sort((left, right) => right.startedAt - left.startedAt)[0]?.runId;
   const all = input.sources
     .filter((source) => source.kind === 'output')
     .map<TraceArtifactRecord>((source) => ({
@@ -108,7 +108,7 @@ export function buildTaskContext(input: {
   profileId?: string;
   permissionMode: string;
 }): ContextPanelViewModel['task'] {
-  const latest = input.runs.slice().sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))[0];
+  const latest = input.runs.slice().sort((left, right) => right.startedAt - left.startedAt)[0];
   const mode = latest?.profileId ?? input.profileId ?? DEFAULT_AGENT_ID;
   const profile = agentProfileRegistry.getForMode(mode);
   const resources: TaskContextResource[] = input.attachments.filter((item) => item.kind === 'attachment').map((item) => ({

@@ -193,6 +193,18 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     expect(() => mcpTrustService.assertConnectAllowed(docs!, project)).not.toThrow();
   });
 
+  it('loads an MCP descriptor with an unsupported transport as blocked and refuses to connect it', async () => {
+    const userMcp = path.join(userRoot, 'mcp');
+    fs.mkdirSync(userMcp, { recursive: true });
+    fs.writeFileSync(path.join(userMcp, 'legacy.mcp.json'), JSON.stringify({ id: 'legacy', name: 'Legacy', description: '', transport: 'sse', url: 'http://127.0.0.1:1' }));
+
+    const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    const { mcpTrustService } = await import('../settings-core/McpTrustService');
+    const legacy = new AgentRuntimeConfigService().listMcpServers().find((server) => server.id === 'legacy');
+    expect(legacy).toMatchObject({ enabledByDefault: false, blockedReason: 'MCP_TRANSPORT_UNSUPPORTED: sse' });
+    expect(() => mcpTrustService.assertConnectAllowed(legacy!)).toThrow(/MCP_TRANSPORT_UNSUPPORTED/);
+  });
+
   it('binds project MCP trust to the launched script bytes, not just the descriptor', async () => {
     const project = path.join(root, 'project');
     const projectMcp = path.join(project, '.rdc-agent', 'mcp');

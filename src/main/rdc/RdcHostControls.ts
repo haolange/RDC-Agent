@@ -22,7 +22,7 @@ function readReplayIsolation(scope: RdcHostControlScope, context?: ToolExecution
   if (!lease || lease.delegatedFrom || lease.version !== scope.leaseVersion
     || !lease.runtimeContext.captureFileId || !lease.runtimeContext.replaySessionId
     || lease.runtimeContext.captureFileId !== identity.runtimeContext?.captureFileId
-    || lease.runtimeContext.replaySessionId !== identity.runtimeContext?.replaySessionId) return unavailable;
+    || lease.runtimeContext.replaySessionId !== identity.runtimeContext.replaySessionId) return unavailable;
   if (listRdcContextLeaseSessionIds().some(id => id !== scope.sessionId
     && getRdcContextLease(id)?.contextId === scope.contextId)) return unavailable;
   return { available: true as const, source: 'main-owned-lease-and-turn-lock' as const,

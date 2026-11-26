@@ -17,24 +17,26 @@ export async function withRdcRemoteProgress<T>(contextId: string, cli: RdcCliInv
   signal: AbortSignal | undefined, progress: RdcRemoteProgress, operation: () => Promise<T>): Promise<T> {
   const startedAt = Date.now();
   let finished = false;
+  // Re-read after each await: the connect action sets finished when it joins.
+  const isFinished = () => finished;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let wake: (() => void) | undefined;
   let traceId: string | undefined;
   const poll = async () => {
-    while (!finished && !signal?.aborted && progress.onPreparationStage) {
+    while (!isFinished() && !signal?.aborted && progress.onPreparationStage) {
       try {
         const result = parseRdcNativeResult(await rdcCliInvokerService.executeCLI('daemon', ['status', '--daemon-context', contextId], {
           contextId, timeout: 5000, settings: cli,
         }));
         const state = record(result.data.state); const active = record(state?.active_operation);
-        if (!finished && !signal?.aborted && result.result_kind === 'rdc_tool.daemon.status' && state?.context_id === contextId
+        if (!isFinished() && !signal?.aborted && result.result_kind === 'rdc_tool.daemon.status' && state?.context_id === contextId
           && active?.operation === 'rd.remote.connect' && typeof active.started_at_ms === 'number' && active.started_at_ms >= startedAt
           && typeof active.trace_id === 'string' && active.trace_id.trim().length > 0 && (!traceId || active.trace_id === traceId)) {
           traceId = active.trace_id;
-          if (phases.has(String(active.stage))) progress.onPreparationStage?.(active.stage as DevicePreparationPhase);
+          if (phases.has(String(active.stage))) progress.onPreparationStage(active.stage as DevicePreparationPhase);
         }
       } catch { /* The connect result remains authoritative when status is unavailable. */ }
-      if (!finished && !signal?.aborted) await new Promise<void>(resolve => { wake = resolve; timer = setTimeout(resolve, 250); });
+      if (!isFinished() && !signal?.aborted) await new Promise<void>(resolve => { wake = resolve; timer = setTimeout(resolve, 250); });
     }
   };
   const polling = poll();
@@ -58,7 +60,7 @@ export async function withRdcRemoteProgress<T>(contextId: string, cli: RdcCliInv
           const deviceAction = unconfirmedDeviceAction(details ?? undefined);
           const identity = deviceInstallationIdentity(details ?? undefined);
           if (deviceAction) progress.onDeviceAction?.({ code: 'remote_install_unconfirmed', stage: 'installing',
-            diagnostic: typeof stage?.message === 'string' ? stage.message : 'Native PackageManager result remains unconfirmed.',
+            diagnostic: typeof stage.message === 'string' ? stage.message : 'Native PackageManager result remains unconfirmed.',
             recovery: identity ? 'retry' : null, deviceAction }, identity);
           if (typeof receipt?.installed_apk !== 'boolean' || typeof receipt.uninstalled_existing !== 'boolean'
             || !['existing', 'install', 'update', 'force_replace'].includes(String(receipt.install_mode))) continue;

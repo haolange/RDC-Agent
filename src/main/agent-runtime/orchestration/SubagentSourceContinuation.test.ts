@@ -25,7 +25,7 @@ import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifac
 import { delegatedArtifactReferences, resolveDelegatedArtifactRead } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
 import { wireSubagentRunner } from '../../testing/subagentRunnerDoubles';
-import { createSubagentBudgetState, type TurnHandle } from './TurnCoordinator';
+import { createPolicyBudgetState, createSubagentBudgetState, type TurnHandle } from './TurnCoordinator';
 import { createBackgroundSubagentService } from './BackgroundSubagentService';
 import type { AgentProfileTurnOptions } from './orchestratorTypes';
 import type { DelegationCapsule } from './delegationCapsule';
@@ -35,7 +35,7 @@ const delegatingTurn = (): TurnHandle => ({
   runtimePlan: { profileDelegates: [], accessCeiling: 'full' },
   registerProducer: () => () => undefined,
   subagentBudget: createSubagentBudgetState(),
-  generation: 1,
+  generation: 1, signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
   isLive: () => true,
 }) as unknown as TurnHandle;
 

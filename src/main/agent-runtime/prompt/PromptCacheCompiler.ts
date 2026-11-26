@@ -78,7 +78,8 @@ export class PromptCacheCompiler {
         return disabledCache(input, 'Explicit cache mode has no compatible breakpoint carrier.');
       }
       breakpoint = 'explicit';
-    } else if (plan.mode === 'automatic-and-explicit-breakpoints') {
+    } else {
+      // automatic-and-explicit-breakpoints
       if (
         plan.breakpointCarrier !== 'openai-prompt-cache'
         && plan.breakpointCarrier !== 'anthropic-cache-control'
@@ -86,8 +87,6 @@ export class PromptCacheCompiler {
         return disabledCache(input, 'Combined cache mode has no compatible breakpoint carrier.');
       }
       breakpoint = 'automatic-and-explicit';
-    } else {
-      return disabledCache(input, 'Cache contract has no supported compiler target.');
     }
 
     const reason = [

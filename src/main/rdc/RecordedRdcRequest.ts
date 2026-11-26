@@ -87,7 +87,7 @@ export function materializeRecordedRdcRequest(
       if (block.type !== 'toolCall' || block.id !== output.source.toolCallId) return [];
       const request = object(block.arguments.rdc);
       if (!request) throw new SessionArtifactError('ARTIFACT_REQUEST_UNAVAILABLE', 'Recorded call is not a structured RDC request.');
-      if (block.name !== 'shell' || request?.operation !== operation || !object(request.args)) fail('Recorded tool call does not match the native output operation.');
+      if (block.name !== 'shell' || request.operation !== operation || !object(request.args)) fail('Recorded tool call does not match the native output operation.');
       return [{ request: { operation, args: request.args, ...experimentField(request) }, turnId: entry.turnId, branchId: entry.branchId,
         messageTimestamp: message.timestamp, executionFingerprint: entry.executionIdentity.fingerprint }];
     });

@@ -108,12 +108,16 @@ export interface AgentDisplayInfo {
   accent: string;
 }
 
+/** Lookups by any Agent id: only the built-in Agents have a seed accent and a display name. */
+const SEED_ACCENT_BY_ID: Readonly<Partial<Record<string, string>>> = AGENT_SEED_ACCENTS;
+const DISPLAY_NAME_BY_ID: Readonly<Partial<Record<string, string>>> = AGENT_DISPLAY_NAMES;
+
 export function resolveAgentDisplay(agentId: string, definitions: AgentManifestDefinition[]): AgentDisplayInfo {
   const manifest = definitions.find((d) => d.id === agentId);
-  const seed = AGENT_SEED_ACCENTS[agentId as AgentId] ?? COMPOSE_ACCENT_FALLBACK;
+  const seed = SEED_ACCENT_BY_ID[agentId] ?? COMPOSE_ACCENT_FALLBACK;
   return {
-    name: manifest?.name ?? AGENT_DISPLAY_NAMES[agentId as AgentId] ?? agentId,
-    glyph: (manifest?.name ?? AGENT_DISPLAY_NAMES[agentId as AgentId] ?? agentId).slice(0, 2).toUpperCase(),
+    name: manifest?.name ?? DISPLAY_NAME_BY_ID[agentId] ?? agentId,
+    glyph: (manifest?.name ?? DISPLAY_NAME_BY_ID[agentId] ?? agentId).slice(0, 2).toUpperCase(),
     icon: manifest?.icon ?? AGENT_MODE_MAP[agentId]?.icon ?? 'message-orbit',
     accent: normalizeAgentAccent(manifest?.accent, seed),
   };

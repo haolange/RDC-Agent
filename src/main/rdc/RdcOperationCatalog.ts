@@ -27,7 +27,7 @@ export function validateDefinitions(value: unknown, count: unknown, fingerprint:
       || ![null, 'measurement', 'intervention', 'rollback'].includes(raw.evidence_kind)
       || raw.input_schema?.type !== 'object' || raw.input_schema?.additionalProperties !== false
       || !raw.input_schema.properties || typeof raw.input_schema.properties !== 'object'
-      || !Array.isArray(raw.path_inputs) || raw.path_inputs.some((entry: Record<string, unknown>) => !entry || typeof entry.name !== 'string' || !Object.hasOwn(raw.input_schema.properties, entry.name) || !['read', 'write', 'read_directory'].includes(String(entry.access)))) {
+      || !Array.isArray(raw.path_inputs) || raw.path_inputs.some((entry: Record<string, unknown> | null) => !entry || typeof entry.name !== 'string' || !Object.hasOwn(raw.input_schema.properties, entry.name) || !['read', 'write', 'read_directory'].includes(String(entry.access)))) {
       throw new AppError('RDC_UPGRADE_REQUIRED', 'unrecognized operation contract. Update RDC-Tool and RDC-Agent together.');
     }
     names.add(raw.name);

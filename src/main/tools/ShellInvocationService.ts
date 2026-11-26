@@ -16,7 +16,7 @@ export interface ShellInvocationRequest {
 }
 
 export function resolveExitCode(code: number | null, signal: NodeJS.Signals | null): number {
-  if (code !== null && code !== undefined) {
+  if (code !== null) {
     return code;
   }
   if (signal) {

@@ -40,7 +40,6 @@ export async function readLimitedBytes(response: Response, maxBytes: number): Pr
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    if (!value) continue;
     if (total + value.byteLength > maxBytes) {
       await reader.cancel().catch(() => undefined);
       return null;

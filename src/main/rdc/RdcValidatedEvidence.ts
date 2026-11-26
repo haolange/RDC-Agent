@@ -60,8 +60,8 @@ export async function validateExecutionEvidence(definition: RdcOperationDefiniti
       || timing.includes_replay_scheduling_gaps !== true || timing.original_application_frame_time !== false
       || !Array.isArray(timing.samples) || timing.samples.length !== (args.samples ?? 3)
       || timing.samples.some(value => !finite(value) || Number(value) <= 0)
-      || sampling?.samples !== (args.samples ?? 3) || sampling?.warmup !== (args.warmup ?? 1)
-      || range?.first_event_id !== 1 || !eventId(range?.last_event_id) || Number(range?.last_event_id) < 1
+      || sampling?.samples !== (args.samples ?? 3) || sampling.warmup !== (args.warmup ?? 1)
+      || range?.first_event_id !== 1 || !eventId(range.last_event_id) || Number(range.last_event_id) < 1
       || !Array.isArray(result.replacement_ids) || canonicalJson([...result.replacement_ids].sort()) !== canonicalJson(expectedReplacements)) invalid();
     return { kind: 'measurement', method: 'frame_timing', conditionsFingerprint: digest({
       captureId, method: timing.method, scope: timing.scope, unit: timing.unit, range, sampling,
@@ -69,9 +69,11 @@ export async function validateExecutionEvidence(definition: RdcOperationDefiniti
     }), values: timing.samples };
   }
   if (Array.isArray(result.event_durations)) {
-    const rows = result.event_durations as Record<string, unknown>[];
-    if (!rows.length || rows.some(row => !row || !eventId(row.event_id) || !finite(row.duration_us) || Number(row.duration_us) < 0)
-      || new Set(rows.map(row => row.event_id)).size !== rows.length) invalid();
+    // Rows come from the native result as parsed JSON, so an entry may be null.
+    const entries = result.event_durations as (Record<string, unknown> | null)[];
+    if (!entries.length || entries.some(row => !row || !eventId(row.event_id) || !finite(row.duration_us) || Number(row.duration_us) < 0)) invalid();
+    const rows = entries as Record<string, unknown>[];
+    if (new Set(rows.map(row => row.event_id)).size !== rows.length) invalid();
     const samples = [...rows].sort((a, b) => Number(a.event_id) - Number(b.event_id));
     return { kind: 'measurement', method: 'event_durations', conditionsFingerprint: digest({ events: samples.map(row => row.event_id), unit: 'us' }), values: samples.map(row => row.duration_us) };
   }

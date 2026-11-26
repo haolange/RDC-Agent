@@ -152,7 +152,7 @@ export const selectAvailableCodingPlanModels = (models: LlmProviderModel[]): Llm
 export const buildManagedAliasIndex = (providerId: string): Map<string, readonly string[]> => {
   const map = new Map<string, readonly string[]>();
   for (const entry of getProviderModelDefinitions(providerId)) {
-    map.set(entry.modelId, entry.aliases ?? []);
+    map.set(entry.modelId, entry.aliases);
   }
   return map;
 };

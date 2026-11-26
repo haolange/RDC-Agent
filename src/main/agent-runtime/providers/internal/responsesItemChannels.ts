@@ -121,7 +121,7 @@ export class ResponsesItemChannels {
     const state = this.reasoningState(identity, mode, artifact);
     if (state.closed) return;
     this.startReasoning(identity, mode, artifact);
-    if (state.closed || !state.started) return;
+    if (!state.started) return;
     if (mode !== state.mode) {
       state.mode = mode;
       this.builder.updateThinking(this.reasoningRef(state), this.meta(mode, artifact ?? state.artifact));

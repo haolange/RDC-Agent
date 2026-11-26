@@ -119,6 +119,9 @@ function computeNextRetryAt(attempts: number, now = Date.now()): number {
   return now + delay;
 }
 
+/** Re-read after the awaits in evictPool: quarantinePool may have run meanwhile. */
+const isQuarantined = (pool: ProjectMcpPool): boolean => pool.quarantined;
+
 export class McpConnectionCoordinator {
   private readonly pools = new Map<string, ProjectMcpPool>();
   /** Maps `${rootKey}::${projectId}` → active poolKey. */
@@ -436,10 +439,10 @@ export class McpConnectionCoordinator {
         return;
       }
     } finally {
-      if (!pool.quarantined && this.pools.get(pool.key) === pool) {
+      if (!isQuarantined(pool) && this.pools.get(pool.key) === pool) {
         this.pools.delete(pool.key);
         this.clearActiveMapping(pool);
-      } else if (pool.quarantined) {
+      } else if (isQuarantined(pool)) {
         // Keep identity in registry while quarantined; allow no new turns.
         pool.closing = true;
         pool.activeTurnRefs = 0;
@@ -496,7 +499,7 @@ export class McpConnectionCoordinator {
         },
       });
     }, MCP_ORPHAN_DEADLINE_MS);
-    record.deadlineTimer.unref?.();
+    record.deadlineTimer.unref();
 
     if (supervised.length === 0) {
       // No handle to observe; keep quarantined until shutdown disconnectAll.

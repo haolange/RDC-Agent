@@ -308,7 +308,7 @@ function convertMessage(message: Message, requestPlan: RequestPlan): GeminiConte
     for (const block of message.content) {
       if (block.type === 'text') {
         parts.push({ text: block.text });
-      } else if (block.type === 'image') {
+      } else {
         parts.push({
           inlineData: { mimeType: block.mimeType, data: block.data },
         });
@@ -342,9 +342,9 @@ function convertMessage(message: Message, requestPlan: RequestPlan): GeminiConte
         } else if (block.text) {
           parts.push({ text: block.text, thought: true, thoughtSignature: block.continuation.thoughtSignature });
         }
-      } else if (block.type === 'toolCall') {
+      } else {
         parts.push({
-          functionCall: { name: block.name, args: block.arguments ?? {} },
+          functionCall: { name: block.name, args: block.arguments },
           ...(pendingSignatures.has(block.id) ? { thoughtSignature: pendingSignatures.get(block.id) } : {}),
         });
       }

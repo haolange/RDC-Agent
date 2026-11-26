@@ -52,8 +52,9 @@ export interface HookExecutionResult {
 }
 
 const parseHookFile = (sourcePath: string): HookDefinition => {
-  const value = YAML.parse(fs.readFileSync(sourcePath, 'utf8')) as Partial<HookDefinition>;
-  if (!value || typeof value !== 'object') throw new Error(`Invalid hook file: ${sourcePath}`);
+  const parsed: unknown = YAML.parse(fs.readFileSync(sourcePath, 'utf8'));
+  if (!parsed || typeof parsed !== 'object') throw new Error(`Invalid hook file: ${sourcePath}`);
+  const value = parsed as Partial<HookDefinition>;
   if (!value.id?.trim() || !value.event || !value.command?.trim()) throw new Error(`Hook requires id, event, and command: ${sourcePath}`);
   if (!['block', 'warn'].includes(value.failurePolicy ?? '')) throw new Error(`Hook failurePolicy must be block or warn: ${sourcePath}`);
   return {
@@ -140,7 +141,8 @@ export class HookEngine {
     this.invalid = [...this.files.invalid];
 
     // A damaged trust file is reported like a damaged hook file; until the user trusts again, nothing in it counts.
-    let trustDamage: string | null = null;
+    // Set by trustRecord, which the hook mapping below calls.
+    let trustDamage = null as string | null;
     const trustRecord = (scope: TrustScope, ownerRoot: string, hookId: string): TrustRecord | undefined => {
       if (trustDamage !== null) return undefined;
       try {
@@ -371,7 +373,7 @@ export class HookEngine {
     } catch {
       // ignore broken stdin
     }
-    const info = await supervised.join(definition.timeoutMs ?? 120_000);
+    const info = await supervised.join(definition.timeoutMs);
     const stdout = supervised.stdout.toString().slice(0, MAX_OUTPUT_BYTES);
     const stderr = supervised.stderr.toString().slice(0, MAX_OUTPUT_BYTES);
     if (info.reason === 'unconfirmed_orphan') {

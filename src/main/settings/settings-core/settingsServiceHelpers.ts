@@ -14,7 +14,7 @@ export function stableSerialize(value: unknown): string {
       .map(([key, child]) => `${JSON.stringify(key)}:${stableSerialize(child)}`)
       .join(',')}}`;
   }
-  return JSON.stringify(value) ?? 'null';
+  return (JSON.stringify(value) as string | undefined) ?? 'null';
 }
 
 export function hashProviderDefinition(provider: LlmProviderEntry): string {

@@ -18,7 +18,7 @@ import type { AgentTurnRun } from './AgentTurnRunner';
 export function reportRouteDiagnostics(run: AgentTurnRun, sharedEventContext: AgentEventBridgeContext, toolDefinitionCount: number): void {
   const { input, preparedRuntime, requestPlan, effectiveModel, executionScopeId } = run;
   const { routeCapability } = preparedRuntime;
-  const mcpConnectionErrors = preparedRuntime.mcpConnectionErrors ?? [];
+  const { mcpConnectionErrors } = preparedRuntime;
   const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, toolDefinitionCount);
   if (mcpConnectionErrors.length > 0) {
     input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {

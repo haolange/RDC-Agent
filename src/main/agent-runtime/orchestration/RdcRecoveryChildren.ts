@@ -58,7 +58,7 @@ async function boundedJoin<T>(joining: Promise<T>, signal?: AbortSignal): Promis
     abort = () => reject(new DOMException('Recovery was cancelled.', 'AbortError'));
     if (signal?.aborted) abort(); else signal?.addEventListener('abort', abort, { once: true });
     timer = setTimeout(() => reject(new AppError('RDC_RECOVERY_CHILD_EXIT_UNCONFIRMED', 'child join timed out.')), 15_000);
-    timer.unref?.();
+    timer.unref();
   });
   try { return await Promise.race([joining, stop]); }
   finally { if (timer) clearTimeout(timer); if (abort) signal?.removeEventListener('abort', abort); }

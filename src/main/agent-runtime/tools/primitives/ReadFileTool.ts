@@ -89,7 +89,7 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails | FileAudit
       const details = await auditFiles(params, context, signal);
       return { content: [{ type: 'text', text: JSON.stringify(details) }], details };
     }
-    if ((params.mode !== undefined && params.mode !== 'text') || params.expectedHash !== undefined
+    if (params.expectedHash !== undefined
       || params.compareWith !== undefined || params.textComparison !== undefined) {
       throw new AppError('FILE_READ_MODE_INVALID', 'audit options require explicit mode=audit.');
     }

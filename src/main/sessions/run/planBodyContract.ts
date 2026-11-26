@@ -16,7 +16,7 @@ export function findInternalReferences(text: string): Array<{ kind: string; valu
   const found = new Map<number, { kind: string; value: string; end: number }>();
   for (const { kind, pattern } of INTERNAL_REFERENCES) {
     for (const match of text.matchAll(pattern)) {
-      const start = match.index ?? 0;
+      const start = match.index;
       const end = start + match[0].length;
       const overlaps = [...found.entries()].some(([other, entry]) => start < entry.end && other < end);
       if (!overlaps) found.set(start, { kind, value: match[0], end });

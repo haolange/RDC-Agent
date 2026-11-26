@@ -108,7 +108,7 @@ export interface SessionArtifactCapacity {
 function defaultResolveSessionPath(sessionId: string): string | null {
   try {
     const session = sessionRecordStore.readSession(sessionId);
-    const sessionPath = session?.sessionPath?.trim();
+    const sessionPath = session?.sessionPath.trim();
     return sessionPath || null;
   } catch {
     return null;
@@ -164,7 +164,7 @@ function realpathExistingAncestor(target: string): string {
   }
   if (fs.existsSync(current)) {
     assertNoSymlinkPath(current);
-    current = fs.realpathSync.native ? fs.realpathSync.native(current) : fs.realpathSync(current);
+    current = fs.realpathSync.native(current);
   }
   for (const part of missing) {
     current = path.join(current, part);
@@ -346,9 +346,7 @@ export class SessionArtifactResolver {
       throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', `session path missing: ${owningSessionId}`);
     }
     assertNoSymlinkPath(resolvedSession);
-    const realSession = fs.realpathSync.native
-      ? fs.realpathSync.native(resolvedSession)
-      : fs.realpathSync(resolvedSession);
+    const realSession = fs.realpathSync.native(resolvedSession);
     const artifactsRoot = path.join(realSession, SESSION_ARTIFACT_ROOT_DIR);
     const categoryRoot = path.join(artifactsRoot, parsed.category);
     const lexical = path.resolve(categoryRoot, parsed.relativePath);
@@ -413,7 +411,7 @@ export class SessionArtifactResolver {
       }
     }
     if ((options?.jsonTextPointers !== undefined || options?.textPointer !== undefined) && fileMimeType !== 'application/json') {
-      throw new SessionArtifactError('ARTIFACT_MIME_DENIED', options?.textPointer !== undefined
+      throw new SessionArtifactError('ARTIFACT_MIME_DENIED', options.textPointer !== undefined
         ? 'Text selection requires a JSON artifact. Omit textPointer for images or plain text.'
         : 'JSON inspection requires a JSON artifact. Omit jsonTextPointers entirely for image or plain-text reads; [] explicitly requests JSON inspection. Do not repeat the same rejected arguments.');
     }
@@ -693,9 +691,7 @@ export class SessionArtifactResolver {
       throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', `session path missing: ${sessionId}`);
     }
     assertNoSymlinkPath(resolvedSession);
-    const realSession = fs.realpathSync.native
-      ? fs.realpathSync.native(resolvedSession)
-      : fs.realpathSync(resolvedSession);
+    const realSession = fs.realpathSync.native(resolvedSession);
     return path.join(realSession, SESSION_ARTIFACT_ROOT_DIR);
   }
 

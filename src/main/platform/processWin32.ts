@@ -40,7 +40,7 @@ export function createWin32ProcessBackend(deps: Win32ProcessDeps = defaultDeps):
       stdio: ['ignore', 'pipe', 'ignore'],
     });
     if (result.error) throw result.error;
-    return { status: result.status, stdout: String(result.stdout ?? '').trim() };
+    return { status: result.status, stdout: result.stdout.trim() };
   };
 
   const isRunning = (pid: number): boolean => {

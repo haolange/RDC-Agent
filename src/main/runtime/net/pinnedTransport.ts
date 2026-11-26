@@ -34,7 +34,7 @@ export async function requestPinned(
   const lookupPinned: LookupFunction = (_hostname, options, callback) => {
     const cb = typeof options === 'function' ? options : callback;
     if (typeof cb !== 'function') return;
-    const wantAll = typeof options === 'object' && options && 'all' in options && options.all;
+    const wantAll = typeof options === 'object' && 'all' in options && options.all;
     if (wantAll) {
       (cb as (err: NodeJS.ErrnoException | null, addresses: Array<{ address: string; family: number }>) => void)(
         null,

@@ -151,9 +151,7 @@ export async function writeTextFileNoFollow(absolutePath: string, content: strin
     assertNoSymlinkPath(target);
   }
 
-  const realParent = fs.realpathSync.native
-    ? fs.realpathSync.native(parentDir)
-    : fs.realpathSync(parentDir);
+  const realParent = fs.realpathSync.native(parentDir);
   const finalTarget = path.join(realParent, path.basename(target));
   if (!isWithinRoot(finalTarget, realParent)) {
     throw new AppError('WRITE_PARENT_ESCAPE', `resolved write target escaped parent ${realParent}`);
@@ -185,9 +183,7 @@ export async function writeTextFileNoFollow(absolutePath: string, content: strin
 }
 
 function realpathNative(target: string): string {
-  const resolved = fs.realpathSync.native
-    ? fs.realpathSync.native(target)
-    : fs.realpathSync(target);
+  const resolved = fs.realpathSync.native(target);
   return path.resolve(stripLongPathPrefix(resolved));
 }
 

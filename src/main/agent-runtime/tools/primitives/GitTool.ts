@@ -73,10 +73,7 @@ async function runGit(
       timeout: GIT_TIMEOUT_MS,
       signal,
     });
-    return {
-      stdout: String(result.stdout ?? ''),
-      stderr: String(result.stderr ?? ''),
-    };
+    return { stdout: result.stdout, stderr: result.stderr };
   } catch (error) {
     const err = error as Error & { stdout?: string | Buffer; stderr?: string | Buffer; killed?: boolean };
     if (err.killed || /timed out/i.test(err.message)) {
@@ -103,7 +100,7 @@ async function resolveGitRoot(workspaceRoot: string, signal?: AbortSignal): Prom
 }
 
 function validateGitPath(input: string): string {
-  const value = String(input ?? '').trim().replace(/\\/g, '/');
+  const value = input.trim().replace(/\\/g, '/');
   if (!value || value.includes('\0') || value.startsWith('/') || /^[A-Za-z]:/.test(value)) {
     throw new Error(`Invalid git path: ${input}`);
   }
@@ -265,7 +262,7 @@ export const gitCommitTool: AgentTool<GitCommitParams, GitDetails> = {
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
-    const message = String(params.message ?? '').trim();
+    const message = params.message.trim();
     if (!message) {
       throw new Error('Commit message is required.');
     }

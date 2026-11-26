@@ -86,7 +86,7 @@ export function createSubagentTools(host: SubagentToolHost, parentAgentId: Agent
       if (!parentAccessCeiling) {
         throw new AppError('SUBAGENT_PARENT_PLAN_REQUIRED', 'delegation needs the delegating turn\'s frozen runtime plan.');
       }
-      const resolvedSessionId = sessionId ?? turn?.eventSink?.sessionId ?? null;
+      const resolvedSessionId = sessionId ?? turn.eventSink?.sessionId ?? null;
       const inheritedScope = resolvedSessionId ? getDelegatedTaskScope(resolvedSessionId) : null;
       const ownerSessionId = inheritedScope?.ownerSessionId ?? resolvedSessionId;
       if (inheritedScope?.executionId && parentExecutionId && parentExecutionId !== inheritedScope.executionId) {
@@ -118,11 +118,11 @@ export function createSubagentTools(host: SubagentToolHost, parentAgentId: Agent
           parentAccessCeiling,
           targetProfile,
           capsule,
-          projectRootPath: turn?.eventSink?.projectRootPath ?? null,
-          projectId: turn?.eventSink?.projectId ?? null,
-          policyBudget: turn?.policyBudget,
-          subagentBudget: turn?.subagentBudget,
-          parentOnEvent: turn?.eventSink?.onEvent,
+          projectRootPath: turn.eventSink?.projectRootPath ?? null,
+          projectId: turn.eventSink?.projectId ?? null,
+          policyBudget: turn.policyBudget,
+          subagentBudget: turn.subagentBudget,
+          parentOnEvent: turn.eventSink?.onEvent,
         });
         return {
           content: [{ type: 'text', text: `Background subagent started: ${execution.id}` }],
@@ -134,8 +134,8 @@ export function createSubagentTools(host: SubagentToolHost, parentAgentId: Agent
       let unregisterOwner: (() => void) | undefined;
       const executionController = new AbortController();
       const forwardAbort = () => executionController.abort();
-      const sourceSignal = signal ?? turn?.signal ?? null;
-      if (sourceSignal?.aborted) forwardAbort();
+      const sourceSignal = signal ?? turn.signal;
+      if (sourceSignal.aborted) forwardAbort();
       let runPromise: Promise<Awaited<ReturnType<SubagentToolHost['runSubagent']>>> | undefined;
       let releaseExecutionBudgetObserver: (() => void) | undefined;
       if (taskId) {
@@ -145,9 +145,8 @@ export function createSubagentTools(host: SubagentToolHost, parentAgentId: Agent
           ? await registry.getExecution(effectiveParentExecutionId)
           : null;
         const previousExecution = (await registry.listExecutions(taskId)).at(-1);
-        const rootBudgetId = parentExecution?.rootBudgetId ?? (turn?.policyBudget
-          ? await bindTaskRootBudget(registry, ownerSessionId, turn.policyBudget, previousExecution?.rootBudgetId)
-          : undefined);
+        const rootBudgetId = parentExecution?.rootBudgetId
+          ?? await bindTaskRootBudget(registry, ownerSessionId, turn.policyBudget, previousExecution?.rootBudgetId);
         const startedAt = Date.now();
         execution = await registry.startExecution(taskId, {
           mode: 'subagent',
@@ -163,12 +162,12 @@ export function createSubagentTools(host: SubagentToolHost, parentAgentId: Agent
             toolCalls: 0,
             maxSubagents: capsule.budget.maxSubagents,
             subagents: 0,
-            maxChildDepth: turn?.policyBudget?.maxChildDepth,
-            childDepth: (turn?.subagentBudget.depth ?? 0) + 1,
-            deadlineAt: capsule.budget.maxWallTimeMs === undefined && (!turn?.policyBudget || turn.policyBudget.maxWallTimeMs === Number.MAX_SAFE_INTEGER)
+            maxChildDepth: turn.policyBudget.maxChildDepth,
+            childDepth: turn.subagentBudget.depth + 1,
+            deadlineAt: capsule.budget.maxWallTimeMs === undefined && turn.policyBudget.maxWallTimeMs === Number.MAX_SAFE_INTEGER
               ? undefined
               : Math.min(capsule.budget.maxWallTimeMs === undefined ? Infinity : startedAt + capsule.budget.maxWallTimeMs,
-                turn?.policyBudget ? turn.policyBudget.wallStartedAt + turn.policyBudget.maxWallTimeMs : Infinity),
+                turn.policyBudget.wallStartedAt + turn.policyBudget.maxWallTimeMs),
           },
         });
         unregisterOwner = registerTaskExecutionCancellationOwner(execution.id, async () => {
@@ -176,7 +175,7 @@ export function createSubagentTools(host: SubagentToolHost, parentAgentId: Agent
           await runPromise?.catch(() => undefined);
         });
       }
-      if (!sourceSignal?.aborted) sourceSignal?.addEventListener('abort', forwardAbort, { once: true });
+      if (!sourceSignal.aborted) sourceSignal.addEventListener('abort', forwardAbort, { once: true });
       let result: Awaited<ReturnType<SubagentToolHost['runSubagent']>>;
       try {
         runPromise = host.runSubagent({
@@ -186,9 +185,9 @@ export function createSubagentTools(host: SubagentToolHost, parentAgentId: Agent
           targetProfile,
           capsule,
           parentSessionId: sessionId ?? null,
-          parentOnEvent: turn?.eventSink?.onEvent,
-          projectRootPath: turn?.eventSink?.projectRootPath ?? null,
-          projectId: turn?.eventSink?.projectId ?? null,
+          parentOnEvent: turn.eventSink?.onEvent,
+          projectRootPath: turn.eventSink?.projectRootPath ?? null,
+          projectId: turn.eventSink?.projectId ?? null,
           parentTurn: turn,
           taskId: taskId || undefined,
           executionId: execution?.id,
@@ -287,7 +286,7 @@ export function createSubagentTools(host: SubagentToolHost, parentAgentId: Agent
       } finally {
         releaseExecutionBudgetObserver?.();
         unregisterOwner?.();
-        sourceSignal?.removeEventListener('abort', forwardAbort);
+        sourceSignal.removeEventListener('abort', forwardAbort);
       }
       return {
         content: [{ type: 'text', text: JSON.stringify(projectSubagentResult(envelope)) }],

@@ -48,11 +48,16 @@ export function modelProbeItems(providerId: string, model: EffectiveModel): Prov
 }
 
 /** Owns a single in-memory batch and joins its request before releasing cancellation. */
+/** Read once the probe settles: the batch may have been cancelled while it ran. */
+const settledState = (signal: AbortSignal): 'cancelled' | 'settled' => (signal.aborted ? 'cancelled' : 'settled');
+
 export class ProviderProbeBatchService {
   private batch: ProviderProbeBatch | null = null;
   private preparing = false;
   private revision = 0;
   private closed = false;
+  /** Re-read after the catalog loads: close() may land while a batch is prepared. */
+  private isClosed(): boolean { return this.closed; }
   private controller?: AbortController;
   private completion?: Promise<void>;
   private readonly identities = new Map<string, string>();
@@ -96,7 +101,7 @@ export class ProviderProbeBatchService {
       }
       batch.modelCount = new Set(batch.items.map(i => `${i.providerId}\0${i.modelId}`)).size;
       batch.requestCount = batch.items.filter(i => i.state === 'pending').length;
-      if (this.closed) throw new Error('Capability batches are shutting down.');
+      if (this.isClosed()) throw new Error('Capability batches are shutting down.');
       this.batch = batch;
       this.emit();
       return structuredClone(batch);
@@ -148,7 +153,7 @@ export class ProviderProbeBatchService {
       this.emit();
       try { item.result = await this.dependencies.test(item, signal); }
       catch (error) { item.result = { success: false, status: 'failed', requestSent: false, detail: error instanceof Error ? error.message : String(error) }; }
-      item.state = signal.aborted ? 'cancelled' : 'settled';
+      item.state = settledState(signal);
       if (item.mode === 'default' && item.result.failureKind === 'entitlement-denied') deniedModels.add(`${item.providerId}\0${item.modelId}`);
       if (item.result.failureKind === 'authentication-failed' || item.result.failureKind === 'quota-exhausted') {
         blocked.set(item.providerId, item.result.detail ?? item.result.failureKind);

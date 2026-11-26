@@ -310,7 +310,7 @@ export class TurnHandle {
       this.wallTimer = setTimeout(() => {
         void this.abortAndJoin({ reason: 'timeout' });
       }, Math.max(0, remainingWallMs));
-      this.wallTimer.unref?.();
+      this.wallTimer.unref();
     }
 
     if (input.parentSignal) {
@@ -511,16 +511,16 @@ export class TurnHandle {
       };
 
       const waitFor = async (durationMs: number): Promise<boolean> => {
-        let timer: ReturnType<typeof setTimeout> | null = null;
+        let timer: ReturnType<typeof setTimeout> | undefined;
         const settled = joinUntilStable().then(() => true);
         const result = await Promise.race([
           settled,
           new Promise<boolean>((resolve) => {
             timer = setTimeout(() => resolve(false), Math.max(0, durationMs));
-            timer.unref?.();
+            timer.unref();
           }),
         ]);
-        if (timer) clearTimeout(timer);
+        clearTimeout(timer);
         return result;
       };
 

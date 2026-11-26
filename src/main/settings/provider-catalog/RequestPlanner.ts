@@ -654,7 +654,7 @@ function cloneReasoningWireProfile(profile: ReasoningWireProfile): ReasoningWire
     case 'openai-responses':
       return {
         ...profile,
-        levels: profile.levels ? { ...profile.levels } : profile.levels,
+        levels: { ...profile.levels },
       };
     case 'openai-compatible':
       return {

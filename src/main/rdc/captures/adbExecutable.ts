@@ -41,12 +41,12 @@ export class AdbExecutableCache {
     const root = configuredInstallationRoot(settings);
     if (!root) throw new AppError('RDC_INSTALLATION_INVALID', 'verify the selected RDC-Tool installation in Settings.');
     const override = (settings.env.RDC_TOOL_ANDROID_ADB_PATH ?? process.env.RDC_TOOL_ANDROID_ADB_PATH ?? '').trim();
-    const key = JSON.stringify([root, override ?? '']);
+    const key = JSON.stringify([root, override]);
     if (key === this.cacheKey && this.cachedPath) {
       try { await fs.access(this.cachedPath); return this.cachedPath; } catch { this.invalidate(); }
     }
     let executable: string;
-    if (override?.trim()) {
+    if (override) {
       if (!path.isAbsolute(override)) throw new Error('RDC_TOOL_ANDROID_ADB_PATH must be an absolute path.');
       executable = override;
     } else {

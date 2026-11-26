@@ -584,8 +584,10 @@ export class SessionRecordStore {
       existing as unknown as Record<string, unknown>,
       sanitizedPatch,
     ) as unknown as PersistedRunRecord;
-    const runtimePatch = merged.runtime && typeof merged.runtime === 'object'
-      ? { ...merged.runtime }
+    // deepMerge applies the patch unchecked, so the merged runtime is not known to be an object.
+    const mergedRuntime: unknown = merged.runtime;
+    const runtimePatch = mergedRuntime && typeof mergedRuntime === 'object'
+      ? { ...mergedRuntime }
       : {};
     merged.runtime = {
       ...existing.runtime,

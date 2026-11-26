@@ -177,7 +177,7 @@ export function upsertLoopThinkingItem(
   const visible = Boolean(thinking.text?.trim());
   // Text that first shows up already complete (a whole summary) was thought out while the loop waited for it,
   // so it is timed from the loop's start rather than reading as an instant.
-  const visibleSince = status === 'complete' ? block.startedAt ?? now : now;
+  const visibleSince = status === 'complete' ? block.startedAt : now;
   if (existing?.kind === 'thinking') {
     if (shouldReplaceThinking(existing.thinking, thinking)) existing.thinking = cloneThinkingArtifact(thinking)!;
     if (existing.startedAt === undefined && visible) existing.startedAt = visibleSince;

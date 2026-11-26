@@ -8,7 +8,8 @@ import { hardenSecretFile, secretStorageUnavailableReason } from '../../platform
 import { StampedValue, fileStamp } from '../../runtime/externalInput';
 
 interface SecretRecord {
-  encoding: 'safeStorage';
+  /** Written as safeStorage; the map is read back checked only as an object, so getSecret refuses any other value. */
+  encoding: string;
   payload: string;
   updatedAt: string;
 }

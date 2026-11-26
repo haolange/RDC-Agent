@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
+import { mergeUiPreferences } from '@shared/theme/uiPreferences';
 import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
 import type { SettingsPatchOp } from '@shared/types/settings';
 
@@ -9,7 +10,7 @@ describe('Appearance persistence', () => {
   it('commits each edit as its own op computed from the settings shown, without waiting for the previous save', async () => {
     let settings = structuredClone(DEFAULT_SETTINGS);
     const patchSettings = vi.fn(async (ops: SettingsPatchOp[]) => {
-      for (const op of ops) if (op.op === 'appearance') settings = { ...settings, appearance: { ...settings.appearance, ...op.value } };
+      for (const op of ops) if (op.op === 'appearance') settings = { ...settings, appearance: mergeUiPreferences(settings.appearance, op.value) };
       return settings;
     });
     const actions = createAppSettingsAppearanceActions(() => ({ settings, patchSettings }), vi.fn());

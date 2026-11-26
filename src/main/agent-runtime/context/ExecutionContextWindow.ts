@@ -99,8 +99,7 @@ export function createExecutionContextWindow(input: {
   const session = sessionRecordStore.readSession(owner);
   const projectRoot = session ? lookupProjectById(session.projectId)?.rootPath : undefined;
   const routeIdentity = input.plan.executionIdentity;
-  const routeFingerprint = routeIdentity?.fingerprint
-    ?? hashScopedResource({ providerId: input.provider.id, modelId: input.model.modelId });
+  const routeFingerprint = routeIdentity.fingerprint;
   return new RecoverableContextWindow({
     tokenLimit: input.tokenLimit,
     estimate: input.estimate,
@@ -109,8 +108,8 @@ export function createExecutionContextWindow(input: {
       // Its window can be reused within this execution, but there is no child
       // session journal from which a later execution could authorize restore.
       if (isSubagentScopeId(input.sessionId)) return null;
-      const priorRoutes = routeIdentity ? new Map<string, ExecutionIdentity>() : null;
-      if (priorRoutes) sessionContextStore.readSessionContextJournal(input.sessionId, entry => {
+      const priorRoutes = new Map<string, ExecutionIdentity>();
+      sessionContextStore.readSessionContextJournal(input.sessionId, entry => {
         priorRoutes.set(entry.executionIdentity.fingerprint, entry.executionIdentity);
         // The JSONL reader still parses/checks every line, but this lookup needs
         // only identities, never another retained copy of the session messages.
@@ -131,10 +130,8 @@ export function createExecutionContextWindow(input: {
         // this view. Check its committed route against the current route;
         // model provenance may advance after a successful request without
         // changing the provider, credential scope or execution contract.
-        if (routeIdentity) {
-          const prior = priorRoutes?.get(installedBy.data.routeFingerprint);
-          if (!prior || stableRouteHash(prior) !== stableRouteHash(routeIdentity)) continue;
-        } else if (installedBy.data.routeFingerprint !== routeFingerprint) continue;
+        const prior = priorRoutes.get(installedBy.data.routeFingerprint);
+        if (!prior || stableRouteHash(prior) !== stableRouteHash(routeIdentity)) continue;
         const stored = WindowStateSchema.safeParse(value);
         if (!stored.success) throw new AppError('CONTEXT_WINDOW_INVALID', `persisted view is incomplete: ${z.prettifyError(stored.error)}`);
         const record = { ...stored.data, window: portableContextMessages(restoreWindowMedia(owner, stored.data.window, stored.data.media ?? [])) };

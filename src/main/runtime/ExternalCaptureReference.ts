@@ -47,8 +47,8 @@ export async function verifyExternalCaptureReference(input: ProjectInputRecord):
   const current = await createExternalCaptureReference(input.filePath);
   if (current.filePath !== input.filePath || current.contentSha256 !== input.contentSha256
     || current.referenceIdentity?.device !== input.referenceIdentity.device
-    || current.referenceIdentity?.inode !== input.referenceIdentity.inode
-    || current.referenceIdentity?.birthtimeNs !== input.referenceIdentity.birthtimeNs) {
+    || current.referenceIdentity.inode !== input.referenceIdentity.inode
+    || current.referenceIdentity.birthtimeNs !== input.referenceIdentity.birthtimeNs) {
     throw new AppError('CAPTURE_REFERENCE_CHANGED', 'explicitly register the current file again.');
   }
   return { ...current, inputId: input.inputId, discoveredAt: input.discoveredAt };

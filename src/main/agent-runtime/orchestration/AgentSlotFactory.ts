@@ -183,7 +183,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
       promptTokens: (resolvePromptPlan?.() ?? promptPlan).totalTokenEstimate + RUNTIME_PERMISSION_TOKEN_RESERVE + toolSchemaTokens()
         + deps.tokenizerService.countMessagesTokens(messages, modelId),
     }),
-    onRequest: async ({ model, context: requestContext, streamOptions: requestOptions, mailboxDeliveries }) => {
+    onRequest: async ({ context: requestContext, streamOptions: requestOptions, mailboxDeliveries }) => {
       const callIndex = requestSnapshotStore.nextCallIndex(executionScopeId, turnSignature || undefined);
       const currentPrompt = resolvePromptPlan?.() ?? promptPlan;
       const actualSegments = requestContext.systemPromptSegments ?? currentPrompt.segments;
@@ -196,7 +196,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
         route: {
           providerId,
           modelId: requestOptions.requestPlan.effectiveModelId,
-          protocol: requestOptions.requestPlan.route.protocol ?? routeProvider?.protocol ?? model.api,
+          protocol: requestOptions.requestPlan.route.protocol,
         },
         requestPlan: requestOptions.requestPlan,
         messages: requestContext.messages,

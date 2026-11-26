@@ -242,7 +242,7 @@ export class ShellResolver {
       this.spawnOptions(),
     );
     if (result.status !== 0) return null;
-    const version = String(result.stdout ?? '').trim().split(/\r?\n/)[0]?.trim() ?? '';
+    const version = String(result.stdout).trim().split(/\r?\n/)[0]?.trim() ?? '';
     return version || null;
   }
 
@@ -254,7 +254,7 @@ export class ShellResolver {
         : ['-c', 'echo ok'];
     const result = this.deps.spawnSync(executable, versionArg, this.spawnOptions());
     if (result.status !== 0) return null;
-    const version = String(result.stdout ?? '').trim().split(/\r?\n/)[0]?.trim() ?? '';
+    const version = String(result.stdout).trim().split(/\r?\n/)[0]?.trim() ?? '';
     if (kind === 'sh') return version === 'ok' ? 'sh' : version || 'sh';
     return version || null;
   }

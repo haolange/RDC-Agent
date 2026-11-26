@@ -42,7 +42,7 @@ export class RdcSessionBindings {
     return { projectId, sessionId };
   }
   protected binding(scope: SessionScope): RdcReplayBinding {
-    if (!scope.sessionId?.trim() || !scope.projectId?.trim()) throw new AppError('RDC_SCOPE_REQUIRED');
+    if (!scope.sessionId.trim() || !scope.projectId.trim()) throw new AppError('RDC_SCOPE_REQUIRED');
     const key = keyOf(scope); let binding = this.bindings.get(key);
     if (!binding) { binding = { runtime: new RdcSessionRuntime(), state: closedReplayState(scope), deviceId: null }; this.bindings.set(key, binding); }
     return binding;

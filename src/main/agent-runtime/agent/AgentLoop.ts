@@ -767,7 +767,7 @@ async function applyTransformContext(
   if (!config.transformContext) {
     return currentMessages;
   }
-  let reported = false;
+  let reported = false as boolean;
   const result = await config.transformContext([...currentMessages], stream.signal, progress => {
     reported = true; stream.push({ type: 'compaction', ...progress });
   });

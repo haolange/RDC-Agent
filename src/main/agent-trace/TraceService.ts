@@ -79,6 +79,9 @@ export function resolveHistoryTurnProfileId(turn: {
   return id || DEFAULT_AGENT_ID;
 }
 
+/** A trace event payload as stored: TraceEventStore checks it only as unknown, so it may be missing or null. */
+type StoredTracePayload<T> = T | null | undefined;
+
 export class TraceService {
   private stores: { run: TraceRunStore; events: TraceEventStore; emitter: TraceEventEmitter } | null = null;
 
@@ -154,12 +157,12 @@ export class TraceService {
 
     for (const run of runs) {
       const runEvents = events.filter((e) => e.run_id === run.runId).sort((a, b) => a.ts_ms - b.ts_ms);
-      const agentType = run.profileId ?? DEFAULT_AGENT_ID;
+      const agentType = run.profileId;
       profileId = agentType;
       const profile = agentProfileRegistry.getForMode(agentType);
 
       const userPrompt = this.userPromptForRun(conversations, run.runId)
-        || runEvents.find((e) => e.event_type === 'user_message')?.payload?.content as string
+        || runEvents.find((e) => e.event_type === 'user_message')?.payload.content as string
         || '调试任务';
 
       const runId = run.runId;
@@ -185,7 +188,7 @@ export class TraceService {
         existingRunEvents.flatMap((traceEvent) => {
           const ids: string[] = [];
           if (traceEvent.type === 'run.completed') ids.push(`__final__:${runId}`);
-          const payloadId = (traceEvent.payload as { id?: string })?.id;
+          const payloadId = (traceEvent.payload as StoredTracePayload<{ id?: string }>)?.id;
           if (payloadId) ids.push(payloadId);
           return ids;
         }),
@@ -216,7 +219,7 @@ export class TraceService {
         existingPhaseCompletions.add(phaseId);
       };
       const hasTaskFrame = existingRunEvents.some(
-        (traceEvent) => (traceEvent.payload as { kind?: string })?.kind === 'task_frame',
+        (traceEvent) => (traceEvent.payload as StoredTracePayload<{ kind?: string }>)?.kind === 'task_frame',
       );
       if (!hasTaskFrame) {
         this.emitter.emitTaskFrame(runId, String(userPrompt));
@@ -295,13 +298,13 @@ export class TraceService {
         existingHistoryEvents.flatMap((traceEvent) => {
           const ids: string[] = [];
           if (traceEvent.type === 'run.completed') ids.push(`__final__:${runId}`);
-          const payloadId = (traceEvent.payload as { id?: string })?.id;
+          const payloadId = (traceEvent.payload as StoredTracePayload<{ id?: string }>)?.id;
           if (payloadId) ids.push(payloadId);
           return ids;
         }),
       );
       const hasHistoryTaskFrame = existingHistoryEvents.some(
-        (traceEvent) => (traceEvent.payload as { kind?: string })?.kind === 'task_frame',
+        (traceEvent) => (traceEvent.payload as StoredTracePayload<{ kind?: string }>)?.kind === 'task_frame',
       );
       if (!hasHistoryTaskFrame) {
         this.emitter.emitTaskFrame(runId, userPrompt);

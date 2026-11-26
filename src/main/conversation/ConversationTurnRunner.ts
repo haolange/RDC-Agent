@@ -176,7 +176,7 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
 
   /** Persists the turn controls, starts the patch scheduler and registers the turn so Stop can reach it. */
   begin(): void {
-    if (this.sessionId && this.turnControls) {
+    if (this.sessionId) {
       sessionRecordStore.updateSession(this.sessionId, { turnControls: this.turnControls });
     }
     this.streamScheduler = new ConversationStreamPatchScheduler({
@@ -243,10 +243,6 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
 
   private async sendPreparedTurn(): Promise<void> {
     const { input, sessionId } = this;
-    const { routePreflight } = input;
-    if (!input.preparedTurn.effectiveModel) {
-      throw new AppError('MODEL_UNAVAILABLE', `${routePreflight.providerId}/${routePreflight.modelId}`);
-    }
     const prepared = input.preparedPrompt;
     const userInput = {
       content: await hydrateFrozenUserContent(
@@ -378,7 +374,7 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
     workTrace: ConversationWorkTrace,
   ): PlanReviewHandoffSuggestion[] | undefined {
     if (!shouldSnapshotHandoffSuggestions({ agentId: this.conversationAgentId, finalStatus, workTrace })) return undefined;
-    return (this.input.preparedTurn.runtime.effectivePlan.profileHandoffs ?? [])
+    return this.input.preparedTurn.runtime.effectivePlan.profileHandoffs
       .filter((handoff) => isHandoffOfferedAtTurnEnd(handoff) && handoff.label.trim() && handoff.agent.trim())
       .map((handoff) => ({
         label: handoff.label.trim(),
@@ -505,7 +501,7 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
       branchId: this.capturedBranchId,
       agentId: this.conversationAgentId,
       executionIdentity: capturedContext.executionIdentity,
-      controls: this.turnControls ?? { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
+      controls: this.turnControls,
       status: terminalStatus === 'complete' ? capturedContext.status : terminalStatus,
       messages: capturedContext.messages,
       createdAt: input.userMessage.createdAt,

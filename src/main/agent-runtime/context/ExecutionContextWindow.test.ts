@@ -16,6 +16,10 @@ import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { createExecutionContextWindow } from './ExecutionContextWindow';
 import type { AgentMessage, AssistantMessage } from '../core/types';
 const messages: AgentMessage[] = Array.from({ length: 12 }, (_, i) => ({ role: 'user', content: `source ${i}: ` + 'x'.repeat(100), timestamp: i }));
+/** A built RequestPlan always names the execution identity it runs under. */
+const ROUTE_IDENTITY = { providerId: 'provider', effectiveModelId: 'model', modelSnapshotId: 'snapshot-a', routeRevision: 'route-a',
+  catalogRevision: 'catalog-a', fingerprint: 'provider-snapshot-a-route-a' };
+const ROUTE_PLAN = { executionIdentity: ROUTE_IDENTITY } as never;
 const create = (providerId = 'provider', snapshotId = 'snapshot-a', routeRevision = 'route-a', catalogRevision = 'catalog-a', identityPatch: Record<string, unknown> = {}) => createExecutionContextWindow({
   sessionId: 'child', provider: { id: providerId } as never, model: { modelId: 'model' } as never,
   plan: { executionIdentity: { providerId, effectiveModelId: 'model', modelSnapshotId: snapshotId,
@@ -69,7 +73,7 @@ it('keeps large retained vision bytes in verified sidecars and restores the exac
   const input = structuredClone(messages);
   input[10] = { role: 'user', content: [{ type: 'image', data, mimeType: 'image/png' }], timestamp: 10 };
   const make = () => createExecutionContextWindow({ sessionId: 'child', provider: { id: 'provider' } as never,
-    model: { modelId: 'model' } as never, plan: {} as never, credentialHandle: 'opaque', tokenLimit: 650,
+    model: { modelId: 'model' } as never, plan: ROUTE_PLAN, credentialHandle: 'opaque', tokenLimit: 650,
     estimate: values => values.reduce((count, message) => count + (Array.isArray(message.content) ? 100 : String(message.content).length), 0) });
   mocks.write.mockImplementation((_owner, _uri, content, options) => {
     const bytes = Buffer.isBuffer(content) ? content : Buffer.from(content);
@@ -94,6 +98,7 @@ it('keeps large retained vision bytes in verified sidecars and restores the exac
     mocks.read.mockImplementation((_owner, uri, options) => uri === record.media[0].uri
       ? { hash: record.media[0].hash, mimeType: 'image/png', imageData: options.includeImageData ? data : undefined }
       : { hash: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') });
+    mocks.journal.mockImplementation((_session, select) => [{ executionIdentity: ROUTE_IDENTITY }].filter(select));
     const restored = await make().prepare(input);
     expect(restored.messages).toEqual(live.messages);
     expect(mocks.read).toHaveBeenCalledWith('owner', record.media[0].uri, { expectedHash: record.media[0].hash, includeImageData: true });
@@ -147,7 +152,7 @@ it('installs and persists the corrected reference in the actual derived handoff'
     progress: { done: [], inProgress: [], blocked: [] }, decisions: [], failedAttempts: [], nextSteps: [], criticalContext: [],
     usage: { inputTokens: 500, outputTokens: 30 } });
   const window = createExecutionContextWindow({ sessionId: 'child', provider: { id: 'provider' } as never,
-    model: { modelId: 'model' } as never, plan: {} as never, credentialHandle: 'opaque', tokenLimit: 1_000,
+    model: { modelId: 'model' } as never, plan: ROUTE_PLAN, credentialHandle: 'opaque', tokenLimit: 1_000,
     estimate: values => values.reduce((n, value) => n + JSON.stringify(value.content).length, 0) });
   const result = await window.prepare(messages);
   const handoff = String(result.messages[0].content);
@@ -279,13 +284,14 @@ it('rejects an installed view of this route that is not the record this module w
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-window-state-'));
   try {
     const file = path.join(directory, 'window-state.json');
-    fs.writeFileSync(file, JSON.stringify({ schemaVersion: 1, sessionId: 'child', routeFingerprint: hashScopedResource({ providerId: 'provider', modelId: 'model' }),
+    fs.writeFileSync(file, JSON.stringify({ schemaVersion: 1, sessionId: 'child', routeFingerprint: ROUTE_IDENTITY.fingerprint,
       source: 'session://tool-outputs/source.json', sourceHash: 'source-hash', count: 'all', hash: 'h', portableHash: 'p', window: [] }));
     mocks.list.mockReturnValue(['session://tool-outputs/source-window-state.json']);
     mocks.resolve.mockReturnValue({ absolutePath: file });
     mocks.read.mockReturnValue({ hash: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') });
     const window = createExecutionContextWindow({ sessionId: 'child', provider: { id: 'provider' } as never, model: { modelId: 'model' } as never,
-      plan: {} as never, credentialHandle: 'opaque', tokenLimit: 650, estimate: values => values.length });
+      plan: ROUTE_PLAN, credentialHandle: 'opaque', tokenLimit: 650, estimate: values => values.length });
+    mocks.journal.mockImplementation((_session, select) => [{ executionIdentity: ROUTE_IDENTITY }].filter(select));
     await expect(window.prepare([{ role: 'user', content: 'small input', timestamp: 1 }])).rejects.toMatchObject({ code: 'CONTEXT_WINDOW_INVALID' });
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });

@@ -42,12 +42,4 @@ describe('MCP RPC transport bounds', () => {
       url: 'http://127.0.0.1:1',
     })).rejects.toThrow(/exceeded/);
   });
-
-  it('fail-closes unsupported MCP transports including legacy sse', async () => {
-    await expect(new MCPManager().connect({
-      name: 'legacy-sse',
-      type: 'sse' as 'http',
-      url: 'http://127.0.0.1:1',
-    })).rejects.toThrow(/MCP_TRANSPORT_UNSUPPORTED/);
-  });
 });

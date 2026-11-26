@@ -56,7 +56,7 @@ export function recordResponseReceipt(
   ));
   if (!grantsTier && !grantsFast && !switchedBinding) return;
   const proven = [
-    grantsTier && activeTier ? `context tier ${activeTier.id}` : '',
+    grantsTier ? `context tier ${activeTier.id}` : '',
     grantsFast ? 'Fast mode' : '',
     switchedBinding ? `execution binding ${switchedBinding.id}` : '',
   ].filter(Boolean);
@@ -66,14 +66,14 @@ export function recordResponseReceipt(
     protocol: plan.route.protocol,
   }, `receipt:${model.modelId}:${plan.route.protocol}:${plan.appliedBindingIds.join(',') || plan.activeTierId}`, [{
     modelId: model.modelId,
-    ...(grantsTier && activeTier
+    ...(grantsTier
       ? {
           contextTiers: model.contextTiers.map((tier) => (
             tier.id === activeTier.id ? { ...tier, entitlement: 'granted' as const } : tier
           )),
         }
       : {}),
-    ...(grantsFast && fastControl.state === 'selectable'
+    ...(grantsFast
       ? { controls: { fast: { ...fastControl, entitlement: 'granted' as const } } }
       : {}),
     ...(switchedBinding

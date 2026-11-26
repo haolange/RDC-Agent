@@ -131,12 +131,10 @@ export function translateCoreToSharedAgentEvent(
             thinking: thinking.length > 0 ? thinking : undefined,
             providerOutputRefs: extractAssistantTextOutputRefs(event.message.content),
             stopReason: mapCoreStopReasonToShared(event.message.stopReason),
-            usage: event.message.usage
-              ? {
-                  inputTokens: event.message.usage.inputTokens,
-                  outputTokens: event.message.usage.outputTokens,
-                }
-              : undefined,
+            usage: {
+              inputTokens: event.message.usage.inputTokens,
+              outputTokens: event.message.usage.outputTokens,
+            },
           },
           context,
         );

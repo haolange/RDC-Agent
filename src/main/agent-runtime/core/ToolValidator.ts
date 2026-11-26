@@ -126,7 +126,8 @@ function assertSupportedSchema(
     if (!schema.not || typeof schema.not !== 'object' || Array.isArray(schema.not)) throw new ToolValidationError('invalid not schema', path, toolName);
     assertSupportedSchema(schema.not as JsonSchema, path + '.not', toolName, depth + 1, counters);
   }
-  const additional = schema.additionalProperties;
+  // An MCP server's schema is external JSON, so additionalProperties may be any value here.
+  const additional: unknown = schema.additionalProperties;
   if (additional !== undefined && typeof additional !== 'boolean') {
     if (!additional || typeof additional !== 'object' || Array.isArray(additional)) {
       throw new ToolValidationError('additionalProperties must be a boolean or a schema', path, toolName);
@@ -165,8 +166,7 @@ export class ToolValidator {
   ): Record<string, unknown> {
     const schema = toolDef.parameters;
     assertSupportedSchema(schema, 'parameters', toolDef.name);
-    const value = args ?? {};
-    const validated = this.validateValue(value, schema, 'args', toolDef.name, false, 0);
+    const validated = this.validateValue(args, schema, 'args', toolDef.name, false, 0);
     if (validated === null || typeof validated !== 'object' || Array.isArray(validated)) {
       throw new ToolValidationError('参数必须是对象', 'args', toolDef.name);
     }
@@ -193,7 +193,7 @@ export class ToolValidator {
         toolCall.name,
       );
     }
-    return this.validate(def, toolCall.arguments ?? {});
+    return this.validate(def, toolCall.arguments);
   }
 
   private validateValue(

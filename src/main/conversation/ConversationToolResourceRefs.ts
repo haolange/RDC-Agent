@@ -73,7 +73,7 @@ const webRef = (details: Record<string, unknown>): ConversationToolResourceRef |
   if (url) {
     try { host = new URL(url).hostname; } catch { host = ''; }
   }
-  const label = title ?? query ?? host ?? url!;
+  const label = title ?? query ?? host;
   return {
     id: 'web:' + (url ?? query),
     kind: 'web',

@@ -29,7 +29,7 @@ function previewRoot(sessionPath: string): string {
 
 function resolveSessionPath(sessionId: string): string {
   const session = sessionRecordStore.readSession(sessionId);
-  const sessionPath = session?.sessionPath?.trim();
+  const sessionPath = session?.sessionPath.trim();
   if (!sessionPath) {
     throw new AppError('IMAGE_PREVIEW_SESSION_NOT_FOUND', sessionId);
   }

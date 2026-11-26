@@ -387,7 +387,7 @@ export function ingestKnowledgePackage(doc: Record<string, unknown>, options: {
       cardId,
       spaceId,
       relativePath,
-      type: (readString(card.type) as KnowledgeCardRecord['type']) ?? 'fact',
+      type: (readString(card.type) ?? 'fact') as KnowledgeCardRecord['type'],
       lifecycle: 'draft',
       title,
       scope: asRecord(card.scope) as KnowledgeScope,

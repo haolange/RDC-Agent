@@ -240,7 +240,7 @@ function convertMessage(message: Message, requestPlan?: RequestPlan): OllamaMess
     const images: string[] = [];
     for (const block of message.content) {
       if (block.type === 'text') texts.push(block.text);
-      else if (block.type === 'image') images.push(block.data);
+      else images.push(block.data);
     }
     const out: OllamaMessage = { role: 'user', content: texts.join('\n') };
     if (images.length > 0) out.images = images;
@@ -262,7 +262,7 @@ function convertMessage(message: Message, requestPlan?: RequestPlan): OllamaMess
         ) thinking.push(block.continuation.reasoningContent);
       } else if (block.type === 'toolCall') {
         toolCalls.push({
-          function: { name: block.name, arguments: block.arguments ?? {} },
+          function: { name: block.name, arguments: block.arguments },
         });
       }
     }

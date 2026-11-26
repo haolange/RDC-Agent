@@ -437,9 +437,6 @@ export class AgentManifestService {
     draft: AgentManifestDraft,
     options: AgentManifestSaveOptions = { scope: 'user' },
   ): Promise<AgentManifestCommit> {
-    if (options.scope !== 'user' && options.scope !== 'project') {
-      throw new AppError('AGENT_MANIFEST_SCOPE_REQUIRED', 'save/delete must specify user or project.');
-    }
     const agentId = draft.id || toSlug(draft.name);
     if (!isSafeAgentProfileId(agentId)) {
       throw new Error(`Invalid agent profile id: ${agentId}`);

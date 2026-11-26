@@ -287,7 +287,7 @@ export function createTaskUpdateTool(
         if (execution.mode !== 'direct') throw new Error('Managed subagent and handoff executions are settled by their execution owner.');
         const disposition = status === 'completed' ? 'completed' : status;
         const effective = result ?? { disposition, summary: statusReason ?? `Task ${status}.`, outputs: {} };
-        const executionStatus = effective.disposition === 'partial' ? 'partial' : status === 'completed' ? 'completed' : status === 'blocked' ? 'blocked' : 'cancelled';
+        const executionStatus = effective.disposition === 'partial' ? 'partial' : status;
         await registry.settleExecution(execution.id, { status: executionStatus, result: effective, expectedGeneration: execution.generation });
         updated = (await registry.getTask(taskId))!;
       } else updated = await registry.updateTask(taskId, {
@@ -593,7 +593,7 @@ function readEnum<T extends string>(
 
 /** 任务行格式化（用于 task_list 输出）。 */
 function formatTaskLine(task: TaskRecord): string {
-  const icon = STATUS_ICON[task.status] ?? '?';
+  const icon = STATUS_ICON[task.status];
   const owner = task.owner ? ` [${task.owner}]` : '';
   const deps =
     task.blockedBy.length > 0

@@ -225,7 +225,7 @@ export function toChatCompletionsMessage(
     for (const block of message.content) {
       if (block.type === 'text') {
         parts.push({ type: 'text', text: block.text });
-      } else if (block.type === 'image') {
+      } else {
         parts.push({
           type: 'image_url',
           image_url: { url: `data:${block.mimeType};base64,${block.data}` },
@@ -249,13 +249,13 @@ export function toChatCompletionsMessage(
           && block.continuation?.carrier === 'reasoning-content'
           && block.continuation.reasoningContent
         ) reasoning.push(block.continuation.reasoningContent);
-      } else if (block.type === 'toolCall') {
+      } else {
         toolCalls.push({
           id: block.id,
           type: 'function',
           function: {
             name: block.name,
-            arguments: JSON.stringify(block.arguments ?? {}),
+            arguments: JSON.stringify(block.arguments),
           },
         });
       }

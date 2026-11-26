@@ -212,8 +212,8 @@ async function resolveTurnRoute(turn: TurnStart): Promise<TurnRoute> {
     ?? (configurationCommit?.providerId && configurationCommit.modelId
       ? { providerId: configurationCommit.providerId, modelId: configurationCommit.modelId }
       : null);
-  const configuredRoute = effectiveSnapshot?.compiledRoute;
-  const surfaceProviderId = modelOverride?.providerId ?? configuredRoute?.providerId;
+  const configuredRoute = effectiveSnapshot.compiledRoute;
+  const surfaceProviderId = modelOverride?.providerId ?? configuredRoute.providerId;
   if (surfaceProviderId) {
     const surface = await loadProviderSurface(surfaceProviderId);
     if (!surface) throw new AppError('PROVIDER_UNAVAILABLE', `${surfaceProviderId} is not in the compiled Catalog.`);

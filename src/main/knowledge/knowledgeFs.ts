@@ -197,7 +197,7 @@ export function toCardDetail(
   return {
     ...toCardSummary(space, relativePath, parsed, updatedAt),
     content: parsed.body,
-    body: parsed.record.body ?? parsed.body,
+    body: parsed.record.body,
     scope: parsed.record.scope ?? {},
     relations: parsed.record.relations ?? [],
     ...(parsed.record.sourceStatus ? { sourceStatus: parsed.record.sourceStatus } : {}),

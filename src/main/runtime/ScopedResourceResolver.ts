@@ -47,7 +47,7 @@ export const hashScopedResource = (value: unknown): string => {
       });
       emit('}'); return;
     }
-    emit(JSON.stringify(entry) ?? String(entry));
+    emit((JSON.stringify(entry) as string | undefined) ?? String(entry));
   };
   visit(value);
   if (pending) hash.update(pending);

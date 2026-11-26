@@ -94,7 +94,7 @@ function convertMessage(
         type: 'function_call',
         id: block.id,
         name: block.name,
-        arguments: block.arguments ?? {},
+        arguments: block.arguments,
       }];
     }
     const decision = decideContinuationReplay(

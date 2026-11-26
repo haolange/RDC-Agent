@@ -203,7 +203,7 @@ export async function preparePlanTaskRequirements(
     const current = task!.currentExecutionId ? await registry.getExecution(task!.currentExecutionId) : null;
     if (current && ['queued', 'running', 'waiting', 'cancelling'].includes(current.status)) denied('Cancel and join before proposing a Task revision.');
     const { taskId: _taskId, expectedRevision: _expectedRevision, ...updates } = change;
-    if (!Object.values(updates).some(value => value !== undefined)) denied('Task revision proposal contains no changes.');
+    if (!(Object.values(updates) as unknown[]).some(value => value !== undefined)) denied('Task revision proposal contains no changes.');
     snapshots.push({ ...snapshotTaskRequirement({ ...task!, ...updates, revision: task!.revision + 1 }),
       replacesRevision: task!.revision, previousRequirementHash: hashTaskRequirement(task!) });
   }

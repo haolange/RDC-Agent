@@ -104,9 +104,9 @@ function openLink(url: string): void {
 function showAbout(): void {
   const detail = [
     nativeMessage('version', { version: app.getVersion() }),
-    `Electron: ${process.versions.electron ?? 'N/A'}`,
-    `Node: ${process.versions.node ?? 'N/A'}`,
-    `Chrome: ${process.versions.chrome ?? 'N/A'}`,
+    `Electron: ${process.versions.electron}`,
+    `Node: ${process.versions.node}`,
+    `Chrome: ${process.versions.chrome}`,
   ].join('\n');
   void dialog.showMessageBox({ type: 'info', title: nativeMessage('about'), message: 'RDC-Agent', detail });
 }

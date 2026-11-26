@@ -217,7 +217,7 @@ function appChannels(): IpcChannelTable {
         label: 'app:copyText',
         maxBytes: 2 * 1024 * 1024,
       });
-      clipboard.writeText(text ?? '');
+      clipboard.writeText(text);
       return { success: true };
     },
     'app:readClipboardText': async (_event, ...rawArgs: unknown[]) => {

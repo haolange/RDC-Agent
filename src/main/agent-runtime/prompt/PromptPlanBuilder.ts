@@ -105,7 +105,7 @@ export class PromptPlanBuilder {
       `# Effective Agent Profile`,
       `Name: ${input.profile.name}`,
       `Description: ${input.profile.description}`,
-      `Declared handoffs (main-resolved profile metadata): ${JSON.stringify((input.profile.handoffs ?? []).map(({ agent, label, requiredSkillIds }) => ({ agent, label, requiredSkillIds: requiredSkillIds ?? [] })))}`,
+      `Declared handoffs (main-resolved profile metadata): ${JSON.stringify(input.profile.handoffs.map(({ agent, label, requiredSkillIds }) => ({ agent, label, requiredSkillIds })))}`,
       'requiredSkillIds are explicit preparation obligations of that recipient only. Methods used as knowledge remain discoverable and readable with skill_read; do not turn every relevant method into a Task preload requirement.',
       input.profile.instructions,
     ].filter(Boolean).join('\n\n');

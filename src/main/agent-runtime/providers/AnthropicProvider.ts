@@ -207,7 +207,7 @@ export class AnthropicProvider implements ProviderStrategy {
       model: model.id,
       messages,
       stream: true,
-      max_tokens: options.maxTokens ?? model.maxTokens ?? 4096,
+      max_tokens: options.maxTokens ?? model.maxTokens,
     };
     if (system) body.system = system;
     if (this.surface === 'anthropic'
@@ -536,7 +536,7 @@ function convertMessage(message: Message, requestPlan: RequestPlan): AnthropicMe
           type: 'tool_use',
           id: block.id,
           name: block.name,
-          input: block.arguments ?? {},
+          input: block.arguments,
         });
       }
     }

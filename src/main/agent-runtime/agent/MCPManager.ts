@@ -294,7 +294,7 @@ export class MCPManager {
         },
       );
       const proc = supervised.child;
-      if (!proc || !supervised.pid) {
+      if (!supervised.pid) {
         const exit = await supervised.join(5_000);
         throw exit.error ?? new Error(`MCP stdio server "${config.name}" failed to spawn`);
       }
@@ -389,44 +389,41 @@ export class MCPManager {
       return conn.tools.map((t) => t.prefixedName);
     }
 
-    if (config.type === 'streamable-http') {
-      if (!config.url) {
-        throw new Error(`MCP streamable-http server "${config.name}" missing url`);
-      }
-      // streamable-http: 使用 POST + streaming response (NDJSON)
-      const conn: MCPConnection = { config, tools: [] };
-      throwIfAborted(signal);
-      await postStreamableJsonRpc(
-        config.url,
-        'initialize',
-        {
-          protocolVersion: '2024-11-05',
-          capabilities: {},
-          clientInfo: { name: 'rdc-agent', version: '0.1.0' },
-        },
-        timeoutMs,
-        signal,
-      );
-
-      throwIfAborted(signal);
-      const listResult = (await postStreamableJsonRpc(
-        config.url,
-        'tools/list',
-        {},
-        timeoutMs,
-        signal,
-      )) as { tools?: Array<Record<string, unknown>> } | undefined;
-      const rawTools = Array.isArray(listResult?.tools)
-        ? listResult!.tools!
-        : [];
-      this.assignDiscoveredTools(conn, rawTools);
-
-      this.connections.set(config.name, conn);
-      this.registerTools(conn.tools);
-      return conn.tools.map((t) => t.prefixedName);
+    // streamable-http: the coordinator rejected every other transport (McpTrustService.assertConnectAllowed).
+    if (!config.url) {
+      throw new Error(`MCP streamable-http server "${config.name}" missing url`);
     }
+    // 使用 POST + streaming response (NDJSON)
+    const conn: MCPConnection = { config, tools: [] };
+    throwIfAborted(signal);
+    await postStreamableJsonRpc(
+      config.url,
+      'initialize',
+      {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'rdc-agent', version: '0.1.0' },
+      },
+      timeoutMs,
+      signal,
+    );
 
-    throw new AppError('MCP_TRANSPORT_UNSUPPORTED', String(config.type));
+    throwIfAborted(signal);
+    const listResult = (await postStreamableJsonRpc(
+      config.url,
+      'tools/list',
+      {},
+      timeoutMs,
+      signal,
+    )) as { tools?: Array<Record<string, unknown>> } | undefined;
+    const rawTools = Array.isArray(listResult?.tools)
+      ? listResult!.tools!
+      : [];
+    this.assignDiscoveredTools(conn, rawTools);
+
+    this.connections.set(config.name, conn);
+    this.registerTools(conn.tools);
+    return conn.tools.map((t) => t.prefixedName);
   }
 
   /** 断开 MCP 服务器。 */

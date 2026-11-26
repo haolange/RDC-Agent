@@ -74,11 +74,8 @@ export function collectRecordKeys(
   if (kind === 'experiment') return [{ space: 'experiment', id: (record as ExperimentRecord).experimentId }];
   if (kind === 'challenge') return [{ space: 'challenge', id: (record as ChallengeRecord).challengeId }];
   if (kind === 'checkpoint') return [{ space: 'checkpoint', id: (record as { checkpointId: string }).checkpointId }];
-  if (kind === 'report') {
-    // Reports cite claims; they do not own claim ids. Treating cited claimId as a
-    // write-key forces supersede of the source Claim and breaks S-CLAIM-01 lookup.
-    return [];
-  }
+  // A report cites claims; it does not own claim ids. Treating a cited claimId as a
+  // write-key forces supersede of the source Claim and breaks S-CLAIM-01 lookup.
   return [];
 }
 

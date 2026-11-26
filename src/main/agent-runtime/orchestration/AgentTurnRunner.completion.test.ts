@@ -32,7 +32,7 @@ function harness(scope: string, validateCompletion: TurnCompletionValidator, app
   onEvents?: (turn: TurnHandle, emit: (event: AgentLoopEvent) => void, assistant: (text: string, withTool?: boolean) => AssistantMessage, messages: AssistantMessage[]) => void) {
   const terminal = vi.fn();
   const preparedRuntime = {
-    promptPlan: { systemPrompt: 'Frozen instructions', segments: [] },
+    promptPlan: { systemPrompt: 'Frozen instructions', segments: [], metrics: { systemPrompt: 19, scopedInstructions: 0, skills: 0 } },
     runtimeTools: { definitions: [], toolMap: new Map() }, activeToolDefinitions: [],
     routeCapability: { toolCallingMode: 'disabled' }, mcpConnectionErrors: [],
     promptCache: {}, credentialHandle: 'fixture',

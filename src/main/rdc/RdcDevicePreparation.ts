@@ -70,7 +70,7 @@ export class RdcDevicePreparation extends RdcSessionBindings {
       binding.confirmation = undefined;
       if (!ipcApprovalTokenService.consume({ token: request.confirmationToken, action: 'device.prepare', scope: 'project',
         projectRoot: scope.projectId, name: confirmation.name })) throw new AppError('RDC_DEVICE_CONFIRMATION_STALE');
-      closeConfirmed = confirmation.kind === 'close_capture';
+      closeConfirmed = true;
     } else if (binding.runtime.snapshotOpenedCaptureForSession(scope)
       && (binding.state.replayDeviceId !== device.id || binding.state.preparation.phase !== 'ready')) {
       return Promise.resolve(this.preparationConfirmation(binding, device.id, 'close_capture'));

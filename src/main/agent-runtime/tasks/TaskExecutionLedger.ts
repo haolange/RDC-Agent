@@ -27,7 +27,7 @@ export class TaskExecutionLedger extends TaskRegistryCore {
       for (const key of ['toolCalls', 'subagents', 'childDepth'] as const) {
         const value = input[key];
         if (value === undefined) continue;
-        const previous = next[key] ?? 0;
+        const previous = next[key];
         if (!Number.isFinite(value) || value < previous) throw new Error(`Execution budget counter must be finite and monotonic: ${key}.`);
         next[key] = value;
       }

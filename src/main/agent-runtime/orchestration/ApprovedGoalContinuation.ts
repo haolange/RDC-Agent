@@ -46,15 +46,18 @@ export function createApprovedGoalContinuation(
     }
   };
 
+  // Re-read after each await: the turn can be aborted or hand off while a review is prepared.
+  const turnEnded = (): boolean => turn.isAborted || turn.pendingHandoff !== null;
+
   const reviewDeclaration: ApprovedGoalContinuation['reviewDeclaration'] = async (declaration) => {
-    if (!turn.requiresApprovedGoalClosure || turn.isAborted || turn.pendingHandoff) return undefined;
+    if (!turn.requiresApprovedGoalClosure || turnEnded()) return undefined;
     if (declaration.disposition !== 'partial' && declaration.disposition !== 'blocked') return undefined;
     // Too little loop budget is left to act on a review; the declaration stands as it is.
     if (turn.providerLoopBudget && turn.providerLoopBudget.remaining <= 2) return undefined;
     // Background work may legitimately outlive a partial parent response.
     if ((await listActiveDelegations(sessionId)).length) return undefined;
     const gap = await incompleteApprovedWork();
-    if (gap?.task?.status === 'cancelled' || turn.isAborted || turn.pendingHandoff) return undefined;
+    if (gap?.task?.status === 'cancelled' || turnEnded()) return undefined;
     if (!gap && (declaration.disposition !== 'partial' || !declaration.result?.unresolved.length)) return undefined;
     // One review per state of the open work: the same unresolved items and Task state are not reviewed again,
     // however often the Agent rewrites its evidence in between.

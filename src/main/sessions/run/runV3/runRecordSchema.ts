@@ -145,7 +145,7 @@ export function toPersistedRunV3(
     caseId: base.caseId,
     profileId: base.profileId,
     goal: base.goal,
-    captures: classified.kind === 'conversation' ? [] : (base.captures ?? []),
+    captures: classified.kind === 'conversation' ? [] : base.captures,
     startedAt: base.startedAt,
     finishedAt: base.finishedAt,
     stoppedAt: base.stoppedAt,

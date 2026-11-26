@@ -158,11 +158,11 @@ export class SubagentRunner implements SubagentToolHost {
       || (tool === 'shell' && agentAccessCeiling(definition) === 'full'))) {
       throw new AppError('RDC_LEASE_DELEGATE_DENIED', 'target Agent has no live RDC capability.');
     }
-    if (!definition.compiledRoute?.providerId || !definition.compiledRoute.modelId) {
+    if (!definition.compiledRoute.providerId || !definition.compiledRoute.modelId) {
       return rejectConfiguration('MODEL_ROUTE_REQUIRED', `MODEL_ROUTE_REQUIRED: ${input.targetProfile} has no configured model route; configure this Agent in Settings.`);
     }
     const effectiveProfileIds = effectiveProfiles.filter((entry) => entry.enabled).map((entry) => entry.id);
-    const systemPrompt = definition.instructions?.trim() || this.deps.prompts.systemPromptForAgent(input.targetProfile);
+    const systemPrompt = definition.instructions.trim() || this.deps.prompts.systemPromptForAgent(input.targetProfile);
 
     const parentBudget = input.subagentBudget ?? input.parentTurn?.subagentBudget ?? createSubagentBudgetState();
     assertSubagentBudgetAllowsChild(parentBudget);
@@ -192,6 +192,8 @@ export class SubagentRunner implements SubagentToolHost {
       : createEphemeralScopeId());
 
     const childAbort = new AbortController();
+    // Re-read after each await: the wall-time deadline and the parent signal abort the child while it runs.
+    const childAborted = () => childAbort.signal.aborted;
     let deadlineTimer: NodeJS.Timeout | undefined;
     const armDeadline = () => {
       const remaining = childPolicyBudget.wallStartedAt + childPolicyBudget.maxWallTimeMs - Date.now();
@@ -199,7 +201,7 @@ export class SubagentRunner implements SubagentToolHost {
         if (remaining > 2_147_000_000) armDeadline();
         else childAbort.abort(new AppError('POLICY_LIMIT_EXCEEDED', 'maxWallTimeMs'));
       }, Math.max(0, Math.min(remaining, 2_147_000_000)));
-      deadlineTimer.unref?.();
+      deadlineTimer.unref();
     };
     if (childPolicyBudget.maxWallTimeMs < Number.MAX_SAFE_INTEGER) armDeadline();
     const parentSignal = input.detached ? (input.signal ?? null) : (input.signal ?? input.parentTurn?.signal ?? null);
@@ -265,7 +267,7 @@ export class SubagentRunner implements SubagentToolHost {
     // The child's own turn is active throughout nested delegations.
     childBudget.activeChildren = 1;
     try {
-      if (childAbort.signal.aborted) {
+      if (childAborted()) {
         throw new DOMException('Aborted', 'AbortError');
       }
       input.onPolicyBudget?.(childPolicyBudget);
@@ -321,7 +323,7 @@ export class SubagentRunner implements SubagentToolHost {
         if (!input.parentSessionId?.trim()) {
           throw new AppError('RDC_LEASE_DELEGATE_DENIED', 'RDC capability requested but no parent session.');
         }
-        const ownerTurnId = input.parentTurn?.turnId?.trim() ?? '';
+        const ownerTurnId = input.parentTurn?.turnId.trim() ?? '';
         if (!ownerTurnId) {
           throw new AppError('RDC_LEASE_DELEGATE_DENIED', 'RDC capability requested but parent turn id is missing.');
         }
@@ -340,7 +342,7 @@ export class SubagentRunner implements SubagentToolHost {
           projectRootPath: input.projectRootPath,
           projectId: input.projectId,
           systemPrompt,
-          effectiveProfile: definition ?? null,
+          effectiveProfile: definition,
           effectiveProfileIds,
           signal: childAbort.signal,
           policyBudget: childPolicyBudget,
@@ -397,7 +399,7 @@ export class SubagentRunner implements SubagentToolHost {
         },
       ));
       resultText = await childPromise;
-      if (childAbort.signal.aborted) {
+      if (childAborted()) {
         resultStatus = 'cancelled';
         const reason = childAbort.signal.reason;
         if (reason instanceof Error && reason.message.startsWith('POLICY_LIMIT_EXCEEDED: maxWallTimeMs')) {
@@ -405,7 +407,7 @@ export class SubagentRunner implements SubagentToolHost {
         }
       }
     } catch (error) {
-      const aborted = childAbort.signal.aborted
+      const aborted = childAborted()
         || (error instanceof Error && error.name === 'AbortError');
       resultStatus = aborted ? 'cancelled' : 'failed';
       if (!aborted && error instanceof DelegationConfigurationError) configurationError = error.code;

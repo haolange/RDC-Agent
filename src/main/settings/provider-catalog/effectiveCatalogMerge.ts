@@ -44,7 +44,7 @@ function stableJson(value: unknown): string {
       .map(([key, child]) => `${JSON.stringify(key)}:${stableJson(child)}`)
       .join(',')}}`;
   }
-  return JSON.stringify(value) ?? 'null';
+  return (JSON.stringify(value) as string | undefined) ?? 'null';
 }
 
 export function revisionFor(value: unknown): string {
@@ -247,7 +247,7 @@ function recordObjectLeafEvidence(
     if (isObject(child)) {
       recordObjectLeafEvidence(
         child,
-        isObject(previous?.[key]) ? previous?.[key] as Record<string, unknown> : undefined,
+        isObject(previous?.[key]) ? previous[key] as Record<string, unknown> : undefined,
         field,
         layer,
         provenance,
@@ -543,7 +543,7 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
       ...model,
       aliases: [...model.aliases],
       selection: model.selection ? cloneJson(model.selection) : { pickerVisibility: 'primary' as const },
-      presencePolicy: model.presencePolicy ?? 'discovered',
+      presencePolicy: model.presencePolicy,
       route: cloneJson(projectedRoute),
       routeRevision: preferredRouteOption?.routeRevision
         ?? routeRevision(model.route),

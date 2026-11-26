@@ -1,7 +1,4 @@
 import path from 'path';
-import {
-  DEFAULT_CONTEXT_COMPACTION_PERCENT,
-} from '@shared/types/modelCapability';
 import { sanitizeCompactionThresholdPercent } from '@shared/utils/contextBudget';
 import {
   APP_DEFAULT_WINDOW_HEIGHT,
@@ -147,7 +144,7 @@ export function sanitizeAgentRuntimeContextSettings(
   return {
     compactionThresholdPercent: sanitizeCompactionThresholdPercent(
       candidate.compactionThresholdPercent,
-      fallback.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
+      fallback.compactionThresholdPercent,
     ),
   };
 }

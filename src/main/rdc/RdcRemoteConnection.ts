@@ -33,7 +33,7 @@ export function assertRemotePreparationContract(binding: RdcTurnBinding): void {
     || definition?.preparation_policy !== 'automatic') {
     throw new AppError('RDC_REMOTE_UPGRADE_REQUIRED', 'configured Tools lacks automatic Android preparation.');
   }
-  if (schema?.properties?.timeout_ms?.type !== 'integer' || policy?.argument !== 'timeout_ms' || !['default_timeout_ms', 'worker_grace_ms', 'transport_grace_ms', 'process_grace_ms']
+  if (schema.properties.timeout_ms?.type !== 'integer' || policy?.argument !== 'timeout_ms' || !['default_timeout_ms', 'worker_grace_ms', 'transport_grace_ms', 'process_grace_ms']
     .every(key => Number.isSafeInteger(policy[key]) && Number(policy[key]) > 0)) {
     throw new AppError('RDC_REMOTE_UPGRADE_REQUIRED', 'configured Tools lacks the canonical remote timeout policy.');
   }

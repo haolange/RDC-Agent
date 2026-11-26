@@ -6,7 +6,7 @@ import type { AppLanguage } from '../types/settings';
 export function manifestTextTranslationsSchema(maxLength: number) {
   const translated = z.string().trim().min(1).max(maxLength);
   return z.object({ 'zh-CN': translated.optional(), en: translated.optional() }).strict()
-    .refine(value => Object.values(value).some(text => text !== undefined), {
+    .refine(value => (Object.values(value) as unknown[]).some(text => text !== undefined), {
       message: 'At least one translation is required when translations are present.',
     });
 }

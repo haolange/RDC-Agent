@@ -45,8 +45,10 @@ export function createProviderStateRef(
   };
 }
 
+/** Checks a ref read back from stored history, whose fields (its version included) are not schema-checked on read. */
 export function verifyProviderStateRef(state: ProviderStateRef): boolean {
-  return state.schemaVersion === 1
+  const storedVersion: number = state.schemaVersion;
+  return storedVersion === 1
     && state.originFingerprint === state.origin.fingerprint
     && state.integrityHash === hashCanonical({
       schemaVersion: state.schemaVersion,

@@ -54,7 +54,7 @@ export function resolveProviderReasoningContract(
     return createNoneReasoningContract('effective-model');
   }
   const route = requestPlan?.route ?? model.route;
-  return requestPlan?.contracts?.reasoning
+  return requestPlan?.contracts.reasoning
     ?? route.contracts?.reasoning
     ?? createFailClosedProviderContracts(route.protocol).reasoning;
 }

@@ -129,7 +129,7 @@ export function validateToolArguments(tool: AgentTool, toolCall: ToolCallContent
       `TOOL_ARGUMENTS_INVALID: the arguments were not a JSON object. Received: ${toolCall.invalidArguments.slice(0, 200)}`) };
   }
   try {
-    const validatedArgs = toolValidator.validate(toolToDefinition(tool), toolCall.arguments ?? {});
+    const validatedArgs = toolValidator.validate(toolToDefinition(tool), toolCall.arguments);
     tool.validateArgs?.(validatedArgs);
     return { ok: true, value: validatedArgs };
   } catch (error) {

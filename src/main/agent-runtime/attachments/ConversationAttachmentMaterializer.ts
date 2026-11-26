@@ -229,9 +229,6 @@ export async function materializeAgentUserInput(
   if (attachments.length > MAX_ATTACHMENT_COUNT) {
     throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `at most ${MAX_ATTACHMENT_COUNT} attachments are allowed.`);
   }
-  if (attachments.some((attachment) => !attachment.layer)) {
-    throw new AppError('ATTACHMENT_INVALID', 'attachment layer is required.');
-  }
   let totalBytes = 0;
   for (const attachment of attachments) {
     const sourcePath = sourcePathOf(attachment);

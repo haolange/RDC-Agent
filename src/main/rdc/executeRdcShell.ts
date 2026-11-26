@@ -121,7 +121,8 @@ export async function executeRdcShell(
   }
   const startedAt = Date.now();
   let lastInvocation: ReturnType<typeof rdcInvocationRecord> | undefined;
-  let lastReplayState: { process: ReturnType<typeof parseRdcProcessIdentity>; replacements: string } | null = null;
+  // Set by readReplayEvent on every replay read.
+  let lastReplayState = null as { process: ReturnType<typeof parseRdcProcessIdentity>; replacements: string } | null;
   const verifyTruncatedBufferRead = input.operation === 'rd.pipeline.get_constant_buffers'
     && args.include_contents === true && definition.effects.length === 1 && definition.effects[0] === 'replay_position';
   let truncatedBufferRead = false;

@@ -125,7 +125,6 @@ export class AgentToolApprovalRequestService {
       reviewMethod,
     });
     let verdict: PermissionReviewVerdict;
-    let settledRejection = false;
     let modeCancelled = false;
     let reviewCancelled = false;
     try {
@@ -134,11 +133,12 @@ export class AgentToolApprovalRequestService {
         verdict = { approved: true, reason: `RULE_APPROVED: ${input.reason}` };
       } else {
         if (!input.reviewer || !input.action) throw new PermissionReviewError('PERMISSION_REVIEW_UNAVAILABLE', 'no frozen reviewer is available.');
-        const result = await awaitReview(input.reviewer(input.action, input.signal, input.tool), input.signal, (result) => { settledRejection = !result.approved; });
+        const result = await awaitReview(input.reviewer(input.action, input.signal, input.tool), input.signal);
         // Only the strict verdict crosses this boundary; route/failure metadata belongs to the host.
         verdict = { approved: result.approved, reason: result.reason };
       }
-      if (!settledRejection) input.signal?.throwIfAborted();
+      // A rejection that settled before the abort stands; an approval is withdrawn by a later abort.
+      if (verdict.approved) input.signal?.throwIfAborted();
     } catch (error) {
       modeCancelled = error instanceof PermissionModeChangedError;
       reviewCancelled = input.signal?.aborted === true && error === input.signal.reason;
@@ -260,14 +260,14 @@ export class AgentToolApprovalRequestService {
 
 export const agentToolApprovalRequestService = new AgentToolApprovalRequestService();
 
-async function awaitReview<T>(review: Promise<T>, signal: AbortSignal | undefined, onSettled: (value: T) => void): Promise<T> {
-  if (!signal) return review.then(value => { onSettled(value); return value; });
+async function awaitReview<T>(review: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (!signal) return review;
   signal.throwIfAborted();
   return new Promise<T>((resolve, reject) => {
     let settled = false;
     const finish = () => { settled = true; signal.removeEventListener('abort', abort); };
     const abort = () => { finish(); reject(signal.reason); };
     signal.addEventListener('abort', abort, { once: true });
-    review.then(value => { if (settled) return; finish(); onSettled(value); resolve(value); }, error => { if (settled) return; finish(); reject(error); });
+    review.then(value => { if (settled) return; finish(); resolve(value); }, error => { if (settled) return; finish(); reject(error); });
   });
 }

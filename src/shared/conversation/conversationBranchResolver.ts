@@ -36,9 +36,9 @@ export function repairConversationBranchState(
     return { branchState, repaired: false };
   }
 
-  let repaired = false;
+  let repaired = false as boolean;
   const forks = branchState.forks.map((fork) => {
-    let forkRepaired = false;
+    let forkRepaired = false as boolean;
     const branches = fork.branches.map((branch) => {
       if (branch.anchorUserMessageId && branch.rootTurnId) {
         return branch;
@@ -171,7 +171,7 @@ export function findForkForMessage(
 
 /** Branches that already have a concrete user anchor (exclude empty pending shells). */
 export function getConcreteForkBranches(fork: ConversationFork): ConversationBranch[] {
-  return fork.branches.filter((branch) => Boolean(branch.anchorUserMessageId?.trim()));
+  return fork.branches.filter((branch) => Boolean(branch.anchorUserMessageId.trim()));
 }
 
 /**

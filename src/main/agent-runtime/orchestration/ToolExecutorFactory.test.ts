@@ -71,8 +71,10 @@ vi.mock('../core/ToolValidator', () => ({
 const { hookTrigger } = vi.hoisted(() => ({
   hookTrigger: vi.fn(async () => [] as Array<{ allowed: boolean; status: string }>),
 }));
+/** Every built EffectiveRuntimePlan carries its route capability. */
+const TEST_ROUTE_CAPABILITY = { visionInputMode: 'disabled' } as const;
 const { permissionEvaluate } = vi.hoisted(() => ({
-  permissionEvaluate: vi.fn(() => ({ action: 'allow' as const })),
+  permissionEvaluate: vi.fn(() => ({ action: 'allow' as const, temporaryPathRoots: [] as string[] })),
 }));
 const approvalRequest = vi.hoisted(() => vi.fn(async () => true));
 vi.mock('../../hooks/HookEngine', () => ({
@@ -140,7 +142,7 @@ describe('ToolExecutorFactory', () => {
     const pin = vi.spyOn(toolResultArtifacts, 'artifactizeToolResult').mockImplementation(input => input.result);
     const executor = preparedExecutor(factory, 'general', ['shell', 'rdc_probe'], 'unscoped-mission', {
       sessionId: 'unscoped-mission', turnId: 'turn', projectId: 'p', projectRootPath: process.cwd(),
-      effectivePlan: { toolAllowlist: ['shell', 'rdc_probe'], skillIntersection: null, activatedDeferredTools: ['rdc_probe'] } as never,
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['shell', 'rdc_probe'], skillIntersection: null, activatedDeferredTools: ['rdc_probe'] } as never,
     });
     try {
       for (const call of [
@@ -187,7 +189,7 @@ describe('ToolExecutorFactory', () => {
     });
     vi.spyOn(factory, 'triggerRuntimeHooks').mockResolvedValue({ allowed: true });
     const executor = preparedExecutor(factory, 'general', ['rdc_probe'], 'recovery-owner', { sessionId: 'recovery-owner', turnId: 'turn',
-      projectId: 'p', projectRootPath: process.cwd(), effectivePlan: { toolAllowlist: ['rdc_probe'], skillIntersection: null,
+      projectId: 'p', projectRootPath: process.cwd(), effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['rdc_probe'], skillIntersection: null,
         activatedDeferredTools: ['rdc_probe'], accessCeiling: 'full' } as never });
     const call = { id: 'recover', type: 'toolCall' as const, name: 'rdc_probe', arguments: { action: 'capture_recover' } };
     permissionEvaluate.mockReturnValueOnce({ action: 'deny', risk: 'high', temporaryPathRoots: [] } as never);
@@ -205,7 +207,7 @@ describe('ToolExecutorFactory', () => {
       expect(effect).not.toHaveBeenCalled();
       release(); await Promise.all([holder, running]);
       expect(effect).toHaveBeenCalledOnce();
-    } finally { release(); await Promise.allSettled([holder, running]); permissionEvaluate.mockReturnValue({ action: 'allow' }); }
+    } finally { release(); await Promise.allSettled([holder, running]); permissionEvaluate.mockReturnValue({ action: 'allow', temporaryPathRoots: [] }); }
   });
 
   it('does not announce execution while approval or a before-call hook is pending', async () => {
@@ -214,7 +216,7 @@ describe('ToolExecutorFactory', () => {
     const approval = new Promise<void>((resolve) => { approve = resolve; });
     const hook = new Promise<void>((resolve) => { continueHook = resolve; });
     approvalRequest.mockImplementationOnce(async () => { await approval; return true; });
-    permissionEvaluate.mockReturnValueOnce({ action: 'ask_user', risk: 'medium', reason: 'Review test effect' } as never);
+    permissionEvaluate.mockReturnValueOnce({ action: 'ask_user', risk: 'medium', reason: 'Review test effect', temporaryPathRoots: [] } as never);
     hookTrigger.mockImplementationOnce(async () => { await hook; return []; });
     const started = vi.fn();
     const effect = vi.fn(async () => { expect(started).toHaveBeenCalledTimes(1); return { content: [] }; });
@@ -227,7 +229,7 @@ describe('ToolExecutorFactory', () => {
     });
     const executor = preparedExecutor(factory, 'general', ['shell'], 'start-boundary', {
       sessionId: 'start-boundary', turnId: 'start-turn', eventContext: { sessionId: 'start-boundary', turnId: 'start-turn' },
-      effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['shell'], skillIntersection: null } as never });
     const execution = executor.execute({ id: 'effect', type: 'toolCall', name: 'shell', arguments: { command: 'Write-Output test' } }, undefined, undefined, started);
     try {
       await vi.waitFor(() => expect(approvalRequest).toHaveBeenCalled());
@@ -255,7 +257,7 @@ describe('ToolExecutorFactory', () => {
       toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'general', ['shell'], 'queued-start', {
-      sessionId: 'queued-start', effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
+      sessionId: 'queued-start', effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['shell'], skillIntersection: null } as never });
     const hooks = vi.spyOn(factory, 'triggerRuntimeHooks').mockResolvedValue({ allowed: true });
     const first = executor.execute({ id: 'first', type: 'toolCall', name: 'shell', arguments: { command: 'Write-Output first' } }, undefined, undefined, started[0]);
     let second: ReturnType<typeof executor.execute> | undefined;
@@ -281,9 +283,9 @@ describe('ToolExecutorFactory', () => {
       tools: { resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }) },
       toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
-    permissionEvaluate.mockReturnValueOnce({ action: 'auto_review', risk: 'high', reason: 'Native mutation requires review.' } as never);
+    permissionEvaluate.mockReturnValueOnce({ action: 'auto_review', risk: 'high', reason: 'Native mutation requires review.', temporaryPathRoots: [] } as never);
     const executor = preparedExecutor(factory, 'general', ['shell'], 'review-owner', { sessionId: 'review-owner', turnId: 'review-turn',
-      eventContext: { sessionId: 'review-owner', turnId: 'review-turn' }, effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null } as never });
+      eventContext: { sessionId: 'review-owner', turnId: 'review-turn' }, effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['shell'], skillIntersection: null } as never });
     const started = vi.fn();
     const result = await executor.execute({ id: 'rejected-native', type: 'toolCall', name: 'shell', arguments: { rdc: { operation: 'rd.buffer.write', args: {} } } }, undefined, undefined, started);
     expect(result.isError).toBe(true);
@@ -310,7 +312,7 @@ describe('ToolExecutorFactory', () => {
         toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
       });
       const result = await preparedExecutor(factory, 'general', ['read_file'], 'audit-owner', {
-        effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, activatedDeferredTools: [] } as never,
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['read_file'], skillIntersection: null, activatedDeferredTools: [] } as never,
       }).execute({ type: 'toolCall', id: 'audit-small', name: 'read_file',
         arguments: { path: 'source.bin', mode: 'audit', expectedHash: 'a'.repeat(64) } });
       const evidence = (result.details as { evidenceArtifact?: { ref: string; hash: string } })?.evidenceArtifact;
@@ -352,7 +354,7 @@ describe('ToolExecutorFactory', () => {
         toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
       });
       const result = await preparedExecutor(factory, 'general', ['rdc_probe'], 'probe-owner', {
-        effectivePlan: { toolAllowlist: ['rdc_probe'], skillIntersection: null, activatedDeferredTools: ['rdc_probe'] } as never,
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['rdc_probe'], skillIntersection: null, activatedDeferredTools: ['rdc_probe'] } as never,
       }).execute({ type: 'toolCall', id: 'context-query', name: 'rdc_probe',
         arguments: { action: 'probe', args: { action: 'context_status' } } });
       const evidence = (result.details as { evidenceArtifact?: { ref: string; hash: string } })?.evidenceArtifact;
@@ -390,7 +392,7 @@ describe('ToolExecutorFactory', () => {
         toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
       });
       const executor = preparedExecutor(factory, 'general', ['rdc_probe'], 'probe-scope', {
-        effectivePlan: { toolAllowlist: ['rdc_probe'], skillIntersection: null, activatedDeferredTools: ['rdc_probe'] } as never,
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['rdc_probe'], skillIntersection: null, activatedDeferredTools: ['rdc_probe'] } as never,
       });
       const control = await executor.execute({ type: 'toolCall', id: 'restore', name: 'rdc_probe', arguments: { action: 'capture_restore' } });
       expect(control.content).toEqual(original.content);
@@ -429,7 +431,7 @@ describe('ToolExecutorFactory', () => {
       const discovery = kind === 'search' ? { kind, query: 'hardware shader trace', limit: 2 }
         : kind === 'describe' ? { kind, operation: 'rd.shader.debug_start' } : { kind, limit: 20 };
       const result = await preparedExecutor(factory, 'general', ['shell'], 'catalog-owner', {
-        effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
       }).execute({ type: 'toolCall', id: `catalog-${kind}`, name: 'shell', arguments: { rdc: { discovery } } });
       const evidence = (result.details as { evidenceArtifact?: { ref: string; hash: string } })?.evidenceArtifact;
       expect(execute).toHaveBeenCalledOnce();
@@ -473,7 +475,7 @@ describe('ToolExecutorFactory', () => {
         toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
       });
       const result = await preparedExecutor(factory, 'general', ['shell'], 'catalog-full', {
-        effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
       }).execute({ type: 'toolCall', id: 'catalog-overflow', name: 'shell',
         arguments: { rdc: { discovery: { kind: 'search', query: 'trace', limit: 2 } } } });
       expect(execute).toHaveBeenCalledOnce();
@@ -503,7 +505,7 @@ describe('ToolExecutorFactory', () => {
     });
     try {
       const result = await preparedExecutor(factory, 'general', ['read_file'], 'text-evidence', {
-        effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, activatedDeferredTools: [] } as never,
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['read_file'], skillIntersection: null, activatedDeferredTools: [] } as never,
       }).execute({ type: 'toolCall', id: 'small-diff', name: 'read_file', arguments: { path: 'change.diff', ...(pinEvidence === undefined ? {} : { pinEvidence }) } });
       expect(execute).toHaveBeenCalledOnce();
       expect(result.content).toEqual(original.content);
@@ -528,7 +530,7 @@ describe('ToolExecutorFactory', () => {
     });
     try {
       const result = await preparedExecutor(factory, 'general', ['runtime_context'], 'context-evidence', {
-        effectivePlan: { toolAllowlist: ['runtime_context'], skillIntersection: null, activatedDeferredTools: [] } as never,
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['runtime_context'], skillIntersection: null, activatedDeferredTools: [] } as never,
       }).execute({ type: 'toolCall', id: 'owner-proof', name: 'runtime_context', arguments: {} });
       expect(result.content).toEqual(original.content);
       expect(pin).toHaveBeenCalledWith(expect.objectContaining({ toolName: 'runtime_context', result: original, pinBelowThreshold: true }));
@@ -547,7 +549,7 @@ describe('ToolExecutorFactory', () => {
       toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const result = await preparedExecutor(factory, 'general', ['shell'], 'plain-shell', {
-      effectivePlan: { toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['shell'], skillIntersection: null, activatedDeferredTools: [] } as never,
     }).execute({ type: 'toolCall', id: 'plain-output', name: 'shell', arguments: { command: 'echo bounded' } });
     expect(execute).toHaveBeenCalledOnce();
     expect(result.content).toEqual(original.content);
@@ -585,7 +587,7 @@ describe('ToolExecutorFactory', () => {
     });
     try {
       const result = await preparedExecutor(factory, 'general', [name], 'native-failure-session', {
-        effectivePlan: { toolAllowlist: [name], skillIntersection: null, activatedDeferredTools: [name] } as never,
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: [name], skillIntersection: null, activatedDeferredTools: [name] } as never,
       }).execute({ type: 'toolCall', id: 'native-failure-call', name, arguments: {} });
       expect(execute).toHaveBeenCalledOnce();
       expect(result.isError).toBe(true);
@@ -614,7 +616,7 @@ describe('ToolExecutorFactory', () => {
         toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
       });
       const result = await preparedExecutor(factory, 'general', ['code_interpreter'], 'interpreter-session', {
-        effectivePlan: { toolAllowlist: ['code_interpreter'], skillIntersection: null,
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['code_interpreter'], skillIntersection: null,
           activatedDeferredTools: ['code_interpreter'] } as never,
       }).execute({
         type: 'toolCall', id: 'interpreter-call', name: 'code_interpreter', arguments: { code: 'print(1)' },
@@ -775,7 +777,7 @@ describe('ToolExecutorFactory', () => {
       toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'ask', ['shell'], null, {
-      effectivePlan: {
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY,
         toolAllowlist: ['shell'],
         skillIntersection: null,
         permissionConstraints: {
@@ -826,7 +828,7 @@ describe('ToolExecutorFactory', () => {
       toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => false },
     });
     const executor = preparedExecutor(factory, 'ask', ['shell'], null, {
-      effectivePlan: {
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY,
         toolAllowlist: ['shell'],
         skillIntersection: ['read_file'],
         permissionConstraints: {
@@ -904,7 +906,7 @@ describe('ToolExecutorFactory', () => {
       toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'plan', ['task_create'], 'session-1', {
-      effectivePlan: {
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY,
         toolAllowlist: ['task_create'],
         activatedDeferredTools: ['task_create'],
         skillIntersection: null,
@@ -944,7 +946,7 @@ describe('ToolExecutorFactory', () => {
     });
     const budget = { toolCalls: 0, subagents: 0, childDepth: 0, wallStartedAt: Date.now(), maxToolCalls: 1, maxSubagents: 3, maxChildDepth: 3, maxWallTimeMs: 60_000 };
     const executor = preparedExecutor(factory, 'ask', ['read_file'], null, {
-      effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
       policyBudget: budget,
     });
     const first = await executor.execute({ type: 'toolCall', id: 'first', name: 'read_file', arguments: {} });
@@ -955,7 +957,7 @@ describe('ToolExecutorFactory', () => {
 
     const expired = { ...budget, toolCalls: 0, wallStartedAt: Date.now() - 100, maxWallTimeMs: 1 };
     const expiredExecutor = preparedExecutor(factory, 'ask', ['read_file'], null, {
-      effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
       policyBudget: expired,
     });
     await expect(expiredExecutor.execute({ type: 'toolCall', id: 'expired', name: 'read_file', arguments: {} })).resolves.toMatchObject({
@@ -985,7 +987,7 @@ describe('ToolExecutorFactory', () => {
       toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'ask', ['read_file'], null, {
-      effectivePlan: {
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY,
         toolAllowlist: ['read_file'],
         skillIntersection: ['read_file'],
         permissionConstraints: {
@@ -1047,7 +1049,7 @@ describe('ToolExecutorFactory', () => {
       maxWallTimeMs: 60_000,
     };
     const executor = preparedExecutor(factory, 'ask', ['read_file', 'shell'], null, {
-      effectivePlan: { toolAllowlist: ['read_file', 'shell'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['read_file', 'shell'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
       policyBudget: budget,
     });
     expect(executor.isConcurrencySafe?.({ id: 'r1', name: 'read_file', arguments: {} })).toBe(true);
@@ -1147,7 +1149,7 @@ describe('ToolExecutorFactory', () => {
       toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'general', tools.map(([name]) => name), null, {
-      effectivePlan: {
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY,
         toolAllowlist: tools.map(([name]) => name),
         skillIntersection: null,
         knowledgeReadRoots: [knowledgeRoot],
@@ -1222,7 +1224,7 @@ describe('ToolExecutorFactory', () => {
       toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
     });
     const executor = preparedExecutor(factory, 'ask', ['read_file', 'write_file'], null, {
-      effectivePlan: {
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY,
         toolAllowlist: ['read_file', 'write_file'],
         skillIntersection: null,
         knowledgeReadRoots: [knowledge],
@@ -1281,7 +1283,7 @@ it('durably saves reserved cost before effects and rejects effects when durable 
  const ledger = createPolicyBudgetState(); let release!: () => void; const persisted: number[] = [];
  const gate = new Promise<void>((resolve) => { release = resolve; });
  const unregister = registerPolicyBudgetObserver(ledger, async (snapshot) => { await gate; persisted.push(snapshot.toolCalls); });
- const executor = preparedExecutor(factory, 'general', ['read_file'], null, { effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never, policyBudget: ledger });
+ const executor = preparedExecutor(factory, 'general', ['read_file'], null, { effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never, policyBudget: ledger });
  const call = { type: 'toolCall' as const, id: 'persisted', name: 'read_file', arguments: {} };
  executor.reserveDispatchBudget?.([call]);
  const running = executor.execute(call);
@@ -1307,7 +1309,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
       const turn = { turnId: 'turn', generation: 7, approvedPlan: null } as TurnHandle;
       const factory = createFactory(turn);
       const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' },
-        effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', surface: 'plan-gate' }] } } as never;
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, profileHandoffs: [{ agent: 'general', label: 'Execute', surface: 'plan-gate' }] } } as never;
       const call = { id: 'plan-call', type: 'toolCall' as const, name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: 'Work' } };
       const denied = await factory.executePlanArtifactTool({ toolCall: call, agentId: 'debugger', runtimeContext: context });
       expect(denied.isError).toBe(true);
@@ -1340,7 +1342,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
     try {
       const turn = { turnId: 'turn', generation: 7, approvedPlan: null } as TurnHandle;
       const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' },
-        effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', surface: 'plan-gate' }] } } as never;
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, profileHandoffs: [{ agent: 'general', label: 'Execute', surface: 'plan-gate' }] } } as never;
       const factory = createFactory(turn);
       const call = { id: 'plan-call', type: 'toolCall' as const, name: 'plan_artifact',
         arguments: { title: 'Plan', summary: ['Work'], content: 'The task is described in prose.' } };
@@ -1371,7 +1373,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
     const begin = vi.spyOn(planReviewStateStore, 'beginRevision').mockReturnValue({ planId: 'plan', revision: 1 } as never);
     try {
       const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' },
-        effectivePlan: { completionContract: 'investigation-report', investigationMission: 'analyzer', projectId: null,
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, completionContract: 'investigation-report', investigationMission: 'analyzer', projectId: null,
           profileHandoffs: [{ agent: 'general', label: 'Execute', surface: 'plan-gate' }] } } as never;
       const result = await createFactory().executePlanArtifactTool({ toolCall: { id: 'plan-call', type: 'toolCall', name: 'plan_artifact',
         arguments: { title: 'Plan', summary: ['Analyze'], content: 'Work' } }, agentId: 'analyzer', runtimeContext: context });
@@ -1387,7 +1389,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
     const begin = vi.spyOn(planReviewStateStore, 'beginRevision').mockReturnValue({ planId: 'plan', revision: 1 } as never);
     try {
       const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' },
-        effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', surface: 'plan-gate' }] } } as never;
+        effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, profileHandoffs: [{ agent: 'general', label: 'Execute', surface: 'plan-gate' }] } } as never;
       for (const name of ['AbortError', 'Error']) {
         const error = new Error('review did not complete'); error.name = name;
         vi.mocked(agentPlanReviewRequestService.request).mockRejectedValueOnce(error);
@@ -1405,7 +1407,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
     const begin = vi.spyOn(planReviewStateStore, 'beginRevision').mockReturnValue({ planId: 'plan', revision: 1 } as never);
     try {
       const factory = createFactory();
-      const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' }, effectivePlan: { profileHandoffs: [{ agent: 'general', label: 'Execute', labelTranslations: { 'zh-CN': '执行' }, surface: 'plan-gate' }] } } as never;
+      const context = { sessionId: 'sess', turnId: 'turn', eventContext: { sessionId: 'sess', turnId: 'turn' }, effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY, profileHandoffs: [{ agent: 'general', label: 'Execute', labelTranslations: { 'zh-CN': '执行' }, surface: 'plan-gate' }] } } as never;
       const value = await factory.executePlanArtifactTool({ toolCall: { id: 'plan-call', type: 'toolCall', name: 'plan_artifact', arguments: { title: 'Plan', summary: ['Work'], content: '## Work\nAnalyze.', requiredTaskIds: ['task-real'], metadata: { executionRequirements: { mode: 'direct' } } } }, agentId: 'debugger', runtimeContext: context });
       expect(value.isError, JSON.stringify(value.content)).toBe(false);
       expect(getTask).toHaveBeenCalledWith('task-real');
@@ -1455,7 +1457,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
       sessionId: 'sess',
       turnId: 'turn-1',
       eventContext: { sessionId: 'sess', requestId: 'req-1' },
-      effectivePlan: {
+      effectivePlan: { routeCapability: TEST_ROUTE_CAPABILITY,
         toolAllowlist: ['plan_artifact'],
         skillIntersection: ['plan_artifact'],
         activatedDeferredTools: ['plan_artifact'],
@@ -1509,7 +1511,7 @@ it('keeps private file-read state across turns and agent switches, isolates and 
 
 function preparedExecutor(factory: ToolExecutorFactory, ...args: Parameters<ToolExecutorFactory['createToolExecutor']>) {
  const [agent,tools,session,context]=args;
- return factory.createToolExecutor(agent,tools,session,{...context,effectivePlan:{toolAllowlist:tools,...context?.effectivePlan,permissionConstraints:context?.effectivePlan?.permissionConstraints??{readableRoots:[],writableRoots:[],allowedCommandPrefixes:[],deniedCommandPrefixes:[]}}} as never);
+ return factory.createToolExecutor(agent,tools,session,{...context,effectivePlan:{toolAllowlist:tools,routeCapability:TEST_ROUTE_CAPABILITY,...context?.effectivePlan,permissionConstraints:context?.effectivePlan?.permissionConstraints??{readableRoots:[],writableRoots:[],allowedCommandPrefixes:[],deniedCommandPrefixes:[]}}} as never);
 }
 
 it('reauthorizes prepared parent/child executors after a global mode switch without repeating their hooks or reserved dispatch', async () => {
@@ -1551,5 +1553,5 @@ it('reauthorizes prepared parent/child executors after a global mode switch with
     expect(approvalRequest).toHaveBeenCalledOnce();
     expect(hook.mock.calls.filter(([event]) => event === 'tool.before-call')).toHaveLength(2);
     expect(ledger.toolCalls).toBe(2);
-  } finally { release(); await Promise.allSettled([running, childRun]); permissionEvaluate.mockReturnValue({ action: 'allow' }); }
+  } finally { release(); await Promise.allSettled([running, childRun]); permissionEvaluate.mockReturnValue({ action: 'allow', temporaryPathRoots: [] }); }
 });

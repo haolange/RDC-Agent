@@ -122,7 +122,7 @@ export class ContextManager {
     for (const block of content) {
       if (block.type === 'text') {
         total += block.text.length;
-      } else if (block.type === 'image') {
+      } else {
         total += estimateImageTokensFromBase64Length(block.data.length) * 4;
       }
     }
@@ -137,7 +137,7 @@ export class ContextManager {
       } else if (block.type === 'thinking') {
         if (block.continuation) total += this.providerArtifactChars(block.continuation);
         else if (block.text) total += block.text.length;
-      } else if (block.type === 'toolCall') {
+      } else {
         try {
           total += JSON.stringify(block.arguments).length + block.name.length;
         } catch {
@@ -161,7 +161,7 @@ export class ContextManager {
     for (const block of msg.content) {
       if (block.type === 'text') {
         total += block.text.length;
-      } else if (block.type === 'image') {
+      } else {
         total += estimateImageTokensFromBase64Length(block.data.length) * 4;
       }
     }

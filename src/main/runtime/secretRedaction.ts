@@ -38,7 +38,7 @@ export function redactCredentialLikeText(value: string): string {
 
 /** A bounded, redacted one-line preview of tool arguments for the visible work process. */
 export function redactedArgumentsPreview(value: unknown, maxChars = 600): string {
-  return (JSON.stringify(redactSecretsDeep(value ?? {}).value) ?? '{}').slice(0, maxChars);
+  return ((JSON.stringify(redactSecretsDeep(value ?? {}).value) as string | undefined) ?? '{}').slice(0, maxChars);
 }
 
 export function redactSecretsDeep(

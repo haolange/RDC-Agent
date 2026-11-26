@@ -1,6 +1,7 @@
 import { createDefaultChromeThemes } from './presets';
 import { sanitizeChromeThemes } from './sanitize';
 import type {
+  AppearancePatch,
   AppLanguage,
   AppTheme,
   FontScale,
@@ -38,8 +39,7 @@ export function sanitizeUiPreferences(
   const record = candidate && typeof candidate === 'object'
     ? candidate as Partial<UiPreferences> & Record<string, unknown>
     : {};
-  const chromeSource = record.chromeThemes
-    ?? (record as { chromeThemes?: unknown }).chromeThemes;
+  const chromeSource = record.chromeThemes;
   return {
     theme: pickEnum(record.theme, VALID_THEMES, fallback.theme),
     language: pickEnum(record.language, VALID_LANGUAGES, fallback.language),
@@ -58,7 +58,7 @@ export function sanitizeUiPreferences(
 /** Merge a partial appearance patch onto current preferences, then sanitize. */
 export function mergeUiPreferences(
   current: UiPreferences,
-  patch: Partial<UiPreferences> | undefined,
+  patch: AppearancePatch | undefined,
 ): UiPreferences {
   if (!patch) {
     return sanitizeUiPreferences(current);

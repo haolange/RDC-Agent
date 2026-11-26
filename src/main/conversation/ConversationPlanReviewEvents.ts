@@ -19,7 +19,7 @@ export function applyPlanReviewRequested(input: {
 }): ConversationWorkTrace | null {
   const planReview = input.payload.planReview;
   if (!planReview) return input.workTrace ?? null;
-  const toolCallId = String(input.payload.toolCallId ?? input.payload.approvalId ?? `approval-${input.payload.toolCallId ?? 'runtime'}`);
+  const toolCallId = String(input.payload.toolCallId ?? input.payload.approvalId ?? 'approval-runtime');
   const pausedTrace = input.workTrace
     ? {
         ...input.workTrace,

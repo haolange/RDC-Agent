@@ -70,7 +70,7 @@ export class ToolResourceArbiter {
       scope.queue.shift()!.grant(); scope.writer = true; return;
     }
     if (scope.readers > 0 && scope.queue[0] && !scope.queue[0].shared) return;
-    while (scope.queue[0]?.shared && !scope.writer) { scope.queue.shift()!.grant(); scope.readers += 1; }
+    while (scope.queue[0]?.shared) { scope.queue.shift()!.grant(); scope.readers += 1; }
   }
 }
 

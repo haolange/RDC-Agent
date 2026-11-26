@@ -5,7 +5,7 @@ import { isRdcLeaseToolName, stripRdcLeaseToolsFromAllowlist } from '@shared/con
 import { filterToolsWithinCeiling } from '@shared/constants/toolAccess';
 import { agentAccessCeiling, agentCompletionContract, type AgentCompletionContract } from '@shared/types/agentManifest';
 import { freezeDelegationCapsule } from './orchestration/delegationCapsule';
-import { compileEffectivePolicy, emptyCompiledPolicy } from './permissions/PolicyCompiler';
+import { compileEffectivePolicy } from './permissions/PolicyCompiler';
 import type { AgentManifestDefinition, ManifestTextTranslations } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
@@ -173,11 +173,7 @@ function serializeActivatedDeferred(
  * Prompt 与 Tool Executor 必须引用同一 planId/fingerprint。
  */
 export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput): EffectiveRuntimePlan {
-  const policy = input.policy ?? (
-    input.projectRootPath === undefined
-      ? emptyCompiledPolicy()
-      : compileEffectivePolicy(input.projectRootPath)
-  );
+  const policy = input.policy ?? compileEffectivePolicy(input.projectRootPath);
   const permissionConstraints: Omit<AgentPermissionSettings, 'mode'> = {
     readableRoots: [...input.permissionConstraints.readableRoots],
     writableRoots: [...input.permissionConstraints.writableRoots],

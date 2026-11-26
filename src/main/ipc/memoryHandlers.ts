@@ -90,11 +90,17 @@ function memoryChannels(): IpcChannelTable {
       return { memory: memory ? { ...memory, scope } : null };
     },
     'memory:write': async (_event, ...rawArgs: unknown[]) => {
+      let request: MemoryWriteRequest;
       try {
-        const [request] = parseIpcArgs(MemoryWriteArgsSchema, rawArgs, {
+        [request] = parseIpcArgs(MemoryWriteArgsSchema, rawArgs, {
           label: 'memory:write',
           maxBytes: 512 * 1024,
         }) as [MemoryWriteRequest];
+      } catch (error) {
+        if (error instanceof IpcValidationError) return validationFailure(error);
+        throw error;
+      }
+      try {
         const consumed = ipcApprovalTokenService.consume({
           token: request.approvalToken,
           action: 'memory.write',
@@ -114,14 +120,7 @@ function memoryChannels(): IpcChannelTable {
         });
         return { success: true, name: memory.displayName };
       } catch (error) {
-        if (error instanceof IpcValidationError) return validationFailure(error);
-        return {
-          success: false,
-          name: typeof (rawArgs[0] as { name?: unknown })?.name === 'string'
-            ? (rawArgs[0] as { name: string }).name
-            : undefined,
-          error: error instanceof Error ? error.message : String(error),
-        };
+        return { success: false, name: request.name, error: error instanceof Error ? error.message : String(error) };
       }
     },
     'memory:delete': async (_event, ...rawArgs: unknown[]) => {

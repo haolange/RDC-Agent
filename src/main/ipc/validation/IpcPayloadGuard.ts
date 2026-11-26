@@ -25,7 +25,7 @@ const DEFAULT_MAX_BYTES = 256 * 1024;
 export function assertIpcPayloadBytes(value: unknown, maxBytes: number, label = 'IPC payload'): void {
   let serialized: string;
   try {
-    serialized = JSON.stringify(value) ?? 'null';
+    serialized = (JSON.stringify(value) as string | undefined) ?? 'null';
   } catch {
     throw new IpcValidationError(`${label} is not JSON-serializable.`);
   }

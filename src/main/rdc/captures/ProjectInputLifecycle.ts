@@ -46,7 +46,8 @@ export class ProjectInputLifecycle {
   }
 
   async remove(projectId: string, inputId: string, approvedIdentity: string): Promise<ProjectInputRemoveResult> {
-    let fileDeleted = false;
+    // Set inside the locked callback; the catch reads whether the file was already removed.
+    let fileDeleted = false as boolean;
     try {
       return await this.host.block(projectId, inputId, async () => {
         const prepared = await this.prepare(projectId, inputId);

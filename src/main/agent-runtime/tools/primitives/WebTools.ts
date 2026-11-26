@@ -126,7 +126,7 @@ export const webSearchTool: AgentTool<WebSearchParams, WebSearchDetails> = {
   effects: { network: true },
 
   async execute(_toolCallId, params, signal) {
-    const query = params.query?.trim();
+    const query = params.query.trim();
     if (!query) {
       throw new Error('Search query cannot be empty.');
     }
@@ -268,7 +268,6 @@ async function readResponseBodyLimited(
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    if (!value) continue;
     if (total >= maxBytes) {
       truncated = true;
       break;

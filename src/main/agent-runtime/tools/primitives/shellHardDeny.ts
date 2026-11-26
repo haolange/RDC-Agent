@@ -316,7 +316,7 @@ function matchPosixHardDeny(command: string): string | null {
 }
 
 export function matchShellHardDeny(command: string, kind?: ShellKind | 'cmd'): string | null {
-  const text = String(command ?? '');
+  const text = command;
   if (!text.trim()) return null;
   const resolved = kind ?? defaultShellKind();
   if (resolved === 'pwsh' || resolved === 'windows-powershell') {

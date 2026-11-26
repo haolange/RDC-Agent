@@ -70,10 +70,10 @@ export function searchTools(tools: ToolSearchToolInfo[], params: ToolSearchParam
     matches = matches.filter((tool) => score(tool) > 0);
   }
   if (category) {
-    matches = matches.filter((tool) => (tool.spec?.category ?? '').toLowerCase() === category);
+    matches = matches.filter((tool) => (tool.spec.category ?? '').toLowerCase() === category);
   }
   if (requiresApproval !== undefined) {
-    matches = matches.filter((tool) => (tool.spec?.requiresApproval ?? false) === requiresApproval);
+    matches = matches.filter((tool) => (tool.spec.requiresApproval ?? false) === requiresApproval);
   }
 
   if (query) {
@@ -86,9 +86,9 @@ export function searchTools(tools: ToolSearchToolInfo[], params: ToolSearchParam
   const page = matches.slice(offset, offset + limit).map((tool) => ({
     name: tool.name,
     description: tool.description,
-    category: tool.spec?.category,
-    requiresApproval: tool.spec?.requiresApproval ?? false,
-    parameters: tool.parameters ?? { type: 'object', properties: {} },
+    category: tool.spec.category,
+    requiresApproval: tool.spec.requiresApproval ?? false,
+    parameters: tool.parameters,
   }));
 
   return {
@@ -137,8 +137,8 @@ export function createToolSetFingerprint(tools: readonly ToolSearchToolInfo[]): 
     .map((tool) => ({
       name: tool.name,
       description: tool.description,
-      parameters: tool.parameters ?? { type: 'object', properties: {} },
-      spec: tool.spec ?? null,
+      parameters: tool.parameters,
+      spec: tool.spec,
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
   return createHash('sha256').update(stableSerialize(canonicalTools)).digest('hex').slice(0, 24);
@@ -152,7 +152,7 @@ function stableSerialize(value: unknown): string {
       .map(([key, child]) => `${JSON.stringify(key)}:${stableSerialize(child)}`)
       .join(',')}}`;
   }
-  return JSON.stringify(value) ?? 'null';
+  return (JSON.stringify(value) as string | undefined) ?? 'null';
 }
 
 export function createToolSearchTool(getAllTools: () => ToolSearchToolInfo[]): AgentTool {
@@ -174,7 +174,7 @@ export function createToolSearchTool(getAllTools: () => ToolSearchToolInfo[]): A
     spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false, activatesDeferredTools: true },
     permissionHint: 'readonly',
     async execute(_id, params) {
-      const p = (params ?? {}) as ToolSearchParams;
+      const p = params as ToolSearchParams;
       const page = searchTools(getAllTools(), p);
       return {
         content: [{ type: 'text', text: formatToolSearchResult(page) }],

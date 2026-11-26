@@ -47,7 +47,7 @@ function clampEntryFields(input: RuntimeLogInput): Pick<
     ? redactCredentialLikeText(input.detail)
     : undefined;
   const redactedRaw = input.raw === undefined || input.raw === null
-    ? input.raw ?? null
+    ? null
     : redactSecretsDeep(input.raw, 'raw').value;
 
   let title = truncateUtf8(redactedTitle, 4 * 1024);

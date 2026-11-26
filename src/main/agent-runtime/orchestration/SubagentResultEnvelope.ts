@@ -40,7 +40,7 @@ export function normalizeSubagentResult(text: string, status: 'complete' | 'fail
 export function projectSubagentResult(result: TaskCompletionResult) {
   const externalizedFields: string[] = [];
   function keep<T>(field: string, value: T, maxBytes: number, empty: T): T {
-    if (Buffer.byteLength(JSON.stringify(value) ?? '', 'utf8') <= maxBytes) return value;
+    if (Buffer.byteLength((JSON.stringify(value) as string | undefined) ?? '', 'utf8') <= maxBytes) return value;
     externalizedFields.push(field); return empty;
   }
   const projection = {

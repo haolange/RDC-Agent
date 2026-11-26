@@ -156,10 +156,7 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
         return true;
       })
       : Array.from(this.preparingRequests.entries())
-          .find(([, entry]) => {
-            if (request.sessionId && !entry.scopeKey.includes(request.sessionId)) return false;
-            return entry.phase === 'preparing' || entry.phase === 'committing';
-          });
+          .find(([, entry]) => !request.sessionId || entry.scopeKey.includes(request.sessionId));
     const preparing = preparingEntry?.[1];
     const preparingRequestId = preparing?.requestId;
     if (preparing && preparingRequestId) {
@@ -234,7 +231,7 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
   private resolveIdempotencyScope(
     input: ConversationContextInput | ConversationRewriteContextInput,
   ): { scopeType: 'session' | 'project'; scopeId: string; scopeKey: string; idempotencyKey: string } {
-    const requestId = input.requestId?.trim();
+    const requestId = input.requestId.trim();
     if (!requestId) throw new AppError('PREFLIGHT_FAILED', 'requestId is required.');
     const sessionId = input.sessionId ?? input.fallbackSessionId ?? null;
     if (sessionId) {
@@ -397,7 +394,7 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
     if (!this.acceptingTurns) {
       throw new AppError('SHUTTING_DOWN', 'conversation service is no longer accepting turns.');
     }
-    const requestId = input.requestId?.trim();
+    const requestId = input.requestId.trim();
     if (!requestId) throw new AppError('PREFLIGHT_FAILED', 'requestId is required.');
     const { scopeKey, idempotencyKey } = this.resolveIdempotencyScope(input);
 

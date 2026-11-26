@@ -73,7 +73,7 @@ export function buildTurnPromptPlan(input: TurnPromptPlanInput): TurnPromptPlan 
     return skill;
   });
   const baseTools = input.baseTools.map((toolName) => normalizeToolName(toolName));
-  const tools = combineActiveSkillAllowlists(baseTools, preloadedSkills.map((skill) => skill.allowedTools ?? [])) ?? baseTools;
+  const tools = combineActiveSkillAllowlists(baseTools, preloadedSkills.map((skill) => skill.allowedTools)) ?? baseTools;
   const promptClock = resolvePromptClock();
   const promptPlan = promptPlanBuilder.build({
     profile: {

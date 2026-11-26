@@ -97,19 +97,19 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
     const canonicalFailure = envelope.schema_version === '3.0.0' && result.exitCode !== 0
       && resultKind !== null && resultKind === expectedKind;
     const effectsNotAttempted = canonicalFailure && details?.recovery_required !== true
-      && details?.effects_attempted === false && details?.context_preserved === true;
+      && details?.effects_attempted === false && details.context_preserved === true;
     const screenshotTargetRestoration = canonicalFailure && details?.recovery_required !== true
       && resultKind === 'rd.export.screenshot' && details?.failure_stage === 'resolve_visual_target'
-      && details?.replay_state_restored === true && details?.artifact_write_attempted === false
-      && typeof details?.context_id === 'string' && typeof details?.session_id === 'string'
-      && Number.isSafeInteger(details?.restored_event_id) && Number(details?.restored_event_id) > 0
+      && details.replay_state_restored === true && details.artifact_write_attempted === false
+      && typeof details.context_id === 'string' && typeof details.session_id === 'string'
+      && Number.isSafeInteger(details.restored_event_id) && Number(details.restored_event_id) > 0
       ? { contextId: details.context_id, sessionId: details.session_id, eventId: Number(details.restored_event_id) } : null;
     const knownInspectionFailure = ((resultKind === 'rd.shader.get_source'
       && details?.failure_stage === 'resolve_binding'
-      && ['stage_unbound', 'shader_id_not_bound'].includes(String(details?.failure_reason)))
+      && ['stage_unbound', 'shader_id_not_bound'].includes(String(details.failure_reason)))
       || (resultKind === 'rd.shader.get_constant_buffer_contents'
         && details?.failure_stage === 'decode_constant_buffer'
-        && ['slot_unavailable', 'reflection_unavailable_without_raw_fallback'].includes(String(details?.failure_reason))))
+        && ['slot_unavailable', 'reflection_unavailable_without_raw_fallback'].includes(String(details.failure_reason))))
       || (['rd.texture.get_data', 'rd.texture.get_region_values', 'rd.texture.get_histogram',
         'rd.texture.compute_stats', 'rd.texture.diff'].includes(resultKind!)
         && details?.failure_stage === 'decode_texture_readback')
@@ -118,12 +118,12 @@ export function parseRdcNativeResult(result: CLIResult, expectedContext?: string
       || (resultKind === 'rd.shader.edit_and_replace'
         && failure.code === 'shader_patch_op_unsupported_for_encoding'
         && details?.failure_stage === 'validate_edit_plan'
-        && details?.failure_reason === 'source_encoding_not_safely_replaceable'
-        && details?.replacement_attempted === false);
+        && details.failure_reason === 'source_encoding_not_safely_replaceable'
+        && details.replacement_attempted === false);
     const inspectionRestoration = canonicalFailure && details?.recovery_required !== true && knownInspectionFailure
-      && details?.replay_state_restored === true
-      && typeof details?.context_id === 'string' && typeof details?.session_id === 'string'
-      && Number.isSafeInteger(details?.restored_event_id) && Number(details?.restored_event_id) > 0
+      && details.replay_state_restored === true
+      && typeof details.context_id === 'string' && typeof details.session_id === 'string'
+      && Number.isSafeInteger(details.restored_event_id) && Number(details.restored_event_id) > 0
       ? { contextId: details.context_id, sessionId: details.session_id, eventId: Number(details.restored_event_id) } : null;
     // Only this infrastructure failure exposes its bounded recovery guidance.
     // Arbitrary native details (including state paths and credentials) stay internal.

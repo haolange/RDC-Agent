@@ -247,7 +247,7 @@ function resolveMissionCheckpoint(
       if (result.manifest.status !== 'ready' && result.manifest.status !== 'draft') continue;
       if (result.manifest.mission !== mission) continue;
       const record = result.record as MissionCheckpoint;
-      if (!record.checkpointId?.trim()) continue;
+      if (!record.checkpointId.trim()) continue;
       resolved.push(result);
     } catch (error) {
       if (error instanceof InvestigationError && error.code === 'INVESTIGATION_NOT_FOUND') continue;

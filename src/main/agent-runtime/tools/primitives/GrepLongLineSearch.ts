@@ -40,8 +40,7 @@ export function searchLongLines(
         clearTimeout(startupTimer);
         executionTimer = setTimeout(() => finish(new Error(`grep pattern timed out after ${GREP_REGEX_TIMEOUT_MS}ms`)), GREP_REGEX_TIMEOUT_MS);
         worker.postMessage(request);
-      } else if (message.type === 'result') finish(undefined, message.matches);
-      else finish(new Error('Invalid grep worker response'));
+      } else finish(undefined, message.matches);
     });
     worker.once('error', (error) => finish(error));
     worker.once('exit', (code) => { if (!settled) finish(new Error(`grep worker exited with code ${code}`)); });

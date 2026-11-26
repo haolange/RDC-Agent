@@ -281,6 +281,14 @@ export interface UiPreferences {
   chromeThemes: ChromeThemesConfig;
 }
 
+/** One chrome variant as a patch carries it: any field, fonts merged field by field. */
+export type ThemeChromePatch = Partial<Omit<ThemeChromeConfig, 'fonts'>> & { fonts?: Partial<ThemeChromeFonts> };
+
+/** The `appearance` op's value (the settings:patch schema): any field, each chrome variant patched on its own. */
+export type AppearancePatch = Partial<Omit<UiPreferences, 'chromeThemes'>> & {
+  chromeThemes?: { light?: ThemeChromePatch; dark?: ThemeChromePatch };
+};
+
 export interface ProfileSettings {
   nickname: string;
   avatarPath?: string;
@@ -632,7 +640,7 @@ type AgentModelBindingField =
  * overwrite each other.
  */
 export type SettingsPatchOp =
-  | { op: 'appearance'; value: Partial<UiPreferences> }
+  | { op: 'appearance'; value: AppearancePatch }
   | { op: 'layout'; value: Partial<{
     leftSidebar: Partial<SidebarLayoutPreference>;
     rightPanel: Partial<SidebarLayoutPreference>;

@@ -301,7 +301,7 @@ function validateState(state: TaskStateDocument): void {
       if (task.executionRequired !== true) throw new Error(`Malformed constrained task without execution: ${id}.`);
       if (!Array.isArray(task.executionRequirements.requiredSkillIds) || !Array.isArray(task.executionRequirements.independentOfTaskIds)) throw new Error(`Malformed canonical task requirements: ${id}.`);
     }
-    if (task.schemaVersion !== TASK_SCHEMA_VERSION || task.id !== id || typeof task.subject !== 'string'
+    if (task.id !== id || typeof task.subject !== 'string'
       || !Array.isArray(task.blockedBy) || !Array.isArray(task.blocks) || !Array.isArray(task.executionIds)
       || !Array.isArray(task.completionRequirements) || typeof task.revision !== 'number'
       || typeof task.description !== 'string' || typeof task.createdAt !== 'number' || typeof task.updatedAt !== 'number'
@@ -336,7 +336,7 @@ function validateState(state: TaskStateDocument): void {
       execution.independentSources.forEach(source => TaskIndependentSourceSchema.parse(source));
     }
     const owner = state.tasks[execution.taskId];
-    if (execution.schemaVersion !== TASK_SCHEMA_VERSION || execution.id !== id || !owner
+    if (execution.id !== id || !owner
       || !owner.executionIds.includes(id) || !Number.isInteger(execution.generation) || execution.generation < 1
       || !Number.isInteger(execution.taskRevision) || execution.taskRevision < 1 || !isRecord(execution.budget)
       || typeof execution.runtimeInstanceId !== 'string' || !execution.runtimeInstanceId.trim()
@@ -366,7 +366,7 @@ function validateState(state: TaskStateDocument): void {
     if (!execution || !Array.isArray(messages)) throw new Error(`Messages reference missing execution: ${executionId}.`);
     const sequences = new Set<number>();
     for (const message of messages) {
-      if (message.schemaVersion !== TASK_SCHEMA_VERSION || message.executionId !== executionId
+      if (message.executionId !== executionId
         || message.taskId !== execution.taskId || message.generation !== execution.generation
         || message.id !== `${executionId}:${message.sequence}` || !Number.isInteger(message.sequence) || message.sequence < 1
         || !['progress', 'blocked', 'decision_required', 'result'].includes(message.kind)

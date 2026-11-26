@@ -138,7 +138,7 @@ function recordAssistantMessage(run: AgentTurnRun, setup: AgentTurnSetup, output
     output.canonicalFinalAnswerText = '';
     output.partialFinalSnapshot = undefined;
   }
-  if (message.usage && isSuccessfulProviderResponse(message)) {
+  if (isSuccessfulProviderResponse(message)) {
     const precomputedBreakdown = buildContextUsageBreakdown(setup.activeSlot, setup.runtimeTools.definitions, run.preparedRuntime.promptPlan);
     debuggerLlmService.recordAgentTurnUsage({
       runId: input.runId,
@@ -191,11 +191,9 @@ function buildContextUsageBreakdown(
   const systemDefs = injectedDefs.filter((d) => !isMcpDef(d) && !isSubagentDef(d));
 
   const pm = promptPlan.metrics;
-  const systemPromptChars = pm
-    ? pm.systemPrompt
-    : promptPlan.systemPrompt.length;
-  const rulesChars    = pm?.scopedInstructions ?? 0;
-  const skillsChars   = pm?.skills ?? 0;
+  const systemPromptChars = pm.systemPrompt;
+  const rulesChars    = pm.scopedInstructions;
+  const skillsChars   = pm.skills;
 
   // 压缩统计：在 message_end 时对当前 agent 的消息历史分类。
   const compressionStats = activeSlot.contextManager.classifyMessages(

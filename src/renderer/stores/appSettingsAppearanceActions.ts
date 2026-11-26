@@ -1,11 +1,11 @@
 import { RevisionLanes } from '../lib/revisionLanes';
 import type {
+  AppearancePatch,
   AppLanguage,
   AppTheme,
   FontScale,
   ThemeChromeConfig,
   ThemeVariant,
-  UiPreferences,
   WorkProcessExpansion,
 } from '@shared/types/settings';
 import type { AppSettingsState } from './appSettingsStoreState';
@@ -28,7 +28,7 @@ export function createAppSettingsAppearanceActions(
   // Only the newest preference shows its save failure.
   const preferenceLanes = new RevisionLanes();
   // Each change is applied at once and committed as its own op; an earlier one still in flight is never overwritten.
-  const save = async (value: Partial<UiPreferences>): Promise<void> => {
+  const save = async (value: AppearancePatch): Promise<void> => {
     await get().patchSettings([{ op: 'appearance', value }]);
   };
   return {

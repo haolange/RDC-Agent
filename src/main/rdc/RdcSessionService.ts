@@ -76,7 +76,7 @@ export class RdcSessionService extends RdcDevicePreparation {
       this.publish(binding, { phase: 'validating', operationId: randomUUID(), generation: binding.state.generation + 1, error: null });
       try {
         const project = projectWorkspaceStore.getProjectById(scope.projectId);
-        const reference = project?.inputs?.find(input => input.inputId === request.inputId && input.source === 'external_reference');
+        const reference = project?.inputs.find(input => input.inputId === request.inputId && input.source === 'external_reference');
         if (reference && reference.filePath !== request.filePath) throw new AppError('CAPTURE_REFERENCE_INVALID_PATH');
         const verifyInput = async () => {
           if (!reference) return hashCaptureFile(request.filePath);

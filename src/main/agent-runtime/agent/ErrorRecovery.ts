@@ -174,7 +174,7 @@ export class ErrorRecovery {
       return 'stream_protocol';
     }
     const wire = findProviderWireFailureError(error);
-    const raw = `${error.message ?? ''} ${error.name ?? ''} ${wire?.bodyText ?? ''}`.toLowerCase();
+    const raw = `${error.message} ${error.name} ${wire?.bodyText ?? ''}`.toLowerCase();
     const status = this.extractStatusCode(error);
 
     // prompt too long / context length
@@ -461,7 +461,7 @@ export class ErrorRecovery {
       return response.status;
     }
     // 从错误消息中尝试解析：例如 "429 Too Many Requests"
-    const match = error.message?.match(/\b(4\d{2}|5\d{2})\b/);
+    const match = error.message.match(/\b(4\d{2}|5\d{2})\b/);
     if (match) {
       const code = Number(match[1]);
       if (!Number.isNaN(code)) return code;

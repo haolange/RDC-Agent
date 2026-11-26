@@ -39,8 +39,8 @@ export function sectionsFromMarkdown(markdown: string): PlanReviewSection[] {
   }
   return matches.map((match, index) => {
     const heading = match[1].trim();
-    const start = (match.index ?? 0) + match[0].length;
-    const end = index + 1 < matches.length ? (matches[index + 1].index ?? text.length) : text.length;
+    const start = match.index + match[0].length;
+    const end = index + 1 < matches.length ? matches[index + 1].index : text.length;
     return { heading, body: text.slice(start, end).replace(/^\n+/, '').trim() };
   });
 }

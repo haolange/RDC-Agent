@@ -14,7 +14,7 @@ export const versionCommand: CommandDefinition = {
   async execute() {
     return {
       success: true,
-      message: `RDC Agent v${app.getVersion()}\nElectron: ${process.versions.electron ?? 'N/A'}\nNode: ${process.version}\nChrome: ${process.versions.chrome ?? 'N/A'}`,
+      message: `RDC Agent v${app.getVersion()}\nElectron: ${process.versions.electron}\nNode: ${process.version}\nChrome: ${process.versions.chrome}`,
     };
   },
 };

@@ -429,10 +429,7 @@ export class ProjectWorkspaceStore {
       this.writeSelection(empty);
       return empty;
     }
-    return {
-      projectId: typeof loaded.projectId === 'string' || loaded.projectId === null ? loaded.projectId : null,
-      sessionId: typeof loaded.sessionId === 'string' || loaded.sessionId === null ? loaded.sessionId : null,
-    };
+    return { projectId: loaded.projectId, sessionId: loaded.sessionId };
   }
 
   writeSelection(selection: SelectionState): void {

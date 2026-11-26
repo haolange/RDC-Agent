@@ -105,7 +105,7 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
     });
     expect(resolveAgentRouteCapability(provider, 'model-a', rawModel).reasoningContract.semantic).toBe('raw');
 
-    const frozenPlan = {
+    const frozenRoute = {
       route: {
         protocol: 'OpenAIResponses',
         baseUrl: 'https://example.test/v1',
@@ -121,7 +121,9 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
           continuation: 'exact-execution',
         }),
       },
-    } as unknown as import('@shared/types/providerCapability').RequestPlan;
+    };
+    // A built RequestPlan carries the contracts its route froze.
+    const frozenPlan = { ...frozenRoute, contracts: frozenRoute.route.contracts } as unknown as import('@shared/types/providerCapability').RequestPlan;
     expect(resolveAgentRouteCapability(provider, 'model-a', rawModel, frozenPlan).reasoningContract.semantic)
       .toBe('summary');
 

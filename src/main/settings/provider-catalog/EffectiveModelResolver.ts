@@ -115,7 +115,7 @@ export function buildCatalogModelContribution(
     option.route.protocol === provider.protocol
   ))
     ? provider.protocol
-    : catalogDefinition?.route?.protocol ?? provider.protocol;
+    : catalogDefinition?.route.protocol ?? provider.protocol;
   const base: CatalogModelContribution = catalogDefinition
     ? {
         ...catalogDefinition,

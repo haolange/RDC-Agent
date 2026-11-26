@@ -58,7 +58,8 @@ export const RdcProbeInputSchema = z.object({
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'event_show requires eventId.' });
     }
     const allowed = QUERY_FIELDS[query];
-    for (const [field, value] of Object.entries(input.args ?? {})) {
+    // Object.entries drops undefined from optional fields, but a blank field is parsed to undefined and kept.
+    for (const [field, value] of Object.entries(input.args ?? {}) as [string, unknown][]) {
       if (field !== 'action' && value !== undefined && !allowed.includes(field)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: `${field} is not allowed for ${query}.` });
       }

@@ -77,7 +77,7 @@ function spaceById(spaces: KnowledgeSpace[], spaceId: string): KnowledgeSpace {
 
 function matchesScope(entry: KnowledgeIndexEntry, scope: KnowledgeQueryRequest['scope']): boolean {
   if (!scope) return true;
-  for (const [axis, value] of Object.entries(scope)) {
+  for (const [axis, value] of Object.entries(scope) as [string, unknown][]) {
     if (axis === 'exclusions' || value == null) continue;
     if (entry.scope[axis as keyof typeof entry.scope] !== value) return false;
   }

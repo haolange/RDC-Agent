@@ -64,7 +64,7 @@ const delegatingTurn = (): TurnHandle => ({
   runtimePlan: { profileDelegates: [], accessCeiling: 'full' },
   registerProducer: () => () => undefined,
   subagentBudget: createSubagentBudgetState(),
-  generation: 1,
+  generation: 1, signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
   isLive: () => true,
 }) as unknown as TurnHandle;
 
@@ -171,7 +171,7 @@ describe('SubagentRunner', () => {
 
     const parentTurn = {
       subagentBudget: createSubagentBudgetState(),
-      signal: undefined,
+      signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
       generation: 1,
       isLive: () => true,
       registerProducer: () => () => undefined,
@@ -356,7 +356,7 @@ describe('SubagentRunner', () => {
     });
     const parentTurn = {
       subagentBudget: parentBudget,
-      signal: undefined,
+      signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
       generation: 1,
       isLive: () => true,
       registerProducer: () => () => undefined,
@@ -398,7 +398,7 @@ describe('SubagentRunner', () => {
     });
     const parentTurn = {
       subagentBudget: parentBudget,
-      signal: undefined,
+      signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
       generation: 1,
       isLive: () => true,
       registerProducer: () => () => undefined,
@@ -466,7 +466,7 @@ describe('SubagentRunner', () => {
         runtimePlan: { profileDelegates: [], accessCeiling: 'full' },
         policyBudget: parentPolicy,
         subagentBudget: createSubagentBudgetState(),
-        generation: 1,
+        generation: 1, signal: new AbortController().signal,
         isLive: () => true,
         registerProducer: () => () => undefined,
         eventSink: { sessionId, onEvent: () => undefined },
@@ -524,7 +524,7 @@ describe('SubagentRunner', () => {
         runtimePlan: { profileDelegates: ['general'], accessCeiling: 'full' },
         registerProducer: () => () => undefined,
         subagentBudget: createSubagentBudgetState(),
-        signal: undefined,
+        signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
         generation: 1,
         isLive: () => true,
         eventSink: { sessionId: 'sess-1', onEvent: () => undefined },
@@ -554,7 +554,8 @@ describe('SubagentRunner', () => {
   it('rejects a child without an explicit model or configured profile route before dispatch', async () => {
     const finish = vi.spyOn(delegationTraceStore, 'finish').mockImplementation(() => undefined);
     const profiles = vi.spyOn(agentManifestService, 'getEffectiveProfiles').mockReturnValueOnce([
-      { id: 'general', enabled: true, instructions: 'General profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: [] },
+      { id: 'general', enabled: true, instructions: 'General profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: [],
+        compiledRoute: { agentId: 'general', providerId: '', modelId: '' } },
     ] as never);
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
     try {
@@ -646,7 +647,7 @@ describe('SubagentRunner', () => {
     const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'fallback', getActiveTurn: () => null });
     const parentTurn = { turnId: 'turn-parent', requiresApprovedCaptureScope: true,
       subagentBudget: createSubagentBudgetState(), registerProducer: () => () => undefined,
-      generation: 1, isLive: () => true, eventSink: { sessionId: 'parent' } } as unknown as TurnHandle;
+      generation: 1, signal: new AbortController().signal, policyBudget: createPolicyBudgetState(), isLive: () => true, eventSink: { sessionId: 'parent' } } as unknown as TurnHandle;
     try {
       await expect(runner.runSubagent({ parentAgentId: 'general', parentAccessCeiling: 'full', parentToolCallId: 'parent-tool', targetProfile: 'ask',
         capsule: testCapsule({ domainExtensions: { rdc: { requiresLease: true } } }),
@@ -682,7 +683,7 @@ describe('SubagentRunner', () => {
     const parentTurn = {
       turnId: 'turn-parent',
       subagentBudget: createSubagentBudgetState(),
-      signal: undefined,
+      signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
       generation: 1,
       isLive: () => true,
       registerProducer: () => () => undefined,
@@ -734,7 +735,7 @@ describe('SubagentRunner', () => {
         turnId: 'turn-parent',
         subagentBudget: createSubagentBudgetState(),
         registerProducer: () => () => undefined,
-        generation: 1,
+        generation: 1, signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
         isLive: () => true,
         eventSink: { sessionId: 'parent', projectId: 'proj-1' },
       } as unknown as TurnHandle,
@@ -765,7 +766,7 @@ describe('SubagentRunner', () => {
         turnId: 'turn-parent',
         subagentBudget: createSubagentBudgetState(),
         registerProducer: () => () => undefined,
-        generation: 1,
+        generation: 1, signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
         isLive: () => true,
         eventSink: { sessionId: 'parent' },
       } as unknown as TurnHandle,

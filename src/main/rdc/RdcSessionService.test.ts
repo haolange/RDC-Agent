@@ -61,7 +61,7 @@ async function openRemote(service: RdcSessionService, sessionId = 's1') {
   await service.prepareDevice({projectId:value.projectId,sessionId,deviceId:value.replayDevice.id,bindingGeneration:service.snapshotReplayForSession(value).generation});
   return service.openProjectInput(value);
 }
-beforeEach(() => { clearRdcContextLeases(); vi.clearAllMocks(); mocks.opened.mockReset(); mocks.project.mockReturnValue({ rootPath: '/project' }); mocks.reference.mockReset(); mocks.hash.mockReset(); mocks.hash.mockResolvedValue({ sha256: 'a'.repeat(64) }); mocks.close.mockResolvedValue(undefined); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue(undefined);
+beforeEach(() => { clearRdcContextLeases(); vi.clearAllMocks(); mocks.opened.mockReset(); mocks.project.mockReturnValue({ rootPath: '/project', inputs: [] }); mocks.reference.mockReset(); mocks.hash.mockReset(); mocks.hash.mockResolvedValue({ sha256: 'a'.repeat(64) }); mocks.close.mockResolvedValue(undefined); mocks.prepare.mockReset(); mocks.prepare.mockResolvedValue(undefined);
   mocks.deviceSubscribers.clear();
   mocks.inspect.mockReset(); mocks.inspect.mockResolvedValue({ state: 'pending', deviceSerial: 'SERIAL', packageName: 'helper', apkSha256: 'a'.repeat(64) });
   mocks.events.mockResolvedValue([{ eventId: 1 }, { eventId: 9 }]);

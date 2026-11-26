@@ -204,7 +204,7 @@ export class ToolExecutorFactory {
       projectRootPath,
       projectId: runtimeContext?.projectId ?? plan?.projectId ?? null,
       sessionId: runtimeContext?.sessionId ?? null,
-      visionInputMode: plan?.routeCapability?.visionInputMode ?? 'disabled',
+      visionInputMode: plan?.routeCapability.visionInputMode ?? 'disabled',
       ...(tool.spec.knowledgeRoots === 'reference' ? { knowledgeReadRoots: plan?.knowledgeReadRoots ?? [] } : {}),
     };
   }
@@ -260,7 +260,7 @@ export class ToolExecutorFactory {
       const executeEffect = (permissionDecision: AgentPermissionDecision, permissionState: RuntimePermissionState) => withProcessExecutionOwner(runtimeContext?.sessionId ?? sessionId, () => withTemporaryPathAccess(
         toolContext,
         [
-          ...(permissionDecision.temporaryPathRoots ?? []),
+          ...permissionDecision.temporaryPathRoots,
           ...(injectKnowledgeRoots ? knowledgeReadRoots : []),
         ],
         (scopedContext) => { announceExecution(permissionState); return tool.execute(
@@ -293,7 +293,7 @@ export class ToolExecutorFactory {
           decision: { executionContext: toolContext,
             effectiveToolNames: [...tools.keys()].filter(name => !activeSkillAllowlist || activeSkillAllowlist.has(name)),
             tool, toolCall: validatedToolCall, agentId, projectRootPath, permissionConstraints,
-            compiledPolicy: plan?.policy, sessionAttachmentsRoot, knowledgeReadRoots },
+            compiledPolicy: plan.policy, sessionAttachmentsRoot, knowledgeReadRoots },
           approval: runtimeContext?.eventContext && runtimeContext.turnId ? {
             agentId, sessionId: runtimeContext.sessionId ?? null, turnId: runtimeContext.turnId,
             toolCallId: toolCall.id, toolName: toolCall.name, context: runtimeContext.eventContext, onEvent: runtimeContext.onEvent,
@@ -422,7 +422,7 @@ export class ToolExecutorFactory {
     onExecutionStart?: () => void,
   ): Promise<ToolResultMessage> {
     try {
-      const args = toolCall.arguments ?? {};
+      const args = toolCall.arguments;
       const questions = normalizeAskUserQuestions(args);
       if (questions.length === 0) {
         throw new Error('ask_user requires at least one canonical questions[] entry with a prompt.');

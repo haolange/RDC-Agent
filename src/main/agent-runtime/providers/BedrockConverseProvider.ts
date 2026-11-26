@@ -377,7 +377,7 @@ function convertMessage(message: Message): BedrockMessage | null {
       for (const block of message.content) {
         if (block.type === 'text') {
           content.push({ text: block.text });
-        } else if (block.type === 'image') {
+        } else {
           content.push({
             image: {
               format: block.mimeType.split('/')[1] ?? 'png',
@@ -404,7 +404,7 @@ function convertMessage(message: Message): BedrockMessage | null {
             },
           });
         }
-      } else if (block.type === 'toolCall') {
+      } else {
         content.push({
           toolUse: {
             toolUseId: block.id,

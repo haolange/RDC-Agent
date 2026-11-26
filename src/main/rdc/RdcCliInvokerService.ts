@@ -272,7 +272,7 @@ export class RdcCliInvokerService {
     try {
       const cliArgs: string[] = [request.toolName];
       const effectiveArgs: Record<string, unknown> = {
-        ...(request.args || {}),
+        ...request.args,
       };
 
       if (request.contextId && effectiveArgs['context_id'] === undefined) {

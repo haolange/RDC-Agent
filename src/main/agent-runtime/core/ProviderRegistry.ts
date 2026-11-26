@@ -53,7 +53,7 @@ export class ProviderRegistry {
 
   /** 注册一个 Provider 策略。 */
   register(strategy: ProviderStrategy): void {
-    if (!strategy || typeof strategy.api !== 'string' || !strategy.api) {
+    if (!strategy.api) {
       throw new Error('ProviderRegistry.register requires a strategy with non-empty api');
     }
     this.providers.set(strategy.api, strategy);

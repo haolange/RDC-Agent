@@ -55,7 +55,7 @@ export function canonicalJson(value: unknown): string {
       .map(([key, child]) => `${JSON.stringify(key)}:${canonicalJson(child)}`)
       .join(',')}}`;
   }
-  return JSON.stringify(value) ?? 'null';
+  return (JSON.stringify(value) as string | undefined) ?? 'null';
 }
 
 export interface ResolvedConversationContext {

@@ -49,7 +49,7 @@ export function createTurnFailedDiagnostic(
       severity: 'error',
       userMessage: isNoProgress
         ? diagnosticText(error.noProgressReason === 'runtime-obligation' ? 'loopObligationIgnored' : 'loopRepeated', { agent: label })
-        : diagnosticText('loopTurnLimit', { agent: label, turns: error.maxTurns ?? error.turn ?? '' }),
+        : diagnosticText('loopTurnLimit', { agent: label, turns: error.maxTurns ?? error.turn }),
       providerId: route.providerId,
       modelId: route.modelId,
       technicalMessage: redactTechnicalMessage(error),

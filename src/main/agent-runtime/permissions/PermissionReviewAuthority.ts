@@ -16,7 +16,7 @@ import type { ApprovedCaptureController } from '../orchestration/ApprovedCapture
 
 function boundedObservation(value: unknown, maxChars: number): unknown {
   const safe = redactSecretsDeep(value).value;
-  const text = JSON.stringify(safe) ?? '';
+  const text = (JSON.stringify(safe) as string | undefined) ?? '';
   return text.length <= maxChars ? safe : { excerpt: text.slice(0, maxChars), truncated: true,
     originalChars: text.length, hash: hashScopedResource(safe) };
 }
@@ -81,7 +81,7 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
   });
   // Retain observed prerequisites referenced by the pending action, even after routine
   // reads move them out of the recent window. Arguments select observations, never proof.
-  const pendingText = JSON.stringify(pendingArguments) ?? '';
+  const pendingText = (JSON.stringify(pendingArguments) as string | undefined) ?? '';
   const scalars = (value: unknown): [string, unknown][] => value && typeof value === 'object'
     ? Object.entries(value).flatMap(([key, item]) => item && typeof item === 'object'
       ? scalars(item) : item !== null && item !== undefined ? [[key, item] as [string, unknown]] : []) : [];

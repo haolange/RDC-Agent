@@ -70,7 +70,7 @@ export function createTurnCompletionTool(turnHandle?: TurnHandle | null, validat
       ));
       if (turnHandle) {
         const supplied = args.result as (Omit<NonNullable<TurnCompletionDeclaration['result']>, 'unresolved'> & { unresolved?: unknown }) | undefined;
-        if (supplied && Object.values(supplied.outputs ?? {}).some((value) => typeof value !== 'string')) {
+        if (supplied && Object.values(supplied.outputs).some((value) => typeof value !== 'string')) {
           throw new AppError('TURN_COMPLETION_INVALID', 'result.outputs values must be strings.');
         }
         const rawResult = supplied ? { ...supplied, unresolved: parseUnresolvedItems(supplied.unresolved ?? []) } : undefined;
@@ -146,7 +146,7 @@ export function createRuntimeContextTool(sessionId?: string | null, projectId?: 
           details: { available: false, requiresRecovery },
         };
       }
-      const ownerSessionId = lease?.delegatedFrom ?? sessionId;
+      const ownerSessionId = lease.delegatedFrom ?? sessionId;
       const scope = ownerSessionId && projectId ? { sessionId: ownerSessionId, projectId } : null;
       const opened = scope ? rdcSessionService.snapshotOpenedCaptureForSession(scope) : null;
       const binding = scope ? rdcSessionService.listBindingsForProject(scope.projectId).find(item =>
@@ -155,7 +155,7 @@ export function createRuntimeContextTool(sessionId?: string | null, projectId?: 
       const captureContentSha256 = opened?.status === 'open' && binding && ['ready', 'applying'].includes(binding.phase)
         && runtimeContext.captureFileId && runtimeContext.replaySessionId
         && opened.contextId === runtimeContext.contextId && opened.captureFileId === runtimeContext.captureFileId
-        && opened.replaySessionId === runtimeContext.replaySessionId && /^[a-f0-9]{64}$/.test(binding?.captureHash ?? '')
+        && opened.replaySessionId === runtimeContext.replaySessionId && /^[a-f0-9]{64}$/.test(binding.captureHash ?? '')
         ? binding!.captureHash : null;
       const { raw: _openTimePayload, ...runtimeIdentity } = runtimeContext;
       return {

@@ -44,7 +44,7 @@ export class SessionResumeService {
         projectId,
         runId: latestRun?.runId ?? null,
         runResumable,
-        lastMessagePreview: session.title ?? undefined,
+        lastMessagePreview: session.title,
       };
     } catch {
       return null;

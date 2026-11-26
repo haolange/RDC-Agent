@@ -90,7 +90,7 @@ export async function executeConcurrentToolGroups<TCall, TResult>(
     const started = group.callIndexes.map((index) => input.executeOne(input.calls[index], index));
     const settled = await Promise.allSettled(started);
     let groupFailed = false;
-    settled.forEach((entry, offset) => {
+    for (const [offset, entry] of settled.entries()) {
       const index = group.callIndexes[offset];
       if (entry.status === 'fulfilled') {
         results[index] = entry.value;
@@ -103,7 +103,7 @@ export async function executeConcurrentToolGroups<TCall, TResult>(
         const message = entry.reason instanceof Error ? entry.reason.message : String(entry.reason);
         results[index] = input.createNotStarted(input.calls[index], index, message);
       }
-    });
+    }
     if (groupFailed || terminalResult || input.signal?.aborted) {
       stopNewGroups = true;
     }

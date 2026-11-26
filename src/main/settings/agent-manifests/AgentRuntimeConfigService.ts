@@ -246,7 +246,7 @@ export class AgentRuntimeConfigService {
         resolved.push(withMcpTrustMetadata({
           ...user,
           name: project.name || user.name,
-          description: project.description ?? user.description,
+          description: project.description,
           enabledByDefault: project.enabledByDefault,
           scope: 'user',
           sourcePath: user.sourcePath,

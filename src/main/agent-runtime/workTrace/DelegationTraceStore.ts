@@ -138,7 +138,7 @@ function parseEntry(trace: ParsedTrace, entry: TraceEntry, callId: string): void
   if (entry.kind === 'start' || entry.kind === 'header') {
     if (entry.header.parentToolCallId !== callId) trace.invalid = true;
     else trace.header = entry.header;
-  } else if (entry.kind === 'block') {
+  } else {
     if (!trace.blocks.has(entry.step.id)) trace.order.push(entry.step.id);
     trace.blocks.set(entry.step.id, entry.step);
   }
@@ -283,7 +283,7 @@ export const delegationTraceStore = {
       } else record.pendingDelta = event;
       if (!record.pendingTimer) {
         record.pendingTimer = setTimeout(() => flushDelta(sessionId, record, target), 120);
-        record.pendingTimer.unref?.();
+        record.pendingTimer.unref();
       }
       return;
     }
@@ -346,7 +346,7 @@ export const delegationTraceStore = {
       if (pageSize === 0) return { header, steps: [], nextCursor: null, total: header.total, revision: header.revision };
       const trace = readParsed(target, callId);
       if (trace.invalid || trace.header?.childSessionId !== header.childSessionId
-        || trace.header?.executionId !== header.executionId || trace.header?.generation !== header.generation) {
+        || trace.header.executionId !== header.executionId || trace.header.generation !== header.generation) {
         return { ...empty, error: 'DELEGATION_TRACE_ID_MISMATCH' };
       }
       const source = sinceRevision === undefined ? trace.order : trace.order.filter((id) => (trace.blocks.get(id)?.revision ?? 0) > sinceRevision);

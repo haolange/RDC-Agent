@@ -77,9 +77,7 @@ function considerCandidate(
   }
 
   try {
-    const real = fs.realpathSync.native
-      ? fs.realpathSync.native(resolved)
-      : fs.realpathSync(resolved);
+    const real = fs.realpathSync.native(resolved);
     const realStat = fs.lstatSync(real);
     if (realStat.isSymbolicLink()) {
       diagnostics.push(skip(

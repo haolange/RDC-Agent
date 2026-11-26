@@ -86,7 +86,8 @@ export const globTool: AgentTool<GlobParams, GlobDetails> = {
 
     const regex = compileGlob(pattern);
     const matches: string[] = [];
-    let truncated = false;
+    // Set inside the walk callback once MAX_RESULTS is reached.
+    let truncated = false as boolean;
 
     await walk(baseDir, baseDir, async (relPath) => {
       if (signal?.aborted) {

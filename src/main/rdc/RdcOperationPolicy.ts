@@ -31,7 +31,7 @@ export function assertRdcBindingOwnership(context?: ToolExecutionContext) {
     denied('binding changed since prepareTurn; prepare a new turn before execution.');
   }
   if (lease.delegatedFrom || lease.ownerSessionId !== context.sessionId || lease.ownerProjectId !== context.projectId || lease.contextId === 'default'
-    || !lease.runtimeContext.replaySessionId || !binding?.cli.enabled || !binding.cli.command.trim()) denied('requires a frozen binding and an owned replay session.');
+    || !lease.runtimeContext.replaySessionId || !binding.cli.enabled || !binding.cli.command.trim()) denied('requires a frozen binding and an owned replay session.');
   if (identity.runtimeContext?.captureFileId !== lease.runtimeContext.captureFileId || identity.runtimeContext?.replaySessionId !== lease.runtimeContext.replaySessionId) {
     denied('capture/replay identity changed since prepareTurn.');
   }

@@ -431,7 +431,7 @@ function convertMessage(message: Message, requestPlan: RequestPlan): unknown[] {
           type: 'function_call',
           call_id: block.id,
           name: block.name,
-          arguments: JSON.stringify(block.arguments ?? {}),
+          arguments: JSON.stringify(block.arguments),
           status: 'completed',
         });
       }

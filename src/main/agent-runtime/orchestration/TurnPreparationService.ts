@@ -5,7 +5,6 @@ import { AppError } from '@shared/errors/appError';
  */
 
 import { agentCompletionContract } from '@shared/types/agentManifest';
-import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
 import { charsToTokens } from '@shared/utils/tokens';
 import {
   resolveCompactionThresholdTokens,
@@ -98,7 +97,7 @@ function resolveSkillIntersection(
       throw new Error('mission_method: preloaded skills declare conflicting investigation-mission values');
     }
     investigationMission = skill.investigationMission ?? investigationMission;
-    if (skill.allowedTools?.length) {
+    if (skill.allowedTools.length) {
       skillAllowedLists.push([...skill.allowedTools]);
     }
   }
@@ -187,7 +186,7 @@ export class TurnPreparationService {
     const effectiveMaxChildDepth = Math.min(compiledPolicy.maxChildDepth, input.inheritedMaxChildDepth ?? Infinity);
     const excludeSubagent = input.excludeSubagent === true || (input.subagentDepth ?? 0) >= effectiveMaxChildDepth;
     const contextCompactionPercent = resolveEffectiveCompactionPercent(
-      turnSettings.agentRuntime.context.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
+      turnSettings.agentRuntime.context.compactionThresholdPercent,
       compiledPolicy.contextCompactionPercent,
     );
     const approvedExecutionOffer = approvedExecutionOfferForAgent(input.sessionId, input.agentId);
@@ -401,8 +400,7 @@ export class TurnPreparationService {
       visibleToolNames: activeToolDefinitions.map((definition) => definition.name),
       activatedDeferredTools,
       mcpDescriptorHash: aggregateMcpDescriptorHash(profile, input.projectRootPath),
-      compactionThresholdPercent: turnSettings.agentRuntime.context.compactionThresholdPercent
-        ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
+      compactionThresholdPercent: turnSettings.agentRuntime.context.compactionThresholdPercent,
       excludeRdcLeaseTools,
       excludeSubagent,
       delegationCapsule: input.frozenDelegationCapsule ?? null,

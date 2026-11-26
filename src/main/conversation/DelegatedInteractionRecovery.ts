@@ -9,7 +9,7 @@ import type { ConversationMessage } from '@shared/types/conversation';
 
 /** Persisted requests do not resurrect approval authority after restart. */
 export function reconcileDelegatedInteractionRequests(sessionId: string, message: ConversationMessage): ConversationMessage {
-  let changed = false;
+  let changed = false as boolean;
   const blocks = message.workTrace?.blocks.map((block) => ({ ...block, toolCalls: block.toolCalls.map((call) => {
     const origin = call.delegatedRequest;
     if (!origin && call.toolName !== 'plan_artifact') return call;

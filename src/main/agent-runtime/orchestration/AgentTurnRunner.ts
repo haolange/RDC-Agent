@@ -203,10 +203,10 @@ export class AgentTurnRunner {
         parentSignal: input.options?.signal,
         subagentBudget: input.options?.subagentBudget ?? createSubagentBudgetState({
           ...DEFAULT_SUBAGENT_BUDGET,
-          maxDepth: turnPolicy.maxChildDepth ?? DEFAULT_SUBAGENT_BUDGET.maxDepth,
-          maxChildren: turnPolicy.maxSubagents ?? DEFAULT_SUBAGENT_BUDGET.maxChildren,
-          maxAggregateToolCalls: turnPolicy.maxToolCalls ?? DEFAULT_SUBAGENT_BUDGET.maxAggregateToolCalls,
-          maxAggregateWallMs: turnPolicy.maxWallTimeMs ?? DEFAULT_SUBAGENT_BUDGET.maxAggregateWallMs,
+          maxDepth: turnPolicy.maxChildDepth,
+          maxChildren: turnPolicy.maxSubagents,
+          maxAggregateToolCalls: turnPolicy.maxToolCalls,
+          maxAggregateWallMs: turnPolicy.maxWallTimeMs,
         }),
         policyBudget: createPolicyBudgetState(
           turnPolicy,
@@ -258,7 +258,7 @@ export class AgentTurnRunner {
       signal: input.options?.signal,
       requestPlan,
       promptCache,
-      credentialHandle: preparedRuntime.credentialHandle ?? input.credentialHandle,
+      credentialHandle: preparedRuntime.credentialHandle,
     };
     reportRouteDiagnostics(run, sharedEventContext, runtimeTools.definitions.length);
     const missionPlanningFeedback = createMissionPlanningFeedback(run, effectivePlan);
@@ -293,9 +293,6 @@ export class AgentTurnRunner {
       beforeRequestMessages: input.options?.beforeProviderRequestMessages,
       onProviderRequestCommitted: input.options?.onProviderRequestCommitted,
     });
-    if (!run.slot) {
-      throw new Error('Agent slot setup did not produce a slot.');
-    }
     const userMessage: UserMessage = {
       role: 'user',
       content: input.options?.userContent ?? input.content,

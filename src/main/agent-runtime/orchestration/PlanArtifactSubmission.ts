@@ -73,7 +73,7 @@ export async function executePlanArtifact(call: PlanArtifactCall): Promise<ToolR
 /** Title, a 1-4 line summary and content, an interaction bridge, a session and a declared continue handoff. */
 function readPlanSubmission(call: PlanArtifactCall): PlanSubmission {
   const { toolCall, runtimeContext } = call;
-  const args = toolCall.arguments ?? {};
+  const args = toolCall.arguments;
   const title = typeof args.title === 'string' ? args.title.trim() : '';
   const content = typeof args.content === 'string' ? args.content.trim() : '';
   const summary = Array.isArray(args.summary)

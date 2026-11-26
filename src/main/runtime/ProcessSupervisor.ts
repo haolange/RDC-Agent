@@ -284,7 +284,7 @@ export class ProcessSupervisor {
         entry.killTimer = setTimeout(() => {
           terminateTree(child.pid, 'SIGKILL');
         }, DEFAULT_GRACE_MS);
-        entry.killTimer.unref?.();
+        entry.killTimer.unref();
       }
     };
 
@@ -306,7 +306,7 @@ export class ProcessSupervisor {
       join: async (timeoutMs?: number) => {
         if (entry.exitInfo) return entry.exitInfo;
         if (timeoutMs == null || timeoutMs <= 0) return exitPromise;
-        let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
+        let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
         const deadline = new Promise<ProcessExitInfo>((resolve) => {
           deadlineTimer = setTimeout(async () => {
             if (entry.exitInfo) {
@@ -314,7 +314,7 @@ export class ProcessSupervisor {
               return;
             }
             abort('timeout');
-            let observationTimer: ReturnType<typeof setTimeout> | null = null;
+            let observationTimer: ReturnType<typeof setTimeout> | undefined;
             const killObservation = await Promise.race<ProcessExitInfo | null>([
               exitPromise,
               new Promise<ProcessExitInfo | null>((orphanResolve) => {
@@ -322,10 +322,10 @@ export class ProcessSupervisor {
                   entry.unconfirmed = true;
                   orphanResolve(null);
                 }, DEFAULT_GRACE_MS + PROCESS_TERMINATION_POLICY.joinObservationSlackMs);
-                observationTimer.unref?.();
+                observationTimer.unref();
               }),
             ]);
-            if (observationTimer) clearTimeout(observationTimer);
+            clearTimeout(observationTimer);
             if (killObservation) {
               resolve(killObservation);
               return;
@@ -338,10 +338,10 @@ export class ProcessSupervisor {
               durationMs: Date.now() - startedAt,
             });
           }, timeoutMs);
-          deadlineTimer.unref?.();
+          deadlineTimer.unref();
         });
         const observed = await Promise.race([exitPromise, deadline]);
-        if (deadlineTimer) clearTimeout(deadlineTimer);
+        clearTimeout(deadlineTimer);
         if (observed.reason === 'unconfirmed_orphan') retainResourceUntilExit(exitPromise);
         return observed;
       },
@@ -381,7 +381,7 @@ export class ProcessSupervisor {
       entry.timeoutTimer = setTimeout(() => {
         abort('timeout');
       }, opts.timeoutMs);
-      entry.timeoutTimer.unref?.();
+      entry.timeoutTimer.unref();
     }
 
     if (opts.abortSignal) {
@@ -411,7 +411,7 @@ export class ProcessSupervisor {
       Promise.allSettled(joins),
       new Promise<void>((resolve) => {
         const timer = setTimeout(resolve, forceAfterMs + graceMs);
-        timer.unref?.();
+        timer.unref();
       }),
     ]);
     // Keep unconfirmed processes in the registry until child.close is observed.

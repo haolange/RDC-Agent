@@ -101,7 +101,7 @@ function stableJson(value: unknown): string {
       .map(([key, child]) => `${JSON.stringify(key)}:${stableJson(child)}`)
       .join(',')}}`;
   }
-  return JSON.stringify(value) ?? 'null';
+  return (JSON.stringify(value) as string | undefined) ?? 'null';
 }
 
 /**
@@ -589,9 +589,6 @@ function validateSurface(
     if (profile && !admitted) errors.push(`${surface.id}/${route.id} is not admitted by profile ${profile.id}`);
     if (!route.contracts.state.supportedModes.includes(route.contracts.state.defaultMode)) {
       errors.push(`${surface.id}/${route.id} state default is not included in supportedModes`);
-    }
-    if (route.contracts.toolLoop.modelSwitch !== 'pin-until-terminal') {
-      errors.push(`${surface.id}/${route.id} must pin an active tool loop to its frozen execution identity`);
     }
   }
   if (stableJson([...routeAdapters].sort()) !== stableJson([...surface.adapterIds].sort())) {

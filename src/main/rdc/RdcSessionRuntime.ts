@@ -91,7 +91,7 @@ export class RdcSessionRuntime {
     options.signal?.throwIfAborted();
     const replayDevice = request.replayDevice;
     const isRemoteReplay = replayDevice.type === 'android';
-    const scope = { projectId: request.projectId, sessionId: request.sessionId ?? '' };
+    const scope = { projectId: request.projectId, sessionId: request.sessionId };
     if (isRemoteReplay) {
       if (!this.isOwnedBy(scope) || !this.remoteConnection || this.remoteConnection.deviceId !== replayDevice.id) {
         throw new AppError('RDC_DEVICE_NOT_PREPARED');
@@ -194,7 +194,7 @@ export class RdcSessionRuntime {
       throw error;
     }
 
-    this.applyRuntimeContext(runtimeContext, request.sessionId, request.projectId ?? null);
+    this.applyRuntimeContext(runtimeContext, request.sessionId, request.projectId);
     const captureIndex = this.captures.findIndex((item) => item.id === capture.id);
     this.captures[captureIndex] = {
       ...this.captures[captureIndex],

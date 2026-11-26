@@ -32,7 +32,7 @@ export function assertDeclaredHandoffSkillCompatibility(input: {
     return skill;
   });
   const tools = resolveAgentToolAllowlistFromDefinition(input.target.id, input.target.tools, agentAccessCeiling(input.target));
-  const intersection = combineActiveSkillAllowlists(tools, skills.map(skill => skill.allowedTools ?? []));
+  const intersection = combineActiveSkillAllowlists(tools, skills.map(skill => skill.allowedTools));
   const policy = compileEffectivePolicy(input.projectRoot);
   const requiredTools = ['artifact_read',
     ...(input.tasks.some(task => task.executionRequirements?.mode !== 'subagent') ? ['task_update'] : []),
