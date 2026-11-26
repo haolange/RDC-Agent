@@ -257,7 +257,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
   - 协议与编码细节见 [`docs/architecture/data-flow.md`](docs/architecture/data-flow.md)「Agent Turn」。
 - **存储 fail-closed**：持久化文件只经 `atomicFile` 原语读写（见 `docs/contracts/failure-model.md`「存储原语」）。
   - 写入走原子持久写（temp + fsync + rename）；deepMerge 拒绝危险原型键。
-  - 读取区分不存在、损坏和不支持的版本：损坏每次读都报 `STORAGE_CORRUPT` 且不读成空；不支持的版本报 `STORAGE_SCHEMA_UNSUPPORTED` 并保留原件。
+  - 读取区分不存在与损坏：损坏每次读都报 `STORAGE_CORRUPT` 且不读成空。持久化格式不带版本号，其他格式写下的文件同样按严格 schema 失败并保留原件，不迁移。
   - Run 只读 run.json，run.yaml 是写入投影；attachments.json 与 usage.json 都是不带格式版本的严格对象。仅有 YAML 的 Run 报 `STORAGE_SCHEMA`，不自动迁移、改写或隔离原件。
   - Settings 只接受当前格式的严格文档（见「Settings 持久化」）：不符合的文件（包括其他格式写下的）报 `STORAGE_CORRUPT` 并保留原文件，启动时提示删除整个数据目录与设置文件后重启。
   - 目录锁对活 pid 永不回收。owner 无法读取时可能仍在初始化，等待并在超时后报错；只自动回收可识别的死 pid 锁。跨进程回收以独占标记串行化，取得标记后重新读取 owner；标记本身不能安全确认失主时等待并超时，不抢占。

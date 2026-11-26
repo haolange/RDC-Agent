@@ -2,7 +2,6 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AppError } from '@shared/errors/appError';
 import { parseJsonWith, readValidatedSync, writeFileAtomic, writeFileAtomicSync } from './atomicFile';
 
 let root: string;
@@ -53,16 +52,5 @@ describe('validated reads', () => {
     expect(copies).toHaveLength(1);
     expect(fs.readFileSync(path.join(root, copies[0]!), 'utf8')).toBe('{"count":');
     expect(fs.readFileSync(target, 'utf8')).toBe('{"count":');
-  });
-
-  it('passes an unsupported schema through without treating the file as damaged', () => {
-    const target = path.join(root, 'state.json');
-    fs.writeFileSync(target, '{"schemaVersion":99}');
-    expect(() =>
-      readValidatedSync(target, () => {
-        throw new AppError('STORAGE_SCHEMA_UNSUPPORTED', 'newer');
-      }),
-    ).toThrow(expect.objectContaining({ code: 'STORAGE_SCHEMA_UNSUPPORTED' }));
-    expect(fs.readdirSync(root)).toEqual(['state.json']);
   });
 });

@@ -455,8 +455,6 @@ export const enErrors = {
   'errors.SKILL_REFERENCE_REQUIRED': 'Choose a reference file to read part of.',
   'errors.SKILL_SOURCE_CHANGED': 'This Skill changed since the turn started. Try again.',
   'errors.STORAGE_SCHEMA': "A data file isn't in the expected format. The original was kept.",
-  'errors.STORAGE_SCHEMA_UNSUPPORTED':
-    'A data file was written by a newer version of RDC-Agent. The original was kept.',
   'errors.SUBAGENT_BUDGET': 'The sub-agent limit was reached.',
   'errors.SUBAGENT_PARENT_PLAN_REQUIRED': "Delegating needs the current turn's prepared plan.",
   'errors.SUBAGENT_REPORT_INVALID': "The sub-agent's report isn't valid.",

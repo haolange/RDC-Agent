@@ -43,7 +43,7 @@
 持久化文件只经两个原语读写（`src/main/runtime/atomicFile.ts`），宿主差异只在 `src/main/platform/fileRename.ts`：
 
 - **写**：`writeFileAtomic(Sync)` 在目标旁写临时文件 → fsync → 改名覆盖目标 → fsync 目录（POSIX；Windows 由 NTFS 日志保证改名持久）。读者只会看到旧内容或新内容。Windows 上读者、索引或杀毒短暂占用目标时改名报 `EBUSY`/`EPERM`/`EACCES`，有界重试后仍失败才报错；不存在先删目标再改名、也不存在 `.bak` 交换。ESLint 禁止平台层之外调用 `rename`。
-- **读**：`readValidatedSync` 区分三态。文件不存在为 `null`；存在但无法解析或校验为损坏：报 `STORAGE_CORRUPT`（Integrity），**每次读都报**，直到属主重新写入，绝不读成空值；损坏字节按内容哈希在旁边保留一份 `<file>.corrupt-<hash>`，后续写入不会毁掉证据。更高的 schemaVersion 报 `STORAGE_SCHEMA_UNSUPPORTED` 并保留原件；I/O 失败报 `STORAGE_UNREADABLE`（Availability），文件原样保留。
+- **读**：`readValidatedSync` 区分三态。文件不存在为 `null`；存在但无法解析或校验为损坏：报 `STORAGE_CORRUPT`（Integrity），**每次读都报**，直到属主重新写入，绝不读成空值；损坏字节按内容哈希在旁边保留一份 `<file>.corrupt-<hash>`，后续写入不会毁掉证据。持久化格式不带版本号，其他格式写下的文件同样不符合严格 schema，按损坏报告并点名文件；I/O 失败报 `STORAGE_UNREADABLE`（Availability），文件原样保留。
 - **信任记录**：hook、项目 MCP 与项目 Agent 的信任决定共用 `src/main/runtime/TrustStore.ts`（`{ records }`，原子写）。损坏的信任文件（包括其他格式写下的文件）读时报 `STORAGE_CORRUPT`，用户重新 trust 即覆盖它；hook 加载时把它作为无效文件上报，其中的 hook 全部按未信任处理。
 
 ## 关键点分类标注
@@ -89,7 +89,7 @@
 | 审计决定记录写入失败 | Security | `AUDIT_WRITE_FAILED`；记录在动作之前写，写失败则动作不发生（IPC 不执行、工具不执行、批准不生效、权限设置不写盘） |
 | 工具写入应用自有文件（凭据、设置、trust、`state/**`） | Security | 任何挡位 `FILE_WRITE_PROTECTED`；仅 `sessions/**/artifacts/**` 可写 |
 | Storage schema 损坏 | Integrity | 每次读报 `STORAGE_CORRUPT`，原件留在原处并旁存一份损坏副本（见「存储原语」） |
-| Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，原件保留 |
+| Storage 文件由其他格式写下（持久化格式不带版本号） | Integrity | 严格 schema 拒绝，报 `STORAGE_CORRUPT` 或 `STORAGE_SCHEMA` 并点名文件，原件保留；不迁移、不转换、不自动重建。设置文件在启动时最先读取，提示删除整个数据目录与设置文件；数据目录外的知识库文件由用户按报错的文件名清理 |
 | Settings 文件（`config.json`）损坏、无法读取或结构不合法（包括其他格式写下的文件） | Integrity（启动 fail-fast） | 启动时主进程按 `app.getLocale()` 的语言弹原生错误框（headless / Browser QA 写 stderr），说明数据格式已变更或文件损坏，写出要删除的整个数据目录（userData）与 `config.json` 的路径，说明重启后以默认设置重建，经正常资源释放后以非零状态退出，不留活锁；不转换、不修复、不改写原件。目录已不再列出的 provider 条目原样保留，不进运行时视图，记 `settings_provider_not_in_catalog` 设置诊断 |
 | Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 记录 owner 的进程身份（pid 与 birth），活 owner 永不抢锁；身份证明已退出（pid 不存在或 birth 不同）的锁经独占回收标记串行回收，owner 记录或身份无法读取、回收标记无法安全确认失主时等待并超时，避免抢占正在初始化或新取得的锁；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |
 | Session attachments.json | Integrity | 只读严格的 `{ attachments }`；纯数组、其他格式写下的文件、无法解析或结构不合法时读报 `STORAGE_CORRUPT`（旁存损坏副本，原件留在原处） |

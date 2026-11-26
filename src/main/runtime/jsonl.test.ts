@@ -121,7 +121,7 @@ describe('jsonl fault handling', () => {
   it('does not swallow a domain validation rejection in the selector', () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-jsonl-'));
     const filePath = path.join(root, 'invalid-schema.jsonl');
-    fs.writeFileSync(filePath, '{"schemaVersion":1}\n');
+    fs.writeFileSync(filePath, '{"turnId":"turn-1"}\n');
     expect(() =>
       readJsonl(
         filePath,

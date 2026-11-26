@@ -429,7 +429,6 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.SKILL_REFERENCE_REQUIRED': '请选择要分段读取的参考文件。',
   'errors.SKILL_SOURCE_CHANGED': '回合开始后此 Skill 已变化，请重试。',
   'errors.STORAGE_SCHEMA': '数据文件格式不符合要求，已保留原件。',
-  'errors.STORAGE_SCHEMA_UNSUPPORTED': '数据文件由更新版本的 RDC-Agent 写入，已保留原件。',
   'errors.SUBAGENT_BUDGET': '已达到子 Agent 上限。',
   'errors.SUBAGENT_PARENT_PLAN_REQUIRED': '委派需要当前回合已准备的计划。',
   'errors.SUBAGENT_REPORT_INVALID': '子 Agent 的报告无效。',

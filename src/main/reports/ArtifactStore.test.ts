@@ -17,7 +17,6 @@ it('reports a damaged artifact store instead of replacing it with an empty one',
   fs.writeFileSync(
     path.join(fixture.runRoot, 'artifact_store.json'),
     JSON.stringify({
-      schemaVersion: '1',
       runId: 'run',
       sessionId: 'session',
       artifacts: [{ artifactId: 'a' }],

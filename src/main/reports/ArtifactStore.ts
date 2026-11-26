@@ -6,7 +6,6 @@ import { runScopedStore } from '../sessions/store/RunScopedStore';
 import type { ArtifactRecord } from './artifactRecord';
 
 export interface ArtifactStoreSnapshot {
-  schemaVersion: '1';
   runId: string;
   sessionId: string;
   artifacts: ArtifactRecord[];
@@ -34,7 +33,6 @@ const ArtifactRecordSchema: ZodType<ArtifactRecord> = z
 
 const ArtifactStoreSnapshotSchema: ZodType<ArtifactStoreSnapshot> = z
   .object({
-    schemaVersion: z.literal('1'),
     runId: z.string(),
     sessionId: z.string(),
     artifacts: z.array(ArtifactRecordSchema),
@@ -48,7 +46,6 @@ export class ArtifactStore {
   read(sessionId: string, runId: string): ArtifactStoreSnapshot {
     return (
       runScopedStore.readJson(sessionId, runId, STORE_PATH, ArtifactStoreSnapshotSchema) ?? {
-        schemaVersion: '1',
         runId,
         sessionId,
         artifacts: [],

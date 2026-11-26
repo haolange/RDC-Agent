@@ -1,5 +1,4 @@
 export interface InteractionPerformanceSnapshot {
-  schemaVersion: 2;
   measurement: 'event-timing-click-to-next-paint';
   interactionCount: number;
   sampleCount: number;
@@ -53,7 +52,6 @@ export function summarizeInteractionPerformance(
   const longTaskMax = longTaskSamples.length > 0 ? Math.max(...longTaskSamples) : undefined;
 
   return {
-    schemaVersion: 2,
     measurement: 'event-timing-click-to-next-paint',
     interactionCount,
     sampleCount: sortedPointerSamples.length,
