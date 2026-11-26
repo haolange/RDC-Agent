@@ -2,7 +2,7 @@
 
 ## 2026-11-26：上次启动诊断与本地崩溃文件（云端 Linux，headless 显式 userData）
 
-- 提交：`b4ff519c0d8bfe30b697e4eed9ff2d6f72c3f213`（PF4 起点构建，PF5 只追加 renderer 崩溃策略与文档）
+- 提交：`d27182daab9ad5a4b23a70a470ac483b7c6888a4`（PF4 起点构建，PF5 只追加 renderer 崩溃策略与文档）
 - 结果：第一次启动后 `kill -9` 主进程，锁未释放；第二次启动归类 `killed-or-power-loss-suspected`，账本记 `previous_instance_diagnosed`，`app:getMeta` 返回 `previousInstance`（未结束回合 0）。
 - 结果：对第二次启动的主进程发 SIGSEGV，Crashpad 在 `state/crash/pending/` 写下一个 minidump；第三次启动归类 `native-crash-suspected`（崩溃文件 1）。随后 SIGTERM 正常关停，账本依次记 `shutdown_began`（`before-quit`）、`shutdown_finished`（未超时）、`instance_exited`（clean），锁已释放。
 - 结果：Electron 自己把 SIGINT/SIGTERM 转成 quit，Node 的信号监听从不运行，因此删除了这两个无效监听，信号关停记为 `before-quit`。
