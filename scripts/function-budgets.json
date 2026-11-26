@@ -5,10 +5,6 @@
     "params": 6
   },
   "exceptions": {
-    "src/main/agent-runtime/agent/AgentLoop.ts": {
-      "lines": 157,
-      "complexity": 49
-    },
     "src/main/agent-runtime/agent/ErrorRecovery.ts": {
       "complexity": 41
     },

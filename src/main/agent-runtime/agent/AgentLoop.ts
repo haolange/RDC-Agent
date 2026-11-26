@@ -28,6 +28,7 @@ import type {
   AgentLoopEvent,
   AgentMessage,
   AssistantMessage,
+  AssistantMessageEvent,
   Context,
   Message,
   Model,
@@ -206,6 +207,26 @@ interface LoopState {
   transition: TransitionReason;
 }
 
+/** State one loop run carries across its turns; the phases below read and update it. */
+interface AgentLoopRun {
+  readonly context: AgentContext;
+  readonly config: AgentLoopConfig;
+  readonly providerStrategy: ProviderStrategy;
+  readonly toolExecutor: ToolExecutor | undefined;
+  readonly stream: EventStream<AgentLoopEvent, Message[]>;
+  /** Every message this run added; the stream's result. */
+  readonly newMessages: Message[];
+  readonly maxTurns: number;
+  readonly progressGuard: LoopProgressGuard;
+  readonly continuationGuard: RuntimeContinuationGuard;
+  /** Request-local host instructions for the next provider request only; consumed when it is built. */
+  runtimeNoProgressInstruction: string | undefined;
+  runtimeContinuationInstruction: string | undefined;
+}
+
+/** How one turn left the loop: on to the next turn, a normal end, or an abort seen between turns. */
+type TurnOutcome = { kind: 'continue'; state: LoopState } | { kind: 'end' } | { kind: 'aborted' };
+
 async function runAgentLoop(
   pendingMessages: UserMessage[],
   context: AgentContext,
@@ -214,183 +235,252 @@ async function runAgentLoop(
   toolExecutor: ToolExecutor | undefined,
   stream: EventStream<AgentLoopEvent, Message[]>,
 ): Promise<void> {
-  const newMessages: Message[] = [];
-  const maxTurns = config.maxTurns ?? Infinity;
-  const progressGuard = new LoopProgressGuard();
-  let runtimeNoProgressInstruction: string | undefined;
-  let runtimeContinuationInstruction: string | undefined;
-  const continuationGuard = new RuntimeContinuationGuard();
+  const run: AgentLoopRun = {
+    context,
+    config,
+    providerStrategy,
+    toolExecutor,
+    stream,
+    newMessages: [],
+    maxTurns: config.maxTurns ?? Infinity,
+    progressGuard: new LoopProgressGuard(),
+    continuationGuard: new RuntimeContinuationGuard(),
+    runtimeNoProgressInstruction: undefined,
+    runtimeContinuationInstruction: undefined,
+  };
 
-  // 桥接外部 abort 信号到 stream
+  const unsubscribeExternalAbort = subscribeExternalAbort(config.signal, stream);
+  if (!unsubscribeExternalAbort) return;
+
+  try {
+    stream.push({ type: 'agent_start' });
+    if (!(await runTurns(run, pendingMessages))) return;
+    stream.push({ type: 'agent_end', messages: run.newMessages });
+    stream.complete(run.newMessages);
+  } catch (err) {
+    failLoop(stream, err);
+  } finally {
+    unsubscribeExternalAbort();
+  }
+}
+
+/**
+ * Bridges the external abort signal to the stream. Returns the unsubscribe, or undefined when the signal had already
+ * fired: the stream is then aborted and the loop never starts.
+ */
+function subscribeExternalAbort(
+  signal: AbortSignal | undefined,
+  stream: EventStream<AgentLoopEvent, Message[]>,
+): (() => void) | undefined {
+  if (!signal) return () => {};
+  if (signal.aborted) {
+    stream.abort();
+    return undefined;
+  }
   const onExternalAbort = (): void => {
     if (!stream.isDone) {
       stream.abort();
     }
   };
-  if (config.signal) {
-    if (config.signal.aborted) {
-      stream.abort();
-      return;
-    }
-    config.signal.addEventListener('abort', onExternalAbort, { once: true });
-  }
+  signal.addEventListener('abort', onExternalAbort, { once: true });
+  return () => signal.removeEventListener('abort', onExternalAbort);
+}
 
-  // 注入 pending 消息到上下文 + 事件流的公共逻辑。
-  const injectPending = (messages: UserMessage[]): void => {
-    for (const msg of messages) {
-      context.messages.push(msg);
-      newMessages.push(msg);
-      stream.push({ type: 'message_start', message: msg });
-      stream.push({ type: 'message_end', message: msg });
-    }
+/** A thrown loop failure ends the stream with an error event, unless the stream already finished. */
+function failLoop(stream: EventStream<AgentLoopEvent, Message[]>, err: unknown): void {
+  const error = err instanceof Error ? err : new Error(String(err));
+  const aborted = stream.signal.aborted || error.name === 'AbortError';
+  if (!stream.isDone) {
+    stream.push({ type: 'error', error, aborted });
+    stream.error(error);
+  }
+}
+
+/** The single-level transition state machine. Resolves false when the stream was aborted between turns. */
+async function runTurns(run: AgentLoopRun, pendingMessages: UserMessage[]): Promise<boolean> {
+  // 初始 state：pending = 用户消息，transition = init。
+  let state: LoopState = {
+    pending: [...pendingMessages],
+    turn: 0,
+    transition: 'init',
   };
-
-  try {
-    stream.push({ type: 'agent_start' });
-
-    // 初始 state：pending = 用户消息，transition = init。
-    let state: LoopState = {
-      pending: [...pendingMessages],
-      turn: 0,
-      transition: 'init',
-    };
-
-    // ---- 单层主循环：transition 状态机 ----
-
-    while (true) {
-      // 1. 快照 state（transition 字段标记本轮来源，供测试断言）
-      // 2. 注入 pending（init 站点携带 pending）
-      if (state.pending.length > 0) {
-        injectPending(state.pending);
-        state = { ...state, pending: [] };
-      }
-
-      // 3. abort 检查
-      if (stream.isDone) {
-        return;
-      }
-
-      // 4. turn 计数 + max_turns 终止
-      state = { ...state, turn: state.turn + 1 };
-      if (state.turn > maxTurns) {
-        throw new AgentLoopTerminationError(
-          'AGENT_MAX_TURNS_EXCEEDED',
-          `Agent still required tool-loop continuation after ${maxTurns} turns.`,
-          { turn: state.turn - 1, maxTurns },
-        );
-      }
-      stream.push({ type: 'turn_start', turn: state.turn });
-
-      // 5. 调用 LLM 生成助手消息（带错误恢复，内部是独立 transition 子状态机）
-      const remainingTurns = maxTurns - state.turn + 1;
-      config.onLoopBudget?.(remainingTurns, maxTurns);
-      const turnBudgetInstruction =
-        remainingTurns <= 5
-          ? [
-              `<runtime_turn_budget remaining="${remainingTurns}" limit="${maxTurns}">`,
-              remainingTurns === 1
-                ? 'This is the final, text-only provider request in this turn. No tools are offered. Give the canonical final answer now, accurately marking unfinished work and unresolved evidence; do not claim structured completion unless it was already recorded.'
-                : remainingTurns === 2
-                  ? 'This is the last request with tools. Settle open Tasks and call turn_complete now if a structured declaration is required; the next and final request is text-only. Preserve a truthful checkpoint and all approval, identity, experiment-restoration, and completion gates. Do not invent missing evidence.'
-                  : 'The turn is near its request limit. Prioritize settling open Tasks, preserving a truthful checkpoint when available, and producing an honest final answer before the limit. Keep all approval, identity, experiment-restoration, and completion gates intact; do not invent missing evidence.',
-              '</runtime_turn_budget>',
-            ].join('\n')
-          : undefined;
-      // Request-local host facts ride at the end of the request so the cached prefix stays intact.
-      const ephemeralInstruction =
-        [runtimeContinuationInstruction, runtimeNoProgressInstruction, turnBudgetInstruction]
-          .filter((instruction): instruction is string => Boolean(instruction))
-          .join('\n\n') || undefined;
-      runtimeNoProgressInstruction = undefined;
-      runtimeContinuationInstruction = undefined;
-      const { message: assistantMessage } = await streamAssistantResponseWithRecovery(
-        context,
-        config,
-        providerStrategy,
-        stream,
-        ephemeralInstruction,
-        remainingTurns > 1,
-      );
-      newMessages.push(assistantMessage);
-
-      if (remainingTurns === 1 && assistantMessage.stopReason === 'toolUse') {
-        throw new AgentLoopTerminationError(
-          'AGENT_MAX_TURNS_EXCEEDED',
-          'Provider requested a tool after the final text-only request.',
-          { turn: state.turn, maxTurns },
-        );
-      }
-
-      // 7. 非 toolUse 停止 → terminal
-      if (assistantMessage.stopReason !== 'toolUse') {
-        stream.push({ type: 'turn_end', turn: state.turn, message: assistantMessage });
-        const continuation = await continuationGuard.next({
-          reason: assistantMessage.stopReason,
-          isDone: stream.isDone,
-          remaining: remainingTurns,
-          turn: state.turn,
-          maxTurns,
-          check: config.beforeTerminalResponse ? () => config.beforeTerminalResponse!(assistantMessage) : undefined,
-        });
-        if (continuation) {
-          runtimeContinuationInstruction = continuation;
-          state = { pending: [], turn: state.turn, transition: 'next_turn' };
-          continue;
-        }
-        break;
-      }
-
-      // 8. 执行工具调用
-      const toolResults = await executeToolCalls(assistantMessage, toolExecutor, stream, config.maxToolConcurrency);
-      continuationGuard.reset();
-      for (const result of toolResults.results) {
-        context.messages.push(result);
-        newMessages.push(result);
-      }
-      stream.push({
-        type: 'turn_end',
-        turn: state.turn,
-        message: assistantMessage,
-        toolResults: toolResults.results,
-      });
-
-      if (toolResults.results.some((result) => toolExecutor?.shouldEndTurnAfterToolResult?.(result))) break;
-
-      const progress = progressGuard.observe(
-        assistantMessage,
-        toolResults.results,
-        context.runtime?.current.revision ?? 0,
-        context.runtime?.current.activeTools ?? context.tools ?? [],
-      );
-      if (progress.action === 'terminate') {
-        throw new AgentLoopTerminationError(
-          'AGENT_NO_PROGRESS',
-          `Agent repeated the same tool round ${progress.consecutiveMatches} consecutive times without runtime progress.`,
-          { turn: state.turn },
-        );
-      }
-      if (progress.action === 'inject-guidance') {
-        runtimeNoProgressInstruction = RUNTIME_NO_PROGRESS_INSTRUCTION;
-      }
-
-      // 9. next_turn 站点：正常工具循环继续
-      state = { pending: [], turn: state.turn, transition: 'next_turn' };
-    }
-
-    stream.push({ type: 'agent_end', messages: newMessages });
-    stream.complete(newMessages);
-  } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err));
-    const aborted = stream.signal.aborted || error.name === 'AbortError';
-    if (!stream.isDone) {
-      stream.push({ type: 'error', error, aborted });
-      stream.error(error);
-    }
-  } finally {
-    if (config.signal) {
-      config.signal.removeEventListener('abort', onExternalAbort);
-    }
+  while (true) {
+    const outcome = await runTurn(run, state);
+    if (outcome.kind !== 'continue') return outcome.kind === 'end';
+    state = outcome.state;
   }
+}
+
+/** One turn: one provider request, then either the terminal check or one tool round. */
+async function runTurn(run: AgentLoopRun, previous: LoopState): Promise<TurnOutcome> {
+  const state = beginTurn(run, previous);
+  if (!state) return { kind: 'aborted' };
+  const { config, maxTurns } = run;
+
+  // 5. 调用 LLM 生成助手消息（带错误恢复，内部是独立 transition 子状态机）
+  const remainingTurns = maxTurns - state.turn + 1;
+  config.onLoopBudget?.(remainingTurns, maxTurns);
+  const ephemeralInstruction = takeEphemeralInstruction(run, remainingTurns);
+  const { message: assistantMessage } = await streamAssistantResponseWithRecovery(
+    run.context,
+    config,
+    run.providerStrategy,
+    run.stream,
+    ephemeralInstruction,
+    remainingTurns > 1,
+  );
+  run.newMessages.push(assistantMessage);
+
+  if (remainingTurns === 1 && assistantMessage.stopReason === 'toolUse') {
+    throw new AgentLoopTerminationError(
+      'AGENT_MAX_TURNS_EXCEEDED',
+      'Provider requested a tool after the final text-only request.',
+      { turn: state.turn, maxTurns },
+    );
+  }
+
+  // 7. 非 toolUse 停止 → terminal
+  if (assistantMessage.stopReason !== 'toolUse') return settleTerminalResponse(run, state, assistantMessage);
+  return runToolRound(run, state, assistantMessage);
+}
+
+/** Injects pending messages, checks for abort and counts the turn; undefined when the stream is already done. */
+function beginTurn(run: AgentLoopRun, previous: LoopState): LoopState | undefined {
+  const { stream, maxTurns } = run;
+  let state = previous;
+  // 1. 快照 state（transition 字段标记本轮来源，供测试断言）
+  // 2. 注入 pending（init 站点携带 pending）
+  if (state.pending.length > 0) {
+    injectPending(run, state.pending);
+    state = { ...state, pending: [] };
+  }
+
+  // 3. abort 检查
+  if (stream.isDone) {
+    return undefined;
+  }
+
+  // 4. turn 计数 + max_turns 终止
+  state = { ...state, turn: state.turn + 1 };
+  if (state.turn > maxTurns) {
+    throw new AgentLoopTerminationError(
+      'AGENT_MAX_TURNS_EXCEEDED',
+      `Agent still required tool-loop continuation after ${maxTurns} turns.`,
+      { turn: state.turn - 1, maxTurns },
+    );
+  }
+  stream.push({ type: 'turn_start', turn: state.turn });
+  return state;
+}
+
+/** 注入 pending 消息到上下文 + 事件流的公共逻辑。 */
+function injectPending(run: AgentLoopRun, messages: UserMessage[]): void {
+  for (const msg of messages) {
+    run.context.messages.push(msg);
+    run.newMessages.push(msg);
+    run.stream.push({ type: 'message_start', message: msg });
+    run.stream.push({ type: 'message_end', message: msg });
+  }
+}
+
+/** The request-local host facts for this request; the one-shot instructions are consumed here. */
+function takeEphemeralInstruction(run: AgentLoopRun, remainingTurns: number): string | undefined {
+  // Request-local host facts ride at the end of the request so the cached prefix stays intact.
+  const ephemeralInstruction =
+    [
+      run.runtimeContinuationInstruction,
+      run.runtimeNoProgressInstruction,
+      turnBudgetInstruction(remainingTurns, run.maxTurns),
+    ]
+      .filter((instruction): instruction is string => Boolean(instruction))
+      .join('\n\n') || undefined;
+  run.runtimeNoProgressInstruction = undefined;
+  run.runtimeContinuationInstruction = undefined;
+  return ephemeralInstruction;
+}
+
+function turnBudgetInstruction(remainingTurns: number, maxTurns: number): string | undefined {
+  return remainingTurns <= 5
+    ? [
+        `<runtime_turn_budget remaining="${remainingTurns}" limit="${maxTurns}">`,
+        remainingTurns === 1
+          ? 'This is the final, text-only provider request in this turn. No tools are offered. Give the canonical final answer now, accurately marking unfinished work and unresolved evidence; do not claim structured completion unless it was already recorded.'
+          : remainingTurns === 2
+            ? 'This is the last request with tools. Settle open Tasks and call turn_complete now if a structured declaration is required; the next and final request is text-only. Preserve a truthful checkpoint and all approval, identity, experiment-restoration, and completion gates. Do not invent missing evidence.'
+            : 'The turn is near its request limit. Prioritize settling open Tasks, preserving a truthful checkpoint when available, and producing an honest final answer before the limit. Keep all approval, identity, experiment-restoration, and completion gates intact; do not invent missing evidence.',
+        '</runtime_turn_budget>',
+      ].join('\n')
+    : undefined;
+}
+
+/** A response without tool use ends the loop, unless a runtime-owned obligation asks for one more request. */
+async function settleTerminalResponse(
+  run: AgentLoopRun,
+  state: LoopState,
+  assistantMessage: AssistantMessage,
+): Promise<TurnOutcome> {
+  const { config, stream, maxTurns } = run;
+  const remainingTurns = maxTurns - state.turn + 1;
+  stream.push({ type: 'turn_end', turn: state.turn, message: assistantMessage });
+  const continuation = await run.continuationGuard.next({
+    reason: assistantMessage.stopReason,
+    isDone: stream.isDone,
+    remaining: remainingTurns,
+    turn: state.turn,
+    maxTurns,
+    check: config.beforeTerminalResponse ? () => config.beforeTerminalResponse!(assistantMessage) : undefined,
+  });
+  if (continuation) {
+    run.runtimeContinuationInstruction = continuation;
+    return { kind: 'continue', state: { pending: [], turn: state.turn, transition: 'next_turn' } };
+  }
+  return { kind: 'end' };
+}
+
+/** 执行工具调用, then the host turn boundary and the no-progress guard decide whether the loop goes on. */
+async function runToolRound(
+  run: AgentLoopRun,
+  state: LoopState,
+  assistantMessage: AssistantMessage,
+): Promise<TurnOutcome> {
+  const { context, stream, toolExecutor } = run;
+  // 8. 执行工具调用
+  const toolResults = await executeToolCalls(assistantMessage, toolExecutor, stream, run.config.maxToolConcurrency);
+  run.continuationGuard.reset();
+  for (const result of toolResults.results) {
+    context.messages.push(result);
+    run.newMessages.push(result);
+  }
+  stream.push({
+    type: 'turn_end',
+    turn: state.turn,
+    message: assistantMessage,
+    toolResults: toolResults.results,
+  });
+
+  if (toolResults.results.some((result) => toolExecutor?.shouldEndTurnAfterToolResult?.(result))) {
+    return { kind: 'end' };
+  }
+
+  const progress = run.progressGuard.observe(
+    assistantMessage,
+    toolResults.results,
+    context.runtime?.current.revision ?? 0,
+    context.runtime?.current.activeTools ?? context.tools ?? [],
+  );
+  if (progress.action === 'terminate') {
+    throw new AgentLoopTerminationError(
+      'AGENT_NO_PROGRESS',
+      `Agent repeated the same tool round ${progress.consecutiveMatches} consecutive times without runtime progress.`,
+      { turn: state.turn },
+    );
+  }
+  if (progress.action === 'inject-guidance') {
+    run.runtimeNoProgressInstruction = RUNTIME_NO_PROGRESS_INSTRUCTION;
+  }
+
+  // 9. next_turn 站点：正常工具循环继续
+  return { kind: 'continue', state: { pending: [], turn: state.turn, transition: 'next_turn' } };
 }
 
 // =====================================================================
@@ -605,6 +695,62 @@ async function streamAssistantResponse(
   ephemeralInstruction?: string,
   allowToolUse = true,
 ): Promise<AssistantMessage> {
+  const { llmContext, streamOptions, pendingMailbox } = await buildProviderRequest(
+    context,
+    config,
+    stream,
+    ephemeralInstruction,
+    allowToolUse,
+  );
+  const requestId = await config.onRequest?.({
+    model: config.model,
+    context: llmContext,
+    streamOptions,
+    mailboxDeliveries: pendingMailbox?.mailboxDeliveries,
+  });
+  await pendingMailbox?.commit?.();
+  if (pendingMailbox?.messages.length) context.messages.push(...pendingMailbox.messages);
+
+  // 6. 调用 provider，转发事件
+  const response: ProviderResponseState = { partialIndex: -1, finalMessage: undefined };
+  try {
+    const providerStream = provider.stream(config.model, llmContext, streamOptions);
+    for await (const event of providerStream) {
+      forwardProviderEvent(event, response, context, stream);
+    }
+
+    if (!response.finalMessage) {
+      response.finalMessage = await providerStream.result();
+      placeAssistantMessage(response, context, response.finalMessage);
+    }
+
+    await config.onResponse?.(requestId, response.finalMessage);
+    return response.finalMessage;
+  } catch (error) {
+    // A failed provider attempt cannot leave an assistant tool call in the next
+    // request without a tool result. The streamed UI events remain diagnostic.
+    if (response.partialIndex >= 0) context.messages.splice(response.partialIndex, 1);
+    throw error;
+  }
+}
+
+type RequestMailbox = Awaited<ReturnType<NonNullable<AgentLoopConfig['beforeRequestMessages']>>>;
+
+/** One provider request as sent: the LLM context, the merged stream options and the mailbox tail it carries. */
+interface ProviderRequest {
+  llmContext: Context;
+  streamOptions: StreamOptions;
+  pendingMailbox: RequestMailbox | undefined;
+}
+
+/** Steps 1–5: the request's messages, output cap, context, API key and stream options. */
+async function buildProviderRequest(
+  context: AgentContext,
+  config: AgentLoopConfig,
+  stream: EventStream<AgentLoopEvent, Message[]>,
+  ephemeralInstruction: string | undefined,
+  allowToolUse: boolean,
+): Promise<ProviderRequest> {
   // 1. 可选的上下文变换（压缩 / 剪裁）
   let messages: AgentMessage[] = context.messages;
   const pendingMailbox = await config.beforeRequestMessages?.();
@@ -656,90 +802,75 @@ async function streamAssistantResponse(
 
   if (config.resolvePermissionState)
     Object.assign(llmContext, appendRuntimePermissionContext(llmContext, config.resolvePermissionState()));
-  const requestId = await config.onRequest?.({
-    model: config.model,
-    context: llmContext,
-    streamOptions,
-    mailboxDeliveries: pendingMailbox?.mailboxDeliveries,
-  });
-  await pendingMailbox?.commit?.();
-  if (pendingMailbox?.messages.length) context.messages.push(...pendingMailbox.messages);
+  return { llmContext, streamOptions, pendingMailbox };
+}
 
-  // 6. 调用 provider，转发事件
-  let partialIndex = -1;
-  let finalMessage: AssistantMessage | undefined;
-  try {
-    const response = provider.stream(config.model, llmContext, streamOptions);
-    for await (const event of response) {
-      switch (event.type) {
-        case 'start': {
-          // 把 partial assistant message 临时挂到 context 末尾，便于 UI 渲染
-          partialIndex = context.messages.length;
-          context.messages.push(event.partial);
-          stream.push({ type: 'message_start', message: event.partial });
-          break;
-        }
-        case 'text_start':
-        case 'text_delta':
-        case 'text_end':
-        case 'thinking_start':
-        case 'thinking_delta':
-        case 'thinking_end':
-        case 'toolcall_start':
-        case 'toolcall_delta':
-        case 'toolcall_end': {
-          if (partialIndex >= 0) {
-            context.messages[partialIndex] = event.partial;
-          }
-          stream.push({
-            type: 'message_update',
-            assistantMessageEvent: event,
-            message: event.partial,
-          });
-          break;
-        }
-        case 'done': {
-          finalMessage = event.message;
-          if (partialIndex >= 0) {
-            context.messages[partialIndex] = finalMessage;
-          } else {
-            context.messages.push(finalMessage);
-            partialIndex = context.messages.length - 1;
-          }
-          stream.push({ type: 'message_end', message: finalMessage });
-          break;
-        }
-        case 'error': {
-          if (partialIndex >= 0) {
-            context.messages[partialIndex] = event.message;
-          } else {
-            partialIndex = context.messages.length;
-            context.messages.push(event.message);
-          }
-          throw event.error;
-        }
-        default:
-          assertNever(event);
-      }
+/** Where the streamed assistant message sits in `context.messages`, and the final message once the provider sent it. */
+interface ProviderResponseState {
+  partialIndex: number;
+  finalMessage: AssistantMessage | undefined;
+}
+
+/** Forwards one provider event to the loop stream and keeps the partial assistant message in the context current. */
+function forwardProviderEvent(
+  event: AssistantMessageEvent,
+  response: ProviderResponseState,
+  context: AgentContext,
+  stream: EventStream<AgentLoopEvent, Message[]>,
+): void {
+  switch (event.type) {
+    case 'start': {
+      // 把 partial assistant message 临时挂到 context 末尾，便于 UI 渲染
+      response.partialIndex = context.messages.length;
+      context.messages.push(event.partial);
+      stream.push({ type: 'message_start', message: event.partial });
+      break;
     }
-
-    if (!finalMessage) {
-      finalMessage = await response.result();
-      if (partialIndex >= 0) {
-        context.messages[partialIndex] = finalMessage;
-      } else {
-        partialIndex = context.messages.length;
-        context.messages.push(finalMessage);
+    case 'text_start':
+    case 'text_delta':
+    case 'text_end':
+    case 'thinking_start':
+    case 'thinking_delta':
+    case 'thinking_end':
+    case 'toolcall_start':
+    case 'toolcall_delta':
+    case 'toolcall_end': {
+      if (response.partialIndex >= 0) {
+        context.messages[response.partialIndex] = event.partial;
       }
+      stream.push({
+        type: 'message_update',
+        assistantMessageEvent: event,
+        message: event.partial,
+      });
+      break;
     }
+    case 'done': {
+      response.finalMessage = event.message;
+      placeAssistantMessage(response, context, event.message);
+      stream.push({ type: 'message_end', message: event.message });
+      break;
+    }
+    case 'error': {
+      placeAssistantMessage(response, context, event.message);
+      throw event.error;
+    }
+    default:
+      assertNever(event);
+  }
+}
 
-    await config.onResponse?.(requestId, finalMessage);
-    return finalMessage;
-  } catch (error) {
-    // A failed provider attempt cannot leave an assistant tool call in the next
-    // request without a tool result. The streamed UI events remain diagnostic.
-    if (partialIndex >= 0) context.messages.splice(partialIndex, 1);
-    throw error;
+/** Replaces the partial assistant message, or appends the message when no partial was streamed. */
+function placeAssistantMessage(
+  response: ProviderResponseState,
+  context: AgentContext,
+  message: AssistantMessage,
+): void {
+  if (response.partialIndex >= 0) {
+    context.messages[response.partialIndex] = message;
+  } else {
+    response.partialIndex = context.messages.length;
+    context.messages.push(message);
   }
 }
 
