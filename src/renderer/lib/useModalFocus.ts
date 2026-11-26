@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { isTopOverlayLayer } from './overlayStack';
 
 export const MODAL_FOCUSABLE_SELECTOR = [
@@ -44,9 +44,16 @@ export function useModalFocus(options: {
   layerId?: number | null;
 }): void {
   const { open, containerRef, onClose, busy = false, trap = true, fallbackFocusRef, layerId = null } = options;
+  // Escape reads the latest close handler and busy state; owners pass a fresh onClose on every render, and re-arming
+  // the trap with each one made where focus landed depend on how many renders a frame saw.
+  const latest = useRef({ onClose, busy });
+  /** Focus has been inside the dialog; until then the opening capture owns where it lands. */
+  const focusEntered = useRef(false);
+  latest.current = { onClose, busy };
 
   useEffect(() => {
     if (!open) return undefined;
+    focusEntered.current = false;
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frameId = window.requestAnimationFrame(() => {
       const container = containerRef.current;
@@ -84,10 +91,10 @@ export function useModalFocus(options: {
       if (event.key === 'Escape' && event.defaultPrevented) return;
       if (!isTopOverlayLayer(layerId)) return;
       if (event.key === 'Escape') {
-        if (busy) return;
+        if (latest.current.busy) return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        onClose();
+        latest.current.onClose();
         return;
       }
       if (event.key !== 'Tab' || !trap) return;
@@ -108,10 +115,28 @@ export function useModalFocus(options: {
         first.focus();
       }
     };
+    const handleFocusIn = (event: FocusEvent) => {
+      if (event.target instanceof Node && containerRef.current?.contains(event.target)) focusEntered.current = true;
+    };
     document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('focusin', handleFocusIn);
     return () => {
       window.cancelAnimationFrame(frameId);
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('focusin', handleFocusIn);
     };
-  }, [busy, containerRef, layerId, onClose, open, trap]);
+  }, [containerRef, layerId, open, trap]);
+
+  // Entering or leaving a busy state disables controls, which drops focus from a disabled one to the page; the
+  // dialog takes it back in the same commit, so the result never depends on frame timing.
+  const settledBusy = useRef(busy);
+  useEffect(() => {
+    if (settledBusy.current === busy) return;
+    settledBusy.current = busy;
+    if (!open || !focusEntered.current || !shouldCaptureEscapedFocus(trap) || !isTopOverlayLayer(layerId)) return;
+    const root = containerRef.current;
+    const active = document.activeElement;
+    // Chromium moves focus off a control that becomes disabled; a focused disabled control counts as lost either way.
+    if (root && (!root.contains(active) || active?.matches(':disabled'))) root.focus();
+  }, [busy, containerRef, layerId, open, trap]);
 }

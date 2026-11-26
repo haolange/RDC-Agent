@@ -56,3 +56,39 @@ it('closes only the topmost layer when the inner layer unmounts before the outer
     vi.unstubAllGlobals();
   }
 });
+
+it('takes focus back into the dialog when busy disables the focused control, whatever the render count', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  let setBusy: ((busy: boolean) => void) | null = null;
+  function Dialog() {
+    const ref = useRef<HTMLDivElement>(null);
+    const [busy, setBusyState] = useState(false);
+    setBusy = setBusyState;
+    const { layerId } = useOverlayLayer(true);
+    // A fresh close handler on every render, as dialog owners pass one.
+    useModalFocus({ open: true, containerRef: ref, onClose: () => undefined, busy, layerId });
+    return createElement(
+      'div',
+      { ref, tabIndex: -1, 'data-testid': 'dialog' },
+      createElement('button', { type: 'button', disabled: busy, 'data-testid': 'action' }, 'Preview'),
+    );
+  }
+  try {
+    await act(async () => root.render(createElement(Dialog)));
+    const action = host.querySelector<HTMLButtonElement>('[data-testid="action"]')!;
+    action.focus();
+    await act(async () => setBusy!(true));
+    // The disabled control dropped focus; the dialog holds it, not the page.
+    expect(document.activeElement).toBe(host.querySelector('[data-testid="dialog"]'));
+    await act(async () => setBusy!(false));
+    await act(async () => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined))));
+    expect(document.activeElement).toBe(host.querySelector('[data-testid="dialog"]'));
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
