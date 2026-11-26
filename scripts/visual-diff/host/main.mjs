@@ -138,7 +138,8 @@ function withTheme(value, theme, depth = 0) {
  * Replay: the n-th call of a channel gets its n-th recorded answer; calls past the end repeat the last one. A
  * scenario's `respond` entries change one answer ({channel, call}: n-th call, default 1): `delayMs` answers late,
  * `hold` keeps the answer until a `release` step names the channel (oldest held first, or the one its `call` names,
- * so releasing call 2 before call 1 delivers a reordered pair), `error` answers with that IPC error payload.
+ * so releasing call 2 before call 1 delivers a reordered pair), `error` answers with that IPC error payload and
+ * `result` with that value instead of the recorded one (the state a failed write leaves behind).
  */
 function createReplayer(responses, respond, theme) {
   const calls = {};
@@ -174,6 +175,7 @@ function createReplayer(responses, respond, theme) {
         pending -= 1;
       }
       if (change?.error) return { __rdcIpcError: change.error };
+      if (change && 'result' in change) return withTheme(change.result, theme);
       if (entry.error) throw new Error(entry.error);
       return withTheme(entry.result, theme);
     },

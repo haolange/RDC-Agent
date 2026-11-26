@@ -40,23 +40,13 @@
   {
    "waitFor": "[data-testid=\"knowledge-center-import-items\"]",
    "waitMs": 400
-  },
-  {
-   "focus": "[data-testid=\"knowledge-center-import\"]",
-   "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing",
-   "waitMs": 200
   }
  ],
  "settleMs": 1200,
  "responses": {
   "settings:get": [
    {
-    "ref": "34f45dbaee40cea6ecbc3e8a"
-   }
-  ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
+    "ref": "bd87c4a38a7d5b58606353ed"
    }
   ],
   "app:getMeta": [
@@ -68,13 +58,18 @@
     }
    }
   ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
   "runtimeLog:list": [
    {
     "result": {
      "entries": [
       {
-       "id": "rlog-d948d4c73c65-1795634384443",
-       "timestamp": 1795634384443,
+       "id": "rlog-4337d8edd763-1795681018767",
+       "timestamp": 1795681018768,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -88,8 +83,8 @@
        }
       },
       {
-       "id": "rlog-4b90e122f118-1795634384484",
-       "timestamp": 1795634384484,
+       "id": "rlog-6ec0ab756ffd-1795681018825",
+       "timestamp": 1795681018825,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -101,8 +96,8 @@
        "raw": null
       },
       {
-       "id": "rlog-18332b19581b-1795634384484",
-       "timestamp": 1795634384484,
+       "id": "rlog-de7522a9cfcf-1795681018826",
+       "timestamp": 1795681018826,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -114,8 +109,8 @@
        "raw": null
       },
       {
-       "id": "rlog-f3bedc9188ca-1795634384497",
-       "timestamp": 1795634384497,
+       "id": "rlog-82213ff25f4d-1795681018840",
+       "timestamp": 1795681018840,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -180,7 +175,7 @@
      ],
      "index": {
       "revision": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "builtAt": "2026-11-25T19:19:45.422Z",
+      "builtAt": "2026-11-26T08:17:00.555Z",
       "cardCount": 0,
       "cardsBySpace": {}
      }
@@ -227,7 +222,7 @@
    {
     "result": {
      "packId": "pack:e2b02937fd0c7754",
-     "compiledAt": "2026-11-25T19:19:45.445Z",
+     "compiledAt": "2026-11-26T08:17:00.587Z",
      "hits": [],
      "conflicts": []
     }
@@ -274,11 +269,5 @@
     }
    }
   ]
- },
- "l3Ignore": {
-  "keys": [
-   "focus"
-  ],
-  "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing"
  }
 }

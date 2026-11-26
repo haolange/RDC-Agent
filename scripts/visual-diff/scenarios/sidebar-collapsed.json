@@ -17,11 +17,6 @@
     "ref": "bd87c4a38a7d5b58606353ed"
    }
   ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
-   }
-  ],
   "app:getMeta": [
    {
     "result": {
@@ -36,8 +31,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-bf53fd236cf7-1795675993985",
-       "timestamp": 1795675993985,
+       "id": "rlog-0bffd6f64f65-1795681310814",
+       "timestamp": 1795681310814,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -51,8 +46,8 @@
        }
       },
       {
-       "id": "rlog-4c8112d92ac9-1795675994052",
-       "timestamp": 1795675994052,
+       "id": "rlog-5246f803b75b-1795681310872",
+       "timestamp": 1795681310872,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -64,8 +59,8 @@
        "raw": null
       },
       {
-       "id": "rlog-00eb52df128f-1795675994052",
-       "timestamp": 1795675994052,
+       "id": "rlog-67d015f1e172-1795681310872",
+       "timestamp": 1795681310872,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -77,8 +72,8 @@
        "raw": null
       },
       {
-       "id": "rlog-dd06eb1fa3be-1795675994068",
-       "timestamp": 1795675994068,
+       "id": "rlog-167ec3a14c31-1795681310886",
+       "timestamp": 1795681310886,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -121,6 +116,11 @@
       "status": "idle"
      }
     }
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "project:list": [

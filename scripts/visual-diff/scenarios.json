@@ -294,20 +294,9 @@
     {
      "waitFor": "[data-testid=\"knowledge-center-import-items\"]",
      "waitMs": 400
-    },
-    {
-     "focus": "[data-testid=\"knowledge-center-import\"]",
-     "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing",
-     "waitMs": 200
     }
    ],
-   "settleMs": 1200,
-   "l3Ignore": {
-    "keys": [
-     "focus"
-    ],
-    "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing"
-   }
+   "settleMs": 1200
   },
   {
    "id": "knowledge-detail",
@@ -816,20 +805,9 @@
     {
      "waitFor": "[data-testid=\"knowledge-center-import-items\"], [data-testid=\"knowledge-center-import-error\"]",
      "waitMs": 400
-    },
-    {
-     "focus": "[data-testid=\"knowledge-center-import\"]",
-     "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing",
-     "waitMs": 200
     }
    ],
-   "settleMs": 1000,
-   "l3Ignore": {
-    "keys": [
-     "focus"
-    ],
-    "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing"
-   }
+   "settleMs": 1000
   },
   {
    "id": "project-workbench",
@@ -1302,14 +1280,7 @@
      "waitMs": 2000
     }
    ],
-   "settleMs": 1200,
-   "l3Ignore": {
-    "keys": [
-     "rect settings-provider-connect-",
-     "rect settings-provider-connection-status"
-    ],
-    "reason": "Saving swaps the footer's Save label for a wider pending label, which shifts Test, Save and the status line for as long as the save takes; whether that span covers two frames is timing, not intent (a layout jump to fix under plan 5.4)"
-   }
+   "settleMs": 1200
   },
   {
    "id": "permission-switch-failure",
@@ -1326,6 +1297,22 @@
       "code": "STORAGE_UNREADABLE",
       "params": {},
       "category": "availability"
+     }
+    },
+    {
+     "channel": "runtime:getPermissionState",
+     "call": 2,
+     "result": {
+      "mode": "default",
+      "revision": 1
+     }
+    },
+    {
+     "channel": "runtime:getPermissionState",
+     "call": 3,
+     "result": {
+      "mode": "default",
+      "revision": 1
      }
     }
    ],

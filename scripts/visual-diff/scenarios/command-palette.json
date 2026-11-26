@@ -32,13 +32,18 @@
     }
    }
   ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
   "runtimeLog:list": [
    {
     "result": {
      "entries": [
       {
-       "id": "rlog-5bc898486eb1-1795675955065",
-       "timestamp": 1795675955065,
+       "id": "rlog-fd0c3621772f-1795681291001",
+       "timestamp": 1795681291001,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -52,8 +57,8 @@
        }
       },
       {
-       "id": "rlog-a8e8f853924c-1795675955128",
-       "timestamp": 1795675955128,
+       "id": "rlog-ce9be7082fab-1795681291058",
+       "timestamp": 1795681291058,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -65,8 +70,8 @@
        "raw": null
       },
       {
-       "id": "rlog-d58599f33584-1795675955129",
-       "timestamp": 1795675955129,
+       "id": "rlog-03ba2ae629aa-1795681291059",
+       "timestamp": 1795681291059,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -78,8 +83,8 @@
        "raw": null
       },
       {
-       "id": "rlog-75b463914e9f-1795675955146",
-       "timestamp": 1795675955146,
+       "id": "rlog-a13396902bea-1795681291076",
+       "timestamp": 1795681291076,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -124,11 +129,6 @@
     }
    }
   ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
-   }
-  ],
   "project:list": [
    {
     "result": {
@@ -143,7 +143,7 @@
       {
        "id": "agents",
        "name": "agents",
-       "description": "List available agent profiles or switch to a specific agent",
+       "description": "列出可用的 Agent，或切换到其中一个",
        "aliases": [
         "agent"
        ],
@@ -152,7 +152,7 @@
       {
        "id": "clear",
        "name": "clear",
-       "description": "Clear the current conversation history",
+       "description": "清空当前对话的历史",
        "aliases": [
         "cls"
        ],
@@ -161,28 +161,28 @@
       {
        "id": "config",
        "name": "config",
-       "description": "Open settings or view/modify a configuration value",
+       "description": "打开设置，可指定分区",
        "aliases": [],
        "category": "system"
       },
       {
        "id": "cost",
        "name": "cost",
-       "description": "Show persisted run statistics and cost availability for the current session",
+       "description": "显示当前对话已保存的运行统计与费用可用性",
        "aliases": [],
        "category": "debug"
       },
       {
        "id": "export",
        "name": "export",
-       "description": "Export the current conversation to Markdown or JSON",
+       "description": "将当前对话导出为 Markdown 或 JSON",
        "aliases": [],
        "category": "workflow"
       },
       {
        "id": "help",
        "name": "help",
-       "description": "List all available commands or get details for a specific command",
+       "description": "列出可用命令，或查看某个命令的详情",
        "aliases": [
         "h",
         "?"
@@ -192,21 +192,21 @@
       {
        "id": "mcp",
        "name": "mcp",
-       "description": "Show MCP servers and their connection status",
+       "description": "显示 MCP 服务器及其状态，或连接、断开其中一个",
        "aliases": [],
        "category": "system"
       },
       {
        "id": "model",
        "name": "model",
-       "description": "View or switch the current conversation model; use default to follow the Agent configuration",
+       "description": "查看或切换当前对话的模型；default 跟随 Agent",
        "aliases": [],
        "category": "navigation"
       },
       {
        "id": "permissions",
        "name": "permissions",
-       "description": "View or change the current permission mode",
+       "description": "查看或更改权限模式",
        "aliases": [
         "perm"
        ],
@@ -215,7 +215,7 @@
       {
        "id": "project",
        "name": "project",
-       "description": "Manage projects (list, create, switch, rename, delete)",
+       "description": "列出项目；在侧边栏管理项目",
        "aliases": [
         "prj"
        ],
@@ -224,7 +224,7 @@
       {
        "id": "resume",
        "name": "resume",
-       "description": "Resume a previously interrupted session",
+       "description": "继续一个被中断的对话",
        "aliases": [
         "res"
        ],
@@ -233,7 +233,7 @@
       {
        "id": "session",
        "name": "session",
-       "description": "Manage sessions (list, create, rename, delete, resume)",
+       "description": "列出当前项目的对话；在侧边栏管理对话",
        "aliases": [
         "sess"
        ],
@@ -242,7 +242,7 @@
       {
        "id": "skills",
        "name": "skills",
-       "description": "List available Markdown Skills or run one by id",
+       "description": "列出可用的 Skill，或为下一条消息启用其中一个",
        "aliases": [
         "skill"
        ],
@@ -251,7 +251,7 @@
       {
        "id": "status",
        "name": "status",
-       "description": "Show system status and diagnostic information",
+       "description": "显示系统状态与诊断信息",
        "aliases": [
         "st",
         "debug",
@@ -262,21 +262,21 @@
       {
        "id": "test",
        "name": "test",
-       "description": "Run tests or view test status",
+       "description": "说明如何运行测试",
        "aliases": [],
        "category": "debug"
       },
       {
        "id": "theme",
        "name": "theme",
-       "description": "Switch application theme (dark/light/system)",
+       "description": "查看或切换主题（dark、light 或 system）",
        "aliases": [],
        "category": "system"
       },
       {
        "id": "tools",
        "name": "tools",
-       "description": "List available tools or get tool details",
+       "description": "列出内置工具",
        "aliases": [
         "tool"
        ],
@@ -285,21 +285,21 @@
       {
        "id": "undo",
        "name": "undo",
-       "description": "Undo the last user message and its assistant response",
+       "description": "撤销最后一条消息及其回复",
        "aliases": [],
        "category": "session"
       },
       {
        "id": "usage",
        "name": "usage",
-       "description": "Show persisted run and live usage availability for the current session",
+       "description": "按状态显示当前对话已保存的运行",
        "aliases": [],
        "category": "debug"
       },
       {
        "id": "version",
        "name": "version",
-       "description": "Show application version information",
+       "description": "显示应用版本",
        "aliases": [
         "v"
        ],

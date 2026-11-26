@@ -121,7 +121,22 @@ function internalize(responses, shared) {
   );
 }
 
-/** Stops the instance's whole process group and waits until it is gone, so the next instance can take the port. */
+/** The processes of a group other than its leader. */
+function groupMembers(pgid) {
+  const listing = spawnSync('ps', ['-eo', 'pid=,pgid='], { encoding: 'utf8' }).stdout ?? '';
+  return listing
+    .trim()
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/).map(Number))
+    .filter(([pid, group]) => group === pgid && pid !== pgid)
+    .map(([pid]) => pid);
+}
+
+/**
+ * Stops the instance's whole process group and waits until it is gone, so the next instance can take the port. Under
+ * xvfb-run the members go first: xvfb-run, the group leader, then sees its program exit and removes its virtual
+ * display and temporary directory itself, which a signal to the whole group would not let it do.
+ */
 async function stopQaInstance(child) {
   const alive = () => {
     try {
@@ -132,9 +147,26 @@ async function stopQaInstance(child) {
       throw error;
     }
   };
+  const wait = async (attempts) => {
+    for (let attempt = 0; attempt < attempts && alive(); attempt += 1)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+  };
+  if (child.spawnargs[0] === 'xvfb-run') {
+    for (const pid of groupMembers(child.pid).filter((pid) => !/Xvfb/.test(processName(pid)))) {
+      try {
+        process.kill(pid);
+      } catch {
+        /* already gone */
+      }
+    }
+    await wait(50);
+  }
   if (alive()) process.kill(-child.pid);
-  for (let attempt = 0; attempt < 100 && alive(); attempt += 1)
-    await new Promise((resolve) => setTimeout(resolve, 100));
+  await wait(100);
+}
+
+function processName(pid) {
+  return (spawnSync('ps', ['-o', 'comm=', '-p', String(pid)], { encoding: 'utf8' }).stdout ?? '').trim();
 }
 
 async function startQaInstance(workDir) {
