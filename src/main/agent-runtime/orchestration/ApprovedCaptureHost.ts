@@ -4,6 +4,7 @@ import {
   assertRdcContextLeaseOwnership,
   getDelegatedChildSessionId,
   getRdcContextLease,
+  quarantinedRdcContextLease,
   registerRdcFault,
 } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
@@ -24,7 +25,7 @@ import { TaskRegistry, createSessionTaskStore } from '../tasks';
 import { listActiveDelegations } from './DirectTaskTurnLifecycle';
 import { prepareRdcRuntimeEpoch } from './RdcRuntimeReprepare';
 import { joinFaultedRdcChild } from './RdcRecoveryChildren';
-import { inspectQuarantinedCapture } from './ApprovedCaptureRecovery';
+import { inspectQuarantinedCapture, reopenQuarantinedCapture } from './ApprovedCaptureRecovery';
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
 import type { InvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
 import type { ExecutionOffer } from '../../sessions/run/executionOffer';
@@ -90,13 +91,10 @@ export function createApprovedCaptureHost(input: {
   };
   return {
     assertPlan,
-    assertNoPendingRecovery() {
-      if (rdcLifecycleReceipts.pending(input.sessionId, input.projectId)) {
-        throw new AppError(
-          'RDC_PREVIOUS_RESTORE_REQUIRED',
-          'restore the previous investigation position through Capture first.',
-        );
-      }
+    pendingRecord: () => rdcLifecycleReceipts.pending(input.sessionId, input.projectId),
+    quarantinedContext() {
+      const lease = quarantinedRdcContextLease(scope);
+      return lease ? { contextId: lease.contextId, leaseVersion: lease.version } : null;
     },
     prepareReceipts: () => rdcLifecycleReceipts.prepare(),
     async quiescent(mode) {
@@ -220,50 +218,17 @@ export function createApprovedCaptureHost(input: {
     },
     async reopenAfterFailure(destination, binding, signal, onStopped, guard) {
       guard();
-      const { capture, device } = await resolve(destination);
-      const old = rdcSessionService.snapshotReplayForSession(scope);
-      if (
-        !(await rdcSessionService.clearOpenedCaptureForSession(scope, {
-          binding,
-          signal,
-          expectedGeneration: old.generation,
-          onDaemonStopped: (receipt) => onStopped(receipt.contextId),
-        }))
-      )
-        throw new AppError('RDC_RECOVERY_CLOSE_UNCONFIRMED');
-      guard();
-      signal?.throwIfAborted();
-      const closed = rdcSessionService.snapshotReplayForSession(scope);
-      const prepared = await rdcSessionService.prepareAgentDevice(
-        { ...scope, deviceId: device.id, bindingGeneration: closed.generation },
-        { binding, turnId: input.turn.turnId, signal, assertAuthorized: guard },
-      );
-      if (!prepared.success)
-        throw new AppError(
-          'RDC_RECOVERY_DEVICE_UNAVAILABLE',
-          prepared.error?.code ?? 'device preparation did not complete',
-        );
-      guard();
-      signal?.throwIfAborted();
-      const currentDevice = replayDeviceService.getDeviceById(device.id);
-      if (
-        !currentDevice ||
-        currentDevice.status !== 'online' ||
-        currentDevice.type !== device.type ||
-        currentDevice.serial !== device.serial
-      ) {
-        throw new AppError('RDC_APPROVED_DEVICE_CHANGED');
-      }
-      await rdcSessionService.openProjectInput(
-        { ...scope, inputId: capture.inputId, filePath: capture.filePath, replayDevice: currentDevice },
-        {
-          binding,
-          signal,
-          expectedGeneration: prepared.state.generation,
-          expectedCaptureSha256: destination.contentSha256,
-        },
-      );
-      guard();
+      const resolved = await resolve(destination);
+      await reopenQuarantinedCapture({
+        ...scope,
+        turnId: input.turn.turnId,
+        destination,
+        resolved,
+        binding,
+        signal,
+        onStopped,
+        guard,
+      });
     },
     async reprepare(previous, signal) {
       assertPlan();

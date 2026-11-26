@@ -179,6 +179,18 @@ export function assertRdcContextLeaseOwnership(input: {
   return getRdcContextLease(sessionId);
 }
 
+/** The session's own quarantined lease in the project: only recovery may act on it. */
+export function quarantinedRdcContextLease(input: { sessionId: string; projectId: string }): RdcContextLease | null {
+  const lease = getRdcContextLease(input.sessionId);
+  return lease?.quarantineReason &&
+    lease.quarantineCause &&
+    !lease.delegatedFrom &&
+    lease.ownerSessionId === input.sessionId &&
+    lease.ownerProjectId === input.projectId
+    ? lease
+    : null;
+}
+
 function failDelegatedLease(code: string, detail: string): never {
   throw new Error(`${code}: ${detail}`);
 }

@@ -215,6 +215,8 @@ export class RdcLifecycleReceipts {
     ref: InvestigationContentRef;
     count: number;
     identities: Array<{ contextId: string; processIdentity: RdcProcessIdentity; stopped: boolean }>;
+    /** The most recent position main observed and signed in this chain. */
+    latest: RdcLifecyclePoint | null;
   } | null {
     const values = this.readAll(sessionId, projectId);
     const baselines = values.filter(
@@ -247,9 +249,10 @@ export class RdcLifecycleReceipts {
     if (!outstanding.length) return null;
     const first = outstanding[0];
     const baseline = first.value;
+    // The chain spans every later turn of the same plan: a turn that adopts the record keeps signing under its own id.
     const relevant = values.filter(
       (item) =>
-        item.value.turnId === baseline.turnId &&
+        item.value.recordedAt >= baseline.recordedAt &&
         item.value.planHash === baseline.planHash &&
         item.value.planUri === baseline.planUri,
     );
@@ -300,7 +303,29 @@ export class RdcLifecycleReceipts {
       const identity = identities.get(key);
       if (identity) identity.stopped = true;
     }
-    return { baseline, ref: first.ref, count: outstanding.length, identities: [...identities.values()] };
+    return {
+      baseline,
+      ref: first.ref,
+      count: outstanding.length,
+      identities: [...identities.values()],
+      latest: latestSignedPoint(relevant.map((item) => item.value)),
+    };
   }
+}
+
+function latestSignedPoint(receipts: readonly RdcLifecycleReceipt[]): RdcLifecyclePoint | null {
+  let latest: { at: number; point: RdcLifecyclePoint } | null = null;
+  for (const value of receipts) {
+    const point =
+      value.event === 'baseline'
+        ? value.original
+        : value.event === 'intent'
+          ? value.from
+          : value.event === 'transition' || value.event === 'position-restored'
+            ? value.to
+            : null;
+    if (point && (!latest || value.recordedAt >= latest.at)) latest = { at: value.recordedAt, point };
+  }
+  return latest?.point ?? null;
 }
 export const rdcLifecycleReceipts = new RdcLifecycleReceipts();

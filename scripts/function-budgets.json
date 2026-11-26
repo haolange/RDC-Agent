@@ -18,7 +18,7 @@
       "lines": 209
     },
     "src/main/agent-runtime/orchestration/ApprovedCaptureHost.ts": {
-      "lines": 280
+      "lines": 244
     },
     "src/main/agent-runtime/orchestration/BackgroundSubagentService.ts": {
       "lines": 317
@@ -49,8 +49,8 @@
       "complexity": 60
     },
     "src/main/agent-runtime/orchestration/TurnPreparationService.ts": {
-      "lines": 436,
-      "complexity": 54
+      "lines": 434,
+      "complexity": 51
     },
     "src/main/agent-runtime/permissions/AgentPermissionPolicy.ts": {
       "lines": 155,

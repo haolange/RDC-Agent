@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { stuckContextStatus } from '../testing/rdcContextStatusFixture';
+import { currentProcessIdentity } from '../platform/process';
 import { setRdcInteractionLock } from './RdcOperationCoordinator';
 
 const mock = vi.hoisted(() => ({
@@ -219,7 +220,7 @@ it('preserves the current replay when input identity changed or an old process m
   await expect(restorePreviousCapture(scope)).rejects.toThrow('RDC_RECOVERY_INPUT_CHANGED');
   expect(mock.clear).not.toHaveBeenCalled();
   expect(mock.prepare).not.toHaveBeenCalled();
-  mock.pending.mockReturnValue({
+  const withDaemon = (start_generation: string) => ({
     baseline,
     ref,
     count: 1,
@@ -227,13 +228,17 @@ it('preserves the current replay when input identity changed or an old process m
       {
         contextId: 'old',
         stopped: false,
-        processIdentity: { ...processIdentity, daemon: { pid: process.pid, start_generation: 'windows-filetime:1' } },
+        processIdentity: { ...processIdentity, daemon: { pid: process.pid, start_generation } },
       },
     ],
   });
+  mock.pending.mockReturnValue(withDaemon(currentProcessIdentity().birth));
   await expect(restorePreviousCapture(scope)).rejects.toThrow('RDC_RECOVERY_OLD_PROCESS_UNCONFIRMED');
   expect(mock.clear).not.toHaveBeenCalled();
   expect(mock.write).not.toHaveBeenCalled();
+  // The same pid under another birth is a reused pid: the recorded daemon has exited.
+  mock.pending.mockReturnValue(withDaemon('windows-filetime:1'));
+  await expect(restorePreviousCapture(scope)).resolves.toMatchObject({ appliedEventId: 42 });
 });
 
 it('does not take over an active turn or accept a stale UI generation', async () => {

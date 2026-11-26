@@ -310,7 +310,8 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。
 
 - `runtime_context` 对同一 session/project 的隔离身份返回明确的受控恢复状态，不将仍打开的 capture 误报为未打开，也不向其他 scope 泄露保留的 lease。
-- 新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化。
+- 新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化：`prepareTurn` 把本会话被隔离的 lease 身份冻结进 binding（其余原生路径照旧拒绝它），获批同一计划的新 turn 在 `ApprovedCaptureController.initialize` 中接续上一 turn 未闭合的签名 baseline（仍是用户的原始位置），以该 lease 上最近一次签名位置为 `lastVerified`，进入待恢复状态：只放行 `capture_recover`，其他现场操作返回 `RDC_CONTEXT_QUARANTINED`；恢复成功后正常工作，终态 `resolved` 以原 baseline 的 turn 签署。不同计划的未闭合 baseline 仍要求先在 Capture 恢复。
+- turn 内 lease 被隔离后，`capture_restore` 先要求 `capture_recover`；恢复成功后 restore 在新 lease 上运行，二者不再互相阻塞。
 - 失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
 
 `rdc_probe` 的 `probe` 是只读语义查询闭集：`context_status`、`resource_list`、`event_list`、`event_search`、`event_show`、`pipeline_show`、`vfs_ls`、`vfs_cat`，规划与执行身份都可使用；像素历史、Shader 调试、替换和导出不在其中。
@@ -338,7 +339,7 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 - 确认消失才继续释放，无法确认则保留归属。
 - 身份链无法解释、权限或安装状态无法确认时停止并保留隔离，不伪造恢复。
 - 任务进入前的位置由签名 baseline 记录；中断或重启后未闭合记录在 Capture 显示，由用户触发恢复，不自动续跑模型。
-- 恢复前复核输入 hash、设备、替换和旧进程，只有重新观察到原位置才签 resolved。
+- 恢复前复核输入 hash、设备、替换和旧进程（`probeProcess` 按 pid + birth 判断，复用的 pid 不算存活，无法读取的身份不算退出），只有重新观察到原位置才签 resolved。
 - 历史结果不被补签，不跨新旧现场拼接实验。
 
 ### 身份链恢复

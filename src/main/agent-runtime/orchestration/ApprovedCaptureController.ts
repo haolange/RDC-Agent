@@ -5,6 +5,7 @@ import {
   sameRdcLifecyclePosition,
   type RdcLifecyclePoint,
   type RdcLifecycleReceipt,
+  type RdcLifecycleReceipts,
 } from '../../rdc/RdcLifecycleReceipts';
 import { getRdcTurnBinding, type RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { observedRdcProcessIdentity } from '../../rdc/RdcProcessIdentity';
@@ -27,7 +28,10 @@ export type RecoveryFacts = {
 };
 export interface ApprovedCaptureHost {
   assertPlan(): void;
-  assertNoPendingRecovery(): void;
+  /** The earliest unresolved signed baseline of this session and project, if any. */
+  pendingRecord(): ReturnType<RdcLifecycleReceipts['pending']>;
+  /** The owning lease when it is quarantined: only recovery may act on it. */
+  quarantinedContext(): { contextId: string; leaseVersion: number } | null;
   prepareReceipts(): void;
   quiescent(mode?: 'recovery'): Promise<void>;
   snapshot(binding: RdcTurnBinding, signal?: AbortSignal): Promise<RdcLifecyclePoint | null>;
@@ -74,6 +78,9 @@ export class ApprovedCaptureController {
   private baseline: InvestigationContentRef | null = null;
   private lastVerified: RdcLifecyclePoint | null = null;
   private recoveryAdmission: { revision: number; guard: () => void } | null = null;
+  /** Set when this turn adopted an earlier turn's unresolved baseline whose lease is quarantined. */
+  private adoptedBaselineTurnId: string | null = null;
+  private pendingRecovery = false;
   private initialError: string | null = null;
   private lastFailure: string | null = null;
   private restoreError: string | null = null;
@@ -93,7 +100,13 @@ export class ApprovedCaptureController {
   async initialize(): Promise<void> {
     try {
       this.input.host.assertPlan();
-      this.input.host.assertNoPendingRecovery();
+      const quarantined = this.input.host.quarantinedContext();
+      if (quarantined) return this.adoptPendingRecovery(quarantined);
+      if (this.input.host.pendingRecord())
+        throw new AppError(
+          'RDC_PREVIOUS_RESTORE_REQUIRED',
+          'restore the previous investigation position through Capture first.',
+        );
       this.original = await this.input.host.snapshot(this.current().binding, this.input.turn.signal);
       this.lastVerified = this.original;
       this.input.host.prepareReceipts();
@@ -107,11 +120,35 @@ export class ApprovedCaptureController {
     }
   }
 
+  /**
+   * A new turn of the same plan that meets its quarantined lease continues the unresolved chain instead of failing to
+   * observe a start position: the earlier baseline stays the user's original, the last signed position on that lease
+   * is the last verified one, and only capture_recover may run until the lease is rebuilt.
+   */
+  private adoptPendingRecovery(quarantined: { contextId: string; leaseVersion: number }): void {
+    const record = this.input.host.pendingRecord();
+    if (!record || record.baseline.planUri !== this.input.planUri || record.baseline.planHash !== this.planHash())
+      throw new AppError(
+        'RDC_PREVIOUS_RESTORE_REQUIRED',
+        'restore the previous investigation position through Capture first.',
+      );
+    if (
+      record.latest?.native.contextId !== quarantined.contextId ||
+      record.latest.native.leaseVersion !== quarantined.leaseVersion
+    )
+      throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'no signed position names the quarantined lease.');
+    this.original = record.baseline.original;
+    this.baseline = record.ref;
+    this.adoptedBaselineTurnId = record.baseline.turnId;
+    this.lastVerified = record.latest;
+    this.pendingRecovery = true;
+  }
+
   async select(
     inputId: string,
     signal?: AbortSignal,
   ): Promise<{ changed: boolean; receipt?: InvestigationContentRef; current: RdcLifecyclePoint | null }> {
-    this.assertReady();
+    this.assertRecovered();
     const chosen = this.input.captureScope.inputs.find((item) => item.inputId === inputId);
     if (!chosen) throw new AppError('RDC_CAPTURE_NOT_APPROVED', 'input is not in the approved plan.');
     const destination = { inputId, contentSha256: chosen.contentSha256, deviceId: this.input.captureScope.deviceId };
@@ -130,8 +167,10 @@ export class ApprovedCaptureController {
     return this.restoreError;
   }
 
-  assertLiveAccess(): void {
-    this.assertReady();
+  /** Live capture work is admitted only on a healthy lease; a quarantined one first needs capture_recover. */
+  assertLiveAccess(recovers = false): void {
+    if (recovers) this.assertReady();
+    else this.assertRecovered();
   }
 
   /** The signed entry point belongs only to the approved owning General turn. */
@@ -156,16 +195,24 @@ export class ApprovedCaptureController {
   /** Close the durable recovery record only after the final user position is observed. */
   async recordTerminalRestoration(signal?: AbortSignal): Promise<boolean> {
     if (!this.baseline || this.original === undefined || this.initialError) return false;
-    this.assertReady();
+    this.assertRecovered();
     this.input.host.assertPlan();
     const observed = await this.input.host.snapshot(this.current().binding, signal);
     if (!sameRdcLifecyclePosition(observed, this.original)) return false;
-    this.input.host.writeReceipt({ ...this.base(randomUUID()), event: 'resolved', baseline: this.baseline, observed });
+    // An adopted baseline is closed under the turn that signed it, as the user's own restore does.
+    const turnId = this.adoptedBaselineTurnId ?? this.input.turn.turnId;
+    this.input.host.writeReceipt({
+      ...this.base(randomUUID()),
+      turnId,
+      event: 'resolved',
+      baseline: this.baseline,
+      observed,
+    });
     return true;
   }
 
   async restorationStatus(signal?: AbortSignal) {
-    this.assertReady();
+    this.assertRecovered();
     this.input.host.assertPlan();
     const current = await this.input.host.snapshot(this.current().binding, signal);
     this.lastVerified = current;
@@ -192,7 +239,7 @@ export class ApprovedCaptureController {
   private async restorePosition(
     signal?: AbortSignal,
   ): Promise<{ changed: boolean; receipt?: InvestigationContentRef }> {
-    this.assertReady();
+    this.assertRecovered();
     this.input.host.assertPlan();
     const from = await this.input.host.snapshot(this.current().binding, signal);
     this.lastVerified = from;
@@ -386,6 +433,7 @@ export class ApprovedCaptureController {
         };
       this.input.turn.runtimeEpochs.push(epoch);
       this.lastVerified = to;
+      this.pendingRecovery = false;
       return { changed: true, receipt, current: to };
     } catch (error) {
       this.fail(intent, base, from, error, true);
@@ -526,10 +574,19 @@ export class ApprovedCaptureController {
       throw new AppError('RDC_REPREPARE_FROZEN_PLAN_CHANGED', 'prepared turn is missing.');
     return { plan, prompt, binding };
   }
+  /** Ready, and the owning lease is not waiting for capture_recover. */
+  private assertRecovered(): void {
+    this.assertReady();
+    if (this.pendingRecovery || this.input.host.quarantinedContext())
+      throw new AppError('RDC_CONTEXT_QUARANTINED', 'recover the capture with capture_recover first.');
+  }
   private assertReady(): void {
     if (this.initialError || this.original === undefined)
       throw new AppError('RDC_INITIAL_STATE_UNVERIFIED', this.initialError ?? 'initial state was not recorded');
     if (!this.input.turn.isLive(this.input.turn.generation)) throw new AppError('RDC_TURN_NOT_ACTIVE');
+  }
+  private planHash(): string {
+    return this.input.planHash.replace(/^sha256:/u, '');
   }
   private base(operationId: string) {
     return {
@@ -538,7 +595,7 @@ export class ApprovedCaptureController {
       turnId: this.input.turn.turnId,
       operationId,
       planUri: this.input.planUri,
-      planHash: this.input.planHash.replace(/^sha256:/u, ''),
+      planHash: this.planHash(),
       recordedAt: Date.now(),
     };
   }

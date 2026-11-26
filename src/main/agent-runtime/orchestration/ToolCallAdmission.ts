@@ -173,7 +173,7 @@ export function captureAccessDenial(call: ValidatedToolCall, activeTurn: TurnHan
   const captureControl = activeTurn?.captureControl;
   if (captureControl && capture.live(call.args)) {
     try {
-      captureControl.assertLiveAccess();
+      captureControl.assertLiveAccess(capture.recovers?.(call.args) === true);
     } catch (error) {
       return error instanceof Error ? error.message : String(error);
     }

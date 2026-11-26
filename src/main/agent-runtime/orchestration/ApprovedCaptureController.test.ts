@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { bindRdcTurn, freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
+import { bindRdcTurn, freezeRdcTurnBinding, getRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { noteRdcProcessIdentity } from '../../rdc/RdcProcessIdentity';
 import { TurnHandle } from './TurnCoordinator';
 import { ApprovedCaptureController, type ApprovedCaptureHost } from './ApprovedCaptureController';
@@ -46,11 +46,13 @@ function fixture() {
   const firstBinding = freezeRdcTurnBinding(cli, [], null);
   bindRdcTurn(turn.runtimePlan, firstBinding);
   let current: RdcLifecyclePoint | null = point('a', 42);
+  let quarantined: { contextId: string; leaseVersion: number } | null = null;
   let sequence = 1;
   const receipts: RdcLifecycleReceipt[] = [];
   const host: ApprovedCaptureHost = {
     assertPlan: vi.fn(),
-    assertNoPendingRecovery: vi.fn(),
+    pendingRecord: vi.fn(() => null),
+    quarantinedContext: vi.fn(() => quarantined),
     prepareReceipts: vi.fn(),
     quiescent: vi.fn(async () => {}),
     snapshot: vi.fn(async () => (current ? structuredClone(current) : null)),
@@ -64,7 +66,10 @@ function fixture() {
       current = null;
     }),
     restorePosition: vi.fn(async (original) => {
-      current = structuredClone(original);
+      // Moving the position keeps the replay's own native identity.
+      current = current
+        ? { ...structuredClone(original), native: { ...current.native, eventId: original.native.eventId } }
+        : structuredClone(original);
     }),
     recoveryGuard: vi.fn(() => () => {}),
     joinRecoveryChild: vi.fn(async () => {}),
@@ -80,6 +85,7 @@ function fixture() {
     })) as ApprovedCaptureHost['inspectRecovery'],
     reopenAfterFailure: vi.fn(async (destination, _binding, _signal, onStopped) => {
       if (current) onStopped(current.native.contextId);
+      quarantined = null;
       current = point(destination.inputId, 9);
       current.native.contextId += '-reopened';
       current.native.leaseVersion += 10;
@@ -123,6 +129,9 @@ function fixture() {
     receipts,
     setCurrent: (value: RdcLifecyclePoint | null) => {
       current = value;
+    },
+    quarantine: (value: { contextId: string; leaseVersion: number } | null) => {
+      quarantined = value;
     },
   };
 }
@@ -363,13 +372,86 @@ it('does not reopen when the permission or verification guard fails', async () =
 
 it('blocks live RDC access if an earlier saved position remains unresolved', async () => {
   const f = fixture();
-  vi.mocked(f.host.assertNoPendingRecovery).mockImplementationOnce(() => {
-    throw new Error('RDC_PREVIOUS_RESTORE_REQUIRED');
-  });
+  vi.mocked(f.host.pendingRecord).mockReturnValue(pendingRecord('session://plans/other.md'));
   await f.controller.initialize();
   expect(() => f.controller.assertLiveAccess()).toThrow('RDC_PREVIOUS_RESTORE_REQUIRED');
   expect(f.host.snapshot).not.toHaveBeenCalled();
   expect(f.receipts).toHaveLength(0);
+});
+
+function pendingRecord(planUri = 'session://plans/p.md') {
+  const original = point('a', 42);
+  return {
+    baseline: {
+      event: 'baseline' as const,
+      sessionId: 's',
+      projectId: 'p',
+      turnId: 'earlier-turn',
+      operationId: 'op',
+      planUri,
+      planHash: 'f'.repeat(64),
+      recordedAt: 1,
+      original,
+    },
+    ref: { uri: 'session://tool-outputs/earlier.json', expectedHash: `sha256:${'b'.repeat(64)}` },
+    count: 1,
+    identities: [],
+    latest: point('a', 7),
+  };
+}
+
+it('lets a quarantined lease recover first, then restores the entry position on the new lease', async () => {
+  const f = fixture();
+  await f.controller.initialize();
+  f.quarantine({ contextId: 'context-a', leaseVersion: 1 });
+  await expect(f.controller.restore()).rejects.toThrow('RDC_CONTEXT_QUARANTINED');
+  expect(() => f.controller.assertLiveAccess()).toThrow('RDC_CONTEXT_QUARANTINED');
+  expect(() => f.controller.assertLiveAccess(true)).not.toThrow();
+  await f.controller.prepareRecovery(1);
+  await f.controller.recover();
+  expect(await f.controller.restore()).toMatchObject({ changed: true });
+  const [restored, binding] = vi.mocked(f.host.restorePosition).mock.calls.at(-1)!;
+  expect(restored.native.eventId).toBe(42);
+  expect(binding).toBe(getRdcTurnBinding(f.turn.runtimePlan!));
+  expect(f.receipts.at(-1)).toMatchObject({
+    event: 'position-restored',
+    from: { native: { contextId: 'context-a-reopened' } },
+  });
+});
+
+it('continues an earlier unresolved chain when a new turn meets its quarantined lease', async () => {
+  const f = fixture();
+  f.quarantine({ contextId: 'context-a', leaseVersion: 1 });
+  vi.mocked(f.host.pendingRecord).mockReturnValue(pendingRecord());
+  await f.controller.initialize();
+  expect(f.host.snapshot).not.toHaveBeenCalled();
+  expect(() => f.controller.assertLiveAccess()).toThrow('RDC_CONTEXT_QUARANTINED');
+  const owner = { sessionId: 's', projectId: 'p', turnId: 't', agentId: 'general', accessCeiling: 'full' } as const;
+  expect(f.controller.restorationBaselineFor(owner)).toMatchObject({
+    available: true,
+    original: { native: { eventId: 42 } },
+    receipt: { uri: 'session://tool-outputs/earlier.json' },
+  });
+  await f.controller.prepareRecovery(1);
+  await f.controller.recover();
+  expect(f.host.inspectRecovery).toHaveBeenCalledWith(
+    expect.objectContaining({ native: expect.objectContaining({ contextId: 'context-a', eventId: 7 }) }),
+    expect.anything(),
+    undefined,
+  );
+  expect(f.receipts.map((value) => [value.event, value.turnId])).toEqual([
+    ['intent', 't'],
+    ['daemon-stopped', 't'],
+    ['transition', 't'],
+  ]);
+  expect(() => f.controller.assertLiveAccess()).not.toThrow();
+  await f.controller.restore();
+  expect(await f.controller.recordTerminalRestoration()).toBe(true);
+  expect(f.receipts.at(-1)).toMatchObject({
+    event: 'resolved',
+    turnId: 'earlier-turn',
+    baseline: { uri: 'session://tool-outputs/earlier.json' },
+  });
 });
 
 it('recovers from the latest process identity a successful result reported, not the turn-start snapshot', async () => {

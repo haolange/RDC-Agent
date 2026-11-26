@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
+import { probeProcess } from '../platform/process';
 import { verifyPlanInput } from './prepareInvestigationPlan';
 import { rdcSessionService } from './RdcSessionService';
 import { replayDeviceService } from './captures/ReplayDeviceService';
@@ -305,12 +306,9 @@ function assertPriorProcessesReleased(
     throw new AppError('RDC_RECOVERY_OLD_OWNER_UNCONFIRMED');
   for (const identity of pending.identities) {
     if (identity.stopped || identity.contextId === currentContext) continue;
+    // pid + birth: a reused pid is a different process, and an unreadable identity is never proof of exit.
     for (const birth of [identity.processIdentity.daemon, identity.processIdentity.worker]) {
-      try {
-        process.kill(birth.pid, 0);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ESRCH') continue;
-      }
+      if (probeProcess({ pid: birth.pid, birth: birth.start_generation }) === 'exited') continue;
       throw new AppError('RDC_RECOVERY_OLD_PROCESS_UNCONFIRMED', 'an earlier daemon or worker may still be alive.');
     }
   }
