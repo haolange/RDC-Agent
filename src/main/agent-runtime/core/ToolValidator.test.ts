@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { toolToDefinition } from '../agent/AgentTool';
-import { getPrimitiveTools, createToolSearchTool } from '../tools';
 import { ToolValidationError, ToolValidator } from './ToolValidator';
 import type { ToolDefinition } from './types';
 
@@ -175,21 +173,6 @@ describe('ToolValidator', () => {
     expect(() => validator.validate(tool, { kind: 'other', n: 2 })).toThrow(/const/);
     expect(() => validator.validate(tool, { kind: 'fixed', n: 0 })).toThrow(/不得小于/);
     expect(() => validator.validate(tool, { kind: 'fixed', n: 4 })).toThrow(/不得大于/);
-  });
-
-  it('compiles every builtin primitive and tool_search schema', () => {
-    const tools = [
-      ...getPrimitiveTools(),
-      createToolSearchTool(() => []),
-    ];
-    for (const tool of tools) {
-      try {
-        validator.validate(toolToDefinition(tool), {});
-      } catch (error) {
-        expect(error, tool.name).toBeInstanceOf(ToolValidationError);
-        expect((error as Error).message, tool.name).not.toMatch(/不支持的 schema 关键字/);
-      }
-    }
   });
 });
 

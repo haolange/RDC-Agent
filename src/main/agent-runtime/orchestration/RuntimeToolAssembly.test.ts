@@ -56,6 +56,7 @@ import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist } from './
 import { resolveAgentToolAllowlistFromDefinition } from './RuntimeToolPolicy';
 import type { SkillLoadResult } from '../../settings/agent-manifests/agentRuntimeTypes';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
+import type { AgentTool } from '../agent/AgentTool';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
 
 function createAssembly(): RuntimeToolAssembly {
@@ -240,6 +241,23 @@ describe('RuntimeToolAssembly', () => {
     expect(allowed.details).toMatchObject({ matches: [{ name: 'artifact_read' }] });
     expect(resolved!.toolMap.has('read_file')).toBe(intersection === null);
   }, 15_000);
+
+  it('compiles every built-in tool when the tool set is assembled and fails on a keyword the validator cannot enforce', () => {
+    const resolved = createAssembly().resolveRuntimeTools('general', ['*'], 'schema-session');
+    expect(resolved.toolMap.size).toBeGreaterThan(20);
+    const unsupported = { name: 'format_probe', description: 'probe', parameters: { type: 'object', properties: { url: { type: 'string', format: 'uri' } } },
+      spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
+      execute: async () => ({ content: [] }) } as unknown as AgentTool;
+    const assembly = new RuntimeToolAssembly({
+      mcp: { getConnectedTools: () => [], getAgentTools: () => [], getMcpServerStatusSummary: () => [] } as unknown as McpConnectionCoordinator,
+      memory: { memoryStore: () => ({}) as never },
+      activeTurns: { getActiveTurn: () => null },
+      subagentTools: { createSubagentTools: () => [unsupported] },
+    });
+    // The tool is not even allowed for this turn: a built-in definition the validator cannot enforce fails the assembly.
+    expect(() => assembly.resolveRuntimeTools('general', ['read_file'], 'schema-session'))
+      .toThrow(/\[format_probe\] parameters\.properties\.url: 不支持的 schema 关键字 "format"/);
+  });
 
   it('validates structured completion through the actual executor schema boundary', async () => {
     const turn = { completionDeclaration: undefined } as unknown as TurnHandle;

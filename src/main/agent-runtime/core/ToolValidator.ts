@@ -152,8 +152,14 @@ function assertSupportedSchema(
  * - Strict subset: type/required/properties/items/enum/const/min-max/pattern; undeclared fields rejected by default.
  * - Compile-time reject any keyword outside SUPPORTED_SCHEMA_KEYS.
  * - Non-safe fields may coerce mildly; path/command/URL stay fail-closed exact types.
+ *
+ * A schema is compiled once and remembered by object identity: built-in tools when the runtime tool set is
+ * assembled (RuntimeToolAssembly), MCP tools when their server connects (compileMcpInputSchema). `validate` only
+ * walks a schema it has not seen before.
  */
 export class ToolValidator {
+  private readonly compiled = new WeakSet<JsonSchema>();
+
   /**
    * 校验并强转一组参数。
    *
@@ -165,7 +171,7 @@ export class ToolValidator {
     args: Record<string, unknown>,
   ): Record<string, unknown> {
     const schema = toolDef.parameters;
-    assertSupportedSchema(schema, 'parameters', toolDef.name);
+    this.assertCompilable(schema, toolDef.name);
     const validated = this.validateValue(args, schema, 'args', toolDef.name, false, 0);
     if (validated === null || typeof validated !== 'object' || Array.isArray(validated)) {
       throw new ToolValidationError('参数必须是对象', 'args', toolDef.name);
@@ -173,9 +179,11 @@ export class ToolValidator {
     return validated as Record<string, unknown>;
   }
 
-  /** Checks a schema once, when a tool is registered; a schema outside the supported keywords fails here. */
+  /** Compiles a schema once, when its tool is registered; a schema outside the supported keywords fails here. */
   assertCompilable(schema: JsonSchema, toolName: string): void {
+    if (this.compiled.has(schema)) return;
     assertSupportedSchema(schema, 'parameters', toolName);
+    this.compiled.add(schema);
   }
 
   /**

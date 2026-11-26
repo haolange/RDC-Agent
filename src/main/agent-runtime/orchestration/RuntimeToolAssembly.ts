@@ -7,6 +7,7 @@ import { AppError } from '@shared/errors/appError';
 import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
 import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from '../tasks/taskExecutionSchemas';
 import { toolToDefinition } from '../agent/AgentTool';
+import { toolValidator } from '../core/ToolValidator';
 import { createToolSearchTool, getPrimitiveTools } from '../tools';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../tasks';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
@@ -235,6 +236,10 @@ export class RuntimeToolAssembly implements RuntimeToolResolver, RuntimeToolPoli
       if (excludeSubagent && normalizeToolName(tool.name) === 'subagent') continue;
       availableTools.set(normalizeToolName(tool.name), tool);
     }
+    // The built-in tool set is complete here. Each schema compiles once (ToolValidator remembers it), so a keyword
+    // the validator cannot enforce fails this assembly instead of every call; MCP schemas compiled when their server
+    // connected.
+    for (const tool of availableTools.values()) toolValidator.assertCompilable(tool.parameters, tool.name);
     for (const tool of this.deps.mcp.getAgentTools(
       projectRootPath ?? turnHandle?.eventSink?.projectRootPath ?? null,
       mcpPoolKey ?? null,
@@ -249,6 +254,7 @@ export class RuntimeToolAssembly implements RuntimeToolResolver, RuntimeToolPoli
         && this.isAllowedForRuntime(agentId, tool.name, toolAllowlist, excludeRdcLeaseTools),
       ),
     );
+    toolValidator.assertCompilable(toolSearchTool.parameters, toolSearchTool.name);
     availableTools.set(normalizeToolName(toolSearchTool.name), toolSearchTool);
 
     const definitions: ToolDefinition[] = [];

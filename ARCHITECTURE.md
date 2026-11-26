@@ -174,7 +174,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
   - 支持 `oneOf` / `anyOf` / `allOf` / `not`、类型数组、`additionalProperties`（布尔或 schema）、数值与数组的边界约束；schema 的深度、节点数、对象键与数组项都有上限。
   - 声明了 `properties` 而省略 `additionalProperties` 时拒绝未声明字段；缺省字段按 `default` 补齐。路径、命令、URL 类参数不做类型转换，其他字段只允许温和转换。
   - 白名单外的关键字 fail-closed。MCP 工具在连接时经 `compileMcpInputSchema`（去注解、内联本地 `$ref`）编译一次，编译不过的工具不提供给模型，并在服务器状态 `unavailableTools` 中写明 `MCP_TOOL_SCHEMA_UNSUPPORTED`。
-  - 内置工具没有注册期编译：每次调用的 `validate` 先检查 schema 再校验参数，不支持的关键字使该工具的每次调用失败；`ToolValidator.test.ts` 编译全部内置 primitive 与 `tool_search` 的 schema。
+  - schema 只编译一次，`ToolValidator` 按 schema 对象身份记住已编译的 schema：内置工具在 `RuntimeToolAssembly.resolveRuntimeTools` 装配工具集时编译（含 `tool_search`，不论本轮是否放行该工具），不支持的关键字使装配失败；MCP 工具在连接时编译。`validate` 只对没见过的 schema 先编译再校验，已编译的不再重走。`RuntimeToolAssembly.test.ts` 装配全部内置工具，并验证带不支持关键字的内置工具在装配时失败。
   - 准入（`validateToolArguments`）在权限与人工审批之前执行：参数文本不是 JSON 对象为 `TOOL_ARGUMENTS_INVALID`；schema 或工具自身 `validateArgs` 不通过为 `TOOL_SCHEMA_VIOLATION`，无效请求不展示审批。
 - **输出通道**：`ProviderOutputRef` 一经声明永久归属 `thinking` | `text` | `tool_call` 之一。
   - ref 承载 provider 侧 block 身份，已关闭的 block 不复用，多 part / 多 item 映射到不同 ref；普通 assistant text 永不合成 thinking。
