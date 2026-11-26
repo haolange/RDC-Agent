@@ -243,6 +243,35 @@ const NODE_BUILTINS = [
 ];
 const mainTestFiles = ['src/main/**/*.test.ts', 'src/main/testing/**'];
 
+// No file-level import cycle in production code (ARCHITECTURE.md Verification Gate): import/no-cycle follows value
+// imports (type-only imports carry no runtime edge) through relative paths and the tsconfig aliases, resolved by
+// scripts/lib/eslint-import-resolver.cjs. IMPORT_CYCLE_PENDING names the files still on a cycle and why; the list only
+// shrinks, and scripts/check-import-cycles.mjs fails while a listed file is off every cycle, gone or outside the rule.
+export const importCycleLint = {
+  ...productionCode,
+  settings: {
+    'import/extensions': ['.ts', '.tsx', '.js', '.mjs'],
+    'import/parsers': { '@typescript-eslint/parser': ['.ts', '.tsx'] },
+    'import/resolver': { [path.join(import.meta.dirname, 'scripts/lib/eslint-import-resolver.cjs')]: {} },
+  },
+  rules: { 'import/no-cycle': 'error' },
+};
+export const IMPORT_CYCLE_PENDING = {
+  ...Object.fromEntries(
+    [
+      'src/renderer/features/transcript/SubagentRow.tsx',
+      'src/renderer/features/transcript/SubagentRowBody.tsx',
+      'src/renderer/features/transcript/WorkProcessContent.tsx',
+      'src/renderer/features/transcript/workProcessRowRenderer.tsx',
+    ].map((file) => [
+      file,
+      'A subagent row nests the work process rows of its delegated run, and that row renderer renders subagent ' +
+        'rows again; breaking the loop means handing the nested renderer down instead of importing it, in the ' +
+        'transcript restructuring (plan 6.5)',
+    ]),
+  ),
+};
+
 // One typed program for all of src (src/tsconfig.lint.json, read only by ESLint): the repository settings plus
 // noUncheckedIndexedAccess, so a lookup that can miss stays guarded. Every typed rule below uses it, so no file is
 // parsed by two TypeScript programs.
@@ -535,6 +564,10 @@ export default [
   {
     ...typedLint,
     ignores: [...typedLint.ignores, ...Object.keys(UNNECESSARY_CONDITION_PENDING)],
+  },
+  {
+    ...importCycleLint,
+    ignores: [...importCycleLint.ignores, ...Object.keys(IMPORT_CYCLE_PENDING)],
   },
   {
     files: testSources,

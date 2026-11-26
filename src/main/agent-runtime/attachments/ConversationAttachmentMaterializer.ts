@@ -21,7 +21,7 @@ import type { UserMessage } from '../core/types';
 import type { FrozenAttachmentManifestEntry } from '../orchestration/orchestratorTypes';
 import type { MaterialContext } from '@shared/types/materialContext';
 
-export { MAX_ATTACHMENT_BYTES_PER_FILE, MAX_ATTACHMENT_COUNT, MAX_ATTACHMENT_TOTAL_BYTES, detectImageMagicMime };
+export { detectImageMagicMime };
 
 export type AgentInputAttachment = {
   material?: import('@shared/types/materialContext').MaterialContext;

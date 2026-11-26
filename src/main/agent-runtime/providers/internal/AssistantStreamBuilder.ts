@@ -1,5 +1,5 @@
-import { AppError } from '@shared/errors/appError';
 import { z, type ZodType } from 'zod';
+import { AppError } from '@shared/errors/appError';
 import {
   appendThinkingText,
   createThinkingContent,

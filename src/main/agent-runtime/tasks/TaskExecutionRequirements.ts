@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
+import { z } from 'zod';
 import { TaskExecutionPreparationSchema, type TaskExecutionPreparation } from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
-import { z } from 'zod';
 import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
 import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
 import type { TaskIndependentSource } from './taskExecutionSchemas';

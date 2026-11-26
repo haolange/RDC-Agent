@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parse as parseYaml } from 'yaml';
 import {
   KNOWLEDGE_CARD_TYPES,
   KNOWLEDGE_CASE_CHAPTERS,
@@ -13,7 +14,6 @@ import {
   type KnowledgeRelation,
   type KnowledgeScope,
 } from '@shared/types/knowledge';
-import { parse as parseYaml } from 'yaml';
 import { sanitizeKnowledgeImages } from './knowledgeImages';
 
 const optionalString = z.string().trim().min(1).optional();

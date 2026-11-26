@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { AppError } from '@shared/errors/appError';
 import Ajv, { type ErrorObject, type Options, type ValidateFunction } from 'ajv';
 import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
+import { AppError } from '@shared/errors/appError';
 import { canonicalJson } from '../../rdc/RdcOperationCatalog';
 import type AjvCore from 'ajv/dist/core';
 import type { JsonSchema, ToolDefinition } from './types';

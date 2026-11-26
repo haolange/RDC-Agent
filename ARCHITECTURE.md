@@ -384,6 +384,8 @@ import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
 
 **函数体量**由 ESLint `max-lines-per-function` / `complexity` / `max-params` 执行：生产函数不超过 150 行（不计空行与注释）、圈复杂度 40、6 个参数（`scripts/function-budgets.json`）。超出的文件逐个按实测最大值封顶，`check:function-budgets` 保证这些条目只减不增。
 
+**import 环**由 ESLint `import/no-cycle` 执行：生产代码没有文件级的值 import 环（`import type` 不计）。仍在环上的文件列在 `eslint.config.mjs` 的 `IMPORT_CYCLE_PENDING`，`check:import-cycles` 保证清单只减不增。
+
 **CI**（`.github/workflows/ci.yml`）：
 
 | Job | 内容 |

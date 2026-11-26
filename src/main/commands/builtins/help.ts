@@ -1,13 +1,13 @@
 /**
  * /help — 列出所有可用命令或查看某个命令的详情。
  */
-import { getRegistry } from '..';
 import { commandText } from '../commandI18n';
-import type { CommandDefinition } from '../CommandRegistry';
+import type { CommandDefinition, CommandRegistry } from '../CommandRegistry';
 
 const categoryLabel = (category: CommandDefinition['category']) => commandText(`category.${category}`);
 
-export const helpCommand: CommandDefinition = {
+/** The registry is handed in by the one that registers this command, so the command never imports its registrar. */
+export const createHelpCommand = (registry: CommandRegistry): CommandDefinition => ({
   id: 'help',
   name: 'help',
   descriptionKey: 'help.description',
@@ -15,7 +15,6 @@ export const helpCommand: CommandDefinition = {
   category: 'system',
 
   async execute(args) {
-    const registry = getRegistry();
     if (args.length > 0) {
       const cmd = registry.resolve(args[0]);
       if (!cmd) return { success: false, message: commandText('help.unknown', { name: args[0] }) };
@@ -40,4 +39,4 @@ export const helpCommand: CommandDefinition = {
     output += commandText('help.footer');
     return { success: true, message: output };
   },
-};
+});
