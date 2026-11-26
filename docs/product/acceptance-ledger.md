@@ -1,5 +1,13 @@
 # Acceptance Ledger
 
+## 2026-11-27：长任务可靠性收口（无进展预算、身份链恢复、账本、去版本号；云端 Linux，无设备与模型账号）
+
+- 提交：`23acf17a0fa72f6865ec838ed07432bf661a2de0`（RDC-Agent，配对 RDC-Tool 1.2.0 `b2aefbf186c96346c6ff85b4470676e9677cb3e3`）
+- 结果：RDC-Agent typecheck、lint、`check:gates`、`test:coverage`（4205 用例）与 `test:coverage:renderer`（1025 用例）均通过且覆盖率底线 OK，`build` 通过；RDC-Tool 全量 1402 通过，另 3 个失败为 Git-LFS 二进制缺失导致，与改动前一致。
+- 结果：卡死、取消、心跳间隙、worker 被换后的身份链分类与自动重建、持久化重试次数由假 CLI 帧与受控 fixture 覆盖；RDC-Tool 用持有 GIL 的真实子进程验证了调用栈转储、树杀与结构化错误。
+- 证据：本地：`pnpm run typecheck && pnpm run lint && pnpm run check:gates && pnpm run test:coverage && pnpm run test:coverage:renderer && pnpm run build`
+- 人工介入：无。真实 RenderDoc 回放、Android 设备、Windows 进程树行为与真实模型流仍待实机验证。
+
 ## 2026-11-26：上次启动诊断与本地崩溃文件（云端 Linux，headless 显式 userData）
 
 - 提交：`d27182daab9ad5a4b23a70a470ac483b7c6888a4`（PF4 起点构建，PF5 只追加 renderer 崩溃策略与文档）
