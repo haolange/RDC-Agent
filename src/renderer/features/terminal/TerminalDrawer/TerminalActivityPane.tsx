@@ -4,7 +4,8 @@ import { useDynStyle } from '../../../lib/useDynStyle';
 import { Button } from '../../../ui/Button';
 import { EmptyState } from '../../../ui/EmptyState';
 import { Skeleton } from '../../../ui/Skeleton';
-import { formatRaw, formatTimestamp, formatShortId } from './terminalFormatters';
+import { formatLogTime } from '../../../lib/formatTime';
+import { formatRaw, formatShortId } from './terminalFormatters';
 import {
   TERMINAL_ENTRY_ESTIMATE,
   TERMINAL_WINDOW_OVERSCAN,
@@ -135,7 +136,7 @@ interface TerminalLogEntryProps {
 }
 
 const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({ entry, isExpanded, onToggle, onCopy, copyLabel }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   return (
     <article
       className={`runtime-terminal-entry severity-${entry.severity} ${isExpanded ? 'expanded' : ''}`}
@@ -148,7 +149,7 @@ const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({ entry, isExpanded, 
           aria-label={t(SEVERITY_LABEL_KEYS[entry.severity])}
           data-tooltip={t(SEVERITY_LABEL_KEYS[entry.severity])}
         />
-        <span className="runtime-terminal-entry-time">{formatTimestamp(entry.timestamp)}</span>
+        <span className="runtime-terminal-entry-time">{formatLogTime(language, entry.timestamp)}</span>
         <span className="runtime-terminal-entry-title">{entry.title}</span>
         <span className="runtime-terminal-entry-summary">{entry.summary}</span>
       </button>

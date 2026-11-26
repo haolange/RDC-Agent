@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { formatClockTime, formatDateTime, formatDuration } from './formatTime';
+import { formatClockTime, formatDateTime, formatDuration, formatLogTime } from './formatTime';
 
 it('keeps the English shapes and formats other languages with their own units and date order', () => {
   expect([850, 1_240, 59_940, 185_000].map((ms) => formatDuration('en', ms))).toEqual([
@@ -22,6 +22,8 @@ it('keeps the English shapes and formats other languages with their own units an
   expect(formatClockTime('en', morning)).toBe('09:05');
   expect(formatClockTime('zh-CN', morning)).toBe('09:05');
   expect(formatClockTime('en', 0)).toBe('');
+  expect(formatLogTime('en', morning + 7_000)).toBe('09:05:07');
+  expect(formatLogTime('zh-CN', morning + 7_000)).toBe('09:05:07');
   expect(formatDateTime('zh-CN', morning)).toBe('2026/11/25 09:05');
   expect(formatDateTime('en', morning)).toBe('11/25/2026, 09:05');
   expect(formatDateTime('en', undefined)).toBe('');

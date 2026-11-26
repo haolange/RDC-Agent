@@ -43,6 +43,15 @@ export function formatClockTime(language: AppLanguage, epoch: number): string {
   ).format(epoch);
 }
 
+/** Hours, minutes and seconds on a 24-hour clock, the time a runtime log entry was recorded. */
+export function formatLogTime(language: AppLanguage, epoch: number): string {
+  return cached(
+    `${language}:log-clock`,
+    () =>
+      new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }),
+  ).format(epoch);
+}
+
 /** A calendar date with the time of day, for records such as knowledge cards and index builds. */
 export function formatDateTime(language: AppLanguage, epoch: number | undefined): string {
   if (epoch == null || !Number.isFinite(epoch)) return '';

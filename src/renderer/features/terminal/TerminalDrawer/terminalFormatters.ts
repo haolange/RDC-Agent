@@ -2,13 +2,6 @@ import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 
 export const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
-export const formatTimestamp = (timestamp: number): string =>
-  new Date(timestamp).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-
 export const formatRaw = (value: RuntimeLogEntry['raw']): string => {
   if (value == null) {
     return '';
