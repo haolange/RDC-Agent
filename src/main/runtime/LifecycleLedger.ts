@@ -3,7 +3,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
-import { PREVIOUS_INSTANCE_CLASSIFICATIONS, SHUTDOWN_CAUSES, TURN_STOP_CAUSES } from '@shared/types/lifecycle';
+import {
+  PREVIOUS_INSTANCE_CLASSIFICATIONS,
+  RENDERER_RECOVERY_ACTIONS,
+  SHUTDOWN_CAUSES,
+  TURN_STOP_CAUSES,
+} from '@shared/types/lifecycle';
 import { SHUTDOWN_PHASE_ORDER } from '../lifecycle/ShutdownCoordinator';
 import { renameWithRetrySync, syncDirectorySync } from '../platform/fileRename';
 import { appPathService } from './AppPathService';
@@ -58,6 +63,7 @@ export function goneProcessKind(type: string): GoneProcessKind {
 }
 
 const id = z.string().min(1);
+const FAULT_KINDS = ['uncaughtException', 'unhandledRejection', 'renderer-exception'] as const;
 const header = { at: z.iso.datetime(), instanceId: id };
 
 /**
@@ -99,6 +105,12 @@ export const LifecycleRecordSchema = z.union([
   }),
   z.strictObject({
     ...header,
+    kind: z.literal('renderer_recovery'),
+    action: z.enum(RENDERER_RECOVERY_ACTIONS),
+    reason: id,
+  }),
+  z.strictObject({
+    ...header,
     kind: z.literal('worker_thread_exited'),
     worker: z.enum(['turn-preparation', 'grep-regex']),
     reason: z.enum(['error', 'exit']),
@@ -116,7 +128,7 @@ export const LifecycleRecordSchema = z.union([
   z.strictObject({
     ...header,
     kind: z.literal('fault'),
-    fault: z.enum(['uncaughtException', 'unhandledRejection']),
+    fault: z.enum(FAULT_KINDS),
     message: z.string(),
     stack: z.string().optional(),
     stackHash: z.string().regex(/^[0-9a-f]{16}$/),
@@ -243,7 +255,7 @@ export class LifecycleLedger {
   }
 
   /** An uncaught fault: its message and stack, bounded, scrubbed and fingerprinted by the scrubbed stack. */
-  recordFault(fault: 'uncaughtException' | 'unhandledRejection', error: unknown): boolean {
+  recordFault(fault: (typeof FAULT_KINDS)[number], error: unknown): boolean {
     const message = this.scrubText(error instanceof Error ? error.message : String(error)).slice(0, MAX_MESSAGE_CHARS);
     const stack = error instanceof Error && error.stack ? this.scrubText(error.stack).slice(0, MAX_STACK_CHARS) : '';
     const stackHash = createHash('sha256')

@@ -57,7 +57,7 @@ describe('ShutdownCoordinator', () => {
 
     expect(coordinator.getPhase()).toBe('running');
     const first = coordinator.shutdownAll(1_000, { cause: 'window-close' });
-    const second = coordinator.shutdownAll(1_000, { cause: 'SIGTERM' });
+    const second = coordinator.shutdownAll(1_000, { cause: 'update' });
     await Promise.all([first, second]);
 
     expect(phases).toEqual([
@@ -81,7 +81,7 @@ describe('ShutdownCoordinator', () => {
       coordinator.register({ id: 'slow', phase: 'join_producers', dispose: () => new Promise<void>(() => {}) });
 
       void coordinator.shutdownAll(50, {
-        cause: 'SIGINT',
+        cause: 'window-close',
         forceExit,
         observer: {
           began: (cause) => events.push(['began', cause]),
@@ -92,7 +92,7 @@ describe('ShutdownCoordinator', () => {
       await vi.advanceTimersByTimeAsync(60);
 
       expect(events).toEqual([
-        ['began', 'SIGINT'],
+        ['began', 'window-close'],
         ['timed-out', 'join_producers', ['slow']],
         ['finished', true],
         'force-exit',

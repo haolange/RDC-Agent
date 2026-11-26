@@ -20,6 +20,7 @@ export const RENDERER_INVOKE_CHANNEL_TABLE = {
   'app:readClipboardText': 'read',
   'app:getCrashFiles': 'read',
   'app:clearCrashFiles': 'mutation',
+  'app:reportRendererFault': 'mutation',
   'web:resolveFavicon': 'desktop-only',
   'web:fetchImage': 'desktop-only',
   'dialog:selectFiles': 'mutation',

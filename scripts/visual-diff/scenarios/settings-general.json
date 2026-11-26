@@ -25,10 +25,10 @@
  "responses": {
   "settings:get": [
    {
-    "ref": "418c435f80d076ecebf6dbba"
+    "ref": "0ea6a783732037adc43d63c6"
    },
    {
-    "ref": "418c435f80d076ecebf6dbba"
+    "ref": "0ea6a783732037adc43d63c6"
    }
   ],
   "app:getMeta": [
@@ -36,13 +36,9 @@
     "result": {
      "version": "0.6.0-rc.8",
      "productName": "rdc-agent",
-     "systemTheme": "light"
+     "systemTheme": "light",
+     "previousInstance": null
     }
-   }
-  ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "runtimeLog:list": [
@@ -50,8 +46,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-47718ecb0147-1795700751498",
-       "timestamp": 1795700751498,
+       "id": "rlog-90ea20412f7e-1795706327079",
+       "timestamp": 1795706327079,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -65,8 +61,8 @@
        }
       },
       {
-       "id": "rlog-0b19b4af8bd7-1795700751545",
-       "timestamp": 1795700751545,
+       "id": "rlog-306210524e02-1795706327128",
+       "timestamp": 1795706327128,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -78,8 +74,8 @@
        "raw": null
       },
       {
-       "id": "rlog-62488b614c24-1795700751546",
-       "timestamp": 1795700751546,
+       "id": "rlog-47bf002233dd-1795706327129",
+       "timestamp": 1795706327129,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -91,8 +87,8 @@
        "raw": null
       },
       {
-       "id": "rlog-97c0ede587f0-1795700751560",
-       "timestamp": 1795700751560,
+       "id": "rlog-3182c161c372-1795706327145",
+       "timestamp": 1795706327145,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -116,6 +112,11 @@
      "mode": "default",
      "revision": 1
     }
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "device:list": [
@@ -144,9 +145,17 @@
     }
    }
   ],
+  "app:getCrashFiles": [
+   {
+    "result": {
+     "count": 0,
+     "bytes": 0
+    }
+   }
+  ],
   "rdc-runtime:overview": [
    {
-    "ref": "bdfd64b4712d2fc1d2fd0613"
+    "ref": "a9182166798061541b59be50"
    }
   ]
  }

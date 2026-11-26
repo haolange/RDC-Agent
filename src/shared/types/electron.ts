@@ -91,7 +91,7 @@ import type { MCPServerStatusSummary } from './mcp';
 import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
 import type { TraceProjectionChangedPayload } from './agenticTrace';
 import type { TraceSessionResult } from './trace';
-import type { CrashFilesSummary, PreviousInstanceNotice } from './lifecycle';
+import type { CrashFilesSummary, PreviousInstanceNotice, RendererFaultReport } from './lifecycle';
 import type {
   HookEvent,
   RdcRuntimeOverview,
@@ -203,6 +203,8 @@ export interface ElectronAPI {
     getCrashFiles: () => Promise<CrashFilesSummary>;
     /** Removes every kept minidump and returns what is left. */
     clearCrashFiles: () => Promise<CrashFilesSummary>;
+    /** A render-time exception the root error boundary caught, for the lifecycle ledger. */
+    reportRendererFault: (report: RendererFaultReport) => Promise<void>;
   };
 
   web: {

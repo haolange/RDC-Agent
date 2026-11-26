@@ -81,7 +81,8 @@ Settings 的 RDC 安装入口依次是检测安装、选择目录、验证并应
    - `catalogRevision` 只冻结 Effective Catalog 的可执行/可选择语义：刷新只更新 provenance 时间戳时 revision 不变，route、control、availability、quota 等有效语义变化时才更新。
 6. **可取消与可回收**：
    - Turn 经 `TurnCoordinator` 管理 Session ownership：Active → Aborting → Orphaned → Settled。Orphaned 时 `beginTurn` fail-closed `TURN_ORPHANED`；`abortAndJoin` 同时等待 stream terminal **与** producerCompletion。
-   - 子进程经 `ProcessSupervisor`；超时未观察到 close 时标记 `unconfirmed_orphan` 并保留 registry。应用退出经 `ShutdownCoordinator`（`release_owned_runtimes` 先于 `terminate_processes`）。归属 RDC daemon 必须 clear+stop 且有进程回执，失败如实保留。
+   - 子进程经 `ProcessSupervisor`；超时未观察到 close 时标记 `unconfirmed_orphan` 并保留 registry。应用退出经 `ShutdownCoordinator`（`release_owned_runtimes` 先于 `terminate_processes`），起因、超时阶段与结局由 `src/main/index.ts` 注入的观察者写入生命周期账本；干净与超时两条路径走同一个退出。归属 RDC daemon 必须 clear+stop 且有进程回执，失败如实保留。
+   - 生命周期事实只写在 `<appStateRoot>/lifecycle/ledger.jsonl`（`src/main/runtime/LifecycleLedger.ts`，每条 fsync），每类事实只有一个生产者；下次启动由未释放的 `instance.lock` 触发诊断（见 `docs/contracts/failure-model.md`「生命周期账本与崩溃追踪」）。本地 minidump 在 `<appStateRoot>/crash`，不上传、不导出。
    - 迟到 event 按 generation 丢弃。无 durable session 的 turn/slot 使用 ephemeral scope id（禁止 `__anon__` / `__no_session__`）。
    - Conversation Stop 相位语义：`preparing` 干净撤销；`committing` / `running` 单调落停。Renderer 对 monotonic-stopped 的 turn/request 丢弃迟到的 `draft|streaming` patch。
    - 会话工作块与工具的取消记为 cancelled，未执行记为 skipped，真实失败记为 error，不伪造用户拒绝；main 与乐观停止共用同一纯结算。

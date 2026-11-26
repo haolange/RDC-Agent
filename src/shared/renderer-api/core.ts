@@ -30,6 +30,7 @@ export function createAppShellApi(transport: RendererApiTransport): AppShellApi 
     readClipboardText: () => transport.invoke('app:readClipboardText'),
     getCrashFiles: () => transport.invoke('app:getCrashFiles'),
     clearCrashFiles: () => transport.invoke('app:clearCrashFiles'),
+    reportRendererFault: (report) => transport.invoke('app:reportRendererFault', report),
   };
 }
 

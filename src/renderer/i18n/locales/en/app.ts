@@ -5,6 +5,12 @@ export const enApp = {
   'app.dismissNotice': 'Dismiss',
   'app.retry': 'Retry',
   'app.copyDetails': 'Copy details',
+  'app.rendererFailureTitle': "RDC-Agent's window stopped working",
+  'app.rendererFailureCrashed':
+    'It stopped twice in a short time, so it was not reopened automatically. Your sessions are saved; reload to try again.',
+  'app.rendererFailureException':
+    'Something on this screen failed to display. Your sessions are saved; reload to try again.',
+  'app.rendererFailureReload': 'Reload',
   'app.copyDiagnostics': 'Copy diagnostics',
   'app.moreActions': 'More actions',
   'app.copied': 'Copied',

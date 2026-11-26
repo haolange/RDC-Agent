@@ -99,9 +99,12 @@
 | 配置文件单文件 invalid + diagnostics | Integrity | 逐文件隔离，不拖垮列表 |
 | Provider stream buffer 超限 | Integrity | 8MiB fail-closed 截断会话步 |
 | 用户 Stop / abortAndJoin | Availability | join producers；丢弃迟到 event |
-| main 进程未处理的 rejection / 未捕获异常 | Integrity | 写运行日志（含 stack）；未捕获异常另弹原生错误框，与 Electron 默认可见性一致；main 生产代码由 ESLint `no-floating-promises` 保证每个 promise 被 await、处理或显式 `void` |
+| main 进程未处理的 rejection / 未捕获异常 | Integrity | 写运行日志（含 stack）并写生命周期账本 `fault`（脱敏、替换家目录与数据目录、按脱敏后的 stack 取指纹）；未捕获异常另弹原生错误框，与 Electron 默认可见性一致；main 生产代码由 ESLint `no-floating-promises` 保证每个 promise 被 await、处理或显式 `void` |
+| renderer / GPU / utility 等 Chromium 子进程死亡、worker 线程意外退出、受监管子进程异常退出 | Availability | 各写一条账本记录（`process_gone`、`worker_thread_exited`、`supervised_child_exited`；正常退出与应用主动的超时、中止不记）；renderer 按下文「renderer 崩溃策略」恢复 |
 | ProcessSupervisor timeout/abort | Availability | terminate process tree; settle only after observed close/error; retain `unconfirmed_orphan` in registry for diagnostics |
-| ShutdownCoordinator 限时 shutdown | Availability | 尽量排空后退出；`release_owned_runtimes` 失败必须记错误并保留归属记录，不得假装 daemon 已停 |
+| ShutdownCoordinator 限时 shutdown | Availability | 尽量排空后退出；`release_owned_runtimes` 失败必须记错误并保留归属记录，不得假装 daemon 已停。账本记录起因（`window-close` / `before-quit` / `update` / `renderer-failure`；SIGINT/SIGTERM 由 Electron 自己转成 quit，记为 `before-quit`）、超时的阶段及当时未完成的 disposable、是否超时；干净与超时两条路径走同一个退出 |
+| 关停时停止的回合 | Availability | 停止原因 `app-shutdown` 写在 stopped 消息的 `stopCause` 与 cancelled run 的 `stopReason` 上，界面写「应用关闭时已停止」，不显示成用户停止 |
+| 上次启动未正常结束（`instance.lock` 未释放） | Availability | 见下文「上次启动诊断」 |
 | Provider 网络/配额类错误 | Availability | 按 ErrorRecovery 契约；不发明 entitlement；429 与明确 `quota_exceeded` 的 402 只记录短期 quota |
 | Provider 空流 / wire 失败 / 恢复 abort | Availability | 见下文「provider 失败诊断保真」；空流不得合成 HTTP 502；最终 Work Process 只展示一条诊断 |
 | Headless instance.lock 冲突 | Security + Availability | 冲突 fail-closed 避免串 userData |
@@ -186,3 +189,26 @@ Open 失败、图片获取失败、设备显示不支持、Close 未确认分别
 ## 会话取消与执行失败
 
 请求 stopped、操作 cancelled、未执行 skipped、真实执行 error 与计划 rejected 是不同事实。取消不得生成拒绝意见或虚构错误；已有真实失败回执保留。待审计划的取消须结算对应 owning Turn 的当前计划状态，不能影响较新审阅。停止提示由 Work Process 标题承担，详细原因仍在所属调用详情，原始模型输出保持。崩溃恢复的 interrupted 继续作为中断错误处理，不冒充用户主动取消。
+
+## 生命周期账本与崩溃追踪
+
+**账本**：`src/main/runtime/LifecycleLedger.ts`，文件 `<appStateRoot>/lifecycle/ledger.jsonl`，每条经 `appendJsonlDurable`（open → write → fsync → close）写入，4 MiB 封顶并保留一代 `ledger.previous.jsonl`。每次启动一个 `instanceId`（Task execution 的 `runtimeInstanceId` 用同一个）。事件为严格 zod 联合：实例启动与退出、关停（起因、阶段超时、结束）、进程死亡、worker 线程、受监管子进程、`fault`、回合开始与结束（含停止原因）、续接丢弃决策、上次启动诊断、renderer 恢复动作，以及留给 RDC 执行层的 `rdc_operation`（started / terminal）与 `recovery_step`。账本只记事实，不记 prompt、工具参数、文件内容与凭据；自由文本经 `redactSecretsDeep` 与家目录、数据目录替换。写入失败只写 stderr，不让生产者抛错；读取（`tail()`）跳过追加中断的末行，其他坏行计数为 damaged。
+
+**本地崩溃文件**：拿到 `instance.lock` 后，主进程把 `crashDumps` 指到 `<appStateRoot>/crash` 并以 `uploadToServer: false` 启动 Electron crash reporter（Crashpad 在进程外写 minidump，主进程自身崩溃也会留下）。disposable Browser QA 不启用。启动时最多保留最新 5 个、不超过 14 天的 minidump；「设置 › 常规 › 崩溃报告」显示数量与大小并可清除（只删 `.dmp`，保留 Crashpad 自身记录）。没有任何导出读取 `state/`：知识导出只读知识空间内的卡片与图片，计划导出只写计划文档，崩溃文件不会经应用离开本机。
+
+**上次启动诊断**：`acquireUserDataInstanceLock` 回收 owner 已退出的锁时返回 `staleOwner`（锁记录 pid、birth、mode、startTs 与 `instanceId`；无法读取的锁视为什么都没记录），本次启动在读取任何会话之前由 `diagnosePreviousInstance` 归类：
+
+| 依据（按顺序） | 归类 |
+| --- | --- |
+| 上次启动之后写下的 minidump 多于记录到的子进程死亡 | `native-crash-suspected` |
+| 否则取最晚的一条结束性事实：未捕获异常 | `js-fatal` |
+| renderer 死亡 | `renderer-gone` |
+| 其他 Chromium 子进程死亡 | `child-process-gone` |
+| 关停已开始但没有 `instance_exited` | `shutdown-interrupted` |
+| 以上都没有（进程无痕消失） | `killed-or-power-loss-suspected` |
+
+诊断写入账本，并经 `app:getMeta` 交给 renderer，启动时以常驻 `notify.failure`（`PREVIOUS_INSTANCE_*` 码）提示，「复制详情」带归类、进程、原因、最后记录时间与未结束的会话/回合。由上次启动留下的记录按时间与 `instanceId` 关联：`CONVERSATION_INTERRUPTED` 诊断带结构化 `interruption.cause`，renderer 按当前语言写出；恢复的 run 写 `stopReason: previous-instance:<cause>`；中断的 Task execution 用按原因区分的 summary。更早启动留下的记录原因为 `unknown`。
+
+**renderer 崩溃策略**（`src/main/window/rendererRecovery.ts`）：renderer 死亡先写账本；第一次自动重载；60 秒内再次死亡则带崩溃参数加载入口，renderer 直接进入整页错误视图（`ui/EmptyState` page：重新加载、复制详情）；错误视图本身再死亡或入口文档加载失败时，弹原生对话框（`src/main/window/rendererStartupFailure.ts`，重新加载 / 退出）。根 React error boundary 对渲染期异常显示同一页面，并经 `app:reportRendererFault` 写账本 `fault`（`renderer-exception`）。
+
+相关测试：`LifecycleLedger.test.ts`、`previousInstanceDiagnosis.test.ts`、`userDataInstanceLock.test.ts`、`crashFiles.test.ts`、`ShutdownCoordinator.test.ts`、`rendererRecovery.test.ts`、`RootErrorBoundary.test.ts`。

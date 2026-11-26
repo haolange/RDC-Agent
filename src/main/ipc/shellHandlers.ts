@@ -6,10 +6,17 @@ import { nativeMessage } from '../window/nativeI18n';
 import { appPathService } from '../runtime/AppPathService';
 import { clearCrashDumps, summarizeCrashFiles } from '../runtime/crashFiles';
 import { previousInstanceNotice } from '../runtime/previousInstanceDiagnosis';
+import { lifecycleLedger } from '../runtime/LifecycleLedger';
+import { reportProcessFault } from '../runtime/processFaultHandlers';
 import { samePath } from '../platform/paths';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
-import { AppCopyTextArgsSchema, AppGetAvatarDataUrlArgsSchema, AppOpenPathArgsSchema } from './validation/shellSchemas';
+import {
+  AppCopyTextArgsSchema,
+  AppGetAvatarDataUrlArgsSchema,
+  AppOpenPathArgsSchema,
+  AppReportRendererFaultArgsSchema,
+} from './validation/shellSchemas';
 import type { IpcChannelTable } from './invokeRegistry';
 
 const AVATAR_MIME_BY_EXTENSION: Record<string, string> = {
@@ -226,6 +233,17 @@ function appChannels(): IpcChannelTable {
     'app:clearCrashFiles': async (_event, ...rawArgs: unknown[]) => {
       parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'app:clearCrashFiles', maxBytes: 1024 });
       return clearCrashDumps();
+    },
+    // A render-time exception the renderer's root error boundary caught; the page it shows offers the reload.
+    'app:reportRendererFault': async (_event, ...rawArgs: unknown[]) => {
+      const [report] = parseIpcArgs(AppReportRendererFaultArgsSchema, rawArgs, {
+        label: 'app:reportRendererFault',
+        maxBytes: 40 * 1024,
+      });
+      const fault = new Error(report.message);
+      fault.stack = [report.stack ?? report.message, report.componentStack].filter(Boolean).join('\nComponent stack:');
+      lifecycleLedger.recordFault('renderer-exception', fault);
+      reportProcessFault('Render error in the renderer', fault);
     },
   };
 }

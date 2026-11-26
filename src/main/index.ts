@@ -45,6 +45,7 @@ import { turnCoordinator } from './agent-runtime/orchestration/TurnCoordinator';
 import { bindWindowLayoutPersistence, resolveWindowCreationOptions } from './window/windowLayoutPersistence';
 import { bindProductIcon } from './window/productIcon';
 import { reportSettingsStartupFailure } from './window/settingsStartupFailure';
+import { bindRendererRecovery, RENDERER_CRASH_PARAM, type RendererCrash } from './window/rendererRecovery';
 import { resolvedAppearanceMode, windowBackgroundColor } from './window/appearanceChrome';
 import { isTrustedRendererUrl, openExternalHttps, trustRendererEntry } from './runtime/rendererTrust';
 import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
@@ -78,7 +79,10 @@ const SHUTDOWN_TIMEOUT_MS = 45_000;
 let shutdownStarted = false;
 let shutdownExitCode = 0;
 let settingsInitialized = false;
-/** What asked the app to quit; a quit without a more specific cause (the menu, the dock) is `before-quit`. */
+/**
+ * What asked the app to quit; a quit without a more specific cause (the menu, the dock, a process signal, which
+ * Electron turns into a quit itself) is `before-quit`.
+ */
 let shutdownCause: ShutdownCause = 'before-quit';
 let shutdownTimedOut = false;
 let instanceExitRecorded = false;
@@ -430,6 +434,36 @@ function setupKeyboardShortcuts(window: BrowserWindow): void {
 }
 
 /**
+ * Loads the renderer entry. The boot theme rides along so the first paint already uses the chosen light or dark
+ * palette; after repeated crashes the crash facts ride along too and the renderer boots into its failure page.
+ */
+function loadRenderer(window: BrowserWindow, crash?: RendererCrash): void {
+  const { appearance } = settingsService.snapshot().user;
+  const query: Record<string, string> = { theme: resolvedAppearanceMode(appearance) };
+  if (crash) {
+    Object.assign(query, {
+      [RENDERER_CRASH_PARAM]: crash.reason,
+      exitCode: String(crash.exitCode),
+      crashedAt: String(Date.now()),
+      lang: appearance.language,
+    });
+  }
+  const loadFailed = (error: unknown) => reportProcessFault('Renderer failed to load', error);
+  if (isDev) {
+    const rendererUrl = getDevRendererUrl();
+    trustRendererEntry(rendererUrl);
+    const entry = new URL(rendererUrl);
+    for (const [key, value] of Object.entries(query)) entry.searchParams.set(key, value);
+    window.loadURL(entry.href).catch(loadFailed);
+  } else {
+    // Production mode loads the bundled renderer.
+    const rendererEntry = path.join(__dirname, '../renderer/index.html');
+    trustRendererEntry(pathToFileURL(rendererEntry).href);
+    window.loadFile(rendererEntry, { query }).catch(loadFailed);
+  }
+}
+
+/**
  * Create the main window.
  */
 function createMainWindow(): void {
@@ -460,22 +494,16 @@ function createMainWindow(): void {
   });
   bindProductIcon(mainWindow);
 
-  // Load the renderer. The boot theme rides along so the first paint already uses the chosen light or dark palette.
-  const bootTheme = resolvedAppearanceMode(settingsService.snapshot().user.appearance);
-  if (isDev) {
-    const rendererUrl = getDevRendererUrl();
-    trustRendererEntry(rendererUrl);
-    const entry = new URL(rendererUrl);
-    entry.searchParams.set('theme', bootTheme);
-    mainWindow.loadURL(entry.href).catch((error: unknown) => reportProcessFault('Renderer failed to load', error));
-  } else {
-    // Production mode loads the bundled renderer.
-    const rendererEntry = path.join(__dirname, '../renderer/index.html');
-    trustRendererEntry(pathToFileURL(rendererEntry).href);
-    mainWindow
-      .loadFile(rendererEntry, { query: { theme: bootTheme } })
-      .catch((error: unknown) => reportProcessFault('Renderer failed to load', error));
-  }
+  const window = mainWindow;
+  loadRenderer(window);
+  bindRendererRecovery(window, {
+    load: (crash) => loadRenderer(window, crash),
+    quit: () => {
+      if (!shutdownStarted) shutdownCause = 'renderer-failure';
+      app.quit();
+    },
+    isShuttingDown: () => shutdownStarted || shutdownCoordinator.isShuttingDown(),
+  });
 
   // Show after the window is ready.
   mainWindow.once('ready-to-show', () => {
@@ -503,21 +531,6 @@ function createMainWindow(): void {
       message: details.message,
       line: details.lineNumber,
       sourceId: details.sourceId,
-    });
-  });
-
-  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
-    console.error('[RendererLoadFailed]', { errorCode, errorDescription, validatedURL });
-  });
-
-  mainWindow.webContents.on('render-process-gone', (_event, details) => {
-    console.error('[RendererProcessGone]', details);
-    if (details.reason === 'clean-exit') return;
-    lifecycleLedger.record({
-      kind: 'process_gone',
-      process: 'renderer',
-      reason: details.reason,
-      exitCode: details.exitCode,
     });
   });
 
@@ -679,14 +692,8 @@ app.on('before-quit', (event) => {
     .then(exitAfterShutdown);
 });
 
-// External QA/CLI launchers use process signals; route them through the same shutdown state machine.
-const requestProcessShutdown = (signal: 'SIGINT' | 'SIGTERM') => {
-  if (shutdownStarted) return;
-  shutdownCause = signal;
-  app.quit();
-};
-process.once('SIGINT', () => requestProcessShutdown('SIGINT'));
-process.once('SIGTERM', () => requestProcessShutdown('SIGTERM'));
+// SIGINT and SIGTERM need no listener: Electron's own signal handling quits the app, so a signal from an external QA or
+// CLI launcher reaches the same before-quit shutdown (a Node listener for them never runs) and records as before-quit.
 
 // Only the app's own entry document may load in a window.
 app.on('web-contents-created', (_event, contents) => {

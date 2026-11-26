@@ -1,5 +1,14 @@
 # Acceptance Ledger
 
+## 2026-11-26：上次启动诊断与本地崩溃文件（云端 Linux，headless 显式 userData）
+
+- 提交：`b4ff519c0d8bfe30b697e4eed9ff2d6f72c3f213`（PF4 起点构建，PF5 只追加 renderer 崩溃策略与文档）
+- 结果：第一次启动后 `kill -9` 主进程，锁未释放；第二次启动归类 `killed-or-power-loss-suspected`，账本记 `previous_instance_diagnosed`，`app:getMeta` 返回 `previousInstance`（未结束回合 0）。
+- 结果：对第二次启动的主进程发 SIGSEGV，Crashpad 在 `state/crash/pending/` 写下一个 minidump；第三次启动归类 `native-crash-suspected`（崩溃文件 1）。随后 SIGTERM 正常关停，账本依次记 `shutdown_began`（`before-quit`）、`shutdown_finished`（未超时）、`instance_exited`（clean），锁已释放。
+- 结果：Electron 自己把 SIGINT/SIGTERM 转成 quit，Node 的信号监听从不运行，因此删除了这两个无效监听，信号关停记为 `before-quit`。
+- 证据：本地：`HOME=<tmp> RDC_AGENT_USER_DATA=<tmp> RDC_AGENT_HEADLESS=1 RDC_AGENT_BROWSER_QA=1 NODE_ENV=production xvfb-run -a electron --no-sandbox .`，`kill -9` / `kill -SEGV` / `kill -TERM` 主进程，读 `state/lifecycle/ledger.jsonl`
+- 人工介入：无。未在回合进行中杀进程（无模型），未结束回合的关联由单元测试覆盖。
+
 ## 2026-11-26：收敛计划收尾 W6/W7 验收（结构瘦身、Prettier、函数预算；云端 Linux Browser QA，桩模型）
 
 - 提交：`1247621fdd7de9fde9289d4d737fc4226d8301bd`（分支 CI）；`fb38204a7e7dc1e96b245356a3234428bbdb95ae`（实测，只多一处差分 harness 修复）

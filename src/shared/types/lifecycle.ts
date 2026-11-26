@@ -1,5 +1,8 @@
-/** What started the app's shutdown: a closed window, a quit request, a process signal or an update. */
-export const SHUTDOWN_CAUSES = ['window-close', 'before-quit', 'SIGINT', 'SIGTERM', 'update'] as const;
+/**
+ * What started the app's shutdown: the last window closed, a quit request (the menu, the dock, or SIGINT/SIGTERM,
+ * which Electron itself turns into a quit), an update, or Quit chosen when the window's renderer could not start.
+ */
+export const SHUTDOWN_CAUSES = ['window-close', 'before-quit', 'update', 'renderer-failure'] as const;
 export type ShutdownCause = (typeof SHUTDOWN_CAUSES)[number];
 
 /**
@@ -48,4 +51,15 @@ export interface PreviousInstanceNotice {
   crashFiles: number;
   /** Turns it started and never finished. */
   interruptedTurns: Array<{ sessionId: string | null; turnId: string }>;
+}
+
+/** How the main process answered a renderer that died or could not load. */
+export const RENDERER_RECOVERY_ACTIONS = ['reload', 'crash-page', 'native-dialog'] as const;
+export type RendererRecoveryAction = (typeof RENDERER_RECOVERY_ACTIONS)[number];
+
+/** A render-time exception the root error boundary caught, reported for the lifecycle ledger. */
+export interface RendererFaultReport {
+  message: string;
+  stack?: string;
+  componentStack?: string;
 }

@@ -50,6 +50,7 @@ Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口
 
 Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 时默认使用经过校验的临时 `os.tmpdir()/rdc-agent/qa-*` userData，并在 `will-quit` 清理；显式路径或 canonical 开关才会共享真实数据。
 
+- disposable 实例不启动本地 crash reporter，也不保留 minidump；显式 userData 的实例与桌面一样把 minidump 写到 `<appStateRoot>/crash`。
 - 进入该 disposable 分支时，主进程在读取任何路径之前调用 `appPathService.isolateUserRdcRoot()`，把用户资源根指到同一目录下的 `.rdc-agent`，使 provider 配置与 `userData/secrets` 落在同一隔离边界，不读写真实 `~/.rdc-agent`。
 - 只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才落真实 `~/.rdc-agent`。
 - 两种载体不得同时占用同一目录；`instance.lock` 冲突应明确失败。

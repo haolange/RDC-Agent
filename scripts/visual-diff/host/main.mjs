@@ -353,7 +353,7 @@ async function runStep(window, step, context) {
   await sleep(context.replay ? Math.min(step.replayWaitMs ?? wait, REPLAY_STEP_WAIT_MS) : wait);
 }
 
-async function openWindow({ theme, width, height, freeze, partition, answerer }) {
+async function openWindow({ theme, width, height, freeze, partition, answerer, query }) {
   const window = new BrowserWindow({
     // Shown on the (virtual) display: a hidden window may hand capturePage its last painted frame instead of the DOM.
     width,
@@ -385,7 +385,8 @@ async function openWindow({ theme, width, height, freeze, partition, answerer })
     await cdp.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: FREEZE_SCRIPT });
     await cdp.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: L3_SCRIPT });
   }
-  await window.loadFile(path.join(root, 'out/renderer/index.html'), { query: { theme } });
+  // A scenario's `query` adds entry parameters main would pass (the failure page's crash facts).
+  await window.loadFile(path.join(root, 'out/renderer/index.html'), { query: { ...query, theme } });
   // Every animation and transition shows its end state at once, and no caret blinks, so a capture is one frame.
   if (freeze) await window.webContents.insertCSS(SETTLE_CSS, { cssOrigin: 'user' });
   return window;
@@ -416,7 +417,14 @@ async function record() {
     setupWindow.destroy();
     for (const key of Object.keys(recorder.recorded)) delete recorder.recorded[key];
   }
-  const window = await openWindow({ theme: 'dark', width, height, freeze: false, answerer: recorder });
+  const window = await openWindow({
+    theme: 'dark',
+    width,
+    height,
+    freeze: false,
+    answerer: recorder,
+    query: scenario.query,
+  });
   for (const step of scenario.steps ?? []) await runStep(window, step, context);
   await sleep(scenario.settleMs ?? 800);
   await window.webContents.executeJavaScript('document.fonts.ready.then(() => true)');
@@ -465,6 +473,7 @@ async function renderVariant(scenario, variant) {
     freeze: true,
     partition: `visual-diff-${(renders += 1)}`,
     answerer,
+    query: scenario.query,
   });
   try {
     const context = { answerer, replay: true };

@@ -32802,6 +32802,5843 @@
    }
   }
  },
+ "0ea6a783732037adc43d63c6": {
+  "result": {
+   "revision": 1,
+   "appearance": {
+    "theme": "dark",
+    "language": "zh-CN",
+    "fontScale": "medium",
+    "composerMarkdown": false,
+    "contextBreakdownExpanded": false,
+    "workProcessExpansion": "latest",
+    "chromeThemes": {
+     "light": {
+      "presetId": "rdc",
+      "accent": "#1b9dcc",
+      "surface": "#fafbfd",
+      "ink": "#151d27",
+      "contrast": 45,
+      "fonts": {
+       "ui": null,
+       "code": null
+      }
+     },
+     "dark": {
+      "presetId": "rdc",
+      "accent": "#33d1ff",
+      "surface": "#0f1115",
+      "ink": "#f4f6f8",
+      "contrast": 45,
+      "fonts": {
+       "ui": null,
+       "code": null
+      }
+     }
+    }
+   },
+   "layout": {
+    "leftSidebar": {
+     "collapsed": false,
+     "width": 256,
+     "expandedWidth": 256
+    },
+    "rightPanel": {
+     "collapsed": false,
+     "width": 312,
+     "expandedWidth": 312
+    },
+    "terminal": {
+     "height": 328
+    },
+    "window": {
+     "width": 1400,
+     "height": 900,
+     "x": 0,
+     "y": 0,
+     "isMaximized": false
+    }
+   },
+   "profile": {
+    "nickname": "RDC Operator",
+    "avatarPath": ""
+   },
+   "tooling": {
+    "rdcCli": {
+     "enabled": false,
+     "command": "",
+     "argsPrefix": [],
+     "workingDirectory": "",
+     "env": {},
+     "timeoutMs": 120000
+    },
+    "codeInterpreter": {
+     "enabled": false,
+     "command": "",
+     "argsPrefix": [],
+     "timeoutMs": 60000,
+     "env": {},
+     "artifactsEnabled": true
+    },
+    "shell": {
+     "executable": ""
+    }
+   },
+   "agentRuntime": {
+    "permissions": {
+     "mode": "default",
+     "readableRoots": [],
+     "writableRoots": [],
+     "allowedCommandPrefixes": [],
+     "deniedCommandPrefixes": []
+    },
+    "context": {
+     "compactionThresholdPercent": 80
+    }
+   },
+   "agentModels": {
+    "default": {},
+    "byAgent": {}
+   },
+   "llm": {
+    "connections": [
+     {
+      "id": "302ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.302.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "abacus",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "ABACUS_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://routellm.abacus.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "abliteration-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "ABLIT_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.abliteration.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "ai-router",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "AI_ROUTER_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.ai-router.dev/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "aihubmix",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "AIHUBMIX_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://aihubmix.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "alibaba",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "DASHSCOPE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "alibaba-coding-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "ALIBABA_CODING_PLAN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://coding-intl.dashscope.aliyuncs.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "alibaba-token-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "ALIBABA_TOKEN_PLAN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "alibaba-token-plan-cn",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "ALIBABA_TOKEN_PLAN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "amazon-bedrock",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "AWS_BEARER_TOKEN_BEDROCK": false,
+       "AWS_ACCESS_KEY_ID": false,
+       "AWS_SECRET_ACCESS_KEY": false,
+       "AWS_SESSION_TOKEN": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://bedrock-mantle.${AWS_REGION}.api.aws/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "ambient",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "AMBIENT_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.ambient.xyz/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "anthropic",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.anthropic.com/v1",
+      "models": [
+       {
+        "id": "claude-fable-5-2",
+        "label": "Claude Fable 5.2",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-haiku-5-5",
+        "label": "claude-haiku-5-5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-sonnet-5-5",
+        "label": "claude-sonnet-5-5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-fable-5-1",
+        "label": "claude-fable-5-1",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-fable-5",
+        "label": "claude-fable-5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-sonnet-5",
+        "label": "claude-sonnet-5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-opus-5",
+        "label": "claude-opus-5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-opus-5-5",
+        "label": "claude-opus-5-5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-opus-4-8",
+        "label": "claude-opus-4-8",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-haiku-4-5-20251001",
+        "label": "claude-haiku-4-5-20251001",
+        "enabled": true,
+        "aliases": [
+         "claude-haiku-4-5"
+        ],
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "anthropic-thirdparty",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "${baseUrl}/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "anyapi",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "ANYAPI_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.anyapi.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "atomic-chat",
+      "authAccountIds": {},
+      "authMode": "local",
+      "hasStoredSecretByAuthMode": {
+       "local": true
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "ATOMIC_CHAT_API_KEY": false
+      },
+      "hasStoredSecret": true,
+      "baseUrl": "http://127.0.0.1:1337/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "auriko",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "AURIKO_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.auriko.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "azure",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "AZURE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://${AZURE_RESOURCE_NAME}.openai.azure.com/openai/deployments/${AZURE_DEPLOYMENT_NAME}",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "azure-cognitive-services",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "AZURE_COGNITIVE_SERVICES_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://${AZURE_COGNITIVE_SERVICES_RESOURCE_NAME}.openai.azure.com/openai/deployments/${AZURE_DEPLOYMENT_NAME}",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "bailian",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "models": [
+       {
+        "id": "qwen-turbo",
+        "label": "qwen-turbo",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "qwen-plus",
+        "label": "qwen-plus",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "qwen-max",
+        "label": "qwen-max",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "qwen-vl-max",
+        "label": "qwen-vl-max",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "bailian-coding-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://coding.dashscope.aliyuncs.com/apps/anthropic/v1",
+      "models": [
+       {
+        "id": "qwen3-coder-plus",
+        "label": "qwen3-coder-plus",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "qwen3-coder-next",
+        "label": "qwen3-coder-next",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "qwen3.6-plus",
+        "label": "qwen3.6-plus",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "kimi-k2.5",
+        "label": "kimi-k2.5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-5",
+        "label": "glm-5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-4.7",
+        "label": "glm-4.7",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "bailing",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "BAILING_API_TOKEN": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.tbox.cn/api/llm/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "baseten",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "BASETEN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://inference.baseten.co/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "berget",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "BERGET_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.berget.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "blueclaw",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "BLUECLAW_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://openai.blueclaw.network/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "cerebras",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.cerebras.ai/v1",
+      "models": [
+       {
+        "id": "gpt-oss-120b",
+        "label": "gpt-oss-120b",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "chatgpt-account",
+      "authAccountIds": {},
+      "authMode": "account",
+      "hasStoredSecretByAuthMode": {
+       "account": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {},
+      "hasStoredSecret": false,
+      "baseUrl": "https://chatgpt.com/backend-api/codex",
+      "models": [
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1 Sol",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6.1-terra",
+        "label": "GPT-6.1 Terra",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6-sol",
+        "label": "GPT-6 Sol",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6 Luna",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "chutes",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://llm.chutes.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "clarifai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "CLARIFAI_PAT": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.clarifai.com/v2/ext/openai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "claude-account",
+      "authAccountIds": {},
+      "authMode": "account",
+      "hasStoredSecretByAuthMode": {
+       "account": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {},
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.anthropic.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "claudinio",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "CLAUDINIO_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.claudin.io/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "cline",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.cline.bot/api/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "cline-pass",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.cline.bot/api/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "cloudferro-sherlock",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "CLOUDFERRO_SHERLOCK_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api-sherlock.cloudferro.com/openai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "cloudflare-ai-gateway",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "CLOUDFLARE_API_TOKEN": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "cloudflare-workers-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "CLOUDFLARE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "cohere",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "COHERE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.cohere.ai/compatibility/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "cortecs",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "CORTECS_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.cortecs.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "crof",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "CROF_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://crof.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "crossmodel",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "CROSSMODEL_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.crossmodel.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "custom-endpoint",
+      "authAccountIds": {},
+      "authMode": "none",
+      "hasStoredSecretByAuthMode": {
+       "none": false,
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "${baseUrl}",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "daoxe",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "DAOXE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://daoxe.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "databricks",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "DATABRICKS_TOKEN": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://${DATABRICKS_HOST}/ai-gateway/mlflow/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "deepinfra",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "DEEPINFRA_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.deepinfra.com/v1/openai",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "deepseek",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.deepseek.com",
+      "models": [
+       {
+        "id": "deepseek-flash",
+        "label": "DeepSeek V4.1 Flash",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "deepseek-v4-pro",
+        "label": "DeepSeek V4 Pro",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "digitalocean",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "DIGITALOCEAN_ACCESS_TOKEN": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://inference.do-ai.run/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "dinference",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "DINFERENCE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.dinference.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "drun",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "DRUN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://chat.d.run/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "ebcloud",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "EBCLOUD_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://maas-api.ebcloud.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "empiriolabs",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "EMPIRIOLABS_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.empiriolabs.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "evroc",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "EVROC_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://models.think.evroc.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "fastrouter",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "FASTROUTER_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://go.fastrouter.ai/api/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "fireworks-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.fireworks.ai/inference/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "freemodel",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "FREEMODEL_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://cc.freemodel.dev/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "friendli",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "FRIENDLI_TOKEN": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.friendli.ai/serverless/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "frogbot",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "FROGBOT_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://app.frogbot.ai/api/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "github-copilot",
+      "authAccountIds": {},
+      "authMode": "account",
+      "hasStoredSecretByAuthMode": {
+       "account": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {},
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.githubcopilot.com",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "github-models",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://models.github.ai/inference",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "gitlab",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "GITLAB_TOKEN": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://gitlab.com",
+      "models": [
+       {
+        "id": "duo-chat-opus-4-5",
+        "label": "Agentic Chat (Claude Opus 4.5)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-opus-4-8",
+        "label": "Agentic Chat (Claude Opus 4.8)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-opus-4-7",
+        "label": "Agentic Chat (Claude Opus 4.7)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-gpt-5-2-codex",
+        "label": "Agentic Chat (GPT-5.2 Codex)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-fable-5",
+        "label": "Agentic Chat (Claude Fable 5)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-gpt-5-5",
+        "label": "Agentic Chat (GPT-5.5)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-opus-4-6",
+        "label": "Agentic Chat (Claude Opus 4.6)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-gpt-5-4",
+        "label": "Agentic Chat (GPT-5.4)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-gpt-5-codex",
+        "label": "Agentic Chat (GPT-5 Codex)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-gpt-5-4-nano",
+        "label": "Agentic Chat (GPT-5.4 Nano)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-sonnet-4-6",
+        "label": "Agentic Chat (Claude Sonnet 4.6)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-gpt-5-mini",
+        "label": "Agentic Chat (GPT-5 Mini)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-sonnet-5",
+        "label": "Agentic Chat (Claude Sonnet 5)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-gpt-5-4-mini",
+        "label": "Agentic Chat (GPT-5.4 Mini)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-gpt-5-3-codex",
+        "label": "Agentic Chat (GPT-5.3 Codex)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-haiku-4-5",
+        "label": "Agentic Chat (Claude Haiku 4.5)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-gpt-5-2",
+        "label": "Agentic Chat (GPT-5.2)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-sonnet-4-5",
+        "label": "Agentic Chat (Claude Sonnet 4.5)",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "duo-chat-gpt-5-1",
+        "label": "Agentic Chat (GPT-5.1)",
+        "enabled": true,
+        "availability": "unknown"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "glm-cn",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://open.bigmodel.cn/api/anthropic/v1",
+      "models": [
+       {
+        "id": "glm-5.3",
+        "label": "glm-5.3",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-5",
+        "label": "glm-5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-4.7",
+        "label": "glm-4.7",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-4.6",
+        "label": "glm-4.6",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-4.5",
+        "label": "glm-4.5",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "glm-cn-coding-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://open.bigmodel.cn/api/anthropic/v1",
+      "models": [
+       {
+        "id": "glm-5.3",
+        "label": "glm-5.3",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-5.3-flash",
+        "label": "glm-5.3-flash",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "glm-global",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.z.ai/api/anthropic/v1",
+      "models": [
+       {
+        "id": "glm-5.3",
+        "label": "glm-5.3",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-5",
+        "label": "glm-5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-4.7",
+        "label": "glm-4.7",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-4.6",
+        "label": "glm-4.6",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-4.5",
+        "label": "glm-4.5",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "glm-global-coding-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.z.ai/api/anthropic/v1",
+      "models": [
+       {
+        "id": "glm-5.3",
+        "label": "glm-5.3",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-5.3-flash",
+        "label": "glm-5.3-flash",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "gmicloud",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "GMICLOUD_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.gmi-serving.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "google-ai-studio",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://generativelanguage.googleapis.com/v1",
+      "models": [
+       {
+        "id": "gemini-4-carbon",
+        "label": "Gemini 4 Carbon",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gemini-4-neon",
+        "label": "Gemini 4 Neon",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gemini-4-hydrogen",
+        "label": "Gemini 4 Hydrogen",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gemini-4-argon",
+        "label": "Gemini 4 Argon",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gemini-3.8-flash",
+        "label": "gemini-3.8-flash",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gemini-3.6-flash",
+        "label": "gemini-3.6-flash",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gemini-3.1-pro-preview",
+        "label": "gemini-3.1-pro-preview",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gemini-2.5-pro",
+        "label": "gemini-2.5-pro",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gemini-2.5-flash",
+        "label": "gemini-2.5-flash",
+        "enabled": true,
+        "availability": "unknown"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "google-vertex",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false,
+       "environment": true
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "GOOGLE_VERTEX_ACCESS_TOKEN": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://${GOOGLE_VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_VERTEX_PROJECT}/locations/${GOOGLE_VERTEX_LOCATION}/publishers/google",
+      "models": [
+       {
+        "id": "gemini-4-carbon",
+        "label": "Gemini 4 Carbon",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gemini-4-neon",
+        "label": "Gemini 4 Neon",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gemini-4-hydrogen",
+        "label": "Gemini 4 Hydrogen",
+        "enabled": true,
+        "availability": "unknown"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "google-vertex-anthropic",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false,
+       "environment": true
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "GOOGLE_VERTEX_ACCESS_TOKEN": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://${GOOGLE_VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_VERTEX_PROJECT}/locations/${GOOGLE_VERTEX_LOCATION}/publishers/anthropic",
+      "models": [
+       {
+        "id": "claude-fable-5-2",
+        "label": "Claude Fable 5.2",
+        "enabled": true,
+        "availability": "unknown"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "grok-account",
+      "authAccountIds": {},
+      "authMode": "account",
+      "hasStoredSecretByAuthMode": {
+       "account": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {},
+      "hasStoredSecret": false,
+      "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "groq",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.groq.com/openai/v1",
+      "models": [
+       {
+        "id": "llama-3.3-70b-versatile",
+        "label": "llama-3.3-70b-versatile",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "openai/gpt-oss-120b",
+        "label": "openai/gpt-oss-120b",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "openai/gpt-oss-20b",
+        "label": "GPT OSS 20B",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "helicone",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "HELICONE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://ai-gateway.helicone.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "hpc-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "HPC_AI_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.hpc-ai.com/inference/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "huggingface",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://router.huggingface.co/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "iflow",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://apis.iflow.cn/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "inception",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "INCEPTION_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.inceptionlabs.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "inceptron",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "INCEPTRON_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.inceptron.io/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "inference",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "INFERENCE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://inference.net/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "inferx",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "INFERX_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://model.inferx.net/endpoints/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "io-net",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "IOINTELLIGENCE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.intelligence.io.solutions/api/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "jiekou",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "JIEKOU_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.jiekou.ai/openai",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "kenari",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "KENARI_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://kenari.id/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "kilo",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "KILO_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.kilo.ai/api/gateway",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "kimi-coding-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.kimi.com/coding",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "kuae-cloud-coding-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "KUAE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://coding-plan-endpoint.kuaecloud.net/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "lilac",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "LILAC_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.getlilac.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "litellm",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "http://localhost:4000/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "llama",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "LLAMA_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.llama.com/compat/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "llmgateway",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "LLMGATEWAY_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.llmgateway.io/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "llmtr",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "LLMTR_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://llmtr.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "lm-studio",
+      "authAccountIds": {},
+      "authMode": "local",
+      "hasStoredSecretByAuthMode": {
+       "local": true
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {},
+      "hasStoredSecret": true,
+      "baseUrl": "http://127.0.0.1:1234/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "longcat",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.longcat.chat/openai/v1",
+      "models": [
+       {
+        "id": "LongCat-2.5",
+        "label": "LongCat 2.5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "LongCat-2.5-Preview",
+        "label": "LongCat-2.5-Preview",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "LongCat-2.0",
+        "label": "LongCat 2.0",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "lucidquery",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "LUCIDQUERY_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.lucidquery.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "lynkr",
+      "authAccountIds": {},
+      "authMode": "local",
+      "hasStoredSecretByAuthMode": {
+       "local": true
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "LYNKR_API_KEY": false
+      },
+      "hasStoredSecret": true,
+      "baseUrl": "http://127.0.0.1:8081/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "manifest",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://app.manifest.build/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "meganova",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "MEGANOVA_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.meganova.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "merge-gateway",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "MERGE_GATEWAY_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api-gateway.merge.dev/v1/openai",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "meta",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "META_MODEL_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.meta.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "minimax-cn",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.minimaxi.com/anthropic/v1",
+      "models": [
+       {
+        "id": "MiniMax-M3",
+        "label": "MiniMax-M3",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "MiniMax-M2.7",
+        "label": "MiniMax-M2.7",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "minimax-cn-coding-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.minimaxi.com/anthropic/v1",
+      "models": [
+       {
+        "id": "MiniMax-M3",
+        "label": "MiniMax-M3",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "MiniMax-M2.7",
+        "label": "MiniMax-M2.7",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "minimax-global",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.minimax.io/anthropic/v1",
+      "models": [
+       {
+        "id": "MiniMax-M3",
+        "label": "MiniMax-M3",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "MiniMax-M2.7",
+        "label": "MiniMax-M2.7",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "minimax-global-coding-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.minimax.io/anthropic/v1",
+      "models": [
+       {
+        "id": "MiniMax-M3",
+        "label": "MiniMax-M3",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "MiniMax-M2.7",
+        "label": "MiniMax-M2.7",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "mistral",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.mistral.ai/v1",
+      "models": [
+       {
+        "id": "mistral-medium-3-5",
+        "label": "mistral-medium-3-5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "mistral-large-4",
+        "label": "mistral-large-4",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "mistral-small-2603",
+        "label": "Mistral Small 4",
+        "enabled": true,
+        "aliases": [
+         "mistral-small-latest"
+        ],
+        "availability": "available"
+       },
+       {
+        "id": "mistral-large-latest",
+        "label": "mistral-large-latest",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "codestral-latest",
+        "label": "codestral-latest",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "mixlayer",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "MIXLAYER_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://models.mixlayer.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "moark",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "MOARK_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://moark.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "model-oracle-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "MODEL_ORACLE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.modeloracle.com/api/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "modelscope",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "MODELSCOPE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api-inference.modelscope.cn/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "moonshot",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.moonshot.cn/anthropic/v1",
+      "models": [
+       {
+        "id": "kimi-k3.1-pro",
+        "label": "kimi-k3.1-pro",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "kimi-k3.1-pro-highspeed",
+        "label": "kimi-k3.1-pro-highspeed",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "kimi-k3",
+        "label": "Kimi K3",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "kimi-k2.7-code",
+        "label": "kimi-k2.7-code",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "kimi-k2.6",
+        "label": "kimi-k2.6",
+        "enabled": true,
+        "availability": "unknown"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "moonshotai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "MOONSHOT_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.moonshot.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "morph",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "MORPH_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.morphllm.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "nano-gpt",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "NANO_GPT_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://nano-gpt.com/api/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "nearai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "NEARAI_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://cloud-api.near.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "nebius",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "NEBIUS_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.tokenfactory.nebius.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "neon",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "NEON_AI_GATEWAY_TOKEN": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "${NEON_AI_GATEWAY_BASE_URL}/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "neuralwatt",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "NEURALWATT_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.neuralwatt.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "nous",
+      "authAccountIds": {},
+      "authMode": "account",
+      "hasStoredSecretByAuthMode": {
+       "account": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {},
+      "hasStoredSecret": false,
+      "baseUrl": "https://inference-api.nousresearch.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "nova",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "NOVA_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.nova.amazon.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "novita-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.novita.ai/openai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "nvidia-nim",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://integrate.api.nvidia.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "ollama",
+      "authAccountIds": {},
+      "authMode": "local",
+      "hasStoredSecretByAuthMode": {
+       "local": true
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {},
+      "hasStoredSecret": true,
+      "baseUrl": "http://127.0.0.1:11434/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "ollama-cloud",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://ollama.com",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "openai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.openai.com/v1",
+      "models": [
+       {
+        "id": "gpt-6.2-astra",
+        "label": "GPT-6.2 Astra",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6.2-sol",
+        "label": "GPT-6.2 Sol",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6.1-terra",
+        "label": "GPT-6.1 Terra",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1 Sol",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6-astra",
+        "label": "GPT-6 Astra",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.6-sol",
+        "label": "GPT-5.6 Sol",
+        "enabled": true,
+        "aliases": [
+         "gpt-5.6"
+        ],
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.6-terra",
+        "label": "GPT-5.6 Terra",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.6-luna",
+        "label": "GPT-5.6 Luna",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6-sol",
+        "label": "GPT-6 Sol",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6 Luna",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.5",
+        "label": "gpt-5.5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.4",
+        "label": "gpt-5.4",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.4-mini",
+        "label": "gpt-5.4-mini",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.4-nano",
+        "label": "gpt-5.4-nano",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.3-codex",
+        "label": "gpt-5.3-codex",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-4.1",
+        "label": "gpt-4.1",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "openai-eu",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://eu.api.openai.com/v1",
+      "models": [
+       {
+        "id": "gpt-6.2-astra",
+        "label": "GPT-6.2 Astra",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6.2-sol",
+        "label": "GPT-6.2 Sol",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6.1-terra",
+        "label": "GPT-6.1 Terra",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1 Sol",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gpt-6-astra",
+        "label": "GPT-6 Astra",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gpt-5.6-sol",
+        "label": "GPT-5.6 Sol",
+        "enabled": true,
+        "aliases": [
+         "gpt-5.6"
+        ],
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.6-terra",
+        "label": "GPT-5.6 Terra",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.6-luna",
+        "label": "GPT-5.6 Luna",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6-sol",
+        "label": "GPT-6 Sol",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6 Luna",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.5",
+        "label": "gpt-5.5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.4",
+        "label": "gpt-5.4",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.4-mini",
+        "label": "gpt-5.4-mini",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.4-nano",
+        "label": "gpt-5.4-nano",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.3-codex",
+        "label": "gpt-5.3-codex",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-4.1",
+        "label": "gpt-4.1",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "openai-us",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://us.api.openai.com/v1",
+      "models": [
+       {
+        "id": "gpt-6.2-astra",
+        "label": "GPT-6.2 Astra",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6.2-sol",
+        "label": "GPT-6.2 Sol",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6.1-terra",
+        "label": "GPT-6.1 Terra",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6.1-sol",
+        "label": "GPT-6.1 Sol",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gpt-6-astra",
+        "label": "GPT-6 Astra",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gpt-5.6-sol",
+        "label": "GPT-5.6 Sol",
+        "enabled": true,
+        "aliases": [
+         "gpt-5.6"
+        ],
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.6-terra",
+        "label": "GPT-5.6 Terra",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.6-luna",
+        "label": "GPT-5.6 Luna",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6-sol",
+        "label": "GPT-6 Sol",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-6-luna",
+        "label": "GPT-6 Luna",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.5",
+        "label": "gpt-5.5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.4",
+        "label": "gpt-5.4",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.4-mini",
+        "label": "gpt-5.4-mini",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.4-nano",
+        "label": "gpt-5.4-nano",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.3-codex",
+        "label": "gpt-5.3-codex",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-4.1",
+        "label": "gpt-4.1",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "opencode-go",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://opencode.ai/zen/go/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "opencode-zen",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://opencode.ai/zen/v1",
+      "models": [
+       {
+        "id": "gpt-5.6-sol",
+        "label": "GPT-5.6 Sol",
+        "enabled": true,
+        "aliases": [
+         "gpt-5.6"
+        ],
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.6-terra",
+        "label": "GPT-5.6 Terra",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.6-luna",
+        "label": "GPT-5.6 Luna",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gpt-5.5",
+        "label": "GPT-5.5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-fable-5",
+        "label": "Claude Fable 5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-opus-5",
+        "label": "Claude Opus 5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-sonnet-5",
+        "label": "Claude Sonnet 5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "claude-opus-4-7",
+        "label": "Claude Opus 4.7",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gemini-3.7-flash",
+        "label": "Gemini 3.7 Flash",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "gemini-3.6-flash",
+        "label": "Gemini 3.6 Flash",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "grok-4.6",
+        "label": "Grok 4.6",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "grok-4.5",
+        "label": "Grok 4.5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "deepseek-v4.1-flash",
+        "label": "DeepSeek V4.1 Flash",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-5.2",
+        "label": "GLM-5.2",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "kimi-k3",
+        "label": "Kimi K3",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "kimi-k2.7-code",
+        "label": "Kimi K2.7 Code",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "minimax-m3",
+        "label": "MiniMax M3",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "qwen3.6-plus",
+        "label": "Qwen3.6 Plus",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "openrouter",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false,
+       "account": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "orcarouter",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "ORCAROUTER_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.orcarouter.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "ovhcloud",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "OVHCLOUD_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "perplexity",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "PERPLEXITY_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.perplexity.ai",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "perplexity-agent",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "PERPLEXITY_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.perplexity.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "pioneer",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "PIONEER_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.pioneer.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "poe",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "POE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.poe.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "poolside",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "POOLSIDE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://inference.poolside.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "privatemode-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "PRIVATEMODE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "${PRIVATEMODE_ENDPOINT}",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "qihang-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "QIHANG_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.qhaigc.net/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "qiniu-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "QINIU_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.qnaigc.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "qwen",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "models": [
+       {
+        "id": "qwen-turbo",
+        "label": "qwen-turbo",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "qwen-plus",
+        "label": "qwen-plus",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "qwen-max",
+        "label": "qwen-max",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "qwen-flash",
+        "label": "qwen-flash",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "qwen-vl-max",
+        "label": "qwen-vl-max",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "regolo-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "REGOLO_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.regolo.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "requesty",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "REQUESTY_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://router.requesty.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "routing-run",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "ROUTING_RUN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.routing.run/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "sakana",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "SAKANA_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.sakana.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "sap-ai-core",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "AICORE_SERVICE_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "${AICORE_AI_API_URL}",
+      "models": [
+       {
+        "id": "anthropic--claude-4.8-opus",
+        "label": "Claude Opus 4.8",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gemini-3.1-flash-lite",
+        "label": "Gemini 3.1 Flash Lite",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-4.6-sonnet",
+        "label": "Claude Sonnet 4.6",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-3-sonnet",
+        "label": "Claude 3 Sonnet",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-4-sonnet",
+        "label": "Claude 4 Sonnet",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gemini-2.5-pro",
+        "label": "Gemini 2.5 Pro",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gpt-5",
+        "label": "GPT-5",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gemini-2.5-flash",
+        "label": "Gemini 2.5 Flash",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gemini-3.5-flash",
+        "label": "Gemini 3.5 Flash",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-4.5-haiku",
+        "label": "Claude Haiku 4.5",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-3-haiku",
+        "label": "Claude 3 Haiku",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-4-opus",
+        "label": "Claude 4 Opus",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-4.5-sonnet",
+        "label": "Claude Sonnet 4.5",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-3.5-sonnet",
+        "label": "Claude 3.5 Sonnet",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-4.6-opus",
+        "label": "Claude Opus 4.6",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gemini-2.5-flash-lite",
+        "label": "Gemini 2.5 Flash Lite",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-3.7-sonnet",
+        "label": "Claude 3.7 Sonnet",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "sonar",
+        "label": "Sonar",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "sonar-pro",
+        "label": "Sonar Pro",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gpt-5.4",
+        "label": "GPT-5.4",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gpt-4.1",
+        "label": "GPT-4.1",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-3-opus",
+        "label": "Claude 3 Opus",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gpt-5-mini",
+        "label": "GPT-5 Mini",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gpt-4.1-mini",
+        "label": "GPT-4.1 Mini",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "sonar-deep-research",
+        "label": "Sonar Deep Research",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gpt-5-nano",
+        "label": "GPT-5 Nano",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-4.5-opus",
+        "label": "Claude Opus 4.5",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "anthropic--claude-4.7-opus",
+        "label": "Claude Opus 4.7",
+        "enabled": true,
+        "availability": "unknown"
+       },
+       {
+        "id": "gpt-5.5",
+        "label": "GPT-5.5",
+        "enabled": true,
+        "availability": "unknown"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "sarvam",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "SARVAM_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.sarvam.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "scaleway",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "SCALEWAY_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.scaleway.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "siliconflow",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.siliconflow.cn/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "siliconflow-cn",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "SILICONFLOW_CN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.siliconflow.cn/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "snowflake-cortex",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "SNOWFLAKE_CORTEX_PAT": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://${SNOWFLAKE_ACCOUNT}.snowflakecomputing.com/api/v2/cortex/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "stackit",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "STACKIT_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.openai-compat.model-serving.eu01.onstackit.cloud/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "stepfun",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "STEPFUN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.stepfun.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "stepfun-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "STEPFUN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.stepfun.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "stepfun-ai-step-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "STEPFUN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.stepfun.ai/step_plan/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "stepfun-step-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "STEPFUN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.stepfun.com/step_plan/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "subconscious",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "SUBCONSCIOUS_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.subconscious.dev/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "submodel",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "SUBMODEL_INSTAGEN_ACCESS_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://llm.submodel.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "synthetic",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.synthetic.new/openai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "tencent-coding-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "TENCENT_CODING_PLAN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.lkeap.cloud.tencent.com/coding/v3",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "tencent-token-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "TENCENT_TOKEN_PLAN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.lkeap.cloud.tencent.com/plan/v3",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "tencent-tokenhub",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "TENCENT_TOKENHUB_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://tokenhub.tencentmaas.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "the-grid-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "THEGRIDAI_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.thegrid.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "tinfoil",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "TINFOIL_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://inference.tinfoil.sh/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "together-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.together.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "trustedrouter",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "TRUSTEDROUTER_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.trustedrouter.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "umans-ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "UMANS_AI_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.code.umans.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "umans-ai-coding-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "UMANS_AI_CODING_PLAN_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.code.umans.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "unorouter",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "UNOROUTER_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.unorouter.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "upstage",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "UPSTAGE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.upstage.ai/v1/solar",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "v0",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "V0_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.v0.dev/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "venice",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "VENICE_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.venice.ai/api/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "vercel-ai-gateway",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://ai-gateway.vercel.sh/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "vivgrid",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "VIVGRID_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.vivgrid.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "volcengine",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+      "models": [
+       {
+        "id": "doubao-seed-2.1-pro",
+        "label": "doubao-seed-2.1-pro",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "doubao-seed-2.1-turbo",
+        "label": "doubao-seed-2.1-turbo",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-5",
+        "label": "glm-5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-4.7",
+        "label": "glm-4.7",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-4.6",
+        "label": "glm-4.6",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-4.5",
+        "label": "glm-4.5",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "kimi-k2.5",
+        "label": "kimi-k2.5",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "volcengine-coding-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v1",
+      "models": [
+       {
+        "id": "doubao-seed-2.1-turbo",
+        "label": "doubao-seed-2.1-turbo",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "minimax-m3",
+        "label": "minimax-m3",
+        "enabled": true,
+        "aliases": [
+         "MiniMax-M3"
+        ],
+        "availability": "available"
+       },
+       {
+        "id": "minimax-m2.7",
+        "label": "minimax-m2.7",
+        "enabled": true,
+        "aliases": [
+         "MiniMax-M2.7"
+        ],
+        "availability": "available"
+       },
+       {
+        "id": "kimi-k2.7-code",
+        "label": "kimi-k2.7-code",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "kimi-k2.6",
+        "label": "kimi-k2.6",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "glm-5.3",
+        "label": "glm-5.3",
+        "enabled": true,
+        "aliases": [
+         "glm-latest"
+        ],
+        "availability": "available"
+       },
+       {
+        "id": "glm-5.2",
+        "label": "glm-5.2",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "vultr",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "VULTR_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.vultrinference.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "wafer.ai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "WAFER_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://pass.wafer.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "wandb",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "WANDB_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.inference.wandb.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "xai",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.x.ai/v1",
+      "models": [
+       {
+        "id": "grok-4.7",
+        "label": "grok-4.7",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "grok-4.6",
+        "label": "grok-4.6",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "grok-4.5",
+        "label": "grok-4.5",
+        "enabled": true,
+        "aliases": [
+         "grok-4.5-latest",
+         "grok-build-latest"
+        ],
+        "availability": "available"
+       },
+       {
+        "id": "grok-4.3",
+        "label": "grok-4.3",
+        "enabled": true,
+        "aliases": [
+         "grok-4.3-latest"
+        ],
+        "availability": "available"
+       },
+       {
+        "id": "grok-build-0.1",
+        "label": "grok-build-0.1",
+        "enabled": true,
+        "availability": "available"
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "xiaomi-mimo",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.xiaomimimo.com/v1",
+      "models": [
+       {
+        "id": "mimo-v2.6-pro",
+        "label": "mimo-v2.6-pro",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "mimo-v2.6-flash",
+        "label": "mimo-v2.6-flash",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "mimo-v2.5-pro",
+        "label": "mimo-v2.5-pro",
+        "enabled": false,
+        "availability": "unavailable",
+        "availabilityReason": "Retired by Xiaomi on 2026-10-21. Select a MiMo V2.6 model explicitly."
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "xiaomi-mimo-token-plan",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "apiKey": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://token-plan-cn.xiaomimimo.com/v1",
+      "models": [
+       {
+        "id": "mimo-v2.6-pro",
+        "label": "mimo-v2.6-pro",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "mimo-v2.6-flash",
+        "label": "mimo-v2.6-flash",
+        "enabled": true,
+        "availability": "available"
+       },
+       {
+        "id": "mimo-v2.5-pro",
+        "label": "mimo-v2.5-pro",
+        "enabled": false,
+        "availability": "unavailable",
+        "availabilityReason": "Retired by Xiaomi on 2026-10-21. Select a MiMo V2.6 model explicitly."
+       }
+      ],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "xiaomi-token-plan-ams",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "XIAOMI_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://token-plan-ams.xiaomimimo.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "xiaomi-token-plan-sgp",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "XIAOMI_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "xpersona",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "XPERSONA_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://www.xpersona.co/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "zeldoc",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "ZELDOC_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://api.zeldoc.ai/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "zenifra",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "ZENIFRA_AI_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://ai.zenifra.com/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     },
+     {
+      "id": "zenmux",
+      "authAccountIds": {},
+      "authMode": "api-key",
+      "hasStoredSecretByAuthMode": {
+       "api-key": false
+      },
+      "enabled": false,
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {
+       "ZENMUX_API_KEY": false
+      },
+      "hasStoredSecret": false,
+      "baseUrl": "https://zenmux.ai/api/v1",
+      "models": [],
+      "status": "unconfigured",
+      "isConfigured": false
+     }
+    ],
+    "agentRoutes": [
+     {
+      "agentId": "general",
+      "providerId": "",
+      "modelId": ""
+     },
+     {
+      "agentId": "debugger",
+      "providerId": "",
+      "modelId": ""
+     },
+     {
+      "agentId": "analyzer",
+      "providerId": "",
+      "modelId": ""
+     },
+     {
+      "agentId": "optimizer",
+      "providerId": "",
+      "modelId": ""
+     },
+     {
+      "agentId": "generator",
+      "providerId": "",
+      "modelId": ""
+     },
+     {
+      "agentId": "knowledge-scout",
+      "providerId": "",
+      "modelId": ""
+     },
+     {
+      "agentId": "pass-analyst",
+      "providerId": "",
+      "modelId": ""
+     },
+     {
+      "agentId": "pixel-analyst",
+      "providerId": "",
+      "modelId": ""
+     },
+     {
+      "agentId": "report-writer",
+      "providerId": "",
+      "modelId": ""
+     },
+     {
+      "agentId": "resource-analyst",
+      "providerId": "",
+      "modelId": ""
+     },
+     {
+      "agentId": "shader-analyst",
+      "providerId": "",
+      "modelId": ""
+     },
+     {
+      "agentId": "verifier",
+      "providerId": "",
+      "modelId": ""
+     }
+    ]
+   },
+   "agents": {
+    "directoryPath": "/visual-diff/.rdc-agent/agents",
+    "definitions": [
+     {
+      "id": "analyzer",
+      "fileName": "analyzer.agent.md",
+      "filePath": "/visual-diff-repo/resources/agent-runtime/agents/analyzer.agent.md",
+      "name": "Analyzer",
+      "description": "Planning Orchestrator that maximizes explainability of an unknown rendering system.",
+      "argumentHint": "System, capture, or behavior to explain",
+      "descriptionTranslations": {
+       "zh-CN": "规划编排者：让未知的渲染系统尽可能可解释。"
+      },
+      "argumentHintTranslations": {
+       "zh-CN": "要解释的系统、capture 或现象"
+      },
+      "target": "rdc-agent",
+      "icon": "waveform-gauge",
+      "accent": "#8d8bff",
+      "disableModelInvocation": false,
+      "userInvocable": true,
+      "accessCeiling": "read-only",
+      "completionContract": "investigation-report",
+      "tools": [
+       "read",
+       "search",
+       "web",
+       "askUser",
+       "task",
+       "planArtifact",
+       "memory",
+       "runtimeContext",
+       "rdc_probe",
+       "subagent",
+       "tool_search",
+       "skill",
+       "knowledge",
+       "investigation"
+      ],
+      "skills": [
+       "investigation-planning",
+       "analyzer-coordinator"
+      ],
+      "mcpServers": [],
+      "agents": [
+       "general",
+       "knowledge-scout"
+      ],
+      "handoffs": [
+       {
+        "label": "Implement Plan",
+        "agent": "general",
+        "prompt": "The Analyzer plan has already passed review and is frozen; this is the General execution turn. Earlier instructions to submit or await approval describe the completed planning turn. Reconstruct or compare to the depth required by the approved goal; distinguish observed, reconstructed and authoring claims without inventing missing layers. Complete the required independent review, relevant Challenges and recovery before declaring completion in place; otherwise report the concrete partial or blocked state. If strategy must change, record the checkpoint and gaps so the user can return to Analyzer.",
+        "labelTranslations": {
+         "zh-CN": "执行计划"
+        },
+        "send": true,
+        "surface": "plan-gate",
+        "requiredSkillIds": [
+         "renderdoc-execution",
+         "analyzer-architecture-method",
+         "rdc-tool-shell",
+         "analyzer-rdc-tools"
+        ],
+        "requiredToolIds": [
+         "investigation_schema",
+         "investigation_read",
+         "investigation_write",
+         "investigation_list",
+         "subagent"
+        ]
+       }
+      ],
+      "metadata": {},
+      "instructions": "你是 Analyzer，负责\"这一帧怎样渲染出来\"这类分析的规划和最终评估。按 $investigation-planning 和 $analyzer-coordinator 工作，其他方法按需读取。你只规划：用 plan_artifact 提交计划并等待审阅，批准后结束本回合，由 General 执行并就地交付。\n用户之后请你评估结果时，依据签名的执行证据、独立审查的 Challenge 和限制，经 investigation_* 发布报告，并在 turn_complete.evidenceRefs 里写它的 contentUri 和 contentHash。不自动写持久 Knowledge 或 Memory。",
+      "builtin": true,
+      "enabled": true,
+      "updatedAt": "2026-11-26T14:28:30.426Z",
+      "effectiveStatus": "effective",
+      "provenance": {
+       "scope": "builtin",
+       "sourcePath": "/visual-diff-repo/resources/agent-runtime/agents/analyzer.agent.md",
+       "sourceHash": "91ef7e4bcb9e4b5de57d2eb685a0e0113c61300e6755d779cba8c21d19547dab"
+      },
+      "compiledRoute": {
+       "agentId": "analyzer",
+       "providerId": "",
+       "modelId": ""
+      },
+      "modelSource": "none"
+     },
+     {
+      "id": "debugger",
+      "fileName": "debugger.agent.md",
+      "filePath": "/visual-diff-repo/resources/agent-runtime/agents/debugger.agent.md",
+      "name": "Debugger",
+      "description": "Planning Orchestrator that minimizes root-cause uncertainty for incorrect rendering results.",
+      "argumentHint": "Wrong result, capture, and expected behavior",
+      "descriptionTranslations": {
+       "zh-CN": "规划编排者：针对错误的渲染结果，把根因的不确定性降到最低。"
+      },
+      "argumentHintTranslations": {
+       "zh-CN": "错误结果、capture 与期望行为"
+      },
+      "target": "rdc-agent",
+      "icon": "crosshair-bug",
+      "accent": "#33d1ff",
+      "disableModelInvocation": false,
+      "userInvocable": true,
+      "accessCeiling": "read-only",
+      "completionContract": "investigation-report",
+      "tools": [
+       "read",
+       "search",
+       "web",
+       "askUser",
+       "task",
+       "planArtifact",
+       "memory",
+       "runtimeContext",
+       "rdc_probe",
+       "subagent",
+       "tool_search",
+       "skill",
+       "knowledge",
+       "investigation"
+      ],
+      "skills": [
+       "investigation-planning",
+       "debugger-coordinator"
+      ],
+      "mcpServers": [],
+      "agents": [
+       "general",
+       "knowledge-scout"
+      ],
+      "handoffs": [
+       {
+        "label": "Implement Plan",
+        "agent": "general",
+        "prompt": "The Debugger plan has already passed review and is frozen; this is the General execution turn. Earlier instructions to submit or await approval describe the completed planning turn. Execute the approved scope with the preloaded methods and runtime gates. Complete its required work, independent review, relevant Challenges and recovery before declaring completion in place; otherwise report the concrete partial or blocked state. If strategy must change, record the checkpoint and gaps so the user can return to Debugger.",
+        "labelTranslations": {
+         "zh-CN": "执行计划"
+        },
+        "send": true,
+        "surface": "plan-gate",
+        "requiredSkillIds": [
+         "renderdoc-execution",
+         "pixel-forensics",
+         "debugger-causal-method",
+         "rdc-tool-shell",
+         "debugger-rdc-tools"
+        ],
+        "requiredToolIds": [
+         "investigation_schema",
+         "investigation_read",
+         "investigation_write",
+         "investigation_list",
+         "subagent"
+        ]
+       }
+      ],
+      "metadata": {},
+      "instructions": "你是 Debugger，负责\"渲染结果不对\"这类调查的规划和最终评估。按 $investigation-planning 和 $debugger-coordinator 工作，其他方法按需读取。你只规划：用 plan_artifact 提交计划并等待审阅，批准后结束本回合，由 General 执行并就地交付。\n用户之后请你评估结果时，依据签名的执行证据、独立审查的 Challenge 和限制，经 investigation_* 发布报告，并在 turn_complete.evidenceRefs 里写它的 contentUri 和 contentHash。不自动写持久 Knowledge 或 Memory。",
+      "builtin": true,
+      "enabled": true,
+      "updatedAt": "2026-11-26T14:28:30.426Z",
+      "effectiveStatus": "effective",
+      "provenance": {
+       "scope": "builtin",
+       "sourcePath": "/visual-diff-repo/resources/agent-runtime/agents/debugger.agent.md",
+       "sourceHash": "8889543276cd1682ed6574f20a0a60de10c39c8ada386bae56b8daf57a50ceee"
+      },
+      "compiledRoute": {
+       "agentId": "debugger",
+       "providerId": "",
+       "modelId": ""
+      },
+      "modelSource": "none"
+     },
+     {
+      "id": "general",
+      "fileName": "general.agent.md",
+      "filePath": "/visual-diff-repo/resources/agent-runtime/agents/general.agent.md",
+      "name": "General",
+      "description": "Execution Orchestrator for ordinary read, write, search, shell, and tool work.",
+      "argumentHint": "Describe the task you want executed",
+      "descriptionTranslations": {
+       "zh-CN": "执行编排者：负责普通的读写、搜索、Shell 与工具工作。"
+      },
+      "argumentHintTranslations": {
+       "zh-CN": "要执行的任务"
+      },
+      "target": "rdc-agent",
+      "icon": "nodes",
+      "accent": "#33d1ff",
+      "disableModelInvocation": false,
+      "userInvocable": true,
+      "tools": [
+       "read",
+       "search",
+       "web",
+       "shell",
+       "interpreter",
+       "write",
+       "edit",
+       "git",
+       "file-manage",
+       "askUser",
+       "task",
+       "output",
+       "memory",
+       "memory-write",
+       "skill",
+       "mcp",
+       "subagent",
+       "runtimeContext",
+       "rdcProbe",
+       "tool_search",
+       "knowledge",
+       "investigation"
+      ],
+      "skills": [
+       "execution-orchestrator"
+      ],
+      "mcpServers": [],
+      "agents": [
+       "debugger",
+       "analyzer",
+       "optimizer",
+       "generator",
+       "verifier",
+       "knowledge-scout",
+       "report-writer",
+       "shader-analyst",
+       "pass-analyst",
+       "resource-analyst",
+       "pixel-analyst"
+      ],
+      "handoffs": [],
+      "metadata": {},
+      "instructions": "你是 General，负责日常对话、问答、文件、编码和协作任务。按 execution-orchestrator 做事，任务需要时使用专门的能力；遵守本任务绑定的交付要求，如实报告未解决的限制。\n执行获批的 Mission 计划时，留在计划范围内，记录实际证据并就地交付。必需的工作、独立审查、相关 Challenge 和现场恢复都闭合后才声明 completed，否则如实报告 partial 或 blocked。需要改变战略时，记下检查点和缺口，让用户切回发起计划的 Mission。",
+      "builtin": true,
+      "enabled": true,
+      "updatedAt": "2026-11-26T14:28:30.426Z",
+      "effectiveStatus": "effective",
+      "provenance": {
+       "scope": "builtin",
+       "sourcePath": "/visual-diff-repo/resources/agent-runtime/agents/general.agent.md",
+       "sourceHash": "64d9faa4850190c3c2682dabd653283be8df0f00a12de9ca6f8132ccbd289beb"
+      },
+      "compiledRoute": {
+       "agentId": "general",
+       "providerId": "",
+       "modelId": ""
+      },
+      "modelSource": "none"
+     },
+     {
+      "id": "optimizer",
+      "fileName": "optimizer.agent.md",
+      "filePath": "/visual-diff-repo/resources/agent-runtime/agents/optimizer.agent.md",
+      "name": "Optimizer",
+      "description": "Planning Orchestrator that minimizes cost while preserving correctness, quality, and scope.",
+      "argumentHint": "Cost, constraints, and required correctness",
+      "descriptionTranslations": {
+       "zh-CN": "规划编排者：在保持正确性、质量与范围的前提下把成本降到最低。"
+      },
+      "argumentHintTranslations": {
+       "zh-CN": "成本、约束与必须保持的正确性"
+      },
+      "target": "rdc-agent",
+      "icon": "spark-tuning",
+      "accent": "#4ee3a0",
+      "disableModelInvocation": false,
+      "userInvocable": true,
+      "accessCeiling": "read-only",
+      "completionContract": "investigation-report",
+      "tools": [
+       "read",
+       "search",
+       "web",
+       "askUser",
+       "task",
+       "planArtifact",
+       "memory",
+       "runtimeContext",
+       "rdc_probe",
+       "subagent",
+       "tool_search",
+       "skill",
+       "knowledge",
+       "investigation"
+      ],
+      "skills": [
+       "investigation-planning",
+       "optimizer-coordinator"
+      ],
+      "mcpServers": [],
+      "agents": [
+       "general",
+       "knowledge-scout"
+      ],
+      "handoffs": [
+       {
+        "label": "Implement Plan",
+        "agent": "general",
+        "prompt": "The Optimizer plan has already passed review and is frozen; this is the General execution turn. Earlier instructions to submit or await approval describe the completed planning turn. Qualify the baseline, noise and quality constraints before approved measurements or reversible experiments; static estimates and local timings do not prove end-to-end benefit. Complete required independent review, relevant Challenges and recovery before declaring completion in place; otherwise report the concrete partial or blocked state. If strategy must change, record the checkpoint and gaps so the user can return to Optimizer.",
+        "labelTranslations": {
+         "zh-CN": "执行计划"
+        },
+        "send": true,
+        "surface": "plan-gate",
+        "requiredSkillIds": [
+         "renderdoc-execution",
+         "optimization-experiment",
+         "rdc-tool-shell",
+         "optimizer-rdc-tools"
+        ],
+        "requiredToolIds": [
+         "investigation_schema",
+         "investigation_read",
+         "investigation_write",
+         "investigation_list",
+         "subagent"
+        ]
+       }
+      ],
+      "metadata": {},
+      "instructions": "你是 Optimizer，负责\"哪里慢、怎样变快\"这类调查的规划和最终评估。按 $investigation-planning 和 $optimizer-coordinator 工作，其他方法按需读取。你只规划：用 plan_artifact 提交计划并等待审阅，批准后结束本回合，由 General 执行并就地交付。\n用户之后请你评估结果时，依据签名的执行证据、独立审查的 Challenge 和限制，经 investigation_* 发布报告，并在 turn_complete.evidenceRefs 里写它的 contentUri 和 contentHash。不自动写持久 Knowledge 或 Memory。",
+      "builtin": true,
+      "enabled": true,
+      "updatedAt": "2026-11-26T14:28:30.426Z",
+      "effectiveStatus": "effective",
+      "provenance": {
+       "scope": "builtin",
+       "sourcePath": "/visual-diff-repo/resources/agent-runtime/agents/optimizer.agent.md",
+       "sourceHash": "80c3506a4edc2d8720751fa3cc3e51980862c3e2f775d4b2b06815c5937b5d85"
+      },
+      "compiledRoute": {
+       "agentId": "optimizer",
+       "providerId": "",
+       "modelId": ""
+      },
+      "modelSource": "none"
+     },
+     {
+      "id": "generator",
+      "fileName": "generator.agent.md",
+      "filePath": "/visual-diff-repo/resources/agent-runtime/agents/generator.agent.md",
+      "name": "Generator",
+      "description": "Develop evidence-based explanations, competing hypotheses and candidate checks within the assigned investigation.",
+      "argumentHint": "Task and evidence",
+      "descriptionTranslations": {
+       "zh-CN": "在分配的调查范围内，基于证据提出解释、相互竞争的假设与候选检查。"
+      },
+      "argumentHintTranslations": {
+       "zh-CN": "任务与证据"
+      },
+      "target": "rdc-agent",
+      "icon": "nodes",
+      "accent": "#33d1ff",
+      "disableModelInvocation": false,
+      "userInvocable": false,
+      "accessCeiling": "read-only",
+      "tools": [
+       "artifact_read",
+       "skill",
+       "tool_search",
+       "turn_complete",
+       "subagent_report",
+       "investigation_schema",
+       "investigation_read",
+       "investigation_list",
+       "investigation_write"
+      ],
+      "skills": [
+       "renderdoc-investigation",
+       "artifact-provenance"
+      ],
+      "mcpServers": [],
+      "agents": [],
+      "handoffs": [],
+      "metadata": {},
+      "instructions": "你是 Generator：在委派的调查范围内，基于证据提出可区分的解释和候选检查。用预载的方法和获授的精确输入工作，按委派要求返回结果、来源和未解决的问题；不扩大目标、权限或结论强度。",
+      "builtin": true,
+      "enabled": true,
+      "updatedAt": "2026-11-26T14:28:30.426Z",
+      "effectiveStatus": "effective",
+      "provenance": {
+       "scope": "builtin",
+       "sourcePath": "/visual-diff-repo/resources/agent-runtime/agents/generator.agent.md",
+       "sourceHash": "441400470536bdb2c4594c7e7e0c955c2d0f91051ef8397315cb2337a3457557"
+      },
+      "compiledRoute": {
+       "agentId": "generator",
+       "providerId": "",
+       "modelId": ""
+      },
+      "modelSource": "none"
+     },
+     {
+      "id": "knowledge-scout",
+      "fileName": "knowledge-scout.agent.md",
+      "filePath": "/visual-diff-repo/resources/agent-runtime/agents/knowledge-scout.agent.md",
+      "name": "Knowledge Scout",
+      "description": "Find relevant knowledge, compare scope and contrary material, and identify applicable checks with versioned sources.",
+      "argumentHint": "Task and evidence",
+      "descriptionTranslations": {
+       "zh-CN": "查找相关知识，比较适用范围与相反材料，给出带版本来源的适用检查。"
+      },
+      "argumentHintTranslations": {
+       "zh-CN": "任务与证据"
+      },
+      "target": "rdc-agent",
+      "icon": "nodes",
+      "accent": "#33d1ff",
+      "disableModelInvocation": false,
+      "userInvocable": false,
+      "accessCeiling": "read-only",
+      "tools": [
+       "artifact_read",
+       "read_image",
+       "skill",
+       "tool_search",
+       "turn_complete",
+       "subagent_report",
+       "knowledge_browse",
+       "knowledge_search",
+       "knowledge_read",
+       "knowledge_compile"
+      ],
+      "skills": [
+       "knowledge-scout"
+      ],
+      "mcpServers": [],
+      "agents": [],
+      "handoffs": [],
+      "metadata": {},
+      "instructions": "你是 Knowledge Scout：找出相关知识，比较适用范围和反例，给出带版本来源的可用检查。用预载的方法和获授的精确输入工作，按委派要求返回结果、来源和未解决的问题；不扩大目标、权限或结论强度。",
+      "builtin": true,
+      "enabled": true,
+      "updatedAt": "2026-11-26T14:28:30.426Z",
+      "effectiveStatus": "effective",
+      "provenance": {
+       "scope": "builtin",
+       "sourcePath": "/visual-diff-repo/resources/agent-runtime/agents/knowledge-scout.agent.md",
+       "sourceHash": "7b68b436500cb932cec816b3b3f4bb199f2f17ac2d95013c7838f87d961af456"
+      },
+      "compiledRoute": {
+       "agentId": "knowledge-scout",
+       "providerId": "",
+       "modelId": ""
+      },
+      "modelSource": "none"
+     },
+     {
+      "id": "pass-analyst",
+      "fileName": "pass-analyst.agent.md",
+      "filePath": "/visual-diff-repo/resources/agent-runtime/agents/pass-analyst.agent.md",
+      "name": "Pass Analyst",
+      "description": "Analyze authorized pass, pipeline and execution relationships and identify unresolved dependencies.",
+      "argumentHint": "Task and evidence",
+      "descriptionTranslations": {
+       "zh-CN": "分析已授权的 pass、管线与执行关系，找出尚未解决的依赖。"
+      },
+      "argumentHintTranslations": {
+       "zh-CN": "任务与证据"
+      },
+      "target": "rdc-agent",
+      "icon": "nodes",
+      "accent": "#33d1ff",
+      "disableModelInvocation": false,
+      "userInvocable": false,
+      "accessCeiling": "read-only",
+      "tools": [
+       "artifact_read",
+       "skill",
+       "tool_search",
+       "turn_complete",
+       "subagent_report",
+       "investigation_schema",
+       "investigation_read",
+       "investigation_list"
+      ],
+      "skills": [
+       "pass-graph-analysis"
+      ],
+      "mcpServers": [],
+      "agents": [],
+      "handoffs": [],
+      "metadata": {},
+      "instructions": "你是 Pass Analyst：分析获授的 pass、管线和执行关系，指出尚未解决的依赖。用预载的方法和获授的精确输入工作，按委派要求返回结果、来源和未解决的问题；不扩大目标、权限或结论强度。",
+      "builtin": true,
+      "enabled": true,
+      "updatedAt": "2026-11-26T14:28:30.426Z",
+      "effectiveStatus": "effective",
+      "provenance": {
+       "scope": "builtin",
+       "sourcePath": "/visual-diff-repo/resources/agent-runtime/agents/pass-analyst.agent.md",
+       "sourceHash": "11f67433a6c8f860f46a1a0236048fae394c3bd023f3adc74ce59397eff84727"
+      },
+      "compiledRoute": {
+       "agentId": "pass-analyst",
+       "providerId": "",
+       "modelId": ""
+      },
+      "modelSource": "none"
+     },
+     {
+      "id": "pixel-analyst",
+      "fileName": "pixel-analyst.agent.md",
+      "filePath": "/visual-diff-repo/resources/agent-runtime/agents/pixel-analyst.agent.md",
+      "name": "Pixel Analyst",
+      "description": "Analyze authorized image and pixel evidence and preserve sampling, mapping and quality limitations.",
+      "argumentHint": "Task and evidence",
+      "descriptionTranslations": {
+       "zh-CN": "分析已授权的图像与像素证据，保留采样、映射与质量上的限制。"
+      },
+      "argumentHintTranslations": {
+       "zh-CN": "任务与证据"
+      },
+      "target": "rdc-agent",
+      "icon": "nodes",
+      "accent": "#33d1ff",
+      "disableModelInvocation": false,
+      "userInvocable": false,
+      "accessCeiling": "read-only",
+      "tools": [
+       "artifact_read",
+       "skill",
+       "tool_search",
+       "turn_complete",
+       "subagent_report",
+       "investigation_schema",
+       "investigation_read",
+       "investigation_list"
+      ],
+      "skills": [
+       "pixel-forensics"
+      ],
+      "mcpServers": [],
+      "agents": [],
+      "handoffs": [],
+      "metadata": {},
+      "instructions": "你是 Pixel Analyst：分析获授的图像和像素证据，保留采样、映射和画质上的限制。用预载的方法和获授的精确输入工作，按委派要求返回结果、来源和未解决的问题；不扩大目标、权限或结论强度。",
+      "builtin": true,
+      "enabled": true,
+      "updatedAt": "2026-11-26T14:28:30.426Z",
+      "effectiveStatus": "effective",
+      "provenance": {
+       "scope": "builtin",
+       "sourcePath": "/visual-diff-repo/resources/agent-runtime/agents/pixel-analyst.agent.md",
+       "sourceHash": "a06933b1d296f2ed4b81670b1002064e71b9d9febd868000718ece8ba88e7b5b"
+      },
+      "compiledRoute": {
+       "agentId": "pixel-analyst",
+       "providerId": "",
+       "modelId": ""
+      },
+      "modelSource": "none"
+     },
+     {
+      "id": "report-writer",
+      "fileName": "report-writer.agent.md",
+      "filePath": "/visual-diff-repo/resources/agent-runtime/agents/report-writer.agent.md",
+      "name": "Report Writer",
+      "description": "Organize eligible claims and evidence without upgrading their qualification or concealing limitations.",
+      "argumentHint": "Task and evidence",
+      "descriptionTranslations": {
+       "zh-CN": "整理合格的结论与证据，不抬高其限定程度，也不隐藏局限。"
+      },
+      "argumentHintTranslations": {
+       "zh-CN": "任务与证据"
+      },
+      "target": "rdc-agent",
+      "icon": "nodes",
+      "accent": "#33d1ff",
+      "disableModelInvocation": false,
+      "userInvocable": false,
+      "accessCeiling": "read-only",
+      "tools": [
+       "artifact_read",
+       "skill",
+       "tool_search",
+       "turn_complete",
+       "subagent_report",
+       "investigation_schema",
+       "investigation_read",
+       "investigation_list",
+       "investigation_write"
+      ],
+      "skills": [
+       "report-composition",
+       "artifact-provenance"
+      ],
+      "mcpServers": [],
+      "agents": [],
+      "handoffs": [],
+      "metadata": {},
+      "instructions": "你是 Report Writer：组织合格的主张和证据写成报告，不抬高等级，不隐藏限制。用预载的方法和获授的精确输入工作，按委派要求返回结果、来源和未解决的问题；不扩大目标、权限或结论强度。",
+      "builtin": true,
+      "enabled": true,
+      "updatedAt": "2026-11-26T14:28:30.426Z",
+      "effectiveStatus": "effective",
+      "provenance": {
+       "scope": "builtin",
+       "sourcePath": "/visual-diff-repo/resources/agent-runtime/agents/report-writer.agent.md",
+       "sourceHash": "0a13e49ba4159550ee25ac34e2ef3c0bab6e028155df6a651fcd130d9c7fb414"
+      },
+      "compiledRoute": {
+       "agentId": "report-writer",
+       "providerId": "",
+       "modelId": ""
+      },
+      "modelSource": "none"
+     },
+     {
+      "id": "resource-analyst",
+      "fileName": "resource-analyst.agent.md",
+      "filePath": "/visual-diff-repo/resources/agent-runtime/agents/resource-analyst.agent.md",
+      "name": "Resource Analyst",
+      "description": "Analyze resource versions, dependencies and cross-capture correspondence with explicit identity and uncertainty.",
+      "argumentHint": "Task and evidence",
+      "descriptionTranslations": {
+       "zh-CN": "分析资源版本、依赖与跨 capture 的对应关系，明确身份与不确定性。"
+      },
+      "argumentHintTranslations": {
+       "zh-CN": "任务与证据"
+      },
+      "target": "rdc-agent",
+      "icon": "nodes",
+      "accent": "#33d1ff",
+      "disableModelInvocation": false,
+      "userInvocable": false,
+      "accessCeiling": "read-only",
+      "tools": [
+       "artifact_read",
+       "skill",
+       "tool_search",
+       "turn_complete",
+       "subagent_report",
+       "investigation_schema",
+       "investigation_read",
+       "investigation_list"
+      ],
+      "skills": [
+       "resource-versioning",
+       "cross-capture-alignment"
+      ],
+      "mcpServers": [],
+      "agents": [],
+      "handoffs": [],
+      "metadata": {},
+      "instructions": "你是 Resource Analyst：分析资源版本、依赖和跨 capture 的对应关系，写明身份依据和不确定性。用预载的方法和获授的精确输入工作，按委派要求返回结果、来源和未解决的问题；不扩大目标、权限或结论强度。",
+      "builtin": true,
+      "enabled": true,
+      "updatedAt": "2026-11-26T14:28:30.426Z",
+      "effectiveStatus": "effective",
+      "provenance": {
+       "scope": "builtin",
+       "sourcePath": "/visual-diff-repo/resources/agent-runtime/agents/resource-analyst.agent.md",
+       "sourceHash": "18e9229faadb5f412cf38402d910511c72ea90f9cd55d59230eb710ad5ea797f"
+      },
+      "compiledRoute": {
+       "agentId": "resource-analyst",
+       "providerId": "",
+       "modelId": ""
+      },
+      "modelSource": "none"
+     },
+     {
+      "id": "shader-analyst",
+      "fileName": "shader-analyst.agent.md",
+      "filePath": "/visual-diff-repo/resources/agent-runtime/agents/shader-analyst.agent.md",
+      "name": "Shader Analyst",
+      "description": "Analyze authorized shader source, IR and dataflow and qualify reconstructed and inferred conclusions.",
+      "argumentHint": "Task and evidence",
+      "descriptionTranslations": {
+       "zh-CN": "分析已授权的着色器源码、IR 与数据流，标明重建与推断得出的结论。"
+      },
+      "argumentHintTranslations": {
+       "zh-CN": "任务与证据"
+      },
+      "target": "rdc-agent",
+      "icon": "nodes",
+      "accent": "#33d1ff",
+      "disableModelInvocation": false,
+      "userInvocable": false,
+      "accessCeiling": "read-only",
+      "tools": [
+       "artifact_read",
+       "skill",
+       "tool_search",
+       "turn_complete",
+       "subagent_report",
+       "investigation_schema",
+       "investigation_read",
+       "investigation_list"
+      ],
+      "skills": [
+       "shader-ir-analysis"
+      ],
+      "mcpServers": [],
+      "agents": [],
+      "handoffs": [],
+      "metadata": {},
+      "instructions": "你是 Shader Analyst：分析获授的 shader 源码、IR 和数据流，标明哪些结论是重建的、哪些是推断的。用预载的方法和获授的精确输入工作，按委派要求返回结果、来源和未解决的问题；不扩大目标、权限或结论强度。",
+      "builtin": true,
+      "enabled": true,
+      "updatedAt": "2026-11-26T14:28:30.426Z",
+      "effectiveStatus": "effective",
+      "provenance": {
+       "scope": "builtin",
+       "sourcePath": "/visual-diff-repo/resources/agent-runtime/agents/shader-analyst.agent.md",
+       "sourceHash": "1a6f14fdc1cb62b5268cf4caf5ec98359bfc3355479bb75bec26a04e4eed362f"
+      },
+      "compiledRoute": {
+       "agentId": "shader-analyst",
+       "providerId": "",
+       "modelId": ""
+      },
+      "modelSource": "none"
+     },
+     {
+      "id": "verifier",
+      "fileName": "verifier.agent.md",
+      "filePath": "/visual-diff-repo/resources/agent-runtime/agents/verifier.agent.md",
+      "name": "Verifier",
+      "description": "Independently review authorized evidence and claims; report coverage, limits and challenges.",
+      "argumentHint": "Describe the assigned task and authorized evidence",
+      "descriptionTranslations": {
+       "zh-CN": "独立审查已授权的证据与结论，报告覆盖范围、局限与质疑。"
+      },
+      "argumentHintTranslations": {
+       "zh-CN": "分配的任务与已授权的证据"
+      },
+      "target": "rdc-agent",
+      "icon": "nodes",
+      "accent": "#33d1ff",
+      "disableModelInvocation": false,
+      "userInvocable": false,
+      "accessCeiling": "read-only",
+      "tools": [
+       "artifact_read",
+       "skill",
+       "tool_search",
+       "turn_complete",
+       "subagent_report",
+       "investigation_schema",
+       "investigation_read",
+       "investigation_list",
+       "investigation_write"
+      ],
+      "skills": [
+       "skeptic-review",
+       "artifact-provenance"
+      ],
+      "mcpServers": [],
+      "agents": [],
+      "handoffs": [],
+      "metadata": {},
+      "instructions": "你是 Verifier：独立审查获授的证据和主张的当前版本，报告覆盖范围、限制和需要处理的缺口。用预载的方法和获授的精确输入工作，按委派要求返回结果、来源和未解决的问题；不扩大目标、权限或结论强度。",
+      "builtin": true,
+      "enabled": true,
+      "updatedAt": "2026-11-26T14:28:30.426Z",
+      "effectiveStatus": "effective",
+      "provenance": {
+       "scope": "builtin",
+       "sourcePath": "/visual-diff-repo/resources/agent-runtime/agents/verifier.agent.md",
+       "sourceHash": "48370f3cdc0e8151db2c0501dc3744b6a96a9d3a4e0743a2eb7371794d274798"
+      },
+      "compiledRoute": {
+       "agentId": "verifier",
+       "providerId": "",
+       "modelId": ""
+      },
+      "modelSource": "none"
+     }
+    ],
+    "globalInstructions": "",
+    "diagnostics": [],
+    "projectId": null
+   },
+   "resourceCatalog": {
+    "diagnostics": [
+     {
+      "code": "missing_configured_provider",
+      "severity": "warning",
+      "message": "No configured provider is available for agent execution."
+     }
+    ]
+   },
+   "paths": {
+    "userRdcRoot": "/visual-diff/.rdc-agent",
+    "configPath": "/visual-diff/.rdc-agent/config.json",
+    "instructionsPath": "/visual-diff/.rdc-agent/RDC.md",
+    "agentsPath": "/visual-diff/.rdc-agent/agents",
+    "skillsPath": "/visual-diff/.rdc-agent/skills",
+    "mcpPath": "/visual-diff/.rdc-agent/mcp",
+    "hooksPath": "/visual-diff/.rdc-agent/hooks",
+    "policiesPath": "/visual-diff/.rdc-agent/policies",
+    "knowledgePath": "/visual-diff/.rdc-agent/knowledge",
+    "memoryPath": "/visual-diff/.rdc-agent/memory",
+    "rdcIntermediateRoot": "/visual-diff/.rdc-agent/rdc-tool-intermediate",
+    "appStateRoot": "/visual-diff/state",
+    "projectsPath": "/visual-diff/state/projects",
+    "sessionsPath": "/visual-diff/state/sessions",
+    "tasksPath": "/visual-diff/state/tasks",
+    "tracesPath": "/visual-diff/state/traces",
+    "llmCallsPath": "/visual-diff/state/llm-calls",
+    "secretsPath": "/visual-diff/secrets",
+    "logsPath": "/visual-diff/logs",
+    "logPath": "/visual-diff/logs/rdc-agent.log",
+    "capturePreviewsPath": "/visual-diff/capture-previews",
+    "profileStatePath": "/visual-diff/state/profile",
+    "attachmentStagingPath": "/visual-diff/state/staging/attachments",
+    "settingsPath": "/visual-diff/.rdc-agent/config.json"
+   }
+  }
+ },
  "13f6daba208dffd78dd6c4e0": {
   "result": {
    "scopeGeneration": "d790c5a5-b111-4950-9a20-859ee393f954",
@@ -226358,6 +232195,526 @@
     "attachmentStagingPath": "/visual-diff/state/staging/attachments",
     "settingsPath": "/visual-diff/.rdc-agent/config.json"
    }
+  }
+ },
+ "a9182166798061541b59be50": {
+  "result": {
+   "userRoot": "/visual-diff/.rdc-agent",
+   "userPaths": {
+    "userRdcRoot": "/visual-diff/.rdc-agent",
+    "configPath": "/visual-diff/.rdc-agent/config.json",
+    "instructionsPath": "/visual-diff/.rdc-agent/RDC.md",
+    "agentsPath": "/visual-diff/.rdc-agent/agents",
+    "skillsPath": "/visual-diff/.rdc-agent/skills",
+    "mcpPath": "/visual-diff/.rdc-agent/mcp",
+    "hooksPath": "/visual-diff/.rdc-agent/hooks",
+    "policiesPath": "/visual-diff/.rdc-agent/policies",
+    "knowledgePath": "/visual-diff/.rdc-agent/knowledge",
+    "memoryPath": "/visual-diff/.rdc-agent/memory",
+    "rdcIntermediateRoot": "/visual-diff/.rdc-agent/rdc-tool-intermediate"
+   },
+   "resources": [],
+   "hooks": [
+    {
+     "id": "artifact-integrity",
+     "scope": "builtin",
+     "sourcePath": "/visual-diff-repo/resources/agent-runtime/hooks/artifact-integrity.hook.yml",
+     "sourceHash": "79e0f7e587c931d1ae612dfd74dfbaf8c738e367bc914fce26f7fde216ce85be",
+     "enabled": true,
+     "event": "tool.before-call",
+     "trusted": true,
+     "needsRetrust": false,
+     "trustFingerprint": "builtin:79e0f7e587c931d1ae612dfd74dfbaf8c738e367bc914fce26f7fde216ce85be",
+     "failurePolicy": "block"
+    },
+    {
+     "id": "mission-plan-handoff-check",
+     "scope": "builtin",
+     "sourcePath": "/visual-diff-repo/resources/agent-runtime/hooks/mission-plan-handoff-check.hook.yml",
+     "sourceHash": "8ff43a1a2affa4e870ec5dc838376e5733580bfd531d42c0892b509964979e00",
+     "enabled": true,
+     "event": "agent.before-handoff",
+     "trusted": true,
+     "needsRetrust": false,
+     "trustFingerprint": "builtin:8ff43a1a2affa4e870ec5dc838376e5733580bfd531d42c0892b509964979e00",
+     "failurePolicy": "block"
+    },
+    {
+     "id": "rdc-shell-audit",
+     "scope": "builtin",
+     "sourcePath": "/visual-diff-repo/resources/agent-runtime/hooks/rdc-shell-audit.hook.yml",
+     "sourceHash": "325b338b1d3e4b258bd430d53afcb7e0c10ce2e134d7463eab3c680e384b10b3",
+     "enabled": true,
+     "event": "tool.before-call",
+     "trusted": true,
+     "needsRetrust": false,
+     "trustFingerprint": "builtin:325b338b1d3e4b258bd430d53afcb7e0c10ce2e134d7463eab3c680e384b10b3",
+     "failurePolicy": "warn"
+    },
+    {
+     "id": "report-contract",
+     "scope": "builtin",
+     "sourcePath": "/visual-diff-repo/resources/agent-runtime/hooks/report-contract.hook.yml",
+     "sourceHash": "d5466729db8595c66bf3ef97a0f1f678767f98406790188d254335619549c781",
+     "enabled": true,
+     "event": "tool.before-call",
+     "trusted": true,
+     "needsRetrust": false,
+     "trustFingerprint": "builtin:d5466729db8595c66bf3ef97a0f1f678767f98406790188d254335619549c781",
+     "failurePolicy": "block"
+    }
+   ],
+   "mcpServers": [],
+   "skillSelection": {
+    "status": "ready",
+    "options": [
+     {
+      "id": "analyzer-architecture-method",
+      "name": "analyzer-architecture-method",
+      "description": "Write Analyzer Architecture Model versions on existing rdc.investigation kinds without crossing Observed / Reconstructed / Authoring layers.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/analyzer-architecture-method/SKILL.md",
+      "sourceHash": "e4e005acf9c627bf0a5e592ebb3c1999ffb55ccd80cf184c0e5a90891f0e0265",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "analyzer-coordinator",
+      "name": "analyzer-coordinator",
+      "description": "Plan and evaluate analyzer investigations using bounded strategies and evidence.",
+      "allowedTools": [],
+      "investigationMission": "analyzer",
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/analyzer-coordinator/SKILL.md",
+      "sourceHash": "a7f7f297c93bf58a92e25adf491738a54b4c5199362965c5da8e3efc92813077",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "analyzer-rdc-tools",
+      "name": "analyzer-rdc-tools",
+      "description": "Operation knowledge for Analyzer planning and owning General execution to reconstruct passes, resources, bindings, shaders, and data flow without overstating author intent.",
+      "allowedTools": [],
+      "audience": [
+       "analyzer",
+       "general"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/analyzer-rdc-tools/SKILL.md",
+      "sourceHash": "370bd39dbe2c0a0073868e003f4dc95ba68c9f8f85923a553964cd49964b0da8",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": [
+       "debugger",
+       "optimizer"
+      ]
+     },
+     {
+      "id": "artifact-provenance",
+      "name": "artifact-provenance",
+      "description": "Enforce ready provenance and cite investigation artifacts only by id and hash.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/artifact-provenance/SKILL.md",
+      "sourceHash": "d3ad14e6d0cc045d6150fbea2f9024585cbbe538c842ff2eabab3739385983c0",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "capture-facts",
+      "name": "capture-facts",
+      "description": "Record observed capture facts as Evidence and World State without promoting inferences.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/capture-facts/SKILL.md",
+      "sourceHash": "e10a602c0b0c3eabcb1d3e499b87ef2b68a471ecec433dcf1ab4d90fb64274b9",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "capture-preflight",
+      "name": "capture-preflight",
+      "description": "Check capture, CLI, and replay readiness before opening or mutating a .rdc.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/capture-preflight/SKILL.md",
+      "sourceHash": "1d498cdb88aab525ec5045907198f849b08f5dce6d60cde9377439def1e45ca8",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "cross-capture-alignment",
+      "name": "cross-capture-alignment",
+      "description": "Align facts across captures on explicit scope axes without over-generalizing.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/cross-capture-alignment/SKILL.md",
+      "sourceHash": "e279cec0d00991639e78896aedc1fe6057b870309569c5350786b5816a3ed01e",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "debug",
+      "name": "debug",
+      "description": "Diagnose issues from reproducible evidence, isolate the responsible component, and verify the correction.",
+      "allowedTools": [
+       "read_file",
+       "glob",
+       "grep",
+       "web_search"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/debug/SKILL.md",
+      "sourceHash": "91e63771a2e1d2afd093cdf34bd42ce6130c56ad371dc8dec4526568aa66ec14",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "debugger-causal-method",
+      "name": "debugger-causal-method",
+      "description": "Write Debugger First Bad Event, Hypothesis Matrix, and Counterfactual records on existing rdc.investigation kinds.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/debugger-causal-method/SKILL.md",
+      "sourceHash": "3dc12bd2f20973bd593c346d2a86465d64802dd01b289a8125450a4da6a3c9f9",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "debugger-coordinator",
+      "name": "debugger-coordinator",
+      "description": "Plan and evaluate debugger investigations using bounded strategies and evidence.",
+      "allowedTools": [],
+      "investigationMission": "debugger",
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/debugger-coordinator/SKILL.md",
+      "sourceHash": "bedee62695eafd483bb973f6895e87057567c4b629fa4f0312842d686180b5c0",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "debugger-rdc-tools",
+      "name": "debugger-rdc-tools",
+      "description": "Operation knowledge for Debugger planning and owning General execution to localize rendering faults, test competing causes, and verify a restored result.",
+      "allowedTools": [],
+      "audience": [
+       "debugger",
+       "general"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/debugger-rdc-tools/SKILL.md",
+      "sourceHash": "efedb17970ec875f07853914e11f9318edd6d7f6fab5bec3c599f57f0020f396",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": [
+       "analyzer",
+       "optimizer"
+      ]
+     },
+     {
+      "id": "execution-orchestrator",
+      "name": "execution-orchestrator",
+      "description": "Complete everyday questions, file work, coding and collaborative tasks with proportionate planning and verification.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/execution-orchestrator/SKILL.md",
+      "sourceHash": "c33a956959df579b90eebc63670224953762758b18fea55f3d402b6a2b23c8ec",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "investigation-planning",
+      "name": "investigation-planning",
+      "description": "Turn a short symptom into a plan the user can read and General can execute, then evaluate the delivered result when the user returns.",
+      "allowedTools": [],
+      "audience": [
+       "debugger",
+       "analyzer",
+       "optimizer"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/investigation-planning/SKILL.md",
+      "sourceHash": "2f59c61f715a5b27f63c3715e35c1b046743f694ff0cef60d44fc6cd29523bf9",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": [
+       "general"
+      ]
+     },
+     {
+      "id": "knowledge-candidate",
+      "name": "knowledge-candidate",
+      "description": "Create a session Knowledge Candidate only after explicit user intent. Never persist verified or promoted cards.",
+      "allowedTools": [
+       "knowledge_candidate_create"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/knowledge-candidate/SKILL.md",
+      "sourceHash": "104dc9b197e7d716922bc95df6b5be0c7dd12ff39cd3c42ce6c268967cd1672c",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "knowledge-scout",
+      "name": "knowledge-scout",
+      "description": "Search, read, and compile scoped Knowledge into a sourced Brief or Pack without writing or promoting cards.",
+      "allowedTools": [
+       "subagent_report",
+       "turn_complete",
+       "artifact_read",
+       "knowledge_browse",
+       "knowledge_search",
+       "knowledge_read",
+       "knowledge_compile",
+       "read_image"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/knowledge-scout/SKILL.md",
+      "sourceHash": "17dd548757e2dca910ce2ce0385b2c1730d366e63be2e61c83aab660bb1875be",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "optimization-experiment",
+      "name": "optimization-experiment",
+      "description": "Run cost experiments with a real intervention, exclusive World State, and verified rollback.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/optimization-experiment/SKILL.md",
+      "sourceHash": "773bde7fa4658f99dc7132390b46d0df110426f73c8a5b03d0e76dc7c378636d",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "optimizer-coordinator",
+      "name": "optimizer-coordinator",
+      "description": "Plan and evaluate optimizer investigations using bounded strategies and evidence.",
+      "allowedTools": [],
+      "investigationMission": "optimizer",
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/optimizer-coordinator/SKILL.md",
+      "sourceHash": "9f92adb4ac7a689b6274c4809efe92a5739aae3f9ed7a74a839ec0ab9d34eb50",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "optimizer-rdc-tools",
+      "name": "optimizer-rdc-tools",
+      "description": "Operation knowledge for Optimizer planning and owning General execution to measure costs, run controlled shader interventions, and verify visual and numeric restoration.",
+      "allowedTools": [],
+      "audience": [
+       "optimizer",
+       "general"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/optimizer-rdc-tools/SKILL.md",
+      "sourceHash": "f7a4dbd2bd83ff3d6f19078768a97564e472ac1be5f1a964bf867e07d089f797",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": [
+       "debugger",
+       "analyzer"
+      ]
+     },
+     {
+      "id": "pass-graph-analysis",
+      "name": "pass-graph-analysis",
+      "description": "Reconstruct pass graphs from capture structure and keep observed names separate from inferred ones.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/pass-graph-analysis/SKILL.md",
+      "sourceHash": "870d2d5e10fe29cef9e91b887b2acd53d634b3c8c4135277d1ebc29e7c072d9b",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "pixel-forensics",
+      "name": "pixel-forensics",
+      "description": "Diagnose pixel history, overdraw, and color errors from region-scoped visual evidence.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/pixel-forensics/SKILL.md",
+      "sourceHash": "c2aaa1f04e40236703c03dfd5e886f9b89caa77646cbc9220dde91d5005f0d0d",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "rdc-context",
+      "name": "rdc-context",
+      "description": "Summarize the active project, capture, and RenderDoc session context before deeper investigation.",
+      "allowedTools": [
+       "runtime_context",
+       "read_file",
+       "glob",
+       "grep"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/rdc-context/SKILL.md",
+      "sourceHash": "9fda924c0a2f84887c612750d9ce28750c160e5b3d401e232d8ce926201bc82e",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "rdc-tool-shell",
+      "name": "rdc-tool-shell",
+      "description": "Plan and interpret RDC operations using shared CLI, identity, output, error, evidence, and side-effect rules. Execution belongs to owning General through the frozen Settings CLI binding.",
+      "allowedTools": [],
+      "audience": [
+       "general",
+       "debugger",
+       "analyzer",
+       "optimizer"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/rdc-tool-shell/SKILL.md",
+      "sourceHash": "54c6bb9ec179b51c316d580f3faaa67b265403f4859b5a4314397bf6fd9cfe90",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "remember",
+      "name": "remember",
+      "description": "Persist a user-approved fact or decision into explicit User or Project memory.",
+      "allowedTools": [
+       "memory_search",
+       "memory_read",
+       "memory_write"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/remember/SKILL.md",
+      "sourceHash": "174d0bbb3c6e97b2f6571e6bdfb715137ae896fc2a40d4aad3872a3f3f8a0cf3",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "renderdoc-execution",
+      "name": "renderdoc-execution",
+      "description": "Execute a frozen RenderDoc investigation plan, deliver in place, and checkpoint changes requiring strategic realignment.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/renderdoc-execution/SKILL.md",
+      "sourceHash": "33388c62b79b6bf4fca44e04e3e22ae4e5b60d37d5e89d888cff6fb951d0f954",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "renderdoc-glossary",
+      "name": "renderdoc-glossary",
+      "description": "Explain RenderDoc and graphics-debugging terms without claiming unobserved runtime evidence.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/renderdoc-glossary/SKILL.md",
+      "sourceHash": "2beb108fd8dff5036119294c2d2223e5d97e2f09223594cb18e13fb6955824e6",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "renderdoc-investigation",
+      "name": "renderdoc-investigation",
+      "description": "Route RenderDoc capture investigations of incorrect rendering, rendering architecture or GPU optimization to the appropriate planning agent. Not needed for terminology explanations or ordinary code questions.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/renderdoc-investigation/SKILL.md",
+      "sourceHash": "0bc9b917599cf7b0e41ffb826a68d738aa13c5aad6dfc35391309343ae3745e7",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "report-composition",
+      "name": "report-composition",
+      "description": "Compose an Investigation report as a View that must not raise Claim rank or rewrite measured facts.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/report-composition/SKILL.md",
+      "sourceHash": "32ae9d674fa56a4d4ef9f02dd406f8bc6e80d17939fda0f9559bc9366396d9c9",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "resource-versioning",
+      "name": "resource-versioning",
+      "description": "Trace resource producers, consumers, and versions across the current World State.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/resource-versioning/SKILL.md",
+      "sourceHash": "f426e2e2a984f9e1a629ad3bff7236b19ba32f5887519711dca4bb0c665a572b",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "shader-ir-analysis",
+      "name": "shader-ir-analysis",
+      "description": "Analyze shader source or IR from hashed artifacts without promoting derived notes to observed facts.",
+      "allowedTools": [],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/shader-ir-analysis/SKILL.md",
+      "sourceHash": "da8404e6c712cf94e25c959617407b413ac0bfd8f5b801742e53fa28e0d6f875",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "simplify",
+      "name": "simplify",
+      "description": "Review the current change for reuse, clarity, efficiency, and correct abstraction level.",
+      "allowedTools": [
+       "read_file",
+       "glob",
+       "grep",
+       "artifact_read",
+       "subagent_report",
+       "turn_complete"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/simplify/SKILL.md",
+      "sourceHash": "1544b011663d75d99900da6ca7e0989f4fab8d3d1b04e8910c6526bb4c9fc4bd",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "skeptic-review",
+      "name": "skeptic-review",
+      "description": "Challenge Claims from Evidence, Experiments, negatives, and unknowns. Do not rewrite the Generator narrative.",
+      "allowedTools": [
+       "subagent_report",
+       "turn_complete",
+       "artifact_read",
+       "investigation_schema",
+       "investigation_read",
+       "investigation_write",
+       "investigation_list",
+       "knowledge_browse",
+       "knowledge_search",
+       "knowledge_read",
+       "knowledge_compile"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/skeptic-review/SKILL.md",
+      "sourceHash": "c4e49b8268005641ad398221ec01a47bcbde58ebb4c6dde9b742ecce129bfdc9",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     },
+     {
+      "id": "verify",
+      "name": "verify",
+      "description": "Verify a change through repository checks and the real product surface affected by it.",
+      "allowedTools": [
+       "read_file",
+       "glob",
+       "grep",
+       "shell"
+      ],
+      "scope": "builtin",
+      "sourcePath": "/visual-diff-repo/resources/agent-runtime/skills/verify/SKILL.md",
+      "sourceHash": "69574fedc034a23c7c3f36500b3fd5c6e03f371543faade350132a5b4b01c23d",
+      "effectiveStatus": "effective",
+      "unavailableToAgentIds": []
+     }
+    ]
+   },
+   "knowledge": {
+    "userPath": "/visual-diff/.rdc-agent/knowledge"
+   },
+   "memory": {
+    "userPath": "/visual-diff/.rdc-agent/memory"
+   },
+   "diagnostics": []
   }
  },
  "b191b4c30b58f01ff7c249ed": {

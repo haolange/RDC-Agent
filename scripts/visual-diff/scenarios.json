@@ -1507,6 +1507,21 @@
     }
    ],
    "settleMs": 1000
+  },
+  {
+   "id": "renderer-crash-page",
+   "query": {
+    "rendererCrash": "crashed",
+    "exitCode": "139",
+    "crashedAt": "1764063000000",
+    "lang": "en"
+   },
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"renderer-failure-page\"]"
+    }
+   ],
+   "settleMs": 600
   }
  ]
 }
