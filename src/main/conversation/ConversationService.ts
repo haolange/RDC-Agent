@@ -105,7 +105,7 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
     }
     const active = Array.from(this.activeTurns.values());
     for (const turn of active) {
-      turn.stop();
+      turn.stop('app-shutdown');
     }
     await Promise.allSettled(active.map((turn) => turn.stopped));
     await agentOrchestrator.backgroundSubagents.abortAll();
@@ -201,7 +201,7 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
       return { success: false, reason: 'no-active-turn' };
     }
 
-    target.stop();
+    target.stop('user');
     await target.stopped;
     if (target.sessionId) await agentOrchestrator.backgroundSubagents.abortSession(target.sessionId);
     return {
@@ -578,7 +578,7 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
       (activeTurn) => activeTurn.sessionId === sessionId && downstreamTurnIds.has(activeTurn.turnId),
     );
     for (const activeTurn of turnsToStop) {
-      activeTurn.stop();
+      activeTurn.stop('user');
     }
     // Overlap producer abort with turn exit; sync slots before rehydrate.
     agentOrchestrator.syncSessionSlots(sessionId);
@@ -667,7 +667,7 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
 
   async switchConversationBranch(input: ConversationSwitchBranchRequest): Promise<ConversationSwitchBranchResult> {
     const activeTurns = Array.from(this.activeTurns.values()).filter((turn) => turn.sessionId === input.sessionId);
-    for (const turn of activeTurns) turn.stop();
+    for (const turn of activeTurns) turn.stop('user');
     if (activeTurns.length > 0) {
       await Promise.allSettled(activeTurns.map((turn) => turn.stopped));
     }

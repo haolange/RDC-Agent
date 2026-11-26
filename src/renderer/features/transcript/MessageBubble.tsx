@@ -65,7 +65,9 @@ const MessageMetaBar: React.FC<{
       ) : null}
       {/* A Working header already says 已停止; the tag only speaks for replies stopped before any work showed. */}
       {status === 'stopped' && !message.workTrace?.blocks.length ? (
-        <span className="conversation-message-status-tag is-stopped">{t('chat.messageStopped')}</span>
+        <span className="conversation-message-status-tag is-stopped">
+          {t(message.stopCause === 'app-shutdown' ? 'chat.messageStoppedAtShutdown' : 'chat.messageStopped')}
+        </span>
       ) : null}
       <MessageActions message={message} branchState={branchState} onEditResend={onEditResend} />
     </footer>
@@ -194,7 +196,13 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
           <div className="conversation-message-stack">
             {/* Working appears with its first content; a request still preparing shows no empty card. */}
             {trace && (trace.blocks.length > 0 || trace.summary) ? (
-              <WorkProcess trace={trace} sessionId={message.sessionId} rowKey={message.id} answer={message.content} />
+              <WorkProcess
+                trace={trace}
+                sessionId={message.sessionId}
+                rowKey={message.id}
+                answer={message.content}
+                stopCause={message.stopCause}
+              />
             ) : null}
             {message.workTraceDiscarded ? (
               <p className="conversation-message-trace-note" data-testid="conversation-trace-discarded">

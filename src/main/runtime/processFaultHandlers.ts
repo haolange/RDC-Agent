@@ -1,14 +1,20 @@
 import { dialog } from 'electron';
+import { lifecycleLedger } from './LifecycleLedger';
 import { runtimeLogService } from './RuntimeLogService';
 
 /**
- * Faults that nothing else caught are written to the runtime log with their stack. An unhandled rejection is reported
- * and the process continues. An uncaught exception is reported and also shown in a native error box, as Electron does
- * when no listener is installed, because the main process may be in an inconsistent state afterwards.
+ * Faults that nothing else caught are written to the runtime log with their stack and to the lifecycle ledger, which
+ * the next launch reads when this one does not end cleanly. An unhandled rejection is reported and the process
+ * continues. An uncaught exception is reported and also shown in a native error box, as Electron does when no listener
+ * is installed, because the main process may be in an inconsistent state afterwards.
  */
 export function installProcessFaultHandlers(): void {
-  process.on('unhandledRejection', (reason) => reportProcessFault('Unhandled promise rejection in main', reason));
+  process.on('unhandledRejection', (reason) => {
+    lifecycleLedger.recordFault('unhandledRejection', reason);
+    reportProcessFault('Unhandled promise rejection in main', reason);
+  });
   process.on('uncaughtException', (error) => {
+    lifecycleLedger.recordFault('uncaughtException', error);
     reportProcessFault('Uncaught exception in main', error);
     dialog.showErrorBox('RDC-Agent', `${error.message}\n\n${error.stack ?? ''}`);
   });

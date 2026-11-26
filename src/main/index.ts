@@ -37,7 +37,7 @@ import { onJsonlTailRepair } from './runtime/jsonl';
 import { rendererEventHub } from './runtime/rendererEventHub';
 import { startBrowserAppBridge, stopBrowserAppBridge } from './browserAppBridge/BrowserAppBridgeServer';
 import { isBrowserQaRun } from './runtime/browserQaRun';
-import { shutdownCoordinator } from './lifecycle/ShutdownCoordinator';
+import { shutdownCoordinator, type ShutdownObserver } from './lifecycle/ShutdownCoordinator';
 import { conversationService } from './conversation/ConversationService';
 import { agentOrchestrator } from './agent-runtime/orchestration/agentRuntimeRoot';
 import { processSupervisor } from './runtime/ProcessSupervisor';
@@ -49,8 +49,10 @@ import { resolvedAppearanceMode, windowBackgroundColor } from './window/appearan
 import { isTrustedRendererUrl, openExternalHttps, trustRendererEntry } from './runtime/rendererTrust';
 import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
 import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
+import { abnormalSupervisedExit, goneProcessKind, lifecycleLedger } from './runtime/LifecycleLedger';
 import { currentHost } from './platform/host';
 import { currentProcessIdentity } from './platform/process';
+import type { ShutdownCause } from '@shared/types/lifecycle';
 
 /**
  * Lower domains declare the port they need and this composition root binds the implementation from the domain
@@ -74,6 +76,20 @@ const SHUTDOWN_TIMEOUT_MS = 45_000;
 let shutdownStarted = false;
 let shutdownExitCode = 0;
 let settingsInitialized = false;
+/** What asked the app to quit; a quit without a more specific cause (the menu, the dock) is `before-quit`. */
+let shutdownCause: ShutdownCause = 'before-quit';
+let shutdownTimedOut = false;
+let instanceExitRecorded = false;
+
+/** The shutdown state machine reports into the ledger; the next launch reads it when this one does not end cleanly. */
+const shutdownLedger: ShutdownObserver = {
+  began: (cause) => lifecycleLedger.record({ kind: 'shutdown_began', cause }),
+  phaseTimedOut: (phase, pending) => lifecycleLedger.record({ kind: 'shutdown_phase_timed_out', phase, pending }),
+  finished: ({ timedOut, durationMs }) => {
+    shutdownTimedOut = timedOut;
+    lifecycleLedger.record({ kind: 'shutdown_finished', timedOut, durationMs });
+  },
+};
 
 function registerShutdownDisposables(): void {
   shutdownCoordinator.register({
@@ -233,9 +249,11 @@ console.log(
   }),
 );
 
+const processIdentity = currentProcessIdentity();
+const instanceMode = isHeadlessMode ? 'browser' : 'desktop';
 const userDataLock = acquireUserDataInstanceLock(userDataPath, {
-  ...currentProcessIdentity(),
-  mode: isHeadlessMode ? 'browser' : 'desktop',
+  ...processIdentity,
+  mode: instanceMode,
   startTs: new Date().toISOString(),
 });
 if (!userDataLock.acquired) {
@@ -246,6 +264,17 @@ if (!userDataLock.acquired) {
   );
   app.exit(1);
 } else {
+  lifecycleLedger.record({
+    kind: 'instance_started',
+    ...processIdentity,
+    appVersion: app.getVersion(),
+    electronVersion: process.versions.electron,
+    mode: instanceMode,
+  });
+  processSupervisor.observeExits((owner, info) => {
+    const event = abnormalSupervisedExit(owner, info);
+    if (event) lifecycleLedger.record(event);
+  });
   process.once('exit', userDataLock.release);
   if (cleanupDisposableBrowserQaUserData) {
     app.once('will-quit', () => {
@@ -262,6 +291,10 @@ if (!userDataLock.acquired) {
 }
 
 function exitMainProcess(code: number): void {
+  if (userDataLock.acquired && !instanceExitRecorded) {
+    instanceExitRecorded = true;
+    lifecycleLedger.record({ kind: 'instance_exited', clean: !shutdownTimedOut, exitCode: code });
+  }
   if (userDataLock.acquired) {
     try {
       userDataLock.release();
@@ -452,6 +485,13 @@ function createMainWindow(): void {
 
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     console.error('[RendererProcessGone]', details);
+    if (details.reason === 'clean-exit') return;
+    lifecycleLedger.record({
+      kind: 'process_gone',
+      process: 'renderer',
+      reason: details.reason,
+      exitCode: details.exitCode,
+    });
   });
 
   // Links never open app windows: https pages open in the system browser and everything else is refused.
@@ -567,12 +607,26 @@ app
     app.quit();
   });
 
+// GPU, utility and other Chromium children: a death other than a clean exit is a lifecycle fact.
+app.on('child-process-gone', (_event, details) => {
+  if (details.reason === 'clean-exit') return;
+  console.error('[ChildProcessGone]', details);
+  lifecycleLedger.record({
+    kind: 'process_gone',
+    process: goneProcessKind(details.type),
+    reason: details.reason,
+    exitCode: details.exitCode,
+    ...(details.serviceName ? { serviceName: details.serviceName } : {}),
+  });
+});
+
 // Quit after all windows close on Windows/Linux.
 app.on('window-all-closed', () => {
   if (isHeadlessMode) {
     return;
   }
   if (!currentHost().isMac) {
+    if (!shutdownStarted) shutdownCause = 'window-close';
     app.quit();
   }
 });
@@ -591,16 +645,21 @@ app.on('before-quit', (event) => {
   }
 
   registerShutdownDisposables();
+  // The clean path and the timed-out path end through the same exit.
   const exitAfterShutdown = () => exitMainProcess(shutdownExitCode);
-  void shutdownCoordinator.shutdownAll(SHUTDOWN_TIMEOUT_MS, exitAfterShutdown).then(exitAfterShutdown);
+  void shutdownCoordinator
+    .shutdownAll(SHUTDOWN_TIMEOUT_MS, { cause: shutdownCause, observer: shutdownLedger, forceExit: exitAfterShutdown })
+    .then(exitAfterShutdown);
 });
 
 // External QA/CLI launchers use process signals; route them through the same shutdown state machine.
-const requestProcessShutdown = () => {
-  if (!shutdownStarted) app.quit();
+const requestProcessShutdown = (signal: 'SIGINT' | 'SIGTERM') => {
+  if (shutdownStarted) return;
+  shutdownCause = signal;
+  app.quit();
 };
-process.once('SIGINT', requestProcessShutdown);
-process.once('SIGTERM', requestProcessShutdown);
+process.once('SIGINT', () => requestProcessShutdown('SIGINT'));
+process.once('SIGTERM', () => requestProcessShutdown('SIGTERM'));
 
 // Only the app's own entry document may load in a window.
 app.on('web-contents-created', (_event, contents) => {

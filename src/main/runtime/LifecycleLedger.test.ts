@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LifecycleLedger, type LifecycleEvent } from './LifecycleLedger';
+import { abnormalSupervisedExit, LifecycleLedger, type LifecycleEvent } from './LifecycleLedger';
+import { ProcessSupervisor } from './ProcessSupervisor';
 
 const turnStarted = (turnId: string): LifecycleEvent => ({
   kind: 'turn_started',
@@ -157,5 +158,46 @@ describe('lifecycle ledger', () => {
       expect(own).toEqual([...own].sort((a, b) => a - b));
     }
     expect(records.length).toBeGreaterThan(200);
+  });
+
+  it('records the abnormal exits a process supervisor settles, not the ones the app asked for', async () => {
+    const writer = ledger();
+    const supervisor = new ProcessSupervisor();
+    supervisor.observeExits((owner, info) => {
+      const event = abnormalSupervisedExit(owner, info);
+      if (event) writer.record(event);
+    });
+    const idle = ['-e', 'setInterval(() => undefined, 1000);'];
+    const fine = supervisor.spawn('shell', process.execPath, ['-e', 'process.exit(3)'], { isolateProcessGroup: false });
+    const failingReplay = supervisor.spawn('replay', process.execPath, ['-e', 'process.exit(2)'], {
+      isolateProcessGroup: false,
+    });
+    const timedOut = supervisor.spawn('shell', process.execPath, idle, { isolateProcessGroup: false, timeoutMs: 100 });
+    await Promise.all([fine.exit, failingReplay.exit, timedOut.exit]);
+    const lingering = supervisor.spawn('background', process.execPath, idle, { isolateProcessGroup: false });
+    await supervisor.joinAll({ graceMs: 300, forceAfterMs: 4_000 });
+    await lingering.exit;
+
+    expect(
+      writer
+        .tail()
+        .records.map((record) =>
+          record.kind === 'supervised_child_exited' ? [record.owner, record.reason, record.code] : record.kind,
+        ),
+    ).toEqual([
+      ['replay', 'exit', 2],
+      ['background', 'supervisor_kill', null],
+    ]);
+  }, 15_000);
+
+  it('keeps a shell exiting non-zero and a requested abort out of the ledger', () => {
+    const base = { code: null, signal: null, durationMs: 1 } as const;
+    expect(abnormalSupervisedExit('shell', { ...base, reason: 'exit', code: 1 })).toBeNull();
+    expect(abnormalSupervisedExit('mcp', { ...base, reason: 'abort' })).toBeNull();
+    expect(abnormalSupervisedExit('mcp', { ...base, reason: 'signal', signal: 'SIGSEGV' })).toMatchObject({
+      owner: 'mcp',
+      reason: 'signal',
+      signal: 'SIGSEGV',
+    });
   });
 });

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { AppError } from '@shared/errors/appError';
+import { lifecycleLedger } from '../../runtime/LifecycleLedger';
 import {
   computeTurnPreparation,
   type TurnPreparationComputationInput,
@@ -27,11 +28,14 @@ export class TurnPreparationWorkerPool {
   private readonly slots: WorkerSlot[] = [];
   private nextTaskId = 1;
 
-  constructor(private readonly maxWorkers = 2) {}
+  constructor(
+    private readonly maxWorkers = 2,
+    private readonly workerPath = path.join(__dirname, 'turnPreparationWorker.js'),
+  ) {}
 
   async run(input: TurnPreparationComputationInput, signal?: AbortSignal): Promise<TurnPreparationComputationResult> {
     if (signal?.aborted) throw new AppError('REQUEST_CANCELLED', 'request preparation was cancelled.');
-    const workerPath = path.join(__dirname, 'turnPreparationWorker.js');
+    const workerPath = this.workerPath;
     // Only the bundle ships the compiled worker; running from source computes on this thread.
     if (!fs.existsSync(workerPath)) {
       await new Promise<void>((resolve) => setImmediate(resolve));
@@ -83,9 +87,24 @@ export class TurnPreparationWorkerPool {
       else task.reject(new Error('Turn preparation worker returned an empty result.'));
       this.dispatch(workerPath);
     });
-    worker.on('error', (error) => this.failSlot(slot, error, workerPath));
+    worker.on('error', (error) => {
+      lifecycleLedger.record({
+        kind: 'worker_thread_exited',
+        worker: 'turn-preparation',
+        reason: 'error',
+        message: error.message.slice(0, 500),
+      });
+      this.failSlot(slot, error, workerPath);
+    });
+    // An idle worker that dies is a fault too; one the pool terminated on purpose has already left the slots.
     worker.on('exit', (code) => {
       if (code !== 0 && this.slots.includes(slot)) {
+        lifecycleLedger.record({
+          kind: 'worker_thread_exited',
+          worker: 'turn-preparation',
+          reason: 'exit',
+          exitCode: code,
+        });
         this.failSlot(slot, new Error(`Turn preparation worker exited with code ${code}.`), workerPath);
       }
     });
@@ -106,7 +125,7 @@ export class TurnPreparationWorkerPool {
     this.slots.splice(this.slots.indexOf(slot), 1);
     void slot.worker.terminate();
     task.reject(new AppError('REQUEST_CANCELLED', 'request preparation was cancelled.'));
-    this.dispatch(path.join(__dirname, 'turnPreparationWorker.js'));
+    this.dispatch(this.workerPath);
   }
 
   private failSlot(slot: WorkerSlot, error: Error, workerPath: string): void {

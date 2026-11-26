@@ -18,6 +18,8 @@ vi.mock('../agent-runtime/attachments/ConversationAttachmentMaterializer', () =>
   hydrateFrozenUserContent: vi.fn(async () => 'inspect'),
 }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
+const ledger = vi.hoisted(() => ({ record: vi.fn((_event: unknown) => true) }));
+vi.mock('../runtime/LifecycleLedger', () => ({ lifecycleLedger: ledger }));
 vi.mock('./approvedPlanExit', () => ({
   verifyApprovedPlanExit: (_session: string, _turn: string, approved: unknown) => Boolean(approved),
 }));
@@ -36,7 +38,10 @@ function message(role: 'user' | 'assistant', status: ConversationMessage['status
 const messageOf = (event: ConversationStreamEvent | undefined): ConversationMessage | undefined =>
   (event as { message?: ConversationMessage } | undefined)?.message;
 
-function runTurn(withApprovedExecution = false): { events: ConversationStreamEvent[]; done: Promise<void> } {
+function runTurn(
+  withApprovedExecution = false,
+  context?: Record<string, unknown>,
+): { events: ConversationStreamEvent[]; done: Promise<void>; host: ConversationTurnRunnerHost } {
   const events: ConversationStreamEvent[] = [];
   const host: ConversationTurnRunnerHost = {
     output: {
@@ -52,7 +57,11 @@ function runTurn(withApprovedExecution = false): { events: ConversationStreamEve
     turns: { registerActiveTurn: vi.fn(), clearActiveTurn: vi.fn() },
   };
   const input = {
-    context: { session: withApprovedExecution ? { sessionId: 'session' } : null, projectId: null, currentRun: null },
+    context: context ?? {
+      session: withApprovedExecution ? { sessionId: 'session' } : null,
+      projectId: null,
+      currentRun: null,
+    },
     requestedProfileId: 'general',
     requestedAgentId: 'general',
     rawMessage: 'inspect',
@@ -89,7 +98,7 @@ function runTurn(withApprovedExecution = false): { events: ConversationStreamEve
       },
     },
   } as unknown as CompleteProfileTurnInput;
-  return { events, done: completeProfileTurn(host, input) };
+  return { events, done: completeProfileTurn(host, input), host };
 }
 
 describe('completeProfileTurn kernel cancellation', () => {
@@ -104,9 +113,47 @@ describe('completeProfileTurn kernel cancellation', () => {
     expect(terminal?.type).toBe('message_completed');
     expect(messageOf(terminal)?.status).toBe('stopped');
     expect(messageOf(terminal)?.workTrace?.status).toBe('stopped');
+    expect(messageOf(terminal)?.stopCause).toBe('runtime');
     expect(events.some((event) => messageOf(event)?.diagnostic?.code === 'CONVERSATION_LLM_REQUEST_FAILED')).toBe(
       false,
     );
+  });
+
+  it('keeps a stop at app shutdown apart from the person stopping it, on the message, the run and the ledger', async () => {
+    ledger.record.mockClear();
+    let stopTurn: ((cause: 'app-shutdown') => void) | undefined;
+    orchestrator.sendProfileMessage.mockImplementationOnce(async (turn) => {
+      stopTurn!('app-shutdown');
+      expect(turn.signal.aborted).toBe(true);
+      throw new DOMException('Aborted', 'AbortError');
+    });
+    const run = { runId: 'run-1', status: 'running' };
+    const { events, done, host } = runTurn(false, {
+      session: { sessionId: 'session' },
+      projectId: null,
+      currentRun: run,
+    });
+    stopTurn = vi.mocked(host.turns.registerActiveTurn).mock.calls[0]![0].stop;
+    await done;
+
+    const stopped = messageOf(events.at(-1));
+    expect(stopped).toMatchObject({ status: 'stopped', stopCause: 'app-shutdown' });
+    expect(storage.updateRun).toHaveBeenCalledWith(
+      'session',
+      'run-1',
+      expect.objectContaining({ status: 'cancelled', stopReason: 'app-shutdown' }),
+    );
+    expect(ledger.record.mock.calls.map(([event]) => event)).toEqual([
+      {
+        kind: 'turn_started',
+        sessionId: 'session',
+        turnId: 'turn-1',
+        runId: 'run-1',
+        providerId: 'provider',
+        modelId: 'model',
+      },
+      { kind: 'turn_finished', sessionId: 'session', turnId: 'turn-1', status: 'stopped', stopCause: 'app-shutdown' },
+    ]);
   });
 
   it('still reports a genuine provider failure as an error', async () => {

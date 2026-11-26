@@ -1,3 +1,4 @@
+import type { TurnStopCause } from './lifecycle';
 import type { AgentRole } from './agent';
 import type { TaskDependencyWait } from './taskExecution';
 import type { ConversationTurnControls } from './modelCapability';
@@ -309,6 +310,8 @@ export interface ConversationMessage {
   agentId?: AgentRole;
   content: string;
   status?: ConversationMessageStatus;
+  /** Stopped assistant messages: who stopped the turn, so a stop at app shutdown is not shown as the person's Stop. */
+  stopCause?: TurnStopCause;
   updatedAt?: number;
   workTrace?: ConversationWorkTrace | null;
   /** The stored process record does not match the current shape, so it is not shown. */

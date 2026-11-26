@@ -367,7 +367,7 @@ describe('faultInjectionContract: shutdown with active producers', () => {
       },
     });
 
-    await coordinator.shutdownAll(1_000);
+    await coordinator.shutdownAll(1_000, { cause: 'before-quit' });
     expect(turns.getActive('shutdown-session')).toBeNull();
     expect(disconnectAll).toHaveBeenCalledTimes(1);
     expect(terminalTabs.size).toBe(0);

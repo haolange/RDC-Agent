@@ -9,7 +9,7 @@ import { renameWithRetrySync, syncDirectorySync } from '../platform/fileRename';
 import { appPathService } from './AppPathService';
 import { appendJsonlDurable, readJsonl } from './jsonl';
 import { redactCredentialLikeText, redactSecretsDeep } from './secretRedaction';
-import type { ProcessExitReason, ProcessOwner } from './ProcessSupervisor';
+import type { ProcessExitInfo, ProcessExitReason, ProcessOwner } from './ProcessSupervisor';
 
 const LEDGER_FILE = 'ledger.jsonl';
 /** The one rotated generation: the file the current one replaced when it reached the cap. */
@@ -50,6 +50,12 @@ export const GONE_PROCESS_KINDS = [
   'unknown',
 ] as const;
 export type GoneProcessKind = (typeof GONE_PROCESS_KINDS)[number];
+
+/** Electron's child process type (`GPU`, `Sandbox helper`, …) as a ledger process kind. */
+export function goneProcessKind(type: string): GoneProcessKind {
+  const kind = type.toLowerCase().replace(/\s+/g, '-');
+  return (GONE_PROCESS_KINDS as readonly string[]).includes(kind) ? (kind as GoneProcessKind) : 'unknown';
+}
 
 const id = z.string().min(1);
 const header = { at: z.iso.datetime(), instanceId: id };
@@ -288,6 +294,22 @@ export class LifecycleLedger {
     renameWithRetrySync(current, this.previousGenerationPath);
     syncDirectorySync(path.dirname(current));
   }
+}
+
+/**
+ * A supervised child's exit as a ledger fact when it is abnormal: killed by a signal, never started, killed at
+ * shutdown, or not confirmed after forced termination; a replay or background child exiting non-zero counts too.
+ * Timeouts and aborts the app asked for are not faults.
+ */
+export function abnormalSupervisedExit(owner: ProcessOwner, info: ProcessExitInfo): LifecycleEvent | null {
+  const abnormal =
+    info.reason === 'signal' ||
+    info.reason === 'spawn_failed' ||
+    info.reason === 'supervisor_kill' ||
+    info.reason === 'unconfirmed_orphan' ||
+    (info.reason === 'exit' && info.code !== 0 && (owner === 'replay' || owner === 'background'));
+  if (!abnormal) return null;
+  return { kind: 'supervised_child_exited', owner, reason: info.reason, code: info.code, signal: info.signal };
 }
 
 /** This launch's ledger; its instance id also stamps the Task executions this launch starts. */

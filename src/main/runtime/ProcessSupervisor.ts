@@ -127,9 +127,23 @@ function terminateTree(pid: number | undefined, signal: NodeJS.Signals = 'SIGTER
   signalChildProcessTree(pid, signal, PROCESS_TERMINATION_POLICY.treeKillTimeoutMs);
 }
 
+export type ProcessExitObserver = (owner: ProcessOwner, info: ProcessExitInfo) => void;
+
 export class ProcessSupervisor {
   private readonly registry = new Map<string, RegistryEntry>();
   private shuttingDown = false;
+  private exitObserver: ProcessExitObserver | null = null;
+
+  /** The one observer of every settled child exit, bound once by the composition root (the lifecycle ledger). */
+  observeExits(observer: ProcessExitObserver): void {
+    this.exitObserver = observer;
+  }
+
+  /** The end of the settle funnel: the entry leaves the registry and the observer sees the exit. */
+  private settled(id: string, owner: ProcessOwner, info: ProcessExitInfo): void {
+    this.registry.delete(id);
+    this.exitObserver?.(owner, info);
+  }
 
   get size(): number {
     return this.registry.size;
@@ -253,7 +267,7 @@ export class ProcessSupervisor {
       if (entry.abortSignal && entry.abortHandler) {
         entry.abortSignal.removeEventListener('abort', entry.abortHandler);
       }
-      this.registry.delete(id);
+      this.settled(id, owner, info);
       resolveExit(info);
     };
 

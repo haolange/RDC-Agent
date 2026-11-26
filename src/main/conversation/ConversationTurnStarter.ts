@@ -17,6 +17,7 @@ import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
 import { conversationHistoryStore, projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { traceService } from '../agent-trace/TraceService';
+import { lifecycleLedger } from '../runtime/LifecycleLedger';
 import {
   createDefaultBranchState,
   resolveVisibleConversationMessages,
@@ -594,6 +595,15 @@ function composeTurnMessages(
   });
   // The notice follows what preparation actually dropped for this turn, never a comparison with an earlier turn.
   const continuationDrop = summarizeContinuationDrop(preparedTurn.summary.continuation.decisionCounts);
+  if (continuationDrop) {
+    lifecycleLedger.record({
+      kind: 'continuation_decision',
+      sessionId: sessionIdForBranch,
+      turnId,
+      dropped: continuationDrop.count,
+      reasons: continuationDrop.reasons,
+    });
+  }
   const continuationNotice = continuationDrop
     ? createContinuationDropNotice({
         requestId,
