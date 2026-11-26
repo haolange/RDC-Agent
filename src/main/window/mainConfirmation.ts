@@ -1,4 +1,5 @@
 import { BrowserWindow, dialog } from 'electron';
+import { isBrowserQaFullAccessRun } from '../runtime/browserQaRun';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 
 export interface MainConfirmation {
@@ -13,12 +14,13 @@ export interface MainConfirmation {
 
 /**
  * Asks the person at the app in a native dialog that the renderer can neither draw nor answer. Without
- * a focused window nothing is confirmed, except a Browser QA run with explicit full access, which is logged.
+ * a focused window nothing is confirmed, except an unpackaged Browser QA run with explicit full access, which is
+ * logged (`isBrowserQaFullAccessRun`).
  */
 export async function confirmInMainProcess(request: MainConfirmation): Promise<boolean> {
   const owner = BrowserWindow.getFocusedWindow() ?? undefined;
   if (!owner) {
-    if (process.env.RDC_AGENT_BROWSER_QA !== '1' || process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS !== '1') return false;
+    if (!isBrowserQaFullAccessRun()) return false;
     runtimeLogService.log({
       scope: 'app',
       namespace: 'context',

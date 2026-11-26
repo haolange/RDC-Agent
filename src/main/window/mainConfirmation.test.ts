@@ -2,9 +2,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const electron = vi.hoisted(() => ({
   focused: undefined as object | undefined,
+  isPackaged: false,
   showMessageBox: vi.fn(async () => ({ response: 1 })),
 }));
 vi.mock('electron', () => ({
+  app: {
+    get isPackaged() {
+      return electron.isPackaged;
+    },
+  },
   BrowserWindow: { getFocusedWindow: () => electron.focused },
   dialog: { showMessageBox: electron.showMessageBox },
 }));
@@ -25,14 +31,18 @@ describe('main-process confirmation', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     electron.focused = undefined;
+    electron.isPackaged = false;
     electron.showMessageBox.mockReset();
   });
 
-  it('confirms nothing without a window, unless Browser QA explicitly runs with full access', async () => {
+  it('confirms nothing without a window, unless unpackaged Browser QA explicitly runs with full access', async () => {
     await expect(confirmInMainProcess(request)).resolves.toBe(false);
     vi.stubEnv('RDC_AGENT_BROWSER_QA', '1');
     await expect(confirmInMainProcess(request)).resolves.toBe(false);
     vi.stubEnv('RDC_AGENT_BROWSER_QA_FULL_ACCESS', '1');
+    electron.isPackaged = true;
+    await expect(confirmInMainProcess(request)).resolves.toBe(false);
+    electron.isPackaged = false;
     await expect(confirmInMainProcess(request)).resolves.toBe(true);
     expect(electron.showMessageBox).not.toHaveBeenCalled();
   });

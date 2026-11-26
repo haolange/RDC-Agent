@@ -13,9 +13,13 @@ const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
   remove: vi.fn(),
   handlers: new Map<string, (...args: unknown[]) => Promise<Record<string, unknown>>>(),
+  isPackaged: false,
 }));
 vi.mock('electron', () => ({
   app: {
+    get isPackaged() {
+      return mocks.isPackaged;
+    },
     once: (_: string, callback: () => void) => {
       mocks.quit = callback;
     },
@@ -215,6 +219,9 @@ describe('native project input removal approval', () => {
     expect(await invoke('prepareRemove', 'project', 'input')).toEqual({ success: false });
     vi.stubEnv('RDC_AGENT_BROWSER_QA', '1');
     vi.stubEnv('RDC_AGENT_BROWSER_QA_FULL_ACCESS', '1');
+    mocks.isPackaged = true;
+    expect(await invoke('prepareRemove', 'project', 'input')).toEqual({ success: false });
+    mocks.isPackaged = false;
     expect((await invoke('prepareRemove', 'project', 'input')).success).toBe(true);
     expect(mocks.confirm).not.toHaveBeenCalled();
   });

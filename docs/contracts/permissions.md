@@ -129,7 +129,7 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 
 ## 主进程确认与审计
 
-- **主进程确认**：知识写入/提升/导入、记忆写入/删除、计划写入/导出、hook / MCP / 项目 Agent 的 trust，都由主进程原生对话框确认（`src/main/window/mainConfirmation.ts`，默认按钮为取消）；renderer 请求本身不构成批准，没有聚焦窗口时一律不确认。唯一例外是未打包 Browser QA 显式 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 且无窗口，自动确认并写运行日志。取消 trust 返回未变化的状态。
+- **主进程确认**：知识写入/提升/导入、记忆写入/删除、计划写入/导出、hook / MCP / 项目 Agent 的 trust，都由主进程原生对话框确认（`src/main/window/mainConfirmation.ts`，默认按钮为取消）；renderer 请求本身不构成批准，没有聚焦窗口时一律不确认。唯一例外是未打包 Browser QA 显式 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 且无窗口，自动确认并写运行日志；判定只在 `src/main/runtime/browserQaRun.ts` 的 `isBrowserQaFullAccessRun`，打包构建（`app.isPackaged`）不论环境变量如何都不自动确认。项目输入删除确认（`src/main/ipc/projectInputLifecycleHandlers.ts`）使用同一判定。取消 trust 返回未变化的状态。
 - **审计日志**：`<userData>/state/audit.jsonl` 只追加、不改写、不裁剪，每行带 `at` 与 `origin`（`desktop` / `browser-qa` / `runtime`）。参数只记指纹不记内容。记录内容：
   - 每次 high-impact IPC 调用：执行前一条 `outcome: requested`，执行后一条 `ok` 或 `error`（带错误码）。
   - 每个工具决定：策略放行与拒绝、用户批准与拒绝、自动审查结论，含工具名、调用 id、参数 sha256、风险。

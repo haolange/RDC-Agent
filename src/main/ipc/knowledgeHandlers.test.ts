@@ -32,6 +32,7 @@ const { handlers, electronState, knowledgeState, writeMocks, topicMocks } = vi.h
 });
 
 vi.mock('electron', () => ({
+  app: { isPackaged: false },
   BrowserWindow: {
     getFocusedWindow: () => electronState.focused,
     getAllWindows: () => [],

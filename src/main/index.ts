@@ -35,11 +35,8 @@ import { installProcessFaultHandlers, reportProcessFault } from './runtime/proce
 import { isDevelopmentRun } from './runtime/developmentRun';
 import { onJsonlTailRepair } from './runtime/jsonl';
 import { rendererEventHub } from './runtime/rendererEventHub';
-import {
-  shouldStartBrowserAppBridge,
-  startBrowserAppBridge,
-  stopBrowserAppBridge,
-} from './browserAppBridge/BrowserAppBridgeServer';
+import { startBrowserAppBridge, stopBrowserAppBridge } from './browserAppBridge/BrowserAppBridgeServer';
+import { isBrowserQaRun } from './runtime/browserQaRun';
 import { shutdownCoordinator } from './lifecycle/ShutdownCoordinator';
 import { conversationService } from './conversation/ConversationService';
 import { agentOrchestrator } from './agent-runtime/orchestration/agentRuntimeRoot';
@@ -157,7 +154,7 @@ function registerShutdownDisposables(): void {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const isDev = isDevelopmentRun({ isPackaged: app.isPackaged, env: process.env });
-const isBrowserQa = shouldStartBrowserAppBridge();
+const isBrowserQa = isBrowserQaRun();
 const isHeadlessMode = process.env.RDC_AGENT_HEADLESS === '1' || isBrowserQa;
 if (isHeadlessMode) {
   process.env.RDC_AGENT_HEADLESS = '1';

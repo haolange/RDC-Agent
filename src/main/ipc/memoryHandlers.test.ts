@@ -18,6 +18,7 @@ const { handlers, electronState } = vi.hoisted(() => {
 });
 
 vi.mock('electron', () => ({
+  app: { isPackaged: false },
   BrowserWindow: {
     getFocusedWindow: () => electronState.focused,
     getAllWindows: () => [],

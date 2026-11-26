@@ -4,7 +4,6 @@ import { createServer, request as httpRequest, type IncomingMessage, type Server
 import { request as httpsRequest } from 'https';
 import { extname, isAbsolute, join, normalize, relative, resolve } from 'path';
 import { URL } from 'url';
-import { app } from 'electron';
 import { AppError, IPC_ERROR_KEY, isIpcErrorResult } from '@shared/errors/appError';
 import { buildRendererCsp } from '@shared/utils/rendererCsp';
 import { invokeRegisteredIpcChannel } from '../ipc/invokeRegistry';
@@ -18,6 +17,7 @@ import { getProviderCatalogRevision, listProviderSummaries } from '../provider-c
 import { SETTINGS_SCHEMA_VERSION } from '../settings/settings-core/settingsFileSchema';
 import { rendererEventHub } from '../runtime/rendererEventHub';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
+import { isBrowserQaRun } from '../runtime/browserQaRun';
 import { attachDevRendererWebSocketProxy, proxyHttpToDevRenderer, shouldProxyToDevRenderer } from './devRendererProxy';
 import {
   buildBridgeAuthCookie,
@@ -449,17 +449,12 @@ async function handleRequest(
   sendJson(response, 404, { success: false, error: 'Not found' }, requestOrigin);
 }
 
-/** Debug-only surface: a packaged build never starts it, whatever the environment says. */
-export function shouldStartBrowserAppBridge(): boolean {
-  return !app.isPackaged && process.env.RDC_AGENT_BROWSER_QA === '1';
-}
-
 export async function startBrowserAppBridge(options: BridgeOptions): Promise<string> {
   if (server && bridgeUrl) {
     return bridgeUrl;
   }
 
-  if (!shouldStartBrowserAppBridge()) {
+  if (!isBrowserQaRun()) {
     throw new Error('Browser app bridge starts only in an unpackaged build with RDC_AGENT_BROWSER_QA=1');
   }
 

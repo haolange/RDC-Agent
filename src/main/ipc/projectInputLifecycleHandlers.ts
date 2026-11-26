@@ -1,6 +1,7 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { AppError } from '@shared/errors/appError';
+import { isBrowserQaFullAccessRun } from '../runtime/browserQaRun';
 import { ProjectInputLifecycle } from '../rdc/captures/ProjectInputLifecycle';
 import { replayHistoryStore } from '../rdc/captures/replay/ReplayHistoryStore';
 import { projectWorkspaceStore } from '../sessions/store/sessionStores';
@@ -37,8 +38,7 @@ async function confirmRemoval(
   reference: boolean,
 ): Promise<boolean> {
   const owner = BrowserWindow.getFocusedWindow() ?? undefined;
-  if (process.env.RDC_AGENT_BROWSER_QA === '1' && !owner) return process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS === '1';
-  if (!owner) return false;
+  if (!owner) return isBrowserQaFullAccessRun();
   const english = settingsService.snapshot().user.appearance.language === 'en';
   const action = english ? (reference ? 'Remove reference' : 'Delete capture') : reference ? '移除引用' : '删除抓帧';
   const consequence = english
