@@ -176,7 +176,8 @@ describe('lifecycle ledger', () => {
     await Promise.all([fine.exit, failingReplay.exit, timedOut.exit]);
     const lingering = supervisor.spawn('background', process.execPath, idle, { isolateProcessGroup: false });
     await supervisor.joinAll({ graceMs: 300, forceAfterMs: 4_000 });
-    await lingering.exit;
+    const terminated = await lingering.exit;
+    expect(terminated.reason).toBe('supervisor_kill');
 
     expect(
       writer
@@ -186,7 +187,7 @@ describe('lifecycle ledger', () => {
         ),
     ).toEqual([
       ['replay', 'exit', 2],
-      ['background', 'supervisor_kill', null],
+      ['background', 'supervisor_kill', terminated.code],
     ]);
   }, 15_000);
 
