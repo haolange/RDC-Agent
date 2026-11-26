@@ -1,298 +1,1525 @@
-[
-  { "id": "welcome-dark-1440", "viewport": [1440, 900], "theme": "dark", "steps": [], "settleMs": 1200 },
-  { "id": "welcome-dark-720", "viewport": [720, 900], "theme": "dark", "steps": [], "settleMs": 1200 },
+{
+ "presets": {
+  "ollama": [
+   {
+    "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+   },
+   {
+    "project": true,
+    "waitMs": 2500
+   },
+   {
+    "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+   },
+   {
+    "click": true,
+    "testId": "sidebar-user-settings-trigger"
+   },
+   {
+    "click": true,
+    "testId": "open-settings-entry"
+   },
+   {
+    "waitFor": "[data-testid=\"settings-nav-models\"]"
+   },
+   {
+    "click": true,
+    "testId": "settings-nav-models",
+    "waitMs": 600
+   },
+   {
+    "waitFor": "[data-testid=\"settings-provider-search\"]"
+   },
+   {
+    "type": "Ollama",
+    "testId": "settings-provider-search",
+    "waitMs": 400
+   },
+   {
+    "waitFor": "[data-testid=\"settings-provider-connect-ollama\"]"
+   },
+   {
+    "click": true,
+    "testId": "settings-provider-connect-ollama",
+    "waitMs": 600
+   },
+   {
+    "waitFor": "[data-testid=\"settings-provider-connect-test\"]"
+   },
+   {
+    "click": true,
+    "testId": "settings-provider-connect-test",
+    "waitMs": 4000
+   },
+   {
+    "click": true,
+    "testId": "settings-provider-connect-save",
+    "waitMs": 3000
+   },
+   {
+    "reload": true,
+    "waitMs": 2500
+   },
+   {
+    "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+   },
+   {
+    "click": true,
+    "testId": "sidebar-user-settings-trigger"
+   },
+   {
+    "click": true,
+    "testId": "open-settings-entry"
+   },
+   {
+    "waitFor": "[data-testid=\"settings-nav-agents\"]"
+   },
+   {
+    "click": true,
+    "testId": "settings-nav-agents",
+    "waitMs": 800
+   },
+   {
+    "waitFor": "[data-testid=\"settings-agent-default-model\"] [data-testid=\"settings-model-cascade-trigger\"]"
+   },
+   {
+    "click": true,
+    "selector": "[data-testid=\"settings-agent-default-model\"] [data-testid=\"settings-model-cascade-trigger\"]",
+    "waitMs": 500
+   },
+   {
+    "waitFor": ".settings-model-option[data-model-id=\"qa-stub:4b\"]"
+   },
+   {
+    "click": true,
+    "selector": ".settings-model-option[data-model-id=\"qa-stub:4b\"]",
+    "waitMs": 1500
+   },
+   {
+    "reload": true,
+    "waitMs": 2500
+   }
+  ],
+  "open-settings": [
+   {
+    "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+   },
+   {
+    "click": true,
+    "testId": "sidebar-user-settings-trigger"
+   },
+   {
+    "click": true,
+    "testId": "open-settings-entry"
+   }
+  ],
+  "project": [
+   {
+    "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+   },
+   {
+    "project": true,
+    "waitMs": 2500
+   },
+   {
+    "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+   }
+  ],
+  "plan-gate": [
+   {
+    "preset": "ollama"
+   },
+   {
+    "waitFor": "[data-testid=\"composer-mode-pill\"]"
+   },
+   {
+    "click": true,
+    "testId": "composer-mode-pill",
+    "waitMs": 400
+   },
+   {
+    "waitFor": "[data-testid=\"mode-menu-item-debugger\"]"
+   },
+   {
+    "click": true,
+    "testId": "mode-menu-item-debugger",
+    "waitMs": 1500
+   },
+   {
+    "waitFor": ".composer-textarea"
+   },
+   {
+    "type": "qa:plan 定位这一帧唯一的 draw 调用。",
+    "selector": ".composer-textarea",
+    "waitMs": 300
+   },
+   {
+    "click": true,
+    "testId": "debugger-start-button",
+    "waitMs": 25000
+   },
+   {
+    "reload": true,
+    "waitMs": 2500
+   }
+  ]
+ },
+ "scenarios": [
   {
-    "id": "welcome-light-1440", "viewport": [1440, 900], "theme": "light",
-    "setup": [
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-appearance\"]" },
-      { "click": true, "testId": "settings-nav-appearance" },
-      { "waitFor": ".appearance-mode-tabs [role=\"tab\"]" },
-      { "click": true, "selector": ".appearance-mode-tabs button[role=\"tab\"]:nth-of-type(2)", "waitMs": 800 }
-    ],
-    "steps": [], "settleMs": 1200
+   "id": "welcome",
+   "steps": [],
+   "settleMs": 1200
   },
   {
-    "id": "settings-appearance-dark", "viewport": [1440, 900], "theme": "dark",
-    "steps": [
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-appearance\"]" },
-      { "click": true, "testId": "settings-nav-appearance", "waitMs": 400 }
-    ],
-    "settleMs": 1000
+   "id": "settings-appearance",
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+    },
+    {
+     "click": true,
+     "testId": "sidebar-user-settings-trigger"
+    },
+    {
+     "click": true,
+     "testId": "open-settings-entry"
+    },
+    {
+     "waitFor": "[data-testid=\"settings-nav-appearance\"]"
+    },
+    {
+     "click": true,
+     "testId": "settings-nav-appearance",
+     "waitMs": 400
+    }
+   ],
+   "settleMs": 1000
   },
   {
-    "id": "knowledge-center-dark", "viewport": [1440, 900], "theme": "dark",
-    "steps": [
-      { "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]" },
-      { "click": true, "testId": "sidebar-knowledge-center-trigger", "waitMs": 600 }
-    ],
-    "settleMs": 1200
+   "id": "knowledge-center",
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]"
+    },
+    {
+     "click": true,
+     "testId": "sidebar-knowledge-center-trigger",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1200
   },
   {
-    "id": "setup-guide-dark", "viewport": [1440, 900], "theme": "dark",
-    "steps": [
-      { "waitFor": "[data-testid=\"titlebar-setup-guide\"]" },
-      { "click": true, "testId": "titlebar-setup-guide", "waitMs": 400 }
-    ],
-    "settleMs": 1000
+   "id": "setup-guide",
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"titlebar-setup-guide\"]"
+    },
+    {
+     "click": true,
+     "testId": "titlebar-setup-guide",
+     "waitMs": 400
+    }
+   ],
+   "settleMs": 1000
   },
   {
-    "id": "settings-agents-dark", "viewport": [1440, 900], "theme": "dark",
-    "steps": [
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-agents\"]" },
-      { "click": true, "testId": "settings-nav-agents", "waitMs": 400 },
-      { "waitFor": "[data-testid=\"settings-agent-panels\"]", "waitMs": 400 }
-    ],
-    "settleMs": 1200
+   "id": "settings-agents",
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+    },
+    {
+     "click": true,
+     "testId": "sidebar-user-settings-trigger"
+    },
+    {
+     "click": true,
+     "testId": "open-settings-entry"
+    },
+    {
+     "waitFor": "[data-testid=\"settings-nav-agents\"]"
+    },
+    {
+     "click": true,
+     "testId": "settings-nav-agents",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"settings-agent-panels\"]",
+     "waitMs": 400
+    }
+   ],
+   "settleMs": 1200
   },
   {
-    "id": "knowledge-import-dark", "viewport": [1440, 900], "theme": "dark",
-    "steps": [
-      { "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]" },
-      { "click": true, "testId": "sidebar-knowledge-center-trigger", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"knowledge-center-import-open\"]" },
-      { "click": true, "testId": "knowledge-center-import-open", "waitMs": 400 },
-      { "waitFor": ".knowledge-import-mode [role=\"tab\"]" },
-      { "click": true, "selector": ".knowledge-import-mode [role=\"tab\"]:nth-of-type(2)", "waitMs": 400 },
-      { "waitFor": "[data-testid=\"knowledge-center-import-source\"]" },
-      { "type": "case_id: qa-shadow-acne\ntitle: 阴影贴图条纹 / 深度偏移过小\nmeta:\n  status: fixed\n  severity: high\nsymptoms:\n  visual: 地面出现斜向条纹，随相机距离变化。\nroot_cause:\n  phenomenon: 输出偏暗\n  responsible_layer: shader\nfix:\n  summary: 调整深度偏移并在同一 capture 上复核。", "testId": "knowledge-center-import-source" },
-      { "click": true, "testId": "knowledge-center-import-preview", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"knowledge-center-import-items\"]", "waitMs": 400 }
+   "id": "knowledge-import",
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]"
+    },
+    {
+     "click": true,
+     "testId": "sidebar-knowledge-center-trigger",
+     "waitMs": 600
+    },
+    {
+     "waitFor": "[data-testid=\"knowledge-center-import-open\"]"
+    },
+    {
+     "click": true,
+     "testId": "knowledge-center-import-open",
+     "waitMs": 400
+    },
+    {
+     "waitFor": ".knowledge-import-mode [role=\"tab\"]"
+    },
+    {
+     "click": true,
+     "selector": ".knowledge-import-mode [role=\"tab\"]:nth-of-type(2)",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"knowledge-center-import-source\"]"
+    },
+    {
+     "type": "case_id: qa-shadow-acne\ntitle: 阴影贴图条纹 / 深度偏移过小\nmeta:\n  status: fixed\n  severity: high\nsymptoms:\n  visual: 地面出现斜向条纹，随相机距离变化。\nroot_cause:\n  phenomenon: 输出偏暗\n  responsible_layer: shader\nfix:\n  summary: 调整深度偏移并在同一 capture 上复核。",
+     "testId": "knowledge-center-import-source"
+    },
+    {
+     "click": true,
+     "testId": "knowledge-center-import-preview",
+     "waitMs": 600
+    },
+    {
+     "waitFor": "[data-testid=\"knowledge-center-import-items\"]",
+     "waitMs": 400
+    },
+    {
+     "focus": "[data-testid=\"knowledge-center-import\"]",
+     "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing",
+     "waitMs": 200
+    }
+   ],
+   "settleMs": 1200,
+   "l3Ignore": {
+    "keys": [
+     "focus"
     ],
-    "settleMs": 1200
+    "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing"
+   }
   },
   {
-    "id": "knowledge-detail-dark", "viewport": [1440, 900], "theme": "dark",
-    "setup": [
-      { "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]" },
-      { "click": true, "testId": "sidebar-knowledge-center-trigger", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"knowledge-center-import-open\"]" },
-      { "click": true, "testId": "knowledge-center-import-open", "waitMs": 400 },
-      { "waitFor": ".knowledge-import-mode [role=\"tab\"]" },
-      { "click": true, "selector": ".knowledge-import-mode [role=\"tab\"]:nth-of-type(2)", "waitMs": 400 },
-      { "waitFor": "[data-testid=\"knowledge-center-import-source\"]" },
-      { "type": "case_id: qa-hair-darkening\ntitle: Adreno 740 头发偏暗 / KajiyaDiffuse\nmeta:\n  status: fixed\n  severity: high\nenvironment:\n  platform: Android\n  api: Vulkan\n  gpu_vendor: Qualcomm\nsymptoms:\n  visual: 头发比参考静帧暗一档，只在 Adreno 740 上出现。\nroot_cause:\n  phenomenon: 输出偏暗\n  first_bad_event: 着色阶段\n  responsible_layer: shader\nfix:\n  summary: 调整能量项并在同一 capture 上复核。\nverification_plan:\n  - 回放相同 pass 并与参考图对比", "testId": "knowledge-center-import-source" },
-      { "click": true, "testId": "knowledge-center-import-preview", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"knowledge-center-import-items\"]", "waitMs": 400 },
-      { "click": true, "testId": "knowledge-center-import-run", "waitMs": 4000 }
-    ],
-    "steps": [
-      { "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]" },
-      { "click": true, "testId": "sidebar-knowledge-center-trigger", "waitMs": 800 },
-      { "waitFor": ".knowledge-center-card-button" },
-      { "click": true, "selector": ".knowledge-center-card-button", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"knowledge-center-detail\"]", "waitMs": 600 }
-    ],
-    "settleMs": 1500
+   "id": "knowledge-detail",
+   "setup": [
+    {
+     "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]"
+    },
+    {
+     "click": true,
+     "testId": "sidebar-knowledge-center-trigger",
+     "waitMs": 600
+    },
+    {
+     "waitFor": "[data-testid=\"knowledge-center-import-open\"]"
+    },
+    {
+     "click": true,
+     "testId": "knowledge-center-import-open",
+     "waitMs": 400
+    },
+    {
+     "waitFor": ".knowledge-import-mode [role=\"tab\"]"
+    },
+    {
+     "click": true,
+     "selector": ".knowledge-import-mode [role=\"tab\"]:nth-of-type(2)",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"knowledge-center-import-source\"]"
+    },
+    {
+     "type": "case_id: qa-hair-darkening\ntitle: Adreno 740 头发偏暗 / KajiyaDiffuse\nmeta:\n  status: fixed\n  severity: high\nenvironment:\n  platform: Android\n  api: Vulkan\n  gpu_vendor: Qualcomm\nsymptoms:\n  visual: 头发比参考静帧暗一档，只在 Adreno 740 上出现。\nroot_cause:\n  phenomenon: 输出偏暗\n  first_bad_event: 着色阶段\n  responsible_layer: shader\nfix:\n  summary: 调整能量项并在同一 capture 上复核。\nverification_plan:\n  - 回放相同 pass 并与参考图对比",
+     "testId": "knowledge-center-import-source"
+    },
+    {
+     "click": true,
+     "testId": "knowledge-center-import-preview",
+     "waitMs": 600
+    },
+    {
+     "waitFor": "[data-testid=\"knowledge-center-import-items\"]",
+     "waitMs": 400
+    },
+    {
+     "click": true,
+     "testId": "knowledge-center-import-run",
+     "waitMs": 4000
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]"
+    },
+    {
+     "click": true,
+     "testId": "sidebar-knowledge-center-trigger",
+     "waitMs": 800
+    },
+    {
+     "click": true,
+     "selector": "[data-testid=\"knowledge-center-narrow-tabs\"] [role=\"tab\"]:nth-of-type(2)",
+     "optional": true,
+     "waitMs": 400
+    },
+    {
+     "waitFor": ".knowledge-center-card-button"
+    },
+    {
+     "click": true,
+     "selector": ".knowledge-center-card-button",
+     "waitMs": 600
+    },
+    {
+     "waitFor": "[data-testid=\"knowledge-center-detail\"]",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1500
   },
   {
-    "id": "composer-model-picker-dark", "viewport": [1440, 900], "theme": "dark",
-    "setup": [
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "project": true, "waitMs": 2500 },
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-models\"]" },
-      { "click": true, "testId": "settings-nav-models", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"settings-provider-search\"]" },
-      { "type": "Ollama", "testId": "settings-provider-search", "waitMs": 400 },
-      { "waitFor": "[data-testid=\"settings-provider-connect-ollama\"]" },
-      { "click": true, "testId": "settings-provider-connect-ollama", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"settings-provider-connect-test\"]" },
-      { "click": true, "testId": "settings-provider-connect-test", "waitMs": 4000 },
-      { "click": true, "testId": "settings-provider-connect-save", "waitMs": 3000 },
-      { "reload": true, "waitMs": 2500 },
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-agents\"]" },
-      { "click": true, "testId": "settings-nav-agents", "waitMs": 800 },
-      { "waitFor": "[data-testid=\"settings-agent-default-model\"] [data-testid=\"settings-model-cascade-trigger\"]" },
-      { "click": true, "selector": "[data-testid=\"settings-agent-default-model\"] [data-testid=\"settings-model-cascade-trigger\"]", "waitMs": 500 },
-      { "waitFor": ".settings-model-option[data-model-id=\"qa-stub:4b\"]" },
-      { "click": true, "selector": ".settings-model-option[data-model-id=\"qa-stub:4b\"]", "waitMs": 1500 },
-      { "reload": true, "waitMs": 2500 }
-    ],
-    "steps": [
-      { "waitFor": "[data-testid=\"composer-model-effort-pill\"]" },
-      { "click": true, "testId": "composer-model-effort-pill", "waitMs": 400 },
-      { "waitFor": "[data-testid=\"composer-model-effort-open-picker\"]" },
-      { "click": true, "testId": "composer-model-effort-open-picker", "waitMs": 400 },
-      { "waitFor": "[data-testid=\"composer-model-popup\"]", "waitMs": 400 }
-    ],
-    "settleMs": 1200
+   "id": "composer-model-picker",
+   "setup": [
+    {
+     "preset": "ollama"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"composer-model-effort-pill\"]"
+    },
+    {
+     "click": true,
+     "testId": "composer-model-effort-pill",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"composer-model-effort-open-picker\"]"
+    },
+    {
+     "click": true,
+     "testId": "composer-model-effort-open-picker",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"composer-model-popup\"]",
+     "waitMs": 400
+    }
+   ],
+   "settleMs": 1200
   },
   {
-    "id": "settings-models-dark", "viewport": [1440, 900], "theme": "dark",
-    "setup": [
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "project": true, "waitMs": 2500 },
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-models\"]" },
-      { "click": true, "testId": "settings-nav-models", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"settings-provider-search\"]" },
-      { "type": "Ollama", "testId": "settings-provider-search", "waitMs": 400 },
-      { "waitFor": "[data-testid=\"settings-provider-connect-ollama\"]" },
-      { "click": true, "testId": "settings-provider-connect-ollama", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"settings-provider-connect-test\"]" },
-      { "click": true, "testId": "settings-provider-connect-test", "waitMs": 4000 },
-      { "click": true, "testId": "settings-provider-connect-save", "waitMs": 3000 },
-      { "reload": true, "waitMs": 2500 },
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-agents\"]" },
-      { "click": true, "testId": "settings-nav-agents", "waitMs": 800 },
-      { "waitFor": "[data-testid=\"settings-agent-default-model\"] [data-testid=\"settings-model-cascade-trigger\"]" },
-      { "click": true, "selector": "[data-testid=\"settings-agent-default-model\"] [data-testid=\"settings-model-cascade-trigger\"]", "waitMs": 500 },
-      { "waitFor": ".settings-model-option[data-model-id=\"qa-stub:4b\"]" },
-      { "click": true, "selector": ".settings-model-option[data-model-id=\"qa-stub:4b\"]", "waitMs": 1500 },
-      { "reload": true, "waitMs": 2500 }
-    ],
-    "steps": [
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-models\"]" },
-      { "click": true, "testId": "settings-nav-models", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"settings-configured-services\"]", "waitMs": 400 }
-    ],
-    "settleMs": 1200
+   "id": "settings-models",
+   "setup": [
+    {
+     "preset": "ollama"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+    },
+    {
+     "click": true,
+     "testId": "sidebar-user-settings-trigger"
+    },
+    {
+     "click": true,
+     "testId": "open-settings-entry"
+    },
+    {
+     "waitFor": "[data-testid=\"settings-nav-models\"]"
+    },
+    {
+     "click": true,
+     "testId": "settings-nav-models",
+     "waitMs": 600
+    },
+    {
+     "waitFor": "[data-testid=\"settings-configured-services\"]",
+     "waitMs": 400
+    }
+   ],
+   "settleMs": 1200
   },
   {
-    "id": "settings-provider-dialog-dark", "viewport": [1440, 900], "theme": "dark",
-    "setup": [
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "project": true, "waitMs": 2500 },
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-models\"]" },
-      { "click": true, "testId": "settings-nav-models", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"settings-provider-search\"]" },
-      { "type": "Ollama", "testId": "settings-provider-search", "waitMs": 400 },
-      { "waitFor": "[data-testid=\"settings-provider-connect-ollama\"]" },
-      { "click": true, "testId": "settings-provider-connect-ollama", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"settings-provider-connect-test\"]" },
-      { "click": true, "testId": "settings-provider-connect-test", "waitMs": 4000 },
-      { "click": true, "testId": "settings-provider-connect-save", "waitMs": 3000 },
-      { "reload": true, "waitMs": 2500 },
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-agents\"]" },
-      { "click": true, "testId": "settings-nav-agents", "waitMs": 800 },
-      { "waitFor": "[data-testid=\"settings-agent-default-model\"] [data-testid=\"settings-model-cascade-trigger\"]" },
-      { "click": true, "selector": "[data-testid=\"settings-agent-default-model\"] [data-testid=\"settings-model-cascade-trigger\"]", "waitMs": 500 },
-      { "waitFor": ".settings-model-option[data-model-id=\"qa-stub:4b\"]" },
-      { "click": true, "selector": ".settings-model-option[data-model-id=\"qa-stub:4b\"]", "waitMs": 1500 },
-      { "reload": true, "waitMs": 2500 }
-    ],
-    "steps": [
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-models\"]" },
-      { "click": true, "testId": "settings-nav-models", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"settings-configured-services\"] [data-testid=\"settings-provider-connect-ollama\"]" },
-      { "click": true, "selector": "[data-testid=\"settings-configured-services\"] [data-testid=\"settings-provider-connect-ollama\"]", "waitMs": 800 },
-      { "waitFor": "[data-testid=\"settings-provider-connect-dialog\"]", "waitMs": 800 }
-    ],
-    "settleMs": 1500
+   "id": "settings-provider-dialog",
+   "setup": [
+    {
+     "preset": "ollama"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+    },
+    {
+     "click": true,
+     "testId": "sidebar-user-settings-trigger"
+    },
+    {
+     "click": true,
+     "testId": "open-settings-entry"
+    },
+    {
+     "waitFor": "[data-testid=\"settings-nav-models\"]"
+    },
+    {
+     "click": true,
+     "testId": "settings-nav-models",
+     "waitMs": 600
+    },
+    {
+     "waitFor": "[data-testid=\"settings-configured-services\"] [data-testid=\"settings-provider-connect-ollama\"]"
+    },
+    {
+     "click": true,
+     "selector": "[data-testid=\"settings-configured-services\"] [data-testid=\"settings-provider-connect-ollama\"]",
+     "waitMs": 800
+    },
+    {
+     "waitFor": "[data-testid=\"settings-provider-connect-dialog\"]",
+     "waitMs": 800
+    }
+   ],
+   "settleMs": 1500
   },
   {
-    "id": "transcript-subagent-dark", "viewport": [1440, 900], "theme": "dark",
-    "setup": [
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "project": true, "waitMs": 2500 },
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-models\"]" },
-      { "click": true, "testId": "settings-nav-models", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"settings-provider-search\"]" },
-      { "type": "Ollama", "testId": "settings-provider-search", "waitMs": 400 },
-      { "waitFor": "[data-testid=\"settings-provider-connect-ollama\"]" },
-      { "click": true, "testId": "settings-provider-connect-ollama", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"settings-provider-connect-test\"]" },
-      { "click": true, "testId": "settings-provider-connect-test", "waitMs": 4000 },
-      { "click": true, "testId": "settings-provider-connect-save", "waitMs": 3000 },
-      { "reload": true, "waitMs": 2500 },
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-agents\"]" },
-      { "click": true, "testId": "settings-nav-agents", "waitMs": 800 },
-      { "waitFor": "[data-testid=\"settings-agent-default-model\"] [data-testid=\"settings-model-cascade-trigger\"]" },
-      { "click": true, "selector": "[data-testid=\"settings-agent-default-model\"] [data-testid=\"settings-model-cascade-trigger\"]", "waitMs": 500 },
-      { "waitFor": ".settings-model-option[data-model-id=\"qa-stub:4b\"]" },
-      { "click": true, "selector": ".settings-model-option[data-model-id=\"qa-stub:4b\"]", "waitMs": 1500 },
-      { "reload": true, "waitMs": 2500 },
-      { "waitFor": "[data-testid=\"composer-model-effort-pill\"]" },
-      { "click": true, "testId": "composer-model-effort-pill", "waitMs": 400 },
-      { "click": true, "testId": "composer-model-effort-open-picker", "waitMs": 400 },
-      { "waitFor": "[data-testid^=\"composer-model-item-\"]" },
-      { "click": true, "selector": "[data-testid^=\"composer-model-item-\"]", "waitMs": 600 },
-      { "key": "Escape", "waitMs": 300 },
-      { "type": "qa:subagent 请让一个子代理核对工作区里有没有 capture。", "selector": ".composer-textarea", "waitMs": 300 },
-      { "click": true, "testId": "debugger-start-button", "waitMs": 25000 },
-      { "reload": true, "waitMs": 2500 }
-    ],
-    "steps": [
-      { "waitFor": ".work-process-header" },
-      { "click": true, "selector": ".work-process-header", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"work-process-subagent\"] .work-card-trigger" },
-      { "click": true, "selector": "[data-testid=\"work-process-subagent\"] .work-card-trigger", "waitMs": 1200 }
-    ],
-    "settleMs": 1500
+   "id": "transcript-subagent",
+   "setup": [
+    {
+     "preset": "ollama"
+    },
+    {
+     "waitFor": "[data-testid=\"composer-model-effort-pill\"]"
+    },
+    {
+     "click": true,
+     "testId": "composer-model-effort-pill",
+     "waitMs": 400
+    },
+    {
+     "click": true,
+     "testId": "composer-model-effort-open-picker",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid^=\"composer-model-item-\"]"
+    },
+    {
+     "click": true,
+     "selector": "[data-testid^=\"composer-model-item-\"]",
+     "waitMs": 600
+    },
+    {
+     "key": "Escape",
+     "waitMs": 300
+    },
+    {
+     "type": "qa:subagent 请让一个子代理核对工作区里有没有 capture。",
+     "selector": ".composer-textarea",
+     "waitMs": 300
+    },
+    {
+     "click": true,
+     "testId": "debugger-start-button",
+     "waitMs": 25000
+    },
+    {
+     "reload": true,
+     "waitMs": 2500
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": ".work-process-header"
+    },
+    {
+     "click": true,
+     "selector": ".work-process-header",
+     "waitMs": 600
+    },
+    {
+     "waitFor": "[data-testid=\"work-process-subagent\"] .work-card-trigger"
+    },
+    {
+     "click": true,
+     "selector": "[data-testid=\"work-process-subagent\"] .work-card-trigger",
+     "waitMs": 1200
+    }
+   ],
+   "settleMs": 1500
   },
   {
-    "id": "transcript-tasks-dark", "viewport": [1440, 900], "theme": "dark",
-    "setup": [
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "project": true, "waitMs": 2500 },
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-models\"]" },
-      { "click": true, "testId": "settings-nav-models", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"settings-provider-search\"]" },
-      { "type": "Ollama", "testId": "settings-provider-search", "waitMs": 400 },
-      { "waitFor": "[data-testid=\"settings-provider-connect-ollama\"]" },
-      { "click": true, "testId": "settings-provider-connect-ollama", "waitMs": 600 },
-      { "waitFor": "[data-testid=\"settings-provider-connect-test\"]" },
-      { "click": true, "testId": "settings-provider-connect-test", "waitMs": 4000 },
-      { "click": true, "testId": "settings-provider-connect-save", "waitMs": 3000 },
-      { "reload": true, "waitMs": 2500 },
-      { "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]" },
-      { "click": true, "testId": "sidebar-user-settings-trigger" },
-      { "click": true, "testId": "open-settings-entry" },
-      { "waitFor": "[data-testid=\"settings-nav-agents\"]" },
-      { "click": true, "testId": "settings-nav-agents", "waitMs": 800 },
-      { "waitFor": "[data-testid=\"settings-agent-default-model\"] [data-testid=\"settings-model-cascade-trigger\"]" },
-      { "click": true, "selector": "[data-testid=\"settings-agent-default-model\"] [data-testid=\"settings-model-cascade-trigger\"]", "waitMs": 500 },
-      { "waitFor": ".settings-model-option[data-model-id=\"qa-stub:4b\"]" },
-      { "click": true, "selector": ".settings-model-option[data-model-id=\"qa-stub:4b\"]", "waitMs": 1500 },
-      { "reload": true, "waitMs": 2500 },
-      { "waitFor": ".composer-textarea" },
-      { "type": "qa:loops 列出工作区的文件，并整理结论。", "selector": ".composer-textarea", "waitMs": 300 },
-      { "click": true, "testId": "debugger-start-button", "waitMs": 25000 },
-      { "reload": true, "waitMs": 2500 }
+   "id": "transcript-tasks",
+   "setup": [
+    {
+     "preset": "ollama"
+    },
+    {
+     "waitFor": ".composer-textarea"
+    },
+    {
+     "type": "qa:loops 列出工作区的文件，并整理结论。",
+     "selector": ".composer-textarea",
+     "waitMs": 300
+    },
+    {
+     "click": true,
+     "testId": "debugger-start-button",
+     "waitMs": 25000
+    },
+    {
+     "reload": true,
+     "waitMs": 2500
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": ".work-process-header",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1500
+  },
+  {
+   "id": "settings-general",
+   "steps": [
+    {
+     "preset": "open-settings"
+    },
+    {
+     "waitFor": "[data-testid=\"settings-nav-general\"]"
+    },
+    {
+     "click": true,
+     "testId": "settings-nav-general",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "settings-skills",
+   "steps": [
+    {
+     "preset": "open-settings"
+    },
+    {
+     "waitFor": "[data-testid=\"settings-nav-skills\"]"
+    },
+    {
+     "click": true,
+     "testId": "settings-nav-skills",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "settings-tools",
+   "steps": [
+    {
+     "preset": "open-settings"
+    },
+    {
+     "waitFor": "[data-testid=\"settings-nav-tools\"]"
+    },
+    {
+     "click": true,
+     "testId": "settings-nav-tools",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "settings-hooks",
+   "steps": [
+    {
+     "preset": "open-settings"
+    },
+    {
+     "waitFor": "[data-testid=\"settings-nav-hooks\"]"
+    },
+    {
+     "click": true,
+     "testId": "settings-nav-hooks",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "settings-policy",
+   "steps": [
+    {
+     "preset": "open-settings"
+    },
+    {
+     "waitFor": "[data-testid=\"settings-nav-policy\"]"
+    },
+    {
+     "click": true,
+     "testId": "settings-nav-policy",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "settings-search",
+   "steps": [
+    {
+     "preset": "open-settings"
+    },
+    {
+     "waitFor": "[data-testid=\"settings-nav-search\"]"
+    },
+    {
+     "type": "theme",
+     "testId": "settings-nav-search",
+     "waitMs": 600
+    },
+    {
+     "waitFor": "[data-testid=\"settings-search-results\"]"
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "command-palette",
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]",
+     "waitMs": 600
+    },
+    {
+     "key": "K",
+     "modifiers": [
+      "control"
+     ],
+     "waitMs": 400
+    },
+    {
+     "waitFor": ".command-palette"
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "command-palette-filter",
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]",
+     "waitMs": 600
+    },
+    {
+     "key": "K",
+     "modifiers": [
+      "control"
+     ],
+     "waitMs": 400
+    },
+    {
+     "waitFor": ".command-palette-input"
+    },
+    {
+     "type": "settings",
+     "selector": ".command-palette-input",
+     "waitMs": 400
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "sidebar-user-menu",
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+    },
+    {
+     "click": true,
+     "testId": "sidebar-user-settings-trigger",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"sidebar-user-menu\"]"
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "sidebar-collapsed",
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"titlebar-left-panel-toggle\"]"
+    },
+    {
+     "click": true,
+     "testId": "titlebar-left-panel-toggle",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "knowledge-import-error",
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]"
+    },
+    {
+     "click": true,
+     "testId": "sidebar-knowledge-center-trigger",
+     "waitMs": 600
+    },
+    {
+     "waitFor": "[data-testid=\"knowledge-center-import-open\"]"
+    },
+    {
+     "click": true,
+     "testId": "knowledge-center-import-open",
+     "waitMs": 400
+    },
+    {
+     "waitFor": ".knowledge-import-mode [role=\"tab\"]"
+    },
+    {
+     "click": true,
+     "selector": ".knowledge-import-mode [role=\"tab\"]:nth-of-type(2)",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"knowledge-center-import-source\"]"
+    },
+    {
+     "type": "case_id: [unclosed\ntitle: : :",
+     "testId": "knowledge-center-import-source"
+    },
+    {
+     "click": true,
+     "testId": "knowledge-center-import-preview",
+     "waitMs": 800
+    },
+    {
+     "waitFor": "[data-testid=\"knowledge-center-import-items\"], [data-testid=\"knowledge-center-import-error\"]",
+     "waitMs": 400
+    },
+    {
+     "focus": "[data-testid=\"knowledge-center-import\"]",
+     "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing",
+     "waitMs": 200
+    }
+   ],
+   "settleMs": 1000,
+   "l3Ignore": {
+    "keys": [
+     "focus"
     ],
-    "steps": [
-      { "waitFor": ".work-process-header", "waitMs": 600 }
+    "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing"
+   }
+  },
+  {
+   "id": "project-workbench",
+   "setup": [
+    {
+     "preset": "project"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": ".composer-textarea",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1200
+  },
+  {
+   "id": "composer-draft",
+   "setup": [
+    {
+     "preset": "project"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": ".composer-textarea"
+    },
+    {
+     "type": "检查这一帧的阴影贴图：\n1. 深度偏移是否过小\n2. 级联边界是否有缝",
+     "selector": ".composer-textarea",
+     "waitMs": 400
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "composer-permission-menu",
+   "setup": [
+    {
+     "preset": "project"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"composer-permission-pill\"]"
+    },
+    {
+     "click": true,
+     "testId": "composer-permission-pill",
+     "waitMs": 400
+    },
+    {
+     "waitFor": ".composer-permission-popup"
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "permission-switch",
+   "setup": [
+    {
+     "preset": "project"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"composer-permission-pill\"]"
+    },
+    {
+     "click": true,
+     "testId": "composer-permission-pill",
+     "waitMs": 400
+    },
+    {
+     "waitFor": ".composer-permission-popup [role=\"menuitemradio\"]"
+    },
+    {
+     "click": true,
+     "selector": ".composer-permission-popup [role=\"menuitemradio\"]:last-child",
+     "waitMs": 1200
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "agent-menu",
+   "setup": [
+    {
+     "preset": "project"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"composer-mode-pill\"]"
+    },
+    {
+     "click": true,
+     "testId": "composer-mode-pill",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"mode-menu-item-debugger\"]"
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "agent-switch",
+   "setup": [
+    {
+     "preset": "project"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"composer-mode-pill\"]"
+    },
+    {
+     "click": true,
+     "testId": "composer-mode-pill",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"mode-menu-item-debugger\"]"
+    },
+    {
+     "click": true,
+     "testId": "mode-menu-item-debugger",
+     "waitMs": 1200
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "right-rail-tabs",
+   "setup": [
+    {
+     "preset": "ollama"
+    },
+    {
+     "waitFor": ".composer-textarea"
+    },
+    {
+     "type": "qa:loops 列出工作区的文件，并整理结论。",
+     "selector": ".composer-textarea",
+     "waitMs": 300
+    },
+    {
+     "click": true,
+     "testId": "debugger-start-button",
+     "waitMs": 25000
+    },
+    {
+     "reload": true,
+     "waitMs": 2500
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": ".right-rail-tabs [role=\"tab\"]"
+    },
+    {
+     "click": true,
+     "selector": ".right-rail-tabs [role=\"tab\"]:nth-of-type(2)",
+     "waitMs": 400
+    },
+    {
+     "click": true,
+     "selector": ".right-rail-tabs [role=\"tab\"]:nth-of-type(4)",
+     "waitMs": 400
+    },
+    {
+     "click": true,
+     "selector": ".right-rail-tabs [role=\"tab\"]:nth-of-type(1)",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1000,
+   "variants": [
+    "dark-1440",
+    "light-1440"
+   ]
+  },
+  {
+   "id": "composer-send",
+   "setup": [
+    {
+     "preset": "ollama"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": ".composer-textarea"
+    },
+    {
+     "type": "列出工作区的文件。",
+     "selector": ".composer-textarea",
+     "waitMs": 300
+    },
+    {
+     "click": true,
+     "testId": "debugger-start-button",
+     "waitMs": 1500
+    }
+   ],
+   "settleMs": 1200
+  },
+  {
+   "id": "working-toggle",
+   "setup": [
+    {
+     "preset": "ollama"
+    },
+    {
+     "waitFor": ".composer-textarea"
+    },
+    {
+     "type": "qa:loops 列出工作区的文件，并整理结论。",
+     "selector": ".composer-textarea",
+     "waitMs": 300
+    },
+    {
+     "click": true,
+     "testId": "debugger-start-button",
+     "waitMs": 25000
+    },
+    {
+     "reload": true,
+     "waitMs": 2500
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": ".work-process-header"
+    },
+    {
+     "click": true,
+     "selector": ".work-process-header",
+     "waitMs": 600
+    },
+    {
+     "click": true,
+     "selector": ".work-process-header",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1200
+  },
+  {
+   "id": "transcript-markdown",
+   "setup": [
+    {
+     "preset": "ollama"
+    },
+    {
+     "waitFor": ".composer-textarea"
+    },
+    {
+     "type": "qa:markdown 展示一份排版样例。",
+     "selector": ".composer-textarea",
+     "waitMs": 300
+    },
+    {
+     "click": true,
+     "testId": "debugger-start-button",
+     "waitMs": 20000
+    },
+    {
+     "reload": true,
+     "waitMs": 2500
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": ".markdown-body",
+     "waitMs": 800
+    }
+   ],
+   "settleMs": 1500
+  },
+  {
+   "id": "transcript-ask",
+   "setup": [
+    {
+     "preset": "ollama"
+    },
+    {
+     "waitFor": ".composer-textarea"
+    },
+    {
+     "type": "qa:ask 需要我确认什么？",
+     "selector": ".composer-textarea",
+     "waitMs": 300
+    },
+    {
+     "click": true,
+     "testId": "debugger-start-button",
+     "waitMs": 12000
+    },
+    {
+     "reload": true,
+     "waitMs": 2500
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"composer-user-input-panel\"]",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1200
+  },
+  {
+   "id": "plan-gate",
+   "setup": [
+    {
+     "preset": "plan-gate"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"plan-review-request-panel\"]",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1200
+  },
+  {
+   "id": "plan-reader",
+   "setup": [
+    {
+     "preset": "plan-gate"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"plan-card\"]"
+    },
+    {
+     "click": true,
+     "testId": "plan-card",
+     "waitMs": 800
+    }
+   ],
+   "settleMs": 1200
+  },
+  {
+   "id": "plan-approve",
+   "setup": [
+    {
+     "preset": "plan-gate"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"plan-review-request-panel\"] [data-testid=\"handoff-action-row\"] button"
+    },
+    {
+     "click": true,
+     "selector": "[data-testid=\"plan-review-request-panel\"] [data-testid=\"handoff-action-row\"] button",
+     "waitMs": 2000
+    }
+   ],
+   "settleMs": 1200
+  },
+  {
+   "id": "session-switch",
+   "setup": [
+    {
+     "preset": "ollama"
+    },
+    {
+     "waitFor": ".composer-textarea"
+    },
+    {
+     "type": "列出工作区的文件。",
+     "selector": ".composer-textarea",
+     "waitMs": 300
+    },
+    {
+     "click": true,
+     "testId": "debugger-start-button",
+     "waitMs": 15000
+    },
+    {
+     "reload": true,
+     "waitMs": 2500
+    },
+    {
+     "waitFor": ".project-item .session-item-icon-button"
+    },
+    {
+     "click": true,
+     "selector": ".project-item .session-item-icon-button",
+     "waitMs": 500
+    },
+    {
+     "click": true,
+     "selector": ".sidebar-context-menu .sidebar-context-menu-item:nth-of-type(3)",
+     "waitMs": 2000
+    },
+    {
+     "waitFor": ".composer-textarea"
+    },
+    {
+     "type": "qa:markdown 展示一份排版样例。",
+     "selector": ".composer-textarea",
+     "waitMs": 300
+    },
+    {
+     "click": true,
+     "testId": "debugger-start-button",
+     "waitMs": 20000
+    },
+    {
+     "reload": true,
+     "waitMs": 2500
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": ".session-subitem:not(.is-selected) .session-item-select"
+    },
+    {
+     "click": true,
+     "selector": ".session-subitem:not(.is-selected) .session-item-select",
+     "waitMs": 1500
+    }
+   ],
+   "settleMs": 1500
+  },
+  {
+   "id": "provider-toggle",
+   "setup": [
+    {
+     "preset": "ollama"
+    }
+   ],
+   "steps": [
+    {
+     "preset": "open-settings"
+    },
+    {
+     "waitFor": "[data-testid=\"settings-nav-models\"]"
+    },
+    {
+     "click": true,
+     "testId": "settings-nav-models",
+     "waitMs": 600
+    },
+    {
+     "waitFor": "[data-testid=\"settings-configured-services\"] [data-testid=\"settings-provider-connect-ollama\"]"
+    },
+    {
+     "click": true,
+     "selector": "[data-testid=\"settings-configured-services\"] [data-testid=\"settings-provider-connect-ollama\"]",
+     "waitMs": 800
+    },
+    {
+     "waitFor": "[data-testid=\"settings-provider-model-list\"] [role=\"switch\"]"
+    },
+    {
+     "click": true,
+     "selector": "[data-testid=\"settings-provider-model-list\"] [role=\"switch\"]",
+     "waitMs": 600
+    },
+    {
+     "click": true,
+     "testId": "settings-provider-connect-save",
+     "waitMs": 2000
+    }
+   ],
+   "settleMs": 1200,
+   "l3Ignore": {
+    "keys": [
+     "rect settings-provider-connect-",
+     "rect settings-provider-connection-status"
     ],
-    "settleMs": 1500
+    "reason": "Saving swaps the footer's Save label for a wider pending label, which shifts Test, Save and the status line for as long as the save takes; whether that span covers two frames is timing, not intent (a layout jump to fix under plan 5.4)"
+   }
+  },
+  {
+   "id": "permission-switch-failure",
+   "setup": [
+    {
+     "preset": "project"
+    }
+   ],
+   "respond": [
+    {
+     "channel": "settings:patch",
+     "call": 1,
+     "error": {
+      "code": "STORAGE_UNREADABLE",
+      "params": {},
+      "category": "availability"
+     }
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"composer-permission-pill\"]"
+    },
+    {
+     "click": true,
+     "testId": "composer-permission-pill",
+     "waitMs": 400
+    },
+    {
+     "waitFor": ".composer-permission-popup [role=\"menuitemradio\"]"
+    },
+    {
+     "click": true,
+     "selector": ".composer-permission-popup [role=\"menuitemradio\"]:last-child",
+     "waitMs": 1200
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "permission-switch-late",
+   "setup": [
+    {
+     "preset": "project"
+    }
+   ],
+   "respond": [
+    {
+     "channel": "settings:patch",
+     "call": 1,
+     "hold": true
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"composer-permission-pill\"]"
+    },
+    {
+     "click": true,
+     "testId": "composer-permission-pill",
+     "waitMs": 400
+    },
+    {
+     "waitFor": ".composer-permission-popup [role=\"menuitemradio\"]"
+    },
+    {
+     "click": true,
+     "selector": ".composer-permission-popup [role=\"menuitemradio\"]:last-child",
+     "waitMs": 600
+    },
+    {
+     "release": "settings:patch",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "agent-switch-late",
+   "setup": [
+    {
+     "preset": "ollama"
+    },
+    {
+     "waitFor": ".composer-textarea"
+    },
+    {
+     "type": "qa:loops 列出工作区的文件，并整理结论。",
+     "selector": ".composer-textarea",
+     "waitMs": 300
+    },
+    {
+     "click": true,
+     "testId": "debugger-start-button",
+     "waitMs": 25000
+    },
+    {
+     "reload": true,
+     "waitMs": 2500
+    }
+   ],
+   "respond": [
+    {
+     "channel": "session:setAgentId",
+     "call": 1,
+     "hold": true
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"composer-mode-pill\"]"
+    },
+    {
+     "click": true,
+     "testId": "composer-mode-pill",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"mode-menu-item-debugger\"]"
+    },
+    {
+     "click": true,
+     "testId": "mode-menu-item-debugger",
+     "waitMs": 600
+    },
+    {
+     "release": "session:setAgentId",
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1000
+  },
+  {
+   "id": "agent-switch-reordered",
+   "setup": [
+    {
+     "preset": "ollama"
+    },
+    {
+     "waitFor": ".composer-textarea"
+    },
+    {
+     "type": "qa:loops 列出工作区的文件，并整理结论。",
+     "selector": ".composer-textarea",
+     "waitMs": 300
+    },
+    {
+     "click": true,
+     "testId": "debugger-start-button",
+     "waitMs": 25000
+    },
+    {
+     "reload": true,
+     "waitMs": 2500
+    }
+   ],
+   "respond": [
+    {
+     "channel": "session:setAgentId",
+     "call": 1,
+     "hold": true
+    },
+    {
+     "channel": "session:setAgentId",
+     "call": 2,
+     "hold": true
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"composer-mode-pill\"]"
+    },
+    {
+     "click": true,
+     "testId": "composer-mode-pill",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"mode-menu-item-debugger\"]"
+    },
+    {
+     "click": true,
+     "testId": "mode-menu-item-debugger",
+     "waitMs": 400
+    },
+    {
+     "click": true,
+     "testId": "composer-mode-pill",
+     "waitMs": 400
+    },
+    {
+     "waitFor": "[data-testid=\"mode-menu-item-analyzer\"]"
+    },
+    {
+     "click": true,
+     "testId": "mode-menu-item-analyzer",
+     "waitMs": 400
+    },
+    {
+     "release": "session:setAgentId",
+     "call": 2,
+     "waitMs": 400
+    },
+    {
+     "release": "session:setAgentId",
+     "call": 1,
+     "waitMs": 600
+    }
+   ],
+   "settleMs": 1000
   }
-]
+ ]
+}

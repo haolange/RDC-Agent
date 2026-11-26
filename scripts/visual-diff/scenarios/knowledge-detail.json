@@ -1,10 +1,5 @@
 {
- "id": "knowledge-detail-dark",
- "viewport": [
-  1440,
-  900
- ],
- "theme": "dark",
+ "id": "knowledge-detail",
  "steps": [
   {
    "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]"
@@ -13,6 +8,12 @@
    "click": true,
    "testId": "sidebar-knowledge-center-trigger",
    "waitMs": 800
+  },
+  {
+   "click": true,
+   "selector": "[data-testid=\"knowledge-center-narrow-tabs\"] [role=\"tab\"]:nth-of-type(2)",
+   "optional": true,
+   "waitMs": 400
   },
   {
    "waitFor": ".knowledge-center-card-button"

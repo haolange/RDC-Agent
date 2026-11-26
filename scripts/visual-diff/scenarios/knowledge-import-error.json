@@ -1,10 +1,5 @@
 {
- "id": "knowledge-import-dark",
- "viewport": [
-  1440,
-  900
- ],
- "theme": "dark",
+ "id": "knowledge-import-error",
  "steps": [
   {
    "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]"
@@ -34,29 +29,29 @@
    "waitFor": "[data-testid=\"knowledge-center-import-source\"]"
   },
   {
-   "type": "case_id: qa-shadow-acne\ntitle: 阴影贴图条纹 / 深度偏移过小\nmeta:\n  status: fixed\n  severity: high\nsymptoms:\n  visual: 地面出现斜向条纹，随相机距离变化。\nroot_cause:\n  phenomenon: 输出偏暗\n  responsible_layer: shader\nfix:\n  summary: 调整深度偏移并在同一 capture 上复核。",
+   "type": "case_id: [unclosed\ntitle: : :",
    "testId": "knowledge-center-import-source"
   },
   {
    "click": true,
    "testId": "knowledge-center-import-preview",
-   "waitMs": 600
+   "waitMs": 800
   },
   {
-   "waitFor": "[data-testid=\"knowledge-center-import-items\"]",
+   "waitFor": "[data-testid=\"knowledge-center-import-items\"], [data-testid=\"knowledge-center-import-error\"]",
    "waitMs": 400
+  },
+  {
+   "focus": "[data-testid=\"knowledge-center-import\"]",
+   "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing",
+   "waitMs": 200
   }
  ],
- "settleMs": 1200,
+ "settleMs": 1000,
  "responses": {
   "settings:get": [
    {
-    "ref": "34f45dbaee40cea6ecbc3e8a"
-   }
-  ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
+    "ref": "bd87c4a38a7d5b58606353ed"
    }
   ],
   "app:getMeta": [
@@ -73,8 +68,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-d948d4c73c65-1795634384443",
-       "timestamp": 1795634384443,
+       "id": "rlog-af878f616621-1795676058950",
+       "timestamp": 1795676058950,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -88,8 +83,8 @@
        }
       },
       {
-       "id": "rlog-4b90e122f118-1795634384484",
-       "timestamp": 1795634384484,
+       "id": "rlog-0e072e3d9381-1795676058999",
+       "timestamp": 1795676058999,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -101,8 +96,8 @@
        "raw": null
       },
       {
-       "id": "rlog-18332b19581b-1795634384484",
-       "timestamp": 1795634384484,
+       "id": "rlog-2306eb351530-1795676059000",
+       "timestamp": 1795676059000,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -114,8 +109,8 @@
        "raw": null
       },
       {
-       "id": "rlog-f3bedc9188ca-1795634384497",
-       "timestamp": 1795634384497,
+       "id": "rlog-4b0ece04bab5-1795676059017",
+       "timestamp": 1795676059017,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -160,6 +155,11 @@
     }
    }
   ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
   "project:list": [
    {
     "result": {
@@ -180,7 +180,7 @@
      ],
      "index": {
       "revision": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "builtAt": "2026-11-25T19:19:45.422Z",
+      "builtAt": "2026-11-26T06:54:20.933Z",
       "cardCount": 0,
       "cardsBySpace": {}
      }
@@ -227,7 +227,7 @@
    {
     "result": {
      "packId": "pack:e2b02937fd0c7754",
-     "compiledAt": "2026-11-25T19:19:45.445Z",
+     "compiledAt": "2026-11-26T06:54:21.004Z",
      "hits": [],
      "conflicts": []
     }
@@ -240,39 +240,22 @@
      "verified": false,
      "items": [
       {
-       "status": "draft",
-       "lifecycle": "draft",
-       "sourceStatus": "fixed",
-       "record": {
-        "cardId": "user:cases/qa-shadow-acne.md",
-        "spaceId": "user",
-        "relativePath": "cases/qa-shadow-acne.md",
-        "type": "case",
-        "lifecycle": "draft",
-        "title": "阴影贴图条纹 / 深度偏移过小",
-        "scope": {},
-        "relations": [],
-        "body": "# 阴影贴图条纹 / 深度偏移过小\n\n## Claim\n\n阴影贴图条纹 / 深度偏移过小\n\n## Symptoms\n\n{\"visual\":\"地面出现斜向条纹，随相机距离变化。\"}\n\n## RootCause\n\n{\"phenomenon\":\"输出偏暗\",\"responsible_layer\":\"shader\"}\n\n## Fix\n\n调整深度偏移并在同一 capture 上复核。\n\n## Derived\n\n{}",
-        "sourceStatus": "fixed",
-        "caseId": "qa-shadow-acne",
-        "chapters": {
-         "claim": "阴影贴图条纹 / 深度偏移过小",
-         "symptoms": "{\"visual\":\"地面出现斜向条纹，随相机距离变化。\"}",
-         "rootCause": "{\"phenomenon\":\"输出偏暗\",\"responsible_layer\":\"shader\"}",
-         "fix": "调整深度偏移并在同一 capture 上复核。",
-         "derived": "{}"
-        },
-        "preview": "地面出现斜向条纹，随相机距离变化。",
-        "sourceHash": "199692f919c3a3e2bdbd69499e7522fcf674693ae5de169cb20af395cde8b453",
-        "sourceSize": 316
-       },
-       "missingAssets": []
+       "status": "quarantine",
+       "lifecycle": null,
+       "missingAssets": [],
+       "reason": "yaml-broken"
       }
      ],
-     "sourceHash": "199692f919c3a3e2bdbd69499e7522fcf674693ae5de169cb20af395cde8b453",
-     "sourceSize": 316
+     "sourceHash": "a27647e18f49ab908c59430618bb77acfee35551db17bc65577bece6e910e596",
+     "sourceSize": 29
     }
    }
   ]
+ },
+ "l3Ignore": {
+  "keys": [
+   "focus"
+  ],
+  "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing"
  }
 }

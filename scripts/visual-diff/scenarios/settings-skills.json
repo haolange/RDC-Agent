@@ -1,16 +1,34 @@
 {
- "id": "welcome-light-1440",
- "viewport": [
-  1440,
-  900
+ "id": "settings-skills",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+  },
+  {
+   "click": true,
+   "testId": "sidebar-user-settings-trigger"
+  },
+  {
+   "click": true,
+   "testId": "open-settings-entry"
+  },
+  {
+   "waitFor": "[data-testid=\"settings-nav-skills\"]"
+  },
+  {
+   "click": true,
+   "testId": "settings-nav-skills",
+   "waitMs": 600
+  }
  ],
- "theme": "light",
- "steps": [],
- "settleMs": 1200,
+ "settleMs": 1000,
  "responses": {
   "settings:get": [
    {
-    "ref": "1b1ab76b2f838991011e1474"
+    "ref": "bd87c4a38a7d5b58606353ed"
+   },
+   {
+    "ref": "bd87c4a38a7d5b58606353ed"
    }
   ],
   "settings:getProviderCatalog": [
@@ -32,8 +50,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-4ba0fef16268-1795618434253",
-       "timestamp": 1795618434253,
+       "id": "rlog-6284a4de5491-1795675920789",
+       "timestamp": 1795675920789,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -47,8 +65,8 @@
        }
       },
       {
-       "id": "rlog-58a54b618d95-1795618434285",
-       "timestamp": 1795618434285,
+       "id": "rlog-b40a684b9357-1795675920842",
+       "timestamp": 1795675920842,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -60,8 +78,8 @@
        "raw": null
       },
       {
-       "id": "rlog-b47ad6211fea-1795618434285",
-       "timestamp": 1795618434285,
+       "id": "rlog-98ccfcb066ba-1795675920842",
+       "timestamp": 1795675920842,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -73,8 +91,8 @@
        "raw": null
       },
       {
-       "id": "rlog-e245b4145030-1795618434300",
-       "timestamp": 1795618434300,
+       "id": "rlog-d8509e167a14-1795675920856",
+       "timestamp": 1795675920856,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -124,6 +142,11 @@
     "result": {
      "projects": []
     }
+   }
+  ],
+  "rdc-runtime:overview": [
+   {
+    "ref": "7cffbe35944e643f3f416670"
    }
   ]
  }

@@ -1,0 +1,284 @@
+{
+ "id": "knowledge-import",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]"
+  },
+  {
+   "click": true,
+   "testId": "sidebar-knowledge-center-trigger",
+   "waitMs": 600
+  },
+  {
+   "waitFor": "[data-testid=\"knowledge-center-import-open\"]"
+  },
+  {
+   "click": true,
+   "testId": "knowledge-center-import-open",
+   "waitMs": 400
+  },
+  {
+   "waitFor": ".knowledge-import-mode [role=\"tab\"]"
+  },
+  {
+   "click": true,
+   "selector": ".knowledge-import-mode [role=\"tab\"]:nth-of-type(2)",
+   "waitMs": 400
+  },
+  {
+   "waitFor": "[data-testid=\"knowledge-center-import-source\"]"
+  },
+  {
+   "type": "case_id: qa-shadow-acne\ntitle: 阴影贴图条纹 / 深度偏移过小\nmeta:\n  status: fixed\n  severity: high\nsymptoms:\n  visual: 地面出现斜向条纹，随相机距离变化。\nroot_cause:\n  phenomenon: 输出偏暗\n  responsible_layer: shader\nfix:\n  summary: 调整深度偏移并在同一 capture 上复核。",
+   "testId": "knowledge-center-import-source"
+  },
+  {
+   "click": true,
+   "testId": "knowledge-center-import-preview",
+   "waitMs": 600
+  },
+  {
+   "waitFor": "[data-testid=\"knowledge-center-import-items\"]",
+   "waitMs": 400
+  },
+  {
+   "focus": "[data-testid=\"knowledge-center-import\"]",
+   "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing",
+   "waitMs": 200
+  }
+ ],
+ "settleMs": 1200,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "34f45dbaee40cea6ecbc3e8a"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-d948d4c73c65-1795634384443",
+       "timestamp": 1795634384443,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-4b90e122f118-1795634384484",
+       "timestamp": 1795634384484,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-18332b19581b-1795634384484",
+       "timestamp": 1795634384484,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-f3bedc9188ca-1795634384497",
+       "timestamp": 1795634384497,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": []
+    }
+   }
+  ],
+  "knowledge:overview": [
+   {
+    "result": {
+     "spaces": [
+      {
+       "spaceId": "user",
+       "kind": "user",
+       "label": "User",
+       "rootPath": "/visual-diff/.rdc-agent/knowledge"
+      }
+     ],
+     "index": {
+      "revision": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "builtAt": "2026-11-25T19:19:45.422Z",
+      "cardCount": 0,
+      "cardsBySpace": {}
+     }
+    }
+   }
+  ],
+  "knowledge:query": [
+   {
+    "result": {
+     "hits": [],
+     "lanes": [
+      {
+       "lane": "Identity/Path",
+       "hits": []
+      },
+      {
+       "lane": "Scope/Metadata",
+       "hits": []
+      },
+      {
+       "lane": "Lexical",
+       "hits": []
+      },
+      {
+       "lane": "Structural",
+       "hits": []
+      },
+      {
+       "lane": "Relation/Graph",
+       "hits": []
+      },
+      {
+       "lane": "Temporal/Version",
+       "hits": []
+      }
+     ],
+     "revision": "491c3f2aa938256d9d2f5a09cd4fb9715843c2b4d3f2edacb2b9b7290193499d",
+     "total": 0,
+     "queryFingerprint": "df655964509fd4ab3e2a30029a6420050466b5070be6b55e99c483b73156f0aa"
+    }
+   }
+  ],
+  "knowledge:compile": [
+   {
+    "result": {
+     "packId": "pack:e2b02937fd0c7754",
+     "compiledAt": "2026-11-25T19:19:45.445Z",
+     "hits": [],
+     "conflicts": []
+    }
+   }
+  ],
+  "knowledge:previewImport": [
+   {
+    "result": {
+     "candidateCreated": false,
+     "verified": false,
+     "items": [
+      {
+       "status": "draft",
+       "lifecycle": "draft",
+       "sourceStatus": "fixed",
+       "record": {
+        "cardId": "user:cases/qa-shadow-acne.md",
+        "spaceId": "user",
+        "relativePath": "cases/qa-shadow-acne.md",
+        "type": "case",
+        "lifecycle": "draft",
+        "title": "阴影贴图条纹 / 深度偏移过小",
+        "scope": {},
+        "relations": [],
+        "body": "# 阴影贴图条纹 / 深度偏移过小\n\n## Claim\n\n阴影贴图条纹 / 深度偏移过小\n\n## Symptoms\n\n{\"visual\":\"地面出现斜向条纹，随相机距离变化。\"}\n\n## RootCause\n\n{\"phenomenon\":\"输出偏暗\",\"responsible_layer\":\"shader\"}\n\n## Fix\n\n调整深度偏移并在同一 capture 上复核。\n\n## Derived\n\n{}",
+        "sourceStatus": "fixed",
+        "caseId": "qa-shadow-acne",
+        "chapters": {
+         "claim": "阴影贴图条纹 / 深度偏移过小",
+         "symptoms": "{\"visual\":\"地面出现斜向条纹，随相机距离变化。\"}",
+         "rootCause": "{\"phenomenon\":\"输出偏暗\",\"responsible_layer\":\"shader\"}",
+         "fix": "调整深度偏移并在同一 capture 上复核。",
+         "derived": "{}"
+        },
+        "preview": "地面出现斜向条纹，随相机距离变化。",
+        "sourceHash": "199692f919c3a3e2bdbd69499e7522fcf674693ae5de169cb20af395cde8b453",
+        "sourceSize": 316
+       },
+       "missingAssets": []
+      }
+     ],
+     "sourceHash": "199692f919c3a3e2bdbd69499e7522fcf674693ae5de169cb20af395cde8b453",
+     "sourceSize": 316
+    }
+   }
+  ]
+ },
+ "l3Ignore": {
+  "keys": [
+   "focus"
+  ],
+  "reason": "TaskDialog re-arms its focus trap on every render (useModalFocus depends on an unstable onClose), so after the preview answer focus lands on the close button or the dialog depending on frame timing"
+ }
+}

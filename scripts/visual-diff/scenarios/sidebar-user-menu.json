@@ -1,25 +1,28 @@
 {
- "id": "setup-guide-dark",
- "viewport": [
-  1440,
-  900
- ],
- "theme": "dark",
+ "id": "sidebar-user-menu",
  "steps": [
   {
-   "waitFor": "[data-testid=\"titlebar-setup-guide\"]"
+   "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
   },
   {
    "click": true,
-   "testId": "titlebar-setup-guide",
+   "testId": "sidebar-user-settings-trigger",
    "waitMs": 400
+  },
+  {
+   "waitFor": "[data-testid=\"sidebar-user-menu\"]"
   }
  ],
  "settleMs": 1000,
  "responses": {
   "settings:get": [
    {
-    "ref": "56880e90c26d8d50cd1761c7"
+    "ref": "bd87c4a38a7d5b58606353ed"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "app:getMeta": [
@@ -36,8 +39,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-ca262e117599-1795618454406",
-       "timestamp": 1795618454406,
+       "id": "rlog-f10ed19b2391-1795675970758",
+       "timestamp": 1795675970758,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -51,8 +54,8 @@
        }
       },
       {
-       "id": "rlog-3a6056c07ada-1795618454455",
-       "timestamp": 1795618454455,
+       "id": "rlog-3fd3a9282544-1795675970857",
+       "timestamp": 1795675970857,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -64,8 +67,8 @@
        "raw": null
       },
       {
-       "id": "rlog-f540a7dc27f6-1795618454455",
-       "timestamp": 1795618454455,
+       "id": "rlog-277248ab847b-1795675970858",
+       "timestamp": 1795675970858,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -77,8 +80,8 @@
        "raw": null
       },
       {
-       "id": "rlog-621d19a4168a-1795618454479",
-       "timestamp": 1795618454479,
+       "id": "rlog-ab2b9a4785d1-1795675970884",
+       "timestamp": 1795675970884,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -121,11 +124,6 @@
       "status": "idle"
      }
     }
-   }
-  ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "project:list": [

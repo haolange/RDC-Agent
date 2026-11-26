@@ -1,43 +1,16 @@
 {
- "id": "settings-agents-dark",
- "viewport": [
-  1440,
-  900
- ],
- "theme": "dark",
- "steps": [
-  {
-   "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
-  },
-  {
-   "click": true,
-   "testId": "sidebar-user-settings-trigger"
-  },
-  {
-   "click": true,
-   "testId": "open-settings-entry"
-  },
-  {
-   "waitFor": "[data-testid=\"settings-nav-agents\"]"
-  },
-  {
-   "click": true,
-   "testId": "settings-nav-agents",
-   "waitMs": 400
-  },
-  {
-   "waitFor": "[data-testid=\"settings-agent-panels\"]",
-   "waitMs": 400
-  }
- ],
+ "id": "welcome",
+ "steps": [],
  "settleMs": 1200,
  "responses": {
   "settings:get": [
    {
-    "ref": "34f45dbaee40cea6ecbc3e8a"
-   },
+    "ref": "56880e90c26d8d50cd1761c7"
+   }
+  ],
+  "settings:getProviderCatalog": [
    {
-    "ref": "34f45dbaee40cea6ecbc3e8a"
+    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "app:getMeta": [
@@ -49,18 +22,13 @@
     }
    }
   ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
-   }
-  ],
   "runtimeLog:list": [
    {
     "result": {
      "entries": [
       {
-       "id": "rlog-ff74d151aa14-1795634378150",
-       "timestamp": 1795634378150,
+       "id": "rlog-43baa64188a0-1795618424240",
+       "timestamp": 1795618424240,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -74,8 +42,8 @@
        }
       },
       {
-       "id": "rlog-4a44cb9fbfb1-1795634378192",
-       "timestamp": 1795634378192,
+       "id": "rlog-68533957fc29-1795618424275",
+       "timestamp": 1795618424275,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -87,8 +55,8 @@
        "raw": null
       },
       {
-       "id": "rlog-01ab1ec1a5d6-1795634378192",
-       "timestamp": 1795634378192,
+       "id": "rlog-c66bd5469fb0-1795618424276",
+       "timestamp": 1795618424276,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -100,8 +68,8 @@
        "raw": null
       },
       {
-       "id": "rlog-17c9f994e94c-1795634378205",
-       "timestamp": 1795634378205,
+       "id": "rlog-236e153b5675-1795618424290",
+       "timestamp": 1795618424290,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -151,14 +119,6 @@
     "result": {
      "projects": []
     }
-   }
-  ],
-  "rdc-runtime:overview": [
-   {
-    "ref": "57f1d22f3c86106853f0f2f6"
-   },
-   {
-    "ref": "57f1d22f3c86106853f0f2f6"
    }
   ]
  }

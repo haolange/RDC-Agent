@@ -1,16 +1,20 @@
 {
- "id": "welcome-dark-1440",
- "viewport": [
-  1440,
-  900
+ "id": "sidebar-collapsed",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"titlebar-left-panel-toggle\"]"
+  },
+  {
+   "click": true,
+   "testId": "titlebar-left-panel-toggle",
+   "waitMs": 600
+  }
  ],
- "theme": "dark",
- "steps": [],
- "settleMs": 1200,
+ "settleMs": 1000,
  "responses": {
   "settings:get": [
    {
-    "ref": "56880e90c26d8d50cd1761c7"
+    "ref": "bd87c4a38a7d5b58606353ed"
    }
   ],
   "settings:getProviderCatalog": [
@@ -32,8 +36,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-43baa64188a0-1795618424240",
-       "timestamp": 1795618424240,
+       "id": "rlog-bf53fd236cf7-1795675993985",
+       "timestamp": 1795675993985,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -47,8 +51,8 @@
        }
       },
       {
-       "id": "rlog-68533957fc29-1795618424275",
-       "timestamp": 1795618424275,
+       "id": "rlog-4c8112d92ac9-1795675994052",
+       "timestamp": 1795675994052,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -60,8 +64,8 @@
        "raw": null
       },
       {
-       "id": "rlog-c66bd5469fb0-1795618424276",
-       "timestamp": 1795618424276,
+       "id": "rlog-00eb52df128f-1795675994052",
+       "timestamp": 1795675994052,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -73,8 +77,8 @@
        "raw": null
       },
       {
-       "id": "rlog-236e153b5675-1795618424290",
-       "timestamp": 1795618424290,
+       "id": "rlog-dd06eb1fa3be-1795675994068",
+       "timestamp": 1795675994068,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -123,6 +127,37 @@
    {
     "result": {
      "projects": []
+    }
+   }
+  ],
+  "settings:patch": [
+   {
+    "result": {
+     "revision": 2,
+     "changed": {
+      "layout": {
+       "leftSidebar": {
+        "collapsed": true,
+        "expandedWidth": 256,
+        "width": 0
+       },
+       "rightPanel": {
+        "collapsed": false,
+        "expandedWidth": 312,
+        "width": 312
+       },
+       "terminal": {
+        "height": 328
+       },
+       "window": {
+        "width": 1400,
+        "height": 900,
+        "x": 0,
+        "y": 0,
+        "isMaximized": false
+       }
+      }
+     }
     }
    }
   ]

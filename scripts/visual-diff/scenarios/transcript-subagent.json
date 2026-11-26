@@ -1,10 +1,5 @@
 {
- "id": "transcript-subagent-dark",
- "viewport": [
-  1440,
-  900
- ],
- "theme": "dark",
+ "id": "transcript-subagent",
  "steps": [
   {
    "waitFor": ".work-process-header"

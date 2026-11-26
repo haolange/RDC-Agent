@@ -1,10 +1,5 @@
 {
- "id": "settings-appearance-dark",
- "viewport": [
-  1440,
-  900
- ],
- "theme": "dark",
+ "id": "settings-appearance",
  "steps": [
   {
    "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"

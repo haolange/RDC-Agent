@@ -1,0 +1,614 @@
+{
+ "id": "composer-send",
+ "steps": [
+  {
+   "waitFor": ".composer-textarea"
+  },
+  {
+   "type": "列出工作区的文件。",
+   "selector": ".composer-textarea",
+   "waitMs": 300
+  },
+  {
+   "click": true,
+   "testId": "debugger-start-button",
+   "waitMs": 1500
+  }
+ ],
+ "settleMs": 1200,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "eaceda0556e81b7f92f87f1a"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-9d7b65c2ce07-1795677461646",
+       "timestamp": 1795677461646,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-75f0db2b56f5-1795677461722",
+       "timestamp": 1795677461722,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-6c6bd04e5991-1795677461722",
+       "timestamp": 1795677461722,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-ce4b21cbda04-1795677461735",
+       "timestamp": 1795677461735,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-9d7b65c2ce07-1795677461646",
+       "timestamp": 1795677461646,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-75f0db2b56f5-1795677461722",
+       "timestamp": 1795677461722,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-6c6bd04e5991-1795677461722",
+       "timestamp": 1795677461722,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-ce4b21cbda04-1795677461735",
+       "timestamp": 1795677461735,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-11e76a2a75c8-1795677486607",
+       "timestamp": 1795677486607,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_f68b48a8200f",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_f68b48a8200f",
+        "status": "thinking"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   },
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   },
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "settings:getEffectiveCatalog": [
+   {
+    "ref": "94dd922b3db025b02fd43e47"
+   },
+   {
+    "ref": "bc48985266e87d13d2e82ad4"
+   },
+   {
+    "ref": "bc21c8ab9ab163bbfd7cfd16"
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": [
+      {
+       "projectId": "proj_f743555210d6",
+       "name": "visual-diff-project",
+       "rootPath": "/visual-diff/visual-diff-project",
+       "slug": "visual-diff-project",
+       "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+       "inputs": [],
+       "inputsUpdatedAt": 1795677482867,
+       "createdAt": 1795677463780,
+       "updatedAt": 1795677463780
+      }
+     ]
+    }
+   }
+  ],
+  "project:select": [
+   {
+    "result": {
+     "success": true,
+     "project": {
+      "projectId": "proj_f743555210d6",
+      "name": "visual-diff-project",
+      "rootPath": "/visual-diff/visual-diff-project",
+      "slug": "visual-diff-project",
+      "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+      "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+      "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+      "inputs": [],
+      "inputsUpdatedAt": 1795677482867,
+      "createdAt": 1795677463780,
+      "updatedAt": 1795677463780
+     },
+     "currentSession": null,
+     "currentRun": null
+    }
+   }
+  ],
+  "session:list": [
+   {
+    "result": {
+     "sessions": []
+    }
+   },
+   {
+    "result": {
+     "sessions": [
+      {
+       "record": {
+        "schemaVersion": "1",
+        "sessionId": "sess_f68b48a8200f",
+        "projectId": "proj_f743555210d6",
+        "title": "列出工作区的文件。",
+        "goal": "列出工作区的文件。",
+        "sessionPath": "/visual-diff/state/sessions/proj_f743555210d6/sess_f68b48a8200f",
+        "createdAt": 1795677486527,
+        "updatedAt": 1795677486599,
+        "lastRunId": "run_b8d5150fe39c06c2",
+        "turnControls": {
+         "reasoningLevel": "on",
+         "maxContextMode": false,
+         "fastModel": false
+        },
+        "agentId": "general"
+       },
+       "revision": {
+        "epoch": "90b94bd2-aae3-403b-aead-935b402cb1e0",
+        "n": 4
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "project:inputs:list": [
+   {
+    "result": {
+     "inputs": []
+    }
+   }
+  ],
+  "settings:getAgentDefinitionCommit": [
+   {
+    "result": null
+   }
+  ],
+  "settings:getProviderDefinitionCommit": [
+   {
+    "result": {
+     "clientRevision": 0,
+     "providerId": "ollama",
+     "commitHash": "3d340c62bb50d3597389d1da879185a884efcd93790dd764a17f29fc9bdce641",
+     "provider": {
+      "id": "ollama",
+      "authAccountIds": {},
+      "protocol": "OllamaOpenAICompatibleChatCompletions",
+      "routeCount": 2,
+      "authMode": "local",
+      "authModeOptions": [
+       "local"
+      ],
+      "authModeAvailability": {
+       "local": {
+        "state": "unknown"
+       }
+      },
+      "hasStoredSecretByAuthMode": {
+       "local": true
+      },
+      "configuredAuthMode": "local",
+      "lifecycleStatus": "stable",
+      "providerAvailability": {
+       "state": "unknown"
+      },
+      "category": "local",
+      "catalogOwnership": "user-managed",
+      "serviceOperator": "ollama",
+      "endpointClass": "local-service",
+      "catalogProvenance": [
+       {
+        "source": "rdc-agent",
+        "revision": "provider-registry-v4",
+        "refreshedAt": "2026-07-15",
+        "surface": "ollama"
+       }
+      ],
+      "label": "Ollama",
+      "enabled": true,
+      "apiKey": "",
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {},
+      "connectionSchema": {
+       "fields": []
+      },
+      "hasStoredSecret": true,
+      "baseUrl": "http://127.0.0.1:11434/v1",
+      "baseUrlEditable": true,
+      "models": [
+       {
+        "id": "qa-coder:32b",
+        "label": "qa-coder:32b",
+        "enabled": true
+       },
+       {
+        "id": "qa-stub:4b",
+        "label": "qa-stub:4b",
+        "enabled": true
+       },
+       {
+        "id": "qa-vision:12b",
+        "label": "qa-vision:12b",
+        "enabled": true
+       }
+      ],
+      "recommendedModels": [],
+      "docsUrl": "https://ollama.com/download",
+      "status": "verified",
+      "lastTestedAt": "2026-11-26T07:17:53.174Z",
+      "lastModelRefreshAt": "2026-11-26T07:17:53.174Z",
+      "isConfigured": true,
+      "capabilities": [
+       "chat",
+       "model-discovery"
+      ]
+     },
+     "catalogRevision": "635da49701d132bad62f24cf920de041411201f79791c895f7d2d3777c1fc4fa"
+    }
+   }
+  ],
+  "conversation:sendMessage": [
+   {
+    "ref": "1aeabe4c3271e2606ca02656"
+   }
+  ],
+  "capture:getReplayState": [
+   {
+    "result": {
+     "projectId": "proj_f743555210d6",
+     "sessionId": "sess_f68b48a8200f",
+     "generation": 0,
+     "revision": 0,
+     "operationId": null,
+     "phase": "closed",
+     "preparation": {
+      "targetDeviceId": null,
+      "phase": "idle",
+      "issue": null
+     },
+     "replayDeviceId": null,
+     "inputId": null,
+     "captureHash": null,
+     "contextId": null,
+     "requestedEventId": null,
+     "appliedEventId": null,
+     "imageEventId": null,
+     "events": [],
+     "targets": [],
+     "target": null,
+     "isFinalOutput": false,
+     "image": null,
+     "observation": null,
+     "devicePresentation": {
+      "status": "not_applicable",
+      "eventId": null,
+      "textureId": null,
+      "sequence": null,
+      "reason": null
+     },
+     "warning": null,
+     "interactionLock": "agent_running",
+     "error": null
+    }
+   }
+  ],
+  "workflow:getState": [
+   {
+    "result": {
+     "caseId": "sess_f68b48a8200f",
+     "runId": "run_b8d5150fe39c06c2",
+     "sessionId": "sess_f68b48a8200f",
+     "blockers": [],
+     "reasoningSummaries": [],
+     "lastUpdated": "2026-11-26T07:18:06.693Z"
+    }
+   }
+  ],
+  "evidence:getChain": [
+   {
+    "result": {
+     "sessionId": "sess_f68b48a8200f",
+     "runId": "run_b8d5150fe39c06c2",
+     "events": [],
+     "isValid": true
+    }
+   }
+  ],
+  "conversation:getHistory": [
+   {
+    "ref": "b5337074ba2adc4891b6dc87"
+   }
+  ],
+  "workflow:getRunUsage": [
+   {
+    "result": {
+     "usage": null,
+     "stale": false
+    }
+   }
+  ],
+  "capture:getOpenedState": [
+   {
+    "result": null
+   }
+  ],
+  "trace:getProjection": [
+   {
+    "result": {
+     "success": true,
+     "presentation": {
+      "projectId": "proj_f743555210d6",
+      "sessionId": "sess_f68b48a8200f",
+      "activeBranchId": "branch-main",
+      "profileId": "general",
+      "runs": [
+       {
+        "run": {
+         "runId": "run_b8d5150fe39c06c2",
+         "agentType": "general",
+         "userRequest": "列出工作区的文件。",
+         "status": "running",
+         "createdAt": "2026-11-26T07:18:06.565Z",
+         "updatedAt": "2026-11-26T07:18:06.696Z"
+        },
+        "timeline": {
+         "runId": "run_b8d5150fe39c06c2",
+         "title": "列出工作区的文件。",
+         "status": "running",
+         "nodes": [
+          {
+           "nodeId": "task-fcda48b0e2f6-1795677486596",
+           "sourceNodeIds": [
+            "task-fcda48b0e2f6-1795677486596"
+           ],
+           "renderer": "task_frame",
+           "title": "本次任务",
+           "status": "succeeded",
+           "collapsedByDefault": false,
+           "importance": "high",
+           "payload": {
+            "id": "task-fcda48b0e2f6-1795677486596",
+            "runId": "run_b8d5150fe39c06c2",
+            "kind": "task_frame",
+            "title": "本次任务",
+            "userRequest": "列出工作区的文件。",
+            "seq": 0,
+            "createdAt": "2026-11-26T07:18:06.596Z",
+            "visibility": "user",
+            "status": "succeeded"
+           }
+          }
+         ]
+        }
+       }
+      ],
+      "rightPanel": {
+       "tasks": [],
+       "artifacts": {
+        "rows": [],
+        "totalCount": 0,
+        "storeDegraded": false
+       },
+       "outputs": {
+        "current": [],
+        "previous": []
+       },
+       "context": {
+        "task": {
+         "projectId": "proj_f743555210d6",
+         "projectName": "visual-diff-project",
+         "sessionId": "sess_f68b48a8200f",
+         "sessionTitle": "列出工作区的文件。",
+         "workingDirectory": "/visual-diff/state/sessions/proj_f743555210d6/sess_f68b48a8200f",
+         "configurationPhase": "current_turn",
+         "agentProfile": "General",
+         "permission": "default",
+         "resources": [
+          {
+           "id": "prompt-skill:execution-orchestrator:24040d530191b974b05eb3887c40bb8725ee51afeef34ca28aa71d6240507cb1",
+           "kind": "skill",
+           "label": "execution-orchestrator",
+           "summary": "SKILL.md",
+           "state": "preloaded",
+           "path": "/visual-diff-repo/resources/agent-runtime/skills/execution-orchestrator/SKILL.md"
+          }
+         ]
+        },
+        "rdc": {
+         "capture": null,
+         "availableCaptures": [],
+         "runtime": {},
+         "diagnostics": []
+        }
+       }
+      },
+      "branchNavigator": null,
+      "rawAuditRefs": [],
+      "updatedAt": "2026-11-26T07:18:06.718Z"
+     }
+    }
+   }
+  ],
+  "context:get": [
+   {
+    "result": null
+   }
+  ]
+ }
+}

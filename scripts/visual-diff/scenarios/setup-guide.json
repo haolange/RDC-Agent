@@ -1,30 +1,20 @@
 {
- "id": "knowledge-center-dark",
- "viewport": [
-  1440,
-  900
- ],
- "theme": "dark",
+ "id": "setup-guide",
  "steps": [
   {
-   "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]"
+   "waitFor": "[data-testid=\"titlebar-setup-guide\"]"
   },
   {
    "click": true,
-   "testId": "sidebar-knowledge-center-trigger",
-   "waitMs": 600
+   "testId": "titlebar-setup-guide",
+   "waitMs": 400
   }
  ],
- "settleMs": 1200,
+ "settleMs": 1000,
  "responses": {
   "settings:get": [
    {
     "ref": "56880e90c26d8d50cd1761c7"
-   }
-  ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "app:getMeta": [
@@ -41,8 +31,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-d71075449306-1795618448339",
-       "timestamp": 1795618448339,
+       "id": "rlog-ca262e117599-1795618454406",
+       "timestamp": 1795618454406,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -56,8 +46,8 @@
        }
       },
       {
-       "id": "rlog-ce9fc333bcd0-1795618448378",
-       "timestamp": 1795618448378,
+       "id": "rlog-3a6056c07ada-1795618454455",
+       "timestamp": 1795618454455,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -69,8 +59,8 @@
        "raw": null
       },
       {
-       "id": "rlog-24434b9d353d-1795618448378",
-       "timestamp": 1795618448378,
+       "id": "rlog-f540a7dc27f6-1795618454455",
+       "timestamp": 1795618454455,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -82,8 +72,8 @@
        "raw": null
       },
       {
-       "id": "rlog-e19ef3529299-1795618448391",
-       "timestamp": 1795618448391,
+       "id": "rlog-621d19a4168a-1795618454479",
+       "timestamp": 1795618454479,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -128,76 +118,15 @@
     }
    }
   ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
   "project:list": [
    {
     "result": {
      "projects": []
-    }
-   }
-  ],
-  "knowledge:overview": [
-   {
-    "result": {
-     "spaces": [
-      {
-       "spaceId": "user",
-       "kind": "user",
-       "label": "User",
-       "rootPath": "/visual-diff/.rdc-agent/knowledge"
-      }
-     ],
-     "index": {
-      "revision": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "builtAt": "2026-11-25T14:54:09.424Z",
-      "cardCount": 0,
-      "cardsBySpace": {}
-     }
-    }
-   }
-  ],
-  "knowledge:query": [
-   {
-    "result": {
-     "hits": [],
-     "lanes": [
-      {
-       "lane": "Identity/Path",
-       "hits": []
-      },
-      {
-       "lane": "Scope/Metadata",
-       "hits": []
-      },
-      {
-       "lane": "Lexical",
-       "hits": []
-      },
-      {
-       "lane": "Structural",
-       "hits": []
-      },
-      {
-       "lane": "Relation/Graph",
-       "hits": []
-      },
-      {
-       "lane": "Temporal/Version",
-       "hits": []
-      }
-     ],
-     "revision": "491c3f2aa938256d9d2f5a09cd4fb9715843c2b4d3f2edacb2b9b7290193499d",
-     "total": 0,
-     "queryFingerprint": "df655964509fd4ab3e2a30029a6420050466b5070be6b55e99c483b73156f0aa"
-    }
-   }
-  ],
-  "knowledge:compile": [
-   {
-    "result": {
-     "packId": "pack:e2b02937fd0c7754",
-     "compiledAt": "2026-11-25T14:54:09.451Z",
-     "hits": [],
-     "conflicts": []
     }
    }
   ]

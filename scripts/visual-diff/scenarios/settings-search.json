@@ -1,16 +1,37 @@
 {
- "id": "welcome-dark-720",
- "viewport": [
-  720,
-  900
+ "id": "settings-search",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+  },
+  {
+   "click": true,
+   "testId": "sidebar-user-settings-trigger"
+  },
+  {
+   "click": true,
+   "testId": "open-settings-entry"
+  },
+  {
+   "waitFor": "[data-testid=\"settings-nav-search\"]"
+  },
+  {
+   "type": "theme",
+   "testId": "settings-nav-search",
+   "waitMs": 600
+  },
+  {
+   "waitFor": "[data-testid=\"settings-search-results\"]"
+  }
  ],
- "theme": "dark",
- "steps": [],
- "settleMs": 1200,
+ "settleMs": 1000,
  "responses": {
   "settings:get": [
    {
-    "ref": "56880e90c26d8d50cd1761c7"
+    "ref": "bd87c4a38a7d5b58606353ed"
+   },
+   {
+    "ref": "bd87c4a38a7d5b58606353ed"
    }
   ],
   "settings:getProviderCatalog": [
@@ -32,8 +53,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-a18138a50e92-1795618429275",
-       "timestamp": 1795618429275,
+       "id": "rlog-76552918f5ef-1795675947995",
+       "timestamp": 1795675947995,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -47,8 +68,8 @@
        }
       },
       {
-       "id": "rlog-17636a7c758e-1795618429307",
-       "timestamp": 1795618429307,
+       "id": "rlog-12130e0cc47a-1795675948044",
+       "timestamp": 1795675948044,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -60,8 +81,8 @@
        "raw": null
       },
       {
-       "id": "rlog-6bbb91a8e5eb-1795618429308",
-       "timestamp": 1795618429308,
+       "id": "rlog-0abeaa27dfe5-1795675948045",
+       "timestamp": 1795675948045,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -73,8 +94,8 @@
        "raw": null
       },
       {
-       "id": "rlog-e7a75da30b9f-1795618429320",
-       "timestamp": 1795618429320,
+       "id": "rlog-fbfa7685a93f-1795675948060",
+       "timestamp": 1795675948060,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -124,6 +145,11 @@
     "result": {
      "projects": []
     }
+   }
+  ],
+  "rdc-runtime:overview": [
+   {
+    "ref": "7cffbe35944e643f3f416670"
    }
   ]
  }

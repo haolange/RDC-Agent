@@ -397,7 +397,7 @@ import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
 | `browser-smoke` | Windows Browser QA smoke，分 full access 开/关两组 |
 | `desktop-smoke` | Windows pack、打包版健康检查与 `check:release-package`（asar 内无开发载荷，资源与源码逐字节一致） |
 | `launcher-fresh-checkout` | Windows 与 Ubuntu 上的 launcher 准备与 `check:release-config` |
-| `visual-diff` | 差分渲染：同一组录制场景在 base 与 head 构建上各渲染一次，比对 DOM 指纹与位图，未经 `Visual-Diff-Allow` trailer 声明的差异即失败；push 事件不运行，`src/renderer` / `src/shared` / `src/preload` / `scripts/visual-diff` 无变化时跳过 |
+| `visual-diff` | 差分渲染：同一组录制场景在 base 与 head 构建上各按深/浅 × 1440/720 渲染，比对 DOM 指纹（L1）、位图（L2）与脚本化交互中逐帧采样的可见状态（L3：焦点、浮层栈、展开状态、rect、滚动，含迟到与失败响应注入），未经 `Visual-Diff-Allow` trailer 声明的差异即失败；push 事件不运行，`src/renderer` / `src/shared` / `src/preload` / `scripts/visual-diff` 无变化时跳过 |
 | `release` / `prerelease` | tag 触发，见「发布面与运行面」 |
 
 - 代码与样式的排版由 Prettier 决定（`.prettierrc.json`，范围见 `.prettierignore`）；`lint` 在 ESLint 之后执行 `check:format`，`check:gates` 也串联它。只改格式的提交列在 `.git-blame-ignore-revs`。

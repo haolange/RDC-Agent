@@ -2,9 +2,11 @@
 // Differential rendering harness.
 //   node scripts/visual-diff/run.mjs record [id...]   record scenarios against a disposable Browser QA instance
 //     (scenarios whose setup connects Ollama expect `node scripts/qa-ollama-stub.mjs` to be running)
-//   node scripts/visual-diff/run.mjs capture <dir> [--build <root>]   replay every scenario and write L1/L2 results
+//   node scripts/visual-diff/run.mjs capture <dir> [--build <root>]   replay every scenario and write L1/L2/L3 results
 //   node scripts/visual-diff/run.mjs compare <base-dir> <head-dir>   fail on differences not declared by Visual-Diff-Allow
 // Recordings live in scripts/visual-diff/scenarios; responses larger than 4 KiB are stored once in shared.json.
+// Definitions (scenarios.json) name reusable setup sequences in `presets`; a step `{ "preset": "<name>" }` expands
+// to that sequence. Each scenario renders in every theme × width variant unless it declares `variants`.
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -27,40 +29,61 @@ const electronBinary = () =>
   process.env.VISUAL_DIFF_ELECTRON ||
   path.join(repoRoot, 'node_modules', 'electron', 'dist', process.platform === 'win32' ? 'electron.exe' : 'electron');
 
-/**
- * Runs the host once and waits for it. A rendering host gets a throwaway Electron profile that is removed here once
- * the host is gone, whether it exited, crashed or timed out: the host itself ends with app.exit(), which skips
- * process exit handlers.
- */
-function spawnHost(args) {
+/** The host command line: under xvfb on a Linux machine without a display. */
+function hostCommand(args, profileDir) {
   const xvfb = process.platform === 'linux' && !process.env.DISPLAY;
-  const command = xvfb ? 'xvfb-run' : electronBinary();
-  const rendering = args[args.indexOf('--mode') + 1] !== 'diff';
-  const profileDir = rendering ? fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-visual-diff-host-')) : null;
   const hostArgs = [
     path.join(here, 'host', 'main.mjs'),
     '--',
     ...args,
     ...(profileDir ? ['--profile', profileDir] : []),
   ];
-  const full = xvfb ? ['-a', '-s', '-screen 0 1920x1200x24', electronBinary(), ...hostArgs] : hostArgs;
-  try {
-    return spawnSync(command, full, { cwd: repoRoot, encoding: 'utf8', timeout: 180_000 });
-  } finally {
-    if (profileDir) fs.rmSync(profileDir, { recursive: true, force: true });
-  }
+  return xvfb
+    ? ['xvfb-run', ['-a', '-s', '-screen 0 1920x1200x24', electronBinary(), ...hostArgs]]
+    : [electronBinary(), hostArgs];
 }
 
-function runHost(args, capture = false) {
-  const result = spawnHost(args);
+/** Runs a host that renders nothing (the image diff) and waits for it. */
+function runHost(args) {
+  const [command, full] = hostCommand(args, null);
+  const result = spawnSync(command, full, { cwd: repoRoot, encoding: 'utf8', timeout: 180_000 });
   if (result.status !== 0)
     fail(`host failed (${args.join(' ')}):\n${(result.stderr || result.stdout || '').slice(-2000)}`);
-  return capture ? result.stdout : undefined;
+  return result.stdout;
+}
+
+/**
+ * Runs a rendering host to completion. It gets a throwaway Electron profile that is removed here once the host is
+ * gone, whether it exited, crashed or timed out: the host itself ends with app.exit(), which skips process exit
+ * handlers.
+ */
+function renderHost(args, timeoutMs) {
+  const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-visual-diff-host-'));
+  const [command, full] = hostCommand(args, profileDir);
+  return new Promise((resolve) => {
+    const child = spawn(command, full, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => (stdout += chunk));
+    child.stderr.on('data', (chunk) => (stderr += chunk));
+    const timer = setTimeout(() => process.kill(-child.pid, 'SIGKILL'), timeoutMs);
+    child.on('close', (status) => {
+      clearTimeout(timer);
+      // Whatever the host left in its group (a virtual display xvfb-run could not clean up) goes with it.
+      try {
+        process.kill(-child.pid, 'SIGKILL');
+      } catch {
+        /* the group is already gone */
+      }
+      fs.rmSync(profileDir, { recursive: true, force: true });
+      resolve({ status, stdout, stderr });
+    });
+  });
 }
 
 /** Pixels that changed beyond antialiasing noise; bitmaps with equal hashes are identical. */
 function changedPixels(basePng, headPng) {
-  const output = runHost(['--mode', 'diff', '--a', basePng, '--b', headPng], true);
+  const output = runHost(['--mode', 'diff', '--a', basePng, '--b', headPng]);
   return JSON.parse(
     output
       .trim()
@@ -121,13 +144,19 @@ async function startQaInstance(workDir) {
   const env = { ...process.env, RDC_AGENT_BROWSER_QA_FULL_ACCESS: '1' };
   delete env.RDC_AGENT_USER_DATA;
   const xvfb = process.platform === 'linux' && !process.env.DISPLAY;
-  const child = spawn(
-    xvfb ? 'xvfb-run' : process.execPath,
-    xvfb
-      ? ['-a', process.execPath, 'scripts/launch-rdc-agent.mjs', '--mode', 'browser']
-      : ['scripts/launch-rdc-agent.mjs', '--mode', 'browser'],
-    { cwd: repoRoot, env, stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')], detached: true },
-  );
+  // With VISUAL_DIFF_ELECTRON the instance is that Electron on the current build (run `pnpm run build` first), in
+  // the launcher's browser mode environment; otherwise the shared launcher prepares and starts it.
+  const direct = Boolean(process.env.VISUAL_DIFF_ELECTRON);
+  if (direct) Object.assign(env, { NODE_ENV: 'production', RDC_AGENT_HEADLESS: '1', RDC_AGENT_BROWSER_QA: '1' });
+  const instance = direct
+    ? [electronBinary(), repoRoot]
+    : [process.execPath, 'scripts/launch-rdc-agent.mjs', '--mode', 'browser'];
+  const child = spawn(xvfb ? 'xvfb-run' : instance[0], xvfb ? ['-a', ...instance] : instance.slice(1), {
+    cwd: repoRoot,
+    env,
+    stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')],
+    detached: true,
+  });
   for (let attempt = 0; attempt < 120; attempt += 1) {
     const text = fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '';
     const url = text.match(/https?:\/\/\S+qaBootstrap=\S+/g)?.at(-1);
@@ -139,9 +168,22 @@ async function startQaInstance(workDir) {
   fail(`QA instance printed no bootstrap url:\n${fs.readFileSync(log, 'utf8').slice(-2000)}`);
 }
 
+/** A definition with its preset steps expanded in place. */
+function expandPresets(definition, presets) {
+  const expand = (steps) =>
+    (steps ?? []).flatMap((step) => {
+      if (!step.preset) return [step];
+      if (!presets[step.preset]) fail(`${definition.id}: unknown preset ${step.preset}`);
+      return expand(presets[step.preset]);
+    });
+  return { ...definition, setup: expand(definition.setup), steps: expand(definition.steps) };
+}
+
 async function record(ids) {
-  const definitions = readJson(definitionsPath, []);
-  const selected = ids.length ? definitions.filter((definition) => ids.includes(definition.id)) : definitions;
+  const { presets = {}, scenarios: definitions = [] } = readJson(definitionsPath, {});
+  const selected = (ids.length ? definitions.filter((definition) => ids.includes(definition.id)) : definitions).map(
+    (definition) => expandPresets(definition, presets),
+  );
   if (!selected.length) fail('no scenario definitions selected');
   const shared = readJson(sharedPath, {});
   fs.mkdirSync(scenarioDir, { recursive: true });
@@ -153,20 +195,11 @@ async function record(ids) {
       const definitionPath = path.join(workDir, 'definition.json');
       const recordedPath = path.join(workDir, 'recorded.json');
       writeJson(definitionPath, definition);
-      runHost([
-        '--mode',
-        'record',
-        '--scenario',
-        definitionPath,
-        '--bridge',
-        url,
-        '--out',
-        recordedPath,
-        '--build',
-        repoRoot,
-        '--userdata',
-        userData,
-      ]);
+      const args = ['--mode', 'record', '--scenario', definitionPath, '--bridge', url, '--out', recordedPath];
+      const result = await renderHost([...args, '--build', repoRoot, '--userdata', userData], 10 * 60_000);
+      // Thrown, not fail(): the finally below still stops the instance and removes its directories.
+      if (result.status !== 0)
+        throw new Error(`recording ${definition.id} failed:\n${(result.stderr || result.stdout || '').slice(-2000)}`);
       // The disposable instance's directories and the checkout's location differ per run and machine; fixed
       // placeholders keep machine paths out of the recordings and let identical answers dedupe.
       const recorded = JSON.parse(
@@ -181,6 +214,8 @@ async function record(ids) {
         ...recorded,
         responses: externalize(recorded.responses, shared),
       });
+      // Kept after every scenario, so a later failure leaves no recording pointing at an unsaved shared answer.
+      writeJson(sharedPath, shared);
       console.log(`[visual-diff] recorded ${definition.id}`);
     } finally {
       await stopQaInstance(child);
@@ -212,7 +247,11 @@ async function record(ids) {
   );
 }
 
-function capture(outDir, buildRoot) {
+/** Scenario shards rendered side by side, each by its own host on its own virtual display. */
+const captureJobs = () =>
+  Math.max(1, Number(process.env.VISUAL_DIFF_JOBS) || Math.min(3, Math.max(1, os.availableParallelism() - 1)));
+
+async function capture(outDir, buildRoot) {
   const shared = readJson(sharedPath, {});
   const scenarios = fs
     .readdirSync(scenarioDir)
@@ -221,37 +260,47 @@ function capture(outDir, buildRoot) {
   if (!scenarios.length) fail('no recorded scenarios');
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-visual-diff-'));
   const otherBuild = path.resolve(buildRoot) !== repoRoot;
-  const skipped = [];
+  const started = Date.now();
   try {
-    for (const name of scenarios) {
+    const resolved = scenarios.map((name) => {
       const scenario = readJson(path.join(scenarioDir, name));
-      const resolved = path.join(workDir, name);
-      writeJson(resolved, { ...scenario, responses: internalize(scenario.responses, shared) });
-      const args = [
-        '--mode',
-        'replay',
-        '--scenario',
-        resolved,
-        '--out',
-        path.resolve(outDir),
-        '--build',
-        path.resolve(buildRoot),
-      ];
-      if (!otherBuild) {
-        runHost(args);
-        continue;
-      }
-      // Another build (the comparison base) may predate the UI a newer scenario reaches; it then has no result and
-      // compare reports the scenario as new. The checkout's own build must render every scenario.
-      const result = spawnHost(args);
-      if (result.status === 0) continue;
-      skipped.push(scenario.id ?? name);
-      console.log(`[visual-diff] ${scenario.id ?? name}: not renderable in ${buildRoot}`);
+      const file = path.join(workDir, name);
+      writeJson(file, { ...scenario, responses: internalize(scenario.responses, shared) });
+      return file;
+    });
+    const jobs = Math.min(captureJobs(), resolved.length);
+    const shards = Array.from({ length: jobs }, (_, shard) => resolved.filter((_, index) => index % jobs === shard));
+    const results = await Promise.all(
+      shards.map((files, shard) => {
+        const list = path.join(workDir, `shard-${shard}.list.json`);
+        writeJson(list, files);
+        const args = ['--mode', 'replay', '--scenarios', list, '--out', path.resolve(outDir)];
+        return renderHost([...args, '--build', path.resolve(buildRoot)], 20 * 60_000);
+      }),
+    );
+    const failed = [];
+    for (const result of results) {
+      const summary = result.stdout
+        .trim()
+        .split('\n')
+        .filter((line) => line.startsWith('{'))
+        .at(-1);
+      if (result.status !== 0 || !summary) fail(`host failed:\n${(result.stderr || result.stdout || '').slice(-3000)}`);
+      failed.push(...JSON.parse(summary).failed);
+      if (JSON.parse(summary).failed.length) console.error(result.stderr.slice(-3000));
     }
+    // Another build (the comparison base) may predate the UI a newer scenario reaches; it then has no result and
+    // compare reports the scenario as new. The checkout's own build must render every scenario.
+    if (failed.length && !otherBuild) fail(`scenarios failed to render: ${failed.join(', ')}`);
+    for (const id of failed) console.log(`[visual-diff] ${id}: not renderable in ${buildRoot}`);
+    const renders = fs.readdirSync(outDir).filter((name) => name.endsWith('.json')).length;
+    console.log(
+      `[visual-diff] captured ${scenarios.length - failed.length} scenarios (${renders} renders, ${jobs} hosts, ` +
+        `${Math.round((Date.now() - started) / 1000)} s) into ${outDir}`,
+    );
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true });
   }
-  console.log(`[visual-diff] captured ${scenarios.length - skipped.length} scenarios into ${outDir}`);
 }
 
 /** Scenario ids declared by `Visual-Diff-Allow:` trailers on the commits under comparison. */
@@ -270,10 +319,34 @@ function allowedScenarios() {
   );
 }
 
+/** The interaction steps whose settled state or flicker set differ, with the first differing keys. */
+function interactionChanges(base, head) {
+  const lines = [];
+  const steps = Math.max(base.steps.length, head.steps.length);
+  for (let index = 0; index < steps; index += 1) {
+    const [before, after] = [base.steps[index], head.steps[index]];
+    if (!before || !after) {
+      lines.push(`step ${(before ?? after).step}: sampled only in ${before ? 'base' : 'head'}`);
+      continue;
+    }
+    const label = `step ${after.step}`;
+    const keys = new Set([...Object.keys(before.settled ?? {}), ...Object.keys(after.settled ?? {})]);
+    const settled = [...keys].filter((key) => before.settled?.[key] !== after.settled?.[key]);
+    for (const key of settled.slice(0, 6))
+      lines.push(`${label} settled ${key}: ${before.settled?.[key] ?? '-'} -> ${after.settled?.[key] ?? '-'}`);
+    if (before.flicker.join() !== after.flicker.join())
+      for (const key of after.flicker.filter((name) => !before.flicker.includes(name)))
+        lines.push(`${label} flickers ${key}: ${after.changes[key]?.join(' -> ')}`);
+    for (const key of before.flicker.filter((name) => !after.flicker.includes(name)))
+      lines.push(`${label} no longer flickers ${key}`);
+  }
+  return lines;
+}
+
 function compare(baseDir, headDir) {
   const allowed = allowedScenarios();
   const results = fs.readdirSync(headDir).filter((name) => name.endsWith('.json'));
-  const unexpected = [];
+  const unexpected = new Set();
   for (const name of results) {
     const head = readJson(path.join(headDir, name));
     const base = readJson(path.join(baseDir, name), null);
@@ -285,23 +358,26 @@ function compare(baseDir, headDir) {
       base.l2 === head.l2
         ? 0
         : changedPixels(path.join(baseDir, `${head.id}.png`), path.join(headDir, `${head.id}.png`));
-    const changed = [base.l1 !== head.l1 && 'L1', pixels > 0 && `L2 (${pixels} px)`].filter(Boolean);
-    if (!changed.length) continue;
-    const declared = allowed.has(head.id) || allowed.has('*');
-    console.log(`[visual-diff] ${head.id}: ${changed.join('+')} changed${declared ? ' (declared)' : ''}`);
+    const changed = [base.l1 !== head.l1 && 'L1', pixels > 0 && `L2 (${pixels} px)`, base.l3 !== head.l3 && 'L3'];
+    if (!changed.some(Boolean)) continue;
+    const declared = allowed.has(head.scenario) || allowed.has(head.id) || allowed.has('*');
+    console.log(
+      `[visual-diff] ${head.id}: ${changed.filter(Boolean).join('+')} changed${declared ? ' (declared)' : ''}`,
+    );
     if (base.l1 !== head.l1) {
       const before = new Set(base.nodes);
       const after = new Set(head.nodes);
       for (const node of head.nodes.filter((entry) => !before.has(entry)).slice(0, 8)) console.log(`    + ${node}`);
       for (const node of base.nodes.filter((entry) => !after.has(entry)).slice(0, 8)) console.log(`    - ${node}`);
     }
-    if (!declared) unexpected.push(head.id);
+    if (base.l3 !== head.l3) for (const line of interactionChanges(base, head).slice(0, 12)) console.log(`    ${line}`);
+    if (!declared) unexpected.add(head.scenario);
   }
-  if (unexpected.length)
+  if (unexpected.size)
     fail(
-      `undeclared differences: ${unexpected.join(', ')} (add "Visual-Diff-Allow: <ids>" to the commit that intends them)`,
+      `undeclared differences: ${[...unexpected].join(', ')} (add "Visual-Diff-Allow: <ids>" to the commit that intends them)`,
     );
-  console.log('[visual-diff] OK');
+  console.log(`[visual-diff] OK (${results.length} renders)`);
 }
 
 const [command, ...rest] = process.argv.slice(2);
@@ -311,7 +387,7 @@ const option = (name, fallback) => {
 };
 if (command === 'record') await record(rest);
 else if (command === 'capture')
-  capture(rest[0] ?? fail('capture needs an output directory'), option('--build', repoRoot));
+  await capture(rest[0] ?? fail('capture needs an output directory'), option('--build', repoRoot));
 else if (command === 'compare')
   compare(rest[0] ?? fail('compare needs a base directory'), rest[1] ?? fail('compare needs a head directory'));
 else fail('usage: run.mjs record [id...] | capture <dir> [--build <root>] | compare <base-dir> <head-dir>');

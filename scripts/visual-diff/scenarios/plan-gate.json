@@ -1,0 +1,522 @@
+{
+ "id": "plan-gate",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"plan-review-request-panel\"]",
+   "waitMs": 600
+  }
+ ],
+ "settleMs": 1200,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "e0081921dcfb13b1194aa3c4"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-21516a3c1db8-1795677644514",
+       "timestamp": 1795677644514,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-d4ab3316f0b9-1795677644553",
+       "timestamp": 1795677644553,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-eb0b6aee44e3-1795677644553",
+       "timestamp": 1795677644553,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-28647a8f088a-1795677644568",
+       "timestamp": 1795677644568,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      },
+      {
+       "id": "rlog-5ff1730c2b6a-1795677670013",
+       "timestamp": 1795677670013,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "Debugger",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_aea14f212479",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "debugger",
+        "sessionId": "sess_aea14f212479",
+        "status": "thinking"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-5ff1730c2b6a-1795677670013",
+       "timestamp": 1795677670013,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "Debugger",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_aea14f212479",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "debugger",
+        "sessionId": "sess_aea14f212479",
+        "status": "thinking"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-5ff1730c2b6a-1795677670013",
+       "timestamp": 1795677670013,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "Debugger",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_aea14f212479",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "debugger",
+        "sessionId": "sess_aea14f212479",
+        "status": "thinking"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   },
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   },
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "settings:getEffectiveCatalog": [
+   {
+    "ref": "13e7e5544b15ca1bb2ce0b08"
+   },
+   {
+    "ref": "82eb150c6e6c06abd6234ad4"
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": [
+      {
+       "projectId": "proj_9f2df3c800dd",
+       "name": "visual-diff-project",
+       "rootPath": "/visual-diff/visual-diff-project",
+       "slug": "visual-diff-project",
+       "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+       "inputs": [],
+       "inputsUpdatedAt": 1795677694763,
+       "createdAt": 1795677645492,
+       "updatedAt": 1795677669994,
+       "lastSessionId": "sess_aea14f212479"
+      }
+     ]
+    }
+   }
+  ],
+  "project:select": [
+   {
+    "result": {
+     "success": true,
+     "project": {
+      "projectId": "proj_9f2df3c800dd",
+      "name": "visual-diff-project",
+      "rootPath": "/visual-diff/visual-diff-project",
+      "slug": "visual-diff-project",
+      "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+      "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+      "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+      "inputs": [],
+      "inputsUpdatedAt": 1795677694763,
+      "createdAt": 1795677645492,
+      "updatedAt": 1795677669994,
+      "lastSessionId": "sess_aea14f212479"
+     },
+     "currentSession": {
+      "record": {
+       "schemaVersion": "1",
+       "sessionId": "sess_aea14f212479",
+       "projectId": "proj_9f2df3c800dd",
+       "title": "qa:plan 定位这一帧唯一的 draw 调用。",
+       "goal": "qa:plan 定位这一帧唯一的 draw 调用。",
+       "sessionPath": "/visual-diff/state/sessions/proj_9f2df3c800dd/sess_aea14f212479",
+       "createdAt": 1795677669888,
+       "updatedAt": 1795677669994,
+       "lastRunId": "run_e47392354d26cdaa",
+       "turnControls": {
+        "reasoningLevel": "on",
+        "maxContextMode": false,
+        "fastModel": false
+       },
+       "agentId": "debugger"
+      },
+      "revision": {
+       "epoch": "b93b7778-d9ea-46cb-acab-3adbddfb0152",
+       "n": 4
+      }
+     },
+     "currentRun": {
+      "schemaVersion": "3",
+      "runId": "run_e47392354d26cdaa",
+      "turnId": "turn-3e4ee1a0-3d1a-4fea-b625-c3c3368ce064",
+      "projectId": "proj_9f2df3c800dd",
+      "sessionId": "sess_aea14f212479",
+      "caseId": "sess_aea14f212479",
+      "profileId": "debugger",
+      "goal": "qa:plan 定位这一帧唯一的 draw 调用。",
+      "captures": [],
+      "startedAt": 1795677669908,
+      "status": "running",
+      "backend": "local",
+      "kind": "mission",
+      "mission": "debugger"
+     }
+    }
+   }
+  ],
+  "session:list": [
+   {
+    "result": {
+     "sessions": [
+      {
+       "record": {
+        "schemaVersion": "1",
+        "sessionId": "sess_aea14f212479",
+        "projectId": "proj_9f2df3c800dd",
+        "title": "qa:plan 定位这一帧唯一的 draw 调用。",
+        "goal": "qa:plan 定位这一帧唯一的 draw 调用。",
+        "sessionPath": "/visual-diff/state/sessions/proj_9f2df3c800dd/sess_aea14f212479",
+        "createdAt": 1795677669888,
+        "updatedAt": 1795677669994,
+        "lastRunId": "run_e47392354d26cdaa",
+        "turnControls": {
+         "reasoningLevel": "on",
+         "maxContextMode": false,
+         "fastModel": false
+        },
+        "agentId": "debugger"
+       },
+       "revision": {
+        "epoch": "b93b7778-d9ea-46cb-acab-3adbddfb0152",
+        "n": 4
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "session:open": [
+   {
+    "ref": "8b3c7f08cd35ef1ddc0956d1"
+   }
+  ],
+  "capture:getReplayState": [
+   {
+    "result": {
+     "projectId": "proj_9f2df3c800dd",
+     "sessionId": "sess_aea14f212479",
+     "generation": 0,
+     "revision": 0,
+     "operationId": null,
+     "phase": "closed",
+     "preparation": {
+      "targetDeviceId": null,
+      "phase": "idle",
+      "issue": null
+     },
+     "replayDeviceId": null,
+     "inputId": null,
+     "captureHash": null,
+     "contextId": null,
+     "requestedEventId": null,
+     "appliedEventId": null,
+     "imageEventId": null,
+     "events": [],
+     "targets": [],
+     "target": null,
+     "isFinalOutput": false,
+     "image": null,
+     "observation": null,
+     "devicePresentation": {
+      "status": "not_applicable",
+      "eventId": null,
+      "textureId": null,
+      "sequence": null,
+      "reason": null
+     },
+     "warning": null,
+     "interactionLock": "agent_running",
+     "error": null
+    }
+   }
+  ],
+  "workflow:getState": [
+   {
+    "result": {
+     "caseId": "sess_aea14f212479",
+     "runId": "run_e47392354d26cdaa",
+     "sessionId": "sess_aea14f212479",
+     "blockers": [],
+     "reasoningSummaries": [],
+     "lastUpdated": "2026-11-26T07:21:37.464Z"
+    }
+   }
+  ],
+  "evidence:getChain": [
+   {
+    "result": {
+     "sessionId": "sess_aea14f212479",
+     "runId": "run_e47392354d26cdaa",
+     "events": [],
+     "isValid": true
+    }
+   }
+  ],
+  "workflow:getRunUsage": [
+   {
+    "result": {
+     "usage": {
+      "runId": "run_e47392354d26cdaa",
+      "providerId": "ollama",
+      "modelId": "qa-stub:4b",
+      "inputTokens": 1200,
+      "outputTokens": 80,
+      "totalTokens": 1280,
+      "promptBudgetTokens": 32768,
+      "contextWindowTokens": 32768,
+      "maxOutputTokens": 32768,
+      "compactionThresholdTokens": 26214,
+      "usagePercent": 4,
+      "occupiedTokens": 1200,
+      "breakdown": [
+       {
+        "id": "system_prompt",
+        "tokens": 180
+       },
+       {
+        "id": "skills",
+        "tokens": 112
+       },
+       {
+        "id": "system_tools",
+        "tokens": 861,
+        "count": 30
+       },
+       {
+        "id": "summarized_conversation",
+        "tokens": 0
+       },
+       {
+        "id": "conversation",
+        "tokens": 47,
+        "count": 2
+       },
+       {
+        "id": "builtin_tools_deferred",
+        "tokens": 6891,
+        "count": 18
+       },
+       {
+        "id": "free",
+        "tokens": 31568
+       }
+      ],
+      "snapshotAt": 1795677670480
+     },
+     "stale": false
+    }
+   },
+   {
+    "result": {
+     "usage": {
+      "runId": "run_e47392354d26cdaa",
+      "providerId": "ollama",
+      "modelId": "qa-stub:4b",
+      "inputTokens": 1200,
+      "outputTokens": 80,
+      "totalTokens": 1280,
+      "promptBudgetTokens": 32768,
+      "contextWindowTokens": 32768,
+      "maxOutputTokens": 32768,
+      "compactionThresholdTokens": 26214,
+      "usagePercent": 4,
+      "occupiedTokens": 1200,
+      "breakdown": [
+       {
+        "id": "system_prompt",
+        "tokens": 180
+       },
+       {
+        "id": "skills",
+        "tokens": 112
+       },
+       {
+        "id": "system_tools",
+        "tokens": 861,
+        "count": 30
+       },
+       {
+        "id": "summarized_conversation",
+        "tokens": 0
+       },
+       {
+        "id": "conversation",
+        "tokens": 47,
+        "count": 2
+       },
+       {
+        "id": "builtin_tools_deferred",
+        "tokens": 6891,
+        "count": 18
+       },
+       {
+        "id": "free",
+        "tokens": 31568
+       }
+      ],
+      "snapshotAt": 1795677670480
+     },
+     "stale": false
+    }
+   }
+  ],
+  "capture:getOpenedState": [
+   {
+    "result": null
+   }
+  ],
+  "context:get": [
+   {
+    "result": null
+   }
+  ],
+  "project:inputs:list": [
+   {
+    "result": {
+     "inputs": []
+    }
+   }
+  ]
+ }
+}

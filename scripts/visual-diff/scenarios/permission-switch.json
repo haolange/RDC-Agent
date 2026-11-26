@@ -1,45 +1,35 @@
 {
- "id": "settings-provider-dialog-dark",
- "viewport": [
-  1440,
-  900
- ],
- "theme": "dark",
+ "id": "permission-switch",
  "steps": [
   {
-   "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+   "waitFor": "[data-testid=\"composer-permission-pill\"]"
   },
   {
    "click": true,
-   "testId": "sidebar-user-settings-trigger"
+   "testId": "composer-permission-pill",
+   "waitMs": 400
+  },
+  {
+   "waitFor": ".composer-permission-popup [role=\"menuitemradio\"]"
   },
   {
    "click": true,
-   "testId": "open-settings-entry"
-  },
-  {
-   "waitFor": "[data-testid=\"settings-nav-models\"]"
-  },
-  {
-   "click": true,
-   "testId": "settings-nav-models",
-   "waitMs": 600
-  },
-  {
-   "waitFor": "[data-testid=\"settings-configured-services\"] [data-testid=\"settings-provider-connect-ollama\"]"
-  },
-  {
-   "click": true,
-   "selector": "[data-testid=\"settings-configured-services\"] [data-testid=\"settings-provider-connect-ollama\"]",
-   "waitMs": 800
-  },
-  {
-   "waitFor": "[data-testid=\"settings-provider-connect-dialog\"]",
-   "waitMs": 800
+   "selector": ".composer-permission-popup [role=\"menuitemradio\"]:last-child",
+   "waitMs": 1200
   }
  ],
- "settleMs": 1500,
+ "settleMs": 1000,
  "responses": {
+  "settings:get": [
+   {
+    "ref": "26b5ee3544d90fdb9eb1c91a"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
   "app:getMeta": [
    {
     "result": {
@@ -49,26 +39,13 @@
     }
    }
   ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
-   }
-  ],
-  "settings:get": [
-   {
-    "ref": "fcf25970d2d50232a07c65d1"
-   },
-   {
-    "ref": "fcf25970d2d50232a07c65d1"
-   }
-  ],
   "runtimeLog:list": [
    {
     "result": {
      "entries": [
       {
-       "id": "rlog-5be96b544862-1795635005767",
-       "timestamp": 1795635005767,
+       "id": "rlog-936194375cc5-1795677373595",
+       "timestamp": 1795677373595,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -82,8 +59,8 @@
        }
       },
       {
-       "id": "rlog-e24173d8a628-1795635005810",
-       "timestamp": 1795635005810,
+       "id": "rlog-4bb82185f69b-1795677373667",
+       "timestamp": 1795677373667,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -95,8 +72,8 @@
        "raw": null
       },
       {
-       "id": "rlog-ff1cb7ab5ae8-1795635005811",
-       "timestamp": 1795635005811,
+       "id": "rlog-e3d31e6e548d-1795677373667",
+       "timestamp": 1795677373667,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -108,8 +85,8 @@
        "raw": null
       },
       {
-       "id": "rlog-6e112480698c-1795635005824",
-       "timestamp": 1795635005824,
+       "id": "rlog-7cae6de92574-1795677373682",
+       "timestamp": 1795677373682,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -130,8 +107,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-5be96b544862-1795635005767",
-       "timestamp": 1795635005767,
+       "id": "rlog-936194375cc5-1795677373595",
+       "timestamp": 1795677373595,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -145,8 +122,8 @@
        }
       },
       {
-       "id": "rlog-e24173d8a628-1795635005810",
-       "timestamp": 1795635005810,
+       "id": "rlog-4bb82185f69b-1795677373667",
+       "timestamp": 1795677373667,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -158,8 +135,8 @@
        "raw": null
       },
       {
-       "id": "rlog-ff1cb7ab5ae8-1795635005811",
-       "timestamp": 1795635005811,
+       "id": "rlog-e3d31e6e548d-1795677373667",
+       "timestamp": 1795677373667,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -171,8 +148,8 @@
        "raw": null
       },
       {
-       "id": "rlog-6e112480698c-1795635005824",
-       "timestamp": 1795635005824,
+       "id": "rlog-7cae6de92574-1795677373682",
+       "timestamp": 1795677373682,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -196,6 +173,12 @@
      "mode": "default",
      "revision": 1
     }
+   },
+   {
+    "result": {
+     "mode": "custom",
+     "revision": 2
+    }
    }
   ],
   "device:list": [
@@ -217,20 +200,12 @@
     }
    }
   ],
-  "settings:getEffectiveCatalog": [
-   {
-    "ref": "43f9f4f4d51a0e299cb6d005"
-   },
-   {
-    "ref": "10dc12cc78bf78313ea5a92e"
-   }
-  ],
   "project:list": [
    {
     "result": {
      "projects": [
       {
-       "projectId": "proj_3d3b2550a304",
+       "projectId": "proj_f942c041d0dc",
        "name": "visual-diff-project",
        "rootPath": "/visual-diff/visual-diff-project",
        "slug": "visual-diff-project",
@@ -238,9 +213,9 @@
        "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
        "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
        "inputs": [],
-       "inputsUpdatedAt": 1795635019221,
-       "createdAt": 1795635006695,
-       "updatedAt": 1795635006695
+       "inputsUpdatedAt": 1795677375718,
+       "createdAt": 1795677375287,
+       "updatedAt": 1795677375287
       }
      ]
     }
@@ -249,8 +224,9 @@
   "project:select": [
    {
     "result": {
+     "success": true,
      "project": {
-      "projectId": "proj_3d3b2550a304",
+      "projectId": "proj_f942c041d0dc",
       "name": "visual-diff-project",
       "rootPath": "/visual-diff/visual-diff-project",
       "slug": "visual-diff-project",
@@ -258,9 +234,9 @@
       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
       "inputs": [],
-      "inputsUpdatedAt": 1795635019221,
-      "createdAt": 1795635006695,
-      "updatedAt": 1795635006695
+      "inputsUpdatedAt": 1795677375718,
+      "createdAt": 1795677375287,
+      "updatedAt": 1795677375287
      },
      "currentSession": null,
      "currentRun": null
@@ -281,17 +257,25 @@
     }
    }
   ],
-  "rdc-runtime:overview": [
+  "settings:patch": [
    {
-    "ref": "4f02b0f6a06670b27eac2067"
-   }
-  ],
-  "llm:getProbeBatch": [
-   {
-    "result": null
-   },
-   {
-    "result": null
+    "result": {
+     "revision": 2,
+     "changed": {
+      "agentRuntime": {
+       "permissions": {
+        "mode": "custom",
+        "readableRoots": [],
+        "writableRoots": [],
+        "allowedCommandPrefixes": [],
+        "deniedCommandPrefixes": []
+       },
+       "context": {
+        "compactionThresholdPercent": 80
+       }
+      }
+     }
+    }
    }
   ]
  }
