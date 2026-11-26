@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
+import { recordRdcOperationStarted, recordRdcOperationTerminal } from './rdcOperationLedger';
 import type { CLIResult, ShellInvocationRequest, ShellInvocationService } from '../tools/ShellInvocationService';
 
 /**
@@ -138,6 +139,7 @@ export interface RdcWatchedOperation {
   invocation: Omit<ShellInvocationRequest, 'timeoutMs' | 'abortSignal' | 'onStderrLine'>;
   operation: string;
   requestId: string;
+  contextId?: string;
   /** Runs `daemon cancel --request-id` for this request under its own control deadline. */
   cancel: () => Promise<CLIResult>;
   signal?: AbortSignal;
@@ -216,6 +218,8 @@ export async function watchRdcOperation(input: RdcWatchedOperation): Promise<Rdc
     kill.abort();
   }, 1_000);
   input.signal?.addEventListener('abort', cancel, { once: true });
+  const identity = { operation: input.operation, requestId: input.requestId, contextId: input.contextId };
+  recordRdcOperationStarted(identity);
   try {
     const result = await input.shell.invoke({
       ...input.invocation,
@@ -227,7 +231,11 @@ export async function watchRdcOperation(input: RdcWatchedOperation): Promise<Rdc
     closeExec();
     const cancellation = state.cancelling ? await state.cancelling : undefined;
     if (state.failure) throw state.failure;
+    recordRdcOperationTerminal(identity, result);
     return { ...result, stderr: plainStderr.join('\n'), ...(cancellation ? { cancellation } : {}) };
+  } catch (error) {
+    recordRdcOperationTerminal(identity, error instanceof Error ? error : new Error(String(error)));
+    throw error;
   } finally {
     clearInterval(liveness);
     input.signal?.removeEventListener('abort', cancel);

@@ -354,6 +354,7 @@ export class RdcCliInvokerService {
       ]),
       operation: args[0] ?? 'call',
       requestId,
+      ...(options.contextId ? { contextId: options.contextId } : {}),
       cancel: () =>
         this.shell.invoke({
           ...spawn('daemon', ['cancel', '--request-id', requestId, ...context]),
