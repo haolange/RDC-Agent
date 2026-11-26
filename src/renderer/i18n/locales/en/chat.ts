@@ -73,7 +73,8 @@ export const enChat = {
   'chat.rewriteWillUse': 'Will use: {agent} · {model}',
   'chat.rewriteModelUnknown': 'model not ready',
   'chat.messageVariantSwitchFailed': 'Could not switch to this version.',
-  'chat.modelContinuationDropped': 'Model switched. Reasoning continuation from the previous model cannot be reused.',
+  'chat.modelContinuationDropped':
+    'Model switched. {count} reasoning continuation item(s) from the previous model cannot be reused.',
   'chat.rewriteCancel': 'Cancel',
   'chat.rewriteSend': 'Send',
   'chat.rewriteSending': 'Sending',

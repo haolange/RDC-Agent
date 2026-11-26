@@ -73,7 +73,7 @@ export const zhChat = {
   'chat.rewriteWillUse': '将使用：{agent} · {model}',
   'chat.rewriteModelUnknown': '模型未就绪',
   'chat.messageVariantSwitchFailed': '没能切换到这个版本。',
-  'chat.modelContinuationDropped': '已切换模型，上一模型的推理续接无法复用。',
+  'chat.modelContinuationDropped': '已切换模型，上一模型的 {count} 条推理续接无法复用。',
   'chat.rewriteCancel': '取消',
   'chat.rewriteSend': '发送',
   'chat.rewriteSending': '发送中',

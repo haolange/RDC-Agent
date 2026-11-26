@@ -36,7 +36,7 @@ import {
   resolveConversationAgentId,
 } from './ConversationRoutePreflight';
 import { assertAgentReasoningHonored, conversationTurnControlInput } from './ConversationTurnControls';
-import { createContinuationDropNotice, shouldAnnounceContinuationDrop } from './ConversationContinuationNotice';
+import { createContinuationDropNotice, summarizeContinuationDrop } from './ConversationContinuationNotice';
 import { prepareConversationPrompt } from './ConversationPromptPreparer';
 import {
   completeProfileTurn,
@@ -547,7 +547,7 @@ function beginTurnCommit(turn: TurnStart, input: TurnInput, commit: TurnCommit):
   }
 }
 
-/** The user message, the assistant draft, a continuation-drop notice when the route changed, and the branch. */
+/** The user message, the assistant draft, a continuation-drop notice when reasoning artifacts were dropped, and the branch. */
 function composeTurnMessages(
   turn: TurnStart,
   route: TurnRoute,
@@ -557,7 +557,6 @@ function composeTurnMessages(
   const { context, branchContext, requestId, turnIds, conversationAgentId, rawMessage } = turn;
   const { turnId } = turnIds;
   const { preparedTurn } = runtime;
-  const { persistedHistoryBeforeCommit } = commit;
   const sessionIdForBranch = commit.workingSession?.sessionId ?? null;
   let branchState = branchContext?.branchState ?? (sessionIdForBranch ? commit.persistedBranchBeforeCommit : null);
   if (sessionIdForBranch && !branchState) branchState = createDefaultBranchState(sessionIdForBranch);
@@ -593,31 +592,22 @@ function composeTurnMessages(
     branchId,
     preparedContext: preparedTurn.summary,
   });
-  const previousPrepared = !sessionIdForBranch
-    ? undefined
-    : turn.excludeTurnId
-      ? persistedHistoryBeforeCommit.find(
-          (entry) => entry.turnId === turn.excludeTurnId && entry.role === 'assistant' && entry.preparedContext,
-        )?.preparedContext
-      : [...persistedHistoryBeforeCommit]
-          .reverse()
-          .find((entry) => entry.role === 'assistant' && entry.preparedContext && entry.status === 'complete')
-          ?.preparedContext;
-  const continuationNotice =
-    previousPrepared && shouldAnnounceContinuationDrop(previousPrepared, route.planning.plan)
-      ? createContinuationDropNotice({
-          requestId,
-          turnId,
-          sessionId: sessionIdForBranch,
-          projectId: context.projectId,
-          profileId: conversationAgentId,
-          branchId,
-          forkId: branchContext?.forkId,
-          variantIndex: branchContext?.variantIndex,
-          previous: previousPrepared.route,
-          next: route.planning.plan,
-        })
-      : null;
+  // The notice follows what preparation actually dropped for this turn, never a comparison with an earlier turn.
+  const continuationDrop = summarizeContinuationDrop(preparedTurn.summary.continuation.decisionCounts);
+  const continuationNotice = continuationDrop
+    ? createContinuationDropNotice({
+        requestId,
+        turnId,
+        sessionId: sessionIdForBranch,
+        projectId: context.projectId,
+        profileId: conversationAgentId,
+        branchId,
+        forkId: branchContext?.forkId,
+        variantIndex: branchContext?.variantIndex,
+        drop: continuationDrop,
+        next: route.planning.plan,
+      })
+    : null;
   if (sessionIdForBranch && branchState && branchContext) {
     branchState = withRewriteVariant(branchState, branchContext, branchId, userMessage.id, turnId);
   }

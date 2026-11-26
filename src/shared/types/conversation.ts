@@ -134,8 +134,14 @@ type ConversationMessageDiagnosticCode =
   | 'ATTACHMENT_INVALID'
   | 'VISION_INPUT_UNSUPPORTED';
 
-export interface ConversationMessageDiagnostic {
-  code: ConversationMessageDiagnosticCode;
+/** Reasoning continuation artifacts dropped by a route or model change, with the per-reason breakdown. */
+export interface ConversationContinuationDrop {
+  count: number;
+  reasons: Array<{ reason: string; count: number }>;
+}
+
+interface ConversationMessageDiagnosticBase {
+  code: Exclude<ConversationMessageDiagnosticCode, 'MODEL_CONTINUATION_DROPPED'>;
   severity: 'warning' | 'error';
   userMessage: string;
   agentId?: AgentRole;
@@ -145,6 +151,14 @@ export interface ConversationMessageDiagnostic {
   technicalMessage?: string;
   recommendations?: Array<{ providerId: string; modelId: string; label: string }>;
 }
+
+/** A model-switch notice always states how many continuation artifacts were dropped. */
+export interface ConversationContinuationDropDiagnostic extends Omit<ConversationMessageDiagnosticBase, 'code'> {
+  code: 'MODEL_CONTINUATION_DROPPED';
+  continuationDrop: ConversationContinuationDrop;
+}
+
+export type ConversationMessageDiagnostic = ConversationMessageDiagnosticBase | ConversationContinuationDropDiagnostic;
 
 export interface ConversationToolCall {
   /** Runtime Hook events owned by this exact call, in arrival order. */

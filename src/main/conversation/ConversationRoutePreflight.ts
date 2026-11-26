@@ -258,7 +258,7 @@ export function redactTechnicalMessage(error: unknown): string {
 
 export function createConversationDiagnostic(input: {
   agentId: AgentRole;
-  code: ConversationMessageDiagnostic['code'];
+  code: Exclude<ConversationMessageDiagnostic['code'], 'MODEL_CONTINUATION_DROPPED'>;
   severity: ConversationMessageDiagnostic['severity'];
   userMessage: string;
   providerId?: string;
