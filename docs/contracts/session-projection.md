@@ -218,6 +218,8 @@ Plan 批准的正常退出携带宿主 owning turn 的批准身份；主进程�
 
 Composer 等到规划回合、消息和主进程投影的 run 都结束，再发送一次获批的执行请求。即使 run 的终态最后到达，也会重新检查是否可以发送。
 
+恢复已批准计划时，主进程接受请求后可以先移除待发送交接投影。Composer 收到同一请求的接受或取消回执后清除本地准备状态，即使投影已先更新。
+
 - 批准是一次 renderer→main 调用：返回的会话记录（含 revision）与审批投影先被接受，Agent 胶囊随会话视图变为声明目标；`send: true` 时由 `usePlanReviewSubmit` 等规划回合与其他执行结束后，经 Composer 发送链直接发送一个带 `planReference: execute` 的执行回合（不经交接建议队列），`send: false` 只预填；主进程未接受的发送让计划保持“已批准未发送”，由 `ApprovedPlanHandoff` 行显式继续。
 - 该执行回合不再调用 `applyDeclaredHandoff`，也不附配置提交；回合结束的建议行与重启后的已批准交接仍经 `applyDeclaredHandoff`。
 - 批准确认到交接共用来源计划身份，迟到成功、Stop、会话切换与修订均不能重新发送；投递不确定只核查 requestId。

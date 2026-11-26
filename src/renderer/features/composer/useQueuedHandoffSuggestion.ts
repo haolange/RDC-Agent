@@ -16,12 +16,15 @@ interface Delivery {
   switchFailed?: boolean;
 }
 
+function ownsQueuedSuggestion(request: HandoffSuggestionRequest): boolean {
+  return (
+    useComposerSessionContextStore.getState().handoffSuggestionRequest === request &&
+    useProjectStore.getState().currentSessionId === request.sessionId
+  );
+}
+
 function current(request: HandoffSuggestionRequest): boolean {
-  if (
-    useComposerSessionContextStore.getState().handoffSuggestionRequest !== request ||
-    useProjectStore.getState().currentSessionId !== request.sessionId
-  )
-    return false;
+  if (!ownsQueuedSuggestion(request)) return false;
   if (!request.approvedPlan) return true;
   return (
     usePlanReviewStore.getState().bySession[request.sessionId]?.approvedHandoff?.planHash === request.approvedPlan.hash
@@ -111,15 +114,18 @@ export function useQueuedHandoffSuggestion(input: {
     void callbacks.current
       .sendPrompt(ready.payload)
       .then((outcome) => {
+        if (!ownsQueuedSuggestion(ready.request)) return;
+        if (outcome?.status === 'accepted' || outcome?.status === 'cancelled') {
+          useComposerSessionContextStore.getState().clearHandoffSuggestion();
+          setReady(null);
+          return;
+        }
         if (!current(ready.request)) return;
         if (!outcome) {
           claimed.current = null;
           return;
         }
-        if (outcome.status === 'accepted' || outcome.status === 'cancelled') {
-          useComposerSessionContextStore.getState().clearHandoffSuggestion();
-          setReady(null);
-        } else setReady({ ...ready, outcome, error: outcome.error || 'HANDOFF_SEND_FAILED' });
+        setReady({ ...ready, outcome, error: outcome.error || 'HANDOFF_SEND_FAILED' });
       })
       .catch(() => {
         if (current(ready.request))
@@ -135,11 +141,13 @@ export function useQueuedHandoffSuggestion(input: {
         useComposerSessionContextStore.getState().queueHandoffSuggestion({ ...ready.request });
       } else if (ready.outcome?.status === 'unknown') {
         const outcome = await callbacks.current.inspectRequest(ready.payload.sessionId, ready.outcome.requestId);
-        if (!current(ready.request)) return;
+        if (!ownsQueuedSuggestion(ready.request)) return;
         if (outcome.status === 'accepted') {
           useComposerSessionContextStore.getState().clearHandoffSuggestion();
           setReady(null);
-        } else setReady({ ...ready, outcome, error: outcome.error || 'HANDOFF_DELIVERY_UNCONFIRMED' });
+        } else if (current(ready.request)) {
+          setReady({ ...ready, outcome, error: outcome.error || 'HANDOFF_DELIVERY_UNCONFIRMED' });
+        }
       } else {
         claimed.current = null;
         setReady({ ...ready, error: undefined, outcome: undefined });

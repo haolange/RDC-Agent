@@ -164,6 +164,48 @@ it('binds a recovered handoff to the currently projected approved hash', async (
     },
   });
 });
+it('releases a recovered handoff after the host consumes the offer before its delivery receipt arrives', async () => {
+  const approvedHandoff = {
+    agent: 'general',
+    label: 'Execute with General',
+    prompt: 'execute',
+    send: true,
+    planHash: 'b'.repeat(64),
+    planId: 'plan-b',
+    revision: 2,
+    planUri: 'session://plans/plan-b/2.md',
+    planTitle: 'Plan B',
+  };
+  const projection = { sessionId: 's', projectionVersion: 1, review: null, recoverable: null };
+  usePlanReviewStore.getState().accept({ ...projection, approvedHandoff });
+  context.setState({
+    handoffSuggestionRequest: {
+      ...request(),
+      approvedPlan: {
+        planId: approvedHandoff.planId,
+        revision: approvedHandoff.revision,
+        hash: approvedHandoff.planHash,
+      },
+    },
+  });
+  let settle!: (result: { status: 'accepted'; requestId: string }) => void;
+  send.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        settle = resolve;
+      }),
+  );
+  await render();
+  await render();
+  expect(controller.phase).toBe('preparing');
+  await act(async () => {
+    usePlanReviewStore.getState().accept({ ...projection, projectionVersion: 2 });
+    settle({ status: 'accepted', requestId: 'request-1' });
+  });
+  expect(send).toHaveBeenCalledOnce();
+  expect(context.getState().handoffSuggestionRequest).toBeNull();
+  expect(controller.phase).toBeUndefined();
+});
 it('does not dispatch a recovered handoff when its projected approval changed', async () => {
   context.setState({
     handoffSuggestionRequest: { ...request(), approvedPlan: { planId: 'plan-a', revision: 2, hash: 'a'.repeat(64) } },
