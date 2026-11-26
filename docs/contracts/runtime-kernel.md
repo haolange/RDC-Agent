@@ -132,7 +132,7 @@ Provider 请求失败或本地响应提交失败时，本次尚未交给工具�
 - 每个 `llm_turn` 以有序 `items` 记录模型产出：`kind: 'text'`（保留 `ProviderOutputRef` 与 provider 实际声明的 phase）与 `kind: 'thinking'`（每个 provider thinking block 一项，按 output ref 归并增量）。
 - 两者与工具调用共用同一 `displayOrder` 序列，先出现的位置终身不变；同一轮里思考、调用工具、再思考，两段思考都保留在原位。
 - 缺少 phase 的文本先在原位中性流式呈现，循环结束时由共享规则 `settleTextPhase`（`src/shared/conversation/loopItems.ts`）一次标注：provider 声明优先，`end_turn` 且为终答的循环标 final，`tool_use` 标 commentary，其余保持未声明；主会话、子代理投影、Trace 重载与终答文本 `loopFinalAnswerText` 都走这一规则。
-- 没有 `result.text`、单一 thinking 槽或 `outputItems`；存储边界遇到这些旧形状时整条 workTrace 丢弃并标记 `workTraceDiscarded`，正文照常显示，转录区给出一行“过程记录来自旧版本”。
+- 没有 `result.text`、单一 thinking 槽或 `outputItems`；存储边界遇到不符合当前形状的记录时整条 workTrace 丢弃并标记 `workTraceDiscarded`，正文照常显示，转录区给出一行“过程记录无法读取”。
 
 请求中途失败、AgentLoop 开始恢复（`error_recovery_*` started）时，当前未结束循环的文本、思考与从未开始执行的工具调用一并丢弃，重试从头流式，不会重复显示。停止时，最后一个答复循环已流出的非 commentary 文本作为消息正文保留。显式 commentary 不进入 canonical final；只有正常结束确认的 final 进入正文与 final trace。Responses 同源历史按原项顺序回放已声明的 phase。正常结束但无 canonical final → fail-closed。
 

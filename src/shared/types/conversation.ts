@@ -311,7 +311,7 @@ export interface ConversationMessage {
   status?: ConversationMessageStatus;
   updatedAt?: number;
   workTrace?: ConversationWorkTrace | null;
-  /** The stored process record was written by an older version and is no longer shown. */
+  /** The stored process record does not match the current shape, so it is not shown. */
   workTraceDiscarded?: boolean;
   diagnostic?: ConversationMessageDiagnostic | null;
   attachments?: SessionAttachmentRecord[];
