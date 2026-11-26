@@ -1,3 +1,4 @@
+import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -446,6 +447,36 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     });
     expect(configuredShellCall).toMatchObject({ status: 'completed', allowed: true });
     expect(configuredShellCall.stdout).toMatch(/rdc-shell-audit: ok/);
+  });
+
+  it('fails the audit and handoff hooks closed on malformed or empty input whatever the environment holds', async () => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const builtin = path.join(repoRoot, 'resources', 'agent-runtime', 'hooks');
+    // Builtin hooks inherit the app's environment; no variable in it may turn a check into a pass.
+    vi.stubEnv('RDC_AGENT_TEST_MODE', '1');
+    try {
+      for (const script of ['rdc-shell-audit.mjs', 'mission-plan-handoff-check.mjs']) {
+        const run = spawnSync(process.execPath, [path.join(builtin, script)], {
+          input: '{not json',
+          encoding: 'utf8',
+          env: { ...process.env },
+        });
+        expect(run.status, script).toBe(1);
+        expect(run.stderr, script).toMatch(/hook stdin is not valid JSON/);
+      }
+      const engine = new HookEngine(path.join(makeRoot(), 'trust.json'));
+      engine.load(path.join(makeRoot(), 'user-hooks'), makeRoot(), builtin);
+      const emptyHandoff = await engine.test('mission-plan-handoff-check', {
+        event: 'agent.before-handoff',
+        agentId: 'debugger',
+        sessionId: 'session-a',
+        payload: {},
+      });
+      expect(emptyHandoff).toMatchObject({ status: 'failed', allowed: false });
+      expect(emptyHandoff.stderr).toMatch(/handoff requires toAgentId/);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('does not keep AgentHooks or BackgroundTaskRunner as a second surface', () => {
