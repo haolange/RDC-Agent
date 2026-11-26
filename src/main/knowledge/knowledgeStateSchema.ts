@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { KnowledgeCardRecordSchema } from './knowledgeCardSchema';
 import type { KnowledgeCardRecord, SessionKnowledgeCandidate } from '@shared/types/knowledge';
 
-export const KNOWLEDGE_STATE_SCHEMA_VERSION = '1';
 export const KNOWLEDGE_STATE_FILE = 'knowledge-state.json';
 export const KNOWLEDGE_STATE_LOCK_FILE = '.knowledge-state.lock';
 export const KNOWLEDGE_STATE_LOCK_TIMEOUT = 'KNOWLEDGE_STATE_LOCK_TIMEOUT';
@@ -56,7 +55,6 @@ export const KnowledgeDurableReviewSchema = z
 
 export const KnowledgeStateDocumentSchema = z
   .object({
-    schemaVersion: z.literal(KNOWLEDGE_STATE_SCHEMA_VERSION),
     candidates: z.array(KnowledgeDurableCandidateSchema),
     reviews: z.array(KnowledgeDurableReviewSchema),
     drafts: z.array(KnowledgeDurableDraftSchema).optional(),
@@ -85,14 +83,12 @@ export interface KnowledgeDurableReview {
 }
 
 export interface KnowledgeStateDocument {
-  schemaVersion: typeof KNOWLEDGE_STATE_SCHEMA_VERSION;
   candidates: KnowledgeDurableCandidate[];
   reviews: KnowledgeDurableReview[];
 }
 
 export function emptyKnowledgeStateDocument(): KnowledgeStateDocument {
   return {
-    schemaVersion: KNOWLEDGE_STATE_SCHEMA_VERSION,
     candidates: [],
     reviews: [],
   };
@@ -108,7 +104,6 @@ export function parseKnowledgeStatePayload(raw: unknown): {
   const parsed = KnowledgeStateDocumentSchema.parse(raw);
   return {
     document: {
-      schemaVersion: KNOWLEDGE_STATE_SCHEMA_VERSION,
       candidates: parsed.candidates,
       reviews: parsed.reviews,
     },
@@ -123,13 +118,11 @@ export function serializeKnowledgeStateDocument(
   const payload =
     leftoverDrafts.length > 0
       ? {
-          schemaVersion: KNOWLEDGE_STATE_SCHEMA_VERSION,
           candidates: document.candidates,
           reviews: document.reviews,
           drafts: [...leftoverDrafts],
         }
       : {
-          schemaVersion: KNOWLEDGE_STATE_SCHEMA_VERSION,
           candidates: document.candidates,
           reviews: document.reviews,
         };

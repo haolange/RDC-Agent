@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { KNOWLEDGE_CARD_TYPES, KNOWLEDGE_LIFECYCLES } from '@shared/types/knowledge';
 import { KnowledgeRelationSchema, KnowledgeScopeSchema } from './knowledgeCardSchema';
-import { KNOWLEDGE_INDEX_SCHEMA_VERSION } from './knowledgeLanes';
 
 export const KnowledgeIndexEntrySchema = z
   .object({
@@ -25,9 +24,6 @@ export const KnowledgeIndexEntrySchema = z
 
 export const KnowledgeIndexSnapshotSchema = z
   .object({
-    schemaVersion: z
-      .union([z.literal(KNOWLEDGE_INDEX_SCHEMA_VERSION), z.literal(String(KNOWLEDGE_INDEX_SCHEMA_VERSION))])
-      .transform(() => KNOWLEDGE_INDEX_SCHEMA_VERSION),
     revision: z.string().min(1),
     builtAt: z.string().min(1),
     cards: z.array(KnowledgeIndexEntrySchema),

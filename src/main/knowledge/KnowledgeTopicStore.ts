@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
+import { StorageSchemaError } from '../runtime/storedDocument';
 import { openedFileIdentity } from '../platform/fileIdentity';
 import { assertSafeKnowledgeWriteTarget, writeKnowledgeCardAtomic } from './knowledgeFs';
 import type { KnowledgeTopicDocument } from '@shared/types/knowledge';
@@ -37,7 +38,6 @@ export const KnowledgeTopicChangesSchema = z
   .strict();
 const documentSchema = z
   .object({
-    schemaVersion: z.literal(1),
     topics: z.array(KnowledgeTopicSchema).max(128),
     assignments: z.array(KnowledgeTopicAssignmentSchema).max(10000),
   })
@@ -70,9 +70,23 @@ const documentSchema = z
     }
   });
 
+/**
+ * The topics file lives in the knowledge space, outside the app's data directory, and carries no format version: one
+ * that is damaged or written in another format is refused, left as it is and named, for the user to remove.
+ */
+function parseTopicDocument(target: string, source: string): KnowledgeTopicDocument {
+  try {
+    return documentSchema.parse(JSON.parse(source));
+  } catch (error) {
+    throw new StorageSchemaError(
+      `${target} is not a topic document: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 const fileName = '.topics.json';
 const lockName = '.topics.lock';
-const emptyDocument = (): KnowledgeTopicDocument => ({ schemaVersion: 1, topics: [], assignments: [] });
+const emptyDocument = (): KnowledgeTopicDocument => ({ topics: [], assignments: [] });
 const digest = (source: string): string => createHash('sha256').update(source, 'utf8').digest('hex');
 
 export class KnowledgeTopicStore {
@@ -88,8 +102,7 @@ export class KnowledgeTopicStore {
       const stat = await fs.lstat(target);
       if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink > 1) throw new AppError('KNOWLEDGE_TOPICS_UNSAFE_PATH');
       const source = await fs.readFile(target, 'utf8');
-      const document = documentSchema.parse(JSON.parse(source));
-      return { document, revision: digest(source), source };
+      return { document: parseTopicDocument(target, source), revision: digest(source), source };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return { document: emptyDocument(), revision: digest('absent'), source: null };

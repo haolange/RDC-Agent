@@ -6,12 +6,7 @@ import { projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { StorageIo } from '../runtime/StorageIo';
 import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
 import { KnowledgeIndexSnapshotSchema } from './knowledgeIndexSchema';
-import {
-  KNOWLEDGE_INDEX_SCHEMA_VERSION,
-  knowledgeCorpusHash,
-  type KnowledgeIndexEntry,
-  type KnowledgeIndexSnapshot,
-} from './knowledgeLanes';
+import { knowledgeCorpusHash, type KnowledgeIndexEntry, type KnowledgeIndexSnapshot } from './knowledgeLanes';
 import { extractPreview, toPosixRelative, walkMarkdownFiles } from './knowledgeFs';
 import type { KnowledgeOperationOptions } from './knowledgeOperations';
 import type { KnowledgeSpace } from '@shared/types/knowledge';
@@ -115,7 +110,6 @@ export class KnowledgeIndexService {
     const cards = await this.collectEntries(options);
     options.signal?.throwIfAborted();
     const snapshot: KnowledgeIndexSnapshot = {
-      schemaVersion: KNOWLEDGE_INDEX_SCHEMA_VERSION,
       revision: knowledgeCorpusHash(cards),
       builtAt: this.dependencies.now().toISOString(),
       cards,

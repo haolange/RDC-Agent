@@ -211,7 +211,6 @@ describe('KnowledgeImportService', () => {
       path.join(sessionDir, KNOWLEDGE_STATE_FILE),
       `${JSON.stringify(
         {
-          schemaVersion: '1',
           drafts: [
             {
               revision: 1,
@@ -231,10 +230,8 @@ describe('KnowledgeImportService', () => {
     await importer.migrateSessionDrafts('sess-mig');
     expect(existsSync(path.join(spaceRoot, 'cases', 'mig-case.md'))).toBe(true);
     const persisted = JSON.parse(readFileSync(path.join(sessionDir, KNOWLEDGE_STATE_FILE), 'utf8')) as {
-      schemaVersion: string;
       drafts?: unknown[];
     };
-    expect(persisted.schemaVersion).toBe('1');
     expect(persisted.drafts).toBeUndefined();
   });
 
@@ -254,7 +251,6 @@ describe('KnowledgeImportService', () => {
       path.join(sessionDir, KNOWLEDGE_STATE_FILE),
       `${JSON.stringify(
         {
-          schemaVersion: '1',
           drafts: [
             {
               revision: 1,
@@ -275,10 +271,8 @@ describe('KnowledgeImportService', () => {
       KnowledgeDraftMigrationConflictError,
     );
     const persisted = JSON.parse(readFileSync(path.join(sessionDir, KNOWLEDGE_STATE_FILE), 'utf8')) as {
-      schemaVersion: string;
       drafts: unknown[];
     };
-    expect(persisted.schemaVersion).toBe('1');
     expect(persisted.drafts).toHaveLength(1);
   });
 });

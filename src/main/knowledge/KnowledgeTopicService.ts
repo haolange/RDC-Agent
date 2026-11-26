@@ -166,7 +166,6 @@ export class KnowledgeTopicService {
       });
     }
     const next: KnowledgeTopicDocument = {
-      schemaVersion: 1,
       topics: [...topics.values()].sort((left, right) => left.id.localeCompare(right.id)),
       assignments: [...assignments.values()].sort((left, right) => left.cardId.localeCompare(right.cardId)),
     };

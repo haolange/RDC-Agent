@@ -257,7 +257,6 @@ interface KnowledgeTopicAssignment {
 }
 
 export interface KnowledgeTopicDocument {
-  schemaVersion: 1;
   topics: KnowledgeTopic[];
   assignments: KnowledgeTopicAssignment[];
 }

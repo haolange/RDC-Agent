@@ -37,10 +37,7 @@ export interface KnowledgeIndexEntry {
   preview?: string;
 }
 
-export const KNOWLEDGE_INDEX_SCHEMA_VERSION = 1 as const;
-
 export interface KnowledgeIndexSnapshot {
-  schemaVersion: typeof KNOWLEDGE_INDEX_SCHEMA_VERSION;
   revision: string;
   builtAt: string;
   cards: KnowledgeIndexEntry[];
