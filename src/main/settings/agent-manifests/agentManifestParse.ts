@@ -14,7 +14,7 @@ import type {
   HandoffSurface,
 } from '@shared/types/agentManifest';
 
-/** A manifest still declares a field that moved to Settings → Agents; the file is not applied until migrated. */
+/** A manifest still declares a field that moved to Settings → Agents; the file is not applied until the field goes. */
 export const AGENT_MANIFEST_FIELD_MOVED = 'AGENT_MANIFEST_FIELD_MOVED';
 
 export interface ManifestParseOk {
@@ -130,7 +130,7 @@ export function parseAgentMarkdownStrict(
     if (record.model !== undefined || record['reasoning-level'] !== undefined) {
       return {
         ok: false,
-        reason: `${AGENT_MANIFEST_FIELD_MOVED}: model and reasoning-level are set in Settings → Agents; migrate this file or delete it.`,
+        reason: `${AGENT_MANIFEST_FIELD_MOVED}: model and reasoning-level are set in Settings → Agents; remove them from this file or delete it.`,
       };
     }
     if (

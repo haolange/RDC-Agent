@@ -459,8 +459,7 @@ export interface ElectronAPI {
     getAgentDefinitionCommit: (
       query: import('./agentManifest').AgentDefinitionCommitQuery,
     ) => Promise<AgentDefinitionCommitSnapshot | null>;
-    previewAgentModelMigration: (sourcePath: string) => Promise<import('./agentManifest').AgentModelMigrationPreview>;
-    applyAgentModelMigration: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
+    previewAgentOverrideFile: (sourcePath: string) => Promise<import('./agentManifest').AgentOverrideFilePreview>;
     deleteAgentOverrideFile: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
     previewProjectAgentTrust: (sourcePath: string) => Promise<import('./agentManifest').ProjectAgentTrustPreview>;
     trustProjectAgent: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;

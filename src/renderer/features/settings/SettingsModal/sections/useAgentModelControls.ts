@@ -5,14 +5,14 @@ import type {
   AgentBuiltinComparison,
   AgentManifestDiagnostic,
   AgentManifestDraft,
-  AgentModelMigrationPreview,
+  AgentOverrideFilePreview,
   AgentOverrideFileRequest,
   ProjectAgentTrustPreview,
 } from '@shared/types/agentManifest';
 import type { SettingsPatchOp } from '@shared/types/settings';
 import type { AgentModelFieldChange } from './AgentModelBindingFields';
 import type { AgentBuiltinDiffState } from './AgentBuiltinDiffDialog';
-import type { AgentOverrideFileAction } from './AgentModelMigrationDialog';
+import type { AgentOverrideDeleteTarget } from './AgentOverrideDeleteDialog';
 import type { ProjectAgentTrustReview } from './ProjectAgentTrustDialog';
 
 /** Where a failed model write is reported: the default row, or one Agent's editor. */
@@ -20,8 +20,8 @@ export const DEFAULT_MODEL_TARGET = '';
 
 export interface AgentModelCommands {
   onAgentModelOps: (ops: SettingsPatchOp[]) => Promise<void>;
-  onPreviewAgentModelMigration: (sourcePath: string) => Promise<AgentModelMigrationPreview>;
-  onCommitAgentOverrideFile: (action: 'migrate' | 'delete', request: AgentOverrideFileRequest) => Promise<void>;
+  onPreviewAgentOverrideFile: (sourcePath: string) => Promise<AgentOverrideFilePreview>;
+  onDeleteAgentOverrideFile: (request: AgentOverrideFileRequest) => Promise<void>;
   onLoadAgentBuiltinComparison: (draft: AgentManifestDraft) => Promise<AgentBuiltinComparison>;
   onPreviewProjectAgentTrust: (sourcePath: string) => Promise<ProjectAgentTrustPreview>;
   onTrustProjectAgent: (request: AgentOverrideFileRequest) => Promise<void>;
@@ -46,7 +46,7 @@ const agentFieldOp = (agentId: string, change: AgentModelFieldChange): SettingsP
 export function useAgentModelControls(commands: AgentModelCommands) {
   const [modelError, setModelError] = useState<{ target: string; message: string } | null>(null);
   const [builtinDiff, setBuiltinDiff] = useState<AgentBuiltinDiffState | null>(null);
-  const [overrideAction, setOverrideAction] = useState<AgentOverrideFileAction | null>(null);
+  const [overrideDelete, setOverrideDelete] = useState<AgentOverrideDeleteTarget | null>(null);
   const [trustReview, setTrustReview] = useState<ProjectAgentTrustReview | null>(null);
 
   const commit = (op: SettingsPatchOp, target: string) => {
@@ -77,24 +77,19 @@ export function useAgentModelControls(commands: AgentModelCommands) {
     );
   };
 
-  const openOverrideAction = (action: AgentOverrideFileAction['action'], issue: AgentManifestDiagnostic) => {
-    const same = (current: AgentOverrideFileAction | null) =>
-      current?.sourcePath === issue.sourcePath && current.action === action;
-    setOverrideAction({ action, agentId: issue.agentId, sourcePath: issue.sourcePath });
-    void commands.onPreviewAgentModelMigration(issue.sourcePath).then(
-      (preview) => setOverrideAction((current) => (same(current) ? { ...current!, preview } : current)),
+  const openOverrideDelete = (issue: AgentManifestDiagnostic) => {
+    const same = (current: AgentOverrideDeleteTarget | null) => current?.sourcePath === issue.sourcePath;
+    setOverrideDelete({ agentId: issue.agentId, sourcePath: issue.sourcePath });
+    void commands.onPreviewAgentOverrideFile(issue.sourcePath).then(
+      (preview) => setOverrideDelete((current) => (same(current) ? { ...current!, preview } : current)),
       (error: unknown) =>
-        setOverrideAction((current) => (same(current) ? { ...current!, error: errorDetail(error) } : current)),
+        setOverrideDelete((current) => (same(current) ? { ...current!, error: errorDetail(error) } : current)),
     );
   };
 
-  const confirmOverrideAction = async (preview: AgentModelMigrationPreview) => {
-    if (!overrideAction) return;
-    await commands.onCommitAgentOverrideFile(overrideAction.action, {
-      sourcePath: preview.sourcePath,
-      sourceHash: preview.sourceHash,
-    });
-    setOverrideAction(null);
+  const confirmOverrideDelete = async (preview: AgentOverrideFilePreview) => {
+    await commands.onDeleteAgentOverrideFile({ sourcePath: preview.sourcePath, sourceHash: preview.sourceHash });
+    setOverrideDelete(null);
   };
 
   const openTrustReview = (issue: AgentManifestDiagnostic) => {
@@ -119,10 +114,10 @@ export function useAgentModelControls(commands: AgentModelCommands) {
     builtinDiff,
     showBuiltinDiff,
     closeBuiltinDiff: () => setBuiltinDiff(null),
-    overrideAction,
-    openOverrideAction,
-    confirmOverrideAction,
-    closeOverrideAction: () => setOverrideAction(null),
+    overrideDelete,
+    openOverrideDelete,
+    confirmOverrideDelete,
+    closeOverrideDelete: () => setOverrideDelete(null),
     trustReview,
     openTrustReview,
     confirmTrust,

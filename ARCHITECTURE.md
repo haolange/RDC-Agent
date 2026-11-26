@@ -487,7 +487,7 @@ Settings 文件不带格式版本（`src/main/settings/settings-core/settingsFil
 四个默认顶层入口与八个默认内部 builtin 经同一有效快照加载；Settings、Composer 和 Conversation preflight 使用 project-aware 资源解析，资源读取不创建或改写 user seed。user/project 可覆盖合法 ID 或新增合法自定义 ID。
 
 - **冻结内容**：Profile 冻结身份与默认 Skill。模型与推理档位只来自 Settings → Agents（`agentModels.byAgent[id]` 逐字段覆盖 `agentModels.default`）。
-- **移走的字段**：`.agent.md` 声明 `model` / `reasoning-level` / handoff `model` 时整份判无效（`AGENT_MANIFEST_FIELD_MOVED`），按优先级回落下层。Agents 页提供用户触发的迁移（预览 → 备份 → 写入设置并去字段 → 原子替换）与删除覆盖。
+- **移走的字段**：`.agent.md` 声明 `model` / `reasoning-level` / handoff `model` 时整份判无效（`AGENT_MANIFEST_FIELD_MOVED`），按优先级回落下层，诊断点名该文件；不提供迁移或转换，用户自行去掉字段，或在 Agents 页删除覆盖。
 - **复制内置**：复制时写入 `based-on: <内置 sourceHash>`；内置变化后显示「内置已更新」，并可对比、恢复内置。
 - **内部 Agent**：默认内部 Agent 经 Settings 配置并按需委派，Task 对必需执行和独立核验作真实准入。
 - **保存**：显式保存使用统一原子替换，sourceHash 为当前 Markdown 原始字节的 SHA256。

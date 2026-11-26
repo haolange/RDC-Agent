@@ -52,7 +52,7 @@ import type {
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
   AgentManifestDefinition,
-  AgentModelMigrationPreview,
+  AgentOverrideFilePreview,
   AgentOverrideFileRequest,
   ProjectAgentTrustPreview,
 } from '@shared/types/agentManifest';
@@ -88,7 +88,7 @@ interface ConnectionView {
 export class SettingsService {
   private readonly store = new SettingsStore();
   private readonly agentOps = new SettingsAgentOps();
-  private readonly agentOverrideOps = new SettingsAgentOverrideOps(this);
+  private readonly agentOverrideOps = new SettingsAgentOverrideOps();
   private readonly providerOps: SettingsProviderOps;
   private connections: ConnectionView | null = null;
 
@@ -331,12 +331,8 @@ export class SettingsService {
     return this.agentOps.saveAgentDefinition(request);
   }
 
-  previewAgentModelMigration(sourcePath: string): AgentModelMigrationPreview {
-    return this.agentOverrideOps.previewModelMigration(sourcePath);
-  }
-
-  async applyAgentModelMigration(request: AgentOverrideFileRequest): Promise<void> {
-    await this.agentOverrideOps.applyModelMigration(request);
+  previewAgentOverrideFile(sourcePath: string): AgentOverrideFilePreview {
+    return this.agentOverrideOps.previewOverrideFile(sourcePath);
   }
 
   async deleteAgentOverrideFile(request: AgentOverrideFileRequest): Promise<void> {

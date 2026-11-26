@@ -1,16 +1,13 @@
 import { AgentBuiltinDiffDialog } from './AgentBuiltinDiffDialog';
-import { AgentModelMigrationDialog } from './AgentModelMigrationDialog';
+import { AgentOverrideDeleteDialog } from './AgentOverrideDeleteDialog';
 import { ProjectAgentTrustDialog } from './ProjectAgentTrustDialog';
 import type { useAgentModelControls } from './useAgentModelControls';
-import type { AgentModelOption } from '@shared/types/agentManifest';
 
 export function AgentReviewDialogs({
   models,
-  options,
   onRestore,
 }: {
   models: ReturnType<typeof useAgentModelControls>;
-  options: AgentModelOption[];
   onRestore: () => void;
 }) {
   return (
@@ -25,12 +22,11 @@ export function AgentReviewDialogs({
           }}
         />
       ) : null}
-      {models.overrideAction ? (
-        <AgentModelMigrationDialog
-          target={models.overrideAction}
-          options={options}
-          onConfirm={models.confirmOverrideAction}
-          onClose={models.closeOverrideAction}
+      {models.overrideDelete ? (
+        <AgentOverrideDeleteDialog
+          target={models.overrideDelete}
+          onConfirm={models.confirmOverrideDelete}
+          onClose={models.closeOverrideDelete}
         />
       ) : null}
       {models.trustReview ? (

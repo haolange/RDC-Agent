@@ -39,7 +39,7 @@ Agent ID 来自文件名 stem，不再从 frontmatter 读取 `id`。
 
 已移除字段（禁止恢复）：`harness` 与 lean/standard 厚度档位。Skill 发现只有 Progressive Skill Index。
 
-已移到 Settings 的字段：`model`、`reasoning-level`、handoff 的 `model`。声明任一字段的文件判无效（`AGENT_MANIFEST_FIELD_MOVED`），按 `builtin < user < project` 回落下层并显示诊断；Agents 页对该诊断提供【迁移】（预览 → 备份为 `<文件>.bak` → 把模型与档位写入 `agentModels.byAgent[id]` 并去掉字段 → 原子替换）与【删除覆盖】。handoff 的模型没有替代字段，目标 Agent 用自己的设置。
+已移到 Settings 的字段：`model`、`reasoning-level`、handoff 的 `model`。声明任一字段的文件判无效（`AGENT_MANIFEST_FIELD_MOVED`），按 `builtin < user < project` 回落下层并显示点名该文件的诊断；不提供迁移或转换，用户自行从文件中去掉这些字段，或在 Agents 页对该诊断【删除覆盖】。handoff 的模型没有替代字段，目标 Agent 用自己的设置。
 
 `handoffs` support:
 
