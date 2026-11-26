@@ -301,7 +301,7 @@ it('reports the live observed position against the frozen baseline without chang
   });
 });
 
-it('records a same-input recovery epoch and stops if the same native failure recurs', async () => {
+it('records a same-input recovery epoch with the signed admission decision', async () => {
   const f = fixture();
   await f.controller.initialize();
   await f.controller.prepareRecovery(1);
@@ -320,10 +320,8 @@ it('records a same-input recovery epoch and stops if the same native failure rec
     { event: 'daemon-stopped', contextId: 'context-a' },
     { event: 'transition', restored: false, from: { inputId: 'a' }, to: { inputId: 'a' } },
   ]);
+  expect(f.receipts[1]).toMatchObject({ recovery: { classification: { decision: 'keep' } } });
   expect(f.turn.runtimeEpochs).toHaveLength(1);
-  await f.controller.prepareRecovery(1);
-  await expect(f.controller.recover()).rejects.toThrow('RDC_RECOVERY_REPEATED_FAILURE');
-  expect(f.host.reopenAfterFailure).toHaveBeenCalledOnce();
 });
 
 it('verifies the entry position after recovery without claiming a terminal receipt early', async () => {

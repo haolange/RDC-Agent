@@ -376,7 +376,6 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.RDC_RECOVERY_PREPARATION_REQUIRED': '恢复前请先准备回放设备。',
   'errors.RDC_RECOVERY_PROCESS_UNEXPLAINED': '回放进程发生了变化，退出记录无法解释。',
   'errors.RDC_RECOVERY_RECORD_CHANGED': '恢复期间 capture 记录发生了变化。',
-  'errors.RDC_RECOVERY_REPEATED_FAILURE': '此类失败已恢复过一次，请检查 capture 和设备。',
   'errors.RDC_RECOVERY_REPLACEMENTS_ACTIVE': '恢复前请先还原当前的替换。',
   'errors.RDC_RECOVERY_RESULT_UNVERIFIED': '无法验证恢复后的 capture。',
   'errors.RDC_RECOVERY_STOP_RECEIPT_MISMATCH': '恢复期间回放的停止回执不一致。',

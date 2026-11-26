@@ -25,6 +25,7 @@ const mock = vi.hoisted(() => ({
   device: vi.fn(),
   snapshot: vi.fn(),
   status: vi.fn(),
+  attempts: vi.fn(),
   permission: vi.fn(),
   active: vi.fn(),
   entries: vi.fn(),
@@ -61,7 +62,7 @@ vi.mock('../../runtime/RuntimePermissionStateService', () => ({
 }));
 vi.mock('../../rdc/captures/ReplayDeviceService', () => ({ replayDeviceService: { getDeviceById: mock.device } }));
 vi.mock('../../rdc/RdcLifecycleReceipts', () => ({
-  rdcLifecycleReceipts: { prepare: vi.fn(), write: vi.fn(), pending: vi.fn() },
+  rdcLifecycleReceipts: { prepare: vi.fn(), write: vi.fn(), pending: vi.fn(), recoveryAttempts: mock.attempts },
 }));
 vi.mock('../../investigation/InvestigationArtifactService', () => ({
   investigationArtifactService: { list: mock.entries, readRecord: mock.readRecord },
@@ -142,6 +143,7 @@ beforeEach(() => {
     processIdentity,
   });
   mock.status.mockResolvedValue(liveContextStatus());
+  mock.attempts.mockReturnValue({ attempts: 0, failed: 0 });
   mock.permission.mockReturnValue({ revision: 1, mode: 'full-access' });
   mock.active.mockResolvedValue([]);
   mock.entries.mockReturnValue([]);
@@ -208,6 +210,13 @@ it('checks quarantined process identity and reconnects the same device under unc
   expect(await host.inspectRecovery(point, binding)).toMatchObject({
     classification: { decision: 'quarantined', code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED' },
   });
+  // Attempts are counted from the signed receipts of every earlier turn, not from this controller's memory.
+  mock.attempts.mockReturnValueOnce({ attempts: 2, failed: 1 });
+  mock.status.mockResolvedValueOnce(stuckContextStatus());
+  expect(await host.inspectRecovery(point, binding)).toMatchObject({
+    classification: { decision: 'quarantined', code: 'RDC_RECOVERY_BUDGET_EXHAUSTED' },
+  });
+  expect(mock.attempts).toHaveBeenLastCalledWith('s', 'p', destination);
 });
 afterEach(() => {
   clearRdcContextLeases();

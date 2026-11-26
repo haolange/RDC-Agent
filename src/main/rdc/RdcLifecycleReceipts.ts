@@ -167,6 +167,45 @@ export class RdcLifecycleReceipts {
     return receipt;
   }
 
+  /**
+   * Recovery attempts on one approved input, content and device across every turn of the session: each signed recovery
+   * intent is an attempt, and `failed` counts the attempts whose signed failed receipt names that intent.
+   */
+  recoveryAttempts(
+    sessionId: string,
+    projectId: string,
+    destination: { inputId: string; contentSha256: string; deviceId: string },
+  ): { attempts: number; failed: number } {
+    const values = this.readAll(sessionId, projectId);
+    const intents = values.filter(
+      ({ value }) =>
+        value.event === 'intent' &&
+        !!value.recovery &&
+        value.destination?.inputId === destination.inputId &&
+        value.destination.contentSha256 === destination.contentSha256 &&
+        value.destination.deviceId === destination.deviceId,
+    );
+    const refs = new Set(intents.map(({ ref }) => JSON.stringify(ref)));
+    const failed = values.filter(({ value }) => value.event === 'failed' && refs.has(JSON.stringify(value.intent)));
+    return { attempts: intents.length, failed: failed.length };
+  }
+
+  private readAll(
+    sessionId: string,
+    projectId: string,
+  ): Array<{ ref: InvestigationContentRef; value: RdcLifecycleReceipt }> {
+    return this.resolver
+      .list(sessionId, 'tool-outputs')
+      .filter((uri) => /^session:\/\/tool-outputs\/rdc-lifecycle-[0-9a-f-]+\.json$/iu.test(uri))
+      .map((uri) => {
+        const source = this.resolver.read(sessionId, uri);
+        if (source.truncated) throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', 'incomplete receipt.');
+        const ref = { uri, expectedHash: `sha256:${source.hash}` };
+        return { ref, value: this.read(sessionId, ref) };
+      })
+      .filter((item) => item.value.projectId === projectId);
+  }
+
   /** Reconstruct unresolved user positions from signed session artifacts, without resuming execution. */
   pending(
     sessionId: string,
@@ -177,16 +216,7 @@ export class RdcLifecycleReceipts {
     count: number;
     identities: Array<{ contextId: string; processIdentity: RdcProcessIdentity; stopped: boolean }>;
   } | null {
-    const values = this.resolver
-      .list(sessionId, 'tool-outputs')
-      .filter((uri) => /^session:\/\/tool-outputs\/rdc-lifecycle-[0-9a-f-]+\.json$/iu.test(uri))
-      .map((uri) => {
-        const source = this.resolver.read(sessionId, uri);
-        if (source.truncated) throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', 'incomplete receipt.');
-        const ref = { uri, expectedHash: `sha256:${source.hash}` };
-        return { ref, value: this.read(sessionId, ref) };
-      })
-      .filter((item) => item.value.projectId === projectId);
+    const values = this.readAll(sessionId, projectId);
     const baselines = values.filter(
       (item): item is typeof item & { value: Extract<RdcLifecycleReceipt, { event: 'baseline' }> } =>
         item.value.event === 'baseline',

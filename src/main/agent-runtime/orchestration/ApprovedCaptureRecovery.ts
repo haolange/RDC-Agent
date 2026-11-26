@@ -3,7 +3,8 @@ import { samePath } from '../../platform/paths';
 import { getDelegatedChildSessionId, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcSessionService } from '../../rdc/RdcSessionService';
 import { readRdcContextStatus, rdcRecoveryObservation } from '../../rdc/RdcContextStatus';
-import { classifyRecovery } from '../../rdc/RdcRecoveryClassification';
+import { classifyRecovery, RDC_RECOVERY_ATTEMPT_LIMIT } from '../../rdc/RdcRecoveryClassification';
+import { rdcLifecycleReceipts } from '../../rdc/RdcLifecycleReceipts';
 import type { RdcLifecyclePoint } from '../../rdc/RdcLifecycleReceipts';
 import type { RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import type { RecoveryFacts } from './ApprovedCaptureController';
@@ -55,11 +56,8 @@ export async function inspectQuarantinedCapture(input: {
       'the current failure does not match the last verified capture.',
     );
   }
-  const resolved = await input.resolve({
-    inputId: point.inputId,
-    contentSha256: point.contentSha256,
-    deviceId: point.deviceId,
-  });
+  const destination = { inputId: point.inputId, contentSha256: point.contentSha256, deviceId: point.deviceId };
+  const resolved = await input.resolve(destination);
   if (!samePath(opened.filePath, resolved.capture.filePath))
     throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'input path changed.');
   const status = await readRdcContextStatus({
@@ -80,7 +78,10 @@ export async function inspectQuarantinedCapture(input: {
     replaySessionId: point.native.replaySessionId,
     status,
     deviceActionPending: !!state.preparation.issue?.deviceAction,
-    budget: null,
+    budget: {
+      attempts: rdcLifecycleReceipts.recoveryAttempts(input.sessionId, input.projectId, destination).attempts,
+      limit: RDC_RECOVERY_ATTEMPT_LIMIT,
+    },
   });
   return { cause: lease.quarantineCause, observed, classification };
 }

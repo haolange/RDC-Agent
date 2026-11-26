@@ -403,7 +403,6 @@ export const enErrors = {
   'errors.RDC_RECOVERY_PREPARATION_REQUIRED': 'Prepare the replay device before recovering.',
   'errors.RDC_RECOVERY_PROCESS_UNEXPLAINED': "The replay process changed in a way its exit records don't explain.",
   'errors.RDC_RECOVERY_RECORD_CHANGED': 'The capture record changed during recovery.',
-  'errors.RDC_RECOVERY_REPEATED_FAILURE': 'This failure was already recovered once. Check the capture and device.',
   'errors.RDC_RECOVERY_REPLACEMENTS_ACTIVE': 'Restore the current replacements before recovering.',
   'errors.RDC_RECOVERY_RESULT_UNVERIFIED': "The recovered capture couldn't be verified.",
   'errors.RDC_RECOVERY_STOP_RECEIPT_MISMATCH': "The replay's stop record doesn't match during recovery.",

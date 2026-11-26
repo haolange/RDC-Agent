@@ -353,6 +353,8 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 
 结论签进恢复 intent 回执；quarantined 立即写 failed 回执并停止，不触碰现场。
 
+Agent 恢复的次数是持久预算：`RdcLifecycleReceipts.recoveryAttempts` 从会话里已签名的回执统计同一 {输入、内容 hash、设备} 的恢复 intent（每次尝试一条，失败的另有 failed 回执指向它），跨 turn 与重启有效；达到 `RDC_RECOVERY_ATTEMPT_LIMIT`（2）后 `classifyRecovery` 先于身份链判 `RDC_RECOVERY_BUDGET_EXHAUSTED`。没有内存里的"已恢复过"集合。用户在 Capture 面板发起的恢复每次都是人的明确操作，不计入、也不受此预算限制。
+
 获批调查的 `turn_complete` 在记录声明前检查入口位置是否恢复；现场无法核验时，把主进程观察到的错误返回工具调用，让模型据此如实声明 partial／blocked 及剩余恢复，而不是先接受声明再要求它猜测错误。终答仍重新核验恢复状态；已声明的 partial 不升级为成功，恢复回执仍以实际现场为准。
 
 Android 的 remote_display 由同一远程连接的原生呈现确认驱动，核对当前事件、目标纹理及新鲜序号；后台窗口、原生失败或缺失能力不得显示 presented。无颜色输出清除手机旧画面并表达无输出，应用 PNG 与手机屏幕状态分别判断。

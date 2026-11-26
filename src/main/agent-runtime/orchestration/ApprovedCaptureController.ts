@@ -73,7 +73,6 @@ export class ApprovedCaptureController {
   private original: RdcLifecyclePoint | null | undefined;
   private baseline: InvestigationContentRef | null = null;
   private lastVerified: RdcLifecyclePoint | null = null;
-  private readonly attemptedRecoveries = new Set<string>();
   private recoveryAdmission: { revision: number; guard: () => void } | null = null;
   private initialError: string | null = null;
   private lastFailure: string | null = null;
@@ -313,15 +312,6 @@ export class ApprovedCaptureController {
     const previous = this.current();
     const facts = await this.input.host.inspectRecovery(from, previous.binding, signal);
     guard();
-    const failureKey = JSON.stringify({
-      inputId: from.inputId,
-      contentSha256: from.contentSha256,
-      deviceId: from.deviceId,
-      ...facts.cause,
-    });
-    if (this.attemptedRecoveries.has(failureKey))
-      throw new AppError('RDC_RECOVERY_REPEATED_FAILURE', 'this failure condition has already been recovered once.');
-    this.attemptedRecoveries.add(failureKey);
     this.input.host.prepareReceipts();
     const operationId = randomUUID();
     const base = this.base(operationId);
