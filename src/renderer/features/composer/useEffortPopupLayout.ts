@@ -77,25 +77,23 @@ export function useEffortPopupLayout(options: {
 
     const track = trackRef.current;
     if (!track) return undefined;
-    let hasValidTrackWidth = false;
-    const syncTrackWidth = () => {
+    /** Whether the track has a width to lay the popup out on. */
+    const syncTrackWidth = (): boolean => {
       const width = track.getBoundingClientRect().width;
       if (width <= 0) {
-        hasValidTrackWidth = false;
         cancelSettleFrame();
         setPositionTransitionsReady(false);
-        return;
+        return false;
       }
-      hasValidTrackWidth = true;
       const changed = Math.abs(trackWidthRef.current - width) >= 0.5;
-      if (!changed) return;
+      if (!changed) return true;
       trackWidthRef.current = width;
       setTrackWidthPx(width);
       setPositionTransitionsReady(false);
       schedulePositionTransitions();
+      return true;
     };
-    syncTrackWidth();
-    if (hasValidTrackWidth) schedulePositionTransitions();
+    if (syncTrackWidth()) schedulePositionTransitions();
     const observer = new ResizeObserver(syncTrackWidth);
     observer.observe(track);
     return () => {

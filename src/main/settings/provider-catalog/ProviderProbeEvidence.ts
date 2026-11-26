@@ -2,7 +2,7 @@ import type { AssistantMessage, ToolDefinition } from '../../agent-runtime/core/
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { LlmModelCapabilityProbeRequest, LlmModelCapabilityProbeResult } from '@shared/types/settings';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
-import type { ResolvedProbeTarget } from './ProviderCapabilityProbeService';
+import type { ResolvedProbeTarget } from '../../agent-runtime/capabilities/ProviderCapabilityProbeService';
 
 /**
  * The probe's one no-op tool. Real turns always carry tools, so the probe offers one too; a structured call
@@ -33,7 +33,8 @@ export type CapabilityProbeFailureKind =
   | 'unknown';
 
 /** Provider wording for a request rejected because the model cannot take tools (e.g. Ollama's 400). */
-const TOOLS_UNSUPPORTED_DETAIL = /does not support tools|tools? (?:are |is )?not supported|tool (?:use|calling) is not supported/iu;
+const TOOLS_UNSUPPORTED_DETAIL =
+  /does not support tools|tools? (?:are |is )?not supported|tool (?:use|calling) is not supported/iu;
 
 export function classifyCapabilityProbeFailure(
   status: number,
@@ -46,23 +47,26 @@ export function classifyCapabilityProbeFailure(
   if (status === 429) return 'quota-exhausted';
   if (status === 400 && TOOLS_UNSUPPORTED_DETAIL.test(detail)) return 'tools-unsupported';
   const normalizedDetail = detail.toLowerCase();
-  if (status === 402 && (
-    normalizedDetail.includes('quota_exceeded')
-    || normalizedDetail.includes('quota exceeded')
-    || normalizedDetail.includes('usage limit')
-    || normalizedDetail.includes('out of budget')
-    || normalizedDetail.includes('insufficient balance')
-    || normalizedDetail.includes('insufficient_balance')
-  )) return 'quota-exhausted';
+  if (
+    status === 402 &&
+    (normalizedDetail.includes('quota_exceeded') ||
+      normalizedDetail.includes('quota exceeded') ||
+      normalizedDetail.includes('usage limit') ||
+      normalizedDetail.includes('out of budget') ||
+      normalizedDetail.includes('insufficient balance') ||
+      normalizedDetail.includes('insufficient_balance'))
+  )
+    return 'quota-exhausted';
   return 'unknown';
 }
-
 
 export const PROBE_AVAILABILITY_DENIAL = 'capability-probe:availability-denied';
 
 export function isProbeAvailabilityDenied(model: EffectiveModel): boolean {
-  return model.availability === 'unavailable' && model.provenance.filter(e => e.field === 'availability')
-    .at(-1)?.sourceRevision === PROBE_AVAILABILITY_DENIAL;
+  return (
+    model.availability === 'unavailable' &&
+    model.provenance.filter((e) => e.field === 'availability').at(-1)?.sourceRevision === PROBE_AVAILABILITY_DENIAL
+  );
 }
 
 export function buildProbeSuccessPatch(
@@ -72,7 +76,8 @@ export function buildProbeSuccessPatch(
   message: AssistantMessage,
 ): CatalogModelContribution | null {
   const patch: CatalogModelContribution = { modelId: target.model.modelId };
-  if (target.model.availability === 'unknown' || isProbeAvailabilityDenied(target.model)) patch.availability = 'available';
+  if (target.model.availability === 'unknown' || isProbeAvailabilityDenied(target.model))
+    patch.availability = 'available';
   // A structured call to the probe's no-op tool is the receipt for tool calling on this route.
   if (target.model.toolCalling.state !== 'supported' && probeCalledCapabilityCheck(message)) {
     patch.toolCalling = { state: 'supported' };
@@ -84,16 +89,22 @@ export function buildProbeSuccessPatch(
   }
   if (max) {
     if (target.model.controls.maxContext.state === 'selectable') {
-      patch.controls = { ...patch.controls, maxContext: { ...target.model.controls.maxContext, entitlement: 'granted' } };
+      patch.controls = {
+        ...patch.controls,
+        maxContext: { ...target.model.controls.maxContext, entitlement: 'granted' },
+      };
     }
-    patch.contextTiers = target.model.contextTiers.map(tier => (
-      tier.id === plan.activeTierId ? { ...tier, entitlement: 'granted' } : tier
-    ));
+    patch.contextTiers = target.model.contextTiers.map((tier) =>
+      tier.id === plan.activeTierId ? { ...tier, entitlement: 'granted' } : tier,
+    );
   }
-  if (fast || max) patch.executionBindings = target.model.executionBindings?.map(binding => (
-    plan.appliedBindingIds.includes(binding.id) ? { ...binding, entitlement: 'granted' } : binding
-  ));
-  return patch.availability || patch.toolCalling || patch.controls || patch.contextTiers || patch.executionBindings ? patch : null;
+  if (fast || max)
+    patch.executionBindings = target.model.executionBindings?.map((binding) =>
+      plan.appliedBindingIds.includes(binding.id) ? { ...binding, entitlement: 'granted' } : binding,
+    );
+  return patch.availability || patch.toolCalling || patch.controls || patch.contextTiers || patch.executionBindings
+    ? patch
+    : null;
 }
 
 export function buildProbeFailurePatch(
@@ -109,48 +120,55 @@ export function buildProbeFailurePatch(
     return { modelId: target.model.modelId, toolCalling: { state: 'unsupported', reason: detail.slice(0, 200) } };
   }
   if (request.mode === 'default' && kind === 'entitlement-denied') {
-    return { modelId: target.model.modelId, availability: 'unavailable',
+    return {
+      modelId: target.model.modelId,
+      availability: 'unavailable',
       controls: {
-        ...(target.model.controls.fast.state === 'selectable' ? { fast: { ...target.model.controls.fast, entitlement: 'denied' as const } } : {}),
-        ...(target.model.controls.maxContext.state === 'selectable' ? { maxContext: { ...target.model.controls.maxContext, entitlement: 'denied' as const } } : {}),
+        ...(target.model.controls.fast.state === 'selectable'
+          ? { fast: { ...target.model.controls.fast, entitlement: 'denied' as const } }
+          : {}),
+        ...(target.model.controls.maxContext.state === 'selectable'
+          ? { maxContext: { ...target.model.controls.maxContext, entitlement: 'denied' as const } }
+          : {}),
       },
       unavailableReason: 'Current account subscription does not have access to this model.',
-      factSource: { sourceKind: 'runtime-observation', sourceRevision: PROBE_AVAILABILITY_DENIAL } };
+      factSource: { sourceKind: 'runtime-observation', sourceRevision: PROBE_AVAILABILITY_DENIAL },
+    };
   }
   if (request.mode === 'fast-max-context' && kind === 'entitlement-denied') {
-    return { modelId: target.model.modelId, executionBindings: target.model.executionBindings?.map(binding =>
-      plan.appliedBindingIds.includes(binding.id) && binding.when.fast === true && binding.when.maxContext === true
-        ? { ...binding, entitlement: 'denied' as const } : binding) };
+    return {
+      modelId: target.model.modelId,
+      executionBindings: target.model.executionBindings?.map((binding) =>
+        plan.appliedBindingIds.includes(binding.id) && binding.when.fast === true && binding.when.maxContext === true
+          ? { ...binding, entitlement: 'denied' as const }
+          : binding,
+      ),
+    };
   }
   if (request.mode === 'max-context' && kind === 'entitlement-denied') {
     return {
       modelId: target.model.modelId,
-      controls: target.model.controls.maxContext.state === 'selectable'
-        ? { maxContext: { ...target.model.controls.maxContext, entitlement: 'denied' } }
-        : undefined,
+      controls:
+        target.model.controls.maxContext.state === 'selectable'
+          ? { maxContext: { ...target.model.controls.maxContext, entitlement: 'denied' } }
+          : undefined,
       contextTiers: [{ id: plan.activeTierId, entitlement: 'denied' }],
-      executionBindings: target.model.executionBindings?.map((binding) => (
-        plan.appliedBindingIds.includes(binding.id)
-          ? { ...binding, entitlement: 'denied' }
-          : binding
-      )),
+      executionBindings: target.model.executionBindings?.map((binding) =>
+        plan.appliedBindingIds.includes(binding.id) ? { ...binding, entitlement: 'denied' } : binding,
+      ),
     };
   }
-  if (request.mode === 'fast' && kind === 'entitlement-denied'
-    && target.model.controls.fast.state === 'selectable') {
+  if (request.mode === 'fast' && kind === 'entitlement-denied' && target.model.controls.fast.state === 'selectable') {
     return {
       modelId: target.model.modelId,
       controls: { fast: { ...target.model.controls.fast, entitlement: 'denied' } },
-      executionBindings: target.model.executionBindings?.map((binding) => (
-        plan.appliedBindingIds.includes(binding.id)
-          ? { ...binding, entitlement: 'denied' }
-          : binding
-      )),
+      executionBindings: target.model.executionBindings?.map((binding) =>
+        plan.appliedBindingIds.includes(binding.id) ? { ...binding, entitlement: 'denied' } : binding,
+      ),
     };
   }
   return null;
 }
-
 
 type BindingAction = NonNullable<EffectiveModel['executionBindings']>[number]['actions'][number];
 
@@ -168,9 +186,10 @@ function receiptConfirmsAction(action: BindingAction, message: AssistantMessage)
  * tier was echoed back, or the provider reported fast speed. A request that merely succeeded proves none.
  */
 export function receiptConfirmsFast(model: EffectiveModel, plan: RequestPlan, message: AssistantMessage): boolean {
-  const bindingActions = model.executionBindings
-    ?.filter((binding) => plan.appliedBindingIds.includes(binding.id) && binding.when.fast === true)
-    .flatMap((binding) => binding.actions) ?? [];
+  const bindingActions =
+    model.executionBindings
+      ?.filter((binding) => plan.appliedBindingIds.includes(binding.id) && binding.when.fast === true)
+      .flatMap((binding) => binding.actions) ?? [];
   if (bindingActions.some((action) => receiptConfirmsAction(action, message))) return true;
   if (plan.bodyPatch.service_tier === 'priority') return message.execution?.serviceTier === 'priority';
   if (plan.bodyPatch.speed === 'fast') return message.usage.speed === 'fast';
@@ -178,7 +197,10 @@ export function receiptConfirmsFast(model: EffectiveModel, plan: RequestPlan, me
 }
 
 /** A model-switch binding is proven only when the target model is the one that answered. */
-export function receiptConfirmsModelSwitch(binding: NonNullable<EffectiveModel['executionBindings']>[number], message: AssistantMessage): boolean {
+export function receiptConfirmsModelSwitch(
+  binding: NonNullable<EffectiveModel['executionBindings']>[number],
+  message: AssistantMessage,
+): boolean {
   return binding.actions.some((action) => action.kind === 'model-switch' && receiptConfirmsAction(action, message));
 }
 
@@ -200,10 +222,14 @@ export function receiptExceedsSmallerTiers(model: EffectiveModel, tierId: string
 
 /** A short successful request cannot prove a larger implicit/client-only context. */
 export function probeConfirmation(
-  request: LlmModelCapabilityProbeRequest, target: ResolvedProbeTarget, plan: RequestPlan, message: AssistantMessage,
+  request: LlmModelCapabilityProbeRequest,
+  target: ResolvedProbeTarget,
+  plan: RequestPlan,
+  message: AssistantMessage,
 ): Pick<LlmModelCapabilityProbeResult, 'detail' | 'detailCode'> | undefined {
-  const answered = (message.stopReason === 'stop' && message.content.some(part => part.type === 'text' && part.text.trim()))
-    || probeCalledCapabilityCheck(message);
+  const answered =
+    (message.stopReason === 'stop' && message.content.some((part) => part.type === 'text' && part.text.trim())) ||
+    probeCalledCapabilityCheck(message);
   if (!answered) {
     return { detail: `Provider did not complete the minimal response (${message.stopReason}).` };
   }
@@ -211,17 +237,27 @@ export function probeConfirmation(
     if (!receiptConfirmsFast(target.model, plan, message)) {
       if (plan.bodyPatch.service_tier === 'priority') {
         const tier = message.execution?.serviceTier;
-        if (tier === 'default') return { detailCode: 'fast-tier-default', detail: 'The provider reported default; actual Fast processing is unconfirmed.' };
-        if (!tier) return { detailCode: 'fast-tier-missing', detail: 'The provider did not report the actual service tier.' };
-        return { detailCode: 'fast-tier-other', detail: 'The provider returned a different service tier from the requested priority tier.' };
+        if (tier === 'default')
+          return {
+            detailCode: 'fast-tier-default',
+            detail: 'The provider reported default; actual Fast processing is unconfirmed.',
+          };
+        if (!tier)
+          return { detailCode: 'fast-tier-missing', detail: 'The provider did not report the actual service tier.' };
+        return {
+          detailCode: 'fast-tier-other',
+          detail: 'The provider returned a different service tier from the requested priority tier.',
+        };
       }
       return { detail: 'Provider did not confirm the selected Fast speed or target model.' };
     }
   }
   if (request.mode === 'max-context' || request.mode === 'fast-max-context') {
-    const tier = target.model.contextTiers.find(t => t.id === plan.activeTierId);
+    const tier = target.model.contextTiers.find((t) => t.id === plan.activeTierId);
     if (!tier || (tier.entitlement !== 'granted' && tier.activation.kind === 'implicit')) {
-      return { detail: 'Minimal request completed; no authoritative account evidence confirms the larger context window.' };
+      return {
+        detail: 'Minimal request completed; no authoritative account evidence confirms the larger context window.',
+      };
     }
   }
   return undefined;

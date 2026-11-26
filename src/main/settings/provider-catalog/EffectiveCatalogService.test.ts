@@ -27,23 +27,27 @@ function request(overrides: Partial<EffectiveCatalogRequest> = {}): EffectiveCat
     catalog: {
       source: 'catalog',
       observedAt: '2026-01-01T00:00:00.000Z',
-      models: [{
-        modelId: 'model-a',
-        label: 'Catalog label',
-        availability: 'available',
-        contextTiers: [{
-          id: 'default',
-          label: 'Default',
-          maxPromptTokens: 200_000,
-          activation: { kind: 'implicit' },
-          entitlement: 'granted',
-        }],
-        controls: {
-          fast: { state: 'unsupported', fixedValue: false },
-          maxContext: { state: 'unsupported', fixedValue: false },
+      models: [
+        {
+          modelId: 'model-a',
+          label: 'Catalog label',
+          availability: 'available',
+          contextTiers: [
+            {
+              id: 'default',
+              label: 'Default',
+              maxPromptTokens: 200_000,
+              activation: { kind: 'implicit' },
+              entitlement: 'granted',
+            },
+          ],
+          controls: {
+            fast: { state: 'unsupported', fixedValue: false },
+            maxContext: { state: 'unsupported', fixedValue: false },
+          },
+          toolCalling: { state: 'supported' },
         },
-        toolCalling: { state: 'supported' },
-      }],
+      ],
     },
     ...overrides,
   };
@@ -68,7 +72,12 @@ describe('EffectiveCatalogService', () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00Z') });
     let finish!: (value: { models: [] }) => void;
-    service.setDiscoveryLoaderResolver(() => () => new Promise(resolve => { finish = resolve; }));
+    service.setDiscoveryLoaderResolver(
+      () => () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
     const first = service.getSnapshot(request());
     expect(first.refreshing).toBe(true);
     finish({ models: [] });
@@ -82,7 +91,12 @@ describe('EffectiveCatalogService', () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00Z') });
     let finish!: (value: { models: [] }) => void;
-    service.setDiscoveryLoaderResolver(() => () => new Promise(resolve => { finish = resolve; }));
+    service.setDiscoveryLoaderResolver(
+      () => () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
     expect(service.firstLoad(request())).toBeNull();
     service.getSnapshot(request());
     const pending = service.firstLoad(request());
@@ -96,11 +110,21 @@ describe('EffectiveCatalogService', () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const service = new EffectiveCatalogService({ statePath });
     let finish!: (value: { models: { modelId: string; label: string }[] }) => void;
-    const pending = service.refreshDiscovery(request(), () => new Promise(resolve => { finish = resolve; }));
-    const current = request({ user: { source: 'user', observedAt: '2026-01-01T00:00:00Z', models: [{ modelId: 'model-a', label: 'Current' }] } });
+    const pending = service.refreshDiscovery(
+      request(),
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const current = request({
+      user: { source: 'user', observedAt: '2026-01-01T00:00:00Z', models: [{ modelId: 'model-a', label: 'Current' }] },
+    });
     const head = service.getSnapshot(current);
-    const listener = vi.fn(); service.subscribe(listener);
-    finish({ models: [{ modelId: 'model-a', label: 'Old' }] }); await pending;
+    const listener = vi.fn();
+    service.subscribe(listener);
+    finish({ models: [{ modelId: 'model-a', label: 'Old' }] });
+    await pending;
     // Subscribers hear that the superseded refresh ended, with the current configuration's models.
     expect(listener).toHaveBeenCalledTimes(1);
     const published = listener.mock.calls[0]![0] as { refreshing: boolean; models: Array<{ label: string }> };
@@ -114,10 +138,14 @@ describe('EffectiveCatalogService', () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const service = new EffectiveCatalogService({ statePath });
     const input = request();
-    const rejected = await service.refreshDiscovery(input, async () => { throw new ProviderConnectionError('Invalid credential', 401); });
+    const rejected = await service.refreshDiscovery(input, async () => {
+      throw new ProviderConnectionError('Invalid credential', 401);
+    });
     expect(rejected.models[0]).toMatchObject({ modelId: 'model-a', availability: 'unavailable' });
     expect(service.getSnapshot(request({ accountId: 'other-account' })).models[0].availability).toBe('available');
-    const stillRejected = await service.refreshDiscovery(input, async () => { throw new Error('Network unavailable'); });
+    const stillRejected = await service.refreshDiscovery(input, async () => {
+      throw new Error('Network unavailable');
+    });
     expect(stillRejected.models[0].availability).toBe('unavailable');
     const restored = await service.refreshDiscovery(input, async () => ({ models: [] }));
     expect(restored.models[0].availability).toBe('available');
@@ -127,34 +155,42 @@ describe('EffectiveCatalogService', () => {
   it('does not treat a transient directory failure as credential rejection', async () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const service = new EffectiveCatalogService({ statePath });
-    const snapshot = await service.refreshDiscovery(request(), async () => { throw new ProviderConnectionError('Service unavailable', 503); });
+    const snapshot = await service.refreshDiscovery(request(), async () => {
+      throw new ProviderConnectionError('Service unavailable', 503);
+    });
     expect(snapshot.models[0].availability).toBe('available');
-    expect(snapshot.lastRefreshError).toBe('Service unavailable');
+    expect(snapshot.lastRefreshError).toBe('PROVIDER_CONNECTION_FAILED: Service unavailable');
   });
 
   it('marks a discovery-only model without a positive executable context budget unavailable', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const [model] = mergeEffectiveCatalog(request({
-      catalog: {
-        source: 'catalog',
-        observedAt: '2026-01-01T00:00:00.000Z',
-        models: [],
-      },
-      discovery: {
-        source: 'discovery',
-        observedAt: '2026-01-02T00:00:00.000Z',
-        models: [{
-          modelId: 'discovery-without-limits',
-          label: 'Discovery without limits',
-          availability: 'available',
-          routeOptions: [{
-            id: 'chat',
-            route,
-            availability: 'available',
-          }],
-        }],
-      },
-    }));
+    const [model] = mergeEffectiveCatalog(
+      request({
+        catalog: {
+          source: 'catalog',
+          observedAt: '2026-01-01T00:00:00.000Z',
+          models: [],
+        },
+        discovery: {
+          source: 'discovery',
+          observedAt: '2026-01-02T00:00:00.000Z',
+          models: [
+            {
+              modelId: 'discovery-without-limits',
+              label: 'Discovery without limits',
+              availability: 'available',
+              routeOptions: [
+                {
+                  id: 'chat',
+                  route,
+                  availability: 'available',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
 
     expect(model).toMatchObject({
       modelId: 'discovery-without-limits',
@@ -166,106 +202,128 @@ describe('EffectiveCatalogService', () => {
 
   it('merges every layer by field and records winning field evidence', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const [model] = mergeEffectiveCatalog(request({
-      discovery: {
-        source: 'discovery',
-        observedAt: '2026-01-02T00:00:00.000Z',
-        models: [{
-          modelId: 'model-a',
-          label: 'Discovered label',
-          contextTiers: [{ id: 'default', maxPromptTokens: 272_000 }],
-          visionInput: { state: 'supported' },
-        }],
-      },
-      overlay: {
-        source: 'overlay',
-        observedAt: '2026-01-03T00:00:00.000Z',
-        protocol: route.protocol,
-        models: [{ modelId: 'model-a', fixedTemperature: 1 }],
-      },
-      entitlement: {
-        source: 'entitlement',
-        observedAt: '2026-01-04T00:00:00.000Z',
-        models: [{
-          modelId: 'model-a',
-          contextTiers: [{ id: 'long', label: 'Long', entitlement: 'unknown', maxPromptTokens: 922_000 }],
-        }],
-      },
-      observed: {
-        source: 'observed',
-        observedAt: '2026-01-05T00:00:00.000Z',
-        models: [{ modelId: 'model-a', structuredOutput: { state: 'unsupported', reason: 'parameter rejected' } }],
-      },
-      user: {
-        source: 'user',
-        observedAt: '2026-01-06T00:00:00.000Z',
-        models: [{
-          modelId: 'model-a',
-          defaultBudgetTokens: 128_000,
-          route: { baseUrl: 'https://forbidden.test' },
-        }],
-      },
-    }));
+    const [model] = mergeEffectiveCatalog(
+      request({
+        discovery: {
+          source: 'discovery',
+          observedAt: '2026-01-02T00:00:00.000Z',
+          models: [
+            {
+              modelId: 'model-a',
+              label: 'Discovered label',
+              contextTiers: [{ id: 'default', maxPromptTokens: 272_000 }],
+              visionInput: { state: 'supported' },
+            },
+          ],
+        },
+        overlay: {
+          source: 'overlay',
+          observedAt: '2026-01-03T00:00:00.000Z',
+          protocol: route.protocol,
+          models: [{ modelId: 'model-a', fixedTemperature: 1 }],
+        },
+        entitlement: {
+          source: 'entitlement',
+          observedAt: '2026-01-04T00:00:00.000Z',
+          models: [
+            {
+              modelId: 'model-a',
+              contextTiers: [{ id: 'long', label: 'Long', entitlement: 'unknown', maxPromptTokens: 922_000 }],
+            },
+          ],
+        },
+        observed: {
+          source: 'observed',
+          observedAt: '2026-01-05T00:00:00.000Z',
+          models: [{ modelId: 'model-a', structuredOutput: { state: 'unsupported', reason: 'parameter rejected' } }],
+        },
+        user: {
+          source: 'user',
+          observedAt: '2026-01-06T00:00:00.000Z',
+          models: [
+            {
+              modelId: 'model-a',
+              defaultBudgetTokens: 128_000,
+              route: { baseUrl: 'https://forbidden.test' },
+            },
+          ],
+        },
+      }),
+    );
 
     expect(model.label).toBe('Discovered label');
-    expect(model.contextTiers).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'default', maxPromptTokens: 272_000, entitlement: 'granted' }),
-      expect.objectContaining({ id: 'long', maxPromptTokens: 922_000, entitlement: 'unknown' }),
-    ]));
+    expect(model.contextTiers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'default', maxPromptTokens: 272_000, entitlement: 'granted' }),
+        expect.objectContaining({ id: 'long', maxPromptTokens: 922_000, entitlement: 'unknown' }),
+      ]),
+    );
     expect(model.defaultBudgetTokens).toBe(128_000);
     expect(model.route.baseUrl).toBe(route.baseUrl);
     expect(model.fixedTemperature).toBe(1);
     expect(model.toolCalling).toEqual({ state: 'supported' });
     expect(model.visionInput).toEqual({ state: 'supported' });
     expect(model.structuredOutput).toMatchObject({ state: 'unsupported' });
-    expect(model.provenance).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        field: 'label',
-        source: 'discovery',
-        value: 'Discovered label',
-        conflict: expect.stringContaining('Catalog label'),
-      }),
-      expect.objectContaining({ field: 'contextTiers.default.maxPromptTokens', source: 'discovery' }),
-      expect.objectContaining({ field: 'contextTiers.long.entitlement', source: 'entitlement' }),
-      expect.objectContaining({ field: 'structuredOutput.state', source: 'observed' }),
-      expect.objectContaining({ field: 'defaultBudgetTokens', source: 'user' }),
-    ]));
+    expect(model.provenance).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: 'label',
+          source: 'discovery',
+          value: 'Discovered label',
+          conflict: expect.stringContaining('Catalog label'),
+        }),
+        expect.objectContaining({ field: 'contextTiers.default.maxPromptTokens', source: 'discovery' }),
+        expect.objectContaining({ field: 'contextTiers.long.entitlement', source: 'entitlement' }),
+        expect.objectContaining({ field: 'structuredOutput.state', source: 'observed' }),
+        expect.objectContaining({ field: 'defaultBudgetTokens', source: 'user' }),
+      ]),
+    );
   });
 
   it('keeps a catalog-owned Max tier structural when billing reports a lower default threshold', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const [model] = mergeEffectiveCatalog(request({
-      catalog: {
-        ...request().catalog,
-        models: [{
-          ...request().catalog.models[0],
-          contextTiers: [{
-            id: 'default',
-            label: 'Max mode',
-            maxTotalTokens: 1_000_000,
-            activation: { kind: 'implicit' },
-            entitlement: 'granted',
-          }],
-          controls: {
-            fast: { state: 'unsupported', fixedValue: false },
-            maxContext: { state: 'fixed', fixedValue: true, tierId: 'default' },
-          },
-        }],
-      },
-      entitlement: {
-        source: 'entitlement',
-        observedAt: '2026-07-17T00:00:00.000Z',
-        models: [{
-          modelId: 'model-a',
-          contextTiers: [{
-            id: 'default',
-            maxPromptTokens: 200_000,
-            maxOutputTokens: 64_000,
-            maxTotalTokens: 264_000,
-          }],
-        }],
-      },
-    }));
+    const [model] = mergeEffectiveCatalog(
+      request({
+        catalog: {
+          ...request().catalog,
+          models: [
+            {
+              ...request().catalog.models[0],
+              contextTiers: [
+                {
+                  id: 'default',
+                  label: 'Max mode',
+                  maxTotalTokens: 1_000_000,
+                  activation: { kind: 'implicit' },
+                  entitlement: 'granted',
+                },
+              ],
+              controls: {
+                fast: { state: 'unsupported', fixedValue: false },
+                maxContext: { state: 'fixed', fixedValue: true, tierId: 'default' },
+              },
+            },
+          ],
+        },
+        entitlement: {
+          source: 'entitlement',
+          observedAt: '2026-07-17T00:00:00.000Z',
+          models: [
+            {
+              modelId: 'model-a',
+              contextTiers: [
+                {
+                  id: 'default',
+                  maxPromptTokens: 200_000,
+                  maxOutputTokens: 64_000,
+                  maxTotalTokens: 264_000,
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
 
     expect(model.availability).toBe('available');
     expect(model.contextTiers[0]).toMatchObject({
@@ -281,32 +339,36 @@ describe('EffectiveCatalogService', () => {
 
   it('projects field-level fact sources onto every affected leaf', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const [model] = mergeEffectiveCatalog(request({
-      catalog: {
-        source: 'catalog',
-        sourceKind: 'rdc-agent',
-        observedAt: '2026-07-15',
-        models: [{
-          modelId: 'model-a',
-          controls: {
-            fast: { state: 'selectable', defaultValue: true, entitlement: 'granted' },
-          },
-          factSource: {
-            sourceKind: 'rdc-agent',
-            sourceRevision: 'user-catalog',
-            observedAt: '2026-07-14',
-          },
-          fieldFactSources: {
-            'controls.fast': {
-              sourceKind: 'opencode',
-              sourceRevision: '571e7b852f82415faf65466e1536357a048bdf5a',
-              observedAt: '2026-07-15',
-              surface: 'model-control-panel',
+    const [model] = mergeEffectiveCatalog(
+      request({
+        catalog: {
+          source: 'catalog',
+          sourceKind: 'rdc-agent',
+          observedAt: '2026-07-15',
+          models: [
+            {
+              modelId: 'model-a',
+              controls: {
+                fast: { state: 'selectable', defaultValue: true, entitlement: 'granted' },
+              },
+              factSource: {
+                sourceKind: 'rdc-agent',
+                sourceRevision: 'user-catalog',
+                observedAt: '2026-07-14',
+              },
+              fieldFactSources: {
+                'controls.fast': {
+                  sourceKind: 'opencode',
+                  sourceRevision: '571e7b852f82415faf65466e1536357a048bdf5a',
+                  observedAt: '2026-07-15',
+                  surface: 'model-control-panel',
+                },
+              },
             },
-          },
-        }],
-      },
-    }));
+          ],
+        },
+      }),
+    );
 
     for (const field of ['controls.fast.state', 'controls.fast.defaultValue', 'controls.fast.entitlement']) {
       expect(model.provenance.filter((entry) => entry.field === field).at(-1), field).toMatchObject({
@@ -320,26 +382,35 @@ describe('EffectiveCatalogService', () => {
 
   it('projects an exact user route option without allowing provider-wide route mutation', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const [model] = mergeEffectiveCatalog(request({
-      catalog: {
-        ...request().catalog,
-        models: [{
-          ...request().catalog.models[0],
-          routeOptions: [{
-            id: 'openai', route, availability: 'available',
-          }, {
-            id: 'anthropic',
-            route: { protocol: 'AnthropicMessages', baseUrl: 'https://example.test/v1', source: 'catalog' },
-            availability: 'available',
-          }],
-        }],
-      },
-      user: {
-        source: 'user',
-        observedAt: '2026-01-06T00:00:00.000Z',
-        models: [{ modelId: 'model-a', preferredRouteOptionId: 'anthropic' }],
-      },
-    }));
+    const [model] = mergeEffectiveCatalog(
+      request({
+        catalog: {
+          ...request().catalog,
+          models: [
+            {
+              ...request().catalog.models[0],
+              routeOptions: [
+                {
+                  id: 'openai',
+                  route,
+                  availability: 'available',
+                },
+                {
+                  id: 'anthropic',
+                  route: { protocol: 'AnthropicMessages', baseUrl: 'https://example.test/v1', source: 'catalog' },
+                  availability: 'available',
+                },
+              ],
+            },
+          ],
+        },
+        user: {
+          source: 'user',
+          observedAt: '2026-01-06T00:00:00.000Z',
+          models: [{ modelId: 'model-a', preferredRouteOptionId: 'anthropic' }],
+        },
+      }),
+    );
 
     expect(model.preferredRouteOptionId).toBe('anthropic');
     expect(model.route.protocol).toBe('AnthropicMessages');
@@ -348,45 +419,57 @@ describe('EffectiveCatalogService', () => {
 
   it('replaces discriminated capability unions atomically across kinds', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const [model] = mergeEffectiveCatalog(request({
-      discovery: {
-        source: 'discovery',
-        observedAt: '2026-01-02T00:00:00.000Z',
-        models: [{
-          modelId: 'model-a',
-          controls: {
-            reasoning: {
-              kind: 'levels',
-              supportsOff: true,
-              levels: ['high', 'max'],
-              defaultSelection: 'high',
-              wireProfile: {
-                kind: 'anthropic',
-                on: 'high',
-                levels: { high: 'high', max: 'max' },
-                onMode: 'enabled',
-                offMode: 'disabled',
+    const [model] = mergeEffectiveCatalog(
+      request({
+        discovery: {
+          source: 'discovery',
+          observedAt: '2026-01-02T00:00:00.000Z',
+          models: [
+            {
+              modelId: 'model-a',
+              controls: {
+                reasoning: {
+                  kind: 'levels',
+                  supportsOff: true,
+                  levels: ['high', 'max'],
+                  defaultSelection: 'high',
+                  wireProfile: {
+                    kind: 'anthropic',
+                    on: 'high',
+                    levels: { high: 'high', max: 'max' },
+                    onMode: 'enabled',
+                    offMode: 'disabled',
+                  },
+                },
+                fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
               },
+              executionBindings: [
+                {
+                  id: 'fast:priority',
+                  when: { fast: true },
+                  actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
+                  entitlement: 'granted',
+                },
+              ],
+              contextTiers: [
+                {
+                  id: 'default',
+                  activation: { kind: 'header', headers: { 'x-context': 'large' } },
+                },
+              ],
             },
-            fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
-          },
-          executionBindings: [{
-            id: 'fast:priority', when: { fast: true },
-            actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }], entitlement: 'granted',
-          }],
-          contextTiers: [{
-            id: 'default',
-            activation: { kind: 'header', headers: { 'x-context': 'large' } },
-          }],
-        }],
-      },
-    }));
+          ],
+        },
+      }),
+    );
 
-    expect(model.controls.reasoning).toEqual(expect.objectContaining({
-      kind: 'levels',
-      levels: ['high', 'max'],
-      defaultSelection: 'high',
-    }));
+    expect(model.controls.reasoning).toEqual(
+      expect.objectContaining({
+        kind: 'levels',
+        levels: ['high', 'max'],
+        defaultSelection: 'high',
+      }),
+    );
     expect(model.controls.reasoning).not.toHaveProperty('lockedSelection');
     expect(model.controls.reasoning.wireProfile).toEqual(expect.objectContaining({ kind: 'anthropic' }));
     expect(model.controls.fast).toEqual({ state: 'selectable', defaultValue: false, entitlement: 'granted' });
@@ -399,60 +482,72 @@ describe('EffectiveCatalogService', () => {
 
   it('applies exact overlays only to admitted Catalog or live-discovered model ids', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const [model] = mergeEffectiveCatalog(request({
-      discovery: {
-        source: 'discovery',
-        observedAt: '2026-01-02T00:00:00.000Z',
-        models: [{ modelId: 'model-a', label: 'Live model' }],
-      },
-      overlay: {
-        source: 'overlay',
-        observedAt: '2026-01-03T00:00:00.000Z',
-        models: [
-          { modelId: 'model-a', fixedTemperature: 0.25 },
-          { modelId: 'model-not-live', label: 'Must not be created', fixedTemperature: 1 },
-        ],
-      },
-    }));
+    const [model] = mergeEffectiveCatalog(
+      request({
+        discovery: {
+          source: 'discovery',
+          observedAt: '2026-01-02T00:00:00.000Z',
+          models: [{ modelId: 'model-a', label: 'Live model' }],
+        },
+        overlay: {
+          source: 'overlay',
+          observedAt: '2026-01-03T00:00:00.000Z',
+          models: [
+            { modelId: 'model-a', fixedTemperature: 0.25 },
+            { modelId: 'model-not-live', label: 'Must not be created', fixedTemperature: 1 },
+          ],
+        },
+      }),
+    );
     expect(model.fixedTemperature).toBe(0.25);
-    expect(mergeEffectiveCatalog(request({
-      overlay: {
-        source: 'overlay',
-        observedAt: '2026-01-03T00:00:00.000Z',
-        models: [{ modelId: 'model-a', fixedTemperature: 0.5 }],
-      },
-    }))[0]?.fixedTemperature).toBe(0.5);
-    expect(mergeEffectiveCatalog(request({
-      overlay: {
-        source: 'overlay',
-        observedAt: '2026-01-03T00:00:00.000Z',
-        models: [{ modelId: 'model-not-live', fixedTemperature: 1 }],
-      },
-    })).map((entry) => entry.modelId)).toEqual(['model-a']);
+    expect(
+      mergeEffectiveCatalog(
+        request({
+          overlay: {
+            source: 'overlay',
+            observedAt: '2026-01-03T00:00:00.000Z',
+            models: [{ modelId: 'model-a', fixedTemperature: 0.5 }],
+          },
+        }),
+      )[0]?.fixedTemperature,
+    ).toBe(0.5);
+    expect(
+      mergeEffectiveCatalog(
+        request({
+          overlay: {
+            source: 'overlay',
+            observedAt: '2026-01-03T00:00:00.000Z',
+            models: [{ modelId: 'model-not-live', fixedTemperature: 1 }],
+          },
+        }),
+      ).map((entry) => entry.modelId),
+    ).toEqual(['model-a']);
   });
 
   it('does not let persisted app-managed preferences create models absent from the live catalog', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const models = mergeEffectiveCatalog(request({
-      catalog: {
-        source: 'catalog',
-        observedAt: '2026-01-01T00:00:00.000Z',
-        models: [],
-      },
-      discovery: {
-        source: 'discovery',
-        observedAt: '2026-01-02T00:00:00.000Z',
-        models: [{ modelId: 'live-model', label: 'Live model', availability: 'available' }],
-      },
-      user: {
-        source: 'user',
-        observedAt: '2026-01-03T00:00:00.000Z',
-        models: [
-          { modelId: 'live-model', defaultBudgetTokens: 128_000 },
-          { modelId: 'claude-not-returned', defaultBudgetTokens: 256_000 },
-        ],
-      },
-    }));
+    const models = mergeEffectiveCatalog(
+      request({
+        catalog: {
+          source: 'catalog',
+          observedAt: '2026-01-01T00:00:00.000Z',
+          models: [],
+        },
+        discovery: {
+          source: 'discovery',
+          observedAt: '2026-01-02T00:00:00.000Z',
+          models: [{ modelId: 'live-model', label: 'Live model', availability: 'available' }],
+        },
+        user: {
+          source: 'user',
+          observedAt: '2026-01-03T00:00:00.000Z',
+          models: [
+            { modelId: 'live-model', defaultBudgetTokens: 128_000 },
+            { modelId: 'claude-not-returned', defaultBudgetTokens: 256_000 },
+          ],
+        },
+      }),
+    );
 
     expect(models).toHaveLength(1);
     expect(models[0]).toMatchObject({ modelId: 'live-model', defaultBudgetTokens: 128_000 });
@@ -461,40 +556,43 @@ describe('EffectiveCatalogService', () => {
   it('removes historical media-output entries from discovery and persisted catalog state', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
-    const cleanModels = mergeEffectiveCatalog(request({
-      catalog: { source: 'catalog', observedAt: '2026-01-01T00:00:00.000Z', models: [] },
-      discovery: {
-        source: 'discovery',
-        observedAt: '2026-01-02T00:00:00.000Z',
-        models: [
-          { modelId: 'grok-4.5', availability: 'available' },
-          { modelId: 'grok-imagine-video-1.5', availability: 'available' },
-        ],
-      },
-      user: {
-        source: 'user',
-        observedAt: '2026-01-03T00:00:00.000Z',
-        models: [{ modelId: 'grok-imagine-video-1.5', enabled: true }],
-      },
-    }));
-    expect(cleanModels.map((model) => model.modelId)).toEqual(['grok-4.5']);
-
-    fs.mkdirSync(path.dirname(statePath), { recursive: true });
-    fs.writeFileSync(statePath, JSON.stringify({
-      schemaVersion: 4,
-      discoveries: {
-        historical: {
+    const cleanModels = mergeEffectiveCatalog(
+      request({
+        catalog: { source: 'catalog', observedAt: '2026-01-01T00:00:00.000Z', models: [] },
+        discovery: {
           source: 'discovery',
           observedAt: '2026-01-02T00:00:00.000Z',
           models: [
-            { modelId: 'grok-4.5' },
-            { modelId: 'grok-imagine-video' },
+            { modelId: 'grok-4.5', availability: 'available' },
+            { modelId: 'grok-imagine-video-1.5', availability: 'available' },
           ],
         },
-      },
-      entitlements: {},
-      observed: {},
-    }), 'utf8');
+        user: {
+          source: 'user',
+          observedAt: '2026-01-03T00:00:00.000Z',
+          models: [{ modelId: 'grok-imagine-video-1.5', enabled: true }],
+        },
+      }),
+    );
+    expect(cleanModels.map((model) => model.modelId)).toEqual(['grok-4.5']);
+
+    fs.mkdirSync(path.dirname(statePath), { recursive: true });
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify({
+        schemaVersion: 4,
+        discoveries: {
+          historical: {
+            source: 'discovery',
+            observedAt: '2026-01-02T00:00:00.000Z',
+            models: [{ modelId: 'grok-4.5' }, { modelId: 'grok-imagine-video' }],
+          },
+        },
+        entitlements: {},
+        observed: {},
+      }),
+      'utf8',
+    );
     new EffectiveCatalogService({ statePath });
     const persisted = JSON.parse(fs.readFileSync(statePath, 'utf8')) as {
       schemaVersion: number;
@@ -504,30 +602,61 @@ describe('EffectiveCatalogService', () => {
     expect(persisted.discoveries).toEqual({});
   });
 
+  it('starts a damaged catalog state empty, rewrites it and keeps the damaged bytes beside it', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const damagedPath = path.join(root, 'damaged', 'catalog-v4.json');
+    fs.mkdirSync(path.dirname(damagedPath), { recursive: true });
+    const damaged = JSON.stringify({
+      schemaVersion: 9,
+      discoveries: {
+        broken: { source: 'discovery', observedAt: '2026-01-02T00:00:00.000Z', models: [{ label: 'no id' }] },
+      },
+      entitlements: {},
+      observed: {},
+    });
+    fs.writeFileSync(damagedPath, damaged, 'utf8');
+    new EffectiveCatalogService({ statePath: damagedPath });
+    expect(JSON.parse(fs.readFileSync(damagedPath, 'utf8'))).toEqual({
+      schemaVersion: 9,
+      discoveries: {},
+      entitlements: {},
+      observed: {},
+    });
+    const kept = fs.readdirSync(path.dirname(damagedPath)).filter((name) => name.includes('.corrupt-'));
+    expect(kept).toHaveLength(1);
+    expect(fs.readFileSync(path.join(path.dirname(damagedPath), kept[0]!), 'utf8')).toBe(damaged);
+  });
+
   it('keeps compiled positive budgets when a context-less discovery row reports zero', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const [model] = mergeEffectiveCatalog(request({
-      catalog: {
-        source: 'catalog',
-        observedAt: '2026-01-01T00:00:00.000Z',
-        models: [{
-          modelId: 'minimax-m3',
-          label: 'MiniMax M3',
-          availability: 'unknown',
-          defaultBudgetTokens: 256_000,
-        }],
-      },
-      discovery: {
-        source: 'discovery',
-        observedAt: '2026-01-02T00:00:00.000Z',
-        models: [{
-          modelId: 'minimax-m3',
-          label: 'MiniMax M3',
-          availability: 'available',
-          defaultBudgetTokens: 0,
-        }],
-      },
-    }));
+    const [model] = mergeEffectiveCatalog(
+      request({
+        catalog: {
+          source: 'catalog',
+          observedAt: '2026-01-01T00:00:00.000Z',
+          models: [
+            {
+              modelId: 'minimax-m3',
+              label: 'MiniMax M3',
+              availability: 'unknown',
+              defaultBudgetTokens: 256_000,
+            },
+          ],
+        },
+        discovery: {
+          source: 'discovery',
+          observedAt: '2026-01-02T00:00:00.000Z',
+          models: [
+            {
+              modelId: 'minimax-m3',
+              label: 'MiniMax M3',
+              availability: 'available',
+              defaultBudgetTokens: 0,
+            },
+          ],
+        },
+      }),
+    );
     expect(model).toMatchObject({
       modelId: 'minimax-m3',
       availability: 'available',
@@ -537,24 +666,28 @@ describe('EffectiveCatalogService', () => {
 
   it('rekeys punctuation-equivalent live ids while preserving the Catalog id as a proven alias', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const [model] = mergeEffectiveCatalog(request({
-      catalog: {
-        source: 'catalog',
-        observedAt: '2026-01-01T00:00:00.000Z',
-        models: [{
-          modelId: 'claude-opus-4-8',
-          label: 'Seed Opus',
-          availability: 'available',
-          defaultBudgetTokens: 200_000,
-          controls: { fast: { state: 'unsupported', fixedValue: false } },
-        }],
-      },
-      discovery: {
-        source: 'discovery',
-        observedAt: '2026-01-02T00:00:00.000Z',
-        models: [{ modelId: 'claude-opus-4.8', label: 'Live Opus', availability: 'available' }],
-      },
-    }));
+    const [model] = mergeEffectiveCatalog(
+      request({
+        catalog: {
+          source: 'catalog',
+          observedAt: '2026-01-01T00:00:00.000Z',
+          models: [
+            {
+              modelId: 'claude-opus-4-8',
+              label: 'Seed Opus',
+              availability: 'available',
+              defaultBudgetTokens: 200_000,
+              controls: { fast: { state: 'unsupported', fixedValue: false } },
+            },
+          ],
+        },
+        discovery: {
+          source: 'discovery',
+          observedAt: '2026-01-02T00:00:00.000Z',
+          models: [{ modelId: 'claude-opus-4.8', label: 'Live Opus', availability: 'available' }],
+        },
+      }),
+    );
 
     expect(model).toMatchObject({
       modelId: 'claude-opus-4.8',
@@ -568,31 +701,35 @@ describe('EffectiveCatalogService', () => {
 
   it('lets live evidence narrow but never promote a manifest-level explicit denial', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const [model] = mergeEffectiveCatalog(request({
-      catalog: {
-        source: 'catalog',
-        observedAt: '2026-07-14',
-        models: [{
-          modelId: 'kimi-k2.7-code',
-          availability: 'unavailable',
-          unavailableReason: 'Unavailable in the user-observed control panel.',
-          factSource: {
-            sourceKind: 'rdc-agent',
-            sourceRevision: 'user-catalog-2026-07-14',
-            observedAt: '2026-07-14',
-            refreshedAt: '2026-07-15T13:04:00+08:00',
-            surface: 'volcengine-coding-plan',
-            accountScope: 'observed-account',
-          },
-        }],
-      },
-      discovery: {
-        source: 'discovery',
-        sourceKind: 'live-catalog',
-        observedAt: '2026-07-15T00:00:00.000Z',
-        models: [{ modelId: 'kimi-k2.7-code', availability: 'available', label: 'Live Kimi' }],
-      },
-    }));
+    const [model] = mergeEffectiveCatalog(
+      request({
+        catalog: {
+          source: 'catalog',
+          observedAt: '2026-07-14',
+          models: [
+            {
+              modelId: 'kimi-k2.7-code',
+              availability: 'unavailable',
+              unavailableReason: 'Unavailable in the user-observed control panel.',
+              factSource: {
+                sourceKind: 'rdc-agent',
+                sourceRevision: 'user-catalog-2026-07-14',
+                observedAt: '2026-07-14',
+                refreshedAt: '2026-07-15T13:04:00+08:00',
+                surface: 'volcengine-coding-plan',
+                accountScope: 'observed-account',
+              },
+            },
+          ],
+        },
+        discovery: {
+          source: 'discovery',
+          sourceKind: 'live-catalog',
+          observedAt: '2026-07-15T00:00:00.000Z',
+          models: [{ modelId: 'kimi-k2.7-code', availability: 'available', label: 'Live Kimi' }],
+        },
+      }),
+    );
 
     expect(model).toMatchObject({
       label: 'Live Kimi',
@@ -626,7 +763,13 @@ describe('EffectiveCatalogService', () => {
         overrides[field] = {
           source,
           observedAt: `2026-02-0${index + 1}T00:00:00.000Z`,
-          models: [{ modelId: 'model-a', label: `${source}-${mask}`, ...(source === 'user' ? { defaultBudgetTokens: 64_000 + mask } : {}) }],
+          models: [
+            {
+              modelId: 'model-a',
+              label: `${source}-${mask}`,
+              ...(source === 'user' ? { defaultBudgetTokens: 64_000 + mask } : {}),
+            },
+          ],
         } as never;
         if (source !== 'user') {
           expectedLabel = `${source}-${mask}`;
@@ -641,7 +784,9 @@ describe('EffectiveCatalogService', () => {
       expect(model.route.baseUrl, `mask=${mask}`).toBe(route.baseUrl);
       if ((mask & (1 << 4)) !== 0) {
         expect(model.defaultBudgetTokens, `mask=${mask}`).toBe(64_000 + mask);
-        expect(model.provenance).toContainEqual(expect.objectContaining({ field: 'defaultBudgetTokens', source: 'user' }));
+        expect(model.provenance).toContainEqual(
+          expect.objectContaining({ field: 'defaultBudgetTokens', source: 'user' }),
+        );
       }
     }
   });
@@ -649,63 +794,75 @@ describe('EffectiveCatalogService', () => {
   it('does not let app-managed user overlays grant toolCalling support', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const catalog = request().catalog!;
-    const [model] = mergeEffectiveCatalog(request({
-      catalog: {
-        ...catalog,
-        models: [{
-          ...catalog.models[0],
-          toolCalling: { state: 'unknown' },
-        }],
-      },
-      user: {
-        source: 'user',
-        observedAt: '2026-01-06T00:00:00.000Z',
-        models: [{ modelId: 'model-a', toolCalling: { state: 'supported' } }],
-      },
-    }));
+    const [model] = mergeEffectiveCatalog(
+      request({
+        catalog: {
+          ...catalog,
+          models: [
+            {
+              ...catalog.models[0],
+              toolCalling: { state: 'unknown' },
+            },
+          ],
+        },
+        user: {
+          source: 'user',
+          observedAt: '2026-01-06T00:00:00.000Z',
+          models: [{ modelId: 'model-a', toolCalling: { state: 'supported' } }],
+        },
+      }),
+    );
     expect(model.toolCalling).toEqual({ state: 'unknown' });
   });
 
   it('keeps discovery candidates without a tool-calling conclusion unknown', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const [model] = mergeEffectiveCatalog(request({
-      catalog: {
-        source: 'catalog',
-        observedAt: '2026-01-01T00:00:00.000Z',
-        models: [],
-      },
-      discovery: {
-        source: 'discovery',
-        observedAt: '2026-01-02T00:00:00.000Z',
-        models: [{
-          modelId: 'discovery-candidate',
-          label: 'Discovery candidate',
-          availability: 'available',
-          defaultBudgetTokens: 128_000,
-          contextTiers: [{
-            id: 'default',
-            label: 'Default',
-            maxPromptTokens: 128_000,
-            activation: { kind: 'implicit' },
-            entitlement: 'granted',
-          }],
-        }],
-      },
-    }));
+    const [model] = mergeEffectiveCatalog(
+      request({
+        catalog: {
+          source: 'catalog',
+          observedAt: '2026-01-01T00:00:00.000Z',
+          models: [],
+        },
+        discovery: {
+          source: 'discovery',
+          observedAt: '2026-01-02T00:00:00.000Z',
+          models: [
+            {
+              modelId: 'discovery-candidate',
+              label: 'Discovery candidate',
+              availability: 'available',
+              defaultBudgetTokens: 128_000,
+              contextTiers: [
+                {
+                  id: 'default',
+                  label: 'Default',
+                  maxPromptTokens: 128_000,
+                  activation: { kind: 'implicit' },
+                  entitlement: 'granted',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
     expect(model.toolCalling).toEqual({ state: 'unknown' });
     expect(model.availability).toBe('available');
   });
 
   it('allows full user-managed overrides', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
-    const [model] = mergeEffectiveCatalog(request({
-      catalogOwnership: 'user-managed',
-      user: {
-        source: 'user',
-        observedAt: '2026-01-06T00:00:00.000Z',
-        models: [{ modelId: 'model-a', route: { baseUrl: 'https://custom.test/v1' } }],
-      },
-    }));
+    const [model] = mergeEffectiveCatalog(
+      request({
+        catalogOwnership: 'user-managed',
+        user: {
+          source: 'user',
+          observedAt: '2026-01-06T00:00:00.000Z',
+          models: [{ modelId: 'model-a', route: { baseUrl: 'https://custom.test/v1' } }],
+        },
+      }),
+    );
     expect(model.route.baseUrl).toBe('https://custom.test/v1');
   });
 
@@ -760,10 +917,12 @@ describe('EffectiveCatalogService', () => {
     const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00.000Z') });
     const original = request();
     await service.refreshDiscovery(original, async () => ({
-      models: [{
-        modelId: 'model-a',
-        controls: { fast: { state: 'unsupported', fixedValue: false } },
-      }],
+      models: [
+        {
+          modelId: 'model-a',
+          controls: { fast: { state: 'unsupported', fixedValue: false } },
+        },
+      ],
     }));
     const persisted = JSON.parse(fs.readFileSync(statePath, 'utf8')) as {
       discoveries: Record<string, { catalogProjectionRevision?: string }>;
@@ -775,26 +934,33 @@ describe('EffectiveCatalogService', () => {
     const updated = request({
       catalog: {
         ...original.catalog,
-        models: [{
-          ...original.catalog.models[0],
-          controls: {
-            ...original.catalog.models[0].controls,
-            fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
+        models: [
+          {
+            ...original.catalog.models[0],
+            controls: {
+              ...original.catalog.models[0].controls,
+              fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
+            },
           },
-        }],
+        ],
       },
     });
     let refreshCount = 0;
     const loader: DiscoveryLoader = async () => {
       refreshCount += 1;
       return {
-        models: [{
-          modelId: 'model-a',
-          controls: { fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' } },
-        }],
+        models: [
+          {
+            modelId: 'model-a',
+            controls: { fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' } },
+          },
+        ],
       };
     };
-    const restartedService = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00.000Z') });
+    const restartedService = new EffectiveCatalogService({
+      statePath,
+      now: () => new Date('2026-01-01T00:00:00.000Z'),
+    });
     restartedService.setDiscoveryLoaderResolver(() => loader);
 
     const refreshed = restartedService.getSnapshot(updated);
@@ -836,8 +1002,12 @@ describe('EffectiveCatalogService', () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00.000Z') });
     await service.refreshDiscovery(request(), async () => ({ models: [{ modelId: 'model-a', label: 'Account A' }] }));
-    await service.refreshDiscovery(request({ accountId: 'account-b' }), async () => ({ models: [{ modelId: 'model-a', label: 'Account B' }] }));
-    await service.refreshDiscovery(request(), async () => { throw new Error('offline'); });
+    await service.refreshDiscovery(request({ accountId: 'account-b' }), async () => ({
+      models: [{ modelId: 'model-a', label: 'Account B' }],
+    }));
+    await service.refreshDiscovery(request(), async () => {
+      throw new Error('offline');
+    });
 
     const accountA = service.getSnapshot(request());
     const accountB = service.getSnapshot(request({ accountId: 'account-b' }));
@@ -850,27 +1020,33 @@ describe('EffectiveCatalogService', () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00.000Z') });
     await service.refreshDiscovery(request(), async () => ({
-      models: [{
-        modelId: 'model-a',
-        contextTiers: [{ id: 'default', entitlement: 'unknown' }],
-      }],
+      models: [
+        {
+          modelId: 'model-a',
+          contextTiers: [{ id: 'default', entitlement: 'unknown' }],
+        },
+      ],
       entitlement: {
         detail: 'Account plan entitlement',
-        models: [{
-          modelId: 'model-a',
-          contextTiers: [{ id: 'default', label: 'Plan', entitlement: 'granted' }],
-        }],
+        models: [
+          {
+            modelId: 'model-a',
+            contextTiers: [{ id: 'default', label: 'Plan', entitlement: 'granted' }],
+          },
+        ],
       },
     }));
 
     const reloaded = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:01.000Z') });
     const accountA = reloaded.getSnapshot(request()).models[0];
     expect(accountA.contextTiers[0]).toMatchObject({ label: 'Plan', entitlement: 'granted' });
-    expect(accountA.provenance).toContainEqual(expect.objectContaining({
-      field: 'contextTiers.default.entitlement',
-      source: 'entitlement',
-      detail: 'Account plan entitlement',
-    }));
+    expect(accountA.provenance).toContainEqual(
+      expect.objectContaining({
+        field: 'contextTiers.default.entitlement',
+        source: 'entitlement',
+        detail: 'Account plan entitlement',
+      }),
+    );
     const accountB = reloaded.getSnapshot(request({ accountId: 'account-b' })).models[0];
     expect(accountB.contextTiers[0].label).toBe('Default');
     expect(accountB.provenance).not.toContainEqual(expect.objectContaining({ source: 'entitlement' }));
@@ -883,8 +1059,9 @@ describe('EffectiveCatalogService', () => {
     }));
     const replaced = reloaded.getSnapshot(request()).models[0];
     expect(replaced.contextTiers[0].label).toBe('Default');
-    expect(replaced.provenance.filter((entry) => entry.field === 'contextTiers.default.entitlement').at(-1)?.source)
-      .toBe('discovery');
+    expect(
+      replaced.provenance.filter((entry) => entry.field === 'contextTiers.default.entitlement').at(-1)?.source,
+    ).toBe('discovery');
 
     reloaded.invalidateDiscovery({ providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol });
     expect(reloaded.getSnapshot(request()).models[0].contextTiers[0].label).toBe('Default');
@@ -902,11 +1079,13 @@ describe('EffectiveCatalogService', () => {
     const reloaded = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-03T00:00:00.000Z') });
     const [model] = reloaded.getSnapshot(request()).models;
     expect(model.toolCalling).toMatchObject({ state: 'unsupported', reason: 'rejected' });
-    expect(model.provenance).toContainEqual(expect.objectContaining({
-      field: 'toolCalling.state',
-      source: 'observed',
-      detail: 'real request',
-    }));
+    expect(model.provenance).toContainEqual(
+      expect.objectContaining({
+        field: 'toolCalling.state',
+        source: 'observed',
+        detail: 'real request',
+      }),
+    );
   });
 
   it('writes observed provenance even when catalog already marks toolCalling supported', async () => {
@@ -921,11 +1100,13 @@ describe('EffectiveCatalogService', () => {
     );
     const [model] = service.getSnapshot(request()).models;
     expect(model.toolCalling).toEqual({ state: 'supported' });
-    expect(model.provenance).toContainEqual(expect.objectContaining({
-      field: 'toolCalling.state',
-      source: 'observed',
-      detail: 'Structured tool call completed through the active provider adapter.',
-    }));
+    expect(model.provenance).toContainEqual(
+      expect.objectContaining({
+        field: 'toolCalling.state',
+        source: 'observed',
+        detail: 'Structured tool call completed through the active provider adapter.',
+      }),
+    );
   });
 
   it('uses the latest matching observed evidence and never leaks protocol-specific evidence', async () => {
@@ -948,17 +1129,22 @@ describe('EffectiveCatalogService', () => {
 
     const matching = service.getSnapshot(request()).models[0];
     expect(matching.toolCalling).toEqual({ state: 'unsupported', reason: 'latest rejection' });
-    expect(matching.provenance.filter((entry) => entry.field === 'toolCalling.state').at(-1))
-      .toMatchObject({ source: 'observed', detail: 'latest result' });
-    expect(service.getSnapshot(request({
-      protocol: 'AnthropicMessages',
-      fallbackRoute: {
-        protocol: 'AnthropicMessages',
-        baseUrl: 'https://example.test/messages',
-        source: 'catalog',
-      },
-    })).models[0].toolCalling)
-      .toEqual({ state: 'supported' });
+    expect(matching.provenance.filter((entry) => entry.field === 'toolCalling.state').at(-1)).toMatchObject({
+      source: 'observed',
+      detail: 'latest result',
+    });
+    expect(
+      service.getSnapshot(
+        request({
+          protocol: 'AnthropicMessages',
+          fallbackRoute: {
+            protocol: 'AnthropicMessages',
+            baseUrl: 'https://example.test/messages',
+            source: 'catalog',
+          },
+        }),
+      ).models[0].toolCalling,
+    ).toEqual({ state: 'supported' });
   });
 
   it('projects route-protocol evidence into the provider catalog snapshot and broadcasts it', async () => {
@@ -969,27 +1155,30 @@ describe('EffectiveCatalogService', () => {
       catalog: {
         source: 'catalog',
         observedAt: '2026-01-01T00:00:00.000Z',
-        models: [{
-          modelId: 'model-chat',
-          label: 'Chat-routed model',
-          availability: 'available',
-          route: {
-            protocol: 'OpenAICompatibleChatCompletions',
-            baseUrl: 'https://example.test/v1',
-            source: 'model',
+        models: [
+          {
+            modelId: 'model-chat',
+            label: 'Chat-routed model',
+            availability: 'available',
+            route: {
+              protocol: 'OpenAICompatibleChatCompletions',
+              baseUrl: 'https://example.test/v1',
+              source: 'model',
+            },
+            toolCalling: { state: 'unknown' },
           },
-          toolCalling: { state: 'unknown' },
-        }, {
-          modelId: 'model-responses',
-          label: 'Responses-routed model',
-          availability: 'available',
-          route: {
-            protocol: 'OpenAIResponses',
-            baseUrl: 'https://example.test/v1/responses',
-            source: 'model',
+          {
+            modelId: 'model-responses',
+            label: 'Responses-routed model',
+            availability: 'available',
+            route: {
+              protocol: 'OpenAIResponses',
+              baseUrl: 'https://example.test/v1/responses',
+              source: 'model',
+            },
+            toolCalling: { state: 'unknown' },
           },
-          toolCalling: { state: 'unknown' },
-        }],
+        ],
       },
     });
     const snapshots: Array<ReturnType<typeof service.getSnapshot>> = [];
@@ -1009,17 +1198,18 @@ describe('EffectiveCatalogService', () => {
 
     const latest = snapshots.at(-1);
     expect(latest?.protocol).toBe('OpenAIResponses');
-    expect(latest?.models.find((model) => model.modelId === 'model-chat')?.toolCalling)
-      .toEqual({ state: 'supported' });
-    expect(latest?.models.find((model) => model.modelId === 'model-responses')?.toolCalling)
-      .toEqual({ state: 'unknown' });
-    expect(latest?.models.find((model) => model.modelId === 'model-chat')?.provenance)
-      .toContainEqual(expect.objectContaining({
+    expect(latest?.models.find((model) => model.modelId === 'model-chat')?.toolCalling).toEqual({ state: 'supported' });
+    expect(latest?.models.find((model) => model.modelId === 'model-responses')?.toolCalling).toEqual({
+      state: 'unknown',
+    });
+    expect(latest?.models.find((model) => model.modelId === 'model-chat')?.provenance).toContainEqual(
+      expect.objectContaining({
         field: 'toolCalling.state',
         source: 'observed',
         protocol: 'OpenAICompatibleChatCompletions',
         detail: 'structured adapter event',
-      }));
+      }),
+    );
   });
 
   it('publishes observed and quota changes to the latest account/protocol snapshot', async () => {
@@ -1051,7 +1241,9 @@ describe('EffectiveCatalogService', () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const service = new EffectiveCatalogService({ statePath });
     await service.refreshDiscovery(request(), async () => ({ models: [{ modelId: 'model-a', label: 'Chat route' }] }));
-    await service.refreshDiscovery(request({ protocol: 'AnthropicMessages' }), async () => ({ models: [{ modelId: 'model-a', label: 'Messages route' }] }));
+    await service.refreshDiscovery(request({ protocol: 'AnthropicMessages' }), async () => ({
+      models: [{ modelId: 'model-a', label: 'Messages route' }],
+    }));
 
     service.invalidateDiscovery({ providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol });
 
@@ -1098,22 +1290,26 @@ describe('EffectiveCatalogService', () => {
     service.recordObserved(
       scope,
       'capability-probe:model-a:fast',
-      [{ modelId: 'model-a', controls: { fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' } } }],
+      [
+        {
+          modelId: 'model-a',
+          controls: { fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' } },
+        },
+      ],
       'granted',
       60_000,
     );
     const replaced = service.getSnapshot(request()).models[0];
     expect(replaced.controls.fast).toMatchObject({ entitlement: 'granted' });
-    expect(replaced.provenance.filter((entry) => entry.field === 'controls.fast.entitlement' && entry.source === 'observed'))
-      .toHaveLength(1);
+    expect(
+      replaced.provenance.filter((entry) => entry.field === 'controls.fast.entitlement' && entry.source === 'observed'),
+    ).toHaveLength(1);
 
     nowMs += 61_000;
     const expired = service.getSnapshot(request()).models[0];
     expect(expired.controls.fast).toEqual({ state: 'unsupported', fixedValue: false });
     expect(
-      expired.provenance.some(
-        (entry) => entry.field === 'controls.fast.entitlement' && entry.source === 'observed',
-      ),
+      expired.provenance.some((entry) => entry.field === 'controls.fast.entitlement' && entry.source === 'observed'),
     ).toBe(false);
   });
 
@@ -1121,7 +1317,9 @@ describe('EffectiveCatalogService', () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     let nowMs = Date.parse('2026-01-01T00:00:00.000Z');
     const service = new EffectiveCatalogService({ statePath, now: () => new Date(nowMs), discoveryTtlMs: 1000 });
-    const failingLoader = vi.fn(async () => { throw new Error('offline'); });
+    const failingLoader = vi.fn(async () => {
+      throw new Error('offline');
+    });
     service.setDiscoveryLoaderResolver(() => failingLoader);
 
     await service.refreshDiscovery(request(), failingLoader);
@@ -1150,7 +1348,9 @@ describe('EffectiveCatalogService', () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     let nowMs = Date.parse('2026-01-01T00:00:00.000Z');
     const service = new EffectiveCatalogService({ statePath, now: () => new Date(nowMs), discoveryTtlMs: 1000 });
-    const failingLoader = vi.fn(async () => { throw new Error('offline'); });
+    const failingLoader = vi.fn(async () => {
+      throw new Error('offline');
+    });
 
     await service.refreshDiscovery(request(), failingLoader);
     expect(failingLoader).toHaveBeenCalledTimes(1);

@@ -12,12 +12,15 @@
   min-width: 44.25rem; /* APP_MIN_WINDOW_WIDTH — left min + composer floor + handle */
   min-height: 0;
   overflow: hidden;
-  transition: grid-template-columns var(--duration-slow) var(--ease-emphasized);
   background: var(--token-bg-app);
 }
 
+/* Only a person's collapse or expand animates the columns; a restored or newly selected layout appears in place. */
+.app-body.is-animating-columns {
+  transition: grid-template-columns var(--duration-slow) var(--ease-emphasized);
+}
+
 .app-body.is-resizing {
-  transition: none;
   cursor: col-resize;
   user-select: none;
 }
@@ -36,7 +39,9 @@
   background: var(--token-bg-shell);
   overflow: hidden;
   border-right: 1px solid var(--token-border-card);
-  transition: background var(--transition-base), border-color var(--transition-base);
+  transition:
+    background var(--transition-base),
+    border-color var(--transition-base);
 }
 
 .app-logo {
@@ -60,7 +65,7 @@
   font-size: var(--type-title-size);
   font-weight: var(--font-semibold);
   color: var(--token-text-primary);
-  letter-spacing: -0.03em;
+  letter-spacing: var(--tracking-tight);
 }
 
 .app-sidebar-left.collapsed,
@@ -100,12 +105,6 @@
   overflow: hidden;
   /* Flat shell fill — empty-state breath lives only on .empty-workbench-prompt. */
   background: var(--token-bg-app);
-}
-
-.main-title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
 }
 
 .main-content {
@@ -230,31 +229,6 @@
   border-top-color: transparent;
 }
 
-.input-bar-placeholder {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--token-border-default);
-  border-radius: var(--radius-lg);
-  background: var(--token-bg-panel);
-}
-
-.mode-badge {
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-md);
-  background: var(--token-accent-primary);
-  color: var(--token-text-on-accent);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-semibold);
-}
-
-.input-placeholder {
-  flex: 1;
-  color: var(--token-text-disabled);
-  font-size: var(--type-body-size);
-}
-
 .app-sidebar-right {
   display: flex;
   flex-direction: column;
@@ -264,7 +238,9 @@
   background: var(--token-bg-shell);
   overflow: hidden;
   border-left: 1px solid var(--token-border-card);
-  transition: background var(--transition-base), border-color var(--transition-base);
+  transition:
+    background var(--transition-base),
+    border-color var(--transition-base);
 }
 
 .shell-panel-toggle {
@@ -277,7 +253,10 @@
   background: color-mix(in srgb, var(--token-bg-panel) 92%, transparent);
   color: var(--token-text-primary);
   cursor: pointer;
-  transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .shell-panel-toggle:hover,
@@ -323,7 +302,9 @@
   overscroll-behavior: contain;
   opacity: 1;
   transform: translateX(0);
-  transition: opacity var(--transition-base), transform var(--transition-base);
+  transition:
+    opacity var(--transition-base),
+    transform var(--transition-base);
 }
 
 .right-panel-body.collapsed {

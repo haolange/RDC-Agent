@@ -7,10 +7,7 @@ declare module 'pdfjs-dist/legacy/build/pdf.mjs' {
     name: 'PasswordException';
   }
 
-  export function getDocument(src: {
-    data: Uint8Array;
-    verbosity?: number;
-  }): {
+  export function getDocument(src: { data: Uint8Array; verbosity?: number }): {
     promise: Promise<{
       numPages: number;
       getPage: (index: number) => Promise<{

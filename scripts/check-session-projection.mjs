@@ -109,12 +109,58 @@ if (traceSetCount < 1 || !gateNearTrace) {
   fail('trace projection writes must be gated by payload.sessionId');
 }
 
+// Session facts have one renderer source: records kept by main's revision, with pending intents laid on top.
+const records = read('src/renderer/stores/sessionRecordStore.ts');
+for (const required of [
+  'export function isNewerSessionRevision',
+  'export function useSessionView',
+  'beginIntent',
+  'settleIntent',
+]) {
+  if (!records.includes(required)) fail(`sessionRecordStore must provide ${required}`);
+}
+if (!bridge.includes('onSessionRecordChanged'))
+  fail('useIpcEventBridge must accept session:recordChanged into the record store');
+if (/\bcurrentSession\s*:/.test(read('src/renderer/stores/projectStore.ts'))) {
+  fail('projectStore keeps currentSessionId and list rows only; the session record lives in sessionRecordStore');
+}
+if (/\b(selectedAgentId|currentMode)\b/.test(read('src/renderer/stores/layoutStore.ts'))) {
+  fail('layoutStore must not mirror the session Agent; the pill derives from the session view');
+}
+const surface = read('src/renderer/app/bootstrap/useSessionSurfaceBootstrap.ts');
+if (!surface.includes('[sessionId, shellReady]')) fail('the session surface bootstrap loads once per session id');
+const renderer = path.join(root, 'src/renderer');
+const walk = (dir) =>
+  fs
+    .readdirSync(dir, { withFileTypes: true })
+    .flatMap((entry) => (entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]));
+for (const file of walk(renderer).filter((name) => /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name))) {
+  if (/\bsetCurrentSession\(|applySessionRecordToStore/.test(fs.readFileSync(file, 'utf8'))) {
+    fail(`${path.relative(root, file)} overwrites a session fact outside sessionRecordStore`);
+  }
+}
+const sessionWrites = read('src/main/sessions/store/SessionRecordStore.ts');
+if ((sessionWrites.match(/sessionRevisions\.written\(/g) || []).length < 3) {
+  fail('every SessionRecordStore write must take a revision and broadcast session:recordChanged');
+}
+if (!contract.includes('session:recordChanged') || !contract.includes('useSessionView')) {
+  fail('docs/contracts/session-projection.md must define session revisions and useSessionView');
+}
+
 const replay = read('src/renderer/lib/captureReplayIdentity.ts');
-if (!read('src/renderer/stores/sessionDeviceStore.ts').includes('acceptsReplayState(current ?? null, next, next)')) fail('Session device projection must use the canonical scope/revision guard');
-if (!read('src/renderer/features/right-rail/useCaptureReplay.ts').includes('useSessionDevicePreparation(scope)')) fail('Capture panel must read the canonical session device projection');
-for (const required of ['next.projectId === scope.projectId', 'next.sessionId === scope.sessionId', 'next.generation', 'next.revision']) {
+if (!read('src/renderer/stores/sessionDeviceStore.ts').includes('acceptsReplayState(current ?? null, next, next)'))
+  fail('Session device projection must use the canonical scope/revision guard');
+if (!read('src/renderer/features/right-rail/useCaptureReplay.ts').includes('useSessionDevicePreparation(scope)'))
+  fail('Capture panel must read the canonical session device projection');
+for (const required of [
+  'next.projectId === scope.projectId',
+  'next.sessionId === scope.sessionId',
+  'next.generation',
+  'next.revision',
+]) {
   if (!replay.includes(required)) fail(`Capture replay must gate scope and revisions: ${required}`);
 }
 const runtime = read('src/main/rdc/RdcSessionService.ts');
-if (!runtime.includes('keyOf(scope)') || !runtime.includes('runRdcOperation')) fail('Capture runtime must retain scoped ownership and native serialization');
+if (!runtime.includes('keyOf(scope)') || !runtime.includes('runRdcOperation'))
+  fail('Capture runtime must retain scoped ownership and native serialization');
 console.log('[session-projection] ok');

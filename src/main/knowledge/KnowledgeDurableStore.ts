@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { StorageIo } from '../sessions/store/StorageIo';
-import { assertNoUnsupportedSchemaVersion } from '../sessions/store/storageSchema';
+import { AppError } from '@shared/errors/appError';
+import { sessionRecordStore } from '../sessions/store/sessionStores';
+import { StorageIo } from '../runtime/StorageIo';
+import { assertNoUnsupportedSchemaVersion } from '../runtime/storedDocument';
 import { withDirectoryFileLock } from '../sessions/store/directoryFileLock';
-import { KnowledgeRevisionConflictError } from './knowledgeErrors';
 import {
   emptyKnowledgeStateDocument,
   KNOWLEDGE_STATE_FILE,
@@ -18,10 +18,8 @@ import {
   type KnowledgeDurableReview,
   type KnowledgeStateDocument,
 } from './knowledgeStateSchema';
-import type {
-  KnowledgeReviewRecord,
-  SessionKnowledgeCandidate,
-} from '@shared/types/knowledge';
+import type { SessionKnowledgeCandidate } from '@shared/types/knowledge';
+import type { KnowledgeReviewRecord } from './knowledgeStateSchema';
 
 export interface KnowledgeDurableStoreDependencies {
   resolveStatePath(sessionId: string): string;
@@ -50,9 +48,9 @@ export function createSessionScopedKnowledgeStore(rootPath: string): KnowledgeDu
 }
 
 function defaultSessionStatePath(sessionId: string): string {
-  const location = storageAdapter.sessions.findSessionLocation(sessionId);
+  const location = sessionRecordStore.findSessionLocation(sessionId);
   if (!location) {
-    throw new Error(`KNOWLEDGE_SESSION_UNKNOWN: no durable session path for ${sessionId}.`);
+    throw new AppError('KNOWLEDGE_SESSION_UNKNOWN', `no durable session path for ${sessionId}.`);
   }
   return path.join(location.sessionPath, KNOWLEDGE_STATE_FILE);
 }
@@ -86,11 +84,17 @@ export class KnowledgeDurableStore {
       const index = document.candidates.findIndex(
         (entry) => entry.candidate.candidateId === input.candidate.candidateId,
       );
-      const next = upsertRecord(document.candidates[index], input.expectedRevision, contentHash, (revision) => ({
-        revision,
+      const next = upsertRecord(
+        document.candidates[index],
+        input.expectedRevision,
         contentHash,
-        candidate: input.candidate,
-      }), `candidate ${input.candidate.candidateId}`);
+        (revision) => ({
+          revision,
+          contentHash,
+          candidate: input.candidate,
+        }),
+        `candidate ${input.candidate.candidateId}`,
+      );
       if (index >= 0) document.candidates[index] = next;
       else document.candidates.push(next);
       return next;
@@ -105,15 +109,21 @@ export class KnowledgeDurableStore {
         cardId: input.review.cardId,
       });
       const index = document.reviews.findIndex((entry) => entry.review.reviewId === input.review.reviewId);
-      const next = upsertRecord(document.reviews[index], input.expectedRevision, contentHash, (revision) => ({
-        revision,
+      const next = upsertRecord(
+        document.reviews[index],
+        input.expectedRevision,
         contentHash,
-        review: {
-          ...input.review,
+        (revision) => ({
           revision,
           contentHash,
-        },
-      }), `review ${input.review.reviewId}`);
+          review: {
+            ...input.review,
+            revision,
+            contentHash,
+          },
+        }),
+        `review ${input.review.reviewId}`,
+      );
       if (index >= 0) document.reviews[index] = next;
       else document.reviews.push(next);
       return next;
@@ -129,11 +139,15 @@ export class KnowledgeDurableStore {
 
   async withSessionLock<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
     const statePath = this.resolveStatePath(sessionId);
-    return withDirectoryFileLock(path.dirname(statePath), {
-      lockFileName: KNOWLEDGE_STATE_LOCK_FILE,
-      timeoutCode: KNOWLEDGE_STATE_LOCK_TIMEOUT,
-      ...(this.overrides.lockMaxAttempts != null ? { maxAttempts: this.overrides.lockMaxAttempts } : {}),
-    }, operation);
+    return withDirectoryFileLock(
+      path.dirname(statePath),
+      {
+        lockFileName: KNOWLEDGE_STATE_LOCK_FILE,
+        timeoutCode: KNOWLEDGE_STATE_LOCK_TIMEOUT,
+        ...(this.overrides.lockMaxAttempts != null ? { maxAttempts: this.overrides.lockMaxAttempts } : {}),
+      },
+      operation,
+    );
   }
 
   private async load(sessionId: string): Promise<{
@@ -170,19 +184,16 @@ export class KnowledgeDurableStore {
   ): void {
     const statePath = this.resolveStatePath(sessionId);
     this.storage.ensureDir(path.dirname(statePath));
-    this.storage.writeUtf8AtomicFsync(statePath, serializeKnowledgeStateDocument(document, leftoverDrafts));
+    this.storage.writeUtf8Atomic(statePath, serializeKnowledgeStateDocument(document, leftoverDrafts));
     const written = this.storage.readJson<unknown>(statePath);
     if (!written) {
-      throw new Error('KNOWLEDGE_WRITE_INTEGRITY: durable knowledge-state.json vanished after atomic replace.');
+      throw new AppError('KNOWLEDGE_WRITE_INTEGRITY', 'durable knowledge-state.json vanished after atomic replace.');
     }
     assertNoUnsupportedSchemaVersion(written, KNOWLEDGE_STATE_SCHEMA_VERSION, statePath);
     parseKnowledgeStatePayload(written);
   }
 
-  private async mutate<T>(
-    sessionId: string,
-    mutate: (document: KnowledgeStateDocument) => T,
-  ): Promise<T> {
+  private async mutate<T>(sessionId: string, mutate: (document: KnowledgeStateDocument) => T): Promise<T> {
     return this.withSessionLock(sessionId, async () => {
       const loaded = this.loadUnlocked(sessionId);
       const result = mutate(loaded.document);
@@ -201,12 +212,16 @@ function upsertRecord<T extends { revision: number; contentHash: string }>(
 ): T {
   if (!existing) {
     if (expectedRevision != null && expectedRevision !== 0) {
-      throw new KnowledgeRevisionConflictError(`${label} does not exist (expected revision ${expectedRevision}).`);
+      throw new AppError(
+        'KNOWLEDGE_REVISION_CONFLICT',
+        `${label} does not exist (expected revision ${expectedRevision}).`,
+      );
     }
     return build(1);
   }
   if (expectedRevision == null || expectedRevision !== existing.revision) {
-    throw new KnowledgeRevisionConflictError(
+    throw new AppError(
+      'KNOWLEDGE_REVISION_CONFLICT',
       `${label} revision ${existing.revision} does not match expected ${expectedRevision ?? 'none'}; refusing overwrite.`,
     );
   }

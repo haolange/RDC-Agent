@@ -10,14 +10,16 @@ function block(id: string, text: string, outputPhase: 'commentary' | 'final_answ
     kind: 'llm_turn',
     title: 'LLM turn',
     status: 'complete',
-    items: [{
-      kind: 'text',
-      providerOutputRef: { protocol: 'test', providerBlockKey: `${id}:text`, contentIndex: 0 },
-      text,
-      phase: outputPhase,
-      status: 'complete',
-      displayOrder: 1,
-    }],
+    items: [
+      {
+        kind: 'text',
+        providerOutputRef: { protocol: 'test', providerBlockKey: `${id}:text`, contentIndex: 0 },
+        text,
+        phase: outputPhase,
+        status: 'complete',
+        displayOrder: 1,
+      },
+    ],
     result: {
       status: 'complete',
       stopReason: 'end_turn',
@@ -53,27 +55,44 @@ describe('TraceService canonical channel reload', () => {
     const commentary = block('loop-1', 'Working update', 'commentary');
     commentary.toolCalls.push({ id: 'tool-1', toolName: 'read_file', status: 'complete', startedAt: 1 });
     const final = block('loop-2', 'Canonical final', 'final_answer');
-    expect(findCanonicalFinalAnswer([
-      assistant('Canonical final', [commentary, final]),
-    ], 'run-1')).toBe('Canonical final');
+    expect(findCanonicalFinalAnswer([assistant('Canonical final', [commentary, final])], 'run-1')).toBe(
+      'Canonical final',
+    );
   });
 
   it('does not use text comparison when explicit commentary and final bytes match', () => {
-    expect(findCanonicalFinalAnswer([
-      assistant('Same bytes', [
-        block('loop-1', 'Same bytes', 'commentary'),
-        block('loop-2', 'Same bytes', 'final_answer'),
-      ]),
-    ], 'run-1')).toBe('Same bytes');
+    expect(
+      findCanonicalFinalAnswer(
+        [
+          assistant('Same bytes', [
+            block('loop-1', 'Same bytes', 'commentary'),
+            block('loop-2', 'Same bytes', 'final_answer'),
+          ]),
+        ],
+        'run-1',
+      ),
+    ).toBe('Same bytes');
   });
 
   it('reads only confirmed final items from a mixed-phase model response', () => {
     const mixed = block('mixed', 'Checking.Final answer.', 'final_answer');
     mixed.items = [
-      { kind: 'text', providerOutputRef: { protocol: 'test', providerBlockKey: 'a', contentIndex: 0 },
-        text: 'Checking.', phase: 'commentary', status: 'complete', displayOrder: 1 },
-      { kind: 'text', providerOutputRef: { protocol: 'test', providerBlockKey: 'b', contentIndex: 1 },
-        text: 'Final answer.', phase: 'final_answer', status: 'complete', displayOrder: 2 },
+      {
+        kind: 'text',
+        providerOutputRef: { protocol: 'test', providerBlockKey: 'a', contentIndex: 0 },
+        text: 'Checking.',
+        phase: 'commentary',
+        status: 'complete',
+        displayOrder: 1,
+      },
+      {
+        kind: 'text',
+        providerOutputRef: { protocol: 'test', providerBlockKey: 'b', contentIndex: 1 },
+        text: 'Final answer.',
+        phase: 'final_answer',
+        status: 'complete',
+        displayOrder: 2,
+      },
     ];
     expect(findCanonicalFinalAnswer([assistant('Final answer.', [mixed])], 'run-1')).toBe('Final answer.');
     // A loop that did not settle as a final answer contributes nothing.

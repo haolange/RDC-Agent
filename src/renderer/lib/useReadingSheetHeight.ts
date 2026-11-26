@@ -1,10 +1,11 @@
 import { useCallback, useLayoutEffect, type RefObject } from 'react';
 import { assignDynStyle, clearDynStyle } from './useDynStyle';
 
-const verticalInsets = (box: CSSStyleDeclaration): number => (
-  Number.parseFloat(box.paddingTop) + Number.parseFloat(box.paddingBottom)
-  + Number.parseFloat(box.borderTopWidth) + Number.parseFloat(box.borderBottomWidth)
-);
+const verticalInsets = (box: CSSStyleDeclaration): number =>
+  Number.parseFloat(box.paddingTop) +
+  Number.parseFloat(box.paddingBottom) +
+  Number.parseFloat(box.borderTopWidth) +
+  Number.parseFloat(box.borderBottomWidth);
 
 function layoutHeight(element: Element): number {
   // Entrance and exit transforms must not change the intrinsic target.
@@ -21,16 +22,16 @@ export function useReadingSheetHeight(
   sheetRef: RefObject<HTMLDivElement | null>,
   contentRef: RefObject<HTMLDivElement | null>,
   hasStatus: boolean,
-  hasFooter: boolean,
 ): void {
   const measure = useCallback(() => {
     const sheet = sheetRef.current;
     const content = contentRef.current;
     if (!enabled || !sheet || !content) return;
     const body = content.parentElement!;
-    const chrome = Array.from(sheet.children).reduce((total, child) => (
-      child === body ? total : total + layoutHeight(child)
-    ), 0);
+    const chrome = Array.from(sheet.children).reduce(
+      (total, child) => (child === body ? total : total + layoutHeight(child)),
+      0,
+    );
     const intrinsicHeight = chrome + verticalInsets(getComputedStyle(body)) + layoutHeight(content);
     const availableHeight = Number.parseFloat(getComputedStyle(sheet).maxHeight);
     assignDynStyle(sheet, { '--reading-sheet-target-height': `${Math.min(intrinsicHeight, availableHeight)}px` });
@@ -56,5 +57,5 @@ export function useReadingSheetHeight(
     }
     return () => observer.disconnect();
     // The observed chrome changes only when an optional element enters or leaves.
-  }, [enabled, sheetRef, contentRef, measure, hasStatus, hasFooter]);
+  }, [enabled, sheetRef, contentRef, measure, hasStatus]);
 }

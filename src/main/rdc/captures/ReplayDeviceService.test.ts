@@ -20,7 +20,8 @@ function makeDevice(overrides: Partial<ReplayDeviceEntry> = {}): ReplayDeviceEnt
     type: 'android',
     status: 'offline',
     transport: 'adb_android',
-    serial: 'SERIAL1',    lastSeen: 1_000,
+    serial: 'SERIAL1',
+    lastSeen: 1_000,
     ...overrides,
   };
 }
@@ -72,7 +73,8 @@ describe('ReplayDeviceService detectAdbDevices policy', () => {
 
   it('spawns start-server once then retries on first unreachable', async () => {
     const startServer = vi.fn(async () => undefined);
-    const queryLines = vi.fn()
+    const queryLines = vi
+      .fn()
       .mockRejectedValueOnce(new AdbServerUnreachableError('down'))
       .mockResolvedValueOnce(['SERIAL1\tdevice']);
     const state = { startServerAttempted: false };
@@ -92,13 +94,15 @@ describe('ReplayDeviceService detectAdbDevices policy', () => {
   it('skips start-server when already attempted (poll backoff path)', async () => {
     const startServer = vi.fn(async () => undefined);
     const error = new AdbServerUnreachableError('still down');
-    await expect(queryAdbDevicesLinesWithServerBootstrap({
-      queryLines: async () => {
-        throw error;
-      },
-      startServer,
-      state: { startServerAttempted: true },
-    })).rejects.toBe(error);
+    await expect(
+      queryAdbDevicesLinesWithServerBootstrap({
+        queryLines: async () => {
+          throw error;
+        },
+        startServer,
+        state: { startServerAttempted: true },
+      }),
+    ).rejects.toBe(error);
     expect(startServer).not.toHaveBeenCalled();
   });
 
@@ -108,7 +112,8 @@ describe('ReplayDeviceService detectAdbDevices policy', () => {
     const state = { startServerAttempted: true };
     state.startServerAttempted = false;
 
-    const queryLines = vi.fn()
+    const queryLines = vi
+      .fn()
       .mockRejectedValueOnce(new AdbServerUnreachableError('down again'))
       .mockResolvedValueOnce(['SERIAL9\tdevice']);
 
@@ -126,13 +131,15 @@ describe('ReplayDeviceService detectAdbDevices policy', () => {
   it('does not start-server for protocol failures', async () => {
     const startServer = vi.fn(async () => undefined);
     const error = new AdbServerProtocolError('bad frame');
-    await expect(queryAdbDevicesLinesWithServerBootstrap({
-      queryLines: async () => {
-        throw error;
-      },
-      startServer,
-      state: { startServerAttempted: false },
-    })).rejects.toBe(error);
+    await expect(
+      queryAdbDevicesLinesWithServerBootstrap({
+        queryLines: async () => {
+          throw error;
+        },
+        startServer,
+        state: { startServerAttempted: false },
+      }),
+    ).rejects.toBe(error);
     expect(startServer).not.toHaveBeenCalled();
   });
 });

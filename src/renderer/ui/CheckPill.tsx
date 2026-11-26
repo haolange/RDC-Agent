@@ -6,8 +6,6 @@ import './CheckPill.css';
 export interface CheckPillProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onChange'> {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
-  /** Secondary text shown under the label, e.g. a tool's purpose. */
-  hint?: ReactNode;
   children: ReactNode;
 }
 
@@ -16,7 +14,7 @@ export interface CheckPillProps extends Omit<ButtonHTMLAttributes<HTMLButtonElem
  * checkbox card. The box shares `--checkbox-*` with `Checkbox`; Switch keeps accent fill.
  */
 export const CheckPill = forwardRef<HTMLButtonElement, CheckPillProps>(function CheckPill(
-  { checked, onCheckedChange, hint, className, disabled, type = 'button', children, ...rest },
+  { checked, onCheckedChange, className, disabled, type = 'button', children, ...rest },
   ref,
 ) {
   return (
@@ -35,7 +33,6 @@ export const CheckPill = forwardRef<HTMLButtonElement, CheckPillProps>(function 
       </span>
       <span className="ui-check-pill-text">
         <span className="ui-check-pill-label">{children}</span>
-        {hint ? <span className="ui-check-pill-hint">{hint}</span> : null}
       </span>
     </button>
   );

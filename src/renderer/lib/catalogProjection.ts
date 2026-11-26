@@ -5,6 +5,8 @@ export function latestCatalogProjection(
   current: EffectiveCatalogSnapshot | null,
   incoming: EffectiveCatalogSnapshot,
 ): EffectiveCatalogSnapshot {
-  return current?.scopeGeneration === incoming.scopeGeneration && current.projectionVersion >= incoming.projectionVersion
-    ? current : incoming;
+  return current?.scopeGeneration === incoming.scopeGeneration &&
+    current.projectionVersion >= incoming.projectionVersion
+    ? current
+    : incoming;
 }

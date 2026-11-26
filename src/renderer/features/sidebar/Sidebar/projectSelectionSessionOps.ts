@@ -2,17 +2,16 @@ import { hydrateLoadedSessionSurface } from '../../../stores/sessionProjectionHy
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { useSessionProjectionStore } from '../../../stores/sessionProjectionStore';
-import { useAgentStore } from '../../../stores/agentStore';
 import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
-import { hydrateComposerAgentFromSession } from '../../../stores/sessionAgentHydration';
+import { acceptSessionSnapshot } from '../../../stores/sessionRecordStore';
 import {
   captureSelectionSnapshot,
-  loadRunsForSession,
   restoreSelectionSnapshot,
   type ProjectSelectionHandlerOpsContext,
   type ProjectSelectionLoaderOpsContext,
 } from './projectSelectionContext';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
+import type { SessionOpenResult } from '@shared/types/electron';
 import type { SelectSessionOptions } from './types';
 
 export async function selectSessionOp(
@@ -24,69 +23,65 @@ export async function selectSessionOp(
   const previousSessionId = ctx.getCurrentSession()?.sessionId ?? null;
 
   if (options.optimisticSession) {
-    if (previousSessionId !== options.optimisticSession.sessionId) applySessionSwitchHygiene({
-      previousSessionId,
-      nextSessionId: options.optimisticSession.sessionId,
-    });
-    ctx.setCurrentSession(options.optimisticSession);
+    if (previousSessionId !== options.optimisticSession.sessionId)
+      applySessionSwitchHygiene({
+        previousSessionId,
+        nextSessionId: options.optimisticSession.sessionId,
+      });
+    ctx.setCurrentSessionId(options.optimisticSession.sessionId);
     ctx.setRightRailTarget('session');
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
-    ctx.setRuns([]);
   }
 
-  const result = await window.electronAPI.session.select(sessionId).catch((error) => ({
-    success: false,
-    session: undefined,
-    currentRun: null,
-    error: error instanceof Error ? error.message : String(error),
-  }));
+  // The surface bootstraps leave a session being opened here alone, so its history and trace load once.
+  useConversationStore.getState().setHistoryLoadingSessionId(sessionId);
+  const outcome = await window.electronAPI.session.open(sessionId).then(
+    (opened): { result: SessionOpenResult } => ({ result: opened }),
+    (error: unknown) => ({ error }),
+  );
+  if (useConversationStore.getState().historyLoadingSessionId === sessionId) {
+    useConversationStore.getState().setHistoryLoadingSessionId(null);
+  }
   if (!ctx.isLatestSelectionRequest(options.requestId)) {
     return false;
   }
-  if (!result.success || !result.session) {
+  if ('error' in outcome) {
     restoreSelectionSnapshot(ctx, rollbackState);
-    ctx.setSidebarError(result.error || ctx.t('sidebar.selectSessionFailed'));
+    ctx.setSidebarError({ contextKey: 'sidebar.selectSessionFailed', reason: outcome.error });
     if (options.optimisticSession?.projectId) {
-      await ctx.loadProjectSessionList(options.optimisticSession.projectId).catch(() => undefined);
+      await ctx
+        .loadProjectSessionList(options.optimisticSession.projectId)
+        .catch((error: unknown) => console.warn('[sidebar] could not reload the session list', error));
     }
     return false;
   }
 
-  if ((options.optimisticSession?.sessionId ?? previousSessionId) !== result.session.sessionId) {
+  const { result } = outcome;
+  const opened = result.session.record;
+  if ((options.optimisticSession?.sessionId ?? previousSessionId) !== opened.sessionId) {
     applySessionSwitchHygiene({
       previousSessionId: options.optimisticSession?.sessionId ?? previousSessionId,
-      nextSessionId: result.session.sessionId,
+      nextSessionId: opened.sessionId,
     });
   }
-  ctx.setCurrentSession(result.session);
-  hydrateComposerAgentFromSession(result.session);
-  const history = await window.electronAPI.conversation.getHistory(result.session.sessionId).catch(() => null);
-  const trace = await window.electronAPI.trace.getProjection(result.session.sessionId).catch(() => null);
-  if (history && ctx.isLatestSelectionRequest(options.requestId)) {
-    hydrateLoadedSessionSurface({
-      messages: history.messages ?? [],
-      branchState: history.branchState ?? null,
-      planReview: history.planReview ?? null,
-      tracePresentation: trace?.presentation ?? null,
-      applyTrace: Boolean(trace?.presentation),
-    });
-  }
+  acceptSessionSnapshot(result.session);
+  ctx.setCurrentSessionId(opened.sessionId);
+  hydrateLoadedSessionSurface({
+    sessionId: opened.sessionId,
+    messages: result.history.messages,
+    branchState: result.history.branchState ?? null,
+    planReview: result.history.planReview,
+    tracePresentation: result.trace.presentation,
+    applyTrace: true,
+  });
   ctx.setRightRailTarget('session');
-  ctx.setCurrentRun(result.currentRun ?? null);
+  ctx.setCurrentRun(result.currentRun);
   ctx.setCaptures(result.currentRun?.captures ?? []);
-  const nextRuns = await loadRunsForSession(sessionId);
-  if (!ctx.isLatestSelectionRequest(options.requestId)) {
-    return false;
-  }
-  ctx.setRuns(nextRuns);
   return true;
 }
 
-export async function handleSessionCreateOp(
-  ctx: ProjectSelectionHandlerOpsContext,
-  project?: ProjectRecord,
-) {
+export async function handleSessionCreateOp(ctx: ProjectSelectionHandlerOpsContext, project?: ProjectRecord) {
   ctx.setSidebarError(null);
   const targetProject = project || ctx.getCurrentProject();
   if (!targetProject) return;
@@ -98,13 +93,12 @@ export async function handleSessionCreateOp(
   const requestId = ctx.beginSelectionRequest();
   ctx.setIsBusy(true);
   try {
-    const result = await window.electronAPI.session.create(targetProject.projectId).catch((error) => ({
-      success: false,
-      session: undefined,
-      error: error instanceof Error ? error.message : String(error),
-    }));
-    if (!result.success || !result.session) {
-      ctx.setSidebarError(result.error || 'Unable to create a new session.');
+    const result = await window.electronAPI.session.create(targetProject.projectId).then(
+      (value) => ({ session: value.session }),
+      (error: unknown) => ({ error }),
+    );
+    if ('error' in result) {
+      ctx.setSidebarError({ contextKey: 'sidebar.createSessionFailed', reason: result.error });
       return;
     }
 
@@ -112,23 +106,35 @@ export async function handleSessionCreateOp(
       return;
     }
 
+    const created = result.session.record;
     const previousSessionId = ctx.getCurrentSession()?.sessionId ?? null;
+    const sameProject = ctx.getCurrentProject()?.projectId === targetProject.projectId;
     applySessionSwitchHygiene({
       previousSessionId,
-      nextSessionId: result.session.sessionId,
+      nextSessionId: created.sessionId,
     });
+    acceptSessionSnapshot(result.session);
     ctx.setCurrentProject(targetProject);
-    ctx.setCurrentSession(result.session);
+    ctx.setCurrentSessionId(created.sessionId);
     ctx.setRightRailTarget('session');
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
-    ctx.setRuns([]);
     ctx.ensureProjectExpanded(targetProject.projectId);
-    await ctx.loadProjects(targetProject.projectId, result.session.sessionId, {
-      autoSelectSession: true,
-      rightRailTarget: 'session',
-      requestId,
-    });
+    if (!sameProject) {
+      // Another project becomes current: its selection and project-scoped settings load with it.
+      await ctx.loadProjects(targetProject.projectId, created.sessionId, {
+        autoSelectSession: true,
+        rightRailTarget: 'session',
+        requestId,
+      });
+      return;
+    }
+    // Same project: the list gains the new session, and the session opens in one request alongside it.
+    const [nextSessions] = await Promise.all([
+      ctx.loadProjectSessionList(targetProject.projectId),
+      selectSessionOp(ctx, created.sessionId, { optimisticSession: created, requestId }),
+    ]);
+    if (ctx.isLatestSelectionRequest(requestId)) ctx.setSessions(nextSessions);
   } finally {
     ctx.setIsBusy(false);
   }
@@ -145,14 +151,17 @@ export async function handleSessionRemoveOp(
   const isRemovingCurrentSession = ctx.getCurrentSession()?.sessionId === session.sessionId;
   ctx.setIsBusy(true);
   try {
-    const result = await window.electronAPI.session.remove(session.sessionId);
-    if (!result.success) {
-      ctx.setSidebarError(result.error || ctx.t('sidebar.removeSessionFailed'));
+    const removal = await window.electronAPI.session.remove(session.sessionId).then(
+      (value) => ({ result: value }),
+      (error: unknown) => ({ error }),
+    );
+    if ('error' in removal) {
+      ctx.setSidebarError({ contextKey: 'sidebar.removeSessionFailed', reason: removal.error });
       return;
     }
+    const { result } = removal;
 
     useSessionProjectionStore.getState().evictSession(session.sessionId);
-    useAgentStore.getState().clearScope(session.sessionId);
 
     const nextSessions = await ctx.loadProjectSessionList(session.projectId);
     if (!ctx.isLatestSelectionRequest(requestId)) {
@@ -166,26 +175,22 @@ export async function handleSessionRemoveOp(
         return;
       }
 
-      const nextSession = result.nextSession ?? nextSessions[0] ?? null;
+      if (result.nextSession) acceptSessionSnapshot(result.nextSession);
+      const nextSession = result.nextSession?.record ?? nextSessions[0] ?? null;
       applySessionSwitchHygiene({
         previousSessionId: session.sessionId,
         nextSessionId: nextSession?.sessionId ?? null,
       });
-      ctx.setCurrentSession(nextSession);
+      ctx.setCurrentSessionId(nextSession?.sessionId ?? null);
       if (nextSession) {
         ctx.setRightRailTarget('session');
         ctx.setCurrentRun(result.nextRun ?? null);
         ctx.setCaptures(result.nextRun?.captures ?? []);
-        const nextRuns = await loadRunsForSession(nextSession.sessionId);
-        if (!ctx.isLatestSelectionRequest(requestId)) {
-          return;
-        }
-        ctx.setRuns(nextRuns);
+        await selectSessionOp(ctx, nextSession.sessionId, { optimisticSession: nextSession, requestId });
       } else {
         ctx.setRightRailTarget('project');
         ctx.setCurrentRun(null);
         ctx.setCaptures([]);
-        ctx.setRuns([]);
         useConversationStore.getState().setTimeline([]);
       }
     }
@@ -211,11 +216,10 @@ export async function handleSessionActivateOp(
   }
   useSessionStore.getState().clearUsageSnapshot();
   ctx.setCurrentProject(project);
-  ctx.setCurrentSession(session);
+  ctx.setCurrentSessionId(session.sessionId);
   ctx.setRightRailTarget('session');
   ctx.setCurrentRun(null);
   ctx.setCaptures([]);
-  ctx.setRuns([]);
   ctx.ensureProjectExpanded(project.projectId);
   ctx.setIsBusy(true);
   try {
@@ -239,4 +243,3 @@ export async function handleSessionActivateOp(
     ctx.setIsBusy(false);
   }
 }
-

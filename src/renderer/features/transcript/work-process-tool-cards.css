@@ -61,13 +61,37 @@
   font-size: var(--type-body-size);
   cursor: pointer;
 }
-.work-card-trigger:disabled { cursor: default; }
-.work-card-trigger:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset-inset); }
-.work-card-trigger.has-preview { display: grid; grid-template-columns: minmax(0, 1fr) max-content; column-gap: var(--space-2); }
+.work-card-trigger:disabled {
+  cursor: default;
+}
+.work-card-trigger:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset-inset);
+}
+.work-card-trigger.has-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  column-gap: var(--space-2);
+}
 .work-card-trigger.has-preview > .work-process-tool-card-header,
-.work-card-trigger.has-preview > .work-card-preview { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; }
-.work-card-preview { display: flex; align-items: center; gap: var(--space-2); min-width: 0; padding: var(--space-2) var(--space-3); font-weight: var(--font-normal); }
-.work-card-preview-trailing { display: block; min-width: 0; width: 100%; }
+.work-card-trigger.has-preview > .work-card-preview {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+.work-card-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  font-weight: var(--font-normal);
+}
+.work-card-preview-trailing {
+  display: block;
+  min-width: 0;
+  width: 100%;
+}
 .work-process-tool-card-title {
   display: inline-flex;
   align-items: center;
@@ -131,7 +155,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .work-row-title { transition: none; }
+  .work-row-title {
+    transition: none;
+  }
 }
 
 .work-process-tool-card-meta {
@@ -155,6 +181,11 @@
   padding: var(--space-2) var(--space-3);
 }
 
+.work-process-tool-card-body.family-interpreter,
+.work-process-tool-card-body.family-memory,
+.work-process-tool-card-body.family-skill,
+.work-process-tool-card-body.family-mcp,
+.work-process-tool-card-body.family-runtime,
 .work-process-tool-card-body.family-web {
   flex-direction: column;
   align-items: stretch;
@@ -219,25 +250,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.45;
-}
-
-.work-process-tool-card-link {
-  color: var(--token-accent-primary);
-  font-size: var(--type-body-size);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  overflow-wrap: anywhere;
-}
-
-.work-process-tool-card-link:hover {
-  color: var(--token-text-primary);
-}
-
-.work-process-tool-card-link:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: var(--focus-ring-offset);
-  border-radius: var(--radius-sm);
+  line-height: var(--type-meta-line);
 }
 
 .work-process-tool-card-copy {
@@ -269,7 +282,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.55;
+  line-height: var(--type-meta-line);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: calc(var(--type-meta-size) * 1.55 * 12);
@@ -300,7 +313,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.45;
+  line-height: var(--type-meta-line);
   overflow-wrap: anywhere;
 }
 
@@ -308,9 +321,10 @@
   margin: 0 0 var(--space-2);
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.45;
+  line-height: var(--leading-normal);
 }
 
+.markdown-mermaid-fallback,
 .work-process-tool-card-raw {
   display: flex;
   flex-direction: column;
@@ -331,7 +345,7 @@
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
@@ -341,14 +355,17 @@
   color: var(--token-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.5;
+  line-height: var(--type-meta-line);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 9rem;
   overflow-y: auto;
 }
 
-.work-process-tool-card-raw-pre.is-unbounded { max-height: none; overflow-y: visible; }
+.work-process-tool-card-raw-pre.is-unbounded {
+  max-height: none;
+  overflow-y: visible;
+}
 
 .work-process-tool-diagnostic {
   display: inline-flex;
@@ -363,7 +380,7 @@
   background: transparent;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.55;
+  line-height: var(--type-body-line);
   text-align: left;
   cursor: pointer;
 }
@@ -397,13 +414,16 @@
   font-size: var(--type-meta-size);
   overflow-wrap: anywhere;
 }
-.work-process-tool-hook-attention.severity-error { color: var(--token-status-error); }
+.work-process-tool-hook-attention.severity-error {
+  color: var(--token-status-error);
+}
 .work-process-tool-hook-details {
   min-width: 0;
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-sm);
   overflow: hidden;
 }
+.work-process-task-snapshot-list,
 .work-process-tool-hook-details ul {
   margin: 0;
   padding: var(--space-2) var(--space-3);
@@ -414,13 +434,31 @@
   font-size: var(--type-body-size);
   overflow-wrap: anywhere;
 }
-.work-process-tool-hook-details li + li { margin-top: var(--space-1); }
-.work-process-tool-hook-details li.severity-warning { color: var(--token-status-warning); }
-.work-process-tool-hook-details li.severity-error { color: var(--token-status-error); }
+.work-process-tool-hook-details li + li {
+  margin-top: var(--space-1);
+}
+.work-process-tool-hook-details li.severity-warning {
+  color: var(--token-status-warning);
+}
+.work-process-tool-hook-details li.severity-error {
+  color: var(--token-status-error);
+}
 
 @media (max-width: 720px) {
   .work-process-tool-card-header,
   .work-process-tool-card-meta {
     gap: var(--space-1) var(--space-2);
   }
+}
+
+/* Truncated card text whose full value is a tooltip takes keyboard focus, so it shows the same focus ring. */
+.work-process-tool-card-path:focus-visible,
+.work-process-tool-card-body-text:focus-visible,
+.work-process-tool-card-body-list-item:focus-visible,
+.work-process-path-chip:focus-visible,
+.work-process-subagent-identifiers dd > span:focus-visible,
+a.work-process-web-item-title:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
 }

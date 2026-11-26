@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '../lib/cn';
+import { documentFonts } from '../lib/documentFonts';
 import './OverflowFade.css';
 
 export interface OverflowFadeProps {
@@ -22,19 +23,17 @@ export function OverflowFade({ text, className }: OverflowFadeProps) {
     };
     measure();
 
-    const resizeObserver = typeof ResizeObserver === 'undefined'
-      ? null
-      : new ResizeObserver(measure);
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     resizeObserver?.observe(element);
 
-    const fonts = document.fonts;
-    fonts?.addEventListener?.('loadingdone', measure);
-    void fonts?.ready?.then(measure);
+    const fonts = documentFonts();
+    fonts?.addEventListener('loadingdone', measure);
+    void fonts?.ready.then(measure);
 
     return () => {
       active = false;
       resizeObserver?.disconnect();
-      fonts?.removeEventListener?.('loadingdone', measure);
+      fonts?.removeEventListener('loadingdone', measure);
     };
   }, [text]);
 

@@ -3,10 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { directoryLinkType, resolvedPathKey } from '../platform/paths';
-import {
-  isKnowledgeReadFileTool,
-  resolveKnowledgeReadRoots,
-} from './knowledgeReadRoots';
+import { resolveKnowledgeReadRoots } from './knowledgeReadRoots';
+import { getPrimitiveTools } from './tools';
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
@@ -17,17 +15,23 @@ async function makeDir(prefix: string): Promise<string> {
   return dir;
 }
 
-describe('isKnowledgeReadFileTool', () => {
-  it('accepts only the four read-only file tools', () => {
-    expect(['read_file', 'read_image', 'glob', 'grep'].every(isKnowledgeReadFileTool)).toBe(true);
-    expect([
-      'write_file',
-      'edit_file',
-      'delete_file',
-      'shell',
-      'code_interpreter',
-      'knowledge_search',
-    ].some(isKnowledgeReadFileTool)).toBe(false);
+describe('knowledge read-access tools', () => {
+  it('only the four read-only file tools declare read access to the knowledge roots', () => {
+    const tools = getPrimitiveTools();
+    const readAccess = tools
+      .filter((tool) => tool.spec.knowledgeRoots === 'read-access')
+      .map((tool) => tool.name)
+      .sort();
+    expect(readAccess).toEqual(['glob', 'grep', 'read_file', 'read_image']);
+    expect(
+      tools
+        .filter((tool) =>
+          ['write_file', 'edit_file', 'delete_file', 'shell', 'code_interpreter', 'knowledge_search'].includes(
+            tool.name,
+          ),
+        )
+        .some((tool) => tool.spec.knowledgeRoots === 'read-access'),
+    ).toBe(false);
   });
 });
 

@@ -48,9 +48,8 @@ export interface SelectSessionOptions {
 
 export interface SelectionSnapshot {
   currentProject: ProjectRecord | null;
-  currentSession: SessionRecord | null;
+  currentSessionId: string | null;
   rightRailTarget: RightRailTarget;
   currentRun: ReturnType<typeof useSessionStore.getState>['currentRun'];
   captures: CaptureDescriptor[];
-  runs: ReturnType<typeof useSessionStore.getState>['runs'];
 }

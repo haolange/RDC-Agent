@@ -12,7 +12,12 @@ export function bodyWithoutTitle(body: string, title: string): string {
   const first = lines.findIndex((line) => line.trim());
   if (first < 0) return body;
   const heading = /^#\s+(.+)$/u.exec(lines[first].trim());
-  return heading && heading[1].trim() === title.trim() ? lines.slice(first + 1).join('\n').replace(/^\s*\n/u, '') : body;
+  return heading && heading[1].trim() === title.trim()
+    ? lines
+        .slice(first + 1)
+        .join('\n')
+        .replace(/^\s*\n/u, '')
+    : body;
 }
 
 /** Markdown headings outside fenced code, in the order the renderer will draw them. */

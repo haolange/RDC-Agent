@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import {
-  INVESTIGATION_SCHEMA_NAMESPACE,
   type ChallengeRecord,
   type ClaimRecord,
   type ClaimSet,
@@ -12,7 +11,8 @@ import {
   type InvestigationRecord,
   type WorldState,
 } from '@shared/types/renderdocInvestigation';
-import { formatSessionArtifactUri } from '@shared/types/sessionArtifact';
+import { formatSessionArtifactUri } from '../sessions/artifacts/sessionArtifactContract';
+import { INVESTIGATION_SCHEMA_NAMESPACE } from './investigationKindRegistry';
 
 export const INDEX_URI = formatSessionArtifactUri('investigation', 'index.json');
 
@@ -34,13 +34,7 @@ export interface InvestigationIndexDocument {
   artifacts: InvestigationIndexEntry[];
 }
 
-type RecordKeySpace =
-  | 'world_state'
-  | 'evidence'
-  | 'claim'
-  | 'experiment'
-  | 'challenge'
-  | 'checkpoint';
+type RecordKeySpace = 'world_state' | 'evidence' | 'claim' | 'experiment' | 'challenge' | 'checkpoint';
 
 export function emptyIndex(): InvestigationIndexDocument {
   return { schemaVersion: INVESTIGATION_SCHEMA_NAMESPACE, artifacts: [] };
@@ -85,11 +79,8 @@ export function collectRecordKeys(
   if (kind === 'experiment') return [{ space: 'experiment', id: (record as ExperimentRecord).experimentId }];
   if (kind === 'challenge') return [{ space: 'challenge', id: (record as ChallengeRecord).challengeId }];
   if (kind === 'checkpoint') return [{ space: 'checkpoint', id: (record as { checkpointId: string }).checkpointId }];
-  if (kind === 'report') {
-    // Reports cite claims; they do not own claim ids. Treating cited claimId as a
-    // write-key forces supersede of the source Claim and breaks S-CLAIM-01 lookup.
-    return [];
-  }
+  // A report cites claims; it does not own claim ids. Treating a cited claimId as a
+  // write-key forces supersede of the source Claim and breaks S-CLAIM-01 lookup.
   return [];
 }
 
@@ -99,7 +90,11 @@ export function recordKeyToken(key: { space: RecordKeySpace; id: string }): stri
 
 export function collectSupersedeChain(artifacts: InvestigationIndexEntry[], startId?: string): Set<string> {
   const chain = new Set<string>();
-  for (let current = startId; current && !chain.has(current); current = artifacts.find((entry) => entry.artifactId === current)?.supersedes) {
+  for (
+    let current = startId;
+    current && !chain.has(current);
+    current = artifacts.find((entry) => entry.artifactId === current)?.supersedes
+  ) {
     chain.add(current);
   }
   return chain;

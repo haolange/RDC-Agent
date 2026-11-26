@@ -61,11 +61,18 @@ describe('reader-facing plan body', () => {
     const { body, appendix } = splitPlanAppendix(markdown);
     expect(findInternalReferences(body)).toEqual([]);
     const moved = new Set(findInternalReferences(appendix).map((entry) => entry.value));
-    for (const reference of findInternalReferences(previousTemplatePlan.content)) expect(moved).toContain(reference.value);
-    expect(sectionsFromMarkdown(markdown).map((section) => section.heading)).toEqual(['要解决的问题', '已经知道的', '打算怎么查', '可能需要你参与的地方', '什么时候停，交付什么']);
+    for (const reference of findInternalReferences(previousTemplatePlan.content))
+      expect(moved).toContain(reference.value);
+    expect(sectionsFromMarkdown(markdown).map((section) => section.heading)).toEqual([
+      '要解决的问题',
+      '已经知道的',
+      '打算怎么查',
+      '可能需要你参与的地方',
+      '什么时候停，交付什么',
+    ]);
   });
 
-  it('requires the execution references to be the planner\'s last section', () => {
+  it("requires the execution references to be the planner's last section", () => {
     const misplaced = { ...readerFacingPlan, content: `${readerFacingPlan.content}\n## 补充\n还有一项。` };
     expect(() => assertReaderFacingPlan(misplaced)).toThrow(/must be the last section/);
   });

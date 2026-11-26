@@ -73,7 +73,7 @@ export function useTerminalDrawer() {
   }, [isOpen]);
 
   const handleCopyEntry = useCallback((entry: RuntimeLogEntry) => {
-    void window.electronAPI?.appShell.copyText(buildEntryCopy(entry));
+    void window.electronAPI.appShell.copyText(buildEntryCopy(entry));
   }, []);
 
   const closeTerminal = useCallback(() => {

@@ -2,27 +2,19 @@
  * /version — 显示应用版本信息。
  */
 import { app } from 'electron';
-import type { CommandDefinition } from '@shared/types/command';
-
-function resolveAppVersion(): string {
-  try {
-    return app.getVersion();
-  } catch {
-    return process.env.npm_package_version ?? '0.6.0';
-  }
-}
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const versionCommand: CommandDefinition = {
   id: 'version',
   name: 'version',
-  description: 'Show application version information',
+  descriptionKey: 'version.description',
   aliases: ['v'],
   category: 'system',
 
   async execute() {
     return {
       success: true,
-      message: `RDC Agent v${resolveAppVersion()}\nElectron: ${process.versions.electron ?? 'N/A'}\nNode: ${process.version}\nChrome: ${process.versions.chrome ?? 'N/A'}`,
+      message: `RDC-Agent v${app.getVersion()}\nElectron: ${process.versions.electron}\nNode: ${process.version}\nChrome: ${process.versions.chrome}`,
     };
   },
 };

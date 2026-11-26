@@ -6,33 +6,15 @@
  * process-tree kill on Windows (Job Object not available without native addon).
  */
 
-import {
-  spawn,
-  type ChildProcess,
-  type SpawnOptions,
-  type StdioOptions,
-} from 'child_process';
+import { spawn, type ChildProcess, type SpawnOptions, type StdioOptions } from 'child_process';
 import { generateEventId } from '@shared/utils/id';
 import { isolatedChildSpawnOptions, signalChildProcessTree } from '../platform/process';
 import { retainResourceUntilExit, currentProcessExecutionOwner } from './ResourceExecutionLifetime';
 
 export type ProcessExitReason =
-  | 'exit'
-  | 'signal'
-  | 'timeout'
-  | 'abort'
-  | 'spawn_failed'
-  | 'supervisor_kill'
-  | 'unconfirmed_orphan';
+  'exit' | 'signal' | 'timeout' | 'abort' | 'spawn_failed' | 'supervisor_kill' | 'unconfirmed_orphan';
 
-export type ProcessOwner =
-  | 'mcp'
-  | 'shell'
-  | 'hook'
-  | 'replay'
-  | 'agent-shell'
-  | 'background'
-  | 'other';
+export type ProcessOwner = 'mcp' | 'shell' | 'hook' | 'replay' | 'agent-shell' | 'background' | 'other';
 
 export interface SupervisedSpawnOptions {
   cwd?: string;
@@ -81,8 +63,10 @@ export const PROCESS_TERMINATION_POLICY = Object.freeze({
   ...PROCESS_TERMINATION_TIMING,
   maxTreeKillAttempts: 2,
   // One idempotent initial termination and one escalation; not a native-exit guarantee.
-  joinTerminationAdditionalWaitMs: 2 * PROCESS_TERMINATION_TIMING.treeKillTimeoutMs
-    + PROCESS_TERMINATION_TIMING.killEscalationDelayMs + PROCESS_TERMINATION_TIMING.joinObservationSlackMs,
+  joinTerminationAdditionalWaitMs:
+    2 * PROCESS_TERMINATION_TIMING.treeKillTimeoutMs +
+    PROCESS_TERMINATION_TIMING.killEscalationDelayMs +
+    PROCESS_TERMINATION_TIMING.joinObservationSlackMs,
 });
 const DEFAULT_GRACE_MS = PROCESS_TERMINATION_POLICY.killEscalationDelayMs;
 
@@ -105,9 +89,9 @@ export class RingBuffer {
     }
   }
 
-  toString(encoding: BufferEncoding = 'utf8'): string {
+  toString(): string {
     if (this.chunks.length === 0) return '';
-    return Buffer.concat(this.chunks, this.size).toString(encoding);
+    return Buffer.concat(this.chunks, this.size).toString('utf8');
   }
 
   byteLength(): number {
@@ -165,9 +149,11 @@ export class ProcessSupervisor {
   }
 
   async joinExecutionProcesses(sessionId: string): Promise<void> {
-    await Promise.all([...this.registry.values()]
-      .filter((entry) => entry.executionSessionId === sessionId)
-      .map((entry) => entry.supervised.exit));
+    await Promise.all(
+      [...this.registry.values()]
+        .filter((entry) => entry.executionSessionId === sessionId)
+        .map((entry) => entry.supervised.exit),
+    );
   }
 
   spawn(
@@ -284,7 +270,7 @@ export class ProcessSupervisor {
         entry.killTimer = setTimeout(() => {
           terminateTree(child.pid, 'SIGKILL');
         }, DEFAULT_GRACE_MS);
-        entry.killTimer.unref?.();
+        entry.killTimer.unref();
       }
     };
 
@@ -306,7 +292,7 @@ export class ProcessSupervisor {
       join: async (timeoutMs?: number) => {
         if (entry.exitInfo) return entry.exitInfo;
         if (timeoutMs == null || timeoutMs <= 0) return exitPromise;
-        let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
+        let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
         const deadline = new Promise<ProcessExitInfo>((resolve) => {
           deadlineTimer = setTimeout(async () => {
             if (entry.exitInfo) {
@@ -314,7 +300,7 @@ export class ProcessSupervisor {
               return;
             }
             abort('timeout');
-            let observationTimer: ReturnType<typeof setTimeout> | null = null;
+            let observationTimer: ReturnType<typeof setTimeout> | undefined;
             const killObservation = await Promise.race<ProcessExitInfo | null>([
               exitPromise,
               new Promise<ProcessExitInfo | null>((orphanResolve) => {
@@ -322,10 +308,10 @@ export class ProcessSupervisor {
                   entry.unconfirmed = true;
                   orphanResolve(null);
                 }, DEFAULT_GRACE_MS + PROCESS_TERMINATION_POLICY.joinObservationSlackMs);
-                observationTimer.unref?.();
+                observationTimer.unref();
               }),
             ]);
-            if (observationTimer) clearTimeout(observationTimer);
+            clearTimeout(observationTimer);
             if (killObservation) {
               resolve(killObservation);
               return;
@@ -338,10 +324,10 @@ export class ProcessSupervisor {
               durationMs: Date.now() - startedAt,
             });
           }, timeoutMs);
-          deadlineTimer.unref?.();
+          deadlineTimer.unref();
         });
         const observed = await Promise.race([exitPromise, deadline]);
-        if (deadlineTimer) clearTimeout(deadlineTimer);
+        clearTimeout(deadlineTimer);
         if (observed.reason === 'unconfirmed_orphan') retainResourceUntilExit(exitPromise);
         return observed;
       },
@@ -381,7 +367,7 @@ export class ProcessSupervisor {
       entry.timeoutTimer = setTimeout(() => {
         abort('timeout');
       }, opts.timeoutMs);
-      entry.timeoutTimer.unref?.();
+      entry.timeoutTimer.unref();
     }
 
     if (opts.abortSignal) {
@@ -411,7 +397,7 @@ export class ProcessSupervisor {
       Promise.allSettled(joins),
       new Promise<void>((resolve) => {
         const timer = setTimeout(resolve, forceAfterMs + graceMs);
-        timer.unref?.();
+        timer.unref();
       }),
     ]);
     // Keep unconfirmed processes in the registry until child.close is observed.

@@ -5,7 +5,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useI18n, type TranslationKey } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
 import { ModeGlyph } from '../../ui/ModeGlyph';
-import { SetupChecklist } from './SetupChecklist';
+import { SetupChecklist } from '../SetupChecklist';
 import type { WorkbenchSetupStep } from '../../hooks/useWorkbenchSetup';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentMode } from '@shared/types/layout';
@@ -42,8 +42,8 @@ const HERO_COPY: Record<EmptyVariant, { title: TranslationKey; subtitle: Transla
 const EmptyToolCard: React.FC<{
   toolMode: FocusMode;
   agentDefinitions: AgentManifestDefinition[];
-  t: ReturnType<typeof useI18n>['t'];
-}> = ({ toolMode, agentDefinitions, t }) => {
+}> = ({ toolMode, agentDefinitions }) => {
+  const { t } = useI18n();
   const dynStyle = useDynStyle({
     '--empty-card-accent': resolveAgentDisplay(toolMode, agentDefinitions).accent,
   });
@@ -55,12 +55,7 @@ const EmptyToolCard: React.FC<{
       {...dynStyle}
     >
       <span className="empty-workbench-tool-core" aria-hidden="true">
-        <ModeGlyph
-          mode={toolMode}
-          className="empty-workbench-tool-icon"
-          size={22}
-          strokeWidth={1.75}
-        />
+        <ModeGlyph mode={toolMode} className="empty-workbench-tool-icon" size={22} strokeWidth={1.75} />
       </span>
       <span className="empty-workbench-tool-copy">
         <span className="empty-workbench-tool-title">{t(`mode.${toolMode}`)}</span>
@@ -94,15 +89,12 @@ export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode
           <p className="empty-workbench-subtitle">{subtitle}</p>
         </div>
 
-        {setupPending ? <SetupChecklist steps={setup} /> : (
+        {setupPending ? (
+          <SetupChecklist steps={setup} />
+        ) : (
           <div className="empty-workbench-tool-grid" aria-label={t('emptyWorkbench.toolsLabel')}>
             {FOCUS_MODES.map((toolMode: FocusMode) => (
-              <EmptyToolCard
-                key={toolMode}
-                toolMode={toolMode}
-                agentDefinitions={agentDefinitions}
-                t={t}
-              />
+              <EmptyToolCard key={toolMode} toolMode={toolMode} agentDefinitions={agentDefinitions} />
             ))}
           </div>
         )}

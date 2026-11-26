@@ -24,37 +24,54 @@ const profile = (overrides: Partial<ContextUsageSelectedProfile> = {}): ContextU
 });
 
 describe('ContextUsageIndicator', () => {
-  it.each([0, 59, 100])('renders %i percent with clean arc endpoints and keeps the percentage centered', (usagePercent) => {
-    const html = renderToStaticMarkup(React.createElement(ContextUsageIndicator, {
-      usage: null, phase: 'current', selectedProfile: profile(), detailsExpanded: false, onDetailsExpandedChange: () => undefined,
-      prepared: { preparedInputTokens: 1, uncompactedInputTokens: 1, promptBudgetTokens: 100,
-        compactionThresholdTokens: 100, compactionApplied: false, usagePercent } as PreparedTurnContextSummary,
-    }));
-    const document = html.match(/<circle class="composer-usage-ring-progress"[^>]*>/)![0];
-    expect(html).toContain(`>${usagePercent}%</span>`);
-    if (usagePercent === 0) expect(document).toContain('visibility="hidden"');
-    else expect(document).not.toContain('visibility="hidden"');
-    if (usagePercent === 100) {
-      expect(document).not.toContain('stroke-dash');
-    }
-    expect(html).not.toContain('width="36"');
-  });
+  it.each([0, 59, 100])(
+    'renders %i percent with clean arc endpoints and keeps the percentage centered',
+    (usagePercent) => {
+      const html = renderToStaticMarkup(
+        React.createElement(ContextUsageIndicator, {
+          usage: null,
+          phase: 'current',
+          selectedProfile: profile(),
+          detailsExpanded: false,
+          onDetailsExpandedChange: () => undefined,
+          prepared: {
+            preparedInputTokens: 1,
+            uncompactedInputTokens: 1,
+            promptBudgetTokens: 100,
+            compactionThresholdTokens: 100,
+            compactionApplied: false,
+            usagePercent,
+          } as PreparedTurnContextSummary,
+        }),
+      );
+      const document = html.match(/<circle class="composer-usage-ring-progress"[^>]*>/)![0];
+      expect(html).toContain(`>${usagePercent}%</span>`);
+      if (usagePercent === 0) expect(document).toContain('visibility="hidden"');
+      else expect(document).not.toContain('visibility="hidden"');
+      if (usagePercent === 100) {
+        expect(document).not.toContain('stroke-dash');
+      }
+      expect(html).not.toContain('width="36"');
+    },
+  );
   it('keeps an oversized pre-window estimate pending until actual request usage arrives', () => {
-    const html = renderToStaticMarkup(React.createElement(ContextUsageIndicator, {
-      detailsExpanded: false,
-      onDetailsExpandedChange: () => undefined,
-      usage: null,
-      prepared: {
-        preparedInputTokens: 943_100,
-        uncompactedInputTokens: 943_100,
-        promptBudgetTokens: 272_000,
-        compactionThresholdTokens: 217_600,
-        usagePercent: 100,
-        compactionApplied: false,
-      } as PreparedTurnContextSummary,
-      phase: 'current',
-      selectedProfile: profile({ contextBudgetTokens: 272_000 }),
-    }));
+    const html = renderToStaticMarkup(
+      React.createElement(ContextUsageIndicator, {
+        detailsExpanded: false,
+        onDetailsExpandedChange: () => undefined,
+        usage: null,
+        prepared: {
+          preparedInputTokens: 943_100,
+          uncompactedInputTokens: 943_100,
+          promptBudgetTokens: 272_000,
+          compactionThresholdTokens: 217_600,
+          usagePercent: 100,
+          compactionApplied: false,
+        } as PreparedTurnContextSummary,
+        phase: 'current',
+        selectedProfile: profile({ contextBudgetTokens: 272_000 }),
+      }),
+    );
     expect(html).toContain('is-pending');
     expect(html).toContain('contextBreakdown.windowPendingAria');
     expect(html).toContain('>…</span>');

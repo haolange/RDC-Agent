@@ -7,25 +7,19 @@ import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { currentHost } from '../../platform/host';
 import { resolveSkillCatalogBudget } from '../capabilities/SkillCatalogBudget';
 import { formatShellInterpreterLabel } from '../../runtime/ShellResolver';
-import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { resolveConfiguredShell } from '../../tools/resolveConfiguredShell';
+import { sessionContextStore } from '../../sessions/store/sessionStores';
 import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
-import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
+import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { applyRequestPlanFacts } from './RequestPlanFacts';
 import { runtimeIdentityContent } from './RuntimeIdentity';
-import type {
-  EffectiveAgentProfile,
-  PromptPlan,
-  PromptSegment,
-  ResourceScope,
-  ScopedInstructionResolution,
-  SkillLoadResult,
-  SkillMetadata,
-} from '@shared/types/rdcRuntime';
-import type { ExecutionOffer } from '@shared/types/executionOffer';
+import type { PromptPlan, PromptSegment, ResourceScope, SkillMetadata } from '@shared/types/rdcRuntime';
+import type { EffectiveAgentProfile, SkillLoadResult } from '../../settings/agent-manifests/agentRuntimeTypes';
+import type { ScopedInstructionResolution } from '../../runtime/scopedResourceTypes';
+import type { ExecutionOffer } from '../../sessions/run/executionOffer';
 import type { AgentPermissionSettings } from '@shared/types/settings';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { RequestPlan } from '@shared/types/providerCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 
@@ -45,7 +39,6 @@ export interface PromptPlanInput {
   /** Main-process verified offer bound to this recipient and the approved plan. */
   approvedExecutionOffer?: ExecutionOffer | null;
   routeCapability: AgentRouteCapability;
-  effectiveModel?: EffectiveModel;
   /** Execution callers supply their resolved plan; offline prompt-cost builds have no provider request. */
   requestPlan?: RequestPlan;
   permissionConstraints: Omit<AgentPermissionSettings, 'mode'>;
@@ -84,8 +77,9 @@ export class PromptPlanBuilder {
     const diagnostics = [...input.scopedInstructions.diagnostics];
     const segments: PromptSegment[] = [];
     const push = (
-      segment: Omit<PromptSegment, 'precedence' | 'tokenEstimate' | 'stability'>
-        & { stability?: PromptSegment['stability'] },
+      segment: Omit<PromptSegment, 'precedence' | 'tokenEstimate' | 'stability'> & {
+        stability?: PromptSegment['stability'];
+      },
     ) => {
       const content = segment.content.trim();
       if (!content) return;
@@ -101,20 +95,37 @@ export class PromptPlanBuilder {
     for (const fileName of CORE_FILES) {
       const sourcePath = path.join(this.coreRoot(), fileName);
       const content = fs.readFileSync(sourcePath, 'utf8');
-      push({ id: `core:${fileName}`, kind: 'core-contract', scope: 'builtin', sourcePath, sourceHash: hashScopedResource(content), content });
+      push({
+        id: `core:${fileName}`,
+        kind: 'core-contract',
+        scope: 'builtin',
+        sourcePath,
+        sourceHash: hashScopedResource(content),
+        content,
+      });
     }
 
-    const fileRouting = 'Use read_file / grep / glob / edit_file / write_file for file I/O. Before editing or overwriting an existing file, successfully read_file the same realpath in this session; after restart read again. shell.command file-tool bypass is denied; use dedicated structured execution for host-owned capabilities.';
-    push({ id: 'core:file-tool-routing', kind: 'core-contract', scope: 'builtin', sourcePath: 'runtime:file-tool-routing', sourceHash: hashScopedResource(fileRouting), content: fileRouting });
+    const fileRouting =
+      'Use read_file / grep / glob / edit_file / write_file for file I/O. Before editing or overwriting an existing file, successfully read_file the same realpath in this session; after restart read again. shell.command file-tool bypass is denied; use dedicated structured execution for host-owned capabilities.';
+    push({
+      id: 'core:file-tool-routing',
+      kind: 'core-contract',
+      scope: 'builtin',
+      sourcePath: 'runtime:file-tool-routing',
+      sourceHash: hashScopedResource(fileRouting),
+      content: fileRouting,
+    });
 
     const profileContent = [
       `# Effective Agent Profile`,
       `Name: ${input.profile.name}`,
       `Description: ${input.profile.description}`,
-      `Declared handoffs (main-resolved profile metadata): ${JSON.stringify((input.profile.handoffs ?? []).map(({ agent, label, requiredSkillIds }) => ({ agent, label, requiredSkillIds: requiredSkillIds ?? [] })))}`,
+      `Declared handoffs (main-resolved profile metadata): ${JSON.stringify(input.profile.handoffs.map(({ agent, label, requiredSkillIds }) => ({ agent, label, requiredSkillIds })))}`,
       'requiredSkillIds are explicit preparation obligations of that recipient only. Methods used as knowledge remain discoverable and readable with skill_read; do not turn every relevant method into a Task preload requirement.',
       input.profile.instructions,
-    ].filter(Boolean).join('\n\n');
+    ]
+      .filter(Boolean)
+      .join('\n\n');
     const provenance = resolveProfileProvenance(input.profile);
     push({
       id: `agent:${input.profile.id}`,
@@ -125,30 +136,32 @@ export class PromptPlanBuilder {
       content: profileContent,
     });
 
-    input.scopedInstructions.sources.forEach((source) => push({
-      id: source.id,
-      kind: 'scoped-instruction',
-      scope: source.scope,
-      sourcePath: source.sourcePath,
-      sourceHash: source.sourceHash,
-      content: `# Scoped Instructions · ${source.scope}\n\n${source.content}`,
-    }));
+    input.scopedInstructions.sources.forEach((source) =>
+      push({
+        id: source.id,
+        kind: 'scoped-instruction',
+        scope: source.scope,
+        sourcePath: source.sourcePath,
+        sourceHash: source.sourceHash,
+        content: `# Scoped Instructions · ${source.scope}\n\n${source.content}`,
+      }),
+    );
 
-    input.preloadedSkills.forEach((skill) => push({
-      id: `skill:${skill.id}`,
-      kind: 'preloaded-skill',
-      scope: skill.scope,
-      sourcePath: skill.sourcePath,
-      sourceHash: skill.sourceHash,
-      content: `# Preloaded Skill · ${skill.name}\n\n${skill.instructions}`,
-    }));
+    input.preloadedSkills.forEach((skill) =>
+      push({
+        id: `skill:${skill.id}`,
+        kind: 'preloaded-skill',
+        scope: skill.scope,
+        sourcePath: skill.sourcePath,
+        sourceHash: skill.sourceHash,
+        content: `# Preloaded Skill · ${skill.name}\n\n${skill.instructions}`,
+      }),
+    );
 
     // Progressive Skill 索引：非空 catalog 一律注入；预算仅按窗口缩放。
     const catalogBudget = resolveSkillCatalogBudget({
       skillCatalogCount: input.skillCatalog.length,
-      ...(input.contextWindowTokens !== undefined
-        ? { contextWindowTokens: input.contextWindowTokens }
-        : {}),
+      ...(input.contextWindowTokens !== undefined ? { contextWindowTokens: input.contextWindowTokens } : {}),
     });
     if (catalogBudget.includeSkillCatalog) {
       const catalogLimitChars = catalogBudget.catalogCharBudget;
@@ -156,17 +169,26 @@ export class PromptPlanBuilder {
       for (const skill of input.skillCatalog) {
         const line = `- ${skill.id}: ${skill.description} [${skill.scope}]`;
         if (catalogLines.join('\n').length + line.length + 1 > catalogLimitChars) {
-          diagnostics.push({ code: 'skills.catalog.truncated', severity: 'warning', message: `Skill metadata catalog exceeded ${catalogLimitChars} characters.` });
+          diagnostics.push({
+            code: 'skills.catalog.truncated',
+            severity: 'warning',
+            message: `Skill metadata catalog exceeded ${catalogLimitChars} characters.`,
+          });
           break;
         }
         catalogLines.push(line);
       }
-      push({ id: 'skills:catalog', kind: 'skill-catalog', scope: 'runtime', sourcePath: 'runtime://skills/catalog', sourceHash: hashScopedResource(catalogLines), content: catalogLines.join('\n') });
+      push({
+        id: 'skills:catalog',
+        kind: 'skill-catalog',
+        scope: 'runtime',
+        sourcePath: 'runtime://skills/catalog',
+        sourceHash: hashScopedResource(catalogLines),
+        content: catalogLines.join('\n'),
+      });
     }
 
-    const effectiveTools = input.routeCapability.toolCallingMode === 'native-structured'
-      ? input.tools
-      : [];
+    const effectiveTools = input.routeCapability.toolCallingMode === 'native-structured' ? input.tools : [];
     const effectiveToolContent = buildEffectiveToolContent(effectiveTools);
     push({
       id: 'runtime:tools',
@@ -187,7 +209,9 @@ export class PromptPlanBuilder {
       `Vision input: ${input.routeCapability.visionInputMode}`,
       `Structured output: ${input.routeCapability.structuredOutputMode}`,
       ...(input.routeCapability.structuredOutputMode === 'prompt-fallback'
-        ? ['When a structured response is requested, follow the requested schema in the prompt; no native structured-output contract is available.']
+        ? [
+            'When a structured response is requested, follow the requested schema in the prompt; no native structured-output contract is available.',
+          ]
         : []),
       `Project root: ${input.workDir || '(none)'}`,
       `Host OS: ${currentHost().platform}`,
@@ -211,8 +235,11 @@ export class PromptPlanBuilder {
 
     const scopeId = input.sessionId?.trim() || null;
     const permissionSnapshot = (() => {
-      try { return runtimePermissionStateService.getSnapshot(); }
-      catch { return null; }
+      try {
+        return runtimePermissionStateService.getSnapshot();
+      } catch {
+        return null;
+      }
     })();
     const lease = scopeId ? getRdcContextLease(scopeId) : null;
     const identityContent = runtimeIdentityContent(scopeId, permissionSnapshot?.revision ?? null, lease);
@@ -226,19 +253,33 @@ export class PromptPlanBuilder {
       content: identityContent,
     });
 
-    const catalog = new Map((input.profileCatalog ?? []).filter(profile => profile.enabled).map(profile => [profile.id, profile]));
+    const catalog = new Map(
+      (input.profileCatalog ?? []).filter((profile) => profile.enabled).map((profile) => [profile.id, profile]),
+    );
     catalog.set(input.profile.id, input.profile);
     const profileLimits = [
       '# Profile Loop Ceilings',
       'These are known enabled profile ceilings at this snapshot, not a future execution reservation. A future turn must resolve its own tighter policy and Task/Capsule limits.',
-      ...[...catalog.values()].sort((a, b) => a.id.localeCompare(b.id)).map(profile => JSON.stringify({
-        agentId: profile.id, ordinaryProviderLoopCeiling: resolveAgentMaxTurns(undefined, profile.maxTurns) ?? null,
-        source: profile.maxTurns == null ? 'not-configured' : 'profile',
-      })),
+      ...[...catalog.values()]
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map((profile) =>
+          JSON.stringify({
+            agentId: profile.id,
+            ordinaryProviderLoopCeiling: resolveAgentMaxTurns(undefined, profile.maxTurns) ?? null,
+            source: profile.maxTurns == null ? 'not-configured' : 'profile',
+          }),
+        ),
       'Unlisted profiles are unknown. These facts grant no delegation, tools, permissions or extra provider requests.',
     ].join('\n');
-    push({ id: 'runtime:profile-limits', kind: 'runtime-fact', scope: 'runtime', stability: 'volatile',
-      sourcePath: 'runtime://profiles/loop-ceilings', sourceHash: hashScopedResource(profileLimits), content: profileLimits });
+    push({
+      id: 'runtime:profile-limits',
+      kind: 'runtime-fact',
+      scope: 'runtime',
+      stability: 'volatile',
+      sourcePath: 'runtime://profiles/loop-ceilings',
+      sourceHash: hashScopedResource(profileLimits),
+      content: profileLimits,
+    });
 
     if (input.approvedExecutionOffer) {
       const offer = input.approvedExecutionOffer;
@@ -269,31 +310,42 @@ export class PromptPlanBuilder {
     const systemPrompt = segments.map((segment) => segment.content).join('\n\n');
     const stableSegments = segments.filter((segment) => segment.stability === 'stable');
     const firstVolatileIndex = segments.findIndex((segment) => segment.stability === 'volatile');
-    if (firstVolatileIndex >= 0 && segments.slice(firstVolatileIndex).some((segment) => segment.stability === 'stable')) {
+    if (
+      firstVolatileIndex >= 0 &&
+      segments.slice(firstVolatileIndex).some((segment) => segment.stability === 'stable')
+    ) {
       throw new Error('PromptPlan stable segments must form one contiguous prefix.');
     }
     const stablePrefix = {
-      fingerprint: hashScopedResource(stableSegments.map((segment) => ({
-        id: segment.id,
-        sourceHash: segment.sourceHash,
-        content: segment.content,
-      }))),
+      fingerprint: hashScopedResource(
+        stableSegments.map((segment) => ({
+          id: segment.id,
+          sourceHash: segment.sourceHash,
+          content: segment.content,
+        })),
+      ),
       segmentIds: stableSegments.map((segment) => segment.id),
       sourceHashes: stableSegments.map((segment) => segment.sourceHash),
       tokenEstimate: stableSegments.reduce((sum, segment) => sum + segment.tokenEstimate, 0),
-      volatileSegmentIds: segments
-        .filter((segment) => segment.stability === 'volatile')
-        .map((segment) => segment.id),
+      volatileSegmentIds: segments.filter((segment) => segment.stability === 'volatile').map((segment) => segment.id),
     };
-    const scopedInstructions = segments.filter((segment) => segment.kind === 'scoped-instruction').reduce((sum, segment) => sum + segment.content.length, 0);
-    const skills = segments.filter((segment) => segment.kind === 'preloaded-skill' || segment.kind === 'skill-catalog').reduce((sum, segment) => sum + segment.content.length, 0);
+    const scopedInstructions = segments
+      .filter((segment) => segment.kind === 'scoped-instruction')
+      .reduce((sum, segment) => sum + segment.content.length, 0);
+    const skills = segments
+      .filter((segment) => segment.kind === 'preloaded-skill' || segment.kind === 'skill-catalog')
+      .reduce((sum, segment) => sum + segment.content.length, 0);
     const plan: PromptPlan = {
       id: generateEventId('prompt-plan'),
       segments,
       systemPrompt,
       totalTokenEstimate: segments.reduce((sum, segment) => sum + segment.tokenEstimate, 0),
       stablePrefix,
-      metrics: { systemPrompt: Math.max(0, systemPrompt.length - scopedInstructions - skills), scopedInstructions, skills },
+      metrics: {
+        systemPrompt: Math.max(0, systemPrompt.length - scopedInstructions - skills),
+        scopedInstructions,
+        skills,
+      },
       diagnostics,
     };
     return input.requestPlan ? applyRequestPlanFacts(plan, input.requestPlan) : plan;
@@ -312,7 +364,7 @@ function resolvePromptShellLabel(): string {
 function resolvePromptShellCwd(sessionId: string | null | undefined, workDir: string): string {
   if (sessionId) {
     try {
-      const persisted = storageAdapter.readSessionShellCwd(sessionId);
+      const persisted = sessionContextStore.readSessionShellCwd(sessionId);
       if (persisted) return persisted;
     } catch {
       /* session may not exist yet */
@@ -352,9 +404,7 @@ function buildEffectiveToolContent(tools: readonly string[]): string {
       ];
   const toolSet = new Set(tools);
   const readableTasks = toolSet.has('task_list') || toolSet.has('task_get');
-  const mutableTasks = toolSet.has('task_create')
-    || toolSet.has('task_update')
-    || toolSet.has('task_stop');
+  const mutableTasks = toolSet.has('task_create') || toolSet.has('task_update') || toolSet.has('task_stop');
 
   if (mutableTasks) {
     lines.push(
@@ -365,13 +415,15 @@ function buildEffectiveToolContent(tools: readonly string[]): string {
       'For work you perform directly, task_update(status=in_progress) starts its direct execution. Settle that execution when the work is done; dependencies govern which Tasks may run.',
       'blocked requires a statusReason. Do not create Tasks for single-step or trivial work.',
     );
-    if (toolSet.has('task_create') && toolSet.has('task_update')) lines.push(
-      'For prerequisites among Tasks created in the same batch, use the returned IDs with task_update(addBlockedBy) before starting work or submitting a plan; descriptions alone do not establish dependencies. If a Task independently reviews another, also update its executionRequirements.independentOfTaskIds with the returned source IDs while preserving its mode, profile and required Skills; a prerequisite alone does not bind independence.',
-    );
-    if (toolSet.has('subagent')) lines.push(
-      'For Task-owned subagent work in either mode=wait or mode=background, pass taskId without first starting a direct execution. The subagent runner claims and settles its own execution.',
-      'Changing status to pending does not release an active execution. Inspect and honestly settle a mistaken direct execution before delegating; never wait for your own direct execution as if it were a child.',
-    );
+    if (toolSet.has('task_create') && toolSet.has('task_update'))
+      lines.push(
+        'For prerequisites among Tasks created in the same batch, use the returned IDs with task_update(addBlockedBy) before starting work or submitting a plan; descriptions alone do not establish dependencies. If a Task independently reviews another, also update its executionRequirements.independentOfTaskIds with the returned source IDs while preserving its mode, profile and required Skills; a prerequisite alone does not bind independence.',
+      );
+    if (toolSet.has('subagent'))
+      lines.push(
+        'For Task-owned subagent work in either mode=wait or mode=background, pass taskId without first starting a direct execution. The subagent runner claims and settles its own execution.',
+        'Changing status to pending does not release an active execution. Inspect and honestly settle a mistaken direct execution before delegating; never wait for your own direct execution as if it were a child.',
+      );
   } else if (readableTasks) {
     lines.push(
       '',

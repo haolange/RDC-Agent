@@ -4,7 +4,11 @@ import { PLAN_TASK_REQUIREMENTS_HEADING } from '../types/taskExecution';
 /** Planner-written appendix holding the references only the executor needs. */
 export const PLAN_EXECUTION_REFERENCES_HEADING = '## Execution references';
 
-const APPENDIX_HEADINGS = [PLAN_EXECUTION_REFERENCES_HEADING, PLAN_INVESTIGATION_HEADING, PLAN_TASK_REQUIREMENTS_HEADING];
+const APPENDIX_HEADINGS = [
+  PLAN_EXECUTION_REFERENCES_HEADING,
+  PLAN_INVESTIGATION_HEADING,
+  PLAN_TASK_REQUIREMENTS_HEADING,
+];
 
 function headingLineIndex(text: string, heading: string): number {
   let from = 0;

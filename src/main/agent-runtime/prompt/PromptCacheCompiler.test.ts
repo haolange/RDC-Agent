@@ -48,36 +48,33 @@ const promptPlan = (stableContent = 'Stable instructions'): PromptPlan => {
   };
 };
 
-const requestPlan = (
-  cachePlan: CachePlan,
-  effectiveModelId = 'model',
-  providerId = 'provider',
-): RequestPlan => createTestRequestPlan({
-  providerId,
-  adapterId: 'openai-responses',
-  catalogRevision: 'catalog',
-  routeRevision: 'route',
-  selectedModelId: effectiveModelId,
-  effectiveModelId,
-  appliedBindingIds: [],
-  route: {
-    protocol: 'OpenAIResponses',
-    baseUrl: 'https://example.test/v1',
-    source: 'catalog',
-  },
-  headers: {},
-  bodyPatch: {},
-  contextBudgetTokens: 128_000,
-  contextMode: 'normal',
-  contextWindowTokens: 128_000,
-  activeTierId: 'default',
-  fastMode: false,
-  reasoningWire: {
-    selection: 'off',
-    control: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
-  },
-  cachePlan,
-});
+const requestPlan = (cachePlan: CachePlan, effectiveModelId = 'model', providerId = 'provider'): RequestPlan =>
+  createTestRequestPlan({
+    providerId,
+    adapterId: 'openai-responses',
+    catalogRevision: 'catalog',
+    routeRevision: 'route',
+    selectedModelId: effectiveModelId,
+    effectiveModelId,
+    appliedBindingIds: [],
+    route: {
+      protocol: 'OpenAIResponses',
+      baseUrl: 'https://example.test/v1',
+      source: 'catalog',
+    },
+    headers: {},
+    bodyPatch: {},
+    contextBudgetTokens: 128_000,
+    contextMode: 'normal',
+    contextWindowTokens: 128_000,
+    activeTierId: 'default',
+    fastMode: false,
+    reasoningWire: {
+      selection: 'off',
+      control: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+    },
+    cachePlan,
+  });
 
 const openAiCachePlan: CachePlan = {
   enabled: true,
@@ -117,7 +114,9 @@ describe('PromptCacheCompiler', () => {
     const baseline = compile(promptPlan(), requestPlan(openAiCachePlan), [{ name: 'read_file' }]);
     expect(compile(promptPlan('Changed'), requestPlan(openAiCachePlan), [{ name: 'read_file' }])).not.toBe(baseline);
     expect(compile(promptPlan(), requestPlan(openAiCachePlan), [{ name: 'write_file' }])).not.toBe(baseline);
-    expect(compile(promptPlan(), requestPlan(openAiCachePlan, 'other-model'), [{ name: 'read_file' }])).not.toBe(baseline);
+    expect(compile(promptPlan(), requestPlan(openAiCachePlan, 'other-model'), [{ name: 'read_file' }])).not.toBe(
+      baseline,
+    );
   });
 
   it('compiles Anthropic automatic caching without inventing a request key', () => {

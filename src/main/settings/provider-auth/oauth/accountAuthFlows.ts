@@ -5,17 +5,8 @@ import {
   startChatGptCallbackServer,
   startChatGptLogin,
 } from './chatGptAccountOAuth';
-import {
-  discoverClaudeCatalog,
-  exchangeClaudeCode,
-  refreshClaudeBundle,
-  startClaudeLogin,
-} from './claudeAccountOAuth';
-import {
-  discoverCopilotCatalog,
-  refreshCopilotBundle,
-  startGitHubCopilotLogin,
-} from './copilotAccountOAuth';
+import { discoverClaudeCatalog, exchangeClaudeCode, refreshClaudeBundle, startClaudeLogin } from './claudeAccountOAuth';
+import { discoverCopilotCatalog, refreshCopilotBundle, startGitHubCopilotLogin } from './copilotAccountOAuth';
 import {
   discoverGrokCatalog,
   exchangeGrokCode,
@@ -24,11 +15,7 @@ import {
   startGrokBrowserLogin,
 } from './grokAccountOAuth';
 import { resolveGrokOAuthDiagnostic } from './grokOAuth';
-import {
-  discoverNousCatalog,
-  refreshNousBundle,
-  startNousLogin,
-} from './nousAccountOAuth';
+import { discoverNousCatalog, refreshNousBundle, startNousLogin } from './nousAccountOAuth';
 import {
   discoverOpenRouterCatalog,
   exchangeOpenRouterCode,
@@ -103,12 +90,13 @@ export const ACCOUNT_AUTH_FLOWS: Readonly<Record<ProviderAccountFlowId, AccountA
       await startChatGptLogin(
         host.providerId,
         (flow) => host.setFlow(flow),
-        (flow) => startChatGptCallbackServer(
-          flow,
-          callbackCompletion(host),
-          (closing) => host.closeFlowServer(closing),
-          (flowId) => host.forgetFlow(flowId),
-        ),
+        (flow) =>
+          startChatGptCallbackServer(
+            flow,
+            callbackCompletion(host),
+            (closing) => host.closeFlowServer(closing),
+            (flowId) => host.forgetFlow(flowId),
+          ),
         (url) => host.openExternal(url),
       );
     },
@@ -181,13 +169,14 @@ export const ACCOUNT_AUTH_FLOWS: Readonly<Record<ProviderAccountFlowId, AccountA
       const flow = await startOpenRouterLogin(
         host.providerId,
         (next) => host.setFlow(next),
-        (next, challenge) => startOpenRouterCallbackServer(
-          next,
-          challenge,
-          callbackCompletion(host),
-          (closing) => host.closeFlowServer(closing),
-          (flowId) => host.forgetFlow(flowId),
-        ),
+        (next, challenge) =>
+          startOpenRouterCallbackServer(
+            next,
+            challenge,
+            callbackCompletion(host),
+            (closing) => host.closeFlowServer(closing),
+            (flowId) => host.forgetFlow(flowId),
+          ),
       );
       void host.openExternal(flow.authUrl);
     },

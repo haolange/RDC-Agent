@@ -1,13 +1,7 @@
 import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 import { findLatestProviderState } from '../reasoning/ProviderStateRefs';
 import { applyGoogleInteractionsReasoning, reasoningVisibilityRequest } from './reasoningWire';
-import type {
-  Context,
-  Message,
-  Model,
-  StreamOptions,
-  ToolDefinition,
-} from '../core/types';
+import type { Context, Message, Model, StreamOptions, ToolDefinition } from '../core/types';
 import type { RequestPlan } from '@shared/types/providerCapability';
 
 export function buildGoogleInteractionsUrl(baseUrl: string): string {
@@ -22,9 +16,7 @@ export function buildGoogleInteractionsRequest(
   options: StreamOptions,
 ): Record<string, unknown> {
   const providerState = findLatestProviderState(context, options.requestPlan);
-  const messages = providerState
-    ? context.messages.slice(providerState.assistantMessageIndex + 1)
-    : context.messages;
+  const messages = providerState ? context.messages.slice(providerState.assistantMessageIndex + 1) : context.messages;
   const body: Record<string, unknown> = {
     model: model.id,
     input: toGoogleInteractionSteps(messages, options.requestPlan),
@@ -41,11 +33,7 @@ export function buildGoogleInteractionsRequest(
   if (typeof maxTokens === 'number' && maxTokens > 0) {
     generationConfig.max_output_tokens = maxTokens;
   }
-  applyGoogleInteractionsReasoning(
-    generationConfig,
-    options.reasoning,
-    reasoningVisibilityRequest(options),
-  );
+  applyGoogleInteractionsReasoning(generationConfig, options.reasoning, reasoningVisibilityRequest(options));
   if (Object.keys(generationConfig).length > 0) body.generation_config = generationConfig;
 
   if (context.tools?.length) {
@@ -61,47 +49,48 @@ export function toGoogleInteractionSteps(
   return messages.flatMap((message) => convertMessage(message, requestPlan));
 }
 
-function convertMessage(
-  message: Message,
-  requestPlan: RequestPlan,
-): Record<string, unknown>[] {
+function convertMessage(message: Message, requestPlan: RequestPlan): Record<string, unknown>[] {
   if (message.role === 'user') {
-    return [{
-      type: 'user_input',
-      content: toInteractionContent(message.content),
-    }];
+    return [
+      {
+        type: 'user_input',
+        content: toInteractionContent(message.content),
+      },
+    ];
   }
   if (message.role === 'toolResult') {
-    return [{
-      type: 'function_result',
-      call_id: message.toolCallId,
-      name: message.toolName,
-      result: toInteractionContent(message.content),
-      ...(message.isError ? { is_error: true } : {}),
-    }];
+    return [
+      {
+        type: 'function_result',
+        call_id: message.toolCallId,
+        name: message.toolName,
+        result: toInteractionContent(message.content),
+        ...(message.isError ? { is_error: true } : {}),
+      },
+    ];
   }
 
   const sameToolLoop = message.content.some((block) => block.type === 'toolCall');
   return message.content.flatMap((block): Record<string, unknown>[] => {
     if (block.type === 'text') {
-      return [{
-        type: 'model_output',
-        content: [{ type: 'text', text: block.text }],
-      }];
+      return [
+        {
+          type: 'model_output',
+          content: [{ type: 'text', text: block.text }],
+        },
+      ];
     }
     if (block.type === 'toolCall') {
-      return [{
-        type: 'function_call',
-        id: block.id,
-        name: block.name,
-        arguments: block.arguments ?? {},
-      }];
+      return [
+        {
+          type: 'function_call',
+          id: block.id,
+          name: block.name,
+          arguments: block.arguments,
+        },
+      ];
     }
-    const decision = decideContinuationReplay(
-      block.continuation,
-      requestPlan,
-      { sameToolLoop },
-    );
+    const decision = decideContinuationReplay(block.continuation, requestPlan, { sameToolLoop });
     if (decision.action !== 'replay' || !block.continuation?.raw) return [];
     return [cloneJsonRecord(block.continuation.raw)];
   });
@@ -130,5 +119,5 @@ function toGoogleInteractionTool(tool: ToolDefinition): Record<string, unknown> 
 }
 
 function cloneJsonRecord(value: Record<string, unknown>): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  return structuredClone(value);
 }

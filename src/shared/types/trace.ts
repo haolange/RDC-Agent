@@ -5,7 +5,12 @@ import type {
   InvestigationRecordType,
 } from './renderdocInvestigation';
 import type { ConversationTaskStatus, TaskDisplayState } from './conversation';
-import type { TaskDependencyWait, TaskExecutionDispatch, TaskExecutionPreparation, TaskExecutionStatus } from './taskExecution';
+import type {
+  TaskDependencyWait,
+  TaskExecutionDispatch,
+  TaskExecutionPreparation,
+  TaskExecutionStatus,
+} from './taskExecution';
 
 export interface RawAuditRef {
   id: string;
@@ -45,18 +50,12 @@ export interface TaskRailItem {
   waitingOn?: TaskDependencyWait[];
 }
 
-export type TraceArtifactType =
-  | 'report'
-  | 'generative_ui'
-  | 'visual_report'
-  | 'evidence_bundle'
-  | 'failure_summary'
-  | 'cancelled_summary'
-  | 'other';
+type TraceArtifactType =
+  'report' | 'generative_ui' | 'visual_report' | 'evidence_bundle' | 'failure_summary' | 'cancelled_summary' | 'other';
 
 export type TraceArtifactSource = 'report' | 'evidence' | 'image' | 'document' | 'data' | 'other';
 
-export type ArtifactStatus = 'draft' | 'ready' | 'failed' | 'superseded';
+type ArtifactStatus = 'draft' | 'ready' | 'failed' | 'superseded';
 
 export interface TraceArtifactRecord {
   id: string;
@@ -81,44 +80,7 @@ export interface TraceArtifactRecord {
   updatedAt: string;
 }
 
-export type ContextKind = 'capture' | 'file' | 'source' | 'capability';
-export type ContextImportance = 'normal' | 'important' | 'cited' | 'decisive';
-
-export interface TraceContextRecord {
-  id: string;
-  sessionId: string;
-  traceLaneId?: string;
-  branchId?: string;
-  kind: ContextKind;
-  label: string;
-  summary?: string;
-  importance: ContextImportance;
-  firstObservedAt: string;
-  lastObservedAt: string;
-  sourceEventIds?: string[];
-  artifactIds?: string[];
-  detailsRef?: string;
-}
-
-export interface UserRequestRevision {
-  id: string;
-  requestId: string;
-  branchId: string;
-  parentRevisionId?: string;
-  prompt: string;
-  createdAt: string;
-  resultingTraceLaneIds: string[];
-}
-
-export interface UserRequest {
-  id: string;
-  sessionId: string;
-  rootRevisionId: string;
-  activeRevisionId: string;
-  revisions: UserRequestRevision[];
-}
-
-export type RequestBranchStatus = 'active' | 'inactive' | 'abandoned' | 'completed';
+type RequestBranchStatus = 'active' | 'inactive' | 'abandoned' | 'completed';
 
 export interface RequestBranch {
   id: string;
@@ -126,13 +88,6 @@ export interface RequestBranch {
   revisionId: string;
   status: RequestBranchStatus;
   traceLaneIds: string[];
-}
-
-export interface RequestBranchGroup {
-  id: string;
-  rootRequestId: string;
-  activeBranchId: string;
-  branches: RequestBranch[];
 }
 
 export interface OutputsPanelViewModel {
@@ -161,14 +116,7 @@ export interface InvestigationArtifactsPanelViewModel {
   storeDegraded: boolean;
 }
 
-export type TaskContextResourceKind =
-  | 'attachment'
-  | 'reference'
-  | 'file'
-  | 'directory'
-  | 'skill'
-  | 'mcp'
-  | 'web';
+type TaskContextResourceKind = 'attachment' | 'reference' | 'file' | 'directory' | 'skill' | 'mcp' | 'web';
 
 export interface TaskContextResource {
   id: string;
@@ -199,7 +147,7 @@ export interface RdcContextCaptureInput {
   sizeBytes: number;
 }
 
-export interface RdcContextCaptureViewModel {
+interface RdcContextCaptureViewModel {
   inputId: string;
   captureId?: string;
   captureFileId?: string;
@@ -213,7 +161,7 @@ export interface RdcContextCaptureViewModel {
   previewAvailable: boolean;
 }
 
-export interface RdcContextRuntimeViewModel {
+interface RdcContextRuntimeViewModel {
   contextId?: string;
   replaySessionId?: string;
   runtimeOwner?: string;
@@ -258,22 +206,19 @@ export interface BranchNavigatorViewModel {
 }
 
 export interface TraceSessionResult {
-  success: boolean;
-  presentation?: import('./agenticTrace').AgentRunPresentation;
-  error?: string;
-}
-
-export interface TraceRevisionResult extends TraceSessionResult {
-  runId?: string;
-  planId?: string;
-  branchId?: string;
-}
-
-export interface TraceBranchSwitchResult extends TraceSessionResult {
-  activeBranchId?: string;
+  presentation: import('./agenticTrace').AgentRunPresentation;
 }
 
 /** Read-only pages of the same current Investigation selection used by the rail. */
-export interface InvestigationListCursor { createdAt: string; artifactId: string }
-export interface InvestigationListRequest { projectId: string; sessionId: string; cursor?: InvestigationListCursor }
-export interface InvestigationListPage extends InvestigationArtifactsPanelViewModel { nextCursor?: InvestigationListCursor }
+export interface InvestigationListCursor {
+  createdAt: string;
+  artifactId: string;
+}
+export interface InvestigationListRequest {
+  projectId: string;
+  sessionId: string;
+  cursor?: InvestigationListCursor;
+}
+export interface InvestigationListPage extends InvestigationArtifactsPanelViewModel {
+  nextCursor?: InvestigationListCursor;
+}

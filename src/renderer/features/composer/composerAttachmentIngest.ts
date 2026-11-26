@@ -1,8 +1,5 @@
 import { isBrowserAppSession } from '../../platform/browserSession';
-import type {
-  ComposerAttachmentDescriptor,
-  ConversationAttachmentStageItem,
-} from '@shared/types/conversation';
+import type { ComposerAttachmentDescriptor, ConversationAttachmentStageItem } from '@shared/types/conversation';
 import type { PendingAttachmentDraft } from '../../types/attachments';
 
 export function descriptorToDraft(descriptor: ComposerAttachmentDescriptor): PendingAttachmentDraft {
@@ -23,9 +20,7 @@ export function descriptorToDraft(descriptor: ComposerAttachmentDescriptor): Pen
 export async function filesToStageItems(files: readonly File[]): Promise<ConversationAttachmentStageItem[]> {
   const items: ConversationAttachmentStageItem[] = [];
   for (const file of files) {
-    const desktopPath = !isBrowserAppSession()
-      ? window.rdcDesktop?.getPathForFile(file) ?? null
-      : null;
+    const desktopPath = !isBrowserAppSession() ? (window.rdcDesktop?.getPathForFile(file) ?? null) : null;
     if (desktopPath) {
       items.push({
         sourcePath: desktopPath,

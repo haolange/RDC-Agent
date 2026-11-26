@@ -1,5 +1,8 @@
 import { getElectronApi } from '../platform/getElectronApi';
-import type { ConversationAccessAttachmentRequest, ConversationAccessAttachmentResult } from '@shared/types/conversation';
+import type {
+  ConversationAccessAttachmentRequest,
+  ConversationAccessAttachmentResult,
+} from '@shared/types/conversation';
 
 export function getAttachmentPreview(request: {
   previewId: string;
@@ -13,7 +16,9 @@ export function getAttachmentPreview(request: {
   });
 }
 
-export async function accessAttachment(request: ConversationAccessAttachmentRequest): Promise<ConversationAccessAttachmentResult> {
+export async function accessAttachment(
+  request: ConversationAccessAttachmentRequest,
+): Promise<ConversationAccessAttachmentResult> {
   try {
     const api = getElectronApi();
     if (api) return await api.conversation.accessAttachment(request);
@@ -23,18 +28,11 @@ export async function accessAttachment(request: ConversationAccessAttachmentRequ
   return { kind: 'error', code: 'unavailable' };
 }
 
-export function getToolImagePreview(request: {
-  sessionId: string;
-  previewId: string;
-}) {
+export function getToolImagePreview(request: { sessionId: string; previewId: string }) {
   return getElectronApi()?.conversation.getToolImagePreview(request);
 }
 
-export function switchConversationBranch(request: {
-  sessionId: string;
-  forkId: string;
-  branchId: string;
-}) {
+export function switchConversationBranch(request: { sessionId: string; forkId: string; branchId: string }) {
   return getElectronApi()?.conversation.switchBranch(request);
 }
 

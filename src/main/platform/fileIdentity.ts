@@ -19,6 +19,11 @@ export async function openedFileIdentity(filePath: string): Promise<BigIntStats>
 
 /** Same file and same bytes as far as metadata can tell: identity, size and both timestamps. */
 export function sameFileState(left: BigIntStats, right: BigIntStats): boolean {
-  return left.dev === right.dev && left.ino === right.ino && left.size === right.size
-    && left.mtimeNs === right.mtimeNs && left.ctimeNs === right.ctimeNs;
+  return (
+    left.dev === right.dev &&
+    left.ino === right.ino &&
+    left.size === right.size &&
+    left.mtimeNs === right.mtimeNs &&
+    left.ctimeNs === right.ctimeNs
+  );
 }

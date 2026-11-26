@@ -12,17 +12,18 @@ import type {
 import type { ProviderConnectionDraft, SettingsSection } from './types';
 
 export function canInitializeAgentEditor(definitions: AgentManifestDefinition[], currentProjectId?: string | null) {
-  return Boolean(currentProjectId?.trim()) || !definitions.some((definition) => definition.provenance?.scope === 'project');
+  return (
+    Boolean(currentProjectId?.trim()) || !definitions.some((definition) => definition.provenance?.scope === 'project')
+  );
 }
 
-export const useSettingsModalState = (
-  open: boolean,
-  settings: AppSettings,
-  currentProjectId?: string | null,
-) => {
+export const useSettingsModalState = (open: boolean, settings: AppSettings, currentProjectId?: string | null) => {
   const [activeSection, setActiveSection] = useState<SettingsSection>('general');
   const [accountDraft, setAccountDraft] = useState(settings.profile);
-  const [providerDrafts, setProviderDrafts] = useState<LlmProviderEntry[]>(settings.llm.providers.map(cloneProvider));
+  // Lazy: the modal stays mounted while closed, and an eager argument cloned every provider on each render.
+  const [providerDrafts, setProviderDrafts] = useState<LlmProviderEntry[]>(() =>
+    settings.llm.providers.map(cloneProvider),
+  );
   const [rdcCliDraft, setRdcCliDraft] = useState<RdcCliInvokerSettings>(settings.tooling.rdcCli);
   const [codeInterpreterDraft, setCodeInterpreterDraft] = useState<CodeInterpreterSettings>(
     settings.tooling.codeInterpreter,
@@ -54,7 +55,9 @@ export const useSettingsModalState = (
       setDraftProjectId(undefined);
       setAgentManifestSaveBlocked(true);
       setAgentManifestSaveState('error');
-      setAgentManifestSaveMessage('AGENT_MANIFEST_PROJECT_ID_REQUIRED: waiting for the current project identity before editing project agents.');
+      setAgentManifestSaveMessage(
+        'AGENT_MANIFEST_PROJECT_ID_REQUIRED: waiting for the current project identity before editing project agents.',
+      );
       return;
     }
     const projectChanged = lastProjectIdRef.current !== currentProjectId;
@@ -68,9 +71,9 @@ export const useSettingsModalState = (
     setRdcCliDraft(settings.tooling.rdcCli);
     setCodeInterpreterDraft(settings.tooling.codeInterpreter);
     setShellDraft(settings.tooling.shell);
-    setAgentManifestDrafts(settings.agents.definitions.map((definition) => (
-      toAgentManifestEditorDraft(definition, currentProjectId)
-    )));
+    setAgentManifestDrafts(
+      settings.agents.definitions.map((definition) => toAgentManifestEditorDraft(definition, currentProjectId)),
+    );
     setDraftProjectId(currentProjectId ?? null);
     setGlobalInstructionsDraft(settings.agents.globalInstructions);
     setSelectedProviderId(providers[0]?.id ?? null);

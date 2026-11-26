@@ -1,117 +1,25 @@
 #!/usr/bin/env node
-import fs from 'node:fs';
-import path from 'node:path';
 import {
   defaultRepoRoot,
   isDirectInvocation,
-  printCheckResult,
-  runSystemDebtCheck,
-} from './system-debt-ratchet.mjs';
+  printForbiddenCheck,
+  runForbiddenCheck,
+} from './lib/forbiddenSourceRules.mjs';
 import { assertBuiltinProfileContracts } from './builtin-profile-contracts.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const INVESTIGATION_RECORDS = [
-  'WorldState',
-  'EvidenceRecord',
-  'ClaimRecord',
-  'ExperimentRecord',
-  'ChallengeRecord',
-  'MissionCheckpoint',
-  'InvestigationArtifactManifest',
-];
-
-export const INVESTIGATION_CONTRACT_CASES = [
-  { title: 'investigation.contract.schema.namespace-fields', minAssertions: 1 },
-  { title: 'investigation.contract.ready.source-hash-schema', minAssertions: 1 },
-  { title: 'investigation.contract.epistemic.order', minAssertions: 1 },
-  { title: 'investigation.contract.s-claim.positive-negative', minAssertions: 1 },
-  { title: 'investigation.contract.s-causal.positive-negative', minAssertions: 1 },
-  { title: 'investigation.contract.s-causal.ready-denied-without-experiment', minAssertions: 1 },
-  { title: 'investigation.contract.skeptic.challenge-shape', minAssertions: 1 },
-  { title: 'investigation.contract.checkpoint.ids-resolvable', minAssertions: 1 },
-  { title: 'investigation.contract.s-rdc.positive-negative', minAssertions: 1 },
-  { title: 'investigation.contract.non-invasion', minAssertions: 1 },
-  { title: 'investigation.contract.rail.five-cards', minAssertions: 1 },
-  { title: 'investigation.contract.analyzer.claimkind-layer', minAssertions: 1 },
-  { title: 'investigation.contract.optimizer.rollback-close', minAssertions: 1 },
-  { title: 'investigation.contract.txn.atomic-recover', minAssertions: 1 },
-  { title: 'investigation.contract.txn.degraded-not-empty', minAssertions: 1 },
-  { title: 'investigation.contract.mission.completion', minAssertions: 1 },
-];
-export const INVESTIGATION_CONTRACT_CASE_IDS = INVESTIGATION_CONTRACT_CASES.map((entry) => entry.title);
-
-const BUILTIN_PROFILES = ['general', 'debugger', 'analyzer', 'optimizer'];
-
-export const INVESTIGATION_RULE_REGISTRY = [
-  {
-    id: 'investigation.missing.types.renderdocInvestigation',
-    kind: 'missing',
-    file: 'src/shared/types/renderdocInvestigation.ts',
-    pattern: "rdc\\.investigation\\.v1",
-    probe: 'source-pattern',
-    note: 'vertical schema namespace lives in src/shared/types/renderdocInvestigation.ts',
-  },
-  ...INVESTIGATION_RECORDS.map((record) => ({
-    id: `investigation.missing.schema.${record}`,
-    kind: 'missing',
-    file: 'src/shared/types/renderdocInvestigation.ts',
-    pattern: record === 'ClaimRecord'
-      ? 'export (?:interface|type) ClaimRecord[\\s\\S]*claimId[\\s\\S]*experimentId'
-      : record === 'ExperimentRecord'
-        ? 'export (?:interface|type) ExperimentRecord[\\s\\S]*experimentId'
-        : record === 'ChallengeRecord'
-          ? 'export (?:interface|type) ChallengeRecord[\\s\\S]*challengeId'
-          : record === 'InvestigationArtifactManifest'
-            ? 'export (?:interface|type) InvestigationArtifactManifest[\\s\\S]*artifactId'
-            : `export (?:interface|type) ${record}`,
-    probe: 'source-pattern',
-    note: `rdc.investigation.v1 must define ${record}`,
-  })),
-  {
-    id: 'investigation.missing.dir.main',
-    kind: 'missing',
-    file: 'src/main/investigation',
-    pattern: '',
-    probe: 'dir-exists',
-    note: 'main-owned investigation module directory',
-  },
-  {
-    id: 'investigation.missing.session.artifacts-card',
-    kind: 'missing',
-    file: 'src/renderer/features/right-rail/SessionRightRail.tsx',
-    pattern: 'id="artifacts"',
-    probe: 'source-pattern',
-    note: 'Session rail target five cards include Artifacts',
-  },
-  ...BUILTIN_PROFILES.map((profile) => ({
-    id: `investigation.missing.builtin.${profile}`,
-    kind: 'missing',
-    file: `resources/agent-runtime/agents/${profile}.agent.md`,
-    pattern: 'target:\\s*rdc-agent',
-    probe: 'source-pattern',
-    note: `four builtin profiles include ${profile} (general + three Missions)`,
-  })),
-  {
-    id: 'investigation.missing.contract.suite',
-    kind: 'missing',
-    file: 'src/main/testing/investigationSystemContract.test.ts',
-    pattern: INVESTIGATION_CONTRACT_CASE_IDS.join('|'),
-    probe: 'contract-suite',
-    note: 'executable Investigation contract suite: schema, ready, epistemic, S-CLAIM/S-CAUSAL/S-RDC, skeptic challenge, checkpoint refs, non-invasion, five cards, analyzer claimKind layer, optimizer rollback close, transactional write recover, degraded-not-empty, mission completion',
-    requiredCases: INVESTIGATION_CONTRACT_CASES,
-    minTests: INVESTIGATION_CONTRACT_CASES.length,
-    minAssertions: INVESTIGATION_CONTRACT_CASES.length,
-  },
+const FORBIDDEN_RULES = [
   {
     id: 'investigation.forbidden.ask-plan-edit.seed',
-    kind: 'forbidden',
     file: 'src/main/settings/agent-manifests/AgentManifestService.ts',
-    pattern: "const createSeedDefinition[\\s\\S]*agentId === 'ask'[\\s\\S]*agentId === 'plan'[\\s\\S]*agentId === 'edit'",
+    pattern:
+      "const createSeedDefinition[\\s\\S]*agentId === 'ask'[\\s\\S]*agentId === 'plan'[\\s\\S]*agentId === 'edit'",
     probe: 'source-pattern',
     note: 'Ask/Plan/Edit user seed writer is current debt',
   },
   {
     id: 'investigation.forbidden.ask-plan-edit.top-level',
-    kind: 'forbidden',
     file: 'src/shared/types/agent.ts',
     pattern: "TOP_LEVEL_AGENT_IDS: AgentId\\[\\] = \\['ask', 'plan', 'edit'",
     probe: 'source-pattern',
@@ -119,15 +27,13 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.ask-plan-edit.default',
-    kind: 'forbidden',
     file: 'src/shared/types/agent.ts',
-    pattern: "DEFAULT_MODEL_ROUTING: Record<AgentId[\\s\\S]*ask:",
+    pattern: 'DEFAULT_MODEL_ROUTING: Record<AgentId[\\s\\S]*ask:',
     probe: 'source-pattern',
     note: 'Ask/Plan/Edit default model routing is current debt',
   },
   {
     id: 'investigation.forbidden.ask-plan-edit.fallback',
-    kind: 'forbidden',
     file: 'src/main/agent-runtime/orchestration/AgentSlotRegistry.ts',
     pattern: "fallbackAgentId[\\s\\S]*'edit'",
     probe: 'source-pattern',
@@ -135,7 +41,6 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.ask-plan-edit.app-mode',
-    kind: 'forbidden',
     file: 'src/shared/types/session.ts',
     pattern: "export type AppMode = 'ask' \\| 'edit'",
     probe: 'source-pattern',
@@ -143,7 +48,6 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.ask-plan-edit.category',
-    kind: 'forbidden',
     file: 'src/shared/constants/agents.ts',
     pattern: "AGENT_CATEGORIES[\\s\\S]*ask: 'orchestrator'[\\s\\S]*plan: 'orchestrator'[\\s\\S]*edit: 'orchestrator'",
     probe: 'source-pattern',
@@ -151,15 +55,13 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.ask-plan-edit.write-scopes',
-    kind: 'forbidden',
     file: 'src/shared/constants/agents.ts',
-    pattern: "AGENT_WRITE_SCOPES[\\s\\S]*ask: \\[\\][\\s\\S]*plan:",
+    pattern: 'AGENT_WRITE_SCOPES[\\s\\S]*ask: \\[\\][\\s\\S]*plan:',
     probe: 'source-pattern',
     note: 'Ask/Plan/Edit writeScopes map is current debt',
   },
   {
     id: 'investigation.forbidden.agent-hooks',
-    kind: 'forbidden',
     file: 'src/main/agent-runtime/agent/AgentHooks.ts',
     pattern: 'export class AgentHooks',
     probe: 'source-pattern',
@@ -167,7 +69,6 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.background-task-runner',
-    kind: 'forbidden',
     file: 'src/main/agent-runtime/scheduler/BackgroundTaskRunner.ts',
     pattern: 'export class BackgroundTaskRunner',
     probe: 'source-pattern',
@@ -175,15 +76,13 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.harness-task',
-    kind: 'forbidden',
-    file: 'src/shared/types/harness.ts',
+    file: 'src/main/reports/artifactRecord.ts',
     pattern: 'export interface HarnessTask',
     probe: 'source-pattern',
     note: 'HarnessTask remains; do not confuse with ArtifactRecord',
   },
   {
     id: 'investigation.forbidden.task-board',
-    kind: 'forbidden',
     file: 'src/main/agent-runtime/orchestration/TaskBoard.ts',
     pattern: 'export class TaskBoard',
     probe: 'source-pattern',
@@ -191,15 +90,13 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.run-capsule',
-    kind: 'forbidden',
-    file: 'src/shared/types/harness.ts',
+    file: 'src/main/reports/artifactRecord.ts',
     pattern: 'export interface RunCapsule',
     probe: 'source-pattern',
     note: 'RunCapsule is current debt',
   },
   {
     id: 'investigation.forbidden.harness-tasks-field',
-    kind: 'forbidden',
     file: 'src/shared/types/workflow.ts',
     pattern: 'harnessTasks\\?:',
     probe: 'source-pattern',
@@ -207,7 +104,6 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.context-service',
-    kind: 'forbidden',
     file: 'src/main/captures/ContextService.ts',
     pattern: 'export class ContextService',
     probe: 'source-pattern',
@@ -215,7 +111,6 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.evidence-ledger',
-    kind: 'forbidden',
     file: 'src/main/reports/EvidenceLedger.ts',
     pattern: 'export class EvidenceLedger',
     probe: 'source-pattern',
@@ -223,23 +118,13 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.report-bundle',
-    kind: 'forbidden',
     file: 'src/main/reports/ReportBundleService.ts',
     pattern: 'export class ReportBundleService',
     probe: 'source-pattern',
     note: 'ReportBundleService is current debt',
   },
   {
-    id: 'investigation.missing.trace-phases',
-    kind: 'missing',
-    file: 'src/main/agent-trace/manifests/profileManifest.ts',
-    pattern: "phaseId: 'understand'[\\s\\S]*phaseId: 'work'[\\s\\S]*phaseId: 'summarize'",
-    probe: 'source-pattern',
-    note: 'trace phases are understand/work/summarize; not Run WorkflowStage',
-  },
-  {
     id: 'investigation.forbidden.session-evidence.schema',
-    kind: 'forbidden',
     file: 'src/main/sessions/store/storageSchema.ts',
     pattern: 'SESSION_EVIDENCE_MIGRATIONS',
     probe: 'source-pattern',
@@ -247,7 +132,6 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.session-evidence.write',
-    kind: 'forbidden',
     file: 'src/main/sessions/store/SessionRecordStore.ts',
     pattern: 'session_evidence\\.yaml',
     probe: 'source-pattern',
@@ -255,7 +139,6 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.use-agent-handoff-actions',
-    kind: 'forbidden',
     file: 'src/renderer/features/transcript/useAgentHandoffActions.ts',
     pattern: 'export function useAgentHandoffActions',
     probe: 'source-pattern',
@@ -263,7 +146,6 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.session.four-card',
-    kind: 'forbidden',
     file: 'src/renderer/features/right-rail/SessionRightRail.tsx',
     pattern: 'id="tasks"[\\s\\S]*id="outputs"[\\s\\S]*id="context"[\\s\\S]*id="capture"',
     unlessPattern: 'id="artifacts"',
@@ -271,24 +153,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
     note: 'current four-card Session rail relative to target five cards',
   },
   {
-    id: 'investigation.missing.txn.protocol',
-    kind: 'missing',
-    file: 'src/main/investigation/investigationTxn.ts',
-    pattern: 'commitInvestigationTxn[\\s\\S]*recoverInvestigationTxn[\\s\\S]*INVESTIGATION_TXN_COMMIT',
-    probe: 'source-pattern',
-    note: 'journal / temp-set / commit marker / atomic replace live in investigationTxn',
-  },
-  {
-    id: 'investigation.missing.service.txn',
-    kind: 'missing',
-    file: 'src/main/investigation/InvestigationArtifactService.ts',
-    pattern: 'commitInvestigationTxn[\\s\\S]*recoverInvestigationTxn',
-    probe: 'source-pattern',
-    note: 'InvestigationArtifactService must commit and recover through investigationTxn',
-  },
-  {
     id: 'investigation.forbidden.non-txn-write-chain',
-    kind: 'forbidden',
     file: 'src/main/investigation',
     pattern: 'this\\.writeArtifact\\([\\s\\S]{0,400}this\\.writeArtifact\\(',
     probe: 'walk-pattern',
@@ -296,7 +161,6 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.service.direct-write',
-    kind: 'forbidden',
     file: 'src/main/investigation/InvestigationArtifactService.ts',
     pattern: 'this\\.writeArtifact\\(|this\\.upsertIndex\\(',
     probe: 'source-pattern',
@@ -304,7 +168,6 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.evidence-ledger.anywhere',
-    kind: 'forbidden',
     file: 'src',
     pattern: 'export class EvidenceLedger',
     probe: 'walk-pattern',
@@ -312,7 +175,6 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.harness-task.anywhere',
-    kind: 'forbidden',
     file: 'src',
     pattern: 'export interface HarnessTask',
     probe: 'walk-pattern',
@@ -320,7 +182,6 @@ export const INVESTIGATION_RULE_REGISTRY = [
   },
   {
     id: 'investigation.forbidden.session-evidence.anywhere',
-    kind: 'forbidden',
     file: 'src',
     pattern: 'session_evidence\\.yaml|SESSION_EVIDENCE_MIGRATIONS',
     probe: 'walk-pattern',
@@ -333,18 +194,10 @@ export function runInvestigationSystemCheck(overrides = {}) {
   if (fs.existsSync(path.join(repoRoot, 'resources', 'agent-runtime', 'agents'))) {
     assertBuiltinProfileContracts(repoRoot);
   }
-  return runSystemDebtCheck({
-    name: 'investigation-system',
-    repoRoot,
-    registry: INVESTIGATION_RULE_REGISTRY,
-    debtRelativePath: 'scripts/fidelity/investigation-system-debt.json',
-    argv: overrides.argv || process.argv.slice(2),
-    env: overrides.env || process.env,
-    ...overrides,
-  });
+  // Hard-forbidden structures are shared with check:knowledge-system, which reports them once.
+  return runForbiddenCheck({ name: 'investigation-system', repoRoot, rules: FORBIDDEN_RULES, hardForbids: false });
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  const result = runInvestigationSystemCheck();
-  process.exit(printCheckResult('investigation-system', result));
+  process.exit(printForbiddenCheck(runInvestigationSystemCheck()));
 }

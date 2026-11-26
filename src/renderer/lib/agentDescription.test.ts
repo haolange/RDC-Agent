@@ -1,8 +1,12 @@
 import { expect, it } from 'vitest';
 import { agentArgumentHint, agentDescription } from './agentDescription';
 
-const shipped = { description: 'Execution Orchestrator for ordinary work.', descriptionTranslations: { 'zh-CN': '执行编排者' },
-  argumentHint: 'Describe the task', argumentHintTranslations: { 'zh-CN': '要执行的任务' } };
+const shipped = {
+  description: 'Execution Orchestrator for ordinary work.',
+  descriptionTranslations: { 'zh-CN': '执行编排者' },
+  argumentHint: 'Describe the task',
+  argumentHintTranslations: { 'zh-CN': '要执行的任务' },
+};
 
 it('shows shipped manifest copy in the interface language and falls back to the manifest text', () => {
   expect(agentDescription(undefined, 'zh-CN')).toBe('');

@@ -9,14 +9,10 @@ import { parseShellRdcInput, type RdcShellInput } from '../../../rdc/RdcShellInp
 import { executeRdcShell } from '../../../rdc/executeRdcShell';
 import { processSupervisor } from '../../../runtime/ProcessSupervisor';
 import { shellResolver, type ShellKind } from '../../../runtime/ShellResolver';
-import { describeResolvedShell, resolveConfiguredShell } from '../../../runtime/resolveConfiguredShell';
-import { storageAdapter } from '../../../sessions/store/StorageAdapter';
-import {
-  SHELL_DEFAULT_TIMEOUT_MS,
-  SHELL_MAX_OUTPUT_BYTES,
-  SHELL_MAX_TIMEOUT_MS,
-} from './toolLimits';
-import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
+import { describeResolvedShell, resolveConfiguredShell } from '../../../tools/resolveConfiguredShell';
+import { sessionContextStore } from '../../../sessions/store/sessionStores';
+import { SHELL_DEFAULT_TIMEOUT_MS, SHELL_MAX_OUTPUT_BYTES, SHELL_MAX_TIMEOUT_MS } from '../../../runtime/toolLimits';
+import { requireMutationWorkspaceRoot, truncateOutput } from '../../../runtime/toolFiles';
 import {
   buildAgentShellEnv,
   createShellTrailerMarker,
@@ -58,7 +54,7 @@ function withSessionShellLock<T>(sessionId: string | null, work: () => Promise<T
 
 function resolvePersistedCwd(sessionId: string | null, projectRoot: string): string {
   if (!sessionId) return projectRoot;
-  const persisted = storageAdapter.readSessionShellCwd(sessionId);
+  const persisted = sessionContextStore.readSessionShellCwd(sessionId);
   if (!persisted) return projectRoot;
   if (!isPathInsideRoot(persisted, projectRoot)) {
     persistCwd(sessionId, projectRoot);
@@ -70,7 +66,7 @@ function resolvePersistedCwd(sessionId: string | null, projectRoot: string): str
 function persistCwd(sessionId: string | null, cwd: string): void {
   if (!sessionId) return;
   try {
-    storageAdapter.writeSessionShellCwd(sessionId, cwd);
+    sessionContextStore.writeSessionShellCwd(sessionId, cwd);
   } catch {
     /* session may have been removed mid-turn */
   }
@@ -85,16 +81,42 @@ function resolveReportedExitCode(trailerExit: number | undefined, processCode: n
   return processCode;
 }
 
-export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operation?: string; receipt?: import("@shared/types/renderdocInvestigation").InvestigationContentRef }> = {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Native RDC operations and catalog discovery keep their URI/hash as evidence even when small. */
+function isNativeRdcEvidence(result: AgentToolResult): boolean {
+  const details = result.details;
+  if (
+    typeof details !== 'object' ||
+    details === null ||
+    !('operation' in details) ||
+    typeof details.operation !== 'string'
+  )
+    return false;
+  return (
+    details.operation.startsWith('rd.') ||
+    details.operation === 'rdc_tool.tools.search' ||
+    details.operation === 'rdc_tool.tools.describe' ||
+    details.operation === 'rdc_tool.tools.list'
+  );
+}
+
+export const shellTool: AgentTool<
+  ShellParams,
+  Partial<ShellDetails> & {
+    operation?: string;
+    receipt?: import('@shared/types/renderdocInvestigation').InvestigationContentRef;
+  }
+> = {
   name: 'shell',
   label: '终端命令',
   get description() {
     try {
       return describeResolvedShell(resolveConfiguredShell());
     } catch (error) {
-      return error instanceof Error
-        ? error.message
-        : 'SHELL_UNAVAILABLE: No usable shell executable was found.';
+      return error instanceof Error ? error.message : 'SHELL_UNAVAILABLE: No usable shell executable was found.';
     }
   },
   parameters: {
@@ -105,29 +127,74 @@ export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operati
         description: 'The shell command to execute in the current session working directory',
       },
       rdc: {
-        type: 'object', additionalProperties: false,
-        oneOf: [{ type: 'object', required: ['operation', 'args'], properties: { operation: {}, args: {}, experimentId: {} }, additionalProperties: false }, { type: 'object', required: ['discovery'], properties: { discovery: {} }, additionalProperties: false }],
+        type: 'object',
+        additionalProperties: false,
+        oneOf: [
+          {
+            type: 'object',
+            required: ['operation', 'args'],
+            properties: { operation: {}, args: {}, experimentId: {} },
+            additionalProperties: false,
+          },
+          { type: 'object', required: ['discovery'], properties: { discovery: {} }, additionalProperties: false },
+        ],
         properties: {
           discovery: {
-            type: 'object', additionalProperties: false, required: ['kind'],
+            type: 'object',
+            additionalProperties: false,
+            required: ['kind'],
             properties: {
               kind: { enum: ['search', 'describe', 'list'] },
-              query: { type: 'string', description: 'Rank frozen operation names, descriptions, and supporting fields. Search may be truncated. Use list for complete frozen capability coverage and describe for one operation contract.' },
-              limit: { type: 'integer', minimum: 1, maximum: 20 }, operation: { type: 'string' },
-              cursor: { type: 'object', additionalProperties: false, required: ['offset', 'fingerprint'], properties: {
-                offset: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
-                fingerprint: { type: 'string', pattern: '^[a-f0-9]{64}$' },
-              } },
+              query: {
+                type: 'string',
+                description:
+                  'Rank frozen operation names, descriptions, and supporting fields. Search may be truncated. Use list for complete frozen capability coverage and describe for one operation contract.',
+              },
+              limit: { type: 'integer', minimum: 1, maximum: 20 },
+              operation: { type: 'string' },
+              cursor: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['offset', 'fingerprint'],
+                properties: {
+                  offset: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+                  fingerprint: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+                },
+              },
             },
             oneOf: [
-              { type: 'object', properties: { kind: { const: 'search' }, query: {}, limit: {} }, required: ['query'], additionalProperties: false },
-              { type: 'object', properties: { kind: { const: 'describe' }, operation: {} }, required: ['operation'], additionalProperties: false },
-              { type: 'object', properties: { kind: { const: 'list' }, cursor: {}, limit: {} }, additionalProperties: false },
+              {
+                type: 'object',
+                properties: { kind: { const: 'search' }, query: {}, limit: {} },
+                required: ['query'],
+                additionalProperties: false,
+              },
+              {
+                type: 'object',
+                properties: { kind: { const: 'describe' }, operation: {} },
+                required: ['operation'],
+                additionalProperties: false,
+              },
+              {
+                type: 'object',
+                properties: { kind: { const: 'list' }, cursor: {}, limit: {} },
+                additionalProperties: false,
+              },
             ],
           },
-          operation: { type: 'string', description: 'Discovered RDC operation allowed by its frozen capability contract. General only.' },
-          args: { type: 'object', description: 'Native operation arguments. Omit session_id, capture_file_id, context_id, and other replay identity fields even when a native catalog schema lists them as required; main injects the owning identity and rejects overrides.' },
-          experimentId: { type: 'string', description: 'Bind a signed execution receipt to this experiment. Required for investigation closure.' },
+          operation: {
+            type: 'string',
+            description: 'Discovered RDC operation allowed by its frozen capability contract. General only.',
+          },
+          args: {
+            type: 'object',
+            description:
+              'Native operation arguments. Omit session_id, capture_file_id, context_id, and other replay identity fields even when a native catalog schema lists them as required; main injects the owning identity and rejects overrides.',
+          },
+          experimentId: {
+            type: 'string',
+            description: 'Bind a signed execution receipt to this experiment. Required for investigation closure.',
+          },
         },
       },
       timeout: {
@@ -140,24 +207,31 @@ export const shellTool: AgentTool<ShellParams, Partial<ShellDetails> & { operati
   },
   spec: {
     isReadOnly: false,
-    isConcurrencySafe: false,
+    concurrency: 'exclusive',
     isDestructive: true,
     sideEffect: 'process',
     category: 'system',
     requiresApproval: true,
+    capture: {
+      live: (args) => args.rdc !== undefined,
+      requiresApprovedScope: (args) => isRecord(args.rdc) && 'operation' in args.rdc,
+      nativeOperation: (args) => args.rdc !== undefined,
+    },
+    shellCommand: 'command',
+    presentation: { pinEvidence: (_args, result) => isNativeRdcEvidence(result), deliversNativeFailure: true },
   },
   permissionHint: 'mutation',
   validateArgs: validateShellInputMode,
 
   async execute(_toolCallId, params, signal, onUpdate, context) {
     validateShellInputMode(params);
-    if (params.rdc) return withSessionShellLock(context?.sessionId ?? null, () => executeRdcShell(params.rdc!, _toolCallId, signal, context));
-    return withSessionShellLock(context?.sessionId ?? null, () => executeShellCommand(
-      params,
-      signal,
-      onUpdate,
-      context,
-    ));
+    if (params.rdc)
+      return withSessionShellLock(context?.sessionId ?? null, () =>
+        executeRdcShell(params.rdc!, _toolCallId, signal, context),
+      );
+    return withSessionShellLock(context?.sessionId ?? null, () =>
+      executeShellCommand(params, signal, onUpdate, context),
+    );
   },
 };
 
@@ -167,24 +241,22 @@ async function executeShellCommand(
   onUpdate: Parameters<typeof shellTool.execute>[3],
   context: Parameters<typeof shellTool.execute>[4],
 ): Promise<AgentToolResult<ShellDetails>> {
-    const command = params.command!;
-    const timeoutMs = Math.max(
-      1,
-      Math.min(
-        SHELL_MAX_TIMEOUT_MS,
-        Math.floor(Number.isFinite(params.timeout) ? Number(params.timeout) : SHELL_DEFAULT_TIMEOUT_MS),
-      ),
-    );
-    const projectRoot = requireMutationWorkspaceRoot(context);
-    const sessionId = context?.sessionId ?? null;
-    const spawnCwd = resolvePersistedCwd(sessionId, projectRoot);
-    const startedAt = Date.now();
-    const shell = resolveConfiguredShell();
-    const marker = createShellTrailerMarker();
-    const tempDir = isPosixShellKind(shell.kind)
-      ? await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-shell-'))
-      : null;
-    try {
+  const command = params.command!;
+  const timeoutMs = Math.max(
+    1,
+    Math.min(
+      SHELL_MAX_TIMEOUT_MS,
+      Math.floor(Number.isFinite(params.timeout) ? Number(params.timeout) : SHELL_DEFAULT_TIMEOUT_MS),
+    ),
+  );
+  const projectRoot = requireMutationWorkspaceRoot(context);
+  const sessionId = context?.sessionId ?? null;
+  const spawnCwd = resolvePersistedCwd(sessionId, projectRoot);
+  const startedAt = Date.now();
+  const shell = resolveConfiguredShell();
+  const marker = createShellTrailerMarker();
+  const tempDir = isPosixShellKind(shell.kind) ? await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-shell-')) : null;
+  try {
     const scriptPath = tempDir ? path.join(tempDir, 'command.sh') : undefined;
     if (scriptPath) {
       await writeFile(scriptPath, `${command}\n`, 'utf8');
@@ -240,9 +312,10 @@ async function executeShellCommand(
     stderr = supervised.stderr.toString() || stderr;
 
     if (info.reason === 'unconfirmed_orphan' || info.reason === 'spawn_failed') {
-      const suffix = info.reason === 'unconfirmed_orphan'
-        ? '\n[orphan] process termination was not confirmed.'
-        : `\n[spawn error] ${info.error?.message ?? 'spawn failed'}`;
+      const suffix =
+        info.reason === 'unconfirmed_orphan'
+          ? '\n[orphan] process termination was not confirmed.'
+          : `\n[spawn error] ${info.error?.message ?? 'spawn failed'}`;
       const text = combineOutput(stdout, stderr) + suffix;
       return errorResult(command, info.reason, text, startedAt, spawnCwd, null);
     }
@@ -257,7 +330,9 @@ async function executeShellCommand(
     if (!parsed.trailer) {
       diagnostics.push('[shell] trailer missing; working directory was not updated.');
     } else if (parsed.trailer.provider && parsed.trailer.provider !== 'FileSystem') {
-      diagnostics.push(`[shell] cwd provider ${parsed.trailer.provider} is not FileSystem; working directory was not updated.`);
+      diagnostics.push(
+        `[shell] cwd provider ${parsed.trailer.provider} is not FileSystem; working directory was not updated.`,
+      );
     } else if (parsed.trailer.cwd && !isPathInsideRoot(parsed.trailer.cwd, projectRoot)) {
       diagnostics.push(`[shell] cwd left the project root (${parsed.trailer.cwd}); working directory was not updated.`);
     } else if (parsed.trailer.cwd) {
@@ -285,11 +360,11 @@ async function executeShellCommand(
         cwd,
       },
     };
-    } finally {
-      if (tempDir) {
-        await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
-      }
+  } finally {
+    if (tempDir) {
+      await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
     }
+  }
 }
 
 function isPosixShellKind(kind: ShellKind): boolean {

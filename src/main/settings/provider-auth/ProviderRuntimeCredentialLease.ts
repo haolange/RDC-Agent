@@ -19,12 +19,12 @@ export interface FrozenProviderRuntimeCredentialLease {
  */
 export async function freezeProviderRuntimeCredentials(
   providerId: LlmProviderId,
-  operation: ProviderRuntimeCredentialOperation = 'chat',
 ): Promise<FrozenProviderRuntimeCredentialLease> {
+  const operation: ProviderRuntimeCredentialOperation = 'chat';
   const surface = await loadProviderSurface(providerId);
   if (!surface) throw new Error(`Provider Catalog surface ${providerId} is unavailable.`);
 
-  const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+  const provider = settingsService.providerConnections.get(providerId);
   const accountCredentialsRefreshed = provider?.authMode === 'account';
   if (accountCredentialsRefreshed) {
     await providerAccountAuthService.ensureRuntimeCredentials(providerId);

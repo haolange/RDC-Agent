@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { directoryLinkType } from '../../../platform/paths';
 
 vi.mock('electron', () => ({ app: {} }));
+import { hashCaptureFile } from '../../../runtime/captureContentHash';
 import { ReplayHistoryStore } from './ReplayHistoryStore';
-import { hashCaptureFile } from './captureContentHash';
 import type { ReplayHistoryScope } from './replayStorageTypes';
 
 const roots: string[] = [];
@@ -40,14 +40,23 @@ describe('ReplayHistoryStore', () => {
     expect(await reloaded.readImage(scope, page.entries[0].imageSha256!)).toEqual(image);
     const files = await fs.readdir(path.join(scope.projectRoot, '.rdc-agent', 'replay', scope.sessionId, hash));
     expect(files.filter((file) => file.endsWith('.png'))).toHaveLength(1);
-    await expect(fs.stat(path.join(scope.projectRoot, '.rdc-agent', 'replay.lock'))).rejects.toHaveProperty('code', 'ENOENT');
+    await expect(fs.stat(path.join(scope.projectRoot, '.rdc-agent', 'replay.lock'))).rejects.toHaveProperty(
+      'code',
+      'ENOENT',
+    );
   });
 
   it('serializes writes across store instances and isolates the same capture across sessions', async () => {
     const scope = await setup();
     const stores = [new ReplayHistoryStore({ codec }), new ReplayHistoryStore({ codec })];
-    await Promise.all(Array.from({ length: 12 }, (_, index) => stores[index % 2].append(scope, { ...fact, operationId: String(index) })));
-    expect((await stores[0].list(scope)).entries.map((entry) => entry.sequence)).toEqual(Array.from({ length: 12 }, (_, i) => i + 1));
+    await Promise.all(
+      Array.from({ length: 12 }, (_, index) =>
+        stores[index % 2].append(scope, { ...fact, operationId: String(index) }),
+      ),
+    );
+    expect((await stores[0].list(scope)).entries.map((entry) => entry.sequence)).toEqual(
+      Array.from({ length: 12 }, (_, i) => i + 1),
+    );
     expect((await stores[0].list({ ...scope, sessionId: 'another' })).entries).toEqual([]);
   });
 
@@ -56,7 +65,9 @@ describe('ReplayHistoryStore', () => {
     const store = new ReplayHistoryStore({ codec });
     await store.append(scope, fact, image);
     const limited = new ReplayHistoryStore({ codec, sessionQuotaBytes: 1 });
-    await expect(limited.append(scope, { ...fact, operationId: 'rejected' }, Buffer.concat([image, Buffer.from('different')]))).rejects.toThrow('REPLAY_QUOTA_EXCEEDED');
+    await expect(
+      limited.append(scope, { ...fact, operationId: 'rejected' }, Buffer.concat([image, Buffer.from('different')])),
+    ).rejects.toThrow('REPLAY_QUOTA_EXCEEDED');
     expect((await store.list(scope)).entries).toHaveLength(1);
   });
 
@@ -64,15 +75,30 @@ describe('ReplayHistoryStore', () => {
     const scope = await setup();
     const store = new ReplayHistoryStore({ codec, projectQuotaBytes: 1 });
     await expect(store.append(scope, fact, image)).rejects.toThrow('REPLAY_QUOTA_EXCEEDED');
-    await expect(fs.stat(path.join(scope.projectRoot, '.rdc-agent', 'replay'))).rejects.toHaveProperty('code', 'ENOENT');
+    await expect(fs.stat(path.join(scope.projectRoot, '.rdc-agent', 'replay'))).rejects.toHaveProperty(
+      'code',
+      'ENOENT',
+    );
   });
 
   it('stores selection without opening anything and safely overwrites it', async () => {
     const scope = await setup();
     const store = new ReplayHistoryStore({ codec });
-    await store.saveSelection(scope.projectRoot, scope.sessionId, { inputId: 'capture', captureSha256: hash, deviceId: 'android' });
-    await store.saveSelection(scope.projectRoot, scope.sessionId, { inputId: 'capture', captureSha256: hash, deviceId: 'local' });
-    expect(await store.readSelection(scope.projectRoot, scope.sessionId)).toEqual({ inputId: 'capture', captureSha256: hash, deviceId: 'local' });
+    await store.saveSelection(scope.projectRoot, scope.sessionId, {
+      inputId: 'capture',
+      captureSha256: hash,
+      deviceId: 'android',
+    });
+    await store.saveSelection(scope.projectRoot, scope.sessionId, {
+      inputId: 'capture',
+      captureSha256: hash,
+      deviceId: 'local',
+    });
+    expect(await store.readSelection(scope.projectRoot, scope.sessionId)).toEqual({
+      inputId: 'capture',
+      captureSha256: hash,
+      deviceId: 'local',
+    });
     expect((await store.list(scope)).entries).toEqual([]);
   });
 
@@ -108,7 +134,9 @@ describe('ReplayHistoryStore', () => {
     await fs.writeFile(path.join(captureRoot, `${'b'.repeat(64)}.png`), image);
     await fs.writeFile(path.join(captureRoot, 'unknown.txt'), 'keep');
     await store.recover(scope.projectRoot);
-    expect(await fs.readdir(captureRoot)).toEqual(expect.arrayContaining(['manifest.json', `${saved.imageSha256}.png`, 'unknown.txt']));
+    expect(await fs.readdir(captureRoot)).toEqual(
+      expect.arrayContaining(['manifest.json', `${saved.imageSha256}.png`, 'unknown.txt']),
+    );
     expect((await fs.readdir(captureRoot)).length).toBe(3);
     await fs.writeFile(path.join(captureRoot, 'manifest.json'), '{broken');
     await expect(store.recover(scope.projectRoot)).rejects.toThrow('REPLAY_MANIFEST_CORRUPT');
@@ -119,7 +147,10 @@ describe('ReplayHistoryStore', () => {
     const scope = await setup();
     const store = new ReplayHistoryStore({ codec });
     const saved = await store.append(scope, fact, image);
-    await fs.writeFile(path.join(scope.projectRoot, '.rdc-agent', 'replay', scope.sessionId, hash, `${saved.imageSha256}.png`), 'corrupted');
+    await fs.writeFile(
+      path.join(scope.projectRoot, '.rdc-agent', 'replay', scope.sessionId, hash, `${saved.imageSha256}.png`),
+      'corrupted',
+    );
     await expect(store.readImage(scope, saved.imageSha256!)).rejects.toThrow('REPLAY_IMAGE_CORRUPT');
     await expect(store.append(scope, fact, image)).rejects.toThrow('REPLAY_IMAGE_CORRUPT');
   });
@@ -136,6 +167,29 @@ describe('ReplayHistoryStore', () => {
     expect((await store.list(other)).entries).toHaveLength(0);
     await store.clearSession(scope.projectRoot, scope.sessionId);
     expect(await fs.readFile(path.join(scope.projectRoot, 'capture.rdc'), 'utf8')).toBe('original');
+  });
+
+  it('rejects a stored manifest entry that this store did not write', async () => {
+    const scope = await setup();
+    const store = new ReplayHistoryStore({ codec });
+    await store.append(scope, fact);
+    const manifest = path.join(scope.projectRoot, '.rdc-agent', 'replay', scope.sessionId, hash, 'manifest.json');
+    const stored = JSON.parse(await fs.readFile(manifest, 'utf8'));
+    stored.entries[0].operationId = 7;
+    await fs.writeFile(manifest, JSON.stringify(stored));
+    await expect(store.list(scope)).rejects.toMatchObject({ code: 'REPLAY_MANIFEST_CORRUPT' });
+  });
+
+  it('never steals a lock whose owner record is not one this store writes', async () => {
+    const scope = await setup();
+    await fs.mkdir(path.join(scope.projectRoot, '.rdc-agent'));
+    await fs.writeFile(
+      path.join(scope.projectRoot, '.rdc-agent', 'replay.lock'),
+      JSON.stringify({ pid: 'self', token: 'another-owner' }),
+    );
+    await expect(new ReplayHistoryStore({ codec }).append(scope, fact)).rejects.toMatchObject({
+      code: 'REPLAY_LOCK_CORRUPT',
+    });
   });
 
   it('never steals a live process lock', async () => {
@@ -160,30 +214,38 @@ describe('ReplayHistoryStore', () => {
     const directory = path.join(scope.projectRoot, '.rdc-agent');
     expect((await fs.readdir(directory)).filter((name) => name.includes('replay-lock'))).toEqual([]);
   });
-  it.each(['writeFile', 'sync'] as const)('cleans only its own lock when initial %s fails and permits retry', async (method) => {
-    const scope = await setup();
-    const originalOpen = fs.open.bind(fs);
-    const spy = vi.spyOn(fs, 'open').mockImplementation(async (...args: Parameters<typeof fs.open>) => {
-      const handle = await originalOpen(...args);
-      if (String(args[0]).includes('.replay-lock-')) vi.spyOn(handle, method).mockRejectedValueOnce(new Error('INJECTED_DISK_FAILURE'));
-      return handle;
-    });
-    const store = new ReplayHistoryStore({ codec });
-    await expect(store.append(scope, fact)).rejects.toThrow('INJECTED_DISK_FAILURE');
-    await expect(fs.stat(path.join(scope.projectRoot, '.rdc-agent', 'replay.lock'))).rejects.toHaveProperty('code', 'ENOENT');
-    spy.mockRestore();
-    expect((await store.append(scope, fact)).saved).toBe(true);
-  });
+  it.each(['writeFile', 'sync'] as const)(
+    'cleans only its own lock when initial %s fails and permits retry',
+    async (method) => {
+      const scope = await setup();
+      const originalOpen = fs.open.bind(fs);
+      const spy = vi.spyOn(fs, 'open').mockImplementation(async (...args: Parameters<typeof fs.open>) => {
+        const handle = await originalOpen(...args);
+        if (String(args[0]).includes('.replay-lock-'))
+          vi.spyOn(handle, method).mockRejectedValueOnce(new Error('INJECTED_DISK_FAILURE'));
+        return handle;
+      });
+      const store = new ReplayHistoryStore({ codec });
+      await expect(store.append(scope, fact)).rejects.toThrow('INJECTED_DISK_FAILURE');
+      await expect(fs.stat(path.join(scope.projectRoot, '.rdc-agent', 'replay.lock'))).rejects.toHaveProperty(
+        'code',
+        'ENOENT',
+      );
+      spy.mockRestore();
+      expect((await store.append(scope, fact)).saved).toBe(true);
+    },
+  );
   it('does not delete another token that replaced a failed lock owner', async () => {
     const scope = await setup();
     const target = path.join(scope.projectRoot, '.rdc-agent', 'replay.lock');
     const originalOpen = fs.open.bind(fs);
     vi.spyOn(fs, 'open').mockImplementation(async (...args: Parameters<typeof fs.open>) => {
       const handle = await originalOpen(...args);
-      if (String(args[0]).includes('.replay-lock-')) vi.spyOn(handle, 'sync').mockImplementationOnce(async () => {
-        await fs.writeFile(target, JSON.stringify({ pid: process.pid, token: 'other-owner' }));
-        throw new Error('INJECTED_DISK_FAILURE');
-      });
+      if (String(args[0]).includes('.replay-lock-'))
+        vi.spyOn(handle, 'sync').mockImplementationOnce(async () => {
+          await fs.writeFile(target, JSON.stringify({ pid: process.pid, token: 'other-owner' }));
+          throw new Error('INJECTED_DISK_FAILURE');
+        });
       return handle;
     });
     await expect(new ReplayHistoryStore({ codec }).append(scope, fact)).rejects.toThrow('INJECTED_DISK_FAILURE');
@@ -198,7 +260,10 @@ describe('ReplayHistoryStore', () => {
     await fs.writeFile(path.join(sessionRoot, '.pending-123-abcd'), 'unfinished selection');
     await store.recover(scope.projectRoot);
     await expect(fs.stat(path.join(sessionRoot, '.pending-123-abcd'))).rejects.toHaveProperty('code', 'ENOENT');
-    expect(await store.readSelection(scope.projectRoot, scope.sessionId)).toEqual({ inputId: 'capture', captureSha256: hash });
+    expect(await store.readSelection(scope.projectRoot, scope.sessionId)).toEqual({
+      inputId: 'capture',
+      captureSha256: hash,
+    });
     expect((await store.list(scope)).entries).toHaveLength(1);
   });
   it('prunes selection-only directories after their capture reference disappears', async () => {
@@ -206,14 +271,25 @@ describe('ReplayHistoryStore', () => {
     const store = new ReplayHistoryStore({ codec });
     await store.saveSelection(scope.projectRoot, scope.sessionId, { inputId: 'capture', captureSha256: hash });
     await store.reconcileCaptureReferences(scope.projectRoot, new Set());
-    await expect(fs.stat(path.join(scope.projectRoot, '.rdc-agent', 'replay'))).rejects.toHaveProperty('code', 'ENOENT');
+    await expect(fs.stat(path.join(scope.projectRoot, '.rdc-agent', 'replay'))).rejects.toHaveProperty(
+      'code',
+      'ENOENT',
+    );
   });
   it('rebinds a closed session selection by content when its original input was moved or removed', async () => {
     const scope = await setup();
     const store = new ReplayHistoryStore({ codec });
-    await store.saveSelection(scope.projectRoot, scope.sessionId, { inputId: 'removed', captureSha256: hash, deviceId: 'android' });
+    await store.saveSelection(scope.projectRoot, scope.sessionId, {
+      inputId: 'removed',
+      captureSha256: hash,
+      deviceId: 'android',
+    });
     await store.reconcileInputSelections(scope.projectRoot, [{ inputId: 'remaining', contentSha256: hash }]);
-    expect(await store.readSelection(scope.projectRoot, scope.sessionId)).toEqual({ inputId: 'remaining', captureSha256: hash, deviceId: 'android' });
+    expect(await store.readSelection(scope.projectRoot, scope.sessionId)).toEqual({
+      inputId: 'remaining',
+      captureSha256: hash,
+      deviceId: 'android',
+    });
     await store.reconcileInputSelections(scope.projectRoot, [{ inputId: 'remaining', contentSha256: 'b'.repeat(64) }]);
     expect(await store.readSelection(scope.projectRoot, scope.sessionId)).toBeNull();
   });
@@ -233,11 +309,14 @@ describe('hashCaptureFile', () => {
   });
 });
 it('persists failed execution facts with unknown EID without inventing a successful frame', async () => {
-  const scope = await setup(); const store = new ReplayHistoryStore({ codec });
+  const scope = await setup();
+  const store = new ReplayHistoryStore({ codec });
   await store.append(scope, { ...fact, eventId: null, failure: 'Observation unavailable', toolCallId: 'failed-tool' });
   const restored = await new ReplayHistoryStore({ codec }).list(scope);
   expect(restored.entries[0]).toMatchObject({ eventId: null, failure: 'Observation unavailable', saved: true });
   expect(restored.entries[0].imageSha256).toBeUndefined();
   await expect(store.append(scope, { ...fact, eventId: null })).rejects.toThrow('INVALID_OBSERVATION');
-  await expect(store.append(scope, { ...fact, eventId: null, failure: 'Unknown event' }, image)).rejects.toThrow('INVALID_OBSERVATION');
+  await expect(store.append(scope, { ...fact, eventId: null, failure: 'Unknown event' }, image)).rejects.toThrow(
+    'INVALID_OBSERVATION',
+  );
 });

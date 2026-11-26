@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { samePath } from '../platform/paths';
-import { StorageIo } from '../sessions/store/StorageIo';
-import { KnowledgeWriteIntegrityError, KnowledgeWritePathError } from './knowledgeErrors';
+import { StorageIo } from '../runtime/StorageIo';
 import type { KnowledgeCardDetail, KnowledgeCardSummary, KnowledgeSpace } from '@shared/types/knowledge';
 import type { ParsedKnowledgeSource } from './knowledgeCardSchema';
 
@@ -29,12 +29,17 @@ export function extractPreview(body: string): string | undefined {
   const title = /^#\s+(.+)$/m.exec(body)?.[1]?.trim();
   // Structured chapters (scope, root cause) are rendered by the reader, not shown raw in a one-line preview,
   // and a chapter that only repeats the title adds nothing.
-  const prose = body.replace(/```[\s\S]*?```/g, '').split(/\n\s*\n/)
+  const prose = body
+    .replace(/```[\s\S]*?```/g, '')
+    .split(/\n\s*\n/)
     .map((paragraph) => paragraph.replace(/^#+\s+.+$/gm, '').trim())
     .filter((paragraph) => paragraph && paragraph !== title && !/^[[{]/.test(paragraph))
     .join(' ');
   const plain = prose
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[*_`>#-]/g, ' ').replace(/\s+/g, ' ').trim();
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_`>#-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!plain) return undefined;
   return plain.length > PREVIEW_MAX_CHARS ? `${plain.slice(0, PREVIEW_MAX_CHARS - 1)}…` : plain;
 }
@@ -52,28 +57,48 @@ export async function resolveWithinRoot(rootPath: string, relativePath: string):
     if (!isPathInside(realRoot, realTarget)) throw new Error('Knowledge card path escaped its space root.');
     return realTarget;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error('Knowledge card not found.');
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+      throw new Error('Knowledge card not found.', { cause: error });
     throw error;
   }
 }
 
 export async function walkMarkdownFiles(rootPath: string): Promise<{ realRoot: string; files: string[] }> {
-  try { await fs.mkdir(rootPath, { recursive: true }); } catch { return { realRoot: rootPath, files: [] }; }
+  try {
+    await fs.mkdir(rootPath, { recursive: true });
+  } catch {
+    return { realRoot: rootPath, files: [] };
+  }
   let realRoot: string;
-  try { realRoot = await fs.realpath(rootPath); } catch { return { realRoot: rootPath, files: [] }; }
+  try {
+    realRoot = await fs.realpath(rootPath);
+  } catch {
+    return { realRoot: rootPath, files: [] };
+  }
   const files: string[] = [];
   const walk = async (absoluteDir: string, depth: number): Promise<void> => {
     if (depth > MAX_WALK_DEPTH) return;
     let entries: import('node:fs').Dirent[];
-    try { entries = await fs.readdir(absoluteDir, { withFileTypes: true }); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error; }
+    try {
+      entries = await fs.readdir(absoluteDir, { withFileTypes: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw error;
+    }
     for (const entry of entries) {
       if (entry.name.startsWith('.')) continue;
       const absolute = path.join(absoluteDir, entry.name);
       let realAbsolute: string;
-      try { realAbsolute = await fs.realpath(absolute); } catch { continue; }
+      try {
+        realAbsolute = await fs.realpath(absolute);
+      } catch {
+        continue;
+      }
       if (!isPathInside(realRoot, realAbsolute)) continue;
-      if (entry.isDirectory()) { await walk(absolute, depth + 1); continue; }
+      if (entry.isDirectory()) {
+        await walk(absolute, depth + 1);
+        continue;
+      }
       if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) files.push(absolute);
     }
   };
@@ -111,10 +136,13 @@ async function lstatOrNull(target: string): Promise<import('node:fs').Stats | nu
 
 function assertNotLink(stat: import('node:fs').Stats, target: string): void {
   if (stat.isSymbolicLink()) {
-    throw new KnowledgeWritePathError(`refusing symlink/junction write path ${target}.`);
+    throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', `refusing symlink/junction write path ${target}.`);
   }
   if (stat.isFile() && stat.nlink > 1) {
-    throw new KnowledgeWritePathError(`refusing hardlinked write path ${target} (nlink=${stat.nlink}).`);
+    throw new AppError(
+      'KNOWLEDGE_WRITE_PATH_REJECTED',
+      `refusing hardlinked write path ${target} (nlink=${stat.nlink}).`,
+    );
   }
 }
 
@@ -138,29 +166,29 @@ async function assertLexicalAncestorsAreLinkFree(absolute: string): Promise<void
     assertNotLink(stat, hop);
     const real = await fs.realpath(hop);
     if (!samePath(real, hop)) {
-      throw new KnowledgeWritePathError(`path escapes through a link at ${hop}.`);
+      throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', `path escapes through a link at ${hop}.`);
     }
   }
 }
 
-export async function assertSafeKnowledgeWriteTarget(
-  rootPath: string,
-  relativePath: string,
-): Promise<string> {
+export async function assertSafeKnowledgeWriteTarget(rootPath: string, relativePath: string): Promise<string> {
   const normalizedRelative = toPosixRelative(relativePath).replace(/^\/+/, '');
   if (!normalizedRelative || normalizedRelative.includes('\0') || normalizedRelative.split('/').includes('..')) {
-    throw new KnowledgeWritePathError('relative path contains .., NUL, or is empty.');
+    throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', 'relative path contains .., NUL, or is empty.');
   }
   const lexicalRoot = path.resolve(rootPath);
   await assertLexicalAncestorsAreLinkFree(lexicalRoot);
   await fs.mkdir(lexicalRoot, { recursive: true });
   const realRoot = await fs.realpath(lexicalRoot);
   if (!samePath(realRoot, lexicalRoot)) {
-    throw new KnowledgeWritePathError(`space root realpath diverged from lexical path ${lexicalRoot}.`);
+    throw new AppError(
+      'KNOWLEDGE_WRITE_PATH_REJECTED',
+      `space root realpath diverged from lexical path ${lexicalRoot}.`,
+    );
   }
   const lexical = path.resolve(lexicalRoot, ...normalizedRelative.split('/'));
   if (!isPathInside(lexicalRoot, lexical)) {
-    throw new KnowledgeWritePathError('Knowledge card path escaped its space root.');
+    throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', 'Knowledge card path escaped its space root.');
   }
   let current = lexicalRoot;
   for (const part of path.relative(lexicalRoot, lexical).split(path.sep).filter(Boolean)) {
@@ -172,17 +200,13 @@ export async function assertSafeKnowledgeWriteTarget(
   return lexical;
 }
 
-export async function writeKnowledgeCardAtomic(
-  absolutePath: string,
-  contents: string,
-  storage = new StorageIo(),
-): Promise<void> {
-  storage.writeUtf8AtomicFsync(absolutePath, contents);
+export async function writeKnowledgeCardAtomic(absolutePath: string, contents: string): Promise<void> {
+  new StorageIo().writeUtf8Atomic(absolutePath, contents);
   const written = await fs.readFile(absolutePath, 'utf8');
   const expected = createHash('sha256').update(contents, 'utf8').digest('hex');
   const actual = createHash('sha256').update(written, 'utf8').digest('hex');
   if (expected !== actual) {
-    throw new KnowledgeWriteIntegrityError(`post-write hash mismatch for ${absolutePath}.`);
+    throw new AppError('KNOWLEDGE_WRITE_INTEGRITY', `post-write hash mismatch for ${absolutePath}.`);
   }
   const writtenStat = await fs.lstat(absolutePath);
   assertNotLink(writtenStat, absolutePath);
@@ -197,7 +221,7 @@ export function toCardDetail(
   return {
     ...toCardSummary(space, relativePath, parsed, updatedAt),
     content: parsed.body,
-    body: parsed.record.body ?? parsed.body,
+    body: parsed.record.body,
     scope: parsed.record.scope ?? {},
     relations: parsed.record.relations ?? [],
     ...(parsed.record.sourceStatus ? { sourceStatus: parsed.record.sourceStatus } : {}),

@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 export type ProviderTimeoutPhase = 'first-byte' | 'idle' | 'total';
 
 export interface ProviderStreamTimeoutOptions {
@@ -10,6 +11,8 @@ export interface ProviderStreamReadOptions extends ProviderStreamTimeoutOptions 
   providerApi: string;
   /** Max incomplete-line buffer bytes before fail-closed. Default 8 MiB. */
   maxBufferBytes?: number;
+  /** Called when the Chat Completions `[DONE]` sentinel arrives; the protocol's own terminal signal. */
+  onDoneSentinel?: () => void;
 }
 
 export const DEFAULT_PROVIDER_FIRST_CHUNK_TIMEOUT_MS = 20_000;
@@ -17,12 +20,15 @@ export const DEFAULT_PROVIDER_STREAM_IDLE_TIMEOUT_MS = 60_000;
 export const DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS = 300_000;
 export const DEFAULT_PROVIDER_MAX_BUFFER_BYTES = 8 * 1024 * 1024;
 
-export class ProviderStreamBufferError extends Error {
+export class ProviderStreamBufferError extends AppError {
   readonly providerApi: string;
   readonly maxBufferBytes: number;
 
   constructor(providerApi: string, maxBufferBytes: number) {
-    super(`[${providerApi}] provider stream buffer exceeded ${maxBufferBytes} bytes`);
+    super(
+      'PROVIDER_STREAM_BUFFER_EXCEEDED',
+      `[${providerApi}] provider stream buffer exceeded ${maxBufferBytes} bytes`,
+    );
     this.name = 'ProviderStreamBufferError';
     this.providerApi = providerApi;
     this.maxBufferBytes = maxBufferBytes;
@@ -35,13 +41,13 @@ interface ResolvedProviderTimeouts {
   requestTimeoutMs: number;
 }
 
-export class ProviderTimeoutError extends Error {
+export class ProviderTimeoutError extends AppError {
   readonly phase: ProviderTimeoutPhase;
   readonly timeoutMs: number;
   readonly providerApi: string;
 
   constructor(providerApi: string, phase: ProviderTimeoutPhase, timeoutMs: number) {
-    super(`[${providerApi}] provider stream ${phase} timeout after ${timeoutMs}ms`);
+    super('PROVIDER_TIMEOUT', `[${providerApi}] provider stream ${phase} timeout after ${timeoutMs}ms`);
     this.name = 'ProviderTimeoutError';
     this.providerApi = providerApi;
     this.phase = phase;
@@ -49,45 +55,54 @@ export class ProviderTimeoutError extends Error {
   }
 }
 
-export class ProviderHttpError extends Error {
+export class ProviderHttpError extends AppError {
   readonly status: number;
   readonly providerApi: string;
   readonly bodyText?: string;
+  /** How long the provider asked the client to wait before retrying (`retry-after-ms` / `Retry-After`). */
+  readonly retryAfterMs?: number;
 
-  constructor(providerApi: string, status: number, message: string, bodyText?: string) {
-    super(`[${providerApi}] HTTP ${status}: ${message}`);
+  constructor(providerApi: string, status: number, message: string, bodyText?: string, retryAfterMs?: number) {
+    super('PROVIDER_HTTP_ERROR', `[${providerApi}] HTTP ${status}: ${message}`);
     this.name = 'ProviderHttpError';
     this.providerApi = providerApi;
     this.status = status;
     this.bodyText = bodyText;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
-export const PROVIDER_EMPTY_STREAM_MESSAGE =
-  'Provider stream ended without assistant output or structured tool call.';
+/** Reads the provider's requested retry delay from `retry-after-ms`, or `Retry-After` in seconds or as an HTTP date. */
+export function parseRetryAfterMs(headers: { get(name: string): string | null }, now = Date.now()): number | undefined {
+  const milliseconds = headers.get('retry-after-ms')?.trim();
+  if (milliseconds && /^\d+(?:\.\d+)?$/u.test(milliseconds)) return Number(milliseconds);
+  const value = headers.get('retry-after')?.trim();
+  if (!value) return undefined;
+  if (/^\d+(?:\.\d+)?$/u.test(value)) return Number(value) * 1000;
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - now) : undefined;
+}
 
-export class ProviderEmptyStreamError extends Error {
-  readonly code = 'PROVIDER_STREAM_EMPTY' as const;
+export const PROVIDER_EMPTY_STREAM_MESSAGE = 'Provider stream ended without assistant output or structured tool call.';
+
+export class ProviderEmptyStreamError extends AppError {
+  declare readonly code: 'PROVIDER_STREAM_EMPTY';
   readonly providerApi: string;
 
   constructor(providerApi: string, message = PROVIDER_EMPTY_STREAM_MESSAGE) {
-    super(message);
+    super('PROVIDER_STREAM_EMPTY', message);
     this.name = 'ProviderEmptyStreamError';
     this.providerApi = providerApi;
   }
 }
 
-export class ProviderWireFailureError extends Error {
+export class ProviderWireFailureError extends AppError {
   readonly providerApi: string;
   readonly wireCode?: string;
   readonly bodyText?: string;
 
-  constructor(
-    providerApi: string,
-    message: string,
-    options?: { code?: string; bodyText?: string },
-  ) {
-    super(`[${providerApi}] ${message}`);
+  constructor(providerApi: string, message: string, options?: { code?: string; bodyText?: string }) {
+    super('PROVIDER_WIRE_FAILURE', `[${providerApi}] ${message}`);
     this.name = 'ProviderWireFailureError';
     this.providerApi = providerApi;
     this.wireCode = options?.code;
@@ -103,9 +118,11 @@ export function isProviderEmptyStreamError(error: unknown): error is ProviderEmp
   if (error instanceof ProviderEmptyStreamError) {
     return true;
   }
-  return error instanceof Error
-    && error.name === 'ProviderEmptyStreamError'
-    && (error as { code?: unknown }).code === 'PROVIDER_STREAM_EMPTY';
+  return (
+    error instanceof Error &&
+    error.name === 'ProviderEmptyStreamError' &&
+    (error as { code?: unknown }).code === 'PROVIDER_STREAM_EMPTY'
+  );
 }
 
 export interface ComposedSignal {
@@ -188,6 +205,7 @@ export async function* parseSSERecords(
         }
         const data = line.slice(5).trimStart();
         if (data === '[DONE]') {
+          options.onDoneSentinel?.();
           return;
         }
         if (data.length === 0) {
@@ -277,11 +295,16 @@ export async function ensureOk(response: Response, providerApi: string): Promise
   const looksLikeHtml = Boolean(bodyText && /(?:<!doctype\s+html|<html\b)/i.test(bodyText));
   const htmlTitle = looksLikeHtml ? bodyText?.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] : undefined;
   const snippet = looksLikeHtml
-    ? (htmlTitle?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-      || response.statusText
-      || 'HTML error response')
-    : bodyText ? bodyText.slice(0, 500) : response.statusText || 'request failed';
-  throw new ProviderHttpError(providerApi, response.status, snippet, bodyText);
+    ? htmlTitle
+        ?.replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim() ||
+      response.statusText ||
+      'HTML error response'
+    : bodyText
+      ? bodyText.slice(0, 500)
+      : response.statusText || 'request failed';
+  throw new ProviderHttpError(providerApi, response.status, snippet, bodyText, parseRetryAfterMs(response.headers));
 }
 
 export function nowMs(): number {
@@ -319,9 +342,10 @@ export function composeAbortSignals(
     }
   }
 
-  const timeoutId = Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0
-    ? setTimeout(() => onAbort(new ProviderTimeoutError(providerApi, 'total', requestTimeoutMs)), requestTimeoutMs)
-    : null;
+  const timeoutId =
+    Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0
+      ? setTimeout(() => onAbort(new ProviderTimeoutError(providerApi, 'total', requestTimeoutMs)), requestTimeoutMs)
+      : null;
 
   return {
     signal: controller.signal,
@@ -341,9 +365,7 @@ export function normalizeError(err: unknown): Error {
 }
 
 function readWireRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
 function readWireString(value: unknown): string {
@@ -443,7 +465,8 @@ async function readWithTimeout(
       finish(() => reject(error));
     }, timeoutMs);
 
-    reader.read()
+    reader
+      .read()
       .then((result) => finish(() => resolve(result)))
       .catch((error) => finish(() => reject(error)));
   });

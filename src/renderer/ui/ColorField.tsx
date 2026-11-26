@@ -11,7 +11,6 @@ export interface ColorFieldProps {
   onChange: (hex: string) => void;
   testId: string;
   className?: string;
-  fallbackHex?: string;
   /** `inline` = stacked label + compact chip (Agents look strip). Default = label | control grid (Appearance). */
   hideLabel?: boolean;
   layout?: 'grid' | 'inline';
@@ -24,6 +23,7 @@ export interface ColorFieldProps {
 }
 
 const HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
+const FALLBACK_HEX = '#33d1ff';
 
 export function ColorField({
   label,
@@ -31,7 +31,6 @@ export function ColorField({
   onChange,
   testId,
   className = '',
-  fallbackHex = '#33d1ff',
   layout = 'grid',
   hideLabel = false,
   areaLabel,
@@ -52,24 +51,25 @@ export function ColorField({
     if (HEX_PATTERN.test(next)) onChange(next);
   };
 
-  const classes = [
-    'color-field',
-    layout === 'inline' ? 'color-field--inline' : 'color-field--grid',
-    className,
-  ].filter(Boolean).join(' ');
+  const classes = ['color-field', layout === 'inline' ? 'color-field--inline' : 'color-field--grid', className]
+    .filter(Boolean)
+    .join(' ');
   const swatchStyle = useDynStyle({ '--color-field-swatch-bg': value });
-  const resolved = HEX_PATTERN.test(value) ? value.toLowerCase() : fallbackHex;
+  const resolved = HEX_PATTERN.test(value) ? value.toLowerCase() : FALLBACK_HEX;
 
   return (
     <div className={classes}>
-      <span id={labelId} className={cn('color-field-label', hideLabel && 'is-visually-hidden')}>{label}</span>
+      <span id={labelId} className={cn('color-field-label', hideLabel && 'is-visually-hidden')}>
+        {label}
+      </span>
       <span className="color-field-control">
         <Popover
           open={open}
           onOpenChange={setOpen}
           align="start"
           className="color-field-popover"
-          trigger={(
+          label={pickerTitle}
+          trigger={
             <button
               type="button"
               className="color-field-swatch"
@@ -77,7 +77,7 @@ export function ColorField({
               data-testid={`${testId}-swatch`}
               aria-labelledby={labelId}
             />
-          )}
+          }
         >
           <div className="color-field-popover-title">{pickerTitle}</div>
           <div className="color-field-popover-body">
@@ -91,7 +91,9 @@ export function ColorField({
             <div className="color-field-live">
               <span className="color-field-live-label">{currentLabel}</span>
               <span className="color-field-live-swatch" {...swatchStyle} aria-hidden="true" />
-              <code className="color-field-live-hex" data-testid={`${testId}-live`}>{resolved}</code>
+              <code className="color-field-live-hex" data-testid={`${testId}-live`}>
+                {resolved}
+              </code>
             </div>
           </div>
         </Popover>

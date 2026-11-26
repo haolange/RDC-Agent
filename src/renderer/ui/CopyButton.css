@@ -10,7 +10,9 @@
   background: transparent;
   color: var(--token-text-secondary);
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .ui-copy-button:hover,

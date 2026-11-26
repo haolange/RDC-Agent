@@ -9,13 +9,18 @@ import {
 } from './ShellResolver';
 import type { ShellResolverDeps } from './ShellResolver';
 
-function createResolver(overrides: {
-  platform?: NodeJS.Platform;
-  env?: NodeJS.ProcessEnv;
-  files?: Record<string, number>;
-  probes?: Record<string, { status: number; stdout: string } | ((args: string[]) => { status: number; stdout: string })>;
-  where?: string[];
-} = {}): ShellResolver {
+function createResolver(
+  overrides: {
+    platform?: NodeJS.Platform;
+    env?: NodeJS.ProcessEnv;
+    files?: Record<string, number>;
+    probes?: Record<
+      string,
+      { status: number; stdout: string } | ((args: string[]) => { status: number; stdout: string })
+    >;
+    where?: string[];
+  } = {},
+): ShellResolver {
   const files = overrides.files ?? {};
   const probes = overrides.probes ?? {};
   return new ShellResolver({

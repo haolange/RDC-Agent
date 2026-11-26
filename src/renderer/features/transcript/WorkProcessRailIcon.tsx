@@ -9,8 +9,14 @@ export const WorkProcessRailIcon: React.FC<{ row: WorkProcessRow; active?: boole
   const structural = isProcessTrackRow(row) && (row.type === 'section' || (row.id === firstId && row.type !== 'tool'));
   if (!structural) return null;
   const running = active ?? isTrackActivity(row);
-  return <span className="work-process-event-anchor" data-work-anchor={row.id}
-    data-work-node={running ? 'activity' : 'structure'} aria-hidden="true">
-    <span className={`work-process-rail-marker${running ? ' is-running' : ''}`} />
-  </span>;
+  return (
+    <span
+      className="work-process-event-anchor"
+      data-work-anchor={row.id}
+      data-work-node={running ? 'activity' : 'structure'}
+      aria-hidden="true"
+    >
+      <span className={`work-process-rail-marker${running ? ' is-running' : ''}`} />
+    </span>
+  );
 };

@@ -36,9 +36,9 @@ export function repairConversationBranchState(
     return { branchState, repaired: false };
   }
 
-  let repaired = false;
+  let repaired = false as boolean;
   const forks = branchState.forks.map((fork) => {
-    let forkRepaired = false;
+    let forkRepaired = false as boolean;
     const branches = fork.branches.map((branch) => {
       if (branch.anchorUserMessageId && branch.rootTurnId) {
         return branch;
@@ -58,9 +58,7 @@ export function repairConversationBranchState(
     return forkRepaired ? { ...fork, branches } : fork;
   });
 
-  return repaired
-    ? { branchState: { ...branchState, forks }, repaired: true }
-    : { branchState, repaired: false };
+  return repaired ? { branchState: { ...branchState, forks }, repaired: true } : { branchState, repaired: false };
 }
 
 function findRecoverableBranchAnchor(
@@ -70,19 +68,15 @@ function findRecoverableBranchAnchor(
 ): ConversationMessage | null {
   const branchId = normalizeBranchId(branch.branchId);
   const candidates = allMessages
-    .filter((message) => (
-      message.role === 'user'
-      && normalizeBranchId(message.branchId) === branchId
-    ))
+    .filter((message) => message.role === 'user' && normalizeBranchId(message.branchId) === branchId)
     .sort(compareConversationMessages);
 
-  return candidates.find((message) => (
-    message.forkId === fork.forkId
-    && message.variantIndex === branch.variantIndex
-  ))
-    ?? candidates.find((message) => message.forkId === fork.forkId)
-    ?? candidates[0]
-    ?? null;
+  return (
+    candidates.find((message) => message.forkId === fork.forkId && message.variantIndex === branch.variantIndex) ??
+    candidates.find((message) => message.forkId === fork.forkId) ??
+    candidates[0] ??
+    null
+  );
 }
 
 /**
@@ -98,12 +92,7 @@ export function resolveVisibleConversationMessages(
       .sort(compareConversationMessages);
   }
 
-  return collectBranchPath(
-    branchState.rootBranchId,
-    allMessages,
-    branchState.forks,
-    0,
-  );
+  return collectBranchPath(branchState.rootBranchId, allMessages, branchState.forks, 0);
 }
 
 function collectBranchPath(
@@ -144,10 +133,10 @@ function collectBranchPath(
   }
 
   const turnMessages = allMessages
-    .filter((message) => (
-      message.turnId === activeAnchor.turnId
-      && normalizeBranchId(message.branchId) === activeBranch.branchId
-    ))
+    .filter(
+      (message) =>
+        message.turnId === activeAnchor.turnId && normalizeBranchId(message.branchId) === activeBranch.branchId,
+    )
     .sort(compareConversationMessages);
 
   if (turnMessages.length === 0) {
@@ -159,19 +148,18 @@ function collectBranchPath(
   return [...beforeFork, ...turnMessages, ...suffix];
 }
 
-export function findForkForMessage(
-  branchState: ConversationBranchState,
-  messageId: string,
-): ConversationFork | null {
-  return branchState.forks.find((fork) => (
-    fork.anchorMessageId === messageId
-    || fork.branches.some((branch) => branch.anchorUserMessageId === messageId)
-  )) ?? null;
+export function findForkForMessage(branchState: ConversationBranchState, messageId: string): ConversationFork | null {
+  return (
+    branchState.forks.find(
+      (fork) =>
+        fork.anchorMessageId === messageId || fork.branches.some((branch) => branch.anchorUserMessageId === messageId),
+    ) ?? null
+  );
 }
 
 /** Branches that already have a concrete user anchor (exclude empty pending shells). */
 export function getConcreteForkBranches(fork: ConversationFork): ConversationBranch[] {
-  return fork.branches.filter((branch) => Boolean(branch.anchorUserMessageId?.trim()));
+  return fork.branches.filter((branch) => Boolean(branch.anchorUserMessageId.trim()));
 }
 
 /**
@@ -186,10 +174,13 @@ export function findForkForVisibleUserMessage(
   if (message.forkId) {
     return branchState.forks.find((fork) => fork.forkId === message.forkId) ?? null;
   }
-  return branchState.forks.find((fork) => (
-    fork.anchorMessageId === message.id
-    || fork.branches.some((branch) => branch.anchorUserMessageId === message.id)
-  )) ?? null;
+  return (
+    branchState.forks.find(
+      (fork) =>
+        fork.anchorMessageId === message.id ||
+        fork.branches.some((branch) => branch.anchorUserMessageId === message.id),
+    ) ?? null
+  );
 }
 
 export function getForkNavigator(
@@ -223,8 +214,9 @@ export function shouldShowForkNavigatorForMessage(
   if (!fork) return false;
   const concreteBranches = getConcreteForkBranches(fork);
   if (concreteBranches.length <= 1) return false;
-  const activeBranch = concreteBranches.find((branch) => branch.branchId === fork.activeBranchId)
-    ?? fork.branches.find((branch) => branch.branchId === fork.activeBranchId);
+  const activeBranch =
+    concreteBranches.find((branch) => branch.branchId === fork.activeBranchId) ??
+    fork.branches.find((branch) => branch.branchId === fork.activeBranchId);
   if (!activeBranch?.anchorUserMessageId) return false;
   return activeBranch.anchorUserMessageId === message.id;
 }

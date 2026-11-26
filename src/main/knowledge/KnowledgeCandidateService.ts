@@ -1,18 +1,14 @@
 import { generateShortId } from '@shared/utils/id';
 import { assertKnowledgeImagesAvailable } from './knowledgeAssetAvailability';
-import { KnowledgeAssetsMissingError, KnowledgeCandidateRequiresIntentError } from './knowledgeErrors';
+import { knowledgeCandidateRequiresIntent, knowledgeAssetsMissing } from './knowledgeErrors';
 import {
   createSessionScopedKnowledgeStore,
   knowledgeDurableStore,
   type KnowledgeDurableStore,
 } from './KnowledgeDurableStore';
 import { knowledgeQueryService } from './KnowledgeQueryService';
-import type {
-  KnowledgeCardRecord,
-  KnowledgeReviewRecord,
-  KnowledgeSpace,
-  SessionKnowledgeCandidate,
-} from '@shared/types/knowledge';
+import type { KnowledgeCardRecord, KnowledgeSpace, SessionKnowledgeCandidate } from '@shared/types/knowledge';
+import type { KnowledgeReviewRecord } from './knowledgeStateSchema';
 
 export type { SessionKnowledgeCandidate };
 
@@ -44,9 +40,9 @@ export class KnowledgeCandidateService {
 
   async createCandidate(input: KnowledgeCandidateCreateInput): Promise<SessionKnowledgeCandidate> {
     if (input.explicitUserIntent !== true) {
-      throw new KnowledgeCandidateRequiresIntentError();
+      throw knowledgeCandidateRequiresIntent();
     }
-    if (input.card.missingAssets?.length) throw new KnowledgeAssetsMissingError();
+    if (input.card.missingAssets?.length) throw knowledgeAssetsMissing();
     if (input.card.images?.length) {
       await assertKnowledgeImagesAvailable(
         input.card,

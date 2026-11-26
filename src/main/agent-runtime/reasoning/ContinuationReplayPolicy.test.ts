@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
-import {
-  createContinuationArtifact,
-  toContinuationMetadata,
-} from './ContinuationArtifacts';
+import { createContinuationArtifact, toContinuationMetadata } from './ContinuationArtifacts';
 import { decideContinuationReplay } from './ContinuationReplayPolicy';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
@@ -13,16 +10,18 @@ type Policy = ProviderContractBundle['reasoning']['continuation'];
 type ArtifactPolicy = ProviderContractBundle['toolLoop']['artifactPolicy'];
 type ArtifactScope = ProviderContractBundle['toolLoop']['artifactScope'];
 
-function plan(options: {
-  providerId?: string;
-  modelId?: string;
-  policy?: Policy;
-  artifactPolicy?: ArtifactPolicy;
-  artifactScope?: ArtifactScope;
-  compatibilityGroup?: string;
-  carrier?: ProviderContractBundle['reasoning']['carrier'];
-  stateMode?: 'local-stateless' | 'provider-managed';
-} = {}): RequestPlan {
+function plan(
+  options: {
+    providerId?: string;
+    modelId?: string;
+    policy?: Policy;
+    artifactPolicy?: ArtifactPolicy;
+    artifactScope?: ArtifactScope;
+    compatibilityGroup?: string;
+    carrier?: ProviderContractBundle['reasoning']['carrier'];
+    stateMode?: 'local-stateless' | 'provider-managed';
+  } = {},
+): RequestPlan {
   const providerId = options.providerId ?? 'provider-a';
   const modelId = options.modelId ?? 'model-a';
   const protocol = 'OpenAIResponses' as const;
@@ -44,15 +43,16 @@ function plan(options: {
       compatibilityGroup,
       continuation: options.policy ?? 'exact-execution',
     },
-    state: options.stateMode === 'provider-managed'
-      ? {
-          supportedModes: ['local-stateless', 'provider-managed'],
-          defaultMode: 'provider-managed',
-          carrier: 'previous-response-id',
-          retention: 'provider',
-          crossModel: 'provider-managed',
-        }
-      : fallback.state,
+    state:
+      options.stateMode === 'provider-managed'
+        ? {
+            supportedModes: ['local-stateless', 'provider-managed'],
+            defaultMode: 'provider-managed',
+            carrier: 'previous-response-id',
+            retention: 'provider',
+            crossModel: 'provider-managed',
+          }
+        : fallback.state,
     toolLoop: {
       artifactPolicy: options.artifactPolicy ?? 'preserve-exact',
       artifactScope: options.artifactScope ?? 'all-assistant-turns',
@@ -75,14 +75,15 @@ function plan(options: {
       contracts,
     },
     contracts,
-    statePlan: options.stateMode === 'provider-managed'
-      ? {
-          mode: 'provider-managed',
-          carrier: 'previous-response-id',
-          store: true,
-          reuseProviderState: true,
-        }
-      : undefined,
+    statePlan:
+      options.stateMode === 'provider-managed'
+        ? {
+            mode: 'provider-managed',
+            carrier: 'previous-response-id',
+            store: true,
+            reuseProviderState: true,
+          }
+        : undefined,
     headers: {},
     bodyPatch: {},
     contextBudgetTokens: 100_000,
@@ -110,8 +111,10 @@ describe('ContinuationReplayPolicy', () => {
       type: 'reasoning',
       encryptedContent: 'sealed',
     });
-    expect(decideContinuationReplay(artifact, source, { sameToolLoop: false }))
-      .toEqual({ action: 'replay', reason: 'exact-execution' });
+    expect(decideContinuationReplay(artifact, source, { sameToolLoop: false })).toEqual({
+      action: 'replay',
+      reason: 'exact-execution',
+    });
 
     const changedEndpoint = {
       ...source,
@@ -120,8 +123,10 @@ describe('ContinuationReplayPolicy', () => {
         endpointHash: 'different-endpoint',
       },
     };
-    expect(decideContinuationReplay(artifact, changedEndpoint, { sameToolLoop: false }))
-      .toEqual({ action: 'drop', reason: 'execution-mismatch' });
+    expect(decideContinuationReplay(artifact, changedEndpoint, { sameToolLoop: false })).toEqual({
+      action: 'drop',
+      reason: 'execution-mismatch',
+    });
   });
 
   it('allows same-provider-model only when the provider boundary and model snapshot stay pinned', () => {
@@ -151,8 +156,10 @@ describe('ContinuationReplayPolicy', () => {
       compatibilityGroup: 'family-v1',
       modelId: 'model-b',
     });
-    expect(decideContinuationReplay(artifact, sibling, { sameToolLoop: false }))
-      .toEqual({ action: 'replay', reason: 'same-compatibility-group' });
+    expect(decideContinuationReplay(artifact, sibling, { sameToolLoop: false })).toEqual({
+      action: 'replay',
+      reason: 'same-compatibility-group',
+    });
 
     const unrelated = plan({
       policy: 'same-compatibility-group',
@@ -176,21 +183,27 @@ describe('ContinuationReplayPolicy', () => {
         toolCallIds: ['tool-1'],
       },
     });
-    expect(decideContinuationReplay(artifact, source, {
-      sameToolLoop: false,
-      providerBlockKey: 'candidate:0:part:0',
-      toolCallIds: ['tool-1'],
-    }).reason).toBe('scope-ended');
-    expect(decideContinuationReplay(artifact, source, {
-      sameToolLoop: true,
-      providerBlockKey: 'candidate:0:part:1',
-      toolCallIds: ['tool-1'],
-    }).reason).toBe('container-mismatch');
-    expect(decideContinuationReplay(artifact, source, {
-      sameToolLoop: true,
-      providerBlockKey: 'candidate:0:part:0',
-      toolCallIds: ['tool-1'],
-    }).action).toBe('replay');
+    expect(
+      decideContinuationReplay(artifact, source, {
+        sameToolLoop: false,
+        providerBlockKey: 'candidate:0:part:0',
+        toolCallIds: ['tool-1'],
+      }).reason,
+    ).toBe('scope-ended');
+    expect(
+      decideContinuationReplay(artifact, source, {
+        sameToolLoop: true,
+        providerBlockKey: 'candidate:0:part:1',
+        toolCallIds: ['tool-1'],
+      }).reason,
+    ).toBe('container-mismatch');
+    expect(
+      decideContinuationReplay(artifact, source, {
+        sameToolLoop: true,
+        providerBlockKey: 'candidate:0:part:0',
+        toolCallIds: ['tool-1'],
+      }).action,
+    ).toBe('replay');
   });
 
   it('drops provider-managed continuation when the effective model changes', () => {
@@ -209,8 +222,10 @@ describe('ContinuationReplayPolicy', () => {
       stateMode: 'provider-managed',
     });
     const artifact = createContinuationArtifact(source, { type: 'response_state', opaqueState: 'state-id' });
-    expect(decideContinuationReplay(artifact, target, { sameToolLoop: false }))
-      .toEqual({ action: 'drop', reason: 'execution-mismatch' });
+    expect(decideContinuationReplay(artifact, target, { sameToolLoop: false })).toEqual({
+      action: 'drop',
+      reason: 'execution-mismatch',
+    });
   });
 
   it('separates provider-managed state from replayable artifacts', () => {
@@ -221,8 +236,10 @@ describe('ContinuationReplayPolicy', () => {
       stateMode: 'provider-managed',
     });
     const artifact = createContinuationArtifact(source, { type: 'response_state', opaqueState: 'state-id' });
-    expect(decideContinuationReplay(artifact, source, { sameToolLoop: false }))
-      .toEqual({ action: 'provider-managed', reason: 'provider-managed' });
+    expect(decideContinuationReplay(artifact, source, { sameToolLoop: false })).toEqual({
+      action: 'provider-managed',
+      reason: 'provider-managed',
+    });
   });
 
   it('fails integrity checks and never exposes payload through shared metadata', () => {
@@ -237,11 +254,15 @@ describe('ContinuationReplayPolicy', () => {
     expect(toContinuationMetadata(artifact)).not.toHaveProperty('raw');
 
     const metadataTampered = { ...artifact, compatibilityGroup: 'forged-group' };
-    expect(decideContinuationReplay(metadataTampered, source, { sameToolLoop: false }))
-      .toEqual({ action: 'drop', reason: 'invalid-integrity' });
+    expect(decideContinuationReplay(metadataTampered, source, { sameToolLoop: false })).toEqual({
+      action: 'drop',
+      reason: 'invalid-integrity',
+    });
 
     artifact.encryptedContent = 'tampered';
-    expect(decideContinuationReplay(artifact, source, { sameToolLoop: false }))
-      .toEqual({ action: 'drop', reason: 'invalid-integrity' });
+    expect(decideContinuationReplay(artifact, source, { sameToolLoop: false })).toEqual({
+      action: 'drop',
+      reason: 'invalid-integrity',
+    });
   });
 });

@@ -13,7 +13,7 @@
   font-size: var(--type-body-size);
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--duration-base) var(--ease-standard);
+  transition: opacity var(--transition-base);
 }
 
 .composer-drop-overlay.is-visible {
@@ -76,4 +76,10 @@
     opacity: 1;
     pointer-events: auto;
   }
+}
+
+.composer-skill-chip-name:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
 }

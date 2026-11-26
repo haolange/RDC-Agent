@@ -37,9 +37,9 @@ function asElement(target: EventTarget | null): HTMLElement | null {
 
 function isOwnedMenuSurface(element: HTMLElement): boolean {
   return Boolean(
-    element.closest('[data-owns-context-menu]')
-    || element.closest('.sidebar-context-menu')
-    || element.closest('.app-context-menu'),
+    element.closest('[data-owns-context-menu]') ||
+    element.closest('.sidebar-context-menu') ||
+    element.closest('.app-context-menu'),
   );
 }
 
@@ -49,7 +49,10 @@ function isTextField(element: HTMLElement): element is HTMLInputElement | HTMLTe
   return !EXCLUDED_INPUT_TYPES.has(element.type.toLowerCase());
 }
 
-function fieldSelection(element: HTMLInputElement | HTMLTextAreaElement): { hasSelection: boolean; selectedText: string } {
+function fieldSelection(element: HTMLInputElement | HTMLTextAreaElement): {
+  hasSelection: boolean;
+  selectedText: string;
+} {
   const start = element.selectionStart ?? 0;
   const end = element.selectionEnd ?? 0;
   const selectedText = element.value.slice(start, end);

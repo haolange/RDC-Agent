@@ -1,21 +1,36 @@
+import { AppError } from '@shared/errors/appError';
 /** Request budgeting and model-window conversion; canonical history is never truncated. */
 import { charsToTokens } from '@shared/utils/tokens';
 import { TokenizerService } from '../core/TokenizerService';
-import type { AgentMessage, AssistantMessage, ImageContent, Message, ProviderContinuationArtifact,
-  TextContent, ToolCall, ToolResultMessage, UserMessage } from '../core/types';
+import type {
+  AgentMessage,
+  AssistantMessage,
+  ImageContent,
+  Message,
+  ProviderContinuationArtifact,
+  TextContent,
+  ToolResultMessage,
+  UserMessage,
+} from '../core/types';
 
 export interface ContextManagerConfig {
   contextTokenLimit: number;
   tokenizer?: TokenizerService;
   modelId?: string;
-  compact?: (messages: AgentMessage[], signal?: AbortSignal, onProgress?: (progress: import('../core/types').CompactionProgress) => void) => Promise<CompressResult>;
+  compact?: (
+    messages: AgentMessage[],
+    signal?: AbortSignal,
+    onProgress?: (progress: import('@shared/types/agentRuntime').AgentContextCompactedPayload) => void,
+  ) => Promise<CompressResult>;
 }
-export interface CompressResult { messages: AgentMessage[]; summary?: string }
+export interface CompressResult {
+  messages: AgentMessage[];
+  summary?: string;
+}
 export const estimateImageTokensFromBase64Length = (base64Length: number): number => {
   const byteLength = Math.max(0, Math.floor(base64Length * 0.75));
   return Math.max(256, Math.ceil(byteLength / 1024));
 };
-
 
 export class ContextManager {
   constructor(private config: ContextManagerConfig) {
@@ -23,27 +38,40 @@ export class ContextManager {
       throw new Error('ContextManager requires a positive RequestPlan context budget.');
     }
   }
-  get tokenLimit(): number { return this.config.contextTokenLimit; }
+  get tokenLimit(): number {
+    return this.config.contextTokenLimit;
+  }
   setRequestTokenLimit(limit: number): void {
-    if (!Number.isFinite(limit) || limit <= 0) throw new Error('PROMPT_OVERHEAD_EXCEEDS_BUDGET: no conversation budget remains.');
+    if (!Number.isFinite(limit) || limit <= 0)
+      throw new AppError('PROMPT_OVERHEAD_EXCEEDS_BUDGET', 'no conversation budget remains.');
     this.config.contextTokenLimit = limit;
   }
   convertToLlm(messages: AgentMessage[]): Message[] {
     return convertAgentMessagesToLlm(messages);
   }
-  async compress(messages: AgentMessage[], signal?: AbortSignal, onProgress?: (progress: import('../core/types').CompactionProgress) => void): Promise<CompressResult> {
+  async compress(
+    messages: AgentMessage[],
+    signal?: AbortSignal,
+    onProgress?: (progress: import('@shared/types/agentRuntime').AgentContextCompactedPayload) => void,
+  ): Promise<CompressResult> {
     signal?.throwIfAborted();
     // The coordinator can reuse a verified window even when canonical history is large.
     if (this.config.compact) {
       const result = await this.config.compact([...messages], signal, onProgress);
       signal?.throwIfAborted();
       if (this.estimateTokens(result.messages) > this.config.contextTokenLimit) {
-        throw new Error('CONTEXT_CANNOT_FIT: recoverable context exceeds request budget; original history retained.');
+        throw new AppError(
+          'CONTEXT_CANNOT_FIT',
+          'recoverable context exceeds request budget; original history retained.',
+        );
       }
       return result;
     }
     if (this.estimateTokens(messages) > this.config.contextTokenLimit) {
-      throw new Error('CONTEXT_CANNOT_FIT: a recoverable compaction service is required; original history retained.');
+      throw new AppError(
+        'CONTEXT_CANNOT_FIT',
+        'a recoverable compaction service is required; original history retained.',
+      );
     }
     return { messages: [...messages] };
   }
@@ -54,18 +82,13 @@ export class ContextManager {
     conversationCount: number;
   } {
     const summaryMessages = messages.filter(
-      (message): message is UserMessage =>
-        message.role === 'user' && Boolean(message.derivedContext),
+      (message): message is UserMessage => message.role === 'user' && Boolean(message.derivedContext),
     );
-    const conversationMessages = messages.filter(
-      (message) => !(message.role === 'user' && message.derivedContext),
-    );
+    const conversationMessages = messages.filter((message) => !(message.role === 'user' && message.derivedContext));
     return {
-      summaryTokens:      this.estimateTokens(summaryMessages),
+      summaryTokens: this.estimateTokens(summaryMessages),
       conversationTokens: this.estimateTokens(conversationMessages),
-      conversationCount:  conversationMessages.filter(
-        (m) => m.role === 'user' || m.role === 'assistant',
-      ).length,
+      conversationCount: conversationMessages.filter((m) => m.role === 'user' || m.role === 'assistant').length,
     };
   }
 
@@ -111,9 +134,7 @@ export class ContextManager {
     }
   }
 
-  private userContentChars(
-    content: string | (TextContent | ImageContent)[],
-  ): number {
+  private userContentChars(content: string | (TextContent | ImageContent)[]): number {
     if (typeof content === 'string') {
       return content.length;
     }
@@ -121,7 +142,7 @@ export class ContextManager {
     for (const block of content) {
       if (block.type === 'text') {
         total += block.text.length;
-      } else if (block.type === 'image') {
+      } else {
         total += estimateImageTokensFromBase64Length(block.data.length) * 4;
       }
     }
@@ -136,24 +157,15 @@ export class ContextManager {
       } else if (block.type === 'thinking') {
         if (block.continuation) total += this.providerArtifactChars(block.continuation);
         else if (block.text) total += block.text.length;
-      } else if (block.type === 'toolCall') {
-        const tc = block as ToolCall;
-        try {
-          total += JSON.stringify(tc.arguments).length + tc.name.length;
-        } catch {
-          total += tc.name.length;
-        }
+      } else {
+        total += JSON.stringify(block.arguments).length + block.name.length;
       }
     }
     return total;
   }
 
   private providerArtifactChars(artifact: ProviderContinuationArtifact): number {
-    try {
-      return JSON.stringify(artifact).length;
-    } catch {
-      return 0;
-    }
+    return JSON.stringify(artifact).length;
   }
 
   private toolResultSize(msg: ToolResultMessage): number {
@@ -161,24 +173,26 @@ export class ContextManager {
     for (const block of msg.content) {
       if (block.type === 'text') {
         total += block.text.length;
-      } else if (block.type === 'image') {
+      } else {
         total += estimateImageTokensFromBase64Length(block.data.length) * 4;
       }
     }
     return total;
   }
-
 }
 
 export function convertAgentMessagesToLlm(messages: AgentMessage[]): Message[] {
   const next: Message[] = [];
-  for (const message of messages.filter((value): value is Message =>
-    value.role === 'user' || value.role === 'assistant' || value.role === 'toolResult')) {
+  for (const message of messages.filter(
+    (value): value is Message => value.role === 'user' || value.role === 'assistant' || value.role === 'toolResult',
+  )) {
     if (message.role !== 'toolResult') {
       next.push(message);
       continue;
     }
-    const images = message.content.filter((block): block is ImageContent => block.type === 'image' && Boolean(block.data));
+    const images = message.content.filter(
+      (block): block is ImageContent => block.type === 'image' && Boolean(block.data),
+    );
     if (images.length === 0) {
       next.push(message);
       continue;
@@ -193,10 +207,7 @@ export function convertAgentMessagesToLlm(messages: AgentMessage[]): Message[] {
     });
     next.push({
       role: 'user',
-      content: [
-        { type: 'text', text: `Images from tool ${message.toolName}:` },
-        ...images,
-      ],
+      content: [{ type: 'text', text: `Images from tool ${message.toolName}:` }, ...images],
       timestamp: message.timestamp,
     });
   }

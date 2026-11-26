@@ -5,13 +5,19 @@
  * references (stored asset ids, session addresses) off the page. None of this knows a particular case.
  */
 
-export type CaseValue = null | boolean | number | string | CaseValue[] | { [key: string]: CaseValue };
-export type CaseRecord = { [key: string]: CaseValue };
+import { parseJsonValue, type JsonObject, type JsonValue } from '@shared/utils/jsonValue';
+
+export type CaseValue = JsonValue;
+export type CaseRecord = JsonObject;
 
 export function parseChapterValue(content: string): CaseValue | undefined {
   const text = content.trim();
   if (!text.startsWith('{') && !text.startsWith('[')) return undefined;
-  try { return JSON.parse(text) as CaseValue; } catch { return undefined; }
+  try {
+    return parseJsonValue(text);
+  } catch {
+    return undefined;
+  }
 }
 
 export function hasReadableCaseChapter(content: string | undefined): boolean {
@@ -20,9 +26,8 @@ export function hasReadableCaseChapter(content: string | undefined): boolean {
   return parsed === undefined || withoutInternalReferences(parsed) !== undefined;
 }
 
-export const isCaseRecord = (value: CaseValue | undefined): value is CaseRecord => (
-  value !== null && typeof value === 'object' && !Array.isArray(value)
-);
+export const isCaseRecord = (value: CaseValue | undefined): value is CaseRecord =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /** A stored asset id or a session address means something to the store, nothing to a reader. */
 export function isInternalReference(value: string): boolean {
@@ -47,10 +52,11 @@ export function withoutInternalReferences(value: CaseValue): CaseValue | undefin
   return value;
 }
 
-const splitWords = (text: string): string[] => text
-  .replace(/([a-z0-9])([A-Z])/gu, '$1 $2')
-  .split(/[_\s-]+/u)
-  .filter(Boolean);
+const splitWords = (text: string): string[] =>
+  text
+    .replace(/([a-z0-9])([A-Z])/gu, '$1 $2')
+    .split(/[_\s-]+/u)
+    .filter(Boolean);
 
 /** `spatial_pattern` or `featureConfiguration` as a sentence-cased label: "Spatial pattern", "Feature configuration". */
 export function humanizeKey(key: string): string {
@@ -67,7 +73,11 @@ export const isTermLike = (value: string): boolean => ENUM_LIKE.test(value) || D
 
 /** `view_space` → "view space"; `Shader.Compiler.ConstantFolding` → "Shader › Compiler › Constant Folding". */
 export function humanizeTerm(value: string): string {
-  if (DOTTED_CATEGORY.test(value)) return value.split('.').map((part) => splitWords(part).join(' ')).join(' › ');
+  if (DOTTED_CATEGORY.test(value))
+    return value
+      .split('.')
+      .map((part) => splitWords(part).join(' '))
+      .join(' › ');
   if (ENUM_LIKE.test(value)) return value.replace(/_/gu, ' ');
   return value;
 }
@@ -87,7 +97,7 @@ export function splitIdentifiers(text: string): TextSegment[] {
   const segments: TextSegment[] = [];
   let last = 0;
   for (const match of text.matchAll(IDENTIFIER)) {
-    const start = match.index ?? 0;
+    const start = match.index;
     if (start > last) segments.push({ text: text.slice(last, start), code: false });
     segments.push({ text: match[0], code: true });
     last = start + match[0].length;

@@ -1,3 +1,5 @@
+import { z, type ZodType } from 'zod';
+import { AppError } from '@shared/errors/appError';
 import {
   appendThinkingText,
   createThinkingContent,
@@ -5,6 +7,7 @@ import {
   mergeThinkingContent,
   type ThinkingContentInput,
 } from '../../reasoning/ReasoningArtifacts';
+import { ProviderEmptyStreamError } from './http';
 import type { EventStream } from '../../core/EventStream';
 import type {
   AssistantMessage,
@@ -14,7 +17,7 @@ import type {
   StopReason,
   TextContent,
   ThinkingContent,
-  ToolCall,
+  ToolCallContent,
   Usage,
 } from '../../core/types';
 
@@ -37,21 +40,61 @@ export type ProviderStreamDiagnosticCode =
   | 'PROVIDER_STREAM_DELTA_BEFORE_START'
   | 'PROVIDER_STREAM_DUPLICATE_BLOCK_START'
   | 'PROVIDER_STREAM_BLOCK_CLOSED'
-  | 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL';
+  | 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL'
+  | 'PROVIDER_STREAM_TRUNCATED'
+  | 'PROVIDER_STREAM_MALFORMED_FRAME';
 
-export class ProviderStreamProtocolError extends Error {
-  readonly code: ProviderStreamDiagnosticCode;
+export class ProviderStreamProtocolError extends AppError {
+  declare readonly code: ProviderStreamDiagnosticCode;
   readonly outputRef: ProviderOutputRef;
 
   constructor(code: ProviderStreamDiagnosticCode, ref: ProviderOutputRef, message: string) {
-    super(message);
+    super(code, message);
     this.name = 'ProviderStreamProtocolError';
-    this.code = code;
     this.outputRef = { ...ref };
   }
 }
 
 const EMPTY_USAGE: Usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
+const TERMINAL_REF = Object.freeze({ protocol: 'provider-terminal', providerBlockKey: 'done', contentIndex: 0 });
+
+/**
+ * Parses one wire frame against the adapter's frame schema. A frame that is not JSON, or not a frame of the
+ * adapter's protocol, is a protocol violation, never a frame to skip.
+ */
+export function parseProviderFrame<T>(data: string, providerApi: string, schema: ZodType<T>): T {
+  const ref = { protocol: providerApi, providerBlockKey: 'frame', contentIndex: 0 };
+  let value: unknown;
+  try {
+    value = JSON.parse(data);
+  } catch {
+    throw new ProviderStreamProtocolError(
+      'PROVIDER_STREAM_MALFORMED_FRAME',
+      ref,
+      `${providerApi} sent a stream frame that is not valid JSON.`,
+    );
+  }
+  const frame = schema.safeParse(value);
+  if (!frame.success) {
+    throw new ProviderStreamProtocolError(
+      'PROVIDER_STREAM_MALFORMED_FRAME',
+      ref,
+      `${providerApi} sent a stream frame that does not match its protocol: ${z.prettifyError(frame.error)}`,
+    );
+  }
+  return frame.data;
+}
+
+/**
+ * The frame of an event type an adapter does not handle. Such frames are ignored, as the adapter's switch always
+ * did; a frame of a handled type that does not match its schema is still a protocol violation.
+ */
+export function unhandledProviderEvent(handledTypes: readonly string[]) {
+  return z
+    .object({ type: z.string().refine((type) => !handledTypes.includes(type)) })
+    .transform(() => ({ type: 'unhandled' as const }));
+}
 
 export function createProviderOutputRef(input: ProviderOutputRef): ProviderOutputRef {
   if (!input.protocol.trim() || !input.providerBlockKey.trim()) {
@@ -64,13 +107,9 @@ export function createProviderOutputRef(input: ProviderOutputRef): ProviderOutpu
 }
 
 function outputRefKey(ref: ProviderOutputRef): string {
-  return [
-    ref.protocol,
-    ref.responseId ?? '',
-    ref.providerBlockKey,
-    ref.sourceIndex ?? '',
-    ref.itemId ?? '',
-  ].join('\u0000');
+  return [ref.protocol, ref.responseId ?? '', ref.providerBlockKey, ref.sourceIndex ?? '', ref.itemId ?? ''].join(
+    '\u0000',
+  );
 }
 
 export class AssistantStreamBuilder {
@@ -85,12 +124,9 @@ export class AssistantStreamBuilder {
   private execution: AssistantMessage['execution'];
   private started = false;
   private finished = false;
+  private terminalReason: StopReason | null = null;
 
-  constructor(
-    stream: EventStream<AssistantMessageEvent, AssistantMessage>,
-    modelId: string,
-    providerId: string,
-  ) {
+  constructor(stream: EventStream<AssistantMessageEvent, AssistantMessage>, modelId: string, providerId: string) {
     this.stream = stream;
     this.modelId = modelId;
     this.providerId = providerId;
@@ -142,7 +178,8 @@ export class AssistantStreamBuilder {
 
   updateTextPhase(ref: ProviderOutputRef, phase: NonNullable<TextContent['phase']>): void {
     const block = this.requireOpenBlock(ref, 'text', 'update');
-    if (block.phase && block.phase !== phase) throw new Error(`Provider changed text phase for ${ref.providerBlockKey}.`);
+    if (block.phase && block.phase !== phase)
+      throw new Error(`Provider changed text phase for ${ref.providerBlockKey}.`);
     block.phase = phase;
   }
 
@@ -263,9 +300,8 @@ export class AssistantStreamBuilder {
       inputTokens: partial.inputTokens ?? this.usage.inputTokens,
       outputTokens: partial.outputTokens ?? this.usage.outputTokens,
       totalTokens:
-        partial.totalTokens
-        ?? (partial.inputTokens ?? this.usage.inputTokens)
-          + (partial.outputTokens ?? this.usage.outputTokens),
+        partial.totalTokens ??
+        (partial.inputTokens ?? this.usage.inputTokens) + (partial.outputTokens ?? this.usage.outputTokens),
       cost: partial.cost ?? this.usage.cost,
       cacheReadTokens: partial.cacheReadTokens ?? this.usage.cacheReadTokens,
       cacheWriteTokens: partial.cacheWriteTokens ?? this.usage.cacheWriteTokens,
@@ -277,13 +313,30 @@ export class AssistantStreamBuilder {
     };
   }
 
-  done(reason: StopReason): void {
-    const terminalRef = createProviderOutputRef({
-      protocol: 'provider-terminal',
-      providerBlockKey: 'done',
-      contentIndex: 0,
-    });
-    this.assertSemanticEvent(terminalRef);
+  /** Records the provider's own end-of-message signal and the stop reason it carried. */
+  markTerminal(reason: StopReason): void {
+    this.terminalReason = reason;
+  }
+
+  /**
+   * Ends a stream whose transport has closed. Only a stream that delivered output and its terminal signal completes;
+   * an aborted read reports the abort, a silent one is empty, and output without a terminal signal is truncated.
+   */
+  finish(context: { signal: AbortSignal; sawOutput: boolean; providerApi: string }): void {
+    if (context.signal.aborted) throw new DOMException('The provider stream was aborted.', 'AbortError');
+    if (!context.sawOutput) throw new ProviderEmptyStreamError(context.providerApi);
+    if (this.terminalReason === null) {
+      throw new ProviderStreamProtocolError(
+        'PROVIDER_STREAM_TRUNCATED',
+        TERMINAL_REF,
+        `${context.providerApi} stream ended without its terminal event.`,
+      );
+    }
+    this.complete(this.terminalReason);
+  }
+
+  private complete(reason: StopReason): void {
+    this.assertSemanticEvent(TERMINAL_REF);
     for (const key of this.orderedBlockKeys) {
       const block = this.blocks.get(key);
       if (block && !block.closed) this.closeBlock(block);
@@ -318,11 +371,7 @@ export class AssistantStreamBuilder {
     }
   }
 
-  private claim<T extends Block>(
-    ref: ProviderOutputRef,
-    kind: BlockKind,
-    block: T,
-  ): T {
+  private claim<T extends Block>(ref: ProviderOutputRef, kind: BlockKind, block: T): T {
     this.assertSemanticEvent(ref);
     const key = outputRefKey(ref);
     const existing = this.blocks.get(key);
@@ -409,11 +458,11 @@ export class AssistantStreamBuilder {
       });
       return;
     }
-    const toolCall: ToolCall = {
+    const toolCall: ToolCallContent = {
       type: 'toolCall',
       id: block.id,
       name: block.name,
-      arguments: parseJsonSafely(block.argsBuffer),
+      ...toolCallArguments(block.argsBuffer),
       providerOutputRef: { ...block.ref },
     };
     this.stream.push({
@@ -448,7 +497,7 @@ export class AssistantStreamBuilder {
           type: 'toolCall',
           id: block.id,
           name: block.name,
-          arguments: parseJsonSafely(block.argsBuffer),
+          ...toolCallArguments(block.argsBuffer),
           providerOutputRef: { ...block.ref },
         });
       }
@@ -461,29 +510,35 @@ export class AssistantStreamBuilder {
       usage: { ...this.usage },
       ...(this.execution ? { execution: { ...this.execution } } : {}),
       stopReason: reason,
-      ...(this.providerState ? {
-        providerState: {
-          ...this.providerState,
-          origin: {
-            ...this.providerState.origin,
-            bindingIds: [...this.providerState.origin.bindingIds],
-          },
-        },
-      } : {}),
+      ...(this.providerState
+        ? {
+            providerState: {
+              ...this.providerState,
+              origin: {
+                ...this.providerState.origin,
+                bindingIds: [...this.providerState.origin.bindingIds],
+              },
+            },
+          }
+        : {}),
       timestamp: Date.now(),
     };
   }
 }
 
-function parseJsonSafely(raw: string): Record<string, unknown> {
-  if (!raw || !raw.trim()) return {};
+/**
+ * Arguments the model streamed for a tool call. Text that is not a JSON object stays visible as `invalidArguments`
+ * so the executor can tell the model exactly that, instead of validating a fabricated object.
+ */
+function toolCallArguments(raw: string): Pick<ToolCallContent, 'arguments' | 'invalidArguments'> {
+  if (!raw.trim()) return { arguments: {} };
   try {
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
+      return { arguments: parsed as Record<string, unknown> };
     }
-    return { value: parsed };
   } catch {
-    return { _raw: raw };
+    // Falls through: the text is reported as invalid arguments below.
   }
+  return { arguments: {}, invalidArguments: raw };
 }

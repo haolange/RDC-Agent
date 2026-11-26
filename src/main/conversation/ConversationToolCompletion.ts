@@ -7,23 +7,30 @@ import type { ConversationToolCall } from '@shared/types/conversation';
 
 /** Shared projection for streamed and stopped-turn canonical tool completions. */
 export function buildConversationToolCompletion(
-  id: string, toolName: string, result: ToolCallResult | undefined,
-  existing: ConversationToolCall | undefined, completedAt: number,
+  id: string,
+  toolName: string,
+  result: ToolCallResult | undefined,
+  existing: ConversationToolCall | undefined,
+  completedAt: number,
 ): Partial<ConversationToolCall> & { id: string; toolName: string } {
   const normalized = normalizeToolName(toolName);
-  const cancelled = !result?.ok && (existing?.status === 'cancelled'
-    || result?.error?.details?.reason === 'abort');
+  const cancelled = !result?.ok && (existing?.status === 'cancelled' || result?.error?.details?.reason === 'abort');
   const skipped = result?.error?.details?.reason === 'turn completed after tool';
   const patch: Partial<ConversationToolCall> & { id: string; toolName: string } = {
-    id, toolName, status: skipped ? 'skipped' : cancelled ? 'cancelled' : result?.ok ? 'complete' : 'error',
+    id,
+    toolName,
+    status: skipped ? 'skipped' : cancelled ? 'cancelled' : result?.ok ? 'complete' : 'error',
     error: skipped || cancelled || result?.ok ? undefined : result?.error?.message,
-    completedAt: cancelled ? existing?.completedAt ?? completedAt : completedAt,
+    completedAt: cancelled ? (existing?.completedAt ?? completedAt) : completedAt,
   };
   if (normalized === 'subagent') {
     const details = (result?.data?.details ?? result?.error?.details) as Record<string, unknown> | undefined;
     patch.delegation = {
       task: existing?.delegation?.task ?? '',
-      profile: typeof details?.profile === 'string' && details.profile ? details.profile : existing?.delegation?.profile ?? '',
+      profile:
+        typeof details?.profile === 'string' && details.profile
+          ? details.profile
+          : (existing?.delegation?.profile ?? ''),
       mode: existing?.delegation?.mode ?? 'wait',
       executionId: typeof details?.executionId === 'string' ? details.executionId : existing?.delegation?.executionId,
       generation: typeof details?.generation === 'number' ? details.generation : existing?.delegation?.generation,

@@ -80,22 +80,21 @@ const preparedContext: ConversationTurnResult['preparedContext'] = {
   preparedAt: 1,
 };
 
-const makeElectronApi = () => ({
-  project: { list: vi.fn().mockResolvedValue({ projects: [] }) },
-  session: { list: vi.fn().mockResolvedValue({ sessions: [] }) },
-  run: { list: vi.fn().mockResolvedValue({ runs: [] }) },
-  conversation: { getHistory: vi.fn() },
-  trace: { getProjection: vi.fn().mockResolvedValue(null) },
-}) as unknown as NonNullable<Window['electronAPI']>;
+const makeElectronApi = () =>
+  ({
+    project: { list: vi.fn().mockResolvedValue({ projects: [] }) },
+    session: { list: vi.fn().mockResolvedValue({ sessions: [] }) },
+    conversation: { getHistory: vi.fn() },
+    trace: { getProjection: vi.fn().mockResolvedValue(null) },
+  }) as unknown as NonNullable<Window['electronAPI']>;
 
 describe('composerSendHelpers', () => {
   it('defaults an empty composer identity to general instead of ask', () => {
-    expect(resolveComposerProfileId('general', undefined)).toBe('general');
-    expect(resolveComposerProfileId('general', '')).toBe('general');
+    expect(resolveComposerProfileId(undefined)).toBe('general');
+    expect(resolveComposerProfileId('')).toBe('general');
     const optimistic = buildOptimisticConversationTurn({
       requestId: 'req-1',
       trimmed: 'hello',
-      currentMode: 'general',
       currentProject: null,
       currentSession: null,
       currentRun: null,
@@ -107,15 +106,36 @@ describe('composerSendHelpers', () => {
   });
 
   it('shows a plan handoff as its plan reference from the first frame', () => {
-    const planReference = { intent: 'execute' as const, planId: 'plan', revision: 2, hash: 'a'.repeat(64),
-      uri: 'session://plans/plan.md', title: 'Find the draw', agentId: 'general' };
+    const planReference = {
+      intent: 'execute' as const,
+      planId: 'plan',
+      revision: 2,
+      hash: 'a'.repeat(64),
+      uri: 'session://plans/plan.md',
+      title: 'Find the draw',
+      agentId: 'general',
+    };
     const optimistic = buildOptimisticConversationTurn({
-      requestId: 'req-plan', trimmed: 'Execute the frozen plan.', currentMode: 'general', currentProject: null,
-      currentSession: null, currentRun: null, pendingAttachments: [], selectedAgentId: 'general', planReference,
+      requestId: 'req-plan',
+      trimmed: 'Execute the frozen plan.',
+      currentProject: null,
+      currentSession: null,
+      currentRun: null,
+      pendingAttachments: [],
+      selectedAgentId: 'general',
+      planReference,
     });
     expect(optimistic.userMessage.planReference).toEqual(planReference);
-    expect(buildOptimisticConversationTurn({ requestId: 'req-plain', trimmed: 'hi', currentMode: 'general', currentProject: null,
-      currentSession: null, currentRun: null, pendingAttachments: [] }).userMessage).not.toHaveProperty('planReference');
+    expect(
+      buildOptimisticConversationTurn({
+        requestId: 'req-plain',
+        trimmed: 'hi',
+        currentProject: null,
+        currentSession: null,
+        currentRun: null,
+        pendingAttachments: [],
+      }).userMessage,
+    ).not.toHaveProperty('planReference');
   });
 
   afterEach(() => {
@@ -149,10 +169,8 @@ describe('composerSendHelpers', () => {
       electronAPI: makeElectronApi(),
       result,
       currentProject: null,
-      setCurrentSession: vi.fn(),
       setSessions: vi.fn(),
       setCurrentRun: vi.fn(),
-      setRuns: vi.fn(),
       setTracePresentation: vi.fn(),
       setConversationMessages,
       setBranchState,
@@ -197,10 +215,8 @@ describe('composerSendHelpers', () => {
       electronAPI: makeElectronApi(),
       result,
       currentProject: null,
-      setCurrentSession: vi.fn(),
       setSessions: vi.fn(),
       setCurrentRun: vi.fn(),
-      setRuns: vi.fn(),
       setTracePresentation: vi.fn(),
       setConversationMessages,
       setBranchState: vi.fn(),
@@ -229,10 +245,8 @@ describe('composerSendHelpers', () => {
       electronAPI: makeElectronApi(),
       result,
       currentProject: null,
-      setCurrentSession: vi.fn(),
       setSessions: vi.fn(),
       setCurrentRun: vi.fn(),
-      setRuns: vi.fn(),
       setTracePresentation: vi.fn(),
       setConversationMessages,
       setBranchState: vi.fn(),

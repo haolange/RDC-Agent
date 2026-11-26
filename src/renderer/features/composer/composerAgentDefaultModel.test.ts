@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  isComposerAgentDefaultToken,
-  resolveComposerAgentDefaultState,
-} from './composerAgentDefaultModel';
+import { isComposerAgentDefaultToken, resolveComposerAgentDefaultState } from './composerAgentDefaultModel';
 import type { ComposerModelPickerOption } from './composerModelPicker';
 
 const option: ComposerModelPickerOption = {
@@ -45,26 +42,22 @@ describe('resolveComposerAgentDefaultState', () => {
   });
 
   it('returns available when the Agent route matches a picker option', () => {
-    expect(resolveComposerAgentDefaultState(
-      { providerId: 'openai', modelId: 'gpt-5.6-sol' },
-      [option],
-      false,
-    )).toEqual({
-      kind: 'available',
-      selectable: true,
-      providerId: 'openai',
-      modelId: 'gpt-5.6-sol',
-      providerLabel: 'OpenAI',
-      modelLabel: 'GPT-5.6 Sol',
-    });
+    expect(resolveComposerAgentDefaultState({ providerId: 'openai', modelId: 'gpt-5.6-sol' }, [option], false)).toEqual(
+      {
+        kind: 'available',
+        selectable: true,
+        providerId: 'openai',
+        modelId: 'gpt-5.6-sol',
+        providerLabel: 'OpenAI',
+        modelLabel: 'GPT-5.6 Sol',
+      },
+    );
   });
 
   it('returns pending only while the catalog is not ready and the route is unmatched', () => {
-    expect(resolveComposerAgentDefaultState(
-      { providerId: 'openai', modelId: 'gpt-5.6-luna' },
-      [option],
-      false,
-    )).toEqual({
+    expect(
+      resolveComposerAgentDefaultState({ providerId: 'openai', modelId: 'gpt-5.6-luna' }, [option], false),
+    ).toEqual({
       kind: 'pending',
       selectable: true,
       providerId: 'openai',
@@ -73,15 +66,13 @@ describe('resolveComposerAgentDefaultState', () => {
   });
 
   it('returns unavailable only after the catalog is ready and the route is unmatched', () => {
-    expect(resolveComposerAgentDefaultState(
-      { providerId: 'openai', modelId: 'gpt-5.6-luna' },
-      [option],
-      true,
-    )).toEqual({
-      kind: 'unavailable',
-      selectable: false,
-      providerId: 'openai',
-      modelId: 'gpt-5.6-luna',
-    });
+    expect(resolveComposerAgentDefaultState({ providerId: 'openai', modelId: 'gpt-5.6-luna' }, [option], true)).toEqual(
+      {
+        kind: 'unavailable',
+        selectable: false,
+        providerId: 'openai',
+        modelId: 'gpt-5.6-luna',
+      },
+    );
   });
 });

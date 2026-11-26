@@ -5,11 +5,7 @@ import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentR
 import { mcpTrustService } from '../../settings/settings-core/McpTrustService';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { describeHost } from '../../platform/host';
-import {
-  canonicalMcpProjectRoot,
-  classifyMcpFailure,
-  McpConnectionCoordinator,
-} from './McpConnectionCoordinator';
+import { canonicalMcpProjectRoot, classifyMcpFailure, McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { McpDisconnectDetail } from '../agent/MCPManager';
 import type { SupervisedProcess } from '../../runtime/ProcessSupervisor';
 
@@ -34,10 +30,18 @@ describe('McpConnectionCoordinator project ownership', () => {
   it('normalizes project roots with realpath and includes project identity in pool keys', async () => {
     const resolved = path.resolve('Case-Sensitive-Project');
     const expectedLinux = (() => {
-      try { return fs.realpathSync.native(resolved); } catch { return resolved; }
+      try {
+        return fs.realpathSync.native(resolved);
+      } catch {
+        return resolved;
+      }
     })();
     const expectedWin = (() => {
-      try { return fs.realpathSync.native(resolved).toLowerCase(); } catch { return resolved.toLowerCase(); }
+      try {
+        return fs.realpathSync.native(resolved).toLowerCase();
+      } catch {
+        return resolved.toLowerCase();
+      }
     })();
     expect(canonicalMcpProjectRoot(resolved, describeHost('linux', 'x64'))).toBe(expectedLinux);
     expect(canonicalMcpProjectRoot(resolved, describeHost('darwin', 'arm64'))).toBe(expectedLinux);
@@ -88,9 +92,11 @@ describe('McpConnectionCoordinator project ownership', () => {
     expect(firstKey).toBeTruthy();
     expect(secondKey).toBeTruthy();
     expect(secondKey).not.toBe(firstKey);
-    const pools = (coordinator as unknown as {
-      pools: Map<string, { manager: { getAgentTools: () => unknown[] } }>;
-    }).pools;
+    const pools = (
+      coordinator as unknown as {
+        pools: Map<string, { manager: { getAgentTools: () => unknown[] } }>;
+      }
+    ).pools;
     const firstPool = pools.get(firstKey!);
     const secondPool = pools.get(secondKey!);
     expect(firstPool).toBeTruthy();
@@ -110,9 +116,9 @@ describe('McpConnectionCoordinator project ownership', () => {
     const rootB = path.resolve('test-project-b');
     const descriptorA = descriptor('project-a-server');
     const descriptorB = descriptor('project-b-server');
-    vi.spyOn(agentRuntimeConfigService, 'listMcpServers').mockImplementation((root) => (
-      root && path.resolve(root) === rootB ? [descriptorB] : [descriptorA]
-    ));
+    vi.spyOn(agentRuntimeConfigService, 'listMcpServers').mockImplementation((root) =>
+      root && path.resolve(root) === rootB ? [descriptorB] : [descriptorA],
+    );
     const coordinator = new McpConnectionCoordinator();
     const leaseA = await coordinator.acquireConnections('ask', rootA, [descriptorA.id]);
     expect(leaseA.errors).toHaveLength(1);
@@ -134,7 +140,9 @@ describe('McpConnectionCoordinator failure cache', () => {
   });
 
   it('classifies trust and missing-command failures as permanent', () => {
-    expect(classifyMcpFailure(new Error('Project MCP "x" needs trust for projectRealpath+descriptorHash before connect.'))).toBe('permanent');
+    expect(
+      classifyMcpFailure(new Error('Project MCP "x" needs trust for projectRealpath+descriptorHash before connect.')),
+    ).toBe('permanent');
     expect(classifyMcpFailure(new Error('MCP_TRANSPORT_UNSUPPORTED: sse'))).toBe('permanent');
     expect(classifyMcpFailure(new Error('MCP stdio server "x" missing command'))).toBe('permanent');
     expect(classifyMcpFailure(new Error('connect ECONNREFUSED 127.0.0.1:9'))).toBe('retryable');
@@ -148,15 +156,18 @@ describe('McpConnectionCoordinator failure cache', () => {
     const d2 = { ...descriptor('retryable-server'), command: 'node' };
     vi.spyOn(agentRuntimeConfigService, 'listMcpServers').mockReturnValue([d2]);
     const { MCPManager } = await import('../agent/MCPManager');
-    const connectSpy = vi.spyOn(MCPManager.prototype, 'connect')
+    const connectSpy = vi
+      .spyOn(MCPManager.prototype, 'connect')
       .mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:9'));
     const coordinator2 = new McpConnectionCoordinator();
 
     const a1 = await coordinator2.acquireConnections('ask', root, [d2.id], 'p2');
     expect(a1.errors[0]).toContain('ECONNREFUSED');
-    const pool2 = (coordinator2 as unknown as {
-      pools: Map<string, { failedMcpServers: Map<string, { kind: string; attempts: number; nextRetryAt: number }> }>;
-    }).pools.get(a1.lease!.poolKey)!;
+    const pool2 = (
+      coordinator2 as unknown as {
+        pools: Map<string, { failedMcpServers: Map<string, { kind: string; attempts: number; nextRetryAt: number }> }>;
+      }
+    ).pools.get(a1.lease!.poolKey)!;
     const r1 = pool2.failedMcpServers.get(d2.id)!;
     expect(r1.kind).toBe('retryable');
     expect(r1.attempts).toBe(1);
@@ -206,9 +217,11 @@ describe('McpConnectionCoordinator failure cache', () => {
     const coordinator = new McpConnectionCoordinator();
     const first = await coordinator.acquireConnections('ask', root, [d.id], 'trust-p');
     expect(first.errors[0]).toMatch(/needs trust/);
-    const pool = (coordinator as unknown as {
-      pools: Map<string, { failedMcpServers: Map<string, { kind: string; attempts: number }> }>;
-    }).pools.get(first.lease!.poolKey)!;
+    const pool = (
+      coordinator as unknown as {
+        pools: Map<string, { failedMcpServers: Map<string, { kind: string; attempts: number }> }>;
+      }
+    ).pools.get(first.lease!.poolKey)!;
     expect(pool.failedMcpServers.get(d.id)?.kind).toBe('permanent');
 
     const second = await coordinator.acquireConnections('ask', root, [d.id], 'trust-p');
@@ -249,17 +262,20 @@ describe('McpConnectionCoordinator orphan quarantine', () => {
     expect(seed.errors).toEqual([]);
     const poolKey = seed.lease!.poolKey;
     const internals = coordinator2 as unknown as {
-      pools: Map<string, {
-        manager: { disconnectAll: () => Promise<McpDisconnectDetail[]>; listServers: () => string[] };
-        quarantined: boolean;
-        failedMcpServers: Map<string, unknown>;
-      }>;
+      pools: Map<
+        string,
+        {
+          manager: { disconnectAll: () => Promise<McpDisconnectDetail[]>; listServers: () => string[] };
+          quarantined: boolean;
+          failedMcpServers: Map<string, unknown>;
+        }
+      >;
       orphanedPools: Map<string, unknown>;
     };
     const live = internals.pools.get(poolKey)!;
     live.failedMcpServers.clear();
     live.manager.listServers = () => [d.id];
-    live.manager.disconnectAll = async () => ([{ serverName: d.id, status: 'orphaned' as const, supervised }]);
+    live.manager.disconnectAll = async () => [{ serverName: d.id, status: 'orphaned' as const, supervised }];
 
     await seed.lease?.release({ discardIfIdle: true });
 
@@ -267,9 +283,9 @@ describe('McpConnectionCoordinator orphan quarantine', () => {
     expect(internals.pools.has(poolKey)).toBe(true);
     expect(live.quarantined).toBe(true);
 
-    await expect(
-      coordinator2.acquireConnections('ask', root, [d.id], 'orphan-p'),
-    ).rejects.toThrow(/MCP_POOL_QUARANTINED/);
+    await expect(coordinator2.acquireConnections('ask', root, [d.id], 'orphan-p')).rejects.toThrow(
+      /MCP_POOL_QUARANTINED/,
+    );
 
     resolveExit({ reason: 'exit' });
     await exitPromise;
@@ -280,9 +296,7 @@ describe('McpConnectionCoordinator orphan quarantine', () => {
     expect(internals.orphanedPools.has(poolKey)).toBe(false);
     expect(internals.pools.has(poolKey)).toBe(false);
 
-    await expect(
-      coordinator2.acquireConnections('ask', root, [d.id], 'orphan-p'),
-    ).resolves.toBeTruthy();
+    await expect(coordinator2.acquireConnections('ask', root, [d.id], 'orphan-p')).resolves.toBeTruthy();
 
     await coordinator2.disconnectAll();
   });
@@ -315,5 +329,33 @@ describe('McpConnectionCoordinator orphan quarantine', () => {
     expect(pool?.failedMcpServers.size ?? 0).toBe(0);
 
     await coordinator2.disconnectAll();
+  });
+
+  it('connects one server on request, retrying it after a recorded failure, and still enforces project trust', async () => {
+    const root = path.resolve('manual-project');
+    const d = descriptor('manual-server');
+    vi.spyOn(agentRuntimeConfigService, 'listMcpServers').mockReturnValue([d]);
+    const { MCPManager } = await import('../agent/MCPManager');
+    const connectInternal = vi
+      .spyOn(MCPManager.prototype as unknown as { connectInternal: () => Promise<string[]> }, 'connectInternal')
+      .mockRejectedValueOnce(new Error('spawn manual-mcp ENOENT'))
+      .mockResolvedValueOnce(['tool']);
+    const coordinator = new McpConnectionCoordinator();
+
+    await expect(coordinator.connectServer(root, 'p', d)).rejects.toThrow('spawn manual-mcp ENOENT');
+    expect(coordinator.getRuntimeStatusSummary(root, 'p')).toEqual([
+      expect.objectContaining({ id: d.id, connectionStatus: 'error', lastError: 'spawn manual-mcp ENOENT' }),
+    ]);
+    await expect(coordinator.connectServer(root, 'p', d)).resolves.toMatchObject({
+      alreadyConnected: false,
+      status: { id: d.id, connectionStatus: 'connected' },
+    });
+    expect(await coordinator.disconnectServer(root, 'p', 'another-server')).toBe('not-connected');
+
+    const untrusted = { ...descriptor('project-server'), scope: 'project' as const };
+    vi.spyOn(mcpTrustService, 'isTrusted').mockReturnValue(false);
+    await expect(coordinator.connectServer(root, 'p', untrusted)).rejects.toMatchObject({ code: 'MCP_TRUST_REQUIRED' });
+    expect(connectInternal).toHaveBeenCalledTimes(2);
+    await coordinator.disconnectAll();
   });
 });

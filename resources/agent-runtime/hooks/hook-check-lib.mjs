@@ -2,10 +2,6 @@
  * Shared stdin + fail-closed helpers for builtin Hook templates.
  * HookEngine writes the HookContext JSON to stdin and ends the stream.
  */
-export function isTestMode() {
-  return process.env.RDC_AGENT_TEST_MODE === '1';
-}
-
 export function parseContext(raw) {
   const text = typeof raw === 'string' ? raw.trim() : '';
   if (!text) return {};

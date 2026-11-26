@@ -1,30 +1,18 @@
 import React, { useId } from 'react';
-import { CANONICAL_HOOK_EVENTS, type ScopedResourceKind } from '@shared/types/rdcRuntime';
-import { MCP_TRANSPORTS } from '@shared/types/mcp';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
-import { Checkbox } from '../../../../ui/Checkbox';
 import { Icon } from '../../../../ui/Icon';
 import { InlineError } from '../../../../ui/InlineError';
 import { Input } from '../../../../ui/Input';
-import { Pill } from '../../../../ui/Pill';
-import { Select } from '../../../../ui/Select';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
-import { hookEventLabel, mcpTransportLabel, timeoutSeconds } from './resourceLabels';
+import { HookResourceFields, McpResourceFields } from './ScopedResourceKindFields';
 import { templateResourceId } from './runtimeScopeMutations';
 import { resourceDisplayName, type ResourceFormState } from './scopedResourceForm';
+import type { ScopedResourceKind } from '@shared/types/rdcRuntime';
+import type { ScopeNotice } from './useScopedResourceForm';
 
 const kindLabelKey = (kind: ScopedResourceKind): TranslationKey => `settings.kind.${kind}` as TranslationKey;
-
-/** Enum select whose options always include the current value so an unsupported value never gets silently rewritten. */
-function enumOptions(values: readonly string[], current: string, label: (value: string) => string, unsupportedSuffix: string) {
-  const options = values.map((value) => ({ value, label: label(value) }));
-  if (current && !values.includes(current)) {
-    options.unshift({ value: current, label: `${current} ${unsupportedSuffix}` });
-  }
-  return options;
-}
 
 export const ScopedResourceEditor: React.FC<{
   kind: ScopedResourceKind;
@@ -34,7 +22,7 @@ export const ScopedResourceEditor: React.FC<{
   busy: boolean;
   dirty?: boolean;
   /** Validation / save outcome shown inside the editor body. */
-  message?: string | null;
+  notice?: ScopeNotice | null;
   /** Dialog presentation moves the title and actions into the dialog chrome. */
   showHeader?: boolean;
   onChange: (patch: Partial<ResourceFormState>) => void;
@@ -48,7 +36,7 @@ export const ScopedResourceEditor: React.FC<{
   idLocked,
   busy,
   dirty = false,
-  message = null,
+  notice = null,
   showHeader = true,
   onChange,
   onSave,
@@ -58,9 +46,12 @@ export const ScopedResourceEditor: React.FC<{
   const { t } = useI18n();
   const fieldId = useId();
   const kindLabel = t(kindLabelKey(kind));
-  const isError = Boolean(message) && message !== t('settings.scopeSaved') && message !== t('settings.scopeImported');
   return (
-    <div className="settings-runtime-editor settings-manifest-editor" data-testid="settings-runtime-editor" data-resource-kind={kind}>
+    <div
+      className="settings-runtime-editor settings-manifest-editor"
+      data-testid="settings-runtime-editor"
+      data-resource-kind={kind}
+    >
       {showHeader ? (
         <div className="settings-manifest-editor-head">
           <div className="settings-section-title">
@@ -72,9 +63,17 @@ export const ScopedResourceEditor: React.FC<{
             ) : null}
           </div>
           <div className="settings-manifest-editor-actions">
-            {onDelete ? <Button variant="danger" disabled={busy} onClick={onDelete}>{t('settings.delete')}</Button> : null}
-            <Button variant="ghost" disabled={busy} onClick={onCancel}>{t('settings.cancel')}</Button>
-            <Button variant="primary" disabled={busy} onClick={onSave}>{t('settings.scopeSave')}</Button>
+            {onDelete ? (
+              <Button variant="danger" disabled={busy} onClick={onDelete}>
+                {t('settings.delete')}
+              </Button>
+            ) : null}
+            <Button variant="ghost" disabled={busy} onClick={onCancel}>
+              {t('settings.cancel')}
+            </Button>
+            <Button variant="primary" disabled={busy} onClick={onSave}>
+              {t('settings.scopeSave')}
+            </Button>
           </div>
         </div>
       ) : null}
@@ -94,8 +93,13 @@ export const ScopedResourceEditor: React.FC<{
 
         <SettingsField label={t('settings.resourceFieldId')} htmlFor={`${fieldId}-id`}>
           <div className="settings-runtime-id-control">
-            <Input id={`${fieldId}-id`} value={form.id} disabled={idLocked || busy} placeholder={templateResourceId(kind)}
-              onChange={(event) => onChange({ id: event.target.value })} />
+            <Input
+              id={`${fieldId}-id`}
+              value={form.id}
+              disabled={idLocked || busy}
+              placeholder={templateResourceId(kind)}
+              onChange={(event) => onChange({ id: event.target.value })}
+            />
             {idLocked ? (
               <span className="settings-runtime-readonly-tag" data-testid="settings-resource-id-locked">
                 <Icon name="lock" size={12} />
@@ -111,7 +115,8 @@ export const ScopedResourceEditor: React.FC<{
             label={kind === 'skill' ? t('settings.resourceFieldSkillMd') : t('settings.resourceFieldContent')}
           >
             <Textarea
-              sizing="fill" className="settings-resource-document-input"
+              sizing="fill"
+              className="settings-resource-document-input"
               aria-label={kind === 'skill' ? t('settings.resourceFieldSkillMd') : t('settings.resourceFieldContent')}
               value={form.body}
               disabled={busy}
@@ -120,90 +125,8 @@ export const ScopedResourceEditor: React.FC<{
           </SettingsField>
         )}
 
-        {kind === 'mcp' && (
-          <>
-            <SettingsField label={t('settings.resourceFieldName')} htmlFor={`${fieldId}-name`}>
-              <Input id={`${fieldId}-name`} value={form.name} disabled={busy} onChange={(event) => onChange({ name: event.target.value })} />
-            </SettingsField>
-            <SettingsField label={t('settings.resourceFieldTransport')}>
-              <Select
-                dataTestId="settings-mcp-transport"
-                ariaLabel={t('settings.resourceFieldTransport')}
-                value={form.transport}
-                disabled={busy}
-                onChange={(value) => onChange({ transport: value })}
-                options={enumOptions(MCP_TRANSPORTS, form.transport, (value) => mcpTransportLabel(value, t), t('settings.resourceEnumUnsupported'))}
-              />
-            </SettingsField>
-            {form.transport === 'streamable-http' ? (
-              <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldUrl')} htmlFor={`${fieldId}-url`}>
-                <Input id={`${fieldId}-url`} value={form.url} disabled={busy} placeholder="http://localhost:8123/mcp" onChange={(event) => onChange({ url: event.target.value })} />
-              </SettingsField>
-            ) : null}
-            <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldCommand')} htmlFor={`${fieldId}-command`}>
-              <Input id={`${fieldId}-command`} value={form.command} disabled={busy} onChange={(event) => onChange({ command: event.target.value })} />
-            </SettingsField>
-            <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldArgsJson')}>
-              <Textarea aria-label={t('settings.resourceFieldArgsJson')} value={form.argsText} disabled={busy} onChange={(event) => onChange({ argsText: event.target.value })} />
-            </SettingsField>
-            <Checkbox
-              className="settings-field settings-runtime-form-check"
-              checked={form.enabled}
-              disabled={busy}
-              onCheckedChange={(enabled) => onChange({ enabled })}
-              label={t('settings.resourceFieldEnabledDefault')}
-            />
-          </>
-        )}
-
-        {kind === 'hook' && (
-          <>
-            <SettingsField label={t('settings.resourceFieldEvent')}>
-              <Select
-                dataTestId="settings-hook-event"
-                ariaLabel={t('settings.resourceFieldEvent')}
-                value={form.event}
-                disabled={busy}
-                onChange={(value) => onChange({ event: value })}
-                options={enumOptions(CANONICAL_HOOK_EVENTS, form.event, (value) => hookEventLabel(value, t), t('settings.resourceEnumUnsupported'))}
-              />
-            </SettingsField>
-            <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldCommand')} htmlFor={`${fieldId}-command`}>
-              <Input id={`${fieldId}-command`} value={form.command} disabled={busy} onChange={(event) => onChange({ command: event.target.value })} />
-            </SettingsField>
-            <SettingsField className="settings-runtime-form-span" label={t('settings.resourceFieldArgsJson')} htmlFor={`${fieldId}-args`}>
-              <Input id={`${fieldId}-args`} value={form.argsText} disabled={busy} onChange={(event) => onChange({ argsText: event.target.value })} />
-            </SettingsField>
-            <SettingsField label={t('settings.resourceFieldTimeout')} htmlFor={`${fieldId}-timeout`}>
-              {/* Stored in milliseconds, edited in seconds. */}
-              <Input id={`${fieldId}-timeout`} type="number" min={1} max={600} step={1} value={timeoutSeconds(form.timeoutMs)} disabled={busy}
-                onChange={(event) => onChange({ timeoutMs: event.target.value ? String(Math.round(Number(event.target.value) * 1000)) : '' })} />
-            </SettingsField>
-            <SettingsField label={t('settings.resourceFieldFailurePolicy')}>
-              <div className="settings-choice-group" role="radiogroup" aria-label={t('settings.resourceFieldFailurePolicy')} data-testid="settings-hook-failure-policy">
-                {(['warn', 'block'] as const).map((policy) => (
-                  <Pill
-                    key={policy}
-                    role="radio"
-                    aria-checked={form.failurePolicy === policy}
-                    selected={form.failurePolicy === policy}
-                    disabled={busy}
-                    onClick={() => onChange({ failurePolicy: policy })}
-                  >
-                    {policy === 'warn' ? t('settings.hookFailureWarn') : t('settings.hookFailureBlock')}
-                  </Pill>
-                ))}
-              </div>
-            </SettingsField>
-            <Checkbox
-              className="settings-field settings-runtime-form-check"
-              checked={form.enabled}
-              disabled={busy}
-              onCheckedChange={(enabled) => onChange({ enabled })}
-              label={t('settings.resourceFieldEnabled')}
-            />
-          </>
-        )}
+        {kind === 'mcp' && <McpResourceFields form={form} busy={busy} fieldId={fieldId} onChange={onChange} />}
+        {kind === 'hook' && <HookResourceFields form={form} busy={busy} fieldId={fieldId} onChange={onChange} />}
       </div>
 
       {kind === 'hook' ? (
@@ -218,10 +141,17 @@ export const ScopedResourceEditor: React.FC<{
           {t('settings.policyProjectTightenOnly')}
         </p>
       ) : null}
-      {message ? (
-        isError
-          ? <InlineError data-testid="settings-runtime-editor-error">{message}</InlineError>
-          : <p className="settings-runtime-editor-status" role="status"><Icon name="check" size={14} />{message}</p>
+      {notice ? (
+        notice.tone === 'error' ? (
+          <InlineError data-testid="settings-runtime-editor-error" detail={notice.detail}>
+            {notice.message}
+          </InlineError>
+        ) : (
+          <p className="settings-runtime-editor-status" role="status">
+            <Icon name="check" size={14} />
+            {notice.message}
+          </p>
+        )
       ) : null}
     </div>
   );

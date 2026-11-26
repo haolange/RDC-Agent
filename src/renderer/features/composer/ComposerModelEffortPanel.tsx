@@ -5,12 +5,13 @@ import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 import { Chevron } from '../../ui/Chevron';
 import { Switch } from '../../ui/Switch';
+import { useI18n } from '../../i18n';
+import { PlainButton } from '../../ui/PlainButton';
 import { EffortModeIconButton, getStopPosition } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, thumbInsetPercent } from './effortSliderGeometry';
 import { EffortMaxField } from './EffortMaxField';
 import type { MaxVisualTimeline } from './maxVisual';
 import type { ExitingMaxPhase } from './useMaxVisualController';
-import type { TranslationKey } from '../../i18n';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 
 const EffortSliderStop: React.FC<{
@@ -60,7 +61,6 @@ export const ComposerModelEffortPanel: React.FC<{
   fastModelStatusLabel?: string;
   maxContextMode: boolean;
   fastModel: boolean;
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   onTrackPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
   onTrackPointerMove: (event: React.PointerEvent<HTMLDivElement>) => void;
   onTrackPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -102,7 +102,6 @@ export const ComposerModelEffortPanel: React.FC<{
   fastModelStatusLabel,
   maxContextMode,
   fastModel,
-  t,
   onTrackPointerDown,
   onTrackPointerMove,
   onTrackPointerUp,
@@ -113,6 +112,7 @@ export const ComposerModelEffortPanel: React.FC<{
   onToggleFastModel,
   onMaxTimelineComplete,
 }) => {
+  const { t } = useI18n();
   const popupDynStyle = useDynStyle({
     '--composer-effort-popup-shift-x': `${popupShiftPx}px`,
   });
@@ -121,7 +121,8 @@ export const ComposerModelEffortPanel: React.FC<{
   // While the slider moves the header follows it; otherwise it shows the level the turn uses.
   const reasoningLabel = hasAdjustableReasoning ? t(EFFORT_LABEL_KEYS[displayLevel]) : currentReasoningLabel;
   // A model whose reasoning is only on or off gets a switch: a two-stop slider implies a range it does not have.
-  const onLevel = hasAdjustableReasoning && displayLevels.length === 2 && displayLevels[0] === 'off' ? displayLevels[1] : null;
+  const onLevel =
+    hasAdjustableReasoning && displayLevels.length === 2 && displayLevels[0] === 'off' ? displayLevels[1] : null;
 
   return (
     <div
@@ -145,9 +146,10 @@ export const ComposerModelEffortPanel: React.FC<{
           <Icon name="lightning" size={16} />
         </EffortModeIconButton>
         <div className="composer-model-effort-identity">
-          <span className="composer-model-effort-level">{t('composer.effort.reasoningValue', { level: reasoningLabel })}</span>
-          <button
-            type="button"
+          <span className="composer-model-effort-level">
+            {t('composer.effort.reasoningValue', { level: reasoningLabel })}
+          </span>
+          <PlainButton
             className="composer-model-effort-model"
             data-testid="composer-model-effort-open-picker"
             aria-label={t('composer.model.openPicker')}
@@ -156,7 +158,7 @@ export const ComposerModelEffortPanel: React.FC<{
           >
             <span>{modelLabel}</span>
             <Chevron size={12} />
-          </button>
+          </PlainButton>
           {capabilityStateDetail ? (
             <Button variant="ghost" size="sm" onClick={onRetryCapability}>
               {capabilityRetryLabel}
@@ -182,80 +184,81 @@ export const ComposerModelEffortPanel: React.FC<{
       </div>
 
       {onLevel ? (
-        <div className="composer-effort-switch-row" data-tooltip={t('composer.effort.thinkingSwitchHint')}>
+        <div className="composer-effort-switch-row">
           <span className="composer-effort-switch-title">{t('composer.effort.thinkingSwitch')}</span>
-          <Switch data-testid="composer-effort-switch" aria-label={t('composer.effort.thinkingSwitch')}
-            checked={displayLevel !== 'off'} onCheckedChange={(on) => onSelectLevel(on ? onLevel : 'off')} />
+          <Switch
+            data-testid="composer-effort-switch"
+            aria-label={t('composer.effort.thinkingSwitch')}
+            data-tooltip={t('composer.effort.thinkingSwitchHint')}
+            checked={displayLevel !== 'off'}
+            onCheckedChange={(on) => onSelectLevel(on ? onLevel : 'off')}
+          />
         </div>
       ) : (
-      <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
-        <div
-          ref={trackRef}
-          className={`composer-effort-slider is-level-${displayLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}${showMaxTrack ? ' is-max-visual' : ''}${exitingMaxPhase !== 'off' ? ` is-exiting-max is-exiting-max-${exitingMaxPhase}` : ''}${positionTransitionsReady ? '' : ' is-layout-stabilizing'} is-max-phase-${maxTimeline.phase}`}
-          data-testid="composer-effort-slider"
-          data-exiting-max={exitingMaxPhase}
-          data-max-phase={maxTimeline.phase}
-          data-max-progress="0.000"
-          data-max-stops-opacity={maxTimeline.fromStopsOpacity.toFixed(3)}
-          data-max-emitter-ratio={thumbRatio.toFixed(3)}
-          data-max-field-energy={maxTimeline.fromEnergy.toFixed(3)}
-          data-max-clip-ratio={thumbRatio.toFixed(3)}
-          onPointerDown={onTrackPointerDown}
-          onPointerMove={onTrackPointerMove}
-          onPointerUp={onTrackPointerUp}
-          onPointerCancel={onTrackPointerUp}
-          onClick={onTrackClick}
-        >
-          {hasAdjustableReasoning ? (
-            <div className="composer-effort-slider-stops" aria-hidden="true">
-              {displayLevels.map((level, index) => (
-                <EffortSliderStop
-                  key={level}
-                  level={level}
-                  isCurrent={level === displayLevel}
-                  leftPercent={thumbInsetPercent(
-                    getStopPosition(index, displayLevels.length),
-                    trackWidthPx,
-                    EFFORT_THUMB_WIDTH_PX,
-                  )}
-                />
-              ))}
-            </div>
-          ) : null}
-
-          <div className="composer-effort-slider-track" aria-hidden="true" />
-
-          <EffortMaxField
-            timeline={maxTimeline}
-            thumbRatio={thumbRatio}
-            onTimelineComplete={onMaxTimelineComplete}
-          />
-
+        <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
           <div
-            className={`composer-effort-slider-thumb${isDragging ? ' is-dragging' : ''}`}
-            {...thumbDynStyle}
-            role="slider"
-            tabIndex={hasAdjustableReasoning ? 0 : -1}
-            aria-valuemin={0}
-            aria-valuemax={displayLevels.length - 1}
-            aria-valuenow={displayIndex}
-            aria-valuetext={reasoningLabel}
-            aria-disabled={!hasAdjustableReasoning}
-            onKeyDown={onThumbKeyDown}
-          />
+            ref={trackRef}
+            className={`composer-effort-slider is-level-${displayLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}${showMaxTrack ? ' is-max-visual' : ''}${exitingMaxPhase !== 'off' ? ` is-exiting-max is-exiting-max-${exitingMaxPhase}` : ''}${positionTransitionsReady ? '' : ' is-layout-stabilizing'} is-max-phase-${maxTimeline.phase}`}
+            data-testid="composer-effort-slider"
+            data-exiting-max={exitingMaxPhase}
+            data-max-phase={maxTimeline.phase}
+            data-max-progress="0.000"
+            data-max-stops-opacity={maxTimeline.fromStopsOpacity.toFixed(3)}
+            data-max-emitter-ratio={thumbRatio.toFixed(3)}
+            data-max-field-energy={maxTimeline.fromEnergy.toFixed(3)}
+            data-max-clip-ratio={thumbRatio.toFixed(3)}
+            onPointerDown={onTrackPointerDown}
+            onPointerMove={onTrackPointerMove}
+            onPointerUp={onTrackPointerUp}
+            onPointerCancel={onTrackPointerUp}
+            onClick={onTrackClick}
+          >
+            {hasAdjustableReasoning ? (
+              <div className="composer-effort-slider-stops" aria-hidden="true">
+                {displayLevels.map((level, index) => (
+                  <EffortSliderStop
+                    key={level}
+                    level={level}
+                    isCurrent={level === displayLevel}
+                    leftPercent={thumbInsetPercent(
+                      getStopPosition(index, displayLevels.length),
+                      trackWidthPx,
+                      EFFORT_THUMB_WIDTH_PX,
+                    )}
+                  />
+                ))}
+              </div>
+            ) : null}
 
-          {isDragging ? (
-            <span className="composer-effort-slider-tooltip" {...tooltipDynStyle}>
-              {tooltipLabel}
-            </span>
-          ) : null}
-        </div>
+            <div className="composer-effort-slider-track" aria-hidden="true" />
 
-        <div className="composer-effort-slider-labels" aria-hidden="true">
-          <span>{t('composer.effort.faster')}</span>
-          <span>{t('composer.effort.smarter')}</span>
+            <EffortMaxField timeline={maxTimeline} thumbRatio={thumbRatio} onTimelineComplete={onMaxTimelineComplete} />
+
+            <div
+              className={`composer-effort-slider-thumb${isDragging ? ' is-dragging' : ''}`}
+              {...thumbDynStyle}
+              role="slider"
+              tabIndex={hasAdjustableReasoning ? 0 : -1}
+              aria-valuemin={0}
+              aria-valuemax={displayLevels.length - 1}
+              aria-valuenow={displayIndex}
+              aria-valuetext={reasoningLabel}
+              aria-disabled={!hasAdjustableReasoning}
+              onKeyDown={onThumbKeyDown}
+            />
+
+            {isDragging ? (
+              <span className="composer-effort-slider-tooltip" {...tooltipDynStyle}>
+                {tooltipLabel}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="composer-effort-slider-labels" aria-hidden="true">
+            <span>{t('composer.effort.faster')}</span>
+            <span>{t('composer.effort.smarter')}</span>
+          </div>
         </div>
-      </div>
       )}
     </div>
   );

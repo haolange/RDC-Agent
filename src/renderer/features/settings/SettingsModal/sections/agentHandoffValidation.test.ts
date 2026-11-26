@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { findProjectedHandoffTargetConflicts, persistAgentHandoff, validateAgentHandoffs } from './agentHandoffValidation';
+import {
+  findProjectedHandoffTargetConflicts,
+  persistAgentHandoff,
+  validateAgentHandoffs,
+} from './agentHandoffValidation';
 import type { AgentHandoffDefinition, AgentManifestDefinition, AgentModelOption } from '@shared/types/agentManifest';
 
 const definition = (id: string, enabled: boolean): AgentManifestDefinition => ({
@@ -82,9 +86,7 @@ describe('validateAgentHandoffs', () => {
 
   it('reports target-disabled and keeps the original id', () => {
     const handoff = { ...valid, agent: 'analyzer' };
-    expect(validateAgentHandoffs([handoff], ctx)).toEqual([
-      { index: 0, field: 'agent', code: 'target-disabled' },
-    ]);
+    expect(validateAgentHandoffs([handoff], ctx)).toEqual([{ index: 0, field: 'agent', code: 'target-disabled' }]);
     expect(handoff.agent).toBe('analyzer');
     expect(persistAgentHandoff(handoff).agent).toBe('analyzer');
   });
@@ -102,10 +104,7 @@ describe('validateAgentHandoffs', () => {
   });
 
   it('does not invent a duplicate-target error', () => {
-    expect(validateAgentHandoffs([
-      valid,
-      { label: 'Again', agent: 'debugger', prompt: 'Continue.' },
-    ], ctx)).toEqual([]);
+    expect(validateAgentHandoffs([valid, { label: 'Again', agent: 'debugger', prompt: 'Continue.' }], ctx)).toEqual([]);
   });
 
   it('accepts a handoff without any model field', () => {
@@ -115,10 +114,12 @@ describe('validateAgentHandoffs', () => {
 
 describe('findProjectedHandoffTargetConflicts', () => {
   it('reports when another profile still hands off to a disabled target', () => {
-    expect(findProjectedHandoffTargetConflicts([
-      { id: 'general', enabled: true, handoffs: [valid] },
-      { id: 'debugger', enabled: false, handoffs: [] },
-    ])).toEqual([{ sourceId: 'general', targetId: 'debugger', code: 'target-disabled' }]);
+    expect(
+      findProjectedHandoffTargetConflicts([
+        { id: 'general', enabled: true, handoffs: [valid] },
+        { id: 'debugger', enabled: false, handoffs: [] },
+      ]),
+    ).toEqual([{ sourceId: 'general', targetId: 'debugger', code: 'target-disabled' }]);
   });
 });
 
@@ -130,6 +131,6 @@ describe('persistAgentHandoff', () => {
       ...valid,
       surface: 'plan-gate',
     });
-    expect(persistAgentHandoff({ ...cleared, send: undefined})).toEqual(valid);
+    expect(persistAgentHandoff({ ...cleared, send: undefined })).toEqual(valid);
   });
 });

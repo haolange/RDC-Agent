@@ -1,9 +1,6 @@
 import { useEffect, useRef } from 'react';
-import type {
-  ProjectMenuPopoverState,
-  ProjectRenamePopoverState,
-  SessionRenamePopoverState,
-} from './types';
+import { useDismissable } from '../../../lib/useDismissable';
+import type { ProjectMenuPopoverState, ProjectRenamePopoverState, SessionRenamePopoverState } from './types';
 
 interface UseRenamePopoverOptions {
   renamePopover: SessionRenamePopoverState | null;
@@ -31,45 +28,36 @@ export function useRenamePopover({
   const projectRenameInputRef = useRef<HTMLInputElement | null>(null);
   const initializedProjectRenameTargetRef = useRef<string | null>(null);
 
+  useDismissable({ open: Boolean(renamePopover), inside: () => [renamePopoverRef.current], onDismiss: onCloseRename });
+  useDismissable({
+    open: Boolean(projectMenuPopover),
+    inside: () => [projectMenuRef.current],
+    onDismiss: onCloseProjectMenu,
+  });
+  useDismissable({
+    open: Boolean(projectRenamePopover),
+    inside: () => [projectRenameRef.current],
+    onDismiss: onCloseProjectRename,
+  });
+
+  // The popovers are anchored to sidebar rows; a window resize moves the rows, so it closes them.
   useEffect(() => {
     if (!renamePopover && !projectMenuPopover && !projectRenamePopover) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (renamePopover && !renamePopoverRef.current?.contains(target)) {
-        onCloseRename();
-      }
-      if (projectMenuPopover && !projectMenuRef.current?.contains(target)) {
-        onCloseProjectMenu();
-      }
-      if (projectRenamePopover && !projectRenameRef.current?.contains(target)) {
-        onCloseProjectRename();
-      }
-    };
-
     const handleDismiss = () => {
       onCloseRename();
       onCloseProjectMenu();
       onCloseProjectRename();
     };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onCloseRename();
-        onCloseProjectMenu();
-        onCloseProjectRename();
-      }
-    };
-
-    window.addEventListener('pointerdown', handlePointerDown);
     window.addEventListener('resize', handleDismiss);
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('resize', handleDismiss);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [renamePopover, projectMenuPopover, projectRenamePopover, onCloseRename, onCloseProjectMenu, onCloseProjectRename]);
+    return () => window.removeEventListener('resize', handleDismiss);
+  }, [
+    renamePopover,
+    projectMenuPopover,
+    projectRenamePopover,
+    onCloseRename,
+    onCloseProjectMenu,
+    onCloseProjectRename,
+  ]);
 
   useEffect(() => {
     const targetSessionId = renamePopover?.session.sessionId ?? null;

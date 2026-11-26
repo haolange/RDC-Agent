@@ -7,8 +7,16 @@ import {
   serializeAgentManifestDraft,
   shouldRollbackFailedAgentManifestSave,
 } from './agentManifestAutosaveState';
-import { findProjectedHandoffTargetConflicts, persistAgentHandoff, validateAgentHandoffs } from './sections/agentHandoffValidation';
-import type { AgentDefinitionSaveResult, AgentManifestDraft, AgentManifestDefinition } from '@shared/types/agentManifest';
+import {
+  findProjectedHandoffTargetConflicts,
+  persistAgentHandoff,
+  validateAgentHandoffs,
+} from './sections/agentHandoffValidation';
+import type {
+  AgentDefinitionSaveResult,
+  AgentManifestDraft,
+  AgentManifestDefinition,
+} from '@shared/types/agentManifest';
 
 const draft = (id: string): AgentManifestDraft => ({
   id,
@@ -36,8 +44,10 @@ describe('agent manifest scoped autosave helpers', () => {
     const saved = { ...draft('custom'), handoffs: [{ label: 'Go', agent: 'general', prompt: 'Run' }] };
     const edited = { ...saved, handoffs: [{ ...saved.handoffs[0], labelTranslations: { 'zh-CN': '执行' } }] };
     expect(getChangedAgentManifestDrafts([edited], [saved])).toEqual([edited]);
-    expect(JSON.parse(serializeAgentManifestDraft({ ...edited, description: 'Edited' })).handoffs[0])
-      .toMatchObject({ label: 'Go', labelTranslations: { 'zh-CN': '执行' } });
+    expect(JSON.parse(serializeAgentManifestDraft({ ...edited, description: 'Edited' })).handoffs[0]).toMatchObject({
+      label: 'Go',
+      labelTranslations: { 'zh-CN': '执行' },
+    });
   });
   it('ignores runtime-only fields and detects only persisted changes', () => {
     const saved = draft('ask');
@@ -49,20 +59,19 @@ describe('agent manifest scoped autosave helpers', () => {
     } as AgentManifestDraft;
     expect(serializeAgentManifestDraft(runtimeDecorated)).toBe(serializeAgentManifestDraft(saved));
     expect(getChangedAgentManifestDrafts([runtimeDecorated], [saved])).toEqual([]);
-    expect(getChangedAgentManifestDrafts([{ ...runtimeDecorated, instructions: 'Changed.' }], [saved]))
-      .toEqual([expect.objectContaining({ instructions: 'Changed.' })]);
-    expect(getChangedAgentManifestDrafts([{ ...runtimeDecorated, accent: '#ff6a00' }], [saved]))
-      .toEqual([expect.objectContaining({ accent: '#ff6a00' })]);
+    expect(getChangedAgentManifestDrafts([{ ...runtimeDecorated, instructions: 'Changed.' }], [saved])).toEqual([
+      expect.objectContaining({ instructions: 'Changed.' }),
+    ]);
+    expect(getChangedAgentManifestDrafts([{ ...runtimeDecorated, accent: '#ff6a00' }], [saved])).toEqual([
+      expect.objectContaining({ accent: '#ff6a00' }),
+    ]);
   });
 
   it('rolls back only the failed agent and preserves unrelated optimistic edits', () => {
     const saved = [draft('ask'), draft('edit')];
     const failed = { ...saved[0], instructions: 'Failed edit.' };
     const unrelated = { ...saved[1], name: 'Edited locally' };
-    expect(rollbackAgentManifestDrafts([failed, unrelated], [failed], saved)).toEqual([
-      saved[0],
-      unrelated,
-    ]);
+    expect(rollbackAgentManifestDrafts([failed, unrelated], [failed], saved)).toEqual([saved[0], unrelated]);
   });
 
   it('replaces a deleted project general draft with the restored builtin and does not resubmit delete', () => {
@@ -107,11 +116,13 @@ describe('agent manifest scoped autosave helpers', () => {
       lastSuccessful: null,
     };
     const next = applyAgentDefinitionSaveResults([projectDraft], [projectDraft], [result], 'proj_demo');
-    expect(next).toMatchObject([{
-      id: 'general',
-      writeScope: 'user',
-      sourceHash: 'builtin-hash',
-    }]);
+    expect(next).toMatchObject([
+      {
+        id: 'general',
+        writeScope: 'user',
+        sourceHash: 'builtin-hash',
+      },
+    ]);
     expect(next[0]?.delete).toBeUndefined();
     expect(getChangedAgentManifestDrafts(next, next)).toEqual([]);
   });
@@ -156,19 +167,23 @@ describe('agent manifest scoped autosave helpers', () => {
     const saved = draft('general');
     const withSend = {
       ...saved,
-      handoffs: [persistAgentHandoff({
-        label: 'Debug',
-        agent: 'debugger',
-        prompt: 'Investigate.',
-        send: true,
-      })],
+      handoffs: [
+        persistAgentHandoff({
+          label: 'Debug',
+          agent: 'debugger',
+          prompt: 'Investigate.',
+          send: true,
+        }),
+      ],
     };
     const cleared = {
       ...saved,
-      handoffs: [persistAgentHandoff({
-        ...withSend.handoffs[0],
-        send: false,
-      })],
+      handoffs: [
+        persistAgentHandoff({
+          ...withSend.handoffs[0],
+          send: false,
+        }),
+      ],
     };
     expect(withSend.handoffs[0]).toEqual({
       label: 'Debug',
@@ -236,7 +251,7 @@ describe('agent manifest scoped autosave helpers', () => {
     const inFlight = new Promise<void>((_, reject) => {
       setTimeout(() => reject(new Error('save failed')), 20);
     }).catch(() => {
-      if (!shouldRollbackFailedAgentManifestSave(submittedRevision, latestRevision, submitted, current)) {
+      if (!shouldRollbackFailedAgentManifestSave(submittedRevision === latestRevision, submitted, current)) {
         return;
       }
       onRollback(submitted, [saved]);
@@ -248,6 +263,6 @@ describe('agent manifest scoped autosave helpers', () => {
     await inFlight;
     expect(onRollback).not.toHaveBeenCalled();
     expect(current).toEqual([illegal]);
-    expect(shouldRollbackFailedAgentManifestSave(1, 1, submitted, submitted)).toBe(true);
+    expect(shouldRollbackFailedAgentManifestSave(true, submitted, submitted)).toBe(true);
   });
 });

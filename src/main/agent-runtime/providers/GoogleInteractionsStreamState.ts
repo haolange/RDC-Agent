@@ -1,16 +1,22 @@
 import { createProviderStateRef } from '../reasoning/ProviderStateRefs';
-import {
-  AssistantStreamBuilder,
-  ProviderStreamProtocolError,
-} from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
 import { ProviderHttpError } from './internal/http';
-import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
+import { normalizeUsage, type UsageFieldMap } from './internal/usageNormalizer';
 import { GoogleInteractionsStepState } from './GoogleInteractionsStepState';
 import type { StopReason } from '../core/types';
 import type { RequestPlan } from '@shared/types/providerCapability';
 
 const PROVIDER_API = 'google-interactions';
+
+const INTERACTIONS_USAGE_FIELDS: UsageFieldMap<Record<string, unknown>> = {
+  inputTokens: (usage) => numberValue(usage.total_input_tokens),
+  outputTokens: (usage) => numberValue(usage.total_output_tokens),
+  // The interaction's own total; one that reports none counts zero rather than a sum.
+  totalTokens: (usage) => numberValue(usage.total_tokens) ?? 0,
+  cacheReadTokens: (usage) => numberValue(usage.total_cached_tokens),
+  reasoningTokens: (usage) => numberValue(usage.total_thought_tokens),
+};
 
 export interface GoogleInteractionsOutcome {
   terminalSeen: boolean;
@@ -33,11 +39,7 @@ export class GoogleInteractionsStreamState {
     private readonly builder: AssistantStreamBuilder,
     private readonly requestPlan: RequestPlan,
   ) {
-    this.steps = new GoogleInteractionsStepState(
-      builder,
-      requestPlan,
-      () => this.interactionId,
-    );
+    this.steps = new GoogleInteractionsStepState(builder, requestPlan, () => this.interactionId);
   }
 
   handle(event: Record<string, unknown>): void {
@@ -83,10 +85,7 @@ export class GoogleInteractionsStreamState {
     };
   }
 
-  private finishInteraction(
-    interaction: Record<string, unknown> | null,
-    forcedReason?: StopReason,
-  ): void {
+  private finishInteraction(interaction: Record<string, unknown> | null, forcedReason?: StopReason): void {
     if (this.steps.hasOpenSteps()) {
       throw new ProviderHttpError(PROVIDER_API, 502, 'Google Interactions ended with open steps.');
     }
@@ -98,8 +97,8 @@ export class GoogleInteractionsStreamState {
     this.applyUsage(recordValue(interaction?.usage));
     const state = createProviderStateRef(this.requestPlan, this.interactionId);
     if (state) this.builder.setProviderState(state);
-    this.finishReason = forcedReason
-      ?? (status === 'incomplete' ? 'length' : this.steps.toolCallSeen() ? 'toolUse' : 'stop');
+    this.finishReason =
+      forcedReason ?? (status === 'incomplete' ? 'length' : this.steps.toolCallSeen() ? 'toolUse' : 'stop');
     this.terminalSeen = true;
   }
 
@@ -113,23 +112,12 @@ export class GoogleInteractionsStreamState {
   }
 
   private applyUsage(usage: Record<string, unknown> | null): void {
-    if (!usage) return;
-    const cacheReadTokens = numberValue(usage.total_cached_tokens);
-    const reasoningTokens = numberValue(usage.total_thought_tokens);
-    this.builder.setUsage(finalizeProviderUsage({
-      inputTokens: numberValue(usage.total_input_tokens) ?? 0,
-      outputTokens: numberValue(usage.total_output_tokens) ?? 0,
-      totalTokens: numberValue(usage.total_tokens) ?? 0,
-      ...(cacheReadTokens !== null ? { cacheReadTokens } : {}),
-      ...(reasoningTokens !== null ? { reasoningTokens } : {}),
-    }));
+    if (usage) this.builder.setUsage(normalizeUsage(usage, INTERACTIONS_USAGE_FIELDS));
   }
 }
 
 function recordValue(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 function stringValue(value: unknown): string {
   return typeof value === 'string' ? value : '';

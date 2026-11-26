@@ -1,0 +1,250 @@
+{
+ "id": "knowledge-import-error",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"sidebar-knowledge-center-trigger\"]"
+  },
+  {
+   "click": true,
+   "testId": "sidebar-knowledge-center-trigger",
+   "waitMs": 600
+  },
+  {
+   "waitFor": "[data-testid=\"knowledge-center-import-open\"]"
+  },
+  {
+   "click": true,
+   "testId": "knowledge-center-import-open",
+   "waitMs": 400
+  },
+  {
+   "waitFor": ".knowledge-import-mode [role=\"tab\"]"
+  },
+  {
+   "click": true,
+   "selector": ".knowledge-import-mode [role=\"tab\"]:nth-of-type(2)",
+   "waitMs": 400
+  },
+  {
+   "waitFor": "[data-testid=\"knowledge-center-import-source\"]"
+  },
+  {
+   "type": "case_id: [unclosed\ntitle: : :",
+   "testId": "knowledge-center-import-source"
+  },
+  {
+   "click": true,
+   "testId": "knowledge-center-import-preview",
+   "waitMs": 800
+  },
+  {
+   "waitFor": "[data-testid=\"knowledge-center-import-items\"], [data-testid=\"knowledge-center-import-error\"]",
+   "waitMs": 400
+  }
+ ],
+ "settleMs": 1000,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "bd87c4a38a7d5b58606353ed"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-e1e14c13f7d5-1795681315969",
+       "timestamp": 1795681315970,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-3c10d463c112-1795681316033",
+       "timestamp": 1795681316033,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-ab73da95db56-1795681316033",
+       "timestamp": 1795681316033,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-4dc2023bca5e-1795681316050",
+       "timestamp": 1795681316050,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": []
+    }
+   }
+  ],
+  "knowledge:overview": [
+   {
+    "result": {
+     "spaces": [
+      {
+       "spaceId": "user",
+       "kind": "user",
+       "label": "User",
+       "rootPath": "/visual-diff/.rdc-agent/knowledge"
+      }
+     ],
+     "index": {
+      "revision": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "builtAt": "2026-11-26T08:21:57.834Z",
+      "cardCount": 0,
+      "cardsBySpace": {}
+     }
+    }
+   }
+  ],
+  "knowledge:query": [
+   {
+    "result": {
+     "hits": [],
+     "lanes": [
+      {
+       "lane": "Identity/Path",
+       "hits": []
+      },
+      {
+       "lane": "Scope/Metadata",
+       "hits": []
+      },
+      {
+       "lane": "Lexical",
+       "hits": []
+      },
+      {
+       "lane": "Structural",
+       "hits": []
+      },
+      {
+       "lane": "Relation/Graph",
+       "hits": []
+      },
+      {
+       "lane": "Temporal/Version",
+       "hits": []
+      }
+     ],
+     "revision": "491c3f2aa938256d9d2f5a09cd4fb9715843c2b4d3f2edacb2b9b7290193499d",
+     "total": 0,
+     "queryFingerprint": "df655964509fd4ab3e2a30029a6420050466b5070be6b55e99c483b73156f0aa"
+    }
+   }
+  ],
+  "knowledge:compile": [
+   {
+    "result": {
+     "packId": "pack:e2b02937fd0c7754",
+     "compiledAt": "2026-11-26T08:21:57.875Z",
+     "hits": [],
+     "conflicts": []
+    }
+   }
+  ],
+  "knowledge:previewImport": [
+   {
+    "result": {
+     "candidateCreated": false,
+     "verified": false,
+     "items": [
+      {
+       "status": "quarantine",
+       "lifecycle": null,
+       "missingAssets": [],
+       "reason": "yaml-broken"
+      }
+     ],
+     "sourceHash": "a27647e18f49ab908c59430618bb77acfee35551db17bc65577bece6e910e596",
+     "sourceSize": 29
+    }
+   }
+  ]
+ }
+}

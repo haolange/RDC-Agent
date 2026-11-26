@@ -1,6 +1,11 @@
 /**
- * Reduced motion shortens tokenized motion and stops the named CSS effects.
- * The Max effort canvas is not included; EffortMaxField settles that loop itself.
+ * Reduced motion shortens tokenized motion and stops every infinite CSS animation. `check:ui-contract` fails when an
+ * infinite animation has no reduced-motion rule. Two preserved assets keep moving because their motion is the state
+ * itself: the Active Signal text shimmer and the Composer energy orbit. The Max effort canvas is not CSS;
+ * EffortMaxField settles that loop itself, and smooth scrolling asks lib/motion for its behavior.
+ *
+ * This layer loads before component CSS, so each selector carries a `:root` prefix: one class of extra specificity
+ * beats the component rule it stops, wherever the component stylesheet lands in the cascade.
  */
 @media (prefers-reduced-motion: reduce) {
   :root {
@@ -12,11 +17,15 @@
     --transition-slow: 0ms linear;
   }
 
-  .animate-spin,
-  .ui-skeleton,
-  .work-process-subagent-dots.is-active > span,
-  .is-trace-flash,
-  .composer-agent-menu-item-running-dot {
+  :root .animate-spin,
+  :root .ui-skeleton,
+  :root .task-status-marker-arc,
+  :root .loading-bar::after,
+  :root .work-process-status-dot.status-running,
+  :root .work-process-subagent-dots.is-active > span,
+  :root .conversation-streaming-cursor,
+  :root .is-trace-flash,
+  :root .composer-agent-menu-item-running-dot {
     animation: none;
   }
 }

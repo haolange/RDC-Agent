@@ -1,8 +1,8 @@
-import { resolve } from 'path'
-import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { resolve } from 'path';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
 
-const rendererRoot = resolve(__dirname, 'src/renderer')
+const rendererRoot = resolve(__dirname, 'src/renderer');
 
 /**
  * browser-dev: Vite is a private origin behind BrowserAppBridge same-origin reverse proxy.
@@ -10,22 +10,29 @@ const rendererRoot = resolve(__dirname, 'src/renderer')
  */
 export default defineConfig({
   root: rendererRoot,
-  plugins: [react(), {
-    name: 'rdc-csp-dev-styles',
-    apply: 'serve',
-    enforce: 'post',
-    transform(code, id) {
-      if (!/\.css(?:\?|$)/u.test(id)) return null
-      const styleImport = /import\s*\{\s*updateStyle as __vite__updateStyle,\s*removeStyle as __vite__removeStyle\s*\}\s*from\s*["']\/@vite\/client["']/u
-      if (!styleImport.test(code)) return null
-      return code.replace(styleImport, 'import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from "/platform/devStyles.ts"')
+  plugins: [
+    react(),
+    {
+      name: 'rdc-csp-dev-styles',
+      apply: 'serve',
+      enforce: 'post',
+      transform(code, id) {
+        if (!/\.css(?:\?|$)/u.test(id)) return null;
+        const styleImport =
+          /import\s*\{\s*updateStyle as __vite__updateStyle,\s*removeStyle as __vite__removeStyle\s*\}\s*from\s*["']\/@vite\/client["']/u;
+        if (!styleImport.test(code)) return null;
+        return code.replace(
+          styleImport,
+          'import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from "/platform/devStyles.ts"',
+        );
+      },
     },
-  }],
+  ],
   resolve: {
     alias: {
       '@renderer': rendererRoot,
-      '@shared': resolve(__dirname, 'src/shared')
-    }
+      '@shared': resolve(__dirname, 'src/shared'),
+    },
   },
   server: {
     host: '127.0.0.1',
@@ -35,5 +42,5 @@ export default defineConfig({
     hmr: {
       protocol: 'ws',
     },
-  }
-})
+  },
+});

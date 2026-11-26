@@ -8,62 +8,70 @@ const LlmProviderAuthModeSchema = z.enum(['none', 'api-key', 'local', 'account',
 /** Matches renderer `Date.now() * 1000` revision clocks (safe-integer domain). */
 const ClientRevisionSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 
+const modelPreferenceShape = {
+  id: ipcNonEmptyString(256, 'id'),
+  enabled: z.boolean(),
+  defaultReasoningSelection: ipcString(64, 'defaultReasoningSelection').optional(),
+  defaultBudgetTokens: z.number().int().positive().optional(),
+  preferredRouteOptionId: ipcString(200, 'preferredRouteOptionId').optional(),
+};
+
 export const LlmProviderDraftArgsSchema = z.tuple([
-  z.object({
-    providerId: ipcNonEmptyString(200, 'providerId'),
-    authMode: LlmProviderAuthModeSchema.optional(),
-    apiKey: ipcString(16_000, 'apiKey').optional(),
-    baseUrl: ipcString(2048, 'baseUrl').optional(),
-    protocol: ipcString(64, 'protocol').optional(),
-    connectionValues: z.record(z.string().max(200), ipcString(16_000, 'connectionValue')).optional(),
-    // Large catalogs (OpenRouter etc.) routinely exceed 512; keep a hard cap for IPC DoS only.
-    modelPreferences: z.array(z.object({
-      id: ipcNonEmptyString(256, 'id'),
-      enabled: z.boolean(),
-      defaultReasoningSelection: ipcString(64, 'defaultReasoningSelection').optional(),
-      defaultBudgetTokens: z.number().int().positive().optional(),
-      preferredRouteOptionId: ipcString(200, 'preferredRouteOptionId').optional(),
-    }).strict()).max(10_000).optional(),
-  }).strict(),
+  z
+    .object({
+      providerId: ipcNonEmptyString(200, 'providerId'),
+      authMode: LlmProviderAuthModeSchema.optional(),
+      apiKey: ipcString(16_000, 'apiKey').optional(),
+      baseUrl: ipcString(2048, 'baseUrl').optional(),
+      protocol: ipcString(64, 'protocol').optional(),
+      connectionValues: z.record(z.string().max(200), ipcString(16_000, 'connectionValue')).optional(),
+      // Large catalogs (OpenRouter etc.) routinely exceed 512; keep a hard cap for IPC DoS only.
+      modelPreferences: z.array(z.object(modelPreferenceShape).strict()).max(10_000).optional(),
+    })
+    .strict(),
 ]);
 
 export const LlmModelCapabilityProbeArgsSchema = z.tuple([
-  z.object({
-    providerId: ipcNonEmptyString(200, 'providerId'),
-    modelId: ipcNonEmptyString(200, 'modelId'),
-    mode: z.enum(['default', 'max-context', 'fast', 'fast-max-context']),
-  }).strict(),
+  z
+    .object({
+      providerId: ipcNonEmptyString(200, 'providerId'),
+      modelId: ipcNonEmptyString(200, 'modelId'),
+      mode: z.enum(['default', 'max-context', 'fast', 'fast-max-context']),
+    })
+    .strict(),
 ]);
 
-export const LlmProviderIdArgsSchema = z.tuple([
-  ipcNonEmptyString(200, 'providerId'),
-]);
+export const LlmProviderIdArgsSchema = z.tuple([ipcNonEmptyString(200, 'providerId')]);
 
 export const LlmRefreshProviderModelsArgsSchema = z.tuple([
   ipcNonEmptyString(200, 'providerId'),
-  z.object({ accountId: ipcNonEmptyString(200, 'accountId'), protocol: ProviderProtocolSchema }).strict().optional(),
+  z
+    .object({ accountId: ipcNonEmptyString(200, 'accountId'), protocol: ProviderProtocolSchema })
+    .strict()
+    .optional(),
 ]);
 
 export const LlmProviderAccountLoginStartArgsSchema = z.tuple([
-  z.object({
-    providerId: ipcNonEmptyString(200, 'providerId'),
-    authMode: LlmProviderAuthModeSchema.optional(),
-  }).strict(),
+  z
+    .object({
+      providerId: ipcNonEmptyString(200, 'providerId'),
+      authMode: LlmProviderAuthModeSchema.optional(),
+    })
+    .strict(),
 ]);
 
 export const LlmProviderAccountLoginFinishArgsSchema = z.tuple([
-  z.object({
-    providerId: ipcNonEmptyString(200, 'providerId'),
-    code: ipcString(8_000, 'code').optional(),
-    state: ipcString(8_000, 'state').optional(),
-    flowId: ipcString(200, 'flowId').optional(),
-  }).strict(),
+  z
+    .object({
+      providerId: ipcNonEmptyString(200, 'providerId'),
+      code: ipcString(8_000, 'code').optional(),
+      state: ipcString(8_000, 'state').optional(),
+      flowId: ipcString(200, 'flowId').optional(),
+    })
+    .strict(),
 ]);
 
-const projectScopeIdRefine = (
-  value: { scope: 'user' | 'project'; projectId?: string },
-  ctx: z.RefinementCtx,
-): void => {
+const projectScopeIdRefine = (value: { scope: 'user' | 'project'; projectId?: string }, ctx: z.RefinementCtx): void => {
   if (value.scope !== 'project') return;
   if (!value.projectId?.trim()) {
     ctx.addIssue({
@@ -83,40 +91,60 @@ const projectScopeIdRefine = (
 };
 
 export const SettingsGetAgentDefinitionCommitArgsSchema = z.tuple([
-  z.object({
-    agentId: z.string().min(1).max(200),
-    scope: z.enum(['user', 'project']),
-    projectId: z.string().max(200).optional(),
-  }).strict().superRefine(projectScopeIdRefine),
+  z
+    .object({
+      agentId: z.string().min(1).max(200),
+      scope: z.enum(['user', 'project']),
+      projectId: z.string().max(200).optional(),
+    })
+    .strict()
+    .superRefine(projectScopeIdRefine),
 ]);
 
-const agentOverrideFileRequest = z.object({
-  sourcePath: z.string().min(1).max(4096),
-  sourceHash: z.string().regex(/^[0-9a-f]{64}$/u),
-}).strict();
+const agentOverrideFileRequest = z
+  .object({
+    sourcePath: z.string().min(1).max(4096),
+    sourceHash: z.string().regex(/^[0-9a-f]{64}$/u),
+  })
+  .strict();
 
 export const SettingsAgentSourcePathArgsSchema = z.tuple([z.string().min(1).max(4096)]);
 export const SettingsAgentOverrideFileArgsSchema = z.tuple([agentOverrideFileRequest]);
 
 export const SettingsSaveAgentDefinitionArgsSchema = z.tuple([
-  z.object({
-    draft: z.record(z.string().max(200), z.unknown()),
-    clientRevision: ClientRevisionSchema,
-    scope: z.enum(['user', 'project']),
-    projectId: z.string().max(200).optional(),
-    sourceHash: z.string().max(128).optional(),
-  }).strict().superRefine(projectScopeIdRefine),
+  z
+    .object({
+      draft: z.record(z.string().max(200), z.unknown()),
+      clientRevision: ClientRevisionSchema,
+      scope: z.enum(['user', 'project']),
+      projectId: z.string().max(200).optional(),
+      sourceHash: z.string().max(128).optional(),
+    })
+    .strict()
+    .superRefine(projectScopeIdRefine),
 ]);
 
 export const SettingsSaveProviderDefinitionArgsSchema = z.tuple([
-  z.object({
-    provider: z.record(z.string().max(200), z.unknown()),
-    clientRevision: ClientRevisionSchema,
-  }).strict(),
+  z
+    .object({
+      providerId: ipcNonEmptyString(200, 'providerId'),
+      connectionIdentity: ipcString(64 * 1024, 'connectionIdentity'),
+      models: z
+        .array(
+          z
+            .object({
+              ...modelPreferenceShape,
+              label: ipcString(256, 'label').optional(),
+              aliases: z.array(ipcString(256, 'alias')).max(32).optional(),
+            })
+            .strict(),
+        )
+        .max(10_000),
+      clientRevision: ClientRevisionSchema,
+    })
+    .strict(),
 ]);
 
 export const SettingsGetModelsOverrideArgsSchema = z.tuple([]);
 
-export const SettingsSetModelsOverrideArgsSchema = z.tuple([
-  ModelsOverrideSchema,
-]);
+export const SettingsSetModelsOverrideArgsSchema = z.tuple([ModelsOverrideSchema]);

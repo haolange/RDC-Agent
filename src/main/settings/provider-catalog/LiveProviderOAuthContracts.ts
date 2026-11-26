@@ -6,7 +6,6 @@ export function createPkcePair() {
   return { verifier, challenge };
 }
 
-
 export const OPENROUTER_AUTHORIZE_URL = 'https://openrouter.ai/auth';
 export const OPENROUTER_EXCHANGE_URL = 'https://openrouter.ai/api/v1/auth/keys';
 

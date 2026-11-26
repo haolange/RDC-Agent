@@ -23,10 +23,13 @@ export const MarkdownSourceProvider: React.FC<{
   sessionId?: string | null;
   children: React.ReactNode;
 }> = ({ sources, sessionId = null, children }) => {
-  const value = useMemo<MarkdownSourceScope>(() => ({
-    sources: new Map(sources.map((source) => [normalizeWebUrl(source.url), source])),
-    sessionId,
-  }), [sources, sessionId]);
+  const value = useMemo<MarkdownSourceScope>(
+    () => ({
+      sources: new Map(sources.map((source) => [normalizeWebUrl(source.url), source])),
+      sessionId,
+    }),
+    [sources, sessionId],
+  );
   return <MarkdownSourceContext.Provider value={value}>{children}</MarkdownSourceContext.Provider>;
 };
 

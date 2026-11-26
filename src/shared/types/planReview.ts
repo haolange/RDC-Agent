@@ -1,6 +1,6 @@
 import type { ManifestTextTranslations } from './agentManifest';
-
-export const PLAN_REVIEW_STATE_SCHEMA = '1' as const;
+import type { ConversationTurnControls } from './modelCapability';
+import type { SessionModelOverride, SessionRecordSnapshot, SessionRevision } from './session';
 
 export type PlanReviewStatus = 'awaiting' | 'approved' | 'rejected' | 'superseded' | 'cancelled';
 
@@ -32,8 +32,7 @@ export interface RecoverableApprovedHandoff extends PlanReviewHandoffSuggestion 
 }
 
 export type PlanReviewDecision =
-  | { kind: 'approve'; handoff: PlanReviewHandoffIdentity }
-  | { kind: 'reject'; feedback: string };
+  { kind: 'approve'; handoff: PlanReviewHandoffIdentity } | { kind: 'reject'; feedback: string };
 
 export interface ConversationPlanReview {
   planId: string;
@@ -46,28 +45,6 @@ export interface ConversationPlanReview {
   status: PlanReviewStatus;
   decision?: PlanReviewDecision;
   handoffOptions: PlanReviewHandoffOption[];
-}
-
-export interface PlanReviewStateDocument {
-  schemaVersion: typeof PLAN_REVIEW_STATE_SCHEMA;
-  planId: string;
-  /** Absence means ownership is unproven; never infer it from the active session. */
-  ownerTurnId?: string;
-  revision: number;
-  status: PlanReviewStatus;
-  approvedHash?: string;
-  frozenUri?: string;
-  approvedHandoff?: PlanReviewHandoffIdentity;
-  updatedAt: number;
-}
-
-export interface ProjectPlanFrontmatter {
-  planId: string;
-  revision: number;
-  sha256: string;
-  agent: string;
-  sessionId: string;
-  savedAt: string;
 }
 
 export interface PlanReadRequest {
@@ -110,9 +87,7 @@ export interface PlanSaveToProjectRequest extends PlanReadRequest {
 }
 
 export interface PlanSaveToProjectResult {
-  success: boolean;
-  path?: string;
-  error?: string;
+  path: string;
 }
 
 export interface PlanExportRequest extends PlanReadRequest {
@@ -121,20 +96,35 @@ export interface PlanExportRequest extends PlanReadRequest {
 }
 
 export interface PlanExportResult {
-  success: boolean;
-  path?: string;
-  error?: string;
+  path: string;
 }
 
 export interface PlanApprovalTokenRequest extends PlanReadRequest {
   action: 'plan.saveToProject' | 'plan.export';
 }
 
-export interface ConversationAnswerPlanReviewRequest {
+/**
+ * Approving a plan is one main transaction: it also commits the Agent switch to the declared target and the model and
+ * controls the person approved with. `expectedPlanHash` names the reviewed revision and `baseRevision` the session
+ * record the choice was made on; either being stale rejects the approval.
+ */
+export interface PlanApprovalRequest {
   sessionId: string;
   reviewId: string;
-  decision: PlanReviewDecision;
+  decision: Extract<PlanReviewDecision, { kind: 'approve' }>;
+  expectedPlanHash: string;
+  model: SessionModelOverride;
+  controls: ConversationTurnControls;
+  baseRevision: SessionRevision;
 }
+
+interface PlanRejectionRequest {
+  sessionId: string;
+  reviewId: string;
+  decision: Extract<PlanReviewDecision, { kind: 'reject' }>;
+}
+
+export type ConversationAnswerPlanReviewRequest = PlanApprovalRequest | PlanRejectionRequest;
 
 export interface PlanReviewContext {
   reviewId: string;
@@ -156,14 +146,22 @@ export interface PlanReviewProjection {
   decision?: { reviewId: string; kind: 'approve' | 'reject' | 'cancel' };
 }
 
-export interface PlanCancelReviewRequest { sessionId: string; reviewId: string }
-
-export interface ConversationAnswerPlanReviewResult {
-  success: boolean;
-  error?: string;
-  replan?: { agentId: string; source: PlanReadRequest; feedback: string };
+export interface PlanCancelReviewRequest {
+  sessionId: string;
+  reviewId: string;
 }
 
-export function isHandoffContinueAction(handoff: { surface?: 'turn-end' | 'plan-gate' | 'hidden' }): boolean {
-  return handoff.surface !== 'hidden';
-}
+/** A failed answer throws a registered error through the IPC error exit; a returned result is a committed decision. */
+export type ConversationAnswerPlanReviewResult =
+  | {
+      decision: 'approve';
+      session: SessionRecordSnapshot;
+      planReview: PlanReviewProjection;
+      /** The declared continuation: send it as one execute turn, or prefill it when `send` is false. */
+      handoff: { prompt: string; send: boolean };
+    }
+  | {
+      decision: 'reject';
+      planReview: PlanReviewProjection;
+      replan?: { agentId: string; source: PlanReadRequest; feedback: string };
+    };

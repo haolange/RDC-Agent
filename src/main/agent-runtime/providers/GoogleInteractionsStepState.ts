@@ -72,19 +72,22 @@ export class GoogleInteractionsStepState {
     } else {
       const continuation = this.thoughtArtifact(active);
       const summaryText = active.summary.map((item) => stringValue(item.text)).join('');
-      this.builder.startThinking(ref, summaryText
-        ? {
-            kind: 'summary',
-            source: reasoningProjectionSource(this.requestPlan, 'summary'),
-            visibility: 'summary',
-            continuation,
-          }
-        : {
-            kind: 'opaque',
-            source: reasoningProjectionSource(this.requestPlan, 'opaque'),
-            visibility: 'hidden',
-            continuation,
-          });
+      this.builder.startThinking(
+        ref,
+        summaryText
+          ? {
+              kind: 'summary',
+              source: reasoningProjectionSource(this.requestPlan, 'summary'),
+              visibility: 'summary',
+              continuation,
+            }
+          : {
+              kind: 'opaque',
+              source: reasoningProjectionSource(this.requestPlan, 'opaque'),
+              visibility: 'hidden',
+              continuation,
+            },
+      );
       if (summaryText) this.builder.appendThinking(ref, summaryText, { continuation });
     }
   }
@@ -92,11 +95,7 @@ export class GoogleInteractionsStepState {
   delta(index: number | null, delta: Record<string, unknown> | null): void {
     const active = index === null ? undefined : this.active.get(index);
     if (!active || !delta) {
-      throw new ProviderHttpError(
-        PROVIDER_API,
-        502,
-        'Google Interactions emitted step.delta before step.start.',
-      );
+      throw new ProviderHttpError(PROVIDER_API, 502, 'Google Interactions emitted step.delta before step.start.');
     }
     const type = stringValue(delta.type);
     if (type === 'text' && active.type === 'model_output') {
@@ -180,9 +179,7 @@ export class GoogleInteractionsStepState {
 }
 
 function recordValue(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 function recordsValue(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value)
@@ -193,5 +190,5 @@ function stringValue(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
-  return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  return structuredClone(value);
 }

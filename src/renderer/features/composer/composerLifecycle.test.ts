@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, createElement, StrictMode, useRef } from 'react';
+import { act, createElement, StrictMode, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ComposerMenuRegistryProvider, useComposerMenu } from './useComposerMenuRegistry';
@@ -13,44 +13,75 @@ let frameId = 0;
 const observers: { disconnected: boolean }[] = [];
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  frames = new Map(); observers.length = 0;
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frames.set(++frameId, callback); return frameId; });
-  vi.stubGlobal('cancelAnimationFrame', (id: number) => { frames.delete(id); });
-  vi.stubGlobal('ResizeObserver', class {
-    disconnected = false;
-    constructor() { observers.push(this); }
-    observe() {}
-    disconnect() { this.disconnected = true; }
+  frames = new Map();
+  observers.length = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++frameId, callback);
+    return frameId;
   });
-  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+    frames.delete(id);
+  });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      disconnected = false;
+      constructor() {
+        observers.push(this);
+      }
+      observe() {}
+      disconnect() {
+        this.disconnected = true;
+      }
+    },
+  );
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
 });
 afterEach(() => {
   act(() => root.unmount());
   expect(frames.size).toBe(0);
-  expect(observers.every(observer => observer.disconnected)).toBe(true);
-  host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals();
+  expect(observers.every((observer) => observer.disconnected)).toBe(true);
+  host.remove();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function Menu({ id }: { id: 'agent' | 'permission' }) {
   const menu = useComposerMenu(id);
-  return createElement('div', { ref: menu.setRoot },
-    createElement('button', { ref: menu.setTrigger, onClick: menu.toggle, 'data-menu': id, 'aria-expanded': menu.open }, id),
-    menu.open ? createElement('span', { 'data-panel': id }, id) : null);
+  return createElement(
+    'div',
+    { ref: menu.setRoot },
+    createElement(
+      'button',
+      { ref: menu.setTrigger, onClick: menu.toggle, 'data-menu': id, 'aria-expanded': menu.open },
+      id,
+    ),
+    menu.open ? createElement('span', { 'data-panel': id }, id) : null,
+  );
 }
 function Menus({ scope }: { scope: string }) {
-  return createElement(StrictMode, null, createElement(ComposerMenuRegistryProvider, { key: scope,
-    children: [
-      createElement(Menu, { key: 'agent', id: 'agent' }),
-      createElement(Menu, { key: 'permission', id: 'permission' }),
-    ],
-  }));
+  return createElement(
+    StrictMode,
+    null,
+    createElement(ComposerMenuRegistryProvider, {
+      key: scope,
+      scope,
+      children: [
+        createElement(Menu, { key: 'agent', id: 'agent' }),
+        createElement(Menu, { key: 'permission', id: 'permission' }),
+      ],
+    }),
+  );
 }
 
 describe('Composer lifecycle', () => {
   it('keeps menus exclusive, dismisses outside, and cancels queued focus on session change', () => {
     act(() => root.render(createElement(Menus, { scope: 'session-a' })));
     const click = (id: string) => act(() => host.querySelector<HTMLButtonElement>(`[data-menu="${id}"]`)!.click());
-    click('agent'); click('permission');
+    click('agent');
+    click('permission');
     expect(host.querySelector('[data-panel="agent"]')).toBeNull();
     expect(host.querySelector('[data-panel="permission"]')).not.toBeNull();
     act(() => window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
@@ -64,18 +95,67 @@ describe('Composer lifecycle', () => {
     expect(host.querySelector('[data-panel]')).toBeNull();
   });
 
+  it('closes an open menu when a pending request arrives without remounting the Composer underneath', () => {
+    const mounts: string[] = [];
+    function Counted({ id }: { id: 'agent' | 'permission' }) {
+      useState(() => mounts.push(id));
+      return createElement(Menu, { id });
+    }
+    const render = (scope: string) =>
+      act(() =>
+        root.render(
+          createElement(ComposerMenuRegistryProvider, {
+            scope,
+            children: [
+              createElement(Counted, { key: 'agent', id: 'agent' }),
+              createElement(Counted, { key: 'permission', id: 'permission' }),
+            ],
+          }),
+        ),
+      );
+    render('composer');
+    act(() => host.querySelector<HTMLButtonElement>('[data-menu="agent"]')!.click());
+    expect(host.querySelector('[data-panel="agent"]')).not.toBeNull();
+    render('plan-review:review-1');
+    expect(host.querySelector('[data-panel]')).toBeNull();
+    render('composer');
+    expect(host.querySelector('[data-panel]')).toBeNull();
+    expect(mounts).toEqual(['agent', 'permission']);
+    expect(frames.size).toBe(0);
+  });
+
   it('releases popup observers and settling frames on close and scope unmount', () => {
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 280, height: 60, left: 0, right: 280, top: 0, bottom: 60, x: 0, y: 0, toJSON() {} });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      width: 280,
+      height: 60,
+      left: 0,
+      right: 280,
+      top: 0,
+      bottom: 60,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    });
     function Popup({ open }: { open: boolean }) {
-      const menuRef = useRef<HTMLDivElement>(null); const popupRef = useRef<HTMLDivElement>(null); const trackRef = useRef<HTMLDivElement>(null);
+      const menuRef = useRef<HTMLDivElement>(null);
+      const popupRef = useRef<HTMLDivElement>(null);
+      const trackRef = useRef<HTMLDivElement>(null);
       const layout = useEffortPopupLayout({ open, menuRef, popupRef, trackRef, trackObserveKey: 'model' });
-      return createElement('div', { ref: menuRef }, createElement('div', { ref: popupRef }, createElement('div', { ref: trackRef, 'data-ready': layout.positionTransitionsReady })));
+      return createElement(
+        'div',
+        { ref: menuRef },
+        createElement(
+          'div',
+          { ref: popupRef },
+          createElement('div', { ref: trackRef, 'data-ready': layout.positionTransitionsReady }),
+        ),
+      );
     }
     act(() => root.render(createElement(StrictMode, null, createElement(Popup, { open: true }))));
     expect(frames.size).toBe(1);
     act(() => root.render(createElement(StrictMode, null, createElement(Popup, { open: false }))));
     expect(frames.size).toBe(0);
-    expect(observers.every(observer => observer.disconnected)).toBe(true);
+    expect(observers.every((observer) => observer.disconnected)).toBe(true);
     act(() => root.render(createElement(StrictMode, null, createElement(Popup, { open: true }))));
     expect(frames.size).toBe(1);
   });

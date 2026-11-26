@@ -10,11 +10,16 @@ it('follows streaming and resized content, respects a reader scrolling away, and
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const disconnect = vi.fn();
   let resize!: ResizeObserverCallback;
-  vi.stubGlobal('ResizeObserver', class {
-    constructor(callback: ResizeObserverCallback) { resize = callback; }
-    observe = vi.fn();
-    disconnect = disconnect;
-  });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: ResizeObserverCallback) {
+        resize = callback;
+      }
+      observe = vi.fn();
+      disconnect = disconnect;
+    },
+  );
   const scrollTo = vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(() => {});
   const host = document.createElement('div');
   document.body.append(host);
@@ -26,7 +31,10 @@ it('follows streaming and resized content, respects a reader scrolling away, and
   try {
     await act(async () => root.render(createElement(Probe, { activity: 1 })));
     const container = host.firstElementChild as HTMLElement;
-    Object.defineProperties(container, { scrollHeight: { configurable: true, value: 2000 }, clientHeight: { value: 600 } });
+    Object.defineProperties(container, {
+      scrollHeight: { configurable: true, value: 2000 },
+      clientHeight: { value: 600 },
+    });
     scrollTo.mockClear();
     await act(async () => root.render(createElement(Probe, { activity: 2 })));
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 2000, behavior: 'auto' });
@@ -45,7 +53,8 @@ it('follows streaming and resized content, respects a reader scrolling away, and
     await act(async () => root.unmount());
     expect(disconnect).toHaveBeenCalledTimes(1);
     host.remove();
-    vi.restoreAllMocks(); vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   }
 });
 
@@ -55,37 +64,62 @@ it('observes virtual row growth after slice changes without forcing a reader bac
   class TestObserver {
     targets = new Set<Element>();
     disconnected = false;
-    constructor(private callback: ResizeObserverCallback) { observers.push(this); }
-    observe(target: Element) { this.targets.add(target); }
-    unobserve(target: Element) { this.targets.delete(target); }
-    disconnect() { this.targets.clear(); this.disconnected = true; }
+    constructor(private callback: ResizeObserverCallback) {
+      observers.push(this);
+    }
+    observe(target: Element) {
+      this.targets.add(target);
+    }
+    unobserve(target: Element) {
+      this.targets.delete(target);
+    }
+    disconnect() {
+      this.targets.clear();
+      this.disconnected = true;
+    }
     resize(target: Element) {
-      if (this.targets.has(target)) this.callback([{ target } as ResizeObserverEntry], this as unknown as ResizeObserver);
+      // Chromium always reports borderBoxSize; an empty one leaves the row's measured height to getBoundingClientRect.
+      if (this.targets.has(target))
+        this.callback(
+          [{ target, borderBoxSize: [] } as unknown as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
     }
   }
   vi.stubGlobal('ResizeObserver', TestObserver);
   const mutationDisconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
   const scrollTo = vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(() => {});
-  const host = document.createElement('div'); document.body.append(host);
+  const host = document.createElement('div');
+  document.body.append(host);
   const root = createRoot(host);
   const messages = Array.from({ length: 60 }, (_, index) => ({
-    id: `message-${index}`, role: 'assistant', content: `Tool or image ${index}`,
+    id: `message-${index}`,
+    role: 'assistant',
+    content: `Tool or image ${index}`,
   })) as ConversationMessage[];
   function Probe() {
     const { scrollContainerRef, handleScroll } = useTranscriptScroll(messages.length, 1);
-    return createElement('div', { className: 'chat-messages', ref: scrollContainerRef, onScroll: handleScroll },
-      createElement(VirtualMessageList, { messages,
+    return createElement(
+      'div',
+      { className: 'chat-messages', ref: scrollContainerRef, onScroll: handleScroll },
+      createElement(VirtualMessageList, {
+        messages,
         renderMessage: (message) => createElement('div', { 'data-message-id': message.id }, message.content),
-      }));
+      }),
+    );
   }
-  const flushMutations = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  const flushMutations = () =>
+    act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
   try {
     await act(async () => root.render(createElement(Probe)));
     const container = host.firstElementChild as HTMLElement;
     const list = container.querySelector('ol')!;
     let scrollHeight = 9600;
     Object.defineProperties(container, {
-      scrollHeight: { get: () => scrollHeight }, clientHeight: { value: 320 },
+      scrollHeight: { get: () => scrollHeight },
+      clientHeight: { value: 320 },
     });
     vi.spyOn(list, 'getBoundingClientRect').mockImplementation(() => ({ top: -container.scrollTop }) as DOMRect);
     const firstRow = container.querySelector('.conversation-thread-item')!;
@@ -93,8 +127,8 @@ it('observes virtual row growth after slice changes without forcing a reader bac
     await act(async () => container.dispatchEvent(new Event('scroll')));
     await flushMutations();
     const lastRow = container.querySelector('[data-message-id="message-59"]')!.parentElement!;
-    expect(observers.some(observer => observer.targets.has(lastRow))).toBe(true);
-    expect(observers.every(observer => !observer.targets.has(firstRow))).toBe(true);
+    expect(observers.some((observer) => observer.targets.has(lastRow))).toBe(true);
+    expect(observers.every((observer) => !observer.targets.has(firstRow))).toBe(true);
     // Only the visible row resizes; the virtual ol remains 60 * 160px tall.
     scrollTo.mockClear();
     scrollHeight += 600 - 160;
@@ -109,8 +143,79 @@ it('observes virtual row growth after slice changes without forcing a reader bac
     expect(scrollTo).not.toHaveBeenCalled();
   } finally {
     await act(async () => root.unmount());
-    expect(observers.every(observer => observer.disconnected && observer.targets.size === 0)).toBe(true);
+    expect(observers.every((observer) => observer.disconnected && observer.targets.size === 0)).toBe(true);
     expect(mutationDisconnect).toHaveBeenCalled();
-    host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals();
+    host.remove();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('reads no layout on a scroll event, and a streaming commit at the bottom reads it once', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe = vi.fn();
+      disconnect = vi.fn();
+    },
+  );
+  const scrollTo = vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(() => {});
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  function Probe({ activity }: { activity: number }) {
+    const { scrollContainerRef, handleScroll } = useTranscriptScroll(3, activity);
+    return createElement('div', { ref: scrollContainerRef, onScroll: handleScroll }, createElement('ol'));
+  }
+  try {
+    await act(async () => root.render(createElement(Probe, { activity: 1 })));
+    const container = host.firstElementChild as HTMLElement;
+    let reads = 0;
+    let scrollHeight = 2000;
+    let scrollTop = 1400;
+    Object.defineProperties(container, {
+      scrollHeight: {
+        configurable: true,
+        get: () => {
+          reads += 1;
+          return scrollHeight;
+        },
+      },
+      clientHeight: {
+        configurable: true,
+        get: () => {
+          reads += 1;
+          return 600;
+        },
+      },
+      scrollTop: {
+        configurable: true,
+        get: () => {
+          reads += 1;
+          return scrollTop;
+        },
+        set: (value: number) => {
+          scrollTop = value;
+        },
+      },
+    });
+    for (let activity = 2; activity < 6; activity += 1) {
+      // The scroll event that the previous follow caused.
+      reads = 0;
+      await act(async () => container.dispatchEvent(new Event('scroll')));
+      expect(reads).toBe(0);
+      scrollHeight += 300;
+      await act(async () => root.render(createElement(Probe, { activity })));
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: scrollHeight, behavior: 'auto' });
+      // One layout pass: the settled position and the new height are read together, once each.
+      expect(reads).toBe(3);
+      scrollTop = scrollHeight - 600;
+    }
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   }
 });

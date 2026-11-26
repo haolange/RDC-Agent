@@ -21,8 +21,8 @@ function makeEvent(id: string): AgentEvent {
     timestamp: Date.now(),
     sessionId: 's1',
     agentId: 'ask',
-    payload: { text: id },
-  } as AgentEvent;
+    payload: { text: id, providerOutputRef: { protocol: 'test', providerBlockKey: 'text:0', contentIndex: 0 } },
+  };
 }
 
 describe('TurnCoordinator', () => {
@@ -104,7 +104,9 @@ describe('TurnCoordinator', () => {
   it('marks an unjoined producer orphaned without dropping its ownership', async () => {
     const handle = await coordinator.beginTurn({ sessionKey: 'orphan', turnId: 't' });
     let resolveJoin!: () => void;
-    const joinPromise = new Promise<void>((resolve) => { resolveJoin = resolve; });
+    const joinPromise = new Promise<void>((resolve) => {
+      resolveJoin = resolve;
+    });
     handle.registerProducer({
       id: 'slow',
       abort: () => undefined,
@@ -146,7 +148,9 @@ describe('TurnCoordinator', () => {
   it('blocks beginTurn while an orphaned turn is unsettled', async () => {
     const first = await coordinator.beginTurn({ sessionKey: 'block-orphan', turnId: 't1' });
     let resolveJoin!: () => void;
-    const joinPromise = new Promise<void>((resolve) => { resolveJoin = resolve; });
+    const joinPromise = new Promise<void>((resolve) => {
+      resolveJoin = resolve;
+    });
     first.registerProducer({
       id: 'slow',
       abort: () => undefined,
@@ -155,8 +159,7 @@ describe('TurnCoordinator', () => {
     await first.abortAndJoin({ reason: 'user_stop', graceMs: 5, forceAfterMs: 5 });
     expect(first.isOrphaned).toBe(true);
     coordinator.endTurn(first);
-    await expect(coordinator.beginTurn({ sessionKey: 'block-orphan', turnId: 't2' }))
-      .rejects.toThrow(/TURN_ORPHANED/);
+    await expect(coordinator.beginTurn({ sessionKey: 'block-orphan', turnId: 't2' })).rejects.toThrow(/TURN_ORPHANED/);
     resolveJoin();
     await first.whenSettled();
     await new Promise((r) => setTimeout(r, 10));
@@ -170,6 +173,29 @@ describe('TurnCoordinator', () => {
     const second = await coordinator.beginTurn({ sessionKey: 's', turnId: 't2' });
     expect(first.isAborted).toBe(true);
     expect(coordinator.getActive('s')).toBe(second);
+  });
+
+  it('serializes concurrent begins so exactly one turn stays active and every earlier one is aborted', async () => {
+    const [first, second, third] = await Promise.all(
+      ['t1', 't2', 't3'].map((turnId) => coordinator.beginTurn({ sessionKey: 's', turnId })),
+    );
+    expect([first.isAborted, second.isAborted, third.isAborted]).toEqual([true, true, false]);
+    expect(coordinator.getActive('s')).toBe(third);
+  });
+
+  it('a stop that finishes after a new turn began does not remove the new turn', async () => {
+    const first = await coordinator.beginTurn({ sessionKey: 's', turnId: 't1' });
+    let release!: () => void;
+    const producerDone = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    first.registerProducer({ id: 'p1', abort: () => undefined, join: () => producerDone });
+    const replacement = coordinator.beginTurn({ sessionKey: 's', turnId: 't2' });
+    await new Promise((resolve) => setImmediate(resolve)); // the replacement is now waiting for t1 to stop
+    const stopping = coordinator.abortSession('s');
+    release();
+    await stopping;
+    expect(coordinator.getActive('s')).toBe(await replacement);
   });
 
   it('abortAll clears every session', async () => {
@@ -232,28 +258,33 @@ describe('SubagentBudget', () => {
   });
 
   it('rejects a zero policy wall time before creating a timer', () => {
-    expect(() => createPolicyBudgetState({
-      maxToolCalls: 1,
-      maxSubagents: 1,
-      maxChildDepth: 1,
-      maxWallTimeMs: 0,
-    })).toThrow(/POLICY_MAX_WALL_TIME_ZERO/);
-    expect(() => assertPolicyWallTimeAllowed(0)).toThrow(/POLICY_MAX_WALL_TIME_ZERO/);
-    expect(() => new TurnHandle({
-      sessionKey: 's',
-      turnId: 't',
-      generation: 1,
-      policyBudget: {
-        toolCalls: 0,
-        subagents: 0,
-        childDepth: 0,
-        wallStartedAt: Date.now(),
+    expect(() =>
+      createPolicyBudgetState({
         maxToolCalls: 1,
         maxSubagents: 1,
         maxChildDepth: 1,
         maxWallTimeMs: 0,
-      },
-    })).toThrow(/POLICY_MAX_WALL_TIME_ZERO/);
+      }),
+    ).toThrow(/POLICY_MAX_WALL_TIME_ZERO/);
+    expect(() => assertPolicyWallTimeAllowed(0)).toThrow(/POLICY_MAX_WALL_TIME_ZERO/);
+    expect(
+      () =>
+        new TurnHandle({
+          sessionKey: 's',
+          turnId: 't',
+          generation: 1,
+          policyBudget: {
+            toolCalls: 0,
+            subagents: 0,
+            childDepth: 0,
+            wallStartedAt: Date.now(),
+            maxToolCalls: 1,
+            maxSubagents: 1,
+            maxChildDepth: 1,
+            maxWallTimeMs: 0,
+          },
+        }),
+    ).toThrow(/POLICY_MAX_WALL_TIME_ZERO/);
   });
 
   it('reserveDispatchBudget deducts atomically and fails the whole group without partial increment', () => {

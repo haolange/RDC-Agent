@@ -1,4 +1,4 @@
-import { bareInvestigationHash, formatInvestigationContentHash } from '@shared/types/renderdocInvestigation';
+import { bareInvestigationHash } from '@shared/types/renderdocInvestigation';
 import { sha256Hex } from '../runtime/contentHash';
 
 export { sha256Hex };
@@ -13,4 +13,12 @@ export function hashesEqual(left: string, right: string): boolean {
 
 export function serializeInvestigationJson(value: unknown): string {
   return `${JSON.stringify(value)}\n`;
+}
+
+export function formatInvestigationContentHash(hex: string): string {
+  const bare = hex
+    .trim()
+    .toLowerCase()
+    .replace(/^sha256:/, '');
+  return `sha256:${bare}`;
 }

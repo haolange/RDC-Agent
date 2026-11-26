@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  isConcurrentModelSwitchCommand,
-  shouldClearSubmittedPrompt,
-} from './composerCommandConcurrency';
+import { isConcurrentModelSwitchCommand, shouldClearSubmittedPrompt } from './composerCommandConcurrency';
 
 describe('composer command concurrency', () => {
   it('allows only the scoped /model command to bypass an in-flight turn', () => {

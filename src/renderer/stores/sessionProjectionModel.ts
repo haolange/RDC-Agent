@@ -1,8 +1,5 @@
 import { compareConversationMessages } from '@shared/conversation/conversationBranchResolver';
-import {
-  createEmptyContextUsageProjection,
-  type ContextUsageProjectionState,
-} from './contextUsageProjectionModel';
+import { createEmptyContextUsageProjection, type ContextUsageProjectionState } from './contextUsageProjectionModel';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { ConversationMessage } from '@shared/types/conversation';

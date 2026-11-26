@@ -12,36 +12,48 @@ import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 type Translate = ReturnType<typeof useI18n>['t'];
 
 export function useTerminalDrawerOptions(t: Translate, activeRunId: string | null) {
-  const scopeOptions = useMemo<SelectOption[]>(() => ([
-    { value: 'current-session', label: t('terminal.scopeCurrentSession') },
-    { value: 'current-run', label: t('terminal.scopeCurrentRun'), disabled: !activeRunId },
-    { value: 'app', label: t('terminal.scopeApp') },
-    { value: 'all-sessions', label: t('terminal.scopeAllSessions') },
-  ]), [activeRunId, t]);
+  const scopeOptions = useMemo<SelectOption[]>(
+    () => [
+      { value: 'current-session', label: t('terminal.scopeCurrentSession') },
+      { value: 'current-run', label: t('terminal.scopeCurrentRun'), disabled: !activeRunId },
+      { value: 'app', label: t('terminal.scopeApp') },
+      { value: 'all-sessions', label: t('terminal.scopeAllSessions') },
+    ],
+    [activeRunId, t],
+  );
 
-  const namespaceOptions = useMemo<SelectOption[]>(() => ([
-    { value: 'all', label: t('terminal.namespaceAll') },
-    { value: 'system', label: t('terminal.namespaceSystem') },
-    { value: 'agent', label: t('terminal.namespaceAgent') },
-    { value: 'tool', label: t('terminal.namespaceTool') },
-    { value: 'device', label: t('terminal.namespaceDevice') },
-    { value: 'capture', label: t('terminal.namespaceCapture') },
-    { value: 'context', label: t('terminal.namespaceContext') },
-    { value: 'llm', label: t('terminal.namespaceLlm') },
-  ]), [t]);
+  const namespaceOptions = useMemo<SelectOption[]>(
+    () => [
+      { value: 'all', label: t('terminal.namespaceAll') },
+      { value: 'system', label: t('terminal.namespaceSystem') },
+      { value: 'agent', label: t('terminal.namespaceAgent') },
+      { value: 'tool', label: t('terminal.namespaceTool') },
+      { value: 'device', label: t('terminal.namespaceDevice') },
+      { value: 'capture', label: t('terminal.namespaceCapture') },
+      { value: 'context', label: t('terminal.namespaceContext') },
+      { value: 'llm', label: t('terminal.namespaceLlm') },
+    ],
+    [t],
+  );
 
-  const severityOptions = useMemo<SelectOption[]>(() => ([
-    { value: 'all', label: t('terminal.severityAll') },
-    { value: 'error', label: t('terminal.severityError') },
-    { value: 'warning', label: t('terminal.severityWarning') },
-    { value: 'success', label: t('terminal.severitySuccess') },
-    { value: 'info', label: t('terminal.severityInfo') },
-  ]), [t]);
+  const severityOptions = useMemo<SelectOption[]>(
+    () => [
+      { value: 'all', label: t('terminal.severityAll') },
+      { value: 'error', label: t('terminal.severityError') },
+      { value: 'warning', label: t('terminal.severityWarning') },
+      { value: 'success', label: t('terminal.severitySuccess') },
+      { value: 'info', label: t('terminal.severityInfo') },
+    ],
+    [t],
+  );
 
-  const densityOptions = useMemo<SelectOption[]>(() => ([
-    { value: 'compact', label: t('terminal.densityCompact') },
-    { value: 'expanded', label: t('terminal.densityExpanded') },
-  ]), [t]);
+  const densityOptions = useMemo<SelectOption[]>(
+    () => [
+      { value: 'compact', label: t('terminal.densityCompact') },
+      { value: 'expanded', label: t('terminal.densityExpanded') },
+    ],
+    [t],
+  );
 
   return { scopeOptions, namespaceOptions, severityOptions, densityOptions };
 }
@@ -89,7 +101,8 @@ export function useTerminalDrawerContextCopy(options: {
     return scopeFilter;
   }, [activeSessionId, scopeFilter]);
 
-  const scopeLabel = scopeOptions.find((option) => option.value === effectiveScopeFilter)?.label ?? t('terminal.scopeCurrentSession');
+  const scopeLabel =
+    scopeOptions.find((option) => option.value === effectiveScopeFilter)?.label ?? t('terminal.scopeCurrentSession');
 
   const titleContext = useMemo(() => {
     if (effectiveScopeFilter === 'app') {
@@ -99,13 +112,9 @@ export function useTerminalDrawerContextCopy(options: {
       return t('terminal.scopeAllSessions');
     }
     if (effectiveScopeFilter === 'current-run') {
-      return activeRunId
-        ? `${scopeLabel} · ${formatShortId(activeRunId)}`
-        : scopeLabel;
+      return activeRunId ? `${scopeLabel} · ${formatShortId(activeRunId)}` : scopeLabel;
     }
-    return activeSessionId
-      ? `${scopeLabel} · ${formatShortId(activeSessionId)}`
-      : t('terminal.scopeApp');
+    return activeSessionId ? `${scopeLabel} · ${formatShortId(activeSessionId)}` : t('terminal.scopeApp');
   }, [activeRunId, activeSessionId, effectiveScopeFilter, scopeLabel, t]);
 
   const emptyCopy = useMemo(() => {

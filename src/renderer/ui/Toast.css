@@ -33,9 +33,15 @@
   color: var(--token-status-info);
 }
 
-.ui-toast.is-tone-success .ui-toast-icon { color: var(--token-status-success); }
-.ui-toast.is-tone-warning .ui-toast-icon { color: var(--token-status-warning); }
-.ui-toast.is-tone-error .ui-toast-icon { color: var(--token-status-error); }
+.ui-toast.is-tone-success .ui-toast-icon {
+  color: var(--token-status-success);
+}
+.ui-toast.is-tone-warning .ui-toast-icon {
+  color: var(--token-status-warning);
+}
+.ui-toast.is-tone-error .ui-toast-icon {
+  color: var(--token-status-error);
+}
 
 .ui-toast-copy {
   flex: 1;
@@ -56,6 +62,12 @@
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
   line-height: var(--type-body-line);
+}
+
+.ui-toast-action {
+  flex-shrink: 0;
+  display: flex;
+  margin-top: calc(-1 * var(--space-1));
 }
 
 .ui-toast-dismiss {

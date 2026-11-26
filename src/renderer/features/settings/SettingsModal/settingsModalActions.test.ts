@@ -29,8 +29,8 @@ const draft = {
 
 describe('settingsModalActions project scope save', () => {
   it('writes project scope+projectId instead of a user override', async () => {
-    const saveAgentDefinition = vi.fn(async (request: AgentDefinitionSaveRequest) => ({
-      clientRevision: request.clientRevision,
+    const saveAgentDefinition = vi.fn(async (_request: Omit<AgentDefinitionSaveRequest, 'clientRevision'>) => ({
+      clientRevision: 1,
       status: 'committed' as const,
       commitHash: 'ok',
       definition: null,
@@ -50,18 +50,14 @@ describe('settingsModalActions project scope save', () => {
       saveAgentDefinition,
       currentProjectId: 'proj_demo',
       t: (key: string) => key,
-      replaceSettings: vi.fn(),
+      adoptView: vi.fn(),
       rebaseAgentDrafts: vi.fn(),
     });
 
-    await actions.handleSaveAgentManifests({
-      drafts: [draft],
-      clientRevision: 7,
-    });
+    await actions.handleSaveAgentManifests({ drafts: [draft] });
 
     expect(saveAgentDefinition).toHaveBeenCalledWith({
       draft,
-      clientRevision: 7,
       scope: 'project',
       projectId: 'proj_demo',
       sourceHash: 'hash-1',
@@ -95,8 +91,8 @@ describe('settingsModalActions project scope save', () => {
       compiledRoute: { agentId: 'general', providerId: 'openrouter', modelId: 'anthropic/claude-3-sonnet' },
     };
     let drafts = [deleted];
-    const saveAgentDefinition = vi.fn(async (request: AgentDefinitionSaveRequest) => ({
-      clientRevision: request.clientRevision,
+    const saveAgentDefinition = vi.fn(async (_request: Omit<AgentDefinitionSaveRequest, 'clientRevision'>) => ({
+      clientRevision: 1,
       status: 'committed' as const,
       commitHash: 'ok',
       definition: restored,
@@ -118,20 +114,19 @@ describe('settingsModalActions project scope save', () => {
       saveAgentDefinition,
       currentProjectId: 'proj_demo',
       t: (key: string) => key,
-      replaceSettings: vi.fn(),
+      adoptView: vi.fn(),
       rebaseAgentDrafts: vi.fn(),
     });
 
-    await actions.handleSaveAgentManifests({
-      drafts: [deleted],
-      clientRevision: 8,
-    });
+    await actions.handleSaveAgentManifests({ drafts: [deleted] });
 
-    expect(drafts).toEqual([expect.objectContaining({
-      id: 'general',
-      writeScope: 'user',
-      sourceHash: 'builtin-hash',
-    })]);
+    expect(drafts).toEqual([
+      expect.objectContaining({
+        id: 'general',
+        writeScope: 'user',
+        sourceHash: 'builtin-hash',
+      }),
+    ]);
     expect(drafts[0]?.delete).toBeUndefined();
     expect(saveAgentDefinition).toHaveBeenCalledTimes(1);
   });
@@ -159,13 +154,13 @@ describe('settingsModalActions project scope save', () => {
       saveAgentDefinition,
       currentProjectId: 'proj_demo',
       t: (key: string) => key,
-      replaceSettings: vi.fn(),
+      adoptView: vi.fn(),
       rebaseAgentDrafts: vi.fn(),
       blockSubmit: () => 'blocked',
       blockProjectedSubmit: () => null,
     });
 
-    await expect(actions.handleSaveAgentManifests({ drafts: [illegal], clientRevision: 9 })).rejects.toThrow('blocked');
+    await expect(actions.handleSaveAgentManifests({ drafts: [illegal] })).rejects.toThrow('blocked');
     expect(saveAgentDefinition).not.toHaveBeenCalled();
     expect(setAgentManifestSaveState).not.toHaveBeenCalled();
   });
@@ -178,14 +173,28 @@ describe('settingsModalActions personalization autosave', () => {
       draft = typeof next === 'function' ? next(draft) : next;
     });
     let release: () => void = () => undefined;
-    const patchSettings = vi.fn((patch: { agents?: { globalInstructions?: string } }) => new Promise((resolve) => {
-      release = () => resolve({ agents: { globalInstructions: patch.agents?.globalInstructions?.trim() } });
-    }));
-    const modalState = { get globalInstructionsDraft() { return draft; }, setGlobalInstructionsDraft };
+    const patchSettings = vi.fn(
+      (ops: Array<{ op: string; value: string }>) =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({ agents: { globalInstructions: ops.find((op) => op.op === 'globalInstructions')?.value.trim() } });
+        }),
+    );
+    const modalState = {
+      get globalInstructionsDraft() {
+        return draft;
+      },
+      setGlobalInstructionsDraft,
+    };
     const actions = createSettingsModalActions({
-      modalState: modalState as never, providerConnection: {} as never, updateProfile: vi.fn(async () => undefined),
-      patchSettings: patchSettings as never, saveAgentDefinition: vi.fn() as never, t: (key: string) => key,
-      replaceSettings: vi.fn(), rebaseAgentDrafts: vi.fn(),
+      modalState: modalState as never,
+      providerConnection: {} as never,
+      updateProfile: vi.fn(async () => undefined),
+      patchSettings: patchSettings as never,
+      saveAgentDefinition: vi.fn() as never,
+      t: (key: string) => key,
+      adoptView: vi.fn(),
+      rebaseAgentDrafts: vi.fn(),
     });
 
     const saving = actions.handleSavePersonalization();

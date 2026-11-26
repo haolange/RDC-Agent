@@ -9,6 +9,8 @@ export function buildComposerPresentation(input: {
   hasProject: boolean;
   hasActiveDebugRun: boolean;
   isComposerBusy: boolean;
+  /** Stop was pressed and main has not answered yet. */
+  stopPending: boolean;
 }) {
   const { t, currentModeLabel: agent } = input;
   const hint = input.currentModeHint.trim();
@@ -17,6 +19,10 @@ export function buildComposerPresentation(input: {
     // The Agent pill already names who receives the message; the placeholder only says what to tell it.
     promptPlaceholder: hint ? t('composer.placeholderHint', { hint }) : t('composer.placeholder', { agent }),
     attachButtonLabel: t(input.hasProject ? 'composer.attach' : 'composer.attachNeedsProject'),
-    primaryButtonDescription: input.isComposerBusy ? stopLabel : t('composer.sendTo', { agent }),
+    primaryButtonDescription: input.stopPending
+      ? t('composer.stopping')
+      : input.isComposerBusy
+        ? stopLabel
+        : t('composer.sendTo', { agent }),
   };
 }

@@ -30,7 +30,10 @@
   color: var(--token-text-secondary);
   cursor: pointer;
   flex: 0 0 auto;
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .composer-attach-button:hover:not(:disabled),
@@ -61,7 +64,7 @@
   background: transparent;
   box-shadow: none;
   color: var(--token-text-secondary);
-  line-height: 1.55;
+  line-height: var(--type-body-line);
   /* Keep in lockstep with ComposerMarkdownInput; composer-viewport.css also pins --type-body-size. */
   font-size: var(--type-body-size);
 }

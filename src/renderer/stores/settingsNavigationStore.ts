@@ -1,8 +1,14 @@
 import { create } from 'zustand';
 import type { SettingsSection } from '../lib/settingsSections';
 
-export interface AgentSettingsRequest { agentId: string; sequence: number }
-export interface SettingsSectionRequest { section: SettingsSection; sequence: number }
+export interface AgentSettingsRequest {
+  agentId: string;
+  sequence: number;
+}
+export interface SettingsSectionRequest {
+  section: SettingsSection;
+  sequence: number;
+}
 
 interface SettingsNavigationState {
   agentRequest: AgentSettingsRequest | null;
@@ -20,8 +26,10 @@ export const useSettingsNavigationStore = create<SettingsNavigationState>((set) 
   sectionRequest: null,
   openAgent: (agentId) => set({ agentRequest: { agentId, sequence: ++sequence } }),
   openSection: (section) => set({ sectionRequest: { section, sequence: ++sequence } }),
-  clearAgentRequest: (expected) => set((state) => expected === undefined || state.agentRequest?.sequence === expected
-    ? { agentRequest: null } : state),
-  clearSectionRequest: (expected) => set((state) => state.sectionRequest?.sequence === expected
-    ? { sectionRequest: null } : state),
+  clearAgentRequest: (expected) =>
+    set((state) =>
+      expected === undefined || state.agentRequest?.sequence === expected ? { agentRequest: null } : state,
+    ),
+  clearSectionRequest: (expected) =>
+    set((state) => (state.sectionRequest?.sequence === expected ? { sectionRequest: null } : state)),
 }));

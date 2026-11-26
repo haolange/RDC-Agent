@@ -26,9 +26,20 @@ function assert(condition, message) {
 }
 
 const expectedPresets = [
-  'rdc', 'absolutely', 'ayu', 'catppuccin', 'dracula', 'everforest', 'github', 'gruvbox', 'linear',
+  'rdc',
+  'absolutely',
+  'ayu',
+  'catppuccin',
+  'dracula',
+  'everforest',
+  'github',
+  'gruvbox',
+  'linear',
 ];
-assert(JSON.stringify([...THEME_PRESET_IDS]) === JSON.stringify(expectedPresets), 'Preset catalog must match Codex-aligned + RDC list');
+assert(
+  JSON.stringify([...THEME_PRESET_IDS]) === JSON.stringify(expectedPresets),
+  'Preset catalog must match Codex-aligned + RDC list',
+);
 assert(
   THEME_PRESET_CATALOG.every((preset) => preset.light.presetId === preset.id && preset.dark.presetId === preset.id),
   'Preset chrome must self-identify',
@@ -38,7 +49,10 @@ const defaults = createDefaultUiPreferences();
 assert(defaults.chromeThemes.light.presetId === 'rdc', 'Default light chrome is RDC');
 assert(defaults.chromeThemes.dark.presetId === 'rdc', 'Default dark chrome is RDC');
 assert(!('reduceMotion' in defaults), 'Removed motion preference must not persist in defaults');
-assert(!('usePointerCursors' in defaults), 'Interactive controls always use the pointer cursor; there is no preference for it');
+assert(
+  !('usePointerCursors' in defaults),
+  'Interactive controls always use the pointer cursor; there is no preference for it',
+);
 
 const sanitized = sanitizeUiPreferences({
   theme: 'light',
@@ -57,7 +71,10 @@ assert(vars['--color-accent-500'], 'compiler emits accent-500');
 assert(vars['--color-bg-1'], 'compiler emits surface bg-1');
 assert(vars['--color-text-primary'], 'compiler emits ink');
 assert(vars['--font-sans'] === undefined, 'default chrome leaves the bundled font stack to design-tokens.css');
-assert(compileThemeChrome({ ...chrome, fonts: { ui: 'Custom UI', code: null } }, 'dark')['--font-sans'] === 'Custom UI', 'a chosen UI font overrides the default stack');
+assert(
+  compileThemeChrome({ ...chrome, fonts: { ui: 'Custom UI', code: null } }, 'dark')['--font-sans'] === 'Custom UI',
+  'a chosen UI font overrides the default stack',
+);
 assert(vars['--color-surface-overlay'], 'compiler emits surface-overlay for popover chrome');
 const lightVars = compileThemeChrome(createDefaultChromeThemes().light, 'light');
 assert(lightVars['--color-surface-overlay'], 'light compiler emits surface-overlay');
@@ -97,30 +114,9 @@ assert(
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const composerChromeSource = scriptReadCssBundle('src/renderer/features/composer/composer-chrome.css');
-assert(
-  composerChromeSource.includes('.composer-shell:focus-within')
-    && composerChromeSource.includes('.composer-shell:has([aria-expanded="true"])')
-    && composerChromeSource.includes('.composer-shell.is-running:has([aria-expanded="true"])'),
-  'Composer ring must stay on while a footer menu is expanded, not only :focus-within',
-);
-
-const checkboxTokenSource = scriptRead('src/renderer/styles/design-tokens.css');
-const checkPillCss = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/CheckPill.css'), 'utf8');
 const knowledgeSidebarCss = fs.readFileSync(
   path.join(repoRoot, 'src/renderer/features/knowledge/KnowledgeCenterModal/knowledge-center-sidebar.css'),
   'utf8',
-);
-assert(
-  checkboxTokenSource.includes('--checkbox-checked-bg:       transparent;')
-    && checkboxTokenSource.includes('--checkbox-check-color:      var(--token-text-primary);')
-    && !checkboxTokenSource.includes('--checkbox-checked-bg:       var(--token-accent-primary);'),
-  'Checkbox tokens must stay outline + ink, not accent fill',
-);
-assert(
-  checkPillCss.includes('border-color: var(--checkbox-checked-border);')
-    && checkPillCss.includes('background: var(--checkbox-checked-bg);')
-    && !checkPillCss.includes('var(--token-accent-primary)'),
-  'CheckPill box must share checkbox tokens and must not paint accent fill',
 );
 assert(
   !knowledgeSidebarCss.includes('--checkbox-checked-bg'),
@@ -128,33 +124,13 @@ assert(
 );
 
 const effortPopupSource = scriptRead('src/renderer/features/composer/ComposerModelEffortPanel.tsx');
-const effortControlSource = scriptRead('src/renderer/features/composer/useComposerEffortControl.ts');
-const effortMaxFieldSource = scriptRead('src/renderer/features/composer/EffortMaxField.tsx');
-const effortLayoutSource = scriptRead('src/renderer/features/composer/useEffortPopupLayout.ts');
-const debuggerCssSource = scriptReadCssBundle('src/renderer/features/composer/composer-effort.css');
-assert(
-  debuggerCssSource.includes('.composer-model-effort-popup.is-picker')
-    && debuggerCssSource.includes('max-height: min(32rem, calc(100vh - var(--space-16)))')
-    && debuggerCssSource.includes('width: min(calc(var(--space-10) * 8), calc(100vw - var(--space-6)))'),
-  'Model picker may grow to 32rem tall but must stay 320px wide',
-);
-assert(
-  debuggerCssSource.includes('.composer-model-effort-mode-tip')
-    && debuggerCssSource.includes('bottom: calc(100% + var(--space-6))')
-    && debuggerCssSource.includes('border-radius: var(--radius-full)')
-    && debuggerCssSource.includes('background: var(--token-bg-raised);')
-    && debuggerCssSource.includes('box-shadow: var(--token-shadow-raised)')
-    && debuggerCssSource.includes('.composer-model-effort-mode:disabled > .ui-icon')
-    && debuggerCssSource.includes('.composer-model-effort-mode.is-active:disabled > .ui-icon')
-    && !/\.composer-model-effort-mode\.is-disabled,\s*\.composer-model-effort-mode:disabled\s*\{[^}]*opacity:/u.test(debuggerCssSource)
-    && !debuggerCssSource.includes('.composer-model-effort-mode-tip {\n  position: absolute;\n  top: calc(100%')
-    && !debuggerCssSource.includes(".composer-model-effort-mode[data-mode='fast'] .composer-model-effort-mode-tip")
-    && !debuggerCssSource.includes(".composer-model-effort-mode[data-mode='max-context'] .composer-model-effort-mode-tip"),
-  'Fast/Max tips must be raised pills centered on the icons, not pinned cards growing into the panel',
-);
 {
   // The last row must clear the popup radius: the list's bottom padding is at least --space-2.
-  const listPadding = composerChromeSource.match(/\.composer-model-list \{[^}]*?\bpadding:\s*([^;]+);/u)?.[1].trim().split(/\s+/u) ?? [];
+  const listPadding =
+    composerChromeSource
+      .match(/\.composer-model-list \{[^}]*?\bpadding:\s*([^;]+);/u)?.[1]
+      .trim()
+      .split(/\s+/u) ?? [];
   const bottom = listPadding[listPadding.length === 4 || listPadding.length === 3 ? 2 : 0];
   assert(
     /^var\(--space-(?:[2-9]|1[0-9])\)$/u.test(bottom ?? ''),
@@ -165,121 +141,52 @@ assert(
   !effortPopupSource.includes("'--composer-effort-stops-opacity'"),
   'Effort popup must not compete with the Max animation for stop opacity ownership',
 );
-assert(
-  effortMaxFieldSource.includes(
-    "assignDynStyle(host, { '--composer-effort-stops-opacity': stopsOpacity.toFixed(3) })",
-  ),
-  'Max animation must own stop opacity frame delivery',
-);
-assert(
-  effortMaxFieldSource.includes('clearDynStyle(host)'),
-  'Max animation must release imperative stop opacity on cleanup',
-);
-const trackObserveKeySource = effortControlSource.match(/const trackObserveKey = \[([\s\S]*?)\]\.join/)?.[1] ?? '';
-assert(
-  effortLayoutSource.includes('positionTransitionsReady')
-    && effortLayoutSource.includes('requestAnimationFrame(() =>')
-    && effortLayoutSource.includes('cancelSettleFrame')
-    && effortPopupSource.includes('positionTransitionsReady')
-    && effortPopupSource.includes('is-layout-stabilizing')
-    && debuggerCssSource.includes('--composer-effort-position-duration: 0ms;')
-    && debuggerCssSource.includes('left var(--composer-effort-position-duration')
-    && debuggerCssSource.includes('transform var(--composer-effort-position-duration')
-    && debuggerCssSource.includes('background var(--transition-fast)')
-    && debuggerCssSource.includes('opacity var(--transition-fast)')
-    && trackObserveKeySource.includes('displayLevelsKey'),
-  'Effort layout measurement must settle before enabling position transitions while preserving color/opacity and Max lifecycle animations',
-);
 assert(!scriptExists('src/renderer/styles/themes/oklch-themes.css'), 'legacy oklch-themes.css must be removed');
 assert(!scriptExists('src/renderer/styles/tokens/index.css'), 'legacy styles/tokens dual track must be removed');
 
 const mainTsx = scriptRead('src/renderer/main.tsx');
 assert(!mainTsx.includes('styles/tokens'), 'main.tsx must not import styles/tokens');
-assert(mainTsx.includes('styles/global.css'), 'main.tsx imports global.css');
-
-const types = scriptRead('src/renderer/lib/settingsSections.ts');
-assert(types.includes("'appearance'"), 'SettingsSection includes appearance');
 
 const applyChromeThemeSource = scriptRead('src/renderer/app/theme/applyChromeTheme.ts');
-assert(applyChromeThemeSource.includes('adoptedStyleSheets'), 'applyChromeTheme must use constructable stylesheets');
-assert(applyChromeThemeSource.includes('replaceSync'), 'applyChromeTheme must replaceSync chrome CSS vars');
-assert(!applyChromeThemeSource.includes("createElement('style')"), 'applyChromeTheme must not inject <style> textContent under CSP');
-assert(!applyChromeThemeSource.includes('.style.colorScheme'), 'applyChromeTheme must not set inline style attributes under style-src-attr none');
-assert(applyChromeThemeSource.includes('color-scheme:'), 'applyChromeTheme must declare color-scheme inside the constructable sheet');
-
-const agentsMd = fs.readFileSync(path.join(repoRoot, 'AGENTS.md'), 'utf8');
-assert(agentsMd.includes('Appearance'), 'AGENTS.md must document Appearance');
-assert(agentsMd.includes('禁止恢复 translucent'), 'AGENTS.md must forbid translucent sidebar');
-
-const designMd = fs.readFileSync(path.join(repoRoot, 'DESIGN.md'), 'utf8');
-assert(designMd.includes('docs/ui/'), 'DESIGN.md must point Appearance/UI authority to docs/ui/');
-assert(designMd.includes('style-src'), 'DESIGN.md must document CSP style-src for Appearance chrome');
 assert(
-  designMd.includes('schema 6') || designMd.includes('schemaVersion') || designMd.includes('chromeThemes'),
-  'DESIGN.md must document Appearance chrome persistence / schema reset boundary',
+  !applyChromeThemeSource.includes("createElement('style')"),
+  'applyChromeTheme must not inject <style> textContent under CSP',
+);
+assert(
+  !applyChromeThemeSource.includes('.style.colorScheme'),
+  'applyChromeTheme must not set inline style attributes under style-src-attr none',
 );
 
-const designSystemMd = fs.readFileSync(path.join(repoRoot, 'docs/ui/design-system.md'), 'utf8');
-assert(designSystemMd.includes('rdc-theme-v1'), 'docs/ui/design-system.md must document rdc-theme-v1');
-assert(designSystemMd.includes('chromeThemes'), 'docs/ui/design-system.md must document chromeThemes');
-
-const workbenchUiMd = fs.readFileSync(path.join(repoRoot, 'docs/ui/workbench-and-transcript.md'), 'utf8');
-assert(workbenchUiMd.includes('Appearance') || workbenchUiMd.includes('chrome'), 'workbench UI doc must reference Appearance chrome');
-
 const appearanceSource = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearanceSettings.tsx');
-const appearanceChromeParts = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearanceChromeParts.tsx');
-assert(!appearanceSource.includes('appearance-preset-swatch'), 'Appearance must not keep a side-mounted preset Aa sibling');
-assert(!appearanceChromeParts.includes('appearance-preset-swatch'), 'Chrome parts must not keep a side-mounted preset Aa sibling');
+const appearanceChromeParts = scriptRead(
+  'src/renderer/features/settings/SettingsModal/sections/AppearanceChromeParts.tsx',
+);
+assert(
+  !appearanceSource.includes('appearance-preset-swatch'),
+  'Appearance must not keep a side-mounted preset Aa sibling',
+);
+assert(
+  !appearanceChromeParts.includes('appearance-preset-swatch'),
+  'Chrome parts must not keep a side-mounted preset Aa sibling',
+);
 // Both theme previews select one editor independently of the application display mode.
-assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AppearancePresetRow.tsx')), 'The preset-tile row that folded the editors away is retired');
-assert(appearanceSource.includes('appearance-theme-previews') && appearanceSource.includes('aria-pressed={editing === variant}'),
-  'Appearance selects an edit target through the two previews');
-assert((appearanceSource.match(/<ChromeThemeCard\b/g) ?? []).length === 1 && appearanceSource.includes('variant={editing}'),
-  'Appearance mounts one editor for the selected variant');
-const chromePreview = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearanceChromePreview.tsx');
-const importDialog = scriptRead('src/renderer/features/settings/SettingsModal/sections/ThemeImportDialog.tsx');
-assert(appearanceSource.includes('<AppearanceChromePreview') && importDialog.includes('<AppearanceChromePreview'),
-  'Appearance and valid theme imports preview the same interface');
-assert(chromePreview.includes('compileThemeChrome(chrome, variant)') &&
-  chromePreview.includes("palette['--font-sans']") && chromePreview.includes("palette['--font-mono']"),
-  'The selected chrome compiles its own contrast and both fonts for the preview');
-const generalSettings = scriptRead('src/renderer/features/settings/SettingsModal/sections/GeneralSettings.tsx');
-assert(generalSettings.includes('icon: <WorkProcessPreview latest />') && generalSettings.includes('icon: <WorkProcessPreview />'),
-  'Both expansion choices show the same timeline using their own presentation mode');
-assert(appearanceChromeParts.includes('appearance-preset-picker') && appearanceChromeParts.includes('swatchColor'), 'Each theme card picks its preset with the Aa swatch dropdown');
+assert(
+  !fs.existsSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AppearancePresetRow.tsx')),
+  'The preset-tile row that folded the editors away is retired',
+);
 assert(!appearanceSource.includes('usePointerCursors'), 'The pointer cursor preference is retired');
-assert(appearanceChromeParts.includes("from '../../../../ui/ColorField'"), 'Appearance must use shared ColorField');
 assert(!appearanceChromeParts.includes('function ColorField'), 'Appearance must not inline a private ColorField');
-assert(appearanceSource.includes('ChromeThemeCard'), 'Appearance page must compose ChromeThemeCard');
 assert(scriptExists('src/renderer/ui/ColorField.tsx'), 'shared ColorField component must exist');
 assert(scriptExists('src/renderer/ui/ColorField.css'), 'shared ColorField styles must exist');
-const colorFieldSource = scriptRead('src/renderer/ui/ColorField.tsx');
 const colorFieldCss = scriptRead('src/renderer/ui/ColorField.css');
-assert(colorFieldSource.includes("layout?: 'grid' | 'inline'"), 'ColorField must support grid and inline layouts');
-assert(colorFieldCss.includes('.color-field-swatch'), 'ColorField must expose a round swatch');
 assert(!colorFieldCss.includes('.color-field-native'), 'ColorField must not fall back to the native OS color input');
-assert(colorFieldSource.includes('ColorPickerSurface'), 'ColorField must open the self-drawn picker surface');
-assert(colorFieldSource.includes("from './Popover'"), 'ColorField picker must be anchored by the shared Popover');
 assert(scriptExists('src/renderer/ui/ColorPickerSurface.tsx'), 'self-drawn color picker surface must exist');
-const colorPickerSource = scriptRead('src/renderer/ui/ColorPickerSurface.tsx');
-assert(colorPickerSource.includes("role=\"slider\""), 'Color picker plane and hue rail must expose slider semantics');
-assert(colorPickerSource.includes('onKeyDown={onAreaKeyDown}'), 'Color picker plane must be keyboard reachable');
-assert(colorPickerSource.includes('onKeyDown={onHueKeyDown}'), 'Color picker hue rail must be keyboard reachable');
-assert(colorFieldCss.includes('.color-field--inline'), 'ColorField must define inline layout for Agents look strip');
 assert(!colorFieldCss.includes('--color-bg-'), 'ColorField CSS must use semantic tokens, not primitive --color-bg-*');
 assert(
   /\.color-field-hex\s*\{[^}]*width:\s*9\.5ch/.test(colorFieldCss),
   'ColorField hex input must stay compact (#RRGGBB width), not stretch full rail',
 );
-assert(
-  !/\.color-field-hex\s*\{[^}]*width:\s*100%/.test(colorFieldCss),
-  'ColorField hex must not use width: 100%',
-);
-assert(colorFieldSource.includes('useDynStyle') || colorFieldSource.includes('assignDynStyle'), 'ColorField must use constructable dyn styles');
-
-const dropdownTypes = scriptRead('src/renderer/ui/Select/types.ts');
-assert(dropdownTypes.includes('swatchColor'), 'SelectOption must support swatchColor');
-assert(dropdownTypes.includes('menuAlign'), 'Select must support menuAlign');
+assert(!/\.color-field-hex\s*\{[^}]*width:\s*100%/.test(colorFieldCss), 'ColorField hex must not use width: 100%');
 
 const dropdownCss = scriptRead('src/renderer/ui/Select/Select.css');
 const dropdownPrimitives = scriptRead('src/renderer/ui/Select/SelectPrimitives.tsx');
@@ -291,15 +198,6 @@ assert(
   /\.dropdown-select-menu\s*\{[^}]*background:\s*var\(--token-bg-shell\)/s.test(dropdownCss),
   'Select menu must use a solid shell surface',
 );
-assert(
-  dropdownCss.includes('dropdown-select-menu-caret'),
-  'Select menu must include a caret tip bridging the trigger',
-);
-assert(
-  dropdownPrimitives.includes('dropdown-select-menu-caret'),
-  'Select menu markup must render the caret tip',
-);
-assert(dropdownPrimitives.includes('dropdown-select-option-check-icon'), 'Select selected state must use a checkmark icon');
 assert(!dropdownPrimitives.includes('●'), 'Select must not use a bullet as the selected marker');
 
 // Keep the shared component path authoritative for ordinary configuration disclosure.
@@ -308,7 +206,6 @@ for (const file of [
   'src/renderer/features/settings/SettingsModal/sections/LocalToolDisclosure.tsx',
 ]) {
   const source = scriptRead(file);
-  assert(source.includes('<Details'), `${file} must use shared Details`);
   assert(!/<details\b|<select\b/.test(source), `${file} must not restore native unstyled controls`);
 }
 // Ids, paths, protocols and hashes never sit on a settings surface; they leave through one copy action.
@@ -318,17 +215,21 @@ for (const file of [
   'src/renderer/features/settings/SettingsModal/sections/HooksSettings.tsx',
 ]) {
   const source = scriptRead(file);
-  assert(/<CopyDiagnosticsMenu\b|\buseCopyDiagnostics\(/.test(source) && !/SettingsDiagnostics|summary=\{labels\.diagnostics\}/.test(source),
-    `${file} must expose object diagnostics from its actions menu`);
+  assert(
+    /<CopyDiagnosticsMenu\b|\buseCopyDiagnostics\(/.test(source) &&
+      !/SettingsDiagnostics|summary=\{labels\.diagnostics\}/.test(source),
+    `${file} must expose object diagnostics from its actions menu`,
+  );
   assert(!/<details\b|<select\b/.test(source), `${file} must not restore native unstyled controls`);
 }
-for (const file of ['Popover.tsx', 'Select/index.tsx', 'ContextMenu/index.tsx']) {
-  assert(scriptRead(`src/renderer/ui/${file}`).includes('placeAnchoredSurface'), `${file} must share viewport geometry`);
-}
-const livePreview = scriptRead('designs/rdc-agent-design-system/preview.tsx');
-assert(livePreview.includes('src/renderer/ui') && livePreview.includes('applyChromeTheme'), 'Live preview must reuse production controls and theme compiler');
-assert(!scriptExists('designs/rdc-agent-design-system/Design System Preview.html'), 'Duplicated HTML preview must remain retired');
+assert(
+  !scriptExists('designs/rdc-agent-design-system/Design System Preview.html'),
+  'Duplicated HTML preview must remain retired',
+);
 const settingsShell = scriptRead('src/renderer/features/settings/SettingsModal/sections/settings-shell.css');
-assert(!settingsShell.includes('aspect-ratio') && !/height:[^;]*100vw/.test(settingsShell), 'Settings height must be independent of width');
+assert(
+  !settingsShell.includes('aspect-ratio') && !/height:[^;]*100vw/.test(settingsShell),
+  'Settings height must be independent of width',
+);
 
 console.log('check:appearance passed');

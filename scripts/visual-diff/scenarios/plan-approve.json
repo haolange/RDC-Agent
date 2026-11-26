@@ -1,0 +1,573 @@
+{
+ "id": "plan-approve",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"plan-review-request-panel\"] [data-testid=\"handoff-action-row\"] button"
+  },
+  {
+   "click": true,
+   "selector": "[data-testid=\"plan-review-request-panel\"] [data-testid=\"handoff-action-row\"] button",
+   "waitMs": 2000
+  }
+ ],
+ "settleMs": 1200,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "f66c7344f5d9ce001d28da30"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-9b2add02adb9-1795681744146",
+       "timestamp": 1795681744146,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-6cc62fa0c88a-1795681744193",
+       "timestamp": 1795681744193,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-e7197c7b5bd6-1795681744193",
+       "timestamp": 1795681744193,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-b375dbf2aeee-1795681744207",
+       "timestamp": 1795681744207,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      },
+      {
+       "id": "rlog-2a93468ebc90-1795681770561",
+       "timestamp": 1795681770561,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "Debugger",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_8a0fc2458312",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "debugger",
+        "sessionId": "sess_8a0fc2458312",
+        "status": "thinking"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-2a93468ebc90-1795681770561",
+       "timestamp": 1795681770561,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "Debugger",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_8a0fc2458312",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "debugger",
+        "sessionId": "sess_8a0fc2458312",
+        "status": "thinking"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-2a93468ebc90-1795681770561",
+       "timestamp": 1795681770561,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "Debugger",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_8a0fc2458312",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "debugger",
+        "sessionId": "sess_8a0fc2458312",
+        "status": "thinking"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   },
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   },
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "settings:getEffectiveCatalog": [
+   {
+    "ref": "e24586a94a20e826a1c34ee5"
+   },
+   {
+    "ref": "42dd0cf807bd232a44445d92"
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": [
+      {
+       "projectId": "proj_94069fc4b693",
+       "name": "visual-diff-project",
+       "rootPath": "/visual-diff/visual-diff-project",
+       "slug": "visual-diff-project",
+       "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+       "inputs": [],
+       "inputsUpdatedAt": 1795681795165,
+       "createdAt": 1795681746026,
+       "updatedAt": 1795681770548,
+       "lastSessionId": "sess_8a0fc2458312"
+      }
+     ]
+    }
+   }
+  ],
+  "project:select": [
+   {
+    "result": {
+     "project": {
+      "projectId": "proj_94069fc4b693",
+      "name": "visual-diff-project",
+      "rootPath": "/visual-diff/visual-diff-project",
+      "slug": "visual-diff-project",
+      "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+      "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+      "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+      "inputs": [],
+      "inputsUpdatedAt": 1795681795165,
+      "createdAt": 1795681746026,
+      "updatedAt": 1795681770548,
+      "lastSessionId": "sess_8a0fc2458312"
+     },
+     "currentSession": {
+      "record": {
+       "schemaVersion": "1",
+       "sessionId": "sess_8a0fc2458312",
+       "projectId": "proj_94069fc4b693",
+       "title": "qa:plan 定位这一帧唯一的 draw 调用。",
+       "goal": "qa:plan 定位这一帧唯一的 draw 调用。",
+       "sessionPath": "/visual-diff/state/sessions/proj_94069fc4b693/sess_8a0fc2458312",
+       "createdAt": 1795681770471,
+       "updatedAt": 1795681770548,
+       "lastRunId": "run_ebf0f610b36ea321",
+       "turnControls": {
+        "reasoningLevel": "on",
+        "maxContextMode": false,
+        "fastModel": false
+       },
+       "agentId": "debugger"
+      },
+      "revision": {
+       "epoch": "f70073db-47fd-470e-a1b0-23c44167f1c2",
+       "n": 4
+      }
+     },
+     "currentRun": {
+      "schemaVersion": "3",
+      "runId": "run_ebf0f610b36ea321",
+      "turnId": "turn-fd81f0e2-548b-4bd5-a5ec-bd384bf493c6",
+      "projectId": "proj_94069fc4b693",
+      "sessionId": "sess_8a0fc2458312",
+      "caseId": "sess_8a0fc2458312",
+      "profileId": "debugger",
+      "goal": "qa:plan 定位这一帧唯一的 draw 调用。",
+      "captures": [],
+      "startedAt": 1795681770490,
+      "status": "running",
+      "backend": "local",
+      "kind": "mission",
+      "mission": "debugger"
+     }
+    }
+   }
+  ],
+  "session:list": [
+   {
+    "result": {
+     "sessions": [
+      {
+       "record": {
+        "schemaVersion": "1",
+        "sessionId": "sess_8a0fc2458312",
+        "projectId": "proj_94069fc4b693",
+        "title": "qa:plan 定位这一帧唯一的 draw 调用。",
+        "goal": "qa:plan 定位这一帧唯一的 draw 调用。",
+        "sessionPath": "/visual-diff/state/sessions/proj_94069fc4b693/sess_8a0fc2458312",
+        "createdAt": 1795681770471,
+        "updatedAt": 1795681770548,
+        "lastRunId": "run_ebf0f610b36ea321",
+        "turnControls": {
+         "reasoningLevel": "on",
+         "maxContextMode": false,
+         "fastModel": false
+        },
+        "agentId": "debugger"
+       },
+       "revision": {
+        "epoch": "f70073db-47fd-470e-a1b0-23c44167f1c2",
+        "n": 4
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "session:open": [
+   {
+    "ref": "ffd3cac9f18ce5fcc0c5ec71"
+   }
+  ],
+  "capture:getReplayState": [
+   {
+    "result": {
+     "projectId": "proj_94069fc4b693",
+     "sessionId": "sess_8a0fc2458312",
+     "generation": 0,
+     "revision": 0,
+     "operationId": null,
+     "phase": "closed",
+     "preparation": {
+      "targetDeviceId": null,
+      "phase": "idle",
+      "issue": null
+     },
+     "replayDeviceId": null,
+     "inputId": null,
+     "captureHash": null,
+     "contextId": null,
+     "requestedEventId": null,
+     "appliedEventId": null,
+     "imageEventId": null,
+     "events": [],
+     "targets": [],
+     "target": null,
+     "isFinalOutput": false,
+     "image": null,
+     "observation": null,
+     "devicePresentation": {
+      "status": "not_applicable",
+      "eventId": null,
+      "textureId": null,
+      "sequence": null,
+      "reason": null
+     },
+     "warning": null,
+     "interactionLock": "agent_running",
+     "error": null
+    }
+   }
+  ],
+  "workflow:getState": [
+   {
+    "result": {
+     "caseId": "sess_8a0fc2458312",
+     "runId": "run_ebf0f610b36ea321",
+     "sessionId": "sess_8a0fc2458312",
+     "blockers": [],
+     "reasoningSummaries": [],
+     "lastUpdated": "2026-11-26T08:29:57.793Z"
+    }
+   }
+  ],
+  "evidence:getChain": [
+   {
+    "result": {
+     "sessionId": "sess_8a0fc2458312",
+     "runId": "run_ebf0f610b36ea321",
+     "events": [],
+     "isValid": true
+    }
+   }
+  ],
+  "workflow:getRunUsage": [
+   {
+    "result": {
+     "usage": {
+      "runId": "run_ebf0f610b36ea321",
+      "providerId": "ollama",
+      "modelId": "qa-stub:4b",
+      "inputTokens": 1200,
+      "outputTokens": 80,
+      "totalTokens": 1280,
+      "promptBudgetTokens": 32768,
+      "contextWindowTokens": 32768,
+      "maxOutputTokens": 32768,
+      "compactionThresholdTokens": 26214,
+      "usagePercent": 4,
+      "occupiedTokens": 1200,
+      "breakdown": [
+       {
+        "id": "system_prompt",
+        "tokens": 180
+       },
+       {
+        "id": "skills",
+        "tokens": 112
+       },
+       {
+        "id": "system_tools",
+        "tokens": 861,
+        "count": 30
+       },
+       {
+        "id": "summarized_conversation",
+        "tokens": 0
+       },
+       {
+        "id": "conversation",
+        "tokens": 47,
+        "count": 2
+       },
+       {
+        "id": "builtin_tools_deferred",
+        "tokens": 6891,
+        "count": 18
+       },
+       {
+        "id": "free",
+        "tokens": 31568
+       }
+      ],
+      "snapshotAt": 1795681771011
+     },
+     "stale": false
+    }
+   },
+   {
+    "result": {
+     "usage": {
+      "runId": "run_ebf0f610b36ea321",
+      "providerId": "ollama",
+      "modelId": "qa-stub:4b",
+      "inputTokens": 1200,
+      "outputTokens": 80,
+      "totalTokens": 1280,
+      "promptBudgetTokens": 32768,
+      "contextWindowTokens": 32768,
+      "maxOutputTokens": 32768,
+      "compactionThresholdTokens": 26214,
+      "usagePercent": 4,
+      "occupiedTokens": 1200,
+      "breakdown": [
+       {
+        "id": "system_prompt",
+        "tokens": 180
+       },
+       {
+        "id": "skills",
+        "tokens": 112
+       },
+       {
+        "id": "system_tools",
+        "tokens": 861,
+        "count": 30
+       },
+       {
+        "id": "summarized_conversation",
+        "tokens": 0
+       },
+       {
+        "id": "conversation",
+        "tokens": 47,
+        "count": 2
+       },
+       {
+        "id": "builtin_tools_deferred",
+        "tokens": 6891,
+        "count": 18
+       },
+       {
+        "id": "free",
+        "tokens": 31568
+       }
+      ],
+      "snapshotAt": 1795681771011
+     },
+     "stale": false
+    }
+   }
+  ],
+  "capture:getOpenedState": [
+   {
+    "result": null
+   }
+  ],
+  "context:get": [
+   {
+    "result": null
+   }
+  ],
+  "project:inputs:list": [
+   {
+    "result": {
+     "inputs": []
+    }
+   }
+  ],
+  "conversation:answerPlanReview": [
+   {
+    "result": {
+     "decision": "approve",
+     "session": {
+      "record": {
+       "schemaVersion": "1",
+       "sessionId": "sess_8a0fc2458312",
+       "projectId": "proj_94069fc4b693",
+       "title": "qa:plan 定位这一帧唯一的 draw 调用。",
+       "goal": "qa:plan 定位这一帧唯一的 draw 调用。",
+       "sessionPath": "/visual-diff/state/sessions/proj_94069fc4b693/sess_8a0fc2458312",
+       "createdAt": 1795681770471,
+       "updatedAt": 1795681798225,
+       "lastRunId": "run_ebf0f610b36ea321",
+       "turnControls": {
+        "reasoningLevel": "on",
+        "maxContextMode": false,
+        "fastModel": false
+       },
+       "agentId": "general",
+       "modelOverride": {
+        "providerId": "ollama",
+        "modelId": "qa-stub:4b"
+       }
+      },
+      "revision": {
+       "epoch": "f70073db-47fd-470e-a1b0-23c44167f1c2",
+       "n": 5
+      }
+     },
+     "planReview": {
+      "sessionId": "sess_8a0fc2458312",
+      "review": null,
+      "recoverable": null,
+      "decision": {
+       "reviewId": "98422927-77fb-42dc-88e6-49606666b711",
+       "kind": "approve"
+      },
+      "projectionVersion": 3
+     },
+     "handoff": {
+      "prompt": "The Debugger plan has already passed review and is frozen; this is the General execution turn. Earlier instructions to submit or await approval describe the completed planning turn. Execute the approved scope with the preloaded methods and runtime gates. Complete its required work, independent review, relevant Challenges and recovery before declaring completion in place; otherwise report the concrete partial or blocked state. If strategy must change, record the checkpoint and gaps so the user can return to Debugger.",
+      "send": true
+     }
+    }
+   }
+  ]
+ }
+}

@@ -1,6 +1,8 @@
 import { useConversationStore } from '../../stores/conversationStore';
 import {
-  type ActiveTurnContext, type ActiveTurnOwnership, useComposerSessionContextStore,
+  type ActiveTurnContext,
+  type ActiveTurnOwnership,
+  useComposerSessionContextStore,
 } from '../../stores/composerSessionContextStore';
 import { isActiveSessionEvent } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
@@ -21,16 +23,17 @@ export async function reconcileConversationStop(options: {
   // A successful session stop may only have joined background work: the
   // requested conversation can already be complete. Read the exact persisted
   // terminal before applying another optimistic stop.
-  if (cancelResult.success && sessionId && activeAssistant && !activeAssistant.turnId.startsWith('optimistic-turn-')) {
+  if (cancelResult.success && sessionId && activeAssistant) {
     const history = await conversationAPI.getHistory(sessionId);
-    const terminal = history.messages.find((message) => (
-      message.role === 'assistant'
-      && message.sessionId === sessionId
-      && message.turnId === activeAssistant.turnId
-      && message.requestId === activeAssistant.requestId
-      && message.agentId === activeAssistant.agentId
-      && !ACTIVE_ASSISTANT_STATUSES.has(message.status)
-    ));
+    const terminal = history.messages.find(
+      (message) =>
+        message.role === 'assistant' &&
+        message.sessionId === sessionId &&
+        message.turnId === activeAssistant.turnId &&
+        message.requestId === activeAssistant.requestId &&
+        message.agentId === activeAssistant.agentId &&
+        !ACTIVE_ASSISTANT_STATUSES.has(message.status),
+    );
     if (terminal) {
       if (isActiveSessionEvent(sessionId)) {
         useConversationStore.getState().upsertConversationMessage(terminal);
@@ -45,11 +48,13 @@ export async function reconcileConversationStop(options: {
   // A delayed stop may not add old request markers to another session's store.
   if (!sessionId || isActiveSessionEvent(sessionId)) {
     const conversation = useConversationStore.getState();
-    const latestAssistant = selectActiveAssistantForTurn(conversation.conversationMessages, sessionId, activeTurn)
-      ?? (activeAssistant && ACTIVE_ASSISTANT_STATUSES.has(activeAssistant.status) ? activeAssistant : null);
-    const requestId = turnOwnership?.requestId ?? cancelResult.cancelledRequestId ?? latestAssistant?.requestId;
+    const latestAssistant =
+      selectActiveAssistantForTurn(conversation.conversationMessages, sessionId, activeTurn) ??
+      (activeAssistant && ACTIVE_ASSISTANT_STATUSES.has(activeAssistant.status) ? activeAssistant : null);
+    const cancelled = cancelResult.success ? cancelResult : undefined;
+    const requestId = turnOwnership?.requestId ?? cancelled?.cancelledRequestId ?? latestAssistant?.requestId;
     if (requestId) conversation.markRequestMonotonicallyStopped(requestId);
-    const turnId = latestAssistant?.turnId ?? cancelResult.cancelledTurnId;
+    const turnId = latestAssistant?.turnId ?? cancelled?.cancelledTurnId;
     if (turnId) {
       conversation.markTurnMonotonicallyStopped(turnId);
       conversation.updateAssistantMessageByTurnId(turnId, stopWorkTrace);

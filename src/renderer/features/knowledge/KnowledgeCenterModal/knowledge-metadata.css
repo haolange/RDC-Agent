@@ -47,21 +47,15 @@
 .knowledge-center-meta dt {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-weight: var(--font-regular);
-}
-
-.knowledge-center-meta dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-  color: var(--token-text-primary);
-  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
 }
 
 .knowledge-center-meta--compact dd {
   font-size: var(--type-body-size);
 }
 
-.knowledge-center-meta-side {
+.knowledge-center-meta-side,
+.knowledge-conflict-compare {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -74,12 +68,6 @@
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
-}
-
-.knowledge-center-meta-empty {
-  margin: 0;
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
 }
 
 @container knowledge-detail (max-width: 34rem) {

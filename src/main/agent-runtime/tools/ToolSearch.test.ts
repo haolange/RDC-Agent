@@ -2,12 +2,7 @@
  * ToolSearch 纯函数与工厂测试。
  */
 import { describe, expect, it } from 'vitest';
-import {
-  createToolSearchTool,
-  formatToolSearchResult,
-  searchTools,
-  type ToolSearchToolInfo,
-} from './ToolSearch';
+import { createToolSearchTool, formatToolSearchResult, searchTools, type ToolSearchToolInfo } from './ToolSearch';
 import type { AgentTool } from '../agent/AgentTool';
 
 function fakeTool(partial: {
@@ -28,7 +23,7 @@ function fakeTool(partial: {
     },
     spec: {
       isReadOnly: true,
-      isConcurrencySafe: true,
+      concurrency: 'shared',
       isDestructive: false,
       sideEffect: 'none',
       category: partial.category ?? 'search',
@@ -58,21 +53,28 @@ describe('searchTools', () => {
   });
 
   it('discovers an exact named capability within a descriptive multi-word request without widening the effective set', () => {
-    const tools = [fakeTool({ name: 'subagent', description: 'Delegate to an isolated sub-agent in background mode', category: 'task' }), fakeTool({ name: 'background_wait', category: 'task' })];
-    expect(searchTools(tools, { query: 'subagent background isolated execution', category: 'task', requires_approval: false }).matches[0]?.name).toBe('subagent');
+    const tools = [
+      fakeTool({
+        name: 'subagent',
+        description: 'Delegate to an isolated sub-agent in background mode',
+        category: 'task',
+      }),
+      fakeTool({ name: 'background_wait', category: 'task' }),
+    ];
+    expect(
+      searchTools(tools, {
+        query: 'subagent background isolated execution',
+        category: 'task',
+        requires_approval: false,
+      }).matches[0]?.name,
+    ).toBe('subagent');
     expect(searchTools(tools, { query: 'subagent', category: 'web' }).total).toBe(0);
     expect(searchTools([tools[1]!], { query: 'subagent' }).total).toBe(0);
   });
 
   it('sorts by name when query is empty', () => {
     const page = searchTools(catalog, {});
-    expect(page.matches.map((m) => m.name)).toEqual([
-      'ask_user',
-      'grep',
-      'read_file',
-      'web_search',
-      'write_file',
-    ]);
+    expect(page.matches.map((m) => m.name)).toEqual(['ask_user', 'grep', 'read_file', 'web_search', 'write_file']);
   });
 
   it('filters by category and requires_approval', () => {
@@ -83,9 +85,11 @@ describe('searchTools', () => {
   });
 
   it('applies default limit 20 and clamps max to 50', () => {
-    const many = Array.from({ length: 60 }, (_, i) => fakeTool({
-      name: `tool_${String(i).padStart(2, '0')}`,
-    }));
+    const many = Array.from({ length: 60 }, (_, i) =>
+      fakeTool({
+        name: `tool_${String(i).padStart(2, '0')}`,
+      }),
+    );
     const defaultPage = searchTools(many, {});
     expect(defaultPage.limit).toBe(20);
     expect(defaultPage.matches).toHaveLength(20);
@@ -102,16 +106,19 @@ describe('searchTools', () => {
   });
 
   it('includes full parameters schema on each match', () => {
-    const page = searchTools([
-      fakeTool({
-        name: 'custom',
-        parameters: {
-          type: 'object',
-          properties: { path: { type: 'string' } },
-          required: ['path'],
-        },
-      }),
-    ], {});
+    const page = searchTools(
+      [
+        fakeTool({
+          name: 'custom',
+          parameters: {
+            type: 'object',
+            properties: { path: { type: 'string' } },
+            required: ['path'],
+          },
+        }),
+      ],
+      {},
+    );
     expect(page.matches[0]?.parameters).toEqual({
       type: 'object',
       properties: { path: { type: 'string' } },
@@ -124,10 +131,13 @@ describe('searchTools', () => {
 
 describe('formatToolSearchResult', () => {
   it('writes Found N tools (showing A-B of N) header and tool fields', () => {
-    const page = searchTools([
-      fakeTool({ name: 'alpha', description: 'First tool', category: 'system', requiresApproval: true }),
-      fakeTool({ name: 'beta', description: 'Second tool', category: 'web' }),
-    ], { limit: 1 });
+    const page = searchTools(
+      [
+        fakeTool({ name: 'alpha', description: 'First tool', category: 'system', requiresApproval: true }),
+        fakeTool({ name: 'beta', description: 'Second tool', category: 'web' }),
+      ],
+      { limit: 1 },
+    );
     const text = formatToolSearchResult(page);
     expect(text).toContain('Found 2 tools (showing 1-1 of 2):');
     expect(text).toContain('name: alpha');

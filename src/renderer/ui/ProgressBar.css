@@ -1,0 +1,23 @@
+.ui-progress {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--space-1);
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--token-interactive-hover);
+}
+
+.ui-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--ui-progress-fill, 0%);
+  border-radius: inherit;
+  background: var(--token-task-active);
+  transition: width var(--motion-indicator);
+}
+
+.ui-progress.is-done .ui-progress-fill {
+  background: var(--token-task-done);
+}

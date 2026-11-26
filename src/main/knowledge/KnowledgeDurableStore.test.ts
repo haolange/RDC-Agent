@@ -17,20 +17,10 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { directoryLinkType } from '../platform/paths';
 import { acquireDirectoryFileLock, releaseDirectoryFileLock } from '../sessions/store/directoryFileLock';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { StorageIo } from '../runtime/StorageIo';
 import { parseKnowledgeFrontmatter, sourceStatusImpliesVerified } from './knowledgeCardSchema';
 import { KNOWLEDGE_IMPORT_MAX_BYTES, ingestKnowledgeFromPath, sanitizeProvenanceToken } from './knowledgeIngest';
-import {
-  KnowledgeApprovalTokenInvalidError,
-  KnowledgeHumanConfirmationRequiredError,
-  KnowledgeLifecycleError,
-  KnowledgeRevisionConflictError,
-  KnowledgeWritePathError,
-} from './knowledgeErrors';
-import {
-  createSessionScopedKnowledgeStore,
-  KnowledgeDurableStore,
-} from './KnowledgeDurableStore';
+import { createSessionScopedKnowledgeStore, KnowledgeDurableStore } from './KnowledgeDurableStore';
 import { createDisposableCandidateService } from './KnowledgeCandidateService';
 import { createDisposableImportService } from './KnowledgeImportService';
 import { KnowledgeIndexService } from './KnowledgeIndexService';
@@ -112,15 +102,21 @@ describe('Knowledge durable store', () => {
       lockFileName: KNOWLEDGE_STATE_LOCK_FILE,
       timeoutCode: KNOWLEDGE_STATE_LOCK_TIMEOUT,
     });
-    writeFileSync(held.lockPath, JSON.stringify({
-      pid: process.pid,
-      createdAt: Date.now() - 120_000,
-    }), 'utf8');
+    writeFileSync(
+      held.lockPath,
+      JSON.stringify({
+        pid: process.pid,
+        createdAt: Date.now() - 120_000,
+      }),
+      'utf8',
+    );
     const store = new KnowledgeDurableStore({
       resolveStatePath: (sessionId) => path.join(root, sessionId, 'knowledge-state.json'),
       lockMaxAttempts: 3,
     });
-    await expect(store.putCandidate('sess-lock', { candidate: candidateOf(factCard(), 'sess-lock') })).rejects.toThrow(/KNOWLEDGE_STATE_LOCK_TIMEOUT/);
+    await expect(store.putCandidate('sess-lock', { candidate: candidateOf(factCard(), 'sess-lock') })).rejects.toThrow(
+      /KNOWLEDGE_STATE_LOCK_TIMEOUT/,
+    );
     await releaseDirectoryFileLock(held.lockPath);
   });
 
@@ -128,13 +124,17 @@ describe('Knowledge durable store', () => {
     const store = createSessionScopedKnowledgeStore(tempRoot('rdc-know-rev-'));
     const created = await store.putCandidate('sess-b', { candidate: candidateOf(factCard()) });
     expect(created.revision).toBe(1);
-    await expect(store.putCandidate('sess-b', {
-      candidate: candidateOf({ ...factCard(), body: 'changed' }),
-    })).rejects.toBeInstanceOf(KnowledgeRevisionConflictError);
-    await expect(store.putCandidate('sess-b', {
-      candidate: candidateOf({ ...factCard(), body: 'changed' }),
-      expectedRevision: 0,
-    })).rejects.toBeInstanceOf(KnowledgeRevisionConflictError);
+    await expect(
+      store.putCandidate('sess-b', {
+        candidate: candidateOf({ ...factCard(), body: 'changed' }),
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_REVISION_CONFLICT' });
+    await expect(
+      store.putCandidate('sess-b', {
+        candidate: candidateOf({ ...factCard(), body: 'changed' }),
+        expectedRevision: 0,
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_REVISION_CONFLICT' });
     const updated = await store.putCandidate('sess-b', {
       candidate: candidateOf({ ...factCard(), body: 'changed' }),
       expectedRevision: 1,
@@ -169,7 +169,9 @@ describe('Knowledge durable store', () => {
     const workerPath = path.join(root, 'worker.cjs');
     const registerPath = path.resolve(__dirname, '../../../scripts/register-ts-source.cjs');
     const storePath = path.resolve(__dirname, './KnowledgeDurableStore.ts');
-    await writeFile(workerPath, `
+    await writeFile(
+      workerPath,
+      `
 require(${JSON.stringify(registerPath)});
 const { KnowledgeDurableStore } = require(${JSON.stringify(storePath)});
 const root = process.env.KNOW_ROOT;
@@ -193,24 +195,31 @@ const card = JSON.parse(process.env.KNOW_CARD);
   console.error(error);
   process.exit(1);
 });
-`, 'utf8');
-    const spawnWorker = (card: KnowledgeCardRecord) => new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
-      const child = spawn(process.execPath, [workerPath], {
-        env: {
-          ...process.env,
-          KNOW_ROOT: root,
-          KNOW_SESSION: 'sess-x',
-          KNOW_CARD: JSON.stringify(card),
-        },
-        windowsHide: true,
+`,
+      'utf8',
+    );
+    const spawnWorker = (card: KnowledgeCardRecord) =>
+      new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+        const child = spawn(process.execPath, [workerPath], {
+          env: {
+            ...process.env,
+            KNOW_ROOT: root,
+            KNOW_SESSION: 'sess-x',
+            KNOW_CARD: JSON.stringify(card),
+          },
+          windowsHide: true,
+        });
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', (chunk) => {
+          stdout += String(chunk);
+        });
+        child.stderr.on('data', (chunk) => {
+          stderr += String(chunk);
+        });
+        child.on('error', reject);
+        child.on('close', (code) => resolve({ code, stdout, stderr }));
       });
-      let stdout = '';
-      let stderr = '';
-      child.stdout.on('data', (chunk) => { stdout += String(chunk); });
-      child.stderr.on('data', (chunk) => { stderr += String(chunk); });
-      child.on('error', reject);
-      child.on('close', (code) => resolve({ code, stdout, stderr }));
-    });
     const [first, second] = await Promise.all([
       spawnWorker(factCard('user:facts/proc-a.md')),
       spawnWorker(factCard('user:facts/proc-b.md')),
@@ -226,12 +235,16 @@ const card = JSON.parse(process.env.KNOW_CARD);
     const root = tempRoot('rdc-know-schema-');
     const sessionDir = path.join(root, 'sess-schema');
     mkdirSync(sessionDir, { recursive: true });
-    writeFileSync(path.join(sessionDir, 'knowledge-state.json'), JSON.stringify({
-      schemaVersion: '99',
-      drafts: [],
-      candidates: [],
-      reviews: [],
-    }), 'utf8');
+    writeFileSync(
+      path.join(sessionDir, 'knowledge-state.json'),
+      JSON.stringify({
+        schemaVersion: '99',
+        drafts: [],
+        candidates: [],
+        reviews: [],
+      }),
+      'utf8',
+    );
     const store = createSessionScopedKnowledgeStore(root);
     await expect(store.listCandidates('sess-schema')).rejects.toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
   });
@@ -239,12 +252,16 @@ const card = JSON.parse(process.env.KNOW_CARD);
   it('fail-closes an unknown higher knowledge-index schemaVersion', async () => {
     const root = tempRoot('rdc-know-index-schema-');
     const snapshotPath = path.join(root, 'knowledge-index.json');
-    writeFileSync(snapshotPath, JSON.stringify({
-      schemaVersion: 99,
-      revision: 'deadbeef',
-      builtAt: '2026-09-01T00:00:00.000Z',
-      cards: [],
-    }), 'utf8');
+    writeFileSync(
+      snapshotPath,
+      JSON.stringify({
+        schemaVersion: 99,
+        revision: 'deadbeef',
+        builtAt: '2026-09-01T00:00:00.000Z',
+        cards: [],
+      }),
+      'utf8',
+    );
     const index = new KnowledgeIndexService({
       listSpaces: () => [{ spaceId: 'user', kind: 'user', label: 'User', rootPath: root }],
       snapshotPath: () => snapshotPath,
@@ -262,13 +279,7 @@ describe('knowledge path ingest', () => {
   it('records source hash/mtime/size and quarantines a mid-read change', async () => {
     const root = tempRoot('rdc-know-path-');
     const filePath = path.join(root, 'case.yaml');
-    const yaml = [
-      'case_id: path-case',
-      'title: Path case',
-      'meta:',
-      '  status: fixed',
-      'symptoms: darker',
-    ].join('\n');
+    const yaml = ['case_id: path-case', 'title: Path case', 'meta:', '  status: fixed', 'symptoms: darker'].join('\n');
     writeFileSync(filePath, yaml, 'utf8');
     const before = sourceFingerprint(filePath);
     const spaceRoot = tempRoot('rdc-know-path-space-');
@@ -289,9 +300,7 @@ describe('knowledge path ingest', () => {
       io: {
         stat: async () => {
           reads += 1;
-          return reads === 1
-            ? { mtimeMs: 1, size: yaml.length }
-            : { mtimeMs: 2, size: changed.length };
+          return reads === 1 ? { mtimeMs: 1, size: yaml.length } : { mtimeMs: 2, size: changed.length };
         },
         readFile: async () => {
           return reads <= 1 ? Buffer.from(yaml) : changed;
@@ -307,16 +316,20 @@ describe('knowledge path ingest', () => {
     const root = tempRoot('rdc-know-fixtures-');
     const cases = [1, 2].map((index) => {
       const filePath = path.join(root, '案例' + index + '.txt');
-      writeFileSync(filePath, [
-        'case_id: synthetic-' + index,
-        'title: Synthetic sanitization fixture',
-        'meta:',
-        '  status: fixed',
-        'symptoms: 企业微信截图.png and HairBlack.txt are missing',
-        'assets:',
-        '  - file: 企业微信截图.png',
-        '  - file: HairBlack.txt',
-      ].join('\n'), 'utf8');
+      writeFileSync(
+        filePath,
+        [
+          'case_id: synthetic-' + index,
+          'title: Synthetic sanitization fixture',
+          'meta:',
+          '  status: fixed',
+          'symptoms: 企业微信截图.png and HairBlack.txt are missing',
+          'assets:',
+          '  - file: 企业微信截图.png',
+          '  - file: HairBlack.txt',
+        ].join('\n'),
+        'utf8',
+      );
       return filePath;
     });
     const before = cases.map((filePath) => ({ filePath, ...sourceFingerprint(filePath) }));
@@ -366,11 +379,7 @@ describe('knowledge path ingest', () => {
     for (const [index, leak] of leaks.entries()) {
       const result = await importer.importToSpace({
         spaceId: 'user',
-        source: [
-          `case_id: abs-case-${index}`,
-          'title: Abs',
-          `symptoms: see ${leak}`,
-        ].join('\n'),
+        source: [`case_id: abs-case-${index}`, 'title: Abs', `symptoms: see ${leak}`].join('\n'),
       });
       expect(result.items[0]?.status, leak).toBe('quarantine');
       expect(result.items[0]?.reason, leak).toBe('absolute-path');
@@ -379,11 +388,9 @@ describe('knowledge path ingest', () => {
     }
     const secret = await importer.importToSpace({
       spaceId: 'user',
-      source: [
-        'case_id: secret-case',
-        'title: Secret',
-        'symptoms: api_key leaked',
-      ].join('\n'),
+      source: ['case_id: secret-case', 'title: Secret', 'symptoms: api_key=sk-live-fixture-0123456789abcdef'].join(
+        '\n',
+      ),
     });
     expect(secret.items[0]?.status).toBe('quarantine');
     expect(secret.items[0]?.reason).toBe('secret-detected');
@@ -405,48 +412,51 @@ describe('knowledge path ingest', () => {
 });
 
 describe('Knowledge write gates', () => {
-  function writeService(root: string, consume?: (token: string) => boolean): KnowledgeWriteService {
+  function writeService(root: string): KnowledgeWriteService {
     return new KnowledgeWriteService({
       listSpaces: () => [{ spaceId: 'user', kind: 'user', label: 'User', rootPath: root }],
       now: () => new Date('2026-09-01T00:00:00.000Z'),
-      ...(consume ? {
-        consumeApprovalToken: (token) => consume(token),
-      } : {}),
     });
   }
 
   it('rejects symlink, junction, hardlink, and .. write targets', async () => {
     const root = tempRoot('rdc-know-gate-');
     const write = writeService(root);
-    await expect(write.write({
-      spaceId: 'user',
-      card: { ...factCard(), relativePath: '../escape.md' },
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeWritePathError);
+    await expect(
+      write.write({
+        spaceId: 'user',
+        card: { ...factCard(), relativePath: '../escape.md' },
+        permissionMode: 'full-access',
+        confirmation: { explicitHumanConfirmation: true },
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_WRITE_PATH_REJECTED' });
 
     const outside = path.join(root, 'outside');
     mkdirSync(outside, { recursive: true });
     const junction = path.join(root, 'facts');
     symlinkSync(outside, junction, directoryLinkType());
-    await expect(write.write({
-      spaceId: 'user',
-      card: factCard('user:facts/via-junction.md'),
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeWritePathError);
+    await expect(
+      write.write({
+        spaceId: 'user',
+        card: factCard('user:facts/via-junction.md'),
+        permissionMode: 'full-access',
+        confirmation: { explicitHumanConfirmation: true },
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_WRITE_PATH_REJECTED' });
 
     const realFile = path.join(root, 'real.md');
     writeFileSync(realFile, 'seed', 'utf8');
     const hardlink = path.join(root, 'hard.md');
     linkSync(realFile, hardlink);
     expect(statSync(hardlink).nlink).toBeGreaterThan(1);
-    await expect(write.write({
-      spaceId: 'user',
-      card: { ...factCard(), relativePath: 'hard.md' },
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeWritePathError);
+    await expect(
+      write.write({
+        spaceId: 'user',
+        card: { ...factCard(), relativePath: 'hard.md' },
+        permissionMode: 'full-access',
+        confirmation: { explicitHumanConfirmation: true },
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_WRITE_PATH_REJECTED' });
   });
 
   it('rejects a parent junction space root before mkdir', async () => {
@@ -457,74 +467,30 @@ describe('Knowledge write gates', () => {
     const junction = path.join(root, 'junction');
     symlinkSync(outside, junction, directoryLinkType());
     const write = writeService(path.join(junction, 'knowledge'));
-    await expect(write.write({
-      spaceId: 'user',
-      card: factCard(),
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeWritePathError);
+    await expect(
+      write.write({
+        spaceId: 'user',
+        card: factCard(),
+        permissionMode: 'full-access',
+        confirmation: { explicitHumanConfirmation: true },
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_WRITE_PATH_REJECTED' });
     expect(readdirSync(outside)).toEqual(before);
     expect(existsSync(path.join(outside, 'knowledge'))).toBe(false);
     expect(existsSync(path.join(outside, 'facts'))).toBe(false);
   });
 
-  it('rejects missing confirmation and a reused approvalToken', async () => {
-    const root = tempRoot('rdc-know-token-');
-    const tokens = new Set(['tok-once']);
-    const write = writeService(root, (token) => {
-      if (!tokens.has(token)) return false;
-      tokens.delete(token);
-      return true;
-    });
-    await expect(write.write({
-      spaceId: 'user',
-      card: factCard(),
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: false } as never,
-      approvalToken: 'tok-once',
-    })).rejects.toBeInstanceOf(KnowledgeHumanConfirmationRequiredError);
-    const saved = await write.write({
-      spaceId: 'user',
-      card: factCard(),
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-      approvalToken: 'tok-once',
-    });
-    expect(saved.lifecycle).toBe('draft');
-    await expect(write.write({
-      spaceId: 'user',
-      card: { ...factCard(), title: 'Again' },
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-      approvalToken: 'tok-once',
-    })).rejects.toBeInstanceOf(KnowledgeApprovalTokenInvalidError);
-  });
-
-  it('consumes a promote approvalToken only once', async () => {
-    const root = tempRoot('rdc-know-promote-tok-');
-    const tokens = new Set(['tok-promote']);
-    const write = writeService(root, (token) => {
-      if (!tokens.has(token)) return false;
-      tokens.delete(token);
-      return true;
-    });
-    const saved = await write.promote({
-      spaceId: 'user',
-      card: { ...factCard(), lifecycle: 'candidate' },
-      to: 'verified',
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-      approvalToken: 'tok-promote',
-    });
-    expect(saved.lifecycle).toBe('verified');
-    await expect(write.promote({
-      spaceId: 'user',
-      card: { ...factCard(), lifecycle: 'candidate' },
-      to: 'verified',
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-      approvalToken: 'tok-promote',
-    })).rejects.toBeInstanceOf(KnowledgeApprovalTokenInvalidError);
+  it('rejects a write without explicit human confirmation', async () => {
+    const root = tempRoot('rdc-know-confirm-');
+    const write = writeService(root);
+    await expect(
+      write.write({
+        spaceId: 'user',
+        card: factCard(),
+        permissionMode: 'full-access',
+        confirmation: { explicitHumanConfirmation: false } as never,
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_HUMAN_CONFIRMATION_REQUIRED' });
   });
 
   it('never treats sourceStatus=fixed as verified', async () => {
@@ -534,30 +500,28 @@ describe('Knowledge write gates', () => {
     const importer = createDisposableImportService({ spaceRoot: root });
     const result = await importer.importToSpace({
       spaceId: 'user',
-      source: [
-        'case_id: fixed-case',
-        'title: Fixed case',
-        'meta:',
-        '  status: fixed',
-        'symptoms: darker',
-      ].join('\n'),
+      source: ['case_id: fixed-case', 'title: Fixed case', 'meta:', '  status: fixed', 'symptoms: darker'].join('\n'),
     });
     expect(result.items[0]?.sourceStatus).toBe('fixed');
     expect(result.verified).toBe(false);
     expect(result.items[0]?.record?.lifecycle).toBe('draft');
-    await expect(write.write({
-      spaceId: 'user',
-      card: { ...factCard(), lifecycle: 'verified', sourceStatus: 'fixed' },
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeLifecycleError);
-    await expect(write.promote({
-      spaceId: 'user',
-      card: { ...factCard(), lifecycle: 'candidate', sourceStatus: 'fixed' },
-      to: 'verified',
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toBeInstanceOf(KnowledgeLifecycleError);
+    await expect(
+      write.write({
+        spaceId: 'user',
+        card: { ...factCard(), lifecycle: 'verified', sourceStatus: 'fixed' },
+        permissionMode: 'full-access',
+        confirmation: { explicitHumanConfirmation: true },
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_LIFECYCLE_INVALID' });
+    await expect(
+      write.promote({
+        spaceId: 'user',
+        card: { ...factCard(), lifecycle: 'candidate', sourceStatus: 'fixed' },
+        to: 'verified',
+        permissionMode: 'full-access',
+        confirmation: { explicitHumanConfirmation: true },
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_LIFECYCLE_INVALID' });
   });
 
   it('marks the index revision stale after an external card edit', async () => {

@@ -14,10 +14,10 @@ import type {
 } from '@shared/types/trace';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 import type { TaskExecutionRecord } from '../agent-runtime/tasks/TaskContracts';
-import type { SessionArtifactSource } from '../sessions/artifacts/SessionArtifactSource';
+import type { SessionArtifactSource } from '../reports/SessionArtifactSource';
 import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
 
-const toIso = (value: number | undefined): string => value ? new Date(value).toISOString() : nowIso();
+const toIso = (value: number | undefined): string => (value ? new Date(value).toISOString() : nowIso());
 
 export function mapRightRailTasks(
   sessionId: string,
@@ -60,8 +60,7 @@ export function mapRightRailOutputs(input: {
   sources: SessionArtifactSource[];
   runs: RunSummary[];
 }): OutputsPanelViewModel {
-  const latestRunId = input.runs
-    .slice().sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))[0]?.runId;
+  const latestRunId = input.runs.slice().sort((left, right) => right.startedAt - left.startedAt)[0]?.runId;
   const all = input.sources
     .filter((source) => source.kind === 'output')
     .map<TraceArtifactRecord>((source) => ({
@@ -86,7 +85,14 @@ export function mapRightRailOutputs(input: {
   return { current, previous: all.filter((artifact) => !currentIds.has(artifact.id)) };
 }
 
-const running = new Set<RunSummary['status']>(['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping']);
+const running = new Set<RunSummary['status']>([
+  'planning',
+  'awaiting_input',
+  'awaiting_approval',
+  'queued',
+  'running',
+  'stopping',
+]);
 const dedupeTaskResources = (resources: TaskContextResource[]): TaskContextResource[] => {
   const seen = new Set<string>();
   return resources.filter((resource) => {
@@ -108,19 +114,30 @@ export function buildTaskContext(input: {
   profileId?: string;
   permissionMode: string;
 }): ContextPanelViewModel['task'] {
-  const latest = input.runs.slice().sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))[0];
+  const latest = input.runs.slice().sort((left, right) => right.startedAt - left.startedAt)[0];
   const mode = latest?.profileId ?? input.profileId ?? DEFAULT_AGENT_ID;
   const profile = agentProfileRegistry.getForMode(mode);
-  const resources: TaskContextResource[] = input.attachments.filter((item) => item.kind === 'attachment').map((item) => ({
-    id: `attachment:${item.id}`, kind: 'attachment', label: item.title, summary: item.filePath, path: item.filePath, state: 'active',
-  }));
+  const resources: TaskContextResource[] = input.attachments
+    .filter((item) => item.kind === 'attachment')
+    .map((item) => ({
+      id: `attachment:${item.id}`,
+      kind: 'attachment',
+      label: item.title,
+      summary: item.filePath,
+      path: item.filePath,
+      state: 'active',
+    }));
   resources.push(...input.resources);
   const distinctResources = dedupeTaskResources(resources);
   return {
-    projectId: input.session.projectId, projectName: input.project?.name ?? input.session.projectId,
-    sessionId: input.session.sessionId, sessionTitle: input.session.title, workingDirectory: input.session.sessionPath,
+    projectId: input.session.projectId,
+    projectName: input.project?.name ?? input.session.projectId,
+    sessionId: input.session.sessionId,
+    sessionTitle: input.session.title,
+    workingDirectory: input.session.sessionPath,
     configurationPhase: latest && running.has(latest.status) ? 'current_turn' : 'next_turn',
-    agentProfile: profile.displayName, permission: input.permissionMode,
+    agentProfile: profile.displayName,
+    permission: input.permissionMode,
     resources: distinctResources,
   };
 }
@@ -128,7 +145,8 @@ export function buildTaskContext(input: {
 const chooseDiagnosticAction = (summary: string): RdcContextDiagnostic['action'] => {
   const normalized = summary.toLowerCase();
   if (normalized.includes('configured') || normalized.includes('settings')) return 'settings';
-  if (normalized.includes('unsupported') || normalized.includes('incompatible') || normalized.includes('replay')) return 'change_device';
+  if (normalized.includes('unsupported') || normalized.includes('incompatible') || normalized.includes('replay'))
+    return 'change_device';
   return 'retry';
 };
 
@@ -137,7 +155,10 @@ const dedupeDiagnostics = (items: Array<Omit<RdcContextDiagnostic, 'id' | 'repea
   for (const item of items) {
     const key = `${item.code ?? 'unknown'}:${item.summary}`;
     const existing = grouped.get(key);
-    if (existing) { existing.repeatCount += 1; continue; }
+    if (existing) {
+      existing.repeatCount += 1;
+      continue;
+    }
     grouped.set(key, { ...item, id: `rdc:${grouped.size + 1}`, repeatCount: 1 });
   }
   return [...grouped.values()];
@@ -155,28 +176,35 @@ export function buildRdcContext(input: {
     diagnostics.push({
       code: opened.previewError.code,
       summary: opened.previewError.message,
-      detail: opened.previewError.attempts.map((attempt) => attempt.message).filter(Boolean).join('\n') || undefined,
+      detail:
+        opened.previewError.attempts
+          .map((attempt) => attempt.message)
+          .filter(Boolean)
+          .join('\n') || undefined,
       action: chooseDiagnosticAction(opened.previewError.message),
     });
   }
   return {
-    capture: opened ? {
-      inputId: opened.inputId,
-      captureId: opened.captureId,
-      captureFileId: opened.captureFileId,
-      displayName: opened.filePath.split(/[\\/]/).filter(Boolean).pop() ?? opened.filePath,
-      filePath: opened.filePath,
-      status: opened.status,
-      backend: opened.backend,
-      deviceLabel: opened.deviceLabel,
-      replaySessionId: opened.replaySessionId || undefined,
-      openedAt: toIso(opened.openedAt),
-      previewAvailable: Boolean(opened.preview),
-    } : null,
+    capture: opened
+      ? {
+          inputId: opened.inputId,
+          captureId: opened.captureId,
+          captureFileId: opened.captureFileId,
+          displayName: opened.filePath.split(/[\\/]/).filter(Boolean).pop() ?? opened.filePath,
+          filePath: opened.filePath,
+          status: opened.status,
+          backend: opened.backend,
+          deviceLabel: opened.deviceLabel,
+          replaySessionId: opened.replaySessionId || undefined,
+          openedAt: toIso(opened.openedAt),
+          previewAvailable: Boolean(opened.preview),
+        }
+      : null,
     availableCaptures: input.availableCaptures,
     runtime: {
       contextId: input.contextSnapshot?.contextId || opened?.contextId || runtimeContext?.contextId || undefined,
-      replaySessionId: input.contextSnapshot?.sessionId || opened?.replaySessionId || runtimeContext?.replaySessionId || undefined,
+      replaySessionId:
+        input.contextSnapshot?.sessionId || opened?.replaySessionId || runtimeContext?.replaySessionId || undefined,
       runtimeOwner: input.contextSnapshot?.runtimeOwner || runtimeContext?.runtimeOwner || undefined,
       ownerLeaseId: input.contextSnapshot?.ownerLeaseId || runtimeContext?.ownerLeaseId || undefined,
       remoteId: runtimeContext?.remoteId,

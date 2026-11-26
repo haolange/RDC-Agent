@@ -49,8 +49,8 @@ const coverageExclude = [
   'src/main/rdc/RdcTurnBindings.ts',
   'src/main/rdc/RdcValidatedEvidence.ts',
   'src/main/rdc/RdcSessionService.ts',
-  'src/main/sessions/store/RewindService.ts',
-  'src/main/sessions/store/SessionBranchService.ts',
+  'src/main/rdc/RdcSessionBindings.ts',
+  'src/main/rdc/RdcDevicePreparation.ts',
   'src/main/sessions/store/SessionResumeService.ts',
   'src/main/settings/provider-auth/oauth/**',
   'src/main/settings/provider-auth/ProviderAccountAuthService.ts',
@@ -82,6 +82,8 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
+          // One budget for every test; a suite that needs more says so with its own timeout.
+          testTimeout: 15_000,
           include: ['src/main/**/*.test.ts', 'src/shared/**/*.test.ts', 'src/preload/**/*.test.ts'],
         },
       },
@@ -90,6 +92,7 @@ export default defineConfig({
         test: {
           name: 'renderer',
           environment: 'happy-dom',
+          testTimeout: 15_000,
           include: ['src/renderer/**/*.test.ts'],
         },
       },

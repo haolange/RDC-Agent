@@ -12,15 +12,18 @@ export interface ToolsDrafts {
   shell: AgentShellSettings;
 }
 
-const stable = (value: unknown): string => JSON.stringify(value, (_key, entry: unknown) => {
-  if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
-    return Object.keys(entry as Record<string, unknown>).sort().reduce<Record<string, unknown>>((acc, key) => {
-      acc[key] = (entry as Record<string, unknown>)[key];
-      return acc;
-    }, {});
-  }
-  return entry;
-});
+const stable = (value: unknown): string =>
+  JSON.stringify(value, (_key, entry: unknown) => {
+    if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+      return Object.keys(entry as Record<string, unknown>)
+        .sort()
+        .reduce<Record<string, unknown>>((acc, key) => {
+          acc[key] = (entry as Record<string, unknown>)[key];
+          return acc;
+        }, {});
+    }
+    return entry;
+  });
 
 /** Manual-save forms only; auto-saved surfaces (Agents, Appearance) never register here. */
 export type ManualSaveForm = 'tools' | 'profile' | 'personalization';
@@ -45,10 +48,6 @@ export function computeSettingsDirty(
     profile: stable(settings.profile) !== stable(drafts.profile),
     personalization: settings.agents.globalInstructions !== drafts.globalInstructions,
   };
-}
-
-export function dirtyForms(state: SettingsDirtyState): ManualSaveForm[] {
-  return (Object.keys(state) as ManualSaveForm[]).filter((key) => state[key]);
 }
 
 /** Memoized dirty state for the Settings modal drafts. */

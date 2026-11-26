@@ -69,13 +69,19 @@
 
 .work-process-track > .work-process-narrative-stream,
 .work-process-section-list,
-.work-process-track-leading { padding-bottom: var(--space-2); }
-.work-process-track .work-process-step.is-appear { animation: none; }
+.work-process-track-leading {
+  padding-bottom: var(--space-2);
+}
+.work-process-track .work-process-step.is-appear {
+  animation: none;
+}
 .work-process-output[hidden],
 .work-process.is-collapsed > .work-process-body {
   display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .work-process-rail-marker.is-running::after { animation: none; }
+  .work-process-rail-marker.is-running::after {
+    animation: none;
+  }
 }

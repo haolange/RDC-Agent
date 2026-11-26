@@ -2,17 +2,11 @@ import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { CaptureDescriptor, ContextSnapshot } from '@shared/types/session';
 
-export {
-  applyActionEventToMessage,
-  applyToolTraceToMessage,
-  hydrateMessagesWithActionEvents,
-} from './conversationMessageMerge';
-
 export const mergeCapturesWithSnapshot = (
   currentCaptures: CaptureDescriptor[],
   snapshot: ContextSnapshot,
 ): CaptureDescriptor[] => {
-  if (!snapshot.captureDescriptors?.length) {
+  if (!snapshot.captureDescriptors.length) {
     return currentCaptures;
   }
 
@@ -64,7 +58,7 @@ export const mapActionEventToTimelineEntry = (event: ActionEvent): AgentTimeline
         type: 'system',
         title: 'System',
         status: event.status,
-        content: String(event.payload.message || ''),
+        content: String(event.payload.message),
         actionEvent: event,
         timestamp: event.ts_ms,
       };

@@ -1,68 +1,27 @@
 /**
- * Concurrency classification for a single tool call.
- * Default is unsafe. Only spec.isConcurrencySafe === true may be concurrent,
- * and hard-serial names / MCP always cut the group. Delegated resource admission
- * and child effects enforce their own resource claims.
+ * Concurrency of same-turn tool calls, read from the concurrency class each tool declares.
+ * A call without a resolved tool is unsafe. Delegated resource admission and child
+ * effects enforce their own resource claims.
  */
 
-import type { AgentTool, AgentToolSpec } from './AgentTool';
-import type { ToolCall } from '../core/types';
+import type { AgentToolSpec } from './AgentTool';
 
-const ALWAYS_SERIAL_TOOL_NAMES = new Set([
-  'shell',
-  'write_file',
-  'edit_file',
-  'delete_file',
-  'move_file',
-  'copy_file',
-  'notebook_edit',
-  'task_create',
-  'task_update',
-  'task_stop',
-  'runtime_context',
-  'rdc_probe',
-  'ask_user',
-  'plan_artifact',
-  'output_register',
-  'investigation_write',
-]);
-
-export function isAlwaysSerialToolName(toolName: string): boolean {
-  const name = toolName.trim();
-  if (!name) return true;
-  if (name.startsWith('mcp__')) return true;
-  return ALWAYS_SERIAL_TOOL_NAMES.has(name);
+/** Whether a call may join a consecutive parallel group. Missing spec → unsafe. */
+export function isConcurrencySafeSpec(spec: AgentToolSpec | undefined): boolean {
+  return spec?.concurrency === 'shared' || spec?.concurrency === 'orchestration-parallel';
 }
 
-export function isAgentToolSpecConcurrencySafe(spec?: AgentToolSpec): boolean {
-  return spec?.isConcurrencySafe === true;
-}
-
-/**
- * Classify one call. Missing spec → unsafe.
- * Dispatch safety is declared by the tool; child resource effects acquire separately.
- */
-export function isToolCallConcurrencySafe(input: {
-  name: string;
-  spec?: AgentToolSpec;
-  args?: Record<string, unknown>;
-}): boolean {
-  const name = input.name.trim();
-  if (!name || isAlwaysSerialToolName(name)) {
-    return false;
+/** The project resource claim a call's effect takes; orchestration takes none. */
+export function resourceClaimOf(spec: AgentToolSpec): 'none' | 'shared' | 'exclusive' {
+  switch (spec.concurrency) {
+    case 'orchestration-parallel':
+    case 'orchestration-serial':
+      return 'none';
+    case 'shared':
+      return 'shared';
+    case 'exclusive':
+      return 'exclusive';
   }
-  return isAgentToolSpecConcurrencySafe(input.spec);
-}
-
-export function isAgentToolCallConcurrencySafe(
-  tool: Pick<AgentTool, 'name' | 'spec'> | undefined,
-  toolCall: Pick<ToolCall, 'name' | 'arguments'>,
-): boolean {
-  return isToolCallConcurrencySafe({
-    name: tool?.name ?? toolCall.name,
-    spec: tool?.spec,
-    args: toolCall.arguments,
-  });
 }
 
 export interface ConcurrentToolGroup {
@@ -72,9 +31,7 @@ export interface ConcurrentToolGroup {
 }
 
 /** Partition a same-turn call list into consecutive safe groups and exclusive unsafe singles. */
-export function partitionConsecutiveSafeGroups(
-  safeFlags: readonly boolean[],
-): ConcurrentToolGroup[] {
+export function partitionConsecutiveSafeGroups(safeFlags: readonly boolean[]): ConcurrentToolGroup[] {
   const groups: ConcurrentToolGroup[] = [];
   let current: ConcurrentToolGroup | null = null;
   for (let index = 0; index < safeFlags.length; index += 1) {
@@ -94,6 +51,7 @@ export function partitionConsecutiveSafeGroups(
   return groups;
 }
 
-export function countSubagentCalls(calls: ReadonlyArray<{ name: string }>): number {
-  return calls.reduce((sum, call) => (call.name.trim() === 'subagent' ? sum + 1 : sum), 0);
+/** Number of calls whose tool declares that it dispatches a subagent. */
+export function countSubagentDispatches(specs: ReadonlyArray<AgentToolSpec | undefined>): number {
+  return specs.reduce((sum, spec) => (spec?.dispatchesSubagent === true ? sum + 1 : sum), 0);
 }

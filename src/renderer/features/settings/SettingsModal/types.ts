@@ -43,4 +43,3 @@ export interface ProviderConnectionDraft {
 
 export type ProviderProtocol = LlmProviderProtocol;
 export type ProviderCatalogCategory = LlmProviderCatalogResponse['categories'][number];
-export type ProviderCatalogSnapshot = LlmProviderCatalogResponse;

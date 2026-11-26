@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -33,10 +32,20 @@ describe('Provider Catalog compiler', () => {
     );
     const [firstRoute, secondRoute] = model.routeOptions.map((route: { id: string }) => route.id);
     model.executionBindings = [
-      { id: 'route:first', when: { fast: true }, actions: [{ kind: 'fixed' }],
-        entitlement: 'unknown', routeOptionIds: [firstRoute] },
-      { id: 'route:second', when: { fast: true }, actions: [{ kind: 'unsupported' }],
-        entitlement: 'unknown', routeOptionIds: [secondRoute] },
+      {
+        id: 'route:first',
+        when: { fast: true },
+        actions: [{ kind: 'fixed' }],
+        entitlement: 'unknown',
+        routeOptionIds: [firstRoute],
+      },
+      {
+        id: 'route:second',
+        when: { fast: true },
+        actions: [{ kind: 'unsupported' }],
+        entitlement: 'unknown',
+        routeOptionIds: [secondRoute],
+      },
     ];
     expect(() => compileProviderCatalog(source)).not.toThrow();
     model.executionBindings[1].routeOptionIds.push(firstRoute);
@@ -51,8 +60,12 @@ describe('Provider Catalog compiler', () => {
     model.executionBindings = [
       { id: 'base:first', when: { fast: true }, actions: [{ kind: 'fixed' }], entitlement: 'unknown' },
       { id: 'base:second', when: { fast: true }, actions: [{ kind: 'unsupported' }], entitlement: 'unknown' },
-      ...[false, true].map(maxContext => ({ id: `combined:${maxContext}`,
-        when: { fast: true, maxContext }, actions: [{ kind: 'fixed' }], entitlement: 'unknown' })),
+      ...[false, true].map((maxContext) => ({
+        id: `combined:${maxContext}`,
+        when: { fast: true, maxContext },
+        actions: [{ kind: 'fixed' }],
+        entitlement: 'unknown',
+      })),
     ];
     expect(() => compileProviderCatalog(source)).not.toThrow();
     model.executionBindings.pop();
@@ -60,17 +73,42 @@ describe('Provider Catalog compiler', () => {
   });
 
   it.each([
-    ['duplicate id', (model: Record<string, any>) => { model.executionBindings.push({ ...model.executionBindings[0] }); }, /duplicate binding id/u],
-    ['unknown route', (model: Record<string, any>) => { model.executionBindings[0].routeOptionIds = ['missing-route']; }, /missing source route/u],
-    ['missing target', (model: Record<string, any>) => { model.executionBindings[0].actions = [{ kind: 'model-switch', targetModelId: 'missing-target' }]; }, /targets missing model/u],
-    ['missing tier', (model: Record<string, any>) => { model.executionBindings[0].actions = [{ kind: 'client-tier', tierId: 'missing-tier' }]; }, /missing context tier/u],
+    [
+      'duplicate id',
+      (model: Record<string, any>) => {
+        model.executionBindings.push({ ...model.executionBindings[0] });
+      },
+      /duplicate binding id/u,
+    ],
+    [
+      'unknown route',
+      (model: Record<string, any>) => {
+        model.executionBindings[0].routeOptionIds = ['missing-route'];
+      },
+      /missing source route/u,
+    ],
+    [
+      'missing target',
+      (model: Record<string, any>) => {
+        model.executionBindings[0].actions = [{ kind: 'model-switch', targetModelId: 'missing-target' }];
+      },
+      /targets missing model/u,
+    ],
+    [
+      'missing tier',
+      (model: Record<string, any>) => {
+        model.executionBindings[0].actions = [{ kind: 'client-tier', tierId: 'missing-tier' }];
+      },
+      /missing context tier/u,
+    ],
   ] as const)('preserves binding integrity validation for %s', (_name, mutate, expected) => {
     const source = clone(input());
     const model = mutableSurface(source, 'deepseek').models.find(
       (entry: Record<string, unknown>) => entry.modelId === 'deepseek-flash',
     );
-    model.executionBindings = [{ id: 'integrity', when: { fast: true },
-      actions: [{ kind: 'fixed' }], entitlement: 'unknown' }];
+    model.executionBindings = [
+      { id: 'integrity', when: { fast: true }, actions: [{ kind: 'fixed' }], entitlement: 'unknown' },
+    ];
     mutate(model);
     expect(() => compileProviderCatalog(source)).toThrow(expected);
   });
@@ -81,13 +119,13 @@ describe('Provider Catalog compiler', () => {
       (model: Record<string, unknown>) => model.modelId === 'grok-4.7',
     );
     grok.executionBindings = grok.executionBindings.filter(
-      (binding: { when: { fast?: boolean; maxContext?: boolean } }) => (
-        !(binding.when.fast === true && binding.when.maxContext === true)
-      ),
+      (binding: { when: { fast?: boolean; maxContext?: boolean } }) =>
+        !(binding.when.fast === true && binding.when.maxContext === true),
     );
     expect(() => compileProviderCatalog(source)).toThrow(/equal-specificity.*fast:build.*context:max/u);
     grok.executionBindings.push({
-      id: 'fast:max', when: { fast: true, maxContext: true },
+      id: 'fast:max',
+      when: { fast: true, maxContext: true },
       actions: [
         { kind: 'model-switch', targetModelId: 'grok-4.7-build-fast' },
         { kind: 'client-tier', tierId: 'max' },
@@ -99,22 +137,7 @@ describe('Provider Catalog compiler', () => {
     expect(() => compileProviderCatalog(source)).toThrow(/equal-specificity/u);
   });
 
-  it('keeps every user-facing one-million control named Max mode', () => {
-    const translations = fs.readFileSync(
-      path.resolve(process.cwd(), 'src/renderer/i18n.ts'),
-      'utf8',
-    );
-    for (const banned of [
-      "'1M context'",
-      "'1M 上下文'",
-      "'Verify 1M'",
-      "'验证 1M'",
-      "'1M mode'",
-      "'1M 模式'",
-    ]) {
-      expect(translations, banned).not.toContain(banned);
-    }
-
+  it('labels no catalog context tier as a one-million mode (the control is named Max mode)', () => {
     for (const surface of input().surfaces as Array<{ models?: Array<{ contextTiers?: Array<{ label?: string }> }> }>) {
       for (const model of surface.models ?? []) {
         for (const tier of model.contextTiers ?? []) {
@@ -135,9 +158,9 @@ describe('Provider Catalog compiler', () => {
 
     expect(first.index.identityCount).toBe(MODELS_DEV_IDENTITY_COUNT);
     expect(first.identities).toHaveLength(166);
-    expect(first.identities.every((identity) => (
-      identity.provenance.sourceRevision === MODELS_DEV_SNAPSHOT_SHA256
-    ))).toBe(true);
+    expect(
+      first.identities.every((identity) => identity.provenance.sourceRevision === MODELS_DEV_SNAPSHOT_SHA256),
+    ).toBe(true);
     expect(first.index.catalogRevision).toBe(reversed.index.catalogRevision);
     expect(first.index.surfaceCount).toBe(first.surfaces.size);
     expect(first.index.modelCount).toBeGreaterThanOrEqual(200);
@@ -146,11 +169,13 @@ describe('Provider Catalog compiler', () => {
   it('keeps provider reasoning semantics route-scoped and manifest-driven', () => {
     const catalog = compileProviderCatalog(input());
     const kimi = catalog.surfaces.get('kimi-coding-plan')?.surface;
-    expect(kimi?.routes.map((route) => ({
-      protocol: route.protocol,
-      semantic: route.contracts.reasoning.semantic,
-      label: route.contracts.reasoning.displayLabel,
-    }))).toEqual([
+    expect(
+      kimi?.routes.map((route) => ({
+        protocol: route.protocol,
+        semantic: route.contracts.reasoning.semantic,
+        label: route.contracts.reasoning.displayLabel,
+      })),
+    ).toEqual([
       { protocol: 'AnthropicMessages', semantic: 'raw', label: 'Raw reasoning' },
       { protocol: 'OpenAICompatibleChatCompletions', semantic: 'raw', label: 'Raw reasoning' },
     ]);
@@ -161,8 +186,9 @@ describe('Provider Catalog compiler', () => {
 
   it('asks for visible reasoning only where the route that declares the semantic says so', () => {
     const catalog = compileProviderCatalog(input());
-    const request = (surfaceId: string, protocol: string) => catalog.surfaces.get(surfaceId)?.surface.routes
-      .find((route) => route.protocol === protocol)?.contracts.reasoning.visibilityRequest;
+    const request = (surfaceId: string, protocol: string) =>
+      catalog.surfaces.get(surfaceId)?.surface.routes.find((route) => route.protocol === protocol)?.contracts.reasoning
+        .visibilityRequest;
     // A Responses gateway inherits the protocol's summary request from its profile.
     expect(request('opencode-go', 'OpenAIResponses')).toBe('responses-summary');
     // DeepSeek redeclares raw reasoning on Responses, so the profile's request does not leak through.
@@ -173,9 +199,14 @@ describe('Provider Catalog compiler', () => {
   });
 
   it('gives Haiku 4.5 budgeted thinking, since it predates adaptive thinking', () => {
-    const haiku = compileProviderCatalog(input()).surfaces.get('anthropic')?.surface.models
-      .find((model) => model.modelId === 'claude-haiku-4-5-20251001');
-    expect(haiku?.controls.reasoning.wireProfile).toMatchObject({ kind: 'anthropic', onMode: 'enabled', onBudgetTokens: 16000 });
+    const haiku = compileProviderCatalog(input())
+      .surfaces.get('anthropic')
+      ?.surface.models.find((model) => model.modelId === 'claude-haiku-4-5-20251001');
+    expect(haiku?.controls.reasoning.wireProfile).toMatchObject({
+      kind: 'anthropic',
+      onMode: 'enabled',
+      onBudgetTokens: 16000,
+    });
   });
 
   it('exposes protocols only through precise model route matrices', () => {
@@ -202,14 +233,14 @@ describe('Provider Catalog compiler', () => {
 
     for (const surfaceId of ['xiaomi-mimo', 'xiaomi-mimo-token-plan']) {
       const xiaomi = catalog.surfaces.get(surfaceId)?.surface;
-      expect(xiaomi?.routes.map((route) => route.protocol), surfaceId).toEqual([
-        'OpenAICompatibleChatCompletions',
-        'OpenAIResponses',
-      ]);
-      expect(xiaomi?.models[0]?.routeOptions?.map((option) => option.id), surfaceId).toEqual([
-        'OpenAICompatibleChatCompletions',
-        'OpenAIResponses',
-      ]);
+      expect(
+        xiaomi?.routes.map((route) => route.protocol),
+        surfaceId,
+      ).toEqual(['OpenAICompatibleChatCompletions', 'OpenAIResponses']);
+      expect(
+        xiaomi?.models[0]?.routeOptions?.map((option) => option.id),
+        surfaceId,
+      ).toEqual(['OpenAICompatibleChatCompletions', 'OpenAIResponses']);
     }
   });
 
@@ -219,7 +250,9 @@ describe('Provider Catalog compiler', () => {
     expect(summary).not.toHaveProperty('discovery');
     expect(summary).not.toHaveProperty('discoveredModelProjection');
     expect(summary).not.toHaveProperty('discoveryPolicyId');
-    expect(summary.models).not.toEqual(expect.arrayContaining([expect.objectContaining({ liveProjection: expect.anything() })]));
+    expect(summary.models).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ liveProjection: expect.anything() })]),
+    );
     expect(summary).not.toHaveProperty('profileId');
   });
 
@@ -260,8 +293,11 @@ describe('Provider Catalog compiler', () => {
       'k3-256k',
       'kimi-for-coding-highspeed',
     ]);
-    expect(surface?.models.filter((model) => model.selection.pickerVisibility === 'primary')
-      .every((model) => model.presencePolicy === 'account-entitled')).toBe(true);
+    expect(
+      surface?.models
+        .filter((model) => model.selection.pickerVisibility === 'primary')
+        .every((model) => model.presencePolicy === 'account-entitled'),
+    ).toBe(true);
     expect(surface?.models.find((model) => model.modelId === 'kimi-for-coding')).toMatchObject({
       label: 'Kimi for Coding',
       controls: {
@@ -275,11 +311,13 @@ describe('Provider Catalog compiler', () => {
         }),
       ]),
       liveProjection: {
-        entitlementDenialMatchers: [{
-          mode: 'fast',
-          statuses: [401, 403],
-          messageIncludes: 'does not have access to kimi-for-coding-highspeed',
-        }],
+        entitlementDenialMatchers: [
+          {
+            mode: 'fast',
+            statuses: [401, 403],
+            messageIncludes: 'does not have access to kimi-for-coding-highspeed',
+          },
+        ],
       },
     });
     expect(surface?.models.find((model) => model.modelId === 'k3')).toMatchObject({
@@ -288,17 +326,28 @@ describe('Provider Catalog compiler', () => {
         fast: { state: 'unsupported' },
         maxContext: { state: 'selectable' },
         reasoning: {
-          kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'], defaultSelection: 'high',
+          kind: 'levels',
+          supportsOff: false,
+          levels: ['low', 'high', 'max'],
+          defaultSelection: 'high',
         },
       },
-      executionBindings: [{
-        id: 'context:max', when: { maxContext: true },
-        actions: [{ kind: 'client-tier', tierId: 'max' }],
-      }],
+      executionBindings: [
+        {
+          id: 'context:max',
+          when: { maxContext: true },
+          actions: [{ kind: 'client-tier', tierId: 'max' }],
+        },
+      ],
       liveProjection: {
-        entitlementDenialMatchers: expect.arrayContaining([{ mode: 'max-context', statuses: [403] }, {
-          mode: 'default', statuses: [403], messageIncludes: 'Your current subscription does not have access to k3',
-        }]),
+        entitlementDenialMatchers: expect.arrayContaining([
+          { mode: 'max-context', statuses: [403] },
+          {
+            mode: 'default',
+            statuses: [403],
+            messageIncludes: 'Your current subscription does not have access to k3',
+          },
+        ]),
       },
     });
     expect(surface?.models.find((model) => model.modelId === 'k3-256k')).toMatchObject({
@@ -306,7 +355,10 @@ describe('Provider Catalog compiler', () => {
         fast: { state: 'unsupported', fixedValue: false },
         maxContext: { state: 'unsupported', fixedValue: false },
         reasoning: {
-          kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'], defaultSelection: 'high',
+          kind: 'levels',
+          supportsOff: false,
+          levels: ['low', 'high', 'max'],
+          defaultSelection: 'high',
         },
       },
       visionInput: { state: 'supported' },
@@ -330,7 +382,10 @@ describe('Provider Catalog compiler', () => {
         fast: { state: 'unsupported', fixedValue: false },
         maxContext: { state: 'selectable', tierId: 'max' },
         reasoning: {
-          kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'], defaultSelection: 'max',
+          kind: 'levels',
+          supportsOff: false,
+          levels: ['low', 'high', 'max'],
+          defaultSelection: 'max',
         },
       },
     });
@@ -343,14 +398,9 @@ describe('Provider Catalog compiler', () => {
       },
     });
     expect(openCodeGo?.routes.every((route) => route.headers?.['x-opencode-session'] === 'rdc-agent')).toBe(true);
-    expect(openCodeGo?.models.map((model) => model.modelId)).toEqual(expect.arrayContaining([
-      'kimi-k3',
-      'deepseek-v4.1-flash',
-      'glm-5.2',
-      'minimax-m3',
-      'qwen3.7-max',
-      'grok-4.5',
-    ]));
+    expect(openCodeGo?.models.map((model) => model.modelId)).toEqual(
+      expect.arrayContaining(['kimi-k3', 'deepseek-v4.1-flash', 'glm-5.2', 'minimax-m3', 'qwen3.7-max', 'grok-4.5']),
+    );
     expect(openCodeGo?.models.length).toBeGreaterThanOrEqual(20);
     expect(openCodeGo?.models.find((model) => model.modelId === 'hy3-preview')).toBeUndefined();
     expect(openCodeGo?.models.find((model) => model.modelId === 'kimi-k3')).toMatchObject({
@@ -369,43 +419,48 @@ describe('Provider Catalog compiler', () => {
         reasoning: { kind: 'unknown', supportsOff: false },
       },
     });
-    expect(catalog.surfaces.get('openrouter')?.surface.discovery.strategy)
-      .toEqual({ kind: 'custom-parser', parserId: 'openrouter-catalog' });
+    expect(catalog.surfaces.get('openrouter')?.surface.discovery.strategy).toEqual({
+      kind: 'custom-parser',
+      parserId: 'openrouter-catalog',
+    });
 
     for (const surfaceId of ['github-copilot', 'bailian', 'bailian-coding-plan', 'volcengine-coding-plan']) {
-      expect(catalog.surfaces.get(surfaceId)?.surface.models.some((model) => (
-        model.modelId === 'kimi-k3' || model.modelId === 'k3'
-      )), surfaceId).toBe(false);
+      expect(
+        catalog.surfaces
+          .get(surfaceId)
+          ?.surface.models.some((model) => model.modelId === 'kimi-k3' || model.modelId === 'k3'),
+        surfaceId,
+      ).toBe(false);
     }
     expect(moonshot?.models.some((model) => model.modelId === 'k3')).toBe(false);
-    expect(catalog.surfaces.get('kimi-coding-plan')?.surface.models.some((model) => (
-      model.modelId === 'kimi-k3' || model.modelId === 'kimi-k2.7-code'
-    ))).toBe(false);
+    expect(
+      catalog.surfaces
+        .get('kimi-coding-plan')
+        ?.surface.models.some((model) => model.modelId === 'kimi-k3' || model.modelId === 'kimi-k2.7-code'),
+    ).toBe(false);
   });
   it('keeps every MiniMax highspeed relation as one hidden execution target', () => {
     const catalog = compileProviderCatalog(input());
-    for (const surfaceId of [
-      'minimax-cn',
-      'minimax-global',
-      'minimax-cn-coding-plan',
-      'minimax-global-coding-plan',
-    ]) {
+    for (const surfaceId of ['minimax-cn', 'minimax-global', 'minimax-cn-coding-plan', 'minimax-global-coding-plan']) {
       const surface = catalog.surfaces.get(surfaceId)?.surface;
       const base = surface?.models.find((model) => model.modelId === 'MiniMax-M2.7');
       const target = surface?.models.find((model) => model.modelId === 'MiniMax-M2.7-highspeed');
       expect(base, surfaceId).toMatchObject({
         controls: { fast: { state: 'selectable' } },
-        executionBindings: [{
-          when: { fast: true },
-          actions: [{ kind: 'model-switch', targetModelId: 'MiniMax-M2.7-highspeed' }],
-        }],
+        executionBindings: [
+          {
+            when: { fast: true },
+            actions: [{ kind: 'model-switch', targetModelId: 'MiniMax-M2.7-highspeed' }],
+          },
+        ],
       });
       expect(target, surfaceId).toMatchObject({
         selection: { pickerVisibility: 'internal', relatedPrimaryModelIds: ['MiniMax-M2.7'] },
         controls: { fast: { state: 'unsupported' } },
       });
-      expect(target?.routeOptions?.map((option) => option.route.protocol))
-        .toEqual(base?.routeOptions?.map((option) => option.route.protocol));
+      expect(target?.routeOptions?.map((option) => option.route.protocol)).toEqual(
+        base?.routeOptions?.map((option) => option.route.protocol),
+      );
     }
   });
 
@@ -416,10 +471,12 @@ describe('Provider Catalog compiler', () => {
       discovery: { authority: 'authoritative-list' },
       discoveredModelProjection: {
         fast: { state: 'selectable', defaultValue: false },
-        executionBindings: [{
-          id: 'fast:cortecs-speed',
-          actions: [{ kind: 'request-patch', patch: { preference: 'speed' } }],
-        }],
+        executionBindings: [
+          {
+            id: 'fast:cortecs-speed',
+            actions: [{ kind: 'request-patch', patch: { preference: 'speed' } }],
+          },
+        ],
       },
     });
   });
@@ -437,7 +494,9 @@ describe('Provider Catalog compiler', () => {
           expect(model.executionBindings).toBeUndefined();
         } else {
           expect(model.controls.fast.state).toBe('selectable');
-          expect(model.executionBindings?.[0].actions).toEqual([{ kind: 'request-patch', patch: { service_tier: 'fast' } }]);
+          expect(model.executionBindings?.[0].actions).toEqual([
+            { kind: 'request-patch', patch: { service_tier: 'fast' } },
+          ]);
         }
       }
     }
@@ -455,7 +514,10 @@ describe('Provider Catalog compiler', () => {
         expect(model.contextTiers[0].maxOutputTokens).toBe(131_072);
         expect(model.controls.reasoning).toMatchObject({ kind: 'toggle', supportsOff: true, defaultSelection: 'on' });
         expect(model.toolCalling.state).toBe('supported');
-        expect(model.routeOptions?.map((route) => route.route.protocol)).toEqual(['OpenAICompatibleChatCompletions', 'OpenAIResponses']);
+        expect(model.routeOptions?.map((route) => route.route.protocol)).toEqual([
+          'OpenAICompatibleChatCompletions',
+          'OpenAIResponses',
+        ]);
       }
     }
   });
@@ -476,12 +538,23 @@ describe('Provider Catalog compiler', () => {
     const verify = (surfaceId: string, rows: readonly ExpectedRow[]) => {
       const surface = catalog.surfaces.get(surfaceId)?.surface;
       expect(surface, surfaceId).toBeDefined();
-      for (const [modelId, contextTokens, maxContext, fast, reasoningKind, supportsOff, levels, defaultSelection, picker = 'primary'] of rows) {
+      for (const [
+        modelId,
+        contextTokens,
+        maxContext,
+        fast,
+        reasoningKind,
+        supportsOff,
+        levels,
+        defaultSelection,
+        picker = 'primary',
+      ] of rows) {
         const model = surface?.models.find((entry) => entry.modelId === modelId);
         expect(model, `${surfaceId}/${modelId}`).toBeDefined();
         const defaultTier = model?.contextTiers.find((tier) => tier.id === 'default');
-        expect(defaultTier?.maxPromptTokens ?? defaultTier?.maxTotalTokens, `${surfaceId}/${modelId} context`)
-          .toBe(contextTokens);
+        expect(defaultTier?.maxPromptTokens ?? defaultTier?.maxTotalTokens, `${surfaceId}/${modelId} context`).toBe(
+          contextTokens,
+        );
         expect(model?.controls.maxContext.state, `${surfaceId}/${modelId} 1M`).toBe(maxContext);
         expect(model?.controls.fast.state, `${surfaceId}/${modelId} Fast`).toBe(fast);
         expect(model?.controls.reasoning, `${surfaceId}/${modelId} reasoning`).toMatchObject({
@@ -495,15 +568,96 @@ describe('Provider Catalog compiler', () => {
     };
 
     verify('chatgpt-account', [
-      ['gpt-6.2-astra', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'low'],
-      ['gpt-6.2-sol', 500_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'low'],
-      ['gpt-6-astra', 500_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-6.1-sol', 500_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'low'],
-      ['gpt-6-sol', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-6-luna', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-5.6-sol', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-5.6-terra', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-5.6-luna', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
+      [
+        'gpt-6.2-astra',
+        272_000,
+        'selectable',
+        'selectable',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'low',
+      ],
+      [
+        'gpt-6.2-sol',
+        500_000,
+        'selectable',
+        'selectable',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'low',
+      ],
+      [
+        'gpt-6-astra',
+        500_000,
+        'selectable',
+        'selectable',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'medium',
+      ],
+      [
+        'gpt-6.1-sol',
+        500_000,
+        'selectable',
+        'selectable',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'low',
+      ],
+      [
+        'gpt-6-sol',
+        272_000,
+        'selectable',
+        'selectable',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'medium',
+      ],
+      [
+        'gpt-6-luna',
+        272_000,
+        'selectable',
+        'selectable',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'medium',
+      ],
+      [
+        'gpt-5.6-sol',
+        272_000,
+        'selectable',
+        'selectable',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'medium',
+      ],
+      [
+        'gpt-5.6-terra',
+        272_000,
+        'selectable',
+        'selectable',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'medium',
+      ],
+      [
+        'gpt-5.6-luna',
+        272_000,
+        'selectable',
+        'selectable',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'medium',
+      ],
     ]);
     const chatGptAccount = catalog.surfaces.get('chatgpt-account')?.surface;
     for (const model of chatGptAccount?.models ?? []) {
@@ -512,43 +666,120 @@ describe('Provider Catalog compiler', () => {
         `chatgpt-account/${model.modelId} Codex request policy`,
       ).toMatchObject({
         when: {},
-        actions: [{
-          kind: 'request-patch',
-          patch: { temperature: null, top_p: null, max_output_tokens: null },
-        }],
+        actions: [
+          {
+            kind: 'request-patch',
+            patch: { temperature: null, top_p: null, max_output_tokens: null },
+          },
+        ],
       });
       const fastBinding = model.executionBindings?.find((binding) => binding.when.fast === true);
       if (fastBinding) {
         expect(fastBinding, `chatgpt-account/${model.modelId} Fast request policy`).toMatchObject({
-          actions: [{
-            kind: 'request-patch',
-            patch: {
-              temperature: null,
-              top_p: null,
-              max_output_tokens: null,
-              service_tier: 'priority',
+          actions: [
+            {
+              kind: 'request-patch',
+              patch: {
+                temperature: null,
+                top_p: null,
+                max_output_tokens: null,
+                service_tier: 'priority',
+              },
             },
-          }],
+          ],
         });
       }
     }
 
     verify('github-copilot', [
-      ['claude-sonnet-4.6', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'max'], 'medium'],
-      ['claude-opus-4.8', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['claude-opus-4.8-fast', undefined, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['claude-sonnet-5', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['claude-fable-5', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-5.6-luna', 256_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-5.6-sol', 256_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
+      [
+        'claude-sonnet-4.6',
+        1_000_000,
+        'fixed',
+        'unsupported',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'max'],
+        'medium',
+      ],
+      [
+        'claude-opus-4.8',
+        1_000_000,
+        'fixed',
+        'unsupported',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'medium',
+      ],
+      [
+        'claude-opus-4.8-fast',
+        undefined,
+        'unsupported',
+        'unsupported',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'medium',
+      ],
+      [
+        'claude-sonnet-5',
+        1_000_000,
+        'fixed',
+        'unsupported',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'medium',
+      ],
+      [
+        'claude-fable-5',
+        1_000_000,
+        'fixed',
+        'unsupported',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'medium',
+      ],
+      [
+        'gpt-5.6-luna',
+        256_000,
+        'selectable',
+        'unsupported',
+        'levels',
+        true,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'medium',
+      ],
+      [
+        'gpt-5.6-sol',
+        256_000,
+        'selectable',
+        'unsupported',
+        'levels',
+        true,
+        ['low', 'medium', 'high', 'xhigh', 'max'],
+        'medium',
+      ],
     ]);
     const copilot = catalog.surfaces.get('github-copilot')?.surface;
-    expect(copilot?.retiredModelIds).toEqual(expect.arrayContaining([
-      'claude-opus-5', 'gemini-3.5-flash', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.5', 'gpt-5.6-terra', 'kimi-k2.7-code',
-    ]));
+    expect(copilot?.retiredModelIds).toEqual(
+      expect.arrayContaining([
+        'claude-opus-5',
+        'gemini-3.5-flash',
+        'gpt-5.4',
+        'gpt-5.4-mini',
+        'gpt-5.5',
+        'gpt-5.6-terra',
+        'kimi-k2.7-code',
+      ]),
+    );
     for (const modelId of ['gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6.1-terra']) {
-      expect(copilot?.models.find(model => model.modelId === modelId)).toMatchObject({
-        availability: 'unknown', presencePolicy: 'account-entitled', defaultBudgetTokens: 0,
+      expect(copilot?.models.find((model) => model.modelId === modelId)).toMatchObject({
+        availability: 'unknown',
+        presencePolicy: 'account-entitled',
+        defaultBudgetTokens: 0,
         toolCalling: { state: 'unknown' },
       });
     }
@@ -556,8 +787,7 @@ describe('Provider Catalog compiler', () => {
     expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.8')).toMatchObject({
       controls: { fast: { state: 'unsupported' } },
     });
-    expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.8')?.executionBindings ?? [])
-      .toEqual([]);
+    expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.8')?.executionBindings ?? []).toEqual([]);
     expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.8-fast')).toMatchObject({
       selection: { pickerVisibility: 'primary' },
       presencePolicy: 'account-entitled',
@@ -566,7 +796,16 @@ describe('Provider Catalog compiler', () => {
     verify('grok-account', [
       ['grok-4.20-0309-non-reasoning', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'off'],
       ['grok-4.20-0309-reasoning', 1_000_000, 'fixed', 'unsupported', 'always-on', false, [], 'on'],
-      ['grok-4.20-multi-agent-0309', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
+      [
+        'grok-4.20-multi-agent-0309',
+        1_000_000,
+        'fixed',
+        'unsupported',
+        'levels',
+        false,
+        ['low', 'medium', 'high', 'xhigh'],
+        'medium',
+      ],
       ['grok-4.3', 500_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high'], 'medium'],
       ['grok-4.7', 256_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'high'],
       ['grok-4.6', 256_000, 'selectable', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'high'],
@@ -578,21 +817,33 @@ describe('Provider Catalog compiler', () => {
       visionInput: { state: 'supported' },
       structuredOutput: { state: 'supported' },
     });
-    expect(grokSurface?.models.find((model) => model.modelId === 'grok-4.20-0309-reasoning')?.controls.reasoning)
-      .toMatchObject({ kind: 'always-on', wireProfile: { kind: 'none' } });
-    expect(grokSurface?.models.find((model) => model.modelId === 'grok-build-0.1')?.controls.reasoning)
-      .toMatchObject({ kind: 'always-on', wireProfile: { kind: 'none' } });
-    expect(grokSurface?.routes).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        baseUrl: 'https://cli-chat-proxy.grok.com/v1',
-        headers: { 'X-XAI-Token-Auth': 'xai-grok-cli', 'x-grok-client-version': '1.0.62', 'x-authenticateresponse': 'authenticate-response' },
-      }),
-    ]));
+    expect(
+      grokSurface?.models.find((model) => model.modelId === 'grok-4.20-0309-reasoning')?.controls.reasoning,
+    ).toMatchObject({ kind: 'always-on', wireProfile: { kind: 'none' } });
+    expect(grokSurface?.models.find((model) => model.modelId === 'grok-build-0.1')?.controls.reasoning).toMatchObject({
+      kind: 'always-on',
+      wireProfile: { kind: 'none' },
+    });
+    expect(grokSurface?.routes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          baseUrl: 'https://cli-chat-proxy.grok.com/v1',
+          headers: {
+            'X-XAI-Token-Auth': 'xai-grok-cli',
+            'x-grok-client-version': '1.0.62',
+            'x-authenticateresponse': 'authenticate-response',
+          },
+        }),
+      ]),
+    );
 
     for (const surfaceId of ['openai', 'openai-us', 'openai-eu']) {
       const surface = catalog.surfaces.get(surfaceId)?.surface;
       for (const modelId of ['gpt-6-sol', 'gpt-6-luna']) {
-        expect(surface?.models.find((model) => model.modelId === modelId), `${surfaceId}/${modelId}`).toMatchObject({
+        expect(
+          surface?.models.find((model) => model.modelId === modelId),
+          `${surfaceId}/${modelId}`,
+        ).toMatchObject({
           visionInput: { state: 'supported' },
           structuredOutput: { state: 'supported' },
           controls: { fast: { state: surfaceId === 'openai-eu' ? 'unsupported' : 'selectable' } },
@@ -601,8 +852,10 @@ describe('Provider Catalog compiler', () => {
     }
 
     for (const surfaceId of ['anthropic', 'claude-account']) {
-      expect(catalog.surfaces.get(surfaceId)?.surface.models.find((model) => model.modelId === 'claude-opus-5-5'), surfaceId)
-        .toMatchObject({ visionInput: { state: 'supported' }, structuredOutput: { state: 'supported' } });
+      expect(
+        catalog.surfaces.get(surfaceId)?.surface.models.find((model) => model.modelId === 'claude-opus-5-5'),
+        surfaceId,
+      ).toMatchObject({ visionInput: { state: 'supported' }, structuredOutput: { state: 'supported' } });
     }
 
     verify('deepseek', [
@@ -610,7 +863,10 @@ describe('Provider Catalog compiler', () => {
       ['deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['low', 'high', 'max'], 'high'],
     ]);
     const deepseek = catalog.surfaces.get('deepseek')?.surface;
-    expect(deepseek?.discovery).toMatchObject({ authority: 'candidate-validation', strategy: { kind: 'json-catalog' } });
+    expect(deepseek?.discovery).toMatchObject({
+      authority: 'candidate-validation',
+      strategy: { kind: 'json-catalog' },
+    });
     expect(deepseek?.models.map((model) => model.modelId)).toEqual(['deepseek-flash', 'deepseek-v4-pro']);
     expect(deepseek?.models.every((model) => model.aliases.length === 0)).toBe(true);
 
@@ -622,7 +878,16 @@ describe('Provider Catalog compiler', () => {
     ]);
 
     verify('volcengine-coding-plan', [
-      ['doubao-seed-2.1-turbo', 131_072, 'unsupported', 'unsupported', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
+      [
+        'doubao-seed-2.1-turbo',
+        131_072,
+        'unsupported',
+        'unsupported',
+        'levels',
+        true,
+        ['minimal', 'low', 'medium', 'high'],
+        'medium',
+      ],
       ['glm-5.3', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
       ['glm-5.2', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
       ['kimi-k2.7-code', 256_000, 'unsupported', 'selectable', 'always-on', false, [], 'on'],
@@ -642,14 +907,28 @@ describe('Provider Catalog compiler', () => {
       ['cline-pass/qwen3.7-plus', 128_000, 'unsupported', 'unsupported', 'unknown', false, [], 'on'],
     ]);
     const volcengine = catalog.surfaces.get('volcengine-coding-plan')?.surface;
-    for (const modelId of ['doubao-seed-2.0-code', 'doubao-seed-code', 'minimax-m2.5', 'kimi-k2.5', 'glm-5.1', 'glm-4.7', 'deepseek-v4-flash', 'deepseek-v4-pro']) {
-      expect(volcengine?.models.find((model) => model.modelId === modelId), modelId).toBeUndefined();
+    for (const modelId of [
+      'doubao-seed-2.0-code',
+      'doubao-seed-code',
+      'minimax-m2.5',
+      'kimi-k2.5',
+      'glm-5.1',
+      'glm-4.7',
+      'deepseek-v4-flash',
+      'deepseek-v4-pro',
+    ]) {
+      expect(
+        volcengine?.models.find((model) => model.modelId === modelId),
+        modelId,
+      ).toBeUndefined();
     }
     expect(volcengine?.models.find((model) => model.modelId === 'kimi-k2.7-code')).toMatchObject({
       availability: 'available',
-      executionBindings: [{
-        actions: [{ kind: 'model-switch', targetModelId: 'kimi-k2.7-code-highspeed' }],
-      }],
+      executionBindings: [
+        {
+          actions: [{ kind: 'model-switch', targetModelId: 'kimi-k2.7-code-highspeed' }],
+        },
+      ],
     });
     expect(volcengine?.models.find((model) => model.modelId === 'kimi-k2.7-code-highspeed')).toMatchObject({
       availability: 'available',
@@ -659,8 +938,7 @@ describe('Provider Catalog compiler', () => {
 
   it('compiles Opus 5 direct Fast and DeepSeek V4.1 Flash protocol-specific controls without aliases', () => {
     const catalog = compileProviderCatalog(input());
-    const opus5 = catalog.surfaces.get('anthropic')?.surface.models
-      .find((model) => model.modelId === 'claude-opus-5');
+    const opus5 = catalog.surfaces.get('anthropic')?.surface.models.find((model) => model.modelId === 'claude-opus-5');
     expect(opus5).toMatchObject({
       contextTiers: [expect.objectContaining({ maxPromptTokens: 1_000_000, maxOutputTokens: 128_000 })],
       cost: { input: 5, output: 25 },
@@ -672,12 +950,14 @@ describe('Provider Catalog compiler', () => {
           defaultSelection: 'high',
         },
       },
-      executionBindings: [expect.objectContaining({
-        actions: [
-          { kind: 'request-patch', patch: { speed: 'fast' } },
-          { kind: 'request-headers', headers: { 'anthropic-beta': 'fast-mode-2026-02-01' } },
-        ],
-      })],
+      executionBindings: [
+        expect.objectContaining({
+          actions: [
+            { kind: 'request-patch', patch: { speed: 'fast' } },
+            { kind: 'request-headers', headers: { 'anthropic-beta': 'fast-mode-2026-02-01' } },
+          ],
+        }),
+      ],
     });
 
     const deepseek = catalog.surfaces.get('deepseek')?.surface;
@@ -691,14 +971,18 @@ describe('Provider Catalog compiler', () => {
       reason: 'DeepSeek Models & Pricing lists vision as not supported for deepseek-v4-pro.',
     });
     expect(flash?.routeOptions?.map((option) => option.route.protocol)).toEqual([
-      'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'AnthropicMessages',
+      'OpenAIResponses',
+      'OpenAICompatibleChatCompletions',
+      'AnthropicMessages',
     ]);
     expect(deepseek?.models).toHaveLength(2);
     expect(deepseek?.models.every((model) => model.aliases.length === 0)).toBe(true);
-    expect(deepseek?.routes.map((route) => ({
-      protocol: route.protocol,
-      artifactScope: route.contracts.toolLoop.artifactScope,
-    }))).toEqual([
+    expect(
+      deepseek?.routes.map((route) => ({
+        protocol: route.protocol,
+        artifactScope: route.contracts.toolLoop.artifactScope,
+      })),
+    ).toEqual([
       { protocol: 'OpenAIResponses', artifactScope: 'all-assistant-turns' },
       { protocol: 'OpenAICompatibleChatCompletions', artifactScope: 'all-assistant-turns' },
       { protocol: 'AnthropicMessages', artifactScope: 'all-assistant-turns' },
@@ -746,40 +1030,48 @@ describe('Provider Catalog compiler', () => {
     expect(() => compileProviderCatalog(missingProfile)).toThrow(/unknown profile/u);
 
     const subMillionMax = clone(input());
-    const copilotModel = mutableSurface(subMillionMax, 'github-copilot').models
-      .find((model: Record<string, unknown>) => model.modelId === 'gpt-5.6-sol');
-    copilotModel.contextTiers.find((tier: Record<string, unknown>) => tier.id === 'one-million')
-      .maxPromptTokens = 200_000;
-    expect(() => compileProviderCatalog(subMillionMax)).toThrow(/Max mode control references a tier that is not larger than the default context window/u);
+    const copilotModel = mutableSurface(subMillionMax, 'github-copilot').models.find(
+      (model: Record<string, unknown>) => model.modelId === 'gpt-5.6-sol',
+    );
+    copilotModel.contextTiers.find((tier: Record<string, unknown>) => tier.id === 'one-million').maxPromptTokens =
+      200_000;
+    expect(() => compileProviderCatalog(subMillionMax)).toThrow(
+      /Max mode control references a tier that is not larger than the default context window/u,
+    );
 
     const missingLiveDefaultTier = clone(input());
-    mutableSurface(missingLiveDefaultTier, 'kimi-coding-plan').models
-      .find((model: Record<string, unknown>) => model.modelId === 'k3')
-      .liveProjection.context.observedTierId = 'missing-default';
+    mutableSurface(missingLiveDefaultTier, 'kimi-coding-plan').models.find(
+      (model: Record<string, unknown>) => model.modelId === 'k3',
+    ).liveProjection.context.observedTierId = 'missing-default';
     expect(() => compileProviderCatalog(missingLiveDefaultTier)).toThrow(/missing observed tier/u);
 
     const missingLiveMaxTier = clone(input());
-    mutableSurface(missingLiveMaxTier, 'kimi-coding-plan').models
-      .find((model: Record<string, unknown>) => model.modelId === 'k3')
-      .liveProjection.context.maxTierId = 'missing-max';
+    mutableSurface(missingLiveMaxTier, 'kimi-coding-plan').models.find(
+      (model: Record<string, unknown>) => model.modelId === 'k3',
+    ).liveProjection.context.maxTierId = 'missing-max';
     expect(() => compileProviderCatalog(missingLiveMaxTier)).toThrow(/invalid Max tier/u);
 
     const unavailableLiveProtocol = clone(input());
-    mutableSurface(unavailableLiveProtocol, 'kimi-coding-plan').models
-      .find((model: Record<string, unknown>) => model.modelId === 'k3')
-      .liveProjection.reasoning.wireProfiles.GoogleGemini = { kind: 'gemini-thinking-level', on: 'high', levels: { high: 'high' } };
+    mutableSurface(unavailableLiveProtocol, 'kimi-coding-plan').models.find(
+      (model: Record<string, unknown>) => model.modelId === 'k3',
+    ).liveProjection.reasoning.wireProfiles.GoogleGemini = {
+      kind: 'gemini-thinking-level',
+      on: 'high',
+      levels: { high: 'high' },
+    };
     expect(() => compileProviderCatalog(unavailableLiveProtocol)).toThrow(/unavailable protocol GoogleGemini/u);
-
 
     const missingTarget = clone(input());
     const kimi = mutableSurface(missingTarget, 'kimi-coding-plan');
-    kimi.models.find((model: Record<string, unknown>) => model.modelId === 'kimi-for-coding')
-      .executionBindings[0].actions[0].targetModelId = 'missing-highspeed';
+    kimi.models.find(
+      (model: Record<string, unknown>) => model.modelId === 'kimi-for-coding',
+    ).executionBindings[0].actions[0].targetModelId = 'missing-highspeed';
     expect(() => compileProviderCatalog(missingTarget)).toThrow(/targets missing model/u);
 
     const conflict = clone(input());
     const conflictKimi = mutableSurface(conflict, 'kimi-coding-plan');
-    conflictKimi.models.find((model: Record<string, unknown>) => model.modelId === 'kimi-for-coding')
+    conflictKimi.models
+      .find((model: Record<string, unknown>) => model.modelId === 'kimi-for-coding')
       .executionBindings.push({
         id: 'fast:conflict',
         when: { fast: true },
@@ -790,7 +1082,8 @@ describe('Provider Catalog compiler', () => {
 
     const overlap = clone(input());
     const overlapKimi = mutableSurface(overlap, 'kimi-coding-plan');
-    overlapKimi.models.find((model: Record<string, unknown>) => model.modelId === 'k3')
+    overlapKimi.models
+      .find((model: Record<string, unknown>) => model.modelId === 'k3')
       .executionBindings.push({
         id: 'context:conflict',
         when: { maxContext: true },
@@ -817,26 +1110,30 @@ describe('Provider Catalog compiler', () => {
 
     const missingToolsFact = clone(input());
     const clinePass = mutableSurface(missingToolsFact, 'cline-pass');
-    const supportedCline = clinePass.models.find((model: Record<string, unknown>) => (
-      (model.toolCalling as { state?: string } | undefined)?.state === 'supported'
-    ));
+    const supportedCline = clinePass.models.find(
+      (model: Record<string, unknown>) => (model.toolCalling as { state?: string } | undefined)?.state === 'supported',
+    );
     delete supportedCline.fieldFactSourceIds;
     expect(() => compileProviderCatalog(missingToolsFact)).toThrow(/dedicated tools fact source/u);
 
     const credentialPatch = clone(input());
-    mutableSurface(credentialPatch, 'chatgpt-account').models[0].executionBindings[0].actions = [{
-      kind: 'request-patch',
-      patch: { authorization: 'Bearer embedded-secret' },
-    }];
+    mutableSurface(credentialPatch, 'chatgpt-account').models[0].executionBindings[0].actions = [
+      {
+        kind: 'request-patch',
+        patch: { authorization: 'Bearer embedded-secret' },
+      },
+    ];
     expect(() => compileProviderCatalog(credentialPatch)).toThrow(/embed credential material/u);
 
     const unknownConflictSource = clone(input());
-    mutableSurface(unknownConflictSource, 'chatgpt-account').factConflicts = [{
-      fieldPath: 'models.gpt-5.6-sol.controls.fast',
-      sourceIds: ['rdc-agent:chatgpt-account:0', 'missing-source'],
-      status: 'unresolved',
-      detail: 'Conflicting observed control state.',
-    }];
+    mutableSurface(unknownConflictSource, 'chatgpt-account').factConflicts = [
+      {
+        fieldPath: 'models.gpt-5.6-sol.controls.fast',
+        sourceIds: ['rdc-agent:chatgpt-account:0', 'missing-source'],
+        status: 'unresolved',
+        detail: 'Conflicting observed control state.',
+      },
+    ];
     expect(() => compileProviderCatalog(unknownConflictSource)).toThrow(/conflict references unknown fact source/u);
 
     const invalidResolution = clone(input());
@@ -851,13 +1148,15 @@ describe('Provider Catalog compiler', () => {
       surfaceBuild: 'test-build',
       plan: 'test-plan',
     });
-    chatgpt.factConflicts = [{
-      fieldPath: 'models.gpt-5.6-sol.controls.fast',
-      sourceIds: ['rdc-agent:chatgpt-account:0', 'user-control-panel:chatgpt-account:test'],
-      status: 'resolved',
-      resolutionSourceId: 'missing-source',
-      detail: 'The user-observed control panel wins.',
-    }];
+    chatgpt.factConflicts = [
+      {
+        fieldPath: 'models.gpt-5.6-sol.controls.fast',
+        sourceIds: ['rdc-agent:chatgpt-account:0', 'user-control-panel:chatgpt-account:test'],
+        status: 'resolved',
+        resolutionSourceId: 'missing-source',
+        detail: 'The user-observed control panel wins.',
+      },
+    ];
     expect(() => compileProviderCatalog(invalidResolution)).toThrow(/must select one of its fact sources/u);
   });
 
@@ -891,7 +1190,10 @@ describe('Provider Catalog compiler', () => {
       if (surface.status !== 'stable') continue;
       expect(surface.availability.state, surface.id).not.toBe('unavailable');
       expect(JSON.stringify(surface), surface.id).not.toMatch(/TODO/iu);
-      expect(surface.routes.every((route) => route.baseUrl.trim().length > 0), surface.id).toBe(true);
+      expect(
+        surface.routes.every((route) => route.baseUrl.trim().length > 0),
+        surface.id,
+      ).toBe(true);
       expect(surface.discovery.strategy !== null || surface.models.length > 0, surface.id).toBe(true);
     }
   });

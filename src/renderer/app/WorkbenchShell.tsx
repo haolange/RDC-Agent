@@ -8,9 +8,9 @@ import { TerminalDrawer } from '../features/terminal/TerminalDrawer';
 import { Composer } from '../features/composer/Composer';
 import { useDynStyle } from '../lib/useDynStyle';
 import { isDockedResizeHandleVisible, ResizeHandle } from '../shell/ResizeHandle';
+import { useI18n } from '../i18n';
 import { WorkbenchPanelDrawer } from './WorkbenchPanelDrawer';
 import { SidebarFooter } from './SidebarFooter';
-import type { TranslationKey } from '../i18n';
 import type { ComposerController } from '../features/composer/useComposer';
 
 type DragSide = 'left' | 'right';
@@ -18,6 +18,9 @@ type DragSide = 'left' | 'right';
 export interface WorkbenchShellProps {
   appBodyRef: RefObject<HTMLDivElement>;
   isResizing: boolean;
+  /** A person toggled a sidebar: the columns animate to their new widths, and only then. */
+  columnsAnimating: boolean;
+  onColumnsSettled: () => void;
   resolvedWidths: { left: number; right: number };
   effectiveLeftCollapsed: boolean;
   effectiveRightCollapsed: boolean;
@@ -36,7 +39,6 @@ export interface WorkbenchShellProps {
   composer: ComposerController;
   showMainPromptBar: boolean;
   mainPage: ReactNode;
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   onOpenKnowledgeCenter: () => void;
   isUserMenuOpen: boolean;
   onUserMenuToggle: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -46,6 +48,8 @@ export interface WorkbenchShellProps {
 export function WorkbenchShell({
   appBodyRef,
   isResizing,
+  columnsAnimating,
+  onColumnsSettled,
   resolvedWidths,
   effectiveLeftCollapsed,
   effectiveRightCollapsed,
@@ -64,19 +68,43 @@ export function WorkbenchShell({
   composer,
   showMainPromptBar,
   mainPage,
-  t,
   onOpenKnowledgeCenter,
   isUserMenuOpen,
   onUserMenuToggle,
   onStartDrag,
 }: WorkbenchShellProps) {
+  const { t } = useI18n();
   const workArea = useRef<HTMLElement>(null);
   const [composerShell, setComposerShell] = useState<HTMLDivElement | null>(null);
-  const readingLayout = useMemo(() => ({ workArea, composerShell,
-    layoutRevision: [resolvedWidths.left, resolvedWidths.right, effectiveLeftCollapsed, effectiveRightCollapsed,
-      isLeftDrawerMode, isRightRailDrawerMode, isRightRailVisible, isTerminalOpen, workbenchRailMaxWidth].join(':'),
-  }), [composerShell, resolvedWidths.left, resolvedWidths.right, effectiveLeftCollapsed, effectiveRightCollapsed,
-    isLeftDrawerMode, isRightRailDrawerMode, isRightRailVisible, isTerminalOpen, workbenchRailMaxWidth]);
+  const readingLayout = useMemo(
+    () => ({
+      workArea,
+      composerShell,
+      layoutRevision: [
+        resolvedWidths.left,
+        resolvedWidths.right,
+        effectiveLeftCollapsed,
+        effectiveRightCollapsed,
+        isLeftDrawerMode,
+        isRightRailDrawerMode,
+        isRightRailVisible,
+        isTerminalOpen,
+        workbenchRailMaxWidth,
+      ].join(':'),
+    }),
+    [
+      composerShell,
+      resolvedWidths.left,
+      resolvedWidths.right,
+      effectiveLeftCollapsed,
+      effectiveRightCollapsed,
+      isLeftDrawerMode,
+      isRightRailDrawerMode,
+      isRightRailVisible,
+      isTerminalOpen,
+      workbenchRailMaxWidth,
+    ],
+  );
   const showDockedRightRail = isRightRailVisible && !isRightRailDrawerMode;
   const showLeftResizeHandle = isDockedResizeHandleVisible(!isLeftDrawerMode, effectiveLeftCollapsed);
   const showRightResizeHandle = isDockedResizeHandleVisible(showDockedRightRail, effectiveRightCollapsed);
@@ -89,93 +117,108 @@ export function WorkbenchShell({
     '--workbench-inline-mode': bothSidebarsCollapsed ? 'dual-collapsed' : 'sidebar-open',
   });
 
-  const sidebarContent = <>
-    <nav className="sidebar-nav">
-      <Sidebar collapsed={isLeftDrawerMode ? false : effectiveLeftCollapsed} />
-    </nav>
-    {(isLeftDrawerMode || !effectiveLeftCollapsed) && (
-      <SidebarFooter
-        t={t}
-        nickname={nickname}
-        avatarPath={avatarPath}
-        isUserMenuOpen={isUserMenuOpen}
-        onCloseLeftDrawer={onCloseLeftDrawer}
-        onOpenKnowledgeCenter={onOpenKnowledgeCenter}
-        onUserMenuToggle={onUserMenuToggle}
-      />
-    )}
-  </>;
+  const sidebarContent = (
+    <>
+      <nav className="sidebar-nav">
+        <Sidebar collapsed={isLeftDrawerMode ? false : effectiveLeftCollapsed} />
+      </nav>
+      {(isLeftDrawerMode || !effectiveLeftCollapsed) && (
+        <SidebarFooter
+          nickname={nickname}
+          avatarPath={avatarPath}
+          isUserMenuOpen={isUserMenuOpen}
+          onCloseLeftDrawer={onCloseLeftDrawer}
+          onOpenKnowledgeCenter={onOpenKnowledgeCenter}
+          onUserMenuToggle={onUserMenuToggle}
+        />
+      )}
+    </>
+  );
 
   return (
     <WorkbenchReadingLayoutContext.Provider value={readingLayout}>
-    <PlanReaderHost>
-    <div
-      ref={appBodyRef}
-      className={`app-body ${isResizing ? 'is-resizing' : ''} ${isLeftDrawerMode ? 'has-left-drawer' : ''}`}
-      {...shellDynStyle}
-    >
-      <aside
-        className={`app-sidebar-left ${effectiveLeftCollapsed ? 'collapsed' : ''}`}
-        data-testid="app-sidebar-left"
-      >
-        {!isLeftDrawerMode ? sidebarContent : null}
-      </aside>
+      <PlanReaderHost>
+        <div
+          ref={appBodyRef}
+          className={`app-body ${isResizing ? 'is-resizing' : ''} ${isLeftDrawerMode ? 'has-left-drawer' : ''}${columnsAnimating ? ' is-animating-columns' : ''}`}
+          {...shellDynStyle}
+          onTransitionEnd={(event) => {
+            if (event.target === event.currentTarget && event.propertyName === 'grid-template-columns')
+              onColumnsSettled();
+          }}
+        >
+          <aside
+            className={`app-sidebar-left ${effectiveLeftCollapsed ? 'collapsed' : ''}`}
+            data-testid="app-sidebar-left"
+          >
+            {!isLeftDrawerMode ? sidebarContent : null}
+          </aside>
 
-      {showLeftResizeHandle ? (
-        <ResizeHandle side="left" onDragStart={onStartDrag('left', resolvedWidths.left)} />
-      ) : (
-        <div aria-hidden="true" />
-      )}
-
-      <main ref={workArea} className={`app-main ${isTerminalOpen ? 'terminal-open' : ''}`}>
-        <div className="main-content">
-          <div className="main-page-shell">{mainPage}</div>
-        </div>
-        {showMainPromptBar && (
-          <div className="main-input-bar">
-            <Composer
-              composer={composer}
-              shellRef={setComposerShell}
-            />
-          </div>
-        )}
-        <TerminalDrawer />
-      </main>
-
-      {showDockedRightRail && (
-        <>
-          {showRightResizeHandle ? (
-            <ResizeHandle side="right" onDragStart={onStartDrag('right', resolvedWidths.right)} />
+          {showLeftResizeHandle ? (
+            <ResizeHandle side="left" onDragStart={onStartDrag('left', resolvedWidths.left)} />
           ) : (
             <div aria-hidden="true" />
           )}
 
-          <aside
-            className={`app-sidebar-right ${effectiveRightCollapsed ? 'collapsed' : ''}`}
-            data-testid="app-sidebar-right"
-          >
-            <div
-              className={`right-panel-body ${effectiveRightCollapsed ? 'collapsed' : ''}`}
-              data-testid="right-rail-scroll"
+          <main ref={workArea} className={`app-main ${isTerminalOpen ? 'terminal-open' : ''}`}>
+            <div className="main-content">
+              <div className="main-page-shell">{mainPage}</div>
+            </div>
+            {showMainPromptBar && (
+              <div className="main-input-bar">
+                <Composer composer={composer} shellRef={setComposerShell} />
+              </div>
+            )}
+            <TerminalDrawer />
+          </main>
+
+          {showDockedRightRail && (
+            <>
+              {showRightResizeHandle ? (
+                <ResizeHandle side="right" onDragStart={onStartDrag('right', resolvedWidths.right)} />
+              ) : (
+                <div aria-hidden="true" />
+              )}
+
+              <aside
+                className={`app-sidebar-right ${effectiveRightCollapsed ? 'collapsed' : ''}`}
+                data-testid="app-sidebar-right"
+              >
+                <div
+                  className={`right-panel-body ${effectiveRightCollapsed ? 'collapsed' : ''}`}
+                  data-testid="right-rail-scroll"
+                >
+                  <RightRail />
+                </div>
+              </aside>
+            </>
+          )}
+          {isLeftDrawerMode ? (
+            <WorkbenchPanelDrawer
+              data-testid="left-navigation-drawer"
+              keepMounted
+              side="left"
+              title={t('sidebar.projects')}
+              closeLabel={t('app.closePanel')}
+              open={isLeftDrawerOpen}
+              onClose={onCloseLeftDrawer}
+            >
+              {sidebarContent}
+            </WorkbenchPanelDrawer>
+          ) : null}
+          {isRightRailVisible && isRightRailDrawerMode ? (
+            <WorkbenchPanelDrawer
+              data-testid="right-rail-drawer"
+              title={t('app.inspector')}
+              closeLabel={t('app.closePanel')}
+              open={isRightRailDrawerOpen}
+              onClose={onCloseRightRailDrawer}
             >
               <RightRail />
-            </div>
-          </aside>
-        </>
-      )}
-      {isLeftDrawerMode ? (
-        <WorkbenchPanelDrawer data-testid="left-navigation-drawer" keepMounted side="left" title={t('sidebar.projects')} closeLabel={t('app.closePanel')} open={isLeftDrawerOpen} onClose={onCloseLeftDrawer}>
-          {sidebarContent}
-        </WorkbenchPanelDrawer>
-      ) : null}
-      {isRightRailVisible && isRightRailDrawerMode ? (
-        <WorkbenchPanelDrawer data-testid="right-rail-drawer" title={t('app.inspector')} closeLabel={t('app.closePanel')} open={isRightRailDrawerOpen} onClose={onCloseRightRailDrawer}>
-          <RightRail />
-        </WorkbenchPanelDrawer>
-      ) : null}
-
-    </div>
-    </PlanReaderHost>
+            </WorkbenchPanelDrawer>
+          ) : null}
+        </div>
+      </PlanReaderHost>
     </WorkbenchReadingLayoutContext.Provider>
   );
 }

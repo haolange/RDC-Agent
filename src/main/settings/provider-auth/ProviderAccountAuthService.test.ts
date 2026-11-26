@@ -9,7 +9,12 @@ import { ProviderAccountAuthService } from './ProviderAccountAuthService';
 const GROK_PUBLIC_CLIENT_ID = 'b1a00492-073a-47ea-816f-4c329264a828';
 
 const mocks = vi.hoisted(() => ({
-  savedConnections: [] as Array<{ providerId: string; secretPayload: string; models: unknown[]; accountSummary: unknown }>,
+  savedConnections: [] as Array<{
+    providerId: string;
+    secretPayload: string;
+    models: unknown[];
+    accountSummary: unknown;
+  }>,
   disconnectedProviders: [] as string[],
   disconnectedAuthModes: [] as Array<string | undefined>,
   oauthSecret: '',
@@ -39,13 +44,17 @@ vi.mock('electron', () => ({
 
 vi.mock('../settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: () => ({
-      llm: {
-        providers: [mocks.provider],
-      },
-    }),
+    providerConnections: {
+      get: (providerId: string) => [mocks.provider].find((entry) => entry.id === providerId),
+      list: () => [mocks.provider],
+    },
     getProviderOAuthSecret: () => mocks.oauthSecret,
-    saveProviderAccountConnection: (providerId: string, secretPayload: string, models: unknown[], accountSummary: unknown) => {
+    saveProviderAccountConnection: (
+      providerId: string,
+      secretPayload: string,
+      models: unknown[],
+      accountSummary: unknown,
+    ) => {
       mocks.savedConnections.push({ providerId, secretPayload, models, accountSummary });
       mocks.provider = {
         ...mocks.provider,
@@ -81,51 +90,54 @@ const grokMetadata = {
   userinfo_endpoint: 'https://auth.x.ai/oauth2/userinfo',
   revocation_endpoint: 'https://auth.x.ai/oauth2/revoke',
   scopes_supported: ['openid', 'profile', 'email', 'offline_access', 'grok-cli:access', 'api:access'],
-  grant_types_supported: [
-    'authorization_code',
-    'refresh_token',
-    'urn:ietf:params:oauth:grant-type:device_code',
-  ],
+  grant_types_supported: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code'],
   code_challenge_methods_supported: ['S256'],
   token_endpoint_auth_methods_supported: ['none'],
 };
 
-const jsonResponse = (payload: unknown, ok = true, status = ok ? 200 : 400): Response => ({
-  ok,
-  status,
-  text: async () => JSON.stringify(payload),
-} as Response);
+const jsonResponse = (payload: unknown, ok = true, status = ok ? 200 : 400): Response =>
+  ({
+    ok,
+    status,
+    text: async () => JSON.stringify(payload),
+  }) as Response;
 
-const fixture = (name: string): Record<string, unknown> => JSON.parse(
-  fs.readFileSync(path.resolve(__dirname, '../fixtures/provider-catalogs', name), 'utf8'),
-) as Record<string, unknown>;
+const fixture = (name: string): Record<string, unknown> =>
+  JSON.parse(fs.readFileSync(path.resolve(__dirname, '../fixtures/provider-catalogs', name), 'utf8')) as Record<
+    string,
+    unknown
+  >;
 
 const mockFetchJson = (...payloads: Array<unknown | { payload: unknown; ok?: boolean; status?: number }>) => {
   const fetchMock = vi.fn();
   for (const item of payloads) {
-    const record = item && typeof item === 'object' && 'payload' in item
-      ? item as { payload: unknown; ok?: boolean; status?: number }
-      : { payload: item };
+    const record =
+      item && typeof item === 'object' && 'payload' in item
+        ? (item as { payload: unknown; ok?: boolean; status?: number })
+        : { payload: item };
     fetchMock.mockResolvedValueOnce(jsonResponse(record.payload, record.ok ?? true, record.status));
   }
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 };
 
-const httpGetText = (url: string): Promise<{ statusCode: number; body: string }> => new Promise((resolve, reject) => {
-  http.get(url, (response) => {
-    let body = '';
-    response.setEncoding('utf8');
-    response.on('data', (chunk) => {
-      body += chunk;
-    });
-    response.on('end', () => resolve({ statusCode: response.statusCode ?? 0, body }));
-  }).on('error', reject);
-});
+const httpGetText = (url: string): Promise<{ statusCode: number; body: string }> =>
+  new Promise((resolve, reject) => {
+    http
+      .get(url, (response) => {
+        let body = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => {
+          body += chunk;
+        });
+        response.on('end', () => resolve({ statusCode: response.statusCode ?? 0, body }));
+      })
+      .on('error', reject);
+  });
 
 describe('ProviderAccountAuthService Grok sign-in', () => {
-  beforeEach(() => {
-    process.env.RDC_AGENT_TEST_MODE = '1';
+  beforeEach(async () => {
+    vi.mocked((await import('electron')).shell.openExternal).mockClear();
     mocks.savedConnections.length = 0;
     mocks.disconnectedProviders.length = 0;
     mocks.disconnectedAuthModes.length = 0;
@@ -154,7 +166,9 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
       expect((await httpGetText(`${status.redirectUri}?code=wrong&state=wrong`)).statusCode).toBe(400);
       expect(mocks.savedConnections).toHaveLength(0);
       expect((await service.finishLogin({ providerId: 'grok-account', code: 'manual' })).connected).toBe(false);
-    } finally { service.dispose(); }
+    } finally {
+      service.dispose();
+    }
   });
 
   it('does not launch an operating-system browser in headless verification', async () => {
@@ -162,17 +176,18 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
     const service = new ProviderAccountAuthService();
     mockFetchJson(grokMetadata);
     process.env.RDC_AGENT_HEADLESS = '1';
-    delete process.env.RDC_AGENT_TEST_MODE;
     try {
       expect((await service.startLogin({ providerId: 'grok-account' })).state).toBe('pending');
       expect(shell.openExternal).not.toHaveBeenCalled();
-    } finally { service.dispose(); delete process.env.RDC_AGENT_HEADLESS; process.env.RDC_AGENT_TEST_MODE = '1'; }
+    } finally {
+      service.dispose();
+      delete process.env.RDC_AGENT_HEADLESS;
+    }
   });
 
   it('opens Grok in the system default browser and reports launch failures without leaving a callback', async () => {
     const { shell } = await import('electron');
     const service = new ProviderAccountAuthService();
-    delete process.env.RDC_AGENT_TEST_MODE;
     mockFetchJson(grokMetadata);
     try {
       const status = await service.startLogin({ providerId: 'grok-account' });
@@ -184,16 +199,29 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
       const failed = await service.startLogin({ providerId: 'grok-account' });
       expect(failed.state).toBe('failed');
       expect(failed.error).toContain('Default browser launch failed');
-      const flows = (service as unknown as { pendingFlows: Map<string, { abortController: AbortController; server?: http.Server }> }).pendingFlows;
+      const flows = (
+        service as unknown as { pendingFlows: Map<string, { abortController: AbortController; server?: http.Server }> }
+      ).pendingFlows;
       expect([...flows.values()][0].abortController.signal.aborted).toBe(true);
-    } finally { service.dispose(); process.env.RDC_AGENT_TEST_MODE = '1'; }
+    } finally {
+      service.dispose();
+    }
   });
 
   it('does not let a replaced login startup failure mark the new attempt failed', async () => {
-    const service = new ProviderAccountAuthService(); let rejectOld!: (error: Error) => void;
-    vi.stubGlobal('fetch', vi.fn()
-      .mockReturnValueOnce(new Promise((_resolve, reject) => { rejectOld = reject; }))
-      .mockResolvedValueOnce(jsonResponse(grokMetadata)));
+    const service = new ProviderAccountAuthService();
+    let rejectOld!: (error: Error) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockReturnValueOnce(
+          new Promise((_resolve, reject) => {
+            rejectOld = reject;
+          }),
+        )
+        .mockResolvedValueOnce(jsonResponse(grokMetadata)),
+    );
     const old = service.startLogin({ providerId: 'grok-account' });
     try {
       const current = await service.startLogin({ providerId: 'grok-account' });
@@ -201,16 +229,32 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
       rejectOld(new Error('cancelled earlier metadata'));
       await old;
       expect(service.status('grok-account')).toMatchObject({ state: 'pending', authUrl: current.authUrl });
-    } finally { service.dispose(); }
+    } finally {
+      service.dispose();
+    }
   });
 
   function signedToken(nonce: string): { token: string; key: unknown } {
     const keys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
     const header = Buffer.from(JSON.stringify({ alg: 'ES256', kid: 'key' })).toString('base64url');
-    const payload = Buffer.from(JSON.stringify({ iss: grokMetadata.issuer, aud: GROK_PUBLIC_CLIENT_ID,
-      sub: 'account', nonce, iat: Date.now() / 1000, exp: Date.now() / 1000 + 3600 })).toString('base64url');
-    const signature = sign('sha256', Buffer.from(`${header}.${payload}`), { key: keys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
-    return { token: `${header}.${payload}.${signature}`, key: { ...keys.publicKey.export({ format: 'jwk' }), kid: 'key' } };
+    const payload = Buffer.from(
+      JSON.stringify({
+        iss: grokMetadata.issuer,
+        aud: GROK_PUBLIC_CLIENT_ID,
+        sub: 'account',
+        nonce,
+        iat: Date.now() / 1000,
+        exp: Date.now() / 1000 + 3600,
+      }),
+    ).toString('base64url');
+    const signature = sign('sha256', Buffer.from(`${header}.${payload}`), {
+      key: keys.privateKey,
+      dsaEncoding: 'ieee-p1363',
+    }).toString('base64url');
+    return {
+      token: `${header}.${payload}.${signature}`,
+      key: { ...keys.publicKey.export({ format: 'jwk' }), kid: 'key' },
+    };
   }
 
   it.each([false, true])('validates identity and never persists a cancelled exchange (cancel=%s)', async (cancel) => {
@@ -222,7 +266,9 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
     const url = new URL(status.authUrl!);
     const signed = signedToken(url.searchParams.get('nonce')!);
     let release: (() => void) | undefined;
-    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const fetchMock = vi.fn(async (input: string) => {
       if (input.endsWith('/token')) {
         if (cancel) await gate;
@@ -246,11 +292,16 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
         expect(publish).toHaveBeenCalledOnce();
         expect(JSON.parse(mocks.savedConnections[0].secretPayload)).not.toHaveProperty('planLabel');
         expect(mocks.savedConnections[0].accountSummary).not.toHaveProperty('planLabel', expect.any(String));
-        expect(fetchMock).toHaveBeenCalledWith('https://cli-chat-proxy.grok.com/v1/models',
-          expect.objectContaining({ headers: expect.objectContaining({ 'X-XAI-Token-Auth': 'xai-grok-cli' }) }));
+        expect(fetchMock).toHaveBeenCalledWith(
+          'https://cli-chat-proxy.grok.com/v1/models',
+          expect.objectContaining({ headers: expect.objectContaining({ 'X-XAI-Token-Auth': 'xai-grok-cli' }) }),
+        );
       }
       expect(fetchMock.mock.calls.some(([endpoint]) => endpoint.startsWith('https://api.x.ai'))).toBe(false);
-    } finally { release?.(); service.dispose(); }
+    } finally {
+      release?.();
+      service.dispose();
+    }
   });
 
   it('rejects incompatible or unreachable metadata with an actionable failure', async () => {
@@ -264,7 +315,11 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
 
   it('does not use the public API as a subscription catalog fallback', async () => {
     const service = new ProviderAccountAuthService();
-    mocks.oauthSecret = JSON.stringify({ providerId: 'grok-account', accessToken: 'access', expiresAt: new Date(Date.now() + 3600000).toISOString() });
+    mocks.oauthSecret = JSON.stringify({
+      providerId: 'grok-account',
+      accessToken: 'access',
+      expiresAt: new Date(Date.now() + 3600000).toISOString(),
+    });
     const fetchMock = vi.fn().mockRejectedValue(new Error('HTTP 403'));
     vi.stubGlobal('fetch', fetchMock);
     expect((await service.test('grok-account')).state).toBe('failed');
@@ -313,8 +368,11 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
         models: {
           'grok-4.5': {
             info: {
-              id: 'grok-4.5', name: 'Grok 4.5', api_backend: 'responses',
-              context_window: 500000, supported_in_api: true,
+              id: 'grok-4.5',
+              name: 'Grok 4.5',
+              api_backend: 'responses',
+              context_window: 500000,
+              supported_in_api: true,
             },
           },
         },
@@ -332,10 +390,28 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
     const refreshBody = new URLSearchParams(fetchMock.mock.calls[1][1].body as string);
     expect(refreshBody.get('client_id')).toBe(GROK_PUBLIC_CLIENT_ID);
     expect(mocks.savedConnections).toHaveLength(1);
-    const bundle = JSON.parse(mocks.savedConnections[0].secretPayload) as { accessToken?: string; refreshToken?: string; authorizationMode?: string };
+    const bundle = JSON.parse(mocks.savedConnections[0].secretPayload) as {
+      accessToken?: string;
+      refreshToken?: string;
+      authorizationMode?: string;
+    };
     expect(bundle.accessToken).toBe('new-access');
     expect(bundle.refreshToken).toBe('refresh-2');
     expect(bundle.authorizationMode).toBe('browser');
+  });
+
+  it('does not treat a stored credential that is not an account bundle as a connected account', async () => {
+    const service = new ProviderAccountAuthService();
+    mocks.oauthSecret = JSON.stringify({
+      providerId: 'grok-account',
+      accessToken: 42,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(service.test('grok-account')).resolves.toMatchObject({ connected: false });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('does not report a failed live catalog refresh as connected', async () => {
@@ -375,10 +451,12 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
 
     expect(status.state).toBe('signed-out');
     expect(mocks.disconnectedProviders).toEqual(['grok-account']);
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      'https://auth.x.ai/oauth2/revoke',
-      expect.objectContaining({ method: 'POST' }),
-    ));
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://auth.x.ai/oauth2/revoke',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
     const revokeBody = new URLSearchParams(fetchMock.mock.calls[1][1].body as string);
     expect(revokeBody.get('client_id')).toBe(GROK_PUBLIC_CLIENT_ID);
   });
@@ -420,11 +498,13 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
     const saved = mocks.savedConnections.at(-1);
     expect(saved?.providerId).toBe('openrouter');
     expect(JSON.parse(saved?.secretPayload ?? '{}')).toMatchObject({
-      providerId: 'openrouter', apiKey: 'sk-or-fixture', accountId: 'fixture-user',
+      providerId: 'openrouter',
+      apiKey: 'sk-or-fixture',
+      accountId: 'fixture-user',
     });
-    expect(saved?.models).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'anthropic/claude-sonnet-4.6' }),
-    ]));
+    expect(saved?.models).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'anthropic/claude-sonnet-4.6' })]),
+    );
 
     service.logout('openrouter');
     expect(mocks.disconnectedProviders.at(-1)).toBe('openrouter');
@@ -448,13 +528,22 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
     const fetchMock = mockFetchJson({
       models: [
         {
-          slug: 'gpt-5.4', display_name: 'GPT-5.4', visibility: 'list', supported_in_api: true,
-          input_modalities: ['text', 'image'], context_window: 272000, max_context_window: 1000000,
+          slug: 'gpt-5.4',
+          display_name: 'GPT-5.4',
+          visibility: 'list',
+          supported_in_api: true,
+          input_modalities: ['text', 'image'],
+          context_window: 272000,
+          max_context_window: 1000000,
           supported_reasoning_levels: [{ effort: 'low' }, { effort: 'medium' }, { effort: 'xhigh' }],
         },
         {
-          slug: 'gpt-5.6-sol-pro', display_name: 'GPT-5.6 Sol Pro', visibility: 'list',
-          supported_in_api: true, context_window: 372000, max_context_window: 372000,
+          slug: 'gpt-5.6-sol-pro',
+          display_name: 'GPT-5.6 Sol Pro',
+          visibility: 'list',
+          supported_in_api: true,
+          context_window: 372000,
+          max_context_window: 372000,
         },
       ],
     });
@@ -468,7 +557,12 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
         defaultBudgetTokens: 272000,
         contextTiers: expect.arrayContaining([
           expect.objectContaining({ id: 'default', maxPromptTokens: 272000, entitlement: 'granted' }),
-          expect.objectContaining({ id: 'max', maxPromptTokens: 1000000, maxTotalTokens: 1000000, entitlement: 'granted' }),
+          expect.objectContaining({
+            id: 'max',
+            maxPromptTokens: 1000000,
+            maxTotalTokens: 1000000,
+            entitlement: 'granted',
+          }),
         ]),
       }),
     ]);
@@ -508,16 +602,17 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
     const discovery = await service.loadEffectiveCatalog('github-copilot');
 
     expect(discovery.models.map((model) => model.id)).toContain('claude-opus-4.8');
-    expect(discovery.contributions?.find((entry) => entry.modelId === 'claude-opus-4.8'))
-      .not.toHaveProperty('executionBindings');
-    expect(discovery.contributions?.find((entry) => entry.modelId === 'claude-opus-4.8-fast'))
-      .not.toHaveProperty('selection');
+    expect(discovery.contributions?.find((entry) => entry.modelId === 'claude-opus-4.8')).not.toHaveProperty(
+      'executionBindings',
+    );
+    expect(discovery.contributions?.find((entry) => entry.modelId === 'claude-opus-4.8-fast')).not.toHaveProperty(
+      'selection',
+    );
     const catalogModels = getProviderModelDefinitions('github-copilot');
     expect(catalogModels.find((entry) => entry.modelId === 'claude-opus-4.8')).toMatchObject({
       controls: { fast: { state: 'unsupported' } },
     });
-    expect(catalogModels.find((entry) => entry.modelId === 'claude-opus-4.8')?.executionBindings ?? [])
-      .toEqual([]);
+    expect(catalogModels.find((entry) => entry.modelId === 'claude-opus-4.8')?.executionBindings ?? []).toEqual([]);
     expect(catalogModels.find((entry) => entry.modelId === 'claude-opus-4.8-fast')).toMatchObject({
       selection: { pickerVisibility: 'primary' },
     });
@@ -549,9 +644,7 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
     const discovery = await service.loadEffectiveCatalog('claude-account');
 
     expect(discovery.models).toEqual([{ id: 'claude-opus-4-8', label: 'Claude Opus 4.8', enabled: true }]);
-    expect(discovery.contributions).toEqual([
-      expect.objectContaining({ modelId: 'claude-opus-4-8' }),
-    ]);
+    expect(discovery.contributions).toEqual([expect.objectContaining({ modelId: 'claude-opus-4-8' })]);
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.anthropic.com/v1/models',
       expect.objectContaining({
@@ -579,7 +672,7 @@ describe('ProviderAccountAuthService Grok sign-in', () => {
         verification_uri: 'https://portal.nousresearch.com/activate',
         verification_uri_complete: 'https://portal.nousresearch.com/activate?code=NOUS-CODE',
         expires_in: 600,
-        interval: 1,
+        interval: 0,
       },
       {
         access_token: 'nous-access-1',

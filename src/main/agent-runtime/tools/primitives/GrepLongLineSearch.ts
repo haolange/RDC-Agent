@@ -1,14 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
-import { GREP_REGEX_TIMEOUT_MS } from './toolLimits';
+import { GREP_REGEX_TIMEOUT_MS } from '../../../runtime/toolLimits';
 import type { GrepWorkerMatch, GrepWorkerRequest, GrepWorkerResponse } from '../../../workers/grepRegexWorker';
 
 const WORKER_STARTUP_TIMEOUT_MS = 5_000;
 
 /** Run whole-line regex matching away from the main event loop so a timeout can stop it. */
 export function searchLongLines(
-  lines: string[], regex: RegExp, limit: number, signal?: AbortSignal,
+  lines: string[],
+  regex: RegExp,
+  limit: number,
+  signal?: AbortSignal,
 ): Promise<GrepWorkerMatch[]> {
   if (signal?.aborted) return Promise.reject(new Error('Aborted'));
   // The bundle ships the compiled worker beside this module; from source, Node strips the worker's types.
@@ -20,7 +23,10 @@ export function searchLongLines(
     const worker = new Worker(workerPath, { execArgv: runsFromBundle ? [] : ['--experimental-strip-types'] });
     let settled = false;
     let executionTimer: NodeJS.Timeout | undefined;
-    const startupTimer = setTimeout(() => finish(new Error('grep worker startup timed out')), WORKER_STARTUP_TIMEOUT_MS);
+    const startupTimer = setTimeout(
+      () => finish(new Error('grep worker startup timed out')),
+      WORKER_STARTUP_TIMEOUT_MS,
+    );
     const abort = () => finish(new Error('Aborted'));
     const finish = (error?: Error, matches?: GrepWorkerMatch[]) => {
       if (settled) return;
@@ -38,12 +44,16 @@ export function searchLongLines(
       if (settled) return;
       if (message.type === 'ready') {
         clearTimeout(startupTimer);
-        executionTimer = setTimeout(() => finish(new Error(`grep pattern timed out after ${GREP_REGEX_TIMEOUT_MS}ms`)), GREP_REGEX_TIMEOUT_MS);
+        executionTimer = setTimeout(
+          () => finish(new Error(`grep pattern timed out after ${GREP_REGEX_TIMEOUT_MS}ms`)),
+          GREP_REGEX_TIMEOUT_MS,
+        );
         worker.postMessage(request);
-      } else if (message.type === 'result') finish(undefined, message.matches);
-      else finish(new Error('Invalid grep worker response'));
+      } else finish(undefined, message.matches);
     });
     worker.once('error', (error) => finish(error));
-    worker.once('exit', (code) => { if (!settled) finish(new Error(`grep worker exited with code ${code}`)); });
+    worker.once('exit', (code) => {
+      if (!settled) finish(new Error(`grep worker exited with code ${code}`));
+    });
   });
 }

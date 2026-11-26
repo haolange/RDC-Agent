@@ -35,7 +35,7 @@ export async function exchangeClaudeCode(flow: OAuthFlowState, code: string): Pr
   if (!code || !flow.codeVerifier) {
     throw new Error('Authorization code is required.');
   }
-  const payload = await fetchJson('https://platform.claude.com/v1/oauth/token', {
+  const payload = (await fetchJson('https://platform.claude.com/v1/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'User-Agent': 'RDC-Agent' },
     body: JSON.stringify({
@@ -46,7 +46,7 @@ export async function exchangeClaudeCode(flow: OAuthFlowState, code: string): Pr
       code_verifier: flow.codeVerifier,
       state: flow.state,
     }),
-  }) as { access_token?: string; refresh_token?: string; expires_in?: number; scope?: string };
+  })) as { access_token?: string; refresh_token?: string; expires_in?: number; scope?: string };
   if (!payload.access_token) {
     throw new Error('Claude OAuth did not return an access token.');
   }
@@ -61,7 +61,7 @@ export async function exchangeClaudeCode(flow: OAuthFlowState, code: string): Pr
 }
 
 export async function refreshClaudeBundle(bundle: OAuthSecretBundle): Promise<OAuthSecretBundle> {
-  const payload = await fetchJson('https://platform.claude.com/v1/oauth/token', {
+  const payload = (await fetchJson('https://platform.claude.com/v1/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'User-Agent': 'RDC-Agent' },
     body: JSON.stringify({
@@ -69,7 +69,7 @@ export async function refreshClaudeBundle(bundle: OAuthSecretBundle): Promise<OA
       client_id: CLAUDE_CLIENT_ID,
       refresh_token: bundle.refreshToken,
     }),
-  }) as { access_token?: string; refresh_token?: string; expires_in?: number; scope?: string };
+  })) as { access_token?: string; refresh_token?: string; expires_in?: number; scope?: string };
   if (!payload.access_token) {
     throw new Error('Claude OAuth refresh did not return an access token.');
   }
@@ -82,7 +82,9 @@ export async function refreshClaudeBundle(bundle: OAuthSecretBundle): Promise<OA
   };
 }
 
-export async function discoverClaudeCatalog(bundle: OAuthSecretBundle): Promise<{ models: LlmProviderModel[]; contributions?: CatalogModelContribution[] }> {
+export async function discoverClaudeCatalog(
+  bundle: OAuthSecretBundle,
+): Promise<{ models: LlmProviderModel[]; contributions?: CatalogModelContribution[] }> {
   const token = bundle.accessToken;
   if (!token) throw new Error('Claude Account OAuth token is missing.');
   const route = accountDefaultRoute(bundle.providerId);

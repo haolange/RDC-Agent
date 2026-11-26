@@ -23,14 +23,18 @@ describe('composerSessionContext', () => {
     });
 
     let restored = '';
-    expect(restoreLastSentIfCurrentSession('session-b', (last) => {
-      restored = last.prompt;
-    })).toBe(false);
+    expect(
+      restoreLastSentIfCurrentSession('session-b', (last) => {
+        restored = last.prompt;
+      }),
+    ).toBe(false);
     expect(restored).toBe('');
 
-    expect(restoreLastSentIfCurrentSession('session-a', (last) => {
-      restored = last.prompt;
-    })).toBe(true);
+    expect(
+      restoreLastSentIfCurrentSession('session-a', (last) => {
+        restored = last.prompt;
+      }),
+    ).toBe(true);
     expect(restored).toBe('hello from a');
   });
 
@@ -43,9 +47,11 @@ describe('composerSessionContext', () => {
       skillIds: [],
     });
     let restored = '';
-    expect(restoreLastSentIfCurrentSession(null, (last) => {
-      restored = last.prompt;
-    })).toBe(true);
+    expect(
+      restoreLastSentIfCurrentSession(null, (last) => {
+        restored = last.prompt;
+      }),
+    ).toBe(true);
     expect(restored).toBe('before session');
   });
 
@@ -55,8 +61,6 @@ describe('composerSessionContext', () => {
       projectId: 'project-1',
       requestId: 'req-1',
       agentId: 'edit',
-      optimisticTurnId: 'optimistic-turn-req-1',
-      realTurnId: null,
     });
     useComposerSessionContextStore.getState().setLastSent({
       sessionId: 'session-a',
@@ -73,31 +77,22 @@ describe('composerSessionContext', () => {
     expect(useComposerSessionContextStore.getState().lastSent?.prompt).toBe('draft');
   });
 
-  it('commits and clears a turn only for the exact session, request, and agent owner', () => {
+  it('binds and clears a turn only for the exact session, request, and agent owner', () => {
     const ownership = {
       sessionId: 'session-a',
       requestId: 'req-1',
       agentId: 'edit',
     };
-    useComposerSessionContextStore.getState().beginTurn({
-      ...ownership,
-      projectId: 'project-1',
-      optimisticTurnId: 'optimistic-turn-req-1',
-      realTurnId: null,
-    });
+    useComposerSessionContextStore.getState().beginTurn({ ...ownership, projectId: 'project-1' });
 
-    useComposerSessionContextStore.getState().setRealTurnId(
-      { ...ownership, agentId: 'plan' },
-      'wrong-agent-turn',
-    );
+    useComposerSessionContextStore
+      .getState()
+      .bindCommittedSession({ ...ownership, agentId: 'plan' }, 'wrong-agent-session');
     useComposerSessionContextStore.getState().clearActiveTurnIfOwned({
       ...ownership,
       requestId: 'stale-request',
     });
-    expect(useComposerSessionContextStore.getState().activeTurn?.realTurnId).toBeNull();
-
-    useComposerSessionContextStore.getState().setRealTurnId(ownership, 'turn-1');
-    expect(useComposerSessionContextStore.getState().activeTurn?.realTurnId).toBe('turn-1');
+    expect(useComposerSessionContextStore.getState().activeTurn?.sessionId).toBe('session-a');
 
     useComposerSessionContextStore.getState().clearActiveTurnIfOwned(ownership);
     expect(useComposerSessionContextStore.getState().activeTurn).toBeNull();
@@ -109,20 +104,14 @@ describe('composerSessionContext', () => {
       requestId: 'req-new',
       agentId: 'plan',
     };
-    useComposerSessionContextStore.getState().beginTurn({
-      ...ownership,
-      projectId: 'project-1',
-      optimisticTurnId: 'optimistic-turn-req-new',
-      realTurnId: null,
-    });
+    useComposerSessionContextStore.getState().beginTurn({ ...ownership, projectId: 'project-1' });
 
-    useComposerSessionContextStore.getState().setRealTurnId(ownership, 'turn-new', 'session-new');
+    useComposerSessionContextStore.getState().bindCommittedSession(ownership, 'session-new');
 
     expect(useComposerSessionContextStore.getState().activeTurn).toMatchObject({
       sessionId: 'session-new',
       requestId: 'req-new',
       agentId: 'plan',
-      realTurnId: 'turn-new',
     });
 
     useComposerSessionContextStore.getState().clearActiveTurnIfOwned(ownership);

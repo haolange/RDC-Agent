@@ -14,13 +14,52 @@
   text-align: left;
   font-weight: var(--font-normal);
 }
-.right-rail-compact-row + .right-rail-compact-row { border-top: 1px solid var(--token-border-subtle); }
+.right-rail-compact-row + .right-rail-compact-row {
+  border-top: 1px solid var(--token-border-subtle);
+}
 .right-rail-compact-row:hover,
-.right-rail-compact-row:focus-visible { background: var(--token-bg-muted); }
-.right-rail-compact-icon { display: inline-flex; color: var(--token-text-secondary); }
-.right-rail-compact-icon svg { width: var(--space-4); height: var(--space-4); fill: none; stroke: currentColor; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
-.right-rail-compact-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--type-body-size); }
-.right-rail-compact-copy { display: flex; flex-direction: column; min-width: 0; }
-.right-rail-compact-kind { color: var(--token-text-secondary); font-size: var(--type-meta-size); font-weight: var(--font-normal); line-height: var(--type-meta-line); }
-.right-rail-browse-all.button { width: 100%; margin-top: var(--space-1); color: var(--token-text-secondary); }
-.right-rail-resource-detail { display: grid; gap: var(--space-2); overflow-wrap: anywhere; }
+.right-rail-compact-row:focus-visible {
+  background: var(--token-bg-muted);
+}
+.right-rail-compact-icon {
+  display: inline-flex;
+  color: var(--token-text-secondary);
+}
+.right-rail-compact-icon svg {
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.right-rail-compact-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--type-body-size);
+}
+.project-capture-input-list,
+.right-rail-compact-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.right-rail-compact-kind {
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-normal);
+  line-height: var(--type-meta-line);
+}
+.right-rail-browse-all.button {
+  width: 100%;
+  margin-top: var(--space-1);
+  color: var(--token-text-secondary);
+}
+.right-rail-resource-detail {
+  display: grid;
+  gap: var(--space-2);
+  overflow-wrap: anywhere;
+}

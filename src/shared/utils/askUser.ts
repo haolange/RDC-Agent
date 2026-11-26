@@ -28,10 +28,7 @@ const makeUniqueId = (base: string, used: Set<string>): string => {
   return candidate;
 };
 
-const normalizeOptions = (
-  rawOptions: unknown,
-  questionId: string,
-): ConversationAskUserOption[] => {
+const normalizeOptions = (rawOptions: unknown, questionId: string): ConversationAskUserOption[] => {
   if (!Array.isArray(rawOptions)) return [];
   const used = new Set<string>();
   return rawOptions.flatMap((entry, index): ConversationAskUserOption[] => {
@@ -39,10 +36,7 @@ const normalizeOptions = (
     if (!record) return [];
     const label = readNonEmptyString(record.label);
     if (!label) return [];
-    const optionId = makeUniqueId(
-      readNonEmptyString(record.optionId) ?? `${questionId}-option-${index + 1}`,
-      used,
-    );
+    const optionId = makeUniqueId(readNonEmptyString(record.optionId) ?? `${questionId}-option-${index + 1}`, used);
     const description = readNonEmptyString(record.description) ?? undefined;
     return [{ optionId, label, description }];
   });
@@ -59,22 +53,21 @@ export const normalizeAskUserQuestions = (value: unknown): ConversationAskUserQu
     const prompt = readNonEmptyString(questionRecord.prompt);
     if (!prompt) return [];
 
-    const questionId = makeUniqueId(
-      readNonEmptyString(questionRecord.questionId) ?? `q${index + 1}`,
-      used,
-    );
+    const questionId = makeUniqueId(readNonEmptyString(questionRecord.questionId) ?? `q${index + 1}`, used);
     const options = normalizeOptions(questionRecord.options, questionId);
     const allowFreeform = options.length === 0 || questionRecord.allowFreeform !== false;
     const description = readNonEmptyString(questionRecord.description) ?? undefined;
 
-    return [{
-      questionId,
-      prompt,
-      description,
-      options,
-      allowFreeform,
-      ...(typeof questionRecord.required === 'boolean' ? { required: questionRecord.required } : {}),
-    }];
+    return [
+      {
+        questionId,
+        prompt,
+        description,
+        options,
+        allowFreeform,
+        ...(typeof questionRecord.required === 'boolean' ? { required: questionRecord.required } : {}),
+      },
+    ];
   });
 };
 
@@ -83,19 +76,24 @@ export const normalizeAskUserAnswers = (
   value: unknown,
 ): ConversationAskUserAnswer[] => {
   const record = asRecord(value);
-  const rawAnswers = Array.isArray(record?.answers)
-    ? record.answers
-    : Array.isArray(value)
-      ? value
-      : [];
+  const rawAnswers = Array.isArray(record?.answers) ? record.answers : Array.isArray(value) ? value : [];
   const questionIds = new Set(questions.map((question) => question.questionId));
 
   return rawAnswers.flatMap((entry): ConversationAskUserAnswer[] => {
     const answerRecord = asRecord(entry);
     if (!answerRecord) return [];
     const questionId = readNonEmptyString(answerRecord.questionId);
-    const responseKind = answerRecord.responseKind === 'unknown' || answerRecord.responseKind === 'skipped' ? answerRecord.responseKind : undefined;
-    const answer = readNonEmptyString(answerRecord.answer) ?? (responseKind === 'unknown' ? 'Unknown; no assumption confirmed.' : responseKind === 'skipped' ? 'Optional question skipped; no decision made.' : null);
+    const responseKind =
+      answerRecord.responseKind === 'unknown' || answerRecord.responseKind === 'skipped'
+        ? answerRecord.responseKind
+        : undefined;
+    const answer =
+      readNonEmptyString(answerRecord.answer) ??
+      (responseKind === 'unknown'
+        ? 'Unknown; no assumption confirmed.'
+        : responseKind === 'skipped'
+          ? 'Optional question skipped; no decision made.'
+          : null);
     if (!questionId || !answer || !questionIds.has(questionId)) return [];
     const selectedOptionId = readNonEmptyString(answerRecord.selectedOptionId) ?? undefined;
     return [{ questionId, answer, selectedOptionId, ...(responseKind ? { responseKind } : {}) }];

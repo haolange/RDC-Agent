@@ -4,7 +4,7 @@
 
 ## Scope 与存储
 
-用户资源根：`~/.rdc-agent`。项目资源根：`<project-root>/.rdc-agent`。无配置 workspace root、无旧目录 fallback、无静默迁移。`RDC_AGENT_HOME` 只供测试与 disposable Browser QA 隔离使用，不是用户配置入口。
+用户资源根：`~/.rdc-agent`。项目资源根：`<project-root>/.rdc-agent`。无配置 workspace root、无旧目录 fallback、无静默迁移。用户资源根只由 `os.homedir()` 决定，没有环境变量覆盖；测试经 `HOME`/`USERPROFILE` 隔离，disposable Browser QA 在启动时把它指到自己的临时 userData（见 `docs/architecture/browser-qa-surface.md`）。
 
 ```text
 ~/.rdc-agent/

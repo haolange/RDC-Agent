@@ -75,12 +75,7 @@ export interface ProviderUsageDraft {
 
 /** Build a Usage object with normalized cacheHit/cacheMiss attached when available. */
 export function finalizeProviderUsage(draft: ProviderUsageDraft): import('../../core/types').Usage {
-  const {
-    promptCacheHitTokens,
-    promptCacheMissTokens,
-    totalTokens,
-    ...rest
-  } = draft;
+  const { promptCacheHitTokens, promptCacheMissTokens, totalTokens, ...rest } = draft;
   const normalized = normalizeCacheUsage({
     inputTokens: draft.inputTokens,
     cacheReadTokens: draft.cacheReadTokens,
@@ -90,7 +85,7 @@ export function finalizeProviderUsage(draft: ProviderUsageDraft): import('../../
   return {
     inputTokens: rest.inputTokens,
     outputTokens: rest.outputTokens,
-    totalTokens: totalTokens ?? (rest.inputTokens + rest.outputTokens),
+    totalTokens: totalTokens ?? rest.inputTokens + rest.outputTokens,
     ...(rest.cacheReadTokens !== undefined ? { cacheReadTokens: rest.cacheReadTokens } : {}),
     ...(rest.cacheWriteTokens !== undefined ? { cacheWriteTokens: rest.cacheWriteTokens } : {}),
     ...(rest.cacheWriteLongTokens !== undefined ? { cacheWriteLongTokens: rest.cacheWriteLongTokens } : {}),

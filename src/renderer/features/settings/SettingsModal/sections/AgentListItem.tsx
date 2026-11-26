@@ -16,18 +16,24 @@ interface AgentListItemProps {
 
 /** Presentation only; scope, translated copy and selection remain parent-owned. */
 export const AgentListItem: React.FC<AgentListItemProps> = ({
-  id, name, description, icon, selected, disabled, onSelect,
+  id,
+  name,
+  description,
+  icon,
+  selected,
+  disabled,
+  onSelect,
 }) => (
   <ListRow
     className="settings-agent-list-item"
     selected={selected}
     disabled={disabled}
     onClick={onSelect}
-    leading={(
+    leading={
       <span className="settings-agent-list-item-icon" aria-hidden="true">
         <ModeGlyph mode={id} icon={icon ?? 'message-orbit'} size={18} strokeWidth={1.9} />
       </span>
-    )}
+    }
   >
     <span className="settings-agent-list-item-copy">
       <span className="settings-agent-list-item-name">{name}</span>

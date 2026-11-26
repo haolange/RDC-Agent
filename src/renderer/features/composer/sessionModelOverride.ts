@@ -1,104 +1,91 @@
 import { getElectronApi } from '../../platform/getElectronApi';
-import { useProjectStore } from '../../stores/projectStore';
+import { RevisionLanes } from '../../lib/revisionLanes';
+import { useSessionRecordStore } from '../../stores/sessionRecordStore';
 import {
   clearComposerDraftModel,
   readComposerDraftModel,
+  writeComposerDraftAgent,
   writeComposerDraftModel,
 } from '../../stores/composerModelDraftStore';
-import type { SessionModelOverride, SessionRecord } from '@shared/types/session';
+import type { SessionModelOverride, SessionModelWriteRequest } from '@shared/types/session';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 
-export function applySessionRecordToStore(session: SessionRecord): void {
-  const store = useProjectStore.getState();
-  if (!store.currentSession || store.currentSession.sessionId === session.sessionId) {
-    store.setCurrentSession(session);
-  }
-  const sessions = store.sessions.some((entry) => entry.sessionId === session.sessionId)
-    ? store.sessions.map((entry) => (entry.sessionId === session.sessionId ? session : entry))
-    : [session, ...store.sessions];
-  store.setSessions(sessions);
+type SessionModelField = 'modelOverride' | 'turnControls';
+
+export interface SessionModelSaveResult {
+  ok: boolean;
+  /** The failure main answered with, for humanizeError; a missing session or bridge is a code string. */
+  error?: unknown;
+  /** Whether this was still the newest intent of its field when main answered. */
+  latest: boolean;
 }
 
-async function saveSessionModelOverride(
+/**
+ * A session's model override and its turn controls are two revision lanes. Each choice goes to main at once with the
+ * lane's next revision; main writes a field only for a revision newer than the last one it wrote for that field, so
+ * a late answer to an earlier choice never undoes a later one and nothing waits in a renderer queue. The flush lane
+ * of a session holds every save in flight for it.
+ */
+const lanes = new RevisionLanes();
+const laneOf = (sessionId: string, field: SessionModelField): string => `${sessionId}\u0000${field}`;
+
+async function saveSessionModelField(
   sessionId: string | null | undefined,
-  modelOverride: SessionModelOverride | null | undefined,
-  turnControls?: ConversationTurnControls,
-  isCurrent: () => boolean = () => true,
-): Promise<{ ok: boolean; error?: string }> {
-  if (!sessionId) return { ok: false, error: 'SESSION_MISSING' };
+  field: SessionModelField,
+  write: Omit<SessionModelWriteRequest, 'clientRevision'>,
+): Promise<SessionModelSaveResult> {
+  if (!sessionId) return { ok: false, error: 'SESSION_MISSING', latest: true };
   const api = getElectronApi();
-  if (!api) return { ok: false, error: 'BRIDGE_UNAVAILABLE' };
-  try {
-    const latest = useProjectStore.getState().currentSession;
-    if (modelOverride === undefined && latest?.sessionId !== sessionId) return { ok: false, error: 'MODEL_SAVE_CANCELLED' };
-    const override = modelOverride === undefined ? latest?.modelOverride ?? null : modelOverride;
-    const result = turnControls
-      ? await api.session.setModelOverride(sessionId, override, turnControls)
-      : await api.session.setModelOverride(sessionId, override);
-    if (!result.success || !result.session) return { ok: false, error: result.error || 'MODEL_UNAVAILABLE' };
-    if (isCurrent()) applySessionRecordToStore(result.session);
-    return { ok: true };
-  } catch {
-    return { ok: false, error: 'MODEL_SAVE_FAILED' };
-  }
-}
-
-const sessionSaves = new Map<string, Promise<{ ok: boolean; error?: string }>>();
-function enqueueSessionModelSave(
-  sessionId: string | null | undefined,
-  modelOverride: SessionModelOverride | null | undefined,
-  turnControls?: ConversationTurnControls,
-): Promise<{ ok: boolean; error?: string }> {
-  if (!sessionId) return Promise.resolve({ ok: false, error: 'SESSION_MISSING' });
-  const initial = useProjectStore.getState();
-  const projectId = initial.currentProject?.projectId;
-  const selectedSessionId = initial.currentSession?.sessionId;
-  let invalidated = false;
-  const off = useProjectStore.subscribe((state) => {
-    if (state.currentProject?.projectId !== projectId || state.currentSession?.sessionId !== selectedSessionId) invalidated = true;
+  if (!api) return { ok: false, error: 'BRIDGE_UNAVAILABLE', latest: true };
+  const lane = laneOf(sessionId, field);
+  const clientRevision = lanes.begin(lane);
+  const records = useSessionRecordStore.getState();
+  // The chosen model shows while its save is in flight; a failed save drops it again.
+  const intentId = field === 'modelOverride' ? records.beginIntent(sessionId, write) : null;
+  const saved = api.session.setModelOverride(sessionId, { ...write, clientRevision }).then((result) => {
+    records.accept(result.session);
   });
-  const save = () => invalidated ? Promise.resolve({ ok: false, error: 'MODEL_SAVE_CANCELLED' })
-    : saveSessionModelOverride(sessionId, modelOverride, turnControls, () => !invalidated);
-  const previous = sessionSaves.get(sessionId);
-  const pending = previous ? previous.then(save) : save();
-  sessionSaves.set(sessionId, pending);
-  void pending.finally(() => { off(); if (sessionSaves.get(sessionId) === pending) sessionSaves.delete(sessionId); });
-  return pending;
+  void lanes.track(lane, clientRevision, saved);
+  void lanes.track(sessionId, clientRevision, saved);
+  try {
+    await saved;
+    return { ok: true, latest: lanes.isLatest(lane, clientRevision) };
+  } catch (error) {
+    return { ok: false, error, latest: lanes.isLatest(lane, clientRevision) };
+  } finally {
+    if (intentId !== null) records.settleIntent(sessionId, intentId);
+  }
 }
 
 export function persistSessionModelOverride(
   sessionId: string | null | undefined,
   modelOverride: SessionModelOverride | null,
-  turnControls?: ConversationTurnControls,
-): Promise<{ ok: boolean; error?: string }> {
-  return enqueueSessionModelSave(sessionId, modelOverride, turnControls);
+): Promise<SessionModelSaveResult> {
+  return saveSessionModelField(sessionId, 'modelOverride', { modelOverride });
 }
 
-/** Resolve the model at queue execution time so an earlier model edit is retained. */
-export function persistSessionTurnControls(sessionId: string, turnControls: ConversationTurnControls) {
-  return enqueueSessionModelSave(sessionId, undefined, turnControls);
+export function persistSessionTurnControls(
+  sessionId: string,
+  turnControls: ConversationTurnControls,
+): Promise<SessionModelSaveResult> {
+  return saveSessionModelField(sessionId, 'turnControls', { turnControls });
 }
 
-export function flushSessionModelSaves(sessionId: string): Promise<void> | undefined {
-  const first = sessionSaves.get(sessionId);
-  if (!first) return undefined;
-  return (async () => {
-    let pending: typeof first | undefined = first;
-    while (pending) {
-      const result = await pending;
-      if (!result.ok) throw new Error(result.error || 'MODEL_SAVE_FAILED');
-      const latest = sessionSaves.get(sessionId);
-      if (latest === pending) return;
-      pending = latest;
-    }
-  })();
+/** Whether a save of the session's turn controls is still in flight. */
+export function isSessionTurnControlsSaving(sessionId: string): boolean {
+  return lanes.busy(laneOf(sessionId, 'turnControls'));
+}
+
+/** Resolves once every model and control save of the session in flight has landed; fails if the newest one failed. */
+export function flushSessionModelSaves(sessionId: string): Promise<void> {
+  return lanes.settled(sessionId);
 }
 
 export async function commitComposerModelChoice(
   model: SessionModelOverride,
   sessionId: string | null | undefined,
   projectId: string | null | undefined,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: unknown }> {
   if (sessionId) {
     return persistSessionModelOverride(sessionId, model);
   }
@@ -109,7 +96,7 @@ export async function commitComposerModelChoice(
 export async function clearComposerModelChoice(
   sessionId: string | null | undefined,
   projectId: string | null | undefined,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: unknown }> {
   if (sessionId) {
     return persistSessionModelOverride(sessionId, null);
   }
@@ -122,6 +109,8 @@ export async function persistComposerDraftToSession(
   projectId: string | null | undefined,
 ): Promise<void> {
   if (!sessionId) return;
+  // The first turn carried the draft Agent and main wrote it to the new session.
+  writeComposerDraftAgent(projectId, null);
   const draft = readComposerDraftModel(projectId);
   if (!draft) return;
   const result = await persistSessionModelOverride(sessionId, draft);

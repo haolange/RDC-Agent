@@ -1,7 +1,7 @@
 .markdown-body {
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
-  line-height: 1.75;
+  line-height: var(--leading-relaxed);
   overflow-wrap: anywhere;
 }
 
@@ -26,16 +26,35 @@
   margin: var(--space-5) 0 var(--space-2);
   color: var(--token-text-primary);
   font-weight: var(--font-semibold);
-  line-height: 1.35;
+  line-height: var(--leading-snug);
 }
 
 /* Six levels on the four type roles: size steps down, then weight and colour carry the last levels. */
-.markdown-body h1 { margin-top: var(--space-6); font-size: var(--type-title-size); }
-.markdown-body h2 { font-size: var(--type-reading-size); }
-.markdown-body h3 { font-size: var(--type-body-size); }
-.markdown-body h4 { margin-top: var(--space-4); font-size: var(--type-body-size); }
-.markdown-body h5 { margin-top: var(--space-4); color: var(--token-text-secondary); font-size: var(--type-body-size); }
-.markdown-body h6 { margin-top: var(--space-4); color: var(--token-text-secondary); font-size: var(--type-body-size); font-weight: var(--font-normal); }
+.markdown-body h1 {
+  margin-top: var(--space-6);
+  font-size: var(--type-title-size);
+}
+.markdown-body h2 {
+  font-size: var(--type-reading-size);
+}
+.markdown-body h3 {
+  font-size: var(--type-body-size);
+}
+.markdown-body h4 {
+  margin-top: var(--space-4);
+  font-size: var(--type-body-size);
+}
+.markdown-body h5 {
+  margin-top: var(--space-4);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+}
+.markdown-body h6 {
+  margin-top: var(--space-4);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
+}
 
 .markdown-body ul,
 .markdown-body ol {
@@ -94,12 +113,6 @@
   padding-left: var(--space-1);
 }
 
-.markdown-body li.task-list-item {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-
 .markdown-task-checkbox {
   margin-top: 0.35em;
   flex-shrink: 0;
@@ -113,7 +126,7 @@
   border: 1px solid color-mix(in srgb, var(--token-border-muted) 60%, transparent);
   color: var(--token-text-primary);
   font-family: var(--font-mono);
-  font-size: 0.92em;
+  font-size: inherit;
 }
 
 .markdown-body pre {
@@ -169,13 +182,14 @@
   overflow: auto;
 }
 
-.markdown-code-block-pre code {
+.markdown-code-block-pre code,
+.markdown-body pre code {
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.6;
+  line-height: var(--leading-relaxed);
 }
 
 .markdown-mermaid {
@@ -191,12 +205,6 @@
   display: block;
   max-width: 100%;
   height: auto;
-}
-
-.markdown-mermaid-fallback {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
 }
 
 .markdown-mermaid-error {
@@ -219,7 +227,7 @@
   background: color-mix(in srgb, var(--token-bg-raised) 60%, transparent);
   font-family: var(--font-mono);
   font-size: var(--type-meta-size);
-  line-height: 1.55;
+  line-height: var(--type-meta-line);
   white-space: pre-wrap;
 }
 
@@ -231,16 +239,7 @@
 
 .markdown-body .katex {
   color: var(--token-text-secondary);
-  font-size: 1.05em;
-}
-
-.markdown-body pre code {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  line-height: 1.6;
+  font-size: inherit;
 }
 
 .markdown-body blockquote {
@@ -310,7 +309,7 @@
 }
 
 .conversation-bubble-assistant .markdown-body {
-  line-height: 1.62;
+  line-height: var(--leading-relaxed);
 }
 
 .conversation-bubble-assistant .markdown-body p {

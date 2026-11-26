@@ -59,12 +59,6 @@
   outline-offset: var(--focus-ring-offset);
 }
 
-.knowledge-conflict-compare {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
 .knowledge-conflict-compare-head {
   display: flex;
   align-items: flex-start;
@@ -117,7 +111,7 @@
 .knowledge-conflict-pane-grid dt {
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.7;
+  line-height: var(--leading-relaxed);
 }
 
 .knowledge-conflict-pane-grid dd {
@@ -128,7 +122,7 @@
 
 .knowledge-conflict-pane-content {
   white-space: pre-wrap;
-  line-height: 1.6;
+  line-height: var(--leading-relaxed);
 }
 
 @container knowledge-detail (max-width: 34rem) {

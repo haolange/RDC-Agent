@@ -1,19 +1,6 @@
-.settings-local-tool-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
-}
-
 .settings-local-tool-form + .settings-local-tool-form {
   padding-top: var(--space-4);
   border-top: 1px solid var(--token-border-muted);
-}
-
-.settings-local-tool-grid {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
 }
 
 .settings-local-tool-grid .settings-field.is-row {
@@ -38,21 +25,6 @@
   min-width: 0;
 }
 
-.settings-input-with-action {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-.settings-rdc-location,
-.settings-rdc-apply {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
 .settings-rdc-location .input {
   flex: 1 1 18rem;
   min-width: 0;
@@ -67,8 +39,8 @@
   padding: var(--space-3) var(--space-2);
 }
 
-.settings-local-tool-grid input[type="number"],
-.settings-runtime-form-grid input[type="number"] {
+.settings-local-tool-grid input[type='number'],
+.settings-runtime-form-grid input[type='number'] {
   inline-size: min(100%, 7rem);
 }
 

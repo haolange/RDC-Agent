@@ -1,10 +1,11 @@
-import { isAgentToolExecutableModel, classifyAgentToolEligibility, describeAgentToolIneligibility } from '@shared/utils/agentToolCapability';
+import {
+  isAgentToolExecutableModel,
+  classifyAgentToolEligibility,
+  describeAgentToolIneligibility,
+} from '@shared/utils/agentToolCapability';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 
-export type CapabilityUnavailableReason =
-  | 'missing-model'
-  | 'missing-revision'
-  | 'route-mismatch';
+export type CapabilityUnavailableReason = 'missing-model' | 'missing-revision' | 'route-mismatch';
 // Provider availability is evaluated before a cached catalog may be used.
 
 export type CapabilityResolutionState =
@@ -26,14 +27,19 @@ export function resolveCatalogCapability(
 ): CapabilityResolutionState {
   const model = projection?.snapshot?.models.find((entry) => entry.modelId === expected.modelId) ?? null;
   const eligibility = model ? classifyAgentToolEligibility(model) : undefined;
-  const unresolved = !model || eligibility === 'availability-unknown' || eligibility === 'tools-unknown' || eligibility === 'budget-unknown';
+  const unresolved =
+    !model ||
+    eligibility === 'availability-unknown' ||
+    eligibility === 'tools-unknown' ||
+    eligibility === 'budget-unknown';
   if (!projection || ((projection.loading || projection.snapshot?.refreshing) && unresolved)) {
     return { status: 'loading' };
   }
   if (projection.error && unresolved) return { status: 'error', message: projection.error };
   const next = validateCapabilityResolution(expected, model);
   return next.status === 'ready' && (projection.loading || projection.snapshot?.refreshing)
-    ? { status: 'refreshing', model: next.model } : next;
+    ? { status: 'refreshing', model: next.model }
+    : next;
 }
 
 export function resolvedCapability(state: CapabilityResolutionState): EffectiveModel | null {
@@ -53,9 +59,15 @@ export function validateCapabilityResolution(
   }
   if (!isAgentToolExecutableModel(resolved)) {
     const eligibility = classifyAgentToolEligibility(resolved);
-    return { status: 'unavailable', reason: 'missing-model', message: resolved.unavailableReason
-      || (eligibility !== 'executable' ? describeAgentToolIneligibility(eligibility, expected.providerId, expected.modelId).userMessage
-        : 'The selected model is not executable.') };
+    return {
+      status: 'unavailable',
+      reason: 'missing-model',
+      message:
+        resolved.unavailableReason ||
+        (eligibility !== 'executable'
+          ? describeAgentToolIneligibility(eligibility, expected.providerId, expected.modelId).userMessage
+          : 'The selected model is not executable.'),
+    };
   }
   if (!resolved.catalogRevision || !resolved.routeRevision) {
     return {

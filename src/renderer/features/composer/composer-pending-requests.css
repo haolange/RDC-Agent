@@ -1,3 +1,13 @@
+/* Holds the height of a request the running turn just answered, so its next request takes the same place. */
+.composer-frame {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--composer-request-reserve);
+}
+
 .composer-shell-user-input,
 .composer-shell-tool-approval {
   padding: var(--space-2);
@@ -33,7 +43,8 @@
 }
 
 .composer-user-input-kicker,
-.composer-tool-approval-kicker {
+.composer-tool-approval-kicker,
+.composer-user-input-hint {
   color: var(--token-text-secondary);
   font-variant-numeric: tabular-nums;
   font-size: var(--type-meta-size);
@@ -44,14 +55,14 @@
   margin: 0;
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
-  line-height: 1.6;
+  line-height: var(--type-body-line);
   overflow-wrap: anywhere;
 }
 
 .composer-user-input-question-description {
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.5;
+  line-height: var(--type-meta-line);
   overflow-wrap: anywhere;
 }
 
@@ -80,9 +91,18 @@
 }
 
 /* Risk reads at a glance: low green, medium amber, high red. */
-.composer-tool-approval-meta .composer-tool-approval-risk.is-low { border-color: color-mix(in srgb, var(--token-status-success) 45%, transparent); color: var(--token-status-success); }
-.composer-tool-approval-meta .composer-tool-approval-risk.is-medium { border-color: color-mix(in srgb, var(--token-status-warning) 45%, transparent); color: var(--token-status-warning); }
-.composer-tool-approval-meta .composer-tool-approval-risk.is-high { border-color: color-mix(in srgb, var(--token-status-error) 45%, transparent); color: var(--token-status-error); }
+.composer-tool-approval-meta .composer-tool-approval-risk.is-low {
+  border-color: color-mix(in srgb, var(--token-status-success) 45%, transparent);
+  color: var(--token-status-success);
+}
+.composer-tool-approval-meta .composer-tool-approval-risk.is-medium {
+  border-color: color-mix(in srgb, var(--token-status-warning) 45%, transparent);
+  color: var(--token-status-warning);
+}
+.composer-tool-approval-meta .composer-tool-approval-risk.is-high {
+  border-color: color-mix(in srgb, var(--token-status-error) 45%, transparent);
+  color: var(--token-status-error);
+}
 
 .composer-tool-approval-meta span {
   min-height: var(--space-6);
@@ -113,16 +133,13 @@
 .composer-shell-tool-approval,
 .composer-shell-plan-review,
 .composer-shell-user-input {
-  animation: composer-pending-enter var(--duration-slow) var(--ease-decelerate) both;
-}
-
-@keyframes composer-pending-enter {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
+  animation: rise-in-4px var(--duration-slow) var(--ease-decelerate) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .composer-shell-tool-approval,
   .composer-shell-plan-review,
-  .composer-shell-user-input { animation: none; }
+  .composer-shell-user-input {
+    animation: none;
+  }
 }

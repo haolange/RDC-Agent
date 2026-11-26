@@ -22,14 +22,19 @@ function mcpTrustState(server: McpServerOverview): McpTrustState {
 function McpTrustBadge({ state }: { state: Exclude<McpTrustState, 'user'> }) {
   const { t } = useI18n();
   const tone = state === 'trusted' ? 'success' : state === 'override-rejected' ? 'error' : 'warning';
-  const label = state === 'trusted'
-    ? t('settings.mcpTrusted')
-    : state === 'needs-retrust'
-      ? t('settings.mcpNeedsRetrust')
-      : state === 'override-rejected'
-        ? t('settings.mcpOverrideRejected')
-        : t('settings.mcpUntrusted');
-  return <Badge tone={tone} data-testid="settings-mcp-trust-badge">{label}</Badge>;
+  const label =
+    state === 'trusted'
+      ? t('settings.mcpTrusted')
+      : state === 'needs-retrust'
+        ? t('settings.mcpNeedsRetrust')
+        : state === 'override-rejected'
+          ? t('settings.mcpOverrideRejected')
+          : t('settings.mcpUntrusted');
+  return (
+    <Badge tone={tone} data-testid="settings-mcp-trust-badge">
+      {label}
+    </Badge>
+  );
 }
 
 /**
@@ -54,9 +59,8 @@ export const McpTrustPanel: React.FC<{
     setBusy(true);
     setMessage('');
     try {
-      const next = action === 'trust'
-        ? await trustMcp(projectRoot, server.id)
-        : await revokeMcp(projectRoot, server.id);
+      const next =
+        action === 'trust' ? await trustMcp(projectRoot, server.id) : await revokeMcp(projectRoot, server.id);
       if (next) onChanged(next);
     } catch (error) {
       setMessage(errorDetail(error));
@@ -72,24 +76,31 @@ export const McpTrustPanel: React.FC<{
       title={t('settings.mcpTrustTitle')}
       hint={t('settings.mcpTrustHint')}
       badge={<McpTrustBadge state={state} />}
-      changed={state === 'needs-retrust' ? { message: t('settings.mcpTrustChanged'), testId: 'settings-mcp-trust-change' } : undefined}
-      actions={state !== 'override-rejected' ? (
-        <>
-          {state === 'trusted' || state === 'needs-retrust' ? (
-            <Button variant="secondary" size="sm" disabled={busy} onClick={() => void run('revoke')}>
-              {t('settings.mcpRevoke')}
-            </Button>
-          ) : null}
-          {state !== 'trusted' ? (
-            <Button variant="primary" size="sm" disabled={busy} onClick={() => void run('trust')}>
-              {t('settings.mcpTrust')}
-            </Button>
-          ) : null}
-        </>
-      ) : undefined}
+      changed={
+        state === 'needs-retrust'
+          ? { message: t('settings.mcpTrustChanged'), testId: 'settings-mcp-trust-change' }
+          : undefined
+      }
+      actions={
+        state !== 'override-rejected' ? (
+          <>
+            {state === 'trusted' || state === 'needs-retrust' ? (
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => void run('revoke')}>
+                {t('settings.mcpRevoke')}
+              </Button>
+            ) : null}
+            {state !== 'trusted' ? (
+              <Button variant="primary" size="sm" disabled={busy} onClick={() => void run('trust')}>
+                {t('settings.mcpTrust')}
+              </Button>
+            ) : null}
+          </>
+        ) : undefined
+      }
     >
-      {state === 'override-rejected' && server.blockedReason
-        ? <InlineError detail={server.blockedReason}>{t('settings.mcpOverrideRejectedMessage')}</InlineError> : null}
+      {state === 'override-rejected' && server.blockedReason ? (
+        <InlineError detail={server.blockedReason}>{t('settings.mcpOverrideRejectedMessage')}</InlineError>
+      ) : null}
       {message ? <InlineError detail={message}>{t('app.error.actionFailed')}</InlineError> : null}
     </ResourceTrustBlock>
   );

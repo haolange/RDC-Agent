@@ -41,7 +41,7 @@
   width: 3px;
   border-radius: var(--radius-full);
   background: var(--permission-tone);
-  content: "";
+  content: '';
   opacity: 0.72;
 }
 
@@ -56,5 +56,5 @@
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
-  line-height: 1.35;
+  line-height: var(--leading-snug);
 }

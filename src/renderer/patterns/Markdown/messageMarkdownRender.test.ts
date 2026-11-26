@@ -38,9 +38,7 @@ describe('MessageMarkdown pipeline for GPT thinking titles', () => {
   });
 
   it('renders mixed summary title plus body', () => {
-    const html = renderMarkdown(
-      '**Planning project purpose inspection**\n\nI will inspect the repository next.',
-    );
+    const html = renderMarkdown('**Planning project purpose inspection**\n\nI will inspect the repository next.');
     expect(html).toContain('<strong>Planning project purpose inspection</strong>');
     expect(html).not.toContain('**');
   });
@@ -55,10 +53,12 @@ describe('MessageMarkdown pipeline for GPT thinking titles', () => {
   });
 
   it('keeps GFM strong when heavy plugins are deferred for streaming', () => {
-    const html = renderToStaticMarkup(createElement(MessageMarkdown, {
-      content: '**Planning project purpose inspection**',
-      deferHeavyPlugins: true,
-    }));
+    const html = renderToStaticMarkup(
+      createElement(MessageMarkdown, {
+        content: '**Planning project purpose inspection**',
+        deferHeavyPlugins: true,
+      }),
+    );
     expect(html).toContain('<strong>Planning project purpose inspection</strong>');
     expect(html).not.toContain('**Planning project purpose inspection**');
   });

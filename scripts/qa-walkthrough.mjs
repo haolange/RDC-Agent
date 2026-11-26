@@ -21,7 +21,9 @@ const args = process.argv.slice(2);
 const [logPath, shotDir] = args;
 if (!logPath || !shotDir) throw new Error('usage: qa-walkthrough.mjs <qa-log> <shot-dir> [--capture <file.rdc>]');
 const capture = args.includes('--capture') ? args[args.indexOf('--capture') + 1] : null;
-const knowledgePackages = args.includes('--knowledge') ? args[args.indexOf('--knowledge') + 1].split(',').filter(Boolean) : [];
+const knowledgePackages = args.includes('--knowledge')
+  ? args[args.indexOf('--knowledge') + 1].split(',').filter(Boolean)
+  : [];
 fs.mkdirSync(shotDir, { recursive: true });
 
 const { browser, page } = await openApp(logPath);
@@ -48,8 +50,12 @@ function gradientPng(width, height) {
   header.writeUInt32BE(width, 0);
   header.writeUInt32BE(height, 4);
   header.set([8, 2, 0, 0, 0], 8);
-  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', header),
-    chunk('IDAT', zlib.deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', header),
+    chunk('IDAT', zlib.deflateSync(rows)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
 }
 
 const startedAt = Date.now();
@@ -88,19 +94,36 @@ const KNOWLEDGE_CASES = [
   ['qa-hair-darkening', 'Adreno 740 头发偏暗 / KajiyaDiffuse', '头发比参考静帧暗一档，只在 Adreno 740 上出现。'],
   ['qa-shadow-acne', '阴影贴图条纹 / 深度偏移过小', '地面出现斜向条纹，随相机距离变化。'],
 ];
-const knowledgeCase = (caseId, title, symptom) => [
-  `case_id: ${caseId}`, `title: ${title}`, 'meta:', '  status: fixed', '  severity: high',
-  'environment:', '  platform: Android', '  api: Vulkan', '  gpu_vendor: Qualcomm',
-  'symptoms:', `  visual: ${symptom}`,
-  'root_cause:', '  phenomenon: 输出偏暗', '  first_bad_event: 着色阶段', '  responsible_layer: shader',
-  'fix:', '  summary: 调整能量项并在同一 capture 上复核。',
-  'verification_plan:', '  - 回放相同 pass 并与参考图对比',
-].join('\n');
+const knowledgeCase = (caseId, title, symptom) =>
+  [
+    `case_id: ${caseId}`,
+    `title: ${title}`,
+    'meta:',
+    '  status: fixed',
+    '  severity: high',
+    'environment:',
+    '  platform: Android',
+    '  api: Vulkan',
+    '  gpu_vendor: Qualcomm',
+    'symptoms:',
+    `  visual: ${symptom}`,
+    'root_cause:',
+    '  phenomenon: 输出偏暗',
+    '  first_bad_event: 着色阶段',
+    '  responsible_layer: shader',
+    'fix:',
+    '  summary: 调整能量项并在同一 capture 上复核。',
+    'verification_plan:',
+    '  - 回放相同 pass 并与参考图对比',
+  ].join('\n');
 
 const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-qa-project-'));
 fs.mkdirSync(path.join(projectRoot, 'docs'));
 fs.writeFileSync(path.join(projectRoot, 'docs', 'frame.png'), gradientPng(480, 270));
-fs.writeFileSync(path.join(projectRoot, 'docs', 'notes.md'), '# 调查笔记\n\n- 这一帧只有一次 draw 调用。\n- 管线状态待回放后读取。\n');
+fs.writeFileSync(
+  path.join(projectRoot, 'docs', 'notes.md'),
+  '# 调查笔记\n\n- 这一帧只有一次 draw 调用。\n- 管线状态待回放后读取。\n',
+);
 if (capture) fs.copyFileSync(capture, path.join(projectRoot, path.basename(capture)));
 
 try {
@@ -117,7 +140,10 @@ try {
       await page.getByTestId('knowledge-center-import-items').waitFor({ timeout: 30_000 });
       if (index === 0) await shot('02a-knowledge-import-preview');
       await page.getByTestId('knowledge-center-import-run').click();
-      await page.getByTestId('knowledge-center-import-run').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => undefined);
+      await page
+        .getByTestId('knowledge-center-import-run')
+        .waitFor({ state: 'detached', timeout: 30_000 })
+        .catch(() => undefined);
       await closeOverlays(page, 1);
     }
     await page.locator('.knowledge-center-card-button').first().click();
@@ -129,13 +155,27 @@ try {
     if (!knowledgePackages.length) return;
     // The import channel is high-impact: the QA instance runs with full access and confirms in the main process.
     for (const filePath of knowledgePackages) {
-      const result = await page.evaluate((file) => window.electronAPI.knowledge.import({ spaceId: 'user', filePath: file }), filePath);
-      console.log(`[walkthrough] knowledge package ${path.basename(filePath)}: ${JSON.stringify(result?.items?.map((item) => item.status) ?? result)}`);
+      const result = await page.evaluate(
+        (file) =>
+          window.electronAPI.knowledge.import({
+            operationId: crypto.randomUUID(),
+            spaceId: 'user',
+            filePath: file,
+          }),
+        filePath,
+      );
+      console.log(
+        `[walkthrough] knowledge package ${path.basename(filePath)}: ${JSON.stringify(result?.items?.map((item) => item.status) ?? result)}`,
+      );
     }
     await page.getByTestId('sidebar-knowledge-center-trigger').click();
     await page.waitForTimeout(1200);
     await shot('02c-knowledge-real-list');
-    await page.locator('.knowledge-center-card-button').filter({ hasText: /发白|发黑/ }).first().click();
+    await page
+      .locator('.knowledge-center-card-button')
+      .filter({ hasText: /发白|发黑/ })
+      .first()
+      .click();
     await page.getByTestId('knowledge-center-detail').waitFor({ timeout: 30_000 });
     await page.waitForTimeout(800);
     await shot('02d-knowledge-real-reader');
@@ -170,10 +210,14 @@ try {
     const dialog = page.getByTestId('settings-provider-connect-dialog');
     await dialog.getByRole('button', { name: /^(检查连接|Check connection)$/ }).click();
     // The service is not saved yet: its discovered models must still settle instead of reading as loading.
-    await page.waitForFunction(() => {
-      const rows = [...document.querySelectorAll('[data-testid^="settings-provider-model-row-"]')];
-      return rows.length > 0 && rows.every((row) => row.getAttribute('data-availability-badge') !== 'loading');
-    }, null, { timeout: 15_000 });
+    await page.waitForFunction(
+      () => {
+        const rows = [...document.querySelectorAll('[data-testid^="settings-provider-model-row-"]')];
+        return rows.length > 0 && rows.every((row) => row.getAttribute('data-availability-badge') !== 'loading');
+      },
+      null,
+      { timeout: 15_000 },
+    );
     await shot('03b-settings-provider-panel');
     await dialog.getByRole('button', { name: /^(保存|连接|Save|Connect)$/ }).click();
     await page.waitForTimeout(2500);
@@ -217,7 +261,10 @@ try {
     await shot('08-turn-settled');
   });
   await step('rail-tasks', async () => {
-    await page.getByRole('tab', { name: /任务|进度|Tasks|Progress/ }).first().click();
+    await page
+      .getByRole('tab', { name: /任务|进度|Tasks|Progress/ })
+      .first()
+      .click();
     await shot('09-rail-tasks');
   });
   await step('context-usage', async () => {
@@ -235,7 +282,9 @@ try {
   });
   await step('scroll', async () => {
     const scroller = page.locator('.chat-messages').first();
-    await scroller.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    await scroller.evaluate((node) => {
+      node.scrollTop = node.scrollHeight;
+    });
     const box = await scroller.boundingBox();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     const positions = [await scroller.evaluate((node) => node.scrollTop)];
@@ -284,7 +333,11 @@ try {
 
   await step('plan', async () => {
     await page.getByTestId('composer-mode-pill').click();
-    await page.getByRole('menuitemradio', { name: /Debugger/ }).or(page.getByRole('option', { name: /Debugger/ })).first().click();
+    await page
+      .getByRole('menuitemradio', { name: /Debugger/ })
+      .or(page.getByRole('option', { name: /Debugger/ }))
+      .first()
+      .click();
     await send('qa:plan 定位这一帧唯一的 draw 调用。');
     await page.getByTestId('plan-review-request-panel').waitFor({ timeout: 90_000 });
     await page.waitForTimeout(800);
@@ -295,11 +348,19 @@ try {
     // A revision request produces the next revision in the same session; the CoT card follows it.
     await page.locator('.composer-plan-review__feedback').fill('补上对照参考帧复核和未知项记录这两步。');
     await page.keyboard.press('Enter');
-    await page.getByTestId('plan-review-request-panel').waitFor({ state: 'detached', timeout: 30_000 }).catch(() => undefined);
+    await page
+      .getByTestId('plan-review-request-panel')
+      .waitFor({ state: 'detached', timeout: 30_000 })
+      .catch(() => undefined);
     await page.getByTestId('plan-review-request-panel').waitFor({ timeout: 90_000 });
     await page.waitForTimeout(800);
     await shot('13b-plan-revised');
-    await page.getByTestId('plan-review-request-panel').getByTestId('handoff-action-row').getByRole('button').first().click();
+    await page
+      .getByTestId('plan-review-request-panel')
+      .getByTestId('handoff-action-row')
+      .getByRole('button')
+      .first()
+      .click();
     await waitForText('它验证流式推理');
     await page.waitForTimeout(1200);
     await shot('14-plan-handoff');
@@ -310,10 +371,19 @@ try {
     // The previous execution must settle first; the Agent pill is locked while a turn runs.
     await page.getByTestId('debugger-start-button').waitFor({ timeout: 180_000 });
     await page.getByTestId('composer-mode-pill').click();
-    await page.getByRole('menuitemradio', { name: /Debugger/ }).or(page.getByRole('option', { name: /Debugger/ })).first().click();
+    await page
+      .getByRole('menuitemradio', { name: /Debugger/ })
+      .or(page.getByRole('option', { name: /Debugger/ }))
+      .first()
+      .click();
     await send('qa:partial 定位这一帧唯一的 draw 调用，并读取它的管线状态。');
     await page.getByTestId('plan-review-request-panel').waitFor({ timeout: 90_000 });
-    await page.getByTestId('plan-review-request-panel').getByTestId('handoff-action-row').getByRole('button').first().click();
+    await page
+      .getByTestId('plan-review-request-panel')
+      .getByTestId('handoff-action-row')
+      .getByRole('button')
+      .first()
+      .click();
     await waitForText('导入 capture 后，从事件树开始继续');
     await page.waitForTimeout(1500);
     await shot('14d-partial-settled');
@@ -335,7 +405,10 @@ try {
   });
   await step('english', async () => {
     await openSettings(page, 'general');
-    await page.locator('.settings-page-general').getByRole('tab', { name: /^English$/ }).click();
+    await page
+      .locator('.settings-page-general')
+      .getByRole('tab', { name: /^English$/ })
+      .click();
     await page.waitForTimeout(800);
     await shot('19-en-settings-general');
     await closeOverlays(page);
@@ -357,7 +430,10 @@ try {
     await page.goto(pseudo.toString());
     await page.waitForTimeout(1500);
     await openSettings(page, 'general');
-    await page.locator('.settings-page-general').getByRole('tab', { name: /^简体中文$/ }).click();
+    await page
+      .locator('.settings-page-general')
+      .getByRole('tab', { name: /^简体中文$/ })
+      .click();
     await closeOverlays(page);
   });
 
@@ -382,5 +458,7 @@ try {
   fs.rmSync(projectRoot, { recursive: true, force: true });
 }
 
-console.log(failures.length ? `[walkthrough] ${failures.length} step(s) failed: ${failures.join(', ')}` : '[walkthrough] OK');
+console.log(
+  failures.length ? `[walkthrough] ${failures.length} step(s) failed: ${failures.join(', ')}` : '[walkthrough] OK',
+);
 process.exit(failures.length ? 1 : 0);

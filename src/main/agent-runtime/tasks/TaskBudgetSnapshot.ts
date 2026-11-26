@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import type { TaskBudgetState, TaskExecutionRecord, TaskRecord, TaskRootBudgetRecord } from './TaskContracts';
 import type { TaskRegistry } from './TaskRegistry';
 
@@ -29,24 +30,41 @@ export async function readTaskBudgetSnapshot(
 ): Promise<TaskBudgetSnapshot> {
   const execution = task.currentExecutionId ? await registry.getExecution(task.currentExecutionId) : null;
   if (execution && (execution.taskId !== task.id || execution.id !== task.currentExecutionId)) {
-    throw new Error('TASK_BUDGET_EXECUTION_MISMATCH');
+    throw new AppError('TASK_BUDGET_EXECUTION_MISMATCH');
   }
   const root = execution?.rootBudgetId ? await registry.getRootBudget(execution.rootBudgetId) : null;
-  if (root && root.id !== execution!.rootBudgetId) throw new Error('TASK_BUDGET_ROOT_ID_MISMATCH');
+  if (root && root.id !== execution!.rootBudgetId) throw new AppError('TASK_BUDGET_ROOT_ID_MISMATCH');
   const observedAt = Date.now();
   return {
     observedAt,
     isReservation: false,
-    unavailableReason: !task.currentExecutionId ? 'no-execution' : !execution ? 'execution-missing'
-      : !execution.rootBudgetId ? 'root-unbound' : !root ? 'root-missing' : null,
-    execution: execution ? { id: execution.id, generation: execution.generation, mode: execution.mode,
-      status: execution.status, budget: execution.budget, updatedAt: execution.updatedAt } : null,
+    unavailableReason: !task.currentExecutionId
+      ? 'no-execution'
+      : !execution
+        ? 'execution-missing'
+        : !execution.rootBudgetId
+          ? 'root-unbound'
+          : !root
+            ? 'root-missing'
+            : null,
+    execution: execution
+      ? {
+          id: execution.id,
+          generation: execution.generation,
+          mode: execution.mode,
+          status: execution.status,
+          budget: execution.budget,
+          updatedAt: execution.updatedAt,
+        }
+      : null,
     root,
-    rootRemaining: root ? {
-      toolCalls: Math.max(0, root.maxToolCalls - root.toolCalls),
-      subagents: Math.max(0, root.maxSubagents - root.subagents),
-      wallTimeMs: Math.max(0, root.deadlineAt - observedAt),
-    } : null,
-    live: root && execution?.status === 'running' ? readLiveBudget?.(root.id) ?? null : null,
+    rootRemaining: root
+      ? {
+          toolCalls: Math.max(0, root.maxToolCalls - root.toolCalls),
+          subagents: Math.max(0, root.maxSubagents - root.subagents),
+          wallTimeMs: Math.max(0, root.deadlineAt - observedAt),
+        }
+      : null,
+    live: root && execution?.status === 'running' ? (readLiveBudget?.(root.id) ?? null) : null,
   };
 }

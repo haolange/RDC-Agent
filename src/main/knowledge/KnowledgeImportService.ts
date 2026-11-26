@@ -1,7 +1,10 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { writeFileAtomic } from '../runtime/atomicFile';
+import { StorageIo } from '../runtime/StorageIo';
 import { KnowledgeDraftMigrationConflictError } from './knowledgeErrors';
+import { assertSafeKnowledgeWriteTarget } from './knowledgeFs';
+import { isKnowledgeImagePathAllowed } from './knowledgeImages';
 import {
   hashKnowledgeImportBytes,
   ingestKnowledge,
@@ -18,6 +21,7 @@ import { KnowledgeIndexService } from './KnowledgeIndexService';
 import { KnowledgeQueryService, knowledgeQueryService } from './KnowledgeQueryService';
 import { knowledgeWriteService, KnowledgeWriteService } from './KnowledgeWriteService';
 import type { KnowledgeDurableDraft } from './knowledgeStateSchema';
+import type { KnowledgeOperationOptions } from './knowledgeOperations';
 import type {
   KnowledgeCardDetail,
   KnowledgeCardRecord,
@@ -68,10 +72,7 @@ function sourceHashOf(item: KnowledgeImportItem, result: KnowledgeImportResult):
   return item.record?.sourceHash ?? result.sourceHash;
 }
 
-function attachInlineSourceHash(
-  result: KnowledgeImportPathResult,
-  source: string,
-): KnowledgeImportPathResult {
+function attachInlineSourceHash(result: KnowledgeImportPathResult, source: string): KnowledgeImportPathResult {
   if (result.sourceHash) return result;
   const bytes = Buffer.from(source, 'utf8');
   const sourceHash = hashKnowledgeImportBytes(bytes);
@@ -95,10 +96,7 @@ function sameSource(occupant: KnowledgeSpaceOccupant, hash: string | undefined):
   return Boolean(hash && occupant.sourceHash && occupant.sourceHash === hash);
 }
 
-function alreadyPresentItem(
-  item: KnowledgeImportItem,
-  occupant: KnowledgeSpaceOccupant,
-): KnowledgeImportItem {
+function alreadyPresentItem(item: KnowledgeImportItem, occupant: KnowledgeSpaceOccupant): KnowledgeImportItem {
   const record = item.record;
   return {
     status: 'draft',
@@ -110,33 +108,30 @@ function alreadyPresentItem(
     ...(item.sourceStatus ? { sourceStatus: item.sourceStatus } : {}),
     record: record
       ? {
-        ...record,
-        cardId: occupant.cardId,
-        relativePath: occupant.relativePath,
-        title: occupant.title,
-        ...(occupant.caseId ? { caseId: occupant.caseId } : {}),
-        ...(occupant.sourceHash ? { sourceHash: occupant.sourceHash } : {}),
-      }
+          ...record,
+          cardId: occupant.cardId,
+          relativePath: occupant.relativePath,
+          title: occupant.title,
+          ...(occupant.caseId ? { caseId: occupant.caseId } : {}),
+          ...(occupant.sourceHash ? { sourceHash: occupant.sourceHash } : {}),
+        }
       : {
-        cardId: occupant.cardId,
-        spaceId: occupant.spaceId,
-        relativePath: occupant.relativePath,
-        type: 'case',
-        lifecycle: 'draft',
-        title: occupant.title,
-        scope: {},
-        relations: [],
-        body: '',
-        preview: occupant.title,
-        ...(occupant.caseId ? { caseId: occupant.caseId } : {}),
-      },
+          cardId: occupant.cardId,
+          spaceId: occupant.spaceId,
+          relativePath: occupant.relativePath,
+          type: 'case',
+          lifecycle: 'draft',
+          title: occupant.title,
+          scope: {},
+          relations: [],
+          body: '',
+          preview: occupant.title,
+          ...(occupant.caseId ? { caseId: occupant.caseId } : {}),
+        },
   };
 }
 
-function spaceConflictItem(
-  item: KnowledgeImportItem,
-  occupant: KnowledgeSpaceOccupant,
-): KnowledgeImportItem {
+function spaceConflictItem(item: KnowledgeImportItem, occupant: KnowledgeSpaceOccupant): KnowledgeImportItem {
   const title = item.record?.title || occupant.title;
   return {
     status: 'conflict',
@@ -163,6 +158,42 @@ function spaceConflictItem(
 }
 
 /**
+ * The files an import's writes replace, captured before each card is written, so a cancelled import can put the
+ * space back exactly as it was: a file the import created is removed, a file it replaced gets its bytes back. Readers
+ * of the index rebuild it on their own once it no longer matches the cards.
+ */
+class KnowledgeImportRollback {
+  private readonly saved = new Map<string, Buffer | null>();
+
+  constructor(private readonly rootPath: string) {}
+
+  async capture(card: KnowledgeCardRecord): Promise<void> {
+    // The same files the write replaces: the card, and each declared image the write is allowed to place.
+    const images = (card.images ?? [])
+      .map((image) => image.relativePath)
+      .filter((relativePath) => isKnowledgeImagePathAllowed(card.relativePath, relativePath, card.caseId));
+    for (const relativePath of [card.relativePath, ...images]) {
+      const absolutePath = await assertSafeKnowledgeWriteTarget(this.rootPath, relativePath);
+      if (this.saved.has(absolutePath)) continue;
+      this.saved.set(
+        absolutePath,
+        await fs.readFile(absolutePath).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === 'ENOENT') return null;
+          throw error;
+        }),
+      );
+    }
+  }
+
+  async restore(): Promise<void> {
+    for (const [absolutePath, previous] of [...this.saved].reverse()) {
+      if (previous === null) await fs.rm(absolutePath, { force: true });
+      else await writeFileAtomic(absolutePath, previous);
+    }
+  }
+}
+
+/**
  * The one judgment of an import against a space: quarantined items stay as they are, an item whose identity is
  * already in the space is either the same source (already present) or a different one (conflict), and every other
  * card is new. New cards become occupants as they are planned, so a package cannot add the same identity twice.
@@ -177,7 +208,8 @@ export function planKnowledgeImport(
   return ingested.items.map((item) => {
     if (item.status !== 'draft' || !item.record) return { item };
     const occupant = known.find((entry) => occupantMatches(item.record!, entry));
-    if (occupant && sameSource(occupant, sourceHashOf(item, ingested))) return { item: alreadyPresentItem(item, occupant) };
+    if (occupant && sameSource(occupant, sourceHashOf(item, ingested)))
+      return { item: alreadyPresentItem(item, occupant) };
     if (occupant) return { item: spaceConflictItem(item, occupant) };
     const card: KnowledgeCardRecord = { ...item.record, spaceId, lifecycle: 'draft' };
     known.push({
@@ -200,7 +232,8 @@ export class KnowledgeImportService {
     return {
       listSpaces: this.overrides.listSpaces ?? (() => knowledgeQueryService.listSpaces()),
       listCards: this.overrides.listCards ?? ((spaceId) => knowledgeQueryService.listCards(spaceId)),
-      getCard: this.overrides.getCard ?? ((spaceId, relativePath) => knowledgeQueryService.getCard(spaceId, relativePath)),
+      getCard:
+        this.overrides.getCard ?? ((spaceId, relativePath) => knowledgeQueryService.getCard(spaceId, relativePath)),
       write: this.overrides.write ?? knowledgeWriteService,
       store: this.overrides.store ?? knowledgeDurableStore,
     };
@@ -210,32 +243,61 @@ export class KnowledgeImportService {
   async previewImport(request: KnowledgeImportRequest): Promise<KnowledgeImportResult> {
     const ingested = await this.ingest(request);
     const planned = planKnowledgeImport(request.spaceId, ingested, await this.listOccupants(request.spaceId));
-    return publicResult(ingested, planned.map((entry) => entry.item));
+    return publicResult(
+      ingested,
+      planned.map((entry) => entry.item),
+    );
   }
 
   /**
-   * Import writes draft cards into the chosen space. This method never creates a Candidate.
+   * Import writes draft cards into the chosen space. This method never creates a Candidate. The signal is checked
+   * between cards, never inside a write; a cancelled import removes the cards it already wrote, so the space keeps
+   * either the whole import or none of it.
    */
-  async importToSpace(request: KnowledgeImportRequest): Promise<KnowledgeImportResult> {
+  async importToSpace(
+    request: KnowledgeImportRequest,
+    options: KnowledgeOperationOptions = {},
+  ): Promise<KnowledgeImportResult> {
+    const { signal, onProgress } = options;
     const ingested = await this.ingest(request);
-    const planned = planKnowledgeImport(request.spaceId, ingested, await this.listOccupants(request.spaceId));
+    signal?.throwIfAborted();
+    const occupants = await this.listOccupants(request.spaceId, options);
+    const planned = planKnowledgeImport(request.spaceId, ingested, occupants);
+    const total = planned.filter((entry) => entry.write).length;
+    const rollback = new KnowledgeImportRollback(this.spaceRoot(request.spaceId));
     const items: KnowledgeImportItem[] = [];
-    for (const entry of planned) {
-      if (!entry.write) {
-        items.push(entry.item);
-        continue;
+    let done = 0;
+    onProgress?.('writing', 0, total);
+    try {
+      for (const entry of planned) {
+        if (!entry.write) {
+          items.push(entry.item);
+          continue;
+        }
+        signal?.throwIfAborted();
+        await rollback.capture(entry.write.card);
+        const written = await this.deps.write.write({
+          spaceId: request.spaceId,
+          card: entry.write.card,
+          permissionMode: 'default',
+          confirmation: { explicitHumanConfirmation: true },
+          ...(entry.write.stagedImages ? { stagedImages: entry.write.stagedImages } : {}),
+        });
+        items.push({ ...entry.item, record: written });
+        done += 1;
+        onProgress?.('writing', done, total);
       }
-      const written = await this.deps.write.write({
-        spaceId: request.spaceId,
-        card: entry.write.card,
-        permissionMode: 'default',
-        confirmation: { explicitHumanConfirmation: true },
-        approvalAlreadyConsumed: true,
-        ...(entry.write.stagedImages ? { stagedImages: entry.write.stagedImages } : {}),
-      });
-      items.push({ ...entry.item, record: written });
+    } catch (error) {
+      if (signal?.aborted) await rollback.restore();
+      throw error;
     }
     return publicResult(ingested, items);
+  }
+
+  private spaceRoot(spaceId: string): string {
+    const space = this.deps.listSpaces().find((entry) => entry.spaceId === spaceId);
+    if (!space) throw new Error(`Unknown knowledge space: ${spaceId}`);
+    return space.rootPath;
   }
 
   private async ingest(request: KnowledgeImportRequest): Promise<KnowledgeImportPathResult> {
@@ -247,15 +309,18 @@ export class KnowledgeImportService {
     }
     return request.filePath
       ? await ingestKnowledgeFromPath(request.filePath, {
-        spaceId: request.spaceId,
-        ...(request.availableAssetNames ? { availableAssetNames: request.availableAssetNames } : {}),
-        ...(request.availableImagePaths ? { availableImagePaths: request.availableImagePaths } : {}),
-      })
-      : attachInlineSourceHash(ingestKnowledge(request.source ?? '', {
-        spaceId: request.spaceId,
-        ...(request.availableAssetNames ? { availableAssetNames: request.availableAssetNames } : {}),
-        ...(request.availableImagePaths ? { availableImagePaths: request.availableImagePaths } : {}),
-      }) as KnowledgeImportPathResult, request.source ?? '');
+          spaceId: request.spaceId,
+          ...(request.availableAssetNames ? { availableAssetNames: request.availableAssetNames } : {}),
+          ...(request.availableImagePaths ? { availableImagePaths: request.availableImagePaths } : {}),
+        })
+      : attachInlineSourceHash(
+          ingestKnowledge(request.source ?? '', {
+            spaceId: request.spaceId,
+            ...(request.availableAssetNames ? { availableAssetNames: request.availableAssetNames } : {}),
+            ...(request.availableImagePaths ? { availableImagePaths: request.availableImagePaths } : {}),
+          }) as KnowledgeImportPathResult,
+          request.source ?? '',
+        );
   }
 
   async migrateSessionDrafts(sessionId: string): Promise<void> {
@@ -284,7 +349,6 @@ export class KnowledgeImportService {
         },
         permissionMode: 'default',
         confirmation: { explicitHumanConfirmation: true },
-        approvalAlreadyConsumed: true,
       });
     }
     await this.deps.store.replaceLeftoverDrafts(sessionId, remaining);
@@ -293,11 +357,17 @@ export class KnowledgeImportService {
     }
   }
 
-  private async listOccupants(spaceId: string): Promise<KnowledgeSpaceOccupant[]> {
+  /** The cards already in the space, read one at a time; an import reports this as its reading phase. */
+  private async listOccupants(
+    spaceId: string,
+    { signal, onProgress }: KnowledgeOperationOptions = {},
+  ): Promise<KnowledgeSpaceOccupant[]> {
     if (!this.deps.listSpaces().some((entry) => entry.spaceId === spaceId)) return [];
     const summaries = await this.deps.listCards(spaceId);
     const occupants: KnowledgeSpaceOccupant[] = [];
+    onProgress?.('reading', 0, summaries.length);
     for (const summary of summaries) {
+      signal?.throwIfAborted();
       const detail = await this.deps.getCard(spaceId, summary.relativePath);
       occupants.push({
         cardId: summary.cardId,
@@ -307,6 +377,7 @@ export class KnowledgeImportService {
         ...(detail?.caseId ? { caseId: detail.caseId } : {}),
         ...(detail?.sourceHash ? { sourceHash: detail.sourceHash } : {}),
       });
+      onProgress?.('reading', occupants.length, summaries.length);
     }
     return occupants;
   }
@@ -338,10 +409,12 @@ export function createDisposableImportService(options: {
     }),
     ...io,
   });
-  const write = options.write ?? new KnowledgeWriteService({
-    listSpaces: () => [space],
-    now: () => new Date(),
-  });
+  const write =
+    options.write ??
+    new KnowledgeWriteService({
+      listSpaces: () => [space],
+      now: () => new Date(),
+    });
   return new KnowledgeImportService({
     listSpaces: () => [space],
     listCards: (spaceId) => query.listCards(spaceId),

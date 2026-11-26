@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { generateEventId, nowMs } from '@shared/utils/id';
-import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
+import { rendererEventHub } from './rendererEventHub';
 import { redactCredentialLikeText, redactSecretsDeep } from './secretRedaction';
 import type {
   RuntimeLogEntry,
@@ -33,22 +33,15 @@ function truncateUtf8(text: string, maxBytes: number): string {
   const buf = Buffer.from(text, 'utf8');
   if (buf.byteLength <= maxBytes) return text;
   let end = Math.max(0, maxBytes - Buffer.byteLength('…[truncated]', 'utf8'));
-  while (end > 0 && (buf[end] & 0xc0) === 0x80) end -= 1;
+  while (end > 0 && (buf.readUInt8(end) & 0xc0) === 0x80) end -= 1;
   return `${buf.subarray(0, end).toString('utf8')}…[truncated]`;
 }
 
-function clampEntryFields(input: RuntimeLogInput): Pick<
-  RuntimeLogEntry,
-  'title' | 'summary' | 'detail' | 'raw'
-> {
+function clampEntryFields(input: RuntimeLogInput): Pick<RuntimeLogEntry, 'title' | 'summary' | 'detail' | 'raw'> {
   const redactedTitle = redactCredentialLikeText(input.title);
   const redactedSummary = redactCredentialLikeText(input.summary);
-  const redactedDetail = input.detail !== undefined
-    ? redactCredentialLikeText(input.detail)
-    : undefined;
-  const redactedRaw = input.raw === undefined || input.raw === null
-    ? input.raw ?? null
-    : redactSecretsDeep(input.raw, 'raw').value;
+  const redactedDetail = input.detail !== undefined ? redactCredentialLikeText(input.detail) : undefined;
+  const redactedRaw = input.raw === undefined || input.raw === null ? null : redactSecretsDeep(input.raw, 'raw').value;
 
   let title = truncateUtf8(redactedTitle, 4 * 1024);
   let summary = truncateUtf8(redactedSummary, 8 * 1024);
@@ -61,9 +54,8 @@ function clampEntryFields(input: RuntimeLogInput): Pick<
     raw = { truncated: true, reason: 'unserializable' };
     rawJson = JSON.stringify(raw);
   }
-  const fixed = Buffer.byteLength(title, 'utf8')
-    + Buffer.byteLength(summary, 'utf8')
-    + Buffer.byteLength(detail ?? '', 'utf8');
+  const fixed =
+    Buffer.byteLength(title, 'utf8') + Buffer.byteLength(summary, 'utf8') + Buffer.byteLength(detail ?? '', 'utf8');
   const rawBudget = Math.max(0, MAX_ENTRY_BYTES - fixed - 64);
   if (Buffer.byteLength(rawJson, 'utf8') > rawBudget) {
     raw = {
@@ -72,13 +64,8 @@ function clampEntryFields(input: RuntimeLogInput): Pick<
     };
   }
   // Final guard: shrink detail if still over.
-  const measure = (): number => {
-    try {
-      return Buffer.byteLength(JSON.stringify({ title, summary, detail, raw }), 'utf8');
-    } catch {
-      return MAX_ENTRY_BYTES + 1;
-    }
-  };
+  // raw is serializable here: it either stringified above or was replaced with a plain object.
+  const measure = (): number => Buffer.byteLength(JSON.stringify({ title, summary, detail, raw }), 'utf8');
   if (measure() > MAX_ENTRY_BYTES && detail) {
     detail = truncateUtf8(detail, Math.max(0, MAX_ENTRY_BYTES - fixed + Buffer.byteLength(detail, 'utf8') - 256));
   }

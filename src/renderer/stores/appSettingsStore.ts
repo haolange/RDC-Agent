@@ -1,155 +1,88 @@
 import { create } from 'zustand';
-import { DEFAULT_AGENT_RUNTIME, createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
-import { providerConnectionIdentity } from '@shared/utils/providerConnectionIdentity';
-import { useRuntimePermissionStore } from './runtimePermissionStore';
-import {
-  beginAgentDefinitionSave,
-  isLatestAgentDefinitionRevision,
-  rollbackAgentDefinitionSave,
-  settleAgentDefinitionSave,
-} from './agentDefinitionSettings';
-import { AgentDefinitionMutationCoordinator } from './AgentDefinitionMutationCoordinator';
-import {
-  beginProviderDefinitionSave,
-  enqueueProviderDefinitionSave,
-  flushProviderDefinitionSaves,
-  isLatestProviderDefinitionRevision,
-  settleProviderDefinitionSave,
-} from './providerDefinitionSettings';
+import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
 import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
-import {
-  withCompactionThresholdPercent,
-  withPermissionMode,
-} from './appSettingsRuntimePatch';
+import { createSettingsDefinitionActions } from './appSettingsDefinitionActions';
+import { SettingsIntents, patchCommit, patchOverlay } from './settingsIntents';
+import { SettingsViewSync, joinSettingsView } from './settingsViewSync';
+import { useProjectStore } from './projectStore';
+import type { AppSettings, LlmProviderCatalogResponse, SettingsView } from '@shared/types/settings';
 import type { AppSettingsState } from './appSettingsStoreState';
 
-export { nextAgentDefinitionClientRevision } from './agentDefinitionSettings';
+const EMPTY_PROVIDER_CATALOG: LlmProviderCatalogResponse = { categories: [], protocols: [], providers: [] };
 
-const agentDefinitionMutations = new AgentDefinitionMutationCoordinator(
-  (request) => window.electronAPI.settings.saveAgentDefinition(request),
-);
-
-
-export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
-  settings: createDefaultAppSettings(),
-  contextBreakdownPreference: null,
-  hydrated: false,
-  systemTheme: 'dark',
-  hydrate: (settings, systemTheme) => set({ settings, systemTheme, hydrated: true }),
-  setSystemTheme: (systemTheme) => set({ systemTheme }),
-  patchSettings: async (patch) => {
-    const nextSettings = await window.electronAPI.settings.set(patch);
-    set({ settings: nextSettings, hydrated: true });
-    return nextSettings;
-  },
-  replaceSettings: (settings) => set({ settings, hydrated: true }),
-  saveAgentDefinition: async (request) => {
-    const agentId = request.draft.id;
-    const optimistic = beginAgentDefinitionSave(get().settings, request);
-    set({ settings: optimistic.settings });
-
-    try {
-      const result = await agentDefinitionMutations.enqueue(request);
-      if (!isLatestAgentDefinitionRevision(request.scope, request.projectId, agentId, request.clientRevision)) return result;
-      if (result.status === 'failed') {
-        set((state) => ({ settings: rollbackAgentDefinitionSave(state.settings, agentId, result.lastSuccessful) }));
-        return Promise.reject(new Error(result.error ?? 'Agent definition save failed.'));
-      }
-      if (result.status === 'committed') {
-        set((state) => ({ settings: settleAgentDefinitionSave(state.settings, agentId, result), hydrated: true }));
-      }
-      return result;
-    } catch (error) {
-      if (isLatestAgentDefinitionRevision(request.scope, request.projectId, agentId, request.clientRevision)) {
-        const lastSuccessful = await window.electronAPI.settings.getAgentDefinitionCommit({
-          agentId,
-          scope: request.scope,
-          projectId: request.projectId,
-        }).catch(() => null);
-        set((state) => ({ settings: rollbackAgentDefinitionSave(state.settings, agentId, lastSuccessful) }));
-      }
-      throw error;
-    }
-  },
-  flushAgentDefinitionSaves: async (query) => {
-    await agentDefinitionMutations.flush(query);
-    return window.electronAPI.settings.getAgentDefinitionCommit(query);
-  },
-  reloadSettings: async () => {
-    const nextSettings = await window.electronAPI.settings.get();
-    set({ settings: nextSettings, hydrated: true });
-    return nextSettings;
-  },
-  ...createAppSettingsAppearanceActions(
-    get,
-    (contextBreakdownPreference) => set({ contextBreakdownPreference }),
-    async (expanded) => {
-      const saved = await window.electronAPI.settings.set({ appearance: { contextBreakdownExpanded: expanded } });
-      // Merge only the persisted preference. Unrelated saves can advance while this IPC returns.
-      set(({ settings }) => ({
-        settings: { ...settings, appearance: {
-          ...settings.appearance, contextBreakdownExpanded: saved.appearance.contextBreakdownExpanded,
-        } },
-      }));
+export const useAppSettingsStore = create<AppSettingsState>((set, get) => {
+  /** Confirmed settings plus every intent in flight; the store's `settings` is always its projection. */
+  const intents = new SettingsIntents(createDefaultAppSettings());
+  const join = (view: SettingsView): AppSettings =>
+    joinSettingsView(view, get().providerCatalog ?? EMPTY_PROVIDER_CATALOG);
+  /** Joins a view main sent whole and adopts it by revision; intents in flight stay on top. */
+  const adoptView = (view: SettingsView): void => {
+    viewSync.adopted(view);
+    set({ settings: intents.rebase(join(view), view.revision), hydrated: true });
+  };
+  const viewSync = new SettingsViewSync(async () => {
+    const api = window.electronAPI;
+    const [view, catalog] = await Promise.all([
+      api.settings.get(),
+      get().providerCatalog ?? api.settings.getProviderCatalog(),
+    ]);
+    if (!get().providerCatalog) set({ providerCatalog: catalog });
+    adoptView(view);
+  });
+  const show = (settings: AppSettings, confirmed = false): void =>
+    set(confirmed ? { settings, hydrated: true } : { settings });
+  return {
+    settings: createDefaultAppSettings(),
+    providerCatalog: null,
+    contextBreakdownPreference: null,
+    hydrated: false,
+    systemTheme: 'dark',
+    hydrate: (view, providerCatalog, systemTheme) => {
+      set({ providerCatalog, systemTheme });
+      viewSync.adopted(view);
+      set({ settings: intents.start(join(view), view.revision), hydrated: true });
     },
-  ),
-  updateProfile: async (profile) => {
-    await get().patchSettings({ profile });
-  },
-  saveProvider: async (provider) => {
-    const clientRevision = beginProviderDefinitionSave(provider.id);
-    const result = await enqueueProviderDefinitionSave(provider, clientRevision);
-    const current = get().settings.llm.providers.find((entry) => entry.id === provider.id);
-    if (!isLatestProviderDefinitionRevision(provider.id, clientRevision)
-      || !current || providerConnectionIdentity(current) !== providerConnectionIdentity(provider)) {
-      return { ...result, status: 'superseded' };
-    }
-    const confirmed = result.status === 'committed' ? result.provider : result.lastSuccessful?.provider;
-    if (confirmed) {
-      set((state) => ({
-        settings: settleProviderDefinitionSave(state.settings, confirmed),
-        hydrated: true,
-      }));
-    }
-    return result;
-  },
-  flushProviderSaves: async (providerId) => {
-    return flushProviderDefinitionSaves(providerId);
-  },
-  removeProvider: async (providerId) => {
-    await get().patchSettings({
-      llm: {
-        providers: get().settings.llm.providers.filter((entry) => entry.id !== providerId),
-      },
-    });
-  },
-  setAgentPermissionMode: async (mode) => {
-    try {
-      await useRuntimePermissionStore.getState().saveMode(mode);
-    } finally {
-      const snapshot = useRuntimePermissionStore.getState().snapshot;
-      if (snapshot) set((state) => ({ settings: withPermissionMode(state.settings, snapshot.mode) }));
-    }
-  },
-  setCustomPermissionRules: async (rules) => {
-    const nextSettings = await window.electronAPI.settings.set({
-      agentRuntime: { permissions: rules },
-    });
-    set({ settings: nextSettings, hydrated: true });
-  },
-  setCompactionThresholdPercent: async (percent) => {
-    const previous = get().settings.agentRuntime?.context?.compactionThresholdPercent
-      ?? DEFAULT_AGENT_RUNTIME.context.compactionThresholdPercent;
-    if (previous === percent) return;
-    set((state) => ({ settings: withCompactionThresholdPercent(state.settings, percent), hydrated: true }));
-    try {
-      const nextSettings = await window.electronAPI.settings.set({
-        agentRuntime: { context: { compactionThresholdPercent: percent } },
-      });
-      set({ settings: nextSettings, hydrated: true });
-    } catch (error) {
-      set((state) => ({ settings: withCompactionThresholdPercent(state.settings, previous) }));
-      throw error;
-    }
-  },
-}));
+    setSystemTheme: (systemTheme) => set({ systemTheme }),
+    patchSettings: async (ops) => {
+      const intent = intents.begin(patchOverlay(ops));
+      show(intent.settings);
+      try {
+        const result = await viewSync.ownWrite(
+          () => window.electronAPI.settings.patch(ops),
+          (committed) => committed.revision,
+        );
+        show(intents.settle(intent.id, patchCommit(ops, result), result.revision), true);
+        return get().settings;
+      } catch (error) {
+        show(intents.fail(intent.id));
+        throw error;
+      }
+    },
+    adoptView,
+    adoptSettingsChange: (change) => viewSync.changed(change),
+    ...createSettingsDefinitionActions({ intents, viewSync, settings: () => get().settings, show }),
+    reloadSettings: async (forProjectId) => {
+      // Without a project named, the selected one; with none selected yet there is no project to compare.
+      const projectId =
+        forProjectId !== undefined ? forProjectId : useProjectStore.getState().currentProject?.projectId;
+      if (viewSync.stale(projectId)) await viewSync.readFor(projectId);
+      return get().settings;
+    },
+    refreshSettings: async () => {
+      await viewSync.readFresh();
+      return get().settings;
+    },
+    ...createAppSettingsAppearanceActions(get, (contextBreakdownPreference) => set({ contextBreakdownPreference })),
+    updateProfile: async (profile) => {
+      await get().patchSettings([{ op: 'profile', value: profile }]);
+    },
+    setCustomPermissionRules: async (rules) => {
+      await get().patchSettings([{ op: 'agentRuntime', value: { permissions: rules } }]);
+    },
+    setCompactionThresholdPercent: async (percent) => {
+      const previous = get().settings.agentRuntime.context.compactionThresholdPercent;
+      if (previous === percent) return;
+      await get().patchSettings([{ op: 'agentRuntime', value: { context: { compactionThresholdPercent: percent } } }]);
+    },
+  };
+});

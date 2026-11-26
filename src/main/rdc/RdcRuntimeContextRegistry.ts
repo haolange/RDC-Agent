@@ -1,9 +1,10 @@
+import { createHash } from 'crypto';
+import { AppError } from '@shared/errors/appError';
 /**
  * Per-session RDC context leases. Tools must verify ownership before reading.
  * Parent sessions may grant one scoped, lifecycle-bound delegated lease to a child.
  */
 
-import { createHash } from 'crypto';
 import type { RdcRuntimeContext } from '@shared/types/session';
 
 export const RDC_LEASE_DELEGATE_DENIED = 'RDC_LEASE_DELEGATE_DENIED';
@@ -40,11 +41,7 @@ const delegatedChildByParent = new Map<string, string>();
 let versionSeq = 0;
 
 function computeCaptureHash(runtimeContext: RdcRuntimeContext): string | null {
-  const captureKey =
-    runtimeContext.captureFileId
-    ?? runtimeContext.captureId
-    ?? runtimeContext.replaySessionId
-    ?? null;
+  const captureKey = runtimeContext.captureFileId ?? runtimeContext.captureId ?? runtimeContext.replaySessionId ?? null;
   if (!captureKey) return null;
   return createHash('sha256').update(captureKey).digest('hex').slice(0, 16);
 }
@@ -73,7 +70,7 @@ export function setRdcRuntimeContextForSession(
     const existing = leasesBySession.get(trimmed);
     const delegatedChild = delegatedChildByParent.get(trimmed);
     if (delegatedChild) {
-      throw new Error('RDC_LEASE_DUAL_OWNER: join delegated execution before clearing the parent binding.');
+      throw new AppError('RDC_LEASE_DUAL_OWNER', 'join delegated execution before clearing the parent binding.');
     }
     if (existing?.delegatedFrom && delegatedChildByParent.get(existing.delegatedFrom) === trimmed) {
       delegatedChildByParent.delete(existing.delegatedFrom);
@@ -83,7 +80,7 @@ export function setRdcRuntimeContextForSession(
   }
   const existing = leasesBySession.get(trimmed);
   if (delegatedChildByParent.has(trimmed)) {
-    throw new Error('RDC_LEASE_DUAL_OWNER: join delegated execution before rebinding.');
+    throw new AppError('RDC_LEASE_DUAL_OWNER', 'join delegated execution before rebinding.');
   }
   if (existing?.delegatedFrom) {
     return null;
@@ -143,11 +140,17 @@ export function assertRdcContextLeaseOwnership(input: {
   if (!sessionId) return null;
   const lease = leasesBySession.get(sessionId);
   if (!lease) return null;
-  if (lease.ownerSessionId !== sessionId || lease.quarantineReason || delegatedChildByParent.has(sessionId)) return null;
+  if (lease.ownerSessionId !== sessionId || lease.quarantineReason || delegatedChildByParent.has(sessionId))
+    return null;
   if (lease.delegatedFrom) {
     const parent = leasesBySession.get(lease.delegatedFrom);
-    if (!parent || parent.quarantineReason || parent.version !== lease.parentVersion
-      || delegatedChildByParent.get(lease.delegatedFrom) !== sessionId) return null;
+    if (
+      !parent ||
+      parent.quarantineReason ||
+      parent.version !== lease.parentVersion ||
+      delegatedChildByParent.get(lease.delegatedFrom) !== sessionId
+    )
+      return null;
   }
   if (input.contextId && lease.contextId !== input.contextId) return null;
   if (input.projectId !== undefined && lease.ownerProjectId !== input.projectId) {
@@ -185,7 +188,8 @@ export function grantDelegatedLease(input: GrantDelegatedLeaseInput): RdcContext
   if (!parentLease) {
     failDelegatedLease(RDC_LEASE_DELEGATE_DENIED, 'parent session has no RDC runtime context lease.');
   }
-  if (parentLease.quarantineReason) failDelegatedLease(RDC_LEASE_DELEGATE_DENIED, 'parent binding requires controlled recovery.');
+  if (parentLease.quarantineReason)
+    failDelegatedLease(RDC_LEASE_DELEGATE_DENIED, 'parent binding requires controlled recovery.');
   if (parentLease.delegatedFrom) {
     failDelegatedLease(RDC_LEASE_DELEGATE_DENIED, 'child lease is not independently transferable.');
   }
@@ -230,7 +234,12 @@ export function revokeDelegatedLease(childSessionId: string, options?: { operati
   if (!trimmed) return false;
   const lease = leasesBySession.get(trimmed);
   if (lease?.delegatedFrom && (options?.operationStopped !== true || lease.quarantineReason)) {
-    quarantineRdcContext(lease.delegatedFrom, undefined, lease.quarantineReason ?? 'Delegated operation exit was not confirmed.', lease.quarantineCause);
+    quarantineRdcContext(
+      lease.delegatedFrom,
+      undefined,
+      lease.quarantineReason ?? 'Delegated operation exit was not confirmed.',
+      lease.quarantineCause,
+    );
   }
   for (const [parent, child] of delegatedChildByParent) {
     if (child === trimmed) {
@@ -263,8 +272,12 @@ export function listRdcContextLeaseSessionIds(): string[] {
 }
 
 /** Preserve an uncertain binding for inspection, while refusing further execution or delegation. */
-export function quarantineRdcContext(sessionId: string, expectedVersion: number | undefined, reason: string,
-  cause?: RdcContextLease['quarantineCause']): void {
+export function quarantineRdcContext(
+  sessionId: string,
+  expectedVersion: number | undefined,
+  reason: string,
+  cause?: RdcContextLease['quarantineCause'],
+): void {
   const lease = leasesBySession.get(sessionId);
   if (!lease || (expectedVersion !== undefined && lease.version !== expectedVersion)) return;
   lease.quarantineReason = reason;

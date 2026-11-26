@@ -65,14 +65,9 @@ export class ResponsesItemChannels {
     this.deepSeekResponses = input.deepSeekResponses === true;
   }
 
-  identityFromEvent(
-    event: Record<string, unknown>,
-    item?: Record<string, unknown> | null,
-  ): ResponsesItemIdentity {
+  identityFromEvent(event: Record<string, unknown>, item?: Record<string, unknown> | null): ResponsesItemIdentity {
     const itemId = readString(event.item_id) || readString(item?.id) || undefined;
-    const outputIndex = readNumber(event.output_index)
-      ?? (itemId ? this.itemIndexById.get(itemId) : undefined)
-      ?? 0;
+    const outputIndex = readNumber(event.output_index) ?? (itemId ? this.itemIndexById.get(itemId) : undefined) ?? 0;
     return this.remember({ outputIndex, itemId });
   }
 
@@ -121,7 +116,7 @@ export class ResponsesItemChannels {
     const state = this.reasoningState(identity, mode, artifact);
     if (state.closed) return;
     this.startReasoning(identity, mode, artifact);
-    if (state.closed || !state.started) return;
+    if (!state.started) return;
     if (mode !== state.mode) {
       state.mode = mode;
       this.builder.updateThinking(this.reasoningRef(state), this.meta(mode, artifact ?? state.artifact));
@@ -166,7 +161,9 @@ export class ResponsesItemChannels {
 
   /** Event-level shape of every reasoning summary part in this response: lengths only, never text. */
   summaryPartReports(): SummaryPartReport[] {
-    return [...this.summaryReports.values()].sort((left, right) => left.itemKey.localeCompare(right.itemKey) || left.index - right.index);
+    return [...this.summaryReports.values()].sort(
+      (left, right) => left.itemKey.localeCompare(right.itemKey) || left.index - right.index,
+    );
   }
 
   private recordSummaryText(state: ReasoningItemState, summaryIndex: number, text: string): void {
@@ -193,10 +190,7 @@ export class ResponsesItemChannels {
     this.builder.updateThinking(this.reasoningRef(state), this.meta(mode, artifact ?? state.artifact));
   }
 
-  closeReasoning(
-    identity: ResponsesItemIdentity,
-    artifact?: ProviderContinuationArtifact,
-  ): void {
+  closeReasoning(identity: ResponsesItemIdentity, artifact?: ProviderContinuationArtifact): void {
     const state = this.reasoning.get(itemKey('reasoning', identity));
     if (!state || state.closed) return;
     if (artifact) state.artifact = artifact;
@@ -336,9 +330,7 @@ function itemKey(kind: 'reasoning' | 'text', identity: ResponsesItemIdentity): s
 }
 
 function readRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
 function readString(value: unknown): string {

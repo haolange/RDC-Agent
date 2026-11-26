@@ -6,7 +6,6 @@ import {
   compiledRoutesFromDefinitions,
   resolveCompiledRouteForAgent,
 } from './compiledAgentRoutes';
-import type { AppSettings } from '@shared/types/settings';
 
 vi.mock('../agent-manifests/AgentManifestService', () => ({
   agentManifestService: {
@@ -17,10 +16,12 @@ vi.mock('../agent-manifests/AgentManifestService', () => ({
 describe('compiledAgentRoutes leftover isolation', () => {
   it('reads compiledRoute and never leftover agentRoutes', () => {
     const leftover = [{ agentId: 'general', providerId: 'leftover', modelId: 'leftover-model' }];
-    const definitions = [{
-      id: 'general',
-      compiledRoute: { agentId: 'general', providerId: 'real', modelId: 'real-model' },
-    }];
+    const definitions = [
+      {
+        id: 'general',
+        compiledRoute: { agentId: 'general', providerId: 'real', modelId: 'real-model' },
+      },
+    ];
     expect(compiledRouteFromDefinition(definitions[0])).toEqual({
       agentId: 'general',
       providerId: 'real',
@@ -34,24 +35,21 @@ describe('compiledAgentRoutes leftover isolation', () => {
 
   it('resolveCompiledRouteForAgent uses the snapshot compiledRoute instead of leftover agentRoutes', () => {
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockReturnValue({
-      profiles: [{
-        id: 'general',
-        compiledRoute: { agentId: 'general', providerId: 'real', modelId: 'real-model' },
-      }],
+      profiles: [
+        {
+          id: 'general',
+          compiledRoute: { agentId: 'general', providerId: 'real', modelId: 'real-model' },
+        },
+      ],
       diagnostics: [],
     } as never);
-    const settings = {
-      paths: { agentsPath: 'C:/agents', instructionsPath: 'C:/RDC.md' },
-      agents: { definitions: [{ id: 'general', compiledRoute: { agentId: 'general', providerId: 'real', modelId: 'real-model' } }] },
-      llm: { agentRoutes: [{ agentId: 'general', providerId: 'leftover', modelId: 'leftover-model' }] },
-    } as unknown as AppSettings;
-    expect(resolveCompiledRouteForAgent('general', settings, 'D:/Project')).toEqual({
+    expect(resolveCompiledRouteForAgent('general', 'D:/Project')).toEqual({
       agentId: 'general',
       providerId: 'real',
       modelId: 'real-model',
     });
     expect(vi.mocked(agentManifestService.resolveEffectiveSnapshot)).toHaveBeenCalledWith(
-      settings.paths,
+      expect.objectContaining({ agentsPath: expect.any(String) }),
       'D:/Project',
     );
   });

@@ -2,14 +2,16 @@ import { AgentBuiltinDiffDialog } from './AgentBuiltinDiffDialog';
 import { AgentModelMigrationDialog } from './AgentModelMigrationDialog';
 import { ProjectAgentTrustDialog } from './ProjectAgentTrustDialog';
 import type { useAgentModelControls } from './useAgentModelControls';
-import type { AppSettings } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
+import type { AgentModelOption } from '@shared/types/agentManifest';
 
-export function AgentReviewDialogs({ models, options, onRestore, t }: {
+export function AgentReviewDialogs({
+  models,
+  options,
+  onRestore,
+}: {
   models: ReturnType<typeof useAgentModelControls>;
-  options: AppSettings['agents']['modelOptions'];
+  options: AgentModelOption[];
   onRestore: () => void;
-  t: ReturnType<typeof useI18n>['t'];
 }) {
   return (
     <>
@@ -17,8 +19,10 @@ export function AgentReviewDialogs({ models, options, onRestore, t }: {
         <AgentBuiltinDiffDialog
           state={models.builtinDiff}
           onClose={models.closeBuiltinDiff}
-          onRestore={() => { models.closeBuiltinDiff(); onRestore(); }}
-          t={t}
+          onRestore={() => {
+            models.closeBuiltinDiff();
+            onRestore();
+          }}
         />
       ) : null}
       {models.overrideAction ? (
@@ -27,7 +31,6 @@ export function AgentReviewDialogs({ models, options, onRestore, t }: {
           options={options}
           onConfirm={models.confirmOverrideAction}
           onClose={models.closeOverrideAction}
-          t={t}
         />
       ) : null}
       {models.trustReview ? (
@@ -35,7 +38,6 @@ export function AgentReviewDialogs({ models, options, onRestore, t }: {
           review={models.trustReview}
           onConfirm={models.confirmTrust}
           onClose={models.closeTrustReview}
-          t={t}
         />
       ) : null}
     </>

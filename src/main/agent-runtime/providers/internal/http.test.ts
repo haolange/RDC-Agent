@@ -21,13 +21,16 @@ describe('provider http stream helpers', () => {
   });
 
   it('summarizes an HTML gateway error without leaking markup into product diagnostics', async () => {
-    const response = new Response('<!DOCTYPE html><html><head><title>opencode.ai | 502: Bad gateway</title></head><body>proxy</body></html>', {
-      status: 502,
-      headers: { 'Content-Type': 'text/html' },
-    });
+    const response = new Response(
+      '<!DOCTYPE html><html><head><title>opencode.ai | 502: Bad gateway</title></head><body>proxy</body></html>',
+      {
+        status: 502,
+        headers: { 'Content-Type': 'text/html' },
+      },
+    );
 
     await expect(ensureOk(response, 'openai-compatible')).rejects.toMatchObject({
-      message: '[openai-compatible] HTTP 502: opencode.ai | 502: Bad gateway',
+      message: 'PROVIDER_HTTP_ERROR: [openai-compatible] HTTP 502: opencode.ai | 502: Bad gateway',
       status: 502,
     });
   });
@@ -56,11 +59,13 @@ describe('provider http stream helpers', () => {
   it('classifies idle timeout after the stream has started', async () => {
     vi.useRealTimers();
     const encoder = new TextEncoder();
-    const response = new Response(new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(encoder.encode('data: first\n\n'));
-      },
-    }));
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: first\n\n'));
+        },
+      }),
+    );
     const iterator = parseSSE(response, undefined, {
       providerApi: 'test-provider',
       firstChunkTimeoutMs: 20,
@@ -98,14 +103,17 @@ describe('provider http stream helpers', () => {
 
   it('keeps the SSE event name with its data record', async () => {
     const encoder = new TextEncoder();
-    const response = new Response(new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(encoder.encode('event: contentBlockDelta\ndata: {"ok":true}\n\n'));
-        controller.close();
-      },
-    }));
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode('event: contentBlockDelta\ndata: {"ok":true}\n\n'));
+          controller.close();
+        },
+      }),
+    );
     const records = [];
-    for await (const record of parseSSERecords(response, undefined, { providerApi: 'test-provider' })) records.push(record);
+    for await (const record of parseSSERecords(response, undefined, { providerApi: 'test-provider' }))
+      records.push(record);
     expect(records).toEqual([{ event: 'contentBlockDelta', data: '{"ok":true}' }]);
   });
 });

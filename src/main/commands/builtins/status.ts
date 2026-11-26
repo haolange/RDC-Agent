@@ -2,12 +2,13 @@
  * /status — 系统状态与诊断信息。
  */
 import { currentHost } from '../../platform/host';
-import type { CommandDefinition } from '@shared/types/command';
+import { commandText } from '../commandI18n';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const statusCommand: CommandDefinition = {
   id: 'status',
   name: 'status',
-  description: 'Show system status and diagnostic information',
+  descriptionKey: 'status.description',
   aliases: ['st', 'debug', 'diag'],
   category: 'debug',
 
@@ -24,9 +25,6 @@ export const statusCommand: CommandDefinition = {
       arch: currentHost().arch,
     };
     const lines = Object.entries(info).map(([k, v]) => `  ${k}: ${v}`);
-    return {
-      success: true,
-      message: `**System Status**\n${lines.join('\n')}`,
-    };
+    return { success: true, message: `${commandText('status.title')}\n${lines.join('\n')}` };
   },
 };

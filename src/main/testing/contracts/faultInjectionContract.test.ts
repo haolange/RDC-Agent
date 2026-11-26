@@ -2,7 +2,7 @@
  * Fault-injection contract (Phase 7 matrix entry).
  *
  * Covers abort/late-discard, never-resolving tool timeout, ProcessSupervisor
- * unconfirmed_orphan, StorageIo bak-swap recovery, and MemoryStore realpath mutex.
+ * unconfirmed_orphan, the StorageIo crash window, and MemoryStore realpath mutex.
  */
 import * as fs from 'fs';
 import os from 'os';
@@ -17,11 +17,11 @@ import {
   ProviderStreamProtocolError,
 } from '../../agent-runtime/providers/internal/AssistantStreamBuilder';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
-import { StorageIo } from '../../sessions/store/StorageIo';
+import { StorageIo } from '../../runtime/StorageIo';
 import { StdioRpcClient } from '../../agent-runtime/agent/mcpRpcTransport';
 import { ShutdownCoordinator } from '../../lifecycle/ShutdownCoordinator';
-import { writeTextFileNoFollow } from '../../agent-runtime/tools/primitives/_shared';
-import { hashAttachmentContents } from '../../conversation/ConversationAttachmentHashing';
+import { writeTextFileNoFollow } from '../../runtime/toolFiles';
+import { hashAttachmentContents } from '../../agent-runtime/attachments/ConversationAttachmentHashing';
 import { ConversationHistoryStore } from '../../sessions/store/ConversationHistoryStore';
 
 const childState = vi.hoisted(() => {
@@ -102,9 +102,11 @@ describe('faultInjectionContract: provider/stream abort late discard', () => {
     abortErr.name = 'AbortError';
     builder.fail(abortErr, 'aborted');
     expect(stream.isDone).toBe(true);
-    expect(() => builder.appendText(ref, 'late')).toThrowError(expect.objectContaining({
-      code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
-    }) as ProviderStreamProtocolError);
+    expect(() => builder.appendText(ref, 'late')).toThrowError(
+      expect.objectContaining({
+        code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
+      }) as ProviderStreamProtocolError,
+    );
   });
 });
 
@@ -167,7 +169,7 @@ describe('faultInjectionContract: ProcessSupervisor unconfirmed_orphan', () => {
   }, 10_000);
 });
 
-describe('faultInjectionContract: StorageIo bak-swap recovery', () => {
+describe('faultInjectionContract: StorageIo crash window', () => {
   let root = '';
   const io = new StorageIo();
 
@@ -178,33 +180,13 @@ describe('faultInjectionContract: StorageIo bak-swap recovery', () => {
     vi.restoreAllMocks();
   });
 
-  it('restores durable content from .bak after corrupt primary (rename-crash path)', () => {
+  it('never reads a truncated primary as an older or empty value (failure-class: integrity)', () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-fault-storage-'));
     const filePath = path.join(root, 'session.json');
     io.writeUtf8Atomic(filePath, JSON.stringify({ generation: 1 }, null, 2));
-    // Simulate crash window: primary corrupt, prior durable bak still readable.
-    fs.writeFileSync(`${filePath}.bak`, JSON.stringify({ generation: 0, recovered: true }, null, 2), 'utf8');
     fs.writeFileSync(filePath, '{truncated-after-rename', 'utf8');
-
-    expect(io.readJson<{ generation: number; recovered?: boolean }>(filePath)).toEqual({
-      generation: 0,
-      recovered: true,
-    });
-  });
-
-  it('writeUtf8Atomic leaves durable primary and optional .bak after overwrite', () => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-fault-rename-'));
-    const filePath = path.join(root, 'atomic.json');
-    io.writeUtf8Atomic(filePath, JSON.stringify({ v: 1 }));
-    io.writeUtf8Atomic(filePath, JSON.stringify({ v: 2 }));
-    expect(JSON.parse(fs.readFileSync(filePath, 'utf8'))).toEqual({ v: 2 });
-    expect(fs.readdirSync(root).filter((name) => name.endsWith('.tmp'))).toEqual([]);
-    // When the platform takes the EPERM/EEXIST bak-swap branch, prior bytes land in .bak.
-    // Direct EPERM injection via vitest fs spies is unreliable across node:fs bindings;
-    // corrupt-primary + .bak recovery above locks the recovery API.
-    if (fs.existsSync(`${filePath}.bak`)) {
-      expect(JSON.parse(fs.readFileSync(`${filePath}.bak`, 'utf8'))).toEqual({ v: 1 });
-    }
+    expect(() => io.readJson(filePath)).toThrow(/STORAGE_CORRUPT/);
+    expect(() => io.readJson(filePath)).toThrow(/STORAGE_CORRUPT/);
   });
 });
 
@@ -270,17 +252,21 @@ describe('faultInjectionContract: attachment source replaced after staging', () 
         io: new StorageIo(),
       } as ConstructorParameters<typeof ConversationHistoryStore>[0]);
       const [stagedPath] = store.stageAttachmentInputs([sourcePath], stagingDir);
-      const [stagedHash] = await hashAttachmentContents([{
-        sourcePath: stagedPath!,
-        fileName: 'source.txt',
-        mimeType: 'text/plain',
-      }]);
+      const [stagedHash] = await hashAttachmentContents([
+        {
+          sourcePath: stagedPath!,
+          fileName: 'source.txt',
+          mimeType: 'text/plain',
+        },
+      ]);
       fs.writeFileSync(sourcePath, 'replaced');
-      const [sourceHash] = await hashAttachmentContents([{
-        sourcePath,
-        fileName: 'source.txt',
-        mimeType: 'text/plain',
-      }]);
+      const [sourceHash] = await hashAttachmentContents([
+        {
+          sourcePath,
+          fileName: 'source.txt',
+          mimeType: 'text/plain',
+        },
+      ]);
       expect(fs.readFileSync(stagedPath!, 'utf8')).toBe('staged-bytes');
       expect(stagedHash).not.toBe(sourceHash);
     } finally {

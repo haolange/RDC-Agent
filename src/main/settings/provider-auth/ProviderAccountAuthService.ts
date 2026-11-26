@@ -1,4 +1,5 @@
-import { openExternalHttps } from '../../window/rendererTrust';
+import { AppError } from '@shared/errors/appError';
+import { openExternalHttps } from '../../runtime/rendererTrust';
 import { settingsService } from '../settings-core/SettingsService';
 import { getProviderAccountAuth, loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
 import { oauthRefreshManager } from './OAuthRefreshManager';
@@ -9,6 +10,7 @@ import {
   type AccountFlowHost,
 } from './oauth/accountAuthFlows';
 import { parseProviderError, renderAccountDiagnosticMessage, shouldOpenSystemBrowser } from './oauth/oauthHttp';
+import { OAuthSecretBundleSchema, type OAuthFlowState, type OAuthSecretBundle } from './oauth/oauthTypes';
 import type {
   LlmProviderAccountDiagnostic,
   LlmProviderAccountLoginFinishRequest,
@@ -17,14 +19,10 @@ import type {
   LlmProviderId,
 } from '@shared/types/settings';
 import type { ProviderAccountAuth } from '@shared/provider-catalog/catalogManifestSchema';
-import type { OAuthFlowState, OAuthSecretBundle } from './oauth/oauthTypes';
 
 export type { AccountCatalogDiscovery } from './oauth/accountAuthFlows';
 
-type AccountCatalogPublisher = (
-  providerId: LlmProviderId,
-  discovery: AccountCatalogDiscovery,
-) => Promise<void>;
+type AccountCatalogPublisher = (providerId: LlmProviderId, discovery: AccountCatalogDiscovery) => Promise<void>;
 
 interface AccountSignIn {
   accountAuth: ProviderAccountAuth;
@@ -61,13 +59,22 @@ export class ProviderAccountAuthService {
     let startedFlow: OAuthFlowState | undefined;
     const host: AccountFlowHost = {
       providerId,
-      setFlow: (flow) => { startedFlow = flow; this.setFlow(flow); },
+      setFlow: (flow) => {
+        startedFlow = flow;
+        this.setFlow(flow);
+      },
       openExternal: (url) => this.openExternal(url),
       completeWithCode: (flowId, code) => this.finishLoginInternal(providerId, flowId, code),
-      persist: async (bundle) => { await this.persistAccount(providerId, bundle, startedFlow); },
-      fail: (flow, message) => { flow.error = message; },
+      persist: async (bundle) => {
+        await this.persistAccount(providerId, bundle, startedFlow);
+      },
+      fail: (flow, message) => {
+        flow.error = message;
+      },
       closeFlowServer: (flow) => this.closeFlowServer(flow),
-      forgetFlow: (flowId) => { this.pendingFlows.delete(flowId); },
+      forgetFlow: (flowId) => {
+        this.pendingFlows.delete(flowId);
+      },
     };
     try {
       await signIn.flow.start(host);
@@ -135,7 +142,7 @@ export class ProviderAccountAuthService {
 
     await loadProviderSurface(providerId);
     const activeBundle = await this.refreshBundleIfNeeded(bundle);
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    const provider = settingsService.providerConnections.get(providerId);
     const refreshedAt = provider?.lastModelRefreshAt ? Date.parse(provider.lastModelRefreshAt) : Number.NaN;
     const catalogIsFresh = Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000;
     if (JSON.stringify(activeBundle) === JSON.stringify(bundle) && catalogIsFresh) {
@@ -173,24 +180,36 @@ export class ProviderAccountAuthService {
     forcedState?: LlmProviderAccountStatus['state'],
     diagnostic?: LlmProviderAccountDiagnostic,
   ): LlmProviderAccountStatus {
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    const provider = settingsService.providerConnections.get(providerId);
     const accountAuth = getProviderAccountAuth(providerId);
     const flow = accountAuth ? this.findFlow(providerId) : null;
-    const authenticated = Boolean(provider?.isConfigured && provider.status === 'verified' && provider.authMode === 'account');
+    const authenticated = Boolean(
+      provider?.isConfigured && provider.status === 'verified' && provider.authMode === 'account',
+    );
     const connected = authenticated && forcedState !== 'failed' && !flow?.error;
     const accountBundle = accountAuth ? this.readBundle(providerId) : null;
     const available = Boolean(accountAuth) && provider?.authModeAvailability?.account?.state !== 'unavailable';
-    const state: LlmProviderAccountStatus['state'] = forcedState
-      ?? (flow?.error ? 'failed' : flow ? 'pending' : connected ? 'connected' : accountAuth ? 'signed-out' : 'unavailable');
+    const state: LlmProviderAccountStatus['state'] =
+      forcedState ??
+      (flow?.error
+        ? 'failed'
+        : flow
+          ? 'pending'
+          : connected
+            ? 'connected'
+            : accountAuth
+              ? 'signed-out'
+              : 'unavailable');
     const activeDiagnostic = diagnostic ?? flow?.diagnostic;
     return {
       providerId,
       state,
       available,
       connected,
-      message: message ?? flow?.error ?? (connected
-        ? 'Connected'
-        : flow && accountAuth ? pendingAuthorizationMessage(accountAuth) : 'Not connected'),
+      message:
+        message ??
+        flow?.error ??
+        (connected ? 'Connected' : flow && accountAuth ? pendingAuthorizationMessage(accountAuth) : 'Not connected'),
       error: forcedState === 'failed' ? message : flow?.error,
       accountLabel: provider?.accountLabel,
       planLabel: provider?.planLabel,
@@ -245,7 +264,8 @@ export class ProviderAccountAuthService {
     bundle: OAuthSecretBundle,
     flow?: OAuthFlowState,
   ): Promise<LlmProviderAccountStatus> {
-    const flowIsCurrent = () => !flow || (!flow.abortController?.signal.aborted && this.pendingFlows.get(flow.flowId) === flow);
+    const flowIsCurrent = () =>
+      !flow || (!flow.abortController?.signal.aborted && this.pendingFlows.get(flow.flowId) === flow);
     if (!flowIsCurrent()) throw new Error('Sign-in was cancelled.');
     const discovery = await this.discoverCatalog(bundle, flow?.abortController?.signal);
     if (!flowIsCurrent()) throw new Error('Sign-in was cancelled.');
@@ -263,17 +283,12 @@ export class ProviderAccountAuthService {
     discovery: AccountCatalogDiscovery,
     publish: boolean,
   ): Promise<void> {
-    settingsService.saveProviderAccountConnection(
-      providerId,
-      JSON.stringify(bundle),
-      discovery.models,
-      {
-        accountLabel: bundle.accountLabel,
-        planLabel: bundle.planLabel,
-        oauthExpiresAt: bundle.expiresAt,
-        oauthRefreshAvailable: this.flowFor(bundle).canRefresh(bundle),
-      },
-    );
+    settingsService.saveProviderAccountConnection(providerId, JSON.stringify(bundle), discovery.models, {
+      accountLabel: bundle.accountLabel,
+      planLabel: bundle.planLabel,
+      oauthExpiresAt: bundle.expiresAt,
+      oauthRefreshAvailable: this.flowFor(bundle).canRefresh(bundle),
+    });
     if (publish && this.catalogPublisher) {
       await this.catalogPublisher(providerId, discovery);
     }
@@ -281,12 +296,14 @@ export class ProviderAccountAuthService {
 
   private async refreshBundleIfNeeded(bundle: OAuthSecretBundle, force = false): Promise<OAuthSecretBundle> {
     const flow = this.flowFor(bundle);
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === bundle.providerId);
+    const provider = settingsService.providerConnections.get(bundle.providerId);
     const accountId = provider?.activeAccountId ?? bundle.accountId ?? `anonymous:${bundle.providerId}`;
     const ownsAccount = () => {
-      const current = settingsService.getAll().llm.providers.find(entry => entry.id === bundle.providerId);
-      return current?.activeAccountId === provider?.activeAccountId
-        && JSON.stringify(this.readBundle(bundle.providerId)) === JSON.stringify(bundle);
+      const current = settingsService.providerConnections.get(bundle.providerId);
+      return (
+        current?.activeAccountId === provider?.activeAccountId &&
+        JSON.stringify(this.readBundle(bundle.providerId)) === JSON.stringify(bundle)
+      );
     };
     return oauthRefreshManager.refresh({
       key: { providerId: bundle.providerId, accountId },
@@ -295,7 +312,8 @@ export class ProviderAccountAuthService {
       force: force || Boolean(flow.requiresRefresh?.(bundle)),
       refresh: () => flow.refresh?.(bundle) ?? Promise.resolve(bundle),
       commit: (refreshed) => {
-        if (!ownsAccount()) throw new Error('PROVIDER_ACCOUNT_CHANGED: credential refresh no longer owns this account.');
+        if (!ownsAccount())
+          throw new AppError('PROVIDER_ACCOUNT_CHANGED', 'credential refresh no longer owns this account.');
         settingsService.rotateProviderAccountCredential(bundle.providerId, JSON.stringify(refreshed), {
           accountLabel: refreshed.accountLabel,
           planLabel: refreshed.planLabel,
@@ -326,17 +344,24 @@ export class ProviderAccountAuthService {
     if (!raw) {
       return null;
     }
+    // A credential that is not this provider's bundle is not a connected account.
+    let value: unknown;
     try {
-      const parsed = JSON.parse(raw) as OAuthSecretBundle;
-      return parsed.providerId === providerId ? parsed : null;
+      value = JSON.parse(raw);
     } catch {
       return null;
     }
+    const bundle = OAuthSecretBundleSchema.safeParse(value);
+    return bundle.success && bundle.data.providerId === providerId ? bundle.data : null;
   }
 
   private findFlow(providerId: LlmProviderId, flowId?: string): OAuthFlowState | null {
     for (const flow of this.pendingFlows.values()) {
-      if (flow.providerId === providerId && (!flowId || flow.flowId === flowId) && (Date.now() <= flow.expiresAt || Boolean(flow.error))) {
+      if (
+        flow.providerId === providerId &&
+        (!flowId || flow.flowId === flowId) &&
+        (Date.now() <= flow.expiresAt || Boolean(flow.error))
+      ) {
         return flow;
       }
     }

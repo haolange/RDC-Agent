@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { appPathService } from '../runtime/AppPathService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { projectWorkspaceStore } from '../sessions/store/sessionStores';
+import { StorageIo } from '../runtime/StorageIo';
 import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
 import { KNOWLEDGE_INDEX_MIGRATIONS } from './knowledgeIndexSchema';
 import {
@@ -13,6 +13,7 @@ import {
   type KnowledgeIndexSnapshot,
 } from './knowledgeLanes';
 import { extractPreview, toPosixRelative, walkMarkdownFiles } from './knowledgeFs';
+import type { KnowledgeOperationOptions } from './knowledgeOperations';
 import type { KnowledgeSpace } from '@shared/types/knowledge';
 
 export interface KnowledgeIndexDependencies {
@@ -27,13 +28,15 @@ export interface KnowledgeIndexDependencies {
 const defaultDependencies = (): KnowledgeIndexDependencies => {
   return {
     listSpaces: () => {
-      const spaces: KnowledgeSpace[] = [{
-        spaceId: 'user',
-        kind: 'user',
-        label: 'User',
-        rootPath: appPathService.getUserRdcPaths().knowledgePath,
-      }];
-      for (const project of storageAdapter.listProjects()) {
+      const spaces: KnowledgeSpace[] = [
+        {
+          spaceId: 'user',
+          kind: 'user',
+          label: 'User',
+          rootPath: appPathService.getUserRdcPaths().knowledgePath,
+        },
+      ];
+      for (const project of projectWorkspaceStore.listProjects()) {
         spaces.push({
           spaceId: `project:${project.projectId}`,
           kind: 'project',
@@ -56,12 +59,7 @@ export function contentHashOf(source: string): string {
   return createHash('sha256').update(source, 'utf8').digest('hex');
 }
 
-function toEntry(
-  space: KnowledgeSpace,
-  relativePath: string,
-  source: string,
-  updatedAt: number,
-): KnowledgeIndexEntry {
+function toEntry(space: KnowledgeSpace, relativePath: string, source: string, updatedAt: number): KnowledgeIndexEntry {
   const parsed = parseKnowledgeFrontmatter(source, { spaceId: space.spaceId, relativePath });
   const headings = [...source.matchAll(/^#{1,3}\s+(.+)$/gm)].map((match) => match[1].trim());
   const lexical = [parsed.record.title, parsed.body, relativePath].join('\n').toLocaleLowerCase();
@@ -86,7 +84,14 @@ function toEntry(
 }
 
 function resolveDeps(overrides: Partial<KnowledgeIndexDependencies>): KnowledgeIndexDependencies {
-  if (overrides.listSpaces && overrides.snapshotPath && overrides.storage && overrides.now && overrides.readFile && overrides.statMtime) {
+  if (
+    overrides.listSpaces &&
+    overrides.snapshotPath &&
+    overrides.storage &&
+    overrides.now &&
+    overrides.readFile &&
+    overrides.statMtime
+  ) {
     return overrides as KnowledgeIndexDependencies;
   }
   return { ...defaultDependencies(), ...overrides };
@@ -102,23 +107,13 @@ export class KnowledgeIndexService {
     return this.resolved;
   }
 
-  async rebuild(): Promise<KnowledgeIndexSnapshot> {
-    const cards: KnowledgeIndexEntry[] = [];
-    for (const space of this.dependencies.listSpaces()) {
-      const { realRoot, files } = await walkMarkdownFiles(space.rootPath);
-      for (const absolutePath of files) {
-        const relativePath = toPosixRelative(path.relative(realRoot, absolutePath));
-        if (!relativePath || relativePath.startsWith('..')) continue;
-        try {
-          const source = await this.dependencies.readFile(absolutePath);
-          const updatedAt = await this.dependencies.statMtime(absolutePath);
-          cards.push(toEntry(space, relativePath, source, updatedAt));
-        } catch {
-          // skip unreadable files
-        }
-      }
-    }
-    cards.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+  /**
+   * Reads every card in every space and replaces the snapshot. The snapshot is written once, atomically, after the
+   * last card: a rebuild that fails or is cancelled (checked between cards) leaves the previous snapshot in use.
+   */
+  async rebuild(options: KnowledgeOperationOptions = {}): Promise<KnowledgeIndexSnapshot> {
+    const cards = await this.collectEntries(options);
+    options.signal?.throwIfAborted();
     const snapshot: KnowledgeIndexSnapshot = {
       schemaVersion: KNOWLEDGE_INDEX_SCHEMA_VERSION,
       revision: knowledgeCorpusHash(cards),
@@ -132,35 +127,44 @@ export class KnowledgeIndexService {
   }
 
   getSnapshot(): KnowledgeIndexSnapshot | null {
-    return this.dependencies.storage.readJson(
-      this.dependencies.snapshotPath(),
-      KNOWLEDGE_INDEX_MIGRATIONS,
-    );
+    return this.dependencies.storage.readJson(this.dependencies.snapshotPath(), KNOWLEDGE_INDEX_MIGRATIONS);
   }
 
   async computeLiveRevision(): Promise<string> {
-    const cards: KnowledgeIndexEntry[] = [];
+    return knowledgeCorpusHash(await this.collectEntries());
+  }
+
+  /** Every readable card of every space, sorted by path; unreadable files are skipped. */
+  private async collectEntries({ signal, onProgress }: KnowledgeOperationOptions = {}): Promise<KnowledgeIndexEntry[]> {
+    const sources: Array<{ space: KnowledgeSpace; relativePath: string; absolutePath: string }> = [];
     for (const space of this.dependencies.listSpaces()) {
+      signal?.throwIfAborted();
       const { realRoot, files } = await walkMarkdownFiles(space.rootPath);
       for (const absolutePath of files) {
         const relativePath = toPosixRelative(path.relative(realRoot, absolutePath));
-        if (!relativePath || relativePath.startsWith('..')) continue;
-        try {
-          const source = await this.dependencies.readFile(absolutePath);
-          const updatedAt = await this.dependencies.statMtime(absolutePath);
-          cards.push(toEntry(space, relativePath, source, updatedAt));
-        } catch {
-          // skip unreadable files
-        }
+        if (relativePath && !relativePath.startsWith('..')) sources.push({ space, relativePath, absolutePath });
       }
     }
+    const cards: KnowledgeIndexEntry[] = [];
+    onProgress?.('indexing', 0, sources.length);
+    for (const [index, { space, relativePath, absolutePath }] of sources.entries()) {
+      signal?.throwIfAborted();
+      try {
+        const source = await this.dependencies.readFile(absolutePath);
+        const updatedAt = await this.dependencies.statMtime(absolutePath);
+        cards.push(toEntry(space, relativePath, source, updatedAt));
+      } catch {
+        // skip unreadable files
+      }
+      onProgress?.('indexing', index + 1, sources.length);
+    }
     cards.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
-    return knowledgeCorpusHash(cards);
+    return cards;
   }
 
   async isSnapshotStale(snapshot: KnowledgeIndexSnapshot | null = this.getSnapshot()): Promise<boolean> {
     if (!snapshot) return true;
-    return snapshot.revision !== await this.computeLiveRevision();
+    return snapshot.revision !== (await this.computeLiveRevision());
   }
 
   async getOrRebuild(): Promise<KnowledgeIndexSnapshot> {

@@ -1,5 +1,6 @@
 import { ProductLogo } from '../../ui/ProductLogo';
 import { Icon } from '../../ui/Icon';
+import { PlainButton } from '../../ui/PlainButton';
 import { WindowControls } from './WindowControls';
 import type { ReactNode } from 'react';
 import './TitleBar.css';
@@ -61,8 +62,7 @@ export function TitleBar({
             <span className="app-logo-text">RDC-Agent</span>
           </div>
         </div>
-        <button
-          type="button"
+        <PlainButton
           className="shell-panel-toggle titlebar-panel-toggle"
           data-testid="titlebar-left-panel-toggle"
           onClick={!leftToggleDisabled ? onToggleLeft : undefined}
@@ -72,13 +72,12 @@ export function TitleBar({
           disabled={leftToggleDisabled}
         >
           <Icon name="sidebar-left" size={18} className="shell-panel-toggle-icon" />
-        </button>
+        </PlainButton>
       </div>
       <div className="app-titlebar-right no-drag">
         {utilities}
         {isRightRailVisible && (
-          <button
-            type="button"
+          <PlainButton
             className="shell-panel-toggle titlebar-panel-toggle"
             data-testid="titlebar-right-panel-toggle"
             onClick={!rightToggleDisabled ? onToggleRight : undefined}
@@ -88,11 +87,17 @@ export function TitleBar({
             disabled={rightToggleDisabled}
           >
             <Icon name="sidebar-right" size={18} className="shell-panel-toggle-icon" />
-          </button>
+          </PlainButton>
         )}
         <WindowControls
           maximized={windowMaximized}
-          labels={{ group: windowControlsLabel, minimize: windowMinimizeLabel, maximize: windowMaximizeLabel, restore: windowRestoreLabel, close: windowCloseLabel }}
+          labels={{
+            group: windowControlsLabel,
+            minimize: windowMinimizeLabel,
+            maximize: windowMaximizeLabel,
+            restore: windowRestoreLabel,
+            close: windowCloseLabel,
+          }}
           onMinimize={onMinimize}
           onToggleMaximize={onToggleMaximize}
           onClose={onClose}

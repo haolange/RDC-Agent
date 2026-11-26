@@ -1,21 +1,23 @@
-import { createFailClosedProviderContracts, createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 import {
-  hasImplementedStructuredToolAdapter,
-  toolCallingEvidenceOf,
-} from '@shared/utils/agentToolCapability';
+  createFailClosedProviderContracts,
+  createNoneReasoningContract,
+} from '@shared/provider-catalog/providerContracts';
+import { hasImplementedStructuredToolAdapter, toolCallingEvidenceOf } from '@shared/utils/agentToolCapability';
 import { classifyProviderError } from '../providers/internal/errorClassifier';
 import { ProviderHttpError } from '../providers/internal/http';
-import type { AgentRouteCapability, ReasoningDelivery, ReasoningVisibility, ToolCallingMode } from '@shared/types/agentRuntime';
+import type {
+  AgentRouteCapability,
+  ReasoningDelivery,
+  ReasoningVisibility,
+  ToolCallingMode,
+} from '@shared/types/agentRuntime';
 import type { ConversationDiagnosticSeverity } from '@shared/types/conversation';
 import type { ProviderReasoningContract } from '@shared/types/rdcRuntime';
 import type { LlmProviderEntry, LlmProviderId, LlmProviderProtocol } from '@shared/types/settings';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 
 export interface RouteCapabilityDiagnostic {
-  code:
-    | 'route_tool_calling_unknown'
-    | 'route_tool_calling_unsupported'
-    | 'route_tool_calling_disabled';
+  code: 'route_tool_calling_unknown' | 'route_tool_calling_unsupported' | 'route_tool_calling_disabled';
   severity: ConversationDiagnosticSeverity;
   message: string;
   surface: 'runtime-log' | 'work-process';
@@ -37,13 +39,7 @@ const EXPLICIT_TOOL_REJECTION_PATTERNS = [
   /\b(?:client[- ]side )?tools?\b.{0,80}\brequire(?:s)?\b.{0,40}\b(?:beta|special access)\b/i,
 ];
 
-const TRANSIENT_PROVIDER_ERROR_CODES = new Set([
-  'rate_limit',
-  'network',
-  'timeout',
-  'quota_exceeded',
-  'aborted',
-]);
+const TRANSIENT_PROVIDER_ERROR_CODES = new Set(['rate_limit', 'network', 'timeout', 'quota_exceeded', 'aborted']);
 
 export function resolveProviderReasoningContract(
   provider: LlmProviderEntry | undefined,
@@ -54,9 +50,11 @@ export function resolveProviderReasoningContract(
     return createNoneReasoningContract('effective-model');
   }
   const route = requestPlan?.route ?? model.route;
-  return requestPlan?.contracts?.reasoning
-    ?? route.contracts?.reasoning
-    ?? createFailClosedProviderContracts(route.protocol).reasoning;
+  return (
+    requestPlan?.contracts.reasoning ??
+    route.contracts?.reasoning ??
+    createFailClosedProviderContracts(route.protocol).reasoning
+  );
 }
 
 export function reasoningContractToDelivery(contract: ProviderReasoningContract): ReasoningDelivery {
@@ -102,17 +100,17 @@ export function resolveAgentRouteCapability(
 ): AgentRouteCapability {
   const providerId = provider?.id ?? '';
   if (
-    !provider
-    || !provider.enabled
-    || !provider.isConfigured
-    || provider.status !== 'verified'
-    || !effectiveModel?.enabled
-    || effectiveModel.availability === 'unavailable'
-  ) return disabledCapability(providerId, modelId);
+    !provider ||
+    !provider.enabled ||
+    !provider.isConfigured ||
+    provider.status !== 'verified' ||
+    !effectiveModel?.enabled ||
+    effectiveModel.availability === 'unavailable'
+  )
+    return disabledCapability(providerId, modelId);
   const activeRoute = requestPlan?.route ?? effectiveModel.route;
-  const activeContracts = requestPlan?.contracts
-    ?? activeRoute.contracts
-    ?? createFailClosedProviderContracts(activeRoute.protocol);
+  const activeContracts =
+    requestPlan?.contracts ?? activeRoute.contracts ?? createFailClosedProviderContracts(activeRoute.protocol);
   const supportsStreaming = activeContracts.streaming.transport !== 'unknown';
   const toolCallingEvidence = toolCallingEvidenceOf(effectiveModel.toolCalling.state);
   let toolCallingMode: ToolCallingMode = 'text-only';
@@ -198,7 +196,7 @@ export function isExplicitStructuredToolCallingRejection(error: unknown): boolea
   if (classified.retryable || TRANSIENT_PROVIDER_ERROR_CODES.has(classified.code)) {
     return false;
   }
-  const bodyText = error instanceof ProviderHttpError ? error.bodyText ?? '' : '';
+  const bodyText = error instanceof ProviderHttpError ? (error.bodyText ?? '') : '';
   const haystack = `${classified.message}\n${bodyText}`;
   return EXPLICIT_TOOL_REJECTION_PATTERNS.some((pattern) => pattern.test(haystack));
 }

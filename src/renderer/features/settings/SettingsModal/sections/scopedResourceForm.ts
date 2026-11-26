@@ -1,4 +1,18 @@
+import { z } from 'zod';
 import type { ScopedResourceKind } from '@shared/types/rdcRuntime';
+
+/** The MCP server fields the form edits; the body keeps every other field as written. */
+const McpServerFormSchema = z
+  .object({
+    id: z.string().optional(),
+    name: z.string().optional(),
+    transport: z.string().optional(),
+    url: z.string().optional(),
+    command: z.string().optional(),
+    args: z.array(z.unknown()).optional(),
+    enabledByDefault: z.boolean().optional(),
+  })
+  .passthrough();
 
 export type ResourceFormState = {
   id: string;
@@ -16,11 +30,12 @@ export type ResourceFormState = {
 
 export const emptyForm = (kind: ScopedResourceKind, id: string): ResourceFormState => ({
   id,
-  body: kind === 'skill'
-    ? `---\nname: ${id}\ndescription: Reusable scoped instructions\nallowed-tools: []\n---\n\nDescribe the skill workflow here.`
-    : kind === 'policy'
-      ? 'deniedTools: []\napproval: mutation\nlimits:\n  contextCompactionPercent: 100'
-      : '',
+  body:
+    kind === 'skill'
+      ? `---\nname: ${id}\ndescription: Reusable scoped instructions\nallowed-tools: []\n---\n\nDescribe the skill workflow here.`
+      : kind === 'policy'
+        ? 'deniedTools: []\napproval: mutation\nlimits:\n  contextCompactionPercent: 100'
+        : '',
   name: id,
   transport: 'stdio',
   url: '',
@@ -38,53 +53,46 @@ export const formFromContent = (kind: ScopedResourceKind, id: string, content: s
     return { ...base, id, body: content };
   }
   if (kind === 'mcp') {
+    // A body that is not an MCP server object opens as raw text, the editor's not-yet-structured state.
+    let value: unknown;
     try {
-      const parsed = JSON.parse(content) as {
-        id?: string;
-        name?: string;
-        transport?: string;
-        url?: string;
-        command?: string;
-        args?: unknown[];
-        enabledByDefault?: boolean;
-      };
-      return {
-        ...base,
-        id: String(parsed.id ?? id),
-        name: String(parsed.name ?? parsed.id ?? id),
-        transport: String(parsed.transport ?? 'stdio'),
-        url: String(parsed.url ?? ''),
-        command: String(parsed.command ?? ''),
-        argsText: JSON.stringify(Array.isArray(parsed.args) ? parsed.args : [], null, 2),
-        enabled: parsed.enabledByDefault !== false,
-        body: content,
-      };
+      value = JSON.parse(content);
     } catch {
       return { ...base, id, body: content };
     }
+    const parsed = McpServerFormSchema.safeParse(value);
+    if (!parsed.success) return { ...base, id, body: content };
+    const server = parsed.data;
+    return {
+      ...base,
+      id: server.id ?? id,
+      name: server.name ?? server.id ?? id,
+      transport: server.transport ?? 'stdio',
+      url: server.url ?? '',
+      command: server.command ?? '',
+      argsText: JSON.stringify(server.args ?? [], null, 2),
+      enabled: server.enabledByDefault !== false,
+      body: content,
+    };
   }
   if (kind === 'hook') {
-    try {
-      const lines = content.split(/\r?\n/);
-      const pick = (key: string): string | undefined => {
-        const line = lines.find((entry) => entry.startsWith(`${key}:`));
-        return line ? line.slice(key.length + 1).trim() : undefined;
-      };
-      const failure = pick('failurePolicy');
-      return {
-        ...base,
-        id: pick('id') ?? id,
-        enabled: pick('enabled') !== 'false',
-        event: pick('event') ?? 'tool.before-call',
-        command: pick('command') ?? '',
-        argsText: pick('args') ?? '[]',
-        timeoutMs: pick('timeoutMs') ?? '30000',
-        failurePolicy: failure === 'block' ? 'block' : 'warn',
-        body: content,
-      };
-    } catch {
-      return { ...base, id, body: content };
-    }
+    const lines = content.split(/\r?\n/);
+    const pick = (key: string): string | undefined => {
+      const line = lines.find((entry) => entry.startsWith(`${key}:`));
+      return line ? line.slice(key.length + 1).trim() : undefined;
+    };
+    const failure = pick('failurePolicy');
+    return {
+      ...base,
+      id: pick('id') ?? id,
+      enabled: pick('enabled') !== 'false',
+      event: pick('event') ?? 'tool.before-call',
+      command: pick('command') ?? '',
+      argsText: pick('args') ?? '[]',
+      timeoutMs: pick('timeoutMs') ?? '30000',
+      failurePolicy: failure === 'block' ? 'block' : 'warn',
+      body: content,
+    };
   }
   return { ...base, id, body: content };
 };
@@ -93,7 +101,7 @@ export const formFromContent = (kind: ScopedResourceKind, id: string, content: s
 const parseDescriptor = (body: string): Record<string, unknown> => {
   try {
     const parsed: unknown = JSON.parse(body);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
   } catch {
     return {};
   }
@@ -108,16 +116,20 @@ export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormStat
     }
     // The form edits a few fields of the descriptor; everything else it carries (env, description, …) stays as written.
     const { url: _url, ...original } = parseDescriptor(form.body);
-    return JSON.stringify({
-      ...original,
-      id: form.id,
-      name: form.name || form.id,
-      transport: form.transport || 'stdio',
-      ...(form.transport === 'streamable-http' && form.url.trim() ? { url: form.url.trim() } : {}),
-      command: form.command,
-      args,
-      enabledByDefault: form.enabled,
-    }, null, 2);
+    return JSON.stringify(
+      {
+        ...original,
+        id: form.id,
+        name: form.name || form.id,
+        transport: form.transport || 'stdio',
+        ...(form.transport === 'streamable-http' && form.url.trim() ? { url: form.url.trim() } : {}),
+        command: form.command,
+        args,
+        enabledByDefault: form.enabled,
+      },
+      null,
+      2,
+    );
   }
   if (kind === 'hook') {
     return [
@@ -137,7 +149,11 @@ export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormStat
 export const resourceDisplayName = (kind: ScopedResourceKind, id: string, content: string): string => {
   if (kind === 'skill') {
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content)?.[1] ?? '';
-    const name = frontmatter.split(/\r?\n/).find((line) => line.startsWith('name:'))?.slice('name:'.length).trim();
+    const name = frontmatter
+      .split(/\r?\n/)
+      .find((line) => line.startsWith('name:'))
+      ?.slice('name:'.length)
+      .trim();
     return name ? name.replace(/^['"]|['"]$/g, '') : id;
   }
   if (kind === 'mcp') return formFromContent('mcp', id, content).name || id;

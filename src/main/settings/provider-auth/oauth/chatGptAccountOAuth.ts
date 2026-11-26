@@ -42,7 +42,7 @@ export async function startChatGptLogin(
 
 export async function exchangeChatGptCode(flow: OAuthFlowState, code: string): Promise<OAuthSecretBundle> {
   if (!code || !flow.codeVerifier) throw new Error('Authorization code is required.');
-  const tokenPayload = await fetchJson('https://auth.openai.com/oauth/token', {
+  const tokenPayload = (await fetchJson('https://auth.openai.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -52,7 +52,7 @@ export async function exchangeChatGptCode(flow: OAuthFlowState, code: string): P
       redirect_uri: `http://localhost:${CHATGPT_CALLBACK_PORT}/auth/callback`,
       code_verifier: flow.codeVerifier,
     }).toString(),
-  }) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number };
+  })) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number };
   if (!tokenPayload.access_token) throw new Error('OpenAI OAuth did not return an access token.');
   return {
     providerId: flow.providerId,
@@ -67,7 +67,7 @@ export async function exchangeChatGptCode(flow: OAuthFlowState, code: string): P
 }
 
 export async function refreshChatGptBundle(bundle: OAuthSecretBundle): Promise<OAuthSecretBundle> {
-  const payload = await fetchJson('https://auth.openai.com/oauth/token', {
+  const payload = (await fetchJson('https://auth.openai.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -75,7 +75,7 @@ export async function refreshChatGptBundle(bundle: OAuthSecretBundle): Promise<O
       client_id: CHATGPT_CLIENT_ID,
       refresh_token: bundle.refreshToken ?? '',
     }).toString(),
-  }) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number };
+  })) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number };
   if (!payload.access_token) throw new Error('OpenAI OAuth refresh did not return an access token.');
   return {
     ...bundle,
@@ -88,7 +88,9 @@ export async function refreshChatGptBundle(bundle: OAuthSecretBundle): Promise<O
   };
 }
 
-export async function discoverChatGptCatalog(bundle: OAuthSecretBundle): Promise<{ models: LlmProviderModel[]; contributions?: CatalogModelContribution[] }> {
+export async function discoverChatGptCatalog(
+  bundle: OAuthSecretBundle,
+): Promise<{ models: LlmProviderModel[]; contributions?: CatalogModelContribution[] }> {
   const token = bundle.accessToken ?? bundle.apiKey;
   if (!token) throw new Error('ChatGPT Account OAuth token is missing.');
   const payload = await fetchJson(
@@ -127,10 +129,14 @@ export function startChatGptCallbackServer(
       const code = url.searchParams.get('code') ?? '';
       void finishLogin(flow.flowId, code)
         .then((status) => {
-          response.writeHead(status.connected ? 200 : 500, { 'Content-Type': status.connected ? 'text/html' : 'text/plain' });
-          response.end(status.connected
-            ? '<html><body>RDC Agent sign-in complete. You can return to the app.</body></html>'
-            : (status.error ?? status.message ?? 'ChatGPT sign-in failed.'));
+          response.writeHead(status.connected ? 200 : 500, {
+            'Content-Type': status.connected ? 'text/html' : 'text/plain',
+          });
+          response.end(
+            status.connected
+              ? '<html><body>RDC Agent sign-in complete. You can return to the app.</body></html>'
+              : (status.error ?? status.message ?? 'ChatGPT sign-in failed.'),
+          );
         })
         .catch((error) => {
           response.writeHead(500, { 'Content-Type': 'text/plain' });
@@ -143,8 +149,14 @@ export function startChatGptCallbackServer(
       flow.error = error instanceof Error ? error.message : String(error);
       closeFlowServer(flow);
       clearFlow(flow.flowId);
-      if (!settled) { settled = true; reject(error); }
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
     });
-    server.listen(CHATGPT_CALLBACK_PORT, '127.0.0.1', () => { settled = true; resolve(); });
+    server.listen(CHATGPT_CALLBACK_PORT, '127.0.0.1', () => {
+      settled = true;
+      resolve();
+    });
   });
 }

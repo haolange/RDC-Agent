@@ -1,9 +1,5 @@
 import { extname } from 'node:path';
-import {
-  KNOWLEDGE_IMAGE_ROLES,
-  type KnowledgeImageRef,
-  type KnowledgeImageRole,
-} from '@shared/types/knowledge';
+import { KNOWLEDGE_IMAGE_ROLES, type KnowledgeImageRef, type KnowledgeImageRole } from '@shared/types/knowledge';
 import { toPosixRelative } from './knowledgeFs';
 
 export const KNOWLEDGE_IMAGE_MAX_BYTES = 2 * 1024 * 1024;

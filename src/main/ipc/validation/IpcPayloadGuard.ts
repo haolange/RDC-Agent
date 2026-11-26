@@ -3,12 +3,11 @@
  * All IPC handlers must validate args through `parseIpcArgs` (fail-closed).
  */
 import { z, type ZodTypeAny } from 'zod';
+import { AppError } from '@shared/errors/appError';
 
-export class IpcValidationError extends Error {
-  readonly code = 'IPC_VALIDATION_ERROR' as const;
-
+export class IpcValidationError extends AppError {
   constructor(message: string) {
-    super(message);
+    super('IPC_VALIDATION_ERROR', message);
     this.name = 'IpcValidationError';
   }
 }
@@ -26,7 +25,7 @@ const DEFAULT_MAX_BYTES = 256 * 1024;
 export function assertIpcPayloadBytes(value: unknown, maxBytes: number, label = 'IPC payload'): void {
   let serialized: string;
   try {
-    serialized = JSON.stringify(value) ?? 'null';
+    serialized = (JSON.stringify(value) as string | undefined) ?? 'null';
   } catch {
     throw new IpcValidationError(`${label} is not JSON-serializable.`);
   }
@@ -74,14 +73,9 @@ export function ipcNonEmptyString(maxLength: number, label = 'string'): z.ZodStr
 
 /** Opaque id: alphanumeric + common separators, fail-closed on path traversal chars. */
 export function ipcId(maxLength = 128, label = 'id'): z.ZodString {
-  return ipcNonEmptyString(maxLength, label).regex(
-    /^[A-Za-z0-9][A-Za-z0-9._:@+-]*$/,
-    `${label} has invalid format`,
-  );
+  return ipcNonEmptyString(maxLength, label).regex(/^[A-Za-z0-9][A-Za-z0-9._:@+-]*$/, `${label} has invalid format`);
 }
 
 export function ipcStringArray(maxItems: number, maxItemLength: number, label = 'array'): z.ZodArray<z.ZodString> {
-  return z
-    .array(ipcString(maxItemLength, `${label} item`))
-    .max(maxItems, `${label} exceeds ${maxItems} items`);
+  return z.array(ipcString(maxItemLength, `${label} item`)).max(maxItems, `${label} exceeds ${maxItems} items`);
 }

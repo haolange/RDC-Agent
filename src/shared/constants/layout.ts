@@ -23,17 +23,11 @@ export const APP_MIN_WINDOW_HEIGHT = 640;
  * Window floor: left rail at its layout min + composer main column + one resize handle.
  * Right rail may auto-collapse / enter drawer before this floor is reached.
  */
-export const APP_MIN_WINDOW_WIDTH =
-  LEFT_SIDEBAR_MIN_WIDTH
-  + APP_MIN_MAIN_WIDTH
-  + APP_RESIZE_HANDLE_WIDTH;
+export const APP_MIN_WINDOW_WIDTH = LEFT_SIDEBAR_MIN_WIDTH + APP_MIN_MAIN_WIDTH + APP_RESIZE_HANDLE_WIDTH;
 
 /** Minimum width when both sidebars remain expanded at their layout mins. */
 export const APP_FULL_CHROME_MIN_WIDTH =
-  APP_MIN_MAIN_WIDTH
-  + LEFT_SIDEBAR_MIN_WIDTH
-  + RIGHT_PANEL_MIN_WIDTH
-  + APP_RESIZE_HANDLE_WIDTH * 2;
+  APP_MIN_MAIN_WIDTH + LEFT_SIDEBAR_MIN_WIDTH + RIGHT_PANEL_MIN_WIDTH + APP_RESIZE_HANDLE_WIDTH * 2;
 
 /** Single product max for page-shell / Local / composer / transcript outer rail. */
 export const WORKBENCH_CHAT_RAIL_MAX_WIDTH = 'min(990px, 77%)';

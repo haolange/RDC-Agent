@@ -10,8 +10,10 @@ import { readdirSync, readFileSync, statSync } from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
-import { PROTOCOL_WIRE_FIXTURE_COVERAGE } from '@shared/provider-catalog/protocolWireFixtureCoverage';
-import { getProviderAdapterImplementation, type ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
+import {
+  getProviderAdapterImplementation,
+  type ProviderAdapterId,
+} from '@shared/provider-catalog/implementationRegistry';
 import { buildAnthropicMessagesUrl } from '../../agent-runtime/providers/AnthropicProvider';
 import { buildGeminiStreamUrl } from '../../agent-runtime/providers/GeminiProvider';
 import { createTestRequestPlan } from '../createTestRequestPlan';
@@ -21,25 +23,22 @@ import {
   createProviderOutputRef,
   ProviderStreamProtocolError,
 } from '../../agent-runtime/providers/internal/AssistantStreamBuilder';
-import {
-  parseJsonLines,
-  parseSSE,
-  ProviderStreamBufferError,
-} from '../../agent-runtime/providers/internal/http';
+import { parseJsonLines, parseSSE, ProviderStreamBufferError } from '../../agent-runtime/providers/internal/http';
 import { requestPlanHeaders } from '../../agent-runtime/providers/requestPlanWire';
 import {
   applyOpenAiCompatibleReasoning,
   buildOpenAiResponsesReasoning,
 } from '../../agent-runtime/providers/reasoningWire';
-import { __testing as openAICompatibleTesting } from '../../agent-runtime/providers/OpenAICompatibleProvider';
-import { __testing as openAIResponsesTesting } from '../../agent-runtime/providers/OpenAIResponsesProvider';
-import { __testing as anthropicTesting } from '../../agent-runtime/providers/AnthropicProvider';
-import { __testing as geminiTesting } from '../../agent-runtime/providers/GeminiProvider';
-import { __testing as ollamaTesting } from '../../agent-runtime/providers/OllamaProvider';
-import { __testing as azureTesting } from '../../agent-runtime/providers/AzureOpenAIResponsesProvider';
-import { __testing as mistralTesting } from '../../agent-runtime/providers/MistralProvider';
-import { __testing as bedrockTesting } from '../../agent-runtime/providers/BedrockConverseProvider';
+import * as openAICompatibleTesting from '../../agent-runtime/providers/OpenAICompatibleProvider';
+import * as openAIResponsesTesting from '../../agent-runtime/providers/OpenAIResponsesProvider';
+import * as anthropicTesting from '../../agent-runtime/providers/AnthropicProvider';
+import * as geminiTesting from '../../agent-runtime/providers/GeminiProvider';
+import * as ollamaTesting from '../../agent-runtime/providers/OllamaProvider';
+import * as azureTesting from '../../agent-runtime/providers/AzureOpenAIResponsesProvider';
+import * as mistralTesting from '../../agent-runtime/providers/MistralProvider';
+import * as bedrockTesting from '../../agent-runtime/providers/BedrockConverseProvider';
 import { buildGoogleInteractionsRequest } from '../../agent-runtime/providers/GoogleInteractionsWire';
+import { PROTOCOL_WIRE_FIXTURE_COVERAGE } from './protocolWireFixtureCoverage';
 import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
 import type { Context, Model } from '../../agent-runtime/core/types';
 import type { RequestPlan } from '@shared/types/providerCapability';
@@ -219,15 +218,17 @@ const ADAPTER_FIXTURES: readonly AdapterFixtureSpec[] = [
 const FIXTURE_CONTEXT: Context = {
   systemPrompt: 'Stay precise.',
   messages: [{ role: 'user', content: 'Read README.md', timestamp: 1 }],
-  tools: [{
-    name: 'read_file',
-    description: 'Read a workspace file',
-    parameters: {
-      type: 'object',
-      properties: { path: { type: 'string' } },
-      required: ['path'],
+  tools: [
+    {
+      name: 'read_file',
+      description: 'Read a workspace file',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+        required: ['path'],
+      },
     },
-  }],
+  ],
 };
 
 function fixtureDir(spec: AdapterFixtureSpec): string {
@@ -352,14 +353,18 @@ function assertTextAndToolCall(spec: AdapterFixtureSpec, events: Record<string, 
       const types = events.map((event) => event.type);
       expect(types).toContain('content_block_start');
       expect(types).toContain('content_block_delta');
-      expect(events.some((event) => {
-        const block = event.content_block as Record<string, unknown> | undefined;
-        return block?.type === 'tool_use' || block?.type === 'text';
-      })).toBe(true);
-      expect(events.some((event) => {
-        const delta = event.delta as Record<string, unknown> | undefined;
-        return delta?.type === 'text_delta' || delta?.type === 'input_json_delta';
-      })).toBe(true);
+      expect(
+        events.some((event) => {
+          const block = event.content_block as Record<string, unknown> | undefined;
+          return block?.type === 'tool_use' || block?.type === 'text';
+        }),
+      ).toBe(true);
+      expect(
+        events.some((event) => {
+          const delta = event.delta as Record<string, unknown> | undefined;
+          return delta?.type === 'text_delta' || delta?.type === 'input_json_delta';
+        }),
+      ).toBe(true);
       break;
     }
     case 'gemini': {
@@ -376,21 +381,27 @@ function assertTextAndToolCall(spec: AdapterFixtureSpec, events: Record<string, 
       const types = events.map((event) => event.event_type);
       expect(types).toContain('step.start');
       expect(types).toContain('step.delta');
-      expect(events.some((event) => {
-        const step = event.step as Record<string, unknown> | undefined;
-        return step?.type === 'function_call' || step?.type === 'text';
-      })).toBe(true);
+      expect(
+        events.some((event) => {
+          const step = event.step as Record<string, unknown> | undefined;
+          return step?.type === 'function_call' || step?.type === 'text';
+        }),
+      ).toBe(true);
       break;
     }
     case 'ollama': {
-      expect(events.some((event) => {
-        const message = event.message as Record<string, unknown> | undefined;
-        return typeof message?.content === 'string' && message.content.length > 0;
-      })).toBe(true);
-      expect(events.some((event) => {
-        const message = event.message as Record<string, unknown> | undefined;
-        return Array.isArray(message?.tool_calls) && message.tool_calls.length > 0;
-      })).toBe(true);
+      expect(
+        events.some((event) => {
+          const message = event.message as Record<string, unknown> | undefined;
+          return typeof message?.content === 'string' && message.content.length > 0;
+        }),
+      ).toBe(true);
+      expect(
+        events.some((event) => {
+          const message = event.message as Record<string, unknown> | undefined;
+          return Array.isArray(message?.tool_calls) && message.tool_calls.length > 0;
+        }),
+      ).toBe(true);
       expect(events.some((event) => event.done === true)).toBe(true);
       break;
     }
@@ -450,10 +461,12 @@ function assertTextAndToolCall(spec: AdapterFixtureSpec, events: Record<string, 
       const types = events.map((event) => event.type);
       expect(types).toContain('content_block_start');
       expect(types).toContain('content_block_delta');
-      expect(events.some((event) => {
-        const block = event.content_block as Record<string, unknown> | undefined;
-        return block?.type === 'tool_use' || block?.type === 'text';
-      })).toBe(true);
+      expect(
+        events.some((event) => {
+          const block = event.content_block as Record<string, unknown> | undefined;
+          return block?.type === 'tool_use' || block?.type === 'text';
+        }),
+      ).toBe(true);
       break;
     }
     case 'gitlab-duo':
@@ -540,9 +553,11 @@ function assertWireBody(spec: AdapterFixtureSpec, plan: RequestPlan): void {
     case 'azure-openai-chat': {
       const messages = openAICompatibleTesting.toOpenAIMessages(FIXTURE_CONTEXT, plan);
       expect(messages.some((message) => message.role === 'user')).toBe(true);
-      expect(openAICompatibleTesting.buildChatCompletionsUrl(plan.route.baseUrl ?? '', {
-        'api-version': '2024-10-21',
-      })).toMatch(/\/chat\/completions\?api-version=/);
+      expect(
+        openAICompatibleTesting.buildChatCompletionsUrl(plan.route.baseUrl ?? '', {
+          'api-version': '2024-10-21',
+        }),
+      ).toMatch(/\/chat\/completions\?api-version=/);
       break;
     }
     case 'openrouter-chat': {
@@ -555,16 +570,16 @@ function assertWireBody(spec: AdapterFixtureSpec, plan: RequestPlan): void {
       const { systemInstruction, contents } = geminiTesting.toGeminiContents(FIXTURE_CONTEXT, plan);
       expect(systemInstruction).toBe('Stay precise.');
       expect(contents[0]).toMatchObject({ role: 'user' });
-      expect(buildGeminiStreamUrl(plan.route.baseUrl ?? '', spec.modelId, 'unused', 'vertex'))
-        .toMatch(/:streamGenerateContent\?alt=sse$/);
+      expect(buildGeminiStreamUrl(plan.route.baseUrl ?? '', spec.modelId, 'unused', 'vertex')).toMatch(
+        /:streamGenerateContent\?alt=sse$/,
+      );
       break;
     }
     case 'google-vertex-anthropic': {
       const { system, messages } = anthropicTesting.toAnthropicMessages(FIXTURE_CONTEXT, plan);
       expect(typeof system === 'string' || Array.isArray(system)).toBe(true);
       expect(messages.some((message) => message.role === 'user')).toBe(true);
-      expect(buildAnthropicMessagesUrl(plan.route.baseUrl ?? '', spec.modelId, 'vertex'))
-        .toMatch(/:streamRawPredict$/);
+      expect(buildAnthropicMessagesUrl(plan.route.baseUrl ?? '', spec.modelId, 'vertex')).toMatch(/:streamRawPredict$/);
       break;
     }
     case 'gitlab-duo':
@@ -584,20 +599,22 @@ describe('providerWireFixture matrix', () => {
     const dirs = new Set(ADAPTER_FIXTURES.map((spec) => spec.dir));
     for (const [protocol, coverage] of Object.entries(PROTOCOL_WIRE_FIXTURE_COVERAGE)) {
       expect(dirs.has(coverage.dir), protocol).toBe(true);
-      expect(ADAPTER_FIXTURES.some((spec) => (
-        spec.protocol === protocol && spec.adapterId === coverage.adapterId
-      ))).toBe(true);
+      expect(ADAPTER_FIXTURES.some((spec) => spec.protocol === protocol && spec.adapterId === coverage.adapterId)).toBe(
+        true,
+      );
     }
   });
 
   it('keeps a closed fixture tree for every required adapter', () => {
-    const dirs = readdirSync(FIXTURE_ROOT).filter((name) => {
-      try {
-        return statSync(path.join(FIXTURE_ROOT, name)).isDirectory();
-      } catch {
-        return false;
-      }
-    }).sort();
+    const dirs = readdirSync(FIXTURE_ROOT)
+      .filter((name) => {
+        try {
+          return statSync(path.join(FIXTURE_ROOT, name)).isDirectory();
+        } catch {
+          return false;
+        }
+      })
+      .sort();
     expect(dirs).toEqual([...ADAPTER_FIXTURES.map((spec) => spec.dir)].sort());
     for (const spec of ADAPTER_FIXTURES) {
       const dir = fixtureDir(spec);
@@ -659,13 +676,17 @@ describe('providerWireFixture fail-closed stream invariants', () => {
       contentIndex: 0,
     });
     builder.startText(ref);
-    expect(() => builder.startThinking(ref, {
-      kind: 'raw',
-      source: 'unknown',
-      visibility: 'raw-collapsed',
-    })).toThrowError(expect.objectContaining({
-      code: 'PROVIDER_STREAM_CHANNEL_COLLISION',
-    }) as ProviderStreamProtocolError);
+    expect(() =>
+      builder.startThinking(ref, {
+        kind: 'raw',
+        source: 'unknown',
+        visibility: 'raw-collapsed',
+      }),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'PROVIDER_STREAM_CHANNEL_COLLISION',
+      }) as ProviderStreamProtocolError,
+    );
   });
 
   it('rejects delta before block start (matrix lock)', () => {
@@ -676,9 +697,11 @@ describe('providerWireFixture fail-closed stream invariants', () => {
       sourceIndex: 1,
       contentIndex: 1,
     });
-    expect(() => builder.appendText(ref, 'early')).toThrowError(expect.objectContaining({
-      code: 'PROVIDER_STREAM_DELTA_BEFORE_START',
-    }) as ProviderStreamProtocolError);
+    expect(() => builder.appendText(ref, 'early')).toThrowError(
+      expect.objectContaining({
+        code: 'PROVIDER_STREAM_DELTA_BEFORE_START',
+      }) as ProviderStreamProtocolError,
+    );
   });
 
   it('aborts mid-stream and discards late EventStream output', async () => {
@@ -707,9 +730,11 @@ describe('providerWireFixture fail-closed stream invariants', () => {
     const abortErr = new Error('fixture abort');
     abortErr.name = 'AbortError';
     builder.fail(abortErr, 'aborted');
-    expect(() => builder.appendText(textRef, 'late')).toThrowError(expect.objectContaining({
-      code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
-    }) as ProviderStreamProtocolError);
+    expect(() => builder.appendText(textRef, 'late')).toThrowError(
+      expect.objectContaining({
+        code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
+      }) as ProviderStreamProtocolError,
+    );
   });
 
   it('fail-closes oversized / truncated SSE buffers', async () => {
@@ -727,10 +752,7 @@ describe('providerWireFixture fail-closed stream invariants', () => {
       }
     }).rejects.toBeInstanceOf(ProviderStreamBufferError);
 
-    const truncated = readFileSync(
-      path.join(FIXTURE_ROOT, 'openai-compatible', 'stream-truncated.sse'),
-      'utf8',
-    );
+    const truncated = readFileSync(path.join(FIXTURE_ROOT, 'openai-compatible', 'stream-truncated.sse'), 'utf8');
     const truncatedResponse = new Response(truncated, {
       status: 200,
       headers: { 'Content-Type': 'text/event-stream' },
@@ -760,20 +782,23 @@ describe('providerWireFixture fail-closed stream invariants', () => {
   });
 
   it('maps reasoning wire when selection is present', () => {
-    const openAiResponses = buildOpenAiResponsesReasoning({
-      selection: 'high',
-      control: {
-        kind: 'levels',
-        supportsOff: true,
-        levels: ['low', 'medium', 'high'],
-        defaultSelection: 'medium',
-        wireProfile: {
-          kind: 'openai-responses',
-          on: 'medium',
-          levels: { low: 'low', medium: 'medium', high: 'high' },
+    const openAiResponses = buildOpenAiResponsesReasoning(
+      {
+        selection: 'high',
+        control: {
+          kind: 'levels',
+          supportsOff: true,
+          levels: ['low', 'medium', 'high'],
+          defaultSelection: 'medium',
+          wireProfile: {
+            kind: 'openai-responses',
+            on: 'medium',
+            levels: { low: 'low', medium: 'medium', high: 'high' },
+          },
         },
       },
-    }, null);
+      null,
+    );
     expect(openAiResponses.reasoning).toMatchObject({ effort: 'high' });
 
     const body: Record<string, unknown> = { model: 'fixture-chat', stream: true };
@@ -793,10 +818,7 @@ describe('providerWireFixture fail-closed stream invariants', () => {
     });
     expect(body.reasoning_effort).toBe('medium');
 
-    const reasoningFixture = readFileSync(
-      path.join(FIXTURE_ROOT, 'openai-compatible', 'stream-reasoning.sse'),
-      'utf8',
-    );
+    const reasoningFixture = readFileSync(path.join(FIXTURE_ROOT, 'openai-compatible', 'stream-reasoning.sse'), 'utf8');
     expect(reasoningFixture).toMatch(/reasoning_content/);
     expect(reasoningFixture).not.toMatch(/sk-fixture|Bearer |api[_-]?key/i);
   });
@@ -828,15 +850,13 @@ describe('providerWireFixture fail-closed stream invariants', () => {
     builder.appendToolCallArgs(toolB, '{"path":"b.md"}');
     builder.endToolCall(toolA);
     builder.endToolCall(toolB);
-    builder.done('toolUse');
+    builder.markTerminal('toolUse');
+    builder.finish({ signal: new AbortController().signal, sawOutput: true, providerApi: 'fixture' });
 
     const message = await stream.result();
     const toolCalls = message.content.filter((block) => block.type === 'toolCall');
     expect(toolCalls).toHaveLength(2);
-    expect(toolCalls.map((block) => (block.type === 'toolCall' ? block.id : ''))).toEqual([
-      'call_a',
-      'call_b',
-    ]);
+    expect(toolCalls.map((block) => (block.type === 'toolCall' ? block.id : ''))).toEqual(['call_a', 'call_b']);
   });
 
   it('keeps RequestPlan wire headers free of fixture secrets across adapters', () => {

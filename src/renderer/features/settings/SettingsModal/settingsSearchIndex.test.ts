@@ -21,7 +21,14 @@ describe('settingsSearchIndex', () => {
   it('covers every settings section at least once', () => {
     const sections = new Set(SETTINGS_SEARCH_INDEX.map((entry) => entry.section));
     const expected: SettingsSection[] = [
-      'general', 'appearance', 'models', 'agents', 'skills', 'tools', 'hooks', 'policy',
+      'general',
+      'appearance',
+      'models',
+      'agents',
+      'skills',
+      'tools',
+      'hooks',
+      'policy',
     ];
     expect([...sections].sort()).toEqual([...expected].sort());
   });

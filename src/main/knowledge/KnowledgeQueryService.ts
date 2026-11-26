@@ -1,9 +1,18 @@
 import { promises as fs } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { KNOWLEDGE_CARD_TYPES, KNOWLEDGE_LIFECYCLES, type KnowledgeCardDetail, type KnowledgeCardSummary, type KnowledgeSpace, type KnowledgeTopicDocument, type KnowledgeTopic } from '@shared/types/knowledge';
+import {
+  KNOWLEDGE_CARD_TYPES,
+  KNOWLEDGE_LIFECYCLES,
+  type KnowledgeCardDetail,
+  type KnowledgeCardSummary,
+  type KnowledgeSpace,
+  type KnowledgeTopicDocument,
+  type KnowledgeTopic,
+} from '@shared/types/knowledge';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../runtime/AppPathService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
 import {
   extractPreview,
@@ -14,7 +23,12 @@ import {
   walkMarkdownFiles,
 } from './knowledgeFs';
 import { KnowledgeIndexService, contentHashOf } from './KnowledgeIndexService';
-import { BUILTIN_KNOWLEDGE_SYNONYMS, createKnowledgeTextMatcher, normalizeKnowledgeText, type KnowledgeSynonymGroup } from './knowledgeVocabulary';
+import {
+  BUILTIN_KNOWLEDGE_SYNONYMS,
+  createKnowledgeTextMatcher,
+  normalizeKnowledgeText,
+  type KnowledgeSynonymGroup,
+} from './knowledgeVocabulary';
 import { KnowledgeTopicStore } from './KnowledgeTopicStore';
 import {
   KNOWLEDGE_RETRIEVAL_LANES,
@@ -37,13 +51,15 @@ export interface KnowledgeQueryDependencies {
 function defaultDependencies(): KnowledgeQueryDependencies {
   return {
     listSpaces: () => {
-      const spaces: KnowledgeSpace[] = [{
-        spaceId: 'user',
-        kind: 'user',
-        label: 'User',
-        rootPath: appPathService.getUserRdcPaths().knowledgePath,
-      }];
-      for (const project of storageAdapter.listProjects()) {
+      const spaces: KnowledgeSpace[] = [
+        {
+          spaceId: 'user',
+          kind: 'user',
+          label: 'User',
+          rootPath: appPathService.getUserRdcPaths().knowledgePath,
+        },
+      ];
+      for (const project of projectWorkspaceStore.listProjects()) {
         spaces.push({
           spaceId: `project:${project.projectId}`,
           kind: 'project',
@@ -76,7 +92,7 @@ function spaceById(spaces: KnowledgeSpace[], spaceId: string): KnowledgeSpace {
 
 function matchesScope(entry: KnowledgeIndexEntry, scope: KnowledgeQueryRequest['scope']): boolean {
   if (!scope) return true;
-  for (const [axis, value] of Object.entries(scope)) {
+  for (const [axis, value] of Object.entries(scope) as [string, unknown][]) {
     if (axis === 'exclusions' || value == null) continue;
     if (entry.scope[axis as keyof typeof entry.scope] !== value) return false;
   }
@@ -87,7 +103,12 @@ function matchesScope(entry: KnowledgeIndexEntry, scope: KnowledgeQueryRequest['
   return true;
 }
 
-function toHit(entry: KnowledgeIndexEntry, lanes: KnowledgeRetrievalLane[], score: number, topics: KnowledgeTopic[]): KnowledgeLaneHit {
+function toHit(
+  entry: KnowledgeIndexEntry,
+  lanes: KnowledgeRetrievalLane[],
+  score: number,
+  topics: KnowledgeTopic[],
+): KnowledgeLaneHit {
   return {
     cardId: entry.cardId,
     contentHash: entry.contentHash,
@@ -107,17 +128,24 @@ function toHit(entry: KnowledgeIndexEntry, lanes: KnowledgeRetrievalLane[], scor
 }
 
 function hasDeclaredScope(scope: KnowledgeIndexEntry['scope']): boolean {
-  return Object.entries(scope).some(([axis, value]) => axis === 'exclusions'
-    ? Object.values(value as Record<string, string[]>).some(values => values.length > 0)
-    : typeof value === 'string' && value.trim().length > 0);
+  return Object.entries(scope).some(([axis, value]) =>
+    axis === 'exclusions'
+      ? Object.values(value as Record<string, string[]>).some((values) => values.length > 0)
+      : typeof value === 'string' && value.trim().length > 0,
+  );
 }
 
-function currentTopics(document: KnowledgeTopicDocument, cardId: string, spaceId: string, contentHash: string): KnowledgeTopic[] {
+function currentTopics(
+  document: KnowledgeTopicDocument,
+  cardId: string,
+  spaceId: string,
+  contentHash: string,
+): KnowledgeTopic[] {
   if (spaceId !== 'user') return [];
-  const assignment = document.assignments.find(item => item.cardId === cardId);
+  const assignment = document.assignments.find((item) => item.cardId === cardId);
   if (assignment?.contentHash !== contentHash) return [];
-  const byId = new Map(document.topics.map(topic => [topic.id, topic]));
-  return assignment.topicIds.flatMap(id => byId.has(id) ? [byId.get(id)!] : []);
+  const byId = new Map(document.topics.map((topic) => [topic.id, topic]));
+  return assignment.topicIds.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
 }
 
 export class KnowledgeQueryService {
@@ -190,48 +218,69 @@ export class KnowledgeQueryService {
 
   async query(request: KnowledgeQueryRequest = {}): Promise<KnowledgeQueryResult> {
     if (request.spaceIds?.length) {
-      const available = this.deps.listSpaces().map(space => space.spaceId);
-      const unknown = request.spaceIds.filter(spaceId => !available.includes(spaceId));
+      const available = this.deps.listSpaces().map((space) => space.spaceId);
+      const unknown = request.spaceIds.filter((spaceId) => !available.includes(spaceId));
       if (unknown.length) {
-        throw new Error(`KNOWLEDGE_SPACE_UNKNOWN: ${JSON.stringify(unknown)}. Use exact space IDs from knowledge_browse: ${JSON.stringify(available)}.`);
+        throw new AppError(
+          'KNOWLEDGE_SPACE_UNKNOWN',
+          `${JSON.stringify(unknown)}. Use exact space IDs from knowledge_browse: ${JSON.stringify(available)}.`,
+        );
       }
     }
     const [snapshot, vocabulary] = await Promise.all([this.deps.index.getOrRebuild(), this.deps.readTopics()]);
-    const revision = createHash('sha256').update(JSON.stringify([snapshot.revision, vocabulary.revision, BUILTIN_KNOWLEDGE_SYNONYMS])).digest('hex');
-    const synonyms: KnowledgeSynonymGroup[] = [...BUILTIN_KNOWLEDGE_SYNONYMS, ...vocabulary.document.topics.map(topic => ({ terms: [topic.label, ...topic.synonyms] }))];
+    const revision = createHash('sha256')
+      .update(JSON.stringify([snapshot.revision, vocabulary.revision, BUILTIN_KNOWLEDGE_SYNONYMS]))
+      .digest('hex');
+    const synonyms: KnowledgeSynonymGroup[] = [
+      ...BUILTIN_KNOWLEDGE_SYNONYMS,
+      ...vocabulary.document.topics.map((topic) => ({ terms: [topic.label, ...topic.synonyms] })),
+    ];
     const matchesText = createKnowledgeTextMatcher(synonyms);
-    const topicById = new Map(vocabulary.document.topics.map(topic => [topic.id, topic]));
-    const assignments = new Map(vocabulary.document.assignments.map(item => [item.cardId, item]));
+    const topicById = new Map(vocabulary.document.topics.map((topic) => [topic.id, topic]));
+    const assignments = new Map(vocabulary.document.assignments.map((item) => [item.cardId, item]));
     const topicsFor = (entry: KnowledgeIndexEntry): KnowledgeTopic[] => {
       const assignment = entry.spaceId === 'user' ? assignments.get(entry.cardId) : undefined;
       return assignment?.contentHash === entry.contentHash
-        ? assignment.topicIds.flatMap(id => topicById.has(id) ? [topicById.get(id)!] : []) : [];
+        ? assignment.topicIds.flatMap((id) => (topicById.has(id) ? [topicById.get(id)!] : []))
+        : [];
     };
     if (request.expectedRevision && request.expectedRevision !== revision) {
-      throw new Error('KNOWLEDGE_INDEX_CHANGED: refresh the search before reading another page.');
+      throw new AppError('KNOWLEDGE_INDEX_CHANGED', 'refresh the search before reading another page.');
     }
     if (request.offset && !request.expectedRevision) {
-      throw new Error('KNOWLEDGE_REVISION_REQUIRED: subsequent pages require the search revision.');
+      throw new AppError('KNOWLEDGE_REVISION_REQUIRED', 'subsequent pages require the search revision.');
     }
-    if ((request.offset !== undefined && (!Number.isInteger(request.offset) || request.offset < 0))
-      || (request.limit !== undefined && (!Number.isInteger(request.limit) || request.limit < 1 || request.limit > 100))) {
-      throw new Error('KNOWLEDGE_PAGE_INVALID: offset must be non-negative and limit must be between 1 and 100.');
+    if (
+      (request.offset !== undefined && (!Number.isInteger(request.offset) || request.offset < 0)) ||
+      (request.limit !== undefined && (!Number.isInteger(request.limit) || request.limit < 1 || request.limit > 100))
+    ) {
+      throw new AppError('KNOWLEDGE_PAGE_INVALID', 'offset must be non-negative and limit must be between 1 and 100.');
     }
-    const allTypes = !!request.type && KNOWLEDGE_CARD_TYPES.every(type => request.type!.includes(type));
-    const allLifecycles = !!request.lifecycle && KNOWLEDGE_LIFECYCLES.every(lifecycle => request.lifecycle!.includes(lifecycle));
+    const allTypes = !!request.type && KNOWLEDGE_CARD_TYPES.every((type) => request.type!.includes(type));
+    const allLifecycles =
+      !!request.lifecycle && KNOWLEDGE_LIFECYCLES.every((lifecycle) => request.lifecycle!.includes(lifecycle));
     // Selecting every known value is a browse operation, including sources that have no classification yet.
-    const rankingRequest = { ...request, type: allTypes ? undefined : request.type, lifecycle: allLifecycles ? undefined : request.lifecycle };
+    const rankingRequest = {
+      ...request,
+      type: allTypes ? undefined : request.type,
+      lifecycle: allLifecycles ? undefined : request.lifecycle,
+    };
     const lanes = request.lanes?.length ? request.lanes : [...KNOWLEDGE_RETRIEVAL_LANES];
     const universe = snapshot.cards.filter((entry) => {
       if (request.spaceIds && !request.spaceIds.includes(entry.spaceId)) return false;
       if (request.cardId && request.cardId !== entry.cardId) return false;
       if (request.relativePath && request.relativePath !== entry.relativePath) return false;
-      if (request.relationTargetCardId && !entry.relations.some(relation => relation.targetCardId === request.relationTargetCardId)) return false;
+      if (
+        request.relationTargetCardId &&
+        !entry.relations.some((relation) => relation.targetCardId === request.relationTargetCardId)
+      )
+        return false;
       if (request.type && (entry.type ? !request.type.includes(entry.type) : !allTypes)) return false;
       // Retired cards remain browsable and explicitly queryable for audit, but
       // do not enter ordinary retrieval packs or Agent context.
       if (!request.lifecycle && entry.lifecycle === 'retired') return false;
-      if (request.lifecycle && (entry.lifecycle ? !request.lifecycle.includes(entry.lifecycle) : !allLifecycles)) return false;
+      if (request.lifecycle && (entry.lifecycle ? !request.lifecycle.includes(entry.lifecycle) : !allLifecycles))
+        return false;
       if (request.asOf != null && entry.updatedAt > request.asOf) return false;
       if (request.text?.trim() && !textMatches(entry, request.text, topicsFor(entry), matchesText)) return false;
       return matchesScope(entry, request.scope);
@@ -260,34 +309,58 @@ export class KnowledgeQueryService {
       }
     }
 
-    const ordered = [...merged.values()].sort((left, right) => right.score - left.score || left.cardId.localeCompare(right.cardId));
+    const ordered = [...merged.values()].sort(
+      (left, right) => right.score - left.score || left.cardId.localeCompare(right.cardId),
+    );
     const offset = request.offset ?? 0;
     const hits = request.limit === undefined ? ordered.slice(offset) : ordered.slice(offset, offset + request.limit);
-    const pageIds = new Set(hits.map(hit => hit.cardId));
+    const pageIds = new Set(hits.map((hit) => hit.cardId));
     const { offset: _offset, limit: _limit, expectedRevision: _expectedRevision, ...semanticRequest } = request;
     return {
       hits,
-      lanes: laneResults.map(result => ({ ...result, hits: result.hits.filter(hit => pageIds.has(hit.cardId)) })),
+      lanes: laneResults.map((result) => ({ ...result, hits: result.hits.filter((hit) => pageIds.has(hit.cardId)) })),
       revision,
       total: ordered.length,
       ...(offset + hits.length < ordered.length ? { nextOffset: offset + hits.length } : {}),
-      queryFingerprint: createHash('sha256').update(JSON.stringify([semanticRequest, vocabulary.revision, BUILTIN_KNOWLEDGE_SYNONYMS])).digest('hex'),
+      queryFingerprint: createHash('sha256')
+        .update(JSON.stringify([semanticRequest, vocabulary.revision, BUILTIN_KNOWLEDGE_SYNONYMS]))
+        .digest('hex'),
     };
   }
 }
 
-function topicText(topics: KnowledgeTopic[]): string { return topics.flatMap(topic => [topic.label, ...topic.synonyms]).join(' '); }
-function textMatches(entry: KnowledgeIndexEntry, query: string, topics: KnowledgeTopic[], matches: (input: string, query: string) => boolean): boolean {
-  return matches([entry.cardId, entry.relativePath, entry.title, entry.lexical, ...entry.headings, topicText(topics)].join(' '), query);
+function topicText(topics: KnowledgeTopic[]): string {
+  return topics.flatMap((topic) => [topic.label, ...topic.synonyms]).join(' ');
+}
+function textMatches(
+  entry: KnowledgeIndexEntry,
+  query: string,
+  topics: KnowledgeTopic[],
+  matches: (input: string, query: string) => boolean,
+): boolean {
+  return matches(
+    [entry.cardId, entry.relativePath, entry.title, entry.lexical, ...entry.headings, topicText(topics)].join(' '),
+    query,
+  );
 }
 
-function scoreLane(lane: KnowledgeRetrievalLane, entry: KnowledgeIndexEntry, request: KnowledgeQueryRequest, topics: KnowledgeTopic[], matches: (input: string, query: string) => boolean): number {
+function scoreLane(
+  lane: KnowledgeRetrievalLane,
+  entry: KnowledgeIndexEntry,
+  request: KnowledgeQueryRequest,
+  topics: KnowledgeTopic[],
+  matches: (input: string, query: string) => boolean,
+): number {
   const text = request.text?.trim();
   switch (lane) {
     case 'Identity/Path': {
       if (request.cardId && entry.cardId === request.cardId) return 10;
       if (request.relativePath && entry.relativePath === request.relativePath) return 8;
-      if (text && (normalizeKnowledgeText(entry.cardId).includes(normalizeKnowledgeText(text)) || normalizeKnowledgeText(entry.relativePath).includes(normalizeKnowledgeText(text)))) {
+      if (
+        text &&
+        (normalizeKnowledgeText(entry.cardId).includes(normalizeKnowledgeText(text)) ||
+          normalizeKnowledgeText(entry.relativePath).includes(normalizeKnowledgeText(text)))
+      ) {
         return 4;
       }
       return 0;
@@ -301,12 +374,26 @@ function scoreLane(lane: KnowledgeRetrievalLane, entry: KnowledgeIndexEntry, req
       return score;
     }
     case 'Lexical':
-      if (!text) return request.cardId || request.relativePath || request.relationTargetCardId || request.scope || request.type || request.lifecycle || request.asOf !== undefined ? 0 : 1;
+      if (!text)
+        return request.cardId ||
+          request.relativePath ||
+          request.relationTargetCardId ||
+          request.scope ||
+          request.type ||
+          request.lifecycle ||
+          request.asOf !== undefined
+          ? 0
+          : 1;
       return matches(`${entry.lexical} ${topicText(topics)}`, text)
-        ? (normalizeKnowledgeText(entry.lexical).includes(normalizeKnowledgeText(text)) ? 5 : 3) : 0;
+        ? normalizeKnowledgeText(entry.lexical).includes(normalizeKnowledgeText(text))
+          ? 5
+          : 3
+        : 0;
     case 'Structural':
       if (!text) return entry.headings.length > 0 ? 1 : 0;
-      return entry.headings.some((heading) => normalizeKnowledgeText(heading).includes(normalizeKnowledgeText(text))) ? 4 : 0;
+      return entry.headings.some((heading) => normalizeKnowledgeText(heading).includes(normalizeKnowledgeText(text)))
+        ? 4
+        : 0;
     case 'Relation/Graph': {
       if (!request.relationTargetCardId) return 0;
       return entry.relations.some((relation) => relation.targetCardId === request.relationTargetCardId) ? 6 : 0;

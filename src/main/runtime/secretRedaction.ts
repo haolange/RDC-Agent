@@ -5,9 +5,12 @@
 
 import { hashScopedResource } from './ScopedResourceResolver';
 
-const SECRET_KEY = /(?:api[-_]?key|authorization|password|passwd|secret|private[-_]?key|cookie|(?:access|refresh|id|session|auth|bearer|oauth|github)[-_]?token|^token$)/i;
-const PROTECTED_KEY = /^(?:encryptedContent|signature|thoughtSignature|redactedContent|opaqueState|reasoningContent|raw)$/i;
-const SECRET_ASSIGNMENT = /((?:api[-_ ]?key|authorization|password|passwd|secret|private[-_ ]?key|(?:access|refresh|id|session|auth|bearer|oauth|github)[-_ ]?token)\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\r\n,;]+)/gi;
+const SECRET_KEY =
+  /(?:api[-_]?key|authorization|password|passwd|secret|private[-_]?key|cookie|(?:access|refresh|id|session|auth|bearer|oauth|github)[-_]?token|^token$)/i;
+const PROTECTED_KEY =
+  /^(?:encryptedContent|signature|thoughtSignature|redactedContent|opaqueState|reasoningContent|raw)$/i;
+const SECRET_ASSIGNMENT =
+  /((?:api[-_ ]?key|authorization|password|passwd|secret|private[-_ ]?key|(?:access|refresh|id|session|auth|bearer|oauth|github)[-_ ]?token)\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\r\n,;]+)/gi;
 const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi;
 /** Provider keys with a dash after the prefix (OpenAI, Anthropic, xAI, Slack). */
 const DASH_PREFIXED_SECRET = /\b(?:sk-ant|sk|rk|xai|xox[abeoprs])-[A-Za-z0-9_-]{12,}/gi;
@@ -37,8 +40,8 @@ export function redactCredentialLikeText(value: string): string {
 }
 
 /** A bounded, redacted one-line preview of tool arguments for the visible work process. */
-export function redactedArgumentsPreview(value: unknown, maxChars = 600): string {
-  return (JSON.stringify(redactSecretsDeep(value ?? {}).value) ?? '{}').slice(0, maxChars);
+export function redactedArgumentsPreview(value: unknown): string {
+  return ((JSON.stringify(redactSecretsDeep(value ?? {}).value) as string | undefined) ?? '{}').slice(0, 600);
 }
 
 export function redactSecretsDeep(
@@ -59,9 +62,7 @@ export function redactSecretsDeep(
   }
   if (Array.isArray(value)) {
     return {
-      value: value.map((entry, index) =>
-        redactSecretsDeep(entry, `${currentPath}[${index}]`, seen, redactions).value,
-      ),
+      value: value.map((entry, index) => redactSecretsDeep(entry, `${currentPath}[${index}]`, seen, redactions).value),
       redactions,
     };
   }

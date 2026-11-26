@@ -1,6 +1,6 @@
 import type { TraceStatus } from './base';
 
-export type TimelineImportance = 'low' | 'normal' | 'high';
+type TimelineImportance = 'low' | 'normal' | 'high';
 
 export interface TimelineNode {
   nodeId: string;

@@ -2,7 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { nativeChinese, nativeEnglish, nativeText } from './nativeMessages';
 
 const state = vi.hoisted(() => ({
-  language: 'zh-CN', template: [] as Electron.MenuItemConstructorOptions[],
+  language: 'zh-CN',
+  template: [] as Electron.MenuItemConstructorOptions[],
   showMessageBox: vi.fn(async () => ({ response: 1 })),
   setApplicationMenu: vi.fn(),
 }));
@@ -10,19 +11,27 @@ vi.mock('electron', () => ({
   app: { getVersion: () => 'test-version' },
   dialog: { showMessageBox: state.showMessageBox },
   Menu: {
-    buildFromTemplate: (template: Electron.MenuItemConstructorOptions[]) => { state.template = template; return template; },
+    buildFromTemplate: (template: Electron.MenuItemConstructorOptions[]) => {
+      state.template = template;
+      return template;
+    },
     setApplicationMenu: state.setApplicationMenu,
   },
   shell: { openExternal: vi.fn() },
 }));
-vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: {
-  getAll: () => ({ appearance: { language: state.language } }),
-} }));
+vi.mock('../settings/settings-core/SettingsService', () => ({
+  settingsService: {
+    snapshot: () => ({ revision: 1, user: { appearance: { language: state.language } } }),
+  },
+}));
 
 import { installApplicationMenu, refreshApplicationMenu } from './applicationMenu';
 import { nativeMessage } from './nativeI18n';
 
-beforeEach(() => { state.language = 'zh-CN'; vi.clearAllMocks(); });
+beforeEach(() => {
+  state.language = 'zh-CN';
+  vi.clearAllMocks();
+});
 
 it('has complete native translations with matching parameters', () => {
   expect(Object.keys(nativeChinese).sort()).toEqual(Object.keys(nativeEnglish).sort());
@@ -36,15 +45,19 @@ it('has complete native translations with matching parameters', () => {
 
 it('refreshes an installed native menu and reads the current language when About opens', async () => {
   installApplicationMenu({ openRdcFiles: vi.fn(), newCase: vi.fn(), openSettings: vi.fn() });
-  const labels = () => state.template.map(item => item.label);
+  const labels = () => state.template.map((item) => item.label);
   expect(labels()).toContain('帮助');
   state.language = 'en';
   refreshApplicationMenu();
   expect(labels()).toContain('Help');
-  const help = state.template.find(item => item.label === 'Help')!;
-  const about = (help.submenu as Electron.MenuItemConstructorOptions[]).find(item => item.label === 'About RDC-Agent')!;
+  const help = state.template.find((item) => item.label === 'Help')!;
+  const about = (help.submenu as Electron.MenuItemConstructorOptions[]).find(
+    (item) => item.label === 'About RDC-Agent',
+  )!;
   await (about.click as () => void)();
-  expect(state.showMessageBox.mock.calls[0]).toEqual([expect.objectContaining({ title: 'About RDC-Agent', detail: expect.stringContaining('Version: test-version') })]);
+  expect(state.showMessageBox.mock.calls[0]).toEqual([
+    expect.objectContaining({ title: 'About RDC-Agent', detail: expect.stringContaining('Version: test-version') }),
+  ]);
   state.language = 'zh-CN';
   refreshApplicationMenu();
   expect(labels()).toContain('帮助');

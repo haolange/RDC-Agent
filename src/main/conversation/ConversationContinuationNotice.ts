@@ -1,3 +1,4 @@
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { createConversationMessage } from './ConversationRoutePreflight';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { RequestPlan } from '@shared/types/providerCapability';
@@ -9,9 +10,11 @@ export function shouldAnnounceContinuationDrop(
 ): boolean {
   const previousRoute = previous && 'route' in previous ? previous.route : previous;
   if (!previousRoute) return false;
-  return previousRoute.providerId !== next.providerId
-    || previousRoute.effectiveModelId !== next.effectiveModelId
-    || previousRoute.protocol !== next.route.protocol;
+  return (
+    previousRoute.providerId !== next.providerId ||
+    previousRoute.effectiveModelId !== next.effectiveModelId ||
+    previousRoute.protocol !== next.route.protocol
+  );
 }
 
 export function createContinuationDropNotice(options: {
@@ -31,6 +34,7 @@ export function createContinuationDropNotice(options: {
     'system',
     'Model switched. Reasoning continuation from the previous model cannot be reused.',
     {
+      id: conversationTurnIds(options.requestId).noticeMessageId,
       requestId: options.requestId,
       turnId: options.turnId,
       sessionId: options.sessionId,
@@ -47,11 +51,10 @@ export function createContinuationDropNotice(options: {
         userMessage: 'Model switched. Reasoning continuation from the previous model cannot be reused.',
         providerId: options.next.providerId,
         modelId: options.next.effectiveModelId,
-        technicalMessage: [
-          options.previous?.providerId,
-          options.previous?.effectiveModelId,
-          options.previous?.protocol,
-        ].filter(Boolean).join('/') || undefined,
+        technicalMessage:
+          [options.previous?.providerId, options.previous?.effectiveModelId, options.previous?.protocol]
+            .filter(Boolean)
+            .join('/') || undefined,
       },
     },
   );

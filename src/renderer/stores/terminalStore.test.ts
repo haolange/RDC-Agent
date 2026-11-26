@@ -14,9 +14,11 @@ const entry = (sessionId: string): RuntimeLogEntry => ({
   projectId: 'project-a',
 });
 
-const deferred = <T,>() => {
+const deferred = <T>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => { resolve = next; });
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
   return { promise, resolve };
 };
 
@@ -95,5 +97,43 @@ describe('terminalStore session isolation', () => {
 
     expect(useTerminalStore.getState().entries).toEqual([]);
     expect(useTerminalStore.getState().isLoading).toBe(false);
+  });
+});
+
+describe('terminalStore refresh', () => {
+  afterEach(() => {
+    if (originalWindow === undefined) {
+      Reflect.deleteProperty(globalThis, 'window');
+      return;
+    }
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: originalWindow });
+  });
+
+  it('keeps lines that streamed in while the list was in flight', async () => {
+    const pending = deferred<{ entries: RuntimeLogEntry[] }>();
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { electronAPI: { runtimeLog: { list: () => pending.promise } } },
+    });
+    const stale = { ...entry('session-a'), id: 'stale' };
+    useTerminalStore.setState({
+      scopeFilter: 'current-session',
+      sessionId: 'session-a',
+      projectId: 'project-a',
+      runId: null,
+      entries: [stale],
+      expandedEntryIds: [],
+      isLoading: false,
+    });
+
+    const refresh = useTerminalStore.getState().refreshEntries();
+    const streamed = { ...entry('session-a'), id: 'streamed' };
+    const listedAndStreamed = { ...entry('session-a'), id: 'both' };
+    useTerminalStore.getState().appendEntry(streamed);
+    useTerminalStore.getState().appendEntry(listedAndStreamed);
+    pending.resolve({ entries: [{ ...entry('session-a'), id: 'listed' }, listedAndStreamed] });
+    await refresh;
+
+    expect(useTerminalStore.getState().entries.map((item) => item.id)).toEqual(['listed', 'both', 'streamed']);
   });
 });

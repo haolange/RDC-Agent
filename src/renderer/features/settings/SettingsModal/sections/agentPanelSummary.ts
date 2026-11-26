@@ -20,7 +20,8 @@ export function agentPanelSummary(
   if (panel === 'handoffs') {
     const [handoff] = selectedAgent.handoffs;
     if (!handoff) return undefined;
-    if (selectedAgent.handoffs.length > 1) return t('settings.agentHandoffChoices', { count: selectedAgent.handoffs.length });
+    if (selectedAgent.handoffs.length > 1)
+      return t('settings.agentHandoffChoices', { count: selectedAgent.handoffs.length });
     const target = settings.agents.definitions.find((agent) => agent.id === handoff.agent);
     return t('settings.agentHandoffSummary', {
       label: resolveHandoffLabel(handoff, settings.appearance.language) || t('settings.handoffs'),

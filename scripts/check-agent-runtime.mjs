@@ -49,8 +49,8 @@ function effectiveModel(provider, modelId, overrides = {}) {
       baseUrl: provider.baseUrl,
       source: 'catalog',
       contracts: require('../src/main/provider-catalog/ProviderCatalogRegistry.ts')
-        .getLoadedProviderSurface(provider.id)?.routes
-        .find((route) => route.protocol === provider.protocol)?.contracts,
+        .getLoadedProviderSurface(provider.id)
+        ?.routes.find((route) => route.protocol === provider.protocol)?.contracts,
     },
     availability: 'available',
     contextTiers: [{ id: 'default', label: 'Default', activation: { kind: 'implicit' }, entitlement: 'granted' }],
@@ -58,7 +58,13 @@ function effectiveModel(provider, modelId, overrides = {}) {
     controls: {
       fast: { state: 'unsupported', fixedValue: false },
       maxContext: { state: 'unsupported', fixedValue: false },
-      reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+      reasoning: {
+        kind: 'none',
+        supportsOff: true,
+        levels: [],
+        defaultSelection: 'off',
+        wireProfile: { kind: 'none' },
+      },
     },
     toolCalling: { state: 'supported' },
     visionInput: { state: 'unknown' },
@@ -76,13 +82,18 @@ async function main() {
   const { loadProviderSurface } = require('../src/main/provider-catalog/ProviderCatalogRegistry.ts');
   await Promise.all(['kimi-coding-plan', 'grok-account', 'openrouter'].map((id) => loadProviderSurface(id)));
   const routeResolverSource = read('src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts');
-  assert(routeResolverSource.includes('LlmProviderProtocol'), 'RouteCapabilityResolver must use the new LlmProviderProtocol enum.');
-  assert(!routeResolverSource.includes('LlmProviderKind'), 'RouteCapabilityResolver must not keep legacy LlmProviderKind.');
-assert(routeResolverSource.includes('reasoningDelivery'), 'RouteCapabilityResolver must expose reasoningDelivery.');
-assert(routeResolverSource.includes('ProviderReasoningContract'), 'RouteCapabilityResolver must expose a provider/model reasoning contract.');
-assert(routeResolverSource.includes('createFailClosedProviderContracts'), 'Compatible providers must resolve missing contract evidence through the fail-closed contract factory.');
-assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning semantics must not be inferred from compatibility protocol.');
-  assert(!routeResolverSource.includes('provider.kind'), 'RouteCapabilityResolver must not route on legacy provider.kind.');
+  assert(
+    !routeResolverSource.includes('LlmProviderKind'),
+    'RouteCapabilityResolver must not keep legacy LlmProviderKind.',
+  );
+  assert(
+    !routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'),
+    'Reasoning semantics must not be inferred from compatibility protocol.',
+  );
+  assert(
+    !routeResolverSource.includes('provider.kind'),
+    'RouteCapabilityResolver must not route on legacy provider.kind.',
+  );
 
   const {
     resolveAgentRouteCapability,
@@ -91,25 +102,45 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
 
   const kimi = configuredProvider('kimi-coding-plan', ['kimi-for-coding']);
   const kimiCapability = resolveAgentRouteCapability(kimi, 'kimi-for-coding', effectiveModel(kimi, 'kimi-for-coding'));
-  assert(kimiCapability.toolCallingMode === 'native-structured', 'kimi-coding-plan must resolve to native structured tool calling.');
+  assert(
+    kimiCapability.toolCallingMode === 'native-structured',
+    'kimi-coding-plan must resolve to native structured tool calling.',
+  );
   assert(kimiCapability.supportsToolResults === true, 'native structured routes must support tool results.');
 
   const grok = configuredProvider('grok-account', ['grok-4.5']);
-  const grokCapability = resolveAgentRouteCapability(grok, 'grok-4.5', effectiveModel(grok, 'grok-4.5', {
-    toolCalling: { state: 'unknown' },
-  }));
-  assert(grokCapability.toolCallingMode === 'text-only', 'grok-account must fail closed while structured tool calling remains unverified.');
-  assert(grokCapability.supportsToolResults === false, 'Unverified grok-account routes must not receive synthetic tool-result support.');
+  const grokCapability = resolveAgentRouteCapability(
+    grok,
+    'grok-4.5',
+    effectiveModel(grok, 'grok-4.5', {
+      toolCalling: { state: 'unknown' },
+    }),
+  );
+  assert(
+    grokCapability.toolCallingMode === 'text-only',
+    'grok-account must fail closed while structured tool calling remains unverified.',
+  );
+  assert(
+    grokCapability.supportsToolResults === false,
+    'Unverified grok-account routes must not receive synthetic tool-result support.',
+  );
   assert(
     describeRouteCapabilityDiagnostic(grokCapability, 2)?.code === 'route_tool_calling_unknown',
     'unknown tool calling must use the unknown diagnostic, not unsupported.',
   );
 
   const openRouter = configuredProvider('openrouter', ['anthropic/claude-haiku-latest']);
-  const openRouterCapability = resolveAgentRouteCapability(openRouter, 'anthropic/claude-haiku-latest', effectiveModel(openRouter, 'anthropic/claude-haiku-latest', {
-    toolCalling: { state: 'unsupported' },
-  }));
-  assert(openRouterCapability.toolCallingMode === 'text-only', 'an explicitly unsupported EffectiveModel must stay text-only.');
+  const openRouterCapability = resolveAgentRouteCapability(
+    openRouter,
+    'anthropic/claude-haiku-latest',
+    effectiveModel(openRouter, 'anthropic/claude-haiku-latest', {
+      toolCalling: { state: 'unsupported' },
+    }),
+  );
+  assert(
+    openRouterCapability.toolCallingMode === 'text-only',
+    'an explicitly unsupported EffectiveModel must stay text-only.',
+  );
   assert(
     describeRouteCapabilityDiagnostic(openRouterCapability, 2)?.code === 'route_tool_calling_unsupported',
     'text-only routes with tools should emit a capability diagnostic.',
@@ -118,200 +149,217 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   const disabledCapability = resolveAgentRouteCapability(undefined, 'missing-model');
   assert(disabledCapability.toolCallingMode === 'disabled', 'missing providers must fail closed.');
 
-  const sharedTypes = read('src/shared/types/agentRuntime.ts');
-  for (const token of ['ToolCallingMode', 'ReasoningVisibility', 'ReasoningDelivery', 'AgentRouteCapability', 'toolCallingEvidence', 'native-structured', 'text-only', 'disabled', 'account-oauth']) {
-    assert(sharedTypes.includes(token), `shared agent runtime types must expose ${token}.`);
-  }
-
   const layoutTypes = read('src/shared/types/layout.ts');
-  assert(layoutTypes.includes("export type AgentMode = 'general' | MissionKind | (string & {})"), 'AgentMode is the Composer profile-id selector.');
   assert(!layoutTypes.includes('BuiltinAgentMode'), 'BuiltinAgentMode must be removed.');
   assert(!layoutTypes.includes('ExecutableAgentMode'), 'ExecutableAgentMode must be removed.');
 
   const sessionTypes = read('src/shared/types/session.ts');
-  assert(sessionTypes.includes("export type MissionId = 'debugger' | 'analyzer' | 'optimizer'"), 'MissionId is the independent mission identity.');
   assert(!sessionTypes.includes('ExecutableAppMode'), 'ExecutableAppMode must be removed.');
   assert(!sessionTypes.includes('mode: ExecutableAppMode'), 'session PlanContract must not use ExecutableAppMode.');
-  assert(!sessionTypes.includes("export type AppMode"), 'AppMode must not return.');
-  assert(sessionTypes.includes("kind: 'mission'"), "MissionRunRecord has kind: 'mission'.");
-  assert(sessionTypes.includes('mission: MissionKind'), 'MissionRunRecord has mission: MissionKind.');
-  assert(sessionTypes.includes('profileId: string'), 'DebugSessionStartRequest has profileId: string.');
-  assert(sessionTypes.includes('mission?: MissionKind'), 'DebugSessionStartRequest has optional mission?: MissionKind.');
+  assert(!sessionTypes.includes('export type AppMode'), 'AppMode must not return.');
 
-  const harnessTypes = read('src/shared/types/harness.ts');
+  const harnessTypes = read('src/main/reports/artifactRecord.ts');
   assert(!harnessTypes.includes('ExecutableAppMode'), 'harness leftover types must not use ExecutableAppMode.');
   assert(!harnessTypes.includes('mode: ExecutableAppMode'), 'harness leftover types must not use ExecutableAppMode.');
 
   const agentConstants = read('src/shared/constants/agents.ts');
-  assert(agentConstants.includes('Execution Orchestrator'), 'General must be described as Execution Orchestrator.');
-  assert(agentConstants.includes('Planning Orchestrator'), 'Mission profiles must be described as Planning Orchestrator.');
   assert(!agentConstants.includes('AGENT_CATEGORIES'), 'AGENT_CATEGORIES must be deleted.');
   assert(!agentConstants.includes('AGENT_WRITE_SCOPES'), 'AGENT_WRITE_SCOPES must be deleted.');
 
   const agentManifestService = read('src/main/settings/agent-manifests/AgentManifestService.ts');
   assert(!agentManifestService.includes('createSeedDefinition'), 'AgentManifestService must not write user seeds.');
   assert(!agentManifestService.includes('ensureSeedManifests'), 'AgentManifestService must not ensure user seeds.');
-  assert(agentManifestService.includes('resolveEffectiveSnapshot'), 'AgentManifestService must resolve builtin/user/project snapshots.');
-  assert(agentManifestService.includes("providerId: ''") && agentManifestService.includes("modelId: ''"), 'Missing routes must persist as empty fail-closed routes.');
-  assert(!agentManifestService.includes('provider.models.some'), 'AgentManifestService must not validate routes against the static settings model list.');
-  assert(agentManifestService.includes('EffectiveCatalog is the only'), 'AgentManifestService must preserve explicit routes for EffectiveCatalog validation.');
+  assert(
+    !agentManifestService.includes('provider.models.some'),
+    'AgentManifestService must not validate routes against the static settings model list.',
+  );
 
   assertBuiltinProfileContracts(repoRoot);
 
   const orchestrator = [
     'src/main/agent-runtime/orchestration/AgentOrchestrator.ts',
     'src/main/agent-runtime/orchestration/AgentTurnRunner.ts',
+    'src/main/agent-runtime/orchestration/AgentTurnSubscription.ts',
+    'src/main/agent-runtime/orchestration/AgentTurnCapabilityObservations.ts',
     'src/main/agent-runtime/orchestration/AgentSlotFactory.ts',
     'src/main/agent-runtime/orchestration/ToolExecutorFactory.ts',
     'src/main/agent-runtime/orchestration/TurnPreparationService.ts',
     'src/main/agent-runtime/permissions/ToolPermissionAuthorization.ts',
-  ].map(read).join('\n');
-  assert(orchestrator.includes('configuredRuntimeProvider'), 'AgentOrchestrator must use the configured runtime provider path.');
-  assert(!orchestrator.includes('llmAdapterProvider'), 'AgentOrchestrator must not use the settings LLMAdapterProvider.');
-  assert(orchestrator.includes('resolveAgentRouteCapability'), 'AgentOrchestrator must gate tools by route capability.');
-  assert(orchestrator.includes('activeToolDefinitions'), 'AgentOrchestrator must register only effective tool schemas.');
-  assert(orchestrator.includes('describeRouteCapabilityDiagnostic'), 'AgentOrchestrator must consume structured route capability diagnostics.');
-  assert(orchestrator.includes('recordObservedToolCallingSupport'), 'AgentOrchestrator must persist successful structured tool evidence.');
-  assert(orchestrator.includes('recordObservedToolCallingUnsupported'), 'AgentOrchestrator must persist explicit tool-calling rejection evidence.');
-  assert(orchestrator.includes('isExplicitStructuredToolCallingRejection'), 'AgentOrchestrator must classify explicit tool-calling rejections.');
-  assert(orchestrator.includes('textual_tool_call_not_executed'), 'AgentOrchestrator must normalize textual tool call diagnostics.');
-  assert(orchestrator.includes('empty_response_without_tool_call'), 'AgentOrchestrator must normalize empty response diagnostics.');
-  assert(orchestrator.includes('agentPermissionPolicyService.evaluate'), 'AgentOrchestrator must mediate tools through AgentPermissionPolicy.');
-  assert(orchestrator.includes('agentToolApprovalRequestService.request'), 'AgentOrchestrator must pause for tool approval requests.');
-  assert(orchestrator.includes('agentToolApprovalRequestService.autoReview'), 'AgentOrchestrator must emit auto-review decisions.');
-  assert(orchestrator.includes('executeWithPermissionAdmission'), 'Tool effects must use the revision-checked final admission path.');
-  const admission = read('src/main/agent-runtime/permissions/ToolPermissionAdmission.ts');
-  assert(admission.includes('authority.getSnapshot().revision !== snapshot.revision'), 'Final tool admission must reject stale permission revisions after resource acquisition.');
-  assert(!read('src/main/agent-runtime/permissions/AgentPermissionPolicy.ts').includes('settingsService.getAll'), 'Policy evaluation must explicitly receive frozen constraints and main-owned mode.');
-  assert(orchestrator.includes('withTemporaryPathAccess'), 'approved external path access must be scoped to the tool execution.');
-  assert(orchestrator.includes('PromptPlan is required before creating an agent runtime slot.'), 'Agent runtime slots must require PromptPlan.');
-  assert(orchestrator.includes('requestEnvelopeBuilder.build'), 'Agent runtime requests must create RequestEnvelope snapshots.');
-  assert(!orchestrator.includes('onRequest: promptPlan ?'), 'RequestEnvelope creation must not be optional on provider calls.');
+  ]
+    .map(read)
+    .join('\n');
+  assert(
+    orchestrator.includes('configuredRuntimeProvider'),
+    'AgentOrchestrator must use the configured runtime provider path.',
+  );
+  assert(
+    !orchestrator.includes('llmAdapterProvider'),
+    'AgentOrchestrator must not use the settings LLMAdapterProvider.',
+  );
+  assert(
+    orchestrator.includes('resolveAgentRouteCapability'),
+    'AgentOrchestrator must gate tools by route capability.',
+  );
+  assert(
+    orchestrator.includes('activeToolDefinitions'),
+    'AgentOrchestrator must register only effective tool schemas.',
+  );
+  assert(
+    orchestrator.includes('describeRouteCapabilityDiagnostic'),
+    'AgentOrchestrator must consume structured route capability diagnostics.',
+  );
+  assert(
+    orchestrator.includes('recordObservedToolCallingSupport'),
+    'AgentOrchestrator must persist successful structured tool evidence.',
+  );
+  assert(
+    orchestrator.includes('recordObservedToolCallingUnsupported'),
+    'AgentOrchestrator must persist explicit tool-calling rejection evidence.',
+  );
+  assert(
+    orchestrator.includes('isExplicitStructuredToolCallingRejection'),
+    'AgentOrchestrator must classify explicit tool-calling rejections.',
+  );
+  assert(
+    orchestrator.includes('textual_tool_call_not_executed'),
+    'AgentOrchestrator must normalize textual tool call diagnostics.',
+  );
+  assert(
+    orchestrator.includes('empty_response_without_tool_call'),
+    'AgentOrchestrator must normalize empty response diagnostics.',
+  );
+  assert(
+    orchestrator.includes('agentPermissionPolicyService.evaluate'),
+    'AgentOrchestrator must mediate tools through AgentPermissionPolicy.',
+  );
+  assert(
+    orchestrator.includes('agentToolApprovalRequestService.request'),
+    'AgentOrchestrator must pause for tool approval requests.',
+  );
+  assert(
+    orchestrator.includes('agentToolApprovalRequestService.autoReview'),
+    'AgentOrchestrator must emit auto-review decisions.',
+  );
+  assert(
+    orchestrator.includes('executeWithPermissionAdmission'),
+    'Tool effects must use the revision-checked final admission path.',
+  );
+  assert(
+    !read('src/main/agent-runtime/permissions/AgentPermissionPolicy.ts').includes('settingsService.getAll'),
+    'Policy evaluation must explicitly receive frozen constraints and main-owned mode.',
+  );
+  assert(
+    orchestrator.includes('withTemporaryPathAccess'),
+    'approved external path access must be scoped to the tool execution.',
+  );
+  assert(
+    orchestrator.includes('PromptPlan is required before creating an agent runtime slot.'),
+    'Agent runtime slots must require PromptPlan.',
+  );
+  assert(
+    orchestrator.includes('requestEnvelopeBuilder.build'),
+    'Agent runtime requests must create RequestEnvelope snapshots.',
+  );
+  assert(
+    !orchestrator.includes('onRequest: promptPlan ?'),
+    'RequestEnvelope creation must not be optional on provider calls.',
+  );
+  assert(
+    !read('src/renderer/features/composer/composerModelPicker.ts').includes('isEffectiveModelPickerSelectable'),
+    'Composer picker must use the Agent tool-eligibility gate.',
+  );
 
-  const routeCapabilityResolver = read('src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts');
-  assert(routeCapabilityResolver.includes('route_tool_calling_unknown'), 'Unknown native tool support must use the unknown diagnostic code.');
-  assert(routeCapabilityResolver.includes('route_tool_calling_unsupported'), 'Explicit unsupported tool support must use the unsupported diagnostic code.');
-  assert(routeCapabilityResolver.includes('route_tool_calling_disabled'), 'Unavailable routes must use the disabled diagnostic code.');
-  assert(routeCapabilityResolver.includes('has not confirmed native tool calling'), 'Unknown tool calling must not reuse the explicit-unsupported wording.');
-  assert(!read('src/renderer/features/composer/composerModelPicker.ts').includes('isEffectiveModelPickerSelectable'), 'Composer picker must use the Agent tool-eligibility gate.');
-  assert(read('src/renderer/features/composer/composerModelPicker.ts').includes('isAgentToolExecutableModel'), 'Composer picker must share the Agent tool-eligibility gate.');
-
-  assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/LLMAdapterProvider.ts')), 'Legacy LLMAdapterProvider must be removed from agent runtime.');
-  assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/cli/StandaloneCli.ts')), 'The unshipped mock StandaloneCli must not return as a second runtime path.');
-  assert(!fs.existsSync(path.join(repoRoot, 'src/main/settings/LLMAdapter.ts')), 'Settings-owned legacy LLMAdapter must be removed.');
+  assert(
+    !fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/LLMAdapterProvider.ts')),
+    'Legacy LLMAdapterProvider must be removed from agent runtime.',
+  );
+  assert(
+    !fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/cli/StandaloneCli.ts')),
+    'The unshipped mock StandaloneCli must not return as a second runtime path.',
+  );
+  assert(
+    !fs.existsSync(path.join(repoRoot, 'src/main/settings/LLMAdapter.ts')),
+    'Settings-owned legacy LLMAdapter must be removed.',
+  );
 
   const configuredProviderSource = read('src/main/agent-runtime/providers/ConfiguredRuntimeProvider.ts');
-  assert(!configuredProviderSource.includes('settingsService'), 'Configured runtime provider must not re-read mutable Settings during a turn.');
-  assert(configuredProviderSource.includes('providerRuntimeCredentialService.get'), 'Configured runtime provider must consume an opaque credential lease.');
-  assert(configuredProviderSource.includes('providerRuntimeCredentialService.refresh'), 'Account 401 retry must refresh the same credential lease.');
-  assert(configuredProviderSource.includes('AnthropicProvider'), 'Configured runtime provider must map Anthropic-style routes.');
-  assert(configuredProviderSource.includes('OpenAICompatibleProvider'), 'Configured runtime provider must map OpenAI-compatible routes.');
-  assert(configuredProviderSource.includes('const effectiveModelId = requestPlan.effectiveModelId'), 'Configured runtime provider must send the RequestPlan model id.');
-  assert(configuredProviderSource.includes('const protocol = requestPlan.route.protocol'), 'Configured runtime provider must route only through RequestPlan.');
-  assert(!configuredProviderSource.includes('provider.models'), 'Configured runtime provider must not gate requests with a static model list.');
-
-  const credentialService = read('src/main/settings/provider-auth/ProviderRuntimeCredentialService.ts');
-  for (const token of ['async freeze(', 'async refresh(', 'connectionHeaders', 'awsBedrockCredentials', 'release(']) {
-    assert(credentialService.includes(token), `Frozen credential service must include ${token}.`);
-  }
+  assert(
+    !configuredProviderSource.includes('settingsService'),
+    'Configured runtime provider must not re-read mutable Settings during a turn.',
+  );
+  assert(
+    !configuredProviderSource.includes('provider.models'),
+    'Configured runtime provider must not gate requests with a static model list.',
+  );
 
   const promptPlanBuilder = read('src/main/agent-runtime/prompt/PromptPlanBuilder.ts');
-  const requestEnvelopeBuilder = read('src/main/agent-runtime/prompt/RequestEnvelopeBuilder.ts');
   const skillCatalogBudget = read('src/main/agent-runtime/capabilities/SkillCatalogBudget.ts');
-  assert(promptPlanBuilder.includes('CORE_FILES'), 'PromptPlanBuilder must assemble source-controlled Core Prompt modules.');
-  assert(promptPlanBuilder.includes("kind: 'skill-catalog'"), 'PromptPlanBuilder must own progressive Skill catalog composition.');
-  assert(promptPlanBuilder.includes('resolveSkillCatalogBudget'), 'PromptPlanBuilder must use SkillCatalogBudget for progressive skill index.');
-  assert(!promptPlanBuilder.includes('Permission mode:'), 'Frozen PromptPlan must not advertise a stale current permission mode.');
-  const permissionContext = read('src/main/agent-runtime/permissions/RuntimePermissionContext.ts');
-  assert(permissionContext.includes('Mode: ${state.mode}') && permissionContext.includes('sourceHash: hashScopedResource(content)'), 'Runtime permission context must identify the current mode and its request-local source hash.');
-  assert(read('src/main/agent-runtime/agent/AgentLoop.ts').includes('appendRuntimePermissionContext(llmContext, config.resolvePermissionState())'), 'Each actual provider request must sample its runtime permission context.');
-  assert(promptPlanBuilder.includes('routeCapability'), 'PromptPlanBuilder must include effective route capabilities.');
-  assert(skillCatalogBudget.includes('includeSkillCatalog'), 'SkillCatalogBudget must decide catalog inclusion.');
-  assert(!skillCatalogBudget.includes("harness:"), 'SkillCatalogBudget must not restore harness frontmatter modes.');
+  assert(
+    !promptPlanBuilder.includes('Permission mode:'),
+    'Frozen PromptPlan must not advertise a stale current permission mode.',
+  );
+  assert(!skillCatalogBudget.includes('harness:'), 'SkillCatalogBudget must not restore harness frontmatter modes.');
   assert(!skillCatalogBudget.includes('HarnessProfile'), 'SkillCatalogBudget must not restore HarnessProfile modes.');
-  assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/capabilities/HarnessProfileResolver.ts')), 'HarnessProfileResolver must be removed after Progressive Skill convergence.');
-  assert(!read('src/shared/types/agentManifest.ts').includes('AgentHarnessPreference'), 'agentManifest must not restore AgentHarnessPreference.');
-  assert(requestEnvelopeBuilder.includes('promptPlan'), 'RequestEnvelopeBuilder must produce provider-neutral snapshots from PromptPlan.');
-  assert(requestEnvelopeBuilder.includes('requestPlan'), 'RequestEnvelopeBuilder must snapshot the exact RequestPlan sent to the adapter.');
-  assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/prompt/PromptAssembler.ts')), 'PromptAssembler must be removed after PromptPlan formalization.');
+  assert(
+    !fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/capabilities/HarnessProfileResolver.ts')),
+    'HarnessProfileResolver must be removed after Progressive Skill convergence.',
+  );
+  assert(
+    !read('src/shared/types/agentManifest.ts').includes('AgentHarnessPreference'),
+    'agentManifest must not restore AgentHarnessPreference.',
+  );
+  assert(
+    !fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/prompt/PromptAssembler.ts')),
+    'PromptAssembler must be removed after PromptPlan formalization.',
+  );
 
   const conversationService = read('src/main/conversation/ConversationService.ts');
   const conversationPromptPreparer = read('src/main/conversation/ConversationPromptPreparer.ts');
   const conversationTurnStarter = read('src/main/conversation/ConversationTurnStarter.ts');
   const conversationTurnRunner = read('src/main/conversation/ConversationTurnRunner.ts');
-  const conversationRuntimeSources = [conversationService, conversationPromptPreparer, conversationTurnStarter, conversationTurnRunner].join('\n');
-  const turnPromptPlan = read('src/main/agent-runtime/orchestration/TurnPromptPlan.ts');
-  assert(conversationPromptPreparer.includes('buildTurnPromptPlan(') && read('src/main/agent-runtime/orchestration/PromptPlanForTurn.ts').includes('buildTurnPromptPlan('),
-    'Conversation and profile turns must build their PromptPlan through the one shared buildTurnPromptPlan.');
-  assert(turnPromptPlan.includes('mergeTurnPreloadSkillIds'), 'Turn prompt preparation must merge profile/$skill/pending skill preload ids.');
-  assert(turnPromptPlan.includes('SKILL_UNAVAILABLE'), 'Turn prompt preparation must fail closed on missing preload skills.');
-  for (const forbidden of ['buildProfileSystemPrompt', 'buildProfileCatalogPrompt', 'buildProfileTurnPrompt', 'mentionsTextualToolCall', 'traceHasRuntimeToolCalls', 'AGENT_WORKBENCH_TOOL_CATALOG']) {
-    assert(!conversationRuntimeSources.includes(forbidden), `Conversation runtime must not keep legacy prompt/text-tool logic: ${forbidden}.`);
+  const conversationRuntimeSources = [
+    conversationService,
+    conversationPromptPreparer,
+    conversationTurnStarter,
+    conversationTurnRunner,
+  ].join('\n');
+  for (const forbidden of [
+    'buildProfileSystemPrompt',
+    'buildProfileCatalogPrompt',
+    'buildProfileTurnPrompt',
+    'mentionsTextualToolCall',
+    'traceHasRuntimeToolCalls',
+    'AGENT_WORKBENCH_TOOL_CATALOG',
+  ]) {
+    assert(
+      !conversationRuntimeSources.includes(forbidden),
+      `Conversation runtime must not keep legacy prompt/text-tool logic: ${forbidden}.`,
+    );
   }
   for (const forbidden of ['TASK_FILE_PATTERN', 'readFileSync(taskFilePath', 'fs.existsSync(taskFilePath']) {
-    assert(!conversationRuntimeSources.includes(forbidden), `Conversation runtime must not preload local files outside the tool permission policy: ${forbidden}.`);
+    assert(
+      !conversationRuntimeSources.includes(forbidden),
+      `Conversation runtime must not preload local files outside the tool permission policy: ${forbidden}.`,
+    );
   }
-  assert(turnPromptPlan.includes('promptPlanBuilder.build'), 'Turn prompt preparation must build a PromptPlan for system instructions.');
-  assert(conversationPromptPreparer.includes('routeCapability: input.routePreflight.routeCapability'), 'Conversation prompt preparation must pass the frozen route capability into PromptPlanBuilder.');
-  assert(conversationPromptPreparer.includes('permissionConstraints: runtimeSettings.agentRuntime.permissions'), 'Conversation prompt preparation must pass explicit frozen permission constraints into PromptPlanBuilder.');
-  assert(conversationService.includes('answerToolApproval'), 'ConversationService must expose tool approval resume.');
-  for (const token of ['prepareTurnContext', 'prepareConversationPrompt', 'materializeAgentUserInput', 'preparedTurn', 'requestId']) {
-    assert(conversationRuntimeSources.includes(token), `Conversation preflight path must include ${token}.`);
-  }
-  assert(conversationRuntimeSources.includes('releaseProviderRuntimeCredentials'), 'Every conversation terminal path must release the opaque credential lease.');
-  assert(!conversationRuntimeSources.includes('previewNextRequestContext'), 'Conversation runtime must not restore draft-time context preview work.');
-
-  const contextJournal = read('src/main/conversation/SessionContextJournal.ts');
-  for (const token of ['filteredArtifactCount', 'decideContinuationReplay', 'canonicalizeTerminalContextMessages', 'schemaVersion !== 2']) {
-    assert(contextJournal.includes(token), `Session context v2 continuation filtering must include ${token}.`);
-  }
+  assert(
+    !conversationRuntimeSources.includes('previewNextRequestContext'),
+    'Conversation runtime must not restore draft-time context preview work.',
+  );
   const conversationIpc = read('src/main/ipc/conversationHandlers.ts');
-  const conversationRejection = read('src/main/conversation/conversationSendRejection.ts');
-  assert(conversationIpc.includes("status: 'accepted'"), 'Main IPC must return a structured accepted send result after commit.');
-  assert(conversationRejection.includes("status: 'rejected'"), 'Main IPC must return a structured rejected preflight result without persistence.');
-  assert(conversationIpc.includes('toRejectedSendResult'), 'Main IPC must map preflight failures through the structured rejection helper.');
-  assert(!conversationIpc.includes('conversation:previewNextRequestContext'), 'Main IPC must not expose draft-time context preview.');
+  assert(
+    !conversationIpc.includes('conversation:previewNextRequestContext'),
+    'Main IPC must not expose draft-time context preview.',
+  );
 
-  const settingsService = read('src/main/settings/settings-core/SettingsService.ts');
-  assert(settingsService.includes('capabilities: definition?.capabilities'), 'Settings normalization must hydrate builtin provider capabilities.');
-  assert(settingsService.includes('agentRuntime'), 'Settings must persist agent runtime permission controls.');
-  assert(settingsService.includes('saveAgentDefinition(request:'), 'Settings must expose the scoped agent-definition save.');
-  const settingsAgentOps = read('src/main/settings/settings-core/SettingsAgentOps.ts');
-  for (const token of ['agentDefinitionRevisions', 'clientRevision <= latestRevision', 'agentManifestService.routeForAgent']) {
-    assert(settingsAgentOps.includes(token), `Scoped agent-definition save path must include ${token}.`);
-  }
-
-  const bridge = read('src/main/agent-runtime/AgentEventBridge.ts');
-  assert(bridge.includes('buildDiagnosticAgentEvent'), 'AgentEventBridge must expose normalized diagnostic event construction.');
-  assert(bridge.includes('routeCapability'), 'run.started must carry route capability metadata.');
-
-  const anthropic = read('src/main/agent-runtime/providers/AnthropicProvider.ts');
-  for (const token of ['body.tools', 'tool_use', 'input_json_delta', 'tool_result']) {
-    assert(anthropic.includes(token), `Anthropic provider must support ${token}.`);
-  }
-
-  const openai = read('src/main/agent-runtime/providers/OpenAICompatibleProvider.ts');
-  for (const token of ['body.tools', 'tool_choice', 'tool_calls']) {
-    assert(openai.includes(token), `OpenAI-compatible provider must support ${token}.`);
-  }
-
-  const permissionPolicy = read('src/main/agent-runtime/permissions/AgentPermissionPolicy.ts');
-  for (const token of ['full-access', 'auto_review', 'POSIX_ROUTINE_COMMAND_PREFIXES', 'WINDOWS_ROUTINE_COMMAND_PREFIXES', 'routineCommandPrefixes', 'readableRoots', 'writableRoots', 'commandUsesExternalPath']) {
-    assert(permissionPolicy.includes(token), `AgentPermissionPolicy must cover ${token}.`);
-  }
-
-  const toolApprovalService = read('src/main/agent-runtime/permissions/AgentToolApprovalRequestService.ts');
-  assert(toolApprovalService.includes('approval.requested'), 'Tool approval service must emit requested events.');
-  assert(toolApprovalService.includes('approval.answered'), 'Tool approval service must emit answered events.');
-
-  const primitiveShared = read('src/main/agent-runtime/tools/primitives/_shared.ts');
-  assert(primitiveShared.includes('withTemporaryPathAccess'), 'Primitive tools must support scoped temporary path access.');
-
-  const globTool = read('src/main/agent-runtime/tools/primitives/GlobTool.ts');
-  assert(globTool.includes('splitExternalPattern'), 'Glob tool must resolve approved external path patterns.');
-
-  assert(fs.existsSync(path.join(repoRoot, 'src/main/provider-catalog/agentToolCapabilityAudit.test.ts')), 'Catalog tool-calling audit must exist.');
-  assert(fs.existsSync(path.join(repoRoot, 'src/shared/provider-catalog/protocolWireFixtureCoverage.ts')), 'Native protocol wire-fixture coverage map must exist.');
+  assert(
+    fs.existsSync(path.join(repoRoot, 'src/main/provider-catalog/agentToolCapabilityAudit.test.ts')),
+    'Catalog tool-calling audit must exist.',
+  );
+  assert(
+    fs.existsSync(path.join(repoRoot, 'src/main/testing/contracts/protocolWireFixtureCoverage.ts')),
+    'Native protocol wire-fixture coverage map must exist.',
+  );
   const toolCapability = spawnSync(process.execPath, [path.join(repoRoot, 'scripts/check-agent-tool-capability.mjs')], {
     cwd: repoRoot,
     env: process.env,

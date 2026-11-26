@@ -3,11 +3,24 @@ import { loopFinalAnswerText, settleTextPhase } from './loopItems';
 import type { ConversationWorkBlock } from '../types/conversation';
 
 const text = (value: string, phase?: 'commentary' | 'final_answer', index = 0) => ({
-  kind: 'text' as const, providerOutputRef: { protocol: 'test', providerBlockKey: `text:${index}`, contentIndex: index },
-  text: value, phase, status: 'complete' as const, displayOrder: index + 1,
+  kind: 'text' as const,
+  providerOutputRef: { protocol: 'test', providerBlockKey: `text:${index}`, contentIndex: index },
+  text: value,
+  phase,
+  status: 'complete' as const,
+  displayOrder: index + 1,
 });
-const loop = (items: ConversationWorkBlock['items'], outputPhase?: 'commentary' | 'final_answer'): ConversationWorkBlock => ({
-  id: 'loop', kind: 'llm_turn', title: 'LLM turn', status: 'complete', toolCalls: [], startedAt: 1, items,
+const loop = (
+  items: ConversationWorkBlock['items'],
+  outputPhase?: 'commentary' | 'final_answer',
+): ConversationWorkBlock => ({
+  id: 'loop',
+  kind: 'llm_turn',
+  title: 'LLM turn',
+  status: 'complete',
+  toolCalls: [],
+  startedAt: 1,
+  items,
   result: { status: 'complete', toolCallIds: [], ...(outputPhase ? { outputPhase } : {}) },
 });
 

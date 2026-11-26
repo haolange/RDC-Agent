@@ -16,7 +16,6 @@ import { useI18n } from '../i18n';
 import { useWindowControls } from '../hooks/useWindowControls';
 import { ProductLogo } from '../ui/ProductLogo';
 import { useSettingsNavigationStore } from '../stores/settingsNavigationStore';
-import { useNotificationStore } from '../stores/notificationStore';
 import { WorkbenchUtilities } from './WorkbenchUtilities';
 import { resolveActiveChrome } from './theme/applyChromeTheme';
 import { useIpcEventBridge, useSyncCapturesFromSnapshot } from './bootstrap/useIpcEventBridge';
@@ -40,6 +39,10 @@ const App: React.FC = () => {
   const agentSettingsRequest = useSettingsNavigationStore((state) => state.agentRequest);
   const settingsSectionRequest = useSettingsNavigationStore((state) => state.sectionRequest);
   const clearAgentSettingsRequest = useSettingsNavigationStore((state) => state.clearAgentRequest);
+  const closeSettingsModal = useCallback(() => {
+    clearAgentSettingsRequest();
+    setSettingsModalOpen(false);
+  }, [clearAgentSettingsRequest]);
 
   useEffect(() => {
     if (agentSettingsRequest || settingsSectionRequest) setSettingsModalOpen(true);
@@ -47,16 +50,13 @@ const App: React.FC = () => {
 
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentRun = useSessionStore((state) => state.currentRun);
-  const currentMode = useLayoutStore((state) => state.currentMode);
   const toggleLeftSidebar = useLayoutStore((state) => state.toggleLeftSidebar);
   const toggleRightPanel = useLayoutStore((state) => state.toggleRightPanel);
 
   const settings = useAppSettingsStore((state) => state.settings);
   const systemTheme = useAppSettingsStore((state) => state.systemTheme);
 
-  const resolvedTheme: ResolvedTheme = settings.appearance.theme === 'system'
-    ? systemTheme
-    : settings.appearance.theme;
+  const resolvedTheme: ResolvedTheme = settings.appearance.theme === 'system' ? systemTheme : settings.appearance.theme;
   const nickname = settings.profile.nickname || t('sidebar.userName');
   const avatarPath = settings.profile.avatarPath;
 
@@ -66,13 +66,9 @@ const App: React.FC = () => {
   const activityEntries = useTerminalStore((state) => state.entries);
 
   const hasActiveDebugRun = Boolean(
-    currentRun
-    && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status),
+    currentRun &&
+    ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status),
   );
-
-  const showNotice = useCallback((message: string) => {
-    useNotificationStore.getState().add({ tone: 'info', title: message });
-  }, []);
 
   const syncCapturesFromSnapshot = useSyncCapturesFromSnapshot();
   const handleToggleLeftSidebar = useCallback(() => {
@@ -81,11 +77,11 @@ const App: React.FC = () => {
       layout.toggleLeftDrawer();
       return;
     }
+    layout.animateColumns();
     void toggleLeftSidebar();
   }, [layout, toggleLeftSidebar]);
 
   const composer = useComposer({
-    showNotice,
     effectiveLeftCollapsed: layout.effectiveLeftCollapsed,
     leftToggleDisabled: layout.leftToggleDisabled,
     toggleLeftSidebar: handleToggleLeftSidebar,
@@ -103,7 +99,6 @@ const App: React.FC = () => {
 
   useIpcEventBridge({
     syncCapturesFromSnapshot,
-    showNotice,
     setSettingsModalOpen,
     setWindowMaximized,
     t,
@@ -118,16 +113,22 @@ const App: React.FC = () => {
         : null;
 
   const leftPanelToggleLabel = (layout.isLeftDrawerMode ? !layout.isLeftDrawerOpen : layout.effectiveLeftCollapsed)
-    ? t('app.leftSidebarExpand') : t('app.leftSidebarCollapse');
+    ? t('app.leftSidebarExpand')
+    : t('app.leftSidebarCollapse');
   const rightPanelToggleLabel = layout.isRightRailDrawerMode
-    ? (layout.isRightRailDrawerOpen ? t('app.rightPanelCollapse') : t('app.rightPanelExpand'))
-    : (layout.effectiveRightCollapsed ? t('app.rightPanelExpand') : t('app.rightPanelCollapse'));
+    ? layout.isRightRailDrawerOpen
+      ? t('app.rightPanelCollapse')
+      : t('app.rightPanelExpand')
+    : layout.effectiveRightCollapsed
+      ? t('app.rightPanelExpand')
+      : t('app.rightPanelCollapse');
   const handleToggleRightRail = useCallback(() => {
     if (layout.isRightRailDrawerMode) {
       layout.closeLeftDrawer();
       layout.toggleRightRailDrawer();
       return;
     }
+    layout.animateColumns();
     void toggleRightPanel();
   }, [layout, toggleRightPanel]);
 
@@ -139,7 +140,13 @@ const App: React.FC = () => {
         <div className="loading-titlebar">
           <WindowControls
             maximized={windowMaximized}
-            labels={{ group: t('app.windowControls'), minimize: t('app.windowMinimize'), maximize: t('app.windowMaximize'), restore: t('app.windowRestore'), close: t('app.windowClose') }}
+            labels={{
+              group: t('app.windowControls'),
+              minimize: t('app.windowMinimize'),
+              maximize: t('app.windowMaximize'),
+              restore: t('app.windowRestore'),
+              close: t('app.windowClose'),
+            }}
             onMinimize={handleWindowMinimize}
             onToggleMaximize={handleWindowToggleMaximize}
             onClose={handleWindowClose}
@@ -154,97 +161,101 @@ const App: React.FC = () => {
   return (
     <AppProviders>
       <AppShell
-        titleBar={<TitleBar
-          utilities={<WorkbenchUtilities isTerminalOpen={isTerminalOpen} activityAlertSeverity={activityAlertSeverity}
-            onToggleTerminal={() => toggleTerminalOpen()} />}
-          effectiveLeftCollapsed={layout.effectiveLeftCollapsed}
-          effectiveRightCollapsed={layout.effectiveRightCollapsed}
-          isRightRailVisible={layout.isRightRailVisible}
-          leftToggleDisabled={layout.leftToggleDisabled}
-          rightToggleDisabled={layout.rightToggleDisabled}
-          leftPanelToggleLabel={leftPanelToggleLabel}
-          rightPanelToggleLabel={rightPanelToggleLabel}
-          autoCollapsedTitle={t('app.panelAutoCollapsed')}
-          windowMaximized={windowMaximized}
-          windowControlsLabel={t('app.windowControls')}
-          windowMinimizeLabel={t('app.windowMinimize')}
-          windowMaximizeLabel={t('app.windowMaximize')}
-          windowRestoreLabel={t('app.windowRestore')}
-          windowCloseLabel={t('app.windowClose')}
-          onToggleLeft={handleToggleLeftSidebar}
-          onToggleRight={handleToggleRightRail}
-          onMinimize={handleWindowMinimize}
-          onToggleMaximize={handleWindowToggleMaximize}
-          onClose={handleWindowClose}
-          accent={resolveActiveChrome(settings.appearance, resolvedTheme).accent}
-        />}
-
-        body={<WorkbenchShell
-          appBodyRef={layout.appBodyRef}
-          isResizing={layout.isResizing}
-          resolvedWidths={layout.resolvedWidths}
-          effectiveLeftCollapsed={layout.effectiveLeftCollapsed}
-          effectiveRightCollapsed={layout.effectiveRightCollapsed}
-          isRightRailVisible={layout.isRightRailVisible}
-          isLeftDrawerMode={layout.isLeftDrawerMode}
-          isLeftDrawerOpen={layout.isLeftDrawerOpen}
-          onCloseLeftDrawer={layout.closeLeftDrawer}
-          isRightRailDrawerMode={layout.isRightRailDrawerMode}
-          isRightRailDrawerOpen={layout.isRightRailDrawerOpen}
-          onCloseRightRailDrawer={layout.closeRightRailDrawer}
-          isTerminalOpen={isTerminalOpen}
-          bothSidebarsCollapsed={layout.bothSidebarsCollapsed}
-          workbenchRailMaxWidth={layout.workbenchRailMaxWidth}
-          nickname={nickname}
-          avatarPath={avatarPath}
-          composer={composer}
-          showMainPromptBar={Boolean(currentProject)}
-          mainPage={<DebuggerPage mode={currentMode} />}
-          t={t}
-          onOpenKnowledgeCenter={() => setKnowledgeCenterOpen(true)}
-          isUserMenuOpen={Boolean(userMenuAnchor)}
-          onUserMenuToggle={(event) => {
-            const element = event.currentTarget;
-            const rect = element.getBoundingClientRect();
-            setUserMenuAnchor((current) => current ? null : { element, rect });
-          }}
-          onStartDrag={layout.startDragging}
-        />}
-        overlays={<>
-
-        <UserMenu
-          anchorRect={userMenuAnchor?.rect ?? null}
-          anchorElement={userMenuAnchor?.element ?? null}
-          open={Boolean(userMenuAnchor)}
-          settings={settings}
-          onClose={() => setUserMenuAnchor(null)}
-          onOpenSettings={() => {
-            setUserMenuAnchor(null);
-            setSettingsModalOpen(true);
-          }}
-        />
-
-        <SettingsModal
-          open={settingsModalOpen}
-          settings={settings}
-          onClose={() => { clearAgentSettingsRequest(); setSettingsModalOpen(false); }}
-        />
-
-        <KnowledgeCenterModal
-          open={knowledgeCenterOpen}
-          onClose={() => setKnowledgeCenterOpen(false)}
-        />
-
-        <CommandPaletteController
-          onExecute={(cmd) => {
-            if (cmd === '/config') {
-              setSettingsModalOpen(true);
+        titleBar={
+          <TitleBar
+            utilities={
+              <WorkbenchUtilities
+                isTerminalOpen={isTerminalOpen}
+                activityAlertSeverity={activityAlertSeverity}
+                onToggleTerminal={() => toggleTerminalOpen()}
+              />
             }
-          }}
-        />
+            effectiveLeftCollapsed={layout.effectiveLeftCollapsed}
+            effectiveRightCollapsed={layout.effectiveRightCollapsed}
+            isRightRailVisible={layout.isRightRailVisible}
+            leftToggleDisabled={layout.leftToggleDisabled}
+            rightToggleDisabled={layout.rightToggleDisabled}
+            leftPanelToggleLabel={leftPanelToggleLabel}
+            rightPanelToggleLabel={rightPanelToggleLabel}
+            autoCollapsedTitle={t('app.panelAutoCollapsed')}
+            windowMaximized={windowMaximized}
+            windowControlsLabel={t('app.windowControls')}
+            windowMinimizeLabel={t('app.windowMinimize')}
+            windowMaximizeLabel={t('app.windowMaximize')}
+            windowRestoreLabel={t('app.windowRestore')}
+            windowCloseLabel={t('app.windowClose')}
+            onToggleLeft={handleToggleLeftSidebar}
+            onToggleRight={handleToggleRightRail}
+            onMinimize={handleWindowMinimize}
+            onToggleMaximize={handleWindowToggleMaximize}
+            onClose={handleWindowClose}
+            accent={resolveActiveChrome(settings.appearance, resolvedTheme).accent}
+          />
+        }
 
-        <NotificationToast />
-        </>}
+        body={
+          <WorkbenchShell
+            appBodyRef={layout.appBodyRef}
+            isResizing={layout.isResizing}
+            columnsAnimating={layout.columnsAnimating}
+            onColumnsSettled={layout.settleColumns}
+            resolvedWidths={layout.resolvedWidths}
+            effectiveLeftCollapsed={layout.effectiveLeftCollapsed}
+            effectiveRightCollapsed={layout.effectiveRightCollapsed}
+            isRightRailVisible={layout.isRightRailVisible}
+            isLeftDrawerMode={layout.isLeftDrawerMode}
+            isLeftDrawerOpen={layout.isLeftDrawerOpen}
+            onCloseLeftDrawer={layout.closeLeftDrawer}
+            isRightRailDrawerMode={layout.isRightRailDrawerMode}
+            isRightRailDrawerOpen={layout.isRightRailDrawerOpen}
+            onCloseRightRailDrawer={layout.closeRightRailDrawer}
+            isTerminalOpen={isTerminalOpen}
+            bothSidebarsCollapsed={layout.bothSidebarsCollapsed}
+            workbenchRailMaxWidth={layout.workbenchRailMaxWidth}
+            nickname={nickname}
+            avatarPath={avatarPath}
+            composer={composer}
+            showMainPromptBar={Boolean(currentProject)}
+            mainPage={<DebuggerPage mode={composer.currentMode} />}
+            onOpenKnowledgeCenter={() => setKnowledgeCenterOpen(true)}
+            isUserMenuOpen={Boolean(userMenuAnchor)}
+            onUserMenuToggle={(event) => {
+              const element = event.currentTarget;
+              const rect = element.getBoundingClientRect();
+              setUserMenuAnchor((current) => (current ? null : { element, rect }));
+            }}
+            onStartDrag={layout.startDragging}
+          />
+        }
+        overlays={
+          <>
+            <UserMenu
+              anchorRect={userMenuAnchor?.rect ?? null}
+              anchorElement={userMenuAnchor?.element ?? null}
+              open={Boolean(userMenuAnchor)}
+              settings={settings}
+              onClose={() => setUserMenuAnchor(null)}
+              onOpenSettings={() => {
+                setUserMenuAnchor(null);
+                setSettingsModalOpen(true);
+              }}
+            />
+
+            <SettingsModal open={settingsModalOpen} settings={settings} onClose={closeSettingsModal} />
+
+            <KnowledgeCenterModal open={knowledgeCenterOpen} onClose={() => setKnowledgeCenterOpen(false)} />
+
+            <CommandPaletteController
+              onExecute={(cmd) => {
+                if (cmd === '/config') {
+                  setSettingsModalOpen(true);
+                }
+              }}
+            />
+
+            <NotificationToast />
+          </>
+        }
       />
     </AppProviders>
   );

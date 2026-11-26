@@ -3,7 +3,7 @@ import { translateCoreToSharedAgentEvent } from '../agent-runtime/AgentEventBrid
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
-import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 
 const eventContext = {
   runId: 'run-cancel-test',
@@ -14,7 +14,7 @@ const eventContext = {
 
 describe('cancel turn stability', () => {
   it('emits cancelled approval.answered when a pending tool approval is cancelled', async () => {
-    const events: SharedAgentEvent[] = [];
+    const events: AgentEvent[] = [];
     const turnId = 'turn-approval-cancel';
     const requestPromise = agentToolApprovalRequestService.request({
       agentId: 'debugger',
@@ -31,10 +31,7 @@ describe('cancel turn stability', () => {
     agentToolApprovalRequestService.cancelTurn(turnId);
 
     await expect(requestPromise).rejects.toThrow(/cancelled/i);
-    expect(events.map((event) => event.type)).toEqual([
-      'approval.requested',
-      'approval.answered',
-    ]);
+    expect(events.map((event) => event.type)).toEqual(['approval.requested', 'approval.answered']);
     expect(events[1]?.payload).toMatchObject({
       status: 'cancelled',
       kind: 'tool',
@@ -43,21 +40,23 @@ describe('cancel turn stability', () => {
   });
 
   it('emits cancelled approval.answered when a pending ask_user request is cancelled', async () => {
-    const events: SharedAgentEvent[] = [];
+    const events: AgentEvent[] = [];
     const turnId = 'turn-ask-user-cancel';
     const requestPromise = agentUserInputRequestService.request({
       agentId: 'debugger',
       turnId,
       toolCallId: 'tool-ask-user',
-      questions: [{
-        questionId: 'choice',
-        prompt: 'Which option?',
-        options: [
-          { optionId: 'a', label: 'A' },
-          { optionId: 'b', label: 'B' },
-        ],
-        allowFreeform: true,
-      }],
+      questions: [
+        {
+          questionId: 'choice',
+          prompt: 'Which option?',
+          options: [
+            { optionId: 'a', label: 'A' },
+            { optionId: 'b', label: 'B' },
+          ],
+          allowFreeform: true,
+        },
+      ],
       context: eventContext,
       onEvent: (event) => events.push(event),
     });
@@ -65,10 +64,7 @@ describe('cancel turn stability', () => {
     agentUserInputRequestService.cancelTurn(turnId);
 
     await expect(requestPromise).rejects.toThrow(/cancelled/i);
-    expect(events.map((event) => event.type)).toEqual([
-      'approval.requested',
-      'approval.answered',
-    ]);
+    expect(events.map((event) => event.type)).toEqual(['approval.requested', 'approval.answered']);
     expect(events[1]?.payload).toMatchObject({
       status: 'cancelled',
       kind: 'ask_user',
@@ -77,7 +73,7 @@ describe('cancel turn stability', () => {
   });
 
   it('emits cancelled approval.answered when a pending plan review is cancelled', async () => {
-    const events: SharedAgentEvent[] = [];
+    const events: AgentEvent[] = [];
     const turnId = 'turn-plan-review-cancel';
     const requestPromise = agentPlanReviewRequestService.request({
       agentId: 'debugger',
@@ -110,13 +106,16 @@ describe('cancel turn stability', () => {
   });
 
   it('translates recovery diagnostic core events for ConversationService projection', () => {
-    const shared = translateCoreToSharedAgentEvent({
-      type: 'diagnostic',
-      code: 'error_recovery_retry',
-      severity: 'info',
-      message: 'provider 错误，正在重试（第 1 次）',
-      phase: 'started',
-    }, eventContext);
+    const shared = translateCoreToSharedAgentEvent(
+      {
+        type: 'diagnostic',
+        code: 'error_recovery_retry',
+        severity: 'info',
+        message: 'provider 错误，正在重试（第 1 次）',
+        phase: 'started',
+      },
+      eventContext,
+    );
 
     expect(shared).toMatchObject({
       type: 'diagnostic',

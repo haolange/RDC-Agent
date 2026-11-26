@@ -9,6 +9,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { AppError } from '@shared/errors/appError';
 import { childScopePrefix, isTransientScopeId } from '@shared/utils/executionScope';
 import { appPathService } from '../../runtime/AppPathService';
 import { FileTaskStore, MemoryTaskStore, type TaskStore } from './TaskStore';
@@ -30,30 +31,43 @@ export function removeSessionTasks(sessionId: string): void {
   if (!fs.existsSync(base)) return;
   const own = safeSegment(sessionId);
   const childPrefix = safeSegment(childScopePrefix(sessionId));
-  const entries = fs.readdirSync(base, { withFileTypes: true })
-    .filter(entry => entry.name === own || entry.name.startsWith(childPrefix));
-  if (entries.some(entry => !entry.isDirectory())) throw new Error('TASK_SCOPE_NOT_DIRECTORY');
+  const entries = fs
+    .readdirSync(base, { withFileTypes: true })
+    .filter((entry) => entry.name === own || entry.name.startsWith(childPrefix));
+  if (entries.some((entry) => !entry.isDirectory())) throw new AppError('TASK_SCOPE_NOT_DIRECTORY');
   for (const entry of entries) fs.rmSync(path.join(base, entry.name), { recursive: true, force: true });
 }
 
 /** 创建会话级 FileTaskStore（写入方与投影读取方共用同一路径规则）。 */
 export function createSessionTaskStore(sessionId: string): FileTaskStore {
-  return new FileTaskStore(resolveSessionTasksDir(sessionId), async () => {
-    const { readApprovedPlanTasks } = await import('../../sessions/run/ApprovedPlanTasks');
-    return readApprovedPlanTasks(sessionId);
-  }, async (uri, hash) => {
-    const { sessionArtifactResolver } = await import('../../sessions/artifacts/SessionArtifactResolver');
-    const { investigationArtifactService } = await import('../../investigation/InvestigationArtifactService');
-    return verifyTaskReviewArtifact(sessionId, uri, hash, sessionArtifactResolver, investigationArtifactService);
-  }, async (epoch, preparation) => {
-    try {
-      const { rdcLifecycleReceipts } = await import('../../rdc/RdcLifecycleReceipts');
-      const receipt = rdcLifecycleReceipts.read(sessionId, epoch.receipt);
-      return receipt.event === 'transition' && receipt.sessionId === preparation.sessionId && receipt.turnId === preparation.turnId
-        && receipt.previousFingerprint === epoch.previousFingerprint && receipt.runtimeFingerprint === epoch.runtimeFingerprint
-        && receipt.recordedAt === epoch.recordedAt;
-    } catch { return false; }
-  });
+  return new FileTaskStore(
+    resolveSessionTasksDir(sessionId),
+    async () => {
+      const { readApprovedPlanTasks } = await import('../../sessions/run/ApprovedPlanTasks');
+      return readApprovedPlanTasks(sessionId);
+    },
+    async (uri, hash) => {
+      const { sessionArtifactResolver } = await import('../../sessions/artifacts/SessionArtifactResolver');
+      const { investigationArtifactService } = await import('../../investigation/InvestigationArtifactService');
+      return verifyTaskReviewArtifact(sessionId, uri, hash, sessionArtifactResolver, investigationArtifactService);
+    },
+    async (epoch, preparation) => {
+      try {
+        const { rdcLifecycleReceipts } = await import('../../rdc/RdcLifecycleReceipts');
+        const receipt = rdcLifecycleReceipts.read(sessionId, epoch.receipt);
+        return (
+          receipt.event === 'transition' &&
+          receipt.sessionId === preparation.sessionId &&
+          receipt.turnId === preparation.turnId &&
+          receipt.previousFingerprint === epoch.previousFingerprint &&
+          receipt.runtimeFingerprint === epoch.runtimeFingerprint &&
+          receipt.recordedAt === epoch.recordedAt
+        );
+      } catch {
+        return false;
+      }
+    },
+  );
 }
 
 const memoryStores = new Map<string, MemoryTaskStore>();

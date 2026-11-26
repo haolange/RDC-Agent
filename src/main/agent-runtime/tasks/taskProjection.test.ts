@@ -4,12 +4,7 @@ import { createdAtFromTaskId, orderTasks, projectTaskItems } from './taskProject
 import type { TaskRecord, TaskStatus } from './TaskRegistry';
 import type { TaskExecutionRecord } from './TaskContracts';
 
-const task = (
-  id: string,
-  status: TaskStatus,
-  createdAt: number,
-  extras: Partial<TaskRecord> = {},
-): TaskRecord => ({
+const task = (id: string, status: TaskStatus, createdAt: number, extras: Partial<TaskRecord> = {}): TaskRecord => ({
   schemaVersion: TASK_SCHEMA_VERSION,
   id,
   subject: extras.subject ?? id,
@@ -52,7 +47,10 @@ describe('taskProjection', () => {
 
   it('does not mistake a completed label without verified proof for satisfied dependencies', () => {
     const upstream = { ...task('upstream', 'completed', 1), disposition: 'completed' as const };
-    const [_, downstream] = projectTaskItems([upstream, task('next', 'pending', 2, { blockedBy: ['upstream', 'missing'] })]);
+    const [_, downstream] = projectTaskItems([
+      upstream,
+      task('next', 'pending', 2, { blockedBy: ['upstream', 'missing'] }),
+    ]);
     expect(downstream.status).toBe('pending');
     expect(downstream.waitingOn).toEqual([
       { taskId: 'upstream', title: 'upstream', reason: 'unverified' },
@@ -67,43 +65,87 @@ describe('taskProjection', () => {
   });
 });
 
-it.each(['blocked', 'cancelled', 'in_progress'] as const)('keeps downstream pending when its prerequisite is %s', status => {
-  const items = projectTaskItems([task('a', status, 1), task('b', 'pending', 2, { blockedBy: ['a'] })]);
-  expect(items[1]).toMatchObject({ status: 'pending', waitingOn: [{ taskId: 'a', reason: 'unfinished' }] });
-});
+it.each(['blocked', 'cancelled', 'in_progress'] as const)(
+  'keeps downstream pending when its prerequisite is %s',
+  (status) => {
+    const items = projectTaskItems([task('a', status, 1), task('b', 'pending', 2, { blockedBy: ['a'] })]);
+    expect(items[1]).toMatchObject({ status: 'pending', waitingOn: [{ taskId: 'a', reason: 'unfinished' }] });
+  },
+);
 it('uses current execution proof without changing task lifecycle or clearing a real block', () => {
   const upstream = { ...task('a', 'completed', 1), disposition: 'completed' as const, currentExecutionId: 'exec' };
-  const proof = { id: 'exec', taskId: 'a', taskRevision: 1, status: 'completed', result: { disposition: 'completed' } } as TaskExecutionRecord;
+  const proof = {
+    id: 'exec',
+    taskId: 'a',
+    taskRevision: 1,
+    status: 'completed',
+    result: { disposition: 'completed' },
+  } as TaskExecutionRecord;
   const next = task('b', 'pending', 2, { blockedBy: ['a'] });
   expect(projectTaskItems([upstream, next], [proof])[1]).toMatchObject({ status: 'pending' });
   expect(projectTaskItems([upstream, next], [proof])[1].waitingOn).toBeUndefined();
-  for (const invalid of [{ ...proof, taskRevision: 2 }, { ...proof, taskId: 'other' }, { ...proof, status: 'failed' as const }]) {
+  for (const invalid of [
+    { ...proof, taskRevision: 2 },
+    { ...proof, taskId: 'other' },
+    { ...proof, status: 'failed' as const },
+  ]) {
     expect(projectTaskItems([upstream, next], [invalid])[1].waitingOn?.[0].reason).toBe('unverified');
   }
-  expect(projectTaskItems([upstream, { ...next, status: 'blocked', statusReason: 'Own blocker' }], [proof])[1])
-    .toMatchObject({ status: 'blocked', statusReason: 'Own blocker' });
+  expect(
+    projectTaskItems([upstream, { ...next, status: 'blocked', statusReason: 'Own blocker' }], [proof])[1],
+  ).toMatchObject({ status: 'blocked', statusReason: 'Own blocker' });
 });
 
-it('shows an open Task whose current execution failed as failed and carries that execution\'s facts', () => {
-  const execution = (id: string, status: TaskExecutionRecord['status'], extras: Partial<TaskExecutionRecord> = {}) => ({
-    schemaVersion: TASK_SCHEMA_VERSION, id, taskId: 'unused', taskRevision: 1, generation: 1, runtimeInstanceId: 'runtime',
-    mode: 'subagent', status, budget: { toolCalls: 0, subagents: 0, childDepth: 1, startedAt: 1 },
-    childMessageAckSequence: 0, parentMessageAckSequence: 0, createdAt: 1, updatedAt: 1, ...extras,
-  }) as TaskExecutionRecord;
-  const items = projectTaskItems([
-    task('failed', 'blocked', 1, { currentExecutionId: 'run-failed' }),
-    task('done', 'completed', 2, { currentExecutionId: 'run-interrupted' }),
-    task('plain', 'blocked', 3),
-  ], [
-    execution('run-failed', 'failed', { dispatch: 'background', preparation: {
-      sessionId: 'session', turnId: 'turn', runtimeFingerprint: 'a'.repeat(24), profileId: 'pixel-analyst', providerId: 'ollama',
-      modelId: 'qa-stub:4b', reasoningLevel: 'high', skills: [], inputArtifacts: [], selectedTurnCount: null, requestsDomainCapability: false,
-    } }),
-    execution('run-interrupted', 'interrupted'),
-  ]);
+it("shows an open Task whose current execution failed as failed and carries that execution's facts", () => {
+  const execution = (id: string, status: TaskExecutionRecord['status'], extras: Partial<TaskExecutionRecord> = {}) =>
+    ({
+      schemaVersion: TASK_SCHEMA_VERSION,
+      id,
+      taskId: 'unused',
+      taskRevision: 1,
+      generation: 1,
+      runtimeInstanceId: 'runtime',
+      mode: 'subagent',
+      status,
+      budget: { toolCalls: 0, subagents: 0, childDepth: 1, startedAt: 1 },
+      childMessageAckSequence: 0,
+      parentMessageAckSequence: 0,
+      createdAt: 1,
+      updatedAt: 1,
+      ...extras,
+    }) as TaskExecutionRecord;
+  const items = projectTaskItems(
+    [
+      task('failed', 'blocked', 1, { currentExecutionId: 'run-failed' }),
+      task('done', 'completed', 2, { currentExecutionId: 'run-interrupted' }),
+      task('plain', 'blocked', 3),
+    ],
+    [
+      execution('run-failed', 'failed', {
+        dispatch: 'background',
+        preparation: {
+          sessionId: 'session',
+          turnId: 'turn',
+          runtimeFingerprint: 'a'.repeat(24),
+          profileId: 'pixel-analyst',
+          providerId: 'ollama',
+          modelId: 'qa-stub:4b',
+          reasoningLevel: 'high',
+          skills: [],
+          inputArtifacts: [],
+          selectedTurnCount: null,
+          requestsDomainCapability: false,
+        },
+      }),
+      execution('run-interrupted', 'interrupted'),
+    ],
+  );
   expect(items.map((item) => item.displayState)).toEqual(['failed', 'completed', 'blocked']);
   expect(items[0]!.execution).toEqual({
-    mode: 'subagent', status: 'failed', dispatch: 'background', agentId: 'pixel-analyst',
+    mode: 'subagent',
+    status: 'failed',
+    dispatch: 'background',
+    agentId: 'pixel-analyst',
     model: { providerId: 'ollama', modelId: 'qa-stub:4b', reasoningLevel: 'high' },
   });
   expect(items[2]!.execution).toBeUndefined();

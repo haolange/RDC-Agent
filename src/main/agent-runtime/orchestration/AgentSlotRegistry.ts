@@ -9,15 +9,12 @@
 import { AGENT_ROLES } from '@shared/constants/agents';
 import { nowIso } from '@shared/utils/id';
 import { requireExecutionScopeId } from './executionScope';
-import type {
-  AgentConfig,
-  AgentRole,
-  AgentState,
-} from '@shared/types/agent';
-import type { LLMAgentRouteConfig } from '@shared/types/llm';
+import type { AgentRole } from '@shared/types/agent';
+import type { LlmAgentRoute } from '@shared/types/settings';
 import type { Agent } from '../agent/Agent';
 import type { ContextManager } from '../agent/ContextManager';
 import type { AgentMessage } from '../core/types';
+import type { LlmProviderId } from '@shared/types/settings';
 
 /** 单个 AgentRole 在内部维护的运行态。 */
 export interface AgentSlot {
@@ -132,7 +129,7 @@ export class AgentSlotRegistry {
     return this.agentConfigs.get(agentId) ?? null;
   }
 
-  applyLlmConfig(compiledRoutes: LLMAgentRouteConfig[]): void {
+  applyLlmConfig(compiledRoutes: LlmAgentRoute[]): void {
     const routeMap = new Map(compiledRoutes.map((route) => [route.agentId, route]));
     for (const [agentId, agentConfig] of this.agentConfigs.entries()) {
       const route = routeMap.get(agentId);
@@ -155,7 +152,10 @@ export class AgentSlotRegistry {
   /** Keep an orphaned slot key reserved until its provider/tool loop settles. */
   quarantineSlot(slotKey: string, completion: Promise<unknown>): void {
     if (this.quarantinedSlots.has(slotKey)) return;
-    const tracked = Promise.resolve(completion).then(() => undefined, () => undefined);
+    const tracked = Promise.resolve(completion).then(
+      () => undefined,
+      () => undefined,
+    );
     this.quarantinedSlots.set(slotKey, tracked);
     void tracked.then(() => {
       if (this.quarantinedSlots.get(slotKey) === tracked) {
@@ -210,5 +210,24 @@ export class AgentSlotRegistry {
     }
     this.purgeAgentStatesForScope(sessionId);
   }
+}
 
+export type AgentStatus = 'idle' | 'thinking' | 'executing' | 'waiting' | 'complete' | 'error';
+
+export interface AgentConfig {
+  agentId: AgentRole;
+  systemPrompt: string;
+  modelProvider: LlmProviderId;
+  modelName: string;
+  temperature?: number;
+}
+
+export interface AgentState {
+  agentId: AgentRole;
+  /** Session or ephemeral execution scope that owns this status projection. */
+  sessionId: string;
+  status: AgentStatus;
+  brief?: string;
+  lastActivity: string;
+  error?: string;
 }

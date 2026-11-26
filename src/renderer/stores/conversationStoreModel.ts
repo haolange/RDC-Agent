@@ -1,27 +1,18 @@
-import { compareConversationMessages, resolveVisibleConversationMessages } from '@shared/conversation/conversationBranchResolver';
+import {
+  compareConversationMessages,
+  resolveVisibleConversationMessages,
+} from '@shared/conversation/conversationBranchResolver';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ReasoningSummary } from '@shared/types/workflow';
 
-const TERMINAL_ASSISTANT_STATUSES = new Set<ConversationMessage['status']>([
-  'complete',
-  'error',
-  'stopped',
-]);
+const TERMINAL_ASSISTANT_STATUSES = new Set<ConversationMessage['status']>(['complete', 'error', 'stopped']);
 
-export const ACTIVE_ASSISTANT_STATUSES = new Set<ConversationMessage['status']>([
-  'draft',
-  'streaming',
-]);
+export const ACTIVE_ASSISTANT_STATUSES = new Set<ConversationMessage['status']>(['draft', 'streaming']);
 
 export const sortConversationMessages = (messages: ConversationMessage[]): ConversationMessage[] =>
   messages.slice().sort(compareConversationMessages);
-
-export const projectVisibleMessages = (
-  allMessages: ConversationMessage[],
-  branchState: ConversationBranchState | null,
-): ConversationMessage[] => resolveVisibleConversationMessages(allMessages, branchState);
 
 /** True when a late streaming/draft patch must not reopen a monotonically stopped turn. */
 export function shouldRejectActivePatchForMonotonicStop(
@@ -36,6 +27,15 @@ export function shouldRejectActivePatchForMonotonicStop(
   if (TERMINAL_ASSISTANT_STATUSES.has(next.status)) return false;
   return ACTIVE_ASSISTANT_STATUSES.has(next.status);
 }
+
+/**
+ * The active branch as the transcript shows it. A send's messages carry main's ids from the start
+ * (`conversationTurnIds`), so main's version replaces the renderer's by id, whichever arrives first.
+ */
+export const projectVisibleMessages = (
+  allMessages: ConversationMessage[],
+  branchState: ConversationBranchState | null,
+): ConversationMessage[] => resolveVisibleConversationMessages(allMessages, branchState);
 
 export const mergeConversationMessages = (
   currentMessages: ConversationMessage[],
@@ -68,6 +68,8 @@ export interface ConversationState {
   latestMessageActivityAt: number;
   /** The session whose saved history is being read; the transcript shows a placeholder, not the empty home. */
   historyLoadingSessionId: string | null;
+  /** The session whose history and trace this renderer last loaded from main (cleared on every switch). */
+  surfaceSessionId: string | null;
   setHistoryLoadingSessionId: (sessionId: string | null) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   setBranchState: (branchState: ConversationBranchState | null) => void;
@@ -76,10 +78,12 @@ export interface ConversationState {
   upsertConversationMessage: (message: ConversationMessage) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
   patchAssistantMessageByTurnId: (turnId: string, patch: Partial<ConversationMessage>) => void;
-  updateAssistantMessageByTurnId: (turnId: string, updater: (message: ConversationMessage) => ConversationMessage) => void;
+  updateAssistantMessageByTurnId: (
+    turnId: string,
+    updater: (message: ConversationMessage) => ConversationMessage,
+  ) => void;
   markTurnMonotonicallyStopped: (turnId: string) => void;
   markRequestMonotonicallyStopped: (requestId: string) => void;
-  migrateMonotonicStoppedTurn: (fromTurnId: string, toTurnId: string) => void;
   markRequestRevoked: (requestId: string) => void;
   consumeRevokedRequest: (requestId: string) => boolean;
   addTimelineEntry: (entry: AgentTimelineEntry) => void;
@@ -99,4 +103,5 @@ export const initialConversationState = {
   revokedRequestIds: [] as string[],
   latestMessageActivityAt: 0,
   historyLoadingSessionId: null as string | null,
+  surfaceSessionId: null as string | null,
 };

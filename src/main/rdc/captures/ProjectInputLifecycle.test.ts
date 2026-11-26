@@ -2,61 +2,126 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { hashCaptureFile } from '../../runtime/captureContentHash';
 import { ProjectInputLifecycle, type ProjectInputLifecycleHost } from './ProjectInputLifecycle';
-import { hashCaptureFile } from './replay/captureContentHash';
 import type { ProjectRecord } from '@shared/types/session';
 import type { ReplayHistoryStore } from './replay/ReplayHistoryStore';
 
 vi.mock('electron', () => ({ app: {} }));
 const roots: string[] = [];
-afterEach(async () => { await Promise.all(roots.splice(0).map(root => fs.rm(root, { recursive: true, force: true }))); });
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })));
+});
 async function setup() {
-  const rootPath = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-input-lifecycle-')); roots.push(rootPath);
-  const inputsPath = path.join(rootPath, '.rdc-agent', 'inputs'); await fs.mkdir(inputsPath, { recursive: true });
-  const filePath = path.join(inputsPath, 'capture.rdc'); await fs.writeFile(filePath, 'original capture');
+  const rootPath = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-input-lifecycle-'));
+  roots.push(rootPath);
+  const inputsPath = path.join(rootPath, '.rdc-agent', 'inputs');
+  await fs.mkdir(inputsPath, { recursive: true });
+  const filePath = path.join(inputsPath, 'capture.rdc');
+  await fs.writeFile(filePath, 'original capture');
   const contentSha256 = (await hashCaptureFile(filePath)).sha256;
-  const project: ProjectRecord = { projectId: 'project', name: 'project', rootPath, inputsPath, resourcePath: path.dirname(inputsPath),
-    knowledgePath: '', slug: 'project', inputsUpdatedAt: 1, createdAt: 1, updatedAt: 1,
-    inputs: [{ inputId: 'capture', fileName: 'capture.rdc', filePath, contentSha256, size: 16,
-      discoveredAt: 1, lastModifiedAt: 1, source: 'project_resource' }] };
-  const bindings = [{ scope: { projectId: 'project', sessionId: 'session' }, inputId: 'capture', captureHash: contentSha256, interactionLock: null as string | null }];
-  const host: ProjectInputLifecycleHost = { getProject: () => project,
+  const project: ProjectRecord = {
+    projectId: 'project',
+    name: 'project',
+    rootPath,
+    inputsPath,
+    resourcePath: path.dirname(inputsPath),
+    knowledgePath: '',
+    slug: 'project',
+    inputsUpdatedAt: 1,
+    createdAt: 1,
+    updatedAt: 1,
+    inputs: [
+      {
+        inputId: 'capture',
+        fileName: 'capture.rdc',
+        filePath,
+        contentSha256,
+        size: 16,
+        discoveredAt: 1,
+        lastModifiedAt: 1,
+        source: 'project_resource',
+      },
+    ],
+  };
+  const bindings = [
+    {
+      scope: { projectId: 'project', sessionId: 'session' },
+      inputId: 'capture',
+      captureHash: contentSha256,
+      interactionLock: null as string | null,
+    },
+  ];
+  const host: ProjectInputLifecycleHost = {
+    getProject: () => project,
     detachReference: vi.fn(async () => []),
     rebind: vi.fn(async () => undefined),
-    refresh: vi.fn(async () => []), bindings: () => bindings,
-    close: vi.fn(async () => { bindings.splice(0); }), block: async (_p, _i, operation) => operation(), stop: vi.fn(async () => { bindings[0].interactionLock = null; }) };
-  const history = { reconcileCaptureReferences: vi.fn(async () => undefined), reconcileInputSelections: vi.fn(async () => undefined) };
-  return { project, filePath, host, history, bindings, service: new ProjectInputLifecycle(host, history as unknown as ReplayHistoryStore) };
+    refresh: vi.fn(async () => []),
+    bindings: () => bindings,
+    close: vi.fn(async () => {
+      bindings.splice(0);
+    }),
+    block: async (_p, _i, operation) => operation(),
+    stop: vi.fn(async () => {
+      bindings[0].interactionLock = null;
+    }),
+  };
+  const history = {
+    reconcileCaptureReferences: vi.fn(async () => undefined),
+    reconcileInputSelections: vi.fn(async () => undefined),
+  };
+  return {
+    project,
+    filePath,
+    host,
+    history,
+    bindings,
+    service: new ProjectInputLifecycle(host, history as unknown as ReplayHistoryStore),
+  };
 }
 
 describe('ProjectInputLifecycle', () => {
   it('closes replay and detaches an external reference without deleting its original', async () => {
-    const f = await setup(); const bytes = await fs.readFile(f.filePath);
-    f.project.inputs[0] = { ...f.project.inputs[0], source: 'external_reference',
-      referenceIdentity: { device: '1', inode: '2', birthtimeNs: '3' } };
+    const f = await setup();
+    const bytes = await fs.readFile(f.filePath);
+    f.project.inputs[0] = {
+      ...f.project.inputs[0],
+      source: 'external_reference',
+      referenceIdentity: { device: '1', inode: '2', birthtimeNs: '3' },
+    };
     const prepared = await f.service.prepare('project', 'capture');
-    expect(await f.service.remove('project', 'capture', prepared.approvalIdentity)).toMatchObject({ success: true, fileDeleted: false });
+    expect(await f.service.remove('project', 'capture', prepared.approvalIdentity)).toMatchObject({
+      success: true,
+      fileDeleted: false,
+    });
     expect(f.host.close).toHaveBeenCalledBefore(vi.mocked(f.host.detachReference));
     expect(f.host.detachReference).toHaveBeenCalledWith('project', 'capture');
     expect(await fs.readFile(f.filePath)).toEqual(bytes);
   });
   it('can detach an unavailable external original and rejects a source-type change after approval', async () => {
     const f = await setup();
-    f.project.inputs[0] = { ...f.project.inputs[0], source: 'external_reference',
-      referenceIdentity: { device: '1', inode: '2', birthtimeNs: '3' } };
+    f.project.inputs[0] = {
+      ...f.project.inputs[0],
+      source: 'external_reference',
+      referenceIdentity: { device: '1', inode: '2', birthtimeNs: '3' },
+    };
     await fs.unlink(f.filePath);
     const prepared = await f.service.prepare('project', 'capture');
     expect((await f.service.remove('project', 'capture', prepared.approvalIdentity)).success).toBe(true);
     expect(f.host.detachReference).toHaveBeenCalled();
     await fs.writeFile(f.filePath, 'original capture');
     f.project.inputs[0].source = 'project_resource';
-    expect(await f.service.remove('project', 'capture', prepared.approvalIdentity))
-      .toMatchObject({ success: false, error: 'PROJECT_INPUT_CHANGED_AFTER_APPROVAL', fileDeleted: false });
+    expect(await f.service.remove('project', 'capture', prepared.approvalIdentity)).toMatchObject({
+      success: false,
+      error: 'PROJECT_INPUT_CHANGED_AFTER_APPROVAL',
+      fileDeleted: false,
+    });
     expect(await fs.readFile(f.filePath, 'utf8')).toBe('original capture');
   });
   it('closes confirmed bindings before deleting only the selected file', async () => {
     const fixture = await setup();
-    const protectedFile = path.join(fixture.project.rootPath, 'report.md'); await fs.writeFile(protectedFile, 'keep');
+    const protectedFile = path.join(fixture.project.rootPath, 'report.md');
+    await fs.writeFile(protectedFile, 'keep');
     const prepared = await fixture.service.prepare('project', 'capture');
     expect(prepared.affectedSessionIds).toEqual(['session']);
     const result = await fixture.service.remove('project', 'capture', prepared.approvalIdentity);
@@ -66,7 +131,8 @@ describe('ProjectInputLifecycle', () => {
     expect(await fs.readFile(protectedFile, 'utf8')).toBe('keep');
   });
   it('refuses active work without stopping it', async () => {
-    const fixture = await setup(); fixture.bindings[0].interactionLock = 'agent_running';
+    const fixture = await setup();
+    fixture.bindings[0].interactionLock = 'agent_running';
     await expect(fixture.service.prepare('project', 'capture')).rejects.toThrow('PROJECT_INPUT_BUSY: session');
     expect(fixture.host.stop).not.toHaveBeenCalled();
     expect(await fs.readFile(fixture.filePath, 'utf8')).toBe('original capture');
@@ -75,7 +141,9 @@ describe('ProjectInputLifecycle', () => {
     const fixture = await setup();
     const prepared = await fixture.service.prepare('project', 'capture');
     await fs.writeFile(fixture.filePath, 'replacement');
-    expect((await fixture.service.remove('project', 'capture', prepared.approvalIdentity)).error).toBe('PROJECT_INPUT_CHANGED_AFTER_APPROVAL');
+    expect((await fixture.service.remove('project', 'capture', prepared.approvalIdentity)).error).toBe(
+      'PROJECT_INPUT_CHANGED_AFTER_APPROVAL',
+    );
     expect(fixture.host.close).not.toHaveBeenCalled();
     const next = await fixture.service.prepare('project', 'capture');
     vi.mocked(fixture.host.close).mockRejectedValue(new Error('CLOSE_UNCONFIRMED'));
@@ -92,19 +160,27 @@ describe('ProjectInputLifecycle', () => {
     });
     const prepared = await fixture.service.prepare('project', 'capture');
     const result = await fixture.service.remove('project', 'capture', prepared.approvalIdentity);
-    expect(result).toMatchObject({ success: false, fileDeleted: true, cleanupPending: true, inputs: [], error: 'DISK_UNAVAILABLE' });
+    expect(result).toMatchObject({
+      success: false,
+      fileDeleted: true,
+      cleanupPending: true,
+      inputs: [],
+      error: 'DISK_UNAVAILABLE',
+    });
     expect(fixture.project.inputs).toEqual([]);
     expect(fixture.project.replayCleanupPending?.error).toBe('DISK_UNAVAILABLE');
   });
   it('stops dependent work for external disappearance, then releases bindings and reconciles complete hash references', async () => {
-    const fixture = await setup(); fixture.bindings[0].interactionLock = 'agent_running';
+    const fixture = await setup();
+    fixture.bindings[0].interactionLock = 'agent_running';
     await fixture.service.reconcile(fixture.project, []);
     expect(fixture.host.stop).toHaveBeenCalledWith('session');
     expect(fixture.host.stop).toHaveBeenCalledBefore(vi.mocked(fixture.host.close));
     expect(fixture.history.reconcileCaptureReferences).toHaveBeenCalledWith(fixture.project.rootPath, new Set());
   });
   it('stops dependent work when the selected input really changes content', async () => {
-    const fixture = await setup(); fixture.bindings[0].interactionLock = 'agent_running';
+    const fixture = await setup();
+    fixture.bindings[0].interactionLock = 'agent_running';
     const changed = { ...fixture.project.inputs[0], contentSha256: 'b'.repeat(64) };
     await fixture.service.reconcile(fixture.project, [changed]);
     expect(fixture.host.stop).toHaveBeenCalledWith('session');
@@ -117,9 +193,14 @@ describe('ProjectInputLifecycle', () => {
     await fixture.service.reconcile(fixture.project, [duplicate]);
     expect(fixture.host.rebind).toHaveBeenCalledWith('project', 'capture', duplicate);
     expect(fixture.host.close).not.toHaveBeenCalled();
-    expect(fixture.history.reconcileCaptureReferences).toHaveBeenCalledWith(fixture.project.rootPath, new Set([duplicate.contentSha256]));
+    expect(fixture.history.reconcileCaptureReferences).toHaveBeenCalledWith(
+      fixture.project.rootPath,
+      new Set([duplicate.contentSha256]),
+    );
     fixture.history.reconcileCaptureReferences.mockClear();
-    await expect(fixture.service.reconcile(fixture.project, [{ ...duplicate, contentSha256: undefined }])).rejects.toThrow('PROJECT_INPUT_HASH_UNVERIFIED');
+    await expect(
+      fixture.service.reconcile(fixture.project, [{ ...duplicate, contentSha256: undefined }]),
+    ).rejects.toThrow('PROJECT_INPUT_HASH_UNVERIFIED');
     expect(fixture.history.reconcileCaptureReferences).not.toHaveBeenCalled();
   });
 });

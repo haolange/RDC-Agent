@@ -4,6 +4,7 @@ import { useI18n, type TranslationKey } from '../../../../i18n';
 import { Button } from '../../../../ui/Button';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { EmptyState } from '../../../../ui/EmptyState';
+import { InlineError } from '../../../../ui/InlineError';
 import { ListRow } from '../../../../ui/ListRow';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { UnsavedChangesDialog } from '../../../../ui/UnsavedChangesDialog';
@@ -80,9 +81,10 @@ export const RuntimeScopePanel: React.FC<{
   // In dialog mode the selection also drives the read-only detail; the dialog only opens on explicit edit.
   const dialogOpen = dialogMode && (panel.creating || panel.dialogEditing);
 
-  const locationPath = scope === 'project'
-    ? overview?.projectPaths?.[`${kind}sPath`] ?? overview?.projectRoot
-    : overview?.userPaths?.[`${kind}sPath`] ?? overview?.userRoot;
+  const locationPath =
+    scope === 'project'
+      ? (overview?.projectPaths?.[`${kind}sPath`] ?? overview?.projectRoot)
+      : (overview?.userPaths[`${kind}sPath`] ?? overview?.userRoot);
 
   const editor = (
     <ScopedResourceEditor
@@ -92,7 +94,7 @@ export const RuntimeScopePanel: React.FC<{
       idLocked={Boolean(panel.selected?.sourcePath) && !panel.creating}
       busy={panel.busy}
       dirty={panel.dirty}
-      message={dialogMode ? panel.message : null}
+      notice={dialogMode ? panel.notice : null}
       showHeader={!dialogMode}
       onChange={panel.patchForm}
       onSave={() => void panel.save()}
@@ -103,14 +105,16 @@ export const RuntimeScopePanel: React.FC<{
 
   const actions = (
     <div className="settings-resource-toolbar-actions">
-      {!showEmptyScope ? <>
-      <Button variant="secondary" disabled={addDisabled || panel.busy} onClick={() => void panel.importResource()}>
-        {t('settings.scopeImport')}
-      </Button>
-      <Button ref={createActionRef} variant="primary" disabled={addDisabled || panel.busy} onClick={panel.startNew}>
-        {t('settings.scopeAdd', { kind: kindLabel })}
-      </Button>
-      </> : null}
+      {!showEmptyScope ? (
+        <>
+          <Button variant="secondary" disabled={addDisabled || panel.busy} onClick={() => void panel.importResource()}>
+            {t('settings.scopeImport')}
+          </Button>
+          <Button ref={createActionRef} variant="primary" disabled={addDisabled || panel.busy} onClick={panel.startNew}>
+            {t('settings.scopeAdd', { kind: kindLabel })}
+          </Button>
+        </>
+      ) : null}
       {locationPath ? (
         <Button variant="ghost" onClick={() => void revealResourceLocation(locationPath)}>
           {t('settings.scopeResourceLocation')}
@@ -136,87 +140,115 @@ export const RuntimeScopePanel: React.FC<{
   return (
     <section className="settings-runtime-scope" data-testid="settings-runtime-scope" data-resource-kind={kind}>
       <ResourceListDetail
-          testId="settings-resource-frame"
-          emptyVariant={kind === 'skill' || kind === 'hook' ? 'panel' : 'inline'}
-          isEmpty={showEmptyScope}
-          emptyTitle={t('settings.scopeEmpty', { kind: kindLabel })}
-          emptyDescription={emptyDescriptionExtra ? (
+        testId="settings-resource-frame"
+        emptyVariant={kind === 'skill' || kind === 'hook' ? 'panel' : 'inline'}
+        isEmpty={showEmptyScope}
+        emptyTitle={t('settings.scopeEmpty', { kind: kindLabel })}
+        emptyDescription={
+          emptyDescriptionExtra ? (
             <>
               {t('settings.scopeEmptyHint')}
               <br />
               {emptyDescriptionExtra}
             </>
-          ) : t('settings.scopeEmptyHint')}
-          emptyActions={(
-            <>
-              <Button ref={createActionRef} variant="primary" size="sm" disabled={addDisabled || panel.busy} onClick={panel.startNew}>
-                {t('settings.scopeAdd', { kind: kindLabel })}
-              </Button>
-              <Button variant="secondary" size="sm" disabled={addDisabled || panel.busy} onClick={() => void panel.importResource()}>
-                {t('settings.scopeImport')}
-              </Button>
-            </>
-          )}
-          status={dialogMode && dialogOpen ? null : (panel.message || null)}
-          toolbar={(
-            <>
-              <SettingsScopeBar
-                scope={scope}
-                onScopeChange={(next) => panel.guard(() => onScopeChange(next))}
-                canProject={canProject}
-                userLabel={t('settings.scopeUser')}
-                projectLabel={t('settings.scopeProject')}
-                groupLabel={t('settings.resourceScope')}
-              />
-              {actions}
-            </>
-          )}
-          list={!panel.resources.length ? null : renderList ? renderList({
-            resources: panel.resources,
-            selectedId: panel.creating ? null : panel.selectedId,
-            select: panel.openResource,
-          }) : panel.resources.map((resource) => (
-            <ListRow
-              key={`${resource.kind}:${resource.id}`}
-              className={cn('settings-scope-row', `status-${resource.effectiveStatus}`)}
-              selected={!panel.creating && resource.id === panel.selectedId}
-              description={rowDescription?.(resource)}
-              onClick={() => {
-                panel.openResource(resource);
-                if (dialogMode && !renderDetail) panel.openDialogEditor();
-              }}
-              trailing={renderRowTrailing?.(resource)}
+          ) : (
+            t('settings.scopeEmptyHint')
+          )
+        }
+        emptyActions={
+          <>
+            <Button
+              ref={createActionRef}
+              variant="primary"
+              size="sm"
+              disabled={addDisabled || panel.busy}
+              onClick={panel.startNew}
             >
-              {resourceDisplayName(resource.kind, resource.id, resource.content)}
-            </ListRow>
-          ))}
-          detail={detail}
-        />
+              {t('settings.scopeAdd', { kind: kindLabel })}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={addDisabled || panel.busy}
+              onClick={() => void panel.importResource()}
+            >
+              {t('settings.scopeImport')}
+            </Button>
+          </>
+        }
+        status={
+          dialogMode && dialogOpen ? null : panel.notice?.tone === 'error' ? (
+            <InlineError detail={panel.notice.detail}>{panel.notice.message}</InlineError>
+          ) : (
+            panel.notice?.message
+          )
+        }
+        toolbar={
+          <>
+            <SettingsScopeBar
+              scope={scope}
+              onScopeChange={(next) => panel.guard(() => onScopeChange(next))}
+              canProject={canProject}
+              userLabel={t('settings.scopeUser')}
+              projectLabel={t('settings.scopeProject')}
+              groupLabel={t('settings.resourceScope')}
+            />
+            {actions}
+          </>
+        }
+        list={
+          !panel.resources.length
+            ? null
+            : renderList
+              ? renderList({
+                  resources: panel.resources,
+                  selectedId: panel.creating ? null : panel.selectedId,
+                  select: panel.openResource,
+                })
+              : panel.resources.map((resource) => (
+                  <ListRow
+                    key={`${resource.kind}:${resource.id}`}
+                    className={cn('settings-scope-row', `status-${resource.effectiveStatus}`)}
+                    selected={!panel.creating && resource.id === panel.selectedId}
+                    description={rowDescription?.(resource)}
+                    onClick={() => {
+                      panel.openResource(resource);
+                      if (dialogMode && !renderDetail) panel.openDialogEditor();
+                    }}
+                    trailing={renderRowTrailing?.(resource)}
+                  >
+                    {resourceDisplayName(resource.kind, resource.id, resource.content)}
+                  </ListRow>
+                ))
+        }
+        detail={detail}
+      />
 
       {dialogMode ? (
         <TaskDialog
           open={dialogOpen}
           size={kind === 'policy' || kind === 'skill' ? 'lg' : 'md'}
           className={`settings-resource-dialog${kind === 'mcp' ? ' settings-mcp-dialog' : ''}${kind === 'policy' || kind === 'skill' || kind === 'agent' ? ' settings-document-dialog' : ''}`}
-          title={panel.creating
-            ? t('settings.scopeAdd', { kind: kindLabel })
-            : t('settings.scopeEditTitle', { kind: kindLabel })}
+          title={
+            panel.creating
+              ? t('settings.scopeAdd', { kind: kindLabel })
+              : t('settings.scopeEditTitle', { kind: kindLabel })
+          }
           onClose={panel.closeDialogEditor}
           fallbackFocusRef={createActionRef}
           closeLabel={t('settings.scopeCancel')}
           busy={panel.busy}
           dataTestId="settings-resource-dialog"
-          footer={(
+          footer={
             <>
-              <span className="task-dialog-footer-spacer settings-runtime-dialog-status" data-testid="settings-resource-dialog-status">
+              <span
+                className="task-dialog-footer-spacer settings-runtime-dialog-status"
+                data-testid="settings-resource-dialog-status"
+              >
                 {panel.dirty ? t('settings.unsaved') : null}
               </span>
               {panel.selected && !panel.creating ? (
-                <Button
-                  variant="danger"
-                  disabled={panel.busy}
-                  onClick={() => panel.setPendingDelete(panel.selected)}
-                >
+                <Button variant="danger" disabled={panel.busy} onClick={() => panel.setPendingDelete(panel.selected)}>
                   {t('settings.delete')}
                 </Button>
               ) : null}
@@ -227,7 +259,7 @@ export const RuntimeScopePanel: React.FC<{
                 {t('settings.scopeSave')}
               </Button>
             </>
-          )}
+          }
         >
           {editor}
         </TaskDialog>

@@ -1,5 +1,6 @@
 import { AssistantStreamBuilder, createProviderOutputRef } from './AssistantStreamBuilder';
 import type { ProviderOutputRef } from '../../core/types';
+import type { ThinkingContentInput } from '../../reasoning/ReasoningArtifacts';
 
 export type StreamChannelKind = 'text' | 'thinking';
 
@@ -22,12 +23,9 @@ export class StreamChannelRefs {
   }
 
   ref(input: StreamChannelRefInput): ProviderOutputRef {
-    const key = [
-      input.responseId ?? '',
-      input.providerBlockKey,
-      input.sourceIndex ?? '',
-      input.itemId ?? '',
-    ].join('\u0000');
+    const key = [input.responseId ?? '', input.providerBlockKey, input.sourceIndex ?? '', input.itemId ?? ''].join(
+      '\u0000',
+    );
     const existing = this.refs.get(key);
     if (existing) return existing;
     const contentIndex = input.contentIndex ?? this.nextContentIndex;
@@ -77,6 +75,22 @@ export class AlternatingTextThinkingChannels {
     });
     this.active = { kind, ref };
     return { close, ref, started: true };
+  }
+
+  /** Appends text to the current text segment, closing an open thinking segment and opening a text one first. */
+  appendText(builder: AssistantStreamBuilder, delta: string): void {
+    const switched = this.ensure('text');
+    closeSwitchedChannel(builder, switched.close);
+    if (switched.started) builder.startText(switched.ref);
+    builder.appendText(switched.ref, delta);
+  }
+
+  /** Appends thinking the same way; `input` describes a segment it opens and is merged into it on every delta. */
+  appendThinking(builder: AssistantStreamBuilder, delta: string, input: ThinkingContentInput): void {
+    const switched = this.ensure('thinking');
+    closeSwitchedChannel(builder, switched.close);
+    if (switched.started) builder.startThinking(switched.ref, input);
+    builder.appendThinking(switched.ref, delta, input);
   }
 }
 

@@ -6,13 +6,8 @@ import { WorkProcessHighlightedCode } from './WorkProcessHighlightedCode';
 import { WorkProcessImageThumbs } from './WorkProcessImageThumbs';
 import type { ToolRowModel } from './workProcessToolTypes';
 
-export const isDedicatedFamily = (family: ToolRowModel['family']): boolean => (
-  family === 'interpreter'
-  || family === 'memory'
-  || family === 'skill'
-  || family === 'mcp'
-  || family === 'runtime'
-);
+export const isDedicatedFamily = (family: ToolRowModel['family']): boolean =>
+  family === 'interpreter' || family === 'memory' || family === 'skill' || family === 'mcp' || family === 'runtime';
 
 export const CopyPathButton: React.FC<{ path: string }> = ({ path }) => {
   const { t } = useI18n();
@@ -21,21 +16,34 @@ export const CopyPathButton: React.FC<{ path: string }> = ({ path }) => {
     await copyAppText(path);
     return true;
   };
-  return <CopyButton className="work-process-tool-card-copy" onCopy={copy} label={t('chat.workProcessCopy')} copiedLabel={t('chat.workProcessCopied')} />;
+  return (
+    <CopyButton
+      className="work-process-tool-card-copy"
+      onCopy={copy}
+      label={t('chat.workProcessCopy')}
+      copiedLabel={t('chat.workProcessCopied')}
+    />
+  );
 };
 
 const ChipRow: React.FC<{ chips?: string[] }> = ({ chips }) => {
   if (!chips?.length) return null;
   return (
     <div className="work-process-tool-chips">
-      {chips.map((chip) => <span key={chip} className="work-process-path-chip">{chip}</span>)}
+      {chips.map((chip) => (
+        <span key={chip} className="work-process-path-chip">
+          {chip}
+        </span>
+      ))}
     </div>
   );
 };
 
 const PathRow: React.FC<{ path: string }> = ({ path }) => (
   <div className="work-process-family-path">
-    <code className="work-process-tool-card-path" data-tooltip={path}>{path}</code>
+    <code className="work-process-tool-card-path" tabIndex={0} data-tooltip={path}>
+      {path}
+    </code>
     <CopyPathButton path={path} />
   </div>
 );
@@ -75,7 +83,11 @@ const MemoryBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   return (
     <div className="work-process-tool-card-body family-memory">
       <ChipRow chips={row.chips} />
-      {sample ? <span className="work-process-tool-card-body-text is-summary" data-tooltip={sample}>{sample}</span> : null}
+      {sample ? (
+        <span className="work-process-tool-card-body-text is-summary" tabIndex={0} data-tooltip={sample}>
+          {sample}
+        </span>
+      ) : null}
     </div>
   );
 };
@@ -86,7 +98,9 @@ const MemoryDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     <div className="work-process-tool-card-detail family-memory" data-testid="work-process-tool-preview">
       <ul className="work-process-tool-card-list">
         {row.previewLines.map((line) => (
-          <li key={line} className="work-process-tool-card-list-item">{line}</li>
+          <li key={line} className="work-process-tool-card-list-item">
+            {line}
+          </li>
         ))}
       </ul>
     </div>
@@ -98,7 +112,9 @@ const SkillBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   if (!name) return null;
   return (
     <div className="work-process-tool-card-body family-skill">
-      <span className="work-process-tool-card-body-text is-summary" data-tooltip={name}>{name}</span>
+      <span className="work-process-tool-card-body-text is-summary" tabIndex={0} data-tooltip={name}>
+        {name}
+      </span>
     </div>
   );
 };
@@ -121,7 +137,11 @@ const McpBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   return (
     <div className="work-process-tool-card-body family-mcp">
       <ChipRow chips={row.chips} />
-      {summary ? <span className="work-process-tool-card-body-text is-summary" data-tooltip={summary}>{summary}</span> : null}
+      {summary ? (
+        <span className="work-process-tool-card-body-text is-summary" tabIndex={0} data-tooltip={summary}>
+          {summary}
+        </span>
+      ) : null}
     </div>
   );
 };
@@ -148,9 +168,7 @@ const RuntimeBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   return (
     <div className="work-process-tool-card-body family-runtime">
       <ChipRow chips={row.chips} />
-      {row.bodyText ? (
-        <span className="work-process-tool-card-body-text is-summary">{row.bodyText}</span>
-      ) : null}
+      {row.bodyText ? <span className="work-process-tool-card-body-text is-summary">{row.bodyText}</span> : null}
     </div>
   );
 };
@@ -162,7 +180,9 @@ const RuntimeDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
       <div className="work-process-tool-card-detail family-runtime" data-testid="work-process-tool-preview">
         <ul className="work-process-tool-card-list">
           {row.previewLines.map((line) => (
-            <li key={line} className="work-process-tool-card-list-item">{line}</li>
+            <li key={line} className="work-process-tool-card-list-item">
+              {line}
+            </li>
           ))}
         </ul>
       </div>

@@ -1,9 +1,11 @@
 /** Resolve keyboard movement through enabled tabs; null leaves the event untouched. */
 export function resolveTabNavigation(
-  tabs: readonly { disabled?: boolean }[], from: number, key: string,
+  tabs: readonly { disabled?: boolean }[],
+  from: number,
+  key: string,
 ): number | null {
   if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(key)) return null;
-  const enabled = tabs.flatMap((tab, index) => tab.disabled ? [] : [index]);
+  const enabled = tabs.flatMap((tab, index) => (tab.disabled ? [] : [index]));
   if (enabled.length === 0) return null;
   if (key === 'Home') return enabled[0];
   if (key === 'End') return enabled[enabled.length - 1];

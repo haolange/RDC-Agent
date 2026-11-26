@@ -1,7 +1,9 @@
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
-import type { CompiledPromptCache, DerivedContextMessageRef } from '@shared/types/semanticContext';
+import type { CompiledPromptCache } from '@shared/types/semanticContext';
+import type { DerivedContextMessageRef } from '../context/structuredHandoff';
 import type { PromptSegment } from '@shared/types/rdcRuntime';
-import type { AssistantMessageDiagnostic } from '@shared/types/providerErrors';
+import type { AssistantMessageDiagnostic } from './providerErrors';
+import type { ToolCall } from '@shared/types/tool';
 
 /**
  * Internal types for the provider/runtime boundary.
@@ -13,10 +15,6 @@ import type { AssistantMessageDiagnostic } from '@shared/types/providerErrors';
 // =====================================================================
 
 export type ProviderOutputRef = import('@shared/types/reasoning').ProviderOutputRef;
-
-export type ProviderContinuationArtifact = import('@shared/types/reasoning').ProviderContinuationArtifact;
-
-export type ProviderStateRef = import('@shared/types/reasoning').ProviderStateRef;
 
 export type ThinkingArtifactKind = import('@shared/types/reasoning').ThinkingArtifactKind;
 
@@ -47,16 +45,15 @@ export interface ImageContent {
   mimeType: string;
 }
 
-export interface ToolCall {
+/** A tool call as an assistant content block: the shared `ToolCall` plus what only main's loop reads. */
+export interface ToolCallContent extends ToolCall {
   type: 'toolCall';
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
+  /** The model's argument text when it was not a JSON object; `arguments` is then empty and the call is not run. */
+  invalidArguments?: string;
   providerOutputRef?: ProviderOutputRef;
 }
 
-export type ContentBlock = TextContent | ThinkingContent | ImageContent | ToolCall;
-
+export type ContentBlock = TextContent | ThinkingContent | ImageContent | ToolCallContent;
 
 // =====================================================================
 // 消息（Message）
@@ -75,13 +72,17 @@ export interface UserMessage {
 /** 助手消息：包含文本、思考、工具调用等内容块。 */
 export interface AssistantMessage {
   role: 'assistant';
-  content: (TextContent | ThinkingContent | ToolCall)[];
+  content: (TextContent | ThinkingContent | ToolCallContent)[];
   /** 模型 id（与 `Model.id` 对应）。 */
   model: string;
   /** Provider id（与 `Model.provider` 对应）。 */
   provider: string;
   /** Actual server response metadata; never inferred from the requested model/tier. */
-  execution?: { modelId?: string; serviceTier?: string; reasoningEvents?: import('@shared/types/reasoning').ReasoningEventSummary };
+  execution?: {
+    modelId?: string;
+    serviceTier?: string;
+    reasoningEvents?: import('@shared/types/reasoning').ReasoningEventSummary;
+  };
   /** Token 使用统计。 */
   usage: Usage;
   /** 助手消息结束的原因。 */
@@ -97,7 +98,7 @@ export interface AssistantMessage {
 /** 工具调用结果消息。 */
 export interface ToolResultMessage {
   role: 'toolResult';
-  /** 对应 `ToolCall.id`。 */
+  /** 对应 `ToolCallContent.id`。 */
   toolCallId: string;
   /** 工具名（冗余存储，便于日志/追踪）。 */
   toolName: string;
@@ -198,7 +199,7 @@ export interface ToolDefinition {
  * 仅覆盖 Agent Runtime 验证需要用到的字段，未列出的字段允许通过索引签名透传。
  */
 export interface JsonSchema {
-  type?: string;
+  type?: string | string[];
   properties?: Record<string, JsonSchema & { description?: string }>;
   required?: string[];
   items?: JsonSchema;
@@ -211,7 +212,7 @@ export interface JsonSchema {
   minItems?: number;
   maxItems?: number;
   pattern?: string;
-  additionalProperties?: boolean;
+  additionalProperties?: boolean | JsonSchema;
   default?: unknown;
   [key: string]: unknown;
 }
@@ -271,23 +272,71 @@ export interface Model {
 export type AssistantMessageEvent =
   | { type: 'start'; partial: AssistantMessage }
   | { type: 'text_start'; contentIndex: number; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'text_delta'; contentIndex: number; delta: string; phase?: TextContent['phase']; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'text_end'; contentIndex: number; content: string; phase?: TextContent['phase']; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'thinking_start'; contentIndex: number; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'thinking_delta'; contentIndex: number; delta: string; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'thinking_end'; contentIndex: number; content: string; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | {
+      type: 'text_delta';
+      contentIndex: number;
+      delta: string;
+      phase?: TextContent['phase'];
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'text_end';
+      contentIndex: number;
+      content: string;
+      phase?: TextContent['phase'];
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'thinking_start';
+      contentIndex: number;
+      thinking: ThinkingContent;
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'thinking_delta';
+      contentIndex: number;
+      delta: string;
+      thinking: ThinkingContent;
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'thinking_end';
+      contentIndex: number;
+      content: string;
+      thinking: ThinkingContent;
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
   | { type: 'toolcall_start'; contentIndex: number; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'toolcall_delta'; contentIndex: number; delta: string; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'toolcall_end'; contentIndex: number; toolCall: ToolCall; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | {
+      type: 'toolcall_delta';
+      contentIndex: number;
+      delta: string;
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'toolcall_end';
+      contentIndex: number;
+      toolCall: ToolCallContent;
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
   | { type: 'done'; reason: StopReason; message: AssistantMessage }
   | { type: 'error'; error: Error; message: AssistantMessage };
 
 // =====================================================================
-// Agent 事件（AgentEvent）
+// Agent loop 事件（AgentLoopEvent）
 // =====================================================================
 
-/** Agent 调度器/Runtime 层面的事件。 */
-export type AgentEvent =
+/**
+ * Agent loop 层面的事件，只在主进程内流转；AgentEventBridge 把它翻译成跨进程的 shared `AgentEvent`。
+ */
+export type AgentLoopEvent =
   | { type: 'agent_start' }
   | { type: 'agent_end'; messages: Message[] }
   | { type: 'turn_start'; turn: number }
@@ -331,7 +380,7 @@ export type AgentEvent =
       args: Record<string, unknown>;
     }
   | { type: 'approval_resolved'; toolCallId: string; approved: boolean }
-  | ({ type: 'compaction' } & CompactionProgress)
+  | ({ type: 'compaction' } & AgentContextCompactedPayload)
   | {
       type: 'diagnostic';
       code: string;
@@ -346,9 +395,12 @@ export type AgentEvent =
 // Stream 选项
 // =====================================================================
 
-import type { ReasoningVisibility } from '@shared/types/agentRuntime';
+import type { AgentContextCompactedPayload, ReasoningVisibility } from '@shared/types/agentRuntime';
 import type { ResolvedReasoningSelection } from '@shared/types/modelCapability';
 import type { RequestPlan } from '@shared/types/providerCapability';
+import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
+import type { ExecutionIdentity } from '@shared/types/providerCapability';
+import type { ContinuationArtifactMetadata } from '@shared/types/reasoning';
 
 /** 调用 Provider 流式生成时的可选参数。 */
 export interface StreamOptions {
@@ -396,13 +448,28 @@ export interface CustomAgentMessage {
 /** Runtime 与应用层共同消费的消息类型。 */
 export type AgentMessage = Message | CustomAgentMessage;
 
-export interface CompactionProgress {
-  usage?: { inputTokens: number; outputTokens: number };
-  summary: string;
-  compactionId?: string;
-  status?: "running" | "complete" | "error";
-  tokensBefore?: number;
-  tokensAfter?: number;
-  sourceUri?: string;
-  sourceHash?: string;
+export interface ProviderStateRef {
+  schemaVersion: 1;
+  carrier: ProviderContractBundle['state']['carrier'];
+  value: string;
+  origin: ExecutionIdentity;
+  originFingerprint: string;
+  integrityHash: string;
+}
+
+export interface ProviderContinuationArtifact extends ContinuationArtifactMetadata {
+  origin: ExecutionIdentity;
+  id?: string;
+  encryptedContent?: string;
+  signature?: string;
+  thoughtSignature?: string;
+  redactedContent?: string;
+  opaqueState?: string;
+  reasoningContent?: string;
+  raw?: Record<string, unknown>;
+  containerBinding?: {
+    providerBlockKey: string;
+    itemId?: string;
+    toolCallIds?: string[];
+  };
 }

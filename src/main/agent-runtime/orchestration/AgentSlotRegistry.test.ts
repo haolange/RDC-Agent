@@ -29,9 +29,7 @@ describe('AgentSlotRegistry compiledRoute apply', () => {
     registry.initializeDefaults();
     expect(registry.getAgentConfig('general')).toMatchObject({ modelProvider: '', modelName: '' });
 
-    registry.applyLlmConfig([
-      { agentId: 'general', providerId: 'real', modelId: 'real-model' },
-    ]);
+    registry.applyLlmConfig([{ agentId: 'general', providerId: 'real', modelId: 'real-model' }]);
     expect(registry.getAgentConfig('general')).toMatchObject({
       modelProvider: 'real',
       modelName: 'real-model',

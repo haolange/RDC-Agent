@@ -2,17 +2,34 @@
  * ErrorRecovery 单元测试。
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from '../providers/internal/http';
-import { AgentRecoveryAbortError, ErrorRecovery } from './ErrorRecovery';
+import {
+  parseRetryAfterMs,
+  ProviderEmptyStreamError,
+  ProviderHttpError,
+  ProviderWireFailureError,
+} from '../providers/internal/http';
+import { AgentRecoveryAbortError, ErrorRecovery, MAX_RETRY_AFTER_MS } from './ErrorRecovery';
 import type { Model } from '../core/types';
 
 const PRIMARY: Model = {
-  id: 'primary', name: 'Primary', provider: 'test', api: 'anthropic' as Model['api'],
-  contextWindow: 128000, maxTokens: 4096, reasoning: false, vision: false,
+  id: 'primary',
+  name: 'Primary',
+  provider: 'test',
+  api: 'anthropic' as Model['api'],
+  contextWindow: 128000,
+  maxTokens: 4096,
+  reasoning: false,
+  vision: false,
 };
 const FALLBACK: Model = {
-  id: 'fallback', name: 'Fallback', provider: 'test', api: 'anthropic' as Model['api'],
-  contextWindow: 64000, maxTokens: 2048, reasoning: false, vision: false,
+  id: 'fallback',
+  name: 'Fallback',
+  provider: 'test',
+  api: 'anthropic' as Model['api'],
+  contextWindow: 64000,
+  maxTokens: 2048,
+  reasoning: false,
+  vision: false,
 };
 
 function makeErr(message: string, status?: number): Error {
@@ -63,9 +80,11 @@ describe('ErrorRecovery', () => {
     });
 
     it('应识别 at capacity / high demand 为 overloaded', () => {
-      expect(recovery.classifyError(makeErr(
-        'The model is currently at capacity due to high demand. Please try again in a few minutes',
-      ))).toBe('overloaded');
+      expect(
+        recovery.classifyError(
+          makeErr('The model is currently at capacity due to high demand. Please try again in a few minutes'),
+        ),
+      ).toBe('overloaded');
     });
 
     it('ProviderWireFailureError 容量不足应分类为 overloaded', () => {
@@ -106,7 +125,9 @@ describe('ErrorRecovery', () => {
     });
 
     it('真实 HTTP 5xx ProviderHttpError 应分类为 server_error', () => {
-      expect(recovery.classifyError(new ProviderHttpError('openai-responses', 500, 'upstream exploded'))).toBe('server_error');
+      expect(recovery.classifyError(new ProviderHttpError('openai-responses', 500, 'upstream exploded'))).toBe(
+        'server_error',
+      );
     });
 
     it('ProviderEmptyStreamError 应分类为 empty_stream 而不是 server_error', () => {
@@ -281,7 +302,7 @@ describe('ErrorRecovery', () => {
       const abortError = recovery.createAbortError(original, action.reason);
       expect(abortError).toBeInstanceOf(AgentRecoveryAbortError);
       expect(abortError.cause).toBe(original);
-      expect(abortError.category).toBe('server_error');
+      expect(abortError.recoveryCategory).toBe('server_error');
       expect(abortError.lastStatus).toBe(500);
       expect(abortError.bodySnippet).toContain('boom');
       expect(abortError.attempts).toBe(4);
@@ -294,19 +315,18 @@ describe('ErrorRecovery', () => {
     });
 
     it('ProviderWireFailureError 应分类为 unknown 并立即 abort', () => {
-      const original = new ProviderWireFailureError(
-        'openai-responses',
-        'Account suspended by provider',
-        { code: 'account_suspended', bodyText: '{"code":"account_suspended"}' },
-      );
+      const original = new ProviderWireFailureError('openai-responses', 'Account suspended by provider', {
+        code: 'account_suspended',
+        bodyText: '{"code":"account_suspended"}',
+      });
       expect(recovery.classifyError(original)).toBe('unknown');
       expect(recovery.decide(original)).toEqual({
         type: 'abort',
-        reason: 'unrecoverable error: [openai-responses] Account suspended by provider',
+        reason: 'unrecoverable error: PROVIDER_WIRE_FAILURE: [openai-responses] Account suspended by provider',
       });
       const abortError = recovery.createAbortError(original, 'unrecoverable error');
       expect(abortError.cause).toBe(original);
-      expect(abortError.category).toBe('unknown');
+      expect(abortError.recoveryCategory).toBe('unknown');
       expect(abortError.bodySnippet).toContain('account_suspended');
     });
 
@@ -349,6 +369,24 @@ describe('ErrorRecovery', () => {
       expect(d1).toBeLessThanOrEqual(2500);
       expect(d2).toBeGreaterThanOrEqual(4000);
       expect(d2).toBeLessThanOrEqual(4500);
+    });
+
+    it('waits at least as long as the provider asked and ends the turn when the request exceeds the window', () => {
+      const asked = (retryAfterMs: number) =>
+        new ProviderHttpError('openai-responses', 429, 'slow down', undefined, retryAfterMs);
+      expect(recovery.decide(asked(9_000))).toEqual({ type: 'retry', delayMs: 9_000 });
+      const short = recovery.decide(asked(10));
+      expect(short.type).toBe('retry');
+      expect((short as { delayMs: number }).delayMs).toBeGreaterThanOrEqual(1000);
+      expect(recovery.decide(asked(MAX_RETRY_AFTER_MS + 1))).toMatchObject({ type: 'abort' });
+    });
+
+    it('reads Retry-After from seconds, HTTP dates and retry-after-ms headers', () => {
+      const headers = (values: Record<string, string>) => ({ get: (name: string) => values[name] ?? null });
+      expect(parseRetryAfterMs(headers({ 'retry-after': '3' }))).toBe(3_000);
+      expect(parseRetryAfterMs(headers({ 'retry-after-ms': '250' }))).toBe(250);
+      expect(parseRetryAfterMs(headers({ 'retry-after': new Date(10_000).toUTCString() }), 4_000)).toBe(6_000);
+      expect(parseRetryAfterMs(headers({}))).toBeUndefined();
     });
   });
 

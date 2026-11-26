@@ -1,34 +1,10 @@
-import { agentDefinitionLaneKey } from '@shared/types/agentManifest';
 import type {
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
-  AgentDefinitionSaveResult,
   AgentManifestDefinition,
 } from '@shared/types/agentManifest';
 import type { AppSettings, LlmAgentRoute } from '@shared/types/settings';
-
-export interface AgentDefinitionRollback {
-  definition: AgentManifestDefinition | null;
-  route: LlmAgentRoute | null;
-}
-
-let lastClientRevision = 0;
-const latestRevisions = new Map<string, number>();
-
-export const nextAgentDefinitionClientRevision = (): number => {
-  const clockRevision = Date.now() * 1_000;
-  lastClientRevision = Math.max(clockRevision, lastClientRevision + 1);
-  return lastClientRevision;
-};
-
-export const isLatestAgentDefinitionRevision = (
-  scope: AgentDefinitionSaveRequest['scope'],
-  projectId: string | undefined,
-  agentId: string,
-  clientRevision: number,
-): boolean => (
-  latestRevisions.get(agentDefinitionLaneKey(scope, projectId, agentId)) === clientRevision
-);
+import type { SettingsOverlay } from './settingsIntents';
 
 const replaceDefinition = (
   definitions: AgentManifestDefinition[],
@@ -38,19 +14,15 @@ const replaceDefinition = (
   const index = definitions.findIndex((entry) => entry.id === agentId);
   if (!definition) return definitions.filter((entry) => entry.id !== agentId);
   if (index < 0) return [...definitions, definition];
-  return definitions.map((entry, entryIndex) => entryIndex === index ? definition : entry);
+  return definitions.map((entry, entryIndex) => (entryIndex === index ? definition : entry));
 };
 
-const replaceRoute = (
-  routes: LlmAgentRoute[],
-  agentId: string,
-  route: LlmAgentRoute | null,
-): LlmAgentRoute[] => [
+const replaceRoute = (routes: LlmAgentRoute[], agentId: string, route: LlmAgentRoute | null): LlmAgentRoute[] => [
   ...routes.filter((entry) => entry.agentId !== agentId),
   ...(route ? [route] : []),
 ];
 
-const projectSettings = (
+const withDefinition = (
   settings: AppSettings,
   agentId: string,
   definition: AgentManifestDefinition | null,
@@ -61,35 +33,24 @@ const projectSettings = (
   llm: { ...settings.llm, agentRoutes: replaceRoute(settings.llm.agentRoutes, agentId, route) },
 });
 
-export function beginAgentDefinitionSave(settings: AppSettings, request: AgentDefinitionSaveRequest): {
-  settings: AppSettings;
-  rollback: AgentDefinitionRollback;
-} {
-  const agentId = request.draft.id;
-  const existing = settings.agents.definitions.find((entry) => entry.id === agentId) ?? null;
-  const previousRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId) ?? null;
-  // The route comes from Settings → Agents, not the manifest; a saved definition keeps it.
-  const optimisticRoute = request.draft.delete ? null : previousRoute;
-  const optimisticDefinition = request.draft.delete || !existing
-    ? null
-    : { ...existing, ...request.draft } as AgentManifestDefinition;
-  latestRevisions.set(agentDefinitionLaneKey(request.scope, request.projectId, agentId), request.clientRevision);
-  return {
-    settings: request.draft.delete
-      ? projectSettings(settings, agentId, null, null)
-      : projectSettings(settings, agentId, optimisticDefinition ?? existing, optimisticRoute),
-    rollback: { definition: existing, route: previousRoute },
+/**
+ * The definition shown while its save is in flight. A deletion hides the Agent and its route; an edit shows over the
+ * definition it changes and keeps the route, which comes from Settings → Agents, not the manifest. A new Agent shows
+ * once main has written it.
+ */
+export const agentDefinitionOverlay =
+  (request: AgentDefinitionSaveRequest): SettingsOverlay =>
+  (settings) => {
+    const agentId = request.draft.id;
+    if (request.draft.delete) return withDefinition(settings, agentId, null, null);
+    const existing = settings.agents.definitions.find((entry) => entry.id === agentId);
+    if (!existing) return settings;
+    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId) ?? null;
+    return withDefinition(settings, agentId, { ...existing, ...request.draft } as AgentManifestDefinition, route);
   };
-}
 
-export const settleAgentDefinitionSave = (
-  settings: AppSettings,
-  agentId: string,
-  result: AgentDefinitionSaveResult,
-): AppSettings => projectSettings(settings, agentId, result.definition, result.route);
-
-export const rollbackAgentDefinitionSave = (
-  settings: AppSettings,
-  agentId: string,
-  snapshot: AgentDefinitionCommitSnapshot | null,
-): AppSettings => projectSettings(settings, agentId, snapshot?.definition ?? null, snapshot?.route ?? null);
+/** The definition and route main committed. */
+export const agentDefinitionCommit =
+  (agentId: string, commit: Pick<AgentDefinitionCommitSnapshot, 'definition' | 'route'>): SettingsOverlay =>
+  (settings) =>
+    withDefinition(settings, agentId, commit.definition, commit.route);

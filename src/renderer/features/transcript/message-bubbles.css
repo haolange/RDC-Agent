@@ -5,7 +5,7 @@
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-bubble);
   font-size: var(--type-body-size);
-  line-height: 1.7;
+  line-height: var(--leading-relaxed);
   word-break: break-word;
   position: relative;
 }
@@ -20,7 +20,7 @@
 
 .conversation-bubble-user .markdown-body {
   font-size: inherit;
-  line-height: 1.55;
+  line-height: var(--leading-normal);
 }
 
 .conversation-bubble-user .markdown-body > :last-child {
@@ -55,7 +55,7 @@
   background: transparent;
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.5;
+  line-height: var(--type-meta-line);
 }
 
 .conversation-bubble-system.severity-error {
@@ -96,7 +96,7 @@
   background: var(--transcript-card-surface);
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.6;
+  line-height: var(--type-body-line);
 }
 
 .conversation-bubble-system.is-command.severity-error {
@@ -119,7 +119,7 @@
 
 .conversation-system-command-body .markdown-body {
   font-size: inherit;
-  line-height: 1.55;
+  line-height: var(--leading-normal);
 }
 
 .conversation-system-command-body .markdown-body > :last-child {
@@ -147,10 +147,12 @@
 }
 
 @keyframes conversationCursorBlink {
-  0%, 49% {
+  0%,
+  49% {
     opacity: 1;
   }
-  50%, 100% {
+  50%,
+  100% {
     opacity: 0;
   }
 }

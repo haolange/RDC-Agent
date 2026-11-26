@@ -12,13 +12,10 @@
   font-size: var(--type-body-size);
 }
 
-.settings-agent-config-status-dot {
-  width: var(--space-2);
-  height: var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--token-text-disabled);
+.settings-agent-config-status[data-tone='warning'] .settings-agent-config-status-dot {
+  background: var(--token-status-warning);
 }
 
-.settings-agent-config-status[data-tone='warning'] .settings-agent-config-status-dot { background: var(--token-status-warning); }
-
-.settings-agent-config-status[data-tone='error'] .settings-agent-config-status-dot { background: var(--token-status-error); }
+.settings-agent-config-status[data-tone='error'] .settings-agent-config-status-dot {
+  background: var(--token-status-error);
+}

@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
-import { NATIVE_IMAGE_MIME_TYPES } from '../conversation/attachmentClassify';
-import { readAttachmentFilePreviewDataUrl } from '../conversation/attachmentPreview';
+import { NATIVE_IMAGE_MIME_TYPES } from '../runtime/attachmentClassify';
+import { readAttachmentFilePreviewDataUrl } from '../runtime/attachmentPreview';
 import { resolveWithinRoot } from './knowledgeFs';
 import { isSafeKnowledgeImageRelative, knowledgeImageMime } from './knowledgeImages';
 import type { KnowledgeSpace } from '@shared/types/knowledge';

@@ -1,16 +1,22 @@
 import { generateEventId } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
+import { AppError } from '@shared/errors/appError';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { assistantMessageText, executeAuxiliaryRequest } from '../prompt/AuxiliaryRequest';
 import { redactSecretsDeep } from '../../runtime/secretRedaction';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { ErrorCode } from '@shared/errors/errorCodes';
+import type { AgentTool } from '../agent/AgentTool';
 
-export interface PermissionReviewVerdict { approved: boolean; reason: string }
-export class PermissionReviewError extends Error {
-  constructor(readonly code: string, detail: string) {
-    super(`${code}: ${detail}`);
+export interface PermissionReviewVerdict {
+  approved: boolean;
+  reason: string;
+}
+export class PermissionReviewError extends AppError {
+  constructor(code: ErrorCode, detail: string) {
+    super(code, detail);
     this.name = 'PermissionReviewError';
   }
 }
@@ -20,7 +26,15 @@ export interface PermissionReviewAction {
   reason: string;
   facts?: Record<string, unknown>;
 }
-export type PermissionReviewer = (action: PermissionReviewAction, signal?: AbortSignal) => Promise<PermissionReviewVerdict>;
+/**
+ * Reviews one pending action. The action is what the review model reads; `tool` is the reviewed tool's declared spec,
+ * which the host reads to gather evidence and which is never sent.
+ */
+export type PermissionReviewer = (
+  action: PermissionReviewAction,
+  signal?: AbortSignal,
+  tool?: Pick<AgentTool, 'spec'>,
+) => Promise<PermissionReviewVerdict>;
 const SYSTEM = `You independently review one pending tool action. You have no tools and must not execute anything.
 Return ONLY a JSON object with exactly {"approved":boolean,"reason":string}; reason must be concise and specific.
 Approve only when the actual user request and approved plan authorize the exact action, its targets and effects.
@@ -38,12 +52,21 @@ Missing or conflicting authority means deny. Never infer permission from a previ
 
 export function parsePermissionReview(text: string): PermissionReviewVerdict {
   let value: unknown;
-  try { value = JSON.parse(text); } catch { throw new PermissionReviewError('PERMISSION_REVIEW_INVALID', 'expected one strict JSON verdict.'); }
-  if (!value || typeof value !== 'object' || Array.isArray(value)
-    || Object.keys(value).sort().join(',') !== 'approved,reason'
-    || typeof (value as PermissionReviewVerdict).approved !== 'boolean'
-    || typeof (value as PermissionReviewVerdict).reason !== 'string'
-    || !(value as PermissionReviewVerdict).reason.trim() || (value as PermissionReviewVerdict).reason.length > 2000) {
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new PermissionReviewError('PERMISSION_REVIEW_INVALID', 'expected one strict JSON verdict.');
+  }
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join(',') !== 'approved,reason' ||
+    typeof (value as PermissionReviewVerdict).approved !== 'boolean' ||
+    typeof (value as PermissionReviewVerdict).reason !== 'string' ||
+    !(value as PermissionReviewVerdict).reason.trim() ||
+    (value as PermissionReviewVerdict).reason.length > 2000
+  ) {
     throw new PermissionReviewError('PERMISSION_REVIEW_INVALID', 'expected one strict verdict and reason.');
   }
   return value as PermissionReviewVerdict;
@@ -51,31 +74,63 @@ export function parsePermissionReview(text: string): PermissionReviewVerdict {
 
 /** One bounded auxiliary provider request, using the frozen route and opaque credential. */
 export async function executePermissionReview(input: {
-  sessionId: string; plan: RequestPlan; credentialHandle: string;
-  reasoning: AgentRouteCapability['reasoningContract']; authority: string;
+  sessionId: string;
+  plan: RequestPlan;
+  credentialHandle: string;
+  reasoning: AgentRouteCapability['reasoningContract'];
+  authority: string;
   evidence?: unknown;
-  action: PermissionReviewAction; signal?: AbortSignal;
+  action: PermissionReviewAction;
+  signal?: AbortSignal;
 }): Promise<PermissionReviewVerdict> {
   input.signal?.throwIfAborted();
   const safeAction = redactSecretsDeep(input.action);
-  if (safeAction.redactions.length) throw new PermissionReviewError('PERMISSION_REVIEW_SENSITIVE_INPUT', 'exact pending action contains protected credential material; it cannot be sent for automatic review.');
-  const content = JSON.stringify({ authority: redactSecretsDeep(input.authority).value,
-    pendingAction: safeAction.value, evidence: redactSecretsDeep(input.evidence).value });
+  if (safeAction.redactions.length)
+    throw new PermissionReviewError(
+      'PERMISSION_REVIEW_SENSITIVE_INPUT',
+      'exact pending action contains protected credential material; it cannot be sent for automatic review.',
+    );
+  const content = JSON.stringify({
+    authority: redactSecretsDeep(input.authority).value,
+    pendingAction: safeAction.value,
+    evidence: redactSecretsDeep(input.evidence).value,
+  });
   const requiredTokens = charsToTokens(SYSTEM.length + content.length);
   const inputBudget = Math.min(32768, input.plan.contextBudgetTokens, input.plan.contextWindowTokens - 1024);
   if (!Number.isFinite(inputBudget) || inputBudget <= 0 || requiredTokens > inputBudget) {
-    throw new PermissionReviewError('PERMISSION_REVIEW_CONTEXT_LIMIT', `authority, exact action and observations require ${requiredTokens} input tokens; limit ${inputBudget}.`);
+    throw new PermissionReviewError(
+      'PERMISSION_REVIEW_CONTEXT_LIMIT',
+      `authority, exact action and observations require ${requiredTokens} input tokens; limit ${inputBudget}.`,
+    );
   }
   const timeout = AbortSignal.timeout(30000);
   const signal = input.signal ? AbortSignal.any([input.signal, timeout]) : timeout;
-  const segment = { id: 'runtime:permission-review', kind: 'runtime-fact' as const,
-    scope: 'runtime' as const, sourcePath: 'runtime://permission-review', sourceHash: hashScopedResource(SYSTEM),
-    content: SYSTEM, stability: 'stable' as const, precedence: 0, tokenEstimate: charsToTokens(SYSTEM.length) };
-  const promptPlan: PromptPlan = { id: generateEventId('prompt-plan'), segments: [segment], systemPrompt: SYSTEM,
-    totalTokenEstimate: charsToTokens(SYSTEM.length + content.length), diagnostics: [],
+  const segment = {
+    id: 'runtime:permission-review',
+    kind: 'runtime-fact' as const,
+    scope: 'runtime' as const,
+    sourcePath: 'runtime://permission-review',
+    sourceHash: hashScopedResource(SYSTEM),
+    content: SYSTEM,
+    stability: 'stable' as const,
+    precedence: 0,
+    tokenEstimate: charsToTokens(SYSTEM.length),
+  };
+  const promptPlan: PromptPlan = {
+    id: generateEventId('prompt-plan'),
+    segments: [segment],
+    systemPrompt: SYSTEM,
+    totalTokenEstimate: charsToTokens(SYSTEM.length + content.length),
+    diagnostics: [],
     metrics: { systemPrompt: SYSTEM.length, scopedInstructions: 0, skills: 0 },
-    stablePrefix: { fingerprint: hashScopedResource(SYSTEM), segmentIds: [segment.id], sourceHashes: [segment.sourceHash],
-      tokenEstimate: segment.tokenEstimate, volatileSegmentIds: [] } };
+    stablePrefix: {
+      fingerprint: hashScopedResource(SYSTEM),
+      segmentIds: [segment.id],
+      sourceHashes: [segment.sourceHash],
+      tokenEstimate: segment.tokenEstimate,
+      volatileSegmentIds: [],
+    },
+  };
   const request = async () => {
     const message = await executeAuxiliaryRequest({
       purpose: 'permission-review',
@@ -92,17 +147,26 @@ export async function executePermissionReview(input: {
       signal,
     });
     signal.throwIfAborted();
-    if (message.stopReason !== 'stop' || message.content.some(block => block.type === 'toolCall')) throw new PermissionReviewError('PERMISSION_REVIEW_INCOMPLETE', 'no terminal verdict without tool calls.');
+    if (message.stopReason !== 'stop' || message.content.some((block) => block.type === 'toolCall'))
+      throw new PermissionReviewError('PERMISSION_REVIEW_INCOMPLETE', 'no terminal verdict without tool calls.');
     return parsePermissionReview(assistantMessageText(message));
   };
   let abortListener: (() => void) | undefined;
   try {
-    return await Promise.race([request(), new Promise<never>((_resolve, reject) => {
-      abortListener = () => reject(input.signal?.aborted
-        ? new PermissionReviewError('PERMISSION_REVIEW_CANCELLED', 'turn cancelled.')
-        : new PermissionReviewError('PERMISSION_REVIEW_TIMEOUT', 'no verdict within 30 seconds.'));
-      signal.addEventListener('abort', abortListener, { once: true });
-      if (signal.aborted) abortListener();
-    })]);
-  } finally { if (abortListener) signal.removeEventListener('abort', abortListener); }
+    return await Promise.race([
+      request(),
+      new Promise<never>((_resolve, reject) => {
+        abortListener = () =>
+          reject(
+            input.signal?.aborted
+              ? new PermissionReviewError('PERMISSION_REVIEW_CANCELLED', 'turn cancelled.')
+              : new PermissionReviewError('PERMISSION_REVIEW_TIMEOUT', 'no verdict within 30 seconds.'),
+          );
+        signal.addEventListener('abort', abortListener, { once: true });
+        if (signal.aborted) abortListener();
+      }),
+    ]);
+  } finally {
+    if (abortListener) signal.removeEventListener('abort', abortListener);
+  }
 }

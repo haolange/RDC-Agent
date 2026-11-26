@@ -8,43 +8,118 @@ import { zhControl } from '../../i18n/locales/zh-CN/control';
 import { SessionRightRail } from './SessionRightRail';
 
 const state = vi.hoisted(() => ({ tracePresentation: null as null | { rightPanel: Record<string, unknown> } }));
-vi.mock('../../stores/workflowStore', () => ({ useWorkflowStore: (select: (value: typeof state) => unknown) => select(state) }));
-vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string, values?: { done: number; total: number }) => values ? `${key}:${values.done}/${values.total}` : key, language: 'en' }) }));
+vi.mock('../../stores/workflowStore', () => ({
+  useWorkflowStore: (select: (value: typeof state) => unknown) => select(state),
+}));
+vi.mock('../../i18n', () => ({
+  useI18n: () => ({
+    t: (key: string, values?: { done: number; total: number }) =>
+      values ? `${key}:${values.done}/${values.total}` : key,
+    language: 'en',
+  }),
+}));
 
 describe('session rail projection composition', () => {
   it('keeps one status marker per task and hides reasons from the compact list', () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    const host = document.createElement('div'); const root = createRoot(host);
+    const host = document.createElement('div');
+    const root = createRoot(host);
     try {
-      state.tracePresentation = { rightPanel: {
-        tasks: [
-          { id: 'started', sessionId: 'session', order: 0, title: 'Started', status: 'cancelled', displayState: 'cancelled', blockerSummary: TASK_STATUS_REASONS.parentTurnStopped },
-          { id: 'pending', sessionId: 'session', order: 1, title: 'Pending', status: 'cancelled', displayState: 'cancelled', blockerSummary: TASK_STATUS_REASONS.createdTurnStopped },
-          { id: 'custom', sessionId: 'session', order: 2, title: 'Custom', status: 'blocked', displayState: 'blocked', blockerSummary: '等待用户确认' },
-        ],
-      } };
+      state.tracePresentation = {
+        rightPanel: {
+          context: {},
+          tasks: [
+            {
+              id: 'started',
+              sessionId: 'session',
+              order: 0,
+              title: 'Started',
+              status: 'cancelled',
+              displayState: 'cancelled',
+              blockerSummary: TASK_STATUS_REASONS.parentTurnStopped,
+            },
+            {
+              id: 'pending',
+              sessionId: 'session',
+              order: 1,
+              title: 'Pending',
+              status: 'cancelled',
+              displayState: 'cancelled',
+              blockerSummary: TASK_STATUS_REASONS.createdTurnStopped,
+            },
+            {
+              id: 'custom',
+              sessionId: 'session',
+              order: 2,
+              title: 'Custom',
+              status: 'blocked',
+              displayState: 'blocked',
+              blockerSummary: '等待用户确认',
+            },
+          ],
+        },
+      };
       act(() => root.render(createElement(SessionRightRail)));
       expect(host.textContent).not.toContain('control.rightRail.tasks.reason.parentTurnStopped');
       expect(host.textContent).not.toContain('control.rightRail.tasks.reason.createdTurnStopped');
       expect(host.textContent).not.toContain('等待用户确认');
-      expect([...host.querySelectorAll('.right-rail-task-title')].map(el => el.textContent)).toEqual(['Started', 'Pending', 'Custom']);
+      expect([...host.querySelectorAll('.right-rail-task-title')].map((el) => el.textContent)).toEqual([
+        'Started',
+        'Pending',
+        'Custom',
+      ]);
       expect(host.querySelectorAll('.right-rail-task-row .task-status-marker')).toHaveLength(3);
       expect(zhControl['control.rightRail.tasks.reason.parentTurnStopped']).toBe('主回合停止，所属执行已结束。');
-      expect(zhControl['control.rightRail.tasks.reason.createdTurnStopped']).toBe('创建此任务的回合已停止，任务尚未开始。');
+      expect(zhControl['control.rightRail.tasks.reason.createdTurnStopped']).toBe(
+        '创建此任务的回合已停止，任务尚未开始。',
+      );
       expect(enControl['control.rightRail.tasks.reason.parentTurnStopped']).toBe(TASK_STATUS_REASONS.parentTurnStopped);
-      expect(enControl['control.rightRail.tasks.reason.createdTurnStopped']).toBe(TASK_STATUS_REASONS.createdTurnStopped);
-    } finally { act(() => root.unmount()); state.tracePresentation = null; host.remove(); }
+      expect(enControl['control.rightRail.tasks.reason.createdTurnStopped']).toBe(
+        TASK_STATUS_REASONS.createdTurnStopped,
+      );
+    } finally {
+      act(() => root.unmount());
+      state.tracePresentation = null;
+      host.remove();
+    }
   });
 
   it('shows the task count from the current projection and removes populated density when cleared', () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    const host = document.createElement('div'); const root = createRoot(host);
+    const host = document.createElement('div');
+    const root = createRoot(host);
     try {
-      state.tracePresentation = { rightPanel: { tasks: [
-        { id: 'done', sessionId: 'session', order: 0, title: 'Complete title retained', status: 'completed', displayState: 'completed' },
-        { id: 'live', sessionId: 'session', order: 1, title: 'Live', status: 'in_progress', displayState: 'in_progress' },
-        { id: 'cancelled', sessionId: 'session', order: 2, title: 'Cancelled', status: 'cancelled', displayState: 'cancelled' },
-      ] } };
+      state.tracePresentation = {
+        rightPanel: {
+          context: {},
+          tasks: [
+            {
+              id: 'done',
+              sessionId: 'session',
+              order: 0,
+              title: 'Complete title retained',
+              status: 'completed',
+              displayState: 'completed',
+            },
+            {
+              id: 'live',
+              sessionId: 'session',
+              order: 1,
+              title: 'Live',
+              status: 'in_progress',
+              displayState: 'in_progress',
+            },
+            {
+              id: 'cancelled',
+              sessionId: 'session',
+              order: 2,
+              title: 'Cancelled',
+              status: 'cancelled',
+              displayState: 'cancelled',
+            },
+          ],
+        },
+      };
       act(() => root.render(createElement(SessionRightRail)));
       const progress = host.querySelector('[data-testid="right-rail-tasks"]')!;
       expect(progress.classList.contains('is-populated')).toBe(true);
@@ -59,30 +134,60 @@ describe('session rail projection composition', () => {
       act(() => root.render(createElement(SessionRightRail)));
       expect(progress.classList.contains('is-populated')).toBe(false);
       expect(progress.querySelector('.right-rail-section-meta')).toBeNull();
-    } finally { act(() => root.unmount()); state.tracePresentation = null; host.remove(); }
+    } finally {
+      act(() => root.unmount());
+      state.tracePresentation = null;
+      host.remove();
+    }
   });
 
   it('shows one section per tab through empty, populated, degraded and cleared projections', () => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    const host = document.createElement('div'); const root = createRoot(host);
+    const host = document.createElement('div');
+    const root = createRoot(host);
     const render = () => act(() => root.render(createElement(SessionRightRail)));
     const tabs = ['tasks', 'artifacts', 'outputs', 'context', 'capture'];
-    const visit = (onTab: (id: string) => void) => tabs.forEach((id, index) => {
-      act(() => host.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]!.click());
-      expect([...host.querySelectorAll('section[data-testid]')].map((node) => node.getAttribute('data-testid'))).toEqual([`right-rail-${id}`]);
-      onTab(id);
-    });
+    const visit = (onTab: (id: string) => void) =>
+      tabs.forEach((id, index) => {
+        act(() => host.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]!.click());
+        expect(
+          [...host.querySelectorAll('section[data-testid]')].map((node) => node.getAttribute('data-testid')),
+        ).toEqual([`right-rail-${id}`]);
+        onTab(id);
+      });
     try {
-      state.tracePresentation = null; render();
+      state.tracePresentation = null;
+      render();
       expect([...host.querySelectorAll('[role="tab"]')].map((node) => node.textContent)).toEqual(
-        tabs.map((id) => `control.rightRail.${id}.title`));
+        tabs.map((id) => `control.rightRail.${id}.title`),
+      );
       visit(() => expect(host.querySelectorAll('[aria-expanded]')).toHaveLength(0));
-      state.tracePresentation = { rightPanel: {
-        tasks: [{ id: 'task', sessionId: 'session', order: 1, title: 'A blocked task', status: 'blocked', displayState: 'blocked', blockerSummary: 'Needs input' }],
-        artifacts: { rows: [], storeDegraded: true, totalCount: 0 },
-        outputs: { current: [{ id: 'output', displayName: 'A long output name', path: '/output', status: 'failed' }], previous: [] },
-        context: { task: { resources: [{ id: 'resource', kind: 'skill', label: 'A loaded skill', summary: 'Scope retained' }] } },
-      } }; render();
+      state.tracePresentation = {
+        rightPanel: {
+          tasks: [
+            {
+              id: 'task',
+              sessionId: 'session',
+              order: 1,
+              title: 'A blocked task',
+              status: 'blocked',
+              displayState: 'blocked',
+              blockerSummary: 'Needs input',
+            },
+          ],
+          artifacts: { rows: [], storeDegraded: true, totalCount: 0 },
+          outputs: {
+            current: [{ id: 'output', displayName: 'A long output name', path: '/output', status: 'failed' }],
+            previous: [],
+          },
+          context: {
+            task: {
+              resources: [{ id: 'resource', kind: 'skill', label: 'A loaded skill', summary: 'Scope retained' }],
+            },
+          },
+        },
+      };
+      render();
       visit((id) => {
         if (id === 'tasks') {
           expect(host.textContent).toContain('A blocked task');
@@ -90,16 +195,26 @@ describe('session rail projection composition', () => {
         }
         if (id === 'artifacts') expect(host.textContent).toContain('control.rightRail.artifacts.storeDegraded');
         if (id === 'outputs') {
-          expect(host.querySelector('.right-rail-output-missing')?.textContent).toBe('control.rightRail.outputs.missing');
-          expect([...host.querySelectorAll('button')].some((button) => button.textContent === 'control.rightRail.outputs.open')).toBe(false);
+          expect(host.querySelector('.right-rail-output-missing')?.textContent).toBe(
+            'control.rightRail.outputs.missing',
+          );
+          expect(
+            [...host.querySelectorAll('button')].some(
+              (button) => button.textContent === 'control.rightRail.outputs.open',
+            ),
+          ).toBe(false);
         }
         if (id === 'context') expect(host.textContent).toContain('A loaded skill');
       });
-      state.tracePresentation = null; render();
+      state.tracePresentation = null;
+      render();
       visit(() => {
         expect(host.textContent).not.toContain('A blocked task');
         expect(host.textContent).not.toContain('A loaded skill');
       });
-    } finally { act(() => root.unmount()); state.tracePresentation = null; }
+    } finally {
+      act(() => root.unmount());
+      state.tracePresentation = null;
+    }
   });
 });

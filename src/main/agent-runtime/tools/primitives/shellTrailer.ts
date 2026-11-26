@@ -1,6 +1,6 @@
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { currentHost, type HostDescriptor } from '../../../platform/host';
+import { currentHost } from '../../../platform/host';
 import { defaultShellLocale } from '../../../platform/shell';
 import type { ShellKind } from '../../../runtime/ShellResolver';
 
@@ -27,13 +27,10 @@ export function quotePosixSingle(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-export function buildAgentShellEnv(
-  base: NodeJS.ProcessEnv = process.env,
-  host: HostDescriptor = currentHost(),
-): NodeJS.ProcessEnv {
-  const env = { ...base };
+export function buildAgentShellEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
   if (!env.LANG) {
-    env.LANG = defaultShellLocale(host);
+    env.LANG = defaultShellLocale(currentHost());
   }
   return env;
 }
@@ -115,7 +112,7 @@ export function wrapPosixCommand(scriptPath: string, marker: string, spawnCwd: s
     '  printf \'\\n%s\\ncwd=%s\\nprovider=FileSystem\\nexit=%s\\n\' "$__m" "$__cwd" "$__exit"',
     `  rm -f -- ${quotedScript}`,
     '}',
-    'trap \'__exit=$?; __emit\' EXIT',
+    "trap '__exit=$?; __emit' EXIT",
     'set +e',
     `. ${quotedScript}`,
     '__exit=$?',

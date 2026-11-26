@@ -27,6 +27,14 @@
     }
   ],
   "forceCodeSigning": false,
+  "electronFuses": {
+    "runAsNode": true,
+    "enableCookieEncryption": true,
+    "enableNodeOptionsEnvironmentVariable": false,
+    "enableNodeCliInspectArguments": false,
+    "enableEmbeddedAsarIntegrityValidation": true,
+    "onlyLoadAppFromAsar": true
+  },
   "electronDist": "node_modules/electron/dist",
   "win": {
     "executableName": "RdcAgent",

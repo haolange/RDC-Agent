@@ -1,6 +1,10 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { useI18n } from '../../i18n';
+import { Button } from '../../ui/Button';
+import { Icon } from '../../ui/Icon';
 import { ImageViewer, type ImageViewerItem } from '../../ui/ImageViewer';
 import { Skeleton } from '../../ui/Skeleton';
+import { PlainButton } from '../../ui/PlainButton';
 import { useMarkdownSourceScope } from './markdownSources';
 import { useMarkdownMedia } from './useMarkdownMedia';
 
@@ -15,11 +19,18 @@ const GalleryContext = createContext<GalleryControl | null>(null);
  * the answer's images the way a reader sees them.
  */
 export const MarkdownGallery: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [view, setView] = useState<{ items: ImageViewerItem[]; originals: (string | undefined)[]; index: number } | null>(null);
+  const [view, setView] = useState<{
+    items: ImageViewerItem[];
+    originals: (string | undefined)[];
+    index: number;
+  } | null>(null);
   const open = useCallback((from: HTMLElement) => {
     const body = from.closest('.markdown-body') ?? from.parentElement;
     const images = [...(body?.querySelectorAll<HTMLImageElement>('img.markdown-media-image') ?? [])];
-    const index = Math.max(0, images.findIndex((image) => from.contains(image)));
+    const index = Math.max(
+      0,
+      images.findIndex((image) => from.contains(image)),
+    );
     setView({
       items: images.map((image) => ({ src: image.src, title: image.alt })),
       originals: images.map((image) => image.dataset.original),
@@ -31,24 +42,53 @@ export const MarkdownGallery: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <GalleryContext.Provider value={control}>
       {children}
-      <ImageViewer open={Boolean(view)} items={view?.items ?? []} index={view?.index ?? 0}
+      <ImageViewer
+        open={Boolean(view)}
+        items={view?.items ?? []}
+        index={view?.index ?? 0}
         onIndexChange={(index) => setView((current) => (current ? { ...current, index } : current))}
         onClose={() => setView(null)}
-        onOpenOriginal={originals[view?.index ?? 0] ? (index) => { window.open(originals[index], '_blank', 'noopener'); } : undefined} />
+        onOpenOriginal={
+          originals[view?.index ?? 0]
+            ? (index) => {
+                window.open(originals[index], '_blank', 'noopener');
+              }
+            : undefined
+        }
+      />
     </GalleryContext.Provider>
   );
 };
 
 /**
  * An image or video an answer embeds. Remote images come through the main-process fetch and local references through
- * the session's media channel; both arrive as object URLs. A reference that cannot resolve leaves only its alt text.
+ * the session's media channel; both arrive as object URLs. A remote image whose URL only the model supplied waits as a
+ * compact placeholder (its host and a load action) until the person asks. A reference that cannot resolve leaves only
+ * its alt text.
  */
 export const MarkdownMedia: React.FC<{ src?: string; alt?: string }> = ({ src, alt = '' }) => {
+  const { t } = useI18n();
   const { sessionId } = useMarkdownSourceScope();
-  const media = useMarkdownMedia(src, sessionId);
+  const { media, loadRequested } = useMarkdownMedia(src, sessionId);
   const gallery = useContext(GalleryContext);
   if (media.status === 'loading') return <Skeleton shape="block" inline className="markdown-media-skeleton" />;
   if (media.status === 'unavailable') return alt ? <span className="markdown-media-missing">{alt}</span> : null;
+  if (media.status === 'unverified') {
+    return (
+      <span className="markdown-media-pending" data-testid="markdown-media-pending">
+        <Icon name="image" size={14} />
+        <span className="markdown-media-pending-label">{alt || media.host}</span>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={loadRequested}
+          data-tooltip={t('chat.markdownImageLoadHint', { host: media.host })}
+        >
+          {t('chat.markdownImageLoad')}
+        </Button>
+      </span>
+    );
+  }
   if (media.kind === 'video') {
     return (
       <span className="markdown-media" role="figure" aria-label={alt || undefined}>
@@ -59,10 +99,14 @@ export const MarkdownMedia: React.FC<{ src?: string; alt?: string }> = ({ src, a
   }
   return (
     <span className="markdown-media" role="figure" aria-label={alt || undefined}>
-      <button type="button" className="markdown-media-open" onClick={(event) => gallery?.open(event.currentTarget)}>
-        <img className="markdown-media-image" src={media.url} alt={alt}
-          data-original={src?.startsWith('https://') ? src : undefined} />
-      </button>
+      <PlainButton className="markdown-media-open" onClick={(event) => gallery?.open(event.currentTarget)}>
+        <img
+          className="markdown-media-image"
+          src={media.url}
+          alt={alt}
+          data-original={src?.startsWith('https://') ? src : undefined}
+        />
+      </PlainButton>
       {alt ? <span className="markdown-media-caption">{alt}</span> : null}
     </span>
   );

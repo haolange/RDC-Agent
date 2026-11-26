@@ -1,6 +1,8 @@
 import { DeviceSelector } from '../features/captures/DeviceSelector';
 import { useI18n } from '../i18n';
 import { Icon } from '../ui/Icon';
+import { PlainButton } from '../ui/PlainButton';
+import { SetupGuideButton } from './SetupGuideButton';
 
 interface WorkbenchUtilitiesProps {
   isTerminalOpen: boolean;
@@ -8,15 +10,19 @@ interface WorkbenchUtilitiesProps {
   onToggleTerminal: () => void;
 }
 
-/** Title-bar utilities: the replay device and the terminal drawer. */
-export function WorkbenchUtilities({ isTerminalOpen, activityAlertSeverity, onToggleTerminal }: WorkbenchUtilitiesProps) {
+/** Title-bar utilities: the setup guide, the replay device and the terminal drawer. */
+export function WorkbenchUtilities({
+  isTerminalOpen,
+  activityAlertSeverity,
+  onToggleTerminal,
+}: WorkbenchUtilitiesProps) {
   const { t } = useI18n();
   const label = isTerminalOpen ? t('terminal.close') : t('terminal.open');
   return (
     <div className="titlebar-utilities">
+      <SetupGuideButton />
       <DeviceSelector />
-      <button
-        type="button"
+      <PlainButton
         className={`main-utility-toggle terminal-pill${isTerminalOpen ? ' is-active' : ''}${activityAlertSeverity ? ` terminal-${activityAlertSeverity}` : ''}`}
         onClick={onToggleTerminal}
         data-testid="terminal-toggle"
@@ -25,8 +31,10 @@ export function WorkbenchUtilities({ isTerminalOpen, activityAlertSeverity, onTo
         data-tooltip={label}
       >
         <Icon name="terminal" />
-        {activityAlertSeverity && <span className={`terminal-status-badge ${activityAlertSeverity}`} aria-hidden="true" />}
-      </button>
+        {activityAlertSeverity && (
+          <span className={`terminal-status-badge ${activityAlertSeverity}`} aria-hidden="true" />
+        )}
+      </PlainButton>
     </div>
   );
 }

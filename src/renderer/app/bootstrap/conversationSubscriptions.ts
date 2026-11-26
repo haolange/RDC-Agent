@@ -1,25 +1,21 @@
-import { applyToolTraceToMessage } from '../../services/conversationTimeline';
 import { useConversationStore } from '../../stores/conversationStore';
-import { useLayoutStore } from '../../stores/layoutStore';
 import { isActiveSessionEvent } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { createConversationEventBatcher } from './conversationEventBatcher';
-import type { ToolTraceEntry } from '@shared/types/tool';
+import { createConversationMessageAssembler } from './conversationMessageAssembler';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
 
 import type { ElectronAPI } from '@shared/types/electron';
-import type { EventBridgeOptions } from './eventBridgeOptions';
 const projection = () => useSessionProjectionStore.getState();
 
 export function subscribeToolExecutionComplete(electronAPI: ElectronAPI) {
-  return electronAPI.events.onToolExecutionComplete((rawTrace) => {
-    const trace = rawTrace as ToolTraceEntry;
+  return electronAPI.events.onToolExecutionComplete((trace) => {
     const conversation = useConversationStore.getState();
     const message = trace.turnId
       ? conversation.allConversationMessages.find(
-        (entry) => entry.turnId === trace.turnId && entry.role === 'assistant',
-      )
+          (entry) => entry.turnId === trace.turnId && entry.role === 'assistant',
+        )
       : undefined;
     const sessionId = message?.sessionId ?? null;
     if (sessionId && !isActiveSessionEvent(sessionId)) {
@@ -42,9 +38,6 @@ export function subscribeToolExecutionComplete(electronAPI: ElectronAPI) {
         timestamp: trace.timestamp,
       });
     }
-    if (trace.turnId) {
-      conversation.updateAssistantMessageByTurnId(trace.turnId, (entry) => applyToolTraceToMessage(entry, trace));
-    }
   });
 }
 
@@ -52,7 +45,7 @@ function resolveMessageSessionId(message: { sessionId?: string | null }): string
   return message.sessionId ?? null;
 }
 
-export function subscribeConversation(electronAPI: ElectronAPI, showNotice: EventBridgeOptions['showNotice'], t: EventBridgeOptions['t']) {
+export function subscribeConversation(electronAPI: ElectronAPI) {
   const conversationEventBatcher = createConversationEventBatcher({
     applyMessage: (event) => {
       const sessionId = resolveMessageSessionId(event.message) ?? event.sessionId;
@@ -70,10 +63,7 @@ export function subscribeConversation(electronAPI: ElectronAPI, showNotice: Even
       conversation.upsertConversationMessage(event.message);
       if (terminal) {
         projection().projectConversationTerminal(sessionId, event.turnId, event.type === 'message_completed');
-        useSessionStore.getState().markConversationTurnTerminal(
-          event.turnId,
-          event.type === 'message_completed',
-        );
+        useSessionStore.getState().markConversationTurnTerminal(event.turnId, event.type === 'message_completed');
       }
     },
   });
@@ -95,36 +85,12 @@ export function subscribeConversation(electronAPI: ElectronAPI, showNotice: Even
       return;
     }
     if (event.type === 'agent_event') {
-      if (
-        event.event.type === 'handoff.requested'
-        || event.event.type === 'handoff.consumed'
-        || event.event.type === 'handoff.cancelled'
-      ) {
-        const toAgentId = String(
-          event.event.payload.toAgentId
-          ?? event.event.payload.toProfile
-          ?? '',
-        ).trim();
-        if (
-          (event.event.type === 'handoff.requested' || event.event.type === 'handoff.consumed')
-          && toAgentId
-        ) {
-          useLayoutStore.getState().setSelectedAgentId(toAgentId);
-        }
-        if (
-          event.event.type === 'handoff.cancelled'
-          && event.event.payload.cancelReason === 'restart_degrade'
-        ) {
-          showNotice(t('chat.handoffRestartDegraded'));
-        }
-        return;
-      }
       if (event.event.type === 'diagnostic') {
         conversation.addTimelineEntry({
           id: event.event.id,
           type: 'agent',
           agentRole: event.event.agentId,
-          content: String(event.event.payload.message ?? ''),
+          content: event.event.payload.message,
           timestamp: event.event.timestamp,
         });
       }
@@ -133,7 +99,22 @@ export function subscribeConversation(electronAPI: ElectronAPI, showNotice: Even
     conversationEventBatcher.handle(event);
   };
 
-  electronAPI.conversation.onEvent(handleConversationEvent);
+  // Streamed updates arrive as deltas; everything below handles the whole messages the assembler rebuilds.
+  const assembler = createConversationMessageAssembler({
+    requestSnapshot: (sessionId, messageId) => electronAPI.conversation.getMessageSnapshot(sessionId, messageId),
+    deliver: handleConversationEvent,
+  });
+  const handleStreamEvent = (event: ConversationStreamEvent) => {
+    const assembled = assembler.accept(event);
+    if (assembled) handleConversationEvent(assembled);
+  };
+  electronAPI.conversation.onEvent(handleStreamEvent);
 
-  return { disposeBatcher: () => conversationEventBatcher.dispose(), unsubscribe: () => electronAPI.conversation.offEvent(handleConversationEvent) };
+  return {
+    disposeBatcher: () => {
+      conversationEventBatcher.dispose();
+      assembler.dispose();
+    },
+    unsubscribe: () => electronAPI.conversation.offEvent(handleStreamEvent),
+  };
 }

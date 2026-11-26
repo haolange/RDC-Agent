@@ -6,7 +6,7 @@ import {
   expandCanonicalToolToken,
 } from '@shared/constants/agentToolTokens';
 import { filterToolsWithinCeiling } from '@shared/constants/toolAccess';
-import { executionProfileService } from '../../settings/settings-core/ExecutionProfileService';
+import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import type { AgentRole } from '@shared/types/agent';
 
@@ -78,10 +78,14 @@ function expandToken(toolName: string): string[] {
   return [normalizeToolName(toolName)];
 }
 
-function finalizeAllowlist(agentId: AgentRole, profileTools: readonly string[], ceiling: AgentAccessCeiling = DEFAULT_AGENT_ACCESS_CEILING): string[] {
+function finalizeAllowlist(
+  agentId: AgentRole,
+  profileTools: readonly string[],
+  ceiling: AgentAccessCeiling = DEFAULT_AGENT_ACCESS_CEILING,
+): string[] {
   const unique = filterToolsWithinCeiling(Array.from(new Set(profileTools.flatMap(expandToken))), ceiling);
   if (unique.length === 0) {
-    throw new Error(`AGENT_TOOLS_EMPTY: profile ${agentId} has an empty tools list and cannot execute.`);
+    throw new AppError('AGENT_TOOLS_EMPTY', `profile ${agentId} has an empty tools list and cannot execute.`);
   }
   return unique;
 }
@@ -95,15 +99,10 @@ export function resolveAgentToolAllowlistFromDefinition(
 }
 
 export function resolveAgentToolAllowlist(agentId: AgentRole): string[] {
-  const settings = settingsService.getAll();
-  const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, agentId);
-  const manifest = settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
-  const profileTools = manifest
-    ? manifest.tools
-    : runtimeProfile.toolAllowlist?.length
-      ? runtimeProfile.toolAllowlist
-      : [];
-  return finalizeAllowlist(agentId, profileTools, agentAccessCeiling(manifest));
+  const manifest = settingsService
+    .agentDefinitions()
+    .find((definition) => definition.id === agentId && definition.enabled);
+  return finalizeAllowlist(agentId, manifest?.tools ?? [], agentAccessCeiling(manifest));
 }
 
 export function isBuiltinToolAllowedForAgent(toolName: string, _agentId: AgentRole): boolean {

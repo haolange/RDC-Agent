@@ -1,7 +1,8 @@
+import { AppError } from '@shared/errors/appError';
 import { loopFinalAnswerText, loopThinkingItems } from '@shared/conversation/loopItems';
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import { nowIso } from '@shared/utils/id';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { traceStateStore } from '../agent-runtime/orchestration/TraceStateStore';
 import { appPathService } from '../runtime/AppPathService';
 import { TraceEventStore, TraceRunStore } from './TraceEventStore';
@@ -10,41 +11,53 @@ import { traceTreeBuilder } from './TraceTreeBuilder';
 import { projectionBuilder } from './ProjectionBuilder';
 import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
 import { rightRailProjectionService } from './RightRailProjectionService';
-import type {
-  RawAuditRef,
-  TraceSessionResult,
-} from '@shared/types/trace';
-import type {
-  AgentRun,
-  AgentRunPresentation,
-  AgentRunViewModel,
-  TraceStatus,
-} from '@shared/types/agenticTrace';
+import type { RawAuditRef, TraceSessionResult } from '@shared/types/trace';
+import type { AgentRun, AgentRunPresentation, AgentRunViewModel, TraceStatus } from '@shared/types/agenticTrace';
 import type { RunSummary } from '@shared/types/session';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
 import type { ActionEvent } from '@shared/types/evidence';
 
-const toIso = (value: number | string | undefined, fallback = nowIso()): string => {
+const toIso = (value: number | string | undefined): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'number' && Number.isFinite(value)) return new Date(value).toISOString();
-  return fallback;
+  return nowIso();
 };
+
+/**
+ * The projection's revision is the newest change among its sources (trace state, runs, messages, action events), so
+ * rebuilding unchanged sources yields the same `updatedAt` instead of the build's wall-clock time.
+ */
+function sourceRevision(
+  state: { updatedAt: string },
+  runs: RunSummary[],
+  conversations: ConversationMessage[],
+  events: ActionEvent[],
+): string {
+  let newest = Date.parse(state.updatedAt);
+  for (const run of runs) newest = Math.max(newest, run.finishedAt ?? run.stoppedAt ?? run.startedAt);
+  for (const message of conversations) newest = Math.max(newest, message.updatedAt ?? message.createdAt);
+  for (const event of events) newest = Math.max(newest, event.ts_ms);
+  return toIso(newest);
+}
 
 const collectExplicitThinking = (
   blocks: ConversationWorkBlock[] | undefined,
-): Array<{ blockId: string; thinking: ThinkingArtifact }> => (blocks ?? []).flatMap((block) => (
-  loopThinkingItems(block).map((item) => ({ blockId: block.id, thinking: item.thinking }))
-));
+): Array<{ blockId: string; thinking: ThinkingArtifact }> =>
+  (blocks ?? []).flatMap((block) =>
+    loopThinkingItems(block).map((item) => ({ blockId: block.id, thinking: item.thinking })),
+  );
 
-export function findCanonicalFinalAnswer(
-  conversations: ConversationMessage[],
-  runId: string,
-): string | null {
+export function findCanonicalFinalAnswer(conversations: ConversationMessage[], runId: string): string | null {
   let finalAnswer: string | null = null;
   for (const message of conversations) {
-    if (message.runId !== runId || message.role !== 'assistant' || message.diagnostic
-      || (message.status ?? message.workTrace?.status) !== 'complete') continue;
+    if (
+      message.runId !== runId ||
+      message.role !== 'assistant' ||
+      message.diagnostic ||
+      (message.status ?? message.workTrace?.status) !== 'complete'
+    )
+      continue;
     const reply = message.content.trim();
     if (reply && message.workTrace?.blocks.some((block) => loopFinalAnswerText(block) === reply)) finalAnswer = reply;
   }
@@ -71,13 +84,17 @@ export function resolveHistoryTurnProfileId(turn: {
   userMessage?: Pick<ConversationMessage, 'profileId' | 'agentId'>;
   assistantMessages: Array<Pick<ConversationMessage, 'profileId' | 'agentId'>>;
 }): string {
-  const raw = turn.userMessage?.profileId
-    ?? turn.assistantMessages.at(-1)?.profileId
-    ?? turn.assistantMessages.at(-1)?.agentId
-    ?? '';
+  const raw =
+    turn.userMessage?.profileId ??
+    turn.assistantMessages.at(-1)?.profileId ??
+    turn.assistantMessages.at(-1)?.agentId ??
+    '';
   const id = typeof raw === 'string' ? raw.trim() : '';
   return id || DEFAULT_AGENT_ID;
 }
+
+/** A trace event payload as stored: TraceEventStore checks it only as unknown, so it may be missing or null. */
+type StoredTracePayload<T> = T | null | undefined;
 
 export class TraceService {
   private stores: { run: TraceRunStore; events: TraceEventStore; emitter: TraceEventEmitter } | null = null;
@@ -91,9 +108,15 @@ export class TraceService {
     return this.stores;
   }
 
-  private get runStore() { return this.getStores().run; }
-  private get eventStore() { return this.getStores().events; }
-  private get emitter() { return this.getStores().emitter; }
+  private get runStore() {
+    return this.getStores().run;
+  }
+  private get eventStore() {
+    return this.getStores().events;
+  }
+  private get emitter() {
+    return this.getStores().emitter;
+  }
 
   getRun(runId: string): AgentRun | null {
     return this.runStore.get(runId);
@@ -108,25 +131,17 @@ export class TraceService {
   }
 
   async getSession(sessionId: string): Promise<TraceSessionResult> {
-    try {
-      const session = storageAdapter.readSession(sessionId);
-      if (!session) {
-        return { success: false, error: `Session not found: ${sessionId}` };
-      }
-      const presentation = await this.buildPresentation(sessionId);
-      return { success: true, presentation };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    if (!sessionRecordStore.readSession(sessionId)) throw new AppError('SESSION_NOT_FOUND', sessionId);
+    return { presentation: await this.buildPresentation(sessionId) };
   }
 
   async buildPresentation(sessionId: string): Promise<AgentRunPresentation> {
     const state = traceStateStore.read(sessionId);
-    const conversations = storageAdapter.readConversationHistory(sessionId);
-    const events = await storageAdapter.readActionChain(sessionId);
+    const conversations = conversationHistoryStore.readConversationHistory(sessionId);
+    const events = await sessionRecordStore.readActionChain(sessionId);
     return this.buildPresentationFromData(
       sessionId,
-      storageAdapter.listRuns(sessionId),
+      sessionRecordStore.listRuns(sessionId),
       conversations,
       events,
       state,
@@ -154,13 +169,14 @@ export class TraceService {
 
     for (const run of runs) {
       const runEvents = events.filter((e) => e.run_id === run.runId).sort((a, b) => a.ts_ms - b.ts_ms);
-      const agentType = run.profileId ?? DEFAULT_AGENT_ID;
+      const agentType = run.profileId;
       profileId = agentType;
       const profile = agentProfileRegistry.getForMode(agentType);
 
-      const userPrompt = this.userPromptForRun(conversations, run.runId)
-        || runEvents.find((e) => e.event_type === 'user_message')?.payload?.content as string
-        || '调试任务';
+      const userPrompt =
+        this.userPromptForRun(conversations, run.runId) ||
+        (runEvents.find((e) => e.event_type === 'user_message')?.payload.content as string) ||
+        '调试任务';
 
       const runId = run.runId;
       let agentRun = this.runStore.get(runId);
@@ -176,7 +192,7 @@ export class TraceService {
         this.runStore.save(agentRun);
       } else {
         agentRun.status = runStatusFromSummary(run);
-        agentRun.updatedAt = toIso(run.finishedAt ?? Date.now());
+        agentRun.updatedAt = toIso(run.finishedAt ?? run.startedAt);
         this.runStore.save(agentRun);
       }
 
@@ -185,7 +201,7 @@ export class TraceService {
         existingRunEvents.flatMap((traceEvent) => {
           const ids: string[] = [];
           if (traceEvent.type === 'run.completed') ids.push(`__final__:${runId}`);
-          const payloadId = (traceEvent.payload as { id?: string })?.id;
+          const payloadId = (traceEvent.payload as StoredTracePayload<{ id?: string }>)?.id;
           if (payloadId) ids.push(payloadId);
           return ids;
         }),
@@ -202,9 +218,8 @@ export class TraceService {
           .map((traceEvent) => (traceEvent.payload as { phaseId?: string }).phaseId)
           .filter((phaseId): phaseId is string => Boolean(phaseId)),
       );
-      const phaseTitle = (phaseId: string) => (
-        profile.phases.find((phase) => phase.phaseId === phaseId)?.displayName ?? phaseId
-      );
+      const phaseTitle = (phaseId: string) =>
+        profile.phases.find((phase) => phase.phaseId === phaseId)?.displayName ?? phaseId;
       const startPhase = (phaseId: string) => {
         if (existingPhaseStarts.has(phaseId)) return;
         this.emitter.emitPhaseStarted(runId, phaseId, phaseTitle(phaseId));
@@ -216,7 +231,7 @@ export class TraceService {
         existingPhaseCompletions.add(phaseId);
       };
       const hasTaskFrame = existingRunEvents.some(
-        (traceEvent) => (traceEvent.payload as { kind?: string })?.kind === 'task_frame',
+        (traceEvent) => (traceEvent.payload as StoredTracePayload<{ kind?: string }>)?.kind === 'task_frame',
       );
       if (!hasTaskFrame) {
         this.emitter.emitTaskFrame(runId, String(userPrompt));
@@ -262,7 +277,6 @@ export class TraceService {
       const timeline = projectionBuilder.build(agentRun, nodes, profile);
 
       runViewModels.push({ run: agentRun, timeline });
-
     }
 
     for (const turn of this.groupHistoryTurns(conversations)) {
@@ -270,13 +284,14 @@ export class TraceService {
       const runId = `history-${turn.turnId}`;
       const userPrompt = turn.userMessage?.content.trim() || 'Conversation';
       const assistant = turn.assistantMessages.slice(-1)[0];
-      const status: TraceStatus = assistant?.status === 'error'
-        ? 'failed'
-        : assistant?.status === 'stopped'
-          ? 'cancelled'
-          : !assistant || assistant.status === 'streaming' || assistant.status === 'draft'
-            ? 'running'
-            : 'succeeded';
+      const status: TraceStatus =
+        assistant?.status === 'error'
+          ? 'failed'
+          : assistant?.status === 'stopped'
+            ? 'cancelled'
+            : !assistant || assistant.status === 'streaming' || assistant.status === 'draft'
+              ? 'running'
+              : 'succeeded';
 
       const profileId = resolveHistoryTurnProfileId(turn);
       let agentRun = this.runStore.get(runId) ?? {
@@ -295,13 +310,13 @@ export class TraceService {
         existingHistoryEvents.flatMap((traceEvent) => {
           const ids: string[] = [];
           if (traceEvent.type === 'run.completed') ids.push(`__final__:${runId}`);
-          const payloadId = (traceEvent.payload as { id?: string })?.id;
+          const payloadId = (traceEvent.payload as StoredTracePayload<{ id?: string }>)?.id;
           if (payloadId) ids.push(payloadId);
           return ids;
         }),
       );
       const hasHistoryTaskFrame = existingHistoryEvents.some(
-        (traceEvent) => (traceEvent.payload as { kind?: string })?.kind === 'task_frame',
+        (traceEvent) => (traceEvent.payload as StoredTracePayload<{ kind?: string }>)?.kind === 'task_frame',
       );
       if (!hasHistoryTaskFrame) {
         this.emitter.emitTaskFrame(runId, userPrompt);
@@ -314,11 +329,7 @@ export class TraceService {
           existingHistoryNodeIds.add(thoughtId);
         }
       }
-      if (
-        assistant?.content.trim()
-        && !existingHistoryNodeIds.has(`__final__:${runId}`)
-        && status !== 'running'
-      ) {
+      if (assistant?.content.trim() && !existingHistoryNodeIds.has(`__final__:${runId}`) && status !== 'running') {
         this.emitter.emitFinalResponse(runId, assistant.content);
       }
 
@@ -330,7 +341,7 @@ export class TraceService {
       });
     }
 
-    const projectId = storageAdapter.readSession(sessionId)?.projectId;
+    const projectId = sessionRecordStore.readSession(sessionId)?.projectId;
     if (!projectId) {
       throw new Error('Trace projection requires an owned project/session scope.');
     }
@@ -353,7 +364,7 @@ export class TraceService {
       rightPanel,
       branchNavigator: null,
       rawAuditRefs,
-      updatedAt: nowIso(),
+      updatedAt: sourceRevision(state, runs, conversations, events),
     };
   }
 
@@ -361,7 +372,7 @@ export class TraceService {
     sessionId: string,
     conversations: ConversationMessage[],
   ): Promise<AgentRunPresentation> {
-    const state = storageAdapter.readSession(sessionId)
+    const state = sessionRecordStore.readSession(sessionId)
       ? traceStateStore.read(sessionId)
       : {
           schemaVersion: '1' as const,
@@ -370,7 +381,8 @@ export class TraceService {
           userRequests: [],
           branches: [],
           plans: [],
-          updatedAt: nowIso(),
+          // No trace state yet: the messages alone date the projection.
+          updatedAt: toIso(0),
         };
     const events: ActionEvent[] = [];
     return this.buildPresentationFromData(sessionId, [], conversations, events, state);
@@ -389,7 +401,6 @@ export class TraceService {
   ): string | null {
     if (run.status !== 'completed') return null;
     return findCanonicalFinalAnswer(conversations, runId);
-
   }
 
   private groupHistoryTurns(messages: ConversationMessage[]): HistoryTurn[] {

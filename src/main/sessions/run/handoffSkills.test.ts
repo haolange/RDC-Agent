@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
+import { EXECUTION_OFFER_SCHEMA } from './executionOffer';
 import { approvedExecutionOfferForAgent, executionOfferRequiredSkillIds } from './handoffSkills';
 
 const mocks = vi.hoisted(() => ({
@@ -8,11 +8,9 @@ const mocks = vi.hoisted(() => ({
   journalRead: vi.fn(),
 }));
 
-vi.mock('../store/StorageAdapter', () => ({
-  storageAdapter: {
-    executionOffers: { read: mocks.offerRead },
-    readSessionContextJournal: mocks.journalRead,
-  },
+vi.mock('../store/sessionStores', () => ({
+  executionOfferStore: { read: mocks.offerRead },
+  sessionContextStore: { readSessionContextJournal: mocks.journalRead },
 }));
 vi.mock('./PlanReviewStateStore', () => ({
   planReviewStateStore: { read: mocks.planRead },
@@ -98,9 +96,16 @@ describe('executionOfferRequiredSkillIds', () => {
     const oldId = '11111111-1111-4111-8111-111111111111';
     const newId = '22222222-2222-4222-8222-222222222222';
     mocks.offerRead.mockReturnValue({ ...offer, offerId: oldId });
-    mocks.journalRead.mockReturnValue([{ status: 'complete', approvedExecutionCompletion: {
-      offerId: oldId, planUri: offer.plan.uri, planHash: offer.plan.hash,
-    } }]);
+    mocks.journalRead.mockReturnValue([
+      {
+        status: 'complete',
+        approvedExecutionCompletion: {
+          offerId: oldId,
+          planUri: offer.plan.uri,
+          planHash: offer.plan.hash,
+        },
+      },
+    ]);
     expect(approvedExecutionOfferForAgent('sess', 'general')).toBeNull();
     mocks.offerRead.mockReturnValue({ ...offer, offerId: newId });
     expect(approvedExecutionOfferForAgent('sess', 'general')?.offerId).toBe(newId);

@@ -50,7 +50,7 @@
   background: transparent;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  font-weight: var(--font-regular);
+  font-weight: var(--font-normal);
   text-align: start;
   cursor: pointer;
 }
@@ -81,7 +81,9 @@
 
 .appearance-font-option.is-selected .appearance-font-option-mark {
   border-color: var(--token-accent-primary);
-  box-shadow: inset 0 0 0 3px var(--token-bg-panel), inset 0 0 0 var(--space-2) var(--token-accent-primary);
+  box-shadow:
+    inset 0 0 0 3px var(--token-bg-panel),
+    inset 0 0 0 var(--space-2) var(--token-accent-primary);
 }
 
 .appearance-font-option-copy {
@@ -94,7 +96,7 @@
 .appearance-font-option-sample {
   font-family: var(--ap-font-sample, inherit);
   font-size: var(--type-body-size);
-  line-height: 1.3;
+  line-height: var(--leading-tight);
   color: var(--token-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -130,5 +132,5 @@
   padding: 0 var(--space-2);
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.5;
+  line-height: var(--type-meta-line);
 }

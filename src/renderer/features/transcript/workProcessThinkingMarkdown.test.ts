@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkProcess } from './WorkProcess';
+import { loadThinkingMarkdownParser } from './workProcessThinkingContent';
 import type { ConversationThinkingItem, ConversationWorkTrace } from '@shared/types/conversation';
 
 vi.mock('../../i18n', () => ({
@@ -18,65 +19,88 @@ vi.mock('../../i18n', () => ({
 vi.mock('../../patterns/Markdown/markdownHighlight', () => ({ MARKDOWN_LANGUAGES: {}, MARKDOWN_LANGUAGE_ALIASES: {} }));
 vi.mock('katex/dist/katex.min.css', () => ({}));
 
+// A finished Working is folded and mounts no rows; these cases read the rendered steps, so Working shows everything.
+// Server rendering reads a zustand store's initial state, so the setting is fixed through the module.
+vi.mock('../../stores/appSettingsStore', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../stores/appSettingsStore')>();
+  const initial = actual.useAppSettingsStore.getState();
+  const state = {
+    ...initial,
+    settings: {
+      ...initial.settings,
+      appearance: { ...initial.settings.appearance, workProcessExpansion: 'all' as const },
+    },
+  };
+  const useExpandedSettings = <T>(selector: (value: typeof state) => T): T => selector(state);
+  return { ...actual, useAppSettingsStore: Object.assign(useExpandedSettings, actual.useAppSettingsStore) };
+});
+
 const now = 1_700_000_000_000;
 
 const gptSummaryTrace: ConversationWorkTrace = {
   status: 'complete',
   updatedAt: now + 1400,
-  blocks: [{
-    id: 'runtime-loop-1',
-    kind: 'llm_turn',
-    title: 'LLM turn',
-    status: 'complete',
-    result: {
+  blocks: [
+    {
+      id: 'runtime-loop-1',
+      kind: 'llm_turn',
+      title: 'LLM turn',
       status: 'complete',
-      outputPhase: 'commentary',
-      toolCallIds: ['tool-glob'],
-    },
-    items: [
-      {
-        kind: 'thinking',
-        providerOutputRef: { protocol: 'OpenAIResponses', providerBlockKey: 'reasoning', contentIndex: 0 },
-        thinking: {
-          text: '**Planning project purpose inspection**',
-          kind: 'summary',
-          source: 'openai-responses-summary',
-          visibility: 'summary',
+      result: {
+        status: 'complete',
+        outputPhase: 'commentary',
+        toolCallIds: ['tool-glob'],
+      },
+      items: [
+        {
+          kind: 'thinking',
+          providerOutputRef: { protocol: 'OpenAIResponses', providerBlockKey: 'reasoning', contentIndex: 0 },
+          thinking: {
+            text: '**Planning project purpose inspection**',
+            kind: 'summary',
+            source: 'openai-responses-summary',
+            visibility: 'summary',
+          },
+          status: 'complete',
+          displayOrder: 1,
         },
-        status: 'complete',
-        displayOrder: 1,
-      },
-      {
-        kind: 'text',
-        providerOutputRef: { protocol: 'OpenAIResponses', providerBlockKey: 'message', contentIndex: 0 },
-        text: '我先查看项目文件，再把身份、模型、工具和这个库的用途一起说明。',
-        phase: 'commentary',
-        status: 'complete',
-        displayOrder: 2,
-      },
-    ],
-    toolCalls: [{
-      id: 'tool-glob',
-      toolName: 'glob',
-      status: 'complete',
-      argsPreview: JSON.stringify({ pattern: '*' }),
-      resultPreview: JSON.stringify({ files: ['.rdc-agent/.gitignore'] }),
-      displayOrder: 3,
-      startedAt: now + 200,
-      completedAt: now + 356,
-    }],
-    startedAt: now,
-    completedAt: now + 1400,
-  }],
+        {
+          kind: 'text',
+          providerOutputRef: { protocol: 'OpenAIResponses', providerBlockKey: 'message', contentIndex: 0 },
+          text: '我先查看项目文件，再把身份、模型、工具和这个库的用途一起说明。',
+          phase: 'commentary',
+          status: 'complete',
+          displayOrder: 2,
+        },
+      ],
+      toolCalls: [
+        {
+          id: 'tool-glob',
+          toolName: 'glob',
+          status: 'complete',
+          argsPreview: JSON.stringify({ pattern: '*' }),
+          resultPreview: JSON.stringify({ files: ['.rdc-agent/.gitignore'] }),
+          displayOrder: 3,
+          startedAt: now + 200,
+          completedAt: now + 356,
+        },
+      ],
+      startedAt: now,
+      completedAt: now + 1400,
+    },
+  ],
 };
 
-function renderThinking(text: string, visibility: ConversationThinkingItem['thinking']['visibility'] = 'summary'): string {
+function renderThinking(
+  text: string,
+  visibility: ConversationThinkingItem['thinking']['visibility'] = 'summary',
+): string {
   const [block] = gptSummaryTrace.blocks;
-  const items = block.items?.map((item) => item.kind === 'thinking'
-    ? { ...item, thinking: { ...item.thinking, text, visibility } }
-    : item);
+  const items = block.items?.map((item) =>
+    item.kind === 'thinking' ? { ...item, thinking: { ...item.thinking, text, visibility } } : item,
+  );
   const trace = { ...gptSummaryTrace, blocks: [{ ...block, items }] };
-  return renderToStaticMarkup(createElement(WorkProcess, { trace, messageId: 'thinking-markdown' }));
+  return renderToStaticMarkup(createElement(WorkProcess, { trace, rowKey: 'thinking-markdown' }));
 }
 
 describe('Work Process thinking markdown', () => {
@@ -105,9 +129,13 @@ describe('Work Process thinking markdown', () => {
     expect(html).toContain('work-process-thinking-preview');
   });
 
-  it.each(['   \n', '[ref]: https://example.com', '## ###'])('omits an empty thinking row for %j', (value) => {
-    expect(renderThinking(value)).not.toContain('data-testid="work-process-thinking"');
-  });
+  it.each(['   \n', '[ref]: https://example.com', '## ###'])(
+    'omits an empty thinking row for %j once the Markdown parser has loaded',
+    async (value) => {
+      await loadThinkingMarkdownParser();
+      expect(renderThinking(value)).not.toContain('data-testid="work-process-thinking"');
+    },
+  );
 
   it('omits hidden thinking before Markdown rendering', () => {
     expect(renderThinking('# Hidden reasoning', 'hidden')).not.toContain('Hidden reasoning');

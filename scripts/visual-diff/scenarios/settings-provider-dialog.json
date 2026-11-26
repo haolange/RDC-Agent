@@ -1,0 +1,293 @@
+{
+ "id": "settings-provider-dialog",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]"
+  },
+  {
+   "click": true,
+   "testId": "sidebar-user-settings-trigger"
+  },
+  {
+   "click": true,
+   "testId": "open-settings-entry"
+  },
+  {
+   "waitFor": "[data-testid=\"settings-nav-models\"]"
+  },
+  {
+   "click": true,
+   "testId": "settings-nav-models",
+   "waitMs": 600
+  },
+  {
+   "waitFor": "[data-testid=\"settings-configured-services\"] [data-testid=\"settings-provider-connect-ollama\"]"
+  },
+  {
+   "click": true,
+   "selector": "[data-testid=\"settings-configured-services\"] [data-testid=\"settings-provider-connect-ollama\"]",
+   "waitMs": 800
+  },
+  {
+   "waitFor": "[data-testid=\"settings-provider-connect-dialog\"]",
+   "waitMs": 800
+  }
+ ],
+ "settleMs": 1500,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "71d463390771e1ea1969ce8c"
+   },
+   {
+    "ref": "71d463390771e1ea1969ce8c"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-531e7d8a55a3-1795681101751",
+       "timestamp": 1795681101751,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-3a4b0c6b60ac-1795681101817",
+       "timestamp": 1795681101817,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-f27827b4d03f-1795681101818",
+       "timestamp": 1795681101818,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-f053ae3ecd59-1795681101834",
+       "timestamp": 1795681101834,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-531e7d8a55a3-1795681101751",
+       "timestamp": 1795681101751,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-3a4b0c6b60ac-1795681101817",
+       "timestamp": 1795681101817,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-f27827b4d03f-1795681101818",
+       "timestamp": 1795681101818,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-f053ae3ecd59-1795681101834",
+       "timestamp": 1795681101834,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "settings:getEffectiveCatalog": [
+   {
+    "ref": "f1a7be608abf3c5befe9bb36"
+   },
+   {
+    "ref": "c22b0d19d3704ea41f0e70ff"
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": [
+      {
+       "projectId": "proj_1380728a78a5",
+       "name": "visual-diff-project",
+       "rootPath": "/visual-diff/visual-diff-project",
+       "slug": "visual-diff-project",
+       "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+       "inputs": [],
+       "inputsUpdatedAt": 1795681122411,
+       "createdAt": 1795681103622,
+       "updatedAt": 1795681103622
+      }
+     ]
+    }
+   }
+  ],
+  "project:select": [
+   {
+    "result": {
+     "project": {
+      "projectId": "proj_1380728a78a5",
+      "name": "visual-diff-project",
+      "rootPath": "/visual-diff/visual-diff-project",
+      "slug": "visual-diff-project",
+      "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+      "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+      "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+      "inputs": [],
+      "inputsUpdatedAt": 1795681122411,
+      "createdAt": 1795681103622,
+      "updatedAt": 1795681103622
+     },
+     "currentSession": null,
+     "currentRun": null
+    }
+   }
+  ],
+  "session:list": [
+   {
+    "result": {
+     "sessions": []
+    }
+   }
+  ],
+  "project:inputs:list": [
+   {
+    "result": {
+     "inputs": []
+    }
+   }
+  ],
+  "rdc-runtime:overview": [
+   {
+    "ref": "39f5fd8130adde2ef1c0863d"
+   }
+  ],
+  "llm:getProbeBatch": [
+   {
+    "result": null
+   },
+   {
+    "result": null
+   }
+  ]
+ }
+}

@@ -26,12 +26,8 @@ import { contextTierWindowTokens, isEligibleMaxContextTier } from '../../shared/
 import { hasImplementedStructuredToolAdapter } from '../../shared/utils/agentToolCapability';
 import { createFailClosedProviderContracts } from '../../shared/provider-catalog/providerContracts';
 
-export function dedicatedToolCallingFactSourceIds(
-  surface: Pick<ProviderSurfaceManifest, 'factSources'>,
-): string[] {
-  return surface.factSources
-    .filter((source) => source.id.includes(':tools-'))
-    .map((source) => source.id);
+export function dedicatedToolCallingFactSourceIds(surface: Pick<ProviderSurfaceManifest, 'factSources'>): string[] {
+  return surface.factSources.filter((source) => source.id.includes(':tools-')).map((source) => source.id);
 }
 
 export const PROVIDER_CATALOG_SCHEMA_VERSION = 2 as const;
@@ -54,7 +50,8 @@ export interface ProviderModelSummary {
   presencePolicy: ModelManifest['presencePolicy'];
 }
 
-export type ProviderSurfaceSummary = Omit<ProviderSurfaceManifest,
+export type ProviderSurfaceSummary = Omit<
+  ProviderSurfaceManifest,
   | 'identityIds'
   | 'profileId'
   | 'adapterIds'
@@ -101,7 +98,7 @@ function stableJson(value: unknown): string {
       .map(([key, child]) => `${JSON.stringify(key)}:${stableJson(child)}`)
       .join(',')}}`;
   }
-  return JSON.stringify(value) ?? 'null';
+  return (JSON.stringify(value) as string | undefined) ?? 'null';
 }
 
 /**
@@ -133,10 +130,7 @@ function mergeProviderContracts(
   });
 }
 
-function materializeSurfaceContractInput(
-  value: unknown,
-  profiles: Map<string, ProviderProfileManifest>,
-): unknown {
+function materializeSurfaceContractInput(value: unknown, profiles: Map<string, ProviderProfileManifest>): unknown {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
   const surface = value as Record<string, unknown>;
   const surfaceId = typeof surface.id === 'string' ? surface.id : '(unknown surface)';
@@ -154,14 +148,11 @@ function materializeSurfaceContractInput(
           `${surfaceId}/${routeId} must inherit contracts from its profile and use contractOverrides for route facts.`,
         );
       }
-      const mechanic = profile?.routeMechanics.find((candidate) => (
-        candidate.protocol === sourceRoute.protocol && candidate.adapter === sourceRoute.adapterId
-      )) ?? profile?.routeMechanics.find((candidate) => (
-        candidate.protocol === sourceRoute.protocol
-      ));
-      const contractOverrides = ProviderContractBundlePatchSchema.parse(
-        sourceRoute.contractOverrides ?? {},
-      );
+      const mechanic =
+        profile?.routeMechanics.find(
+          (candidate) => candidate.protocol === sourceRoute.protocol && candidate.adapter === sourceRoute.adapterId,
+        ) ?? profile?.routeMechanics.find((candidate) => candidate.protocol === sourceRoute.protocol);
+      const contractOverrides = ProviderContractBundlePatchSchema.parse(sourceRoute.contractOverrides ?? {});
       delete sourceRoute.contractOverrides;
       const protocol = ProviderProtocolSchema.safeParse(sourceRoute.protocol);
       return {
@@ -194,54 +185,56 @@ function uniqueModels(values: ModelManifest[], label: string, errors: string[]):
 }
 
 function bindingSpecificity(binding: ExecutionBinding): number {
-  return Number(binding.when.fast !== undefined)
-    + Number(binding.when.maxContext !== undefined)
-    + Number(Boolean(binding.when.reasoning));
+  return (
+    Number(binding.when.fast !== undefined) +
+    Number(binding.when.maxContext !== undefined) +
+    Number(Boolean(binding.when.reasoning))
+  );
 }
 
-function validateBindingSelections(
-  surfaceId: string,
-  model: ModelManifest,
-  errors: string[],
-): void {
+function validateBindingSelections(surfaceId: string, model: ModelManifest, errors: string[]): void {
   const bindings = model.executionBindings ?? [];
   const reasoningSelections = new Set([undefined, ...bindings.flatMap((binding) => binding.when.reasoning ?? [])]);
   const routeIds = model.routeOptions?.map((option) => option.id) ?? [model.route.protocol];
   const conflicts = new Set<string>();
-  for (const fast of [false, true]) for (const maxContext of [false, true]) {
-    for (const reasoning of reasoningSelections) for (const routeId of routeIds) {
-      const matches = bindings.filter((binding) => (
-        (binding.when.fast === undefined || binding.when.fast === fast)
-        && (binding.when.maxContext === undefined || binding.when.maxContext === maxContext)
-        && (!binding.when.reasoning || (reasoning !== undefined && binding.when.reasoning.includes(reasoning)))
-        && (!binding.routeOptionIds?.length || binding.routeOptionIds.includes(routeId))
-      )).sort((left, right) => bindingSpecificity(right) - bindingSpecificity(left));
-      const first = matches[0];
-      if (!first) continue;
-      for (const other of matches.slice(1)) {
-        if (bindingSpecificity(first) !== bindingSpecificity(other)) break;
-        if (stableJson(first.actions) !== stableJson(other.actions)) {
-          conflicts.add(`${surfaceId}/${model.modelId} has conflicting equal-specificity bindings ${first.id} and ${other.id}`);
+  for (const fast of [false, true])
+    for (const maxContext of [false, true]) {
+      for (const reasoning of reasoningSelections)
+        for (const routeId of routeIds) {
+          const matches = bindings
+            .filter(
+              (binding) =>
+                (binding.when.fast === undefined || binding.when.fast === fast) &&
+                (binding.when.maxContext === undefined || binding.when.maxContext === maxContext) &&
+                (!binding.when.reasoning || (reasoning !== undefined && binding.when.reasoning.includes(reasoning))) &&
+                (!binding.routeOptionIds?.length || binding.routeOptionIds.includes(routeId)),
+            )
+            .sort((left, right) => bindingSpecificity(right) - bindingSpecificity(left));
+          const first = matches[0];
+          if (!first) continue;
+          for (const other of matches.slice(1)) {
+            if (bindingSpecificity(first) !== bindingSpecificity(other)) break;
+            if (stableJson(first.actions) !== stableJson(other.actions)) {
+              conflicts.add(
+                `${surfaceId}/${model.modelId} has conflicting equal-specificity bindings ${first.id} and ${other.id}`,
+              );
+            }
+          }
         }
-      }
     }
-  }
   errors.push(...conflicts);
 }
 
 function modelProtocols(model: ModelManifest): Set<string> {
-  return new Set((model.routeOptions?.length
-    ? model.routeOptions.map((option) => option.route.protocol)
-    : [model.route.protocol]));
+  return new Set(
+    model.routeOptions?.length ? model.routeOptions.map((option) => option.route.protocol) : [model.route.protocol],
+  );
 }
 
-const SENSITIVE_MANIFEST_KEY = /^(?:authorization|proxy[-_]?authorization|cookie|set[-_]?cookie|api[-_]?key|x[-_]?api[-_]?key|access[-_]?token|refresh[-_]?token|bearer[-_]?token|security[-_]?token|client[-_]?secret|password|credential|credentials)$/iu;
+const SENSITIVE_MANIFEST_KEY =
+  /^(?:authorization|proxy[-_]?authorization|cookie|set[-_]?cookie|api[-_]?key|x[-_]?api[-_]?key|access[-_]?token|refresh[-_]?token|bearer[-_]?token|security[-_]?token|client[-_]?secret|password|credential|credentials)$/iu;
 
-function validatePublicPatch(
-  value: unknown,
-  location: string,
-  errors: string[],
-): void {
+function validatePublicPatch(value: unknown, location: string, errors: string[]): void {
   if (Array.isArray(value)) {
     value.forEach((entry, index) => validatePublicPatch(entry, `${location}[${index}]`, errors));
     return;
@@ -270,18 +263,23 @@ function validateBindingTargets(
     bindingIds.add(binding.id);
     for (const routeOptionId of binding.routeOptionIds ?? []) {
       if (!model.routeOptions?.some((option) => option.id === routeOptionId)) {
-        errors.push(`${surface.id}/${model.modelId} binding ${binding.id} references missing source route ${routeOptionId}`);
+        errors.push(
+          `${surface.id}/${model.modelId} binding ${binding.id} references missing source route ${routeOptionId}`,
+        );
       }
     }
     for (const action of binding.actions) {
-      if (action.kind === 'client-tier'
-        && !model.contextTiers.some((tier) => tier.id === action.tierId)) {
-        errors.push(`${surface.id}/${model.modelId} binding ${binding.id} references missing context tier ${action.tierId}`);
+      if (action.kind === 'client-tier' && !model.contextTiers.some((tier) => tier.id === action.tierId)) {
+        errors.push(
+          `${surface.id}/${model.modelId} binding ${binding.id} references missing context tier ${action.tierId}`,
+        );
       }
       if (action.kind !== 'model-switch') continue;
       const target = models.get(action.targetModelId);
       if (!target) {
-        errors.push(`${surface.id}/${model.modelId} binding ${binding.id} targets missing model ${action.targetModelId}`);
+        errors.push(
+          `${surface.id}/${model.modelId} binding ${binding.id} targets missing model ${action.targetModelId}`,
+        );
         continue;
       }
       const sourceProtocols = modelProtocols(model);
@@ -289,16 +287,18 @@ function validateBindingTargets(
       if (![...sourceProtocols].some((protocol) => targetProtocols.has(protocol))) {
         errors.push(`${surface.id}/${model.modelId} binding ${binding.id} has no protocol-compatible target route`);
       }
-      if (action.routeOptionId
-        && !target.routeOptions?.some((option) => option.id === action.routeOptionId)) {
-        errors.push(`${surface.id}/${model.modelId} binding ${binding.id} references missing target route ${action.routeOptionId}`);
+      if (action.routeOptionId && !target.routeOptions?.some((option) => option.id === action.routeOptionId)) {
+        errors.push(
+          `${surface.id}/${model.modelId} binding ${binding.id} references missing target route ${action.routeOptionId}`,
+        );
       }
     }
   }
   validateBindingSelections(surface.id, model, errors);
   if (model.controls.fast.state === 'selectable') {
     const hasFastBinding = (model.executionBindings ?? []).some((binding) => binding.when.fast === true);
-    if (!hasFastBinding) errors.push(`${surface.id}/${model.modelId} exposes selectable Fast without an execution binding`);
+    if (!hasFastBinding)
+      errors.push(`${surface.id}/${model.modelId} exposes selectable Fast without an execution binding`);
   }
 }
 
@@ -315,17 +315,21 @@ function validateModel(
   if (model.toolCalling.state === 'supported') {
     const protocol = model.route.protocol;
     if (!hasImplementedStructuredToolAdapter(protocol)) {
-      errors.push(`${surface.id}/${model.modelId} marks toolCalling supported but ${protocol} has no implemented structured-tool adapter`);
+      errors.push(
+        `${surface.id}/${model.modelId} marks toolCalling supported but ${protocol} has no implemented structured-tool adapter`,
+      );
     }
     const dedicatedToolsSources = dedicatedToolCallingFactSourceIds(surface);
     const boundToolsSource = model.fieldFactSourceIds?.toolCalling;
     if (dedicatedToolsSources.length > 0 && (!boundToolsSource || !dedicatedToolsSources.includes(boundToolsSource))) {
-      errors.push(`${surface.id}/${model.modelId} marks toolCalling supported without binding the dedicated tools fact source`);
+      errors.push(
+        `${surface.id}/${model.modelId} marks toolCalling supported without binding the dedicated tools fact source`,
+      );
     }
   }
-  const modelFieldRoots = new Set(Object.keys(model).filter((key) => (
-    key !== 'factSourceId' && key !== 'fieldFactSourceIds'
-  )));
+  const modelFieldRoots = new Set(
+    Object.keys(model).filter((key) => key !== 'factSourceId' && key !== 'fieldFactSourceIds'),
+  );
   for (const [fieldPath, sourceId] of Object.entries(model.fieldFactSourceIds ?? {})) {
     if (!modelFieldRoots.has(fieldPath.split('.')[0])) {
       errors.push(`${surface.id}/${model.modelId} maps an unknown fact field ${fieldPath}`);
@@ -339,18 +343,21 @@ function validateModel(
     errors.push(`${surface.id}/${model.modelId} has duplicate context tier ids`);
   }
   const contextControl = model.controls.maxContext;
-  const normalTier = model.contextTiers.find((tier) => tier.id === 'default')
-    ?? model.contextTiers[0];
+  const normalTier = model.contextTiers.find((tier) => tier.id === 'default') ?? model.contextTiers[0];
   if (contextControl.state === 'selectable' || contextControl.state === 'fixed') {
     const contextTier = model.contextTiers.find((tier) => tier.id === contextControl.tierId);
     if (!contextTier) {
       errors.push(`${surface.id}/${model.modelId} Max mode control references a missing context tier`);
-    } else if (!normalTier
-      || contextTierWindowTokens(contextTier) === undefined
-      || contextTierWindowTokens(normalTier) === undefined) {
+    } else if (
+      !normalTier ||
+      contextTierWindowTokens(contextTier) === undefined ||
+      contextTierWindowTokens(normalTier) === undefined
+    ) {
       errors.push(`${surface.id}/${model.modelId} Max mode control references a context tier without a numeric window`);
     } else if (!isEligibleMaxContextTier(contextTier, normalTier)) {
-      errors.push(`${surface.id}/${model.modelId} Max mode control references a tier that is not larger than the default context window`);
+      errors.push(
+        `${surface.id}/${model.modelId} Max mode control references a tier that is not larger than the default context window`,
+      );
     }
   }
   const liveContext = model.liveProjection?.context;
@@ -360,20 +367,24 @@ function validateModel(
     }
     if (liveContext.maxTierId) {
       const maxTier = model.contextTiers.find((tier) => tier.id === liveContext.maxTierId);
-      if (!maxTier
-        || !normalTier
-        || contextTierWindowTokens(maxTier) === undefined
-        || contextTierWindowTokens(normalTier) === undefined
-        || !isEligibleMaxContextTier(maxTier, normalTier)) {
+      if (
+        !maxTier ||
+        !normalTier ||
+        contextTierWindowTokens(maxTier) === undefined ||
+        contextTierWindowTokens(normalTier) === undefined ||
+        !isEligibleMaxContextTier(maxTier, normalTier)
+      ) {
         errors.push(`${surface.id}/${model.modelId} live context projection references an invalid Max tier`);
       }
-      const maxBindings = (model.executionBindings ?? []).filter((binding) => (
-        binding.when.maxContext === true
-        && binding.actions.some((action) => (
-          (action.kind === 'client-tier' && action.tierId === liveContext.maxTierId)
-          || action.kind === 'model-switch'
-        ))
-      ));
+      const maxBindings = (model.executionBindings ?? []).filter(
+        (binding) =>
+          binding.when.maxContext === true &&
+          binding.actions.some(
+            (action) =>
+              (action.kind === 'client-tier' && action.tierId === liveContext.maxTierId) ||
+              action.kind === 'model-switch',
+          ),
+      );
       // Combined selectors may add paths; validateBindingSelections rejects ambiguous winners.
       if (maxBindings.length === 0) {
         errors.push(`${surface.id}/${model.modelId} live Max projection requires an executable binding`);
@@ -383,28 +394,45 @@ function validateModel(
   const modelRouteProtocols = modelProtocols(model);
   for (const protocol of Object.keys(model.liveProjection?.reasoning?.wireProfiles ?? {})) {
     if (!modelRouteProtocols.has(protocol)) {
-      errors.push(`${surface.id}/${model.modelId} live reasoning projection targets an unavailable protocol ${protocol}`);
+      errors.push(
+        `${surface.id}/${model.modelId} live reasoning projection targets an unavailable protocol ${protocol}`,
+      );
     }
   }
   validatePublicPatch(model.route.headers, `${surface.id}/${model.modelId}.route.headers`, errors);
   for (const tier of model.contextTiers) {
     if (tier.activation.kind === 'header') {
-      validatePublicPatch(tier.activation.headers, `${surface.id}/${model.modelId}.contextTiers.${tier.id}.headers`, errors);
+      validatePublicPatch(
+        tier.activation.headers,
+        `${surface.id}/${model.modelId}.contextTiers.${tier.id}.headers`,
+        errors,
+      );
     } else if (tier.activation.kind === 'body') {
-      validatePublicPatch(tier.activation.patch, `${surface.id}/${model.modelId}.contextTiers.${tier.id}.patch`, errors);
+      validatePublicPatch(
+        tier.activation.patch,
+        `${surface.id}/${model.modelId}.contextTiers.${tier.id}.patch`,
+        errors,
+      );
     }
   }
   for (const binding of model.executionBindings ?? []) {
     for (const action of binding.actions) {
       if (action.kind === 'request-patch') {
-        validatePublicPatch(action.patch, `${surface.id}/${model.modelId}.executionBindings.${binding.id}.patch`, errors);
+        validatePublicPatch(
+          action.patch,
+          `${surface.id}/${model.modelId}.executionBindings.${binding.id}.patch`,
+          errors,
+        );
       } else if (action.kind === 'request-headers') {
-        validatePublicPatch(action.headers, `${surface.id}/${model.modelId}.executionBindings.${binding.id}.headers`, errors);
+        validatePublicPatch(
+          action.headers,
+          `${surface.id}/${model.modelId}.executionBindings.${binding.id}.headers`,
+          errors,
+        );
       }
     }
   }
-  if (model.selection.pickerVisibility === 'internal'
-    && !model.selection.relatedPrimaryModelIds?.length) {
+  if (model.selection.pickerVisibility === 'internal' && !model.selection.relatedPrimaryModelIds?.length) {
     errors.push(`${surface.id}/${model.modelId} is internal without a related primary model`);
   }
   for (const relatedId of model.selection.relatedPrimaryModelIds ?? []) {
@@ -414,23 +442,28 @@ function validateModel(
   }
   const surfaceRouteProtocols = new Set(surface.routes.map((route) => route.protocol));
   const routeOptions = model.routeOptions ?? [];
-  const routeMatrixIsLive = model.presencePolicy === 'account-entitled'
-    && (surface.discovery.authority === 'authoritative-list'
-      || surface.discovery.authority === 'entitlement-overlay');
-  if (surface.routes.length > 1
-    && routeOptions.length === 0
-    && model.route.source !== 'model'
-    && !routeMatrixIsLive
-    && surface.discovery.authority !== 'additive') {
+  const routeMatrixIsLive =
+    model.presencePolicy === 'account-entitled' &&
+    (surface.discovery.authority === 'authoritative-list' || surface.discovery.authority === 'entitlement-overlay');
+  if (
+    surface.routes.length > 1 &&
+    routeOptions.length === 0 &&
+    model.route.source !== 'model' &&
+    !routeMatrixIsLive &&
+    surface.discovery.authority !== 'additive'
+  ) {
     errors.push(`${surface.id}/${model.modelId} must declare its model-level route matrix`);
   }
   const routeOptionIds = new Set<string>();
   for (const option of routeOptions) {
-    if (routeOptionIds.has(option.id)) errors.push(`${surface.id}/${model.modelId} has duplicate route option ${option.id}`);
+    if (routeOptionIds.has(option.id))
+      errors.push(`${surface.id}/${model.modelId} has duplicate route option ${option.id}`);
     routeOptionIds.add(option.id);
     validatePublicPatch(option.route.headers, `${surface.id}/${model.modelId}/${option.id}.route.headers`, errors);
     if (!surfaceRouteProtocols.has(option.route.protocol)) {
-      errors.push(`${surface.id}/${model.modelId}/${option.id} references a protocol outside the surface route registry`);
+      errors.push(
+        `${surface.id}/${model.modelId}/${option.id} references a protocol outside the surface route registry`,
+      );
     }
     const surfaceRoute = surface.routes.find((route) => route.protocol === option.route.protocol);
     if (!option.protocolOwner || option.protocolOwner !== surfaceRoute?.protocolOwner) {
@@ -442,10 +475,12 @@ function validateModel(
       }
     }
   }
-  if (routeOptions.length > 0
-    && !routeOptions.some((option) => (
-      option.route.protocol === model.route.protocol && option.route.baseUrl === model.route.baseUrl
-    ))) {
+  if (
+    routeOptions.length > 0 &&
+    !routeOptions.some(
+      (option) => option.route.protocol === model.route.protocol && option.route.baseUrl === model.route.baseUrl,
+    )
+  ) {
     errors.push(`${surface.id}/${model.modelId} default route is absent from its model-level route matrix`);
   }
   validateBindingTargets(surface, model, models, errors);
@@ -468,26 +503,27 @@ function validateSurface(
     'coding-token-plan': ['plan', 'coding-plan', 'service-operator'],
     local: ['local', 'local-service', 'local'],
   } as const;
-  const categoryShape = surface.category === 'compatible-access'
-    ? undefined
-    : categoryShapes[surface.category];
+  const categoryShape = surface.category === 'compatible-access' ? undefined : categoryShapes[surface.category];
   if (categoryShape) {
     const [surfaceKind, endpointClass, endpointOwnership] = categoryShape;
-    if (surface.surfaceKind !== surfaceKind
-      || surface.endpointClass !== endpointClass
-      || surface.endpointOwnership !== endpointOwnership) {
+    if (
+      surface.surfaceKind !== surfaceKind ||
+      surface.endpointClass !== endpointClass ||
+      surface.endpointOwnership !== endpointOwnership
+    ) {
       errors.push(`${surface.id} has an invalid explicit shape for category ${surface.category}`);
     }
-  } else if (surface.surfaceKind !== 'compatible-api'
-    || !(new Set<string>([
-      'third-party-gateway:third-party',
-      'first-party:service-operator',
-      'user-endpoint:user',
-    ])).has(`${surface.endpointClass}:${surface.endpointOwnership}`)) {
+  } else if (
+    surface.surfaceKind !== 'compatible-api' ||
+    !new Set<string>(['third-party-gateway:third-party', 'first-party:service-operator', 'user-endpoint:user']).has(
+      `${surface.endpointClass}:${surface.endpointOwnership}`,
+    )
+  ) {
     errors.push(`${surface.id} has an invalid explicit compatible-access ownership shape`);
   }
   if (!profile) errors.push(`${surface.id} references unknown profile ${surface.profileId}`);
-  if (!authSchemas.has(surface.authSchemaId)) errors.push(`${surface.id} references unknown auth schema ${surface.authSchemaId}`);
+  if (!authSchemas.has(surface.authSchemaId))
+    errors.push(`${surface.id} references unknown auth schema ${surface.authSchemaId}`);
   for (const retiredId of surface.retiredModelIds ?? []) {
     if (surface.models.some((model) => model.modelId === retiredId || model.aliases.includes(retiredId))) {
       errors.push(`${surface.id} lists retired model ${retiredId} in its catalog`);
@@ -514,11 +550,13 @@ function validateSurface(
   }
   for (const alternative of surface.connectionSchema?.credentialAlternatives ?? []) {
     for (const fieldId of alternative.fieldIds) {
-      if (!connectionFieldIds.has(fieldId)) errors.push(`${surface.id}/${alternative.id} references missing connection field ${fieldId}`);
+      if (!connectionFieldIds.has(fieldId))
+        errors.push(`${surface.id}/${alternative.id} references missing connection field ${fieldId}`);
     }
   }
   for (const mapping of surface.connectionSchema?.headerMappings ?? []) {
-    if (!connectionFieldIds.has(mapping.fieldId)) errors.push(`${surface.id} header mapping references missing connection field ${mapping.fieldId}`);
+    if (!connectionFieldIds.has(mapping.fieldId))
+      errors.push(`${surface.id} header mapping references missing connection field ${mapping.fieldId}`);
   }
   for (const identityId of surface.identityIds) {
     if (!identities.has(identityId)) errors.push(`${surface.id} references unknown identity ${identityId}`);
@@ -531,13 +569,17 @@ function validateSurface(
   const discoveredProjection = surface.discoveredModelProjection;
   if (discoveredProjection) {
     if (!factSourceIds.has(discoveredProjection.factSourceId)) {
-      errors.push(`${surface.id} discovered model projection references unknown fact source ${discoveredProjection.factSourceId}`);
+      errors.push(
+        `${surface.id} discovered model projection references unknown fact source ${discoveredProjection.factSourceId}`,
+      );
     }
     if (surface.discovery.strategy === null) {
       errors.push(`${surface.id} declares a discovered model projection without discovery`);
     }
-    if (discoveredProjection.fast?.state === 'selectable'
-      && !discoveredProjection.executionBindings?.some((binding) => binding.when.fast === true)) {
+    if (
+      discoveredProjection.fast?.state === 'selectable' &&
+      !discoveredProjection.executionBindings?.some((binding) => binding.when.fast === true)
+    ) {
       errors.push(`${surface.id} projects selectable Fast without an execution binding`);
     }
     for (const binding of discoveredProjection.executionBindings ?? []) {
@@ -575,7 +617,8 @@ function validateSurface(
     if (routeIds.has(route.id)) errors.push(`${surface.id} has duplicate route id ${route.id}`);
     routeIds.add(route.id);
     routeAdapters.add(route.adapterId);
-    if (!adapters.has(route.adapterId)) errors.push(`${surface.id}/${route.id} has no registered adapter ${route.adapterId}`);
+    if (!adapters.has(route.adapterId))
+      errors.push(`${surface.id}/${route.id} has no registered adapter ${route.adapterId}`);
     if (!providerAdapterSupportsProtocol(route.adapterId, route.protocol)) {
       errors.push(`${surface.id}/${route.id} adapter ${route.adapterId} does not implement ${route.protocol}`);
     }
@@ -583,26 +626,20 @@ function validateSurface(
     if (surface.category === 'official-direct' && route.protocolOwner !== surface.serviceOperator) {
       errors.push(`${surface.id}/${route.id} is first-party direct but its protocol owner is ${route.protocolOwner}`);
     }
-    const admitted = profile?.routeMechanics.some((mechanic) => (
-      mechanic.protocol === route.protocol && mechanic.adapter === route.adapterId
-    ));
+    const admitted = profile?.routeMechanics.some(
+      (mechanic) => mechanic.protocol === route.protocol && mechanic.adapter === route.adapterId,
+    );
     if (profile && !admitted) errors.push(`${surface.id}/${route.id} is not admitted by profile ${profile.id}`);
     if (!route.contracts.state.supportedModes.includes(route.contracts.state.defaultMode)) {
       errors.push(`${surface.id}/${route.id} state default is not included in supportedModes`);
-    }
-    if (route.contracts.toolLoop.modelSwitch !== 'pin-until-terminal') {
-      errors.push(`${surface.id}/${route.id} must pin an active tool loop to its frozen execution identity`);
     }
   }
   if (stableJson([...routeAdapters].sort()) !== stableJson([...surface.adapterIds].sort())) {
     errors.push(`${surface.id} adapterIds do not match its routes`);
   }
   const strategy = surface.discovery.strategy;
-  const expectedDiscoveryPolicy = strategy === null
-    ? 'none'
-    : strategy.kind === 'custom-parser'
-      ? strategy.parserId
-      : 'json-catalog';
+  const expectedDiscoveryPolicy =
+    strategy === null ? 'none' : strategy.kind === 'custom-parser' ? strategy.parserId : 'json-catalog';
   if (surface.discoveryPolicyId !== expectedDiscoveryPolicy) {
     errors.push(`${surface.id} discoveryPolicyId does not match its strategy`);
   }
@@ -617,9 +654,12 @@ function validateSurface(
       errors.push(`${surface.id} override targets missing model ${override.modelId}`);
     }
     if (override.protocol && !surface.routes.some((route) => route.protocol === override.protocol)) {
-      errors.push(`${surface.id} override for ${override.modelId} references a protocol outside the surface route registry`);
+      errors.push(
+        `${surface.id} override for ${override.modelId} references a protocol outside the surface route registry`,
+      );
     }
-    if (!factSourceIds.has(override.factSourceId)) errors.push(`${surface.id} override has unknown fact source ${override.factSourceId}`);
+    if (!factSourceIds.has(override.factSourceId))
+      errors.push(`${surface.id} override has unknown fact source ${override.factSourceId}`);
   }
   for (const modelId of surface.recommendedModels) {
     if (surface.models.length > 0 && !modelKeys.has(modelId) && surface.discovery.strategy === null) {
@@ -632,9 +672,9 @@ export function compileProviderCatalog(input: ProviderCatalogCompileInput): Comp
   const identities = input.identities.map((value) => ProviderIdentityManifestSchema.parse(value));
   const profiles = input.profiles.map((value) => ProviderProfileManifestSchema.parse(value));
   const profileContractsById = new Map(profiles.map((profile) => [profile.id, profile]));
-  const surfaces = input.surfaces.map((value) => ProviderSurfaceManifestSchema.parse(
-    materializeSurfaceContractInput(value, profileContractsById),
-  ));
+  const surfaces = input.surfaces.map((value) =>
+    ProviderSurfaceManifestSchema.parse(materializeSurfaceContractInput(value, profileContractsById)),
+  );
   identities.sort((left, right) => left.id.localeCompare(right.id));
   profiles.sort((left, right) => left.id.localeCompare(right.id));
   surfaces.sort((left, right) => left.id.localeCompare(right.id));
@@ -654,7 +694,8 @@ export function compileProviderCatalog(input: ProviderCatalogCompileInput): Comp
   for (const surface of surfaces) validateSurface(surface, identityById, profileById, errors);
   const representedIdentities = surfaces.flatMap((surface) => surface.identityIds);
   const representedSet = new Set(representedIdentities);
-  if (representedIdentities.length !== representedSet.size) errors.push('A models.dev identity is represented by more than one surface');
+  if (representedIdentities.length !== representedSet.size)
+    errors.push('A models.dev identity is represented by more than one surface');
   for (const identity of identities) {
     if (!representedSet.has(identity.id)) errors.push(`Identity ${identity.id} has no explicit surface owner`);
   }
@@ -664,11 +705,16 @@ export function compileProviderCatalog(input: ProviderCatalogCompileInput): Comp
 
   const canonicalInput = { identities, profiles, surfaces };
   const catalogRevision = createHash('sha256').update(stableJson(canonicalInput), 'utf8').digest('hex');
-  const compiledSurfaces = new Map(surfaces.map((surface) => [surface.id, {
-    schemaVersion: PROVIDER_CATALOG_SCHEMA_VERSION,
-    catalogRevision,
-    surface,
-  }]));
+  const compiledSurfaces = new Map(
+    surfaces.map((surface) => [
+      surface.id,
+      {
+        schemaVersion: PROVIDER_CATALOG_SCHEMA_VERSION,
+        catalogRevision,
+        surface,
+      },
+    ]),
+  );
   const summaries = surfaces.map((surface) => ({
     schemaVersion: surface.schemaVersion,
     id: surface.id,
@@ -716,7 +762,11 @@ export function compileProviderCatalog(input: ProviderCatalogCompileInput): Comp
       catalogRevision,
       identityCount: identities.length,
       surfaceCount: surfaces.length,
-      modelCount: surfaces.reduce((count, surface) => count + surface.models.filter((model) => model.selection.pickerVisibility !== 'internal').length, 0),
+      modelCount: surfaces.reduce(
+        (count, surface) =>
+          count + surface.models.filter((model) => model.selection.pickerVisibility !== 'internal').length,
+        0,
+      ),
       surfaces: summaries,
     },
     identities,

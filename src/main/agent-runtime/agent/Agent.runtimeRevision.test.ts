@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { EventStream } from '../core/EventStream';
-import { __testing as responsesWire } from '../providers/OpenAIResponsesProvider';
+import * as responsesWire from '../providers/OpenAIResponsesProvider';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { Agent } from './Agent';
 import type { AssistantMessage, AssistantMessageEvent, Context, Message, Model, ToolDefinition } from '../core/types';
@@ -69,18 +69,21 @@ describe('Agent LoopRuntimeState', () => {
   it('delivers a native tool image through the default Agent path to Responses input', async () => {
     let request: Context | undefined;
     const completed: AssistantMessage = {
-      role: 'assistant', content: [{ type: 'text', text: 'Seen.' }],
-      model: model.id, provider: model.provider,
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Seen.' }],
+      model: model.id,
+      provider: model.provider,
       usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-      stopReason: 'stop', timestamp: 4,
+      stopReason: 'stop',
+      timestamp: 4,
     };
     const provider = {
       api: model.api,
       stream: (_model: Model, context: Context) => {
         request = context;
         const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(
-          event => event.type === 'done',
-          event => (event as Extract<AssistantMessageEvent, { type: 'done' }>).message,
+          (event) => event.type === 'done',
+          (event) => (event as Extract<AssistantMessageEvent, { type: 'done' }>).message,
         );
         queueMicrotask(() => stream.push({ type: 'done', reason: 'stop', message: completed }));
         return stream;
@@ -88,34 +91,47 @@ describe('Agent LoopRuntimeState', () => {
     };
     const agent = new Agent({
       initialState: {
-        model, tools: [], messages: [
+        model,
+        tools: [],
+        messages: [
           { role: 'user', content: 'Inspect the exported frame.', timestamp: 1 },
           {
-            role: 'assistant', content: [{ type: 'toolCall', id: 'image-call', name: 'read_image', arguments: {} }],
-            model: model.id, provider: model.provider,
+            role: 'assistant',
+            content: [{ type: 'toolCall', id: 'image-call', name: 'read_image', arguments: {} }],
+            model: model.id,
+            provider: model.provider,
             usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-            stopReason: 'toolUse', timestamp: 2,
+            stopReason: 'toolUse',
+            timestamp: 2,
           },
           {
-            role: 'toolResult', toolCallId: 'image-call', toolName: 'read_image',
+            role: 'toolResult',
+            toolCallId: 'image-call',
+            toolName: 'read_image',
             content: [
               { type: 'text', text: 'frame export' },
               { type: 'image', mimeType: 'image/png', data: 'YWJj' },
             ],
-            isError: false, timestamp: 3,
+            isError: false,
+            timestamp: 3,
           },
         ],
       },
-      provider, streamOptions,
+      provider,
+      streamOptions,
     });
 
     await agent.prompt('Describe visible evidence only.');
     expect(request).toBeDefined();
     const wire = responsesWire.toResponsesInput(request!, streamOptions.requestPlan) as Array<Record<string, unknown>>;
-    const output = wire.find(item => item.type === 'function_call_output' && item.call_id === 'image-call');
+    const output = wire.find((item) => item.type === 'function_call_output' && item.call_id === 'image-call');
     expect(output?.output).toContain('frame export');
-    const imageMessage = wire.find(item => item.role === 'user' && Array.isArray(item.content)
-      && (item.content as Array<{ type: string }>).some(part => part.type === 'input_image'));
+    const imageMessage = wire.find(
+      (item) =>
+        item.role === 'user' &&
+        Array.isArray(item.content) &&
+        (item.content as Array<{ type: string }>).some((part) => part.type === 'input_image'),
+    );
     expect(imageMessage).toMatchObject({
       content: expect.arrayContaining([{ type: 'input_image', image_url: 'data:image/png;base64,YWJj' }]),
     });
@@ -151,9 +167,7 @@ describe('Agent LoopRuntimeState', () => {
       streamOptions,
     });
 
-    agent.rehydrateMessages([
-      { role: 'user', content: 'from-disk', timestamp: 2 },
-    ]);
+    agent.rehydrateMessages([{ role: 'user', content: 'from-disk', timestamp: 2 }]);
     expect(agent.messages).toHaveLength(1);
     expect((agent.messages[0] as { content: string }).content).toBe('from-disk');
 

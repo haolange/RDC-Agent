@@ -5,12 +5,14 @@ import type {
   StructuredHandoffFact,
   StructuredHandoffProgress,
   StructuredHandoffResourceRef,
-} from '@shared/types/semanticContext';
+} from './structuredHandoff';
 import type { AgentMessage, AssistantMessage, ToolResultMessage, UserMessage } from '../core/types';
 
 const SECRET_NAME = /^(?:api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)$/i;
-const QUOTED_SECRET_ASSIGNMENT = /((?:["']?)(?:api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)(?:["']?)\s*[:=]\s*)(["'])[^"']+\2/gi;
-const SECRET_ASSIGNMENT = /(api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)\s*[:=]\s*[^\s,;]+/gi;
+const QUOTED_SECRET_ASSIGNMENT =
+  /((?:["']?)(?:api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)(?:["']?)\s*[:=]\s*)(["'])[^"']+\2/gi;
+const SECRET_ASSIGNMENT =
+  /(api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)\s*[:=]\s*[^\s,;]+/gi;
 const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+\x2f-]+=*/gi;
 const PREFIXED_API_TOKEN = /\b(?:sk|rk)-[A-Za-z0-9_-]{12,}\b/g;
 const JWT_TOKEN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
@@ -43,29 +45,39 @@ export interface DerivedContextBuildOptions {
   sections: ModelHandoffSections;
 }
 
-const redact = (value: string): string => value
-  .replace(BEARER_TOKEN, 'Bearer [REDACTED]')
-  .replace(PREFIXED_API_TOKEN, '[REDACTED]')
-  .replace(JWT_TOKEN, '[REDACTED]')
-  .replace(QUOTED_SECRET_ASSIGNMENT, '$1$2[REDACTED]$2')
-  .replace(SECRET_ASSIGNMENT, (_match, key: string) => `${key}: [REDACTED]`)
-  .replace(/\s+/g, ' ')
-  .trim();
+const redact = (value: string): string =>
+  value
+    .replace(BEARER_TOKEN, 'Bearer [REDACTED]')
+    .replace(PREFIXED_API_TOKEN, '[REDACTED]')
+    .replace(JWT_TOKEN, '[REDACTED]')
+    .replace(QUOTED_SECRET_ASSIGNMENT, '$1$2[REDACTED]$2')
+    .replace(SECRET_ASSIGNMENT, (_match, key: string) => `${key}: [REDACTED]`)
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const readableMessageText = (message: AgentMessage): string => {
   if (message.role === 'user') {
     const current = message as UserMessage;
     return typeof current.content === 'string'
       ? current.content
-      : current.content.filter((block) => block.type === 'text').map((block) => block.text).join('\n');
+      : current.content
+          .filter((block) => block.type === 'text')
+          .map((block) => block.text)
+          .join('\n');
   }
   if (message.role === 'assistant') {
     const current = message as AssistantMessage;
-    return current.content.filter((block) => block.type === 'text').map((block) => block.text).join('\n');
+    return current.content
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('\n');
   }
   if (message.role === 'toolResult') {
     const current = message as ToolResultMessage;
-    return current.content.filter((block) => block.type === 'text').map((block) => block.text).join('\n');
+    return current.content
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('\n');
   }
   return '';
 };
@@ -84,7 +96,13 @@ const readableMessageProjection = (message: AgentMessage): unknown => {
   }
   if (message.role === 'toolResult') {
     const current = message as ToolResultMessage;
-    return { role: current.role, toolCallId: current.toolCallId, toolName: current.toolName, text, isError: current.isError };
+    return {
+      role: current.role,
+      toolCallId: current.toolCallId,
+      toolName: current.toolName,
+      text,
+      isError: current.isError,
+    };
   }
   return { role: message.role, text };
 };
@@ -102,10 +120,7 @@ const toFacts = (items: string[], source: StructuredHandoffFact['source']): Stru
   return facts;
 };
 
-const extractResources = (
-  messages: AgentMessage[],
-  refs: string[],
-): StructuredHandoffResourceRef[] => {
+const extractResources = (messages: AgentMessage[], refs: string[]): StructuredHandoffResourceRef[] => {
   const resources: StructuredHandoffResourceRef[] = [];
   const seen = new Set<string>();
   const sanitizeResource = (kind: StructuredHandoffResourceRef['kind'], value: string): string => {
@@ -148,19 +163,27 @@ const extractResources = (
   return resources;
 };
 
-export const computeContextSourceHash = (
-  messages: AgentMessage[],
-  sourceTurnIds: string[] = [],
-): string => hashScopedResource({
-  sourceTurnIds,
-  messages: messages.map(message => ({ readable: readableMessageProjection(message), contentHash: hashScopedResource(message.content) })),
-});
+export const computeContextSourceHash = (messages: AgentMessage[], sourceTurnIds: string[] = []): string =>
+  hashScopedResource({
+    sourceTurnIds,
+    messages: messages.map((message) => ({
+      readable: readableMessageProjection(message),
+      contentHash: hashScopedResource(message.content),
+    })),
+  });
 
-export const serializeHandoffSourceTranscript = (messages: AgentMessage[]): string => messages
-  .map((message, index) => `message:${index} timestamp:${message.timestamp} ${redact(JSON.stringify(readableMessageProjection(message)))}`)
-  .join('\n');
+export const serializeHandoffSourceTranscript = (messages: AgentMessage[]): string =>
+  messages
+    .map(
+      (message, index) =>
+        `message:${index} timestamp:${message.timestamp} ${redact(JSON.stringify(readableMessageProjection(message)))}`,
+    )
+    .join('\n');
 
-const SECTION_ALIASES: Record<string, keyof ModelHandoffSections | 'progress.done' | 'progress.inProgress' | 'progress.blocked'> = {
+const SECTION_ALIASES: Record<
+  string,
+  keyof ModelHandoffSections | 'progress.done' | 'progress.inProgress' | 'progress.blocked'
+> = {
   goal: 'objective',
   objective: 'objective',
   constraints: 'constraints',
@@ -193,7 +216,9 @@ const pushSectionValue = (
   key: keyof ModelHandoffSections | 'progress.done' | 'progress.inProgress' | 'progress.blocked',
   value: string,
 ): void => {
-  const text = redact(value).replace(/^[-*]\s+/, '').trim();
+  const text = redact(value)
+    .replace(/^[-*]\s+/, '')
+    .trim();
   if (!text) return;
   if (key === 'objective') {
     sections.objective = [sections.objective, text].filter(Boolean).join(' ');
@@ -211,9 +236,13 @@ const pushSectionValue = (
 
 export const parseModelHandoffSections = (text: string): ModelHandoffSections => {
   const sections = emptySections();
-  let current: keyof ModelHandoffSections | 'progress.done' | 'progress.inProgress' | 'progress.blocked' = 'criticalContext';
+  let current: keyof ModelHandoffSections | 'progress.done' | 'progress.inProgress' | 'progress.blocked' =
+    'criticalContext';
   for (const rawLine of text.split(/\r?\n/)) {
-    const heading = rawLine.replace(/^#{1,6}\s+/, '').trim().toLocaleLowerCase();
+    const heading = rawLine
+      .replace(/^#{1,6}\s+/, '')
+      .trim()
+      .toLocaleLowerCase();
     const aliased = SECTION_ALIASES[heading];
     if (aliased && /^#{1,6}\s+/.test(rawLine)) {
       current = aliased;
@@ -241,8 +270,7 @@ export const assembleDerivedContextView = (
     blocked: toFacts(options.sections.progress.blocked, 'assistant'),
   };
   const content = {
-    objective: redact(options.sections.objective)
-      || 'No explicit objective was present in the compacted source.',
+    objective: redact(options.sections.objective) || 'No explicit objective was present in the compacted source.',
     decisions: toFacts(options.sections.decisions, 'assistant'),
     constraints: toFacts(options.sections.constraints, 'assistant'),
     facts: toFacts(options.sections.criticalContext, 'assistant'),
@@ -284,25 +312,25 @@ export const assembleDerivedContextView = (
   };
 };
 
-const section = (title: string, facts: StructuredHandoffFact[]): string[] => (
-  facts.length ? [`${title}:`, ...facts.map((fact) => `- ${fact.text}`)] : []
-);
+const section = (title: string, facts: StructuredHandoffFact[]): string[] =>
+  facts.length ? [`${title}:`, ...facts.map((fact) => `- ${fact.text}`)] : [];
 
-export const renderStructuredHandoff = (handoff: StructuredHandoff): string => [
-  '[Derived context; not a user request]',
-  `Objective: ${handoff.objective}`,
-  ...section('Constraints', handoff.constraints),
-  ...section('Progress done', handoff.progress?.done ?? []),
-  ...section('Progress in progress', handoff.progress?.inProgress ?? []),
-  ...section('Progress blocked', handoff.progress?.blocked ?? []),
-  ...section('Decisions', handoff.decisions),
-  ...section('Errors and failed attempts', handoff.failedAttempts ?? []),
-  ...section('Next steps', handoff.nextSteps ?? handoff.openWork),
-  ...section('Critical context', handoff.facts),
-  ...(handoff.resourceRefs.length
-    ? ['Resources:', ...handoff.resourceRefs.map((ref) => `- ${ref.kind}: ${ref.value}`)]
-    : []),
-].join('\n');
+export const renderStructuredHandoff = (handoff: StructuredHandoff): string =>
+  [
+    '[Derived context; not a user request]',
+    `Objective: ${handoff.objective}`,
+    ...section('Constraints', handoff.constraints),
+    ...section('Progress done', handoff.progress?.done ?? []),
+    ...section('Progress in progress', handoff.progress?.inProgress ?? []),
+    ...section('Progress blocked', handoff.progress?.blocked ?? []),
+    ...section('Decisions', handoff.decisions),
+    ...section('Errors and failed attempts', handoff.failedAttempts ?? []),
+    ...section('Next steps', handoff.nextSteps ?? handoff.openWork),
+    ...section('Critical context', handoff.facts),
+    ...(handoff.resourceRefs.length
+      ? ['Resources:', ...handoff.resourceRefs.map((ref) => `- ${ref.kind}: ${ref.value}`)]
+      : []),
+  ].join('\n');
 
 export const createStructuredHandoffMessage = (view: DerivedContextView): UserMessage => ({
   role: 'user',

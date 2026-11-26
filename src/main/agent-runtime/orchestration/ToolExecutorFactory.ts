@@ -1,82 +1,57 @@
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { childScopePrefix, rootScopeId } from '@shared/utils/executionScope';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
-import { isHandoffContinueAction } from '@shared/types/planReview';
-import { isRdcLeaseToolName } from '@shared/constants/rdcLeaseTools';
+import { AppError } from '@shared/errors/appError';
 import { executeWithPermissionAdmission } from '../permissions/ToolPermissionAdmission';
 import { withProcessExecutionOwner } from '../../runtime/ResourceExecutionLifetime';
 import { getRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 /**
  * ToolExecutorFactory — createToolExecutor and tool-call mediation helpers.
+ * Per-tool behaviour (concurrency class, host prompts, capture access, Knowledge roots,
+ * result presentation) is read from the declared `AgentTool.spec`, never from the tool name.
  */
 
-import { toolToDefinition } from '../agent/AgentTool';
-import { getWorkspaceRoot, withTemporaryPathAccess } from '../tools/primitives/_shared';
-import { isKnowledgeReadFileTool } from '../knowledgeReadRoots';
+import { getWorkspaceRoot, withTemporaryPathAccess } from '../../runtime/toolFiles';
 import { buildDiagnosticAgentEvent } from '../AgentEventBridge';
 import { agentUserInputRequestService } from '../interactions/AgentUserInputRequestService';
-import { agentPlanReviewRequestService } from '../interactions/AgentPlanReviewRequestService';
-import {
-  composePlanMarkdown,
-  planArtifactWriter,
-  sectionsFromMarkdown,
-} from '../../sessions/run/sessionPlanArtifact';
-import { planReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
-import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../tasks';
-import { preparePlanTaskRequirements } from '../tasks/TaskExecutionRequirements';
-import { prepareInvestigationPlan } from '../../sessions/run/prepareInvestigationPlan';
-import { rdcSessionService } from '../../sessions';
-import { assertDeclaredHandoffForPlan } from '../../conversation/applyDeclaredHandoff';
 import { authorizeToolPermission, ToolPermissionDenied } from '../permissions/ToolPermissionAuthorization';
-import { isToolDeniedByPolicy } from '../permissions/PolicyCompiler';
-import { ToolValidationError, toolValidator } from '../core/ToolValidator';
 import { hookEngine } from '../../hooks/HookEngine';
 import { appPathService } from '../../runtime/AppPathService';
-import { countSubagentCalls, isAgentToolCallConcurrencySafe } from '../agent/toolConcurrency';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
+import { countSubagentDispatches, isConcurrencySafeSpec, resourceClaimOf } from '../agent/toolConcurrency';
+import { sessionRecordStore } from '../../sessions/store/sessionStores';
 import { artifactizeToolResult } from '../tools/ToolResultArtifactizer';
 import { RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
-import { APPROVED_CAPTURE_SCOPE_REQUIRED, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
+import { reserveDispatchBudget } from './TurnCoordinator';
 import { normalizeToolName } from './RuntimeToolPolicy';
-import {
-  extractDeferredToolNamesFromToolSearchDetails,
-  isDeferredToolName,
-} from './deferredTools';
+import { extractDeferredToolNamesFromToolSearchDetails } from './deferredTools';
 import { flushPolicyBudgetObservers } from './DelegationBudget';
+import { executePlanArtifact, type PlanArtifactToolCall } from './PlanArtifactSubmission';
 import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
-import { listUnfinishedDirectTasks } from './DirectTaskTurnLifecycle';
-import type { ResolvedRuntimeTools, ToolExecutorRuntimeContext } from './orchestratorTypes';
+import {
+  admitToolCall,
+  captureAccessDenial,
+  errorToolResult,
+  reserveCallBudget,
+  validateToolArguments,
+  type DenyTool,
+  type ToolCallAdmissionDeps,
+  type ToolExecutorScope,
+  type ValidatedToolCall,
+} from './ToolCallAdmission';
+import type { RuntimeToolResolver, ToolExecutorRuntimeContext } from './orchestratorTypes';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import type { AgentSlotRegistry } from './AgentSlotRegistry';
-import type { ToolCall, ToolResultMessage } from '../core/types';
+import type { ToolCallContent, ToolResultMessage } from '../core/types';
+import type { ToolCall } from '@shared/types/tool';
 import type { ToolExecutor } from '../agent/AgentLoop';
-import type { AgentToolResult, ToolExecutionContext } from '../agent/AgentTool';
+import type { AgentTool, AgentToolResult, ToolExecutionContext } from '../agent/AgentTool';
 import type { HookEvent } from '@shared/types/rdcRuntime';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentPermissionDecision } from '../permissions/AgentPermissionPolicy';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 
-export interface ToolExecutorFactoryDeps {
-  slots: AgentSlotRegistry;
+export interface ToolExecutorFactoryDeps extends ToolCallAdmissionDeps {
   deferredActivation: DeferredToolActivationTracker;
-  getActiveTurn: (sessionId?: string | null) => TurnHandle | null;
-  resolveRuntimeTools: (
-    agentId: AgentRole,
-    toolAllowlist: string[],
-    sessionId?: string | null,
-    turnHandle?: TurnHandle | null,
-    projectId?: string | null,
-    projectRootPath?: string | null,
-    mcpPoolKey?: string | null,
-    options?: { excludeRdcLeaseTools?: boolean; excludeSubagent?: boolean },
-  ) => ResolvedRuntimeTools;
-  isAllowedForRuntime: (
-    agentId: AgentRole,
-    toolName: string,
-    frozenToolAllowlist?: readonly string[],
-    excludeRdcLeaseTools?: boolean,
-  ) => boolean;
-  matchesToolAllowlist: (toolName: string, toolAllowlist: string[]) => boolean;
+  tools: Pick<RuntimeToolResolver, 'resolveRuntimeTools'>;
 }
 
 export class ToolExecutorFactory {
@@ -92,13 +67,16 @@ export class ToolExecutorFactory {
   private sessionFileReads(sessionId: string | null | undefined): Set<string> {
     if (!sessionId) return new Set();
     let reads = this.successfulFileReads.get(sessionId);
-    if (!reads) { reads = new Set(); this.successfulFileReads.set(sessionId, reads); }
+    if (!reads) {
+      reads = new Set();
+      this.successfulFileReads.set(sessionId, reads);
+    }
     return reads;
   }
   constructor(private readonly deps: ToolExecutorFactoryDeps) {}
 
   activateDeferredTools(toolNames: string[], sessionId?: string | null): void {
-    const activation = this.deps.getActiveTurn(sessionId)?.deferredActivation ?? null;
+    const activation = this.deps.activeTurns.getActiveTurn(sessionId)?.deferredActivation ?? null;
     if (!activation || toolNames.length === 0) {
       return;
     }
@@ -125,329 +103,345 @@ export class ToolExecutorFactory {
     sessionId?: string | null,
     runtimeContext?: ToolExecutorRuntimeContext,
   ): ToolExecutor {
-    // Frozen constraints / skills / policy / toolAllowlist come from the plan; mode is main-owned live state.
+    const scope = this.createExecutorScope(agentId, toolAllowlist, sessionId, runtimeContext);
+    const specOf = (toolName: string) => scope.tools.get(normalizeToolName(toolName))?.spec;
+    return {
+      shouldEndTurnAfterToolResult: (result) => {
+        const approved = this.deps.activeTurns.getActiveTurn(sessionId)?.approvedPlan;
+        // The result names the tool exactly as called; only the canonical name resolves.
+        return (
+          !result.isError &&
+          scope.tools.get(result.toolName)?.spec.interaction === 'plan-review' &&
+          approved?.toolCallId === result.toolCallId
+        );
+      },
+      isConcurrencySafe: (toolCall: ToolCall) => isConcurrencySafeSpec(specOf(toolCall.name)),
+      reserveDispatchBudget: (toolCalls: ToolCall[]) => {
+        const cost = {
+          toolCalls: toolCalls.length,
+          subagents: countSubagentDispatches(toolCalls.map((call) => specOf(call.name))),
+        };
+        const reserved = reserveDispatchBudget(runtimeContext?.policyBudget, cost);
+        if (reserved.ok) {
+          for (const call of toolCalls) {
+            scope.reservedCallIds.add(call.id);
+          }
+        }
+        return reserved;
+      },
+      execute: (toolCall, signal, onUpdate, onExecutionStart) =>
+        this.executeToolCall(scope, toolCall, signal, onUpdate, onExecutionStart),
+    };
+  }
+
+  /** Frozen constraints / skills / policy / toolAllowlist come from the plan; mode is main-owned live state. */
+  private createExecutorScope(
+    agentId: AgentRole,
+    toolAllowlist: string[],
+    sessionId: string | null | undefined,
+    runtimeContext: ToolExecutorRuntimeContext | undefined,
+  ): ToolExecutorScope {
     const plan = runtimeContext?.effectivePlan;
-    const effectiveToolAllowlist = plan
-      ? [...plan.toolAllowlist]
-      : toolAllowlist;
-    const tools = this.deps.resolveRuntimeTools(
+    const effectiveToolAllowlist = plan ? [...plan.toolAllowlist] : toolAllowlist;
+    const tools = this.deps.tools.resolveRuntimeTools(
       agentId,
       // Match the prepared schemas, including the tool_search closure. Building
       // from the broader profile list advertises tools the frozen Skill forbids.
       [...(plan?.skillIntersection ?? effectiveToolAllowlist)],
       sessionId,
-      this.deps.getActiveTurn(sessionId),
+      this.deps.activeTurns.getActiveTurn(sessionId),
       runtimeContext?.projectId ?? plan?.projectId,
       runtimeContext?.projectRootPath ?? plan?.projectRootPath,
       runtimeContext?.mcpPoolKey ?? null,
-      { excludeRdcLeaseTools: plan?.excludeRdcLeaseTools === true,
-        excludeSubagent: plan?.excludeSubagent === true },
+      { excludeRdcLeaseTools: plan?.excludeRdcLeaseTools === true, excludeSubagent: plan?.excludeSubagent === true },
     ).toolMap;
     // Skill allowed-tools 收窄集（DESIGN Skills 条款：只收窄、不扩展）。
     // 多 skill：allowedTools = ∩(skill_i) ∩ runtimeAllowlist（空声明不参与）。
-    // Frozen on prepareTurn. skill_read does not re-narrow mid-turn.
-    let activeSkillAllowlist: Set<string> | null = plan?.skillIntersection
-      ? new Set(plan.skillIntersection)
-      : null;
-    // 无 plan 时才从 settings 解析 preloaded skills；有 plan 则用冻结的 skillIntersection。
-    const permissionConstraints = plan?.permissionConstraints;
-    const compiledPolicy = plan?.policy;
-    const planActivatedDeferredTools = new Set(plan?.activatedDeferredTools ?? []);
-    const reservedCallIds = new Set<string>();
     return {
-      shouldEndTurnAfterToolResult: (result) => {
-        const approved = this.deps.getActiveTurn(sessionId)?.approvedPlan;
-        return !result.isError && result.toolName === 'plan_artifact' && approved?.toolCallId === result.toolCallId;
-      },
-      isConcurrencySafe: (toolCall: ToolCall) => {
-        const normalizedName = normalizeToolName(toolCall.name);
-        return isAgentToolCallConcurrencySafe(tools.get(normalizedName), {
-          ...toolCall,
-          name: normalizedName,
-        });
-      },
-      reserveDispatchBudget: (toolCalls: ToolCall[]) => {
-        const cost = {
-          toolCalls: toolCalls.length,
-          subagents: countSubagentCalls(toolCalls.map((call) => ({ name: normalizeToolName(call.name) }))),
-        };
-        const reserved = reserveDispatchBudget(runtimeContext?.policyBudget, cost);
-        if (reserved.ok) {
-          for (const call of toolCalls) {
-            reservedCallIds.add(call.id);
-          }
-        }
-        return reserved;
-      },
-      execute: async (toolCall: ToolCall, signal?: AbortSignal, onUpdate?: (partialResult: unknown) => void, onExecutionStart?: (permissionState?: RuntimePermissionState) => void) => {
-        const denyTool = (reason?: string) => this.createPolicyDeniedToolResult(
-          toolCall,
-          agentId,
-          reason,
-          runtimeContext,
-        );
-        const normalizedName = normalizeToolName(toolCall.name);
-        if (
-          (plan?.excludeRdcLeaseTools && isRdcLeaseToolName(toolCall.name))
-          || (plan?.excludeSubagent && normalizedName === 'subagent')
-          || !this.deps.isAllowedForRuntime(
-            agentId,
-            toolCall.name,
-            effectiveToolAllowlist,
-            plan?.excludeRdcLeaseTools === true,
-          )
-          || !tools.has(normalizedName)
-        ) {
-          return denyTool();
-        }
-        if (
-          activeSkillAllowlist !== null
-          && !this.deps.matchesToolAllowlist(normalizedName, Array.from(activeSkillAllowlist))
-        ) {
-          return denyTool(
-            `Tool "${toolCall.name}" is outside the allowed-tools set declared by the active skill.`,
-          );
-        }
-        if (compiledPolicy && isToolDeniedByPolicy(compiledPolicy, normalizedName)) {
-          return denyTool(
-            `POLICY_DENIED: tool "${toolCall.name}" is in deniedTools.`,
-          );
-        }
-        if (isDeferredToolName(normalizedName)) {
-          const activation = this.deps.getActiveTurn(runtimeContext?.sessionId)?.deferredActivation ?? null;
-          const slot = activation ? this.deps.slots.getSlot(activation.slotKey) : undefined;
-          const activatedByFrozenPlan = planActivatedDeferredTools.has(normalizedName);
-          const activatedDuringTurn = slot?.activatedDeferredTools.has(normalizedName) === true;
-          if (!activatedByFrozenPlan && !activatedDuringTurn) {
-            return {
-              role: 'toolResult',
-              toolCallId: toolCall.id,
-              toolName: toolCall.name,
-              content: [{ type: 'text', text: 'TOOL_NOT_ACTIVATED: Use tool_search first.' }],
-              isError: true,
-              timestamp: Date.now(),
-            };
-          }
-        }
-        const tool = tools.get(normalizedName);
-        if (!tool) {
-          return denyTool();
-        }
-        const policyBudget = runtimeContext?.policyBudget;
-        const alreadyReserved = reservedCallIds.delete(toolCall.id);
-        if (policyBudget && !alreadyReserved) {
-          const reserved = reserveDispatchBudget(policyBudget, { toolCalls: 1, subagents: 0 });
-          if (!reserved.ok) {
-            return this.createPolicyLimitToolResult(toolCall, agentId, reserved.limit);
-          }
-        }
-        await flushPolicyBudgetObservers(policyBudget);
-        let validatedArgs: Record<string, unknown>;
-        try {
-          validatedArgs = toolValidator.validate(toolToDefinition(tool), toolCall.arguments ?? {});
-          tool.validateArgs?.(validatedArgs);
-        } catch (error) {
-          const message = error instanceof ToolValidationError
-            ? error.message
-            : error instanceof Error ? error.message : String(error);
-          return {
-            role: 'toolResult',
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            content: [{ type: 'text', text: `TOOL_SCHEMA_VIOLATION: ${message}` }],
-            isError: true,
-            timestamp: Date.now(),
-          };
-        }
-        const validatedToolCall: ToolCall = { ...toolCall, arguments: validatedArgs };
-        const activeTurn = this.deps.getActiveTurn(runtimeContext?.sessionId ?? sessionId);
-        const captureControl = activeTurn?.captureControl;
-        const needsLiveCapture = normalizedName === 'shell' && validatedArgs.rdc !== undefined
-          || normalizedName === 'rdc_probe' && !['enumerate', 'doctor', 'version'].includes(String(validatedArgs.action));
-        const rdc = validatedArgs.rdc;
-        const invokesRdcOperation = normalizedName === 'shell' && rdc !== null && typeof rdc === 'object'
-          && !Array.isArray(rdc) && 'operation' in rdc;
-        if (activeTurn?.requiresApprovedCaptureScope && (invokesRdcOperation || normalizedName === 'rdc_probe' && needsLiveCapture)) {
-          return denyTool(APPROVED_CAPTURE_SCOPE_REQUIRED);
-        }
-        if (captureControl && needsLiveCapture) {
-          try { captureControl.assertLiveAccess(); }
-          catch (error) { return denyTool(error instanceof Error ? error.message : String(error)); }
-        }
-        if (normalizedName === 'ask_user') {
-          return this.executeAskUserTool(validatedToolCall, agentId, runtimeContext, signal, onExecutionStart);
-        }
-        if (normalizedName === 'plan_artifact') {
-          return this.executePlanArtifactTool(validatedToolCall, agentId, runtimeContext, signal, onExecutionStart);
-        }
-        const executorSessionId = runtimeContext?.sessionId ?? sessionId ?? null;
-        let sessionAttachmentsRoot: string | null = null;
-        if (executorSessionId) {
-          try {
-            sessionAttachmentsRoot = storageAdapter.getSessionAttachmentsDir(executorSessionId);
-          } catch {
-            sessionAttachmentsRoot = null;
-          }
-        }
-        const knowledgeReadRoots = plan?.knowledgeReadRoots ?? [];
-        const projectRootPath = runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null;
-        const executionPlan = this.deps.getActiveTurn(executorSessionId)?.runtimePlan ?? plan;
-        const toolContext: ToolExecutionContext = {
-          successfulFileReads: this.sessionFileReads(runtimeContext?.sessionId ?? sessionId),
-          rdcBinding: executionPlan ? getRdcTurnBinding(executionPlan) : undefined,
-          captureControl: this.deps.getActiveTurn(executorSessionId)?.captureControl ?? undefined,
-          agentId,
-          accessCeiling: plan?.accessCeiling,
-          turnId: runtimeContext?.turnId,
-          excludeRdcLeaseTools: plan?.excludeRdcLeaseTools,
-          workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
-          projectRootPath,
-          projectId: runtimeContext?.projectId ?? plan?.projectId ?? null,
-          sessionId: runtimeContext?.sessionId ?? null,
-          visionInputMode: plan?.routeCapability?.visionInputMode ?? 'disabled',
-          ...(normalizedName === 'knowledge_read' ? { knowledgeReadRoots } : {}),
-        };
-        if (signal?.aborted) return denyTool('Tool call cancelled before execution.');
-        if (policyBudget) {
-          const current = reserveDispatchBudget(policyBudget, { toolCalls: 0, subagents: 0 });
-          if (!current.ok) return this.createPolicyLimitToolResult(toolCall, agentId, current.limit);
-        }
-        try {
-          let executionAnnounced = false;
-          const announceExecution = (state: RuntimePermissionState) => {
-            if (!executionAnnounced) { executionAnnounced = true; onExecutionStart?.(state); }
-          };
-          if (!permissionConstraints) return denyTool('PERMISSION_CONSTRAINTS_MISSING: a prepared runtime plan is required.');
-          const beforeExecute = async () => {
-            const beforeHooks = await this.triggerRuntimeHooks('tool.before-call', agentId, runtimeContext, {
-              toolName: toolCall.name,
-              toolCallId: toolCall.id,
-              arguments: structuredClone(validatedArgs),
-            });
-            if (!beforeHooks.allowed) {
-              throw new ToolPermissionDenied(`A blocking lifecycle hook denied this tool call: ${beforeHooks.reason ?? 'reason unavailable'}`);
-            }
-          };
-          const injectKnowledgeRoots = isKnowledgeReadFileTool(normalizedName);
-          const executeToolEffect = (permissionDecision: AgentPermissionDecision, permissionState: RuntimePermissionState) => withProcessExecutionOwner(runtimeContext?.sessionId ?? sessionId, () => withTemporaryPathAccess(
-            toolContext,
-            [
-              ...(permissionDecision.temporaryPathRoots ?? []),
-              ...(injectKnowledgeRoots ? knowledgeReadRoots : []),
-            ],
-            (scopedContext) => { announceExecution(permissionState); return tool.execute(
-              toolCall.id,
-              validatedArgs,
-              signal,
-              onUpdate,
-              scopedContext,
-            ); },
-          ));
-          // Unsafe effects from parent and detached children share the same
-          // session/project gate. The subagent call itself is orchestration;
-          // locking it here would deadlock while awaiting child effects.
-          const ownerSessionId = rootScopeId(runtimeContext?.sessionId ?? sessionId ?? 'ephemeral');
-          // Project files/shell state are shared across sessions; use the
-          // canonical project root when available and fall back to session
-          // ownership only for ephemeral/no-project execution.
-          const resourceKey = toolResourceKey(projectRootPath, ownerSessionId);
-          const admissionTurn = this.deps.getActiveTurn(executorSessionId);
-          const admissionGeneration = admissionTurn?.generation;
-          const argumentIdentity = JSON.stringify(validatedArgs);
-          const assertLive = () => {
-            if (JSON.stringify(validatedArgs) !== argumentIdentity || admissionTurn && !admissionTurn.isLive(admissionGeneration!)) {
-              throw new Error('PERMISSION_ADMISSION_STALE: call arguments or turn changed.');
-            }
-          };
-          const result = await executeWithPermissionAdmission({
-            signal, beforeExecute, assertLive,
-            authorize: (snapshot, approvalSignal) => authorizeToolPermission({
-              decision: { executionContext: toolContext,
-                effectiveToolNames: [...tools.keys()].filter(name => !activeSkillAllowlist || activeSkillAllowlist.has(name)),
-                tool, toolCall: validatedToolCall, agentId, projectRootPath, permissionConstraints,
-                compiledPolicy, sessionAttachmentsRoot, knowledgeReadRoots },
-              approval: runtimeContext?.eventContext && runtimeContext.turnId ? {
-                agentId, sessionId: runtimeContext.sessionId ?? null, turnId: runtimeContext.turnId,
-                toolCallId: toolCall.id, toolName: toolCall.name, context: runtimeContext.eventContext, onEvent: runtimeContext.onEvent,
-              } : undefined,
-              reviewer: runtimeContext?.reviewPermission, executionBudget: policyBudget, assertLive,
-            }, snapshot, approvalSignal),
-            withResource: async (operation, permissionState) => {
-              // The affected child may itself be waiting for this resource. Join it
-              // after authorization but before taking the recovery's exclusive lock.
-              if (normalizedName === 'rdc_probe' && validatedArgs.action === 'capture_recover'
-                && toolContext.captureControl && toolContext.agentId === GENERAL_AGENT_ID && toolContext.accessCeiling === 'full'
-                && toolContext.turnId && toolContext.sessionId && toolContext.projectId) {
-                announceExecution(permissionState);
-                await toolContext.captureControl.prepareRecovery(permissionState.revision, signal);
-              }
-              return tool.spec?.orchestration === true ? operation()
-                : isAgentToolCallConcurrencySafe(tool, validatedToolCall)
-                  ? toolResourceArbiter.runShared(resourceKey, signal, operation)
-                  : toolResourceArbiter.runExclusive(resourceKey, signal, operation);
-            },
-            execute: executeToolEffect,
-          });
-          await this.triggerRuntimeHooks('tool.after-call', agentId, runtimeContext, {
-            toolName: toolCall.name,
-            toolCallId: toolCall.id,
-            isError: result.isError === true,
-          });
-          // Deferred 激活：仅 tool_search 可激活；直接调用未激活 deferred → 上文已 fail-closed。
-          if (normalizedName === 'tool_search' && result.isError !== true) {
-            this.activateDeferredTools(
-              extractDeferredToolNamesFromToolSearchDetails(result.details),
-              runtimeContext?.sessionId,
-            );
-          }
-          // skill_read is discovery only. Armed-skill ∩ is frozen on prepareTurn
-          // from profile.skills / composer $skill / /skills — not from a read.
-          const finalized = result.isError === true && toolCall.name !== 'code_interpreter'
-            ? result
-            : artifactizeToolResult({
-                sessionId: runtimeContext?.sessionId ?? sessionId,
-                toolCallId: toolCall.id,
-                toolName: toolCall.name,
-                result,
-                pinBelowThreshold: (normalizedName === 'read_file' && (validatedToolCall.arguments.mode === 'audit'
-                  || validatedToolCall.arguments.pinEvidence === true))
-                  || normalizedName === 'runtime_context' || (normalizedName === 'rdc_probe' && validatedArgs.action === 'probe')
-                  || toolCall.name === 'code_interpreter' || (toolCall.name === 'shell'
-                  && typeof result.details === 'object' && result.details !== null
-                  && 'operation' in result.details && typeof result.details.operation === 'string'
-                  && (result.details.operation.startsWith('rd.')
-                    || result.details.operation === 'rdc_tool.tools.search'
-                    || result.details.operation === 'rdc_tool.tools.describe'
-                    || result.details.operation === 'rdc_tool.tools.list')),
-              });
-          return this.agentToolResultToMessage(toolCall, finalized);
-        } catch (error) {
-          if (error instanceof ToolPermissionDenied) return error.requiresApproval
-            ? this.createApprovalRequiredToolResult(toolCall, agentId, error.message)
-            : denyTool(error.message);
-          await this.triggerRuntimeHooks('tool.on-error', agentId, runtimeContext, {
-            toolName: toolCall.name,
-            toolCallId: toolCall.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          if (normalizedName === 'shell' && error instanceof RdcNativeFailure && error.deliveryResult) {
-            return this.agentToolResultToMessage(toolCall, artifactizeToolResult({
-              sessionId: runtimeContext?.sessionId ?? sessionId,
-              toolCallId: toolCall.id, toolName: toolCall.name,
-              result: error.deliveryResult, pinBelowThreshold: true,
-            }));
-          }
-          return {
-            role: 'toolResult',
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
-            isError: true,
-            timestamp: Date.now(),
-          };
-        }
-      },
+      agentId,
+      sessionId,
+      runtimeContext,
+      plan,
+      effectiveToolAllowlist,
+      tools,
+      activeSkillAllowlist: plan?.skillIntersection ? new Set(plan.skillIntersection) : null,
+      planActivatedDeferredTools: new Set(plan?.activatedDeferredTools ?? []),
+      reservedCallIds: new Set<string>(),
     };
+  }
+
+  private async executeToolCall(
+    scope: ToolExecutorScope,
+    toolCall: ToolCallContent,
+    signal?: AbortSignal,
+    onUpdate?: (partialResult: unknown) => void,
+    onExecutionStart?: (permissionState?: RuntimePermissionState) => void,
+  ): Promise<ToolResultMessage> {
+    const { agentId, runtimeContext, sessionId } = scope;
+    const denyTool: DenyTool = (reason) => this.createPolicyDeniedToolResult(toolCall, agentId, reason, runtimeContext);
+    const admitted = admitToolCall(this.deps, scope, toolCall, denyTool);
+    if (!admitted.ok) return admitted.result;
+    const tool = admitted.value;
+    const exhaustedLimit = reserveCallBudget(scope, toolCall);
+    if (exhaustedLimit) return this.createPolicyLimitToolResult(toolCall, agentId, exhaustedLimit);
+    await flushPolicyBudgetObservers(runtimeContext?.policyBudget);
+    const validated = validateToolArguments(tool, toolCall);
+    if (!validated.ok) return validated.result;
+    const call: ValidatedToolCall = { toolCall, tool, args: validated.value };
+    const captureDenial = captureAccessDenial(
+      call,
+      this.deps.activeTurns.getActiveTurn(runtimeContext?.sessionId ?? sessionId),
+    );
+    if (captureDenial) return denyTool(captureDenial);
+    if (tool.spec.interaction === 'user-input') {
+      return this.executeAskUserTool(
+        { ...toolCall, arguments: call.args },
+        agentId,
+        runtimeContext,
+        signal,
+        onExecutionStart,
+      );
+    }
+    if (tool.spec.interaction === 'plan-review') {
+      return this.executePlanArtifactTool({
+        toolCall: { ...toolCall, arguments: call.args },
+        agentId,
+        runtimeContext,
+        signal,
+        onExecutionStart,
+      });
+    }
+    return this.executeToolEffect(scope, call, denyTool, signal, onUpdate, onExecutionStart);
+  }
+
+  private buildExecutionContext(
+    scope: ToolExecutorScope,
+    tool: AgentTool,
+    executorSessionId: string | null,
+  ): ToolExecutionContext {
+    const { plan, runtimeContext, sessionId } = scope;
+    const projectRootPath = runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null;
+    const executionPlan = this.deps.activeTurns.getActiveTurn(executorSessionId)?.runtimePlan ?? plan;
+    return {
+      successfulFileReads: this.sessionFileReads(runtimeContext?.sessionId ?? sessionId),
+      rdcBinding: executionPlan ? getRdcTurnBinding(executionPlan) : undefined,
+      captureControl: this.deps.activeTurns.getActiveTurn(executorSessionId)?.captureControl ?? undefined,
+      agentId: scope.agentId,
+      accessCeiling: plan?.accessCeiling,
+      turnId: runtimeContext?.turnId,
+      excludeRdcLeaseTools: plan?.excludeRdcLeaseTools,
+      workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
+      projectRootPath,
+      projectId: runtimeContext?.projectId ?? plan?.projectId ?? null,
+      sessionId: runtimeContext?.sessionId ?? null,
+      visionInputMode: plan?.routeCapability.visionInputMode ?? 'disabled',
+      ...(tool.spec.knowledgeRoots === 'reference' ? { knowledgeReadRoots: plan?.knowledgeReadRoots ?? [] } : {}),
+    };
+  }
+
+  /** Final permission admission, resource claim, the tool effect, lifecycle hooks and result presentation. */
+  private async executeToolEffect(
+    scope: ToolExecutorScope,
+    call: ValidatedToolCall,
+    denyTool: DenyTool,
+    signal?: AbortSignal,
+    onUpdate?: (partialResult: unknown) => void,
+    onExecutionStart?: (permissionState?: RuntimePermissionState) => void,
+  ): Promise<ToolResultMessage> {
+    const { agentId, plan, runtimeContext, sessionId, tools, activeSkillAllowlist } = scope;
+    const { toolCall, tool, args: validatedArgs } = call;
+    const validatedToolCall: ToolCallContent = { ...toolCall, arguments: validatedArgs };
+    const executorSessionId = runtimeContext?.sessionId ?? sessionId ?? null;
+    let sessionAttachmentsRoot: string | null = null;
+    if (executorSessionId) {
+      try {
+        sessionAttachmentsRoot = sessionRecordStore.getSessionAttachmentsDir(executorSessionId);
+      } catch {
+        sessionAttachmentsRoot = null;
+      }
+    }
+    const knowledgeReadRoots = plan?.knowledgeReadRoots ?? [];
+    const projectRootPath = runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null;
+    const toolContext = this.buildExecutionContext(scope, tool, executorSessionId);
+    const policyBudget = runtimeContext?.policyBudget;
+    const permissionConstraints = plan?.permissionConstraints;
+    if (signal?.aborted) return denyTool('Tool call cancelled before execution.');
+    if (policyBudget) {
+      const current = reserveDispatchBudget(policyBudget, { toolCalls: 0, subagents: 0 });
+      if (!current.ok) return this.createPolicyLimitToolResult(toolCall, agentId, current.limit);
+    }
+    try {
+      let executionAnnounced = false;
+      const announceExecution = (state: RuntimePermissionState) => {
+        if (!executionAnnounced) {
+          executionAnnounced = true;
+          onExecutionStart?.(state);
+        }
+      };
+      if (!permissionConstraints)
+        return denyTool('PERMISSION_CONSTRAINTS_MISSING: a prepared runtime plan is required.');
+      const beforeExecute = async () => {
+        const beforeHooks = await this.triggerRuntimeHooks('tool.before-call', agentId, runtimeContext, {
+          toolName: toolCall.name,
+          toolCallId: toolCall.id,
+          arguments: structuredClone(validatedArgs),
+        });
+        if (!beforeHooks.allowed) {
+          throw new ToolPermissionDenied(
+            `A blocking lifecycle hook denied this tool call: ${beforeHooks.reason ?? 'reason unavailable'}`,
+          );
+        }
+      };
+      const injectKnowledgeRoots = tool.spec.knowledgeRoots === 'read-access';
+      const executeEffect = (permissionDecision: AgentPermissionDecision, permissionState: RuntimePermissionState) =>
+        withProcessExecutionOwner(runtimeContext?.sessionId ?? sessionId, () =>
+          withTemporaryPathAccess(
+            toolContext,
+            [...permissionDecision.temporaryPathRoots, ...(injectKnowledgeRoots ? knowledgeReadRoots : [])],
+            (scopedContext) => {
+              announceExecution(permissionState);
+              return tool.execute(toolCall.id, validatedArgs, signal, onUpdate, scopedContext);
+            },
+          ),
+        );
+      // Unsafe effects from parent and detached children share the same
+      // session/project gate. Orchestration calls take no claim; locking a
+      // dispatcher here would deadlock while awaiting child effects.
+      const ownerSessionId = rootScopeId(runtimeContext?.sessionId ?? sessionId ?? 'ephemeral');
+      // Project files/shell state are shared across sessions; use the
+      // canonical project root when available and fall back to session
+      // ownership only for ephemeral/no-project execution.
+      const resourceKey = toolResourceKey(projectRootPath, ownerSessionId);
+      const admissionTurn = this.deps.activeTurns.getActiveTurn(executorSessionId);
+      const admissionGeneration = admissionTurn?.generation;
+      const argumentIdentity = JSON.stringify(validatedArgs);
+      const assertLive = () => {
+        if (
+          JSON.stringify(validatedArgs) !== argumentIdentity ||
+          (admissionTurn && !admissionTurn.isLive(admissionGeneration!))
+        ) {
+          throw new AppError('PERMISSION_ADMISSION_STALE', 'call arguments or turn changed.');
+        }
+      };
+      const result = await executeWithPermissionAdmission({
+        signal,
+        beforeExecute,
+        assertLive,
+        authorize: (snapshot, approvalSignal) =>
+          authorizeToolPermission(
+            {
+              decision: {
+                executionContext: toolContext,
+                effectiveToolNames: [...tools.keys()].filter(
+                  (name) => !activeSkillAllowlist || activeSkillAllowlist.has(name),
+                ),
+                tool,
+                toolCall: validatedToolCall,
+                projectRootPath,
+                permissionConstraints,
+                compiledPolicy: plan.policy,
+                sessionAttachmentsRoot,
+                knowledgeReadRoots,
+              },
+              approval:
+                runtimeContext?.eventContext && runtimeContext.turnId
+                  ? {
+                      agentId,
+                      sessionId: runtimeContext.sessionId ?? null,
+                      turnId: runtimeContext.turnId,
+                      toolCallId: toolCall.id,
+                      toolName: toolCall.name,
+                      context: runtimeContext.eventContext,
+                      onEvent: runtimeContext.onEvent,
+                    }
+                  : undefined,
+              reviewer: runtimeContext?.reviewPermission,
+              executionBudget: policyBudget,
+              assertLive,
+            },
+            snapshot,
+            approvalSignal,
+          ),
+        withResource: async (operation, permissionState) => {
+          // The affected child may itself be waiting for this resource. Join it
+          // after authorization but before taking the recovery's exclusive lock.
+          if (
+            tool.spec.capture?.recovers?.(validatedArgs) &&
+            toolContext.captureControl &&
+            toolContext.agentId === GENERAL_AGENT_ID &&
+            toolContext.accessCeiling === 'full' &&
+            toolContext.turnId &&
+            toolContext.sessionId &&
+            toolContext.projectId
+          ) {
+            announceExecution(permissionState);
+            await toolContext.captureControl.prepareRecovery(permissionState.revision, signal);
+          }
+          const claim = resourceClaimOf(tool.spec);
+          return claim === 'none'
+            ? operation()
+            : claim === 'shared'
+              ? toolResourceArbiter.runShared(resourceKey, signal, operation)
+              : toolResourceArbiter.runExclusive(resourceKey, signal, operation);
+        },
+        execute: executeEffect,
+      });
+      await this.triggerRuntimeHooks('tool.after-call', agentId, runtimeContext, {
+        toolName: toolCall.name,
+        toolCallId: toolCall.id,
+        isError: result.isError === true,
+      });
+      // Deferred 激活：仅声明 activatesDeferredTools 的发现工具可激活；直接调用未激活 deferred → 上文已 fail-closed。
+      if (tool.spec.activatesDeferredTools === true && result.isError !== true) {
+        this.activateDeferredTools(
+          extractDeferredToolNamesFromToolSearchDetails(result.details),
+          runtimeContext?.sessionId,
+        );
+      }
+      // skill_read is discovery only. Armed-skill ∩ is frozen on prepareTurn
+      // from profile.skills / composer $skill / /skills — not from a read.
+      return this.agentToolResultToMessage(toolCall, this.presentToolResult(scope, call, result));
+    } catch (error) {
+      if (error instanceof ToolPermissionDenied)
+        return error.requiresApproval
+          ? this.createApprovalRequiredToolResult(toolCall, agentId, error.message)
+          : denyTool(error.message);
+      await this.triggerRuntimeHooks('tool.on-error', agentId, runtimeContext, {
+        toolName: toolCall.name,
+        toolCallId: toolCall.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      if (tool.spec.presentation?.deliversNativeFailure && error instanceof RdcNativeFailure && error.deliveryResult) {
+        return this.agentToolResultToMessage(
+          toolCall,
+          artifactizeToolResult({
+            sessionId: runtimeContext?.sessionId ?? sessionId,
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            result: error.deliveryResult,
+            pinBelowThreshold: true,
+          }),
+        );
+      }
+      return errorToolResult(toolCall, error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /** Error results stay inline unless the tool keeps them; the rest go through the session artifact path. */
+  private presentToolResult(
+    scope: ToolExecutorScope,
+    call: ValidatedToolCall,
+    result: AgentToolResult,
+  ): AgentToolResult {
+    const presentation = call.tool.spec.presentation;
+    if (result.isError === true && !presentation?.keepErrorResults) return result;
+    return artifactizeToolResult({
+      sessionId: scope.runtimeContext?.sessionId ?? scope.sessionId,
+      toolCallId: call.toolCall.id,
+      toolName: call.toolCall.name,
+      result,
+      pinBelowThreshold: presentation?.pinEvidence?.(call.args, result) === true,
+    });
   }
 
   async triggerRuntimeHooks(
@@ -458,34 +452,39 @@ export class ToolExecutorFactory {
   ): Promise<{ allowed: boolean; reason?: string }> {
     const projectRoot = runtimeContext?.projectRootPath ?? undefined;
     hookEngine.load(appPathService.getUserRdcPaths().hooksPath, projectRoot ?? undefined);
-    const results = await toolResourceArbiter.runExclusive(
-      toolResourceKey(projectRoot, runtimeContext?.sessionId ?? 'ephemeral'),
-      undefined,
-      () => withProcessExecutionOwner(runtimeContext?.sessionId, () => hookEngine.trigger(event, {
-      event,
-      agentId,
-      toolName: typeof payload.toolName === 'string' ? payload.toolName : undefined,
-      sessionId: runtimeContext?.sessionId ?? undefined,
-      projectRoot: projectRoot ?? undefined,
-      payload,
-    }))).catch(() => null);
+    const results = await toolResourceArbiter
+      .runExclusive(toolResourceKey(projectRoot, runtimeContext?.sessionId ?? 'ephemeral'), undefined, () =>
+        withProcessExecutionOwner(runtimeContext?.sessionId, () =>
+          hookEngine.trigger(event, {
+            event,
+            agentId,
+            toolName: typeof payload.toolName === 'string' ? payload.toolName : undefined,
+            sessionId: runtimeContext?.sessionId ?? undefined,
+            projectRoot: projectRoot ?? undefined,
+            payload,
+          }),
+        ),
+      )
+      .catch(() => null);
     // A quarantined process prevents further hook effects; the original tool
     // result must still reach the caller without waiting for an unknown exit.
     if (!results) return { allowed: false, reason: 'Hook process state could not be confirmed' };
     for (const result of results) {
       if (!runtimeContext?.eventContext || !runtimeContext.onEvent) continue;
-      runtimeContext.onEvent(buildDiagnosticAgentEvent(runtimeContext.eventContext, {
-        code: `hook.${result.status}`,
-        severity: result.status === 'completed' ? 'info' : result.allowed ? 'warning' : 'error',
-        message: `Hook ${result.hookId}: ${result.status}${!result.allowed && result.reason ? ` · ${result.reason}` : ''}`,
-        toolCallId: typeof payload.toolCallId === 'string' ? payload.toolCallId : undefined,
-        technicalMessage: JSON.stringify({
-          exitCode: result.exitCode,
-          reason: result.reason,
-          stdout: result.stdout,
-          stderr: result.stderr,
+      runtimeContext.onEvent(
+        buildDiagnosticAgentEvent(runtimeContext.eventContext, {
+          code: `hook.${result.status}`,
+          severity: result.status === 'completed' ? 'info' : result.allowed ? 'warning' : 'error',
+          message: `Hook ${result.hookId}: ${result.status}${!result.allowed && result.reason ? ` · ${result.reason}` : ''}`,
+          toolCallId: typeof payload.toolCallId === 'string' ? payload.toolCallId : undefined,
+          technicalMessage: JSON.stringify({
+            exitCode: result.exitCode,
+            reason: result.reason,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          }),
         }),
-      }));
+      );
     }
     const blockingResult = results.find((result) => !result.allowed);
     return blockingResult
@@ -493,137 +492,20 @@ export class ToolExecutorFactory {
       : { allowed: true };
   }
 
-  async executePlanArtifactTool(
-    toolCall: ToolCall,
-    agentId: AgentRole,
-    runtimeContext: ToolExecutorRuntimeContext | undefined,
-    signal?: AbortSignal,
-    onExecutionStart?: () => void,
-  ): Promise<ToolResultMessage> {
-    try {
-      const args = toolCall.arguments ?? {};
-      const title = typeof args.title === 'string' ? args.title.trim() : '';
-      const content = typeof args.content === 'string' ? args.content.trim() : '';
-      const summary = Array.isArray(args.summary)
-        ? args.summary.map((line) => typeof line === 'string' ? line.trim() : '').filter(Boolean)
-        : [];
-      if (!title || !content || summary.length < 1 || summary.length > 4) {
-        throw new Error('plan_artifact requires title, 1-4 summary lines, and content.');
-      }
-      if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
-        throw new Error('plan_artifact requires an active conversation interaction bridge.');
-      }
-      const sessionId = runtimeContext.sessionId ?? null;
-      if (!sessionId) {
-        throw new Error('plan_artifact requires an active session.');
-      }
-      const handoffOptions = (runtimeContext.effectivePlan?.profileHandoffs ?? [])
-        .filter((handoff) => isHandoffContinueAction(handoff) && handoff.label.trim() && handoff.agent.trim())
-        .map((handoff) => ({ label: handoff.label.trim(), agent: handoff.agent.trim(),
-          ...(handoff.labelTranslations ? { labelTranslations: { ...handoff.labelTranslations } } : {}),
-        }));
-      if (handoffOptions.length === 0) {
-        throw new Error('PLAN_REVIEW_NO_HANDOFF: plan_artifact requires a declared continue handoff on this profile.');
-      }
-      const turnHandle = this.deps.getActiveTurn(sessionId);
-      if (turnHandle) {
-        if (turnHandle.turnId !== runtimeContext.turnId) throw new Error('PLAN_TURN_CHANGED: the planning turn is no longer active.');
-        const unfinished = await listUnfinishedDirectTasks({ sessionId, turnId: turnHandle.turnId, generation: turnHandle.generation });
-        if (unfinished.length) {
-          throw new Error(`PLAN_DIRECT_TASKS_UNSETTLED: Plan approval ends this planning turn, but direct Tasks are still active: ${unfinished.map(item => item.taskId).join(', ')}. Settle each with its actual result before submitting the plan. Do not claim that approval has already happened; keep work that begins after approval pending, and do not make it depend on a blocked planning task merely waiting for approval.`);
-        }
-      }
-      const requiredTaskIds = args.requiredTaskIds;
-      const delegatedScope = getDelegatedTaskScope(sessionId);
-      if (delegatedScope && (requiredTaskIds !== undefined || args.taskRevisions !== undefined)) {
-        throw new Error('TASK_SCOPE_DENIED: approved Task bindings and revisions belong to the owning planner session, not a delegated Capsule.');
-      }
-      if (requiredTaskIds !== undefined && (!Array.isArray(requiredTaskIds) || requiredTaskIds.length > 128
-        || requiredTaskIds.some(id => typeof id !== 'string' || !id.trim()) || new Set(requiredTaskIds).size !== requiredTaskIds.length)) {
-        throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: requiredTaskIds must be distinct existing Task ids.');
-      }
-      if (turnHandle && !delegatedScope && requiredTaskIds === undefined) {
-        const registry = new TaskRegistry(createSessionTaskStore(sessionId));
-        const turnRef = `turn:${turnHandle.turnId}:generation:${turnHandle.generation}`;
-        const unsettled = (await registry.listTasks()).filter(task => task.creationTurnRef === turnRef
-          && (task.status === 'pending' || task.status === 'blocked'));
-        if (unsettled.length) {
-          throw new Error(`PLAN_TASK_BINDINGS_UNDECLARED: This planning turn created unfinished Tasks: ${unsettled.map(task => task.id).join(', ')}. Explicitly set requiredTaskIds to the existing Tasks required by this plan, or [] if none are required. Task names or IDs in Markdown do not freeze their requirements.`);
-        }
-      }
-      const registry = Array.isArray(requiredTaskIds) && requiredTaskIds.length ? new TaskRegistry(createSessionTaskStore(sessionId)) : null;
-      if (args.taskRevisions !== undefined && !registry) throw new Error('PLAN_TASK_REQUIREMENTS_INVALID: taskRevisions requires requiredTaskIds.');
-      const taskRequirements = registry ? await preparePlanTaskRequirements(registry, requiredTaskIds as string[], args.taskRevisions) : [];
-      const sourcePlan = runtimeContext.effectivePlan;
-      if (args.captureScope !== undefined && (!sourcePlan || sourcePlan.completionContract !== 'investigation-report')) {
-        throw new Error('PLAN_CAPTURE_SCOPE_INVALID: capture scope requires an investigation plan.');
-      }
-      const investigation = sourcePlan?.completionContract === 'investigation-report' && sourcePlan.investigationMission
-        ? await prepareInvestigationPlan({ mission: sourcePlan.investigationMission, sessionId,
-          projectId: runtimeContext.projectId ?? sourcePlan.projectId, captureScope: args.captureScope,
-          host: { sessionProjectId: id => storageAdapter.sessions.readSession(id)?.projectId ?? null,
-            project: id => storageAdapter.getProjectById(id),
-            replayState: (owner, projectId) => rdcSessionService.snapshotReplayForSession({ sessionId: owner, projectId }) } })
-        : null;
-      for (const handoff of handoffOptions) assertDeclaredHandoffForPlan({ sourceAgentId: agentId,
-        projectRoot: runtimeContext.projectRootPath ?? runtimeContext.effectivePlan?.projectRootPath ?? null, handoff, tasks: taskRequirements });
-      const markdown = composePlanMarkdown({ title, summary, content, taskRequirements, investigation });
-      if (turnHandle) turnHandle.approvedPlan = null;
-      onExecutionStart?.();
-      const written = planArtifactWriter.writeLivePlan(sessionId, markdown);
-      const revision = planReviewStateStore.beginRevision(sessionId, runtimeContext.turnId);
-      const planReview = {
-        planId: revision.planId,
-        revision: revision.revision,
-        uri: written.uri,
-        hash: written.hash,
-        title,
-        summary,
-        sections: sectionsFromMarkdown(markdown),
-        status: 'awaiting' as const,
-        handoffOptions,
-      };
-      const answer = await agentPlanReviewRequestService.request({
-        agentId,
-        sessionId,
-        turnId: runtimeContext.turnId,
-        toolCallId: toolCall.id,
-        planReview,
-        turnHandle,
-        context: runtimeContext.eventContext,
-        onEvent: runtimeContext.onEvent,
-        signal,
-      });
-      return {
-        role: 'toolResult',
-        toolCallId: toolCall.id,
-        toolName: toolCall.name,
-        content: [{ type: 'text', text: answer }],
-        isError: false,
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      return {
-        role: 'toolResult',
-        toolCallId: toolCall.id,
-        toolName: toolCall.name,
-        content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
-        isError: true,
-        details: error instanceof Error && error.name === 'AbortError' ? { reason: 'abort' } : undefined,
-        timestamp: Date.now(),
-      };
-    }
+  /** Runs a plan_artifact call against this factory's active turns. */
+  executePlanArtifactTool(call: PlanArtifactToolCall): Promise<ToolResultMessage> {
+    return executePlanArtifact({ ...call, activeTurns: this.deps.activeTurns });
   }
 
   async executeAskUserTool(
-    toolCall: ToolCall,
+    toolCall: ToolCallContent,
     agentId: AgentRole,
     runtimeContext: ToolExecutorRuntimeContext | undefined,
     signal?: AbortSignal,
     onExecutionStart?: () => void,
   ): Promise<ToolResultMessage> {
     try {
-      const args = toolCall.arguments ?? {};
+      const args = toolCall.arguments;
       const questions = normalizeAskUserQuestions(args);
       if (questions.length === 0) {
         throw new Error('ask_user requires at least one canonical questions[] entry with a prompt.');
@@ -670,7 +552,9 @@ export class ToolExecutorFactory {
       role: 'toolResult',
       toolCallId: toolCall.id,
       toolName: toolCall.name,
-      content: [{ type: 'text', text: `POLICY_LIMIT_EXCEEDED: ${limit} for ${agentId}; tool execution was not started.` }],
+      content: [
+        { type: 'text', text: `POLICY_LIMIT_EXCEEDED: ${limit} for ${agentId}; tool execution was not started.` },
+      ],
       isError: true,
       details: { code: 'POLICY_LIMIT_EXCEEDED', limit },
       timestamp: Date.now(),
@@ -678,7 +562,7 @@ export class ToolExecutorFactory {
   }
 
   async createPolicyDeniedToolResult(
-    toolCall: ToolCall,
+    toolCall: ToolCallContent,
     agentId: AgentRole,
     reason?: string,
     runtimeContext?: ToolExecutorRuntimeContext,
@@ -693,34 +577,34 @@ export class ToolExecutorFactory {
       role: 'toolResult',
       toolCallId: toolCall.id,
       toolName: toolCall.name,
-      content: [{
-        type: 'text',
-        text: message,
-      }],
+      content: [
+        {
+          type: 'text',
+          text: message,
+        },
+      ],
       isError: true,
       timestamp: Date.now(),
     };
   }
 
-  createApprovalRequiredToolResult(
-    toolCall: ToolCall,
-    agentId: AgentRole,
-    reason: string,
-  ): ToolResultMessage {
+  createApprovalRequiredToolResult(toolCall: ToolCallContent, agentId: AgentRole, reason: string): ToolResultMessage {
     return {
       role: 'toolResult',
       toolCallId: toolCall.id,
       toolName: toolCall.name,
-      content: [{
-        type: 'text',
-        text: `Approval required for tool "${toolCall.name}" before it can run for ${agentId}. ${reason} No changes were made.`,
-      }],
+      content: [
+        {
+          type: 'text',
+          text: `Approval required for tool "${toolCall.name}" before it can run for ${agentId}. ${reason} No changes were made.`,
+        },
+      ],
       isError: true,
       timestamp: Date.now(),
     };
   }
 
-  agentToolResultToMessage(toolCall: ToolCall, result: AgentToolResult): ToolResultMessage {
+  agentToolResultToMessage(toolCall: ToolCallContent, result: AgentToolResult): ToolResultMessage {
     return {
       role: 'toolResult',
       toolCallId: toolCall.id,

@@ -82,12 +82,6 @@
   font-size: var(--type-meta-size);
 }
 
-.composer-model-effort-mode .ui-icon {
-  fill: currentColor;
-  stroke: none;
-  stroke-width: 2;
-}
-
 .composer-model-effort-mode[data-mode='max-context'] .ui-icon {
   fill: none;
   stroke: currentColor;

@@ -52,9 +52,7 @@ function clampOffset(raw: unknown): number {
 export function searchTools(tools: ToolSearchToolInfo[], params: ToolSearchParams = {}): ToolSearchPage {
   const query = typeof params.query === 'string' ? params.query.trim().toLowerCase() : '';
   const category = typeof params.category === 'string' ? params.category.trim().toLowerCase() : '';
-  const requiresApproval = typeof params.requires_approval === 'boolean'
-    ? params.requires_approval
-    : undefined;
+  const requiresApproval = typeof params.requires_approval === 'boolean' ? params.requires_approval : undefined;
   const limit = clampLimit(params.limit);
   const offset = clampOffset(params.offset);
 
@@ -62,7 +60,10 @@ export function searchTools(tools: ToolSearchToolInfo[], params: ToolSearchParam
   const score = (tool: ToolSearchToolInfo): number => {
     const name = tool.name.toLowerCase();
     const description = tool.description.toLowerCase();
-    return terms.reduce((total, term) => total + (name === term ? 100 : name.includes(term) ? 10 : description.includes(term) ? 1 : 0), 0);
+    return terms.reduce(
+      (total, term) => total + (name === term ? 100 : name.includes(term) ? 10 : description.includes(term) ? 1 : 0),
+      0,
+    );
   };
   let matches = tools.slice();
 
@@ -70,10 +71,10 @@ export function searchTools(tools: ToolSearchToolInfo[], params: ToolSearchParam
     matches = matches.filter((tool) => score(tool) > 0);
   }
   if (category) {
-    matches = matches.filter((tool) => (tool.spec?.category ?? '').toLowerCase() === category);
+    matches = matches.filter((tool) => (tool.spec.category ?? '').toLowerCase() === category);
   }
   if (requiresApproval !== undefined) {
-    matches = matches.filter((tool) => (tool.spec?.requiresApproval ?? false) === requiresApproval);
+    matches = matches.filter((tool) => (tool.spec.requiresApproval ?? false) === requiresApproval);
   }
 
   if (query) {
@@ -86,9 +87,9 @@ export function searchTools(tools: ToolSearchToolInfo[], params: ToolSearchParam
   const page = matches.slice(offset, offset + limit).map((tool) => ({
     name: tool.name,
     description: tool.description,
-    category: tool.spec?.category,
-    requiresApproval: tool.spec?.requiresApproval ?? false,
-    parameters: tool.parameters ?? { type: 'object', properties: {} },
+    category: tool.spec.category,
+    requiresApproval: tool.spec.requiresApproval ?? false,
+    parameters: tool.parameters,
   }));
 
   return {
@@ -114,9 +115,7 @@ export function formatToolSearchResult(page: ToolSearchPage): string {
 
   const start = page.matches.length === 0 ? 0 : page.offset + 1;
   const end = page.offset + page.matches.length;
-  const rangeLabel = page.matches.length === 0
-    ? `0 of ${page.total}`
-    : `${start}-${end} of ${page.total}`;
+  const rangeLabel = page.matches.length === 0 ? `0 of ${page.total}` : `${start}-${end} of ${page.total}`;
 
   const blocks = page.matches.map((tool) => {
     const lines = [
@@ -137,8 +136,8 @@ export function createToolSetFingerprint(tools: readonly ToolSearchToolInfo[]): 
     .map((tool) => ({
       name: tool.name,
       description: tool.description,
-      parameters: tool.parameters ?? { type: 'object', properties: {} },
-      spec: tool.spec ?? null,
+      parameters: tool.parameters,
+      spec: tool.spec,
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
   return createHash('sha256').update(stableSerialize(canonicalTools)).digest('hex').slice(0, 24);
@@ -152,14 +151,15 @@ function stableSerialize(value: unknown): string {
       .map(([key, child]) => `${JSON.stringify(key)}:${stableSerialize(child)}`)
       .join(',')}}`;
   }
-  return JSON.stringify(value) ?? 'null';
+  return (JSON.stringify(value) as string | undefined) ?? 'null';
 }
 
 export function createToolSearchTool(getAllTools: () => ToolSearchToolInfo[]): AgentTool {
   return {
     name: 'tool_search',
     label: 'Search Tools',
-    description: 'Search for available tools by name, description, category, or permission. Returns matching tools with their schemas.',
+    description:
+      'Search for available tools by name, description, category, or permission. Returns matching tools with their schemas.',
     parameters: {
       type: 'object',
       properties: {
@@ -171,10 +171,18 @@ export function createToolSearchTool(getAllTools: () => ToolSearchToolInfo[]): A
       },
       required: [],
     },
-    spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false },
+    spec: {
+      isReadOnly: true,
+      concurrency: 'shared',
+      isDestructive: false,
+      sideEffect: 'none',
+      category: 'search',
+      requiresApproval: false,
+      activatesDeferredTools: true,
+    },
     permissionHint: 'readonly',
     async execute(_id, params) {
-      const p = (params ?? {}) as ToolSearchParams;
+      const p = params as ToolSearchParams;
       const page = searchTools(getAllTools(), p);
       return {
         content: [{ type: 'text', text: formatToolSearchResult(page) }],

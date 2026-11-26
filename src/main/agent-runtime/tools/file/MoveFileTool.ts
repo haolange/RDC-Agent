@@ -1,7 +1,13 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { assertFileSizeCap, isPathExisting, requireMutationWorkspaceRoot, safeResolvePath } from '../primitives/_shared';
-import { COPY_MOVE_MAX_BYTES } from '../primitives/toolLimits';
+import {
+  assertFileSizeCap,
+  isPathExisting,
+  requireMutationWorkspaceRoot,
+  safeResolvePath,
+} from '../../../runtime/toolFiles';
+import { COPY_MOVE_MAX_BYTES } from '../../../runtime/toolLimits';
+import { renameWithRetry } from '../../../platform/fileRename';
 import type { AgentTool } from '../../agent/AgentTool';
 
 interface MoveFileParams {
@@ -28,7 +34,14 @@ export const moveFileTool: AgentTool<MoveFileParams, MoveFileDetails> = {
     },
     required: ['source', 'destination'],
   },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: {
+    isReadOnly: false,
+    concurrency: 'exclusive',
+    isDestructive: true,
+    sideEffect: 'filesystem',
+    category: 'file',
+    requiresApproval: true,
+  },
   permissionHint: 'mutation',
   effects: { writes: ['source', 'destination'] },
 
@@ -43,7 +56,7 @@ export const moveFileTool: AgentTool<MoveFileParams, MoveFileDetails> = {
     if (isPathExisting(dest)) {
       throw new Error(`Destination already exists; refusing overwrite: ${dest}`);
     }
-    await fs.rename(src, dest);
+    await renameWithRetry(src, dest);
     return {
       content: [{ type: 'text', text: `Moved ${src} → ${dest}` }],
       details: { source: src, destination: dest, overwritten: false },

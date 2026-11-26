@@ -1,25 +1,22 @@
+import { z } from 'zod';
 import { generateEventId, nowIso } from '@shared/utils/id';
 import { toolManifestRegistry } from './manifests/ToolManifestRegistry';
 import { toolResultNormalizer } from './ToolResultNormalizer';
 import type { ActionEvent } from '@shared/types/evidence';
-import type {
-  TraceEvent,
-  TaskFrameNode,
-  ThoughtSummaryNode,
-  ToolActionNode,
-  SubAgentNode,
-  FinalResponseNode,
-  ObservationNode,
-  TraceStatus,
-  VisibleReasoningPacket,
-} from '@shared/types/agenticTrace';
+import type { TraceStatus } from '@shared/types/agenticTrace';
+import type { TraceEvent } from './TraceEventStore';
+import type { ObservationNode } from './traceNodes';
+import type { TaskFrameNode, ThoughtSummaryNode, ToolActionNode, SubAgentNode, FinalResponseNode } from './traceNodes';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type { TraceEventStore } from './TraceEventStore';
+import type { EvidenceRef } from './traceNodes';
+import type { ReasoningConfidence } from './traceNodes';
+import type { VisibleReasoningMode } from './traceNodes';
 
-const toIso = (value: number | string | undefined, fallback = nowIso()): string => {
+const toIso = (value: number | string | undefined): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'number' && Number.isFinite(value)) return new Date(value).toISOString();
-  return fallback;
+  return nowIso();
 };
 
 const traceStatusFromAction = (event: ActionEvent): TraceStatus => {
@@ -29,16 +26,42 @@ const traceStatusFromAction = (event: ActionEvent): TraceStatus => {
   return 'succeeded';
 };
 
-const parseReasoningPacket = (text: string): VisibleReasoningPacket | null => {
+/** The packet fields this emitter reads; a model may add others. */
+const VisibleReasoningPacketSchema = z
+  .object({
+    mode: z.enum([
+      'task_understanding',
+      'planning',
+      'intent',
+      'hypothesis',
+      'evidence_need',
+      'observation_summary',
+      'decision_update',
+      'next_action',
+      'risk_note',
+      'summary',
+    ]),
+    content: z.string().min(1),
+    hypothesis: z.string().optional(),
+    nextAction: z.string().optional(),
+    confidence: z.enum(['low', 'medium', 'high']).optional(),
+  })
+  .passthrough();
+
+/** Model thinking text that is a structured packet; any other text is shown as written. */
+const parseReasoningPacket = (
+  text: string,
+): Pick<VisibleReasoningPacket, 'mode' | 'content' | 'hypothesis' | 'nextAction' | 'confidence'> | null => {
   const trimmed = text.trim();
   if (!trimmed.startsWith('{')) return null;
+  let value: unknown;
   try {
-    const parsed = JSON.parse(trimmed) as VisibleReasoningPacket;
-    if (parsed.content) return parsed;
+    value = JSON.parse(trimmed);
   } catch {
     return null;
   }
-  return null;
+  const packet = VisibleReasoningPacketSchema.safeParse(value);
+  return packet.success ? packet.data : null;
 };
 
 export class TraceEventEmitter {
@@ -52,14 +75,13 @@ export class TraceEventEmitter {
     return this.store.append(runId, 'phase.completed', { phaseId });
   }
 
-  emitTaskFrame(runId: string, userRequest: string, constraints?: string[]): TraceEvent {
+  emitTaskFrame(runId: string, userRequest: string): TraceEvent {
     const node: TaskFrameNode = {
       id: generateEventId('task'),
       runId,
       kind: 'task_frame',
       title: '本次任务',
       userRequest,
-      constraints,
       seq: 0,
       createdAt: nowIso(),
       visibility: 'user',
@@ -141,14 +163,13 @@ export class TraceEventEmitter {
     return this.store.append(runId, 'node.created', node);
   }
 
-
-  emitFinalResponse(runId: string, content: string, format: 'markdown' | 'plain' = 'markdown'): TraceEvent {
+  emitFinalResponse(runId: string, content: string): TraceEvent {
     const node: FinalResponseNode = {
       id: generateEventId('final'),
       runId,
       kind: 'final_response',
       content,
-      format,
+      format: 'markdown',
       seq: 0,
       createdAt: nowIso(),
       visibility: 'user',
@@ -171,5 +192,14 @@ export class TraceEventEmitter {
     };
     return this.store.append(runId, 'node.created', node);
   }
+}
 
+export interface VisibleReasoningPacket {
+  mode: VisibleReasoningMode;
+  title?: string;
+  content: string;
+  hypothesis?: string;
+  evidenceRefs?: EvidenceRef[];
+  nextAction?: string;
+  confidence?: ReasoningConfidence;
 }

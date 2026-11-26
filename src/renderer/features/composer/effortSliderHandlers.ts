@@ -1,7 +1,4 @@
-import {
-  findAdjacentSupportedLevel,
-  resolveNearestSnapLevel,
-} from './effortControlParts';
+import { findAdjacentSupportedLevel, resolveNearestSnapLevel } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, ratioFromInsetClientX } from './effortSliderGeometry';
 import type React from 'react';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
@@ -86,9 +83,12 @@ export function createEffortSliderHandlers(input: {
     },
     handleThumbKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (!input.hasAdjustableReasoning) return;
-      const direction = event.key === 'ArrowLeft' || event.key === 'ArrowDown'
-        ? -1
-        : event.key === 'ArrowRight' || event.key === 'ArrowUp' ? 1 : 0;
+      const direction =
+        event.key === 'ArrowLeft' || event.key === 'ArrowDown'
+          ? -1
+          : event.key === 'ArrowRight' || event.key === 'ArrowUp'
+            ? 1
+            : 0;
       if (direction === 0) return;
       event.preventDefault();
       const next = findAdjacentSupportedLevel(input.displayLevel, direction, input.displayLevels);

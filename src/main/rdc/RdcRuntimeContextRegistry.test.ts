@@ -91,20 +91,24 @@ describe('RdcRuntimeContextRegistry delegated leases', () => {
     expect(child.ownerSessionId).toBe('parent::subagent::child-1');
     expect(child.ownerTurnId).toBe('turn-1');
     expect(child.runtimeContext.captureId).toBe('cap-live');
-    expect(assertRdcContextLeaseOwnership({
-      sessionId: 'parent::subagent::child-1',
-      projectId: 'p1',
-    })?.contextId).toBe('c1');
+    expect(
+      assertRdcContextLeaseOwnership({
+        sessionId: 'parent::subagent::child-1',
+        projectId: 'p1',
+      })?.contextId,
+    ).toBe('c1');
     expect(getRdcContextLease('parent')?.delegatedFrom).toBeUndefined();
     expect(getRdcContextLease('parent')?.ownerSessionId).toBe('parent');
   });
 
   it('fail-closes grant without a parent lease', () => {
-    expect(() => grantDelegatedLease({
-      parentSessionId: 'missing',
-      childSessionId: 'child',
-      ownerTurnId: 'turn-1',
-    })).toThrow(new RegExp(RDC_LEASE_DELEGATE_DENIED));
+    expect(() =>
+      grantDelegatedLease({
+        parentSessionId: 'missing',
+        childSessionId: 'child',
+        ownerTurnId: 'turn-1',
+      }),
+    ).toThrow(new RegExp(RDC_LEASE_DELEGATE_DENIED));
     expect(getRdcContextLease('child')).toBeNull();
   });
 
@@ -116,12 +120,14 @@ describe('RdcRuntimeContextRegistry delegated leases', () => {
       projectId: 'p1',
       ownerTurnId: 'turn-1',
     });
-    expect(() => grantDelegatedLease({
-      parentSessionId: 'parent',
-      childSessionId: 'child-b',
-      projectId: 'p1',
-      ownerTurnId: 'turn-1',
-    })).toThrow(new RegExp(RDC_LEASE_DUAL_OWNER));
+    expect(() =>
+      grantDelegatedLease({
+        parentSessionId: 'parent',
+        childSessionId: 'child-b',
+        projectId: 'p1',
+        ownerTurnId: 'turn-1',
+      }),
+    ).toThrow(new RegExp(RDC_LEASE_DUAL_OWNER));
     expect(getDelegatedChildSessionId('parent')).toBe('child-a');
     expect(getRdcContextLease('child-b')).toBeNull();
   });
@@ -134,12 +140,14 @@ describe('RdcRuntimeContextRegistry delegated leases', () => {
       projectId: 'p1',
       ownerTurnId: 'turn-1',
     });
-    expect(() => grantDelegatedLease({
-      parentSessionId: 'child',
-      childSessionId: 'grandchild',
-      projectId: 'p1',
-      ownerTurnId: 'turn-2',
-    })).toThrow(/not independently transferable/);
+    expect(() =>
+      grantDelegatedLease({
+        parentSessionId: 'child',
+        childSessionId: 'grandchild',
+        projectId: 'p1',
+        ownerTurnId: 'turn-2',
+      }),
+    ).toThrow(/not independently transferable/);
     expect(getRdcContextLease('grandchild')).toBeNull();
   });
 
@@ -179,10 +187,12 @@ describe('RdcRuntimeContextRegistry delegated leases', () => {
 
   it('does not fall back to the parent when asserting a child without a grant', () => {
     setRdcRuntimeContextForSession('parent', ctx('c1'), { projectId: 'p1' });
-    expect(assertRdcContextLeaseOwnership({
-      sessionId: 'parent::subagent::offline',
-      projectId: 'p1',
-    })).toBeNull();
+    expect(
+      assertRdcContextLeaseOwnership({
+        sessionId: 'parent::subagent::offline',
+        projectId: 'p1',
+      }),
+    ).toBeNull();
   });
 });
 
@@ -202,7 +212,9 @@ describe('exclusive delegated control and uncertain release', () => {
     grantDelegatedLease({ parentSessionId: 'parent', childSessionId: 'child', ownerTurnId: 't' });
     revokeDelegatedLease('child', { operationStopped: false });
     expect(assertRdcContextLeaseOwnership({ sessionId: 'parent' })).toBeNull();
-    expect(() => grantDelegatedLease({ parentSessionId: 'parent', childSessionId: 'next', ownerTurnId: 't2' })).toThrow(/recovery/);
+    expect(() => grantDelegatedLease({ parentSessionId: 'parent', childSessionId: 'next', ownerTurnId: 't2' })).toThrow(
+      /recovery/,
+    );
   });
   it('late failed calls cannot quarantine a rebound identity', () => {
     const old = setRdcRuntimeContextForSession('s', ctx('c1'))!;

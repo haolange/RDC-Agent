@@ -11,15 +11,9 @@ export function sanitizeCompactionThresholdPercent(
   fallback = DEFAULT_CONTEXT_COMPACTION_PERCENT,
 ): number {
   const numeric = typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-  const clamped = Math.min(
-    CONTEXT_COMPACTION_PERCENT_MAX,
-    Math.max(CONTEXT_COMPACTION_PERCENT_MIN, numeric),
-  );
+  const clamped = Math.min(CONTEXT_COMPACTION_PERCENT_MAX, Math.max(CONTEXT_COMPACTION_PERCENT_MIN, numeric));
   const stepped = Math.round(clamped / CONTEXT_COMPACTION_PERCENT_STEP) * CONTEXT_COMPACTION_PERCENT_STEP;
-  return Math.min(
-    CONTEXT_COMPACTION_PERCENT_MAX,
-    Math.max(CONTEXT_COMPACTION_PERCENT_MIN, stepped),
-  );
+  return Math.min(CONTEXT_COMPACTION_PERCENT_MAX, Math.max(CONTEXT_COMPACTION_PERCENT_MIN, stepped));
 }
 
 /**
@@ -27,20 +21,14 @@ export function sanitizeCompactionThresholdPercent(
  * (do not constrain). The result never loosens past the user setting, and is
  * clamped to the product 50–90 / step-5 range.
  */
-export function resolveEffectiveCompactionPercent(
-  userPercent: number,
-  policyPercent: number,
-): number {
+export function resolveEffectiveCompactionPercent(userPercent: number, policyPercent: number): number {
   const user = sanitizeCompactionThresholdPercent(userPercent);
   if (!Number.isFinite(policyPercent) || policyPercent >= POLICY_UNLIMITED_COMPACTION_PERCENT) {
     return user;
   }
   const tightened = Math.min(user, policyPercent);
   const steppedDown = Math.floor(tightened / CONTEXT_COMPACTION_PERCENT_STEP) * CONTEXT_COMPACTION_PERCENT_STEP;
-  return Math.min(
-    CONTEXT_COMPACTION_PERCENT_MAX,
-    Math.max(CONTEXT_COMPACTION_PERCENT_MIN, steppedDown),
-  );
+  return Math.min(CONTEXT_COMPACTION_PERCENT_MAX, Math.max(CONTEXT_COMPACTION_PERCENT_MIN, steppedDown));
 }
 
 export function resolveCompactionThresholdTokens(promptBudget: number, percent: number): number {

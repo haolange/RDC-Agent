@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { policyBudgetChain } from './DelegationBudget';
 import type { UnresolvedItem } from '@shared/types/unresolvedWork';
 /**
@@ -10,10 +11,10 @@ import type { UnresolvedItem } from '@shared/types/unresolvedWork';
  * task registry hook, agent slot key, cancellation scope, generation token, producers.
  */
 
-import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 import type { ToolDefinition } from '../core/types';
-import type { CompiledPolicy } from '@shared/types/rdcRuntime';
+import type { CompiledPolicy } from '../permissions/PolicyCompiler';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 
 export type AbortReason =
@@ -28,7 +29,7 @@ export type AbortReason =
   | 'unknown';
 
 export interface TurnEventSink {
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   sessionId?: string | null;
   requestId?: string | null;
   projectRootPath?: string | null;
@@ -79,7 +80,7 @@ export interface PolicyBudgetState {
 
 export function assertPolicyWallTimeAllowed(maxWallTimeMs: number): void {
   if (maxWallTimeMs === 0) {
-    throw new Error('POLICY_MAX_WALL_TIME_ZERO: maxWallTimeMs must be greater than zero for an executable turn.');
+    throw new AppError('POLICY_MAX_WALL_TIME_ZERO', 'maxWallTimeMs must be greater than zero for an executable turn.');
   }
 }
 
@@ -195,29 +196,25 @@ export function startSubagentBudgetChild(state: SubagentBudgetState, now = Date.
 }
 
 export function finishSubagentBudgetChild(state: SubagentBudgetState, now = Date.now()): void {
-  if (state.activeChildren <= 0) throw new Error('SUBAGENT_BUDGET: no active child to finish.');
+  if (state.activeChildren <= 0) throw new AppError('SUBAGENT_BUDGET', 'no active child to finish.');
   state.activeChildren -= 1;
   if (state.activeChildren === 0) state.wallPausedAt = now;
 }
 
 export function assertSubagentBudgetAllowsChild(state: SubagentBudgetState, now = Date.now()): void {
   if (state.depth >= state.budget.maxDepth) {
-    throw new Error(`SUBAGENT_BUDGET: maxDepth ${state.budget.maxDepth} exceeded.`);
+    throw new AppError('SUBAGENT_BUDGET', `maxDepth ${state.budget.maxDepth} exceeded.`);
   }
   if (state.childrenSpawned >= state.budget.maxChildren) {
-    throw new Error(`SUBAGENT_BUDGET: maxChildren ${state.budget.maxChildren} exceeded.`);
+    throw new AppError('SUBAGENT_BUDGET', `maxChildren ${state.budget.maxChildren} exceeded.`);
   }
   if (state.aggregateToolCalls >= state.budget.maxAggregateToolCalls) {
-    throw new Error(
-      `SUBAGENT_BUDGET: maxAggregateToolCalls ${state.budget.maxAggregateToolCalls} exceeded.`,
-    );
+    throw new AppError('SUBAGENT_BUDGET', `maxAggregateToolCalls ${state.budget.maxAggregateToolCalls} exceeded.`);
   }
   // Only time with an active child spends the child wall window. Parent work
   // between delegations must not consume time reserved for child execution.
   if (subagentActiveWallMs(state, now) >= state.budget.maxAggregateWallMs) {
-    throw new Error(
-      `SUBAGENT_BUDGET: maxAggregateWallMs ${state.budget.maxAggregateWallMs} exceeded.`,
-    );
+    throw new AppError('SUBAGENT_BUDGET', `maxAggregateWallMs ${state.budget.maxAggregateWallMs} exceeded.`);
   }
 }
 
@@ -227,7 +224,8 @@ export type TurnProducer = {
   join: () => Promise<void>;
 };
 
-export const APPROVED_CAPTURE_SCOPE_REQUIRED = 'APPROVED_CAPTURE_SCOPE_REQUIRED: This approved Mission has no frozen capture scope. Return to the Mission and submit plan_artifact.captureScope with the intended registered inputs and selected device for review before using live RDC.';
+export const APPROVED_CAPTURE_SCOPE_REQUIRED =
+  'APPROVED_CAPTURE_SCOPE_REQUIRED: This approved Mission has no frozen capture scope. Return to the Mission and submit plan_artifact.captureScope with the intended registered inputs and selected device for review before using live RDC.';
 
 export interface AbortAndJoinOptions {
   graceMs?: number;
@@ -249,7 +247,7 @@ export class TurnHandle {
   runtimePlan: EffectiveRuntimePlan | null = null;
   promptPlan: import('@shared/types/rdcRuntime').PromptPlan | null = null;
   taskPreparation: import('@shared/types/taskExecution').TaskExecutionPreparation | null = null;
-  runtimeEpochs: import('@shared/types/taskExecution').TaskRuntimeEpoch[] = [];
+  runtimeEpochs: import('../tasks/taskExecutionSchemas').TaskRuntimeEpoch[] = [];
   captureControl: import('./ApprovedCaptureController').ApprovedCaptureController | null = null;
   /** Structured model-declared completion, populated only by turn_complete. */
   completionDeclaration: TurnCompletionDeclaration | null = null;
@@ -306,10 +304,13 @@ export class TurnHandle {
     assertPolicyWallTimeAllowed(this.policyBudget.maxWallTimeMs);
     const remainingWallMs = this.policyBudget.maxWallTimeMs - (Date.now() - this.policyBudget.wallStartedAt);
     if (remainingWallMs < 2_147_000_000) {
-      this.wallTimer = setTimeout(() => {
-        void this.abortAndJoin({ reason: 'timeout' });
-      }, Math.max(0, remainingWallMs));
-      this.wallTimer.unref?.();
+      this.wallTimer = setTimeout(
+        () => {
+          void this.abortAndJoin({ reason: 'timeout' });
+        },
+        Math.max(0, remainingWallMs),
+      );
+      this.wallTimer.unref();
     }
 
     if (input.parentSignal) {
@@ -329,7 +330,10 @@ export class TurnHandle {
   }
 
   private releaseTimers(): void {
-    if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
+    if (this.wallTimer) {
+      clearTimeout(this.wallTimer);
+      this.wallTimer = null;
+    }
     this.detachParentSignal?.();
     this.detachParentSignal = null;
   }
@@ -378,7 +382,10 @@ export class TurnHandle {
       }
       await Promise.allSettled(
         entries.map(([, producer]) =>
-          producer.join().then(() => undefined, () => undefined),
+          producer.join().then(
+            () => undefined,
+            () => undefined,
+          ),
         ),
       );
       // Joins may settle without unregister callbacks; drop settled entries so
@@ -399,7 +406,7 @@ export class TurnHandle {
    * Emit an event only if the turn is still live (generation token guard).
    * Returns false when the write was dropped as late.
    */
-  emitEvent(event: SharedAgentEvent, expectedGeneration?: number): boolean {
+  emitEvent(event: AgentEvent, expectedGeneration?: number): boolean {
     if (this.closed) return false;
     if (expectedGeneration != null && expectedGeneration !== this.generation) return false;
     if (this.aborted) return false;
@@ -434,7 +441,7 @@ export class TurnHandle {
 
   /** Abort only a named child; the owning turn and its budget remain live. */
   async abortProducerForRecovery(id: string): Promise<boolean> {
-    if (!this.isLive(this.generation)) throw new Error('RDC_TURN_NOT_ACTIVE');
+    if (!this.isLive(this.generation)) throw new AppError('RDC_TURN_NOT_ACTIVE');
     const producer = this.producers.get(id);
     if (!producer) return false;
     producer.abort('replay_recovery');
@@ -510,16 +517,16 @@ export class TurnHandle {
       };
 
       const waitFor = async (durationMs: number): Promise<boolean> => {
-        let timer: ReturnType<typeof setTimeout> | null = null;
+        let timer: ReturnType<typeof setTimeout> | undefined;
         const settled = joinUntilStable().then(() => true);
         const result = await Promise.race([
           settled,
           new Promise<boolean>((resolve) => {
             timer = setTimeout(() => resolve(false), Math.max(0, durationMs));
-            timer.unref?.();
+            timer.unref();
           }),
         ]);
-        if (timer) clearTimeout(timer);
+        clearTimeout(timer);
         return result;
       };
 
@@ -561,11 +568,23 @@ export class TurnHandle {
   }
 }
 
+interface BeginTurnInput {
+  sessionKey: string;
+  turnId: string;
+  runId?: string | null;
+  parentSignal?: AbortSignal | null;
+  eventSink?: TurnEventSink | null;
+  subagentBudget?: SubagentBudgetState;
+  policyBudget?: PolicyBudgetState;
+}
+
 export class TurnCoordinator {
   private readonly activeBySession = new Map<string, TurnHandle>();
   /** Orphaned handles retained until producers fully settle. */
   private readonly orphanedBySession = new Map<string, TurnHandle>();
   private generationSeq = 0;
+  /** Begins for one session run one after another, so two concurrent sends cannot both become the active turn. */
+  private readonly beginQueue = new Map<string, Promise<unknown>>();
 
   getActive(sessionKey: string): TurnHandle | null {
     return this.activeBySession.get(sessionKey) ?? null;
@@ -576,19 +595,25 @@ export class TurnCoordinator {
   }
 
   /** Begin a turn for a session; aborts any previous active turn for that session. */
-  async beginTurn(input: {
-    sessionKey: string;
-    turnId: string;
-    runId?: string | null;
-    parentSignal?: AbortSignal | null;
-    eventSink?: TurnEventSink | null;
-    subagentBudget?: SubagentBudgetState;
-    policyBudget?: PolicyBudgetState;
-  }): Promise<TurnHandle> {
+  beginTurn(input: BeginTurnInput): Promise<TurnHandle> {
+    const begin = () => this.beginTurnNow(input);
+    const previous = this.beginQueue.get(input.sessionKey) ?? Promise.resolve();
+    // The previous begin's outcome belongs to its own caller; this one starts after it settles either way.
+    const next = previous.then(begin, begin);
+    this.beginQueue.set(input.sessionKey, next);
+    const release = () => {
+      if (this.beginQueue.get(input.sessionKey) === next) this.beginQueue.delete(input.sessionKey);
+    };
+    next.then(release, release);
+    return next;
+  }
+
+  private async beginTurnNow(input: BeginTurnInput): Promise<TurnHandle> {
     const orphaned = this.orphanedBySession.get(input.sessionKey);
     if (orphaned && !orphaned.isSettled) {
-      throw new Error(
-        `TURN_ORPHANED: session ${input.sessionKey} still has an orphaned turn (${orphaned.turnId}) awaiting producer settlement.`,
+      throw new AppError(
+        'TURN_ORPHANED',
+        `session ${input.sessionKey} still has an orphaned turn (${orphaned.turnId}) awaiting producer settlement.`,
       );
     }
     if (orphaned && orphaned.isSettled) {
@@ -600,8 +625,9 @@ export class TurnCoordinator {
       await previous.abortAndJoin({ reason: 'edit_resend', graceMs: 500, forceAfterMs: 2_000 });
       if (previous.isOrphaned && !previous.isSettled) {
         this.retainOrphan(previous);
-        throw new Error(
-          `TURN_ORPHANED: session ${input.sessionKey} previous turn (${previous.turnId}) is orphaned and not settled.`,
+        throw new AppError(
+          'TURN_ORPHANED',
+          `session ${input.sessionKey} previous turn (${previous.turnId}) is orphaned and not settled.`,
         );
       }
       if (this.activeBySession.get(input.sessionKey) === previous) {
@@ -657,18 +683,21 @@ export class TurnCoordinator {
       this.retainOrphan(handle);
       return;
     }
-    this.activeBySession.delete(sessionKey);
+    // A turn begun while this one was stopping is the session's active turn now; only the aborted handle leaves.
+    if (this.activeBySession.get(sessionKey) === handle) this.activeBySession.delete(sessionKey);
   }
 
   async abortAll(reason: AbortReason = 'app_shutdown'): Promise<void> {
     const handles = Array.from(this.activeBySession.values());
     this.activeBySession.clear();
-    await Promise.allSettled(handles.map(async (h) => {
-      await h.abortAndJoin({ reason });
-      if (h.isOrphaned && !h.isSettled) {
-        this.retainOrphan(h);
-      }
-    }));
+    await Promise.allSettled(
+      handles.map(async (h) => {
+        await h.abortAndJoin({ reason });
+        if (h.isOrphaned && !h.isSettled) {
+          this.retainOrphan(h);
+        }
+      }),
+    );
   }
 }
 

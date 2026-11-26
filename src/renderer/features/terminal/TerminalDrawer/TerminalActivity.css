@@ -30,7 +30,6 @@
   flex-shrink: 0;
 }
 
-
 .runtime-terminal-entry {
   position: relative;
   border-bottom: 1px solid var(--token-border-card);
@@ -76,10 +75,18 @@
   background: var(--token-text-disabled);
 }
 
-.runtime-terminal-severity-dot.severity-error { background: var(--token-status-error); }
-.runtime-terminal-severity-dot.severity-warning { background: var(--token-status-warning); }
-.runtime-terminal-severity-dot.severity-success { background: var(--token-status-success); }
-.runtime-terminal-severity-dot.severity-info { background: var(--token-status-info); }
+.runtime-terminal-severity-dot.severity-error {
+  background: var(--token-status-error);
+}
+.runtime-terminal-severity-dot.severity-warning {
+  background: var(--token-status-warning);
+}
+.runtime-terminal-severity-dot.severity-success {
+  background: var(--token-status-success);
+}
+.runtime-terminal-severity-dot.severity-info {
+  background: var(--token-status-info);
+}
 
 .runtime-terminal-entry-title,
 .runtime-terminal-entry-summary {
@@ -117,7 +124,7 @@
   color: var(--token-text-secondary);
   font-family: var(--font-sans);
   font-size: var(--type-body-size);
-  line-height: 1.5;
+  line-height: var(--leading-normal);
 }
 
 .runtime-terminal-entry-meta {

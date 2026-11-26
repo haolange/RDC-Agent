@@ -75,9 +75,7 @@ export class EventStream<T, R = T> implements AsyncIterable<T> {
     }
 
     if (this.isComplete && this.isComplete(event)) {
-      const result = this.extractResult
-        ? this.extractResult(event)
-        : (event as unknown as R);
+      const result = this.extractResult ? this.extractResult(event) : (event as unknown as R);
       this.complete(result);
     }
   }
@@ -185,10 +183,7 @@ export class EventStream<T, R = T> implements AsyncIterable<T> {
    */
   map<U>(fn: (event: T) => U): EventStream<U, R> {
     const downstream = new EventStream<U, R>();
-    void this.pipeTo(
-      downstream,
-      (event) => downstream.push(fn(event)),
-    );
+    void this.pipeTo(downstream, (event) => downstream.push(fn(event)));
     return downstream;
   }
 
@@ -247,10 +242,7 @@ export class EventStream<T, R = T> implements AsyncIterable<T> {
    * 把当前流的事件 / 终止状态转发到 downstream。
    * `onEvent` 决定如何把事件投递到 downstream（map/filter/tap 可定制）。
    */
-  private async pipeTo<U, DR>(
-    downstream: EventStream<U, DR>,
-    onEvent: (event: T) => void,
-  ): Promise<void> {
+  private async pipeTo<U, DR>(downstream: EventStream<U, DR>, onEvent: (event: T) => void): Promise<void> {
     try {
       for await (const event of this) {
         if (downstream.isDone) {

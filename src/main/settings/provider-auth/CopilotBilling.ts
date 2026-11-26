@@ -1,10 +1,6 @@
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from '../provider-catalog/DiscoveryAdmission';
 import { parseOpenAiReasoningControl } from '../provider-catalog/LiveProviderCatalogParsers';
-import type {
-  ContextTier,
-  EntitlementState,
-  ModelRouteOption,
-} from '@shared/types/providerCapability';
+import type { ContextTier, EntitlementState, ModelRouteOption } from '@shared/types/providerCapability';
 import type { LlmProviderModel } from '@shared/types/settings';
 import type { CatalogModelContribution } from '../provider-catalog/effectiveCatalogTypes';
 
@@ -25,16 +21,12 @@ export interface CopilotCatalogParseResult {
 }
 
 function record(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function positiveInteger(value: unknown): number | undefined {
   const parsed = typeof value === 'string' ? Number(value) : value;
-  return typeof parsed === 'number' && Number.isFinite(parsed) && parsed > 0
-    ? Math.floor(parsed)
-    : undefined;
+  return typeof parsed === 'number' && Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined;
 }
 
 function entitlement(value: unknown): EntitlementState {
@@ -67,9 +59,10 @@ function copilotRouteOptions(endpoints: readonly string[], apiBaseUrl: string): 
     id: protocol,
     route: {
       protocol,
-      baseUrl: protocol === 'AnthropicMessages' && !normalizedBaseUrl.endsWith('/v1')
-        ? `${normalizedBaseUrl}/v1`
-        : normalizedBaseUrl,
+      baseUrl:
+        protocol === 'AnthropicMessages' && !normalizedBaseUrl.endsWith('/v1')
+          ? `${normalizedBaseUrl}/v1`
+          : normalizedBaseUrl,
       source: 'model',
     },
     availability: 'available',
@@ -82,12 +75,14 @@ function copilotRouteOptions(endpoints: readonly string[], apiBaseUrl: string): 
 function copilotPolicyDenied(entry: Record<string, unknown>): boolean {
   const policy = record(entry.policy);
   const state = typeof policy.state === 'string' ? policy.state.toLowerCase() : '';
-  return entry.model_picker_enabled === false
-    || entry.entitled === false
-    || policy.allowed === false
-    || policy.enabled === false
-    || state === 'denied'
-    || state === 'disabled';
+  return (
+    entry.model_picker_enabled === false ||
+    entry.entitled === false ||
+    policy.allowed === false ||
+    policy.enabled === false ||
+    state === 'denied' ||
+    state === 'disabled'
+  );
 }
 
 export function parseCopilotBillingTiers(billing: unknown): ContextTier[] {
@@ -97,22 +92,24 @@ export function parseCopilotBillingTiers(billing: unknown): ContextTier[] {
   const maxOutputTokens = positiveInteger(limits.maxOutputTokens);
   const liveMaxTotalTokens = positiveInteger(limits.maxTotalTokens);
   const liveMaxPromptTokens = positiveInteger(limits.maxPromptTokens);
-  const modelEntitlement = metadata.entitlement === 'granted'
-    || metadata.entitlement === 'denied'
-    || metadata.entitlement === 'unknown'
-    ? metadata.entitlement
-    : undefined;
+  const modelEntitlement =
+    metadata.entitlement === 'granted' || metadata.entitlement === 'denied' || metadata.entitlement === 'unknown'
+      ? metadata.entitlement
+      : undefined;
   const tiers: ContextTier[] = [];
-  for (const [id, label] of [['default', 'Default'], ['long_context', 'Long context']] as const) {
+  for (const [id, label] of [
+    ['default', 'Default'],
+    ['long_context', 'Long context'],
+  ] as const) {
     const price = record(tokenPrices[id]);
-    const contextMax = positiveInteger(price.context_max)
-      ?? (id === 'default' ? liveMaxPromptTokens : undefined);
+    const contextMax = positiveInteger(price.context_max) ?? (id === 'default' ? liveMaxPromptTokens : undefined);
     if (!contextMax && !(id === 'default' && liveMaxTotalTokens)) continue;
-    const maxTotalTokens = id === 'long_context'
-      ? contextMax
-        ? Math.max(liveMaxTotalTokens ?? 0, contextMax + (maxOutputTokens ?? 0)) || undefined
-        : undefined
-      : liveMaxTotalTokens ?? (contextMax && maxOutputTokens ? contextMax + maxOutputTokens : undefined);
+    const maxTotalTokens =
+      id === 'long_context'
+        ? contextMax
+          ? Math.max(liveMaxTotalTokens ?? 0, contextMax + (maxOutputTokens ?? 0)) || undefined
+          : undefined
+        : (liveMaxTotalTokens ?? (contextMax && maxOutputTokens ? contextMax + maxOutputTokens : undefined));
     tiers.push({
       id,
       label,
@@ -120,9 +117,12 @@ export function parseCopilotBillingTiers(billing: unknown): ContextTier[] {
       ...(maxOutputTokens ? { maxOutputTokens } : {}),
       ...(maxTotalTokens ? { maxTotalTokens } : {}),
       activation: { kind: 'implicit' },
-      entitlement: modelEntitlement === 'denied'
-        ? 'denied'
-        : Object.keys(price).length > 0 ? entitlement(price) : modelEntitlement ?? 'granted',
+      entitlement:
+        modelEntitlement === 'denied'
+          ? 'denied'
+          : Object.keys(price).length > 0
+            ? entitlement(price)
+            : (modelEntitlement ?? 'granted'),
     });
   }
   return tiers;
@@ -136,9 +136,9 @@ export function parseCopilotBillingContribution(
   const contextTiers = parseCopilotBillingTiers(billing);
   if (contextTiers.length === 0) return undefined;
   const longContext = contextTiers.find((tier) => tier.id === 'long_context');
-  const fixedMillionContext = !longContext && contextTiers.some((tier) => (
-    (tier.maxPromptTokens ?? 0) >= 1_000_000 || (tier.maxTotalTokens ?? 0) >= 1_000_000
-  ));
+  const fixedMillionContext =
+    !longContext &&
+    contextTiers.some((tier) => (tier.maxPromptTokens ?? 0) >= 1_000_000 || (tier.maxTotalTokens ?? 0) >= 1_000_000);
   return {
     modelId,
     contextTiers,
@@ -161,14 +161,18 @@ export function parseCopilotBillingContribution(
             }
           : { state: 'unsupported', fixedValue: false },
     },
-    ...(longContext ? {
-      executionBindings: [{
-        id: 'context:copilot-long-context',
-        when: { maxContext: true },
-        actions: [{ kind: 'client-tier', tierId: longContext.id }],
-        entitlement: longContext.entitlement,
-      }],
-    } : {}),
+    ...(longContext
+      ? {
+          executionBindings: [
+            {
+              id: 'context:copilot-long-context',
+              when: { maxContext: true },
+              actions: [{ kind: 'client-tier', tierId: longContext.id }],
+              entitlement: longContext.entitlement,
+            },
+          ],
+        }
+      : {}),
   };
 }
 
@@ -176,7 +180,7 @@ export function parseCopilotModelCatalog(
   payload: unknown,
   apiBaseUrl = 'https://api.githubcopilot.com',
 ): CopilotCatalogParseResult {
-  const collection = Array.isArray(record(payload).data) ? record(payload).data as unknown[] : [];
+  const collection = Array.isArray(record(payload).data) ? (record(payload).data as unknown[]) : [];
   const billingByModel: Record<string, CopilotModelCapabilityMetadata> = {};
   const models: LlmProviderModel[] = [];
   const contributions: CatalogModelContribution[] = [];
@@ -191,29 +195,32 @@ export function parseCopilotModelCatalog(
     const supportedEndpoints = Array.isArray(entry.supported_endpoints)
       ? entry.supported_endpoints.filter((value): value is string => typeof value === 'string')
       : [];
-    const supportsChatEndpoint = supportedEndpoints.some((endpoint) => (
-      endpoint.includes('/chat/completions') || endpoint.includes('/responses') || endpoint.includes('/v1/messages')
-    ));
+    const supportsChatEndpoint = supportedEndpoints.some(
+      (endpoint) =>
+        endpoint.includes('/chat/completions') || endpoint.includes('/responses') || endpoint.includes('/v1/messages'),
+    );
     if (
-      !discoveredId
-      || !id
-      || seen.has(id)
-      || (capabilityType && capabilityType !== 'chat')
-      || !supportsChatEndpoint
-      || !isAdmittedDiscoveredModel(entry)
-    ) continue;
+      !discoveredId ||
+      !id ||
+      seen.has(id) ||
+      (capabilityType && capabilityType !== 'chat') ||
+      !supportsChatEndpoint ||
+      !isAdmittedDiscoveredModel(entry)
+    )
+      continue;
     seen.add(id);
     const label = typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : id;
     const routeOptions = copilotRouteOptions(supportedEndpoints, apiBaseUrl);
     const preferredProtocol = routeOptions[0]?.route.protocol;
-    const reasoning = Array.isArray(entry.supported_reasoning_efforts)
-      && (preferredProtocol === 'OpenAIResponses' || preferredProtocol === 'OpenAICompatibleChatCompletions')
-      ? parseOpenAiReasoningControl(
-          entry.supported_reasoning_efforts,
-          entry.default_reasoning_effort,
-          preferredProtocol === 'OpenAIResponses' ? 'openai-responses' : 'openai-compatible',
-        )
-      : undefined;
+    const reasoning =
+      Array.isArray(entry.supported_reasoning_efforts) &&
+      (preferredProtocol === 'OpenAIResponses' || preferredProtocol === 'OpenAICompatibleChatCompletions')
+        ? parseOpenAiReasoningControl(
+            entry.supported_reasoning_efforts,
+            entry.default_reasoning_effort,
+            preferredProtocol === 'OpenAIResponses' ? 'openai-responses' : 'openai-compatible',
+          )
+        : undefined;
     const supports = record(capabilities.supports);
     const toolCalling = explicitCapability(supports.tool_calls);
     const visionInput = explicitCapability(supports.vision);
@@ -233,9 +240,10 @@ export function parseCopilotModelCatalog(
     const limits = record(capabilities.limits);
     const maxPromptTokens = positiveInteger(limits.max_prompt_tokens);
     const maxOutputTokens = positiveInteger(limits.max_output_tokens);
-    const liveMaxTotalTokens = positiveInteger(limits.max_context_window_tokens)
-      ?? positiveInteger(limits.max_context_window)
-      ?? positiveInteger(limits.max_total_tokens);
+    const liveMaxTotalTokens =
+      positiveInteger(limits.max_context_window_tokens) ??
+      positiveInteger(limits.max_context_window) ??
+      positiveInteger(limits.max_total_tokens);
     const maxTotalTokens = liveMaxTotalTokens;
     const contextEntitlement: EntitlementState = deniedByAccountPolicy ? 'denied' : 'granted';
     contributions.push({

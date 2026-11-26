@@ -7,7 +7,7 @@
  *  - 返回是否可恢复的判定。
  */
 
-import { storageAdapter } from './StorageAdapter';
+import { conversationHistoryStore, projectWorkspaceStore, sessionRecordStore } from './sessionStores';
 
 export interface SessionResumeState {
   sessionId: string;
@@ -23,20 +23,18 @@ export class SessionResumeService {
   /** 获取可恢复的会话状态。若无历史会话，返回 null。 */
   async getResumableSession(): Promise<SessionResumeState | null> {
     try {
-      const sessionId = await storageAdapter.getCurrentSessionId();
+      const sessionId = projectWorkspaceStore.getCurrentSessionId();
       if (!sessionId) return null;
 
-      const session = storageAdapter.readSession(sessionId);
+      const session = sessionRecordStore.readSession(sessionId);
       if (!session) return null;
 
       const projectId = session.projectId;
-      const latestRun = storageAdapter.getLatestRun(sessionId);
+      const latestRun = sessionRecordStore.getLatestRun(sessionId);
 
       // 检查是否有未完成的 run（状态非 success/failed/stopped 等终态）
       const runningStatuses = ['running', 'awaiting_input', 'awaiting_approval'] as string[];
-      const unfinishedRuns = storageAdapter.listRuns(sessionId).filter(
-        (r) => runningStatuses.includes(r.status),
-      );
+      const unfinishedRuns = sessionRecordStore.listRuns(sessionId).filter((r) => runningStatuses.includes(r.status));
       const runResumable = unfinishedRuns.length > 0;
 
       return {
@@ -44,7 +42,7 @@ export class SessionResumeService {
         projectId,
         runId: latestRun?.runId ?? null,
         runResumable,
-        lastMessagePreview: session.title ?? undefined,
+        lastMessagePreview: session.title,
       };
     } catch {
       return null;
@@ -54,7 +52,7 @@ export class SessionResumeService {
   /** 获取会话的对话历史（用于恢复时加载到 UI）。 */
   async getSessionHistory(sessionId: string) {
     try {
-      return storageAdapter.readConversationHistory(sessionId);
+      return conversationHistoryStore.readConversationHistory(sessionId);
     } catch {
       return null;
     }

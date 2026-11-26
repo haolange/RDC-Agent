@@ -8,7 +8,9 @@
   min-height: var(--control-height-md);
 }
 
-.handoff-action-row.is-decisions { flex-direction: column; }
+.handoff-action-row.is-decisions {
+  flex-direction: column;
+}
 .handoff-action-row.is-decisions .handoff-action-row__button {
   width: 100%;
   justify-content: flex-start;
@@ -19,4 +21,7 @@
   --btn-radius: var(--radius-md);
   background: var(--token-bg-panel);
 }
-.handoff-action-row__label { min-width: 0; overflow-wrap: anywhere; }
+.handoff-action-row__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

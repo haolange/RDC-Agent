@@ -1,17 +1,3 @@
-.right-rail-inline-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.right-rail-capture-panel .right-rail-capture-utility-actions {
-  gap: var(--space-2);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--token-border-subtle);
-}
-
-.right-rail-inline-actions .button,
 .right-rail-artifact-row .button {
   min-height: auto;
   padding: var(--space-1) var(--space-2);
@@ -20,34 +6,25 @@
   font-size: var(--type-body-size);
 }
 
-.right-rail-inline-actions .button:hover,
-.right-rail-inline-actions .button:focus-visible,
 .right-rail-artifact-row .button:hover,
 .right-rail-artifact-row .button:focus-visible {
   background: var(--token-bg-muted);
   color: var(--token-text-secondary);
 }
 
-.right-rail-diagnostic {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-width: 0;
-  gap: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--token-border-subtle);
-  color: var(--token-status-error);
-  font-size: var(--type-body-size);
+.is-trace-flash {
+  animation: trace-flash 1.6s ease-out;
 }
-
-.is-trace-flash { animation: trace-flash 1.6s ease-out; }
 
 @keyframes trace-flash {
-  0%, 100% { outline: 0 solid transparent; }
-  35% { outline: var(--space-1) solid color-mix(in srgb, var(--token-border-focus) 35%, transparent); }
+  0%,
+  100% {
+    outline: 0 solid transparent;
+  }
+  35% {
+    outline: var(--space-1) solid color-mix(in srgb, var(--token-border-focus) 35%, transparent);
+  }
 }
-
-.right-rail-diagnostic > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .right-rail-output-actions {
   display: inline-flex;

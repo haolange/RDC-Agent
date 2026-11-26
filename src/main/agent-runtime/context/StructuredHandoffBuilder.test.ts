@@ -44,7 +44,8 @@ describe('StructuredHandoffBuilder', () => {
     const messages: AgentMessage[] = [
       {
         role: 'user',
-        content: 'Goal: inspect the capture. Must not leak api_key="secret-value" or Authorization: Bearer bearer-secret. TODO: verify output.',
+        content:
+          'Goal: inspect the capture. Must not leak api_key="secret-value" or Authorization: Bearer bearer-secret. TODO: verify output.',
         timestamp: 1,
       },
       assistant(),
@@ -52,7 +53,9 @@ describe('StructuredHandoffBuilder', () => {
         role: 'toolResult',
         toolCallId: 'call-1',
         toolName: 'read_file',
-        content: [{ type: 'text', text: 'See https://example.test/result?access_token=url-secret and D:\\Captures\\scene.rdc' }],
+        content: [
+          { type: 'text', text: 'See https://example.test/result?access_token=url-secret and D:\\Captures\\scene.rdc' },
+        ],
         isError: false,
         timestamp: 3,
       },
@@ -70,38 +73,52 @@ describe('StructuredHandoffBuilder', () => {
   });
 
   it('preserves tool-only invocation parameters and separately identifies later user revisions', () => {
-    const invocation = { ...assistant(), content: [{ type: 'toolCall' as const, id: 'measure-call', name: 'measure', arguments: { samples: 7, units: 'ms', variant: 'baseline' } }] };
-    const serialized = serializeHandoffSourceTranscript([invocation, { role: 'user', content: 'Later correction: do not rename the blue label.', timestamp: 9 }]);
-    expect(serialized).toContain('"samples":7'); expect(serialized).toContain('"variant":"baseline"');
-    expect(serialized).toContain('message:1 timestamp:9'); expect(serialized).toContain('Later correction');
+    const invocation = {
+      ...assistant(),
+      content: [
+        {
+          type: 'toolCall' as const,
+          id: 'measure-call',
+          name: 'measure',
+          arguments: { samples: 7, units: 'ms', variant: 'baseline' },
+        },
+      ],
+    };
+    const serialized = serializeHandoffSourceTranscript([
+      invocation,
+      { role: 'user', content: 'Later correction: do not rename the blue label.', timestamp: 9 },
+    ]);
+    expect(serialized).toContain('"samples":7');
+    expect(serialized).toContain('"variant":"baseline"');
+    expect(serialized).toContain('message:1 timestamp:9');
+    expect(serialized).toContain('Later correction');
   });
 
   it('parses model-generated sections and assembles a typed view', () => {
-    const messages: AgentMessage[] = [
-      { role: 'user', content: 'Inspect the capture.', timestamp: 1 },
-      assistant(),
-    ];
-    const sections = parseModelHandoffSections([
-      '## Goal',
-      'Inspect the capture.',
-      '## Constraints',
-      '- Must not leak secrets',
-      '## Progress',
-      '### Done',
-      '- Opened the file',
-      '### In Progress',
-      '- Reading events',
-      '### Blocked',
-      '- Need replay device',
-      '## Key Decisions',
-      '- Use the latest capture',
-      '## Errors and Failed Attempts',
-      '- First read failed',
-      '## Next Steps',
-      '- Verify output',
-      '## Critical Context',
-      '- See D:\\Captures\\scene.rdc',
-    ].join('\n'));
+    const messages: AgentMessage[] = [{ role: 'user', content: 'Inspect the capture.', timestamp: 1 }, assistant()];
+    const sections = parseModelHandoffSections(
+      [
+        '## Goal',
+        'Inspect the capture.',
+        '## Constraints',
+        '- Must not leak secrets',
+        '## Progress',
+        '### Done',
+        '- Opened the file',
+        '### In Progress',
+        '- Reading events',
+        '### Blocked',
+        '- Need replay device',
+        '## Key Decisions',
+        '- Use the latest capture',
+        '## Errors and Failed Attempts',
+        '- First read failed',
+        '## Next Steps',
+        '- Verify output',
+        '## Critical Context',
+        '- See D:\\Captures\\scene.rdc',
+      ].join('\n'),
+    );
     const view = assembleDerivedContextView(messages, {
       scope: 'session',
       sessionId: 'session-1',
@@ -109,7 +126,6 @@ describe('StructuredHandoffBuilder', () => {
       sourceTurnIds: ['turn-1'],
       retainedTurnIds: ['turn-2'],
       createdAt: 10,
-
 
       sections,
     });
@@ -120,10 +136,12 @@ describe('StructuredHandoffBuilder', () => {
     expect(view.sourceHash).toBe(computeContextSourceHash(messages, ['turn-1']));
     expect(JSON.stringify(view.handoff)).not.toContain('tool-secret');
     expect(JSON.stringify(view.handoff)).not.toContain('private chain detail');
-    expect(view.handoff.resourceRefs).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: 'tool-call', value: 'read_file' }),
-      expect.objectContaining({ kind: 'path', value: expect.stringContaining('scene.rdc') }),
-    ]));
+    expect(view.handoff.resourceRefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'tool-call', value: 'read_file' }),
+        expect.objectContaining({ kind: 'path', value: expect.stringContaining('scene.rdc') }),
+      ]),
+    );
     const message = createStructuredHandoffMessage(view);
     expect(message.content).toContain('[Derived context; not a user request]');
     expect(message.derivedContext).toEqual({
@@ -134,16 +152,12 @@ describe('StructuredHandoffBuilder', () => {
   });
 
   it('preserves generated facts without dropping them to fit a projection', () => {
-    const view = assembleDerivedContextView(
-      [{ role: 'user', content: 'Objective only', timestamp: 1 }],
-      {
-        scope: 'ephemeral',
-        createdAt: 1,
+    const view = assembleDerivedContextView([{ role: 'user', content: 'Objective only', timestamp: 1 }], {
+      scope: 'ephemeral',
+      createdAt: 1,
 
-
-        sections: testHandoffSections('Objective only'),
-      },
-    );
+      sections: testHandoffSections('Objective only'),
+    });
     expect(view.handoff.decisions).toEqual([]);
     expect(view.handoff.constraints).toEqual([]);
     expect(view.handoff.facts).toEqual([{ text: 'Objective only', source: 'assistant' }]);

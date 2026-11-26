@@ -1,6 +1,6 @@
 import { nowMs } from '@shared/utils/id';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
-import { supersedePreviousPlanReviews, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import { supersedePreviousPlanReviews, upsertRuntimeToolCall } from '../agent-runtime/workTrace/ConversationWorkTrace';
 import type { PlanReviewDecision } from '@shared/types/planReview';
 import type { ConversationToolCall, ConversationWorkTrace } from '@shared/types/conversation';
 
@@ -19,13 +19,20 @@ export function applyPlanReviewRequested(input: {
 }): ConversationWorkTrace | null {
   const planReview = input.payload.planReview;
   if (!planReview) return input.workTrace ?? null;
-  const toolCallId = String(input.payload.toolCallId ?? input.payload.approvalId ?? `approval-${input.payload.toolCallId ?? 'runtime'}`);
+  const toolCallId = String(input.payload.toolCallId ?? input.payload.approvalId ?? 'approval-runtime');
   const pausedTrace = input.workTrace
     ? {
         ...input.workTrace,
-        blocks: input.workTrace.blocks.map((block) => block.items?.some((item) => item.kind === 'thinking' && item.status === 'streaming')
-          ? { ...block, items: block.items.map((item) => item.kind === 'thinking' ? { ...item, status: 'complete' as const } : item) }
-          : block),
+        blocks: input.workTrace.blocks.map((block) =>
+          block.items?.some((item) => item.kind === 'thinking' && item.status === 'streaming')
+            ? {
+                ...block,
+                items: block.items.map((item) =>
+                  item.kind === 'thinking' ? { ...item, status: 'complete' as const } : item,
+                ),
+              }
+            : block,
+        ),
       }
     : input.workTrace;
   return upsertRuntimeToolCall(
@@ -68,7 +75,11 @@ export function applyPlanReviewAnswered(input: {
           ...planReview,
           status: cancelled
             ? 'cancelled'
-            : (input.payload.decision?.kind === 'approve' ? 'approved' : input.payload.decision?.kind === 'reject' ? 'rejected' : planReview.status),
+            : input.payload.decision?.kind === 'approve'
+              ? 'approved'
+              : input.payload.decision?.kind === 'reject'
+                ? 'rejected'
+                : planReview.status,
           decision: input.payload.decision ?? planReview.decision,
         }
       : undefined,

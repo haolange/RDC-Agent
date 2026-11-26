@@ -1,9 +1,14 @@
 import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react';
 import { assignDynStyle, clearDynStyle } from '../../lib/useDynStyle';
+import { documentFonts } from '../../lib/documentFonts';
 import { COMPOSER_PROMPT_MAX_HEIGHT, COMPOSER_PROMPT_MIN_HEIGHT } from './composerPromptGeometry';
 
 /** Measure after CodeMirror's update cycle; both panes use their rendered padding. */
-export function useComposerMarkdownSizing(hostRef: RefObject<HTMLDivElement>, value: string, mode: 'write' | 'preview') {
+export function useComposerMarkdownSizing(
+  hostRef: RefObject<HTMLDivElement>,
+  value: string,
+  mode: 'write' | 'preview',
+) {
   const request = useRef<() => void>(() => {});
   const schedule = useCallback(() => request.current(), []);
   useLayoutEffect(() => {
@@ -19,10 +24,16 @@ export function useComposerMarkdownSizing(hostRef: RefObject<HTMLDivElement>, va
       const css = getComputedStyle(stage);
       const padding = parseFloat(css.paddingTop) + parseFloat(css.paddingBottom);
       assignDynStyle(host, { height: COMPOSER_PROMPT_MIN_HEIGHT + 'px' });
-      const height = Math.min(COMPOSER_PROMPT_MAX_HEIGHT, Math.max(COMPOSER_PROMPT_MIN_HEIGHT, content.scrollHeight + padding));
+      const height = Math.min(
+        COMPOSER_PROMPT_MAX_HEIGHT,
+        Math.max(COMPOSER_PROMPT_MIN_HEIGHT, content.scrollHeight + padding),
+      );
       assignDynStyle(host, { height: height + 'px' });
     };
-    const enqueue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
+    const enqueue = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
     request.current = enqueue;
     let width = -1;
     const resize = new ResizeObserver((entries) => {
@@ -38,8 +49,10 @@ export function useComposerMarkdownSizing(hostRef: RefObject<HTMLDivElement>, va
     for (let node: HTMLElement | null = host; node; node = node.parentElement) {
       mutation.observe(node, { attributes: true, attributeFilter: ['class', 'hidden', 'data-font-scale'] });
     }
-    document.fonts?.addEventListener('loadingdone', enqueue);
-    void document.fonts?.ready.then(() => { if (!disposed) enqueue(); });
+    documentFonts()?.addEventListener('loadingdone', enqueue);
+    void documentFonts()?.ready.then(() => {
+      if (!disposed) enqueue();
+    });
     enqueue();
     return () => {
       disposed = true;
@@ -47,7 +60,7 @@ export function useComposerMarkdownSizing(hostRef: RefObject<HTMLDivElement>, va
       cancelAnimationFrame(frame);
       resize.disconnect();
       mutation.disconnect();
-      document.fonts?.removeEventListener('loadingdone', enqueue);
+      documentFonts()?.removeEventListener('loadingdone', enqueue);
       clearDynStyle(host);
     };
   }, [hostRef, mode]);

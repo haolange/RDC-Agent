@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { grantDelegatedArtifactAccess, resolveDelegatedArtifactRead, assertDelegatedArtifactWrite, grantDelegatedOutput } from './DelegatedArtifactAccess';
+import {
+  grantDelegatedArtifactAccess,
+  resolveDelegatedArtifactRead,
+  assertDelegatedArtifactWrite,
+  grantDelegatedOutput,
+} from './DelegatedArtifactAccess';
 import type { SessionArtifactResolver } from './SessionArtifactResolver';
 const uri = 'session://tool-outputs/a.md';
 const hash = 'a'.repeat(64);
@@ -12,11 +17,20 @@ describe('delegated artifact grants', () => {
       grantDelegatedOutput('child', 'session://investigation/new.json', hash);
       expect(() => assertDelegatedArtifactWrite('child', 'session://investigation/new.json')).not.toThrow();
       expect(resolveDelegatedArtifactRead('child', uri)).toEqual({ sessionId: 'root', expectedHash: hash });
-      expect(() => resolveDelegatedArtifactRead('child', 'session://tool-outputs/sibling.md', 'b'.repeat(64))).toThrow(/ARTIFACT_SESSION_DENIED/);
+      expect(() => resolveDelegatedArtifactRead('child', 'session://tool-outputs/sibling.md', 'b'.repeat(64))).toThrow(
+        /ARTIFACT_SESSION_DENIED/,
+      );
       expect(() => resolveDelegatedArtifactRead('child', uri, 'b'.repeat(64))).toThrow(/ARTIFACT_HASH_MISMATCH/);
-      expect(resolveDelegatedArtifactRead('child', uri, `sha256:${hash}`)).toEqual({ sessionId: 'root', expectedHash: hash });
-      expect(() => grantDelegatedArtifactAccess('grandchild', 'child', ['session://tool-outputs/sibling.md'], { read })).toThrow(/exceeds/);
-    } finally { release(); }
+      expect(resolveDelegatedArtifactRead('child', uri, `sha256:${hash}`)).toEqual({
+        sessionId: 'root',
+        expectedHash: hash,
+      });
+      expect(() =>
+        grantDelegatedArtifactAccess('grandchild', 'child', ['session://tool-outputs/sibling.md'], { read }),
+      ).toThrow(/exceeds/);
+    } finally {
+      release();
+    }
     expect(resolveDelegatedArtifactRead('child', uri).sessionId).toBe('child');
   });
   it('propagates only verified child-created outputs to its immediate parent after release', () => {
@@ -31,10 +45,15 @@ describe('delegated artifact grants', () => {
       expect(resolveDelegatedArtifactRead('parent-child', output)).toEqual({ sessionId: 'root', expectedHash: hash });
       expect(() => resolveDelegatedArtifactRead('parent-child', 'session://investigation/unrelated.json')).toThrow();
       expect(() => assertDelegatedArtifactWrite('parent-child', output)).toThrow();
-    } finally { releaseNested(); releaseParent(); }
+    } finally {
+      releaseNested();
+      releaseParent();
+    }
   });
   it('does not publish partial grants when an input cannot be read', () => {
-    const read = vi.fn(() => { throw new Error('hash mismatch'); }) as unknown as SessionArtifactResolver['read'];
+    const read = vi.fn(() => {
+      throw new Error('hash mismatch');
+    }) as unknown as SessionArtifactResolver['read'];
     expect(() => grantDelegatedArtifactAccess('child', 'root', [uri], { read })).toThrow(/hash/);
     expect(resolveDelegatedArtifactRead('child', uri).sessionId).toBe('child');
   });

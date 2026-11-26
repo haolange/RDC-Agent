@@ -1,7 +1,4 @@
-import type {
-  ConversationPreflightErrorCode,
-  ConversationSendResult,
-} from '@shared/types/conversation';
+import type { ConversationPreflightErrorCode, ConversationSendResult } from '@shared/types/conversation';
 
 const PREFLIGHT_ERROR_CODES = new Set<ConversationPreflightErrorCode>([
   'REQUEST_CANCELLED',
@@ -28,11 +25,12 @@ const PREFLIGHT_ERROR_CODES = new Set<ConversationPreflightErrorCode>([
 export function toRejectedSendResult(requestId: string, error: unknown): ConversationSendResult {
   const technicalMessage = error instanceof Error ? error.message : String(error);
   const matchedCode = technicalMessage.match(/^([A-Z][A-Z0-9_]+):\s*/u)?.[1];
-  const code = matchedCode && PREFLIGHT_ERROR_CODES.has(matchedCode as ConversationPreflightErrorCode)
-    ? matchedCode as ConversationPreflightErrorCode
-    : 'PREFLIGHT_FAILED';
-  const message = technicalMessage.replace(/^([A-Z][A-Z0-9_]+):\s*/u, '').trim()
-    || 'The request could not be prepared.';
+  const code =
+    matchedCode && PREFLIGHT_ERROR_CODES.has(matchedCode as ConversationPreflightErrorCode)
+      ? (matchedCode as ConversationPreflightErrorCode)
+      : 'PREFLIGHT_FAILED';
+  const message =
+    technicalMessage.replace(/^([A-Z][A-Z0-9_]+):\s*/u, '').trim() || 'The request could not be prepared.';
   return {
     status: 'rejected',
     requestId,
@@ -41,10 +39,11 @@ export function toRejectedSendResult(requestId: string, error: unknown): Convers
       code,
       message,
       technicalMessage,
-      retryable: code === 'REQUEST_CANCELLED'
-        || code === 'CONVERSATION_BUSY'
-        || code === 'PROVIDER_UNAVAILABLE'
-        || code === 'PREFLIGHT_FAILED',
+      retryable:
+        code === 'REQUEST_CANCELLED' ||
+        code === 'CONVERSATION_BUSY' ||
+        code === 'PROVIDER_UNAVAILABLE' ||
+        code === 'PREFLIGHT_FAILED',
     },
   };
 }

@@ -1,8 +1,9 @@
+import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import YAML from 'yaml';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HookEngine } from './HookEngine';
 
 const roots: string[] = [];
@@ -26,19 +27,122 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     fs.mkdirSync(hooks, { recursive: true });
     const source = path.join(hooks, 'check.hook.yml');
     const definition = {
-      id: 'check', enabled: true, event: 'tool.before-call', command: process.execPath,
+      id: 'check',
+      enabled: true,
+      event: 'tool.before-call',
+      command: process.execPath,
       args: ['-e', 'process.stdin.resume(); process.stdin.on("end",()=>{console.log("ok")})'],
-      timeoutMs: 2000, failurePolicy: 'block', matcher: { tools: ['read_file'] },
+      timeoutMs: 2000,
+      failurePolicy: 'block',
+      matcher: { tools: ['read_file'] },
     };
     fs.writeFileSync(source, YAML.stringify(definition));
     const engine = new HookEngine(path.join(root, 'trust.json'));
     const isolatedBuiltin = emptyBuiltin();
     engine.load(path.join(root, 'user-hooks'), project, isolatedBuiltin);
-    expect((await engine.trigger('tool.before-call', { event: 'tool.before-call', projectRoot: project, toolName: 'read_file' }))[0].status).toBe('untrusted');
+    expect(
+      (
+        await engine.trigger('tool.before-call', {
+          event: 'tool.before-call',
+          projectRoot: project,
+          toolName: 'read_file',
+        })
+      )[0].status,
+    ).toBe('untrusted');
     engine.trustProjectHook(project, 'check');
-    expect((await engine.trigger('tool.before-call', { event: 'tool.before-call', projectRoot: project, toolName: 'read_file' }))[0]).toMatchObject({ status: 'completed', allowed: true });
+    expect(
+      (
+        await engine.trigger('tool.before-call', {
+          event: 'tool.before-call',
+          projectRoot: project,
+          toolName: 'read_file',
+        })
+      )[0],
+    ).toMatchObject({ status: 'completed', allowed: true });
     fs.writeFileSync(source, YAML.stringify({ ...definition, args: ['-e', 'process.exit(0)'] }));
     expect(engine.load(path.join(root, 'user-hooks'), project, isolatedBuiltin)[0].trust.trusted).toBe(false);
+  });
+
+  it('loads the other hooks when one hook file is malformed and reports that file', () => {
+    const root = makeRoot();
+    const userHooks = path.join(root, 'user-hooks');
+    fs.mkdirSync(userHooks, { recursive: true });
+    fs.writeFileSync(
+      path.join(userHooks, 'good.hook.yml'),
+      YAML.stringify({
+        id: 'good',
+        event: 'turn.before-start',
+        command: process.execPath,
+        failurePolicy: 'warn',
+      }),
+    );
+    fs.writeFileSync(path.join(userHooks, 'broken.hook.yml'), 'id: broken\nevent: [unclosed');
+    const engine = new HookEngine(path.join(root, 'trust.json'));
+    const loaded = engine.load(userHooks, undefined, emptyBuiltin());
+    expect(loaded.map((hook) => hook.definition.id)).toEqual(['good']);
+    expect(engine.invalidFiles()).toEqual([
+      expect.objectContaining({ scope: 'user', sourcePath: path.join(userHooks, 'broken.hook.yml') }),
+    ]);
+  });
+
+  it('parses hook files once per change, and a hook edited on disk applies to the next tool call', async () => {
+    const root = makeRoot();
+    const builtin = emptyBuiltin();
+    const userHooks = path.join(root, 'user-hooks');
+    fs.mkdirSync(userHooks, { recursive: true });
+    const source = path.join(builtin, 'echo.hook.yml');
+    // A builtin hook runs only scripts from its own directory.
+    const writeEcho = (text: string) => {
+      fs.writeFileSync(path.join(builtin, `echo-${text}.cjs`), `console.log(${JSON.stringify(text)});\n`);
+      fs.writeFileSync(
+        source,
+        YAML.stringify({
+          id: 'echo',
+          event: 'tool.before-call',
+          command: 'node',
+          args: [`echo-${text}.cjs`],
+          timeoutMs: 4000,
+          failurePolicy: 'warn',
+        }),
+      );
+    };
+    const broken = path.join(userHooks, 'broken.hook.yml');
+    writeEcho('first');
+    fs.writeFileSync(broken, 'id: broken\nevent: [unclosed');
+    const engine = new HookEngine(path.join(root, 'trust.json'));
+    const toolCall = async () => {
+      engine.load(userHooks, undefined, builtin);
+      return (await engine.trigger('tool.before-call', { event: 'tool.before-call', toolName: 'read_file' })).map(
+        (result) => result.stdout.trim(),
+      );
+    };
+    const hookFileReads = vi.spyOn(fs, 'readFileSync');
+    const readsOfHookFiles = () =>
+      hookFileReads.mock.calls.filter(([file]) => String(file).endsWith('.hook.yml')).length;
+    try {
+      expect(await toolCall()).toEqual(['first']);
+      expect(readsOfHookFiles()).toBe(2);
+      expect(await toolCall()).toEqual(['first']);
+      expect(readsOfHookFiles()).toBe(2);
+      expect(engine.invalidFiles()).toEqual([expect.objectContaining({ scope: 'user', sourcePath: broken })]);
+
+      writeEcho('second');
+      expect(await toolCall()).toEqual(['second']);
+      fs.writeFileSync(
+        broken,
+        YAML.stringify({ id: 'fixed', event: 'turn.before-start', command: process.execPath, failurePolicy: 'warn' }),
+      );
+      engine.load(userHooks, undefined, builtin);
+      expect(engine.invalidFiles()).toEqual([]);
+      expect(
+        engine
+          .list()
+          .map((hook) => hook.definition.id)
+          .sort(),
+      ).toEqual(['echo', 'fixed']);
+    } finally {
+      hookFileReads.mockRestore();
+    }
   });
 
   it('resolves builtin < user < project with the same ScopedResourceResolver order', async () => {
@@ -51,15 +155,18 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     fs.mkdirSync(userHooks, { recursive: true });
     fs.mkdirSync(projectHooks, { recursive: true });
     const writeHook = (dir: string, commandArg: string) => {
-      fs.writeFileSync(path.join(dir, 'audit.hook.yml'), YAML.stringify({
-        id: 'audit',
-        enabled: true,
-        event: 'session.before-start',
-        command: process.execPath,
-        args: ['-e', `console.log(${JSON.stringify(commandArg)})`],
-        timeoutMs: 2000,
-        failurePolicy: 'warn',
-      }));
+      fs.writeFileSync(
+        path.join(dir, 'audit.hook.yml'),
+        YAML.stringify({
+          id: 'audit',
+          enabled: true,
+          event: 'session.before-start',
+          command: process.execPath,
+          args: ['-e', `console.log(${JSON.stringify(commandArg)})`],
+          timeoutMs: 2000,
+          failurePolicy: 'warn',
+        }),
+      );
     };
     writeHook(builtin, 'builtin');
     writeHook(userHooks, 'user');
@@ -89,15 +196,18 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     const userHooks = path.join(root, 'user');
     const project = path.join(root, 'project');
     fs.mkdirSync(userHooks, { recursive: true });
-    fs.writeFileSync(path.join(userHooks, 'audit.hook.yml'), YAML.stringify({
-      id: 'audit',
-      enabled: true,
-      event: 'session.before-start',
-      command: process.execPath,
-      args: ['-e', 'console.log("user")'],
-      timeoutMs: 2000,
-      failurePolicy: 'warn',
-    }));
+    fs.writeFileSync(
+      path.join(userHooks, 'audit.hook.yml'),
+      YAML.stringify({
+        id: 'audit',
+        enabled: true,
+        event: 'session.before-start',
+        command: process.execPath,
+        args: ['-e', 'console.log("user")'],
+        timeoutMs: 2000,
+        failurePolicy: 'warn',
+      }),
+    );
     const engine = new HookEngine(path.join(root, 'trust.json'));
     const builtin = emptyBuiltin();
     engine.load(userHooks, undefined, builtin);
@@ -113,9 +223,13 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     const repoRoot = path.resolve(__dirname, '../../..');
     const builtin = path.join(repoRoot, 'resources', 'agent-runtime', 'hooks');
     const engine = new HookEngine(path.join(makeRoot(), 'trust.json'));
-    const loaded = engine.load(path.join(makeRoot(), 'user-hooks'), undefined, builtin)
-      .filter((hook) => ['mission-plan-handoff-check', 'rdc-shell-audit', 'artifact-integrity', 'report-contract']
-        .includes(hook.definition.id));
+    const loaded = engine
+      .load(path.join(makeRoot(), 'user-hooks'), undefined, builtin)
+      .filter((hook) =>
+        ['mission-plan-handoff-check', 'rdc-shell-audit', 'artifact-integrity', 'report-contract'].includes(
+          hook.definition.id,
+        ),
+      );
     expect(loaded.map((hook) => hook.definition.id).sort()).toEqual([
       'artifact-integrity',
       'mission-plan-handoff-check',
@@ -123,10 +237,9 @@ describe('HookEngine', { timeout: 20_000 }, () => {
       'report-contract',
     ]);
     expect(loaded.every((hook) => hook.scope === 'builtin' && hook.trust.trusted)).toBe(true);
-    expect(loaded.map((hook) => hook.definition.event)).toEqual(expect.arrayContaining([
-      'agent.before-handoff',
-      'tool.before-call',
-    ]));
+    expect(loaded.map((hook) => hook.definition.event)).toEqual(
+      expect.arrayContaining(['agent.before-handoff', 'tool.before-call']),
+    );
 
     const handoff = await engine.test('mission-plan-handoff-check', {
       event: 'agent.before-handoff',
@@ -211,12 +324,17 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     const unprefixedHash = await engine.test('artifact-integrity', {
       event: 'tool.before-call',
       toolName: 'investigation_write',
-      payload: { toolName: 'investigation_write', arguments: {
-        status: 'ready', sourceRefs: [{ artifactId: 'source-a', expectedHash: 'a'.repeat(64) }],
-      } },
+      payload: {
+        toolName: 'investigation_write',
+        arguments: {
+          status: 'ready',
+          sourceRefs: [{ artifactId: 'source-a', expectedHash: 'a'.repeat(64) }],
+        },
+      },
     });
     expect(unprefixedHash).toMatchObject({
-      status: 'failed', allowed: false,
+      status: 'failed',
+      allowed: false,
       reason: 'artifact-integrity: sourceRefs[0] expectedHash must be sha256:<64 hex>',
     });
 
@@ -231,7 +349,9 @@ describe('HookEngine', { timeout: 20_000 }, () => {
             projectionKind: 'report',
             claimId: 'c1',
             epistemic: 'observed',
-            compactProvenance: [{ sourceClaimId: 'c0', sourceEpistemicStatus: 'inferred', sourceVerificationLevel: 'reconstructed' }],
+            compactProvenance: [
+              { sourceClaimId: 'c0', sourceEpistemicStatus: 'inferred', sourceVerificationLevel: 'reconstructed' },
+            ],
           },
         },
       },
@@ -246,20 +366,22 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     const project = path.join(root, 'project');
     fs.mkdirSync(builtin, { recursive: true });
     fs.mkdirSync(project, { recursive: true });
-    fs.writeFileSync(path.join(builtin, 'trap.hook.yml'), YAML.stringify({
-      id: 'trap',
-      enabled: true,
-      event: 'tool.before-call',
-      command: process.execPath,
-      args: ['trap.mjs'],
-      timeoutMs: 2000,
-      failurePolicy: 'block',
-    }));
-    fs.writeFileSync(path.join(project, 'trap.mjs'), [
-      'process.stdout.write("HIJACKED\\n");',
-      'process.exit(0);',
-      '',
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(builtin, 'trap.hook.yml'),
+      YAML.stringify({
+        id: 'trap',
+        enabled: true,
+        event: 'tool.before-call',
+        command: process.execPath,
+        args: ['trap.mjs'],
+        timeoutMs: 2000,
+        failurePolicy: 'block',
+      }),
+    );
+    fs.writeFileSync(
+      path.join(project, 'trap.mjs'),
+      ['process.stdout.write("HIJACKED\\n");', 'process.exit(0);', ''].join('\n'),
+    );
     const engine = new HookEngine(path.join(root, 'trust.json'));
     engine.load(path.join(root, 'user-hooks'), project, builtin);
     const result = await engine.test('trap', {
@@ -279,12 +401,13 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     const project = path.join(makeRoot(), 'project');
     const hijackDir = path.join(project, 'scripts', 'hooks');
     fs.mkdirSync(hijackDir, { recursive: true });
-    const hijackSource = [
-      'process.stdout.write("HIJACKED\\n");',
-      'process.exit(0);',
-      '',
-    ].join('\n');
-    for (const name of ['artifact-integrity.mjs', 'report-contract.mjs', 'rdc-shell-audit.mjs', 'mission-plan-handoff-check.mjs']) {
+    const hijackSource = ['process.stdout.write("HIJACKED\\n");', 'process.exit(0);', ''].join('\n');
+    for (const name of [
+      'artifact-integrity.mjs',
+      'report-contract.mjs',
+      'rdc-shell-audit.mjs',
+      'mission-plan-handoff-check.mjs',
+    ]) {
       fs.writeFileSync(path.join(hijackDir, name), hijackSource);
       fs.writeFileSync(path.join(project, name), hijackSource);
     }
@@ -326,6 +449,36 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     expect(configuredShellCall.stdout).toMatch(/rdc-shell-audit: ok/);
   });
 
+  it('fails the audit and handoff hooks closed on malformed or empty input whatever the environment holds', async () => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const builtin = path.join(repoRoot, 'resources', 'agent-runtime', 'hooks');
+    // Builtin hooks inherit the app's environment; no variable in it may turn a check into a pass.
+    vi.stubEnv('RDC_AGENT_TEST_MODE', '1');
+    try {
+      for (const script of ['rdc-shell-audit.mjs', 'mission-plan-handoff-check.mjs']) {
+        const run = spawnSync(process.execPath, [path.join(builtin, script)], {
+          input: '{not json',
+          encoding: 'utf8',
+          env: { ...process.env },
+        });
+        expect(run.status, script).toBe(1);
+        expect(run.stderr, script).toMatch(/hook stdin is not valid JSON/);
+      }
+      const engine = new HookEngine(path.join(makeRoot(), 'trust.json'));
+      engine.load(path.join(makeRoot(), 'user-hooks'), makeRoot(), builtin);
+      const emptyHandoff = await engine.test('mission-plan-handoff-check', {
+        event: 'agent.before-handoff',
+        agentId: 'debugger',
+        sessionId: 'session-a',
+        payload: {},
+      });
+      expect(emptyHandoff).toMatchObject({ status: 'failed', allowed: false });
+      expect(emptyHandoff.stderr).toMatch(/handoff requires toAgentId/);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('does not keep AgentHooks or BackgroundTaskRunner as a second surface', () => {
     const repoRoot = path.resolve(__dirname, '../../..');
     expect(fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/agent/AgentHooks.ts'))).toBe(false);
@@ -337,46 +490,118 @@ describe('HookEngine', { timeout: 20_000 }, () => {
     const root = makeRoot();
     const userHooks = path.join(root, 'hooks');
     fs.mkdirSync(userHooks);
-    fs.writeFileSync(path.join(userHooks, 'timeout.hook.yml'), YAML.stringify({
-      id: 'timeout', enabled: true, event: 'turn.before-start', command: process.execPath,
-      args: ['-e', 'setTimeout(()=>{}, 5000)'], timeoutMs: 20, failurePolicy: 'warn',
-    }));
+    fs.writeFileSync(
+      path.join(userHooks, 'timeout.hook.yml'),
+      YAML.stringify({
+        id: 'timeout',
+        enabled: true,
+        event: 'turn.before-start',
+        command: process.execPath,
+        args: ['-e', 'setTimeout(()=>{}, 5000)'],
+        timeoutMs: 20,
+        failurePolicy: 'warn',
+      }),
+    );
     const engine = new HookEngine(path.join(root, 'trust.json'));
     engine.load(userHooks, undefined, emptyBuiltin());
     engine.trustUserHook('timeout');
-    expect((await engine.trigger('turn.before-start', { event: 'turn.before-start' }))[0]).toMatchObject({ status: 'timed-out', allowed: true });
+    expect((await engine.trigger('turn.before-start', { event: 'turn.before-start' }))[0]).toMatchObject({
+      status: 'timed-out',
+      allowed: true,
+    });
   });
 });
 
 describe('report Hook publication boundary', { timeout: 20_000 }, () => {
   async function checkReport(status?: 'draft' | 'ready', claims: unknown[] = [], reportContract?: object) {
     const engine = new HookEngine(path.join(makeRoot(), 'trust.json'));
-    engine.load(path.join(makeRoot(), 'user-hooks'), undefined,
-      path.resolve(__dirname, '../../../resources/agent-runtime/hooks'));
+    engine.load(
+      path.join(makeRoot(), 'user-hooks'),
+      undefined,
+      path.resolve(__dirname, '../../../resources/agent-runtime/hooks'),
+    );
     return engine.test('report-contract', {
-      event: 'tool.before-call', toolName: 'investigation_write',
-      payload: { toolName: 'investigation_write', arguments: {
-        kind: 'report', ...(status ? { status } : {}),
-        record: { title: 'Incomplete investigation', mission: 'debugger', summary: 'Evidence gap retained.',
-          claims, evidenceIds: [], experimentIds: [], ...(reportContract ? { reportContract } : {}) },
-      } },
+      event: 'tool.before-call',
+      toolName: 'investigation_write',
+      payload: {
+        toolName: 'investigation_write',
+        arguments: {
+          kind: 'report',
+          ...(status ? { status } : {}),
+          record: {
+            title: 'Incomplete investigation',
+            mission: 'debugger',
+            summary: 'Evidence gap retained.',
+            claims,
+            evidenceIds: [],
+            experimentIds: [],
+            ...(reportContract ? { reportContract } : {}),
+          },
+        },
+      },
     });
   }
 
-  it.each(['draft', undefined] as const)('accepts an incomplete %s report without a publication contract', async (status) => {
-    expect(await checkReport(status)).toMatchObject({ status: 'completed', allowed: true });
-  });
+  it.each(['draft', undefined] as const)(
+    'accepts an incomplete %s report without a publication contract',
+    async (status) => {
+      expect(await checkReport(status)).toMatchObject({ status: 'completed', allowed: true });
+    },
+  );
 
   it('still refuses ready publication without its report contract', async () => {
-    expect(await checkReport('ready')).toMatchObject({ status: 'failed', allowed: false,
-      reason: expect.stringContaining('report missing reportContract') });
+    expect(await checkReport('ready')).toMatchObject({
+      status: 'failed',
+      allowed: false,
+      reason: expect.stringContaining('report missing reportContract'),
+    });
   });
 
   it('still refuses an epistemic upgrade in a draft report', async () => {
-    expect(await checkReport('draft', [{ claimId: 'projection', epistemic: 'observed',
-      compactProvenance: [{ sourceClaimId: 'source', sourceEpistemicStatus: 'inferred',
-        sourceVerificationLevel: 'reconstructed' }] }])).toMatchObject({
-      status: 'failed', allowed: false, reason: expect.stringContaining('raises epistemic rank'),
+    expect(
+      await checkReport('draft', [
+        {
+          claimId: 'projection',
+          epistemic: 'observed',
+          compactProvenance: [
+            { sourceClaimId: 'source', sourceEpistemicStatus: 'inferred', sourceVerificationLevel: 'reconstructed' },
+          ],
+        },
+      ]),
+    ).toMatchObject({
+      status: 'failed',
+      allowed: false,
+      reason: expect.stringContaining('raises epistemic rank'),
     });
+  });
+
+  it('trusts a built-in hook by scope without hashing the runtime it launches', () => {
+    const root = makeRoot();
+    const builtin = emptyBuiltin();
+    fs.writeFileSync(path.join(builtin, 'noop.cjs'), '\n');
+    fs.writeFileSync(
+      path.join(builtin, 'node-runtime.hook.yml'),
+      YAML.stringify({
+        id: 'node-runtime',
+        event: 'tool.before-call',
+        command: 'node',
+        args: ['noop.cjs'],
+        timeoutMs: 4000,
+        failurePolicy: 'warn',
+      }),
+    );
+    const readFileSync = vi.spyOn(fs, 'readFileSync');
+    try {
+      const [hook] = new HookEngine(path.join(root, 'trust.json')).load(
+        path.join(root, 'user-hooks'),
+        undefined,
+        builtin,
+      );
+      expect(hook.trust.trusted).toBe(true);
+      expect(hook.trustFingerprint).toBe(`builtin:${hook.sourceHash}`);
+      expect(readFileSync.mock.calls.some(([target]) => String(target) === process.execPath)).toBe(false);
+    } finally {
+      readFileSync.mockRestore();
+    }
   });
 });

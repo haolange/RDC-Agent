@@ -29,11 +29,29 @@ describe('MCP argument editing', () => {
 
 describe('MCP descriptor round trip', () => {
   it('keeps fields the form does not edit and drops a URL once the transport is no longer HTTP', () => {
-    const original = JSON.stringify({ id: 'files', name: 'Files', transport: 'streamable-http', url: 'http://localhost:8123/mcp',
-      command: '', args: [], enabledByDefault: true, env: { WORKSPACE: '/tmp' }, description: 'Workspace files' });
-    const toggled = JSON.parse(contentFromForm('mcp', { ...formFromContent('mcp', 'files', original), enabled: false }));
-    expect(toggled).toMatchObject({ enabledByDefault: false, env: { WORKSPACE: '/tmp' }, description: 'Workspace files', url: 'http://localhost:8123/mcp' });
-    const local = JSON.parse(contentFromForm('mcp', { ...formFromContent('mcp', 'files', original), transport: 'stdio', command: 'npx' }));
+    const original = JSON.stringify({
+      id: 'files',
+      name: 'Files',
+      transport: 'streamable-http',
+      url: 'http://localhost:8123/mcp',
+      command: '',
+      args: [],
+      enabledByDefault: true,
+      env: { WORKSPACE: '/tmp' },
+      description: 'Workspace files',
+    });
+    const toggled = JSON.parse(
+      contentFromForm('mcp', { ...formFromContent('mcp', 'files', original), enabled: false }),
+    );
+    expect(toggled).toMatchObject({
+      enabledByDefault: false,
+      env: { WORKSPACE: '/tmp' },
+      description: 'Workspace files',
+      url: 'http://localhost:8123/mcp',
+    });
+    const local = JSON.parse(
+      contentFromForm('mcp', { ...formFromContent('mcp', 'files', original), transport: 'stdio', command: 'npx' }),
+    );
     expect(local).toMatchObject({ transport: 'stdio', command: 'npx', env: { WORKSPACE: '/tmp' } });
     expect(local).not.toHaveProperty('url');
   });

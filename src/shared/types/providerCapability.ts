@@ -1,50 +1,22 @@
-import type {
-  ConversationTurnControls,
-  ReasoningControl,
-  ResolvedReasoningSelection,
-} from './modelCapability';
-import type {
-  ProviderSurfaceManifest,
-} from '../provider-catalog/catalogManifestSchema';
+import type { ReasoningControl, ResolvedReasoningSelection } from './modelCapability';
 import type { ProviderAdapterId } from '../provider-catalog/implementationRegistry';
+import type { JsonObject, JsonValue } from '../utils/jsonValue';
 import type {
   BooleanControlDefinition,
-  CatalogJsonObject,
-  CatalogJsonPrimitive,
-  CatalogJsonValue,
   ExecutionBinding,
   ModelCost,
-  ModelManifest,
-  ModelModeAction as CatalogModelModeAction,
   ModelPresencePolicy,
   ProviderContractBundle,
 } from '../provider-catalog/modelManifestSchema';
-import type {
-  LlmProviderLifecycleStatus,
-  LlmProviderProtocol,
-} from './settings';
-
-export type JsonPrimitive = CatalogJsonPrimitive;
-export type JsonValue = CatalogJsonValue;
-export type JsonObject = CatalogJsonObject;
+import type { LlmProviderProtocol } from './settings';
 
 export type EntitlementState = 'granted' | 'denied' | 'unknown';
 export type EffectiveAvailability = 'available' | 'unavailable' | 'unknown';
 
-export interface ProviderAccountKey {
-  providerId: string;
-  accountId: string;
-}
+export type CapabilityState = { state: 'supported' } | { state: 'unsupported'; reason?: string } | { state: 'unknown' };
 
-export type CapabilityState =
-  | { state: 'supported' }
-  | { state: 'unsupported'; reason?: string }
-  | { state: 'unknown' };
-
-export type TierActivation =
-  | { kind: 'implicit' }
-  | { kind: 'header'; headers: Record<string, string> }
-  | { kind: 'body'; patch: JsonObject };
+type TierActivation =
+  { kind: 'implicit' } | { kind: 'header'; headers: Record<string, string> } | { kind: 'body'; patch: JsonObject };
 
 export interface ContextTier {
   id: string;
@@ -86,17 +58,9 @@ export interface ModelSelection {
 }
 
 export type ControlDefinition = BooleanControlDefinition;
-export type ModelModeAction = CatalogModelModeAction;
 export type ExecutionBindingDefinition = ExecutionBinding;
-export type ModelPresence = ModelPresencePolicy;
 
-export type ResolvedControlState =
-  | 'selectable'
-  | 'fixed'
-  | 'blocked'
-  | 'unsupported'
-  | 'unknown'
-  | 'provider-managed';
+type ResolvedControlState = 'selectable' | 'fixed' | 'blocked' | 'unsupported' | 'unknown' | 'provider-managed';
 
 export interface ResolvedBooleanControlCapability {
   state: ResolvedControlState;
@@ -125,13 +89,7 @@ export interface ExecutionBindingResolution {
 }
 
 export type CapabilityEvidenceSource =
-  | 'catalog'
-  | 'discovery'
-  | 'overlay'
-  | 'entitlement'
-  | 'observed'
-  | 'maintained-surface'
-  | 'user';
+  'catalog' | 'discovery' | 'overlay' | 'entitlement' | 'observed' | 'maintained-surface' | 'user';
 
 export interface CapabilityEvidence {
   field: string;
@@ -215,10 +173,48 @@ export interface EffectiveCatalogSnapshot {
   lastRefreshError?: string;
 }
 
+/** Names the snapshot a catalog change applies to. */
+export interface EffectiveCatalogBase {
+  scopeGeneration: string;
+  projectionVersion: number;
+  catalogRevision: string;
+}
+
+/**
+ * `llm:effectiveCatalogChanged`: one scope's catalog as a change against the snapshot main last handed out for that
+ * scope. A reader holding that snapshot applies it; any other reader reads the catalog again.
+ */
+export interface EffectiveCatalogChange {
+  /** The snapshot this change applies to; null when main handed out none, and `models.upsert` is the whole list. */
+  base: EffectiveCatalogBase | null;
+  /** The new snapshot's header. */
+  snapshot: Omit<EffectiveCatalogSnapshot, 'models'>;
+  models: {
+    /** Models the base does not have, whole. */
+    add: EffectiveModel[];
+    /** Models of the base that changed, as the values that changed. A new `catalogRevision` alone is not a change. */
+    update: EffectiveModelUpdate[];
+    remove: string[];
+    /** Every model id in order; present only when the order is not the base order without the removed ids, new ids last. */
+    order?: string[];
+  };
+}
+
+/** One changed value inside a model: the path to it and its new value; without a value the path is removed. */
+export interface EffectiveModelValueChange {
+  path: Array<string | number>;
+  value?: unknown;
+}
+
+export interface EffectiveModelUpdate {
+  modelId: string;
+  changes: EffectiveModelValueChange[];
+}
+
 export type ProviderStateMode = 'local-stateless' | 'provider-managed';
 export type ToolLoopPhase = 'top-level' | 'assistant-tool-call' | 'tool-result' | 'terminal';
 
-export interface StatePlan {
+interface StatePlan {
   mode: ProviderStateMode;
   carrier: ProviderContractBundle['state']['carrier'];
   store: boolean;
@@ -234,7 +230,7 @@ export interface CachePlan {
   ttl: ProviderContractBundle['cache']['ttl'];
 }
 
-export interface ToolLoopPlan {
+interface ToolLoopPlan {
   phase: ToolLoopPhase;
   pinned: true;
   artifactPolicy: ProviderContractBundle['toolLoop']['artifactPolicy'];
@@ -242,7 +238,7 @@ export interface ToolLoopPlan {
   ordering: ProviderContractBundle['toolLoop']['ordering'];
 }
 
-export interface StreamingPlan {
+interface StreamingPlan {
   transport: ProviderContractBundle['streaming']['transport'];
   outputIdentity: ProviderContractBundle['streaming']['outputIdentity'];
   usage: ProviderContractBundle['streaming']['usage'];
@@ -250,11 +246,7 @@ export interface StreamingPlan {
 }
 
 export type ContextTransitionStrategy =
-  | 'exact-continuation'
-  | 'provider-managed'
-  | 'semantic-replay'
-  | 'structured-handoff'
-  | 'fresh-chain';
+  'exact-continuation' | 'provider-managed' | 'semantic-replay' | 'structured-handoff' | 'fresh-chain';
 
 export interface ContextTransitionPlan {
   strategy: ContextTransitionStrategy;
@@ -323,76 +315,4 @@ export interface RequestPlan {
 }
 
 export type RequestPlanningErrorCode =
-  | 'MODEL_UNAVAILABLE'
-  | 'NO_USABLE_CONTEXT_TIER'
-  | 'PLAN_CONFLICT'
-  | 'CONSTRAINT_REJECTED';
-
-export interface ModelRouteRecommendation {
-  providerId: string;
-  modelId: string;
-  label: string;
-}
-
-export type RequestPlanningResult =
-  | {
-      ok: true;
-      plan: RequestPlan;
-      controls: ConversationTurnControls;
-      warnings: string[];
-    }
-  | {
-      ok: false;
-      code: RequestPlanningErrorCode;
-      message: string;
-      controls: ConversationTurnControls;
-      recommendations?: ModelRouteRecommendation[];
-    };
-
-export type ProviderLifecycleStatus = LlmProviderLifecycleStatus;
-export type ProviderSurfaceAuthMode = 'none' | 'api-key' | 'oauth' | 'device' | 'environment' | 'local';
-
-export interface ProviderAvailability {
-  state: EffectiveAvailability;
-  reason?: string;
-}
-
-export interface DiscoveryFieldMapping {
-  id: string;
-  label?: string;
-  aliases?: string;
-  contextWindow?: string;
-  contextWindowKind?: 'prompt' | 'total';
-  maxOutputTokens?: string;
-  protocol?: string;
-  modality?: string;
-  toolCalling?: DiscoveryCapabilityMapping;
-  visionInput?: DiscoveryCapabilityMapping;
-  structuredOutput?: DiscoveryCapabilityMapping;
-}
-
-export interface DiscoveryCapabilityMapping {
-  path: string;
-  equals?: JsonPrimitive;
-  includes?: JsonPrimitive;
-}
-
-export interface DiscoveryRouteRule {
-  allowPatterns: string[];
-  protocol: LlmProviderProtocol;
-  baseUrl?: string;
-  headers?: Record<string, string>;
-}
-
-export interface DiscoveryAdmission {
-  allowPatterns?: string[];
-  denyPatterns?: string[];
-  allowedModalities?: string[];
-  requireContextWindow?: boolean;
-}
-
-export type DiscoveryStrategy = ProviderSurfaceManifest['discovery']['strategy'];
-export type CatalogModelDefinition = ModelManifest;
-export type ProviderSurfaceRoute = ProviderSurfaceManifest['routes'][number];
-export type ProviderProtocolOverride = ProviderSurfaceManifest['protocolOverrides'][number];
-export type ProviderSurfaceDefinition = ProviderSurfaceManifest;
+  'MODEL_UNAVAILABLE' | 'NO_USABLE_CONTEXT_TIER' | 'PLAN_CONFLICT' | 'CONSTRAINT_REJECTED';

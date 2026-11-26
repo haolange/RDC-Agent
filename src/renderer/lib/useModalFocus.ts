@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { isTopOverlayLayer } from './overlayStack';
 
 export const MODAL_FOCUSABLE_SELECTOR = [
@@ -11,19 +11,12 @@ export const MODAL_FOCUSABLE_SELECTOR = [
 ].join(',');
 
 export function getModalFocusableElements(container: HTMLElement): HTMLElement[] {
-  return Array.from(container.querySelectorAll<HTMLElement>(MODAL_FOCUSABLE_SELECTOR))
-    .filter((element) => (
-      !element.hasAttribute('disabled')
-      && element.getAttribute('aria-hidden') !== 'true'
-      && element.getClientRects().length > 0
-    ));
-}
-
-export function resolveModalTrapRoot(
-  container: HTMLElement,
-  trapRoot: HTMLElement | null | undefined,
-): HTMLElement {
-  return trapRoot && container.contains(trapRoot) ? trapRoot : container;
+  return Array.from(container.querySelectorAll<HTMLElement>(MODAL_FOCUSABLE_SELECTOR)).filter(
+    (element) =>
+      !element.hasAttribute('disabled') &&
+      element.getAttribute('aria-hidden') !== 'true' &&
+      element.getClientRects().length > 0,
+  );
 }
 
 export function shouldCaptureEscapedFocus(trap: boolean): boolean {
@@ -42,7 +35,6 @@ export function useModalFocus(options: {
   onClose: () => void;
   busy?: boolean;
   trap?: boolean;
-  trapRootRef?: RefObject<HTMLElement>;
   /** Focus target after an edit removes the action that opened the dialog. */
   fallbackFocusRef?: RefObject<HTMLElement>;
   /**
@@ -51,13 +43,18 @@ export function useModalFocus(options: {
    */
   layerId?: number | null;
 }): void {
-  const { open, containerRef, onClose, busy = false, trap = true, trapRootRef, fallbackFocusRef, layerId = null } = options;
+  const { open, containerRef, onClose, busy = false, trap = true, fallbackFocusRef, layerId = null } = options;
+  // Escape reads the latest close handler and busy state; owners pass a fresh onClose on every render, and re-arming
+  // the trap with each one made where focus landed depend on how many renders a frame saw.
+  const latest = useRef({ onClose, busy });
+  /** Focus has been inside the dialog; until then the opening capture owns where it lands. */
+  const focusEntered = useRef(false);
+  latest.current = { onClose, busy };
 
   useEffect(() => {
     if (!open) return undefined;
-    const previouslyFocused = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
+    focusEntered.current = false;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frameId = window.requestAnimationFrame(() => {
       const container = containerRef.current;
       if (!container) return;
@@ -76,9 +73,8 @@ export function useModalFocus(options: {
   useEffect(() => {
     if (!open) return undefined;
     const focusTrapRoot = () => {
-      const container = containerRef.current;
-      if (!container) return;
-      const root = resolveModalTrapRoot(container, trapRootRef?.current);
+      const root = containerRef.current;
+      if (!root) return;
       if (root.contains(document.activeElement)) return;
       const first = getModalFocusableElements(root)[0];
       (first ?? root).focus();
@@ -88,21 +84,20 @@ export function useModalFocus(options: {
       focusTrapRoot();
     });
     const handleKeyDown = (event: KeyboardEvent) => {
-      const container = containerRef.current;
-      if (!container) return;
+      const root = containerRef.current;
+      if (!root) return;
       // An Escape another layer already consumed must not close this one as well: listener order on the
       // document follows effect order, and the closed layer can unmount before later listeners run.
       if (event.key === 'Escape' && event.defaultPrevented) return;
       if (!isTopOverlayLayer(layerId)) return;
       if (event.key === 'Escape') {
-        if (busy) return;
+        if (latest.current.busy) return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        onClose();
+        latest.current.onClose();
         return;
       }
       if (event.key !== 'Tab' || !trap) return;
-      const root = resolveModalTrapRoot(container, trapRootRef?.current);
       const focusable = getModalFocusableElements(root);
       if (focusable.length === 0) {
         event.preventDefault();
@@ -120,10 +115,28 @@ export function useModalFocus(options: {
         first.focus();
       }
     };
+    const handleFocusIn = (event: FocusEvent) => {
+      if (event.target instanceof Node && containerRef.current?.contains(event.target)) focusEntered.current = true;
+    };
     document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('focusin', handleFocusIn);
     return () => {
       window.cancelAnimationFrame(frameId);
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('focusin', handleFocusIn);
     };
-  }, [busy, containerRef, layerId, onClose, open, trap, trapRootRef]);
+  }, [containerRef, layerId, open, trap]);
+
+  // Entering or leaving a busy state disables controls, which drops focus from a disabled one to the page; the
+  // dialog takes it back in the same commit, so the result never depends on frame timing.
+  const settledBusy = useRef(busy);
+  useEffect(() => {
+    if (settledBusy.current === busy) return;
+    settledBusy.current = busy;
+    if (!open || !focusEntered.current || !shouldCaptureEscapedFocus(trap) || !isTopOverlayLayer(layerId)) return;
+    const root = containerRef.current;
+    const active = document.activeElement;
+    // Chromium moves focus off a control that becomes disabled; a focused disabled control counts as lost either way.
+    if (root && (!root.contains(active) || active?.matches(':disabled'))) root.focus();
+  }, [busy, containerRef, layerId, open, trap]);
 }

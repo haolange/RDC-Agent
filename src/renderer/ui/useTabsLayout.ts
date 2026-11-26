@@ -1,7 +1,10 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { useDynStyle } from '../lib/useDynStyle';
 
-interface Indicator { x: number; width: number }
+interface Indicator {
+  x: number;
+  width: number;
+}
 
 /**
  * Measures the selected tab so one indicator can slide between options, and — when `collapsible` — drops
@@ -37,20 +40,30 @@ export function useTabsLayout(
       }
       const tab = list.querySelectorAll<HTMLElement>('[role="tab"]')[selectedIndex];
       const next = tab ? { x: tab.offsetLeft, width: tab.offsetWidth } : null;
-      setIndicator(current => current?.x === next?.x && current?.width === next?.width ? current : next);
+      setIndicator((current) => (current?.x === next?.x && current?.width === next?.width ? current : next));
     };
-    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
     const observer = new ResizeObserver(schedule);
     observer.observe(root);
     observer.observe(list);
-    list.querySelectorAll('[role="tab"]').forEach(tab => observer.observe(tab));
+    list.querySelectorAll('[role="tab"]').forEach((tab) => observer.observe(tab));
     measure();
-    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
   }, [rootRef, listRef, selectedIndex, collapsible, collapsed]);
 
-  const indicatorStyle = useDynStyle(indicator ? {
-    '--ui-tabs-indicator-x': `${indicator.x}px`,
-    '--ui-tabs-indicator-width': `${indicator.width}px`,
-  } : {});
+  const indicatorStyle = useDynStyle(
+    indicator
+      ? {
+          '--ui-tabs-indicator-x': `${indicator.x}px`,
+          '--ui-tabs-indicator-width': `${indicator.width}px`,
+        }
+      : {},
+  );
   return { collapsed, measured: indicator !== null, indicatorStyle };
 }

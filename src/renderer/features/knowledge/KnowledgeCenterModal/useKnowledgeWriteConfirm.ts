@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useAppSettingsStore } from '../../../stores/appSettingsStore';
+import { useRuntimePermissionStore } from '../../../stores/runtimePermissionStore';
+import { errorDetail } from '../../../lib/errorDetail';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
 import { diffKnowledgeCard, rollbackBasis } from './knowledgeCardDiff';
-import { detailToRecord, knowledgeErrorMessage, type KnowledgeWriteAction } from './knowledgeCenterModel';
+import { detailToRecord, type KnowledgeWriteAction } from './knowledgeCenterModel';
 import {
   canSubmitKnowledgeWrite,
   collectCardContradicts,
@@ -11,7 +12,6 @@ import {
   issueKnowledgeWrite,
   resolveWriteConfirmPack,
 } from './knowledgeWriteConfirm';
-import type { AgentPermissionMode } from '@shared/types/settings';
 import type { KnowledgeCardRecord, KnowledgePack, KnowledgeQueryRequest } from '@shared/types/knowledge';
 
 export function useKnowledgeWriteConfirm(options: {
@@ -22,7 +22,7 @@ export function useKnowledgeWriteConfirm(options: {
   onWritten: () => Promise<void>;
 }) {
   const request = useKnowledgeRequestScope(options.active);
-  const permissionMode = useAppSettingsStore((state) => state.settings.agentRuntime.permissions.mode) as AgentPermissionMode;
+  const permissionMode = useRuntimePermissionStore((state) => state.snapshot?.mode ?? 'default');
   const [open, setOpen] = useState(false);
   const [action, setAction] = useState<KnowledgeWriteAction>('save');
   const [before, setBefore] = useState<KnowledgeCardRecord | null>(null);
@@ -53,59 +53,69 @@ export function useKnowledgeWriteConfirm(options: {
     setError(null);
   }, [request]);
 
-  useEffect(() => { if (!options.active) close(); }, [close, options.active]);
+  useEffect(() => {
+    if (!options.active) close();
+  }, [close, options.active]);
 
-  const openFor = useCallback(async (nextAction: KnowledgeWriteAction, current: KnowledgeCardRecord) => {
-    const seq = request.next();
-    const next = { ...current };
-    if (nextAction === 'promote-verified') next.lifecycle = 'verified';
-    if (nextAction === 'promote-promoted') next.lifecycle = 'promoted';
-    if (nextAction === 'retire') next.lifecycle = 'retired';
-    if (nextAction === 'persist-draft') next.lifecycle = 'draft';
-    setAction(nextAction);
-    setBefore(current);
-    setAfter(next);
-    setOpenedUpdatedAt(current.updatedAt);
-    const rollback = await rollbackBasis(current.body);
-    if (!request.isCurrent(seq)) return;
-    setBasis(rollback);
-    setChangeReason('');
-    setConfirmed(false);
-    setAcknowledgedConflicts(false);
-    setVersionStale(false);
-    setPackReady(false);
-    setError(null);
-    setOpen(true);
-    try {
-      const latest = await window.electronAPI.knowledge.card(current.spaceId, current.relativePath);
+  const openFor = useCallback(
+    async (nextAction: KnowledgeWriteAction, current: KnowledgeCardRecord) => {
+      const seq = request.next();
+      const next = { ...current };
+      if (nextAction === 'promote-verified') next.lifecycle = 'verified';
+      if (nextAction === 'promote-promoted') next.lifecycle = 'promoted';
+      if (nextAction === 'retire') next.lifecycle = 'retired';
+      if (nextAction === 'persist-draft') next.lifecycle = 'draft';
+      setAction(nextAction);
+      setBefore(current);
+      setAfter(next);
+      setOpenedUpdatedAt(current.updatedAt);
+      const rollback = await rollbackBasis(current.body);
       if (!request.isCurrent(seq)) return;
-      if (isWriteVersionStale(latest.card, current.updatedAt)) {
-        setVersionStale(true);
+      setBasis(rollback);
+      setChangeReason('');
+      setConfirmed(false);
+      setAcknowledgedConflicts(false);
+      setVersionStale(false);
+      setPackReady(false);
+      setError(null);
+      setOpen(true);
+      try {
+        const latest = await window.electronAPI.knowledge.card(current.spaceId, current.relativePath);
+        if (!request.isCurrent(seq)) return;
+        if (isWriteVersionStale(latest.card, current.updatedAt)) {
+          setVersionStale(true);
+        }
+        const nextPack = await resolveWriteConfirmPack({
+          pack: options.pack,
+          packQueryKey: options.packQueryKey,
+          queryRequest: options.queryRequest,
+          compile: (request) => window.electronAPI.knowledge.compile(request),
+        });
+        if (!request.isCurrent(seq)) return;
+        setGatePack(nextPack);
+        setPackReady(true);
+      } catch (err) {
+        if (request.isCurrent(seq)) setError(errorDetail(err));
       }
-      const nextPack = await resolveWriteConfirmPack({
-        pack: options.pack,
-        packQueryKey: options.packQueryKey,
-        queryRequest: options.queryRequest,
-        compile: (request) => window.electronAPI.knowledge.compile(request),
-      });
-      if (!request.isCurrent(seq)) return;
-      setGatePack(nextPack);
-      setPackReady(true);
-    } catch (err) {
-      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
-    }
-  }, [options.pack, options.packQueryKey, options.queryRequest, request]);
+    },
+    [options.pack, options.packQueryKey, options.queryRequest, request],
+  );
 
   const submit = useCallback(async () => {
     if (!after) return;
-    if (!canSubmitKnowledgeWrite({
-      after, changeReason, confirmed, contradicts, acknowledgedConflicts, packReady,
-    })) return;
-    const block = evaluateWriteGate(action, before ?? after);
-    if (block) {
-      setError(block);
+    if (
+      !canSubmitKnowledgeWrite({
+        after,
+        changeReason,
+        confirmed,
+        contradicts,
+        acknowledgedConflicts,
+        packReady,
+      })
+    )
       return;
-    }
+    // A blocked write is already explained by `block`; submitting it does nothing.
+    if (evaluateWriteGate(action, before ?? after)) return;
     const seq = request.next();
     setBusy(true);
     setError(null);
@@ -129,11 +139,25 @@ export function useKnowledgeWriteConfirm(options: {
       await options.onWritten();
       if (request.isCurrent(seq)) close();
     } catch (err) {
-      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) setError(errorDetail(err));
     } finally {
       if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [acknowledgedConflicts, action, after, before, changeReason, close, confirmed, contradicts, openedUpdatedAt, options, packReady, permissionMode, request]);
+  }, [
+    acknowledgedConflicts,
+    action,
+    after,
+    before,
+    changeReason,
+    close,
+    confirmed,
+    contradicts,
+    openedUpdatedAt,
+    options,
+    packReady,
+    permissionMode,
+    request,
+  ]);
 
   return {
     open,

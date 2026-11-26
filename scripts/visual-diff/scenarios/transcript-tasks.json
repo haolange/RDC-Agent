@@ -1,0 +1,623 @@
+{
+ "id": "transcript-tasks",
+ "steps": [
+  {
+   "waitFor": ".work-process-header",
+   "waitMs": 600
+  }
+ ],
+ "settleMs": 1500,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "2139a95f30e58de1e539aee8"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-5021be6dc331-1795681192862",
+       "timestamp": 1795681192862,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-d8a7e5c70997-1795681192913",
+       "timestamp": 1795681192913,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-92cd476ffff4-1795681192913",
+       "timestamp": 1795681192913,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-46701a631c50-1795681192927",
+       "timestamp": 1795681192927,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      },
+      {
+       "id": "rlog-5504e0533076-1795681216926",
+       "timestamp": 1795681216926,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_9f679b35b695",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_9f679b35b695",
+        "status": "thinking"
+       }
+      },
+      {
+       "id": "rlog-8c4c2775bcb4-1795681219388",
+       "timestamp": 1795681219388,
+       "scope": "session",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General profile turn",
+       "summary": "我列出了工作区的文件。\n\n这是 QA 协议桩的固定回复：它验证流式推理、一次工具调用与最终答复在界面上的顺序与折叠。",
+       "sessionId": "sess_9f679b35b695",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "providerId": "ollama",
+        "modelId": "qa-stub:4b"
+       }
+      },
+      {
+       "id": "rlog-13567f9e6eb2-1795681219388",
+       "timestamp": 1795681219388,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "success",
+       "title": "General",
+       "summary": "Status changed to complete.",
+       "sessionId": "sess_9f679b35b695",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_9f679b35b695",
+        "status": "complete"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-5504e0533076-1795681216926",
+       "timestamp": 1795681216926,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_9f679b35b695",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_9f679b35b695",
+        "status": "thinking"
+       }
+      },
+      {
+       "id": "rlog-8c4c2775bcb4-1795681219388",
+       "timestamp": 1795681219388,
+       "scope": "session",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General profile turn",
+       "summary": "我列出了工作区的文件。\n\n这是 QA 协议桩的固定回复：它验证流式推理、一次工具调用与最终答复在界面上的顺序与折叠。",
+       "sessionId": "sess_9f679b35b695",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "providerId": "ollama",
+        "modelId": "qa-stub:4b"
+       }
+      },
+      {
+       "id": "rlog-13567f9e6eb2-1795681219388",
+       "timestamp": 1795681219388,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "success",
+       "title": "General",
+       "summary": "Status changed to complete.",
+       "sessionId": "sess_9f679b35b695",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_9f679b35b695",
+        "status": "complete"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-5504e0533076-1795681216926",
+       "timestamp": 1795681216926,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_9f679b35b695",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_9f679b35b695",
+        "status": "thinking"
+       }
+      },
+      {
+       "id": "rlog-8c4c2775bcb4-1795681219388",
+       "timestamp": 1795681219388,
+       "scope": "session",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General profile turn",
+       "summary": "我列出了工作区的文件。\n\n这是 QA 协议桩的固定回复：它验证流式推理、一次工具调用与最终答复在界面上的顺序与折叠。",
+       "sessionId": "sess_9f679b35b695",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "providerId": "ollama",
+        "modelId": "qa-stub:4b"
+       }
+      },
+      {
+       "id": "rlog-13567f9e6eb2-1795681219388",
+       "timestamp": 1795681219388,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "success",
+       "title": "General",
+       "summary": "Status changed to complete.",
+       "sessionId": "sess_9f679b35b695",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_9f679b35b695",
+        "status": "complete"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   },
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   },
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "settings:getEffectiveCatalog": [
+   {
+    "ref": "b9a67f4a6f44e0b85aece482"
+   },
+   {
+    "ref": "1fead761984fb7c958756e7a"
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": [
+      {
+       "projectId": "proj_1ce4f18ec4ac",
+       "name": "visual-diff-project",
+       "rootPath": "/visual-diff/visual-diff-project",
+       "slug": "visual-diff-project",
+       "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+       "inputs": [],
+       "inputsUpdatedAt": 1795681241489,
+       "createdAt": 1795681194657,
+       "updatedAt": 1795681219413,
+       "lastSessionId": "sess_9f679b35b695"
+      }
+     ]
+    }
+   }
+  ],
+  "project:select": [
+   {
+    "result": {
+     "project": {
+      "projectId": "proj_1ce4f18ec4ac",
+      "name": "visual-diff-project",
+      "rootPath": "/visual-diff/visual-diff-project",
+      "slug": "visual-diff-project",
+      "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+      "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+      "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+      "inputs": [],
+      "inputsUpdatedAt": 1795681241489,
+      "createdAt": 1795681194657,
+      "updatedAt": 1795681219413,
+      "lastSessionId": "sess_9f679b35b695"
+     },
+     "currentSession": {
+      "record": {
+       "schemaVersion": "1",
+       "sessionId": "sess_9f679b35b695",
+       "projectId": "proj_1ce4f18ec4ac",
+       "title": "qa:loops 列出工作区的文件，并整理结论。",
+       "goal": "qa:loops 列出工作区的文件，并整理结论。",
+       "sessionPath": "/visual-diff/state/sessions/proj_1ce4f18ec4ac/sess_9f679b35b695",
+       "createdAt": 1795681216809,
+       "updatedAt": 1795681219413,
+       "lastRunId": "run_d3a8944a327d40b3",
+       "turnControls": {
+        "reasoningLevel": "on",
+        "maxContextMode": false,
+        "fastModel": false
+       },
+       "agentId": "general"
+      },
+      "revision": {
+       "epoch": "59e52716-0cb4-41f2-b525-efa539775d90",
+       "n": 6
+      }
+     },
+     "currentRun": {
+      "schemaVersion": "3",
+      "runId": "run_d3a8944a327d40b3",
+      "turnId": "turn-353b787d-909a-476c-93df-aed9df098baa",
+      "projectId": "proj_1ce4f18ec4ac",
+      "sessionId": "sess_9f679b35b695",
+      "caseId": "sess_9f679b35b695",
+      "profileId": "general",
+      "goal": "qa:loops 列出工作区的文件，并整理结论。",
+      "captures": [],
+      "startedAt": 1795681216825,
+      "finishedAt": 1795681219407,
+      "status": "completed",
+      "backend": "local",
+      "kind": "conversation"
+     }
+    }
+   }
+  ],
+  "session:list": [
+   {
+    "result": {
+     "sessions": [
+      {
+       "record": {
+        "schemaVersion": "1",
+        "sessionId": "sess_9f679b35b695",
+        "projectId": "proj_1ce4f18ec4ac",
+        "title": "qa:loops 列出工作区的文件，并整理结论。",
+        "goal": "qa:loops 列出工作区的文件，并整理结论。",
+        "sessionPath": "/visual-diff/state/sessions/proj_1ce4f18ec4ac/sess_9f679b35b695",
+        "createdAt": 1795681216809,
+        "updatedAt": 1795681219413,
+        "lastRunId": "run_d3a8944a327d40b3",
+        "turnControls": {
+         "reasoningLevel": "on",
+         "maxContextMode": false,
+         "fastModel": false
+        },
+        "agentId": "general"
+       },
+       "revision": {
+        "epoch": "59e52716-0cb4-41f2-b525-efa539775d90",
+        "n": 6
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "session:open": [
+   {
+    "ref": "0277fd7f9fd6c83e771ea817"
+   }
+  ],
+  "capture:getReplayState": [
+   {
+    "result": {
+     "projectId": "proj_1ce4f18ec4ac",
+     "sessionId": "sess_9f679b35b695",
+     "generation": 0,
+     "revision": 1,
+     "operationId": null,
+     "phase": "closed",
+     "preparation": {
+      "targetDeviceId": null,
+      "phase": "idle",
+      "issue": null
+     },
+     "replayDeviceId": null,
+     "inputId": null,
+     "captureHash": null,
+     "contextId": null,
+     "requestedEventId": null,
+     "appliedEventId": null,
+     "imageEventId": null,
+     "events": [],
+     "targets": [],
+     "target": null,
+     "isFinalOutput": false,
+     "image": null,
+     "observation": null,
+     "devicePresentation": {
+      "status": "not_applicable",
+      "eventId": null,
+      "textureId": null,
+      "sequence": null,
+      "reason": null
+     },
+     "warning": null,
+     "interactionLock": null,
+     "error": null
+    }
+   }
+  ],
+  "workflow:getState": [
+   {
+    "result": {
+     "caseId": "sess_9f679b35b695",
+     "runId": "run_d3a8944a327d40b3",
+     "sessionId": "sess_9f679b35b695",
+     "blockers": [],
+     "reasoningSummaries": [],
+     "lastUpdated": "2026-11-26T08:20:44.191Z"
+    }
+   }
+  ],
+  "evidence:getChain": [
+   {
+    "result": {
+     "sessionId": "sess_9f679b35b695",
+     "runId": "run_d3a8944a327d40b3",
+     "events": [],
+     "isValid": true
+    }
+   }
+  ],
+  "workflow:getRunUsage": [
+   {
+    "result": {
+     "usage": {
+      "runId": "run_d3a8944a327d40b3",
+      "providerId": "ollama",
+      "modelId": "qa-stub:4b",
+      "inputTokens": 6000,
+      "outputTokens": 400,
+      "totalTokens": 6400,
+      "promptBudgetTokens": 32768,
+      "contextWindowTokens": 32768,
+      "maxOutputTokens": 32768,
+      "compactionThresholdTokens": 26214,
+      "usagePercent": 4,
+      "occupiedTokens": 1200,
+      "breakdown": [
+       {
+        "id": "system_prompt",
+        "tokens": 169
+       },
+       {
+        "id": "skills",
+        "tokens": 97
+       },
+       {
+        "id": "system_tools",
+        "tokens": 767,
+        "count": 32
+       },
+       {
+        "id": "summarized_conversation",
+        "tokens": 0
+       },
+       {
+        "id": "conversation",
+        "tokens": 167,
+        "count": 6
+       },
+       {
+        "id": "builtin_tools_deferred",
+        "tokens": 7203,
+        "count": 29
+       },
+       {
+        "id": "free",
+        "tokens": 31568
+       }
+      ],
+      "snapshotAt": 1795681219356
+     },
+     "stale": false
+    }
+   },
+   {
+    "result": {
+     "usage": {
+      "runId": "run_d3a8944a327d40b3",
+      "providerId": "ollama",
+      "modelId": "qa-stub:4b",
+      "inputTokens": 6000,
+      "outputTokens": 400,
+      "totalTokens": 6400,
+      "promptBudgetTokens": 32768,
+      "contextWindowTokens": 32768,
+      "maxOutputTokens": 32768,
+      "compactionThresholdTokens": 26214,
+      "usagePercent": 4,
+      "occupiedTokens": 1200,
+      "breakdown": [
+       {
+        "id": "system_prompt",
+        "tokens": 169
+       },
+       {
+        "id": "skills",
+        "tokens": 97
+       },
+       {
+        "id": "system_tools",
+        "tokens": 767,
+        "count": 32
+       },
+       {
+        "id": "summarized_conversation",
+        "tokens": 0
+       },
+       {
+        "id": "conversation",
+        "tokens": 167,
+        "count": 6
+       },
+       {
+        "id": "builtin_tools_deferred",
+        "tokens": 7203,
+        "count": 29
+       },
+       {
+        "id": "free",
+        "tokens": 31568
+       }
+      ],
+      "snapshotAt": 1795681219356
+     },
+     "stale": false
+    }
+   }
+  ],
+  "capture:getOpenedState": [
+   {
+    "result": null
+   }
+  ],
+  "context:get": [
+   {
+    "result": null
+   }
+  ],
+  "project:inputs:list": [
+   {
+    "result": {
+     "inputs": []
+    }
+   }
+  ]
+ }
+}

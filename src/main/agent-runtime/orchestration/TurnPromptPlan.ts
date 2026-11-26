@@ -1,4 +1,5 @@
 import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
+import { AppError } from '@shared/errors/appError';
 import { approvedExecutionOfferForAgent } from '../../sessions/run/handoffSkills';
 import { appPathService } from '../../runtime/AppPathService';
 import { scopedInstructionResolver } from '../../runtime/ScopedInstructionResolver';
@@ -7,7 +8,7 @@ import { promptPlanBuilder, resolvePromptClock } from '../prompt';
 import { combineActiveSkillAllowlists, normalizeToolName } from './RuntimeToolPolicy';
 import type { AgentPermissionSettings } from '@shared/types/settings';
 import type { PromptPlan, PromptSegment } from '@shared/types/rdcRuntime';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { RequestPlan } from '@shared/types/providerCapability';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
@@ -30,7 +31,6 @@ export interface TurnPromptPlanInput {
   pendingSkillIds?: readonly string[];
   permissionConstraints: Omit<AgentPermissionSettings, 'mode'>;
   routeCapability: AgentRouteCapability;
-  effectiveModel?: EffectiveModel;
   requestPlan: RequestPlan;
   contextWindowTokens: number;
   extraSegments?: PromptSegment[];
@@ -51,8 +51,9 @@ export interface TurnPromptPlan {
  */
 export function buildTurnPromptPlan(input: TurnPromptPlanInput): TurnPromptPlan {
   const projectRoot = input.projectRootPath ?? undefined;
-  const activePaths = [input.projectRootPath, ...(input.activePaths ?? [])]
-    .filter((value): value is string => Boolean(value));
+  const activePaths = [input.projectRootPath, ...(input.activePaths ?? [])].filter((value): value is string =>
+    Boolean(value),
+  );
   const scopedInstructions = input.projectRootPath
     ? scopedInstructionResolver.resolveForPaths({
         userInstructionsPath: appPathService.getUserRdcPaths().instructionsPath,
@@ -68,11 +69,15 @@ export function buildTurnPromptPlan(input: TurnPromptPlanInput): TurnPromptPlan 
   });
   const preloadedSkills = preloadSkillIds.map((skillId) => {
     const skill = agentRuntimeConfigService.loadSkill(skillId, projectRoot, input.agentId);
-    if (!skill) throw new Error(`SKILL_UNAVAILABLE: skill is not configured: ${skillId}`);
+    if (!skill) throw new AppError('SKILL_UNAVAILABLE', `skill is not configured: ${skillId}`);
     return skill;
   });
   const baseTools = input.baseTools.map((toolName) => normalizeToolName(toolName));
-  const tools = combineActiveSkillAllowlists(baseTools, preloadedSkills.map((skill) => skill.allowedTools ?? [])) ?? baseTools;
+  const tools =
+    combineActiveSkillAllowlists(
+      baseTools,
+      preloadedSkills.map((skill) => skill.allowedTools),
+    ) ?? baseTools;
   const promptClock = resolvePromptClock();
   const promptPlan = promptPlanBuilder.build({
     profile: {
@@ -89,7 +94,6 @@ export function buildTurnPromptPlan(input: TurnPromptPlanInput): TurnPromptPlan 
     sessionId: input.sessionId,
     approvedExecutionOffer,
     routeCapability: input.routeCapability,
-    effectiveModel: input.effectiveModel,
     requestPlan: input.requestPlan,
     permissionConstraints: input.permissionConstraints,
     currentDate: promptClock.currentDate,

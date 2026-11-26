@@ -2,46 +2,96 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { PlanReviewRequestPanel } from './PlanReviewRequestPanel';
 import { planReviewRequestKey, type PendingPlanReviewRequest } from './planReviewRequestModel';
 import type { CapabilityResolutionState } from '../../lib/capabilityResolution';
+const continuation = { send: vi.fn(), prefill: vi.fn() };
 
-const mock = vi.hoisted(() => ({ language: 'en' as 'en' | 'zh-CN', stop: vi.fn(), submit: vi.fn(), retry: vi.fn(), capabilityState: { status: 'ready' } as CapabilityResolutionState,
-  modelSave: (_state: { saving: boolean; error?: string }) => {} }));
+const mock = vi.hoisted(() => ({
+  language: 'en' as 'en' | 'zh-CN',
+  stop: vi.fn(),
+  submit: vi.fn(),
+  retry: vi.fn(),
+  capabilityState: { status: 'ready' } as CapabilityResolutionState,
+  modelSave: (_state: { saving: boolean; error?: string }) => {},
+}));
 vi.mock('../../services/planReviewService', () => ({ cancelPlanReview: mock.stop }));
 vi.mock('./usePlanReviewSubmit', () => ({ usePlanReviewSubmit: () => mock.submit }));
-vi.mock('./ComposerTurnControlsContext', () => ({ useComposerTurnControls: () => ({ capabilityState: mock.capabilityState, retryCapability: mock.retry }) }));
-vi.mock('./ComposerModelEffortControl', () => ({ ComposerModelEffortControl: (props: {
-  onSaveStateChange: typeof mock.modelSave;
-}) => { mock.modelSave = props.onSaveStateChange; return createElement('button', null, 'Model'); } }));
+vi.mock('./ComposerTurnControlsContext', () => ({
+  useComposerTurnControls: () => ({ capabilityState: mock.capabilityState, retryCapability: mock.retry }),
+}));
+vi.mock('./ComposerModelEffortControl', () => ({
+  ComposerModelEffortControl: (props: { onSaveStateChange: typeof mock.modelSave }) => {
+    mock.modelSave = props.onSaveStateChange;
+    return createElement('button', null, 'Model');
+  },
+}));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ language: mock.language, t: (key: string) => key }) }));
 let root: Root;
 let host: HTMLDivElement;
-const request: PendingPlanReviewRequest = { reviewId: 'review', agentId: 'debugger', recovered: false,
-  sessionId: 's', turnId: 't', toolCallId: 'c', planReview: {
-    planId: 'p', revision: 1, uri: 'session://plans/plan.md', hash: 'h', title: 'Do not repeat title',
-    summary: ['Do not repeat summary'], sections: [], status: 'awaiting',
-    handoffOptions: [{ agent: 'general', label: 'Execute' }, { agent: 'custom', label: 'Review with custom' }],
+const request: PendingPlanReviewRequest = {
+  reviewId: 'review',
+  agentId: 'debugger',
+  recovered: false,
+  sessionId: 's',
+  turnId: 't',
+  toolCallId: 'c',
+  planReview: {
+    planId: 'p',
+    revision: 1,
+    uri: 'session://plans/plan.md',
+    hash: 'h',
+    title: 'Do not repeat title',
+    summary: ['Do not repeat summary'],
+    sections: [],
+    status: 'awaiting',
+    handoffOptions: [
+      { agent: 'general', label: 'Execute' },
+      { agent: 'custom', label: 'Review with custom' },
+    ],
   },
 };
-const render = (value = request) => act(async () => {
-  if (value.planReview.revision !== request.planReview.revision) value = { ...value, reviewId: `review-${value.planReview.revision}` };
-  root.render(createElement(PlanReviewRequestPanel, { key: planReviewRequestKey(value), request: value,
-    agentId: 'debugger', currentSession: null }));
-});
-const click = (selector: string) => act(async () => { host.querySelector<HTMLButtonElement>(selector)!.click(); });
+const render = (value = request) =>
+  act(async () => {
+    if (value.planReview.revision !== request.planReview.revision)
+      value = { ...value, reviewId: `review-${value.planReview.revision}` };
+    root.render(
+      createElement(PlanReviewRequestPanel, {
+        key: planReviewRequestKey(value),
+        request: value,
+        agentId: 'debugger',
+        currentSession: null,
+        continuation,
+      }),
+    );
+  });
+const click = (selector: string) =>
+  act(async () => {
+    host.querySelector<HTMLButtonElement>(selector)!.click();
+  });
 beforeEach(() => {
   mock.language = 'en';
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  useComposerSessionContextStore.getState().clearHandoffSuggestion();
-  mock.submit.mockReset().mockResolvedValue(undefined); mock.stop.mockReset().mockResolvedValue(undefined);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  mock.submit.mockReset().mockResolvedValue(undefined);
+  mock.stop.mockReset().mockResolvedValue(undefined);
   mock.capabilityState = { status: 'ready' } as CapabilityResolutionState;
   mock.retry.mockReset();
-  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
 });
-afterEach(async () => { await act(async () => root.unmount()); vi.unstubAllGlobals(); host.remove(); });
+afterEach(async () => {
+  await act(async () => root.unmount());
+  vi.unstubAllGlobals();
+  host.remove();
+});
 
 it('waits for the shared catalog without claiming the selected model is unavailable', async () => {
   mock.capabilityState = { status: 'loading' };
@@ -60,18 +110,25 @@ it('uses the conversation capability even when the declared target default is un
   expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(false);
 });
 
-it.each(['unavailable', 'error'] as const)('retains the selected model and reports %s with an explicit retry', async (status) => {
-  mock.capabilityState = status === 'error' ? { status, message: 'Discovery failed' }
-    : { status, reason: 'missing-model', message: 'Selected model is not executable' };
-  await render();
-  expect(host.textContent).not.toContain(mock.capabilityState.message);
-  expect(host.querySelector('[role="alert"] button[aria-label="app.copyDetails"]')).not.toBeNull();
-  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
-  const retry = [...host.querySelectorAll('button')].find(button => button.textContent === 'composer.effort.capabilityRetry')!;
-  await act(async () => retry.click());
-  expect(mock.retry).toHaveBeenCalledOnce();
-  expect(mock.submit).not.toHaveBeenCalled();
-});
+it.each(['unavailable', 'error'] as const)(
+  'retains the selected model and reports %s with an explicit retry',
+  async (status) => {
+    mock.capabilityState =
+      status === 'error'
+        ? { status, message: 'Discovery failed' }
+        : { status, reason: 'missing-model', message: 'Selected model is not executable' };
+    await render();
+    expect(host.textContent).not.toContain(mock.capabilityState.message);
+    expect(host.querySelector('[role="alert"] button[aria-label="app.copyDetails"]')).not.toBeNull();
+    expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
+    const retry = [...host.querySelectorAll('button')].find(
+      (button) => button.textContent === 'composer.effort.capabilityRetry',
+    )!;
+    await act(async () => retry.click());
+    expect(mock.retry).toHaveBeenCalledOnce();
+    expect(mock.submit).not.toHaveBeenCalled();
+  },
+);
 
 it('keeps approval available while a previously executable model refreshes', async () => {
   mock.capabilityState = { status: 'refreshing' } as CapabilityResolutionState;
@@ -81,13 +138,23 @@ it('keeps approval available while a previously executable model refreshes', asy
 });
 
 it('preserves distinct declared captions for actions with the same General target', async () => {
-  await render({ ...request, planReview: { ...request.planReview, handoffOptions: [
-    { agent: 'general', label: 'Implement Plan' }, { agent: 'general', label: 'Inspect evidence' },
-  ] } });
+  await render({
+    ...request,
+    planReview: {
+      ...request.planReview,
+      handoffOptions: [
+        { agent: 'general', label: 'Implement Plan' },
+        { agent: 'general', label: 'Inspect evidence' },
+      ],
+    },
+  });
   const buttons = host.querySelectorAll<HTMLButtonElement>('.handoff-action-row__button');
-  expect([...buttons].map(button => button.textContent)).toEqual(['Implement Plan', 'Inspect evidence']);
+  expect([...buttons].map((button) => button.textContent)).toEqual(['Implement Plan', 'Inspect evidence']);
   await click('.handoff-action-row__button');
-  expect(mock.submit).toHaveBeenCalledWith(expect.anything(), { kind: 'approve', handoff: { agent: 'general', label: 'Implement Plan' } });
+  expect(mock.submit).toHaveBeenCalledWith(expect.anything(), {
+    kind: 'approve',
+    handoff: { agent: 'general', label: 'Implement Plan' },
+  });
 });
 
 it('uses frozen translations for any target and submits only its original identity', async () => {
@@ -95,42 +162,73 @@ it('uses frozen translations for any target and submits only its original identi
   const value = { ...request, planReview: { ...request.planReview, handoffOptions: [option] } };
   await render(value);
   expect(host.querySelector('.handoff-action-row__button')?.textContent).toBe('Review');
-  mock.language = 'zh-CN'; await render(value);
+  mock.language = 'zh-CN';
+  await render(value);
   expect(host.querySelector('.handoff-action-row__button')?.textContent).toBe('审阅计划');
   await click('.handoff-action-row__button');
-  expect(mock.submit).toHaveBeenCalledExactlyOnceWith(value, { kind: 'approve', handoff: { agent: 'custom', label: 'Review' } });
+  expect(mock.submit).toHaveBeenCalledExactlyOnceWith(value, {
+    kind: 'approve',
+    handoff: { agent: 'custom', label: 'Review' },
+  });
   expect(option.label).toBe('Review');
 });
 
 it('starts compact, offers every declared target and submits the selected one exactly once', async () => {
   let finish!: () => void;
-  mock.submit.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));
+  mock.submit.mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
   await render();
-  expect(host.textContent).not.toContain('Do not repeat'); expect(host.querySelector('textarea')).not.toBeNull();
+  expect(host.textContent).not.toContain('Do not repeat');
+  expect(host.querySelector('textarea')).not.toBeNull();
   expect(host.querySelector('.handoff-action-row__number')).toBeNull();
   const buttons = host.querySelectorAll<HTMLButtonElement>('.handoff-action-row__button');
   expect(buttons).toHaveLength(2);
-  await act(async () => { buttons[1].click(); buttons[1].click(); });
-  expect(mock.submit).toHaveBeenCalledExactlyOnceWith(request, { kind: 'approve', handoff: request.planReview.handoffOptions[1] });
+  await act(async () => {
+    buttons[1].click();
+    buttons[1].click();
+  });
+  expect(mock.submit).toHaveBeenCalledExactlyOnceWith(request, {
+    kind: 'approve',
+    handoff: request.planReview.handoffOptions[1],
+  });
   expect(buttons[0].disabled).toBe(true);
   await act(async () => finish());
 });
 
 it('renders a single declared target without numbering or an invented alternative', async () => {
-  await render({ ...request, planReview: { ...request.planReview, handoffOptions: request.planReview.handoffOptions.slice(0, 1) } });
+  await render({
+    ...request,
+    planReview: { ...request.planReview, handoffOptions: request.planReview.handoffOptions.slice(0, 1) },
+  });
   expect(host.querySelectorAll('.handoff-action-row__button')).toHaveLength(1);
   expect(host.textContent).not.toContain('Review with custom');
   expect(host.querySelector('.handoff-action-row__number')).toBeNull();
 });
 it('stops an awaiting plan without approving its handoff', async () => {
   let finish!: () => void;
-  const onStop = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+  const onStop = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
   mock.stop.mockImplementation(onStop);
-  await act(async () => root.render(createElement(PlanReviewRequestPanel, { request,
-    agentId: 'debugger', currentSession: null })));
-  const stop = [...host.querySelectorAll<HTMLButtonElement>('button')]
-    .find((button) => button.getAttribute('aria-label') === 'chat.planReviewStop')!;
-  await act(async () => { stop.click(); stop.click(); });
+  await act(async () =>
+    root.render(
+      createElement(PlanReviewRequestPanel, { request, agentId: 'debugger', currentSession: null, continuation }),
+    ),
+  );
+  const stop = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.getAttribute('aria-label') === 'chat.planReviewStop',
+  )!;
+  await act(async () => {
+    stop.click();
+    stop.click();
+  });
   expect(onStop).toHaveBeenCalledTimes(1);
   expect(mock.submit).not.toHaveBeenCalled();
   expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
@@ -154,27 +252,50 @@ it('always offers revisions, disallows empty feedback and preserves it on failed
   await click('.composer-plan-review__revision button');
   expect(mock.submit).toHaveBeenCalledTimes(2);
 });
-it.each(['session', 'revision'])('resets editor/error and ignores the previous request failure after %s replacement', async (change) => {
-  let fail!: (error: Error) => void;
-  mock.submit.mockImplementation(() => new Promise<void>((_, reject) => { fail = reject; }));
-  await render(); await click('.handoff-action-row__button');
-  await render({ ...request, sessionId: change === 'session' ? 'other' : 's',
-    planReview: { ...request.planReview, revision: change === 'revision' ? 2 : 1 } });
-  await act(async () => fail(new Error('Old request failed')));
-  expect(host.querySelector('textarea')!.value).toBe(''); expect(host.querySelector('[role="alert"]')).toBeNull();
-  expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(false);
-});
+it.each(['session', 'revision'])(
+  'resets editor/error and ignores the previous request failure after %s replacement',
+  async (change) => {
+    let fail!: (error: Error) => void;
+    mock.submit.mockImplementation(
+      () =>
+        new Promise<void>((_, reject) => {
+          fail = reject;
+        }),
+    );
+    await render();
+    await click('.handoff-action-row__button');
+    await render({
+      ...request,
+      sessionId: change === 'session' ? 'other' : 's',
+      planReview: { ...request.planReview, revision: change === 'revision' ? 2 : 1 },
+    });
+    await act(async () => fail(new Error('Old request failed')));
+    expect(host.querySelector('textarea')!.value).toBe('');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(false);
+  },
+);
 
 it('holds approval while a model saves, retains failures and still allows stop', async () => {
-  const onStop = vi.fn(async () => {}); mock.stop.mockImplementation(onStop);
-  await act(async () => root.render(createElement(PlanReviewRequestPanel, {
-    request, agentId: 'debugger', currentSession: null,
-  })));
+  const onStop = vi.fn(async () => {});
+  mock.stop.mockImplementation(onStop);
+  await act(async () =>
+    root.render(
+      createElement(PlanReviewRequestPanel, {
+        request,
+        agentId: 'debugger',
+        currentSession: null,
+        continuation,
+      }),
+    ),
+  );
   await act(async () => mock.modelSave({ saving: true }));
   await click('.handoff-action-row__button');
   expect(mock.submit).not.toHaveBeenCalled();
   expect(host.querySelector<HTMLTextAreaElement>('textarea')!.disabled).toBe(true);
-  const stop = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'chat.planReviewStop')!;
+  const stop = [...host.querySelectorAll('button')].find(
+    (button) => button.getAttribute('aria-label') === 'chat.planReviewStop',
+  )!;
   await act(async () => stop.click());
   expect(onStop).toHaveBeenCalledOnce();
   await act(async () => mock.modelSave({ saving: false, error: 'Save failed' }));
@@ -192,11 +313,18 @@ it('submits Enter once while Shift+Enter and IME remain editing input', async ()
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
   });
   for (const options of [{ shiftKey: true }, { isComposing: true }, { keyCode: 229 }]) {
-    await act(async () => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, ...options })));
+    await act(async () =>
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, ...options })),
+    );
   }
   expect(mock.submit).not.toHaveBeenCalled();
   let finish!: () => void;
-  mock.submit.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));
+  mock.submit.mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
   await act(async () => {
     textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
@@ -205,15 +333,21 @@ it('submits Enter once while Shift+Enter and IME remain editing input', async ()
   await act(async () => finish());
 });
 
-it('retains acknowledgement and locks decisions until the approval projection catches up, without locking a new revision', async () => {
+it('locks decisions while an approval and its continuation are in flight, without locking a new revision', async () => {
   await render();
-  await act(async () => useComposerSessionContextStore.getState().queueHandoffSuggestion({
-    sessionId: 's', agentId: 'general', label: 'Execute', prompt: '', send: true, phase: 'handoff',
-    sourcePlan: { reviewId: 'review', turnId: 't', toolCallId: 'c', planId: 'p', revision: 1, hash: 'h' },
-  }));
+  let finish!: () => void;
+  mock.submit.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  await click('.handoff-action-row__button');
   expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(true);
-  expect(host.querySelector('[role="status"]')?.textContent).toBe('composer.handoff.switching');
-  await click('.handoff-action-row__button'); expect(mock.submit).not.toHaveBeenCalled();
+  expect(host.querySelector('[role="status"]')?.textContent).toBe('composer.handoff.confirming');
+  await click('.handoff-action-row__button');
+  expect(mock.submit).toHaveBeenCalledOnce();
   await render({ ...request, planReview: { ...request.planReview, revision: 2 } });
   expect(host.querySelector<HTMLButtonElement>('.handoff-action-row__button')!.disabled).toBe(false);
+  await act(async () => finish());
 });

@@ -1,15 +1,12 @@
-import fs from 'fs';
 import path from 'path';
+import { errorCodeOf } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 import { ProviderConnectionError } from '../provider-auth/providerConnectionErrors';
+import { parseJsonWith, readValidatedSync, writeFileAtomicSync } from '../../runtime/atomicFile';
+import { reportProcessFault } from '../../runtime/processFaultHandlers';
 import { CatalogProjectionClock } from './CatalogProjectionClock';
-import {
-  cloneJson,
-  enforceDiscoveryAdmission,
-  isObject,
-  mergeEffectiveCatalog,
-  revisionFor,
-} from './effectiveCatalogMerge';
+import { cloneJson, enforceDiscoveryAdmission, mergeEffectiveCatalog, revisionFor } from './effectiveCatalogMerge';
+import { parsePersistedCatalogState } from './persistedCatalogStateSchema';
 import {
   DISCOVERY_TTL_MS,
   EFFECTIVE_CATALOG_SCHEMA_VERSION,
@@ -34,28 +31,32 @@ const EMPTY_STATE: PersistedCatalogState = {
   observed: {},
 };
 
-function sanitizePersistedCatalogState(
-  state: PersistedCatalogState,
-): { state: PersistedCatalogState; changed: boolean } {
+function sanitizePersistedCatalogState(state: PersistedCatalogState): {
+  state: PersistedCatalogState;
+  changed: boolean;
+} {
   let changed = false;
-  const sanitizeRecord = (
-    layers: Record<string, CatalogLayerContribution>,
-  ): Record<string, CatalogLayerContribution> => Object.fromEntries(
-    Object.entries(layers).map(([key, layer]) => {
-      const sanitized = enforceDiscoveryAdmission(layer) ?? layer;
-      changed ||= sanitized.models.length !== layer.models.length;
-      return [key, sanitized];
-    }),
-  );
+  const sanitizeRecord = (layers: Record<string, CatalogLayerContribution>): Record<string, CatalogLayerContribution> =>
+    Object.fromEntries(
+      Object.entries(layers).map(([key, layer]) => {
+        const sanitized = enforceDiscoveryAdmission(layer) ?? layer;
+        changed ||= sanitized.models.length !== layer.models.length;
+        return [key, sanitized];
+      }),
+    );
   const sanitizeObserved = (
     layers: Record<string, CatalogLayerContribution[]>,
-  ): Record<string, CatalogLayerContribution[]> => Object.fromEntries(
-    Object.entries(layers).map(([key, entries]) => [key, entries.map((layer) => {
-      const sanitized = enforceDiscoveryAdmission(layer) ?? layer;
-      changed ||= sanitized.models.length !== layer.models.length;
-      return sanitized;
-    })]),
-  );
+  ): Record<string, CatalogLayerContribution[]> =>
+    Object.fromEntries(
+      Object.entries(layers).map(([key, entries]) => [
+        key,
+        entries.map((layer) => {
+          const sanitized = enforceDiscoveryAdmission(layer) ?? layer;
+          changed ||= sanitized.models.length !== layer.models.length;
+          return sanitized;
+        }),
+      ]),
+    );
   return {
     state: {
       ...state,
@@ -111,8 +112,9 @@ export class EffectiveCatalogService {
   private stateNeedsRewrite = false;
 
   constructor(options: EffectiveCatalogServiceOptions = {}) {
-    this.statePath = options.statePath
-      ?? path.join(appPathService.getRuntimePaths().appStateRoot, 'provider-catalog', 'catalog-v4.json');
+    this.statePath =
+      options.statePath ??
+      path.join(appPathService.getRuntimePaths().appStateRoot, 'provider-catalog', 'catalog-v4.json');
     this.now = options.now ?? (() => new Date());
     this.discoveryTtlMs = options.discoveryTtlMs ?? DISCOVERY_TTL_MS;
     const persisted = sanitizePersistedCatalogState(this.readState());
@@ -158,10 +160,11 @@ export class EffectiveCatalogService {
     }
     const observedKey = evidenceKey(input.providerId, input.accountId);
     if (this.state.observed[observedKey]) {
-      this.state.observed[observedKey] = this.state.observed[observedKey].filter((layer) => (
-        !layer.evidenceKey?.startsWith('capability-probe:')
-        || (input.protocol !== undefined && layer.protocol !== input.protocol)
-      ));
+      this.state.observed[observedKey] = this.state.observed[observedKey].filter(
+        (layer) =>
+          !layer.evidenceKey?.startsWith('capability-probe:') ||
+          (input.protocol !== undefined && layer.protocol !== input.protocol),
+      );
       if (this.state.observed[observedKey].length === 0) delete this.state.observed[observedKey];
     }
     if (exactKey) this.clearKeyRefreshState(exactKey);
@@ -173,13 +176,10 @@ export class EffectiveCatalogService {
     const key = cacheKey(request.providerId, request.accountId, request.protocol);
     this.bindRequest(key, request);
     const snapshot = this.createSnapshot(request);
-    const activeLoader = loader ?? this.discoveryLoaderResolver?.(request);
-    if (
-      (!this.resolveDiscovery(request) || snapshot.stale)
-      && activeLoader
-      && !this.isInBackoffWindow(key)
-    ) {
-      void this.refreshDiscovery(request, activeLoader);
+    // The loader is resolved only when a refresh is due: resolving it reads the provider's settings.
+    if ((!this.resolveDiscovery(request) || snapshot.stale) && !this.isInBackoffWindow(key)) {
+      const activeLoader = loader ?? this.discoveryLoaderResolver?.(request);
+      if (activeLoader) void this.refreshDiscovery(request, activeLoader);
     }
     return this.refreshes.has(key) ? this.createSnapshot(request) : snapshot;
   }
@@ -196,7 +196,10 @@ export class EffectiveCatalogService {
 
   private bindRequest(key: string, request: EffectiveCatalogRequest): string {
     const { generation, changed } = this.projectionClock.bind(key, request);
-    if (changed) { this.refreshes.delete(key); this.clearKeyRefreshState(key); }
+    if (changed) {
+      this.refreshes.delete(key);
+      this.clearKeyRefreshState(key);
+    }
     this.latestRequests.set(key, cloneJson(request));
     return generation;
   }
@@ -205,23 +208,25 @@ export class EffectiveCatalogService {
     const key = cacheKey(request.providerId, request.accountId, request.protocol);
     const rawDiscovery = request.discovery ?? this.state.discoveries[key];
     const cachedDiscovery = rawDiscovery
-      ? this.discoveryLayerNormalizer?.(request, rawDiscovery) ?? rawDiscovery
+      ? (this.discoveryLayerNormalizer?.(request, rawDiscovery) ?? rawDiscovery)
       : undefined;
-    const projectionChanged = Boolean(cachedDiscovery && !request.discovery
-      && cachedDiscovery.catalogProjectionRevision !== catalogProjectionRevision(request));
+    const projectionChanged = Boolean(
+      cachedDiscovery &&
+      !request.discovery &&
+      cachedDiscovery.catalogProjectionRevision !== catalogProjectionRevision(request),
+    );
     const effectiveDiscovery = projectionChanged ? undefined : cachedDiscovery;
     const cachedEntitlement = request.entitlement ?? this.state.entitlements[key];
     const nowMs = this.now().getTime();
     const rawObserved = request.observed ?? this.state.observed[evidenceKey(request.providerId, request.accountId)];
-    const persistedObserved = (Array.isArray(rawObserved)
-      ? rawObserved
-      : rawObserved ? [rawObserved] : [])
-      .filter((layer) => (
-        !layer.expiresAt || Date.parse(layer.expiresAt) > nowMs
-      ));
-    const stale = projectionChanged || (cachedDiscovery?.expiresAt
-      ? Date.parse(cachedDiscovery.expiresAt) <= this.now().getTime()
-      : Boolean(cachedDiscovery));
+    const persistedObserved = (Array.isArray(rawObserved) ? rawObserved : rawObserved ? [rawObserved] : []).filter(
+      (layer) => !layer.expiresAt || Date.parse(layer.expiresAt) > nowMs,
+    );
+    const stale =
+      projectionChanged ||
+      (cachedDiscovery?.expiresAt
+        ? Date.parse(cachedDiscovery.expiresAt) <= this.now().getTime()
+        : Boolean(cachedDiscovery));
     const mergedRequest: EffectiveCatalogRequest = {
       ...request,
       discovery: effectiveDiscovery,
@@ -231,10 +236,12 @@ export class EffectiveCatalogService {
     const mergedModels = mergeEffectiveCatalog(mergedRequest);
     const now = this.now();
     const models = mergedModels.map((model) => {
-      if (this.lastErrors.get(key)?.authenticationRejected) return {
-        ...model, availability: 'unavailable' as const,
-        unavailableReason: this.lastErrors.get(key)!.message,
-      };
+      if (this.lastErrors.get(key)?.authenticationRejected)
+        return {
+          ...model,
+          availability: 'unavailable' as const,
+          unavailableReason: this.lastErrors.get(key)!.message,
+        };
       const quotaKey = this.quotaKey(request, model.modelId);
       const entry = this.transientQuota.get(quotaKey);
       if (!entry) return model;
@@ -263,11 +270,9 @@ export class EffectiveCatalogService {
     // timestamps are audit metadata and are renewed by an otherwise identical
     // discovery refresh; including them makes every SWR refresh invalidate an
     // in-flight renderer preflight even when no effective model fact changed.
-    const revisionModels = models.map(({
-      provenance: _provenance,
-      catalogRevision: _catalogRevision,
-      ...model
-    }) => model);
+    const revisionModels = models.map(
+      ({ provenance: _provenance, catalogRevision: _catalogRevision, ...model }) => model,
+    );
     const catalogRevision = revisionFor({
       providerId: request.providerId,
       accountId: request.accountId,
@@ -276,7 +281,10 @@ export class EffectiveCatalogService {
     });
     const revisionedModels = models.map((model) => ({ ...model, catalogRevision }));
     const snapshot: EffectiveCatalogSnapshot = {
-      ...this.projectionClock.stamp(key, [catalogRevision, stale, this.refreshes.has(key), this.lastErrors.get(key)?.message ?? ''].join('\u0000')),
+      ...this.projectionClock.stamp(
+        key,
+        [catalogRevision, stale, this.refreshes.has(key), this.lastErrors.get(key)?.message ?? ''].join('\u0000'),
+      ),
       providerId: request.providerId,
       accountId: request.accountId,
       protocol: request.protocol,
@@ -299,12 +307,16 @@ export class EffectiveCatalogService {
     }
     let resolveRefresh!: (snapshot: EffectiveCatalogSnapshot) => void;
     let rejectRefresh!: (error: unknown) => void;
-    const refresh = new Promise<EffectiveCatalogSnapshot>((resolve, reject) => { resolveRefresh = resolve; rejectRefresh = reject; });
+    const refresh = new Promise<EffectiveCatalogSnapshot>((resolve, reject) => {
+      resolveRefresh = resolve;
+      rejectRefresh = reject;
+    });
     this.refreshes.set(key, refresh);
     void (async () => {
       try {
         const loaded = await loader();
-        if (this.projectionClock.generation(key) !== generation || !this.configurationIsCurrent(request)) return this.discardRefresh(key);
+        if (this.projectionClock.generation(key) !== generation || !this.configurationIsCurrent(request))
+          return this.discardRefresh(key);
         const observedAt = this.now();
         const expiresAt = new Date(observedAt.getTime() + this.discoveryTtlMs).toISOString();
         const { entitlement, ...discovery } = loaded;
@@ -317,13 +329,13 @@ export class EffectiveCatalogService {
         };
         const observedKey = evidenceKey(request.providerId, request.accountId);
         if (this.state.observed[observedKey]) {
-          this.state.observed[observedKey] = this.state.observed[observedKey].filter((layer) => (
-            layer.protocol !== request.protocol || !layer.evidenceKey?.startsWith('capability-probe:')
-          ));
+          this.state.observed[observedKey] = this.state.observed[observedKey].filter(
+            (layer) => layer.protocol !== request.protocol || !layer.evidenceKey?.startsWith('capability-probe:'),
+          );
         }
-        this.state.discoveries[key] = enforceDiscoveryAdmission(
-          this.discoveryLayerNormalizer?.(request, loadedDiscovery) ?? loadedDiscovery,
-        ) ?? loadedDiscovery;
+        this.state.discoveries[key] =
+          enforceDiscoveryAdmission(this.discoveryLayerNormalizer?.(request, loadedDiscovery) ?? loadedDiscovery) ??
+          loadedDiscovery;
         if (entitlement?.models.length) {
           this.state.entitlements[key] = {
             ...entitlement,
@@ -338,11 +350,13 @@ export class EffectiveCatalogService {
         this.refreshBackoff.delete(key);
         this.persistState();
       } catch (error) {
-        if (this.projectionClock.generation(key) !== generation || !this.configurationIsCurrent(request)) return this.discardRefresh(key);
+        if (this.projectionClock.generation(key) !== generation || !this.configurationIsCurrent(request))
+          return this.discardRefresh(key);
         this.lastErrors.set(key, {
           message: error instanceof Error ? error.message : String(error),
-          authenticationRejected: (error instanceof ProviderConnectionError && error.httpStatus === 401)
-            || this.lastErrors.get(key)?.authenticationRejected === true,
+          authenticationRejected:
+            (error instanceof ProviderConnectionError && error.httpStatus === 401) ||
+            this.lastErrors.get(key)?.authenticationRejected === true,
         });
         this.recordRefreshFailure(key);
       } finally {
@@ -381,10 +395,11 @@ export class EffectiveCatalogService {
     };
     const nowMs = this.now().getTime();
     this.state.observed[key] = [
-      ...(this.state.observed[key] ?? []).filter((layer) => (
-        (!layer.expiresAt || Date.parse(layer.expiresAt) > nowMs)
-        && !(layer.protocol === request.protocol && layer.evidenceKey === evidenceId)
-      )),
+      ...(this.state.observed[key] ?? []).filter(
+        (layer) =>
+          (!layer.expiresAt || Date.parse(layer.expiresAt) > nowMs) &&
+          !(layer.protocol === request.protocol && layer.evidenceKey === evidenceId),
+      ),
       next,
     ];
     this.persistState();
@@ -405,7 +420,9 @@ export class EffectiveCatalogService {
   }
 
   private resolveDiscovery(request: EffectiveCatalogRequest): CatalogLayerContribution | undefined {
-    return request.discovery ?? this.state.discoveries[cacheKey(request.providerId, request.accountId, request.protocol)];
+    return (
+      request.discovery ?? this.state.discoveries[cacheKey(request.providerId, request.accountId, request.protocol)]
+    );
   }
 
   private quotaKey(
@@ -415,9 +432,7 @@ export class EffectiveCatalogService {
     return `${cacheKey(request.providerId, request.accountId, request.protocol)}\u0000${modelId}`;
   }
 
-  private emitLatestSnapshots(
-    input: Pick<EffectiveCatalogRequest, 'providerId' | 'accountId' | 'protocol'>,
-  ): void {
+  private emitLatestSnapshots(input: Pick<EffectiveCatalogRequest, 'providerId' | 'accountId' | 'protocol'>): void {
     const exactKey = input.protocol ? cacheKey(input.providerId, input.accountId, input.protocol) : null;
     const prefix = `${input.providerId}\u0000${input.accountId}\u0000`;
     for (const [key, request] of this.latestRequests.entries()) {
@@ -438,6 +453,11 @@ export class EffectiveCatalogService {
     ].join('\u0000');
   }
 
+  /** Tells subscribers about a snapshot a caller resolved (after a settings commit); an unchanged one is not repeated. */
+  announce(snapshot: EffectiveCatalogSnapshot): void {
+    this.emit(snapshot);
+  }
+
   private emit(snapshot: EffectiveCatalogSnapshot): void {
     const key = cacheKey(snapshot.providerId, snapshot.accountId, snapshot.protocol);
     const fingerprint = this.snapshotFingerprint(snapshot);
@@ -448,8 +468,9 @@ export class EffectiveCatalogService {
     for (const listener of this.listeners) {
       try {
         listener(snapshot);
-      } catch {
-        // A renderer subscription must not break catalog persistence or other listeners.
+      } catch (error) {
+        // A renderer subscription must not break catalog persistence or other listeners; it is reported.
+        reportProcessFault('Effective catalog listener failed', error);
       }
     }
   }
@@ -458,10 +479,7 @@ export class EffectiveCatalogService {
     if (failCount <= 0) {
       return 0;
     }
-    return Math.min(
-      REFRESH_BACKOFF_BASE_MS * 2 ** (failCount - 1),
-      REFRESH_BACKOFF_MAX_MS,
-    );
+    return Math.min(REFRESH_BACKOFF_BASE_MS * 2 ** (failCount - 1), REFRESH_BACKOFF_MAX_MS);
   }
 
   private isInBackoffWindow(key: string): boolean {
@@ -487,32 +505,23 @@ export class EffectiveCatalogService {
     this.lastEmitFingerprints.delete(key);
   }
 
+  /**
+   * The catalog state is a cache of upstream evidence, rebuilt by the next refresh. A file from another schema
+   * version or a damaged one (whose bytes `readValidatedSync` keeps beside it) starts empty and is rewritten;
+   * an unreadable one starts empty and is left as it is.
+   */
   private readState(): PersistedCatalogState {
     try {
-      if (!fs.existsSync(this.statePath)) {
-        return cloneJson(EMPTY_STATE);
-      }
-      const parsed = JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as Partial<PersistedCatalogState>;
-      if (
-        parsed.schemaVersion !== EFFECTIVE_CATALOG_SCHEMA_VERSION
-        || !isObject(parsed.discoveries)
-        || !isObject(parsed.entitlements)
-        || !isObject(parsed.observed)
-      ) {
-        this.stateNeedsRewrite = true;
-        return cloneJson(EMPTY_STATE);
-      }
-      return parsed as PersistedCatalogState;
-    } catch {
+      return readValidatedSync(this.statePath, parseJsonWith(parsePersistedCatalogState)) ?? cloneJson(EMPTY_STATE);
+    } catch (error) {
+      const code = errorCodeOf(error);
+      if (code === 'STORAGE_SCHEMA_UNSUPPORTED' || code === 'STORAGE_CORRUPT') this.stateNeedsRewrite = true;
       return cloneJson(EMPTY_STATE);
     }
   }
 
   private persistState(): void {
-    fs.mkdirSync(path.dirname(this.statePath), { recursive: true });
-    const temporaryPath = `${this.statePath}.tmp`;
-    fs.writeFileSync(temporaryPath, JSON.stringify(this.state, null, 2), 'utf8');
-    fs.renameSync(temporaryPath, this.statePath);
+    writeFileAtomicSync(this.statePath, JSON.stringify(this.state, null, 2));
   }
 }
 

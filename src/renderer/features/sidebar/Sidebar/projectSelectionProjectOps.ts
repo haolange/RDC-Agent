@@ -16,37 +16,34 @@ export async function loadSessionsOp(
   options: LoadSessionsOptions = {},
 ) {
   const autoSelectSession = options.autoSelectSession !== false;
-  const projectSelection = await window.electronAPI.project.select(project.projectId).catch((error) => ({
-    success: false,
-    project: undefined,
-    currentSession: null,
-    currentRun: null,
-    error: error instanceof Error ? error.message : String(error),
-  }));
+  const projectSelection = await window.electronAPI.project.select(project.projectId).then(
+    (selection) => ({ selection }),
+    (error: unknown) => ({ error }),
+  );
   if (!ctx.isLatestSelectionRequest(options.requestId)) {
     return;
   }
-  if (!projectSelection.success || !projectSelection.project) {
+  if ('error' in projectSelection) {
     if (options.rollbackState) {
       restoreSelectionSnapshot(ctx, options.rollbackState);
     }
-    ctx.setSidebarError(projectSelection.error || ctx.t('sidebar.selectProjectFailed'));
+    ctx.setSidebarError({ contextKey: 'sidebar.selectProjectFailed', reason: projectSelection.error });
     return;
   }
 
-  const selectedProject = projectSelection.project;
+  const selectedProject = projectSelection.selection.project;
   const nextSessions = await ctx.loadProjectSessionList(selectedProject.projectId);
   if (!ctx.isLatestSelectionRequest(options.requestId)) {
     return;
   }
 
   ctx.setSessions(nextSessions);
-  await ctx.reloadSettings();
+  await ctx.reloadSettings(selectedProject.projectId);
   if (!ctx.isLatestSelectionRequest(options.requestId)) {
     return;
   }
   ctx.setCurrentProject(selectedProject);
-  ctx.updateProjectInputs(selectedProject.projectId, selectedProject.inputs ?? []);
+  ctx.updateProjectInputs(selectedProject.projectId, selectedProject.inputs);
   ctx.ensureProjectExpanded(selectedProject.projectId);
 
   const currentSession = ctx.getCurrentSession();
@@ -54,10 +51,9 @@ export async function loadSessionsOp(
     ctx.setRightRailTarget(options.rightRailTarget ?? 'project');
     if (currentSession?.projectId && currentSession.projectId !== selectedProject.projectId) {
       applySessionSwitchHygiene({ previousSessionId: currentSession.sessionId, nextSessionId: null });
-      ctx.setCurrentSession(null);
+      ctx.setCurrentSessionId(null);
       ctx.setCurrentRun(null);
       ctx.setCaptures([]);
-      ctx.setRuns([]);
     }
     return;
   }
@@ -79,10 +75,9 @@ export async function loadSessionsOp(
       applySessionSwitchHygiene({ previousSessionId: currentSession.sessionId, nextSessionId: null });
     }
     ctx.setRightRailTarget(options.rightRailTarget ?? 'project');
-    ctx.setCurrentSession(null);
+    ctx.setCurrentSessionId(null);
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
-    ctx.setRuns([]);
     return;
   }
 
@@ -105,15 +100,14 @@ export async function loadProjectsOp(
     return;
   }
 
-  const nextProjects = result.projects ?? [];
+  const nextProjects = result.projects;
   ctx.setProjects(nextProjects);
   const visibleProjectIds = new Set(nextProjects.map((project) => project.projectId));
   ctx.pruneTreeForProjects(visibleProjectIds);
   options.onProjectsListed?.();
 
-  const targetProject = nextProjects.find((project) => project.projectId === preferredProjectId)
-    || nextProjects[0]
-    || null;
+  const targetProject =
+    nextProjects.find((project) => project.projectId === preferredProjectId) || nextProjects[0] || null;
 
   if (!targetProject) {
     const currentSession = ctx.getCurrentSession();
@@ -122,15 +116,14 @@ export async function loadProjectsOp(
     }
     ctx.setCurrentProject(null);
     useSessionStore.getState().clearUsageSnapshot();
-    ctx.setCurrentSession(null);
+    ctx.setCurrentSessionId(null);
     ctx.setRightRailTarget('project');
     ctx.setCurrentRun(null);
     ctx.setProjectInputs([]);
     ctx.resetTree();
     ctx.setCaptures([]);
     ctx.setSessions([]);
-    ctx.setRuns([]);
-    await ctx.reloadSettings();
+    await ctx.reloadSettings(null);
     return;
   }
 
@@ -149,12 +142,8 @@ export async function handleAddProjectOp(ctx: ProjectSelectionHandlerOpsContext,
   const requestId = ctx.beginSelectionRequest();
   ctx.setIsBusy(true);
   try {
-    const result = await window.electronAPI.project.add(rootPath);
-    if (!result.success || !result.project) {
-      throw new Error(result.error || 'Project could not be added');
-    }
-
-    await ctx.loadProjects(result.project.projectId, null, {
+    const { project } = await window.electronAPI.project.add(rootPath);
+    await ctx.loadProjects(project.projectId, null, {
       autoSelectSession: false,
       rightRailTarget: 'project',
       requestId,
@@ -164,10 +153,7 @@ export async function handleAddProjectOp(ctx: ProjectSelectionHandlerOpsContext,
   }
 }
 
-export async function handleRemoveProjectOp(
-  ctx: ProjectSelectionHandlerOpsContext,
-  project?: ProjectRecord,
-) {
+export async function handleRemoveProjectOp(ctx: ProjectSelectionHandlerOpsContext, project?: ProjectRecord) {
   ctx.setSidebarError(null);
   const targetProject = project || ctx.getCurrentProject();
   if (!targetProject) return;
@@ -185,23 +171,19 @@ export async function handleRemoveProjectOp(
   }
 }
 
-export async function handleProjectSelectOp(
-  ctx: ProjectSelectionHandlerOpsContext,
-  project: ProjectRecord,
-) {
+export async function handleProjectSelectOp(ctx: ProjectSelectionHandlerOpsContext, project: ProjectRecord) {
   ctx.setSidebarError(null);
   const requestId = ctx.beginSelectionRequest();
   const rollbackState = captureSelectionSnapshot();
   const currentSession = ctx.getCurrentSession();
   if (currentSession?.projectId && currentSession.projectId !== project.projectId) {
     applySessionSwitchHygiene({ previousSessionId: currentSession.sessionId, nextSessionId: null });
-    ctx.setCurrentSession(null);
+    ctx.setCurrentSessionId(null);
     ctx.setCurrentRun(null);
     ctx.setCaptures([]);
-    ctx.setRuns([]);
   }
   ctx.setCurrentProject(project);
-  ctx.updateProjectInputs(project.projectId, project.inputs ?? []);
+  ctx.updateProjectInputs(project.projectId, project.inputs);
   ctx.setRightRailTarget('project');
   ctx.ensureProjectExpanded(project.projectId);
 
@@ -218,13 +200,9 @@ export async function handleProjectSelectOp(
   }
 }
 
-export async function handleOpenExplorerOp(
-  ctx: ProjectSelectionHandlerOpsContext,
-  project: ProjectRecord,
-) {
+export async function handleOpenExplorerOp(ctx: ProjectSelectionHandlerOpsContext, project: ProjectRecord) {
   if (ctx.projectMenuOpen) {
     ctx.onCloseProjectMenu();
   }
   await window.electronAPI.appShell.openPath(project.rootPath);
 }
-

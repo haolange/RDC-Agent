@@ -3,10 +3,7 @@ import { observeTextareaSizing } from '../lib/textareaSizing';
 import { cn } from '../lib/cn';
 import './Input.css';
 
-export type TextareaSize = 'md' | 'lg';
-
 export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
-  inputSize?: TextareaSize;
   error?: boolean;
   sizing?: 'content' | 'fill';
   /** `plain` is the shell writing surface: no field fill, border, or radius. */
@@ -19,7 +16,6 @@ export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
   {
-    inputSize = 'md',
     error = false,
     className,
     disabled,
@@ -51,7 +47,6 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         'ui-textarea',
         chrome === 'plain' && 'is-chrome-plain',
         `is-sizing-${sizing}`,
-        chrome === 'field' && inputSize !== 'md' && `is-size-${inputSize}`,
         error && 'is-error',
         disabled && 'is-disabled',
         className,

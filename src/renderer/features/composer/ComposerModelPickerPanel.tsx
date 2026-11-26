@@ -6,15 +6,12 @@ import { useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
 import { readCompiledComposerRoute } from '../../lib/composerEffectiveModel';
 import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { Button } from '../../ui/Button';
-import { Icon } from '../../ui/Icon';
 import { InlineError } from '../../ui/InlineError';
-import { filterComposerPickerOptions, type ComposerModelPickerOption } from './composerModelPicker';
-import {
-  resolveComposerAgentDefaultState,
-  type ComposerAgentDefaultState,
-} from './composerAgentDefaultModel';
+import { filterComposerPickerOptions } from './composerModelPicker';
+import { resolveComposerAgentDefaultState, type ComposerAgentDefaultState } from './composerAgentDefaultModel';
 import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
-import { useComposerModelPickerOptions, type ComposerPickerProviderNotice } from './useComposerModelPickerOptions';
+import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
+import { ComposerModelList } from './ComposerModelPickerList';
 import type { SessionRecord } from '@shared/types/session';
 import type { ComposerModelSaveState } from './ComposerModelEffortControl';
 
@@ -46,24 +43,30 @@ export const ComposerModelPickerPanel: React.FC<{
   const [saving, setSaving] = useState(false);
   const mounted = useRef(true);
   const savingRef = useRef(false);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const providers = useAppSettingsStore((state) => state.settings.llm.providers);
   useEffect(() => {
-    for (const provider of providers.filter(entry => entry.enabled && entry.isConfigured)) {
+    for (const provider of providers.filter((entry) => entry.enabled && entry.isConfigured)) {
       void useEffectiveCatalogStore.getState().load(provider, false, true);
     }
   }, [providers]);
   const agentRoute = useAppSettingsStore((state) => readCompiledComposerRoute(state.settings, agentId));
-  const agentName = useAppSettingsStore((state) => (
-    state.settings.agents.definitions.find((entry) => entry.id === agentId)?.name || agentId
-  ));
+  const agentName = useAppSettingsStore(
+    (state) => state.settings.agents.definitions.find((entry) => entry.id === agentId)?.name || agentId,
+  );
   const { options, providerStates, loading, retry } = useComposerModelPickerOptions(providers);
   const { effective, hasChoice, projectId } = useComposerEffectiveModel(agentId, currentSession);
   const agentDefault = resolveComposerAgentDefaultState(agentRoute, options, !loading);
   const agentDefaultMeta = formatAgentDefaultMeta(agentDefault, agentName, t);
-  const agentDefaultTitle = agentDefault.kind === 'unavailable' && agentDefault.providerId && agentDefault.modelId
-    ? `${agentDefault.providerId} / ${agentDefault.modelId}`
-    : t('composer.model.agentDefaultTitle', { name: agentName });
+  const agentDefaultTitle =
+    agentDefault.kind === 'unavailable' && agentDefault.providerId && agentDefault.modelId
+      ? `${agentDefault.providerId} / ${agentDefault.modelId}`
+      : t('composer.model.agentDefaultTitle', { name: agentName });
   // One section per connected provider, in settings order: its matching models plus, when it has one,
   // the provider's own loading / refresh-failed / empty notice, so a failure sits next to what it affects.
   const sections = useMemo(() => {
@@ -83,17 +86,14 @@ export const ComposerModelPickerPanel: React.FC<{
     window.requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }));
   }, []);
 
-  const selectModel = async (next: { providerId: string; modelId: string }) => {
+  // One save at a time; the menu closes only once main has the choice.
+  const save = async (write: () => ReturnType<typeof clearComposerModelChoice>) => {
     if (savingRef.current) return;
     savingRef.current = true;
     setSaveError('');
     setSaving(true);
     onSaveStateChange?.({ saving: true });
-    const result = await commitComposerModelChoice(
-      next,
-      currentSession?.sessionId,
-      projectId,
-    );
+    const result = await write();
     savingRef.current = false;
     onSaveStateChange?.({ saving: false, error: result.ok ? undefined : t('composer.model.saveFailed') });
     if (!mounted.current) return;
@@ -104,24 +104,11 @@ export const ComposerModelPickerPanel: React.FC<{
     }
     onChosen();
   };
-
+  const selectModel = (next: { providerId: string; modelId: string }) =>
+    save(() => commitComposerModelChoice(next, currentSession?.sessionId, projectId));
   const selectAgentDefault = async () => {
     if (!agentDefault.selectable) return;
-    if (savingRef.current) return;
-    savingRef.current = true;
-    setSaveError('');
-    setSaving(true);
-    onSaveStateChange?.({ saving: true });
-    const result = await clearComposerModelChoice(currentSession?.sessionId, projectId);
-    savingRef.current = false;
-    onSaveStateChange?.({ saving: false, error: result.ok ? undefined : t('composer.model.saveFailed') });
-    if (!mounted.current) return;
-    setSaving(false);
-    if (!result.ok) {
-      setSaveError(t('composer.model.saveFailed'));
-      return;
-    }
-    onChosen();
+    await save(() => clearComposerModelChoice(currentSession?.sessionId, projectId));
   };
 
   const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -174,7 +161,9 @@ export const ComposerModelPickerPanel: React.FC<{
           aria-label={t('composer.model.searchPlaceholder')}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <Button variant="ghost" size="sm"
+        <Button
+          variant="ghost"
+          size="sm"
           type="button"
           className={`composer-model-item composer-model-default${hasChoice ? '' : ' is-selected'}`}
           data-testid="composer-model-agent-default"
@@ -187,98 +176,21 @@ export const ComposerModelPickerPanel: React.FC<{
           <span className="composer-model-item-label">{t('composer.model.agentDefault')}</span>
           <span className="composer-model-item-meta">{agentDefaultMeta}</span>
         </Button>
-        {saving ? <p className="composer-model-empty" role="status">{t('settings.saving')}</p> : null}
+        {saving ? (
+          <p className="composer-model-empty" role="status">
+            {t('settings.saving')}
+          </p>
+        ) : null}
         {saveError ? <InlineError>{saveError}</InlineError> : null}
       </div>
-      {sections.length === 0 ? (
-        <p className="composer-model-empty">{t(loading ? 'composer.model.loading' : 'composer.model.empty')}</p>
-      ) : (
-        <div className="composer-model-list">
-          {sections.map((section) => (
-            <div key={section.id} className="composer-model-group" data-testid={`composer-model-provider-${section.id}`}>
-              <p className="composer-model-group-label">{section.label}</p>
-              {section.models.map((option) => {
-                const selected = Boolean(
-                  effective
-                  && option.providerId === effective.providerId
-                  && option.modelId === effective.modelId,
-                );
-                return (
-                  <Button variant="ghost" size="sm"
-                    key={`${option.providerId}:${option.modelId}`}
-                    type="button"
-                    className={`composer-model-item ${selected ? 'is-selected' : ''}`}
-                    data-testid={`composer-model-item-${option.providerId}-${option.modelId}`}
-                    role="menuitemradio"
-                    disabled={saving}
-                    aria-checked={selected}
-                    onClick={() => void selectModel({
-                      providerId: option.providerId,
-                      modelId: option.modelId,
-                    })}
-                  >
-                    <span className="composer-model-item-text">
-                      <span className="composer-model-item-label">{option.label}</span>
-                      {option.contextWindowLabel ? (
-                        <span className="composer-model-item-meta">{t('composer.model.contextWindow', { tokens: option.contextWindowLabel })}</span>
-                      ) : null}
-                    </span>
-                    <ModelCapabilities option={option} />
-                    {selected ? <Icon name="check" size={16} className="composer-model-check" /> : null}
-                  </Button>
-                );
-              })}
-              {section.notice ? (
-                <ProviderNotice
-                  notice={section.notice}
-                  retrying={section.retrying}
-                  onRetry={() => retry(section.id)}
-                />
-              ) : null}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-/** What a model can do, as quiet icons named on hover: image input, reasoning, Fast mode. */
-const ModelCapabilities: React.FC<{ option: ComposerModelPickerOption }> = ({ option }) => {
-  const { t } = useI18n();
-  const capabilities = [
-    option.hasVisionInput ? { icon: 'image' as const, label: t('composer.model.visionInput') } : null,
-    option.hasReasoning ? { icon: 'brain' as const, label: t('composer.model.reasoning') } : null,
-    option.hasFastMode ? { icon: 'lightning' as const, label: t('composer.model.fastChip') } : null,
-  ].filter((capability) => capability !== null);
-  if (capabilities.length === 0) return null;
-  return (
-    <span className="composer-model-capabilities">
-      {capabilities.map((capability) => (
-        <span key={capability.icon} className="composer-model-capability" data-tooltip={capability.label} aria-label={capability.label} role="img">
-          <Icon name={capability.icon} size={14} />
-        </span>
-      ))}
-    </span>
-  );
-};
-
-const ProviderNotice: React.FC<{
-  notice: ComposerPickerProviderNotice;
-  retrying: boolean;
-  onRetry: () => void;
-}> = ({ notice, retrying, onRetry }) => {
-  const { t } = useI18n();
-  const text = t(notice.kind === 'failed' ? 'composer.model.refreshFailed'
-    : notice.kind === 'loading' ? 'composer.model.loading' : 'composer.model.providerEmpty');
-  // The provider's own error text is technical; it stays on hover rather than in the sentence.
-  return (
-    <div className="composer-model-notice" role="status" data-notice={notice.kind}
-      data-tooltip={notice.kind === 'failed' ? notice.error : undefined}>
-      <span className="composer-model-notice-text">{text}</span>
-      {notice.kind === 'loading' ? null : (
-        <Button variant="secondary" size="sm" disabled={retrying} onClick={onRetry}>{t('settings.retry')}</Button>
-      )}
+      <ComposerModelList
+        sections={sections}
+        loading={loading}
+        effective={effective}
+        saving={saving}
+        onSelect={(choice) => void selectModel(choice)}
+        onRetry={retry}
+      />
     </div>
   );
 };

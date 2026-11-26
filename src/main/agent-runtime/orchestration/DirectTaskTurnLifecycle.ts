@@ -1,12 +1,16 @@
 import { TASK_STATUS_REASONS } from '@shared/constants/taskStatusReasons';
+import { AppError } from '@shared/errors/appError';
 import { TaskRegistry, taskStoreForExecutionScope, getDelegatedTaskScope, type TaskExecutionRecord } from '../tasks';
 import { processSupervisor } from '../../runtime/ProcessSupervisor';
 
 const TERMINAL = new Set(['completed', 'partial', 'blocked', 'failed', 'cancelled', 'interrupted']);
 
 /** Active delegated executions belonging to this owner or this child's descendants. */
-export function activeDelegations(executions: readonly TaskExecutionRecord[], parentExecutionId?: string): TaskExecutionRecord[] {
-  const byId = new Map(executions.map(execution => [execution.id, execution]));
+export function activeDelegations(
+  executions: readonly TaskExecutionRecord[],
+  parentExecutionId?: string,
+): TaskExecutionRecord[] {
+  const byId = new Map(executions.map((execution) => [execution.id, execution]));
   const belongsToParent = (execution: TaskExecutionRecord): boolean => {
     if (!parentExecutionId) return true;
     const visited = new Set<string>();
@@ -18,13 +22,19 @@ export function activeDelegations(executions: readonly TaskExecutionRecord[], pa
     }
     return false;
   };
-  return executions.filter(execution => execution.mode === 'subagent' && !TERMINAL.has(execution.status)
-    && execution.id !== parentExecutionId && belongsToParent(execution));
+  return executions.filter(
+    (execution) =>
+      execution.mode === 'subagent' &&
+      !TERMINAL.has(execution.status) &&
+      execution.id !== parentExecutionId &&
+      belongsToParent(execution),
+  );
 }
 
 export async function listActiveDelegations(sessionId: string): Promise<TaskExecutionRecord[]> {
   const scope = getDelegatedTaskScope(sessionId);
-  if (scope && !scope.executionId) throw new Error('TASK_SCOPE_UNVERIFIED: delegated execution identity is missing.');
+  if (scope && !scope.executionId)
+    throw new AppError('TASK_SCOPE_UNVERIFIED', 'delegated execution identity is missing.');
   const registry = new TaskRegistry(taskStoreForExecutionScope(sessionId, scope?.ownerSessionId));
   return activeDelegations(await registry.listExecutions(), scope?.executionId);
 }
@@ -39,7 +49,10 @@ export async function listUnfinishedDirectTasks(input: {
   const registry = new TaskRegistry(taskStoreForExecutionScope(input.sessionId, delegatedScope?.ownerSessionId));
   const frozenPlanRef = `turn:${input.turnId}:generation:${input.generation}`;
   return (await registry.listExecutions())
-    .filter((execution) => execution.mode === 'direct' && execution.frozenPlanRef === frozenPlanRef && !TERMINAL.has(execution.status))
+    .filter(
+      (execution) =>
+        execution.mode === 'direct' && execution.frozenPlanRef === frozenPlanRef && !TERMINAL.has(execution.status),
+    )
     .map((execution) => ({ executionId: execution.id, taskId: execution.taskId }));
 }
 
@@ -61,7 +74,11 @@ export async function settleUnfinishedDirectTasks(input: {
       status: input.stopped ? 'cancelled' : 'blocked',
       result: input.stopped
         ? { disposition: 'cancelled', summary: TASK_STATUS_REASONS.parentTurnStopped, outputs: {} }
-        : { disposition: 'blocked', summary: 'Parent turn ended without settling this direct Task execution.', outputs: {} },
+        : {
+            disposition: 'blocked',
+            summary: 'Parent turn ended without settling this direct Task execution.',
+            outputs: {},
+          },
     });
   }
   return unfinished.length;
@@ -83,9 +100,16 @@ export async function cancelPendingCreatedTasks(registry: TaskRegistry, turnRef:
   for (const task of tasks.slice().reverse()) {
     if (task.creationTurnRef !== turnRef || task.status !== 'pending') continue;
     // cancelTask cascades. Leave a parent alone if another turn owns unfinished descendants.
-    if (tasks.some((child) => child.creationTurnRef !== turnRef
-      && child.status !== 'completed' && child.status !== 'cancelled'
-      && belongsTo(child.id, task.id))) continue;
+    if (
+      tasks.some(
+        (child) =>
+          child.creationTurnRef !== turnRef &&
+          child.status !== 'completed' &&
+          child.status !== 'cancelled' &&
+          belongsTo(child.id, task.id),
+      )
+    )
+      continue;
     const current = await registry.getTask(task.id);
     if (current?.status !== 'pending') continue;
     await registry.cancelTask(task.id, TASK_STATUS_REASONS.createdTurnStopped);
@@ -106,9 +130,10 @@ export async function settleJoinedTurnTaskExecutions(input: {
   const delegatedScope = getDelegatedTaskScope(input.sessionId);
   const registry = new TaskRegistry(taskStoreForExecutionScope(input.sessionId, delegatedScope?.ownerSessionId));
   const frozenPlanRef = `turn:${input.turnId}:generation:${input.generation}`;
-  const hasDirectExecution = (await registry.listExecutions()).some((execution) => (
-    execution.mode === 'direct' && execution.frozenPlanRef === frozenPlanRef && !TERMINAL.has(execution.status)
-  ));
+  const hasDirectExecution = (await registry.listExecutions()).some(
+    (execution) =>
+      execution.mode === 'direct' && execution.frozenPlanRef === frozenPlanRef && !TERMINAL.has(execution.status),
+  );
   if (hasDirectExecution) {
     await processSupervisor.joinExecutionProcesses(input.sessionId);
     if (processSupervisor.hasUnconfirmedProcesses(input.sessionId)) return;

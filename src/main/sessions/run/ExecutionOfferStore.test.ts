@@ -3,8 +3,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { EXECUTION_OFFER_SCHEMA } from '@shared/types/executionOffer';
-import { StorageIo } from '../store/StorageIo';
+import { StorageIo } from '../../runtime/StorageIo';
+import { EXECUTION_OFFER_SCHEMA } from './executionOffer';
 import {
   EXECUTION_OFFER_FILE,
   ExecutionOfferStore,
@@ -65,7 +65,9 @@ describe('ExecutionOfferStore', () => {
 
   it('matches only the same target and frozen plan', () => {
     const current = offer();
-    expect(executionOfferMatches(current, { agentId: 'general', planHash: 'a'.repeat(64), planUri: current.plan.uri })).toBe(true);
+    expect(
+      executionOfferMatches(current, { agentId: 'general', planHash: 'a'.repeat(64), planUri: current.plan.uri }),
+    ).toBe(true);
     expect(executionOfferMatches(current, { agentId: 'analyzer', planHash: 'a'.repeat(64) })).toBe(false);
     expect(executionOfferMatches(current, { agentId: 'general', planHash: 'b'.repeat(64) })).toBe(false);
   });

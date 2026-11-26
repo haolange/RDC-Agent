@@ -1,17 +1,3 @@
-.settings-handoff-editor {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.settings-handoff-list {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
 .settings-handoff-card {
   display: flex;
   min-width: 0;
@@ -72,16 +58,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.settings-handoff-card-title {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--token-text-primary);
-  font-size: var(--type-body-size);
-  font-weight: var(--font-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .settings-handoff-card-target {
   min-width: 0;
   overflow: hidden;
@@ -93,12 +69,6 @@
 
 .settings-handoff-card-warning {
   color: var(--token-status-error);
-}
-
-.settings-handoff-card-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
 }
 
 .settings-handoff-delete:not(:disabled):hover,
@@ -126,13 +96,6 @@
 
 .settings-handoff-card-body .settings-field.is-row .settings-field-label {
   padding-top: calc((var(--control-height-md) - var(--type-body-size) * 1.4) / 2);
-}
-
-.settings-handoff-card-body .settings-field-control {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--space-1);
 }
 
 .settings-handoff-card-body .ui-input,

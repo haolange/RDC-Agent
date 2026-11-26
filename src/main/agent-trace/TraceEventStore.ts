@@ -1,8 +1,50 @@
 import fs from 'fs';
 import path from 'path';
+import { z, type ZodType } from 'zod';
 import { generateEventId, nowIso } from '@shared/utils/id';
+import { AppError } from '@shared/errors/appError';
+import { parseJsonWith, readValidatedSync } from '../runtime/atomicFile';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '../runtime/jsonl';
-import type { AgentRun, TraceEvent } from '@shared/types/agenticTrace';
+import type { AgentRun } from '@shared/types/agenticTrace';
+
+const AgentRunSchema: ZodType<AgentRun> = z
+  .object({
+    runId: z.string(),
+    agentType: z.string(),
+    title: z.string().optional(),
+    userRequest: z.string(),
+    status: z.enum(['pending', 'running', 'succeeded', 'failed', 'cancelled', 'skipped', 'waiting_approval']),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    context: z.record(z.string(), z.unknown()).optional(),
+    profileVersion: z.string().optional(),
+  })
+  .strict();
+
+const TraceEventSchema: ZodType<TraceEvent> = z
+  .object({
+    eventId: z.string(),
+    runId: z.string(),
+    seq: z.number(),
+    timestamp: z.string(),
+    type: z.enum([
+      'node.created',
+      'node.updated',
+      'tool.started',
+      'tool.completed',
+      'tool.failed',
+      'phase.started',
+      'phase.completed',
+      'run.completed',
+      'run.failed',
+      'run.cancelled',
+    ]),
+    payload: z.unknown(),
+    visibility: z.enum(['user', 'debug', 'internal']),
+  })
+  .strict();
+
+const readRun = (file: string): AgentRun | null => readValidatedSync(file, parseJsonWith(AgentRunSchema.parse));
 
 export class TraceRunStore {
   private runsDir: string;
@@ -21,16 +63,15 @@ export class TraceRunStore {
   }
 
   get(runId: string): AgentRun | null {
-    const file = this.runPath(runId);
-    if (!fs.existsSync(file)) return null;
-    return JSON.parse(fs.readFileSync(file, 'utf-8')) as AgentRun;
+    return readRun(this.runPath(runId));
   }
 
   list(): AgentRun[] {
     if (!fs.existsSync(this.runsDir)) return [];
-    return fs.readdirSync(this.runsDir)
+    return fs
+      .readdirSync(this.runsDir)
       .filter((name) => name.endsWith('.json'))
-      .map((name) => JSON.parse(fs.readFileSync(path.join(this.runsDir, name), 'utf-8')) as AgentRun)
+      .flatMap((name) => readRun(path.join(this.runsDir, name)) ?? [])
       .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
   }
 }
@@ -68,7 +109,9 @@ export class TraceEventStore {
       // Detect collision: if disk already has this seq, bump until free.
       let seq = next;
       const existing = new Set(
-        this.getEventsRaw(runId).map((event) => event.seq).filter((value) => Number.isFinite(value)),
+        this.getEventsRaw(runId)
+          .map((event) => event.seq)
+          .filter((value) => Number.isFinite(value)),
       );
       while (existing.has(seq)) {
         seq += 1;
@@ -89,17 +132,12 @@ export class TraceEventStore {
 
   private getEventsRaw(runId: string): TraceEvent[] {
     const filePath = this.eventsPath(runId);
-    const result = readJsonl<TraceEvent>(filePath);
+    const result = readJsonl(filePath, TraceEventSchema.parse);
     assertNoJsonlDiagnostics(filePath, result.diagnostics);
     return result.records;
   }
 
-  append(
-    runId: string,
-    type: TraceEvent['type'],
-    payload: unknown,
-    visibility: TraceEvent['visibility'] = 'user',
-  ): TraceEvent {
+  append(runId: string, type: TraceEvent['type'], payload: unknown): TraceEvent {
     const seq = this.nextSeq(runId);
     const event: TraceEvent = {
       eventId: generateEventId('trace'),
@@ -108,7 +146,7 @@ export class TraceEventStore {
       timestamp: nowIso(),
       type,
       payload,
-      visibility,
+      visibility: 'user',
     };
     appendJsonl(this.eventsPath(runId), event);
     return event;
@@ -121,7 +159,7 @@ export class TraceEventStore {
     const seen = new Set<number>();
     for (const event of events) {
       if (seen.has(event.seq)) {
-        throw new Error(`TRACE_SEQ_CONFLICT: duplicate seq ${event.seq} in run ${runId}`);
+        throw new AppError('TRACE_SEQ_CONFLICT', `duplicate seq ${event.seq} in run ${runId}`);
       }
       seen.add(event.seq);
     }
@@ -140,4 +178,26 @@ export class TraceEventStore {
     writeJsonl(this.eventsPath(runId), events);
     this.seqCounters.set(runId, events.length > 0 ? Math.max(...events.map((e) => e.seq)) : 0);
   }
+}
+
+export type TraceEventType =
+  | 'node.created'
+  | 'node.updated'
+  | 'tool.started'
+  | 'tool.completed'
+  | 'tool.failed'
+  | 'phase.started'
+  | 'phase.completed'
+  | 'run.completed'
+  | 'run.failed'
+  | 'run.cancelled';
+
+export interface TraceEvent {
+  eventId: string;
+  runId: string;
+  seq: number;
+  timestamp: string;
+  type: TraceEventType;
+  payload: unknown;
+  visibility: 'user' | 'debug' | 'internal';
 }

@@ -56,7 +56,6 @@
   padding: 0;
 }
 
-
 .right-rail-empty-state .ui-empty-state-visual {
   justify-content: center;
   width: 100%;
@@ -75,9 +74,7 @@
 .right-rail-tasks,
 .right-rail-artifact-list,
 .right-rail-investigation-list,
-.right-rail-context,
-.right-rail-resource-list,
-.right-rail-capture-panel {
+.right-rail-context {
   display: flex;
   flex-direction: column;
   min-width: 0;

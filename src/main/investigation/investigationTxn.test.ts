@@ -1,9 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SESSION_ARTIFACT_ROOT_DIR } from '@shared/types/sessionArtifact';
-import { InvestigationError } from './investigationErrors';
-import { sha256Prefixed } from './investigationHash';
+import { SESSION_ARTIFACT_ROOT_DIR } from '../sessions/artifacts/sessionArtifactContract';
 import {
   SESSION_B_ID,
   SESSION_ID,
@@ -15,7 +13,9 @@ import {
   reopenInvestigationHarness,
   seedNote,
   writeDraft,
-} from './investigationTestFixtures';
+} from '../testing/investigationTestFixtures';
+import { InvestigationError } from './investigationErrors';
+import { sha256Prefixed } from './investigationHash';
 import {
   INVESTIGATION_PERSIST_BOUNDARIES,
   INVESTIGATION_TXN_COMMIT,
@@ -61,7 +61,9 @@ function assertComplete(sessionPath: string, expected: string[]): void {
     expect(existsSync(recordPath(sessionPath, artifactId))).toBe(true);
   }
   const leftovers = existsSync(txnDir(sessionPath))
-    ? require('node:fs').readdirSync(txnDir(sessionPath)).filter((name: string) => name !== INVESTIGATION_TXN_LOCK)
+    ? require('node:fs')
+        .readdirSync(txnDir(sessionPath))
+        .filter((name: string) => name !== INVESTIGATION_TXN_LOCK)
     : [];
   expect(leftovers).toEqual([]);
 }
@@ -86,21 +88,23 @@ describe('InvestigationArtifactService transactions', () => {
           }
         },
       });
-      expect(() => crashing.service.writeRecord(SESSION_ID, {
-        kind: 'world_state',
-        mission: 'debugger',
-        title: 'pollute',
-        summary: 'txn fault',
-        record: {
-          ...exclusiveWorld('ws-txn', true),
-          replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
-        },
-        supersedes: world.manifest.artifactId,
-      })).toThrow(new RegExp(`fault:${boundary.replace(':', '\\:')}|INVESTIGATION_`));
+      expect(() =>
+        crashing.service.writeRecord(SESSION_ID, {
+          kind: 'world_state',
+          mission: 'debugger',
+          title: 'pollute',
+          summary: 'txn fault',
+          record: {
+            ...exclusiveWorld('ws-txn', true),
+            replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
+          },
+          supersedes: world.manifest.artifactId,
+        }),
+      ).toThrow(new RegExp(`fault:${boundary.replace(':', '\\:')}|INVESTIGATION_`));
       const recovered = reopenInvestigationHarness(seeded.sessionPath);
-      const ids = recovered.service.list(SESSION_ID).map((entry) => (
-        `${entry.artifactId}:${entry.status}:${entry.recordKey}`
-      ));
+      const ids = recovered.service
+        .list(SESSION_ID)
+        .map((entry) => `${entry.artifactId}:${entry.status}:${entry.recordKey}`);
       if (PRE_COMMIT.has(boundary)) {
         expect(ids).toEqual(oldIds);
         expect(recovered.service.readRecord(SESSION_ID, world.manifest.artifactId).manifest.status).toBe('draft');
@@ -158,31 +162,43 @@ describe('InvestigationArtifactService transactions', () => {
       contentHash: sha256Prefixed('{"ok":true}\n'),
       stagingName: '000-content.json',
     };
-    writeFileSync(path.join(root, INVESTIGATION_TXN_JOURNAL), `${JSON.stringify({
-      schemaVersion: 1,
-      txnId: 'invtxn-incomplete',
-      sessionId: SESSION_ID,
-      createdAt: '2026-09-01T00:00:00.000Z',
-      mutations: [],
-    })}\n`, 'utf8');
+    writeFileSync(
+      path.join(root, INVESTIGATION_TXN_JOURNAL),
+      `${JSON.stringify({
+        schemaVersion: 1,
+        txnId: 'invtxn-incomplete',
+        sessionId: SESSION_ID,
+        createdAt: '2026-09-01T00:00:00.000Z',
+        mutations: [],
+      })}\n`,
+      'utf8',
+    );
     const incomplete = reopenInvestigationHarness(sessionPath);
     expect(() => incomplete.service.list(SESSION_ID)).toThrow(/INVESTIGATION_DEGRADED/);
     expect(incomplete.service.listForProjection(SESSION_ID).storeDegraded).toBe(true);
 
-    writeFileSync(path.join(root, INVESTIGATION_TXN_JOURNAL), `${JSON.stringify({
-      schemaVersion: 1,
-      txnId: 'invtxn-journal',
-      sessionId: SESSION_ID,
-      createdAt: '2026-09-01T00:00:00.000Z',
-      mutations: [mutation],
-    })}\n`, 'utf8');
-    writeFileSync(path.join(root, INVESTIGATION_TXN_COMMIT), `${JSON.stringify({
-      schemaVersion: 1,
-      txnId: 'invtxn-other',
-      mutationCount: 1,
-      planHash: sha256Prefixed(JSON.stringify([mutation])),
-      mutations: [mutation],
-    })}\n`, 'utf8');
+    writeFileSync(
+      path.join(root, INVESTIGATION_TXN_JOURNAL),
+      `${JSON.stringify({
+        schemaVersion: 1,
+        txnId: 'invtxn-journal',
+        sessionId: SESSION_ID,
+        createdAt: '2026-09-01T00:00:00.000Z',
+        mutations: [mutation],
+      })}\n`,
+      'utf8',
+    );
+    writeFileSync(
+      path.join(root, INVESTIGATION_TXN_COMMIT),
+      `${JSON.stringify({
+        schemaVersion: 1,
+        txnId: 'invtxn-other',
+        mutationCount: 1,
+        planHash: sha256Prefixed(JSON.stringify([mutation])),
+        mutations: [mutation],
+      })}\n`,
+      'utf8',
+    );
     const mismatched = reopenInvestigationHarness(sessionPath);
     expect(() => mismatched.service.list(SESSION_ID)).toThrow(/INVESTIGATION_DEGRADED/);
     expect(mismatched.service.listForProjection(SESSION_ID)).toMatchObject({
@@ -198,8 +214,9 @@ describe('InvestigationArtifactService transactions', () => {
     expect(existsSync(recordPath(sessionPath, written.manifest.artifactId))).toBe(true);
     const restarted = reopenInvestigationHarness(sessionPath);
     expect(() => restarted.service.list(SESSION_ID)).toThrow(/INVESTIGATION_INDEX_MISSING|INVESTIGATION_DEGRADED/);
-    expect(() => writeDraft(restarted.service, 'world_state', baselineWorld('ws-miss-2')))
-      .toThrow(/INVESTIGATION_INDEX_MISSING|INVESTIGATION_DEGRADED/);
+    expect(() => writeDraft(restarted.service, 'world_state', baselineWorld('ws-miss-2'))).toThrow(
+      /INVESTIGATION_INDEX_MISSING|INVESTIGATION_DEGRADED/,
+    );
   });
 
   it('isolates writes across sessions and rejects duplicate ids inside one session', () => {
@@ -224,35 +241,43 @@ describe('InvestigationArtifactService transactions', () => {
     expect(other.manifest.artifactId).toBe('art-shared');
     expect(service.list(SESSION_ID)).toHaveLength(1);
     expect(service.list(SESSION_B_ID)).toHaveLength(1);
-    expect(() => service.readRecord(SESSION_B_ID, first.manifest.artifactId).record)
-      .not.toThrow();
-    expect(() => service.writeRecord(SESSION_ID, {
-      kind: 'world_state',
-      mission: 'debugger',
-      title: 'dup',
-      summary: 'dup',
-      record: baselineWorld('ws-other'),
-      artifactId: 'art-shared',
-    })).toThrow(/INVESTIGATION_DUPLICATE_ID/);
-    expect(() => service.writeRecord(null, {
-      kind: 'world_state',
-      mission: 'debugger',
-      title: 'denied',
-      summary: 'denied',
-      record: baselineWorld('ws-x'),
-    })).toThrow(InvestigationError);
+    expect(() => service.readRecord(SESSION_B_ID, first.manifest.artifactId).record).not.toThrow();
+    expect(() =>
+      service.writeRecord(SESSION_ID, {
+        kind: 'world_state',
+        mission: 'debugger',
+        title: 'dup',
+        summary: 'dup',
+        record: baselineWorld('ws-other'),
+        artifactId: 'art-shared',
+      }),
+    ).toThrow(/INVESTIGATION_DUPLICATE_ID/);
+    expect(() =>
+      service.writeRecord(null, {
+        kind: 'world_state',
+        mission: 'debugger',
+        title: 'denied',
+        summary: 'denied',
+        record: baselineWorld('ws-x'),
+      }),
+    ).toThrow(InvestigationError);
   });
 
   it('times out when another owner holds the session txn lock', () => {
     const { sessionPath, service } = createInvestigationHarness('rdc-inv-lock-');
     mkdirSync(txnDir(sessionPath), { recursive: true });
-    writeFileSync(path.join(txnDir(sessionPath), INVESTIGATION_TXN_LOCK), JSON.stringify({
-      pid: process.pid,
-      createdAt: Date.now(),
-    }), 'utf8');
+    writeFileSync(
+      path.join(txnDir(sessionPath), INVESTIGATION_TXN_LOCK),
+      JSON.stringify({
+        pid: process.pid,
+        createdAt: Date.now(),
+      }),
+      'utf8',
+    );
     const blocked = reopenInvestigationHarness(sessionPath, { lockMaxAttempts: 2 });
-    expect(() => writeDraft(blocked.service, 'world_state', baselineWorld('ws-lock')))
-      .toThrow(/INVESTIGATION_STORAGE_FAILED|INVESTIGATION_TXN_LOCK_TIMEOUT/);
+    expect(() => writeDraft(blocked.service, 'world_state', baselineWorld('ws-lock'))).toThrow(
+      /INVESTIGATION_STORAGE_FAILED|INVESTIGATION_TXN_LOCK_TIMEOUT/,
+    );
     unlinkSync(path.join(txnDir(sessionPath), INVESTIGATION_TXN_LOCK));
     expect(writeDraft(service, 'world_state', baselineWorld('ws-lock')).manifest.kind).toBe('world_state');
   });
@@ -264,8 +289,9 @@ describe('InvestigationArtifactService transactions', () => {
         if (boundary === 'commit-marker') throw new Error('fault:first-commit');
       },
     });
-    expect(() => writeDraft(crashing.service, 'world_state', baselineWorld('ws-first')))
-      .toThrow(/fault:first-commit|INVESTIGATION_/);
+    expect(() => writeDraft(crashing.service, 'world_state', baselineWorld('ws-first'))).toThrow(
+      /fault:first-commit|INVESTIGATION_/,
+    );
     const recovered = reopenInvestigationHarness(sessionPath);
     expect(recovered.service.list(SESSION_ID)).toHaveLength(1);
     expect(recovered.service.list(SESSION_ID)[0]?.recordKey).toBe('ws-first');
@@ -278,8 +304,9 @@ describe('InvestigationArtifactService transactions', () => {
         if (boundary === 'journal') throw new Error('fault:first-journal');
       },
     });
-    expect(() => writeDraft(crashing.service, 'world_state', baselineWorld('ws-empty')))
-      .toThrow(/fault:first-journal|INVESTIGATION_/);
+    expect(() => writeDraft(crashing.service, 'world_state', baselineWorld('ws-empty'))).toThrow(
+      /fault:first-journal|INVESTIGATION_/,
+    );
     const recovered = reopenInvestigationHarness(sessionPath);
     expect(recovered.service.list(SESSION_ID)).toEqual([]);
   });

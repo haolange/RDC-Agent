@@ -1,95 +1,33 @@
-import { RENDERER_EVENT_CHANNEL as EVENT } from './channels';
+import { isRendererEventChannel } from './channels';
 import type { EventSubscriptionApi } from '../types/electron-api';
-import type { RuntimePermissionState } from '../types/runtimePermission';
-import type { RuntimeLogEntry } from '../types/runtimeLog';
-import type {
-  ContextSnapshot,
-  OpenedCaptureState,
-  ProjectInputRecord,
-  RunContextUsageSummary,
-  SessionScopedPayload,
-} from '../types/session';
-import type { TraceProjectionChangedPayload } from '../types/agenticTrace';
-import type { RendererApiTransport } from './transport';
+import type { RendererEvents } from './rendererEvents';
 
-export function createEventSubscriptionApi(transport: RendererApiTransport): EventSubscriptionApi {
+export function createEventSubscriptionApi(events: RendererEvents): EventSubscriptionApi {
   return {
-    onPlanReviewChanged: (callback) => transport.subscribe(EVENT.conversation.planReviewChanged,
-      payload => callback(payload as Parameters<typeof callback>[0])),
-    onDelegationTraceChanged: (callback) => (
-      transport.subscribe(EVENT.conversation.delegationChanged, (payload) => (
-        callback(payload as { sessionId: string; parentToolCallId: string; revision: number })
-      ))
-    ),
-    onRunStatusChanged: (callback) => (
-      transport.subscribe(EVENT.workflow.runStatusChanged, (data) => callback(data as Parameters<typeof callback>[0]))
-    ),
-    onRunUsageChanged: (callback) => (
-      transport.subscribe(EVENT.workflow.runUsageChanged, (summary) => (
-        callback(summary as SessionScopedPayload<RunContextUsageSummary>)
-      ))
-    ),
-    onTraceProjectionChanged: (callback) => (
-      transport.subscribe(EVENT.workflow.traceProjectionChanged, (payload) => (
-        callback(payload as TraceProjectionChangedPayload)
-      ))
-    ),
-    onProbeBatchChanged: callback => transport.subscribe(EVENT.llm.probeBatchChanged,
-      payload => callback(payload as Parameters<typeof callback>[0])),
-    onEffectiveCatalogChanged: (callback) => (
-      transport.subscribe(EVENT.llm.effectiveCatalogChanged, (snapshot) => (
-        callback(snapshot as Parameters<typeof callback>[0])
-      ))
-    ),
-    onAgentStatusChanged: (callback) => (
-      transport.subscribe(EVENT.agent.statusChanged, (state) => callback(state as Parameters<typeof callback>[0]))
-    ),
-    onToolExecutionComplete: (callback) => (
-      transport.subscribe(EVENT.tools.executionComplete, (trace) => callback(trace))
-    ),
-    onEvidenceEventAdded: (callback) => (
-      transport.subscribe(EVENT.tools.evidenceAdded, (event) => callback(event as Parameters<typeof callback>[0]))
-    ),
-    onDeviceStatusChanged: (callback) => (
-      transport.subscribe(EVENT.workbench.deviceStatusChanged, (status) => (
-        callback(status as Parameters<typeof callback>[0])
-      ))
-    ),
-    onCaptureStatusChanged: (callback) => (
-      transport.subscribe(EVENT.workbench.captureStatusChanged, (status) => (
-        callback(status as SessionScopedPayload<unknown>)
-      ))
-    ),
-    onContextChanged: (callback) => (
-      transport.subscribe(EVENT.workbench.contextChanged, (snapshot) => (
-        callback(snapshot as SessionScopedPayload<ContextSnapshot | null>)
-      ))
-    ),
-    onProjectInputsChanged: (callback) => (
-      transport.subscribe(EVENT.workbench.projectInputsChanged, (payload) => (
-        callback(payload as { projectId: string; inputs: ProjectInputRecord[] })
-      ))
-    ),
-    onProjectInputsError: (callback) => transport.subscribe(EVENT.workbench.projectInputsError,
-      payload => callback(payload as { projectId: string; error: string })),
-    onCaptureReplayChanged: (callback) => transport.subscribe(EVENT.workbench.captureReplayChanged, payload => callback(payload as import('../types/captureReplay').CaptureReplayState)),
-    onOpenedCaptureStateChanged: (callback) => (
-      transport.subscribe(EVENT.workbench.openedCaptureStateChanged, (payload) => (
-        callback(payload as SessionScopedPayload<OpenedCaptureState | null>)
-      ))
-    ),
-    onPermissionStateChanged: (callback) => (
-      transport.subscribe(EVENT.runtime.permissionStateChanged, (state) => callback(state as RuntimePermissionState))
-    ),
-    onRuntimeLogAppended: (callback) => (
-      transport.subscribe(EVENT.runtime.logAppended, (entry) => callback(entry as RuntimeLogEntry))
-    ),
-    onAppThemeChanged: (callback) => (
-      transport.subscribe(EVENT.shell.themeChanged, (theme) => callback(theme as Parameters<typeof callback>[0]))
-    ),
+    onPlanReviewChanged: (callback) => events.subscribe('plan:reviewChanged', callback),
+    onSessionRecordChanged: (callback) => events.subscribe('session:recordChanged', callback),
+    onDelegationTraceChanged: (callback) => events.subscribe('conversation:delegationChanged', callback),
+    onRunStatusChanged: (callback) => events.subscribe('workflow:runStatusChanged', callback),
+    onRunUsageChanged: (callback) => events.subscribe('workflow:runUsageChanged', callback),
+    onTraceProjectionChanged: (callback) => events.subscribe('trace:projectionChanged', callback),
+    onProbeBatchChanged: (callback) => events.subscribe('llm:probeBatchChanged', callback),
+    onKnowledgeProgress: (callback) => events.subscribe('knowledge:progress', callback),
+    onEffectiveCatalogChanged: (callback) => events.subscribe('llm:effectiveCatalogChanged', callback),
+    onToolExecutionComplete: (callback) => events.subscribe('tool:executionComplete', callback),
+    onEvidenceEventAdded: (callback) => events.subscribe('evidence:eventAdded', callback),
+    onDeviceStatusChanged: (callback) => events.subscribe('device:statusChanged', callback),
+    onCaptureStatusChanged: (callback) => events.subscribe('capture:statusChanged', callback),
+    onContextChanged: (callback) => events.subscribe('context:changed', callback),
+    onProjectInputsChanged: (callback) => events.subscribe('project:inputsChanged', callback),
+    onProjectInputsError: (callback) => events.subscribe('project:inputsError', callback),
+    onCaptureReplayChanged: (callback) => events.subscribe('capture:replayChanged', callback),
+    onOpenedCaptureStateChanged: (callback) => events.subscribe('capture:openedStateChanged', callback),
+    onPermissionStateChanged: (callback) => events.subscribe('runtime:permissionStateChanged', callback),
+    onRuntimeLogAppended: (callback) => events.subscribe('runtime:logAppended', callback),
+    onSettingsChanged: (callback) => events.subscribe('settings:changed', callback),
+    onAppThemeChanged: (callback) => events.subscribe('app:themeChanged', callback),
     removeAllListeners: (channel) => {
-      const candidate = channel as Parameters<RendererApiTransport['removeAllListeners']>[0];
-      transport.removeAllListeners(candidate);
+      if (isRendererEventChannel(channel)) events.removeAll(channel);
     },
   };
 }

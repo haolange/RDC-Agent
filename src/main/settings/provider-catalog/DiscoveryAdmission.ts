@@ -1,4 +1,4 @@
-import type { DiscoveryAdmission } from '@shared/types/providerCapability';
+import type { DiscoveryAdmission } from './providerCatalogTypes';
 
 const DEFAULT_DENY_PATTERNS = [
   '*embedding*',
@@ -25,8 +25,18 @@ const DEFAULT_DENY_PATTERNS = [
 ];
 
 const NON_AGENT_MODALITIES = new Set([
-  'audio', 'embedding', 'embeddings', 'image', 'moderation', 'rerank', 'reranker',
-  'music', 'speech', 'transcription', 'tts', 'video',
+  'audio',
+  'embedding',
+  'embeddings',
+  'image',
+  'moderation',
+  'rerank',
+  'reranker',
+  'music',
+  'speech',
+  'transcription',
+  'tts',
+  'video',
 ]);
 
 export interface DiscoveryAdmissionDecision {
@@ -40,7 +50,10 @@ export interface DiscoveredModelIdentity {
 }
 
 export function normalizeDiscoveredModelMatchKey(modelId: string): string {
-  return modelId.trim().toLowerCase().replace(/[._\-\s]+/gu, '');
+  return modelId
+    .trim()
+    .toLowerCase()
+    .replace(/[._\-\s]+/gu, '');
 }
 
 function readString(record: Record<string, unknown>, ...keys: string[]): string | undefined {
@@ -56,11 +69,8 @@ function globMatches(value: string, pattern: string): boolean {
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
     .replace(/\*/g, '.*')
     .replace(/\?/g, '.');
-  try {
-    return new RegExp(`^${escaped}$`, 'i').test(value);
-  } catch {
-    return false;
-  }
+  // Every regex metacharacter but * and ? is escaped above, so the pattern always compiles.
+  return new RegExp(`^${escaped}$`, 'i').test(value);
 }
 
 export function extractDiscoveredModelId(value: unknown): string {
@@ -102,15 +112,18 @@ export function evaluateDiscoveryAdmission(
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     const record = value as Record<string, unknown>;
     const modality = readString(record, 'modality')?.toLowerCase();
-    const capabilities = record.capabilities && typeof record.capabilities === 'object' && !Array.isArray(record.capabilities)
-      ? record.capabilities as Record<string, unknown>
-      : {};
+    const capabilities =
+      record.capabilities && typeof record.capabilities === 'object' && !Array.isArray(record.capabilities)
+        ? (record.capabilities as Record<string, unknown>)
+        : {};
     const declaredKinds = [
       modality,
       readString(record, 'type', 'kind')?.toLowerCase(),
       readString(capabilities, 'type', 'modality')?.toLowerCase(),
       ...(Array.isArray(record.output_modalities)
-        ? record.output_modalities.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.toLowerCase())
+        ? record.output_modalities
+            .filter((entry): entry is string => typeof entry === 'string')
+            .map((entry) => entry.toLowerCase())
         : []),
     ].filter((entry): entry is string => Boolean(entry));
     if (declaredKinds.some((entry) => NON_AGENT_MODALITIES.has(entry))) {

@@ -5,8 +5,8 @@ import { IconButton } from '../../../../ui/IconButton';
 import { Chevron } from '../../../../ui/Chevron';
 import { Popover } from '../../../../ui/Popover';
 import { useDynStyle } from '../../../../lib/useDynStyle';
+import { useI18n } from '../../../../i18n';
 import type { ThemeVariant } from '@shared/types/settings';
-import type { AppearanceTranslate } from './appearanceChromeModel';
 
 /**
  * Engine-guaranteed generic families only. The app never enumerates installed
@@ -21,7 +21,6 @@ interface AppearanceFontFieldProps {
   variant: ThemeVariant;
   value: string | null;
   onChange: (value: string | null) => void;
-  t: AppearanceTranslate;
 }
 
 interface FontOptionProps {
@@ -45,7 +44,9 @@ function FontOption({ family, selected, sample, label, onSelect }: FontOptionPro
     >
       <span className="appearance-font-option-mark" aria-hidden="true" />
       <span className="appearance-font-option-copy">
-        <span className="appearance-font-option-sample" {...style}>{sample}</span>
+        <span className="appearance-font-option-sample" {...style}>
+          {sample}
+        </span>
         <span className="appearance-font-option-name">{label}</span>
       </span>
     </Button>
@@ -57,12 +58,15 @@ function FontPreview({ family, sample, title }: { family: string; sample: string
   return (
     <div className="appearance-font-preview">
       <div className="appearance-font-preview-title">{title}</div>
-      <div className="appearance-font-option-sample appearance-font-preview-sample" {...style}>{sample}</div>
+      <div className="appearance-font-option-sample appearance-font-preview-sample" {...style}>
+        {sample}
+      </div>
     </div>
   );
 }
 
-export function AppearanceFontField({ kind, variant, value, onChange, t }: AppearanceFontFieldProps) {
+export function AppearanceFontField({ kind, variant, value, onChange }: AppearanceFontFieldProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
   const label = kind === 'ui' ? t('settings.appearanceUiFont') : t('settings.appearanceCodeFont');
@@ -78,7 +82,9 @@ export function AppearanceFontField({ kind, variant, value, onChange, t }: Appea
 
   return (
     <div className="appearance-text-field">
-      <span className="settings-field-label" id={`appearance-font-${kind}-${variant}`}>{label}</span>
+      <span className="settings-field-label" id={`appearance-font-${kind}-${variant}`}>
+        {label}
+      </span>
       <div className="appearance-font-control">
         <Input
           value={draft ?? value ?? ''}
@@ -98,7 +104,7 @@ export function AppearanceFontField({ kind, variant, value, onChange, t }: Appea
           onOpenChange={setOpen}
           align="end"
           className="appearance-font-popover"
-          trigger={(
+          trigger={
             <IconButton
               label={t('settings.appearanceFontSuggestions')}
               size="sm"
@@ -106,7 +112,7 @@ export function AppearanceFontField({ kind, variant, value, onChange, t }: Appea
             >
               <Chevron direction="down" />
             </IconButton>
-          )}
+          }
         >
           <div className="appearance-font-popover-head">
             <div className="appearance-font-popover-title">{t('settings.appearanceFontSuggestions')}</div>

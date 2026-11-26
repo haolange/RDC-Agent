@@ -48,7 +48,8 @@
     color var(--transition-fast);
 }
 
-.ui-check-pill:hover:not(:disabled) .ui-check-pill-box {
+.ui-check-pill:hover:not(:disabled) .ui-check-pill-box,
+.ui-check-pill:focus-visible .ui-check-pill-box {
   border-color: var(--token-border-strong);
 }
 

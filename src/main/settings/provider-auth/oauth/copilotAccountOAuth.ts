@@ -5,7 +5,7 @@ import { isAdmittedDiscoveredModel } from '../../provider-catalog/DiscoveryAdmis
 import { getProviderModelDefinitions } from '../../../provider-catalog/ProviderCatalogRegistry';
 import { accountDefaultRoute } from './accountRoute';
 import { GITHUB_COPILOT_CLIENT_ID } from './oauthConstants';
-import { fetchJson, isTestMode, wait } from './oauthHttp';
+import { fetchJson, wait } from './oauthHttp';
 import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
 import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
 import type { LlmProviderId, LlmProviderModel } from '@shared/types/settings';
@@ -19,11 +19,17 @@ export async function startGitHubCopilotLogin(
   onComplete: (bundle: OAuthSecretBundle) => Promise<void>,
   onError: (flow: OAuthFlowState, message: string) => void,
 ): Promise<OAuthFlowState> {
-  const payload = await fetchJson('https://github.com/login/device/code', {
+  const payload = (await fetchJson('https://github.com/login/device/code', {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ client_id: GITHUB_COPILOT_CLIENT_ID, scope: 'read:user' }),
-  }) as { device_code?: string; user_code?: string; verification_uri?: string; expires_in?: number; interval?: number };
+  })) as {
+    device_code?: string;
+    user_code?: string;
+    verification_uri?: string;
+    expires_in?: number;
+    interval?: number;
+  };
   const flow: OAuthFlowState = {
     providerId,
     flowId: randomUUID(),
@@ -36,21 +42,21 @@ export async function startGitHubCopilotLogin(
   };
   setFlow(flow);
   if (flow.verificationUri) void openExternal(flow.verificationUri);
-  void pollGitHubDevice(flow).then(onComplete).catch((error) => {
-    onError(flow, error instanceof Error ? error.message : String(error));
-  });
+  void pollGitHubDevice(flow)
+    .then(onComplete)
+    .catch((error) => {
+      onError(flow, error instanceof Error ? error.message : String(error));
+    });
   return flow;
 }
 
 async function pollGitHubDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
   if (!flow.deviceCode) throw new Error('GitHub device code is missing.');
   let intervalSeconds = flow.intervalSeconds ?? 5;
-  let delayBeforePoll = !isTestMode();
   for (;;) {
     if (Date.now() > flow.expiresAt) throw new Error('GitHub authorization code expired.');
-    if (delayBeforePoll) await wait(intervalSeconds * 1000);
-    delayBeforePoll = true;
-    const payload = await fetchJson('https://github.com/login/oauth/access_token', {
+    await wait(intervalSeconds * 1000);
+    const payload = (await fetchJson('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -58,15 +64,26 @@ async function pollGitHubDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle
         device_code: flow.deviceCode,
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
       }),
-    }) as { access_token?: string; error?: string; interval?: number };
-    if (payload.error === 'authorization_pending') { delete flow.error; continue; }
-    if (payload.error === 'slow_down') { delete flow.error; intervalSeconds += 5; continue; }
+    })) as { access_token?: string; error?: string; interval?: number };
+    if (payload.error === 'authorization_pending') {
+      delete flow.error;
+      continue;
+    }
+    if (payload.error === 'slow_down') {
+      delete flow.error;
+      intervalSeconds += 5;
+      continue;
+    }
     if (payload.error) throw new Error(payload.error);
     if (!payload.access_token) throw new Error('GitHub OAuth did not return an access token.');
-    const copilot = await fetchJson('https://api.github.com/copilot_internal/v2/token', {
+    const copilot = (await fetchJson('https://api.github.com/copilot_internal/v2/token', {
       method: 'GET',
-      headers: { Accept: 'application/json', Authorization: `token ${payload.access_token}`, ...COPILOT_EDITOR_HEADERS },
-    }) as { token?: string; expires_at?: number; endpoints?: { api?: string } };
+      headers: {
+        Accept: 'application/json',
+        Authorization: `token ${payload.access_token}`,
+        ...COPILOT_EDITOR_HEADERS,
+      },
+    })) as { token?: string; expires_at?: number; endpoints?: { api?: string } };
     if (!copilot.token) throw new Error('GitHub Copilot did not return an API token.');
     return {
       providerId: flow.providerId,
@@ -81,10 +98,10 @@ async function pollGitHubDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle
 
 export async function refreshCopilotBundle(bundle: OAuthSecretBundle): Promise<OAuthSecretBundle> {
   if (!bundle.accessToken) throw new Error('GitHub Copilot account access token is missing. Sign in again.');
-  const copilot = await fetchJson('https://api.github.com/copilot_internal/v2/token', {
+  const copilot = (await fetchJson('https://api.github.com/copilot_internal/v2/token', {
     method: 'GET',
     headers: { Accept: 'application/json', Authorization: `token ${bundle.accessToken}`, ...COPILOT_EDITOR_HEADERS },
-  }) as { token?: string; expires_at?: number; endpoints?: { api?: string } };
+  })) as { token?: string; expires_at?: number; endpoints?: { api?: string } };
   if (!copilot.token) throw new Error('GitHub Copilot did not return an API token.');
   return {
     ...bundle,
@@ -94,7 +111,9 @@ export async function refreshCopilotBundle(bundle: OAuthSecretBundle): Promise<O
   };
 }
 
-export async function discoverCopilotCatalog(bundle: OAuthSecretBundle): Promise<{ models: LlmProviderModel[]; contributions?: CatalogModelContribution[] }> {
+export async function discoverCopilotCatalog(
+  bundle: OAuthSecretBundle,
+): Promise<{ models: LlmProviderModel[]; contributions?: CatalogModelContribution[] }> {
   if (!bundle.copilotToken) throw new Error('GitHub Copilot API token is missing.');
   const route = accountDefaultRoute(bundle.providerId);
   const baseUrl = (bundle.copilotApiBaseUrl ?? route.baseUrl).replace(/\/+$/, '');
@@ -103,9 +122,11 @@ export async function discoverCopilotCatalog(bundle: OAuthSecretBundle): Promise
     headers: { Accept: 'application/json', Authorization: `Bearer ${bundle.copilotToken}`, ...route.headers },
   });
   const parsed = parseCopilotModelCatalog(payload, baseUrl);
-  const internalModelIds = new Set(getProviderModelDefinitions(bundle.providerId)
-    .filter((model) => model.selection.pickerVisibility === 'internal')
-    .map((model) => model.modelId));
+  const internalModelIds = new Set(
+    getProviderModelDefinitions(bundle.providerId)
+      .filter((model) => model.selection.pickerVisibility === 'internal')
+      .map((model) => model.modelId),
+  );
   const allModels = parsed.models.filter((model) => isAgentRoutableAccountModel(model.id));
   const models = allModels.filter((model) => !internalModelIds.has(model.id));
   if (models.length === 0) {

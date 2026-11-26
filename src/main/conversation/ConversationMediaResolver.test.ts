@@ -13,7 +13,8 @@ function fixture(): { scope: ConversationMediaScope; project: string; outside: s
   const project = path.join(base, 'project');
   const attachments = path.join(base, 'attachments');
   const artifacts = path.join(base, 'artifacts');
-  for (const dir of [project, attachments, artifacts, path.join(project, 'docs')]) fs.mkdirSync(dir, { recursive: true });
+  for (const dir of [project, attachments, artifacts, path.join(project, 'docs')])
+    fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(project, 'docs', 'frame.png'), PNG);
   fs.writeFileSync(path.join(project, 'notes.txt'), 'text');
   fs.writeFileSync(path.join(project, 'fake.png'), 'not an image');
@@ -55,11 +56,25 @@ describe('resolveConversationMedia', () => {
     const second = path.join(scope.attachmentsRoot, 'shot-2.png');
     const secondBytes = Buffer.concat([PNG, Buffer.from([1])]);
     fs.writeFileSync(second, secondBytes);
-    const withDuplicateName = { ...scope, attachments: [...scope.attachments, { fileName: 'shot.png', filePath: second }] };
-    expect(resolveConversationMedia('a1-shot.png', withDuplicateName)).toEqual({ kind: 'image', dataUrl: `data:image/png;base64,${PNG.toString('base64')}` });
-    expect(resolveConversationMedia('shot-2.png', withDuplicateName)).toEqual({ kind: 'image', dataUrl: `data:image/png;base64,${secondBytes.toString('base64')}` });
-    expect(resolveConversationMedia(second, withDuplicateName)).toEqual(resolveConversationMedia('shot-2.png', withDuplicateName));
-    expect(resolveConversationMedia('shot.png', withDuplicateName)).toEqual({ dataUrl: null, error: 'MEDIA_NOT_FOUND' });
+    const withDuplicateName = {
+      ...scope,
+      attachments: [...scope.attachments, { fileName: 'shot.png', filePath: second }],
+    };
+    expect(resolveConversationMedia('a1-shot.png', withDuplicateName)).toEqual({
+      kind: 'image',
+      dataUrl: `data:image/png;base64,${PNG.toString('base64')}`,
+    });
+    expect(resolveConversationMedia('shot-2.png', withDuplicateName)).toEqual({
+      kind: 'image',
+      dataUrl: `data:image/png;base64,${secondBytes.toString('base64')}`,
+    });
+    expect(resolveConversationMedia(second, withDuplicateName)).toEqual(
+      resolveConversationMedia('shot-2.png', withDuplicateName),
+    );
+    expect(resolveConversationMedia('shot.png', withDuplicateName)).toEqual({
+      dataUrl: null,
+      error: 'MEDIA_NOT_FOUND',
+    });
   });
 
   it('refuses anything outside the three roots, other schemes, and bytes that do not match an allowed type', () => {
@@ -68,8 +83,14 @@ describe('resolveConversationMedia', () => {
     expect(resolveConversationMedia('../outside.png', scope)).toEqual({ dataUrl: null, error: 'MEDIA_SCOPE_DENIED' });
     expect(resolveConversationMedia(outside, scope)).toEqual({ dataUrl: null, error: 'MEDIA_SCOPE_DENIED' });
     expect(resolveConversationMedia('link.png', scope)).toEqual({ dataUrl: null, error: 'MEDIA_SCOPE_DENIED' });
-    expect(resolveConversationMedia('file:///etc/passwd', scope)).toEqual({ dataUrl: null, error: 'MEDIA_SCOPE_DENIED' });
-    expect(resolveConversationMedia('session://outputs/../../x.png', scope)).toEqual({ dataUrl: null, error: 'MEDIA_SCOPE_DENIED' });
+    expect(resolveConversationMedia('file:///etc/passwd', scope)).toEqual({
+      dataUrl: null,
+      error: 'MEDIA_SCOPE_DENIED',
+    });
+    expect(resolveConversationMedia('session://outputs/../../x.png', scope)).toEqual({
+      dataUrl: null,
+      error: 'MEDIA_SCOPE_DENIED',
+    });
     expect(resolveConversationMedia('notes.txt', scope)).toEqual({ dataUrl: null, error: 'MEDIA_TYPE_DENIED' });
     expect(resolveConversationMedia('fake.png', scope)).toEqual({ dataUrl: null, error: 'MEDIA_TYPE_DENIED' });
     expect(resolveConversationMedia('missing.png', scope)).toEqual({ dataUrl: null, error: 'MEDIA_NOT_FOUND' });

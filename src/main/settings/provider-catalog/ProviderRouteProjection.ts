@@ -1,11 +1,6 @@
-import type {
-  CatalogLayerContribution,
-  CatalogModelContribution,
-} from './effectiveCatalogTypes';
-import type {
-  CatalogModelRoute,
-  ProviderProtocolOverride,
-} from '@shared/types/providerCapability';
+import type { CatalogLayerContribution, CatalogModelContribution } from './effectiveCatalogTypes';
+import type { CatalogModelRoute } from '@shared/types/providerCapability';
+import type { ProviderProtocolOverride } from './providerCatalogTypes';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 
 export function resolveModelRoutePrecedence(input: {
@@ -31,10 +26,10 @@ export function projectModelProtocolOverlays(
   observedAt: string,
 ): CatalogLayerContribution | undefined {
   const models = overlays
-    .filter((overlay) => (
-      !overlay.protocol
-      || overlay.protocol === (preferredProtocols.get(overlay.modelId) ?? defaultProtocol)
-    ))
+    .filter(
+      (overlay) =>
+        !overlay.protocol || overlay.protocol === (preferredProtocols.get(overlay.modelId) ?? defaultProtocol),
+    )
     .map((overlay) => ({ modelId: overlay.modelId, ...overlay.patch })) as CatalogModelContribution[];
   return models.length > 0
     ? {

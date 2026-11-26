@@ -1,4 +1,5 @@
 export const enOnboarding = {
+  'setup.reopen': 'Setup guide',
   'setup.title': 'Get set up · {done} of {total} done',
   'setup.rdcTool.title': 'Configure the RDC tool',
   'setup.rdcTool.body': 'Point the app at the RenderDoc replay component so the agent can open captures.',

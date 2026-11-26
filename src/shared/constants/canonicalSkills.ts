@@ -41,10 +41,7 @@ export const MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS = [
   'renderdoc-glossary',
 ] as const;
 
-export const CANONICAL_SKILL_IDS = [
-  ...MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS,
-  ...GENERAL_SKILL_IDS,
-] as const;
+export const CANONICAL_SKILL_IDS = [...MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS, ...GENERAL_SKILL_IDS] as const;
 
 export type CanonicalSkillId = (typeof CANONICAL_SKILL_IDS)[number];
 export type SkillCallEntry = 'agent.md-skills' | 'task-matched-or-explicit';
@@ -67,16 +64,7 @@ export const SKILL_ARMED_BY_PROFILE: Record<string, readonly string[]> = {
 
 const ARMED_SKILL_IDS = new Set(Object.values(SKILL_ARMED_BY_PROFILE).flat());
 
-export const FORBIDDEN_SKILL_NAMES = [
-  'ask',
-  'plan',
-  'edit',
-  'bash',
-  'todo',
-  'harness',
-  'classic',
-  'legacy',
-] as const;
+export const FORBIDDEN_SKILL_NAMES = ['ask', 'plan', 'edit', 'bash', 'todo', 'harness', 'classic', 'legacy'] as const;
 
 export function skillCallEntry(id: string): SkillCallEntry {
   return ARMED_SKILL_IDS.has(id) ? 'agent.md-skills' : 'task-matched-or-explicit';

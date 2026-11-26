@@ -3,9 +3,7 @@ import { ConversationTurnControlsSchema } from './conversationSchemas';
 import { ipcId, ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 import { FilePathArraySchema, OptionalProjectIdArgsSchema, ProjectIdArgsSchema } from './commonIpcSchemas';
 
-export const ProjectAddArgsSchema = z.tuple([
-  ipcNonEmptyString(4096, 'rootPath'),
-]);
+export const ProjectAddArgsSchema = z.tuple([ipcNonEmptyString(4096, 'rootPath')]);
 
 export const ProjectSelectArgsSchema = ProjectIdArgsSchema;
 export const ProjectRemoveArgsSchema = ProjectIdArgsSchema;
@@ -14,17 +12,15 @@ export const ProjectInputsRefreshArgsSchema = ProjectIdArgsSchema;
 export const ProjectInputsImportArgsSchema = ProjectIdArgsSchema;
 export const ProjectInputReferenceArgsSchema = z.tuple([ipcId(128, 'projectId'), ipcNonEmptyString(4096, 'filePath')]);
 export const ProjectInputPrepareRemoveArgsSchema = z.tuple([ipcId(128, 'projectId'), ipcId(256, 'inputId')]);
-export const ProjectInputRemoveArgsSchema = z.tuple([ipcId(128, 'projectId'), ipcId(256, 'inputId'), ipcNonEmptyString(512, 'approvalToken')]);
-
-export const ProjectRenameArgsSchema = z.tuple([
+export const ProjectInputRemoveArgsSchema = z.tuple([
   ipcId(128, 'projectId'),
-  ipcNonEmptyString(200, 'newName'),
+  ipcId(256, 'inputId'),
+  ipcNonEmptyString(512, 'approvalToken'),
 ]);
 
-export const ProjectInputsImportPathsArgsSchema = z.tuple([
-  ipcId(128, 'projectId'),
-  FilePathArraySchema,
-]);
+export const ProjectRenameArgsSchema = z.tuple([ipcId(128, 'projectId'), ipcNonEmptyString(200, 'newName')]);
+
+export const ProjectInputsImportPathsArgsSchema = z.tuple([ipcId(128, 'projectId'), FilePathArraySchema]);
 
 export const SessionListArgsSchema = OptionalProjectIdArgsSchema;
 
@@ -32,40 +28,50 @@ export const SessionCreateArgsSchema = z.tuple([
   ipcId(128, 'projectId'),
   // JSON bridge payloads serialize an omitted optional positional argument as
   // null. Normalize that transport representation at the IPC boundary.
-  ipcString(200, 'title').nullable().optional().transform((title) => title ?? undefined),
+  ipcString(200, 'title')
+    .nullable()
+    .optional()
+    .transform((title) => title ?? undefined),
 ]);
 
+/** The title is stored trimmed; a blank one is a validation failure. */
 export const SessionRenameArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),
-  ipcNonEmptyString(200, 'title'),
+  ipcString(200, 'title').trim().min(1, 'title is required'),
 ]);
 
-export const SessionIdOnlyArgsSchema = z.tuple([
-  ipcId(128, 'sessionId'),
-]);
+export const SessionIdOnlyArgsSchema = z.tuple([ipcId(128, 'sessionId')]);
 
+/** One intent on the session's model lanes: the fields it sets, with its client revision (see SessionModelLanes). */
 export const SessionSetModelOverrideArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),
-  z.object({
-    providerId: ipcNonEmptyString(128, 'providerId'),
-    modelId: ipcNonEmptyString(256, 'modelId'),
-  }).nullable(),
-  ConversationTurnControlsSchema.optional(),
+  z
+    .object({
+      modelOverride: z
+        .object({
+          providerId: ipcNonEmptyString(128, 'providerId'),
+          modelId: ipcNonEmptyString(256, 'modelId'),
+        })
+        .nullable()
+        .optional(),
+      turnControls: ConversationTurnControlsSchema.optional(),
+      clientRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    })
+    .strict()
+    .refine(
+      (request) => request.modelOverride !== undefined || request.turnControls !== undefined,
+      'set at least the model override or the turn controls',
+    ),
 ]);
 
-export const SessionSetAgentIdArgsSchema = z.tuple([
-  ipcId(128, 'sessionId'),
-  ipcNonEmptyString(128, 'agentId'),
-]);
+export const SessionSetAgentIdArgsSchema = z.tuple([ipcId(128, 'sessionId'), ipcNonEmptyString(128, 'agentId')]);
 
 export const SessionApplyDeclaredHandoffArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),
   ipcNonEmptyString(128, 'agent'),
   ipcNonEmptyString(200, 'label'),
-  z.string().regex(/^[a-f0-9]{64}$/).optional(),
-]);
-
-
-export const RunListArgsSchema = z.tuple([
-  ipcId(128, 'sessionId'),
+  z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
 ]);

@@ -3,14 +3,12 @@ import {
   normalizeAskUserAnswers,
   normalizeAskUserQuestions,
 } from '@shared/utils/askUser';
+import { AppError } from '@shared/errors/appError';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from './DelegatedInteractionOwner';
 import type { AgentRole } from '@shared/types/agent';
-import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
-import type {
-  ConversationAskUserAnswer,
-  ConversationAskUserQuestion,
-} from '@shared/types/conversation';
+import type { AgentApprovalEventPayload, AgentEvent } from '@shared/types/agentRuntime';
+import type { ConversationAskUserAnswer, ConversationAskUserQuestion } from '@shared/types/conversation';
 
 interface PendingUserInputRequest {
   delegatedOwner?: DelegatedInteractionOwner;
@@ -21,7 +19,7 @@ interface PendingUserInputRequest {
   approvalId: string;
   questions: ConversationAskUserQuestion[];
   context: AgentEventBridgeContext;
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   resolve: (answer: string) => void;
   reject: (error: Error) => void;
   abortListener?: () => void;
@@ -35,7 +33,7 @@ export interface AgentUserInputRequestInput {
   toolCallId: string;
   questions: ConversationAskUserQuestion[];
   context: AgentEventBridgeContext;
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   signal?: AbortSignal;
 }
 
@@ -46,10 +44,8 @@ export interface AgentUserInputAnswerInput {
   answers: ConversationAskUserAnswer[];
 }
 
-export interface AgentUserInputAnswerResult {
-  success: boolean;
-  error?: string;
-}
+const invalidAnswer = (questionId: string, detail: string) =>
+  new AppError('USER_INPUT_ANSWER_INVALID', detail, { params: { questionId } });
 
 const keyFor = (turnId: string, toolCallId: string): string => `${turnId}::${toolCallId}`;
 
@@ -120,43 +116,51 @@ export class AgentUserInputRequestService {
     return !!pending && (pending.delegatedOwner?.ownerSessionId ?? pending.sessionId) === sessionId;
   }
 
-  answer(input: AgentUserInputAnswerInput): AgentUserInputAnswerResult {
+  /** Resolves the pending request with the answers; a rejected answer names its question in the error's params. */
+  answer(input: AgentUserInputAnswerInput): void {
     const pending = this.pending.get(keyFor(input.turnId, input.toolCallId));
     if (!pending) {
-      return { success: false, error: 'No pending user input request was found for this turn.' };
+      throw new AppError('USER_INPUT_REQUEST_NOT_FOUND', `${input.turnId}/${input.toolCallId}`);
     }
     if ((input.sessionId ?? null) !== (pending.delegatedOwner?.ownerSessionId ?? pending.sessionId)) {
-      return { success: false, error: 'Pending user input request belongs to a different session.' };
+      throw new AppError('SESSION_OWNER_DENIED', 'pending user input request belongs to a different session.');
     }
 
     const answers = normalizeAskUserAnswers(pending.questions, { answers: input.answers });
     const answerByQuestionId = new Map(answers.map((answer) => [answer.questionId, answer]));
     const missingQuestion = pending.questions.find((question) => !answerByQuestionId.has(question.questionId));
     if (missingQuestion) {
-      return {
-        success: false,
-        error: `Answer cannot be empty for question ${missingQuestion.questionId}: ${missingQuestion.prompt}`,
-      };
+      throw invalidAnswer(
+        missingQuestion.questionId,
+        `Answer cannot be empty for question ${missingQuestion.questionId}: ${missingQuestion.prompt}`,
+      );
     }
 
     for (const question of pending.questions) {
       const answer = answerByQuestionId.get(question.questionId);
       if (!answer) continue;
       if (answer.responseKind === 'skipped' && question.required !== false) {
-        return { success: false, error: `Question ${question.questionId} is required; answer or choose unknown.` };
+        throw invalidAnswer(
+          question.questionId,
+          `Question ${question.questionId} is required; answer or choose unknown.`,
+        );
       }
       if (answer.responseKind === 'unknown' || answer.responseKind === 'skipped') {
-        if (answer.selectedOptionId) return { success: false, error: 'An unknown or skipped answer cannot select a proposed explanation.' };
+        if (answer.selectedOptionId)
+          throw invalidAnswer(
+            question.questionId,
+            'An unknown or skipped answer cannot select a proposed explanation.',
+          );
         continue;
       }
       if (!question.allowFreeform && !answer.selectedOptionId) {
-        return { success: false, error: `Question ${question.questionId} requires one of the provided options.` };
+        throw invalidAnswer(
+          question.questionId,
+          `Question ${question.questionId} requires one of the provided options.`,
+        );
       }
-      if (
-        answer.selectedOptionId
-        && !question.options.some((option) => option.optionId === answer.selectedOptionId)
-      ) {
-        return { success: false, error: `Unknown option selected for question ${question.questionId}.` };
+      if (answer.selectedOptionId && !question.options.some((option) => option.optionId === answer.selectedOptionId)) {
+        throw invalidAnswer(question.questionId, `Unknown option selected for question ${question.questionId}.`);
       }
     }
 
@@ -174,7 +178,6 @@ export class AgentUserInputRequestService {
       answers: orderedAnswers,
     });
     pending.resolve(formattedAnswer);
-    return { success: true };
   }
 
   cancelTurn(turnId?: string): void {
@@ -216,7 +219,22 @@ export class AgentUserInputRequestService {
     payload: AgentApprovalEventPayload,
   ): void {
     const owner = pending.delegatedOwner;
-    pending.onEvent?.(buildSharedAgentEvent(type, owner ? { ...payload, delegatedRequest: { executionId: owner.executionId, childSessionId: owner.childSessionId, turnId: pending.turnId } } : payload, owner ? { ...pending.context, sessionId: owner.ownerSessionId } : pending.context));
+    pending.onEvent?.(
+      buildSharedAgentEvent(
+        type,
+        owner
+          ? {
+              ...payload,
+              delegatedRequest: {
+                executionId: owner.executionId,
+                childSessionId: owner.childSessionId,
+                turnId: pending.turnId,
+              },
+            }
+          : payload,
+        owner ? { ...pending.context, sessionId: owner.ownerSessionId } : pending.context,
+      ),
+    );
   }
 }
 

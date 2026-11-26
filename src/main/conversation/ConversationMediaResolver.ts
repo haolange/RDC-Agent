@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { isSessionArtifactUri } from '@shared/types/sessionArtifact';
+import { AppError } from '@shared/errors/appError';
 import { sniffRasterImageMime, sniffVideoMime, toDataUrl } from '../media/mediaBytes';
 
 const IMAGE_MAX_BYTES = 20 * 1024 * 1024;
@@ -9,7 +10,8 @@ const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bm
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm']);
 
 export type ConversationMediaError = 'MEDIA_SCOPE_DENIED' | 'MEDIA_NOT_FOUND' | 'MEDIA_TYPE_DENIED' | 'MEDIA_TOO_LARGE';
-export type ConversationMediaResult = { dataUrl: string; kind: 'image' | 'video' } | { dataUrl: null; error: ConversationMediaError };
+export type ConversationMediaResult =
+  { dataUrl: string; kind: 'image' | 'video' } | { dataUrl: null; error: ConversationMediaError };
 
 export interface ConversationMediaScope {
   /** Absolute path of a `session://` artifact, contained by the session artifact resolver. */
@@ -20,10 +22,8 @@ export interface ConversationMediaScope {
   attachments: ReadonlyArray<{ fileName: string; filePath: string }>;
 }
 
-class MediaError extends Error {
-  constructor(readonly code: ConversationMediaError) {
-    super(code);
-  }
+class MediaError extends AppError {
+  declare readonly code: ConversationMediaError;
 }
 
 const realpathWithin = (candidate: string, root: string): string => {
@@ -36,7 +36,8 @@ const realpathWithin = (candidate: string, root: string): string => {
 };
 
 function findAttachment(src: string, attachments: ConversationMediaScope['attachments']) {
-  if (path.isAbsolute(src)) return attachments.find((attachment) => path.resolve(attachment.filePath) === path.resolve(src));
+  if (path.isAbsolute(src))
+    return attachments.find((attachment) => path.resolve(attachment.filePath) === path.resolve(src));
   if (/[\\/]/.test(src)) return undefined;
   const stored = attachments.find((attachment) => path.basename(attachment.filePath) === src);
   if (stored) return stored;

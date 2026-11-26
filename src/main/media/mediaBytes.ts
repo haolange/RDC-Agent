@@ -13,7 +13,8 @@ export function sniffRasterImageMime(bytes: Uint8Array): RasterImageMime | null 
   if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png';
   if (startsWith(bytes, [0xff, 0xd8, 0xff])) return 'image/jpeg';
   if (startsWith(bytes, [0x47, 0x49, 0x46, 0x38])) return 'image/gif';
-  if (startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) && startsWith(bytes, [0x57, 0x45, 0x42, 0x50], 8)) return 'image/webp';
+  if (startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) && startsWith(bytes, [0x57, 0x45, 0x42, 0x50], 8))
+    return 'image/webp';
   if (startsWith(bytes, [0x42, 0x4d])) return 'image/bmp';
   return null;
 }
@@ -40,7 +41,6 @@ export async function readLimitedBytes(response: Response, maxBytes: number): Pr
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    if (!value) continue;
     if (total + value.byteLength > maxBytes) {
       await reader.cancel().catch(() => undefined);
       return null;

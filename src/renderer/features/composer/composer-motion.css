@@ -1,6 +1,6 @@
 /* Historical angular sweep: the fixed rectangle stretches the light near corners. */
 @property --composer-energy-angle {
-  syntax: "<angle>";
+  syntax: '<angle>';
   inherits: false;
   initial-value: -130deg;
 }
@@ -18,27 +18,29 @@
   border-radius: calc(var(--composer-shell-radius) + var(--composer-energy-stroke));
   pointer-events: none;
   z-index: var(--z-local-1);
-  content: "";
-  background:
-    conic-gradient(
-      from calc(var(--composer-energy-angle) - 28deg) at 50% 50%,
-      transparent 0deg,
-      transparent 10deg,
-      color-mix(in srgb, var(--composer-mode-accent) 8%, transparent) 22deg,
-      color-mix(in srgb, var(--composer-mode-accent) 28%, transparent) 34deg,
-      color-mix(in srgb, var(--composer-mode-accent) 46%, transparent) 46deg,
-      color-mix(in srgb, var(--composer-mode-accent) 30%, transparent) 58deg,
-      color-mix(in srgb, var(--composer-mode-accent) 12%, transparent) 70deg,
-      transparent 88deg,
-      transparent 360deg
-    );
-  filter:
-    drop-shadow(0 0 3px color-mix(in srgb, var(--composer-mode-accent) 40%, transparent))
+  content: '';
+  background: conic-gradient(
+    from calc(var(--composer-energy-angle) - 28deg) at 50% 50%,
+    transparent 0deg,
+    transparent 10deg,
+    color-mix(in srgb, var(--composer-mode-accent) 8%, transparent) 22deg,
+    color-mix(in srgb, var(--composer-mode-accent) 28%, transparent) 34deg,
+    color-mix(in srgb, var(--composer-mode-accent) 46%, transparent) 46deg,
+    color-mix(in srgb, var(--composer-mode-accent) 30%, transparent) 58deg,
+    color-mix(in srgb, var(--composer-mode-accent) 12%, transparent) 70deg,
+    transparent 88deg,
+    transparent 360deg
+  );
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--composer-mode-accent) 40%, transparent))
     drop-shadow(0 0 8px color-mix(in srgb, var(--composer-mode-accent) 24%, transparent))
     drop-shadow(0 0 16px color-mix(in srgb, var(--composer-mode-accent) 12%, transparent));
   animation: composerEnergyOrbit 2.85s linear infinite;
-  -webkit-mask: linear-gradient(rgb(255 255 255) 0 0) content-box, linear-gradient(rgb(255 255 255) 0 0);
-  mask: linear-gradient(rgb(255 255 255) 0 0) content-box, linear-gradient(rgb(255 255 255) 0 0);
+  -webkit-mask:
+    linear-gradient(rgb(255 255 255) 0 0) content-box,
+    linear-gradient(rgb(255 255 255) 0 0);
+  mask:
+    linear-gradient(rgb(255 255 255) 0 0) content-box,
+    linear-gradient(rgb(255 255 255) 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
 }

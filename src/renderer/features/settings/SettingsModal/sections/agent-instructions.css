@@ -13,7 +13,7 @@
 
 .settings-agent-instructions,
 .settings-agent-textarea-compact {
-  line-height: 1.5;
+  line-height: var(--leading-normal);
 }
 
 .settings-agent-textarea-compact {
@@ -24,7 +24,7 @@
 .settings-agent-instructions--editor {
   font-family: var(--font-mono);
   font-size: var(--type-body-size);
-  line-height: 1.7;
+  line-height: var(--leading-relaxed);
 }
 
 .settings-agent-diagnostics-row {

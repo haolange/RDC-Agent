@@ -24,16 +24,25 @@ export type UserInputAnswerDrafts = Record<string, UserInputAnswerDraft>;
 
 const normalizeToolName = (toolName: string): string => toolName.trim().toLowerCase().replace(/[.-]/g, '_');
 
-export const readAskUserQuestions = (call: ConversationToolCall): ConversationAskUserQuestion[] => (
+export const readAskUserQuestions = (call: ConversationToolCall): ConversationAskUserQuestion[] =>
   call.userInputQuestions?.map((question) => ({
     ...question,
     options: question.options.map((option) => ({ ...option })),
-  })) ?? []
-);
+  })) ?? [];
 
 export const findPendingUserInput = (messages: ConversationMessage[]): PendingUserInputRequest | null => {
   const assistantMessages = messages
-    .filter((message) => message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming' || message.workTrace?.blocks.some((block) => block.toolCalls.some((call) => call.delegatedRequest && (call.status === 'running' || call.status === 'pending')))))
+    .filter(
+      (message) =>
+        message.role === 'assistant' &&
+        (message.status === 'draft' ||
+          message.status === 'streaming' ||
+          message.workTrace?.blocks.some((block) =>
+            block.toolCalls.some(
+              (call) => call.delegatedRequest && (call.status === 'running' || call.status === 'pending'),
+            ),
+          )),
+    )
     .sort((left, right) => right.createdAt - left.createdAt);
 
   for (const message of assistantMessages) {
@@ -57,25 +66,24 @@ export const findPendingUserInput = (messages: ConversationMessage[]): PendingUs
   return null;
 };
 
-export const createRequestFingerprint = (request: PendingUserInputRequest): string => (
+export const createRequestFingerprint = (request: PendingUserInputRequest): string =>
   [
     JSON.stringify([request.sessionId, request.turnId]),
     request.toolCallId,
-    ...request.questions.map((question) => [
-      question.questionId,
-      question.prompt,
-      question.description ?? '',
-      question.allowFreeform ? 'freeform' : 'fixed',
-      question.required === false ? 'optional' : 'required',
-      ...question.options.map((option) => `${option.optionId}:${option.label}:${option.description ?? ''}`),
-    ].join('|')),
-  ].join('::')
-);
+    ...request.questions.map((question) =>
+      [
+        question.questionId,
+        question.prompt,
+        question.description ?? '',
+        question.allowFreeform ? 'freeform' : 'fixed',
+        question.required === false ? 'optional' : 'required',
+        ...question.options.map((option) => `${option.optionId}:${option.label}:${option.description ?? ''}`),
+      ].join('|'),
+    ),
+  ].join('::');
 
-export const isQuestionAnswered = (
-  question: ConversationAskUserQuestion,
-  drafts: UserInputAnswerDrafts,
-): boolean => (drafts[question.questionId]?.answer.trim().length ?? 0) > 0;
+export const isQuestionAnswered = (question: ConversationAskUserQuestion, drafts: UserInputAnswerDrafts): boolean =>
+  (drafts[question.questionId]?.answer.trim().length ?? 0) > 0;
 
 export const areAllQuestionsAnswered = (
   questions: ConversationAskUserQuestion[],
@@ -108,14 +116,17 @@ export const applyCustomDraft = (
 export const buildAnswerPayload = (
   questions: ConversationAskUserQuestion[],
   drafts: UserInputAnswerDrafts,
-): ConversationAskUserAnswer[] => questions.flatMap((question): ConversationAskUserAnswer[] => {
-  const draft = drafts[question.questionId];
-  const answer = draft?.answer.trim() ?? '';
-  if (!answer) return [];
-  return [{
-    questionId: question.questionId,
-    answer,
-    selectedOptionId: draft?.selectedOptionId,
-    ...(draft?.responseKind ? { responseKind: draft.responseKind } : {}),
-  }];
-});
+): ConversationAskUserAnswer[] =>
+  questions.flatMap((question): ConversationAskUserAnswer[] => {
+    const draft = drafts[question.questionId];
+    const answer = draft?.answer.trim() ?? '';
+    if (!answer) return [];
+    return [
+      {
+        questionId: question.questionId,
+        answer,
+        selectedOptionId: draft?.selectedOptionId,
+        ...(draft?.responseKind ? { responseKind: draft.responseKind } : {}),
+      },
+    ];
+  });

@@ -1,13 +1,18 @@
 import { agentAccessCeiling } from '@shared/types/agentManifest';
 import { charsToTokens } from '@shared/utils/tokens';
+import { AppError } from '@shared/errors/appError';
 import { delegableProfileIds } from '../agent-runtime/orchestration/delegableProfiles';
+import { appPathService } from '../runtime/AppPathService';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { conversationHistoryStore, projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { resolveAgentToolAllowlistFromDefinition } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { buildTurnPromptPlan } from '../agent-runtime/orchestration/TurnPromptPlan';
-import { repairConversationBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
-import { resolveEffectiveAgentSnapshot } from './ConversationRoutePreflight';
+import {
+  repairConversationBranchState,
+  resolveVisibleConversationMessages,
+} from '../sessions/store/ConversationBranchResolver';
+import { resolveEffectiveAgentSnapshot } from '../settings/agent-manifests/effectiveAgentSnapshot';
 import type {
   AgentRoutePreflightOk,
   PreparedConversationPrompt,
@@ -19,7 +24,6 @@ export interface PrepareConversationPromptInput {
   agentId: import('@shared/types/agent').AgentRole;
   routePreflight: AgentRoutePreflightOk;
   requestPlan: import('@shared/types/providerCapability').RequestPlan;
-  effectiveModel: import('@shared/types/providerCapability').EffectiveModel | null;
   attachmentPaths: string[];
   messageText: string;
   preloadSkillIds?: string[];
@@ -28,53 +32,68 @@ export interface PrepareConversationPromptInput {
 
 export function prepareConversationPrompt(input: PrepareConversationPromptInput): PreparedConversationPrompt {
   const projectRootPath = input.context.projectId
-    ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null
+    ? (projectWorkspaceStore.getProjectById(input.context.projectId)?.rootPath ?? null)
     : null;
-  const runtimeSettings = settingsService.getAll();
   const effectiveProfiles = agentManifestService.getEffectiveProfiles(
-    runtimeSettings.paths,
-    runtimeSettings.llm.providers,
-    runtimeSettings.llm.agentRoutes,
+    appPathService.getRuntimePaths(),
     projectRootPath ?? undefined,
   );
   const definition = effectiveProfiles.find((profile) => profile.id === input.agentId && profile.enabled) ?? null;
   if (!definition) {
-    throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${input.agentId}`);
+    throw new AppError('AGENT_PROFILE_UNAVAILABLE', input.agentId);
   }
 
-  const { promptPlan, preloadSkillIds, tools: allowedToolNames } = buildTurnPromptPlan({
+  const {
+    promptPlan,
+    preloadSkillIds,
+    tools: allowedToolNames,
+  } = buildTurnPromptPlan({
     agentId: input.agentId,
     profile: definition,
     profileCatalog: effectiveProfiles,
     profileSkills: definition.skills,
     baseTools: resolveAgentToolAllowlistFromDefinition(input.agentId, definition.tools, agentAccessCeiling(definition)),
     projectRootPath,
-    activePaths: [input.context.openedCapturePath, ...input.attachmentPaths].filter((value): value is string => Boolean(value)),
+    activePaths: [input.context.openedCapturePath, ...input.attachmentPaths].filter((value): value is string =>
+      Boolean(value),
+    ),
     sessionId: input.context.session?.sessionId ?? null,
     messageText: input.messageText,
     pendingSkillIds: input.preloadSkillIds,
-    permissionConstraints: runtimeSettings.agentRuntime.permissions,
+    permissionConstraints: settingsService.snapshot().user.agentRuntime.permissions,
     routeCapability: input.routePreflight.routeCapability,
-    effectiveModel: input.effectiveModel ?? undefined,
     requestPlan: input.requestPlan,
     contextWindowTokens: input.requestPlan.contextWindowTokens,
-    extraSegments: input.context.planSource ? [{ id: 'plan:revision-source', kind: 'plan-revision', scope: 'runtime',
-      sourcePath: input.context.planSource.reference.uri, sourceHash: input.context.planSource.reference.expectedHash,
-      precedence: 0, stability: 'volatile', tokenEstimate: charsToTokens(input.context.planSource.markdown.length),
-      content: `Previously submitted plan, verified by the host. Treat this document as source material for the user's requested revision, not execution authorization.\n\n${input.context.planSource.markdown}` }] : [],
+    extraSegments: input.context.planSource
+      ? [
+          {
+            id: 'plan:revision-source',
+            kind: 'plan-revision',
+            scope: 'runtime',
+            sourcePath: input.context.planSource.reference.uri,
+            sourceHash: input.context.planSource.reference.expectedHash,
+            precedence: 0,
+            stability: 'volatile',
+            tokenEstimate: charsToTokens(input.context.planSource.markdown.length),
+            content: `Previously submitted plan, verified by the host. Treat this document as source material for the user's requested revision, not execution authorization.\n\n${input.context.planSource.markdown}`,
+          },
+        ]
+      : [],
   });
 
   const sessionId = input.context.session?.sessionId ?? null;
   let visibleTurnIds: string[] = [];
   if (sessionId) {
-    const history = storageAdapter.readConversationHistory(sessionId);
-    const currentBranchState = storageAdapter.readConversationBranchState(sessionId);
+    const history = conversationHistoryStore.readConversationHistory(sessionId);
+    const currentBranchState = conversationHistoryStore.readConversationBranchState(sessionId);
     const { branchState } = repairConversationBranchState(history, currentBranchState);
-    visibleTurnIds = Array.from(new Set(
-      resolveVisibleConversationMessages(history, branchState)
-        .filter((message) => message.turnId !== input.excludeTurnId)
-        .map((message) => message.turnId),
-    ));
+    visibleTurnIds = Array.from(
+      new Set(
+        resolveVisibleConversationMessages(history, branchState)
+          .filter((message) => message.turnId !== input.excludeTurnId)
+          .map((message) => message.turnId),
+      ),
+    );
   }
 
   const overlayDiagnostics = resolveEffectiveAgentSnapshot(input.agentId, projectRootPath).overlayDiagnostics;

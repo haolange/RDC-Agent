@@ -4,6 +4,7 @@ import { serializeRdcThemeV1 } from '@shared/theme/rdcThemeV1';
 import { Button } from '../../../../ui/Button';
 import { ColorField } from '../../../../ui/ColorField';
 import { Select } from '../../../../ui/Select';
+import { useI18n } from '../../../../i18n';
 import { AppearanceFontField } from './AppearanceFontField';
 import { ThemeImportDialog } from './ThemeImportDialog';
 import type { ThemeChromeConfig, ThemePresetId, ThemeVariant } from '@shared/types/settings';
@@ -14,20 +15,21 @@ export type { AppearanceTranslate };
 export function ChromeThemeCard(props: {
   variant: ThemeVariant;
   chrome: ThemeChromeConfig;
-  t: AppearanceTranslate;
   onChange: (chrome: Partial<ThemeChromeConfig>) => void;
 }) {
+  const { t } = useI18n();
   const [importOpen, setImportOpen] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   const presetOptions = useMemo(
-    () => THEME_PRESET_CATALOG.map((preset) => ({
-      value: preset.id,
-      label: preset.label,
-      // The selected preset previews the live accent; the others show their own.
-      swatchColor: preset.id === props.chrome.presetId ? props.chrome.accent : preset[props.variant].accent,
-      testId: `appearance-preset-option-${props.variant}-${preset.id}`,
-    })),
+    () =>
+      THEME_PRESET_CATALOG.map((preset) => ({
+        value: preset.id,
+        label: preset.label,
+        // The selected preset previews the live accent; the others show their own.
+        swatchColor: preset.id === props.chrome.presetId ? props.chrome.accent : preset[props.variant].accent,
+        testId: `appearance-preset-option-${props.variant}-${preset.id}`,
+      })),
     [props.chrome.accent, props.chrome.presetId, props.variant],
   );
 
@@ -46,37 +48,35 @@ export function ChromeThemeCard(props: {
     }
   };
 
-  const title = props.variant === 'light'
-    ? props.t('settings.appearanceLightTheme')
-    : props.t('settings.appearanceDarkTheme');
+  const title = props.variant === 'light' ? t('settings.appearanceLightTheme') : t('settings.appearanceDarkTheme');
 
   return (
     <div className="appearance-chrome-card" data-testid={`appearance-chrome-${props.variant}`}>
       <div className="appearance-chrome-header">
-        <h3 className="appearance-chrome-title">{props.t('settings.appearanceEditingTheme', { theme: title })}</h3>
+        <h3 className="appearance-chrome-title">{t('settings.appearanceEditingTheme', { theme: title })}</h3>
         <div className="appearance-chrome-actions">
           <Button variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
-            {props.t('settings.appearanceImport')}
+            {t('settings.appearanceImport')}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => void handleCopy()}>
             {copyState === 'copied'
-              ? props.t('settings.appearanceCopied')
+              ? t('settings.appearanceCopied')
               : copyState === 'failed'
-                ? props.t('settings.appearanceCopyFailed')
-                : props.t('settings.appearanceCopyTheme')}
+                ? t('settings.appearanceCopyFailed')
+                : t('settings.appearanceCopyTheme')}
           </Button>
         </div>
       </div>
 
       <div className="appearance-chrome-fields">
         <div className="appearance-preset-picker">
-          <span className="settings-field-label">{props.t('settings.appearancePreset')}</span>
+          <span className="settings-field-label">{t('settings.appearancePreset')}</span>
           <Select
             value={props.chrome.presetId}
             options={presetOptions}
             onChange={(value) => handlePreset(value as ThemePresetId)}
             dataTestId={`appearance-preset-${props.variant}`}
-            ariaLabel={props.t('settings.appearancePreset')}
+            ariaLabel={t('settings.appearancePreset')}
             variant="inline"
             menuAlign="end"
             minMenuWidth={280}
@@ -86,31 +86,31 @@ export function ChromeThemeCard(props: {
           />
         </div>
         <ColorField
-          label={props.t('settings.appearanceAccent')}
-          areaLabel={props.t('settings.colorPickerArea')}
-          hueLabel={props.t('settings.colorPickerHue')}
-          pickerTitle={props.t('settings.colorPickerTitle')}
-          currentLabel={props.t('settings.colorPickerCurrent')}
+          label={t('settings.appearanceAccent')}
+          areaLabel={t('settings.colorPickerArea')}
+          hueLabel={t('settings.colorPickerHue')}
+          pickerTitle={t('settings.colorPickerTitle')}
+          currentLabel={t('settings.colorPickerCurrent')}
           value={props.chrome.accent}
           testId={`appearance-accent-${props.variant}`}
           onChange={(accent) => props.onChange({ accent, presetId: props.chrome.presetId })}
         />
         <ColorField
-          label={props.t('settings.appearanceBackground')}
-          areaLabel={props.t('settings.colorPickerArea')}
-          hueLabel={props.t('settings.colorPickerHue')}
-          pickerTitle={props.t('settings.colorPickerTitle')}
-          currentLabel={props.t('settings.colorPickerCurrent')}
+          label={t('settings.appearanceBackground')}
+          areaLabel={t('settings.colorPickerArea')}
+          hueLabel={t('settings.colorPickerHue')}
+          pickerTitle={t('settings.colorPickerTitle')}
+          currentLabel={t('settings.colorPickerCurrent')}
           value={props.chrome.surface}
           testId={`appearance-surface-${props.variant}`}
           onChange={(surface) => props.onChange({ surface })}
         />
         <ColorField
-          label={props.t('settings.appearanceForeground')}
-          areaLabel={props.t('settings.colorPickerArea')}
-          hueLabel={props.t('settings.colorPickerHue')}
-          pickerTitle={props.t('settings.colorPickerTitle')}
-          currentLabel={props.t('settings.colorPickerCurrent')}
+          label={t('settings.appearanceForeground')}
+          areaLabel={t('settings.colorPickerArea')}
+          hueLabel={t('settings.colorPickerHue')}
+          pickerTitle={t('settings.colorPickerTitle')}
+          currentLabel={t('settings.colorPickerCurrent')}
           value={props.chrome.ink}
           testId={`appearance-ink-${props.variant}`}
           onChange={(ink) => props.onChange({ ink })}
@@ -120,18 +120,16 @@ export function ChromeThemeCard(props: {
           variant={props.variant}
           value={props.chrome.fonts.ui}
           onChange={(ui) => props.onChange({ fonts: { ...props.chrome.fonts, ui } })}
-          t={props.t}
         />
         <AppearanceFontField
           kind="code"
           variant={props.variant}
           value={props.chrome.fonts.code}
           onChange={(code) => props.onChange({ fonts: { ...props.chrome.fonts, code } })}
-          t={props.t}
         />
         <label className="appearance-contrast-field">
           <span className="settings-field-label">
-            {props.t('settings.appearanceContrast')}
+            {t('settings.appearanceContrast')}
             <span className="appearance-contrast-value">{props.chrome.contrast}</span>
           </span>
           <input
@@ -150,7 +148,6 @@ export function ChromeThemeCard(props: {
         variant={props.variant}
         onApply={(chrome) => props.onChange(chrome)}
         onClose={() => setImportOpen(false)}
-        t={props.t}
       />
     </div>
   );

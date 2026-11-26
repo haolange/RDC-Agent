@@ -1,7 +1,4 @@
-import {
-  getProviderAuthModeAvailability,
-  isBuiltinProviderId,
-} from '../../provider-catalog/ProviderCatalogRegistry';
+import { getProviderAuthModeAvailability, isBuiltinProviderId } from '../../provider-catalog/ProviderCatalogRegistry';
 import { settingsService } from '../settings-core/SettingsService';
 import {
   buildEffectiveCatalogRequest,
@@ -12,15 +9,9 @@ import {
 import { effectiveCatalogService } from '../provider-catalog/EffectiveCatalogService';
 import { discoverProviderModels } from '../provider-catalog/ProviderModelDiscovery';
 import { describeProviderError, ProviderConnectionError, providerConnectionError } from './providerConnectionErrors';
-import {
-  resolveProviderConnectionDraft,
-  resolveTestDiscoveryAccountId,
-} from './ProviderConnectionDraft';
+import { resolveProviderConnectionDraft, resolveTestDiscoveryAccountId } from './ProviderConnectionDraft';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
-import type {
-  DiscoveryLoader,
-  EffectiveCatalogRequest,
-} from '../provider-catalog/effectiveCatalogTypes';
+import type { DiscoveryLoader, EffectiveCatalogRequest } from '../provider-catalog/effectiveCatalogTypes';
 import type {
   LlmProviderAccountLoginFinishRequest,
   LlmProviderAccountLoginStartRequest,
@@ -55,7 +46,7 @@ export { resolveProviderConnectionDraft, resolveTestDiscoveryAccountId } from '.
 export class ProviderConnectionService {
   constructor() {
     providerAccountAuthService.setCatalogPublisher(async (providerId, discovery) => {
-      const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+      const provider = settingsService.providerConnections.get(providerId);
       if (provider) {
         await refreshEffectiveCatalogDiscovery(
           provider,
@@ -69,27 +60,30 @@ export class ProviderConnectionService {
   }
 
   createEffectiveCatalogDiscoveryLoader(request: EffectiveCatalogRequest): DiscoveryLoader | undefined {
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === request.providerId);
+    const provider = settingsService.providerConnections.get(request.providerId);
     const accountId = provider?.activeAccountId ?? (provider ? `anonymous:${provider.id}` : '');
     if (
-      !provider
-      || !provider.isConfigured
-      || provider.protocol !== request.protocol
-      || accountId !== request.accountId
+      !provider ||
+      !provider.isConfigured ||
+      provider.protocol !== request.protocol ||
+      accountId !== request.accountId
     ) {
       return undefined;
     }
     return async () => {
-      const connection = provider.authMode === 'account'
-        ? null
-        : resolveProviderConnectionDraft(
-            provider,
-            {},
-            settingsService.getProviderConnectionValues(provider.id),
-          );
-      const discovery = provider.authMode === 'account'
-        ? await providerAccountAuthService.loadEffectiveCatalog(provider.id)
-        : await discoverProviderModels(provider, connection?.apiKey ?? '', connection?.baseUrl ?? '', connection?.values ?? {});
+      const connection =
+        provider.authMode === 'account'
+          ? null
+          : resolveProviderConnectionDraft(provider, {}, settingsService.getProviderConnectionValues(provider.id));
+      const discovery =
+        provider.authMode === 'account'
+          ? await providerAccountAuthService.loadEffectiveCatalog(provider.id)
+          : await discoverProviderModels(
+              provider,
+              connection?.apiKey ?? '',
+              connection?.baseUrl ?? '',
+              connection?.values ?? {},
+            );
       return {
         protocol: provider.protocol,
         ...('detail' in discovery && discovery.detail ? { detail: discovery.detail } : {}),
@@ -167,7 +161,7 @@ export class ProviderConnectionService {
       const { apiKey, baseUrl } = connection;
       const discovery = await discoverProviderModels(provider, apiKey, baseUrl, connection.values);
       const { models } = discovery;
-      const nextSettings = settingsService.saveProviderConnection(
+      const nextProvider = settingsService.saveProviderConnection(
         provider.id,
         apiKey,
         models,
@@ -177,15 +171,12 @@ export class ProviderConnectionService {
         request.modelPreferences,
         request.connectionValues,
       );
-      const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
-      if (nextProvider) {
-        await refreshEffectiveCatalogDiscovery(
-          nextProvider,
-          models,
-          discovery.contributions,
-          discovery.entitlementContributions,
-        );
-      }
+      await refreshEffectiveCatalogDiscovery(
+        nextProvider,
+        models,
+        discovery.contributions,
+        discovery.entitlementContributions,
+      );
       return {
         success: true,
         provider: nextProvider,
@@ -200,7 +191,10 @@ export class ProviderConnectionService {
     }
   }
 
-  async refreshProviderModels(providerId: LlmProviderId, scope?: { accountId: string; protocol: LlmProviderEntry['protocol'] }): Promise<LlmProviderConnectionResult> {
+  async refreshProviderModels(
+    providerId: LlmProviderId,
+    scope?: { accountId: string; protocol: LlmProviderEntry['protocol'] },
+  ): Promise<LlmProviderConnectionResult> {
     try {
       const provider = this.getProvider(providerId);
       const request = buildEffectiveCatalogRequest(provider);
@@ -210,15 +204,22 @@ export class ProviderConnectionService {
       const loader = this.createEffectiveCatalogDiscoveryLoader(request);
       if (!loader) throw new ProviderConnectionError('Provider is not configured for catalog discovery.');
       const snapshot = await effectiveCatalogService.refreshDiscovery(request, loader);
-      const current = settingsService.getAll().llm.providers.find(entry => entry.id === providerId);
+      const current = settingsService.providerConnections.get(providerId);
       if (!current || buildEffectiveCatalogRequest(current).configurationRevision !== request.configurationRevision) {
         throw new ProviderConnectionError('Provider configuration changed while refreshing.');
       }
       if (snapshot.lastRefreshError) throw new ProviderConnectionError(snapshot.lastRefreshError);
       return {
-        success: true, provider: current, discoveryAccountId: snapshot.accountId,
-        models: snapshot.models.map(model => ({ id: model.modelId, label: model.label,
-          enabled: model.enabled, availability: model.availability, unavailableReason: model.unavailableReason })),
+        success: true,
+        provider: current,
+        discoveryAccountId: snapshot.accountId,
+        models: snapshot.models.map((model) => ({
+          id: model.modelId,
+          label: model.label,
+          enabled: model.enabled,
+          availability: model.availability,
+          unavailableReason: model.unavailableReason,
+        })),
       };
     } catch (error) {
       return {
@@ -231,12 +232,11 @@ export class ProviderConnectionService {
 
   disconnectProvider(providerId: LlmProviderId): LlmProviderConnectionResult {
     try {
-      const nextSettings = settingsService.disconnectProvider(providerId);
-      const provider = nextSettings.llm.providers.find((entry) => entry.id === providerId);
+      const provider = settingsService.disconnectProvider(providerId);
       return {
         success: true,
         provider,
-        models: provider?.models ?? [],
+        models: provider.models,
       };
     } catch (error) {
       return {
@@ -284,7 +284,7 @@ export class ProviderConnectionService {
   }
 
   private getProvider(providerId: LlmProviderId): LlmProviderEntry {
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    const provider = settingsService.providerConnections.get(providerId);
     if (!provider || !isBuiltinProviderId(provider.id)) {
       throw providerConnectionError('unknown-provider', 'Unknown provider.');
     }
@@ -309,9 +309,10 @@ export class ProviderConnectionService {
     if (!options.includes(authMode)) {
       throw new ProviderConnectionError(`Provider ${provider.id} does not support ${authMode} authentication.`);
     }
-    const availability = getProviderAuthModeAvailability(provider.id)[authMode]
-      ?? provider.authModeAvailability?.[authMode]
-      ?? provider.providerAvailability;
+    const availability =
+      getProviderAuthModeAvailability(provider.id)[authMode] ??
+      provider.authModeAvailability?.[authMode] ??
+      provider.providerAvailability;
     return {
       ...provider,
       authMode,

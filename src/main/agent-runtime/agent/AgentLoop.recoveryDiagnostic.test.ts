@@ -6,7 +6,7 @@ import { agentLoop, type AgentContext } from './AgentLoop';
 import { AgentRecoveryAbortError, ErrorRecovery } from './ErrorRecovery';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type {
-  AgentEvent,
+  AgentLoopEvent,
   AssistantMessage,
   AssistantMessageEvent,
   Message,
@@ -40,9 +40,9 @@ const TEST_REQUEST_PLAN = createTestRequestPlan({
   },
   headers: {},
   bodyPatch: {},
-    contextBudgetTokens: TEST_MODEL.contextWindow,
-    contextMode: 'normal',
-    contextWindowTokens: TEST_MODEL.contextWindow,
+  contextBudgetTokens: TEST_MODEL.contextWindow,
+  contextMode: 'normal',
+  contextWindowTokens: TEST_MODEL.contextWindow,
   activeTierId: 'default',
   fastMode: false,
   reasoningWire: {
@@ -69,7 +69,9 @@ function makeAssistantMessage(text: string): AssistantMessage {
   };
 }
 
-function makeProviderStream(factory: () => Promise<AssistantMessage>): EventStream<AssistantMessageEvent, AssistantMessage> {
+function makeProviderStream(
+  factory: () => Promise<AssistantMessage>,
+): EventStream<AssistantMessageEvent, AssistantMessage> {
   const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(
     (event) => event.type === 'done' || event.type === 'error',
     (event) => (event.type === 'done' || event.type === 'error' ? event.message : makeAssistantMessage('')),
@@ -93,11 +95,13 @@ describe('AgentLoop recovery diagnostics', () => {
     const provider: ProviderStrategy = {
       api: 'openai-completions',
       stream: (_model, requestContext) => {
-        observedCallIds.push(requestContext.messages.flatMap((message) => (
-          message.role === 'assistant'
-            ? message.content.filter((block) => block.type === 'toolCall').map((block) => block.id)
-            : []
-        )));
+        observedCallIds.push(
+          requestContext.messages.flatMap((message) =>
+            message.role === 'assistant'
+              ? message.content.filter((block) => block.type === 'toolCall').map((block) => block.id)
+              : [],
+          ),
+        );
         attempts += 1;
         if (attempts !== 1) return makeProviderStream(async () => makeAssistantMessage('recovered'));
 
@@ -117,15 +121,24 @@ describe('AgentLoop recovery diagnostics', () => {
     const recovery = new ErrorRecovery({ primaryModel: TEST_MODEL, maxRetries: 1 });
     vi.spyOn(recovery, 'getRetryDelay').mockReturnValue(0);
     const context: AgentContext = { messages: [] };
-    const { stream, producerCompletion } = agentLoop([{
-      role: 'user', content: 'look up the value', timestamp: Date.now(),
-    }], context, {
-      model: TEST_MODEL,
-      convertToLlm: (messages) => messages as Message[],
-      errorRecovery: recovery,
-      maxTurns: 1,
-      streamOptions: { requestPlan: TEST_REQUEST_PLAN },
-    }, provider);
+    const { stream, producerCompletion } = agentLoop(
+      [
+        {
+          role: 'user',
+          content: 'look up the value',
+          timestamp: Date.now(),
+        },
+      ],
+      context,
+      {
+        model: TEST_MODEL,
+        convertToLlm: (messages) => messages as Message[],
+        errorRecovery: recovery,
+        maxTurns: 1,
+        streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+      },
+      provider,
+    );
 
     for await (const _event of stream) {
       // Drain the same UI stream that saw the failed partial response.
@@ -154,23 +167,30 @@ describe('AgentLoop recovery diagnostics', () => {
       },
     };
 
-    const events: AgentEvent[] = [];
+    const events: AgentLoopEvent[] = [];
     const context: AgentContext = {
-      messages: [{
-        role: 'user',
-        content: [{ type: 'text', text: 'hello' }],
-        timestamp: Date.now(),
-      }],
+      messages: [
+        {
+          role: 'user',
+          content: [{ type: 'text', text: 'hello' }],
+          timestamp: Date.now(),
+        },
+      ],
     };
     const recovery = new ErrorRecovery({ primaryModel: TEST_MODEL, maxRetries: 3 });
 
-    const { stream } = agentLoop([], context, {
-      model: TEST_MODEL,
-      convertToLlm: (messages) => messages as Message[],
-      errorRecovery: recovery,
-      maxTurns: 1,
-      streamOptions: { maxTokens: 256, requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
-    }, provider);
+    const { stream } = agentLoop(
+      [],
+      context,
+      {
+        model: TEST_MODEL,
+        convertToLlm: (messages) => messages as Message[],
+        errorRecovery: recovery,
+        maxTurns: 1,
+        streamOptions: { maxTokens: 256, requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
+      },
+      provider,
+    );
 
     for await (const event of stream) {
       events.push(event);
@@ -198,22 +218,29 @@ describe('AgentLoop recovery diagnostics', () => {
       stream: () => makeProviderStream(async () => makeAssistantMessage('ok')),
     };
 
-    const events: AgentEvent[] = [];
+    const events: AgentLoopEvent[] = [];
     const context: AgentContext = {
-      messages: [{
-        role: 'user',
-        content: [{ type: 'text', text: 'hello' }],
-        timestamp: Date.now(),
-      }],
+      messages: [
+        {
+          role: 'user',
+          content: [{ type: 'text', text: 'hello' }],
+          timestamp: Date.now(),
+        },
+      ],
     };
 
-    const { stream } = agentLoop([], context, {
-      model: TEST_MODEL,
-      convertToLlm: (messages) => messages as Message[],
-      errorRecovery: new ErrorRecovery({ primaryModel: TEST_MODEL }),
-      maxTurns: 1,
-      streamOptions: { requestPlan: TEST_REQUEST_PLAN },
-    }, provider);
+    const { stream } = agentLoop(
+      [],
+      context,
+      {
+        model: TEST_MODEL,
+        convertToLlm: (messages) => messages as Message[],
+        errorRecovery: new ErrorRecovery({ primaryModel: TEST_MODEL }),
+        maxTurns: 1,
+        streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+      },
+      provider,
+    );
 
     for await (const event of stream) {
       events.push(event);
@@ -236,28 +263,37 @@ describe('AgentLoop recovery diagnostics', () => {
       },
     };
     const context: AgentContext = {
-      messages: [{
-        role: 'user',
-        content: [{ type: 'text', text: 'hello' }],
-        timestamp: Date.now(),
-      }],
+      messages: [
+        {
+          role: 'user',
+          content: [{ type: 'text', text: 'hello' }],
+          timestamp: Date.now(),
+        },
+      ],
     };
     const recovery = new ErrorRecovery({ primaryModel: TEST_MODEL, maxRetries: 5 });
-    const { stream, producerCompletion } = agentLoop([], context, {
-      model: TEST_MODEL,
-      convertToLlm: (messages) => messages as Message[],
-      errorRecovery: recovery,
-      maxTurns: 1,
-      streamOptions: { maxTokens: 256, requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
-    }, provider);
+    const { stream, producerCompletion } = agentLoop(
+      [],
+      context,
+      {
+        model: TEST_MODEL,
+        convertToLlm: (messages) => messages as Message[],
+        errorRecovery: recovery,
+        maxTurns: 1,
+        streamOptions: { maxTokens: 256, requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
+      },
+      provider,
+    );
 
     // Abort during the long retry backoff.
     setTimeout(() => stream.abort(), 5);
-    await expect((async () => {
-      for await (const _event of stream) {
-        // drain
-      }
-    })()).rejects.toMatchObject({ name: 'AbortError' });
+    await expect(
+      (async () => {
+        for await (const _event of stream) {
+          // drain
+        }
+      })(),
+    ).rejects.toMatchObject({ name: 'AbortError' });
     await producerCompletion;
     expect(attempts).toBeGreaterThanOrEqual(1);
   });
@@ -278,19 +314,26 @@ describe('AgentLoop recovery diagnostics', () => {
         return stream;
       },
     };
-    const { stream, producerCompletion } = agentLoop([], {
-      messages: [{
-        role: 'user',
-        content: [{ type: 'text', text: 'hello' }],
-        timestamp: Date.now(),
-      }],
-    }, {
-      model: TEST_MODEL,
-      convertToLlm: (messages) => messages as Message[],
-      errorRecovery: recovery,
-      maxTurns: 1,
-      streamOptions: { maxTokens: 256, requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
-    }, provider);
+    const { stream, producerCompletion } = agentLoop(
+      [],
+      {
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'hello' }],
+            timestamp: Date.now(),
+          },
+        ],
+      },
+      {
+        model: TEST_MODEL,
+        convertToLlm: (messages) => messages as Message[],
+        errorRecovery: recovery,
+        maxTurns: 1,
+        streamOptions: { maxTokens: 256, requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
+      },
+      provider,
+    );
 
     const rejected = await (async () => {
       try {
@@ -307,7 +350,7 @@ describe('AgentLoop recovery diagnostics', () => {
     expect(attempts).toBe(4);
     expect(rejected).toBeInstanceOf(AgentRecoveryAbortError);
     expect(rejected).toMatchObject({
-      category: 'server_error',
+      recoveryCategory: 'server_error',
       lastStatus: 500,
       attempts: 4,
       maxAttempts: 4,
@@ -331,19 +374,26 @@ describe('AgentLoop recovery diagnostics', () => {
         return stream;
       },
     };
-    const { stream, producerCompletion } = agentLoop([], {
-      messages: [{
-        role: 'user',
-        content: [{ type: 'text', text: 'hello' }],
-        timestamp: Date.now(),
-      }],
-    }, {
-      model: TEST_MODEL,
-      convertToLlm: (messages) => messages as Message[],
-      errorRecovery: recovery,
-      maxTurns: 1,
-      streamOptions: { maxTokens: 256, requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
-    }, provider);
+    const { stream, producerCompletion } = agentLoop(
+      [],
+      {
+        messages: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'hello' }],
+            timestamp: Date.now(),
+          },
+        ],
+      },
+      {
+        model: TEST_MODEL,
+        convertToLlm: (messages) => messages as Message[],
+        errorRecovery: recovery,
+        maxTurns: 1,
+        streamOptions: { maxTokens: 256, requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
+      },
+      provider,
+    );
 
     const rejected = await (async () => {
       try {
@@ -360,7 +410,7 @@ describe('AgentLoop recovery diagnostics', () => {
     expect(attempts).toBe(2);
     expect(rejected).toBeInstanceOf(AgentRecoveryAbortError);
     expect(rejected).toMatchObject({
-      category: 'empty_stream',
+      recoveryCategory: 'empty_stream',
       attempts: 2,
       maxAttempts: 2,
     });

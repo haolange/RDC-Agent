@@ -57,10 +57,9 @@ describe('resolveContextTierChoices', () => {
     expect(contextTierOutputTokens(total)).toBe(64_000);
     expect(contextTierOutputTokens(tier('prompt-only', { maxPromptTokens: 272_000 }, 'granted'))).toBeUndefined();
     expect(resolvePlanningOutputTokens(copilot, 1_050_000)).toBe(128_000);
-    expect(resolvePlanningOutputTokens(
-      tier('prompt-only', { maxPromptTokens: 272_000 }, 'granted'),
+    expect(resolvePlanningOutputTokens(tier('prompt-only', { maxPromptTokens: 272_000 }, 'granted'), 272_000)).toBe(
       272_000,
-    )).toBe(272_000);
+    );
   });
 
   it('uses the requested budget when a tier has no prompt cap', () => {
@@ -70,79 +69,106 @@ describe('resolveContextTierChoices', () => {
   });
 
   it('resolves Max only from the explicitly referenced tier', () => {
-    const choices = resolveContextTierChoices(input([
-      tier('default', { maxTotalTokens: 256_000 }, 'granted'),
-      tier('long', { maxTotalTokens: 1_000_000 }, 'unknown'),
-    ], {
-      state: 'selectable',
-      defaultValue: false,
-      entitlement: 'unknown',
-      tierId: 'long',
-    }));
+    const choices = resolveContextTierChoices(
+      input(
+        [
+          tier('default', { maxTotalTokens: 256_000 }, 'granted'),
+          tier('long', { maxTotalTokens: 1_000_000 }, 'unknown'),
+        ],
+        {
+          state: 'selectable',
+          defaultValue: false,
+          entitlement: 'unknown',
+          tierId: 'long',
+        },
+      ),
+    );
     expect(choices.normalTier?.id).toBe('default');
     expect(choices.maxTier?.id).toBe('long');
     expect(choices.maxTierUnverified).toBe(true);
   });
 
   it('allows a fixed Max tier to be both normal and Max', () => {
-    const choices = resolveContextTierChoices(input([
-      tier('default', { maxTotalTokens: 1_000_000 }, 'granted'),
-    ], { state: 'fixed', fixedValue: true, tierId: 'default' }));
+    const choices = resolveContextTierChoices(
+      input([tier('default', { maxTotalTokens: 1_000_000 }, 'granted')], {
+        state: 'fixed',
+        fixedValue: true,
+        tierId: 'default',
+      }),
+    );
     expect(choices.normalTier?.id).toBe('default');
     expect(choices.maxTier?.id).toBe('default');
   });
 
   it('does not infer Max from a numeric window when the control is unsupported', () => {
-    const choices = resolveContextTierChoices(input([
-      tier('future', { maxTotalTokens: 2_000_000 }, 'granted'),
-    ], { state: 'unsupported', fixedValue: false }));
+    const choices = resolveContextTierChoices(
+      input([tier('future', { maxTotalTokens: 2_000_000 }, 'granted')], { state: 'unsupported', fixedValue: false }),
+    );
     expect(choices.normalTier?.id).toBe('future');
     expect(choices.maxTier).toBeUndefined();
   });
 
   it('fails closed when the pointed Max tier is not larger than the default window', () => {
-    const choices = resolveContextTierChoices(input([
-      tier('default', { maxTotalTokens: 256_000 }, 'granted'),
-      tier('max', { maxTotalTokens: 200_000 }, 'granted'),
-    ], {
-      state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'max',
-    }));
+    const choices = resolveContextTierChoices(
+      input(
+        [tier('default', { maxTotalTokens: 256_000 }, 'granted'), tier('max', { maxTotalTokens: 200_000 }, 'granted')],
+        {
+          state: 'selectable',
+          defaultValue: false,
+          entitlement: 'granted',
+          tierId: 'max',
+        },
+      ),
+    );
     expect(choices.normalTier?.id).toBe('default');
     expect(choices.maxTier).toBeUndefined();
   });
 
   it('accepts a sub-million Max tier when it is strictly larger than the default window', () => {
-    const choices = resolveContextTierChoices(input([
-      tier('default', { maxTotalTokens: 272_000 }, 'granted'),
-      tier('max', { maxTotalTokens: 872_000 }, 'unknown'),
-    ], {
-      state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'max',
-    }));
+    const choices = resolveContextTierChoices(
+      input(
+        [tier('default', { maxTotalTokens: 272_000 }, 'granted'), tier('max', { maxTotalTokens: 872_000 }, 'unknown')],
+        {
+          state: 'selectable',
+          defaultValue: false,
+          entitlement: 'unknown',
+          tierId: 'max',
+        },
+      ),
+    );
     expect(choices.normalTier?.id).toBe('default');
     expect(choices.maxTier?.id).toBe('max');
     expect(choices.maxTierUnverified).toBe(true);
   });
 
   it('fails closed when the explicit tier is missing or denied', () => {
-    expect(resolveContextTierChoices(input([
-      tier('default', { maxTotalTokens: 256_000 }, 'granted'),
-    ], {
-      state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'missing',
-    })).maxTier).toBeUndefined();
-    expect(resolveContextTierChoices(input([
-      tier('long', { maxTotalTokens: 1_000_000 }, 'denied'),
-    ], {
-      state: 'fixed', fixedValue: true, tierId: 'long',
-    })).maxTier).toBeUndefined();
+    expect(
+      resolveContextTierChoices(
+        input([tier('default', { maxTotalTokens: 256_000 }, 'granted')], {
+          state: 'selectable',
+          defaultValue: false,
+          entitlement: 'granted',
+          tierId: 'missing',
+        }),
+      ).maxTier,
+    ).toBeUndefined();
+    expect(
+      resolveContextTierChoices(
+        input([tier('long', { maxTotalTokens: 1_000_000 }, 'denied')], {
+          state: 'fixed',
+          fixedValue: true,
+          tierId: 'long',
+        }),
+      ).maxTier,
+    ).toBeUndefined();
   });
 });
 
-
 it('offers a larger input budget when the normal model capacity already includes the Max budget', () => {
-  const base = input([
-    tier('default', { maxPromptTokens: 1048576 }, 'granted'),
-    tier('max', { maxPromptTokens: 1000000 }, 'unknown'),
-  ], { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'max' });
+  const base = input(
+    [tier('default', { maxPromptTokens: 1048576 }, 'granted'), tier('max', { maxPromptTokens: 1000000 }, 'unknown')],
+    { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'max' },
+  );
   expect(resolveContextTierChoices({ ...base, defaultBudgetTokens: 256000 }).maxTier?.id).toBe('max');
   expect(resolveContextTierChoices({ ...base, defaultBudgetTokens: 1048576 }).maxTier).toBeUndefined();
 });

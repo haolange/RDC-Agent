@@ -8,17 +8,10 @@ import type {
 
 export type KnowledgeViewMode = 'cards' | 'candidates' | 'conflicts';
 export type KnowledgeNarrowPane = 'spaces' | 'list' | 'detail';
-export type KnowledgeWriteAction =
-  | 'save'
-  | 'persist-draft'
-  | 'promote-verified'
-  | 'promote-promoted'
-  | 'retire';
+export type KnowledgeWriteAction = 'save' | 'persist-draft' | 'promote-verified' | 'promote-promoted' | 'retire';
 
 export const ALL_CARD_TYPES: KnowledgeCardType[] = [...KNOWLEDGE_CARD_TYPES];
 export const ALL_LIFECYCLES: KnowledgeLifecycle[] = [...KNOWLEDGE_LIFECYCLES];
-
-export { serviceErrorMessage as knowledgeErrorMessage } from '../../../lib/serviceErrorMessage';
 
 export function createRequestSeq(): { next(): number; isCurrent(value: number): boolean } {
   let seq = 0;

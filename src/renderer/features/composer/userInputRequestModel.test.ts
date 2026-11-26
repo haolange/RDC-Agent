@@ -49,13 +49,15 @@ describe('userInputRequestModel', () => {
   });
 
   it('fails closed when an ask_user tool call has no structured questions', () => {
-    expect(readAskUserQuestions({
-      id: 'tool-ask',
-      toolName: 'ask_user',
-      status: 'running',
-      argsPreview: JSON.stringify({ questions }),
-      startedAt: 1,
-    })).toEqual([]);
+    expect(
+      readAskUserQuestions({
+        id: 'tool-ask',
+        toolName: 'ask_user',
+        status: 'running',
+        argsPreview: JSON.stringify({ questions }),
+        startedAt: 1,
+      }),
+    ).toEqual([]);
   });
 
   it('keeps structured questions intact when the display preview is truncated', () => {
@@ -110,34 +112,40 @@ describe('userInputRequestModel', () => {
   });
 
   it('finds only unresolved ask_user tool calls from active assistant messages', () => {
-    const messages = [{
-      id: 'message',
-      turnId: 'turn',
-      sessionId: 'session',
-      projectId: null,
-      role: 'assistant',
-      content: '',
-      status: 'streaming',
-      createdAt: 1,
-      workTrace: {
-        status: 'running',
-        updatedAt: 1,
-        blocks: [{
-          id: 'block',
-          kind: 'user_input',
-          title: 'ask',
+    const messages = [
+      {
+        id: 'message',
+        turnId: 'turn',
+        sessionId: 'session',
+        projectId: null,
+        role: 'assistant',
+        content: '',
+        status: 'streaming',
+        createdAt: 1,
+        workTrace: {
           status: 'running',
-          startedAt: 1,
-          toolCalls: [{
-            id: 'tool-ask',
-            toolName: 'ask_user',
-            status: 'running',
-            userInputQuestions: questions,
-            startedAt: 1,
-          }],
-        }],
+          updatedAt: 1,
+          blocks: [
+            {
+              id: 'block',
+              kind: 'user_input',
+              title: 'ask',
+              status: 'running',
+              startedAt: 1,
+              toolCalls: [
+                {
+                  id: 'tool-ask',
+                  toolName: 'ask_user',
+                  status: 'running',
+                  userInputQuestions: questions,
+                  startedAt: 1,
+                },
+              ],
+            },
+          ],
+        },
       },
-    }] as ConversationMessage[];
+    ] as ConversationMessage[];
 
     const pending = findPendingUserInput(messages);
     expect(pending).toMatchObject({

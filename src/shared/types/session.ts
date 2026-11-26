@@ -2,12 +2,12 @@
  * Session Types - Session 控制面板相关类型定义
  */
 
+import { z } from 'zod';
 import type { ConversationTurnControls } from './modelCapability';
 import type { ReplayDeviceEntry } from './device';
 
-export type MissionId = 'debugger' | 'analyzer' | 'optimizer';
+type MissionId = 'debugger' | 'analyzer' | 'optimizer';
 export type MissionKind = MissionId;
-export type RunKind = 'conversation' | 'mission';
 
 export interface ProjectInputRecord {
   inputId: string;
@@ -23,12 +23,34 @@ export interface ProjectInputRecord {
   contentSha256?: string;
 }
 
+/** A project input as the registry stores it and `project:inputsChanged` carries it. */
+export const ProjectInputRecordSchema = z
+  .object({
+    inputId: z.string().min(1),
+    fileName: z.string().min(1),
+    filePath: z.string().min(1),
+    source: z.enum(['project_resource', 'external_reference']),
+    referenceIdentity: z.object({ device: z.string(), inode: z.string(), birthtimeNs: z.string() }).optional(),
+    discoveredAt: z.number(),
+    lastModifiedAt: z.number(),
+    size: z.number(),
+    contentSha256: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/u)
+      .optional(),
+  })
+  .passthrough()
+  .superRefine((input, ctx) => {
+    if (input.source === 'external_reference' && (!input.referenceIdentity || !input.contentSha256)) {
+      ctx.addIssue({ code: 'custom', message: 'External capture references require file identity and content hash.' });
+    }
+  }) satisfies z.ZodType<ProjectInputRecord>;
+
+/** A confirmed removal: the single-use approval for `project:inputs:remove` and what it affects. */
 export interface ProjectInputRemovePreparation {
-  success: boolean;
-  approvalToken?: string;
-  input?: ProjectInputRecord;
-  affectedSessionIds?: string[];
-  error?: string;
+  approvalToken: string;
+  input: ProjectInputRecord;
+  affectedSessionIds: string[];
 }
 export interface ProjectInputRemoveResult {
   success: boolean;
@@ -79,6 +101,32 @@ export interface SessionRecord {
   agentId?: string;
 }
 
+/**
+ * The order in which main wrote a session record. `epoch` names the main process run; `n` counts session writes in
+ * it. Held in memory only, never persisted: a newer epoch always supersedes, within one epoch the larger `n` does.
+ */
+export interface SessionRevision {
+  epoch: string;
+  n: number;
+}
+
+/** A session record as main last wrote it, with the revision of that write. Every response carrying a session uses it. */
+export interface SessionRecordSnapshot {
+  record: SessionRecord;
+  revision: SessionRevision;
+}
+
+/**
+ * One intent on a session's model lanes (`session:setModelOverride`). It sets only the fields it carries; an absent
+ * field stays as written. Main writes each field only for a `clientRevision` newer than the last one it wrote for that
+ * field of the session, so a late intent never overwrites a later one.
+ */
+export interface SessionModelWriteRequest {
+  modelOverride?: SessionModelOverride | null;
+  turnControls?: ConversationTurnControls;
+  clientRevision: number;
+}
+
 /** Explicit project/session ownership for stateful RDC operations and events. */
 export interface SessionScope {
   projectId: string;
@@ -111,41 +159,16 @@ export interface SessionAttachmentRecord {
   createdAt: number;
 }
 
-
-export interface RunReportPaths {
+interface RunReportPaths {
   reportsDir: string;
   markdownPath?: string;
   jsonPath?: string;
   htmlPath?: string;
 }
 
-export interface CaptureInfo {
-  id: string;
-  filePath: string;
-  fileName: string;
-  fileSize: number;
-  capturedAt: number;
-  deviceId?: string;
-}
-
-export interface CaptureControl {
-  captures: CaptureInfo[];
-  activeCapture: string | null;
-  isLoading: boolean;
-}
-
-export interface SessionContext {
-  sessionId: string | null;
-  caseId: string | null;
-  startedAt: number | null;
-  deviceId: string | null;
-  replayContext: string | null;
-  captureControl: CaptureControl;
-}
-
 export type CaptureRole = 'primary' | 'baseline' | 'reference' | 'fix';
 
-export type ReplayBackendHint = 'local' | 'remote';
+type ReplayBackendHint = 'local' | 'remote';
 
 export interface CaptureDescriptor {
   id: string;
@@ -160,19 +183,6 @@ export interface CaptureDescriptor {
   contextId?: string;
 }
 
-export interface DebugSessionStartRequest {
-  projectId: string;
-  sessionId?: string;
-  turnId?: string;
-  profileId: string;
-  kind?: RunKind;
-  mission?: MissionKind;
-  goal: string;
-  captures?: CaptureDescriptor[];
-  primaryCaptureId?: string;
-  replayDevice?: ReplayDeviceEntry | null;
-}
-
 export type RunStatus =
   | 'queued'
   | 'planning'
@@ -185,7 +195,7 @@ export type RunStatus =
   | 'cancelled'
   | 'interrupted';
 
-export interface RunRecordBase {
+interface RunRecordBase {
   schemaVersion: '3';
   runId: string;
   turnId?: string;
@@ -205,11 +215,11 @@ export interface RunRecordBase {
   diagnostics?: string[];
 }
 
-export interface ConversationRunRecord extends RunRecordBase {
+interface ConversationRunRecord extends RunRecordBase {
   kind: 'conversation';
 }
 
-export interface MissionRunRecord extends RunRecordBase {
+interface MissionRunRecord extends RunRecordBase {
   kind: 'mission';
   mission: MissionKind;
 }
@@ -298,6 +308,60 @@ export interface RunContextUsageSummary {
   cumulativeCost?: number;
 }
 
+const ContextUsageBreakdownEntrySchema = z
+  .object({
+    id: z.custom<ContextUsageBreakdownId>((value) => typeof value === 'string' && value.length > 0),
+    tokens: z.number(),
+    count: z.number().optional(),
+  })
+  .passthrough();
+
+const LlmUsageCostSchema = z
+  .object({
+    input: z.number(),
+    output: z.number(),
+    cacheRead: z.number().optional(),
+    cacheWrite: z.number().optional(),
+    total: z.number(),
+  })
+  .passthrough();
+
+const UsageCoreFields = {
+  runId: z.string().min(1),
+  providerId: z.string().min(1),
+  modelId: z.string().min(1),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  totalTokens: z.number(),
+  promptBudgetTokens: z.number().nullable(),
+  contextWindowTokens: z.number().nullable(),
+  usagePercent: z.number(),
+  occupiedTokens: z.number(),
+  breakdown: z.array(ContextUsageBreakdownEntrySchema).nullable(),
+  snapshotAt: z.number().nullable(),
+  cacheReadTokens: z.number().optional(),
+  cacheWriteTokens: z.number().optional(),
+  cacheHitTokens: z.number().optional(),
+  cacheMissTokens: z.number().optional(),
+  lastTurnCacheHitTokens: z.number().optional(),
+  lastTurnCacheMissTokens: z.number().optional(),
+  cacheSavedTokens: z.number().optional(),
+  lastTurnCacheHitRate: z.number().optional(),
+  cumulativeCacheHitRate: z.number().optional(),
+  reasoningTokens: z.number().optional(),
+  cost: LlmUsageCostSchema.optional(),
+  cumulativeCost: z.number().optional(),
+};
+
+/** A run's context usage as the session usage file stores it and `workflow:runUsageChanged` carries it. */
+export const RunContextUsageSummarySchema: z.ZodType<RunContextUsageSummary> = z
+  .object({
+    ...UsageCoreFields,
+    maxOutputTokens: z.number().nullable(),
+    compactionThresholdTokens: z.number().nullable(),
+  })
+  .strict();
+
 export interface RunContextUsageRequest {
   sessionId: string;
   runId?: string;
@@ -323,7 +387,7 @@ export interface PreparedTurnContextSummary {
   };
   wirePatch: {
     headers: Record<string, string>;
-    body: import('./providerCapability').JsonObject;
+    body: import('../utils/jsonValue').JsonObject;
   };
   controls: import('./modelCapability').ConversationTurnControls;
   contextMode: 'normal' | 'one-million';
@@ -360,8 +424,6 @@ export interface PreparedTurnContextSummary {
   preparedAt: number;
   runtimeDiagnostics?: string[];
 }
-
-
 
 export interface RdcRuntimeContext {
   contextId: string;

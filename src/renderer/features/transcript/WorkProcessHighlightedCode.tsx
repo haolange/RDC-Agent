@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { hljs } from '../../patterns/Markdown/markdownHighlight';
+import { useMarkdownEnhancers } from '../../patterns/Markdown/markdownEnhancers';
 
 export const WorkProcessHighlightedCode: React.FC<{
   code: string;
@@ -7,20 +7,23 @@ export const WorkProcessHighlightedCode: React.FC<{
   collapsed?: boolean;
 }> = ({ code, language = 'python', collapsed = false }) => {
   const source = collapsed ? code.split('\n').slice(0, 3).join('\n') : code;
+  const enhancers = useMarkdownEnhancers();
   const html = useMemo(() => {
+    if (!enhancers) return null;
     try {
-      return hljs.highlight(source, { language, ignoreIllegals: true }).value;
+      return enhancers.hljs.highlight(source, { language, ignoreIllegals: true }).value;
     } catch {
-      return hljs.highlightAuto(source).value;
+      return enhancers.hljs.highlightAuto(source).value;
     }
-  }, [language, source]);
+  }, [enhancers, language, source]);
 
   return (
     <pre className={`work-process-highlighted-code${collapsed ? ' is-collapsed' : ''}`}>
-      <code
-        className={`hljs language-${language}`}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      {html === null ? (
+        <code className={`hljs language-${language}`}>{source}</code>
+      ) : (
+        <code className={`hljs language-${language}`} dangerouslySetInnerHTML={{ __html: html }} />
+      )}
     </pre>
   );
 };

@@ -11,12 +11,14 @@ describe('Textarea chrome', () => {
   });
 
   it('selects plain chrome without changing the shared textarea identity', () => {
-    const html = renderToStaticMarkup(createElement(Textarea, {
-      chrome: 'plain',
-      className: 'composer-textarea',
-      ref: createRef<HTMLTextAreaElement>(),
-      'aria-label': 'Prompt',
-    }));
+    const html = renderToStaticMarkup(
+      createElement(Textarea, {
+        chrome: 'plain',
+        className: 'composer-textarea',
+        ref: createRef<HTMLTextAreaElement>(),
+        'aria-label': 'Prompt',
+      }),
+    );
     expect(html).toContain('ui-textarea');
     expect(html).toContain('class="ui-textarea is-chrome-plain is-sizing-content composer-textarea"');
   });

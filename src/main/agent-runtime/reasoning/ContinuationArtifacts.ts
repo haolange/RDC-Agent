@@ -1,10 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { RequestPlan } from '@shared/types/providerCapability';
-import type {
-  ContinuationArtifactMetadata,
-  ContinuationArtifactMutationPolicy,
-  ProviderContinuationArtifact,
-} from '@shared/types/reasoning';
+import type { ContinuationArtifactMetadata, ContinuationArtifactMutationPolicy } from '@shared/types/reasoning';
+import type { ProviderContinuationArtifact } from '../core/types';
 
 export interface ContinuationArtifactPayload {
   type: string;
@@ -29,11 +26,12 @@ export function createContinuationArtifact(
   }
   const contract = requestPlan.contracts;
   if (
-    contract.reasoning.continuation === 'none'
-    || contract.reasoning.continuation === 'unknown'
-    || contract.toolLoop.artifactPolicy === 'discard'
-    || contract.toolLoop.artifactPolicy === 'unknown'
-  ) return undefined;
+    contract.reasoning.continuation === 'none' ||
+    contract.reasoning.continuation === 'unknown' ||
+    contract.toolLoop.artifactPolicy === 'discard' ||
+    contract.toolLoop.artifactPolicy === 'unknown'
+  )
+    return undefined;
 
   const canonicalPayload = {
     type: payload.type,
@@ -53,7 +51,8 @@ export function createContinuationArtifact(
     version: contract.reasoning.artifactVersion,
     compatibilityGroup: contract.reasoning.compatibilityGroup,
     continuationPolicy: contract.reasoning.continuation,
-    requirement: contract.toolLoop.artifactPolicy === 'provider-managed' ? 'optional' as const : 'required' as const,
+    requirement:
+      contract.toolLoop.artifactPolicy === 'provider-managed' ? ('optional' as const) : ('required' as const),
     scope: contract.toolLoop.artifactScope,
     mutationPolicy: resolveMutationPolicy(contract.toolLoop.artifactPolicy),
     originFingerprint: requestPlan.executionIdentity.fingerprint,
@@ -89,24 +88,27 @@ export function toContinuationMetadata(
 }
 
 export function verifyContinuationArtifact(artifact: ProviderContinuationArtifact): boolean {
-  return artifact.originFingerprint === artifact.origin.fingerprint
-    && artifact.integrityHash === hashCanonical(continuationIntegrityEnvelope(artifact));
+  return (
+    artifact.originFingerprint === artifact.origin.fingerprint &&
+    artifact.integrityHash === hashCanonical(continuationIntegrityEnvelope(artifact))
+  );
 }
 
 export function normalizeContinuationArtifact(value: unknown): ProviderContinuationArtifact | undefined {
   if (!isRecord(value) || !isExecutionIdentity(value.origin)) return undefined;
   if (
-    typeof value.type !== 'string'
-    || typeof value.carrier !== 'string'
-    || typeof value.format !== 'string'
-    || typeof value.version !== 'string'
-    || typeof value.compatibilityGroup !== 'string'
-    || typeof value.continuationPolicy !== 'string'
-    || typeof value.originFingerprint !== 'string'
-    || typeof value.integrityHash !== 'string'
-    || (value.requirement !== 'optional' && value.requirement !== 'required')
-    || !isMutationPolicy(value.mutationPolicy)
-  ) return undefined;
+    typeof value.type !== 'string' ||
+    typeof value.carrier !== 'string' ||
+    typeof value.format !== 'string' ||
+    typeof value.version !== 'string' ||
+    typeof value.compatibilityGroup !== 'string' ||
+    typeof value.continuationPolicy !== 'string' ||
+    typeof value.originFingerprint !== 'string' ||
+    typeof value.integrityHash !== 'string' ||
+    (value.requirement !== 'optional' && value.requirement !== 'required') ||
+    !isMutationPolicy(value.mutationPolicy)
+  )
+    return undefined;
   const artifact = value as unknown as ProviderContinuationArtifact;
   return verifyContinuationArtifact(artifact) ? artifact : undefined;
 }
@@ -154,9 +156,14 @@ function hashCanonical(value: unknown): string {
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return '[' + value.map(stableJson).join(',') + ']';
   if (isRecord(value)) {
-    return '{' + Object.keys(value).sort()
-      .map((key) => JSON.stringify(key) + ':' + stableJson(value[key]))
-      .join(',') + '}';
+    return (
+      '{' +
+      Object.keys(value)
+        .sort()
+        .map((key) => JSON.stringify(key) + ':' + stableJson(value[key]))
+        .join(',') +
+      '}'
+    );
   }
   if (value === undefined) return 'null';
   return JSON.stringify(value);
@@ -167,16 +174,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isExecutionIdentity(value: unknown): boolean {
-  return isRecord(value)
-    && value.schemaVersion === 1
-    && typeof value.providerId === 'string'
-    && typeof value.fingerprint === 'string'
-    && typeof value.contractHash === 'string';
+  return (
+    isRecord(value) &&
+    value.schemaVersion === 1 &&
+    typeof value.providerId === 'string' &&
+    typeof value.fingerprint === 'string' &&
+    typeof value.contractHash === 'string'
+  );
 }
 
 function isMutationPolicy(value: unknown): value is ContinuationArtifactMutationPolicy {
-  return value === 'verbatim'
-    || value === 'verbatim-ordered'
-    || value === 'container-bound'
-    || value === 'provider-managed';
+  return (
+    value === 'verbatim' || value === 'verbatim-ordered' || value === 'container-bound' || value === 'provider-managed'
+  );
 }

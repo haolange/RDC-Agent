@@ -26,8 +26,10 @@
   font-size: var(--type-body-size);
   line-height: var(--chip-height);
   text-decoration: none;
-  transition: border-color var(--transition-fast), color var(--transition-fast);
-  animation: work-process-web-pill-enter var(--duration-base) var(--ease-decelerate) both;
+  transition:
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+  animation: rise-in-2px var(--duration-base) var(--ease-decelerate) both;
 }
 
 a.work-process-web-pill:hover,
@@ -65,13 +67,10 @@ a.work-process-web-pill:focus-visible {
   white-space: nowrap;
 }
 
-@keyframes work-process-web-pill-enter {
-  from { opacity: 0; transform: translateY(2px); }
-  to { opacity: 1; transform: none; }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .work-process-web-pill { animation: none; }
+  .work-process-web-pill {
+    animation: none;
+  }
 }
 
 /* Expanded list: every page with its title, address and first lines. */
@@ -168,5 +167,11 @@ a.work-process-web-item-title:hover {
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
   font-weight: var(--font-semibold);
-  line-height: 1;
+  line-height: var(--leading-none);
+}
+
+/* A page that cannot be opened still takes focus for its tooltip; focus shows the ring, not the hover surface. */
+span.work-process-web-pill:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
 }

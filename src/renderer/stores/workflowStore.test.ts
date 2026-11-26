@@ -7,7 +7,17 @@ const rightPanel = {
   artifacts: { rows: [], totalCount: 0, storeDegraded: false },
   outputs: { current: [], previous: [] },
   context: {
-    task: { projectId: 'p', projectName: 'p', sessionId: 's', sessionTitle: 's', workingDirectory: '.', configurationPhase: 'current_turn', agentProfile: 'general', permission: 'default', resources: [] },
+    task: {
+      projectId: 'p',
+      projectName: 'p',
+      sessionId: 's',
+      sessionTitle: 's',
+      workingDirectory: '.',
+      configurationPhase: 'current_turn',
+      agentProfile: 'general',
+      permission: 'default',
+      resources: [],
+    },
     rdc: { capture: null, availableCaptures: [], runtime: {}, diagnostics: [] },
   },
 } as AgentRunPresentation['rightPanel'];

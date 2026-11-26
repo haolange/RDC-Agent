@@ -33,16 +33,15 @@ export function isTopOverlayLayer(id: number | null): boolean {
   return stack.length > 0 && stack[stack.length - 1] === id;
 }
 
-export function getOverlayLayerDepth(id: number | null): number {
-  if (id === null) return 0;
-  return stack.indexOf(id) + 1;
-}
-
 /**
  * Registers an overlay layer while `open` is true and reports whether it is
  * currently the topmost one.
  */
-function bindOverlay(open: boolean, setLayerId: (id: number | null) => void, setIsTop: (top: boolean) => void): (() => void) | undefined {
+function bindOverlay(
+  open: boolean,
+  setLayerId: (id: number | null) => void,
+  setIsTop: (top: boolean) => void,
+): (() => void) | undefined {
   if (!open) {
     setLayerId(null);
     setIsTop(false);
@@ -70,24 +69,4 @@ export function useOverlayLayer(
   useEffect(() => (timing === 'effect' ? bindOverlay(open, setLayerId, setIsTop) : undefined), [open, timing]);
 
   return { layerId, isTop };
-}
-
-/** Escape dismisses only the top overlay. Nested menus register later than their parent. */
-export function useOverlayDismiss(
-  open: boolean,
-  onDismiss: () => void,
-  timing: 'layout' | 'effect' = 'effect',
-): void {
-  const { isTop } = useOverlayLayer(open, timing);
-  useEffect(() => {
-    if (!open || !isTop) return undefined;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopPropagation();
-      onDismiss();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isTop, onDismiss, open]);
 }

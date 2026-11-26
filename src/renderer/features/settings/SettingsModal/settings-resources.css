@@ -1,13 +1,5 @@
-
-
 .settings-actions {
   gap: var(--space-2);
-}
-
-.settings-permission-rules .settings-block-body {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
 }
 
 .settings-permission-rules .settings-actions {
@@ -39,12 +31,6 @@
   padding: 0;
   border: 0;
   background: transparent;
-}
-
-.settings-runtime-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
 }
 
 .settings-runtime-editor-placeholder {
@@ -101,14 +87,6 @@
 }
 
 /* Read-only rows inside the editor (scope, locked id). */
-.settings-runtime-readonly,
-.settings-runtime-id-control {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
 .settings-runtime-readonly {
   min-height: var(--control-height-md);
   padding: 0 var(--space-3);
@@ -159,12 +137,8 @@
   font-size: var(--type-body-size);
 }
 
-.settings-runtime-editor-status .ui-icon { color: var(--token-status-success); }
-
-.settings-runtime-editor-note .ui-icon {
-  flex: none;
-  margin-top: var(--space-0-5);
-  color: var(--token-status-warning);
+.settings-runtime-editor-status .ui-icon {
+  color: var(--token-status-success);
 }
 
 .settings-runtime-editor .ui-inline-error {
@@ -174,11 +148,6 @@
 .settings-runtime-dialog-status {
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-}
-
-.settings-runtime-list {
-  display: grid;
-  gap: var(--space-3);
 }
 
 .settings-runtime-editor textarea {

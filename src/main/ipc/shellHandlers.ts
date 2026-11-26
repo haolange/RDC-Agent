@@ -6,12 +6,9 @@ import { nativeMessage } from '../window/nativeI18n';
 import { appPathService } from '../runtime/AppPathService';
 import { samePath } from '../platform/paths';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
-import { EmptyArgsSchema, SaveFileArgsSchema } from './validation/commonIpcSchemas';
-import {
-  AppCopyTextArgsSchema,
-  AppGetAvatarDataUrlArgsSchema,
-  AppOpenPathArgsSchema,
-} from './validation/shellSchemas';
+import { EmptyArgsSchema } from './validation/commonIpcSchemas';
+import { AppCopyTextArgsSchema, AppGetAvatarDataUrlArgsSchema, AppOpenPathArgsSchema } from './validation/shellSchemas';
+import type { IpcChannelTable } from './invokeRegistry';
 
 const AVATAR_MIME_BY_EXTENSION: Record<string, string> = {
   '.png': 'image/png',
@@ -61,141 +58,139 @@ function getSenderWindow(event: IpcMainInvokeEvent): BrowserWindow | null {
 }
 
 export function registerShellHandlers(): void {
-  ipcMain.handle('dialog:selectRdcFiles', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectRdcFiles', maxBytes: 1024 });
-    const result = await dialog.showOpenDialog({
-      title: nativeMessage('selectCaptures'),
-      filters: [{ name: nativeMessage('captureFilter'), extensions: ['rdc'] }],
-      properties: ['openFile', 'multiSelections'],
-    });
-    return result.canceled ? null : result.filePaths;
-  });
+  const channels: IpcChannelTable = {
+    ...dialogChannels(),
+    ...windowChannels(),
+    ...appChannels(),
+  };
+  for (const [channel, handler] of Object.entries(channels)) ipcMain.handle(channel, handler);
+}
 
-  ipcMain.handle('dialog:selectKnowledgeImport', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectKnowledgeImport', maxBytes: 1024 });
-    const result = await dialog.showOpenDialog({
-      title: nativeMessage('selectKnowledge'),
-      filters: [
-        { name: nativeMessage('knowledgeFilter'), extensions: ['zip'] },
-        { name: nativeMessage('caseFilter'), extensions: ['yaml', 'yml'] },
-      ],
-      properties: ['openFile'],
-    });
-    return result.canceled ? null : result.filePaths[0] ?? null;
-  });
+/** Native file and directory pickers. */
+function dialogChannels(): IpcChannelTable {
+  return {
+    'dialog:selectRdcFiles': async (_event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectRdcFiles', maxBytes: 1024 });
+      const result = await dialog.showOpenDialog({
+        title: nativeMessage('selectCaptures'),
+        filters: [{ name: nativeMessage('captureFilter'), extensions: ['rdc'] }],
+        properties: ['openFile', 'multiSelections'],
+      });
+      return result.canceled ? null : result.filePaths;
+    },
+    'dialog:selectKnowledgeImport': async (_event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectKnowledgeImport', maxBytes: 1024 });
+      const result = await dialog.showOpenDialog({
+        title: nativeMessage('selectKnowledge'),
+        filters: [
+          { name: nativeMessage('knowledgeFilter'), extensions: ['zip'] },
+          { name: nativeMessage('caseFilter'), extensions: ['yaml', 'yml'] },
+        ],
+        properties: ['openFile'],
+      });
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
+    'dialog:selectFiles': async (_event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectFiles', maxBytes: 1024 });
+      const result = await dialog.showOpenDialog({
+        title: nativeMessage('selectFiles'),
+        properties: ['openFile', 'multiSelections'],
+      });
+      return result.canceled ? null : result.filePaths;
+    },
+    'dialog:selectDirectory': async (_event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectDirectory', maxBytes: 1024 });
+      const result = await dialog.showOpenDialog({
+        title: nativeMessage('selectDirectory'),
+        properties: ['openDirectory', 'createDirectory'],
+      });
+      return result.canceled ? null : result.filePaths[0];
+    },
+  };
+}
 
-  ipcMain.handle('dialog:selectFiles', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectFiles', maxBytes: 1024 });
-    const result = await dialog.showOpenDialog({
-      title: nativeMessage('selectFiles'),
-      properties: ['openFile', 'multiSelections'],
-    });
-    return result.canceled ? null : result.filePaths;
-  });
+/** Window chrome controls of the sending window. */
+function windowChannels(): IpcChannelTable {
+  return {
+    'window:minimize': async (event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'window:minimize', maxBytes: 1024 });
+      getSenderWindow(event)?.minimize();
+    },
+    'window:toggleMaximize': async (event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'window:toggleMaximize', maxBytes: 1024 });
+      const window = getSenderWindow(event);
+      if (!window) return false;
 
-  ipcMain.handle('dialog:selectDirectory', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectDirectory', maxBytes: 1024 });
-    const result = await dialog.showOpenDialog({
-      title: nativeMessage('selectDirectory'),
-      properties: ['openDirectory', 'createDirectory'],
-    });
-    return result.canceled ? null : result.filePaths[0];
-  });
+      if (window.isMaximized()) {
+        window.unmaximize();
+        return false;
+      }
 
-  ipcMain.handle('dialog:saveFile', async (_event, ...rawArgs: unknown[]) => {
-    const [request] = parseIpcArgs(SaveFileArgsSchema, rawArgs, {
-      label: 'dialog:saveFile',
-      maxBytes: 4 * 1024,
-    });
-    const result = await dialog.showSaveDialog({
-      defaultPath: request.defaultFileName,
-      filters: [{ name: request.extension.toUpperCase(), extensions: [request.extension] }],
-      properties: ['createDirectory', 'showOverwriteConfirmation'],
-    });
-    return result.canceled || !result.filePath ? null : result.filePath;
-  });
+      window.maximize();
+      return true;
+    },
+    'window:close': async (event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'window:close', maxBytes: 1024 });
+      getSenderWindow(event)?.close();
+    },
+    'window:isMaximized': async (event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'window:isMaximized', maxBytes: 1024 });
+      return getSenderWindow(event)?.isMaximized() ?? false;
+    },
+  };
+}
 
-  ipcMain.handle('window:minimize', async (event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'window:minimize', maxBytes: 1024 });
-    getSenderWindow(event)?.minimize();
-  });
+/** App metadata, the avatar, opening paths and the clipboard. */
+function appChannels(): IpcChannelTable {
+  return {
+    'app:getMeta': async (_event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'app:getMeta', maxBytes: 1024 });
+      return {
+        version: app.getVersion(),
+        productName: app.getName(),
+        systemTheme: nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
+      };
+    },
+    'app:selectAvatar': async (_event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'app:selectAvatar', maxBytes: 1024 });
+      const result = await dialog.showOpenDialog({
+        title: nativeMessage('selectAvatar'),
+        filters: [{ name: nativeMessage('imageFilter'), extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
+        properties: ['openFile'],
+      });
+      const [selectedPath] = result.filePaths;
+      if (result.canceled || !selectedPath) {
+        return null;
+      }
 
-  ipcMain.handle('window:toggleMaximize', async (event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'window:toggleMaximize', maxBytes: 1024 });
-    const window = getSenderWindow(event);
-    if (!window) return false;
+      try {
+        return copyAvatarToWorkspace(selectedPath);
+      } catch (error) {
+        console.warn('[IPC] Failed to import avatar:', error);
+        return null;
+      }
+    },
+    'app:getAvatarDataUrl': async (_event, ...rawArgs: unknown[]) => {
+      const [avatarPath] = parseIpcArgs(AppGetAvatarDataUrlArgsSchema, rawArgs, {
+        label: 'app:getAvatarDataUrl',
+        maxBytes: 8 * 1024,
+      });
+      if (!avatarPath) {
+        return null;
+      }
 
-    if (window.isMaximized()) {
-      window.unmaximize();
-      return false;
-    }
-
-    window.maximize();
-    return true;
-  });
-
-  ipcMain.handle('window:close', async (event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'window:close', maxBytes: 1024 });
-    getSenderWindow(event)?.close();
-  });
-
-  ipcMain.handle('window:isMaximized', async (event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'window:isMaximized', maxBytes: 1024 });
-    return getSenderWindow(event)?.isMaximized() ?? false;
-  });
-
-  ipcMain.handle('app:getMeta', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'app:getMeta', maxBytes: 1024 });
-    return {
-      version: app.getVersion(),
-      productName: app.getName(),
-      systemTheme: nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
-    };
-  });
-
-  ipcMain.handle('app:selectAvatar', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'app:selectAvatar', maxBytes: 1024 });
-    const result = await dialog.showOpenDialog({
-      title: nativeMessage('selectAvatar'),
-      filters: [{ name: nativeMessage('imageFilter'), extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
-      properties: ['openFile'],
-    });
-    if (result.canceled || result.filePaths.length === 0) {
-      return null;
-    }
-
-    try {
-      return copyAvatarToWorkspace(result.filePaths[0]);
-    } catch (error) {
-      console.warn('[IPC] Failed to import avatar:', error);
-      return null;
-    }
-  });
-
-  ipcMain.handle('app:getAvatarDataUrl', async (_event, ...rawArgs: unknown[]) => {
-    const [avatarPath] = parseIpcArgs(AppGetAvatarDataUrlArgsSchema, rawArgs, {
-      label: 'app:getAvatarDataUrl',
-      maxBytes: 8 * 1024,
-    });
-    if (!avatarPath) {
-      return null;
-    }
-
-    try {
-      return readAvatarDataUrl(avatarPath);
-    } catch (error) {
-      console.warn('[IPC] Failed to read avatar:', error);
-      return null;
-    }
-  });
-
-  ipcMain.handle('app:openPath', async (_event, ...rawArgs: unknown[]) => {
-    try {
+      try {
+        return readAvatarDataUrl(avatarPath);
+      } catch (error) {
+        console.warn('[IPC] Failed to read avatar:', error);
+        return null;
+      }
+    },
+    'app:openPath': async (_event, ...rawArgs: unknown[]) => {
       const [targetPath] = parseIpcArgs(AppOpenPathArgsSchema, rawArgs, {
         label: 'app:openPath',
         maxBytes: 8 * 1024,
       });
-      if (!targetPath) return { success: false, error: 'path is required' };
       try {
         const stats = fs.existsSync(targetPath) ? fs.statSync(targetPath) : null;
         if (stats?.isDirectory()) {
@@ -206,25 +201,20 @@ export function registerShellHandlers(): void {
       } catch {
         shell.showItemInFolder(targetPath);
       }
+    },
+    'app:copyText': async (_event, ...rawArgs: unknown[]) => {
+      const [text] = parseIpcArgs(AppCopyTextArgsSchema, rawArgs, {
+        label: 'app:copyText',
+        maxBytes: 2 * 1024 * 1024,
+      });
+      clipboard.writeText(text);
       return { success: true };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-
-  ipcMain.handle('app:copyText', async (_event, ...rawArgs: unknown[]) => {
-    const [text] = parseIpcArgs(AppCopyTextArgsSchema, rawArgs, {
-      label: 'app:copyText',
-      maxBytes: 2 * 1024 * 1024,
-    });
-    clipboard.writeText(text ?? '');
-    return { success: true };
-  });
-
-  ipcMain.handle('app:readClipboardText', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, {
-      label: 'app:readClipboardText',
-    });
-    return { success: true, text: clipboard.readText() };
-  });
+    },
+    'app:readClipboardText': async (_event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, {
+        label: 'app:readClipboardText',
+      });
+      return { success: true, text: clipboard.readText() };
+    },
+  };
 }

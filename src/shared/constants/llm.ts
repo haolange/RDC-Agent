@@ -4,8 +4,6 @@ import type {
   LlmProviderProtocolDescriptor,
 } from '@shared/types/settings';
 
-
-
 export const LLM_PROVIDER_CATEGORY_DEFINITIONS: LlmProviderCategoryDescriptor[] = [
   {
     id: 'login-authorization',
@@ -25,7 +23,8 @@ export const LLM_PROVIDER_CATEGORY_DEFINITIONS: LlmProviderCategoryDescriptor[] 
   {
     id: 'compatible-access',
     label: 'Compatible Access',
-    description: 'Official or third-party services reached through a compatibility protocol; operator facts remain explicit.',
+    description:
+      'Official or third-party services reached through a compatibility protocol; operator facts remain explicit.',
   },
   {
     id: 'coding-token-plan',
@@ -109,8 +108,6 @@ export const LLM_PROVIDER_PROTOCOL_DEFINITIONS: LlmProviderProtocolDescriptor[] 
   },
 ];
 
-
 export function isLlmProviderProtocol(value: unknown): value is LlmProviderProtocol {
-  return typeof value === 'string'
-    && LLM_PROVIDER_PROTOCOL_DEFINITIONS.some((entry) => entry.id === value);
+  return typeof value === 'string' && LLM_PROVIDER_PROTOCOL_DEFINITIONS.some((entry) => entry.id === value);
 }

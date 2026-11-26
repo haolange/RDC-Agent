@@ -3,13 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { fetchMock, lookupMock } = vi.hoisted(() => ({ fetchMock: vi.fn(), lookupMock: vi.fn() }));
 vi.mock('dns/promises', () => ({ lookup: lookupMock }));
-vi.mock('../../net/assertPublicHttpUrl', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../../net/assertPublicHttpUrl')>(),
-  fetchPinnedPublic: fetchMock,
-}));
+vi.mock('../../../runtime/net/pinnedTransport', () => ({ requestPinned: fetchMock }));
 
+import { WEB_MAX_RESPONSE_BYTES } from '../../../runtime/toolLimits';
 import { webFetchTool } from './WebTools';
-import { WEB_MAX_RESPONSE_BYTES } from './toolLimits';
 
 const url = 'https://example.com/large-source';
 const digest = (text: string) => createHash('sha256').update(text).digest('hex');
@@ -27,12 +24,16 @@ describe('web_fetch complete-source pagination', () => {
     fetchMock.mockImplementation(() => Promise.resolve(new Response(body)));
     const first = await webFetchTool.execute('first', { url });
     expect(first.details).toMatchObject({
-      bytes: Buffer.byteLength(body), sourceHash: digest(body), truncated: true,
+      bytes: Buffer.byteLength(body),
+      sourceHash: digest(body),
+      truncated: true,
       page: { offset: 0, bytes: WEB_MAX_RESPONSE_BYTES, nextOffset: WEB_MAX_RESPONSE_BYTES },
     });
     expect(output(first)).not.toContain('TAIL_CONTRACT_CLAUSE');
     const second = await webFetchTool.execute('second', {
-      url, offset: first.details!.page.nextOffset!, expectedSourceHash: first.details!.sourceHash,
+      url,
+      offset: first.details!.page.nextOffset!,
+      expectedSourceHash: first.details!.sourceHash,
     });
     expect(output(second)).toContain('TAIL_CONTRACT_CLAUSE');
     expect(second.details).toMatchObject({ sourceHash: digest(body), truncated: false });
@@ -44,9 +45,13 @@ describe('web_fetch complete-source pagination', () => {
     const body = 'a'.repeat(WEB_MAX_RESPONSE_BYTES + 1);
     fetchMock.mockResolvedValueOnce(new Response(body)).mockResolvedValueOnce(new Response(`${body}changed`));
     const first = await webFetchTool.execute('first', { url });
-    await expect(webFetchTool.execute('changed', {
-      url, offset: first.details!.page.nextOffset!, expectedSourceHash: first.details!.sourceHash,
-    })).rejects.toThrow(/source hash mismatch/i);
+    await expect(
+      webFetchTool.execute('changed', {
+        url,
+        offset: first.details!.page.nextOffset!,
+        expectedSourceHash: first.details!.sourceHash,
+      }),
+    ).rejects.toThrow(/source hash mismatch/i);
   });
 
   it('does not split UTF-8 characters or normalize CRLF and BOM between pages', async () => {
@@ -54,7 +59,9 @@ describe('web_fetch complete-source pagination', () => {
     fetchMock.mockImplementation(() => Promise.resolve(new Response(body)));
     const first = await webFetchTool.execute('first', { url });
     const second = await webFetchTool.execute('second', {
-      url, offset: first.details!.page.nextOffset!, expectedSourceHash: first.details!.sourceHash,
+      url,
+      offset: first.details!.page.nextOffset!,
+      expectedSourceHash: first.details!.sourceHash,
     });
     expect(first.details!.page.bytes).toBeLessThanOrEqual(WEB_MAX_RESPONSE_BYTES);
     expect(second.details!.page.bytes).toBeLessThanOrEqual(WEB_MAX_RESPONSE_BYTES);
@@ -65,24 +72,29 @@ describe('web_fetch complete-source pagination', () => {
   });
 
   it.each([-1, 0.5, Number.NaN])('rejects an invalid cursor %s before network access', async (offset) => {
-    await expect(webFetchTool.execute('bad', { url, offset, expectedSourceHash: 'a'.repeat(64) }))
-      .rejects.toThrow(/offset/i);
+    await expect(webFetchTool.execute('bad', { url, offset, expectedSourceHash: 'a'.repeat(64) })).rejects.toThrow(
+      /offset/i,
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('requires a source hash for continuation and validates it before network access', async () => {
     await expect(webFetchTool.execute('missing', { url, offset: 1 })).rejects.toThrow(/source hash/i);
-    await expect(webFetchTool.execute('bad-hash', { url, expectedSourceHash: 'invalid' })).rejects.toThrow(/source hash/i);
+    await expect(webFetchTool.execute('bad-hash', { url, expectedSourceHash: 'invalid' })).rejects.toThrow(
+      /source hash/i,
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('rejects cursors past the source or inside a surrogate pair', async () => {
     const body = 'a😀b';
     fetchMock.mockImplementation(() => Promise.resolve(new Response(body)));
-    await expect(webFetchTool.execute('past', { url, offset: 99, expectedSourceHash: digest(body) }))
-      .rejects.toThrow(/offset/i);
-    await expect(webFetchTool.execute('split', { url, offset: 2, expectedSourceHash: digest(body) }))
-      .rejects.toThrow(/offset/i);
+    await expect(webFetchTool.execute('past', { url, offset: 99, expectedSourceHash: digest(body) })).rejects.toThrow(
+      /offset/i,
+    );
+    await expect(webFetchTool.execute('split', { url, offset: 2, expectedSourceHash: digest(body) })).rejects.toThrow(
+      /offset/i,
+    );
   });
 
   it('rejects a source beyond its finite whole-source bound without returning a false complete prefix', async () => {
@@ -98,8 +110,9 @@ describe('web_fetch complete-source pagination', () => {
   it('does not initiate a request after cancellation', async () => {
     const controller = new AbortController();
     controller.abort(new Error('cancelled before fetch'));
-    await expect(webFetchTool.execute('cancelled', { url }, controller.signal))
-      .rejects.toThrow('cancelled before fetch');
+    await expect(webFetchTool.execute('cancelled', { url }, controller.signal)).rejects.toThrow(
+      'cancelled before fetch',
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -34,7 +34,7 @@
 }
 
 .ui-checkbox:hover .ui-checkbox-box {
-  border-color: var(--token-border-strong);
+  border-color: var(--token-text-secondary);
 }
 
 .ui-checkbox-input:checked + .ui-checkbox-box {

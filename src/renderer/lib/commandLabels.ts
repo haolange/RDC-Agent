@@ -1,4 +1,5 @@
 import { AGENT_WORKBENCH_COMMAND_CATALOG } from '@shared/constants/agentWorkbenchCatalog';
+import { AppError } from '@shared/errors/appError';
 import type { CommandListResult } from '@shared/types/command';
 import type { Translator, TranslationKey } from '../i18n/messages';
 
@@ -15,7 +16,7 @@ export const WORKBENCH_COMMAND_DESCRIPTION_KEYS: Record<string, TranslationKey> 
 
 export function workbenchCommandDescriptionKey(command: string): TranslationKey {
   const key = WORKBENCH_COMMAND_DESCRIPTION_KEYS[command];
-  if (!key) throw new Error(`WORKBENCH_COMMAND_COPY_MISSING: ${command}`);
+  if (!key) throw new AppError('WORKBENCH_COMMAND_COPY_MISSING', command);
   return key;
 }
 
@@ -60,7 +61,8 @@ export type LocalizedCommand = CommandListResult['commands'][number] & { categor
 
 /** The command list stays main-owned; only builtin display copy is localized here. The raw category stays for icons. */
 export function localizeCommands(commands: CommandListResult['commands'], t: Translator): LocalizedCommand[] {
-  return commands.map(command => ({ ...command,
+  return commands.map((command) => ({
+    ...command,
     description: DESCRIPTION_KEYS[command.id] ? t(DESCRIPTION_KEYS[command.id]) : command.description,
     categoryLabel: CATEGORY_KEYS[command.category] ? t(CATEGORY_KEYS[command.category]) : command.category,
   }));

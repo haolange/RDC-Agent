@@ -7,7 +7,10 @@ import { hardenSecretFile, secretStorageUnavailableReason, type SecretStoragePro
 
 const windows = describeHost('win32', 'x64');
 const linux = describeHost('linux', 'x64');
-const storage = (available: boolean, backend: ReturnType<SecretStorageProbe['getSelectedStorageBackend']>): SecretStorageProbe => ({
+const storage = (
+  available: boolean,
+  backend: ReturnType<SecretStorageProbe['getSelectedStorageBackend']>,
+): SecretStorageProbe => ({
   isEncryptionAvailable: () => available,
   getSelectedStorageBackend: () => backend,
 });

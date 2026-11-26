@@ -21,10 +21,13 @@ function activeAssistant(overrides: Partial<ConversationMessage>): ConversationM
 }
 
 describe('stopWorkTrace', () => {
-  it.each(['complete', 'error', 'stopped'] as const)('does not overwrite the authoritative %s terminal message', (status) => {
-    const message = activeAssistant({ status, content: 'Final answer', updatedAt: 10 });
-    expect(stopWorkTrace(message)).toBe(message);
-  });
+  it.each(['complete', 'error', 'stopped'] as const)(
+    'does not overwrite the authoritative %s terminal message',
+    (status) => {
+      const message = activeAssistant({ status, content: 'Final answer', updatedAt: 10 });
+      expect(stopWorkTrace(message)).toBe(message);
+    },
+  );
 
   it('optimistically marks the active assistant message and running work rows as stopped locally', () => {
     vi.useFakeTimers();
@@ -82,33 +85,67 @@ describe('stopWorkTrace', () => {
   });
 
   it('settles pending tools, thinking, approval and plan review when stopped during a live loop', () => {
-    const stopped = stopWorkTrace(activeAssistant({
-      workTrace: {
-        status: 'running', updatedAt: 1, blocks: [{
-          id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running',
-          startedAt: 1,
-          result: { status: 'streaming', toolCallIds: [] },
-          items: [{ kind: 'thinking', status: 'streaming', displayOrder: 1,
-            providerOutputRef: { protocol: 'test', providerBlockKey: 'reasoning', contentIndex: 0 },
-            thinking: { kind: 'raw', source: 'anthropic-thinking', visibility: 'raw-collapsed', text: 'Still reasoning' } }],
-          toolCalls: [
-            { id: 'queued', toolName: 'investigation_read', status: 'pending', startedAt: 1 },
-            { id: 'review', toolName: 'plan_artifact', status: 'running', startedAt: 1,
-              approval: { approvalId: 'approval', status: 'pending' },
-              planReview: { planId: 'plan', revision: 1, hash: 'hash',
-                uri: 'session://plans/plan.md', title: 'Plan', summary: [], sections: [],
-                status: 'awaiting', handoffOptions: [] } },
+    const stopped = stopWorkTrace(
+      activeAssistant({
+        workTrace: {
+          status: 'running',
+          updatedAt: 1,
+          blocks: [
+            {
+              id: 'loop',
+              kind: 'llm_turn',
+              title: 'Loop',
+              status: 'running',
+              startedAt: 1,
+              result: { status: 'streaming', toolCallIds: [] },
+              items: [
+                {
+                  kind: 'thinking',
+                  status: 'streaming',
+                  displayOrder: 1,
+                  providerOutputRef: { protocol: 'test', providerBlockKey: 'reasoning', contentIndex: 0 },
+                  thinking: {
+                    kind: 'raw',
+                    source: 'anthropic-thinking',
+                    visibility: 'raw-collapsed',
+                    text: 'Still reasoning',
+                  },
+                },
+              ],
+              toolCalls: [
+                { id: 'queued', toolName: 'investigation_read', status: 'pending', startedAt: 1 },
+                {
+                  id: 'review',
+                  toolName: 'plan_artifact',
+                  status: 'running',
+                  startedAt: 1,
+                  approval: { approvalId: 'approval', status: 'pending' },
+                  planReview: {
+                    planId: 'plan',
+                    revision: 1,
+                    hash: 'hash',
+                    uri: 'session://plans/plan.md',
+                    title: 'Plan',
+                    summary: [],
+                    sections: [],
+                    status: 'awaiting',
+                    handoffOptions: [],
+                  },
+                },
+              ],
+            },
           ],
-        }],
-      },
-    }));
+        },
+      }),
+    );
 
     const loop = stopped.workTrace?.blocks[0];
     expect(loop).toMatchObject({ status: 'cancelled', items: [{ kind: 'thinking', status: 'complete' }] });
     expect(loop?.result).toMatchObject({ status: 'complete', toolCallIds: ['queued', 'review'] });
     expect(loop?.toolCalls[0]).toMatchObject({ status: 'skipped', completedAt: expect.any(Number) });
     expect(loop?.toolCalls[1]).toMatchObject({
-      status: 'cancelled', completedAt: expect.any(Number),
+      status: 'cancelled',
+      completedAt: expect.any(Number),
       approval: { status: 'cancelled' },
       planReview: { status: 'cancelled' },
     });
@@ -132,43 +169,31 @@ describe('selectActiveAssistantForTurn', () => {
       updatedAt: 2,
     });
 
-    expect(selectActiveAssistantForTurn(
-      [owned, unrelatedLatest],
-      'session-1',
-      {
+    expect(
+      selectActiveAssistantForTurn([owned, unrelatedLatest], 'session-1', {
         sessionId: 'session-1',
         projectId: 'project-1',
         requestId: 'request-owned',
         agentId: 'plan',
-        optimisticTurnId: null,
-        realTurnId: 'turn-owned',
-      },
-    )?.id).toBe('owned');
+      })?.id,
+    ).toBe('owned');
   });
 
   it('does not fall back to a different agent when the scoped active turn has no message', () => {
-    expect(selectActiveAssistantForTurn(
-      [activeAssistant({ agentId: 'ask' })],
-      'session-1',
-      {
+    expect(
+      selectActiveAssistantForTurn([activeAssistant({ agentId: 'ask' })], 'session-1', {
         sessionId: 'session-1',
         projectId: 'project-1',
         requestId: 'request-edit',
         agentId: 'edit',
-        optimisticTurnId: 'optimistic-turn-request-edit',
-        realTurnId: null,
-      },
-    )).toBeNull();
+      }),
+    ).toBeNull();
   });
 
   it('falls back only within the selected session when runtime state was restored', () => {
     const otherSession = activeAssistant({ id: 'other', sessionId: 'session-2', updatedAt: 3 });
     const selectedSession = activeAssistant({ id: 'selected', sessionId: 'session-1', updatedAt: 2 });
 
-    expect(selectActiveAssistantForTurn(
-      [selectedSession, otherSession],
-      'session-1',
-      null,
-    )?.id).toBe('selected');
+    expect(selectActiveAssistantForTurn([selectedSession, otherSession], 'session-1', null)?.id).toBe('selected');
   });
 });

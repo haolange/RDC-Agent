@@ -3,39 +3,97 @@ import * as os from 'os';
 import * as path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TaskRegistry } from '../tasks';
-import { delegationTraceStore } from '../../conversation/DelegationTraceStore';
+import { delegationTraceStore } from '../workTrace/DelegationTraceStore';
 import { BackgroundSubagentService } from './BackgroundSubagentService';
 import { flushPolicyBudgetObservers } from './DelegationBudget';
 import { createSubagentBudgetState } from './TurnCoordinator';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { DelegationCapsule } from './delegationCapsule';
 import type { RequestEnvelopeSnapshot } from '@shared/types/rdcRuntime';
 
 const roots: string[] = [];
 const capsule: DelegationCapsule = {
-  goal: 'Inspect', task: 'Inspect the target', scope: 'tests', acceptedFacts: [], hypotheses: [],
-  challengeRefs: [], negativePaths: [], inputArtifactRefs: [], outputRequirements: 'Return findings',
-  stopConditions: ['done'], requiredSkillIds: [], budget: { maxToolCalls: 4, maxWallTimeMs: 10_000 },
+  goal: 'Inspect',
+  task: 'Inspect the target',
+  scope: 'tests',
+  acceptedFacts: [],
+  hypotheses: [],
+  challengeRefs: [],
+  negativePaths: [],
+  inputArtifactRefs: [],
+  outputRequirements: 'Return findings',
+  stopConditions: ['done'],
+  requiredSkillIds: [],
+  budget: { maxToolCalls: 4, maxWallTimeMs: 10_000 },
 };
-function harness(run: ConstructorParameters<typeof BackgroundSubagentService>[0], listDeliveries?: ConstructorParameters<typeof BackgroundSubagentService>[3]) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'background-subagent-')); roots.push(root);
+function harness(
+  run: ConstructorParameters<typeof BackgroundSubagentService>[0],
+  listDeliveries?: ConstructorParameters<typeof BackgroundSubagentService>[3],
+) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'background-subagent-'));
+  roots.push(root);
   const registries = new Map<string, TaskRegistry>();
-  const service = new BackgroundSubagentService(run, (sessionId, onCancel) => {
-    const registry = new TaskRegistry(path.join(root, sessionId), { onCancelExecution: onCancel });
-    registries.set(sessionId, registry); return registry;
-  }, (_sessionId, executionId) => ({ uri: `session://tool-outputs/background-${executionId}.json`, hash: 'fixture-hash' }), listDeliveries);
+  const service = new BackgroundSubagentService(
+    run,
+    (sessionId, onCancel) => {
+      const registry = new TaskRegistry(path.join(root, sessionId), { onCancelExecution: onCancel });
+      registries.set(sessionId, registry);
+      return registry;
+    },
+    (_sessionId, executionId) => ({
+      uri: `session://tool-outputs/background-${executionId}.json`,
+      hash: 'fixture-hash',
+    }),
+    listDeliveries,
+  );
   return { service, registry: (sessionId: string) => registries.get(sessionId)! };
 }
-afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
+afterEach(() => {
+  for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
+});
 
 describe('BackgroundSubagentService', () => {
   it('returns immediately and persists a bounded structured result and parent mailbox receipt', async () => {
-    let release!: () => void; const gate = new Promise<void>((resolve) => { release = resolve; });
-    const { service, registry } = harness(async (input) => { await gate; await input.onProviderRequestCommitted?.('request-snapshot-1'); await input.onProviderRequestCommitted?.('request-snapshot-2'); return { status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: { report: 'session://result' }, counterevidence: [], unresolved: [], scope: 'one file', sideEffects: [], recoveryState: [] } } }; });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const { service, registry } = harness(async (input) => {
+      await gate;
+      await input.onProviderRequestCommitted?.('request-snapshot-1');
+      await input.onProviderRequestCommitted?.('request-snapshot-2');
+      return {
+        status: 'complete',
+        text: 'done',
+        completionDeclaration: {
+          disposition: 'completed',
+          evidenceRefs: [],
+          result: {
+            summary: 'done',
+            outputs: { report: 'session://result' },
+            counterevidence: [],
+            unresolved: [],
+            scope: 'one file',
+            sideEffects: [],
+            recoveryState: [],
+          },
+        },
+      };
+    });
     await service.query('s1', 'missing');
     const taskRegistry = registry('s1');
     const task = await taskRegistry.createTask('background', { completionRequirements: ['report'] });
-    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule });
-    expect(execution.status).toBe('running'); release(); await service.join(execution.id);
+    const execution = await service.start({
+      parentToolCallId: 'test-tool',
+      sessionId: 's1',
+      taskId: task.id,
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      targetProfile: 'general',
+      capsule,
+    });
+    expect(execution.status).toBe('running');
+    release();
+    await service.join(execution.id);
     expect((await registry('s1').getExecution(execution.id))?.result?.outputs.report).toBe('session://result');
     expect((await registry('s1').getExecution(execution.id))?.frozenPlanRef).toBe('request-snapshot-1');
     const parentMailbox = await service.beforeParentProviderRequestMessages('s1');
@@ -43,10 +101,34 @@ describe('BackgroundSubagentService', () => {
   });
 
   it('delivers parent events once and acknowledges them only after the request commit', async () => {
-    const { service, registry } = harness(async () => ({ status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: {}, counterevidence: [], unresolved: [], scope: 'test', sideEffects: [], recoveryState: [] } } }));
+    const { service, registry } = harness(async () => ({
+      status: 'complete',
+      text: 'done',
+      completionDeclaration: {
+        disposition: 'completed',
+        evidenceRefs: [],
+        result: {
+          summary: 'done',
+          outputs: {},
+          counterevidence: [],
+          unresolved: [],
+          scope: 'test',
+          sideEffects: [],
+          recoveryState: [],
+        },
+      },
+    }));
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('parent mailbox');
-    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule });
+    const execution = await service.start({
+      parentToolCallId: 'test-tool',
+      sessionId: 's1',
+      taskId: task.id,
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      targetProfile: 'general',
+      capsule,
+    });
     await service.join(execution.id);
     const pending = await service.beforeParentProviderRequestMessages('s1');
     expect(JSON.stringify(pending.messages)).toContain(execution.id);
@@ -58,67 +140,169 @@ describe('BackgroundSubagentService', () => {
 
   it('recovers a parent mailbox commit from structured request metadata after a crash before ack', async () => {
     const deliveries: NonNullable<RequestEnvelopeSnapshot['mailboxDeliveries']> = [];
-    const { service, registry } = harness(async () => ({ status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: {}, counterevidence: [], unresolved: [], scope: 'test', sideEffects: [], recoveryState: [] } } }), () => deliveries);
+    const { service, registry } = harness(
+      async () => ({
+        status: 'complete',
+        text: 'done',
+        completionDeclaration: {
+          disposition: 'completed',
+          evidenceRefs: [],
+          result: {
+            summary: 'done',
+            outputs: {},
+            counterevidence: [],
+            unresolved: [],
+            scope: 'test',
+            sideEffects: [],
+            recoveryState: [],
+          },
+        },
+      }),
+      () => deliveries,
+    );
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('parent crash recovery');
-    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule });
+    const execution = await service.start({
+      parentToolCallId: 'test-tool',
+      sessionId: 's1',
+      taskId: task.id,
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      targetProfile: 'general',
+      capsule,
+    });
     await service.join(execution.id);
     const pending = await service.beforeParentProviderRequestMessages('s1');
-    deliveries.push(...pending.mailboxDeliveries ?? []);
+    deliveries.push(...(pending.mailboxDeliveries ?? []));
     const recovered = await service.beforeParentProviderRequestMessages('s1');
     expect(recovered.messages).toEqual([]);
   });
 
   it('rejects cross-session tool ownership before cancellation', async () => {
-    const { service, registry } = harness(async ({ signal }) => new Promise((resolve) => signal.addEventListener('abort', () => resolve({ status: 'cancelled', text: 'cancelled' }), { once: true })));
+    const { service, registry } = harness(
+      async ({ signal }) =>
+        new Promise((resolve) =>
+          signal.addEventListener('abort', () => resolve({ status: 'cancelled', text: 'cancelled' }), { once: true }),
+        ),
+    );
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('background');
-    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule });
+    const execution = await service.start({
+      parentToolCallId: 'test-tool',
+      sessionId: 's1',
+      taskId: task.id,
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      targetProfile: 'general',
+      capsule,
+    });
     await expect(service.cancel('s2', execution.id)).rejects.toThrow(/not owned/);
     await service.cancel('s1', execution.id);
   });
 
   it('delivers and acknowledges owner data only at a provider request boundary', async () => {
-    let enter!: () => void; const gate = new Promise<void>((resolve) => { enter = resolve; });
+    let enter!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
     let delivered = '';
     const { service, registry } = harness(async (input) => {
       await gate;
       const pending = await input.beforeProviderRequestMessages!();
       delivered = JSON.stringify(pending.messages);
       await pending.commit?.();
-      return { status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: {}, counterevidence: [], unresolved: [], scope: 'test', sideEffects: [], recoveryState: [] } } };
+      return {
+        status: 'complete',
+        text: 'done',
+        completionDeclaration: {
+          disposition: 'completed',
+          evidenceRefs: [],
+          result: {
+            summary: 'done',
+            outputs: {},
+            counterevidence: [],
+            unresolved: [],
+            scope: 'test',
+            sideEffects: [],
+            recoveryState: [],
+          },
+        },
+      };
     });
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('mailbox');
-    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule });
+    const execution = await service.start({
+      parentToolCallId: 'test-tool',
+      sessionId: 's1',
+      taskId: task.id,
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      targetProfile: 'general',
+      capsule,
+    });
     await service.postMessage('s1', execution.id, execution.generation, 'observed condition');
-    enter(); await service.join(execution.id);
+    enter();
+    await service.join(execution.id);
     expect(delivered).toContain('observed condition');
     expect((await registry('s1').getExecution(execution.id))?.childMessageAckSequence).toBeGreaterThan(0);
   });
 
   it('recovers a child mailbox commit from structured request metadata after a crash before ack', async () => {
     const deliveries: NonNullable<RequestEnvelopeSnapshot['mailboxDeliveries']> = [];
-    let enter!: () => void; const gate = new Promise<void>((resolve) => { enter = resolve; });
+    let enter!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
     let redelivered = true;
-    const { service, registry } = harness(async (input) => {
-      await gate;
-      const pending = await input.beforeProviderRequestMessages!();
-      deliveries.push(...pending.mailboxDeliveries ?? []);
-      const recovered = await input.beforeProviderRequestMessages!();
-      redelivered = recovered.messages.length > 0;
-      return { status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: {}, counterevidence: [], unresolved: [], scope: 'test', sideEffects: [], recoveryState: [] } } };
-    }, () => deliveries);
+    const { service, registry } = harness(
+      async (input) => {
+        await gate;
+        const pending = await input.beforeProviderRequestMessages!();
+        deliveries.push(...(pending.mailboxDeliveries ?? []));
+        const recovered = await input.beforeProviderRequestMessages!();
+        redelivered = recovered.messages.length > 0;
+        return {
+          status: 'complete',
+          text: 'done',
+          completionDeclaration: {
+            disposition: 'completed',
+            evidenceRefs: [],
+            result: {
+              summary: 'done',
+              outputs: {},
+              counterevidence: [],
+              unresolved: [],
+              scope: 'test',
+              sideEffects: [],
+              recoveryState: [],
+            },
+          },
+        };
+      },
+      () => deliveries,
+    );
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('crash recovery');
-    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule });
+    const execution = await service.start({
+      parentToolCallId: 'test-tool',
+      sessionId: 's1',
+      taskId: task.id,
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      targetProfile: 'general',
+      capsule,
+    });
     await service.postMessage('s1', execution.id, execution.generation, 'deliver once');
-    enter(); await service.join(execution.id);
+    enter();
+    await service.join(execution.id);
     expect(redelivered).toBe(false);
   });
 
   it('pages a large owner mailbox without duplicate delivery or exceeding the request bound', async () => {
-    let enter!: () => void; const gate = new Promise<void>((resolve) => { enter = resolve; });
+    let enter!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
     const deliveries: string[] = [];
     const { service, registry } = harness(async (input) => {
       await gate;
@@ -130,53 +314,133 @@ describe('BackgroundSubagentService', () => {
         deliveries.push(rendered);
         await pending.commit?.();
       }
-      return { status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: {}, counterevidence: [], unresolved: [], scope: 'test', sideEffects: [], recoveryState: [] } } };
+      return {
+        status: 'complete',
+        text: 'done',
+        completionDeclaration: {
+          disposition: 'completed',
+          evidenceRefs: [],
+          result: {
+            summary: 'done',
+            outputs: {},
+            counterevidence: [],
+            unresolved: [],
+            scope: 'test',
+            sideEffects: [],
+            recoveryState: [],
+          },
+        },
+      };
     });
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('paged mailbox');
-    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule });
+    const execution = await service.start({
+      parentToolCallId: 'test-tool',
+      sessionId: 's1',
+      taskId: task.id,
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      targetProfile: 'general',
+      capsule,
+    });
     for (let index = 0; index < 40; index += 1) {
       await service.postMessage('s1', execution.id, execution.generation, `message-${index}-${'x'.repeat(500)}`);
     }
-    enter(); await service.join(execution.id);
+    enter();
+    await service.join(execution.id);
     expect(deliveries).toHaveLength(2);
     const combined = deliveries.join('\n');
-    for (let index = 0; index < 40; index += 1) expect(combined.match(new RegExp(`message-${index}-`, 'g'))).toHaveLength(1);
+    for (let index = 0; index < 40; index += 1)
+      expect(combined.match(new RegExp(`message-${index}-`, 'g'))).toHaveLength(1);
   });
 
   it('does not expose exploratory final text as a successful result when the typed envelope is missing', async () => {
     const traceStatus = vi.spyOn(delegationTraceStore, 'setExecutionStatus');
     try {
-    const secretExploration = 'private scratch reasoning '.repeat(300);
-    const { service, registry } = harness(async () => ({ status: 'complete', text: secretExploration }));
-    await service.query('s1', 'missing');
-    const task = await registry('s1').createTask('typed result');
-    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule });
-    await service.join(execution.id);
-    const stored = await registry('s1').getExecution(execution.id);
-    expect(stored?.status).toBe('partial');
-    expect(stored?.result?.summary).not.toContain('private scratch');
-    expect(stored?.result?.error?.length).toBeLessThanOrEqual(8_000);
-    expect(stored?.result?.resultRef).toContain('session://tool-outputs/background-');
-    await vi.waitFor(() => expect(traceStatus).toHaveBeenCalledWith('s1', 'test-tool',
-      `s1::subagent::${execution.id}\u0000${execution.id}\u0000${execution.generation}`, 'partial'));
-    } finally { traceStatus.mockRestore(); }
+      const secretExploration = 'private scratch reasoning '.repeat(300);
+      const { service, registry } = harness(async () => ({ status: 'complete', text: secretExploration }));
+      await service.query('s1', 'missing');
+      const task = await registry('s1').createTask('typed result');
+      const execution = await service.start({
+        parentToolCallId: 'test-tool',
+        sessionId: 's1',
+        taskId: task.id,
+        parentAgentId: 'general',
+        parentAccessCeiling: 'full',
+        targetProfile: 'general',
+        capsule,
+      });
+      await service.join(execution.id);
+      const stored = await registry('s1').getExecution(execution.id);
+      expect(stored?.status).toBe('partial');
+      expect(stored?.result?.summary).not.toContain('private scratch');
+      expect(stored?.result?.error?.length).toBeLessThanOrEqual(8_000);
+      expect(stored?.result?.resultRef).toContain('session://tool-outputs/background-');
+      await vi.waitFor(() =>
+        expect(traceStatus).toHaveBeenCalledWith(
+          's1',
+          'test-tool',
+          `s1::subagent::${execution.id}\u0000${execution.id}\u0000${execution.generation}`,
+          'partial',
+        ),
+      );
+    } finally {
+      traceStatus.mockRestore();
+    }
   });
 
   it('persists waiting and running around a delegated approval request', async () => {
     let observedWaiting = false;
     const { service, registry } = harness(async (input) => {
-      input.parentOnEvent?.({ id: 'approval-1', type: 'approval.requested', timestamp: Date.now(), sessionId: 's1', agentId: 'general', payload: { approvalId: 'a1', toolCallId: 't1', toolName: 'shell', args: {} } });
+      input.parentOnEvent?.({
+        id: 'approval-1',
+        type: 'approval.requested',
+        timestamp: Date.now(),
+        sessionId: 's1',
+        agentId: 'general',
+        payload: { approvalId: 'a1', title: 'Approve shell', status: 'pending', toolCallId: 't1', toolName: 'shell' },
+      });
       await vi.waitFor(async () => {
         expect((await registry('s1').listExecutions()).at(-1)?.status).toBe('waiting');
       });
       observedWaiting = true;
-      input.parentOnEvent?.({ id: 'approval-2', type: 'approval.answered', timestamp: Date.now(), sessionId: 's1', agentId: 'general', payload: { approvalId: 'a1', toolCallId: 't1', toolName: 'shell', approved: true } as never });
-      return { status: 'complete', text: 'done', completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: { summary: 'done', outputs: {}, counterevidence: [], unresolved: [], scope: 'test', sideEffects: [], recoveryState: [] } } };
+      input.parentOnEvent?.({
+        id: 'approval-2',
+        type: 'approval.answered',
+        timestamp: Date.now(),
+        sessionId: 's1',
+        agentId: 'general',
+        payload: { approvalId: 'a1', title: 'Approve shell', status: 'approved', toolCallId: 't1', toolName: 'shell' },
+      });
+      return {
+        status: 'complete',
+        text: 'done',
+        completionDeclaration: {
+          disposition: 'completed',
+          evidenceRefs: [],
+          result: {
+            summary: 'done',
+            outputs: {},
+            counterevidence: [],
+            unresolved: [],
+            scope: 'test',
+            sideEffects: [],
+            recoveryState: [],
+          },
+        },
+      };
     });
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('approval');
-    const execution = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule });
+    const execution = await service.start({
+      parentToolCallId: 'test-tool',
+      sessionId: 's1',
+      taskId: task.id,
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      targetProfile: 'general',
+      capsule,
+    });
     await service.join(execution.id);
     expect(observedWaiting).toBe(true);
     expect((await registry('s1').getExecution(execution.id))?.status).toBe('completed');
@@ -187,13 +451,53 @@ describe('BackgroundSubagentService', () => {
     const limitedCapsule = { ...capsule, budget: { ...capsule.budget, maxToolCalls: 1 } };
     const { service, registry } = harness(async (input) => {
       restored.push(input.restoredPolicyBudget?.toolCalls ?? -1);
-      return { status: 'complete', text: 'partial', policyBudget: { ...input.restoredPolicyBudget!, toolCalls: 1 }, completionDeclaration: { disposition: 'partial', evidenceRefs: [], result: { summary: 'retry required', outputs: {}, counterevidence: [], unresolved: [{ gap: 'more work', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }], scope: 'test', sideEffects: [], recoveryState: [] } } };
+      return {
+        status: 'complete',
+        text: 'partial',
+        policyBudget: { ...input.restoredPolicyBudget!, toolCalls: 1 },
+        completionDeclaration: {
+          disposition: 'partial',
+          evidenceRefs: [],
+          result: {
+            summary: 'retry required',
+            outputs: {},
+            counterevidence: [],
+            unresolved: [
+              {
+                gap: 'more work',
+                attempted: 'Fixture attempt.',
+                blocker: 'external' as const,
+                resumeWhen: 'Fixture condition.',
+              },
+            ],
+            scope: 'test',
+            sideEffects: [],
+            recoveryState: [],
+          },
+        },
+      };
     });
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('retry budget');
-    const first = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule: limitedCapsule });
+    const first = await service.start({
+      parentToolCallId: 'test-tool',
+      sessionId: 's1',
+      taskId: task.id,
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      targetProfile: 'general',
+      capsule: limitedCapsule,
+    });
     await service.join(first.id);
-    const second = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule: limitedCapsule });
+    const second = await service.start({
+      parentToolCallId: 'test-tool',
+      sessionId: 's1',
+      taskId: task.id,
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      targetProfile: 'general',
+      capsule: limitedCapsule,
+    });
     await service.join(second.id);
     expect(restored).toEqual([0, 1]);
     expect((await registry('s1').getExecution(second.id))?.budget.toolCalls).toBe(1);
@@ -205,14 +509,79 @@ describe('BackgroundSubagentService', () => {
       observed.push(input.policyBudget!.toolCalls);
       input.policyBudget!.toolCalls += 1;
       await flushPolicyBudgetObservers(input.policyBudget);
-      return { status: 'complete', text: 'partial', policyBudget: input.restoredPolicyBudget, completionDeclaration: { disposition: 'partial', evidenceRefs: [], result: { summary: 'retry', outputs: {}, counterevidence: [], unresolved: [{ gap: 'more', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }], scope: 'test', sideEffects: [], recoveryState: [] } } };
+      return {
+        status: 'complete',
+        text: 'partial',
+        policyBudget: input.restoredPolicyBudget,
+        completionDeclaration: {
+          disposition: 'partial',
+          evidenceRefs: [],
+          result: {
+            summary: 'retry',
+            outputs: {},
+            counterevidence: [],
+            unresolved: [
+              {
+                gap: 'more',
+                attempted: 'Fixture attempt.',
+                blocker: 'external' as const,
+                resumeWhen: 'Fixture condition.',
+              },
+            ],
+            scope: 'test',
+            sideEffects: [],
+            recoveryState: [],
+          },
+        },
+      };
     });
     await service.query('s1', 'missing');
     const task = await registry('s1').createTask('root retry');
-    const policy = () => ({ toolCalls: 0, subagents: 0, childDepth: 0, wallStartedAt: Date.now(), maxToolCalls: 2, maxSubagents: 2, maxChildDepth: 2, maxWallTimeMs: 10_000 });
-    const first = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, rootBudgetId: 'turn:first', parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule, policyBudget: policy(), subagentBudget: createSubagentBudgetState({ maxDepth: 2, maxChildren: 2, maxAggregateToolCalls: 2, maxAggregateWallMs: 10_000 }) });
+    const policy = () => ({
+      toolCalls: 0,
+      subagents: 0,
+      childDepth: 0,
+      wallStartedAt: Date.now(),
+      maxToolCalls: 2,
+      maxSubagents: 2,
+      maxChildDepth: 2,
+      maxWallTimeMs: 10_000,
+    });
+    const first = await service.start({
+      parentToolCallId: 'test-tool',
+      sessionId: 's1',
+      taskId: task.id,
+      rootBudgetId: 'turn:first',
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      targetProfile: 'general',
+      capsule,
+      policyBudget: policy(),
+      subagentBudget: createSubagentBudgetState({
+        maxDepth: 2,
+        maxChildren: 2,
+        maxAggregateToolCalls: 2,
+        maxAggregateWallMs: 10_000,
+      }),
+    });
     await service.join(first.id);
-    const second = await service.start({ parentToolCallId: 'test-tool', sessionId: 's1', taskId: task.id, rootBudgetId: 'turn:second', parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', capsule, policyBudget: policy(), subagentBudget: createSubagentBudgetState({ maxDepth: 2, maxChildren: 2, maxAggregateToolCalls: 2, maxAggregateWallMs: 10_000 }) });
+    const second = await service.start({
+      parentToolCallId: 'test-tool',
+      sessionId: 's1',
+      taskId: task.id,
+      rootBudgetId: 'turn:second',
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      targetProfile: 'general',
+      capsule,
+      policyBudget: policy(),
+      subagentBudget: createSubagentBudgetState({
+        maxDepth: 2,
+        maxChildren: 2,
+        maxAggregateToolCalls: 2,
+        maxAggregateWallMs: 10_000,
+      }),
+    });
     await service.join(second.id);
     expect(observed).toEqual([0, 1]);
     expect((await registry('s1').getExecution(second.id))?.rootBudgetId).toBe('turn:first');

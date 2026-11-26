@@ -14,13 +14,24 @@ export function useCaptureReplay(scope: CaptureScope) {
   }, []);
   const reload = useCallback(async () => {
     try {
-      const [, remembered] = await Promise.all([useSessionDeviceStore.getState().load(scope), getReplaySelection(scope)]);
-      if (active.current) { setSelection(remembered); setSelectionError(null); }
-    } catch (reason) { if (active.current) setSelectionError(reason instanceof Error ? reason.message : String(reason)); }
+      const [, remembered] = await Promise.all([
+        useSessionDeviceStore.getState().load(scope),
+        getReplaySelection(scope),
+      ]);
+      if (active.current) {
+        setSelection(remembered);
+        setSelectionError(null);
+      }
+    } catch (reason) {
+      if (active.current) setSelectionError(reason instanceof Error ? reason.message : String(reason));
+    }
   }, [scope]);
   useEffect(() => {
-    active.current = true; void reload();
-    return () => { active.current = false; };
+    active.current = true;
+    void reload();
+    return () => {
+      active.current = false;
+    };
   }, [reload]);
   return { state, selection, error: error ?? selectionError, actionFailure, reload, receive };
 }

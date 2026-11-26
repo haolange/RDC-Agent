@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import {
-  isMaxTierLevel,
-  type MaxVisualPhase,
-  type MaxVisualTimeline,
-  shouldStartMaxDragIngress,
-} from './maxVisual';
-import {
-  createMaxVisualExitController,
-  type ExitingMaxPhase,
-} from './maxVisualExitController';
+import { isMaxTierLevel, type MaxVisualPhase, type MaxVisualTimeline, shouldStartMaxDragIngress } from './maxVisual';
+import { createMaxVisualExitController, type ExitingMaxPhase } from './maxVisualExitController';
 import {
   buildEgressTimeline,
   buildIngressTimeline,
@@ -38,12 +30,13 @@ export function useMaxVisualController(input: {
   isDraggingRef.current = input.isDragging;
 
   const exitController = useMemo(
-    () => createMaxVisualExitController({
-      isDraggingRef,
-      solidHandoffEligibleRef,
-      timelineRef,
-      setExitingMaxPhase,
-    }),
+    () =>
+      createMaxVisualExitController({
+        isDraggingRef,
+        solidHandoffEligibleRef,
+        timelineRef,
+        setExitingMaxPhase,
+      }),
     [],
   );
 
@@ -65,24 +58,29 @@ export function useMaxVisualController(input: {
     commitTimeline(createIdleMaxTimeline(nextRevision(), visualNow()));
   }, [clearExitingMax, commitTimeline, nextRevision]);
 
-  useEffect(() => () => {
-    exitController.dispose();
-  }, [exitController]);
+  useEffect(
+    () => () => {
+      exitController.dispose();
+    },
+    [exitController],
+  );
 
-  const startIngress = useCallback((phase: Extract<MaxVisualPhase,
-    'ingress-drag' | 'ingress-committed' | 'ingress-reopen'>) => {
-    clearExitingMax();
-    const built = buildIngressTimeline({
-      phase,
-      current: timelineRef.current,
-      nextRevision,
-    });
-    if (built === 'reset') {
-      resetState();
-      return;
-    }
-    commitTimeline(built);
-  }, [clearExitingMax, commitTimeline, nextRevision, resetState]);
+  const startIngress = useCallback(
+    (phase: Extract<MaxVisualPhase, 'ingress-drag' | 'ingress-committed' | 'ingress-reopen'>) => {
+      clearExitingMax();
+      const built = buildIngressTimeline({
+        phase,
+        current: timelineRef.current,
+        nextRevision,
+      });
+      if (built === 'reset') {
+        resetState();
+        return;
+      }
+      commitTimeline(built);
+    },
+    [clearExitingMax, commitTimeline, nextRevision, resetState],
+  );
 
   const startEgress = useCallback(() => {
     const built = buildEgressTimeline({
@@ -98,17 +96,20 @@ export function useMaxVisualController(input: {
     commitTimeline(built.timeline);
   }, [commitTimeline, nextRevision, resetState]);
 
-  const completeTimeline = useCallback((revision: number) => {
-    const current = timelineRef.current;
-    if (current.revision !== revision) return;
-    const now = visualNow();
-    if (current.phase === 'ingress-committed' || current.phase === 'ingress-reopen') {
-      commitTimeline(createActiveMaxTimeline(nextRevision(), now, current.fieldEpoch));
-    } else if (current.phase === 'egress') {
-      commitTimeline(createIdleMaxTimeline(nextRevision(), now));
-      beginExitingMax();
-    }
-  }, [beginExitingMax, commitTimeline, nextRevision]);
+  const completeTimeline = useCallback(
+    (revision: number) => {
+      const current = timelineRef.current;
+      if (current.revision !== revision) return;
+      const now = visualNow();
+      if (current.phase === 'ingress-committed' || current.phase === 'ingress-reopen') {
+        commitTimeline(createActiveMaxTimeline(nextRevision(), now, current.fieldEpoch));
+      } else if (current.phase === 'egress') {
+        commitTimeline(createIdleMaxTimeline(nextRevision(), now));
+        beginExitingMax();
+      }
+    },
+    [beginExitingMax, commitTimeline, nextRevision],
+  );
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -149,14 +150,17 @@ export function useMaxVisualController(input: {
     if (currentPhase !== 'idle' && currentPhase !== 'egress') startEgress();
   }, [clearExitingMax, input.isDragging, input.open, isMaxTier, startEgress, startIngress]);
 
-  const applyCommittedLevelVisual = useCallback((level: ReasoningSelection) => {
-    if (isMaxTierLevel(level)) {
-      startIngress('ingress-committed');
-      return;
-    }
-    const phase = timelineRef.current.phase;
-    if (phase !== 'idle' && phase !== 'egress') startEgress();
-  }, [startEgress, startIngress]);
+  const applyCommittedLevelVisual = useCallback(
+    (level: ReasoningSelection) => {
+      if (isMaxTierLevel(level)) {
+        startIngress('ingress-committed');
+        return;
+      }
+      const phase = timelineRef.current.phase;
+      if (phase !== 'idle' && phase !== 'egress') startEgress();
+    },
+    [startEgress, startIngress],
+  );
 
   return {
     maxTimeline,

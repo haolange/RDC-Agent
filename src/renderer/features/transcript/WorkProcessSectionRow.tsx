@@ -11,11 +11,17 @@ interface WorkProcessSectionRowProps {
 /** A model response keeps one ordered list, including text that changes phase while streaming. */
 export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({ row, renderRow }) => {
   return (
-    <li className={`work-process-step work-process-section kind-section status-${row.status}`}
-      data-testid="work-process-section">
+    <li
+      className={`work-process-step work-process-section kind-section status-${row.status}`}
+      data-testid="work-process-section"
+    >
       <WorkProcessRailIcon row={row} />
       <div className="work-process-step-content">
-        <MeasuredWorkRows className="work-process-steps work-process-section-list" rows={row.visibleSteps} renderRow={renderRow} />
+        <MeasuredWorkRows
+          className="work-process-steps work-process-section-list"
+          rows={row.visibleSteps}
+          renderRow={renderRow}
+        />
       </div>
     </li>
   );

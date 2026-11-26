@@ -135,9 +135,7 @@ export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentTo
 };
 
 export function getBuiltinToolTier(toolName: string): BuiltinAgentToolTier | null {
-  return BUILTIN_AGENT_TOOL_ID_SET.has(toolName)
-    ? BUILTIN_AGENT_TOOL_TIERS[toolName as BuiltinAgentToolId]
-    : null;
+  return BUILTIN_AGENT_TOOL_ID_SET.has(toolName) ? BUILTIN_AGENT_TOOL_TIERS[toolName as BuiltinAgentToolId] : null;
 }
 
 /** Manifest-facing canonical tokens → concrete tool ids. */
@@ -154,7 +152,22 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   edit: ['edit_file'],
   askUser: ['ask_user'],
   'vscode/askQuestions': ['ask_user'],
-  task: ['task_create', 'task_update', 'task_get', 'task_list', 'task_stop', 'turn_complete', 'subagent_report', 'background_query', 'background_wait', 'background_result', 'background_message', 'background_cancel', 'background_join', 'output_register'],
+  task: [
+    'task_create',
+    'task_update',
+    'task_get',
+    'task_list',
+    'task_stop',
+    'turn_complete',
+    'subagent_report',
+    'background_query',
+    'background_wait',
+    'background_result',
+    'background_message',
+    'background_cancel',
+    'background_join',
+    'output_register',
+  ],
   memory: ['memory_search', 'memory_read'],
   'memory-write': ['memory_write', 'memory_delete'],
   'file-manage': ['delete_file', 'move_file', 'copy_file', 'notebook_edit'],
@@ -171,7 +184,13 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   rdcProbe: ['rdc_probe'],
   rdc_probe: ['rdc_probe'],
   subagent: ['subagent'],
-  knowledge: ['knowledge_browse', 'knowledge_search', 'knowledge_read', 'knowledge_compile', 'knowledge_candidate_create'],
+  knowledge: [
+    'knowledge_browse',
+    'knowledge_search',
+    'knowledge_read',
+    'knowledge_compile',
+    'knowledge_candidate_create',
+  ],
   investigation: ['investigation_schema', 'investigation_read', 'investigation_write', 'investigation_list'],
 };
 

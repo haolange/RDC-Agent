@@ -1,5 +1,6 @@
 import { ZodError } from 'zod';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { AppError } from '@shared/errors/appError';
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
 
 export const INVESTIGATION_ERROR_CODES = [
   'INVESTIGATION_SESSION_DENIED',
@@ -20,8 +21,8 @@ export const INVESTIGATION_ERROR_CODES = [
 
 export type InvestigationErrorCode = (typeof INVESTIGATION_ERROR_CODES)[number];
 
-export class InvestigationError extends Error {
-  readonly code: InvestigationErrorCode;
+export class InvestigationError extends AppError {
+  declare readonly code: InvestigationErrorCode;
   readonly invariantId?: string;
   readonly details?: Record<string, unknown>;
 
@@ -31,9 +32,8 @@ export class InvestigationError extends Error {
     extras?: { invariantId?: string; details?: Record<string, unknown> },
   ) {
     const suffix = extras?.invariantId ? ` [${extras.invariantId}]` : '';
-    super((message ? `${code}: ${message}` : code) + suffix);
+    super(code, `${message ?? ''}${suffix}`.trim() || undefined);
     this.name = 'InvestigationError';
-    this.code = code;
     this.invariantId = extras?.invariantId;
     this.details = extras?.details;
   }
@@ -45,19 +45,22 @@ export function toInvestigationError(error: unknown): InvestigationError {
     return new InvestigationError('INVESTIGATION_SCHEMA_INVALID', error.message);
   }
   if (error instanceof SessionArtifactError) {
-    return new InvestigationError(error.code === 'ARTIFACT_SESSION_DENIED' ? 'INVESTIGATION_SESSION_DENIED' : 'INVESTIGATION_STORAGE_FAILED', error.message, {
-      details: { artifactCode: error.code },
-    });
+    return new InvestigationError(
+      error.code === 'ARTIFACT_SESSION_DENIED' ? 'INVESTIGATION_SESSION_DENIED' : 'INVESTIGATION_STORAGE_FAILED',
+      error.message,
+      {
+        details: { artifactCode: error.code },
+      },
+    );
   }
-  return new InvestigationError(
-    'INVESTIGATION_STORAGE_FAILED',
-    error instanceof Error ? error.message : String(error),
-  );
+  return new InvestigationError('INVESTIGATION_STORAGE_FAILED', error instanceof Error ? error.message : String(error));
 }
 
 export function isInvestigationStoreDegraded(error: unknown): boolean {
   if (!(error instanceof InvestigationError)) return false;
-  return error.code === 'INVESTIGATION_DEGRADED'
-    || error.code === 'INVESTIGATION_INDEX_CORRUPT'
-    || error.code === 'INVESTIGATION_INDEX_MISSING';
+  return (
+    error.code === 'INVESTIGATION_DEGRADED' ||
+    error.code === 'INVESTIGATION_INDEX_CORRUPT' ||
+    error.code === 'INVESTIGATION_INDEX_MISSING'
+  );
 }

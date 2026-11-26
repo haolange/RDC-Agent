@@ -8,8 +8,6 @@ export type RuntimeLogNamespace = 'system' | 'agent' | 'tool' | 'device' | 'capt
 
 export type RuntimeLogSeverity = 'info' | 'success' | 'warning' | 'error';
 
-export type RuntimeLogDetailLevel = 'summary' | 'verbose' | 'raw';
-
 export interface RuntimeLogEntry {
   id: string;
   timestamp: number;

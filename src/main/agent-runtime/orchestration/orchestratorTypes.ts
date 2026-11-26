@@ -3,26 +3,20 @@
  */
 
 import type { AgentRole } from '@shared/types/agent';
-import type { AgentRouteCapability, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
-import type {
-  ConversationTurnControls,
-  ResolvedReasoningSelection,
-} from '@shared/types/modelCapability';
+import type { AgentRouteCapability, AgentEvent } from '@shared/types/agentRuntime';
+import type { ConversationTurnControls, ResolvedReasoningSelection } from '@shared/types/modelCapability';
 import type { EffectiveModel, ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 import type { PreparedTurnContextSummary } from '@shared/types/session';
-import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdcRuntime';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { EffectiveAgentProfile } from '../../settings/agent-manifests/agentRuntimeTypes';
 import type { CompiledPromptCache } from '@shared/types/semanticContext';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
-import type { PendingHandoff, PolicyBudgetState, SubagentBudgetState } from './TurnCoordinator';
+import type { PendingHandoff, PolicyBudgetState, SubagentBudgetState, TurnHandle } from './TurnCoordinator';
 import type { McpConnectionLease } from './McpConnectionCoordinator';
 import type { AgentEventBridgeContext } from '../AgentEventBridge';
 import type { AttachmentLayer } from '@shared/types/conversation';
 import type { SessionAttachmentKind } from '@shared/types/session';
-import type {
-  Message,
-  ToolDefinition,
-  UserMessage,
-} from '../core/types';
+import type { Message, ToolDefinition, UserMessage } from '../core/types';
 import type { AgentTool } from '../agent/AgentTool';
 
 export interface FrozenAttachmentManifestEntry {
@@ -52,7 +46,7 @@ export interface AgentTurnOptions {
   onTaskPreparation?: (preparation: import('@shared/types/taskExecution').TaskExecutionPreparation) => Promise<void>;
   signal?: AbortSignal;
   onChunk?: (text: string) => void;
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   reasoning?: ResolvedReasoningSelection;
   turnControls?: ConversationTurnControls;
   requestPlan?: RequestPlan;
@@ -84,7 +78,7 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
   /** Volatile Delegation Capsule segments appended to the child PromptPlan. */
   extraPromptSegments?: import('@shared/types/rdcRuntime').PromptSegment[];
   /** Frozen capsule stored on the child EffectiveRuntimePlan. */
-  frozenDelegationCapsule?: import('@shared/types/delegationCapsule').DelegationCapsule;
+  frozenDelegationCapsule?: import('./delegationCapsule').DelegationCapsule;
   /** Offline children strip rdc_context / rdc_probe at allowlist compile time. */
   excludeRdcLeaseTools?: boolean;
   /** Exact profile snapshot used to build this child turn. */
@@ -98,7 +92,6 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
   /** Shared parent-child policy lineage; child turns must not reset counters. */
   policyBudget?: PolicyBudgetState;
   subagentBudget?: SubagentBudgetState;
-  preparedTurn?: PreparedAgentTurnContext;
   onTerminalContext?: (result: {
     messages: Message[];
     executionIdentity: ExecutionIdentity;
@@ -117,6 +110,26 @@ export interface ResolvedRuntimeTools {
   toolMap: Map<string, AgentTool>;
 }
 
+/** The live turn that owns a session or ephemeral scope, if one is running. */
+export interface ActiveTurnLookup {
+  getActiveTurn(sessionId?: string | null): TurnHandle | null;
+}
+
+/** Builds a turn's runtime tools and their order-free signature (RuntimeToolAssembly). */
+export interface RuntimeToolResolver {
+  resolveRuntimeTools(
+    agentId: AgentRole,
+    toolAllowlist: string[],
+    sessionId?: string | null,
+    turnHandle?: TurnHandle | null,
+    projectId?: string | null,
+    projectRootPath?: string | null,
+    mcpPoolKey?: string | null,
+    options?: { excludeRdcLeaseTools?: boolean; excludeSubagent?: boolean },
+  ): ResolvedRuntimeTools;
+  createToolSignature(tools: ToolDefinition[]): string;
+}
+
 export interface PreparedAgentRuntime {
   /** Canonical prompt finalized before estimation, cache compilation and runtime fingerprinting. */
   promptPlan: PromptPlan;
@@ -130,8 +143,8 @@ export interface PreparedAgentRuntime {
   effectivePlan: EffectiveRuntimePlan;
   /** The approved, hash-verified plan for this execution, if present. */
   approvedExecution?: {
-    offer: import('@shared/types/executionOffer').ExecutionOffer;
-    investigation: import('@shared/types/planInvestigation').InvestigationPlanContract | null;
+    offer: import('../../sessions/run/executionOffer').ExecutionOffer;
+    investigation: import('../../sessions/run/investigationPlanContract').InvestigationPlanContract | null;
   } | null;
 }
 
@@ -166,7 +179,7 @@ export interface ToolExecutorRuntimeContext {
   runId?: string;
   turnId?: string;
   eventContext?: AgentEventBridgeContext;
-  onEvent?: (event: SharedAgentEvent) => void;
+  onEvent?: (event: AgentEvent) => void;
   /** 当前激活项目根目录，用于把工具执行 base 对齐到 project root 而非 process.cwd()。 */
   projectRootPath?: string | null;
   /** Exact MCP pool leased by this turn; never resolve tools from a mutable active-project pointer. */

@@ -13,5 +13,17 @@
     { "id": "Q4", "name": "action count", "expected": "6", "accept": ["^\\D*\\b6\\b"] },
     { "id": "Q5", "name": "present event", "expected": "14", "accept": ["^\\D*\\b14\\b"] },
     { "id": "Q6", "name": "shader stages", "expected": "vertex and pixel (fragment)", "accept": ["^(?=.*\\b(?:vertex|vs|顶点)\\b|.*顶点)(?=.*\\b(?:pixel|fragment|ps|fs)\\b|.*(?:像素|片元|片段))"] }
-  ]
+  ],
+  "requiredToolCalls": [
+    {"name": "rdc_probe", "args": {"action": "probe", "args": {"action": "event_list"}}},
+    {"name": "rdc_probe", "args": {"action": "probe", "args": {"action": "pipeline_show"}}}
+  ],
+  "faux": {
+    "about": "Native-shaped answers that stand in for the RDC-Tool CLI in the faux-provider eval (eval-investigation.mjs --faux). Values are the ground truth above; field layout is reduced to what the eval reads. Never evidence of a real replay.",
+    "replay": {
+      "rd.session.get_context": {"ok": true, "result_kind": "rd.session.get_context", "meta": {"process_identity": {"status": "available", "daemon": {"pid": 10, "start_generation": "windows-filetime:100"}, "worker": {"pid": 11, "start_generation": "windows-filetime:200"}}}, "data": {"context_id": "faux-context", "current_session_id": "faux-replay", "runtime": {"session_id": "faux-replay", "capture_file_id": "faux-capture", "active_event_id": 14}, "sessions": [{"session_id": "faux-replay", "capture_file_id": "faux-capture", "shader_replacements": []}]}},
+      "rd.event.get_action_tree": {"ok": true, "result_kind": "rd.event.get_action_tree", "meta": {"process_identity": {"status": "available", "daemon": {"pid": 10, "start_generation": "windows-filetime:100"}, "worker": {"pid": 11, "start_generation": "windows-filetime:200"}}}, "data": {"session_id": "faux-replay", "actions": [{"event_id": 1, "name": "vkBeginCommandBuffer()", "flags": ["CommandBufferBoundary"]}, {"event_id": 10, "name": "vkCmdBeginRenderPass(C=Clear)", "flags": ["PassBoundary", "BeginPass", "Clear"], "children": [{"event_id": 11, "name": "vkCmdDraw(36, 1)", "flags": ["Drawcall"], "num_indices": 36}]}, {"event_id": 12, "name": "vkCmdEndRenderPass(C=Store)", "flags": ["PassBoundary", "EndPass"]}, {"event_id": 13, "name": "vkEndCommandBuffer()", "flags": ["CommandBufferBoundary"]}, {"event_id": 14, "name": "vkQueuePresentKHR(Swapchain Image 0)", "flags": ["Present"]}], "pagination": {"offset": 0, "limit": 256, "truncated": false}}},
+      "rd.pipeline.get_state": {"ok": true, "result_kind": "rd.pipeline.get_state", "meta": {"process_identity": {"status": "available", "daemon": {"pid": 10, "start_generation": "windows-filetime:100"}, "worker": {"pid": 11, "start_generation": "windows-filetime:200"}}}, "data": {"session_id": "faux-replay", "resolved_event_id": 11, "pipeline_state": {"api": "Vulkan", "output_targets": [{"slot": 0, "format": "B8G8R8A8_UNORM", "width": 500, "height": 500}], "shaders": [{"stage": "Vertex", "bound": true}, {"stage": "Hull", "bound": false}, {"stage": "Domain", "bound": false}, {"stage": "Geometry", "bound": false}, {"stage": "Pixel", "bound": true}, {"stage": "Compute", "bound": false}]}}}
+    }
+  }
 }

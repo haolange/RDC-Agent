@@ -11,10 +11,7 @@ import type { ProviderContractBundle } from '@shared/provider-catalog/modelManif
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { Context } from '../core/types';
 
-function plan(
-  modelId: string,
-  crossModel: ProviderContractBundle['state']['crossModel'] = 'never',
-): RequestPlan {
+function plan(modelId: string, crossModel: ProviderContractBundle['state']['crossModel'] = 'never'): RequestPlan {
   const fallback = createFailClosedProviderContracts('OpenAIResponses');
   const contracts: ProviderContractBundle = {
     ...fallback,

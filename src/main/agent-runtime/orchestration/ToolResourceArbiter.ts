@@ -13,7 +13,12 @@ export function toolResourceKey(projectRoot: string | null | undefined, sessionI
  * Safe reads share a claim and exclude unsafe effects. The subagent dispatcher is orchestration,
  * so it is intentionally excluded by the caller; child effects acquire here.
  */
-type Scope = { quarantined: number; readers: number; writer: boolean; queue: Array<{ shared: boolean; grant: () => void }> };
+type Scope = {
+  quarantined: number;
+  readers: number;
+  writer: boolean;
+  queue: Array<{ shared: boolean; grant: () => void }>;
+};
 
 export class ToolResourceArbiter {
   private readonly scopes = new Map<string, Scope>();
@@ -27,7 +32,12 @@ export class ToolResourceArbiter {
     return this.run(key, true, signal, () => this.run('unsafe-effects::global', true, signal, operation));
   }
 
-  private async run<T>(key: string, exclusive: boolean, signal: AbortSignal | undefined, operation: () => Promise<T>): Promise<T> {
+  private async run<T>(
+    key: string,
+    exclusive: boolean,
+    signal: AbortSignal | undefined,
+    operation: () => Promise<T>,
+  ): Promise<T> {
     if (signal?.aborted) throw new DOMException('The operation was aborted', 'AbortError');
     const scope = this.scopes.get(key) ?? { quarantined: 0, readers: 0, writer: false, queue: [] };
     if (scope.quarantined > 0) throw new Error('Resource quarantined: process exit has not been observed.');
@@ -35,7 +45,8 @@ export class ToolResourceArbiter {
     await this.acquire(scope, exclusive, signal);
     const retained = new Set<Promise<unknown>>();
     const release = () => {
-      if (exclusive) scope.writer = false; else scope.readers -= 1;
+      if (exclusive) scope.writer = false;
+      else scope.readers -= 1;
       this.drain(scope);
       if (!scope.writer && scope.readers === 0 && scope.queue.length === 0) this.scopes.delete(key);
     };
@@ -46,20 +57,42 @@ export class ToolResourceArbiter {
       if (retained.size === 0) release();
       else {
         scope.quarantined += 1;
-        void Promise.all([...retained]).then(() => { scope.quarantined -= 1; release(); }, () => { /* Unknown exit retains ownership. */ });
+        void Promise.all([...retained]).then(
+          () => {
+            scope.quarantined -= 1;
+            release();
+          },
+          () => {
+            /* Unknown exit retains ownership. */
+          },
+        );
       }
     }
   }
 
   private acquire(scope: Scope, exclusive: boolean, signal?: AbortSignal): Promise<void> {
-    const canStart = exclusive ? !scope.writer && scope.readers === 0 : !scope.writer && !scope.queue.some((x) => !x.shared);
-    if (canStart) { if (exclusive) scope.writer = true; else scope.readers += 1; return Promise.resolve(); }
+    const canStart = exclusive
+      ? !scope.writer && scope.readers === 0
+      : !scope.writer && !scope.queue.some((x) => !x.shared);
+    if (canStart) {
+      if (exclusive) scope.writer = true;
+      else scope.readers += 1;
+      return Promise.resolve();
+    }
     if (signal?.aborted) return Promise.reject(new DOMException('The operation was aborted', 'AbortError'));
     return new Promise<void>((resolve, reject) => {
       const entry = { shared: !exclusive, grant: resolve };
-      const abort = () => { const index = scope.queue.indexOf(entry); if (index >= 0) scope.queue.splice(index, 1); this.drain(scope); reject(new DOMException('The operation was aborted', 'AbortError')); };
+      const abort = () => {
+        const index = scope.queue.indexOf(entry);
+        if (index >= 0) scope.queue.splice(index, 1);
+        this.drain(scope);
+        reject(new DOMException('The operation was aborted', 'AbortError'));
+      };
       signal?.addEventListener('abort', abort, { once: true });
-      entry.grant = () => { signal?.removeEventListener('abort', abort); resolve(); };
+      entry.grant = () => {
+        signal?.removeEventListener('abort', abort);
+        resolve();
+      };
       scope.queue.push(entry);
     });
   }
@@ -67,10 +100,15 @@ export class ToolResourceArbiter {
   private drain(scope: Scope): void {
     if (scope.writer) return;
     if (scope.readers === 0 && scope.queue[0] && !scope.queue[0].shared) {
-      scope.queue.shift()!.grant(); scope.writer = true; return;
+      scope.queue.shift()!.grant();
+      scope.writer = true;
+      return;
     }
     if (scope.readers > 0 && scope.queue[0] && !scope.queue[0].shared) return;
-    while (scope.queue[0]?.shared && !scope.writer) { scope.queue.shift()!.grant(); scope.readers += 1; }
+    while (scope.queue[0]?.shared) {
+      scope.queue.shift()!.grant();
+      scope.readers += 1;
+    }
   }
 }
 

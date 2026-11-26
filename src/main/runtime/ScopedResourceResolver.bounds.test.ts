@@ -13,9 +13,16 @@ it('hashes a large shared payload in a fixed small heap without materializing it
     if (hashScopedResource(messages) === digest) throw new Error('Tail mutation was lost');
     console.log(digest);
   `;
-  const output = execFileSync(process.execPath,
+  const output = execFileSync(
+    process.execPath,
     ['--max-old-space-size=64', '--experimental-strip-types', '--input-type=module', '-e', script],
-    { cwd: fileURLToPath(new URL('../../../..', import.meta.url)), encoding: 'utf8', timeout: 20_000,
-      maxBuffer: 16_384, env: { ...process.env, NODE_OPTIONS: '' } });
+    {
+      cwd: fileURLToPath(new URL('../../../..', import.meta.url)),
+      encoding: 'utf8',
+      timeout: 20_000,
+      maxBuffer: 16_384,
+      env: { ...process.env, NODE_OPTIONS: '' },
+    },
+  );
   expect(output.trim()).toMatch(/^[a-f0-9]{64}$/u);
 });

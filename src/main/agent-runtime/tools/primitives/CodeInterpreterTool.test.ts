@@ -5,20 +5,20 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getAll, spawn } = vi.hoisted(() => ({
-  getAll: vi.fn(),
+const { snapshot, spawn } = vi.hoisted(() => ({
+  snapshot: vi.fn(),
   spawn: vi.fn(),
 }));
 
 vi.mock('../../../settings/settings-core/SettingsService', () => ({
-  settingsService: { getAll },
+  settingsService: { snapshot },
 }));
 
 vi.mock('../../../runtime/ProcessSupervisor', () => ({
   processSupervisor: { spawn },
 }));
 
-vi.mock('../../../conversation/ToolImagePreviewStore', () => ({
+vi.mock('../../attachments/ToolImagePreviewStore', () => ({
   recordToolImagePreview: vi.fn(),
 }));
 
@@ -37,15 +37,18 @@ afterEach(async () => {
 
 function enabledSettings(overrides: Record<string, unknown> = {}) {
   return {
-    tooling: {
-      codeInterpreter: {
-        enabled: true,
-        command: 'python',
-        argsPrefix: [],
-        timeoutMs: 5000,
-        env: {},
-        artifactsEnabled: true,
-        ...overrides,
+    revision: 1,
+    user: {
+      tooling: {
+        codeInterpreter: {
+          enabled: true,
+          command: 'python',
+          argsPrefix: [],
+          timeoutMs: 5000,
+          env: {},
+          artifactsEnabled: true,
+          ...overrides,
+        },
       },
     },
   };
@@ -53,45 +56,48 @@ function enabledSettings(overrides: Record<string, unknown> = {}) {
 
 describe('CodeInterpreterTool', () => {
   beforeEach(() => {
-    getAll.mockReset();
+    snapshot.mockReset();
     spawn.mockReset();
   });
 
   it('fails closed when the interpreter is disabled', async () => {
-    getAll.mockReturnValue(enabledSettings({ enabled: false }));
-    await expect(codeInterpreterTool.execute(
-      'py-1',
-      { code: 'print(1)' },
-      undefined,
-      undefined,
-      { workspaceRoot: 'D:/proj', projectRootPath: 'D:/proj', projectId: 'p1', sessionId: 's1' },
-    )).rejects.toThrow('CODE_INTERPRETER_DISABLED');
+    snapshot.mockReturnValue(enabledSettings({ enabled: false }));
+    await expect(
+      codeInterpreterTool.execute('py-1', { code: 'print(1)' }, undefined, undefined, {
+        workspaceRoot: 'D:/proj',
+        projectRootPath: 'D:/proj',
+        projectId: 'p1',
+        sessionId: 's1',
+      }),
+    ).rejects.toThrow('CODE_INTERPRETER_DISABLED');
   });
 
   it('rejects unsupported languages', async () => {
-    getAll.mockReturnValue(enabledSettings());
-    await expect(codeInterpreterTool.execute(
-      'py-1',
-      { code: 'puts 1', language: 'ruby' },
-      undefined,
-      undefined,
-      { workspaceRoot: 'D:/proj', projectRootPath: 'D:/proj', projectId: 'p1', sessionId: 's1' },
-    )).rejects.toThrow('CODE_INTERPRETER_UNSUPPORTED_LANGUAGE');
+    snapshot.mockReturnValue(enabledSettings());
+    await expect(
+      codeInterpreterTool.execute('py-1', { code: 'puts 1', language: 'ruby' }, undefined, undefined, {
+        workspaceRoot: 'D:/proj',
+        projectRootPath: 'D:/proj',
+        projectId: 'p1',
+        sessionId: 's1',
+      }),
+    ).rejects.toThrow('CODE_INTERPRETER_UNSUPPORTED_LANGUAGE');
   });
 
   it('requires a project root before spawning', async () => {
-    getAll.mockReturnValue(enabledSettings());
-    await expect(codeInterpreterTool.execute(
-      'py-1',
-      { code: 'print(1)' },
-      undefined,
-      undefined,
-      { workspaceRoot: '', projectRootPath: null, projectId: null, sessionId: 's1' },
-    )).rejects.toThrow('MUTATION_REQUIRES_PROJECT');
+    snapshot.mockReturnValue(enabledSettings());
+    await expect(
+      codeInterpreterTool.execute('py-1', { code: 'print(1)' }, undefined, undefined, {
+        workspaceRoot: '',
+        projectRootPath: null,
+        projectId: null,
+        sessionId: 's1',
+      }),
+    ).rejects.toThrow('MUTATION_REQUIRES_PROJECT');
   });
 
   it('runs the configured interpreter and returns stdout', async () => {
-    getAll.mockReturnValue(enabledSettings());
+    snapshot.mockReturnValue(enabledSettings());
     const stdout = new EventEmitter();
     const stderr = new EventEmitter();
     spawn.mockReturnValue({
@@ -101,13 +107,12 @@ describe('CodeInterpreterTool', () => {
       join: vi.fn(async () => ({ reason: 'exit', code: 0 })),
     });
 
-    const result = await codeInterpreterTool.execute(
-      'py-1',
-      { code: 'print(42)' },
-      undefined,
-      undefined,
-      { workspaceRoot: process.cwd(), projectRootPath: process.cwd(), projectId: 'p1', sessionId: 's1' },
-    );
+    const result = await codeInterpreterTool.execute('py-1', { code: 'print(42)' }, undefined, undefined, {
+      workspaceRoot: process.cwd(),
+      projectRootPath: process.cwd(),
+      projectId: 'p1',
+      sessionId: 's1',
+    });
     artifactDirs.push(result.details!.artifactsDir);
 
     expect(spawn).toHaveBeenCalledWith(
@@ -135,21 +140,34 @@ describe('CodeInterpreterTool', () => {
     { reason: 'exit', code: 7 },
     { reason: 'timeout', code: null },
   ])('retains exact executed source and observed $reason failure', async ({ reason, code }) => {
-    getAll.mockReturnValue(enabledSettings({ argsPrefix: ['-B'], env: { PRIVATE_TOKEN: 'never-record-env' } }));
+    snapshot.mockReturnValue(enabledSettings({ argsPrefix: ['-B'], env: { PRIVATE_TOKEN: 'never-record-env' } }));
     spawn.mockReturnValue({
       child: { stdout: new EventEmitter(), stderr: new EventEmitter() },
-      stdout: { toString: () => '' }, stderr: { toString: () => 'actual failure' },
+      stdout: { toString: () => '' },
+      stderr: { toString: () => 'actual failure' },
       join: vi.fn(async () => ({ reason, code })),
     });
     const source = 'print("引号 \\" and newline")\nraise SystemExit(7)\n';
-    const result = await codeInterpreterTool.execute('failed', { code: source, language: 'py' }, undefined, undefined,
-      { workspaceRoot: process.cwd(), projectRootPath: process.cwd(), projectId: 'p1', sessionId: 's1' });
+    const result = await codeInterpreterTool.execute('failed', { code: source, language: 'py' }, undefined, undefined, {
+      workspaceRoot: process.cwd(),
+      projectRootPath: process.cwd(),
+      projectId: 'p1',
+      sessionId: 's1',
+    });
     artifactDirs.push(result.details!.artifactsDir);
     expect(result.isError).toBe(true);
     expect(result.content[0]).toEqual({ type: 'text', text: 'actual failure' });
-    expect(result.details).toMatchObject({ exitCode: code, exitReason: reason,
-      invocation: { kind: 'configured-local-interpreter-execution', language: 'python', code: source,
-        codeSha256: createHash('sha256').update(source, 'utf8').digest('hex'), argsPrefix: ['-B'] } });
+    expect(result.details).toMatchObject({
+      exitCode: code,
+      exitReason: reason,
+      invocation: {
+        kind: 'configured-local-interpreter-execution',
+        language: 'python',
+        code: source,
+        codeSha256: createHash('sha256').update(source, 'utf8').digest('hex'),
+        argsPrefix: ['-B'],
+      },
+    });
     expect(spawn.mock.calls[0]![2]).toEqual(['-B', '-c', source]);
     expect(JSON.stringify(result)).not.toContain('never-record-env');
   });

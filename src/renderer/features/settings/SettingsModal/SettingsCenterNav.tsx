@@ -1,11 +1,12 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { cn } from '../../../lib/cn';
+import { isImeComposing } from '../../../lib/ime';
+import { motionScrollBehavior } from '../../../lib/motion';
 import { SearchField } from '../../../ui/SearchField';
+import { useI18n } from '../../../i18n';
+import { PlainButton } from '../../../ui/PlainButton';
 import { SettingsNavIcon } from './SettingsNavIcon';
-import {
-  matchSettingsSearchEntries,
-  type SettingsSearchEntry,
-} from './settingsSearchIndex';
+import { matchSettingsSearchEntries, type SettingsSearchEntry } from './settingsSearchIndex';
 import type { TranslationKey } from '../../../i18n';
 import type { SettingsSection } from './types';
 
@@ -27,7 +28,7 @@ export function focusSettingsSearchTarget(target: string): void {
   if (!node) return;
   node.scrollIntoView({
     block: 'center',
-    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    behavior: motionScrollBehavior(),
   });
   node.classList.add('is-settings-search-hit');
   window.setTimeout(() => node.classList.remove('is-settings-search-hit'), 1600);
@@ -38,8 +39,8 @@ export const SettingsCenterNav: React.FC<{
   activeSection: SettingsSection;
   onSelectSection: (section: SettingsSection) => void;
   providers: SettingsSearchProvider[];
-  t: (key: TranslationKey) => string;
-}> = ({ sections, activeSection, onSelectSection, providers, t }) => {
+}> = ({ sections, activeSection, onSelectSection, providers }) => {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [activeResult, setActiveResult] = useState(0);
   const resultsId = useId();
@@ -54,12 +55,25 @@ export const SettingsCenterNav: React.FC<{
   // Cheap to compute; the index and the provider list are both small.
   const results = (() => {
     const normalized = query.trim().toLowerCase();
-    const providerHits = normalized ? providers.filter((provider) => provider.label.toLowerCase().includes(normalized)).slice(0, 6) : [];
+    const providerHits = normalized
+      ? providers.filter((provider) => provider.label.toLowerCase().includes(normalized)).slice(0, 6)
+      : [];
     return [
-      ...matchSettingsSearchEntries(query, t).map((entry) => ({ key: entry.id, title: t(entry.titleKey), section: entry.section,
-        select: () => selectEntry(entry) })),
-      ...providerHits.map((provider) => ({ key: `provider-${provider.id}`, title: provider.label, section: 'models' as SettingsSection,
-        select: () => { setQuery(''); provider.open(); } })),
+      ...matchSettingsSearchEntries(query, t).map((entry) => ({
+        key: entry.id,
+        title: t(entry.titleKey),
+        section: entry.section,
+        select: () => selectEntry(entry),
+      })),
+      ...providerHits.map((provider) => ({
+        key: `provider-${provider.id}`,
+        title: provider.label,
+        section: 'models' as SettingsSection,
+        select: () => {
+          setQuery('');
+          provider.open();
+        },
+      })),
     ];
   })();
   useEffect(() => setActiveResult(0), [query]);
@@ -83,7 +97,13 @@ export const SettingsCenterNav: React.FC<{
 
   // The field keeps focus; arrows move the active result, Enter opens it, Escape clears the search.
   const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Escape' && query) { event.preventDefault(); event.stopPropagation(); setQuery(''); return; }
+    if (isImeComposing(event)) return;
+    if (event.key === 'Escape' && query) {
+      event.preventDefault();
+      event.stopPropagation();
+      setQuery('');
+      return;
+    }
     if (results.length === 0) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
@@ -131,15 +151,16 @@ export const SettingsCenterNav: React.FC<{
         role="combobox"
         aria-expanded={results.length > 0}
         aria-controls={resultsId}
-        aria-activedescendant={results.length > 0 ? `${resultsId}-${Math.min(activeResult, results.length - 1)}` : undefined}
+        aria-activedescendant={
+          results.length > 0 ? `${resultsId}-${Math.min(activeResult, results.length - 1)}` : undefined
+        }
       />
       {results.length > 0 ? (
         <div id={resultsId} className="settings-search-results" role="listbox" data-testid="settings-search-results">
           {results.map((entry, index) => (
-            <button
+            <PlainButton
               key={entry.key}
               id={`${resultsId}-${index}`}
-              type="button"
               role="option"
               tabIndex={-1}
               aria-selected={index === activeResult}
@@ -152,7 +173,7 @@ export const SettingsCenterNav: React.FC<{
               <span className="settings-search-result-section">
                 {sections.find((section) => section.id === entry.section)?.label}
               </span>
-            </button>
+            </PlainButton>
           ))}
         </div>
       ) : null}
@@ -167,9 +188,12 @@ export const SettingsCenterNav: React.FC<{
           const group = GROUP_LABELS[section.id];
           return (
             <React.Fragment key={section.id}>
-              {group ? <span className="settings-center-nav-group" role="presentation">{t(group)}</span> : null}
-              <button
-                type="button"
+              {group ? (
+                <span className="settings-center-nav-group" role="presentation">
+                  {t(group)}
+                </span>
+              ) : null}
+              <PlainButton
                 className={cn('settings-center-nav-item', activeSection === section.id && 'is-active')}
                 data-testid={`settings-nav-${section.id}`}
                 data-settings-nav-item="true"
@@ -180,7 +204,7 @@ export const SettingsCenterNav: React.FC<{
               >
                 <SettingsNavIcon section={section.id} />
                 <span>{section.label}</span>
-              </button>
+              </PlainButton>
             </React.Fragment>
           );
         })}

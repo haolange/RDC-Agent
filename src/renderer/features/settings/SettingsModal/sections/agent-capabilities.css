@@ -1,15 +1,8 @@
-.settings-capability-picker {
-  display: flex;
-  min-width: 0;
-  gap: var(--space-4);
-  flex-direction: column;
-}
-
 .settings-capability-note {
   margin: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.6;
+  line-height: var(--leading-relaxed);
 }
 
 .settings-capability-group {
@@ -30,26 +23,10 @@
   gap: var(--space-2);
 }
 
-.settings-capability-group-head strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--token-text-primary);
-  font-size: var(--type-body-size);
-  font-weight: var(--font-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .settings-capability-group-head span {
   flex: 0 0 auto;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-}
-
-.settings-capability-bucket {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
 }
 
 .settings-capability-bucket + .settings-capability-bucket {
@@ -60,7 +37,7 @@
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
   font-weight: var(--font-normal);
-  letter-spacing: 0.02em;
+  letter-spacing: var(--tracking-normal);
 }
 
 .settings-capability-options {

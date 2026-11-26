@@ -7,7 +7,9 @@ export function useKnowledgeRequestScope(active: boolean, scope = '') {
   const request = requestRef.current;
   useEffect(() => {
     request.next();
-    return () => { request.next(); };
+    return () => {
+      request.next();
+    };
   }, [active, request, scope]);
   return request;
 }

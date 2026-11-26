@@ -25,12 +25,24 @@
   stroke-linejoin: round;
 }
 
-.task-status-marker.is-pending { --task-status-color: var(--token-task-pending); }
-.task-status-marker.is-in-progress { --task-status-color: var(--token-task-active); }
-.task-status-marker.is-completed { --task-status-color: var(--token-task-done); }
-.task-status-marker.is-blocked { --task-status-color: var(--token-task-blocked); }
-.task-status-marker.is-failed { --task-status-color: var(--token-task-failed); }
-.task-status-marker.is-cancelled { --task-status-color: var(--token-task-cancelled); }
+.task-status-marker.is-pending {
+  --task-status-color: var(--token-task-pending);
+}
+.task-status-marker.is-in-progress {
+  --task-status-color: var(--token-task-active);
+}
+.task-status-marker.is-completed {
+  --task-status-color: var(--token-task-done);
+}
+.task-status-marker.is-blocked {
+  --task-status-color: var(--token-task-blocked);
+}
+.task-status-marker.is-failed {
+  --task-status-color: var(--token-task-failed);
+}
+.task-status-marker.is-cancelled {
+  --task-status-color: var(--token-task-cancelled);
+}
 
 .task-status-marker-fill {
   fill: currentColor;
@@ -58,5 +70,7 @@
 }
 
 @keyframes task-status-marker-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }

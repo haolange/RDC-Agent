@@ -29,7 +29,9 @@
   line-height: var(--type-body-line);
   text-align: start;
   cursor: pointer;
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .ui-disclosure-trigger:hover {

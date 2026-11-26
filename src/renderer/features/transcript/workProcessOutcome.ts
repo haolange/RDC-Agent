@@ -6,10 +6,14 @@ import type { InvestigationArtifactKind, InvestigationArtifactStatus } from '@sh
 
 export type ToolOutcome =
   | { type: 'investigation'; title: string; kind?: InvestigationArtifactKind; status?: InvestigationArtifactStatus }
-  | { type: 'completion'; disposition: 'completed' | 'partial' | 'blocked' | 'cancelled' | 'budget_paused'; unresolved?: UnresolvedItem[] }
+  | {
+      type: 'completion';
+      disposition: 'completed' | 'partial' | 'blocked' | 'cancelled' | 'budget_paused';
+      unresolved?: UnresolvedItem[];
+    }
   | { type: 'toolSearch'; count: number; names: string[] };
 
-const text = (value: unknown): string => typeof value === 'string' ? value.trim() : '';
+const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 /** Present structured results; protocol receipts remain in the existing details/raw path. */
 export function getToolOutcome(toolName: string, parsed: unknown, argsPreview?: string): ToolOutcome | undefined {
@@ -23,27 +27,43 @@ export function getToolOutcome(toolName: string, parsed: unknown, argsPreview?: 
     return {
       type: 'investigation',
       title: text(manifest?.title) || (toolName === 'investigation_write' ? text(args?.title) : ''),
-      kind: INVESTIGATION_ARTIFACT_KINDS.find(value => value === kind),
-      status: INVESTIGATION_ARTIFACT_STATUSES.find(value => value === status),
+      kind: INVESTIGATION_ARTIFACT_KINDS.find((value) => value === kind),
+      status: INVESTIGATION_ARTIFACT_STATUSES.find((value) => value === status),
     };
   }
   if (toolName === 'turn_complete') {
     const disposition = args?.disposition;
-    if (disposition === 'completed' || disposition === 'partial' || disposition === 'blocked'
-      || disposition === 'cancelled' || disposition === 'budget_paused') {
+    if (
+      disposition === 'completed' ||
+      disposition === 'partial' ||
+      disposition === 'blocked' ||
+      disposition === 'cancelled' ||
+      disposition === 'budget_paused'
+    ) {
       // Structured items come from the recorded declaration; older results carry none and show only the disposition.
-      const unresolved = Array.isArray(details?.unresolved) ? details.unresolved.flatMap(item => {
-        const entry = toRecord(item);
-        const blocker = UNRESOLVED_BLOCKERS.find(value => value === entry?.blocker);
-        return entry && blocker && text(entry.gap)
-          ? [{ gap: text(entry.gap), attempted: text(entry.attempted), blocker, resumeWhen: text(entry.resumeWhen) }] : [];
-      }) : [];
+      const unresolved = Array.isArray(details?.unresolved)
+        ? details.unresolved.flatMap((item) => {
+            const entry = toRecord(item);
+            const blocker = UNRESOLVED_BLOCKERS.find((value) => value === entry?.blocker);
+            return entry && blocker && text(entry.gap)
+              ? [
+                  {
+                    gap: text(entry.gap),
+                    attempted: text(entry.attempted),
+                    blocker,
+                    resumeWhen: text(entry.resumeWhen),
+                  },
+                ]
+              : [];
+          })
+        : [];
       return unresolved.length ? { type: 'completion', disposition, unresolved } : { type: 'completion', disposition };
     }
   }
   if (toolName === 'tool_search' && Array.isArray(details?.matches)) {
-    const names = details.matches.map(item => text(toRecord(item)?.name)).filter(Boolean);
-    const count = typeof details.total === 'number' && Number.isFinite(details.total) ? details.total : details.matches.length;
+    const names = details.matches.map((item) => text(toRecord(item)?.name)).filter(Boolean);
+    const count =
+      typeof details.total === 'number' && Number.isFinite(details.total) ? details.total : details.matches.length;
     return { type: 'toolSearch', count, names };
   }
   return undefined;

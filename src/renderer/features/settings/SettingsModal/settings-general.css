@@ -7,20 +7,12 @@
 }
 
 .settings-page-general .settings-profile-section,
-.settings-page-general .settings-language-section,
-.settings-page-general .settings-personalization-block {
+.settings-page-general .settings-language-section {
   display: flex;
   flex-direction: column;
   width: 100%;
   min-height: 0;
   height: auto;
-}
-
-.settings-profile-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
 }
 
 /* The avatar is the change-avatar button; hover lifts its ring. */
@@ -70,7 +62,9 @@
   font: inherit;
   font-size: var(--type-reading-size);
   font-weight: var(--font-semibold);
-  transition: border-color var(--transition-fast), background var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .settings-profile-nickname:hover {
@@ -94,7 +88,7 @@
 
 .settings-save-mark-check {
   opacity: 0;
-  transition: opacity var(--duration-slow) var(--ease-standard);
+  transition: opacity var(--transition-slow);
 }
 
 .settings-save-mark-check.is-visible {
@@ -102,7 +96,7 @@
 }
 
 .settings-personalization-textarea {
-  line-height: 1.7;
+  line-height: var(--leading-relaxed);
 }
 
 .settings-save-status:empty {
@@ -136,12 +130,6 @@
   color: var(--token-text-secondary);
 }
 
-.work-process-choice-preview > span {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
 .work-process-choice-preview > span::before,
 .work-process-choice-preview > span::after {
   content: '';
@@ -150,8 +138,18 @@
   background: currentColor;
 }
 
-.work-process-choice-preview > span::before { inline-size: var(--space-1); }
-.work-process-choice-preview > span::after { inline-size: 68%; }
-.work-process-choice-preview > span:nth-child(even)::after { inline-size: 48%; }
-.work-process-choice-preview > span:last-child { color: var(--token-accent-primary); }
-.work-process-choice-preview.is-following { mask-image: linear-gradient(to bottom, transparent 20%, black 75%); }
+.work-process-choice-preview > span::before {
+  inline-size: var(--space-1);
+}
+.work-process-choice-preview > span::after {
+  inline-size: 68%;
+}
+.work-process-choice-preview > span:nth-child(even)::after {
+  inline-size: 48%;
+}
+.work-process-choice-preview > span:last-child {
+  color: var(--token-accent-primary);
+}
+.work-process-choice-preview.is-following {
+  mask-image: linear-gradient(to bottom, transparent 20%, black 75%);
+}

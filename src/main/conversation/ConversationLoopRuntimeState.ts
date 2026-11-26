@@ -6,9 +6,7 @@ export interface ConversationLoopRuntimeState {
   visibleResponse: string;
 }
 
-export function beginAssistantContentLoopIfPending(
-  state: ConversationLoopRuntimeState,
-): ConversationLoopRuntimeState {
+export function beginAssistantContentLoopIfPending(state: ConversationLoopRuntimeState): ConversationLoopRuntimeState {
   if (!state.pendingNewLoop) return state;
   return {
     loopSeq: state.loopSeq + 1,

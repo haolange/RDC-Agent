@@ -10,12 +10,21 @@ export function moduleReferences(content, filename = 'module.tsx') {
     if (ts.isImportDeclaration(node)) {
       const clause = node.importClause;
       const bindings = clause?.namedBindings;
-      const typeOnly = clause?.isTypeOnly || (bindings && ts.isNamedImports(bindings)
-        && bindings.elements.length > 0 && !clause.name && bindings.elements.every((entry) => entry.isTypeOnly));
+      const typeOnly =
+        clause?.isTypeOnly ||
+        (bindings &&
+          ts.isNamedImports(bindings) &&
+          bindings.elements.length > 0 &&
+          !clause.name &&
+          bindings.elements.every((entry) => entry.isTypeOnly));
       add(node.moduleSpecifier, !typeOnly);
     } else if (ts.isExportDeclaration(node)) {
-      const typeOnly = node.isTypeOnly || (node.exportClause && ts.isNamedExports(node.exportClause)
-        && node.exportClause.elements.length > 0 && node.exportClause.elements.every((entry) => entry.isTypeOnly));
+      const typeOnly =
+        node.isTypeOnly ||
+        (node.exportClause &&
+          ts.isNamedExports(node.exportClause) &&
+          node.exportClause.elements.length > 0 &&
+          node.exportClause.elements.every((entry) => entry.isTypeOnly));
       add(node.moduleSpecifier, !typeOnly);
     } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
       add(node.arguments[0]);
@@ -33,7 +42,8 @@ export function moduleReferences(content, filename = 'module.tsx') {
 /** Callable state members are actions, regardless of their spelling or selector alias. */
 export function patternStoreActions(source, checker) {
   const hits = new Set();
-  const fromStore = (declaration) => /\/renderer\/stores\//.test(declaration?.getSourceFile().fileName.replaceAll('\\', '/') ?? '');
+  const fromStore = (declaration) =>
+    /\/renderer\/stores\//.test(declaration?.getSourceFile().fileName.replaceAll('\\', '/') ?? '');
   const isStore = (node) => {
     const type = checker.getTypeAtLocation(node);
     return Boolean(type.getProperty('getState') && type.getProperty('setState'));
@@ -41,14 +51,22 @@ export function patternStoreActions(source, checker) {
   const isStoreWrite = (node) => {
     if (ts.isPropertyAccessExpression(node)) return node.name.text === 'setState' && isStore(node.expression);
     if (ts.isElementAccessExpression(node)) {
-      return ts.isStringLiteralLike(node.argumentExpression) && node.argumentExpression.text === 'setState' && isStore(node.expression);
+      return (
+        ts.isStringLiteralLike(node.argumentExpression) &&
+        node.argumentExpression.text === 'setState' &&
+        isStore(node.expression)
+      );
     }
     if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
       const name = node.propertyName ?? node.name;
       const owner = node.parent.parent;
       const initializer = ts.isVariableDeclaration(owner) ? owner.initializer : undefined;
-      return (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) && name.text === 'setState'
-        && initializer && isStore(initializer);
+      return (
+        (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) &&
+        name.text === 'setState' &&
+        initializer &&
+        isStore(initializer)
+      );
     }
     return false;
   };

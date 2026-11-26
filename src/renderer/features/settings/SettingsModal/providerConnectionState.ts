@@ -7,17 +7,18 @@ import type {
 import type { ProviderConnectionDraft } from './types';
 import type { useI18n } from '../../../i18n';
 
-const sortedRecord = (value: Readonly<Record<string, string | boolean>>): Record<string, string | boolean> => (
-  Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)))
-);
+const sortedRecord = (value: Readonly<Record<string, string | boolean>>): Record<string, string | boolean> =>
+  Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)));
 
 export function resolvePrimarySecretField(
   schema: LlmProviderConnectionSchema | undefined,
 ): LlmProviderConnectionField | undefined {
   const secrets = schema?.fields.filter((field) => field.kind === 'secret') ?? [];
-  return secrets.find((field) => field.id === schema?.primarySecretFieldId)
-    ?? secrets.find((field) => field.id === 'apiKey')
-    ?? secrets[0];
+  return (
+    secrets.find((field) => field.id === schema?.primarySecretFieldId) ??
+    secrets.find((field) => field.id === 'apiKey') ??
+    secrets[0]
+  );
 }
 
 export function getConnectionDraftSignature(draft: ProviderConnectionDraft): string {
@@ -31,25 +32,20 @@ export function getConnectionDraftSignature(draft: ProviderConnectionDraft): str
 }
 
 export function getConnectionRequestValues(draft: ProviderConnectionDraft): Record<string, string> {
-  return Object.fromEntries(Object.entries(draft.connectionValues).filter(([fieldId, value]) => (
-    !draft.usingStoredConnectionSecrets[fieldId] && Boolean(value.trim())
-  )));
+  return Object.fromEntries(
+    Object.entries(draft.connectionValues).filter(
+      ([fieldId, value]) => !draft.usingStoredConnectionSecrets[fieldId] && Boolean(value.trim()),
+    ),
+  );
 }
 
-export function isConnectionDraftComplete(
-  provider: LlmProviderEntry,
-  draft: ProviderConnectionDraft,
-): boolean {
+export function isConnectionDraftComplete(provider: LlmProviderEntry, draft: ProviderConnectionDraft): boolean {
   const schema = provider.connectionSchema;
   if (!schema?.fields.length) {
-    return provider.authMode !== 'api-key'
-      || draft.usingStoredSecret
-      || Boolean(draft.apiKey.trim());
+    return provider.authMode !== 'api-key' || draft.usingStoredSecret || Boolean(draft.apiKey.trim());
   }
-  const isPresent = (fieldId: string): boolean => (
-    draft.usingStoredConnectionSecrets[fieldId]
-    || Boolean(draft.connectionValues[fieldId]?.trim())
-  );
+  const isPresent = (fieldId: string): boolean =>
+    draft.usingStoredConnectionSecrets[fieldId] || Boolean(draft.connectionValues[fieldId]?.trim());
   const alternativeFieldIds = new Set(
     schema.credentialAlternatives?.flatMap((alternative) => alternative.fieldIds) ?? [],
   );
@@ -57,11 +53,13 @@ export function isConnectionDraftComplete(
     .filter((field) => field.required && !alternativeFieldIds.has(field.id))
     .every((field) => isPresent(field.id));
   if (!requiredFieldsPresent) return false;
-  return !schema.credentialAlternatives?.length
-    || schema.credentialAlternatives.some((alternative) => (
-      alternative.ambient === true
-      || (alternative.fieldIds.length > 0 && alternative.fieldIds.every(isPresent))
-    ));
+  return (
+    !schema.credentialAlternatives?.length ||
+    schema.credentialAlternatives.some(
+      (alternative) =>
+        alternative.ambient === true || (alternative.fieldIds.length > 0 && alternative.fieldIds.every(isPresent)),
+    )
+  );
 }
 
 export function projectEndpointTemplate(
@@ -77,12 +75,13 @@ export function projectEndpointTemplate(
 }
 
 export function shouldUseProviderDocsLink(provider: LlmProviderEntry): boolean {
-  const usesTypedConnectionSchema = (provider.connectionSchema?.fields ?? [])
-    .some((field) => field.id !== 'apiKey');
-  return provider.authMode === 'local'
-    || provider.authMode === 'account'
-    || provider.authMode === 'environment'
-    || usesTypedConnectionSchema;
+  const usesTypedConnectionSchema = (provider.connectionSchema?.fields ?? []).some((field) => field.id !== 'apiKey');
+  return (
+    provider.authMode === 'local' ||
+    provider.authMode === 'account' ||
+    provider.authMode === 'environment' ||
+    usesTypedConnectionSchema
+  );
 }
 
 export function projectConnectionProvider(
@@ -100,11 +99,7 @@ export function projectConnectionProvider(
     baseUrl: draft.baseUrl,
     activeAccountId: provider.authAccountIds?.[authMode],
     hasStoredSecret: provider.hasStoredSecretByAuthMode?.[authMode] === true,
-    status: availability.state === 'unavailable'
-      ? 'unavailable'
-      : isConfigured
-        ? provider.status
-        : 'unconfigured',
+    status: availability.state === 'unavailable' ? 'unavailable' : isConfigured ? provider.status : 'unconfigured',
     enabled: isConfigured && provider.enabled,
     isConfigured,
     unavailableReason: availability.state === 'unavailable' ? availability.reason : undefined,
@@ -113,10 +108,12 @@ export function projectConnectionProvider(
 
 export function createProviderConnectionDraft(provider: LlmProviderEntry): ProviderConnectionDraft {
   const models = provider.models.map((model) => ({ ...model }));
-  const connectionValues = Object.fromEntries((provider.connectionSchema?.fields ?? []).map((field) => [
-    field.id,
-    field.kind === 'secret' ? '' : provider.connectionValues?.[field.id] ?? '',
-  ]));
+  const connectionValues = Object.fromEntries(
+    (provider.connectionSchema?.fields ?? []).map((field) => [
+      field.id,
+      field.kind === 'secret' ? '' : (provider.connectionValues?.[field.id] ?? ''),
+    ]),
+  );
   const usingStoredConnectionSecrets = Object.fromEntries(
     (provider.connectionSchema?.fields ?? [])
       .filter((field) => field.kind === 'secret')
@@ -132,12 +129,12 @@ export function createProviderConnectionDraft(provider: LlmProviderEntry): Provi
     usingStoredConnectionSecrets,
     visibleConnectionSecrets: {},
     apiKey: '',
-    baseUrl: routeTemplate?.includes('${') ? routeTemplate : provider.baseUrl ?? routeTemplate ?? '',
+    baseUrl: routeTemplate?.includes('${') ? routeTemplate : (provider.baseUrl ?? routeTemplate ?? ''),
     showApiKey: false,
     usingStoredSecret: primarySecretField
       ? usingStoredConnectionSecrets[primarySecretField.id] === true
-      : provider.authMode === 'api-key'
-        && (provider.hasStoredSecretByAuthMode?.['api-key'] ?? provider.hasStoredSecret),
+      : provider.authMode === 'api-key' &&
+        (provider.hasStoredSecretByAuthMode?.['api-key'] ?? provider.hasStoredSecret),
     busy: 'idle',
     error: '',
     discoveryDiagnostic: null,
@@ -148,29 +145,29 @@ export function createProviderConnectionDraft(provider: LlmProviderEntry): Provi
     testedConnectionSignature: '',
     discoveryAccountId: null,
     models,
-    accountStatus: provider.authMode === 'account' && provider.configuredAuthMode === 'account' && provider.isConfigured
-      ? {
-          providerId: provider.id,
-          state: 'connected',
-          available: true,
-          connected: true,
-          accountLabel: provider.accountLabel,
-          planLabel: provider.planLabel,
-          expiresAt: provider.oauthExpiresAt,
-          models,
-        }
-      : undefined,
+    accountStatus:
+      provider.authMode === 'account' && provider.configuredAuthMode === 'account' && provider.isConfigured
+        ? {
+            providerId: provider.id,
+            state: 'connected',
+            available: true,
+            connected: true,
+            accountLabel: provider.accountLabel,
+            planLabel: provider.planLabel,
+            expiresAt: provider.oauthExpiresAt,
+            models,
+          }
+        : undefined,
     authCode: '',
   };
 }
 
 /** A coded connection failure in the person's language; otherwise the provider's own message or the generic one. */
 export function connectionFailureText(
-  result: Pick<LlmProviderConnectionResult, 'error' | 'errorCode' | 'errorParams'>,
+  result: Pick<LlmProviderConnectionResult, 'errorCode' | 'errorParams'>,
   t: ReturnType<typeof useI18n>['t'],
   fallback: 'settings.providerTestFailed' | 'settings.providerSaveFailed',
 ): string {
-  return result.errorCode
-    ? t(`settings.providerError.${result.errorCode}` as const, result.errorParams)
-    : result.error ?? t(fallback);
+  // The provider's own text is technical; without a known code the caller's sentence stands in for it.
+  return result.errorCode ? t(`settings.providerError.${result.errorCode}` as const, result.errorParams) : t(fallback);
 }

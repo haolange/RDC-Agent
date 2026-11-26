@@ -37,7 +37,7 @@ export const zhTerminal = {
   'terminal.emptyRun': '当前运行暂无活动。',
   'terminal.emptyRunHint': '开始或选择一次运行后，这里显示它的活动。',
   'terminal.emptyAllSessions': '暂无运行活动。',
-  'terminal.metaSession': "会话",
-  'terminal.metaRun': "运行",
-  'terminal.metaProject': "项目",
+  'terminal.metaSession': '会话',
+  'terminal.metaRun': '运行',
+  'terminal.metaProject': '项目',
 } as const;

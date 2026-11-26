@@ -7,8 +7,9 @@ import {
 import { switchConversationBranch } from '../../hooks/conversationPreview';
 import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { useI18n } from '../../i18n';
-import { useNotificationStore } from '../../stores/notificationStore';
+import { notify } from '../../stores/notificationStore';
 import { Chevron } from '../../ui/Chevron';
+import { PlainButton } from '../../ui/PlainButton';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ConversationMessage } from '@shared/types/conversation';
 
@@ -17,10 +18,7 @@ interface MessageVariantNavigatorProps {
   branchState: ConversationBranchState | null;
 }
 
-export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = ({
-  message,
-  branchState,
-}) => {
+export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = ({ message, branchState }) => {
   const { t } = useI18n();
 
   const fork = useMemo(() => {
@@ -46,59 +44,67 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
     };
   }, [fork]);
 
-  const switchVariant = useCallback(async (direction: -1 | 1) => {
-    if (!fork || !navigator || !message.sessionId) return;
-    const nextIndex = navigator.variantIndex + direction;
-    if (nextIndex < 0 || nextIndex >= navigator.variantCount) return;
-    const nextBranch = navigator.branches[nextIndex];
-    if (!nextBranch) return;
+  const switchVariant = useCallback(
+    async (direction: -1 | 1) => {
+      if (!fork || !navigator || !message.sessionId) return;
+      const nextIndex = navigator.variantIndex + direction;
+      if (nextIndex < 0 || nextIndex >= navigator.variantCount) return;
+      const nextBranch = navigator.branches[nextIndex];
+      if (!nextBranch) return;
 
-    const result = await switchConversationBranch({
-      sessionId: message.sessionId,
-      forkId: fork.forkId,
-      branchId: nextBranch.branchId,
-    });
-    // A switch that did not happen says so; silently staying on the old branch reads as a broken control.
-    if (!result?.success) {
-      useNotificationStore.getState().add({ tone: 'error', title: t('chat.messageVariantSwitchFailed') });
-      return;
-    }
-    hydrateLoadedSessionSurface({
-      messages: result.messages,
-      branchState: result.branchState ?? null,
-      tracePresentation: result.tracePresentation ?? null,
-      applyTrace: Boolean(result.tracePresentation),
-    });
-  }, [fork, message.sessionId, navigator, t]);
+      let result: Awaited<ReturnType<typeof switchConversationBranch>>;
+      try {
+        result = await switchConversationBranch({
+          sessionId: message.sessionId,
+          forkId: fork.forkId,
+          branchId: nextBranch.branchId,
+        });
+      } catch (error) {
+        // A switch that did not happen says so; silently staying on the old branch reads as a broken control.
+        notify.failure(error, t, 'chat.messageVariantSwitchFailed');
+        return;
+      }
+      if (!result) {
+        notify.error(t('chat.messageVariantSwitchFailed'));
+        return;
+      }
+      hydrateLoadedSessionSurface({
+        sessionId: message.sessionId,
+        messages: result.messages,
+        branchState: result.branchState,
+        tracePresentation: result.tracePresentation,
+        applyTrace: true,
+      });
+    },
+    [fork, message.sessionId, navigator, t],
+  );
 
   if (!navigator) return null;
 
   return (
     <div className="message-variant-navigator" data-testid="message-variant-navigator">
-      <button
-        type="button"
+      <PlainButton
         className="message-variant-nav-btn"
         aria-label={t('chat.messageVariantPrev')}
         disabled={navigator.variantIndex <= 0}
         onClick={() => void switchVariant(-1)}
       >
         <Chevron direction="left" size={12} />
-      </button>
+      </PlainButton>
       <span className="message-variant-nav-label" aria-live="polite">
         {t('chat.messageVariantLabel', {
           current: navigator.variantIndex + 1,
           total: navigator.variantCount,
         })}
       </span>
-      <button
-        type="button"
+      <PlainButton
         className="message-variant-nav-btn"
         aria-label={t('chat.messageVariantNext')}
         disabled={navigator.variantIndex >= navigator.variantCount - 1}
         onClick={() => void switchVariant(1)}
       >
         <Chevron size={12} />
-      </button>
+      </PlainButton>
     </div>
   );
 };

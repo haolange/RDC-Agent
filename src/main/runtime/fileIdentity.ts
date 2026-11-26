@@ -56,7 +56,10 @@ export const resolveCommandOnPath = (command: string): string | null => {
   if (path.isAbsolute(command) || command.includes('/') || command.includes('\\')) {
     return isRegularFile(command) ? command : null;
   }
-  const directories = (process.env.PATH ?? '').split(path.delimiter).map((entry) => entry.trim()).filter(Boolean);
+  const directories = (process.env.PATH ?? '')
+    .split(path.delimiter)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
   for (const directory of directories) {
     for (const name of commandFileNames(command)) {
       const candidate = path.join(directory, name);

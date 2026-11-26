@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useAsyncValue } from '../../lib/useAsyncValue';
 import { readLivePreview, type CaptureScope } from './capturePanelActions';
 
 function toPngBytes(value: Uint8Array): Uint8Array<ArrayBuffer> {
@@ -7,36 +8,32 @@ function toPngBytes(value: Uint8Array): Uint8Array<ArrayBuffer> {
   return copy;
 }
 
-export function useCapturePreview(
-  scope: CaptureScope,
-  source: { imagePath?: string | null; imageRevision?: number },
-) {
-  const [result, setResult] = useState<{ key: string; url: string | null; error: boolean } | null>(null);
+const revoke = (url: string | null) => {
+  if (url) URL.revokeObjectURL(url);
+};
+
+export function useCapturePreview(scope: CaptureScope, source: { imagePath?: string | null; imageRevision?: number }) {
   const [attempt, setAttempt] = useState(0);
-  const retry = useCallback(() => setAttempt(value => value + 1), []);
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
   const imagePath = source.imagePath ?? null;
-  const projectId = scope.projectId;
-  const sessionId = scope.sessionId;
-  const key = JSON.stringify([projectId, sessionId, imagePath, source.imageRevision, attempt]);
+  const { projectId, sessionId } = scope;
   const hasSource = Boolean(imagePath);
-  useEffect(() => {
-    let active = true;
-    let objectUrl: string | null = null;
-    const requestScope = { projectId, sessionId };
-    const load = async () => {
-      const bytes = imagePath ? await readLivePreview(requestScope) : null;
-      if (!active) return;
-      if (!bytes) { setResult({ key, url: null, error: hasSource }); return; }
-      objectUrl = URL.createObjectURL(new Blob([toPngBytes(bytes)], { type: 'image/png' }));
-      if (active) setResult({ key, url: objectUrl, error: false });
-      else URL.revokeObjectURL(objectUrl);
-    };
-    void load().catch(() => { if (active) setResult({ key, url: null, error: true }); });
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [projectId, sessionId, imagePath, key, hasSource]);
-  return { url: result?.key === key ? result.url : null,
-    loading: hasSource && result?.key !== key, error: result?.key === key && result.error, retry };
+  // An object URL lives while it shows: one replaced, unmounted or answered too late is revoked.
+  const preview = useAsyncValue(
+    JSON.stringify([projectId, sessionId, imagePath, source.imageRevision, attempt]),
+    async (signal) => {
+      const bytes = imagePath ? await readLivePreview({ projectId, sessionId }) : null;
+      // A superseded read makes no URL at all.
+      signal.throwIfAborted();
+      return bytes ? URL.createObjectURL(new Blob([toPngBytes(bytes)], { type: 'image/png' })) : null;
+    },
+    { dispose: revoke },
+  );
+  const url = preview.status === 'ready' ? preview.value : null;
+  return {
+    url,
+    loading: hasSource && preview.status === 'loading',
+    error: preview.status === 'error' || (preview.status === 'ready' && !url && hasSource),
+    retry,
+  };
 }

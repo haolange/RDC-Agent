@@ -7,32 +7,26 @@ export interface AgentModelProviderGroup {
   availableCount: number;
 }
 
-export const isAgentModelSelectionInvalid = (
-  value: string,
-  options: AgentModelOption[],
-): boolean => Boolean(value && !options.some((option) => option.canonicalId === value && option.configured));
+export const isAgentModelSelectionInvalid = (value: string, options: AgentModelOption[]): boolean =>
+  Boolean(value && !options.some((option) => option.canonicalId === value && option.configured));
 
-export const agentModelOptionAccessibleLabel = (
-  option: AgentModelOption,
-  unavailableLabel: string,
-): string => [
-  option.modelLabel,
-  option.canonicalId,
-  ...(!option.configured ? [option.disabledReason ?? unavailableLabel] : []),
-].join(' · ');
+export const agentModelOptionAccessibleLabel = (option: AgentModelOption, unavailableLabel: string): string =>
+  [
+    option.modelLabel,
+    option.canonicalId,
+    ...(!option.configured ? [option.disabledReason ?? unavailableLabel] : []),
+  ].join(' · ');
 
 export function matchesAgentModelQuery(option: AgentModelOption, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
-  return [option.modelLabel, option.modelId, option.canonicalId, option.providerLabel]
-    .some((field) => field.toLowerCase().includes(needle));
+  return [option.modelLabel, option.modelId, option.canonicalId, option.providerLabel].some((field) =>
+    field.toLowerCase().includes(needle),
+  );
 }
 
 /** Only executable options enter the selector; Provider retains catalog diagnostics. */
-export function buildAgentModelGroups(
-  options: AgentModelOption[],
-  query: string,
-): AgentModelProviderGroup[] {
+export function buildAgentModelGroups(options: AgentModelOption[], query: string): AgentModelProviderGroup[] {
   const map = new Map<string, AgentModelOption[]>();
   for (const option of options) {
     if (!option.configured || !matchesAgentModelQuery(option, query)) continue;

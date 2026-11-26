@@ -4,7 +4,8 @@ import { createServer, request as httpRequest, type IncomingMessage, type Server
 import { request as httpsRequest } from 'https';
 import { extname, isAbsolute, join, normalize, relative, resolve } from 'path';
 import { URL } from 'url';
-import { app } from 'electron';
+import { AppError, IPC_ERROR_KEY, isIpcErrorResult } from '@shared/errors/appError';
+import { buildRendererCsp } from '@shared/utils/rendererCsp';
 import { invokeRegisteredIpcChannel } from '../ipc/invokeRegistry';
 import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/provider-catalog/effectiveCatalogTypes';
 import {
@@ -12,16 +13,12 @@ import {
   MODELS_DEV_SNAPSHOT_SHA256,
   PROVIDER_CATALOG_SCHEMA_VERSION,
 } from '../provider-catalog/catalogCompiler';
-import {
-  getProviderCatalogRevision,
-  listProviderSummaries,
-} from '../provider-catalog/ProviderCatalogRegistry';
-import { SETTINGS_SCHEMA_VERSION } from '../settings/settings-core/settingsDefaults';
-import {
-  attachDevRendererWebSocketProxy,
-  proxyHttpToDevRenderer,
-  shouldProxyToDevRenderer,
-} from './devRendererProxy';
+import { getProviderCatalogRevision, listProviderSummaries } from '../provider-catalog/ProviderCatalogRegistry';
+import { SETTINGS_SCHEMA_VERSION } from '../settings/settings-core/settingsFileSchema';
+import { rendererEventHub } from '../runtime/rendererEventHub';
+import { attachmentStagingService } from '../conversation/AttachmentStagingService';
+import { isBrowserQaRun } from '../runtime/browserQaRun';
+import { attachDevRendererWebSocketProxy, proxyHttpToDevRenderer, shouldProxyToDevRenderer } from './devRendererProxy';
 import {
   buildBridgeAuthCookie,
   createBridgeBearerToken,
@@ -33,7 +30,6 @@ import {
   tokensMatch,
   cookieOriginRequiredForPath,
 } from './bridgeSecurity';
-import { rendererEventHub } from './rendererEventHub';
 
 type BridgeOptions = {
   devRendererUrl: string | null;
@@ -124,12 +120,7 @@ function setCors(response: ServerResponse, requestOrigin: string | undefined): v
   response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
 }
 
-function sendJson(
-  response: ServerResponse,
-  statusCode: number,
-  payload: unknown,
-  requestOrigin?: string,
-): void {
+function sendJson(response: ServerResponse, statusCode: number, payload: unknown, requestOrigin?: string): void {
   setCors(response, requestOrigin);
   response.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
   response.end(JSON.stringify(payload));
@@ -213,16 +204,14 @@ async function checkDevRenderer(url: string): Promise<{ ok: boolean; url: string
 function resolveInvokeBodyLimit(request: IncomingMessage): number {
   const declared = request.headers[INVOKE_CHANNEL_HEADER];
   const channel = Array.isArray(declared) ? declared[0] : declared;
-  return channel === 'conversation:stageAttachments'
-    ? STAGE_ATTACHMENTS_JSON_BODY_BYTES
-    : MAX_JSON_BODY_BYTES;
+  return channel === 'conversation:stageAttachments' ? STAGE_ATTACHMENTS_JSON_BODY_BYTES : MAX_JSON_BODY_BYTES;
 }
 
 async function readJsonBody(request: IncomingMessage, maxBytes = MAX_JSON_BODY_BYTES): Promise<unknown> {
   const declaredLength = Number(request.headers['content-length'] ?? 0);
   if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
     request.destroy();
-    throw new Error(`PAYLOAD_TOO_LARGE: bridge JSON body exceeds ${maxBytes} bytes.`);
+    throw new AppError('PAYLOAD_TOO_LARGE', `bridge JSON body exceeds ${maxBytes} bytes.`);
   }
   const chunks: Buffer[] = [];
   let total = 0;
@@ -231,7 +220,7 @@ async function readJsonBody(request: IncomingMessage, maxBytes = MAX_JSON_BODY_B
     total += buffer.byteLength;
     if (total > maxBytes) {
       request.destroy();
-      throw new Error(`PAYLOAD_TOO_LARGE: bridge JSON body exceeds ${maxBytes} bytes.`);
+      throw new AppError('PAYLOAD_TOO_LARGE', `bridge JSON body exceeds ${maxBytes} bytes.`);
     }
     chunks.push(buffer);
   }
@@ -240,18 +229,18 @@ async function readJsonBody(request: IncomingMessage, maxBytes = MAX_JSON_BODY_B
 }
 
 function serveStatic(response: ServerResponse, rendererRoot: string, requestPath: string): void {
-  const relativePath = requestPath === '/app' || requestPath === '/app/'
-    ? 'index.html'
-    : requestPath.replace(/^\/app\/?/, '').replace(/^\//, '');
+  const relativePath =
+    requestPath === '/app' || requestPath === '/app/'
+      ? 'index.html'
+      : requestPath.replace(/^\/app\/?/, '').replace(/^\//, '');
   const requestedPath = normalize(join(rendererRoot, relativePath || 'index.html'));
   const root = resolve(rendererRoot);
   const fallbackIndex = join(root, 'index.html');
   const relativePathFromRoot = relative(root, requestedPath);
-  const contained = relativePathFromRoot === ''
-    || (!relativePathFromRoot.startsWith('..') && !isAbsolute(relativePathFromRoot));
-  const filePath = contained && existsSync(requestedPath) && statSync(requestedPath).isFile()
-    ? requestedPath
-    : fallbackIndex;
+  const contained =
+    relativePathFromRoot === '' || (!relativePathFromRoot.startsWith('..') && !isAbsolute(relativePathFromRoot));
+  const filePath =
+    contained && existsSync(requestedPath) && statSync(requestedPath).isFile() ? requestedPath : fallbackIndex;
 
   if (!existsSync(filePath)) {
     sendJson(response, 404, { success: false, error: 'Renderer build output not found' });
@@ -263,25 +252,17 @@ function serveStatic(response: ServerResponse, rendererRoot: string, requestPath
     'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
   };
   if (extname(filePath) === '.html') {
-    headers['Content-Security-Policy'] = [
-      "default-src 'self'",
-      "script-src 'self'",
-      "style-src 'self'",
-      "style-src-attr 'none'",
-      "img-src 'self' data: blob:",
-      "media-src 'self' blob:",
-      "font-src 'self' data:",
-      "connect-src 'self' http://127.0.0.1:* https://openrouter.ai https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "frame-ancestors 'none'",
-    ].join('; ');
+    headers['Content-Security-Policy'] = buildRendererCsp('production');
   }
   response.writeHead(200, headers);
   createReadStream(filePath).pipe(response);
 }
 
-async function handleRequest(options: BridgeOptions, request: IncomingMessage, response: ServerResponse): Promise<void> {
+async function handleRequest(
+  options: BridgeOptions,
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
   const requestOrigin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
 
   if (!request.url) {
@@ -303,11 +284,7 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   }
 
   // Same-origin only: reject foreign Origins (no cross-port Vite peer).
-  if (
-    requestOrigin
-    && requestOrigin !== bridgeOrigin
-    && request.method !== 'OPTIONS'
-  ) {
+  if (requestOrigin && requestOrigin !== bridgeOrigin && request.method !== 'OPTIONS') {
     sendJson(response, 403, { success: false, error: 'Origin not allowed' }, requestOrigin);
     return;
   }
@@ -330,18 +307,21 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
     return;
   }
 
-  const isPublicAsset = !options.devRendererUrl
-    && (url.pathname.startsWith('/assets/') || url.pathname === '/favicon.ico');
-  if (!isPublicAsset && !requireBridgeAuth(request, bridgeOrigin, {
-    requireCookieOrigin: cookieOriginRequiredForPath(url.pathname),
-  }).ok) {
+  const isPublicAsset =
+    !options.devRendererUrl && (url.pathname.startsWith('/assets/') || url.pathname === '/favicon.ico');
+  if (
+    !isPublicAsset &&
+    !requireBridgeAuth(request, bridgeOrigin, {
+      requireCookieOrigin: cookieOriginRequiredForPath(url.pathname),
+    }).ok
+  ) {
     sendJson(response, 401, { success: false, error: 'Unauthorized' }, requestOrigin);
     return;
   }
 
   if (url.pathname === '/api/settings/providers/catalog' && request.method === 'GET') {
     const catalog = await invokeRegisteredIpcChannel('settings:getProviderCatalog');
-    sendJson(response, 200, catalog, requestOrigin);
+    sendJson(response, isIpcErrorResult(catalog) ? 500 : 200, catalog, requestOrigin);
     return;
   }
 
@@ -349,15 +329,20 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
     const renderer = options.devRendererUrl
       ? await checkDevRenderer(options.devRendererUrl)
       : { ok: existsSync(join(options.rendererRoot, 'index.html')), url: null };
-    sendJson(response, 200, {
-      ok: renderer.ok,
-      productName: 'RDC-Agent',
-      mode: 'browser-app-session',
-      bridgeUrl,
-      sameOriginDevProxy: Boolean(options.devRendererUrl),
-      renderer,
-      ...healthMetadata,
-    }, requestOrigin);
+    sendJson(
+      response,
+      200,
+      {
+        ok: renderer.ok,
+        productName: 'RDC-Agent',
+        mode: 'browser-app-session',
+        bridgeUrl,
+        sameOriginDevProxy: Boolean(options.devRendererUrl),
+        renderer,
+        ...healthMetadata,
+      },
+      requestOrigin,
+    );
     return;
   }
 
@@ -377,27 +362,52 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
           return;
         }
         if (!isBridgeChannelAllowed(payload.channel)) {
-          sendJson(response, 403, {
-            success: false,
-            error: `Channel not allowed on browser bridge: ${payload.channel}`,
-          }, requestOrigin);
+          sendJson(
+            response,
+            403,
+            {
+              success: false,
+              error: `Channel not allowed on browser bridge: ${payload.channel}`,
+            },
+            requestOrigin,
+          );
           return;
         }
         const args = Array.isArray(payload.args) ? payload.args : [];
         const result = await invokeRegisteredIpcChannel(payload.channel, args);
+        if (isIpcErrorResult(result)) {
+          const appError = result[IPC_ERROR_KEY];
+          sendJson(
+            response,
+            appError.code === 'INTERNAL_ERROR' ? 500 : 422,
+            {
+              success: false,
+              error: appError.technical ?? appError.code,
+              appError,
+            },
+            requestOrigin,
+          );
+          return;
+        }
         sendJson(response, 200, { success: true, result }, requestOrigin);
       })
       .catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
-        sendJson(response, message.startsWith('PAYLOAD_TOO_LARGE') ? 413 : 500, {
-          success: false,
-          error: message,
-        }, requestOrigin);
+        sendJson(
+          response,
+          message.startsWith('PAYLOAD_TOO_LARGE') ? 413 : 500,
+          {
+            success: false,
+            error: message,
+          },
+          requestOrigin,
+        );
       });
     return;
   }
 
   if (url.pathname === '/events' && request.method === 'POST') {
+    if (!rendererEventHub.hasClients()) attachmentStagingService.clearAll();
     rendererEventHub.connect(response, requestOrigin && allowedOrigins.has(requestOrigin) ? requestOrigin : undefined);
     return;
   }
@@ -405,11 +415,16 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   if (shouldProxyToDevRenderer(url.pathname, options.devRendererUrl)) {
     const renderer = await checkDevRenderer(options.devRendererUrl!);
     if (!renderer.ok) {
-      sendJson(response, 503, {
-        success: false,
-        error: 'Dev renderer is not reachable',
-        renderer,
-      }, requestOrigin);
+      sendJson(
+        response,
+        503,
+        {
+          success: false,
+          error: 'Dev renderer is not reachable',
+          renderer,
+        },
+        requestOrigin,
+      );
       return;
     }
     proxyHttpToDevRenderer(request, response, {
@@ -434,17 +449,12 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   sendJson(response, 404, { success: false, error: 'Not found' }, requestOrigin);
 }
 
-/** Debug-only surface: a packaged build never starts it, whatever the environment says. */
-export function shouldStartBrowserAppBridge(): boolean {
-  return !app.isPackaged && process.env.RDC_AGENT_BROWSER_QA === '1';
-}
-
 export async function startBrowserAppBridge(options: BridgeOptions): Promise<string> {
   if (server && bridgeUrl) {
     return bridgeUrl;
   }
 
-  if (!shouldStartBrowserAppBridge()) {
+  if (!isBrowserQaRun()) {
     throw new Error('Browser app bridge starts only in an unpackaged build with RDC_AGENT_BROWSER_QA=1');
   }
 
@@ -457,10 +467,15 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
   server = createServer((request, response) => {
     void handleRequest(options, request, response).catch((error) => {
       const requestOrigin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
-      sendJson(response, 500, {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }, requestOrigin);
+      sendJson(
+        response,
+        500,
+        {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        requestOrigin,
+      );
     });
   });
   attachDevRendererWebSocketProxy(server, () => activeDevRendererUrl);
@@ -490,9 +505,11 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
   const port = typeof address === 'object' && address ? address.port : preferredPort;
   bridgeUrl = `http://127.0.0.1:${port}`;
   allowedOrigins = resolveBridgeAllowedOrigins(bridgeUrl, options.devRendererUrl);
-  (globalThis as typeof globalThis & {
-    __RDC_AGENT_BROWSER_BRIDGE_URL__?: string;
-  }).__RDC_AGENT_BROWSER_BRIDGE_URL__ = bridgeUrl;
+  (
+    globalThis as typeof globalThis & {
+      __RDC_AGENT_BROWSER_BRIDGE_URL__?: string;
+    }
+  ).__RDC_AGENT_BROWSER_BRIDGE_URL__ = bridgeUrl;
 
   const bootstrap = qaBootstrapToken;
   if (!bootstrap) {
@@ -515,7 +532,8 @@ export async function stopBrowserAppBridge(): Promise<void> {
   activeDevRendererUrl = null;
   allowedOrigins = new Set();
   healthMetadata = null;
-  delete (globalThis as typeof globalThis & { __RDC_AGENT_BROWSER_BRIDGE_URL__?: string }).__RDC_AGENT_BROWSER_BRIDGE_URL__;
+  delete (globalThis as typeof globalThis & { __RDC_AGENT_BROWSER_BRIDGE_URL__?: string })
+    .__RDC_AGENT_BROWSER_BRIDGE_URL__;
   if (!activeServer) {
     return;
   }

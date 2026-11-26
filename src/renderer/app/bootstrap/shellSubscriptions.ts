@@ -1,13 +1,13 @@
 import { useTerminalStore } from '../../stores/terminalStore';
 import { resetWorkbenchStores } from '../storesReset';
-import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
+import { notify } from '../../stores/notificationStore';
 
 import type { ElectronAPI } from '@shared/types/electron';
 import type { EventBridgeOptions } from './eventBridgeOptions';
 
 export function subscribeRuntimeLogAppended(electronAPI: ElectronAPI) {
   return electronAPI.events.onRuntimeLogAppended((entry) => {
-    useTerminalStore.getState().appendEntry(entry as RuntimeLogEntry);
+    useTerminalStore.getState().appendEntry(entry);
   });
 }
 
@@ -17,14 +17,21 @@ export function subscribeAppThemeChanged(electronAPI: ElectronAPI, setSystemThem
   });
 }
 
-export function subscribeShellCommands(electronAPI: ElectronAPI, { showNotice, t, setSettingsModalOpen, setWindowMaximized }: Pick<EventBridgeOptions, 'showNotice' | 't' | 'setSettingsModalOpen' | 'setWindowMaximized'>) {
+export function subscribeShellCommands(
+  electronAPI: ElectronAPI,
+  {
+    t,
+    setSettingsModalOpen,
+    setWindowMaximized,
+  }: Pick<EventBridgeOptions, 't' | 'setSettingsModalOpen' | 'setWindowMaximized'>,
+) {
   const handleFileOpen = (paths: unknown) => {
     if (!Array.isArray(paths) || paths.length === 0) return;
-    showNotice(t('app.notice.filesReceived', { count: paths.length }));
+    notify.info(t('app.notice.filesReceived', { count: paths.length }));
   };
   const handleCaseNew = () => {
     resetWorkbenchStores();
-    showNotice(t('app.notice.newWorkspace'));
+    notify.info(t('app.notice.newWorkspace'));
   };
   const handleSettingsOpen = () => {
     setSettingsModalOpen(true);

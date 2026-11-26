@@ -1,16 +1,14 @@
 import React from 'react';
+import { Button } from '../../../../ui/Button';
+import { useI18n } from '../../../../i18n';
 import { authModeLabelKey } from './providerCardModel';
 import type { LlmProviderAuthMode, LlmProviderEntry } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProviderAuthModeFieldProps {
   provider: LlmProviderEntry;
   value: LlmProviderAuthMode;
   disabled: boolean;
   onChange: (mode: LlmProviderAuthMode) => void;
-  t: Translate;
 }
 
 export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
@@ -18,13 +16,18 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
   value,
   disabled,
   onChange,
-  t,
 }) => {
+  const { t } = useI18n();
   const options = provider.authModeOptions ?? [provider.authMode];
   if (options.length < 2) return null;
   const selectedAvailability = provider.authModeAvailability?.[value] ?? provider.providerAvailability;
-  const selectedReason = selectedAvailability.reason
-    ?? (selectedAvailability.state === 'unknown' ? t('settings.providerAuthUnverified') : '');
+  // The manifest's reason is English provider data: it may explain in a tooltip, the visible line is product copy.
+  const selectedState =
+    selectedAvailability.state === 'unknown'
+      ? t('settings.providerAuthUnverified')
+      : selectedAvailability.state === 'unavailable'
+        ? t('settings.providerAuthUnavailable')
+        : '';
 
   return (
     <div className="settings-field settings-provider-auth-field">
@@ -32,15 +35,13 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
       <div className="settings-provider-auth-options" role="radiogroup" aria-label={t('settings.providerAuthMode')}>
         {options.map((mode) => {
           const availability = provider.authModeAvailability?.[mode] ?? provider.providerAvailability;
-          const unavailable = availability.state === 'unavailable'
-            || (mode === 'account' && !provider.accountLogin);
-          const reason = availability.reason
-            ?? (unavailable ? t('settings.providerAuthUnavailable') : undefined);
+          const unavailable = availability.state === 'unavailable' || (mode === 'account' && !provider.accountLogin);
+          const reason = availability.reason ?? (unavailable ? t('settings.providerAuthUnavailable') : undefined);
           return (
-            <button
+            <Button
               key={mode}
-              type="button"
-              className={`button button-secondary settings-provider-auth-option${mode === value ? ' is-active' : ''}`}
+              variant="secondary"
+              className={`settings-provider-auth-option${mode === value ? ' is-active' : ''}`}
               data-testid={`settings-provider-auth-mode-${mode}`}
               role="radio"
               aria-checked={mode === value}
@@ -49,16 +50,18 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
               onClick={() => onChange(mode)}
             >
               {t(authModeLabelKey(mode, provider))}
-            </button>
+            </Button>
           );
         })}
       </div>
-      {selectedAvailability.state !== 'available' && selectedReason ? (
+      {selectedState ? (
         <span
           className={`settings-provider-auth-state settings-provider-auth-state--${selectedAvailability.state}`}
           data-testid="settings-provider-auth-state"
+          tabIndex={selectedAvailability.reason ? 0 : undefined}
+          data-tooltip={selectedAvailability.reason}
         >
-          {selectedReason}
+          {selectedState}
         </span>
       ) : null}
     </div>

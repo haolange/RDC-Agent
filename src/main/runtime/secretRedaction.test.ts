@@ -19,18 +19,36 @@ describe('secret redaction', () => {
   ])('removes %s from text', (_label, text) => {
     const redacted = redactCredentialLikeText(text);
     expect(redacted).toContain('[REDACTED');
-    for (const secret of [githubClassic, githubFineGrained, awsKeyId, slackBot, 'abcdefgh12345678', 'b3BlbnNzaC1rZXk']) {
+    for (const secret of [
+      githubClassic,
+      githubFineGrained,
+      awsKeyId,
+      slackBot,
+      'abcdefgh12345678',
+      'b3BlbnNzaC1rZXk',
+    ]) {
       expect(redacted).not.toContain(secret);
     }
   });
 
   it('redacts token-named fields without touching token counts', () => {
-    const { value } = redactSecretsDeep({ token: 'opaque', githubToken: 'opaque', usage: { inputTokens: 12, maxTokens: 400 } });
-    expect(value).toEqual({ token: '[REDACTED]', githubToken: '[REDACTED]', usage: { inputTokens: 12, maxTokens: 400 } });
+    const { value } = redactSecretsDeep({
+      token: 'opaque',
+      githubToken: 'opaque',
+      usage: { inputTokens: 12, maxTokens: 400 },
+    });
+    expect(value).toEqual({
+      token: '[REDACTED]',
+      githubToken: '[REDACTED]',
+      usage: { inputTokens: 12, maxTokens: 400 },
+    });
   });
 
   it('previews any tool arguments through the same redaction', () => {
-    const preview = redactedArgumentsPreview({ command: `git push https://${githubClassic}@example.com/repo.git`, headers: { Authorization: 'Bearer abc' } });
+    const preview = redactedArgumentsPreview({
+      command: `git push https://${githubClassic}@example.com/repo.git`,
+      headers: { Authorization: 'Bearer abc' },
+    });
     expect(preview).not.toContain(githubClassic);
     expect(preview).toContain('"Authorization":"[REDACTED]"');
     expect(redactedArgumentsPreview(undefined)).toBe('{}');

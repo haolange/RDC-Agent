@@ -1,6 +1,5 @@
 import { randomBytes, timingSafeEqual } from 'crypto';
-import { isRendererInvokeChannel } from '@shared/renderer-api';
-import { resolveBridgeChannelCapability, hasBridgeChannelCapability } from '@shared/renderer-api/channelCapabilities';
+import { isRendererInvokeChannel, RENDERER_INVOKE_CHANNEL_TABLE } from '@shared/renderer-api';
 import { hasRegisteredIpcChannel } from '../ipc/invokeRegistry';
 
 /**
@@ -8,7 +7,7 @@ import { hasRegisteredIpcChannel } from '../ipc/invokeRegistry';
  * API available through the desktop preload, while main-process validation,
  * permissions, trust, and secret isolation remain authoritative.
  *
- * Capability matrix (with channels.ts):
+ * Capability (one column of the channel table in channels.ts):
  * - read | mutation: default allow
  * - high-impact: requires RDC_AGENT_BROWSER_QA_FULL_ACCESS=1
  * - desktop-only: always denied
@@ -17,10 +16,7 @@ export function isBridgeChannelAllowed(channel: string): boolean {
   if (!isRendererInvokeChannel(channel) || !hasRegisteredIpcChannel(channel)) {
     return false;
   }
-  if (!hasBridgeChannelCapability(channel)) {
-    return false;
-  }
-  const capability = resolveBridgeChannelCapability(channel);
+  const capability = RENDERER_INVOKE_CHANNEL_TABLE[channel];
   if (capability === 'desktop-only') {
     return false;
   }
@@ -113,7 +109,5 @@ export function isOriginAllowed(
 
 /** Cookie-authenticated product surfaces that must be same-origin to the bridge. */
 export function cookieOriginRequiredForPath(pathname: string): boolean {
-  return pathname === '/invoke'
-    || pathname === '/events'
-    || pathname.startsWith('/api/');
+  return pathname === '/invoke' || pathname === '/events' || pathname.startsWith('/api/');
 }

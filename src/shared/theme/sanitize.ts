@@ -1,9 +1,5 @@
 import { isHexColor, normalizeHexColor } from './color';
-import {
-  createDefaultChromeThemes,
-  getPresetChrome,
-  isThemePresetId,
-} from './presets';
+import { createDefaultChromeThemes, getPresetChrome, isThemePresetId } from './presets';
 import type {
   ChromeThemesConfig,
   ThemeChromeConfig,
@@ -17,16 +13,14 @@ function sanitizeFonts(candidate: unknown, fallback: ThemeChromeFonts): ThemeChr
     return { ui: fallback.ui, code: fallback.code };
   }
   const record = candidate as Record<string, unknown>;
-  const ui = record.ui === null
-    ? null
-    : typeof record.ui === 'string' && record.ui.trim()
-      ? record.ui.trim()
-      : fallback.ui;
-  const code = record.code === null
-    ? null
-    : typeof record.code === 'string' && record.code.trim()
-      ? record.code.trim()
-      : fallback.code;
+  const ui =
+    record.ui === null ? null : typeof record.ui === 'string' && record.ui.trim() ? record.ui.trim() : fallback.ui;
+  const code =
+    record.code === null
+      ? null
+      : typeof record.code === 'string' && record.code.trim()
+        ? record.code.trim()
+        : fallback.code;
   return { ui, code };
 }
 
@@ -43,26 +37,14 @@ export function sanitizeThemeChrome(
     };
   }
   const record = candidate as Record<string, unknown>;
-  const presetId: ThemePresetId = isThemePresetId(record.presetId)
-    ? record.presetId
-    : base.presetId;
-  const contrastRaw = typeof record.contrast === 'number' && Number.isFinite(record.contrast)
-    ? record.contrast
-    : base.contrast;
+  const presetId: ThemePresetId = isThemePresetId(record.presetId) ? record.presetId : base.presetId;
+  const contrastRaw =
+    typeof record.contrast === 'number' && Number.isFinite(record.contrast) ? record.contrast : base.contrast;
   return {
     presetId,
-    accent: normalizeHexColor(
-      typeof record.accent === 'string' ? record.accent : base.accent,
-      base.accent,
-    ),
-    surface: normalizeHexColor(
-      typeof record.surface === 'string' ? record.surface : base.surface,
-      base.surface,
-    ),
-    ink: normalizeHexColor(
-      typeof record.ink === 'string' ? record.ink : base.ink,
-      base.ink,
-    ),
+    accent: normalizeHexColor(typeof record.accent === 'string' ? record.accent : base.accent, base.accent),
+    surface: normalizeHexColor(typeof record.surface === 'string' ? record.surface : base.surface, base.surface),
+    ink: normalizeHexColor(typeof record.ink === 'string' ? record.ink : base.ink, base.ink),
     contrast: Math.max(0, Math.min(100, Math.round(contrastRaw))),
     fonts: sanitizeFonts(record.fonts, base.fonts),
   };

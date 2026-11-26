@@ -1,5 +1,5 @@
 import { selectKnowledgeContent } from './KnowledgeReadSelection';
-import type { KnowledgeCardDetail, KnowledgeReadRequest, KnowledgeReadResult } from '@shared/types/knowledge';
+import type { KnowledgeCardDetail } from '@shared/types/knowledge';
 
 /** Project only the selected source range; the metadata cannot contain a second copy of the body. */
 export function projectKnowledgeRead(card: KnowledgeCardDetail, request: KnowledgeReadRequest): KnowledgeReadResult {
@@ -11,4 +11,23 @@ export function projectKnowledgeRead(card: KnowledgeCardDetail, request: Knowled
   });
   const { content: _content, body: _body, chapters: _chapters, ...metadata } = card;
   return { card: metadata, content: selected.content, range: selected.range, headings, lineCount: lines.length };
+}
+
+export interface KnowledgeReadRequest {
+  spaceId: string;
+  relativePath: string;
+  mode: 'summary' | 'section' | 'range' | 'full';
+  contentHash?: string;
+  heading?: string;
+  headingLine?: number;
+  startLine?: number;
+  endLine?: number;
+}
+
+export interface KnowledgeReadResult {
+  card: Omit<KnowledgeCardDetail, 'content' | 'body' | 'chapters'>;
+  content: string;
+  range: string;
+  headings: Array<{ title: string; line: number; level: number }>;
+  lineCount: number;
 }

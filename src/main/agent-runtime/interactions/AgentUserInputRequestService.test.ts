@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { agentUserInputRequestService } from './AgentUserInputRequestService';
-import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 
 const eventContext = {
@@ -31,7 +31,7 @@ const questions: ConversationAskUserQuestion[] = [
 
 describe('AgentUserInputRequestService', () => {
   it('resolves a batch request with structured answers and numbered Q/A text', async () => {
-    const events: SharedAgentEvent[] = [];
+    const events: AgentEvent[] = [];
     const turnId = 'turn-ask-user-batch';
     const requestPromise = agentUserInputRequestService.request({
       agentId: 'debugger',
@@ -49,7 +49,7 @@ describe('AgentUserInputRequestService', () => {
       questions: [{ questionId: 'direction' }, { questionId: 'keyword' }],
     });
 
-    const result = agentUserInputRequestService.answer({
+    agentUserInputRequestService.answer({
       sessionId: 'session-ask-user',
       turnId,
       toolCallId: 'tool-ask-user-batch',
@@ -59,7 +59,6 @@ describe('AgentUserInputRequestService', () => {
       ],
     });
 
-    expect(result).toEqual({ success: true });
     await expect(requestPromise).resolves.toBe(
       'Q1: Where should I start?\nA1: Repo structure\n\nQ2: What keyword should summarize the repo?\nA2: graphics\npipeline',
     );
@@ -84,42 +83,82 @@ describe('AgentUserInputRequestService', () => {
       context: eventContext,
     });
 
-    expect(agentUserInputRequestService.answer({
-      sessionId: 'session-ask-user',
-      turnId,
-      toolCallId: 'tool-ask-user-incomplete',
-      answers: [{ questionId: 'direction', answer: 'Repo structure', selectedOptionId: 'repo' }],
-    })).toMatchObject({ success: false });
+    expect(() =>
+      agentUserInputRequestService.answer({
+        sessionId: 'session-ask-user',
+        turnId,
+        toolCallId: 'tool-ask-user-incomplete',
+        answers: [{ questionId: 'direction', answer: 'Repo structure', selectedOptionId: 'repo' }],
+      }),
+    ).toThrow();
 
-    expect(agentUserInputRequestService.answer({
-      sessionId: 'other-session',
+    expect(() =>
+      agentUserInputRequestService.answer({
+        sessionId: 'other-session',
+        turnId,
+        toolCallId: 'tool-ask-user-incomplete',
+        answers: [
+          { questionId: 'direction', answer: 'Repo structure', selectedOptionId: 'repo' },
+          { questionId: 'keyword', answer: 'graphics' },
+        ],
+      }),
+    ).toThrow();
+
+    agentUserInputRequestService.answer({
+      sessionId: 'session-ask-user',
       turnId,
       toolCallId: 'tool-ask-user-incomplete',
       answers: [
         { questionId: 'direction', answer: 'Repo structure', selectedOptionId: 'repo' },
         { questionId: 'keyword', answer: 'graphics' },
       ],
-    })).toMatchObject({ success: false });
-
-    expect(agentUserInputRequestService.answer({
-      sessionId: 'session-ask-user',
-      turnId,
-      toolCallId: 'tool-ask-user-incomplete',
-      answers: [
-        { questionId: 'direction', answer: 'Repo structure', selectedOptionId: 'repo' },
-        { questionId: 'keyword', answer: 'graphics' },
-      ],
-    })).toEqual({ success: true });
+    });
     await expect(requestPromise).resolves.toContain('Q2: What keyword should summarize the repo?');
   });
 });
 
 it('preserves unknown and optional skipped answers without selecting a cause or granting approval', async () => {
-  const turnId = 'clarification-status'; const toolCallId = 'clarification-tool';
-  const pending = agentUserInputRequestService.request({ agentId: 'debugger', sessionId: 'session-ask-user', turnId, toolCallId,
-    questions: [{ questionId: 'cause', prompt: 'What changes visually?', options: [], allowFreeform: true }, { questionId: 'reference', prompt: 'Do you have a reference?', options: [], allowFreeform: true, required: false }], context: eventContext });
-  expect(agentUserInputRequestService.answer({ sessionId: 'session-ask-user', turnId, toolCallId, answers: [{ questionId: 'cause', answer: '', responseKind: 'skipped' }, { questionId: 'reference', answer: '', responseKind: 'skipped' }] }).success).toBe(false);
-  expect(agentUserInputRequestService.answer({ sessionId: 'session-ask-user', turnId, toolCallId, answers: [{ questionId: 'cause', answer: '', responseKind: 'unknown' }, { questionId: 'reference', answer: '', responseKind: 'skipped' }] }).success).toBe(true);
+  const turnId = 'clarification-status';
+  const toolCallId = 'clarification-tool';
+  const pending = agentUserInputRequestService.request({
+    agentId: 'debugger',
+    sessionId: 'session-ask-user',
+    turnId,
+    toolCallId,
+    questions: [
+      { questionId: 'cause', prompt: 'What changes visually?', options: [], allowFreeform: true },
+      {
+        questionId: 'reference',
+        prompt: 'Do you have a reference?',
+        options: [],
+        allowFreeform: true,
+        required: false,
+      },
+    ],
+    context: eventContext,
+  });
+  expect(() =>
+    agentUserInputRequestService.answer({
+      sessionId: 'session-ask-user',
+      turnId,
+      toolCallId,
+      answers: [
+        { questionId: 'cause', answer: '', responseKind: 'skipped' },
+        { questionId: 'reference', answer: '', responseKind: 'skipped' },
+      ],
+    }),
+  ).toThrow();
+  agentUserInputRequestService.answer({
+    sessionId: 'session-ask-user',
+    turnId,
+    toolCallId,
+    answers: [
+      { questionId: 'cause', answer: '', responseKind: 'unknown' },
+      { questionId: 'reference', answer: '', responseKind: 'skipped' },
+    ],
+  });
   const result = await pending;
-  expect(result).toContain('Response status: unknown'); expect(result).toContain('Response status: skipped'); expect(result).toContain('not an approval or verified observation');
+  expect(result).toContain('Response status: unknown');
+  expect(result).toContain('Response status: skipped');
+  expect(result).toContain('not an approval or verified observation');
 });

@@ -10,9 +10,21 @@ The agent runtime owns agent turns, tool mediation policy, deterministic events,
 - Agent route capability gates tool registration before each turn. Only `native-structured` routes receive tool schemas and enter the tool execution loop.
 - Prompt composition lives in `src/main/agent-runtime/prompt`. Conversation code collects context, but does not hand-code provider/tool prompt fragments.
 - Tool capability comes only from the effective profile manifest ∩ active skill ∩ policy ∩ runtime prerequisites. Empty tools fail-closed (`AGENT_TOOLS_EMPTY`). There is no Ask-readonly / Plan→Edit / custom→Edit hardcoded fallback. General is the Execution Orchestrator; Debugger / Analyzer / Optimizer are Planning Orchestrators. ask/plan/edit and S0 specialist ids are reserved historical ids: drop from the effective snapshot with `AGENT_ID_RESERVED_HISTORICAL`.  There is no custom-manifest runtime channel.
-- Mission profiles (`debugger` / `analyzer` / `optimizer`) are plan-only: they must not receive `shell` or `code_interpreter`. They access RDC only through controlled read-only `rdc_probe` plus `runtime_context` (current session lease status). `plan_artifact` is a human-in-the-loop gate: approve freezes the plan and writes a session execution offer; the user clicks the declared continue button to switch to General. General executes lease-holding Live RDC operations through the fixed session boundary and `shell`; installation settings are mediated by `ShellInvocationService`. See `ARCHITECTURE.md` adjudication J and D.
+- Mission profiles (`debugger` / `analyzer` / `optimizer`) are plan-only: they must not receive `shell` or `code_interpreter`.
+  - They access RDC only through controlled read-only `rdc_probe` plus `runtime_context` (current session lease status).
+  - `plan_artifact` is a human-in-the-loop gate: approve freezes the plan and writes a session execution offer; the user clicks the declared continue button to switch to General.
+  - General executes lease-holding Live RDC operations through the fixed session boundary and `shell`; installation settings are mediated by `ShellInvocationService`.
+  - See `ARCHITECTURE.md` adjudication J and D.
 - No RDC-specific bridge, MCP server, or skill registry is injected as a hidden default tool path.
 - Assistant text is never parsed as an executable tool call. Textual tool-call shaped output produces a diagnostic event only.
+
+## Composition
+
+`agentRuntimeRoot.ts` is the composition root of the agent runtime: it constructs every collaborator of the `AgentOrchestrator` façade once (slots, MCP coordinator, deferred-tool tracker, prompt plans, tool assembly, tool executor factory, turn preparation, turn runner, `ProviderRouteCredentials`, `ProfileTurnRunner`, subagent runner, background subagents) and passes them to the façade's constructor; the façade depends on their types only.
+
+- `ProfileTurnRunner` runs a profile turn in named phases (begin, resolve profile and route, plan request and prompt, prepare a child runtime, run, end): `sendPrepared` serves `sendProfileMessage`, which only receives a turn `prepareTurnContext` already froze, and `runChildTurn` serves subagents, preparing the child's runtime under a credential lease the turn owns. plan_artifact calls run in `PlanArtifactSubmission.ts` (read the submission, check the planning turn, freeze Task requirements and the investigation capture scope, submit for review).
+- Collaborators reach each other through narrow interfaces the consuming module declares instead of bags of callbacks: `ActiveTurnLookup` and `RuntimeToolResolver` (`orchestratorTypes.ts`), `RuntimeToolPolicyCheck` (`ToolCallAdmission.ts`), `TurnToolExecutors` (`AgentTurnRunner.ts`), `ProfileTurnSender` and `SystemPromptSource` (`SubagentRunner.ts`), `ScopedMemoryStores` (`memory/MemoryStore.ts`), `SubagentToolHost` (`SubagentTool.ts`) and `BackgroundTaskToolHost` (`BackgroundTaskTools.ts`), which the subagent runner and the background service implement themselves.
+- The one late binding is `SubagentRunner.bindProfileTurns`: a child turn runs through the same `ProfileTurnRunner` whose turns carry the subagent runner's tools.
 
 ## Tool Mediation
 
@@ -23,13 +35,23 @@ Mission planner -> rdc_probe / runtime_context (read-only Settings actions) -> S
 General or UI -> shell or Settings shell action (lease-holding Live RDC) -> ShellInvocationService -> system-installed RDC-Tool CLI -> RdcRuntimeContext
 ```
 
-Runtime tool requests are assembled by `ToolPool` and executed through `ToolExecutorFactory`; RDC-Tool CLI command configuration is not stored there. Installation configuration is stored in `settings.tooling.rdcCli`; the catalog is read from that same CLI and lifecycle operations are fixed in the main session boundary.
+Runtime tool requests are assembled by `RuntimeToolAssembly` (tool declarations in `TurnControlTools` for `turn_complete` / `runtime_context`, `WorkbenchTools` for `ask_user`, memory, Skills and the MCP catalog, `SubagentTool` for `subagent` and `BackgroundTaskTools` for `background_*`) and executed through `ToolExecutorFactory`, whose pre-permission gates (runtime allowlist, Skill intersection, policy, deferred activation, budget, argument validation, live-capture access) live in `ToolCallAdmission`;
+
+- RDC-Tool CLI command configuration is not stored there.
+- The executor reads per-tool behaviour (concurrency class, host prompts, capture access, Knowledge roots, result presentation) only from each tool's declared `spec`, never from its name; the traits are listed in `docs/contracts/runtime-kernel.md`.
+- Installation configuration is stored in `settings.tooling.rdcCli`; the catalog is read from that same CLI and lifecycle operations are fixed in the main session boundary.
 
 General agent tools are mediated by `AgentPermissionPolicy` before execution. The policy combines profile allowlists, permission mode, workspace root, configured readable/writable roots, command allow/deny lists, and tool metadata. Routine workspace inspection can run in `Default`; external files, mutation, network, destructive shell, and unrecognized commands emit approval or auto-review events. Temporary external path access is granted only for the approved tool call and is not a renderer-side bypass.
 
 ## Deferred Tool Loading（core/extended 分层）
 
-`native-structured` 路由按 tier 注入工具 schema：`BUILTIN_AGENT_TOOL_TIERS` 中的 core builtin 每请求常驻注入且顺序稳定（保 prompt cache 前缀）；extended builtin 与 `mcp__*` 工具默认 deferred——保留在执行器 `toolMap` 中可执行，但不进入 provider tools 列表，发现入口为 `tool_search`（只搜索 allowlist + runtime policy 过滤后的工具集）与 `mcp` catalog 工具。只有 `tool_search` 命中可激活 deferred 工具；直接调用未激活 deferred 工具 fail-closed 返回 `TOOL_NOT_ACTIVATED`。Tasks 是显式例外：冻结计划预激活其已获准的 Tasks 工具；是否可写只看 effective manifest ∩ skill ∩ policy，不再按 Ask/Plan/Edit 角色硬编码。激活集按 `session::agent` + 全量工具签名保存在 orchestrator（`partitionDeferredTools`，`src/main/agent-runtime/orchestration/deferredTools.ts`），激活后经 `activateDeferredTools` 以 copy-on-write 更新运行时工具集，激活 schema 按激活顺序追加在 core 前缀之后，同 turn 内下一次 LLM 调用即携带；全量工具集合变化时激活集重置。`RequestEnvelopeSnapshot.tools` 始终反映实际发送集；context breakdown 以 `mcp_tools_deferred` / `builtin_tools_deferred` 报告未激活估算量。契约由 `pnpm run check:tool-system` 静态校验。
+`native-structured` 路由按 tier 注入工具 schema：`BUILTIN_AGENT_TOOL_TIERS` 中的 core builtin 每请求常驻注入且顺序稳定（保 prompt cache 前缀）；extended builtin 与 `mcp__*` 工具默认 deferred——保留在执行器 `toolMap` 中可执行，但不进入 provider tools 列表，发现入口为 `tool_search`（只搜索 allowlist + runtime policy 过滤后的工具集）与 `mcp` catalog 工具。
+
+- 只有 `tool_search` 命中可激活 deferred 工具；直接调用未激活 deferred 工具 fail-closed 返回 `TOOL_NOT_ACTIVATED`。
+- Tasks 是显式例外：冻结计划预激活其已获准的 Tasks 工具；是否可写只看 effective manifest ∩ skill ∩ policy，不再按 Ask/Plan/Edit 角色硬编码。
+- 激活集按 `session::agent` + 全量工具签名保存在 orchestrator（`partitionDeferredTools`，`src/main/agent-runtime/orchestration/deferredTools.ts`），激活后经 `activateDeferredTools` 以 copy-on-write 更新运行时工具集，激活 schema 按激活顺序追加在 core 前缀之后，同 turn 内下一次 LLM 调用即携带；全量工具集合变化时激活集重置。
+- `RequestEnvelopeSnapshot.tools` 始终反映实际发送集；context breakdown 以 `mcp_tools_deferred` / `builtin_tools_deferred` 报告未激活估算量。
+- 契约由 `pnpm run check:tool-system` 静态校验。
 
 `tool_search` 对最终 effective tool set 做权威搜索。空结果返回结构化 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 和 tool-set fingerprint；同一 fingerprint 下重复相同搜索不能得到新工具。text-only route 在 `PromptPlanBuilder` 中得到空工具集，Prompt 明确禁止把 tool-call-shaped 文本当作调用，也禁止反复搜索本回合不存在的工具。
 
@@ -41,9 +63,19 @@ General agent tools are mediated by `AgentPermissionPolicy` before execution. Th
 
 Agent 达到 `maxTurns` 时，只有已经获得 canonical final 才能正常完成；若 Provider 仍要求 continuation，则抛出 `AGENT_MAX_TURNS_EXCEEDED`。Conversation 分别映射为 `CONVERSATION_AGENT_LOOP_STALLED` 与 `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；流式协议完整性违规映射为 `CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION`。三者都和 `CONVERSATION_LLM_REQUEST_FAILED` 互斥。Work Process 的完成摘要由真实 tool result 统计成功、失败、跳过，模型自述不能覆盖 runtime 证据。
 
-`ExecutionLimits.resolveAgentMaxTurns` 是循环配置与 Prompt 额度事实的共同解析入口。`TurnPreparationService` 在固定输入估算前把实际 profile/policy 上限写入 `runtime:execution-limits`；prepared runtime 持有同一最终 PromptPlan，其缓存、Context 指标和 EffectiveRuntimePlan fingerprint 与执行器一致。规划所见 `runtime:profile-limits` 来自当前已解析 catalog 快照，仅为 profile 上界，不代表未来回合的实际 policy 或剩余预算；辅助压缩请求与普通循环分开计。不得为了满足模型提出的纸面预算修改这些上限。
+`ExecutionLimits.resolveAgentMaxTurns` 是循环配置与 Prompt 额度事实的共同解析入口。
 
-`maxTurns` 是防失控的安全停止，不是规划预算。`maxTurns` 无固定默认值；仅当 profile 声明 `max-turns` 或 policy 声明 `limits.maxTurns` 时生效，取较小者并在 prepareTurn 冻结。用户显式限制、期限、取消与无进展检测始终有效。子执行按其自身 profile 解析，不继承父级数值；Capsule 的工具数、墙钟与子执行数，以及 `maxChildDepth`、`maxSubagents` 另行约束。新配置只在后续 prepareTurn 冻结时生效，在途回合、已有 Task 消费、期限与历史不变，也不因此自动重启或续跑。临近上限的剩余请求只由 runtime 在最后几次请求临时告知；计划引用这些冻结限制与用户明确限制，阶段调用数仅为可调整估算，不另设停止门。
+- `TurnPreparationService` 在固定输入估算前把实际 profile/policy 上限写入 `runtime:execution-limits`；prepared runtime 持有同一最终 PromptPlan，其缓存、Context 指标和 EffectiveRuntimePlan fingerprint 与执行器一致。
+- 规划所见 `runtime:profile-limits` 来自当前已解析 catalog 快照，仅为 profile 上界，不代表未来回合的实际 policy 或剩余预算；辅助压缩请求与普通循环分开计。
+- 不得为了满足模型提出的纸面预算修改这些上限。
+
+`maxTurns` 是防失控的安全停止，不是规划预算。
+
+- `maxTurns` 无固定默认值；仅当 profile 声明 `max-turns` 或 policy 声明 `limits.maxTurns` 时生效，取较小者并在 prepareTurn 冻结。
+- 用户显式限制、期限、取消与无进展检测始终有效。
+- 子执行按其自身 profile 解析，不继承父级数值；Capsule 的工具数、墙钟与子执行数，以及 `maxChildDepth`、`maxSubagents` 另行约束。
+- 新配置只在后续 prepareTurn 冻结时生效，在途回合、已有 Task 消费、期限与历史不变，也不因此自动重启或续跑。
+- 临近上限的剩余请求只由 runtime 在最后几次请求临时告知；计划引用这些冻结限制与用户明确限制，阶段调用数仅为可调整估算，不另设停止门。
 
 `turn_complete` 在接受声明前核对本回合 direct Task 执行是否均已由所属 Task 结算；未结算时返回可操作的 `TASK_COMPLETION_DENIED`，不给模型制造“已声明完成”的假回执。若模型绕过声明直接终答，父回合最终门禁仍将遗留执行标为 blocked，并以本地 Task 完整性诊断收口，不归咎 Provider。
 
@@ -62,49 +94,137 @@ Provider-private protocols are normalized before reaching Conversation or Work P
 - Route capability diagnostics use structured `code + severity + message + surface`: unverified native tools are runtime-log-only `info`, explicit unsupported is a Work Process `warning`, and unavailable/disabled routes are Work Process `error`. Textual tool calls and empty no-tool responses remain diagnostics, never executable tool evidence.
 
 Work Process renders these normalized events only. It must not infer reasoning, tools, or results from the assistant body.
-Each adapter assigns a stable `ProviderOutputRef` before a provider block enters the runtime. The ref must carry the provider's own block identity: protocol-supplied indexes or item ids when present, otherwise consecutive same-kind deltas share one ref and a kind switch closes that segment. An ordered typed slot registry owns the block lifecycle: one source ref can be claimed once as `thinking`, `text`, or `tool_call`, then accepts only same-kind deltas until close. Reusing a closed ref, emitting a delta before start or after close, changing an Anthropic content-index type, or emitting semantic events after the provider terminal marker raises `PROVIDER_STREAM_CHANNEL_COLLISION` / `PROVIDER_STREAM_BLOCK_CLOSED` or the corresponding structured protocol diagnostic and terminates the provider step. OpenAI-compatible virtual thinking, text, and tool slots use separate namespaces. Distinct provider refs are never merged or hidden because their text happens to match.
+Each adapter assigns a stable `ProviderOutputRef` before a provider block enters the runtime.
+
+- The ref must carry the provider's own block identity: protocol-supplied indexes or item ids when present, otherwise consecutive same-kind deltas share one ref and a kind switch closes that segment.
+- An ordered typed slot registry owns the block lifecycle: one source ref can be claimed once as `thinking`, `text`, or `tool_call`, then accepts only same-kind deltas until close.
+- Reusing a closed ref, emitting a delta before start or after close, changing an Anthropic content-index type, or emitting semantic events after the provider terminal marker raises `PROVIDER_STREAM_CHANNEL_COLLISION` / `PROVIDER_STREAM_BLOCK_CLOSED` or the corresponding structured protocol diagnostic and terminates the provider step.
+- OpenAI-compatible virtual thinking, text, and tool slots use separate namespaces.
+- Distinct provider refs are never merged or hidden because their text happens to match.
+
+An adapter records the provider's own terminal signal with `markTerminal`; the shared driver (`startProviderStream`) ends every stream through `AssistantStreamBuilder.finish`: an aborted read reports the abort, a stream without output is `PROVIDER_STREAM_EMPTY`, and output without a terminal signal is `PROVIDER_STREAM_TRUNCATED`.
+
+- Each wire frame goes through `parseProviderFrame` with the adapter's frame schema (`readProviderFrames`); a frame that is not JSON, or a handled event whose fields do not match the schema, is `PROVIDER_STREAM_MALFORMED_FRAME` and is never skipped.
+- Event types an adapter does not handle stay ignored (`unhandledProviderEvent`).
+- Tool-call argument text that is not a JSON object is kept as `invalidArguments`; the executor answers it with `TOOL_ARGUMENTS_INVALID` instead of validating fabricated fields.
 
 ## Reasoning Artifact Boundary
 
 Runtime thinking is normalized into three separate layers:
 
 - `Transcript`: ordinary user messages, assistant final text, tool calls, and tool results that may be replayed as normal model context.
-- `WorkTrace`: UI progress data in `ConversationWorkTrace`. Each `llm_turn` holds ordered `items` (text and thinking blocks, each keyed by its provider output ref), a canonical `result` (status, stop reason, phase), and nested tool calls; items and tool calls share one display sequence. Updates are copy-on-write: a change copies only the block it touches, so earlier snapshots never change and untouched blocks are shared. Desensitized request snapshots remain storage/IPC only for a future dedicated Debug View, not in Settings Diagnostics, the default Session/Trace right panels, or the Work Process transcript. The canonical `result` remains runtime data for lifecycle/accounting and is not duplicated into the Work Process. `assistant.thinking_delta` / `assistant.thinking_end` carry the thinking block's output ref and update that one thinking item; `assistant.delta` / `assistant.text_end` update that one text item. Work Process 的文案、折叠与聚合规则见 [`docs/ui/workbench-and-transcript.md`](../ui/workbench-and-transcript.md) 与 [`docs/ui/work-process-checklist.md`](../ui/work-process-checklist.md)。
+- `WorkTrace`: UI progress data in `ConversationWorkTrace`.
+  - Each `llm_turn` holds ordered `items` (text and thinking blocks, each keyed by its provider output ref), a canonical `result` (status, stop reason, phase), and nested tool calls; items and tool calls share one display sequence.
+  - Updates are copy-on-write: a change copies only the block it touches, so earlier snapshots never change and untouched blocks are shared.
+  - Desensitized request snapshots remain storage/IPC only for a future dedicated Debug View, not in Settings Diagnostics, the default Session/Trace right panels, or the Work Process transcript.
+  - The canonical `result` remains runtime data for lifecycle/accounting and is not duplicated into the Work Process.
+  - `assistant.thinking_delta` / `assistant.thinking_end` carry the thinking block's output ref and update that one thinking item; `assistant.delta` / `assistant.text_end` update that one text item.
+  - Work Process 的文案、折叠与聚合规则见 [`docs/ui/workbench-and-transcript.md`](../ui/workbench-and-transcript.md) 与 [`docs/ui/work-process-checklist.md`](../ui/work-process-checklist.md)。
 - `ProviderContinuationArtifact`: protocol-native continuation payloads such as OpenAI Responses encrypted reasoning items or Anthropic thinking/signature/redacted blocks. Replay is decided by the compiled `ExecutionIdentity` and continuation contract; incompatible artifacts are dropped fail-closed and are never converted into ordinary assistant text.
 `ProviderReasoningContract` is a strict route-manifest fact carried unchanged through `EffectiveModel -> RequestPlan -> AgentRouteCapability`. No provider-id list, endpoint table, or protocol-name heuristic may classify readable thinking. Ordinary assistant text never creates a `ThinkingArtifact`; Trace synthesis and session reload read only explicit thinking blocks.
 
 Turn output is reduced by typed phase rather than text shape. `commentary` is optional Work Process prose, while `final_answer` is the sole writer of the canonical assistant body and final trace node. Normal provider completion without a canonical final answer fails closed. Commentary, thinking, and final may contain identical bytes when they came from different explicit source refs; the runtime preserves those typed facts and performs no string or similarity deduplication.
 
-Readable `summary` or `raw` thinking is not inserted into ordinary composer context on later turns. Readable thinking uses `replayPolicy: 'none'` unless an adapter explicitly identifies provider-required continuation content. OpenAI-compatible `reasoning_content` may use `openai-reasoning-content`, and OpenAI Responses or Anthropic Messages may use `provider-artifact`, only when the producing `providerId + modelId + protocol` exactly match the next route. Agent/model/Fast route changes remove incompatible reasoning continuation state while preserving ordinary assistant text and paired tool facts. DeepSeek thinking-mode routes that send tools declare `artifactScope: all-assistant-turns` so later user turns replay `reasoning_content` (empty string when no artifact exists). Optional continuation artifacts expire after 8 visible turns; `requirement: required` artifacts are not retention-expired and only end at a compaction boundary. Switching models does not compact or rewrite history; ordinary Send and rewrite both insert the same continuation-drop system notice when execution identity changes and artifacts will be dropped.
+Readable `summary` or `raw` thinking is not inserted into ordinary composer context on later turns.
+
+- Readable thinking uses `replayPolicy: 'none'` unless an adapter explicitly identifies provider-required continuation content.
+- OpenAI-compatible `reasoning_content` may use `openai-reasoning-content`, and OpenAI Responses or Anthropic Messages may use `provider-artifact`, only when the producing `providerId + modelId + protocol` exactly match the next route.
+- Agent/model/Fast route changes remove incompatible reasoning continuation state while preserving ordinary assistant text and paired tool facts.
+- DeepSeek thinking-mode routes that send tools declare `artifactScope: all-assistant-turns` so later user turns replay `reasoning_content` (empty string when no artifact exists).
+- Optional continuation artifacts expire after 8 visible turns; `requirement: required` artifacts are not retention-expired and only end at a compaction boundary.
+- Switching models does not compact or rewrite history; ordinary Send and rewrite both insert the same continuation-drop system notice when execution identity changes and artifacts will be dropped.
 
 ## Canonical session context
 
-Session history is agent-neutral and append-only. `conversation.jsonl` stores transcript messages, `conversation-branches.json` is the fork and active-leaf authority, and `session-context.jsonl` stores one provider-neutral terminal delta per turn. Streaming transcript deltas are durable before optional journal compaction. A work-trace change is stored as `traceBlocks`: the trace's status and block order plus only the blocks that changed (blocks are copy-on-write, so an unchanged block is the same object); replay rebuilds the trace from the previous one, so a long turn no longer appends its whole trace on every update. Compaction rewrites the history after the event that crossed the threshold rather than inside it, reading and replacing the file in one synchronous step so no append falls between. If a Windows reader temporarily blocks the atomic replacement with `EBUSY`, compaction is deferred and retried at the next delta threshold; the committed delta remains readable and the live turn continues. Other persistence errors and terminal commit failures still surface as errors. At request start, the shared branch resolver selects the active leaf's visible turn ids; the route materializer selects those journal entries, filters route-private artifacts, then combines them with the current `PromptPlan`, effective tools, route, and controls. Agent profiles and runtime slots are execution configuration/caches, not independent session truth.
+Session history is agent-neutral and append-only.
 
-Fast, Max mode, reasoning effort, Agent, model, provider, and protocol changes are immediate local next-turn state and never proactively estimate, compact, or rewrite history. Before send, `ConversationTurnCoordinator` flushes the latest Agent/Provider commit, refreshes credentials and entitlement, freezes the exact catalog/model/route/variant/controls, resolves tools/skills/attachments, and builds the `PromptPlan`, `RequestEnvelope`, and closed `RequestPlan`. It also acquires an opaque main-process credential lease that freezes the selected provider configuration and resolved short-lived credentials without placing secrets in IPC, renderer state, persisted turn summaries, journals, or traces. Preparing uses a bounded worker to estimate the complete canonical input without deleting messages. The execution coordinator performs automatic compaction at the first and subsequent safe Provider request boundaries, counting frozen instructions and the currently activated tool schemas. Every committed turn owns that frozen plan and lease, so later asynchronous changes can affect only the next send.
+- `conversation.jsonl` stores transcript messages, `conversation-branches.json` is the fork and active-leaf authority, and `session-context.jsonl` stores one provider-neutral terminal delta per turn.
+- Streaming transcript deltas are durable before optional journal compaction.
+- A work-trace change is stored as `traceBlocks`: the trace's status and block order plus only the blocks that changed (blocks are copy-on-write, so an unchanged block is the same object); replay rebuilds the trace from the previous one, so a long turn no longer appends its whole trace on every update.
+- Compaction rewrites the history after the event that crossed the threshold rather than inside it, reading and replacing the file in one synchronous step so no append falls between.
+- If a Windows reader temporarily blocks the atomic replacement with `EBUSY`, compaction is deferred and retried at the next delta threshold; the committed delta remains readable and the live turn continues.
+- Other persistence errors and terminal commit failures still surface as errors.
+- At request start, the shared branch resolver selects the active leaf's visible turn ids; the route materializer selects those journal entries, filters route-private artifacts, then combines them with the current `PromptPlan`, effective tools, route, and controls.
+- Agent profiles and runtime slots are execution configuration/caches, not independent session truth.
 
-Preparing is persistence-free. Cancellation or failure before commit restores the Composer snapshot and leaves no Session, Turn, branch, attachment, journal, transcript, draft, or credential lease. A successful preflight atomically commits the turn and `requestId` mapping before provider execution; retries with the same request id resolve to that committed turn rather than creating a duplicate. The running adapter reads only the frozen lease; terminal, cancellation, and exceptional paths all release it. New sessions use a staged directory rename, while existing sessions use a per-session lock and recoverable journal. Provider-native reasoning artifacts replay only for an exact `providerId + effectiveModelId + protocol + routeRevision` match.
+Fast, Max mode, reasoning effort, Agent, model, provider, and protocol changes are immediate local next-turn state and never proactively estimate, compact, or rewrite history.
 
-Settings Agent 编辑走 scoped revisioned Agent mutation service；provider/model-route 偏好走等价的 per-provider coordinator。保存结果是 `committed`、`superseded` 或 `failed`，带 commit hash 和 last successful snapshot，原子替换一份规范资源，并只刷新受影响的 Agent 或 route。它不重建 workspace、不重初始化 IPC、不重载整份 LLM settings、不广播全部 provider catalog、也不改写历史 turn。Renderer 选择是乐观的，只有最新失败 revision 可以回滚。Agent route 的唯一持久真值是用户设置 `agentModels`（默认 + 按 Agent），`AgentManifestService.routeForAgent` 解析；`.agent.md` 不声明模型，定义保存不改变 route。Composer 底栏与 `/model` 选择当前对话模型，并共用同一套 EffectiveCatalog 可执行集合：有 session 写 `modelOverride`，无 session 只记草稿并随首次发送冻结；未 override 是显式可选状态（「按 Agent 配置」/ `/model default`），清除写 `null` 或清草稿；Agent route 不可执行时禁止清除；不写回 Settings，切 Agent 不清模型。
+- Before send, the renderer waits for the session and settings writes in flight (`settled(lane)`), and `startProfileTurn` (`ConversationTurnStarter.ts`) refreshes credentials and entitlement, freezes the exact catalog/model/route/variant/controls, resolves tools/skills/attachments, and builds the `PromptPlan`, `RequestEnvelope`, and closed `RequestPlan`.
+- It also acquires an opaque main-process credential lease that freezes the selected provider configuration and resolved short-lived credentials without placing secrets in IPC, renderer state, persisted turn summaries, journals, or traces.
+- Preparing uses a bounded worker to estimate the complete canonical input without deleting messages.
+- The execution coordinator performs automatic compaction at the first and subsequent safe Provider request boundaries, counting frozen instructions and the currently activated tool schemas.
+- Every committed turn owns that frozen plan and lease, so later asynchronous changes can affect only the next send.
 
-Edit-and-resend and branch switches wait for the active turn to finish scheduler flush, provider abort, tool/Ask cleanup, terminal conversation persistence, journal append or error publication, and active-turn cleanup. A rewrite then writes one concrete branch with its actual user anchor and root turn before starting exactly one resend. Rewrite binds the **current Composer** `selectedAgentId` plus the current conversation model, and builds the same `configurationCommit` as Send (flush agent + flush provider + catalog revision + routeRevision). The rewritten turn is excluded from replay via `excludeTurnId`. When `crossModel` is `provider-managed`, an effective-model change must disconnect continuation (no leftover `previous_interaction_id` or equivalent). Ordinary Send and rewrite both insert the same transcript system hint when reasoning continuation is dropped. A single execution-owned automatic compaction lifecycle generates one model-authored `StructuredHandoff` (`derivation: 'model-generated'`) through `PromptPlan → RequestEnvelope → adapter`, with cache write disabled. There is no deterministic-extractive builder and no silent fallback. A request below the compaction line returns the current window without a model call or completed compaction work block. Compaction persists original journal/media references and a scoped authority checkpoint from the existing Task/execution, Journal and Artifact stores. A candidate must pass source, cancellation and budget validation before installation. The visible transcript is retained. This does not create another Task or grant authority; stable instructions and permissions come from frozen configuration. Terminal entries use the branch, turn, and message identities captured at start; they never infer ownership from a later active leaf. Migration may synthesize provider-neutral entries from canonical conversation/branch data, but never reads old per-Agent thread files. A migration marker is committed only after all journal appends succeed, and partial runs resume idempotently.
+Preparing is persistence-free.
 
-Agent/Composer executable models require source-backed `toolCalling.state === 'supported'` plus an implemented structured-tool adapter. `unknown` and `unsupported` stay out of the picker; persisted overrides fail closed with same-provider verified alternatives. The first adapter-produced `toolcall_end` on a native-structured route whose catalog evidence is not yet `supported` is deterministic positive evidence. Runtime records `toolCalling: supported` against the current provider/account/protocol/canonical model and publishes a new EffectiveCatalog snapshot at most once for the active run. An explicit provider rejection of `tools` records short-lived, revocable `unsupported` evidence. Text shaped like a tool call, 5xx, network, and quota failures do not qualify.
+- Cancellation or failure before commit restores the Composer snapshot and leaves no Session, Turn, branch, attachment, journal, transcript, draft, or credential lease.
+- A successful preflight atomically commits the turn and `requestId` mapping before provider execution; retries with the same request id resolve to that committed turn rather than creating a duplicate.
+- The running adapter reads only the frozen lease; terminal, cancellation, and exceptional paths all release it.
+- New sessions use a staged directory rename, while existing sessions use a per-session lock and recoverable journal.
+- Provider-native reasoning artifacts replay only for an exact `providerId + effectiveModelId + protocol + routeRevision` match.
+
+Settings Agent 编辑走 scoped revisioned Agent mutation service；provider/model-route 偏好走等价的 per-provider coordinator。
+
+- 保存结果是 `committed`、`superseded` 或 `failed`，带 commit hash 和 last successful snapshot，原子替换一份规范资源，并只刷新受影响的 Agent 或 route。
+- 它不重建 workspace、不重初始化 IPC、不重载整份 LLM settings、不广播全部 provider catalog、也不改写历史 turn。
+- Renderer 选择是乐观的，只有最新失败 revision 可以回滚。
+- Agent route 的唯一持久真值是用户设置 `agentModels`（默认 + 按 Agent），`AgentManifestService.routeForAgent` 解析；`.agent.md` 不声明模型，定义保存不改变 route。
+- Composer 底栏与 `/model` 选择当前对话模型，并共用同一套 EffectiveCatalog 可执行集合：有 session 写 `modelOverride`，无 session 只记草稿并随首次发送冻结；未 override 是显式可选状态（「按 Agent 配置」/ `/model default`），清除写 `null` 或清草稿；Agent route 不可执行时禁止清除；不写回 Settings，切 Agent 不清模型。
+
+Edit-and-resend and branch switches wait for the active turn to finish scheduler flush, provider abort, tool/Ask cleanup, terminal conversation persistence, journal append or error publication, and active-turn cleanup.
+
+- A rewrite then writes one concrete branch with its actual user anchor and root turn before starting exactly one resend.
+- Rewrite binds the **current Composer** `selectedAgentId` plus the current conversation model, and builds the same `configurationCommit` as Send (flush agent + flush provider + catalog revision + routeRevision).
+- The rewritten turn is excluded from replay via `excludeTurnId`.
+- When `crossModel` is `provider-managed`, an effective-model change must disconnect continuation (no leftover `previous_interaction_id` or equivalent).
+- Ordinary Send and rewrite both insert the same transcript system hint when reasoning continuation is dropped.
+- A single execution-owned automatic compaction lifecycle generates one model-authored `StructuredHandoff` (`derivation: 'model-generated'`) through `PromptPlan → RequestEnvelope → adapter`, with cache write disabled.
+- There is no deterministic-extractive builder and no silent fallback.
+- A request below the compaction line returns the current window without a model call or completed compaction work block.
+- Compaction persists original journal/media references and a scoped authority checkpoint from the existing Task/execution, Journal and Artifact stores.
+- A candidate must pass source, cancellation and budget validation before installation.
+- The visible transcript is retained.
+- This does not create another Task or grant authority; stable instructions and permissions come from frozen configuration.
+- Terminal entries use the branch, turn, and message identities captured at start; they never infer ownership from a later active leaf.
+- Migration may synthesize provider-neutral entries from canonical conversation/branch data, but never reads old per-Agent thread files.
+- A migration marker is committed only after all journal appends succeed, and partial runs resume idempotently.
+
+Agent/Composer executable models require source-backed `toolCalling.state === 'supported'` plus an implemented structured-tool adapter.
+
+- `unknown` and `unsupported` stay out of the picker; persisted overrides fail closed with same-provider verified alternatives.
+- The first adapter-produced `toolcall_end` on a native-structured route whose catalog evidence is not yet `supported` is deterministic positive evidence.
+- Runtime records `toolCalling: supported` against the current provider/account/protocol/canonical model and publishes a new EffectiveCatalog snapshot at most once for the active run.
+- An explicit provider rejection of `tools` records short-lived, revocable `unsupported` evidence.
+- Text shaped like a tool call, 5xx, network, and quota failures do not qualify.
 
 ## Validation
 
 - Static contract: `pnpm run typecheck`
 - Agent runtime contract: `pnpm run check:agent-runtime`
 - Work Process contract: `pnpm run check:work-process` and `pnpm run check:work-process-tool-coverage`
-- Architecture/fidelity/shared export checks after renderer or shared-contract changes
+- Architecture and QA-id checks after renderer or shared-contract changes
 - Shell smoke after window, preload, IPC, workspace permission, or RDC-Tool CLI invocation boundary changes
 
 
 ## 通用完成接口与任务绑定
 
-AgentTurnRunner / ConversationTurnRunner 仅调用注入的 TurnCompletionValidator。AgentOrchestrator / ConversationService 组合现有 Investigation 校验器；prepareTurn 由主进程根据真实派发者选择校验策略并冻结 TaskCompletionBinding。普通 General turn 没有领域完成要求。RDC Capsule 扩展由 sessions/RdcDelegation 验证及注入；通用 Capsule 编译器不含租约方法段。详见 runtime-kernel 的结构化交接契约。
+AgentTurnRunner / ConversationTurnRunner 仅调用注入的 TurnCompletionValidator。
+
+- `AgentTurnRunner.runAgentTurn` 以显式的 `AgentTurnRun` 状态依次执行 begin（scope、`turn.before-start`、beginTurn）、setup（完成守卫、Task 准备、工具与执行器、slot）、订阅（`AgentTurnSubscription`：流式文本、结构化工具调用证据、canonical final、用量与响应诊断、abort 桥接）、prompt 与 finalization；
+  - 结束前必须结清的义务（capture 复位、完成就绪、未结直接 Task、委派结构化结果、Mission 计划、批准目标收口）在 `AgentTurnCompletionGuards`，路由能力诊断与工具调用能力证据在 `AgentTurnCapabilityObservations`。
+- AgentOrchestrator / ConversationService 组合现有 Investigation 校验器；prepareTurn 由主进程根据真实派发者选择校验策略并冻结 TaskCompletionBinding。
+- 普通 General turn 没有领域完成要求。
+- RDC Capsule 扩展由 sessions/RdcDelegation 验证及注入；通用 Capsule 编译器不含租约方法段。
+- 详见 runtime-kernel 的结构化交接契约。
 
 
 ## Live permission mode and frozen execution constraints
 
-Only the main-owned global permission mode/revision changes during an active turn. Prepared roots, command rules, tools, skill intersection, policy, provider route and RDC binding remain frozen. The executor authorizes outside resource claims, then synchronously rechecks and consumes the exact revision-bound grant at final admission after hooks and queues. A stale grant releases its claims before reauthorization; it does not repeat the call budget or before-hook. Already admitted tools retain their execution lifetime and are stopped only through the existing cancellation/join path. Parent, foreground and background child effects share this permission source while retaining their own frozen scope. See [permissions contract](../contracts/permissions.md#在途权限切换).
+Only the main-owned global permission mode/revision changes during an active turn.
+
+- Prepared roots, command rules, tools, skill intersection, policy, provider route and RDC binding remain frozen.
+- The executor authorizes outside resource claims, then synchronously rechecks and consumes the exact revision-bound grant at final admission after hooks and queues.
+- A stale grant releases its claims before reauthorization; it does not repeat the call budget or before-hook.
+- Already admitted tools retain their execution lifetime and are stopped only through the existing cancellation/join path.
+- Parent, foreground and background child effects share this permission source while retaining their own frozen scope.
+- See [permissions contract](../contracts/permissions.md#在途权限切换).

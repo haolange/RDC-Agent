@@ -2,10 +2,20 @@ import { useLayoutEffect, useState } from 'react';
 import { useWorkbenchReadingLayout } from './WorkbenchReadingLayout';
 import { useDynStyle } from './useDynStyle';
 
-interface ReadingBounds { left: number; top: number; width: number; height: number }
+interface ReadingBounds {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
 
-export function readingBounds(workArea: DOMRect, rail: DOMRect, viewportWidth: number, viewportHeight: number,
-  inset = { top: 16, gap: 8 }): ReadingBounds | null {
+export function readingBounds(
+  workArea: DOMRect,
+  rail: DOMRect,
+  viewportWidth: number,
+  viewportHeight: number,
+  inset = { top: 16, gap: 8 },
+): ReadingBounds | null {
   const left = Math.max(0, rail.left);
   const right = Math.min(viewportWidth, rail.right);
   const top = Math.max(0, workArea.top) + inset.top;
@@ -19,18 +29,34 @@ export function useReadingPanelGeometry() {
   useLayoutEffect(() => {
     const area = layout?.workArea.current;
     const rail = layout?.composerShell;
-    if (!area || !rail) { setBounds(null); return; }
+    if (!area || !rail) {
+      setBounds(null);
+      return;
+    }
     let frame = 0;
     const measure = () => {
       const tokens = getComputedStyle(area);
-      const next = readingBounds(area.getBoundingClientRect(), rail.getBoundingClientRect(), window.innerWidth, window.innerHeight,
-        { top: Number.parseFloat(tokens.getPropertyValue('--space-4')) || 16, gap: Number.parseFloat(tokens.getPropertyValue('--space-2')) || 8 });
-      setBounds((current) => JSON.stringify(current) === JSON.stringify(next) ? current : next);
+      const next = readingBounds(
+        area.getBoundingClientRect(),
+        rail.getBoundingClientRect(),
+        window.innerWidth,
+        window.innerHeight,
+        {
+          top: Number.parseFloat(tokens.getPropertyValue('--space-4')) || 16,
+          gap: Number.parseFloat(tokens.getPropertyValue('--space-2')) || 8,
+        },
+      );
+      setBounds((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
     };
-    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
     const observer = new ResizeObserver(schedule);
     // Observe the shell as well: moving a same-sized rail is a position change.
-    [area, rail, area.parentElement].forEach((element) => { if (element) observer.observe(element); });
+    [area, rail, area.parentElement].forEach((element) => {
+      if (element) observer.observe(element);
+    });
     const mutations = new MutationObserver(schedule);
     mutations.observe(area, { attributes: true });
     if (area.parentElement) mutations.observe(area.parentElement, { attributes: true });
@@ -50,11 +76,17 @@ export function useReadingPanelGeometry() {
       area.removeEventListener('transitionend', schedule);
     };
   }, [layout]);
-  const style = useDynStyle(bounds ? {
-    '--reading-left': `${bounds.left}px`, '--reading-top': `${bounds.top}px`,
-    '--reading-width': `${bounds.width}px`, '--reading-height': `${bounds.height}px`,
-    '--reading-bottom': `${bounds.top + bounds.height}px`,
-  } : {});
+  const style = useDynStyle(
+    bounds
+      ? {
+          '--reading-left': `${bounds.left}px`,
+          '--reading-top': `${bounds.top}px`,
+          '--reading-width': `${bounds.width}px`,
+          '--reading-height': `${bounds.height}px`,
+          '--reading-bottom': `${bounds.top + bounds.height}px`,
+        }
+      : {},
+  );
   // Outside the workbench (component catalog, isolated tests) there is no reading area: callers center instead.
   return { ready: bounds !== null, anchored: layout !== null, style };
 }

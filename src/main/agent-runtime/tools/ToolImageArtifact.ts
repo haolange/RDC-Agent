@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
-import { formatSessionArtifactUri, SessionArtifactError } from '@shared/types/sessionArtifact';
+import { SessionArtifactError } from '../../sessions/artifacts/sessionArtifactContract';
+import { formatSessionArtifactUri } from '../../sessions/artifacts/sessionArtifactContract';
 import type { SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 
 /** Reuse verified pixels, never a call's provenance or an artifact from another execution namespace. */

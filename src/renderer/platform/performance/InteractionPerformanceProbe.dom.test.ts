@@ -8,17 +8,31 @@ class Observer {
   options?: PerformanceObserverInit;
   disconnect = vi.fn();
   records: PerformanceEntry[] = [];
-  constructor(private callback: PerformanceObserverCallback) { Observer.instances.push(this); }
-  observe(options: PerformanceObserverInit) { this.options = options; }
-  takeRecords() { return this.records.splice(0); }
+  constructor(private callback: PerformanceObserverCallback) {
+    Observer.instances.push(this);
+  }
+  observe(options: PerformanceObserverInit) {
+    this.options = options;
+  }
+  takeRecords() {
+    return this.records.splice(0);
+  }
   emit(entries: PerformanceEntry[]) {
-    this.callback({ getEntries: () => entries } as PerformanceObserverEntryList,
-      this as unknown as PerformanceObserver);
+    this.callback(
+      { getEntries: () => entries } as PerformanceObserverEntryList,
+      this as unknown as PerformanceObserver,
+    );
   }
 }
 const snapshot = () => JSON.parse(document.documentElement.getAttribute('data-rdc-qa-performance')!);
-const entry = (entryType: string, startTime: number, duration: number, target?: Element) =>
-  ({ entryType, startTime, duration, name: 'click', target, toJSON: () => ({}) });
+const entry = (entryType: string, startTime: number, duration: number, target?: Element) => ({
+  entryType,
+  startTime,
+  duration,
+  name: 'click',
+  target,
+  toJSON: () => ({}),
+});
 let dispose: (() => void) | undefined;
 
 beforeEach(() => {
@@ -44,7 +58,9 @@ afterEach(() => {
 describe('query-gated native performance probe', () => {
   it('measures device controls without counting unrelated Composer actions', () => {
     window.history.replaceState({}, '', '/app?qaPerformance=1&qaPerformanceScope=devices');
-    const button = document.createElement('button'); button.dataset.testid = 'utility-device-selector-trigger'; document.body.append(button);
+    const button = document.createElement('button');
+    button.dataset.testid = 'utility-device-selector-trigger';
+    document.body.append(button);
     dispose = installInteractionPerformanceProbe();
     document.querySelector<HTMLButtonElement>('[role="switch"]')!.click();
     button.click();
@@ -69,7 +85,11 @@ describe('query-gated native performance probe', () => {
 
   it('measures real transcript controls and native page LongTasks during a bounded window', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    window.history.replaceState({}, '', '/app?qaPerformance=1&qaPerformanceScope=transcript&qaPerformanceWindowMs=1000');
+    window.history.replaceState(
+      {},
+      '',
+      '/app?qaPerformance=1&qaPerformanceScope=transcript&qaPerformanceWindowMs=1000',
+    );
     dispose = installInteractionPerformanceProbe();
     const [events, tasks] = Observer.instances;
     const button = document.querySelector<HTMLButtonElement>('button')!;
@@ -78,10 +98,18 @@ describe('query-gated native performance probe', () => {
     button.querySelector<HTMLElement>('span')!.click();
     document.querySelector<HTMLElement>('summary')!.click();
     document.querySelector<HTMLButtonElement>('[role="switch"]')!.click();
-    events.emit([entry('event', 50, 80, button), entry('event', 120, 24, button),
-      entry('event', 120, 24, button), entry('event', 130, 40, document.querySelector('summary')!)]);
-    expect(snapshot()).toMatchObject({ interactionCount: 2, eventTimingObservedCount: 2,
-      pointerToPaintP95Ms: 40, longTaskMaxMs: 70 });
+    events.emit([
+      entry('event', 50, 80, button),
+      entry('event', 120, 24, button),
+      entry('event', 120, 24, button),
+      entry('event', 130, 40, document.querySelector('summary')!),
+    ]);
+    expect(snapshot()).toMatchObject({
+      interactionCount: 2,
+      eventTimingObservedCount: 2,
+      pointerToPaintP95Ms: 40,
+      longTaskMaxMs: 70,
+    });
     tasks.records.push(entry('longtask', 200, 90));
     vi.mocked(performance.now).mockReturnValue(1100);
     vi.advanceTimersByTime(1000);
@@ -126,7 +154,13 @@ describe('query-gated native performance probe', () => {
     Observer.instances[0].records.push(entry('event', 200, 24, control), entry('event', 700, 80, control));
     Observer.instances[1].records.push(entry('longtask', 580, 100), entry('longtask', 700, 90));
     vi.advanceTimersByTime(500);
-    expect(snapshot()).toMatchObject({ observationEndedAt: 600, observationDurationMs: 500,
-      interactionCount: 1, eventTimingObservedCount: 1, longTaskCount: 1, longTaskMaxMs: 100 });
+    expect(snapshot()).toMatchObject({
+      observationEndedAt: 600,
+      observationDurationMs: 500,
+      interactionCount: 1,
+      eventTimingObservedCount: 1,
+      longTaskCount: 1,
+      longTaskMaxMs: 100,
+    });
   });
 });

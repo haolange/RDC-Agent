@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { stopWorkTrace } from '../lib/stopWorkTrace';
-import {
-  shouldRejectActivePatchForMonotonicStop,
-  useConversationStore,
-} from './conversationStore';
+import { shouldRejectActivePatchForMonotonicStop, useConversationStore } from './conversationStore';
 import type { ConversationMessage } from '@shared/types/conversation';
 
 const baseAssistant = (overrides: Partial<ConversationMessage> = {}): ConversationMessage => ({
@@ -26,14 +24,15 @@ describe('conversationStore monotonic stop', () => {
 
   it('rejects late streaming patches for monotonically stopped turns', () => {
     const stopped = new Set(['turn-1']);
-    expect(shouldRejectActivePatchForMonotonicStop(
-      baseAssistant({ status: 'streaming', updatedAt: 99 }),
-      stopped,
-    )).toBe(true);
-    expect(shouldRejectActivePatchForMonotonicStop(
-      baseAssistant({ status: 'stopped', updatedAt: 99, content: 'final stop' }),
-      stopped,
-    )).toBe(false);
+    expect(
+      shouldRejectActivePatchForMonotonicStop(baseAssistant({ status: 'streaming', updatedAt: 99 }), stopped),
+    ).toBe(true);
+    expect(
+      shouldRejectActivePatchForMonotonicStop(
+        baseAssistant({ status: 'stopped', updatedAt: 99, content: 'final stop' }),
+        stopped,
+      ),
+    ).toBe(false);
   });
 
   it('upsertConversationMessage keeps stopped over later streaming when marked', () => {
@@ -46,11 +45,13 @@ describe('conversationStore monotonic stop', () => {
       updatedAt: 2,
       content: 'stopped locally',
     }));
-    store.upsertConversationMessage(baseAssistant({
-      status: 'streaming',
-      updatedAt: 100,
-      content: 'late stream',
-    }));
+    store.upsertConversationMessage(
+      baseAssistant({
+        status: 'streaming',
+        updatedAt: 100,
+        content: 'late stream',
+      }),
+    );
 
     const assistant = useConversationStore.getState().conversationMessages.find((m) => m.id === 'assistant-1');
     expect(assistant?.status).toBe('stopped');
@@ -59,25 +60,55 @@ describe('conversationStore monotonic stop', () => {
 
   it('accepts the authoritative terminal trace after an optimistic stop', () => {
     const store = useConversationStore.getState();
-    store.upsertConversationMessage(baseAssistant({
-      workTrace: { status: 'running', updatedAt: 1, blocks: [{
-        id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'running', startedAt: 1,
-        toolCalls: [{ id: 'pending', toolName: 'investigation_read', status: 'pending', startedAt: 1 }],
-      }] },
-    }));
+    store.upsertConversationMessage(
+      baseAssistant({
+        workTrace: {
+          status: 'running',
+          updatedAt: 1,
+          blocks: [
+            {
+              id: 'loop',
+              kind: 'llm_turn',
+              title: 'Loop',
+              status: 'running',
+              startedAt: 1,
+              toolCalls: [{ id: 'pending', toolName: 'investigation_read', status: 'pending', startedAt: 1 }],
+            },
+          ],
+        },
+      }),
+    );
     store.markTurnMonotonicallyStopped('turn-1');
     store.updateAssistantMessageByTurnId('turn-1', stopWorkTrace);
-    expect(useConversationStore.getState().conversationMessages[0].workTrace?.blocks[0].toolCalls[0].status).toBe('skipped');
+    expect(useConversationStore.getState().conversationMessages[0].workTrace?.blocks[0].toolCalls[0].status).toBe(
+      'skipped',
+    );
 
-    store.upsertConversationMessage(baseAssistant({
-      status: 'stopped', updatedAt: 2, workTrace: {
-        status: 'stopped', updatedAt: 2, blocks: [{
-          id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'complete', startedAt: 1,
-          toolCalls: [{ id: 'pending', toolName: 'investigation_read', status: 'complete', startedAt: 1, completedAt: 2 }],
-        }],
-      },
-    }));
-    expect(useConversationStore.getState().conversationMessages[0].workTrace?.blocks[0].toolCalls[0].status).toBe('complete');
+    store.upsertConversationMessage(
+      baseAssistant({
+        status: 'stopped',
+        updatedAt: 2,
+        workTrace: {
+          status: 'stopped',
+          updatedAt: 2,
+          blocks: [
+            {
+              id: 'loop',
+              kind: 'llm_turn',
+              title: 'Loop',
+              status: 'complete',
+              startedAt: 1,
+              toolCalls: [
+                { id: 'pending', toolName: 'investigation_read', status: 'complete', startedAt: 1, completedAt: 2 },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+    expect(useConversationStore.getState().conversationMessages[0].workTrace?.blocks[0].toolCalls[0].status).toBe(
+      'complete',
+    );
   });
 
   it('consumeRevokedRequest is single-shot', () => {
@@ -87,35 +118,36 @@ describe('conversationStore monotonic stop', () => {
     expect(useConversationStore.getState().consumeRevokedRequest('req-1')).toBe(false);
   });
 
-  it('rejects late streaming patches by requestId after rewrite stop', () => {
+  it("keeps a request stopped before main answered stopped when main's message for it arrives late", () => {
     const store = useConversationStore.getState();
-    store.upsertConversationMessage(baseAssistant({
-      id: 'assistant-opt',
-      turnId: 'optimistic-turn-req-9',
-      requestId: 'req-9',
-      status: 'streaming',
-      updatedAt: 1,
-    }));
+    const { turnId, assistantMessageId } = conversationTurnIds('req-9');
+    store.upsertConversationMessage(
+      baseAssistant({
+        id: assistantMessageId,
+        turnId,
+        requestId: 'req-9',
+        status: 'streaming',
+        updatedAt: 1,
+      }),
+    );
     store.markRequestMonotonicallyStopped('req-9');
-    store.markTurnMonotonicallyStopped('optimistic-turn-req-9');
-    store.updateAssistantMessageByTurnId('optimistic-turn-req-9', (message) => ({
-      ...message,
-      status: 'stopped',
-      updatedAt: 2,
-    }));
+    store.markTurnMonotonicallyStopped(turnId);
+    store.updateAssistantMessageByTurnId(turnId, (message) => ({ ...message, status: 'stopped' }));
 
-    // Simulate IPC reconcile replacing optimistic turn with real turn id.
-    store.migrateMonotonicStoppedTurn('optimistic-turn-req-9', 'turn-real-9');
-    store.upsertConversationMessage(baseAssistant({
-      id: 'assistant-real',
-      turnId: 'turn-real-9',
-      requestId: 'req-9',
-      status: 'streaming',
-      updatedAt: 100,
-      content: 'late after rewrite stop',
-    }));
+    // Main's message carries the same ids; a late streaming version of it cannot reopen the stopped turn.
+    store.upsertConversationMessage(
+      baseAssistant({
+        id: assistantMessageId,
+        turnId,
+        requestId: 'req-9',
+        status: 'streaming',
+        updatedAt: 100,
+        content: 'late after stop',
+      }),
+    );
 
-    const late = useConversationStore.getState().allConversationMessages.find((m) => m.id === 'assistant-real');
-    expect(late).toBeUndefined();
+    const [message] = useConversationStore.getState().allConversationMessages;
+    expect(message).toMatchObject({ id: assistantMessageId, status: 'stopped' });
+    expect(message.content).not.toBe('late after stop');
   });
 });

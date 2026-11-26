@@ -12,7 +12,7 @@ export interface EffectiveModelPickerCandidate {
  * Only an explicit denial or an internal variant is hidden here.
  */
 export function isEffectiveModelPickerSelectable(model: EffectiveModelPickerCandidate): boolean {
-  return model.enabled !== false
-    && model.availability !== 'unavailable'
-    && model.selection?.pickerVisibility !== 'internal';
+  return (
+    model.enabled !== false && model.availability !== 'unavailable' && model.selection?.pickerVisibility !== 'internal'
+  );
 }

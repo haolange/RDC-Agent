@@ -11,7 +11,7 @@ import ts from 'typescript';
 import { moduleReferences, patternStoreActions } from './renderer-source-analysis.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applyDebtRatchet, assertContractIntegrity, contractRel } from './renderer-contract.mjs';
+import { assertContractIntegrity, contractRel, requireZeroHits } from './renderer-contract.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -63,7 +63,8 @@ const LAYER_RULES = {
 };
 
 const resolveImport = (fromRel, importPath) => {
-  if (importPath.startsWith('@renderer/')) importPath = './' + path.posix.relative(path.posix.dirname(fromRel), 'src/renderer/' + importPath.slice(10));
+  if (importPath.startsWith('@renderer/'))
+    importPath = './' + path.posix.relative(path.posix.dirname(fromRel), 'src/renderer/' + importPath.slice(10));
   if (importPath.startsWith('@shared')) return { layer: '(shared)' };
   if (!importPath.startsWith('.')) return { layer: '(external)' };
   const fromDir = path.posix.dirname(fromRel);
@@ -93,7 +94,13 @@ for (const filePath of files) {
       fail(`${rel}: layer "${layer}" must not import "${resolved.layer}" (${imp})`);
     }
 
-    if (layer === 'features' && resolved.layer === 'features' && feature && resolved.feature && feature !== resolved.feature) {
+    if (
+      layer === 'features' &&
+      resolved.layer === 'features' &&
+      feature &&
+      resolved.feature &&
+      feature !== resolved.feature
+    ) {
       fail(`${rel}: cross-feature import is forbidden (${feature} -> ${resolved.feature} via ${imp})`);
     }
   }
@@ -112,7 +119,9 @@ for (const filePath of files) {
     const allowedLayer = ['platform', 'stores', 'services', 'hooks', 'app'].includes(layer);
     const isFeatureModule = layer === 'features' && !isTsx;
     if (isTsx && !rel.startsWith('src/renderer/platform/')) {
-      fail(`${rel}: components must not touch window.electronAPI / getElectronApi directly (use a store, service, or feature data hook)`);
+      fail(
+        `${rel}: components must not touch window.electronAPI / getElectronApi directly (use a store, service, or feature data hook)`,
+      );
     } else if (!allowedLayer && !isFeatureModule) {
       fail(`${rel}: layer "${layer}" must not access IPC directly`);
     }
@@ -132,13 +141,28 @@ for (const retired of ['src/renderer/pages', 'src/renderer/components', 'src/ren
 }
 
 // CSS colocation: feature components must not be styled from styles/global.
-for (const globalCss of fs.readdirSync(path.join(rendererRoot, 'styles/global')).filter((name) => name.endsWith('.css')).map((name) => `src/renderer/styles/global/${name}`)) {
+for (const globalCss of fs
+  .readdirSync(path.join(rendererRoot, 'styles/global'))
+  .filter((name) => name.endsWith('.css'))
+  .map((name) => `src/renderer/styles/global/${name}`)) {
   const absolute = path.join(root, globalCss);
   if (!fs.existsSync(absolute)) continue;
   const content = fs.readFileSync(absolute, 'utf8');
-  for (const forbiddenPrefix of ['.composer-', '.settings-', '.knowledge-center-', '.right-rail-', '.work-process-', '.session-item', '.sidebar-', '.context-breakdown', '.command-palette']) {
+  for (const forbiddenPrefix of [
+    '.composer-',
+    '.settings-',
+    '.knowledge-center-',
+    '.right-rail-',
+    '.work-process-',
+    '.session-item',
+    '.sidebar-',
+    '.context-breakdown',
+    '.command-palette',
+  ]) {
     if (content.includes(forbiddenPrefix)) {
-      fail(`${globalCss}: feature selector "${forbiddenPrefix}" must live in the owning feature directory, not styles/global`);
+      fail(
+        `${globalCss}: feature selector "${forbiddenPrefix}" must live in the owning feature directory, not styles/global`,
+      );
     }
   }
 }
@@ -157,8 +181,9 @@ const visitRuntime = (relative) => {
     if (!runtime) continue;
     if (!importPath.startsWith('.')) continue;
     const base = path.posix.normalize(path.posix.join(path.posix.dirname(relative), importPath));
-    const target = [base, `${base}.tsx`, `${base}.ts`, `${base}/index.tsx`, `${base}/index.ts`]
-      .find((candidate) => /\.(?:tsx?|css)$/.test(candidate) && fs.existsSync(path.join(root, candidate)));
+    const target = [base, `${base}.tsx`, `${base}.ts`, `${base}/index.tsx`, `${base}/index.ts`].find(
+      (candidate) => /\.(?:tsx?|css)$/.test(candidate) && fs.existsSync(path.join(root, candidate)),
+    );
     if (target) visitRuntime(target);
   }
 };
@@ -169,8 +194,4 @@ for (const key of ['shell.appShellCss', 'shell.appShellMiscCss']) {
 
 assertContractIntegrity(fail);
 
-applyDebtRatchet({
-  id: 'renderer-structure',
-  hits: hitCount,
-  baselineRel: 'scripts/fidelity/renderer-structure-baseline.json',
-});
+requireZeroHits({ id: 'renderer-structure', hits: hitCount });

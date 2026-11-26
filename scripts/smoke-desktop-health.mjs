@@ -12,7 +12,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -114,7 +114,7 @@ async function removeTemporaryRoot(root) {
       lastError = error;
       const code = error?.code;
       if (code !== 'EBUSY' && code !== 'EPERM') throw error;
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
     }
   }
   throw lastError;
@@ -134,6 +134,10 @@ async function main() {
   ok(`Starting ${executable} for ${HOLD_MS}ms`);
 
   const root = mkdtempSync(path.join(tmpdir(), 'rdc-agent-desktop-smoke-'));
+  // The profile is redirected to `root`. Windows expands its known folders from %USERPROFILE% and fails
+  // `app.getPath('appData')` when the expanded folder does not exist, so the isolated profile carries them.
+  mkdirSync(path.join(root, 'AppData', 'Roaming'), { recursive: true });
+  mkdirSync(path.join(root, 'AppData', 'Local'), { recursive: true });
   let child;
   let output = '';
   try {
@@ -141,11 +145,11 @@ async function main() {
       cwd: unpacked,
       env: {
         ...process.env,
-        RDC_AGENT_HOME: path.join(root, '.rdc-agent'),
+        HOME: root,
+        USERPROFILE: root,
         RDC_AGENT_USER_DATA: path.join(root, 'app-data'),
         RDC_AGENT_HEADLESS: '0',
         RDC_AGENT_BROWSER_QA: '0',
-        RDC_AGENT_TEST_MODE: '0',
         NODE_ENV: 'production',
       },
       windowsHide: true,
@@ -160,17 +164,21 @@ async function main() {
     child.stderr?.on('data', collect);
     let timer;
     const outcome = await Promise.race([
-      new Promise(resolve => {
-        child.once('error', error => resolve({ type: 'error', error }));
+      new Promise((resolve) => {
+        child.once('error', (error) => resolve({ type: 'error', error }));
         child.once('exit', (code, signal) => resolve({ type: 'exit', code, signal }));
       }),
-      new Promise(resolve => { timer = setTimeout(() => resolve({ type: 'hold' }), HOLD_MS); }),
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve({ type: 'hold' }), HOLD_MS);
+      }),
     ]);
     clearTimeout(timer);
     if (outcome.type !== 'hold') {
-      fail(outcome.type === 'error'
-        ? `Electron failed to start: ${String(outcome.error)}`
-        : `Electron exited before readiness (code=${outcome.code}, signal=${outcome.signal})`);
+      fail(
+        outcome.type === 'error'
+          ? `Electron failed to start: ${String(outcome.error)}`
+          : `Electron exited before readiness (code=${outcome.code}, signal=${outcome.signal})`,
+      );
       return;
     }
     // A missing packaged dependency may leave a live process showing an error

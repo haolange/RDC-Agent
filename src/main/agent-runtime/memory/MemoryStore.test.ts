@@ -7,7 +7,12 @@ import { MemoryStore } from './MemoryStore';
 const roots: string[] = [];
 const fsWrite = writeFile;
 const pathExists = async (target: string): Promise<boolean> => {
-  try { await access(target); return true; } catch { return false; }
+  try {
+    await access(target);
+    return true;
+  } catch {
+    return false;
+  }
 };
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
@@ -16,7 +21,12 @@ describe('MemoryStore explicit scoped storage', () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-'));
     roots.push(root);
     const store = new MemoryStore(root);
-    await store.writeMemory({ name: 'User Preference', description: 'Preferred language', type: 'user', content: 'Use Chinese.' });
+    await store.writeMemory({
+      name: 'User Preference',
+      description: 'Preferred language',
+      type: 'user',
+      content: 'Use Chinese.',
+    });
     expect((await readdir(root)).sort()).toEqual(['user-preference.md']);
     expect(await store.searchMemories('Chinese')).toHaveLength(1);
     expect(await store.getMemory('user-preference')).toMatchObject({ content: 'Use Chinese.' });
@@ -93,7 +103,12 @@ describe('MemoryStore explicit scoped storage', () => {
     const userRoot = await mkdtemp(path.join(os.tmpdir(), 'rdc-user-memory-'));
     const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'rdc-project-memory-'));
     roots.push(userRoot, projectRoot);
-    await new MemoryStore(userRoot).writeMemory({ name: 'identity', description: 'User identity', type: 'user', content: 'User scoped.' });
+    await new MemoryStore(userRoot).writeMemory({
+      name: 'identity',
+      description: 'User identity',
+      type: 'user',
+      content: 'User scoped.',
+    });
     expect(await new MemoryStore(projectRoot).getMemory('identity')).toBeNull();
   });
 
@@ -102,22 +117,25 @@ describe('MemoryStore explicit scoped storage', () => {
     roots.push(root);
     const store = new MemoryStore(root);
     const evilPath = path.join(root, '..', 'escaped.md');
-    await fsWrite(path.join(root, 'safe-slug.md'), [
-      '---',
-      'id: "mem_evil"',
-      'name: "../../escaped"',
-      'displayName: "Evil"',
-      'normalizedName: "evil"',
-      'description: "escape"',
-      'type: "user"',
-      'tags: []',
-      'createdAt: 1',
-      'updatedAt: 1',
-      '---',
-      '',
-      'body',
-      '',
-    ].join('\n'));
+    await fsWrite(
+      path.join(root, 'safe-slug.md'),
+      [
+        '---',
+        'id: "mem_evil"',
+        'name: "../../escaped"',
+        'displayName: "Evil"',
+        'normalizedName: "evil"',
+        'description: "escape"',
+        'type: "user"',
+        'tags: []',
+        'createdAt: 1',
+        'updatedAt: 1',
+        '---',
+        '',
+        'body',
+        '',
+      ].join('\n'),
+    );
     const record = await store.getMemory('safe-slug');
     expect(record).toMatchObject({ name: 'safe-slug', displayName: 'Evil', content: 'body' });
     expect(await pathExists(evilPath)).toBe(false);
@@ -147,9 +165,12 @@ describe('MemoryStore explicit scoped storage', () => {
     const store = new MemoryStore(root);
     await store.writeMemory({ name: 'ok', description: 'small', type: 'user', content: 'tiny' });
     const huge = path.join(root, 'huge.md');
-    await fsWrite(huge, '---\nid: "x"\nname: "huge"\ndisplayName: "huge"\nnormalizedName: "huge"\ndescription: "d"\ntype: "user"\ntags: []\ncreatedAt: 1\nupdatedAt: 1\n---\n\n' + 'x'.repeat(600 * 1024));
+    await fsWrite(
+      huge,
+      '---\nid: "x"\nname: "huge"\ndisplayName: "huge"\nnormalizedName: "huge"\ndescription: "d"\ntype: "user"\ntags: []\ncreatedAt: 1\nupdatedAt: 1\n---\n\n' +
+        'x'.repeat(600 * 1024),
+    );
     const listed = await store.listMemories();
     expect(listed.map((record) => record.name)).toEqual(['ok']);
   });
-
 });

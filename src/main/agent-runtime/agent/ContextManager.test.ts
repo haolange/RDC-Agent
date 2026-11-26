@@ -39,9 +39,7 @@ function toolResult(toolCallId: string, toolName: string, text: string): ToolRes
   };
 }
 
-function createContextManager(
-  config: Partial<ConstructorParameters<typeof ContextManager>[0]> = {},
-): ContextManager {
+function createContextManager(config: Partial<ConstructorParameters<typeof ContextManager>[0]> = {}): ContextManager {
   return new ContextManager({
     contextTokenLimit: 64_000,
     ...config,
@@ -50,18 +48,13 @@ function createContextManager(
 
 describe('ContextManager', () => {
   it('fails closed when compression has no RequestPlan-derived budget', async () => {
-    expect(() => new ContextManager({ contextTokenLimit: 0 }))
-      .toThrow('RequestPlan context budget');
+    expect(() => new ContextManager({ contextTokenLimit: 0 })).toThrow('RequestPlan context budget');
   });
 
   describe('convertToLlm', () => {
     it('应保留 user/assistant/toolResult 消息', () => {
       const cm = createContextManager();
-      const msgs: AgentMessage[] = [
-        user('hello'),
-        assistant('hi'),
-        toolResult('tc1', 'shell', 'output'),
-      ];
+      const msgs: AgentMessage[] = [user('hello'), assistant('hi'), toolResult('tc1', 'shell', 'output')];
       const result = cm.convertToLlm(msgs);
       expect(result).toHaveLength(3);
       expect(result[0].role).toBe('user');
@@ -120,11 +113,15 @@ describe('ContextManager', () => {
       const base64Length = 4 * 1024 * 1024;
       expect(estimateImageTokensFromBase64Length(base64Length)).toBe(3072);
       const cm = createContextManager();
-      expect(cm.estimateTokens([{
-        role: 'user',
-        content: [{ type: 'image', data: 'a'.repeat(base64Length), mimeType: 'image/png' }],
-        timestamp: Date.now(),
-      }])).toBe(3072);
+      expect(
+        cm.estimateTokens([
+          {
+            role: 'user',
+            content: [{ type: 'image', data: 'a'.repeat(base64Length), mimeType: 'image/png' }],
+            timestamp: Date.now(),
+          },
+        ]),
+      ).toBe(3072);
     });
 
     it('应累加多条消息的 token', () => {
@@ -148,10 +145,7 @@ describe('ContextManager', () => {
     it('注入 tokenizer 后使用真实计数而非字符估算', () => {
       const cm = tokenizedManager();
       const text = 'The quick brown fox jumps over the lazy dog.';
-      const expected = tokenizer.countMessagesTokens(
-        [{ role: 'user', content: text }],
-        'gpt-test',
-      );
+      const expected = tokenizer.countMessagesTokens([{ role: 'user', content: text }], 'gpt-test');
       expect(cm.estimateTokens([user(text)])).toBe(expected);
       // 真实计数含消息格式开销，与纯字符估算（len/4）不同
       expect(expected).not.toBe(Math.ceil(text.length / 4));
@@ -196,18 +190,19 @@ describe('ContextManager', () => {
           },
         ],
       };
-      expect(cm.estimateTokens([withContinuation]))
-        .toBeGreaterThan(cm.estimateTokens([base]) + 900);
+      expect(cm.estimateTokens([withContinuation])).toBeGreaterThan(cm.estimateTokens([base]) + 900);
     });
 
     it('图像块经 tokenizer 路径仍按解码字节估算', () => {
       const cm = tokenizedManager();
       const base64Length = 4 * 1024 * 1024;
-      const tokens = cm.estimateTokens([{
-        role: 'user',
-        content: [{ type: 'image', data: 'a'.repeat(base64Length), mimeType: 'image/png' }],
-        timestamp: Date.now(),
-      }]);
+      const tokens = cm.estimateTokens([
+        {
+          role: 'user',
+          content: [{ type: 'image', data: 'a'.repeat(base64Length), mimeType: 'image/png' }],
+          timestamp: Date.now(),
+        },
+      ]);
       // 3072 图像 token + 少量消息格式开销
       expect(tokens).toBeGreaterThanOrEqual(3072);
       expect(tokens).toBeLessThan(3072 + 16);
@@ -227,13 +222,17 @@ describe('ContextManager', () => {
     it('fails without a recoverable service instead of deleting old messages', async () => {
       const messages = [user('x'.repeat(5000)), assistant('later')];
       const original = structuredClone(messages);
-      await expect(createContextManager({ contextTokenLimit: 20 }).compress(messages)).rejects.toThrow('CONTEXT_CANNOT_FIT');
+      await expect(createContextManager({ contextTokenLimit: 20 }).compress(messages)).rejects.toThrow(
+        'CONTEXT_CANNOT_FIT',
+      );
       expect(messages).toEqual(original);
     });
     it('never strips user images to fit', async () => {
       const messages = [user('look')];
       messages[0].content = [{ type: 'image', data: 'x'.repeat(4096), mimeType: 'image/png' }];
-      await expect(createContextManager({ contextTokenLimit: 20 }).compress(messages)).rejects.toThrow('CONTEXT_CANNOT_FIT');
+      await expect(createContextManager({ contextTokenLimit: 20 }).compress(messages)).rejects.toThrow(
+        'CONTEXT_CANNOT_FIT',
+      );
       expect(messages[0].content).toEqual([{ type: 'image', data: 'x'.repeat(4096), mimeType: 'image/png' }]);
     });
     it('preserves full negative evidence and original error flags', async () => {
@@ -242,20 +241,35 @@ describe('ContextManager', () => {
     });
     it('uses a verified candidate supplied by the maintenance service', async () => {
       const compact = async () => ({ messages: [user('qualified checkpoint')], summary: 'saved' });
-      expect(await createContextManager({ contextTokenLimit: 20, compact }).compress([user('x'.repeat(5000))])).toEqual({ messages: [expect.objectContaining({ content: 'qualified checkpoint' })], summary: 'saved' });
+      expect(await createContextManager({ contextTokenLimit: 20, compact }).compress([user('x'.repeat(5000))])).toEqual(
+        { messages: [expect.objectContaining({ content: 'qualified checkpoint' })], summary: 'saved' },
+      );
     });
     it('rejects an oversized candidate without a second lossy fallback', async () => {
       const messages = [user('x'.repeat(5000))];
-      await expect(createContextManager({ contextTokenLimit: 20, compact: async () => ({ messages }) }).compress(messages)).rejects.toThrow('CONTEXT_CANNOT_FIT');
+      await expect(
+        createContextManager({ contextTokenLimit: 20, compact: async () => ({ messages }) }).compress(messages),
+      ).rejects.toThrow('CONTEXT_CANNOT_FIT');
     });
     it('propagates storage failures and retains canonical content', async () => {
       const messages = [user('original revision')];
-      await expect(createContextManager({ compact: async () => { throw new Error('disk full'); } }).compress(messages)).rejects.toThrow('disk full');
+      await expect(
+        createContextManager({
+          compact: async () => {
+            throw new Error('disk full');
+          },
+        }).compress(messages),
+      ).rejects.toThrow('disk full');
       expect(messages[0].content).toBe('original revision');
     });
     it('rejects a cancelled maintenance result', async () => {
       const controller = new AbortController();
-      const cm = createContextManager({ compact: async messages => { controller.abort(); return { messages }; } });
+      const cm = createContextManager({
+        compact: async (messages) => {
+          controller.abort();
+          return { messages };
+        },
+      });
       await expect(cm.compress([user('hello')], controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
     });
   });

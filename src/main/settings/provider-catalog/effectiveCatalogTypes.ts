@@ -8,13 +8,10 @@ import type {
   EffectiveModel,
   ExecutionBindingDefinition,
   CatalogModelRoute,
-  ProviderAvailability,
 } from '@shared/types/providerCapability';
+import type { ProviderAvailability } from './providerCatalogTypes';
 import type { ModelCost } from '@shared/provider-catalog/modelManifestSchema';
-import type {
-  LlmProviderCatalogOwnership,
-  LlmProviderProtocol,
-} from '@shared/types/settings';
+import type { LlmProviderCatalogOwnership, LlmProviderProtocol } from '@shared/types/settings';
 import type { ReasoningControl } from '@shared/types/modelCapability';
 
 export const DISCOVERY_TTL_MS = 24 * 60 * 60 * 1000;

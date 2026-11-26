@@ -14,21 +14,24 @@ const STATUS_KEY = {
   cancelled: 'chat.planReviewStatusCancelled',
 } as const;
 
+/** The plan revision inside Working: the one plan card a turn shows, opening the shared reader. */
 export const PlanCard: React.FC<{
   plan: ConversationPlanReview;
   onOpen: (plan: ConversationPlanReview) => void;
-  variant?: 'deliverable' | 'process';
-}> = ({ plan, onOpen, variant = 'deliverable' }) => {
+}> = ({ plan, onOpen }) => {
   const { t } = useI18n();
   const readButton = useRef<HTMLElement>(null);
   const preview = planPreview(plan);
   const { previewRef, overflowing } = usePlanPreviewOverflow(preview);
-  const showPlan = () => { readButton.current?.focus(); onOpen(plan); };
+  const showPlan = () => {
+    readButton.current?.focus();
+    onOpen(plan);
+  };
 
   return (
     <>
       <section
-        className={`plan-card is-${variant} is-${plan.status}`}
+        className={`plan-card is-${plan.status}`}
         ref={readButton}
         role="button"
         tabIndex={0}
@@ -47,10 +50,12 @@ export const PlanCard: React.FC<{
         }}
       >
         <div className="plan-card__head">
-          <span>{t(variant === 'process' ? 'chat.planReviewProcessKind' : 'chat.planReviewCardKind')}</span>
+          <span>{t('chat.planReviewProcessKind')}</span>
           <span>{t(STATUS_KEY[plan.status])}</span>
         </div>
-        <h3 className="plan-card__title" data-tooltip={plan.title} data-work-node-prose>{plan.title}</h3>
+        <h3 className="plan-card__title" data-tooltip={plan.title} data-work-node-prose>
+          {plan.title}
+        </h3>
         <div ref={previewRef} className={`plan-card__preview${overflowing ? ' is-overflowing' : ''}`}>
           <MessageMarkdown content={preview} deferHeavyPlugins interactive={false} />
         </div>

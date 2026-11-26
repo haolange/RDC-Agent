@@ -3,17 +3,27 @@ import { formatDurationMs } from './workProcessFormat';
 import { groupImageRows } from './groupImageRows';
 import { groupWebRows } from './groupWebRows';
 import type { ConversationToolCall, ConversationWorkBlock } from '@shared/types/conversation';
+import type { AppLanguage } from '@shared/types/settings';
 import type { LoopPresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
 import type { WorkProcessRow } from './workProcessTypes';
-import type { BlockProjectionContext, LoopProjectionDeps, ThinkingItemPresentation } from './workProcessBlockProjection';
+import type {
+  BlockProjectionContext,
+  LoopProjectionDeps,
+  ThinkingItemPresentation,
+} from './workProcessBlockProjection';
 
 export function isVisibleToolCall(call: ConversationToolCall): boolean {
   if (call.approval || call.planReview || call.userInputQuestions) return true;
-  return call.status === 'error' || call.status === 'running' || call.status === 'complete'
-    || call.executionStartedAt !== undefined;
+  return (
+    call.status === 'error' ||
+    call.status === 'running' ||
+    call.status === 'complete' ||
+    call.executionStartedAt !== undefined
+  );
 }
 
-const isTaskLifecycleTool = (toolName: string): boolean => /^task_(?:create|update|get|list|stop)$/u.test(toolName.trim());
+const isTaskLifecycleTool = (toolName: string): boolean =>
+  /^task_(?:create|update|get|list|stop)$/u.test(toolName.trim());
 
 export function projectLlmTurn(
   block: ConversationWorkBlock,
@@ -23,53 +33,96 @@ export function projectLlmTurn(
   interactions: ConversationWorkBlock[] = [],
   superseded = false,
 ): LoopPresentationUnit | StandalonePresentationUnit | null {
-  const outputPhase = superseded ? 'commentary' : deps.resolveOutputPhase(block, ctx.hasVisibleProcessEvidence);
+  const outputPhase = superseded ? 'commentary' : deps.resolveOutputPhase(block);
   const reasoningState = deps.resolveReasoningState(block);
   const stopReason = block.result?.stopReason;
   // Successful TaskRegistry mutations already have authoritative snapshots;
   // pending approval and failed mutations still need their own interaction/error.
   const orderedSteps = [
-    ...block.toolCalls
-      .map((call) => ({ order: call.displayOrder, time: call.executionStartedAt ?? call.approval?.requestedAt ?? call.startedAt,
-        row: !isVisibleToolCall(call) || (isTaskLifecycleTool(call.toolName) && call.status !== 'error'
-          && (!call.approval || call.approval.status === 'approved')) ? null : call.delegation ? {
-        type: 'subagent', id: call.id, status: call.status,
-        profile: call.delegation.profile, task: call.delegation.task, mode: call.delegation.mode,
-        argsPreview: call.argsPreview ?? '', resultPreview: call.resultPreview ?? '',
-        executionId: call.delegation.executionId, generation: call.delegation.generation,
-        duration: formatDurationMs(call.executionStartedAt, call.completedAt),
-      } as WorkProcessRow : ctx.createToolRow(call) })),
-    ...snapshots.filter((snapshot) => snapshot.taskSnapshot).map((snapshot) => ({
-      order: snapshot.displayOrder, time: snapshot.startedAt,
-      row: { type: 'taskSnapshot', id: snapshot.id, status: snapshot.status,
-        change: snapshot.taskSnapshot!.change, completed: snapshot.taskSnapshot!.completed,
-        total: snapshot.taskSnapshot!.total, items: snapshot.taskSnapshot!.items,
-        duration: formatDurationMs(snapshot.startedAt, snapshot.completedAt) } as WorkProcessRow,
+    ...block.toolCalls.map((call) => ({
+      order: call.displayOrder,
+      time: call.executionStartedAt ?? call.approval?.requestedAt ?? call.startedAt,
+      row:
+        !isVisibleToolCall(call) ||
+        (isTaskLifecycleTool(call.toolName) &&
+          call.status !== 'error' &&
+          (!call.approval || call.approval.status === 'approved'))
+          ? null
+          : call.delegation
+            ? ({
+                type: 'subagent',
+                id: call.id,
+                status: call.status,
+                profile: call.delegation.profile,
+                task: call.delegation.task,
+                mode: call.delegation.mode,
+                argsPreview: call.argsPreview ?? '',
+                resultPreview: call.resultPreview ?? '',
+                executionId: call.delegation.executionId,
+                generation: call.delegation.generation,
+                duration: formatDurationMs(ctx.t.language, call.executionStartedAt, call.completedAt),
+              } as WorkProcessRow)
+            : ctx.createToolRow(call),
     })),
-    ...interactions.flatMap((interaction) => interaction.toolCalls.filter(isVisibleToolCall).map((call) => ({
-      order: call.displayOrder, time: call.executionStartedAt ?? call.approval?.requestedAt ?? call.startedAt,
-      row: ctx.createToolRow(call),
-    }))),
+    ...snapshots
+      .filter((snapshot) => snapshot.taskSnapshot)
+      .map((snapshot) => ({
+        order: snapshot.displayOrder,
+        time: snapshot.startedAt,
+        row: {
+          type: 'taskSnapshot',
+          id: snapshot.id,
+          status: snapshot.status,
+          change: snapshot.taskSnapshot!.change,
+          completed: snapshot.taskSnapshot!.completed,
+          total: snapshot.taskSnapshot!.total,
+          items: snapshot.taskSnapshot!.items,
+          duration: formatDurationMs(ctx.t.language, snapshot.startedAt, snapshot.completedAt),
+        } as WorkProcessRow,
+      })),
+    ...interactions.flatMap((interaction) =>
+      interaction.toolCalls.filter(isVisibleToolCall).map((call) => ({
+        order: call.displayOrder,
+        time: call.executionStartedAt ?? call.approval?.requestedAt ?? call.startedAt,
+        row: ctx.createToolRow(call),
+      })),
+    ),
     ...loopTextItems(block).map((item) => ({
-      order: item.displayOrder, time: block.startedAt,
-      row: { type: 'output', id: `${block.id}:output:${item.providerOutputRef.contentIndex}`,
-        status: item.status === 'streaming' ? 'running' : 'complete', text: item.text, phase: presentedTextPhase(item.phase, superseded), duration: '' } as WorkProcessRow,
+      order: item.displayOrder,
+      time: block.startedAt,
+      row: {
+        type: 'output',
+        id: `${block.id}:output:${item.providerOutputRef.contentIndex}`,
+        status: item.status === 'streaming' ? 'running' : 'complete',
+        text: item.text,
+        phase: presentedTextPhase(item.phase, superseded),
+        duration: '',
+      } as WorkProcessRow,
     })),
   ];
   // Each visible thinking block is its own row at the position it first streamed in.
   const thinkingRows = loopThinkingItems(block).flatMap((item) => {
     const presented = deps.resolveThinkingItem(block, item);
     if (!presented || isDuplicateThinking(presented, ctx, deps)) return [];
-    return [{
-      order: item.displayOrder,
-      time: block.startedAt,
-      row: { type: 'thinking', id: `${block.id}:thinking:${item.providerOutputRef.providerBlockKey}:${item.providerOutputRef.contentIndex}`,
-        duration: '', status: presented.status === 'streaming' ? 'running' : 'complete',
-        preview: presented.preview, label: presented.label, kind: presented.kind,
-        visibility: presented.visibility, thinkingStatus: presented.status,
-        openByDefault: presented.openByDefault } as WorkProcessRow,
-      presented,
-    }];
+    return [
+      {
+        order: item.displayOrder,
+        time: block.startedAt,
+        row: {
+          type: 'thinking',
+          id: `${block.id}:thinking:${item.providerOutputRef.providerBlockKey}:${item.providerOutputRef.contentIndex}`,
+          duration: '',
+          status: presented.status === 'streaming' ? 'running' : 'complete',
+          preview: presented.preview,
+          label: presented.label,
+          kind: presented.kind,
+          visibility: presented.visibility,
+          thinkingStatus: presented.status,
+          openByDefault: presented.openByDefault,
+        } as WorkProcessRow,
+        presented,
+      },
+    ];
   });
   const loopRows: WorkProcessRow[] = [];
   const isFinalAnswer = outputPhase === 'final_answer' && !deps.isNonFinalStopReason(stopReason);
@@ -80,33 +133,36 @@ export function projectLlmTurn(
   const hasDisplayableThinking = thinkingRows.length > 0;
   const hasSummaryThinking = thinkingRows.some((entry) => entry.presented.kind === 'summary');
   // Order is the shared display sequence only; every entry carries one.
-  const ordered = [...orderedSteps, ...thinkingRows.map(({ order, time, row }) => ({ order, time, row }))]
-    .sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER));
-  const steps = ctx.groupProcessRows(ordered.flatMap(({ row }) => row ? [row] : []));
-  const shouldRenderSection = steps.length > 0;
-
-  if (!shouldRenderSection) {
+  const ordered = [...orderedSteps, ...thinkingRows.map(({ order, time, row }) => ({ order, time, row }))].sort(
+    (left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER),
+  );
+  const steps = ctx.groupProcessRows(ordered.flatMap(({ row }) => (row ? [row] : [])));
+  if (steps.length === 0) {
     return null;
   }
 
-  if (shouldRenderSection) {
-    loopRows.push({
-      type: 'section',
-      id: block.id,
-      loopId: block.id,
-      status: block.status,
-      hasActiveTools: block.toolCalls.some((call) => isTaskLifecycleTool(call.toolName) && call.status === 'running'
-        && call.executionStartedAt !== undefined && (!call.approval || call.approval.status === 'approved')),
-      stepCount: deps.countToolSteps(steps),
-      duration: formatDurationMs(block.startedAt, block.completedAt),
-      steps,
-      visibleSteps: groupSectionSteps(ordered.map(({ row }) => row)),
-      outputPhase,
-      stopReason,
-    });
-  }
-
-  ctx.hasVisibleProcessEvidence = true;
+  loopRows.push({
+    type: 'section',
+    id: block.id,
+    loopId: block.id,
+    status: block.status,
+    hasActiveTools: block.toolCalls.some(
+      (call) =>
+        isTaskLifecycleTool(call.toolName) &&
+        call.status === 'running' &&
+        call.executionStartedAt !== undefined &&
+        (!call.approval || call.approval.status === 'approved'),
+    ),
+    stepCount: deps.countToolSteps(steps),
+    duration: formatDurationMs(ctx.t.language, block.startedAt, block.completedAt),
+    steps,
+    visibleSteps: groupSectionSteps(
+      ordered.map(({ row }) => row),
+      ctx.t.language,
+    ),
+    outputPhase,
+    stopReason,
+  });
 
   return {
     kind: 'loop',
@@ -131,15 +187,15 @@ function isDuplicateThinking(
 }
 
 /** A suppressed call interrupts a contiguous run of image or web requests. */
-function groupSectionSteps(steps: (WorkProcessRow | null)[]): WorkProcessRow[] {
+function groupSectionSteps(steps: (WorkProcessRow | null)[], language: AppLanguage): WorkProcessRow[] {
   const output: WorkProcessRow[] = [];
   let run: WorkProcessRow[] = [];
   for (const row of steps) {
     if (row) run.push(row);
     else {
-      output.push(...groupImageRows(groupWebRows(run)));
+      output.push(...groupImageRows(groupWebRows(run, language)));
       run = [];
     }
   }
-  return output.concat(groupImageRows(groupWebRows(run)));
+  return output.concat(groupImageRows(groupWebRows(run, language)));
 }

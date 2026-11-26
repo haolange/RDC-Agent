@@ -37,13 +37,21 @@ export const ToolApprovalRequestPanel: React.FC<{
   return (
     <section className="composer-tool-approval-panel" data-testid="composer-tool-approval-panel">
       <div className="composer-tool-approval-header">
-        <ActiveSignalText active tone="info" className="composer-tool-approval-kicker">{t('composer.toolApprovalKicker')}</ActiveSignalText>
+        <ActiveSignalText active tone="info" className="composer-tool-approval-kicker">
+          {t('composer.toolApprovalKicker')}
+        </ActiveSignalText>
         <p>{formatToolApprovalReason(request.question, t) || t('chat.approvalRequiredMessage')}</p>
       </div>
       <div className="composer-tool-approval-meta" aria-label={t('composer.toolApprovalContext')}>
         <span>{toolCategoryLabel(request.toolName, t)}</span>
-        <span className={`composer-tool-approval-risk is-${request.risk}`}>{t(`composer.toolApprovalRisk.${request.risk}`)}</span>
-        {request.reviewer ? <span>{t(request.reviewer === 'user' ? 'chat.workProcessManualReviewMeta' : 'chat.workProcessAutoReviewMeta')}</span> : null}
+        <span className={`composer-tool-approval-risk is-${request.risk}`}>
+          {t(`composer.toolApprovalRisk.${request.risk}`)}
+        </span>
+        {request.reviewer ? (
+          <span>
+            {t(request.reviewer === 'user' ? 'chat.workProcessManualReviewMeta' : 'chat.workProcessAutoReviewMeta')}
+          </span>
+        ) : null}
       </div>
       <div className="composer-tool-approval-actions">
         <Button
@@ -63,7 +71,9 @@ export const ToolApprovalRequestPanel: React.FC<{
           {t('composer.toolApprovalApproveOnce')}
         </Button>
       </div>
-      {error !== null ? <InlineError detail={error || undefined}>{t('composer.toolApprovalSubmitFailed')}</InlineError> : null}
+      {error !== null ? (
+        <InlineError detail={error || undefined}>{t('composer.toolApprovalSubmitFailed')}</InlineError>
+      ) : null}
     </section>
   );
 };

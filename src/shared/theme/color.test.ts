@@ -40,19 +40,9 @@ describe('theme color helpers', () => {
   it('mixes colors and applies contrast pairs', () => {
     const mixed = mixRgb({ r: 0, g: 0, b: 0 }, { r: 100, g: 0, b: 0 }, 0.5);
     expect(mixed.r).toBe(50);
-    const dark = applyContrastPair(
-      { r: 20, g: 20, b: 20 },
-      { r: 200, g: 200, b: 200 },
-      80,
-      'dark',
-    );
+    const dark = applyContrastPair({ r: 20, g: 20, b: 20 }, { r: 200, g: 200, b: 200 }, 80, 'dark');
     expect(dark.surface.r).toBeLessThanOrEqual(20);
-    const light = applyContrastPair(
-      { r: 240, g: 240, b: 240 },
-      { r: 20, g: 20, b: 20 },
-      80,
-      'light',
-    );
+    const light = applyContrastPair({ r: 240, g: 240, b: 240 }, { r: 20, g: 20, b: 20 }, 80, 'light');
     expect(light.surface.r).toBeGreaterThanOrEqual(240);
   });
 

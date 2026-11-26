@@ -12,14 +12,10 @@ export const SystemMessage: React.FC<SystemMessageProps> = ({ message }) => {
   const { t } = useI18n();
   const tone = resolveSystemNoticeTone(message);
   const commandLabel = resolveCommandLabel(message);
-  const text = message.diagnostic?.code === 'MODEL_CONTINUATION_DROPPED'
-    ? t('chat.modelContinuationDropped')
-    : message.content;
-  const toneLabel = tone === 'error'
-    ? t('chat.messageError')
-    : tone === 'warning'
-      ? t('chat.messageWarning')
-      : undefined;
+  const text =
+    message.diagnostic?.code === 'MODEL_CONTINUATION_DROPPED' ? t('chat.modelContinuationDropped') : message.content;
+  const toneLabel =
+    tone === 'error' ? t('chat.messageError') : tone === 'warning' ? t('chat.messageWarning') : undefined;
   const liveRole = tone === 'error' ? 'alert' : 'status';
 
   if (commandLabel) {
@@ -29,10 +25,7 @@ export const SystemMessage: React.FC<SystemMessageProps> = ({ message }) => {
         data-testid="message-bubble-system"
         data-message-id={message.id}
       >
-        <div
-          className={`conversation-bubble-system is-command severity-${tone}`}
-          role={liveRole}
-        >
+        <div className={`conversation-bubble-system is-command severity-${tone}`} role={liveRole}>
           <span className="conversation-system-command-label">{commandLabel}</span>
           <div className="conversation-system-command-body">
             <MessageMarkdown content={text} />
@@ -49,11 +42,7 @@ export const SystemMessage: React.FC<SystemMessageProps> = ({ message }) => {
       data-message-id={message.id}
     >
       <div className={`conversation-bubble-system severity-${tone}`} role={liveRole}>
-        <span
-          className="conversation-system-dot"
-          aria-hidden={toneLabel ? undefined : true}
-          aria-label={toneLabel}
-        />
+        <span className="conversation-system-dot" aria-hidden={toneLabel ? undefined : true} aria-label={toneLabel} />
         <span className="conversation-system-text">{text}</span>
       </div>
     </article>

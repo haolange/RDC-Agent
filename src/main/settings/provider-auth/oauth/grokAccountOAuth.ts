@@ -4,14 +4,7 @@ import { parseGrokBuilderCatalog } from '../../provider-catalog/LiveProviderCata
 import { listenGrokCallback } from './grokCallback';
 import { verifyGrokIdentity } from './grokIdentity';
 import { GROK_BUILD_API_BASE_URL, GROK_OAUTH_CLIENT_ID } from './oauthConstants';
-import {
-  appendParams,
-  createFormBody,
-  createPkce,
-  fetchJson,
-  fetchOAuthJson,
-  readString,
-} from './oauthHttp';
+import { appendParams, createFormBody, createPkce, fetchJson, fetchOAuthJson, readString } from './oauthHttp';
 import {
   createGrokOAuthFailureDiagnostic,
   fetchGrokOAuthMetadata,
@@ -31,9 +24,15 @@ export async function startGrokBrowserLogin(
 ): Promise<OAuthFlowState> {
   const { verifier, challenge } = createPkce();
   const flow: OAuthFlowState = {
-    providerId, flowId: randomUUID(), state: randomUUID(), nonce: randomUUID(),
-    codeVerifier: verifier, clientId, authorizationMode: 'browser',
-    expiresAt: Date.now() + 10 * 60 * 1000, abortController: new AbortController(),
+    providerId,
+    flowId: randomUUID(),
+    state: randomUUID(),
+    nonce: randomUUID(),
+    codeVerifier: verifier,
+    clientId,
+    authorizationMode: 'browser',
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    abortController: new AbortController(),
   };
   setFlow(flow);
   try {
@@ -46,9 +45,14 @@ export async function startGrokBrowserLogin(
     flow.jwksUri = metadata.jwksUri;
     await listenGrokCallback(flow, (code) => complete(flow, code));
     flow.authUrl = appendParams(metadata.authorizationEndpoint, {
-      client_id: clientId, response_type: 'code', redirect_uri: flow.redirectUri!,
-      scope: flow.requestedScopes, code_challenge: challenge, code_challenge_method: 'S256',
-      state: flow.state, nonce: flow.nonce!,
+      client_id: clientId,
+      response_type: 'code',
+      redirect_uri: flow.redirectUri!,
+      scope: flow.requestedScopes,
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      state: flow.state,
+      nonce: flow.nonce!,
     });
     await openBrowser(flow.authUrl);
     flow.abortController?.signal.throwIfAborted();
@@ -64,7 +68,7 @@ export async function exchangeGrokCode(flow: OAuthFlowState, code: string): Prom
     throw new Error('Grok authorization requires an automatic callback and an active PKCE login flow.');
   }
   const tokenEndpoint = flow.tokenEndpoint ?? (await fetchGrokOAuthMetadata()).tokenEndpoint;
-  const payload = await fetchOAuthJson(tokenEndpoint, {
+  const payload = (await fetchOAuthJson(tokenEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     signal: flow.abortController?.signal,
@@ -75,7 +79,7 @@ export async function exchangeGrokCode(flow: OAuthFlowState, code: string): Prom
       redirect_uri: flow.redirectUri,
       code_verifier: flow.codeVerifier,
     }),
-  }) as {
+  })) as {
     access_token?: string;
     refresh_token?: string;
     id_token?: string;
@@ -84,7 +88,15 @@ export async function exchangeGrokCode(flow: OAuthFlowState, code: string): Prom
     error_description?: string;
   };
   if (payload.error) {
-    throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic('token', 'browser token exchange', payload, flow.requestedScopes, flow.redirectUri));
+    throw new GrokOAuthDiagnosticError(
+      createGrokOAuthFailureDiagnostic(
+        'token',
+        'browser token exchange',
+        payload,
+        flow.requestedScopes,
+        flow.redirectUri,
+      ),
+    );
   }
   if (!payload.access_token) {
     throw new Error('xAI OAuth did not return an access token.');
@@ -106,7 +118,11 @@ export async function exchangeGrokCode(flow: OAuthFlowState, code: string): Prom
   };
 }
 
-export async function fetchGrokUserInfo(accessToken: string, userinfoEndpoint?: string, signal?: AbortSignal): Promise<{ accountId?: string; accountLabel?: string }> {
+export async function fetchGrokUserInfo(
+  accessToken: string,
+  userinfoEndpoint?: string,
+  signal?: AbortSignal,
+): Promise<{ accountId?: string; accountLabel?: string }> {
   try {
     const endpoint = userinfoEndpoint ?? (await fetchGrokOAuthMetadata()).userinfoEndpoint;
     const payload = await fetchJson(endpoint, {
@@ -114,12 +130,15 @@ export async function fetchGrokUserInfo(accessToken: string, userinfoEndpoint?: 
       signal,
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    const record = payload && typeof payload === 'object' && !Array.isArray(payload)
-      ? payload as Record<string, unknown>
-      : {};
+    const record =
+      payload && typeof payload === 'object' && !Array.isArray(payload) ? (payload as Record<string, unknown>) : {};
     return {
       accountId: readString(record.sub),
-      accountLabel: readString(record.email) ?? readString(record.name) ?? readString(record.preferred_username) ?? readString(record.sub),
+      accountLabel:
+        readString(record.email) ??
+        readString(record.name) ??
+        readString(record.preferred_username) ??
+        readString(record.sub),
     };
   } catch {
     return {};
@@ -131,7 +150,7 @@ export async function refreshGrokBundle(bundle: OAuthSecretBundle): Promise<OAut
     return bundle;
   }
   const metadata = await fetchGrokOAuthMetadata();
-  const payload = await fetchOAuthJson(metadata.tokenEndpoint, {
+  const payload = (await fetchOAuthJson(metadata.tokenEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: createFormBody({
@@ -139,9 +158,18 @@ export async function refreshGrokBundle(bundle: OAuthSecretBundle): Promise<OAut
       client_id: GROK_OAUTH_CLIENT_ID,
       refresh_token: bundle.refreshToken,
     }),
-  }) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number; error?: string; error_description?: string };
+  })) as {
+    access_token?: string;
+    refresh_token?: string;
+    id_token?: string;
+    expires_in?: number;
+    error?: string;
+    error_description?: string;
+  };
   if (payload.error) {
-    throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic('refresh', 'token refresh', payload, bundle.requestedScopes, bundle.redirectUri));
+    throw new GrokOAuthDiagnosticError(
+      createGrokOAuthFailureDiagnostic('refresh', 'token refresh', payload, bundle.requestedScopes, bundle.redirectUri),
+    );
   }
   if (!payload.access_token) {
     throw new Error('xAI OAuth refresh did not return an access token.');
@@ -186,12 +214,18 @@ export async function discoverGrokCatalog(
   const surface = getLoadedProviderSurface(bundle.providerId);
   if (!surface) throw new Error('Grok subscription catalog is unavailable.');
   const payload = await fetchJson(`${GROK_BUILD_API_BASE_URL}/models`, {
-    method: 'GET', signal, headers: { Accept: 'application/json',
+    method: 'GET',
+    signal,
+    headers: {
+      Accept: 'application/json',
       ...(surface.routes.find((route) => route.protocol === 'OpenAIResponses')?.headers ?? {}),
-      Authorization: `Bearer ${token}` },
+      Authorization: `Bearer ${token}`,
+    },
   });
   const parsed = parseGrokBuilderCatalog(payload, surface);
-  if (!parsed.diagnostic?.complete) throw new Error('Grok subscription returned an incomplete model catalog. Refresh to check current availability.');
-  if (!parsed.models.length) throw new Error('Grok subscription returned no supported agent models. Check account access or sign in again.');
+  if (!parsed.diagnostic?.complete)
+    throw new Error('Grok subscription returned an incomplete model catalog. Refresh to check current availability.');
+  if (!parsed.models.length)
+    throw new Error('Grok subscription returned no supported agent models. Check account access or sign in again.');
   return { ...parsed, detail: 'Grok subscription model catalog' };
 }

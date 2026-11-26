@@ -33,9 +33,7 @@ export function resolveComposerAgentDefaultState(
     return { kind: 'unset', selectable: false };
   }
 
-  const match = options.find((option) => (
-    option.providerId === providerId && option.modelId === modelId
-  ));
+  const match = options.find((option) => option.providerId === providerId && option.modelId === modelId);
   if (match) {
     return {
       kind: 'available',

@@ -5,7 +5,6 @@ require('./register-ts-source.cjs');
 const { translate } = require('../src/renderer/i18n/messages.ts');
 const t = (key, params) => translate('zh-CN', key, params);
 
-
 const { AGENT_WORKBENCH_TOOL_CATALOG } = require('../src/shared/constants/agentWorkbenchCatalog.ts');
 const { BUILTIN_AGENT_TOOL_IDS } = require('../src/shared/constants/agentToolTokens.ts');
 const {
@@ -25,20 +24,27 @@ const assert = (condition, message) => {
 
 const now = 1_700_000_000_000;
 
-const toolEnvelope = (text, details = {}, extra = {}) => JSON.stringify({
-  ok: true,
-  data: {
-    content: text ? [{ type: 'text', text }] : [],
-    details,
-  },
-  duration_ms: 16,
-  ...extra,
-});
+const toolEnvelope = (text, details = {}, extra = {}) =>
+  JSON.stringify({
+    ok: true,
+    data: {
+      content: text ? [{ type: 'text', text }] : [],
+      details,
+    },
+    duration_ms: 16,
+    ...extra,
+  });
 
 const FIXTURES = {
   read_file: {
     argsPreview: JSON.stringify({ path: 'src/main/index.ts' }),
-    resultPreview: toolEnvelope('     1→export {}\n     2→', { path: 'src/main/index.ts', totalLines: 12, offset: 1, limit: 2000, truncated: false }),
+    resultPreview: toolEnvelope('     1→export {}\n     2→', {
+      path: 'src/main/index.ts',
+      totalLines: 12,
+      offset: 1,
+      limit: 2000,
+      truncated: false,
+    }),
   },
   artifact_read: {
     argsPreview: JSON.stringify({ uri: 'session://tool-outputs/call-1.json' }),
@@ -52,15 +58,33 @@ const FIXTURES = {
   },
   glob: {
     argsPreview: JSON.stringify({ pattern: '**/package.json' }),
-    resultPreview: toolEnvelope('package.json\ntools/package.json', { pattern: '**/package.json', cwd: '.', matched: 2, truncated: false }),
+    resultPreview: toolEnvelope('package.json\ntools/package.json', {
+      pattern: '**/package.json',
+      cwd: '.',
+      matched: 2,
+      truncated: false,
+    }),
   },
   grep: {
     argsPreview: JSON.stringify({ pattern: 'export', path: 'src' }),
-    resultPreview: toolEnvelope('src/index.ts:1: export const x = 1', { pattern: 'export', root: 'src', matchedFiles: 1, matchedLines: 1, truncated: false }),
+    resultPreview: toolEnvelope('src/index.ts:1: export const x = 1', {
+      pattern: 'export',
+      root: 'src',
+      matchedFiles: 1,
+      matchedLines: 1,
+      truncated: false,
+    }),
   },
   web_fetch: {
     argsPreview: JSON.stringify({ url: 'https://example.com' }),
-    resultPreview: toolEnvelope('Status: 200 OK', { kind: 'fetch', url: 'https://example.com/', status: 200, statusText: 'OK', bytes: 1256, truncated: false }),
+    resultPreview: toolEnvelope('Status: 200 OK', {
+      kind: 'fetch',
+      url: 'https://example.com/',
+      status: 200,
+      statusText: 'OK',
+      bytes: 1256,
+      truncated: false,
+    }),
   },
   web_search: {
     argsPreview: JSON.stringify({ query: 'renderdoc' }),
@@ -73,7 +97,13 @@ const FIXTURES = {
   },
   shell: {
     argsPreview: JSON.stringify({ command: 'pnpm run typecheck' }),
-    resultPreview: toolEnvelope('OK', { command: 'pnpm run typecheck', exitCode: 0, durationMs: 120, truncated: false, cwd: '.' }),
+    resultPreview: toolEnvelope('OK', {
+      command: 'pnpm run typecheck',
+      exitCode: 0,
+      durationMs: 120,
+      truncated: false,
+      cwd: '.',
+    }),
   },
   write_file: {
     argsPreview: JSON.stringify({ path: 'notes.md', content: 'hello' }),
@@ -81,7 +111,13 @@ const FIXTURES = {
   },
   edit_file: {
     argsPreview: JSON.stringify({ path: 'src/foo.ts', old_text: 'a', new_text: 'b' }),
-    resultPreview: toolEnvelope('Updated src/foo.ts', { path: 'src/foo.ts', oldLength: 1, newLength: 1, occurrence: 1, delta: 0 }),
+    resultPreview: toolEnvelope('Updated src/foo.ts', {
+      path: 'src/foo.ts',
+      oldLength: 1,
+      newLength: 1,
+      occurrence: 1,
+      delta: 0,
+    }),
   },
   delete_file: {
     argsPreview: JSON.stringify({ path: 'tmp.txt' }),
@@ -143,13 +179,34 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ taskId: 'task-1' }),
     resultPreview: toolEnvelope('Stopped task-1', { taskId: 'task-1', status: 'stopped' }),
   },
-  turn_complete: { argsPreview: JSON.stringify({ disposition: 'completed' }), resultPreview: toolEnvelope('Turn completion recorded', { disposition: 'completed' }) },
-  background_query: { argsPreview: JSON.stringify({ executionId: 'exec-1' }), resultPreview: toolEnvelope('running', { executionId: 'exec-1' }) },
-  background_wait: { argsPreview: JSON.stringify({ executionId: 'exec-1' }), resultPreview: toolEnvelope('completed', { executionId: 'exec-1' }) },
-  background_result: { argsPreview: JSON.stringify({ executionId: 'exec-1' }), resultPreview: toolEnvelope('result', { executionId: 'exec-1' }) },
-  background_message: { argsPreview: JSON.stringify({ executionId: 'exec-1', body: 'data' }), resultPreview: toolEnvelope('queued', { executionId: 'exec-1' }) },
-  background_cancel: { argsPreview: JSON.stringify({ executionId: 'exec-1' }), resultPreview: toolEnvelope('cancelled', { executionId: 'exec-1' }) },
-  background_join: { argsPreview: JSON.stringify({ executionId: 'exec-1' }), resultPreview: toolEnvelope('joined', { executionId: 'exec-1' }) },
+  turn_complete: {
+    argsPreview: JSON.stringify({ disposition: 'completed' }),
+    resultPreview: toolEnvelope('Turn completion recorded', { disposition: 'completed' }),
+  },
+  background_query: {
+    argsPreview: JSON.stringify({ executionId: 'exec-1' }),
+    resultPreview: toolEnvelope('running', { executionId: 'exec-1' }),
+  },
+  background_wait: {
+    argsPreview: JSON.stringify({ executionId: 'exec-1' }),
+    resultPreview: toolEnvelope('completed', { executionId: 'exec-1' }),
+  },
+  background_result: {
+    argsPreview: JSON.stringify({ executionId: 'exec-1' }),
+    resultPreview: toolEnvelope('result', { executionId: 'exec-1' }),
+  },
+  background_message: {
+    argsPreview: JSON.stringify({ executionId: 'exec-1', body: 'data' }),
+    resultPreview: toolEnvelope('queued', { executionId: 'exec-1' }),
+  },
+  background_cancel: {
+    argsPreview: JSON.stringify({ executionId: 'exec-1' }),
+    resultPreview: toolEnvelope('cancelled', { executionId: 'exec-1' }),
+  },
+  background_join: {
+    argsPreview: JSON.stringify({ executionId: 'exec-1' }),
+    resultPreview: toolEnvelope('joined', { executionId: 'exec-1' }),
+  },
   subagent: {
     argsPreview: JSON.stringify({ profile: 'reviewer', prompt: 'Review this' }),
     resultPreview: toolEnvelope('Reviewed', { summary: 'Reviewed' }),
@@ -167,7 +224,14 @@ const FIXTURES = {
     resultPreview: toolEnvelope('note body', { name: 'project-notes' }),
   },
   memory_write: {
-    argsPreview: JSON.stringify({ scope: 'project', name: 'project-notes', description: 'd', type: 'project', content: 'c', approved: true }),
+    argsPreview: JSON.stringify({
+      scope: 'project',
+      name: 'project-notes',
+      description: 'd',
+      type: 'project',
+      content: 'c',
+      approved: true,
+    }),
     resultPreview: toolEnvelope('Wrote project-notes', { name: 'project-notes' }),
   },
   memory_delete: {
@@ -192,7 +256,9 @@ const FIXTURES = {
   output_register: {
     argsPreview: JSON.stringify({ path: 'qa-output.md', display_name: 'QA Output' }),
     resultPreview: toolEnvelope('Published output: QA Output', {
-      path: 'qa-output.md', displayName: 'QA Output', sizeBytes: 1024,
+      path: 'qa-output.md',
+      displayName: 'QA Output',
+      sizeBytes: 1024,
     }),
   },
   tool_search: {
@@ -229,14 +295,16 @@ const FIXTURES = {
   },
   ask_user: {
     argsPreview: '1 question',
-    userInputQuestions: [{
+    userInputQuestions: [
+      {
         questionId: 'continue',
         prompt: 'Continue?',
         options: [
           { optionId: 'yes', label: 'Yes' },
           { optionId: 'no', label: 'No' },
         ],
-      }],
+      },
+    ],
     resultPreview: toolEnvelope('Yes', {
       answers: [{ questionId: 'continue', answer: 'Yes', selectedOptionId: 'yes' }],
     }),
@@ -247,7 +315,11 @@ const FIXTURES = {
   },
   read_image: {
     argsPreview: JSON.stringify({ path: 'captures/frame.png' }),
-    resultPreview: toolEnvelope('Viewed image frame.png', { path: 'captures/frame.png', mimeType: 'image/png', bytes: 1200 }),
+    resultPreview: toolEnvelope('Viewed image frame.png', {
+      path: 'captures/frame.png',
+      mimeType: 'image/png',
+      bytes: 1200,
+    }),
   },
   code_interpreter: {
     argsPreview: JSON.stringify({ code: 'print(1)' }),
@@ -259,14 +331,21 @@ const FIXTURES = {
   },
   knowledge_search: {
     argsPreview: JSON.stringify({ query: 'vulkan' }),
-    resultPreview: toolEnvelope('1 hits · semantic: unavailable (consent-denied)\n1. Sample · fact · draft · Lexical · user:facts/sample.md', {
-      count: 1,
-      cardIds: ['user:facts/sample.md'],
-    }),
+    resultPreview: toolEnvelope(
+      '1 hits · semantic: unavailable (consent-denied)\n1. Sample · fact · draft · Lexical · user:facts/sample.md',
+      {
+        count: 1,
+        cardIds: ['user:facts/sample.md'],
+      },
+    ),
   },
   knowledge_read: {
     argsPreview: JSON.stringify({ spaceId: 'user', relativePath: 'facts/sample.md' }),
-    resultPreview: toolEnvelope('# Sample\n\nA fact.', { spaceId: 'user', relativePath: 'facts/sample.md', title: 'Sample' }),
+    resultPreview: toolEnvelope('# Sample\n\nA fact.', {
+      spaceId: 'user',
+      relativePath: 'facts/sample.md',
+      title: 'Sample',
+    }),
   },
   knowledge_compile: {
     argsPreview: JSON.stringify({ query: 'vulkan', limit: 8 }),
@@ -289,14 +368,23 @@ const FIXTURES = {
   },
   investigation_read: {
     argsPreview: JSON.stringify({ artifactId: 'invart-1' }),
-    resultPreview: toolEnvelope('world_state\tdraft\tBaseline\ncontentRef\tsession://investigation/records/invart-1.json\ncontentHash\tsha256:abc\n{"worldStateId":"ws-1"}', {
-      artifactId: 'invart-1',
-      contentUri: 'session://investigation/records/invart-1.json',
-      contentHash: 'sha256:abc',
-    }),
+    resultPreview: toolEnvelope(
+      'world_state\tdraft\tBaseline\ncontentRef\tsession://investigation/records/invart-1.json\ncontentHash\tsha256:abc\n{"worldStateId":"ws-1"}',
+      {
+        artifactId: 'invart-1',
+        contentUri: 'session://investigation/records/invart-1.json',
+        contentHash: 'sha256:abc',
+      },
+    ),
   },
   investigation_write: {
-    argsPreview: JSON.stringify({ kind: 'world_state', mission: 'debugger', title: 'Baseline', summary: 'ws', record: { worldStateId: 'ws-1' } }),
+    argsPreview: JSON.stringify({
+      kind: 'world_state',
+      mission: 'debugger',
+      title: 'Baseline',
+      summary: 'ws',
+      record: { worldStateId: 'ws-1' },
+    }),
     resultPreview: toolEnvelope('invart-1\tworld_state\tdraft\tsha256:abc', {
       artifactId: 'invart-1',
       kind: 'world_state',
@@ -305,7 +393,10 @@ const FIXTURES = {
   },
   investigation_list: {
     argsPreview: JSON.stringify({ kind: 'claim' }),
-    resultPreview: toolEnvelope('artifacts\t1\ninvart-1\tclaim\tdraft\tclaim-1\tsession://investigation/records/invart-1.json\tsha256:abc', { count: 1 }),
+    resultPreview: toolEnvelope(
+      'artifacts\t1\ninvart-1\tclaim\tdraft\tclaim-1\tsession://investigation/records/invart-1.json\tsha256:abc',
+      { count: 1 },
+    ),
   },
 };
 
@@ -313,7 +404,10 @@ const workbenchToolIds = AGENT_WORKBENCH_TOOL_CATALOG.map((tool) => tool.id);
 const builtinIds = [...BUILTIN_AGENT_TOOL_IDS];
 const missingFromCatalog = builtinIds.filter((id) => !workbenchToolIds.includes(id));
 const extraInCatalog = workbenchToolIds.filter((id) => !builtinIds.includes(id));
-assert(missingFromCatalog.length === 0, `AGENT_WORKBENCH_TOOL_CATALOG missing builtin ids: ${missingFromCatalog.join(', ')}`);
+assert(
+  missingFromCatalog.length === 0,
+  `AGENT_WORKBENCH_TOOL_CATALOG missing builtin ids: ${missingFromCatalog.join(', ')}`,
+);
 assert(extraInCatalog.length === 0, `AGENT_WORKBENCH_TOOL_CATALOG has unknown ids: ${extraInCatalog.join(', ')}`);
 assert(new Set(workbenchToolIds).size === workbenchToolIds.length, 'AGENT_WORKBENCH_TOOL_CATALOG has duplicate ids');
 
@@ -327,7 +421,10 @@ for (const [id, icon] of builtinIconEntries) {
   assert(icon && icon !== 'tool', `${id} must map to a semantic Work Process icon`);
 }
 const builtinIcons = builtinIconEntries.map(([, icon]) => icon);
-assert(new Set(builtinIcons).size === builtinIcons.length, `builtin Work Process icons must be unique, got duplicates among: ${builtinIcons.join(', ')}`);
+assert(
+  new Set(builtinIcons).size === builtinIcons.length,
+  `builtin Work Process icons must be unique, got duplicates among: ${builtinIcons.join(', ')}`,
+);
 
 for (const toolName of allTools) {
   const fixture = FIXTURES[toolName];
@@ -337,17 +434,20 @@ for (const toolName of allTools) {
     assert(WORK_PROCESS_TOOL_DISPLAY_CATALOG[toolName], `${toolName} missing display catalog entry`);
   }
 
-  const row = createToolRowForPresentation({
-    id: `tool-${toolName}`,
-    toolName,
-    status: 'complete',
-    userInputQuestions: fixture.userInputQuestions,
-    planReview: fixture.planReview,
-    argsPreview: fixture.argsPreview,
-    resultPreview: fixture.resultPreview,
-    startedAt: now,
-    completedAt: now + 50,
-  }, t);
+  const row = createToolRowForPresentation(
+    {
+      id: `tool-${toolName}`,
+      toolName,
+      status: 'complete',
+      userInputQuestions: fixture.userInputQuestions,
+      planReview: fixture.planReview,
+      argsPreview: fixture.argsPreview,
+      resultPreview: fixture.resultPreview,
+      startedAt: now,
+      completedAt: now + 50,
+    },
+    t,
+  );
 
   if (toolName === 'ask_user') {
     assert(row.type === 'userInput', 'ask_user should render as userInput row');
@@ -360,10 +460,18 @@ for (const toolName of allTools) {
     // Working shows the current revision as the plan card; a revision it replaced folds into one compact shell row.
     assert(row.type === 'planReview', 'the current plan revision should render as the plan card');
     assert(row.plan.status === 'awaiting' && row.plan.title === 'Plan', 'the plan card should carry the reviewed plan');
-    const replaced = createToolRowForPresentation({
-      id: 'tool-plan_artifact-replaced', toolName, status: 'complete', argsPreview: fixture.argsPreview,
-      planReview: { ...fixture.planReview, status: 'superseded' }, startedAt: now, completedAt: now + 50,
-    }, t);
+    const replaced = createToolRowForPresentation(
+      {
+        id: 'tool-plan_artifact-replaced',
+        toolName,
+        status: 'complete',
+        argsPreview: fixture.argsPreview,
+        planReview: { ...fixture.planReview, status: 'superseded' },
+        startedAt: now,
+        completedAt: now + 50,
+      },
+      t,
+    );
     assert(replaced.type === 'tool', 'a replaced plan revision should render as a compact tool shell row');
     assert(replaced.target === 'Plan', 'plan shell row should name the plan title');
     assert(replaced.icon === 'plan-artifact', 'plan shell row should use the plan icon');
@@ -371,13 +479,21 @@ for (const toolName of allTools) {
   }
 
   assert(row.type === 'tool', `${toolName} should render as tool row`);
-  assert(row.verb !== 'Called tool' && row.verb !== '已调用工具', `${toolName} should have a dedicated verb, got "${row.verb}"`);
+  assert(
+    row.verb !== 'Called tool' && row.verb !== '已调用工具',
+    `${toolName} should have a dedicated verb, got "${row.verb}"`,
+  );
   assert(row.icon && row.icon !== 'tool', `${toolName} should have a semantic icon, got "${row.icon}"`);
   assert(row.groupKind && row.groupKind !== 'diagnostic', `${toolName} should have a semantic group`);
   assert(row.category.length > 0, `${toolName} should have a category`);
-  assert(row.target.length > 0 || row.previewLines.length > 0 || Boolean(row.bodyText), `${toolName} should expose a target, preview or body`);
   assert(
-    ['file', 'search', 'shell', 'git', 'web', 'memory', 'skill', 'mcp', 'runtime', 'interpreter', 'generic'].includes(row.family),
+    row.target.length > 0 || row.previewLines.length > 0 || Boolean(row.bodyText),
+    `${toolName} should expose a target, preview or body`,
+  );
+  assert(
+    ['file', 'search', 'shell', 'git', 'web', 'memory', 'skill', 'mcp', 'runtime', 'interpreter', 'generic'].includes(
+      row.family,
+    ),
     `${toolName} should expose a unified card family, got "${row.family}"`,
   );
   assert(row.family === getToolFamily(toolName), `${toolName} family should match getToolFamily()`);
@@ -389,7 +505,10 @@ for (const toolName of allTools) {
   }
 
   if (toolName === 'glob') {
-    assert(row.bodyText && /\d+ 个文件/.test(row.bodyText), `glob bodyText should be a file count, got "${row.bodyText}"`);
+    assert(
+      row.bodyText && /\d+ 个文件/.test(row.bodyText),
+      `glob bodyText should be a file count, got "${row.bodyText}"`,
+    );
     assert(row.bodyText !== '**/package.json', 'glob collapsed body must not be only the pattern');
     assert(row.bodyLines?.includes('package.json'), 'glob should expose path samples in bodyLines');
     assert(row.previewLines.includes('package.json'), 'glob previewLines should include matched paths');
@@ -398,28 +517,49 @@ for (const toolName of allTools) {
   if (toolName === 'grep') {
     assert(row.bodyText && /匹配/.test(row.bodyText), `grep bodyText should summarize matches, got "${row.bodyText}"`);
     assert(row.bodyText !== 'export' && row.bodyText !== 'src', 'grep collapsed body must not be only args');
-    assert(row.previewLines.some((line) => line.includes('src/index.ts')), 'grep preview should include match lines');
+    assert(
+      row.previewLines.some((line) => line.includes('src/index.ts')),
+      'grep preview should include match lines',
+    );
   }
 
   if (toolName === 'read_file') {
     assert(row.pathChip === 'src/main/index.ts', `read_file keeps its path for the details, got "${row.pathChip}"`);
     assert(row.bodyText === '12 行', `read_file caption is only the line count, got "${row.bodyText}"`);
-    assert(row.previewLines.some((line) => line.includes('export')), 'read_file preview should include file content');
+    assert(
+      row.previewLines.some((line) => line.includes('export')),
+      'read_file preview should include file content',
+    );
   }
 
   if (toolName === 'artifact_read') {
-    assert(!row.pathChip && !row.target.startsWith('session://'), `artifact_read shows no session:// address, got "${row.pathChip || row.target}"`);
-    assert(!row.chips?.some((chip) => /^[0-9a-f]{8,}$/i.test(chip)), `artifact_read shows no hash chip, got ${JSON.stringify(row.chips)}`);
+    assert(
+      !row.pathChip && !row.target.startsWith('session://'),
+      `artifact_read shows no session:// address, got "${row.pathChip || row.target}"`,
+    );
+    assert(
+      !row.chips?.some((chip) => /^[0-9a-f]{8,}$/i.test(chip)),
+      `artifact_read shows no hash chip, got ${JSON.stringify(row.chips)}`,
+    );
   }
 
   if (toolName === 'web_search') {
-    assert(row.webPages?.length > 0 && row.webPages.every((page) => page.domain), 'web_search lists results as page pills with domains');
+    assert(
+      row.webPages?.length > 0 && row.webPages.every((page) => page.domain),
+      'web_search lists results as page pills with domains',
+    );
     assert(row.icon === 'web-search', 'web_search icon key must be webSearch');
   }
 
   if (toolName === 'web_fetch') {
-    assert(row.webPages?.[0]?.domain === 'example.com', `web_fetch shows the page it read, got ${JSON.stringify(row.webPages)}`);
-    assert(row.webMeta?.status === 200 && !row.bodyText, 'web_fetch keeps the HTTP status in its expanded facts, not on the card');
+    assert(
+      row.webPages?.[0]?.domain === 'example.com',
+      `web_fetch shows the page it read, got ${JSON.stringify(row.webPages)}`,
+    );
+    assert(
+      row.webMeta?.status === 200 && !row.bodyText,
+      'web_fetch keeps the HTTP status in its expanded facts, not on the card',
+    );
     assert(row.icon === 'web-fetch', 'web_fetch icon key must be webFetch');
     assert(row.verb === '已抓取', `web_fetch verb should be 已抓取, got "${row.verb}"`);
   }

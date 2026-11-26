@@ -1,20 +1,20 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  generateEventId,
-  generateRunId,
-  generateShortId,
-  nowMs,
-  sanitizeToken,
-} from '@shared/utils/id';
+import { generateEventId, generateRunId, generateShortId, nowMs, sanitizeToken } from '@shared/utils/id';
+import { AppError } from '@shared/errors/appError';
+import { ActionEventSchema } from '@shared/types/evidence';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/jsonl';
-import { requestSnapshotStore } from '../../agent-runtime/prompt/RequestSnapshotStore';
-import { removeSessionTasks } from '../../agent-runtime/tasks/sessionTaskStore';
 import { assertNoRunV3StageFields, toPersistedRunV3 } from '../run/runV3/runRecordSchema';
 import { appPathService } from '../../runtime/AppPathService';
-import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from '../run/sessionRunPersistence';
+import {
+  readPersistedRun as loadPersistedRun,
+  toRunSummary,
+  writeRunFiles as persistRunFiles,
+} from '../run/sessionRunPersistence';
+import { renameWithRetrySync } from '../../platform/fileRename';
 import { SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
 import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
+import { sessionRevisions } from './SessionRevisionRegistry';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
@@ -24,10 +24,43 @@ import type {
   ProjectRecord,
   RunSummary,
   SessionRecord,
+  SessionRecordSnapshot,
 } from '@shared/types/session';
 import type { PersistedRunRecord } from './storageTypes';
 import type { ReservedStagedConversationSession, StagedConversationSessionCommit } from './storageCommitTypes';
+import type { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
+import type { ConversationHistoryStore } from './ConversationHistoryStore';
+import type { ExecutionOfferStore } from '../run/ExecutionOfferStore';
+import type { StorageIo } from '../../runtime/StorageIo';
 
+/** What session records need from storage: file I/O and the project registry that places them. */
+export interface SessionRecordHost {
+  io: StorageIo;
+  projects: Pick<
+    ProjectWorkspaceStore,
+    | 'getProjectById'
+    | 'listProjects'
+    | 'ensureProjectSessionsRoot'
+    | 'touchProject'
+    | 'readSelection'
+    | 'writeSelection'
+    | 'getCurrentProjectId'
+    | 'setCurrentProjectId'
+    | 'setCurrentSessionId'
+  >;
+}
+
+/** Per-session state another domain keeps outside the session directory; it is removed with the session. */
+export interface SessionSideChannel {
+  removeSession(sessionId: string): void;
+}
+
+export interface SessionRecordLinks {
+  /** Copies a staged session's turn attachments. */
+  attachments: Pick<ConversationHistoryStore, 'copyAttachmentsForTurn'>;
+  /** Reading a session discards the state file of the removed handoff flow. */
+  removedHandoffState: Pick<ExecutionOfferStore, 'discardRemovedHandoffState'>;
+}
 
 const SAFE_RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
@@ -40,7 +73,23 @@ function isSafeRunId(runId: string): boolean {
 }
 
 export class SessionRecordStore {
-  constructor(private readonly host: import('./storageHost').StorageHost) {}
+  /** The project each session was last found under; see `findSessionLocation`. */
+  private readonly sessionProjects = new Map<string, ProjectRecord>();
+
+  private links!: SessionRecordLinks;
+  private readonly sideChannels: SessionSideChannel[] = [];
+
+  constructor(private readonly host: SessionRecordHost) {}
+
+  /** Wired once by the storage composition root (`sessionStores.ts`): the stores reference each other. */
+  connect(links: SessionRecordLinks): void {
+    this.links = links;
+  }
+
+  /** Bound by the process composition root (`src/main/index.ts`) for the agent runtime's per-session files. */
+  addSideChannels(channel: SessionSideChannel): void {
+    this.sideChannels.push(channel);
+  }
 
   removeSession(sessionId: string): void {
     const location = this.findSessionLocation(sessionId);
@@ -52,6 +101,8 @@ export class SessionRecordStore {
     if (fs.existsSync(location.sessionPath)) {
       fs.rmSync(location.sessionPath, { recursive: true, force: true });
     }
+    this.sessionProjects.delete(sessionId);
+    sessionRevisions.forget(sessionId);
 
     const selection = this.host.projects.readSelection();
     if (selection.sessionId === sessionId) {
@@ -73,8 +124,7 @@ export class SessionRecordStore {
 
   private removeSessionSideChannels(sessionId: string, runIds: string[]): void {
     const paths = appPathService.getAppStatePaths();
-    requestSnapshotStore.removeSession(sessionId);
-    removeSessionTasks(sessionId);
+    for (const channel of this.sideChannels) channel.removeSession(sessionId);
 
     const tracesRunsDir = path.join(paths.tracesPath, 'runs');
     const tracesEventsDir = path.join(paths.tracesPath, 'events');
@@ -97,10 +147,12 @@ export class SessionRecordStore {
   listSessions(projectId: string): SessionRecord[] {
     const project = this.host.projects.getProjectById(projectId);
     if (!project) return [];
-    return reconcileProjectSessionTitles(this.host, project, (session, sessionPath) => (
-      this.normalizeSessionRecord(session, sessionPath)
-    ))
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return reconcileProjectSessionTitles(
+      this.host,
+      project,
+      (session, sessionPath) => this.normalizeSessionRecord(session, sessionPath),
+      (rewritten) => sessionRevisions.written(rewritten),
+    ).sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
   createSession(projectId: string, title?: string, goal: string = ''): SessionRecord {
@@ -140,6 +192,7 @@ export class SessionRecordStore {
     this.host.projects.touchProject(project.projectId, session.sessionId, timestamp);
     this.host.projects.setCurrentProjectId(projectId);
     this.host.projects.setCurrentSessionId(session.sessionId);
+    sessionRevisions.written(session);
 
     return session;
   }
@@ -189,12 +242,7 @@ export class SessionRecordStore {
       plannedAttachments?: import('@shared/types/session').SessionAttachmentRecord[];
     },
   ): StagedConversationSessionCommit {
-    const reserved = options?.reserved ?? this.allocateStagedConversationSession(
-      projectId,
-      title,
-      requestId,
-      turnId,
-    );
+    const reserved = options?.reserved ?? this.allocateStagedConversationSession(projectId, title, requestId, turnId);
     const { session, stagingPath, finalPath } = reserved;
     if (fs.existsSync(stagingPath)) fs.rmSync(stagingPath, { recursive: true, force: true });
     this.host.io.ensureDir(path.join(stagingPath, 'attachments'));
@@ -203,16 +251,16 @@ export class SessionRecordStore {
     try {
       const attachments = options?.plannedAttachments
         ? this.copyPlannedAttachments(
-          sourceAttachmentPaths,
-          options.plannedAttachments,
-          path.join(stagingPath, 'attachments'),
-        )
-        : this.host.history.copyAttachmentsForTurn(
-          session,
-          sourceAttachmentPaths,
-          path.join(stagingPath, 'attachments'),
-          path.join(finalPath, 'attachments'),
-        );
+            sourceAttachmentPaths,
+            options.plannedAttachments,
+            path.join(stagingPath, 'attachments'),
+          )
+        : this.links.attachments.copyAttachmentsForTurn(
+            session,
+            sourceAttachmentPaths,
+            path.join(stagingPath, 'attachments'),
+            path.join(finalPath, 'attachments'),
+          );
       return { session, requestId, turnId, stagingPath, finalPath, attachments };
     } catch (error) {
       fs.rmSync(stagingPath, { recursive: true, force: true });
@@ -251,10 +299,11 @@ export class SessionRecordStore {
     if (branchState) {
       this.host.io.writeJsonAtomic(path.join(commit.stagingPath, 'conversation-branches.json'), branchState);
     }
-    fs.renameSync(commit.stagingPath, commit.finalPath);
+    renameWithRetrySync(commit.stagingPath, commit.finalPath);
     this.host.projects.touchProject(commit.session.projectId, commit.session.sessionId, commit.session.updatedAt);
     this.host.projects.setCurrentProjectId(commit.session.projectId);
     this.host.projects.setCurrentSessionId(commit.session.sessionId);
+    sessionRevisions.written(commit.session);
     return commit.session;
   }
 
@@ -262,12 +311,28 @@ export class SessionRecordStore {
     if (fs.existsSync(commit.stagingPath)) fs.rmSync(commit.stagingPath, { recursive: true, force: true });
   }
 
+  /** Reads a session for a caller that opens it: the removed handoff flow's state file is discarded first. */
   readSession(sessionId: string): SessionRecord | null {
+    const session = this.readSessionRecord(sessionId);
+    if (session) this.links.removedHandoffState.discardRemovedHandoffState(sessionId);
+    return session;
+  }
+
+  readSessionSnapshot(sessionId: string): SessionRecordSnapshot | null {
+    const session = this.readSession(sessionId);
+    return session ? sessionRevisions.snapshot(session) : null;
+  }
+
+  /** The stored session record, as the other stores read it. */
+  readSessionRecord(sessionId: string): SessionRecord | null {
     const location = this.findSessionLocation(sessionId);
     if (!location) return null;
-    const sessions = reconcileProjectSessionTitles(this.host, location.project, (session, sessionPath) => (
-      this.normalizeSessionRecord(session, sessionPath)
-    ));
+    const sessions = reconcileProjectSessionTitles(
+      this.host,
+      location.project,
+      (session, sessionPath) => this.normalizeSessionRecord(session, sessionPath),
+      (rewritten) => sessionRevisions.written(rewritten),
+    );
     return sessions.find((session) => session.sessionId === sessionId) ?? null;
   }
 
@@ -289,6 +354,7 @@ export class SessionRecordStore {
 
     this.host.io.writeJsonAtomic(path.join(location.sessionPath, 'session.json'), nextSession);
     this.host.projects.touchProject(existing.projectId, nextSession.sessionId, nextSession.updatedAt);
+    sessionRevisions.written(nextSession);
     return nextSession;
   }
 
@@ -301,7 +367,8 @@ export class SessionRecordStore {
       return [];
     }
 
-    return fs.readdirSync(runsRoot, { withFileTypes: true })
+    return fs
+      .readdirSync(runsRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => this.readPersistedRun(sessionId, entry.name))
       .filter((run): run is PersistedRunRecord => run !== null)
@@ -350,7 +417,7 @@ export class SessionRecordStore {
     }
 
     if (input.caseId) {
-      const existingSession = this.readSession(input.caseId);
+      const existingSession = this.readSessionRecord(input.caseId);
       if (existingSession) {
         return existingSession.sessionId;
       }
@@ -365,7 +432,7 @@ export class SessionRecordStore {
   }
 
   async readCase(caseId: string): Promise<Record<string, unknown> | null> {
-    const session = this.readSession(caseId);
+    const session = this.readSessionRecord(caseId);
     if (!session) return null;
 
     return {
@@ -380,11 +447,12 @@ export class SessionRecordStore {
   }
 
   async updateCase(caseId: string, data: Record<string, unknown>): Promise<void> {
-    const title = typeof data.title === 'string'
-      ? data.title
-      : typeof data.symptom_summary === 'string'
-        ? data.symptom_summary
-        : undefined;
+    const title =
+      typeof data.title === 'string'
+        ? data.title
+        : typeof data.symptom_summary === 'string'
+          ? data.symptom_summary
+          : undefined;
     const goal = typeof data.user_goal === 'string' ? data.user_goal : undefined;
     const lastRunId = typeof data.current_run === 'string' ? data.current_run : undefined;
 
@@ -410,7 +478,7 @@ export class SessionRecordStore {
     status?: PersistedRunRecord['status'];
   }): Promise<{ runId: string; sessionId: string }> {
     const sessionId = input.sessionId || input.caseId;
-    const session = this.readSession(sessionId);
+    const session = this.readSessionRecord(sessionId);
     if (!session) {
       throw new Error(`Session not found: ${sessionId}`);
     }
@@ -435,8 +503,8 @@ export class SessionRecordStore {
           status: 'pending' as const,
         }));
 
-    const backend = input.backend
-      || (captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local');
+    const backend =
+      input.backend || (captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local');
     const startedAt = nowMs();
     const persistedRun = toPersistedRunV3({
       runId,
@@ -463,7 +531,7 @@ export class SessionRecordStore {
       },
     });
 
-    persistRunFiles(this.host, runPath, persistedRun);
+    persistRunFiles(this.host.io, runPath, persistedRun);
 
     this.updateSession(sessionId, {
       goal: persistedRun.goal,
@@ -478,7 +546,7 @@ export class SessionRecordStore {
 
   async readRun(caseId: string, runId: string): Promise<Record<string, unknown> | null> {
     const run = this.readPersistedRun(caseId, runId);
-    return run ? run as unknown as Record<string, unknown> : null;
+    return run ? (run as unknown as Record<string, unknown>) : null;
   }
 
   async updateRun(caseId: string, runId: string, data: Record<string, unknown>): Promise<void> {
@@ -514,7 +582,7 @@ export class SessionRecordStore {
     if (existing.kind === 'conversation' && 'captures' in sanitizedPatch) {
       const nextCaptures = sanitizedPatch.captures;
       if (!Array.isArray(nextCaptures) || nextCaptures.length > 0) {
-        throw new Error('CONVERSATION_RUN_CAPTURES_FORBIDDEN: conversation runs cannot persist captures.');
+        throw new AppError('CONVERSATION_RUN_CAPTURES_FORBIDDEN', 'conversation runs cannot persist captures.');
       }
     }
 
@@ -522,16 +590,17 @@ export class SessionRecordStore {
       existing as unknown as Record<string, unknown>,
       sanitizedPatch,
     ) as unknown as PersistedRunRecord;
-    const runtimePatch = merged.runtime && typeof merged.runtime === 'object'
-      ? { ...merged.runtime }
-      : {};
+    // deepMerge applies the patch unchecked, so the merged runtime is not known to be an object.
+    const mergedRuntime: unknown = merged.runtime;
+    const runtimePatch = mergedRuntime && typeof mergedRuntime === 'object' ? { ...mergedRuntime } : {};
     merged.runtime = {
       ...existing.runtime,
       ...runtimePatch,
     };
-    const identity = existing.kind === 'mission'
-      ? { kind: existing.kind, profileId: existing.profileId, mission: existing.mission }
-      : { kind: existing.kind, profileId: existing.profileId };
+    const identity =
+      existing.kind === 'mission'
+        ? { kind: existing.kind, profileId: existing.profileId, mission: existing.mission }
+        : { kind: existing.kind, profileId: existing.profileId };
     Object.assign(merged, identity);
     if (existing.kind !== 'mission') {
       delete (merged as { mission?: unknown }).mission;
@@ -539,7 +608,7 @@ export class SessionRecordStore {
     assertNoRunV3StageFields(merged as unknown as Record<string, unknown>, 'merged run');
     merged.updatedAt = nowMs();
 
-    persistRunFiles(this.host, this.getRunPath(merged.sessionId, merged.runId), merged);
+    persistRunFiles(this.host.io, this.getRunPath(merged.sessionId, merged.runId), merged);
     this.updateSession(caseId, {
       lastRunId: runId,
     });
@@ -578,7 +647,7 @@ export class SessionRecordStore {
 
   async readActionChain(sessionId: string): Promise<ActionEvent[]> {
     const actionChainPath = this.getActionChainPath(sessionId);
-    const result = readJsonl<ActionEvent>(actionChainPath);
+    const result = readJsonl(actionChainPath, ActionEventSchema.parse);
     assertNoJsonlDiagnostics(actionChainPath, result.diagnostics);
     return result.records;
   }
@@ -610,21 +679,42 @@ export class SessionRecordStore {
   }
 
   writeRunFiles(run: PersistedRunRecord): void {
-    persistRunFiles(this.host, this.getRunPath(run.sessionId, run.runId), run);
+    persistRunFiles(this.host.io, this.getRunPath(run.sessionId, run.runId), run);
   }
 
+  /**
+   * The project a session belongs to and its directory. Every streaming commit asks, so the project a session was
+   * found under is kept in memory: a later lookup checks only that project's directory and reads no registry. The
+   * entry goes when the session's `session.json` is no longer there (removed or moved), when the session is removed,
+   * and all entries go whenever the registry is written (`forgetSessionLocations`: projects created, renamed or removed,
+   * sessions created or touched). A miss reads the registry under its lock as before. Not finding a session is not
+   * kept.
+   */
   findSessionLocation(sessionId: string): { project: ProjectRecord; sessionPath: string } | null {
+    const known = this.sessionProjects.get(sessionId);
+    if (known) {
+      const sessionPath = path.join(this.host.projects.ensureProjectSessionsRoot(known), sessionId);
+      if (fs.existsSync(path.join(sessionPath, 'session.json'))) return { project: known, sessionPath };
+      this.sessionProjects.delete(sessionId);
+    }
     for (const project of this.host.projects.listProjects()) {
       const sessionPath = path.join(this.host.projects.ensureProjectSessionsRoot(project), sessionId);
       if (fs.existsSync(path.join(sessionPath, 'session.json'))) {
+        this.sessionProjects.set(sessionId, project);
         return { project, sessionPath };
       }
     }
     return null;
   }
 
+  /** Called whenever the project registry is written or moves; the next lookup of each session reads it again. */
+  forgetSessionLocations(): void {
+    this.sessionProjects.clear();
+  }
+
   normalizeSessionRecord(session: SessionRecord, sessionPath?: string): SessionRecord {
-    const resolvedSessionPath = sessionPath || this.findSessionLocation(session.sessionId)?.sessionPath || session.sessionPath;
+    const resolvedSessionPath =
+      sessionPath || this.findSessionLocation(session.sessionId)?.sessionPath || session.sessionPath;
     return {
       ...session,
       sessionPath: resolvedSessionPath || '',
@@ -634,7 +724,7 @@ export class SessionRecordStore {
   readPersistedRun(sessionId: string, runId: string): PersistedRunRecord | null {
     const location = this.findSessionLocation(sessionId);
     if (!location) return null;
-    return loadPersistedRun(this.host, this.getRunPath(sessionId, runId), sessionId, runId);
+    return loadPersistedRun(this.host.io, this.getRunPath(sessionId, runId), sessionId, runId);
   }
 
   private normalizeSessionTitle(projectId: string, title?: string): string {
@@ -663,5 +753,4 @@ export class SessionRecordStore {
 
     return Math.max(...usedIndexes) + 1;
   }
-
 }

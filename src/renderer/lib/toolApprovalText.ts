@@ -9,4 +9,3 @@ export const formatToolApprovalReason = (value: string | undefined, t: Translato
   if (toolMatch) return t('chat.approvalRequiredTool', { tool: toolMatch[1] });
   return text;
 };
-

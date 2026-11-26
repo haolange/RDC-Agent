@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 /**
  * MCPManager — Model Context Protocol 连接与工具管理。
  *
@@ -15,26 +16,15 @@
  * 上层若接入特定 MCP 服务器有特殊框架需求，可以在此基础上扩展。
  */
 
-import {
-  processSupervisor,
-  type SupervisedProcess,
-} from '../../runtime/ProcessSupervisor';
-import { type AgentTool, type AgentToolResult } from './AgentTool';
-import {
-  postJsonRpc,
-  postStreamableJsonRpc,
-  StdioRpcClient,
-} from './mcpRpcTransport';
+import { processSupervisor, type SupervisedProcess } from '../../runtime/ProcessSupervisor';
+import { type AgentTool, type AgentToolResult, type AgentToolSpec } from './AgentTool';
+import { postJsonRpc, postStreamableJsonRpc, StdioRpcClient } from './mcpRpcTransport';
 import { buildMcpPrefixedName, decodeMcpNameSegment } from './mcpToolNames';
+import { compileMcpInputSchema } from './mcpInputSchema';
 import type { ChildProcess } from 'child_process';
 
 import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
-import type {
-  ImageContent,
-  JsonSchema,
-  TextContent,
-  ToolDefinition,
-} from '../core/types';
+import type { ImageContent, JsonSchema, TextContent, ToolDefinition } from '../core/types';
 
 const MCP_ENV_ALLOWLIST = [
   'PATH',
@@ -112,13 +102,17 @@ export interface MCPDiscoveredTool {
   /** 带前缀的名称：mcp__{server}__{tool}。 */
   prefixedName: string;
   description: string;
+  /** Provider projection of the declared schema (see `compileMcpInputSchema`). */
   inputSchema: JsonSchema;
+  /** The schema the server declared; tool arguments are validated against it. */
+  argumentSchema: JsonSchema;
 }
 
 /** 内部连接对象。 */
 interface MCPConnection {
   config: MCPServerConfig;
   tools: MCPDiscoveredTool[];
+  unavailableTools?: Array<{ name: string; reason: string }>;
   /** stdio 模式下的子进程。 */
   process?: ChildProcess;
   /** ProcessSupervisor 句柄（stdio）。 */
@@ -131,19 +125,23 @@ interface MCPConnection {
 // AgentTool 适配
 // =====================================================================
 
+/** Declared default for every MCP tool: an external effect of unknown scope, run alone and approved. */
+export const MCP_TOOL_SPEC: AgentToolSpec = {
+  isReadOnly: false,
+  concurrency: 'exclusive',
+  isDestructive: false,
+  sideEffect: 'network',
+  category: 'web',
+  requiresApproval: true,
+};
+
 class MCPAgentTool implements AgentTool {
   readonly name: string;
   readonly description: string;
   readonly parameters: JsonSchema;
+  readonly argumentSchema: JsonSchema;
   readonly permissionHint = 'mutation' as const;
-  readonly spec = {
-    isReadOnly: false,
-    isConcurrencySafe: false,
-    isDestructive: false,
-    sideEffect: 'network' as const,
-    category: 'web' as const,
-    requiresApproval: true,
-  };
+  readonly spec = MCP_TOOL_SPEC;
 
   constructor(
     private readonly manager: MCPManager,
@@ -152,13 +150,10 @@ class MCPAgentTool implements AgentTool {
     this.name = tool.prefixedName;
     this.description = tool.description;
     this.parameters = tool.inputSchema;
+    this.argumentSchema = tool.argumentSchema;
   }
 
-  async execute(
-    _toolCallId: string,
-    args: Record<string, unknown>,
-    signal?: AbortSignal,
-  ): Promise<AgentToolResult> {
+  async execute(_toolCallId: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<AgentToolResult> {
     return this.manager.executeTool(this.name, args, signal);
   }
 }
@@ -184,11 +179,14 @@ export class MCPManager {
   private connections = new Map<string, MCPConnection>();
   private discoveredTools = new Map<string, MCPDiscoveredTool>();
   /** Connection lifecycle status (including failed/disconnected). */
-  private serverStatuses = new Map<string, {
-    name: string;
-    connectionStatus: MCPConnectionStatus;
-    lastError?: string;
-  }>();
+  private serverStatuses = new Map<
+    string,
+    {
+      name: string;
+      connectionStatus: MCPConnectionStatus;
+      lastError?: string;
+    }
+  >();
 
   private recordServerStatus(
     id: string,
@@ -212,39 +210,39 @@ export class MCPManager {
    * 不触发连接；未出现在本表中的已配置 server 由调用方标为 unknown。
    */
   getServerStatusSummary(): MCPServerStatusSummary[] {
-    const ids = new Set<string>([
-      ...this.connections.keys(),
-      ...this.serverStatuses.keys(),
-    ]);
-    return Array.from(ids).sort((a, b) => a.localeCompare(b)).map((id) => {
-      const conn = this.connections.get(id);
-      const status = this.serverStatuses.get(id);
-      const name = conn?.config.name ?? status?.name ?? id;
-      if (conn) {
+    const ids = new Set<string>([...this.connections.keys(), ...this.serverStatuses.keys()]);
+    return Array.from(ids)
+      .sort((a, b) => a.localeCompare(b))
+      .map((id) => {
+        const conn = this.connections.get(id);
+        const status = this.serverStatuses.get(id);
+        const name = conn?.config.name ?? status?.name ?? id;
+        if (conn) {
+          const summary: MCPServerStatusSummary = {
+            id,
+            name,
+            connectionStatus: 'connected',
+            toolCount: conn.tools.length,
+            tools: conn.tools.map((tool) => tool.originalName),
+            ...(conn.unavailableTools?.length ? { unavailableTools: conn.unavailableTools } : {}),
+          };
+          if (status?.lastError) {
+            summary.lastError = status.lastError;
+          }
+          return summary;
+        }
         const summary: MCPServerStatusSummary = {
           id,
           name,
-          connectionStatus: 'connected',
-          toolCount: conn.tools.length,
-          tools: conn.tools.map((tool) => tool.originalName),
+          connectionStatus: status?.connectionStatus ?? 'unknown',
+          toolCount: 0,
+          tools: [],
         };
         if (status?.lastError) {
           summary.lastError = status.lastError;
         }
         return summary;
-      }
-      const summary: MCPServerStatusSummary = {
-        id,
-        name,
-        connectionStatus: status?.connectionStatus ?? 'unknown',
-        toolCount: 0,
-        tools: [],
-      };
-      if (status?.lastError) {
-        summary.lastError = status.lastError;
-      }
-      return summary;
-    });
+      });
   }
 
   /** 连接到 MCP 服务器，返回该服务器发现的 prefixedName 列表。 */
@@ -271,23 +269,16 @@ export class MCPManager {
 
     if (config.type === 'stdio') {
       if (!config.command) {
-        throw new Error(
-          `MCP stdio server "${config.name}" missing command`,
-        );
+        throw new Error(`MCP stdio server "${config.name}" missing command`);
       }
-      const supervised = processSupervisor.spawn(
-        'mcp',
-        config.command,
-        config.args ?? [],
-        {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          env: buildSparseMcpEnv(config.env),
-          // MCP JSON-RPC 依赖 stdin/stdout；不使用 detached pgid。
-          isolateProcessGroup: true,
-        },
-      );
+      const supervised = processSupervisor.spawn('mcp', config.command, config.args ?? [], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: buildSparseMcpEnv(config.env),
+        // MCP JSON-RPC 依赖 stdin/stdout；不使用 detached pgid。
+        isolateProcessGroup: true,
+      });
       const proc = supervised.child;
-      if (!proc || !supervised.pid) {
+      if (!supervised.pid) {
         const exit = await supervised.join(5_000);
         throw exit.error ?? new Error(`MCP stdio server "${config.name}" failed to spawn`);
       }
@@ -321,24 +312,18 @@ export class MCPManager {
         rpc.notify('notifications/initialized', {});
 
         throwIfAborted(signal);
-        const listResult = (await rpc.request(
-          'tools/list',
-          {},
-          timeoutMs,
-          signal,
-        )) as { tools?: Array<Record<string, unknown>> } | undefined;
-        const rawTools = Array.isArray(listResult?.tools)
-          ? listResult!.tools!
-          : [];
-        conn.tools = rawTools.map((t) =>
-          this.toDiscoveredTool(config.name, t),
-        );
+        const listResult = (await rpc.request('tools/list', {}, timeoutMs, signal)) as
+          { tools?: Array<Record<string, unknown>> } | undefined;
+        const rawTools = Array.isArray(listResult?.tools) ? listResult!.tools! : [];
+        this.assignDiscoveredTools(conn, rawTools);
       } catch (err) {
         rpc.close();
         supervised.abort('supervisor_kill');
         const exit = await supervised.join(5_000);
         if (exit.reason === 'unconfirmed_orphan') {
-          throw new Error(`MCP stdio server "${config.name}" became an unconfirmed orphan while connecting.`);
+          throw new Error(`MCP stdio server "${config.name}" became an unconfirmed orphan while connecting.`, {
+            cause: err,
+          });
         }
         throw err;
       }
@@ -367,65 +352,44 @@ export class MCPManager {
       );
 
       throwIfAborted(signal);
-      const listResult = (await postJsonRpc(
-        config.url,
-        'tools/list',
-        {},
-        timeoutMs,
-        signal,
-      )) as { tools?: Array<Record<string, unknown>> } | undefined;
-      const rawTools = Array.isArray(listResult?.tools)
-        ? listResult!.tools!
-        : [];
-      conn.tools = rawTools.map((t) =>
-        this.toDiscoveredTool(config.name, t),
-      );
+      const listResult = (await postJsonRpc(config.url, 'tools/list', {}, timeoutMs, signal)) as
+        { tools?: Array<Record<string, unknown>> } | undefined;
+      const rawTools = Array.isArray(listResult?.tools) ? listResult!.tools! : [];
+      this.assignDiscoveredTools(conn, rawTools);
 
       this.connections.set(config.name, conn);
       this.registerTools(conn.tools);
       return conn.tools.map((t) => t.prefixedName);
     }
 
-    if (config.type === 'streamable-http') {
-      if (!config.url) {
-        throw new Error(`MCP streamable-http server "${config.name}" missing url`);
-      }
-      // streamable-http: 使用 POST + streaming response (NDJSON)
-      const conn: MCPConnection = { config, tools: [] };
-      throwIfAborted(signal);
-      await postStreamableJsonRpc(
-        config.url,
-        'initialize',
-        {
-          protocolVersion: '2024-11-05',
-          capabilities: {},
-          clientInfo: { name: 'rdc-agent', version: '0.1.0' },
-        },
-        timeoutMs,
-        signal,
-      );
-
-      throwIfAborted(signal);
-      const listResult = (await postStreamableJsonRpc(
-        config.url,
-        'tools/list',
-        {},
-        timeoutMs,
-        signal,
-      )) as { tools?: Array<Record<string, unknown>> } | undefined;
-      const rawTools = Array.isArray(listResult?.tools)
-        ? listResult!.tools!
-        : [];
-      conn.tools = rawTools.map((t) =>
-        this.toDiscoveredTool(config.name, t),
-      );
-
-      this.connections.set(config.name, conn);
-      this.registerTools(conn.tools);
-      return conn.tools.map((t) => t.prefixedName);
+    // streamable-http: the coordinator rejected every other transport (McpTrustService.assertConnectAllowed).
+    if (!config.url) {
+      throw new Error(`MCP streamable-http server "${config.name}" missing url`);
     }
+    // 使用 POST + streaming response (NDJSON)
+    const conn: MCPConnection = { config, tools: [] };
+    throwIfAborted(signal);
+    await postStreamableJsonRpc(
+      config.url,
+      'initialize',
+      {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'rdc-agent', version: '0.1.0' },
+      },
+      timeoutMs,
+      signal,
+    );
 
-    throw new Error(`MCP_TRANSPORT_UNSUPPORTED: ${String(config.type)}`);
+    throwIfAborted(signal);
+    const listResult = (await postStreamableJsonRpc(config.url, 'tools/list', {}, timeoutMs, signal)) as
+      { tools?: Array<Record<string, unknown>> } | undefined;
+    const rawTools = Array.isArray(listResult?.tools) ? listResult!.tools! : [];
+    this.assignDiscoveredTools(conn, rawTools);
+
+    this.connections.set(config.name, conn);
+    this.registerTools(conn.tools);
+    return conn.tools.map((t) => t.prefixedName);
   }
 
   /** 断开 MCP 服务器。 */
@@ -433,11 +397,7 @@ export class MCPManager {
     const conn = this.connections.get(serverName);
     if (!conn) {
       if (this.serverStatuses.has(serverName)) {
-        this.recordServerStatus(
-          serverName,
-          this.serverStatuses.get(serverName)?.name ?? serverName,
-          'disconnected',
-        );
+        this.recordServerStatus(serverName, this.serverStatuses.get(serverName)?.name ?? serverName, 'disconnected');
       }
       return { serverName, status: 'disconnected' };
     }
@@ -466,9 +426,7 @@ export class MCPManager {
       }
     }
     this.recordServerStatus(serverName, conn.config.name, 'disconnected');
-    return supervised
-      ? { serverName, status, supervised }
-      : { serverName, status };
+    return supervised ? { serverName, status, supervised } : { serverName, status };
   }
 
   /** 断开所有服务器。 */
@@ -498,9 +456,7 @@ export class MCPManager {
 
   /** 将发现的工具转换为 AgentTool 实例。 */
   getAgentTools(): AgentTool[] {
-    return this.getDiscoveredTools().map(
-      (t) => new MCPAgentTool(this, t),
-    );
+    return this.getDiscoveredTools().map((t) => new MCPAgentTool(this, t));
   }
 
   /** 执行 MCP 工具。 */
@@ -565,12 +521,7 @@ export class MCPManager {
         if (!conn.rpc) {
           throw new Error('stdio rpc client not initialized');
         }
-        result = await conn.rpc.request(
-          'tools/call',
-          { name: tool.originalName, arguments: args },
-          timeoutMs,
-          signal,
-        );
+        result = await conn.rpc.request('tools/call', { name: tool.originalName, arguments: args }, timeoutMs, signal);
       } else {
         if (!conn.config.url) {
           throw new Error('server url missing');
@@ -609,9 +560,7 @@ export class MCPManager {
   }
 
   /** 从前缀名称解析服务器和工具名；两段都必须是可逆编码，否则 null。 */
-  parsePrefixedName(
-    prefixedName: string,
-  ): { serverId: string; serverName: string; toolName: string } | null {
+  parsePrefixedName(prefixedName: string): { serverId: string; serverName: string; toolName: string } | null {
     if (!prefixedName.startsWith('mcp__')) return null;
     const rest = prefixedName.slice('mcp__'.length);
     const sepIdx = rest.indexOf('__');
@@ -633,39 +582,38 @@ export class MCPManager {
   // 内部
   // -------------------------------------------------------------------
 
-  private toDiscoveredTool(
-    serverId: string,
-    raw: Record<string, unknown>,
-  ): MCPDiscoveredTool {
-    const originalName =
-      typeof raw.name === 'string' ? raw.name : 'unnamed_tool';
-    const description =
-      typeof raw.description === 'string' ? raw.description : '';
-    const inputSchema =
-      raw.inputSchema && typeof raw.inputSchema === 'object'
-        ? (raw.inputSchema as JsonSchema)
-        : ({ type: 'object', properties: {} } as JsonSchema);
-
-    return {
-      serverId,
-      serverName: serverId,
-      originalName,
-      prefixedName: buildMcpPrefixedName(serverId, originalName),
-      description,
-      inputSchema,
-    };
+  /** Splits a server's declared tools into those offered to the model and those whose schema could not compile. */
+  private assignDiscoveredTools(conn: MCPConnection, rawTools: Array<Record<string, unknown>>): void {
+    const serverId = conn.config.name;
+    conn.tools = [];
+    conn.unavailableTools = [];
+    for (const raw of rawTools) {
+      const originalName = typeof raw.name === 'string' ? raw.name : 'unnamed_tool';
+      const compiled = compileMcpInputSchema(raw.inputSchema, originalName);
+      if (!compiled.ok) {
+        conn.unavailableTools.push({ name: originalName, reason: `MCP_TOOL_SCHEMA_UNSUPPORTED: ${compiled.reason}` });
+        continue;
+      }
+      conn.tools.push({
+        serverId,
+        serverName: serverId,
+        originalName,
+        prefixedName: buildMcpPrefixedName(serverId, originalName),
+        description: typeof raw.description === 'string' ? raw.description : '',
+        inputSchema: compiled.schema,
+        argumentSchema: compiled.argumentSchema,
+      });
+    }
   }
 
   private registerTools(tools: MCPDiscoveredTool[]): void {
     for (const t of tools) {
       const existing = this.discoveredTools.get(t.prefixedName);
-      if (
-        existing
-        && (existing.serverId !== t.serverId || existing.originalName !== t.originalName)
-      ) {
-        throw new Error(
-          `MCP_TOOL_NAME_COLLISION: prefixed name "${t.prefixedName}" already registered for `
-          + `${existing.serverId}/${existing.originalName}; refusing ${t.serverId}/${t.originalName}`,
+      if (existing && (existing.serverId !== t.serverId || existing.originalName !== t.originalName)) {
+        throw new AppError(
+          'MCP_TOOL_NAME_COLLISION',
+          `prefixed name "${t.prefixedName}" already registered for ` +
+            `${existing.serverId}/${existing.originalName}; refusing ${t.serverId}/${t.originalName}`,
         );
       }
       this.discoveredTools.set(t.prefixedName, t);
@@ -701,11 +649,7 @@ export class MCPManager {
         const b = block as Record<string, unknown>;
         if (b.type === 'text' && typeof b.text === 'string') {
           content.push({ type: 'text', text: b.text });
-        } else if (
-          b.type === 'image' &&
-          typeof b.data === 'string' &&
-          typeof b.mimeType === 'string'
-        ) {
+        } else if (b.type === 'image' && typeof b.data === 'string' && typeof b.mimeType === 'string') {
           content.push({
             type: 'image',
             data: b.data,

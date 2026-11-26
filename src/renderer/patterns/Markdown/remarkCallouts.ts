@@ -7,7 +7,7 @@ interface MdastNode {
 }
 
 export const CALLOUT_KINDS = ['note', 'tip', 'important', 'warning', 'caution'] as const;
-export type CalloutKind = typeof CALLOUT_KINDS[number];
+export type CalloutKind = (typeof CALLOUT_KINDS)[number];
 
 const MARKER = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*(?:\r?\n)?/i;
 
@@ -21,7 +21,10 @@ export function remarkCallouts() {
         const match = text?.type === 'text' && text.value ? MARKER.exec(text.value) : null;
         if (paragraph && text && match) {
           text.value = text.value!.slice(match[0].length);
-          if (!text.value) paragraph.children = paragraph.children?.slice(1).filter((child, index) => index > 0 || child.type !== 'break');
+          if (!text.value)
+            paragraph.children = paragraph.children
+              ?.slice(1)
+              .filter((child, index) => index > 0 || child.type !== 'break');
           if (!paragraph.children?.length) node.children = node.children?.slice(1);
           node.data = { ...node.data, hProperties: { ...node.data?.hProperties, dataCallout: match[1].toLowerCase() } };
         }

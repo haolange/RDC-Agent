@@ -22,13 +22,12 @@ describe('globTool', () => {
     fs.mkdirSync(path.join(root, 'node_modules', 'pkg'), { recursive: true });
     fs.writeFileSync(path.join(root, 'node_modules', 'pkg', 'x.ts'), 'export {};');
 
-    const result = await globTool.execute(
-      'tc-1',
-      { pattern: 'src/**/*.{ts,md}' },
-      undefined,
-      undefined,
-      { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null },
-    );
+    const result = await globTool.execute('tc-1', { pattern: 'src/**/*.{ts,md}' }, undefined, undefined, {
+      workspaceRoot: root,
+      projectRootPath: root,
+      projectId: null,
+      sessionId: null,
+    });
 
     expect(result.isError).not.toBe(true);
     expect(result.details?.matched).toBeGreaterThanOrEqual(2);
@@ -43,23 +42,23 @@ describe('globTool', () => {
     fs.mkdirSync(path.join(root, 'nested'));
     fs.writeFileSync(path.join(root, 'nested', 'c.ts'), 'export {};');
 
-    const found = await globTool.execute(
-      'tc-2',
-      { pattern: '*.ts', cwd: 'nested' },
-      undefined,
-      undefined,
-      { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null },
-    );
+    const found = await globTool.execute('tc-2', { pattern: '*.ts', cwd: 'nested' }, undefined, undefined, {
+      workspaceRoot: root,
+      projectRootPath: root,
+      projectId: null,
+      sessionId: null,
+    });
     expect(found.details?.matched).toBe(1);
 
     const controller = new AbortController();
     controller.abort();
-    await expect(globTool.execute(
-      'tc-3',
-      { pattern: '**/*' },
-      controller.signal,
-      undefined,
-      { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null },
-    )).rejects.toThrow(/Aborted/);
+    await expect(
+      globTool.execute('tc-3', { pattern: '**/*' }, controller.signal, undefined, {
+        workspaceRoot: root,
+        projectRootPath: root,
+        projectId: null,
+        sessionId: null,
+      }),
+    ).rejects.toThrow(/Aborted/);
   });
 });

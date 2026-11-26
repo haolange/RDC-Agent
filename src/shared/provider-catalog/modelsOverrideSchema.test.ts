@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  ModelsOverrideSchema,
-  ModelOverrideSchema,
-  CustomModelSchema,
-} from './modelsOverrideSchema';
+import { ModelsOverrideSchema, ModelOverrideSchema, CustomModelSchema } from './modelsOverrideSchema';
 
 describe('ModelsOverrideSchema', () => {
   it('accepts a valid minimal override', () => {
@@ -30,14 +26,16 @@ describe('ModelsOverrideSchema', () => {
       providers: {
         'custom-openai': {
           baseUrl: 'https://api.example.com/v1',
-          models: [{
-            id: 'my-model',
-            name: 'My Custom Model',
-            api: 'openai-chat',
-            baseUrl: 'https://api.example.com/v1',
-            contextWindow: 128000,
-            maxTokens: 4096,
-          }],
+          models: [
+            {
+              id: 'my-model',
+              name: 'My Custom Model',
+              api: 'openai-chat',
+              baseUrl: 'https://api.example.com/v1',
+              contextWindow: 128000,
+              maxTokens: 4096,
+            },
+          ],
         },
       },
     };

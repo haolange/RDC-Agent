@@ -72,30 +72,36 @@ function resolveGrid(
 
 describe('effortControlParts', () => {
   it('builds visible selections for levels, toggle, and always-on controls', () => {
-    expect(buildDisplaySelections({
-      kind: 'levels',
-      supportsOff: true,
-      levels: ['low', 'medium', 'high', 'xhigh'],
-      defaultSelection: 'medium',
-      wireProfile: { kind: 'none' },
-    })).toEqual(['off', 'low', 'medium', 'high', 'xhigh']);
+    expect(
+      buildDisplaySelections({
+        kind: 'levels',
+        supportsOff: true,
+        levels: ['low', 'medium', 'high', 'xhigh'],
+        defaultSelection: 'medium',
+        wireProfile: { kind: 'none' },
+      }),
+    ).toEqual(['off', 'low', 'medium', 'high', 'xhigh']);
 
-    expect(buildDisplaySelections({
-      kind: 'toggle',
-      supportsOff: true,
-      levels: [],
-      defaultSelection: 'on',
-      wireProfile: { kind: 'none' },
-    })).toEqual(['off', 'on']);
+    expect(
+      buildDisplaySelections({
+        kind: 'toggle',
+        supportsOff: true,
+        levels: [],
+        defaultSelection: 'on',
+        wireProfile: { kind: 'none' },
+      }),
+    ).toEqual(['off', 'on']);
 
-    expect(buildDisplaySelections({
-      kind: 'always-on',
-      supportsOff: false,
-      levels: [],
-      defaultSelection: 'on',
-      lockedSelection: 'on',
-      wireProfile: { kind: 'none' },
-    })).toEqual(['on']);
+    expect(
+      buildDisplaySelections({
+        kind: 'always-on',
+        supportsOff: false,
+        levels: [],
+        defaultSelection: 'on',
+        lockedSelection: 'on',
+        wireProfile: { kind: 'none' },
+      }),
+    ).toEqual(['on']);
   });
 
   it('shows Fast and Max icons on the capsule only when those modes are on', () => {
@@ -131,16 +137,18 @@ describe('effortControlParts', () => {
   });
 
   it('projects unavailable Max mode entitlement as Disabled in the icon accessible name', () => {
-    const markup = renderToStaticMarkup(React.createElement(EffortModeIconButton, {
-      mode: 'max-context',
-      'data-testid': 'composer-model-effort-max-mode',
-      label: 'Max mode',
-      statusLabel: 'Disabled',
-      available: false,
-      active: false,
-      onToggle: () => undefined,
-      children: 'M',
-    }));
+    const markup = renderToStaticMarkup(
+      React.createElement(EffortModeIconButton, {
+        mode: 'max-context',
+        'data-testid': 'composer-model-effort-max-mode',
+        label: 'Max mode',
+        statusLabel: 'Disabled',
+        available: false,
+        active: false,
+        onToggle: () => undefined,
+        children: 'M',
+      }),
+    );
 
     expect(markup).toContain('composer-model-effort-mode-tip');
     expect(markup).toContain('>Disabled<');
@@ -150,15 +158,17 @@ describe('effortControlParts', () => {
   });
 
   it('shows the mode label in the tip when no status constraint is present', () => {
-    const markup = renderToStaticMarkup(React.createElement(EffortModeIconButton, {
-      mode: 'fast',
-      'data-testid': 'composer-model-effort-fast-mode',
-      label: 'Fast mode',
-      available: true,
-      active: false,
-      onToggle: () => undefined,
-      children: 'F',
-    }));
+    const markup = renderToStaticMarkup(
+      React.createElement(EffortModeIconButton, {
+        mode: 'fast',
+        'data-testid': 'composer-model-effort-fast-mode',
+        label: 'Fast mode',
+        available: true,
+        active: false,
+        onToggle: () => undefined,
+        children: 'F',
+      }),
+    );
 
     expect(markup).toContain('>Fast mode<');
     expect(markup).toContain('aria-label="Fast mode"');
@@ -166,16 +176,18 @@ describe('effortControlParts', () => {
   });
 
   it('renders fixed Max mode as active and disabled instead of flashing off', () => {
-    const markup = renderToStaticMarkup(React.createElement(EffortModeIconButton, {
-      mode: 'max-context',
-      'data-testid': 'composer-model-effort-max-mode',
-      label: 'Max mode',
-      statusLabel: 'Fixed',
-      available: false,
-      active: true,
-      onToggle: () => undefined,
-      children: 'M',
-    }));
+    const markup = renderToStaticMarkup(
+      React.createElement(EffortModeIconButton, {
+        mode: 'max-context',
+        'data-testid': 'composer-model-effort-max-mode',
+        label: 'Max mode',
+        statusLabel: 'Fixed',
+        available: false,
+        active: true,
+        onToggle: () => undefined,
+        children: 'M',
+      }),
+    );
 
     expect(markup).toContain('aria-checked="true"');
     expect(markup).toContain('disabled=""');
@@ -362,7 +374,9 @@ describe('effortControlParts', () => {
     const reverseStart = resolveMaxVisualFrame(reverse, egressMidAt);
     expect(reverseStart.energy).toBeCloseTo(egressMid.energy);
     expect(reverseStart.stopsOpacity).toBeCloseTo(egressMid.stopsOpacity);
-    expect(resolveMaxVisualFrame(reverse, egressMidAt + MAX_VISUAL_EGRESS_MS).stopsOpacity).toBeCloseTo(egressMid.stopsOpacity);
+    expect(resolveMaxVisualFrame(reverse, egressMidAt + MAX_VISUAL_EGRESS_MS).stopsOpacity).toBeCloseTo(
+      egressMid.stopsOpacity,
+    );
     expect(reverse.fieldEpoch).toBe(egress.fieldEpoch);
     expect(reverse.formationEnergy).toBe(egress.formationEnergy);
     expect(reverse.fieldMode).toBe('dissolve');
@@ -399,9 +413,7 @@ describe('effortControlParts', () => {
     const first = resolveGrid(1, 0);
     const later = resolveGrid(1, 430);
     expect(first.every(({ sample }) => sample.occupied)).toBe(true);
-    expect(first.map(({ sample }) => sample.occupied)).toEqual(
-      later.map(({ sample }) => sample.occupied),
-    );
+    expect(first.map(({ sample }) => sample.occupied)).toEqual(later.map(({ sample }) => sample.occupied));
 
     const deltas = first.map(({ col, row, sample }) => {
       const laterAlpha = later[row * FIELD_COLS + col]?.sample.alpha ?? sample.alpha;
@@ -416,9 +428,8 @@ describe('effortControlParts', () => {
     const early = resolveGrid(0.18, 224);
     const middle = resolveGrid(0.55, 800);
     const late = resolveGrid(1, 1_600);
-    const leftBoundary = (grid: ReturnType<typeof resolveGrid>) => Math.min(
-      ...grid.filter(({ sample }) => sample.visible).map(({ col }) => col),
-    );
+    const leftBoundary = (grid: ReturnType<typeof resolveGrid>) =>
+      Math.min(...grid.filter(({ sample }) => sample.visible).map(({ col }) => col));
     expect(leftBoundary(middle)).toBeLessThan(leftBoundary(early));
     expect(leftBoundary(late)).toBeLessThan(leftBoundary(middle));
     for (const grid of [early, middle, late]) {
@@ -441,9 +452,8 @@ describe('effortControlParts', () => {
     expect(c60 - cMid).toBeGreaterThan(c80 - c60);
     expect(c80 - c60).toBeGreaterThan(c100 - c80);
 
-    const leftBoundary = (grid: ReturnType<typeof resolveGrid>) => Math.min(
-      ...grid.filter(({ sample }) => sample.visible).map(({ col }) => col),
-    );
+    const leftBoundary = (grid: ReturnType<typeof resolveGrid>) =>
+      Math.min(...grid.filter(({ sample }) => sample.visible).map(({ col }) => col));
     const atMid = leftBoundary(resolveGrid(MAX_INGRESS_MID_ENERGY, 700));
     const at070 = leftBoundary(resolveGrid(0.7, 1_100));
     const at100 = leftBoundary(resolveGrid(1, 1_600));
@@ -453,10 +463,9 @@ describe('effortControlParts', () => {
   it('keeps the completed field translucent with a mottled left edge and brighter right edge', () => {
     const active = resolveGrid(1, 620).filter(({ sample }) => sample.occupied);
     const left = active.filter(({ col }) => col < FIELD_COLS / 3);
-    const right = active.filter(({ col }) => col >= FIELD_COLS * 2 / 3);
-    const averageAlpha = (cells: typeof active) => (
-      cells.reduce((sum, { sample }) => sum + sample.alpha, 0) / cells.length
-    );
+    const right = active.filter(({ col }) => col >= (FIELD_COLS * 2) / 3);
+    const averageAlpha = (cells: typeof active) =>
+      cells.reduce((sum, { sample }) => sum + sample.alpha, 0) / cells.length;
     const alphaRange = (cells: typeof active) => {
       const values = cells.map(({ sample }) => sample.alpha);
       return Math.max(...values) - Math.min(...values);
@@ -493,9 +502,10 @@ describe('effortControlParts', () => {
     expect(surviving.length).toBeGreaterThan(0);
     expect(surviving.length).toBeLessThan(occupied.length);
 
-    const thirds = [0, 1, 2].map((third) => surviving.filter(({ col }) => (
-      col >= third * FIELD_COLS / 3 && col < (third + 1) * FIELD_COLS / 3
-    )).length);
+    const thirds = [0, 1, 2].map(
+      (third) =>
+        surviving.filter(({ col }) => col >= (third * FIELD_COLS) / 3 && col < ((third + 1) * FIELD_COLS) / 3).length,
+    );
     expect(thirds.every((count) => count > 0)).toBe(true);
 
     const restoredFormation = resolveGrid(0.5, 620, 1, 'dissolve', 0.5);
@@ -521,9 +531,7 @@ describe('effortControlParts', () => {
     expect(resolveMaxClipX(300, -1)).toBe(16);
     expect(resolveMaxClipX(300, 0)).toBe(16);
     const clipped = resolveGrid(1, 500, 0.42);
-    expect(clipped.every(({ col, sample }) => (
-      col / (FIELD_COLS - 1) <= 0.42 || sample.alpha === 0
-    ))).toBe(true);
+    expect(clipped.every(({ col, sample }) => col / (FIELD_COLS - 1) <= 0.42 || sample.alpha === 0)).toBe(true);
   });
 
   it('uses one symmetric progress curve for ingress and egress', () => {

@@ -10,9 +10,21 @@ export interface DetailsProps extends Omit<ComponentPropsWithoutRef<'details'>, 
 }
 
 /** Native disclosure keeps hidden detail out of the tab order and supports Enter/Space. */
-export function Details({ summary, summaryClassName, className, children, variant = 'inline', ...props }: DetailsProps) {
-  return <details className={cn('ui-details', `ui-details-${variant}`, className)} {...props}>
-    <summary className={summaryClassName}><Chevron size={12} className="ui-details-chevron" />{summary}</summary>
-    {children}
-  </details>;
+export function Details({
+  summary,
+  summaryClassName,
+  className,
+  children,
+  variant = 'inline',
+  ...props
+}: DetailsProps) {
+  return (
+    <details className={cn('ui-details', `ui-details-${variant}`, className)} {...props}>
+      <summary className={summaryClassName}>
+        <Chevron size={12} className="ui-details-chevron" />
+        {summary}
+      </summary>
+      {children}
+    </details>
+  );
 }

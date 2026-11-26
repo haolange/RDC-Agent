@@ -1,18 +1,16 @@
 /**
- * /test — 运行测试或查看测试状态。
+ * /test — 说明如何运行测试。
  */
-import type { CommandDefinition } from '@shared/types/command';
+import { commandText } from '../commandI18n';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const testCommand: CommandDefinition = {
   id: 'test',
   name: 'test',
-  description: 'Run tests or view test status',
+  descriptionKey: 'test.description',
   category: 'debug',
 
-  async execute(_args) {
-    return {
-      success: true,
-      message: 'Test runner: Use `pnpm test` to run unit tests, or `pnpm run typecheck` for type checking.',
-    };
+  async execute() {
+    return { success: true, message: commandText('test.hint') };
   },
 };

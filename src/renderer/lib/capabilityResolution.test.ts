@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  resolvedCapability,
-  validateCapabilityResolution,
-  resolveCatalogCapability,
-} from './capabilityResolution';
+import { resolvedCapability, validateCapabilityResolution, resolveCatalogCapability } from './capabilityResolution';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const effectiveModel = (overrides: Partial<EffectiveModel> = {}): EffectiveModel => ({
@@ -41,29 +37,36 @@ describe('capability resolution state', () => {
   it('waits for discovery but never conceals a denial or a completed missing result', () => {
     const route = { providerId: 'provider-b', modelId: 'model-b' };
     const snapshot = { models: [effectiveModel({ availability: 'unknown' })], refreshing: true };
-    const projection = { snapshot: snapshot as import('@shared/types/providerCapability').EffectiveCatalogSnapshot, loading: false };
+    const projection = {
+      snapshot: snapshot as import('@shared/types/providerCapability').EffectiveCatalogSnapshot,
+      loading: false,
+    };
     expect(resolveCatalogCapability(route, projection).status).toBe('loading');
     snapshot.models[0].availability = 'unavailable';
     expect(resolveCatalogCapability(route, projection).status).toBe('unavailable');
-    snapshot.models = []; snapshot.refreshing = false;
+    snapshot.models = [];
+    snapshot.refreshing = false;
     expect(resolveCatalogCapability(route, projection).status).toBe('unavailable');
     expect(resolveCatalogCapability(route, { ...projection, error: 'offline' }).status).toBe('error');
     expect(resolveCatalogCapability(route, undefined).status).toBe('loading');
   });
   it('reports discovery errors for unknown tool evidence and recovers when evidence arrives', () => {
     const route = { providerId: 'provider-b', modelId: 'model-b' };
-    const snapshot = { models: [effectiveModel({ toolCalling: { state: 'unknown' } })], refreshing: true } as import('@shared/types/providerCapability').EffectiveCatalogSnapshot;
+    const snapshot = {
+      models: [effectiveModel({ toolCalling: { state: 'unknown' } })],
+      refreshing: true,
+    } as import('@shared/types/providerCapability').EffectiveCatalogSnapshot;
     expect(resolveCatalogCapability(route, { snapshot, loading: false }).status).toBe('loading');
     snapshot.refreshing = false;
-    expect(resolveCatalogCapability(route, { snapshot, loading: false, error: 'HTTP 401' })).toEqual({ status: 'error', message: 'HTTP 401' });
+    expect(resolveCatalogCapability(route, { snapshot, loading: false, error: 'HTTP 401' })).toEqual({
+      status: 'error',
+      message: 'HTTP 401',
+    });
     snapshot.models[0] = effectiveModel();
     expect(resolveCatalogCapability(route, { snapshot, loading: false }).status).toBe('ready');
   });
   it('accepts only a revisioned model matching the committed Agent route', () => {
-    const result = validateCapabilityResolution(
-      { providerId: 'provider-b', modelId: 'model-b' },
-      effectiveModel(),
-    );
+    const result = validateCapabilityResolution({ providerId: 'provider-b', modelId: 'model-b' }, effectiveModel());
     expect(result.status).toBe('ready');
     expect(resolvedCapability(result)?.routeRevision).toBe('route-b');
   });
@@ -73,11 +76,9 @@ describe('capability resolution state', () => {
     [effectiveModel({ catalogRevision: undefined }), 'missing-revision'],
     [effectiveModel({ providerId: 'provider-a', modelId: 'model-a' }), 'route-mismatch'],
   ] as const)('fails closed instead of returning a permanent loading sentinel', (model, reason) => {
-    expect(validateCapabilityResolution(
-      { providerId: 'provider-b', modelId: 'model-b' },
-      model,
-    )).toMatchObject({ status: 'unavailable', reason });
+    expect(validateCapabilityResolution({ providerId: 'provider-b', modelId: 'model-b' }, model)).toMatchObject({
+      status: 'unavailable',
+      reason,
+    });
   });
-
-
 });

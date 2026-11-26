@@ -4,7 +4,15 @@ import { inspectArtifactJson } from './SessionArtifactJsonInspection';
 
 const sha = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
 function envelope(text: string, truncated = false) {
-  return { owner: 'session-a', source: { toolName: 'shell', toolCallId: 'calculation' }, hash: 'a'.repeat(64), size: text.length, mime: 'application/json', content: [{ type: 'text', text }], details: { truncated } };
+  return {
+    owner: 'session-a',
+    source: { toolName: 'shell', toolCallId: 'calculation' },
+    hash: 'a'.repeat(64),
+    size: text.length,
+    mime: 'application/json',
+    content: [{ type: 'text', text }],
+    details: { truncated },
+  };
 }
 
 describe('controlled artifact JSON inspection', () => {
@@ -12,7 +20,9 @@ describe('controlled artifact JSON inspection', () => {
     const inner = '{"values":[[1,2,3],[4,5,6]],"tag":"汉"}';
     const payload = JSON.stringify({ payloadJson: inner, duplicate: inner });
     const encoded = JSON.stringify(envelope(payload));
-    const bytes = Buffer.from(JSON.stringify({ encoding: 'json-chunks', chunks: [encoded.slice(0, 20), encoded.slice(20)] }));
+    const bytes = Buffer.from(
+      JSON.stringify({ encoding: 'json-chunks', chunks: [encoded.slice(0, 20), encoded.slice(20)] }),
+    );
     const result = inspectArtifactJson(bytes, ['/content/0/text', '/payloadJson']);
     expect(result.layers).toEqual([
       { kind: 'file', bytes: bytes.length, sha256: sha(bytes) },
@@ -20,7 +30,15 @@ describe('controlled artifact JSON inspection', () => {
       { kind: 'json-text', pointer: '/content/0/text', bytes: Buffer.byteLength(payload), sha256: sha(payload) },
       { kind: 'json-text', pointer: '/payloadJson', bytes: Buffer.byteLength(inner), sha256: sha(inner) },
     ]);
-    expect(result).toMatchObject({ rootType: 'object', nodeCount: 11, numberCount: 6, nonFiniteNumberCount: 0, arrayCount: 3, arrayLengths: { '2': 1, '3': 2 }, sourceResultTruncated: false });
+    expect(result).toMatchObject({
+      rootType: 'object',
+      nodeCount: 11,
+      numberCount: 6,
+      nonFiniteNumberCount: 0,
+      arrayCount: 3,
+      arrayLengths: { '2': 1, '3': 2 },
+      sourceResultTruncated: false,
+    });
   });
 
   it('rejects omitted JSON and retains producer truncation as distinct from successful outer parsing', () => {
@@ -39,17 +57,28 @@ describe('controlled artifact JSON inspection', () => {
 
   it('fails closed on invalid UTF-8 and malformed chunk envelopes', () => {
     expect(() => inspectArtifactJson(Buffer.from([0xff]), [])).toThrow('ARTIFACT_JSON_INVALID');
-    expect(() => inspectArtifactJson(Buffer.from('{"encoding":"json-chunks","chunks":[1]}'), [])).toThrow('ARTIFACT_JSON_INVALID');
+    expect(() => inspectArtifactJson(Buffer.from('{"encoding":"json-chunks","chunks":[1]}'), [])).toThrow(
+      'ARTIFACT_JSON_INVALID',
+    );
   });
 
   it('reports actual empty data and numeric overflow without substituting successful zero measurements', () => {
-    expect(inspectArtifactJson(Buffer.from('[]'), [])).toMatchObject({ arrayCount: 1, arrayLengths: { '0': 1 }, numberCount: 0 });
-    expect(inspectArtifactJson(Buffer.from('{"overflow":1e400}'), [])).toMatchObject({ numberCount: 1, nonFiniteNumberCount: 1 });
+    expect(inspectArtifactJson(Buffer.from('[]'), [])).toMatchObject({
+      arrayCount: 1,
+      arrayLengths: { '0': 1 },
+      numberCount: 0,
+    });
+    expect(inspectArtifactJson(Buffer.from('{"overflow":1e400}'), [])).toMatchObject({
+      numberCount: 1,
+      nonFiniteNumberCount: 1,
+    });
   });
 
   it('bounds decoding and traversal without returning a partial success receipt', () => {
     expect(() => inspectArtifactJson(Buffer.from('{}'), Array(5).fill(''))).toThrow('ARTIFACT_JSON_INSPECTION_LIMIT');
     expect(() => inspectArtifactJson(Buffer.from('{}'), ['/'.repeat(257)])).toThrow('ARTIFACT_JSON_POINTER_INVALID');
-    expect(() => inspectArtifactJson(Buffer.from(JSON.stringify(Array(100_001).fill(0))), [])).toThrow('ARTIFACT_JSON_INSPECTION_LIMIT');
+    expect(() => inspectArtifactJson(Buffer.from(JSON.stringify(Array(100_001).fill(0))), [])).toThrow(
+      'ARTIFACT_JSON_INSPECTION_LIMIT',
+    );
   });
 });

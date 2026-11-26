@@ -11,13 +11,6 @@
   max-width: min(680px, 80%);
 }
 
-/* A reply whose stored work process came from an older version. */
-.conversation-message-trace-note {
-  margin: 0;
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-}
-
 .message-actions {
   display: inline-flex;
   align-items: center;
@@ -43,10 +36,14 @@
   background: transparent;
   color: var(--token-text-secondary);
   cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
-.message-action-btn:hover {
+.message-action-btn:hover,
+.conversation-message-footer .message-action-btn:hover {
   border-color: var(--token-border-muted);
   background: var(--token-interactive-hover);
   color: var(--token-text-primary);
@@ -75,12 +72,6 @@
 .conversation-message-assistant .conversation-message-footer {
   justify-content: flex-start;
   align-self: flex-start;
-}
-
-.conversation-message-footer .conversation-message-time {
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  letter-spacing: 0;
 }
 
 .conversation-message-footer .message-actions {
@@ -117,6 +108,11 @@
   background: color-mix(in srgb, var(--token-bg-muted) 70%, transparent);
 }
 
+.message-variant-nav-btn:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
 .message-variant-nav-btn:disabled {
   opacity: 0.35;
   cursor: default;
@@ -133,12 +129,6 @@
   height: calc(var(--space-6) + var(--space-1));
   border-radius: var(--radius-md);
   color: var(--token-text-secondary);
-}
-
-.conversation-message-footer .message-action-btn:hover {
-  border-color: var(--token-border-muted);
-  background: var(--token-interactive-hover);
-  color: var(--token-text-primary);
 }
 
 .conversation-message-footer .message-action-btn[data-copied='true'] {

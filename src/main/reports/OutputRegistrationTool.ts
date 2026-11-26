@@ -1,10 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 import { generateEventId, nowIso } from '@shared/utils/id';
-import { runScopedStore } from '../agent-runtime/orchestration/RunScopedStore';
-import { safeResolvePath } from '../agent-runtime/tools/primitives/_shared';
+import { runScopedStore } from '../sessions/store/RunScopedStore';
+import { safeResolvePath } from '../runtime/toolFiles';
 import { artifactStore } from './ArtifactStore';
-import type { ArtifactKind, ArtifactRecord } from '@shared/types/harness';
+import type { ArtifactKind, ArtifactRecord } from './artifactRecord';
 import type { AgentTool } from '../agent-runtime/agent/AgentTool';
 
 const OUTPUT_KINDS: ArtifactKind[] = ['report', 'screenshot', 'trace', 'shader', 'log', 'data', 'note'];
@@ -41,11 +41,14 @@ const readRequiredString = (value: unknown, label: string): string => {
  * The tool copies the selected file into the run-owned artifact directory first;
  * it never scans workspace paths or treats an input attachment as output.
  */
-export function createOutputRegistrationTool(context: OutputRegistrationContext): AgentTool<OutputRegistrationParams, { artifactId: string; path: string }> {
+export function createOutputRegistrationTool(
+  context: OutputRegistrationContext,
+): AgentTool<OutputRegistrationParams, { artifactId: string; path: string }> {
   return {
     name: 'output_register',
     label: 'Publish Output',
-    description: 'Publish one finished project file as a user-visible session output. Use only after creating the file; never publish inputs or plans.',
+    description:
+      'Publish one finished project file as a user-visible session output. Use only after creating the file; never publish inputs or plans.',
     parameters: {
       type: 'object',
       required: ['path'],
@@ -57,14 +60,24 @@ export function createOutputRegistrationTool(context: OutputRegistrationContext)
     },
     permissionHint: 'session_mutation',
     effects: { reads: ['path'] },
-    spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: false },
+    spec: {
+      isReadOnly: false,
+      concurrency: 'exclusive',
+      isDestructive: false,
+      sideEffect: 'filesystem',
+      category: 'file',
+      requiresApproval: false,
+    },
     async execute(_toolCallId, params, signal) {
       if (signal?.aborted) throw new Error('Output publication cancelled.');
       const sessionId = context.sessionId;
       const runId = context.runId;
       const projectRootPath = context.projectRootPath;
       if (!sessionId || !runId || !projectRootPath) {
-        return { content: [{ type: 'text', text: 'A live session, run, and project are required to publish an output.' }], isError: true };
+        return {
+          content: [{ type: 'text', text: 'A live session, run, and project are required to publish an output.' }],
+          isError: true,
+        };
       }
 
       const requestedPath = readRequiredString(params.path, 'path');
@@ -74,7 +87,10 @@ export function createOutputRegistrationTool(context: OutputRegistrationContext)
         // Rejects symlinks and junctions and re-checks the project boundary after realpath.
         sourcePath = safeResolvePath(requestedPath, root);
       } catch {
-        return { content: [{ type: 'text', text: 'Only regular files inside the active project can be published.' }], isError: true };
+        return {
+          content: [{ type: 'text', text: 'Only regular files inside the active project can be published.' }],
+          isError: true,
+        };
       }
       if (isProjectInput(root, sourcePath)) {
         return { content: [{ type: 'text', text: 'Project inputs cannot be published as outputs.' }], isError: true };
@@ -98,13 +114,14 @@ export function createOutputRegistrationTool(context: OutputRegistrationContext)
       fs.copyFileSync(sourcePath, targetPath);
 
       const now = nowIso();
-      const kind = OUTPUT_KINDS.includes(params.kind as ArtifactKind) ? params.kind as ArtifactKind : 'note';
+      const kind = OUTPUT_KINDS.includes(params.kind as ArtifactKind) ? (params.kind as ArtifactKind) : 'note';
       const artifact: ArtifactRecord = artifactStore.register(sessionId, runId, {
         artifactId,
         sessionId,
         runId,
         kind,
-        title: typeof params.title === 'string' && params.title.trim() ? params.title.trim() : path.basename(sourcePath),
+        title:
+          typeof params.title === 'string' && params.title.trim() ? params.title.trim() : path.basename(sourcePath),
         filePath: targetPath,
         mimeType: 'application/octet-stream',
         sizeBytes: stat.size,

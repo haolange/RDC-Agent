@@ -1,16 +1,19 @@
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import type { ConversationAttachmentInput, ConversationMessage } from '@shared/types/conversation';
-import type { AgentMode } from '@shared/types/layout';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type { PendingAttachmentDraft } from '../types/attachments';
 
-export const resolveComposerProfileId = (_mode: AgentMode, selectedAgentId?: string): string =>
+export const resolveComposerProfileId = (selectedAgentId?: string): string =>
   selectedAgentId?.trim() || DEFAULT_AGENT_ID;
 
+/**
+ * The user and assistant messages a send shows before main answers. They carry the ids main gives them
+ * (`conversationTurnIds`), so main's messages update them in place.
+ */
 export function buildOptimisticConversationTurn(options: {
   requestId: string;
   trimmed: string;
-  currentMode: AgentMode;
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
   currentRun: RunSummary | null;
@@ -18,11 +21,10 @@ export function buildOptimisticConversationTurn(options: {
   selectedAgentId?: string;
   /** Shown at once, so a plan handoff never flashes its raw prompt while main verifies the claim. */
   planReference?: ConversationMessage['planReference'];
-}): { userMessage: ConversationMessage; assistantDraftMessage: ConversationMessage; optimisticIds: string[] } {
+}): { userMessage: ConversationMessage; assistantDraftMessage: ConversationMessage } {
   const {
     requestId,
     trimmed,
-    currentMode,
     currentProject,
     currentSession,
     currentRun,
@@ -30,11 +32,9 @@ export function buildOptimisticConversationTurn(options: {
     selectedAgentId,
     planReference,
   } = options;
-  const turnId = `optimistic-turn-${requestId}`;
+  const { turnId, userMessageId: userId, assistantMessageId: assistantId } = conversationTurnIds(requestId);
   const now = Date.now();
-  const profileId = resolveComposerProfileId(currentMode, selectedAgentId);
-  const userId = `optimistic-user-${requestId}`;
-  const assistantId = `optimistic-assistant-${requestId}`;
+  const profileId = resolveComposerProfileId(selectedAgentId);
 
   const userMessage: ConversationMessage = {
     id: userId,
@@ -74,7 +74,7 @@ export function buildOptimisticConversationTurn(options: {
     runId: currentRun?.runId ?? null,
     profileId,
     role: 'assistant',
-    agentId: selectedAgentId || currentMode,
+    agentId: profileId,
     content: '',
     status: 'streaming',
     updatedAt: now,
@@ -87,31 +87,25 @@ export function buildOptimisticConversationTurn(options: {
     createdAt: now,
   };
 
-  return {
-    userMessage,
-    assistantDraftMessage,
-    optimisticIds: [userId, assistantId],
-  };
+  return { userMessage, assistantDraftMessage };
 }
 
-export const removeOptimisticConversationMessages = (
-  messages: ConversationMessage[],
-  optimisticIds: string[],
-): ConversationMessage[] => {
-  if (optimisticIds.length === 0) return messages;
-  const idSet = new Set(optimisticIds);
-  return messages.filter((message) => !idSet.has(message.id));
+/** The messages without those of `requestId`: a request main refused, or Stop revoked while it prepared. */
+export const removeRequestMessages = (messages: ConversationMessage[], requestId: string): ConversationMessage[] => {
+  const kept = messages.filter((message) => message.requestId !== requestId);
+  return kept.length === messages.length ? messages : kept;
 };
 
 export const toConversationAttachmentInputs = (
   pendingAttachments: PendingAttachmentDraft[],
-): ConversationAttachmentInput[] => pendingAttachments
-  .filter((attachment) => !attachment.error && attachment.sourcePath)
-  .map((attachment) => ({
-    sourcePath: attachment.sourcePath,
-    fileName: attachment.fileName,
-    mimeType: attachment.mimeType,
-    size: attachment.size,
-    stagingId: attachment.stagingId,
-    material: attachment.material,
-  }));
+): ConversationAttachmentInput[] =>
+  pendingAttachments
+    .filter((attachment) => !attachment.error && attachment.sourcePath)
+    .map((attachment) => ({
+      sourcePath: attachment.sourcePath,
+      fileName: attachment.fileName,
+      mimeType: attachment.mimeType,
+      size: attachment.size,
+      stagingId: attachment.stagingId,
+      material: attachment.material,
+    }));

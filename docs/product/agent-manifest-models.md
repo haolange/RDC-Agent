@@ -62,7 +62,7 @@ Composer 与 orchestrator 的切换列表来自 `enabled && userInvocable` 为�
 
 ## 模型选择
 
-模型只存用户设置 `~/.rdc-agent/config.json` 的 `agentModels`（schema 8 可选段）：`default` 是默认模型与推理档位，`byAgent[agentId]` 可只设模型或只设档位，缺的字段逐项取默认。项目不能指定模型。子执行按目标 Agent 解析，不继承父会话。Settings 改动立即生效于下一次请求。
+模型只存用户设置 `~/.rdc-agent/config.json` 的 `agentModels`（schema 9 的必有段，未设置时为空绑定）：`default` 是默认模型与推理档位，`byAgent[agentId]` 可只设模型或只设档位，缺的字段逐项取默认。项目不能指定模型。子执行按目标 Agent 解析，不继承父会话。Settings 改动立即生效于下一次请求。
 
 这是会话未显式选择时的初始模型；都未设置时 Composer 提示选择模型，不静默选择目录中的其它模型。Composer / 计划卡的模型和 Effort、Fast、Max 保存在会话 `modelOverride + turnControls`，首次建会话前使用 Composer 草稿，不写回 Agent 文件。进入计划审批不切换到交接目标的默认模型；批准前将继承的当前模型与参数落地到同一会话。
 

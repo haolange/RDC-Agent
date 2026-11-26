@@ -14,7 +14,10 @@ function check(channel: string, ref = '') {
       ...process.env,
       RDC_AGENT_RELEASE_CHANNEL: channel,
       GITHUB_REF: ref,
-      WIN_CSC_LINK: '', WIN_CSC_KEY_PASSWORD: '', CSC_LINK: '', CSC_KEY_PASSWORD: '',
+      WIN_CSC_LINK: '',
+      WIN_CSC_KEY_PASSWORD: '',
+      CSC_LINK: '',
+      CSC_KEY_PASSWORD: '',
     },
   });
   if (result.error) throw result.error;

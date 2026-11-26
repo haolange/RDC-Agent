@@ -2,6 +2,7 @@ import {
   cloneElement,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -15,7 +16,10 @@ import { createPortal, flushSync } from 'react-dom';
 import { cn } from '../lib/cn';
 import { placeAnchoredSurface } from '../lib/anchoredSurface';
 import { useDynStyle } from '../lib/useDynStyle';
+import { documentFonts } from '../lib/documentFonts';
 import { isTopOverlayLayer, useOverlayLayer } from '../lib/overlayStack';
+import { useDismissable } from '../lib/useDismissable';
+import { getModalFocusableElements } from '../lib/useModalFocus';
 import { usePresence } from './usePresence';
 import './Popover.css';
 
@@ -30,7 +34,14 @@ export interface PopoverProps {
   align?: 'start' | 'end';
   side?: 'top' | 'bottom';
   className?: string;
+  /**
+   * `dialog` (the default) is a non-modal dialog: focus moves in when it opens, Tab from the trigger enters it and Tab
+   * past its last control continues after the trigger. `presentation` wraps content that owns its own role and focus
+   * (Menu).
+   */
   role?: 'dialog' | 'presentation';
+  /** Accessible name of the dialog; without it the dialog is named by its trigger. */
+  label?: string;
   dismissOnTab?: boolean;
 }
 
@@ -52,10 +63,16 @@ export function Popover({
   side = 'bottom',
   className,
   role = 'dialog',
+  label,
   dismissOnTab = false,
 }: PopoverProps) {
   const triggerRef = useRef<HTMLElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const generatedId = useId();
+  const contentId = `${generatedId}-popover`;
+  const triggerId = (trigger.props.id as string | undefined) ?? `${generatedId}-trigger`;
+  const isDialog = role === 'dialog';
+  const focusedOpen = useRef(false);
   // An open popover is the topmost dismissible layer, so Escape closes only it
   // and leaves the modal it was launched from open.
   const { layerId } = useOverlayLayer(open, 'layout');
@@ -72,8 +89,15 @@ export function Popover({
     if (!triggerRect || !content) return;
     const width = content.offsetWidth;
     const height = content.offsetHeight;
-    const { left, top } = placeAnchoredSurface(triggerRect, { width, height },
-      { width: window.innerWidth, height: window.innerHeight }, align, side, VIEWPORT_MARGIN, ANCHOR_GAP);
+    const { left, top } = placeAnchoredSurface(
+      triggerRect,
+      { width, height },
+      { width: window.innerWidth, height: window.innerHeight },
+      align,
+      side,
+      VIEWPORT_MARGIN,
+      ANCHOR_GAP,
+    );
     setCoords({ left, top, ready: true });
   }, [align, side]);
 
@@ -87,48 +111,54 @@ export function Popover({
     if (open) updatePosition();
   }, [open, presence.mounted, children, updatePosition]);
 
+  // Focus enters a dialog once it is placed and visible; a Menu moves focus to its active item itself.
+  useEffect(() => {
+    if (!open) {
+      focusedOpen.current = false;
+      return;
+    }
+    if (!isDialog || !coords.ready || focusedOpen.current) return;
+    focusedOpen.current = true;
+    const content = contentRef.current;
+    if (content && !content.contains(document.activeElement))
+      (getModalFocusableElements(content)[0] ?? content).focus();
+  }, [coords.ready, isDialog, open]);
+
+  useDismissable({
+    open,
+    layerId,
+    inside: () => [contentRef.current, triggerRef.current],
+    onDismiss: (reason) => {
+      onOpenChange(false);
+      if (reason === 'escape') triggerRef.current?.focus();
+    },
+  });
+
   useEffect(() => {
     if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!isTopOverlayLayer(layerId)) return;
-      const target = event.target as Node;
-      if (contentRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
-      onOpenChange(false);
-    };
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (!isTopOverlayLayer(layerId)) return;
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopPropagation();
-      onOpenChange(false);
-      triggerRef.current?.focus();
-    };
     const onReposition = () => updatePosition();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onReposition);
     if (contentRef.current) observer?.observe(contentRef.current);
     if (triggerRef.current) observer?.observe(triggerRef.current);
-    document.fonts?.addEventListener('loadingdone', onReposition);
-    window.addEventListener('pointerdown', onPointerDown);
-    // Capture phase so the popover wins the key before any modal below it.
-    window.addEventListener('keydown', onKeyDown, true);
+    documentFonts()?.addEventListener('loadingdone', onReposition);
     window.addEventListener('resize', onReposition);
     window.addEventListener('scroll', onReposition, true);
     return () => {
       observer?.disconnect();
-      document.fonts?.removeEventListener('loadingdone', onReposition);
-      window.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown, true);
+      documentFonts()?.removeEventListener('loadingdone', onReposition);
       window.removeEventListener('resize', onReposition);
       window.removeEventListener('scroll', onReposition, true);
     };
-  }, [open, layerId, onOpenChange, updatePosition]);
+  }, [open, updatePosition]);
 
   const triggerNode = cloneElement(trigger, {
     ref: (node: HTMLElement | null) => {
       triggerRef.current = node;
       assignRef((trigger as { ref?: Ref<HTMLElement> }).ref, node);
     },
+    id: triggerId,
     'aria-expanded': open,
+    'aria-controls': isDialog && presence.mounted ? contentId : undefined,
     'aria-haspopup': trigger.props['aria-haspopup'] ?? 'dialog',
     onClick: (event: MouseEvent<HTMLElement>) => {
       trigger.props.onClick?.(event);
@@ -137,42 +167,80 @@ export function Popover({
     },
     onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
       trigger.props.onKeyDown?.(event);
-      if (event.key === 'Escape' && open && isTopOverlayLayer(layerId)) {
+      if (!open || !isTopOverlayLayer(layerId)) return;
+      if (event.key === 'Escape') {
         event.preventDefault();
         onOpenChange(false);
         triggerRef.current?.focus();
+      } else if (event.key === 'Tab' && !event.shiftKey && isDialog && contentRef.current) {
+        // The surface is portaled to the end of the document; Tab from its trigger enters it.
+        event.preventDefault();
+        (getModalFocusableElements(contentRef.current)[0] ?? contentRef.current).focus();
       }
     },
   });
+
+  // The trigger's own name is the dialog's name unless a label is given; a trigger named by another element lends
+  // that element (a swatch named by its field label).
+  const triggerLabelledBy = trigger.props['aria-labelledby'] as string | undefined;
+  const nameProps = !isDialog
+    ? {}
+    : label
+      ? { 'aria-label': label }
+      : { 'aria-labelledby': triggerLabelledBy ?? triggerId };
+
+  /** Tab past either end of a dialog leaves through its trigger, as if the surface sat right after it. */
+  const leaveByTab = (event: KeyboardEvent<HTMLDivElement>) => {
+    const content = event.currentTarget;
+    const focusable = getModalFocusableElements(content);
+    const active = document.activeElement;
+    if (event.shiftKey) {
+      if (focusable.length > 0 && active !== focusable[0] && active !== content) return;
+      event.preventDefault();
+      triggerRef.current?.focus();
+      return;
+    }
+    if (focusable.length > 0 && active !== focusable[focusable.length - 1]) return;
+    // Closing first lets the native Tab continue from the trigger to whatever follows it.
+    flushSync(() => onOpenChange(false));
+    triggerRef.current?.focus();
+  };
 
   return (
     <>
       {triggerNode}
       {presence.mounted && typeof document !== 'undefined'
         ? createPortal(
-          <div
-            ref={contentRef}
-            className={cn('ui-popover', className)}
-            role={role}
-            onKeyDownCapture={(event) => {
-              if (!open || !isTopOverlayLayer(layerId) || !event.currentTarget.contains(event.target as Node)) return;
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                event.stopPropagation();
-              } else if (event.key !== 'Tab' || !dismissOnTab) return;
-              // Release this surface before its dialog handles the key. Tab continues natively from the trigger.
-              flushSync(() => onOpenChange(false));
-              triggerRef.current?.focus();
-            }}
-            data-side={side}
-            data-state={presence.state}
-            data-ready={coords.ready ? 'true' : 'false'}
-            {...positionStyle}
-          >
-            {children}
-          </div>,
-          document.body,
-        )
+            <div
+              ref={contentRef}
+              id={contentId}
+              className={cn('ui-popover', className)}
+              role={role}
+              tabIndex={isDialog ? -1 : undefined}
+              {...nameProps}
+              onKeyDownCapture={(event) => {
+                if (!open || !isTopOverlayLayer(layerId) || !event.currentTarget.contains(event.target as Node)) return;
+                if (event.key === 'Tab' && isDialog && !dismissOnTab) {
+                  leaveByTab(event);
+                  return;
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                } else if (event.key !== 'Tab' || !dismissOnTab) return;
+                // Release this surface before its dialog handles the key. Tab continues natively from the trigger.
+                flushSync(() => onOpenChange(false));
+                triggerRef.current?.focus();
+              }}
+              data-side={side}
+              data-state={presence.state}
+              data-ready={coords.ready ? 'true' : 'false'}
+              {...positionStyle}
+            >
+              {children}
+            </div>,
+            document.body,
+          )
         : null}
     </>
   );

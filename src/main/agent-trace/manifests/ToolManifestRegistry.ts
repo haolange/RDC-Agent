@@ -1,5 +1,5 @@
-import fs from 'fs';
-import type { ToolManifest, ToolCategory } from '@shared/types/agenticTrace';
+import type { ToolCategory } from '../traceNodes';
+import type { ToolManifest } from './traceManifest';
 
 const PRIMITIVE_MANIFESTS: ToolManifest[] = [
   {
@@ -37,11 +37,7 @@ const categoryFromNamespace = (toolName: string): ToolCategory => {
   return 'unknown';
 };
 
-const displayNameFromTool = (toolName: string, description?: string): string => {
-  if (description) {
-    const short = description.split(/[。.!?\n]/)[0]?.trim();
-    if (short && short.length <= 32) return short;
-  }
+const displayNameFromTool = (toolName: string): string => {
   const segment = toolName.split('.').pop() || toolName;
   return segment.replace(/_/g, ' ');
 };
@@ -55,41 +51,20 @@ export class ToolManifestRegistry {
     }
   }
 
-  loadFromCatalog(catalogPath: string): void {
-    if (!fs.existsSync(catalogPath)) return;
-    const raw = JSON.parse(fs.readFileSync(catalogPath, 'utf-8')) as {
-      tools?: Array<{ name: string; description?: string }>;
-    };
-    for (const tool of raw.tools ?? []) {
-      if (this.manifests.has(tool.name)) continue;
-      this.manifests.set(tool.name, {
-        toolName: tool.name,
-        displayName: displayNameFromTool(tool.name, tool.description),
-        category: categoryFromNamespace(tool.name),
-        description: tool.description,
+  get(toolName: string): ToolManifest {
+    return (
+      this.manifests.get(toolName) ?? {
+        toolName,
+        displayName: displayNameFromTool(toolName),
+        category: categoryFromNamespace(toolName),
         renderer: {
-          key: 'tool.domain.rd',
+          key: 'tool.unknown',
           defaultCollapsed: true,
           supportsPreview: true,
           supportsRawJson: true,
-          supportsArtifacts: true,
         },
-      });
-    }
-  }
-
-  get(toolName: string): ToolManifest {
-    return this.manifests.get(toolName) ?? {
-      toolName,
-      displayName: displayNameFromTool(toolName),
-      category: categoryFromNamespace(toolName),
-      renderer: {
-        key: 'tool.unknown',
-        defaultCollapsed: true,
-        supportsPreview: true,
-        supportsRawJson: true,
-      },
-    };
+      }
+    );
   }
 
   list(): ToolManifest[] {

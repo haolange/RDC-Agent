@@ -2,7 +2,7 @@
  * Canonical knowledge read-root resolution for prepareTurn.
  *
  * Frozen onto EffectiveRuntimePlan.knowledgeReadRoots. Policy and executor
- * may grant these roots only to read_file / read_image / glob / grep.
+ * grant these roots only to tools whose spec declares `knowledgeRoots: 'read-access'`.
  * Missing / non-directory candidates are omitted. A root that is itself a
  * symlink or junction is omitted and reported as a diagnostic.
  */
@@ -11,13 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { resolvedPathKey } from '../platform/paths';
 
-export const KNOWLEDGE_READ_FILE_TOOLS = new Set(['read_file', 'read_image', 'glob', 'grep']);
-
-export type KnowledgeReadRootSkipReason =
-  | 'missing'
-  | 'not-directory'
-  | 'symlink-or-junction'
-  | 'realpath-failed';
+export type KnowledgeReadRootSkipReason = 'missing' | 'not-directory' | 'symlink-or-junction' | 'realpath-failed';
 
 export interface KnowledgeReadRootDiagnostic {
   candidate: string;
@@ -35,22 +29,11 @@ export interface ResolveKnowledgeReadRootsInput {
   projectKnowledgePath?: string | null;
 }
 
-export function isKnowledgeReadFileTool(toolName: string): boolean {
-  return KNOWLEDGE_READ_FILE_TOOLS.has(toolName.trim().toLowerCase().replace(/[.-]/g, '_'));
-}
-
-function skip(
-  candidate: string,
-  reason: KnowledgeReadRootSkipReason,
-  message: string,
-): KnowledgeReadRootDiagnostic {
+function skip(candidate: string, reason: KnowledgeReadRootSkipReason, message: string): KnowledgeReadRootDiagnostic {
   return { candidate, reason, message };
 }
 
-function considerCandidate(
-  candidate: string,
-  diagnostics: KnowledgeReadRootDiagnostic[],
-): string | null {
+function considerCandidate(candidate: string, diagnostics: KnowledgeReadRootDiagnostic[]): string | null {
   const resolved = path.resolve(candidate);
   if (!fs.existsSync(resolved)) {
     return null;
@@ -60,22 +43,26 @@ function considerCandidate(
   try {
     lexicalStat = fs.lstatSync(resolved);
   } catch (error) {
-    diagnostics.push(skip(
-      resolved,
-      'realpath-failed',
-      `KNOWLEDGE_READ_ROOT_SKIPPED: cannot stat knowledge root ${resolved}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    ));
+    diagnostics.push(
+      skip(
+        resolved,
+        'realpath-failed',
+        `KNOWLEDGE_READ_ROOT_SKIPPED: cannot stat knowledge root ${resolved}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      ),
+    );
     return null;
   }
 
   if (lexicalStat.isSymbolicLink()) {
-    diagnostics.push(skip(
-      resolved,
-      'symlink-or-junction',
-      `KNOWLEDGE_READ_ROOT_SKIPPED: refusing symlink/junction knowledge root ${resolved}.`,
-    ));
+    diagnostics.push(
+      skip(
+        resolved,
+        'symlink-or-junction',
+        `KNOWLEDGE_READ_ROOT_SKIPPED: refusing symlink/junction knowledge root ${resolved}.`,
+      ),
+    );
     return null;
   }
   if (!lexicalStat.isDirectory()) {
@@ -83,16 +70,16 @@ function considerCandidate(
   }
 
   try {
-    const real = fs.realpathSync.native
-      ? fs.realpathSync.native(resolved)
-      : fs.realpathSync(resolved);
+    const real = fs.realpathSync.native(resolved);
     const realStat = fs.lstatSync(real);
     if (realStat.isSymbolicLink()) {
-      diagnostics.push(skip(
-        resolved,
-        'symlink-or-junction',
-        `KNOWLEDGE_READ_ROOT_SKIPPED: refusing symlink/junction knowledge root ${resolved}.`,
-      ));
+      diagnostics.push(
+        skip(
+          resolved,
+          'symlink-or-junction',
+          `KNOWLEDGE_READ_ROOT_SKIPPED: refusing symlink/junction knowledge root ${resolved}.`,
+        ),
+      );
       return null;
     }
     if (!fs.statSync(real).isDirectory()) {
@@ -100,13 +87,15 @@ function considerCandidate(
     }
     return path.resolve(real);
   } catch (error) {
-    diagnostics.push(skip(
-      resolved,
-      'realpath-failed',
-      `KNOWLEDGE_READ_ROOT_SKIPPED: cannot realpath knowledge root ${resolved}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    ));
+    diagnostics.push(
+      skip(
+        resolved,
+        'realpath-failed',
+        `KNOWLEDGE_READ_ROOT_SKIPPED: cannot realpath knowledge root ${resolved}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      ),
+    );
     return null;
   }
 }
@@ -115,9 +104,7 @@ function considerCandidate(
  * Resolve user + project knowledge directories into existing, real directories.
  * Canonical order is user then project. Duplicate identities (8.3 / case) collapse.
  */
-export function resolveKnowledgeReadRoots(
-  input: ResolveKnowledgeReadRootsInput,
-): KnowledgeReadRootResolution {
+export function resolveKnowledgeReadRoots(input: ResolveKnowledgeReadRootsInput): KnowledgeReadRootResolution {
   const diagnostics: KnowledgeReadRootDiagnostic[] = [];
   const roots: string[] = [];
   const seen = new Set<string>();

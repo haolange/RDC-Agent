@@ -1,10 +1,8 @@
 import React from 'react';
 import { Icon } from '../../../../ui/Icon';
 import { Spinner } from '../../../../ui/Spinner';
-import type { useI18n } from '../../../../i18n';
+import { useI18n } from '../../../../i18n';
 import type { ProviderConnectionDraft } from '../types';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 export type ProviderConnectionPhase = 'untested' | 'testing' | 'testPassed' | 'connected' | 'failed' | 'saving';
 
@@ -26,19 +24,30 @@ export function connectionPhase(
 }
 
 /** One status line for the current connection draft across provider types. */
-export const ProviderConnectionStatusLine: React.FC<{ phase: ProviderConnectionPhase; t: Translate }> = ({ phase, t }) => (
-  <div className="settings-provider-connection-status" role="status" aria-label={t('settings.providers.connectionStatus')}
-    data-testid="settings-provider-connection-status" data-phase={phase}>
-    {phase === 'testing' || phase === 'saving' ? <Spinner size="sm" /> : null}
-    {phase === 'connected' || phase === 'testPassed' ? <Icon name="check" size={14} /> : null}
-    <span>{t(`settings.providers.connectionPhase.${phase}` as const)}</span>
-  </div>
-);
+export const ProviderConnectionStatusLine: React.FC<{ phase: ProviderConnectionPhase }> = ({ phase }) => {
+  const { t } = useI18n();
+  return (
+    <div
+      className="settings-provider-connection-status"
+      role="status"
+      aria-label={t('settings.providers.connectionStatus')}
+      data-testid="settings-provider-connection-status"
+      data-phase={phase}
+    >
+      {phase === 'testing' || phase === 'saving' ? <Spinner size="sm" /> : null}
+      {phase === 'connected' || phase === 'testPassed' ? <Icon name="check" size={14} /> : null}
+      <span>{t(`settings.providers.connectionPhase.${phase}` as const)}</span>
+    </div>
+  );
+};
 
 /** Empty discovery pane shown before the first successful test. */
-export const ProviderDiscoveryEmpty: React.FC<{ t: Translate }> = ({ t }) => (
-  <div className="settings-provider-discovery-empty" data-testid="settings-provider-discovery-empty">
-    <Icon name="nav-models" size={20} />
-    <span>{t('settings.providers.discoveryEmpty')}</span>
-  </div>
-);
+export const ProviderDiscoveryEmpty: React.FC<{}> = ({}) => {
+  const { t } = useI18n();
+  return (
+    <div className="settings-provider-discovery-empty" data-testid="settings-provider-discovery-empty">
+      <Icon name="nav-models" size={20} />
+      <span>{t('settings.providers.discoveryEmpty')}</span>
+    </div>
+  );
+};

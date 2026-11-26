@@ -1,5 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import { createRequestSeq, knowledgeErrorMessage, knowledgeQueryKey, type KnowledgeViewMode } from './knowledgeCenterModel';
+import { errorDetail } from '../../../lib/errorDetail';
+import { createRequestSeq, knowledgeQueryKey, type KnowledgeViewMode } from './knowledgeCenterModel';
 import { runKnowledgeCenterQuery } from './knowledgeCenterQuery';
 import type { KnowledgeLaneHit, KnowledgePack, KnowledgeQueryRequest } from '@shared/types/knowledge';
 
@@ -14,24 +15,32 @@ export function useKnowledgeQueryRunner(input: {
   setError: Dispatch<SetStateAction<string | null>>;
 }) {
   const { querySeq, setLoadingQuery, setPage, setHits, setPack, setPackQueryKey, setError } = input;
-  return useCallback(async (viewMode: KnowledgeViewMode, queryRequest: KnowledgeQueryRequest): Promise<boolean> => {
-    const seq = querySeq.current.next();
-    setLoadingQuery(true);
-    setPage({});
-    try {
-      const next = await runKnowledgeCenterQuery({ viewMode, queryRequest,
-        query: request => window.electronAPI.knowledge.query({ ...request, limit: 50 }),
-        compile: request => window.electronAPI.knowledge.compile(request),
-        isCurrent: () => querySeq.current.isCurrent(seq) });
-      if (!next || !querySeq.current.isCurrent(seq)) return false;
-      setHits(next.hits); setPage(next.page ?? {}); setPack(next.pack);
-      setPackQueryKey(knowledgeQueryKey(queryRequest));
-      return true;
-    } catch (error) {
-      if (querySeq.current.isCurrent(seq)) setError(knowledgeErrorMessage(error));
-      return false;
-    } finally {
-      if (querySeq.current.isCurrent(seq)) setLoadingQuery(false);
-    }
-  }, [querySeq, setError, setHits, setLoadingQuery, setPack, setPackQueryKey, setPage]);
+  return useCallback(
+    async (viewMode: KnowledgeViewMode, queryRequest: KnowledgeQueryRequest): Promise<boolean> => {
+      const seq = querySeq.current.next();
+      setLoadingQuery(true);
+      setPage({});
+      try {
+        const next = await runKnowledgeCenterQuery({
+          viewMode,
+          queryRequest,
+          query: (request) => window.electronAPI.knowledge.query({ ...request, limit: 50 }),
+          compile: (request) => window.electronAPI.knowledge.compile(request),
+          isCurrent: () => querySeq.current.isCurrent(seq),
+        });
+        if (!next || !querySeq.current.isCurrent(seq)) return false;
+        setHits(next.hits);
+        setPage(next.page ?? {});
+        setPack(next.pack);
+        setPackQueryKey(knowledgeQueryKey(queryRequest));
+        return true;
+      } catch (error) {
+        if (querySeq.current.isCurrent(seq)) setError(errorDetail(error));
+        return false;
+      } finally {
+        if (querySeq.current.isCurrent(seq)) setLoadingQuery(false);
+      }
+    },
+    [querySeq, setError, setHits, setLoadingQuery, setPack, setPackQueryKey, setPage],
+  );
 }

@@ -1,39 +1,38 @@
 import { translate, type TranslationKey } from '../../i18n';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useRuntimePermissionStore } from '../../stores/runtimePermissionStore';
+import { acceptSessionSnapshot, receiveSessionList } from '../../stores/sessionRecordStore';
 import { useSessionStore } from '../../stores/sessionStore';
+import { applySessionSwitchHygiene } from '../../stores/sessionSwitchHygiene';
+import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { readCompiledComposerRoute } from '../../lib/composerEffectiveModel';
 import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
+import { notify } from '../../stores/notificationStore';
 import { resolveComposerModelOverride } from './resolveComposerModelOverride';
 import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
-import {
-  isComposerAgentDefaultToken,
-  resolveComposerAgentDefaultState,
-} from './composerAgentDefaultModel';
+import { isComposerAgentDefaultToken, resolveComposerAgentDefaultState } from './composerAgentDefaultModel';
 import { loadComposerModelPickerOptions } from './useComposerModelPickerOptions';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { CommandUiAction } from '@shared/types/command';
 import type { AgentPermissionMode, AppTheme } from '@shared/types/settings';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
-import type { AgentMode } from '@shared/types/layout';
 
-const currentText = (key: TranslationKey, params?: Record<string, string | number>) => translate(useAppSettingsStore.getState().settings.appearance.language, key, params);
+const currentText = (key: TranslationKey, params?: Record<string, string | number>) =>
+  translate(useAppSettingsStore.getState().settings.appearance.language, key, params);
 
 interface SlashCommandContext {
   currentSession: SessionRecord | null;
   currentProject: ProjectRecord | null;
   selectedAgentId: string;
   setSelectedAgentId: (agentId: string) => void;
-  setCurrentMode: (mode: AgentMode) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
   openSettings: (section?: string) => void;
-  showNotice: (message: string) => void;
   armPendingSkill?: (skillId: string, skillName?: string) => void;
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value && typeof value === 'object');
+const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
 
 const getPayloadString = (action: CommandUiAction, key: string): string | null => {
   if (!('payload' in action) || !isRecord(action.payload)) {
@@ -45,10 +44,12 @@ const getPayloadString = (action: CommandUiAction, key: string): string | null =
 };
 
 const toMarkdown = (messages: ConversationMessage[]): string =>
-  messages.map((message) => {
-    const timestamp = new Date(message.createdAt).toISOString();
-    return `## ${message.role} - ${timestamp}\n\n${message.content || ''}`;
-  }).join('\n\n');
+  messages
+    .map((message) => {
+      const timestamp = new Date(message.createdAt).toISOString();
+      return `## ${message.role} - ${timestamp}\n\n${message.content || ''}`;
+    })
+    .join('\n\n');
 
 const downloadTextFile = (fileName: string, content: string, mimeType: string): void => {
   const blob = new Blob([content], { type: mimeType });
@@ -62,27 +63,36 @@ const downloadTextFile = (fileName: string, content: string, mimeType: string): 
   URL.revokeObjectURL(url);
 };
 
-async function loadSession(sessionId: string, context: SlashCommandContext): Promise<void> {
+async function loadSession(sessionId: string): Promise<void> {
   const electronAPI = window.electronAPI;
-  const result = await electronAPI.session.select(sessionId);
-  if (!result.success || !result.session) {
-    context.showNotice(result.error ?? currentText('composer.commandSessionMissing'));
+  const projectStore = useProjectStore.getState();
+  const previousSessionId = projectStore.currentSessionId;
+  let result: Awaited<ReturnType<typeof electronAPI.session.open>>;
+  try {
+    result = await electronAPI.session.open(sessionId);
+  } catch (error) {
+    notify.failure(error, currentText, 'composer.commandSessionMissing');
     return;
   }
 
-  const projectStore = useProjectStore.getState();
+  const opened = result.session.record;
+  if (previousSessionId !== opened.sessionId) {
+    applySessionSwitchHygiene({ previousSessionId, nextSessionId: opened.sessionId });
+  }
+  acceptSessionSnapshot(result.session);
+  projectStore.setCurrentSessionId(opened.sessionId);
   const sessionStore = useSessionStore.getState();
-  projectStore.setCurrentSession(result.session);
-  sessionStore.setCurrentRun(result.currentRun ?? null);
-
-  const [sessionsResult, runsResult, historyResult] = await Promise.all([
-    electronAPI.session.list(result.session.projectId),
-    electronAPI.run.list(result.session.sessionId),
-    electronAPI.conversation.getHistory(result.session.sessionId),
-  ]);
-  projectStore.setSessions(sessionsResult.sessions);
-  sessionStore.setRuns(runsResult.runs);
-  context.setConversationMessages(historyResult.messages);
+  sessionStore.setCurrentRun(result.currentRun);
+  hydrateLoadedSessionSurface({
+    sessionId: opened.sessionId,
+    messages: result.history.messages,
+    branchState: result.history.branchState ?? null,
+    planReview: result.history.planReview,
+    tracePresentation: result.trace.presentation,
+    applyTrace: true,
+  });
+  const sessionsResult = await electronAPI.session.list(opened.projectId);
+  projectStore.setSessions(receiveSessionList(sessionsResult.sessions));
 }
 
 async function switchModel(modelId: string, context: SlashCommandContext): Promise<void> {
@@ -93,22 +103,24 @@ async function switchModel(modelId: string, context: SlashCommandContext): Promi
   if (isComposerAgentDefaultToken(modelId)) {
     const state = resolveComposerAgentDefaultState(route, options, true);
     if (!state.selectable) {
-      context.showNotice(translate(
-        language,
-        state.kind === 'unset' ? 'composer.model.agentDefaultUnset' : 'composer.model.agentDefaultUnavailable',
-      ));
+      notify.warning(
+        translate(
+          language,
+          state.kind === 'unset' ? 'composer.model.agentDefaultUnset' : 'composer.model.agentDefaultUnavailable',
+        ),
+      );
       return;
     }
     const cleared = await clearComposerModelChoice(
       context.currentSession?.sessionId,
       context.currentProject?.projectId,
     );
-    if (!cleared.ok) context.showNotice(translate(language, 'composer.model.saveFailed'));
+    if (!cleared.ok) notify.error(translate(language, 'composer.model.saveFailed'));
     return;
   }
   const override = resolveComposerModelOverride(modelId, options);
   if (!override) {
-    context.showNotice(translate(language, 'composer.model.invalidArg'));
+    notify.warning(translate(language, 'composer.model.invalidArg'));
     return;
   }
   const result = await commitComposerModelChoice(
@@ -116,7 +128,7 @@ async function switchModel(modelId: string, context: SlashCommandContext): Promi
     context.currentSession?.sessionId,
     context.currentProject?.projectId,
   );
-  if (!result.ok) context.showNotice(translate(language, 'composer.model.saveFailed'));
+  if (!result.ok) notify.error(translate(language, 'composer.model.saveFailed'));
 }
 
 async function handleUiAction(action: CommandUiAction, context: SlashCommandContext): Promise<void> {
@@ -132,7 +144,6 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
       const agentId = getPayloadString(action, 'agentId');
       if (!agentId) return;
       context.setSelectedAgentId(agentId);
-      context.setCurrentMode(agentId as AgentMode);
       return;
     }
     case 'switch-model': {
@@ -144,7 +155,7 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
     case 'switch-theme': {
       const theme = getPayloadString(action, 'theme');
       if (!theme || !(['dark', 'light', 'system'] as string[]).includes(theme)) {
-        context.showNotice(currentText('composer.commandThemeInvalid'));
+        notify.warning(currentText('composer.commandThemeInvalid'));
         return;
       }
       await useAppSettingsStore.getState().setTheme(theme as AppTheme);
@@ -153,35 +164,34 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
     case 'switch-permissions': {
       const mode = getPayloadString(action, 'mode');
       if (!mode || !(['default', 'auto-review', 'full-access', 'custom'] as string[]).includes(mode)) {
-        context.showNotice(currentText('composer.commandPermissionInvalid'));
+        notify.warning(currentText('composer.commandPermissionInvalid'));
         return;
       }
-      await useAppSettingsStore.getState().setAgentPermissionMode(mode as AgentPermissionMode);
+      await useRuntimePermissionStore.getState().saveMode(mode as AgentPermissionMode);
       return;
     }
     case 'resume-session': {
       const sessionId = getPayloadString(action, 'sessionId');
       if (sessionId) {
-        await loadSession(sessionId, context);
+        await loadSession(sessionId);
         return;
       }
-      const result = await electronAPI.workflow.resume();
-      if (!result.success) {
-        context.showNotice(result.error ?? currentText('composer.commandNoResumable'));
+      try {
+        await electronAPI.workflow.resume();
+      } catch (error) {
+        notify.failure(error, currentText, 'composer.commandNoResumable');
       }
       return;
     }
     case 'export-session': {
       const sessionId = getPayloadString(action, 'sessionId') || context.currentSession?.sessionId;
       if (!sessionId) {
-        context.showNotice(currentText('composer.commandNoSession'));
+        notify.warning(currentText('composer.commandNoSession'));
         return;
       }
       const format = getPayloadString(action, 'format') === 'json' ? 'json' : 'markdown';
       const history = await electronAPI.conversation.getHistory(sessionId);
-      const content = format === 'json'
-        ? JSON.stringify(history.messages, null, 2)
-        : toMarkdown(history.messages);
+      const content = format === 'json' ? JSON.stringify(history.messages, null, 2) : toMarkdown(history.messages);
       downloadTextFile(
         `${sessionId}.${format === 'json' ? 'json' : 'md'}`,
         content,
@@ -192,40 +202,38 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
     case 'undo-session': {
       const sessionId = getPayloadString(action, 'sessionId') || context.currentSession?.sessionId;
       if (!sessionId) {
-        context.showNotice(currentText('composer.commandNoSession'));
+        notify.warning(currentText('composer.commandNoSession'));
         return;
       }
-      const result = await electronAPI.conversation.undoLastTurn(sessionId);
-      if (result.success) {
-        context.setConversationMessages(result.messages);
-      } else {
-        context.showNotice(result.error ?? currentText('composer.commandUndoFailed'));
+      try {
+        context.setConversationMessages((await electronAPI.conversation.undoLastTurn(sessionId)).messages);
+      } catch (error) {
+        notify.failure(error, currentText, 'composer.commandUndoFailed');
       }
       return;
     }
     case 'clear-session': {
       const sessionId = getPayloadString(action, 'sessionId') || context.currentSession?.sessionId;
       if (!sessionId) {
-        context.showNotice(currentText('composer.commandNoSession'));
+        notify.warning(currentText('composer.commandNoSession'));
         return;
       }
-      const result = await electronAPI.conversation.clearHistory(sessionId);
-      if (result.success) {
-        context.setConversationMessages(result.messages);
-      } else {
-        context.showNotice(result.error ?? currentText('composer.commandClearFailed'));
+      try {
+        context.setConversationMessages((await electronAPI.conversation.clearHistory(sessionId)).messages);
+      } catch (error) {
+        notify.failure(error, currentText, 'composer.commandClearFailed');
       }
       return;
     }
     case 'run-skill': {
       const skillId = getPayloadString(action, 'skillId');
       if (!skillId) {
-        context.showNotice(currentText('composer.commandNoSkill'));
+        notify.warning(currentText('composer.commandNoSkill'));
         return;
       }
       const skillName = getPayloadString(action, 'skillName') || skillId;
       context.armPendingSkill?.(skillId, skillName);
-      context.showNotice(currentText('composer.commandSkillArmed', { skill: skillName }));
+      notify.info(currentText('composer.commandSkillArmed', { skill: skillName }));
       return;
     }
     default:
@@ -233,10 +241,8 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
   }
 }
 
-export async function executeSlashCommand(input: string, context: SlashCommandContext): Promise<boolean> {
+export async function executeSlashCommand(input: string, context: SlashCommandContext): Promise<void> {
   const electronAPI = window.electronAPI;
-  if (!electronAPI) return false;
-
   try {
     const settings = useAppSettingsStore.getState().settings;
     const effectiveModel = readComposerEffectiveModel(
@@ -252,9 +258,7 @@ export async function executeSlashCommand(input: string, context: SlashCommandCo
         workspaceRoot: context.currentProject?.rootPath,
         agentId: context.selectedAgentId,
         currentMode: context.selectedAgentId,
-        currentModelId: effectiveModel
-          ? `${effectiveModel.providerId}:${effectiveModel.modelId}`
-          : undefined,
+        currentModelId: effectiveModel ? `${effectiveModel.providerId}:${effectiveModel.modelId}` : undefined,
         currentTheme: settings.appearance.theme,
       },
     });
@@ -275,12 +279,9 @@ export async function executeSlashCommand(input: string, context: SlashCommandCo
     }
 
     if (!response.result.success) {
-      context.showNotice(response.result.message);
+      notify.failure(response.result.message, currentText, 'composer.commandFailed');
     }
-
-    return true;
   } catch (error) {
-    context.showNotice(error instanceof Error ? error.message : currentText('composer.commandFailed'));
-    return true;
+    notify.failure(error, currentText, 'composer.commandFailed');
   }
 }

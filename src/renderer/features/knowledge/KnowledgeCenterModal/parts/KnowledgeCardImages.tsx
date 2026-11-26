@@ -19,10 +19,7 @@ export function KnowledgeCardImages({ spaceId, images }: KnowledgeCardImagesProp
     setLoaded((current) => (current[relativePath] === url ? current : { ...current, [relativePath]: url }));
   }, []);
   // The viewer walks the loaded images in reading order: each before / after pair, then the singles.
-  const items = [
-    ...pairs.flatMap((pair) => [pair.observed, pair.reference]),
-    ...singles,
-  ].flatMap((image) => {
+  const items = [...pairs.flatMap((pair) => [pair.observed, pair.reference]), ...singles].flatMap((image) => {
     const src = loaded[image.relativePath];
     if (!src) return [];
     const role = t(knowledgeImageRoleLabelKey(image.role));
@@ -35,7 +32,10 @@ export function KnowledgeCardImages({ spaceId, images }: KnowledgeCardImagesProp
   return (
     <div className="knowledge-card-images" data-testid="knowledge-card-images">
       {pairs.map((pair) => (
-        <div className="knowledge-card-images-pair" key={`${pair.observed.relativePath}:${pair.reference.relativePath}`}>
+        <div
+          className="knowledge-card-images-pair"
+          key={`${pair.observed.relativePath}:${pair.reference.relativePath}`}
+        >
           <KnowledgeCardImage
             spaceId={spaceId}
             relativePath={pair.observed.relativePath}
@@ -67,8 +67,13 @@ export function KnowledgeCardImages({ spaceId, images }: KnowledgeCardImagesProp
           onOpen={setOpened}
         />
       ))}
-      <ImageViewer open={index >= 0} items={items} index={Math.max(0, index)}
-        onIndexChange={(next) => setOpened(items[next].path)} onClose={() => setOpened(null)} />
+      <ImageViewer
+        open={index >= 0}
+        items={items}
+        index={Math.max(0, index)}
+        onIndexChange={(next) => setOpened(items[next].path)}
+        onClose={() => setOpened(null)}
+      />
     </div>
   );
 }

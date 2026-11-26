@@ -15,18 +15,14 @@ export interface ProviderRequestAuthorizationInput {
   body: string;
 }
 
-export type ProviderRequestAuthorizer = (
-  input: ProviderRequestAuthorizationInput,
-) => Promise<Record<string, string>>;
+export type ProviderRequestAuthorizer = (input: ProviderRequestAuthorizationInput) => Promise<Record<string, string>>;
 
 type ConnectionValues = Readonly<Record<string, string>>;
 
 const providerChainByProfile = new Map<string, ReturnType<typeof fromNodeProviderChain>>();
 
 function requiredRegion(values: ConnectionValues): string {
-  const region = values.AWS_REGION?.trim()
-    || process.env.AWS_REGION?.trim()
-    || process.env.AWS_DEFAULT_REGION?.trim();
+  const region = values.AWS_REGION?.trim() || process.env.AWS_REGION?.trim() || process.env.AWS_DEFAULT_REGION?.trim();
   if (!region) {
     throw new Error('AWS_REGION is required for Amazon Bedrock.');
   }
@@ -49,9 +45,7 @@ function explicitCredentials(values: ConnectionValues, region: string): AwsBedro
   };
 }
 
-export async function resolveAwsBedrockCredentials(
-  values: ConnectionValues,
-): Promise<AwsBedrockCredentials> {
+export async function resolveAwsBedrockCredentials(values: ConnectionValues): Promise<AwsBedrockCredentials> {
   const region = requiredRegion(values);
   const explicit = explicitCredentials(values, region);
   if (explicit) return explicit;
@@ -67,9 +61,9 @@ export async function resolveAwsBedrockCredentials(
   try {
     resolved = await provider();
   } catch (error) {
-    throw new Error(
-      `AWS credential chain is unavailable: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new Error(`AWS credential chain is unavailable: ${error instanceof Error ? error.message : String(error)}`, {
+      cause: error,
+    });
   }
   if (!resolved.accessKeyId || !resolved.secretAccessKey) {
     throw new Error('AWS credential chain did not return a usable access key pair.');
@@ -100,14 +94,9 @@ export async function signAwsBedrockRequest(
   return Object.fromEntries(signed.headers.entries());
 }
 
-export function createAwsBedrockRequestAuthorizer(
-  values: ConnectionValues,
-): ProviderRequestAuthorizer {
+export function createAwsBedrockRequestAuthorizer(values: ConnectionValues): ProviderRequestAuthorizer {
   const frozenValues = { ...values };
-  return async (input) => signAwsBedrockRequest(
-    input,
-    await resolveAwsBedrockCredentials(frozenValues),
-  );
+  return async (input) => signAwsBedrockRequest(input, await resolveAwsBedrockCredentials(frozenValues));
 }
 
 export function createAwsBedrockRequestAuthorizerFromCredentials(

@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { RendererEventChannel } from '@shared/renderer-api';
 
 export interface BrowserBridgeEvent {
@@ -5,33 +6,89 @@ export interface BrowserBridgeEvent {
   args?: unknown[];
 }
 
-export function parseEventStreamChunk(buffer: string): { events: BrowserBridgeEvent[]; remainder: string } {
-  const normalized = buffer.replace(/\r\n/gu, '\n');
-  const frames = normalized.split('\n\n');
-  const remainder = frames.pop() ?? '';
-  const events: BrowserBridgeEvent[] = [];
-  for (const frame of frames) {
-    const data = frame.split('\n')
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => line.slice(5).trimStart())
-      .join('\n');
-    if (!data) continue;
-    try {
-      const parsed = JSON.parse(data) as Partial<BrowserBridgeEvent>;
-      if (typeof parsed.channel === 'string') events.push(parsed as BrowserBridgeEvent);
-    } catch {
-      // A malformed frame is isolated; later valid frames on the same stream remain deliverable.
-    }
+/**
+ * One SSE frame: a channel name and its arguments. Only listeners of declared channels exist, and the renderer API checks
+ * each payload against its channel.
+ */
+const BrowserBridgeEventSchema: z.ZodType<BrowserBridgeEvent> = z.object({
+  channel: z.custom<RendererEventChannel>((value) => typeof value === 'string'),
+  args: z.array(z.unknown()).optional(),
+});
+
+export interface EventStreamParser {
+  /** Feeds decoded text and returns the events of every frame it completed. */
+  push(text: string): BrowserBridgeEvent[];
+}
+
+/**
+ * Incremental SSE framing. Only the text that arrived since the last push is scanned for a frame boundary, so a large
+ * frame delivered in many chunks costs linear time; re-splitting the whole buffer per chunk was quadratic.
+ */
+export function createEventStreamParser(): EventStreamParser {
+  let buffer = '';
+  let scanFrom = 0;
+  let pendingCarriageReturn = false;
+  return {
+    push(text) {
+      // CRLF and lone CR both end a line; a CR at the end of a chunk may pair with an LF at the start of the next.
+      let chunk = pendingCarriageReturn ? `\r${text}` : text;
+      pendingCarriageReturn = chunk.endsWith('\r');
+      if (pendingCarriageReturn) chunk = chunk.slice(0, -1);
+      buffer += chunk.replace(/\r\n?/gu, '\n');
+      const events: BrowserBridgeEvent[] = [];
+      let frameStart = 0;
+      for (;;) {
+        const boundary = buffer.indexOf('\n\n', scanFrom);
+        if (boundary < 0) break;
+        const event = parseFrame(buffer.slice(frameStart, boundary));
+        if (event) events.push(event);
+        frameStart = boundary + 2;
+        scanFrom = frameStart;
+      }
+      if (frameStart > 0) buffer = buffer.slice(frameStart);
+      // The next boundary may begin with the last newline already buffered.
+      scanFrom = Math.max(0, buffer.length - 1);
+      return events;
+    },
+  };
+}
+
+function parseFrame(frame: string): BrowserBridgeEvent | null {
+  const data = frame
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trimStart())
+    .join('\n');
+  if (!data) return null;
+  try {
+    const parsed = BrowserBridgeEventSchema.safeParse(JSON.parse(data));
+    if (parsed.success) return parsed.data;
+    console.warn(
+      '[BrowserAppBridge] Dropped an event frame that is not a bridge event:',
+      parsed.error.issues.map((issue) => issue.path.join('.')),
+    );
+  } catch (error) {
+    // A malformed frame is isolated; later valid frames on the same stream remain deliverable.
+    console.warn('[BrowserAppBridge] Dropped a malformed event frame:', error);
   }
-  return { events, remainder };
+  return null;
 }
 
 function abortableDelay(milliseconds: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
-    if (signal.aborted) { resolve(); return; }
-    const finish = () => { signal.removeEventListener('abort', onAbort); resolve(); };
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+    const finish = () => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    };
     const timer = globalThis.setTimeout(finish, milliseconds);
-    const onAbort = () => { globalThis.clearTimeout(timer); finish(); };
+    const onAbort = () => {
+      globalThis.clearTimeout(timer);
+      finish();
+    };
     signal.addEventListener('abort', onAbort, { once: true });
   });
 }
@@ -42,9 +99,11 @@ export function connectBrowserEventStream(
   fetchImpl: typeof fetch = fetch,
 ): () => void {
   const controller = new AbortController();
+  // Read afresh at every check: abort() lands while a fetch, a read or a delay is awaited.
+  const stopped = (): boolean => controller.signal.aborted;
   void (async () => {
     let retryDelay = 250;
-    while (!controller.signal.aborted) {
+    while (!stopped()) {
       let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
       try {
         const response = await fetchImpl(url, {
@@ -61,23 +120,22 @@ export function connectBrowserEventStream(
         retryDelay = 250;
         reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let buffer = '';
-        while (!controller.signal.aborted) {
+        const parser = createEventStreamParser();
+        while (!stopped()) {
           const chunk = await reader.read();
-          if (controller.signal.aborted) break;
+          if (stopped()) break;
           if (chunk.done) break;
-          buffer += decoder.decode(chunk.value, { stream: true });
-          const parsed = parseEventStreamChunk(buffer);
-          buffer = parsed.remainder;
-          for (const event of parsed.events) {
-            if (controller.signal.aborted) break;
-            try { onEvent(event); } catch (error) {
+          for (const event of parser.push(decoder.decode(chunk.value, { stream: true }))) {
+            if (stopped()) break;
+            try {
+              onEvent(event);
+            } catch (error) {
               console.error('[BrowserAppBridge] Event listener failed:', error);
             }
           }
         }
       } catch (error) {
-        if (controller.signal.aborted) break;
+        if (stopped()) break;
         console.warn('[BrowserAppBridge] Event stream disconnected:', error);
       } finally {
         if (reader) {

@@ -1,10 +1,8 @@
 /**
  * Vertical Session Artifact schema for RenderDoc investigation.
  * Namespace `rdc.investigation.v1` — Session Artifact only.
- * Do not write these fields into TaskRecord / AgentProfile / ConversationMessage.
+ * Do not write these fields into TaskRecord / AgentManifestDefinition / ConversationMessage.
  */
-
-export const INVESTIGATION_SCHEMA_NAMESPACE = 'rdc.investigation.v1' as const;
 
 export const INVESTIGATION_MISSIONS = ['debugger', 'analyzer', 'optimizer'] as const;
 export type InvestigationMission = (typeof INVESTIGATION_MISSIONS)[number];
@@ -12,20 +10,8 @@ export type InvestigationMission = (typeof INVESTIGATION_MISSIONS)[number];
 export const EPISTEMIC_STATUSES = ['unknown', 'inferred', 'derived', 'observed'] as const;
 export type EpistemicStatus = (typeof EPISTEMIC_STATUSES)[number];
 
-/** Epistemic partial order: unknown < inferred < derived < observed. */
-export const EPISTEMIC_RANK: Record<EpistemicStatus, number> = {
-  unknown: 0,
-  inferred: 1,
-  derived: 2,
-  observed: 3,
-};
-
-export function epistemicRank(status: EpistemicStatus): number {
-  return EPISTEMIC_RANK[status];
-}
-
 export const CONFIDENCE_LEVELS = ['exact', 'strong', 'probable', 'speculative'] as const;
-export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
+type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
 
 export const VERIFICATION_LEVELS = [
   'observed',
@@ -37,13 +23,13 @@ export const VERIFICATION_LEVELS = [
   'cross_device',
   'expert_reviewed',
 ] as const;
-export type VerificationLevel = (typeof VERIFICATION_LEVELS)[number];
+type VerificationLevel = (typeof VERIFICATION_LEVELS)[number];
 
 export const WORLD_STATE_KINDS = ['baseline', 'experiment', 'restored_baseline', 'unknown'] as const;
-export type WorldStateKind = (typeof WORLD_STATE_KINDS)[number];
+type WorldStateKind = (typeof WORLD_STATE_KINDS)[number];
 
 export const WORLD_STATE_VALIDITIES = ['valid', 'stale', 'polluted', 'unknown'] as const;
-export type WorldStateValidity = (typeof WORLD_STATE_VALIDITIES)[number];
+type WorldStateValidity = (typeof WORLD_STATE_VALIDITIES)[number];
 
 export const CLAIM_KINDS = [
   'observed_fact',
@@ -57,10 +43,10 @@ export const CLAIM_KINDS = [
 export type ClaimKind = (typeof CLAIM_KINDS)[number];
 
 export const CLAIM_PROJECTION_KINDS = ['compact', 'report', 'view'] as const;
-export type ClaimProjectionKind = (typeof CLAIM_PROJECTION_KINDS)[number];
+type ClaimProjectionKind = (typeof CLAIM_PROJECTION_KINDS)[number];
 
 export const CLAIM_DECISIONS = ['accept', 'reject', 'downgrade', 'defer'] as const;
-export type ClaimDecisionVerdict = (typeof CLAIM_DECISIONS)[number];
+type ClaimDecisionVerdict = (typeof CLAIM_DECISIONS)[number];
 
 export const EXPERIMENT_STATUSES = [
   'designed',
@@ -74,13 +60,13 @@ export const EXPERIMENT_STATUSES = [
 export type ExperimentStatus = (typeof EXPERIMENT_STATUSES)[number];
 
 export const EXPERIMENT_PROTOCOLS = ['A-B-A', 'ABABAB'] as const;
-export type ExperimentProtocolKind = (typeof EXPERIMENT_PROTOCOLS)[number];
+type ExperimentProtocolKind = (typeof EXPERIMENT_PROTOCOLS)[number];
 
 export const EXPERIMENT_ACTION_CLASSES = ['C', 'R', 'E'] as const;
-export type ExperimentActionClass = (typeof EXPERIMENT_ACTION_CLASSES)[number];
+type ExperimentActionClass = (typeof EXPERIMENT_ACTION_CLASSES)[number];
 
 export const CHALLENGE_TARGET_TYPES = ['claim', 'evidence', 'experiment'] as const;
-export type ChallengeTargetType = (typeof CHALLENGE_TARGET_TYPES)[number];
+type ChallengeTargetType = (typeof CHALLENGE_TARGET_TYPES)[number];
 
 export const CHALLENGE_KINDS = [
   'contradiction',
@@ -90,10 +76,10 @@ export const CHALLENGE_KINDS = [
   'unknown',
   'methodology',
 ] as const;
-export type ChallengeKind = (typeof CHALLENGE_KINDS)[number];
+type ChallengeKind = (typeof CHALLENGE_KINDS)[number];
 
 export const CHALLENGE_STATUSES = ['open', 'resolved', 'wont_fix'] as const;
-export type ChallengeStatus = (typeof CHALLENGE_STATUSES)[number];
+type ChallengeStatus = (typeof CHALLENGE_STATUSES)[number];
 
 export const INVESTIGATION_ARTIFACT_KINDS = [
   'world_state',
@@ -108,13 +94,7 @@ export const INVESTIGATION_ARTIFACT_KINDS = [
 ] as const;
 export type InvestigationArtifactKind = (typeof INVESTIGATION_ARTIFACT_KINDS)[number];
 
-export const INVESTIGATION_ARTIFACT_STATUSES = [
-  'draft',
-  'ready',
-  'stale',
-  'failed',
-  'superseded',
-] as const;
+export const INVESTIGATION_ARTIFACT_STATUSES = ['draft', 'ready', 'stale', 'failed', 'superseded'] as const;
 export type InvestigationArtifactStatus = (typeof INVESTIGATION_ARTIFACT_STATUSES)[number];
 
 export const INVESTIGATION_RECORD_TYPES = [
@@ -131,7 +111,7 @@ export const INVESTIGATION_RECORD_TYPES = [
 export type InvestigationRecordType = (typeof INVESTIGATION_RECORD_TYPES)[number];
 
 export const EVIDENCE_SOURCE_KINDS = ['tool', 'human', 'external_document'] as const;
-export type EvidenceSourceKind = (typeof EVIDENCE_SOURCE_KINDS)[number];
+type EvidenceSourceKind = (typeof EVIDENCE_SOURCE_KINDS)[number];
 
 export const EVIDENCE_OBSERVATION_KINDS = [
   'image_compare',
@@ -142,70 +122,46 @@ export const EVIDENCE_OBSERVATION_KINDS = [
   'resource',
   'other',
 ] as const;
-export type EvidenceObservationKind = (typeof EVIDENCE_OBSERVATION_KINDS)[number];
+type EvidenceObservationKind = (typeof EVIDENCE_OBSERVATION_KINDS)[number];
 
 export const EVIDENCE_STRENGTHS = ['strong', 'moderate', 'weak', 'none'] as const;
-export type EvidenceStrength = (typeof EVIDENCE_STRENGTHS)[number];
+type EvidenceStrength = (typeof EVIDENCE_STRENGTHS)[number];
 
 export const EVIDENCE_REGION_KINDS = ['pixel', 'event', 'resource'] as const;
-export type EvidenceRegionKind = (typeof EVIDENCE_REGION_KINDS)[number];
+type EvidenceRegionKind = (typeof EVIDENCE_REGION_KINDS)[number];
 
-export interface InvestigationKindRegistryEntry {
-  kind: InvestigationArtifactKind;
-  recordType: InvestigationRecordType;
-  schema: `${typeof INVESTIGATION_SCHEMA_NAMESPACE}.${InvestigationRecordType}`;
-}
-
-export const INVESTIGATION_KIND_REGISTRY: readonly InvestigationKindRegistryEntry[] = [
-  { kind: 'world_state', recordType: 'WorldState', schema: 'rdc.investigation.v1.WorldState' },
-  { kind: 'evidence', recordType: 'EvidenceRecord', schema: 'rdc.investigation.v1.EvidenceRecord' },
-  { kind: 'evidence_pack', recordType: 'EvidencePack', schema: 'rdc.investigation.v1.EvidencePack' },
-  { kind: 'claim', recordType: 'ClaimRecord', schema: 'rdc.investigation.v1.ClaimRecord' },
-  { kind: 'claim_set', recordType: 'ClaimSet', schema: 'rdc.investigation.v1.ClaimSet' },
-  { kind: 'experiment', recordType: 'ExperimentRecord', schema: 'rdc.investigation.v1.ExperimentRecord' },
-  { kind: 'challenge', recordType: 'ChallengeRecord', schema: 'rdc.investigation.v1.ChallengeRecord' },
-  { kind: 'checkpoint', recordType: 'MissionCheckpoint', schema: 'rdc.investigation.v1.MissionCheckpoint' },
-  { kind: 'report', recordType: 'InvestigationReport', schema: 'rdc.investigation.v1.InvestigationReport' },
-] as const;
-
-const KIND_BY_ID = new Map(INVESTIGATION_KIND_REGISTRY.map((entry) => [entry.kind, entry]));
-
-export function resolveInvestigationKind(kind: string): InvestigationKindRegistryEntry | null {
-  return KIND_BY_ID.get(kind as InvestigationArtifactKind) ?? null;
-}
-
-export interface WorldStateReplay {
+interface WorldStateReplay {
   adapter: string;
   driver: string;
   device: string;
   exclusiveLock: boolean;
 }
 
-export interface WorldStateShaderReplacement {
+interface WorldStateShaderReplacement {
   shaderId: string;
   replacementRef: string;
 }
 
-export interface WorldStatePatch {
+interface WorldStatePatch {
   patchId: string;
   summary: string;
 }
 
-export interface WorldStateFocus {
+interface WorldStateFocus {
   event?: string;
   resource?: string;
   pixel?: { x: number; y: number };
   subresource?: string;
 }
 
-export interface WorldStateBenchmark {
+interface WorldStateBenchmark {
   warmup: number;
   resolution: string;
   vsync: boolean;
   samplingProtocol: string;
 }
 
-export interface WorldStateBenchmarkNotMeasured {
+interface WorldStateBenchmarkNotMeasured {
   status: 'not_measured';
   reason: string;
 }
@@ -222,7 +178,7 @@ export interface WorldState {
   validity: WorldStateValidity;
 }
 
-export interface EvidenceSource {
+interface EvidenceSource {
   kind: EvidenceSourceKind;
   name: string;
   parameterFingerprint: string;
@@ -233,7 +189,7 @@ export interface InvestigationContentRef {
   expectedHash: string;
 }
 
-export interface EvidenceRegion {
+interface EvidenceRegion {
   kind: EvidenceRegionKind;
   spec: string;
 }
@@ -266,7 +222,7 @@ export interface CompactProvenanceEntry {
   sourceVerificationLevel: VerificationLevel;
 }
 
-export interface InvestigationClaimScope {
+interface InvestigationClaimScope {
   capture?: string;
   eventId?: string;
   resourceId?: string;
@@ -276,7 +232,7 @@ export interface InvestigationClaimScope {
   notes?: string;
 }
 
-export interface ClaimRootCause {
+interface ClaimRootCause {
   trigger: string;
   faultLocation: string;
   failureMechanism: string;
@@ -286,7 +242,7 @@ export interface ClaimRootCause {
   counterfactualEvidence: string;
 }
 
-export interface ClaimDecision {
+interface ClaimDecision {
   verdict: ClaimDecisionVerdict;
   reason: string;
   challengeId?: string;
@@ -302,6 +258,8 @@ export interface ClaimRecord {
   worldStateId: string;
   experimentId: string | null;
   declaresCounterfactual: boolean;
+  /** EvidenceRecord.evidenceId values the claim rests on; required (at least one) for a non-projected observed claim. */
+  evidenceIds?: string[];
   supports?: string[];
   contradicts?: string[];
   scope: InvestigationClaimScope;
@@ -315,36 +273,36 @@ export interface ClaimSet {
   items: ClaimRecord[];
 }
 
-export interface ExperimentIntervention {
+interface ExperimentIntervention {
   type: string;
   payload: Record<string, unknown>;
 }
 
-export interface ExperimentProtocol {
+interface ExperimentProtocol {
   kind: ExperimentProtocolKind;
   warmup: number;
   noiseThreshold: number;
 }
 
-export interface ExperimentMetric {
+interface ExperimentMetric {
   name: string;
   kind: string;
   unit?: string;
 }
 
-export interface ExperimentVisualValidation {
+interface ExperimentVisualValidation {
   before?: string;
   after?: string;
   diff?: string;
   region?: string;
 }
 
-export interface ExperimentResult {
+interface ExperimentResult {
   summary: string;
   accepted: boolean;
 }
 
-export interface ExperimentRollback {
+interface ExperimentRollback {
   executed: boolean;
   baselineRestored: boolean;
   verifyEvidenceIds: string[];
@@ -352,7 +310,10 @@ export interface ExperimentRollback {
 
 export interface ExperimentRecord {
   /** Main-signed native execution receipts; absent on historical records. */
-  executionEvidence?: Record<"baseline" | "intervention" | "variant" | "rollback" | "restored", InvestigationContentRef>;
+  executionEvidence?: Record<
+    'baseline' | 'intervention' | 'variant' | 'rollback' | 'restored',
+    InvestigationContentRef
+  >;
   experimentId: string;
   hypothesisClaimId: string;
   intervention: ExperimentIntervention;
@@ -370,7 +331,7 @@ export interface ExperimentRecord {
   status: ExperimentStatus;
 }
 
-export interface ChallengeTargetRef {
+interface ChallengeTargetRef {
   type: ChallengeTargetType;
   id: string;
 }
@@ -400,7 +361,7 @@ export interface MissionCheckpoint {
 }
 
 export const REPORT_CANDIDATE_STATUSES = ['none', 'session-created', 'not-requested'] as const;
-export type ReportCandidateStatus = (typeof REPORT_CANDIDATE_STATUSES)[number];
+type ReportCandidateStatus = (typeof REPORT_CANDIDATE_STATUSES)[number];
 
 export interface InvestigationReportContract {
   conclusion: string;
@@ -455,42 +416,14 @@ export type InvestigationRecord =
   | MissionCheckpoint
   | InvestigationReport;
 
-export function isCausalOrCounterfactualClaim(claim: Pick<ClaimRecord, 'claimKind' | 'declaresCounterfactual'>): boolean {
-  return claim.claimKind === 'causal_conclusion' || claim.declaresCounterfactual === true;
-}
-
-export const ANALYZER_EXPLANATION_LAYERS = ['observed', 'reconstructed', 'authoring'] as const;
-export type AnalyzerExplanationLayer = (typeof ANALYZER_EXPLANATION_LAYERS)[number];
-
-export const MISSION_PLANNING_AGENT_IDS = ['debugger', 'analyzer', 'optimizer'] as const;
-
-/** Observed / Reconstructed / Authoring. Non-architecture kinds return null. */
-export function analyzerExplanationLayer(claimKind: ClaimKind): AnalyzerExplanationLayer | null {
-  if (claimKind === 'observed_fact') return 'observed';
-  if (claimKind === 'derived_structure') return 'reconstructed';
-  if (claimKind === 'semantic_inference' || claimKind === 'hypothesis') return 'authoring';
-  return null;
-}
-
-export function isClosedExperimentStatus(status: ExperimentStatus): boolean {
-  return status === 'recorded' || status === 'rolled_back';
-}
-
-export function isWorldStateMutated(state: Pick<WorldState, 'shaderReplacement' | 'patchStack'>): boolean {
-  return state.shaderReplacement != null || state.patchStack.length > 0;
-}
-
-export function formatInvestigationContentHash(hex: string): string {
-  const bare = hex.trim().toLowerCase().replace(/^sha256:/, '');
-  return `sha256:${bare}`;
-}
-
 export function bareInvestigationHash(value: string): string {
-  return value.trim().toLowerCase().replace(/^sha256:/, '');
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^sha256:/, '');
 }
 
-export const INVESTIGATION_READ_IPC_STATUSES = ['ready', 'degraded', 'error', 'hash-mismatch'] as const;
-export type InvestigationReadIpcStatus = (typeof INVESTIGATION_READ_IPC_STATUSES)[number];
+type InvestigationReadIpcStatus = 'ready' | 'degraded' | 'error' | 'hash-mismatch';
 
 export interface InvestigationReadRequest {
   sessionId: string;

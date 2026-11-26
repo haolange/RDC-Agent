@@ -1,13 +1,15 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useConversationStore } from '../../stores/conversationStore';
-import { removeOptimisticConversationMessages } from '../../stores/conversationSendHelpers';
+import { removeRequestMessages } from '../../stores/conversationSendHelpers';
 import {
   restoreLastSentIfCurrentSession,
   type ActiveTurnOwnership,
   useComposerSessionContextStore,
 } from '../../stores/composerSessionContextStore';
 import { stopWorkTrace } from '../../lib/stopWorkTrace';
+import { notify } from '../../stores/notificationStore';
 import { selectActiveAssistantForTurn } from './composerStopSelection';
 import { reconcileConversationStop } from './composerStopReconciliation';
 import type { useI18n } from '../../i18n';
@@ -18,8 +20,10 @@ export { stopWorkTrace };
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
+/** The Stop notice never waits on the workflow stop, so its failure is only reported. */
+const reportWorkflowStopFailure = (error: unknown) => console.warn('[composer] the workflow did not stop', error);
+
 export function useComposerStop(options: {
-  showNotice: (message: string) => void;
   t: Translate;
   currentSession: SessionRecord | null;
   currentRun: RunSummary | null;
@@ -27,35 +31,27 @@ export function useComposerStop(options: {
   setPendingAttachments?: Dispatch<SetStateAction<PendingAttachmentDraft[]>>;
   setPendingSkillIds?: Dispatch<SetStateAction<string[]>>;
 }) {
-  const {
-    showNotice,
-    t,
-    currentSession,
-    currentRun,
-    setPromptValue,
-    setPendingAttachments,
-    setPendingSkillIds,
-  } = options;
+  const { t, currentSession, currentRun, setPromptValue, setPendingAttachments, setPendingSkillIds } = options;
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
+  // The session whose Stop main has not answered yet: its button shows the pending icon from the click on.
+  const [stoppingSessionId, setStoppingSessionId] = useState<string | null>(null);
+  const stopScope = currentSession?.sessionId ?? 'no-session';
 
   const handlePrimaryStop = useCallback(async () => {
     useComposerSessionContextStore.getState().clearHandoffSuggestion();
     const electronAPI = window.electronAPI;
-    if (!electronAPI) return;
-
+    setStoppingSessionId(stopScope);
     try {
       useComposerSessionContextStore.getState().setIsPromptSending(false);
       const activeTurn = useComposerSessionContextStore.getState().activeTurn;
-      const turnOwnership: ActiveTurnOwnership | null = (
-        activeTurn
-        && activeTurn.sessionId === (currentSession?.sessionId ?? 'no-session')
+      const turnOwnership: ActiveTurnOwnership | null =
+        activeTurn && activeTurn.sessionId === (currentSession?.sessionId ?? 'no-session')
           ? {
-            sessionId: activeTurn.sessionId,
-            requestId: activeTurn.requestId,
-            agentId: activeTurn.agentId,
-          }
-          : null
-      );
+              sessionId: activeTurn.sessionId,
+              requestId: activeTurn.requestId,
+              agentId: activeTurn.agentId,
+            }
+          : null;
       const requestId = turnOwnership?.requestId ?? null;
       const conversation = useConversationStore.getState();
       const activeAssistant = selectActiveAssistantForTurn(
@@ -64,58 +60,37 @@ export function useComposerStop(options: {
         activeTurn,
       );
 
-      // Optimistic stop for both preparing (optimistic-turn-*) and committed streaming turns.
-      if (activeAssistant) {
-        if (requestId) conversation.markRequestMonotonicallyStopped(requestId);
-        if (activeAssistant.requestId) {
-          conversation.markRequestMonotonicallyStopped(activeAssistant.requestId);
-        }
-        conversation.markTurnMonotonicallyStopped(activeAssistant.turnId);
-        if (activeTurn?.optimisticTurnId) {
-          conversation.markTurnMonotonicallyStopped(activeTurn.optimisticTurnId);
-        }
-        conversation.updateAssistantMessageByTurnId(activeAssistant.turnId, stopWorkTrace);
-      } else if (requestId) {
-        conversation.markRequestMonotonicallyStopped(requestId);
-        if (activeTurn?.optimisticTurnId) {
-          conversation.markTurnMonotonicallyStopped(activeTurn.optimisticTurnId);
-        }
-      }
-
-      const clearlyPastPreparing = Boolean(
-        activeAssistant
-        && !activeAssistant.turnId.startsWith('optimistic-turn-'),
-      );
+      // Stop shows at once, whether the turn is still preparing or already streaming: the turn id is the same one
+      // main gives it (conversationTurnIds), so the marks hold for main's messages too.
+      const turnId = activeAssistant?.turnId ?? (requestId ? conversationTurnIds(requestId).turnId : null);
+      if (requestId) conversation.markRequestMonotonicallyStopped(requestId);
+      if (activeAssistant?.requestId) conversation.markRequestMonotonicallyStopped(activeAssistant.requestId);
+      if (turnId) conversation.markTurnMonotonicallyStopped(turnId);
+      if (activeAssistant) conversation.updateAssistantMessageByTurnId(activeAssistant.turnId, stopWorkTrace);
 
       const cancelPromise = electronAPI.conversation.cancelActiveTurn({
         requestId: requestId ?? undefined,
         sessionId: currentSession?.sessionId,
-        turnId: clearlyPastPreparing ? activeAssistant?.turnId : undefined,
+        turnId: turnId ?? undefined,
       });
 
-      const workflowStopPromise = currentRun
-        && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running'].includes(currentRun.status)
-        ? (setCurrentRun({ ...currentRun, status: 'stopping' }), electronAPI.workflow.stop(currentRun.runId))
-        : null;
+      const workflowStopPromise =
+        currentRun &&
+        ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running'].includes(currentRun.status)
+          ? (setCurrentRun({ ...currentRun, status: 'stopping' }), electronAPI.workflow.stop(currentRun.runId))
+          : null;
 
       const cancelResult = await cancelPromise;
 
       if (cancelResult.success && cancelResult.phase === 'preparing') {
-        const revokedRequestId = requestId
-          ?? cancelResult.cancelledRequestId
-          ?? activeAssistant?.requestId
-          ?? null;
+        const revokedRequestId = requestId ?? cancelResult.cancelledRequestId ?? activeAssistant?.requestId ?? null;
         if (revokedRequestId) {
           conversation.markRequestRevoked(revokedRequestId);
-          const optimisticIds = conversation.allConversationMessages
-            .filter((message) => message.requestId === revokedRequestId)
-            .map((message) => message.id);
-          useConversationStore.getState().setConversationMessages(
-            removeOptimisticConversationMessages(
-              useConversationStore.getState().allConversationMessages,
-              optimisticIds,
-            ),
-          );
+          useConversationStore
+            .getState()
+            .setConversationMessages(
+              removeRequestMessages(useConversationStore.getState().allConversationMessages, revokedRequestId),
+            );
         }
         if (setPromptValue && setPendingAttachments && setPendingSkillIds) {
           restoreLastSentIfCurrentSession(currentSession?.sessionId, (lastSent) => {
@@ -130,41 +105,43 @@ export function useComposerStop(options: {
           useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
         }
         if (workflowStopPromise) {
-          void workflowStopPromise.catch(() => undefined);
+          void workflowStopPromise.catch(reportWorkflowStopFailure);
         }
-        showNotice(t('app.stopRunSent'));
+        notify.info(t('app.stopRunSent'));
         return;
       }
 
-      await reconcileConversationStop({ conversationAPI: electronAPI.conversation, cancelResult,
-        sessionId: currentSession?.sessionId, activeAssistant, activeTurn, turnOwnership });
+      await reconcileConversationStop({
+        conversationAPI: electronAPI.conversation,
+        cancelResult,
+        sessionId: currentSession?.sessionId,
+        activeAssistant,
+        activeTurn,
+        turnOwnership,
+      });
 
       // Do not block notice on workflow stop latency.
       if (workflowStopPromise) {
-        void workflowStopPromise.catch(() => undefined);
+        void workflowStopPromise.catch(reportWorkflowStopFailure);
       }
 
-      if (!cancelResult.success) {
-        const error = cancelResult.error;
-        if (error && !error.includes('No active conversation')) {
-          showNotice(error);
-          return;
-        }
-      }
-      showNotice(t('app.stopRunSent'));
+      // Nothing left to stop (`no-active-turn`) reads the same as a sent stop; a failed stop rejected above.
+      notify.info(t('app.stopRunSent'));
     } catch (error) {
-      showNotice(error instanceof Error ? error.message : t('app.stopRunFailed'));
+      notify.failure(error, t, 'app.stopRunFailed');
+    } finally {
+      setStoppingSessionId((current) => (current === stopScope ? null : current));
     }
   }, [
+    stopScope,
     currentRun,
     currentSession?.sessionId,
     setCurrentRun,
     setPendingAttachments,
     setPendingSkillIds,
     setPromptValue,
-    showNotice,
     t,
   ]);
 
-  return { handlePrimaryStop };
+  return { handlePrimaryStop, stopPending: stoppingSessionId === stopScope };
 }

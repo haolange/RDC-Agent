@@ -15,8 +15,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { expandHomePath } from '../../../platform/paths';
-import { getWorkspaceRoot, safeResolvePath, truncateOutput } from './_shared';
-import { GLOB_MAX_OUTPUT_BYTES } from './toolLimits';
+import { getWorkspaceRoot, safeResolvePath, truncateOutput } from '../../../runtime/toolFiles';
+import { GLOB_MAX_OUTPUT_BYTES } from '../../../runtime/toolLimits';
 import type { AgentTool } from '../../agent/AgentTool';
 
 interface GlobParams {
@@ -48,25 +48,30 @@ const DEFAULT_IGNORED_DIRS = new Set<string>([
 export const globTool: AgentTool<GlobParams, GlobDetails> = {
   name: 'glob',
   label: '文件搜索',
-  description:
-    'Search for files matching a glob pattern in the workspace. Supports *, **, ?, {a,b}, and [abc].',
+  description: 'Search for files matching a glob pattern in the workspace. Supports *, **, ?, {a,b}, and [abc].',
   parameters: {
     type: 'object',
     properties: {
       pattern: {
         type: 'string',
-        description:
-          'Glob pattern, e.g. "src/**/*.ts" or "**/*.{json,md}".',
+        description: 'Glob pattern, e.g. "src/**/*.ts" or "**/*.{json,md}".',
       },
       cwd: {
         type: 'string',
-        description:
-          'Optional sub-directory inside the workspace to search from (default: workspace root).',
+        description: 'Optional sub-directory inside the workspace to search from (default: workspace root).',
       },
     },
     required: ['pattern'],
   },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false },
+  spec: {
+    isReadOnly: true,
+    concurrency: 'shared',
+    isDestructive: false,
+    sideEffect: 'none',
+    category: 'search',
+    requiresApproval: false,
+    knowledgeRoots: 'read-access',
+  },
   permissionHint: 'readonly',
   effects: { reads: ['cwd', 'path'], readPattern: 'pattern' },
 
@@ -86,7 +91,8 @@ export const globTool: AgentTool<GlobParams, GlobDetails> = {
 
     const regex = compileGlob(pattern);
     const matches: string[] = [];
-    let truncated = false;
+    // Set inside the walk callback once MAX_RESULTS is reached.
+    let truncated = false as boolean;
 
     await walk(baseDir, baseDir, async (relPath) => {
       if (signal?.aborted) {

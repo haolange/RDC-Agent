@@ -10,7 +10,16 @@ const SAVED_MARK_MS = 1600;
  * Autosave feedback without a sentence: a spinner while saving, a check that fades after a moment once saved, and a
  * one-line error when the save failed.
  */
-export function SettingsSaveMark({ status, savingLabel, savedLabel, errorLabel, errorDetail, onRetry, retryLabel, testId }: {
+export function SettingsSaveMark({
+  status,
+  savingLabel,
+  savedLabel,
+  errorLabel,
+  errorDetail,
+  onRetry,
+  retryLabel,
+  testId,
+}: {
   status: SettingsAutosaveStatus;
   savingLabel: string;
   savedLabel: string;
@@ -31,16 +40,30 @@ export function SettingsSaveMark({ status, savingLabel, savedLabel, errorLabel, 
   }, [status]);
   if (status === 'error') {
     return (
-      <InlineError className="settings-save-error" detail={errorDetail} onRetry={onRetry} retryLabel={retryLabel} data-testid={testId}>
+      <InlineError
+        className="settings-save-error"
+        detail={errorDetail}
+        onRetry={onRetry}
+        retryLabel={retryLabel}
+        data-testid={testId}
+      >
         {errorLabel}
       </InlineError>
     );
   }
   return (
-    <span className="settings-save-mark" role="status" data-testid={testId}
-      aria-label={status === 'saving' ? savingLabel : showSaved ? savedLabel : undefined}>
+    <span
+      className="settings-save-mark"
+      role="status"
+      data-testid={testId}
+      aria-label={status === 'saving' ? savingLabel : showSaved ? savedLabel : undefined}
+    >
       {status === 'saving' ? <Spinner size="sm" /> : null}
-      <Icon name="check" size={16} className={`settings-save-mark-check${showSaved && status === 'saved' ? ' is-visible' : ''}`} />
+      <Icon
+        name="check"
+        size={16}
+        className={`settings-save-mark-check${showSaved && status === 'saved' ? ' is-visible' : ''}`}
+      />
     </span>
   );
 }

@@ -4,6 +4,7 @@ import { ImageViewer } from '../../../../ui/ImageViewer';
 import { Skeleton } from '../../../../ui/Skeleton';
 import { knowledgeImageRoleLabelKey, normalizeKnowledgePreviewPath } from '../knowledgeCardImages';
 import { useKnowledgeCardImage } from '../useKnowledgeCardImage';
+import { PlainButton } from '../../../../ui/PlainButton';
 import type { KnowledgeImageRole } from '@shared/types/knowledge';
 
 interface KnowledgeCardImageProps {
@@ -40,19 +41,17 @@ export function KnowledgeCardImage({
   }, [url, relativePath, onReady]);
 
   return (
-    <figure
-      className="knowledge-card-image"
-      data-testid="knowledge-card-image"
-      data-role={role}
-      data-path={path}
-    >
+    <figure className="knowledge-card-image" data-testid="knowledge-card-image" data-role={role} data-path={path}>
       {heading ? <figcaption className="knowledge-card-image-label">{heading}</figcaption> : null}
       <div className="knowledge-card-image-frame">
         {ready ? (
-          <button type="button" className="knowledge-card-image-open" aria-label={t('knowledgeCenter.imageOpen', { name: heading || imageLabel })}
-            onClick={() => (onOpen ? onOpen(relativePath) : setViewing(true))}>
+          <PlainButton
+            className="knowledge-card-image-open"
+            aria-label={t('knowledgeCenter.imageOpen', { name: heading || imageLabel })}
+            onClick={() => (onOpen ? onOpen(relativePath) : setViewing(true))}
+          >
             <img src={preview.dataUrl} alt={imageLabel} />
-          </button>
+          </PlainButton>
         ) : preview.status === 'loading' || preview.status === 'idle' ? (
           <div className="knowledge-card-image-missing" role="status" aria-label={t('knowledgeCenter.loading')}>
             <Skeleton shape="line" count={2} />
@@ -64,8 +63,13 @@ export function KnowledgeCardImage({
         )}
       </div>
       {!onOpen && url ? (
-        <ImageViewer open={viewing} items={[{ src: url, title: imageLabel }]} index={0}
-          onIndexChange={() => undefined} onClose={() => setViewing(false)} />
+        <ImageViewer
+          open={viewing}
+          items={[{ src: url, title: imageLabel }]}
+          index={0}
+          onIndexChange={() => undefined}
+          onClose={() => setViewing(false)}
+        />
       ) : null}
     </figure>
   );

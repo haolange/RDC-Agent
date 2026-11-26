@@ -3,14 +3,12 @@ import CodeMirror from '@uiw/react-codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { Prec, type Extension } from '@codemirror/state';
-import { indentWithTab } from '@codemirror/commands';
-import { registerCodeMirrorView } from '../../lib/contextMenuCommands';
+import { indentWithTab, redo, redoDepth, undo, undoDepth } from '@codemirror/commands';
+import { registerCodeMirrorSurface, type CodeMirrorCommandSurface } from '../../lib/contextMenuCommands';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { useComposerMarkdownSizing } from './useComposerMarkdownSizing';
+import type { ComposerMarkdownMode } from './ComposerControllerContext';
 import './ComposerMarkdownInput.css';
-
-export type ComposerMarkdownMode = 'write' | 'preview';
-
 
 interface ComposerMarkdownInputProps {
   value: string;
@@ -20,6 +18,8 @@ interface ComposerMarkdownInputProps {
   placeholder: string;
   mode: ComposerMarkdownMode;
   disabled?: boolean;
+  /** The plain field shown while the editor loaded had focus; the caret moves to the end of the editor. */
+  focusOnCreate?: boolean;
 }
 
 const composerEditorTheme = EditorView.theme({
@@ -89,6 +89,17 @@ const composerEditorTheme = EditorView.theme({
   },
 });
 
+const commandSurface = (view: EditorView): CodeMirrorCommandSurface => ({
+  undoDepth: () => undoDepth(view.state),
+  redoDepth: () => redoDepth(view.state),
+  undo: () => undo(view),
+  redo: () => redo(view),
+  focus: () => view.focus(),
+  selectAll: () => view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } }),
+  selectedText: () => view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to),
+  replaceSelection: (text) => view.dispatch(view.state.replaceSelection(text)),
+});
+
 export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
   value,
   onChange,
@@ -97,16 +108,21 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
   placeholder,
   mode,
   disabled = false,
+  focusOnCreate = false,
 }) => {
   const hostRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => () => {
-    if (hostRef.current) registerCodeMirrorView(hostRef.current, null);
-  }, []);
+  useEffect(
+    () => () => {
+      if (hostRef.current) registerCodeMirrorSurface(hostRef.current, null, null);
+    },
+    [],
+  );
 
   const syncHostHeight = useComposerMarkdownSizing(hostRef, value, mode);
 
-  const extensions = useMemo((): Extension[] => [
+  const extensions = useMemo(
+    (): Extension[] => [
       markdown(),
       composerEditorTheme,
       cmPlaceholder(placeholder),
@@ -149,15 +165,12 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
         }
         syncHostHeight();
       }),
-    ], [disabled, mode, onPasteFiles, onSend, placeholder, syncHostHeight]);
+    ],
+    [disabled, mode, onPasteFiles, onSend, placeholder, syncHostHeight],
+  );
 
   return (
-    <div
-      ref={hostRef}
-      className="composer-markdown-input"
-      data-testid="composer-markdown-input"
-      data-mode={mode}
-    >
+    <div ref={hostRef} className="composer-markdown-input" data-testid="composer-markdown-input" data-mode={mode}>
       <div className="composer-markdown-stage">
         <div
           className={`composer-markdown-pane composer-markdown-editor-pane ${mode === 'write' ? 'is-active' : 'is-inactive'}`}
@@ -177,7 +190,11 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
             extensions={extensions}
             onChange={onChange}
             onCreateEditor={(view) => {
-              if (hostRef.current) registerCodeMirrorView(hostRef.current, view);
+              if (hostRef.current) registerCodeMirrorSurface(hostRef.current, view.contentDOM, commandSurface(view));
+              if (focusOnCreate) {
+                view.focus();
+                view.dispatch({ selection: { anchor: view.state.doc.length } });
+              }
             }}
             editable={!disabled && mode === 'write'}
             aria-label={placeholder}
@@ -199,5 +216,3 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
     </div>
   );
 };
-
-export default ComposerMarkdownInput;

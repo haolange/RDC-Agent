@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import {
   LEFT_SIDEBAR_COLLAPSED_WIDTH,
   LEFT_SIDEBAR_DEFAULT_WIDTH,
@@ -13,13 +12,10 @@ import {
   TERMINAL_MIN_HEIGHT,
 } from '@shared/constants/layout';
 import type { AppSettings } from '@shared/types/settings';
-import type { AgentMode } from '@shared/types/layout';
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 interface LayoutState {
-  currentMode: AgentMode;
-  selectedAgentId: string;
   leftSidebarCollapsed: boolean;
   rightPanelCollapsed: boolean;
   leftSidebarWidth: number;
@@ -28,8 +24,6 @@ interface LayoutState {
   rightPanelExpandedWidth: number;
   terminalHeight: number;
   hydrateFromSettings: (settings: AppSettings) => void;
-  setCurrentMode: (mode: AgentMode) => void;
-  setSelectedAgentId: (agentId: string) => void;
   toggleLeftSidebar: () => Promise<void>;
   toggleRightPanel: () => Promise<void>;
   setLeftSidebarWidth: (width: number) => void;
@@ -38,44 +32,46 @@ interface LayoutState {
   persistLayout: () => Promise<void>;
 }
 
-const persistLayout = async (state: Pick<
-  LayoutState,
-  'leftSidebarCollapsed'
-  | 'rightPanelCollapsed'
-  | 'leftSidebarWidth'
-  | 'rightPanelWidth'
-  | 'leftSidebarExpandedWidth'
-  | 'rightPanelExpandedWidth'
-  | 'terminalHeight'
->): Promise<void> => {
-  const api = window.electronAPI;
-  if (!api) return;
+const persistLayout = async (
+  state: Pick<
+    LayoutState,
+    | 'leftSidebarCollapsed'
+    | 'rightPanelCollapsed'
+    | 'leftSidebarWidth'
+    | 'rightPanelWidth'
+    | 'leftSidebarExpandedWidth'
+    | 'rightPanelExpandedWidth'
+    | 'terminalHeight'
+  >,
+): Promise<void> => {
   try {
-    await api.settings.set({
-      layout: {
-        leftSidebar: {
-          collapsed: state.leftSidebarCollapsed,
-          width: state.leftSidebarWidth,
-          expandedWidth: state.leftSidebarExpandedWidth,
-        },
-        rightPanel: {
-          collapsed: state.rightPanelCollapsed,
-          width: state.rightPanelWidth,
-          expandedWidth: state.rightPanelExpandedWidth,
-        },
-        terminal: {
-          height: state.terminalHeight,
+    await window.electronAPI.settings.patch([
+      {
+        op: 'layout',
+        value: {
+          leftSidebar: {
+            collapsed: state.leftSidebarCollapsed,
+            width: state.leftSidebarWidth,
+            expandedWidth: state.leftSidebarExpandedWidth,
+          },
+          rightPanel: {
+            collapsed: state.rightPanelCollapsed,
+            width: state.rightPanelWidth,
+            expandedWidth: state.rightPanelExpandedWidth,
+          },
+          terminal: {
+            height: state.terminalHeight,
+          },
         },
       },
-    });
-  } catch {
+    ]);
+  } catch (error) {
     // Browser QA intentionally denies settings writes; keep this in-memory layout usable.
+    console.warn('[layout] could not save the layout', error);
   }
 };
 
 export const useLayoutStore = create<LayoutState>((set, get) => ({
-  currentMode: DEFAULT_AGENT_ID,
-  selectedAgentId: DEFAULT_AGENT_ID,
   leftSidebarCollapsed: false,
   rightPanelCollapsed: false,
   leftSidebarWidth: LEFT_SIDEBAR_DEFAULT_WIDTH,
@@ -83,33 +79,28 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   leftSidebarExpandedWidth: LEFT_SIDEBAR_DEFAULT_WIDTH,
   rightPanelExpandedWidth: RIGHT_PANEL_DEFAULT_WIDTH,
   terminalHeight: TERMINAL_DEFAULT_HEIGHT,
-  hydrateFromSettings: (settings) => set({
-    leftSidebarCollapsed: settings.layout.leftSidebar.collapsed,
-    rightPanelCollapsed: settings.layout.rightPanel.collapsed,
-    leftSidebarWidth: settings.layout.leftSidebar.collapsed
-      ? LEFT_SIDEBAR_COLLAPSED_WIDTH
-      : clamp(settings.layout.leftSidebar.width, LEFT_SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
-    rightPanelWidth: settings.layout.rightPanel.collapsed
-      ? RIGHT_PANEL_COLLAPSED_WIDTH
-      : clamp(settings.layout.rightPanel.width, RIGHT_PANEL_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
-    leftSidebarExpandedWidth: clamp(
-      settings.layout.leftSidebar.expandedWidth,
-      LEFT_SIDEBAR_MIN_WIDTH,
-      SIDEBAR_MAX_WIDTH,
-    ),
-    rightPanelExpandedWidth: clamp(
-      settings.layout.rightPanel.expandedWidth,
-      RIGHT_PANEL_MIN_WIDTH,
-      SIDEBAR_MAX_WIDTH,
-    ),
-    terminalHeight: clamp(
-      settings.layout.terminal?.height ?? TERMINAL_DEFAULT_HEIGHT,
-      TERMINAL_MIN_HEIGHT,
-      TERMINAL_MAX_HEIGHT,
-    ),
-  }),
-  setCurrentMode: (mode) => set({ currentMode: mode, selectedAgentId: mode }),
-  setSelectedAgentId: (agentId) => set({ selectedAgentId: agentId, currentMode: agentId as AgentMode }),
+  hydrateFromSettings: (settings) =>
+    set({
+      leftSidebarCollapsed: settings.layout.leftSidebar.collapsed,
+      rightPanelCollapsed: settings.layout.rightPanel.collapsed,
+      leftSidebarWidth: settings.layout.leftSidebar.collapsed
+        ? LEFT_SIDEBAR_COLLAPSED_WIDTH
+        : clamp(settings.layout.leftSidebar.width, LEFT_SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
+      rightPanelWidth: settings.layout.rightPanel.collapsed
+        ? RIGHT_PANEL_COLLAPSED_WIDTH
+        : clamp(settings.layout.rightPanel.width, RIGHT_PANEL_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
+      leftSidebarExpandedWidth: clamp(
+        settings.layout.leftSidebar.expandedWidth,
+        LEFT_SIDEBAR_MIN_WIDTH,
+        SIDEBAR_MAX_WIDTH,
+      ),
+      rightPanelExpandedWidth: clamp(
+        settings.layout.rightPanel.expandedWidth,
+        RIGHT_PANEL_MIN_WIDTH,
+        SIDEBAR_MAX_WIDTH,
+      ),
+      terminalHeight: clamp(settings.layout.terminal.height, TERMINAL_MIN_HEIGHT, TERMINAL_MAX_HEIGHT),
+    }),
   toggleLeftSidebar: async () => {
     const state = get();
     const nextCollapsed = !state.leftSidebarCollapsed;
@@ -134,19 +125,22 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
     set(nextState);
     await get().persistLayout();
   },
-  setLeftSidebarWidth: (width) => set({
-    leftSidebarCollapsed: false,
-    leftSidebarWidth: clamp(width, LEFT_SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
-    leftSidebarExpandedWidth: clamp(width, LEFT_SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
-  }),
-  setRightPanelWidth: (width) => set({
-    rightPanelCollapsed: false,
-    rightPanelWidth: clamp(width, RIGHT_PANEL_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
-    rightPanelExpandedWidth: clamp(width, RIGHT_PANEL_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
-  }),
-  setTerminalHeight: (height) => set({
-    terminalHeight: clamp(height, TERMINAL_MIN_HEIGHT, TERMINAL_MAX_HEIGHT),
-  }),
+  setLeftSidebarWidth: (width) =>
+    set({
+      leftSidebarCollapsed: false,
+      leftSidebarWidth: clamp(width, LEFT_SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
+      leftSidebarExpandedWidth: clamp(width, LEFT_SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
+    }),
+  setRightPanelWidth: (width) =>
+    set({
+      rightPanelCollapsed: false,
+      rightPanelWidth: clamp(width, RIGHT_PANEL_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
+      rightPanelExpandedWidth: clamp(width, RIGHT_PANEL_MIN_WIDTH, SIDEBAR_MAX_WIDTH),
+    }),
+  setTerminalHeight: (height) =>
+    set({
+      terminalHeight: clamp(height, TERMINAL_MIN_HEIGHT, TERMINAL_MAX_HEIGHT),
+    }),
   persistLayout: async () => {
     const state = get();
     await persistLayout(state);

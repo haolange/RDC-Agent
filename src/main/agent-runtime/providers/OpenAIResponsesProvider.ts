@@ -1,34 +1,31 @@
-import { EventStream } from '../core/EventStream';
-import { recordQuotaFromResponse } from '../../settings/provider-catalog/ProviderQuota';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { promptCacheHeaders } from './promptCacheWire';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
-import {
-  composeAbortSignals,
-  ensureOk,
-  normalizeError,
-  ProviderHttpError,
-} from './internal/http';
+import { ProviderHttpError } from './internal/http';
+import { sendProviderRequest, startProviderStream } from './internal/providerStreamDriver';
 import {
   buildResponsesRequestBody,
   consumeResponsesEventStream,
   isDeepSeekResponsesPlan,
   readDeepSeekReasoningText,
   toResponsesInput,
+  type ResponsesStreamSurface,
 } from './internal/responsesShared';
 import { isReasoningEnabled } from './reasoningWire';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Model,
-  StreamOptions,
-} from '../core/types';
+import type { EventStream } from '../core/EventStream';
+import type { AssistantMessage, AssistantMessageEvent, Context, Model, StreamOptions } from '../core/types';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { ProviderRequestAuthorizer } from '../../settings/provider-auth/AwsBedrockCredentials';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const PROVIDER_API = 'openai-responses';
+
+const OPENAI_RESPONSES_SURFACE: ResponsesStreamSurface = {
+  protocol: PROVIDER_API,
+  failureMessages: {
+    failed: 'OpenAI Responses request failed',
+    error: 'OpenAI Responses stream error',
+  },
+};
 
 export interface OpenAIResponsesProviderOptions {
   baseUrl?: string;
@@ -59,75 +56,31 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
     this.requestAuthorizer = options.requestAuthorizer;
   }
 
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage> {
-    const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(
-      (event) => event.type === 'done',
-      (event) => (event as Extract<AssistantMessageEvent, { type: 'done' }>).message,
-    );
-    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
-    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, '');
-    const apiKey = options.apiKey ?? this.defaultApiKey;
-    void this.run(stream, builder, model, context, options, baseUrl, apiKey);
-    return stream;
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
+    return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
+      const response = await this.send(model, context, options, run.signal);
+      return consumeResponsesEventStream(response, run, options, OPENAI_RESPONSES_SURFACE);
+    });
   }
 
-  private async run(
-    stream: EventStream<AssistantMessageEvent, AssistantMessage>,
-    builder: AssistantStreamBuilder,
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-    baseUrl: string,
-    apiKey: string | undefined,
-  ): Promise<void> {
-    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API, ...options });
-    try {
-      builder.start();
-      if (!this.allowAnonymous && !apiKey && !this.requestAuthorizer) {
-        throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for OpenAI Responses provider');
-      }
-      const url = buildOpenAIResponsesUrl(baseUrl);
-      const bodyText = JSON.stringify(applyRequestPlanBody(buildResponsesRequestBody(model, context, options), options.requestPlan));
-      const unsignedHeaders = {
+  private async send(model: Model, context: Context, options: StreamOptions, signal: AbortSignal): Promise<Response> {
+    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, '');
+    const apiKey = options.apiKey ?? this.defaultApiKey;
+    if (!this.allowAnonymous && !apiKey && !this.requestAuthorizer) {
+      throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for OpenAI Responses provider');
+    }
+    const url = buildOpenAIResponsesUrl(baseUrl);
+    const body = applyRequestPlanBody(buildResponsesRequestBody(model, context, options), options.requestPlan);
+    return sendProviderRequest(PROVIDER_API, options.requestPlan, signal, {
+      url,
+      headers: {
         ...(apiKey ? this.createHeaders(apiKey) : { 'Content-Type': 'application/json', ...this.defaultHeaders }),
         ...requestPlanHeaders(options.requestPlan),
         ...promptCacheHeaders(options.promptCache),
-      };
-      const headers = this.requestAuthorizer
-        ? await this.requestAuthorizer({ url, method: 'POST', headers: unsignedHeaders, body: bodyText })
-        : unsignedHeaders;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: bodyText,
-        signal: composed.signal,
-      });
-      recordQuotaFromResponse(options.requestPlan, response);
-      await ensureOk(response, PROVIDER_API);
-      await consumeResponsesEventStream({
-        protocol: PROVIDER_API,
-        response,
-        signal: composed.signal,
-        options,
-        builder,
-        failureMessages: {
-          failed: 'OpenAI Responses request failed',
-          error: 'OpenAI Responses stream error',
-        },
-      });
-    } catch (err) {
-      const thrown = normalizeError(err);
-      const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
-        ? composed.signal.reason
-        : thrown;
-      builder.fail(error, error.name === 'AbortError' ? 'aborted' : 'error');
-    } finally {
-      composed.dispose();
-    }
+      },
+      body,
+      authorizer: this.requestAuthorizer,
+    });
   }
 
   private createHeaders(apiKey: string): Record<string, string> {
@@ -148,8 +101,8 @@ export function buildOpenAIResponsesUrl(baseUrl: string): string {
   return trimmed.endsWith('/responses') ? trimmed : `${trimmed}/responses`;
 }
 
-export const __testing = {
-  buildRequestBody: buildResponsesRequestBody,
+export {
+  buildResponsesRequestBody as buildRequestBody,
   isDeepSeekResponsesPlan,
   isReasoningEnabled,
   readDeepSeekReasoningText,

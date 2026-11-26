@@ -24,15 +24,32 @@ describe('app state paths after startup', () => {
     const snapshots = new RequestSnapshotStore();
     const trace = new TraceService();
     expect(getPaths).not.toHaveBeenCalled();
-    getPaths.mockReturnValue({ ...appPathService.getAppStatePaths(), appStateRoot: root,
-      llmCallsPath: path.join(root, 'llm-calls'), tracesPath: path.join(root, 'traces') });
+    getPaths.mockReturnValue({
+      ...appPathService.getAppStatePaths(),
+      appStateRoot: root,
+      llmCallsPath: path.join(root, 'llm-calls'),
+      tracesPath: path.join(root, 'traces'),
+    });
     const userHooks = path.join(root, 'hooks');
     fs.mkdirSync(userHooks);
-    fs.writeFileSync(path.join(userHooks, 'audit.hook.yml'), 'id: audit\nevent: session.before-start\ncommand: echo\nargs: [audit]\nfailurePolicy: warn\n');
+    fs.writeFileSync(
+      path.join(userHooks, 'audit.hook.yml'),
+      'id: audit\nevent: session.before-start\ncommand: echo\nargs: [audit]\nfailurePolicy: warn\n',
+    );
     hooks.load(userHooks, undefined, path.join(root, 'builtin'));
     hooks.trustUserHook('audit');
     expect(fs.existsSync(path.join(root, 'hook-trust.json'))).toBe(true);
-    expect(mcp.isTrusted(root, { id: 'audit', name: 'audit', description: '', transport: 'stdio', enabledByDefault: true, scope: 'project', command: 'echo' })).toBe(false);
+    expect(
+      mcp.isTrusted(root, {
+        id: 'audit',
+        name: 'audit',
+        description: '',
+        transport: 'stdio',
+        enabledByDefault: true,
+        scope: 'project',
+        command: 'echo',
+      }),
+    ).toBe(false);
     expect(snapshots.list('session')).toEqual([]);
     expect(trace.getRun('missing')).toBeNull();
     expect(fs.existsSync(path.join(root, 'traces', 'runs'))).toBe(true);

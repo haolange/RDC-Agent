@@ -24,13 +24,13 @@ export function resolveComposerEffectiveModel(
 
 export function readCompiledComposerRoute(
   settings: {
-    agents?: {
-      definitions?: Array<{ id: string; compiledRoute?: ComposerModelRouteSeed }>;
+    agents: {
+      definitions: Array<{ id: string; compiledRoute?: ComposerModelRouteSeed }>;
     };
   },
   agentId: string,
 ): ComposerModelRouteSeed | null {
-  const compiled = settings.agents?.definitions?.find((entry) => entry.id === agentId)?.compiledRoute;
+  const compiled = settings.agents.definitions.find((entry) => entry.id === agentId)?.compiledRoute;
   if (!compiled?.providerId || !compiled.modelId) return null;
   return compiled;
 }
@@ -40,7 +40,6 @@ export function hasComposerModelChoice(
   draftModel: SessionModelOverride | null | undefined,
 ): boolean {
   return Boolean(
-    (sessionOverride?.providerId && sessionOverride.modelId)
-    || (draftModel?.providerId && draftModel.modelId),
+    (sessionOverride?.providerId && sessionOverride.modelId) || (draftModel?.providerId && draftModel.modelId),
   );
 }

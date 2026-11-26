@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultAppSettings } from '@shared/constants/appSettingsDefaults';
-import {
-  beginAgentDefinitionSave,
-  isLatestAgentDefinitionRevision,
-  rollbackAgentDefinitionSave,
-  settleAgentDefinitionSave,
-} from './agentDefinitionSettings';
+import { agentDefinitionCommit, agentDefinitionOverlay } from './agentDefinitionSettings';
+import { SettingsIntents } from './settingsIntents';
 import type { AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
 
 const DEFAULT_SETTINGS = createDefaultAppSettings();
@@ -39,51 +35,50 @@ const draft = (label: string): AgentManifestDraft => {
   return value;
 };
 
-describe('agent definition optimistic settings projection', () => {
-  it('keeps only the newest A to B to C revision authoritative without moving the Settings route', () => {
-    const base = structuredClone(DEFAULT_SETTINGS);
-    base.agents.definitions = [definition('provider:a')];
-    base.llm.agentRoutes = [{ agentId: 'ask', providerId: 'provider', modelId: 'a' }];
+describe('agent definition settings overlays', () => {
+  const base = () => {
+    const settings = structuredClone(DEFAULT_SETTINGS);
+    settings.agents.definitions = [definition('provider:a')];
+    settings.llm.agentRoutes = [{ agentId: 'ask', providerId: 'provider', modelId: 'a' }];
+    return settings;
+  };
 
-    const a = beginAgentDefinitionSave(base, { draft: draft('provider:a'), clientRevision: 101, scope: 'user' });
-    const b = beginAgentDefinitionSave(a.settings, { draft: draft('provider:b'), clientRevision: 102, scope: 'user' });
-    const c = beginAgentDefinitionSave(b.settings, { draft: draft('provider:c'), clientRevision: 103, scope: 'user' });
-
-    expect(isLatestAgentDefinitionRevision('user', undefined, 'ask', 101)).toBe(false);
-    expect(isLatestAgentDefinitionRevision('user', undefined, 'ask', 102)).toBe(false);
-    expect(isLatestAgentDefinitionRevision('user', undefined, 'ask', 103)).toBe(true);
+  it('shows the newest of A, B and C over the confirmed definition without moving the Settings route', () => {
+    const intents = new SettingsIntents(base());
+    intents.begin(agentDefinitionOverlay({ draft: draft('provider:a'), clientRevision: 101, scope: 'user' }));
+    intents.begin(agentDefinitionOverlay({ draft: draft('provider:b'), clientRevision: 102, scope: 'user' }));
+    const c = intents.begin(agentDefinitionOverlay({ draft: draft('provider:c'), clientRevision: 103, scope: 'user' }));
     expect(c.settings.agents.definitions[0].instructions).toBe('provider:c');
     expect(c.settings.llm.agentRoutes).toEqual([{ agentId: 'ask', providerId: 'provider', modelId: 'a' }]);
   });
 
-  it('settles or rolls back only the scoped agent route', () => {
-    const base = structuredClone(DEFAULT_SETTINGS);
-    base.agents.definitions = [definition('provider:a')];
-    base.llm.agentRoutes = [{ agentId: 'ask', providerId: 'provider', modelId: 'a' }];
-    const pending = beginAgentDefinitionSave(base, { draft: draft('provider:b'), clientRevision: 201, scope: 'user' });
-    const settled = settleAgentDefinitionSave(pending.settings, 'ask', {
-      clientRevision: 201,
-      status: 'committed',
-      commitHash: 'commit-b',
-      definition: definition('provider:b'),
-      route: { agentId: 'ask', providerId: 'provider', modelId: 'b' },
-      lastSuccessful: {
-        clientRevision: 201,
-        commitHash: 'commit-b',
+  it("folds main's commit into the confirmed settings, and a failure only drops its own overlay", () => {
+    const intents = new SettingsIntents(base());
+    const b = intents.begin(agentDefinitionOverlay({ draft: draft('provider:b'), clientRevision: 201, scope: 'user' }));
+    const c = intents.begin(agentDefinitionOverlay({ draft: draft('provider:c'), clientRevision: 202, scope: 'user' }));
+    const committed = intents.settle(
+      b.id,
+      agentDefinitionCommit('ask', {
         definition: definition('provider:b'),
         route: { agentId: 'ask', providerId: 'provider', modelId: 'b' },
-      },
+      }),
+    );
+    // C is still in flight, so it still shows; B's route is confirmed.
+    expect(committed).toMatchObject({
+      agents: { definitions: [{ instructions: 'provider:c' }] },
+      llm: { agentRoutes: [{ agentId: 'ask', providerId: 'provider', modelId: 'b' }] },
     });
-    expect(settled.agents.definitions[0].instructions).toBe('provider:b');
-    expect(rollbackAgentDefinitionSave(settled, 'ask', {
-      clientRevision: 200,
-      commitHash: 'commit-a',
-      definition: pending.rollback.definition,
-      route: pending.rollback.route,
-    })).toMatchObject({
-      agents: { definitions: [{ instructions: 'provider:a' }] },
-      llm: { agentRoutes: [{ agentId: 'ask', providerId: 'provider', modelId: 'a' }] },
-    });
+    expect(intents.fail(c.id).agents.definitions[0].instructions).toBe('provider:b');
+  });
+
+  it('hides a deleted Agent and its route while the deletion is in flight', () => {
+    const intents = new SettingsIntents(base());
+    const deletion = intents.begin(
+      agentDefinitionOverlay({ draft: { ...draft('provider:a'), delete: true }, clientRevision: 1, scope: 'user' }),
+    );
+    expect(deletion.settings.agents.definitions).toEqual([]);
+    expect(deletion.settings.llm.agentRoutes).toEqual([]);
+    expect(intents.fail(deletion.id).agents.definitions).toHaveLength(1);
   });
 
   it('upserts a restored builtin general after deleting a project override', () => {
@@ -103,22 +98,17 @@ describe('agent definition optimistic settings projection', () => {
       provenance: { scope: 'builtin', sourcePath: 'builtin/general.agent.md', sourceHash: 'builtin-hash' },
       compiledRoute: { agentId: 'general', providerId: '', modelId: '' },
     };
-    restoredBuiltin.compiledRoute = { agentId: 'general', providerId: 'openrouter', modelId: 'anthropic/claude-3-sonnet' };
+    restoredBuiltin.compiledRoute = {
+      agentId: 'general',
+      providerId: 'openrouter',
+      modelId: 'anthropic/claude-3-sonnet',
+    };
     const base = structuredClone(DEFAULT_SETTINGS);
     base.agents.definitions = [projectOverride];
-    const settled = settleAgentDefinitionSave(base, 'general', {
-      clientRevision: 301,
-      status: 'committed',
-      commitHash: 'deleted-project',
+    const settled = agentDefinitionCommit('general', {
       definition: restoredBuiltin,
       route: restoredBuiltin.compiledRoute,
-      lastSuccessful: {
-        clientRevision: 301,
-        commitHash: 'deleted-project',
-        definition: restoredBuiltin,
-        route: restoredBuiltin.compiledRoute,
-      },
-    });
+    })(base);
     const general = settled.agents.definitions.find((entry) => entry.id === 'general');
     expect(general).toMatchObject({
       builtin: true,

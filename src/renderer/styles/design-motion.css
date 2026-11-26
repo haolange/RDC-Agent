@@ -13,40 +13,68 @@
   }
 }
 
-@keyframes fadeInScale {
+/* Content that appears in place rises into position: 2px for inline status, 4px for popovers and panels. */
+@keyframes rise-in-2px {
   from {
     opacity: 0;
-    transform: scale(0.96);
+    transform: translateY(2px);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
+  }
+}
+
+@keyframes rise-in-4px {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes active-signal-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 /* Paired enter / exit for every overlay. An overlay plays the enter keyframe while open and the exit keyframe
    while `data-state="closing"`; ui/usePresence unmounts it on the exit's animationend. */
 @keyframes overlay-fade-in {
-  from { opacity: 0; }
+  from {
+    opacity: 0;
+  }
 }
 
 @keyframes overlay-fade-out {
-  to { opacity: 0; }
+  to {
+    opacity: 0;
+  }
 }
 
 @keyframes surface-rise-in {
@@ -84,7 +112,9 @@
 
 /* ========== Utility Classes ========== */
 
-.animate-spin { animation: spin 1s linear infinite; }
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
 /* Active runtime signal text — left-to-right energy shimmer on live phrases */
 .active-signal-text {
   --active-signal-highlight: var(--token-text-primary);

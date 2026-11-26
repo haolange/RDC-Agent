@@ -30,24 +30,28 @@ const commandTrace = (title: string): ConversationWorkTrace => ({
 
 describe('resolveSystemNoticeTone', () => {
   it('uses diagnostic.severity when present', () => {
-    expect(resolveSystemNoticeTone({
-      ...baseMessage(),
-      status: 'complete',
-      diagnostic: {
-        code: 'MODEL_CONTINUATION_DROPPED',
-        severity: 'warning',
-        userMessage: 'switched',
-      },
-    })).toBe('warning');
-    expect(resolveSystemNoticeTone({
-      ...baseMessage(),
-      status: 'complete',
-      diagnostic: {
-        code: 'CONVERSATION_LLM_REQUEST_FAILED',
-        severity: 'error',
-        userMessage: 'failed',
-      },
-    })).toBe('error');
+    expect(
+      resolveSystemNoticeTone({
+        ...baseMessage(),
+        status: 'complete',
+        diagnostic: {
+          code: 'MODEL_CONTINUATION_DROPPED',
+          severity: 'warning',
+          userMessage: 'switched',
+        },
+      }),
+    ).toBe('warning');
+    expect(
+      resolveSystemNoticeTone({
+        ...baseMessage(),
+        status: 'complete',
+        diagnostic: {
+          code: 'CONVERSATION_LLM_REQUEST_FAILED',
+          severity: 'error',
+          userMessage: 'failed',
+        },
+      }),
+    ).toBe('error');
   });
 
   it('maps status error without a diagnostic to error', () => {
@@ -62,17 +66,21 @@ describe('resolveSystemNoticeTone', () => {
 
 describe('resolveCommandLabel', () => {
   it('reads the command work-trace title', () => {
-    expect(resolveCommandLabel({
-      ...baseMessage(),
-      workTrace: commandTrace('/help'),
-    })).toBe('/help');
+    expect(
+      resolveCommandLabel({
+        ...baseMessage(),
+        workTrace: commandTrace('/help'),
+      }),
+    ).toBe('/help');
   });
 
   it('returns null when there is no command block or the title is blank', () => {
     expect(resolveCommandLabel(baseMessage())).toBeNull();
-    expect(resolveCommandLabel({
-      ...baseMessage(),
-      workTrace: commandTrace('   '),
-    })).toBeNull();
+    expect(
+      resolveCommandLabel({
+        ...baseMessage(),
+        workTrace: commandTrace('   '),
+      }),
+    ).toBeNull();
   });
 });

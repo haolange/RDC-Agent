@@ -4,8 +4,9 @@ import { InlineError } from '../../../../ui/InlineError';
 import { Textarea } from '../../../../ui/Textarea';
 import { TaskDialog } from '../../../../ui/TaskDialog';
 import { SettingsField } from '../parts';
+import { useI18n } from '../../../../i18n';
 import { AppearanceChromePreview } from './AppearanceChromePreview';
-import { previewThemeImport, themeImportErrorMessage, type AppearanceTranslate } from './appearanceChromeModel';
+import { previewThemeImport, themeImportErrorMessage } from './appearanceChromeModel';
 import type { ThemeChromeConfig, ThemeVariant } from '@shared/types/settings';
 
 interface ThemeImportDialogProps {
@@ -13,10 +14,10 @@ interface ThemeImportDialogProps {
   variant: ThemeVariant;
   onApply: (chrome: ThemeChromeConfig) => void;
   onClose: () => void;
-  t: AppearanceTranslate;
 }
 
-export function ThemeImportDialog({ open, variant, onApply, onClose, t }: ThemeImportDialogProps) {
+export function ThemeImportDialog({ open, variant, onApply, onClose }: ThemeImportDialogProps) {
+  const { t } = useI18n();
   const [text, setText] = useState('');
   const preview = previewThemeImport(text, variant);
   const inputId = `appearance-import-input-${variant}`;
@@ -41,14 +42,16 @@ export function ThemeImportDialog({ open, variant, onApply, onClose, t }: ThemeI
       onClose={close}
       closeLabel={t('dialog.cancel')}
       dataTestId={`appearance-import-dialog-${variant}`}
-      footer={(
+      footer={
         <>
-          <Button variant="ghost" onClick={close}>{t('dialog.cancel')}</Button>
+          <Button variant="ghost" onClick={close}>
+            {t('dialog.cancel')}
+          </Button>
           <Button variant="primary" disabled={preview.state !== 'valid'} onClick={apply}>
             {t('settings.appearanceApplyImport')}
           </Button>
         </>
-      )}
+      }
     >
       <SettingsField label={t('settings.appearanceImportField')} htmlFor={inputId}>
         <Textarea
@@ -63,16 +66,29 @@ export function ThemeImportDialog({ open, variant, onApply, onClose, t }: ThemeI
         />
       </SettingsField>
       {preview.state === 'empty' ? (
-        <p className="appearance-import-status" role="status">{t('settings.appearanceImportEmpty')}</p>
+        <p className="appearance-import-status" role="status">
+          {t('settings.appearanceImportEmpty')}
+        </p>
       ) : null}
-      {preview.state === 'invalid' ? <InlineError>{themeImportErrorMessage(preview.error, t)}</InlineError> : null}
+      {preview.state === 'invalid' ? (
+        <InlineError detail={preview.error}>{themeImportErrorMessage(preview.reason, t)}</InlineError>
+      ) : null}
       {preview.state === 'valid' ? (
         <>
-          <p className="appearance-import-status" role="status">{t('settings.appearanceImportValid')}</p>
-          <AppearanceChromePreview chrome={preview.chrome} variant={variant} t={t} data-testid="appearance-import-preview"
+          <p className="appearance-import-status" role="status">
+            {t('settings.appearanceImportValid')}
+          </p>
+          <AppearanceChromePreview
+            chrome={preview.chrome}
+            variant={variant}
+            data-testid="appearance-import-preview"
             description={t('settings.appearanceImportPalette', {
-              accent: preview.chrome.accent, surface: preview.chrome.surface, ink: preview.chrome.ink, contrast: preview.chrome.contrast,
-            })} />
+              accent: preview.chrome.accent,
+              surface: preview.chrome.surface,
+              ink: preview.chrome.ink,
+              contrast: preview.chrome.contrast,
+            })}
+          />
         </>
       ) : null}
     </TaskDialog>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../../i18n';
+import { errorDetail } from '../../../lib/errorDetail';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
-import { knowledgeErrorMessage } from './knowledgeCenterModel';
 import { beginSynchronousFlight } from './knowledgeImportExportModel';
 import type { KnowledgeCandidatesResult, KnowledgeCardRecord } from '@shared/types/knowledge';
 
@@ -32,7 +32,7 @@ export function useKnowledgeCandidateInbox(options: { open: boolean; sessionId: 
         setError(null);
       }
     } catch (err) {
-      if (request.isCurrent(seq)) setError(knowledgeErrorMessage(err));
+      if (request.isCurrent(seq)) setError(errorDetail(err));
     }
   }, [request, options.sessionId]);
 
@@ -43,30 +43,34 @@ export function useKnowledgeCandidateInbox(options: { open: boolean; sessionId: 
   }, [options.open, refreshInbox]);
 
   /** Proposes a draft card for review; `onCreated` runs once the queue shows it. */
-  const createCandidate = useCallback(async (card: KnowledgeCardRecord, onCreated?: () => void) => {
-    if (!options.sessionId) {
-      setCandidateError({ cardId: card.cardId, message: t('knowledgeCenter.sessionRequired') });
-      return;
-    }
-    if (!beginSynchronousFlight(inFlight)) return;
-    const seq = createRequest.next();
-    setBusy(true);
-    setCandidateError(null);
-    try {
-      await window.electronAPI.knowledge.candidateCreate({ sessionId: options.sessionId, card, explicitUserIntent: true });
-      if (!createRequest.isCurrent(seq)) return;
-      await refreshInbox();
-      if (createRequest.isCurrent(seq)) onCreated?.();
-    } catch (err) {
-      if (createRequest.isCurrent(seq)) {
-        const raw = knowledgeErrorMessage(err);
-        setCandidateError({ cardId: card.cardId, message: raw.includes('KNOWLEDGE_ASSETS_MISSING') ? t('knowledgeCenter.candidateAssetsMissing') : raw });
+  const createCandidate = useCallback(
+    async (card: KnowledgeCardRecord, onCreated?: () => void) => {
+      if (!options.sessionId) {
+        setCandidateError({ cardId: card.cardId, message: t('knowledgeCenter.sessionRequired') });
+        return;
       }
-    } finally {
-      inFlight.current = false;
-      if (createRequest.isCurrent(seq)) setBusy(false);
-    }
-  }, [createRequest, options.sessionId, refreshInbox, t]);
+      if (!beginSynchronousFlight(inFlight)) return;
+      const seq = createRequest.next();
+      setBusy(true);
+      setCandidateError(null);
+      try {
+        await window.electronAPI.knowledge.candidateCreate({
+          sessionId: options.sessionId,
+          card,
+          explicitUserIntent: true,
+        });
+        if (!createRequest.isCurrent(seq)) return;
+        await refreshInbox();
+        if (createRequest.isCurrent(seq)) onCreated?.();
+      } catch (err) {
+        if (createRequest.isCurrent(seq)) setCandidateError({ cardId: card.cardId, message: errorDetail(err) });
+      } finally {
+        inFlight.current = false;
+        if (createRequest.isCurrent(seq)) setBusy(false);
+      }
+    },
+    [createRequest, options.sessionId, refreshInbox, t],
+  );
 
   return { hasSession: Boolean(options.sessionId), inbox, refreshInbox, busy, error, candidateError, createCandidate };
 }

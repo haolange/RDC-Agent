@@ -1,8 +1,9 @@
 import { ipcMain } from 'electron';
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { AppError } from '@shared/errors/appError';
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
 import { InvestigationError, isInvestigationStoreDegraded } from '../investigation/investigationErrors';
 import { investigationArtifactService } from '../investigation/InvestigationArtifactService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
+import { sessionRecordStore } from '../sessions/store/sessionStores';
 import { listInvestigationArtifacts } from '../agent-trace/rightRailInvestigationArtifacts';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { InvestigationReadArgsSchema, InvestigationListArgsSchema } from './validation/investigationSchemas';
@@ -25,7 +26,7 @@ function assertActiveInvestigationOwner(
   if (!state.currentSessionId || sessionId !== state.currentSessionId) {
     return sessionDenied('investigation:read requires the active session');
   }
-  const session = storageAdapter.readSession(sessionId);
+  const session = sessionRecordStore.readSession(sessionId);
   if (!session) {
     return sessionDenied('investigation:read session was not found');
   }
@@ -71,9 +72,13 @@ function mapInvestigationReadError(error: unknown): InvestigationReadIpcResult {
 
 export function registerInvestigationHandlers(context: WorkbenchIpcContext): void {
   ipcMain.handle('investigation:list', (_event, ...rawArgs: unknown[]) => {
-    const [request] = parseIpcArgs(InvestigationListArgsSchema, rawArgs, { label: 'investigation:list', maxBytes: 4096 });
+    const [request] = parseIpcArgs(InvestigationListArgsSchema, rawArgs, {
+      label: 'investigation:list',
+      maxBytes: 4096,
+    });
     const denied = assertActiveInvestigationOwner(context.state, request.sessionId);
-    if (denied || request.projectId !== context.state.currentProjectId) throw new Error('INVESTIGATION_SESSION_DENIED');
+    if (denied || request.projectId !== context.state.currentProjectId)
+      throw new AppError('INVESTIGATION_SESSION_DENIED');
     return listInvestigationArtifacts(request.sessionId, request.cursor);
   });
   ipcMain.handle('investigation:read', async (_event, ...rawArgs: unknown[]) => {

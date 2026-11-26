@@ -15,24 +15,44 @@ export interface SplitButtonProps {
   variant?: Extract<ButtonVariant, 'primary' | 'secondary'>;
   size?: ButtonSize;
   disabled?: boolean;
-  className?: string;
   dataTestId?: string;
 }
 
 export function SplitButton({
-  label, onClick, items, menuLabel, variant = 'primary', size = 'sm', disabled = false, className, dataTestId,
+  label,
+  onClick,
+  items,
+  menuLabel,
+  variant = 'primary',
+  size = 'sm',
+  disabled = false,
+  dataTestId,
 }: SplitButtonProps) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={cn('ui-split-button', `is-${variant}`, className)} data-testid={dataTestId}>
-      <Button variant={variant} size={size} disabled={disabled} className="ui-split-button-main" onClick={onClick}>{label}</Button>
-      <Menu open={open} onOpenChange={setOpen} label={menuLabel} align="end" items={items}
-        trigger={(
-          <Button variant={variant} size={size} disabled={disabled} className="ui-split-button-caret"
-            aria-label={menuLabel} aria-haspopup="menu">
+    <div className={cn('ui-split-button', `is-${variant}`)} data-testid={dataTestId}>
+      <Button variant={variant} size={size} disabled={disabled} className="ui-split-button-main" onClick={onClick}>
+        {label}
+      </Button>
+      <Menu
+        open={open}
+        onOpenChange={setOpen}
+        label={menuLabel}
+        align="end"
+        items={items}
+        trigger={
+          <Button
+            variant={variant}
+            size={size}
+            disabled={disabled}
+            className="ui-split-button-caret"
+            aria-label={menuLabel}
+            aria-haspopup="menu"
+          >
             <Chevron direction="down" />
           </Button>
-        )} />
+        }
+      />
     </div>
   );
 }

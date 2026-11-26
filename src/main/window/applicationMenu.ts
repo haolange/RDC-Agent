@@ -1,5 +1,6 @@
 import { app, dialog, Menu, shell } from 'electron';
 import { currentHost } from '../platform/host';
+import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { nativeMessage } from './nativeI18n';
 
 interface MenuActions {
@@ -68,42 +69,7 @@ export function refreshApplicationMenu(): void {
           { role: 'togglefullscreen' },
         ],
       },
-      {
-        label: nativeMessage('help'),
-        submenu: [
-          {
-            label: nativeMessage('documentation'),
-            click: () => {
-              shell.openExternal('https://github.com/haolange/RDC-Agent#readme');
-            },
-          },
-          {
-            label: nativeMessage('reportIssue'),
-            click: () => {
-              shell.openExternal('https://github.com/haolange/RDC-Agent/issues');
-            },
-          },
-          { type: 'separator' },
-          {
-            label: nativeMessage('about'),
-            click: () => {
-              const version = app.getVersion();
-              const detail = [
-                nativeMessage('version', { version }),
-                `Electron: ${process.versions.electron ?? 'N/A'}`,
-                `Node: ${process.versions.node ?? 'N/A'}`,
-                `Chrome: ${process.versions.chrome ?? 'N/A'}`,
-              ].join('\n');
-              void dialog.showMessageBox({
-                type: 'info',
-                title: nativeMessage('about'),
-                message: 'RDC-Agent',
-                detail,
-              });
-            },
-          },
-        ],
-      },
+      helpMenu(),
     ];
 
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -111,41 +77,39 @@ export function refreshApplicationMenu(): void {
   }
 
   // Non-darwin: still expose Help with real repo links (no placeholder URLs).
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    {
-      label: nativeMessage('help'),
-      submenu: [
-        {
-          label: nativeMessage('documentation'),
-          click: () => {
-            shell.openExternal('https://github.com/haolange/RDC-Agent#readme');
-          },
-        },
-        {
-          label: nativeMessage('reportIssue'),
-          click: () => {
-            shell.openExternal('https://github.com/haolange/RDC-Agent/issues');
-          },
-        },
-        { type: 'separator' },
-        {
-          label: nativeMessage('about'),
-          click: () => {
-            const version = app.getVersion();
-            void dialog.showMessageBox({
-              type: 'info',
-              title: nativeMessage('about'),
-              message: 'RDC-Agent',
-              detail: [
-                nativeMessage('version', { version }),
-                `Electron: ${process.versions.electron ?? 'N/A'}`,
-                `Node: ${process.versions.node ?? 'N/A'}`,
-              ].join('\n'),
-            });
-          },
-        },
-      ],
-    },
-  ]));
+  Menu.setApplicationMenu(Menu.buildFromTemplate([helpMenu()]));
 }
 
+function helpMenu(): Electron.MenuItemConstructorOptions {
+  return {
+    label: nativeMessage('help'),
+    submenu: [
+      { label: nativeMessage('documentation'), click: () => openLink('https://github.com/haolange/RDC-Agent#readme') },
+      { label: nativeMessage('reportIssue'), click: () => openLink('https://github.com/haolange/RDC-Agent/issues') },
+      { type: 'separator' },
+      { label: nativeMessage('about'), click: showAbout },
+    ],
+  };
+}
+
+function openLink(url: string): void {
+  shell.openExternal(url).catch((error: unknown) => {
+    runtimeLogService.log({
+      scope: 'app',
+      namespace: 'system',
+      severity: 'error',
+      title: 'Could not open link',
+      summary: `${url}: ${error instanceof Error ? error.message : String(error)}`,
+    });
+  });
+}
+
+function showAbout(): void {
+  const detail = [
+    nativeMessage('version', { version: app.getVersion() }),
+    `Electron: ${process.versions.electron}`,
+    `Node: ${process.versions.node}`,
+    `Chrome: ${process.versions.chrome}`,
+  ].join('\n');
+  void dialog.showMessageBox({ type: 'info', title: nativeMessage('about'), message: 'RDC-Agent', detail });
+}

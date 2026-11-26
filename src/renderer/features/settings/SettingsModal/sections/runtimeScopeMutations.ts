@@ -1,4 +1,4 @@
-import { selectFiles } from '../../../../hooks/appShellBridge';
+import { errorDetail } from '../../../../lib/errorDetail';
 import { contentFromForm, type ResourceFormState } from './scopedResourceForm';
 import { importScopedResource, upsertScopedResource, validateScopedResource } from './runtimeScopeActions';
 import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdcRuntime';
@@ -6,11 +6,16 @@ import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } f
 export const templateResourceId = (kind: ScopedResourceKind): string => `new-${kind}`;
 
 export const normalizeResourceId = (value: string): string =>
-  value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || value;
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || value;
 
 export type SaveScopedResourceOutcome =
   | { ok: true; overview: RdcRuntimeOverview; id: string }
   | { ok: false; messageKey: 'resourceArgsInvalid' | 'resourceIdExists' | 'resourceIdRequired'; message?: string }
+  /** `message` is the technical reason (parser or validator text); it only leaves through "Copy details". */
   | { ok: false; messageKey: null; message: string };
 
 /**
@@ -31,7 +36,7 @@ export async function saveScopedResource(input: {
   } catch (error) {
     return input.kind === 'mcp'
       ? { ok: false, messageKey: 'resourceArgsInvalid' }
-      : { ok: false, messageKey: null, message: String(error) };
+      : { ok: false, messageKey: null, message: errorDetail(error) };
   }
 
   const nextId = normalizeResourceId(input.form.id);
@@ -67,18 +72,15 @@ export async function importScopedResourceFromPicker(input: {
   scope: 'user' | 'project';
   projectRoot?: string;
 }): Promise<{ overview: RdcRuntimeOverview; imported: ScopedResourceDocument | null } | null> {
-  const paths = await selectFiles();
-  const filePath = paths?.[0];
-  if (!filePath) return null;
   const result = await importScopedResource({
     kind: input.kind,
     scope: input.scope,
-    filePath,
     ...(input.projectRoot ? { projectRoot: input.projectRoot } : {}),
   });
   if (!result) return null;
-  const imported = result.overview.resources.find(
-    (entry) => entry.scope === input.scope && entry.kind === input.kind && entry.id === result.id,
-  ) ?? null;
+  const imported =
+    result.overview.resources.find(
+      (entry) => entry.scope === input.scope && entry.kind === input.kind && entry.id === result.id,
+    ) ?? null;
   return { overview: result.overview, imported };
 }

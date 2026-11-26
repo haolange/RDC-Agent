@@ -28,17 +28,10 @@ export {
   type SettleTaskExecutionOptions,
 } from './TaskContracts';
 
-export {
-  registerTaskExecutionCancellationOwner,
-  cancelOwnedTaskExecution,
-} from './TaskExecutionOwners';
+export { registerTaskExecutionCancellationOwner, cancelOwnedTaskExecution } from './TaskExecutionOwners';
 export { registerDelegatedTaskScope, getDelegatedTaskScope } from './DelegatedTaskScopes';
 
-export {
-  type TaskStore,
-  FileTaskStore,
-  MemoryTaskStore,
-} from './TaskStore';
+export { type TaskStore, FileTaskStore, MemoryTaskStore } from './TaskStore';
 
 export {
   createTaskTools,

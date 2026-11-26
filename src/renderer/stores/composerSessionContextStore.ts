@@ -1,13 +1,12 @@
 import { create } from 'zustand';
 import type { PendingAttachmentDraft } from '../types/attachments';
 
+/** The turn the Composer sent and has not seen end. Its turn id is `conversationTurnIds(requestId).turnId`. */
 export interface ActiveTurnContext {
   sessionId: string;
   projectId: string | null;
   requestId: string;
   agentId: string;
-  optimisticTurnId: string | null;
-  realTurnId: string | null;
 }
 
 export type ActiveTurnOwnership = Pick<ActiveTurnContext, 'sessionId' | 'requestId' | 'agentId'>;
@@ -22,7 +21,6 @@ export interface LastSentPrompt {
 }
 
 export interface HandoffSuggestionRequest {
-  phase?: 'confirming' | 'handoff';
   sessionId: string;
   agentId: string;
   label: string;
@@ -30,7 +28,6 @@ export interface HandoffSuggestionRequest {
   send: boolean;
   /** Recovery path: the approved, still-unsent plan revision this handoff executes. */
   approvedPlan?: { planId: string; revision: number; hash: string };
-  sourcePlan?: { reviewId: string; turnId: string; toolCallId: string; planId: string; revision: number; hash: string };
 }
 
 interface ComposerSessionContextState {
@@ -40,11 +37,8 @@ interface ComposerSessionContextState {
   handoffSuggestionRequest: HandoffSuggestionRequest | null;
 
   beginTurn: (context: ActiveTurnContext) => void;
-  setRealTurnId: (
-    ownership: ActiveTurnOwnership,
-    turnId: string,
-    committedSessionId?: string | null,
-  ) => void;
+  /** Main committed the turn; a first turn also created its session, which now owns it. */
+  bindCommittedSession: (ownership: ActiveTurnOwnership, committedSessionId: string) => void;
   clearActiveTurnIfOwned: (ownership: ActiveTurnOwnership) => void;
   setLastSent: (lastSent: LastSentPrompt | null) => void;
   setIsPromptSending: (sending: boolean) => void;
@@ -60,16 +54,10 @@ export const useComposerSessionContextStore = create<ComposerSessionContextState
   handoffSuggestionRequest: null,
 
   beginTurn: (context) => set({ activeTurn: context }),
-  setRealTurnId: (ownership, turnId, committedSessionId) => {
+  bindCommittedSession: (ownership, committedSessionId) => {
     const current = get().activeTurn;
     if (!current || !ownsActiveTurn(current, ownership)) return;
-    set({
-      activeTurn: {
-        ...current,
-        sessionId: committedSessionId ?? current.sessionId,
-        realTurnId: turnId,
-      },
-    });
+    set({ activeTurn: { ...current, sessionId: committedSessionId } });
   },
   clearActiveTurnIfOwned: (ownership) => {
     const current = get().activeTurn;
@@ -83,20 +71,20 @@ export const useComposerSessionContextStore = create<ComposerSessionContextState
     set({ handoffSuggestionRequest });
   },
   clearHandoffSuggestion: () => set({ handoffSuggestionRequest: null }),
-  resetForSessionSwitch: () => set({
-    activeTurn: null,
-    isPromptSending: false,
-    handoffSuggestionRequest: null,
-  }),
+  resetForSessionSwitch: () =>
+    set({
+      activeTurn: null,
+      isPromptSending: false,
+      handoffSuggestionRequest: null,
+    }),
 }));
 
-export function ownsActiveTurn(
-  activeTurn: ActiveTurnContext,
-  ownership: ActiveTurnOwnership,
-): boolean {
-  return activeTurn.sessionId === ownership.sessionId
-    && activeTurn.requestId === ownership.requestId
-    && activeTurn.agentId === ownership.agentId;
+export function ownsActiveTurn(activeTurn: ActiveTurnContext, ownership: ActiveTurnOwnership): boolean {
+  return (
+    activeTurn.sessionId === ownership.sessionId &&
+    activeTurn.requestId === ownership.requestId &&
+    activeTurn.agentId === ownership.agentId
+  );
 }
 
 function normalizeComposerSessionOwner(sessionId: string | null | undefined): string {

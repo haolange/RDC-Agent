@@ -1,17 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { IpcApprovalTokenService } from '../../runtime/IpcApprovalTokenService';
-import {
-  IpcValidationError,
-  assertIpcPayloadBytes,
-  ipcId,
-  parseIpcArgs,
-} from './IpcPayloadGuard';
-import {
-  MemoryWriteArgsSchema,
-  SettingsGetEffectiveCatalogArgsSchema,
-  WorkflowStopArgsSchema,
-} from './ipcSchemas';
+import { IpcValidationError, assertIpcPayloadBytes, ipcId, parseIpcArgs } from './IpcPayloadGuard';
+import { MemoryWriteArgsSchema, SettingsGetEffectiveCatalogArgsSchema, WorkflowStopArgsSchema } from './ipcSchemas';
 import { EmptyArgsSchema } from './commonIpcSchemas';
 import { ConversationSendMessageArgsSchema } from './conversationSchemas';
 import {
@@ -29,33 +20,42 @@ import { WebResolveFaviconArgsSchema } from './webSchemas';
 describe('parseIpcArgs', () => {
   it('rejects payloads that exceed maxBytes', () => {
     const schema = z.tuple([z.string()]);
-    expect(() => parseIpcArgs(schema, ['x'.repeat(100)], { maxBytes: 40, label: 'test' }))
-      .toThrow(IpcValidationError);
+    expect(() => parseIpcArgs(schema, ['x'.repeat(100)], { maxBytes: 40, label: 'test' })).toThrow(IpcValidationError);
   });
 
   it('rejects schema violations for memory write', () => {
-    expect(() => parseIpcArgs(MemoryWriteArgsSchema, [{
-      scope: 'user',
-      approvalToken: 'tok',
-      name: 'n',
-      description: 'd',
-      type: 'project',
-      content: 'c',
-      approved: true,
-    }], { label: 'memory:write' })).toThrow(/schema violation|unrecognized|strict/i);
+    expect(() =>
+      parseIpcArgs(
+        MemoryWriteArgsSchema,
+        [
+          {
+            scope: 'user',
+            approvalToken: 'tok',
+            name: 'n',
+            description: 'd',
+            type: 'project',
+            content: 'c',
+            approved: true,
+          },
+        ],
+        { label: 'memory:write' },
+      ),
+    ).toThrow(/schema violation|unrecognized|strict/i);
   });
 
   it('rejects self-asserted approved field (strict object)', () => {
     try {
-      parseIpcArgs(MemoryWriteArgsSchema, [{
-        scope: 'user',
-        approvalToken: 'tok',
-        name: 'n',
-        description: 'd',
-        type: 'project',
-        content: 'c',
-        approved: true,
-      }]);
+      parseIpcArgs(MemoryWriteArgsSchema, [
+        {
+          scope: 'user',
+          approvalToken: 'tok',
+          name: 'n',
+          description: 'd',
+          type: 'project',
+          content: 'c',
+          approved: true,
+        },
+      ]);
       expect.unreachable('should reject');
     } catch (error) {
       expect(error).toBeInstanceOf(IpcValidationError);
@@ -63,8 +63,9 @@ describe('parseIpcArgs', () => {
   });
 
   it('rejects invalid run id format', () => {
-    expect(() => parseIpcArgs(WorkflowStopArgsSchema, ['../evil'], { label: 'workflow:stop' }))
-      .toThrow(IpcValidationError);
+    expect(() => parseIpcArgs(WorkflowStopArgsSchema, ['../evil'], { label: 'workflow:stop' })).toThrow(
+      IpcValidationError,
+    );
   });
 
   it('accepts valid workflow stop id', () => {
@@ -98,105 +99,151 @@ describe('parseIpcArgs', () => {
   });
 
   it('rejects unexpected args on empty channels', () => {
-    expect(() => parseIpcArgs(EmptyArgsSchema, ['surprise'], { label: 'project:list' }))
-      .toThrow(IpcValidationError);
+    expect(() => parseIpcArgs(EmptyArgsSchema, ['surprise'], { label: 'project:list' })).toThrow(IpcValidationError);
   });
 
   it('rejects invalid project id format', () => {
-    expect(() => parseIpcArgs(ProjectSelectArgsSchema, ['../evil'], { label: 'project:select' }))
-      .toThrow(IpcValidationError);
+    expect(() => parseIpcArgs(ProjectSelectArgsSchema, ['../evil'], { label: 'project:select' })).toThrow(
+      IpcValidationError,
+    );
   });
 
   it('normalizes a browser bridge null session title to an omitted title', () => {
-    expect(parseIpcArgs(SessionCreateArgsSchema, ['proj_abc123', null], {
-      label: 'session:create',
-      padTo: 2,
-    })).toEqual(['proj_abc123', undefined]);
+    expect(
+      parseIpcArgs(SessionCreateArgsSchema, ['proj_abc123', null], {
+        label: 'session:create',
+        padTo: 2,
+      }),
+    ).toEqual(['proj_abc123', undefined]);
   });
 
   it('rejects oversized import path arrays', () => {
     const paths = Array.from({ length: 65 }, (_, i) => `D:/file-${i}.rdc`);
-    expect(() => parseIpcArgs(ProjectInputsImportPathsArgsSchema, ['proj_abc', paths], {
-      label: 'project:inputs:importPaths',
-    })).toThrow(IpcValidationError);
+    expect(() =>
+      parseIpcArgs(ProjectInputsImportPathsArgsSchema, ['proj_abc', paths], {
+        label: 'project:inputs:importPaths',
+      }),
+    ).toThrow(IpcValidationError);
   });
 
   it('rejects conversation send with self-asserted approved field', () => {
-    expect(() => parseIpcArgs(ConversationSendMessageArgsSchema, [{
-      requestId: 'request-1',
-      profileId: 'debugger',
-      message: 'hi',
-      turnControls: { reasoningLevel: 'medium', maxContextMode: false, fastModel: false },
-      approved: true,
-    }], { label: 'conversation:sendMessage' })).toThrow(/schema violation|unrecognized|strict/i);
+    expect(() =>
+      parseIpcArgs(
+        ConversationSendMessageArgsSchema,
+        [
+          {
+            requestId: 'request-1',
+            profileId: 'debugger',
+            message: 'hi',
+            turnControls: { reasoningLevel: 'medium', maxContextMode: false, fastModel: false },
+            approved: true,
+          },
+        ],
+        { label: 'conversation:sendMessage' },
+      ),
+    ).toThrow(/schema violation|unrecognized|strict/i);
   });
 
   it('rejects conversation send with unrecognized identity field', () => {
-    expect(() => parseIpcArgs(ConversationSendMessageArgsSchema, [{
-      requestId: 'request-1',
-      mode: 'hacker',
-      message: 'hi',
-      turnControls: { reasoningLevel: 'medium', maxContextMode: false, fastModel: false },
-    }], { label: 'conversation:sendMessage' })).toThrow(IpcValidationError);
+    expect(() =>
+      parseIpcArgs(
+        ConversationSendMessageArgsSchema,
+        [
+          {
+            requestId: 'request-1',
+            mode: 'hacker',
+            message: 'hi',
+            turnControls: { reasoningLevel: 'medium', maxContextMode: false, fastModel: false },
+          },
+        ],
+        { label: 'conversation:sendMessage' },
+      ),
+    ).toThrow(IpcValidationError);
   });
 
   it('rejects capture open payload with path-traversal project id', () => {
-    expect(() => parseIpcArgs(CaptureOpenProjectInputArgsSchema, [{
-      projectId: '../x',
-      sessionId: 'session_a',
-      ownerSessionId: null,
-      inputId: 'input_a',
-      filePath: 'D:/a.rdc',
-      replayDeviceId: 'local',
-    }], { label: 'capture:openProjectInput' })).toThrow(IpcValidationError);
+    expect(() =>
+      parseIpcArgs(
+        CaptureOpenProjectInputArgsSchema,
+        [
+          {
+            projectId: '../x',
+            sessionId: 'session_a',
+            ownerSessionId: null,
+            inputId: 'input_a',
+            filePath: 'D:/a.rdc',
+            replayDeviceId: 'local',
+          },
+        ],
+        { label: 'capture:openProjectInput' },
+      ),
+    ).toThrow(IpcValidationError);
   });
 
   it('rejects command execute with empty input', () => {
-    expect(() => parseIpcArgs(CommandExecuteArgsSchema, [{ input: '' }], {
-      label: 'command:execute',
-    })).toThrow(IpcValidationError);
+    expect(() =>
+      parseIpcArgs(CommandExecuteArgsSchema, [{ input: '' }], {
+        label: 'command:execute',
+      }),
+    ).toThrow(IpcValidationError);
   });
 
   it('rejects knowledge card with empty relativePath', () => {
-    expect(() => parseIpcArgs(KnowledgeCardArgsSchema, ['user', ''], {
-      label: 'knowledge:card',
-    })).toThrow(IpcValidationError);
+    expect(() =>
+      parseIpcArgs(KnowledgeCardArgsSchema, ['user', ''], {
+        label: 'knowledge:card',
+      }),
+    ).toThrow(IpcValidationError);
   });
 
   it('rejects knowledge candidateCreate without explicit user intent', () => {
-    expect(() => parseIpcArgs(KnowledgeCandidateCreateArgsSchema, [{
-      sessionId: 'session_a',
-      card: {
-        cardId: 'user:facts/sample.md',
-        spaceId: 'user',
-        relativePath: 'facts/sample.md',
-        type: 'fact',
-        lifecycle: 'draft',
-        title: 'Sample',
-        scope: {},
-        relations: [],
-        body: 'Body',
-      },
-      explicitUserIntent: false,
-    }], { label: 'knowledge:candidateCreate' })).toThrow(IpcValidationError);
+    expect(() =>
+      parseIpcArgs(
+        KnowledgeCandidateCreateArgsSchema,
+        [
+          {
+            sessionId: 'session_a',
+            card: {
+              cardId: 'user:facts/sample.md',
+              spaceId: 'user',
+              relativePath: 'facts/sample.md',
+              type: 'fact',
+              lifecycle: 'draft',
+              title: 'Sample',
+              scope: {},
+              relations: [],
+              body: 'Body',
+            },
+            explicitUserIntent: false,
+          },
+        ],
+        { label: 'knowledge:candidateCreate' },
+      ),
+    ).toThrow(IpcValidationError);
   });
 
   it('rejects rdc-runtime trustMcp with empty descriptorId', () => {
-    expect(() => parseIpcArgs(RdcRuntimeTrustMcpArgsSchema, ['D:/proj', ''], {
-      label: 'rdc-runtime:trustMcp',
-    })).toThrow(IpcValidationError);
+    expect(() =>
+      parseIpcArgs(RdcRuntimeTrustMcpArgsSchema, ['D:/proj', ''], {
+        label: 'rdc-runtime:trustMcp',
+      }),
+    ).toThrow(IpcValidationError);
   });
 
   it('rejects trace getProjection with a malformed session id', () => {
-    expect(() => parseIpcArgs(TraceGetProjectionArgsSchema, ['../escape'], {
-      label: 'trace:getProjection',
-    })).toThrow(IpcValidationError);
+    expect(() =>
+      parseIpcArgs(TraceGetProjectionArgsSchema, ['../escape'], {
+        label: 'trace:getProjection',
+      }),
+    ).toThrow(IpcValidationError);
   });
 
   it('rejects oversized favicon domain', () => {
-    expect(() => parseIpcArgs(WebResolveFaviconArgsSchema, ['x'.repeat(300)], {
-      label: 'web:resolveFavicon',
-    })).toThrow(IpcValidationError);
+    expect(() =>
+      parseIpcArgs(WebResolveFaviconArgsSchema, ['x'.repeat(300)], {
+        label: 'web:resolveFavicon',
+      }),
+    ).toThrow(IpcValidationError);
   });
 
   it('accepts valid project select id', () => {
@@ -215,18 +262,22 @@ describe('IpcApprovalTokenService', () => {
       scope: 'user',
       name: 'note',
     });
-    expect(service.consume({
-      token,
-      action: 'memory.write',
-      scope: 'user',
-      name: 'note',
-    })).toBe(true);
-    expect(service.consume({
-      token,
-      action: 'memory.write',
-      scope: 'user',
-      name: 'note',
-    })).toBe(false);
+    expect(
+      service.consume({
+        token,
+        action: 'memory.write',
+        scope: 'user',
+        name: 'note',
+      }),
+    ).toBe(true);
+    expect(
+      service.consume({
+        token,
+        action: 'memory.write',
+        scope: 'user',
+        name: 'note',
+      }),
+    ).toBe(false);
   });
 
   it('rejects token reused for a different action', () => {
@@ -237,23 +288,27 @@ describe('IpcApprovalTokenService', () => {
       name: 'old',
       projectRoot: 'D:/proj',
     });
-    expect(service.consume({
-      token,
-      action: 'memory.write',
-      scope: 'project',
-      name: 'old',
-      projectRoot: 'D:/proj',
-    })).toBe(false);
+    expect(
+      service.consume({
+        token,
+        action: 'memory.write',
+        scope: 'project',
+        name: 'old',
+        projectRoot: 'D:/proj',
+      }),
+    ).toBe(false);
   });
 
   it('rejects expired tokens', () => {
     const service = new IpcApprovalTokenService(-1);
     const token = service.issue({ action: 'memory.write', scope: 'user', name: 'n' });
-    expect(service.consume({
-      token,
-      action: 'memory.write',
-      scope: 'user',
-      name: 'n',
-    })).toBe(false);
+    expect(
+      service.consume({
+        token,
+        action: 'memory.write',
+        scope: 'user',
+        name: 'n',
+      }),
+    ).toBe(false);
   });
 });

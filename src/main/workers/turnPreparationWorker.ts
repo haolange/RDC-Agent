@@ -2,7 +2,7 @@ import { parentPort } from 'node:worker_threads';
 import {
   computeTurnPreparation,
   type TurnPreparationComputationInput,
-} from './TurnPreparationComputation';
+} from '../agent-runtime/context/TurnPreparationComputation';
 
 interface WorkerRequest {
   id: number;

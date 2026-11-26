@@ -28,7 +28,8 @@ function vertexProvider(): LlmProviderEntry {
         { id: 'GOOGLE_VERTEX_ACCESS_TOKEN', label: 'Access token', kind: 'secret', required: false },
       ],
       primarySecretFieldId: 'GOOGLE_VERTEX_ACCESS_TOKEN',
-      endpointTemplate: 'https://${GOOGLE_VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_VERTEX_PROJECT}',
+      endpointTemplate:
+        'https://${GOOGLE_VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_VERTEX_PROJECT}',
       credentialAlternatives: [
         { id: 'access-token', fieldIds: ['GOOGLE_VERTEX_ACCESS_TOKEN'] },
         { id: 'service-account', fieldIds: ['GOOGLE_APPLICATION_CREDENTIALS'] },
@@ -67,11 +68,13 @@ describe('providerConnectionState', () => {
 
   it('uses provider documentation wording for typed credentials', () => {
     expect(shouldUseProviderDocsLink(vertexProvider())).toBe(true);
-    expect(shouldUseProviderDocsLink({
-      ...vertexProvider(),
-      connectionSchema: {
-        fields: [{ id: 'apiKey', label: 'API Key', kind: 'secret', required: true }],
-      },
-    })).toBe(false);
+    expect(
+      shouldUseProviderDocsLink({
+        ...vertexProvider(),
+        connectionSchema: {
+          fields: [{ id: 'apiKey', label: 'API Key', kind: 'secret', required: true }],
+        },
+      }),
+    ).toBe(false);
   });
 });

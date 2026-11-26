@@ -14,7 +14,15 @@ export interface PendingToolApprovalRequest {
 
 export const findPendingToolApproval = (messages: ConversationMessage[]): PendingToolApprovalRequest | null => {
   const assistantMessages = messages
-    .filter((message) => message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming' || message.workTrace?.blocks.some((block) => block.toolCalls.some((call) => call.delegatedRequest && call.approval?.status === 'pending'))))
+    .filter(
+      (message) =>
+        message.role === 'assistant' &&
+        (message.status === 'draft' ||
+          message.status === 'streaming' ||
+          message.workTrace?.blocks.some((block) =>
+            block.toolCalls.some((call) => call.delegatedRequest && call.approval?.status === 'pending'),
+          )),
+    )
     .sort((left, right) => right.createdAt - left.createdAt);
 
   for (const message of assistantMessages) {
@@ -27,9 +35,7 @@ export const findPendingToolApproval = (messages: ConversationMessage[]): Pendin
           approvalId: toolCall.approval.approvalId,
           toolCallId: toolCall.id,
           toolName: toolCall.toolName,
-          question: toolCall.approval.reason?.trim()
-            || block.summary?.trim()
-            || '',
+          question: toolCall.approval.reason?.trim() || block.summary?.trim() || '',
           risk: (toolCall.approval.risk === 'low' || toolCall.approval.risk === 'high'
             ? toolCall.approval.risk
             : 'medium') as PendingToolApprovalRequest['risk'],

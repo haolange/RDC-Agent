@@ -8,6 +8,12 @@ import {
   isAgentModelSelectionInvalid,
 } from './AgentModelCascadeSelect';
 import type { AgentModelOption } from '@shared/types/agentManifest';
+vi.mock('../../../../i18n', () => ({
+  useI18n: () => ({
+    t: (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) =>
+      translate('zh-CN', key, params),
+  }),
+}));
 
 const primaryOption: AgentModelOption = {
   canonicalId: 'kimi-coding-plan/kimi-for-coding',
@@ -22,14 +28,23 @@ const primaryOption: AgentModelOption = {
 describe('AgentModelCascadeSelect selection validation', () => {
   it('preserves a configured model identity when its provider is not configured', async () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-    const host = document.createElement('div'); document.body.append(host);
+    const host = document.createElement('div');
+    document.body.append(host);
     const root = createRoot(host);
-    const unavailable: AgentModelOption = { ...primaryOption, configured: false,
-      status: 'provider-unavailable', providerIssue: 'unconfigured' };
-    const render = (option: AgentModelOption) => root.render(createElement(AgentModelCascadeSelect, {
-      value: option.canonicalId, options: [option], onChange: () => {},
-      t: (key, params) => translate('zh-CN', key, params),
-    }));
+    const unavailable: AgentModelOption = {
+      ...primaryOption,
+      configured: false,
+      status: 'provider-unavailable',
+      providerIssue: 'unconfigured',
+    };
+    const render = (option: AgentModelOption) =>
+      root.render(
+        createElement(AgentModelCascadeSelect, {
+          value: option.canonicalId,
+          options: [option],
+          onChange: () => {},
+        }),
+      );
     try {
       await act(async () => render(unavailable));
       expect(host.textContent).toContain(unavailable.modelLabel);
@@ -42,7 +57,9 @@ describe('AgentModelCascadeSelect selection validation', () => {
       expect(host.textContent).toContain('所选模型已失效');
       expect(host.querySelector('[aria-invalid]')?.getAttribute('aria-invalid')).toBe('true');
     } finally {
-      await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals();
+      await act(async () => root.unmount());
+      host.remove();
+      vi.unstubAllGlobals();
     }
   });
 
@@ -51,10 +68,7 @@ describe('AgentModelCascadeSelect selection validation', () => {
   });
 
   it('fails closed when a persisted internal target is absent from projection', () => {
-    expect(isAgentModelSelectionInvalid(
-      'kimi-coding-plan/kimi-for-coding-highspeed',
-      [primaryOption],
-    )).toBe(true);
+    expect(isAgentModelSelectionInvalid('kimi-coding-plan/kimi-for-coding-highspeed', [primaryOption])).toBe(true);
   });
 
   it('allows an empty route while the user is choosing a model', () => {
@@ -65,12 +79,15 @@ describe('AgentModelCascadeSelect selection validation', () => {
     expect(agentModelOptionAccessibleLabel(primaryOption, 'Unavailable')).toBe(
       'Kimi for Coding · kimi-coding-plan/kimi-for-coding',
     );
-    expect(agentModelOptionAccessibleLabel({
-      ...primaryOption,
-      configured: false,
-      disabledReason: 'Account entitlement denied',
-    }, 'Unavailable')).toBe(
-      'Kimi for Coding · kimi-coding-plan/kimi-for-coding · Account entitlement denied',
-    );
+    expect(
+      agentModelOptionAccessibleLabel(
+        {
+          ...primaryOption,
+          configured: false,
+          disabledReason: 'Account entitlement denied',
+        },
+        'Unavailable',
+      ),
+    ).toBe('Kimi for Coding · kimi-coding-plan/kimi-for-coding · Account entitlement denied');
   });
 });

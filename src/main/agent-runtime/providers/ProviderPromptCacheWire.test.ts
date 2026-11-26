@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { AnthropicProvider } from './AnthropicProvider';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
-import { OpenAIResponsesProvider, __testing as responsesTesting } from './OpenAIResponsesProvider';
+import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
+import * as responsesTesting from './OpenAIResponsesProvider';
 import type { Context, Model, StreamOptions } from '../core/types';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { CompiledPromptCache } from '@shared/types/semanticContext';
@@ -18,30 +19,28 @@ const model: Model = {
   vision: true,
 };
 
-const plan = (
-  protocol: RequestPlan['route']['protocol'],
-  adapterId: RequestPlan['adapterId'],
-): RequestPlan => createTestRequestPlan({
-  providerId: 'provider',
-  adapterId,
-  catalogRevision: 'catalog',
-  routeRevision: 'route',
-  selectedModelId: model.id,
-  effectiveModelId: model.id,
-  appliedBindingIds: [],
-  route: { protocol, baseUrl: 'https://example.test/v1', source: 'catalog' },
-  headers: {},
-  bodyPatch: {},
-  contextBudgetTokens: 900_000,
-  contextMode: 'normal',
-  contextWindowTokens: 1_000_000,
-  activeTierId: 'default',
-  fastMode: false,
-  reasoningWire: {
-    selection: 'off',
-    control: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
-  },
-});
+const plan = (protocol: RequestPlan['route']['protocol'], adapterId: RequestPlan['adapterId']): RequestPlan =>
+  createTestRequestPlan({
+    providerId: 'provider',
+    adapterId,
+    catalogRevision: 'catalog',
+    routeRevision: 'route',
+    selectedModelId: model.id,
+    effectiveModelId: model.id,
+    appliedBindingIds: [],
+    route: { protocol, baseUrl: 'https://example.test/v1', source: 'catalog' },
+    headers: {},
+    bodyPatch: {},
+    contextBudgetTokens: 900_000,
+    contextMode: 'normal',
+    contextWindowTokens: 1_000_000,
+    activeTierId: 'default',
+    fastMode: false,
+    reasoningWire: {
+      selection: 'off',
+      control: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+    },
+  });
 
 const context: Context = {
   systemPrompt: 'Stable instructions\n\nCurrent date: 2026-07-19',
@@ -104,16 +103,19 @@ describe('provider prompt cache wire', () => {
     let capturedBody: Record<string, unknown> | undefined;
     vi.stubGlobal('fetch', async (_url: string | URL | Request, init?: RequestInit) => {
       capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
-      return new Response([
-        'data: {"type":"response.output_text.delta","delta":"OK"}',
-        '',
-        'data: {"type":"response.output_text.done"}',
-        '',
-        'data: {"type":"response.completed","response":{"id":"resp-1","status":"completed","usage":{"input_tokens":20,"output_tokens":2,"total_tokens":22,"input_tokens_details":{"cached_tokens":8,"cache_write_tokens":6}}}}',
-        '',
-        'data: [DONE]',
-        '',
-      ].join('\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+      return new Response(
+        [
+          'data: {"type":"response.output_text.delta","delta":"OK"}',
+          '',
+          'data: {"type":"response.output_text.done"}',
+          '',
+          'data: {"type":"response.completed","response":{"id":"resp-1","status":"completed","usage":{"input_tokens":20,"output_tokens":2,"total_tokens":22,"input_tokens_details":{"cached_tokens":8,"cache_write_tokens":6}}}}',
+          '',
+          'data: [DONE]',
+          '',
+        ].join('\n'),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+      );
     });
 
     const requestPlan = plan('OpenAIResponses', 'openai-responses');
@@ -148,16 +150,19 @@ describe('provider prompt cache wire', () => {
     let capturedBody: Record<string, unknown> | undefined;
     vi.stubGlobal('fetch', async (_url: string | URL | Request, init?: RequestInit) => {
       capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
-      return new Response([
-        'data: {"choices":[{"delta":{"content":"OK"},"finish_reason":null}]}',
-        '',
-        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
-        '',
-        'data: {"choices":[],"usage":{"prompt_tokens":20,"completion_tokens":2,"total_tokens":22,"prompt_tokens_details":{"cached_tokens":9,"cache_write_tokens":7}}}',
-        '',
-        'data: [DONE]',
-        '',
-      ].join('\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+      return new Response(
+        [
+          'data: {"choices":[{"delta":{"content":"OK"},"finish_reason":null}]}',
+          '',
+          'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
+          '',
+          'data: {"choices":[],"usage":{"prompt_tokens":20,"completion_tokens":2,"total_tokens":22,"prompt_tokens_details":{"cached_tokens":9,"cache_write_tokens":7}}}',
+          '',
+          'data: [DONE]',
+          '',
+        ].join('\n'),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+      );
     });
 
     const requestPlan = plan('OpenAICompatibleChatCompletions', 'openai-compatible');
@@ -193,26 +198,29 @@ describe('provider prompt cache wire', () => {
     let capturedBody: Record<string, unknown> | undefined;
     vi.stubGlobal('fetch', async (_url: string | URL | Request, init?: RequestInit) => {
       capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
-      return new Response([
-        'event: message_start',
-        'data: {"type":"message_start","message":{"id":"msg-1","usage":{"input_tokens":20,"output_tokens":0,"cache_read_input_tokens":10,"cache_creation_input_tokens":5,"speed":"fast"}}}',
-        '',
-        'event: content_block_start',
-        'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
-        '',
-        'event: content_block_delta',
-        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"OK"}}',
-        '',
-        'event: content_block_stop',
-        'data: {"type":"content_block_stop","index":0}',
-        '',
-        'event: message_delta',
-        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2,"cache_read_input_tokens":10,"cache_creation_input_tokens":5,"speed":"fast"}}',
-        '',
-        'event: message_stop',
-        'data: {"type":"message_stop"}',
-        '',
-      ].join('\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+      return new Response(
+        [
+          'event: message_start',
+          'data: {"type":"message_start","message":{"id":"msg-1","usage":{"input_tokens":20,"output_tokens":0,"cache_read_input_tokens":10,"cache_creation_input_tokens":5,"speed":"fast"}}}',
+          '',
+          'event: content_block_start',
+          'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+          '',
+          'event: content_block_delta',
+          'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"OK"}}',
+          '',
+          'event: content_block_stop',
+          'data: {"type":"content_block_stop","index":0}',
+          '',
+          'event: message_delta',
+          'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2,"cache_read_input_tokens":10,"cache_creation_input_tokens":5,"speed":"fast"}}',
+          '',
+          'event: message_stop',
+          'data: {"type":"message_stop"}',
+          '',
+        ].join('\n'),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+      );
     });
 
     const requestPlan = plan('AnthropicMessages', 'anthropic-messages');

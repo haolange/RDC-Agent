@@ -3,16 +3,11 @@ import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Icon } from '../../ui/Icon';
+import { PlainButton } from '../../ui/PlainButton';
 import { WorkCardHeader } from './WorkCardHeader';
 import { getRowStatusLabel } from './workProcessStatus';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
-import {
-  CardBody,
-  FamilyDetail,
-  RawPanel,
-  ToolApprovalCallout,
-  type ToolRowModel,
-} from './WorkProcessToolCardParts';
+import { CardBody, FamilyDetail, RawPanel, ToolApprovalCallout, type ToolRowModel } from './WorkProcessToolCardParts';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { usePlanReader } from './PlanReaderHost';
 import { isTrackActivity } from './workProcessTrack';
@@ -22,8 +17,21 @@ const PlanReadAction: React.FC<{ plan: NonNullable<ToolRowModel['planReview']> }
   const { t } = useI18n();
   const open = usePlanReader();
   const ref = React.useRef<HTMLButtonElement>(null);
-  return <Button ref={ref} data-plan-id={plan.planId} variant="ghost" size="sm" aria-label={`${t('chat.planReviewReadFull')} · ${plan.title}`}
-    onClick={() => { ref.current?.focus(); open(plan); }}>{t('chat.planReviewReadFull')}</Button>;
+  return (
+    <Button
+      ref={ref}
+      data-plan-id={plan.planId}
+      variant="ghost"
+      size="sm"
+      aria-label={`${t('chat.planReviewReadFull')} · ${plan.title}`}
+      onClick={() => {
+        ref.current?.focus();
+        open(plan);
+      }}
+    >
+      {t('chat.planReviewReadFull')}
+    </Button>
+  );
 };
 
 export const ToolRow: React.FC<{
@@ -35,35 +43,46 @@ export const ToolRow: React.FC<{
 }> = ({ row, extraDetail, density = 'normal', grouped = false }) => {
   const { t } = useI18n();
   // A plan row's verb already names its review state; only a real failure adds a status.
-  const statusLabel = row.status === 'complete' || (row.approval && row.approval.status !== 'approved') || (row.planReview && row.status !== 'error')
-    ? '' : getRowStatusLabel(row.status, t);
-  const hasDetail = row.previewLines.length > 0
-    || Boolean(row.hookDiagnostics?.length)
-    || Boolean(row.commandText)
-    || Boolean(row.pathChip)
-    || Boolean(row.chips?.length)
-    || Boolean(row.imagePreviews?.length)
-    || Boolean(row.webPages?.length)
-    || (row.family === 'file' && Boolean(row.target || row.pathChip));
+  const statusLabel =
+    row.status === 'complete' ||
+    (row.approval && row.approval.status !== 'approved') ||
+    (row.planReview && row.status !== 'error')
+      ? ''
+      : getRowStatusLabel(row.status, t);
+  const hasDetail =
+    row.previewLines.length > 0 ||
+    Boolean(row.hookDiagnostics?.length) ||
+    Boolean(row.commandText) ||
+    Boolean(row.pathChip) ||
+    Boolean(row.chips?.length) ||
+    Boolean(row.imagePreviews?.length) ||
+    Boolean(row.webPages?.length) ||
+    (row.family === 'file' && Boolean(row.target || row.pathChip));
   const hasRaw = row.argsLines.length > 0 || row.rawLines.length > 0;
   const canExpand = hasDetail || hasRaw || Boolean(extraDetail) || Boolean(row.planReview) || Boolean(row.approval);
   const hasApproval = Boolean(row.approval);
   const diagnosticCaption = row.diagnosticCaption?.trim() || '';
   const hasDiagnostic = row.status === 'error' && Boolean(diagnosticCaption);
-  const hookAttention = row.hookDiagnostics?.find((diagnostic) => diagnostic.severity === 'error')
-    ?? row.hookDiagnostics?.find((diagnostic) => diagnostic.severity === 'warning');
+  const hookAttention =
+    row.hookDiagnostics?.find((diagnostic) => diagnostic.severity === 'error') ??
+    row.hookDiagnostics?.find((diagnostic) => diagnostic.severity === 'warning');
   // Collapsed by default — including while running — so live CoT stays quiet;
   // users expand individual cards when they want detail / Raw.
   const [expanded, toggleDisclosure] = useScopedWorkDisclosure(`tool-${row.id}`, false);
   const verbLabel = toolHeadline(row, t);
-  const approvalAttention = row.approval && row.approval.status !== 'approved'
-    ? [row.approval.verb !== verbLabel ? row.approval.verb : '', row.approval.message].filter(Boolean).join(' · ')
-    : '';
+  const approvalAttention =
+    row.approval && row.approval.status !== 'approved'
+      ? [row.approval.verb !== verbLabel ? row.approval.verb : '', row.approval.message].filter(Boolean).join(' · ')
+      : '';
   const isBackgroundWait = row.toolName === 'background_wait';
   const compact = density === 'compact' || isBackgroundWait;
   const payloadText = row.bodyText?.trim() ?? '';
-  const hasPayloadSurface = payloadText.length > 160
-    && (row.family === 'shell' || payloadText.startsWith('{') || payloadText.startsWith('[') || payloadText.includes('\n'));
+  const hasPayloadSurface =
+    payloadText.length > 160 &&
+    (row.family === 'shell' ||
+      payloadText.startsWith('{') ||
+      payloadText.startsWith('[') ||
+      payloadText.includes('\n'));
 
   const toggleExpanded = (event: React.MouseEvent) => {
     event.preventDefault();
@@ -85,17 +104,31 @@ export const ToolRow: React.FC<{
           data-family={row.family}
           data-locate={canExpand || undefined}
         >
-          <WorkCardHeader onClick={toggleExpanded} expanded={canExpand ? expanded : undefined}
-            disabled={!canExpand} duration={row.duration} title={verbLabel}
+          <WorkCardHeader
+            onClick={toggleExpanded}
+            expanded={canExpand ? expanded : undefined}
+            disabled={!canExpand}
+            duration={row.duration}
+            title={verbLabel}
             icon={<Icon name={row.icon} className="work-process-icon work-process-tool-card-icon" />}
-            titleContent={<ActiveSignalText active={isTrackActivity(row)} tone="info">{verbLabel}</ActiveSignalText>}
-            status={statusLabel && statusLabel !== verbLabel ? <span className={row.status === 'error' ? 'work-process-tool-status-error' : undefined}>{statusLabel}</span> : null} />
+            titleContent={
+              <ActiveSignalText active={isTrackActivity(row)} tone="info">
+                {verbLabel}
+              </ActiveSignalText>
+            }
+            status={
+              statusLabel && statusLabel !== verbLabel ? (
+                <span className={row.status === 'error' ? 'work-process-tool-status-error' : undefined}>
+                  {statusLabel}
+                </span>
+              ) : null
+            }
+          />
 
           {(!isBackgroundWait || expanded) && !grouped ? <CardBody row={row} /> : null}
 
           {hasDiagnostic ? (
-            <button
-              type="button"
+            <PlainButton
               className={`work-process-tool-diagnostic${expanded ? ' is-open' : ''}`}
               data-testid="work-process-tool-diagnostic"
               aria-expanded={expanded}
@@ -108,7 +141,7 @@ export const ToolRow: React.FC<{
                   {expanded ? t('chat.workProcessHideDiagnostic') : t('chat.workProcessShowDiagnostic')}
                 </span>
               ) : null}
-            </button>
+            </PlainButton>
           ) : null}
 
           {hookAttention && !expanded ? (
@@ -130,9 +163,13 @@ export const ToolRow: React.FC<{
               {row.hookDiagnostics?.length ? (
                 <div className="work-process-tool-hook-details" aria-label={t('chat.workProcessHookDiagnostics')}>
                   <span className="work-process-tool-card-raw-label">{t('chat.workProcessHookDiagnostics')}</span>
-                  <ul>{row.hookDiagnostics.map((diagnostic) => (
-                    <li key={diagnostic.id} className={`severity-${diagnostic.severity}`}>{diagnostic.message}</li>
-                  ))}</ul>
+                  <ul>
+                    {row.hookDiagnostics.map((diagnostic) => (
+                      <li key={diagnostic.id} className={`severity-${diagnostic.severity}`}>
+                        {diagnostic.message}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ) : null}
               {extraDetail}

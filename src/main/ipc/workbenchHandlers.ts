@@ -4,17 +4,16 @@
 
 import { BrowserWindow, nativeTheme } from 'electron';
 import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
-import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
 import { runExecutionService } from '../agent-runtime/orchestration/RunExecutionService';
-import { settingsService } from '../settings/settings-core/SettingsService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { projectSessionForClient } from '../sessions/store/projectSessionHandoff';
+import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
+import { sessionRevisions } from '../sessions/store/SessionRevisionRegistry';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rdcCliInvokerService } from '../rdc/RdcCliInvokerService';
 import { applyProductIcon } from '../window/productIcon';
 import { applyWindowBackgrounds } from '../window/appearanceChrome';
 import { sessionResumeService } from '../sessions/store/SessionResumeService';
-import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
+import { rendererEventHub } from '../runtime/rendererEventHub';
 import { registerMemoryHandlers } from './memoryHandlers';
 import { registerInvestigationHandlers } from './investigationHandlers';
 import { registerKnowledgeHandlers } from './knowledgeHandlers';
@@ -54,10 +53,10 @@ let nativeThemeSubscribed = false;
 
 export async function initializeIpcState(): Promise<void> {
   try {
-    state.currentSessionId = await storageAdapter.getCurrentSessionId();
-    state.currentProjectId = storageAdapter.getCurrentProjectId();
+    state.currentSessionId = projectWorkspaceStore.getCurrentSessionId();
+    state.currentProjectId = projectWorkspaceStore.getCurrentProjectId();
     state.currentRunId = state.currentSessionId
-      ? storageAdapter.getLatestRun(state.currentSessionId)?.runId || null
+      ? sessionRecordStore.getLatestRun(state.currentSessionId)?.runId || null
       : null;
   } catch (error) {
     console.warn('[IPC] Failed to restore current session id:', error);
@@ -74,7 +73,10 @@ export async function initializeIpcState(): Promise<void> {
       state.currentProjectId = resumable.projectId;
       state.currentRunId = resumable.runId;
     }
-  } catch { /* resume detection is best-effort */ }
+  } catch (error) {
+    // Resume detection is best-effort: the app starts without a resumed session.
+    console.warn('[IPC] Failed to detect a resumable session:', error);
+  }
 }
 
 function broadcastToRenderer(channel: string, ...args: unknown[]): void {
@@ -97,20 +99,15 @@ function broadcastRunStatusChanged(payload: {
 }
 
 function applyCurrentLlmConfig(): void {
-  const llmConfig = settingsService.getLlmConfig();
-  agentOrchestrator.applyLlmConfig(llmConfig);
+  agentOrchestrator.applyLlmConfig();
 }
 
 async function appendActionEvent(event: ActionEvent): Promise<void> {
-  await storageAdapter.appendActionEvent(event.session_id, event);
+  await sessionRecordStore.appendActionEvent(event.session_id, event);
   broadcastToRenderer('evidence:eventAdded', event);
 }
 
-async function setRunLifecycleState(
-  sessionId: string,
-  runId: string,
-  patch: RunLifecyclePatch,
-): Promise<void> {
+async function setRunLifecycleState(sessionId: string, runId: string, patch: RunLifecyclePatch): Promise<void> {
   const updatePayload: Record<string, unknown> = {
     status: patch.status,
   };
@@ -125,7 +122,7 @@ async function setRunLifecycleState(
     updatePayload.finishedAt = patch.finishedAt;
   }
 
-  await storageAdapter.updateRun(sessionId, runId, updatePayload);
+  await sessionRecordStore.updateRun(sessionId, runId, updatePayload);
   broadcastRunStatusChanged({
     runId,
     sessionId,
@@ -139,7 +136,7 @@ async function selectCurrentProject(projectId: string | null): Promise<ProjectSe
     state.currentProjectId = null;
     state.currentSessionId = null;
     state.currentRunId = null;
-    storageAdapter.setCurrentProjectId(null);
+    projectWorkspaceStore.setCurrentProjectId(null);
     return {
       project: null,
       currentSession: null,
@@ -147,7 +144,7 @@ async function selectCurrentProject(projectId: string | null): Promise<ProjectSe
     };
   }
 
-  const project = storageAdapter.getProjectById(projectId);
+  const project = projectWorkspaceStore.getProjectById(projectId);
   if (!project) {
     return {
       project: null,
@@ -158,23 +155,21 @@ async function selectCurrentProject(projectId: string | null): Promise<ProjectSe
 
   state.currentProjectId = projectId;
   const selectedSession: SessionRecord | null = state.currentSessionId
-    ? storageAdapter.readSession(state.currentSessionId)
+    ? sessionRecordStore.readSession(state.currentSessionId)
     : null;
   if (!selectedSession || selectedSession.projectId !== projectId) {
     state.currentSessionId = null;
     state.currentRunId = null;
-    await storageAdapter.setCurrentSessionId(null);
+    projectWorkspaceStore.setCurrentSessionId(null);
   } else {
     state.currentRunId = selectedSession.lastRunId || state.currentRunId;
   }
-  storageAdapter.setCurrentProjectId(projectId);
+  projectWorkspaceStore.setCurrentProjectId(projectId);
 
   return {
     project,
-    currentSession: selectedSession?.projectId === projectId
-      ? projectSessionForClient(selectedSession)
-      : null,
-    currentRun: state.currentSessionId ? storageAdapter.getLatestRun(state.currentSessionId) : null,
+    currentSession: selectedSession?.projectId === projectId ? sessionRevisions.snapshot(selectedSession) : null,
+    currentRun: state.currentSessionId ? sessionRecordStore.getLatestRun(state.currentSessionId) : null,
   };
 }
 
@@ -196,30 +191,30 @@ function registerToolTraceBridge(): void {
   rdcCliInvokerService.onInvocationTrace((trace) => {
     broadcastToRenderer('tool:executionComplete', trace);
     if (state.currentSessionId && state.currentRunId) {
-      void appendActionEvent(storageAdapter.createActionEvent({
-        runId: state.currentRunId,
-        sessionId: state.currentSessionId,
-        agentId: trace.runtimeOwner || 'debugger',
-        eventType: 'tool_execution',
-        status: trace.result.ok ? 'ok' : 'error',
-        turnId: trace.turnId,
-        payload: {
-          tool_name: trace.toolName,
-          args: trace.args,
-          result: trace.result.ok ? 'success' : 'failed',
-          error: trace.result.error,
-          trace_id: trace.traceId,
-        },
-      }));
+      void appendActionEvent(
+        sessionRecordStore.createActionEvent({
+          runId: state.currentRunId,
+          sessionId: state.currentSessionId,
+          agentId: trace.runtimeOwner || 'debugger',
+          eventType: 'tool_execution',
+          status: trace.result.ok ? 'ok' : 'error',
+          turnId: trace.turnId,
+          payload: {
+            tool_name: trace.toolName,
+            args: trace.args,
+            result: trace.result.ok ? 'success' : 'failed',
+            error: trace.result.error,
+            trace_id: trace.traceId,
+          },
+        }),
+      );
     }
     runtimeLogService.log({
       scope: state.currentSessionId ? 'session' : 'app',
       namespace: 'tool',
       severity: trace.result.ok ? 'success' : 'error',
       title: trace.toolName,
-      summary: trace.result.ok
-        ? '工具调用已完成。'
-        : trace.result.error?.message ?? '工具调用失败。',
+      summary: trace.result.ok ? '工具调用已完成。' : (trace.result.error?.message ?? '工具调用失败。'),
       detail: trace.result.duration_ms ? `${trace.result.duration_ms}ms` : undefined,
       sessionId: state.currentSessionId,
       projectId: state.currentProjectId,
@@ -264,7 +259,7 @@ export function registerIPCHandlers(): void {
   registerToolTraceBridge();
   preloadLlmConfig();
   registerShellHandlers();
-  registerWebHandlers();
+  registerWebHandlers(context);
   registerConversationHandlers(context);
   registerConversationMediaHandlers(context);
   registerPlanHandlers(context);

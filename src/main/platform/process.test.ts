@@ -10,7 +10,9 @@ import {
 import { currentHost } from './host';
 import type { ProcessBackend } from './processBackend';
 
-function fakeBackend(births: Record<number, string | Error | null>): ProcessBackend & { killTree: ReturnType<typeof vi.fn> } {
+function fakeBackend(
+  births: Record<number, string | Error | null>,
+): ProcessBackend & { killTree: ReturnType<typeof vi.fn> } {
   const read = (pid: number): string | null => {
     const value = births[pid] ?? null;
     if (value instanceof Error) throw value;
@@ -71,9 +73,14 @@ describe('process identity on this host', () => {
   });
 
   it('terminates an isolated child together with its descendants', { timeout: 20_000 }, async () => {
-    const script = "const c=require('child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});"
-      + "process.stdout.write(String(c.pid)+'\\n');setInterval(()=>{},1000);";
-    const child = spawn(process.execPath, ['-e', script], { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true, ...isolatedChildSpawnOptions() });
+    const script =
+      "const c=require('child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});" +
+      "process.stdout.write(String(c.pid)+'\\n');setInterval(()=>{},1000);";
+    const child = spawn(process.execPath, ['-e', script], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+      ...isolatedChildSpawnOptions(),
+    });
     const grandchild = await new Promise<number>((resolve, reject) => {
       child.stdout.once('data', (chunk: Buffer) => resolve(Number(chunk.toString().trim())));
       child.once('error', reject);

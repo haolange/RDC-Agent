@@ -18,13 +18,37 @@ const HANDLER_FILES = readdirSync(HANDLERS_DIR)
 
 describe('IPC schema coverage', () => {
   it('accepts only declared handoff identity in plan approval, never display translations', () => {
-    const request = { sessionId: 'session', reviewId: 'review', decision: {
-      kind: 'approve', handoff: { agent: 'general', label: 'Implement Plan' },
-    } };
+    const request = {
+      sessionId: 'session',
+      reviewId: 'review',
+      decision: {
+        kind: 'approve',
+        handoff: { agent: 'general', label: 'Implement Plan' },
+      },
+      expectedPlanHash: 'a'.repeat(64),
+      model: { providerId: 'p', modelId: 'm' },
+      controls: { reasoningLevel: 'high', fastModel: false, maxContextMode: false },
+      baseRevision: { epoch: 'run-1', n: 3 },
+    };
     expect(parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, [request])).toEqual([request]);
-    expect(() => parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, [{ ...request, decision: {
-      ...request.decision, handoff: { ...request.decision.handoff, labelTranslations: { 'zh-CN': '执行计划' } },
-    } }])).toThrow();
+    expect(() =>
+      parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, [
+        {
+          ...request,
+          decision: {
+            ...request.decision,
+            handoff: { ...request.decision.handoff, labelTranslations: { 'zh-CN': '执行计划' } },
+          },
+        },
+      ]),
+    ).toThrow();
+    const { baseRevision: _omitted, ...withoutRevision } = request;
+    expect(() => parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, [withoutRevision])).toThrow();
+    expect(() =>
+      parseIpcArgs(ConversationAnswerPlanReviewArgsSchema, [
+        { sessionId: 'session', reviewId: 'review', decision: { kind: 'reject', feedback: '   ' } },
+      ]),
+    ).toThrow();
   });
   it('enumerates every IPC handler module and requires parseIpcArgs wiring', () => {
     expect(HANDLER_FILES.length).toBeGreaterThan(10);
@@ -49,52 +73,84 @@ describe('IPC schema coverage', () => {
 
   it('accepts settings/llm channel args', () => {
     expect(parseIpcArgs(LlmProviderIdArgsSchema, ['openai'])[0]).toBe('openai');
-    expect(parseIpcArgs(LlmProviderDraftArgsSchema, [{
-      providerId: 'openai',
-      authMode: 'api-key',
-      apiKey: 'sk-test',
-    }])[0]).toMatchObject({ providerId: 'openai' });
-    expect(parseIpcArgs(LlmModelCapabilityProbeArgsSchema, [{
-      providerId: 'openai',
-      modelId: 'gpt',
-      mode: 'default',
-    }])[0].mode).toBe('default');
-    expect(() => parseIpcArgs(LlmModelCapabilityProbeArgsSchema, [{
-      providerId: 'openai',
-      modelId: 'gpt',
-      mode: 'nope',
-    }])).toThrow();
+    expect(
+      parseIpcArgs(LlmProviderDraftArgsSchema, [
+        {
+          providerId: 'openai',
+          authMode: 'api-key',
+          apiKey: 'sk-test',
+        },
+      ])[0],
+    ).toMatchObject({ providerId: 'openai' });
+    expect(
+      parseIpcArgs(LlmModelCapabilityProbeArgsSchema, [
+        {
+          providerId: 'openai',
+          modelId: 'gpt',
+          mode: 'default',
+        },
+      ])[0].mode,
+    ).toBe('default');
+    expect(() =>
+      parseIpcArgs(LlmModelCapabilityProbeArgsSchema, [
+        {
+          providerId: 'openai',
+          modelId: 'gpt',
+          mode: 'nope',
+        },
+      ]),
+    ).toThrow();
   });
 
   it('accepts investigation:read ids and rejects URI or path payloads', () => {
     const hash = `sha256:${'a'.repeat(64)}`;
-    expect(parseIpcArgs(InvestigationReadArgsSchema, [{
-      sessionId: 'session-1',
-      artifactId: 'invart-1',
-      expectedHash: hash,
-    }])).toEqual([{ sessionId: 'session-1', artifactId: 'invart-1', expectedHash: hash }]);
-    expect(() => parseIpcArgs(InvestigationReadArgsSchema, [{
-      sessionId: 'session-1',
-      artifactId: 'session://investigation/a.json',
-      expectedHash: hash,
-    }])).toThrow();
-    expect(() => parseIpcArgs(InvestigationReadArgsSchema, [{
-      sessionId: 'session-1',
-      artifactId: 'invart-1',
-      expectedHash: hash,
-      uri: 'D:/escape.json',
-    }])).toThrow();
+    expect(
+      parseIpcArgs(InvestigationReadArgsSchema, [
+        {
+          sessionId: 'session-1',
+          artifactId: 'invart-1',
+          expectedHash: hash,
+        },
+      ]),
+    ).toEqual([{ sessionId: 'session-1', artifactId: 'invart-1', expectedHash: hash }]);
+    expect(() =>
+      parseIpcArgs(InvestigationReadArgsSchema, [
+        {
+          sessionId: 'session-1',
+          artifactId: 'session://investigation/a.json',
+          expectedHash: hash,
+        },
+      ]),
+    ).toThrow();
+    expect(() =>
+      parseIpcArgs(InvestigationReadArgsSchema, [
+        {
+          sessionId: 'session-1',
+          artifactId: 'invart-1',
+          expectedHash: hash,
+          uri: 'D:/escape.json',
+        },
+      ]),
+    ).toThrow();
     for (const schemeId of ['file:record', 'http:record', 'D:record']) {
-      expect(() => parseIpcArgs(InvestigationReadArgsSchema, [{
-        sessionId: 'session-1',
-        artifactId: schemeId,
-        expectedHash: hash,
-      }])).toThrow();
-      expect(() => parseIpcArgs(InvestigationReadArgsSchema, [{
-        sessionId: schemeId,
-        artifactId: 'invart-1',
-        expectedHash: hash,
-      }])).toThrow();
+      expect(() =>
+        parseIpcArgs(InvestigationReadArgsSchema, [
+          {
+            sessionId: 'session-1',
+            artifactId: schemeId,
+            expectedHash: hash,
+          },
+        ]),
+      ).toThrow();
+      expect(() =>
+        parseIpcArgs(InvestigationReadArgsSchema, [
+          {
+            sessionId: schemeId,
+            artifactId: 'invart-1',
+            expectedHash: hash,
+          },
+        ]),
+      ).toThrow();
     }
   });
 });

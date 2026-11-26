@@ -1,5 +1,6 @@
 import { generateEventId } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
+import { AppError } from '@shared/errors/appError';
 import { assistantMessageText, executeAuxiliaryRequest } from '../prompt/AuxiliaryRequest';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
@@ -25,17 +26,19 @@ export function buildCompactionPromptPlan(transcript: string): PromptPlan {
   const system = COMPACTION_HANDOFF_SYSTEM_PROMPT;
   return {
     id: generateEventId('prompt-plan'),
-    segments: [{
-      id: 'runtime:compaction-handoff',
-      kind: 'runtime-fact',
-      scope: 'runtime',
-      sourcePath: 'runtime://compaction-handoff',
-      sourceHash: hashScopedResource(system),
-      precedence: 0,
-      content: system,
-      stability: 'stable',
-      tokenEstimate: charsToTokens(system.length),
-    }],
+    segments: [
+      {
+        id: 'runtime:compaction-handoff',
+        kind: 'runtime-fact',
+        scope: 'runtime',
+        sourcePath: 'runtime://compaction-handoff',
+        sourceHash: hashScopedResource(system),
+        precedence: 0,
+        content: system,
+        stability: 'stable',
+        tokenEstimate: charsToTokens(system.length),
+      },
+    ],
     systemPrompt: system,
     totalTokenEstimate: charsToTokens(system.length + transcript.length),
     stablePrefix: {
@@ -51,9 +54,7 @@ export function buildCompactionPromptPlan(transcript: string): PromptPlan {
 }
 
 /** One compaction call without tools through PromptPlan → RequestEnvelope → adapter. */
-export async function executeCompactionHandoff(
-  input: CompactionHandoffExecution,
-): Promise<AssistantMessage> {
+export async function executeCompactionHandoff(input: CompactionHandoffExecution): Promise<AssistantMessage> {
   const message = await executeAuxiliaryRequest({
     purpose: 'compaction-handoff',
     sessionId: input.sessionId,
@@ -64,16 +65,20 @@ export async function executeCompactionHandoff(
     userContent: `Transcript to compact:\n\n${input.transcript}`,
     tools: [],
     maxTokens: COMPACTION_MAX_OUTPUT_TOKENS,
-    reasoning: resolveAgentRouteCapability(input.provider, input.model.modelId, input.model, input.plan).reasoningContract,
+    reasoning: resolveAgentRouteCapability(input.provider, input.model.modelId, input.model, input.plan)
+      .reasoningContract,
     writesPromptCache: false,
     signal: input.signal,
   });
   input.signal?.throwIfAborted();
   if (message.stopReason !== 'stop') {
-    throw new Error(`COMPACTION_INCOMPLETE: provider ended with ${message.stopReason}; original context retained.`);
+    throw new AppError(
+      'COMPACTION_INCOMPLETE',
+      `provider ended with ${message.stopReason}; original context retained.`,
+    );
   }
   if (!assistantMessageText(message)) {
-    throw new Error('COMPACTION_HANDOFF_EMPTY: the compaction model returned no text.');
+    throw new AppError('COMPACTION_HANDOFF_EMPTY', 'the compaction model returned no text.');
   }
   return message;
 }

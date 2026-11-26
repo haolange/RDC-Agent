@@ -1,29 +1,31 @@
-import type { CommandDefinition } from '@shared/types/command';
+/**
+ * /model — 查看或切换当前对话的模型。
+ */
+import { commandText } from '../commandI18n';
+import type { CommandDefinition } from '../CommandRegistry';
 
 export const modelCommand: CommandDefinition = {
   id: 'model',
   name: 'model',
-  description: 'View or switch the current conversation model; use default to follow the Agent configuration',
+  descriptionKey: 'model.description',
   category: 'navigation',
 
   async execute(args, ctx) {
     if (args.length === 0) {
-      return {
-        success: true,
-        message: `Current model: ${ctx.currentModelId ?? 'not configured'}`,
-      };
+      const model = ctx.currentModelId ?? commandText('model.notConfigured');
+      return { success: true, message: commandText('model.current', { model }) };
     }
     const token = args[0].trim();
     if (token.toLowerCase() === 'default') {
       return {
         success: true,
-        message: 'Following the current Agent configuration',
+        message: commandText('model.default'),
         uiAction: { type: 'switch-model', payload: { modelId: 'default' } },
       };
     }
     return {
       success: true,
-      message: `Switching model to: ${token}`,
+      message: commandText('model.switching', { model: token }),
       uiAction: { type: 'switch-model', payload: { modelId: token } },
     };
   },

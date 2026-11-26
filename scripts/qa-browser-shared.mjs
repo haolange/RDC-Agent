@@ -8,7 +8,10 @@ const { chromium } = createRequire(import.meta.url)('playwright');
 
 /** The newest single-use bootstrap URL in a QA launcher log. The token is never printed. */
 export function readBootstrapUrl(logPath) {
-  const url = fs.readFileSync(logPath, 'utf8').match(/https?:\/\/\S+qaBootstrap=\S+/g)?.at(-1);
+  const url = fs
+    .readFileSync(logPath, 'utf8')
+    .match(/https?:\/\/\S+qaBootstrap=\S+/g)
+    ?.at(-1);
   if (!url) throw new Error(`no QA bootstrap url found in ${logPath}`);
   return url;
 }
@@ -16,7 +19,9 @@ export function readBootstrapUrl(logPath) {
 export async function openApp(logPath, viewport = { width: 1440, height: 900 }) {
   const browser = await chromium.launch();
   // QA_VIDEO_DIR records the whole run (for motion clips); without it nothing is written.
-  const recordVideo = process.env.QA_VIDEO_DIR ? { recordVideo: { dir: process.env.QA_VIDEO_DIR, size: viewport } } : {};
+  const recordVideo = process.env.QA_VIDEO_DIR
+    ? { recordVideo: { dir: process.env.QA_VIDEO_DIR, size: viewport } }
+    : {};
   const page = await (await browser.newContext({ viewport, ...recordVideo })).newPage();
   page.setDefaultTimeout(8000);
   await page.goto(readBootstrapUrl(logPath));
@@ -50,9 +55,15 @@ export async function openSettings(page, section) {
 export async function useTheme(page, theme) {
   await openSettings(page, 'appearance');
   // The mode tabs, not the editor's light/dark switch below them.
-  await page.getByTestId('settings-appearance-page').locator('.appearance-mode-tabs')
-    .getByRole('tab', { name: theme === 'light' ? /^(浅色|Light)$/ : /^(深色|Dark)$/ }).click();
-  await page.waitForFunction((expected) => document.documentElement.dataset.resolvedTheme === expected, theme, { timeout: 4000 })
+  await page
+    .getByTestId('settings-appearance-page')
+    .locator('.appearance-mode-tabs')
+    .getByRole('tab', { name: theme === 'light' ? /^(浅色|Light)$/ : /^(深色|Dark)$/ })
+    .click();
+  await page
+    .waitForFunction((expected) => document.documentElement.dataset.resolvedTheme === expected, theme, {
+      timeout: 4000,
+    })
     .catch(() => {
       throw new Error(`theme "${theme}" did not apply; start the QA instance with RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`);
     });
@@ -64,7 +75,10 @@ export function inspectPage() {
   const parse = (value) => {
     const match = value.match(/rgba?\(([^)]+)\)/);
     if (!match) return null;
-    const [r, g, b, a = 1] = match[1].split(/[ ,/]+/).filter(Boolean).map(Number);
+    const [r, g, b, a = 1] = match[1]
+      .split(/[ ,/]+/)
+      .filter(Boolean)
+      .map(Number);
     return { r, g, b, a };
   };
   const luminance = ({ r, g, b }) => {
@@ -114,8 +128,17 @@ export function inspectPage() {
  */
 export function scanSurfaceForbidden() {
   const EXCLUDED = [
-    '.markdown-body', '.message-bubble-user', 'textarea', 'input', 'code', 'pre', '.knowledge-center-markdown',
-    '.runtime-terminal-drawer', '.work-process-tool-card-raw', '.work-process-subagent-raw', '.work-process-tool-card-expand',
+    '.markdown-body',
+    '.message-bubble-user',
+    'textarea',
+    'input',
+    'code',
+    'pre',
+    '.knowledge-center-markdown',
+    '.runtime-terminal-drawer',
+    '.work-process-tool-card-raw',
+    '.work-process-subagent-raw',
+    '.work-process-tool-card-expand',
   ].join(', ');
   const PATTERNS = [
     ['internal-address', /session:\/\//u],
@@ -124,7 +147,10 @@ export function scanSurfaceForbidden() {
     ['raw-identifier', /\b[a-z]{2,}(?:_[a-z0-9]{2,})+\b/u],
     ['byte-count', /\b\d+(?:\.\d+)?\s?(?:B|KB|MB|GB|KiB|MiB|bytes)\b/u],
     ['diagnostics-disclosure', /^(诊断|诊断详情|技术详情|Diagnostics|Technical details)$/u],
-    ['receipt-sentence', /已应用事件|Applied event|设备画面已同步|Device display synchronized|生效证据|Winning evidence/u],
+    [
+      'receipt-sentence',
+      /已应用事件|Applied event|设备画面已同步|Device display synchronized|生效证据|Winning evidence/u,
+    ],
   ];
   const hits = new Set();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);

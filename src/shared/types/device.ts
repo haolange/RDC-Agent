@@ -2,11 +2,12 @@
  * Device Types - 设备管理相关类型定义
  */
 
-export type ReplayDeviceStatus = 'offline' | 'online';
+type ReplayDeviceStatus = 'offline' | 'online';
 
-export type ReplayDeviceTransport = 'local' | 'adb_android';
+type ReplayDeviceTransport = 'local' | 'adb_android';
 
-export type DevicePreparationPhase = 'idle' | 'checking' | 'installing' | 'starting' | 'verifying' | 'ready' | 'failed' | 'cancelled';
+export type DevicePreparationPhase =
+  'idle' | 'checking' | 'installing' | 'starting' | 'verifying' | 'ready' | 'failed' | 'cancelled';
 /** Product copy is derived from code; diagnostic remains the original native report. */
 export interface ReplayDeviceIssue {
   code: string;

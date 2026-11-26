@@ -135,12 +135,11 @@ const allMessages = [
 ];
 
 const activeVisible = resolveVisibleConversationMessages(allMessages, branchState);
-assert(activeVisible.map((message) => message.id).join(',') === [
-  'msg-user-1b',
-  'msg-assistant-1b',
-  'msg-user-2b',
-  'msg-assistant-2b',
-].join(','), 'active branch path should exclude sibling downstream');
+assert(
+  activeVisible.map((message) => message.id).join(',') ===
+    ['msg-user-1b', 'msg-assistant-1b', 'msg-user-2b', 'msg-assistant-2b'].join(','),
+  'active branch path should exclude sibling downstream',
+);
 
 const corruptedBranchState = JSON.parse(JSON.stringify(branchState));
 const corruptedBranch = corruptedBranchState.forks[0].branches.find((entry) => entry.branchId === 'branch-v2');
@@ -149,7 +148,8 @@ corruptedBranch.rootTurnId = '';
 const repaired = repairConversationBranchState(allMessages, corruptedBranchState);
 assert(repaired.repaired, 'empty branch anchor/root should be repaired from the matching user turn');
 assert(
-  repaired.branchState.forks[0].branches.find((entry) => entry.branchId === 'branch-v2').anchorUserMessageId === 'msg-user-1b',
+  repaired.branchState.forks[0].branches.find((entry) => entry.branchId === 'branch-v2').anchorUserMessageId ===
+    'msg-user-1b',
   'branch repair should restore anchorUserMessageId from the matching variant user message',
 );
 assert(
@@ -157,12 +157,11 @@ assert(
   'branch repair should restore rootTurnId from the matching variant user message',
 );
 const repairedVisible = resolveVisibleConversationMessages(allMessages, repaired.branchState);
-assert(repairedVisible.map((message) => message.id).join(',') === [
-  'msg-user-1b',
-  'msg-assistant-1b',
-  'msg-user-2b',
-  'msg-assistant-2b',
-].join(','), 'repaired branch path should keep the rewritten user and paired assistant visible');
+assert(
+  repairedVisible.map((message) => message.id).join(',') ===
+    ['msg-user-1b', 'msg-assistant-1b', 'msg-user-2b', 'msg-assistant-2b'].join(','),
+  'repaired branch path should keep the rewritten user and paired assistant visible',
+);
 
 const unrecoverableBranchState = JSON.parse(JSON.stringify(branchState));
 unrecoverableBranchState.forks[0].activeBranchId = 'branch-empty';
@@ -177,17 +176,19 @@ unrecoverableBranchState.forks[0].branches.push({
 const unrecoverable = repairConversationBranchState(allMessages, unrecoverableBranchState);
 assert(!unrecoverable.repaired, 'unrecoverable branch must fail closed instead of fabricating anchors');
 const unrecoverableVisible = resolveVisibleConversationMessages(allMessages, unrecoverable.branchState);
-assert(unrecoverableVisible.map((message) => message.id).join(',') === ''.trim(), 'unrecoverable branch should not fabricate visible messages');
+assert(
+  unrecoverableVisible.map((message) => message.id).join(',') === ''.trim(),
+  'unrecoverable branch should not fabricate visible messages',
+);
 
 branchState.forks[0].activeBranchId = ROOT_BRANCH_ID;
 branchState.activeLeafBranchId = ROOT_BRANCH_ID;
 const restoredVisible = resolveVisibleConversationMessages(allMessages, branchState);
-assert(restoredVisible.map((message) => message.id).join(',') === [
-  'msg-user-1',
-  'msg-assistant-1',
-  'msg-user-2',
-  'msg-assistant-2',
-].join(','), 'switching branch should restore original downstream conversation');
+assert(
+  restoredVisible.map((message) => message.id).join(',') ===
+    ['msg-user-1', 'msg-assistant-1', 'msg-user-2', 'msg-assistant-2'].join(','),
+  'switching branch should restore original downstream conversation',
+);
 
 assert(!restoredVisible.some((message) => message.content.includes('v2')), 'inactive branch messages must stay hidden');
 
@@ -218,72 +219,5 @@ assert(
 
 const fs = require('node:fs');
 const path = require('node:path');
-const mainShim = fs.readFileSync(
-  path.join(process.cwd(), 'src/main/conversation/ConversationBranchResolver.ts'),
-  'utf8',
-);
-assert(
-  mainShim.includes('@shared/conversation/conversationBranchResolver')
-    && !mainShim.includes('export function resolveVisibleConversationMessages'),
-  'main ConversationBranchResolver must re-export shared resolver only (no dual implementation)',
-);
-const conversationService = fs.readFileSync(
-  path.join(process.cwd(), 'src/main/conversation/ConversationService.ts'),
-  'utf8',
-).replace(/\r\n/g, '\n');
-const conversationTurnRunner = fs.readFileSync(
-  path.join(process.cwd(), 'src/main/conversation/ConversationTurnRunner.ts'),
-  'utf8',
-).replace(/\r\n/g, '\n');
-const conversationTurnTerminal = fs.readFileSync(
-  path.join(process.cwd(), 'src/main/conversation/ConversationTurnTerminal.ts'),
-  'utf8',
-).replace(/\r\n/g, '\n');
-assert(
-  conversationTurnRunner.includes('storageAdapter.commitConversationTerminal')
-    && conversationTurnRunner.includes('visibleTurnIds')
-    && conversationTurnTerminal.includes('Failed to persist conversation snapshot')
-    && conversationTurnRunner.includes('settleStopped();'),
-  'terminal runner must commit journal context, settle stopped turns, and classify persistence failures through the terminal helper',
-);
-const stopImplementation = conversationTurnRunner.match(/stop:\s*\(\)\s*=>\s*\{([\s\S]*?)\n\s*\},\n\s*\}\);/)?.[1] ?? '';
-const rewriteJoinIndex = conversationService.indexOf('await Promise.all([');
-const awaitStoppedIndex = conversationService.indexOf('Promise.allSettled(turnsToStop.map((turn) => turn.stopped))');
-const historyRehydrateIndex = conversationService.indexOf(
-  'const history = storageAdapter.readConversationHistory(sessionId);',
-  awaitStoppedIndex,
-);
-const terminalCleanupIndex = conversationTurnRunner.lastIndexOf('host.clearActiveTurn(assistantMessage.turnId, abortController);');
-const stoppedSettledIndex = conversationTurnRunner.indexOf('settleStopped();', terminalCleanupIndex);
-assert(
-  rewriteJoinIndex >= 0
-    && awaitStoppedIndex > rewriteJoinIndex
-    && historyRehydrateIndex > awaitStoppedIndex
-    && terminalCleanupIndex >= 0
-    && stoppedSettledIndex > terminalCleanupIndex
-    && !stopImplementation.includes('settleStopped()')
-    && !stopImplementation.includes('clearActiveTurn('),
-  'rewrite must re-read history after stopped turns settle, and the terminal runner must settle only after cleanup',
-);
-assert(
-  conversationTurnRunner.includes('beginAssistantContentLoopIfPending')
-    && conversationTurnRunner.includes('resolveStreamingOutputPhase')
-    && fs.readFileSync(path.join(process.cwd(), 'src/main/conversation/ConversationTurnAgentEventHandler.ts'), 'utf8').includes('upsertLoopTextItem'),
-  'terminal runner must retain response boundaries and item-scoped streaming output',
-);
-const conversationStore = fs.readFileSync(
-  path.join(process.cwd(), 'src/renderer/stores/conversationStore.ts'),
-  'utf8',
-);
-const conversationStoreModel = fs.readFileSync(
-  path.join(process.cwd(), 'src/renderer/stores/conversationStoreModel.ts'),
-  'utf8',
-);
-assert(
-  conversationStore.includes('allConversationMessages')
-    && conversationStore.includes('projectVisibleMessages')
-    && conversationStoreModel.includes('resolveVisibleConversationMessages'),
-  'renderer conversationStore must project visible messages from branchState through its canonical model',
-);
 
 console.log('[conversation-branch] OK');

@@ -21,7 +21,8 @@ function paeth(left: number, up: number, upLeft: number): number {
 }
 
 function decodePng(buffer: Buffer): { width: number; height: number; rgba: Uint8Array } {
-  if (!buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error('Invalid PNG signature.');
+  if (!buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
+    throw new Error('Invalid PNG signature.');
   let offset = 8;
   let width = 0;
   let height = 0;
@@ -84,19 +85,23 @@ function scale(source: Uint8Array, sourceSize: number, targetSize: number): Uint
   for (let y = 0; y < targetSize; y += 1) {
     for (let x = 0; x < targetSize; x += 1) {
       const sums = [0, 0, 0, 0];
-      const x0 = x * ratio, x1 = (x + 1) * ratio;
-      const y0 = y * ratio, y1 = (y + 1) * ratio;
+      const x0 = x * ratio,
+        x1 = (x + 1) * ratio;
+      const y0 = y * ratio,
+        y1 = (y + 1) * ratio;
       for (let sy = Math.floor(y0); sy < Math.ceil(y1); sy += 1) {
         for (let sx = Math.floor(x0); sx < Math.ceil(x1); sx += 1) {
           const weight = (Math.min(sx + 1, x1) - Math.max(sx, x0)) * (Math.min(sy + 1, y1) - Math.max(sy, y0));
           const from = (Math.min(sourceSize - 1, sy) * sourceSize + Math.min(sourceSize - 1, sx)) * 4;
-          for (let channel = 0; channel < 3; channel += 1) sums[channel] += source[from + channel] * source[from + 3] / 255 * weight;
+          for (let channel = 0; channel < 3; channel += 1)
+            sums[channel] += ((source[from + channel] * source[from + 3]) / 255) * weight;
           sums[3] += source[from + 3] * weight;
         }
       }
       const to = (y * targetSize + x) * 4;
       target[to + 3] = Math.round(sums[3] / (ratio * ratio));
-      for (let channel = 0; channel < 3; channel += 1) target[to + channel] = sums[3] > 0 ? Math.round(sums[channel] * 255 / sums[3]) : 0;
+      for (let channel = 0; channel < 3; channel += 1)
+        target[to + channel] = sums[3] > 0 ? Math.round((sums[channel] * 255) / sums[3]) : 0;
     }
   }
   return target;
@@ -157,7 +162,7 @@ function encodeIco(images: { png: Buffer; size: number }[]): Buffer {
     offset += png.length;
     return entry;
   });
-  return Buffer.concat([header, ...entries, ...images.map(image => image.png)]);
+  return Buffer.concat([header, ...entries, ...images.map((image) => image.png)]);
 }
 
 function icnsChunk(type: string, png: Buffer): Buffer {
@@ -168,7 +173,8 @@ function icnsChunk(type: string, png: Buffer): Buffer {
 }
 
 const source = decodePng(fs.readFileSync(path.join(repoRoot, 'resources/brand/rdc-agent-logo.png')));
-if (source.width !== source.height || source.width < 512) throw new Error('Brand source must be square and at least 512px.');
+if (source.width !== source.height || source.width < 512)
+  throw new Error('Brand source must be square and at least 512px.');
 recolorLogoRgba(source.rgba, DEFAULT_DARK_ACCENT);
 maskLogoCircleRgba(source.rgba, source.width, source.height);
 const icons = path.join(repoRoot, 'resources/icons');
@@ -184,8 +190,9 @@ function writeIcon(name: string, bytes: Buffer): void {
 }
 const png256 = encodePng(256, 256, scale(source.rgba, source.width, 256));
 writeIcon('icon.png', png256);
-const icoImages = [16, 20, 24, 32, 40, 48, 64, 128, 256].map(size => ({
-  size, png: encodePng(size, size, scale(source.rgba, source.width, size)),
+const icoImages = [16, 20, 24, 32, 40, 48, 64, 128, 256].map((size) => ({
+  size,
+  png: encodePng(size, size, scale(source.rgba, source.width, size)),
 }));
 writeIcon('icon.ico', encodeIco(icoImages));
 const icns = Buffer.concat([

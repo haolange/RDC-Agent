@@ -9,7 +9,11 @@ const shorten = (text: string): string => (text.length > OBJECT_LIMIT ? `${text.
 
 /** The file a path names; directories and quotes are noise in a title. */
 const fileName = (target: string): string => {
-  const clean = target.replace(/^['"`]|['"`]$/g, '').split(/\s+->\s+/).at(-1) ?? target;
+  const clean =
+    target
+      .replace(/^['"`]|['"`]$/g, '')
+      .split(/\s+->\s+/)
+      .at(-1) ?? target;
   return clean.split(/[\\/]/).filter(Boolean).at(-1) ?? clean;
 };
 
@@ -21,7 +25,9 @@ function webFetchHeadline(row: ToolRowModel, t: Translator): string {
   if (!page) return row.verb;
   if (isRunning(row.status)) return t('chat.webFetchHeadlineRunning', { site: page.domain });
   if (page.state === 'failed') return t('chat.webFetchHeadlineFailed', { site: page.domain });
-  return page.title ? t('chat.webFetchHeadline', { site: page.domain, title: page.title }) : t('chat.webFetchHeadlineSite', { site: page.domain });
+  return page.title
+    ? t('chat.webFetchHeadline', { site: page.domain, title: page.title })
+    : t('chat.webFetchHeadlineSite', { site: page.domain });
 }
 
 function webSearchHeadline(row: ToolRowModel, t: Translator): string {
@@ -49,5 +55,8 @@ export function toolHeadline(row: ToolRowModel, t: Translator): string {
 
 export function webGroupHeadline(row: Extract<WorkProcessRow, { type: 'webGroup' }>, t: Translator): string {
   const count = row.pages.length;
-  return t(row.members.some((member) => isRunning(member.status)) ? 'chat.webGroupHeadlineRunning' : 'chat.webGroupHeadline', { count });
+  return t(
+    row.members.some((member) => isRunning(member.status)) ? 'chat.webGroupHeadlineRunning' : 'chat.webGroupHeadline',
+    { count },
+  );
 }

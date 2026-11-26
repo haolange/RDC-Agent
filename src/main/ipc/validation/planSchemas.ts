@@ -9,14 +9,31 @@ export const planReference = {
   expectedHash: z.string().regex(/^[a-f0-9]{64}$/),
 };
 export const PlanReadArgsSchema = z.tuple([z.object(planReference).strict()]);
-export const PlanCancelReviewArgsSchema = z.tuple([z.object({ sessionId: ipcId(128, 'sessionId'), reviewId: ipcNonEmptyString(128, 'reviewId') }).strict()]);
-export const PlanIssueApprovalTokenArgsSchema = z.tuple([z.object({
-  ...planReference, action: z.enum(['plan.saveToProject', 'plan.export']),
-}).strict()]);
-export const PlanSaveToProjectArgsSchema = z.tuple([z.object({
-  ...planReference, approvalToken: ipcNonEmptyString(128, 'approvalToken'),
-}).strict()]);
-export const PlanExportArgsSchema = z.tuple([z.object({
-  ...planReference, targetPath: ipcNonEmptyString(1024, 'targetPath'),
-  approvalToken: ipcNonEmptyString(128, 'approvalToken'),
-}).strict()]);
+export const PlanCancelReviewArgsSchema = z.tuple([
+  z.object({ sessionId: ipcId(128, 'sessionId'), reviewId: ipcNonEmptyString(128, 'reviewId') }).strict(),
+]);
+export const PlanIssueApprovalTokenArgsSchema = z.tuple([
+  z
+    .object({
+      ...planReference,
+      action: z.enum(['plan.saveToProject', 'plan.export']),
+    })
+    .strict(),
+]);
+export const PlanSaveToProjectArgsSchema = z.tuple([
+  z
+    .object({
+      ...planReference,
+      approvalToken: ipcNonEmptyString(128, 'approvalToken'),
+    })
+    .strict(),
+]);
+export const PlanExportArgsSchema = z.tuple([
+  z
+    .object({
+      ...planReference,
+      targetPath: ipcNonEmptyString(1024, 'targetPath'),
+      approvalToken: ipcNonEmptyString(128, 'approvalToken'),
+    })
+    .strict(),
+]);

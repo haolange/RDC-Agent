@@ -1,8 +1,22 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { assertFileSizeCap, assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from '../primitives/_shared';
-import { NOTEBOOK_MAX_BYTES } from '../primitives/toolLimits';
+import { z } from 'zod';
+import {
+  assertFileSizeCap,
+  assertTextReadable,
+  requireMutationWorkspaceRoot,
+  safeResolvePath,
+  writeTextFileNoFollow,
+} from '../../../runtime/toolFiles';
+import { NOTEBOOK_MAX_BYTES } from '../../../runtime/toolLimits';
 import type { AgentTool } from '../../agent/AgentTool';
+
+/** The nbformat fields this tool edits; every other notebook field is written back unchanged. */
+const NotebookSchema = z
+  .object({
+    cells: z.array(z.object({ source: z.union([z.string(), z.array(z.string())]) }).passthrough()),
+  })
+  .passthrough();
 
 interface NotebookEditParams {
   notebook_path: string;
@@ -30,7 +44,14 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
     },
     required: ['notebook_path', 'cell_index', 'new_source'],
   },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: {
+    isReadOnly: false,
+    concurrency: 'exclusive',
+    isDestructive: false,
+    sideEffect: 'filesystem',
+    category: 'file',
+    requiresApproval: true,
+  },
   permissionHint: 'mutation',
   effects: { writes: ['notebook_path'] },
 
@@ -45,20 +66,25 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
     assertTextReadable(absolute, { maxBytes: NOTEBOOK_MAX_BYTES });
 
     const raw = await fs.readFile(absolute, 'utf8');
-    const notebook = JSON.parse(raw) as { cells?: Array<{ source: string | string[] }> };
-    if (!Array.isArray(notebook.cells)) {
-      throw new Error('Invalid notebook: missing cells array');
+    let value: unknown;
+    try {
+      value = JSON.parse(raw);
+    } catch (error) {
+      throw new Error('Invalid notebook: not JSON', { cause: error });
     }
+    const parsed = NotebookSchema.safeParse(value);
+    if (!parsed.success) {
+      throw new Error(`Invalid notebook: ${z.prettifyError(parsed.error)}`);
+    }
+    const notebook = parsed.data;
     const idx = params.cell_index;
     if (idx < 0 || idx >= notebook.cells.length) {
       throw new Error(`Cell index ${idx} out of range (0..${notebook.cells.length - 1})`);
     }
     const cell = notebook.cells[idx];
-    const oldSource = Array.isArray(cell.source) ? cell.source.join('') : String(cell.source ?? '');
+    const oldSource = Array.isArray(cell.source) ? cell.source.join('') : cell.source;
     // Preserve Jupyter array source shape when the cell originally used string[].
-    cell.source = Array.isArray(cell.source)
-      ? params.new_source.split(/(?<=\n)/)
-      : params.new_source;
+    cell.source = Array.isArray(cell.source) ? params.new_source.split(/(?<=\n)/) : params.new_source;
     await writeTextFileNoFollow(absolute, JSON.stringify(notebook, null, 2));
     return {
       content: [{ type: 'text', text: `Edited cell ${idx} in ${absolute}` }],

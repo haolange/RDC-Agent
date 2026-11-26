@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useDynStyle } from '../../../lib/useDynStyle';
 import { Icon } from '../../../ui/Icon';
+import { PlainButton } from '../../../ui/PlainButton';
 import type { TerminalDrawerViewModel } from './useTerminalDrawer';
 
 interface TerminalDrawerShellProps {
@@ -9,11 +10,7 @@ interface TerminalDrawerShellProps {
   body: React.ReactNode;
 }
 
-export const TerminalDrawerShell: React.FC<TerminalDrawerShellProps> = ({
-  vm,
-  toolbar,
-  body,
-}) => {
+export const TerminalDrawerShell: React.FC<TerminalDrawerShellProps> = ({ vm, toolbar, body }) => {
   const {
     t,
     terminalHeight,
@@ -77,21 +74,18 @@ export const TerminalDrawerShell: React.FC<TerminalDrawerShellProps> = ({
           <div className="runtime-terminal-subtitle">{titleContext}</div>
         </div>
 
-        <button
-          type="button"
+        <PlainButton
           className="runtime-terminal-close-workspace"
           aria-label={t('terminal.close')}
           onClick={closeTerminal}
         >
           <Icon name="close" size={14} />
-        </button>
+        </PlainButton>
       </div>
 
       {toolbar}
 
-      <div className="runtime-terminal-workspace-body">
-        {body}
-      </div>
+      <div className="runtime-terminal-workspace-body">{body}</div>
     </section>
   );
 };

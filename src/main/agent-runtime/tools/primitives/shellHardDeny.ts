@@ -29,14 +29,7 @@ const POWERSHELL_ALIASES: Record<string, string> = {
 const REMOVE_ITEM_PARAMS = ['Recurse', 'Force', 'Path', 'LiteralPath', 'Filter', 'Include', 'Exclude'];
 const START_PROCESS_PARAMS = ['Verb', 'FilePath', 'ArgumentList', 'WorkingDirectory', 'Wait', 'PassThru'];
 const DOWNLOAD_LEFT = new Set(['invoke-webrequest', 'invoke-restmethod']);
-const DOWNLOAD_RIGHT = new Set([
-  'invoke-expression',
-  'bash',
-  'sh',
-  'pwsh',
-  'powershell',
-  'cmd',
-]);
+const DOWNLOAD_RIGHT = new Set(['invoke-expression', 'bash', 'sh', 'pwsh', 'powershell', 'cmd']);
 const NESTED_LAUNCHERS = new Set(['powershell', 'pwsh', 'cmd']);
 const REGISTRY_HIVES = new Set(['hklm', 'hkcu', 'hkcr', 'hku', 'hkcc']);
 const MAX_NESTED_LAUNCHER_DEPTH = 2;
@@ -164,7 +157,10 @@ function commandNameOf(tokens: string[]): string {
 }
 
 function matchDownloadPipe(command: string): string | null {
-  const pipeParts = command.split('|').map((part) => part.trim()).filter(Boolean);
+  const pipeParts = command
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean);
   for (let index = 0; index < pipeParts.length - 1; index += 1) {
     const left = commandNameOf(tokenizeQuoted(pipeParts[index]!)).toLowerCase();
     const right = commandNameOf(tokenizeQuoted(pipeParts[index + 1]!)).toLowerCase();
@@ -190,16 +186,18 @@ function matchPosixCatastrophicPatterns(command: string): string | null {
 }
 
 function matchNestedCommand(nested: string, depth: number): string | null {
-  return matchPowerShellHardDeny(nested, depth)
-    ?? matchWindowsCmdHardDeny(nested)
-    ?? matchPosixHardDeny(nested);
+  return matchPowerShellHardDeny(nested, depth) ?? matchWindowsCmdHardDeny(nested) ?? matchPosixHardDeny(nested);
 }
 
 function matchPowerShellHardDeny(command: string, depth = 0): string | null {
   if (/\bvssadmin\b/i.test(command) && /\bdelete\b/i.test(command) && /\bshadows?\b/i.test(command)) {
     return 'vssadmin delete shadows';
   }
-  if (/\bicacls\b/i.test(command) && /\s\/grant\b/i.test(command) && /\bicacls\s+(?:[A-Za-z]:\\?|\/)\s+\/grant/i.test(command)) {
+  if (
+    /\bicacls\b/i.test(command) &&
+    /\s\/grant\b/i.test(command) &&
+    /\bicacls\s+(?:[A-Za-z]:\\?|\/)\s+\/grant/i.test(command)
+  ) {
     return 'icacls /grant';
   }
 
@@ -218,10 +216,12 @@ function matchPowerShellHardDeny(command: string, depth = 0): string | null {
     }
 
     if (NESTED_LAUNCHERS.has(commandLower)) {
-      if (tokens.some((token, index) => (
-        isExecutionPolicySwitch(token)
-        && /^bypass$/i.test((tokens[index + 1] ?? '').replace(/^['"]|['"]$/g, ''))
-      ))) {
+      if (
+        tokens.some(
+          (token, index) =>
+            isExecutionPolicySwitch(token) && /^bypass$/i.test((tokens[index + 1] ?? '').replace(/^['"]|['"]$/g, '')),
+        )
+      ) {
         return 'Set-ExecutionPolicy Bypass';
       }
       if (depth < MAX_NESTED_LAUNCHER_DEPTH) {
@@ -303,8 +303,13 @@ function matchPosixHardDeny(command: string): string | null {
     const token = normalizeCommandToken(tokens[0] ?? '').toLowerCase();
     if (token === 'sudo') {
       const rest = tokens.slice(1).join(' ');
-      const nested = matchPosixCatastrophicPatterns(rest)
-        ?? (normalizeCommandToken(tokens[1] ?? '').toLowerCase().startsWith('mkfs') ? 'mkfs' : null);
+      const nested =
+        matchPosixCatastrophicPatterns(rest) ??
+        (normalizeCommandToken(tokens[1] ?? '')
+          .toLowerCase()
+          .startsWith('mkfs')
+          ? 'mkfs'
+          : null);
       if (nested) return `sudo ${nested}`;
       continue;
     }
@@ -316,7 +321,7 @@ function matchPosixHardDeny(command: string): string | null {
 }
 
 export function matchShellHardDeny(command: string, kind?: ShellKind | 'cmd'): string | null {
-  const text = String(command ?? '');
+  const text = command;
   if (!text.trim()) return null;
   const resolved = kind ?? defaultShellKind();
   if (resolved === 'pwsh' || resolved === 'windows-powershell') {

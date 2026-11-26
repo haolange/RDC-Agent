@@ -2,6 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { useLayoutStore } from '../../../stores/layoutStore';
 import { useTerminalStore } from '../../../stores/terminalStore';
 import { TerminalDrawer } from './index';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
@@ -10,34 +11,56 @@ vi.mock('../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }
 let host: HTMLDivElement;
 let root: Root;
 const initial = useTerminalStore.getState();
-const entry: RuntimeLogEntry = { id: 'error', timestamp: 1, scope: 'app', namespace: 'tool', severity: 'error', title: 'Failed command', summary: 'Failure', detail: 'Exact failure detail', raw: { exitCode: 1 } };
+const entry: RuntimeLogEntry = {
+  id: 'error',
+  timestamp: 1,
+  scope: 'app',
+  namespace: 'tool',
+  severity: 'error',
+  title: 'Failed command',
+  summary: 'Failure',
+  detail: 'Exact failure detail',
+  raw: { exitCode: 1 },
+};
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   useTerminalStore.setState({ ...initial, isOpen: true, entries: [entry], refreshEntries: vi.fn(async () => {}) });
-  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
 });
-afterEach(() => { act(() => root.unmount()); useTerminalStore.setState(initial, true); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  act(() => root.unmount());
+  useTerminalStore.setState(initial, true);
+  host.remove();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 it('renders error details, filters, follows new output only when enabled and closes', () => {
   act(() => root.render(createElement(TerminalDrawer)));
   const body = host.querySelector<HTMLDivElement>('.runtime-terminal-activity-body')!;
   Object.defineProperty(body, 'scrollHeight', { configurable: true, value: 900 });
   const row = host.querySelector<HTMLButtonElement>('.runtime-terminal-entry-main')!;
-  row.focus(); act(() => row.click());
+  row.focus();
+  act(() => row.click());
   expect(document.activeElement).toBe(row);
   expect(row.getAttribute('aria-expanded')).toBe('true');
   expect(host.textContent).toContain('Exact failure detail');
   expect(host.textContent).toContain('"exitCode": 1');
   const filter = host.querySelector<HTMLButtonElement>('[data-testid="runtime-terminal-filter-toggle"]')!;
-  act(() => filter.click()); expect(filter.getAttribute('aria-expanded')).toBe('true');
+  act(() => filter.click());
+  expect(filter.getAttribute('aria-expanded')).toBe('true');
   act(() => document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
   expect(filter.getAttribute('aria-expanded')).toBe('false');
   act(() => useTerminalStore.setState({ entries: [entry, { ...entry, id: 'second' }] }));
   expect(body.scrollTop).toBe(900);
   const follow = host.querySelector<HTMLButtonElement>('[data-testid="runtime-terminal-follow"]')!;
-  act(() => follow.click()); body.scrollTop = 50;
+  act(() => follow.click());
+  body.scrollTop = 50;
   act(() => useTerminalStore.setState({ entries: [entry, { ...entry, id: 'second' }, { ...entry, id: 'third' }] }));
-  expect(body.scrollTop).toBe(50); expect(follow.getAttribute('aria-pressed')).toBe('false');
+  expect(body.scrollTop).toBe(50);
+  expect(follow.getAttribute('aria-pressed')).toBe('false');
   act(() => host.querySelector<HTMLButtonElement>('.runtime-terminal-close-workspace')!.click());
   expect(useTerminalStore.getState().isOpen).toBe(false);
   expect(host.querySelector('[data-testid="runtime-terminal"]')?.getAttribute('aria-hidden')).toBe('true');
@@ -46,9 +69,15 @@ it('renders error details, filters, follows new output only when enabled and clo
 it('closes only the nested selector on Escape and returns focus through both layers', () => {
   act(() => root.render(createElement(TerminalDrawer)));
   const filter = host.querySelector<HTMLButtonElement>('[data-testid="runtime-terminal-filter-toggle"]')!;
-  act(() => { filter.focus(); filter.click(); });
+  act(() => {
+    filter.focus();
+    filter.click();
+  });
   const select = document.querySelector<HTMLButtonElement>('[data-testid="runtime-terminal-severity"]')!;
-  act(() => { select.focus(); select.click(); });
+  act(() => {
+    select.focus();
+    select.click();
+  });
   expect(document.querySelector('.dropdown-select-menu')).not.toBeNull();
   act(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   expect(document.querySelector('.dropdown-select-menu')).toBeNull();
@@ -57,4 +86,20 @@ it('closes only the nested selector on Escape and returns focus through both lay
   act(() => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   expect(document.querySelector('.runtime-terminal-filter-popover')).toBeNull();
   expect(document.activeElement).toBe(filter);
+});
+
+it('ends a resize drag when the pointer is cancelled instead of released', () => {
+  const layout = useLayoutStore.getState();
+  const persistSpy = vi.fn(async () => {});
+  useLayoutStore.setState({ persistLayout: persistSpy });
+  act(() => root.render(createElement(TerminalDrawer)));
+  const handle = host.querySelector<HTMLDivElement>('[data-testid="runtime-terminal-resize-handle"]')!;
+  const workspace = host.querySelector<HTMLElement>('[data-testid="runtime-terminal"]')!;
+  act(() => handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientY: 400 })));
+  expect(workspace.classList.contains('resizing')).toBe(true);
+  act(() => window.dispatchEvent(new PointerEvent('pointercancel')));
+  expect(workspace.classList.contains('resizing')).toBe(false);
+  expect(document.body.classList.contains('terminal-resizing')).toBe(false);
+  expect(persistSpy).toHaveBeenCalledOnce();
+  useLayoutStore.setState(layout, true);
 });

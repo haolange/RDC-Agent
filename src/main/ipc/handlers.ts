@@ -1,6 +1,1 @@
-export {
-  initializeIpcState,
-  registerIPCHandlers,
-  setMainWindow,
-  stopAllActiveRuns,
-} from './workbenchHandlers';
+export { initializeIpcState, registerIPCHandlers, setMainWindow, stopAllActiveRuns } from './workbenchHandlers';

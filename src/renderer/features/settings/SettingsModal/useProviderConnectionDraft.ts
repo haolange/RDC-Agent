@@ -1,4 +1,5 @@
-import { useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { RevisionLanes } from '../../../lib/revisionLanes';
 import {
   createProviderConnectionDraft,
   getConnectionDraftSignature,
@@ -35,6 +36,7 @@ export const useProviderConnectionDraft = ({
   reloadSettings,
   t,
 }: UseProviderConnectionDraftOptions) => {
+  const [accountPolls] = useState(() => new RevisionLanes());
   const connectionProvider = useMemo(() => {
     const provider = providerDrafts.find((entry) => entry.id === connectionDraft?.providerId) ?? null;
     return projectConnectionProvider(provider, connectionDraft);
@@ -49,65 +51,68 @@ export const useProviderConnectionDraft = ({
         ? preferredProviderId
         : selectedProviderId && nextProviders.some((provider) => provider.id === selectedProviderId)
           ? selectedProviderId
-          : nextProviders[0]?.id ?? null,
+          : (nextProviders[0]?.id ?? null),
     );
     return nextSettings;
   };
 
   useEffect(() => {
     if (
-      !open
-      || !connectionDraft
-      || connectionProvider?.authMode !== 'account'
-      || connectionDraft.accountStatus?.state !== 'pending'
+      !open ||
+      !connectionDraft ||
+      connectionProvider?.authMode !== 'account' ||
+      connectionDraft.accountStatus?.state !== 'pending'
     ) {
       return;
     }
 
-    let cancelled = false;
+    // Each sign-in wait is one revision of the poll lane; a poll answering after the wait ended changes nothing.
+    const poll = accountPolls.begin('status');
+    const current = () => accountPolls.isLatest('status', poll);
     const timer = window.setInterval(() => {
       void (async () => {
         const status = await window.electronAPI.llm.getProviderAccountStatus(connectionDraft.providerId);
-        if (cancelled) {
-          return;
-        }
+        if (!current()) return;
         if (status.connected) {
           const nextSettings = await reloadSettings();
-          if (cancelled) {
-            return;
-          }
+          if (!current()) return;
           const nextProviders = nextSettings.llm.providers.map(cloneProvider);
           setProviderDrafts(nextProviders);
           setSelectedProviderId(
             nextProviders.some((provider) => provider.id === connectionDraft.providerId)
               ? connectionDraft.providerId
-              : nextProviders[0]?.id ?? null,
+              : (nextProviders[0]?.id ?? null),
           );
           setConnectionDraft(null);
           return;
         }
         if (status.state === 'failed' || status.state === 'unavailable') {
-          setConnectionDraft((current) => current && current.providerId === connectionDraft.providerId
-            ? {
-              ...current,
-              busy: 'idle',
-              accountStatus: status,
-              error: status.error ?? status.message ?? t('settings.providerSaveFailed'),
-            }
-            : current);
+          setConnectionDraft((current) =>
+            current && current.providerId === connectionDraft.providerId
+              ? {
+                  ...current,
+                  busy: 'idle',
+                  accountStatus: status,
+                  error: status.error ?? status.message ?? t('settings.providerSaveFailed'),
+                }
+              : current,
+          );
           return;
         }
-        setConnectionDraft((current) => current && current.providerId === connectionDraft.providerId
-          ? { ...current, accountStatus: status, error: '' }
-          : current);
+        setConnectionDraft((current) =>
+          current && current.providerId === connectionDraft.providerId
+            ? { ...current, accountStatus: status, error: '' }
+            : current,
+        );
       })();
     }, 1200);
 
     return () => {
-      cancelled = true;
+      accountPolls.forget('status');
       window.clearInterval(timer);
     };
   }, [
+    accountPolls,
     connectionDraft,
     connectionProvider?.authMode,
     open,
@@ -119,45 +124,54 @@ export const useProviderConnectionDraft = ({
   ]);
 
   const loginOwner = open && connectionDraft ? connectionDraft.providerId : null;
-  useEffect(() => () => {
-    if (loginOwner) void window.electronAPI.llm.cancelProviderAccountLogin(loginOwner).catch(() => undefined);
-  }, [loginOwner]);
+  useEffect(
+    () => () => {
+      if (loginOwner) {
+        void window.electronAPI.llm
+          .cancelProviderAccountLogin(loginOwner)
+          .catch((error: unknown) => console.warn('[settings] could not cancel the account login', error));
+      }
+    },
+    [loginOwner],
+  );
 
   const openProviderConnection = (provider: LlmProviderEntry) => {
     setConnectionDraft(createProviderConnectionDraft(provider));
   };
 
   const updateConnectionDraft = (patch: Partial<ProviderConnectionDraft>) => {
-    setConnectionDraft((current) => current && current.providerId === connectionDraft?.providerId ? { ...current, ...patch } : current);
+    setConnectionDraft((current) =>
+      current && current.providerId === connectionDraft?.providerId ? { ...current, ...patch } : current,
+    );
   };
 
   const connectionNeedsCredentials = Boolean(
-    connectionDraft
-    && connectionProvider?.authMode === 'api-key'
-    && !isConnectionDraftComplete(connectionProvider, connectionDraft),
+    connectionDraft &&
+    connectionProvider?.authMode === 'api-key' &&
+    !isConnectionDraftComplete(connectionProvider, connectionDraft),
   );
   const connectionNeedsBaseUrl = Boolean(
-    connectionDraft
-    && connectionProvider?.baseUrlEditable
-    && !connectionProvider.connectionSchema?.endpointTemplate
-    && !connectionDraft.baseUrl.trim(),
+    connectionDraft &&
+    connectionProvider?.baseUrlEditable &&
+    !connectionProvider.connectionSchema?.endpointTemplate &&
+    !connectionDraft.baseUrl.trim(),
   );
   const connectionHasFreshTest = Boolean(
-    connectionDraft
-    && connectionDraft.models.length > 0
-    && connectionDraft.testedConnectionSignature === getConnectionDraftSignature(connectionDraft),
+    connectionDraft &&
+    connectionDraft.models.length > 0 &&
+    connectionDraft.testedConnectionSignature === getConnectionDraftSignature(connectionDraft),
   );
   const connectionAccountConnected = Boolean(
-    connectionDraft
-    && connectionProvider?.authMode === 'account'
-    && connectionProvider.isConfigured
-    && connectionDraft.accountStatus?.connected,
+    connectionDraft &&
+    connectionProvider?.authMode === 'account' &&
+    connectionProvider.isConfigured &&
+    connectionDraft.accountStatus?.connected,
   );
   const connectionDevicePending = Boolean(
-    connectionDraft
-    && connectionProvider?.authMode === 'account'
-    && connectionDraft.accountStatus?.state === 'pending'
-    && !connectionDraft.accountStatus.requiresCodeInput,
+    connectionDraft &&
+    connectionProvider?.authMode === 'account' &&
+    connectionDraft.accountStatus?.state === 'pending' &&
+    !connectionDraft.accountStatus.requiresCodeInput,
   );
 
   return {

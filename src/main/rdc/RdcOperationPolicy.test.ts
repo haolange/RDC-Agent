@@ -2,101 +2,297 @@ import { describe, expect, it } from 'vitest';
 import { authorizeRdcOperation, validateRdcArguments } from './RdcOperationPolicy';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
-import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { RdcOperationDefinition } from './RdcOperationCatalog';
 const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 };
-function definition(patch: Partial<RdcOperationDefinition> = {}): RdcOperationDefinition { return {
-  name: 'rd.texture.query', namespace: 'texture', description: '', scope: 'replay', effects: [], evidence_kind: null, path_inputs: [], prerequisites: [],
-  input_schema: { type: 'object', properties: { session_id: { type: 'string' }, filter: { type: 'object', additionalProperties: false, properties: { name: { type: 'string' } } } }, required: ['session_id'], additionalProperties: false }, ...patch,
-}; }
-function context(item: RdcOperationDefinition): ToolExecutionContext { return { workspaceRoot: process.cwd(), projectRootPath: process.cwd(), projectId: 'project', sessionId: 'session', rdcBinding: freezeRdcTurnBinding(cli, [item]) }; }
+function definition(patch: Partial<RdcOperationDefinition> = {}): RdcOperationDefinition {
+  return {
+    name: 'rd.texture.query',
+    namespace: 'texture',
+    description: '',
+    scope: 'replay',
+    effects: [],
+    evidence_kind: null,
+    path_inputs: [],
+    prerequisites: [],
+    input_schema: {
+      type: 'object',
+      properties: {
+        session_id: { type: 'string' },
+        filter: { type: 'object', additionalProperties: false, properties: { name: { type: 'string' } } },
+      },
+      required: ['session_id'],
+      additionalProperties: false,
+    },
+    ...patch,
+  };
+}
+function context(item: RdcOperationDefinition): ToolExecutionContext {
+  return {
+    workspaceRoot: process.cwd(),
+    projectRootPath: process.cwd(),
+    projectId: 'project',
+    sessionId: 'session',
+    rdcBinding: freezeRdcTurnBinding(cli, [item]),
+  };
+}
 describe('capability execution policy', () => {
   it('accepts a discovered texture query beyond the removed six-domain restriction', () => {
-    const item = definition(); expect(authorizeRdcOperation(item.name, {}, context(item), 'replay').args).toEqual({ session_id: 'replay' });
+    const item = definition();
+    expect(authorizeRdcOperation(item.name, {}, context(item), 'replay').args).toEqual({ session_id: 'replay' });
   });
-  it.each(['unknown', 'lifecycle', 'global_config', 'artifact_delete', 'desktop_window', 'remote_control'])('rejects effect %s before invocation', effect => {
-    const item = definition({ effects: [effect] }); expect(() => authorizeRdcOperation(item.name, {}, context(item), 'replay')).toThrow(/DENIED/);
-  });
-  it.each([{ filter: { name: 3 } }, { filter: { invented: true } }, { filter: { context_id: 'foreign' } }, { invented: true }])('rejects nested or unknown args %j', args => {
-    const item = definition(); expect(() => authorizeRdcOperation(item.name, args, context(item), 'replay')).toThrow(/DENIED/);
+  it.each(['unknown', 'lifecycle', 'global_config', 'artifact_delete', 'desktop_window', 'remote_control'])(
+    'rejects effect %s before invocation',
+    (effect) => {
+      const item = definition({ effects: [effect] });
+      expect(() => authorizeRdcOperation(item.name, {}, context(item), 'replay')).toThrow(/DENIED/);
+    },
+  );
+  it.each([
+    { filter: { name: 3 } },
+    { filter: { invented: true } },
+    { filter: { context_id: 'foreign' } },
+    { invented: true },
+  ])('rejects nested or unknown args %j', (args) => {
+    const item = definition();
+    expect(() => authorizeRdcOperation(item.name, args, context(item), 'replay')).toThrow(/DENIED/);
   });
   it('does not inject replay identity into context/global operations', () => {
-    for (const scope of ['context', 'global'] as const) { const item = definition({ scope, input_schema: { type: 'object', properties: {}, additionalProperties: false } }); expect(authorizeRdcOperation(item.name, {}, context(item), 'replay').args).toEqual({}); }
+    for (const scope of ['context', 'global'] as const) {
+      const item = definition({ scope, input_schema: { type: 'object', properties: {}, additionalProperties: false } });
+      expect(authorizeRdcOperation(item.name, {}, context(item), 'replay').args).toEqual({});
+    }
   });
   it('accepts a context operation requiring an open replay without injecting its identity', () => {
-    const item = definition({ name: 'rd.session.observe', namespace: 'session', scope: 'context',
-      prerequisites: [{ requires: 'session_id' }], effects: ['replay_position', 'artifact_write'],
-      input_schema: { type: 'object', properties: { event_id: { type: 'integer' }, out_path: { type: 'string' } }, required: ['out_path'], additionalProperties: false },
-      path_inputs: [{ name: 'out_path', access: 'write' }] });
+    const item = definition({
+      name: 'rd.session.observe',
+      namespace: 'session',
+      scope: 'context',
+      prerequisites: [{ requires: 'session_id' }],
+      effects: ['replay_position', 'artifact_write'],
+      input_schema: {
+        type: 'object',
+        properties: { event_id: { type: 'integer' }, out_path: { type: 'string' } },
+        required: ['out_path'],
+        additionalProperties: false,
+      },
+      path_inputs: [{ name: 'out_path', access: 'write' }],
+    });
     const outPath = 'observed.png';
-    expect(authorizeRdcOperation(item.name, { event_id: 42, out_path: outPath }, context(item), 'replay').args)
-      .toEqual({ event_id: 42, out_path: expect.stringMatching(/observed[.]png$/) });
-    expect(() => authorizeRdcOperation(item.name, { event_id: 42, out_path: outPath, session_id: 'foreign' }, context(item), 'replay')).toThrow(/main-owned/);
+    expect(authorizeRdcOperation(item.name, { event_id: 42, out_path: outPath }, context(item), 'replay').args).toEqual(
+      { event_id: 42, out_path: expect.stringMatching(/observed[.]png$/) },
+    );
+    expect(() =>
+      authorizeRdcOperation(
+        item.name,
+        { event_id: 42, out_path: outPath, session_id: 'foreign' },
+        context(item),
+        'replay',
+      ),
+    ).toThrow(/main-owned/);
   });
   it('restricts context updates to user fields', () => {
-    const item = definition({ scope: 'context', effects: ['context_metadata'], input_schema: { type: 'object', properties: { key: { type: 'string' }, value: {} }, required: ['key'], additionalProperties: false } });
-    expect(authorizeRdcOperation(item.name, { key: 'notes', value: 'observed' }, context(item), 'replay').args.key).toBe('notes');
-    expect(() => authorizeRdcOperation(item.name, { key: 'active_event_id', value: 9 }, context(item), 'replay')).toThrow(/application-owned/);
+    const item = definition({
+      scope: 'context',
+      effects: ['context_metadata'],
+      input_schema: {
+        type: 'object',
+        properties: { key: { type: 'string' }, value: {} },
+        required: ['key'],
+        additionalProperties: false,
+      },
+    });
+    expect(
+      authorizeRdcOperation(item.name, { key: 'notes', value: 'observed' }, context(item), 'replay').args.key,
+    ).toBe('notes');
+    expect(() =>
+      authorizeRdcOperation(item.name, { key: 'active_event_id', value: 9 }, context(item), 'replay'),
+    ).toThrow(/application-owned/);
   });
   it('rejects paths outside the owning workspace', () => {
-    const item = definition({ input_schema: { type: 'object', properties: { session_id: { type: 'string' }, output_path: { type: 'string' } }, additionalProperties: false }, path_inputs: [{ name: 'output_path', access: 'write' }] });
-    expect(() => authorizeRdcOperation(item.name, { output_path: '../outside.png' }, context(item), 'replay')).toThrow();
+    const item = definition({
+      input_schema: {
+        type: 'object',
+        properties: { session_id: { type: 'string' }, output_path: { type: 'string' } },
+        additionalProperties: false,
+      },
+      path_inputs: [{ name: 'output_path', access: 'write' }],
+    });
+    expect(() =>
+      authorizeRdcOperation(item.name, { output_path: '../outside.png' }, context(item), 'replay'),
+    ).toThrow();
   });
   it('rejects unknown prerequisites and virtual traversal', () => {
-    const item = definition({ prerequisites: [{ requires: 'anything' }] }); expect(() => authorizeRdcOperation(item.name, {}, context(item), 'replay')).toThrow(/prerequisite/);
-    const vfs = definition({ name: 'rd.vfs.cat', namespace: 'vfs', scope: 'global', input_schema: { type: 'object', properties: { path: { type: 'string' } }, additionalProperties: false } });
-    expect(() => authorizeRdcOperation(vfs.name, { path: '/textures/../context' }, context(vfs), 'replay')).toThrow(/virtual/);
+    const item = definition({ prerequisites: [{ requires: 'anything' }] });
+    expect(() => authorizeRdcOperation(item.name, {}, context(item), 'replay')).toThrow(/prerequisite/);
+    const vfs = definition({
+      name: 'rd.vfs.cat',
+      namespace: 'vfs',
+      scope: 'global',
+      input_schema: { type: 'object', properties: { path: { type: 'string' } }, additionalProperties: false },
+    });
+    expect(() => authorizeRdcOperation(vfs.name, { path: '/textures/../context' }, context(vfs), 'replay')).toThrow(
+      /virtual/,
+    );
   });
 });
 
-
 it('injects the owning capture and rejects user identity overrides', () => {
-  const item = definition({ name: 'rd.capture.get_thumbnail', namespace: 'capture', scope: 'capture',
+  const item = definition({
+    name: 'rd.capture.get_thumbnail',
+    namespace: 'capture',
+    scope: 'capture',
     prerequisites: [{ requires: 'capture_file_id' }],
-    input_schema: { type: 'object', properties: { capture_file_id: { type: 'string' } }, required: ['capture_file_id'], additionalProperties: false } });
-  expect(authorizeRdcOperation(item.name, {}, context(item), 'replay', 'owned-capture').args).toEqual({ capture_file_id: 'owned-capture' });
+    input_schema: {
+      type: 'object',
+      properties: { capture_file_id: { type: 'string' } },
+      required: ['capture_file_id'],
+      additionalProperties: false,
+    },
+  });
+  expect(authorizeRdcOperation(item.name, {}, context(item), 'replay', 'owned-capture').args).toEqual({
+    capture_file_id: 'owned-capture',
+  });
   expect(() => authorizeRdcOperation(item.name, {}, context(item), 'replay')).toThrow(/identity/);
-  expect(() => authorizeRdcOperation(item.name, { capture_file_id: 'foreign' }, context(item), 'replay', 'owned-capture')).toThrow(/main-owned/);
+  expect(() =>
+    authorizeRdcOperation(item.name, { capture_file_id: 'foreign' }, context(item), 'replay', 'owned-capture'),
+  ).toThrow(/main-owned/);
 });
 it('enforces exclusive selectors, timepoint conflicts and array budgets', () => {
-  const schema = { type: 'object', oneOf: [{ required: ['event_id'], not: { required: ['chunk_indices'] } }, { required: ['chunk_indices'], not: { required: ['event_id'] } }], properties: { event_id: { type: 'integer' }, chunk_indices: { type: 'array', maxItems: 2, minItems: 1, items: { type: 'integer' } } } };
+  const schema = {
+    type: 'object',
+    oneOf: [
+      { required: ['event_id'], not: { required: ['chunk_indices'] } },
+      { required: ['chunk_indices'], not: { required: ['event_id'] } },
+    ],
+    properties: {
+      event_id: { type: 'integer' },
+      chunk_indices: { type: 'array', maxItems: 2, minItems: 1, items: { type: 'integer' } },
+    },
+  };
   expect(() => validateRdcArguments({ event_id: 4 }, schema)).not.toThrow();
-  for (const value of [{}, { event_id: 4, chunk_indices: [1] }, { chunk_indices: [] }, { chunk_indices: [1, 2, 3] }]) expect(() => validateRdcArguments(value, schema)).toThrow(/DENIED/);
+  for (const value of [{}, { event_id: 4, chunk_indices: [1] }, { chunk_indices: [] }, { chunk_indices: [1, 2, 3] }])
+    expect(() => validateRdcArguments(value, schema)).toThrow(/DENIED/);
   const timepoint = { not: { required: ['state', 'event_id'], properties: { state: { enum: ['capture_initial'] } } } };
   expect(() => validateRdcArguments({ state: 'capture_initial', event_id: 4 }, timepoint)).toThrow(/DENIED/);
   expect(() => validateRdcArguments({ state: 'current', event_id: 4 }, timepoint)).not.toThrow();
 });
 
 it('accepts frozen native trace PCs without allowing replay overrides or texture selectors', () => {
-  const item = definition({ name: 'rd.debug.run_to', namespace: 'debug', effects: ['shader_debug', 'replay_position'],
-    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, shader_debug_id: { type: 'string' },
-      target: { type: 'object', properties: { pc: { type: 'integer', minimum: 0 } }, required: ['pc'], additionalProperties: false } },
-    required: ['session_id', 'shader_debug_id', 'target'], additionalProperties: false } });
+  const item = definition({
+    name: 'rd.debug.run_to',
+    namespace: 'debug',
+    effects: ['shader_debug', 'replay_position'],
+    input_schema: {
+      type: 'object',
+      properties: {
+        session_id: { type: 'string' },
+        shader_debug_id: { type: 'string' },
+        target: {
+          type: 'object',
+          properties: { pc: { type: 'integer', minimum: 0 } },
+          required: ['pc'],
+          additionalProperties: false,
+        },
+      },
+      required: ['session_id', 'shader_debug_id', 'target'],
+      additionalProperties: false,
+    },
+  });
   const bound = context(item);
   for (const pc of [0, 17]) {
-    expect(authorizeRdcOperation(item.name, { shader_debug_id: 'current-debugger', target: { pc } }, bound, 'owning-replay').args)
-      .toEqual({ session_id: 'owning-replay', shader_debug_id: 'current-debugger', target: { pc } });
+    expect(
+      authorizeRdcOperation(item.name, { shader_debug_id: 'current-debugger', target: { pc } }, bound, 'owning-replay')
+        .args,
+    ).toEqual({ session_id: 'owning-replay', shader_debug_id: 'current-debugger', target: { pc } });
   }
-  for (const target of [{}, { texture_id: 'wrong-selector' }, { pc: -1 }, { pc: 1.5 }, { pc: true }, { pc: 17, session_id: 'foreign' }]) {
-    expect(() => authorizeRdcOperation(item.name, { shader_debug_id: 'current-debugger', target }, bound, 'owning-replay')).toThrow(/DENIED/);
+  for (const target of [
+    {},
+    { texture_id: 'wrong-selector' },
+    { pc: -1 },
+    { pc: 1.5 },
+    { pc: true },
+    { pc: 17, session_id: 'foreign' },
+  ]) {
+    expect(() =>
+      authorizeRdcOperation(item.name, { shader_debug_id: 'current-debugger', target }, bound, 'owning-replay'),
+    ).toThrow(/DENIED/);
   }
 });
 
 it('enforces native PC breakpoint items and rejects unimplemented stepping modes', () => {
-  const breakpoints = definition({ name: 'rd.debug.set_breakpoints', namespace: 'debug', effects: ['shader_debug'],
-    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, shader_debug_id: { type: 'string' },
-      breakpoints: { type: 'array', items: { type: 'object', properties: { pc: { type: 'integer', minimum: 0 } }, required: ['pc'], additionalProperties: false } } },
-    required: ['session_id', 'shader_debug_id', 'breakpoints'], additionalProperties: false } });
+  const breakpoints = definition({
+    name: 'rd.debug.set_breakpoints',
+    namespace: 'debug',
+    effects: ['shader_debug'],
+    input_schema: {
+      type: 'object',
+      properties: {
+        session_id: { type: 'string' },
+        shader_debug_id: { type: 'string' },
+        breakpoints: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: { pc: { type: 'integer', minimum: 0 } },
+            required: ['pc'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['session_id', 'shader_debug_id', 'breakpoints'],
+      additionalProperties: false,
+    },
+  });
   const bound = context(breakpoints);
-  expect(authorizeRdcOperation(breakpoints.name, { shader_debug_id: 'current-debugger', breakpoints: [{ pc: 0 }, { pc: 17 }] }, bound, 'owning-replay').args.session_id)
-    .toBe('owning-replay');
+  expect(
+    authorizeRdcOperation(
+      breakpoints.name,
+      { shader_debug_id: 'current-debugger', breakpoints: [{ pc: 0 }, { pc: 17 }] },
+      bound,
+      'owning-replay',
+    ).args.session_id,
+  ).toBe('owning-replay');
   for (const points of [[{ pc: -1 }], [{ file: 'shader', line: 1 }], [{ pc: 17, contextId: 'foreign' }]]) {
-    expect(() => authorizeRdcOperation(breakpoints.name, { shader_debug_id: 'current-debugger', breakpoints: points }, bound, 'owning-replay')).toThrow(/DENIED/);
+    expect(() =>
+      authorizeRdcOperation(
+        breakpoints.name,
+        { shader_debug_id: 'current-debugger', breakpoints: points },
+        bound,
+        'owning-replay',
+      ),
+    ).toThrow(/DENIED/);
   }
-  const step = definition({ name: 'rd.debug.step', namespace: 'debug', effects: ['shader_debug'],
-    input_schema: { type: 'object', properties: { session_id: { type: 'string' }, shader_debug_id: { type: 'string' }, step_mode: { type: 'string', enum: ['instruction'] } },
-    required: ['session_id', 'shader_debug_id'], additionalProperties: false } });
-  expect(() => authorizeRdcOperation(step.name, { shader_debug_id: 'current-debugger', step_mode: 'instruction' }, context(step), 'owning-replay')).not.toThrow();
+  const step = definition({
+    name: 'rd.debug.step',
+    namespace: 'debug',
+    effects: ['shader_debug'],
+    input_schema: {
+      type: 'object',
+      properties: {
+        session_id: { type: 'string' },
+        shader_debug_id: { type: 'string' },
+        step_mode: { type: 'string', enum: ['instruction'] },
+      },
+      required: ['session_id', 'shader_debug_id'],
+      additionalProperties: false,
+    },
+  });
+  expect(() =>
+    authorizeRdcOperation(
+      step.name,
+      { shader_debug_id: 'current-debugger', step_mode: 'instruction' },
+      context(step),
+      'owning-replay',
+    ),
+  ).not.toThrow();
   for (const mode of ['line', 'over', 'out']) {
-    expect(() => authorizeRdcOperation(step.name, { shader_debug_id: 'current-debugger', step_mode: mode }, context(step), 'owning-replay')).toThrow(/DENIED/);
+    expect(() =>
+      authorizeRdcOperation(
+        step.name,
+        { shader_debug_id: 'current-debugger', step_mode: mode },
+        context(step),
+        'owning-replay',
+      ),
+    ).toThrow(/DENIED/);
   }
 });

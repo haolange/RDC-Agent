@@ -15,13 +15,14 @@ function parseResetValue(value: string, nowMs: number, header: string): number |
   const duration = value.trim().match(/^(\d+(?:\.\d+)?)\s*(ms|s|m|h)$/i);
   if (duration) {
     const amount = Number(duration[1]);
-    const multiplier = duration[2].toLowerCase() === 'ms'
-      ? 1
-      : duration[2].toLowerCase() === 's'
-        ? 1_000
-        : duration[2].toLowerCase() === 'm'
-          ? 60_000
-          : 3_600_000;
+    const multiplier =
+      duration[2].toLowerCase() === 'ms'
+        ? 1
+        : duration[2].toLowerCase() === 's'
+          ? 1_000
+          : duration[2].toLowerCase() === 'm'
+            ? 60_000
+            : 3_600_000;
     return nowMs + amount * multiplier;
   }
   const numeric = Number(value);
@@ -35,10 +36,7 @@ function parseResetValue(value: string, nowMs: number, header: string): number |
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-export function parseQuotaFromHeaders(
-  headers: Headers,
-  now = new Date(),
-): NonNullable<EffectiveModel['quota']> {
+export function parseQuotaFromHeaders(headers: Headers, now = new Date()): NonNullable<EffectiveModel['quota']> {
   const nowMs = now.getTime();
   const retryAfter = headers.get('retry-after')?.trim();
   let exhaustedUntilMs: number | undefined;
@@ -67,10 +65,14 @@ export function parseQuotaFromHeaders(
 
 export function recordQuotaFromResponse(plan: RequestPlan, response: Response): void {
   if (response.status !== 429) return;
-  const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === plan.providerId);
-  effectiveCatalogService.recordTransientQuota({
-    providerId: plan.providerId,
-    accountId: provider?.activeAccountId ?? `anonymous:${plan.providerId}`,
-    protocol: plan.route.protocol,
-  }, plan.effectiveModelId, parseQuotaFromHeaders(response.headers));
+  const provider = settingsService.providerConnections.get(plan.providerId);
+  effectiveCatalogService.recordTransientQuota(
+    {
+      providerId: plan.providerId,
+      accountId: provider?.activeAccountId ?? `anonymous:${plan.providerId}`,
+      protocol: plan.route.protocol,
+    },
+    plan.effectiveModelId,
+    parseQuotaFromHeaders(response.headers),
+  );
 }

@@ -6,18 +6,37 @@ import type { RdcRuntimeContext, SessionScope } from '@shared/types/session';
 /** Freeze only the lease that owns this particular replay before an asynchronous observation. */
 export function replayObservationLease(scope: SessionScope, owner: RdcRuntimeContext): RdcContextLease | null {
   const lease = getRdcContextLease(scope.sessionId);
-  if (!lease || lease.ownerSessionId !== scope.sessionId || lease.ownerProjectId !== scope.projectId
-    || lease.contextId !== owner.contextId || lease.runtimeContext.replaySessionId !== owner.replaySessionId
-    || lease.runtimeContext.captureFileId !== owner.captureFileId || lease.runtimeContext.ownerLeaseId !== owner.ownerLeaseId) return null;
+  if (
+    !lease ||
+    lease.ownerSessionId !== scope.sessionId ||
+    lease.ownerProjectId !== scope.projectId ||
+    lease.contextId !== owner.contextId ||
+    lease.runtimeContext.replaySessionId !== owner.replaySessionId ||
+    lease.runtimeContext.captureFileId !== owner.captureFileId ||
+    lease.runtimeContext.ownerLeaseId !== owner.ownerLeaseId
+  )
+    return null;
   return lease;
 }
 
 /** A fatal controller cannot safely be treated as a retryable image-export failure. */
-export function quarantineFatalReplayFailure(lease: RdcContextLease | null, error: unknown, operation: string, args: unknown) {
-  if (!(error instanceof RdcNativeFailure)
-    || !['replay_fatal_error', 'replay_health_unavailable'].includes(error.nativeError.code)) return null;
-  if (lease) quarantineRdcContext(lease.ownerSessionId, lease.version,
-    'Native replay health is uncertain; close or recover this capture before further execution.',
-    { operation, argsFingerprint: rdcDigest(args), code: error.nativeError.code });
+export function quarantineFatalReplayFailure(
+  lease: RdcContextLease | null,
+  error: unknown,
+  operation: string,
+  args: unknown,
+) {
+  if (
+    !(error instanceof RdcNativeFailure) ||
+    !['replay_fatal_error', 'replay_health_unavailable'].includes(error.nativeError.code)
+  )
+    return null;
+  if (lease)
+    quarantineRdcContext(
+      lease.ownerSessionId,
+      lease.version,
+      'Native replay health is uncertain; close or recover this capture before further execution.',
+      { operation, argsFingerprint: rdcDigest(args), code: error.nativeError.code },
+    );
   return { code: error.nativeError.code, message: String(error), retry: 'close' as const };
 }

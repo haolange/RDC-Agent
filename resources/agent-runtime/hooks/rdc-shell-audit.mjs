@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { fail, isTestMode, pass, payloadOf, readHookContext, toolArgumentsOf } from './hook-check-lib.mjs';
+import { fail, pass, payloadOf, readHookContext, toolArgumentsOf } from './hook-check-lib.mjs';
 
 const HARDCODED = [
   /(?:^|[\\/"']|\s)renderdoccmd(?:\.exe)?(?=["'\s]|$)/i,
@@ -11,10 +11,7 @@ const HARDCODED = [
 ];
 
 const context = await readHookContext();
-if (context.__parseError) {
-  process.stderr.write('rdc-shell-audit: hook stdin is not valid JSON\n');
-  process.exit(isTestMode() ? 0 : 1);
-}
+if (context.__parseError) fail('rdc-shell-audit: hook stdin is not valid JSON');
 
 const toolName = String(context.toolName ?? payloadOf(context).toolName ?? '');
 if (toolName && toolName !== 'shell') pass('rdc-shell-audit: not a shell call');

@@ -10,6 +10,7 @@ import { spawnSync, type SpawnSyncOptions } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { AppError } from '@shared/errors/appError';
 import { currentHost, type HostDescriptor } from '../platform/host';
 import { shellCandidates } from '../platform/shell';
 
@@ -31,11 +32,9 @@ export interface ShellResolverDeps {
   spawnSync: typeof spawnSync;
 }
 
-export class ShellUnavailableError extends Error {
-  readonly code = 'SHELL_UNAVAILABLE';
-
+export class ShellUnavailableError extends AppError {
   constructor(detail = 'No usable shell executable was found.') {
-    super(`SHELL_UNAVAILABLE: ${detail}`);
+    super('SHELL_UNAVAILABLE', detail);
     this.name = 'ShellUnavailableError';
   }
 }
@@ -62,9 +61,9 @@ export function formatShellDialect(kind: ShellKind): string {
 }
 
 export function parseShellVersionMajor(version: string): number | null {
-  const match = version.trim().match(/^(\d+)/);
-  if (!match) return null;
-  const major = Number.parseInt(match[1], 10);
+  const digits = version.trim().match(/^(\d+)/)?.[1];
+  if (!digits) return null;
+  const major = Number.parseInt(digits, 10);
   return Number.isFinite(major) ? major : null;
 }
 
@@ -81,7 +80,10 @@ function defaultDeps(): ShellResolverDeps {
 
 function basenameWithoutExt(executable: string, host: HostDescriptor): string {
   const pathApi = host.isWindows ? path.win32 : path.posix;
-  return pathApi.basename(executable).replace(/\.exe$/i, '').toLowerCase();
+  return pathApi
+    .basename(executable)
+    .replace(/\.exe$/i, '')
+    .toLowerCase();
 }
 
 export class ShellResolver {
@@ -186,11 +188,7 @@ export class ShellResolver {
     }
     const powershellVersion = this.probePowerShell(executable);
     if (powershellVersion) {
-      return this.toResolved(
-        executable,
-        this.inferPowerShellKind(executable, powershellVersion),
-        powershellVersion,
-      );
+      return this.toResolved(executable, this.inferPowerShellKind(executable, powershellVersion), powershellVersion);
     }
     const zshVersion = this.probePosix(executable, 'zsh');
     if (zshVersion) return this.toResolved(executable, 'zsh', zshVersion);
@@ -243,19 +241,20 @@ export class ShellResolver {
       this.spawnOptions(),
     );
     if (result.status !== 0) return null;
-    const version = String(result.stdout ?? '').trim().split(/\r?\n/)[0]?.trim() ?? '';
+    const version = String(result.stdout).trim().split(/\r?\n/)[0]?.trim() ?? '';
     return version || null;
   }
 
   private probePosix(executable: string, kind: 'zsh' | 'bash' | 'sh'): string | null {
-    const versionArg = kind === 'zsh'
-      ? ['-c', 'printf %s "$ZSH_VERSION"']
-      : kind === 'bash'
-        ? ['-c', 'printf %s "$BASH_VERSION"']
-        : ['-c', 'echo ok'];
+    const versionArg =
+      kind === 'zsh'
+        ? ['-c', 'printf %s "$ZSH_VERSION"']
+        : kind === 'bash'
+          ? ['-c', 'printf %s "$BASH_VERSION"']
+          : ['-c', 'echo ok'];
     const result = this.deps.spawnSync(executable, versionArg, this.spawnOptions());
     if (result.status !== 0) return null;
-    const version = String(result.stdout ?? '').trim().split(/\r?\n/)[0]?.trim() ?? '';
+    const version = String(result.stdout).trim().split(/\r?\n/)[0]?.trim() ?? '';
     if (kind === 'sh') return version === 'ok' ? 'sh' : version || 'sh';
     return version || null;
   }

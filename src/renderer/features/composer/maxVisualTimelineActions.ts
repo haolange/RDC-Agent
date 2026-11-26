@@ -19,9 +19,7 @@ export function buildIngressTimeline(input: {
   const now = visualNow();
   if (document.hidden) return 'reset';
   const { phase, current, nextRevision } = input;
-  const fieldEpoch = phase === 'ingress-reopen' || current.phase === 'idle'
-    ? now
-    : current.fieldEpoch;
+  const fieldEpoch = phase === 'ingress-reopen' || current.phase === 'idle' ? now : current.fieldEpoch;
   if (phase === 'ingress-reopen') {
     return createReopenMaxTimeline(nextRevision(), now);
   }

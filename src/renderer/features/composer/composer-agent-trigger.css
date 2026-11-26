@@ -14,19 +14,16 @@
   background: var(--token-surface-sunken);
   color: var(--token-text-primary);
   cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    transform var(--transition-fast);
 }
 .composer-agent-pill:hover,
 .composer-agent-pill.is-open,
 .composer-agent-pill:focus-visible {
   border-color: color-mix(in srgb, var(--composer-mode-accent) 24%, var(--token-border-strong));
   background: color-mix(in srgb, var(--composer-mode-accent) 8%, var(--token-interactive-hover));
-}
-
-.composer-agent-pill:focus-visible {
-  border-color: var(--token-border-focus);
-  box-shadow: 0 0 0 1px var(--token-border-focus);
-  outline: none;
 }
 
 .composer-agent-pill-icon {
@@ -40,6 +37,7 @@
   color: var(--composer-mode-accent);
 }
 
+.composer-agent-menu-item-icon svg,
 .composer-agent-pill-icon svg {
   display: block;
   width: var(--space-4);

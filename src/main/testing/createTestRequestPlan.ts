@@ -1,9 +1,5 @@
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
-import type {
-  ContextTransitionPlan,
-  ExecutionIdentity,
-  RequestPlan,
-} from '@shared/types/providerCapability';
+import type { ContextTransitionPlan, ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 
 type CompiledPlanFields =
   | 'contracts'
@@ -14,13 +10,14 @@ type CompiledPlanFields =
   | 'streamingPlan'
   | 'contextTransitionPlan';
 
-export type TestRequestPlanInput = Omit<RequestPlan, CompiledPlanFields | 'maxOutputTokens' | 'compactionThresholdTokens'> &
+export type TestRequestPlanInput = Omit<
+  RequestPlan,
+  CompiledPlanFields | 'maxOutputTokens' | 'compactionThresholdTokens'
+> &
   Partial<Pick<RequestPlan, CompiledPlanFields | 'maxOutputTokens' | 'compactionThresholdTokens'>>;
 
 export function createTestRequestPlan(input: TestRequestPlanInput): RequestPlan {
-  const contracts = input.contracts
-    ?? input.route.contracts
-    ?? createFailClosedProviderContracts(input.route.protocol);
+  const contracts = input.contracts ?? input.route.contracts ?? createFailClosedProviderContracts(input.route.protocol);
   const statePlan = input.statePlan ?? {
     mode: 'local-stateless' as const,
     carrier: 'none' as const,
@@ -67,8 +64,7 @@ export function createTestRequestPlan(input: TestRequestPlanInput): RequestPlan 
   return {
     ...input,
     maxOutputTokens: input.maxOutputTokens ?? 0,
-    compactionThresholdTokens: input.compactionThresholdTokens
-      ?? Math.floor((input.contextBudgetTokens * 80) / 100),
+    compactionThresholdTokens: input.compactionThresholdTokens ?? Math.floor((input.contextBudgetTokens * 80) / 100),
     route: { ...input.route, contracts },
     contracts,
     executionIdentity: input.executionIdentity ?? {

@@ -1,17 +1,13 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useEffect, useId } from 'react';
 import { useResolvedTheme } from '../../lib/useResolvedTheme';
 import { useI18n } from '../../i18n';
 import { errorDetail } from '../../lib/errorDetail';
+import { useAsyncValue } from '../../lib/useAsyncValue';
 import { extractMermaidStyles, useAdoptedStyles } from './mermaidStyles';
 
 interface MarkdownMermaidProps {
   source: string;
 }
-
-type MermaidState =
-  | { status: 'loading' }
-  | { status: 'ready'; svg: string; css: string }
-  | { status: 'error' };
 
 /**
  * Lazily render a Mermaid diagram. Fail-closed: show source + error on parse/render failure.
@@ -20,42 +16,27 @@ type MermaidState =
 export const MarkdownMermaid: React.FC<MarkdownMermaidProps> = ({ source }) => {
   const { t } = useI18n();
   const reactId = useId().replace(/:/g, '');
-  const [state, setState] = useState<MermaidState>({ status: 'loading' });
   const theme = useResolvedTheme();
-
+  const renderId = `mermaid-${reactId}`;
+  const state = useAsyncValue(JSON.stringify([renderId, theme, source]), async () => {
+    const mermaid = (await import('mermaid')).default;
+    // Labels are measured before the diagram's styles apply, so both use the transcript's own font.
+    const { fontFamily, fontSize } = getComputedStyle(document.body);
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: theme === 'light' ? 'default' : 'dark',
+      fontFamily,
+      themeVariables: { fontFamily, fontSize },
+    });
+    const { svg } = await mermaid.render(renderId, source);
+    return extractMermaidStyles(svg, renderId);
+  });
+  const failed = state.status === 'error';
   useEffect(() => {
-    let cancelled = false;
-    const renderId = `mermaid-${reactId}`;
-
-    void (async () => {
-      try {
-        const mermaid = (await import('mermaid')).default;
-        // Labels are measured before the diagram's styles apply, so both use the transcript's own font.
-        const { fontFamily, fontSize } = getComputedStyle(document.body);
-        mermaid.initialize({
-          startOnLoad: false,
-          securityLevel: 'strict',
-          theme: theme === 'light' ? 'default' : 'dark',
-          fontFamily,
-          themeVariables: { fontFamily, fontSize },
-        });
-        const { svg } = await mermaid.render(renderId, source);
-        if (!cancelled) {
-          setState({ status: 'ready', ...extractMermaidStyles(svg, renderId) });
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('[markdown] mermaid render failed', errorDetail(error));
-          setState({ status: 'error' });
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [reactId, source, theme]);
-  useAdoptedStyles(state.status === 'ready' ? state.css : '');
+    if (state.status === 'error') console.error('[markdown] mermaid render failed', errorDetail(state.error));
+  }, [state]);
+  useAdoptedStyles(state.status === 'ready' ? state.value.css : '');
 
   if (state.status === 'ready') {
     return (
@@ -63,14 +44,14 @@ export const MarkdownMermaid: React.FC<MarkdownMermaidProps> = ({ source }) => {
         className="markdown-mermaid"
         data-testid="markdown-mermaid"
         // Mermaid returns sanitized SVG under securityLevel: 'strict'; its styles were moved into an adopted sheet.
-        dangerouslySetInnerHTML={{ __html: state.svg }}
+        dangerouslySetInnerHTML={{ __html: state.value.svg }}
       />
     );
   }
 
   return (
     <div className="markdown-mermaid markdown-mermaid-fallback" data-testid="markdown-mermaid-fallback">
-      {state.status === 'error' ? (
+      {failed ? (
         <p className="markdown-mermaid-error" role="status">
           {t('chat.markdownMermaidFailed')}
         </p>

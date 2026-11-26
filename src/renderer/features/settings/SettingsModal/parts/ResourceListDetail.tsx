@@ -14,7 +14,6 @@ export interface ResourceListDetailProps {
   list?: ReactNode;
   detail?: ReactNode;
   status?: ReactNode;
-  className?: string;
   testId?: string;
 }
 
@@ -32,11 +31,10 @@ export function ResourceListDetail({
   list,
   detail,
   status,
-  className,
   testId,
 }: ResourceListDetailProps) {
   return (
-    <div className={cn('settings-resource-frame', className)} data-testid={testId}>
+    <div className="settings-resource-frame" data-testid={testId}>
       <div className="settings-resource-toolbar">{toolbar}</div>
       {isEmpty ? (
         <EmptyState
@@ -52,7 +50,11 @@ export function ResourceListDetail({
           <div className="settings-resource-detail-column">{detail}</div>
         </div>
       )}
-      {status ? <div className="settings-resource-status" role="status">{status}</div> : null}
+      {status ? (
+        <div className="settings-resource-status" role="status">
+          {status}
+        </div>
+      ) : null}
     </div>
   );
 }

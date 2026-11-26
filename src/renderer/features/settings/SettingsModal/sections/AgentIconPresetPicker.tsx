@@ -5,22 +5,17 @@ import { Icon } from '../../../../ui/Icon';
 import { Chevron } from '../../../../ui/Chevron';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { Popover } from '../../../../ui/Popover';
+import { useI18n } from '../../../../i18n';
+import { PlainButton } from '../../../../ui/PlainButton';
 import type { ModeIconKey } from '@shared/types/layout';
-import type { useI18n } from '../../../../i18n';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface AgentIconPresetPickerProps {
   value: ModeIconKey;
   onChange: (value: ModeIconKey) => void;
-  t: Translate;
 }
 
-export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
-  value,
-  onChange,
-  t,
-}) => {
+export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({ value, onChange }) => {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -33,11 +28,16 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
     const items = Array.from(gridRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? []);
     if (items.length === 0) return;
     const current = items.indexOf(document.activeElement as HTMLButtonElement);
-    const next = event.key === 'Home' ? 0
-      : event.key === 'End' ? items.length - 1
-        : ['ArrowDown', 'ArrowRight'].includes(event.key) ? (current + 1 + items.length) % items.length
-          : ['ArrowUp', 'ArrowLeft'].includes(event.key) ? (current - 1 + items.length) % items.length
-            : null;
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? items.length - 1
+          : ['ArrowDown', 'ArrowRight'].includes(event.key)
+            ? (current + 1 + items.length) % items.length
+            : ['ArrowUp', 'ArrowLeft'].includes(event.key)
+              ? (current - 1 + items.length) % items.length
+              : null;
     if (next === null) return;
     event.preventDefault();
     items[next]?.focus();
@@ -49,13 +49,14 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
       onOpenChange={setOpen}
       align="start"
       className="settings-agent-icon-popover"
-      trigger={(
+      label={t('settings.chooseAgentIcon')}
+      trigger={
         <Button variant="secondary" className="settings-agent-icon-trigger" aria-haspopup="menu">
           <ModeGlyph mode="general" icon={value} size={16} strokeWidth={1.9} />
           <span>{t('settings.changeAgentIcon')}</span>
           <Chevron direction="down" />
         </Button>
-      )}
+      }
     >
       <div className="settings-agent-icon-popover-title">{t('settings.chooseAgentIcon')}</div>
       <div
@@ -66,9 +67,8 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
         onKeyDown={onGridKeyDown}
       >
         {AGENT_ICON_PRESETS.map((preset) => (
-          <button
+          <PlainButton
             key={preset.id}
-            type="button"
             className={`settings-agent-icon-option${value === preset.id ? ' is-selected' : ''}`}
             role="menuitemradio"
             aria-checked={value === preset.id}
@@ -81,7 +81,7 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
                 <Icon name="check" size={12} />
               </span>
             ) : null}
-          </button>
+          </PlainButton>
         ))}
       </div>
     </Popover>

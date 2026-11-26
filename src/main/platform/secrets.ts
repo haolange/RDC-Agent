@@ -20,8 +20,10 @@ export function secretStorageUnavailableReason(
   if (!host.isLinux) return null;
   const backend = storage.getSelectedStorageBackend();
   if (backend === 'basic_text') {
-    return 'No OS keyring is available to safeStorage (backend basic_text). '
-      + 'Install and unlock a Secret Service keyring such as GNOME Keyring or KWallet, then restart; refusing to store credentials.';
+    return (
+      'No OS keyring is available to safeStorage (backend basic_text). ' +
+      'Install and unlock a Secret Service keyring such as GNOME Keyring or KWallet, then restart; refusing to store credentials.'
+    );
   }
   if (backend === 'unknown') return 'safeStorage has not selected an OS keyring yet; refusing to store credentials.';
   return null;

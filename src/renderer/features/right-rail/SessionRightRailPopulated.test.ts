@@ -14,125 +14,253 @@ const state = vi.hoisted(() => ({
   tracePresentation: null as AgentRunPresentation | null,
   replay: null as CaptureReplayState | null,
   previewUrl: null as string | null,
-  reload: vi.fn(), receive: vi.fn(),
+  reload: vi.fn(),
+  receive: vi.fn(),
   recovery: null as import('@shared/types/captureReplay').CaptureRecoveryStatus | null,
   restoreRecovery: vi.fn(async () => null),
 }));
-vi.mock('../../stores/workflowStore', () => ({ useWorkflowStore: (select: (value: typeof state) => unknown) => select(state) }));
-vi.mock('../../stores/projectStore', () => ({ useProjectStore: (select: (value: { currentSession: { sessionId: string; projectId: string } }) => unknown) => select({ currentSession: { sessionId: 'session', projectId: 'project' } }) }));
+vi.mock('../../stores/workflowStore', () => ({
+  useWorkflowStore: (select: (value: typeof state) => unknown) => select(state),
+}));
+vi.mock('../../stores/projectStore', () => ({
+  useProjectStore: (select: (value: { currentProject: { projectId: string }; currentSessionId: string }) => unknown) =>
+    select({ currentProject: { projectId: 'project' }, currentSessionId: 'session' }),
+}));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, language: 'en' }) }));
 // Mock data/lifecycle boundaries; render the actual rail, artifact preview, CapturePanel,
 // CaptureWorkspace, replay controls, status chips and callouts throughout these samples.
-vi.mock('./useCaptureReplay', () => ({ useCaptureReplay: () => ({ state: state.replay, selection: null, error: null, reload: state.reload, receive: state.receive }) }));
-vi.mock('./useCaptureRecovery', () => ({ useCaptureRecovery: () => ({ status: state.recovery, error: null, restore: state.restoreRecovery }) }));
-vi.mock('./useCapturePreview', () => ({ useCapturePreview: (_scope: unknown, source: { imagePath?: string | null }) => ({ url: source.imagePath ? state.previewUrl : null, loading: false, error: false }) }));
-vi.mock('./investigationPreviewActions', () => ({ readInvestigationArtifact: vi.fn(async () => ({ ok: false, status: 'error', error: 'Artifact storage unavailable' })) }));
+vi.mock('./useCaptureReplay', () => ({
+  useCaptureReplay: () => ({
+    state: state.replay,
+    selection: null,
+    error: null,
+    reload: state.reload,
+    receive: state.receive,
+  }),
+}));
+vi.mock('./useCaptureRecovery', () => ({
+  useCaptureRecovery: () => ({ status: state.recovery, error: null, restore: state.restoreRecovery }),
+}));
+vi.mock('./useCapturePreview', () => ({
+  useCapturePreview: (_scope: unknown, source: { imagePath?: string | null }) => ({
+    url: source.imagePath ? state.previewUrl : null,
+    loading: false,
+    error: false,
+  }),
+}));
+vi.mock('./investigationPreviewActions', () => ({
+  readInvestigationArtifact: vi.fn(async () => ({ ok: false, status: 'error', error: 'Artifact storage unavailable' })),
+}));
 
 const artifact: InvestigationArtifactRow = {
-  artifactId: 'artifact-1', kind: 'claim', recordType: 'ClaimRecord', status: 'stale',
-  mission: 'debugger', title: 'Draw 42 requires a fresh baseline', createdAt: '2026-09-22T00:00:00Z',
-  contentHash: `sha256:${'a'.repeat(64)}`, contentHashShort: 'aaaaaaaaaaaa',
-  sourceRefCount: 2, worldStateId: 'baseline', degraded: false,
+  artifactId: 'artifact-1',
+  kind: 'claim',
+  recordType: 'ClaimRecord',
+  status: 'stale',
+  mission: 'debugger',
+  title: 'Draw 42 requires a fresh baseline',
+  createdAt: '2026-09-22T00:00:00Z',
+  contentHash: `sha256:${'a'.repeat(64)}`,
+  contentHashShort: 'aaaaaaaaaaaa',
+  sourceRefCount: 2,
+  worldStateId: 'baseline',
+  degraded: false,
 };
 function presentation(): AgentRunPresentation {
   return {
-    projectId: 'project', sessionId: 'session', activeBranchId: 'branch', profileId: 'general',
-    updatedAt: '2026-09-22T00:00:00Z', runs: [], rawAuditRefs: [],
+    projectId: 'project',
+    sessionId: 'session',
+    activeBranchId: 'branch',
+    profileId: 'general',
+    updatedAt: '2026-09-22T00:00:00Z',
+    runs: [],
+    rawAuditRefs: [],
     rightPanel: {
-      tasks: [], artifacts: { rows: [artifact], totalCount: 1, storeDegraded: false },
+      tasks: [],
+      artifacts: { rows: [artifact], totalCount: 1, storeDegraded: false },
       outputs: { current: [], previous: [] },
       context: {
-        task: { projectId: 'project', projectName: 'Project', sessionId: 'session', sessionTitle: 'Session',
-          workingDirectory: '/project', configurationPhase: 'current_turn', agentProfile: 'general', permission: 'default', resources: [] },
-        rdc: { capture: null, availableCaptures: [{ inputId: 'input', fileName: 'Scene.rdc', filePath: '/captures/Scene.rdc', sizeBytes: 1024 ** 2 }], runtime: {}, diagnostics: [] },
+        task: {
+          projectId: 'project',
+          projectName: 'Project',
+          sessionId: 'session',
+          sessionTitle: 'Session',
+          workingDirectory: '/project',
+          configurationPhase: 'current_turn',
+          agentProfile: 'general',
+          permission: 'default',
+          resources: [],
+        },
+        rdc: {
+          capture: null,
+          availableCaptures: [
+            { inputId: 'input', fileName: 'Scene.rdc', filePath: '/captures/Scene.rdc', sizeBytes: 1024 ** 2 },
+          ],
+          runtime: {},
+          diagnostics: [],
+        },
       },
     },
   };
 }
 function replay(): CaptureReplayState {
   return {
-    projectId: 'project', sessionId: 'session', generation: 1, preparation: { targetDeviceId: 'local', phase: 'ready', issue: null }, revision: 1, operationId: null,
-    phase: 'ready', replayDeviceId: 'local', inputId: 'input', captureHash: null, contextId: 'context',
-    requestedEventId: 42, appliedEventId: 42, imageEventId: 42, events: [{ eventId: 21 }, { eventId: 42 }],
-    targets: [], target: null, isFinalOutput: false, image: null, observation: null,
+    projectId: 'project',
+    sessionId: 'session',
+    generation: 1,
+    preparation: { targetDeviceId: 'local', phase: 'ready', issue: null },
+    revision: 1,
+    operationId: null,
+    phase: 'ready',
+    replayDeviceId: 'local',
+    inputId: 'input',
+    captureHash: null,
+    contextId: 'context',
+    requestedEventId: 42,
+    appliedEventId: 42,
+    imageEventId: 42,
+    events: [{ eventId: 21 }, { eventId: 42 }],
+    targets: [],
+    target: null,
+    isFinalOutput: false,
+    image: null,
+    observation: null,
     devicePresentation: { status: 'not_applicable', eventId: null, textureId: null, sequence: null, reason: null },
-    warning: null, interactionLock: null, error: null,
+    warning: null,
+    interactionLock: null,
+    error: null,
   };
 }
 
 /** The rail shows one section at a time: Progress, Artifacts, Outputs, Context, Capture. */
-const openRailTab = (host: HTMLElement, index: number) => act(() => host.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]!.click());
+const openRailTab = (host: HTMLElement, index: number) =>
+  act(() => host.querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]!.click());
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  state.tracePresentation = presentation(); state.replay = replay(); state.previewUrl = null; state.recovery = null;
+  state.tracePresentation = presentation();
+  state.replay = replay();
+  state.previewUrl = null;
+  state.recovery = null;
   vi.clearAllMocks();
 });
 
 describe('populated session rail', () => {
   it('shows the saved position and requires an explicit unlocked restore action', async () => {
-    state.recovery = { pendingCount: 1, original: { inputId: 'input', fileName: 'Scene.rdc', deviceId: 'local', eventId: 21 } };
+    state.recovery = {
+      pendingCount: 1,
+      original: { inputId: 'input', fileName: 'Scene.rdc', deviceId: 'local', eventId: 21 },
+    };
     state.replay = { ...replay(), interactionLock: 'agent_running' };
-    const host = document.createElement('div'); const root = createRoot(host);
-    const button = () => [...host.querySelectorAll('button')].find(entry => entry.textContent === 'control.replay.recoveryAction');
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    const button = () =>
+      [...host.querySelectorAll('button')].find((entry) => entry.textContent === 'control.replay.recoveryAction');
     try {
       await act(async () => root.render(createElement(SessionRightRail)));
       openRailTab(host, 4);
       expect(host.textContent).not.toContain('Scene.rdc · device.local');
       expect(host.textContent).not.toContain('Scene.rdc · device.local · control.replay.eventNumber');
       expect(host.textContent).not.toContain('EID');
-      expect(button()?.disabled).toBe(true); expect(state.restoreRecovery).not.toHaveBeenCalled();
+      expect(button()?.disabled).toBe(true);
+      expect(state.restoreRecovery).not.toHaveBeenCalled();
       state.replay = { ...replay(), interactionLock: null, revision: 2 };
       await act(async () => root.render(createElement(SessionRightRail)));
       expect(button()?.disabled).toBe(false);
       await act(async () => button()!.click());
       expect(state.restoreRecovery).toHaveBeenCalledExactlyOnceWith(1);
-    } finally { act(() => root.unmount()); }
+    } finally {
+      act(() => root.unmount());
+    }
   });
   it('blocks Open and target switching while installation is unknown but preserves explicit verification', async () => {
-    state.replay = { ...replay(), inputId: null, contextId: null, phase: 'error', preparation: {
-      targetDeviceId: 'remote', phase: 'failed', issue: { code: 'remote_install_unconfirmed', stage: 'installing', diagnostic: 'Installation still pending', recovery: 'retry', deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: false } },
-    } };
-    const prepare = vi.fn(); useSessionDeviceStore.setState({ prepare });
-    const host = document.createElement('div'); const root = createRoot(host);
+    state.replay = {
+      ...replay(),
+      inputId: null,
+      contextId: null,
+      phase: 'error',
+      preparation: {
+        targetDeviceId: 'remote',
+        phase: 'failed',
+        issue: {
+          code: 'remote_install_unconfirmed',
+          stage: 'installing',
+          diagnostic: 'Installation still pending',
+          recovery: 'retry',
+          deviceAction: { kind: 'package_install', outcome: 'unconfirmed', uninstalledExisting: false },
+        },
+      },
+    };
+    const prepare = vi.fn();
+    useSessionDeviceStore.setState({ prepare });
+    const host = document.createElement('div');
+    const root = createRoot(host);
     try {
       act(() => root.render(createElement(SessionRightRail)));
       openRailTab(host, 4);
-      const button = (label: string) => [...host.querySelectorAll('button')].find(entry => entry.textContent === label);
+      const button = (label: string) =>
+        [...host.querySelectorAll('button')].find((entry) => entry.textContent === label);
       expect(button('control.captureOpen')?.disabled).toBe(true);
       expect(host.querySelector<HTMLButtonElement>('[data-testid="right-rail-replay-device"]')?.disabled).toBe(true);
       expect(button('device.prepare.retry')?.disabled).toBe(false);
       await act(async () => button('device.prepare.retry')!.click());
       expect(prepare).toHaveBeenCalledExactlyOnceWith({ projectId: 'project', sessionId: 'session' }, 'remote');
       expect(button('Verify and reconnect')).toBeUndefined();
-    } finally { act(() => root.unmount()); }
+    } finally {
+      act(() => root.unmount());
+    }
   });
   it('presents an incomplete typed report as seven readable sections without hiding its limits', async () => {
-    const reportRow: InvestigationArtifactRow = { ...artifact, kind: 'report', recordType: 'InvestigationReport', status: 'draft', title: 'Event 1248 assessment' };
+    const reportRow: InvestigationArtifactRow = {
+      ...artifact,
+      kind: 'report',
+      recordType: 'InvestigationReport',
+      status: 'draft',
+      title: 'Event 1248 assessment',
+    };
     const current = presentation();
     current.rightPanel.artifacts.rows = [reportRow];
     state.tracePresentation = current;
     const payload: InvestigationReadIpcResult = {
-      ok: true, status: 'ready', contentHash: reportRow.contentHash,
+      ok: true,
+      status: 'ready',
+      contentHash: reportRow.contentHash,
       manifest: {
-        artifactId: reportRow.artifactId, mission: 'debugger', kind: 'report', status: 'draft',
-        title: reportRow.title, summary: 'Evidence remains incomplete', contentRef: 'record.json',
-        sourceRefs: [], contentHash: reportRow.contentHash, recordType: 'InvestigationReport',
+        artifactId: reportRow.artifactId,
+        mission: 'debugger',
+        kind: 'report',
+        status: 'draft',
+        title: reportRow.title,
+        summary: 'Evidence remains incomplete',
+        contentRef: 'record.json',
+        sourceRefs: [],
+        contentHash: reportRow.contentHash,
+        recordType: 'InvestigationReport',
         createdAt: reportRow.createdAt,
       },
       record: {
-        title: reportRow.title, mission: 'debugger', summary: 'The root cause remains unknown.',
-        claims: [], evidenceIds: ['ev-1248'], experimentIds: [],
+        title: reportRow.title,
+        mission: 'debugger',
+        summary: 'The root cause remains unknown.',
+        claims: [],
+        evidenceIds: ['ev-1248'],
+        experimentIds: [],
         reportContract: {
-          conclusion: 'Partial; no causal fix verified.', evidence: 'Event 1248 has a native pixel-history result.',
-          verification: 'No intervention or restored-state receipt.', limitations: 'The first bad event is unknown.',
-          status: 'partial', links: 'Approved plan: session://plans/example',
-          artifactIds: ['ev-1248'], candidateStatus: 'none',
+          conclusion: 'Partial; no causal fix verified.',
+          evidence: 'Event 1248 has a native pixel-history result.',
+          verification: 'No intervention or restored-state receipt.',
+          limitations: 'The first bad event is unknown.',
+          status: 'partial',
+          links: 'Approved plan: session://plans/example',
+          artifactIds: ['ev-1248'],
+          candidateStatus: 'none',
         },
       },
     };
     vi.mocked(readInvestigationArtifact).mockResolvedValueOnce(payload);
-    const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
     try {
       await act(async () => root.render(createElement(SessionRightRail)));
       openRailTab(host, 1);
@@ -143,18 +271,25 @@ describe('populated session rail', () => {
       expect(dialog?.textContent).toContain('The root cause remains unknown.');
       expect(dialog?.textContent).toContain('Partial; no causal fix verified.');
       expect(dialog?.textContent).toContain('No intervention or restored-state receipt.');
-      const sections = [...(dialog?.querySelectorAll('.investigation-report section') ?? [])].map((section) => section.textContent).join('\n');
+      const sections = [...(dialog?.querySelectorAll('.investigation-report section') ?? [])]
+        .map((section) => section.textContent)
+        .join('\n');
       expect(sections).not.toMatch(/\b0\d\b|partial|ev-1248/);
       // Record ids leave through the copy action; none is printed in the report.
       expect(dialog?.textContent).not.toContain('ev-1248');
       expect(dialog?.querySelector('.investigation-report-copy-diagnostics')).not.toBeNull();
       act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
       expect(document.querySelector('[data-testid="investigation-preview"]')).toBeNull();
-    } finally { act(() => root.unmount()); host.remove(); }
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
   });
 
   it('renders a typed artifact title/status and opens the real preview with its owning session and hash', async () => {
-    const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
     try {
       await act(async () => root.render(createElement(SessionRightRail)));
       openRailTab(host, 1);
@@ -163,41 +298,64 @@ describe('populated session rail', () => {
       expect(row?.textContent).not.toContain('control.rightRail.artifacts.status.stale');
       const preview = row;
       await act(async () => preview!.click());
-      expect(readInvestigationArtifact).toHaveBeenCalledExactlyOnceWith({ sessionId: 'session', artifactId: artifact.artifactId, expectedHash: artifact.contentHash });
+      expect(readInvestigationArtifact).toHaveBeenCalledExactlyOnceWith({
+        sessionId: 'session',
+        artifactId: artifact.artifactId,
+        expectedHash: artifact.contentHash,
+      });
       const dialog = document.querySelector('[data-testid="investigation-preview"]');
       expect(dialog?.textContent).toContain(artifact.title);
       expect(dialog?.textContent).toContain('app.error.loadFailed');
       expect(dialog?.textContent).not.toContain('Artifact storage unavailable');
       act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
       expect(document.querySelector('[data-testid="investigation-preview"]')).toBeNull();
-    } finally { act(() => root.unmount()); host.remove(); }
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
   });
 
   it('keeps the real Capture controls and frame coherent across opened, loading-image and failure states', () => {
-    const host = document.createElement('div'); const root = createRoot(host);
+    const host = document.createElement('div');
+    const root = createRoot(host);
     const render = () => act(() => root.render(createElement(SessionRightRail)));
     const button = (label: string) => [...host.querySelectorAll('button')].find((entry) => entry.textContent === label);
     try {
       render();
       openRailTab(host, 4);
       expect(host.querySelectorAll('[data-testid="right-rail-capture"]')).toHaveLength(1);
-      expect(host.querySelector('.capture-replay-file-row')?.getAttribute('data-tooltip')).toMatch(/^Scene\.rdc · /);
+      expect(host.querySelector('[data-testid="right-rail-capture-input"]')?.getAttribute('data-tooltip')).toMatch(
+        /^Scene\.rdc · /,
+      );
       expect(host.querySelector('[data-testid="capture-replay-copy-diagnostics"]')).not.toBeNull();
-      expect(host.querySelector('[data-testid="right-rail-capture"]')?.textContent).not.toContain('/captures/Scene.rdc');
+      expect(host.querySelector('[data-testid="right-rail-capture"]')?.textContent).not.toContain(
+        '/captures/Scene.rdc',
+      );
       expect(host.querySelector('.capture-replay-status')?.textContent).toBe('control.replay.ready');
       expect(button('control.replay.close')?.disabled).toBe(false);
       expect(host.querySelector<HTMLInputElement>('.capture-event-input input')?.value).toBe('42');
-      state.replay = { ...replay(), phase: 'loading_image', revision: 2 }; render();
+      state.replay = { ...replay(), phase: 'loading_image', revision: 2 };
+      render();
       expect(host.querySelector('.capture-replay-image')?.getAttribute('aria-busy')).toBe('true');
       expect(host.querySelector('.capture-replay-image')?.textContent).toContain('control.replay.loading_image');
       expect(button('control.replay.close')?.disabled).toBe(true);
-      state.replay = { ...replay(), phase: 'error', revision: 3, error: { code: 'READ_FAILED', message: 'Readback failed', retry: 'image' } }; render();
+      state.replay = {
+        ...replay(),
+        phase: 'error',
+        revision: 3,
+        error: { code: 'READ_FAILED', message: 'Readback failed', retry: 'image' },
+      };
+      render();
       expect(host.querySelector('.capture-replay-image')?.getAttribute('aria-busy')).toBe('false');
       expect(host.querySelector('[role="alert"]')?.textContent).not.toContain('Readback failed');
       expect(host.querySelector('[role="alert"] button[aria-label="app.copyDetails"]')).not.toBeNull();
       expect(button('control.replay.retryImage')?.disabled).toBe(false);
       expect(host.querySelector('.capture-replay-status')?.classList.contains('is-error')).toBe(true);
-      expect([...host.querySelectorAll('section[data-testid]')].map((node) => node.getAttribute('data-testid'))).toEqual(['right-rail-capture']);
-    } finally { act(() => root.unmount()); }
+      expect(
+        [...host.querySelectorAll('section[data-testid]')].map((node) => node.getAttribute('data-testid')),
+      ).toEqual(['right-rail-capture']);
+    } finally {
+      act(() => root.unmount());
+    }
   });
 });

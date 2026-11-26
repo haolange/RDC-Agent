@@ -3,12 +3,7 @@ import { useI18n } from '../../i18n';
 import { WebPageList, WebPillStrip } from './WorkProcessWebParts';
 import { WorkProcessImageThumbs } from './WorkProcessImageThumbs';
 import { ToolOutcomeSummary } from './ToolOutcomeSummary';
-import {
-  CopyPathButton,
-  FamilyLayerBody,
-  FamilyLayerDetail,
-  isDedicatedFamily,
-} from './WorkProcessFamilyLayers';
+import { CopyPathButton, FamilyLayerBody, FamilyLayerDetail, isDedicatedFamily } from './WorkProcessFamilyLayers';
 import type { ToolRowModel } from './workProcessToolTypes';
 
 export type { ToolRowModel } from './workProcessToolTypes';
@@ -79,12 +74,16 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     return (
       <div className={`work-process-tool-card-body family-${row.family}`}>
         {bodyText ? (
-          <span className="work-process-tool-card-body-text is-summary" data-tooltip={bodyText}>{bodyText}</span>
+          <span className="work-process-tool-card-body-text is-summary" tabIndex={0} data-tooltip={bodyText}>
+            {bodyText}
+          </span>
         ) : null}
         {sampleLines.length > 0 ? (
           <ul className="work-process-tool-card-body-list">
             {sampleLines.map((line) => (
-              <li key={line} className="work-process-tool-card-body-list-item" data-tooltip={line}>{line}</li>
+              <li key={line} className="work-process-tool-card-body-list-item" tabIndex={0} data-tooltip={line}>
+                {line}
+              </li>
             ))}
           </ul>
         ) : null}
@@ -96,10 +95,18 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     <div className={`work-process-tool-card-body family-${row.family}`}>
       {row.chips?.length ? (
         <div className="work-process-tool-chips">
-          {row.chips.map((chip) => <span key={chip} className="work-process-path-chip">{chip}</span>)}
+          {row.chips.map((chip) => (
+            <span key={chip} className="work-process-path-chip">
+              {chip}
+            </span>
+          ))}
         </div>
       ) : null}
-      {bodyText ? <span className="work-process-tool-card-body-text" data-tooltip={bodyText}>{bodyText}</span> : null}
+      {bodyText ? (
+        <span className="work-process-tool-card-body-text" tabIndex={0} data-tooltip={bodyText}>
+          {bodyText}
+        </span>
+      ) : null}
       {row.imagePreviews?.length ? <WorkProcessImageThumbs previews={row.imagePreviews} /> : null}
     </div>
   );
@@ -113,12 +120,8 @@ export const FamilyDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     if (!row.commandText && lines.length === 0) return null;
     return (
       <div className="work-process-tool-card-detail family-shell" data-testid="work-process-tool-preview">
-        {row.commandText ? (
-          <pre className="work-process-shell-command">{`$ ${row.commandText}`}</pre>
-        ) : null}
-        {lines.length > 0 ? (
-          <pre className="work-process-shell-stdout">{lines.join('\n')}</pre>
-        ) : null}
+        {row.commandText ? <pre className="work-process-shell-command">{`$ ${row.commandText}`}</pre> : null}
+        {lines.length > 0 ? <pre className="work-process-shell-stdout">{lines.join('\n')}</pre> : null}
       </div>
     );
   }
@@ -146,7 +149,9 @@ export const FamilyDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
       <div className="work-process-tool-card-detail family-search" data-testid="work-process-tool-preview">
         <ul className="work-process-tool-card-list">
           {lines.map((line) => (
-            <li key={line} className="work-process-tool-card-list-item">{line}</li>
+            <li key={line} className="work-process-tool-card-list-item">
+              {line}
+            </li>
           ))}
         </ul>
       </div>
@@ -167,11 +172,11 @@ export const FamilyDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     <div className="work-process-tool-card-detail family-generic" data-testid="work-process-tool-preview">
       {lines[0] ? <p className="work-process-tool-card-caption">{lines[0]}</p> : null}
       {row.pathChip ? (
-        <span className="work-process-path-chip" data-tooltip={row.pathChip}>{row.pathChip}</span>
+        <span className="work-process-path-chip" tabIndex={0} data-tooltip={row.pathChip}>
+          {row.pathChip}
+        </span>
       ) : null}
-      {lines.length > 1 ? (
-        <pre className="work-process-tool-card-preview">{lines.slice(1).join('\n')}</pre>
-      ) : null}
+      {lines.length > 1 ? <pre className="work-process-tool-card-preview">{lines.slice(1).join('\n')}</pre> : null}
     </div>
   );
 };
@@ -209,7 +214,9 @@ export const ToolApprovalCallout: React.FC<{ approval: NonNullable<ToolRowModel[
         <span className="work-process-tool-approval-verb">{approval.verb}</span>
         {approval.metaLines.length > 0 ? (
           <span className="work-process-tool-approval-meta">
-            {approval.metaLines.map((line) => <span key={line}>{line}</span>)}
+            {approval.metaLines.map((line) => (
+              <span key={line}>{line}</span>
+            ))}
           </span>
         ) : null}
       </div>

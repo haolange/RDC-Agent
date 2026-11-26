@@ -2,12 +2,9 @@ import { contextTierPromptCap, contextTierWindowTokens, resolveContextTierChoice
 import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
-import type { CapabilityState, CatalogModelRoute, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
-import type {
-  NamedReasoningLevel,
-  ReasoningControl,
-  ReasoningWireProfile,
-} from '@shared/types/modelCapability';
+import type { CapabilityState, CatalogModelRoute } from '@shared/types/providerCapability';
+import type { ProviderSurfaceDefinition } from './providerCatalogTypes';
+import type { NamedReasoningLevel, ReasoningControl, ReasoningWireProfile } from '@shared/types/modelCapability';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 
 export interface LiveModelObservation {
@@ -31,10 +28,7 @@ export interface LiveModelObservation {
   structuredOutput?: CapabilityState;
 }
 
-function withRouteContracts(
-  surface: ProviderSurfaceDefinition,
-  route: CatalogModelRoute,
-): CatalogModelRoute {
+function withRouteContracts(surface: ProviderSurfaceDefinition, route: CatalogModelRoute): CatalogModelRoute {
   const surfaceRoute = surface.routes.find((candidate) => candidate.protocol === route.protocol);
   return {
     ...route,
@@ -46,17 +40,22 @@ function definitionKeys(model: ModelManifest): string[] {
   return [model.modelId, ...model.aliases].map(normalizeDiscoveredModelMatchKey).filter(Boolean);
 }
 
-function findDefinition(surface: ProviderSurfaceDefinition, observation: LiveModelObservation): ModelManifest | undefined {
-  const keys = new Set([observation.modelId, ...(observation.aliases ?? [])]
-    .map(normalizeDiscoveredModelMatchKey)
-    .filter(Boolean));
+function findDefinition(
+  surface: ProviderSurfaceDefinition,
+  observation: LiveModelObservation,
+): ModelManifest | undefined {
+  const keys = new Set(
+    [observation.modelId, ...(observation.aliases ?? [])].map(normalizeDiscoveredModelMatchKey).filter(Boolean),
+  );
   return surface.models.find((model) => definitionKeys(model).some((key) => keys.has(key)));
 }
 
 function admittedDynamicModel(surface: ProviderSurfaceDefinition): boolean {
-  return surface.catalogOwnership !== 'app-managed'
-    && surface.discovery.authority !== 'candidate-validation'
-    && surface.discovery.authority !== 'entitlement-overlay';
+  return (
+    surface.catalogOwnership !== 'app-managed' &&
+    surface.discovery.authority !== 'candidate-validation' &&
+    surface.discovery.authority !== 'entitlement-overlay'
+  );
 }
 
 function filterWireProfile(
@@ -66,44 +65,56 @@ function filterWireProfile(
 ): ReasoningWireProfile {
   if (template.kind === 'none' || template.kind === 'moonshot-thinking') return template;
   const on = levels.includes(template.on) ? template.on : fallback;
-  if (template.kind === 'gemini-thinking-budget' || template.kind === 'gemini-thinking-level'
-    || template.kind === 'openai-responses') {
+  if (
+    template.kind === 'gemini-thinking-budget' ||
+    template.kind === 'gemini-thinking-level' ||
+    template.kind === 'openai-responses'
+  ) {
     return {
       ...template,
       on,
-      levels: Object.fromEntries(levels.flatMap((level) => (
-        template.levels[level] === undefined ? [] : [[level, template.levels[level]]]
-      ))),
+      levels: Object.fromEntries(
+        levels.flatMap((level) => (template.levels[level] === undefined ? [] : [[level, template.levels[level]]])),
+      ),
     } as ReasoningWireProfile;
   }
   return {
     ...template,
     on,
-    ...(template.levels ? {
-      levels: Object.fromEntries(levels.flatMap((level) => (
-        template.levels?.[level] === undefined ? [] : [[level, template.levels[level]]]
-      ))),
-    } : {}),
+    ...(template.levels
+      ? {
+          levels: Object.fromEntries(
+            levels.flatMap((level) =>
+              template.levels?.[level] === undefined ? [] : [[level, template.levels[level]]],
+            ),
+          ),
+        }
+      : {}),
   } as ReasoningWireProfile;
 }
 
-function projectReasoning(
-  model: ModelManifest,
-  observation: LiveModelObservation,
-): ReasoningControl | undefined {
+function projectReasoning(model: ModelManifest, observation: LiveModelObservation): ReasoningControl | undefined {
   const policy = model.liveProjection?.reasoning;
   const observed = observation.reasoning;
   if (!policy || !observed) return undefined;
   if (observed.supported === false) {
     if (policy.offPolicy === 'forbidden') {
       return {
-        kind: 'unknown', supportsOff: false, levels: [], defaultState: 'provider-managed',
-        defaultSelection: 'on', wireProfile: { kind: 'none' },
+        kind: 'unknown',
+        supportsOff: false,
+        levels: [],
+        defaultState: 'provider-managed',
+        defaultSelection: 'on',
+        wireProfile: { kind: 'none' },
       };
     }
 
     return {
-      kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', lockedSelection: 'off',
+      kind: 'none',
+      supportsOff: true,
+      levels: [],
+      defaultSelection: 'off',
+      lockedSelection: 'off',
       wireProfile: { kind: 'none' },
     };
   }
@@ -112,46 +123,66 @@ function projectReasoning(
     model.route.protocol,
     ...(model.routeOptions ?? []).map((option) => option.route.protocol),
   ]);
-  const protocol = observation.protocol && routeProtocols.has(observation.protocol)
-    ? observation.protocol
-    : model.route.protocol;
+  const protocol =
+    observation.protocol && routeProtocols.has(observation.protocol) ? observation.protocol : model.route.protocol;
   const template = policy.wireProfiles[protocol];
   if (levels.length === 0) {
     if (observed.supported === true && observed.thinkingType === 'only' && template) {
       return {
-        kind: 'always-on', supportsOff: false, levels: [], defaultState: 'provider-managed',
-        defaultSelection: 'on', lockedSelection: 'on', wireProfile: template,
+        kind: 'always-on',
+        supportsOff: false,
+        levels: [],
+        defaultState: 'provider-managed',
+        defaultSelection: 'on',
+        lockedSelection: 'on',
+        wireProfile: template,
       };
     }
     return {
-      kind: 'unknown', supportsOff: false, levels: [], defaultState: 'provider-managed',
-      defaultSelection: 'on', wireProfile: { kind: 'none' },
+      kind: 'unknown',
+      supportsOff: false,
+      levels: [],
+      defaultState: 'provider-managed',
+      defaultSelection: 'on',
+      wireProfile: { kind: 'none' },
     };
   }
   if (!template) {
     return {
-      kind: 'unknown', supportsOff: false, levels: [], defaultState: 'provider-managed',
-      defaultSelection: 'on', wireProfile: { kind: 'none' },
+      kind: 'unknown',
+      supportsOff: false,
+      levels: [],
+      defaultState: 'provider-managed',
+      defaultSelection: 'on',
+      wireProfile: { kind: 'none' },
     };
   }
-  const supportsOff = policy.offPolicy === 'allowed'
-    || (policy.offPolicy === 'from-live'
-      && (observed.thinkingType === 'optional' || observed.thinkingType === 'both'));
-  const observedDefault = observed.defaultEffort && levels.includes(observed.defaultEffort)
-    ? observed.defaultEffort
-    : undefined;
-  const fallback = observedDefault ?? (template.kind !== 'none' && template.kind !== 'moonshot-thinking'
-    && levels.includes(template.on) ? template.on : levels[0]);
+  const supportsOff =
+    policy.offPolicy === 'allowed' ||
+    (policy.offPolicy === 'from-live' && (observed.thinkingType === 'optional' || observed.thinkingType === 'both'));
+  const observedDefault =
+    observed.defaultEffort && levels.includes(observed.defaultEffort) ? observed.defaultEffort : undefined;
+  const fallback =
+    observedDefault ??
+    (template.kind !== 'none' && template.kind !== 'moonshot-thinking' && levels.includes(template.on)
+      ? template.on
+      : levels[0]);
   const wireProfile = filterWireProfile(template, levels, fallback);
   if (levels.length === 1 && !supportsOff) {
     return {
-      kind: 'always-on', supportsOff: false, levels,
+      kind: 'always-on',
+      supportsOff: false,
+      levels,
       defaultState: observedDefault ? 'known' : 'provider-managed',
-      defaultSelection: levels[0], lockedSelection: levels[0], wireProfile,
+      defaultSelection: levels[0],
+      lockedSelection: levels[0],
+      wireProfile,
     };
   }
   return {
-    kind: 'levels', supportsOff, levels,
+    kind: 'levels',
+    supportsOff,
+    levels,
     defaultState: observedDefault ? 'known' : 'provider-managed',
     defaultSelection: fallback,
     wireProfile,
@@ -167,7 +198,7 @@ function projectContext(
   if (!policy || !tokens) return {};
   const observedTier = model.contextTiers.find((tier) => tier.id === policy.observedTierId);
   if (!observedTier) return {};
-  const contextTiers: NonNullable<CatalogModelContribution['contextTiers']> = model.contextTiers.map((tier) => (
+  const contextTiers: NonNullable<CatalogModelContribution['contextTiers']> = model.contextTiers.map((tier) =>
     tier.id === observedTier.id
       ? {
           ...tier,
@@ -177,38 +208,44 @@ function projectContext(
             ? { maxOutputTokens: observation.maxOutputTokens }
             : {}),
         }
-      : tier
-  ));
-  if (!policy.maxTierId) return {
-    contextTiers,
-    ...(model.controls.maxContext.state === 'fixed' && model.controls.maxContext.tierId === observedTier.id
-      ? { controls: { maxContext: { ...model.controls.maxContext, entitlement: 'granted' as const } } } : {}),
-  };
+      : tier,
+  );
+  if (!policy.maxTierId)
+    return {
+      contextTiers,
+      ...(model.controls.maxContext.state === 'fixed' && model.controls.maxContext.tierId === observedTier.id
+        ? { controls: { maxContext: { ...model.controls.maxContext, entitlement: 'granted' as const } } }
+        : {}),
+    };
   const maxTier = model.contextTiers.find((tier) => tier.id === policy.maxTierId);
   if (!maxTier) return { contextTiers };
   const defaultWindow = contextTierWindowTokens(
     model.contextTiers.find((tier) => tier.id === 'default') ?? model.contextTiers[0],
   );
-  const maxEntitlement = policy.entitlementAuthority === 'manifest'
-    ? maxTier.entitlement
-    : policy.entitlementAuthority === 'catalog-observation' && observation.contextWindowChoices
-      ? observation.contextWindowChoices.includes(contextTierWindowTokens(maxTier) ?? 0) ? 'granted' as const : 'denied' as const
-    : policy.entitlementAuthority === 'catalog-observation' && observedTier.id === maxTier.id
-      ? defaultWindow !== undefined && tokens > defaultWindow ? 'granted' as const : 'denied' as const
-      : 'unknown' as const;
+  const maxEntitlement =
+    policy.entitlementAuthority === 'manifest'
+      ? maxTier.entitlement
+      : policy.entitlementAuthority === 'catalog-observation' && observation.contextWindowChoices
+        ? observation.contextWindowChoices.includes(contextTierWindowTokens(maxTier) ?? 0)
+          ? ('granted' as const)
+          : ('denied' as const)
+        : policy.entitlementAuthority === 'catalog-observation' && observedTier.id === maxTier.id
+          ? defaultWindow !== undefined && tokens > defaultWindow
+            ? ('granted' as const)
+            : ('denied' as const)
+          : ('unknown' as const);
   const maxTierIndex = contextTiers.findIndex((tier) => tier.id === maxTier.id);
   contextTiers[maxTierIndex] = { ...contextTiers[maxTierIndex], entitlement: maxEntitlement };
-  const executionBindings = (model.executionBindings ?? []).map((binding) => (
-    binding.when.maxContext === true
-      ? { ...binding, entitlement: maxEntitlement }
-      : binding
-  ));
+  const executionBindings = (model.executionBindings ?? []).map((binding) =>
+    binding.when.maxContext === true ? { ...binding, entitlement: maxEntitlement } : binding,
+  );
   return {
     contextTiers,
     controls: {
-      maxContext: model.controls.maxContext.state === 'selectable'
-        ? { ...model.controls.maxContext, entitlement: maxEntitlement }
-        : model.controls.maxContext,
+      maxContext:
+        model.controls.maxContext.state === 'selectable'
+          ? { ...model.controls.maxContext, entitlement: maxEntitlement }
+          : model.controls.maxContext,
     },
     executionBindings,
   };
@@ -227,8 +264,9 @@ function resolveProjectedDefaultBudget(
   if (typeof observed === 'number' && observed > 0) return observed;
   const tiers = contextTiers ?? model.contextTiers;
   const observedTierId = model.liveProjection?.context?.observedTierId;
-  const tier = (observedTierId ? tiers.find((entry) => entry.id === observedTierId) : undefined)
-    ?? tiers.find((entry) => typeof entry.maxPromptTokens === 'number' && entry.maxPromptTokens > 0);
+  const tier =
+    (observedTierId ? tiers.find((entry) => entry.id === observedTierId) : undefined) ??
+    tiers.find((entry) => typeof entry.maxPromptTokens === 'number' && entry.maxPromptTokens > 0);
   return typeof tier?.maxPromptTokens === 'number' && tier.maxPromptTokens > 0
     ? tier.maxPromptTokens
     : model.defaultBudgetTokens;
@@ -248,15 +286,13 @@ function projectCompiledModel(
     return target
       ? {
           ...binding,
-          entitlement: availableModelIds.has(target.targetModelId)
-            ? binding.entitlement
-            : 'denied' as const,
+          entitlement: availableModelIds.has(target.targetModelId) ? binding.entitlement : ('denied' as const),
         }
       : binding;
   });
-  const fastBinding = executionBindings?.find((binding) => (
-    binding.when.fast === true && binding.actions.some((action) => action.kind === 'model-switch')
-  ));
+  const fastBinding = executionBindings?.find(
+    (binding) => binding.when.fast === true && binding.actions.some((action) => action.kind === 'model-switch'),
+  );
   const contextTiers = context.contextTiers ?? model.contextTiers;
   const defaultBudgetTokens = resolveProjectedDefaultBudget(model, observation, contextTiers);
   return {
@@ -278,20 +314,25 @@ function projectCompiledModel(
     controls: {
       ...model.controls,
       ...context.controls,
-      ...(fastBinding ? {
-        fast: model.controls.fast.state === 'selectable'
-          ? { ...model.controls.fast, entitlement: fastBinding.entitlement }
-          : model.controls.fast,
-      } : {}),
+      ...(fastBinding
+        ? {
+            fast:
+              model.controls.fast.state === 'selectable'
+                ? { ...model.controls.fast, entitlement: fastBinding.entitlement }
+                : model.controls.fast,
+          }
+        : {}),
       ...(reasoning ? { reasoning } : {}),
     },
     ...(executionBindings ? { executionBindings } : {}),
-    toolCalling: capabilities.has('toolCalling') && observation.toolCalling
-      ? observation.toolCalling : model.toolCalling,
-    visionInput: capabilities.has('visionInput') && observation.visionInput
-      ? observation.visionInput : model.visionInput,
-    structuredOutput: capabilities.has('structuredOutput') && observation.structuredOutput
-      ? observation.structuredOutput : model.structuredOutput,
+    toolCalling:
+      capabilities.has('toolCalling') && observation.toolCalling ? observation.toolCalling : model.toolCalling,
+    visionInput:
+      capabilities.has('visionInput') && observation.visionInput ? observation.visionInput : model.visionInput,
+    structuredOutput:
+      capabilities.has('structuredOutput') && observation.structuredOutput
+        ? observation.structuredOutput
+        : model.structuredOutput,
     ...(model.fixedTemperature !== undefined ? { fixedTemperature: model.fixedTemperature } : {}),
     factSource: {
       sourceKind: 'live-catalog',
@@ -306,9 +347,10 @@ function projectDynamicModel(
   observation: LiveModelObservation,
 ): CatalogModelContribution {
   const defaultRoute = surface.routes.find((route) => route.default) ?? surface.routes[0];
-  const route = observation.protocol && surface.routes.some((candidate) => candidate.protocol === observation.protocol)
-    ? surface.routes.find((candidate) => candidate.protocol === observation.protocol)!
-    : defaultRoute;
+  const route =
+    observation.protocol && surface.routes.some((candidate) => candidate.protocol === observation.protocol)
+      ? surface.routes.find((candidate) => candidate.protocol === observation.protocol)!
+      : defaultRoute;
   return {
     modelId: observation.modelId,
     aliases: observation.aliases,
@@ -321,19 +363,23 @@ function projectDynamicModel(
       contracts: route.contracts,
       source: 'catalog',
     },
-    ...(observation.contextWindowTokens ? {
-      contextTiers: [{
-        id: 'default',
-        label: 'Provider catalog limit',
-        maxPromptTokens: observation.contextWindowTokens,
-        ...(typeof observation.maxOutputTokens === 'number' && observation.maxOutputTokens > 0
-          ? { maxOutputTokens: observation.maxOutputTokens }
-          : {}),
-        activation: { kind: 'implicit' },
-        entitlement: 'granted',
-      }],
-      defaultBudgetTokens: observation.contextWindowTokens,
-    } : {}),
+    ...(observation.contextWindowTokens
+      ? {
+          contextTiers: [
+            {
+              id: 'default',
+              label: 'Provider catalog limit',
+              maxPromptTokens: observation.contextWindowTokens,
+              ...(typeof observation.maxOutputTokens === 'number' && observation.maxOutputTokens > 0
+                ? { maxOutputTokens: observation.maxOutputTokens }
+                : {}),
+              activation: { kind: 'implicit' },
+              entitlement: 'granted',
+            },
+          ],
+          defaultBudgetTokens: observation.contextWindowTokens,
+        }
+      : {}),
     ...(observation.toolCalling ? { toolCalling: observation.toolCalling } : {}),
     ...(observation.visionInput ? { visionInput: observation.visionInput } : {}),
     ...(observation.structuredOutput ? { structuredOutput: observation.structuredOutput } : {}),
@@ -351,10 +397,12 @@ export function projectLiveModelObservations(
     }
     unique.set(observation.modelId, observation);
   }
-  const availableModelIds = new Set(observations.flatMap((observation) => {
-    const definition = findDefinition(surface, observation);
-    return observation.availability === 'unavailable' ? [] : [definition?.modelId ?? observation.modelId];
-  }));
+  const availableModelIds = new Set(
+    observations.flatMap((observation) => {
+      const definition = findDefinition(surface, observation);
+      return observation.availability === 'unavailable' ? [] : [definition?.modelId ?? observation.modelId];
+    }),
+  );
   return observations.flatMap((observation) => {
     const definition = findDefinition(surface, observation);
     if (definition) return [projectCompiledModel(surface, definition, observation, availableModelIds)];

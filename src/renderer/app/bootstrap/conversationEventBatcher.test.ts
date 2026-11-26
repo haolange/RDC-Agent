@@ -70,10 +70,7 @@ describe('conversationEventBatcher', () => {
       message: { ...message('a1', 'final', 3), status: 'complete' },
     });
 
-    expect(applied).toEqual([
-      'message_patched:partial',
-      'message_completed:final',
-    ]);
+    expect(applied).toEqual(['message_patched:partial', 'message_completed:final']);
     expect(scheduled).toHaveLength(1);
   });
 });

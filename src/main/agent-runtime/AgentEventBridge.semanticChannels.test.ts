@@ -5,15 +5,16 @@ import type {
   AssistantMessageEvent,
   ProviderOutputRef,
   ThinkingContent,
-  ToolCall,
+  ToolCallContent,
 } from './core/types';
 
 describe('run start identity', () => {
   it('uses the resolved profile and rejects a missing identity', () => {
-    expect(translateCoreToSharedAgentEvent({ type: 'agent_start' }, { agentId: 'general', profileId: 'custom-agent' })?.payload)
-      .toMatchObject({ profileId: 'custom-agent' });
-    expect(() => translateCoreToSharedAgentEvent({ type: 'agent_start' }, {}))
-      .toThrow(/AGENT_IDENTITY_MISSING/);
+    expect(
+      translateCoreToSharedAgentEvent({ type: 'agent_start' }, { agentId: 'general', profileId: 'custom-agent' })
+        ?.payload,
+    ).toMatchObject({ profileId: 'custom-agent' });
+    expect(() => translateCoreToSharedAgentEvent({ type: 'agent_start' }, {})).toThrow(/AGENT_IDENTITY_MISSING/);
   });
 });
 
@@ -48,7 +49,7 @@ const thinking: ThinkingContent = {
 
   providerOutputRef: thinkingRef,
 };
-const toolCall: ToolCall = {
+const toolCall: ToolCallContent = {
   type: 'toolCall',
   id: 'call-1',
   name: 'read_file',
@@ -57,11 +58,7 @@ const toolCall: ToolCall = {
 };
 const message: AssistantMessage = {
   role: 'assistant',
-  content: [
-    { type: 'text', text: 'answer', providerOutputRef: textRef },
-    thinking,
-    toolCall,
-  ],
+  content: [{ type: 'text', text: 'answer', providerOutputRef: textRef }, thinking, toolCall],
   model: 'model',
   provider: 'provider',
   usage: { inputTokens: 1, outputTokens: 2, totalTokens: 3 },
@@ -94,31 +91,47 @@ describe('AgentEventBridge semantic channel refs', () => {
       partial: message,
     };
 
-    const textShared = translateCoreToSharedAgentEvent({
-      type: 'message_update',
-      assistantMessageEvent: textEvent,
-      message,
-    }, {});
-    const thinkingShared = translateCoreToSharedAgentEvent({
-      type: 'message_update',
-      assistantMessageEvent: thinkingEvent,
-      message,
-    }, {});
-    const toolShared = translateCoreToSharedAgentEvent({
-      type: 'message_update',
-      assistantMessageEvent: toolEvent,
-      message,
-    }, {});
-    const completedShared = translateCoreToSharedAgentEvent({
-      type: 'message_end',
-      message,
-    }, {});
+    const textShared = translateCoreToSharedAgentEvent(
+      {
+        type: 'message_update',
+        assistantMessageEvent: textEvent,
+        message,
+      },
+      {},
+    );
+    const thinkingShared = translateCoreToSharedAgentEvent(
+      {
+        type: 'message_update',
+        assistantMessageEvent: thinkingEvent,
+        message,
+      },
+      {},
+    );
+    const toolShared = translateCoreToSharedAgentEvent(
+      {
+        type: 'message_update',
+        assistantMessageEvent: toolEvent,
+        message,
+      },
+      {},
+    );
+    const completedShared = translateCoreToSharedAgentEvent(
+      {
+        type: 'message_end',
+        message,
+      },
+      {},
+    );
 
-    expect(textShared?.payload.providerOutputRef).toEqual(textRef);
-    expect((thinkingShared?.payload.thinking as { providerOutputRef?: ProviderOutputRef }).providerOutputRef).toEqual(thinkingRef);
-    expect(toolShared?.payload.providerOutputRef).toEqual(toolRef);
-    expect(completedShared?.payload.providerOutputRefs).toEqual([textRef]);
-    expect((completedShared?.payload.thinking as Array<{ providerOutputRef?: ProviderOutputRef }>)[0]?.providerOutputRef)
-      .toEqual(thinkingRef);
+    expect(textShared).toMatchObject({ type: 'assistant.delta', payload: { providerOutputRef: textRef } });
+    expect(thinkingShared).toMatchObject({
+      type: 'assistant.thinking_end',
+      payload: { thinking: { providerOutputRef: thinkingRef } },
+    });
+    expect(toolShared).toMatchObject({ type: 'tool.requested', payload: { providerOutputRef: toolRef } });
+    expect(completedShared).toMatchObject({
+      type: 'assistant.completed',
+      payload: { providerOutputRefs: [textRef], thinking: [{ providerOutputRef: thinkingRef }] },
+    });
   });
 });

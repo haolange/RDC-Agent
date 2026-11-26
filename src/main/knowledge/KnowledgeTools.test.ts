@@ -24,26 +24,32 @@ const card: KnowledgeCardRecord = {
 const spaces: KnowledgeSpace[] = [{ spaceId: 'user', kind: 'user', label: 'User', rootPath: '/tmp/knowledge' }];
 
 const queryResult: KnowledgeQueryResult = {
-  hits: [{
-    cardId: card.cardId,
-    contentHash: 'a'.repeat(64),
-    spaceId: card.spaceId,
-    relativePath: card.relativePath,
-    title: card.title,
-    type: card.type,
-    lifecycle: card.lifecycle,
-    score: 5,
-    lanes: ['Lexical'],
-  }],
+  hits: [
+    {
+      cardId: card.cardId,
+      contentHash: 'a'.repeat(64),
+      spaceId: card.spaceId,
+      relativePath: card.relativePath,
+      title: card.title,
+      type: card.type,
+      lifecycle: card.lifecycle,
+      score: 5,
+      lanes: ['Lexical'],
+    },
+  ],
   lanes: [{ lane: 'Lexical', hits: [] }],
 };
 
-function createTools(candidates: KnowledgeCandidateService = createDisposableCandidateService(
-  mkdtempSync(path.join(tmpdir(), 'rdc-knowledge-tools-')),
-)) {
+function createTools(
+  candidates: KnowledgeCandidateService = createDisposableCandidateService(
+    mkdtempSync(path.join(tmpdir(), 'rdc-knowledge-tools-')),
+  ),
+) {
   const query = {
     listSpaces: vi.fn(() => spaces),
-    listCards: vi.fn(async () => [{ cardId: card.cardId, spaceId: card.spaceId, relativePath: card.relativePath, title: card.title }]),
+    listCards: vi.fn(async () => [
+      { cardId: card.cardId, spaceId: card.spaceId, relativePath: card.relativePath, title: card.title },
+    ]),
     getCard: vi.fn(async () => ({ ...card, content: card.body, contentHash: 'a'.repeat(64) })),
     query: vi.fn(async () => queryResult),
   } as unknown as KnowledgeQueryService;
@@ -112,7 +118,9 @@ describe('KnowledgeTools', () => {
     const { byName } = createTools();
     const search = await byName.knowledge_search.execute('c3', { query: 'sample' });
     expect(String(search.content[0] && 'text' in search.content[0] ? search.content[0].text : '')).toContain('1 hits');
-    expect(String(search.content[0] && 'text' in search.content[0] ? search.content[0].text : '')).toContain(`sha256:${'a'.repeat(64)}`);
+    expect(String(search.content[0] && 'text' in search.content[0] ? search.content[0].text : '')).toContain(
+      `sha256:${'a'.repeat(64)}`,
+    );
     const compiled = await byName.knowledge_compile.execute('c4', { query: 'sample' });
     expect(compiled.details).toMatchObject({ packId: expect.stringMatching(/^pack:/), count: 1 });
     expect(compiled.details).toMatchObject({ hits: [{ cardId: card.cardId, contentHash: 'a'.repeat(64) }] });
@@ -121,20 +129,54 @@ describe('KnowledgeTools', () => {
 
   it('reads one card by space and path', async () => {
     const { byName, query } = createTools();
-    const result = await byName.knowledge_read.execute('c5', { spaceId: 'user', relativePath: 'facts/sample.md', contentHash: 'a'.repeat(64) });
+    const result = await byName.knowledge_read.execute('c5', {
+      spaceId: 'user',
+      relativePath: 'facts/sample.md',
+      contentHash: 'a'.repeat(64),
+    });
     expect(query.getCard).toHaveBeenCalledWith('user', 'facts/sample.md');
     expect(result.details).toMatchObject({ cardId: 'user:facts/sample.md', contentHash: 'a'.repeat(64), images: [] });
   });
 
   it('passes scope and versioned paging through search and reads an exact card section', async () => {
     const { byName, query } = createTools();
-    await byName.knowledge_search.execute('search', { query: 'sample', scope: { api: 'Vulkan' }, asOf: 42, offset: 20, limit: 10, expectedRevision: 'revision' });
-    expect(query.query).toHaveBeenCalledWith(expect.objectContaining({ text: 'sample', scope: { api: 'Vulkan' }, asOf: 42, offset: 20, limit: 10, expectedRevision: 'revision' }));
-    vi.mocked(query.getCard).mockResolvedValueOnce({ ...card, content: '# Main\n\n## Evidence\nsource\n\n## Other\nother', contentHash: 'a'.repeat(64) });
-    const result = await byName.knowledge_read.execute('read', { spaceId: 'user', relativePath: card.relativePath, mode: 'section', heading: 'Evidence', contentHash: 'a'.repeat(64) });
+    await byName.knowledge_search.execute('search', {
+      query: 'sample',
+      scope: { api: 'Vulkan' },
+      asOf: 42,
+      offset: 20,
+      limit: 10,
+      expectedRevision: 'revision',
+    });
+    expect(query.query).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'sample',
+        scope: { api: 'Vulkan' },
+        asOf: 42,
+        offset: 20,
+        limit: 10,
+        expectedRevision: 'revision',
+      }),
+    );
+    vi.mocked(query.getCard).mockResolvedValueOnce({
+      ...card,
+      content: '# Main\n\n## Evidence\nsource\n\n## Other\nother',
+      contentHash: 'a'.repeat(64),
+    });
+    const result = await byName.knowledge_read.execute('read', {
+      spaceId: 'user',
+      relativePath: card.relativePath,
+      mode: 'section',
+      heading: 'Evidence',
+      contentHash: 'a'.repeat(64),
+    });
     expect(result.content[0]).toMatchObject({ text: expect.stringContaining('## Evidence\nsource') });
     expect(result.content[0]).not.toMatchObject({ text: expect.stringContaining('## Other') });
-    const changed = await byName.knowledge_read.execute('read-stale', { spaceId: 'user', relativePath: card.relativePath, contentHash: 'b'.repeat(64) });
+    const changed = await byName.knowledge_read.execute('read-stale', {
+      spaceId: 'user',
+      relativePath: card.relativePath,
+      contentHash: 'b'.repeat(64),
+    });
     expect(changed.isError).toBe(true);
   });
 
@@ -146,7 +188,11 @@ describe('KnowledgeTools', () => {
       contentHash: 'a'.repeat(64),
       images: [{ relativePath: 'cases/sample/observed.png', role: 'observed' }],
     });
-    const result = await byName.knowledge_read.execute('c5b', { spaceId: 'user', relativePath: 'facts/sample.md', contentHash: 'a'.repeat(64) });
+    const result = await byName.knowledge_read.execute('c5b', {
+      spaceId: 'user',
+      relativePath: 'facts/sample.md',
+      contentHash: 'a'.repeat(64),
+    });
     const text = String(result.content[0] && 'text' in result.content[0] ? result.content[0].text : '');
     expect(text).toContain('cases/sample/observed.png');
     expect(text).toContain('observed');
@@ -157,41 +203,96 @@ describe('KnowledgeTools', () => {
 
   it('returns directly usable image arguments only inside the frozen Knowledge read scope', async () => {
     const root = mkdtempSync(path.join(tmpdir(), 'rdc-knowledge-image-ref-'));
-    const knowledge = path.join(root, 'knowledge'); mkdirSync(knowledge);
-    const imagePath = path.join(knowledge, 'reference.png'); writeFileSync(imagePath, 'small image fixture');
+    const knowledge = path.join(root, 'knowledge');
+    mkdirSync(knowledge);
+    const imagePath = path.join(knowledge, 'reference.png');
+    writeFileSync(imagePath, 'small image fixture');
     const { byName, query } = createTools(createDisposableCandidateService(path.join(root, 'candidates')));
-    vi.mocked(query.listSpaces).mockReturnValue([{ spaceId: 'user', kind: 'user', label: 'User', rootPath: knowledge }]);
-    vi.mocked(query.getCard).mockResolvedValue({ ...card, content: card.body, contentHash: 'a'.repeat(64),
-      images: [{ relativePath: 'reference.png', role: 'reference' }] });
-    const context = { workspaceRoot: root, projectRootPath: root, projectId: 'p', sessionId: 's', knowledgeReadRoots: [knowledge] };
+    vi.mocked(query.listSpaces).mockReturnValue([
+      { spaceId: 'user', kind: 'user', label: 'User', rootPath: knowledge },
+    ]);
+    vi.mocked(query.getCard).mockResolvedValue({
+      ...card,
+      content: card.body,
+      contentHash: 'a'.repeat(64),
+      images: [{ relativePath: 'reference.png', role: 'reference' }],
+    });
+    const context = {
+      workspaceRoot: root,
+      projectRootPath: root,
+      projectId: 'p',
+      sessionId: 's',
+      knowledgeReadRoots: [knowledge],
+    };
     try {
-      const result = await byName.knowledge_read.execute('image-ref', { spaceId: 'user', relativePath: card.relativePath, contentHash: 'a'.repeat(64) }, undefined, undefined, context);
-      expect(result.details).toMatchObject({ images: [{ relativePath: 'reference.png', role: 'reference', readImageArgs: { path: imagePath } }] });
+      const result = await byName.knowledge_read.execute(
+        'image-ref',
+        { spaceId: 'user', relativePath: card.relativePath, contentHash: 'a'.repeat(64) },
+        undefined,
+        undefined,
+        context,
+      );
+      expect(result.details).toMatchObject({
+        images: [{ relativePath: 'reference.png', role: 'reference', readImageArgs: { path: imagePath } }],
+      });
       expect(result.content[0]).toMatchObject({ text: expect.stringContaining(JSON.stringify({ path: imagePath })) });
-      const denied = await byName.knowledge_read.execute('no-image-scope', { spaceId: 'user', relativePath: card.relativePath, contentHash: 'a'.repeat(64) },
-        undefined, undefined, { ...context, knowledgeReadRoots: [] });
+      const denied = await byName.knowledge_read.execute(
+        'no-image-scope',
+        { spaceId: 'user', relativePath: card.relativePath, contentHash: 'a'.repeat(64) },
+        undefined,
+        undefined,
+        { ...context, knowledgeReadRoots: [] },
+      );
       expect(denied.details).toMatchObject({ images: [{ readError: 'KNOWLEDGE_IMAGE_READ_SCOPE_UNAVAILABLE' }] });
       expect(JSON.stringify(denied)).not.toContain(imagePath.replace(/\\/g, '\\\\'));
-    } finally { rmSync(root, { recursive: true, force: true }); }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it.each(['missing.png', '../private.png', 'linked/private.png', 'absolute'])(
-    'does not emit image read arguments for an invalid declared path: %s', async (declared) => {
+    'does not emit image read arguments for an invalid declared path: %s',
+    async (declared) => {
       const root = mkdtempSync(path.join(tmpdir(), 'rdc-knowledge-image-boundary-'));
-      const knowledge = path.join(root, 'knowledge'), outside = path.join(root, 'outside');
-      mkdirSync(knowledge); mkdirSync(outside); writeFileSync(path.join(outside, 'private.png'), 'private fixture');
+      const knowledge = path.join(root, 'knowledge'),
+        outside = path.join(root, 'outside');
+      mkdirSync(knowledge);
+      mkdirSync(outside);
+      writeFileSync(path.join(outside, 'private.png'), 'private fixture');
       symlinkSync(outside, path.join(knowledge, 'linked'), 'junction');
       const { byName, query } = createTools(createDisposableCandidateService(path.join(root, 'candidates')));
-      vi.mocked(query.listSpaces).mockReturnValue([{ spaceId: 'user', kind: 'user', label: 'User', rootPath: knowledge }]);
-      vi.mocked(query.getCard).mockResolvedValue({ ...card, content: card.body, contentHash: 'a'.repeat(64),
-        images: [{ relativePath: declared === 'absolute' ? path.join(outside, 'private.png') : declared, role: 'reference' }] });
+      vi.mocked(query.listSpaces).mockReturnValue([
+        { spaceId: 'user', kind: 'user', label: 'User', rootPath: knowledge },
+      ]);
+      vi.mocked(query.getCard).mockResolvedValue({
+        ...card,
+        content: card.body,
+        contentHash: 'a'.repeat(64),
+        images: [
+          { relativePath: declared === 'absolute' ? path.join(outside, 'private.png') : declared, role: 'reference' },
+        ],
+      });
       try {
-        const result = await byName.knowledge_read.execute('invalid-image', { spaceId: 'user', relativePath: card.relativePath, contentHash: 'a'.repeat(64) },
-          undefined, undefined, { workspaceRoot: root, projectRootPath: root, projectId: 'p', sessionId: 's', knowledgeReadRoots: [knowledge] });
+        const result = await byName.knowledge_read.execute(
+          'invalid-image',
+          { spaceId: 'user', relativePath: card.relativePath, contentHash: 'a'.repeat(64) },
+          undefined,
+          undefined,
+          {
+            workspaceRoot: root,
+            projectRootPath: root,
+            projectId: 'p',
+            sessionId: 's',
+            knowledgeReadRoots: [knowledge],
+          },
+        );
         expect(result.details).toMatchObject({ images: [{ readError: 'KNOWLEDGE_IMAGE_PATH_UNAVAILABLE' }] });
         expect(JSON.stringify(result)).not.toContain('readImageArgs');
-      } finally { rmSync(root, { recursive: true, force: true }); }
-    });
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it('creates a session candidate only after explicit intent and never as verified/promoted', async () => {
     const candidates = createDisposableCandidateService(mkdtempSync(path.join(tmpdir(), 'rdc-knowledge-tools-')));

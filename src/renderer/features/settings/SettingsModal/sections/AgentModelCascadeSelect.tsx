@@ -4,18 +4,17 @@ import { Icon } from '../../../../ui/Icon';
 import { Chevron } from '../../../../ui/Chevron';
 import { Popover } from '../../../../ui/Popover';
 import { SearchField } from '../../../../ui/SearchField';
+import { useI18n } from '../../../../i18n';
+import { PlainButton } from '../../../../ui/PlainButton';
 import { ProviderMark } from './ProviderMark';
 import {
   agentModelOptionAccessibleLabel,
   buildAgentModelGroups,
   isAgentModelSelectionInvalid,
 } from './agentModelCascadeModel';
-import type { useI18n } from '../../../../i18n';
 import type { AgentModelOption } from '@shared/types/agentManifest';
 
 export { agentModelOptionAccessibleLabel, isAgentModelSelectionInvalid };
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface AgentModelCascadeSelectProps {
   value: string;
@@ -23,7 +22,6 @@ interface AgentModelCascadeSelectProps {
   /** For one Agent: the first choice follows the default model, named in this label; choosing it clears the value. */
   followDefaultLabel?: string;
   onChange: (value: string) => void;
-  t: Translate;
 }
 
 /**
@@ -34,13 +32,14 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
   options,
   followDefaultLabel,
   onChange,
-  t,
 }) => {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
-  const selected = options.find((option) => option.canonicalId === value
-    && (option.configured || option.status === 'provider-unavailable'));
+  const selected = options.find(
+    (option) => option.canonicalId === value && (option.configured || option.status === 'provider-unavailable'),
+  );
   const invalidSelection = isAgentModelSelectionInvalid(value, options);
   const providerUnavailable = selected?.status === 'provider-unavailable';
   const groups = useMemo(() => buildAgentModelGroups(options, query), [options, query]);
@@ -52,9 +51,12 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
     if (items.length === 0) return;
     event.preventDefault();
     const current = items.indexOf(document.activeElement as HTMLButtonElement);
-    const index = event.key === 'Home' ? 0
-      : event.key === 'End' ? items.length - 1
-        : (current + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
+    const index =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? items.length - 1
+          : (current + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
     items[index]?.focus();
   };
 
@@ -64,9 +66,11 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
     setQuery('');
   };
 
-  const triggerPrimary = selected ? selected.modelLabel
-    : invalidSelection ? t('composer.model.unavailable')
-      : followDefaultLabel ?? t('settings.selectModelPlaceholder');
+  const triggerPrimary = selected
+    ? selected.modelLabel
+    : invalidSelection
+      ? t('composer.model.unavailable')
+      : (followDefaultLabel ?? t('settings.selectModelPlaceholder'));
   const followsDefault = Boolean(followDefaultLabel) && !value;
 
   return (
@@ -76,9 +80,8 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
         onOpenChange={setOpen}
         align="start"
         className="settings-model-cascade-menu"
-        trigger={(
-          <button
-            type="button"
+        trigger={
+          <PlainButton
             className="settings-model-cascade-trigger"
             data-testid="settings-model-cascade-trigger"
             aria-haspopup="listbox"
@@ -87,11 +90,16 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
           >
             <span className="settings-model-cascade-trigger-copy">
               <strong>{triggerPrimary}</strong>
-              {selected ? <span className="settings-service-title"><ProviderMark id={selected.providerId} size={14} />{selected.providerLabel}</span> : null}
+              {selected ? (
+                <span className="settings-service-title">
+                  <ProviderMark id={selected.providerId} size={14} />
+                  {selected.providerLabel}
+                </span>
+              ) : null}
             </span>
             <Chevron direction="down" />
-          </button>
-        )}
+          </PlainButton>
+        }
       >
         <div className="settings-model-cascade-search">
           <SearchField
@@ -105,9 +113,13 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
           />
         </div>
         {followDefaultLabel && !query ? (
-          <div className="settings-model-cascade-list" role="listbox" aria-label={t('settings.modelFieldLabel')} onKeyDown={onMenuKeyDown}>
-            <button
-              type="button"
+          <div
+            className="settings-model-cascade-list"
+            role="listbox"
+            aria-label={t('settings.modelFieldLabel')}
+            onKeyDown={onMenuKeyDown}
+          >
+            <PlainButton
               className={`settings-model-option settings-model-option--default${followsDefault ? ' is-selected' : ''}`}
               role="option"
               aria-selected={followsDefault}
@@ -118,7 +130,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
                 <span className="settings-model-option-label">{followDefaultLabel}</span>
               </span>
               {followsDefault ? <Icon name="check" size={14} className="settings-model-option-check" /> : null}
-            </button>
+            </PlainButton>
           </div>
         ) : null}
         {groups.length === 0 ? (
@@ -134,18 +146,26 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
             onKeyDown={onMenuKeyDown}
           >
             {groups.map((group) => (
-              <div key={group.providerId} className="settings-model-group" role="group" aria-label={group.label} data-provider-id={group.providerId}>
+              <div
+                key={group.providerId}
+                className="settings-model-group"
+                role="group"
+                aria-label={group.label}
+                data-provider-id={group.providerId}
+              >
                 <div className="settings-model-group-title">
-                  <span className="settings-service-title"><ProviderMark id={group.providerId} size={16} />{group.label}</span>
+                  <span className="settings-service-title">
+                    <ProviderMark id={group.providerId} size={16} />
+                    {group.label}
+                  </span>
                   <span>{group.availableCount}</span>
                 </div>
                 {group.options.map((option) => {
                   const accessibleLabel = agentModelOptionAccessibleLabel(option, t('settings.modelUnavailable'));
                   const selectedRow = option.canonicalId === value;
                   return (
-                    <button
+                    <PlainButton
                       key={option.canonicalId}
-                      type="button"
                       className={`settings-model-option${selectedRow ? ' is-selected' : ''}`}
                       data-provider-id={option.providerId}
                       data-model-id={option.modelId}
@@ -175,7 +195,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
                         </span>
                       ) : null}
                       {selectedRow ? <Icon name="check" size={14} className="settings-model-option-check" /> : null}
-                    </button>
+                    </PlainButton>
                   );
                 })}
               </div>

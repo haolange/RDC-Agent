@@ -1,7 +1,7 @@
 import { supersededAnswerLoopIds } from '@shared/conversation/loopItems';
 import { projectLlmTurn } from './workProcessLlmProjection';
 import { pushStandaloneBlock } from './workProcessStandaloneProjection';
-import type { Translator } from '../../i18n/messages';
+import type { LocalizedTranslator } from '../../i18n/messages';
 import type {
   ConversationLoopOutputPhase,
   ConversationLoopStopReason,
@@ -17,9 +17,8 @@ import type { WorkProcessRow } from './workProcessTypes';
 export type { LoopPresentationUnit, PresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
 
 export interface BlockProjectionContext {
-  t: Translator;
+  t: LocalizedTranslator;
   visibleThinkingKeys: Set<string>;
-  hasVisibleProcessEvidence: boolean;
   createToolRow: (call: import('@shared/types/conversation').ConversationToolCall) => WorkProcessRow;
   groupProcessRows: (rows: WorkProcessRow[]) => WorkProcessRow[];
   blocksToDetailRows: (blocks: ConversationWorkBlock[]) => WorkProcessRow[];
@@ -35,9 +34,12 @@ export interface ThinkingItemPresentation {
 }
 
 export interface LoopProjectionDeps {
-  resolveOutputPhase: (block: ConversationWorkBlock, hasVisibleProcessEvidence: boolean) => ConversationLoopOutputPhase;
+  resolveOutputPhase: (block: ConversationWorkBlock) => ConversationLoopOutputPhase;
   resolveReasoningState: (block: ConversationWorkBlock) => ConversationReasoningState;
-  resolveThinkingItem: (block: ConversationWorkBlock, item: ConversationThinkingItem) => ThinkingItemPresentation | null;
+  resolveThinkingItem: (
+    block: ConversationWorkBlock,
+    item: ConversationThinkingItem,
+  ) => ThinkingItemPresentation | null;
   isNonFinalStopReason: (stopReason?: ConversationLoopStopReason) => boolean;
   normalizeThinkingDedupKey: (value: string) => string;
   createApprovalRow: (block: ConversationWorkBlock) => WorkProcessRow;
@@ -55,20 +57,25 @@ export function buildPresentationUnits(
   const units: PresentationUnit[] = [];
   const snapshotsByLoop = new Map<string, ConversationWorkBlock[]>();
   const interactionsByLoop = new Map<string, ConversationWorkBlock[]>();
+  const loopIds = new Set(blocks.filter((block) => block.kind === 'llm_turn').map((block) => block.id));
   let previousLoop: string | undefined;
   for (const block of blocks) {
     if (block.kind === 'llm_turn') previousLoop = block.id;
     if (block.kind === 'user_input' || block.kind === 'plan_review') {
       const owner = block.parentLoopId;
-      if (owner && blocks.some((candidate) => candidate.kind === 'llm_turn' && candidate.id === owner)) {
-        interactionsByLoop.set(owner, [...(interactionsByLoop.get(owner) ?? []), block]);
+      if (owner && loopIds.has(owner)) {
+        const owned = interactionsByLoop.get(owner);
+        if (owned) owned.push(block);
+        else interactionsByLoop.set(owner, [block]);
       }
       continue;
     }
     if (block.kind !== 'task_snapshot') continue;
     const owner = block.parentLoopId ?? previousLoop;
-    if (!owner || !blocks.some((candidate) => candidate.kind === 'llm_turn' && candidate.id === owner)) continue;
-    snapshotsByLoop.set(owner, [...(snapshotsByLoop.get(owner) ?? []), block]);
+    if (!owner || !loopIds.has(owner)) continue;
+    const owned = snapshotsByLoop.get(owner);
+    if (owned) owned.push(block);
+    else snapshotsByLoop.set(owner, [block]);
   }
   // Answers the runtime sent back read as commentary, also in sessions recorded before the runtime said so.
   const superseded = supersededAnswerLoopIds(blocks);
@@ -79,17 +86,25 @@ export function buildPresentationUnits(
     const block = blocks[blockIndex];
 
     if (block.kind === 'llm_turn') {
-      const unit = projectLlmTurn(block, deps, ctx, snapshotsByLoop.get(block.id), interactionsByLoop.get(block.id), superseded.has(block.id));
+      const unit = projectLlmTurn(
+        block,
+        deps,
+        ctx,
+        snapshotsByLoop.get(block.id),
+        interactionsByLoop.get(block.id),
+        superseded.has(block.id),
+      );
       if (unit) units.push(unit);
       continue;
     }
 
-    if (!groupedSnapshots.has(block.id) && !groupedInteractions.has(block.id)) pushStandaloneBlock(block, units, deps, ctx);
-    }
+    if (!groupedSnapshots.has(block.id) && !groupedInteractions.has(block.id))
+      pushStandaloneBlock(block, units, deps, ctx);
+  }
 
   return units;
 }
 
 export function presentationUnitsToDetailRows(units: PresentationUnit[]): WorkProcessRow[] {
-  return units.flatMap((unit) => unit.kind === 'loop' || unit.kind === 'standalone' ? unit.rows : []);
+  return units.flatMap((unit) => unit.rows);
 }

@@ -1,13 +1,16 @@
 import { Input } from '../../../../ui/Input';
 import { SettingsField } from '../parts';
+import { useI18n } from '../../../../i18n';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
-import type { useI18n } from '../../../../i18n';
 
-export function AgentExecutionLimitField({ agent, onUpdateAgent, t }: {
+export function AgentExecutionLimitField({
+  agent,
+  onUpdateAgent,
+}: {
   agent: AgentManifestDraft;
   onUpdateAgent: (patch: Partial<AgentManifestDraft>) => void;
-  t: ReturnType<typeof useI18n>['t'];
 }) {
+  const { t } = useI18n();
   return (
     <SettingsField label={t('settings.agentMaxTurns')} description={t('settings.agentMaxTurnsHelp')}>
       <Input

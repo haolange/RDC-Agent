@@ -6,9 +6,22 @@ import type { EffectiveCatalogRequest } from './effectiveCatalogTypes';
 function configurationFacts(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(configurationFacts);
   if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(Object.entries(value).filter(([key]) => ![
-    'observedAt', 'refreshedAt', 'expiresAt', 'provenance', 'factSource', 'fieldFactSources', 'detail',
-  ].includes(key)).map(([key, child]) => [key, configurationFacts(child)]));
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(
+        ([key]) =>
+          ![
+            'observedAt',
+            'refreshedAt',
+            'expiresAt',
+            'provenance',
+            'factSource',
+            'fieldFactSources',
+            'detail',
+          ].includes(key),
+      )
+      .map(([key, child]) => [key, configurationFacts(child)]),
+  );
 }
 
 export class CatalogProjectionClock {
@@ -24,13 +37,20 @@ export class CatalogProjectionClock {
     return { generation, changed: true };
   }
 
-  generation(key: string): string | undefined { return this.scopes.get(key)?.generation; }
-  invalidate(key: string): void { this.scopes.delete(key); }
+  generation(key: string): string | undefined {
+    return this.scopes.get(key)?.generation;
+  }
+  invalidate(key: string): void {
+    this.scopes.delete(key);
+  }
 
   stamp(key: string, fingerprint: string): { scopeGeneration: string; projectionVersion: number } {
     const current = this.scopes.get(key);
     if (!current) throw new Error('Catalog projection has no configuration owner.');
-    if (current.fingerprint !== fingerprint) { current.version += 1; current.fingerprint = fingerprint; }
+    if (current.fingerprint !== fingerprint) {
+      current.version += 1;
+      current.fingerprint = fingerprint;
+    }
     return { scopeGeneration: current.generation, projectionVersion: current.version };
   }
 }

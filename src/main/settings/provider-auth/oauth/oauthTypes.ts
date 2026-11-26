@@ -1,8 +1,5 @@
-import type {
-  LlmProviderAccountDiagnostic,
-  LlmProviderAccountLoginMode,
-  LlmProviderId,
-} from '@shared/types/settings';
+import { z, type ZodType } from 'zod';
+import type { LlmProviderAccountDiagnostic, LlmProviderAccountLoginMode, LlmProviderId } from '@shared/types/settings';
 
 export interface OAuthFlowState {
   providerId: LlmProviderId;
@@ -51,6 +48,26 @@ export interface OAuthSecretBundle {
   planLabel?: string;
   resourceUrl?: string;
 }
+
+/** A stored account credential as the sign-in flows write it. */
+export const OAuthSecretBundleSchema: ZodType<OAuthSecretBundle> = z.object({
+  providerId: z.string(),
+  accessToken: z.string().optional(),
+  refreshToken: z.string().optional(),
+  apiKey: z.string().optional(),
+  copilotToken: z.string().optional(),
+  copilotApiBaseUrl: z.string().optional(),
+  copilotModelBilling: z.record(z.string(), z.unknown()).optional(),
+  idToken: z.string().optional(),
+  authorizationMode: z.enum(['browser', 'device']).optional(),
+  requestedScopes: z.string().optional(),
+  redirectUri: z.string().optional(),
+  accountId: z.string().optional(),
+  expiresAt: z.string().optional(),
+  accountLabel: z.string().optional(),
+  planLabel: z.string().optional(),
+  resourceUrl: z.string().optional(),
+});
 
 export interface GrokOAuthMetadata {
   authorizationEndpoint: string;

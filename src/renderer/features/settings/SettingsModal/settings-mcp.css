@@ -1,10 +1,4 @@
 /* MCP overview: a list of name · status · switch above the selected server. */
-.settings-runtime-scope[data-resource-kind='mcp'] .settings-resource-split {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
 .settings-runtime-scope[data-resource-kind='mcp'] .settings-resource-list-column {
   padding: 0;
   border: 0;
@@ -30,8 +24,13 @@
   transition: background var(--transition-fast);
 }
 
-.settings-mcp-row:hover { background: var(--token-interactive-hover); }
-.settings-mcp-row.is-selected { background: var(--token-interactive-active); }
+.settings-mcp-row:hover,
+.settings-mcp-row:focus-within {
+  background: var(--token-interactive-hover);
+}
+.settings-mcp-row.is-selected {
+  background: var(--token-interactive-active);
+}
 
 .settings-mcp-row-main {
   display: flex;
@@ -62,7 +61,9 @@
   font-size: var(--type-body-size);
 }
 
-.settings-mcp-detail { padding: var(--space-4) var(--space-1); }
+.settings-mcp-detail {
+  padding: var(--space-4) var(--space-1);
+}
 
 .settings-mcp-dialog .settings-runtime-form-grid {
   grid-template-columns: minmax(0, 1fr);

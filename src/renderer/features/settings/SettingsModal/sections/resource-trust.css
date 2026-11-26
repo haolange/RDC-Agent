@@ -13,14 +13,14 @@
   border-radius: var(--radius-full);
   background: var(--token-text-disabled);
 }
-.settings-mcp-status[data-status='connected']::before { background: var(--token-status-success); }
-.settings-mcp-status[data-status='error']::before { background: var(--token-status-error); }
-.settings-mcp-status[data-status='connecting']::before { background: var(--token-status-warning); }
-.settings-runtime-detail {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
+.settings-mcp-status[data-status='connected']::before {
+  background: var(--token-status-success);
+}
+.settings-mcp-status[data-status='error']::before {
+  background: var(--token-status-error);
+}
+.settings-mcp-status[data-status='connecting']::before {
+  background: var(--token-status-warning);
 }
 .settings-runtime-detail-head {
   display: flex;
@@ -42,7 +42,7 @@
 .settings-runtime-detail-title small {
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  font-weight: var(--font-regular);
+  font-weight: var(--font-normal);
 }
 .settings-runtime-detail-grid {
   display: grid;
@@ -88,20 +88,6 @@
   display: grid;
   gap: var(--space-1);
 }
-.settings-trust-block-head {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-.settings-trust-block-title {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--token-text-primary);
-  font-size: var(--type-body-size);
-  font-weight: var(--font-semibold);
-}
 .settings-trust-change {
   display: flex;
   align-items: flex-start;
@@ -109,11 +95,6 @@
   margin: 0;
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
-}
-.settings-trust-change .ui-icon {
-  flex: none;
-  margin-top: var(--space-0-5);
-  color: var(--token-status-warning);
 }
 .settings-trust-block-actions {
   margin-inline-start: auto;

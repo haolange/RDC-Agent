@@ -4,16 +4,37 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyTerminalAppend, prepareTerminalAppend } from './ConversationTerminalAppend';
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { SessionContextTurnEntry } from '../../conversation/SessionContextJournal';
+import type { SessionContextTurnEntry } from '../../agent-runtime/context/SessionContextJournal';
 
 describe('bounded terminal append transaction', () => {
   let root = '';
   const assistant = {
-    id: 'assistant', requestId: 'request', turnId: 'turn', role: 'assistant', content: '终态😀',
-    sessionId: 'session', projectId: 'project', createdAt: 1, updatedAt: 2, status: 'complete',
+    id: 'assistant',
+    requestId: 'request',
+    turnId: 'turn',
+    role: 'assistant',
+    content: '终态😀',
+    sessionId: 'session',
+    projectId: 'project',
+    createdAt: 1,
+    updatedAt: 2,
+    status: 'complete',
   } satisfies ConversationMessage;
   // This layer serializes the already-validated context entry, not its provider contract.
-  const context = { schemaVersion: 2, turnId: 'turn', assistantMessageId: 'assistant', messages: [] } as unknown as SessionContextTurnEntry;
+  const context = {
+    schemaVersion: 2,
+    turnId: 'turn',
+    userMessageId: 'user',
+    assistantMessageId: 'assistant',
+    branchId: 'root',
+    agentId: 'general',
+    executionIdentity: { fingerprint: 'route' },
+    controls: { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
+    status: 'complete',
+    messages: [],
+    createdAt: 1,
+    completedAt: 2,
+  } as unknown as SessionContextTurnEntry;
   const file = (name: string) => path.join(root, name);
   const prepare = () => prepareTerminalAppend(root, 'request', 'turn', assistant, context, true, false);
 
@@ -24,14 +45,21 @@ describe('bounded terminal append transaction', () => {
   });
   afterEach(() => {
     vi.restoreAllMocks();
-    if (root && path.dirname(root) === path.resolve(os.tmpdir()) && path.basename(root).startsWith('rdc-terminal-append-') && !fs.lstatSync(root).isSymbolicLink()) {
+    if (
+      root &&
+      path.dirname(root) === path.resolve(os.tmpdir()) &&
+      path.basename(root).startsWith('rdc-terminal-append-') &&
+      !fs.lstatSync(root).isSymbolicLink()
+    ) {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
   it('keeps the WAL proportional to one turn and never bulk-reads historical files', () => {
     fs.writeFileSync(file('session-context.jsonl'), `${JSON.stringify({ value: 'x'.repeat(1024 * 1024) })}\n`);
-    const bulkRead = vi.spyOn(fs, 'readFileSync').mockImplementation(() => { throw new Error('bulk read forbidden'); });
+    const bulkRead = vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+      throw new Error('bulk read forbidden');
+    });
     const wal = prepare();
     expect(wal.context.bytes).toBeGreaterThan(1024 * 1024);
     expect(JSON.stringify(wal).length).toBeLessThan(2000);
@@ -41,7 +69,10 @@ describe('bounded terminal append transaction', () => {
 
   it('rolls forward interrupted UTF8 appends and is idempotent', () => {
     const wal = prepare();
-    fs.appendFileSync(file('conversation.jsonl'), Buffer.from(wal.history.append).subarray(0, Buffer.byteLength(wal.history.append) - 5));
+    fs.appendFileSync(
+      file('conversation.jsonl'),
+      Buffer.from(wal.history.append).subarray(0, Buffer.byteLength(wal.history.append) - 5),
+    );
     applyTerminalAppend(root, wal, true);
     applyTerminalAppend(root, wal, true);
     expect(fs.readFileSync(file('conversation.jsonl'), 'utf8')).toBe(`{"id":"old"}\n${wal.history.append}`);
@@ -70,7 +101,12 @@ describe('bounded terminal append transaction', () => {
   it('recovers when the second file write failed after the first file committed', () => {
     const wal = prepare();
     const write = fs.writeSync;
-    const fault = vi.spyOn(fs, 'writeSync').mockImplementationOnce(write).mockImplementationOnce(() => { throw new Error('injected context write failure'); });
+    const fault = vi
+      .spyOn(fs, 'writeSync')
+      .mockImplementationOnce(write)
+      .mockImplementationOnce(() => {
+        throw new Error('injected context write failure');
+      });
     expect(() => applyTerminalAppend(root, wal, true)).toThrow('injected context write failure');
     fault.mockRestore();
     applyTerminalAppend(root, wal, true);
@@ -87,10 +123,32 @@ describe('bounded terminal append transaction', () => {
     expect(fs.readFileSync(file('session-context.jsonl'), 'utf8')).toBe(wal.context.append);
   });
 
-  it('rejects mismatched terminal ownership and invalid newline prefixes', () => {
+  it('rejects mismatched terminal ownership', () => {
     const wal = prepare();
     expect(() => applyTerminalAppend(root, { ...wal, turnId: 'other' }, true)).toThrow(/ownership/);
+  });
+
+  it('rejects a journaled record that is not the message it serialized before changing either file', () => {
+    const wal = prepare();
+    const before = fs.readFileSync(file('conversation.jsonl'));
+    const damaged = {
+      ...wal,
+      history: { ...wal.history, append: `${JSON.stringify({ id: 'assistant', role: 'assistant' })}\n` },
+    };
+    expect(() => applyTerminalAppend(root, damaged, true)).toThrow(
+      expect.objectContaining({ code: 'STORAGE_CORRUPT' }),
+    );
+    expect(fs.readFileSync(file('conversation.jsonl'))).toEqual(before);
+  });
+
+  it('journals a prefix that ends on a record boundary after an interrupted ordinary append', () => {
     fs.writeFileSync(file('session-context.jsonl'), '{"turnId":"old"}');
-    expect(prepare).toThrow(/newline-terminated/);
+    fs.writeFileSync(file('conversation.jsonl'), '{"id":"old"}\n{"id":"interrup');
+    const wal = prepare();
+    expect(fs.readFileSync(file('session-context.jsonl'), 'utf8')).toBe('{"turnId":"old"}\n');
+    expect(fs.readFileSync(file('conversation.jsonl'), 'utf8')).toBe('{"id":"old"}\n');
+    expect(fs.readdirSync(root).filter((name) => name.startsWith('conversation.jsonl.torn-'))).toHaveLength(1);
+    applyTerminalAppend(root, wal, true);
+    expect(fs.readFileSync(file('conversation.jsonl'), 'utf8')).toBe(`{"id":"old"}\n${wal.history.append}`);
   });
 });

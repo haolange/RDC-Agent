@@ -23,9 +23,7 @@ export function deriveToolExecutionEvidence(
   return evidence;
 }
 
-export function attachToolExecutionEvidence(
-  trace: ConversationWorkTrace,
-): ConversationWorkTrace {
+export function attachToolExecutionEvidence(trace: ConversationWorkTrace): ConversationWorkTrace {
   const toolEvidence = deriveToolExecutionEvidence(trace);
   return {
     ...trace,

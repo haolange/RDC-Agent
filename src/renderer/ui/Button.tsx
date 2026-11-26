@@ -28,27 +28,26 @@ const sizeClass: Record<ButtonSize, string> = {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  {
-    variant = 'secondary',
-    size = 'md',
-    className = '',
-    type = 'button',
-    children,
-    loading = false,
-    ...rest
-  },
+  { variant = 'secondary', size = 'md', className = '', type = 'button', children, loading = false, ...rest },
   ref,
 ) {
   return (
     <button
       ref={ref}
       type={type}
-      className={cn(variantClass[variant], sizeClass[size], (rest.disabled || loading) && 'is-disabled', loading && 'is-loading', className)}
+      className={cn(
+        variantClass[variant],
+        sizeClass[size],
+        (rest.disabled || loading) && 'is-disabled',
+        loading && 'is-loading',
+        className,
+      )}
       {...rest}
       disabled={rest.disabled || loading}
       aria-busy={loading || rest['aria-busy']}
     >
-      {loading && <Spinner size="sm" />}{children}
+      {loading && <Spinner size="sm" />}
+      {children}
     </button>
   );
 });

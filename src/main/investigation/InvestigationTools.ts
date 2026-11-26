@@ -1,10 +1,15 @@
 import {
   INVESTIGATION_ARTIFACT_KINDS,
   INVESTIGATION_ARTIFACT_STATUSES,
-  resolveInvestigationKind,
   type InvestigationMission,
 } from '@shared/types/renderdocInvestigation';
-import { delegatedArtifactOwner, resolveDelegatedArtifactRead, grantDelegatedOutput, assertDelegatedArtifactWrite } from '../sessions/artifacts/DelegatedArtifactAccess';
+import {
+  delegatedArtifactOwner,
+  resolveDelegatedArtifactRead,
+  grantDelegatedOutput,
+  assertDelegatedArtifactWrite,
+} from '../sessions/artifacts/DelegatedArtifactAccess';
+import { resolveInvestigationKind } from './investigationKindRegistry';
 import { InvestigationError, toInvestigationError } from './investigationErrors';
 import { getInvestigationRecordJsonSchema } from './investigationRecordSchemas';
 import { recordKeyOf } from './investigationRecordKeys';
@@ -36,12 +41,16 @@ function textResult<TDetails>(text: string, details: TDetails, isError = false):
 
 function errorResult(error: unknown): AgentToolResult<Record<string, unknown>> {
   const mapped = toInvestigationError(error);
-  return textResult(mapped.message, {
-    ok: false,
-    code: mapped.code,
-    invariantId: mapped.invariantId,
-    details: mapped.details,
-  }, true);
+  return textResult(
+    mapped.message,
+    {
+      ok: false,
+      code: mapped.code,
+      invariantId: mapped.invariantId,
+      details: mapped.details,
+    },
+    true,
+  );
 }
 
 function parseWriteStatus(value: unknown): 'draft' | 'ready' {
@@ -84,7 +93,8 @@ function createInvestigationSchemaTool(): AgentTool {
   return {
     name: 'investigation_schema',
     label: 'Read Investigation Schema',
-    description: 'Read the authoritative rdc.investigation.v1 input shape for one kind. This does not read records; use tool_search to activate investigation_read or investigation_list for existing records, or investigation_write to save one.',
+    description:
+      'Read the authoritative rdc.investigation.v1 input shape for one kind. This does not read records; use tool_search to activate investigation_read or investigation_list for existing records, or investigation_write to save one.',
     parameters: {
       type: 'object',
       required: ['kind'],
@@ -95,7 +105,7 @@ function createInvestigationSchemaTool(): AgentTool {
     permissionHint: 'readonly',
     spec: {
       isReadOnly: true,
-      isConcurrencySafe: true,
+      concurrency: 'shared',
       isDestructive: false,
       sideEffect: 'none',
       category: 'search',
@@ -103,18 +113,29 @@ function createInvestigationSchemaTool(): AgentTool {
     },
     async execute(_id, args) {
       const entry = resolveInvestigationKind(asString(args.kind));
-      if (!entry) return errorResult(new InvestigationError('INVESTIGATION_SCHEMA_INVALID', `unknown kind "${asString(args.kind)}"`));
+      if (!entry)
+        return errorResult(
+          new InvestigationError('INVESTIGATION_SCHEMA_INVALID', `unknown kind "${asString(args.kind)}"`),
+        );
       const recordSchema = getInvestigationRecordJsonSchema(entry.recordType);
-      const nextStep = 'Schema only. To retrieve an existing record, use tool_search query=investigation_read; to enumerate records, use tool_search query=investigation_list; to save a record, use tool_search query=investigation_write. Repeating this call does not retrieve record content.';
-      const recordIdPolicy = entry.kind === 'claim_set'
-        ? 'ClaimSet.items define ClaimRecords, not references to previously written claims. New claimIds must be unique; when versioning through supersedes, retain the IDs of continuing claims. Current items can be sources for report projections.'
-        : entry.kind === 'report'
-          ? 'A ready report projects existing ClaimRecords, including members of a current ClaimSet. Read the source ClaimSet and preserve each source claimId, epistemic and verification in compactProvenance.'
-          : entry.kind === 'evidence' || entry.kind === 'evidence_pack'
-            ? 'Write each artifactRefs URI and expectedHash once. The service derives stored contentHashes; omit that derived field even when copying a previously read record.'
-          : undefined;
+      const nextStep =
+        'Schema only. To retrieve an existing record, use tool_search query=investigation_read; to enumerate records, use tool_search query=investigation_list; to save a record, use tool_search query=investigation_write. Repeating this call does not retrieve record content.';
+      const recordIdPolicy =
+        entry.kind === 'claim_set'
+          ? 'ClaimSet.items define ClaimRecords, not references to previously written claims. New claimIds must be unique; when versioning through supersedes, retain the IDs of continuing claims. Current items can be sources for report projections.'
+          : entry.kind === 'report'
+            ? 'A ready report projects existing ClaimRecords, including members of a current ClaimSet. Read the source ClaimSet and preserve each source claimId, epistemic and verification in compactProvenance.'
+            : entry.kind === 'evidence' || entry.kind === 'evidence_pack'
+              ? 'Write each artifactRefs URI and expectedHash once. The service derives stored contentHashes; omit that derived field even when copying a previously read record.'
+              : undefined;
       return textResult(
-        JSON.stringify({ kind: entry.kind, recordType: entry.recordType, nextStep, recordIdPolicy, schema: recordSchema }),
+        JSON.stringify({
+          kind: entry.kind,
+          recordType: entry.recordType,
+          nextStep,
+          recordIdPolicy,
+          schema: recordSchema,
+        }),
         { ok: true, kind: entry.kind, recordType: entry.recordType, nextStep, recordIdPolicy, schema: recordSchema },
       );
     },
@@ -128,7 +149,8 @@ function createInvestigationReadTool(
   return {
     name: 'investigation_read',
     label: 'Read Investigation Artifact',
-    description: 'Read one session-owned rdc.investigation.v1 artifact by artifactId. Fails closed if the hash or schema does not match.',
+    description:
+      'Read one session-owned rdc.investigation.v1 artifact by artifactId. Fails closed if the hash or schema does not match.',
     parameters: {
       type: 'object',
       required: ['artifactId'],
@@ -140,7 +162,7 @@ function createInvestigationReadTool(
     permissionHint: 'readonly',
     spec: {
       isReadOnly: true,
-      isConcurrencySafe: true,
+      concurrency: 'shared',
       isDestructive: false,
       sideEffect: 'none',
       category: 'search',
@@ -149,12 +171,24 @@ function createInvestigationReadTool(
     async execute(_id, args) {
       try {
         const artifactId = asString(args.artifactId);
-        if (!artifactId) return errorResult(new InvestigationError('INVESTIGATION_SCHEMA_INVALID', 'artifactId is required'));
-        const result = deps.service.readRecord(delegatedArtifactOwner(sessionId) ?? sessionId, artifactId, asString(args.expectedHash) || undefined);
+        if (!artifactId)
+          return errorResult(new InvestigationError('INVESTIGATION_SCHEMA_INVALID', 'artifactId is required'));
+        const result = deps.service.readRecord(
+          delegatedArtifactOwner(sessionId) ?? sessionId,
+          artifactId,
+          asString(args.expectedHash) || undefined,
+        );
         if (sessionId) resolveDelegatedArtifactRead(sessionId, result.contentUri, result.contentHash);
         return textResult(
           `${result.manifest.kind}\t${result.manifest.status}\t${result.manifest.title}\nmetadata\t${JSON.stringify({ artifactId, status: result.manifest.status, contentRef: result.contentUri, contentHash: result.contentHash, supersedes: result.manifest.supersedes ?? null })}\n${JSON.stringify(result.record)}`,
-          { ok: true, artifactId, manifest: result.manifest, record: result.record, contentUri: result.contentUri, contentHash: result.contentHash },
+          {
+            ok: true,
+            artifactId,
+            manifest: result.manifest,
+            record: result.record,
+            contentUri: result.contentUri,
+            contentHash: result.contentHash,
+          },
         );
       } catch (error) {
         return errorResult(error);
@@ -170,7 +204,8 @@ function createInvestigationWriteTool(
   return {
     name: 'investigation_write',
     label: 'Write Investigation Artifact',
-    description: 'Write or version a session-owned rdc.investigation.v1 record through InvestigationArtifactService. Schema and invariants fail closed; ready is never set on invalid records. A delegated read grant does not authorize replacing its source record. Independent reviewers return findings and their own outputs; the owning parent versions parent records.',
+    description:
+      'Write or version a session-owned rdc.investigation.v1 record through InvestigationArtifactService. Schema and invariants fail closed; ready is never set on invalid records. A delegated read grant does not authorize replacing its source record. Independent reviewers return findings and their own outputs; the owning parent versions parent records.',
     parameters: {
       type: 'object',
       required: ['kind', 'mission', 'title', 'summary', 'record'],
@@ -182,26 +217,35 @@ function createInvestigationWriteTool(
         record: { type: 'object', description: 'Record body matching the kind schema' },
         sourceRefs: {
           type: 'array',
-          description: 'Required and non-empty for ready writes, including Challenges. Cite existing Investigation artifacts as {artifactId, expectedHash} from investigation_read/list. A record targetRef, worldStateId, or evidence artifactRefs does not replace these manifest provenance references.',
+          description:
+            'Required and non-empty for ready writes, including Challenges. Cite existing Investigation artifacts as {artifactId, expectedHash} from investigation_read/list. A record targetRef, worldStateId, or evidence artifactRefs does not replace these manifest provenance references.',
           items: {
             type: 'object',
             required: ['artifactId', 'expectedHash'],
             properties: {
               artifactId: { type: 'string' },
-              expectedHash: { type: 'string', description: 'Exact source contentHash from investigation_read/list, including the sha256: prefix (sha256:<64 hex>). Required for ready writes.' },
+              expectedHash: {
+                type: 'string',
+                description:
+                  'Exact source contentHash from investigation_read/list, including the sha256: prefix (sha256:<64 hex>). Required for ready writes.',
+              },
             },
           },
         },
         worldStateId: { type: 'string' },
         supersedes: { type: 'string' },
-        status: { type: 'string', description: 'Artifact readiness: draft or ready. Ready requires at least one valid sourceRefs entry; this is separate from Challenge record.status=open/resolved/wont_fix.' },
+        status: {
+          type: 'string',
+          description:
+            'Artifact readiness: draft or ready. Ready requires at least one valid sourceRefs entry; this is separate from Challenge record.status=open/resolved/wont_fix.',
+        },
         artifactId: { type: 'string' },
       },
     },
     permissionHint: 'session_mutation',
     spec: {
       isReadOnly: false,
-      isConcurrencySafe: false,
+      concurrency: 'exclusive',
       isDestructive: false,
       sideEffect: 'session',
       category: 'system',
@@ -217,9 +261,9 @@ function createInvestigationWriteTool(
           record: args.record,
           sourceRefs: Array.isArray(args.sourceRefs)
             ? args.sourceRefs.map((entry) => ({
-              artifactId: asString((entry as { artifactId?: unknown }).artifactId),
-              expectedHash: asString((entry as { expectedHash?: unknown }).expectedHash),
-            }))
+                artifactId: asString((entry as { artifactId?: unknown }).artifactId),
+                expectedHash: asString((entry as { expectedHash?: unknown }).expectedHash),
+              }))
             : undefined,
           worldStateId: asString(args.worldStateId) || undefined,
           supersedes: asString(args.supersedes) || undefined,
@@ -237,8 +281,9 @@ function createInvestigationWriteTool(
             assertDelegatedArtifactWrite(sessionId, previous.contentUri);
           }
           if (input.artifactId) {
-            const existing = deps.service.list(owner).find(item => item.artifactId === input.artifactId);
-            if (existing) assertDelegatedArtifactWrite(sessionId, deps.service.readRecord(owner, existing.artifactId).contentUri);
+            const existing = deps.service.list(owner).find((item) => item.artifactId === input.artifactId);
+            if (existing)
+              assertDelegatedArtifactWrite(sessionId, deps.service.readRecord(owner, existing.artifactId).contentUri);
           }
         }
         const result = deps.service.writeRecord(owner ?? sessionId, input);
@@ -262,18 +307,27 @@ function createInvestigationListTool(
   return {
     name: 'investigation_list',
     label: 'List Investigation Artifacts',
-    description: 'List session-owned rdc.investigation.v1 artifact manifests with contentUri and contentHash. Kind filters select artifact kinds, not records embedded in a ClaimSet. Use kind/status "any" (or omit a filter) to include every value; invalid filters fail instead of looking like an empty session. To delegate a record for child investigation_read, place its exact contentUri in the Capsule read refs; an artifactId in scope does not grant access. Does not invent a graph.',
+    description:
+      'List session-owned rdc.investigation.v1 artifact manifests with contentUri and contentHash. Kind filters select artifact kinds, not records embedded in a ClaimSet. Use kind/status "any" (or omit a filter) to include every value; invalid filters fail instead of looking like an empty session. To delegate a record for child investigation_read, place its exact contentUri in the Capsule read refs; an artifactId in scope does not grant access. Does not invent a graph.',
     parameters: {
       type: 'object',
       properties: {
-        kind: { type: 'string', enum: ['any', ...INVESTIGATION_ARTIFACT_KINDS], description: 'Exact kind, or "any" for all kinds.' },
-        status: { type: 'string', enum: ['any', ...INVESTIGATION_ARTIFACT_STATUSES], description: 'Exact status, or "any" for all statuses.' },
+        kind: {
+          type: 'string',
+          enum: ['any', ...INVESTIGATION_ARTIFACT_KINDS],
+          description: 'Exact kind, or "any" for all kinds.',
+        },
+        status: {
+          type: 'string',
+          enum: ['any', ...INVESTIGATION_ARTIFACT_STATUSES],
+          description: 'Exact status, or "any" for all statuses.',
+        },
       },
     },
     permissionHint: 'readonly',
     spec: {
       isReadOnly: true,
-      isConcurrencySafe: true,
+      concurrency: 'shared',
       isDestructive: false,
       sideEffect: 'none',
       category: 'search',
@@ -284,24 +338,43 @@ function createInvestigationListTool(
         const owner = delegatedArtifactOwner(sessionId);
         const kind = parseListFilter(args.kind, 'kind');
         const status = parseListFilter(args.status, 'status');
-        const items = deps.service.list(owner ?? sessionId, {
-          kind,
-          status,
-        }).filter(item => {
-          if (!owner || !sessionId) return true;
-          const result = deps.service.readRecord(owner, item.artifactId);
-          try { resolveDelegatedArtifactRead(sessionId, result.contentUri, result.contentHash); return true; } catch { return false; }
-        });
-        const lines = items.map((item) => JSON.stringify({ artifactId: item.artifactId, kind: item.kind, status: item.status, recordKey: item.recordKey, contentUri: item.contentUri, contentHash: item.contentHash, supersedes: item.supersedes ?? null }));
-        const summary = lines.length > 0 ? `artifacts\t${items.length}\n${lines.join('\n')}`
-          : kind || status ? 'No Investigation artifacts match the requested filters.' : 'No Investigation artifacts in this session.';
-        const claimSetNote = kind === 'claim'
-          ? '\nThis filter lists standalone Claim artifacts only. Current ClaimSet items are also ClaimRecord sources; list and read an accessible claim_set to use its members.'
-          : '';
-        return textResult(
-          summary + claimSetNote,
-          { ok: true, count: items.length, artifacts: items },
+        const items = deps.service
+          .list(owner ?? sessionId, {
+            kind,
+            status,
+          })
+          .filter((item) => {
+            if (!owner || !sessionId) return true;
+            const result = deps.service.readRecord(owner, item.artifactId);
+            try {
+              resolveDelegatedArtifactRead(sessionId, result.contentUri, result.contentHash);
+              return true;
+            } catch {
+              return false;
+            }
+          });
+        const lines = items.map((item) =>
+          JSON.stringify({
+            artifactId: item.artifactId,
+            kind: item.kind,
+            status: item.status,
+            recordKey: item.recordKey,
+            contentUri: item.contentUri,
+            contentHash: item.contentHash,
+            supersedes: item.supersedes ?? null,
+          }),
         );
+        const summary =
+          lines.length > 0
+            ? `artifacts\t${items.length}\n${lines.join('\n')}`
+            : kind || status
+              ? 'No Investigation artifacts match the requested filters.'
+              : 'No Investigation artifacts in this session.';
+        const claimSetNote =
+          kind === 'claim'
+            ? '\nThis filter lists standalone Claim artifacts only. Current ClaimSet items are also ClaimRecord sources; list and read an accessible claim_set to use its members.'
+            : '';
+        return textResult(summary + claimSetNote, { ok: true, count: items.length, artifacts: items });
       } catch (error) {
         return errorResult(error);
       }

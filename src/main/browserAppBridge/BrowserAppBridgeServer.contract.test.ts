@@ -1,11 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  buildBridgeAuthCookie,
-  resolveProvidedBridgeToken,
-  tokensMatch,
-} from './bridgeSecurity';
+import { buildBridgeAuthCookie, resolveProvidedBridgeToken, tokensMatch } from './bridgeSecurity';
 import type { AddressInfo } from 'net';
 
 /**
@@ -105,7 +101,7 @@ describe('BrowserAppBridge /qa auth contract', () => {
     const response = await fetch(`${started.baseUrl}/app`);
     expect(response.status).toBe(401);
     expect(response.headers.get('content-type')).toMatch(/application\/json/);
-    const payload = await response.json() as { success: boolean; error: string };
+    const payload = (await response.json()) as { success: boolean; error: string };
     expect(payload.success).toBe(false);
     expect(payload.error).toBe('Unauthorized');
   });

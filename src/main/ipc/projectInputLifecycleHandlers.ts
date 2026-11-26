@@ -1,9 +1,11 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { AppError } from '@shared/errors/appError';
+import { isBrowserQaFullAccessRun } from '../runtime/browserQaRun';
 import { ProjectInputLifecycle } from '../rdc/captures/ProjectInputLifecycle';
 import { replayHistoryStore } from '../rdc/captures/replay/ReplayHistoryStore';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { rdcSessionService } from '../sessions';
+import { projectWorkspaceStore } from '../sessions/store/sessionStores';
+import { rdcSessionService } from '../rdc/RdcSessionService';
 import { conversationService } from '../conversation/ConversationService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { settingsService } from '../settings/settings-core/SettingsService';
@@ -11,38 +13,57 @@ import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { ProjectInputPrepareRemoveArgsSchema, ProjectInputRemoveArgsSchema } from './validation/projectSessionSchemas';
 import type { WorkbenchIpcContext } from './workbenchContext';
+import type { ProjectInputRemovePreparation } from '@shared/types/session';
 
-export const projectInputLifecycle = new ProjectInputLifecycle({
-  getProject: (id) => storageAdapter.getProjectById(id),
-  refresh: (id) => storageAdapter.refreshProjectInputs(id),
-  detachReference: (id, inputId) => storageAdapter.projects.detachProjectInputReference(id, inputId),
-  bindings: (id) => rdcSessionService.listBindingsForProject(id),
-  close: (projectId, inputId) => rdcSessionService.closeMatchingCaptures(projectId, inputId),
-  rebind: (projectId, inputId, input) => rdcSessionService.rebindInput(projectId, inputId, input),
-  block: (projectId, inputId, operation) => rdcSessionService.blockInputOperations(projectId, inputId, operation),
-  stop: async (sessionId) => {
-    const result = await conversationService.cancelActiveTurn({ sessionId });
-    if (!result.success) throw new Error(result.error || 'PROJECT_INPUT_STOP_FAILED');
+export const projectInputLifecycle = new ProjectInputLifecycle(
+  {
+    getProject: (id) => projectWorkspaceStore.getProjectById(id),
+    refresh: (id) => projectWorkspaceStore.refreshProjectInputs(id),
+    detachReference: (id, inputId) => projectWorkspaceStore.detachProjectInputReference(id, inputId),
+    bindings: (id) => rdcSessionService.listBindingsForProject(id),
+    close: (projectId, inputId) => rdcSessionService.closeMatchingCaptures(projectId, inputId),
+    rebind: (projectId, inputId, input) => rdcSessionService.rebindInput(projectId, inputId, input),
+    block: (projectId, inputId, operation) => rdcSessionService.blockInputOperations(projectId, inputId, operation),
+    stop: async (sessionId) => {
+      await conversationService.cancelActiveTurn({ sessionId });
+    },
   },
-}, replayHistoryStore);
+  replayHistoryStore,
+);
 
-async function confirmRemoval(fileName: string, filePath: string, sessions: string[], reference: boolean): Promise<boolean> {
+async function confirmRemoval(
+  fileName: string,
+  filePath: string,
+  sessions: string[],
+  reference: boolean,
+): Promise<boolean> {
   const owner = BrowserWindow.getFocusedWindow() ?? undefined;
-  if (process.env.RDC_AGENT_BROWSER_QA === '1' && !owner) return process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS === '1';
-  if (!owner) return false;
-  const english = settingsService.getAll().appearance.language === 'en';
-  const action = english ? (reference ? 'Remove reference' : 'Delete capture') : (reference ? '移除引用' : '删除抓帧');
+  if (!owner) return isBrowserQaFullAccessRun();
+  const english = settingsService.snapshot().user.appearance.language === 'en';
+  const action = english ? (reference ? 'Remove reference' : 'Delete capture') : reference ? '移除引用' : '删除抓帧';
   const consequence = english
-    ? (reference ? 'Associated replays will close and the reference will be removed. The external RDC original will be kept. '
-      : 'Associated replays will close and this RDC file will be deleted. ')
-    : (reference ? '将关闭关联回放并移除登记，保留外部 RDC 原件。' : '将关闭关联回放并删除这个 RDC 文件。');
+    ? reference
+      ? 'Associated replays will close and the reference will be removed. The external RDC original will be kept. '
+      : 'Associated replays will close and this RDC file will be deleted. '
+    : reference
+      ? '将关闭关联回放并移除登记，保留外部 RDC 原件。'
+      : '将关闭关联回放并删除这个 RDC 文件。';
   const history = english
     ? 'Associated replay history will also be cleared when no other input references the same content. Chats, reports and formal investigation evidence will be kept.'
     : '没有其他同内容输入引用时，也会清理各会话关联的回放足迹。聊天、报告和正式调查证据保留。';
   const result = await dialog.showMessageBox(owner, {
-    type: 'warning', buttons: [action, english ? 'Cancel' : '取消'], defaultId: 1, cancelId: 1, noLink: true,
-    title: english ? (reference ? 'Remove external capture reference' : 'Delete project capture')
-      : (reference ? '移除外部抓帧引用' : '删除项目抓帧'),
+    type: 'warning',
+    buttons: [action, english ? 'Cancel' : '取消'],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+    title: english
+      ? reference
+        ? 'Remove external capture reference'
+        : 'Delete project capture'
+      : reference
+        ? '移除外部抓帧引用'
+        : '删除项目抓帧',
     message: english ? `${action} ${fileName}?` : `${reference ? '移除引用' : '删除'} ${fileName}？`,
     detail: `${filePath}\n\n${consequence}${history}${sessions.length ? `\n${english ? 'Associated sessions: ' : '关联会话：'}${sessions.join(', ')}` : ''}`,
   });
@@ -51,29 +72,57 @@ async function confirmRemoval(fileName: string, filePath: string, sessions: stri
 
 /** Installs one reconciliation path for imports, refresh, startup and file changes. */
 export function registerProjectInputLifecycleHandlers(context: WorkbenchIpcContext): void {
-  storageAdapter.projects.setInputReconciler((project, inputs) => projectInputLifecycle.reconcile(project, inputs));
-  storageAdapter.projects.setInputCommitListener((projectId, inputs) => context.broadcastToRenderer('project:inputsChanged', { projectId, inputs }));
-  ipcMain.handle('project:inputs:prepareRemove', async (_event, ...rawArgs: unknown[]) => {
-    try {
-      const [projectId, inputId] = parseIpcArgs(ProjectInputPrepareRemoveArgsSchema, rawArgs, { label: 'project:inputs:prepareRemove', maxBytes: 4096 });
+  projectWorkspaceStore.setInputReconciler((project, inputs) => projectInputLifecycle.reconcile(project, inputs));
+  projectWorkspaceStore.setInputCommitListener((projectId, inputs) =>
+    context.broadcastToRenderer('project:inputsChanged', { projectId, inputs }),
+  );
+  // `null` when the person declines the confirmation dialog.
+  ipcMain.handle(
+    'project:inputs:prepareRemove',
+    async (_event, ...rawArgs: unknown[]): Promise<ProjectInputRemovePreparation | null> => {
+      const [projectId, inputId] = parseIpcArgs(ProjectInputPrepareRemoveArgsSchema, rawArgs, {
+        label: 'project:inputs:prepareRemove',
+        maxBytes: 4096,
+      });
       const prepared = await projectInputLifecycle.prepare(projectId, inputId);
-      if (!await confirmRemoval(prepared.input.fileName, prepared.input.filePath, prepared.affectedSessionIds,
-        prepared.input.source === 'external_reference')) return { success: false };
-      const approvalToken = ipcApprovalTokenService.issue({ action: 'project.input.delete', scope: 'project',
-        projectRoot: prepared.project.rootPath, name: prepared.approvalIdentity });
-      return { success: true, approvalToken, input: prepared.input, affectedSessionIds: prepared.affectedSessionIds };
-    } catch (error) { return { success: false, error: error instanceof Error ? error.message : String(error) }; }
-  });
+      if (
+        !(await confirmRemoval(
+          prepared.input.fileName,
+          prepared.input.filePath,
+          prepared.affectedSessionIds,
+          prepared.input.source === 'external_reference',
+        ))
+      )
+        return null;
+      const approvalToken = ipcApprovalTokenService.issue({
+        action: 'project.input.delete',
+        scope: 'project',
+        projectRoot: prepared.project.rootPath,
+        name: prepared.approvalIdentity,
+      });
+      return { approvalToken, input: prepared.input, affectedSessionIds: prepared.affectedSessionIds };
+    },
+  );
   ipcMain.handle('project:inputs:remove', async (_event, ...rawArgs: unknown[]) => {
-    try {
-      const [projectId, inputId, token] = parseIpcArgs(ProjectInputRemoveArgsSchema, rawArgs, { label: 'project:inputs:remove', maxBytes: 4096 });
-      const prepared = await projectInputLifecycle.prepare(projectId, inputId);
-      if (!ipcApprovalTokenService.consume({ token, action: 'project.input.delete', scope: 'project',
-        projectRoot: prepared.project.rootPath, name: prepared.approvalIdentity })) throw new Error('PROJECT_INPUT_APPROVAL_INVALID');
-      const result = await projectInputLifecycle.remove(projectId, inputId, prepared.approvalIdentity);
-      if (result.success || result.fileDeleted) context.broadcastToRenderer('project:inputsChanged', { projectId, inputs: result.inputs });
-      return result;
-    } catch (error) { return { success: false, inputs: [], error: error instanceof Error ? error.message : String(error) }; }
+    const [projectId, inputId, token] = parseIpcArgs(ProjectInputRemoveArgsSchema, rawArgs, {
+      label: 'project:inputs:remove',
+      maxBytes: 4096,
+    });
+    const prepared = await projectInputLifecycle.prepare(projectId, inputId);
+    if (
+      !ipcApprovalTokenService.consume({
+        token,
+        action: 'project.input.delete',
+        scope: 'project',
+        projectRoot: prepared.project.rootPath,
+        name: prepared.approvalIdentity,
+      })
+    )
+      throw new AppError('PROJECT_INPUT_APPROVAL_INVALID');
+    const result = await projectInputLifecycle.remove(projectId, inputId, prepared.approvalIdentity);
+    if (result.success || result.fileDeleted)
+      context.broadcastToRenderer('project:inputsChanged', { projectId, inputs: result.inputs });
+    return result;
   });
   installProjectInputWatchers(context);
 }
@@ -86,25 +135,39 @@ function installProjectInputWatchers(context: WorkbenchIpcContext): void {
     const message = error instanceof Error ? error.message : String(error);
     if (lastErrors.get(projectId) === message) return;
     lastErrors.set(projectId, message);
-    runtimeLogService.log({ scope: 'app', namespace: 'context', severity: 'error', projectId,
-      title: 'Project capture reconciliation failed', summary: message });
+    runtimeLogService.log({
+      scope: 'app',
+      namespace: 'context',
+      severity: 'error',
+      projectId,
+      title: 'Project capture reconciliation failed',
+      summary: message,
+    });
     context.broadcastToRenderer('project:inputsError', { projectId, error: message });
   };
   const refresh = (projectId: string) => {
     if (pending.has(projectId)) clearTimeout(pending.get(projectId));
-    pending.set(projectId, setTimeout(() => {
-      pending.delete(projectId);
-      void storageAdapter.refreshProjectInputs(projectId).then(inputs => {
-        lastErrors.delete(projectId);
-        context.broadcastToRenderer('project:inputsChanged', { projectId, inputs });
-      }).catch(error => report(projectId, error));
-    }, 250));
+    pending.set(
+      projectId,
+      setTimeout(() => {
+        pending.delete(projectId);
+        void projectWorkspaceStore
+          .refreshProjectInputs(projectId)
+          .then((inputs) => {
+            lastErrors.delete(projectId);
+            context.broadcastToRenderer('project:inputsChanged', { projectId, inputs });
+          })
+          .catch((error) => report(projectId, error));
+      }, 250),
+    );
   };
   const sync = () => {
-    const projects = storageAdapter.listProjects();
-    for (const [projectId, watcher] of watchers) if (!projects.some(project => project.projectId === projectId)) {
-      watcher.close(); watchers.delete(projectId);
-    }
+    const projects = projectWorkspaceStore.listProjects();
+    for (const [projectId, watcher] of watchers)
+      if (!projects.some((project) => project.projectId === projectId)) {
+        watcher.close();
+        watchers.delete(projectId);
+      }
     for (const project of projects) {
       if (watchers.has(project.projectId)) continue;
       try {
@@ -112,12 +175,19 @@ function installProjectInputWatchers(context: WorkbenchIpcContext): void {
           const name = filename?.toString().replace(/\\/gu, '/').toLowerCase();
           // Windows also reports a parent-directory change for our own project.yaml and
           // replay-lock writes. Only creation/removal of the resource root changes inputs.
-          if ((event === 'rename' && name === '.rdc-agent') || name === '.rdc-agent/inputs' || name?.startsWith('.rdc-agent/inputs/')) refresh(project.projectId);
+          if (
+            (event === 'rename' && name === '.rdc-agent') ||
+            name === '.rdc-agent/inputs' ||
+            name?.startsWith('.rdc-agent/inputs/')
+          )
+            refresh(project.projectId);
         });
-        watcher.on('error', error => report(project.projectId, error));
+        watcher.on('error', (error) => report(project.projectId, error));
         watchers.set(project.projectId, watcher);
         refresh(project.projectId);
-      } catch (error) { report(project.projectId, error); }
+      } catch (error) {
+        report(project.projectId, error);
+      }
     }
   };
   sync();
@@ -127,6 +197,7 @@ function installProjectInputWatchers(context: WorkbenchIpcContext): void {
     clearInterval(timer);
     for (const timeout of pending.values()) clearTimeout(timeout);
     for (const watcher of watchers.values()) watcher.close();
-    pending.clear(); watchers.clear();
+    pending.clear();
+    watchers.clear();
   });
 }

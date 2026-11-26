@@ -1,33 +1,25 @@
 .plan-card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: 100%;
   padding: var(--transcript-card-padding);
   border: var(--transcript-card-border);
   border-radius: var(--transcript-card-radius);
-  background: var(--token-bg-panel);
+  background: var(--token-bg-raised);
   color: var(--token-text-primary);
   text-align: left;
   min-width: 0;
   cursor: var(--cursor-pointer, pointer);
 }
 
-.plan-card.is-process {
-  background: var(--token-bg-raised);
-  gap: var(--space-2);
+.plan-card:hover {
+  border-color: var(--token-border-focus);
 }
-
-.plan-card.is-process .plan-card__title {
-  font-size: var(--type-body-size);
+.plan-card:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
 }
-
-.plan-card.is-process .plan-card__preview {
-  max-height: min(4lh, 24dvh);
-}
-
-.plan-card:hover { border-color: var(--token-border-focus); }
-.plan-card:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset); }
 
 .plan-card__head {
   display: flex;
@@ -40,7 +32,7 @@
 
 .plan-card__title {
   margin: 0;
-  font-size: var(--type-title-size);
+  font-size: var(--type-body-size);
   font-weight: var(--font-semibold);
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -50,7 +42,7 @@
 }
 
 .plan-card__preview {
-  max-height: min(6lh, 28dvh);
+  max-height: min(4lh, 24dvh);
   overflow: hidden;
   overflow-wrap: anywhere;
   font-size: var(--type-body-size);
@@ -60,19 +52,22 @@
 }
 
 .plan-card__preview.is-overflowing {
-  mask-image: linear-gradient(to bottom,
+  mask-image: linear-gradient(
+    to bottom,
     black var(--plan-fade-start),
-    rgb(0 0 0 / 94%) calc(var(--plan-fade-start) + var(--plan-fade-length) * .25),
-    rgb(0 0 0 / 75%) calc(var(--plan-fade-start) + var(--plan-fade-length) * .5),
-    rgb(0 0 0 / 44%) calc(var(--plan-fade-start) + var(--plan-fade-length) * .75),
-    transparent calc(var(--plan-fade-start) + var(--plan-fade-length)));
+    rgb(0 0 0 / 94%) calc(var(--plan-fade-start) + var(--plan-fade-length) * 0.25),
+    rgb(0 0 0 / 75%) calc(var(--plan-fade-start) + var(--plan-fade-length) * 0.5),
+    rgb(0 0 0 / 44%) calc(var(--plan-fade-start) + var(--plan-fade-length) * 0.75),
+    transparent calc(var(--plan-fade-start) + var(--plan-fade-length))
+  );
 }
 
-.plan-card__preview .markdown-body { font-size: inherit; }
-.plan-card__preview .markdown-body > :first-child { margin-top: 0; }
-.plan-card__preview .markdown-body > :last-child { margin-bottom: 0; }
-
-/* The plan a reply delivers sits after Working, in the reply flow. */
-.plan-deliverable {
-  min-width: 0;
+.plan-card__preview .markdown-body {
+  font-size: inherit;
+}
+.plan-card__preview .markdown-body > :first-child {
+  margin-top: 0;
+}
+.plan-card__preview .markdown-body > :last-child {
+  margin-bottom: 0;
 }

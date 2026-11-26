@@ -5,8 +5,14 @@ import type { SessionRecord } from '@shared/types/session';
 const Context = createContext<ReturnType<typeof useTurnControls> | null>(null);
 
 /** One owner survives switching between the editor and a plan review revision. */
-export function ComposerTurnControlsProvider({ agentId, currentSession, children }: {
-  agentId: string; currentSession: SessionRecord | null; children: ReactNode;
+export function ComposerTurnControlsProvider({
+  agentId,
+  currentSession,
+  children,
+}: {
+  agentId: string;
+  currentSession: SessionRecord | null;
+  children: ReactNode;
 }) {
   const controls = useTurnControls(agentId, currentSession);
   return <Context.Provider value={controls}>{children}</Context.Provider>;

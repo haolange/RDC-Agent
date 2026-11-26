@@ -1,6 +1,6 @@
 import { toolResultToSharedResult } from '../agent-runtime/AgentEventBridge';
+import { upsertRuntimeToolCall } from '../agent-runtime/workTrace/ConversationWorkTrace';
 import { buildConversationToolCompletion } from './ConversationToolCompletion';
-import { upsertRuntimeToolCall } from './ConversationWorkTrace';
 import type { Message } from '../agent-runtime/core/types';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 
@@ -13,12 +13,22 @@ export function reconcileTerminalToolReceipts(
   if (!Number.isFinite(turnStartedAt)) return trace;
   let next = trace;
   for (const message of messages) {
-    if (message.role !== 'toolResult' || !Number.isFinite(message.timestamp) || message.timestamp < turnStartedAt) continue;
+    if (message.role !== 'toolResult' || !Number.isFinite(message.timestamp) || message.timestamp < turnStartedAt)
+      continue;
     const call = next?.blocks.flatMap((block) => block.toolCalls).find((entry) => entry.id === message.toolCallId);
-    if (!call || call.toolName !== message.toolName || !Number.isFinite(call.startedAt)
-      || call.startedAt < turnStartedAt || message.timestamp < call.startedAt
-      || (call.status !== 'pending' && call.status !== 'running')) continue;
-    const result = toolResultToSharedResult(message, call.executionStartedAt === undefined ? 0 : message.timestamp - call.executionStartedAt);
+    if (
+      !call ||
+      call.toolName !== message.toolName ||
+      !Number.isFinite(call.startedAt) ||
+      call.startedAt < turnStartedAt ||
+      message.timestamp < call.startedAt ||
+      (call.status !== 'pending' && call.status !== 'running')
+    )
+      continue;
+    const result = toolResultToSharedResult(
+      message,
+      call.executionStartedAt === undefined ? 0 : message.timestamp - call.executionStartedAt,
+    );
     const patch = buildConversationToolCompletion(call.id, call.toolName, result, call, message.timestamp);
     next = upsertRuntimeToolCall(next, patch);
   }

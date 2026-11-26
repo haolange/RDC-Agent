@@ -30,12 +30,7 @@ export const SECRET_PATTERNS = [
   { name: 'deepseek', source: 'sk-[0-9a-f]{32}(?![0-9a-f])', grep: 'sk-[0-9a-f]{32}' },
 ];
 
-export const ALLOWED_TOKENS = new Set([
-  'sk-test',
-  'sk-custom',
-  'sk-or-fixture',
-  'secret',
-]);
+export const ALLOWED_TOKENS = new Set(['sk-test', 'sk-custom', 'sk-or-fixture', 'secret']);
 
 const compiled = SECRET_PATTERNS.map((pattern) => ({
   name: pattern.name,
@@ -107,11 +102,18 @@ export function findSecretsInDiff(diffText) {
   let file = '';
   let newLine = 0;
   for (const line of String(diffText ?? '').split('\n')) {
-    if (line.startsWith('diff ') || line.startsWith('index ') || line.startsWith('--- ')
-      || line.startsWith('new file') || line.startsWith('deleted file')
-      || line.startsWith('similarity ') || line.startsWith('rename ')
-      || line.startsWith('old mode') || line.startsWith('new mode')
-      || line.startsWith('Binary file')) {
+    if (
+      line.startsWith('diff ') ||
+      line.startsWith('index ') ||
+      line.startsWith('--- ') ||
+      line.startsWith('new file') ||
+      line.startsWith('deleted file') ||
+      line.startsWith('similarity ') ||
+      line.startsWith('rename ') ||
+      line.startsWith('old mode') ||
+      line.startsWith('new mode') ||
+      line.startsWith('Binary file')
+    ) {
       continue;
     }
     if (line.startsWith('+++ ')) {
@@ -144,9 +146,7 @@ function isResolvableCommit(cwd, sha) {
 }
 
 export function resolveSecretScanRange({ cwd = process.cwd(), env = process.env } = {}) {
-  const candidate = String(
-    env.RDC_DIFF_BASE || env.GITHUB_BASE_SHA || env.GITHUB_EVENT_BEFORE || '',
-  ).trim();
+  const candidate = String(env.RDC_DIFF_BASE || env.GITHUB_BASE_SHA || env.GITHUB_EVENT_BEFORE || '').trim();
   if (isResolvableCommit(cwd, candidate)) {
     return { mode: 'base', base: candidate, head: 'HEAD' };
   }

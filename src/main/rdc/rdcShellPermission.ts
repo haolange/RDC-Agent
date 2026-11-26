@@ -1,14 +1,18 @@
-import { fileOperationBoundary } from '../agent-runtime/permissions/FileOperationBoundary';
-import {
-  registerRdcShellBaseline,
-  type AgentPermissionDecision,
-  type AgentPermissionDecisionInput,
-} from '../agent-runtime/permissions/AgentPermissionPolicy';
+import { fileOperationBoundary } from '../runtime/FileOperationBoundary';
 import { assertRdcDiscovery, parseShellRdcInput } from './RdcShellInput';
-import { assertRdcBindingOwnership, authorizeRdcOperation, rdcCatalogCapabilitySummary, rdcOperationCapability } from './RdcOperationPolicy';
+import {
+  assertRdcBindingOwnership,
+  authorizeRdcOperation,
+  rdcCatalogCapabilitySummary,
+  rdcOperationCapability,
+} from './RdcOperationPolicy';
 import { readRdcHostControls } from './RdcHostControls';
+import type {
+  AgentPermissionDecision,
+  AgentPermissionDecisionInput,
+} from '../agent-runtime/permissions/AgentPermissionPolicy';
 import type { AgentAccessCeiling } from '@shared/types/agentManifest';
-import type { RdcOperationDefinition } from '@shared/types/tool';
+import type { RdcOperationDefinition } from './RdcOperationCatalog';
 import type { AgentPermissionMode } from '@shared/types/settings';
 
 function request(
@@ -20,8 +24,8 @@ function request(
   return { action: 'ask_user', reason, risk, temporaryPathRoots: [] };
 }
 
-function denied(reason: string, risk: AgentPermissionDecision['risk'] = 'high'): AgentPermissionDecision {
-  return { action: 'deny', reason, risk, temporaryPathRoots: [] };
+function denied(reason: string): AgentPermissionDecision {
+  return { action: 'deny', reason, risk: 'high', temporaryPathRoots: [] };
 }
 
 export function evaluateRdcShellBaseline(
@@ -48,9 +52,14 @@ export function evaluateRdcShellBaseline(
     }
     return mode === 'full-access'
       ? { action: 'allow', risk: 'low', temporaryPathRoots: [] }
-      : request(mode, `Frozen RDC catalog ${rdcRequest.discovery.kind}; reads definitions without native execution.`, 'low');
+      : request(
+          mode,
+          `Frozen RDC catalog ${rdcRequest.discovery.kind}; reads definitions without native execution.`,
+          'low',
+        );
   }
-  if (!input.executionContext) return request(mode, `Native RDC operation requires verified execution context: ${rdcRequest.operation}`, 'high');
+  if (!input.executionContext)
+    return request(mode, `Native RDC operation requires verified execution context: ${rdcRequest.operation}`, 'high');
   try {
     const lease = assertRdcBindingOwnership(input.executionContext);
     const admitted = authorizeRdcOperation(
@@ -64,19 +73,22 @@ export function evaluateRdcShellBaseline(
     const changesShader = effects.includes('shader_replacement');
     const protectedPaths = admitted.definition.path_inputs.some((entry) => {
       const values = admitted.args[entry.name];
-      return (Array.isArray(values) ? values : [values]).some((value) => typeof value === 'string' && fileOperationBoundary(value).protected);
-    });
-    const decision = mode === 'full-access'
-      ? { action: 'allow' as const, risk: 'low' as const, temporaryPathRoots: [] }
-      : request(
-        mode,
-        protectedPaths
-          ? 'Protected native filesystem input requires specific authorization.'
-          : changesShader
-            ? 'Owned replay shader change requires authorization review.'
-            : 'Validated operation within the owning replay and workspace.',
-        protectedPaths ? 'high' : changesShader ? 'medium' : 'low',
+      return (Array.isArray(values) ? values : [values]).some(
+        (value) => typeof value === 'string' && fileOperationBoundary(value).protected,
       );
+    });
+    const decision =
+      mode === 'full-access'
+        ? { action: 'allow' as const, risk: 'low' as const, temporaryPathRoots: [] }
+        : request(
+            mode,
+            protectedPaths
+              ? 'Protected native filesystem input requires specific authorization.'
+              : changesShader
+                ? 'Owned replay shader change requires authorization review.'
+                : 'Validated operation within the owning replay and workspace.',
+            protectedPaths ? 'high' : changesShader ? 'medium' : 'low',
+          );
     const definitions = input.executionContext.rdcBinding!.definitions as readonly RdcOperationDefinition[];
     return {
       ...decision,
@@ -98,19 +110,21 @@ export function evaluateRdcShellBaseline(
         rollbackContracts: changesShader
           ? definitions.filter((item) => item.evidence_kind === 'rollback' && rdcOperationCapability(item).available)
           : undefined,
-        hostControls: changesShader || protectedPaths
-          ? readRdcHostControls({
-            sessionId: input.executionContext.sessionId!,
-            projectId: input.executionContext.projectId!,
-            contextId: lease.contextId,
-            leaseVersion: lease.version,
-          }, input.executionContext)
-          : undefined,
+        hostControls:
+          changesShader || protectedPaths
+            ? readRdcHostControls(
+                {
+                  sessionId: input.executionContext.sessionId!,
+                  projectId: input.executionContext.projectId!,
+                  contextId: lease.contextId,
+                  leaseVersion: lease.version,
+                },
+                input.executionContext,
+              )
+            : undefined,
       },
     };
   } catch (error) {
     return denied(error instanceof Error ? error.message : String(error));
   }
 }
-
-registerRdcShellBaseline(evaluateRdcShellBaseline);

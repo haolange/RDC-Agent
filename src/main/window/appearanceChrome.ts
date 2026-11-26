@@ -24,7 +24,7 @@ export function windowBackgroundColor(appearance: UiPreferences): string {
 
 /** Repaints every window's native background after the theme or the system appearance changes. */
 export function applyWindowBackgrounds(): void {
-  const color = windowBackgroundColor(settingsService.getAll().appearance);
+  const color = windowBackgroundColor(settingsService.snapshot().user.appearance);
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.setBackgroundColor(color);
   }

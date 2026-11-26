@@ -1,21 +1,17 @@
 import { generateEventId } from '@shared/utils/id';
+import type { TraceEvent } from './TraceEventStore';
 import type {
-  TraceEvent,
   TraceNode,
   ToolActionNode,
   PhaseGroupNode,
   FinalResponseNode,
   SubAgentNode,
   ErrorNode,
-} from '@shared/types/agenticTrace';
-import type { AgentProfile } from '@shared/types/agenticTrace';
+} from './traceNodes';
+import type { AgentProfile } from './manifests/traceManifest';
 
-const isTraceNode = (payload: unknown): payload is TraceNode => (
-  typeof payload === 'object'
-  && payload !== null
-  && 'kind' in payload
-  && 'id' in payload
-);
+const isTraceNode = (payload: unknown): payload is TraceNode =>
+  typeof payload === 'object' && payload !== null && 'kind' in payload && 'id' in payload;
 
 export class TraceTreeBuilder {
   build(events: TraceEvent[], profile: AgentProfile): TraceNode[] {
@@ -23,12 +19,12 @@ export class TraceTreeBuilder {
     let currentPhase: PhaseGroupNode | null = null;
     let seq = 0;
 
-    const pushNode = (node: TraceNode, parentId?: string) => {
+    const pushNode = (node: TraceNode) => {
       const withMeta = {
         ...node,
         seq: seq++,
-        parentId: parentId ?? node.parentId,
-        visibility: node.visibility ?? 'user',
+        // A stored payload passes only the kind/id check (isTraceNode), so its visibility may be missing.
+        visibility: (node as Partial<TraceNode>).visibility ?? 'user',
       } as TraceNode;
       if (currentPhase && node.kind !== 'phase_group' && node.kind !== 'task_frame') {
         currentPhase.children.push(withMeta);
@@ -47,7 +43,7 @@ export class TraceTreeBuilder {
         runId: events[0]?.runId ?? '',
         kind: 'phase_group',
         title,
-        phase: (profile.phases.find((p) => p.phaseId === phaseId)?.phaseId as PhaseGroupNode['phase']) ?? 'custom',
+        phase: (profile.phases.find((p) => p.phaseId === phaseId)?.phaseId ?? 'custom') as PhaseGroupNode['phase'],
         children: [],
         status: 'running',
         seq: seq++,
@@ -82,7 +78,7 @@ export class TraceTreeBuilder {
           const node = event.payload as TraceNode;
           if (node.kind === 'phase_group') {
             closePhase();
-            currentPhase = { ...node, children: node.kind === 'phase_group' ? (node as PhaseGroupNode).children : [] } as PhaseGroupNode;
+            currentPhase = { ...node, children: node.children };
             continue;
           }
           pushNode(node);
@@ -104,11 +100,10 @@ export class TraceTreeBuilder {
         continue;
       }
 
-      if (event.type === 'run.completed') {
-        closePhase();
-        if (isTraceNode(event.payload)) {
-          pushNode(event.payload as FinalResponseNode);
-        }
+      // run.completed
+      closePhase();
+      if (isTraceNode(event.payload)) {
+        pushNode(event.payload as FinalResponseNode);
       }
     }
 

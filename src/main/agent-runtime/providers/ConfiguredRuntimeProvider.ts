@@ -21,16 +21,10 @@ import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
 import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
 import { streamWithUnauthorizedRefresh } from './AccountStreamRetry';
 import { createGitLabDuoProvider, createSapAiCoreProvider } from './DedicatedAiSdkProviders';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Model,
-  StreamOptions,
-} from '../core/types';
+import type { AssistantMessage, AssistantMessageEvent, Context, Model, StreamOptions } from '../core/types';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { LlmProviderProtocol } from '@shared/types/settings';
-import type { LLMProviderConfig } from '@shared/types/llm';
+import type { LLMProviderConfig } from '../../settings/provider-auth/ProviderRuntimeCredentialService';
 
 const CONFIGURED_PROVIDER_API = 'rdc-agent-configured-provider';
 
@@ -227,11 +221,14 @@ function createProviderStrategy(
       });
     case 'sap-ai-core-orchestration':
     case 'sap-ai-core-foundation-models':
-      return createSapAiCoreProvider({
-        apiKey: provider.apiKey,
-        baseUrl: provider.baseUrl,
-        connectionValues,
-      }, protocol as Extract<LlmProviderProtocol, 'SapAiCoreOrchestration' | 'SapAiCoreFoundationModels'>);
+      return createSapAiCoreProvider(
+        {
+          apiKey: provider.apiKey,
+          baseUrl: provider.baseUrl,
+          connectionValues,
+        },
+        protocol as Extract<LlmProviderProtocol, 'SapAiCoreOrchestration' | 'SapAiCoreFoundationModels'>,
+      );
     default:
       throw new Error(`Provider adapter "${adapterId}" is not available in the agent runtime provider path.`);
   }
@@ -251,17 +248,13 @@ function missingProviderStream(error: Error): EventStream<AssistantMessageEvent,
 export class ConfiguredRuntimeProvider implements ProviderStrategy {
   readonly api = CONFIGURED_PROVIDER_API;
 
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage> {
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     const decoded = decodeAgentModel(model);
     const requestPlan = options.requestPlan;
     if (requestPlan.providerId !== decoded.providerId) {
-      return missingProviderStream(new Error(
-        `RequestPlan provider ${requestPlan.providerId} does not match ${decoded.providerId}.`,
-      ));
+      return missingProviderStream(
+        new Error(`RequestPlan provider ${requestPlan.providerId} does not match ${decoded.providerId}.`),
+      );
     }
     let credentialLease: ReturnType<typeof providerRuntimeCredentialService.get>;
     try {
@@ -270,9 +263,9 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
       return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
     }
     if (!credentialLease || !options.credentialHandle) {
-      return missingProviderStream(new Error(
-        `A frozen runtime credential handle is required for ${decoded.providerId}.`,
-      ));
+      return missingProviderStream(
+        new Error(`A frozen runtime credential handle is required for ${decoded.providerId}.`),
+      );
     }
     const provider = credentialLease.provider;
     const protocol = requestPlan.route.protocol;
@@ -292,11 +285,13 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
       } catch (error) {
         return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
       }
-      if (!activeLease) return missingProviderStream(new Error(`Provider ${decoded.providerId} credential lease was released.`));
+      if (!activeLease)
+        return missingProviderStream(new Error(`Provider ${decoded.providerId} credential lease was released.`));
       const latest = activeLease.provider;
-      const latestBaseUrl = protocol === 'OllamaOpenAICompatibleChatCompletions'
-        ? normalizeLocalBaseUrl(requestPlan.route.baseUrl ?? latest.baseUrl)
-        : requestPlan.route.baseUrl ?? latest.baseUrl;
+      const latestBaseUrl =
+        protocol === 'OllamaOpenAICompatibleChatCompletions'
+          ? normalizeLocalBaseUrl(requestPlan.route.baseUrl ?? latest.baseUrl)
+          : (requestPlan.route.baseUrl ?? latest.baseUrl);
       const connectionValues = activeLease.connectionValues;
       const createWithApiKey = (
         apiKey: string,

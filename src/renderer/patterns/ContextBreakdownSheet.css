@@ -100,7 +100,9 @@
   font-size: var(--type-body-size);
 }
 
-.context-breakdown-budget dt { color: var(--token-text-secondary); }
+.context-breakdown-budget dt {
+  color: var(--token-text-secondary);
+}
 
 .context-breakdown-budget dd {
   margin: 0;

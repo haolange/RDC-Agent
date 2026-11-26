@@ -8,10 +8,18 @@ let root: Root;
 let container: HTMLDivElement;
 const onSelect = vi.fn();
 const render = async (overrides: Partial<Parameters<typeof AgentListItem>[0]> = {}) => {
-  await act(async () => root.render(createElement(AgentListItem, {
-    id: 'analyzer', name: 'Analyzer', description: '用于证据分析。',
-    selected: false, onSelect, ...overrides,
-  })));
+  await act(async () =>
+    root.render(
+      createElement(AgentListItem, {
+        id: 'analyzer',
+        name: 'Analyzer',
+        description: '用于证据分析。',
+        selected: false,
+        onSelect,
+        ...overrides,
+      }),
+    ),
+  );
 };
 
 beforeEach(() => {

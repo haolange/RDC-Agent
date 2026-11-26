@@ -1,6 +1,9 @@
-import { fileIdentity } from '../../runtime/fileIdentity';
+import path from 'path';
+import { appPathService } from '../../runtime/AppPathService';
+import { canonicalRealpath, fileIdentity } from '../../runtime/fileIdentity';
+import { TrustStore } from '../../runtime/TrustStore';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { ProjectTrustStore } from '../settings-core/ProjectTrustStore';
+import { fileStamp } from '../../runtime/externalInput';
 
 /**
  * A project Agent profile changes instructions, tools and delegation for every turn in that project,
@@ -8,22 +11,43 @@ import { ProjectTrustStore } from '../settings-core/ProjectTrustStore';
  * bytes. Profiles the user saves through Settings are trusted as written.
  */
 export class ProjectAgentTrust {
-  private readonly store: ProjectTrustStore;
+  private readonly store: TrustStore;
+  private readonly storePath: () => string;
+  private revisionValue = 0;
 
-  constructor(explicitStorePath?: string) {
-    this.store = new ProjectTrustStore('agent-trust.json', explicitStorePath);
+  constructor() {
+    this.storePath = () => path.join(appPathService.getAppStatePaths().appStateRoot, 'agent-trust.json');
+    this.store = new TrustStore(this.storePath);
+  }
+
+  /** Changes with every trust decision made through the app. */
+  get revision(): number {
+    return this.revisionValue;
+  }
+
+  /** Stamp of the trust file, so a decision edited outside the app is noticed when inputs are re-checked. */
+  stamp(): string {
+    return fileStamp(this.storePath());
   }
 
   isTrusted(projectRoot: string, agentId: string, sourcePath: string): boolean {
-    return this.store.isTrusted(projectRoot, agentId, projectAgentFingerprint(sourcePath));
+    return this.store.isTrusted(
+      'project',
+      canonicalRealpath(projectRoot),
+      agentId,
+      projectAgentFingerprint(sourcePath),
+    );
   }
 
   trust(projectRoot: string, agentId: string, sourcePath: string): void {
-    this.store.trust(projectRoot, agentId, projectAgentFingerprint(sourcePath));
+    this.store.trust('project', canonicalRealpath(projectRoot), agentId, projectAgentFingerprint(sourcePath));
+    this.revisionValue += 1;
   }
 
   revoke(projectRoot: string, agentId: string): void {
-    this.store.revoke(projectRoot, agentId);
+    const owner = canonicalRealpath(projectRoot).toLowerCase();
+    this.store.revoke((record) => record.ownerRealpath.toLowerCase() === owner && record.resourceId === agentId);
+    this.revisionValue += 1;
   }
 }
 

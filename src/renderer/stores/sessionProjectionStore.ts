@@ -3,11 +3,7 @@ import { useConversationStore } from './conversationStore';
 import { useWorkflowStore } from './workflowStore';
 import { useCaptureStore } from './captureStore';
 import { useSessionStore } from './sessionStore';
-import {
-  acceptsContextUsage,
-  applyContextUsage,
-  markContextTurnTerminal,
-} from './contextUsageProjectionModel';
+import { acceptsContextUsage, applyContextUsage, markContextTurnTerminal } from './contextUsageProjectionModel';
 import {
   createEmptySessionProjection,
   updateProjectionMessages,

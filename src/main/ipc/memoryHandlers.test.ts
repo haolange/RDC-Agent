@@ -1,4 +1,6 @@
-vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: { language: electronState.language } }) } }));
+vi.mock('../settings/settings-core/SettingsService', () => ({
+  settingsService: { snapshot: () => ({ revision: 1, user: { appearance: { language: electronState.language } } }) },
+}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dialog } from 'electron';
 
@@ -16,6 +18,7 @@ const { handlers, electronState } = vi.hoisted(() => {
 });
 
 vi.mock('electron', () => ({
+  app: { isPackaged: false },
   BrowserWindow: {
     getFocusedWindow: () => electronState.focused,
     getAllWindows: () => [],
@@ -43,22 +46,28 @@ describe('memory mutation approval boundaries', () => {
 
   it('rejects headless Browser QA memory approval without full access', async () => {
     process.env.RDC_AGENT_BROWSER_QA = '1';
-    const result = await handlers.get('memory:issueApprovalToken')!({ }, {
-      action: 'memory.write',
-      scope: 'user',
-      name: 'qa-memory',
-    });
-    expect(result).toEqual({ error: 'Memory mutation was not confirmed by the main-process dialog.' });
+    const result = await handlers.get('memory:issueApprovalToken')!(
+      {},
+      {
+        action: 'memory.write',
+        scope: 'user',
+        name: 'qa-memory',
+      },
+    );
+    expect(result).toEqual({ cancelled: true });
   });
 
   it('auto-confirms Browser QA memory approval only with full access', async () => {
     process.env.RDC_AGENT_BROWSER_QA = '1';
     process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS = '1';
-    const result = await handlers.get('memory:issueApprovalToken')!({ }, {
-      action: 'memory.write',
-      scope: 'user',
-      name: 'qa-memory',
-    });
+    const result = await handlers.get('memory:issueApprovalToken')!(
+      {},
+      {
+        action: 'memory.write',
+        scope: 'user',
+        name: 'qa-memory',
+      },
+    );
     expect(result).toMatchObject({ token: expect.any(String) });
   });
 
@@ -69,11 +78,14 @@ describe('memory mutation approval boundaries', () => {
     const showMessageBox = vi.mocked(dialog.showMessageBox);
     showMessageBox.mockClear();
 
-    const result = await handlers.get('memory:issueApprovalToken')!({ }, {
-      action: 'memory.write',
-      scope: 'user',
-      name: 'focused-qa-memory',
-    });
+    const result = await handlers.get('memory:issueApprovalToken')!(
+      {},
+      {
+        action: 'memory.write',
+        scope: 'user',
+        name: 'focused-qa-memory',
+      },
+    );
 
     expect(result).toMatchObject({ token: expect.any(String) });
     expect(showMessageBox).toHaveBeenCalledOnce();
@@ -81,24 +93,39 @@ describe('memory mutation approval boundaries', () => {
 
   it('uses the native dialog for desktop approval', async () => {
     electronState.focused = {};
-    const result = await handlers.get('memory:issueApprovalToken')!({ }, {
-      action: 'memory.delete',
-      scope: 'project',
-      name: 'desktop-memory',
-    });
+    const result = await handlers.get('memory:issueApprovalToken')!(
+      {},
+      {
+        action: 'memory.delete',
+        scope: 'project',
+        name: 'desktop-memory',
+      },
+    );
     expect(result).toMatchObject({ token: expect.any(String) });
   });
 });
 
-it.each([['zh-CN', '确认更改记忆', '取消'], ['en', 'Confirm memory change', 'Cancel']])('localizes %s native confirmation and issues no token after cancellation', async (language, title, cancel) => {
+it.each([
+  ['zh-CN', '确认更改记忆', '取消'],
+  ['en', 'Confirm memory change', 'Cancel'],
+])('localizes %s native confirmation and issues no token after cancellation', async (language, title, cancel) => {
   delete process.env.RDC_AGENT_BROWSER_QA;
   registerMemoryHandlers({} as never);
   electronState.focused = {};
   electronState.language = language;
   vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 1, checkboxChecked: false });
-  const result = await handlers.get('memory:issueApprovalToken')!({}, { action: 'memory.write', scope: 'user', name: 'language-test' });
+  const result = await handlers.get('memory:issueApprovalToken')!(
+    {},
+    { action: 'memory.write', scope: 'user', name: 'language-test' },
+  );
   expect(result).not.toHaveProperty('token');
-  expect(dialog.showMessageBox).toHaveBeenLastCalledWith(expect.any(Object), expect.objectContaining({
-    title, buttons: [expect.any(String), cancel], defaultId: 1, cancelId: 1,
-  }));
+  expect(dialog.showMessageBox).toHaveBeenLastCalledWith(
+    expect.any(Object),
+    expect.objectContaining({
+      title,
+      buttons: [expect.any(String), cancel],
+      defaultId: 1,
+      cancelId: 1,
+    }),
+  );
 });

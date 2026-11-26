@@ -5,7 +5,8 @@ import { assertWorkbenchCommandCopy, workbenchCommandDescriptionKey } from './co
 describe('workbench command copy', () => {
   it('maps every shared command to a renderer translation key', () => {
     expect(() => assertWorkbenchCommandCopy()).not.toThrow();
-    expect(AGENT_WORKBENCH_COMMAND_CATALOG.map((entry) => workbenchCommandDescriptionKey(entry.command)))
-      .toContain('composer.commandDescription.context');
+    expect(AGENT_WORKBENCH_COMMAND_CATALOG.map((entry) => workbenchCommandDescriptionKey(entry.command))).toContain(
+      'composer.commandDescription.context',
+    );
   });
 });

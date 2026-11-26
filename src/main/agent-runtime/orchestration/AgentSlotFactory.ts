@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 /**
  * AgentSlotFactory — builds or reuses the per-scope Agent execution cache.
  *
@@ -13,29 +14,23 @@ import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
 import { createExecutionContextManager } from '../context/ExecutionContextWindow';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
 import { RUNTIME_PERMISSION_TOKEN_RESERVE } from '../permissions/RuntimePermissionContext';
-import { runtimePermissionStateService } from '../permissions/RuntimePermissionStateService';
+import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { requestEnvelopeBuilder, requestSnapshotStore } from '../prompt';
 import { promptCacheCompiler } from '../prompt/PromptCacheCompiler';
 import { configuredRuntimeProvider, encodeAgentModel } from '../providers/ConfiguredRuntimeProvider';
-import { recordResponseReceipt, resolveEffectiveModel } from '../../settings/provider-catalog/EffectiveModelResolver';
+import { resolveEffectiveModel } from '../../settings/provider-catalog/EffectiveModelResolver';
+import { recordResponseReceipt } from '../../settings/provider-catalog/ObservedModelEvidence';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { agentSlotKey, type AgentSlot, type AgentSlotRegistry } from './AgentSlotRegistry';
 import { requireExecutionScopeId } from './executionScope';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import type {
-  AgentMessage,
-  AssistantMessage,
-  Message,
-  StreamOptions,
-  ToolDefinition,
-  Usage,
-} from '../core/types';
+import type { AgentMessage, AssistantMessage, Message, StreamOptions, ToolDefinition, Usage } from '../core/types';
 import type { TokenizerService } from '../core/TokenizerService';
 import type { AgentLoopConfig, ToolExecutor } from '../agent/AgentLoop';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
-import type { AgentProfileTurnOptions } from './orchestratorTypes';
+import type { AgentProfileTurnOptions, RuntimeToolResolver } from './orchestratorTypes';
 
 /** A provider response that actually completed (not a transport/stream error). */
 export function isSuccessfulProviderResponse(message: AssistantMessage): boolean {
@@ -43,8 +38,11 @@ export function isSuccessfulProviderResponse(message: AssistantMessage): boolean
 }
 
 /** Optional provider usage counters, copied only when the provider reported them. */
-export function reportedUsageFields(usage: Usage): Partial<Pick<Usage,
-  'cacheReadTokens' | 'cacheWriteTokens' | 'cacheHitTokens' | 'cacheMissTokens' | 'reasoningTokens'>> {
+export function reportedUsageFields(
+  usage: Usage,
+): Partial<
+  Pick<Usage, 'cacheReadTokens' | 'cacheWriteTokens' | 'cacheHitTokens' | 'cacheMissTokens' | 'reasoningTokens'>
+> {
   return {
     ...(typeof usage.cacheReadTokens === 'number' ? { cacheReadTokens: usage.cacheReadTokens } : {}),
     ...(typeof usage.cacheWriteTokens === 'number' ? { cacheWriteTokens: usage.cacheWriteTokens } : {}),
@@ -54,11 +52,21 @@ export function reportedUsageFields(usage: Usage): Partial<Pick<Usage,
   };
 }
 
+/** The usage a completed request stores beside its snapshot: the provider's own counts, never an estimate. */
+function completedRequestUsage(usage: Usage) {
+  return {
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    ...reportedUsageFields(usage),
+    estimated: false,
+  };
+}
+
 export interface AgentSlotFactoryDeps {
   slots: AgentSlotRegistry;
   deferredActivation: DeferredToolActivationTracker;
   tokenizerService: TokenizerService;
-  createToolSignature: (tools: ToolDefinition[]) => string;
+  tools: Pick<RuntimeToolResolver, 'createToolSignature'>;
 }
 
 export interface AgentSlotRequest {
@@ -91,9 +99,29 @@ export interface AgentSlotRequest {
 
 export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: AgentSlotRequest): AgentSlot {
   const {
-    agentId, providerId, modelId, systemPrompt, streamOptions, tools, toolExecutor, turnSignature,
-    contextWindow, contextTokenLimit, promptPlan, initialMessages, contextDiagnostic, signatureTools,
-    routeCapabilityOverride, policyMaxTurns, profileMaxTurns, beforeRequestMessages, beforeTerminalResponse, onLoopBudget, resolvePromptPlan, resolveRuntimeFingerprint, onProviderRequestCommitted,
+    agentId,
+    providerId,
+    modelId,
+    systemPrompt,
+    streamOptions,
+    tools,
+    toolExecutor,
+    turnSignature,
+    contextWindow,
+    contextTokenLimit,
+    promptPlan,
+    initialMessages,
+    contextDiagnostic,
+    signatureTools,
+    routeCapabilityOverride,
+    policyMaxTurns,
+    profileMaxTurns,
+    beforeRequestMessages,
+    beforeTerminalResponse,
+    onLoopBudget,
+    resolvePromptPlan,
+    resolveRuntimeFingerprint,
+    onProviderRequestCommitted,
   } = request;
   if (!promptPlan) {
     throw new Error('PromptPlan is required before creating an agent runtime slot.');
@@ -101,28 +129,31 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
   const executionScopeId = requireExecutionScopeId(request.sessionId);
   const slotKey = agentSlotKey(executionScopeId, agentId);
   if (deps.slots.isQuarantined(slotKey)) {
-    throw new Error(`AGENT_SLOT_QUARANTINED: ${slotKey} is still owned by an orphaned turn.`);
+    throw new AppError('AGENT_SLOT_QUARANTINED', `${slotKey} is still owned by an orphaned turn.`);
   }
-  const toolSignature = deps.createToolSignature(signatureTools ?? tools);
+  const toolSignature = deps.tools.createToolSignature(signatureTools ?? tools);
   const activeContextWindow = contextWindow ?? streamOptions.requestPlan.contextWindowTokens;
   const requestCompactionThreshold = contextTokenLimit;
   const fixedPromptTokens = promptPlan.totalTokenEstimate + charsToTokens(JSON.stringify(tools).length);
   const resolvedContextTokenLimit = requestCompactionThreshold - fixedPromptTokens;
   if (resolvedContextTokenLimit <= 0) {
-    throw new Error('PROMPT_OVERHEAD_EXCEEDS_BUDGET: system prompt and tool schemas leave no conversation budget.');
+    throw new AppError(
+      'PROMPT_OVERHEAD_EXCEEDS_BUDGET',
+      'system prompt and tool schemas leave no conversation budget.',
+    );
   }
   const existing = deps.slots.getSlot(slotKey);
   if (existing?.agent.isStreaming) {
-    throw new Error(`AGENT_SLOT_BUSY: ${slotKey} has not completed its previous provider loop.`);
+    throw new AppError('AGENT_SLOT_BUSY', `${slotKey} has not completed its previous provider loop.`);
   }
   if (
-    existing
-    && existing.providerId === providerId
-    && existing.modelId === modelId
-    && existing.systemPrompt === systemPrompt
-    && existing.toolSignature === toolSignature
-    && existing.turnSignature === turnSignature
-    && existing.contextTokenLimit === resolvedContextTokenLimit
+    existing &&
+    existing.providerId === providerId &&
+    existing.modelId === modelId &&
+    existing.systemPrompt === systemPrompt &&
+    existing.toolSignature === toolSignature &&
+    existing.turnSignature === turnSignature &&
+    existing.contextTokenLimit === resolvedContextTokenLimit
   ) {
     // Reuse: rehydrate from the canonical history, then swap tools (copy-on-write).
     existing.activatedDeferredTools = deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
@@ -135,22 +166,35 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
     contextWindow: activeContextWindow,
     maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
   });
-  const routeProvider = settingsService.getAll().llm.providers.find((provider) => provider.id === providerId);
-  const reasoningContract = (routeCapabilityOverride ?? resolveAgentRouteCapability(
-    routeProvider,
-    modelId,
-    resolveEffectiveModel(providerId, modelId, settingsService.getAll()),
-  )).reasoningContract;
+  const routeProvider = settingsService.providerConnections.get(providerId);
+  const reasoningContract = (
+    routeCapabilityOverride ??
+    resolveAgentRouteCapability(
+      routeProvider,
+      modelId,
+      resolveEffectiveModel(providerId, modelId, settingsService.providerConnections),
+    )
+  ).reasoningContract;
 
   const contextManager = createExecutionContextManager({
-    sessionId: executionScopeId, provider: routeProvider,
-    model: resolveEffectiveModel(providerId, modelId, settingsService.getAll()),
-    plan: streamOptions.requestPlan, credentialHandle: streamOptions.credentialHandle,
+    sessionId: executionScopeId,
+    provider: routeProvider,
+    model: resolveEffectiveModel(providerId, modelId, settingsService.providerConnections),
+    plan: streamOptions.requestPlan,
+    credentialHandle: streamOptions.credentialHandle,
     config: { modelId, contextTokenLimit: resolvedContextTokenLimit, tokenizer: deps.tokenizerService },
   });
 
   const errorRecovery = new ErrorRecovery({ primaryModel: agentModel });
   const toolSchemaTokens = (): number => charsToTokens(JSON.stringify(agent.state.tools).length);
+  // Local estimates are rescaled by the ratio this scope's provider reported for earlier requests on this model.
+  const calibration = deps.tokenizerService.calibration(executionScopeId, modelId);
+  const estimatePromptTokens = (messages: Array<{ role: string; content?: unknown }>): number =>
+    (resolvePromptPlan?.() ?? promptPlan).totalTokenEstimate +
+    RUNTIME_PERMISSION_TOKEN_RESERVE +
+    toolSchemaTokens() +
+    deps.tokenizerService.countMessagesTokens(messages, modelId);
+  let sentEstimate: { requestId: string; tokens: number } | undefined;
 
   const agent: Agent = new Agent({
     initialState: {
@@ -170,31 +214,38 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
     resolvePromptPlan,
     transformContext: (messages, signal, onProgress) => {
       contextManager.setRequestTokenLimit(
-        requestCompactionThreshold - (resolvePromptPlan?.() ?? promptPlan).totalTokenEstimate - RUNTIME_PERMISSION_TOKEN_RESERVE - toolSchemaTokens(),
+        calibration.toEstimateTokens(requestCompactionThreshold) -
+          (resolvePromptPlan?.() ?? promptPlan).totalTokenEstimate -
+          RUNTIME_PERMISSION_TOKEN_RESERVE -
+          toolSchemaTokens(),
       );
       return contextManager.compress(messages, signal, onProgress);
     },
     errorRecovery,
-    resolveMaxTokens: (messages) => resolveTurnOutputTokens({
-      contextWindowTokens: streamOptions.requestPlan.contextWindowTokens,
-      maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
-      promptTokens: (resolvePromptPlan?.() ?? promptPlan).totalTokenEstimate + RUNTIME_PERMISSION_TOKEN_RESERVE + toolSchemaTokens()
-        + deps.tokenizerService.countMessagesTokens(messages, modelId),
-    }),
-    onRequest: async ({ model, context: requestContext, streamOptions: requestOptions, mailboxDeliveries }) => {
+    resolveMaxTokens: (messages) =>
+      resolveTurnOutputTokens({
+        contextWindowTokens: streamOptions.requestPlan.contextWindowTokens,
+        maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
+        promptTokens: calibration.toProviderTokens(estimatePromptTokens(messages)),
+      }),
+    onRequest: async ({ context: requestContext, streamOptions: requestOptions, mailboxDeliveries }) => {
       const callIndex = requestSnapshotStore.nextCallIndex(executionScopeId, turnSignature || undefined);
       const currentPrompt = resolvePromptPlan?.() ?? promptPlan;
       const actualSegments = requestContext.systemPromptSegments ?? currentPrompt.segments;
       const snapshot = requestEnvelopeBuilder.build({
-        promptPlan: { ...currentPrompt, segments: actualSegments, systemPrompt: requestContext.systemPrompt ?? currentPrompt.systemPrompt,
-          totalTokenEstimate: actualSegments.reduce((sum, segment) => sum + segment.tokenEstimate, 0) },
+        promptPlan: {
+          ...currentPrompt,
+          segments: actualSegments,
+          systemPrompt: requestContext.systemPrompt ?? currentPrompt.systemPrompt,
+          totalTokenEstimate: actualSegments.reduce((sum, segment) => sum + segment.tokenEstimate, 0),
+        },
         sessionId: executionScopeId,
         turnId: turnSignature || undefined,
         callIndex,
         route: {
           providerId,
           modelId: requestOptions.requestPlan.effectiveModelId,
-          protocol: requestOptions.requestPlan.route.protocol ?? routeProvider?.protocol ?? model.api,
+          protocol: requestOptions.requestPlan.route.protocol,
         },
         requestPlan: requestOptions.requestPlan,
         messages: requestContext.messages,
@@ -206,30 +257,44 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
           topP: requestOptions.topP,
           reasoningSelection: requestOptions.reasoning?.selection,
           contextDiagnostic,
-          runtimePermissionContext: requestContext.systemPromptSegments?.find((segment) => segment.id === 'runtime:permission'),
+          runtimePermissionContext: requestContext.systemPromptSegments?.find(
+            (segment) => segment.id === 'runtime:permission',
+          ),
           runtimePlanFingerprint: resolveRuntimeFingerprint?.(),
         },
         reasoning: reasoningContract,
-        cache: requestOptions.promptCache ?? streamOptions.promptCache ?? promptCacheCompiler.compile({
-          promptPlan,
-          requestPlan: requestOptions.requestPlan,
-          tools: requestContext.tools ?? [],
-          affinityScopeId: executionScopeId,
-        }),
+        cache:
+          requestOptions.promptCache ??
+          streamOptions.promptCache ??
+          promptCacheCompiler.compile({
+            promptPlan,
+            requestPlan: requestOptions.requestPlan,
+            tools: requestContext.tools ?? [],
+            affinityScopeId: executionScopeId,
+          }),
       });
       requestSnapshotStore.write(snapshot);
+      sentEstimate = { requestId: snapshot.id, tokens: estimatePromptTokens(requestContext.messages) };
       await onProviderRequestCommitted?.(snapshot.id);
       return snapshot.id;
     },
     onResponse: (requestId, message) => {
       if (!requestId || !isSuccessfulProviderResponse(message)) return;
-      recordResponseReceipt(providerId, modelId, settingsService.getAll(), streamOptions.requestPlan, message);
-      requestSnapshotStore.complete(requestId, executionScopeId, turnSignature || undefined, {
-        inputTokens: message.usage.inputTokens,
-        outputTokens: message.usage.outputTokens,
-        ...reportedUsageFields(message.usage),
-        estimated: false,
-      }, message.execution?.reasoningEvents);
+      if (sentEstimate?.requestId === requestId) calibration.observe(sentEstimate.tokens, message.usage.inputTokens);
+      recordResponseReceipt(
+        providerId,
+        modelId,
+        settingsService.providerConnections,
+        streamOptions.requestPlan,
+        message,
+      );
+      requestSnapshotStore.complete(
+        requestId,
+        executionScopeId,
+        turnSignature || undefined,
+        completedRequestUsage(message.usage),
+        message.execution?.reasoningEvents,
+      );
     },
     beforeRequestMessages,
   });

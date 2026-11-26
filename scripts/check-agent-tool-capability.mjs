@@ -21,9 +21,23 @@ if (!preflight.includes('CONVERSATION_LLM_TOOLS_UNAVAILABLE') || !preflight.incl
   fail('Route preflight must fail closed through the shared Agent tool-eligibility gate');
 }
 
+const sessionModelGate = fs.readFileSync(
+  path.join(repoRoot, 'src/main/agent-runtime/interactions/sessionModelGate.ts'),
+  'utf8',
+);
+if (!sessionModelGate.includes('isAgentToolExecutableModel')) {
+  fail('The session model gate must use the shared Agent tool-eligibility gate');
+}
 const sessionHandler = fs.readFileSync(path.join(repoRoot, 'src/main/ipc/projectSessionHandlers.ts'), 'utf8');
-if (!sessionHandler.includes('isAgentToolExecutableModel')) {
-  fail('session:setModelOverride must use the shared Agent tool-eligibility gate');
+if (!sessionHandler.includes('assertSessionModelExecutable')) {
+  fail('session:setModelOverride must use the session model gate');
+}
+const planApproval = fs.readFileSync(
+  path.join(repoRoot, 'src/main/agent-runtime/interactions/PlanApprovalTransaction.ts'),
+  'utf8',
+);
+if (!planApproval.includes('assertSessionModelAndControls')) {
+  fail('Plan approval must check the approved model through the session model gate');
 }
 
 const resolveOverride = fs.readFileSync(
@@ -37,17 +51,14 @@ if (!resolveOverride.includes('ComposerModelPickerOption')) {
   fail('/model resolver must accept ComposerModelPickerOption');
 }
 
-const slash = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/features/composer/slashCommandExecutor.ts'),
-  'utf8',
-);
+const slash = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/composer/slashCommandExecutor.ts'), 'utf8');
 if (slash.includes('modelOptions')) {
   fail('/model must not read settings.agents.modelOptions');
 }
 if (
-  !slash.includes('loadComposerModelPickerOptions')
-  || !slash.includes('isComposerAgentDefaultToken')
-  || !slash.includes('clearComposerModelChoice')
+  !slash.includes('loadComposerModelPickerOptions') ||
+  !slash.includes('isComposerAgentDefaultToken') ||
+  !slash.includes('clearComposerModelChoice')
 ) {
   fail('/model must share the picker catalog and Follow Agent clear path');
 }
@@ -57,28 +68,34 @@ const loader = fs.readFileSync(
   'utf8',
 );
 if (
-  !loader.includes('export async function loadComposerModelPickerOptions')
-  || !loader.includes('isComposerPickerModel')
+  !loader.includes('export async function loadComposerModelPickerOptions') ||
+  !loader.includes('isComposerPickerModel')
 ) {
   fail('Composer picker loader must stay the shared EffectiveCatalog path');
 }
 
 const vitest = path.join(repoRoot, 'node_modules/vitest/vitest.mjs');
-const result = spawnSync(process.execPath, [vitest, 'run',
-  'src/shared/utils/agentToolCapability.test.ts',
-  'src/main/provider-catalog/agentToolCapabilityAudit.test.ts',
-  'src/main/agent-runtime/capabilities/RouteCapabilityResolver.test.ts',
-  'src/main/conversation/ConversationRoutePreflight.test.ts',
-  'src/main/settings/provider-catalog/RequestPlanner.test.ts',
-  'src/main/settings/provider-catalog/EffectiveCatalogService.test.ts',
-  'src/renderer/features/composer/composerModelPicker.test.ts',
-  'src/renderer/features/composer/resolveComposerModelOverride.test.ts',
-  'src/main/testing/contracts/providerWireFixture.test.ts',
-], {
-  cwd: repoRoot,
-  env: process.env,
-  stdio: 'inherit',
-});
+const result = spawnSync(
+  process.execPath,
+  [
+    vitest,
+    'run',
+    'src/shared/utils/agentToolCapability.test.ts',
+    'src/main/provider-catalog/agentToolCapabilityAudit.test.ts',
+    'src/main/agent-runtime/capabilities/RouteCapabilityResolver.test.ts',
+    'src/main/conversation/ConversationRoutePreflight.test.ts',
+    'src/main/settings/provider-catalog/RequestPlanner.test.ts',
+    'src/main/settings/provider-catalog/EffectiveCatalogService.test.ts',
+    'src/renderer/features/composer/composerModelPicker.test.ts',
+    'src/renderer/features/composer/resolveComposerModelOverride.test.ts',
+    'src/main/testing/contracts/providerWireFixture.test.ts',
+  ],
+  {
+    cwd: repoRoot,
+    env: process.env,
+    stdio: 'inherit',
+  },
+);
 if (result.error) fail(result.error.message);
 if (result.status !== 0) process.exit(result.status ?? 1);
 console.log('[agent-tool-capability] shared gate, catalog audit, picker, and preflight contracts passed.');

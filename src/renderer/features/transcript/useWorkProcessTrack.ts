@@ -1,5 +1,6 @@
 import { useLayoutEffect, type RefObject } from 'react';
 import { assignDynStyles, clearDynStyles } from '../../lib/useDynStyle';
+import { documentFonts } from '../../lib/documentFonts';
 
 const nodeTarget = '[data-work-node-heading], [data-work-node-prose]';
 
@@ -37,8 +38,9 @@ export function useWorkProcessTrack(ref: RefObject<HTMLDivElement | null>, first
       for (const anchor of root.querySelectorAll<HTMLElement>('[data-work-anchor]')) {
         if (anchor.closest('[data-work-track]') !== root || !anchor.getClientRects().length) continue;
         const parent = anchor.parentElement!;
-        const target = [...parent.querySelectorAll<HTMLElement>(nodeTarget)]
-          .find(element => element.closest('[data-work-track]') === root && element.getClientRects().length > 0);
+        const target = [...parent.querySelectorAll<HTMLElement>(nodeTarget)].find(
+          (element) => element.closest('[data-work-track]') === root && element.getClientRects().length > 0,
+        );
         if (!target) continue;
         const center = firstLineCenter(target, target.getBoundingClientRect());
         const y = center - bounds.top;
@@ -65,17 +67,23 @@ export function useWorkProcessTrack(ref: RefObject<HTMLDivElement | null>, first
     const observer = new ResizeObserver(schedule);
     observer.observe(root);
     const mutations = new MutationObserver(schedule);
-    mutations.observe(root, { childList: true, subtree: true, characterData: true, attributes: true,
-      attributeFilter: ['open', 'class', 'data-work-node', 'data-work-node-prose'] });
-    const fonts = document.fonts;
-    fonts?.addEventListener?.('loadingdone', schedule);
-    void fonts?.ready?.then(schedule);
+    mutations.observe(root, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['open', 'class', 'data-work-node', 'data-work-node-prose'],
+    });
+    const fonts = documentFonts();
+    fonts?.addEventListener('loadingdone', schedule);
+    void fonts?.ready.then(schedule);
     measure();
     return () => {
       connected = false;
       if (frame) cancelAnimationFrame(frame);
-      observer.disconnect(); mutations.disconnect();
-      fonts?.removeEventListener?.('loadingdone', schedule);
+      observer.disconnect();
+      mutations.disconnect();
+      fonts?.removeEventListener('loadingdone', schedule);
       clearDynStyles([...measured, root]);
     };
   }, [ref, firstId]);

@@ -1,23 +1,29 @@
+import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { RdcExecutionReceipts, rdcDigest } from '../rdc/RdcExecutionReceipts';
-import { createInvestigationHarness, recordedExperiment, SESSION_ID } from './investigationTestFixtures';
-import { seedExecutionEvidence } from './investigationExecutionFixtures';
+import { createInvestigationHarness, recordedExperiment, SESSION_ID } from '../testing/investigationTestFixtures';
+import { seedExecutionEvidence } from '../testing/investigationExecutionFixtures';
 import { assertExecutionEvidence } from './investigationExecutionEvidence';
 
 function harness() {
   const { resolver } = createInvestigationHarness();
   const store = new RdcExecutionReceipts(resolver, () => 'test-evidence-signing-key');
   const experiment = recordedExperiment({
-    experimentId: 'experiment-1', hypothesisClaimId: 'hypothesis-1', baselineWorldStateId: 'baseline',
-    variantWorldStateId: 'variant', restoredWorldStateId: 'restored', verifyEvidenceIds: ['evidence-1'],
+    experimentId: 'experiment-1',
+    hypothesisClaimId: 'hypothesis-1',
+    baselineWorldStateId: 'baseline',
+    variantWorldStateId: 'variant',
+    restoredWorldStateId: 'restored',
+    verifyEvidenceIds: ['evidence-1'],
   });
   return { resolver, store, experiment };
 }
 describe('native execution evidence', () => {
   it.each(['missing', 'daemon-restarted', 'worker-restarted', 'pid-reused'])(
-    'rejects %s process proof despite identical logical replay identity', scenario => {
+    'rejects %s process proof despite identical logical replay identity',
+    (scenario) => {
       const { store, experiment } = harness();
-      experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId, records => {
+      experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId, (records) => {
         if (scenario === 'missing') delete records[2].processIdentity;
         else if (scenario === 'daemon-restarted') records[2].processIdentity!.daemon.pid = 41;
         else if (scenario === 'worker-restarted') records[2].processIdentity!.worker.pid = 42;
@@ -26,47 +32,116 @@ describe('native execution evidence', () => {
       expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow(/process|PROCESS_IDENTITY/);
     },
   );
+  it('rejects a signed receipt body that is not an execution receipt', () => {
+    const { resolver, store } = harness();
+    const body = JSON.stringify({ schemaVersion: 1, sessionId: SESSION_ID, evidence: { kind: 'guess' }, exitCode: 0 });
+    const signature = createHmac('sha256', 'test-evidence-signing-key').update(body).digest('hex');
+    const written = resolver.write(
+      SESSION_ID,
+      'session://tool-outputs/rdc-receipt-forged.json',
+      JSON.stringify({ body, signature }),
+      { mimeType: 'application/json' },
+    );
+    expect(() => store.read(SESSION_ID, { uri: written.uri, expectedHash: `sha256:${written.hash}` })).toThrow(
+      expect.objectContaining({ code: 'RDC_RECEIPT_INVALID' }),
+    );
+  });
   it('accepts a signed ordered same-context experiment, including after store recreation', () => {
     const { resolver, store, experiment } = harness();
     experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId);
-    expect(() => assertExecutionEvidence(SESSION_ID, experiment, new RdcExecutionReceipts(resolver, () => 'test-evidence-signing-key'))).not.toThrow();
+    expect(() =>
+      assertExecutionEvidence(
+        SESSION_ID,
+        experiment,
+        new RdcExecutionReceipts(resolver, () => 'test-evidence-signing-key'),
+      ),
+    ).not.toThrow();
   });
   it('accepts distinct image output paths while requiring identical sampling arguments', () => {
     const { store, experiment } = harness();
-    experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId, records => {
-      for (const [index, phase] of [[0, 'baseline'], [2, 'variant'], [4, 'restored']] as const) {
+    experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId, (records) => {
+      for (const [index, phase] of [
+        [0, 'baseline'],
+        [2, 'variant'],
+        [4, 'restored'],
+      ] as const) {
         const record = records[index];
         record.operation = 'rd.export.screenshot';
-        record.args = { session_id: 'replay-fixture', event_id: 11, file_format: 'png', overlay: 'None', output_path: `/owned/${phase}.png` };
+        record.args = {
+          session_id: 'replay-fixture',
+          event_id: 11,
+          file_format: 'png',
+          overlay: 'None',
+          output_path: `/owned/${phase}.png`,
+        };
         record.argsFingerprint = rdcDigest(record.args);
-        record.evidence = { kind: 'measurement', method: 'image', conditionsFingerprint: 'b'.repeat(64), values: { sha256: 'c'.repeat(64) } };
+        record.evidence = {
+          kind: 'measurement',
+          method: 'image',
+          conditionsFingerprint: 'b'.repeat(64),
+          values: { sha256: 'c'.repeat(64) },
+        };
       }
     });
     expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).not.toThrow();
 
     const changed = harness();
-    changed.experiment.executionEvidence = seedExecutionEvidence(changed.store, SESSION_ID, changed.experiment.experimentId, records => {
-      for (const [index, phase] of [[0, 'baseline'], [2, 'variant'], [4, 'restored']] as const) {
-        const record = records[index];
-        record.operation = 'rd.export.screenshot';
-        record.args = { session_id: 'replay-fixture', event_id: 11, file_format: 'png', overlay: index === 2 ? 'Wireframe' : 'None', output_path: `/owned/${phase}.png` };
-        record.argsFingerprint = rdcDigest(record.args);
-        record.evidence = { kind: 'measurement', method: 'image', conditionsFingerprint: 'b'.repeat(64), values: { sha256: 'c'.repeat(64) } };
-      }
-    });
+    changed.experiment.executionEvidence = seedExecutionEvidence(
+      changed.store,
+      SESSION_ID,
+      changed.experiment.experimentId,
+      (records) => {
+        for (const [index, phase] of [
+          [0, 'baseline'],
+          [2, 'variant'],
+          [4, 'restored'],
+        ] as const) {
+          const record = records[index];
+          record.operation = 'rd.export.screenshot';
+          record.args = {
+            session_id: 'replay-fixture',
+            event_id: 11,
+            file_format: 'png',
+            overlay: index === 2 ? 'Wireframe' : 'None',
+            output_path: `/owned/${phase}.png`,
+          };
+          record.argsFingerprint = rdcDigest(record.args);
+          record.evidence = {
+            kind: 'measurement',
+            method: 'image',
+            conditionsFingerprint: 'b'.repeat(64),
+            values: { sha256: 'c'.repeat(64) },
+          };
+        }
+      },
+    );
     expect(() => assertExecutionEvidence(SESSION_ID, changed.experiment, changed.store)).toThrow(/sampling/);
   });
   it('does not accept booleans without receipts', () => {
     const { store, experiment } = harness();
     expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow(/executionEvidence/);
   });
-  it.each(['foreign-experiment', 'foreign-context', 'wrong-order', 'missing-intervention', 'rollback-denied', 'wrong-replacement', 'different-measurement'])('%s cannot close', (scenario) => {
+  it.each([
+    'foreign-experiment',
+    'foreign-context',
+    'wrong-order',
+    'missing-intervention',
+    'rollback-denied',
+    'wrong-replacement',
+    'different-measurement',
+  ])('%s cannot close', (scenario) => {
     const { store, experiment } = harness();
     experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId, (records) => {
       if (scenario === 'foreign-experiment') records[0].experimentId = 'old-experiment';
       if (scenario === 'foreign-context') records[2].contextId = 'foreign';
       if (scenario === 'wrong-order') records[2].startedAt = 0;
-      if (scenario === 'missing-intervention') records[1].evidence = { kind: 'measurement', method: 'event_durations', conditionsFingerprint: 'b'.repeat(64), values: [2] };
+      if (scenario === 'missing-intervention')
+        records[1].evidence = {
+          kind: 'measurement',
+          method: 'event_durations',
+          conditionsFingerprint: 'b'.repeat(64),
+          values: [2],
+        };
       if (scenario === 'rollback-denied') records[3].exitCode = 1 as 0;
       if (scenario === 'wrong-replacement') records[3].args.replacement_id = 'other';
       if (scenario === 'different-measurement') records[4].operation = 'rd.export.screenshot';
@@ -76,14 +151,20 @@ describe('native execution evidence', () => {
   it('rejects signed content under a different main key and wrong hashes', () => {
     const { resolver, store, experiment } = harness();
     experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId);
-    expect(() => assertExecutionEvidence(SESSION_ID, experiment, new RdcExecutionReceipts(resolver, () => 'forged-key'))).toThrow(/signature/);
+    expect(() =>
+      assertExecutionEvidence(SESSION_ID, experiment, new RdcExecutionReceipts(resolver, () => 'forged-key')),
+    ).toThrow(/signature/);
     experiment.executionEvidence.baseline.expectedHash = '0'.repeat(64);
     expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow();
   });
   it('rejects a hand-written JSON receipt even when the content hash is correct', () => {
     const { resolver, store, experiment } = harness();
     experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId);
-    const fake = resolver.write(SESSION_ID, 'session://tool-outputs/forged.json', JSON.stringify({ ok: true, rollback: true }));
+    const fake = resolver.write(
+      SESSION_ID,
+      'session://tool-outputs/forged.json',
+      JSON.stringify({ ok: true, rollback: true }),
+    );
     experiment.executionEvidence.baseline = { uri: fake.uri, expectedHash: fake.hash };
     expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow(/unsigned/);
   });
@@ -91,7 +172,7 @@ describe('native execution evidence', () => {
 
 it('rejects changed sampling conditions despite identical method and parameters', () => {
   const { store, experiment } = harness();
-  experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId, records => {
+  experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId, (records) => {
     if (records[2].evidence.kind === 'measurement') records[2].evidence.conditionsFingerprint = 'c'.repeat(64);
   });
   expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow(/sampling/);

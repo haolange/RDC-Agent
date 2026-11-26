@@ -1,35 +1,43 @@
 import fs from 'fs';
 import path from 'path';
-import { extractSessionArtifactUris, isSessionArtifactUri } from '@shared/types/sessionArtifact';
+import { isSessionArtifactUri } from '@shared/types/sessionArtifact';
+import { extractSessionArtifactUris } from '../sessions/artifacts/sessionArtifactContract';
 import { pathComparisonKey } from '../platform/paths';
 import type { ConversationToolImagePreviewRef, ConversationToolResourceRef } from '@shared/types/conversation';
 import type { ToolCallResult } from '@shared/types/tool';
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 export function extractToolImagePreviews(result: ToolCallResult | undefined): ConversationToolImagePreviewRef[] {
-  const details = result?.data && typeof result.data === 'object' && !Array.isArray(result.data)
-    ? (result.data as { details?: unknown }).details
-    : undefined;
-  const raw = details && typeof details === 'object' && !Array.isArray(details)
-    ? (details as { imagePreviews?: unknown }).imagePreviews
-    : undefined;
+  const details =
+    result?.data && typeof result.data === 'object' && !Array.isArray(result.data)
+      ? (result.data as { details?: unknown }).details
+      : undefined;
+  const raw =
+    details && typeof details === 'object' && !Array.isArray(details)
+      ? (details as { imagePreviews?: unknown }).imagePreviews
+      : undefined;
   if (!Array.isArray(raw)) return [];
   return raw.flatMap((entry) => {
     if (!entry || typeof entry !== 'object') return [];
     const record = entry as Record<string, unknown>;
-    if (typeof record.previewId !== 'string' || typeof record.fileName !== 'string' || typeof record.mimeType !== 'string') {
+    if (
+      typeof record.previewId !== 'string' ||
+      typeof record.fileName !== 'string' ||
+      typeof record.mimeType !== 'string'
+    ) {
       return [];
     }
-    return [{
-      previewId: record.previewId,
-      fileName: record.fileName,
-      mimeType: record.mimeType,
-      width: typeof record.width === 'number' ? record.width : undefined,
-      height: typeof record.height === 'number' ? record.height : undefined,
-    }];
+    return [
+      {
+        previewId: record.previewId,
+        fileName: record.fileName,
+        mimeType: record.mimeType,
+        width: typeof record.width === 'number' ? record.width : undefined,
+        height: typeof record.height === 'number' ? record.height : undefined,
+      },
+    ];
   });
 }
 
@@ -70,9 +78,13 @@ const webRef = (details: Record<string, unknown>): ConversationToolResourceRef |
   if (!url && !query) return null;
   let host = '';
   if (url) {
-    try { host = new URL(url).hostname; } catch { host = ''; }
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      host = '';
+    }
   }
-  const label = title ?? query ?? host ?? url!;
+  const label = title ?? query ?? host;
   return {
     id: 'web:' + (url ?? query),
     kind: 'web',
@@ -100,12 +112,14 @@ export const extractConversationToolResourceRefs = (
   const normalizedName = toolName.trim().toLowerCase();
   const mcp = parseMcpName(normalizedName);
   if (mcp) {
-    return [{
-      id: 'mcp:' + mcp.server + ':' + mcp.tool,
-      kind: 'mcp',
-      label: mcp.tool.replaceAll('_', ' '),
-      summary: mcp.server,
-    }];
+    return [
+      {
+        id: 'mcp:' + mcp.server + ':' + mcp.tool,
+        kind: 'mcp',
+        label: mcp.tool.replaceAll('_', ' '),
+        summary: mcp.server,
+      },
+    ];
   }
 
   const details = isRecord(result.data?.details) ? result.data.details : {};
@@ -115,7 +129,8 @@ export const extractConversationToolResourceRefs = (
     if (value) refs.push(pathRef(value, classifyPath(value, fallback)));
   };
 
-  if (['read_file', 'read_image', 'write_file', 'edit_file', 'delete_file'].includes(normalizedName)) addPath('path', 'file');
+  if (['read_file', 'read_image', 'write_file', 'edit_file', 'delete_file'].includes(normalizedName))
+    addPath('path', 'file');
   if (normalizedName === 'code_interpreter') addPath('cwd', 'directory');
   if (normalizedName === 'notebook_edit') addPath('notebook_path', 'file');
   if (normalizedName === 'copy_file' || normalizedName === 'move_file') {
@@ -151,13 +166,14 @@ export const extractConversationToolResourceRefs = (
     const value = stringValue(details, key);
     if (value && isSessionArtifactUri(value)) sessionUris.add(value);
   }
-  const contentText = typeof result.data?.content === 'string'
-    ? result.data.content
-    : Array.isArray(result.data?.content)
+  const contentText =
+    typeof result.data?.content === 'string'
       ? result.data.content
-        .map((item) => (isRecord(item) && typeof item.text === 'string' ? item.text : ''))
-        .join('\n')
-      : '';
+      : Array.isArray(result.data?.content)
+        ? result.data.content
+            .map((item) => (isRecord(item) && typeof item.text === 'string' ? item.text : ''))
+            .join('\n')
+        : '';
   for (const uri of extractSessionArtifactUris(contentText)) sessionUris.add(uri);
   for (const uri of sessionUris) {
     refs.push({

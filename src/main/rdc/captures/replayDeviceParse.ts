@@ -1,7 +1,4 @@
-import type {
-  AndroidBootstrapMetadata,
-  ReplayDeviceEntry,
-} from '@shared/types/device';
+import type { AndroidBootstrapMetadata, ReplayDeviceEntry } from '@shared/types/device';
 
 export function sanitizeDeviceId(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -45,13 +42,13 @@ export function parseAndroidBootstrapMetadata(payload: unknown): AndroidBootstra
     startedActivity: normalizeBoolean(record.started_activity),
     createdForward: normalizeBoolean(record.created_forward),
     installMode: ['existing', 'install', 'update', 'force_replace'].includes(String(record.install_mode))
-      ? record.install_mode as AndroidBootstrapMetadata['installMode']
+      ? (record.install_mode as AndroidBootstrapMetadata['installMode'])
       : undefined,
     installReason:
-      record.install_reason === 'fresh_install'
-      || record.install_reason === 'mismatched_existing_apk'
-      || record.install_reason === 'version_downgrade'
-      || record.install_reason === 'signature_mismatch'
+      record.install_reason === 'fresh_install' ||
+      record.install_reason === 'mismatched_existing_apk' ||
+      record.install_reason === 'version_downgrade' ||
+      record.install_reason === 'signature_mismatch'
         ? record.install_reason
         : undefined,
     uninstalledExisting: normalizeBoolean(record.uninstalled_existing),

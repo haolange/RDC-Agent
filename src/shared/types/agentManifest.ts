@@ -1,3 +1,4 @@
+import { AppError } from '../errors/appError';
 import type { AgentModelBinding, AppLanguage, LlmProviderId } from './settings';
 import type { ModeIconKey } from './layout';
 import type { ModelCost } from '../provider-catalog/modelManifestSchema';
@@ -5,7 +6,11 @@ import type { ReasoningSelection } from './modelCapability';
 
 /** Upper bound on what any tool may do for a profile; no permission mode can exceed it. */
 export type AgentAccessCeiling = 'read-only' | 'workspace-write' | 'full';
-export const AGENT_ACCESS_CEILINGS = ['read-only', 'workspace-write', 'full'] as const satisfies readonly AgentAccessCeiling[];
+export const AGENT_ACCESS_CEILINGS = [
+  'read-only',
+  'workspace-write',
+  'full',
+] as const satisfies readonly AgentAccessCeiling[];
 export const DEFAULT_AGENT_ACCESS_CEILING: AgentAccessCeiling = 'full';
 
 /** Manifest diagnostics the Agents settings page acts on. */
@@ -14,8 +19,11 @@ export const AGENT_PROJECT_CEILING_NARROWED = 'AGENT_PROJECT_CEILING_NARROWED';
 
 /** Obligation a turn must satisfy before it may declare `turn_complete(completed)`. */
 export type AgentCompletionContract = 'final-answer' | 'investigation-report';
-export const AGENT_COMPLETION_CONTRACTS = ['final-answer', 'investigation-report'] as const satisfies readonly AgentCompletionContract[];
-export const DEFAULT_AGENT_COMPLETION_CONTRACT: AgentCompletionContract = 'final-answer';
+export const AGENT_COMPLETION_CONTRACTS = [
+  'final-answer',
+  'investigation-report',
+] as const satisfies readonly AgentCompletionContract[];
+const DEFAULT_AGENT_COMPLETION_CONTRACT: AgentCompletionContract = 'final-answer';
 
 /**
  * Where a declared handoff is offered:
@@ -24,7 +32,6 @@ export const DEFAULT_AGENT_COMPLETION_CONTRACT: AgentCompletionContract = 'final
  * - `hidden`: declared but never offered.
  */
 export type HandoffSurface = 'turn-end' | 'plan-gate' | 'hidden';
-export const HANDOFF_SURFACES = ['turn-end', 'plan-gate', 'hidden'] as const satisfies readonly HandoffSurface[];
 
 export interface AgentHandoffDefinition {
   label: string;
@@ -40,28 +47,15 @@ export interface AgentHandoffDefinition {
   requiredToolIds?: string[];
 }
 
-export function handoffSurfaceOf(handoff: Pick<AgentHandoffDefinition, 'surface'>): HandoffSurface {
-  return handoff.surface ?? 'turn-end';
-}
-
-export function isHandoffOfferedAtPlanGate(handoff: Pick<AgentHandoffDefinition, 'surface'>): boolean {
-  return handoffSurfaceOf(handoff) !== 'hidden';
-}
-
-export function isHandoffOfferedAtTurnEnd(handoff: Pick<AgentHandoffDefinition, 'surface'>): boolean {
-  return handoffSurfaceOf(handoff) === 'turn-end';
-}
-
-export function agentAccessCeiling(profile: { accessCeiling?: AgentAccessCeiling } | null | undefined): AgentAccessCeiling {
+export function agentAccessCeiling(
+  profile: { accessCeiling?: AgentAccessCeiling } | null | undefined,
+): AgentAccessCeiling {
   return profile?.accessCeiling ?? DEFAULT_AGENT_ACCESS_CEILING;
 }
 
-/** The stricter of two ceilings; a delegated or overriding profile never gains access. */
-export function narrowerAccessCeiling(left: AgentAccessCeiling, right: AgentAccessCeiling): AgentAccessCeiling {
-  return AGENT_ACCESS_CEILINGS.indexOf(left) <= AGENT_ACCESS_CEILINGS.indexOf(right) ? left : right;
-}
-
-export function agentCompletionContract(profile: { completionContract?: AgentCompletionContract } | null | undefined): AgentCompletionContract {
+export function agentCompletionContract(
+  profile: { completionContract?: AgentCompletionContract } | null | undefined,
+): AgentCompletionContract {
   return profile?.completionContract ?? DEFAULT_AGENT_COMPLETION_CONTRACT;
 }
 
@@ -124,8 +118,16 @@ export interface AgentManifestProvenance {
 
 export interface AgentManifestDraft extends Omit<
   AgentManifestDefinition,
-  'filePath' | 'builtin' | 'updatedAt' | 'provenance' | 'compiledRoute' | 'reasoningLevel' | 'modelSource' | 'builtinUpdate'
-  | 'descriptionTranslations' | 'argumentHintTranslations'
+  | 'filePath'
+  | 'builtin'
+  | 'updatedAt'
+  | 'provenance'
+  | 'compiledRoute'
+  | 'reasoningLevel'
+  | 'modelSource'
+  | 'builtinUpdate'
+  | 'descriptionTranslations'
+  | 'argumentHintTranslations'
 > {
   delete?: boolean;
   writeScope?: AgentManifestWriteScope;
@@ -161,10 +163,10 @@ export interface AgentManifestDiagnostic {
   message: string;
 }
 
+/** The Agents part of the settings view; the model choices are computed in the renderer from the effective catalogs. */
 export interface AgentManifestSettings {
   directoryPath: string;
   definitions: AgentManifestDefinition[];
-  modelOptions: AgentModelOption[];
   globalInstructions: string;
   diagnostics: AgentManifestDiagnostic[];
 }
@@ -225,7 +227,10 @@ export function resolveAgentWriteTarget(
   if (definition?.provenance?.scope === 'project') {
     const projectId = currentProjectId?.trim();
     if (!projectId) {
-      throw new Error('AGENT_MANIFEST_PROJECT_ID_REQUIRED: project effective profile requires a current projectId.');
+      throw new AppError(
+        'AGENT_MANIFEST_PROJECT_ID_REQUIRED',
+        'project effective profile requires a current projectId.',
+      );
     }
     return { scope: 'project', projectId };
   }
@@ -239,7 +244,10 @@ export function resolveAgentWriteTargetFromDraft(
   if (draft.writeScope === 'project') {
     const projectId = draft.writeProjectId?.trim() || currentProjectId?.trim();
     if (!projectId) {
-      throw new Error('AGENT_MANIFEST_PROJECT_ID_REQUIRED: project-scoped editor draft requires a current projectId.');
+      throw new AppError(
+        'AGENT_MANIFEST_PROJECT_ID_REQUIRED',
+        'project-scoped editor draft requires a current projectId.',
+      );
     }
     return { scope: 'project', projectId };
   }
@@ -279,7 +287,7 @@ export interface AgentDefinitionSaveRequest {
   sourceHash?: string;
 }
 
-export type AgentDefinitionSaveStatus = 'committed' | 'superseded' | 'failed';
+type AgentDefinitionSaveStatus = 'committed' | 'superseded' | 'failed';
 
 export interface AgentDefinitionCommitSnapshot {
   clientRevision: number;

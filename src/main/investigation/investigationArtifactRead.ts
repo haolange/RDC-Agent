@@ -1,6 +1,8 @@
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
 import {
-  ARTIFACT_READ_MAX_OUTPUT_LINES, SESSION_ARTIFACT_MAX_FILE_BYTES, SessionArtifactError,
-} from '@shared/types/sessionArtifact';
+  ARTIFACT_READ_MAX_OUTPUT_LINES,
+  SESSION_ARTIFACT_MAX_FILE_BYTES,
+} from '../sessions/artifacts/sessionArtifactContract';
 import type { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 
 /** Internal complete JSON reads retain the Resolver's ownership, file bound and hash checks. */
@@ -18,8 +20,7 @@ export function readCompleteInvestigationArtifact(
   const maxPages = Math.ceil(SESSION_ARTIFACT_MAX_FILE_BYTES / (ARTIFACT_READ_MAX_OUTPUT_LINES - 1)) + 1;
   for (let pages = 1; pages < maxPages; pages += 1) {
     const next = page.next;
-    if (!next || next.offset < cursor.offset
-      || (next.offset === cursor.offset && next.column <= cursor.column)) {
+    if (!next || next.offset < cursor.offset || (next.offset === cursor.offset && next.column <= cursor.column)) {
       throw new SessionArtifactError('ARTIFACT_URI_INVALID', 'Incomplete or non-advancing investigation pagination.');
     }
     cursor = next;

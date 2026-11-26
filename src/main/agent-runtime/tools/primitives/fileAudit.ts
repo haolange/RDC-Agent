@@ -2,8 +2,9 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { TextDecoder } from 'node:util';
-import { safeResolvePath, truncateOutput } from './_shared';
-import { TEXT_FILE_MAX_BYTES } from './toolLimits';
+import { AppError } from '@shared/errors/appError';
+import { safeResolvePath, truncateOutput } from '../../../runtime/toolFiles';
+import { TEXT_FILE_MAX_BYTES } from '../../../runtime/toolLimits';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 export interface FileAuditParams {
@@ -49,13 +50,20 @@ function compareBytes(left: Buffer, right: Buffer) {
     return { bytesEqual: true, firstDifferenceOffset: null, differenceWindow: null };
   }
   const start = Math.max(0, offset - 8);
-  return { bytesEqual: false, firstDifferenceOffset: offset,
-    differenceWindow: { offset: start, leftHex: left.subarray(start, start + 32).toString('hex'), rightHex: right.subarray(start, start + 32).toString('hex') } };
+  return {
+    bytesEqual: false,
+    firstDifferenceOffset: offset,
+    differenceWindow: {
+      offset: start,
+      leftHex: left.subarray(start, start + 32).toString('hex'),
+      rightHex: right.subarray(start, start + 32).toString('hex'),
+    },
+  };
 }
 
 function expectedDigest(value: string | undefined): string {
   if (typeof value !== 'string' || !/^(?:sha256:)?[a-fA-F0-9]{64}$/.test(value)) {
-    throw new Error('FILE_AUDIT_EXPECTED_HASH_REQUIRED: supply the exact whole-file SHA-256 for each input.');
+    throw new AppError('FILE_AUDIT_EXPECTED_HASH_REQUIRED', 'supply the exact whole-file SHA-256 for each input.');
   }
   return value.replace(/^sha256:/, '').toLowerCase();
 }
@@ -63,35 +71,37 @@ function expectedDigest(value: string | undefined): string {
 async function readBoundFile(input: string, expected: string, context?: ToolExecutionContext, signal?: AbortSignal) {
   signal?.throwIfAborted();
   const absolute = safeResolvePath(input, undefined, context);
-  if (path.extname(absolute).toLowerCase() === '.rdc') throw new Error('FILE_AUDIT_CAPTURE_DENIED');
+  if (path.extname(absolute).toLowerCase() === '.rdc') throw new AppError('FILE_AUDIT_CAPTURE_DENIED');
   const stat = await fs.promises.stat(absolute);
-  if (!stat.isFile() || stat.size > TEXT_FILE_MAX_BYTES) throw new Error('FILE_AUDIT_SIZE_OR_TYPE_REJECTED');
+  if (!stat.isFile() || stat.size > TEXT_FILE_MAX_BYTES) throw new AppError('FILE_AUDIT_SIZE_OR_TYPE_REJECTED');
   const chunks: Buffer[] = [];
   let bytes = 0;
   for await (const chunk of fs.createReadStream(absolute, { signal })) {
     bytes += chunk.length;
-    if (bytes > TEXT_FILE_MAX_BYTES) throw new Error('FILE_AUDIT_SIZE_OR_TYPE_REJECTED');
+    if (bytes > TEXT_FILE_MAX_BYTES) throw new AppError('FILE_AUDIT_SIZE_OR_TYPE_REJECTED');
     chunks.push(chunk);
   }
   signal?.throwIfAborted();
   const buffer = Buffer.concat(chunks);
   if (buffer.length >= 8 && buffer.readUInt32LE(0) === 0x434f4452 && buffer.readUInt32LE(4) === 0) {
-    throw new Error('FILE_AUDIT_CAPTURE_DENIED');
+    throw new AppError('FILE_AUDIT_CAPTURE_DENIED');
   }
   const sha256 = digest(buffer);
-  if (sha256 !== expected) throw new Error(`FILE_AUDIT_HASH_MISMATCH: ${input}`);
+  if (sha256 !== expected) throw new AppError('FILE_AUDIT_HASH_MISMATCH', input);
   return { buffer, identity: { path: absolute, bytes, sha256, headHex: buffer.subarray(0, 64).toString('hex') } };
 }
 
 function normalizedText(bytes: Buffer): string {
+  let text: string;
   try {
     // Preserve BOM, bare CR and all other bytes' text semantics. Only CRLF is normalized.
-    const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
-    if (text.includes('\0')) throw new Error('NUL');
-    return text.replace(/\r\n/g, '\n');
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch {
-    throw new Error('FILE_AUDIT_UTF8_REQUIRED: text comparison requires NUL-free, valid UTF-8 inputs.');
+    text = '\0';
   }
+  if (text.includes('\0'))
+    throw new AppError('FILE_AUDIT_UTF8_REQUIRED', 'text comparison requires NUL-free, valid UTF-8 inputs.');
+  return text.replace(/\r\n/g, '\n');
 }
 
 function textIdentity(text: string): TextIdentity {
@@ -99,10 +109,13 @@ function textIdentity(text: string): TextIdentity {
 }
 
 function compareText(left: string, right: string) {
-  const a = left.split('\n'), b = right.split('\n');
-  let prefix = 0, suffix = 0;
+  const a = left.split('\n'),
+    b = right.split('\n');
+  let prefix = 0,
+    suffix = 0;
   while (prefix < Math.min(a.length, b.length) && a[prefix] === b[prefix]) prefix += 1;
-  while (suffix < Math.min(a.length, b.length) - prefix && a[a.length - 1 - suffix] === b[b.length - 1 - suffix]) suffix += 1;
+  while (suffix < Math.min(a.length, b.length) - prefix && a[a.length - 1 - suffix] === b[b.length - 1 - suffix])
+    suffix += 1;
   const leftChanged = a.slice(prefix, a.length - suffix).join('\n');
   const rightChanged = b.slice(prefix, b.length - suffix).join('\n');
   return {
@@ -113,12 +126,17 @@ function compareText(left: string, right: string) {
     rightTotalLines: b.length,
     leftChanged: truncateOutput(leftChanged, CHANGE_PREVIEW_BYTES),
     rightChanged: truncateOutput(rightChanged, CHANGE_PREVIEW_BYTES),
-    truncated: Buffer.byteLength(leftChanged) > CHANGE_PREVIEW_BYTES || Buffer.byteLength(rightChanged) > CHANGE_PREVIEW_BYTES,
+    truncated:
+      Buffer.byteLength(leftChanged) > CHANGE_PREVIEW_BYTES || Buffer.byteLength(rightChanged) > CHANGE_PREVIEW_BYTES,
   };
 }
 
 /** Audits the bytes actually read. No mutation, executable parser, edit grant, or domain interpretation. */
-export async function auditFiles(params: FileAuditParams, context?: ToolExecutionContext, signal?: AbortSignal): Promise<FileAuditDetails> {
+export async function auditFiles(
+  params: FileAuditParams,
+  context?: ToolExecutionContext,
+  signal?: AbortSignal,
+): Promise<FileAuditDetails> {
   const leftHash = expectedDigest(params.expectedHash);
   const rightHash = params.compareWith ? expectedDigest(params.compareWith.expectedHash) : undefined;
   const left = await readBoundFile(params.path, leftHash, context, signal);

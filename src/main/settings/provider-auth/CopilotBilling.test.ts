@@ -1,13 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
-import {
-  parseCopilotBillingContribution,
-  parseCopilotBillingTiers,
-  parseCopilotModelCatalog,
-} from './CopilotBilling';
+import { parseCopilotBillingContribution, parseCopilotBillingTiers, parseCopilotModelCatalog } from './CopilotBilling';
 
-const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, '../fixtures', 'copilot-models.json'), 'utf8')) as unknown;
+const fixture = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '../fixtures', 'copilot-models.json'), 'utf8'),
+) as unknown;
 
 describe('Copilot account catalog parser', () => {
   it('projects only account-advertised visibility, routes, controls, and capabilities', () => {
@@ -39,8 +37,10 @@ describe('Copilot account catalog parser', () => {
       ],
       controls: {
         reasoning: {
-          kind: 'levels', supportsOff: true,
-          levels: ['low', 'medium', 'high', 'xhigh'], defaultSelection: 'high',
+          kind: 'levels',
+          supportsOff: true,
+          levels: ['low', 'medium', 'high', 'xhigh'],
+          defaultSelection: 'high',
         },
       },
       toolCalling: { state: 'supported' },
@@ -59,69 +59,101 @@ describe('Copilot account catalog parser', () => {
   it('parses account-specific default and long-context billing rows', () => {
     const catalog = parseCopilotModelCatalog(fixture);
     expect(parseCopilotBillingTiers(catalog.billingByModel['gpt-5.5'])).toEqual([
-      { id: 'default', label: 'Default', maxPromptTokens: 272_000, maxOutputTokens: 128_000, maxTotalTokens: 400_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
-      { id: 'long_context', label: 'Long context', maxPromptTokens: 922_000, maxOutputTokens: 128_000, maxTotalTokens: 1_050_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
+      {
+        id: 'default',
+        label: 'Default',
+        maxPromptTokens: 272_000,
+        maxOutputTokens: 128_000,
+        maxTotalTokens: 400_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      },
+      {
+        id: 'long_context',
+        label: 'Long context',
+        maxPromptTokens: 922_000,
+        maxOutputTokens: 128_000,
+        maxTotalTokens: 1_050_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'unknown',
+      },
     ]);
     expect(parseCopilotBillingTiers(catalog.billingByModel['gpt-5-mini'])).toEqual([
-      { id: 'default', label: 'Default', maxPromptTokens: 272_000, maxOutputTokens: 64_000, maxTotalTokens: 336_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
+      {
+        id: 'default',
+        label: 'Default',
+        maxPromptTokens: 272_000,
+        maxOutputTokens: 64_000,
+        maxTotalTokens: 336_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'unknown',
+      },
     ]);
-    expect(parseCopilotBillingContribution('gpt-5.5', catalog.billingByModel['gpt-5.5']))
-      .toMatchObject({
-        controls: {
-          maxContext: { state: 'selectable', tierId: 'long_context', entitlement: 'unknown' },
-        },
-        executionBindings: [{
+    expect(parseCopilotBillingContribution('gpt-5.5', catalog.billingByModel['gpt-5.5'])).toMatchObject({
+      controls: {
+        maxContext: { state: 'selectable', tierId: 'long_context', entitlement: 'unknown' },
+      },
+      executionBindings: [
+        {
           id: 'context:copilot-long-context',
           when: { maxContext: true },
           actions: [{ kind: 'client-tier', tierId: 'long_context' }],
           entitlement: 'unknown',
-        }],
-      });
-    expect(parseCopilotBillingContribution('gpt-5-mini', catalog.billingByModel['gpt-5-mini']))
-      .toMatchObject({ controls: { maxContext: { state: 'unsupported', fixedValue: false } } });
+        },
+      ],
+    });
+    expect(parseCopilotBillingContribution('gpt-5-mini', catalog.billingByModel['gpt-5-mini'])).toMatchObject({
+      controls: { maxContext: { state: 'unsupported', fixedValue: false } },
+    });
   });
 
   it('parses a Gemini 3.5 billing threshold without declaring structural controls', () => {
     const catalog = parseCopilotModelCatalog({
-      data: [{
-        id: 'gemini-3.5-flash',
-        name: 'Gemini 3.5 Flash',
-        model_picker_enabled: true,
-        supported_endpoints: ['/chat/completions'],
-        capabilities: {
-          type: 'chat',
-          limits: {
-            max_prompt_tokens: 200_000,
-            max_output_tokens: 64_000,
-            max_context_window_tokens: 264_000,
+      data: [
+        {
+          id: 'gemini-3.5-flash',
+          name: 'Gemini 3.5 Flash',
+          model_picker_enabled: true,
+          supported_endpoints: ['/chat/completions'],
+          capabilities: {
+            type: 'chat',
+            limits: {
+              max_prompt_tokens: 200_000,
+              max_output_tokens: 64_000,
+              max_context_window_tokens: 264_000,
+            },
+          },
+          billing: {
+            token_prices: {
+              default: { context_max: 200_000, entitlement: 'granted' },
+            },
           },
         },
-        billing: {
-          token_prices: {
-            default: { context_max: 200_000, entitlement: 'granted' },
-          },
-        },
-      }],
+      ],
     });
 
-    expect(parseCopilotBillingTiers(catalog.billingByModel['gemini-3.5-flash'])).toEqual([{
-      id: 'default',
-      label: 'Default',
-      maxPromptTokens: 200_000,
-      maxOutputTokens: 64_000,
-      maxTotalTokens: 264_000,
-      activation: { kind: 'implicit' },
-      entitlement: 'granted',
-    }]);
+    expect(parseCopilotBillingTiers(catalog.billingByModel['gemini-3.5-flash'])).toEqual([
+      {
+        id: 'default',
+        label: 'Default',
+        maxPromptTokens: 200_000,
+        maxOutputTokens: 64_000,
+        maxTotalTokens: 264_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      },
+    ]);
     expect(catalog.contributions[0]).not.toHaveProperty('controls');
   });
 
   it('lets an account policy denial dominate incomplete billing metadata', () => {
-    expect(parseCopilotBillingTiers({
-      limits: { maxPromptTokens: 272_000, maxTotalTokens: 1_000_000 },
-      tokenPrices: { default: { context_max: 272_000 } },
-      entitlement: 'denied',
-    })).toEqual([expect.objectContaining({ entitlement: 'denied' })]);
+    expect(
+      parseCopilotBillingTiers({
+        limits: { maxPromptTokens: 272_000, maxTotalTokens: 1_000_000 },
+        tokenPrices: { default: { context_max: 272_000 } },
+        entitlement: 'denied',
+      }),
+    ).toEqual([expect.objectContaining({ entitlement: 'denied' })]);
   });
 
   it('does not infer fixed 1M or Fast from Copilot model names', () => {
@@ -142,12 +174,14 @@ describe('Copilot account catalog parser', () => {
 
   it('selects the only account-advertised route instead of retaining an unsupported provider default', () => {
     const catalog = parseCopilotModelCatalog({
-      data: [{
-        id: 'responses-only-model',
-        model_picker_enabled: true,
-        supported_endpoints: ['/responses'],
-        capabilities: { type: 'chat', supports: {}, limits: { max_context_window_tokens: 128_000 } },
-      }],
+      data: [
+        {
+          id: 'responses-only-model',
+          model_picker_enabled: true,
+          supported_endpoints: ['/responses'],
+          capabilities: { type: 'chat', supports: {}, limits: { max_context_window_tokens: 128_000 } },
+        },
+      ],
     });
 
     expect(catalog.contributions).toEqual([

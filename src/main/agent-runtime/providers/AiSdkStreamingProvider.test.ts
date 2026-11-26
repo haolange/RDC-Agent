@@ -28,7 +28,13 @@ const requestPlan = createTestRequestPlan({
   fastMode: false,
   reasoningWire: {
     selection: 'off',
-    control: { kind: 'unknown', supportsOff: false, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+    control: {
+      kind: 'unknown',
+      supportsOff: false,
+      levels: [],
+      defaultSelection: 'off',
+      wireProfile: { kind: 'none' },
+    },
   },
 });
 
@@ -47,9 +53,13 @@ describe('AiSdkStreamingProvider', () => {
         yield { type: 'tool-input-end', id: 'call-1' };
         yield { type: 'tool-call', toolCallId: 'call-1', toolName: 'inspect', input: { path: 'a.rdc' } };
         yield {
-          type: 'finish', finishReason: 'tool-calls', rawFinishReason: 'tool_use',
+          type: 'finish',
+          finishReason: 'tool-calls',
+          rawFinishReason: 'tool_use',
           totalUsage: {
-            inputTokens: 12, outputTokens: 8, totalTokens: 20,
+            inputTokens: 12,
+            outputTokens: 8,
+            totalTokens: 20,
             inputTokenDetails: { noCacheTokens: 10, cacheReadTokens: 2, cacheWriteTokens: 0 },
             outputTokenDetails: { textTokens: 6, reasoningTokens: 2 },
           },
@@ -60,17 +70,47 @@ describe('AiSdkStreamingProvider', () => {
       api: 'gitlab-duo',
       createModel: async () => ({}) as Exclude<LanguageModel, string>,
     });
-    const stream = provider.stream({
-      id: 'duo-chat-opus-4-8', name: 'Opus', provider: 'gitlab', api: 'gitlab-duo',
-      contextWindow: 1_000_000, maxTokens: 128_000, reasoning: true, vision: true,
-    }, {
-      systemPrompt: 'system',
-      messages: [
-        { role: 'user', content: [{ type: 'text', text: 'open' }, { type: 'image', data: 'AA==', mimeType: 'image/png' }], timestamp: 1 },
-        { role: 'toolResult', toolCallId: 'old-call', toolName: 'read', content: [{ type: 'text', text: 'done' }], isError: false, timestamp: 2 },
-      ],
-      tools: [{ name: 'inspect', description: 'Inspect a capture', parameters: { type: 'object', properties: { path: { type: 'string' } } } }],
-    }, { requestPlan });
+    const stream = provider.stream(
+      {
+        id: 'duo-chat-opus-4-8',
+        name: 'Opus',
+        provider: 'gitlab',
+        api: 'gitlab-duo',
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
+        reasoning: true,
+        vision: true,
+      },
+      {
+        systemPrompt: 'system',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'open' },
+              { type: 'image', data: 'AA==', mimeType: 'image/png' },
+            ],
+            timestamp: 1,
+          },
+          {
+            role: 'toolResult',
+            toolCallId: 'old-call',
+            toolName: 'read',
+            content: [{ type: 'text', text: 'done' }],
+            isError: false,
+            timestamp: 2,
+          },
+        ],
+        tools: [
+          {
+            name: 'inspect',
+            description: 'Inspect a capture',
+            parameters: { type: 'object', properties: { path: { type: 'string' } } },
+          },
+        ],
+      },
+      { requestPlan },
+    );
 
     const message = await stream.result();
     expect(message.stopReason).toBe('toolUse');
@@ -84,31 +124,56 @@ describe('AiSdkStreamingProvider', () => {
       cacheMissTokens: 10,
     });
     expect(message.content).toEqual([
-      expect.objectContaining({ type: 'text', text: 'hello', providerOutputRef: expect.objectContaining({ providerBlockKey: 'part:text-1' }) }),
+      expect.objectContaining({
+        type: 'text',
+        text: 'hello',
+        providerOutputRef: expect.objectContaining({ providerBlockKey: 'part:text-1' }),
+      }),
       expect.objectContaining({ type: 'thinking', text: 'think', kind: 'unknown' }),
-      expect.objectContaining({ type: 'toolCall', id: 'call-1', name: 'inspect', arguments: { path: 'a.rdc' }, providerOutputRef: expect.objectContaining({ providerBlockKey: 'part:call-1' }) }),
+      expect.objectContaining({
+        type: 'toolCall',
+        id: 'call-1',
+        name: 'inspect',
+        arguments: { path: 'a.rdc' },
+        providerOutputRef: expect.objectContaining({ providerBlockKey: 'part:call-1' }),
+      }),
     ]);
-    expect(streamTextMock).toHaveBeenCalledWith(expect.objectContaining({
-      system: 'system',
-      maxRetries: 0,
-      messages: [
-        expect.objectContaining({ role: 'user', content: expect.arrayContaining([expect.objectContaining({ type: 'image', mediaType: 'image/png' })]) }),
-        expect.objectContaining({ role: 'tool' }),
-      ],
-      tools: expect.objectContaining({ inspect: expect.any(Object) }),
-    }));
+    expect(streamTextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: 'system',
+        maxRetries: 0,
+        messages: [
+          expect.objectContaining({
+            role: 'user',
+            content: expect.arrayContaining([expect.objectContaining({ type: 'image', mediaType: 'image/png' })]),
+          }),
+          expect.objectContaining({ role: 'tool' }),
+        ],
+        tools: expect.objectContaining({ inspect: expect.any(Object) }),
+      }),
+    );
   });
 
   it('fails closed before provider creation when the frozen effective model differs', async () => {
     streamTextMock.mockClear();
     const createModel = vi.fn(async () => ({}) as Exclude<LanguageModel, string>);
     const provider = new AiSdkStreamingProvider({ api: 'gitlab-duo', createModel });
-    const stream = provider.stream({
-      id: 'duo-chat-opus-4-8', name: 'Opus', provider: 'gitlab', api: 'gitlab-duo',
-      contextWindow: 1_000_000, maxTokens: 128_000, reasoning: true, vision: true,
-    }, { messages: [] }, {
-      requestPlan: { ...requestPlan, effectiveModelId: 'duo-chat-sonnet-5' },
-    });
+    const stream = provider.stream(
+      {
+        id: 'duo-chat-opus-4-8',
+        name: 'Opus',
+        provider: 'gitlab',
+        api: 'gitlab-duo',
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
+        reasoning: true,
+        vision: true,
+      },
+      { messages: [] },
+      {
+        requestPlan: { ...requestPlan, effectiveModelId: 'duo-chat-sonnet-5' },
+      },
+    );
 
     await expect(stream.result()).rejects.toThrow(
       'RequestPlan model duo-chat-sonnet-5 does not match duo-chat-opus-4-8.',

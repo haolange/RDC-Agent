@@ -2,15 +2,22 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { KNOWLEDGE_CARD_TYPES, KNOWLEDGE_LIFECYCLES, type KnowledgeSpace, type KnowledgeTopicChanges } from '@shared/types/knowledge';
-import { StorageIo } from '../sessions/store/StorageIo';
+import {
+  KNOWLEDGE_CARD_TYPES,
+  KNOWLEDGE_LIFECYCLES,
+  type KnowledgeSpace,
+  type KnowledgeTopicChanges,
+} from '@shared/types/knowledge';
+import { StorageIo } from '../runtime/StorageIo';
 import { KnowledgeIndexService } from './KnowledgeIndexService';
 import { KnowledgeQueryService } from './KnowledgeQueryService';
 import { KnowledgeTopicService } from './KnowledgeTopicService';
 import { KnowledgeTopicStore } from './KnowledgeTopicStore';
 
 const roots: string[] = [];
-afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
 
 async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), 'knowledge-topics-'));
@@ -23,14 +30,27 @@ async function fixture() {
   const storage = {
     ensureDir: () => undefined,
     readJson: (key: string) => snapshots.get(key) ?? null,
-    writeJsonAtomic: (key: string, value: unknown) => { snapshots.set(key, value); },
+    writeJsonAtomic: (key: string, value: unknown) => {
+      snapshots.set(key, value);
+    },
   } as unknown as StorageIo;
-  const index = new KnowledgeIndexService({ listSpaces: () => [space], snapshotPath: () => path.join(root, 'index.json'), storage,
-    now: () => new Date(0), readFile: file => readFile(file, 'utf8'), statMtime: async () => 1 });
+  const index = new KnowledgeIndexService({
+    listSpaces: () => [space],
+    snapshotPath: () => path.join(root, 'index.json'),
+    storage,
+    now: () => new Date(0),
+    readFile: (file) => readFile(file, 'utf8'),
+    statMtime: async () => 1,
+  });
   const store = new KnowledgeTopicStore(() => root);
   const topics = new KnowledgeTopicService(store, index);
-  const query = new KnowledgeQueryService({ listSpaces: () => [space], index, readFile: file => readFile(file, 'utf8'),
-    statMtime: async () => 1, readTopics: () => store.read() });
+  const query = new KnowledgeQueryService({
+    listSpaces: () => [space],
+    index,
+    readFile: (file) => readFile(file, 'utf8'),
+    statMtime: async () => 1,
+    readTopics: () => store.read(),
+  });
   return { root, cardPath, original, topics, query, store };
 }
 
@@ -38,8 +58,8 @@ it('keeps unclassified Markdown browsable when all types and lifecycles are sele
   const { root, query } = await fixture();
   await writeFile(path.join(root, 'plain.md'), 'Unclassified source without headings.');
   const all = { type: [...KNOWLEDGE_CARD_TYPES], lifecycle: [...KNOWLEDGE_LIFECYCLES] };
-  expect((await query.query(all)).hits.map(hit => hit.title)).toEqual(expect.arrayContaining(['纹理采样', 'plain']));
-  expect((await query.query({ ...all, text: '纹理' })).hits.map(hit => hit.title)).toEqual(['纹理采样']);
+  expect((await query.query(all)).hits.map((hit) => hit.title)).toEqual(expect.arrayContaining(['纹理采样', 'plain']));
+  expect((await query.query({ ...all, text: '纹理' })).hits.map((hit) => hit.title)).toEqual(['纹理采样']);
   expect((await query.query({ ...all, type: ['fact'] })).hits).toHaveLength(0);
   expect((await query.query({ ...all, lifecycle: ['draft'] })).hits).toHaveLength(0);
 });
@@ -47,12 +67,13 @@ it('keeps unclassified Markdown browsable when all types and lifecycles are sele
 it('proposes and previews without changing knowledge, then atomically applies only confirmed versioned assignments', async () => {
   const { root, cardPath, original, topics, query, store } = await fixture();
   const proposal = await topics.suggest();
-  expect(proposal.suggestions.find(item => item.topic.id === 'texture')?.cards).toHaveLength(1);
+  expect(proposal.suggestions.find((item) => item.topic.id === 'texture')?.cards).toHaveLength(1);
   await expect(readFile(path.join(root, '.topics.json'))).rejects.toMatchObject({ code: 'ENOENT' });
   const page = await query.query({ limit: 1 });
-  const card = proposal.suggestions.find(item => item.topic.id === 'texture')!.cards[0];
+  const card = proposal.suggestions.find((item) => item.topic.id === 'texture')!.cards[0];
   const changes: KnowledgeTopicChanges = {
-    expectedRevision: proposal.revision, expectedCorpusRevision: proposal.corpusRevision,
+    expectedRevision: proposal.revision,
+    expectedCorpusRevision: proposal.corpusRevision,
     topics: [{ id: 'gloss-drift', label: 'Gloss drift', synonyms: ['glosschange'] }],
     assignments: [{ cardId: card.cardId, contentHash: card.contentHash, topicIds: ['gloss-drift'] }],
   };
@@ -75,10 +96,14 @@ it('proposes and previews without changing knowledge, then atomically applies on
 it('rejects stale source versions and preserves an invalid taxonomy instead of overwriting it', async () => {
   const { root, cardPath, topics, store } = await fixture();
   const proposal = await topics.suggest();
-  const suggestion = proposal.suggestions.find(item => item.topic.id === 'texture')!;
+  const suggestion = proposal.suggestions.find((item) => item.topic.id === 'texture')!;
   const card = suggestion.cards[0];
-  const changes: KnowledgeTopicChanges = { expectedRevision: proposal.revision, expectedCorpusRevision: proposal.corpusRevision,
-    topics: [suggestion.topic], assignments: [{ cardId: card.cardId, contentHash: card.contentHash, topicIds: [suggestion.topic.id] }] };
+  const changes: KnowledgeTopicChanges = {
+    expectedRevision: proposal.revision,
+    expectedCorpusRevision: proposal.corpusRevision,
+    topics: [suggestion.topic],
+    assignments: [{ cardId: card.cardId, contentHash: card.contentHash, topicIds: [suggestion.topic.id] }],
+  };
   await writeFile(cardPath, 'changed source', 'utf8');
   await expect(topics.preview(changes)).rejects.toThrow('INDEX_CHANGED');
   const malformed = '{"schemaVersion":999,"important":"retain"}';
@@ -90,19 +115,38 @@ it('rejects stale source versions and preserves an invalid taxonomy instead of o
 it('previews a topic merge, transfers its assignments and synonyms, and rejects merge chains', async () => {
   const { topics, store } = await fixture();
   const proposal = await topics.suggest();
-  const card = proposal.suggestions.find(item => item.topic.id === 'texture')!.cards[0];
-  const initial: KnowledgeTopicChanges = { expectedRevision: proposal.revision, expectedCorpusRevision: proposal.corpusRevision,
-    topics: [{ id: 'source', label: 'Surface', synonyms: ['表面'] }, { id: 'target', label: 'Material', synonyms: ['材质'] }],
-    assignments: [{ cardId: card.cardId, contentHash: card.contentHash, topicIds: ['source'] }] };
+  const card = proposal.suggestions.find((item) => item.topic.id === 'texture')!.cards[0];
+  const initial: KnowledgeTopicChanges = {
+    expectedRevision: proposal.revision,
+    expectedCorpusRevision: proposal.corpusRevision,
+    topics: [
+      { id: 'source', label: 'Surface', synonyms: ['表面'] },
+      { id: 'target', label: 'Material', synonyms: ['材质'] },
+    ],
+    assignments: [{ cardId: card.cardId, contentHash: card.contentHash, topicIds: ['source'] }],
+  };
   const first = await topics.preview(initial);
   await topics.apply(initial, first.changeHash);
   const latest = await topics.suggest();
-  const merge: KnowledgeTopicChanges = { expectedRevision: latest.revision, expectedCorpusRevision: latest.corpusRevision,
-    topics: [], assignments: [], merges: [{ sourceId: 'source', targetId: 'target' }] };
+  const merge: KnowledgeTopicChanges = {
+    expectedRevision: latest.revision,
+    expectedCorpusRevision: latest.corpusRevision,
+    topics: [],
+    assignments: [],
+    merges: [{ sourceId: 'source', targetId: 'target' }],
+  };
   const preview = await topics.preview(merge);
-  expect(preview.merges[0]).toMatchObject({ source: { id: 'source' }, target: { id: 'target', synonyms: expect.arrayContaining(['Surface', '表面', '材质']) } });
+  expect(preview.merges[0]).toMatchObject({
+    source: { id: 'source' },
+    target: { id: 'target', synonyms: expect.arrayContaining(['Surface', '表面', '材质']) },
+  });
   expect(preview.cards[0]).toMatchObject({ before: ['source'], after: ['target'] });
-  await expect(topics.preview({ ...merge, merges: [...merge.merges!, { sourceId: 'target', targetId: 'source' }] })).rejects.toThrow('MERGE_INVALID');
+  await expect(
+    topics.preview({ ...merge, merges: [...merge.merges!, { sourceId: 'target', targetId: 'source' }] }),
+  ).rejects.toThrow('MERGE_INVALID');
   await topics.apply(merge, preview.changeHash);
-  expect((await store.read()).document).toMatchObject({ topics: [{ id: 'target' }], assignments: [{ topicIds: ['target'] }] });
+  expect((await store.read()).document).toMatchObject({
+    topics: [{ id: 'target' }],
+    assignments: [{ topicIds: ['target'] }],
+  });
 });

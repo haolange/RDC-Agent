@@ -14,9 +14,10 @@ export function diffLines(before: string, after: string): DiffLine[] {
   const common = new Uint32Array((left.length + 1) * columns);
   for (let row = left.length - 1; row >= 0; row -= 1) {
     for (let column = right.length - 1; column >= 0; column -= 1) {
-      common[row * columns + column] = left[row] === right[column]
-        ? common[(row + 1) * columns + column + 1] + 1
-        : Math.max(common[(row + 1) * columns + column], common[row * columns + column + 1]);
+      common[row * columns + column] =
+        left[row] === right[column]
+          ? common[(row + 1) * columns + column + 1] + 1
+          : Math.max(common[(row + 1) * columns + column], common[row * columns + column + 1]);
     }
   }
   const lines: DiffLine[] = [];

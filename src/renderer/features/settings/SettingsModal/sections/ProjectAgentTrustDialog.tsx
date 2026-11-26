@@ -3,10 +3,10 @@ import { Button } from '../../../../ui/Button';
 import { InlineError } from '../../../../ui/InlineError';
 import { Spinner } from '../../../../ui/Spinner';
 import { TaskDialog } from '../../../../ui/TaskDialog';
-import type { useI18n } from '../../../../i18n';
+import { humanizeError } from '../../../../i18n/humanizeError';
+import { errorDetail } from '../../../../lib/errorDetail';
+import { useI18n } from '../../../../i18n';
 import type { ProjectAgentTrustPreview } from '@shared/types/agentManifest';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 /** A project Agent profile under review: the file loads first, then the user trusts what they read. */
 export interface ProjectAgentTrustReview {
@@ -20,12 +20,16 @@ export interface ProjectAgentTrustReview {
  * The whole profile is shown before trusting it, because its instructions and tool list run in every
  * turn of this project. Trust covers these bytes only; a later edit outside Settings asks again.
  */
-export function ProjectAgentTrustDialog({ review, onConfirm, onClose, t }: {
+export function ProjectAgentTrustDialog({
+  review,
+  onConfirm,
+  onClose,
+}: {
   review: ProjectAgentTrustReview;
   onConfirm: (preview: ProjectAgentTrustPreview) => Promise<void>;
   onClose: () => void;
-  t: Translate;
 }) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { preview } = review;
@@ -36,7 +40,7 @@ export function ProjectAgentTrustDialog({ review, onConfirm, onClose, t }: {
     try {
       await onConfirm(preview);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t('settings.agentTrustFailed'));
+      setError(errorDetail(reason));
       setBusy(false);
     }
   };
@@ -52,29 +56,47 @@ export function ProjectAgentTrustDialog({ review, onConfirm, onClose, t }: {
       closeLabel={t('dialog.close')}
       onClose={onClose}
       dataTestId="settings-agent-trust-dialog"
-      footer={<>
-        <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>{t('dialog.cancel')}</Button>
-        <Button variant="primary" size="sm" loading={busy} disabled={!preview}
-          onClick={() => void confirm()} data-testid="settings-agent-trust-confirm">
-          {t('settings.agentTrustConfirm')}
-        </Button>
-      </>}
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>
+            {t('dialog.cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            loading={busy}
+            disabled={!preview}
+            onClick={() => void confirm()}
+            data-testid="settings-agent-trust-confirm"
+          >
+            {t('settings.agentTrustConfirm')}
+          </Button>
+        </>
+      }
     >
       {!preview && !review.error ? <Spinner size="sm" /> : null}
-      {review.error ? <InlineError>{review.error}</InlineError> : null}
+      {review.error ? (
+        <InlineError detail={review.error}>{humanizeError(review.error, t, 'app.error.loadFailed')}</InlineError>
+      ) : null}
       {preview ? (
         <>
           <dl className="settings-agent-migration-facts">
             <dt>{t('settings.agentModelMigrationFile')}</dt>
-            <dd><code>{preview.sourcePath}</code></dd>
+            <dd>
+              <code>{preview.sourcePath}</code>
+            </dd>
           </dl>
-          <pre className="settings-agent-trust-content scrollbar-thin" tabIndex={0}
-            aria-label={t('settings.agentTrustContent')} data-testid="settings-agent-trust-content">
+          <pre
+            className="settings-agent-trust-content scrollbar-thin"
+            tabIndex={0}
+            aria-label={t('settings.agentTrustContent')}
+            data-testid="settings-agent-trust-content"
+          >
             {preview.content}
           </pre>
         </>
       ) : null}
-      {error ? <InlineError>{error}</InlineError> : null}
+      {error ? <InlineError detail={error}>{humanizeError(error, t, 'settings.agentTrustFailed')}</InlineError> : null}
     </TaskDialog>
   );
 }

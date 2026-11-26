@@ -3,27 +3,26 @@ import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { findPendingToolApproval, type PendingToolApprovalRequest } from './toolApprovalRequestModel';
 
-export const useToolApprovalSubmit = () => useCallback(async (
-  request: PendingToolApprovalRequest,
-  approved: boolean,
-): Promise<void> => {
-  const electronAPI = window.electronAPI;
-  if (!electronAPI) {
-    throw new Error('Conversation API is not available.');
-  }
-
-  const current = () => {
-    const pending = findPendingToolApproval(useConversationStore.getState().conversationMessages);
-    return useProjectStore.getState().currentSession?.sessionId === request.sessionId && pending?.turnId === request.turnId && pending.approvalId === request.approvalId;
-  };
-  if (!current()) return;
-  const result = await electronAPI.conversation.answerToolApproval({
-    sessionId: request.sessionId,
-    turnId: request.turnId,
-    approvalId: request.approvalId,
-    approved,
-  });
-  if (!result.success && current()) {
-    throw new Error(result.error || 'Unable to submit the approval decision.');
-  }
-}, []);
+export const useToolApprovalSubmit = () =>
+  useCallback(async (request: PendingToolApprovalRequest, approved: boolean): Promise<void> => {
+    const current = () => {
+      const pending = findPendingToolApproval(useConversationStore.getState().conversationMessages);
+      return (
+        useProjectStore.getState().currentSessionId === request.sessionId &&
+        pending?.turnId === request.turnId &&
+        pending.approvalId === request.approvalId
+      );
+    };
+    if (!current()) return;
+    try {
+      await window.electronAPI.conversation.answerToolApproval({
+        sessionId: request.sessionId,
+        turnId: request.turnId,
+        approvalId: request.approvalId,
+        approved,
+      });
+    } catch (error) {
+      // A decision for a request that is no longer the pending one has nothing left to report.
+      if (current()) throw error;
+    }
+  }, []);

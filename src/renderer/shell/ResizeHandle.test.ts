@@ -1,11 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  bindResizePointerDown,
-  isDockedResizeHandleVisible,
-  ResizeHandle,
-} from './ResizeHandle';
+import { bindResizePointerDown, isDockedResizeHandleVisible, ResizeHandle } from './ResizeHandle';
 
 describe('isDockedResizeHandleVisible', () => {
   it('shows the handle only when the rail is docked and expanded', () => {
@@ -18,9 +14,7 @@ describe('isDockedResizeHandleVisible', () => {
 
 describe('ResizeHandle', () => {
   it('exposes a pointer-only test id without a sibling-width API', () => {
-    const markup = renderToStaticMarkup(
-      React.createElement(ResizeHandle, { side: 'left', onDragStart() {} }),
-    );
+    const markup = renderToStaticMarkup(React.createElement(ResizeHandle, { side: 'left', onDragStart() {} }));
     expect(markup).toContain('data-testid="panel-resize-handle-left"');
     expect(markup).toContain('aria-hidden="true"');
     expect(markup).toContain('panel-resize-handle-left');

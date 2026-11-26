@@ -2,10 +2,17 @@ import path from 'path';
 import YAML from 'yaml';
 import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
 import { isAgentIconPreset } from '@shared/constants/agents';
-import { AGENT_ACCESS_CEILINGS, AGENT_COMPLETION_CONTRACTS, HANDOFF_SURFACES } from '@shared/types/agentManifest';
+import { AGENT_ACCESS_CEILINGS, AGENT_COMPLETION_CONTRACTS } from '@shared/types/agentManifest';
 import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '@shared/theme/composeAccent';
 import { agentTextTranslationsSchema, handoffLabelTranslationsSchema } from '@shared/utils/handoffLabels';
-import type { AgentHandoffDefinition, AgentManifestDefinition, AgentManifestDraft, AgentAccessCeiling, AgentCompletionContract, HandoffSurface } from '@shared/types/agentManifest';
+import type {
+  AgentHandoffDefinition,
+  AgentManifestDefinition,
+  AgentManifestDraft,
+  AgentAccessCeiling,
+  AgentCompletionContract,
+  HandoffSurface,
+} from '@shared/types/agentManifest';
 
 /** A manifest still declares a field that moved to Settings → Agents; the file is not applied until migrated. */
 export const AGENT_MANIFEST_FIELD_MOVED = 'AGENT_MANIFEST_FIELD_MOVED';
@@ -121,9 +128,15 @@ export function parseAgentMarkdownStrict(
     const mcpServers = readStringArray(record['mcp-servers']);
     const agents = readStringArray(record.agents);
     if (record.model !== undefined || record['reasoning-level'] !== undefined) {
-      return { ok: false, reason: `${AGENT_MANIFEST_FIELD_MOVED}: model and reasoning-level are set in Settings → Agents; migrate this file or delete it.` };
+      return {
+        ok: false,
+        reason: `${AGENT_MANIFEST_FIELD_MOVED}: model and reasoning-level are set in Settings → Agents; migrate this file or delete it.`,
+      };
     }
-    if (record['based-on'] !== undefined && (typeof record['based-on'] !== 'string' || !/^[0-9a-f]{64}$/u.test(record['based-on']))) {
+    if (
+      record['based-on'] !== undefined &&
+      (typeof record['based-on'] !== 'string' || !/^[0-9a-f]{64}$/u.test(record['based-on']))
+    ) {
       return { ok: false, reason: 'based-on must be the 64-hex sourceHash of the builtin profile it was copied from.' };
     }
     const enabled = readBoolean(record.enabled, true);
@@ -149,17 +162,26 @@ export function parseAgentMarkdownStrict(
     if (record['max-turns'] !== undefined && (typeof record['max-turns'] !== 'number' || record['max-turns'] <= 0)) {
       return { ok: false, reason: 'max-turns must be a positive number when present.' };
     }
-    if (record['access-ceiling'] !== undefined && !AGENT_ACCESS_CEILINGS.includes(record['access-ceiling'] as AgentAccessCeiling)) {
+    if (
+      record['access-ceiling'] !== undefined &&
+      !AGENT_ACCESS_CEILINGS.includes(record['access-ceiling'] as AgentAccessCeiling)
+    ) {
       return { ok: false, reason: 'access-ceiling must be read-only, workspace-write, or full.' };
     }
-    if (record['completion-contract'] !== undefined && !AGENT_COMPLETION_CONTRACTS.includes(record['completion-contract'] as AgentCompletionContract)) {
+    if (
+      record['completion-contract'] !== undefined &&
+      !AGENT_COMPLETION_CONTRACTS.includes(record['completion-contract'] as AgentCompletionContract)
+    ) {
       return { ok: false, reason: 'completion-contract must be final-answer or investigation-report.' };
     }
     if (record.showContinueOn !== undefined) {
       return { ok: false, reason: 'showContinueOn was removed; declare handoff surface instead.' };
     }
     const translations: Pick<AgentManifestDefinition, 'descriptionTranslations' | 'argumentHintTranslations'> = {};
-    for (const [key, field] of [['description-translations', 'descriptionTranslations'], ['argument-hint-translations', 'argumentHintTranslations']] as const) {
+    for (const [key, field] of [
+      ['description-translations', 'descriptionTranslations'],
+      ['argument-hint-translations', 'argumentHintTranslations'],
+    ] as const) {
       if (record[key] === undefined) continue;
       const parsed = agentTextTranslationsSchema.safeParse(record[key]);
       if (!parsed.success) return { ok: false, reason: `${key}: ${parsed.error.message}` };
@@ -181,16 +203,21 @@ export function parseAgentMarkdownStrict(
         accent: normalizeAgentAccent(record.accent, COMPOSE_ACCENT_FALLBACK),
         disableModelInvocation,
         userInvocable,
-        ...(typeof record['access-ceiling'] === 'string' ? { accessCeiling: record['access-ceiling'] as AgentAccessCeiling } : {}),
-        ...(typeof record['completion-contract'] === 'string' ? { completionContract: record['completion-contract'] as AgentCompletionContract } : {}),
+        ...(typeof record['access-ceiling'] === 'string'
+          ? { accessCeiling: record['access-ceiling'] as AgentAccessCeiling }
+          : {}),
+        ...(typeof record['completion-contract'] === 'string'
+          ? { completionContract: record['completion-contract'] as AgentCompletionContract }
+          : {}),
         tools,
         skills,
         mcpServers,
         agents,
         handoffs,
-        metadata: record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
-          ? record.metadata as Record<string, unknown>
-          : {},
+        metadata:
+          record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
+            ? (record.metadata as Record<string, unknown>)
+            : {},
         instructions: match[2].trim(),
         builtin,
         enabled,
@@ -230,3 +257,5 @@ export function serializeAgentMarkdown(definition: AgentManifestDraft): string {
   };
   return `---\n${YAML.stringify(frontmatter).trim()}\n---\n\n${definition.instructions.trim()}\n`;
 }
+
+export const HANDOFF_SURFACES = ['turn-end', 'plan-gate', 'hidden'] as const satisfies readonly HandoffSurface[];

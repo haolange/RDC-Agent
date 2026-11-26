@@ -3,11 +3,9 @@
  */
 
 import { isTopLevelAgentId } from '@shared/types/agent';
-import {
-  AGENT_DESCRIPTIONS,
-  AGENT_DISPLAY_NAMES,
-} from '@shared/constants/agents';
+import { AGENT_DESCRIPTIONS, AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
+import { appPathService } from '../../runtime/AppPathService';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { buildTurnPromptPlan } from './TurnPromptPlan';
@@ -56,21 +54,20 @@ export class PromptPlanForTurn {
     >;
   }): PromptPlan | null {
     const plan = input.effectivePlan;
-    const runtimeSettings = settingsService.getAll();
-    const profiles = input.effectiveProfiles ?? (input.effectiveProfile ? [input.effectiveProfile]
-      : agentManifestService.getEffectiveProfiles(
-        runtimeSettings.paths,
-        runtimeSettings.llm.providers,
-        runtimeSettings.llm.agentRoutes,
-        (plan?.projectRootPath ?? input.projectRootPath) ?? undefined,
-      ));
-    const definition = input.effectiveProfile
-      ?? profiles.find((profile) => profile.id === input.agentId && profile.enabled)
-      ?? null;
+    const profiles =
+      input.effectiveProfiles ??
+      (input.effectiveProfile
+        ? [input.effectiveProfile]
+        : agentManifestService.getEffectiveProfiles(
+            appPathService.getRuntimePaths(),
+            plan?.projectRootPath ?? input.projectRootPath ?? undefined,
+          ));
+    const definition =
+      input.effectiveProfile ?? profiles.find((profile) => profile.id === input.agentId && profile.enabled) ?? null;
     if (!definition || !definition.enabled) {
       return null;
     }
-    const provider = runtimeSettings.llm.providers.find((entry) => entry.id === input.providerId);
+    const provider = settingsService.providerConnections.get(input.providerId);
     return buildTurnPromptPlan({
       agentId: input.agentId,
       profile: definition,
@@ -82,9 +79,8 @@ export class PromptPlanForTurn {
       sessionId: input.sessionId ?? null,
       messageText: input.messageText ?? '',
       pendingSkillIds: input.preloadSkillIds,
-      permissionConstraints: plan?.permissionConstraints ?? runtimeSettings.agentRuntime.permissions,
+      permissionConstraints: plan?.permissionConstraints ?? settingsService.snapshot().user.agentRuntime.permissions,
       routeCapability: resolveAgentRouteCapability(provider, input.modelId, input.capability),
-      effectiveModel: input.capability,
       requestPlan: input.requestPlan,
       contextWindowTokens: input.contextWindowTokens,
       extraSegments: input.extraSegments,

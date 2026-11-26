@@ -42,11 +42,16 @@ describe('evaluateWriteGate', () => {
   });
 
   it('blocks case verified when chapters are missing', () => {
-    expect(evaluateWriteGate('promote-verified', card({
-      type: 'case',
-      lifecycle: 'candidate',
-      chapters: { claim: 'only claim' },
-    }))).toMatch(/^missing-chapters:/);
+    expect(
+      evaluateWriteGate(
+        'promote-verified',
+        card({
+          type: 'case',
+          lifecycle: 'candidate',
+          chapters: { claim: 'only claim' },
+        }),
+      ),
+    ).toMatch(/^missing-chapters:/);
   });
 
   it('allows save without lifecycle promotion', () => {
@@ -77,11 +82,14 @@ describe('collectCardContradicts', () => {
   });
 
   it('includes the card own contradicts relations', () => {
-    expect(collectCardContradicts(null, card({
-      relations: [{ kind: 'contradicts', targetCardId: 'user:facts/rival.md' }],
-    }))).toEqual([
-      { leftCardId: 'user:facts/sample.md', rightCardId: 'user:facts/rival.md', kind: 'contradicts' },
-    ]);
+    expect(
+      collectCardContradicts(
+        null,
+        card({
+          relations: [{ kind: 'contradicts', targetCardId: 'user:facts/rival.md' }],
+        }),
+      ),
+    ).toEqual([{ leftCardId: 'user:facts/sample.md', rightCardId: 'user:facts/rival.md', kind: 'contradicts' }]);
   });
 
   it('returns empty when there is no conflict', () => {
@@ -103,23 +111,27 @@ describe('resolveWriteConfirmPack', () => {
 
   it('recompiles when Cards never visited Conflicts', async () => {
     const compile = vi.fn(async () => pack);
-    await expect(resolveWriteConfirmPack({
-      pack: null,
-      packQueryKey: null,
-      queryRequest,
-      compile,
-    })).resolves.toBe(pack);
+    await expect(
+      resolveWriteConfirmPack({
+        pack: null,
+        packQueryKey: null,
+        queryRequest,
+        compile,
+      }),
+    ).resolves.toBe(pack);
     expect(compile).toHaveBeenCalledWith({ ...queryRequest, limit: 50 });
   });
 
   it('reuses a fresh pack without compiling again', async () => {
     const compile = vi.fn(async () => pack);
-    await expect(resolveWriteConfirmPack({
-      pack,
-      packQueryKey: knowledgeQueryKey(queryRequest),
-      queryRequest,
-      compile,
-    })).resolves.toBe(pack);
+    await expect(
+      resolveWriteConfirmPack({
+        pack,
+        packQueryKey: knowledgeQueryKey(queryRequest),
+        queryRequest,
+        compile,
+      }),
+    ).resolves.toBe(pack);
     expect(compile).not.toHaveBeenCalled();
   });
 });
@@ -130,9 +142,7 @@ describe('Cards write confirm without visiting Conflicts', () => {
     packId: 'pack-cards',
     compiledAt: '2026-09-01T00:00:00.000Z',
     hits: [],
-    conflicts: [
-      { leftCardId: 'user:facts/other.md', rightCardId: 'user:facts/sample.md', kind: 'contradicts' },
-    ],
+    conflicts: [{ leftCardId: 'user:facts/other.md', rightCardId: 'user:facts/sample.md', kind: 'contradicts' }],
   };
 
   it('requires acknowledge for compile-derived contradicts before issuing a write token', async () => {
@@ -179,10 +189,9 @@ describe('Cards write confirm without visiting Conflicts', () => {
     expect(issueApprovalToken).toHaveBeenCalledWith({
       action: 'knowledge.write',
       spaceId: 'user',
-      relativePath: 'facts/sample.md',
+      card: expect.objectContaining({ relativePath: 'facts/sample.md' }),
     });
     expect(write).toHaveBeenCalled();
     expect(promote).not.toHaveBeenCalled();
   });
-
 });

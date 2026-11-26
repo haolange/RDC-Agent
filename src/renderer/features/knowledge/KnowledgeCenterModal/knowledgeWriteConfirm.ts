@@ -45,7 +45,6 @@ export function collectCardContradicts(
     conflicts.push({ leftCardId, rightCardId, kind: 'contradicts' });
   };
   for (const entry of pack?.conflicts ?? []) {
-    if (entry.kind !== 'contradicts') continue;
     if (entry.leftCardId === card.cardId || entry.rightCardId === card.cardId) {
       push(entry.leftCardId, entry.rightCardId);
     }
@@ -101,7 +100,7 @@ export async function issueKnowledgeWrite(input: {
     issueApprovalToken: (request: {
       action: 'knowledge.write' | 'knowledge.promote';
       spaceId: string;
-      relativePath: string;
+      card: KnowledgeCardRecord;
     }) => Promise<{ token?: string; error?: string }>;
     write: (request: {
       spaceId: string;
@@ -124,11 +123,12 @@ export async function issueKnowledgeWrite(input: {
   if (isWriteVersionStale(latest.card, input.openedUpdatedAt)) {
     return { ok: false, stale: true };
   }
-  const isPromote = input.action === 'promote-verified' || input.action === 'promote-promoted' || input.action === 'retire';
+  const isPromote =
+    input.action === 'promote-verified' || input.action === 'promote-promoted' || input.action === 'retire';
   const issued = await input.api.issueApprovalToken({
     action: isPromote ? 'knowledge.promote' : 'knowledge.write',
     spaceId: input.after.spaceId,
-    relativePath: input.after.relativePath,
+    card: input.after,
   });
   if (!issued.token) {
     return { ok: false, error: issued.error || 'KNOWLEDGE_APPROVAL_TOKEN_INVALID' };

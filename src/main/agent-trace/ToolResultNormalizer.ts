@@ -1,6 +1,8 @@
-import type { NormalizedToolResult } from '@shared/types/agenticTrace';
 import type { ToolCallResult } from '@shared/types/tool';
 import type { ActionEvent } from '@shared/types/evidence';
+import type { ArtifactRef } from './traceNodes';
+import type { FindingNode, ObservationNode } from './traceNodes';
+import type { ToolResultPreview } from './traceNodes';
 
 const firstLine = (value: unknown, fallback: string): string => {
   const text = typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value);
@@ -68,3 +70,12 @@ export class ToolResultNormalizer {
 }
 
 export const toolResultNormalizer = new ToolResultNormalizer();
+
+export interface NormalizedToolResult {
+  summary: string;
+  preview?: ToolResultPreview;
+  observations?: ObservationNode[];
+  findings?: FindingNode[];
+  artifacts?: ArtifactRef[];
+  raw?: unknown;
+}

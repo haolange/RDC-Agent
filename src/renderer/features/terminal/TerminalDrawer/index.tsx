@@ -9,11 +9,7 @@ export const TerminalDrawer: React.FC = () => {
   const vm = useTerminalDrawer();
 
   return (
-    <TerminalDrawerShell
-      vm={vm}
-      toolbar={<TerminalDrawerToolbar vm={vm} />}
-      body={<TerminalActivityPane vm={vm} />}
-    />
+    <TerminalDrawerShell vm={vm} toolbar={<TerminalDrawerToolbar vm={vm} />} body={<TerminalActivityPane vm={vm} />} />
   );
 };
 

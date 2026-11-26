@@ -89,11 +89,7 @@ describe('executeConcurrentToolGroups', () => {
   it('does not cancel already-dispatched calls and does not open the next group after a partial failure', async () => {
     const started: string[] = [];
     const results = await executeConcurrentToolGroups<Call, Result>({
-      calls: [
-        call('a', 'read_file', true),
-        call('b', 'grep', true),
-        call('c', 'glob', true),
-      ],
+      calls: [call('a', 'read_file', true), call('b', 'grep', true), call('c', 'glob', true)],
       isSafe: () => true,
       reserve: () => ({ ok: true }),
       executeOne: async (item) => {

@@ -24,12 +24,15 @@
   width: 100%;
 }
 
-.knowledge-import-hint,
-.knowledge-write-hint {
+.knowledge-write-hint,
+.knowledge-import-lead,
+.knowledge-import-drop-hint,
+.knowledge-import-item-meta,
+.knowledge-import-item-note {
   margin: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.6;
+  line-height: var(--type-body-line);
 }
 
 /* Export */
@@ -66,7 +69,8 @@
   outline-offset: var(--focus-ring-offset);
 }
 
-.knowledge-export-result {
+.knowledge-export-result,
+.knowledge-export-picker {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -92,14 +96,16 @@
   font-size: var(--type-body-size);
 }
 
-.knowledge-write-fact dd {
+.knowledge-write-fact dd,
+.knowledge-center-meta dd {
   margin: 0;
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
   overflow-wrap: anywhere;
 }
 
-.knowledge-write-section {
+.knowledge-write-section,
+.knowledge-center-header-copy {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -120,13 +126,6 @@
 .knowledge-write-conflict .knowledge-center-card-title {
   display: block;
   overflow: visible;
-}
-
-.knowledge-import-lead {
-  margin: 0;
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-  line-height: var(--type-body-line);
 }
 
 /* The drop zone is the file step itself: one place to drop, one button to choose. */
@@ -159,13 +158,6 @@
   overflow-wrap: anywhere;
 }
 
-.knowledge-import-drop-hint {
-  margin: 0;
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-  line-height: var(--type-body-line);
-}
-
 .knowledge-import-summary {
   display: flex;
   flex-direction: column;
@@ -179,7 +171,10 @@
   font-weight: var(--font-semibold);
 }
 
-.knowledge-import-summary p {
+.knowledge-import-summary p,
+.knowledge-export-picker-empty,
+.knowledge-export-file,
+.knowledge-center-meta-empty {
   margin: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
@@ -213,26 +208,11 @@
   color: var(--token-text-secondary);
 }
 
-.knowledge-import-item-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
 .knowledge-import-item-title {
   color: var(--token-text-primary);
   font-size: var(--type-body-size);
   line-height: var(--type-body-line);
   overflow-wrap: anywhere;
-}
-
-.knowledge-import-item-meta,
-.knowledge-import-item-note {
-  margin: 0;
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
-  line-height: var(--type-body-line);
 }
 
 .knowledge-import-item[data-outcome='quarantine'] .knowledge-import-item-note {
@@ -245,12 +225,6 @@
   flex-direction: column;
   align-items: flex-end;
   gap: var(--space-1);
-}
-
-.knowledge-export-picker {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
 }
 
 .knowledge-export-picker-bar {
@@ -276,11 +250,4 @@
   list-style: none;
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
-}
-
-.knowledge-export-picker-empty,
-.knowledge-export-file {
-  margin: 0;
-  color: var(--token-text-secondary);
-  font-size: var(--type-body-size);
 }

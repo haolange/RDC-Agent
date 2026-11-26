@@ -43,14 +43,17 @@ describe('isDeferredToolName', () => {
 describe('preactivateWorkflowTools', () => {
   it('activates the complete granted task surface in canonical order', () => {
     const activated = new Set<string>(['mcp__fs__read']);
-    preactivateWorkflowTools([
-      { name: 'task_create' },
-      { name: 'task_update' },
-      { name: 'task_get' },
-      { name: 'output_register' },
-      { name: 'task_list' },
-      { name: 'task_stop' },
-    ], activated);
+    preactivateWorkflowTools(
+      [
+        { name: 'task_create' },
+        { name: 'task_update' },
+        { name: 'task_get' },
+        { name: 'output_register' },
+        { name: 'task_list' },
+        { name: 'task_stop' },
+      ],
+      activated,
+    );
     expect([...activated]).toEqual([
       'mcp__fs__read',
       'task_create',
@@ -71,8 +74,11 @@ describe('preactivateWorkflowTools', () => {
   it('injects the granted plan review gate without granting it to a role that lacks it', () => {
     const mission = new Set<string>();
     preactivateWorkflowTools([{ name: 'plan_artifact' }, { name: 'task_list' }], mission);
-    expect(partitionDeferredTools([{ name: 'plan_artifact' }, { name: 'task_list' }], mission).injected.map((tool) => tool.name))
-      .toEqual(['plan_artifact', 'task_list']);
+    expect(
+      partitionDeferredTools([{ name: 'plan_artifact' }, { name: 'task_list' }], mission).injected.map(
+        (tool) => tool.name,
+      ),
+    ).toEqual(['plan_artifact', 'task_list']);
 
     const general = new Set<string>();
     preactivateWorkflowTools([{ name: 'task_list' }], general);
@@ -80,17 +86,18 @@ describe('preactivateWorkflowTools', () => {
   });
 
   it('injects only granted Investigation tools for Mission evaluation or declared execution', () => {
-    const definitions = [
-      { name: 'investigation_schema' },
-      { name: 'investigation_write' },
-      { name: 'task_list' },
-    ];
+    const definitions = [{ name: 'investigation_schema' }, { name: 'investigation_write' }, { name: 'task_list' }];
     const ordinary = new Set<string>();
     preactivateWorkflowTools(definitions, ordinary);
     expect([...ordinary]).toEqual(['task_list']);
 
     const declared = new Set<string>();
-    preactivateWorkflowTools(definitions, declared, ['investigation_schema', 'investigation_write', 'investigation_read', 'investigation_list']);
+    preactivateWorkflowTools(definitions, declared, [
+      'investigation_schema',
+      'investigation_write',
+      'investigation_read',
+      'investigation_list',
+    ]);
     expect([...declared]).toEqual(['task_list', 'investigation_schema', 'investigation_write']);
     expect(declared.has('investigation_read')).toBe(false);
     expect(declared.has('investigation_list')).toBe(false);
@@ -119,12 +126,7 @@ describe('partitionDeferredTools', () => {
     activated.add('mcp__fs__read');
     const { injected, deferredMcp, deferredBuiltin } = partitionDeferredTools(defs, activated);
     // core 前缀稳定，激活工具按激活顺序追加尾部（保 prompt cache 前缀）。
-    expect(injected.map((d) => d.name)).toEqual([
-      'read_file',
-      'tool_search',
-      'task_create',
-      'mcp__fs__read',
-    ]);
+    expect(injected.map((d) => d.name)).toEqual(['read_file', 'tool_search', 'task_create', 'mcp__fs__read']);
     expect(deferredMcp.map((d) => d.name)).toEqual(['mcp__fs__list']);
     expect(deferredBuiltin.map((d) => d.name)).toEqual(['delete_file']);
   });
@@ -137,15 +139,12 @@ describe('partitionDeferredTools', () => {
 
 describe('extractDeferredToolNamesFromToolSearchDetails', () => {
   it('returns mcp__ and extended builtin names from tool_search matches', () => {
-    expect(extractDeferredToolNamesFromToolSearchDetails({
-      total: 4,
-      matches: [
-        { name: 'read_file' },
-        { name: 'mcp__server__tool' },
-        { name: 'memory_write' },
-        { name: 'shell' },
-      ],
-    })).toEqual(['mcp__server__tool', 'memory_write']);
+    expect(
+      extractDeferredToolNamesFromToolSearchDetails({
+        total: 4,
+        matches: [{ name: 'read_file' }, { name: 'mcp__server__tool' }, { name: 'memory_write' }, { name: 'shell' }],
+      }),
+    ).toEqual(['mcp__server__tool', 'memory_write']);
   });
 
   it('returns empty for malformed details', () => {

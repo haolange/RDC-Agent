@@ -1,18 +1,20 @@
 import { createHash, randomBytes } from 'crypto';
 import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
 import { resolveEffectiveCompactionPercent } from '@shared/utils/contextBudget';
-import { freezeDelegationCapsule } from '@shared/types/delegationCapsule';
 import { isRdcLeaseToolName, stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
 import { filterToolsWithinCeiling } from '@shared/constants/toolAccess';
 import { agentAccessCeiling, agentCompletionContract, type AgentCompletionContract } from '@shared/types/agentManifest';
-import { compileEffectivePolicy, emptyCompiledPolicy } from './permissions/PolicyCompiler';
+import { freezeDelegationCapsule } from './orchestration/delegationCapsule';
+import { compileEffectivePolicy } from './permissions/PolicyCompiler';
 import type { AgentManifestDefinition, ManifestTextTranslations } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { PromptPlan, CompiledPolicy, ResourceProvenance } from '@shared/types/rdcRuntime';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { CompiledPolicy } from './permissions/PolicyCompiler';
+import type { ResourceProvenance } from '../runtime/scopedResourceTypes';
 import type { AgentPermissionSettings } from '@shared/types/settings';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { ToolDefinition } from './core/types';
-import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import type { DelegationCapsule } from './orchestration/delegationCapsule';
 
 export interface FrozenHandoffDefinition {
   agent: string;
@@ -97,10 +99,12 @@ export interface BuildEffectiveRuntimePlanInput {
   projectRootPath: string | null;
   projectId?: string | null;
   profileProvenance?: ResourceProvenance | null;
-  profile?: Pick<AgentManifestDefinition, 'skills' | 'maxTurns' | 'accessCeiling' | 'completionContract'> & {
-    agents?: AgentManifestDefinition['agents'];
-    handoffs?: AgentManifestDefinition['handoffs'];
-  } | null;
+  profile?:
+    | (Pick<AgentManifestDefinition, 'skills' | 'maxTurns' | 'accessCeiling' | 'completionContract'> & {
+        agents?: AgentManifestDefinition['agents'];
+        handoffs?: AgentManifestDefinition['handoffs'];
+      })
+    | null;
   enabledProfileIds?: readonly string[];
   /** Profiles other agents may hand work to; declared delegates outside this set are dropped. */
   delegableProfileIds?: readonly string[];
@@ -157,9 +161,7 @@ function freezeStringList(values: readonly string[] | undefined): readonly strin
   return Object.freeze([...(values ?? [])]);
 }
 
-function serializeActivatedDeferred(
-  value: ReadonlySet<string> | readonly string[] | undefined,
-): readonly string[] {
+function serializeActivatedDeferred(value: ReadonlySet<string> | readonly string[] | undefined): readonly string[] {
   if (!value) return Object.freeze([]);
   const list = Array.isArray(value) ? [...value] : [...value];
   list.sort();
@@ -171,11 +173,7 @@ function serializeActivatedDeferred(
  * Prompt 与 Tool Executor 必须引用同一 planId/fingerprint。
  */
 export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput): EffectiveRuntimePlan {
-  const policy = input.policy ?? (
-    input.projectRootPath === undefined
-      ? emptyCompiledPolicy()
-      : compileEffectivePolicy(input.projectRootPath)
-  );
+  const policy = input.policy ?? compileEffectivePolicy(input.projectRootPath);
   const permissionConstraints: Omit<AgentPermissionSettings, 'mode'> = {
     readableRoots: [...input.permissionConstraints.readableRoots],
     writableRoots: [...input.permissionConstraints.writableRoots],
@@ -184,55 +182,69 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
   };
   const knowledgeReadRoots = freezeStringList(input.knowledgeReadRoots);
   const profileSkills = freezeStringList(input.profile?.skills ?? []);
-  const profileMaxTurns = typeof input.profile?.maxTurns === 'number' && input.profile.maxTurns > 0
-    ? input.profile.maxTurns
-    : null;
-  const profileHandoffs = Object.freeze((input.profile?.handoffs ?? []).map((handoff) => Object.freeze({
-    agent: handoff.agent,
-    label: handoff.label,
-    ...(handoff.labelTranslations ? { labelTranslations: Object.freeze({ ...handoff.labelTranslations }) } : {}),
-    prompt: handoff.prompt,
-    ...(handoff.send !== undefined ? { send: handoff.send } : {}),
-    ...(handoff.surface !== undefined ? { surface: handoff.surface } : {}),
-    ...(handoff.requiredSkillIds && handoff.requiredSkillIds.length > 0
-      ? { requiredSkillIds: Object.freeze([...handoff.requiredSkillIds]) }
-      : {}),
-    ...(handoff.requiredToolIds && handoff.requiredToolIds.length > 0
-      ? { requiredToolIds: Object.freeze([...handoff.requiredToolIds]) }
-      : {}),
-  })));
+  const profileMaxTurns =
+    typeof input.profile?.maxTurns === 'number' && input.profile.maxTurns > 0 ? input.profile.maxTurns : null;
+  const profileHandoffs = Object.freeze(
+    (input.profile?.handoffs ?? []).map((handoff) =>
+      Object.freeze({
+        agent: handoff.agent,
+        label: handoff.label,
+        ...(handoff.labelTranslations ? { labelTranslations: Object.freeze({ ...handoff.labelTranslations }) } : {}),
+        prompt: handoff.prompt,
+        ...(handoff.send !== undefined ? { send: handoff.send } : {}),
+        ...(handoff.surface !== undefined ? { surface: handoff.surface } : {}),
+        ...(handoff.requiredSkillIds && handoff.requiredSkillIds.length > 0
+          ? { requiredSkillIds: Object.freeze([...handoff.requiredSkillIds]) }
+          : {}),
+        ...(handoff.requiredToolIds && handoff.requiredToolIds.length > 0
+          ? { requiredToolIds: Object.freeze([...handoff.requiredToolIds]) }
+          : {}),
+      }),
+    ),
+  );
   const enabledProfileIds = freezeStringList(input.enabledProfileIds);
   const declaredDelegates = input.profileDelegates ?? input.profile?.agents ?? [];
   const delegable = input.delegableProfileIds ? new Set(input.delegableProfileIds) : null;
-  const profileDelegates = freezeStringList(delegable ? declaredDelegates.filter((id) => delegable.has(id)) : declaredDelegates);
+  const profileDelegates = freezeStringList(
+    delegable ? declaredDelegates.filter((id) => delegable.has(id)) : declaredDelegates,
+  );
   const excludeRdcLeaseTools = input.excludeRdcLeaseTools === true;
   const excludeSubagent = input.excludeSubagent === true;
-  const withoutSubagent = (values: readonly string[]): string[] => excludeSubagent
-    ? values.filter((name) => name.trim().toLowerCase() !== 'subagent')
-    : [...values];
+  const withoutSubagent = (values: readonly string[]): string[] =>
+    excludeSubagent ? values.filter((name) => name.trim().toLowerCase() !== 'subagent') : [...values];
   const ceiling = agentAccessCeiling(input.profile);
   const completionContract = agentCompletionContract(input.profile);
-  const investigationMission = completionContract === 'investigation-report' ? input.investigationMission ?? null : null;
+  const investigationMission =
+    completionContract === 'investigation-report' ? (input.investigationMission ?? null) : null;
   if (completionContract === 'investigation-report' && !investigationMission) {
-    throw new Error('mission_method: investigation-report requires a preloaded skill that declares investigation-mission');
+    throw new Error(
+      'mission_method: investigation-report requires a preloaded skill that declares investigation-mission',
+    );
   }
   const applyCeiling = (values: readonly string[]): readonly string[] => filterToolsWithinCeiling(values, ceiling);
   const rawAllowlist = excludeRdcLeaseTools
     ? stripRdcLeaseToolsFromAllowlist(input.toolAllowlist)
     : input.toolAllowlist;
   const toolAllowlist = freezeStringList(withoutSubagent(applyCeiling(rawAllowlist)));
-  const skillIntersection = input.skillIntersection === undefined || input.skillIntersection === null
-    ? null
-    : freezeStringList(withoutSubagent(applyCeiling(
-      excludeRdcLeaseTools
-        ? stripRdcLeaseToolsFromAllowlist(input.skillIntersection)
-        : input.skillIntersection,
-    )));
-  const visibleToolNames = freezeStringList(withoutSubagent(applyCeiling(
-      excludeRdcLeaseTools
-        ? stripRdcLeaseToolsFromAllowlist(input.visibleToolNames ?? [])
-        : input.visibleToolNames ?? [],
-  )));
+  const skillIntersection =
+    input.skillIntersection === undefined || input.skillIntersection === null
+      ? null
+      : freezeStringList(
+          withoutSubagent(
+            applyCeiling(
+              excludeRdcLeaseTools ? stripRdcLeaseToolsFromAllowlist(input.skillIntersection) : input.skillIntersection,
+            ),
+          ),
+        );
+  const visibleToolNames = freezeStringList(
+    withoutSubagent(
+      applyCeiling(
+        excludeRdcLeaseTools
+          ? stripRdcLeaseToolsFromAllowlist(input.visibleToolNames ?? [])
+          : (input.visibleToolNames ?? []),
+      ),
+    ),
+  );
   const delegationCapsule = input.delegationCapsule
     ? freezeDelegationCapsule(structuredClone(input.delegationCapsule))
     : null;
@@ -322,33 +334,49 @@ export function rebuildEffectiveRuntimePlan(
   input: { rdcBindingFingerprint: string; systemPrompt: string },
 ): EffectiveRuntimePlan {
   return buildEffectiveRuntimePlan({
-    agentId: previous.agentId, projectRootPath: previous.projectRootPath, projectId: previous.projectId,
+    agentId: previous.agentId,
+    projectRootPath: previous.projectRootPath,
+    projectId: previous.projectId,
     profileProvenance: previous.profileProvenance,
-    profile: { skills: [...previous.profileSkills], ...(previous.profileMaxTurns !== null ? { maxTurns: previous.profileMaxTurns } : {}),
-      accessCeiling: previous.accessCeiling, completionContract: previous.completionContract,
-      agents: [...previous.profileDelegates], handoffs: previous.profileHandoffs.map(handoff => {
+    profile: {
+      skills: [...previous.profileSkills],
+      ...(previous.profileMaxTurns !== null ? { maxTurns: previous.profileMaxTurns } : {}),
+      accessCeiling: previous.accessCeiling,
+      completionContract: previous.completionContract,
+      agents: [...previous.profileDelegates],
+      handoffs: previous.profileHandoffs.map((handoff) => {
         const { requiredSkillIds, requiredToolIds, ...rest } = handoff;
-        return { ...rest, ...(requiredSkillIds ? { requiredSkillIds: [...requiredSkillIds] } : {}),
-          ...(requiredToolIds ? { requiredToolIds: [...requiredToolIds] } : {}) };
-      }) },
-    enabledProfileIds: previous.enabledProfileIds, profileDelegates: previous.profileDelegates,
-    toolAllowlist: previous.toolAllowlist, permissionConstraints: previous.permissionConstraints,
-    knowledgeReadRoots: previous.knowledgeReadRoots, policy: previous.policy,
-    routeCapability: previous.routeCapability, requestPlan: { executionIdentity: { fingerprint: previous.requestPlanFingerprint } },
-    promptPlan: { systemPrompt: input.systemPrompt }, investigationMission: previous.investigationMission,
-    skillIntersection: previous.skillIntersection, visibleToolNames: previous.visibleToolNames,
-    activatedDeferredTools: previous.activatedDeferredTools, mcpDescriptorHash: previous.mcpDescriptorHash,
+        return {
+          ...rest,
+          ...(requiredSkillIds ? { requiredSkillIds: [...requiredSkillIds] } : {}),
+          ...(requiredToolIds ? { requiredToolIds: [...requiredToolIds] } : {}),
+        };
+      }),
+    },
+    enabledProfileIds: previous.enabledProfileIds,
+    profileDelegates: previous.profileDelegates,
+    toolAllowlist: previous.toolAllowlist,
+    permissionConstraints: previous.permissionConstraints,
+    knowledgeReadRoots: previous.knowledgeReadRoots,
+    policy: previous.policy,
+    routeCapability: previous.routeCapability,
+    requestPlan: { executionIdentity: { fingerprint: previous.requestPlanFingerprint } },
+    promptPlan: { systemPrompt: input.systemPrompt },
+    investigationMission: previous.investigationMission,
+    skillIntersection: previous.skillIntersection,
+    visibleToolNames: previous.visibleToolNames,
+    activatedDeferredTools: previous.activatedDeferredTools,
+    mcpDescriptorHash: previous.mcpDescriptorHash,
     compactionThresholdPercent: previous.contextCompactionPercent,
     attachmentManifestFingerprint: previous.attachmentManifestFingerprint,
-    excludeRdcLeaseTools: previous.excludeRdcLeaseTools, excludeSubagent: previous.excludeSubagent,
-    delegationCapsule: previous.delegationCapsule, rdcBindingFingerprint: input.rdcBindingFingerprint,
+    excludeRdcLeaseTools: previous.excludeRdcLeaseTools,
+    excludeSubagent: previous.excludeSubagent,
+    delegationCapsule: previous.delegationCapsule,
+    rdcBindingFingerprint: input.rdcBindingFingerprint,
   });
 }
 
-export function activeToolNamesForPlan(
-  definitions: readonly ToolDefinition[],
-  plan: EffectiveRuntimePlan,
-): string[] {
+export function activeToolNamesForPlan(definitions: readonly ToolDefinition[], plan: EffectiveRuntimePlan): string[] {
   const allow = new Set(plan.toolAllowlist.map((name) => name.trim().toLowerCase()));
   return definitions
     .map((definition) => definition.name)

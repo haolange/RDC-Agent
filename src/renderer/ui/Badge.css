@@ -16,11 +16,21 @@
   white-space: nowrap;
 }
 
-.ui-badge.is-tone-neutral { --ui-badge-color: var(--token-text-secondary); }
-.ui-badge.is-tone-accent { --ui-badge-color: var(--token-accent-primary); }
-.ui-badge.is-tone-success { --ui-badge-color: var(--token-status-success); }
-.ui-badge.is-tone-warning { --ui-badge-color: var(--token-status-warning); }
-.ui-badge.is-tone-error { --ui-badge-color: var(--token-status-error); }
+.ui-badge.is-tone-neutral {
+  --ui-badge-color: var(--token-text-secondary);
+}
+.ui-badge.is-tone-accent {
+  --ui-badge-color: var(--token-accent-primary);
+}
+.ui-badge.is-tone-success {
+  --ui-badge-color: var(--token-status-success);
+}
+.ui-badge.is-tone-warning {
+  --ui-badge-color: var(--token-status-warning);
+}
+.ui-badge.is-tone-error {
+  --ui-badge-color: var(--token-status-error);
+}
 
 .ui-badge.is-soft {
   background: color-mix(in srgb, var(--ui-badge-color) 14%, transparent);

@@ -1,10 +1,7 @@
 import type { ProviderProbeBatch, ProviderProbeBatchRequest } from './providerProbe';
 import type { RendererEventChannel } from '../renderer-api/channels';
 import type { CaptureReplayState, CaptureReplayApplyRequest } from './captureReplay';
-import type {
-  WorkflowState,
-} from './workflow';
-import type { AgentState } from './agent';
+import type { WorkflowState } from './workflow';
 import type {
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
@@ -17,9 +14,7 @@ import type {
   ConversationCancelActiveTurnRequest,
   ConversationCancelActiveTurnResult,
   ConversationAnswerUserInputRequest,
-  ConversationAnswerUserInputResult,
   ConversationAnswerToolApprovalRequest,
-  ConversationAnswerToolApprovalResult,
   ConversationAnswerPlanReviewRequest,
   ConversationAnswerPlanReviewResult,
   ConversationGetAttachmentPreviewRequest,
@@ -49,14 +44,15 @@ import type {
   PlanSaveToProjectRequest,
   PlanSaveToProjectResult,
 } from './planReview';
-import type { EffectiveCatalogSnapshot, EffectiveModel } from './providerCapability';
+import type { EffectiveCatalogChange, EffectiveCatalogSnapshot, EffectiveModel } from './providerCapability';
 import type { ModelsOverride } from '../provider-catalog/modelsOverrideSchema';
 import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
 import type { RuntimePermissionState } from './runtimePermission';
 import type {
   AgentPermissionMode,
-  AppSettings,
-  AppSettingsPatch,
+  SettingsPatchOp,
+  SettingsPatchResult,
+  SettingsView,
   ResolvedShellSnapshot,
   LlmProviderAccountStatus,
   LlmProviderAccountLoginStartRequest,
@@ -72,6 +68,7 @@ import type {
   ProviderDefinitionSaveRequest,
   ProviderDefinitionSaveResult,
   ResolvedTheme,
+  SettingsChangedPayload,
 } from './settings';
 import type {
   CaptureDescriptor,
@@ -84,16 +81,24 @@ import type {
   RunContextUsageRequest,
   RunContextUsageSummary,
   RunSummary,
-  SessionRecord,
+  SessionModelWriteRequest,
+  SessionRecordSnapshot,
   SessionScope,
   SessionScopedPayload,
 } from './session';
-import type { ToolRuntimeSummary } from './tool';
+import type { ToolRuntimeSummary, ToolTraceEntry } from './tool';
 import type { MCPServerStatusSummary } from './mcp';
 import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
 import type { TraceProjectionChangedPayload } from './agenticTrace';
 import type { TraceSessionResult } from './trace';
-import type { HookEvent, RdcRuntimeOverview, RequestEnvelopeSnapshot, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from './rdcRuntime';
+import type {
+  HookEvent,
+  RdcRuntimeOverview,
+  RequestEnvelopeSnapshot,
+  ScopedResourceImportRequest,
+  ScopedResourceKind,
+  ScopedResourceWriteRequest,
+} from './rdcRuntime';
 import type {
   KnowledgeImportResult,
   KnowledgeCandidatesResult,
@@ -112,13 +117,24 @@ import type {
   SessionKnowledgeCandidate,
 } from './knowledge';
 import type { KnowledgeExportRequest, KnowledgeExportResult } from './knowledgeExport';
-import type {
-  InvestigationReadIpcResult,
-  InvestigationReadRequest,
-} from './renderdocInvestigation';
+import type { KnowledgeOperationProgress, KnowledgeOperationRef } from './knowledgeOperation';
+import type { InvestigationReadIpcResult, InvestigationReadRequest } from './renderdocInvestigation';
 
 /** Memory 面板列表项摘要（对应 MemoryRecord 的精简视图）。 */
-export interface MemorySummary {
+/** `session:open`: the opened session with its history, trace projection and runs. */
+export interface SessionOpenResult {
+  session: SessionRecordSnapshot;
+  currentRun: RunSummary | null;
+  runs: RunSummary[];
+  history: {
+    messages: ConversationMessage[];
+    planReview: PlanReviewProjection | null;
+    branchState?: import('./conversationBranch').ConversationBranchState | null;
+  };
+  trace: TraceSessionResult;
+}
+
+interface MemorySummary {
   scope: 'user' | 'project';
   /** Canonical storage key; use displayName for user-facing text. */
   name: string;
@@ -129,7 +145,7 @@ export interface MemorySummary {
 }
 
 /** Memory 面板详情（含完整正文）。 */
-export interface MemoryDetail extends MemorySummary {
+interface MemoryDetail extends MemorySummary {
   content: string;
   tags?: string[];
   createdAt: number;
@@ -148,7 +164,7 @@ export interface MemoryWriteRequest {
 }
 
 /** Main 发放的敏感操作 approvalToken 请求。 */
-export interface MemoryApprovalTokenRequest {
+interface MemoryApprovalTokenRequest {
   action: 'memory.write' | 'memory.delete';
   scope: 'user' | 'project';
   name?: string;
@@ -172,10 +188,7 @@ export interface ElectronAPI {
   appShell: {
     selectAvatar: () => Promise<string | null>;
     getAvatarDataUrl: (avatarPath: string) => Promise<string | null>;
-    openPath: (targetPath: string) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
+    openPath: (targetPath: string) => Promise<void>;
     copyText: (text: string) => Promise<{
       success: boolean;
     }>;
@@ -190,54 +203,63 @@ export interface ElectronAPI {
       dataUrl: string | null;
     }>;
     /** An https image an answer embeds, fetched by the main process (≤5 MB, sniffed raster types only). */
-    fetchImage: (url: string) => Promise<{ dataUrl: string } | { dataUrl: null; error: string }>;
+    /** `auto` loads only URLs a non-model source supplied in this session; `click` is the person asking (audited). */
+    fetchImage: (request: {
+      sessionId: string;
+      url: string;
+      intent: 'auto' | 'click';
+    }) => Promise<{ dataUrl: string } | { dataUrl: null; error: string }>;
   };
 
   conversation: {
     sendMessage: (request: ConversationSendRequest) => Promise<ConversationSendResult>;
     rewriteFromMessage: (request: ConversationRewriteFromMessageRequest) => Promise<ConversationTurnResult>;
     cancelActiveTurn: (request?: ConversationCancelActiveTurnRequest) => Promise<ConversationCancelActiveTurnResult>;
-    answerUserInput: (request: ConversationAnswerUserInputRequest) => Promise<ConversationAnswerUserInputResult>;
-    answerToolApproval: (request: ConversationAnswerToolApprovalRequest) => Promise<ConversationAnswerToolApprovalResult>;
+    answerUserInput: (request: ConversationAnswerUserInputRequest) => Promise<void>;
+    answerToolApproval: (request: ConversationAnswerToolApprovalRequest) => Promise<void>;
     answerPlanReview: (request: ConversationAnswerPlanReviewRequest) => Promise<ConversationAnswerPlanReviewResult>;
     getHistory: (sessionId: string) => Promise<{
       messages: ConversationMessage[];
       planReview: PlanReviewProjection | null;
       branchState?: import('./conversationBranch').ConversationBranchState | null;
     }>;
-    getDelegationTrace: (request: { sessionId: string; parentToolCallId: string; cursor: number; pageSize: number; sinceRevision?: number }) => Promise<import('./delegationTrace').DelegationTracePage>;
-    getDelegationContent: (request: import('./delegationTrace').DelegationContentRequest) => Promise<import('./delegationTrace').DelegationContentPage>;
-    switchBranch: (request: import('./conversationBranch').ConversationSwitchBranchRequest) => Promise<import('./conversationBranch').ConversationSwitchBranchResult>;
-    clearHistory: (sessionId: string) => Promise<{
-      success: boolean;
-      messages: ConversationMessage[];
-      error?: string;
-    }>;
-    undoLastTurn: (sessionId: string) => Promise<{
-      success: boolean;
-      messages: ConversationMessage[];
-      error?: string;
-    }>;
+    /** The last streamed state of a message; `null` when it is not streaming (any more). */
+    getMessageSnapshot: (
+      sessionId: string,
+      messageId: string,
+    ) => Promise<{ seq: number; message: ConversationMessage } | null>;
+    getDelegationTrace: (request: {
+      sessionId: string;
+      parentToolCallId: string;
+      cursor: number;
+      pageSize: number;
+      sinceRevision?: number;
+    }) => Promise<import('./delegationTrace').DelegationTracePage>;
+    getDelegationContent: (
+      request: import('./delegationTrace').DelegationContentRequest,
+    ) => Promise<import('./delegationTrace').DelegationContentPage>;
+    switchBranch: (
+      request: import('./conversationBranch').ConversationSwitchBranchRequest,
+    ) => Promise<import('./conversationBranch').ConversationSwitchBranchResult>;
+    clearHistory: (sessionId: string) => Promise<{ messages: ConversationMessage[] }>;
+    undoLastTurn: (sessionId: string) => Promise<{ messages: ConversationMessage[] }>;
     getToolImagePreview: (request: { sessionId: string; previewId: string }) => Promise<{
       dataUrl: string | null;
       error?: string;
     }>;
-    stageAttachments: (
-      request: ConversationStageAttachmentsRequest,
-    ) => Promise<ConversationStageAttachmentsResult>;
+    stageAttachments: (request: ConversationStageAttachmentsRequest) => Promise<ConversationStageAttachmentsResult>;
     releaseAttachments: (
       request: ConversationReleaseAttachmentsRequest,
     ) => Promise<ConversationReleaseAttachmentsResult>;
     getAttachmentPreview: (
       request: ConversationGetAttachmentPreviewRequest,
     ) => Promise<ConversationGetAttachmentPreviewResult>;
-    accessAttachment: (
-      request: ConversationAccessAttachmentRequest,
-    ) => Promise<ConversationAccessAttachmentResult>;
+    accessAttachment: (request: ConversationAccessAttachmentRequest) => Promise<ConversationAccessAttachmentResult>;
     /** A session artifact, attachment or project file an answer embeds; images and mp4/webm video only. */
-    resolveMedia: (request: { sessionId: string; src: string }) => Promise<
-      { dataUrl: string; kind: 'image' | 'video' } | { dataUrl: null; error: string }
-    >;
+    resolveMedia: (request: {
+      sessionId: string;
+      src: string;
+    }) => Promise<{ dataUrl: string; kind: 'image' | 'video' } | { dataUrl: null; error: string }>;
     onEvent: (callback: (event: ConversationStreamEvent) => void) => void;
     offEvent: (callback: (event: ConversationStreamEvent) => void) => void;
   };
@@ -246,18 +268,11 @@ export interface ElectronAPI {
   selectRdcFiles: () => Promise<string[] | null>;
   selectKnowledgeImport: () => Promise<string | null>;
   selectDirectory: () => Promise<string | null>;
-  saveFile: (request: { defaultFileName: string; extension: string }) => Promise<string | null>;
 
   workflow: {
     getState: () => Promise<WorkflowState>;
-    resume: (sessionId?: string) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-    stop: (runId?: string) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
+    resume: (sessionId?: string) => Promise<void>;
+    stop: (runId?: string) => Promise<void>;
     /**
      * 读取上下文用量快照。key 优先级：runId > sessionId > handler 内部 currentRunId。
      * sessionId 用于 Ask 模式（无 debug run，用量以 sessionId 为 store key）。
@@ -266,11 +281,18 @@ export interface ElectronAPI {
   };
 
   memory: {
-    issueApprovalToken: (request: MemoryApprovalTokenRequest) => Promise<{ token?: string; error?: string }>;
+    /** `cancelled` when the person declines main's confirmation dialog. */
+    issueApprovalToken: (request: MemoryApprovalTokenRequest) => Promise<{ token: string } | { cancelled: true }>;
     list: (scope: 'user' | 'project', projectRoot?: string) => Promise<{ memories: MemorySummary[] }>;
     get: (scope: 'user' | 'project', name: string, projectRoot?: string) => Promise<{ memory: MemoryDetail | null }>;
-    write: (request: MemoryWriteRequest) => Promise<{ success: boolean; name: string; error?: string }>;
-    delete: (scope: 'user' | 'project', name: string, approvalToken: string, projectRoot?: string) => Promise<{ success: boolean; error?: string }>;
+    write: (request: MemoryWriteRequest) => Promise<{ name: string }>;
+    /** `deleted` is false when no memory had that name. */
+    delete: (
+      scope: 'user' | 'project',
+      name: string,
+      approvalToken: string,
+      projectRoot?: string,
+    ) => Promise<{ deleted: boolean }>;
   };
 
   investigation: {
@@ -280,9 +302,12 @@ export interface ElectronAPI {
 
   plan: {
     reopenReview: (request: PlanReadRequest) => Promise<PlanReviewProjection>;
-    cancelReview: (request: PlanCancelReviewRequest) => Promise<{ success: boolean }>;
+    cancelReview: (request: PlanCancelReviewRequest) => Promise<void>;
     read: (request: PlanReadRequest) => Promise<PlanReadResult>;
-    issueApprovalToken: (request: PlanApprovalTokenRequest) => Promise<{ token?: string; targetPath?: string; cancelled?: boolean; error?: string }>;
+    /** `cancelled` when the person declines main's dialog. */
+    issueApprovalToken: (
+      request: PlanApprovalTokenRequest,
+    ) => Promise<{ token: string; targetPath: string } | { cancelled: true }>;
     saveToProject: (request: PlanSaveToProjectRequest) => Promise<PlanSaveToProjectResult>;
     export: (request: PlanExportRequest) => Promise<PlanExportResult>;
   };
@@ -291,11 +316,17 @@ export interface ElectronAPI {
     overview: () => Promise<KnowledgeOverviewResult>;
     topicSuggest: () => Promise<KnowledgeTopicProposal>;
     topicPreview: (changes: KnowledgeTopicChanges) => Promise<KnowledgeTopicPreview>;
-    topicApply: (request: { changes: KnowledgeTopicChanges; changeHash: string; confirmation: KnowledgeHumanConfirmation }) => Promise<{ revision: string } | { cancelled: true }>;
+    topicApply: (request: {
+      changes: KnowledgeTopicChanges;
+      changeHash: string;
+      confirmation: KnowledgeHumanConfirmation;
+    }) => Promise<{ revision: string } | { cancelled: true }>;
     query: (request: KnowledgeQueryRequest) => Promise<KnowledgeQueryResult>;
     card: (spaceId: string, relativePath: string) => Promise<{ card: KnowledgeCardDetail | null }>;
     compile: (request: KnowledgeQueryRequest & { limit?: number }) => Promise<KnowledgePack>;
-    indexRebuild: () => Promise<Pick<KnowledgeIndexOverview, 'revision' | 'builtAt' | 'cardCount'>>;
+    indexRebuild: (
+      request: KnowledgeOperationRef,
+    ) => Promise<Pick<KnowledgeIndexOverview, 'revision' | 'builtAt' | 'cardCount'>>;
     candidates: (sessionId: string) => Promise<KnowledgeCandidatesResult>;
     candidateCreate: (request: {
       sessionId: string;
@@ -303,25 +334,20 @@ export interface ElectronAPI {
       explicitUserIntent: true;
     }) => Promise<SessionKnowledgeCandidate>;
     /** What importing this source would do, item by item; nothing is written and nothing asks for confirmation. */
-    previewImport: (request: {
-      spaceId: string;
-      source?: string;
-      filePath?: string;
-    }) => Promise<KnowledgeImportResult>;
-    import: (request: {
-      spaceId: string;
-      sessionId?: string;
-      source?: string;
-      filePath?: string;
-    }) => Promise<KnowledgeImportResult | { cancelled: true }>;
-    image: (request: {
-      spaceId: string;
-      relativePath: string;
-    }) => Promise<{ dataUrl: string | null; error?: string }>;
+    previewImport: (request: { spaceId: string; source?: string; filePath?: string }) => Promise<KnowledgeImportResult>;
+    import: (
+      request: KnowledgeOperationRef & {
+        spaceId: string;
+        sessionId?: string;
+        source?: string;
+        filePath?: string;
+      },
+    ) => Promise<KnowledgeImportResult | { cancelled: true }>;
+    image: (request: { spaceId: string; relativePath: string }) => Promise<{ dataUrl: string | null; error?: string }>;
     issueApprovalToken: (request: {
       action: 'knowledge.write' | 'knowledge.promote';
       spaceId: string;
-      relativePath: string;
+      card: KnowledgeCardRecord;
     }) => Promise<{ token?: string; error?: string }>;
     write: (request: {
       spaceId: string;
@@ -338,23 +364,38 @@ export interface ElectronAPI {
       confirmation: KnowledgeHumanConfirmation;
       approvalToken: string;
     }) => Promise<{ card: KnowledgeCardRecord }>;
-    export: (request: KnowledgeExportRequest) => Promise<KnowledgeExportResult>;
+    /** Main shows the save dialog; `null` when the person cancels it. */
+    export: (request: KnowledgeExportRequest & KnowledgeOperationRef) => Promise<KnowledgeExportResult | null>;
+    /** Stops a running import, export or rebuild between items; `false` when that operation already settled. */
+    cancel: (request: KnowledgeOperationRef) => Promise<{ cancelled: boolean }>;
   };
 
   rdcRuntime: {
     getOverview: (projectRoot?: string) => Promise<RdcRuntimeOverview>;
     validateResource: (request: ScopedResourceWriteRequest) => Promise<{ valid: boolean; diagnostics: string[] }>;
     upsertResource: (request: ScopedResourceWriteRequest) => Promise<RdcRuntimeOverview>;
-    importResource: (request: ScopedResourceImportRequest) => Promise<{ overview: RdcRuntimeOverview; id: string }>;
-    deleteResource: (kind: ScopedResourceKind, scope: 'user' | 'project', id: string, projectRoot?: string) => Promise<RdcRuntimeOverview>;
-    revealResource: (sourcePath: string) => Promise<{ success: boolean; error?: string }>;
+    /** `null` when the person cancels main's file picker. */
+    importResource: (
+      request: ScopedResourceImportRequest,
+    ) => Promise<{ overview: RdcRuntimeOverview; id: string } | null>;
+    deleteResource: (
+      kind: ScopedResourceKind,
+      scope: 'user' | 'project',
+      id: string,
+      projectRoot?: string,
+    ) => Promise<RdcRuntimeOverview>;
+    revealResource: (sourcePath: string) => Promise<void>;
     trustHook: (projectRoot: string | undefined | null, hookId: string) => Promise<RdcRuntimeOverview>;
     revokeHook: (projectRoot: string | undefined | null, hookId: string) => Promise<RdcRuntimeOverview>;
     trustMcp: (projectRoot: string, descriptorId: string) => Promise<RdcRuntimeOverview>;
     revokeMcp: (projectRoot: string, descriptorId: string) => Promise<RdcRuntimeOverview>;
     testHook: (event: HookEvent, projectRoot?: string, hookId?: string) => Promise<unknown>;
     listRequestSnapshots: (sessionId: string, turnId?: string) => Promise<RequestEnvelopeSnapshot[]>;
-    getRequestSnapshot: (sessionId: string, turnId: string, snapshotId: string) => Promise<RequestEnvelopeSnapshot | null>;
+    getRequestSnapshot: (
+      sessionId: string,
+      turnId: string,
+      snapshotId: string,
+    ) => Promise<RequestEnvelopeSnapshot | null>;
   };
 
   command: {
@@ -367,8 +408,12 @@ export interface ElectronAPI {
 
   tool: {
     detectInstallations: () => Promise<import('./rdcInstallation').RdcInstallationCandidate[]>;
-    resolveInstallation: (request: import('./rdcInstallation').RdcInstallationRequest) => Promise<import('./settings').RdcCliInvokerSettings>;
-    verifyInstallation: (request: import('./rdcInstallation').RdcInstallationRequest) => Promise<{ settings: import('./settings').RdcCliInvokerSettings; summary: ToolRuntimeSummary }>;
+    resolveInstallation: (
+      request: import('./rdcInstallation').RdcInstallationRequest,
+    ) => Promise<import('./settings').RdcCliInvokerSettings>;
+    verifyInstallation: (
+      request: import('./rdcInstallation').RdcInstallationRequest,
+    ) => Promise<{ settings: import('./settings').RdcCliInvokerSettings; summary: ToolRuntimeSummary }>;
   };
 
   mcp: {
@@ -392,7 +437,10 @@ export interface ElectronAPI {
     testProviderDraft: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
     testModelCapability: (request: LlmModelCapabilityProbeRequest) => Promise<LlmModelCapabilityProbeResult>;
     connectProvider: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
-    refreshProviderModels: (providerId: LlmProviderId, scope?: { accountId: string; protocol: LlmProviderProtocol }) => Promise<LlmProviderConnectionResult>;
+    refreshProviderModels: (
+      providerId: LlmProviderId,
+      scope?: { accountId: string; protocol: LlmProviderProtocol },
+    ) => Promise<LlmProviderConnectionResult>;
     disconnectProvider: (providerId: LlmProviderId) => Promise<LlmProviderConnectionResult>;
     startProviderAccountLogin: (request: LlmProviderAccountLoginStartRequest) => Promise<LlmProviderAccountStatus>;
     getProviderAccountStatus: (providerId: LlmProviderId) => Promise<LlmProviderAccountStatus>;
@@ -402,75 +450,67 @@ export interface ElectronAPI {
   };
 
   settings: {
-    get: () => Promise<AppSettings>;
+    get: () => Promise<SettingsView>;
     getProviderCatalog: () => Promise<LlmProviderCatalogResponse>;
     getEffectiveModel: (agentId: string) => Promise<EffectiveModel | null>;
     getEffectiveCatalog: (providerId: string, accountId?: string) => Promise<EffectiveCatalogSnapshot | null>;
     hasProviderSecret: (providerId: string) => Promise<{ hasSecret: boolean; maskedPreview?: string }>;
-    importAgentManifest: (filePath: string) => Promise<AppSettings>;
+    importAgentManifest: (filePath: string) => Promise<SettingsView>;
     saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
-    getAgentDefinitionCommit: (query: import('./agentManifest').AgentDefinitionCommitQuery) => Promise<AgentDefinitionCommitSnapshot | null>;
+    getAgentDefinitionCommit: (
+      query: import('./agentManifest').AgentDefinitionCommitQuery,
+    ) => Promise<AgentDefinitionCommitSnapshot | null>;
     previewAgentModelMigration: (sourcePath: string) => Promise<import('./agentManifest').AgentModelMigrationPreview>;
-    applyAgentModelMigration: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
-    deleteAgentOverrideFile: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
+    applyAgentModelMigration: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
+    deleteAgentOverrideFile: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
     previewProjectAgentTrust: (sourcePath: string) => Promise<import('./agentManifest').ProjectAgentTrustPreview>;
-    trustProjectAgent: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<AppSettings>;
-    getAgentBuiltinComparison: (query: import('./agentManifest').AgentDefinitionCommitQuery) => Promise<import('./agentManifest').AgentBuiltinComparison>;
+    trustProjectAgent: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
+    getAgentBuiltinComparison: (
+      query: import('./agentManifest').AgentDefinitionCommitQuery,
+    ) => Promise<import('./agentManifest').AgentBuiltinComparison>;
     saveProviderDefinition: (request: ProviderDefinitionSaveRequest) => Promise<ProviderDefinitionSaveResult>;
     getProviderDefinitionCommit: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
     getModelsOverride: () => Promise<ModelsOverride>;
     setModelsOverride: (overrides: ModelsOverride) => Promise<ModelsOverride>;
     getResolvedShell: (executable: string) => Promise<ResolvedShellSnapshot>;
-    set: (settings: AppSettingsPatch) => Promise<AppSettings>;
+    /** Applies the ops in order and commits once; the result names only what changed. */
+    patch: (ops: SettingsPatchOp[]) => Promise<SettingsPatchResult>;
   };
 
   project: {
     list: () => Promise<{ projects: ProjectRecord[] }>;
-    add: (rootPath: string) => Promise<{
-      success: boolean;
-      project?: ProjectRecord;
-      error?: string;
-    }>;
+    add: (rootPath: string) => Promise<{ project: ProjectRecord }>;
     select: (projectId: string) => Promise<{
-      success: boolean;
-      project?: ProjectRecord;
-      currentSession?: SessionRecord | null;
-      currentRun?: RunSummary | null;
-      error?: string;
+      project: ProjectRecord;
+      currentSession: SessionRecordSnapshot | null;
+      currentRun: RunSummary | null;
     }>;
-    rename: (projectId: string, newName: string) => Promise<{
-      success: boolean;
-      project?: ProjectRecord;
-      error?: string;
-    }>;
-    remove: (projectId: string) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
+    rename: (projectId: string, newName: string) => Promise<{ project: ProjectRecord }>;
+    remove: (projectId: string) => Promise<void>;
     inputs: {
-      referencePath: (projectId: string, filePath: string) => Promise<{
-        success: boolean; inputs: ProjectInputRecord[]; error?: string;
-      }>;
-      prepareRemove: (projectId: string, inputId: string) => Promise<import('./session').ProjectInputRemovePreparation>;
-      remove: (projectId: string, inputId: string, approvalToken: string) => Promise<import('./session').ProjectInputRemoveResult>;
+      referencePath: (projectId: string, filePath: string) => Promise<{ inputs: ProjectInputRecord[] }>;
+      /** `null` when the person declines main's confirmation dialog. */
+      prepareRemove: (
+        projectId: string,
+        inputId: string,
+      ) => Promise<import('./session').ProjectInputRemovePreparation | null>;
+      remove: (
+        projectId: string,
+        inputId: string,
+        approvalToken: string,
+      ) => Promise<import('./session').ProjectInputRemoveResult>;
       list: (projectId: string) => Promise<{ inputs: ProjectInputRecord[] }>;
       refresh: (projectId: string) => Promise<{ inputs: ProjectInputRecord[] }>;
-      import: (projectId: string) => Promise<{
-        success: boolean;
-        inputs: ProjectInputRecord[];
-        error?: string;
-      }>;
-      importPaths: (projectId: string, filePaths: string[]) => Promise<{
-        success: boolean;
-        inputs: ProjectInputRecord[];
-        error?: string;
-      }>;
+      import: (projectId: string) => Promise<{ inputs: ProjectInputRecord[] }>;
+      importPaths: (projectId: string, filePaths: string[]) => Promise<{ inputs: ProjectInputRecord[] }>;
     };
   };
 
   device: {
     prepare: (request: DevicePreparationRequest) => Promise<DevicePreparationResult>;
-    cancelPreparation: (request: import('./captureReplay').CaptureReplayBindingRequest) => Promise<DevicePreparationResult>;
+    cancelPreparation: (
+      request: import('./captureReplay').CaptureReplayBindingRequest,
+    ) => Promise<DevicePreparationResult>;
     list: () => Promise<ReplayDeviceSnapshot>;
     refresh: () => Promise<ReplayDeviceSnapshot>;
     watchStart: () => Promise<void>;
@@ -479,62 +519,21 @@ export interface ElectronAPI {
   };
 
   session: {
-    list: (projectId?: string) => Promise<{ sessions: SessionRecord[] }>;
-    create: (projectId: string, title?: string) => Promise<{
-      success: boolean;
-      session?: SessionRecord;
-      error?: string;
-    }>;
-    rename: (id: string, title: string) => Promise<{
-      success: boolean;
-      session?: SessionRecord;
-      error?: string;
-    }>;
-    remove: (id: string) => Promise<{
-      success: boolean;
-      nextSession?: SessionRecord | null;
-      nextRun?: RunSummary | null;
-      error?: string;
-    }>;
-    select: (id: string) => Promise<{
-      success: boolean;
-      session?: SessionRecord;
-      currentRun?: RunSummary | null;
-      error?: string;
-    }>;
-    setModelOverride: (
-      id: string,
-      modelOverride: SessionRecord['modelOverride'],
-      turnControls?: import('./modelCapability').ConversationTurnControls,
-    ) => Promise<{
-      success: boolean;
-      session?: SessionRecord;
-      error?: string;
-    }>;
-    setAgentId: (
-      id: string,
-      agentId: string,
-    ) => Promise<{
-      success: boolean;
-      session?: SessionRecord;
-      error?: string;
-    }>;
+    list: (projectId?: string) => Promise<{ sessions: SessionRecordSnapshot[] }>;
+    create: (projectId: string, title?: string) => Promise<{ session: SessionRecordSnapshot }>;
+    rename: (id: string, title: string) => Promise<{ session: SessionRecordSnapshot }>;
+    remove: (id: string) => Promise<{ nextSession: SessionRecordSnapshot | null; nextRun: RunSummary | null }>;
+    /** Makes the session current and returns what its surfaces show. */
+    open: (id: string) => Promise<SessionOpenResult>;
+    /** Sets the session's model override and/or turn controls on their revision lanes. */
+    setModelOverride: (id: string, request: SessionModelWriteRequest) => Promise<{ session: SessionRecordSnapshot }>;
+    setAgentId: (id: string, agentId: string) => Promise<{ session: SessionRecordSnapshot }>;
     applyDeclaredHandoff: (
       id: string,
       agent: string,
       label: string,
       expectedPlanHash?: string,
-    ) => Promise<{
-      success: boolean;
-      session?: SessionRecord;
-      suggestion?: PlanReviewHandoffSuggestion;
-      error?: string;
-    }>;
-
-  };
-
-  run: {
-    list: (sessionId: string) => Promise<{ runs: RunSummary[] }>;
+    ) => Promise<{ session: SessionRecordSnapshot; suggestion: PlanReviewHandoffSuggestion }>;
   };
 
   runtime: {
@@ -552,33 +551,20 @@ export interface ElectronAPI {
     readLivePreview: (scope: SessionScope) => Promise<Uint8Array>;
     getReplayState: (scope: SessionScope) => Promise<CaptureReplayState>;
     getRecovery: (scope: SessionScope) => Promise<import('./captureReplay').CaptureRecoveryStatus | null>;
-    restorePrevious: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<{ success: boolean; state?: CaptureReplayState; error?: string }>;
+    restorePrevious: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<CaptureReplayState>;
     applyReplayEvent: (request: CaptureReplayApplyRequest) => Promise<CaptureReplayState>;
     refreshFrame: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<CaptureReplayState>;
     list: (scope: SessionScope) => Promise<{ captures: CaptureDescriptor[] }>;
-    select: (request: SessionScope & { captureId: string; bindingGeneration: number }) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
+    select: (request: SessionScope & { captureId: string; bindingGeneration: number }) => Promise<void>;
     openProjectInput: (
-      request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string; bindingGeneration: number }
-    ) => Promise<{
-      success: boolean;
-      openedCapture?: OpenedCaptureState;
-      contextSnapshot?: ContextSnapshot | null;
-      issue?: import('./device').ReplayDeviceIssue;
-      error?: string;
-    }>;
+      request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string; bindingGeneration: number },
+    ) => Promise<{ openedCapture: OpenedCaptureState; contextSnapshot: ContextSnapshot | null }>;
     getOpenedState: (scope: SessionScope) => Promise<OpenedCaptureState | null>;
-    clearOpenedState: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
+    clearOpenedState: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<void>;
   };
 
   context: {
     get: (scope: SessionScope) => Promise<ContextSnapshot | null>;
-
   };
 
   trace: {
@@ -587,26 +573,34 @@ export interface ElectronAPI {
 
   events: {
     onCaptureReplayChanged: (callback: (state: CaptureReplayState) => void) => () => void;
-    onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; stopReason?: string }) => void) => () => void;
-    onRunUsageChanged: (
-      callback: (summary: SessionScopedPayload<RunContextUsageSummary>) => void
+    onRunStatusChanged: (
+      callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; stopReason?: string }) => void,
     ) => () => void;
+    onRunUsageChanged: (callback: (summary: SessionScopedPayload<RunContextUsageSummary>) => void) => () => void;
     onTraceProjectionChanged: (callback: (payload: TraceProjectionChangedPayload) => void) => () => void;
-    onDelegationTraceChanged: (callback: (payload: { sessionId: string; parentToolCallId: string; revision: number }) => void) => () => void;
+    onDelegationTraceChanged: (
+      callback: (payload: { sessionId: string; parentToolCallId: string; revision: number }) => void,
+    ) => () => void;
     onProbeBatchChanged: (callback: (batch: ProviderProbeBatch) => void) => () => void;
-    onEffectiveCatalogChanged: (callback: (snapshot: EffectiveCatalogSnapshot) => void) => () => void;
+    onKnowledgeProgress: (callback: (progress: KnowledgeOperationProgress) => void) => () => void;
+    onEffectiveCatalogChanged: (callback: (change: EffectiveCatalogChange) => void) => () => void;
     onPlanReviewChanged: (callback: (projection: PlanReviewProjection) => void) => () => void;
-    onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;
-    onToolExecutionComplete: (callback: (trace: unknown) => void) => () => void;
+    onSessionRecordChanged: (callback: (snapshot: SessionRecordSnapshot) => void) => () => void;
+    onToolExecutionComplete: (callback: (trace: ToolTraceEntry) => void) => () => void;
     onEvidenceEventAdded: (callback: (event: ActionEvent) => void) => () => void;
     onDeviceStatusChanged: (callback: (status: ReplayDeviceStatusChangedPayload) => void) => () => void;
     onCaptureStatusChanged: (callback: (status: SessionScopedPayload<unknown>) => void) => () => void;
     onContextChanged: (callback: (snapshot: SessionScopedPayload<ContextSnapshot | null>) => void) => () => void;
-    onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void) => () => void;
+    onProjectInputsChanged: (
+      callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void,
+    ) => () => void;
     onProjectInputsError: (callback: (payload: { projectId: string; error: string }) => void) => () => void;
-    onOpenedCaptureStateChanged: (callback: (state: SessionScopedPayload<OpenedCaptureState | null>) => void) => () => void;
+    onOpenedCaptureStateChanged: (
+      callback: (state: SessionScopedPayload<OpenedCaptureState | null>) => void,
+    ) => () => void;
     onPermissionStateChanged: (callback: (state: RuntimePermissionState) => void) => () => void;
     onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void) => () => void;
+    onSettingsChanged: (callback: (change: SettingsChangedPayload) => void) => () => void;
     onAppThemeChanged: (callback: (theme: ResolvedTheme) => void) => () => void;
     removeAllListeners: (channel: string) => void;
   };

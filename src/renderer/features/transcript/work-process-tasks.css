@@ -16,12 +16,6 @@
   white-space: nowrap;
 }
 
-.work-process-task-snapshot-list {
-  list-style: none;
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-}
-
 .work-process-task-snapshot-item {
   display: flex;
   align-items: flex-start;
@@ -46,13 +40,7 @@
   min-width: 0;
   font-weight: var(--font-normal);
   overflow-wrap: anywhere;
-  line-height: 1.45;
-}
-
-.work-process-task-snapshot-reason {
-  color: var(--token-text-secondary);
-  font-size: var(--type-meta-size);
-  line-height: 1.45;
+  line-height: var(--leading-normal);
 }
 
 /* Done stays readable (the green mark carries the state); only a cancelled title recedes. */
@@ -87,7 +75,15 @@
   list-style: none;
   cursor: pointer;
 }
-.work-process-task-snapshot-copy summary::-webkit-details-marker { display: none; }
-.work-process-task-snapshot-copy[open] > summary .work-process-row-caret { transform: rotate(90deg); }
-.work-process-task-snapshot-copy summary:focus-visible { outline: 2px solid var(--token-border-focus); }
-.work-process-task-snapshot-reason { margin: var(--space-1) 0 0; }
+.work-process-task-snapshot-copy summary::-webkit-details-marker {
+  display: none;
+}
+.work-process-task-snapshot-copy[open] > summary .work-process-row-caret {
+  transform: rotate(90deg);
+}
+.work-process-task-snapshot-copy summary:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+}
+.work-process-task-snapshot-reason {
+  margin: var(--space-1) 0 0;
+}

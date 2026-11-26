@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
+import { prefersReducedMotion } from '../lib/motion';
 
 export type PresenceState = 'open' | 'closing';
 
@@ -33,7 +34,7 @@ export function usePresence(
     }
     if (!mounted) return undefined;
     const element = ref.current;
-    const reducedMotion = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reducedMotion = prefersReducedMotion();
     // An element without an exit animation (or under reduced motion) leaves at once.
     const exitAnimation = element ? getComputedStyle(element).animationName : '';
     if (!element || reducedMotion || !exitAnimation || exitAnimation === 'none') {

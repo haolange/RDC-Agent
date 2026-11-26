@@ -7,10 +7,7 @@ export type ComposerMenuAction =
   | { type: 'close'; id?: ComposerMenuId }
   | { type: 'toggle'; id: ComposerMenuId };
 
-export function reduceComposerMenu(
-  current: ComposerMenuId | null,
-  action: ComposerMenuAction,
-): ComposerMenuId | null {
+export function reduceComposerMenu(current: ComposerMenuId | null, action: ComposerMenuAction): ComposerMenuId | null {
   if (action.type === 'open') {
     return action.id;
   }
@@ -18,11 +15,4 @@ export function reduceComposerMenu(
     return !action.id || action.id === current ? null : current;
   }
   return current === action.id ? null : action.id;
-}
-
-export function isInsideComposerMenuRoot(
-  root: HTMLElement | null,
-  target: EventTarget | null,
-): boolean {
-  return Boolean(root && target instanceof Node && root.contains(target));
 }

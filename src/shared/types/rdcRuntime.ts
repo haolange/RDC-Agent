@@ -1,86 +1,10 @@
-import type { AgentManifestDefinition } from './agentManifest';
 import type { CompiledPromptCache, PromptStablePrefix } from './semanticContext';
 
 export type ResourceScope = 'builtin' | 'user' | 'project';
 
-export type ScopedResourceKind =
-  | 'agent'
-  | 'skill'
-  | 'mcp'
-  | 'hook'
-  | 'policy'
-  | 'knowledge'
-  | 'memory';
+export type ScopedResourceKind = 'agent' | 'skill' | 'mcp' | 'hook' | 'policy' | 'knowledge' | 'memory';
 
 export type EffectiveResourceStatus = 'effective' | 'inherited' | 'overridden' | 'disabled' | 'invalid';
-
-export interface ResourceProvenance {
-  scope: ResourceScope;
-  sourcePath: string;
-  sourceHash: string;
-  overriddenSource?: Omit<ResourceProvenance, 'overriddenSource'>;
-}
-
-export interface ScopedResourceCandidate<T> {
-  id: string;
-  kind: ScopedResourceKind;
-  scope: ResourceScope;
-  sourcePath: string;
-  value: T;
-  enabled?: boolean;
-  invalid?: boolean;
-  invalidReason?: string;
-}
-
-export interface ResolvedResource<T> {
-  id: string;
-  kind: ScopedResourceKind;
-  value: T;
-  enabled: boolean;
-  effectiveStatus: EffectiveResourceStatus;
-  provenance: ResourceProvenance;
-}
-
-export interface ScopedResourceCatalog<T = unknown> {
-  resources: Array<ResolvedResource<T>>;
-  diagnostics: Array<{
-    code: string;
-    severity: 'warning' | 'error';
-    message: string;
-    sourcePath?: string;
-  }>;
-}
-
-export interface EffectiveAgentProfile extends AgentManifestDefinition {
-  effectiveStatus: EffectiveResourceStatus;
-  provenance: ResourceProvenance;
-  compiledRoute: {
-    agentId: string;
-    providerId: string;
-    modelId: string;
-  };
-}
-
-export interface ScopedInstructionSource {
-  id: string;
-  scope: 'user' | 'project';
-  sourcePath: string;
-  sourceHash: string;
-  content: string;
-  byteLength: number;
-  precedence: number;
-}
-
-export interface ScopedInstructionResolution {
-  sources: ScopedInstructionSource[];
-  totalBytes: number;
-  diagnostics: Array<{
-    code: string;
-    severity: 'warning' | 'error';
-    message: string;
-    sourcePath?: string;
-  }>;
-}
 
 export interface SkillMetadata {
   id: string;
@@ -95,13 +19,6 @@ export interface SkillMetadata {
   sourcePath: string;
   sourceHash: string;
   effectiveStatus: EffectiveResourceStatus;
-}
-
-export interface SkillLoadResult extends SkillMetadata {
-  instructions: string;
-  referencesPath?: string;
-  scriptsPath?: string;
-  assetsPath?: string;
 }
 
 /** Read-only authoring metadata, never an execution permission or frozen catalog. */
@@ -129,31 +46,9 @@ export const CANONICAL_HOOK_EVENTS = [
   'permission.denied',
 ] as const;
 
-export type HookEvent = typeof CANONICAL_HOOK_EVENTS[number];
+export type HookEvent = (typeof CANONICAL_HOOK_EVENTS)[number];
 
-export interface HookDefinition {
-  id: string;
-  enabled: boolean;
-  event: HookEvent;
-  command: string;
-  args: string[];
-  cwd?: string;
-  env?: Record<string, string>;
-  timeoutMs: number;
-  failurePolicy: 'block' | 'warn';
-  matcher?: { agents?: string[]; tools?: string[] };
-}
-
-export interface HookTrustState {
-  trusted: boolean;
-  needsRetrust: boolean;
-  projectRoot?: string;
-  sourceHash: string;
-  trustFingerprint: string;
-  trustedAt?: string;
-}
-
-export type PromptSegmentKind =
+type PromptSegmentKind =
   | 'core-contract'
   | 'agent-profile'
   | 'scoped-instruction'
@@ -176,7 +71,7 @@ export interface PromptSegment {
   tokenEstimate: number;
 }
 
-export interface PromptPlanMetrics {
+interface PromptPlanMetrics {
   systemPrompt: number;
   scopedInstructions: number;
   skills: number;
@@ -230,7 +125,6 @@ export interface RequestEnvelopeSnapshot {
 }
 
 export type ProviderReasoningContract = import('../provider-catalog/modelManifestSchema').ProviderReasoningContract;
-export type ReasoningSemantic = ProviderReasoningContract['semantic'];
 
 export interface ScopedResourceDocument {
   id: string;
@@ -288,37 +182,9 @@ export interface ScopedResourceWriteRequest {
   projectRoot?: string;
 }
 
+/** Main shows the file picker; the request only names what is imported and where it lands. */
 export interface ScopedResourceImportRequest {
   kind: ScopedResourceKind;
   scope: 'user' | 'project';
-  filePath: string;
   projectRoot?: string;
-}
-
-export interface RestrictivePolicy {
-  deniedTools?: string[];
-  approval?: 'none' | 'destructive' | 'mutation' | 'all';
-  /** Optional per-tool approval floor; keys are normalized tool names. */
-  approvalFloorByTool?: Record<string, PolicyApprovalFloor>;
-  limits?: Record<string, number>;
-}
-
-export type PolicyApprovalFloor = 'none' | 'auto_review' | 'user';
-
-/**
- * 编译后的执行期 Policy（不可变快照）。
- * `.policy.yml` 解析失败必须 fail-closed，不得静默忽略。
- */
-export interface CompiledPolicy {
-  deniedTools: readonly string[];
-  approvalFloorByTool: Readonly<Record<string, PolicyApprovalFloor>>;
-  approval: 'none' | 'destructive' | 'mutation' | 'all';
-  maxTurns: number;
-  maxToolCalls: number;
-  maxSubagents: number;
-  maxChildDepth: number;
-  maxWallTimeMs: number;
-  /** 100 = unlimited (does not constrain the user compaction percent). */
-  contextCompactionPercent: number;
-  sourceFingerprint: string;
 }

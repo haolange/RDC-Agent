@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto';
+import { z } from 'zod';
 import { isReasoningSelection } from '@shared/types/modelCapability';
-import { TOP_LEVEL_AGENT_IDS, isSafeAgentProfileId } from '@shared/types/agent';
+import { TOP_LEVEL_AGENT_IDS } from '@shared/types/agent';
+import { isSafeAgentProfileId } from '../agent-manifests/agentProfileId';
 import {
-  createProviderEntryFromCatalog,
-  createProviderEntriesFromCatalog,
   getProviderAuthModeAvailability,
   getProviderCatalogModelSummaries,
   getProviderCatalogOwnership,
@@ -12,31 +12,19 @@ import {
   getProviderAccountAuth,
   getProviderModelSummaries,
   getProviderSurfaceSummary,
-  isBuiltinProviderId,
   isRetiredProviderModel,
 } from '../../provider-catalog/ProviderCatalogRegistry';
-import { appPathService } from '../../runtime/AppPathService';
-import { normalizeProviderCategory, normalizeProviderProtocol } from '../provider-catalog/providerCatalogNormalize';
 import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from '../provider-catalog/DiscoveryAdmission';
-import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
 import { secretStorageService } from './SecretStorageService';
 import type {
   LlmAgentRoute,
   LlmProviderAuthMode,
   LlmProviderAvailability,
-  LlmProviderConnectionStatus,
   LlmProviderConnectionSchema,
   LlmProviderEntry,
   LlmProviderModel,
   LlmProviderModelPreference,
 } from '@shared/types/settings';
-import type { PersistedLlmProviderEntry } from './settingsDefaults';
-
-export type ProviderCredentialView = 'runtime' | 'storage-metadata';
-
-export interface ProviderSanitizeOptions {
-  credentialView?: ProviderCredentialView;
-}
 
 /** A stored key is usable when it is non-empty and carries the prefix the provider's manifest declares. */
 export function isVendorSecretUsable(providerId: string, secret: string): boolean {
@@ -47,7 +35,11 @@ export function isVendorSecretUsable(providerId: string, secret: string): boolea
   return !primaryField?.valuePrefix || normalized.startsWith(primaryField.valuePrefix.toLowerCase());
 }
 
-export function getResolvedProviderSecret(providerId: string, secretRef: string | undefined, workspaceRoot: string): string {
+export function getResolvedProviderSecret(
+  providerId: string,
+  secretRef: string | undefined,
+  workspaceRoot: string,
+): string {
   const secret = secretStorageService.getSecret(secretRef, workspaceRoot).trim();
   return isVendorSecretUsable(providerId, secret) ? secret : '';
 }
@@ -56,16 +48,27 @@ export function createLocalAccountId(): string {
   return `account-${randomUUID()}`;
 }
 
-export function extractOAuthBundleAccountId(raw: string): string | undefined {
-  if (!raw) {
-    return undefined;
-  }
+/** A stored OAuth bundle as far as Settings reads it: string fields by name; anything else is not a bundle. */
+const OAuthBundleFieldsSchema = z.record(z.string(), z.unknown());
+
+function readOAuthBundle(raw: string): Record<string, unknown> | null {
+  if (!raw) return null;
+  let value: unknown;
   try {
-    const accountId = (JSON.parse(raw) as { accountId?: unknown }).accountId;
-    return typeof accountId === 'string' && accountId.trim() ? accountId.trim() : undefined;
+    value = JSON.parse(raw);
   } catch {
-    return undefined;
+    return null;
   }
+  const parsed = OAuthBundleFieldsSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+const bundleText = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() ? value.trim() : undefined;
+
+/** The upstream account id an OAuth bundle names; undefined when the payload is not a bundle or names none. */
+export function extractOAuthBundleAccountId(raw: string): string | undefined {
+  return bundleText(readOAuthBundle(raw)?.accountId);
 }
 
 export function getProviderAccountSecretRef(
@@ -73,19 +76,7 @@ export function getProviderAccountSecretRef(
   accountId: string | undefined,
   kind: 'api-key' | 'oauth',
 ): string | undefined {
-  return accountId
-    ? secretStorageService.createProviderAccountSecretRef(providerId, accountId, kind)
-    : undefined;
-}
-
-export function resolveProviderAuthMode(
-  provider: Partial<LlmProviderEntry>,
-  fallback: LlmProviderEntry,
-): LlmProviderAuthMode {
-  const options = fallback.authModeOptions ?? [fallback.authMode];
-  return typeof provider.authMode === 'string' && options.includes(provider.authMode)
-    ? provider.authMode
-    : fallback.authMode;
+  return accountId ? secretStorageService.createProviderAccountSecretRef(providerId, accountId, kind) : undefined;
 }
 
 export function sanitizeAuthAccountIds(
@@ -110,9 +101,11 @@ export function resolveSelectedAuthAvailability(
   mode: LlmProviderAuthMode,
   fallback: LlmProviderEntry,
 ): LlmProviderAvailability {
-  return getProviderAuthModeAvailability(providerId)[mode]
-    ?? fallback.authModeAvailability?.[mode]
-    ?? fallback.providerAvailability;
+  return (
+    getProviderAuthModeAvailability(providerId)[mode] ??
+    fallback.authModeAvailability?.[mode] ??
+    fallback.providerAvailability
+  );
 }
 
 export function resolveAccountRuntimeCredential(
@@ -128,26 +121,17 @@ export function resolveAccountRuntimeCredential(
     getProviderAccountSecretRef(providerId, provider.activeAccountId, 'oauth'),
     workspaceRoot,
   );
-  if (!raw) {
+  // A stored credential that is not a bundle leaves the account unconfigured.
+  const bundle = readOAuthBundle(raw);
+  if (!bundle) {
     return { apiKey: '' };
   }
-  try {
-    const bundle = JSON.parse(raw) as Partial<Record<
-      'accessToken' | 'apiKey' | 'copilotToken' | 'copilotApiBaseUrl' | 'resourceUrl' | 'accountId',
-      unknown
-    >>;
-    const readField = (value: unknown): string | undefined => (
-      typeof value === 'string' && value.trim() ? value.trim() : undefined
-    );
-    const { tokenFields, baseUrlField } = accountAuth.credential;
-    return {
-      apiKey: tokenFields.map((field) => readField(bundle[field])).find(Boolean) ?? '',
-      baseUrl: (baseUrlField ? readField(bundle[baseUrlField]) : undefined) ?? getProviderDefaultBaseUrl(providerId),
-      accountId: readField(bundle.accountId),
-    };
-  } catch {
-    return { apiKey: '' };
-  }
+  const { tokenFields, baseUrlField } = accountAuth.credential;
+  return {
+    apiKey: tokenFields.map((field) => bundleText(bundle[field])).find(Boolean) ?? '',
+    baseUrl: (baseUrlField ? bundleText(bundle[baseUrlField]) : undefined) ?? getProviderDefaultBaseUrl(providerId),
+    accountId: bundleText(bundle.accountId),
+  };
 }
 
 export function sanitizeModels(models: unknown): LlmProviderModel[] {
@@ -164,16 +148,24 @@ export function sanitizeModels(models: unknown): LlmProviderModel[] {
     if (!modelId || modelMap.has(modelId)) {
       continue;
     }
-    const availability = candidate.availability === 'available'
-      || candidate.availability === 'unavailable'
-      || candidate.availability === 'unknown'
-      ? candidate.availability
-      : undefined;
+    const availability =
+      candidate.availability === 'available' ||
+      candidate.availability === 'unavailable' ||
+      candidate.availability === 'unknown'
+        ? candidate.availability
+        : undefined;
 
     const aliases = Array.isArray(candidate.aliases)
-      ? [...new Set(candidate.aliases.filter((value): value is string => (
-          typeof value === 'string' && Boolean(value.trim()) && value.trim() !== modelId
-        )).map((value) => value.trim()))]
+      ? [
+          ...new Set(
+            candidate.aliases
+              .filter(
+                (value): value is string =>
+                  typeof value === 'string' && Boolean(value.trim()) && value.trim() !== modelId,
+              )
+              .map((value) => value.trim()),
+          ),
+        ]
       : [];
     modelMap.set(modelId, {
       id: modelId,
@@ -182,20 +174,22 @@ export function sanitizeModels(models: unknown): LlmProviderModel[] {
       defaultReasoningSelection: isReasoningSelection(candidate.defaultReasoningSelection)
         ? candidate.defaultReasoningSelection
         : undefined,
-      defaultBudgetTokens: typeof candidate.defaultBudgetTokens === 'number'
-        && Number.isSafeInteger(candidate.defaultBudgetTokens)
-        && candidate.defaultBudgetTokens > 0
-        ? candidate.defaultBudgetTokens
-        : undefined,
-      preferredRouteOptionId: typeof candidate.preferredRouteOptionId === 'string'
-        && candidate.preferredRouteOptionId.trim()
-        ? candidate.preferredRouteOptionId.trim()
-        : undefined,
+      defaultBudgetTokens:
+        typeof candidate.defaultBudgetTokens === 'number' &&
+        Number.isSafeInteger(candidate.defaultBudgetTokens) &&
+        candidate.defaultBudgetTokens > 0
+          ? candidate.defaultBudgetTokens
+          : undefined,
+      preferredRouteOptionId:
+        typeof candidate.preferredRouteOptionId === 'string' && candidate.preferredRouteOptionId.trim()
+          ? candidate.preferredRouteOptionId.trim()
+          : undefined,
       ...(aliases.length > 0 ? { aliases } : {}),
       availability,
-      availabilityReason: typeof candidate.availabilityReason === 'string' && candidate.availabilityReason.trim()
-        ? candidate.availabilityReason.trim()
-        : undefined,
+      availabilityReason:
+        typeof candidate.availabilityReason === 'string' && candidate.availabilityReason.trim()
+          ? candidate.availabilityReason.trim()
+          : undefined,
     });
   }
 
@@ -216,7 +210,7 @@ export function applyModelEnabledState(
       defaultReasoningSelection: persisted?.defaultReasoningSelection,
       defaultBudgetTokens: persisted?.defaultBudgetTokens,
       preferredRouteOptionId: persisted?.preferredRouteOptionId,
-      availability: manifestDenied ? 'unavailable' : persisted?.availability ?? model.availability,
+      availability: manifestDenied ? 'unavailable' : (persisted?.availability ?? model.availability),
       availabilityReason: manifestDenied ? model.availabilityReason : persisted?.availabilityReason,
     };
   });
@@ -237,15 +231,16 @@ export function applyModelPreferences(
       defaultReasoningSelection: isReasoningSelection(preference.defaultReasoningSelection)
         ? preference.defaultReasoningSelection
         : undefined,
-      defaultBudgetTokens: typeof preference.defaultBudgetTokens === 'number'
-        && Number.isSafeInteger(preference.defaultBudgetTokens)
-        && preference.defaultBudgetTokens > 0
-        ? preference.defaultBudgetTokens
-        : undefined,
-      preferredRouteOptionId: typeof preference.preferredRouteOptionId === 'string'
-        && preference.preferredRouteOptionId.trim()
-        ? preference.preferredRouteOptionId.trim()
-        : undefined,
+      defaultBudgetTokens:
+        typeof preference.defaultBudgetTokens === 'number' &&
+        Number.isSafeInteger(preference.defaultBudgetTokens) &&
+        preference.defaultBudgetTokens > 0
+          ? preference.defaultBudgetTokens
+          : undefined,
+      preferredRouteOptionId:
+        typeof preference.preferredRouteOptionId === 'string' && preference.preferredRouteOptionId.trim()
+          ? preference.preferredRouteOptionId.trim()
+          : undefined,
     };
   });
 }
@@ -257,12 +252,16 @@ export function resolveProviderModels(providerId: string, persistedModels: unkno
   const catalogMetadata = getProviderCatalogModelSummaries(providerId);
   const metadataById = new Map(catalogMetadata.map((metadata) => [metadata.modelId, metadata]));
   const catalogModels = getProviderModelSummaries(providerId);
-  const catalogKeys = new Set(catalogMetadata.flatMap((metadata) => (
-    [metadata.modelId, ...metadata.aliases].map(normalizeDiscoveredModelMatchKey).filter(Boolean)
-  )));
-  const observedKeys = new Set(sanitized.flatMap((model) => (
-    [model.id, ...(model.aliases ?? [])].map(normalizeDiscoveredModelMatchKey).filter(Boolean)
-  )));
+  const catalogKeys = new Set(
+    catalogMetadata.flatMap((metadata) =>
+      [metadata.modelId, ...metadata.aliases].map(normalizeDiscoveredModelMatchKey).filter(Boolean),
+    ),
+  );
+  const observedKeys = new Set(
+    sanitized.flatMap((model) =>
+      [model.id, ...(model.aliases ?? [])].map(normalizeDiscoveredModelMatchKey).filter(Boolean),
+    ),
+  );
   const visibleCatalogModels = catalogModels.filter((model) => {
     const metadata = metadataById.get(model.id);
     if (!metadata || metadata.presencePolicy === 'maintained') return true;
@@ -270,9 +269,8 @@ export function resolveProviderModels(providerId: string, persistedModels: unkno
       .map(normalizeDiscoveredModelMatchKey)
       .some((key) => observedKeys.has(key));
   });
-  const dynamicAllowed = ownership !== 'app-managed'
-    && authority !== 'candidate-validation'
-    && authority !== 'entitlement-overlay';
+  const dynamicAllowed =
+    ownership !== 'app-managed' && authority !== 'candidate-validation' && authority !== 'entitlement-overlay';
   const dynamicModels = dynamicAllowed
     ? sanitized.filter((model) => {
         if (!isAdmittedDiscoveredModel({ id: model.id })) return false;
@@ -281,10 +279,7 @@ export function resolveProviderModels(providerId: string, persistedModels: unkno
           .some((key) => catalogKeys.has(key));
       })
     : [];
-  return [
-    ...applyModelEnabledState(visibleCatalogModels, sanitized),
-    ...dynamicModels,
-  ];
+  return [...applyModelEnabledState(visibleCatalogModels, sanitized), ...dynamicModels];
 }
 
 export function createEmptyAgentRoutes(): LlmAgentRoute[] {
@@ -312,43 +307,17 @@ function sanitizeRoute(entry: unknown): LlmAgentRoute | null {
   };
 }
 
-function pickProviderStatus(
-  previousStatus: LlmProviderConnectionStatus | undefined,
-  authUnavailable: boolean,
-  verifiedConnection: boolean,
-): LlmProviderConnectionStatus {
-  if (authUnavailable) {
-    return 'unavailable';
-  }
-  if (previousStatus === 'failed') {
-    return 'failed';
-  }
-  return verifiedConnection ? 'verified' : 'unconfigured';
-}
-
-export function isFixtureProvider(provider: Partial<LlmProviderEntry>): boolean {
-  const id = typeof provider.id === 'string' ? provider.id.trim() : '';
-  const baseUrl = typeof provider.baseUrl === 'string' ? provider.baseUrl.trim().toLowerCase() : '';
-
-  return (
-    /^provider-\d+$/i.test(id)
-    || id === 'acme'
-    || id === 'vendorx'
-    || baseUrl.includes('example.com')
-    || baseUrl.includes('acme.local')
-    || baseUrl.includes('vendorx.ai')
-  );
-}
-
-function cloneConnectionSchema(
+export function cloneConnectionSchema(
   schema: LlmProviderConnectionSchema | undefined,
 ): LlmProviderConnectionSchema | undefined {
   return schema
     ? {
         ...schema,
         fields: schema.fields.map((field) => ({ ...field })),
-        credentialAlternatives: schema.credentialAlternatives
-          ?.map((alternative) => ({ ...alternative, fieldIds: [...alternative.fieldIds] })),
+        credentialAlternatives: schema.credentialAlternatives?.map((alternative) => ({
+          ...alternative,
+          fieldIds: [...alternative.fieldIds],
+        })),
         headerMappings: schema.headerMappings?.map((mapping) => ({ ...mapping })),
       }
     : undefined;
@@ -371,32 +340,6 @@ export function sanitizeConnectionValues(
   );
 }
 
-function sanitizeConnectionSecretRefs(
-  providerId: string,
-  accountId: string | undefined,
-  schema: LlmProviderConnectionSchema | undefined,
-  refs: Record<string, string> | undefined,
-): Record<string, string> {
-  if (!accountId) {
-    return {};
-  }
-  const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(schema);
-  const secretFieldIds = new Set(
-    schema?.fields
-      .filter((field) => field.kind === 'secret' && field.id !== primarySecretFieldId)
-      .map((field) => field.id) ?? [],
-  );
-  return Object.fromEntries(
-    Object.entries(refs ?? {}).flatMap(([fieldId, secretRef]) => {
-      if (!secretFieldIds.has(fieldId) || typeof secretRef !== 'string') {
-        return [];
-      }
-      const expectedRef = secretStorageService.createProviderConnectionSecretRef(providerId, accountId, fieldId);
-      return secretRef.trim() === expectedRef ? [[fieldId, expectedRef]] : [];
-    }),
-  );
-}
-
 export function isConnectionSchemaSatisfied(
   schema: LlmProviderConnectionSchema | undefined,
   connectionValues: Record<string, string>,
@@ -407,9 +350,7 @@ export function isConnectionSchemaSatisfied(
   }
   const isPresent = (fieldId: string): boolean => {
     const field = schema.fields.find((candidate) => candidate.id === fieldId);
-    return field?.kind === 'secret'
-      ? secretPresence[fieldId] === true
-      : Boolean(connectionValues[fieldId]?.trim());
+    return field?.kind === 'secret' ? secretPresence[fieldId] === true : Boolean(connectionValues[fieldId]?.trim());
   };
   const alternativeFieldIds = new Set(
     schema.credentialAlternatives?.flatMap((alternative) => alternative.fieldIds) ?? [],
@@ -420,280 +361,17 @@ export function isConnectionSchemaSatisfied(
   if (!requiredFieldsPresent) {
     return false;
   }
-  return !schema.credentialAlternatives?.length
-    || schema.credentialAlternatives.some((alternative) => (
-      alternative.ambient === true
-      || (alternative.fieldIds.length > 0 && alternative.fieldIds.every(isPresent))
-    ));
+  return (
+    !schema.credentialAlternatives?.length ||
+    schema.credentialAlternatives.some(
+      (alternative) =>
+        alternative.ambient === true || (alternative.fieldIds.length > 0 && alternative.fieldIds.every(isPresent)),
+    )
+  );
 }
 
-export function sanitizeUserProvider(
-  provider: PersistedLlmProviderEntry,
-  workspaceRoot = appPathService.getUserRdcRoot(),
-  options: ProviderSanitizeOptions = {},
-): LlmProviderEntry | null {
-  const incomingId = typeof provider.id === 'string' ? provider.id.trim() : '';
-  const rawId = incomingId;
-  if (!rawId || !isBuiltinProviderId(rawId)) {
-    return null;
-  }
-
-  const builtinFallback = createProviderEntryFromCatalog(rawId);
-  const definition = builtinFallback;
-  const authMode = resolveProviderAuthMode(provider, builtinFallback);
-  const authAccountIds = sanitizeAuthAccountIds(provider, authMode);
-  const activeAccountId = authAccountIds[authMode];
-  const connectionSchema = cloneConnectionSchema(builtinFallback.connectionSchema);
-  const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(connectionSchema);
-  const connectionValues = sanitizeConnectionValues(connectionSchema, provider.connectionValues);
-  const secretRefs = sanitizeConnectionSecretRefs(
-    rawId,
-    authAccountIds['api-key'],
-    connectionSchema,
-    provider.secretRefs,
-  );
-  const secretRef = getProviderAccountSecretRef(rawId, authAccountIds['api-key'], 'api-key');
-  const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
-  const catalogOwnership = getProviderCatalogOwnership(rawId);
-  const apiKeySecret = getResolvedProviderSecret(rawId, secretRef, workspaceRoot);
-  const oauthSecret = secretStorageService.getSecret(
-    getProviderAccountSecretRef(rawId, authAccountIds.account, 'oauth'),
-    workspaceRoot,
-  );
-  const preserveStorageMetadata = options.credentialView === 'storage-metadata';
-  const persistedApiKeyPresence = preserveStorageMetadata && (
-    provider.hasStoredSecretByAuthMode?.['api-key'] === true
-    || (authMode === 'api-key' && provider.hasStoredSecret === true)
-  );
-  const hasStoredConnectionSecrets = Object.fromEntries(
-    (connectionSchema?.fields ?? [])
-      .filter((field) => field.kind === 'secret')
-      .map((field) => {
-        const present = field.id === primarySecretFieldId
-          ? Boolean(apiKeySecret) || persistedApiKeyPresence
-          : Boolean(secretStorageService.getSecret(secretRefs[field.id], workspaceRoot))
-            || (preserveStorageMetadata && (
-              secretStorageService.hasSecretRecord(secretRefs[field.id], workspaceRoot)
-              || provider.hasStoredConnectionSecrets?.[field.id] === true
-            ));
-        return [field.id, present];
-      }),
-  ) as Record<string, boolean>;
-  const apiKeyCredentialPresent = connectionSchema?.fields.length
-    ? isConnectionSchemaSatisfied(connectionSchema, connectionValues, hasStoredConnectionSecrets)
-    : Boolean(apiKeySecret) || persistedApiKeyPresence;
-  const hasStoredSecretByAuthMode = Object.fromEntries(
-    (builtinFallback.authModeOptions ?? [builtinFallback.authMode]).map((mode) => {
-      const persisted = preserveStorageMetadata && (
-        provider.hasStoredSecretByAuthMode?.[mode] === true
-        || (mode === authMode && provider.hasStoredSecret === true)
-      );
-      const present = mode === 'local' || mode === 'environment'
-        ? true
-        : mode === 'api-key'
-          ? apiKeyCredentialPresent
-          : Boolean(oauthSecret) || persisted;
-      return [mode, present];
-    }),
-  ) as Partial<Record<LlmProviderAuthMode, boolean>>;
-  const hasStoredSecret = hasStoredSecretByAuthMode[authMode] === true;
-  const persistedModels = resolveProviderModels(rawId, provider.models ?? []);
-  const structuralMetadataById = new Map(
-    getProviderCatalogModelSummaries(rawId).map((metadata) => [metadata.modelId, metadata]),
-  );
-  const structuralModels = getProviderModelSummaries(rawId)
-    .filter((model) => structuralMetadataById.get(model.id)?.presencePolicy === 'maintained');
-  const structuralModelsById = new Map(structuralModels.map((model) => [model.id, model]));
-  // Account discovery is scoped to the active identity. Once its credential is
-  // absent, retain only released structural rows and discard account-specific
-  // dynamic models and availability overlays.
-  const models = catalogOwnership !== 'user-managed' && (authMode !== 'account' || hasStoredSecretByAuthMode.account === true)
-    ? persistedModels
-    : authMode === 'account' && hasStoredSecretByAuthMode.account !== true
-    ? applyModelEnabledState(structuralModels, persistedModels).map((model) => {
-        const structural = structuralModelsById.get(model.id);
-        return {
-          ...model,
-          availability: structural?.availability,
-          availabilityReason: structural?.availabilityReason,
-        };
-      })
-    : persistedModels;
-  const selectedAvailability = resolveSelectedAuthAvailability(rawId, authMode, builtinFallback);
-  const configuredAuthMode = (builtinFallback.authModeOptions ?? [builtinFallback.authMode]).includes(provider.configuredAuthMode as LlmProviderAuthMode)
-    ? provider.configuredAuthMode
-    : provider.status === 'verified' || provider.isConfigured === true
-      ? authMode
-      : undefined;
-  const status = pickProviderStatus(
-    configuredAuthMode && configuredAuthMode !== authMode ? 'unconfigured' : provider.status,
-    selectedAvailability.state === 'unavailable',
-    configuredAuthMode === authMode && hasStoredSecret,
-  );
-  const hasEnabledModels = models.some((model) => model.enabled !== false);
-  const enabled = status === 'verified' && hasEnabledModels;
-  const label = builtinFallback.label;
-  const recommendedModels = builtinFallback.recommendedModels.filter((id) => models.some((model) =>
-    model.id === id && model.enabled !== false && model.availability !== 'unavailable'));
-  const docsUrl = builtinFallback.docsUrl;
-
-  return {
-    id: rawId,
-    activeAccountId,
-    authAccountIds,
-    protocol,
-    routeCount: builtinFallback.routeCount,
-    authMode,
-    authModeOptions: builtinFallback.authModeOptions,
-    authModeAvailability: builtinFallback.authModeAvailability,
-    hasStoredSecretByAuthMode,
-    configuredAuthMode,
-    lifecycleStatus: builtinFallback.lifecycleStatus,
-    providerAvailability: { ...builtinFallback.providerAvailability },
-    category: normalizeProviderCategory({ ...provider, id: rawId, authMode }),
-    catalogOwnership,
-    serviceOperator: builtinFallback.serviceOperator,
-    endpointClass: builtinFallback.endpointClass,
-    catalogProvenance: builtinFallback.catalogProvenance.map((entry) => ({ ...entry })),
-    label,
-    enabled,
-    apiKey: '',
-    secretRef,
-    secretRefs,
-    connectionValues,
-    hasStoredConnectionSecrets,
-    connectionSchema,
-    hasStoredSecret,
-    baseUrl: (() => {
-      const defaultBaseUrl = getProviderDefaultBaseUrl(rawId);
-      if (definition?.baseUrlEditable) {
-        return typeof provider.baseUrl === 'string' && provider.baseUrl.trim()
-          ? provider.baseUrl.trim()
-          : defaultBaseUrl ?? definition.baseUrl;
-      }
-      return definition?.baseUrl;
-    })(),
-    baseUrlEditable: definition?.baseUrlEditable,
-    models,
-    recommendedModels,
-    docsUrl,
-    status,
-    lastTestedAt: typeof provider.lastTestedAt === 'string' ? provider.lastTestedAt : undefined,
-    lastModelRefreshAt: typeof provider.lastModelRefreshAt === 'string' ? provider.lastModelRefreshAt : undefined,
-    lastError: status === 'failed' && typeof provider.lastError === 'string' ? provider.lastError : undefined,
-    accountLogin: definition?.accountLogin,
-    accountLabel: typeof provider.accountLabel === 'string' ? provider.accountLabel : undefined,
-    planLabel: typeof provider.planLabel === 'string' ? provider.planLabel : undefined,
-    oauthExpiresAt: typeof provider.oauthExpiresAt === 'string' ? provider.oauthExpiresAt : undefined,
-    oauthRefreshAvailable: typeof provider.oauthRefreshAvailable === 'boolean' ? provider.oauthRefreshAvailable : undefined,
-    unavailableReason: selectedAvailability.state === 'unavailable' ? selectedAvailability.reason : undefined,
-    isConfigured: status === 'verified',
-    capabilities: definition?.capabilities ? [...definition.capabilities] : undefined,
-  };
-}
-
-export function normalizeUserProviders(
-  providers: unknown,
-  workspaceRoot: string,
-  options: ProviderSanitizeOptions = {},
-): LlmProviderEntry[] {
-  const persistedProviders = new Map<string, LlmProviderEntry>();
-
-  for (const entry of Array.isArray(providers) ? providers : []) {
-    if (!entry || typeof entry !== 'object') {
-      continue;
-    }
-
-    const provider = sanitizeUserProvider(entry as Partial<LlmProviderEntry>, workspaceRoot, options);
-    if (!provider || persistedProviders.has(provider.id)) {
-      continue;
-    }
-
-    persistedProviders.set(provider.id, provider);
-  }
-
-  return createProviderEntriesFromCatalog()
-    .map((catalogProvider) => sanitizeUserProvider(
-      persistedProviders.get(catalogProvider.id) ?? catalogProvider,
-      workspaceRoot,
-      options,
-    ))
-    .filter((provider): provider is LlmProviderEntry => provider !== null);
-}
-
-export function hydrateProviderSecrets(
-  providers: LlmProviderEntry[],
-  workspaceRoot: string,
-): LlmProviderEntry[] {
-  return providers.map((provider) => {
-    const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(provider.connectionSchema);
-    const apiKeySecret = getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
-    const oauthSecret = secretStorageService.getSecret(
-      getProviderAccountSecretRef(provider.id, provider.authAccountIds?.account, 'oauth'),
-      workspaceRoot,
-    );
-    const hasStoredConnectionSecrets = Object.fromEntries(
-      (provider.connectionSchema?.fields ?? [])
-        .filter((field) => field.kind === 'secret')
-        .map((field) => [
-          field.id,
-          field.id === primarySecretFieldId
-            ? Boolean(apiKeySecret)
-            : Boolean(secretStorageService.getSecret(provider.secretRefs?.[field.id], workspaceRoot)),
-        ]),
-    ) as Record<string, boolean>;
-    const apiKeyCredentialPresent = provider.connectionSchema?.fields.length
-      ? isConnectionSchemaSatisfied(
-          provider.connectionSchema,
-          provider.connectionValues ?? {},
-          hasStoredConnectionSecrets,
-        )
-      : Boolean(apiKeySecret);
-    const hasStoredSecretByAuthMode = Object.fromEntries(
-      (provider.authModeOptions ?? [provider.authMode]).map((mode) => [
-        mode,
-        mode === 'local' || mode === 'environment'
-          ? true
-          : mode === 'api-key'
-            ? apiKeyCredentialPresent
-            : Boolean(oauthSecret),
-      ]),
-    ) as Partial<Record<LlmProviderAuthMode, boolean>>;
-    const hasStoredSecret = hasStoredSecretByAuthMode[provider.authMode] === true;
-    const canUseProvider = hasStoredSecret && provider.authModeAvailability?.[provider.authMode]?.state !== 'unavailable';
-    const hasEnabledModels = provider.models.some((model) => model.enabled !== false);
-    const status = provider.status === 'unavailable'
-      ? 'unavailable'
-      : provider.status === 'verified'
-        && provider.configuredAuthMode === provider.authMode
-        && canUseProvider
-        ? 'verified'
-        : provider.status === 'failed'
-          ? 'failed'
-          : 'unconfigured';
-    const isConfigured = status === 'verified';
-
-    return {
-      ...provider,
-      // The renderer only needs to know whether a secret exists.
-      // Keep plaintext secrets out of settings:get payloads.
-      apiKey: '',
-      hasStoredSecret,
-      hasStoredSecretByAuthMode,
-      hasStoredConnectionSecrets,
-      enabled: isConfigured && hasEnabledModels,
-      status,
-      isConfigured,
-    };
-  });
-}
-
-export function normalizeManifestRoutes(
-  routes: unknown,
-): LlmAgentRoute[] {
-  const routeMap = new Map<string, LlmAgentRoute>(
-    createEmptyAgentRoutes().map((route) => [route.agentId, route]),
-  );
+export function normalizeManifestRoutes(routes: unknown): LlmAgentRoute[] {
+  const routeMap = new Map<string, LlmAgentRoute>(createEmptyAgentRoutes().map((route) => [route.agentId, route]));
   for (const route of Array.isArray(routes) ? routes.map(sanitizeRoute) : []) {
     if (!route) {
       continue;

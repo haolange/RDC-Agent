@@ -19,7 +19,10 @@ export interface ProjectedTaskItem {
 }
 
 /** An open Task whose current execution failed or was interrupted shows as failed; otherwise its status. */
-export function taskDisplayState(task: Pick<TaskRecord, 'status'>, current: Pick<TaskExecutionRecord, 'status'> | undefined): TaskDisplayState {
+export function taskDisplayState(
+  task: Pick<TaskRecord, 'status'>,
+  current: Pick<TaskExecutionRecord, 'status'> | undefined,
+): TaskDisplayState {
   const open = task.status !== 'completed' && task.status !== 'cancelled';
   return open && (current?.status === 'failed' || current?.status === 'interrupted') ? 'failed' : task.status;
 }
@@ -31,13 +34,15 @@ export function taskExecutionFacts(execution: TaskExecutionRecord): TaskExecutio
     status: execution.status,
     ...(execution.dispatch ? { dispatch: execution.dispatch } : {}),
     ...(preparation?.profileId ? { agentId: preparation.profileId } : {}),
-    ...(preparation?.providerId && preparation.modelId ? {
-      model: {
-        providerId: preparation.providerId,
-        modelId: preparation.modelId,
-        ...(preparation.reasoningLevel ? { reasoningLevel: preparation.reasoningLevel } : {}),
-      },
-    } : {}),
+    ...(preparation?.providerId && preparation.modelId
+      ? {
+          model: {
+            providerId: preparation.providerId,
+            modelId: preparation.modelId,
+            ...(preparation.reasoningLevel ? { reasoningLevel: preparation.reasoningLevel } : {}),
+          },
+        }
+      : {}),
   };
 }
 
@@ -49,21 +54,29 @@ export function createdAtFromTaskId(id: string): number {
 }
 
 export function orderTasks(records: readonly TaskRecord[]): TaskRecord[] {
-  return records
-    .slice()
-    .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
+  return records.slice().sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
 }
 
-export function projectTaskItems(records: readonly TaskRecord[], executions: readonly TaskExecutionRecord[] = []): ProjectedTaskItem[] {
+export function projectTaskItems(
+  records: readonly TaskRecord[],
+  executions: readonly TaskExecutionRecord[] = [],
+): ProjectedTaskItem[] {
   const ordered = orderTasks(records);
   const byId = new Map(ordered.map((task) => [task.id, task] as const));
-  const byExecution = new Map(executions.map(execution => [execution.id, execution] as const));
+  const byExecution = new Map(executions.map((execution) => [execution.id, execution] as const));
   return ordered.map((task, order) => {
-    const waitingOn = task.status === 'pending' ? task.blockedBy.flatMap(id => {
-      const dependency = byId.get(id);
-      const wait = taskDependencyWait(id, dependency, dependency?.currentExecutionId ? byExecution.get(dependency.currentExecutionId) : undefined);
-      return wait ? [wait] : [];
-    }) : [];
+    const waitingOn =
+      task.status === 'pending'
+        ? task.blockedBy.flatMap((id) => {
+            const dependency = byId.get(id);
+            const wait = taskDependencyWait(
+              id,
+              dependency,
+              dependency?.currentExecutionId ? byExecution.get(dependency.currentExecutionId) : undefined,
+            );
+            return wait ? [wait] : [];
+          })
+        : [];
     const current = task.currentExecutionId ? byExecution.get(task.currentExecutionId) : undefined;
     return {
       order,

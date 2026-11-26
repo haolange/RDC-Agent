@@ -6,5 +6,8 @@ export function sha256Hex(bytes: Buffer | string): string {
 }
 
 export function normalizeSha256(value: string): string {
-  return value.trim().toLowerCase().replace(/^sha256:/, '');
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^sha256:/, '');
 }

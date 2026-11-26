@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useUiLabels } from '../../lib/useUiLabels';
 import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
+import { useDismissable } from '../../lib/useDismissable';
 import { placeAnchoredSurface } from '../../lib/anchoredSurface';
+import { documentFonts } from '../../lib/documentFonts';
 import { usePresence } from '../usePresence';
 import {
   ANCHOR_GAP,
@@ -23,21 +25,20 @@ export const Select: React.FC<SelectProps> = ({
   options,
   onChange,
   placeholder: suppliedPlaceholder,
-  emptyLabel: suppliedEmptyLabel,
   disabled = false,
   dataTestId,
   ariaLabel,
+  tooltip,
   variant = 'field',
   menuAlign = 'start',
   minMenuWidth = DEFAULT_MIN_MENU_WIDTH,
   className = '',
   triggerClassName = '',
   menuClassName = '',
-  optionClassName = '',
 }) => {
   const labels = useUiLabels();
   const placeholder = suppliedPlaceholder ?? labels.selectPlaceholder;
-  const emptyLabel = suppliedEmptyLabel ?? labels.selectEmpty;
+  const emptyLabel = labels.selectEmpty;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -53,10 +54,7 @@ export const Select: React.FC<SelectProps> = ({
     ready: false,
   });
 
-  const selectedOption = useMemo(
-    () => options.find((option) => option.value === value) ?? null,
-    [options, value],
-  );
+  const selectedOption = useMemo(() => options.find((option) => option.value === value) ?? null, [options, value]);
 
   const resolveInitialIndex = useCallback(() => {
     const selectedIndex = findSelectedEnabledIndex(options, value);
@@ -84,17 +82,18 @@ export const Select: React.FC<SelectProps> = ({
       return;
     }
 
-    const measuredWidth = Math.max(
-      triggerRect.width,
-      menuElement?.offsetWidth ?? 0,
-      minMenuWidth,
-    );
-    const { width, left, top, placement } = placeAnchoredSurface(triggerRect,
+    const measuredWidth = Math.max(triggerRect.width, menuElement?.offsetWidth ?? 0, minMenuWidth);
+    const { width, left, top, placement } = placeAnchoredSurface(
+      triggerRect,
       { width: measuredWidth, height: menuElement?.offsetHeight ?? 320 },
-      { width: viewportWidth, height: viewportHeight }, menuAlign, 'bottom', VIEWPORT_MARGIN, ANCHOR_GAP);
-    const tipAnchorX = menuAlign === 'end'
-      ? triggerRect.right - 16
-      : triggerRect.left + Math.min(20, triggerRect.width / 2);
+      { width: viewportWidth, height: viewportHeight },
+      menuAlign,
+      'bottom',
+      VIEWPORT_MARGIN,
+      ANCHOR_GAP,
+    );
+    const tipAnchorX =
+      menuAlign === 'end' ? triggerRect.right - 16 : triggerRect.left + Math.min(20, triggerRect.width / 2);
 
     setMenuPosition({
       left,
@@ -107,42 +106,37 @@ export const Select: React.FC<SelectProps> = ({
   }, [menuAlign, minMenuWidth]);
 
   const closeMenu = useCallback(() => setOpen(false), []);
+  useDismissable({
+    open,
+    layerId,
+    inside: () => [menuRef.current, triggerRef.current],
+    onDismiss: (reason) => {
+      closeMenu();
+      if (reason === 'escape') triggerRef.current?.focus();
+    },
+  });
 
   // A closing menu keeps its place while the exit plays; it is measured afresh after it unmounts.
   useLayoutEffect(() => {
     if (!presence.mounted) setMenuPosition((current) => (current.ready ? { ...current, ready: false } : current));
   }, [presence.mounted]);
 
-  const commitSelection = useCallback((nextValue: string) => {
-    onChange(nextValue);
-    setOpen(false);
-    triggerRef.current?.focus();
-  }, [onChange]);
+  const commitSelection = useCallback(
+    (nextValue: string) => {
+      onChange(nextValue);
+      setOpen(false);
+      triggerRef.current?.focus();
+    },
+    [onChange],
+  );
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!isTopOverlayLayer(layerId)) return;
-      const target = event.target as Node;
-      if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) {
-        return;
-      }
-      closeMenu();
-    };
-
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTopOverlayLayer(layerId)) return;
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        closeMenu();
-        triggerRef.current?.focus();
-        return;
-      }
-
       if (event.key === 'Tab') {
         closeMenu();
         return;
@@ -175,12 +169,8 @@ export const Select: React.FC<SelectProps> = ({
       }
     };
 
-    document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [activeIndex, closeMenu, commitSelection, layerId, open, options]);
 
   useEffect(() => {
@@ -202,21 +192,20 @@ export const Select: React.FC<SelectProps> = ({
       updateMenuPosition();
     };
 
-    const resizeObserver = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(() => updateMenuPosition())
-      : null;
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => updateMenuPosition()) : null;
 
     if (menuRef.current && resizeObserver) {
       resizeObserver.observe(menuRef.current);
     }
 
     if (triggerRef.current) resizeObserver?.observe(triggerRef.current);
-    document.fonts?.addEventListener('loadingdone', handleViewportChange);
+    documentFonts()?.addEventListener('loadingdone', handleViewportChange);
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
     return () => {
       resizeObserver?.disconnect();
-      document.fonts?.removeEventListener('loadingdone', handleViewportChange);
+      documentFonts()?.removeEventListener('loadingdone', handleViewportChange);
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
     };
@@ -246,7 +235,9 @@ export const Select: React.FC<SelectProps> = ({
     open ? 'is-open' : '',
     disabled ? 'is-disabled' : '',
     className,
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const triggerLabel = selectedOption?.label ?? placeholder;
   const triggerAriaLabel = ariaLabel ?? triggerLabel;
@@ -262,6 +253,7 @@ export const Select: React.FC<SelectProps> = ({
         dataTestId={dataTestId}
         triggerAriaLabel={triggerAriaLabel}
         triggerLabel={triggerLabel}
+        tooltip={tooltip}
         swatchColor={triggerSwatchColor}
         hasSelection={Boolean(selectedOption)}
         triggerClassName={triggerClassName}
@@ -277,7 +269,6 @@ export const Select: React.FC<SelectProps> = ({
           dataTestId={dataTestId}
           triggerAriaLabel={triggerAriaLabel}
           menuClassName={menuClassName}
-          optionClassName={optionClassName}
           emptyLabel={emptyLabel}
           value={value}
           options={options}

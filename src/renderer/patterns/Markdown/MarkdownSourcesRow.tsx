@@ -13,7 +13,9 @@ export const MarkdownSourcesRow: React.FC<{ content: string }> = ({ content }) =
     <div className="markdown-sources" data-testid="markdown-sources">
       <span className="markdown-sources-label">{t('chat.markdownSources')}</span>
       <span className="markdown-sources-list">
-        {cited.map((source) => <CitationPill key={source.url} source={source} />)}
+        {cited.map((source) => (
+          <CitationPill key={source.url} source={source} />
+        ))}
       </span>
     </div>
   );

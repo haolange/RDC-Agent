@@ -3,14 +3,20 @@ import { buildConversationConfigurationCommit } from '../../stores/conversationC
 
 const flushAgentDefinitionSaves = vi.fn();
 const flushProviderSaves = vi.fn();
-const definitions: Array<{ id: string; provenance?: { scope: 'builtin' | 'user' | 'project'; sourcePath: string; sourceHash: string } }> = [];
+const definitions: Array<{
+  id: string;
+  provenance?: { scope: 'builtin' | 'user' | 'project'; sourcePath: string; sourceHash: string };
+}> = [];
 
 vi.mock('../../stores/appSettingsStore', () => ({
   useAppSettingsStore: {
     getState: () => ({
       flushAgentDefinitionSaves,
       flushProviderSaves,
-      settings: { agents: { definitions }, llm: { providers: ['openai', 'kimi-coding-plan'].map((id) => ({ id, enabled: true, isConfigured: true })) } },
+      settings: {
+        agents: { definitions },
+        llm: { providers: ['openai', 'kimi-coding-plan'].map((id) => ({ id, enabled: true, isConfigured: true })) },
+      },
     }),
   },
 }));

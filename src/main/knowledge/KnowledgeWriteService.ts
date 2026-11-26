@@ -1,31 +1,33 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { missingCaseChapters, serializeKnowledgeCard } from './knowledgeCardSchema';
 import { assertKnowledgeImagesAvailable } from './knowledgeAssetAvailability';
-import {
-  KnowledgeApprovalTokenInvalidError,
-  KnowledgeAssetsMissingError,
-  KnowledgeHumanConfirmationRequiredError,
-  KnowledgeLifecycleError,
-  KnowledgeWriteIntegrityError,
-} from './knowledgeErrors';
+import { knowledgeHumanConfirmationRequired, knowledgeAssetsMissing } from './knowledgeErrors';
 import { assertSafeKnowledgeWriteTarget, writeKnowledgeCardAtomic } from './knowledgeFs';
-import { clearStagedKnowledgeImages, putStagedKnowledgeImages, takeStagedKnowledgeImages } from './knowledgeImageStaging';
+import {
+  clearStagedKnowledgeImages,
+  putStagedKnowledgeImages,
+  takeStagedKnowledgeImages,
+} from './knowledgeImageStaging';
 import { isKnowledgeImagePathAllowed } from './knowledgeImages';
 import { knowledgeIndexService, KnowledgeIndexService } from './KnowledgeIndexService';
 import { knowledgeQueryService } from './KnowledgeQueryService';
 import type { KnowledgeStagedImage } from './knowledgeIngest';
 import type { AgentPermissionMode } from '@shared/types/settings';
-import type { KnowledgeCardRecord, KnowledgeHumanConfirmation, KnowledgeLifecycle, KnowledgeSpace } from '@shared/types/knowledge';
+import type {
+  KnowledgeCardRecord,
+  KnowledgeHumanConfirmation,
+  KnowledgeLifecycle,
+  KnowledgeSpace,
+} from '@shared/types/knowledge';
 
 export interface KnowledgeWriteInput {
   spaceId: string;
   card: KnowledgeCardRecord;
   permissionMode: AgentPermissionMode;
   confirmation: KnowledgeHumanConfirmation;
-  approvalToken?: string;
-  approvalAlreadyConsumed?: boolean;
   stagedImages?: KnowledgeStagedImage[];
 }
 
@@ -35,7 +37,6 @@ export interface KnowledgePromoteInput {
   to: Extract<KnowledgeLifecycle, 'verified' | 'promoted' | 'retired'>;
   permissionMode: AgentPermissionMode;
   confirmation: KnowledgeHumanConfirmation;
-  approvalToken?: string;
 }
 
 export interface KnowledgeWriteDependencies {
@@ -44,7 +45,6 @@ export interface KnowledgeWriteDependencies {
   mkdir?(dirPath: string): Promise<void>;
   index?: KnowledgeIndexService;
   now(): Date;
-  consumeApprovalToken?(token: string, action: 'knowledge.write' | 'knowledge.promote'): boolean;
 }
 
 function assertHumanConfirmation(
@@ -52,7 +52,7 @@ function assertHumanConfirmation(
   permissionMode: AgentPermissionMode,
 ): void {
   if (confirmation?.explicitHumanConfirmation !== true) {
-    throw new KnowledgeHumanConfirmationRequiredError(permissionMode);
+    throw knowledgeHumanConfirmationRequired(permissionMode);
   }
 }
 
@@ -65,7 +65,7 @@ function resolveSpace(spaces: KnowledgeSpace[], spaceId: string): KnowledgeSpace
 function assertFixedIsNotVerified(card: KnowledgeCardRecord, to?: KnowledgeLifecycle): void {
   const becomingVerified = card.lifecycle === 'verified' || to === 'verified';
   if (becomingVerified && card.sourceStatus === 'fixed') {
-    throw new KnowledgeLifecycleError('KNOWLEDGE_LIFECYCLE_INVALID: sourceStatus=fixed is not verified.');
+    throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', 'sourceStatus=fixed is not verified.');
   }
 }
 
@@ -74,20 +74,23 @@ export class KnowledgeWriteService {
 
   async write(input: KnowledgeWriteInput): Promise<KnowledgeCardRecord> {
     assertHumanConfirmation(input.confirmation, input.permissionMode);
-    if (!input.approvalAlreadyConsumed) {
-      this.consumeToken(input.approvalToken, 'knowledge.write');
-    }
     if (input.card.lifecycle === 'candidate') {
-      throw new KnowledgeLifecycleError('KNOWLEDGE_LIFECYCLE_INVALID: persist Candidate via KnowledgeCandidateService, not Write.');
+      throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', 'persist Candidate via KnowledgeCandidateService, not Write.');
     }
     assertFixedIsNotVerified(input.card);
-    if ((input.card.lifecycle === 'verified' || input.card.lifecycle === 'promoted') && input.card.missingAssets?.length) {
-      throw new KnowledgeAssetsMissingError();
+    if (
+      (input.card.lifecycle === 'verified' || input.card.lifecycle === 'promoted') &&
+      input.card.missingAssets?.length
+    ) {
+      throw knowledgeAssetsMissing();
     }
     if (input.card.lifecycle === 'verified' && input.card.type === 'case') {
       const missing = missingCaseChapters(input.card.chapters);
       if (missing.length > 0) {
-        throw new KnowledgeLifecycleError(`KNOWLEDGE_LIFECYCLE_INVALID: case cannot be verified; missing chapters: ${missing.join(',')}`);
+        throw new AppError(
+          'KNOWLEDGE_LIFECYCLE_INVALID',
+          `case cannot be verified; missing chapters: ${missing.join(',')}`,
+        );
       }
     }
     if ((input.card.lifecycle === 'verified' || input.card.lifecycle === 'promoted') && input.card.images?.length) {
@@ -114,7 +117,7 @@ export class KnowledgeWriteService {
       const expected = createHash('sha256').update(serialized, 'utf8').digest('hex');
       const actual = createHash('sha256').update(written, 'utf8').digest('hex');
       if (expected !== actual) {
-        throw new KnowledgeWriteIntegrityError(`post-write hash mismatch for ${absolute}.`);
+        throw new AppError('KNOWLEDGE_WRITE_INTEGRITY', `post-write hash mismatch for ${absolute}.`);
       }
     } else {
       await writeKnowledgeCardAtomic(absolute, serialized);
@@ -132,7 +135,10 @@ export class KnowledgeWriteService {
     const declared = record.images ?? [];
     if (declared.length === 0) return;
     if (incoming?.length) await putStagedKnowledgeImages(record.cardId, incoming);
-    const staged = await takeStagedKnowledgeImages(record.cardId, declared.map((image) => image.relativePath));
+    const staged = await takeStagedKnowledgeImages(
+      record.cardId,
+      declared.map((image) => image.relativePath),
+    );
     for (const image of staged) {
       if (!isKnowledgeImagePathAllowed(record.relativePath, image.relativePath, record.caseId)) continue;
       const dest = await assertSafeKnowledgeWriteTarget(rootPath, image.relativePath);
@@ -144,22 +150,24 @@ export class KnowledgeWriteService {
 
   async promote(input: KnowledgePromoteInput): Promise<KnowledgeCardRecord> {
     assertHumanConfirmation(input.confirmation, input.permissionMode);
-    this.consumeToken(input.approvalToken, 'knowledge.promote');
     assertFixedIsNotVerified(input.card, input.to);
     const current = input.card.lifecycle;
     if (current === 'draft') {
-      throw new KnowledgeLifecycleError('KNOWLEDGE_LIFECYCLE_INVALID: Draft cannot promote; create a Candidate first.');
+      throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', 'Draft cannot promote; create a Candidate first.');
     }
     if (input.to === 'verified' && current !== 'candidate' && current !== 'verified') {
-      throw new KnowledgeLifecycleError(`KNOWLEDGE_LIFECYCLE_INVALID: cannot promote ${current} to verified.`);
+      throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', `cannot promote ${current} to verified.`);
     }
     if (input.to === 'promoted' && current !== 'verified' && current !== 'promoted') {
-      throw new KnowledgeLifecycleError(`KNOWLEDGE_LIFECYCLE_INVALID: cannot promote ${current} to promoted.`);
+      throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', `cannot promote ${current} to promoted.`);
     }
     if (input.to === 'verified' && input.card.type === 'case') {
       const missing = missingCaseChapters(input.card.chapters);
       if (missing.length > 0) {
-        throw new KnowledgeLifecycleError(`KNOWLEDGE_LIFECYCLE_INVALID: case cannot be verified; missing chapters: ${missing.join(',')}`);
+        throw new AppError(
+          'KNOWLEDGE_LIFECYCLE_INVALID',
+          `case cannot be verified; missing chapters: ${missing.join(',')}`,
+        );
       }
     }
     return this.write({
@@ -167,18 +175,7 @@ export class KnowledgeWriteService {
       card: { ...input.card, lifecycle: input.to },
       permissionMode: input.permissionMode,
       confirmation: input.confirmation,
-      approvalAlreadyConsumed: true,
     });
-  }
-
-  private consumeToken(
-    token: string | undefined,
-    action: 'knowledge.write' | 'knowledge.promote',
-  ): void {
-    if (!this.overrides.consumeApprovalToken) return;
-    if (!token || this.overrides.consumeApprovalToken(token, action) !== true) {
-      throw new KnowledgeApprovalTokenInvalidError();
-    }
   }
 }
 

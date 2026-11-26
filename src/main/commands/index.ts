@@ -4,7 +4,7 @@
 export { CommandRegistry } from './CommandRegistry';
 
 import { CommandRegistry } from './CommandRegistry';
-import { helpCommand } from './builtins/help';
+import { createHelpCommand } from './builtins/help';
 import { clearCommand } from './builtins/clear';
 import { configCommand } from './builtins/config';
 import { modelCommand } from './builtins/model';
@@ -39,7 +39,7 @@ export function getRegistry(): CommandRegistry {
 /** 将所有内置命令注册到 registry。 */
 function registerBuiltins(registry: CommandRegistry): void {
   const builtins = [
-    helpCommand,
+    createHelpCommand(registry),
     clearCommand,
     configCommand,
     modelCommand,

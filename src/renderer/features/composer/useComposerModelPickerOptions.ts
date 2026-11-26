@@ -5,10 +5,7 @@ import { isComposerPickerModel, toComposerPickerOption, type ComposerModelPicker
 import type { LlmProviderEntry } from '@shared/types/settings';
 
 /** Why a connected provider has no (or only cached) executable models right now. */
-export type ComposerPickerProviderNotice =
-  | { kind: 'loading' }
-  | { kind: 'failed'; error: string }
-  | { kind: 'empty' };
+export type ComposerPickerProviderNotice = { kind: 'loading' } | { kind: 'failed'; error: string } | { kind: 'empty' };
 
 export interface ComposerPickerProviderState {
   id: string;
@@ -22,13 +19,16 @@ export interface ComposerPickerProviderState {
 export async function loadComposerModelPickerOptions(
   providers: readonly LlmProviderEntry[],
 ): Promise<ComposerModelPickerOption[]> {
-  const rows = await Promise.all(providers
-    .filter(isProviderExecutable)
-    .map(async (provider) => {
+  const rows = await Promise.all(
+    providers.filter(isProviderExecutable).map(async (provider) => {
       const catalog = await useEffectiveCatalogStore.getState().load(provider);
-      return catalog?.models.filter(isComposerPickerModel)
-        .map((model) => toComposerPickerOption(provider.id, provider.label, model)) ?? [];
-    }));
+      return (
+        catalog?.models
+          .filter(isComposerPickerModel)
+          .map((model) => toComposerPickerOption(provider.id, provider.label, model)) ?? []
+      );
+    }),
+  );
   return rows.flat();
 }
 
@@ -46,18 +46,26 @@ export function useComposerModelPickerOptions(providers: readonly LlmProviderEnt
   }, [resolved]);
   const providerStates = resolved.map((provider): ComposerPickerProviderState => {
     const entry = entries[catalogScopeKey(provider)];
-    const models = entry?.snapshot?.models.filter(isComposerPickerModel)
-      .map((model) => toComposerPickerOption(provider.id, provider.label, model)) ?? [];
+    const models =
+      entry?.snapshot?.models
+        .filter(isComposerPickerModel)
+        .map((model) => toComposerPickerOption(provider.id, provider.label, model)) ?? [];
     const pending = !entry || entry.loading || entry.snapshot?.refreshing === true;
     const notice: ComposerPickerProviderNotice | null = entry?.error
       ? { kind: 'failed', error: entry.error }
-      : models.length > 0 ? null : pending ? { kind: 'loading' } : { kind: 'empty' };
+      : models.length > 0
+        ? null
+        : pending
+          ? { kind: 'loading' }
+          : { kind: 'empty' };
     return { id: provider.id, label: provider.label, models, notice, retrying: entry?.loading === true };
   });
   return {
     options: providerStates.flatMap((state) => state.models),
     providerStates,
-    loading: resolved.some((provider) => !entries[catalogScopeKey(provider)] || entries[catalogScopeKey(provider)].loading),
+    loading: resolved.some(
+      (provider) => !entries[catalogScopeKey(provider)] || entries[catalogScopeKey(provider)].loading,
+    ),
     retry: (providerId) => {
       const provider = resolved.find((entry) => entry.id === providerId);
       if (provider) void useEffectiveCatalogStore.getState().load(provider, true);

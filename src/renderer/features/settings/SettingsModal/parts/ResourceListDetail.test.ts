@@ -5,10 +5,17 @@ import { ResourceListDetail } from './ResourceListDetail';
 
 describe('resource frame layouts', () => {
   it.each(['panel', 'inline'] as const)('renders a single %s empty state and action group', (emptyVariant) => {
-    const html = renderToStaticMarkup(React.createElement(ResourceListDetail, {
-      toolbar: 'Scope', isEmpty: true, emptyTitle: 'No resources', emptyVariant,
-      emptyActions: React.createElement('button', null, 'Add resource'), list: 'hidden list', detail: 'hidden editor',
-    }));
+    const html = renderToStaticMarkup(
+      React.createElement(ResourceListDetail, {
+        toolbar: 'Scope',
+        isEmpty: true,
+        emptyTitle: 'No resources',
+        emptyVariant,
+        emptyActions: React.createElement('button', null, 'Add resource'),
+        list: 'hidden list',
+        detail: 'hidden editor',
+      }),
+    );
     expect(html).toContain(`ui-empty-state is-${emptyVariant}`);
     expect(html.match(/Add resource/g)).toHaveLength(1);
     expect(html).not.toContain('hidden list');
@@ -16,19 +23,31 @@ describe('resource frame layouts', () => {
   });
 
   it('keeps the toolbar and editor while removing empty actions in populated state', () => {
-    const html = renderToStaticMarkup(React.createElement(ResourceListDetail, {
-      toolbar: 'Scope', isEmpty: false, emptyTitle: 'No resources', emptyActions: 'Add resource', detail: 'Document editor',
-    }));
+    const html = renderToStaticMarkup(
+      React.createElement(ResourceListDetail, {
+        toolbar: 'Scope',
+        isEmpty: false,
+        emptyTitle: 'No resources',
+        emptyActions: 'Add resource',
+        detail: 'Document editor',
+      }),
+    );
     expect(html).toContain('is-detail-only');
     expect(html).toContain('Document editor');
     expect(html).not.toContain('Add resource');
   });
 
   it('renders populated Hook list and detail instead of the empty prompt', () => {
-    const html = renderToStaticMarkup(React.createElement(ResourceListDetail, {
-      toolbar: 'Scope', isEmpty: false, emptyTitle: 'No Hooks', emptyVariant: 'panel',
-      list: 'Hook resources', detail: 'Hook trust and test results',
-    }));
+    const html = renderToStaticMarkup(
+      React.createElement(ResourceListDetail, {
+        toolbar: 'Scope',
+        isEmpty: false,
+        emptyTitle: 'No Hooks',
+        emptyVariant: 'panel',
+        list: 'Hook resources',
+        detail: 'Hook trust and test results',
+      }),
+    );
     expect(html).toContain('settings-resource-list-column');
     expect(html).toContain('settings-resource-detail-column');
     expect(html).toContain('Hook trust and test results');

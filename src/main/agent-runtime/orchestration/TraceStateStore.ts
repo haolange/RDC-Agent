@@ -1,14 +1,11 @@
 ﻿import * as fs from 'fs';
 import * as path from 'path';
+import { z, type ZodType } from 'zod';
 import { generateEventId, nowIso } from '@shared/utils/id';
-import { storageAdapter } from '../../sessions/store/StorageAdapter';
-import { runScopedStore } from './RunScopedStore';
-import type {
-  RequestBranch,
-  RequestBranchGroup,
-  UserRequest,
-  UserRequestRevision,
-} from '@shared/types/trace';
+import { parseJsonWith, readValidatedSync } from '../../runtime/atomicFile';
+import { sessionRecordStore } from '../../sessions/store/sessionStores';
+import { runScopedStore } from '../../sessions/store/RunScopedStore';
+import type { RequestBranch } from '@shared/types/trace';
 
 const STORE_FILE = 'agentic-trace-state.json';
 
@@ -21,6 +18,58 @@ export interface TracePersistedState {
   updatedAt: string;
 }
 
+const UserRequestRevisionSchema = z
+  .object({
+    id: z.string(),
+    requestId: z.string(),
+    branchId: z.string(),
+    parentRevisionId: z.string().optional(),
+    prompt: z.string(),
+    createdAt: z.string(),
+    resultingTraceLaneIds: z.array(z.string()),
+  })
+  .strict();
+
+const RequestBranchSchema = z
+  .object({
+    id: z.string(),
+    parentBranchId: z.string().optional(),
+    revisionId: z.string(),
+    status: z.enum(['active', 'inactive', 'abandoned', 'completed']),
+    traceLaneIds: z.array(z.string()),
+  })
+  .strict();
+
+const TracePersistedStateSchema: ZodType<TracePersistedState> = z
+  .object({
+    schemaVersion: z.literal('1'),
+    sessionId: z.string(),
+    activeBranchId: z.string(),
+    userRequests: z.array(
+      z
+        .object({
+          id: z.string(),
+          sessionId: z.string(),
+          rootRevisionId: z.string(),
+          activeRevisionId: z.string(),
+          revisions: z.array(UserRequestRevisionSchema),
+        })
+        .strict(),
+    ),
+    branches: z.array(
+      z
+        .object({
+          id: z.string(),
+          rootRequestId: z.string(),
+          activeBranchId: z.string(),
+          branches: z.array(RequestBranchSchema),
+        })
+        .strict(),
+    ),
+    updatedAt: z.string(),
+  })
+  .strict();
+
 const defaultState = (sessionId: string): TracePersistedState => ({
   schemaVersion: '1',
   sessionId,
@@ -31,25 +80,16 @@ const defaultState = (sessionId: string): TracePersistedState => ({
 });
 
 export class TraceStateStore {
+  /** The stored request tree, or the initial state when none was written; a damaged file throws `STORAGE_CORRUPT`. */
   read(sessionId: string): TracePersistedState {
-    const filePath = this.resolvePath(sessionId);
-    if (!fs.existsSync(filePath)) {
-      return defaultState(sessionId);
-    }
-
-    try {
-      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Partial<TracePersistedState> & Record<string, unknown>;
-      return {
-        ...defaultState(sessionId),
-        sessionId,
-        activeBranchId: typeof parsed.activeBranchId === 'string' ? parsed.activeBranchId : 'branch-main',
-        userRequests: parsed.userRequests ?? [],
-        branches: parsed.branches ?? [],
-      };
-    } catch (error) {
-      console.error(`[TraceStateStore] Failed to read ${filePath}`, error);
-      return defaultState(sessionId);
-    }
+    const stored = readValidatedSync(this.resolvePath(sessionId), parseJsonWith(TracePersistedStateSchema.parse));
+    if (!stored) return defaultState(sessionId);
+    return {
+      ...defaultState(sessionId),
+      activeBranchId: stored.activeBranchId,
+      userRequests: stored.userRequests,
+      branches: stored.branches,
+    };
   }
 
   write(state: TracePersistedState): TracePersistedState {
@@ -70,9 +110,11 @@ export class TraceStateStore {
     traceLaneId: string;
   }): TracePersistedState {
     const state = this.read(input.sessionId);
-    if (state.userRequests.some((request) => (
-      request.revisions.some((revision) => revision.resultingTraceLaneIds.includes(input.traceLaneId))
-    ))) {
+    if (
+      state.userRequests.some((request) =>
+        request.revisions.some((revision) => revision.resultingTraceLaneIds.includes(input.traceLaneId)),
+      )
+    ) {
       return state;
     }
 
@@ -165,9 +207,9 @@ export class TraceStateStore {
           ...branchGroup,
           activeBranchId: branchId,
           branches: branchGroup.branches
-            .map((branch): RequestBranch => (
-              branch.id === state.activeBranchId ? { ...branch, status: 'inactive' } : branch
-            ))
+            .map((branch): RequestBranch =>
+              branch.id === state.activeBranchId ? { ...branch, status: 'inactive' } : branch,
+            )
             .concat(nextBranch),
         }
       : {
@@ -181,10 +223,10 @@ export class TraceStateStore {
       ...state,
       activeBranchId: branchId,
       userRequests: rootRequest
-        ? state.userRequests.map((request) => request.id === rootRequest.id ? nextRequest : request)
+        ? state.userRequests.map((request) => (request.id === rootRequest.id ? nextRequest : request))
         : [...state.userRequests, nextRequest],
       branches: branchGroup
-        ? state.branches.map((group) => group.id === branchGroup.id ? nextBranchGroup : group)
+        ? state.branches.map((group) => (group.id === branchGroup.id ? nextBranchGroup : group))
         : [...state.branches, nextBranchGroup],
     });
   }
@@ -211,7 +253,7 @@ export class TraceStateStore {
   }
 
   private resolvePath(sessionId: string): string {
-    const session = storageAdapter.readSession(sessionId);
+    const session = sessionRecordStore.readSession(sessionId);
     if (!session) {
       throw new Error(`Session not found for trace state: ${sessionId}`);
     }
@@ -225,4 +267,27 @@ export class TraceStateStore {
 
 export const traceStateStore = new TraceStateStore();
 
+export interface UserRequestRevision {
+  id: string;
+  requestId: string;
+  branchId: string;
+  parentRevisionId?: string;
+  prompt: string;
+  createdAt: string;
+  resultingTraceLaneIds: string[];
+}
 
+export interface UserRequest {
+  id: string;
+  sessionId: string;
+  rootRevisionId: string;
+  activeRevisionId: string;
+  revisions: UserRequestRevision[];
+}
+
+export interface RequestBranchGroup {
+  id: string;
+  rootRequestId: string;
+  activeBranchId: string;
+  branches: RequestBranch[];
+}

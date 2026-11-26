@@ -3,14 +3,15 @@ import { catalogScopeKey, useEffectiveCatalogStore } from '../../../../stores/ef
 import { projectProviderModels } from '../providerModelProjection';
 import { InlineError } from '../../../../ui/InlineError';
 import { SearchField } from '../../../../ui/SearchField';
+import { useI18n } from '../../../../i18n';
 import { ProviderConnectModelRow } from './ProviderConnectModelRow';
-import type { useI18n } from '../../../../i18n';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 
-type Translate = ReturnType<typeof useI18n>['t'];
-
 interface ProviderConnectModelListProps {
-  provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured' | 'serviceOperator' | 'authMode'>;
+  provider: Pick<
+    LlmProviderEntry,
+    'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured' | 'serviceOperator' | 'authMode'
+  >;
   models: LlmProviderModel[];
   discoveryAccountId?: string | null;
   expandedModelId: string | null;
@@ -18,7 +19,6 @@ interface ProviderConnectModelListProps {
   onToggleExpanded: (modelId: string) => void;
   onModelChange: (modelId: string, patch: Partial<LlmProviderModel>) => void;
   onModelCountChange: (count: number) => void;
-  t: Translate;
 }
 
 export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> = ({
@@ -30,12 +30,14 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   onToggleExpanded,
   onModelChange,
   onModelCountChange,
-  t,
 }) => {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const catalogAccountId = discoveryAccountId?.trim() || provider.activeAccountId || `anonymous:${provider.id}`;
-  const scope = useMemo(() => ({ id: provider.id, activeAccountId: catalogAccountId, protocol: provider.protocol }),
-    [provider.id, provider.protocol, catalogAccountId]);
+  const scope = useMemo(
+    () => ({ id: provider.id, activeAccountId: catalogAccountId, protocol: provider.protocol }),
+    [provider.id, provider.protocol, catalogAccountId],
+  );
   const projection = useEffectiveCatalogStore((state) => state.entries[catalogScopeKey(scope)]);
   const snapshot = projection?.snapshot ?? null;
   const loading = !projection || projection.loading;
@@ -43,32 +45,41 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   // Settings reconciliation drops catalog entries of scopes that are not saved providers, which includes the draft this
   // panel discovers against. The panel owns its scope, so it asks again whenever its entry is dropped.
   const dropped = projection === undefined;
-  useEffect(() => { void useEffectiveCatalogStore.getState().load(scope, false, true); }, [scope, dropped]);
+  useEffect(() => {
+    void useEffectiveCatalogStore.getState().load(scope, false, true);
+  }, [scope, dropped]);
 
   const resolvedModels = useMemo(
     () => projectProviderModels(provider.catalogOwnership, models, snapshot),
     [models, provider.catalogOwnership, snapshot],
   );
   const availableModelCount = useMemo(
-    () => resolvedModels.filter(({ model, effectiveModel }) => (
-      effectiveModel?.availability ?? model.availability
-    ) === 'available').length,
+    () =>
+      resolvedModels.filter(
+        ({ model, effectiveModel }) => (effectiveModel?.availability ?? model.availability) === 'available',
+      ).length,
     [resolvedModels],
   );
   useEffect(() => onModelCountChange(resolvedModels.length), [onModelCountChange, resolvedModels.length]);
-  const allUnavailable = resolvedModels.length > 0 && resolvedModels.every(({ model, effectiveModel }) => (
-    effectiveModel?.availability ?? model.availability
-  ) === 'unavailable');
+  const allUnavailable =
+    resolvedModels.length > 0 &&
+    resolvedModels.every(
+      ({ model, effectiveModel }) => (effectiveModel?.availability ?? model.availability) === 'unavailable',
+    );
   const rowLoading = loading && !snapshot;
   const needle = query.trim().toLowerCase();
   const visibleModels = needle
-    ? resolvedModels.filter(({ model, effectiveModel }) => [model.id, model.label, effectiveModel?.label]
-      .some((field) => field?.toLowerCase().includes(needle)))
+    ? resolvedModels.filter(({ model, effectiveModel }) =>
+        [model.id, model.label, effectiveModel?.label].some((field) => field?.toLowerCase().includes(needle)),
+      )
     : resolvedModels;
   const showSearch = resolvedModels.length > 5;
 
   return (
-    <div className="settings-model-section settings-provider-connect-models" data-testid="settings-provider-connect-models">
+    <div
+      className="settings-model-section settings-provider-connect-models"
+      data-testid="settings-provider-connect-models"
+    >
       <div className="settings-model-section-header">
         <span className="settings-model-section-title">
           {provider.catalogOwnership !== 'user-managed'
@@ -108,9 +119,15 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
           <span>{t('settings.providers.columns.enabled')}</span>
         </div>
       ) : null}
-      <div className="settings-model-list scrollbar-thin" data-empty-label={t('settings.testBeforeSaveHint')} data-testid="settings-provider-model-list">
+      <div
+        className="settings-model-list scrollbar-thin"
+        data-empty-label={t('settings.testBeforeSaveHint')}
+        data-testid="settings-provider-model-list"
+      >
         {needle && visibleModels.length === 0 ? (
-          <div className="settings-model-list-no-match" role="status">{t('settings.providers.noModelMatch')}</div>
+          <div className="settings-model-list-no-match" role="status">
+            {t('settings.providers.noModelMatch')}
+          </div>
         ) : null}
         {visibleModels.map(({ model, effectiveModel }) => (
           <ProviderConnectModelRow
@@ -125,7 +142,6 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
             disabled={disabled}
             onToggleExpanded={onToggleExpanded}
             onModelChange={(modelId, patch) => onModelChange(modelId, { ...model, ...patch })}
-            t={t}
           />
         ))}
       </div>

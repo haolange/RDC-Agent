@@ -40,9 +40,15 @@ describe('SAP AI Core credentials', () => {
 
   it('rejects incomplete or non-HTTPS service keys', () => {
     expect(() => parseSapAiCoreServiceKey('{}')).toThrow(/must include/u);
-    expect(() => parseSapAiCoreServiceKey(JSON.stringify({
-      clientid: 'id', clientsecret: 'secret', url: 'http://auth.test',
-      serviceurls: { AI_API_URL: 'https://api.test/v2' },
-    }))).toThrow(/HTTPS/u);
+    expect(() =>
+      parseSapAiCoreServiceKey(
+        JSON.stringify({
+          clientid: 'id',
+          clientsecret: 'secret',
+          url: 'http://auth.test',
+          serviceurls: { AI_API_URL: 'https://api.test/v2' },
+        }),
+      ),
+    ).toThrow(/HTTPS/u);
   });
 });

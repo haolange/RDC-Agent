@@ -69,11 +69,14 @@ export class ShutdownCoordinator {
     let forceExitTimer: ReturnType<typeof setTimeout> | null = null;
 
     if (forceExit) {
-      forceExitTimer = setTimeout(() => {
-        this.phase = 'exited';
-        forceExit();
-      }, Math.max(0, timeoutMs));
-      forceExitTimer.unref?.();
+      forceExitTimer = setTimeout(
+        () => {
+          this.phase = 'exited';
+          forceExit();
+        },
+        Math.max(0, timeoutMs),
+      );
+      forceExitTimer.unref();
     }
 
     try {
@@ -106,7 +109,7 @@ export class ShutdownCoordinator {
       Promise.allSettled(tasks),
       new Promise<void>((resolve) => {
         const timer = setTimeout(resolve, timeoutMs);
-        timer.unref?.();
+        timer.unref();
       }),
     ]);
   }

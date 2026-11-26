@@ -1,7 +1,5 @@
-import type {
-  ConversationMessage,
-  ConversationStreamEvent,
-} from '@shared/types/conversation';
+import type { MessageUpdateType } from '@shared/conversation/messageUpdateEvent';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 type TimerHandle = ReturnType<typeof setTimeout>;
 
@@ -12,7 +10,7 @@ export interface ConversationStreamPatchCommitOptions {
 }
 
 export interface ConversationStreamPatchCommit {
-  type: ConversationStreamEvent['type'];
+  type: MessageUpdateType;
   patch: Partial<ConversationMessage>;
   options: ConversationStreamPatchCommitOptions;
 }
@@ -88,7 +86,7 @@ export class ConversationStreamPatchScheduler {
   }
 
   commitImmediate(
-    type: ConversationStreamEvent['type'],
+    type: MessageUpdateType,
     patch: Partial<ConversationMessage>,
     options: Partial<ConversationStreamPatchCommitOptions> = {},
   ): void {
@@ -110,7 +108,7 @@ export class ConversationStreamPatchScheduler {
   }
 
   commitTerminal(
-    type: ConversationStreamEvent['type'],
+    type: MessageUpdateType,
     patch: Partial<ConversationMessage>,
     options: Partial<ConversationStreamPatchCommitOptions> = {},
   ): void {

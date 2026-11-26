@@ -53,8 +53,8 @@ export function defaultAppDataDir(host: HostDescriptor = currentHost(), home: st
 }
 
 /** The Windows roaming profile directory (`%APPDATA%`); other hosts have none. */
-export function roamingAppDataDir(host: HostDescriptor = currentHost()): string | null {
-  if (!host.isWindows) return null;
+export function roamingAppDataDir(): string | null {
+  if (!currentHost().isWindows) return null;
   return process.env.APPDATA?.trim() || null;
 }
 
@@ -65,7 +65,10 @@ export function commandFileNames(
   pathExt: string = process.env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD;.VBS;.JS',
 ): string[] {
   if (!host.isWindows || pathApi(host).extname(command)) return [command];
-  const extensions = pathExt.split(';').map((entry) => entry.trim()).filter(Boolean);
+  const extensions = pathExt
+    .split(';')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
   return [command, ...extensions.map((extension) => `${command}${extension}`)];
 }
 

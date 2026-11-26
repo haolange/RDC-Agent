@@ -1,4 +1,3 @@
-import { RENDERER_EVENT_CHANNEL as EVENT, RENDERER_INVOKE_CHANNEL as INVOKE } from './channels';
 import type {
   AppMetaApi,
   AppShellApi,
@@ -15,149 +14,147 @@ import type {
   WorkflowApi,
 } from '../types/electron-api';
 import type { ElectronAPI } from '../types/electron';
-import type { RendererApiTransport, RendererEventCallback } from './transport';
+import type { RendererEvents } from './rendererEvents';
+import type { RendererApiTransport } from './transport';
 
 export function createAppMetaApi(transport: RendererApiTransport): AppMetaApi {
-  return { get: () => transport.invoke(INVOKE.shell.getAppMeta) };
+  return { get: () => transport.invoke('app:getMeta') };
 }
 
 export function createAppShellApi(transport: RendererApiTransport): AppShellApi {
   return {
-    selectAvatar: () => transport.invoke(INVOKE.shell.selectAvatar),
-    getAvatarDataUrl: (avatarPath) => transport.invoke(INVOKE.shell.getAvatarDataUrl, avatarPath),
-    openPath: (targetPath) => transport.invoke(INVOKE.shell.openPath, targetPath),
-    copyText: (text) => transport.invoke(INVOKE.shell.copyText, text),
-    readClipboardText: () => transport.invoke(INVOKE.shell.readClipboardText),
+    selectAvatar: () => transport.invoke('app:selectAvatar'),
+    getAvatarDataUrl: (avatarPath) => transport.invoke('app:getAvatarDataUrl', avatarPath),
+    openPath: (targetPath) => transport.invoke('app:openPath', targetPath),
+    copyText: (text) => transport.invoke('app:copyText', text),
+    readClipboardText: () => transport.invoke('app:readClipboardText'),
   };
 }
 
 export function createWebApi(transport: RendererApiTransport): ElectronAPI['web'] {
   return {
-    resolveFavicon: (domain) => transport.invoke(INVOKE.shell.resolveFavicon, domain),
-    fetchImage: (url) => transport.invoke(INVOKE.shell.fetchImage, url),
+    resolveFavicon: (domain) => transport.invoke('web:resolveFavicon', domain),
+    fetchImage: (request) => transport.invoke('web:fetchImage', request),
   };
 }
 
 export function createDialogApi(transport: RendererApiTransport): DialogApi {
   return {
-    selectFiles: () => transport.invoke(INVOKE.shell.selectFiles),
-    selectRdcFiles: () => transport.invoke(INVOKE.shell.selectRdcFiles),
-    selectKnowledgeImport: () => transport.invoke(INVOKE.shell.selectKnowledgeImport),
-    selectDirectory: () => transport.invoke(INVOKE.shell.selectDirectory),
-    saveFile: (request) => transport.invoke(INVOKE.shell.saveFile, request),
+    selectFiles: () => transport.invoke('dialog:selectFiles'),
+    selectRdcFiles: () => transport.invoke('dialog:selectRdcFiles'),
+    selectKnowledgeImport: () => transport.invoke('dialog:selectKnowledgeImport'),
+    selectDirectory: () => transport.invoke('dialog:selectDirectory'),
   };
 }
 
 export function createWindowControlsApi(transport: RendererApiTransport): WindowControlsApi {
   return {
-    minimize: () => transport.invoke(INVOKE.shell.minimizeWindow),
-    toggleMaximize: () => transport.invoke(INVOKE.shell.toggleMaximizeWindow),
-    close: () => transport.invoke(INVOKE.shell.closeWindow),
-    isMaximized: () => transport.invoke(INVOKE.shell.isWindowMaximized),
+    minimize: () => transport.invoke('window:minimize'),
+    toggleMaximize: () => transport.invoke('window:toggleMaximize'),
+    close: () => transport.invoke('window:close'),
+    isMaximized: () => transport.invoke('window:isMaximized'),
   };
 }
 
-export function createConversationApi(transport: RendererApiTransport): ConversationApi {
+export function createConversationApi(transport: RendererApiTransport, events: RendererEvents): ConversationApi {
   return {
-    sendMessage: (request) => transport.invoke(INVOKE.conversation.sendMessage, request),
-    rewriteFromMessage: (request) => transport.invoke(INVOKE.conversation.rewriteFromMessage, request),
-    cancelActiveTurn: (request) => transport.invoke(INVOKE.conversation.cancelActiveTurn, request),
-    answerUserInput: (request) => transport.invoke(INVOKE.conversation.answerUserInput, request),
-    answerToolApproval: (request) => transport.invoke(INVOKE.conversation.answerToolApproval, request),
-    answerPlanReview: (request) => transport.invoke(INVOKE.conversation.answerPlanReview, request),
-    getHistory: (sessionId) => transport.invoke(INVOKE.conversation.getHistory, sessionId),
-    getDelegationTrace: (request) => transport.invoke(INVOKE.conversation.getDelegationTrace, request),
-    getDelegationContent: (request) => transport.invoke(INVOKE.conversation.getDelegationContent, request),
-    switchBranch: (request) => transport.invoke(INVOKE.conversation.switchBranch, request),
-    clearHistory: (sessionId) => transport.invoke(INVOKE.conversation.clearHistory, sessionId),
-    undoLastTurn: (sessionId) => transport.invoke(INVOKE.conversation.undoLastTurn, sessionId),
-    getToolImagePreview: (request) => transport.invoke(INVOKE.conversation.getToolImagePreview, request),
-    stageAttachments: (request) => transport.invoke(INVOKE.conversation.stageAttachments, request),
-    releaseAttachments: (request) => transport.invoke(INVOKE.conversation.releaseAttachments, request),
-    getAttachmentPreview: (request) => transport.invoke(INVOKE.conversation.getAttachmentPreview, request),
-    accessAttachment: (request) => transport.invoke(INVOKE.conversation.accessAttachment, request),
-    resolveMedia: (request) => transport.invoke(INVOKE.conversation.resolveMedia, request),
-    onEvent: (callback): void => {
-      transport.addListener(EVENT.conversation.event, callback as unknown as RendererEventCallback);
-    },
-    offEvent: (callback): void => {
-      transport.removeListener(EVENT.conversation.event, callback as unknown as RendererEventCallback);
-    },
+    sendMessage: (request) => transport.invoke('conversation:sendMessage', request),
+    rewriteFromMessage: (request) => transport.invoke('conversation:rewriteFromMessage', request),
+    cancelActiveTurn: (request) => transport.invoke('conversation:cancelActiveTurn', request),
+    answerUserInput: (request) => transport.invoke('conversation:answerUserInput', request),
+    answerToolApproval: (request) => transport.invoke('conversation:answerToolApproval', request),
+    answerPlanReview: (request) => transport.invoke('conversation:answerPlanReview', request),
+    getHistory: (sessionId) => transport.invoke('conversation:getHistory', sessionId),
+    getMessageSnapshot: (sessionId, messageId) =>
+      transport.invoke('conversation:getMessageSnapshot', sessionId, messageId),
+    getDelegationTrace: (request) => transport.invoke('conversation:getDelegationTrace', request),
+    getDelegationContent: (request) => transport.invoke('conversation:getDelegationContent', request),
+    switchBranch: (request) => transport.invoke('conversation:switchBranch', request),
+    clearHistory: (sessionId) => transport.invoke('conversation:clearHistory', sessionId),
+    undoLastTurn: (sessionId) => transport.invoke('conversation:undoLastTurn', sessionId),
+    getToolImagePreview: (request) => transport.invoke('conversation:getToolImagePreview', request),
+    stageAttachments: (request) => transport.invoke('conversation:stageAttachments', request),
+    releaseAttachments: (request) => transport.invoke('conversation:releaseAttachments', request),
+    getAttachmentPreview: (request) => transport.invoke('conversation:getAttachmentPreview', request),
+    accessAttachment: (request) => transport.invoke('conversation:accessAttachment', request),
+    resolveMedia: (request) => transport.invoke('conversation:resolveMedia', request),
+    onEvent: (callback) => events.add('conversation:event', callback),
+    offEvent: (callback) => events.remove('conversation:event', callback),
   };
 }
 
 export function createWorkflowApi(transport: RendererApiTransport): WorkflowApi {
   return {
-    getState: () => transport.invoke(INVOKE.workflow.getState),
-    resume: (sessionId) => transport.invoke(INVOKE.workflow.resume, sessionId),
-    stop: (runId) => transport.invoke(INVOKE.workflow.stop, runId),
-    getRunUsage: (request) => transport.invoke(INVOKE.workflow.getRunUsage, request),
+    getState: () => transport.invoke('workflow:getState'),
+    resume: (sessionId) => transport.invoke('workflow:resume', sessionId),
+    stop: (runId) => transport.invoke('workflow:stop', runId),
+    getRunUsage: (request) => transport.invoke('workflow:getRunUsage', request),
   };
 }
 
 export function createInvestigationApi(transport: RendererApiTransport): InvestigationApi {
   return {
-    read: (request) => transport.invoke(INVOKE.investigation.read, request),
-    list: (request) => transport.invoke(INVOKE.investigation.list, request),
+    read: (request) => transport.invoke('investigation:read', request),
+    list: (request) => transport.invoke('investigation:list', request),
   };
 }
 
 export function createPlanApi(transport: RendererApiTransport): PlanApi {
   return {
-    reopenReview: (request) => transport.invoke(INVOKE.plan.reopenReview, request),
-    cancelReview: (request) => transport.invoke(INVOKE.plan.cancelReview, request),
-    read: (request) => transport.invoke(INVOKE.plan.read, request),
-    issueApprovalToken: (request) => transport.invoke(INVOKE.plan.issueApprovalToken, request),
-    saveToProject: (request) => transport.invoke(INVOKE.plan.saveToProject, request),
-    export: (request) => transport.invoke(INVOKE.plan.export, request),
+    reopenReview: (request) => transport.invoke('plan:reopenReview', request),
+    cancelReview: (request) => transport.invoke('plan:cancelReview', request),
+    read: (request) => transport.invoke('plan:read', request),
+    issueApprovalToken: (request) => transport.invoke('plan:issueApprovalToken', request),
+    saveToProject: (request) => transport.invoke('plan:saveToProject', request),
+    export: (request) => transport.invoke('plan:export', request),
   };
 }
 
 export function createKnowledgeApi(transport: RendererApiTransport): KnowledgeApi {
   return {
-    overview: () => transport.invoke(INVOKE.knowledge.overview),
-    topicSuggest: () => transport.invoke(INVOKE.knowledge.topicSuggest),
-    topicPreview: (changes) => transport.invoke(INVOKE.knowledge.topicPreview, changes),
-    topicApply: (request) => transport.invoke(INVOKE.knowledge.topicApply, request),
-    query: (request) => transport.invoke(INVOKE.knowledge.query, request),
-    card: (spaceId, relativePath) => transport.invoke(INVOKE.knowledge.card, spaceId, relativePath),
-    compile: (request) => transport.invoke(INVOKE.knowledge.compile, request),
-    indexRebuild: () => transport.invoke(INVOKE.knowledge.indexRebuild),
-    candidates: (sessionId) => transport.invoke(INVOKE.knowledge.candidates, sessionId),
-    candidateCreate: (request) => transport.invoke(INVOKE.knowledge.candidateCreate, request),
-    previewImport: (request) => transport.invoke(INVOKE.knowledge.previewImport, request),
-    import: (request) => transport.invoke(INVOKE.knowledge.import, request),
-    image: (request) => transport.invoke(INVOKE.knowledge.image, request),
-    issueApprovalToken: (request) => transport.invoke(INVOKE.knowledge.issueApprovalToken, request),
-    write: (request) => transport.invoke(INVOKE.knowledge.write, request),
-    promote: (request) => transport.invoke(INVOKE.knowledge.promote, request),
-    export: (request) => transport.invoke(INVOKE.knowledge.export, request),
+    overview: () => transport.invoke('knowledge:overview'),
+    topicSuggest: () => transport.invoke('knowledge:topics:suggest'),
+    topicPreview: (changes) => transport.invoke('knowledge:topics:preview', changes),
+    topicApply: (request) => transport.invoke('knowledge:topics:apply', request),
+    query: (request) => transport.invoke('knowledge:query', request),
+    card: (spaceId, relativePath) => transport.invoke('knowledge:card', spaceId, relativePath),
+    compile: (request) => transport.invoke('knowledge:compile', request),
+    indexRebuild: (request) => transport.invoke('knowledge:index:rebuild', request),
+    candidates: (sessionId) => transport.invoke('knowledge:candidates', sessionId),
+    candidateCreate: (request) => transport.invoke('knowledge:candidateCreate', request),
+    previewImport: (request) => transport.invoke('knowledge:previewImport', request),
+    import: (request) => transport.invoke('knowledge:import', request),
+    image: (request) => transport.invoke('knowledge:image', request),
+    issueApprovalToken: (request) => transport.invoke('knowledge:issueApprovalToken', request),
+    write: (request) => transport.invoke('knowledge:write', request),
+    promote: (request) => transport.invoke('knowledge:promote', request),
+    export: (request) => transport.invoke('knowledge:export', request),
+    cancel: (request) => transport.invoke('knowledge:cancel', request),
   };
 }
 
 export function createCommandApi(transport: RendererApiTransport): CommandApi {
   return {
-    list: (category) => category === undefined
-      ? transport.invoke(INVOKE.command.list)
-      : transport.invoke(INVOKE.command.list, category),
-    execute: (request) => transport.invoke(INVOKE.command.execute, request),
+    list: (category) =>
+      category === undefined ? transport.invoke('command:list') : transport.invoke('command:list', category),
+    execute: (request) => transport.invoke('command:execute', request),
   };
 }
 
 export function createToolApi(transport: RendererApiTransport): ToolApi {
   return {
-    detectInstallations: () => transport.invoke(INVOKE.tools.detectInstallations),
-    resolveInstallation: (request) => transport.invoke(INVOKE.tools.resolveInstallation, request),
-    verifyInstallation: (request) => transport.invoke(INVOKE.tools.verifyInstallation, request),
+    detectInstallations: () => transport.invoke('tool:detectInstallations'),
+    resolveInstallation: (request) => transport.invoke('tool:resolveInstallation', request),
+    verifyInstallation: (request) => transport.invoke('tool:verifyInstallation', request),
   };
 }
 
 export function createMcpApi(transport: RendererApiTransport): McpApi {
-  return { getStatusSummary: () => transport.invoke(INVOKE.tools.getMcpStatusSummary) };
+  return { getStatusSummary: () => transport.invoke('mcp:getStatusSummary') };
 }
 
 export function createEvidenceApi(transport: RendererApiTransport): EvidenceApi {
   return {
-    getChain: () => transport.invoke(INVOKE.tools.getEvidenceChain),
+    getChain: () => transport.invoke('evidence:getChain'),
   };
 }

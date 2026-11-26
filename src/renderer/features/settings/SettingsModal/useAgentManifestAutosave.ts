@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { nextAgentDefinitionClientRevision } from '../../../stores/appSettingsStore';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { RevisionLanes } from '../../../lib/revisionLanes';
 import {
   applyAgentDefinitionSaveResults,
   getChangedAgentManifestDrafts,
@@ -7,7 +7,11 @@ import {
   serializeAgentManifestDraft,
   shouldRollbackFailedAgentManifestSave,
 } from './agentManifestAutosaveState';
-import type { AgentDefinitionSaveResult, AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
+import type {
+  AgentDefinitionSaveResult,
+  AgentManifestDefinition,
+  AgentManifestDraft,
+} from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import type { AgentManifestSaveBatch } from './settingsModalActions';
 
@@ -29,48 +33,28 @@ interface UseAgentManifestAutosaveOptions {
   failedMessage: string;
 }
 
-export function useAgentManifestAutosave({
-  open,
-  settings,
-  agentManifestDrafts,
-  onSave,
-  currentProjectId,
-  onRollback,
-  onSaveStateChange,
-  onSaveMessageChange,
-  onBlockedChange,
-  blockSubmit,
-  blockProjectedSubmit,
-  savedMessage,
-  failedMessage,
-}: UseAgentManifestAutosaveOptions) {
+export function useAgentManifestAutosave(options: UseAgentManifestAutosaveOptions) {
+  const { open, settings, agentManifestDrafts, currentProjectId, savedMessage, failedMessage } = options;
   const savedDraftsRef = useRef<AgentManifestDraft[]>(settings.agents.definitions.map((entry) => ({ ...entry })));
-  const latestRevisionRef = useRef(0);
-  const committedRevisionRef = useRef(0);
+  // One lane for the editor's batches: only the newest drives the status; a result moves the saved baseline only
+  // when it is newer than the one applied.
+  const [lanes] = useState(() => new RevisionLanes());
   const wasOpenRef = useRef(open);
-  const draftsRef = useRef(agentManifestDrafts);
   const failedDraftsRef = useRef<AgentManifestDraft[] | null>(null);
   const debounceTimerRef = useRef<number | null>(null);
-  const saveRef = useRef(onSave);
-  const rollbackRef = useRef(onRollback);
-  const stateRef = useRef(onSaveStateChange);
-  const messageRef = useRef(onSaveMessageChange);
-  const blockedRef = useRef(onBlockedChange);
-  const blockSubmitRef = useRef(blockSubmit);
-  const blockProjectedRef = useRef(blockProjectedSubmit);
+  // Saves and their callbacks run after renders; they read the drafts and callbacks of the latest one.
+  const latest = useRef(options);
+  latest.current = options;
   const draftSnapshot = useMemo(
     () => agentManifestDrafts.map(serializeAgentManifestDraft).join('\n'),
     [agentManifestDrafts],
   );
-
-  useEffect(() => { draftsRef.current = agentManifestDrafts; }, [agentManifestDrafts]);
-  useEffect(() => { saveRef.current = onSave; }, [onSave]);
-  useEffect(() => { rollbackRef.current = onRollback; }, [onRollback]);
-  useEffect(() => { stateRef.current = onSaveStateChange; }, [onSaveStateChange]);
-  useEffect(() => { messageRef.current = onSaveMessageChange; }, [onSaveMessageChange]);
-  useEffect(() => { blockedRef.current = onBlockedChange; }, [onBlockedChange]);
-  useEffect(() => { blockSubmitRef.current = blockSubmit; }, [blockSubmit]);
-  useEffect(() => { blockProjectedRef.current = blockProjectedSubmit; }, [blockProjectedSubmit]);
+  /** Reports the save status and its message; `blocked` says whether a required field stops the save. */
+  const report = (state: SaveState, message: string, blocked?: boolean) => {
+    if (blocked !== undefined) latest.current.onBlockedChange?.(blocked);
+    latest.current.onSaveStateChange(state);
+    latest.current.onSaveMessageChange(message);
+  };
 
   /** Committed definitions become the saved baseline: on close, and after import or migration. */
   const rebase = (definitions: AgentManifestDefinition[]) => {
@@ -82,57 +66,57 @@ export function useAgentManifestAutosave({
     if (!open) rebase(settings.agents.definitions);
   }, [open, settings.agents.definitions]);
 
-  const selectDrafts = (pending = getChangedAgentManifestDrafts(draftsRef.current, savedDraftsRef.current)) => (
+  const selectDrafts = (
+    pending = getChangedAgentManifestDrafts(latest.current.agentManifestDrafts, savedDraftsRef.current),
+  ) =>
     selectSubmittableAgentManifestDrafts(
-      pending, blockSubmitRef.current, blockProjectedRef.current, draftsRef.current,
-    )
-  );
+      pending,
+      latest.current.blockSubmit,
+      latest.current.blockProjectedSubmit,
+      latest.current.agentManifestDrafts,
+    );
 
-  const executeRef = useRef<(drafts: AgentManifestDraft[], revision: number, visibleDrafts?: AgentManifestDraft[]) => Promise<void>>(async () => {});
+  const executeRef = useRef<
+    (drafts: AgentManifestDraft[], revision: number, visibleDrafts?: AgentManifestDraft[]) => Promise<void>
+  >(async () => {});
   executeRef.current = async (drafts, revision, visibleDrafts = drafts) => {
-    blockedRef.current?.(false);
-    stateRef.current('saving');
-    messageRef.current('');
+    report('saving', '', false);
     try {
-      const results = await saveRef.current({ drafts, clientRevision: revision });
+      const results = await latest.current.onSave({ drafts });
       if (!results) throw new Error(failedMessage);
-      if (revision >= committedRevisionRef.current) {
+      lanes.applyIfNewer('drafts', revision, () => {
         savedDraftsRef.current = applyAgentDefinitionSaveResults(
           savedDraftsRef.current,
           drafts,
           results,
           currentProjectId,
         );
-        committedRevisionRef.current = revision;
-      }
-      if (revision !== latestRevisionRef.current) return;
+      });
+      if (!lanes.isLatest('drafts', revision)) return;
       const remaining = selectDrafts();
       if (remaining.drafts.length === 0 && remaining.blockedReason) {
-        latestRevisionRef.current = nextAgentDefinitionClientRevision();
-        blockedRef.current?.(true);
-        stateRef.current('error');
-        messageRef.current(remaining.blockedReason);
+        lanes.begin('drafts');
+        report('error', remaining.blockedReason, true);
         return;
       }
       if (results.every((result) => result.status === 'committed')) {
         failedDraftsRef.current = null;
-        stateRef.current('saved');
-        messageRef.current(savedMessage);
+        report('saved', savedMessage);
       }
     } catch (error) {
-      if (!shouldRollbackFailedAgentManifestSave(
-        revision,
-        latestRevisionRef.current,
-        visibleDrafts,
-        draftsRef.current,
-      )) return;
+      if (
+        !shouldRollbackFailedAgentManifestSave(
+          lanes.isLatest('drafts', revision),
+          visibleDrafts,
+          latest.current.agentManifestDrafts,
+        )
+      )
+        return;
       // Keep the attempted values and compare hashes even when the visible draft
       // rolls back. Retrying must not save unrelated profiles or rebase a conflict.
       failedDraftsRef.current = drafts;
-      rollbackRef.current(drafts, savedDraftsRef.current);
-      blockedRef.current?.(false);
-      stateRef.current('error');
-      messageRef.current(error instanceof Error && error.message ? error.message : failedMessage);
+      latest.current.onRollback(drafts, savedDraftsRef.current);
+      report('error', error instanceof Error && error.message ? error.message : failedMessage, false);
     }
   };
 
@@ -141,49 +125,37 @@ export function useAgentManifestAutosave({
     const { drafts: changed, blockedReason } = selectDrafts();
     if (changed.length === 0) {
       if (blockedReason) {
-        latestRevisionRef.current = nextAgentDefinitionClientRevision();
-        blockedRef.current?.(true);
-        stateRef.current('error');
-        messageRef.current(blockedReason);
+        lanes.begin('drafts');
+        report('error', blockedReason, true);
       }
       return;
     }
-    const revision = nextAgentDefinitionClientRevision();
-    latestRevisionRef.current = revision;
-    blockedRef.current?.(false);
-    stateRef.current('idle');
-    messageRef.current('');
+    const revision = lanes.begin('drafts');
+    report('idle', '', false);
     const timer = window.setTimeout(() => void executeRef.current(changed, revision), 300);
     debounceTimerRef.current = timer;
     return () => {
       window.clearTimeout(timer);
       if (debounceTimerRef.current === timer) debounceTimerRef.current = null;
     };
-
-  }, [draftSnapshot, open]);
+  }, [draftSnapshot, lanes, open]);
 
   useEffect(() => {
     if (wasOpenRef.current && !open) {
       const { drafts: changed } = selectDrafts();
-      if (changed.length > 0) {
-        const revision = nextAgentDefinitionClientRevision();
-        latestRevisionRef.current = revision;
-        void executeRef.current(changed, revision);
-      }
+      if (changed.length > 0) void executeRef.current(changed, lanes.begin('drafts'));
     }
     wasOpenRef.current = open;
-
-  }, [draftSnapshot, open]);
+  }, [draftSnapshot, lanes, open]);
 
   const retry = async () => {
     if (!open) return;
-    const changed = getChangedAgentManifestDrafts(draftsRef.current, savedDraftsRef.current);
+    const current = latest.current.agentManifestDrafts;
+    const changed = getChangedAgentManifestDrafts(current, savedDraftsRef.current);
     const pending = changed.length > 0 ? changed : (failedDraftsRef.current ?? []);
     const { drafts, blockedReason } = selectDrafts(pending);
     if (blockedReason) {
-      blockedRef.current?.(true);
-      stateRef.current('error');
-      messageRef.current(blockedReason);
+      report('error', blockedReason, true);
       return;
     }
     if (drafts.length === 0) return;
@@ -191,9 +163,11 @@ export function useAgentManifestAutosave({
       window.clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
     }
-    const revision = nextAgentDefinitionClientRevision();
-    latestRevisionRef.current = revision;
-    await executeRef.current(drafts, revision, draftsRef.current.filter(current => drafts.some(draft => draft.id === current.id)));
+    await executeRef.current(
+      drafts,
+      lanes.begin('drafts'),
+      current.filter((entry) => drafts.some((draft) => draft.id === entry.id)),
+    );
   };
 
   return { retry, rebase };

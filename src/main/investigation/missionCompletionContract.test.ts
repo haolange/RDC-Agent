@@ -1,13 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { InvestigationError } from './investigationErrors';
-import {
-  assertMissionTurnCompletion,
-  enforceMissionTurnReadiness,
-  enforceMissionTurnCompletion,
-  isAllowedMissionCompletionStatus,
-  MissionCompletionError,
-  reportStatusForbidsCompleted,
-} from './missionCompletionContract';
 import {
   SESSION_ID,
   baselineWorld,
@@ -26,115 +17,195 @@ import {
   seedNote,
   writeDraft,
   writeReadyReport,
-} from './investigationTestFixtures';
+} from '../testing/investigationTestFixtures';
+import { InvestigationError } from './investigationErrors';
+import {
+  assertMissionTurnCompletion,
+  enforceMissionTurnReadiness,
+  enforceMissionTurnCompletion,
+  isAllowedMissionCompletionStatus,
+  MissionCompletionError,
+  reportStatusForbidsCompleted,
+} from './missionCompletionContract';
 import type { InvestigationArtifactService } from './InvestigationArtifactService';
 
 const MISSIONS = ['debugger', 'analyzer', 'optimizer'] as const;
 
-function seedCheckpoint(service: ReturnType<typeof createInvestigationHarness>['service'], mission: typeof MISSIONS[number]) {
+function seedCheckpoint(
+  service: ReturnType<typeof createInvestigationHarness>['service'],
+  mission: (typeof MISSIONS)[number],
+) {
   writeDraft(service, 'world_state', baselineWorld('ws-baseline'), { mission });
-  return writeDraft(service, 'checkpoint', sampleCheckpoint({
-    checkpointId: `cp-${mission}`,
-    currentWorldStateId: 'ws-baseline',
-  }), { mission });
+  return writeDraft(
+    service,
+    'checkpoint',
+    sampleCheckpoint({
+      checkpointId: `cp-${mission}`,
+      currentWorldStateId: 'ws-baseline',
+    }),
+    { mission },
+  );
 }
 
-function seedHypothesis(service: ReturnType<typeof createInvestigationHarness>['service'], mission: typeof MISSIONS[number]) {
+function seedHypothesis(
+  service: ReturnType<typeof createInvestigationHarness>['service'],
+  mission: (typeof MISSIONS)[number],
+) {
   return writeDraft(service, 'claim', hypothesisClaim('ws-baseline', `claim-${mission}`), { mission });
 }
 
-const reportRef = (report: { contentUri: string; contentHash: string }) => ({ uri: report.contentUri, hash: report.contentHash });
+const reportRef = (report: { contentUri: string; contentHash: string }) => ({
+  uri: report.contentUri,
+  hash: report.contentHash,
+});
 
 describe('missionCompletionContract', () => {
   it('binds the exact declared report without requiring internal identifiers in the answer', () => {
-    const { service } = createInvestigationHarness();
+    const { resolver, service } = createInvestigationHarness();
     seedCheckpoint(service, 'analyzer');
-    const source = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-declared-report'), { mission: 'analyzer' });
-    const report = writeReadyReport(service, { mission: 'analyzer', source,
-      claims: [projectClaim(source.record as never, 'claim-declared-report-projection')] });
-    const input = { profileId: 'general', completionContract: 'investigation-report' as const,
-      investigationMission: 'analyzer' as const, sessionId: SESSION_ID, disposition: 'completed' as const,
+    writeDraft(service, 'evidence', evidenceOf('ws-baseline', seedNote(resolver)), { mission: 'analyzer' });
+    const source = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-declared-report'), {
+      mission: 'analyzer',
+    });
+    const report = writeReadyReport(service, {
+      mission: 'analyzer',
+      source,
+      claims: [projectClaim(source.record as never, 'claim-declared-report-projection')],
+    });
+    const input = {
+      profileId: 'general',
+      completionContract: 'investigation-report' as const,
+      investigationMission: 'analyzer' as const,
+      sessionId: SESSION_ID,
+      disposition: 'completed' as const,
       evidenceRefs: [{ uri: report.contentUri, hash: report.contentHash }],
-      finalAnswerText: 'The analysis is complete. [Read the report](report.md).', service };
+      finalAnswerText: 'The analysis is complete. [Read the report](report.md).',
+      service,
+    };
     expect(() => enforceMissionTurnReadiness(input)).not.toThrow();
     expect(assertMissionTurnCompletion(input).reportArtifactId).toBe(report.manifest.artifactId);
-    expect(assertMissionTurnCompletion({ ...input,
-      evidenceRefs: [{ uri: report.contentUri, hash: report.contentHash.slice(7) }] }).reportArtifactId).toBe(report.manifest.artifactId);
+    expect(
+      assertMissionTurnCompletion({
+        ...input,
+        evidenceRefs: [{ uri: report.contentUri, hash: report.contentHash.slice(7) }],
+      }).reportArtifactId,
+    ).toBe(report.manifest.artifactId);
     writeDraft(service, 'report', report.record, { mission: 'analyzer', supersedes: report.manifest.artifactId });
     expect(() => assertMissionTurnCompletion(input)).toThrow(/ready kind=report/);
   });
 
   it('rejects missing completion artifacts and references at declaration time', () => {
     const { service } = createInvestigationHarness();
-    const input = { profileId: 'general', completionContract: 'investigation-report' as const,
-      investigationMission: 'debugger' as const, sessionId: SESSION_ID, disposition: 'completed' as const, service };
+    const input = {
+      profileId: 'general',
+      completionContract: 'investigation-report' as const,
+      investigationMission: 'debugger' as const,
+      sessionId: SESSION_ID,
+      disposition: 'completed' as const,
+      service,
+    };
     expect(() => enforceMissionTurnReadiness(input)).toThrow(/dereferenceable MissionCheckpoint/);
     seedCheckpoint(service, 'debugger');
     expect(() => enforceMissionTurnReadiness(input)).toThrow(/ready kind=report/);
     const claim = seedHypothesis(service, 'debugger');
-    const report = writeReadyReport(service, { mission: 'debugger', source: claim,
-      claims: [projectClaim(claim.record as never, 'claim-readiness-proj')] });
+    const report = writeReadyReport(service, {
+      mission: 'debugger',
+      source: claim,
+      claims: [projectClaim(claim.record as never, 'claim-readiness-proj')],
+    });
     expect(() => enforceMissionTurnReadiness(input)).toThrow(/evidenceRefs/);
     expect(() => enforceMissionTurnReadiness({ ...input, evidenceRefs: [reportRef(report)] })).not.toThrow();
-    expect(() => assertMissionTurnCompletion({ ...input, evidenceRefs: [reportRef(report)], finalAnswerText: '  ' }))
-      .toThrow(/canonical final answer/);
+    expect(() =>
+      assertMissionTurnCompletion({ ...input, evidenceRefs: [reportRef(report)], finalAnswerText: '  ' }),
+    ).toThrow(/canonical final answer/);
     expect(() => enforceMissionTurnReadiness({ ...input, disposition: 'partial', sessionId: null })).not.toThrow();
   });
 
   it('does not constrain General', () => {
-    expect(enforceMissionTurnCompletion({
-      profileId: 'general',
-      sessionId: SESSION_ID,
-      finalAnswerText: 'done without artifacts',
-    })).toBeUndefined();
-    expect(() => enforceMissionTurnCompletion({
-      profileId: 'general',
-      sessionId: null,
-      finalAnswerText: '',
-    })).not.toThrow();
+    expect(
+      enforceMissionTurnCompletion({
+        profileId: 'general',
+        sessionId: SESSION_ID,
+        finalAnswerText: 'done without artifacts',
+      }),
+    ).toBeUndefined();
+    expect(() =>
+      enforceMissionTurnCompletion({
+        profileId: 'general',
+        sessionId: null,
+        finalAnswerText: '',
+      }),
+    ).not.toThrow();
   });
 
-  it.each(MISSIONS)('%s can clarify an intent without claiming investigation completion', profileId => {
-    expect(() => enforceMissionTurnCompletion({ profileId, completionContract: 'investigation-report', investigationMission: profileId, sessionId: SESSION_ID, finalAnswerText: 'What should this area look like?' })).not.toThrow();
-    expect(() => enforceMissionTurnCompletion({ profileId, completionContract: 'investigation-report', investigationMission: profileId, sessionId: SESSION_ID, finalAnswerText: 'Done.', disposition: 'completed', service: createInvestigationHarness().service })).toThrow(MissionCompletionError);
+  it.each(MISSIONS)('%s can clarify an intent without claiming investigation completion', (profileId) => {
+    expect(() =>
+      enforceMissionTurnCompletion({
+        profileId,
+        completionContract: 'investigation-report',
+        investigationMission: profileId,
+        sessionId: SESSION_ID,
+        finalAnswerText: 'What should this area look like?',
+      }),
+    ).not.toThrow();
+    expect(() =>
+      enforceMissionTurnCompletion({
+        profileId,
+        completionContract: 'investigation-report',
+        investigationMission: profileId,
+        sessionId: SESSION_ID,
+        finalAnswerText: 'Done.',
+        disposition: 'completed',
+        service: createInvestigationHarness().service,
+      }),
+    ).toThrow(MissionCompletionError);
   });
 
   it('does not infer a mission from the profile id', () => {
-    expect(enforceMissionTurnCompletion({
-      profileId: 'debugger',
-      sessionId: SESSION_ID,
-      finalAnswerText: 'Done.',
-      disposition: 'completed',
-    })).toBeUndefined();
+    expect(
+      enforceMissionTurnCompletion({
+        profileId: 'debugger',
+        sessionId: SESSION_ID,
+        finalAnswerText: 'Done.',
+        disposition: 'completed',
+      }),
+    ).toBeUndefined();
   });
 
-  it.each(['partial', 'blocked', 'cancelled'] as const)('allows honest %s without promoting a report', disposition => {
-    expect(() => enforceMissionTurnCompletion({
-      profileId: 'debugger',
-      completionContract: 'investigation-report',
-      investigationMission: 'debugger',
-      sessionId: SESSION_ID,
-      finalAnswerText: 'Unresolved.',
-      disposition,
-    })).not.toThrow();
-  });
+  it.each(['partial', 'blocked', 'cancelled'] as const)(
+    'allows honest %s without promoting a report',
+    (disposition) => {
+      expect(() =>
+        enforceMissionTurnCompletion({
+          profileId: 'debugger',
+          completionContract: 'investigation-report',
+          investigationMission: 'debugger',
+          sessionId: SESSION_ID,
+          finalAnswerText: 'Unresolved.',
+          disposition,
+        }),
+      ).not.toThrow();
+    },
+  );
 
   it.each(MISSIONS)('%s cannot complete without a report', (mission) => {
     const { service } = createInvestigationHarness();
     seedCheckpoint(service, mission);
-    expect(() => assertMissionTurnCompletion({
-      profileId: mission,
-      completionContract: 'investigation-report',
-      investigationMission: mission,
-      sessionId: SESSION_ID,
-      finalAnswerText: 'Mission finished in prose only.',
-      service,
-    })).toThrow(MissionCompletionError);
+    expect(() =>
+      assertMissionTurnCompletion({
+        profileId: mission,
+        completionContract: 'investigation-report',
+        investigationMission: mission,
+        sessionId: SESSION_ID,
+        finalAnswerText: 'Mission finished in prose only.',
+        service,
+      }),
+    ).toThrow(MissionCompletionError);
     try {
       assertMissionTurnCompletion({
         profileId: mission,
-      completionContract: 'investigation-report',
-      investigationMission: mission,
+        completionContract: 'investigation-report',
+        investigationMission: mission,
         sessionId: SESSION_ID,
         finalAnswerText: 'Mission finished in prose only.',
         service,
@@ -156,19 +227,21 @@ describe('missionCompletionContract', () => {
       claims: [projectClaim(claim.record as never, `claim-${mission}-proj`)],
     });
     const finalAnswer = `See ${report.manifest.artifactId} ${report.contentHash}`;
-    expect(() => assertMissionTurnCompletion({
-      profileId: mission,
-      completionContract: 'investigation-report',
-      investigationMission: mission,
-      sessionId: SESSION_ID,
-      finalAnswerText: finalAnswer,
-      service,
-    })).toThrow(/missing_checkpoint|MISSION_COMPLETION_DENIED/);
+    expect(() =>
+      assertMissionTurnCompletion({
+        profileId: mission,
+        completionContract: 'investigation-report',
+        investigationMission: mission,
+        sessionId: SESSION_ID,
+        finalAnswerText: finalAnswer,
+        service,
+      }),
+    ).toThrow(/missing_checkpoint|MISSION_COMPLETION_DENIED/);
     try {
       assertMissionTurnCompletion({
         profileId: mission,
-      completionContract: 'investigation-report',
-      investigationMission: mission,
+        completionContract: 'investigation-report',
+        investigationMission: mission,
         sessionId: SESSION_ID,
         finalAnswerText: finalAnswer,
         service,
@@ -190,11 +263,20 @@ describe('missionCompletionContract', () => {
       evidenceIds: extras.evidenceIds,
       experimentIds: extras.experimentIds,
     });
-    const base = { profileId: mission, completionContract: 'investigation-report' as const,
-      investigationMission: mission, sessionId: SESSION_ID, disposition: 'completed' as const,
-      finalAnswerText: `See ${report.manifest.artifactId} ${report.contentHash}`, service };
-    for (const evidenceRefs of [[], [{ ...reportRef(report), uri: 'session://investigation/records/other.json' }],
-      [{ ...reportRef(report), hash: `sha256:${'0'.repeat(64)}` }]]) {
+    const base = {
+      profileId: mission,
+      completionContract: 'investigation-report' as const,
+      investigationMission: mission,
+      sessionId: SESSION_ID,
+      disposition: 'completed' as const,
+      finalAnswerText: `See ${report.manifest.artifactId} ${report.contentHash}`,
+      service,
+    };
+    for (const evidenceRefs of [
+      [],
+      [{ ...reportRef(report), uri: 'session://investigation/records/other.json' }],
+      [{ ...reportRef(report), hash: `sha256:${'0'.repeat(64)}` }],
+    ]) {
       expect(() => enforceMissionTurnReadiness({ ...base, evidenceRefs })).toThrow(/evidenceRefs/);
       expect(() => assertMissionTurnCompletion({ ...base, evidenceRefs })).toThrow(/evidenceRefs/);
     }
@@ -209,7 +291,18 @@ describe('missionCompletionContract', () => {
       expect(isAllowedMissionCompletionStatus(allowed)).toBe(true);
       expect(reportStatusForbidsCompleted(allowed)).toBe(false);
     }
-    for (const denied of ['Partial', 'Inconclusive', 'Blocked', 'Pending', 'Failed', 'Unknown', 'Partially', 'done', 'almost complete', '']) {
+    for (const denied of [
+      'Partial',
+      'Inconclusive',
+      'Blocked',
+      'Pending',
+      'Failed',
+      'Unknown',
+      'Partially',
+      'done',
+      'almost complete',
+      '',
+    ]) {
       expect(isAllowedMissionCompletionStatus(denied)).toBe(false);
       expect(reportStatusForbidsCompleted(denied)).toBe(true);
     }
@@ -222,141 +315,252 @@ describe('missionCompletionContract', () => {
       claims: [projectClaim(claim.record as never, 'claim-status-pending')],
       reportContract: sampleReportContract([claim.manifest.artifactId], { status: 'Pending' }),
     });
-    expect(() => enforceMissionTurnReadiness({
-      profileId: 'debugger', completionContract: 'investigation-report', investigationMission: 'debugger',
-      sessionId: SESSION_ID, disposition: 'completed', evidenceRefs: [reportRef(report)], service,
-    })).toThrow(/report.status/);
-    expect(() => assertMissionTurnCompletion({
-      profileId: 'debugger',
-      completionContract: 'investigation-report',
-      investigationMission: 'debugger',
-      sessionId: SESSION_ID,
-      finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
-      evidenceRefs: [reportRef(report)],
-      service,
-    })).toThrow(/non_complete_status|MISSION_COMPLETION_DENIED/);
+    expect(() =>
+      enforceMissionTurnReadiness({
+        profileId: 'debugger',
+        completionContract: 'investigation-report',
+        investigationMission: 'debugger',
+        sessionId: SESSION_ID,
+        disposition: 'completed',
+        evidenceRefs: [reportRef(report)],
+        service,
+      }),
+    ).toThrow(/report.status/);
+    expect(() =>
+      assertMissionTurnCompletion({
+        profileId: 'debugger',
+        completionContract: 'investigation-report',
+        investigationMission: 'debugger',
+        sessionId: SESSION_ID,
+        finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
+        evidenceRefs: [reportRef(report)],
+        service,
+      }),
+    ).toThrow(/non_complete_status|MISSION_COMPLETION_DENIED/);
   });
 
   it('allows an appropriately scoped Analyzer report without inventing other explanation layers', () => {
-    const { service } = createInvestigationHarness();
+    const { resolver, service } = createInvestigationHarness();
     seedCheckpoint(service, 'analyzer');
-    const observed = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-analyzer-obs'), { mission: 'analyzer' });
+    writeDraft(service, 'evidence', evidenceOf('ws-baseline', seedNote(resolver)), { mission: 'analyzer' });
+    const observed = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-analyzer-obs'), {
+      mission: 'analyzer',
+    });
     const report = writeReadyReport(service, {
       mission: 'analyzer',
       source: observed,
       claims: [projectClaim(observed.record as never, 'claim-analyzer-obs-proj')],
     });
-    expect(() => assertMissionTurnCompletion({
-      profileId: 'analyzer',
-      completionContract: 'investigation-report',
-      investigationMission: 'analyzer',
-      sessionId: SESSION_ID,
-      finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
-      evidenceRefs: [reportRef(report)],
-      service,
-    })).not.toThrow();
+    expect(() =>
+      assertMissionTurnCompletion({
+        profileId: 'analyzer',
+        completionContract: 'investigation-report',
+        investigationMission: 'analyzer',
+        sessionId: SESSION_ID,
+        finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
+        evidenceRefs: [reportRef(report)],
+        service,
+      }),
+    ).not.toThrow();
   });
 
-  it('blocks completion for an open Challenge against the reported source, not an unrelated finding', { timeout: 15_000 }, () => {
-    const { service } = createInvestigationHarness();
-    seedCheckpoint(service, 'debugger');
-    const source = seedHypothesis(service, 'debugger');
-    const unrelated = writeDraft(service, 'claim', hypothesisClaim('ws-baseline', 'claim-unrelated'));
-    const unrelatedChallenge = writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'unrelated-challenge', targetId: (unrelated.record as { claimId: string }).claimId }));
-    const report = writeReadyReport(service, { mission: 'debugger', source,
-      claims: [projectClaim(source.record as never, 'projected-conclusion')] });
-    const input = { profileId: 'debugger', completionContract: 'investigation-report' as const,
-      investigationMission: 'debugger' as const, sessionId: SESSION_ID,
-      finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`, evidenceRefs: [reportRef(report)], service };
-    const readiness = { ...input, disposition: 'completed' as const };
-    expect(() => enforceMissionTurnReadiness(readiness)).not.toThrow();
-    expect(() => assertMissionTurnCompletion(input)).not.toThrow();
-    const challenge = writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'source-challenge', targetId: (source.record as { claimId: string }).claimId }));
-    expect(() => enforceMissionTurnReadiness(readiness)).toThrow('source-challenge');
-    expect(() => assertMissionTurnCompletion(input)).toThrow('source-challenge');
-    writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'source-challenge', targetId: (source.record as { claimId: string }).claimId,
-      status: 'resolved', resolutionClaimId: (source.record as { claimId: string }).claimId }), { supersedes: challenge.manifest.artifactId });
-    expect(service.readRecord(SESSION_ID, unrelatedChallenge.manifest.artifactId).record).toMatchObject({ status: 'open' });
-    expect(() => enforceMissionTurnReadiness(readiness)).not.toThrow();
-    expect(() => assertMissionTurnCompletion(input)).not.toThrow();
-  });
+  it(
+    'blocks completion for an open Challenge against the reported source, not an unrelated finding',
+    { timeout: 15_000 },
+    () => {
+      const { service } = createInvestigationHarness();
+      seedCheckpoint(service, 'debugger');
+      const source = seedHypothesis(service, 'debugger');
+      const unrelated = writeDraft(service, 'claim', hypothesisClaim('ws-baseline', 'claim-unrelated'));
+      const unrelatedChallenge = writeDraft(
+        service,
+        'challenge',
+        sampleChallenge({
+          challengeId: 'unrelated-challenge',
+          targetId: (unrelated.record as { claimId: string }).claimId,
+        }),
+      );
+      const report = writeReadyReport(service, {
+        mission: 'debugger',
+        source,
+        claims: [projectClaim(source.record as never, 'projected-conclusion')],
+      });
+      const input = {
+        profileId: 'debugger',
+        completionContract: 'investigation-report' as const,
+        investigationMission: 'debugger' as const,
+        sessionId: SESSION_ID,
+        finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
+        evidenceRefs: [reportRef(report)],
+        service,
+      };
+      const readiness = { ...input, disposition: 'completed' as const };
+      expect(() => enforceMissionTurnReadiness(readiness)).not.toThrow();
+      expect(() => assertMissionTurnCompletion(input)).not.toThrow();
+      const challenge = writeDraft(
+        service,
+        'challenge',
+        sampleChallenge({ challengeId: 'source-challenge', targetId: (source.record as { claimId: string }).claimId }),
+      );
+      expect(() => enforceMissionTurnReadiness(readiness)).toThrow('source-challenge');
+      expect(() => assertMissionTurnCompletion(input)).toThrow('source-challenge');
+      writeDraft(
+        service,
+        'challenge',
+        sampleChallenge({
+          challengeId: 'source-challenge',
+          targetId: (source.record as { claimId: string }).claimId,
+          status: 'resolved',
+          resolutionClaimId: (source.record as { claimId: string }).claimId,
+        }),
+        { supersedes: challenge.manifest.artifactId },
+      );
+      expect(service.readRecord(SESSION_ID, unrelatedChallenge.manifest.artifactId).record).toMatchObject({
+        status: 'open',
+      });
+      expect(() => enforceMissionTurnReadiness(readiness)).not.toThrow();
+      expect(() => assertMissionTurnCompletion(input)).not.toThrow();
+    },
+  );
 
   it('allows a declaration when another ready report satisfies the contract', { timeout: 15_000 }, () => {
     const { service } = createInvestigationHarness();
     seedCheckpoint(service, 'debugger');
     const claim = seedHypothesis(service, 'debugger');
     const claims = [projectClaim(claim.record as never, 'claim-multiple-reports')];
-    const pending = writeReadyReport(service, { mission: 'debugger', source: claim, claims,
-      reportContract: sampleReportContract([claim.manifest.artifactId], { status: 'Pending' }) });
+    const pending = writeReadyReport(service, {
+      mission: 'debugger',
+      source: claim,
+      claims,
+      reportContract: sampleReportContract([claim.manifest.artifactId], { status: 'Pending' }),
+    });
     const complete = writeReadyReport(service, { mission: 'debugger', source: claim, claims });
-    const input = { profileId: 'debugger', completionContract: 'investigation-report' as const,
-      investigationMission: 'debugger' as const, sessionId: SESSION_ID, service };
-    expect(() => enforceMissionTurnReadiness({ ...input, disposition: 'completed', evidenceRefs: [reportRef(complete)] })).not.toThrow();
-    expect(() => assertMissionTurnCompletion({ ...input, evidenceRefs: [reportRef(pending)], finalAnswerText: 'Pending report.' }))
-      .toThrow(/report.status/);
-    expect(() => assertMissionTurnCompletion({ ...input, evidenceRefs: [reportRef(complete)], finalAnswerText: 'Complete report.' }))
-      .not.toThrow();
+    const input = {
+      profileId: 'debugger',
+      completionContract: 'investigation-report' as const,
+      investigationMission: 'debugger' as const,
+      sessionId: SESSION_ID,
+      service,
+    };
+    expect(() =>
+      enforceMissionTurnReadiness({ ...input, disposition: 'completed', evidenceRefs: [reportRef(complete)] }),
+    ).not.toThrow();
+    expect(() =>
+      assertMissionTurnCompletion({ ...input, evidenceRefs: [reportRef(pending)], finalAnswerText: 'Pending report.' }),
+    ).toThrow(/report.status/);
+    expect(() =>
+      assertMissionTurnCompletion({
+        ...input,
+        evidenceRefs: [reportRef(complete)],
+        finalAnswerText: 'Complete report.',
+      }),
+    ).not.toThrow();
   });
 
   it.each([
     new Error('unexpected report lookup failure'),
     new InvestigationError('INVESTIGATION_STORAGE_FAILED', 'report storage unavailable'),
-  ])('propagates unexpected report validation failures instead of trying another report: %s', failure => {
+  ])('propagates unexpected report validation failures instead of trying another report: %s', (failure) => {
     const source = hypothesisClaim('ws-baseline', 'claim-lookup');
-    const record = sampleReport({ mission: 'debugger', claims: [projectClaim(source, 'claim-lookup-projected')],
-      reportContract: sampleReportContract(['source-artifact']) });
-    const lookup = { getArtifact: (artifactId: string) => ({ artifactId }), getClaim: () => source,
-      getWorldState: () => null, getEvidence: () => null, getExperiment: () => null };
+    const record = sampleReport({
+      mission: 'debugger',
+      claims: [projectClaim(source, 'claim-lookup-projected')],
+      reportContract: sampleReportContract(['source-artifact']),
+    });
+    const lookup = {
+      getArtifact: (artifactId: string) => ({ artifactId }),
+      getClaim: () => source,
+      getWorldState: () => null,
+      getEvidence: () => null,
+      getExperiment: () => null,
+    };
     const service = {
-      list: (_sessionId: string, filter: { kind: string }) => filter.kind === 'checkpoint'
-        ? [{ artifactId: 'checkpoint', status: 'draft' }]
-        : filter.kind === 'report' ? [{ artifactId: 'report-a', status: 'ready' }, { artifactId: 'report-b', status: 'ready' }] : [],
-      readRecord: (_sessionId: string, artifactId: string) => artifactId === 'checkpoint'
-        ? { manifest: { artifactId, status: 'draft', mission: 'debugger' }, record: { checkpointId: 'checkpoint' } }
-        : { manifest: { artifactId, status: 'ready', kind: 'report', mission: 'debugger' },
-          contentUri: `session://investigation/records/${artifactId}.json`, contentHash: 'sha256:test', record },
-      createLookup: vi.fn().mockImplementationOnce(() => { throw failure; }).mockReturnValue(lookup),
+      list: (_sessionId: string, filter: { kind: string }) =>
+        filter.kind === 'checkpoint'
+          ? [{ artifactId: 'checkpoint', status: 'draft' }]
+          : filter.kind === 'report'
+            ? [
+                { artifactId: 'report-a', status: 'ready' },
+                { artifactId: 'report-b', status: 'ready' },
+              ]
+            : [],
+      readRecord: (_sessionId: string, artifactId: string) =>
+        artifactId === 'checkpoint'
+          ? { manifest: { artifactId, status: 'draft', mission: 'debugger' }, record: { checkpointId: 'checkpoint' } }
+          : {
+              manifest: { artifactId, status: 'ready', kind: 'report', mission: 'debugger' },
+              contentUri: `session://investigation/records/${artifactId}.json`,
+              contentHash: 'sha256:test',
+              record,
+            },
+      createLookup: vi
+        .fn()
+        .mockImplementationOnce(() => {
+          throw failure;
+        })
+        .mockReturnValue(lookup),
     } as unknown as InvestigationArtifactService;
-    expect(() => enforceMissionTurnReadiness({
-      profileId: 'general', completionContract: 'investigation-report', investigationMission: 'debugger',
-      sessionId: SESSION_ID, disposition: 'completed',
-      evidenceRefs: [{ uri: 'session://investigation/records/report-b.json', hash: 'sha256:test' }], service,
-    })).toThrow(failure.message);
+    expect(() =>
+      enforceMissionTurnReadiness({
+        profileId: 'general',
+        completionContract: 'investigation-report',
+        investigationMission: 'debugger',
+        sessionId: SESSION_ID,
+        disposition: 'completed',
+        evidenceRefs: [{ uri: 'session://investigation/records/report-b.json', hash: 'sha256:test' }],
+        service,
+      }),
+    ).toThrow(failure.message);
   });
 
   it('rejects an Optimizer declaration when no ready report has a qualifying experiment', { timeout: 15_000 }, () => {
     const { service } = createInvestigationHarness();
     seedCheckpoint(service, 'optimizer');
     const claim = seedHypothesis(service, 'optimizer');
-    const report = writeReadyReport(service, { mission: 'optimizer', source: claim,
-      claims: [projectClaim(claim.record as never, 'claim-optimizer-no-experiment')] });
-    expect(() => enforceMissionTurnReadiness({
-      profileId: 'general', completionContract: 'investigation-report', investigationMission: 'optimizer',
-      sessionId: SESSION_ID, disposition: 'completed', evidenceRefs: [reportRef(report)], service,
-    })).toThrow(/Optimizer completion requires/);
+    const report = writeReadyReport(service, {
+      mission: 'optimizer',
+      source: claim,
+      claims: [projectClaim(claim.record as never, 'claim-optimizer-no-experiment')],
+    });
+    expect(() =>
+      enforceMissionTurnReadiness({
+        profileId: 'general',
+        completionContract: 'investigation-report',
+        investigationMission: 'optimizer',
+        sessionId: SESSION_ID,
+        disposition: 'completed',
+        evidenceRefs: [reportRef(report)],
+        service,
+      }),
+    ).toThrow(/Optimizer completion requires/);
   });
 
   it('does not treat an ordinary Mission reply as completed', () => {
     const { service } = createInvestigationHarness();
-    expect(enforceMissionTurnCompletion({
-      profileId: 'debugger',
-      completionContract: 'investigation-report',
-      investigationMission: 'debugger',
-      sessionId: SESSION_ID,
-      finalAnswerText: 'still planning',
-      service,
-    })).toBeUndefined();
+    expect(
+      enforceMissionTurnCompletion({
+        profileId: 'debugger',
+        completionContract: 'investigation-report',
+        investigationMission: 'debugger',
+        sessionId: SESSION_ID,
+        finalAnswerText: 'still planning',
+        service,
+      }),
+    ).toBeUndefined();
   });
 });
 
 function seedMissionMethod(
   service: ReturnType<typeof createInvestigationHarness>['service'],
   resolver: ReturnType<typeof createInvestigationHarness>['resolver'],
-  mission: typeof MISSIONS[number],
+  mission: (typeof MISSIONS)[number],
 ) {
   if (mission === 'analyzer') {
+    writeDraft(service, 'evidence', evidenceOf('ws-baseline', seedNote(resolver)), { mission });
     const observed = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-analyzer'), { mission });
-    const reconstructed = writeDraft(service, 'claim', derivedStructureClaim('ws-baseline', 'claim-analyzer-recon'), { mission });
+    const reconstructed = writeDraft(service, 'claim', derivedStructureClaim('ws-baseline', 'claim-analyzer-recon'), {
+      mission,
+    });
     const authoring = writeDraft(service, 'claim', hypothesisClaim('ws-baseline', 'claim-analyzer-auth'), { mission });
     return {
       claim: observed,
@@ -381,16 +585,26 @@ function seedMissionMethod(
   const note = seedNote(resolver);
   writeDraft(service, 'world_state', exclusiveWorld('ws-var'), { mission });
   writeDraft(service, 'world_state', baselineWorld('ws-restored'), { mission });
-  writeDraft(service, 'evidence', { ...evidenceOf('ws-restored', note, 'ev-verify'), mission: 'optimizer' }, { mission });
-  writeDraft(service, 'experiment', recordedExperiment({
-    experimentId: 'exp-opt',
-    hypothesisClaimId: `claim-${mission}`,
-    baselineWorldStateId: 'ws-baseline',
-    variantWorldStateId: 'ws-var',
-    restoredWorldStateId: 'ws-restored',
-    verifyEvidenceIds: ['ev-verify'],
-    protocolKind: 'A-B-A',
-  }), { mission });
+  writeDraft(
+    service,
+    'evidence',
+    { ...evidenceOf('ws-restored', note, 'ev-verify'), mission: 'optimizer' },
+    { mission },
+  );
+  writeDraft(
+    service,
+    'experiment',
+    recordedExperiment({
+      experimentId: 'exp-opt',
+      hypothesisClaimId: `claim-${mission}`,
+      baselineWorldStateId: 'ws-baseline',
+      variantWorldStateId: 'ws-var',
+      restoredWorldStateId: 'ws-restored',
+      verifyEvidenceIds: ['ev-verify'],
+      protocolKind: 'A-B-A',
+    }),
+    { mission },
+  );
   return {
     claim,
     claims: [projectClaim(claim.record as never, `claim-${mission}-proj`)],
@@ -398,5 +612,3 @@ function seedMissionMethod(
     experimentIds: ['exp-opt'],
   };
 }
-
-

@@ -5,23 +5,10 @@
  * Candidate / Write through thin IPC; list order comes from the service.
  */
 
-export const KNOWLEDGE_CARD_TYPES = [
-  'fact',
-  'constraint',
-  'pattern',
-  'procedure',
-  'case',
-  'model',
-] as const;
+export const KNOWLEDGE_CARD_TYPES = ['fact', 'constraint', 'pattern', 'procedure', 'case', 'model'] as const;
 export type KnowledgeCardType = (typeof KNOWLEDGE_CARD_TYPES)[number];
 
-export const KNOWLEDGE_LIFECYCLES = [
-  'draft',
-  'candidate',
-  'verified',
-  'promoted',
-  'retired',
-] as const;
+export const KNOWLEDGE_LIFECYCLES = ['draft', 'candidate', 'verified', 'promoted', 'retired'] as const;
 export type KnowledgeLifecycle = (typeof KNOWLEDGE_LIFECYCLES)[number];
 
 export const KNOWLEDGE_RELATION_KINDS = [
@@ -133,7 +120,7 @@ export interface KnowledgeCardRecord {
   sourceSize?: number;
 }
 
-export type KnowledgeSpaceKind = 'user' | 'project';
+type KnowledgeSpaceKind = 'user' | 'project';
 
 export interface KnowledgeSpace {
   spaceId: string;
@@ -176,37 +163,8 @@ export interface KnowledgeCardDetail extends KnowledgeCardSummary {
   sourceSize?: number;
 }
 
-export interface KnowledgeReadRequest {
-  spaceId: string;
-  relativePath: string;
-  mode: 'summary' | 'section' | 'range' | 'full';
-  contentHash?: string;
-  heading?: string;
-  headingLine?: number;
-  startLine?: number;
-  endLine?: number;
-}
-
-export interface KnowledgeReadResult {
-  card: Omit<KnowledgeCardDetail, 'content' | 'body' | 'chapters'>;
-  content: string;
-  range: string;
-  headings: Array<{ title: string; line: number; level: number }>;
-  lineCount: number;
-}
-
 export interface KnowledgeHumanConfirmation {
   explicitHumanConfirmation: true;
-}
-
-export interface KnowledgeReviewRecord {
-  reviewId: string;
-  sessionId: string;
-  kind: 'write' | 'promote';
-  cardId: string;
-  createdAt: string;
-  revision: number;
-  contentHash: string;
 }
 
 /** Six retrieval lanes. Order is the walk-pattern contract. */
@@ -292,7 +250,7 @@ export interface KnowledgeTopic {
   synonyms: string[];
 }
 
-export interface KnowledgeTopicAssignment {
+interface KnowledgeTopicAssignment {
   cardId: string;
   contentHash: string;
   topicIds: string[];
@@ -331,7 +289,14 @@ export interface KnowledgeTopicPreview {
   changeHash: string;
   topics: KnowledgeTopic[];
   merges: Array<{ source: KnowledgeTopic; target: KnowledgeTopic }>;
-  cards: Array<{ cardId: string; title: string; relativePath: string; before: string[]; after: string[]; stale: boolean }>;
+  cards: Array<{
+    cardId: string;
+    title: string;
+    relativePath: string;
+    before: string[];
+    after: string[];
+    stale: boolean;
+  }>;
 }
 
 export interface KnowledgeCompiledHit extends KnowledgeLaneHit {

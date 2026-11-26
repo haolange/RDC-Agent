@@ -1,25 +1,47 @@
 import fs from 'fs';
 import path from 'path';
+import { z, type ZodType } from 'zod';
 import { generateEventId, nowMs } from '@shared/utils/id';
+import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { shellInvocationService, type ShellInvocationService } from '../tools/ShellInvocationService';
 import { samePath } from '../platform/paths';
 import { rdcInstallationFiles } from '../platform/rdcLayout';
+import { assertRdcCliBinding } from '../runtime/rdcCliBinding';
 import { canonicalJson, deepFreeze, validateDefinitions, validateApplicationOperations } from './RdcOperationCatalog';
-import { assertRdcCliBinding } from './rdcCliBinding';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
+import { assertRdcCatalogIdentity, packagedRdcCatalogIdentity, type RdcCatalogIdentity } from './rdcCatalogIdentity';
 import { resolveRdcBatchInvocation } from './resolveRdcBatchInvocation';
 import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type {
-  CLIResult,
-  ToolCallRequest,
+  ToolArtifact,
   ToolCallResult,
-  ToolCatalog,
   ToolRuntimeMetadata,
   ToolRuntimeSummary,
   ToolTraceEntry,
 } from '@shared/types/tool';
+import type { CLIResult } from '../tools/ShellInvocationService';
+import type { RdcOperationDefinition } from './RdcOperationCatalog';
+
+/** Artifacts RDC-Tool reports beside its data; fields this app does not read pass through. */
+const ToolArtifactsSchema: ZodType<ToolArtifact[] | undefined> = z
+  .array(
+    z
+      .object({
+        artifact_id: z.string(),
+        type: z.string(),
+        mime: z.string(),
+        size_bytes: z.number(),
+        sha256: z.string(),
+        path: z.string(),
+        url: z.string().optional(),
+        storage_backend: z.string(),
+        metadata: z.record(z.string(), z.unknown()),
+      })
+      .passthrough(),
+  )
+  .optional();
 
 export class RdcCliInvokerService {
   private catalogs = new Map<string, Promise<ToolCatalog>>();
@@ -27,10 +49,13 @@ export class RdcCliInvokerService {
   private versions = new Map<string, string>();
   private traceListeners = new Set<(trace: ToolTraceEntry) => void>();
 
-  constructor(private readonly shell: ShellInvocationService = shellInvocationService) {}
+  constructor(
+    private readonly shell: ShellInvocationService = shellInvocationService,
+    private readonly expectedCatalog: () => RdcCatalogIdentity = packagedRdcCatalogIdentity,
+  ) {}
 
   private getSettings(): RdcCliInvokerSettings {
-    return settingsService.getAll().tooling.rdcCli;
+    return settingsService.snapshot().user.tooling.rdcCli;
   }
 
   private createRuntimeMetadata(settings = this.getSettings(), catalog?: Partial<ToolCatalog>): ToolRuntimeMetadata {
@@ -60,7 +85,11 @@ export class RdcCliInvokerService {
     }
     const command = settings.command.trim();
     let root: string;
-    try { root = path.resolve(assertRdcCliBinding(settings)); } catch (error) { return (error as Error).message; }
+    try {
+      root = path.resolve(assertRdcCliBinding(settings));
+    } catch (error) {
+      return (error as Error).message;
+    }
     if ((path.isAbsolute(command) || command.includes(path.sep) || command.includes('/')) && !fs.existsSync(command)) {
       return `RDC-Tool CLI command not found: ${command}`;
     }
@@ -87,48 +116,111 @@ export class RdcCliInvokerService {
     const key = canonicalJson(frozen);
     const unavailable = this.getAvailabilityFailure(frozen);
     if (unavailable) {
-      this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key);
+      this.catalogs.delete(key);
+      this.validatedCatalogs.delete(key);
+      this.versions.delete(key);
       throw new Error(unavailable);
     }
-    if (refresh) { this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key); }
+    if (refresh) {
+      this.catalogs.delete(key);
+      this.validatedCatalogs.delete(key);
+      this.versions.delete(key);
+    }
     const cached = this.catalogs.get(key);
     if (cached) return cached;
     const loading = (async () => {
-      const version = parseRdcNativeResult(await this.executeCLI('version', ['--json'], { settings: frozen }), undefined, 'rdc_tool.version');
-      if (version.schema_version !== '3.0.0' || version.data.schema_version !== '3.0.0'
-        || typeof version.data.tool_version !== 'string' || !version.data.tool_version.trim()) {
-        throw new Error('RDC_UPGRADE_REQUIRED: the configured CLI must provide the current canonical JSON contract.');
+      const version = parseRdcNativeResult(
+        await this.executeCLI('version', ['--json'], { settings: frozen }),
+        undefined,
+        'rdc_tool.version',
+      );
+      if (
+        version.schema_version !== '3.0.0' ||
+        version.data.schema_version !== '3.0.0' ||
+        typeof version.data.tool_version !== 'string' ||
+        !version.data.tool_version.trim()
+      ) {
+        throw new AppError(
+          'RDC_UPGRADE_REQUIRED',
+          'the configured CLI must provide the current canonical JSON contract.',
+        );
       }
-      const envelope = parseRdcNativeResult(await this.executeCLI('tools', ['list', '--full', '--json'], { settings: frozen }), undefined, 'rdc_tool.tools.list');
-      if (envelope.schema_version !== '3.0.0' || envelope.data.schema_version !== '1') throw new Error('RDC_UPGRADE_REQUIRED: unsupported catalog envelope schema.');
+      const envelope = parseRdcNativeResult(
+        await this.executeCLI('tools', ['list', '--full', '--json'], { settings: frozen }),
+        undefined,
+        'rdc_tool.tools.list',
+      );
+      if (envelope.schema_version !== '3.0.0' || envelope.data.schema_version !== '1')
+        throw new AppError('RDC_UPGRADE_REQUIRED', 'unsupported catalog envelope schema.');
       const tools = validateDefinitions(envelope.data.tools, envelope.data.tool_count, envelope.data.fingerprint);
       validateApplicationOperations(tools);
+      assertRdcCatalogIdentity(
+        {
+          toolVersion: version.data.tool_version,
+          versionCatalog: version.data.catalog,
+          served: { fingerprint: String(envelope.data.fingerprint), toolCount: tools.length },
+        },
+        this.expectedCatalog(),
+      );
       const namespaces: ToolCatalog['namespaces'] = {};
       for (const tool of tools) namespaces[tool.namespace] ??= { description: '', groups: [] };
       this.versions.set(key, version.data.tool_version);
-      const catalog: ToolCatalog = deepFreeze({ schema_version: '1', fingerprint: String(envelope.data.fingerprint), tools,
-        tool_count: tools.length, namespaces, runtime: this.createRuntimeMetadata(frozen, { tool_count: tools.length, schema_version: '1', fingerprint: String(envelope.data.fingerprint) }) });
+      const catalog: ToolCatalog = deepFreeze({
+        schema_version: '1',
+        fingerprint: String(envelope.data.fingerprint),
+        tools,
+        tool_count: tools.length,
+        namespaces,
+        runtime: this.createRuntimeMetadata(frozen, {
+          tool_count: tools.length,
+          schema_version: '1',
+          fingerprint: String(envelope.data.fingerprint),
+        }),
+      });
       this.validatedCatalogs.set(key, catalog);
       return catalog;
     })();
     this.catalogs.set(key, loading);
-    try { return await loading; } catch (error) { this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key); throw error; }
+    try {
+      return await loading;
+    } catch (error) {
+      this.catalogs.delete(key);
+      this.validatedCatalogs.delete(key);
+      this.versions.delete(key);
+      throw error;
+    }
   }
 
-  async getRuntimeSummary(refresh = false, draft: RdcCliInvokerSettings = this.getSettings()): Promise<ToolRuntimeSummary> {
+  async getRuntimeSummary(
+    refresh = false,
+    draft: RdcCliInvokerSettings = this.getSettings(),
+  ): Promise<ToolRuntimeSummary> {
     const settings = structuredClone(draft);
     if (refresh) {
       const key = canonicalJson(settings);
-      this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key);
+      this.catalogs.delete(key);
+      this.validatedCatalogs.delete(key);
+      this.versions.delete(key);
     }
     try {
       const catalog = await this.loadCatalog(settings);
       const counts = new Map<string, number>();
       for (const tool of catalog.tools) counts.set(tool.namespace, (counts.get(tool.namespace) ?? 0) + 1);
-      return { runtime: this.createRuntimeMetadata(settings, catalog), cli: { available: true },
-        namespaces: [...counts].map(([namespace, toolCount]) => ({ namespace: `rd.${namespace}.*`, toolCount, available: true })) };
+      return {
+        runtime: this.createRuntimeMetadata(settings, catalog),
+        cli: { available: true },
+        namespaces: [...counts].map(([namespace, toolCount]) => ({
+          namespace: `rd.${namespace}.*`,
+          toolCount,
+          available: true,
+        })),
+      };
     } catch (error) {
-      return { runtime: this.createRuntimeMetadata(settings), cli: { available: false, unavailableReason: error instanceof Error ? error.message : String(error) }, namespaces: [] };
+      return {
+        runtime: this.createRuntimeMetadata(settings),
+        cli: { available: false, unavailableReason: error instanceof Error ? error.message : String(error) },
+        namespaces: [],
+      };
     }
   }
 
@@ -192,7 +284,9 @@ export class RdcCliInvokerService {
     const unavailableReason = this.getAvailabilityFailure(settings);
     if (unavailableReason) {
       const key = canonicalJson(incoming);
-      this.catalogs.delete(key); this.validatedCatalogs.delete(key); this.versions.delete(key);
+      this.catalogs.delete(key);
+      this.validatedCatalogs.delete(key);
+      this.versions.delete(key);
       return {
         exitCode: 2,
         stdout: '',
@@ -202,7 +296,9 @@ export class RdcCliInvokerService {
     }
 
     if (command !== 'version' && !(command === 'tools' && args[0] === 'list')) {
-      try { await this.loadCatalog(incoming); } catch (error) {
+      try {
+        await this.loadCatalog(incoming);
+      } catch (error) {
         return { exitCode: 2, stdout: '', stderr: (error as Error).message, duration_ms: nowMs() - startTime };
       }
     }
@@ -257,7 +353,7 @@ export class RdcCliInvokerService {
     try {
       const cliArgs: string[] = [request.toolName];
       const effectiveArgs: Record<string, unknown> = {
-        ...(request.args || {}),
+        ...request.args,
       };
 
       if (request.contextId && effectiveArgs['context_id'] === undefined) {
@@ -286,56 +382,14 @@ export class RdcCliInvokerService {
       });
 
       request.abortSignal?.throwIfAborted();
-      parseRdcNativeResult(result);
-      if (result.stdout.trim()) {
-        const parsed = JSON.parse(result.stdout) as Record<string, unknown>;
-
-        if (parsed) {
-          if (parsed.ok === false) {
-            const errObj = (parsed.error ?? {}) as Record<string, unknown>;
-            response = {
-              ok: false,
-              data: null as unknown as Record<string, unknown>,
-              artifacts: [],
-              error: {
-                code: (errObj.code as string) ?? 'TOOL_ERROR',
-                message: (errObj.message as string) ?? 'RDC-Tool CLI returned ok:false',
-                category: (errObj.category as string) ?? 'execution',
-                details: (errObj.details as Record<string, unknown>) ?? undefined,
-              },
-              duration_ms: nowMs() - startTime,
-              trace_id: generateEventId('tool'),
-            };
-            this.emitInvocationTrace(request, response);
-            return response;
-          }
-
-          response = {
-            ok: true,
-            data: (parsed.data as Record<string, unknown>) ?? parsed,
-            artifacts: parsed.artifacts as ToolCallResult['artifacts'],
-            duration_ms: nowMs() - startTime,
-            trace_id: generateEventId('tool'),
-          };
-          this.emitInvocationTrace(request, response);
-          return response;
-        }
-      }
-
+      const envelope = parseRdcNativeResult(result);
+      const artifacts = ToolArtifactsSchema.safeParse(envelope.artifacts);
+      if (!artifacts.success)
+        throw new AppError('RDC_CLI_PROTOCOL', `invalid artifacts: ${z.prettifyError(artifacts.error)}`);
       response = {
-        ok: false,
-        data: null as unknown as Record<string, unknown>,
-        artifacts: [],
-        error: {
-          code: 'CLI_ERROR',
-          message: result.stderr.trim() || `Exit code: ${result.exitCode}`,
-          category: 'execution',
-          details: {
-            stdout: result.stdout,
-            stderr: result.stderr,
-            exitCode: result.exitCode,
-          },
-        },
+        ok: true,
+        data: envelope.data,
+        artifacts: artifacts.data,
         duration_ms: nowMs() - startTime,
         trace_id: generateEventId('tool'),
       };
@@ -369,3 +423,40 @@ export class RdcCliInvokerService {
 }
 
 export const rdcCliInvokerService = new RdcCliInvokerService();
+
+// 工具调用请求
+export interface ToolCallRequest {
+  toolName: string;
+  args: Record<string, unknown>;
+  turnId?: string;
+  contextId?: string;
+  runtimeOwner?: string;
+  ownerLeaseId?: string;
+  runId?: string;
+  abortSignal?: AbortSignal;
+}
+
+// 工具目录
+export interface ToolCatalog {
+  schema_version: string;
+  source_path?: string;
+  tool_count?: number;
+  generated_at?: string;
+  tools: RdcOperationDefinition[];
+  fingerprint: string;
+  namespaces: Record<
+    ToolNamespace,
+    {
+      description: string;
+      groups: string[];
+    }
+  >;
+  runtime?: ToolRuntimeMetadata;
+}
+
+/**
+ * Tool Types - 工具层相关类型定义
+ */
+
+// 工具命名空间
+export type ToolNamespace = string;

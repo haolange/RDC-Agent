@@ -1,13 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../../../ui/Button';
 import { EmptyState } from '../../../../ui/EmptyState';
+import { useI18n } from '../../../../i18n';
 import { AgentHandoffCard } from './AgentHandoffCard';
 import { persistAgentHandoff, validateAgentHandoffs } from './agentHandoffValidation';
 import type { AgentSkillCatalog } from './AgentSkillPicker';
-import type { useI18n } from '../../../../i18n';
 import type { AgentHandoffDefinition, AgentManifestDefinition } from '@shared/types/agentManifest';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 interface AgentHandoffEditorProps {
   skills: AgentSkillCatalog;
@@ -16,7 +14,6 @@ interface AgentHandoffEditorProps {
   definitions: AgentManifestDefinition[];
   forceShowRequired: boolean;
   onChange: (handoffs: AgentHandoffDefinition[]) => void;
-  t: Translate;
 }
 
 const emptyHandoff = (): AgentHandoffDefinition => ({ label: '', agent: '', prompt: '' });
@@ -43,8 +40,8 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
   definitions,
   forceShowRequired,
   onChange,
-  t,
 }) => {
+  const { t } = useI18n();
   const rowKeysRef = useRef<string[]>([]);
   const pendingFocusRef = useRef<{ key: string; target: 'label' | 'delete' | 'add' } | null>(null);
   const addRef = useRef<HTMLButtonElement | null>(null);
@@ -54,10 +51,11 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
   rowKeysRef.current = syncRowKeys(rowKeysRef.current, handoffs.length);
   const rowKeys = rowKeysRef.current;
   const targets = useMemo(
-    () => definitions
-      .filter((agent) => agent.enabled && agent.id !== selfId)
-      .slice()
-      .sort((first, second) => first.name.localeCompare(second.name)),
+    () =>
+      definitions
+        .filter((agent) => agent.enabled && agent.id !== selfId)
+        .slice()
+        .sort((first, second) => first.name.localeCompare(second.name)),
     [definitions, selfId],
   );
   const issues = validateAgentHandoffs(handoffs, { selfId, definitions });
@@ -85,9 +83,7 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
 
   const removeHandoff = (index: number) => {
     const previousKey = rowKeysRef.current[index - 1];
-    pendingFocusRef.current = previousKey
-      ? { key: previousKey, target: 'delete' }
-      : { key: 'add', target: 'add' };
+    pendingFocusRef.current = previousKey ? { key: previousKey, target: 'delete' } : { key: 'add', target: 'add' };
     commit(
       handoffs.filter((_, current) => current !== index),
       rowKeysRef.current.filter((_, current) => current !== index),
@@ -115,13 +111,26 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
                 isLast={index === handoffs.length - 1}
                 expanded={expandedIndex === index}
                 onToggle={() => setExpandedIndex((current) => (current === index ? null : index))}
-                t={t}
-                onChange={(next) => commit(handoffs.map((entry, current) => (
-                  current === index ? persistAgentHandoff(next) : entry
-                )), rowKeysRef.current)}
-                onMoveUp={() => { setExpandedIndex(index - 1); commit(swapAt(handoffs, index, -1), swapAt(rowKeysRef.current, index, -1)); }}
-                onMoveDown={() => { setExpandedIndex(index + 1); commit(swapAt(handoffs, index, 1), swapAt(rowKeysRef.current, index, 1)); }}
-                onDelete={() => { setExpandedIndex((current) => (current === index ? null : current !== null && current > index ? current - 1 : current)); removeHandoff(index); }}
+                onChange={(next) =>
+                  commit(
+                    handoffs.map((entry, current) => (current === index ? persistAgentHandoff(next) : entry)),
+                    rowKeysRef.current,
+                  )
+                }
+                onMoveUp={() => {
+                  setExpandedIndex(index - 1);
+                  commit(swapAt(handoffs, index, -1), swapAt(rowKeysRef.current, index, -1));
+                }}
+                onMoveDown={() => {
+                  setExpandedIndex(index + 1);
+                  commit(swapAt(handoffs, index, 1), swapAt(rowKeysRef.current, index, 1));
+                }}
+                onDelete={() => {
+                  setExpandedIndex((current) =>
+                    current === index ? null : current !== null && current > index ? current - 1 : current,
+                  );
+                  removeHandoff(index);
+                }}
                 labelRef={(node) => {
                   if (node) labelRefs.current.set(rowKey, node);
                   else labelRefs.current.delete(rowKey);

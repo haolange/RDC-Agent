@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { AppError } from '@shared/errors/appError';
 import { createContinuationArtifact } from '../../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../../reasoning/ContinuationReplayPolicy';
 import { createProviderStateRef, findLatestProviderState } from '../../reasoning/ProviderStateRefs';
@@ -6,12 +8,10 @@ import { buildOpenAiResponsesReasoning, reasoningVisibilityRequest } from '../re
 import { reasoningProjectionSource } from '../reasoningProjection';
 import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './AssistantStreamBuilder';
 import { ResponsesItemChannels } from './responsesItemChannels';
-import {
-  createResponsesStreamFailure,
-  parseSSE,
-  ProviderEmptyStreamError,
-} from './http';
-import { finalizeProviderUsage } from './normalizeCacheUsage';
+import { createResponsesStreamFailure } from './http';
+import { readProviderFrames, type ProviderStreamRun } from './providerStreamDriver';
+import { ToolCallAccumulator } from './toolCallAccumulator';
+import { normalizeUsage, type UsageFieldMap } from './usageNormalizer';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type {
   Context,
@@ -40,27 +40,44 @@ interface ResponsesCompletedPayload {
   };
 }
 
-type InputMessageContent = string | Array<{
-  type: string;
-  text?: string;
-  data?: string;
-  mimeType?: string;
-}>;
+type InputMessageContent =
+  | string
+  | Array<{
+      type: string;
+      text?: string;
+      data?: string;
+      mimeType?: string;
+    }>;
 
 type ResponsesInputContentPart =
   | { type: 'input_text'; text: string; prompt_cache_breakpoint?: { mode: 'explicit' } }
   | { type: 'input_image'; image_url: string };
 
-export async function consumeResponsesEventStream(input: {
+const RESPONSES_USAGE_FIELDS: UsageFieldMap<NonNullable<ResponsesCompletedPayload['usage']>> = {
+  inputTokens: (usage) => usage.input_tokens,
+  outputTokens: (usage) => usage.output_tokens,
+  totalTokens: (usage) => usage.total_tokens,
+  cacheReadTokens: (usage) => usage.input_tokens_details?.cached_tokens,
+  cacheWriteTokens: (usage) => usage.input_tokens_details?.cache_write_tokens,
+  reasoningTokens: (usage) => usage.output_tokens_details?.reasoning_tokens,
+};
+
+/** One Responses stream frame is a JSON object; its fields are read through the typed readers below. */
+const ResponsesFrameSchema = z.record(z.string(), z.unknown());
+
+/** The Responses surface a stream comes from: its protocol name and the messages its failures fall back to. */
+export interface ResponsesStreamSurface {
   protocol: string;
-  response: Response;
-  signal: AbortSignal;
-  options: StreamOptions;
-  builder: AssistantStreamBuilder;
   failureMessages: { failed: string; error: string };
-}): Promise<void> {
-  const { protocol, response, signal, options, builder } = input;
-  const toolArgBuffers = new Map<string, string>();
+}
+
+export async function consumeResponsesEventStream(
+  response: Response,
+  { builder, signal }: ProviderStreamRun,
+  options: StreamOptions,
+  surface: ResponsesStreamSurface,
+): Promise<{ sawOutput: boolean }> {
+  const { protocol } = surface;
   const summarySource = reasoningProjectionSource(options.requestPlan, 'summary');
   const rawSource = reasoningProjectionSource(options.requestPlan, 'raw');
   const opaqueSource = reasoningProjectionSource(options.requestPlan, 'opaque');
@@ -71,7 +88,7 @@ export async function consumeResponsesEventStream(input: {
     sources: { summary: summarySource, raw: rawSource, opaque: opaqueSource },
     deepSeekResponses,
   });
-  const toolStarted = new Set<string>();
+  const toolCalls = new ToolCallAccumulator<string>(builder);
   let rawReasoningText = '';
   let sawToolCall = false;
   let sawOutput = false;
@@ -85,13 +102,11 @@ export async function consumeResponsesEventStream(input: {
   const toolKey = (outputIndex: number, itemId?: string) => itemId || `index:${outputIndex}`;
 
   const reasoningEventCounts: Record<string, number> = {};
-  for await (const data of parseSSE(response, signal, { providerApi: protocol, ...options })) {
-    if (signal.aborted) break;
-    const event = parseJsonObject(data);
-    if (!event) continue;
-
+  const frames = { providerApi: protocol, framing: 'sse', frameSchema: ResponsesFrameSchema } as const;
+  for await (const event of readProviderFrames(response, signal, options, frames)) {
     const eventType = readString(event.type);
-    if (eventType.startsWith('response.reasoning')) reasoningEventCounts[eventType] = (reasoningEventCounts[eventType] ?? 0) + 1;
+    if (eventType.startsWith('response.reasoning'))
+      reasoningEventCounts[eventType] = (reasoningEventCounts[eventType] ?? 0) + 1;
     if (providerTerminalSeen) {
       throw new ProviderStreamProtocolError(
         'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
@@ -127,7 +142,10 @@ export async function consumeResponsesEventStream(input: {
       case 'response.reasoning_summary_text.done':
       case 'response.reasoning_summary_part.done': {
         const identity = items.identityFromEvent(event);
-        const text = eventType === 'response.reasoning_summary_text.done' ? readString(event.text) : readString(readRecord(event.part)?.text);
+        const text =
+          eventType === 'response.reasoning_summary_text.done'
+            ? readString(event.text)
+            : readString(readRecord(event.part)?.text);
         if (text) {
           sawOutput = true;
           items.completeSummaryPart(identity, readNumber(event.summary_index) ?? 0, text);
@@ -175,34 +193,27 @@ export async function consumeResponsesEventStream(input: {
         } else if (readString(item?.type) === 'function_call') {
           sawToolCall = true;
           sawOutput = true;
-          const toolRef = items.toolRef(identity);
-          builder.startToolCall(
-            toolRef,
+          toolCalls.start(
+            toolKey(identity.outputIndex, identity.itemId),
+            items.toolRef(identity),
             readString(item?.call_id) || readString(item?.id) || '',
             readString(item?.name) || '',
           );
-          toolStarted.add(toolKey(identity.outputIndex, identity.itemId));
         }
         break;
       }
       case 'response.function_call_arguments.delta': {
         const identity = items.identityFromEvent(event);
         const delta = readString(event.delta);
-        if (delta) {
-          const key = toolKey(identity.outputIndex, identity.itemId);
-          toolArgBuffers.set(key, `${toolArgBuffers.get(key) ?? ''}${delta}`);
-          builder.appendToolCallArgs(items.toolRef(identity), delta);
-        }
+        if (delta)
+          toolCalls.appendArguments(toolKey(identity.outputIndex, identity.itemId), items.toolRef(identity), delta);
         break;
       }
       case 'response.function_call_arguments.done': {
         const identity = items.identityFromEvent(event);
         const args = readString(event.arguments);
         const key = toolKey(identity.outputIndex, identity.itemId);
-        if (args && !toolArgBuffers.get(key)) {
-          toolArgBuffers.set(key, args);
-          builder.appendToolCallArgs(items.toolRef(identity), args);
-        }
+        if (args && !toolCalls.hasArguments(key)) toolCalls.appendArguments(key, items.toolRef(identity), args);
         break;
       }
       case 'response.output_item.done': {
@@ -230,18 +241,15 @@ export async function consumeResponsesEventStream(input: {
           sawOutput = true;
           const toolRef = items.toolRef(identity);
           const key = toolKey(identity.outputIndex, identity.itemId);
-          if (toolStarted.has(key)) {
-            builder.updateToolCall(toolRef, readString(item?.call_id) || readString(item?.id) || '', readString(item?.name) || '');
-          } else {
-            builder.startToolCall(toolRef, readString(item?.call_id) || readString(item?.id) || '', readString(item?.name) || '');
-            toolStarted.add(key);
-          }
+          toolCalls.open(
+            key,
+            toolRef,
+            readString(item?.call_id) || readString(item?.id) || '',
+            readString(item?.name) || '',
+          );
           const args = readString(item?.arguments);
-          if (args && !toolArgBuffers.get(key)) {
-            toolArgBuffers.set(key, args);
-            builder.appendToolCallArgs(toolRef, args);
-          }
-          builder.endToolCall(toolRef);
+          if (args && !toolCalls.hasArguments(key)) toolCalls.appendArguments(key, toolRef, args);
+          toolCalls.close(key, toolRef);
         } else if (readString(item?.type) === 'message') {
           items.setTextPhase(identity, readOutputPhase(item?.phase));
           items.closeText(identity);
@@ -254,15 +262,13 @@ export async function consumeResponsesEventStream(input: {
           applyCompletedUsage(builder, completed);
           const providerState = createProviderStateRef(options.requestPlan, completed.id);
           if (providerState) builder.setProviderState(providerState);
-          items.applyCompletedReasoning(completed.output, (item) => (
-            createResponsesReasoningArtifact(options.requestPlan, item)
-          ));
+          items.applyCompletedReasoning(completed.output, (item) =>
+            createResponsesReasoningArtifact(options.requestPlan, item),
+          );
           items.closeRemaining();
           finishReason = completed.status === 'incomplete' ? 'length' : sawToolCall ? 'toolUse' : 'stop';
         }
-        if (!sawOutput) {
-          throw new ProviderEmptyStreamError(protocol);
-        }
+        builder.markTerminal(finishReason);
         providerTerminalSeen = true;
         break;
       }
@@ -270,15 +276,12 @@ export async function consumeResponsesEventStream(input: {
         const incomplete = readRecord(event.response) as ResponsesCompletedPayload | null;
         if (incomplete) {
           applyCompletedUsage(builder, incomplete);
-          items.applyCompletedReasoning(incomplete.output, (item) => (
-            createResponsesReasoningArtifact(options.requestPlan, item)
-          ));
+          items.applyCompletedReasoning(incomplete.output, (item) =>
+            createResponsesReasoningArtifact(options.requestPlan, item),
+          );
         }
         items.closeRemaining();
-        finishReason = 'length';
-        if (!sawOutput) {
-          throw new ProviderEmptyStreamError(protocol);
-        }
+        builder.markTerminal('length');
         providerTerminalSeen = true;
         break;
       }
@@ -288,14 +291,14 @@ export async function consumeResponsesEventStream(input: {
         throw createResponsesStreamFailure(protocol, {
           error,
           event,
-          fallbackMessage: input.failureMessages.failed,
+          fallbackMessage: surface.failureMessages.failed,
         });
       }
       case 'error': {
         throw createResponsesStreamFailure(protocol, {
           error: readRecord(event.error) ?? event,
           event,
-          fallbackMessage: input.failureMessages.error,
+          fallbackMessage: surface.failureMessages.error,
         });
       }
       default:
@@ -303,15 +306,12 @@ export async function consumeResponsesEventStream(input: {
     }
   }
 
-  if (!sawOutput) {
-    throw new ProviderEmptyStreamError(protocol);
-  }
-  items.closeRemaining();
+  if (sawOutput) items.closeRemaining();
   const summaryParts = items.summaryPartReports();
   if (Object.keys(reasoningEventCounts).length || summaryParts.length) {
     builder.setExecution({ reasoningEvents: { events: reasoningEventCounts, summaryParts } });
   }
-  builder.done(finishReason);
+  return { sawOutput };
 }
 
 /** `summary[]` of a finished Responses reasoning item, by summary index; empty entries keep their index. */
@@ -331,24 +331,26 @@ export function buildResponsesRequestBody(
     ? { ...context, messages: context.messages.slice(providerState.assistantMessageIndex + 1) }
     : context;
   const prompt = partitionSystemPrompt(context);
-  const explicitBreakpoint = !deepSeekResponses && options.promptCache?.enabled === true
-    && options.promptCache.breakpointCarrier === 'openai-prompt-cache'
-    && (
-      options.promptCache.breakpoint === 'explicit'
-      || options.promptCache.breakpoint === 'automatic-and-explicit'
-    );
+  const explicitBreakpoint =
+    !deepSeekResponses &&
+    options.promptCache?.enabled === true &&
+    options.promptCache.breakpointCarrier === 'openai-prompt-cache' &&
+    (options.promptCache.breakpoint === 'explicit' || options.promptCache.breakpoint === 'automatic-and-explicit');
   const input = toResponsesInput(inputContext, options.requestPlan);
   if (explicitBreakpoint) {
     if (!prompt.stableText) {
-      throw new Error(
-        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE: explicit OpenAI cache mode requires PromptPlan-owned stable segments.',
+      throw new AppError(
+        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE',
+        'explicit OpenAI cache mode requires PromptPlan-owned stable segments.',
       );
     }
-    const content: ResponsesInputContentPart[] = [{
-      type: 'input_text',
-      text: prompt.stableText,
-      prompt_cache_breakpoint: { mode: 'explicit' },
-    }];
+    const content: ResponsesInputContentPart[] = [
+      {
+        type: 'input_text',
+        text: prompt.stableText,
+        prompt_cache_breakpoint: { mode: 'explicit' },
+      },
+    ];
     if (prompt.volatileText) {
       content.push({ type: 'input_text', text: prompt.volatileText });
     }
@@ -358,14 +360,20 @@ export function buildResponsesRequestBody(
     model: model.id,
     input,
     stream: true,
-    ...(!deepSeekResponses ? {
-      store: options.requestPlan.statePlan.store,
-      parallel_tool_calls: true,
-    } : {}),
+    ...(!deepSeekResponses
+      ? {
+          store: options.requestPlan.statePlan.store,
+          parallel_tool_calls: true,
+        }
+      : {}),
   };
-  if (!deepSeekResponses && options.promptCache?.enabled
-    && (options.promptCache.keyCarrier === 'prompt-cache-key' || options.promptCache.keyCarrier === 'session-id-and-prompt-cache-key')
-    && options.promptCache.requestKey) {
+  if (
+    !deepSeekResponses &&
+    options.promptCache?.enabled &&
+    (options.promptCache.keyCarrier === 'prompt-cache-key' ||
+      options.promptCache.keyCarrier === 'session-id-and-prompt-cache-key') &&
+    options.promptCache.requestKey
+  ) {
     body.prompt_cache_key = options.promptCache.requestKey;
   }
   if (explicitBreakpoint) {
@@ -414,11 +422,13 @@ export function readDeepSeekReasoningText(item: Record<string, unknown> | null |
   if (!item) return '';
   if (typeof item.content === 'string') return item.content;
   if (!Array.isArray(item.content)) return '';
-  return item.content.flatMap((part): string[] => {
-    const value = readRecord(part);
-    const text = readString(value?.text) || readString(value?.content);
-    return text ? [text] : [];
-  }).join('');
+  return item.content
+    .flatMap((part): string[] => {
+      const value = readRecord(part);
+      const text = readString(value?.text) || readString(value?.content);
+      return text ? [text] : [];
+    })
+    .join('');
 }
 
 function convertMessage(message: Message, requestPlan: RequestPlan): unknown[] {
@@ -437,13 +447,18 @@ function convertMessage(message: Message, requestPlan: RequestPlan): unknown[] {
         );
         if (replayItem) items.push(replayItem);
       } else if (block.type === 'text' && block.text) {
-        items.push({ role: 'assistant', content: block.text, type: 'message', ...(block.phase ? { phase: block.phase } : {}) });
+        items.push({
+          role: 'assistant',
+          content: block.text,
+          type: 'message',
+          ...(block.phase ? { phase: block.phase } : {}),
+        });
       } else if (block.type === 'toolCall') {
         items.push({
           type: 'function_call',
           call_id: block.id,
           name: block.name,
-          arguments: JSON.stringify(block.arguments ?? {}),
+          arguments: JSON.stringify(block.arguments),
           status: 'completed',
         });
       }
@@ -455,11 +470,13 @@ function convertMessage(message: Message, requestPlan: RequestPlan): unknown[] {
     .filter((block) => block.type === 'text')
     .map((block) => block.text)
     .join('\n');
-  return [{
-    type: 'function_call_output',
-    call_id: message.toolCallId,
-    output,
-  }];
+  return [
+    {
+      type: 'function_call_output',
+      call_id: message.toolCallId,
+      output,
+    },
+  ];
 }
 
 function readOutputPhase(value: unknown): 'commentary' | 'final_answer' | undefined {
@@ -511,20 +528,7 @@ function applyCompletedUsage(builder: AssistantStreamBuilder, payload: Responses
     ...(typeof payload.model === 'string' ? { modelId: payload.model } : {}),
     ...(typeof payload.service_tier === 'string' ? { serviceTier: payload.service_tier } : {}),
   });
-  if (!payload.usage) return;
-  const cacheReadTokens = payload.usage.input_tokens_details?.cached_tokens;
-  const cacheWriteTokens = payload.usage.input_tokens_details?.cache_write_tokens;
-  const reasoningTokens = payload.usage.output_tokens_details?.reasoning_tokens;
-  builder.setUsage(finalizeProviderUsage({
-    inputTokens: payload.usage.input_tokens ?? 0,
-    outputTokens: payload.usage.output_tokens ?? 0,
-    totalTokens:
-      payload.usage.total_tokens
-      ?? (payload.usage.input_tokens ?? 0) + (payload.usage.output_tokens ?? 0),
-    ...(typeof cacheReadTokens === 'number' ? { cacheReadTokens } : {}),
-    ...(typeof cacheWriteTokens === 'number' ? { cacheWriteTokens } : {}),
-    ...(typeof reasoningTokens === 'number' ? { reasoningTokens } : {}),
-  }));
+  if (payload.usage) builder.setUsage(normalizeUsage(payload.usage, RESPONSES_USAGE_FIELDS));
 }
 
 function createResponsesReasoningArtifact(
@@ -541,21 +545,8 @@ function createResponsesReasoningArtifact(
   });
 }
 
-function parseJsonObject(raw: string): Record<string, unknown> | null {
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 function readRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
 function readString(value: unknown): string {

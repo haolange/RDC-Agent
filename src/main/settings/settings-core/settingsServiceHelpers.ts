@@ -1,85 +1,10 @@
-import fs from 'fs';
-import path from 'path';
 import { createHash } from 'crypto';
-import { sanitizeUiPreferences } from '@shared/theme/uiPreferences';
-import {
-  DEFAULT_APPEARANCE,
-  DEFAULT_AGENT_RUNTIME,
-  DEFAULT_LAYOUT,
-  DEFAULT_PROFILE,
-  DEFAULT_CODE_INTERPRETER,
-  DEFAULT_RDC_CLI_INVOKER,
-  DEFAULT_SHELL_TOOLING,
-  EMPTY_PATHS,
-} from '@shared/constants/appSettingsDefaults';
-import {
-  createProviderEntryFromCatalog,
-  isBuiltinProviderId,
-} from '../../provider-catalog/ProviderCatalogRegistry';
+import { errorCodeOf } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
-import { agentManifestService } from '../agent-manifests/AgentManifestService';
-import { StorageSchemaError } from '../../sessions/store/storageSchema';
-import { executionProfileService } from './ExecutionProfileService';
-import { tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
+import { parseJsonWith, readValidatedSync, writeFileAtomicSync } from '../../runtime/atomicFile';
 import { secretStorageService } from './SecretStorageService';
-import {
-  LEFT_DEFAULTS,
-  RIGHT_DEFAULTS,
-  SETTINGS_SCHEMA_VERSION,
-  createDefaultPersistedSettings,
-  type PersistedSettingsPayload,
-} from './settingsDefaults';
-import {
-  sanitizeAgentRuntimeSettings,
-  sanitizeSidebar,
-  sanitizeTerminal,
-  sanitizeWindow,
-  sanitizeToolingSettings,
-} from './settingsSanitize';
-import { sanitizeAgentModelSettings } from './agentModelSettings';
-import {
-  createEmptyAgentRoutes,
-  hydrateProviderSecrets,
-  isFixtureProvider,
-  normalizeManifestRoutes,
-  normalizeUserProviders,
-  resolveProviderAuthMode,
-  sanitizeAuthAccountIds,
-  sanitizeUserProvider,
-  type ProviderSanitizeOptions,
-} from './settingsProviderSanitize';
-import type {
-  AgentModelSettings,
-  AppRuntimePaths,
-  AppSettings,
-  LayoutPreferences,
-  LlmProviderEntry,
-  ProfileSettings,
-  RuntimeResourceCatalog,
-  ToolingSettings,
-  AgentRuntimeSettings,
-  UiPreferences,
-} from '@shared/types/settings';
-
-export interface HardRebuildResult {
-  settings: PersistedSettingsPayload;
-  changed: boolean;
-  fixes: string[];
-  warnings: string[];
-  secretRefsToDelete: string[];
-}
-
-export interface NormalizedPersistedSettings {
-  appearance: UiPreferences;
-  layout: LayoutPreferences;
-  profile: ProfileSettings;
-  tooling: ToolingSettings;
-  agentRuntime: AgentRuntimeSettings;
-  agentModels: AgentModelSettings;
-  llm: {
-    providers: LlmProviderEntry[];
-  };
-}
+import { SettingsFileError, assertSettingsFile, parseSettingsFile, type SettingsFile } from './settingsFileSchema';
+import type { LlmProviderEntry, SettingsDiagnostic } from '@shared/types/settings';
 
 export function stableSerialize(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
@@ -89,234 +14,39 @@ export function stableSerialize(value: unknown): string {
       .map(([key, child]) => `${JSON.stringify(key)}:${stableSerialize(child)}`)
       .join(',')}}`;
   }
-  return JSON.stringify(value) ?? 'null';
+  return (JSON.stringify(value) as string | undefined) ?? 'null';
 }
 
 export function hashProviderDefinition(provider: LlmProviderEntry): string {
-  return createHash('sha256').update(stableSerialize({ ...provider, apiKey: '' }), 'utf8').digest('hex');
+  return createHash('sha256')
+    .update(stableSerialize({ ...provider, apiKey: '' }), 'utf8')
+    .digest('hex');
 }
 
 export function nowIso(): string {
   return new Date().toISOString();
 }
 
-export function readJsonFile<T>(filePath: string): T | null {
-  let parsed: T;
-  try {
-    parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw new StorageSchemaError(`STORAGE_CORRUPT: ${filePath} could not be read as JSON: ${error instanceof Error ? error.message : String(error)}`);
-  }
-  assertPersistedSettingsSchemaVersion(parsed, filePath);
-  return parsed;
-}
-
-export function assertPersistedSettingsSchemaVersion(raw: unknown, filePath: string): void {
-  if (raw === null) return;
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new StorageSchemaError(`STORAGE_SCHEMA: ${filePath} must be a settings object`);
-  }
-  const version = (raw as { schemaVersion?: unknown }).schemaVersion;
-  if (version !== SETTINGS_SCHEMA_VERSION) {
-    throw new StorageSchemaError(
-      `STORAGE_SCHEMA_UNSUPPORTED: ${filePath} has schemaVersion ${String(version)}; requires ${SETTINGS_SCHEMA_VERSION}`,
-    );
-  }
-  const llm = (raw as { llm?: unknown }).llm;
-  if (llm && typeof llm === 'object' && !Array.isArray(llm) && 'embedding' in llm) {
-    throw new StorageSchemaError(`STORAGE_SCHEMA_UNSUPPORTED: ${filePath} contains a retired embedding selection`);
-  }
-  if (llm && typeof llm === 'object' && !Array.isArray(llm) && 'agentRoutes' in llm) {
-    throw new StorageSchemaError(`STORAGE_SCHEMA_UNSUPPORTED: ${filePath} contains retired persisted agent routes`);
-  }
-}
-
-export function createDefaultRuntimeSettings(): AppSettings {
-  const resourceCatalog = executionProfileService.normalizeResourceCatalog({
-    availableSkills: [],
-    availableMcpServers: [],
-    diagnostics: [],
-  });
-
-  return {
-    appearance: DEFAULT_APPEARANCE,
-    layout: DEFAULT_LAYOUT,
-    profile: DEFAULT_PROFILE,
-    tooling: {
-      rdcCli: DEFAULT_RDC_CLI_INVOKER,
-      codeInterpreter: DEFAULT_CODE_INTERPRETER,
-      shell: DEFAULT_SHELL_TOOLING,
-    },
-    agentRuntime: DEFAULT_AGENT_RUNTIME,
-    agentModels: { default: {}, byAgent: {} },
-    llm: {
-      providers: [],
-      agentRoutes: createEmptyAgentRoutes(),
-    },
-    agents: {
-      directoryPath: appPathService.getRuntimePaths().agentsPath,
-      definitions: [],
-      modelOptions: [],
-      globalInstructions: '',
-      diagnostics: [],
-    },
-    resourceCatalog,
-    paths: EMPTY_PATHS,
-  };
-}
-
-export function rebuildPersistedSettings(
-  raw: PersistedSettingsPayload | null,
-  workspaceRoot: string,
-): HardRebuildResult {
-  const fallback = createDefaultPersistedSettings();
-  const candidate = raw ?? fallback;
-  const fixes: string[] = [];
-  const warnings: string[] = [];
-  const persistedRawProviders = Array.isArray(candidate.llm?.providers) ? candidate.llm?.providers : [];
-
-  const rawProviders = persistedRawProviders;
-
-  const nextProviders: LlmProviderEntry[] = [];
-  for (const entry of rawProviders) {
-    if (isFixtureProvider(entry)) {
-      fixes.push(`Removed fixture provider ${entry.id}`);
-      secretStorageService.deleteSecret(entry.secretRef, workspaceRoot);
-      continue;
-    }
-
-    const incomingId = typeof entry.id === 'string' ? entry.id.trim() : '';
-    const rawId = incomingId;
-    if (!rawId) {
-      fixes.push('Removed provider with empty id');
-      continue;
-    }
-    if (!isBuiltinProviderId(rawId)) {
-      fixes.push(`Removed non-catalog provider ${rawId}`);
-      continue;
-    }
-
-    const builtin = createProviderEntryFromCatalog(rawId);
-    const authMode = resolveProviderAuthMode(entry, builtin);
-    const authAccountIds = sanitizeAuthAccountIds(entry, authMode);
-    const unkeyedApiKeyRef = secretStorageService.createProviderSecretRef(rawId);
-    const incomingSecretRef = typeof entry.secretRef === 'string' && entry.secretRef.trim()
-      ? entry.secretRef.trim()
-      : undefined;
-    const secretRef = incomingSecretRef || unkeyedApiKeyRef;
-
-    const sanitized = sanitizeUserProvider({
-      ...entry,
-      authMode,
-      activeAccountId: authAccountIds[authMode],
-      authAccountIds,
-      secretRef,
-    }, workspaceRoot, { credentialView: 'storage-metadata' });
-    if (!sanitized) {
-      fixes.push(`Removed non-catalog provider ${rawId}`);
-      continue;
-    }
-
-    if (!nextProviders.some((provider) => provider.id === sanitized.id)) {
-      nextProviders.push(sanitized);
-    } else {
-      fixes.push(`Removed duplicated provider ${sanitized.id}`);
-    }
-  }
-
-  const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot, {
-    credentialView: 'storage-metadata',
-  });
-  if (!catalogProviders.some((provider) => provider.isConfigured)) {
-    warnings.push('No configured provider available for Debugger mode.');
-  }
-
-  const appearance = sanitizeUiPreferences(
-    candidate.appearance,
-    sanitizeUiPreferences(fallback.appearance, DEFAULT_APPEARANCE),
-  );
-  const tooling = sanitizeToolingSettings(candidate.tooling ?? fallback.tooling);
-
-  const nextSettings: PersistedSettingsPayload = {
-    schemaVersion: SETTINGS_SCHEMA_VERSION,
-    appearance,
-    layout: {
-      leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
-      rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
-      terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal),
-      window: sanitizeWindow(candidate.layout?.window, fallback.layout?.window ?? DEFAULT_LAYOUT.window),
-    },
-    profile: {
-      nickname: typeof candidate.profile?.nickname === 'string' && candidate.profile.nickname.trim()
-        ? candidate.profile.nickname.trim()
-        : DEFAULT_PROFILE.nickname,
-      avatarPath: typeof candidate.profile?.avatarPath === 'string' ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath,
-    },
-    tooling,
-    agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
-    agentModels: sanitizeAgentModelSettings(candidate.agentModels, fixes),
-    llm: {
-      providers: catalogProviders.map((provider) => ({ ...provider, apiKey: '' })),
-    },
-  };
-
-  return {
-    settings: nextSettings,
-    changed: JSON.stringify(candidate) !== JSON.stringify(nextSettings),
-    fixes,
-    warnings,
-    secretRefsToDelete: [],
-  };
-}
-
-export function normalizePersistedSettings(
-  raw: PersistedSettingsPayload | null,
-  workspaceRoot: string,
-  options: ProviderSanitizeOptions = {},
-): NormalizedPersistedSettings {
-  const fallback = createDefaultPersistedSettings();
-  const candidate = raw ?? fallback;
-  const nextProviders = normalizeUserProviders(candidate.llm?.providers, workspaceRoot, options).map((provider) => ({
-    ...provider,
-    apiKey: '',
-  }));
-  return {
-    appearance: sanitizeUiPreferences(
-      candidate.appearance,
-      sanitizeUiPreferences(fallback.appearance, DEFAULT_APPEARANCE),
-    ),
-    layout: {
-      leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
-      rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
-      terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal),
-      window: sanitizeWindow(candidate.layout?.window, fallback.layout?.window ?? DEFAULT_LAYOUT.window),
-    },
-    profile: {
-      nickname: typeof candidate.profile?.nickname === 'string' && candidate.profile.nickname.trim()
-        ? candidate.profile.nickname.trim()
-        : DEFAULT_PROFILE.nickname,
-      avatarPath: typeof candidate.profile?.avatarPath === 'string' ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath,
-    },
-    tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
-    agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
-    agentModels: sanitizeAgentModelSettings(candidate.agentModels),
-    llm: {
-      providers: nextProviders,
-    },
-  };
-}
-
-export function writeSettings(settings: PersistedSettingsPayload): void {
+/**
+ * The one read of the settings file: missing is `null` (defaults, nothing written); anything that is not a valid v9
+ * document is a `SettingsFileError` naming the file, whatever the storage primitive reported.
+ */
+export function readSettingsFile(): SettingsFile | null {
   const filePath = appPathService.getRuntimePaths().settingsPath;
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const temporaryPath = `${filePath}.${process.pid}.tmp`;
   try {
-    fs.writeFileSync(temporaryPath, JSON.stringify(settings, null, 2), 'utf8');
-    fs.renameSync(temporaryPath, filePath);
-  } finally {
-    if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+    return readValidatedSync(filePath, parseJsonWith(parseSettingsFile));
+  } catch (error) {
+    const code = errorCodeOf(error);
+    if (code === 'STORAGE_CORRUPT' || code === 'STORAGE_SCHEMA_UNSUPPORTED' || code === 'STORAGE_UNREADABLE') {
+      throw new SettingsFileError(code, filePath, { cause: error });
+    }
+    throw error;
   }
+}
+
+/** Writes the whole document compactly and atomically; callers write only when something actually changed. */
+export function writeSettingsFile(file: SettingsFile): void {
+  writeFileAtomicSync(appPathService.getRuntimePaths().settingsPath, JSON.stringify(assertSettingsFile(file)));
 }
 
 export function deleteSecretsAfterCommit(secretRefs: Iterable<string>, workspaceRoot: string): void {
@@ -325,55 +55,11 @@ export function deleteSecretsAfterCommit(secretRefs: Iterable<string>, workspace
   }
 }
 
-export function toRuntimeSettings(
-  persisted: PersistedSettingsPayload,
-  runtimePaths?: Partial<AppRuntimePaths>,
-): AppSettings {
-  const workspaceRoot = appPathService.getUserRdcRoot();
-  const normalized = normalizePersistedSettings(persisted, workspaceRoot);
-  const hydratedProviders = hydrateProviderSecrets(normalized.llm.providers, workspaceRoot);
-  const paths = appPathService.getRuntimePaths();
-  const resourceCatalog: RuntimeResourceCatalog = executionProfileService.normalizeResourceCatalog({
-    availableSkills: [],
-    availableMcpServers: [],
-    diagnostics: [],
-  });
-  const baseAgentSettings = agentManifestService.getSettings(
-    paths,
-    hydratedProviders,
-    createEmptyAgentRoutes(),
-    [],
-    tryCurrentProjectRoot(),
-  );
-  const agentRoutes = normalizeManifestRoutes(
-    agentManifestService.routesFromDefinitions(createEmptyAgentRoutes(), baseAgentSettings.definitions),
-  );
-
-  const settings: AppSettings = {
-    ...createDefaultRuntimeSettings(),
-    appearance: normalized.appearance,
-    layout: normalized.layout,
-    profile: normalized.profile,
-    tooling: normalized.tooling,
-    agentRuntime: normalized.agentRuntime,
-    agentModels: normalized.agentModels,
-    llm: {
-      providers: hydratedProviders,
-      agentRoutes,
-    },
-    agents: agentManifestService.projectEffectiveModelOptions(
-      baseAgentSettings,
-      hydratedProviders,
-      agentRoutes,
-      [],
-    ),
-    resourceCatalog,
-    paths: {
-      ...paths,
-      ...(runtimePaths ?? {}),
-    },
-  };
-
-  settings.resourceCatalog.diagnostics = executionProfileService.getDiagnostics(settings);
-  return settings;
+export function orphanProviderDiagnostics(providerIds: string[], settingsPath: string): SettingsDiagnostic[] {
+  return providerIds.map((providerId) => ({
+    code: 'settings_provider_not_in_catalog',
+    severity: 'warning',
+    message: `Stored settings for provider ${providerId} are kept but not used: the provider catalog no longer lists it.`,
+    path: settingsPath,
+  }));
 }

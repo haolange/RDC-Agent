@@ -5,6 +5,8 @@ import {
   type RendererEventChannel,
   type RendererInvokeChannel,
 } from '@shared/renderer-api';
+import { AppError, IPC_ERROR_KEY, type IpcErrorPayload } from '@shared/errors/appError';
+import { getElectronApi } from '../getElectronApi';
 import { connectBrowserEventStream } from './browserEventStream';
 import type { ElectronAPI } from '@shared/types/electron';
 
@@ -48,15 +50,25 @@ class BrowserAppBridgeClient implements RendererApiTransport {
       body: JSON.stringify({ channel, args }),
     });
 
-    const payload = await response.json() as { success?: boolean; result?: TResult; error?: string };
+    const payload = (await response.json()) as {
+      success?: boolean;
+      result?: TResult;
+      error?: string;
+      appError?: IpcErrorPayload;
+    };
+    // A handler failure arrives as the same error result the desktop bridge returns; createRendererApi throws it.
+    if (payload.appError) return { [IPC_ERROR_KEY]: payload.appError } as TResult;
     if (!response.ok || !payload.success) {
       throw new Error(payload.error || `Bridge invoke failed for ${channel}`);
     }
     if (channel === 'capture:readLivePreview') {
       const bytes = payload.result as { type?: unknown; data?: unknown } | null;
-      if (bytes?.type !== 'Buffer' || !Array.isArray(bytes.data)
-        || !bytes.data.every(value => Number.isInteger(value) && value >= 0 && value <= 255)) {
-        throw new Error('BRIDGE_INVALID_IMAGE_BYTES');
+      if (
+        bytes?.type !== 'Buffer' ||
+        !Array.isArray(bytes.data) ||
+        !bytes.data.every((value) => Number.isInteger(value) && value >= 0 && value <= 255)
+      ) {
+        throw new AppError('BRIDGE_INVALID_IMAGE_BYTES');
       }
       return Uint8Array.from(bytes.data) as TResult;
     }
@@ -114,7 +126,7 @@ export function installBrowserAppBridge(): void {
   if (typeof window === 'undefined') return;
 
   const target = window as BrowserBridgeWindow;
-  if (window.electronAPI || target[BRIDGE_MARKER]) return;
+  if (getElectronApi() || target[BRIDGE_MARKER]) return;
 
   const client = new BrowserAppBridgeClient();
   window.electronAPI = client.api;

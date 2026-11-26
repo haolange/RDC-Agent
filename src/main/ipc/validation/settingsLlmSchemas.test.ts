@@ -11,57 +11,112 @@ describe('settingsLlmSchemas clientRevision / modelPreferences', () => {
     const revision = Date.now() * 1_000;
     expect(revision).toBeGreaterThan(1_000_000_000);
 
-    expect(SettingsSaveAgentDefinitionArgsSchema.safeParse([{
-      draft: { id: 'debugger' },
-      clientRevision: revision,
-      scope: 'user',
-    }]).success).toBe(true);
+    expect(
+      SettingsSaveAgentDefinitionArgsSchema.safeParse([
+        {
+          draft: { id: 'debugger' },
+          clientRevision: revision,
+          scope: 'user',
+        },
+      ]).success,
+    ).toBe(true);
 
-    expect(SettingsSaveProviderDefinitionArgsSchema.safeParse([{
-      provider: { id: 'openai' },
-      clientRevision: revision,
-    }]).success).toBe(true);
+    expect(
+      SettingsSaveProviderDefinitionArgsSchema.safeParse([
+        {
+          providerId: 'openai',
+          connectionIdentity: '["openai"]',
+          models: [{ id: 'gpt-6', enabled: false }],
+          clientRevision: revision,
+        },
+      ]).success,
+    ).toBe(true);
+  });
+
+  it('takes only model choices in a provider definition save', () => {
+    const save = { providerId: 'openai', connectionIdentity: '["openai"]', clientRevision: 1 };
+    expect(
+      SettingsSaveProviderDefinitionArgsSchema.safeParse([
+        { ...save, models: [{ id: 'gpt-6', enabled: true, label: 'GPT-6' }] },
+      ]).success,
+    ).toBe(true);
+    expect(
+      SettingsSaveProviderDefinitionArgsSchema.safeParse([
+        { ...save, models: [{ id: 'gpt-6', enabled: true, contextWindow: 1 }] },
+      ]).success,
+    ).toBe(false);
+    expect(
+      SettingsSaveProviderDefinitionArgsSchema.safeParse([{ ...save, models: [], provider: { id: 'openai' } }]).success,
+    ).toBe(false);
   });
 
   it('rejects non-positive or non-safe-integer revisions', () => {
-    expect(SettingsSaveAgentDefinitionArgsSchema.safeParse([{
-      draft: { id: 'debugger' },
-      clientRevision: 0,
-    }]).success).toBe(false);
+    expect(
+      SettingsSaveAgentDefinitionArgsSchema.safeParse([
+        {
+          draft: { id: 'debugger' },
+          clientRevision: 0,
+        },
+      ]).success,
+    ).toBe(false);
 
-    expect(SettingsSaveAgentDefinitionArgsSchema.safeParse([{
-      draft: { id: 'debugger' },
-      clientRevision: Number.MAX_SAFE_INTEGER + 1,
-    }]).success).toBe(false);
+    expect(
+      SettingsSaveAgentDefinitionArgsSchema.safeParse([
+        {
+          draft: { id: 'debugger' },
+          clientRevision: Number.MAX_SAFE_INTEGER + 1,
+        },
+      ]).success,
+    ).toBe(false);
   });
 
   it('rejects path-shaped projectId and missing projectId on project scope', () => {
-    expect(SettingsSaveAgentDefinitionArgsSchema.safeParse([{
-      draft: { id: 'general' },
-      clientRevision: 1,
-      scope: 'project',
-      projectId: 'D:/Projects/Demo',
-    }]).success).toBe(false);
-    expect(SettingsSaveAgentDefinitionArgsSchema.safeParse([{
-      draft: { id: 'general' },
-      clientRevision: 1,
-      scope: 'project',
-    }]).success).toBe(false);
-    expect(SettingsSaveAgentDefinitionArgsSchema.safeParse([{
-      draft: { id: 'general' },
-      clientRevision: 1,
-      scope: 'project',
-      projectId: 'proj_demo',
-    }]).success).toBe(true);
-    expect(SettingsGetAgentDefinitionCommitArgsSchema.safeParse([{
-      agentId: 'general',
-      scope: 'project',
-      projectId: 'proj_demo',
-    }]).success).toBe(true);
-    expect(SettingsGetAgentDefinitionCommitArgsSchema.safeParse([{
-      agentId: 'general',
-      scope: 'project',
-    }]).success).toBe(false);
+    expect(
+      SettingsSaveAgentDefinitionArgsSchema.safeParse([
+        {
+          draft: { id: 'general' },
+          clientRevision: 1,
+          scope: 'project',
+          projectId: 'D:/Projects/Demo',
+        },
+      ]).success,
+    ).toBe(false);
+    expect(
+      SettingsSaveAgentDefinitionArgsSchema.safeParse([
+        {
+          draft: { id: 'general' },
+          clientRevision: 1,
+          scope: 'project',
+        },
+      ]).success,
+    ).toBe(false);
+    expect(
+      SettingsSaveAgentDefinitionArgsSchema.safeParse([
+        {
+          draft: { id: 'general' },
+          clientRevision: 1,
+          scope: 'project',
+          projectId: 'proj_demo',
+        },
+      ]).success,
+    ).toBe(true);
+    expect(
+      SettingsGetAgentDefinitionCommitArgsSchema.safeParse([
+        {
+          agentId: 'general',
+          scope: 'project',
+          projectId: 'proj_demo',
+        },
+      ]).success,
+    ).toBe(true);
+    expect(
+      SettingsGetAgentDefinitionCommitArgsSchema.safeParse([
+        {
+          agentId: 'general',
+          scope: 'project',
+        },
+      ]).success,
+    ).toBe(false);
   });
 
   it('accepts large modelPreferences arrays beyond the old 512 cap', () => {
@@ -69,9 +124,13 @@ describe('settingsLlmSchemas clientRevision / modelPreferences', () => {
       id: `model-${index}`,
       enabled: true,
     }));
-    expect(LlmProviderDraftArgsSchema.safeParse([{
-      providerId: 'openrouter',
-      modelPreferences,
-    }]).success).toBe(true);
+    expect(
+      LlmProviderDraftArgsSchema.safeParse([
+        {
+          providerId: 'openrouter',
+          modelPreferences,
+        },
+      ]).success,
+    ).toBe(true);
   });
 });

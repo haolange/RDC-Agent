@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProjectStore } from '../../../stores/projectStore';
+import { getCurrentSessionView } from '../../../stores/sessionRecordStore';
 import {
   handleAddProjectOp,
   handleOpenExplorerOp,
@@ -7,13 +8,9 @@ import {
   handleRemoveProjectOp,
 } from './projectSelectionProjectOps';
 import { commitSessionRenameOp, handleProjectRenameSubmitOp } from './projectSelectionRenameOps';
-import {
-  handleSessionActivateOp,
-  handleSessionCreateOp,
-  handleSessionRemoveOp,
-} from './projectSelectionSessionOps';
+import { handleSessionActivateOp, handleSessionCreateOp, handleSessionRemoveOp } from './projectSelectionSessionOps';
 import { useProjectSelectionLoaders } from './useProjectSelectionLoaders';
-import type { ProjectSelectionHandlerOpsContext } from './projectSelectionContext';
+import type { ProjectSelectionHandlerOpsContext, SidebarError } from './projectSelectionContext';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
 interface UseProjectSelectionOptions {
@@ -34,12 +31,12 @@ export function useProjectSelection({
   projectMenuOpen,
 }: UseProjectSelectionOptions) {
   const [isBusy, setIsBusy] = useState(false);
-  const [sidebarError, setSidebarError] = useState<string | null>(null);
+  const [sidebarError, setSidebarError] = useState<SidebarError | null>(null);
 
   const projects = useProjectStore((state) => state.projects);
   const sessions = useProjectStore((state) => state.sessions);
   const currentProject = useProjectStore((state) => state.currentProject);
-  const currentSession = useProjectStore((state) => state.currentSession);
+  const currentSessionId = useProjectStore((state) => state.currentSessionId);
   const rightRailTarget = useProjectStore((state) => state.rightRailTarget);
 
   const loaders = useProjectSelectionLoaders({
@@ -50,12 +47,7 @@ export function useProjectSelection({
     setSidebarError,
   });
 
-  const {
-    isLoading,
-    beginSelectionRequest,
-    loadProjects,
-    loaderCtx,
-  } = loaders;
+  const { isLoading, beginSelectionRequest, loadProjects, loaderCtx } = loaders;
 
   useEffect(() => {
     if (currentProject?.projectId) {
@@ -63,20 +55,31 @@ export function useProjectSelection({
     }
   }, [currentProject, ensureProjectExpanded]);
 
-  const handlerCtx = useMemo((): ProjectSelectionHandlerOpsContext => ({
-    ...loaderCtx,
-    setIsBusy,
-    setSidebarError,
-    beginSelectionRequest,
-    loadProjects: loaders.loadProjects,
-    loadSessions: loaders.loadSessions,
-    selectSession: loaders.selectSession,
-    getCurrentProject: () => useProjectStore.getState().currentProject,
-    getCurrentSession: () => useProjectStore.getState().currentSession,
-    getRightRailTarget: () => useProjectStore.getState().rightRailTarget,
-    projectMenuOpen,
-    onCloseProjectMenu,
-  }), [loaderCtx, beginSelectionRequest, loaders.loadProjects, loaders.loadSessions, loaders.selectSession, onCloseProjectMenu, projectMenuOpen]);
+  const handlerCtx = useMemo(
+    (): ProjectSelectionHandlerOpsContext => ({
+      ...loaderCtx,
+      setIsBusy,
+      setSidebarError,
+      beginSelectionRequest,
+      loadProjects: loaders.loadProjects,
+      loadSessions: loaders.loadSessions,
+      selectSession: loaders.selectSession,
+      getCurrentProject: () => useProjectStore.getState().currentProject,
+      getCurrentSession: getCurrentSessionView,
+      getRightRailTarget: () => useProjectStore.getState().rightRailTarget,
+      projectMenuOpen,
+      onCloseProjectMenu,
+    }),
+    [
+      loaderCtx,
+      beginSelectionRequest,
+      loaders.loadProjects,
+      loaders.loadSessions,
+      loaders.selectSession,
+      onCloseProjectMenu,
+      projectMenuOpen,
+    ],
+  );
 
   const handleAddProject = useCallback((rootPath: string) => handleAddProjectOp(handlerCtx, rootPath), [handlerCtx]);
   const handleRemoveProject = useCallback(
@@ -96,9 +99,8 @@ export function useProjectSelection({
     [handlerCtx],
   );
   const handleProjectRenameSubmit = useCallback(
-    (projectRenamePopover: { project: ProjectRecord; titleDraft: string } | null, onClose: () => void) => (
-      handleProjectRenameSubmitOp(handlerCtx, projectRenamePopover, onClose)
-    ),
+    (projectRenamePopover: { project: ProjectRecord; titleDraft: string } | null, onClose: () => void) =>
+      handleProjectRenameSubmitOp(handlerCtx, projectRenamePopover, onClose),
     [handlerCtx],
   );
   const handleSessionRemove = useCallback(
@@ -106,15 +108,13 @@ export function useProjectSelection({
     [handlerCtx],
   );
   const commitSessionRename = useCallback(
-    (renamePopover: { session: SessionRecord; titleDraft: string } | null, onClose: () => void) => (
-      commitSessionRenameOp(handlerCtx, renamePopover, onClose)
-    ),
+    (renamePopover: { session: SessionRecord; titleDraft: string } | null, onClose: () => void) =>
+      commitSessionRenameOp(handlerCtx, renamePopover, onClose),
     [handlerCtx],
   );
   const handleSessionActivate = useCallback(
-    (project: ProjectRecord, session: SessionRecord, onCloseRename: () => void) => (
-      handleSessionActivateOp(handlerCtx, project, session, onCloseRename)
-    ),
+    (project: ProjectRecord, session: SessionRecord, onCloseRename: () => void) =>
+      handleSessionActivateOp(handlerCtx, project, session, onCloseRename),
     [handlerCtx],
   );
 
@@ -125,7 +125,7 @@ export function useProjectSelection({
     projects,
     sessions,
     currentProject,
-    currentSession,
+    currentSessionId,
     rightRailTarget,
     beginSelectionRequest,
     loadProjects,

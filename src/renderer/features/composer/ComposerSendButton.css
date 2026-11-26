@@ -14,3 +14,9 @@
 .chat-send-button:focus-visible {
   outline-color: var(--composer-mode-accent);
 }
+
+/* Stop is on its way to main: the button keeps full weight and shows the pending icon instead of fading out. */
+.chat-send-button.is-pending:disabled {
+  opacity: 1;
+  cursor: progress;
+}

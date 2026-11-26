@@ -7,23 +7,17 @@ import { normalizeTestIdSegment } from './selectUtils';
 import type { SelectOption } from './types';
 import type { PresenceState } from '../usePresence';
 
-function AaSwatch(props: { color: string; className?: string }) {
+function AaSwatch(props: { color: string }) {
   const dynStyle = useDynStyle({ '--dropdown-swatch-bg': props.color });
   return (
-    <span
-      className={['dropdown-select-swatch', props.className].filter(Boolean).join(' ')}
-      {...dynStyle}
-      aria-hidden="true"
-    >
+    <span className="dropdown-select-swatch" {...dynStyle} aria-hidden="true">
       Aa
     </span>
   );
 }
 
 function CheckIcon() {
-  return (
-    <Icon name="check" size={14} className="dropdown-select-option-check-icon" />
-  );
+  return <Icon name="check" size={14} className="dropdown-select-option-check-icon" />;
 }
 
 interface SelectTriggerProps {
@@ -34,6 +28,7 @@ interface SelectTriggerProps {
   dataTestId: string;
   triggerAriaLabel: string;
   triggerLabel: string;
+  tooltip?: string;
   swatchColor?: string;
   hasSelection: boolean;
   triggerClassName: string;
@@ -49,6 +44,7 @@ export const SelectTrigger: React.FC<SelectTriggerProps> = ({
   dataTestId,
   triggerAriaLabel,
   triggerLabel,
+  tooltip,
   swatchColor,
   hasSelection,
   triggerClassName,
@@ -64,12 +60,15 @@ export const SelectTrigger: React.FC<SelectTriggerProps> = ({
       hasSelection ? '' : 'placeholder',
       swatchColor ? 'has-swatch' : '',
       triggerClassName,
-    ].filter(Boolean).join(' ')}
+    ]
+      .filter(Boolean)
+      .join(' ')}
     data-testid={dataTestId}
     disabled={disabled}
     aria-haspopup="listbox"
     aria-expanded={open}
     aria-label={triggerAriaLabel}
+    data-tooltip={tooltip}
     onClick={onClick}
     onKeyDown={onKeyDown}
   >
@@ -90,7 +89,6 @@ interface SelectMenuProps {
   dataTestId: string;
   triggerAriaLabel: string;
   menuClassName: string;
-  optionClassName: string;
   emptyLabel: string;
   value: string;
   options: SelectOption[];
@@ -114,7 +112,6 @@ const SelectMenuPortal: React.FC<SelectMenuProps> = ({
   dataTestId,
   triggerAriaLabel,
   menuClassName,
-  optionClassName,
   emptyLabel,
   value,
   options,
@@ -132,78 +129,74 @@ const SelectMenuPortal: React.FC<SelectMenuProps> = ({
   });
 
   return (
-  <div
-    ref={menuRef}
-    className={[
-      'dropdown-select-menu',
-      `variant-${variant}`,
-      `placement-${menuPosition.placement}`,
-      menuClassName,
-    ].filter(Boolean).join(' ')}
-    data-testid={`${dataTestId}-menu`}
-    data-placement={menuPosition.placement}
-    data-state={state}
-    role="listbox"
-    aria-label={triggerAriaLabel}
-    {...dynStyle}
-  >
-    <span className="dropdown-select-menu-caret" aria-hidden="true" />
-    <div className="dropdown-select-menu-panel">
-      {options.length === 0 ? (
-        <div className="dropdown-select-empty">{emptyLabel}</div>
-      ) : (
-        options.map((option, index) => {
-          const optionTestId = option.testId
-            ?? `${dataTestId}-option-${normalizeTestIdSegment(option.value)}`;
-          const isSelected = option.value === value;
-          const isActive = index === activeIndex;
+    <div
+      ref={menuRef}
+      className={['dropdown-select-menu', `variant-${variant}`, `placement-${menuPosition.placement}`, menuClassName]
+        .filter(Boolean)
+        .join(' ')}
+      data-testid={`${dataTestId}-menu`}
+      data-placement={menuPosition.placement}
+      data-state={state}
+      role="listbox"
+      aria-label={triggerAriaLabel}
+      {...dynStyle}
+    >
+      <span className="dropdown-select-menu-caret" aria-hidden="true" />
+      <div className="dropdown-select-menu-panel">
+        {options.length === 0 ? (
+          <div className="dropdown-select-empty">{emptyLabel}</div>
+        ) : (
+          options.map((option, index) => {
+            const optionTestId = option.testId ?? `${dataTestId}-option-${normalizeTestIdSegment(option.value)}`;
+            const isSelected = option.value === value;
+            const isActive = index === activeIndex;
 
-          return (
-            <button
-              key={`${option.value}-${index}`}
-              type="button"
-              className={[
-                'dropdown-select-option',
-                isSelected ? 'is-selected' : '',
-                isActive ? 'is-active' : '',
-                option.disabled ? 'is-disabled' : '',
-                option.swatchColor ? 'has-swatch' : '',
-                optionClassName,
-              ].filter(Boolean).join(' ')}
-              data-testid={optionTestId}
-              role="option"
-              aria-selected={isSelected}
-              aria-disabled={option.disabled ? 'true' : 'false'}
-              disabled={option.disabled}
-              onMouseEnter={() => {
-                if (!option.disabled) {
-                  onActiveIndexChange(index);
-                }
-              }}
-              onClick={() => {
-                if (!option.disabled) {
-                  onCommitSelection(option.value);
-                }
-              }}
-            >
-              <span className="dropdown-select-option-main">
-                {option.swatchColor ? <AaSwatch color={option.swatchColor} /> : null}
-                <span className="dropdown-select-option-label">{option.label}</span>
-              </span>
-              {isSelected ? (
-                <span className="dropdown-select-option-check">
-                  <CheckIcon />
+            return (
+              <button
+                key={`${option.value}-${index}`}
+                type="button"
+                className={[
+                  'dropdown-select-option',
+                  isSelected ? 'is-selected' : '',
+                  isActive ? 'is-active' : '',
+                  option.disabled ? 'is-disabled' : '',
+                  option.swatchColor ? 'has-swatch' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                data-testid={optionTestId}
+                role="option"
+                aria-selected={isSelected}
+                aria-disabled={option.disabled ? 'true' : 'false'}
+                disabled={option.disabled}
+                onMouseEnter={() => {
+                  if (!option.disabled) {
+                    onActiveIndexChange(index);
+                  }
+                }}
+                onClick={() => {
+                  if (!option.disabled) {
+                    onCommitSelection(option.value);
+                  }
+                }}
+              >
+                <span className="dropdown-select-option-main">
+                  {option.swatchColor ? <AaSwatch color={option.swatchColor} /> : null}
+                  <span className="dropdown-select-option-label">{option.label}</span>
                 </span>
-              ) : null}
-            </button>
-          );
-        })
-      )}
+                {isSelected ? (
+                  <span className="dropdown-select-option-check">
+                    <CheckIcon />
+                  </span>
+                ) : null}
+              </button>
+            );
+          })
+        )}
+      </div>
     </div>
-  </div>
   );
 };
 
-export const SelectMenu: React.FC<SelectMenuProps> = (props) => (
-  createPortal(<SelectMenuPortal {...props} />, document.body)
-);
+export const SelectMenu: React.FC<SelectMenuProps> = (props) =>
+  createPortal(<SelectMenuPortal {...props} />, document.body);

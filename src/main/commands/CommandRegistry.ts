@@ -7,13 +7,9 @@
  *  - 按类别列举命令供 UI 自动补全使用。
  */
 
-import type {
-  CommandContext,
-  CommandDefinition,
-  CommandResult,
-  CommandExecuteRequest,
-  CommandListResult,
-} from '@shared/types/command';
+import { commandText } from './commandI18n';
+import type { CommandMessageKey } from './commandMessages';
+import type { CommandContext, CommandResult, CommandExecuteRequest, CommandListResult } from '@shared/types/command';
 
 export class CommandRegistry {
   private readonly commands = new Map<string, CommandDefinition>();
@@ -62,7 +58,7 @@ export class CommandRegistry {
       result.push({
         id: cmd.id,
         name: cmd.name,
-        description: cmd.description,
+        description: commandText(cmd.descriptionKey),
         aliases: cmd.aliases ?? [],
         category: cmd.category,
       });
@@ -74,10 +70,7 @@ export class CommandRegistry {
   async execute(request: CommandExecuteRequest): Promise<CommandResult> {
     const raw = request.input.trim();
     if (!raw.startsWith('/')) {
-      return {
-        success: false,
-        message: 'Input does not start with "/"',
-      };
+      return { success: false, message: commandText('registry.notCommand') };
     }
 
     const parts = raw.slice(1).split(/\s+/);
@@ -86,10 +79,7 @@ export class CommandRegistry {
 
     const cmd = this.resolve(commandName);
     if (!cmd) {
-      return {
-        success: false,
-        message: `Unknown command: /${commandName}. Type /help to see available commands.`,
-      };
+      return { success: false, message: commandText('registry.unknown', { name: commandName }) };
     }
 
     const context: CommandContext = {
@@ -105,11 +95,24 @@ export class CommandRegistry {
     try {
       return await cmd.execute(args, context);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return {
-        success: false,
-        message: `Command /${commandName} failed: ${message}`,
-      };
+      const reason = err instanceof Error ? err.message : String(err);
+      return { success: false, message: commandText('registry.failed', { name: commandName, reason }) };
     }
   }
+}
+
+/** Definition of a slash command. */
+export interface CommandDefinition {
+  /** Unique command ID (kebab-case, e.g. "help", "clear", "git-commit"). */
+  id: string;
+  /** Primary command name (without leading slash). */
+  name: string;
+  /** Short description shown in the command list popover and /help, in the app language. */
+  descriptionKey: CommandMessageKey;
+  /** Alternative names that trigger this command. */
+  aliases?: string[];
+  /** Category for grouping in the UI. */
+  category: 'workflow' | 'navigation' | 'system' | 'debug' | 'edit' | 'session';
+  /** Execute the command. Receives parsed arguments and context. */
+  execute: (args: string[], context: CommandContext) => Promise<CommandResult>;
 }

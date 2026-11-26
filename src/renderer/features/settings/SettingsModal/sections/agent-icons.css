@@ -10,7 +10,10 @@
   background: color-mix(in srgb, var(--token-bg-raised) 42%, transparent);
   color: var(--token-text-secondary);
   cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .settings-agent-icon-option:hover,

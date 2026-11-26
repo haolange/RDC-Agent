@@ -16,8 +16,9 @@ export interface WorkbenchSetupStep {
  */
 export function useWorkbenchSetup(): WorkbenchSetupStep[] {
   const rdcCli = useAppSettingsStore((state) => state.settings.tooling.rdcCli);
-  const modelConnected = useAppSettingsStore((state) => state.settings.llm.providers
-    .some((provider) => provider.enabled && provider.isConfigured));
+  const modelConnected = useAppSettingsStore((state) =>
+    state.settings.llm.providers.some((provider) => provider.enabled && provider.isConfigured),
+  );
   const hasProject = useProjectStore((state) => state.projects.length > 0);
   const requestAddProject = useProjectStore((state) => state.requestAddProject);
   const openSection = useSettingsNavigationStore((state) => state.openSection);

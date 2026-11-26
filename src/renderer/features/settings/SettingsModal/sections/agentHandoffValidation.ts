@@ -41,9 +41,7 @@ export function persistAgentHandoff(handoff: AgentHandoffDefinition): AgentHando
   if (handoff.labelTranslations) next.labelTranslations = { ...handoff.labelTranslations };
   if (handoff.send === true) next.send = true;
   if (handoff.surface && handoff.surface !== 'turn-end') next.surface = handoff.surface;
-  const requiredSkillIds = (handoff.requiredSkillIds ?? [])
-    .map((id) => id.trim())
-    .filter(Boolean);
+  const requiredSkillIds = (handoff.requiredSkillIds ?? []).map((id) => id.trim()).filter(Boolean);
   if (requiredSkillIds.length > 0) next.requiredSkillIds = requiredSkillIds;
   const requiredToolIds = (handoff.requiredToolIds ?? []).map((id) => id.trim()).filter(Boolean);
   if (requiredToolIds.length > 0) next.requiredToolIds = requiredToolIds;
@@ -66,7 +64,10 @@ export function validateAgentHandoffs(
   const byId = new Map(ctx.definitions.map((entry) => [entry.id, entry]));
   handoffs.forEach((handoff, index) => {
     if (!handoff.label.trim()) issues.push({ index, field: 'label', code: 'label-required' });
-    if (handoff.labelTranslations !== undefined && !handoffLabelTranslationsSchema.safeParse(handoff.labelTranslations).success) {
+    if (
+      handoff.labelTranslations !== undefined &&
+      !handoffLabelTranslationsSchema.safeParse(handoff.labelTranslations).success
+    ) {
       issues.push({ index, field: 'labelTranslations', code: 'translations-invalid' });
     }
     const agent = handoff.agent.trim();

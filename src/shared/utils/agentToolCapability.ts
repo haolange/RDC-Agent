@@ -1,7 +1,4 @@
-import {
-  PROVIDER_ADAPTER_IMPLEMENTATIONS,
-  PROVIDER_ADAPTER_IDS,
-} from '../provider-catalog/implementationRegistry';
+import { PROVIDER_ADAPTER_IMPLEMENTATIONS, PROVIDER_ADAPTER_IDS } from '../provider-catalog/implementationRegistry';
 import { isEffectiveModelPickerSelectable } from './effectiveModelPicker';
 import type { CapabilityState, EffectiveAvailability } from '../types/providerCapability';
 import type { LlmProviderProtocol } from '../types/settings';
@@ -29,21 +26,17 @@ export interface AgentToolEligibilityCandidate extends EffectiveModelPickerCandi
 
 export function hasImplementedStructuredToolAdapter(protocol: string | undefined): boolean {
   if (!protocol) return false;
-  return PROVIDER_ADAPTER_IDS.some((adapterId) => (
-    (PROVIDER_ADAPTER_IMPLEMENTATIONS[adapterId].protocols as readonly string[]).includes(protocol)
-  ));
+  return PROVIDER_ADAPTER_IDS.some((adapterId) =>
+    (PROVIDER_ADAPTER_IMPLEMENTATIONS[adapterId].protocols as readonly string[]).includes(protocol),
+  );
 }
 
-export function toolCallingEvidenceOf(
-  state: CapabilityState['state'] | undefined,
-): AgentToolCallingEvidence {
+export function toolCallingEvidenceOf(state: CapabilityState['state'] | undefined): AgentToolCallingEvidence {
   if (state === 'supported' || state === 'unsupported') return state;
   return 'unknown';
 }
 
-export function classifyAgentToolEligibility(
-  model: AgentToolEligibilityCandidate,
-): AgentToolEligibility {
+export function classifyAgentToolEligibility(model: AgentToolEligibilityCandidate): AgentToolEligibility {
   if (model.enabled === false) return 'disabled';
   if (model.availability === 'unavailable') return 'unavailable';
   if (model.availability !== 'available') return 'availability-unknown';
@@ -60,8 +53,7 @@ export function classifyAgentToolEligibility(
  * and the request planner. Settings catalog visibility stays on `isEffectiveModelPickerSelectable`.
  */
 export function isAgentToolExecutableModel(model: AgentToolEligibilityCandidate): boolean {
-  return isEffectiveModelPickerSelectable(model)
-    && classifyAgentToolEligibility(model) === 'executable';
+  return isEffectiveModelPickerSelectable(model) && classifyAgentToolEligibility(model) === 'executable';
 }
 
 export function isCatalogVisibleAgentModel(model: EffectiveModelPickerCandidate): boolean {

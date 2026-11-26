@@ -62,12 +62,6 @@
   line-height: 0;
 }
 
-.composer-agent-menu-item-icon svg {
-  display: block;
-  width: var(--space-4);
-  height: var(--space-4);
-}
-
 .composer-agent-menu-item-label {
   min-width: 0;
   overflow: hidden;
@@ -109,7 +103,7 @@
   box-shadow: var(--token-shadow-popover);
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.45;
+  line-height: var(--type-meta-line);
   opacity: 0;
   pointer-events: none;
   transform: translate(var(--space-2), -50%);

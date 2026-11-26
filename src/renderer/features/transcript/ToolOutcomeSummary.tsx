@@ -11,23 +11,37 @@ export const ToolOutcomeSummary: React.FC<{ outcome: ToolOutcome }> = ({ outcome
   if (outcome.type === 'investigation') {
     const kind = outcome.kind ? t(`control.rightRail.artifacts.kind.${outcome.kind}`) : '';
     title = outcome.title || kind || t('chat.toolOutcomeArtifact');
-    meta = [outcome.title ? kind : '', outcome.status ? t(`control.rightRail.artifacts.status.${outcome.status}`) : ''].filter(Boolean).join(' · ');
+    meta = [outcome.title ? kind : '', outcome.status ? t(`control.rightRail.artifacts.status.${outcome.status}`) : '']
+      .filter(Boolean)
+      .join(' · ');
   } else if (outcome.type === 'completion') {
     title = t(`chat.toolOutcomeCompletion.${outcome.disposition}`);
   } else {
-    title = outcome.names.map((name) => toolDisplayName(name, t)).join(t('chat.listSeparator')) || t('chat.toolOutcomeNoTools');
+    title =
+      outcome.names.map((name) => toolDisplayName(name, t)).join(t('chat.listSeparator')) ||
+      t('chat.toolOutcomeNoTools');
     meta = t(outcome.count === 1 ? 'chat.toolOutcomeToolOne' : 'chat.toolOutcomeToolsCount', { count: outcome.count });
   }
-  const items = outcome.type === 'completion' ? outcome.unresolved ?? [] : [];
-  return <div className="work-process-tool-card-body work-process-outcome">
-    <span className="work-process-outcome-title"><OverflowFade text={title} /></span>
-    {meta ? <span className="work-process-outcome-meta">{meta}</span> : null}
-    {items.length ? <ul className="work-process-outcome-items" aria-label={t('chat.toolOutcomeUnresolved')}>
-      {items.map((item, index) => <li key={index}>
-        <span className="work-process-outcome-item-gap">{item.gap}</span>
-        <span className="work-process-outcome-meta">{t(`chat.toolOutcomeBlocker.${item.blocker}`)}</span>
-        <span className="work-process-outcome-item-detail">{t('chat.toolOutcomeItemDetail', { attempted: item.attempted, resumeWhen: item.resumeWhen })}</span>
-      </li>)}
-    </ul> : null}
-  </div>;
+  const items = outcome.type === 'completion' ? (outcome.unresolved ?? []) : [];
+  return (
+    <div className="work-process-tool-card-body work-process-outcome">
+      <span className="work-process-outcome-title">
+        <OverflowFade text={title} />
+      </span>
+      {meta ? <span className="work-process-outcome-meta">{meta}</span> : null}
+      {items.length ? (
+        <ul className="work-process-outcome-items" aria-label={t('chat.toolOutcomeUnresolved')}>
+          {items.map((item, index) => (
+            <li key={index}>
+              <span className="work-process-outcome-item-gap">{item.gap}</span>
+              <span className="work-process-outcome-meta">{t(`chat.toolOutcomeBlocker.${item.blocker}`)}</span>
+              <span className="work-process-outcome-item-detail">
+                {t('chat.toolOutcomeItemDetail', { attempted: item.attempted, resumeWhen: item.resumeWhen })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
 };

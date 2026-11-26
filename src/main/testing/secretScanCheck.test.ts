@@ -5,7 +5,10 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 // Scripts live outside tsconfig include; the .mjs is the provider-key gate.
 // @ts-expect-error -- untyped ESM helper
-import { findSecretsInDiff, findSecretsInText, isZeroSha, resolveSecretScanRange, runSecretCheck, scanFile } from '../../../scripts/check-secrets';
+import * as secretScan from '../../../scripts/check-secrets';
+
+const { findSecretsInDiff, findSecretsInText, isZeroSha, resolveSecretScanRange, runSecretCheck, scanFile } =
+  secretScan;
 
 type SecretFinding = { path?: string; line: number; pattern: string };
 
@@ -55,12 +58,7 @@ function fakeTokens() {
   };
 }
 
-const FIXTURES = [
-  "apiKey: 'sk-test'",
-  "apiKey: 'sk-custom'",
-  "apiKey: 'sk-or-fixture'",
-  "apiKey: 'secret'",
-].join('\n');
+const FIXTURES = ["apiKey: 'sk-test'", "apiKey: 'sk-custom'", "apiKey: 'sk-or-fixture'", "apiKey: 'secret'"].join('\n');
 
 // Each case spawns real git processes against a temp repository.
 describe('provider key literal gate', { timeout: 30_000 }, () => {

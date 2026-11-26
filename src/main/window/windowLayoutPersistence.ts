@@ -26,9 +26,7 @@ export function captureWindowLayout(win: BrowserWindow): WindowLayoutPreference 
   };
 }
 
-export function resolveWindowCreationOptions(
-  saved: WindowLayoutPreference | undefined,
-): {
+export function resolveWindowCreationOptions(saved: WindowLayoutPreference | undefined): {
   width: number;
   height: number;
   x?: number;
@@ -52,10 +50,11 @@ export function resolveWindowCreationOptions(
   const height = clamp(candidate.height, APP_MIN_WINDOW_HEIGHT, display.height);
   const maxX = display.x + Math.max(0, display.width - width);
   const maxY = display.y + Math.max(0, display.height - height);
-  const hasSavedOrigin = Boolean(saved)
-    && Number.isFinite(saved!.x)
-    && Number.isFinite(saved!.y)
-    && (saved!.x !== 0 || saved!.y !== 0 || saved!.isMaximized);
+  const hasSavedOrigin =
+    Boolean(saved) &&
+    Number.isFinite(saved!.x) &&
+    Number.isFinite(saved!.y) &&
+    (saved!.x !== 0 || saved!.y !== 0 || saved!.isMaximized);
 
   if (!hasSavedOrigin) {
     return {

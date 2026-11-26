@@ -68,7 +68,13 @@ Electron Vite 构建调用同一编译器，产出轻量 summary index 和按 su
 
 `serviceOperator`、`endpointOwnership`、`endpointClass`、`surfaceKind`、`protocolOwner` 与 catalog ownership 独立保存，禁止互相推导。
 
-协议选择只来自 model-level `routeOptions`。多协议模型显示 enum，单协议显示只读值，不支持的组合禁用并 fail-closed。偏好按 provider surface + account + model 保存 `preferredRouteOptionId`。Provider 列表行对 `routes.length > 1` 的 surface 只摘要「多协议 · 默认 {protocol}」，不提供 Provider 级协议切换。LongCat 属于兼容接入，并显式提供 OpenAI Chat 与 Anthropic Messages；Vertex 属于 Cloud，Vertex Gemini、Vertex Anthropic 与精确获准的 OpenAI-compatible route 分开声明。Vertex Gemini 只有从 OpenAI-compatible `/models` 实际发现的模型才投影该兼容 route；Vertex Anthropic 从原生 Model Garden publisher catalog 发现候选，项目 entitlement 未经验证时保持 `unknown`，禁止借 Gemini OpenAI endpoint 伪造 Claude 可用性。
+协议选择只来自 model-level `routeOptions`。
+
+- 多协议模型显示 enum，单协议显示只读值，不支持的组合禁用并 fail-closed。
+- 偏好按 provider surface + account + model 保存 `preferredRouteOptionId`。
+- Provider 列表行对 `routes.length > 1` 的 surface 只摘要「多协议 · 默认 {protocol}」，不提供 Provider 级协议切换。
+- LongCat 属于兼容接入，并显式提供 OpenAI Chat 与 Anthropic Messages；Vertex 属于 Cloud，Vertex Gemini、Vertex Anthropic 与精确获准的 OpenAI-compatible route 分开声明。
+- Vertex Gemini 只有从 OpenAI-compatible `/models` 实际发现的模型才投影该兼容 route；Vertex Anthropic 从原生 Model Garden publisher catalog 发现候选，项目 entitlement 未经验证时保持 `unknown`，禁止借 Gemini OpenAI endpoint 伪造 Claude 可用性。
 
 可编辑地址的用户自管本地服务，在没有显式 model-level 地址时，将已保存的服务地址冻结进默认 `EffectiveModel` 与 `RequestPlan`；不得在发现模型时使用已保存地址、执行时退回目录默认地址。显式 model-level route 仍优先，Cloud 与其他带模板的 endpoint 沿用各自已声明的路由规则。
 
@@ -109,24 +115,51 @@ Discovery authority 为 `authoritative-list`、`candidate-validation`、`additiv
 - `discovered`：完整 authoritative list 的缺席可以判定不可用；
 - `account-entitled`：由账号完整列表决定访问权。
 
-Catalog ownership 只用于审计，不能决定 discovery 缺席语义。Kimi Coding Plan 的精确 model id 以 manifest 为准：其 live identity 均按 `account-entitled` 处理，缺席会 tombstone；internal Fast target 不进入 selector 或持久化配置，已引用 primary route 保持 fail-closed；K3 的 1M 是同一 model id 的 client-side context tier，禁止虚构 `[1m]` target。Anthropic-compatible base URL 固定为 `/coding`，OpenAI-compatible base URL 固定为 `/coding/v1`。后台版本名只可进入 provenance/脱敏诊断，禁止生成 selector、alias、持久化 route 或跨 surface 映射。
+Catalog ownership 只用于审计，不能决定 discovery 缺席语义。
+
+- Kimi Coding Plan 的精确 model id 以 manifest 为准：其 live identity 均按 `account-entitled` 处理，缺席会 tombstone；internal Fast target 不进入 selector 或持久化配置，已引用 primary route 保持 fail-closed；K3 的 1M 是同一 model id 的 client-side context tier，禁止虚构 `[1m]` target。
+- Anthropic-compatible base URL 固定为 `/coding`，OpenAI-compatible base URL 固定为 `/coding/v1`。
+- 后台版本名只可进入 provenance/脱敏诊断，禁止生成 selector、alias、持久化 route 或跨 surface 映射。
 
 Grok 订阅的 Builder `/models` 使用 `authoritative-list`。完整有效的响应才能判定已知型号缺席。分页、残缺、无法识别或没有受支持模型的响应按刷新失败处理，沿既有缓存和错误链路呈现。仍可看到基线模型及其缺席原因，Composer 只提供当前可用项。该规则独立于 xAI API 目录。
 Credential-scoped live discovery follows one path: `parser -> LiveModelObservation -> manifest.liveProjection -> CatalogModelContribution -> Effective Catalog`. Parsers report only explicit upstream identity, availability, context, protocol, reasoning metadata, and capability evidence. Product labels, selection, routes, tiers, controls, bindings, and Fast targets remain compiled-manifest facts. `liveProjection` declares allowed fields and authority; it is never exposed through IPC or Settings persistence.
 Missing protocol, context, or reasoning efforts remain manifest-owned or unknown; projection never guesses OpenAI-compatible, 256K, or High. `observedTierId` scopes a live capacity to one manifest tier, and `entitlementAuthority` independently selects manifest, catalog-observation, or execution-evidence authority. A default-tier 256K observation cannot erase a separate 1M tier; target presence cannot grant a Fast or Max binding.
 
-Discovery、overlay、entitlement、observed evidence 和 user preference 按字段合并。冲突记录 provenance，不静默覆盖。Unknown model fallback 不创造窗口、Fast、Max mode 或 reasoning 事实。Max mode 的目标 tier 在每次 live overlay 合并后都必须提高完整窗口或正常输入预算；不满足时只阻断 Max mode，默认模型继续可用。 Account discovery 只有在当前认证表面同时证明 endpoint 与协议可执行时才可贡献 route；Grok 订阅只读取 `cli-chat-proxy.grok.com` 的账号目录；不读取或合并公共 xAI `/models`，执行 route 由同一订阅 manifest/Builder catalog 掌管。该 proxy 所需的非秘密客户端协议版本同样属于 route manifest；不得依赖运行机器恰好安装 Grok CLI，也不得在 adapter 中按 hostname 猜测或伪造。
+Discovery、overlay、entitlement、observed evidence 和 user preference 按字段合并。
+
+- 冲突记录 provenance，不静默覆盖。
+- Unknown model fallback 不创造窗口、Fast、Max mode 或 reasoning 事实。
+- Max mode 的目标 tier 在每次 live overlay 合并后都必须提高完整窗口或正常输入预算；不满足时只阻断 Max mode，默认模型继续可用。
+- Account discovery 只有在当前认证表面同时证明 endpoint 与协议可执行时才可贡献 route；Grok 订阅只读取 `cli-chat-proxy.grok.com` 的账号目录；不读取或合并公共 xAI `/models`，执行 route 由同一订阅 manifest/Builder catalog 掌管。
+- 该 proxy 所需的非秘密客户端协议版本同样属于 route manifest；不得依赖运行机器恰好安装 Grok CLI，也不得在 adapter 中按 hostname 猜测或伪造。
+
 `catalogRevision` 是 preflight 与冻结 `RequestPlan` 共用的语义 revision：它包含 effective model 的 route、control、availability、selection、quota 等行为事实，但排除 provenance 时间戳与快照生成时间。SWR discovery 只续期相同 evidence 时 revision 必须不变；有效模型事实变化时才使旧 preflight fail-closed。
-Structural capability, account entitlement, expiring execution evidence, and transient quota are independent dimensions. Unknown or denied entitlement disables normal execution without hiding the explicit Retry surface. Observed evidence replaces the same provider/account/protocol/model/binding scope, and capability-probe denials expire or are cleared by catalog refresh and explicit Retry. HTTP 401/403 is not itself subscription evidence: only a strict manifest matcher scoped to the model, mode, and optional protocol may classify a rejection as entitlement denial. HTTP 429 is transient quota; HTTP 402 is transient quota only when the response explicitly identifies `quota_exceeded` / quota exhaustion / `insufficient_balance`, otherwise it remains unknown. Capability probes attach a bounded retry expiry and never downgrade structural capability. Probes and ordinary replies share one evidence rule (`ProviderProbeEvidence`): only a response receipt grants an entitlement — the switched-to model id that answered, an echoed `service_tier: priority` or reported `speed: fast`, or a prompt larger than every smaller tier. A request that merely succeeded grants nothing; receipt grants expire after seven days so a changed subscription is noticed again.
+
+Structural capability, account entitlement, expiring execution evidence, and transient quota are independent dimensions.
+
+- Unknown or denied entitlement disables normal execution without hiding the explicit Retry surface.
+- Observed evidence replaces the same provider/account/protocol/model/binding scope, and capability-probe denials expire or are cleared by catalog refresh and explicit Retry.
+- HTTP 401/403 is not itself subscription evidence: only a strict manifest matcher scoped to the model, mode, and optional protocol may classify a rejection as entitlement denial.
+- HTTP 429 is transient quota; HTTP 402 is transient quota only when the response explicitly identifies `quota_exceeded` / quota exhaustion / `insufficient_balance`, otherwise it remains unknown.
+- Capability probes attach a bounded retry expiry and never downgrade structural capability.
+- Probes and ordinary replies share one evidence rule (`ProviderProbeEvidence`; ordinary replies record it through `ObservedModelEvidence`, which also records structured tool calling that worked or was explicitly rejected): only a response receipt grants an entitlement — the switched-to model id that answered, an echoed `service_tier: priority` or reported `speed: fast`, or a prompt larger than every smaller tier.
+- A request that merely succeeded grants nothing; receipt grants expire after seven days so a changed subscription is noticed again.
 
 
-本地 Ollama（`ollama-tags`）：`/api/tags` 列出已安装模型，再逐个读 `/api/show`——`capabilities` 中的 `tools` / `vision` / `thinking` 与 `model_info` 里的 `<arch>.context_length` 是本地运行时自己的事实，经 live observation 投影为工具调用、图像输入与上下文窗口（默认输入预算）。已安装即可用；读不到 `/api/show` 的模型仍列出，能力保持未知，可由显式探测补证。上下文窗口是模型训练上限，Ollama 服务端实际窗口由 `OLLAMA_CONTEXT_LENGTH` 决定，需要用户调大到能容纳 Agent 提示。
+本地 Ollama（`ollama-tags`）：`/api/tags` 列出已安装模型，再逐个读 `/api/show`——`capabilities` 中的 `tools` / `vision` / `thinking` 与 `model_info` 里的 `<arch>.context_length` 是本地运行时自己的事实，经 live observation 投影为工具调用、图像输入与上下文窗口（默认输入预算）。
+
+- 已安装即可用；读不到 `/api/show` 的模型仍列出，能力保持未知，可由显式探测补证。
+- 上下文窗口是模型训练上限，Ollama 服务端实际窗口由 `OLLAMA_CONTEXT_LENGTH` 决定，需要用户调大到能容纳 Agent 提示。
 
 ## 凭据与请求事务
 
-版本见 `SETTINGS_SCHEMA_VERSION` / `EFFECTIVE_CATALOG_SCHEMA_VERSION`。运行时投影顺序字段不修改缓存 schema。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。稳定 provider/model/surface ID、secret ref 与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
+版本见 `SETTINGS_SCHEMA_VERSION` / `EFFECTIVE_CATALOG_SCHEMA_VERSION`。
 
-发送 preflight 创建主进程内 opaque credential lease，冻结 provider 配置、typed connection values、认证 headers、OAuth/Vertex 短时 token 与 AWS Bedrock credentials。认证 header 不进入 `ModelRoute` 或 `RequestPlan`。Adapter 必须持有 lease handle 才能发送；运行中不允许回读 Settings。
+- 运行时投影顺序字段不修改缓存 schema。
+- 版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。
+- Settings 只存用户状态，provider/model 目录事实由 manifest 组合：`SettingsService.providerConnections` 在内存里把冻结的目录事实、用户状态与凭据存在性组合一次，只在用户的 provider 状态或凭据 revision 变化时重组；目录 Registry 冻结一次后共享，不按调用克隆；稳定的 provider/model ID、账号 ID（secret ref 由它派生）与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
+
+发送 preflight 创建主进程内 opaque credential lease，冻结 provider 配置、typed connection values、认证 headers、OAuth/Vertex 短时 token 与 AWS Bedrock credentials。认证 header 不进入 `CatalogModelRoute` 或 `RequestPlan`。Adapter 必须持有 lease handle 才能发送；运行中不允许回读 Settings。
 
 账号请求在尚未输出 stream 内容的 401 上只重试一次：先刷新上游凭据，再原位替换同一 lease 的 credential material，保持冻结 endpoint、route、model 与 controls 不变。Terminal、取消与异常路径统一释放 lease。
 
@@ -156,7 +189,7 @@ Preflight 失败或取消不得留下 Session、Turn、branch、attachment、jou
 
 ## Adapter 边界
 
-Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolicyId`、`accountAuth.flow` 和 `wireProfileId`。现有协议、认证机制、标准 discovery mapping、endpoint、route、model facts、controls、bindings 与 provenance 只改 JSON。
+Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolicyId` 与 `accountAuth.flow`；推理控件的 `wireProfile` 只能是 `ReasoningWireProfileSchema` 中已有的 kind。现有协议、认证机制、标准 discovery mapping、endpoint、route、model facts、controls、bindings 与 provenance 只改 JSON。
 
 代码不按 provider id 分支；surface 之间的差异全部是 manifest 字段：
 
@@ -172,15 +205,38 @@ Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolic
 
 只有新 wire protocol、请求签名、OAuth/device/refresh、非标准动态目录或外部进程集成才新增 TS 行为。GitLab Duo 与 SAP AI Core 使用专用 adapter；标准 OpenAI-compatible surface 复用统一 adapter，但不能把原生/混合 surface 强压成兼容协议。
 
-`OpenAIResponsesProvider` 与 Azure 共用 `consumeResponsesEventStream`。该循环必须处理 `response.reasoning_text.delta/done`、raw reasoning item、function-call continuation、terminal usage/error。推理摘要按 `item_id + summary_index` 分段：`reasoning_summary_text.delta` 累计流式文本；`reasoning_summary_text.done`、`reasoning_summary_part.done` 与完成 item 的 `summary[]` 携带整段时，只补流式缺失的部分（未流式则补全文，流式是前缀则补后缀，二者不一致时保留已显示文本）。每次响应的推理事件计数与各摘要段的流式/完成长度（不含正文）写入该请求快照的 `reasoningEvents`，用于对照真实上游与持久记录。DeepSeek 工具 loop 回放 Provider 要求的 raw reasoning/function-call item，且不使用 `previous_response_id`；Chat/Anthropic route 则按各自 continuation contract 回放 `reasoning_content`。Anthropic、AI SDK 与 Google Interactions 的内容通道经 `StreamChannelRefs` 分配。
+每个 adapter 只声明自己的 wire 差异：请求（URL、认证、body）、帧 schema 与逐帧语义、stop reason 映射和 usage 字段表。各 adapter 共用的流机械在 `providers/internal/`：
+
+- `providerStreamDriver.ts`：`startProviderStream` 持有 EventStream、`AssistantStreamBuilder`、合成的 abort signal 与终止契约，adapter 读完流后由它调用 `finish`，异常时 `fail`。HTTP adapter 的 abort 报告 signal 的原因（超时仍是超时）；AI SDK adapter 传入自己的失败映射，因为传输与 abort 由 SDK 报告。`sendProviderRequest` 以 JSON 文本发送 body（SigV4 路线对该文本签名）、记录 429 配额并 `ensureOk`；`readProviderFrames` 按 SSE 或 JSON lines 读帧，逐帧经 `parseProviderFrame` 校验。
+- `toolCallAccumulator.ts`：按调用 index 或 item id 组装跨帧的工具调用。首见即 start，之后只补缺失的 id／name；记录是否已收到参数，收尾帧重复的整段参数只在未流式时补上；整段到达的调用（Gemini、Ollama）一次 start、填参、close。
+- `usageNormalizer.ts`：`normalizeUsage` 按 wire 的 `UsageFieldMap` 读取 input、output、total、cache read／write、reasoning、原生 hit／miss 与 speed，再经 `finalizeProviderUsage` 得出 hit／miss。字段表由各 adapter 声明；wire 未报告的字段没有 reader，结果里缺省。
+- `chatCompletionsWire.ts`：OpenAI-compatible 与 Mistral 共用的 Chat Completions 帧 schema、流读取、消息转换与 finish_reason 映射。每个 surface 用 `ChatCompletionsDialect` 声明选 choice 的规则、usage 字段表以及是否记录 execution。
+
+Google Interactions 的事件由 `GoogleInteractionsStreamState` 逐字段校验，帧只需是 JSON 对象，因此它沿用自己的帧解析，只共用 driver 与请求发送。
+
+`OpenAIResponsesProvider` 与 Azure 共用 `consumeResponsesEventStream`。
+
+- 该循环必须处理 `response.reasoning_text.delta/done`、raw reasoning item、function-call continuation、terminal usage/error。
+- 推理摘要按 `item_id + summary_index` 分段：`reasoning_summary_text.delta` 累计流式文本；`reasoning_summary_text.done`、`reasoning_summary_part.done` 与完成 item 的 `summary[]` 携带整段时，只补流式缺失的部分（未流式则补全文，流式是前缀则补后缀，二者不一致时保留已显示文本）。
+- 每次响应的推理事件计数与各摘要段的流式/完成长度（不含正文）写入该请求快照的 `reasoningEvents`，用于对照真实上游与持久记录。
+- DeepSeek 工具 loop 回放 Provider 要求的 raw reasoning/function-call item，且不使用 `previous_response_id`；Chat/Anthropic route 则按各自 continuation contract 回放 `reasoning_content`。
+- Anthropic、AI SDK 与 Google Interactions 的内容通道经 `StreamChannelRefs` 分配。
 
 `OpenAIResponsesProvider` 的 function tool 显式发送 `strict: false`，保持 canonical `parameters.required` 的可选字段语义，不依赖服务端对省略 strict 的自动规范。否则“省略”可能变为必填默认值（例如图片读取意外携带启用 JSON 校验的空数组）。这是模型生成格式选项，不改变主进程参数验证、权限、委派引用或操作执行门禁；不通过删除参数或静默忽略不适用字段消除错误。依据：[OpenAI function calling strict mode](https://developers.openai.com/api/docs/guides/function-calling)。
 
 最终操作 URL 按 operation builder 构建并逐 route 测试，禁止重复追加 `/chat/completions`、`/responses` 或 Anthropic `/v1`。所有 stable surface 必须具有 adapter、auth schema、endpoint、Connection Test 与 operation URL；无凭据显示 `Unconfigured`，不得显示假 `Available`。
 
-Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入 Effective Catalog；已配置 Refresh 与自动 SWR 共用 `EffectiveCatalogService.refreshDiscovery` 和同一 discovery loader，不再先写回 Provider 设置。Test 成功必须就地写入已发现的 contributions 并广播，禁止为徽章另开 renderer 假状态；未提交的替换密钥写入 `anonymous:{providerId}`，不得覆盖 live `activeAccountId`。Settings 模型行徽章只反映 catalog `availability`：有新鲜缓存显示 OK；无缓存或 `refreshing` 显示加载中，禁止先闪「待确认」；刷新失败且可用性未知时显示「刷新失败」并以失败原因为提示，只有刷新完成而账号目录仍未确认时才显示「待确认」。被新配置取代的刷新不落盘、不发布旧结果，但会广播当前配置的快照，以清除旧一代的加载状态。
+Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入 Effective Catalog；已配置 Refresh 与自动 SWR 共用 `EffectiveCatalogService.refreshDiscovery` 和同一 discovery loader，不再先写回 Provider 设置；读取快照时只在需要刷新（无发现结果或已过期、且不在退避窗口）时才解析 loader。
 
-首轮目录加载期间所有模型都是可用性未知。回合开始时若该 Provider 尚无 discovery 且首轮加载在进行，`awaitFirstCatalogLoad` 最多等待 8 秒再做 preflight；有缓存（即使过期）时从不等待。可用性未知与工具不可执行分属两个诊断码：`CONVERSATION_LLM_MODEL_AVAILABILITY_UNVERIFIED` 与 `CONVERSATION_LLM_TOOLS_UNAVAILABLE`。Settings → 智能体、Composer、会话覆盖、preflight 与 RequestPlanner 共用 `isAgentToolExecutableModel`，其中包含正的 `defaultBudgetTokens`（缺失为 `budget-unknown`），不再各自追加条件。
+- Test 成功必须就地写入已发现的 contributions 并广播，禁止为徽章另开 renderer 假状态；未提交的替换密钥写入 `anonymous:{providerId}`，不得覆盖 live `activeAccountId`。
+- Settings 模型行徽章只反映 catalog `availability`：有新鲜缓存显示 OK；无缓存或 `refreshing` 显示加载中，禁止先闪「待确认」；刷新失败且可用性未知时显示「刷新失败」并以失败原因为提示，只有刷新完成而账号目录仍未确认时才显示「待确认」。
+- 被新配置取代的刷新不落盘、不发布旧结果，但会广播当前配置的快照，以清除旧一代的加载状态。
+
+首轮目录加载期间所有模型都是可用性未知。
+
+- 回合开始时若该 Provider 尚无 discovery 且首轮加载在进行，`awaitFirstCatalogLoad` 最多等待 8 秒再做 preflight；有缓存（即使过期）时从不等待。
+- 可用性未知与工具不可执行分属两个诊断码：`CONVERSATION_LLM_MODEL_AVAILABILITY_UNVERIFIED` 与 `CONVERSATION_LLM_TOOLS_UNAVAILABLE`。
+- Settings → 智能体、Composer、会话覆盖、preflight 与 RequestPlanner 共用 `isAgentToolExecutableModel`，其中包含正的 `defaultBudgetTokens`（缺失为 `budget-unknown`），不再各自追加条件。
 
 ## HAL Adapter 实现注册
 
@@ -209,26 +265,15 @@ Connection Test、Connect 的贡献经 `refreshEffectiveCatalogDiscovery` 写入
 
 - **Mistral Conversations**（`MistralProvider.ts`）：adapter 源码仍在，但当前没有 compiled selectable surface；产品面保持不可选，该 adapter 不是已上线的续接能力。
 - **Azure OpenAI Responses**（`AzureOpenAIResponsesProvider.ts`）：只保留 Azure URL（`api-version`）和 `api-key` 鉴权。Responses 请求体与 SSE 事件循环在 `providers/internal/responsesShared.ts`，与 OpenAI Responses 共用。
-- **Bedrock Converse Stream**（`BedrockConverseProvider.ts`）：适配 AWS Bedrock Converse Stream API，使用 SigV4 签名、`cachePoint` 缓存标记，流式帧走共享 `parseSSE` / `StreamChannelRefs`。
+- **Bedrock Converse Stream**（`BedrockConverseProvider.ts`）：适配 AWS Bedrock Converse Stream API，使用 SigV4 签名、`cachePoint` 缓存标记，流式帧走共享 `readProviderFrames` / `StreamChannelRefs`。
 
-## 成本计算（Cost Calculation）
+## 成本（Cost）
 
-`Usage.cost` 由 `src/main/agent-runtime/providers/internal/costCalculator.ts` 的 `calculateUsageCost()` 在流结束时计算。定价来源为 `Model.cost`（manifest / models.json 声明的每百万 token 美元价格）：
-
-```text
-cost.input  = (model.cost.input  / 1M) × usage.inputTokens
-cost.output = (model.cost.output / 1M) × usage.outputTokens
-cost.cacheRead  = (model.cost.cacheRead / 1M) × cacheReadTokens
-cost.cacheWrite = (model.cost.cacheWrite / 1M) × shortWrite
-               + (model.cost.input × 2 / 1M) × longWrite   // Anthropic 1h TTL = 2× input
-cost.total  = input + output + cacheRead + cacheWrite
-```
-
-无定价信息时返回 `undefined`，UI 不显示成本字段。
+应用不按价格表估算费用。`Usage.cost` 只在 provider 的流里自带计费时出现：`normalizeCacheUsage` 保留它，`AssistantStreamBuilder` 原样透传；没有时为 `undefined`，UI 不显示成本字段。`Model.cost`（manifest / models.json 声明的每百万 token 价格）是目录事实，不参与运行时计算。
 
 ## 统一错误模型（Error Model）
 
-`src/shared/types/providerErrors.ts` 定义 `ProviderErrorCode` 联合类型，`src/main/agent-runtime/providers/internal/errorClassifier.ts` 实现分类逻辑：
+`src/main/agent-runtime/core/providerErrors.ts` 定义 `ProviderErrorCode` 联合类型，`src/main/agent-runtime/providers/internal/errorClassifier.ts` 实现分类逻辑：
 
 | ProviderErrorCode | 含义 | retryable |
 | --- | --- | --- |
@@ -290,29 +335,68 @@ Bedrock 使用 `cachePoint: { type: 'default' }` 标记 stable prefix。`partiti
 
 目录发现明确返回 HTTP 401 时，将当前 provider/account/protocol 的模型投影为不可执行，直到同一 scope 的发现成功；随后临时网络失败不能清除已知认证拒绝。这表示凭据当前不可用，不改变模型结构能力或订阅 entitlement。普通网络/5xx 目录刷新失败保留已有可执行事实并单独报告错误，不把暂时刷新失败当作账号断连；配置中的模型引用不被删除或自动替换。
 
-Grok 订阅使用 xAI 公共 native-client + PKCE，仅保留系统默认浏览器登录一种方式，无设备码、手动粘贴或 CLI 凭据复用模式，不导入 `~/.grok/auth.json` 或共享 refresh token；xAI (Grok) API-key 是独立 provider，不作订阅失败的 fallback。动态 loopback callback、同一 state、nonce 与 ES256/JWKS 身份校验；取消、替换、超时和退出释放监听器并隔离迟到提交；外部浏览器标签页不由应用管理。主进程 `llm:cancelProviderAccountLogin` 仅取消待登录流程，不登出、不吊销既有凭据。订阅请求携带 `X-XAI-Token-Auth: xai-grok-cli`，目录只读取订阅代理，不合并公共 API。独立 xAI API Key 路径保持独立计费和权限，不互相 fallback。现有令牌不满足当前协议时要求重新登录。
+Grok 订阅使用 xAI 公共 native-client + PKCE，仅保留系统默认浏览器登录一种方式，无设备码、手动粘贴或 CLI 凭据复用模式，不导入 `~/.grok/auth.json` 或共享 refresh token；xAI (Grok) API-key 是独立 provider，不作订阅失败的 fallback。
+
+- 动态 loopback callback、同一 state、nonce 与 ES256/JWKS 身份校验；取消、替换、超时和退出释放监听器并隔离迟到提交；外部浏览器标签页不由应用管理。
+- 主进程 `llm:cancelProviderAccountLogin` 仅取消待登录流程，不登出、不吊销既有凭据。
+- 订阅请求携带 `X-XAI-Token-Auth: xai-grok-cli`，目录只读取订阅代理，不合并公共 API。
+- 独立 xAI API Key 路径保持独立计费和权限，不互相 fallback。
+- 现有令牌不满足当前协议时要求重新登录。
 
 默认浏览器打开请求完成后返回待授权状态，不等待网页加载；打开失败通过所属 flow 投影明确错误并释放回调。待授权期间允许重新打开同一有效授权页；关闭外部标签页不等同取消，取消入口、超时与退出负责收口，迟到结果不覆盖终态。账号显示使用服务端真实身份，缺失时仅用中性账号名称；认证协议名不写入套餐字段，不推断套餐或余额。历史证据中的原始套餐名称保留来源与日期，不成为当前账号事实。
 
-Renderer `effectiveCatalogStore` 是 main 快照的内存投影，以 provider/account/protocol 为 scope，合并在途请求，逐 provider 呈现结果；配置和账号变化精确失效，迟到响应不得覆盖新 scope 或较新事件。service 通过注入的 ElectronAPI 读取；组件不直调 IPC。Composer、能力控件和 Settings 共用该投影；菜单重挂载不重读完整 settings，也不等待全部 provider。后台刷新保持已有内容，错误单独呈现并允许重试。主进程的执行前权限与 route 校验仍为唯一权威。
+Renderer `effectiveCatalogStore` 是 main 快照的内存投影，以 provider/account/protocol 为 scope，合并在途请求，逐 provider 呈现结果；配置和账号变化精确失效，迟到响应不得覆盖新 scope 或较新事件。
 
-目录运行时顺序独立于语义 revision：scopeGeneration 代表规范化配置代次，projectionVersion 在代次内递增，generatedAt 只审计，两字段不落目录缓存。刷新登记在途后才产生首次快照；完成前复核代次和当前连接配置，旧任务不能持久化发现、广播或清除新任务状态。账号 discovery 只返回贡献，不写设置；凭据续期独立核对原账号所有权。Renderer 的 IPC 与事件共用版本接收器；配置失效后由有效读取绑定新代次，早到事件只暂存并匹配代次。菜单/会话进入只读重验证，显式 Retry 使用上述同一刷新链；不新增轮询。
+- service 通过注入的 ElectronAPI 读取；组件不直调 IPC。
+- Composer、能力控件和 Settings 共用该投影；Settings → Agents 的模型候选也由 renderer 从该投影计算（`src/shared/utils/agentModelOptions.ts`），目录变化不重读 settings。
+- 菜单重挂载不重读完整 settings，也不等待全部 provider。
+- 后台刷新保持已有内容，错误单独呈现并允许重试。
+- 主进程的执行前权限与 route 校验仍为唯一权威。
+
+目录运行时顺序独立于语义 revision：scopeGeneration 代表规范化配置代次，projectionVersion 在代次内递增，generatedAt 只审计，两字段不落目录缓存。
+
+- 刷新登记在途后才产生首次快照；完成前复核代次和当前连接配置，旧任务不能持久化发现、广播或清除新任务状态。
+- 账号 discovery 只返回贡献，不写设置；凭据续期独立核对原账号所有权。
+- `llm:effectiveCatalogChanged` 只发差异：每个 scope 相对 main 最近一次交给 renderer 的快照（事件或 `settings:getEffectiveCatalog` 读取）给出新头部、新增模型、变化模型中变了的值（按路径）与移除的模型 id；只有 `catalogRevision` 变化不算模型变化。
+- renderer 只把差异应用到它持有的那个快照（代次、版本与 catalogRevision 都相同），否则重读；读取在途时到达的差异在读取返回后按同一规则应用。
+- 模型开关不再触发目录重读，变化随差异到达；连接身份变化才使该 scope 的目录失效。
+- 菜单/会话进入只读重验证，显式 Retry 使用上述同一刷新链；不新增轮询。
 
 
 ## 显式能力探测与批量生命周期
 
-Settings 的单项与批量探测共用 ProviderCapabilityProbeService 和 canonical RequestPlan / PromptPlan / adapter。批次只在主进程内存中存在，准备阶段读取本地 manifest 和已保存的有效目录，列出请求数量。请求发送仅始于用户确认，目录发现仍由连接管理负责；用户明确开始后串行发送短提示，只附一个无副作用工具 `capability_check`（真实回合总是带工具，探测按回合的样子检查路线）、最低合法 reasoning、64-token 输出请求上限（仍服从 surface 的参数策略）。回复里对该工具的结构化调用是工具调用能力的回执，记为 `toolCalling: supported`；只回文字不改变工具调用状态；HTTP 400 且消息明确说模型不支持工具（如 Ollama 的 `does not support tools`）记为 `unsupported`，不算账号资格拒绝。不发送长文本填充，不自动重试；每项 60 秒超时，账号 401 不进入普通对话的刷新重试路径。
+Settings 的单项与批量探测共用 ProviderCapabilityProbeService 和 canonical RequestPlan / PromptPlan / adapter。
+
+- 批次只在主进程内存中存在，准备阶段读取本地 manifest 和已保存的有效目录，列出请求数量。
+- 请求发送仅始于用户确认，目录发现仍由连接管理负责；用户明确开始后串行发送短提示，只附一个无副作用工具 `capability_check`（真实回合总是带工具，探测按回合的样子检查路线）、最低合法 reasoning、64-token 输出请求上限（仍服从 surface 的参数策略）。
+- 回复里对该工具的结构化调用是工具调用能力的回执，记为 `toolCalling: supported`；只回文字不改变工具调用状态；HTTP 400 且消息明确说模型不支持工具（如 Ollama 的 `does not support tools`）记为 `unsupported`，不算账号资格拒绝。
+- 不发送长文本填充，不自动重试；每项 60 秒超时，账号 401 不进入普通对话的刷新重试路径。
 
 成功必须有正常终止和文本。Fast 根据实际 binding 分别检查原生 usage.speed、响应 service tier 或响应 model id；请求参数和客户端构造的消息 model 不能冒充服务端回执。Max 的 implicit/client-tier 扩窗必须有明确当前账号目录资格，短请求成功不能独自授予更大窗口；明确 header/body 激活仍沿所属执行契约。组合 binding 独立验证，组合拒绝不撤销两个单项的资格。
 
 Priority 探测回执分别记录冻结请求档位与服务端档位。正常终止且实际档位为 `priority` 才确认 Fast 执行。ChatGPT 订阅的 `default` 回执不足以确定实际 Fast 状态，缺少字段时单独报告。两种结果均保留既有结构能力和账号资格。Codex 维护者说明见 https://github.com/openai/codex/issues/14204 。
 
-批次按已保存 provider/account/configuration 身份执行，禁用或 unavailable 项跳过，internal target 只作为 binding 目标。固定 Max 不重复请求。认证或 quota 阻塞只停止所属 Provider 后续请求；其他项继续。取消、所属面板卸载及 shutdown 中止派发并 abort/join 当前请求后释放凭据；迟到结果或配置变化后的结果不入目录。状态事件使用批次 id 与单调 revision，Renderer 不以旧 IPC 回包覆盖新进度。实际能力证据沿 EffectiveCatalog 持久化并在 24 小时后失效，UI 结果明细只保留当前内存批次。cache v9 使旧判定产生的能力观察失效，不迁移旧缓存；用户配置和凭据版本不变。
+批次按已保存 provider/account/configuration 身份执行，禁用或 unavailable 项跳过，internal target 只作为 binding 目标。
+
+- 固定 Max 不重复请求。
+- 认证或 quota 阻塞只停止所属 Provider 后续请求；其他项继续。
+- 取消、所属面板卸载及 shutdown 中止派发并 abort/join 当前请求后释放凭据；迟到结果或配置变化后的结果不入目录。
+- 状态事件使用批次 id 与单调 revision，Renderer 不以旧 IPC 回包覆盖新进度。
+- 实际能力证据沿 EffectiveCatalog 持久化并在 24 小时后失效，UI 结果明细只保留当前内存批次。
+- cache v9 使旧判定产生的能力观察失效，不迁移旧缓存；用户配置和凭据版本不变。
 
 ### ChatGPT Account 窗口字段裁决
 
 Codex 官方 [ModelInfo 定义与计算](https://github.com/openai/codex/blob/main/codex-rs/protocol/src/openai_models.rs) 将 max_context_window 定义为配置覆盖允许的最大窗口；[with_config_overrides](https://github.com/openai/codex/blob/main/codex-rs/models-manager/src/model_info.rs) 直接对配置值与此上限取 min。effective_context_window_percent 的推理余量及 auto_compact_token_limit 在此之后独立计算。不能仅凭 1000000−128000=872000 宣称该字段已经扣除了回复预留，也不能用 API 1.05M 覆盖账号字段。
 
-本库将当前账号 context_window/max_context_window 作为明确 maxTotalTokens，并保留对应输入上限；声明的输出上限独立约束每次请求，由完整窗口减去实际输入和既有安全余量得到剩余输出。压缩阈值只按输入预算及用户配置计算，不另套 Codex 的 95%/90%。默认与 Max 分别使用同一套计算，禁止将 maxPromptTokens+maxOutputTokens 再加到已经明确的完整窗口。GPT-6.1 Terra 为独立维护的 OAuth 模型：Low/Medium/High/Extra/Max、默认 Low、文本/图像、Responses 工具调用、priority Fast；Ultra 不作为 wire effort。窗口及资格以账号目录和 manifest 来源为准。
+本库将当前账号 context_window/max_context_window 作为明确 maxTotalTokens，并保留对应输入上限；声明的输出上限独立约束每次请求，由完整窗口减去实际输入和既有安全余量得到剩余输出。
 
-当前账号明确的 model-specific subscription denial 可以将该模型投影为 unavailable，并禁用其可选模式；只匹配 manifest 中精确 model/mode/HTTP status/消息片段，不由普通 403 推断。单项显式 Retry 或批量重试通过观察 provenance 识别可重试的探测拒绝，仍使用原模型与结构能力，正常对话继续 fail-closed。Max tier 的判断以完整容量和实际默认输入预算为边界：账号目录给出较大默认容量、但正常输入预算仍为 256K 时，1M 输入预算仍是有意义的 Max 选项；不能仅比较两条容量数值便阻断探测。
+- 压缩阈值只按输入预算及用户配置计算，不另套 Codex 的 95%/90%。
+- 默认与 Max 分别使用同一套计算，禁止将 maxPromptTokens+maxOutputTokens 再加到已经明确的完整窗口。
+- GPT-6.1 Terra 为独立维护的 OAuth 模型：Low/Medium/High/Extra/Max、默认 Low、文本/图像、Responses 工具调用、priority Fast；Ultra 不作为 wire effort。
+- 窗口及资格以账号目录和 manifest 来源为准。
+
+当前账号明确的 model-specific subscription denial 可以将该模型投影为 unavailable，并禁用其可选模式；只匹配 manifest 中精确 model/mode/HTTP status/消息片段，不由普通 403 推断。
+
+- 单项显式 Retry 或批量重试通过观察 provenance 识别可重试的探测拒绝，仍使用原模型与结构能力，正常对话继续 fail-closed。
+- Max tier 的判断以完整容量和实际默认输入预算为边界：账号目录给出较大默认容量、但正常输入预算仍为 256K 时，1M 输入预算仍是有意义的 Max 选项；不能仅比较两条容量数值便阻断探测。

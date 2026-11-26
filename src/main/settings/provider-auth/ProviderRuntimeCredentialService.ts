@@ -9,7 +9,7 @@ import {
   type AwsBedrockCredentials,
 } from './AwsBedrockCredentials';
 import type { LlmProviderId } from '@shared/types/settings';
-import type { LLMProviderConfig } from '@shared/types/llm';
+import type { LlmProviderAuthMode, LlmProviderProtocol } from '@shared/types/settings';
 
 export type ProviderRuntimeCredentialOperation = 'chat' | 'embed';
 
@@ -37,11 +37,13 @@ interface ProviderRuntimeCredentialDependencies {
 const MAX_LEASE_AGE_MS = 24 * 60 * 60 * 1000;
 
 const defaultDependencies: ProviderRuntimeCredentialDependencies = {
-  getProvider: (providerId) => settingsService.getLlmConfig().providers.find((entry) => entry.id === providerId),
+  getProvider: (providerId) => settingsService.runtimeProviderConfig(providerId),
   getConnectionValues: (providerId) => settingsService.getProviderConnectionValues(providerId),
   getConnectionHeaders: (providerId, values) => {
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
-    return resolveProviderConnectionHeaders(provider?.connectionSchema, values);
+    return resolveProviderConnectionHeaders(
+      settingsService.providerConnections.get(providerId)?.connectionSchema,
+      values,
+    );
   },
   resolveGoogleVertex: resolveGoogleVertexAccessToken,
   resolveAwsBedrock: resolveAwsBedrockCredentials,
@@ -52,14 +54,9 @@ const defaultDependencies: ProviderRuntimeCredentialDependencies = {
 export class ProviderRuntimeCredentialService {
   private readonly leases = new Map<string, FrozenProviderRuntimeCredential>();
 
-  constructor(
-    private readonly dependencies: ProviderRuntimeCredentialDependencies = defaultDependencies,
-  ) {}
+  constructor(private readonly dependencies: ProviderRuntimeCredentialDependencies = defaultDependencies) {}
 
-  async freeze(
-    providerId: LlmProviderId,
-    operation: ProviderRuntimeCredentialOperation = 'chat',
-  ): Promise<string> {
+  async freeze(providerId: LlmProviderId, operation: ProviderRuntimeCredentialOperation = 'chat'): Promise<string> {
     this.purgeExpired();
     const handle = this.dependencies.createHandle();
     this.leases.set(handle, await this.materializeLease(providerId, handle, operation));
@@ -145,3 +142,16 @@ export class ProviderRuntimeCredentialService {
 }
 
 export const providerRuntimeCredentialService = new ProviderRuntimeCredentialService();
+
+/** Runtime credentials and transport metadata. Model capability never lives here. */
+export interface LLMProviderConfig {
+  id: LlmProviderId;
+  protocol: LlmProviderProtocol;
+  authMode?: LlmProviderAuthMode;
+  label: string;
+  enabled: boolean;
+  apiKey: string;
+  baseUrl?: string;
+  accountId?: string;
+  docsUrl?: string;
+}

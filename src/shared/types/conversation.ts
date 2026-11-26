@@ -4,25 +4,23 @@ import type { ConversationTurnControls } from './modelCapability';
 import type { AgentEvent } from './agentRuntime';
 import type { ConversationBranchState } from './conversationBranch';
 import type { ProviderOutputRef, ThinkingArtifact } from './reasoning';
-import type {
-  ConversationPlanReview,
-  PlanReviewHandoffSuggestion,
-} from './planReview';
+import type { ConversationPlanReview, PlanReviewHandoffSuggestion } from './planReview';
 import type {
   PreparedTurnContextSummary,
   RunSummary,
   SessionAttachmentLayer,
   SessionAttachmentRecord,
-  SessionRecord,
+  SessionRecordSnapshot,
 } from './session';
+import type { ConversationMessageDelta } from '../conversation/messageDelta';
 
-export type ConversationMode = 'talk';
+type ConversationMode = 'talk';
 
-export type ConversationRole = 'user' | 'assistant' | 'system';
+type ConversationRole = 'user' | 'assistant' | 'system';
 
 export type ConversationMessageStatus = 'draft' | 'streaming' | 'complete' | 'error' | 'stopped';
 
-export type ConversationWorkBlockStatus = 'pending' | 'running' | 'complete' | 'error' | 'cancelled';
+type ConversationWorkBlockStatus = 'pending' | 'running' | 'complete' | 'error' | 'cancelled';
 
 /** Durable TaskRegistry lifecycle state carried by task work-trace blocks. */
 export type ConversationTaskStatus = 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
@@ -35,7 +33,7 @@ export type TaskDisplayState = ConversationTaskStatus | 'failed';
 
 export type ConversationDiagnosticSeverity = 'info' | 'warning' | 'error';
 
-export type ConversationWorkBlockKind =
+type ConversationWorkBlockKind =
   | 'reasoning'
   | 'llm_turn'
   | 'approval'
@@ -61,14 +59,14 @@ export interface ConversationTaskSnapshotItem {
   order: number;
 }
 
-export interface ConversationTaskSnapshot {
+interface ConversationTaskSnapshot {
   change?: 'created' | 'updated';
   completed: number;
   total: number;
   items: ConversationTaskSnapshotItem[];
 }
 
-export interface ConversationCompactionStats {
+interface ConversationCompactionStats {
   usage?: { inputTokens: number; outputTokens: number };
   provenance: ConversationCompactionProvenance;
   sourceUri?: string;
@@ -87,9 +85,9 @@ export interface ConversationToolImagePreviewRef {
   height?: number;
 }
 
-export type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped' | 'cancelled';
+type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped' | 'cancelled';
 
-export type ConversationToolResourceKind = 'file' | 'directory' | 'skill' | 'mcp' | 'web';
+type ConversationToolResourceKind = 'file' | 'directory' | 'skill' | 'mcp' | 'web';
 
 /**
  * Sanitized resource evidence emitted by a successful tool call.
@@ -108,19 +106,13 @@ export type ConversationThinkingStatus = 'streaming' | 'complete';
 
 export type ConversationLoopResultStatus = 'streaming' | 'complete';
 
-export type ConversationLoopStopReason =
-  | 'end_turn'
-  | 'tool_use'
-  | 'max_tokens'
-  | 'refusal'
-  | 'error'
-  | 'aborted';
+export type ConversationLoopStopReason = 'end_turn' | 'tool_use' | 'max_tokens' | 'refusal' | 'error' | 'aborted';
 
 export type ConversationLoopOutputPhase = 'commentary' | 'final_answer';
 
 export type ConversationReasoningState = 'raw' | 'summary' | 'unknown' | 'opaque' | 'hidden' | 'none';
 
-export type ConversationMessageDiagnosticCode =
+type ConversationMessageDiagnosticCode =
   | 'CONVERSATION_LLM_ROUTE_MISSING'
   | 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
   | 'CONVERSATION_LLM_TOOLS_UNAVAILABLE'
@@ -352,20 +344,19 @@ export interface ComposerAttachmentDescriptor {
   error?: ComposerAttachmentError;
 }
 
-export interface ConversationAttachmentStagePathItem {
+interface ConversationAttachmentStagePathItem {
   sourcePath: string;
   fileName?: string;
 }
 
-export interface ConversationAttachmentStageBytesItem {
+interface ConversationAttachmentStageBytesItem {
   fileName: string;
   mimeType?: string | null;
   bytesBase64: string;
 }
 
 export type ConversationAttachmentStageItem =
-  | ConversationAttachmentStagePathItem
-  | ConversationAttachmentStageBytesItem;
+  ConversationAttachmentStagePathItem | ConversationAttachmentStageBytesItem;
 
 export interface ConversationStageAttachmentsRequest {
   items: ConversationAttachmentStageItem[];
@@ -419,18 +410,18 @@ export interface ConversationAttachmentInput {
   stagingId?: string;
 }
 
-export interface ConversationErrorViewModel {
+interface ConversationErrorViewModel {
   code: string;
   message: string;
   technicalMessage?: string;
 }
 
-export interface ConversationUiHints {
+interface ConversationUiHints {
   highlightProjectPicker?: boolean;
   highlightSettingsRoute?: boolean;
 }
 
-export interface ConversationExecutionTransition {
+interface ConversationExecutionTransition {
   action: 'none' | 'started_run';
   runId?: string;
   sessionId?: string;
@@ -472,13 +463,18 @@ export interface ConversationCancelActiveTurnRequest {
   turnId?: string;
 }
 
-export interface ConversationCancelActiveTurnResult {
-  success: boolean;
-  phase?: 'preparing' | 'committing' | 'running';
-  cancelledRequestId?: string;
-  cancelledTurnId?: string;
-  error?: string;
-}
+/**
+ * What a stop request did. `success: false` only means no turn or preparing request matched (`no-active-turn`);
+ * a stop that fails rejects with its AppError like any other call.
+ */
+export type ConversationCancelActiveTurnResult =
+  | {
+      success: true;
+      phase: 'preparing' | 'committing' | 'running';
+      cancelledRequestId?: string;
+      cancelledTurnId?: string;
+    }
+  | { success: false; reason: 'no-active-turn' };
 
 export interface ConversationAskUserOption {
   optionId: string;
@@ -509,21 +505,11 @@ export interface ConversationAnswerUserInputRequest {
   answers: ConversationAskUserAnswer[];
 }
 
-export interface ConversationAnswerUserInputResult {
-  success: boolean;
-  error?: string;
-}
-
 export interface ConversationAnswerToolApprovalRequest {
   sessionId?: string | null;
   turnId: string;
   approvalId: string;
   approved: boolean;
-}
-
-export interface ConversationAnswerToolApprovalResult {
-  success: boolean;
-  error?: string;
 }
 
 export type {
@@ -536,7 +522,7 @@ export type {
 
 export interface ConversationTurnResult {
   requestId: string;
-  session: SessionRecord | null;
+  session: SessionRecordSnapshot | null;
   mode: ConversationMode;
   userMessage: ConversationMessage;
   assistantDraftMessage: ConversationMessage;
@@ -592,35 +578,47 @@ export type ConversationSendResult =
       };
     };
 
-export interface ConversationMessagePatchedEvent {
+interface ConversationMessagePatchedEvent {
   type: 'message_patched';
   sessionId: string;
   turnId: string;
   message: ConversationMessage;
 }
 
-export interface ConversationMessageCompletedEvent {
+interface ConversationMessageCompletedEvent {
   type: 'message_completed';
   sessionId: string;
   turnId: string;
   message: ConversationMessage;
 }
 
-export interface ConversationMessageErroredEvent {
+interface ConversationMessageErroredEvent {
   type: 'message_errored';
   sessionId: string;
   turnId: string;
   message: ConversationMessage;
 }
 
-export interface ConversationRunLinkedEvent {
+/**
+ * A streaming update of one message as the change since the previous update of the same message
+ * (`src/shared/conversation/messageDelta.ts`). Main sends these instead of whole-message `message_patched` events;
+ * the renderer rebuilds the message, and asks for `conversation:getMessageSnapshot` when it missed one.
+ */
+interface ConversationMessageDeltaEvent {
+  type: 'message_delta';
+  sessionId: string;
+  turnId: string;
+  delta: ConversationMessageDelta;
+}
+
+interface ConversationRunLinkedEvent {
   type: 'run_linked';
   sessionId: string;
   turnId: string;
   runId: string;
 }
 
-export interface ConversationAgentEvent {
+interface ConversationAgentEvent {
   type: 'agent_event';
   sessionId: string;
   turnId: string;
@@ -631,5 +629,6 @@ export type ConversationStreamEvent =
   | ConversationMessagePatchedEvent
   | ConversationMessageCompletedEvent
   | ConversationMessageErroredEvent
+  | ConversationMessageDeltaEvent
   | ConversationRunLinkedEvent
   | ConversationAgentEvent;

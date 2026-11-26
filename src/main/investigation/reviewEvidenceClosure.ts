@@ -1,5 +1,11 @@
 import type {
-  ChallengeRecord, ClaimRecord, ClaimSet, EvidencePack, EvidenceRecord, ExperimentRecord, InvestigationReport,
+  ChallengeRecord,
+  ClaimRecord,
+  ClaimSet,
+  EvidencePack,
+  EvidenceRecord,
+  ExperimentRecord,
+  InvestigationReport,
 } from '@shared/types/renderdocInvestigation';
 import type { InvestigationArtifactService } from './InvestigationArtifactService';
 
@@ -12,7 +18,11 @@ export interface ReviewEvidenceClosure {
   omitted: Array<{ uri: string; reason: 'limit' | 'outside-parent-grant' }>;
 }
 
-interface Node { uri: string; kind: string; record: unknown }
+interface Node {
+  uri: string;
+  kind: string;
+  record: unknown;
+}
 
 /**
  * Follow the investigation records a reviewer was granted to the records and raw artifacts they
@@ -21,29 +31,42 @@ interface Node { uri: string; kind: string; record: unknown }
  * Challenges or reports to what they target. Only existing, active records are followed.
  */
 export function reviewEvidenceClosure(
-  service: InvestigationArtifactService, ownerSessionId: string, granted: readonly string[],
+  service: InvestigationArtifactService,
+  ownerSessionId: string,
+  granted: readonly string[],
   canGrant: (uri: string) => boolean = () => true,
 ): ReviewEvidenceClosure {
   const nodes = new Map<string, Node>();
-  const byId = { claim: new Map<string, string[]>(), evidence: new Map<string, string>(), experiment: new Map<string, string>(),
-    worldState: new Map<string, string>(), evidenceForClaim: new Map<string, string[]>(),
-    evidenceForWorldState: new Map<string, string[]>() };
+  const byId = {
+    claim: new Map<string, string[]>(),
+    evidence: new Map<string, string>(),
+    experiment: new Map<string, string>(),
+    worldState: new Map<string, string>(),
+    evidenceForClaim: new Map<string, string[]>(),
+    evidenceForWorldState: new Map<string, string[]>(),
+  };
   const push = <K>(map: Map<K, string[]>, key: K, uri: string) => map.set(key, [...(map.get(key) ?? []), uri]);
   for (const read of service.readAllRecords(ownerSessionId)) {
     if (read.manifest.status !== 'ready' && read.manifest.status !== 'draft') continue;
     const { contentUri: uri, record } = read;
     nodes.set(uri, { uri, kind: read.manifest.kind, record });
     if (read.manifest.kind === 'claim') push(byId.claim, (record as ClaimRecord).claimId, uri);
-    if (read.manifest.kind === 'claim_set') for (const item of (record as ClaimSet).items) push(byId.claim, item.claimId, uri);
-    const evidenceItems = read.manifest.kind === 'evidence' ? [record as EvidenceRecord]
-      : read.manifest.kind === 'evidence_pack' ? (record as EvidencePack).items : [];
+    if (read.manifest.kind === 'claim_set')
+      for (const item of (record as ClaimSet).items) push(byId.claim, item.claimId, uri);
+    const evidenceItems =
+      read.manifest.kind === 'evidence'
+        ? [record as EvidenceRecord]
+        : read.manifest.kind === 'evidence_pack'
+          ? (record as EvidencePack).items
+          : [];
     for (const evidence of evidenceItems) {
       byId.evidence.set(evidence.evidenceId, uri);
       push(byId.evidenceForWorldState, evidence.worldStateId, uri);
       for (const claimId of evidence.claimIds) push(byId.evidenceForClaim, claimId, uri);
     }
     if (read.manifest.kind === 'experiment') byId.experiment.set((record as ExperimentRecord).experimentId, uri);
-    if (read.manifest.kind === 'world_state') byId.worldState.set((record as { worldStateId: string }).worldStateId, uri);
+    if (read.manifest.kind === 'world_state')
+      byId.worldState.set((record as { worldStateId: string }).worldStateId, uri);
   }
 
   const result: string[] = [...new Set(granted)];
@@ -54,8 +77,14 @@ export function reviewEvidenceClosure(
   const visit = (uri: string | undefined) => {
     if (!uri || seen.has(uri)) return;
     seen.add(uri);
-    if (!canGrant(uri)) { omitted.push({ uri, reason: 'outside-parent-grant' }); return; }
-    if (added >= REVIEW_CLOSURE_MAX_ADDED_REFS) { omitted.push({ uri, reason: 'limit' }); return; }
+    if (!canGrant(uri)) {
+      omitted.push({ uri, reason: 'outside-parent-grant' });
+      return;
+    }
+    if (added >= REVIEW_CLOSURE_MAX_ADDED_REFS) {
+      omitted.push({ uri, reason: 'limit' });
+      return;
+    }
     added += 1;
     result.push(uri);
     queue.push(uri);
@@ -76,11 +105,17 @@ export function reviewEvidenceClosure(
     const node = nodes.get(queue.shift()!);
     if (!node) continue;
     switch (node.kind) {
-      case 'claim': followClaim(node.record as ClaimRecord); break;
-      case 'claim_set': (node.record as ClaimSet).items.forEach(followClaim); break;
+      case 'claim':
+        followClaim(node.record as ClaimRecord);
+        break;
+      case 'claim_set':
+        (node.record as ClaimSet).items.forEach(followClaim);
+        break;
       case 'evidence':
       case 'evidence_pack':
-        for (const evidence of node.kind === 'evidence' ? [node.record as EvidenceRecord] : (node.record as EvidencePack).items) {
+        for (const evidence of node.kind === 'evidence'
+          ? [node.record as EvidenceRecord]
+          : (node.record as EvidencePack).items) {
           visit(byId.worldState.get(evidence.worldStateId));
           for (const ref of evidence.artifactRefs) visit(ref.uri);
         }
@@ -88,7 +123,12 @@ export function reviewEvidenceClosure(
       case 'experiment': {
         const experiment = node.record as ExperimentRecord;
         claim(experiment.hypothesisClaimId);
-        for (const id of [experiment.baselineWorldStateId, experiment.variantWorldStateId, experiment.restoredWorldStateId]) visit(byId.worldState.get(id));
+        for (const id of [
+          experiment.baselineWorldStateId,
+          experiment.variantWorldStateId,
+          experiment.restoredWorldStateId,
+        ])
+          visit(byId.worldState.get(id));
         for (const ref of Object.values(experiment.executionEvidence ?? {})) visit(ref.uri);
         for (const id of experiment.rollback.verifyEvidenceIds) visit(byId.evidence.get(id));
         break;
@@ -106,7 +146,8 @@ export function reviewEvidenceClosure(
         for (const id of report.experimentIds) visit(byId.experiment.get(id));
         break;
       }
-      default: break;
+      default:
+        break;
     }
   }
   return { refs: result, omitted };

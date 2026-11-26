@@ -10,15 +10,7 @@ export interface SwitchProps extends Omit<InputHTMLAttributes<HTMLInputElement>,
 /**
  * Design-system switch (track + thumb). Prefer over bare checkboxes for binary preferences.
  */
-export function Switch({
-  checked,
-  onCheckedChange,
-  label,
-  className = '',
-  disabled,
-  id,
-  ...rest
-}: SwitchProps) {
+export function Switch({ checked, onCheckedChange, label, className = '', disabled, id, ...rest }: SwitchProps) {
   const classes = ['ui-switch', className].filter(Boolean).join(' ');
 
   return (

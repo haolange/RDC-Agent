@@ -8,14 +8,15 @@ import { stringifyPreview, createDetailLines, toRecord } from './workProcessCont
  */
 export function unwrapArtifactContent(input: ToolContentInput): UnwrappedToolContent | null {
   const { details, contentText } = input;
-  const artifactized = details?.artifactized === true
-    || (typeof details?.ref === 'string' && details.ref.startsWith('session://'))
-    || (typeof details?.uri === 'string' && details.uri.startsWith('session://'));
+  const artifactized =
+    details?.artifactized === true ||
+    (typeof details?.ref === 'string' && details.ref.startsWith('session://')) ||
+    (typeof details?.uri === 'string' && details.uri.startsWith('session://'));
   if (!artifactized) return null;
 
-  const summary = contentText || sanitizeContentText(stringifyPreview(details?.summary));
+  const summary = contentText || sanitizeContentText(stringifyPreview(details.summary));
   const previewLines = createDetailLines(summary, 4);
-  const display = toRecord(details?.display);
+  const display = toRecord(details.display);
   if (display?.kind === 'command' && typeof display.command === 'string') {
     return { previewKind: 'shell', commandText: display.command, bodyText: display.command, previewLines };
   }

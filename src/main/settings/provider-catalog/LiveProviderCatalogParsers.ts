@@ -6,12 +6,9 @@ import {
 import { projectLiveModelObservations, type LiveModelObservation } from './LiveProviderCatalogProjection';
 import type { ProviderSurfaceManifest } from '@shared/provider-catalog/catalogManifestSchema';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
-import type { CapabilityState, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
-import type {
-  NamedReasoningLevel,
-  OpenAiWireEffort,
-  ReasoningControl,
-} from '@shared/types/modelCapability';
+import type { CapabilityState } from '@shared/types/providerCapability';
+import type { ProviderSurfaceDefinition } from './providerCatalogTypes';
+import type { NamedReasoningLevel, OpenAiWireEffort, ReasoningControl } from '@shared/types/modelCapability';
 import type { LlmProviderModel, LlmProviderProtocol } from '@shared/types/settings';
 
 export interface GrokBuilderCatalogDiagnostic {
@@ -48,16 +45,12 @@ function text(value: unknown): string | undefined {
 }
 
 function record(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function positiveInteger(value: unknown): number | undefined {
   const parsed = typeof value === 'string' ? Number(value) : value;
-  return typeof parsed === 'number' && Number.isFinite(parsed) && parsed > 0
-    ? Math.floor(parsed)
-    : undefined;
+  return typeof parsed === 'number' && Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined;
 }
 
 function capabilityState(value: unknown): CapabilityState {
@@ -95,26 +88,31 @@ function contextTokens(value: Record<string, unknown>): number | undefined {
 
 function outputTokens(value: Record<string, unknown>): number | undefined {
   const limits = record(value.limits);
-  return positiveInteger(value.max_output_tokens)
-    ?? positiveInteger(value.max_completion_tokens)
-    ?? positiveInteger(value.maxOutputTokens)
-    ?? positiveInteger(value.max_output_length)
-    ?? positiveInteger(limits.max_output_tokens)
-    ?? positiveInteger(limits.max_completion_tokens)
-    ?? positiveInteger(limits.maxOutputTokens);
+  return (
+    positiveInteger(value.max_output_tokens) ??
+    positiveInteger(value.max_completion_tokens) ??
+    positiveInteger(value.maxOutputTokens) ??
+    positiveInteger(value.max_output_length) ??
+    positiveInteger(limits.max_output_tokens) ??
+    positiveInteger(limits.max_completion_tokens) ??
+    positiveInteger(limits.maxOutputTokens)
+  );
 }
 
 function mergeContributions(contributions: CatalogModelContribution[]): CatalogModelContribution[] {
   const byId = new Map<string, CatalogModelContribution>();
   for (const contribution of contributions) {
     const previous = byId.get(contribution.modelId);
-    byId.set(contribution.modelId, previous
-      ? {
-          ...previous,
-          ...contribution,
-          aliases: [...new Set([...(previous.aliases ?? []), ...(contribution.aliases ?? [])])],
-        }
-      : contribution);
+    byId.set(
+      contribution.modelId,
+      previous
+        ? {
+            ...previous,
+            ...contribution,
+            aliases: [...new Set([...(previous.aliases ?? []), ...(contribution.aliases ?? [])])],
+          }
+        : contribution,
+    );
   }
   return [...byId.values()].sort((left, right) => left.modelId.localeCompare(right.modelId));
 }
@@ -158,7 +156,10 @@ const OPENAI_EFFORT_MAP: Record<NamedReasoningLevel, OpenAiWireEffort> = {
 function reasoningLevels(values: unknown): NamedReasoningLevel[] {
   if (!Array.isArray(values)) return [];
   const normalized = values.flatMap((value): NamedReasoningLevel[] => {
-    const effort = typeof value === 'string' ? value : text(record(value).effort) ?? text(record(value).id) ?? text(record(value).value);
+    const effort =
+      typeof value === 'string'
+        ? value
+        : (text(record(value).effort) ?? text(record(value).id) ?? text(record(value).value));
     const level = effort ? REASONING_LEVEL_MAP[effort.toLowerCase()] : undefined;
     return level ? [level] : [];
   });
@@ -172,11 +173,12 @@ export function parseOpenAiReasoningControl(
 ): ReasoningControl {
   const levels = reasoningLevels(values);
   const declaredValues = Array.isArray(values)
-    ? values.map((value) => (
-        typeof value === 'string'
+    ? values.map((value) =>
+        (typeof value === 'string'
           ? value
-          : text(record(value).effort) ?? text(record(value).id) ?? text(record(value).value) ?? ''
-      ).toLowerCase())
+          : (text(record(value).effort) ?? text(record(value).id) ?? text(record(value).value) ?? '')
+        ).toLowerCase(),
+      )
     : [];
   const supportsOff = declaredValues.includes('off') || declaredValues.includes('none');
   if (levels.length === 0) {
@@ -192,9 +194,12 @@ export function parseOpenAiReasoningControl(
   }
   const requestedDefault = text(defaultValue)?.toLowerCase();
   const mappedDefault = requestedDefault ? REASONING_LEVEL_MAP[requestedDefault] : undefined;
-  const defaultSelection = supportsOff && (requestedDefault === 'off' || requestedDefault === 'none')
-    ? 'off' as const
-    : mappedDefault && levels.includes(mappedDefault) ? mappedDefault : levels[0];
+  const defaultSelection =
+    supportsOff && (requestedDefault === 'off' || requestedDefault === 'none')
+      ? ('off' as const)
+      : mappedDefault && levels.includes(mappedDefault)
+        ? mappedDefault
+        : levels[0];
   const onSelection = defaultSelection === 'off' ? levels[0] : defaultSelection;
   const wireLevels = Object.fromEntries(levels.map((level) => [level, OPENAI_EFFORT_MAP[level]]));
   return {
@@ -202,22 +207,22 @@ export function parseOpenAiReasoningControl(
     supportsOff,
     levels,
     defaultSelection,
-    wireProfile: protocol === 'openai-responses'
-      ? {
-          kind: 'openai-responses',
-          on: onSelection,
-          levels: wireLevels,
-          ...(supportsOff ? { offMode: 'reasoning-none' as const } : {}),
-        }
-      : {
-          kind: 'openai-compatible',
-          on: onSelection,
-          levels: wireLevels,
-          ...(supportsOff ? { offMode: 'reasoning-none' as const } : {}),
-        },
+    wireProfile:
+      protocol === 'openai-responses'
+        ? {
+            kind: 'openai-responses',
+            on: onSelection,
+            levels: wireLevels,
+            ...(supportsOff ? { offMode: 'reasoning-none' as const } : {}),
+          }
+        : {
+            kind: 'openai-compatible',
+            on: onSelection,
+            levels: wireLevels,
+            ...(supportsOff ? { offMode: 'reasoning-none' as const } : {}),
+          },
   };
 }
-
 
 function strictCatalogRecords(payload: unknown, surfaceLabel: string): Record<string, unknown>[] {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
@@ -250,17 +255,21 @@ function explicitProtocol(value: Record<string, unknown>): LlmProviderProtocol |
 }
 
 function observedReasoning(value: Record<string, unknown>): LiveModelObservation['reasoning'] | undefined {
-  const supported = value.supports_reasoning === true || value.supports_reasoning_effort === true
-    ? true
-    : value.supports_reasoning === false || value.supports_reasoning_effort === false ? false : undefined;
+  const supported =
+    value.supports_reasoning === true || value.supports_reasoning_effort === true
+      ? true
+      : value.supports_reasoning === false || value.supports_reasoning_effort === false
+        ? false
+        : undefined;
   const efforts = record(value.think_efforts);
   const levels = reasoningLevels(efforts.valid_efforts ?? value.think_efforts ?? value.reasoning_efforts);
   const rawDefault = text(efforts.default_effort ?? value.default_effort ?? value.reasoning_effort)?.toLowerCase();
   const defaultEffort = rawDefault ? REASONING_LEVEL_MAP[rawDefault] : undefined;
   const rawThinkingType = text(value.supports_thinking_type)?.toLowerCase();
-  const thinkingType = rawThinkingType === 'only' || rawThinkingType === 'optional' || rawThinkingType === 'both'
-    ? rawThinkingType
-    : undefined;
+  const thinkingType =
+    rawThinkingType === 'only' || rawThinkingType === 'optional' || rawThinkingType === 'both'
+      ? rawThinkingType
+      : undefined;
   if (supported === undefined && levels.length === 0 && !thinkingType) return undefined;
   return {
     ...(supported !== undefined ? { supported } : {}),
@@ -285,7 +294,8 @@ function observationFromCatalogRow(value: Record<string, unknown>): LiveModelObs
     protocol: explicitProtocol(value),
     contextWindowTokens: contextTokens(value),
     contextWindowChoices: Array.isArray(value.context_windows)
-      ? value.context_windows.map(positiveInteger).filter((tokens): tokens is number => tokens !== undefined) : undefined,
+      ? value.context_windows.map(positiveInteger).filter((tokens): tokens is number => tokens !== undefined)
+      : undefined,
     ...(maxOutputTokens ? { maxOutputTokens } : {}),
     reasoning: observedReasoning(value),
     ...(toolCalling ? { toolCalling } : {}),
@@ -295,15 +305,11 @@ function observationFromCatalogRow(value: Record<string, unknown>): LiveModelObs
 }
 
 /** Parse only credential-scoped observations; compiled manifests own product identity and controls. */
-export function parseKimiCodeCatalog(
-  payload: unknown,
-  surface: ProviderSurfaceDefinition,
-): ParsedLiveCatalog {
-  const observations = strictCatalogRecords(payload, surface.label)
-    .flatMap((value) => {
-      const observation = observationFromCatalogRow(value);
-      return observation ? [observation] : [];
-    });
+export function parseKimiCodeCatalog(payload: unknown, surface: ProviderSurfaceDefinition): ParsedLiveCatalog {
+  const observations = strictCatalogRecords(payload, surface.label).flatMap((value) => {
+    const observation = observationFromCatalogRow(value);
+    return observation ? [observation] : [];
+  });
   return asResult(projectLiveModelObservations(surface, observations));
 }
 /** Account discovery reports availability and windows; structural capabilities remain manifest-owned. */
@@ -314,100 +320,112 @@ export function parseChatGptAccountCatalog(
   const retired = new Set(surface.retiredModelIds ?? []);
   const root = record(payload);
   const values = Array.isArray(root.models) ? root.models : [];
-  return asResult(values.flatMap((candidate): CatalogModelContribution[] => {
-    const value = record(candidate);
-    const id = text(value.slug) ?? text(value.id);
-    const identity = liveIdentity(value, id);
-    if (
-      !id
-      || !identity
-      || retired.has(id.toLowerCase())
-      || value.supported_in_api === false
-      || (text(value.visibility) && text(value.visibility) !== 'list')
-      || /(?:^|-)pro$/i.test(id)
-      || /(?:auto-review|compaction)/i.test(id)
-    ) return [];
-    const definition = surface.models.find(model => model.modelId === id);
-    const maxControl = definition?.controls.maxContext;
-    const contextWindow = positiveInteger(value.context_window);
-    const maxContextWindow = positiveInteger(value.max_context_window);
-    const observedOutputTokens = outputTokens(value);
-    const effectiveContextWindow = contextWindow;
-    const contextTiers: NonNullable<CatalogModelContribution['contextTiers']> = [{
-      id: 'default',
-      label: 'Codex service limit',
-      ...(effectiveContextWindow ? { maxPromptTokens: effectiveContextWindow, maxTotalTokens: effectiveContextWindow } : {}),
-      ...(observedOutputTokens ? { maxOutputTokens: observedOutputTokens } : {}),
-      activation: { kind: 'implicit' },
-      entitlement: 'granted',
-    }];
-    if (contextWindow && maxContextWindow && maxContextWindow > contextWindow) {
-      contextTiers.push({
-        id: 'max',
-        label: 'Maximum Codex limit',
-        maxPromptTokens: maxContextWindow,
-        maxTotalTokens: maxContextWindow,
-        ...(observedOutputTokens ? { maxOutputTokens: observedOutputTokens } : {}),
-        activation: { kind: 'implicit' },
-        entitlement: 'granted',
-      });
-    }
-    return [{
-      modelId: identity.id,
-      aliases: identity.aliases.filter(alias => !retired.has(alias.toLowerCase())),
-      label: text(value.display_name) ?? text(value.name) ?? id,
-      availability: 'available',
-      route: { protocol: 'OpenAIResponses', baseUrl: 'https://chatgpt.com/backend-api/codex', source: 'model' },
-      contextTiers,
-      ...(contextTiers.length > 1 && maxControl?.state === 'selectable' && maxControl.tierId === 'max' ? {
-        controls: { maxContext: { ...maxControl, entitlement: 'granted' as const } },
-        executionBindings: definition?.executionBindings?.map(binding => binding.when.maxContext === true
-          ? { ...binding, entitlement: 'granted' as const } : binding),
-      } : {}),
-      ...(effectiveContextWindow ? { defaultBudgetTokens: effectiveContextWindow } : {}),
-    }];
-  }));
+  return asResult(
+    values.flatMap((candidate): CatalogModelContribution[] => {
+      const value = record(candidate);
+      const id = text(value.slug) ?? text(value.id);
+      const identity = liveIdentity(value, id);
+      if (
+        !id ||
+        !identity ||
+        retired.has(id.toLowerCase()) ||
+        value.supported_in_api === false ||
+        (text(value.visibility) && text(value.visibility) !== 'list') ||
+        /(?:^|-)pro$/i.test(id) ||
+        /(?:auto-review|compaction)/i.test(id)
+      )
+        return [];
+      const definition = surface.models.find((model) => model.modelId === id);
+      const maxControl = definition?.controls.maxContext;
+      const contextWindow = positiveInteger(value.context_window);
+      const maxContextWindow = positiveInteger(value.max_context_window);
+      const observedOutputTokens = outputTokens(value);
+      const effectiveContextWindow = contextWindow;
+      const contextTiers: NonNullable<CatalogModelContribution['contextTiers']> = [
+        {
+          id: 'default',
+          label: 'Codex service limit',
+          ...(effectiveContextWindow
+            ? { maxPromptTokens: effectiveContextWindow, maxTotalTokens: effectiveContextWindow }
+            : {}),
+          ...(observedOutputTokens ? { maxOutputTokens: observedOutputTokens } : {}),
+          activation: { kind: 'implicit' },
+          entitlement: 'granted',
+        },
+      ];
+      if (contextWindow && maxContextWindow && maxContextWindow > contextWindow) {
+        contextTiers.push({
+          id: 'max',
+          label: 'Maximum Codex limit',
+          maxPromptTokens: maxContextWindow,
+          maxTotalTokens: maxContextWindow,
+          ...(observedOutputTokens ? { maxOutputTokens: observedOutputTokens } : {}),
+          activation: { kind: 'implicit' },
+          entitlement: 'granted',
+        });
+      }
+      return [
+        {
+          modelId: identity.id,
+          aliases: identity.aliases.filter((alias) => !retired.has(alias.toLowerCase())),
+          label: text(value.display_name) ?? text(value.name) ?? id,
+          availability: 'available',
+          route: { protocol: 'OpenAIResponses', baseUrl: 'https://chatgpt.com/backend-api/codex', source: 'model' },
+          contextTiers,
+          ...(contextTiers.length > 1 && maxControl?.state === 'selectable' && maxControl.tierId === 'max'
+            ? {
+                controls: { maxContext: { ...maxControl, entitlement: 'granted' as const } },
+                executionBindings: definition?.executionBindings?.map((binding) =>
+                  binding.when.maxContext === true ? { ...binding, entitlement: 'granted' as const } : binding,
+                ),
+              }
+            : {}),
+          ...(effectiveContextWindow ? { defaultBudgetTokens: effectiveContextWindow } : {}),
+        },
+      ];
+    }),
+  );
 }
 
 /** The Anthropic model endpoint is authoritative for account-visible ids, not for undocumented limits. */
 export function parseClaudeAccountCatalog(payload: unknown): ParsedLiveCatalog {
-  return asResult(records(payload).flatMap((value): CatalogModelContribution[] => {
-    const identity = liveIdentity(value);
-    if (!identity) return [];
-    return [{
-      modelId: identity.id,
-      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
-      label: text(value.display_name) ?? text(value.label) ?? identity.id,
-      availability: 'available',
-      route: { protocol: 'AnthropicMessages', baseUrl: 'https://api.anthropic.com/v1', source: 'model' },
-    }];
-  }));
+  return asResult(
+    records(payload).flatMap((value): CatalogModelContribution[] => {
+      const identity = liveIdentity(value);
+      if (!identity) return [];
+      return [
+        {
+          modelId: identity.id,
+          ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
+          label: text(value.display_name) ?? text(value.label) ?? identity.id,
+          availability: 'available',
+          route: { protocol: 'AnthropicMessages', baseUrl: 'https://api.anthropic.com/v1', source: 'model' },
+        },
+      ];
+    }),
+  );
 }
 
 /** Parse OpenCode Go observations; the compiled surface owns exact model contracts. */
-export function parseOpenCodeGoCatalog(
-  payload: unknown,
-  surface: ProviderSurfaceDefinition,
-): ParsedLiveCatalog {
+export function parseOpenCodeGoCatalog(payload: unknown, surface: ProviderSurfaceDefinition): ParsedLiveCatalog {
   const observations = strictCatalogRecords(payload, surface.label)
     .flatMap((value) => {
       const observation = observationFromCatalogRow(value);
       return observation ? [observation] : [];
     })
-    .filter((observation) => isAdmittedDiscoveredModel(
-      { id: observation.modelId },
-      surface.discovery.admission,
-    ));
+    .filter((observation) => isAdmittedDiscoveredModel({ id: observation.modelId }, surface.discovery.admission));
   return asResult(projectLiveModelObservations(surface, observations));
 }
 function isClinePassCatalogRow(value: Record<string, unknown>, modelId: string): boolean {
   if (modelId.toLowerCase().startsWith('cline-pass/')) return true;
   const entitlement = text(value.entitlement)?.toLowerCase();
   const groups = Array.isArray(value.groups) ? value.groups.map((entry) => text(entry)?.toLowerCase()) : [];
-  return entitlement === 'clinepass'
-    || entitlement === 'cline-pass'
-    || groups.includes('clinepass')
-    || groups.includes('cline-pass');
+  return (
+    entitlement === 'clinepass' ||
+    entitlement === 'cline-pass' ||
+    groups.includes('clinepass') ||
+    groups.includes('cline-pass')
+  );
 }
 
 /** Prefer `data` from `/ai/cline/models`; keep OpenAI-shaped fixtures working. */
@@ -448,27 +466,17 @@ function clinePassCanonicalObservation(observation: LiveModelObservation): LiveM
   };
 }
 
-function matchesClinePassManifest(
-  surface: ProviderSurfaceDefinition,
-  observation: LiveModelObservation,
-): boolean {
+function matchesClinePassManifest(surface: ProviderSurfaceDefinition, observation: LiveModelObservation): boolean {
   const keys = new Set(
-    [observation.modelId, ...(observation.aliases ?? [])]
-      .map(normalizeDiscoveredModelMatchKey)
-      .filter(Boolean),
+    [observation.modelId, ...(observation.aliases ?? [])].map(normalizeDiscoveredModelMatchKey).filter(Boolean),
   );
-  return surface.models.some((model) => (
-    [model.modelId, ...model.aliases]
-      .map(normalizeDiscoveredModelMatchKey)
-      .some((key) => key && keys.has(key))
-  ));
+  return surface.models.some((model) =>
+    [model.modelId, ...model.aliases].map(normalizeDiscoveredModelMatchKey).some((key) => key && keys.has(key)),
+  );
 }
 
 /** Cline usage/API catalog: admit non-ClinePass models only. */
-export function parseClineCatalog(
-  payload: unknown,
-  surface: ProviderSurfaceDefinition,
-): ParsedLiveCatalog {
+export function parseClineCatalog(payload: unknown, surface: ProviderSurfaceDefinition): ParsedLiveCatalog {
   const observations = clineUsageCatalogRecords(payload).flatMap((value) => {
     const observation = observationFromCatalogRow(value);
     if (!observation || isClinePassCatalogRow(value, observation.modelId)) return [];
@@ -478,10 +486,7 @@ export function parseClineCatalog(
 }
 
 /** ClinePass plan catalog: admit ClinePass models only through manifest projection. */
-export function parseClinePassCatalog(
-  payload: unknown,
-  surface: ProviderSurfaceDefinition,
-): ParsedLiveCatalog {
+export function parseClinePassCatalog(payload: unknown, surface: ProviderSurfaceDefinition): ParsedLiveCatalog {
   const observations = clinePassCatalogRecords(payload).flatMap((value) => {
     const observation = observationFromCatalogRow(value);
     if (!observation) return [];
@@ -502,68 +507,81 @@ export function parseClinePassCatalog(
  * OpenAI endpoint (or vice versa).
  */
 export function parseFreeModelCatalog(openAiPayload: unknown, claudePayload: unknown): ParsedLiveCatalog {
-  const parse = (
-    payload: unknown,
-    kind: 'openai' | 'anthropic',
-  ): CatalogModelContribution[] => records(payload).flatMap((value): CatalogModelContribution[] => {
-    const identity = liveIdentity(value);
-    if (!identity) return [];
-    const id = identity.id;
-    if (kind === 'openai') {
-      const chatRoute = {
-        protocol: 'OpenAICompatibleChatCompletions' as const,
-        baseUrl: 'https://api.freemodel.dev/v1',
+  const parse = (payload: unknown, kind: 'openai' | 'anthropic'): CatalogModelContribution[] =>
+    records(payload).flatMap((value): CatalogModelContribution[] => {
+      const identity = liveIdentity(value);
+      if (!identity) return [];
+      const id = identity.id;
+      if (kind === 'openai') {
+        const chatRoute = {
+          protocol: 'OpenAICompatibleChatCompletions' as const,
+          baseUrl: 'https://api.freemodel.dev/v1',
+          source: 'model' as const,
+        };
+        const responsesRoute = {
+          protocol: 'OpenAIResponses' as const,
+          baseUrl: 'https://api.freemodel.dev/v1',
+          source: 'model' as const,
+        };
+        return [
+          {
+            modelId: id,
+            ...(identity.aliases.length ? { aliases: identity.aliases } : {}),
+            label: text(value.name) ?? text(value.display_name) ?? id,
+            availability: 'available',
+            route: chatRoute,
+            routeOptions: [
+              {
+                id: 'OpenAICompatibleChatCompletions',
+                route: chatRoute,
+                availability: 'available',
+                protocolOwner: 'openai',
+                endpointOwner: 'freemodel',
+                authMode: 'api-key',
+              },
+              {
+                id: 'OpenAIResponses',
+                route: responsesRoute,
+                availability: 'unknown',
+                protocolOwner: 'openai',
+                endpointOwner: 'freemodel',
+                authMode: 'api-key',
+              },
+            ],
+          },
+        ];
+      }
+      const route = {
+        protocol: 'AnthropicMessages' as const,
+        baseUrl: 'https://cc.freemodel.dev/v1',
         source: 'model' as const,
       };
-      const responsesRoute = {
-        protocol: 'OpenAIResponses' as const,
-        baseUrl: 'https://api.freemodel.dev/v1',
-        source: 'model' as const,
-      };
-      return [{
-        modelId: id,
-        ...(identity.aliases.length ? { aliases: identity.aliases } : {}),
-        label: text(value.name) ?? text(value.display_name) ?? id,
-        availability: 'available',
-        route: chatRoute,
-        routeOptions: [
-          {
-            id: 'OpenAICompatibleChatCompletions', route: chatRoute, availability: 'available',
-            protocolOwner: 'openai', endpointOwner: 'freemodel', authMode: 'api-key',
-          },
-          {
-            id: 'OpenAIResponses', route: responsesRoute, availability: 'unknown',
-            protocolOwner: 'openai', endpointOwner: 'freemodel', authMode: 'api-key',
-          },
-        ],
-      }];
-    }
-    const route = {
-      protocol: 'AnthropicMessages' as const,
-      baseUrl: 'https://cc.freemodel.dev/v1',
-      source: 'model' as const,
-    };
-    return [{
-      modelId: id,
-      ...(identity.aliases.length ? { aliases: identity.aliases } : {}),
-      label: text(value.name) ?? text(value.display_name) ?? id,
-      availability: 'available',
-      route,
-      routeOptions: [{
-        id: 'AnthropicMessages', route, availability: 'available',
-        protocolOwner: 'anthropic', endpointOwner: 'freemodel', authMode: 'api-key',
-      }],
-    }];
-  });
+      return [
+        {
+          modelId: id,
+          ...(identity.aliases.length ? { aliases: identity.aliases } : {}),
+          label: text(value.name) ?? text(value.display_name) ?? id,
+          availability: 'available',
+          route,
+          routeOptions: [
+            {
+              id: 'AnthropicMessages',
+              route,
+              availability: 'available',
+              protocolOwner: 'anthropic',
+              endpointOwner: 'freemodel',
+              authMode: 'api-key',
+            },
+          ],
+        },
+      ];
+    });
   return asResult([...parse(openAiPayload, 'openai'), ...parse(claudePayload, 'anthropic')]);
 }
 
 /** Parse the models visible to the API key minted by OpenRouter PKCE. */
 /** Parse account-visible OpenRouter observations without attaching model-specific product controls. */
-export function parseOpenRouterAccountCatalog(
-  payload: unknown,
-  surface: ProviderSurfaceDefinition,
-): ParsedLiveCatalog {
+export function parseOpenRouterAccountCatalog(payload: unknown, surface: ProviderSurfaceDefinition): ParsedLiveCatalog {
   const observations = strictCatalogRecords(payload, surface.label).flatMap((value): LiveModelObservation[] => {
     const identity = liveIdentity(value);
     if (!identity) return [];
@@ -572,34 +590,32 @@ export function parseOpenRouterAccountCatalog(
       : [];
     const inputModalities = Array.isArray(record(value.architecture).input_modalities)
       ? (record(value.architecture).input_modalities as unknown[])
-        .map((entry) => text(entry)?.toLowerCase())
-        .filter(Boolean)
+          .map((entry) => text(entry)?.toLowerCase())
+          .filter(Boolean)
       : [];
     const maxOutputTokens = outputTokens(value);
-    return [{
-      modelId: identity.id,
-      ...(identity.aliases.length ? { aliases: identity.aliases } : {}),
-      upstreamLabel: text(value.name),
-      availability: 'available',
-      contextWindowTokens: contextTokens(value),
-      ...(maxOutputTokens ? { maxOutputTokens } : {}),
-      toolCalling: supportedParameters.includes('tools') ? { state: 'supported' } : { state: 'unknown' },
-      visionInput: inputModalities.length === 0
-        ? { state: 'unknown' }
-        : capabilityState(inputModalities.includes('image')),
-      structuredOutput: supportedParameters.includes('response_format')
-        || supportedParameters.includes('structured_outputs')
-        ? { state: 'supported' }
-        : { state: 'unknown' },
-    }];
+    return [
+      {
+        modelId: identity.id,
+        ...(identity.aliases.length ? { aliases: identity.aliases } : {}),
+        upstreamLabel: text(value.name),
+        availability: 'available',
+        contextWindowTokens: contextTokens(value),
+        ...(maxOutputTokens ? { maxOutputTokens } : {}),
+        toolCalling: supportedParameters.includes('tools') ? { state: 'supported' } : { state: 'unknown' },
+        visionInput:
+          inputModalities.length === 0 ? { state: 'unknown' } : capabilityState(inputModalities.includes('image')),
+        structuredOutput:
+          supportedParameters.includes('response_format') || supportedParameters.includes('structured_outputs')
+            ? { state: 'supported' }
+            : { state: 'unknown' },
+      },
+    ];
   });
   return asResult(projectLiveModelObservations(surface, observations));
 }
 /** Parse Builder observations; the compiled Grok surface owns identity, route, controls, and bindings. */
-export function parseGrokBuilderCatalog(
-  payload: unknown,
-  surface: ProviderSurfaceDefinition,
-): ParsedLiveCatalog {
+export function parseGrokBuilderCatalog(payload: unknown, surface: ProviderSurfaceDefinition): ParsedLiveCatalog {
   const root = record(payload);
   const envelope = (() => {
     if (Array.isArray(payload)) {
@@ -620,9 +636,7 @@ export function parseGrokBuilderCatalog(
             const wrapper = record(candidate);
             const info = record(wrapper.info);
             if (text(info.id) || text(wrapper.id)) return candidate;
-            return Object.keys(info).length > 0
-              ? { ...wrapper, info: { ...info, id } }
-              : { ...wrapper, id };
+            return Object.keys(info).length > 0 ? { ...wrapper, info: { ...info, id } } : { ...wrapper, id };
           });
           return { kind: 'models-map' as const, candidates };
         }
@@ -655,9 +669,14 @@ export function parseGrokBuilderCatalog(
     ...asResult(contributions),
     diagnostic: {
       envelopeKind: envelope.kind,
-      complete: envelope.kind !== 'unknown' && filtered.invalidIdentity === 0
-        && root.has_more !== true && root.partial !== true
-        && !root.next && !root.next_cursor && !root.next_page_token,
+      complete:
+        envelope.kind !== 'unknown' &&
+        filtered.invalidIdentity === 0 &&
+        root.has_more !== true &&
+        root.partial !== true &&
+        !root.next &&
+        !root.next_cursor &&
+        !root.next_page_token,
       candidateCount: envelope.candidates.length,
       admittedCount: contributions.length,
       filtered,
@@ -714,17 +733,21 @@ export function parseOllamaInstalledModels(
     const toolCalling = ollamaCapability(capabilities, 'tools');
     const visionInput = ollamaCapability(capabilities, 'vision');
     if (capabilities?.includes('thinking')) thinkingModelIds.add(id);
-    return [{
-      modelId: id,
-      availability: 'available',
-      ...(contextWindowTokens ? { contextWindowTokens } : {}),
-      ...(toolCalling ? { toolCalling } : {}),
-      ...(visionInput ? { visionInput } : {}),
-    }];
+    return [
+      {
+        modelId: id,
+        availability: 'available',
+        ...(contextWindowTokens ? { contextWindowTokens } : {}),
+        ...(toolCalling ? { toolCalling } : {}),
+        ...(visionInput ? { visionInput } : {}),
+      },
+    ];
   });
-  return asResult(projectLiveModelObservations(surface, observations).map((contribution) => (
-    thinkingModelIds.has(contribution.modelId)
-      ? { ...contribution, controls: { ...contribution.controls, reasoning: OLLAMA_THINK_TOGGLE } }
-      : contribution
-  )));
+  return asResult(
+    projectLiveModelObservations(surface, observations).map((contribution) =>
+      thinkingModelIds.has(contribution.modelId)
+        ? { ...contribution, controls: { ...contribution.controls, reasoning: OLLAMA_THINK_TOGGLE } }
+        : contribution,
+    ),
+  );
 }

@@ -14,42 +14,8 @@ import {
   RIGHT_PANEL_MIN_WIDTH,
   SIDEBAR_MAX_WIDTH,
 } from '@shared/constants/layout';
-import type {
-  AgentModelSettings,
-  AgentPermissionMode,
-  AgentPermissionSettings,
-  LayoutPreferences,
-  ProfileSettings,
-  RdcCliInvokerSettings,
-  AgentShellSettings,
-  CodeInterpreterSettings,
-  UiPreferences,
-  LlmProviderEntry,
-} from '@shared/types/settings';
-
-export const SETTINGS_SCHEMA_VERSION = 8;
-
-export type PersistedLlmProviderEntry = Partial<LlmProviderEntry>;
-
-export interface PersistedSettingsPayload {
-  schemaVersion?: number;
-  appearance?: Partial<UiPreferences>;
-  layout?: Partial<LayoutPreferences>;
-  profile?: Partial<ProfileSettings>;
-  llm?: {
-    providers?: PersistedLlmProviderEntry[];
-  };
-  tooling?: {
-    rdcCli?: Partial<RdcCliInvokerSettings>;
-    codeInterpreter?: Partial<CodeInterpreterSettings>;
-    shell?: Partial<AgentShellSettings>;
-  };
-  agentRuntime?: {
-    permissions?: Partial<AgentPermissionSettings>;
-    context?: Partial<{ compactionThresholdPercent: number }>;
-  };
-  agentModels?: AgentModelSettings;
-}
+import { SETTINGS_SCHEMA_VERSION, type SettingsFile } from './settingsFileSchema';
+import type { AgentPermissionMode } from '@shared/types/settings';
 
 export const LEFT_DEFAULTS = {
   width: LEFT_SIDEBAR_DEFAULT_WIDTH,
@@ -67,7 +33,8 @@ export const RIGHT_DEFAULTS = {
 
 export const VALID_PERMISSION_MODES: AgentPermissionMode[] = ['default', 'auto-review', 'full-access', 'custom'];
 
-export function createDefaultPersistedSettings(): PersistedSettingsPayload {
+/** The settings a missing file stands for; nothing is written until the user changes something. */
+export function createDefaultSettingsFile(): SettingsFile {
   return {
     schemaVersion: SETTINGS_SCHEMA_VERSION,
     appearance: DEFAULT_APPEARANCE,
@@ -76,8 +43,6 @@ export function createDefaultPersistedSettings(): PersistedSettingsPayload {
     tooling: DEFAULT_TOOLING,
     agentRuntime: DEFAULT_AGENT_RUNTIME,
     agentModels: { default: {}, byAgent: {} },
-    llm: {
-      providers: [],
-    },
+    providers: {},
   };
 }

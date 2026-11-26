@@ -5,21 +5,17 @@ import { appPathService } from '../runtime/AppPathService';
 import { assertSafeKnowledgeWriteTarget, toPosixRelative } from './knowledgeFs';
 import type { KnowledgeStagedImage } from './knowledgeIngest';
 
-export function knowledgeIngestStagingRoot(appStateRoot?: string): string {
-  return path.join(appStateRoot ?? appPathService.getAppStatePaths().appStateRoot, 'knowledge-ingest');
+function knowledgeIngestStagingRoot(): string {
+  return path.join(appPathService.getAppStatePaths().appStateRoot, 'knowledge-ingest');
 }
 
-function cardStagingDir(cardId: string, appStateRoot?: string): string {
+function cardStagingDir(cardId: string): string {
   const digest = createHash('sha256').update(cardId, 'utf8').digest('hex').slice(0, 16);
-  return path.join(knowledgeIngestStagingRoot(appStateRoot), digest);
+  return path.join(knowledgeIngestStagingRoot(), digest);
 }
 
-export async function putStagedKnowledgeImages(
-  cardId: string,
-  images: readonly KnowledgeStagedImage[],
-  appStateRoot?: string,
-): Promise<void> {
-  const root = cardStagingDir(cardId, appStateRoot);
+export async function putStagedKnowledgeImages(cardId: string, images: readonly KnowledgeStagedImage[]): Promise<void> {
+  const root = cardStagingDir(cardId);
   await fs.rm(root, { recursive: true, force: true });
   if (images.length === 0) return;
   for (const image of images) {
@@ -32,9 +28,8 @@ export async function putStagedKnowledgeImages(
 export async function takeStagedKnowledgeImages(
   cardId: string,
   relativePaths: readonly string[],
-  appStateRoot?: string,
 ): Promise<KnowledgeStagedImage[]> {
-  const root = cardStagingDir(cardId, appStateRoot);
+  const root = cardStagingDir(cardId);
   const out: KnowledgeStagedImage[] = [];
   for (const relativePath of relativePaths) {
     const dest = path.resolve(root, ...toPosixRelative(relativePath).replace(/^\/+/, '').split('/'));
@@ -53,6 +48,6 @@ export async function takeStagedKnowledgeImages(
   return out;
 }
 
-export async function clearStagedKnowledgeImages(cardId: string, appStateRoot?: string): Promise<void> {
-  await fs.rm(cardStagingDir(cardId, appStateRoot), { recursive: true, force: true });
+export async function clearStagedKnowledgeImages(cardId: string): Promise<void> {
+  await fs.rm(cardStagingDir(cardId), { recursive: true, force: true });
 }

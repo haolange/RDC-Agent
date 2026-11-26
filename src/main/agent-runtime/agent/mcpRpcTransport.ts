@@ -37,7 +37,10 @@ export async function readBoundedResponseBody(response: Response, maxBytes: numb
   }
   const bytes = new Uint8Array(total);
   let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
   return new TextDecoder().decode(bytes);
 }
 
@@ -45,11 +48,13 @@ const JsonRpcResponseSchema = z.object({
   jsonrpc: z.literal('2.0'),
   id: z.union([z.number(), z.string()]).optional(),
   result: z.unknown().optional(),
-  error: z.object({
-    code: z.number(),
-    message: z.string(),
-    data: z.unknown().optional(),
-  }).optional(),
+  error: z
+    .object({
+      code: z.number(),
+      message: z.string(),
+      data: z.unknown().optional(),
+    })
+    .optional(),
   method: z.string().optional(),
   params: z.unknown().optional(),
 });
@@ -68,10 +73,7 @@ export function parseJsonRpcResponse(line: string): JsonRpcResponse | null {
 export class StdioRpcClient {
   private nextId = 1;
   private buffer = '';
-  private pending = new Map<
-    number,
-    { resolve: (v: unknown) => void; reject: (e: Error) => void }
-  >();
+  private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   private closed = false;
 
   constructor(private readonly proc: ChildProcess) {
@@ -100,9 +102,7 @@ export class StdioRpcClient {
         const entry = this.pending.get(msg.id)!;
         this.pending.delete(msg.id);
         if (msg.error) {
-          entry.reject(
-            new Error(`MCP error ${msg.error.code}: ${msg.error.message}`),
-          );
+          entry.reject(new Error(`MCP error ${msg.error.code}: ${msg.error.message}`));
         } else {
           entry.resolve(msg.result);
         }
@@ -119,12 +119,7 @@ export class StdioRpcClient {
     this.pending.clear();
   }
 
-  request(
-    method: string,
-    params: unknown,
-    timeoutMs: number,
-    signal?: AbortSignal,
-  ): Promise<unknown> {
+  request(method: string, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
     if (this.closed) {
       return Promise.reject(new Error('MCP connection is closed'));
     }
@@ -205,7 +200,10 @@ interface JsonRpcPost {
   signal?: AbortSignal;
 }
 
-async function withRpcDeadline<T>(request: JsonRpcPost, run: (signal: AbortSignal, id: number) => Promise<T>): Promise<T> {
+async function withRpcDeadline<T>(
+  request: JsonRpcPost,
+  run: (signal: AbortSignal, id: number) => Promise<T>,
+): Promise<T> {
   const timeout = AbortSignal.timeout(request.timeoutMs);
   const signal = request.signal ? AbortSignal.any([timeout, request.signal]) : timeout;
   const id = Date.now() + Math.floor(Math.random() * 1000);
@@ -213,7 +211,13 @@ async function withRpcDeadline<T>(request: JsonRpcPost, run: (signal: AbortSigna
 }
 
 /** http transport: one JSON-RPC POST, one JSON response body. */
-export function postJsonRpc(url: string, method: string, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+export function postJsonRpc(
+  url: string,
+  method: string,
+  params: unknown,
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<unknown> {
   return withRpcDeadline({ url, method, params, timeoutMs, signal }, async (linked, id) => {
     const res = await fetch(url, {
       method: 'POST',
@@ -230,7 +234,13 @@ export function postJsonRpc(url: string, method: string, params: unknown, timeou
 }
 
 /** streamable-http transport: POST with an NDJSON response; returns the frame matching the request id. */
-export function postStreamableJsonRpc(url: string, method: string, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+export function postStreamableJsonRpc(
+  url: string,
+  method: string,
+  params: unknown,
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<unknown> {
   return withRpcDeadline({ url, method, params, timeoutMs, signal }, async (linked, id) => {
     const res = await fetch(url, {
       method: 'POST',

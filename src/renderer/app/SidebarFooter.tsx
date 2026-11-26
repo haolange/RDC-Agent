@@ -2,11 +2,10 @@ import { ProfileAvatar } from '../patterns/ProfileAvatar';
 import { Button } from '../ui/Button';
 import { Icon } from '../ui/Icon';
 import { Chevron } from '../ui/Chevron';
-import type { TranslationKey } from '../i18n';
+import { useI18n } from '../i18n';
 import type { MouseEvent } from 'react';
 
 export function SidebarFooter({
-  t,
   nickname,
   avatarPath,
   isUserMenuOpen,
@@ -14,7 +13,6 @@ export function SidebarFooter({
   onOpenKnowledgeCenter,
   onUserMenuToggle,
 }: {
-  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   nickname: string;
   avatarPath: string | undefined;
   isUserMenuOpen: boolean;
@@ -22,13 +20,17 @@ export function SidebarFooter({
   onOpenKnowledgeCenter: () => void;
   onUserMenuToggle: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="app-sidebar-footer" data-testid="sidebar-footer">
       <Button
         variant="ghost"
         className="footer-entry sidebar-footer-entry"
         data-testid="sidebar-knowledge-center-trigger"
-        onClick={() => { onCloseLeftDrawer(); onOpenKnowledgeCenter(); }}
+        onClick={() => {
+          onCloseLeftDrawer();
+          onOpenKnowledgeCenter();
+        }}
         data-tooltip={t('knowledgeCenter.title')}
         aria-label={t('knowledgeCenter.title')}
       >
@@ -48,7 +50,10 @@ export function SidebarFooter({
         aria-haspopup="dialog"
         aria-expanded={isUserMenuOpen}
         aria-controls={isUserMenuOpen ? 'sidebar-user-menu' : undefined}
-        onClick={(event) => { onCloseLeftDrawer(); onUserMenuToggle(event); }}
+        onClick={(event) => {
+          onCloseLeftDrawer();
+          onUserMenuToggle(event);
+        }}
         data-tooltip={t('sidebar.userSettings')}
         aria-label={t('sidebar.userSettings')}
       >

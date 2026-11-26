@@ -4,11 +4,17 @@ import type { RdcRuntimeOverview } from '@shared/types/rdcRuntime';
 
 const runtime = () => getElectronApi()?.rdcRuntime;
 
-export async function trustHook(projectRoot: string | null | undefined, hookId: string): Promise<RdcRuntimeOverview | undefined> {
+export async function trustHook(
+  projectRoot: string | null | undefined,
+  hookId: string,
+): Promise<RdcRuntimeOverview | undefined> {
   return runtime()?.trustHook(projectRoot ?? undefined, hookId);
 }
 
-export async function revokeHook(projectRoot: string | null | undefined, hookId: string): Promise<RdcRuntimeOverview | undefined> {
+export async function revokeHook(
+  projectRoot: string | null | undefined,
+  hookId: string,
+): Promise<RdcRuntimeOverview | undefined> {
   return runtime()?.revokeHook(projectRoot ?? undefined, hookId);
 }
 
@@ -22,9 +28,11 @@ export async function testHook(
   hookId: string,
 ) {
   const receipt = await runtime()?.testHook(event, projectRoot, hookId);
-  const { status } = z.object({
-    hookId: z.literal(hookId),
-    status: z.enum(['completed', 'failed', 'timed-out', 'untrusted', 'skipped']),
-  }).parse(receipt);
+  const { status } = z
+    .object({
+      hookId: z.literal(hookId),
+      status: z.enum(['completed', 'failed', 'timed-out', 'untrusted', 'skipped']),
+    })
+    .parse(receipt);
   return { status, details: JSON.stringify(receipt, null, 2) };
 }

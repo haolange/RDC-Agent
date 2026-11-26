@@ -60,13 +60,6 @@
   color: var(--token-text-secondary);
 }
 
-.settings-provider-card-dot {
-  width: var(--space-2);
-  height: var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--token-text-disabled);
-}
-
 .settings-provider-card.is-tone-connected .settings-provider-card-dot {
   background: var(--token-status-success);
 }

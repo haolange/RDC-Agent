@@ -1,9 +1,14 @@
 import type { Dispatch, SetStateAction } from 'react';
 
 /** Identity is per committed request lifetime, not a reusable project-path string. */
-export interface OverviewProjectionLifetime { active: boolean }
+export interface OverviewProjectionLifetime {
+  active: boolean;
+}
 
-export function fenceOverviewSetter<T>(lifetime: OverviewProjectionLifetime, setValue: Dispatch<SetStateAction<T>>): Dispatch<SetStateAction<T>> {
+export function fenceOverviewSetter<T>(
+  lifetime: OverviewProjectionLifetime,
+  setValue: Dispatch<SetStateAction<T>>,
+): Dispatch<SetStateAction<T>> {
   return (update) => {
     if (!lifetime.active) return;
     setValue((previous) => {

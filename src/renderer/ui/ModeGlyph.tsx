@@ -7,15 +7,12 @@ import './ModeGlyph.css';
 interface ModeGlyphProps {
   mode: AgentMode;
   icon?: ModeIconKey;
-  accentColor?: string;
   className?: string;
   size?: number;
   strokeWidth?: number;
 }
 
-const glyphByIcon = (
-  icon: ModeIconKey,
-): React.ReactNode => {
+const glyphByIcon = (icon: ModeIconKey): React.ReactNode => {
   switch (icon) {
     case 'message-orbit':
       return (
@@ -151,25 +148,14 @@ const FALLBACK_MODE_CONFIG = {
   accentColor: '#33d1ff',
 };
 
-export const ModeGlyph: React.FC<ModeGlyphProps> = ({
-  mode,
-  icon,
-  accentColor,
-  className,
-  size = 16,
-  strokeWidth = 2,
-}) => {
+export const ModeGlyph: React.FC<ModeGlyphProps> = ({ mode, icon, className, size = 16, strokeWidth = 2 }) => {
   const modeConfig = getAgentModeConfig(mode) ?? FALLBACK_MODE_CONFIG;
   const resolvedIcon = icon ?? modeConfig.icon;
-  const resolvedAccent = accentColor ?? modeConfig.accentColor;
+  const resolvedAccent = modeConfig.accentColor;
   const dynStyle = useDynStyle({ '--mode-glyph-color': resolvedAccent });
 
   return (
-    <span
-      className={['mode-glyph', className].filter(Boolean).join(' ')}
-      {...dynStyle}
-      aria-hidden="true"
-    >
+    <span className={['mode-glyph', className].filter(Boolean).join(' ')} {...dynStyle} aria-hidden="true">
       <svg
         width={size}
         height={size}

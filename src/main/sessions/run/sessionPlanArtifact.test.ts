@@ -2,15 +2,11 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { parsePlanTaskRequirements, renderPlanTaskRequirements, type PlanTaskRequirement } from '@shared/types/taskExecution';
-import { StorageIo } from '../store/StorageIo';
+import { StorageIo } from '../../runtime/StorageIo';
 import { SessionArtifactResolver } from '../artifacts/SessionArtifactResolver';
-import {
-  LIVE_PLAN_URI,
-  PlanArtifactWriter,
-  composePlanMarkdown,
-  sectionsFromMarkdown,
-} from './sessionPlanArtifact';
+import { parsePlanTaskRequirements, renderPlanTaskRequirements } from './planTaskRequirements';
+import { LIVE_PLAN_URI, PlanArtifactWriter, composePlanMarkdown, sectionsFromMarkdown } from './sessionPlanArtifact';
+import type { PlanTaskRequirement } from './planTaskRequirements';
 
 describe('PlanArtifactWriter', () => {
   const roots: string[] = [];
@@ -24,15 +20,19 @@ describe('PlanArtifactWriter', () => {
     roots.push(projectsRoot);
     const sessionPath = path.join(projectsRoot, 'sess');
     await mkdir(sessionPath, { recursive: true });
-    await writeFile(path.join(sessionPath, 'session.json'), JSON.stringify({
-      sessionId: 'sess',
-      projectId: 'p',
-      title: 't',
-      goal: '',
-      sessionPath,
-      createdAt: 1,
-      updatedAt: 1,
-    }), 'utf8');
+    await writeFile(
+      path.join(sessionPath, 'session.json'),
+      JSON.stringify({
+        sessionId: 'sess',
+        projectId: 'p',
+        title: 't',
+        goal: '',
+        sessionPath,
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+      'utf8',
+    );
 
     const resolver = new SessionArtifactResolver({ resolveSessionPath: () => sessionPath, io: new StorageIo() });
     const writer = new PlanArtifactWriter(resolver);
@@ -41,9 +41,13 @@ describe('PlanArtifactWriter', () => {
     expect(first.uri).toBe(LIVE_PLAN_URI);
     expect(second.uri).toBe(LIVE_PLAN_URI);
     expect(first.hash).not.toBe(second.hash);
-    const frozen = writer.freezeApprovedPlan('sess', second.hash);
+    const frozen = writer.stageFrozenPlan('sess', second.hash);
     expect(frozen.uri).toMatch(/^session:\/\/plans\/plan-\d{4}-\d{2}-\d{2}T\d+Z-[a-f0-9]{8}\.md$/);
     expect(frozen.hash).toBe(second.hash);
+    writer.writeFrozenPlan('sess', frozen);
+    expect(writer.readMarkdown('sess', frozen.uri, second.hash).markdown).toContain('## Goal\ntwo');
+    writer.discardFrozenPlan('sess', frozen.uri);
+    expect(() => writer.readMarkdown('sess', frozen.uri, second.hash)).toThrow('PLAN_NOT_FOUND');
     const live = writer.readMarkdown('sess', LIVE_PLAN_URI, second.hash);
     expect(live.markdown).toContain('## Goal\ntwo');
   });
@@ -51,9 +55,17 @@ describe('PlanArtifactWriter', () => {
 
 describe('plan markdown helpers', () => {
   const task: PlanTaskRequirement = {
-    taskId: 'task-review', revision: 3, subject: 'Independent review', description: 'Review current material only.',
-    blockedBy: ['task-generation'], completionRequirements: ['review'],
-    executionRequirements: { mode: 'subagent', requiredSkillIds: ['review-method'], independentOfTaskIds: ['task-generation'] },
+    taskId: 'task-review',
+    revision: 3,
+    subject: 'Independent review',
+    description: 'Review current material only.',
+    blockedBy: ['task-generation'],
+    completionRequirements: ['review'],
+    executionRequirements: {
+      mode: 'subagent',
+      requiredSkillIds: ['review-method'],
+      independentOfTaskIds: ['task-generation'],
+    },
   };
 
   it('includes the exact main-owned Task obligations in the reviewed and hashed Markdown', () => {
@@ -61,7 +73,12 @@ describe('plan markdown helpers', () => {
     const markdown = composePlanMarkdown({ ...input, taskRequirements: [task] });
     expect(parsePlanTaskRequirements(markdown)).toEqual([task]);
     expect(sectionsFromMarkdown(markdown).map((section) => section.heading)).toEqual(['Work']);
-    expect(composePlanMarkdown({ ...input, taskRequirements: [{ ...task, completionRequirements: ['review', 'limitations'] }] })).not.toBe(markdown);
+    expect(
+      composePlanMarkdown({
+        ...input,
+        taskRequirements: [{ ...task, completionRequirements: ['review', 'limitations'] }],
+      }),
+    ).not.toBe(markdown);
     expect(() => composePlanMarkdown({ ...input, content: markdown })).toThrow('generated from requiredTaskIds');
   });
 
@@ -71,7 +88,11 @@ describe('plan markdown helpers', () => {
     const section = renderPlanTaskRequirements([task]);
     expect(() => parsePlanTaskRequirements(section + section)).toThrow('duplicate');
     expect(() => parsePlanTaskRequirements(section + '\nUnbound trailing instructions.')).toThrow('terminate');
-    expect(() => renderPlanTaskRequirements([{ ...task, executionRequirements: { ...task.executionRequirements!, mode: 'direct' } }])).toThrow();
+    expect(() =>
+      renderPlanTaskRequirements([
+        { ...task, executionRequirements: { ...task.executionRequirements!, mode: 'direct' } },
+      ]),
+    ).toThrow();
   });
 
   it('composes title, summary and content then splits ## sections', () => {

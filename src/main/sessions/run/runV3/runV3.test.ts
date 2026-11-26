@@ -3,11 +3,11 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { StorageIo } from '../../store/StorageIo';
+import { StorageIo } from '../../../runtime/StorageIo';
 import { readPersistedRun, writeRunFiles } from '../sessionRunPersistence';
 import { SessionRecordStore } from '../../store/SessionRecordStore';
 import { PersistedRunRecordV3Schema, toPersistedRunV3 } from './runRecordSchema';
-import type { StorageHost } from '../../store/storageHost';
+import type { SessionRecordHost } from '../../store/SessionRecordStore';
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
@@ -20,8 +20,8 @@ const runtime = {
   session_id: 'sess',
 };
 
-function host(): StorageHost {
-  return { io: new StorageIo() } as StorageHost;
+function storageIo(): StorageIo {
+  return new StorageIo();
 }
 
 function v3Base() {
@@ -32,7 +32,15 @@ function v3Base() {
     caseId: 'sess',
     profileId: 'general',
     goal: 'g',
-    captures: [{ id: 'cap', filePath: 'a.rdc', role: 'primary' as const, backendHint: 'local' as const, status: 'pending' as const }],
+    captures: [
+      {
+        id: 'cap',
+        filePath: 'a.rdc',
+        role: 'primary' as const,
+        backendHint: 'local' as const,
+        status: 'pending' as const,
+      },
+    ],
     startedAt: 1,
     status: 'running' as const,
     backend: 'local' as const,
@@ -56,13 +64,23 @@ describe('Run v3 schema', () => {
     expect(conversation.kind).toBe('conversation');
     expect(conversation.captures).toEqual([]);
     expect(PersistedRunRecordV3Schema.safeParse(conversation).success).toBe(true);
-    for (const field of ['mode', 'lastStage', 'last_stage', 'workflow_stage', 'recommendedSpecialists', 'availableStages', 'currentStage']) {
+    for (const field of [
+      'mode',
+      'lastStage',
+      'last_stage',
+      'workflow_stage',
+      'recommendedSpecialists',
+      'availableStages',
+      'currentStage',
+    ]) {
       expect(PersistedRunRecordV3Schema.safeParse({ ...conversation, [field]: 'obsolete' }).success).toBe(false);
     }
-    expect(PersistedRunRecordV3Schema.safeParse({
-      ...conversation,
-      runtime: { ...runtime, workflow_stage: 'investigate' },
-    }).success).toBe(false);
+    expect(
+      PersistedRunRecordV3Schema.safeParse({
+        ...conversation,
+        runtime: { ...runtime, workflow_stage: 'investigate' },
+      }).success,
+    ).toBe(false);
     expect(PersistedRunRecordV3Schema.safeParse({ ...conversation, mission: 'debugger' }).success).toBe(false);
     expect(PersistedRunRecordV3Schema.safeParse({ ...conversation, captures: v3Base().captures }).success).toBe(false);
 
@@ -99,34 +117,40 @@ describe('current Run persistence', () => {
   it('writes JSON and YAML projections and reads current JSON', async () => {
     const runPath = await tempRun();
     const run = toPersistedRunV3(v3Base());
-    writeRunFiles(host(), runPath, run);
+    writeRunFiles(storageIo(), runPath, run);
     expect(fs.existsSync(path.join(runPath, 'run.yaml'))).toBe(true);
-    expect(JSON.parse(await readFile(path.join(runPath, 'run.json'), 'utf8'))).toMatchObject({ schemaVersion: '3', runId: 'run_c' });
-    expect(readPersistedRun(host(), runPath, 'sess', 'run_c')).toEqual(run);
+    expect(JSON.parse(await readFile(path.join(runPath, 'run.json'), 'utf8'))).toMatchObject({
+      schemaVersion: '3',
+      runId: 'run_c',
+    });
+    expect(readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toEqual(run);
   });
 
   it('returns null only when neither Run projection exists', async () => {
     const runPath = await tempRun();
-    expect(readPersistedRun(host(), runPath, 'sess', 'run_c')).toBeNull();
+    expect(readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toBeNull();
   });
 
   it('rejects YAML-only data without silently recreating a JSON Run', async () => {
     const runPath = await tempRun();
     const yamlPath = path.join(runPath, 'run.yaml');
     await writeFile(yamlPath, 'schemaVersion: "2"\nrunId: run_c\n', 'utf8');
-    expect(() => readPersistedRun(host(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+    expect(() => readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
     expect(await readFile(yamlPath, 'utf8')).toContain('schemaVersion');
     expect(fs.existsSync(path.join(runPath, 'run.json'))).toBe(false);
   });
 
-  it.each([undefined, '0', '1', '2', '99'])('rejects unsupported version %s without touching the source', async (version) => {
-    const runPath = await tempRun();
-    const filePath = path.join(runPath, 'run.json');
-    const raw = JSON.stringify({ ...toPersistedRunV3(v3Base()), schemaVersion: version });
-    await writeFile(filePath, raw, 'utf8');
-    expect(() => readPersistedRun(host(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-    expect(await readFile(filePath, 'utf8')).toBe(raw);
-  });
+  it.each([undefined, '0', '1', '2', '99'])(
+    'rejects unsupported version %s without touching the source',
+    async (version) => {
+      const runPath = await tempRun();
+      const filePath = path.join(runPath, 'run.json');
+      const raw = JSON.stringify({ ...toPersistedRunV3(v3Base()), schemaVersion: version });
+      await writeFile(filePath, raw, 'utf8');
+      expect(() => readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+      expect(await readFile(filePath, 'utf8')).toBe(raw);
+    },
+  );
 
   it('rejects invalid v3 and mismatched directory identity without rewriting', async () => {
     const runPath = await tempRun();
@@ -140,7 +164,7 @@ describe('current Run persistence', () => {
     ]) {
       const raw = JSON.stringify(run);
       await writeFile(filePath, raw, 'utf8');
-      expect(() => readPersistedRun(host(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA/);
+      expect(() => readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA/);
       expect(await readFile(filePath, 'utf8')).toBe(raw);
     }
   });
@@ -148,7 +172,7 @@ describe('current Run persistence', () => {
   it('refuses to write an invalid Run instead of persisting a stage field', async () => {
     const runPath = await tempRun();
     const run = { ...toPersistedRunV3(v3Base()), lastStage: 'investigate' };
-    expect(() => writeRunFiles(host(), runPath, run)).toThrow(/refused to write invalid Run v3/);
+    expect(() => writeRunFiles(storageIo(), runPath, run)).toThrow(/refused to write invalid Run v3/);
     expect(fs.existsSync(path.join(runPath, 'run.json'))).toBe(false);
   });
 
@@ -167,14 +191,28 @@ describe('current Run persistence', () => {
         setCurrentProjectId: () => undefined,
         setCurrentSessionId: () => undefined,
       },
-    } as unknown as StorageHost);
+    } as unknown as SessionRecordHost);
     await mkdir(runPath, { recursive: true });
-    await writeFile(path.join(sessionPath, 'session.json'), JSON.stringify({
-      sessionId: 'sess', projectId: 'p', title: 't', goal: '', sessionPath, createdAt: 1, updatedAt: 1,
-    }), 'utf8');
-    writeRunFiles({ io } as StorageHost, runPath, toPersistedRunV3({ ...v3Base(), runId: 'r-final' }));
-    await expect(store.updateRun('sess', 'r-final', { lastStage: 'finalize', status: 'running' })).rejects.toThrow(/RUN_V3_STAGE_FIELD/);
-    await expect(store.updateRun('sess', 'r-final', { runtime: { workflow_stage: 'finalize' }, status: 'running' })).rejects.toThrow(/RUN_V3_STAGE_FIELD/);
+    await writeFile(
+      path.join(sessionPath, 'session.json'),
+      JSON.stringify({
+        sessionId: 'sess',
+        projectId: 'p',
+        title: 't',
+        goal: '',
+        sessionPath,
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+      'utf8',
+    );
+    writeRunFiles(io, runPath, toPersistedRunV3({ ...v3Base(), runId: 'r-final' }));
+    await expect(store.updateRun('sess', 'r-final', { lastStage: 'finalize', status: 'running' })).rejects.toThrow(
+      /RUN_V3_STAGE_FIELD/,
+    );
+    await expect(
+      store.updateRun('sess', 'r-final', { runtime: { workflow_stage: 'finalize' }, status: 'running' }),
+    ).rejects.toThrow(/RUN_V3_STAGE_FIELD/);
     expect(store.readPersistedRun('sess', 'r-final')?.status).toBe('running');
   });
 });

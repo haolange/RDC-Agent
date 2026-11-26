@@ -6,13 +6,6 @@ import {
   splitAnthropicCacheWrite,
   cacheHitRatePercent,
 } from './internal/normalizeCacheUsage';
-import type {
-  CredentialStore,
-  ProviderCredential,
-  ApiKeyAuth,
-  OAuthAuth,
-  ProviderAuth,
-} from '../../settings/settings-core/CredentialStoreInterface';
 
 // =====================================================================
 // 4. normalizeCacheUsage with cacheWriteLongTokens
@@ -116,88 +109,6 @@ describe('cacheHitRatePercent', () => {
     expect(cacheHitRatePercent(75, 25)).toBe(75);
     expect(cacheHitRatePercent(100, 0)).toBe(100);
     expect(cacheHitRatePercent(0, 100)).toBe(0);
-  });
-});
-
-// =====================================================================
-// 7. CredentialStoreInterface type conformance (compile-time + runtime)
-// =====================================================================
-
-describe('CredentialStoreInterface', () => {
-  it('CredentialStore interface is structurally implementable', () => {
-    const store = new Map<string, ProviderCredential>();
-    const impl: CredentialStore = {
-      async read(providerId: string) {
-        return store.get(providerId);
-      },
-      async modify(providerId, fn) {
-        const current = store.get(providerId);
-        const next = await fn(current);
-        if (next === undefined) {
-          store.delete(providerId);
-        } else {
-          store.set(providerId, next);
-        }
-        return next;
-      },
-      async delete(providerId: string) {
-        store.delete(providerId);
-      },
-    };
-
-    // Verify the interface is callable
-    expect(impl.read).toBeTypeOf('function');
-    expect(impl.modify).toBeTypeOf('function');
-    expect(impl.delete).toBeTypeOf('function');
-  });
-
-  it('ApiKeyAuth interface is structurally implementable', () => {
-    const auth: ApiKeyAuth = {
-      name: 'test-key-auth',
-      async resolve({ modelId, providerId }) {
-        if (providerId === 'openai') return { apiKey: 'sk-test', baseUrl: undefined };
-        if (modelId === 'custom') return { apiKey: 'sk-custom', baseUrl: 'https://custom.api' };
-        return undefined;
-      },
-    };
-    expect(auth.name).toBe('test-key-auth');
-    expect(auth.resolve).toBeTypeOf('function');
-  });
-
-  it('OAuthAuth interface is structurally implementable', () => {
-    const auth: OAuthAuth = {
-      name: 'test-oauth',
-      async login() {
-        return { token: 'oauth-token-123' };
-      },
-      async refresh(credential) {
-        return { token: `${credential.token}-refreshed` };
-      },
-      async toAuth(credential) {
-        return { apiKey: credential.token, headers: { Authorization: `Bearer ${credential.token}` } };
-      },
-    };
-    expect(auth.name).toBe('test-oauth');
-    expect(auth.login).toBeTypeOf('function');
-    expect(auth.refresh).toBeTypeOf('function');
-    expect(auth.toAuth).toBeTypeOf('function');
-  });
-
-  it('ProviderAuth composes apiKey and oauth', () => {
-    const providerAuth: ProviderAuth = {
-      apiKey: {
-        name: 'key',
-        resolve: async () => ({ apiKey: 'k' }),
-      },
-      oauth: {
-        name: 'oauth',
-        login: async () => ({ token: 't' }),
-        refresh: async (c) => ({ token: c.token }),
-        toAuth: async (c) => ({ apiKey: c.token }),
-      },
-    };
-    expect(providerAuth.apiKey).toBeDefined();
-    expect(providerAuth.oauth).toBeDefined();
   });
 });
 

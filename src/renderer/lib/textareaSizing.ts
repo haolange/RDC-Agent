@@ -1,4 +1,5 @@
 import { assignDynStyle, clearDynStyle } from './useDynStyle';
+import { documentFonts } from './documentFonts';
 
 export function textareaHeight(
   scrollHeight: number,
@@ -55,17 +56,25 @@ export function observeTextareaSizing(
   let width = -1;
   const resize = new ResizeObserver((entries) => {
     const next = entries[0]?.contentRect.width ?? 0;
-    if (next !== width) { width = next; schedule(); }
+    if (next !== width) {
+      width = next;
+      schedule();
+    }
   });
   resize.observe(element);
   const mutations = new MutationObserver(schedule);
   for (let node: HTMLElement | null = element; node; node = node.parentElement) {
-    mutations.observe(node, { attributes: true, attributeFilter: ['class', 'style', 'hidden', 'open', 'data-font-scale'] });
+    mutations.observe(node, {
+      attributes: true,
+      attributeFilter: ['class', 'style', 'hidden', 'open', 'data-font-scale'],
+    });
   }
   element.addEventListener('input', measure);
   window.addEventListener('resize', schedule);
-  document.fonts?.addEventListener('loadingdone', schedule);
-  void document.fonts?.ready.then(() => { if (!disposed) schedule(); });
+  documentFonts()?.addEventListener('loadingdone', schedule);
+  void documentFonts()?.ready.then(() => {
+    if (!disposed) schedule();
+  });
   measure();
   return () => {
     disposed = true;
@@ -74,7 +83,7 @@ export function observeTextareaSizing(
     mutations.disconnect();
     element.removeEventListener('input', measure);
     window.removeEventListener('resize', schedule);
-    document.fonts?.removeEventListener('loadingdone', schedule);
+    documentFonts()?.removeEventListener('loadingdone', schedule);
     clearDynStyle(element);
   };
 }

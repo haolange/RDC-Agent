@@ -8,11 +8,14 @@ import type { ElectronAPI } from '@shared/types/electron';
 
 it('updates descriptions without fetching again and distinguishes read failures from empty lists', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const list = vi.fn(async () => ({ commands: [{ id: 'help', name: 'help', description: 'Original', aliases: [], category: 'system' }] }));
+  const list = vi.fn(async () => ({
+    commands: [{ id: 'help', name: 'help', description: 'Original', aliases: [], category: 'system' }],
+  }));
   const priorApi = window.electronAPI;
   window.electronAPI = { command: { list } } as unknown as ElectronAPI;
   const initial = useAppSettingsStore.getState().settings;
-  const host = document.createElement('div'); document.body.append(host);
+  const host = document.createElement('div');
+  document.body.append(host);
   const root = createRoot(host);
   let catalog: ReturnType<typeof useCommandCatalog>;
   function Consumer({ enabled }: { enabled: boolean }) {
@@ -21,11 +24,15 @@ it('updates descriptions without fetching again and distinguishes read failures 
   }
   try {
     await act(async () => {
-      useAppSettingsStore.setState({ settings: { ...initial, appearance: { ...initial.appearance, language: 'zh-CN' } } });
+      useAppSettingsStore.setState({
+        settings: { ...initial, appearance: { ...initial.appearance, language: 'zh-CN' } },
+      });
       root.render(createElement(Consumer, { enabled: true }));
     });
     expect(host.textContent).toBe('列出可用命令或查看命令详情');
-    await act(async () => useAppSettingsStore.setState({ settings: { ...initial, appearance: { ...initial.appearance, language: 'en' } } }));
+    await act(async () =>
+      useAppSettingsStore.setState({ settings: { ...initial, appearance: { ...initial.appearance, language: 'en' } } }),
+    );
     expect(host.textContent).toBe('List all available commands or get details for a specific command');
     expect(list).toHaveBeenCalledOnce();
     await act(async () => root.render(createElement(Consumer, { enabled: false })));
@@ -35,7 +42,10 @@ it('updates descriptions without fetching again and distinguishes read failures 
     expect(catalog!.error).toBe('original read failure');
     expect(catalog!.commands).toHaveLength(1);
   } finally {
-    await act(async () => root.unmount()); host.remove();
-    window.electronAPI = priorApi; useAppSettingsStore.setState({ settings: initial }); vi.unstubAllGlobals();
+    await act(async () => root.unmount());
+    host.remove();
+    window.electronAPI = priorApi;
+    useAppSettingsStore.setState({ settings: initial });
+    vi.unstubAllGlobals();
   }
 });

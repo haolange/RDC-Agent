@@ -16,8 +16,15 @@ export function subscribePermissionState(electronAPI: ElectronAPI): () => void {
   };
   // Subscribe first: a slower initial query may arrive after a newer event.
   const unsubscribe = electronAPI.events.onPermissionStateChanged(apply);
-  void electronAPI.runtime.getPermissionState().then(apply).catch(() => {
-    if (!disposed && !useRuntimePermissionStore.getState().snapshot) useRuntimePermissionStore.getState().setSyncError();
-  });
-  return () => { disposed = true; unsubscribe(); };
+  void electronAPI.runtime
+    .getPermissionState()
+    .then(apply)
+    .catch(() => {
+      if (!disposed && !useRuntimePermissionStore.getState().snapshot)
+        useRuntimePermissionStore.getState().setSyncError();
+    });
+  return () => {
+    disposed = true;
+    unsubscribe();
+  };
 }

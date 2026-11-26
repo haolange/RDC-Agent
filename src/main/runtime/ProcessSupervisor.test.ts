@@ -6,12 +6,11 @@ const spawnLongRunning = (
   supervisor: ProcessSupervisor,
   owner: ProcessOwner = 'shell',
   options: SupervisedSpawnOptions = {},
-) => supervisor.spawn(
-  owner,
-  process.execPath,
-  ['-e', 'setInterval(() => undefined, 1000);'],
-  { isolateProcessGroup: false, ...options },
-);
+) =>
+  supervisor.spawn(owner, process.execPath, ['-e', 'setInterval(() => undefined, 1000);'], {
+    isolateProcessGroup: false,
+    ...options,
+  });
 
 describe('RingBuffer', () => {
   it('bounds retained bytes', () => {
@@ -39,12 +38,9 @@ describe('ProcessSupervisor', () => {
   });
 
   it('registers spawn and reports exit reason', async () => {
-    const supervised = supervisor.spawn(
-      'other',
-      process.execPath,
-      ['-e', 'process.stdout.write("hello");'],
-      { isolateProcessGroup: false },
-    );
+    const supervised = supervisor.spawn('other', process.execPath, ['-e', 'process.stdout.write("hello");'], {
+      isolateProcessGroup: false,
+    });
 
     const info = await supervised.exit;
     expect(info.reason === 'exit' || info.reason === 'signal').toBe(true);

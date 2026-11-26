@@ -23,13 +23,20 @@ export function resolveProviderCardStatus(provider: LlmProviderEntry): ProviderC
   if (provider.isConfigured && provider.status === 'verified') {
     return { tone: 'connected', labelKey: 'settings.providerConnected' };
   }
-  return { tone: 'neutral', labelKey: provider.isConfigured ? 'settings.directory.configured' : 'settings.providerUnconfigured' };
+  return {
+    tone: 'neutral',
+    labelKey: provider.isConfigured ? 'settings.directory.configured' : 'settings.providerUnconfigured',
+  };
 }
 
-export function authModeLabelKey(mode: LlmProviderAuthMode, provider: Pick<LlmProviderEntry, 'connectionSchema'>): TranslationKey {
+export function authModeLabelKey(
+  mode: LlmProviderAuthMode,
+  provider: Pick<LlmProviderEntry, 'connectionSchema'>,
+): TranslationKey {
   if (mode === 'api-key') {
-    return provider.connectionSchema?.fields.some(field => field.id !== 'apiKey')
-      ? 'settings.providerAuthCredentials' : 'settings.providerAuthApiKey';
+    return provider.connectionSchema?.fields.some((field) => field.id !== 'apiKey')
+      ? 'settings.providerAuthCredentials'
+      : 'settings.providerAuthApiKey';
   }
   if (mode === 'account') return 'settings.providerAuthAccount';
   if (mode === 'environment') return 'settings.providerAuthEnvironment';
@@ -37,14 +44,18 @@ export function authModeLabelKey(mode: LlmProviderAuthMode, provider: Pick<LlmPr
   return 'settings.providers.row.noKey';
 }
 
-export function connectHintKey(provider: Pick<LlmProviderEntry, 'authMode' | 'category' | 'connectionSchema'>): TranslationKey {
+export function connectHintKey(
+  provider: Pick<LlmProviderEntry, 'authMode' | 'category' | 'connectionSchema'>,
+): TranslationKey {
   return provider.category === 'coding-token-plan' && provider.authMode === 'api-key'
-    ? 'settings.directory.plan' : authModeLabelKey(provider.authMode, provider);
+    ? 'settings.directory.plan'
+    : authModeLabelKey(provider.authMode, provider);
 }
 
 export function providerIdentityDetail(
   provider: Pick<LlmProviderEntry, 'authMode' | 'category' | 'connectionSchema' | 'accountLabel' | 'planLabel'>,
-  title: string, t: ReturnType<typeof useI18n>['t'],
+  title: string,
+  t: ReturnType<typeof useI18n>['t'],
 ): string {
   const parts = [t(connectHintKey(provider)), provider.accountLabel, provider.planLabel];
   return [...new Set(parts.filter((part) => part && part !== title))].join(' · ');

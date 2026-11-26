@@ -10,18 +10,20 @@ function materializeContractBaseUrl(template: string): string {
 
 describe('provider route URL contracts', () => {
   it('builds every Anthropic-compatible base into one versioned messages operation', () => {
-    const invalid = listProviderSummaries().flatMap((surface) => surface.routes
-      .filter((route) => route.protocol === 'AnthropicMessages' && route.baseUrl)
-      .flatMap((route) => {
-        const url = adapterOperationUrl(
-          route.adapterId,
-          materializeContractBaseUrl(route.baseUrl),
-          surface.models[0]?.modelId ?? 'catalog-contract-model',
-        );
-        return url && /\/v\d+(?:\/[^/?#]+)*\/messages(?:\?|$)/u.test(new URL(url).pathname)
-          ? []
-          : [`${surface.id}: ${url}`];
-      }));
+    const invalid = listProviderSummaries().flatMap((surface) =>
+      surface.routes
+        .filter((route) => route.protocol === 'AnthropicMessages' && route.baseUrl)
+        .flatMap((route) => {
+          const url = adapterOperationUrl(
+            route.adapterId,
+            materializeContractBaseUrl(route.baseUrl),
+            surface.models[0]?.modelId ?? 'catalog-contract-model',
+          );
+          return url && /\/v\d+(?:\/[^/?#]+)*\/messages(?:\?|$)/u.test(new URL(url).pathname)
+            ? []
+            : [`${surface.id}: ${url}`];
+        }),
+    );
     expect(invalid).toEqual([]);
   });
 

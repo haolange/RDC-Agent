@@ -7,9 +7,18 @@ export interface CapabilityStatusPresentation {
   refreshing: boolean;
 }
 
-export function capabilityStatusPresentation(
-  state: CapabilityResolutionState,
-): CapabilityStatusPresentation {
+/** Why a committed model cannot run, in words; the diagnostic message only travels through「复制详情」. */
+const UNAVAILABLE_DETAIL_KEYS: Record<
+  Extract<CapabilityResolutionState, { status: 'unavailable' }>['reason'],
+  TranslationKey
+> = {
+  'missing-model': 'composer.effort.capabilityUnavailableDetail',
+  'missing-revision': 'composer.effort.capabilityUnavailableUnconfirmed',
+  'route-mismatch': 'composer.effort.capabilityUnavailableRouteChanged',
+  'provider-unavailable': 'composer.effort.capabilityUnavailableProvider',
+};
+
+export function capabilityStatusPresentation(state: CapabilityResolutionState): CapabilityStatusPresentation {
   switch (state.status) {
     case 'loading':
       return { labelKey: 'composer.effort.capabilityLoading', refreshing: false };
@@ -18,7 +27,7 @@ export function capabilityStatusPresentation(
     case 'unavailable':
       return {
         labelKey: 'composer.effort.capabilityUnavailable',
-        detailKey: 'composer.effort.capabilityUnavailableDetail',
+        detailKey: UNAVAILABLE_DETAIL_KEYS[state.reason],
         refreshing: false,
       };
     case 'error':

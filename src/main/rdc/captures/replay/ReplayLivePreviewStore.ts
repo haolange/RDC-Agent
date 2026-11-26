@@ -1,7 +1,8 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../../runtime/AppPathService';
-import { assertSession, missing } from './replayFileSafety';
+import { assertSession, missing } from '../../../runtime/replayFileSafety';
 import type { OpenedCapturePreview } from '@shared/types/session';
 import type { EncodedReplayPng } from './replayStorageTypes';
 
@@ -16,7 +17,12 @@ export class ReplayLivePreviewStore {
     return appPathService.getLiveReplayPreviewPath(sessionId);
   }
 
-  async write(sessionId: string, generation: number, imageEventId: number, encoded: EncodedReplayPng): Promise<OpenedCapturePreview> {
+  async write(
+    sessionId: string,
+    generation: number,
+    imageEventId: number,
+    encoded: EncodedReplayPng,
+  ): Promise<OpenedCapturePreview> {
     const target = this.pathFor(sessionId);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, encoded.png);
@@ -33,7 +39,7 @@ export class ReplayLivePreviewStore {
     try {
       return await fs.readFile(this.pathFor(sessionId));
     } catch (error) {
-      if (missing(error)) throw new Error('REPLAY_LIVE_MISSING');
+      if (missing(error)) throw new AppError('REPLAY_LIVE_MISSING', undefined, { cause: error });
       throw error;
     }
   }

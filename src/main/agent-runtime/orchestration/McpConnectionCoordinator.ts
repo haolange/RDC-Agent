@@ -7,6 +7,7 @@
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { AppError } from '@shared/errors/appError';
 import { currentHost, type HostDescriptor } from '../../platform/host';
 import { pathComparisonKey } from '../../platform/paths';
 import {
@@ -19,7 +20,7 @@ import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentR
 import { mcpTrustService } from '../../settings/settings-core/McpTrustService';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import type { AgentRole } from '@shared/types/agent';
-import type { AgentRuntimeMcpDescriptor } from '@shared/types/agentRuntime';
+import type { AgentRuntimeMcpDescriptor } from '../../settings/agent-manifests/agentRuntimeTypes';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { AgentTool } from '../agent/AgentTool';
 import type { SupervisedProcess } from '../../runtime/ProcessSupervisor';
@@ -92,19 +93,19 @@ export function classifyMcpFailure(err: unknown): McpFailureKind {
   const message = err instanceof Error ? err.message : String(err);
   const lower = message.toLowerCase();
   if (
-    message.includes('MCP_TRANSPORT_UNSUPPORTED')
-    || /needs trust/i.test(message)
-    || /trust denied|not trusted|requires a trusted project root/i.test(message)
-    || /invalid descriptor|missing command|missing url/i.test(message)
-    || /configuration error|misconfigured|blockedreason/i.test(lower)
-    || /executableoverriderejected/i.test(lower)
+    message.includes('MCP_TRANSPORT_UNSUPPORTED') ||
+    /needs trust/i.test(message) ||
+    /trust denied|not trusted|requires a trusted project root/i.test(message) ||
+    /invalid descriptor|missing command|missing url/i.test(message) ||
+    /configuration error|misconfigured|blockedreason/i.test(lower) ||
+    /executableoverriderejected/i.test(lower)
   ) {
     return 'permanent';
   }
   if (
-    /econnrefused|etimedout|enotfound|econnreset|eai_again|ehostunreach|enetunreach/i.test(message)
-    || /timeout|timed out|spawn|network|temporarily unavailable|eperm|eacces|pipe|broken pipe/i.test(lower)
-    || /unconfirmed orphan|failed to spawn/i.test(lower)
+    /econnrefused|etimedout|enotfound|econnreset|eai_again|ehostunreach|enetunreach/i.test(message) ||
+    /timeout|timed out|spawn|network|temporarily unavailable|eperm|eacces|pipe|broken pipe/i.test(lower) ||
+    /unconfirmed orphan|failed to spawn/i.test(lower)
   ) {
     return 'retryable';
   }
@@ -112,11 +113,14 @@ export function classifyMcpFailure(err: unknown): McpFailureKind {
   return 'retryable';
 }
 
-function computeNextRetryAt(attempts: number, now = Date.now()): number {
+function computeNextRetryAt(attempts: number): number {
   const exp = Math.max(0, attempts - 1);
-  const delay = Math.min(MCP_RETRY_CAP_MS, MCP_RETRY_BASE_MS * (2 ** exp));
-  return now + delay;
+  const delay = Math.min(MCP_RETRY_CAP_MS, MCP_RETRY_BASE_MS * 2 ** exp);
+  return Date.now() + delay;
 }
+
+/** Re-read after the awaits in evictPool: quarantinePool may have run meanwhile. */
+const isQuarantined = (pool: ProjectMcpPool): boolean => pool.quarantined;
 
 export class McpConnectionCoordinator {
   private readonly pools = new Map<string, ProjectMcpPool>();
@@ -124,15 +128,15 @@ export class McpConnectionCoordinator {
   private readonly activePoolByProject = new Map<string, string>();
   private readonly orphanedPools = new Map<string, OrphanedPoolRecord>();
 
-  getAgentTools(projectRootPath?: string | null, poolKey?: string | null, projectId?: string | null): AgentTool[] {
-    const pool = poolKey
-      ? this.pools.get(poolKey)
-      : this.resolveActivePool(projectRootPath, projectId);
+  getAgentTools(projectRootPath?: string | null, poolKey?: string | null): AgentTool[] {
+    const pool = poolKey ? this.pools.get(poolKey) : this.resolveActivePool(projectRootPath);
     if (!pool || pool.closing || pool.quarantined) return [];
-    if (poolKey && projectRootPath && pool.projectRootPath && this.projectKey(pool.projectRootPath) !== this.projectKey(projectRootPath)) {
-      return [];
-    }
-    if (poolKey && projectId && pool.projectId && pool.projectId !== projectId.trim()) {
+    if (
+      poolKey &&
+      projectRootPath &&
+      pool.projectRootPath &&
+      this.projectKey(pool.projectRootPath) !== this.projectKey(projectRootPath)
+    ) {
       return [];
     }
     return pool.manager.getAgentTools();
@@ -143,14 +147,16 @@ export class McpConnectionCoordinator {
   }
 
   /** Settings / IPC status is scoped to the requested project and never merges pools. */
-  getMcpServerStatusSummary(projectRootPath?: string | null, query?: string, projectId?: string | null): MCPServerStatusSummary[] {
+  getMcpServerStatusSummary(projectRootPath?: string | null, query?: string): MCPServerStatusSummary[] {
     const normalizedQuery = query?.trim().toLowerCase() ?? '';
-    const configured = agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
-      .filter((server) => !normalizedQuery
-        || (server.id + ' ' + server.name + ' ' + server.description).toLowerCase().includes(normalizedQuery));
-    const runtimeById = new Map(
-      this.getRuntimeStatusSummary(projectRootPath, projectId).map((entry) => [entry.id, entry]),
-    );
+    const configured = agentRuntimeConfigService
+      .listMcpServers(projectRootPath ?? undefined)
+      .filter(
+        (server) =>
+          !normalizedQuery ||
+          (server.id + ' ' + server.name + ' ' + server.description).toLowerCase().includes(normalizedQuery),
+      );
+    const runtimeById = new Map(this.getRuntimeStatusSummary(projectRootPath).map((entry) => [entry.id, entry]));
     return configured.map((server) => {
       const runtime = runtimeById.get(server.id) ?? runtimeById.get(server.name);
       const summary: MCPServerStatusSummary = {
@@ -165,13 +171,92 @@ export class McpConnectionCoordinator {
     });
   }
 
+  /**
+   * Connects one configured server at the person's request (`/mcp connect`) into the project's active pool, or a pool
+   * of its own when no turn has opened one. Its failure backoff is cleared so a server that failed before is tried
+   * now; trust is enforced at connect time as for a turn. The returned status is the server's live summary.
+   */
+  async connectServer(
+    projectRootPath: string | null,
+    projectId: string | null,
+    descriptor: AgentRuntimeMcpDescriptor,
+  ): Promise<{ alreadyConnected: boolean; status: MCPServerStatusSummary }> {
+    const pool =
+      this.resolveActivePool(projectRootPath, projectId) ??
+      this.openManualPool(projectRootPath, projectId, [descriptor]);
+    if (pool.closing) throw new AppError('MCP_POOL_QUARANTINED', `pool ${pool.key} is closing.`);
+    const alreadyConnected = pool.manager.listServers().includes(descriptor.id);
+    if (!alreadyConnected) {
+      pool.failedMcpServers.delete(descriptor.id);
+      try {
+        await this.ensurePoolServerConnected(pool, descriptor, projectRootPath);
+      } catch (error) {
+        this.recordFailure(pool, descriptor.id, error);
+        throw error;
+      }
+    }
+    const status = pool.manager.getServerStatusSummary().find((entry) => entry.id === descriptor.id)!;
+    return { alreadyConnected, status };
+  }
+
+  /**
+   * Disconnects one server of the project's active pool at the person's request (`/mcp disconnect`). A pool a running
+   * turn holds is left alone, since its tools would vanish mid-turn. A turn that needs the server connects it again.
+   */
+  async disconnectServer(
+    projectRootPath: string | null,
+    projectId: string | null,
+    serverId: string,
+  ): Promise<'disconnected' | 'not-connected' | 'in-use' | 'orphaned'> {
+    const pool = this.resolveActivePool(projectRootPath, projectId);
+    if (!pool || !pool.manager.listServers().includes(serverId)) return 'not-connected';
+    if (pool.activeTurnRefs > 0) return 'in-use';
+    const detail = await pool.manager.disconnect(serverId);
+    this.reportOrphanedDisconnects([detail.status], 'MCP manual disconnect left an orphaned process');
+    return detail.status;
+  }
+
+  /** A pool for a manual connect when no turn has one: keyed by its descriptor set and active for the project. */
+  private openManualPool(
+    projectRootPath: string | null,
+    projectId: string | null,
+    descriptors: readonly AgentRuntimeMcpDescriptor[],
+  ): ProjectMcpPool {
+    const root = projectRootPath ? this.resolveRootPath(projectRootPath) : null;
+    const normalizedProjectId = projectId?.trim() || null;
+    const descriptorHash = this.descriptorSetHash(descriptors);
+    const key = this.poolKey(root, normalizedProjectId, descriptorHash);
+    if (this.orphanedPools.has(key)) {
+      throw new AppError('MCP_POOL_QUARANTINED', `pool ${key} is quarantined until orphaned processes exit.`);
+    }
+    const pool = this.pools.get(key) ?? {
+      key,
+      projectRootPath: root,
+      projectId: normalizedProjectId,
+      descriptorHash,
+      manager: new MCPManager(),
+      connecting: new Map(),
+      failedMcpServers: new Map(),
+      lastUsedAt: Date.now(),
+      activeTurnRefs: 0,
+      closing: false,
+      superseded: false,
+      quarantined: false,
+    };
+    this.pools.set(key, pool);
+    if (root) this.activePoolByProject.set(this.activeProjectMapKey(root, normalizedProjectId), key);
+    return pool;
+  }
+
   async disconnectAll(): Promise<void> {
     const pools = Array.from(this.pools.values());
     for (const pool of pools) pool.closing = true;
-    const statuses = await Promise.all(pools.map(async (pool) => {
-      await Promise.allSettled(pool.connecting.values());
-      return pool.manager.disconnectAll();
-    }));
+    const statuses = await Promise.all(
+      pools.map(async (pool) => {
+        await Promise.allSettled(pool.connecting.values());
+        return pool.manager.disconnectAll();
+      }),
+    );
     this.reportOrphanedDisconnects(
       statuses.flat().map((detail) => detail.status),
       'MCP shutdown left an orphaned process',
@@ -232,10 +317,10 @@ export class McpConnectionCoordinator {
             const activePool = activeKey ? this.pools.get(activeKey) : undefined;
             return activePool ? [activePool] : [];
           })()
-        : Array.from(this.pools.values()).filter((pool) => (
-          pool.projectRootPath === null
-          && (normalizedProjectId === null || pool.projectId === normalizedProjectId)
-        ));
+        : Array.from(this.pools.values()).filter(
+            (pool) =>
+              pool.projectRootPath === null && (normalizedProjectId === null || pool.projectId === normalizedProjectId),
+          );
       for (const pool of pools) {
         if (pool.activeTurnRefs === 0) await this.evictPool(pool);
         else pool.superseded = true;
@@ -247,12 +332,12 @@ export class McpConnectionCoordinator {
     const poolKey = this.poolKey(root, normalizedProjectId, descriptorHash);
 
     if (this.orphanedPools.has(poolKey)) {
-      throw new Error(`MCP_POOL_QUARANTINED: pool ${poolKey} is quarantined until orphaned processes exit.`);
+      throw new AppError('MCP_POOL_QUARANTINED', `pool ${poolKey} is quarantined until orphaned processes exit.`);
     }
 
     let pool = this.pools.get(poolKey);
     if (pool?.quarantined) {
-      throw new Error(`MCP_POOL_QUARANTINED: pool ${poolKey} is quarantined until orphaned processes exit.`);
+      throw new AppError('MCP_POOL_QUARANTINED', `pool ${poolKey} is quarantined until orphaned processes exit.`);
     }
     if (!pool) {
       pool = {
@@ -281,10 +366,10 @@ export class McpConnectionCoordinator {
       this.activePoolByProject.set(activeMapKey, poolKey);
       for (const candidate of this.pools.values()) {
         if (
-          candidate.key !== poolKey
-          && candidate.projectRootPath
-          && this.projectKey(candidate.projectRootPath) === this.projectKey(root)
-          && (candidate.projectId ?? null) === normalizedProjectId
+          candidate.key !== poolKey &&
+          candidate.projectRootPath &&
+          this.projectKey(candidate.projectRootPath) === this.projectKey(root) &&
+          (candidate.projectId ?? null) === normalizedProjectId
         ) {
           candidate.superseded = true;
         }
@@ -305,12 +390,12 @@ export class McpConnectionCoordinator {
         }
         if (now < previous.nextRetryAt) {
           errors.push(
-            descriptor.id
-              + ': retry deferred until '
-              + new Date(previous.nextRetryAt).toISOString()
-              + ' ('
-              + previous.lastError
-              + ')',
+            descriptor.id +
+              ': retry deferred until ' +
+              new Date(previous.nextRetryAt).toISOString() +
+              ' (' +
+              previous.lastError +
+              ')',
           );
           continue;
         }
@@ -321,9 +406,9 @@ export class McpConnectionCoordinator {
       } catch (error) {
         // Cancellation must not poison the failure/backoff cache.
         if (
-          signal?.aborted
-          || (error instanceof Error && error.name === 'AbortError')
-          || (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError')
+          signal?.aborted ||
+          (error instanceof Error && error.name === 'AbortError') ||
+          (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError')
         ) {
           throw error instanceof Error ? error : new DOMException('The operation was aborted', 'AbortError');
         }
@@ -435,10 +520,10 @@ export class McpConnectionCoordinator {
         return;
       }
     } finally {
-      if (!pool.quarantined && this.pools.get(pool.key) === pool) {
+      if (!isQuarantined(pool) && this.pools.get(pool.key) === pool) {
         this.pools.delete(pool.key);
         this.clearActiveMapping(pool);
-      } else if (pool.quarantined) {
+      } else if (isQuarantined(pool)) {
         // Keep identity in registry while quarantined; allow no new turns.
         pool.closing = true;
         pool.activeTurnRefs = 0;
@@ -495,7 +580,7 @@ export class McpConnectionCoordinator {
         },
       });
     }, MCP_ORPHAN_DEADLINE_MS);
-    record.deadlineTimer.unref?.();
+    record.deadlineTimer.unref();
 
     if (supervised.length === 0) {
       // No handle to observe; keep quarantined until shutdown disconnectAll.
@@ -599,14 +684,16 @@ export class McpConnectionCoordinator {
 
   private hashMcpDescriptor(descriptor: AgentRuntimeMcpDescriptor): string {
     return createHash('sha256')
-      .update(JSON.stringify({
-        id: descriptor.id,
-        transport: descriptor.transport,
-        command: descriptor.command ?? null,
-        args: descriptor.args ?? [],
-        url: descriptor.url ?? null,
-        env: descriptor.env ?? {},
-      }))
+      .update(
+        JSON.stringify({
+          id: descriptor.id,
+          transport: descriptor.transport,
+          command: descriptor.command ?? null,
+          args: descriptor.args ?? [],
+          url: descriptor.url ?? null,
+          env: descriptor.env ?? {},
+        }),
+      )
       .digest('hex')
       .slice(0, 16);
   }
@@ -621,7 +708,8 @@ export class McpConnectionCoordinator {
     // back to user settings would reintroduce prompt/runtime split-brain.
     const ids = enabledMcpIds ?? [];
     const enabledIds = new Set(ids);
-    return agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
+    return agentRuntimeConfigService
+      .listMcpServers(projectRootPath ?? undefined)
       .filter((server) => enabledIds.has(server.id) || enabledIds.has(server.name));
   }
 

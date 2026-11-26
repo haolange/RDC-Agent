@@ -9,7 +9,6 @@ export interface HandoffActionRowProps {
   options: PlanReviewHandoffOption[];
   onSelect: (option: PlanReviewHandoffOption) => void;
   disabled?: boolean;
-  testId?: string;
   presentation?: 'buttons' | 'decisions';
 }
 
@@ -17,12 +16,11 @@ export const HandoffActionRow: React.FC<HandoffActionRowProps> = ({
   options,
   onSelect,
   disabled = false,
-  testId = 'handoff-action-row',
   presentation = 'buttons',
 }) => {
   const { language } = useI18n();
   return (
-    <div className={`handoff-action-row is-${presentation}`} data-testid={testId} role="group">
+    <div className={`handoff-action-row is-${presentation}`} data-testid="handoff-action-row" role="group">
       {options.map((option) => (
         <Button
           key={`${option.agent}:${option.label}`}

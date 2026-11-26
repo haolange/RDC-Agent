@@ -1,8 +1,10 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useDynStyle } from '../../lib/useDynStyle';
+import { documentFonts } from '../../lib/documentFonts';
 import { placeAnchoredSurface } from '../../lib/anchoredSurface';
 import { isTopOverlayLayer, useOverlayLayer } from '../../lib/overlayStack';
+import { useDismissable } from '../../lib/useDismissable';
 import { usePresence, type PresenceState } from '../usePresence';
 import type { ContextMenuCommandId } from '../../lib/contextMenuCommands';
 import type { ContextMenuItem } from '../../lib/contextMenuItems';
@@ -20,9 +22,7 @@ export interface ContextMenuProps {
 }
 
 function enabledCommandIndexes(items: ContextMenuItem[]): number[] {
-  return items.flatMap((item, index) => (
-    item.type === 'command' && !item.disabled ? [index] : []
-  ));
+  return items.flatMap((item, index) => (item.type === 'command' && !item.disabled ? [index] : []));
 }
 
 function nextEnabledIndex(items: ContextMenuItem[], current: number, delta: number): number {
@@ -41,16 +41,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ open, ...props }) => {
   return <ContextMenuSurface {...props} open={open} state={presence.state} menuRef={menuRef} />;
 };
 
-const ContextMenuSurface: React.FC<Omit<ContextMenuProps, 'open'> & { open: boolean; state: PresenceState; menuRef: RefObject<HTMLDivElement> }> = ({
-  open,
-  state,
-  menuRef,
-  x,
-  y,
-  items,
-  onSelect,
-  onClose,
-}) => {
+const ContextMenuSurface: React.FC<
+  Omit<ContextMenuProps, 'open'> & { open: boolean; state: PresenceState; menuRef: RefObject<HTMLDivElement> }
+> = ({ open, state, menuRef, x, y, items, onSelect, onClose }) => {
   const { layerId } = useOverlayLayer(open);
   const [coords, setCoords] = useState({ left: x, top: y });
   const [activeIndex, setActiveIndex] = useState(() => enabledCommandIndexes(items)[0] ?? -1);
@@ -63,38 +56,38 @@ const ContextMenuSurface: React.FC<Omit<ContextMenuProps, 'open'> & { open: bool
     const menu = menuRef.current;
     if (!menu) return;
     const position = () => {
-      const next = placeAnchoredSurface({ left: x, right: x, top: y, bottom: y },
+      const next = placeAnchoredSurface(
+        { left: x, right: x, top: y, bottom: y },
         { width: menu.offsetWidth, height: menu.offsetHeight },
-        { width: window.innerWidth, height: window.innerHeight }, 'start', 'bottom', VIEWPORT_MARGIN, 0);
+        { width: window.innerWidth, height: window.innerHeight },
+        'start',
+        'bottom',
+        VIEWPORT_MARGIN,
+        0,
+      );
       setCoords({ left: next.left, top: next.top });
     };
     position();
     const observer = new ResizeObserver(position);
     observer.observe(menu);
     window.addEventListener('resize', position);
-    document.fonts?.addEventListener('loadingdone', position);
+    documentFonts()?.addEventListener('loadingdone', position);
     return () => {
       observer.disconnect();
       window.removeEventListener('resize', position);
-      document.fonts?.removeEventListener('loadingdone', position);
+      documentFonts()?.removeEventListener('loadingdone', position);
     };
   }, [x, y, items, menuRef]);
 
+  useDismissable({ open, layerId, inside: () => [menuRef.current], onDismiss: onClose });
+
   useEffect(() => {
-    const onPointerDown = (event: PointerEvent) => {
-      if (!isTopOverlayLayer(layerId)) return;
-      if (menuRef.current?.contains(event.target as Node)) return;
-      onClose();
-    };
     const onKeyDown = (event: KeyboardEvent) => {
       if (!isTopOverlayLayer(layerId)) return;
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
+      if (event.key === 'Tab') {
         onClose();
         return;
       }
-      if (event.key === 'Tab') { onClose(); return; }
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
         setActiveIndex((current) => nextEnabledIndex(items, current, event.key === 'ArrowDown' ? 1 : -1));
@@ -114,27 +107,22 @@ const ContextMenuSurface: React.FC<Omit<ContextMenuProps, 'open'> & { open: bool
         onSelect(item.id);
       }
     };
-    window.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('keydown', onKeyDown, true);
-    return () => {
-      window.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown, true);
-    };
+    return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [activeIndex, items, layerId, onClose, onSelect, menuRef]);
 
   useEffect(() => {
     const origin = document.activeElement;
-    return () => { if (origin instanceof HTMLElement && origin.isConnected) origin.focus({ preventScroll: true }); };
+    return () => {
+      if (origin instanceof HTMLElement && origin.isConnected) origin.focus({ preventScroll: true });
+    };
   }, []);
 
   useEffect(() => {
     menuRef.current?.querySelector<HTMLElement>('[tabindex="0"]')?.focus({ preventScroll: true });
   }, [activeIndex, menuRef]);
 
-  const labelledBy = useMemo(
-    () => items.find((item) => item.type === 'command')?.id ?? 'copy',
-    [items],
-  );
+  const labelledBy = useMemo(() => items.find((item) => item.type === 'command')?.id ?? 'copy', [items]);
 
   return createPortal(
     <div

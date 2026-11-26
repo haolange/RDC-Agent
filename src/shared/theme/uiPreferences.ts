@@ -1,6 +1,7 @@
 import { createDefaultChromeThemes } from './presets';
 import { sanitizeChromeThemes } from './sanitize';
 import type {
+  AppearancePatch,
   AppLanguage,
   AppTheme,
   FontScale,
@@ -14,9 +15,7 @@ const VALID_FONT_SCALES: FontScale[] = ['small', 'medium', 'large'];
 const VALID_WORK_PROCESS_EXPANSIONS: WorkProcessExpansion[] = ['latest', 'all'];
 
 function pickEnum<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
-  return typeof value === 'string' && (allowed as readonly string[]).includes(value)
-    ? (value as T)
-    : fallback;
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
 }
 
 export function createDefaultUiPreferences(): UiPreferences {
@@ -31,49 +30,54 @@ export function createDefaultUiPreferences(): UiPreferences {
   };
 }
 
-export function sanitizeUiPreferences(
-  candidate: unknown,
-  fallback: UiPreferences = createDefaultUiPreferences(),
-): UiPreferences {
-  const record = candidate && typeof candidate === 'object'
-    ? candidate as Partial<UiPreferences> & Record<string, unknown>
-    : {};
-  const chromeSource = record.chromeThemes
-    ?? (record as { chromeThemes?: unknown }).chromeThemes;
+export function sanitizeUiPreferences(candidate: unknown): UiPreferences {
+  const fallback = createDefaultUiPreferences();
+  const record =
+    candidate && typeof candidate === 'object' ? (candidate as Partial<UiPreferences> & Record<string, unknown>) : {};
+  const chromeSource = record.chromeThemes;
   return {
     theme: pickEnum(record.theme, VALID_THEMES, fallback.theme),
     language: pickEnum(record.language, VALID_LANGUAGES, fallback.language),
     fontScale: pickEnum(record.fontScale, VALID_FONT_SCALES, fallback.fontScale),
-    composerMarkdown: typeof record.composerMarkdown === 'boolean'
-      ? record.composerMarkdown
-      : fallback.composerMarkdown,
-    contextBreakdownExpanded: typeof record.contextBreakdownExpanded === 'boolean'
-      ? record.contextBreakdownExpanded
-      : fallback.contextBreakdownExpanded,
-    workProcessExpansion: pickEnum(record.workProcessExpansion, VALID_WORK_PROCESS_EXPANSIONS, fallback.workProcessExpansion),
+    composerMarkdown:
+      typeof record.composerMarkdown === 'boolean' ? record.composerMarkdown : fallback.composerMarkdown,
+    contextBreakdownExpanded:
+      typeof record.contextBreakdownExpanded === 'boolean'
+        ? record.contextBreakdownExpanded
+        : fallback.contextBreakdownExpanded,
+    workProcessExpansion: pickEnum(
+      record.workProcessExpansion,
+      VALID_WORK_PROCESS_EXPANSIONS,
+      fallback.workProcessExpansion,
+    ),
     chromeThemes: sanitizeChromeThemes(chromeSource, fallback.chromeThemes),
   };
 }
 
 /** Merge a partial appearance patch onto current preferences, then sanitize. */
-export function mergeUiPreferences(
-  current: UiPreferences,
-  patch: Partial<UiPreferences> | undefined,
-): UiPreferences {
+export function mergeUiPreferences(current: UiPreferences, patch: AppearancePatch | undefined): UiPreferences {
   if (!patch) {
     return sanitizeUiPreferences(current);
   }
   const chromePatch = patch.chromeThemes;
   const mergedChrome = chromePatch
     ? {
-        light: { ...current.chromeThemes.light, ...chromePatch.light, fonts: {
-          ...current.chromeThemes.light.fonts,
-          ...(chromePatch.light?.fonts ?? {}),
-        } },
-        dark: { ...current.chromeThemes.dark, ...chromePatch.dark, fonts: {
-          ...current.chromeThemes.dark.fonts,
-          ...(chromePatch.dark?.fonts ?? {}),
-        } },
+        light: {
+          ...current.chromeThemes.light,
+          ...chromePatch.light,
+          fonts: {
+            ...current.chromeThemes.light.fonts,
+            ...(chromePatch.light?.fonts ?? {}),
+          },
+        },
+        dark: {
+          ...current.chromeThemes.dark,
+          ...chromePatch.dark,
+          fonts: {
+            ...current.chromeThemes.dark.fonts,
+            ...(chromePatch.dark?.fonts ?? {}),
+          },
+        },
       }
     : current.chromeThemes;
   return sanitizeUiPreferences({

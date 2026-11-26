@@ -21,18 +21,36 @@ describe.skipIf(!files)('external native parser contract (explicit installation)
     const invoker = new RdcCliInvokerService(new ParserCapture());
     vi.spyOn(invoker, 'loadCatalog').mockResolvedValue({} as never);
     const inputs: RdcProbeInput[] = [
-      { action: 'version' }, { action: 'doctor' }, { action: 'enumerate' }, { action: 'preview_status' },
-      ...['context_status', 'event_list', 'event_search', 'event_show', 'pipeline_show', 'resource_list', 'vfs_ls', 'vfs_cat'].map((action) => ({
-        action: 'probe' as const, args: { action: action as NonNullable<RdcProbeInput['args']>['action'],
+      { action: 'version' },
+      { action: 'doctor' },
+      { action: 'enumerate' },
+      { action: 'preview_status' },
+      ...[
+        'context_status',
+        'event_list',
+        'event_search',
+        'event_show',
+        'pipeline_show',
+        'resource_list',
+        'vfs_ls',
+        'vfs_cat',
+      ].map((action) => ({
+        action: 'probe' as const,
+        args: {
+          action: action as NonNullable<RdcProbeInput['args']>['action'],
           ...(action === 'event_show' || action === 'pipeline_show' ? { eventId: '1' } : {}),
           ...(action === 'event_search' ? { nameContains: 'draw' } : {}),
-          ...(action.startsWith('vfs_') ? { path: '/draws/1' } : {}) },
+          ...(action.startsWith('vfs_') ? { path: '/draws/1' } : {}),
+        },
       })),
     ];
     for (const input of inputs) {
       const command = compileRdcProbe(input, 'qa-parser-session');
-      await invoker.executeCLI(command.command, [...command.args, ...(command.needsContext ? ['--daemon-context', 'qa-parser-context'] : [])],
-        { settings: { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, command: files!.python, argsPrefix: [files!.entry] } });
+      await invoker.executeCLI(
+        command.command,
+        [...command.args, ...(command.needsContext ? ['--daemon-context', 'qa-parser-context'] : [])],
+        { settings: { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, command: files!.python, argsPrefix: [files!.entry] } },
+      );
     }
     const code = [
       'import sys,json,contextlib,io',
@@ -50,7 +68,10 @@ describe.skipIf(!files)('external native parser contract (explicit installation)
       ' else: raise AssertionError("invalid command accepted: " + str(argv))',
       'print("native parser cases passed")',
     ].join('\n');
-    const result = spawnSync(files!.python, ['-c', code, path.resolve(root!), JSON.stringify(calls)], { encoding: 'utf8', windowsHide: true });
+    const result = spawnSync(files!.python, ['-c', code, path.resolve(root!), JSON.stringify(calls)], {
+      encoding: 'utf8',
+      windowsHide: true,
+    });
     expect(result.stderr).toBe('');
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(calls).toHaveLength(inputs.length);

@@ -8,7 +8,13 @@ import { AgentToolApprovalRequestService } from '../../agent-runtime/permissions
 import { OllamaProvider } from '../../agent-runtime/providers/OllamaProvider';
 import { createTestRequestPlan } from '../createTestRequestPlan';
 import type { AddressInfo } from 'node:net';
-import type { AgentEvent, AssistantMessage, Message, Model, ToolResultMessage } from '../../agent-runtime/core/types';
+import type {
+  AgentLoopEvent,
+  AssistantMessage,
+  Message,
+  Model,
+  ToolResultMessage,
+} from '../../agent-runtime/core/types';
 
 vi.mock('../../runtime/AuditLog', () => ({ auditLog: { record: vi.fn() } }));
 
@@ -19,8 +25,14 @@ vi.mock('../../runtime/AuditLog', () => ({ auditLog: { record: vi.fn() } }));
  */
 
 const MODEL: Model = {
-  id: 'qa-stub:4b', name: 'qa-stub:4b', provider: 'ollama', api: 'ollama',
-  contextWindow: 32_768, maxTokens: 4_096, reasoning: true, vision: false,
+  id: 'qa-stub:4b',
+  name: 'qa-stub:4b',
+  provider: 'ollama',
+  api: 'ollama',
+  contextWindow: 32_768,
+  maxTokens: 4_096,
+  reasoning: true,
+  vision: false,
 };
 
 const WRITE_TOOL = {
@@ -33,18 +45,32 @@ const WRITE_TOOL = {
   },
 };
 
-const line = (message: Record<string, unknown>, done = false) => `${JSON.stringify({
-  model: MODEL.id, created_at: '2026-11-20T00:00:00Z', message: { role: 'assistant', content: '', ...message }, done,
-  ...(done ? { done_reason: 'stop', prompt_eval_count: 900, eval_count: 40 } : {}),
-})}\n`;
+const line = (message: Record<string, unknown>, done = false) =>
+  `${JSON.stringify({
+    model: MODEL.id,
+    created_at: '2026-11-20T00:00:00Z',
+    message: { role: 'assistant', content: '', ...message },
+    done,
+    ...(done ? { done_reason: 'stop', prompt_eval_count: 900, eval_count: 40 } : {}),
+  })}\n`;
 
-interface WireRequest { body: Record<string, unknown> }
+interface WireRequest {
+  body: Record<string, unknown>;
+}
 
 function readBody(request: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((done, reject) => {
     let raw = '';
-    request.on('data', (chunk) => { raw += chunk; });
-    request.on('end', () => { try { done(JSON.parse(raw)); } catch (error) { reject(error); } });
+    request.on('data', (chunk) => {
+      raw += chunk;
+    });
+    request.on('end', () => {
+      try {
+        done(JSON.parse(raw));
+      } catch (error) {
+        reject(error);
+      }
+    });
   });
 }
 
@@ -59,12 +85,16 @@ async function startWire(requests: WireRequest[]): Promise<{ server: Server; bas
     requests.push({ body });
     const messages = body.messages as Array<{ role: string; content?: string }>;
     const toolMessage = messages.find((message) => message.role === 'tool');
-    const toolResult = toolMessage ? toolMessage.content ?? '' : null;
+    const toolResult = toolMessage ? (toolMessage.content ?? '') : null;
     response.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
     if (toolResult === null) {
       response.write(line({ thinking: 'The notes file does not exist yet; ' }));
       response.write(line({ thinking: 'write it, then report.' }));
-      response.write(line({ tool_calls: [{ function: { name: 'write_file', arguments: { path: 'notes.md', content: '# Findings' } } }] }));
+      response.write(
+        line({
+          tool_calls: [{ function: { name: 'write_file', arguments: { path: 'notes.md', content: '# Findings' } } }],
+        }),
+      );
     } else {
       response.write(line({ content: `Result: ${toolResult}. ` }));
       response.write(line({ content: 'Done.' }));
@@ -76,28 +106,52 @@ async function startWire(requests: WireRequest[]): Promise<{ server: Server; bas
 }
 
 /** The local Ollama surface's default route, compiled from the shipped manifests. */
-const OLLAMA_ROUTE = compileProviderCatalog(loadProviderCatalogManifestInput(resolve(__dirname, '../../../shared/provider-catalog/manifests')))
-  .surfaces.get('ollama')!.surface.routes.find((candidate) => candidate.default)!;
+const OLLAMA_ROUTE = compileProviderCatalog(
+  loadProviderCatalogManifestInput(resolve(__dirname, '../../../shared/provider-catalog/manifests')),
+)
+  .surfaces.get('ollama')!
+  .surface.routes.find((candidate) => candidate.default)!;
 
 function ollamaPlan(baseUrl: string) {
   const route = OLLAMA_ROUTE;
   return createTestRequestPlan({
-    providerId: 'ollama', adapterId: 'ollama-openai-compatible', catalogRevision: 'wire-integration', routeRevision: 'ollama',
-    selectedModelId: MODEL.id, effectiveModelId: MODEL.id, appliedBindingIds: [],
+    providerId: 'ollama',
+    adapterId: 'ollama-openai-compatible',
+    catalogRevision: 'wire-integration',
+    routeRevision: 'ollama',
+    selectedModelId: MODEL.id,
+    effectiveModelId: MODEL.id,
+    appliedBindingIds: [],
     route: { protocol: route.protocol, baseUrl, source: 'catalog', contracts: route.contracts },
-    headers: {}, bodyPatch: {}, contextBudgetTokens: MODEL.contextWindow, contextMode: 'normal',
-    contextWindowTokens: MODEL.contextWindow, activeTierId: 'default', fastMode: false,
+    headers: {},
+    bodyPatch: {},
+    contextBudgetTokens: MODEL.contextWindow,
+    contextMode: 'normal',
+    contextWindowTokens: MODEL.contextWindow,
+    activeTierId: 'default',
+    fastMode: false,
     reasoningWire: {
       selection: 'on',
-      control: { kind: 'toggle', supportsOff: true, levels: [], defaultState: 'known', defaultSelection: 'on', wireProfile: { kind: 'none' } },
+      control: {
+        kind: 'toggle',
+        supportsOff: true,
+        levels: [],
+        defaultState: 'known',
+        defaultSelection: 'on',
+        wireProfile: { kind: 'none' },
+      },
     },
   });
 }
 
 describe('one turn across the wire, loop, approval and final answer', () => {
   let server: Server | null = null;
-  beforeEach(() => { server = null; });
-  afterEach(async () => { if (server) await new Promise((done) => server!.close(done)); });
+  beforeEach(() => {
+    server = null;
+  });
+  afterEach(async () => {
+    if (server) await new Promise((done) => server!.close(done));
+  });
 
   it.each([true, false])('runs thinking → approved=%s write → replayed result → final answer', async (approved) => {
     const requests: WireRequest[] = [];
@@ -111,31 +165,60 @@ describe('one turn across the wire, loop, approval and final answer', () => {
     const executor: ToolExecutor = {
       execute: async (call): Promise<ToolResultMessage> => {
         const granted = await approvals.request({
-          agentId: 'general', sessionId: 'session-wire', turnId: 'turn-wire', toolCallId: call.id, toolName: call.name,
-          argumentsSha256: 'fixture', reason: 'Writes a project file.', risk: 'medium', context: { turnId: 'turn-wire', sessionId: 'session-wire' },
+          agentId: 'general',
+          sessionId: 'session-wire',
+          turnId: 'turn-wire',
+          toolCallId: call.id,
+          toolName: call.name,
+          argumentsSha256: 'fixture',
+          reason: 'Writes a project file.',
+          risk: 'medium',
+          context: { turnId: 'turn-wire', sessionId: 'session-wire' },
           onEvent: (event) => {
             order.push(event.type);
             if (event.type !== 'approval.requested') return;
-            const approvalId = String((event.payload as { approvalId: string }).approvalId);
-            queueMicrotask(() => expect(approvals.answer({ sessionId: 'session-wire', turnId: 'turn-wire', approvalId, approved })).toEqual({ success: true }));
+            const { approvalId } = event.payload;
+            queueMicrotask(() =>
+              expect(
+                approvals.answer({ sessionId: 'session-wire', turnId: 'turn-wire', approvalId, approved }),
+              ).toEqual({ success: true }),
+            );
           },
         });
         if (granted) effects.push(`${String(call.arguments.path)}:${String(call.arguments.content)}`);
         const text = granted ? 'wrote notes.md' : 'denied by the user';
-        return { role: 'toolResult', toolCallId: call.id, toolName: call.name, content: [{ type: 'text', text }], isError: !granted, timestamp: Date.now() };
+        return {
+          role: 'toolResult',
+          toolCallId: call.id,
+          toolName: call.name,
+          content: [{ type: 'text', text }],
+          isError: !granted,
+          timestamp: Date.now(),
+        };
       },
     };
 
-    const { stream } = agentLoop([{ role: 'user', content: 'Record the findings.', timestamp: 1 }], {
-      systemPrompt: 'Investigate and record findings.', messages: [], tools: [WRITE_TOOL],
-    }, {
-      model: MODEL, maxTurns: 3, convertToLlm: (messages) => messages as Message[],
-      streamOptions: { requestPlan: plan, reasoning: plan.reasoningWire },
-    }, new OllamaProvider({ baseUrl: wire.baseUrl }), executor);
+    const { stream } = agentLoop(
+      [{ role: 'user', content: 'Record the findings.', timestamp: 1 }],
+      {
+        systemPrompt: 'Investigate and record findings.',
+        messages: [],
+        tools: [WRITE_TOOL],
+      },
+      {
+        model: MODEL,
+        maxTurns: 3,
+        convertToLlm: (messages) => messages as Message[],
+        streamOptions: { requestPlan: plan, reasoning: plan.reasoningWire },
+      },
+      new OllamaProvider({ baseUrl: wire.baseUrl }),
+      executor,
+    );
 
     let final: AssistantMessage | undefined;
-    for await (const event of stream as AsyncIterable<AgentEvent>) {
-      if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'thinking_delta') order.push('thinking');
+    for await (const event of stream as AsyncIterable<AgentLoopEvent>) {
+      if (event.type === 'message_update' && event.assistantMessageEvent?.type === 'thinking_delta')
+        order.push('thinking');
       if (event.type === 'tool_execution_end') order.push('tool_result');
       if (event.type === 'message_end' && event.message.role === 'assistant') final = event.message as AssistantMessage;
     }
@@ -144,7 +227,9 @@ describe('one turn across the wire, loop, approval and final answer', () => {
     expect(requests.every(({ body }) => body.think === true && (body.tools as unknown[]).length === 1)).toBe(true);
     const replay = requests[1].body.messages as Array<{ role: string; content?: string; tool_calls?: unknown[] }>;
     expect(replay.some((message) => message.role === 'assistant' && message.tool_calls?.length === 1)).toBe(true);
-    expect(replay.find((message) => message.role === 'tool')).toMatchObject({ content: approved ? 'wrote notes.md' : 'denied by the user' });
+    expect(replay.find((message) => message.role === 'tool')).toMatchObject({
+      content: approved ? 'wrote notes.md' : 'denied by the user',
+    });
 
     expect(order.indexOf('thinking')).toBeGreaterThanOrEqual(0);
     expect(order.indexOf('thinking')).toBeLessThan(order.indexOf('approval.requested'));
@@ -153,7 +238,10 @@ describe('one turn across the wire, loop, approval and final answer', () => {
     expect(effects).toEqual(approved ? ['notes.md:# Findings'] : []);
 
     expect(final?.stopReason).toBe('stop');
-    const answer = final!.content.filter((block) => block.type === 'text').map((block) => block.text).join('');
+    const answer = final!.content
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('');
     expect(answer).toBe(`Result: ${approved ? 'wrote notes.md' : 'denied by the user'}. Done.`);
   });
 });

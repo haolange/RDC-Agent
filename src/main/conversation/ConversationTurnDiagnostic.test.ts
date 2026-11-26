@@ -2,13 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../settings/settings-core/SettingsService', () => ({
   settingsService: {
-    getAll: () => ({ agents: { definitions: [] }, appearance: { language: 'zh-CN' } }),
+    snapshot: () => ({ revision: 1, user: { appearance: { language: 'zh-CN' } } }),
   },
 }));
-import { SessionArtifactError } from '@shared/types/sessionArtifact';
+import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
 import { AgentRecoveryAbortError } from '../agent-runtime/agent/ErrorRecovery';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
-import { ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from '../agent-runtime/providers/internal/http';
+import {
+  ProviderEmptyStreamError,
+  ProviderHttpError,
+  ProviderWireFailureError,
+} from '../agent-runtime/providers/internal/http';
 import { MissionCompletionError } from '../investigation/missionCompletionContract';
 import { InvestigationError } from '../investigation/investigationErrors';
 import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
@@ -23,11 +27,7 @@ describe('conversation turn failure classification', () => {
   it('classifies no-progress termination independently from provider failures', () => {
     const diagnostic = createTurnFailedDiagnostic(
       ROUTE,
-      new AgentLoopTerminationError(
-        'AGENT_NO_PROGRESS',
-        'same tool round repeated three times',
-        { turn: 3 },
-      ),
+      new AgentLoopTerminationError('AGENT_NO_PROGRESS', 'same tool round repeated three times', { turn: 3 }),
     );
     expect(diagnostic.code).toBe('CONVERSATION_AGENT_LOOP_STALLED');
     expect(diagnostic.userMessage).toContain('连续三轮');
@@ -35,10 +35,14 @@ describe('conversation turn failure classification', () => {
   });
 
   it('does not describe an unchanged runtime obligation as repeated tool calls', () => {
-    const diagnostic = createTurnFailedDiagnostic(ROUTE, new AgentLoopTerminationError(
-      'AGENT_NO_PROGRESS', 'The runtime obligation remained unchanged after a continuation without tool work.',
-      { turn: 3, noProgressReason: 'runtime-obligation' },
-    ));
+    const diagnostic = createTurnFailedDiagnostic(
+      ROUTE,
+      new AgentLoopTerminationError(
+        'AGENT_NO_PROGRESS',
+        'The runtime obligation remained unchanged after a continuation without tool work.',
+        { turn: 3, noProgressReason: 'runtime-obligation' },
+      ),
+    );
     expect(diagnostic.code).toBe('CONVERSATION_AGENT_LOOP_STALLED');
     expect(diagnostic.userMessage).toContain('未完成的条件');
     expect(diagnostic.userMessage).not.toContain('连续三轮');
@@ -47,18 +51,20 @@ describe('conversation turn failure classification', () => {
   it('classifies pending continuation at max turns independently from provider failures', () => {
     const diagnostic = createTurnFailedDiagnostic(
       ROUTE,
-      new AgentLoopTerminationError(
-        'AGENT_MAX_TURNS_EXCEEDED',
-        'continuation remained pending',
-        { turn: 25, maxTurns: 25 },
-      ),
+      new AgentLoopTerminationError('AGENT_MAX_TURNS_EXCEEDED', 'continuation remained pending', {
+        turn: 25,
+        maxTurns: 25,
+      }),
     );
     expect(diagnostic.code).toBe('CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED');
     expect(diagnostic.userMessage).toContain('25 轮的上限');
   });
 
   it('classifies an unclosed direct Task as a local completion failure', () => {
-    const diagnostic = createTurnFailedDiagnostic(ROUTE, new Error('TASK_COMPLETION_DENIED: Direct Task executions must be settled before the parent turn completes.'));
+    const diagnostic = createTurnFailedDiagnostic(
+      ROUTE,
+      new Error('TASK_COMPLETION_DENIED: Direct Task executions must be settled before the parent turn completes.'),
+    );
     expect(diagnostic.code).toBe('CONVERSATION_TASK_COMPLETION_DENIED');
     expect(diagnostic.userMessage).toContain('没收尾的任务');
     expect(diagnostic.userMessage).not.toContain('服务商');
@@ -110,7 +116,7 @@ describe('conversation turn failure classification', () => {
     expect(diagnostic.code).toBe('CONVERSATION_LLM_REQUEST_FAILED');
     expect(diagnostic.userMessage).toContain('服务没有返回答复或工具调用');
     expect(diagnostic.technicalMessage).toBe(
-      'provider HTTP n/a · attempts 2/2 · Provider stream ended without assistant output or structured tool call.',
+      'provider HTTP n/a · attempts 2/2 · PROVIDER_STREAM_EMPTY: Provider stream ended without assistant output or structured tool call.',
     );
   });
 
@@ -141,7 +147,10 @@ describe('conversation turn failure classification', () => {
   it('reports a local artifact quota failure without blaming the model route', () => {
     const quota = new SessionArtifactError('ARTIFACT_QUOTA_EXCEEDED', 'tool-outputs would have 257 files (cap 256).');
     const abort = new AgentRecoveryAbortError('[Recovery abort] unrecoverable error', {
-      cause: quota, category: 'unknown', attempts: 1, maxAttempts: 1,
+      cause: quota,
+      category: 'unknown',
+      attempts: 1,
+      maxAttempts: 1,
     });
     const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
     expect(diagnostic.code).toBe('CONVERSATION_ARTIFACT_QUOTA_EXCEEDED');
@@ -152,7 +161,9 @@ describe('conversation turn failure classification', () => {
   it('reports retained-window artifact size failures as local context errors', () => {
     const abort = new AgentRecoveryAbortError('[Recovery abort] unrecoverable error', {
       cause: new SessionArtifactError('ARTIFACT_TOO_LARGE', '3565679 bytes exceeds 2097152 bytes.'),
-      category: 'unknown', attempts: 4, maxAttempts: 1,
+      category: 'unknown',
+      attempts: 4,
+      maxAttempts: 1,
     });
     const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
     expect(diagnostic.code).toBe('CONVERSATION_CONTEXT_COMPACTION_FAILED');
@@ -168,7 +179,10 @@ describe('conversation turn failure classification', () => {
       { invariantId: 'S-CTX-01' },
     );
     const abort = new AgentRecoveryAbortError('[Recovery abort] unrecoverable error', {
-      cause: invalidEvidence, category: 'unknown', attempts: 1, maxAttempts: 1,
+      cause: invalidEvidence,
+      category: 'unknown',
+      attempts: 1,
+      maxAttempts: 1,
     });
     const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
     expect(diagnostic.code).toBe('CONVERSATION_CONTEXT_COMPACTION_FAILED');
@@ -313,11 +327,10 @@ describe('conversation turn failure classification', () => {
   });
 
   it('classifies ProviderWireFailureError abort with provider HTTP n/a technicalMessage', () => {
-    const original = new ProviderWireFailureError(
-      'openai-responses',
-      'Account suspended by provider',
-      { code: 'account_suspended', bodyText: '{"code":"account_suspended"}' },
-    );
+    const original = new ProviderWireFailureError('openai-responses', 'Account suspended by provider', {
+      code: 'account_suspended',
+      bodyText: '{"code":"account_suspended"}',
+    });
     const abort = new AgentRecoveryAbortError('[Recovery abort] unrecoverable error', {
       cause: original,
       category: 'unknown',
@@ -328,8 +341,6 @@ describe('conversation turn failure classification', () => {
     const diagnostic = createTurnFailedDiagnostic(ROUTE, abort);
     expect(diagnostic.code).toBe('CONVERSATION_LLM_REQUEST_FAILED');
     expect(diagnostic.userMessage).toContain('请求没有成功');
-    expect(diagnostic.technicalMessage).toBe(
-      'provider HTTP n/a · attempts 1/1 · {"code":"account_suspended"}',
-    );
+    expect(diagnostic.technicalMessage).toBe('provider HTTP n/a · attempts 1/1 · {"code":"account_suspended"}');
   });
 });

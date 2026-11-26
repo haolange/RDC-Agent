@@ -1,4 +1,6 @@
-vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: { language: electronState.language } }) } }));
+vi.mock('../settings/settings-core/SettingsService', () => ({
+  settingsService: { snapshot: () => ({ revision: 1, user: { appearance: { language: electronState.language } } }) },
+}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dialog } from 'electron';
 
@@ -30,12 +32,14 @@ const { handlers, electronState, knowledgeState, writeMocks, topicMocks } = vi.h
 });
 
 vi.mock('electron', () => ({
+  app: { isPackaged: false },
   BrowserWindow: {
     getFocusedWindow: () => electronState.focused,
     getAllWindows: () => [],
   },
   dialog: {
     showMessageBox: vi.fn(async () => ({ response: 0 })),
+    showSaveDialog: vi.fn(async () => ({ canceled: true })),
   },
   ipcMain: {
     handle: (channel: string, handler: (...args: unknown[]) => Promise<unknown>) => {
@@ -86,7 +90,12 @@ vi.mock('../runtime/RuntimeLogService', () => ({
 }));
 
 import { knowledgeImportService } from '../knowledge/KnowledgeImportService';
+import { knowledgeIndexService } from '../knowledge/KnowledgeIndexService';
 import { registerKnowledgeHandlers } from './knowledgeHandlers';
+import type { KnowledgeOperationOptions } from '../knowledge/knowledgeOperations';
+
+const broadcastToRenderer = vi.fn();
+const context = { broadcastToRenderer } as never;
 
 const sampleCard = {
   cardId: 'project:a:facts/same.md',
@@ -99,6 +108,12 @@ const sampleCard = {
   relations: [],
   body: 'Body',
 };
+const cardAt = (spaceId: string, relativePath: string) => ({
+  ...sampleCard,
+  cardId: `${spaceId}:${relativePath}`,
+  spaceId,
+  relativePath,
+});
 
 describe('knowledge mutation approval boundaries', () => {
   beforeEach(() => {
@@ -112,12 +127,17 @@ describe('knowledge mutation approval boundaries', () => {
     delete process.env.RDC_AGENT_BROWSER_QA;
     delete process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS;
     electronState.focused = undefined;
-    registerKnowledgeHandlers({} as never);
+    broadcastToRenderer.mockClear();
+    registerKnowledgeHandlers(context);
   });
 
   it('requires a matching preview and main-process human confirmation before applying topic changes', async () => {
-    const changes = { expectedRevision: 'c'.repeat(64), expectedCorpusRevision: 'd'.repeat(64),
-      topics: [{ id: 'texture', label: 'Texture', synonyms: ['纹理'] }], assignments: [] };
+    const changes = {
+      expectedRevision: 'c'.repeat(64),
+      expectedCorpusRevision: 'd'.repeat(64),
+      topics: [{ id: 'texture', label: 'Texture', synonyms: ['纹理'] }],
+      assignments: [],
+    };
     const request = { changes, changeHash: 'a'.repeat(64), confirmation: { explicitHumanConfirmation: true } };
     const apply = handlers.get('knowledge:topics:apply')!;
     await expect(apply({}, { ...request, confirmation: { explicitHumanConfirmation: false } })).rejects.toThrow();
@@ -133,11 +153,14 @@ describe('knowledge mutation approval boundaries', () => {
 
   it('rejects headless Browser QA knowledge approval without full access', async () => {
     process.env.RDC_AGENT_BROWSER_QA = '1';
-    const result = await handlers.get('knowledge:issueApprovalToken')!({}, {
-      action: 'knowledge.write',
-      spaceId: 'user',
-      relativePath: 'facts/qa.md',
-    });
+    const result = await handlers.get('knowledge:issueApprovalToken')!(
+      {},
+      {
+        action: 'knowledge.write',
+        spaceId: 'user',
+        card: cardAt('user', 'facts/qa.md'),
+      },
+    );
     expect(result).toEqual({ error: 'Knowledge mutation was not confirmed by the main-process dialog.' });
   });
 
@@ -146,11 +169,14 @@ describe('knowledge mutation approval boundaries', () => {
     process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS = '1';
     const showMessageBox = vi.mocked(dialog.showMessageBox);
     showMessageBox.mockClear();
-    const result = await handlers.get('knowledge:issueApprovalToken')!({}, {
-      action: 'knowledge.write',
-      spaceId: 'user',
-      relativePath: 'facts/qa.md',
-    });
+    const result = await handlers.get('knowledge:issueApprovalToken')!(
+      {},
+      {
+        action: 'knowledge.write',
+        spaceId: 'user',
+        card: cardAt('user', 'facts/qa.md'),
+      },
+    );
     expect(result).toMatchObject({ token: expect.any(String) });
     expect(showMessageBox).not.toHaveBeenCalled();
   });
@@ -162,11 +188,14 @@ describe('knowledge mutation approval boundaries', () => {
     const showMessageBox = vi.mocked(dialog.showMessageBox);
     showMessageBox.mockClear();
 
-    const result = await handlers.get('knowledge:issueApprovalToken')!({}, {
-      action: 'knowledge.write',
-      spaceId: 'user',
-      relativePath: 'facts/focused.md',
-    });
+    const result = await handlers.get('knowledge:issueApprovalToken')!(
+      {},
+      {
+        action: 'knowledge.write',
+        spaceId: 'user',
+        card: cardAt('user', 'facts/focused.md'),
+      },
+    );
 
     expect(result).toMatchObject({ token: expect.any(String) });
     expect(showMessageBox).toHaveBeenCalledOnce();
@@ -176,47 +205,96 @@ describe('knowledge mutation approval boundaries', () => {
     electronState.focused = {};
     const showMessageBox = vi.mocked(dialog.showMessageBox);
     showMessageBox.mockClear();
-    const result = await handlers.get('knowledge:issueApprovalToken')!({}, {
-      action: 'knowledge.promote',
-      spaceId: 'project:a',
-      relativePath: 'facts/desktop.md',
-    });
+    const result = await handlers.get('knowledge:issueApprovalToken')!(
+      {},
+      {
+        action: 'knowledge.promote',
+        spaceId: 'project:a',
+        card: cardAt('project:a', 'facts/desktop.md'),
+      },
+    );
     expect(result).toMatchObject({ token: expect.any(String) });
     expect(showMessageBox).toHaveBeenCalledOnce();
   });
 
   it('rejects a project A token when writing the same path in project B', async () => {
     electronState.focused = {};
-    const issued = await handlers.get('knowledge:issueApprovalToken')!({}, {
-      action: 'knowledge.write',
-      spaceId: 'project:a',
-      relativePath: 'facts/same.md',
-    }) as { token?: string };
+    const issued = (await handlers.get('knowledge:issueApprovalToken')!(
+      {},
+      {
+        action: 'knowledge.write',
+        spaceId: 'project:a',
+        card: cardAt('project:a', 'facts/same.md'),
+      },
+    )) as { token?: string };
     expect(issued.token).toEqual(expect.any(String));
 
-    await expect(handlers.get('knowledge:write')!({}, {
-      spaceId: 'project:b',
-      card: { ...sampleCard, cardId: 'project:b:facts/same.md', spaceId: 'project:b' },
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-      approvalToken: issued.token,
-    })).rejects.toMatchObject({ message: 'KNOWLEDGE_APPROVAL_TOKEN_INVALID' });
+    await expect(
+      handlers.get('knowledge:write')!(
+        {},
+        {
+          spaceId: 'project:b',
+          card: { ...sampleCard, cardId: 'project:b:facts/same.md', spaceId: 'project:b' },
+          permissionMode: 'full-access',
+          confirmation: { explicitHumanConfirmation: true },
+          approvalToken: issued.token,
+        },
+      ),
+    ).rejects.toMatchObject({ message: 'KNOWLEDGE_APPROVAL_TOKEN_INVALID' });
     expect(writeMocks.write).not.toHaveBeenCalled();
+  });
+
+  it('binds a token to the approved card so a different card or a second use is refused', async () => {
+    electronState.focused = {};
+    const approved = cardAt('project:a', 'facts/same.md');
+    const issue = async () =>
+      (
+        (await handlers.get('knowledge:issueApprovalToken')!(
+          {},
+          {
+            action: 'knowledge.write',
+            spaceId: 'project:a',
+            card: approved,
+          },
+        )) as { token: string }
+      ).token;
+    const write = (card: typeof approved, approvalToken: string) =>
+      handlers.get('knowledge:write')!(
+        {},
+        {
+          spaceId: 'project:a',
+          card,
+          permissionMode: 'full-access',
+          confirmation: { explicitHumanConfirmation: true },
+          approvalToken,
+        },
+      );
+
+    await expect(write({ ...approved, body: 'Swapped after approval' }, await issue())).rejects.toMatchObject({
+      message: 'KNOWLEDGE_APPROVAL_TOKEN_INVALID',
+    });
+    const token = await issue();
+    await write(approved, token);
+    await expect(write(approved, token)).rejects.toMatchObject({ message: 'KNOWLEDGE_APPROVAL_TOKEN_INVALID' });
+    expect(writeMocks.write).toHaveBeenCalledOnce();
   });
 
   it('imports into the chosen space only after the person confirms in main', async () => {
     const imported = {
       candidateCreated: false as const,
       verified: false as const,
-      items: [{
-        status: 'draft' as const,
-        lifecycle: 'draft' as const,
-        missingAssets: [],
-        record: { ...sampleCard, spaceId: 'user', cardId: 'user:facts/same.md' },
-      }],
+      items: [
+        {
+          status: 'draft' as const,
+          lifecycle: 'draft' as const,
+          missingAssets: [],
+          record: { ...sampleCard, spaceId: 'user', cardId: 'user:facts/same.md' },
+        },
+      ],
     };
     vi.mocked(knowledgeImportService.importToSpace).mockResolvedValueOnce(imported);
-    const request = { spaceId: 'user', source: 'case_id: same\ntitle: Same\nsymptoms: darker' };
+    const source = { spaceId: 'user', source: 'case_id: same\ntitle: Same\nsymptoms: darker' };
+    const request = { ...source, operationId: 'op-import' };
 
     // No window to confirm in: nothing is written.
     await expect(handlers.get('knowledge:import')!({}, request)).resolves.toEqual({ cancelled: true });
@@ -230,7 +308,10 @@ describe('knowledge mutation approval boundaries', () => {
     vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 0, checkboxChecked: false });
     await expect(handlers.get('knowledge:import')!({}, request)).resolves.toEqual(imported);
     expect(knowledgeImportService.migrateSessionDrafts).not.toHaveBeenCalled();
-    expect(knowledgeImportService.importToSpace).toHaveBeenCalledWith(request);
+    expect(knowledgeImportService.importToSpace).toHaveBeenCalledWith(
+      source,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(writeMocks.write).not.toHaveBeenCalled();
   });
 
@@ -241,19 +322,105 @@ describe('knowledge mutation approval boundaries', () => {
     expect(knowledgeImportService.previewImport).toHaveBeenCalledWith(request);
     expect(vi.mocked(dialog.showMessageBox).mock.calls.length).toBe(confirmations);
     expect(knowledgeImportService.importToSpace).not.toHaveBeenCalled();
-    await expect(handlers.get('knowledge:previewImport')!({}, { spaceId: 'project:unknown', source: 'x' })).rejects.toThrow();
+    await expect(
+      handlers.get('knowledge:previewImport')!({}, { spaceId: 'project:unknown', source: 'x' }),
+    ).rejects.toThrow();
   });
 });
 
-it.each([['zh-CN', '确认更改知识', '取消'], ['en', 'Confirm knowledge change', 'Cancel']])('localizes %s native confirmation and issues no token after cancellation', async (language, title, cancel) => {
+describe('knowledge operation progress and cancellation', () => {
+  beforeEach(() => {
+    handlers.clear();
+    broadcastToRenderer.mockClear();
+    vi.mocked(knowledgeImportService.importToSpace).mockClear();
+    electronState.focused = {};
+    registerKnowledgeHandlers(context);
+  });
+
+  it('reports rebuild progress on knowledge:progress and rejects a cancelled rebuild with the registered code', async () => {
+    let reached!: () => void;
+    const atSecondCard = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    vi.mocked(knowledgeIndexService.rebuild).mockImplementationOnce(async (options: KnowledgeOperationOptions = {}) => {
+      for (let done = 0; done < 3; done += 1) {
+        options.signal?.throwIfAborted();
+        options.onProgress?.('indexing', done, 3);
+        if (done === 1) {
+          reached();
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+      }
+      throw new Error('a cancelled rebuild must not finish');
+    });
+    const running = handlers.get('knowledge:index:rebuild')!({}, { operationId: 'op-rebuild' });
+    await atSecondCard;
+    await expect(handlers.get('knowledge:cancel')!({}, { operationId: 'op-rebuild' })).resolves.toEqual({
+      cancelled: true,
+    });
+    await expect(running).rejects.toMatchObject({ code: 'KNOWLEDGE_OPERATION_CANCELLED' });
+    const events = broadcastToRenderer.mock.calls
+      .filter(([channel]) => channel === 'knowledge:progress')
+      .map(([, event]) => event);
+    expect(events[0]).toEqual({ operationId: 'op-rebuild', phase: 'indexing', done: 0, total: 3 });
+    // The report that waited for its window is still delivered when the run settles.
+    expect(events.at(-1)).toEqual({ operationId: 'op-rebuild', phase: 'indexing', done: 1, total: 3 });
+    await expect(handlers.get('knowledge:cancel')!({}, { operationId: 'op-rebuild' })).resolves.toEqual({
+      cancelled: false,
+    });
+  });
+
+  it('cancels an export after the save dialog without writing, and a cancelled save dialog stays a plain null', async () => {
+    const request = { format: 'markdown', scope: 'space', spaceId: 'user', operationId: 'op-export' };
+    await expect(handlers.get('knowledge:export')!({}, request)).resolves.toBeNull();
+    let choose!: (value: { canceled: boolean; filePath: string }) => void;
+    vi.mocked(dialog.showSaveDialog).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          choose = resolve as typeof choose;
+        }),
+    );
+    const running = handlers.get('knowledge:export')!({}, request);
+    await vi.waitFor(() => expect(choose).toBeTypeOf('function'));
+    await expect(handlers.get('knowledge:cancel')!({}, { operationId: 'op-export' })).resolves.toEqual({
+      cancelled: true,
+    });
+    choose({ canceled: false, filePath: '/exports/knowledge-export.md' });
+    await expect(running).rejects.toMatchObject({ code: 'KNOWLEDGE_OPERATION_CANCELLED' });
+  });
+
+  it('refuses a long operation without an operation id', async () => {
+    const rebuilds = vi.mocked(knowledgeIndexService.rebuild).mock.calls.length;
+    await expect(handlers.get('knowledge:index:rebuild')!({})).rejects.toThrow();
+    await expect(
+      handlers.get('knowledge:import')!({}, { spaceId: 'user', source: 'case_id: a\ntitle: A' }),
+    ).rejects.toThrow();
+    expect(vi.mocked(knowledgeIndexService.rebuild).mock.calls.length).toBe(rebuilds);
+    expect(knowledgeImportService.importToSpace).not.toHaveBeenCalled();
+  });
+});
+
+it.each([
+  ['zh-CN', '确认更改知识', '取消'],
+  ['en', 'Confirm knowledge change', 'Cancel'],
+])('localizes %s native confirmation and issues no token after cancellation', async (language, title, cancel) => {
   delete process.env.RDC_AGENT_BROWSER_QA;
-  registerKnowledgeHandlers({} as never);
+  registerKnowledgeHandlers(context);
   electronState.focused = {};
   electronState.language = language;
   vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 1, checkboxChecked: false });
-  const result = await handlers.get('knowledge:issueApprovalToken')!({}, { action: 'knowledge.write', spaceId: 'user', relativePath: 'facts/language.md' });
+  const result = await handlers.get('knowledge:issueApprovalToken')!(
+    {},
+    { action: 'knowledge.write', spaceId: 'user', card: cardAt('user', 'facts/language.md') },
+  );
   expect(result).not.toHaveProperty('token');
-  expect(dialog.showMessageBox).toHaveBeenLastCalledWith(expect.any(Object), expect.objectContaining({
-    title, buttons: [expect.any(String), cancel], defaultId: 1, cancelId: 1,
-  }));
+  expect(dialog.showMessageBox).toHaveBeenLastCalledWith(
+    expect.any(Object),
+    expect.objectContaining({
+      title,
+      buttons: [expect.any(String), cancel],
+      defaultId: 1,
+      cancelId: 1,
+    }),
+  );
 });

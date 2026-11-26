@@ -37,15 +37,20 @@ describe('account stream 401 retry', () => {
   it('refreshes and retries once before any stream content', async () => {
     const unauthorized = new ProviderHttpError('test', 401, 'expired');
     const attempts = [
-      () => attempt([
-        { type: 'start', partial: message },
-        { type: 'error', error: unauthorized, message },
-      ], unauthorized),
-      () => attempt([
-        { type: 'start', partial: message },
-        { type: 'text_delta', contentIndex: 0, delta: 'ok', providerOutputRef: textRef, partial: message },
-        { type: 'done', reason: 'stop', message },
-      ]),
+      () =>
+        attempt(
+          [
+            { type: 'start', partial: message },
+            { type: 'error', error: unauthorized, message },
+          ],
+          unauthorized,
+        ),
+      () =>
+        attempt([
+          { type: 'start', partial: message },
+          { type: 'text_delta', contentIndex: 0, delta: 'ok', providerOutputRef: textRef, partial: message },
+          { type: 'done', reason: 'stop', message },
+        ]),
     ];
     const refresh = vi.fn(async () => undefined);
     const stream = streamWithUnauthorizedRefresh({ createAttempt: () => attempts.shift()!(), refresh });
@@ -59,16 +64,24 @@ describe('account stream 401 retry', () => {
     const unauthorized = new ProviderHttpError('test', 401, 'late rejection');
     const refresh = vi.fn(async () => undefined);
     const stream = streamWithUnauthorizedRefresh({
-      createAttempt: () => attempt([
-        { type: 'start', partial: message },
-        { type: 'text_delta', contentIndex: 0, delta: 'partial', providerOutputRef: textRef, partial: message },
-        { type: 'error', error: unauthorized, message },
-      ], unauthorized),
+      createAttempt: () =>
+        attempt(
+          [
+            { type: 'start', partial: message },
+            { type: 'text_delta', contentIndex: 0, delta: 'partial', providerOutputRef: textRef, partial: message },
+            { type: 'error', error: unauthorized, message },
+          ],
+          unauthorized,
+        ),
       refresh,
     });
-    await expect((async () => {
-      for await (const _event of stream) { /* consume */ }
-    })()).rejects.toBe(unauthorized);
+    await expect(
+      (async () => {
+        for await (const _event of stream) {
+          /* consume */
+        }
+      })(),
+    ).rejects.toBe(unauthorized);
     expect(refresh).not.toHaveBeenCalled();
   });
 });

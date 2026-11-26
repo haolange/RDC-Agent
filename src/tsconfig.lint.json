@@ -1,0 +1,9 @@
+{
+  // ESLint's one typed program for src (eslint.config.mjs `typedLintProgram`): the repository settings plus
+  // noUncheckedIndexedAccess, so no-unnecessary-condition knows an index lookup can miss. Tests are left out; test
+  // support files stay in because main's no-floating-promises covers them.
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "noUncheckedIndexedAccess": true },
+  "include": ["./**/*.ts", "./**/*.tsx"],
+  "exclude": ["./**/*.test.ts", "./**/*.test.tsx"]
+}

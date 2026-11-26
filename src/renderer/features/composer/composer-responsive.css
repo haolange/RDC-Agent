@@ -1,7 +1,12 @@
 /* Moved from app-shell during B3 colocation */
 @keyframes composer-agent-running-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
 }
 
 @media (max-width: 480px) {

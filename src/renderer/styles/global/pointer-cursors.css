@@ -14,12 +14,13 @@ input[type='reset']:not(:disabled),
 [role='tab']:not([aria-disabled='true']),
 [role='option']:not([aria-disabled='true']),
 [role='switch']:not([aria-disabled='true']),
-.button:not(:disabled),
-[data-pointer-interactive] {
+.button:not(:disabled) {
   cursor: pointer;
 }
 
-input:not([type='checkbox']):not([type='radio']):not([type='button']):not([type='submit']):not([type='reset']):not([type='file']),
+input:not([type='checkbox']):not([type='radio']):not([type='button']):not([type='submit']):not([type='reset']):not(
+    [type='file']
+  ),
 textarea {
   cursor: text;
 }

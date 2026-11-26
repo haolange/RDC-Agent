@@ -2,23 +2,57 @@
 import { act, createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { VirtualMessageList, measuredMessageOffsets } from './VirtualMessageList';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
+import { VirtualMessageList } from './VirtualMessageList';
 import type { ConversationMessage } from '@shared/types/conversation';
 
-it('positions expanded messages using measured heights', () => {
-  expect(measuredMessageOffsets([{ id: 'a' }, { id: 'b' }, { id: 'c' }], new Map([['b', 640]]), 160))
-    .toEqual([0, 160, 800, 960]);
+it("keeps a request's row in place when main's message for it arrives under the same id", async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const { assistantMessageId } = conversationTurnIds('request-1');
+  const row = (content: string) =>
+    ({ id: assistantMessageId, requestId: 'request-1', role: 'assistant', content }) as ConversationMessage;
+  const render = (message: ConversationMessage) =>
+    act(async () =>
+      root.render(
+        createElement(VirtualMessageList, {
+          messages: [message],
+          renderMessage: (entry) => createElement('span', { 'data-message-id': entry.id }, entry.content),
+        }),
+      ),
+    );
+  try {
+    await render(row(''));
+    const item = host.querySelector('li');
+    await render(row('Answer'));
+    expect(host.querySelector('li')).toBe(item);
+    expect(host.querySelector(`[data-message-id="${assistantMessageId}"]`)?.textContent).toBe('Answer');
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
 });
 
 it('renders short state samples and windows a long conversation while releasing listeners and observers', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const observers: { disconnected: boolean }[] = [];
-  vi.stubGlobal('ResizeObserver', class {
-    disconnected = false;
-    constructor() { observers.push(this); }
-    observe() {}
-    disconnect() { this.disconnected = true; }
-  });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      disconnected = false;
+      constructor() {
+        observers.push(this);
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {
+        this.disconnected = true;
+      }
+    },
+  );
   const host = document.createElement('div');
   host.className = 'chat-messages';
   document.body.append(host);
@@ -32,16 +66,36 @@ it('renders short state samples and windows a long conversation while releasing 
   });
   vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
   const messages = Array.from({ length: 100 }, (_, index) => ({
-    id: `message-${index}`, role: index % 2 ? 'assistant' : 'user',
-    status: index % 3 === 0 ? 'error' : 'complete', content: `Message ${index}`,
+    id: `message-${index}`,
+    role: index % 2 ? 'assistant' : 'user',
+    status: index % 3 === 0 ? 'error' : 'complete',
+    content: `Message ${index}`,
   })) as ConversationMessage[];
-  messages[75] = { ...messages[75], projectId: 'project', sessionId: 'session',
-    workTrace: { blocks: [{ toolCalls: [{ id: 'tool-target', planReview: { planId: 'plan', revision: 1, hash: 'a'.repeat(64) } }] }] },
+  messages[75] = {
+    ...messages[75],
+    projectId: 'project',
+    sessionId: 'session',
+    workTrace: {
+      blocks: [
+        { toolCalls: [{ id: 'tool-target', planReview: { planId: 'plan', revision: 1, hash: 'a'.repeat(64) } }] },
+      ],
+    },
   } as ConversationMessage;
-  const render = (items: ConversationMessage[]) => act(async () => root.render(createElement(StrictMode, null,
-    createElement(VirtualMessageList, { messages: items, estimateHeight: 160, overscan: 2,
-      renderMessage: (message) => createElement('span', { 'data-message-id': message.id }, message.content),
-    }))));
+  const render = (items: ConversationMessage[]) =>
+    act(async () =>
+      root.render(
+        createElement(
+          StrictMode,
+          null,
+          createElement(VirtualMessageList, {
+            messages: items,
+            estimateHeight: 160,
+            overscan: 2,
+            renderMessage: (message) => createElement('span', { 'data-message-id': message.id }, message.content),
+          }),
+        ),
+      ),
+    );
   try {
     await render(messages.slice(0, 3));
     expect(host.querySelector('ol')?.dataset.virtualized).toBe('false');
@@ -61,6 +115,8 @@ it('renders short state samples and windows a long conversation while releasing 
   } finally {
     await act(async () => root.unmount());
     expect(observers.every((observer) => observer.disconnected)).toBe(true);
-    host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals();
+    host.remove();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   }
 });

@@ -6,6 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { AppError } from '@shared/errors/appError';
 import type { ProcessBackend } from './processBackend';
 
 export interface PosixProcessDeps {
@@ -53,8 +54,11 @@ export function createPosixProcessBackend(deps: PosixProcessDeps = defaultDeps):
       throw error;
     }
     // Fields after the parenthesised command name start at field 3 (state).
-    const fields = text.slice(text.lastIndexOf(')') + 2).trim().split(/\s+/);
-    if (fields.length < 20) throw new Error(`PROCESS_QUERY_FAILED: malformed stat for pid ${pid}.`);
+    const fields = text
+      .slice(text.lastIndexOf(')') + 2)
+      .trim()
+      .split(/\s+/);
+    if (fields.length < 20) throw new AppError('PROCESS_QUERY_FAILED', `malformed stat for pid ${pid}.`);
     return { state: fields[0]!, processGroup: Number(fields[2]), startTicks: fields[19]! };
   };
   const liveStat = (pid: number): ProcStat | null => {
@@ -78,7 +82,7 @@ export function createPosixProcessBackend(deps: PosixProcessDeps = defaultDeps):
       return hasProc() ? liveStat(pid) !== null : signalExists(pid);
     },
     readBirth(pid) {
-      if (!hasProc()) throw new Error('PROCESS_QUERY_UNAVAILABLE: process birth requires /proc.');
+      if (!hasProc()) throw new AppError('PROCESS_QUERY_UNAVAILABLE', 'process birth requires /proc.');
       const stat = liveStat(pid);
       if (!stat) return null;
       bootId ??= deps.readFile(procFile('sys', 'kernel', 'random', 'boot_id')).trim();
@@ -86,7 +90,10 @@ export function createPosixProcessBackend(deps: PosixProcessDeps = defaultDeps):
     },
     readCommandLine(pid) {
       try {
-        const commandLine = deps.readFile(procFile(String(pid), 'cmdline')).replace(/\0/g, ' ').trim();
+        const commandLine = deps
+          .readFile(procFile(String(pid), 'cmdline'))
+          .replace(/\0/g, ' ')
+          .trim();
         return commandLine || null;
       } catch {
         return null;

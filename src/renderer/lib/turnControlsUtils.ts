@@ -1,11 +1,5 @@
-import {
-  contextTierWindowTokens,
-  resolveContextTierChoices,
-} from '@shared/utils/contextTiers';
 import { resolveModelControls } from '@shared/utils/modelControls';
-import type {
-  ConversationTurnControls,
-} from '@shared/types/modelCapability';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 
 export const DEFAULT_TURN_CONTROLS: ConversationTurnControls = {
@@ -30,12 +24,6 @@ export function hasSelectableMaxContext(capability: EffectiveModel | null): bool
   if (!capability) return false;
   const resolved = resolveModelControls(capability).resolved.maxContext;
   return resolved.state === 'selectable' && !resolved.disabled;
-}
-
-export function maxContextTokens(capability: EffectiveModel | null): number | undefined {
-  if (!capability) return undefined;
-  const maxTier = resolveContextTierChoices(capability).maxTier;
-  return maxTier ? contextTierWindowTokens(maxTier) : undefined;
 }
 
 export function isMaxContextUnverified(capability: EffectiveModel | null): boolean {

@@ -1,26 +1,17 @@
 import { LLM_PROVIDER_PROTOCOL_DEFINITIONS } from '@shared/constants/llm';
 import type { TranslationKey } from '../../../i18n';
-import type {
-  LlmProviderCategory,
-  LlmProviderEntry,
-  LlmProviderModel,
-} from '@shared/types/settings';
+import type { LlmProviderCategory, LlmProviderEntry } from '@shared/types/settings';
 import type { ProviderProtocol } from './types';
 
 export const STORED_SECRET_MASK = '************************';
-
-export const joinPath = (root: string, ...segments: string[]): string => {
-  const separator = root.includes('\\') ? '\\' : '/';
-  return [root.replace(/[\\/]+$/, ''), ...segments.map((segment) => segment.replace(/^[\\/]+/, ''))]
-    .filter(Boolean)
-    .join(separator);
-};
 
 export const cloneProvider = (provider: LlmProviderEntry): LlmProviderEntry => ({
   ...provider,
   authModeOptions: provider.authModeOptions ? [...provider.authModeOptions] : undefined,
   authModeAvailability: provider.authModeAvailability
-    ? Object.fromEntries(Object.entries(provider.authModeAvailability).map(([mode, availability]) => [mode, { ...availability }]))
+    ? Object.fromEntries(
+        Object.entries(provider.authModeAvailability).map(([mode, availability]) => [mode, { ...availability }]),
+      )
     : undefined,
   authAccountIds: provider.authAccountIds ? { ...provider.authAccountIds } : undefined,
   hasStoredSecretByAuthMode: provider.hasStoredSecretByAuthMode ? { ...provider.hasStoredSecretByAuthMode } : undefined,
@@ -32,8 +23,10 @@ export const cloneProvider = (provider: LlmProviderEntry): LlmProviderEntry => (
     ? {
         ...provider.connectionSchema,
         fields: provider.connectionSchema.fields.map((field) => ({ ...field })),
-        credentialAlternatives: provider.connectionSchema.credentialAlternatives
-          ?.map((alternative) => ({ ...alternative, fieldIds: [...alternative.fieldIds] })),
+        credentialAlternatives: provider.connectionSchema.credentialAlternatives?.map((alternative) => ({
+          ...alternative,
+          fieldIds: [...alternative.fieldIds],
+        })),
         headerMappings: provider.connectionSchema.headerMappings?.map((mapping) => ({ ...mapping })),
       }
     : undefined,
@@ -45,10 +38,8 @@ export const cloneProvider = (provider: LlmProviderEntry): LlmProviderEntry => (
 export const getEnabledModels = (provider?: Pick<LlmProviderEntry, 'models'> | null) =>
   provider?.models.filter((model) => model.enabled) ?? [];
 
-export const getProviderDisplayLabel = (
-  provider: Pick<LlmProviderEntry, 'label'>,
-  fallbackLabel: string,
-): string => provider.label.trim() || fallbackLabel;
+export const getProviderDisplayLabel = (provider: Pick<LlmProviderEntry, 'label'>, fallbackLabel: string): string =>
+  provider.label.trim() || fallbackLabel;
 
 const PROVIDER_CATEGORY_TRANSLATIONS = {
   'login-authorization': 'settings.providerCategory.loginAuthorization.label',
@@ -59,34 +50,20 @@ const PROVIDER_CATEGORY_TRANSLATIONS = {
   local: 'settings.providerCategory.local.label',
 } as const satisfies Record<LlmProviderCategory, TranslationKey>;
 
-export const getProviderCategoryTranslation = (category: LlmProviderCategory) => PROVIDER_CATEGORY_TRANSLATIONS[category];
+export const getProviderCategoryTranslation = (category: LlmProviderCategory) =>
+  PROVIDER_CATEGORY_TRANSLATIONS[category];
 
 export const getProviderProtocolLabel = (protocol: ProviderProtocol): string => {
   const definition = LLM_PROVIDER_PROTOCOL_DEFINITIONS.find((entry) => entry.id === protocol);
   return definition?.label ?? protocol;
 };
 
-export const getProviderStatusLabel = (provider: Pick<LlmProviderEntry, 'status' | 'isConfigured'>): TranslationKey => {
-  if (provider.status === 'verified' && provider.isConfigured) return 'settings.providerConnected';
-  if (provider.status === 'failed') return 'settings.providerFailed';
-  if (provider.status === 'unavailable') return 'settings.providerUnavailable';
-  return 'settings.providerUnconfigured';
-};
-
-export const getModelSummary = (models: LlmProviderModel[], fallback: string): string => {
-  if (models.length === 0) return fallback;
-  if (models.length <= 2) return models.map((model) => model.label).join(', ');
-  return `${models.slice(0, 2).map((model) => model.label).join(', ')} +${models.length - 2}`;
-};
-
 export const sortProvidersByLabel = (providers: LlmProviderEntry[]): LlmProviderEntry[] =>
-  [...providers].sort((left, right) => (
-    getProviderDisplayLabel(left, left.id).localeCompare(
-      getProviderDisplayLabel(right, right.id),
-      undefined,
-      { sensitivity: 'base' },
-    )
-  ));
+  [...providers].sort((left, right) =>
+    getProviderDisplayLabel(left, left.id).localeCompare(getProviderDisplayLabel(right, right.id), undefined, {
+      sensitivity: 'base',
+    }),
+  );
 
 export const getErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof Error && error.message.trim()) return error.message;

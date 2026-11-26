@@ -14,8 +14,8 @@ vi.mock('electron', () => ({
     getPath: () => process.env.TEMP ?? process.cwd(),
   },
 }));
-vi.mock('../../../sessions/store/StorageAdapter', () => ({
-  storageAdapter: {
+vi.mock('../../../sessions/store/sessionStores', () => ({
+  sessionContextStore: {
     readSessionShellCwd: (sessionId: string) => cwdBySession.get(sessionId) ?? null,
     writeSessionShellCwd: (sessionId: string, cwd: string) => {
       cwdBySession.set(sessionId, cwd);
@@ -25,12 +25,7 @@ vi.mock('../../../sessions/store/StorageAdapter', () => ({
 import { toolToDefinition } from '../../agent/AgentTool';
 import { toolValidator } from '../../core/ToolValidator';
 import { shellTool } from './ShellTool';
-import {
-  isPathInsideRoot,
-  parseShellTrailer,
-  wrapPosixCommand,
-  wrapPowerShellCommand,
-} from './shellTrailer';
+import { isPathInsideRoot, parseShellTrailer, wrapPosixCommand, wrapPowerShellCommand } from './shellTrailer';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 const roots: string[] = [];
@@ -42,20 +37,14 @@ afterEach(async () => {
 describe('shellTrailer', () => {
   it('strips a GUID trailer and reads cwd, provider, and exit', () => {
     const marker = 'RDC_SHELL_TESTMARKER';
-    const parsed = parseShellTrailer(
-      `hello\n${marker}\ncwd=D:\\\\proj\nprovider=FileSystem\nexit=7\n`,
-      marker,
-    );
+    const parsed = parseShellTrailer(`hello\n${marker}\ncwd=D:\\\\proj\nprovider=FileSystem\nexit=7\n`, marker);
     expect(parsed.body).toBe('hello');
     expect(parsed.trailer).toEqual({
       cwd: 'D:\\\\proj',
       provider: 'FileSystem',
       exit: 7,
     });
-    const crlf = parseShellTrailer(
-      `hello\r\n${marker}\r\ncwd=D:\\\\proj\r\nprovider=FileSystem\r\nexit=0\r\n`,
-      marker,
-    );
+    const crlf = parseShellTrailer(`hello\r\n${marker}\r\ncwd=D:\\\\proj\r\nprovider=FileSystem\r\nexit=0\r\n`, marker);
     expect(crlf.body).toBe('hello');
     expect(crlf.trailer?.exit).toBe(0);
   });
@@ -70,7 +59,7 @@ describe('shellTrailer', () => {
     const wrapped = wrapPosixCommand('/tmp/rdc-agent-shell-x/command.sh', 'RDC_SHELL_POSIX', '/tmp/proj');
     expect(wrapped).toContain("trap '__exit=$?; __emit' EXIT");
     expect(wrapped).toContain('pwd -P');
-    expect(wrapped).toContain("printf '%s\\n' \"$__begin\"");
+    expect(wrapped).toContain('printf \'%s\\n\' "$__begin"');
     expect(wrapped).toContain("cd '/tmp/proj'");
     expect(wrapped).not.toContain('mktemp');
     expect(wrapped).not.toContain('base64');
@@ -104,8 +93,15 @@ describe('shellTrailer', () => {
 
   it('preserves a complete PowerShell formatting stream', { timeout: 15_000 }, () => {
     if (!currentHost().isWindows) return;
-    const wrapped = wrapPowerShellCommand("@([pscustomobject]@{Name='alpha';Count=1}, [pscustomobject]@{Name='beta';Count=2}) | Format-Table -AutoSize", 'RDC_FORMAT');
-    const result = spawnSync(windowsPowerShellPath(), ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(wrapped, 'utf16le').toString('base64')], { encoding: 'utf8', timeout: 10000 });
+    const wrapped = wrapPowerShellCommand(
+      "@([pscustomobject]@{Name='alpha';Count=1}, [pscustomobject]@{Name='beta';Count=2}) | Format-Table -AutoSize",
+      'RDC_FORMAT',
+    );
+    const result = spawnSync(
+      windowsPowerShellPath(),
+      ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(wrapped, 'utf16le').toString('base64')],
+      { encoding: 'utf8', timeout: 10000 },
+    );
     expect(result.status).toBe(0);
     const parsed = parseShellTrailer(result.stdout, 'RDC_FORMAT');
     expect(parsed.trailer?.exit).toBe(0);
@@ -122,7 +118,7 @@ describe('shellTrailer', () => {
     expect(wrapped).toContain('[System.Text.Encoding]::Default');
     expect(wrapped).toContain('2>$__errFile');
     expect(wrapped).not.toContain('2>&1');
-    expect(wrapped).toContain('$ErrorActionPreference = \'Stop\'');
+    expect(wrapped).toContain("$ErrorActionPreference = 'Stop'");
     expect(wrapped).toContain('[Environment]::Exit($__exit)');
   });
 });
@@ -137,16 +133,8 @@ describe('ShellTool', () => {
       projectId: null,
       sessionId: null,
     };
-    const command = currentHost().isWindows
-      ? 'Write-Output hello-rdc'
-      : 'printf %s hello-rdc';
-    const result = await shellTool.execute(
-      's1',
-      { command, timeout: 20_000 },
-      undefined,
-      undefined,
-      context,
-    );
+    const command = currentHost().isWindows ? 'Write-Output hello-rdc' : 'printf %s hello-rdc';
+    const result = await shellTool.execute('s1', { command, timeout: 20_000 }, undefined, undefined, context);
     const text = result.content[0]?.type === 'text' ? result.content[0].text : '';
     expect(text).toContain('hello-rdc');
     expect(text).not.toContain('RDC_SHELL_');
@@ -168,13 +156,7 @@ describe('ShellTool', () => {
       sessionId: null,
     };
     const command = currentHost().isWindows ? 'Get-Location' : 'pwd';
-    const result = await shellTool.execute(
-      's-cwd',
-      { command, timeout: 20_000 },
-      undefined,
-      undefined,
-      context,
-    );
+    const result = await shellTool.execute('s-cwd', { command, timeout: 20_000 }, undefined, undefined, context);
     const text = result.content[0]?.type === 'text' ? result.content[0].text : '';
     expect(text).not.toContain('trailer missing');
     expect(result.isError).not.toBe(true);
@@ -195,31 +177,47 @@ describe('ShellTool', () => {
   });
 
   it('rejects mixed or empty command/rdc at execute time', async () => {
-    await expect(shellTool.execute('s-empty', {}, undefined, undefined, {
-      workspaceRoot: process.cwd(),
-      projectRootPath: process.cwd(),
-      projectId: null,
-      sessionId: null,
-    })).rejects.toThrow('exactly one of command or rdc');
-    await expect(shellTool.execute('s-mixed', { command: 'echo', rdc: { operation: 'rd.core.init', args: {} } }, undefined, undefined, {
-      workspaceRoot: process.cwd(),
-      projectRootPath: process.cwd(),
-      projectId: null,
-      sessionId: null,
-    })).rejects.toThrow('exactly one of command or rdc');
-    await expect(shellTool.execute('s-whitespace', { command: '  ' }, undefined, undefined, {
-      workspaceRoot: process.cwd(),
-      projectRootPath: process.cwd(),
-      projectId: null,
-      sessionId: null,
-    })).rejects.toThrow('exactly one of command or rdc');
+    await expect(
+      shellTool.execute('s-empty', {}, undefined, undefined, {
+        workspaceRoot: process.cwd(),
+        projectRootPath: process.cwd(),
+        projectId: null,
+        sessionId: null,
+      }),
+    ).rejects.toThrow('exactly one of command or rdc');
+    await expect(
+      shellTool.execute(
+        's-mixed',
+        { command: 'echo', rdc: { operation: 'rd.core.init', args: {} } },
+        undefined,
+        undefined,
+        {
+          workspaceRoot: process.cwd(),
+          projectRootPath: process.cwd(),
+          projectId: null,
+          sessionId: null,
+        },
+      ),
+    ).rejects.toThrow('exactly one of command or rdc');
+    await expect(
+      shellTool.execute('s-whitespace', { command: '  ' }, undefined, undefined, {
+        workspaceRoot: process.cwd(),
+        projectRootPath: process.cwd(),
+        projectId: null,
+        sessionId: null,
+      }),
+    ).rejects.toThrow('exactly one of command or rdc');
   });
 
   it('validates shell input modes without entering approval or execution', () => {
     expect(() => shellTool.validateArgs?.({ command: 'echo ok' })).not.toThrow();
-    expect(() => shellTool.validateArgs?.({ rdc: { discovery: { kind: 'search', query: 'draw', limit: 5 } } })).not.toThrow();
+    expect(() =>
+      shellTool.validateArgs?.({ rdc: { discovery: { kind: 'search', query: 'draw', limit: 5 } } }),
+    ).not.toThrow();
     expect(() => shellTool.validateArgs?.({ command: '' })).toThrow('SHELL_INPUT');
-    expect(() => shellTool.validateArgs?.({ command: ' ', rdc: { discovery: { kind: 'search', query: 'draw', limit: 5 } } })).toThrow('SHELL_INPUT');
+    expect(() =>
+      shellTool.validateArgs?.({ command: ' ', rdc: { discovery: { kind: 'search', query: 'draw', limit: 5 } } }),
+    ).toThrow('SHELL_INPUT');
   });
 
   it('validates bounded frozen catalog listing in the actual tool schema validator', () => {
@@ -231,7 +229,8 @@ describe('ShellTool', () => {
       expect(() => toolValidator.validate(definition, { rdc: { discovery } })).not.toThrow();
     }
     for (const discovery of [
-      { kind: 'list', query: 'hidden' }, { kind: 'list', limit: 21 },
+      { kind: 'list', query: 'hidden' },
+      { kind: 'list', limit: 21 },
       { kind: 'list', cursor: { offset: -1, fingerprint: 'a'.repeat(64) } },
       { kind: 'list', cursor: { offset: 0, fingerprint: 'invalid' } },
     ]) {
@@ -258,11 +257,23 @@ describe('ShellTool', () => {
     };
     cwdBySession.set('sess_shell_cwd', path.join(os.tmpdir(), 'outside-project'));
     const cd = currentHost().isWindows ? 'Set-Location nested' : 'cd nested';
-    const first = await shellTool.execute('s-persist-1', { command: cd, timeout: 20_000 }, undefined, undefined, context);
+    const first = await shellTool.execute(
+      's-persist-1',
+      { command: cd, timeout: 20_000 },
+      undefined,
+      undefined,
+      context,
+    );
     expect(first.isError).not.toBe(true);
     expect(cwdBySession.get('sess_shell_cwd')).toBe(path.resolve(nested));
     const loc = currentHost().isWindows ? 'Get-Location' : 'pwd';
-    const second = await shellTool.execute('s-persist-2', { command: loc, timeout: 20_000 }, undefined, undefined, context);
+    const second = await shellTool.execute(
+      's-persist-2',
+      { command: loc, timeout: 20_000 },
+      undefined,
+      undefined,
+      context,
+    );
     expect(second.details?.cwd).toBe(path.resolve(nested));
   });
 
@@ -312,15 +323,21 @@ describe('ShellTool', () => {
     if (!currentHost().isWindows) return;
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-shell-utf8-'));
     roots.push(root);
-    const result = await shellTool.execute('s-utf8', {
-      command: "Write-Output '中文样本'; [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); node -e \"process.stdout.write(String.fromCharCode(20013,25991))\"",
-      timeout: 20_000,
-    }, undefined, undefined, { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null });
+    const result = await shellTool.execute(
+      's-utf8',
+      {
+        command:
+          'Write-Output \'中文样本\'; [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); node -e "process.stdout.write(String.fromCharCode(20013,25991))"',
+        timeout: 20_000,
+      },
+      undefined,
+      undefined,
+      { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null },
+    );
     const text = result.content[0]?.type === 'text' ? result.content[0].text : '';
     expect(text).toContain('中文样本');
     expect(text.match(/中文/g)).toHaveLength(2);
     expect(text).not.toContain('\uFFFD');
     expect(result.isError).not.toBe(true);
   });
-
 });

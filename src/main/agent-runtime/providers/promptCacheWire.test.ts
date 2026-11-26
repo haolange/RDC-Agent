@@ -55,8 +55,7 @@ describe('partitionSystemPrompt', () => {
   });
 
   it('fails closed when runtime text and PromptPlan ownership diverge', () => {
-    expect(() => partitionSystemPrompt(context({ systemPrompt: 'mutated' })))
-      .toThrow('PROMPT_PLAN_CONTEXT_MISMATCH');
+    expect(() => partitionSystemPrompt(context({ systemPrompt: 'mutated' }))).toThrow('PROMPT_PLAN_CONTEXT_MISMATCH');
   });
 
   it('fails closed when a stable segment appears after volatile content', () => {
@@ -67,7 +66,6 @@ describe('partitionSystemPrompt', () => {
       { ...invalid.systemPromptSegments![1], content: 'Stable B' },
     ];
     invalid.systemPrompt = 'Stable A\n\nVolatile\n\nStable B';
-    expect(() => partitionSystemPrompt(invalid))
-      .toThrow('PROMPT_PLAN_STABILITY_ORDER_INVALID');
+    expect(() => partitionSystemPrompt(invalid)).toThrow('PROMPT_PLAN_STABILITY_ORDER_INVALID');
   });
 });

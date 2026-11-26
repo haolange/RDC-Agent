@@ -1,11 +1,13 @@
+import { errorCodeOf } from '@shared/errors/appError';
 import { selectOrderedConversationMessages, useConversationStore } from '../../stores/conversationStore';
 import { findPlanReview } from '../../lib/transcriptPlanLocation';
+import { errorDetail } from '../../lib/errorDetail';
 import { buildConversationConfigurationCommit } from '../../stores/conversationConfigurationCommit';
 import { useSessionStore } from '../../stores/sessionStore';
 import {
   applyConversationTurnResult,
   buildOptimisticConversationTurn,
-  removeOptimisticConversationMessages,
+  removeRequestMessages,
   resolveComposerProfileId,
   toConversationAttachmentInputs,
 } from '../../stores/conversationSendHelpers';
@@ -15,8 +17,10 @@ import {
   useComposerSessionContextStore,
 } from '../../stores/composerSessionContextStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useWorkflowStore } from '../../stores/workflowStore';
 import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel';
 import { createConversationRequestId } from '../../services/conversationRequestId';
+import { notify } from '../../stores/notificationStore';
 import { persistComposerDraftToSession } from './sessionModelOverride';
 import { inspectHandoffCommit, type ComposerSendOutcome } from './composerHandoffSend';
 import type { PendingAttachmentDraft } from '../../types/attachments';
@@ -24,16 +28,32 @@ import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
-import type { AgentMode } from '@shared/types/layout';
+import type { Translator } from '../../i18n/messages';
 
 export { createConversationRequestId };
+
+/**
+ * The conversation, session and trace writers a send applies its result with. Store actions never change identity,
+ * so a send reads them when it runs instead of a component holding a selector for each.
+ */
+export const conversationWriters = () => {
+  const conversation = useConversationStore.getState();
+  return {
+    setConversationMessages: conversation.setConversationMessages,
+    setBranchState: conversation.setBranchState,
+    setConversationSnapshot: conversation.setConversationSnapshot,
+    upsertConversationMessages: conversation.upsertConversationMessages,
+    setSessions: useProjectStore.getState().setSessions,
+    setCurrentRun: useSessionStore.getState().setCurrentRun,
+    setTracePresentation: useWorkflowStore.getState().setTracePresentation,
+  };
+};
 
 export async function sendComposerConversationTurn(options: {
   electronAPI: NonNullable<Window['electronAPI']>;
   trimmed: string;
   pendingAttachments: PendingAttachmentDraft[];
   pendingSkillIds: string[];
-  currentMode: AgentMode;
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
   currentRun: RunSummary | null;
@@ -44,18 +64,12 @@ export async function sendComposerConversationTurn(options: {
   setPendingSkillIds: (value: string[]) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   setBranchState: (branchState: ConversationBranchState | null) => void;
-  setConversationSnapshot?: (
-    messages: ConversationMessage[],
-    branchState?: ConversationBranchState | null,
-  ) => void;
+  setConversationSnapshot?: (messages: ConversationMessage[], branchState?: ConversationBranchState | null) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
-  setCurrentSession: (session: SessionRecord | null) => void;
   setSessions: (sessions: SessionRecord[]) => void;
   setCurrentRun: (run: RunSummary | null) => void;
-  setRuns: (runs: RunSummary[]) => void;
   setTracePresentation: (presentation: AgentRunPresentation | null) => void;
-  showNotice: (message: string) => void;
-  failedSummary: string;
+  t: Translator;
   preserveDraft?: boolean;
   planReference?: import('@shared/types/planReview').PlanReferenceRequest;
 }): Promise<ComposerSendOutcome> {
@@ -64,7 +78,6 @@ export async function sendComposerConversationTurn(options: {
     trimmed,
     pendingAttachments,
     pendingSkillIds,
-    currentMode,
     currentProject,
     currentSession,
     currentRun,
@@ -77,13 +90,10 @@ export async function sendComposerConversationTurn(options: {
     setBranchState,
     setConversationSnapshot,
     upsertConversationMessages,
-    setCurrentSession,
     setSessions,
     setCurrentRun,
-    setRuns,
     setTracePresentation,
-    showNotice,
-    failedSummary,
+    t,
   } = options;
 
   const { preserveDraft = false } = options;
@@ -96,8 +106,8 @@ export async function sendComposerConversationTurn(options: {
   const owningSessionId = currentSession?.sessionId ?? null;
   const isOwningSelectionActive = (sessionId: string | null) => {
     const selection = useProjectStore.getState();
-    return selection.currentSession?.sessionId
-      ? selection.currentSession.sessionId === sessionId
+    return selection.currentSessionId
+      ? selection.currentSessionId === sessionId
       : (selection.currentProject?.projectId ?? null) === (currentProject?.projectId ?? null);
   };
   let turnOwnership = {
@@ -106,35 +116,44 @@ export async function sendComposerConversationTurn(options: {
     agentId: selectedAgentId,
   };
   const claimedPlan = options.planReference;
-  const referencedPlan = claimedPlan ? findPlanReview(selectOrderedConversationMessages(useConversationStore.getState()),
-    { planId: claimedPlan.planId, revision: claimedPlan.revision, hash: claimedPlan.expectedHash }) : undefined;
+  const referencedPlan = claimedPlan
+    ? findPlanReview(selectOrderedConversationMessages(useConversationStore.getState()), {
+        planId: claimedPlan.planId,
+        revision: claimedPlan.revision,
+        hash: claimedPlan.expectedHash,
+      })
+    : undefined;
   const optimistic = buildOptimisticConversationTurn({
     requestId,
     trimmed: sentPrompt,
-    currentMode,
     currentProject,
     currentSession,
     currentRun,
     pendingAttachments: sentAttachments,
     selectedAgentId,
-    ...(claimedPlan && referencedPlan ? { planReference: {
-      intent: claimedPlan.intent, planId: claimedPlan.planId, revision: claimedPlan.revision, hash: claimedPlan.expectedHash,
-      uri: referencedPlan.uri, title: referencedPlan.title, agentId: selectedAgentId,
-    } } : {}),
+    ...(claimedPlan && referencedPlan
+      ? {
+          planReference: {
+            intent: claimedPlan.intent,
+            planId: claimedPlan.planId,
+            revision: claimedPlan.revision,
+            hash: claimedPlan.expectedHash,
+            uri: referencedPlan.uri,
+            title: referencedPlan.title,
+            agentId: selectedAgentId,
+          },
+        }
+      : {}),
   });
 
+  // A refused request takes its messages back out; an accepted one keeps them, since main's carry the same ids.
   const rollbackOptimistic = () => {
-    setConversationMessages(removeOptimisticConversationMessages(
-      useConversationStore.getState().allConversationMessages,
-      optimistic.optimisticIds,
-    ));
+    setConversationMessages(removeRequestMessages(useConversationStore.getState().allConversationMessages, requestId));
   };
 
   useComposerSessionContextStore.getState().beginTurn({
     ...turnOwnership,
     projectId: currentProject?.projectId ?? null,
-    optimisticTurnId: optimistic.assistantDraftMessage.turnId,
-    realTurnId: null,
   });
   if (!preserveDraft) {
     setPromptValue('');
@@ -147,7 +166,7 @@ export async function sendComposerConversationTurn(options: {
 
   const restoreComposerDraft = () => {
     if (preserveDraft) return;
-    const activeSessionId = useProjectStore.getState().currentSession?.sessionId ?? null;
+    const activeSessionId = useProjectStore.getState().currentSessionId;
     if (owningSessionId && activeSessionId !== owningSessionId) {
       return;
     }
@@ -174,23 +193,18 @@ export async function sendComposerConversationTurn(options: {
     return true;
   };
 
-  const isRequestCancelledError = (error: unknown): boolean => {
-    const message = error instanceof Error ? error.message : String(error);
-    return message.includes('REQUEST_CANCELLED');
-  };
-
   try {
-    const configuration = await buildConversationConfigurationCommit({
-      selectedAgentId,
-      currentProjectId: currentProject?.projectId,
-      getEffectiveCatalog: (providerId) => electronAPI.settings.getEffectiveCatalog(providerId),
-      modelOverride: readComposerEffectiveModel(
-        selectedAgentId,
-        currentSession,
-        currentProject?.projectId,
-      ),
-    });
-    const profileId = resolveComposerProfileId(currentMode, selectedAgentId);
+    // A handoff runs on the session's committed Agent, model and controls (main wrote them with the handoff or the
+    // approval), so only a person's own send freezes the Composer's configuration for main to check.
+    const configuration = preserveDraft
+      ? null
+      : await buildConversationConfigurationCommit({
+          selectedAgentId,
+          currentProjectId: currentProject?.projectId,
+          getEffectiveCatalog: (providerId) => electronAPI.settings.getEffectiveCatalog(providerId),
+          modelOverride: readComposerEffectiveModel(selectedAgentId, currentSession, currentProject?.projectId),
+        });
+    const profileId = resolveComposerProfileId(selectedAgentId);
     const turnControls = { ...useTurnControlsStore.getState().turnControls };
     dispatchStarted = true;
     const result = await electronAPI.conversation.sendMessage({
@@ -206,7 +220,7 @@ export async function sendComposerConversationTurn(options: {
       preloadSkillIds: sentSkillIds,
       ...(options.planReference ? { planReference: options.planReference } : {}),
       turnControls,
-      configurationCommit: configuration.configurationCommit,
+      ...(configuration ? { configurationCommit: configuration.configurationCommit } : {}),
     });
 
     if (finishRevokedOrCancelled()) {
@@ -227,8 +241,10 @@ export async function sendComposerConversationTurn(options: {
       useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
       useSessionStore.getState().setPreparedTurnContext(null);
       useSessionStore.getState().setConversationPreparationPhase('idle');
-      if (!preserveDraft) showNotice(result.error.message || failedSummary);
-      return { status: 'rejected', requestId, error: result.error.message || failedSummary };
+      // The message is technical; the code words the toast and both leave through "Copy details".
+      const failure = `${result.error.code}: ${result.error.message}`;
+      if (!preserveDraft) notify.failure(failure, t, 'app.conversationRequestFailed');
+      return { status: 'rejected', requestId, error: failure };
     }
 
     accepted = true;
@@ -239,19 +255,13 @@ export async function sendComposerConversationTurn(options: {
       void electronAPI.conversation.releaseAttachments({ stagingIds: stagedIds });
     }
 
-    // Drop optimistic placeholders before applying authoritative turn messages.
-    rollbackOptimistic();
-
     const turn = result.turn;
-    const committedSessionId = turn.session?.sessionId
-      ?? turn.userMessage.sessionId
-      ?? turn.assistantDraftMessage.sessionId
-      ?? turnOwnership.sessionId;
-    useComposerSessionContextStore.getState().setRealTurnId(
-      turnOwnership,
-      turn.userMessage.turnId,
-      committedSessionId,
-    );
+    const committedSessionId =
+      turn.session?.record.sessionId ??
+      turn.userMessage.sessionId ??
+      turn.assistantDraftMessage.sessionId ??
+      turnOwnership.sessionId;
+    useComposerSessionContextStore.getState().bindCommittedSession(turnOwnership, committedSessionId);
     turnOwnership = { ...turnOwnership, sessionId: committedSessionId };
     if (isOwningSelectionActive(committedSessionId)) {
       useSessionStore.getState().setPreparedTurnContext(result.preparedContext);
@@ -262,20 +272,19 @@ export async function sendComposerConversationTurn(options: {
       electronAPI,
       result: turn,
       currentProject,
-      setCurrentSession,
       setSessions,
       setCurrentRun,
-      setRuns,
       setTracePresentation,
       setConversationMessages,
       setBranchState,
       setConversationSnapshot,
       upsertConversationMessages,
     });
-    if (!preserveDraft) await persistComposerDraftToSession(
-      turn.session?.sessionId ?? committedSessionId,
-      currentProject?.projectId,
-    );
+    if (!preserveDraft)
+      await persistComposerDraftToSession(
+        turn.session?.record.sessionId ?? committedSessionId,
+        currentProject?.projectId,
+      );
 
     useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
     return { status: 'accepted', requestId };
@@ -288,10 +297,11 @@ export async function sendComposerConversationTurn(options: {
     useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
     useSessionStore.getState().setPreparedTurnContext(null);
     useSessionStore.getState().setConversationPreparationPhase('idle');
-    if (isRequestCancelledError(error)) return { status: 'cancelled', requestId };
-    if (!preserveDraft) showNotice(error instanceof Error ? error.message : failedSummary);
+    if (errorCodeOf(error) === 'REQUEST_CANCELLED') return { status: 'cancelled', requestId };
+    if (!preserveDraft) notify.failure(error, t, 'app.conversationRequestFailed');
     if (accepted) return { status: 'accepted', requestId };
-    if (preserveDraft && dispatchStarted && owningSessionId) return inspectHandoffCommit(electronAPI.conversation, owningSessionId, requestId);
-    return { status: 'rejected', requestId, error: error instanceof Error ? error.message : failedSummary };
+    if (preserveDraft && dispatchStarted && owningSessionId)
+      return inspectHandoffCommit(electronAPI.conversation, owningSessionId, requestId);
+    return { status: 'rejected', requestId, error: errorDetail(error) };
   }
 }

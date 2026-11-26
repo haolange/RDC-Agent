@@ -8,10 +8,15 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { assertFileWriteBoundary } from '../../permissions/FileOperationBoundary';
+import { assertFileWriteBoundary } from '../../../runtime/FileOperationBoundary';
+import {
+  isPathExisting,
+  requireMutationWorkspaceRoot,
+  safeResolvePath,
+  writeTextFileNoFollow,
+} from '../../../runtime/toolFiles';
+import { WRITE_FILE_MAX_CONTENT_BYTES } from '../../../runtime/toolLimits';
 import { requireSuccessfulFileRead } from './fileReadAccess';
-import { isPathExisting, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from './_shared';
-import { WRITE_FILE_MAX_CONTENT_BYTES } from './toolLimits';
 import type { AgentTool } from '../../agent/AgentTool';
 
 interface WriteFileParams {
@@ -45,7 +50,14 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
     },
     required: ['path', 'content'],
   },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: {
+    isReadOnly: false,
+    concurrency: 'exclusive',
+    isDestructive: true,
+    sideEffect: 'filesystem',
+    category: 'file',
+    requiresApproval: true,
+  },
   permissionHint: 'mutation',
   effects: { writes: ['path'] },
 
@@ -57,9 +69,7 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
     const content = typeof params.content === 'string' ? params.content : '';
     const bytesWritten = Buffer.byteLength(content, 'utf8');
     if (bytesWritten > WRITE_FILE_MAX_CONTENT_BYTES) {
-      throw new Error(
-        `write_file content exceeds limit (${bytesWritten} > ${WRITE_FILE_MAX_CONTENT_BYTES} bytes)`,
-      );
+      throw new Error(`write_file content exceeds limit (${bytesWritten} > ${WRITE_FILE_MAX_CONTENT_BYTES} bytes)`);
     }
 
     const workspaceRoot = requireMutationWorkspaceRoot(context);

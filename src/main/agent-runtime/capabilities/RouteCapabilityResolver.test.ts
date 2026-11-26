@@ -21,9 +21,7 @@ const provider = {
   capabilities: ['chat', 'tool-calling', 'vision-input', 'structured-output'],
 } as LlmProviderEntry;
 
-function testContracts(
-  protocol: Parameters<typeof createFailClosedProviderContracts>[0],
-) {
+function testContracts(protocol: Parameters<typeof createFailClosedProviderContracts>[0]) {
   const contracts = createFailClosedProviderContracts(protocol);
   return {
     ...contracts,
@@ -55,7 +53,12 @@ function model(patch: Partial<EffectiveModel> = {}): EffectiveModel {
     label: 'Model A',
     aliases: [],
     enabled: true,
-    route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', contracts: testContracts('OpenAICompatibleChatCompletions'), source: 'catalog' },
+    route: {
+      protocol: 'OpenAICompatibleChatCompletions',
+      baseUrl: 'https://example.test',
+      contracts: testContracts('OpenAICompatibleChatCompletions'),
+      source: 'catalog',
+    },
     availability: 'available',
     presencePolicy: 'maintained',
     contextTiers: [{ id: 'default', label: 'Default', activation: { kind: 'implicit' }, entitlement: 'granted' }],
@@ -63,7 +66,13 @@ function model(patch: Partial<EffectiveModel> = {}): EffectiveModel {
     controls: {
       fast: { state: 'unsupported', fixedValue: false },
       maxContext: { state: 'unsupported', fixedValue: false },
-      reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+      reasoning: {
+        kind: 'none',
+        supportsOff: true,
+        levels: [],
+        defaultSelection: 'off',
+        wireProfile: { kind: 'none' },
+      },
     },
     toolCalling: { state: 'unknown' },
     visionInput: { state: 'unknown' },
@@ -105,7 +114,7 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
     });
     expect(resolveAgentRouteCapability(provider, 'model-a', rawModel).reasoningContract.semantic).toBe('raw');
 
-    const frozenPlan = {
+    const frozenRoute = {
       route: {
         protocol: 'OpenAIResponses',
         baseUrl: 'https://example.test/v1',
@@ -121,9 +130,15 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
           continuation: 'exact-execution',
         }),
       },
+    };
+    // A built RequestPlan carries the contracts its route froze.
+    const frozenPlan = {
+      ...frozenRoute,
+      contracts: frozenRoute.route.contracts,
     } as unknown as import('@shared/types/providerCapability').RequestPlan;
-    expect(resolveAgentRouteCapability(provider, 'model-a', rawModel, frozenPlan).reasoningContract.semantic)
-      .toBe('summary');
+    expect(resolveAgentRouteCapability(provider, 'model-a', rawModel, frozenPlan).reasoningContract.semantic).toBe(
+      'summary',
+    );
 
     const undeclared = model({
       controls: rawModel.controls,
@@ -133,8 +148,7 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
         source: 'user',
       },
     });
-    expect(resolveAgentRouteCapability(provider, 'model-a', undeclared).reasoningContract.semantic)
-      .toBe('unknown');
+    expect(resolveAgentRouteCapability(provider, 'model-a', undeclared).reasoningContract.semantic).toBe('unknown');
   });
 
   it('fails closed for unknown tools with a distinct unverified diagnostic', () => {
@@ -161,11 +175,17 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
   });
 
   it('honors explicit supported and unsupported states', () => {
-    expect(resolveAgentRouteCapability(provider, 'model-a', model({
-      toolCalling: { state: 'unsupported' },
-      visionInput: { state: 'supported' },
-      structuredOutput: { state: 'supported' },
-    }))).toMatchObject({
+    expect(
+      resolveAgentRouteCapability(
+        provider,
+        'model-a',
+        model({
+          toolCalling: { state: 'unsupported' },
+          visionInput: { state: 'supported' },
+          structuredOutput: { state: 'supported' },
+        }),
+      ),
+    ).toMatchObject({
       toolCallingMode: 'text-only',
       toolCallingEvidence: 'unsupported',
       toolCallingUnverified: false,
@@ -175,31 +195,44 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
   });
 
   it('uses EffectiveModel instead of the provider static capability list', () => {
-    expect(resolveAgentRouteCapability(
-      { ...provider, capabilities: ['chat'] },
-      'model-a',
-      model({ toolCalling: { state: 'supported' } }),
-    )).toMatchObject({
+    expect(
+      resolveAgentRouteCapability(
+        { ...provider, capabilities: ['chat'] },
+        'model-a',
+        model({ toolCalling: { state: 'supported' } }),
+      ),
+    ).toMatchObject({
       toolCallingMode: 'native-structured',
       toolCallingEvidence: 'supported',
       toolCallingUnverified: false,
     });
   });
 
-  it.each(['AzureOpenAIResponses', 'MistralConversations', 'BedrockConverseStream'] as const)('enables native tools for the dedicated %s adapter contract', (protocol) => {
-    const capability = resolveAgentRouteCapability(provider, 'model-a', model({
-      route: { protocol, baseUrl: 'https://example.test', source: 'catalog', contracts: testContracts(protocol) },
-      toolCalling: { state: 'supported' },
-    }));
-    expect(capability.toolCallingMode).toBe('native-structured');
-    expect(capability.supportsToolResults).toBe(true);
-  });
+  it.each(['AzureOpenAIResponses', 'MistralConversations', 'BedrockConverseStream'] as const)(
+    'enables native tools for the dedicated %s adapter contract',
+    (protocol) => {
+      const capability = resolveAgentRouteCapability(
+        provider,
+        'model-a',
+        model({
+          route: { protocol, baseUrl: 'https://example.test', source: 'catalog', contracts: testContracts(protocol) },
+          toolCalling: { state: 'supported' },
+        }),
+      );
+      expect(capability.toolCallingMode).toBe('native-structured');
+      expect(capability.supportsToolResults).toBe(true);
+    },
+  );
 
   it('fails closed for an unavailable EffectiveModel', () => {
-    const capability = resolveAgentRouteCapability(provider, 'model-a', model({
-      availability: 'unavailable',
-      unavailableReason: 'adapter unavailable',
-    }));
+    const capability = resolveAgentRouteCapability(
+      provider,
+      'model-a',
+      model({
+        availability: 'unavailable',
+        unavailableReason: 'adapter unavailable',
+      }),
+    );
     expect(capability).toMatchObject({
       toolCallingMode: 'disabled',
       supportsStreaming: false,
@@ -214,9 +247,13 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
   });
 
   it('reports explicit tool-call rejection as a warning without registering tools', () => {
-    const capability = resolveAgentRouteCapability(provider, 'model-a', model({
-      toolCalling: { state: 'unsupported' },
-    }));
+    const capability = resolveAgentRouteCapability(
+      provider,
+      'model-a',
+      model({
+        toolCalling: { state: 'unsupported' },
+      }),
+    );
     expect(describeRouteCapabilityDiagnostic(capability, 3)).toMatchObject({
       code: 'route_tool_calling_unsupported',
       severity: 'warning',
@@ -225,9 +262,13 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
   });
 
   it('claims observed evidence only after a native tool-call and successful tool-result', () => {
-    const capability = resolveAgentRouteCapability(provider, 'model-a', model({
-      toolCalling: { state: 'supported' },
-    }));
+    const capability = resolveAgentRouteCapability(
+      provider,
+      'model-a',
+      model({
+        toolCalling: { state: 'supported' },
+      }),
+    );
     const gate: StructuredToolCallingEvidenceGate = { recorded: false };
     expect(claimStructuredToolCallingEvidence('text_delta', capability, gate)).toBe(false);
     expect(claimStructuredToolCallingEvidence('toolcall_end', capability, gate)).toBe(false);
@@ -238,9 +279,13 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
   });
 
   it('does not claim evidence from a tool result without a prior structured tool-call', () => {
-    const capability = resolveAgentRouteCapability(provider, 'model-a', model({
-      toolCalling: { state: 'supported' },
-    }));
+    const capability = resolveAgentRouteCapability(
+      provider,
+      'model-a',
+      model({
+        toolCalling: { state: 'supported' },
+      }),
+    );
     expect(claimStructuredToolCallingEvidence('tool_execution_end', capability, { recorded: false })).toBe(false);
   });
 
@@ -255,9 +300,17 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
     ['supported', 'native-structured', false, 'native', 'native'],
     ['unsupported', 'text-only', false, 'disabled', 'prompt-fallback'],
   ] as const)('applies the shared unknown policy table for %s', (state, tools, unverified, vision, structured) => {
-    expect(resolveAgentRouteCapability(provider, 'model-a', model({
-      toolCalling: { state }, visionInput: { state }, structuredOutput: { state },
-    }))).toMatchObject({
+    expect(
+      resolveAgentRouteCapability(
+        provider,
+        'model-a',
+        model({
+          toolCalling: { state },
+          visionInput: { state },
+          structuredOutput: { state },
+        }),
+      ),
+    ).toMatchObject({
       toolCallingMode: tools,
       toolCallingEvidence: state,
       toolCallingUnverified: unverified,
@@ -267,31 +320,35 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
   });
 
   it('classifies only explicit tool-parameter rejections as unsupported evidence', () => {
-    expect(isExplicitStructuredToolCallingRejection(
-      new ProviderHttpError('openai', 400, 'this model does not support tools'),
-    )).toBe(true);
-    expect(isExplicitStructuredToolCallingRejection(
-      new ProviderHttpError('openai', 429, 'this model does not support tools'),
-    )).toBe(false);
-    expect(isExplicitStructuredToolCallingRejection(
-      new ProviderHttpError('openai', 503, 'unknown parameter: tools'),
-    )).toBe(false);
-    expect(isExplicitStructuredToolCallingRejection(
-      new ProviderHttpError('openai', 400, 'insufficient_quota'),
-    )).toBe(false);
-    expect(isExplicitStructuredToolCallingRejection(
-      new ProviderHttpError(
-        'openai-responses',
-        400,
-        'Client-side tools for multi-agent models require beta access',
+    expect(
+      isExplicitStructuredToolCallingRejection(
+        new ProviderHttpError('openai', 400, 'this model does not support tools'),
       ),
-    )).toBe(true);
-    expect(isExplicitStructuredToolCallingRejection(
-      new ProviderHttpError(
-        'anthropic-messages',
-        400,
-        'The parameter `max_tokens` specified in the request is not valid',
+    ).toBe(true);
+    expect(
+      isExplicitStructuredToolCallingRejection(
+        new ProviderHttpError('openai', 429, 'this model does not support tools'),
       ),
-    )).toBe(false);
+    ).toBe(false);
+    expect(
+      isExplicitStructuredToolCallingRejection(new ProviderHttpError('openai', 503, 'unknown parameter: tools')),
+    ).toBe(false);
+    expect(isExplicitStructuredToolCallingRejection(new ProviderHttpError('openai', 400, 'insufficient_quota'))).toBe(
+      false,
+    );
+    expect(
+      isExplicitStructuredToolCallingRejection(
+        new ProviderHttpError('openai-responses', 400, 'Client-side tools for multi-agent models require beta access'),
+      ),
+    ).toBe(true);
+    expect(
+      isExplicitStructuredToolCallingRejection(
+        new ProviderHttpError(
+          'anthropic-messages',
+          400,
+          'The parameter `max_tokens` specified in the request is not valid',
+        ),
+      ),
+    ).toBe(false);
   });
 });

@@ -1,19 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { stringify } from 'yaml';
-import { storageAdapter } from '../store/StorageAdapter';
-import type { ProjectPlanFrontmatter } from '@shared/types/planReview';
-import type { StorageIo } from '../store/StorageIo';
+import { AppError } from '@shared/errors/appError';
+import { storageIo } from '../store/sessionStores';
+import type { StorageIo } from '../../runtime/StorageIo';
 
 export function assertPlanWritePath(targetPath: string): string {
-  if (!path.isAbsolute(targetPath)) throw new Error('PLAN_TARGET_INVALID: absolute path required.');
+  if (!path.isAbsolute(targetPath)) throw new AppError('PLAN_TARGET_INVALID', 'absolute path required.');
   const target = path.resolve(targetPath);
   let current = target;
   while (current) {
     try {
       const stat = fs.lstatSync(current);
-      if (stat.isSymbolicLink()) throw new Error('PLAN_TARGET_INVALID: links are not permitted.');
-      if (current === target && !stat.isFile()) throw new Error('PLAN_TARGET_INVALID: expected a file.');
+      if (stat.isSymbolicLink()) throw new AppError('PLAN_TARGET_INVALID', 'links are not permitted.');
+      if (current === target && !stat.isFile()) throw new AppError('PLAN_TARGET_INVALID', 'expected a file.');
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
@@ -28,15 +28,24 @@ export function composeProjectPlan(markdown: string, fields: ProjectPlanFrontmat
   return '---\n' + stringify(fields) + '---\n\n' + markdown;
 }
 
-export function writePlanFile(targetPath: string, document: string, io: StorageIo = storageAdapter.io): void {
+export function writePlanFile(targetPath: string, document: string, io: StorageIo = storageIo): void {
   const target = assertPlanWritePath(targetPath);
   const original = fs.existsSync(target) ? fs.readFileSync(target) : null;
-  io.writeUtf8AtomicFsync(target, document);
+  io.writeUtf8Atomic(target, document);
   try {
-    if (!fs.readFileSync(target).equals(Buffer.from(document, 'utf8'))) throw new Error('PLAN_WRITE_VERIFY_FAILED');
+    if (!fs.readFileSync(target).equals(Buffer.from(document, 'utf8'))) throw new AppError('PLAN_WRITE_VERIFY_FAILED');
   } catch (error) {
-    if (original) io.writeBytesAtomic(target, original, { fsync: true });
+    if (original) io.writeBytesAtomic(target, original);
     else fs.unlinkSync(target);
     throw error;
   }
+}
+
+export interface ProjectPlanFrontmatter {
+  planId: string;
+  revision: number;
+  sha256: string;
+  agent: string;
+  sessionId: string;
+  savedAt: string;
 }

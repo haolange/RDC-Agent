@@ -1,12 +1,10 @@
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { formatInvestigationContentHash, type ClaimRecord } from '@shared/types/renderdocInvestigation';
-import { SESSION_ARTIFACT_ROOT_DIR } from '@shared/types/sessionArtifact';
+import { type ClaimRecord } from '@shared/types/renderdocInvestigation';
+import { SESSION_ARTIFACT_ROOT_DIR } from '../sessions/artifacts/sessionArtifactContract';
 import { toolToDefinition } from '../agent-runtime/agent/AgentTool';
 import { toolValidator } from '../agent-runtime/core/ToolValidator';
-import { InvestigationError } from './investigationErrors';
-import { serializeInvestigationJson } from './investigationHash';
 import {
   SESSION_ID,
   baselineWorld,
@@ -27,8 +25,13 @@ import {
   seedNote,
   writeDraft,
   writeReadyReport,
-} from './investigationTestFixtures';
+} from '../testing/investigationTestFixtures';
+import { formatInvestigationContentHash } from './investigationHash';
+import { InvestigationError } from './investigationErrors';
+import { serializeInvestigationJson, sha256Prefixed } from './investigationHash';
+import { parseVerifiedRecordBody, parseVerifiedRecordBodyOf } from './investigationReadIntegrity';
 import { createInvestigationTools } from './InvestigationTools';
+import type { InvestigationIndexEntry } from './investigationRecordKeys';
 
 function indexPath(sessionPath: string): string {
   return path.join(sessionPath, SESSION_ARTIFACT_ROOT_DIR, 'investigation', 'index.json');
@@ -46,10 +49,12 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeDraft(service, 'world_state', baselineWorld('ws-hash-correction'));
     const evidence = evidenceOf('ws-hash-correction', note, 'ev-hash-correction');
     const wrong = `sha256:${'0'.repeat(65)}`;
-    expect(() => writeDraft(service, 'evidence', { ...evidence,
-      artifactRefs: [{ uri: note.uri, expectedHash: wrong }] }))
-      .toThrow(/INVESTIGATION_HASH_MISMATCH: content .*64 hexadecimal.*artifact_read.*omit expectedHash.*original source/);
-    expect(service.list(SESSION_ID).some(item => item.kind === 'evidence')).toBe(false);
+    expect(() =>
+      writeDraft(service, 'evidence', { ...evidence, artifactRefs: [{ uri: note.uri, expectedHash: wrong }] }),
+    ).toThrow(
+      /INVESTIGATION_HASH_MISMATCH: content .*64 hexadecimal.*artifact_read.*omit expectedHash.*original source/,
+    );
+    expect(service.list(SESSION_ID).some((item) => item.kind === 'evidence')).toBe(false);
     expect(writeDraft(service, 'evidence', evidence).record).toMatchObject({ evidenceId: 'ev-hash-correction' });
   });
 
@@ -59,18 +64,25 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeDraft(service, 'world_state', baselineWorld('ws-evidence-input'));
     const historical = { ...evidenceOf('ws-evidence-input', note, 'ev-historical'), contentHashes: [note.hash] };
     plantInvestigationRecord(resolver, {
-      artifactId: 'art-historical', kind: 'evidence', recordType: 'EvidenceRecord',
-      recordKey: historical.evidenceId, record: historical,
+      artifactId: 'art-historical',
+      kind: 'evidence',
+      recordType: 'EvidenceRecord',
+      recordKey: historical.evidenceId,
+      record: historical,
     });
     const before = resolver.read(SESSION_ID, 'session://investigation/records/art-historical.json').hash;
     expect(service.readRecord(SESSION_ID, 'art-historical').record).toEqual(historical);
     const packed = writeDraft(service, 'evidence_pack', {
       items: [evidenceOf('ws-evidence-input', note, 'ev-packed-input')],
     });
-    expect(packed.record).toMatchObject({ items: [{ artifactRefs: [{ expectedHash: note.hash }], contentHashes: [note.hash] }] });
-    expect(() => writeDraft(service, 'evidence_pack', {
-      items: [{ ...evidenceOf('ws-evidence-input', note, 'ev-packed-duplicate'), contentHashes: [note.hash] }],
-    })).toThrow(/INVESTIGATION_SCHEMA_INVALID/);
+    expect(packed.record).toMatchObject({
+      items: [{ artifactRefs: [{ expectedHash: note.hash }], contentHashes: [note.hash] }],
+    });
+    expect(() =>
+      writeDraft(service, 'evidence_pack', {
+        items: [{ ...evidenceOf('ws-evidence-input', note, 'ev-packed-duplicate'), contentHashes: [note.hash] }],
+      }),
+    ).toThrow(/INVESTIGATION_SCHEMA_INVALID/);
     expect(resolver.read(SESSION_ID, 'session://investigation/records/art-historical.json').hash).toBe(before);
   });
 
@@ -79,30 +91,44 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const note = seedNote(resolver);
     writeDraft(service, 'world_state', baselineWorld('ws-close-baseline'));
     const anchor = writeDraft(service, 'world_state', {
-      ...baselineWorld('ws-close-variant'), kind: 'unknown', validity: 'unknown',
+      ...baselineWorld('ws-close-variant'),
+      kind: 'unknown',
+      validity: 'unknown',
     });
     writeDraft(service, 'world_state', baselineWorld('ws-close-restored'));
     writeDraft(service, 'claim', hypothesisClaim('ws-close-baseline'));
     const design = recordedExperiment({
-      experimentId: 'exp-close', hypothesisClaimId: 'claim-hyp',
-      baselineWorldStateId: 'ws-close-baseline', variantWorldStateId: 'ws-close-variant',
-      restoredWorldStateId: 'ws-close-restored', verifyEvidenceIds: [],
-      executed: false, baselineRestored: false, status: 'designed',
+      experimentId: 'exp-close',
+      hypothesisClaimId: 'claim-hyp',
+      baselineWorldStateId: 'ws-close-baseline',
+      variantWorldStateId: 'ws-close-variant',
+      restoredWorldStateId: 'ws-close-restored',
+      verifyEvidenceIds: [],
+      executed: false,
+      baselineRestored: false,
+      status: 'designed',
     });
     design.result = { summary: 'Not executed; planned state anchors only', accepted: false };
     const planned = writeDraft(service, 'experiment', design);
     // Synthetic receipt fixtures exercise record ordering, not native execution.
     writeDraft(service, 'evidence', evidenceOf('ws-close-restored', note, 'ev-close-restored'));
-    writeDraft(service, 'experiment', {
-      ...design, status: 'rolled_back',
-      rollback: { executed: true, baselineRestored: true, verifyEvidenceIds: ['ev-close-restored'] },
-    }, { supersedes: planned.manifest.artifactId });
+    writeDraft(
+      service,
+      'experiment',
+      {
+        ...design,
+        status: 'rolled_back',
+        rollback: { executed: true, baselineRestored: true, verifyEvidenceIds: ['ev-close-restored'] },
+      },
+      { supersedes: planned.manifest.artifactId },
+    );
     const observed = writeDraft(service, 'world_state', exclusiveWorld('ws-close-variant', true), {
       supersedes: anchor.manifest.artifactId,
     });
     expect(observed.record).toMatchObject({ worldStateId: 'ws-close-variant', validity: 'valid' });
     const evidence = writeDraft(service, 'evidence', {
-      ...evidenceOf('ws-close-variant', note, 'ev-close-variant'), experimentId: 'exp-close',
+      ...evidenceOf('ws-close-variant', note, 'ev-close-variant'),
+      experimentId: 'exp-close',
     });
     expect(evidence.record).toMatchObject({ stale: false });
     expect(service.createLookup(SESSION_ID).getEvidence('ev-close-variant')).toMatchObject({ stale: false });
@@ -117,10 +143,15 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeDraft(service, 'world_state', baselineWorld('ws-open-restored'));
     writeDraft(service, 'claim', hypothesisClaim('ws-open-baseline'));
     const design = recordedExperiment({
-      experimentId: 'exp-open', hypothesisClaimId: 'claim-hyp',
-      baselineWorldStateId: 'ws-open-baseline', variantWorldStateId: 'ws-open-variant',
-      restoredWorldStateId: 'ws-open-restored', verifyEvidenceIds: [],
-      executed: false, baselineRestored: false, status: 'designed',
+      experimentId: 'exp-open',
+      hypothesisClaimId: 'claim-hyp',
+      baselineWorldStateId: 'ws-open-baseline',
+      variantWorldStateId: 'ws-open-variant',
+      restoredWorldStateId: 'ws-open-restored',
+      verifyEvidenceIds: [],
+      executed: false,
+      baselineRestored: false,
+      status: 'designed',
     });
     design.result = { summary: 'Not executed; planned state anchors only', accepted: false };
     writeDraft(service, 'experiment', design);
@@ -138,16 +169,18 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const { resolver, service } = createInvestigationHarness();
     const count = 8;
     const written = Array.from({ length: count }, (_, index) =>
-      writeDraft(service, 'world_state', baselineWorld(`ws-archive-${index}`)));
+      writeDraft(service, 'world_state', baselineWorld(`ws-archive-${index}`)),
+    );
     const read = vi.spyOn(resolver, 'read');
     try {
       const records = service.readAllRecords(SESSION_ID);
-      expect(records.map(item => item.manifest.artifactId))
-        .toEqual(written.map(item => item.manifest.artifactId));
+      expect(records.map((item) => item.manifest.artifactId)).toEqual(written.map((item) => item.manifest.artifactId));
       const bodyReads = read.mock.calls.filter(([, uri]) => uri.includes('/investigation/records/'));
       expect(bodyReads.length).toBeLessThanOrEqual(count * 5);
       for (const item of written) expect(bodyReads.some(([, uri]) => uri === item.contentUri)).toBe(true);
-    } finally { read.mockRestore(); }
+    } finally {
+      read.mockRestore();
+    }
   });
   it('archives a verified multi-record snapshot with one index integrity pass', () => {
     const { resolver, service } = createInvestigationHarness();
@@ -155,7 +188,10 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const second = writeDraft(service, 'world_state', baselineWorld('ws-batch-second'));
     const read = vi.spyOn(resolver, 'read');
     const records = service.readAllRecords(SESSION_ID);
-    expect(records.map(item => item.manifest.artifactId)).toEqual([first.manifest.artifactId, second.manifest.artifactId]);
+    expect(records.map((item) => item.manifest.artifactId)).toEqual([
+      first.manifest.artifactId,
+      second.manifest.artifactId,
+    ]);
     expect(read.mock.calls.filter(([, uri]) => uri === 'session://investigation/index.json')).toHaveLength(1);
     read.mockRestore();
   });
@@ -176,19 +212,29 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     });
     expect(() => service.list(SESSION_ID)).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
 
-    const correction = writeDraft(service, 'evidence', {
-      ...unsupportedInput,
+    const correction = writeDraft(
+      service,
+      'evidence',
+      {
+        ...unsupportedInput,
+        epistemicStatus: 'unknown',
+        strength: 'weak',
+        stale: true,
+      },
+      { supersedes: 'art-unsupported-evidence' },
+    );
+    expect(service.readRecord(SESSION_ID, 'art-unsupported-evidence').manifest.status).toBe('superseded');
+    expect(service.createLookup(SESSION_ID).getEvidence('ev-corrected')).toMatchObject({
       epistemicStatus: 'unknown',
       strength: 'weak',
       stale: true,
-    }, { supersedes: 'art-unsupported-evidence' });
-    expect(service.readRecord(SESSION_ID, 'art-unsupported-evidence').manifest.status).toBe('superseded');
-    expect(service.createLookup(SESSION_ID).getEvidence('ev-corrected')).toMatchObject({
-      epistemicStatus: 'unknown', strength: 'weak', stale: true,
     });
-    expect(service.readAllRecords(SESSION_ID).filter((item) => item.manifest.kind === 'evidence')
-      .map((item) => item.manifest.artifactId))
-      .toEqual(['art-unsupported-evidence', correction.manifest.artifactId]);
+    expect(
+      service
+        .readAllRecords(SESSION_ID)
+        .filter((item) => item.manifest.kind === 'evidence')
+        .map((item) => item.manifest.artifactId),
+    ).toEqual(['art-unsupported-evidence', correction.manifest.artifactId]);
 
     overwriteInvestigationRecordBody(resolver, 'art-unsupported-evidence', { ...unsupported, summary: 'tampered' });
     expect(() => service.readAllRecords(SESSION_ID)).toThrow(/INVESTIGATION_HASH_MISMATCH|INVESTIGATION_INDEX_CORRUPT/);
@@ -218,7 +264,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       status: 'ready',
       sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
     });
-    const claim = writeDraft(service, 'claim', observedClaim('ws-old', 'claim-old'), {
+    const claim = writeDraft(service, 'claim', observedClaim('ws-old', 'claim-old', ['ev-old']), {
       status: 'ready',
       sourceRefs: [{ artifactId: evidence.manifest.artifactId, expectedHash: evidence.contentHash }],
     });
@@ -233,8 +279,9 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     });
     expect(service.readRecord(SESSION_ID, claim.manifest.artifactId).manifest.status).toBe('stale');
     expect(service.list(SESSION_ID).map((entry) => entry.status)).toEqual(['superseded', 'stale', 'stale', 'draft']);
-    expect(() => writeDraft(service, 'evidence', evidenceOf('ws-old', seedNote(resolver), 'ev-new')))
-      .toThrow(/worldStateId ws-old is not resolvable/);
+    expect(() => writeDraft(service, 'evidence', evidenceOf('ws-old', seedNote(resolver), 'ev-new'))).toThrow(
+      /worldStateId ws-old is not resolvable/,
+    );
   });
 
   it('repairs an older supersede transaction that left ready evidence bound to the retired id', () => {
@@ -255,7 +302,8 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       artifacts: Array<{ artifactId: string; status: string; supersedes?: string }>;
     };
     index.artifacts.find((item) => item.artifactId === world.manifest.artifactId)!.status = 'superseded';
-    index.artifacts.find((item) => item.artifactId === replacement.manifest.artifactId)!.supersedes = world.manifest.artifactId;
+    index.artifacts.find((item) => item.artifactId === replacement.manifest.artifactId)!.supersedes =
+      world.manifest.artifactId;
     resolver.write(SESSION_ID, indexUri, serializeInvestigationJson(index), { mimeType: 'application/json' });
 
     const projected = service.listForProjection(SESSION_ID);
@@ -263,8 +311,9 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     expect(projected.storeDegraded).toBe(false);
     expect(projectedEvidence?.status).toBe('stale');
     expect(projectedEvidence?.contentHash).not.toBe(evidence.contentHash);
-    expect(service.list(SESSION_ID).find((item) => item.artifactId === evidence.manifest.artifactId)?.status)
-      .toBe('stale');
+    expect(service.list(SESSION_ID).find((item) => item.artifactId === evidence.manifest.artifactId)?.status).toBe(
+      'stale',
+    );
     expect(service.readRecord(SESSION_ID, evidence.manifest.artifactId, projectedEvidence?.contentHash)).toMatchObject({
       manifest: { status: 'stale' },
       record: { stale: true, worldStateId: 'ws-retired' },
@@ -273,23 +322,29 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
 
   it('rejects opaque provider payloads and missing session', () => {
     const { service } = createInvestigationHarness();
-    expect(() => writeDraft(service, 'world_state', {
-      ...baselineWorld(),
-      opaqueProviderPayload: { raw: true },
-    })).toThrow(/INVESTIGATION_OPAQUE_PAYLOAD_DENIED|INVESTIGATION_SCHEMA_INVALID/);
-    expect(() => service.writeRecord(null, {
-      kind: 'world_state',
-      mission: 'debugger',
-      title: 'no session',
-      summary: 'no session',
-      record: baselineWorld(),
-    })).toThrow(InvestigationError);
+    expect(() =>
+      writeDraft(service, 'world_state', {
+        ...baselineWorld(),
+        opaqueProviderPayload: { raw: true },
+      }),
+    ).toThrow(/INVESTIGATION_OPAQUE_PAYLOAD_DENIED|INVESTIGATION_SCHEMA_INVALID/);
+    expect(() =>
+      service.writeRecord(null, {
+        kind: 'world_state',
+        mission: 'debugger',
+        title: 'no session',
+        summary: 'no session',
+        record: baselineWorld(),
+      }),
+    ).toThrow(InvestigationError);
   });
 
   it('lists and reads through tools without silent downgrade', async () => {
     const { service } = createInvestigationHarness();
     const written = writeDraft(service, 'world_state', baselineWorld());
-    const tools = Object.fromEntries(createInvestigationTools(SESSION_ID, { service }).map((tool) => [tool.name, tool]));
+    const tools = Object.fromEntries(
+      createInvestigationTools(SESSION_ID, { service }).map((tool) => [tool.name, tool]),
+    );
     const listed = await tools.investigation_list.execute('c1', {});
     expect(listed.isError).not.toBe(true);
     expect(listed.details).toMatchObject({ count: 1 });
@@ -298,25 +353,41 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       expectedHash: written.contentHash,
     });
     expect(read.isError).not.toBe(true);
-    expect(read.content).toEqual(expect.arrayContaining([
-      expect.objectContaining({ text: expect.stringContaining(`"contentRef":"${written.contentUri}"`) }),
-    ]));
+    expect(read.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: expect.stringContaining(`"contentRef":"${written.contentUri}"`) }),
+      ]),
+    );
     expect(read.details).toMatchObject({ contentUri: written.contentUri, contentHash: written.contentHash });
-    expect(listed.content).toEqual(expect.arrayContaining([
-      expect.objectContaining({ text: expect.stringContaining(`"contentUri":"${written.contentUri}","contentHash":"${written.contentHash}","supersedes":null`) }),
-    ]));
+    expect(listed.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: expect.stringContaining(
+            `"contentUri":"${written.contentUri}","contentHash":"${written.contentHash}","supersedes":null`,
+          ),
+        }),
+      ]),
+    );
     const filtered = await tools.investigation_list.execute('list-filtered', { kind: 'world_state', status: 'draft' });
     expect(filtered.details).toMatchObject({ count: 1 });
-    const allStatuses = await tools.investigation_list.execute('list-all-statuses', { kind: 'world_state', status: 'any' });
+    const allStatuses = await tools.investigation_list.execute('list-all-statuses', {
+      kind: 'world_state',
+      status: 'any',
+    });
     expect(allStatuses.details).toMatchObject({ count: 1 });
     const allKinds = await tools.investigation_list.execute('list-all-kinds', { kind: 'any', status: 'draft' });
     expect(allKinds.details).toMatchObject({ count: 1 });
-    const invalidStatus = await tools.investigation_list.execute('list-invalid-status', { kind: 'world_state', status: 'unknown' });
+    const invalidStatus = await tools.investigation_list.execute('list-invalid-status', {
+      kind: 'world_state',
+      status: 'unknown',
+    });
     expect(invalidStatus.isError).toBe(true);
     expect(toolErrorCode(invalidStatus)).toBe('INVESTIGATION_SCHEMA_INVALID');
-    expect(invalidStatus.content).toEqual(expect.arrayContaining([
-      expect.objectContaining({ text: expect.stringContaining('use "any" or omit status to include all statuses') }),
-    ]));
+    expect(invalidStatus.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: expect.stringContaining('use "any" or omit status to include all statuses') }),
+      ]),
+    );
     const invalidKind = await tools.investigation_list.execute('list-invalid-kind', { kind: 'unknown' });
     expect(invalidKind.isError).toBe(true);
     expect(toolErrorCode(invalidKind)).toBe('INVESTIGATION_KIND_UNKNOWN');
@@ -345,27 +416,42 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const { resolver, service } = createInvestigationHarness();
     writeDraft(service, 'world_state', baselineWorld('ws-report-evidence'));
     const note = seedNote(resolver);
-    const tools = Object.fromEntries(createInvestigationTools(SESSION_ID, { service }).map((tool) => [tool.name, tool]));
+    const tools = Object.fromEntries(
+      createInvestigationTools(SESSION_ID, { service }).map((tool) => [tool.name, tool]),
+    );
     const written = await tools.investigation_write.execute('write-evidence', {
-      kind: 'evidence', mission: 'debugger', title: 'observation', summary: 'observation',
+      kind: 'evidence',
+      mission: 'debugger',
+      title: 'observation',
+      summary: 'observation',
       record: evidenceOf('ws-report-evidence', note, 'ev-report-evidence'),
     });
     expect(written.isError).not.toBe(true);
     expect((written.details as { record: { contentHashes: string[] } }).record.contentHashes).toEqual([note.hash]);
-    expect(written.content).toEqual(expect.arrayContaining([
-      expect.objectContaining({ text: expect.stringContaining('recordKey=ev-report-evidence') }),
-    ]));
+    expect(written.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: expect.stringContaining('recordKey=ev-report-evidence') }),
+      ]),
+    );
     const artifactId = (written.details as { manifest: { artifactId: string } }).manifest.artifactId;
     const rejected = await tools.investigation_write.execute('bad-report', {
-      kind: 'report', mission: 'debugger', title: 'report', summary: 'report',
+      kind: 'report',
+      mission: 'debugger',
+      title: 'report',
+      summary: 'report',
       record: sampleReport({ claims: [], evidenceIds: [artifactId] }),
     });
     expect(rejected.isError).toBe(true);
-    expect(rejected.content).toEqual(expect.arrayContaining([
-      expect.objectContaining({ text: expect.stringMatching(/EvidenceRecord\.evidenceId.*not artifactId/) }),
-    ]));
+    expect(rejected.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: expect.stringMatching(/EvidenceRecord\.evidenceId.*not artifactId/) }),
+      ]),
+    );
     const corrected = await tools.investigation_write.execute('correct-report', {
-      kind: 'report', mission: 'debugger', title: 'report', summary: 'report',
+      kind: 'report',
+      mission: 'debugger',
+      title: 'report',
+      summary: 'report',
       record: sampleReport({ claims: [], evidenceIds: ['ev-report-evidence'] }),
     });
     expect(corrected.isError).not.toBe(true);
@@ -399,16 +485,24 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     expect(evidence.isError).not.toBe(true);
     expect(claimSet.isError).not.toBe(true);
     expect(report.isError).not.toBe(true);
-    const worldSchema = (world.details as { schema: { required: string[]; properties: Record<string, unknown> } }).schema;
-    const evidenceSchema = (evidence.details as { schema: { required: string[]; properties: Record<string, unknown> } }).schema;
+    const worldSchema = (world.details as { schema: { required: string[]; properties: Record<string, unknown> } })
+      .schema;
+    const evidenceSchema = (evidence.details as { schema: { required: string[]; properties: Record<string, unknown> } })
+      .schema;
     expect(worldSchema.required).toContain('worldStateId');
     expect(worldSchema.properties.replay).toBeDefined();
     expect(evidenceSchema.required).toContain('evidenceId');
-    expect(evidenceSchema.properties.observationKind).toMatchObject({ enum: expect.arrayContaining(['pixel_history']) });
+    expect(evidenceSchema.properties.observationKind).toMatchObject({
+      enum: expect.arrayContaining(['pixel_history']),
+    });
     expect(evidenceSchema.properties.contentHashes).toBeUndefined();
-    const packSchema = (evidencePack.details as { schema: { properties: { items: { items: { properties: Record<string, unknown> } } } } }).schema;
+    const packSchema = (
+      evidencePack.details as { schema: { properties: { items: { items: { properties: Record<string, unknown> } } } } }
+    ).schema;
     expect(packSchema.properties.items.items.properties.contentHashes).toBeUndefined();
-    expect((evidence.details as { recordIdPolicy: string }).recordIdPolicy).toContain('service derives stored contentHashes');
+    expect((evidence.details as { recordIdPolicy: string }).recordIdPolicy).toContain(
+      'service derives stored contentHashes',
+    );
     expect((world.details as { nextStep: string }).nextStep).toContain('tool_search query=investigation_read');
     expect((claimSet.details as { recordIdPolicy: string }).recordIdPolicy).toContain('define ClaimRecords');
     const schemaContent = world.content[0];
@@ -420,31 +514,43 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     if (claimSetContent?.type !== 'text') throw new Error('claim_set schema did not return text');
     const claimSetSchema = JSON.parse(claimSetContent.text);
     expect(claimSetSchema.recordIdPolicy).toContain('retain the IDs of continuing claims');
-    expect(claimSetSchema.schema.properties.items.items.properties.projectionKind.description).toContain('null for an original Claim');
-    expect(claimSetSchema.schema.properties.items.items.properties.compactProvenance.description).toContain('a projection, including a report Claim');
+    expect(claimSetSchema.schema.properties.items.items.properties.projectionKind.description).toContain(
+      'null for an original Claim',
+    );
+    expect(claimSetSchema.schema.properties.items.items.properties.compactProvenance.description).toContain(
+      'a projection, including a report Claim',
+    );
     const reportSchema = (report.details as { schema: { properties: Record<string, unknown> } }).schema;
     expect(JSON.stringify(reportSchema.properties.claims)).toContain('Current ClaimSet items are valid sources');
     expect(JSON.stringify(reportSchema.properties.evidenceIds)).toContain('EvidenceRecord.evidenceId');
-    expect(JSON.stringify(reportSchema.properties.reportContract)).toContain('exactly verified, conclusive or complete');
+    expect(JSON.stringify(reportSchema.properties.reportContract)).toContain(
+      'exactly verified, conclusive or complete',
+    );
     expect((await schemaTool.execute('invalid', { kind: 'not_a_kind' })).isError).toBe(true);
   });
 
   it('explains how to correct original Claim fields without accepting an unproven projection', async () => {
     const { service } = createInvestigationHarness();
     writeDraft(service, 'world_state', baselineWorld('ws-original-claim'));
-    const write = createInvestigationTools(SESSION_ID, { service }).find((tool) => tool.name === 'investigation_write')!;
+    const write = createInvestigationTools(SESSION_ID, { service }).find(
+      (tool) => tool.name === 'investigation_write',
+    )!;
     const original = observedClaim('ws-original-claim', 'claim-original');
     const omitted: Partial<ClaimRecord> = { ...original };
     delete omitted.projectionKind;
     delete omitted.compactProvenance;
     const args = {
-      kind: 'claim_set', mission: 'analyzer', title: 'Architecture Model', summary: 'Observed structure',
+      kind: 'claim_set',
+      mission: 'analyzer',
+      title: 'Architecture Model',
+      summary: 'Observed structure',
     };
     const missing = await write.execute('missing-fields', { ...args, record: { items: [omitted] } });
     expect(missing.isError).toBe(true);
     expect(JSON.stringify(missing.content)).toContain('null for an original Claim');
     const projected = await write.execute('empty-projection', {
-      ...args, record: { items: [{ ...original, projectionKind: 'compact', compactProvenance: [] }] },
+      ...args,
+      record: { items: [{ ...original, projectionKind: 'compact', compactProvenance: [] }] },
     });
     expect(projected.isError).toBe(true);
     expect(JSON.stringify(projected.content)).toContain('original Claim uses null for both');
@@ -455,22 +561,32 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
   });
 
   it('finds report sources inside a current ClaimSet even when no standalone Claim artifact matches', async () => {
-    const { service } = createInvestigationHarness();
+    const { resolver, service } = createInvestigationHarness();
     const world = writeDraft(service, 'world_state', baselineWorld('ws-model'));
+    writeDraft(service, 'evidence', evidenceOf('ws-model', seedNote(resolver)));
     const claim = observedClaim('ws-model', 'claim-model');
-    const model = writeDraft(service, 'claim_set', { items: [claim] }, {
-      mission: 'analyzer', status: 'ready',
-      sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
-    });
+    const model = writeDraft(
+      service,
+      'claim_set',
+      { items: [claim] },
+      {
+        mission: 'analyzer',
+        status: 'ready',
+        sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
+      },
+    );
     const list = createInvestigationTools(SESSION_ID, { service }).find((tool) => tool.name === 'investigation_list')!;
     const filtered = await list.execute('standalone-claims', { kind: 'claim', status: 'any' });
     expect(filtered.details).toMatchObject({ count: 0 });
     expect(JSON.stringify(filtered.content)).toContain('No Investigation artifacts match the requested filters');
     expect(JSON.stringify(filtered.content)).toContain('ClaimSet items');
-    expect(() => writeReadyReport(service, { mission: 'analyzer', source: model, claims: [] }))
-      .toThrow(/ClaimSet items/);
+    expect(() => writeReadyReport(service, { mission: 'analyzer', source: model, claims: [] })).toThrow(
+      /ClaimSet items/,
+    );
     const report = writeReadyReport(service, {
-      mission: 'analyzer', source: model, claims: [projectClaim(claim, 'claim-report')],
+      mission: 'analyzer',
+      source: model,
+      claims: [projectClaim(claim, 'claim-report')],
     });
     expect(report.manifest.status).toBe('ready');
     expect(service.createLookup(SESSION_ID).getClaim(claim.claimId)).toMatchObject(claim);
@@ -478,30 +594,48 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
 
   it('records an explicitly unmeasured debugger benchmark without weakening optimizer baselines', () => {
     const { service } = createInvestigationHarness();
-    const world = { ...baselineWorld('ws-unmeasured'), benchmark: { status: 'not_measured' as const, reason: 'No timing run in this capture investigation' } };
+    const world = {
+      ...baselineWorld('ws-unmeasured'),
+      benchmark: { status: 'not_measured' as const, reason: 'No timing run in this capture investigation' },
+    };
     const written = writeDraft(service, 'world_state', world);
     expect(service.readRecord(SESSION_ID, written.manifest.artifactId).record).toMatchObject(world);
-    expect(() => writeDraft(service, 'world_state', { ...world, worldStateId: 'ws-optimizer' }, { mission: 'optimizer' }))
-      .toThrow(/Optimizer WorldState requires measured benchmark settings/);
-    expect(() => writeDraft(service, 'world_state', { ...world, worldStateId: 'ws-invalid', benchmark: { status: 'not_measured' } }))
-      .toThrow(/INVESTIGATION_SCHEMA_INVALID/);
+    expect(() =>
+      writeDraft(service, 'world_state', { ...world, worldStateId: 'ws-optimizer' }, { mission: 'optimizer' }),
+    ).toThrow(/Optimizer WorldState requires measured benchmark settings/);
+    expect(() =>
+      writeDraft(service, 'world_state', {
+        ...world,
+        worldStateId: 'ws-invalid',
+        benchmark: { status: 'not_measured' },
+      }),
+    ).toThrow(/INVESTIGATION_SCHEMA_INVALID/);
   });
 
   it('lets a report cite an existing claimId without superseding the source claim', () => {
     const { service } = createInvestigationHarness();
     writeDraft(service, 'world_state', baselineWorld());
     writeDraft(service, 'claim', observedClaim('ws-baseline', 'cl-cite'));
-    const report = writeDraft(service, 'report', sampleReport({
-      claims: [{
-        ...observedClaim('ws-baseline', 'cl-cite'),
-        projectionKind: 'report',
-        compactProvenance: [{
-          sourceClaimId: 'cl-cite',
-          sourceEpistemicStatus: 'observed',
-          sourceVerificationLevel: 'observed',
-        }],
-      }],
-    }), { title: 'cite', summary: 'cite' });
+    const report = writeDraft(
+      service,
+      'report',
+      sampleReport({
+        claims: [
+          {
+            ...observedClaim('ws-baseline', 'cl-cite'),
+            projectionKind: 'report',
+            compactProvenance: [
+              {
+                sourceClaimId: 'cl-cite',
+                sourceEpistemicStatus: 'observed',
+                sourceVerificationLevel: 'observed',
+              },
+            ],
+          },
+        ],
+      }),
+      { title: 'cite', summary: 'cite' },
+    );
     expect(report.manifest.supersedes).toBeUndefined();
     expect(service.createLookup(SESSION_ID).getClaim('cl-cite')).toMatchObject({ claimId: 'cl-cite' });
   });
@@ -530,14 +664,20 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     });
     const polluted = writeDraft(service, 'world_state', exclusiveWorld('ws-dirty-iso', true));
     expect(polluted.record).toMatchObject({ validity: 'polluted' });
-    expect(() => writeDraft(service, 'experiment', recordedExperiment({
-      experimentId: 'exp-write-fail',
-      hypothesisClaimId: 'claim-hyp',
-      baselineWorldStateId: 'ws-a',
-      variantWorldStateId: 'ws-b',
-      restoredWorldStateId: 'ws-c',
-      verifyEvidenceIds: ['ev-ghost'],
-    }))).toThrow(InvestigationError);
+    expect(() =>
+      writeDraft(
+        service,
+        'experiment',
+        recordedExperiment({
+          experimentId: 'exp-write-fail',
+          hypothesisClaimId: 'claim-hyp',
+          baselineWorldStateId: 'ws-a',
+          variantWorldStateId: 'ws-b',
+          restoredWorldStateId: 'ws-c',
+          verifyEvidenceIds: ['ev-ghost'],
+        }),
+      ),
+    ).toThrow(InvestigationError);
   });
 
   it('P1-2 / P1-3 run full invariants on packs, claim sets, and reports', () => {
@@ -546,63 +686,101 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const world = writeDraft(service, 'world_state', baselineWorld());
     const claim = writeDraft(service, 'claim', observedClaim('ws-baseline'));
     const evidence = writeDraft(service, 'evidence', evidenceOf('ws-baseline', note, 'ev-pack'));
-    expect(writeDraft(service, 'evidence_pack', { items: [evidenceOf('ws-baseline', note, 'ev-pack-item')] }).manifest.kind)
-      .toBe('evidence_pack');
-    expect(writeDraft(service, 'claim_set', { items: [hypothesisClaim('ws-baseline', 'claim-set-1')] }).manifest.kind)
-      .toBe('claim_set');
+    expect(
+      writeDraft(service, 'evidence_pack', { items: [evidenceOf('ws-baseline', note, 'ev-pack-item')] }).manifest.kind,
+    ).toBe('evidence_pack');
+    expect(
+      writeDraft(service, 'claim_set', { items: [hypothesisClaim('ws-baseline', 'claim-set-1')] }).manifest.kind,
+    ).toBe('claim_set');
     const projected: ClaimRecord = {
       ...(claim.record as ClaimRecord),
       claimId: 'claim-projected-report',
       projectionKind: 'report',
-      compactProvenance: [{
-        sourceClaimId: (claim.record as ClaimRecord).claimId,
-        sourceEpistemicStatus: (claim.record as ClaimRecord).epistemic,
-        sourceVerificationLevel: (claim.record as ClaimRecord).verification,
-      }],
+      compactProvenance: [
+        {
+          sourceClaimId: (claim.record as ClaimRecord).claimId,
+          sourceEpistemicStatus: (claim.record as ClaimRecord).epistemic,
+          sourceVerificationLevel: (claim.record as ClaimRecord).verification,
+        },
+      ],
     };
-    expect(writeDraft(service, 'report', sampleReport({
-      claims: [projected],
-      evidenceIds: ['ev-pack'],
-    })).manifest.kind).toBe('report');
-    expect(() => writeDraft(service, 'evidence_pack', {
-      items: [evidenceOf('ws-missing', note, 'ev-bad-pack')],
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED|S-STATE-01/);
-    expect(() => writeDraft(service, 'claim_set', {
-      items: [hypothesisClaim('ws-missing', 'claim-bad-set')],
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    expect(() => writeDraft(service, 'report', sampleReport({
-      claims: [projected],
-      evidenceIds: ['ev-ghost'],
-    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    expect(() => writeDraft(service, 'report', sampleReport({
-      claims: [projected],
-      evidenceIds: ['ev-pack'],
-      experimentIds: ['exp-ghost'],
-    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    expect(() => writeDraft(service, 'report', sampleReport({
-      claims: [{
-        ...(claim.record as ClaimRecord),
-        claimId: 'claim-no-prov',
-        projectionKind: null,
-        compactProvenance: null,
-      }],
-    }))).toThrow(/S-CLAIM-01|compactProvenance/);
-    expect(() => service.writeRecord(SESSION_ID, {
-      kind: 'report',
-      mission: 'debugger',
-      title: 'ready denied',
-      summary: 'no provenance',
-      record: sampleReport({
-        claims: [{
-          ...(claim.record as ClaimRecord),
-          claimId: 'claim-ready-denied',
-          projectionKind: null,
-          compactProvenance: null,
-        }],
+    expect(
+      writeDraft(
+        service,
+        'report',
+        sampleReport({
+          claims: [projected],
+          evidenceIds: ['ev-pack'],
+        }),
+      ).manifest.kind,
+    ).toBe('report');
+    expect(() =>
+      writeDraft(service, 'evidence_pack', {
+        items: [evidenceOf('ws-missing', note, 'ev-bad-pack')],
       }),
-      sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
-      status: 'ready',
-    })).toThrow(/S-CLAIM-01|compactProvenance|INVESTIGATION_READY_DENIED|INVESTIGATION_INVARIANT/);
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED|S-STATE-01/);
+    expect(() =>
+      writeDraft(service, 'claim_set', {
+        items: [hypothesisClaim('ws-missing', 'claim-bad-set')],
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() =>
+      writeDraft(
+        service,
+        'report',
+        sampleReport({
+          claims: [projected],
+          evidenceIds: ['ev-ghost'],
+        }),
+      ),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() =>
+      writeDraft(
+        service,
+        'report',
+        sampleReport({
+          claims: [projected],
+          evidenceIds: ['ev-pack'],
+          experimentIds: ['exp-ghost'],
+        }),
+      ),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() =>
+      writeDraft(
+        service,
+        'report',
+        sampleReport({
+          claims: [
+            {
+              ...(claim.record as ClaimRecord),
+              claimId: 'claim-no-prov',
+              projectionKind: null,
+              compactProvenance: null,
+            },
+          ],
+        }),
+      ),
+    ).toThrow(/S-CLAIM-01|compactProvenance/);
+    expect(() =>
+      service.writeRecord(SESSION_ID, {
+        kind: 'report',
+        mission: 'debugger',
+        title: 'ready denied',
+        summary: 'no provenance',
+        record: sampleReport({
+          claims: [
+            {
+              ...(claim.record as ClaimRecord),
+              claimId: 'claim-ready-denied',
+              projectionKind: null,
+              compactProvenance: null,
+            },
+          ],
+        }),
+        sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
+        status: 'ready',
+      }),
+    ).toThrow(/S-CLAIM-01|compactProvenance|INVESTIGATION_READY_DENIED|INVESTIGATION_INVARIANT/);
     expect(evidence.manifest.kind).toBe('evidence');
   });
 
@@ -632,10 +810,15 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const note = seedNote(resolver);
     const world = writeDraft(service, 'world_state', baselineWorld('ws-stale-src'));
     const evidence = writeDraft(service, 'evidence', evidenceOf('ws-stale-src', note, 'ev-pre'));
-    const polluted = writeDraft(service, 'world_state', {
-      ...exclusiveWorld('ws-stale-src', true),
-      replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
-    }, { supersedes: world.manifest.artifactId });
+    const polluted = writeDraft(
+      service,
+      'world_state',
+      {
+        ...exclusiveWorld('ws-stale-src', true),
+        replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
+      },
+      { supersedes: world.manifest.artifactId },
+    );
     expect(polluted.record).toMatchObject({ validity: 'polluted' });
     const reread = service.readRecord(SESSION_ID, evidence.manifest.artifactId);
     expect(reread.record).toMatchObject({ stale: true });
@@ -665,12 +848,16 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeDraft(fresh.service, 'world_state', baselineWorld('ws-gone'));
     unlinkSync(indexPath(fresh.sessionPath));
     expect(() => fresh.service.list(SESSION_ID)).toThrow(/INVESTIGATION_INDEX_MISSING/);
-    expect(() => writeDraft(fresh.service, 'world_state', baselineWorld('ws-gone-2'))).toThrow(/INVESTIGATION_INDEX_MISSING/);
+    expect(() => writeDraft(fresh.service, 'world_state', baselineWorld('ws-gone-2'))).toThrow(
+      /INVESTIGATION_INDEX_MISSING/,
+    );
   });
 
   it('P1-6 tools always return a typed code and reject illegal status', async () => {
     const { service } = createInvestigationHarness();
-    const tools = Object.fromEntries(createInvestigationTools(SESSION_ID, { service }).map((tool) => [tool.name, tool]));
+    const tools = Object.fromEntries(
+      createInvestigationTools(SESSION_ID, { service }).map((tool) => [tool.name, tool]),
+    );
     const illegal = await tools.investigation_write.execute('c-status', {
       kind: 'world_state',
       mission: 'debugger',
@@ -707,10 +894,10 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
   it('P1-7 rejects duplicate artifact and record ids unless superseding', () => {
     const { service } = createInvestigationHarness();
     const first = writeDraft(service, 'world_state', baselineWorld('ws-dup'), { artifactId: 'art-stable' });
-    expect(() => writeDraft(service, 'world_state', baselineWorld('ws-other'), { artifactId: 'art-stable' }))
-      .toThrow(/INVESTIGATION_DUPLICATE_ID/);
-    expect(() => writeDraft(service, 'world_state', baselineWorld('ws-dup')))
-      .toThrow(/INVESTIGATION_DUPLICATE_ID/);
+    expect(() => writeDraft(service, 'world_state', baselineWorld('ws-other'), { artifactId: 'art-stable' })).toThrow(
+      /INVESTIGATION_DUPLICATE_ID/,
+    );
+    expect(() => writeDraft(service, 'world_state', baselineWorld('ws-dup'))).toThrow(/INVESTIGATION_DUPLICATE_ID/);
     const versioned = writeDraft(service, 'world_state', baselineWorld('ws-dup'), {
       supersedes: first.manifest.artifactId,
     });
@@ -726,8 +913,9 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       supersedes: first.manifest.artifactId,
     });
     expect(service.readRecord(SESSION_ID, first.manifest.artifactId).manifest.status).toBe('superseded');
-    expect(() => writeDraft(service, 'claim', observedClaim('ws-hist', 'claim-C1')))
-      .toThrow(/INVESTIGATION_DUPLICATE_ID/);
+    expect(() => writeDraft(service, 'claim', observedClaim('ws-hist', 'claim-C1'))).toThrow(
+      /INVESTIGATION_DUPLICATE_ID/,
+    );
     const third = writeDraft(service, 'claim', observedClaim('ws-hist', 'claim-C1'), {
       supersedes: second.manifest.artifactId,
     });
@@ -739,9 +927,11 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const { service } = createInvestigationHarness();
     writeDraft(service, 'world_state', baselineWorld('ws-claims'));
     writeDraft(service, 'claim', hypothesisClaim('ws-claims', 'claim-existing'));
-    expect(() => writeDraft(service, 'claim_set', {
-      items: [hypothesisClaim('ws-claims', 'claim-existing')],
-    })).toThrow(/ClaimSet\.items define new Claims and cannot repeat IDs from previously written Claims/);
+    expect(() =>
+      writeDraft(service, 'claim_set', {
+        items: [hypothesisClaim('ws-claims', 'claim-existing')],
+      }),
+    ).toThrow(/ClaimSet\.items define new Claims and cannot repeat IDs from previously written Claims/);
   });
 
   it('resolves ClaimSet sibling links atomically while rejecting missing or self links', () => {
@@ -751,13 +941,19 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const second = { ...hypothesisClaim('ws-matrix', 'claim-matrix-b'), contradicts: ['claim-matrix-a'] };
     const set = writeDraft(service, 'claim_set', { items: [first, second] });
     expect(set.manifest.kind).toBe('claim_set');
-    expect(service.createLookup(SESSION_ID).getClaim('claim-matrix-a')).toMatchObject({ contradicts: ['claim-matrix-b'] });
-    expect(() => writeDraft(service, 'claim_set', {
-      items: [{ ...hypothesisClaim('ws-matrix', 'claim-missing-ref'), contradicts: ['claim-absent'] }],
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    expect(() => writeDraft(service, 'claim_set', {
-      items: [{ ...hypothesisClaim('ws-matrix', 'claim-self-ref'), contradicts: ['claim-self-ref'] }],
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(service.createLookup(SESSION_ID).getClaim('claim-matrix-a')).toMatchObject({
+      contradicts: ['claim-matrix-b'],
+    });
+    expect(() =>
+      writeDraft(service, 'claim_set', {
+        items: [{ ...hypothesisClaim('ws-matrix', 'claim-missing-ref'), contradicts: ['claim-absent'] }],
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() =>
+      writeDraft(service, 'claim_set', {
+        items: [{ ...hypothesisClaim('ws-matrix', 'claim-self-ref'), contradicts: ['claim-self-ref'] }],
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
   });
 
   it('stales an old experiment and its challenge when a ClaimSet replaces its hypothesis ID', () => {
@@ -766,28 +962,48 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const oldSet = writeDraft(service, 'claim_set', {
       items: [hypothesisClaim('ws-retired-claim', 'claim-retired')],
     });
-    const experiment = writeDraft(service, 'experiment', recordedExperiment({
-      experimentId: 'exp-retired-claim',
-      hypothesisClaimId: 'claim-retired',
-      baselineWorldStateId: 'ws-retired-claim',
-      variantWorldStateId: 'ws-retired-claim',
-      restoredWorldStateId: 'ws-retired-claim',
-      verifyEvidenceIds: [],
-      status: 'designed',
-      executed: false,
-      baselineRestored: false,
-    }));
-    const challenge = writeDraft(service, 'challenge', sampleChallenge({
-      targetType: 'experiment', targetId: 'exp-retired-claim',
-    }));
-    writeDraft(service, 'claim_set', {
-      items: [hypothesisClaim('ws-retired-claim', 'claim-current')],
-    }, { supersedes: oldSet.manifest.artifactId });
+    const experiment = writeDraft(
+      service,
+      'experiment',
+      recordedExperiment({
+        experimentId: 'exp-retired-claim',
+        hypothesisClaimId: 'claim-retired',
+        baselineWorldStateId: 'ws-retired-claim',
+        variantWorldStateId: 'ws-retired-claim',
+        restoredWorldStateId: 'ws-retired-claim',
+        verifyEvidenceIds: [],
+        status: 'designed',
+        executed: false,
+        baselineRestored: false,
+      }),
+    );
+    const challenge = writeDraft(
+      service,
+      'challenge',
+      sampleChallenge({
+        targetType: 'experiment',
+        targetId: 'exp-retired-claim',
+      }),
+    );
+    writeDraft(
+      service,
+      'claim_set',
+      {
+        items: [hypothesisClaim('ws-retired-claim', 'claim-current')],
+      },
+      { supersedes: oldSet.manifest.artifactId },
+    );
     expect(service.readRecord(SESSION_ID, experiment.manifest.artifactId).manifest.status).toBe('stale');
     expect(service.readRecord(SESSION_ID, challenge.manifest.artifactId).manifest.status).toBe('stale');
-    expect(service.list(SESSION_ID).filter(entry => entry.status === 'stale').map(entry => entry.artifactId))
-      .toEqual([experiment.manifest.artifactId, challenge.manifest.artifactId]);
-    expect(service.readAllRecords(SESSION_ID).map(item => item.manifest.artifactId)).toContain(experiment.manifest.artifactId);
+    expect(
+      service
+        .list(SESSION_ID)
+        .filter((entry) => entry.status === 'stale')
+        .map((entry) => entry.artifactId),
+    ).toEqual([experiment.manifest.artifactId, challenge.manifest.artifactId]);
+    expect(service.readAllRecords(SESSION_ID).map((item) => item.manifest.artifactId)).toContain(
+      experiment.manifest.artifactId,
+    );
     expect(service.createLookup(SESSION_ID).getClaim('claim-retired')).toBeNull();
     expect(service.createLookup(SESSION_ID).getClaim('claim-current')).toMatchObject({ claimId: 'claim-current' });
   });
@@ -798,129 +1014,270 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const oldSet = writeDraft(service, 'claim_set', {
       items: [hypothesisClaim('ws-replacement-source', 'claim-before')],
     });
-    const evidence = writeDraft(service, 'evidence', {
-      ...evidenceOf('ws-replacement-source', seedNote(resolver), 'ev-replacement-source'),
-      claimIds: ['claim-before'],
-    }, { status: 'ready', sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }] });
+    const evidence = writeDraft(
+      service,
+      'evidence',
+      {
+        ...evidenceOf('ws-replacement-source', seedNote(resolver), 'ev-replacement-source'),
+        claimIds: ['claim-before'],
+      },
+      { status: 'ready', sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }] },
+    );
 
-    expect(() => writeDraft(service, 'claim_set', {
-      items: [hypothesisClaim('ws-replacement-source', 'claim-after')],
-    }, {
-      status: 'ready', supersedes: oldSet.manifest.artifactId,
-      sourceRefs: [{ artifactId: evidence.manifest.artifactId, expectedHash: evidence.contentHash }],
-    })).toThrow(/source .* changes during this write/);
+    expect(() =>
+      writeDraft(
+        service,
+        'claim_set',
+        {
+          items: [hypothesisClaim('ws-replacement-source', 'claim-after')],
+        },
+        {
+          status: 'ready',
+          supersedes: oldSet.manifest.artifactId,
+          sourceRefs: [{ artifactId: evidence.manifest.artifactId, expectedHash: evidence.contentHash }],
+        },
+      ),
+    ).toThrow(/source .* changes during this write/);
 
     expect(service.readRecord(SESSION_ID, oldSet.manifest.artifactId).manifest.status).toBe('draft');
     expect(service.readRecord(SESSION_ID, evidence.manifest.artifactId, evidence.contentHash)).toMatchObject({
-      manifest: { status: 'ready' }, record: { stale: false },
+      manifest: { status: 'ready' },
+      record: { stale: false },
     });
     expect(service.list(SESSION_ID)).toHaveLength(3);
-    const replacement = writeDraft(service, 'claim_set', {
-      items: [{ ...hypothesisClaim('ws-replacement-source', 'claim-before'), statement: 'A revised hypothesis.' }],
-    }, {
-      status: 'ready', supersedes: oldSet.manifest.artifactId,
-      sourceRefs: [{ artifactId: evidence.manifest.artifactId, expectedHash: evidence.contentHash }],
-    });
+    const replacement = writeDraft(
+      service,
+      'claim_set',
+      {
+        items: [{ ...hypothesisClaim('ws-replacement-source', 'claim-before'), statement: 'A revised hypothesis.' }],
+      },
+      {
+        status: 'ready',
+        supersedes: oldSet.manifest.artifactId,
+        sourceRefs: [{ artifactId: evidence.manifest.artifactId, expectedHash: evidence.contentHash }],
+      },
+    );
     expect(service.readRecord(SESSION_ID, replacement.manifest.artifactId).manifest.status).toBe('ready');
   });
 
-  it.each(['claim', 'experiment'] as const)('stales checkpoint references through a retired %s challenge without losing audit records', (targetType) => {
-    const { service } = createInvestigationHarness();
-    const world = writeDraft(service, 'world_state', baselineWorld('ws-checkpoint-retire'));
-    const oldSet = writeDraft(service, 'claim_set', {
-      items: [hypothesisClaim('ws-checkpoint-retire', 'claim-before-checkpoint')],
-    });
-    if (targetType === 'experiment') writeDraft(service, 'experiment', recordedExperiment({
-      experimentId: 'exp-before-checkpoint', hypothesisClaimId: 'claim-before-checkpoint',
-      baselineWorldStateId: 'ws-checkpoint-retire', variantWorldStateId: 'ws-checkpoint-retire',
-      restoredWorldStateId: 'ws-checkpoint-retire', verifyEvidenceIds: [],
-      status: 'designed', executed: false, baselineRestored: false,
-    }));
-    const challenge = writeDraft(service, 'challenge', sampleChallenge({
-      challengeId: 'ch-before-checkpoint', targetType,
-      targetId: targetType === 'claim' ? 'claim-before-checkpoint' : 'exp-before-checkpoint',
-    }));
-    const checkpoint = service.writeRecord(SESSION_ID, {
-      kind: 'checkpoint', mission: 'debugger', title: 'Current checkpoint', summary: 'Open challenge', status: 'ready',
-      record: sampleCheckpoint({ currentWorldStateId: 'ws-checkpoint-retire', openChallenges: ['ch-before-checkpoint'] }),
-      sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
-    });
-    writeDraft(service, 'claim_set', { items: [hypothesisClaim('ws-checkpoint-retire', 'claim-after-checkpoint')] }, {
-      supersedes: oldSet.manifest.artifactId,
-    });
-    expect(service.list(SESSION_ID).find(entry => entry.artifactId === checkpoint.manifest.artifactId)?.status).toBe('stale');
-    const historical = service.readRecord(SESSION_ID, checkpoint.manifest.artifactId, checkpoint.contentHash);
-    expect(historical.manifest.status).toBe('stale');
-    expect(historical.contentHash).toBe(checkpoint.contentHash);
-    expect(service.readAllRecords(SESSION_ID).map(item => item.manifest.artifactId)).toContain(challenge.manifest.artifactId);
-    expect(() => writeDraft(service, 'checkpoint', sampleCheckpoint({
-      checkpointId: 'cp-expired-challenge', currentWorldStateId: 'ws-checkpoint-retire', openChallenges: ['ch-before-checkpoint'],
-    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    if (targetType === 'experiment') expect(() => writeDraft(service, 'checkpoint', sampleCheckpoint({
-      checkpointId: 'cp-expired-experiment', currentWorldStateId: 'ws-checkpoint-retire', completedExperiments: ['exp-before-checkpoint'],
-    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    const current = writeDraft(service, 'checkpoint', sampleCheckpoint({
-      checkpointId: 'cp-current-audit', currentWorldStateId: 'ws-checkpoint-retire',
-      criticalArtifactRefs: [challenge.manifest.artifactId, oldSet.manifest.artifactId],
-    }));
-    expect(service.readRecord(SESSION_ID, current.manifest.artifactId).manifest.status).toBe('draft');
-  });
+  it.each(['claim', 'experiment'] as const)(
+    'stales checkpoint references through a retired %s challenge without losing audit records',
+    (targetType) => {
+      const { service } = createInvestigationHarness();
+      const world = writeDraft(service, 'world_state', baselineWorld('ws-checkpoint-retire'));
+      const oldSet = writeDraft(service, 'claim_set', {
+        items: [hypothesisClaim('ws-checkpoint-retire', 'claim-before-checkpoint')],
+      });
+      if (targetType === 'experiment')
+        writeDraft(
+          service,
+          'experiment',
+          recordedExperiment({
+            experimentId: 'exp-before-checkpoint',
+            hypothesisClaimId: 'claim-before-checkpoint',
+            baselineWorldStateId: 'ws-checkpoint-retire',
+            variantWorldStateId: 'ws-checkpoint-retire',
+            restoredWorldStateId: 'ws-checkpoint-retire',
+            verifyEvidenceIds: [],
+            status: 'designed',
+            executed: false,
+            baselineRestored: false,
+          }),
+        );
+      const challenge = writeDraft(
+        service,
+        'challenge',
+        sampleChallenge({
+          challengeId: 'ch-before-checkpoint',
+          targetType,
+          targetId: targetType === 'claim' ? 'claim-before-checkpoint' : 'exp-before-checkpoint',
+        }),
+      );
+      const checkpoint = service.writeRecord(SESSION_ID, {
+        kind: 'checkpoint',
+        mission: 'debugger',
+        title: 'Current checkpoint',
+        summary: 'Open challenge',
+        status: 'ready',
+        record: sampleCheckpoint({
+          currentWorldStateId: 'ws-checkpoint-retire',
+          openChallenges: ['ch-before-checkpoint'],
+        }),
+        sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
+      });
+      writeDraft(
+        service,
+        'claim_set',
+        { items: [hypothesisClaim('ws-checkpoint-retire', 'claim-after-checkpoint')] },
+        {
+          supersedes: oldSet.manifest.artifactId,
+        },
+      );
+      expect(
+        service.list(SESSION_ID).find((entry) => entry.artifactId === checkpoint.manifest.artifactId)?.status,
+      ).toBe('stale');
+      const historical = service.readRecord(SESSION_ID, checkpoint.manifest.artifactId, checkpoint.contentHash);
+      expect(historical.manifest.status).toBe('stale');
+      expect(historical.contentHash).toBe(checkpoint.contentHash);
+      expect(service.readAllRecords(SESSION_ID).map((item) => item.manifest.artifactId)).toContain(
+        challenge.manifest.artifactId,
+      );
+      expect(() =>
+        writeDraft(
+          service,
+          'checkpoint',
+          sampleCheckpoint({
+            checkpointId: 'cp-expired-challenge',
+            currentWorldStateId: 'ws-checkpoint-retire',
+            openChallenges: ['ch-before-checkpoint'],
+          }),
+        ),
+      ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+      if (targetType === 'experiment')
+        expect(() =>
+          writeDraft(
+            service,
+            'checkpoint',
+            sampleCheckpoint({
+              checkpointId: 'cp-expired-experiment',
+              currentWorldStateId: 'ws-checkpoint-retire',
+              completedExperiments: ['exp-before-checkpoint'],
+            }),
+          ),
+        ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+      const current = writeDraft(
+        service,
+        'checkpoint',
+        sampleCheckpoint({
+          checkpointId: 'cp-current-audit',
+          currentWorldStateId: 'ws-checkpoint-retire',
+          criticalArtifactRefs: [challenge.manifest.artifactId, oldSet.manifest.artifactId],
+        }),
+      );
+      expect(service.readRecord(SESSION_ID, current.manifest.artifactId).manifest.status).toBe('draft');
+    },
+  );
 
-  it.each(['evidence', 'evidence_pack'] as const)('retires %s IDs and their semantic dependents without losing audit history', (kind) => {
-    const { resolver, service } = createInvestigationHarness();
-    const world = writeDraft(service, 'world_state', baselineWorld('ws-retired-evidence'));
-    const note = seedNote(resolver);
-    const recordFor = (id: string) => kind === 'evidence'
-      ? evidenceOf('ws-retired-evidence', note, id)
-      : { items: [evidenceOf('ws-retired-evidence', note, id), evidenceOf('ws-retired-evidence', note, 'ev-retained')] };
-    const old = writeDraft(service, kind, recordFor('ev-retired'));
-    writeDraft(service, 'claim', hypothesisClaim('ws-retired-evidence', 'hyp-retired-evidence'));
-    const experiment = writeDraft(service, 'experiment', recordedExperiment({
-      experimentId: 'exp-retired-evidence', hypothesisClaimId: 'hyp-retired-evidence',
-      baselineWorldStateId: 'ws-retired-evidence', variantWorldStateId: 'ws-retired-evidence',
-      restoredWorldStateId: 'ws-retired-evidence', verifyEvidenceIds: ['ev-retired'],
-      status: 'designed', executed: false, baselineRestored: false,
-    }));
-    const challenge = writeDraft(service, 'challenge', sampleChallenge({
-      challengeId: 'ch-retired-evidence', targetType: 'evidence', targetId: 'ev-retired',
-    }));
-    const experimentChallenge = writeDraft(service, 'challenge', sampleChallenge({
-      challengeId: 'ch-retired-evidence-experiment', targetType: 'experiment', targetId: 'exp-retired-evidence',
-    }));
-    const report = writeDraft(service, 'report', sampleReport({ claims: [], evidenceIds: ['ev-retired'] }));
-    const checkpoint = service.writeRecord(SESSION_ID, {
-      kind: 'checkpoint', mission: 'debugger', title: 'Evidence review', summary: 'Keep open challenge', status: 'ready',
-      record: sampleCheckpoint({ currentWorldStateId: 'ws-retired-evidence', openChallenges: ['ch-retired-evidence'] }),
-      sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
-    });
-    const replacement = service.writeRecord(SESSION_ID, {
-      kind, mission: 'debugger', title: 'Qualified evidence', summary: 'Narrow original observation', status: 'ready',
-      record: recordFor('ev-current'), supersedes: old.manifest.artifactId,
-      sourceRefs: [{ artifactId: old.manifest.artifactId, expectedHash: old.contentHash },
-        { artifactId: challenge.manifest.artifactId, expectedHash: challenge.contentHash }],
-    });
-    expect(service.readRecord(SESSION_ID, replacement.manifest.artifactId).manifest.status).toBe('ready');
-    for (const artifact of [experiment, challenge, experimentChallenge, report, checkpoint]) {
-      expect(service.readRecord(SESSION_ID, artifact.manifest.artifactId, artifact.contentHash).manifest.status).toBe('stale');
-    }
-    expect(service.readRecord(SESSION_ID, challenge.manifest.artifactId).record).toMatchObject({
-      status: 'open', targetRef: { type: 'evidence', id: 'ev-retired' },
-    });
-    const lookup = service.createLookup(SESSION_ID);
-    expect(lookup.getEvidence('ev-retired')).toBeNull();
-    expect(lookup.getEvidence('ev-current')).toMatchObject({ evidenceId: 'ev-current' });
-    if (kind === 'evidence_pack') expect(lookup.getEvidence('ev-retained')).toMatchObject({ evidenceId: 'ev-retained' });
-    expect(() => writeDraft(service, 'challenge', sampleChallenge({
-      challengeId: 'ch-invalid-retired-target', targetType: 'evidence', targetId: 'ev-retired',
-    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    expect(() => writeDraft(service, 'checkpoint', sampleCheckpoint({
-      checkpointId: 'cp-invalid-retired-challenge', currentWorldStateId: 'ws-retired-evidence',
-      openChallenges: ['ch-retired-evidence'],
-    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    expect(service.readAllRecords(SESSION_ID).find(item => item.manifest.artifactId === old.manifest.artifactId)?.manifest.status)
-      .toBe('superseded');
-    expect(service.listForProjection(SESSION_ID).storeDegraded).toBe(false);
-  });
+  it.each(['evidence', 'evidence_pack'] as const)(
+    'retires %s IDs and their semantic dependents without losing audit history',
+    (kind) => {
+      const { resolver, service } = createInvestigationHarness();
+      const world = writeDraft(service, 'world_state', baselineWorld('ws-retired-evidence'));
+      const note = seedNote(resolver);
+      const recordFor = (id: string) =>
+        kind === 'evidence'
+          ? evidenceOf('ws-retired-evidence', note, id)
+          : {
+              items: [
+                evidenceOf('ws-retired-evidence', note, id),
+                evidenceOf('ws-retired-evidence', note, 'ev-retained'),
+              ],
+            };
+      const old = writeDraft(service, kind, recordFor('ev-retired'));
+      writeDraft(service, 'claim', hypothesisClaim('ws-retired-evidence', 'hyp-retired-evidence'));
+      const experiment = writeDraft(
+        service,
+        'experiment',
+        recordedExperiment({
+          experimentId: 'exp-retired-evidence',
+          hypothesisClaimId: 'hyp-retired-evidence',
+          baselineWorldStateId: 'ws-retired-evidence',
+          variantWorldStateId: 'ws-retired-evidence',
+          restoredWorldStateId: 'ws-retired-evidence',
+          verifyEvidenceIds: ['ev-retired'],
+          status: 'designed',
+          executed: false,
+          baselineRestored: false,
+        }),
+      );
+      const challenge = writeDraft(
+        service,
+        'challenge',
+        sampleChallenge({
+          challengeId: 'ch-retired-evidence',
+          targetType: 'evidence',
+          targetId: 'ev-retired',
+        }),
+      );
+      const experimentChallenge = writeDraft(
+        service,
+        'challenge',
+        sampleChallenge({
+          challengeId: 'ch-retired-evidence-experiment',
+          targetType: 'experiment',
+          targetId: 'exp-retired-evidence',
+        }),
+      );
+      const report = writeDraft(service, 'report', sampleReport({ claims: [], evidenceIds: ['ev-retired'] }));
+      const checkpoint = service.writeRecord(SESSION_ID, {
+        kind: 'checkpoint',
+        mission: 'debugger',
+        title: 'Evidence review',
+        summary: 'Keep open challenge',
+        status: 'ready',
+        record: sampleCheckpoint({
+          currentWorldStateId: 'ws-retired-evidence',
+          openChallenges: ['ch-retired-evidence'],
+        }),
+        sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
+      });
+      const replacement = service.writeRecord(SESSION_ID, {
+        kind,
+        mission: 'debugger',
+        title: 'Qualified evidence',
+        summary: 'Narrow original observation',
+        status: 'ready',
+        record: recordFor('ev-current'),
+        supersedes: old.manifest.artifactId,
+        sourceRefs: [
+          { artifactId: old.manifest.artifactId, expectedHash: old.contentHash },
+          { artifactId: challenge.manifest.artifactId, expectedHash: challenge.contentHash },
+        ],
+      });
+      expect(service.readRecord(SESSION_ID, replacement.manifest.artifactId).manifest.status).toBe('ready');
+      for (const artifact of [experiment, challenge, experimentChallenge, report, checkpoint]) {
+        expect(service.readRecord(SESSION_ID, artifact.manifest.artifactId, artifact.contentHash).manifest.status).toBe(
+          'stale',
+        );
+      }
+      expect(service.readRecord(SESSION_ID, challenge.manifest.artifactId).record).toMatchObject({
+        status: 'open',
+        targetRef: { type: 'evidence', id: 'ev-retired' },
+      });
+      const lookup = service.createLookup(SESSION_ID);
+      expect(lookup.getEvidence('ev-retired')).toBeNull();
+      expect(lookup.getEvidence('ev-current')).toMatchObject({ evidenceId: 'ev-current' });
+      if (kind === 'evidence_pack')
+        expect(lookup.getEvidence('ev-retained')).toMatchObject({ evidenceId: 'ev-retained' });
+      expect(() =>
+        writeDraft(
+          service,
+          'challenge',
+          sampleChallenge({
+            challengeId: 'ch-invalid-retired-target',
+            targetType: 'evidence',
+            targetId: 'ev-retired',
+          }),
+        ),
+      ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+      expect(() =>
+        writeDraft(
+          service,
+          'checkpoint',
+          sampleCheckpoint({
+            checkpointId: 'cp-invalid-retired-challenge',
+            currentWorldStateId: 'ws-retired-evidence',
+            openChallenges: ['ch-retired-evidence'],
+          }),
+        ),
+      ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+      expect(
+        service.readAllRecords(SESSION_ID).find((item) => item.manifest.artifactId === old.manifest.artifactId)
+          ?.manifest.status,
+      ).toBe('superseded');
+      expect(service.listForProjection(SESSION_ID).storeDegraded).toBe(false);
+    },
+  );
 
   it('repairs a prior evidence supersede with an open challenge and checkpoint left live', () => {
     const { resolver, service } = createInvestigationHarness();
@@ -928,12 +1285,24 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const note = seedNote(resolver);
     const old = writeDraft(service, 'evidence', evidenceOf('ws-evidence-repair', note, 'ev-before-repair'));
     const challenge = service.writeRecord(SESSION_ID, {
-      kind: 'challenge', mission: 'debugger', title: 'Original evidence review', summary: 'Original target', status: 'ready',
-      record: sampleChallenge({ challengeId: 'ch-evidence-repair', targetType: 'evidence', targetId: 'ev-before-repair' }),
+      kind: 'challenge',
+      mission: 'debugger',
+      title: 'Original evidence review',
+      summary: 'Original target',
+      status: 'ready',
+      record: sampleChallenge({
+        challengeId: 'ch-evidence-repair',
+        targetType: 'evidence',
+        targetId: 'ev-before-repair',
+      }),
       sourceRefs: [{ artifactId: old.manifest.artifactId, expectedHash: old.contentHash }],
     });
     const checkpoint = service.writeRecord(SESSION_ID, {
-      kind: 'checkpoint', mission: 'debugger', title: 'Recovery checkpoint', summary: 'Original challenge', status: 'ready',
+      kind: 'checkpoint',
+      mission: 'debugger',
+      title: 'Recovery checkpoint',
+      summary: 'Original challenge',
+      status: 'ready',
       record: sampleCheckpoint({ currentWorldStateId: 'ws-evidence-repair', openChallenges: ['ch-evidence-repair'] }),
       sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
     });
@@ -943,10 +1312,18 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const repairIds = new Set([challenge.manifest.artifactId, checkpoint.manifest.artifactId]);
     for (const id of repairIds) overwriteInvestigationManifest(resolver, id, { status: 'ready' });
     const file = indexPath(resolver.resolve(SESSION_ID, 'session://investigation/index.json').sessionPath);
-    const index = JSON.parse(readFileSync(file, 'utf8')) as { artifacts: Array<{ artifactId: string; status: string }> };
-    writeFileSync(file, serializeInvestigationJson({ ...index, artifacts: index.artifacts.map(entry => (
-      repairIds.has(entry.artifactId) ? { ...entry, status: 'ready' } : entry
-    )) }));
+    const index = JSON.parse(readFileSync(file, 'utf8')) as {
+      artifacts: Array<{ artifactId: string; status: string }>;
+    };
+    writeFileSync(
+      file,
+      serializeInvestigationJson({
+        ...index,
+        artifacts: index.artifacts.map((entry) =>
+          repairIds.has(entry.artifactId) ? { ...entry, status: 'ready' } : entry,
+        ),
+      }),
+    );
     expect(service.listForProjection(SESSION_ID).storeDegraded).toBe(false);
     for (const artifact of [challenge, checkpoint]) {
       const historical = service.readRecord(SESSION_ID, artifact.manifest.artifactId, artifact.contentHash);
@@ -959,24 +1336,52 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
   it('repairs an existing checkpoint after its challenge was already marked stale', () => {
     const { resolver, service } = createInvestigationHarness();
     writeDraft(service, 'world_state', baselineWorld('ws-stale-checkpoint'));
-    const oldSet = writeDraft(service, 'claim_set', { items: [hypothesisClaim('ws-stale-checkpoint', 'claim-old-cp')] });
-    writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'ch-old-cp', targetType: 'claim', targetId: 'claim-old-cp' }));
-    const checkpoint = writeDraft(service, 'checkpoint', sampleCheckpoint({
-      currentWorldStateId: 'ws-stale-checkpoint', openChallenges: ['ch-old-cp'],
-    }));
-    writeDraft(service, 'claim_set', { items: [hypothesisClaim('ws-stale-checkpoint', 'claim-new-cp')] }, {
-      supersedes: oldSet.manifest.artifactId,
+    const oldSet = writeDraft(service, 'claim_set', {
+      items: [hypothesisClaim('ws-stale-checkpoint', 'claim-old-cp')],
     });
+    writeDraft(
+      service,
+      'challenge',
+      sampleChallenge({ challengeId: 'ch-old-cp', targetType: 'claim', targetId: 'claim-old-cp' }),
+    );
+    const checkpoint = writeDraft(
+      service,
+      'checkpoint',
+      sampleCheckpoint({
+        currentWorldStateId: 'ws-stale-checkpoint',
+        openChallenges: ['ch-old-cp'],
+      }),
+    );
+    writeDraft(
+      service,
+      'claim_set',
+      { items: [hypothesisClaim('ws-stale-checkpoint', 'claim-new-cp')] },
+      {
+        supersedes: oldSet.manifest.artifactId,
+      },
+    );
     overwriteInvestigationManifest(resolver, checkpoint.manifest.artifactId, { status: 'draft' });
     const file = indexPath(resolver.resolve(SESSION_ID, 'session://investigation/index.json').sessionPath);
-    const index = JSON.parse(readFileSync(file, 'utf8')) as { artifacts: Array<{ artifactId: string; status: string }> };
-    writeFileSync(file, serializeInvestigationJson({ ...index, artifacts: index.artifacts.map(entry => (
-      entry.artifactId === checkpoint.manifest.artifactId ? { ...entry, status: 'draft' } : entry
-    )) }));
+    const index = JSON.parse(readFileSync(file, 'utf8')) as {
+      artifacts: Array<{ artifactId: string; status: string }>;
+    };
+    writeFileSync(
+      file,
+      serializeInvestigationJson({
+        ...index,
+        artifacts: index.artifacts.map((entry) =>
+          entry.artifactId === checkpoint.manifest.artifactId ? { ...entry, status: 'draft' } : entry,
+        ),
+      }),
+    );
     expect(service.listForProjection(SESSION_ID).storeDegraded).toBe(false);
     const archived = service.readAllRecords(SESSION_ID);
-    expect(archived.find(item => item.manifest.artifactId === checkpoint.manifest.artifactId)?.manifest.status).toBe('stale');
-    expect(service.readRecord(SESSION_ID, checkpoint.manifest.artifactId, checkpoint.contentHash).contentHash).toBe(checkpoint.contentHash);
+    expect(archived.find((item) => item.manifest.artifactId === checkpoint.manifest.artifactId)?.manifest.status).toBe(
+      'stale',
+    );
+    expect(service.readRecord(SESSION_ID, checkpoint.manifest.artifactId, checkpoint.contentHash).contentHash).toBe(
+      checkpoint.contentHash,
+    );
   });
 
   it('repairs a prior ClaimSet supersede whose old draft experiment remained live', () => {
@@ -985,33 +1390,48 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const oldSet = writeDraft(service, 'claim_set', {
       items: [hypothesisClaim('ws-retire-repair', 'claim-before-repair')],
     });
-    const experiment = writeDraft(service, 'experiment', recordedExperiment({
-      experimentId: 'exp-before-repair',
-      hypothesisClaimId: 'claim-before-repair',
-      baselineWorldStateId: 'ws-retire-repair',
-      variantWorldStateId: 'ws-retire-repair',
-      restoredWorldStateId: 'ws-retire-repair',
-      verifyEvidenceIds: [],
-      status: 'designed',
-      executed: false,
-      baselineRestored: false,
-    }));
-    writeDraft(service, 'claim_set', {
-      items: [hypothesisClaim('ws-retire-repair', 'claim-after-repair')],
-    }, { supersedes: oldSet.manifest.artifactId });
+    const experiment = writeDraft(
+      service,
+      'experiment',
+      recordedExperiment({
+        experimentId: 'exp-before-repair',
+        hypothesisClaimId: 'claim-before-repair',
+        baselineWorldStateId: 'ws-retire-repair',
+        variantWorldStateId: 'ws-retire-repair',
+        restoredWorldStateId: 'ws-retire-repair',
+        verifyEvidenceIds: [],
+        status: 'designed',
+        executed: false,
+        baselineRestored: false,
+      }),
+    );
+    writeDraft(
+      service,
+      'claim_set',
+      {
+        items: [hypothesisClaim('ws-retire-repair', 'claim-after-repair')],
+      },
+      { supersedes: oldSet.manifest.artifactId },
+    );
     overwriteInvestigationManifest(resolver, experiment.manifest.artifactId, { status: 'draft' });
     const file = indexPath(resolver.resolve(SESSION_ID, 'session://investigation/index.json').sessionPath);
     const index = JSON.parse(readFileSync(file, 'utf8')) as {
       artifacts: Array<{ artifactId: string; status: string }>;
     };
-    writeFileSync(file, serializeInvestigationJson({
-      ...index,
-      artifacts: index.artifacts.map(entry => entry.artifactId === experiment.manifest.artifactId
-        ? { ...entry, status: 'draft' } : entry),
-    }));
+    writeFileSync(
+      file,
+      serializeInvestigationJson({
+        ...index,
+        artifacts: index.artifacts.map((entry) =>
+          entry.artifactId === experiment.manifest.artifactId ? { ...entry, status: 'draft' } : entry,
+        ),
+      }),
+    );
     expect(service.listForProjection(SESSION_ID).storeDegraded).toBe(false);
     expect(service.readRecord(SESSION_ID, experiment.manifest.artifactId).manifest.status).toBe('stale');
-    expect(service.readAllRecords(SESSION_ID).map(item => item.manifest.artifactId)).toContain(experiment.manifest.artifactId);
+    expect(service.readAllRecords(SESSION_ID).map((item) => item.manifest.artifactId)).toContain(
+      experiment.manifest.artifactId,
+    );
   });
 
   it('P1-2 live pack and set members resolve for refs', { timeout: 15_000 }, () => {
@@ -1029,60 +1449,98 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const lookup = service.createLookup(SESSION_ID);
     expect(lookup.getEvidence('ev-pack-only')).toMatchObject({ evidenceId: 'ev-pack-only' });
     expect(lookup.getClaim('claim-set-only')).toMatchObject({ claimId: 'claim-set-only' });
-    expect(writeDraft(service, 'experiment', recordedExperiment({
-      experimentId: 'exp-pack-verify',
-      hypothesisClaimId: 'claim-set-only',
-      baselineWorldStateId: 'ws-agg-a',
-      variantWorldStateId: 'ws-agg-b',
-      restoredWorldStateId: 'ws-agg-c',
-      verifyEvidenceIds: ['ev-pack-only'],
-    })).manifest.kind).toBe('experiment');
-    expect(writeDraft(service, 'claim', {
-      ...hypothesisClaim('ws-agg-a', 'claim-supports-set'),
-      supports: ['claim-set-only'],
-    }).manifest.kind).toBe('claim');
-    expect(writeDraft(service, 'claim', {
-      ...hypothesisClaim('ws-agg-a', 'claim-contradicts-set'),
-      contradicts: ['claim-set-only'],
-    }).manifest.kind).toBe('claim');
+    expect(
+      writeDraft(
+        service,
+        'experiment',
+        recordedExperiment({
+          experimentId: 'exp-pack-verify',
+          hypothesisClaimId: 'claim-set-only',
+          baselineWorldStateId: 'ws-agg-a',
+          variantWorldStateId: 'ws-agg-b',
+          restoredWorldStateId: 'ws-agg-c',
+          verifyEvidenceIds: ['ev-pack-only'],
+        }),
+      ).manifest.kind,
+    ).toBe('experiment');
+    expect(
+      writeDraft(service, 'claim', {
+        ...hypothesisClaim('ws-agg-a', 'claim-supports-set'),
+        supports: ['claim-set-only'],
+      }).manifest.kind,
+    ).toBe('claim');
+    expect(
+      writeDraft(service, 'claim', {
+        ...hypothesisClaim('ws-agg-a', 'claim-contradicts-set'),
+        contradicts: ['claim-set-only'],
+      }).manifest.kind,
+    ).toBe('claim');
     const source = service.createLookup(SESSION_ID).getClaim('claim-set-only');
     expect(source).toBeTruthy();
     if (!source) throw new Error('expected live ClaimSet member');
-    expect(writeDraft(service, 'report', sampleReport({
-      claims: [{
-        ...hypothesisClaim('ws-agg-a', 'claim-report-from-set'),
-        projectionKind: 'report',
-        compactProvenance: [{
-          sourceClaimId: source.claimId,
-          sourceEpistemicStatus: source.epistemic,
-          sourceVerificationLevel: source.verification,
-        }],
-      }],
-      evidenceIds: ['ev-pack-only'],
-    })).manifest.kind).toBe('report');
-    writeDraft(service, 'claim_set', {
-      items: [hypothesisClaim('ws-agg-a', 'claim-set-v2')],
-    }, { supersedes: set.manifest.artifactId });
-    writeDraft(service, 'evidence_pack', {
-      items: [evidenceOf('ws-agg-c', note, 'ev-pack-v2')],
-    }, { supersedes: packed.manifest.artifactId });
+    expect(
+      writeDraft(
+        service,
+        'report',
+        sampleReport({
+          claims: [
+            {
+              ...hypothesisClaim('ws-agg-a', 'claim-report-from-set'),
+              projectionKind: 'report',
+              compactProvenance: [
+                {
+                  sourceClaimId: source.claimId,
+                  sourceEpistemicStatus: source.epistemic,
+                  sourceVerificationLevel: source.verification,
+                },
+              ],
+            },
+          ],
+          evidenceIds: ['ev-pack-only'],
+        }),
+      ).manifest.kind,
+    ).toBe('report');
+    writeDraft(
+      service,
+      'claim_set',
+      {
+        items: [hypothesisClaim('ws-agg-a', 'claim-set-v2')],
+      },
+      { supersedes: set.manifest.artifactId },
+    );
+    writeDraft(
+      service,
+      'evidence_pack',
+      {
+        items: [evidenceOf('ws-agg-c', note, 'ev-pack-v2')],
+      },
+      { supersedes: packed.manifest.artifactId },
+    );
     const after = service.createLookup(SESSION_ID);
     expect(after.getClaim('claim-set-only')).toBeNull();
     expect(after.getClaim('claim-set-v2')).toMatchObject({ claimId: 'claim-set-v2' });
     expect(after.getEvidence('ev-pack-only')).toBeNull();
     expect(after.getEvidence('ev-pack-v2')).toMatchObject({ evidenceId: 'ev-pack-v2' });
-    expect(() => writeDraft(service, 'claim', {
-      ...hypothesisClaim('ws-agg-a', 'claim-uses-old-set'),
-      supports: ['claim-set-only'],
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    expect(() => writeDraft(service, 'experiment', recordedExperiment({
-      experimentId: 'exp-old-pack',
-      hypothesisClaimId: 'claim-set-v2',
-      baselineWorldStateId: 'ws-agg-a',
-      variantWorldStateId: 'ws-agg-b',
-      restoredWorldStateId: 'ws-agg-c',
-      verifyEvidenceIds: ['ev-pack-only'],
-    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() =>
+      writeDraft(service, 'claim', {
+        ...hypothesisClaim('ws-agg-a', 'claim-uses-old-set'),
+        supports: ['claim-set-only'],
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() =>
+      writeDraft(
+        service,
+        'experiment',
+        recordedExperiment({
+          experimentId: 'exp-old-pack',
+          hypothesisClaimId: 'claim-set-v2',
+          baselineWorldStateId: 'ws-agg-a',
+          variantWorldStateId: 'ws-agg-b',
+          restoredWorldStateId: 'ws-agg-c',
+          verifyEvidenceIds: ['ev-pack-only'],
+        }),
+      ),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
   });
 
   it('P1-A does not mark existing evidence stale when mutate write fails validation', () => {
@@ -1095,20 +1553,23 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       ...exclusiveWorld('ws-p1a', true),
       replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
     };
-    expect(() => writeDraft(service, 'world_state', polluted, { artifactId: world.manifest.artifactId }))
-      .toThrow(/INVESTIGATION_DUPLICATE_ID/);
+    expect(() => writeDraft(service, 'world_state', polluted, { artifactId: world.manifest.artifactId })).toThrow(
+      /INVESTIGATION_DUPLICATE_ID/,
+    );
     expect(service.readRecord(SESSION_ID, evidence.manifest.artifactId).record).toMatchObject({ stale: false });
     expect(service.readRecord(SESSION_ID, evidence.manifest.artifactId).manifest.status).not.toBe('stale');
-    expect(() => service.writeRecord(SESSION_ID, {
-      kind: 'world_state',
-      mission: 'debugger',
-      title: 'ready mutate fail',
-      summary: 'must not stale existing evidence',
-      record: polluted,
-      supersedes: world.manifest.artifactId,
-      status: 'ready',
-      sourceRefs: [],
-    })).toThrow(/INVESTIGATION_READY_DENIED/);
+    expect(() =>
+      service.writeRecord(SESSION_ID, {
+        kind: 'world_state',
+        mission: 'debugger',
+        title: 'ready mutate fail',
+        summary: 'must not stale existing evidence',
+        record: polluted,
+        supersedes: world.manifest.artifactId,
+        status: 'ready',
+        sourceRefs: [],
+      }),
+    ).toThrow(/INVESTIGATION_READY_DENIED/);
     const afterReadyFail = service.readRecord(SESSION_ID, evidence.manifest.artifactId);
     expect(afterReadyFail.record).toMatchObject({ stale: false });
     expect(afterReadyFail.manifest.status).not.toBe('stale');
@@ -1141,48 +1602,78 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeDraft(service, 'world_state', baselineWorld('ws-comp'));
     const claim = writeDraft(service, 'claim', observedClaim('ws-comp', 'claim-owned'));
     const evidence = writeDraft(service, 'evidence', evidenceOf('ws-comp', note, 'ev-owned'));
-    expect(() => writeDraft(service, 'evidence_pack', {
-      items: [evidenceOf('ws-comp', note, 'ev-owned')],
-    })).toThrow(/INVESTIGATION_DUPLICATE_ID/);
-    expect(() => writeDraft(service, 'evidence_pack', {
-      items: [evidenceOf('ws-comp', note, 'ev-dup'), evidenceOf('ws-comp', note, 'ev-dup')],
-    })).toThrow(/INVESTIGATION_DUPLICATE_ID/);
-    expect(() => writeDraft(service, 'claim_set', {
-      items: [hypothesisClaim('ws-comp', 'claim-owned')],
-    })).toThrow(/INVESTIGATION_DUPLICATE_ID/);
+    expect(() =>
+      writeDraft(service, 'evidence_pack', {
+        items: [evidenceOf('ws-comp', note, 'ev-owned')],
+      }),
+    ).toThrow(/INVESTIGATION_DUPLICATE_ID/);
+    expect(() =>
+      writeDraft(service, 'evidence_pack', {
+        items: [evidenceOf('ws-comp', note, 'ev-dup'), evidenceOf('ws-comp', note, 'ev-dup')],
+      }),
+    ).toThrow(/INVESTIGATION_DUPLICATE_ID/);
+    expect(() =>
+      writeDraft(service, 'claim_set', {
+        items: [hypothesisClaim('ws-comp', 'claim-owned')],
+      }),
+    ).toThrow(/INVESTIGATION_DUPLICATE_ID/);
     const projected = (claimId: string): ClaimRecord => ({
       ...(claim.record as ClaimRecord),
       claimId,
       projectionKind: 'report',
-      compactProvenance: [{
-        sourceClaimId: (claim.record as ClaimRecord).claimId,
-        sourceEpistemicStatus: (claim.record as ClaimRecord).epistemic,
-        sourceVerificationLevel: (claim.record as ClaimRecord).verification,
-      }],
+      compactProvenance: [
+        {
+          sourceClaimId: (claim.record as ClaimRecord).claimId,
+          sourceEpistemicStatus: (claim.record as ClaimRecord).epistemic,
+          sourceVerificationLevel: (claim.record as ClaimRecord).verification,
+        },
+      ],
     });
-    const cited = writeDraft(service, 'report', sampleReport({
-      claims: [projected('claim-owned')],
-      evidenceIds: ['ev-owned'],
-    }));
+    const cited = writeDraft(
+      service,
+      'report',
+      sampleReport({
+        claims: [projected('claim-owned')],
+        evidenceIds: ['ev-owned'],
+      }),
+    );
     expect(cited.manifest.supersedes).toBeUndefined();
     expect(service.createLookup(SESSION_ID).getClaim('claim-owned')).toMatchObject({ claimId: 'claim-owned' });
-    const report = writeDraft(service, 'report', sampleReport({
-      claims: [projected('claim-report-1')],
-      evidenceIds: ['ev-owned'],
-    }));
-    const shared = writeDraft(service, 'report', sampleReport({
-      claims: [projected('claim-report-2')],
-      evidenceIds: ['ev-owned'],
-    }));
+    const report = writeDraft(
+      service,
+      'report',
+      sampleReport({
+        claims: [projected('claim-report-1')],
+        evidenceIds: ['ev-owned'],
+      }),
+    );
+    const shared = writeDraft(
+      service,
+      'report',
+      sampleReport({
+        claims: [projected('claim-report-2')],
+        evidenceIds: ['ev-owned'],
+      }),
+    );
     expect(shared.manifest.kind).toBe('report');
-    const replaced = writeDraft(service, 'report', sampleReport({
-      claims: [projected('claim-report-3')],
-      evidenceIds: ['ev-owned'],
-    }), { supersedes: report.manifest.artifactId });
+    const replaced = writeDraft(
+      service,
+      'report',
+      sampleReport({
+        claims: [projected('claim-report-3')],
+        evidenceIds: ['ev-owned'],
+      }),
+      { supersedes: report.manifest.artifactId },
+    );
     expect(replaced.supersededArtifactId).toBe(report.manifest.artifactId);
-    const packed = writeDraft(service, 'evidence_pack', {
-      items: [evidenceOf('ws-comp', note, 'ev-owned')],
-    }, { supersedes: evidence.manifest.artifactId });
+    const packed = writeDraft(
+      service,
+      'evidence_pack',
+      {
+        items: [evidenceOf('ws-comp', note, 'ev-owned')],
+      },
+      { supersedes: evidence.manifest.artifactId },
+    );
     expect(packed.supersededArtifactId).toBe(evidence.manifest.artifactId);
   });
 
@@ -1191,46 +1682,66 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const note = seedNote(resolver);
     writeDraft(service, 'world_state', baselineWorld('ws-refs'));
     const claim = writeDraft(service, 'claim', observedClaim('ws-refs', 'claim-target'));
-    expect(writeDraft(service, 'evidence', {
-      ...evidenceOf('ws-refs', note, 'ev-linked'),
-      claimIds: ['claim-target'],
-    }).manifest.kind).toBe('evidence');
-    expect(writeDraft(service, 'claim', {
-      ...hypothesisClaim('ws-refs', 'claim-supports'),
-      supports: ['claim-target'],
-    }).manifest.kind).toBe('claim');
-    expect(writeDraft(service, 'claim', {
-      ...hypothesisClaim('ws-refs', 'claim-contradicts'),
-      contradicts: ['claim-target'],
-    }).manifest.kind).toBe('claim');
-    expect(() => writeDraft(service, 'evidence', {
-      ...evidenceOf('ws-refs', note, 'ev-ghost-claim'),
-      claimIds: ['claim-ghost'],
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    expect(() => writeDraft(service, 'evidence', {
-      ...evidenceOf('ws-refs', note, 'ev-hash-mismatch'),
-      artifactRefs: [{ uri: note.uri, expectedHash: 'f'.repeat(64) }],
-    })).toThrow(/INVESTIGATION_HASH_MISMATCH/);
-    expect(() => writeDraft(service, 'evidence', {
-      ...evidenceOf('ws-refs', note, 'ev-hash-len'),
-      contentHashes: [],
-    })).toThrow(/INVESTIGATION_SCHEMA_INVALID/);
-    expect(() => writeDraft(service, 'evidence', {
-      ...evidenceOf('ws-refs', note, 'ev-unanchored-tool'),
-      artifactRefs: [],
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    expect(() => writeDraft(service, 'claim', {
-      ...hypothesisClaim('ws-refs', 'claim-ghost-sup'),
-      supports: ['claim-does-not-exist'],
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    expect(() => writeDraft(service, 'claim', {
-      ...hypothesisClaim('ws-refs', 'claim-self'),
-      supports: ['claim-self'],
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
-    expect(() => writeDraft(service, 'claim', {
-      ...hypothesisClaim('ws-refs', 'claim-ghost-con'),
-      contradicts: ['claim-does-not-exist'],
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(
+      writeDraft(service, 'evidence', {
+        ...evidenceOf('ws-refs', note, 'ev-linked'),
+        claimIds: ['claim-target'],
+      }).manifest.kind,
+    ).toBe('evidence');
+    expect(
+      writeDraft(service, 'claim', {
+        ...hypothesisClaim('ws-refs', 'claim-supports'),
+        supports: ['claim-target'],
+      }).manifest.kind,
+    ).toBe('claim');
+    expect(
+      writeDraft(service, 'claim', {
+        ...hypothesisClaim('ws-refs', 'claim-contradicts'),
+        contradicts: ['claim-target'],
+      }).manifest.kind,
+    ).toBe('claim');
+    expect(() =>
+      writeDraft(service, 'evidence', {
+        ...evidenceOf('ws-refs', note, 'ev-ghost-claim'),
+        claimIds: ['claim-ghost'],
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() =>
+      writeDraft(service, 'evidence', {
+        ...evidenceOf('ws-refs', note, 'ev-hash-mismatch'),
+        artifactRefs: [{ uri: note.uri, expectedHash: 'f'.repeat(64) }],
+      }),
+    ).toThrow(/INVESTIGATION_HASH_MISMATCH/);
+    expect(() =>
+      writeDraft(service, 'evidence', {
+        ...evidenceOf('ws-refs', note, 'ev-hash-len'),
+        contentHashes: [],
+      }),
+    ).toThrow(/INVESTIGATION_SCHEMA_INVALID/);
+    expect(() =>
+      writeDraft(service, 'evidence', {
+        ...evidenceOf('ws-refs', note, 'ev-unanchored-tool'),
+        artifactRefs: [],
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() =>
+      writeDraft(service, 'claim', {
+        ...hypothesisClaim('ws-refs', 'claim-ghost-sup'),
+        supports: ['claim-does-not-exist'],
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() =>
+      writeDraft(service, 'claim', {
+        ...hypothesisClaim('ws-refs', 'claim-self'),
+        supports: ['claim-self'],
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() =>
+      writeDraft(service, 'claim', {
+        ...hypothesisClaim('ws-refs', 'claim-ghost-con'),
+        contradicts: ['claim-does-not-exist'],
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
     expect(claim.manifest.kind).toBe('claim');
   });
 
@@ -1241,8 +1752,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const latest = writeDraft(service, 'claim', observedClaim('ws-hist', 'C2'), {
       supersedes: first.manifest.artifactId,
     });
-    expect(() => writeDraft(service, 'claim', observedClaim('ws-hist', 'C1')))
-      .toThrow(/INVESTIGATION_DUPLICATE_ID/);
+    expect(() => writeDraft(service, 'claim', observedClaim('ws-hist', 'C1'))).toThrow(/INVESTIGATION_DUPLICATE_ID/);
     const reused = writeDraft(service, 'claim', observedClaim('ws-hist', 'C1'), {
       supersedes: latest.manifest.artifactId,
     });
@@ -1261,50 +1771,80 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const lookup = service.createLookup(SESSION_ID);
     expect(lookup.getClaim('claim-set-only')).toMatchObject({ claimId: 'claim-set-only' });
     expect(lookup.getEvidence('ev-pack-only')).toMatchObject({ evidenceId: 'ev-pack-only' });
-    expect(writeDraft(service, 'experiment', recordedExperiment({
-      experimentId: 'exp-pack-verify',
-      hypothesisClaimId: 'claim-set-only',
-      baselineWorldStateId: 'ws-a',
-      variantWorldStateId: 'ws-b',
-      restoredWorldStateId: 'ws-c',
-      verifyEvidenceIds: ['ev-pack-only'],
-    })).manifest.kind).toBe('experiment');
-    expect(writeDraft(service, 'claim', {
-      ...observedClaim('ws-a', 'claim-supports-set'),
-      supports: ['claim-set-only'],
-    }).manifest.kind).toBe('claim');
-    expect(writeDraft(service, 'claim', {
-      ...observedClaim('ws-a', 'claim-contradicts-set'),
-      contradicts: ['claim-set-only'],
-    }).manifest.kind).toBe('claim');
+    expect(
+      writeDraft(
+        service,
+        'experiment',
+        recordedExperiment({
+          experimentId: 'exp-pack-verify',
+          hypothesisClaimId: 'claim-set-only',
+          baselineWorldStateId: 'ws-a',
+          variantWorldStateId: 'ws-b',
+          restoredWorldStateId: 'ws-c',
+          verifyEvidenceIds: ['ev-pack-only'],
+        }),
+      ).manifest.kind,
+    ).toBe('experiment');
+    expect(
+      writeDraft(service, 'claim', {
+        ...observedClaim('ws-a', 'claim-supports-set'),
+        supports: ['claim-set-only'],
+      }).manifest.kind,
+    ).toBe('claim');
+    expect(
+      writeDraft(service, 'claim', {
+        ...observedClaim('ws-a', 'claim-contradicts-set'),
+        contradicts: ['claim-set-only'],
+      }).manifest.kind,
+    ).toBe('claim');
     const projected: ClaimRecord = {
       ...hypothesisClaim('ws-a', 'claim-report-from-set'),
       projectionKind: 'report',
-      compactProvenance: [{
-        sourceClaimId: 'claim-set-only',
-        sourceEpistemicStatus: 'inferred',
-        sourceVerificationLevel: 'reconstructed',
-      }],
+      compactProvenance: [
+        {
+          sourceClaimId: 'claim-set-only',
+          sourceEpistemicStatus: 'inferred',
+          sourceVerificationLevel: 'reconstructed',
+        },
+      ],
     };
-    expect(writeDraft(service, 'report', sampleReport({
-      claims: [projected],
-      evidenceIds: ['ev-pack-only'],
-    })).manifest.kind).toBe('report');
-    writeDraft(service, 'claim_set', { items: [hypothesisClaim('ws-a', 'claim-set-v2')] }, {
-      supersedes: set.manifest.artifactId,
-    });
-    writeDraft(service, 'evidence_pack', { items: [evidenceOf('ws-c', note, 'ev-pack-v2')] }, {
-      supersedes: pack.manifest.artifactId,
-    });
+    expect(
+      writeDraft(
+        service,
+        'report',
+        sampleReport({
+          claims: [projected],
+          evidenceIds: ['ev-pack-only'],
+        }),
+      ).manifest.kind,
+    ).toBe('report');
+    writeDraft(
+      service,
+      'claim_set',
+      { items: [hypothesisClaim('ws-a', 'claim-set-v2')] },
+      {
+        supersedes: set.manifest.artifactId,
+      },
+    );
+    writeDraft(
+      service,
+      'evidence_pack',
+      { items: [evidenceOf('ws-c', note, 'ev-pack-v2')] },
+      {
+        supersedes: pack.manifest.artifactId,
+      },
+    );
     const after = service.createLookup(SESSION_ID);
     expect(after.getClaim('claim-set-only')).toBeNull();
     expect(after.getEvidence('ev-pack-only')).toBeNull();
     expect(after.getClaim('claim-set-v2')).toMatchObject({ claimId: 'claim-set-v2' });
     expect(after.getEvidence('ev-pack-v2')).toMatchObject({ evidenceId: 'ev-pack-v2' });
-    expect(() => writeDraft(service, 'claim', {
-      ...observedClaim('ws-a', 'claim-stale-set-ref'),
-      supports: ['claim-set-only'],
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() =>
+      writeDraft(service, 'claim', {
+        ...observedClaim('ws-a', 'claim-stale-set-ref'),
+        supports: ['claim-set-only'],
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
   });
 
   it('P1-1 marks EvidencePack members stale when bound WorldState is polluted', () => {
@@ -1317,10 +1857,15 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     expect(pack.record).toMatchObject({
       items: [expect.objectContaining({ evidenceId: 'ev-pack-member', stale: false })],
     });
-    const polluted = writeDraft(service, 'world_state', {
-      ...exclusiveWorld('ws-pack-stale', true),
-      replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
-    }, { supersedes: world.manifest.artifactId });
+    const polluted = writeDraft(
+      service,
+      'world_state',
+      {
+        ...exclusiveWorld('ws-pack-stale', true),
+        replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
+      },
+      { supersedes: world.manifest.artifactId },
+    );
     expect(polluted.record).toMatchObject({ validity: 'polluted' });
     const reread = service.readRecord(SESSION_ID, pack.manifest.artifactId);
     expect(reread.record).toMatchObject({
@@ -1337,10 +1882,12 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
   it('P1-2 rejects observed_fact Claim with unresolved experimentId', () => {
     const { service } = createInvestigationHarness();
     writeDraft(service, 'world_state', baselineWorld('ws-obs-exp'));
-    expect(() => writeDraft(service, 'claim', {
-      ...observedClaim('ws-obs-exp', 'claim-ghost-exp'),
-      experimentId: 'exp-ghost',
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() =>
+      writeDraft(service, 'claim', {
+        ...observedClaim('ws-obs-exp', 'claim-ghost-exp'),
+        experimentId: 'exp-ghost',
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
   });
 
   it('P1-1 ready claim becomes stale when source evidence hash changes', () => {
@@ -1353,15 +1900,20 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       mission: 'debugger',
       title: 'ready claim',
       summary: 'depends on evidence hash',
-      record: observedClaim('ws-ready-src', 'claim-ready-src'),
+      record: observedClaim('ws-ready-src', 'claim-ready-src', ['ev-ready-src']),
       sourceRefs: [{ artifactId: evidence.manifest.artifactId, expectedHash: evidence.contentHash }],
       status: 'ready',
     });
     expect(claim.manifest.status).toBe('ready');
-    const polluted = writeDraft(service, 'world_state', {
-      ...exclusiveWorld('ws-ready-src', true),
-      replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
-    }, { supersedes: world.manifest.artifactId });
+    const polluted = writeDraft(
+      service,
+      'world_state',
+      {
+        ...exclusiveWorld('ws-ready-src', true),
+        replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
+      },
+      { supersedes: world.manifest.artifactId },
+    );
     expect(polluted.record).toMatchObject({ validity: 'polluted' });
     const evidenceAfter = service.readRecord(SESSION_ID, evidence.manifest.artifactId);
     expect(evidenceAfter.manifest.status).toBe('stale');
@@ -1388,7 +1940,9 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeFileSync(indexPath(sessionPath), `${JSON.stringify(raw)}\n`, 'utf8');
     expect(() => service.list(SESSION_ID)).toThrow(/INVESTIGATION_INDEX_CORRUPT/);
     expect(() => service.readRecord(SESSION_ID, first.manifest.artifactId)).toThrow(/INVESTIGATION_INDEX_CORRUPT/);
-    expect(() => service.createLookup(SESSION_ID).getWorldState('ws-idx-status')).toThrow(/INVESTIGATION_INDEX_CORRUPT/);
+    expect(() => service.createLookup(SESSION_ID).getWorldState('ws-idx-status')).toThrow(
+      /INVESTIGATION_INDEX_CORRUPT/,
+    );
   });
 
   it('P1-3 two reports may share the same evidence and experiment ids', () => {
@@ -1399,34 +1953,48 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeDraft(service, 'world_state', baselineWorld('ws-rep-c'));
     const source = writeDraft(service, 'claim', observedClaim('ws-rep-a', 'claim-rep-src'));
     writeDraft(service, 'evidence', evidenceOf('ws-rep-c', note, 'ev-shared'));
-    writeDraft(service, 'experiment', recordedExperiment({
-      experimentId: 'exp-shared',
-      hypothesisClaimId: 'claim-rep-src',
-      baselineWorldStateId: 'ws-rep-a',
-      variantWorldStateId: 'ws-rep-b',
-      restoredWorldStateId: 'ws-rep-c',
-      verifyEvidenceIds: ['ev-shared'],
-    }));
+    writeDraft(
+      service,
+      'experiment',
+      recordedExperiment({
+        experimentId: 'exp-shared',
+        hypothesisClaimId: 'claim-rep-src',
+        baselineWorldStateId: 'ws-rep-a',
+        variantWorldStateId: 'ws-rep-b',
+        restoredWorldStateId: 'ws-rep-c',
+        verifyEvidenceIds: ['ev-shared'],
+      }),
+    );
     const projected = (claimId: string): ClaimRecord => ({
       ...(source.record as ClaimRecord),
       claimId,
       projectionKind: 'report',
-      compactProvenance: [{
-        sourceClaimId: (source.record as ClaimRecord).claimId,
-        sourceEpistemicStatus: (source.record as ClaimRecord).epistemic,
-        sourceVerificationLevel: (source.record as ClaimRecord).verification,
-      }],
+      compactProvenance: [
+        {
+          sourceClaimId: (source.record as ClaimRecord).claimId,
+          sourceEpistemicStatus: (source.record as ClaimRecord).epistemic,
+          sourceVerificationLevel: (source.record as ClaimRecord).verification,
+        },
+      ],
     });
-    const first = writeDraft(service, 'report', sampleReport({
-      claims: [projected('claim-rep-a')],
-      evidenceIds: ['ev-shared'],
-      experimentIds: ['exp-shared'],
-    }));
-    const second = writeDraft(service, 'report', sampleReport({
-      claims: [projected('claim-rep-b')],
-      evidenceIds: ['ev-shared'],
-      experimentIds: ['exp-shared'],
-    }));
+    const first = writeDraft(
+      service,
+      'report',
+      sampleReport({
+        claims: [projected('claim-rep-a')],
+        evidenceIds: ['ev-shared'],
+        experimentIds: ['exp-shared'],
+      }),
+    );
+    const second = writeDraft(
+      service,
+      'report',
+      sampleReport({
+        claims: [projected('claim-rep-b')],
+        evidenceIds: ['ev-shared'],
+        experimentIds: ['exp-shared'],
+      }),
+    );
     expect(first.manifest.kind).toBe('report');
     expect(second.manifest.kind).toBe('report');
     expect(first.record).toMatchObject({ evidenceIds: ['ev-shared'], experimentIds: ['exp-shared'] });
@@ -1438,25 +2006,34 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const note = seedNote(resolver);
     const world = writeDraft(service, 'world_state', baselineWorld('ws-bound'));
     writeDraft(service, 'world_state', baselineWorld('ws-other'));
-    expect(() => writeDraft(service, 'claim', observedClaim('ws-bound'), {
-      worldStateId: 'ws-missing',
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED|INVESTIGATION_READY_DENIED/);
-    expect(() => writeDraft(service, 'claim', observedClaim('ws-bound'), {
-      worldStateId: 'ws-other',
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED|INVESTIGATION_READY_DENIED/);
-    expect(() => writeDraft(service, 'evidence', evidenceOf('ws-bound', note, 'ev-ghost-ws'), {
-      worldStateId: 'ws-does-not-exist',
-    })).toThrow(/INVESTIGATION_REF_UNRESOLVED|INVESTIGATION_READY_DENIED/);
-    expect(() => service.writeRecord(SESSION_ID, {
-      kind: 'claim',
-      mission: 'debugger',
-      title: 'ready mismatch',
-      summary: 'must fail closed',
-      record: observedClaim('ws-bound', 'claim-ready-mismatch'),
-      worldStateId: 'ws-other',
-      sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
-      status: 'ready',
-    })).toThrow(/INVESTIGATION_READY_DENIED|INVESTIGATION_REF_UNRESOLVED/);
+    writeDraft(service, 'evidence', evidenceOf('ws-bound', note));
+    expect(() =>
+      writeDraft(service, 'claim', observedClaim('ws-bound'), {
+        worldStateId: 'ws-missing',
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED|INVESTIGATION_READY_DENIED/);
+    expect(() =>
+      writeDraft(service, 'claim', observedClaim('ws-bound'), {
+        worldStateId: 'ws-other',
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED|INVESTIGATION_READY_DENIED/);
+    expect(() =>
+      writeDraft(service, 'evidence', evidenceOf('ws-bound', note, 'ev-ghost-ws'), {
+        worldStateId: 'ws-does-not-exist',
+      }),
+    ).toThrow(/INVESTIGATION_REF_UNRESOLVED|INVESTIGATION_READY_DENIED/);
+    expect(() =>
+      service.writeRecord(SESSION_ID, {
+        kind: 'claim',
+        mission: 'debugger',
+        title: 'ready mismatch',
+        summary: 'must fail closed',
+        record: observedClaim('ws-bound', 'claim-ready-mismatch'),
+        worldStateId: 'ws-other',
+        sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
+        status: 'ready',
+      }),
+    ).toThrow(/INVESTIGATION_READY_DENIED|INVESTIGATION_REF_UNRESOLVED/);
     const aligned = writeDraft(service, 'claim', observedClaim('ws-bound', 'claim-aligned'), {
       worldStateId: 'ws-bound',
     });
@@ -1472,10 +2049,15 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       items: [evidenceOf('ws-validity-stale', note, 'ev-vs-pack')],
     });
     expect(evidence.record).toMatchObject({ stale: false });
-    const staleWorld = writeDraft(service, 'world_state', {
-      ...baselineWorld('ws-validity-stale'),
-      validity: 'stale',
-    }, { supersedes: world.manifest.artifactId });
+    const staleWorld = writeDraft(
+      service,
+      'world_state',
+      {
+        ...baselineWorld('ws-validity-stale'),
+        validity: 'stale',
+      },
+      { supersedes: world.manifest.artifactId },
+    );
     expect(staleWorld.record).toMatchObject({ validity: 'stale' });
     const staleEvidence = service.readRecord(SESSION_ID, evidence.manifest.artifactId);
     expect(staleEvidence.record).toMatchObject({ stale: true });
@@ -1495,49 +2077,65 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeDraft(service, 'world_state', baselineWorld('ws-c'));
     writeDraft(service, 'claim', hypothesisClaim('ws-a'));
     writeDraft(service, 'evidence', evidenceOf('ws-c', note, 'ev-verify'));
-    const experiment = writeDraft(service, 'experiment', recordedExperiment({
-      experimentId: 'exp-tamper',
-      hypothesisClaimId: 'claim-hyp',
-      baselineWorldStateId: 'ws-a',
-      variantWorldStateId: 'ws-b',
-      restoredWorldStateId: 'ws-c',
-      verifyEvidenceIds: ['ev-verify'],
-    }));
-    overwriteInvestigationRecordBody(resolver, experiment.manifest.artifactId, recordedExperiment({
-      experimentId: 'exp-tamper',
-      hypothesisClaimId: 'claim-hyp',
-      baselineWorldStateId: 'ws-a',
-      variantWorldStateId: 'ws-b',
-      restoredWorldStateId: 'ws-c',
-      verifyEvidenceIds: ['ev-verify'],
-      interventionType: 'none',
-    }));
+    const experiment = writeDraft(
+      service,
+      'experiment',
+      recordedExperiment({
+        experimentId: 'exp-tamper',
+        hypothesisClaimId: 'claim-hyp',
+        baselineWorldStateId: 'ws-a',
+        variantWorldStateId: 'ws-b',
+        restoredWorldStateId: 'ws-c',
+        verifyEvidenceIds: ['ev-verify'],
+      }),
+    );
+    overwriteInvestigationRecordBody(
+      resolver,
+      experiment.manifest.artifactId,
+      recordedExperiment({
+        experimentId: 'exp-tamper',
+        hypothesisClaimId: 'claim-hyp',
+        baselineWorldStateId: 'ws-a',
+        variantWorldStateId: 'ws-b',
+        restoredWorldStateId: 'ws-c',
+        verifyEvidenceIds: ['ev-verify'],
+        interventionType: 'none',
+      }),
+    );
     expect(() => service.list(SESSION_ID)).toThrow(/INVESTIGATION_HASH_MISMATCH|INVESTIGATION_INDEX_CORRUPT/);
-    expect(() => service.readRecord(SESSION_ID, experiment.manifest.artifactId))
-      .toThrow(/INVESTIGATION_HASH_MISMATCH|INVESTIGATION_INDEX_CORRUPT/);
-    expect(() => service.createLookup(SESSION_ID).getExperiment('exp-tamper'))
-      .toThrow(/INVESTIGATION_HASH_MISMATCH|INVESTIGATION_INDEX_CORRUPT/);
-    expect(() => writeDraft(service, 'claim', {
-      ...hypothesisClaim('ws-a', 'claim-causal-tamper'),
-      claimKind: 'causal_conclusion',
-      experimentId: 'exp-tamper',
-      epistemic: 'derived',
-      verification: 'replay_counterfactual',
-    })).toThrow(/INVESTIGATION_HASH_MISMATCH|INVESTIGATION_INDEX_CORRUPT|S-CAUSAL-01/);
-    expect(() => writeDraft(service, 'world_state', exclusiveWorld('ws-b', true), {
-      supersedes: variant.manifest.artifactId,
-    })).toThrow(/INVESTIGATION_HASH_MISMATCH|INVESTIGATION_INDEX_CORRUPT/);
+    expect(() => service.readRecord(SESSION_ID, experiment.manifest.artifactId)).toThrow(
+      /INVESTIGATION_HASH_MISMATCH|INVESTIGATION_INDEX_CORRUPT/,
+    );
+    expect(() => service.createLookup(SESSION_ID).getExperiment('exp-tamper')).toThrow(
+      /INVESTIGATION_HASH_MISMATCH|INVESTIGATION_INDEX_CORRUPT/,
+    );
+    expect(() =>
+      writeDraft(service, 'claim', {
+        ...hypothesisClaim('ws-a', 'claim-causal-tamper'),
+        claimKind: 'causal_conclusion',
+        experimentId: 'exp-tamper',
+        epistemic: 'derived',
+        verification: 'replay_counterfactual',
+      }),
+    ).toThrow(/INVESTIGATION_HASH_MISMATCH|INVESTIGATION_INDEX_CORRUPT|S-CAUSAL-01/);
+    expect(() =>
+      writeDraft(service, 'world_state', exclusiveWorld('ws-b', true), {
+        supersedes: variant.manifest.artifactId,
+      }),
+    ).toThrow(/INVESTIGATION_HASH_MISMATCH|INVESTIGATION_INDEX_CORRUPT/);
   });
 
   it('P1-2 read rejects planted ready manifests with empty sourceRefs', () => {
     const { resolver, service } = createInvestigationHarness();
     const world = writeDraft(service, 'world_state', baselineWorld('ws-ready-empty'));
     forceReadyEmptySourceRefs(resolver, world.manifest.artifactId);
-    expect(() => service.readRecord(SESSION_ID, world.manifest.artifactId))
-      .toThrow(/INVESTIGATION_READY_DENIED|INVESTIGATION_INDEX_CORRUPT/);
+    expect(() => service.readRecord(SESSION_ID, world.manifest.artifactId)).toThrow(
+      /INVESTIGATION_READY_DENIED|INVESTIGATION_INDEX_CORRUPT/,
+    );
     expect(() => service.list(SESSION_ID)).toThrow(/INVESTIGATION_READY_DENIED|INVESTIGATION_INDEX_CORRUPT/);
-    expect(() => service.createLookup(SESSION_ID).getWorldState('ws-ready-empty'))
-      .toThrow(/INVESTIGATION_READY_DENIED|INVESTIGATION_INDEX_CORRUPT/);
+    expect(() => service.createLookup(SESSION_ID).getWorldState('ws-ready-empty')).toThrow(
+      /INVESTIGATION_READY_DENIED|INVESTIGATION_INDEX_CORRUPT/,
+    );
   });
 
   it('P1 read paths re-run record invariants after refs drift', () => {
@@ -1546,20 +2144,22 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const note = seedNote(evidenceCase.resolver);
     writeDraft(evidenceCase.service, 'world_state', baselineWorld('ws-ctx'));
     const evidence = writeDraft(evidenceCase.service, 'evidence', evidenceOf('ws-ctx', note, 'ev-ctx'));
-    expect(evidenceCase.service.readRecord(SESSION_ID, evidence.manifest.artifactId).record)
-      .toMatchObject({ evidenceId: 'ev-ctx' });
-    expect(evidenceCase.service.list(SESSION_ID, { kind: 'evidence' }).map((entry) => entry.artifactId))
-      .toContain(evidence.manifest.artifactId);
-    expect(evidenceCase.service.createLookup(SESSION_ID).getEvidence('ev-ctx'))
-      .toMatchObject({ evidenceId: 'ev-ctx' });
+    expect(evidenceCase.service.readRecord(SESSION_ID, evidence.manifest.artifactId).record).toMatchObject({
+      evidenceId: 'ev-ctx',
+    });
+    expect(evidenceCase.service.list(SESSION_ID, { kind: 'evidence' }).map((entry) => entry.artifactId)).toContain(
+      evidence.manifest.artifactId,
+    );
+    expect(evidenceCase.service.createLookup(SESSION_ID).getEvidence('ev-ctx')).toMatchObject({ evidenceId: 'ev-ctx' });
     evidenceCase.resolver.write(SESSION_ID, note.uri, '{"note":"overwritten"}\n', { mimeType: 'application/json' });
     expect(() => evidenceCase.service.readRecord(SESSION_ID, evidence.manifest.artifactId)).toThrow(drifted);
     expect(() => evidenceCase.service.list(SESSION_ID, { kind: 'evidence' })).toThrow(drifted);
     expect(() => evidenceCase.service.list(SESSION_ID)).toThrow(drifted);
     expect(() => evidenceCase.service.createLookup(SESSION_ID).getEvidence('ev-ctx')).toThrow(drifted);
     expect(evidenceCase.service.list(SESSION_ID, { kind: 'world_state' })).toHaveLength(1);
-    expect(evidenceCase.service.createLookup(SESSION_ID).getWorldState('ws-ctx'))
-      .toMatchObject({ worldStateId: 'ws-ctx' });
+    expect(evidenceCase.service.createLookup(SESSION_ID).getWorldState('ws-ctx')).toMatchObject({
+      worldStateId: 'ws-ctx',
+    });
 
     const claimCase = createInvestigationHarness();
     writeDraft(claimCase.service, 'world_state', baselineWorld('ws-claim-ctx'));
@@ -1568,17 +2168,22 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       ...hypothesisClaim('ws-claim-ctx', 'claim-supports-ctx'),
       supports: ['claim-target-ctx'],
     });
-    expect(claimCase.service.readRecord(SESSION_ID, supporter.manifest.artifactId).record)
-      .toMatchObject({ claimId: 'claim-supports-ctx' });
+    expect(claimCase.service.readRecord(SESSION_ID, supporter.manifest.artifactId).record).toMatchObject({
+      claimId: 'claim-supports-ctx',
+    });
     writeDraft(claimCase.service, 'claim', observedClaim('ws-claim-ctx', 'claim-target-v2'), {
       supersedes: target.manifest.artifactId,
     });
     expect(claimCase.service.readRecord(SESSION_ID, supporter.manifest.artifactId).manifest.status).toBe('stale');
-    expect(claimCase.service.list(SESSION_ID, { kind: 'claim' })
-      .find(entry => entry.artifactId === supporter.manifest.artifactId)?.status).toBe('stale');
+    expect(
+      claimCase.service
+        .list(SESSION_ID, { kind: 'claim' })
+        .find((entry) => entry.artifactId === supporter.manifest.artifactId)?.status,
+    ).toBe('stale');
     expect(() => claimCase.service.createLookup(SESSION_ID).getClaim('claim-supports-ctx')).toThrow(drifted);
-    expect(claimCase.service.createLookup(SESSION_ID).getClaim('claim-target-v2'))
-      .toMatchObject({ claimId: 'claim-target-v2' });
+    expect(claimCase.service.createLookup(SESSION_ID).getClaim('claim-target-v2')).toMatchObject({
+      claimId: 'claim-target-v2',
+    });
 
     const experimentCase = createInvestigationHarness();
     const verifyNote = seedNote(experimentCase.resolver);
@@ -1587,25 +2192,34 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeDraft(experimentCase.service, 'world_state', baselineWorld('ws-c'));
     writeDraft(experimentCase.service, 'claim', hypothesisClaim('ws-a'));
     const verify = writeDraft(experimentCase.service, 'evidence', evidenceOf('ws-c', verifyNote, 'ev-verify-ctx'));
-    const experiment = writeDraft(experimentCase.service, 'experiment', recordedExperiment({
+    const experiment = writeDraft(
+      experimentCase.service,
+      'experiment',
+      recordedExperiment({
+        experimentId: 'exp-ctx',
+        hypothesisClaimId: 'claim-hyp',
+        baselineWorldStateId: 'ws-a',
+        variantWorldStateId: 'ws-b',
+        restoredWorldStateId: 'ws-c',
+        verifyEvidenceIds: ['ev-verify-ctx'],
+      }),
+    );
+    expect(experimentCase.service.readRecord(SESSION_ID, experiment.manifest.artifactId).record).toMatchObject({
       experimentId: 'exp-ctx',
-      hypothesisClaimId: 'claim-hyp',
-      baselineWorldStateId: 'ws-a',
-      variantWorldStateId: 'ws-b',
-      restoredWorldStateId: 'ws-c',
-      verifyEvidenceIds: ['ev-verify-ctx'],
-    }));
-    expect(experimentCase.service.readRecord(SESSION_ID, experiment.manifest.artifactId).record)
-      .toMatchObject({ experimentId: 'exp-ctx' });
+    });
     writeDraft(experimentCase.service, 'evidence', evidenceOf('ws-c', verifyNote, 'ev-verify-v2'), {
       supersedes: verify.manifest.artifactId,
     });
     expect(experimentCase.service.readRecord(SESSION_ID, experiment.manifest.artifactId).manifest.status).toBe('stale');
-    expect(experimentCase.service.list(SESSION_ID, { kind: 'experiment' })
-      .find(entry => entry.artifactId === experiment.manifest.artifactId)?.status).toBe('stale');
+    expect(
+      experimentCase.service
+        .list(SESSION_ID, { kind: 'experiment' })
+        .find((entry) => entry.artifactId === experiment.manifest.artifactId)?.status,
+    ).toBe('stale');
     expect(experimentCase.service.createLookup(SESSION_ID).getExperiment('exp-ctx')).toBeNull();
-    expect(experimentCase.service.createLookup(SESSION_ID).getEvidence('ev-verify-v2'))
-      .toMatchObject({ evidenceId: 'ev-verify-v2' });
+    expect(experimentCase.service.createLookup(SESSION_ID).getEvidence('ev-verify-v2')).toMatchObject({
+      evidenceId: 'ev-verify-v2',
+    });
   });
 
   it('P1 read rejects Experiment and causal Claim when verify Evidence artifact content drifts', () => {
@@ -1616,14 +2230,18 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     writeDraft(service, 'world_state', baselineWorld('ws-c'));
     writeDraft(service, 'claim', hypothesisClaim('ws-a'));
     const evidence = writeDraft(service, 'evidence', evidenceOf('ws-c', note, 'ev-verify-drift'));
-    const experiment = writeDraft(service, 'experiment', recordedExperiment({
-      experimentId: 'exp-verify-drift',
-      hypothesisClaimId: 'claim-hyp',
-      baselineWorldStateId: 'ws-a',
-      variantWorldStateId: 'ws-b',
-      restoredWorldStateId: 'ws-c',
-      verifyEvidenceIds: ['ev-verify-drift'],
-    }));
+    const experiment = writeDraft(
+      service,
+      'experiment',
+      recordedExperiment({
+        experimentId: 'exp-verify-drift',
+        hypothesisClaimId: 'claim-hyp',
+        baselineWorldStateId: 'ws-a',
+        variantWorldStateId: 'ws-b',
+        restoredWorldStateId: 'ws-c',
+        verifyEvidenceIds: ['ev-verify-drift'],
+      }),
+    );
     const causal = writeDraft(service, 'claim', {
       ...hypothesisClaim('ws-a', 'claim-causal-drift'),
       claimKind: 'causal_conclusion',
@@ -1631,10 +2249,14 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       epistemic: 'derived',
       verification: 'replay_counterfactual',
     });
-    expect(service.readRecord(SESSION_ID, experiment.manifest.artifactId).record)
-      .toMatchObject({ experimentId: 'exp-verify-drift', status: 'recorded' });
-    expect(service.readRecord(SESSION_ID, causal.manifest.artifactId).record)
-      .toMatchObject({ claimId: 'claim-causal-drift', experimentId: 'exp-verify-drift' });
+    expect(service.readRecord(SESSION_ID, experiment.manifest.artifactId).record).toMatchObject({
+      experimentId: 'exp-verify-drift',
+      status: 'recorded',
+    });
+    expect(service.readRecord(SESSION_ID, causal.manifest.artifactId).record).toMatchObject({
+      claimId: 'claim-causal-drift',
+      experimentId: 'exp-verify-drift',
+    });
     resolver.write(SESSION_ID, note.uri, '{"note":"drifted-without-updating-evidence"}\n', {
       mimeType: 'application/json',
     });
@@ -1652,6 +2274,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
   it('P1-2 read rejects ready records whose worldStateId no longer binds', () => {
     const { resolver, service } = createInvestigationHarness();
     const world = writeDraft(service, 'world_state', baselineWorld('ws-bind-read'));
+    writeDraft(service, 'evidence', evidenceOf('ws-bind-read', seedNote(resolver)));
     const claim = service.writeRecord(SESSION_ID, {
       kind: 'claim',
       mission: 'debugger',
@@ -1663,10 +2286,12 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     });
     expect(claim.manifest.status).toBe('ready');
     overwriteInvestigationManifest(resolver, claim.manifest.artifactId, { worldStateId: 'ws-ghost' });
-    expect(() => service.readRecord(SESSION_ID, claim.manifest.artifactId))
-      .toThrow(/INVESTIGATION_READY_DENIED|INVESTIGATION_INDEX_CORRUPT|INVESTIGATION_REF_UNRESOLVED/);
-    expect(() => service.createLookup(SESSION_ID).getClaim('claim-bind-read'))
-      .toThrow(/INVESTIGATION_READY_DENIED|INVESTIGATION_INDEX_CORRUPT|INVESTIGATION_REF_UNRESOLVED/);
+    expect(() => service.readRecord(SESSION_ID, claim.manifest.artifactId)).toThrow(
+      /INVESTIGATION_READY_DENIED|INVESTIGATION_INDEX_CORRUPT|INVESTIGATION_REF_UNRESOLVED/,
+    );
+    expect(() => service.createLookup(SESSION_ID).getClaim('claim-bind-read')).toThrow(
+      /INVESTIGATION_READY_DENIED|INVESTIGATION_INDEX_CORRUPT|INVESTIGATION_REF_UNRESOLVED/,
+    );
   });
 
   it('P1 lookup does not return a cycle member after the root fails on the same lookup', () => {
@@ -1699,5 +2324,74 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     const lookup = service.createLookup(SESSION_ID);
     expect(() => lookup.getExperiment('exp-cycle-root')).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
     expect(() => lookup.getClaim('claim-cycle')).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+  });
+});
+
+describe('verified record bodies', () => {
+  const body = (text: string) => ({ text, hash: sha256Prefixed(text), truncated: false });
+  const entry = (text: string) =>
+    ({
+      artifactId: 'claims-1',
+      kind: 'claim_set',
+      recordType: 'ClaimSet',
+      contentHash: sha256Prefixed(text),
+    }) as InvestigationIndexEntry;
+
+  it('rejects a hash-bound body that is not a record of the type its index entry names', () => {
+    const text = JSON.stringify({ items: 'claims' });
+    expect(() => parseVerifiedRecordBody(entry(text), body(text))).toThrow(
+      expect.objectContaining({ code: 'INVESTIGATION_SCHEMA_INVALID' }),
+    );
+    expect(() => parseVerifiedRecordBodyOf(entry(text), body(text), 'EvidencePack')).toThrow(
+      expect.objectContaining({ code: 'INVESTIGATION_INDEX_CORRUPT' }),
+    );
+  });
+});
+
+describe('S-EVIDENCE-01: observed claims rest on evidence', () => {
+  it('lets a draft observation wait for its evidence, and rejects it as ready until it cites a resolvable one', () => {
+    const { resolver, service } = createInvestigationHarness();
+    const world = writeDraft(service, 'world_state', baselineWorld('ws-obs-ev'));
+    const draft = writeDraft(service, 'claim', observedClaim('ws-obs-ev', 'claim-waiting', []));
+    expect(service.readRecord(SESSION_ID, draft.manifest.artifactId).record).toMatchObject({
+      claimId: 'claim-waiting',
+    });
+    expect(service.list(SESSION_ID, { kind: 'claim' })).toHaveLength(1);
+    const ready = (record: ClaimRecord) =>
+      service.writeRecord(SESSION_ID, {
+        kind: 'claim',
+        mission: 'debugger',
+        title: 'observation',
+        summary: 'ready observation',
+        record,
+        sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
+        status: 'ready',
+      });
+    expect(() => ready(observedClaim('ws-obs-ev', 'claim-uncited', []))).toThrow(/S-EVIDENCE-01/);
+    expect(() => ready(observedClaim('ws-obs-ev', 'claim-dangling', ['ev-missing']))).toThrow(/S-EVIDENCE-01/);
+    writeDraft(service, 'evidence', evidenceOf('ws-obs-ev', seedNote(resolver), 'ev-seen'));
+    expect(ready(observedClaim('ws-obs-ev', 'claim-cited', ['ev-seen'])).manifest.status).toBe('ready');
+  });
+
+  it('rejects a ready report whose conclusion projects an observation without evidence', () => {
+    const { resolver, service } = createInvestigationHarness();
+    const source = writeDraft(service, 'world_state', baselineWorld('ws-report-ev'));
+    const uncited = writeDraft(service, 'claim', observedClaim('ws-report-ev', 'claim-report-uncited', []));
+    expect(() =>
+      writeReadyReport(service, {
+        mission: 'debugger',
+        source,
+        claims: [projectClaim(uncited.record as ClaimRecord, 'claim-report-uncited-proj')],
+      }),
+    ).toThrow(/S-EVIDENCE-01/);
+    writeDraft(service, 'evidence', evidenceOf('ws-report-ev', seedNote(resolver), 'ev-report'));
+    const cited = writeDraft(service, 'claim', observedClaim('ws-report-ev', 'claim-report-cited', ['ev-report']));
+    expect(
+      writeReadyReport(service, {
+        mission: 'debugger',
+        source,
+        claims: [projectClaim(cited.record as ClaimRecord, 'claim-report-cited-proj')],
+      }).manifest.status,
+    ).toBe('ready');
   });
 });

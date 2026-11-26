@@ -30,14 +30,7 @@ export interface ConversationSwitchBranchRequest {
 }
 
 export interface ConversationSwitchBranchResult {
-  success: boolean;
   messages: import('./conversation').ConversationMessage[];
-  branchState?: ConversationBranchState;
-  tracePresentation?: import('./agenticTrace').AgentRunPresentation | null;
-  error?: string;
-}
-
-export interface ConversationHistoryResult {
-  messages: import('./conversation').ConversationMessage[];
-  branchState?: ConversationBranchState | null;
+  branchState: ConversationBranchState;
+  tracePresentation: import('./agenticTrace').AgentRunPresentation;
 }

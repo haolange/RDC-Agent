@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { AppError } from '@shared/errors/appError';
 import { traceService } from '../agent-trace/TraceService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { TraceGetProjectionArgsSchema } from './validation/traceSchemas';
@@ -14,9 +15,7 @@ export function registerTraceHandlers(context: WorkbenchIpcContext): void {
       padTo: 1,
     });
     const targetSessionId = sessionId || state.currentSessionId;
-    if (!targetSessionId) {
-      return { success: false, error: 'No active session.' };
-    }
+    if (!targetSessionId) throw new AppError('SESSION_NOT_FOUND', 'no active session.');
     return traceService.getSession(targetSessionId);
   });
 }

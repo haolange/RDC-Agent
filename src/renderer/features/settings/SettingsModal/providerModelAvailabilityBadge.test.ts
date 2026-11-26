@@ -3,48 +3,60 @@ import { resolveProviderModelAvailabilityBadge } from './providerModelAvailabili
 
 describe('resolveProviderModelAvailabilityBadge', () => {
   it('never flashes unverified while loading or refreshing', () => {
-    expect(resolveProviderModelAvailabilityBadge({
-      availability: 'unknown',
-      enabled: true,
-      loading: true,
-      refreshing: false,
-    })).toBe('loading');
-    expect(resolveProviderModelAvailabilityBadge({
-      availability: 'unknown',
-      enabled: true,
-      loading: false,
-      refreshing: true,
-    })).toBe('loading');
+    expect(
+      resolveProviderModelAvailabilityBadge({
+        availability: 'unknown',
+        enabled: true,
+        loading: true,
+        refreshing: false,
+      }),
+    ).toBe('loading');
+    expect(
+      resolveProviderModelAvailabilityBadge({
+        availability: 'unknown',
+        enabled: true,
+        loading: false,
+        refreshing: true,
+      }),
+    ).toBe('loading');
   });
 
   it('names a failed refresh instead of calling the model unconfirmed', () => {
     const idle = { availability: 'unknown' as const, enabled: true, loading: false, refreshing: false };
     expect(resolveProviderModelAvailabilityBadge(idle)).toBe('unverified');
     expect(resolveProviderModelAvailabilityBadge({ ...idle, refreshError: 'HTTP 503' })).toBe('refresh-failed');
-    expect(resolveProviderModelAvailabilityBadge({ ...idle, refreshing: true, refreshError: 'HTTP 503' })).toBe('loading');
+    expect(resolveProviderModelAvailabilityBadge({ ...idle, refreshing: true, refreshError: 'HTTP 503' })).toBe(
+      'loading',
+    );
   });
 
   it('returns available once evidence is present and idle', () => {
-    expect(resolveProviderModelAvailabilityBadge({
-      availability: 'available',
-      enabled: true,
-      loading: false,
-      refreshing: false,
-    })).toBe('available');
+    expect(
+      resolveProviderModelAvailabilityBadge({
+        availability: 'available',
+        enabled: true,
+        loading: false,
+        refreshing: false,
+      }),
+    ).toBe('available');
   });
 
   it('keeps unavailable and disabled ahead of loading', () => {
-    expect(resolveProviderModelAvailabilityBadge({
-      availability: 'unavailable',
-      enabled: true,
-      loading: true,
-      refreshing: true,
-    })).toBe('unavailable');
-    expect(resolveProviderModelAvailabilityBadge({
-      availability: 'available',
-      enabled: false,
-      loading: true,
-      refreshing: false,
-    })).toBe('disabled');
+    expect(
+      resolveProviderModelAvailabilityBadge({
+        availability: 'unavailable',
+        enabled: true,
+        loading: true,
+        refreshing: true,
+      }),
+    ).toBe('unavailable');
+    expect(
+      resolveProviderModelAvailabilityBadge({
+        availability: 'available',
+        enabled: false,
+        loading: true,
+        refreshing: false,
+      }),
+    ).toBe('disabled');
   });
 });

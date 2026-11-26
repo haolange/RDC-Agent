@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { isolateHome } from '../../testing/isolatedHome';
 
 const electronMock = vi.hoisted(() => ({
   userDataRoot: '',
@@ -28,14 +29,13 @@ vi.mock('electron', () => ({
 describe('SecretStorageService fail-closed', () => {
   let root = '';
   let previousUserData: string | undefined;
-  let previousHome: string | undefined;
+  let restoreHome: () => void = () => undefined;
 
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-secrets-'));
     previousUserData = process.env.RDC_AGENT_USER_DATA;
-    previousHome = process.env.RDC_AGENT_HOME;
     process.env.RDC_AGENT_USER_DATA = path.join(root, 'app-data');
-    process.env.RDC_AGENT_HOME = path.join(root, '.rdc-agent');
+    restoreHome = isolateHome(root);
     electronMock.userDataRoot = process.env.RDC_AGENT_USER_DATA;
     electronMock.encryptionAvailable = true;
     fs.mkdirSync(process.env.RDC_AGENT_USER_DATA, { recursive: true });
@@ -46,8 +46,7 @@ describe('SecretStorageService fail-closed', () => {
     vi.restoreAllMocks();
     if (previousUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
     else process.env.RDC_AGENT_USER_DATA = previousUserData;
-    if (previousHome === undefined) delete process.env.RDC_AGENT_HOME;
-    else process.env.RDC_AGENT_HOME = previousHome;
+    restoreHome();
     fs.rmSync(root, { recursive: true, force: true });
   });
 
@@ -59,23 +58,26 @@ describe('SecretStorageService fail-closed', () => {
     );
   });
 
-  it('quarantines corrupt secret files instead of returning an empty map', async () => {
+  it('reports a corrupt secret file on every read instead of returning an empty map', async () => {
     const { appPathService } = await import('../../runtime/AppPathService');
-    const { secretStorageService, SecretStoreCorruptError } = await import('./SecretStorageService');
+    const { secretStorageService } = await import('./SecretStorageService');
     const secretsPath = appPathService.getRuntimePaths().secretsPath;
     fs.mkdirSync(secretsPath, { recursive: true });
     const filePath = path.join(secretsPath, 'provider-secrets.json');
     fs.writeFileSync(filePath, '{not-json', 'utf8');
 
-    expect(() => secretStorageService.hasSecretRecord('provider-test-api-key')).toThrow(SecretStoreCorruptError);
-    expect(fs.existsSync(filePath)).toBe(false);
-    const quarantined = fs.readdirSync(secretsPath).filter((entry) => entry.includes('.corrupt-'));
-    expect(quarantined.length).toBe(1);
+    for (let read = 0; read < 2; read += 1) {
+      expect(() => secretStorageService.hasSecretRecord('provider-test-api-key')).toThrow(
+        expect.objectContaining({ code: 'STORAGE_CORRUPT' }),
+      );
+    }
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('{not-json');
+    expect(fs.readdirSync(secretsPath).filter((entry) => entry.includes('.corrupt-'))).toHaveLength(1);
   });
 
-  it('does not quarantine an unreadable but intact secret file', async () => {
+  it('reports an unreadable but intact secret file as unreadable and leaves it as it is', async () => {
     const { appPathService } = await import('../../runtime/AppPathService');
-    const { secretStorageService, SecretStorageUnavailableError } = await import('./SecretStorageService');
+    const { secretStorageService } = await import('./SecretStorageService');
     const secretsPath = appPathService.getRuntimePaths().secretsPath;
     fs.mkdirSync(secretsPath, { recursive: true });
     const filePath = path.join(secretsPath, 'provider-secrets.json');
@@ -87,10 +89,26 @@ describe('SecretStorageService fail-closed', () => {
     });
 
     expect(() => secretStorageService.hasSecretRecord('provider-test-api-key')).toThrow(
-      SecretStorageUnavailableError,
+      expect.objectContaining({ code: 'STORAGE_UNREADABLE', category: 'availability' }),
     );
     expect(fs.readFileSync(filePath, 'utf8')).toBe('{}');
     expect(fs.readdirSync(secretsPath)).toEqual(['provider-secrets.json']);
+  });
+
+  it('reads the secret file and decrypts each secret once until a write replaces them', async () => {
+    const { safeStorage } = await import('electron');
+    const { secretStorageService } = await import('./SecretStorageService');
+    secretStorageService.setSecret('provider-test-api-key', 'sk-first');
+    const decrypt = vi.spyOn(safeStorage, 'decryptString');
+    const reads = vi.spyOn(fs, 'readFileSync');
+    for (let read = 0; read < 3; read += 1)
+      expect(secretStorageService.getSecret('provider-test-api-key')).toBe('sk-first');
+    expect(decrypt).toHaveBeenCalledTimes(1);
+    expect(reads).not.toHaveBeenCalled();
+    const revision = secretStorageService.revision;
+    secretStorageService.setSecret('provider-test-api-key', 'sk-second');
+    expect(secretStorageService.revision).toBeGreaterThan(revision);
+    expect(secretStorageService.getSecret('provider-test-api-key')).toBe('sk-second');
   });
 
   it('stores and decrypts with safeStorage only', async () => {

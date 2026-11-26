@@ -6,32 +6,105 @@ import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() } }));
-vi.mock('../../runtime/resolveConfiguredShell', () => ({
+vi.mock('../../tools/resolveConfiguredShell', () => ({
   resolveConfiguredShell: () => {
     throw new Error('SHELL_UNAVAILABLE: test stub');
   },
 }));
-vi.mock('../../sessions/store/StorageAdapter', () => ({
-  storageAdapter: {
-    readSessionShellCwd: () => null,
-  },
+vi.mock('../../sessions/store/sessionStores', () => ({
+  sessionContextStore: { readSessionShellCwd: () => null },
 }));
 
 describe('PromptPlanBuilder', () => {
   it('builds a provenance-carrying plan without memory injection or hardcoded capabilities', async () => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const profile = {
-      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdc-agent/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['read_file'], skills: ['debug'], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
+      id: 'ask',
+      fileName: 'ask.agent.md',
+      filePath: 'C:/User/.rdc-agent/agents/ask.agent.md',
+      name: 'Ask',
+      description: 'Read-only answers',
+      argumentHint: '',
+      target: 'rdc-agent',
+      icon: 'message-orbit',
+      accent: '#38c6f4',
+      disableModelInvocation: false,
+      userInvocable: true,
+      tools: ['read_file'],
+      skills: ['debug'],
+      mcpServers: [],
+      agents: [],
+      handoffs: [],
+      metadata: {},
+      instructions: 'Answer from current evidence.',
+      builtin: false,
+      enabled: true,
     } satisfies AgentManifestDefinition;
     const skillPath = path.join(process.cwd(), 'resources', 'agent-runtime', 'skills', 'debug', 'SKILL.md');
     const input: import('./PromptPlanBuilder').PromptPlanInput = {
       profile,
-      scopedInstructions: { sources: [{ id: 'project:RDC.md', scope: 'project', sourcePath: 'D:/Project/RDC.md', sourceHash: 'hash', content: 'Project instruction', byteLength: 19, precedence: 0 }], totalBytes: 19, diagnostics: [] },
-      preloadedSkills: [{ id: 'debug', name: 'debug', description: 'Debug', allowedTools: ['read_file'], scope: 'builtin', sourcePath: skillPath, sourceHash: 'skill-hash', effectiveStatus: 'effective', instructions: fs.readFileSync(skillPath, 'utf8') }],
+      scopedInstructions: {
+        sources: [
+          {
+            id: 'project:RDC.md',
+            scope: 'project',
+            sourcePath: 'D:/Project/RDC.md',
+            sourceHash: 'hash',
+            content: 'Project instruction',
+            byteLength: 19,
+            precedence: 0,
+          },
+        ],
+        totalBytes: 19,
+        diagnostics: [],
+      },
+      preloadedSkills: [
+        {
+          id: 'debug',
+          name: 'debug',
+          description: 'Debug',
+          allowedTools: ['read_file'],
+          scope: 'builtin',
+          sourcePath: skillPath,
+          sourceHash: 'skill-hash',
+          effectiveStatus: 'effective',
+          instructions: fs.readFileSync(skillPath, 'utf8'),
+        },
+      ],
       skillCatalog: [],
-      tools: ['read_file'], workDir: 'D:/Project', routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
-      permissionConstraints: {  readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
-      currentDate: '2026-07-11', timeZone: 'Asia/Shanghai',
+      tools: ['read_file'],
+      workDir: 'D:/Project',
+      routeCapability: {
+        providerId: 'deepseek',
+        modelId: 'deepseek-v4',
+        toolCallingMode: 'native-structured',
+        reasoningVisibility: 'none',
+        reasoningDelivery: 'stream-full',
+        reasoningContract: {
+          semantic: 'raw',
+          source: 'deepseek-reasoning-content',
+          displayLabel: 'Raw reasoning',
+          carrier: 'reasoning-content',
+          artifactFormat: 'deepseek.reasoning-content',
+          artifactVersion: 'v1',
+          compatibilityGroup: 'test',
+          continuation: 'exact-execution',
+        },
+        supportsStreaming: true,
+        supportsToolResults: true,
+        toolCallingEvidence: 'supported',
+        toolCallingUnverified: false,
+        visionInputMode: 'disabled',
+        structuredOutputMode: 'native',
+      },
+      permissionConstraints: {
+        readableRoots: [],
+        writableRoots: [],
+        allowedCommandPrefixes: [],
+        deniedCommandPrefixes: [],
+      },
+      currentDate: '2026-07-11',
+      timeZone: 'Asia/Shanghai',
     };
     const plan = new PromptPlanBuilder().build(input);
     expect(plan.segments.some((segment) => segment.kind === 'scoped-instruction')).toBe(true);
@@ -39,7 +112,9 @@ describe('PromptPlanBuilder', () => {
     expect(plan.systemPrompt).toContain('Effective Tools\n- read_file');
     expect(plan.systemPrompt).toContain('Declared handoffs (main-resolved profile metadata): []');
     expect(plan.systemPrompt).toContain('Methods used as knowledge remain discoverable and readable with skill_read');
-    expect(plan.segments.find(segment => segment.id === 'core:file-tool-routing')?.content).toContain('same realpath in this session');
+    expect(plan.segments.find((segment) => segment.id === 'core:file-tool-routing')?.content).toContain(
+      'same realpath in this session',
+    );
     expect(plan.systemPrompt).toContain('after restart read again');
     expect(plan.systemPrompt).not.toContain('MEMORY.md');
     expect(plan.systemPrompt).not.toContain('Read and write files in the workspace');
@@ -54,10 +129,13 @@ describe('PromptPlanBuilder', () => {
 
     const limitsPlan = new PromptPlanBuilder().build({
       ...input,
-      profileCatalog: [profile, { id: 'executor', enabled: true, maxTurns: 50 },
-        { id: 'disabled-profile', enabled: false, maxTurns: 500 }],
+      profileCatalog: [
+        profile,
+        { id: 'executor', enabled: true, maxTurns: 50 },
+        { id: 'disabled-profile', enabled: false, maxTurns: 500 },
+      ],
     });
-    const profileLimits = limitsPlan.segments.find(segment => segment.id === 'runtime:profile-limits');
+    const profileLimits = limitsPlan.segments.find((segment) => segment.id === 'runtime:profile-limits');
     expect(profileLimits).toMatchObject({ kind: 'runtime-fact', stability: 'volatile' });
     expect(profileLimits?.content).toContain('"agentId":"executor","ordinaryProviderLoopCeiling":50');
     expect(profileLimits?.content).toContain('"agentId":"ask","ordinaryProviderLoopCeiling":null');
@@ -65,17 +143,39 @@ describe('PromptPlanBuilder', () => {
     expect(profileLimits?.content).toContain('not a future execution reservation');
     expect(limitsPlan.stablePrefix.fingerprint).toBe(plan.stablePrefix.fingerprint);
 
-    const executionPlan = new PromptPlanBuilder().build({ ...input, requestPlan: createTestRequestPlan({
-      providerId: 'deepseek', adapterId: 'openai-responses', catalogRevision: 'test', routeRevision: 'test',
-      selectedModelId: 'deepseek-v4', effectiveModelId: 'deepseek-v4', appliedBindingIds: [],
-      route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'catalog' }, headers: {}, bodyPatch: {},
-      contextBudgetTokens: 1000, contextMode: 'normal', contextWindowTokens: 1000, activeTierId: 'default', fastMode: false,
-      reasoningWire: { selection: 'low', control: { kind: 'levels', supportsOff: true, levels: ['low', 'high'], defaultSelection: 'high',
-        wireProfile: { kind: 'openai-responses', on: 'high', levels: { low: 'low', high: 'high' } } } },
-    }) });
+    const executionPlan = new PromptPlanBuilder().build({
+      ...input,
+      requestPlan: createTestRequestPlan({
+        providerId: 'deepseek',
+        adapterId: 'openai-responses',
+        catalogRevision: 'test',
+        routeRevision: 'test',
+        selectedModelId: 'deepseek-v4',
+        effectiveModelId: 'deepseek-v4',
+        appliedBindingIds: [],
+        route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'catalog' },
+        headers: {},
+        bodyPatch: {},
+        contextBudgetTokens: 1000,
+        contextMode: 'normal',
+        contextWindowTokens: 1000,
+        activeTierId: 'default',
+        fastMode: false,
+        reasoningWire: {
+          selection: 'low',
+          control: {
+            kind: 'levels',
+            supportsOff: true,
+            levels: ['low', 'high'],
+            defaultSelection: 'high',
+            wireProfile: { kind: 'openai-responses', on: 'high', levels: { low: 'low', high: 'high' } },
+          },
+        },
+      }),
+    });
     expect(executionPlan.systemPrompt).toContain('Resolved reasoning selection: "low"');
     expect(executionPlan.stablePrefix.fingerprint).toBe(plan.stablePrefix.fingerprint);
-    expect(executionPlan.segments.find(segment => segment.id === 'runtime:request-plan')?.kind).toBe('runtime-fact');
+    expect(executionPlan.segments.find((segment) => segment.id === 'runtime:request-plan')?.kind).toBe('runtime-fact');
 
     const offeredPlan = new PromptPlanBuilder().build({
       ...input,
@@ -90,8 +190,8 @@ describe('PromptPlanBuilder', () => {
         approvedAt: 1,
       },
     });
-    const offerFact = offeredPlan.segments.find(segment => segment.id === 'runtime:approved-execution-offer');
-    expect(plan.segments.some(segment => segment.id === 'runtime:approved-execution-offer')).toBe(false);
+    const offerFact = offeredPlan.segments.find((segment) => segment.id === 'runtime:approved-execution-offer');
+    expect(plan.segments.some((segment) => segment.id === 'runtime:approved-execution-offer')).toBe(false);
     expect(offerFact).toMatchObject({ kind: 'runtime-fact', scope: 'runtime', stability: 'volatile' });
     expect(offerFact?.content).toContain('Plan review is complete.');
     expect(offerFact?.content).toContain('Plan approved at (Unix epoch milliseconds): 1');
@@ -102,14 +202,34 @@ describe('PromptPlanBuilder', () => {
     expect(offerFact?.content).toContain('summary omitting a step does not establish that it was completed');
     expect(offerFact?.content).toContain('grants no tools, permissions, or device access');
     expect(offeredPlan.stablePrefix.fingerprint).toBe(plan.stablePrefix.fingerprint);
-    expect(offeredPlan.segments.find(segment => segment.id === 'runtime:tools')?.content)
-      .toBe(plan.segments.find(segment => segment.id === 'runtime:tools')?.content);
+    expect(offeredPlan.segments.find((segment) => segment.id === 'runtime:tools')?.content).toBe(
+      plan.segments.find((segment) => segment.id === 'runtime:tools')?.content,
+    );
   });
 
   it('describes Ask Tasks as read-only and tool_search no-match as authoritative', async () => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const profile = {
-      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdc-agent/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['task_list', 'task_get', 'tool_search'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
+      id: 'ask',
+      fileName: 'ask.agent.md',
+      filePath: 'C:/User/.rdc-agent/agents/ask.agent.md',
+      name: 'Ask',
+      description: 'Read-only answers',
+      argumentHint: '',
+      target: 'rdc-agent',
+      icon: 'message-orbit',
+      accent: '#38c6f4',
+      disableModelInvocation: false,
+      userInvocable: true,
+      tools: ['task_list', 'task_get', 'tool_search'],
+      skills: [],
+      mcpServers: [],
+      agents: [],
+      handoffs: [],
+      metadata: {},
+      instructions: 'Answer from current evidence.',
+      builtin: false,
+      enabled: true,
     } satisfies AgentManifestDefinition;
     const plan = new PromptPlanBuilder().build({
       profile,
@@ -118,8 +238,35 @@ describe('PromptPlanBuilder', () => {
       skillCatalog: [],
       tools: ['task_list', 'task_get', 'tool_search'],
       workDir: 'D:/Project',
-      routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
-      permissionConstraints: {  readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+      routeCapability: {
+        providerId: 'deepseek',
+        modelId: 'deepseek-v4',
+        toolCallingMode: 'native-structured',
+        reasoningVisibility: 'none',
+        reasoningDelivery: 'stream-full',
+        reasoningContract: {
+          semantic: 'raw',
+          source: 'deepseek-reasoning-content',
+          displayLabel: 'Raw reasoning',
+          carrier: 'reasoning-content',
+          artifactFormat: 'deepseek.reasoning-content',
+          artifactVersion: 'v1',
+          compatibilityGroup: 'test',
+          continuation: 'exact-execution',
+        },
+        supportsStreaming: true,
+        supportsToolResults: true,
+        toolCallingEvidence: 'supported',
+        toolCallingUnverified: false,
+        visionInputMode: 'disabled',
+        structuredOutputMode: 'native',
+      },
+      permissionConstraints: {
+        readableRoots: [],
+        writableRoots: [],
+        allowedCommandPrefixes: [],
+        deniedCommandPrefixes: [],
+      },
       currentDate: '2026-08-01',
       timeZone: 'Asia/Shanghai',
     });
@@ -134,7 +281,26 @@ describe('PromptPlanBuilder', () => {
   it.each([false, true])('describes task execution ownership with effective subagent=%s', async (includeSubagent) => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const profile = {
-      id: 'edit', fileName: 'edit.agent.md', filePath: 'C:/User/.rdc-agent/agents/edit.agent.md', name: 'Edit', description: 'Edit files', argumentHint: '', target: 'rdc-agent', icon: 'pencil-edit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['task_create', 'task_update', 'task_stop'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Execute.', builtin: false, enabled: true,
+      id: 'edit',
+      fileName: 'edit.agent.md',
+      filePath: 'C:/User/.rdc-agent/agents/edit.agent.md',
+      name: 'Edit',
+      description: 'Edit files',
+      argumentHint: '',
+      target: 'rdc-agent',
+      icon: 'pencil-edit',
+      accent: '#38c6f4',
+      disableModelInvocation: false,
+      userInvocable: true,
+      tools: ['task_create', 'task_update', 'task_stop'],
+      skills: [],
+      mcpServers: [],
+      agents: [],
+      handoffs: [],
+      metadata: {},
+      instructions: 'Execute.',
+      builtin: false,
+      enabled: true,
     } satisfies AgentManifestDefinition;
     const plan = new PromptPlanBuilder().build({
       profile,
@@ -143,8 +309,35 @@ describe('PromptPlanBuilder', () => {
       skillCatalog: [],
       tools: ['task_create', 'task_update', 'task_stop', ...(includeSubagent ? ['subagent'] : [])],
       workDir: 'D:/Project',
-      routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
-      permissionConstraints: {  readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+      routeCapability: {
+        providerId: 'deepseek',
+        modelId: 'deepseek-v4',
+        toolCallingMode: 'native-structured',
+        reasoningVisibility: 'none',
+        reasoningDelivery: 'stream-full',
+        reasoningContract: {
+          semantic: 'raw',
+          source: 'deepseek-reasoning-content',
+          displayLabel: 'Raw reasoning',
+          carrier: 'reasoning-content',
+          artifactFormat: 'deepseek.reasoning-content',
+          artifactVersion: 'v1',
+          compatibilityGroup: 'test',
+          continuation: 'exact-execution',
+        },
+        supportsStreaming: true,
+        supportsToolResults: true,
+        toolCallingEvidence: 'supported',
+        toolCallingUnverified: false,
+        visionInputMode: 'disabled',
+        structuredOutputMode: 'native',
+      },
+      permissionConstraints: {
+        readableRoots: [],
+        writableRoots: [],
+        allowedCommandPrefixes: [],
+        deniedCommandPrefixes: [],
+      },
       currentDate: '2026-08-01',
       timeZone: 'Asia/Shanghai',
     });
@@ -154,14 +347,35 @@ describe('PromptPlanBuilder', () => {
     expect(plan.systemPrompt).toContain('independentOfTaskIds');
     expect(plan.systemPrompt).toContain('For work you perform directly');
     expect(plan.systemPrompt).not.toContain('mark exactly one task in_progress');
-    expect(plan.systemPrompt.includes('For Task-owned subagent work in either mode=wait or mode=background')).toBe(includeSubagent);
+    expect(plan.systemPrompt.includes('For Task-owned subagent work in either mode=wait or mode=background')).toBe(
+      includeSubagent,
+    );
     expect(plan.systemPrompt).not.toContain('Tasks are read-only in this turn.');
   });
 
   it('projects no effective Tasks tools when the selected route cannot execute structured tools', async () => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const profile = {
-      id: 'plan', fileName: 'plan.agent.md', filePath: 'C:/User/.rdc-agent/agents/plan.agent.md', name: 'Plan', description: 'Plan work', argumentHint: '', target: 'rdc-agent', icon: 'route-plan', accent: '#8d8bff', disableModelInvocation: false, userInvocable: true, tools: ['task_create', 'task_update', 'task_list'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Plan from evidence.', builtin: false, enabled: true,
+      id: 'plan',
+      fileName: 'plan.agent.md',
+      filePath: 'C:/User/.rdc-agent/agents/plan.agent.md',
+      name: 'Plan',
+      description: 'Plan work',
+      argumentHint: '',
+      target: 'rdc-agent',
+      icon: 'route-plan',
+      accent: '#8d8bff',
+      disableModelInvocation: false,
+      userInvocable: true,
+      tools: ['task_create', 'task_update', 'task_list'],
+      skills: [],
+      mcpServers: [],
+      agents: [],
+      handoffs: [],
+      metadata: {},
+      instructions: 'Plan from evidence.',
+      builtin: false,
+      enabled: true,
     } satisfies AgentManifestDefinition;
     const plan = new PromptPlanBuilder().build({
       profile,
@@ -170,8 +384,35 @@ describe('PromptPlanBuilder', () => {
       skillCatalog: [],
       tools: ['task_create', 'task_update', 'task_list', 'tool_search'],
       workDir: 'D:/Project',
-      routeCapability: { providerId: 'cline-pass', modelId: 'glm-5.2', toolCallingMode: 'text-only', reasoningVisibility: 'none', reasoningDelivery: 'none', reasoningContract: { semantic: 'none', source: 'none', displayLabel: 'None', carrier: 'none', artifactFormat: 'none', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'none' }, supportsStreaming: true, supportsToolResults: false, toolCallingEvidence: 'unknown', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'prompt-fallback' },
-      permissionConstraints: {  readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+      routeCapability: {
+        providerId: 'cline-pass',
+        modelId: 'glm-5.2',
+        toolCallingMode: 'text-only',
+        reasoningVisibility: 'none',
+        reasoningDelivery: 'none',
+        reasoningContract: {
+          semantic: 'none',
+          source: 'none',
+          displayLabel: 'None',
+          carrier: 'none',
+          artifactFormat: 'none',
+          artifactVersion: 'v1',
+          compatibilityGroup: 'test',
+          continuation: 'none',
+        },
+        supportsStreaming: true,
+        supportsToolResults: false,
+        toolCallingEvidence: 'unknown',
+        toolCallingUnverified: false,
+        visionInputMode: 'disabled',
+        structuredOutputMode: 'prompt-fallback',
+      },
+      permissionConstraints: {
+        readableRoots: [],
+        writableRoots: [],
+        allowedCommandPrefixes: [],
+        deniedCommandPrefixes: [],
+      },
       currentDate: '2026-08-01',
       timeZone: 'Asia/Shanghai',
     });
@@ -186,19 +427,79 @@ describe('PromptPlanBuilder', () => {
   it('includes the skill catalog for large and small windows when non-empty', async () => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const baseProfile = {
-      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdc-agent/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['read_file'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
+      id: 'ask',
+      fileName: 'ask.agent.md',
+      filePath: 'C:/User/.rdc-agent/agents/ask.agent.md',
+      name: 'Ask',
+      description: 'Read-only answers',
+      argumentHint: '',
+      target: 'rdc-agent',
+      icon: 'message-orbit',
+      accent: '#38c6f4',
+      disableModelInvocation: false,
+      userInvocable: true,
+      tools: ['read_file'],
+      skills: [],
+      mcpServers: [],
+      agents: [],
+      handoffs: [],
+      metadata: {},
+      instructions: 'Answer from current evidence.',
+      builtin: false,
+      enabled: true,
     } satisfies AgentManifestDefinition;
-    const buildWith = (contextWindowTokens?: number) => new PromptPlanBuilder().build({
-      profile: baseProfile,
-      scopedInstructions: { sources: [], totalBytes: 0, diagnostics: [] },
-      preloadedSkills: [],
-      skillCatalog: [{ id: 'debug', name: 'debug', description: 'Debug workflows', allowedTools: [], scope: 'builtin', sourcePath: 'skill://debug', sourceHash: 'h', effectiveStatus: 'effective' }],
-      tools: ['read_file'], workDir: 'D:/Project',
-      routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
-      permissionConstraints: {  readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
-      currentDate: '2026-07-11', timeZone: 'Asia/Shanghai',
-      ...(contextWindowTokens !== undefined ? { contextWindowTokens } : {}),
-    });
+    const buildWith = (contextWindowTokens?: number) =>
+      new PromptPlanBuilder().build({
+        profile: baseProfile,
+        scopedInstructions: { sources: [], totalBytes: 0, diagnostics: [] },
+        preloadedSkills: [],
+        skillCatalog: [
+          {
+            id: 'debug',
+            name: 'debug',
+            description: 'Debug workflows',
+            allowedTools: [],
+            scope: 'builtin',
+            sourcePath: 'skill://debug',
+            sourceHash: 'h',
+            effectiveStatus: 'effective',
+          },
+        ],
+        tools: ['read_file'],
+        workDir: 'D:/Project',
+        routeCapability: {
+          providerId: 'deepseek',
+          modelId: 'deepseek-v4',
+          toolCallingMode: 'native-structured',
+          reasoningVisibility: 'none',
+          reasoningDelivery: 'stream-full',
+          reasoningContract: {
+            semantic: 'raw',
+            source: 'deepseek-reasoning-content',
+            displayLabel: 'Raw reasoning',
+            carrier: 'reasoning-content',
+            artifactFormat: 'deepseek.reasoning-content',
+            artifactVersion: 'v1',
+            compatibilityGroup: 'test',
+            continuation: 'exact-execution',
+          },
+          supportsStreaming: true,
+          supportsToolResults: true,
+          toolCallingEvidence: 'supported',
+          toolCallingUnverified: false,
+          visionInputMode: 'disabled',
+          structuredOutputMode: 'native',
+        },
+        permissionConstraints: {
+          readableRoots: [],
+          writableRoots: [],
+          allowedCommandPrefixes: [],
+          deniedCommandPrefixes: [],
+        },
+        currentDate: '2026-07-11',
+        timeZone: 'Asia/Shanghai',
+        ...(contextWindowTokens !== undefined ? { contextWindowTokens } : {}),
+      });
 
     expect(buildWith(200_000).segments.some((segment) => segment.kind === 'skill-catalog')).toBe(true);
     expect(buildWith(32_000).segments.some((segment) => segment.kind === 'skill-catalog')).toBe(true);

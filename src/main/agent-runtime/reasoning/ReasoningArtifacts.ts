@@ -50,10 +50,7 @@ export function appendThinkingText(thinking: ThinkingContent, delta: string): Th
   };
 }
 
-export function mergeThinkingContent(
-  thinking: ThinkingContent,
-  patch: ThinkingContentInput,
-): ThinkingContent {
+export function mergeThinkingContent(thinking: ThinkingContent, patch: ThinkingContentInput): ThinkingContent {
   return {
     ...thinking,
     ...(patch.text !== undefined ? { text: patch.text.trim() || undefined } : {}),
@@ -72,11 +69,8 @@ export function normalizeThinkingContent(value: unknown): ThinkingContent | null
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (record.type !== 'thinking') return null;
-  const text = typeof record.text === 'string'
-    ? record.text
-    : typeof record.thinking === 'string'
-      ? record.thinking
-      : undefined;
+  const text =
+    typeof record.text === 'string' ? record.text : typeof record.thinking === 'string' ? record.thinking : undefined;
   return createThinkingContent({
     text,
     kind: isThinkingKind(record.kind) ? record.kind : undefined,
@@ -103,29 +97,26 @@ function defaultVisibility(kind: ThinkingArtifactKind): ThinkingArtifactVisibili
   return DEFAULT_VISIBILITY;
 }
 
-const isThinkingKind = (value: unknown): value is ThinkingArtifactKind => (
-  value === 'summary' || value === 'raw' || value === 'opaque' || value === 'unknown'
-);
+const isThinkingKind = (value: unknown): value is ThinkingArtifactKind =>
+  value === 'summary' || value === 'raw' || value === 'opaque' || value === 'unknown';
 
-const isThinkingVisibility = (value: unknown): value is ThinkingArtifactVisibility => (
-  value === 'summary' || value === 'raw-collapsed' || value === 'hidden'
-);
+const isThinkingVisibility = (value: unknown): value is ThinkingArtifactVisibility =>
+  value === 'summary' || value === 'raw-collapsed' || value === 'hidden';
 
-const isThinkingSource = (value: unknown): value is ThinkingArtifactSource => (
-  value === 'openai-responses-summary'
-  || value === 'openai-responses-encrypted'
-  || value === 'xai-responses-summary'
-  || value === 'xai-responses-encrypted'
-  || value === 'anthropic-thinking'
-  || value === 'anthropic-redacted-thinking'
-  || value === 'openai-compatible-raw'
-  || value === 'openrouter-raw'
-  || value === 'deepseek-raw'
-  || value === 'kimi-raw'
-  || value === 'glm-raw'
-  || value === 'qwen-raw'
-  || value === 'gemini-summary'
-  || value === 'gemini-thought-signature'
-  || value === 'ollama-raw'
-  || value === 'unknown'
-);
+const isThinkingSource = (value: unknown): value is ThinkingArtifactSource =>
+  value === 'openai-responses-summary' ||
+  value === 'openai-responses-encrypted' ||
+  value === 'xai-responses-summary' ||
+  value === 'xai-responses-encrypted' ||
+  value === 'anthropic-thinking' ||
+  value === 'anthropic-redacted-thinking' ||
+  value === 'openai-compatible-raw' ||
+  value === 'openrouter-raw' ||
+  value === 'deepseek-raw' ||
+  value === 'kimi-raw' ||
+  value === 'glm-raw' ||
+  value === 'qwen-raw' ||
+  value === 'gemini-summary' ||
+  value === 'gemini-thought-signature' ||
+  value === 'ollama-raw' ||
+  value === 'unknown';

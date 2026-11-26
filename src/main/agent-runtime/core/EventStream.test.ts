@@ -65,10 +65,11 @@ describe('EventStream', () => {
     });
 
     it('未提供 extractResult 时以事件本身作为结果', async () => {
-      interface MyEvent { type: string; value: number; }
-      const stream = new EventStream<MyEvent>(
-        (e) => e.type === 'done',
-      );
+      interface MyEvent {
+        type: string;
+        value: number;
+      }
+      const stream = new EventStream<MyEvent>((e) => e.type === 'done');
       stream.push({ type: 'done', value: 42 });
 
       const result = await stream.result();

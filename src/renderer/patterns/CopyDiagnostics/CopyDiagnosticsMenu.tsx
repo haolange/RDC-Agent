@@ -7,10 +7,13 @@ import { Menu } from '../../ui/Menu';
 import { useCopyDiagnostics, type DiagnosticFact } from './useCopyDiagnostics';
 
 /** Object-level diagnostics live with the owner's secondary actions. */
-export function CopyDiagnosticsMenu({ facts, label, className, testId }: {
+export function CopyDiagnosticsMenu({
+  facts,
+  label,
+  testId,
+}: {
   facts: readonly DiagnosticFact[];
   label?: string;
-  className?: string;
   testId?: string;
 }) {
   const { t } = useI18n();
@@ -18,11 +21,22 @@ export function CopyDiagnosticsMenu({ facts, label, className, testId }: {
   const { copied, copy } = useCopyFeedback(useCopyDiagnostics(facts));
   const triggerLabel = label ?? t('app.moreActions');
   return (
-    <Menu open={open} onOpenChange={setOpen} align="end" label={triggerLabel}
-      trigger={<IconButton size="sm" className={className} label={triggerLabel} aria-haspopup="menu"
-        data-tooltip={copied ? t('app.copied') : triggerLabel} data-testid={testId && `${testId}-menu`}>
-        <Icon name={copied ? 'check' : 'more'} size={16} />
-      </IconButton>}
+    <Menu
+      open={open}
+      onOpenChange={setOpen}
+      align="end"
+      label={triggerLabel}
+      trigger={
+        <IconButton
+          size="sm"
+          label={triggerLabel}
+          aria-haspopup="menu"
+          data-tooltip={copied ? t('app.copied') : triggerLabel}
+          data-testid={testId && `${testId}-menu`}
+        >
+          <Icon name={copied ? 'check' : 'more'} size={16} />
+        </IconButton>
+      }
       items={[{ id: 'copy', testId, label: t('app.copyDiagnostics'), onSelect: () => void copy() }]}
     />
   );

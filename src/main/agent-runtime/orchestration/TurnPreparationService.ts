@@ -1,15 +1,12 @@
+import { createHash } from 'crypto';
+import { AppError } from '@shared/errors/appError';
 /**
  * TurnPreparationService — prepareTurnContext (compaction / cache / effectivePlan freeze).
  */
 
-import { createHash } from 'crypto';
 import { agentCompletionContract } from '@shared/types/agentManifest';
-import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
 import { charsToTokens } from '@shared/utils/tokens';
-import {
-  resolveCompactionThresholdTokens,
-  resolveEffectiveCompactionPercent,
-} from '@shared/utils/contextBudget';
+import { resolveCompactionThresholdTokens, resolveEffectiveCompactionPercent } from '@shared/utils/contextBudget';
 import { nowMs } from '@shared/utils/id';
 import { bindRdcTurn, freezeRdcTurnBinding, rdcBindingFingerprint } from '../../rdc/RdcTurnBindings';
 import { approvedExecutionOfferFact } from '../prompt/PromptPlanBuilder';
@@ -17,60 +14,49 @@ import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { approvedInvestigationContract } from '../../sessions/run/approvedInvestigationContract';
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { approvedExecutionOfferForAgent } from '../../sessions/run/handoffSkills';
-import { assertExecutionOfferSkillCompatibility } from '../../sessions/run/handoffSkillCompatibility';
+import { assertExecutionOfferSkillCompatibility } from '../interactions/handoffSkillCompatibility';
 import { assertRdcContextLeaseOwnership } from '../../rdc/RdcRuntimeContextRegistry';
 import { withRdcHostRuntimeEnv } from '../../rdc/withRdcHostRuntimeEnv';
 import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
-import { turnPreparationWorkerPool } from '../../workers/TurnPreparationWorkerPool';
+import { turnPreparationWorkerPool } from '../context/TurnPreparationWorkerPool';
 import { requestEnvelopeBuilder } from '../prompt';
 import { promptCacheCompiler } from '../prompt/PromptCacheCompiler';
 import { requestPlanHeaders } from '../providers/requestPlanWire';
 import { applyExecutionLimitFacts } from '../prompt/ExecutionLimitFacts';
-import {
-  buildEffectiveRuntimePlan,
-} from '../EffectiveRuntimePlan';
+import { buildEffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import { compileEffectivePolicy } from '../permissions/PolicyCompiler';
 import { resolveKnowledgeReadRoots } from '../knowledgeReadRoots';
 import { appPathService } from '../../runtime/AppPathService';
-import { sessionContextJournal } from '../../conversation/SessionContextJournal';
+import { sessionContextJournal } from '../context/SessionContextJournal';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
 import { mcpDescriptorHash } from '../../settings/settings-core/McpTrustService';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { agentSlotKey } from './AgentSlotRegistry';
 import { resolveExecutionScopeId } from './executionScope';
-import {
-  combineActiveSkillAllowlists,
-  isToolAllowedByFrozenAllowlist,
-} from './RuntimeToolPolicy';
-import {
-  isMcpPrefixedToolName,
-  partitionDeferredTools,
-  preactivateWorkflowTools,
-} from './deferredTools';
+import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist } from './RuntimeToolPolicy';
+import { isMcpPrefixedToolName, partitionDeferredTools, preactivateWorkflowTools } from './deferredTools';
 import {
   countContinuationDecisions,
   type FrozenAttachmentManifestEntry,
   type PreparedAgentTurnContext,
-  type ResolvedRuntimeTools,
+  type RuntimeToolResolver,
 } from './orchestratorTypes';
-import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdcRuntime';
+import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { EffectiveAgentProfile } from '../../settings/agent-manifests/agentRuntimeTypes';
 import type { ContextUsageBreakdownEntry, PreparedTurnContextSummary } from '@shared/types/session';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 import type { UserMessage, ToolDefinition } from '../core/types';
-import type { TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 
-function aggregateMcpDescriptorHash(
-  profile: EffectiveAgentProfile,
-  projectRootPath: string | null,
-): string | null {
+function aggregateMcpDescriptorHash(profile: EffectiveAgentProfile, projectRootPath: string | null): string | null {
   const enabledIds = new Set(profile.mcpServers);
   if (enabledIds.size === 0) return null;
-  const hashes = agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
+  const hashes = agentRuntimeConfigService
+    .listMcpServers(projectRootPath ?? undefined)
     .filter((server) => enabledIds.has(server.id) || enabledIds.has(server.name))
     .map((server) => mcpDescriptorHash(server))
     .sort();
@@ -89,15 +75,18 @@ function resolveSkillIntersection(
   let investigationMission: 'debugger' | 'analyzer' | 'optimizer' | null = null;
   for (const skillId of profileSkills) {
     const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined, agentId);
-    if (!skill) throw new Error('SKILL_UNAVAILABLE: ' + skillId);
-    const frozen = promptPlan.segments.find(segment => segment.id === 'skill:' + skillId && segment.kind === 'preloaded-skill');
-    if (!frozen) throw new Error('SKILL_NOT_PRELOADED: rebuild preparation for ' + skillId);
-    if (frozen.sourceHash !== skill.sourceHash) throw new Error('SKILL_SOURCE_CHANGED: rebuild preparation for ' + skillId);
+    if (!skill) throw new AppError('SKILL_UNAVAILABLE', skillId);
+    const frozen = promptPlan.segments.find(
+      (segment) => segment.id === 'skill:' + skillId && segment.kind === 'preloaded-skill',
+    );
+    if (!frozen) throw new AppError('SKILL_NOT_PRELOADED', 'rebuild preparation for ' + skillId);
+    if (frozen.sourceHash !== skill.sourceHash)
+      throw new AppError('SKILL_SOURCE_CHANGED', 'rebuild preparation for ' + skillId);
     if (skill.investigationMission && investigationMission && skill.investigationMission !== investigationMission) {
       throw new Error('mission_method: preloaded skills declare conflicting investigation-mission values');
     }
     investigationMission = skill.investigationMission ?? investigationMission;
-    if (skill.allowedTools?.length) {
+    if (skill.allowedTools.length) {
       skillAllowedLists.push([...skill.allowedTools]);
     }
   }
@@ -107,17 +96,7 @@ function resolveSkillIntersection(
 export interface TurnPreparationServiceDeps {
   mcp: McpConnectionCoordinator;
   deferredActivation: DeferredToolActivationTracker;
-  resolveRuntimeTools: (
-    agentId: AgentRole,
-    toolAllowlist: string[],
-    sessionId?: string | null,
-    turnHandle?: TurnHandle | null,
-    projectId?: string | null,
-    projectRootPath?: string | null,
-    mcpPoolKey?: string | null,
-    options?: { excludeRdcLeaseTools?: boolean; excludeSubagent?: boolean },
-  ) => ResolvedRuntimeTools;
-  createToolSignature: (tools: ToolDefinition[]) => string;
+  tools: RuntimeToolResolver;
 }
 
 export class TurnPreparationService {
@@ -152,13 +131,13 @@ export class TurnPreparationService {
     activeBranchId?: string | null;
     signal?: AbortSignal;
     excludeRdcLeaseTools?: boolean;
-    frozenDelegationCapsule?: import('@shared/types/delegationCapsule').DelegationCapsule;
+    frozenDelegationCapsule?: import('./delegationCapsule').DelegationCapsule;
     subagentDepth?: number;
     inheritedMaxChildDepth?: number;
     excludeSubagent?: boolean;
   }): Promise<PreparedAgentTurnContext> {
     const throwIfCancelled = () => {
-      if (input.signal?.aborted) throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
+      if (input.signal?.aborted) throw new AppError('REQUEST_CANCELLED', 'request preparation was cancelled.');
     };
     throwIfCancelled();
     const contextRoute = {
@@ -183,7 +162,7 @@ export class TurnPreparationService {
     throwIfCancelled();
     // Compile the immutable policy before acquiring any external MCP lease.
     // Invalid policy must not spawn processes or establish network connections.
-    const turnSettings = settingsService.getAll();
+    const turnSettings = settingsService.snapshot().user;
     const cliSettings = withRdcHostRuntimeEnv(structuredClone(turnSettings.tooling.rdcCli));
     const leaseIdentity = assertRdcContextLeaseOwnership({ sessionId: input.sessionId, projectId: input.projectId });
     const catalog = leaseIdentity ? await rdcCliInvokerService.loadCatalog(cliSettings, true) : null;
@@ -191,26 +170,50 @@ export class TurnPreparationService {
     const rdcBinding = freezeRdcTurnBinding(cliSettings, catalog?.tools ?? [], leaseIdentity);
     const compiledPolicy = compileEffectivePolicy(input.projectRootPath);
     const promptPlan = applyExecutionLimitFacts(input.promptPlan, {
-      profileMaxTurns: input.effectiveProfile.maxTurns, policyMaxTurns: compiledPolicy.maxTurns,
+      profileMaxTurns: input.effectiveProfile.maxTurns,
+      policyMaxTurns: compiledPolicy.maxTurns,
     });
     const effectiveMaxChildDepth = Math.min(compiledPolicy.maxChildDepth, input.inheritedMaxChildDepth ?? Infinity);
     const excludeSubagent = input.excludeSubagent === true || (input.subagentDepth ?? 0) >= effectiveMaxChildDepth;
     const contextCompactionPercent = resolveEffectiveCompactionPercent(
-      turnSettings.agentRuntime.context.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
+      turnSettings.agentRuntime.context.compactionThresholdPercent,
       compiledPolicy.contextCompactionPercent,
     );
     const approvedExecutionOffer = approvedExecutionOfferForAgent(input.sessionId, input.agentId);
-    const offerSegment = promptPlan.segments.find(segment => segment.id === 'runtime:approved-execution-offer');
-    if (Boolean(approvedExecutionOffer) !== Boolean(offerSegment)
-      || (approvedExecutionOffer && offerSegment?.sourceHash !== hashScopedResource(approvedExecutionOfferFact(approvedExecutionOffer)))) {
-      throw new Error('APPROVED_PLAN_CHANGED: rebuild the prompt and preparation for the current plan.');
+    const offerSegment = promptPlan.segments.find((segment) => segment.id === 'runtime:approved-execution-offer');
+    if (
+      Boolean(approvedExecutionOffer) !== Boolean(offerSegment) ||
+      (approvedExecutionOffer &&
+        offerSegment?.sourceHash !== hashScopedResource(approvedExecutionOfferFact(approvedExecutionOffer)))
+    ) {
+      throw new AppError('APPROVED_PLAN_CHANGED', 'rebuild the prompt and preparation for the current plan.');
     }
-    const approvedExecution = approvedExecutionOffer && input.sessionId ? {
-      offer: structuredClone(approvedExecutionOffer),
-      investigation: approvedInvestigationContract(approvedExecutionOffer, planArtifactWriter.readMarkdown(input.sessionId,
-        approvedExecutionOffer.plan.uri, approvedExecutionOffer.plan.hash).markdown),
-    } : null;
-    const profile = { ...input.effectiveProfile, skills: [...new Set([...input.effectiveProfile.skills, ...promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)), ...(approvedExecutionOffer?.requiredSkillIds ?? [])])] };
+    const approvedExecution =
+      approvedExecutionOffer && input.sessionId
+        ? {
+            offer: structuredClone(approvedExecutionOffer),
+            investigation: approvedInvestigationContract(
+              approvedExecutionOffer,
+              planArtifactWriter.readMarkdown(
+                input.sessionId,
+                approvedExecutionOffer.plan.uri,
+                approvedExecutionOffer.plan.hash,
+              ).markdown,
+            ),
+          }
+        : null;
+    const profile = {
+      ...input.effectiveProfile,
+      skills: [
+        ...new Set([
+          ...input.effectiveProfile.skills,
+          ...promptPlan.segments
+            .filter((segment) => segment.kind === 'preloaded-skill')
+            .map((segment) => segment.id.slice('skill:'.length)),
+          ...(approvedExecutionOffer?.requiredSkillIds ?? []),
+        ]),
+      ],
+    };
     const profileSkills = profile.skills;
     const resolvedSkills = resolveSkillIntersection(
       profileSkills,
@@ -221,7 +224,9 @@ export class TurnPreparationService {
     );
     const skillIntersection = resolvedSkills.intersection;
     assertExecutionOfferSkillCompatibility({
-      preloadedSkillIds: promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => segment.id.slice('skill:'.length)),
+      preloadedSkillIds: promptPlan.segments
+        .filter((segment) => segment.kind === 'preloaded-skill')
+        .map((segment) => segment.id.slice('skill:'.length)),
       sessionId: input.sessionId,
       agentId: input.agentId,
       tools: input.toolAllowlist,
@@ -230,19 +235,24 @@ export class TurnPreparationService {
     });
     const preparedToolAllowlist = skillIntersection ?? input.toolAllowlist;
     if (input.frozenDelegationCapsule) {
-      const canUse = (tool: string) => !compiledPolicy.deniedTools.includes(tool)
-        && isToolAllowedByFrozenAllowlist(tool, input.agentId, preparedToolAllowlist);
-      const refs = [
-        ...input.frozenDelegationCapsule.inputArtifactRefs,
-        ...input.frozenDelegationCapsule.challengeRefs,
-      ];
+      const canUse = (tool: string) =>
+        !compiledPolicy.deniedTools.includes(tool) &&
+        isToolAllowedByFrozenAllowlist(tool, input.agentId, preparedToolAllowlist);
+      const refs = [...input.frozenDelegationCapsule.inputArtifactRefs, ...input.frozenDelegationCapsule.challengeRefs];
       const missing: string[] = [];
       if (!canUse('turn_complete')) missing.push('turn_complete');
-      if (refs.length && !canUse('artifact_read')
-        && (refs.some(ref => !ref.startsWith('session://investigation/')) || !canUse('investigation_read'))) {
+      if (
+        refs.length &&
+        !canUse('artifact_read') &&
+        (refs.some((ref) => !ref.startsWith('session://investigation/')) || !canUse('investigation_read'))
+      ) {
         missing.push('artifact_read (or investigation_read for Investigation records)');
       }
-      if (missing.length) throw new Error(`DELEGATION_PREPARATION_CONFLICT: ${input.agentId} cannot use ${missing.join(', ')} under the prepared Profile, Skill intersection or policy. Review the declared methods and authorized profile; do not bypass policy or approved Task requirements.`);
+      if (missing.length)
+        throw new AppError(
+          'DELEGATION_PREPARATION_CONFLICT',
+          `${input.agentId} cannot use ${missing.join(', ')} under the prepared Profile, Skill intersection or policy. Review the declared methods and authorized profile; do not bypass policy or approved Task requirements.`,
+        );
     }
     const acquiredMcp = await this.deps.mcp.acquireConnections(
       input.agentId,
@@ -255,250 +265,282 @@ export class TurnPreparationService {
     const mcpLease = acquiredMcp.lease;
     try {
       throwIfCancelled();
-    const excludeRdcLeaseTools = input.excludeRdcLeaseTools === true;
-    const runtimeTools = this.deps.resolveRuntimeTools(
-      input.agentId,
-      preparedToolAllowlist,
-      input.sessionId,
-      undefined,
-      input.projectId,
-      input.projectRootPath,
-      mcpLease?.poolKey ?? null,
-      { excludeRdcLeaseTools, excludeSubagent },
-    );
-    const executionScopeId = resolveExecutionScopeId(input.sessionId);
-    const slotKey = agentSlotKey(executionScopeId, input.agentId);
-    const toolSignature = this.deps.createToolSignature(runtimeTools.definitions);
-    const activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
-    const investigationTools = ['investigation_schema', 'investigation_read', 'investigation_write', 'investigation_list'];
-    preactivateWorkflowTools(
-      runtimeTools.definitions,
-      activatedDeferredTools,
-      [
+      const excludeRdcLeaseTools = input.excludeRdcLeaseTools === true;
+      const runtimeTools = this.deps.tools.resolveRuntimeTools(
+        input.agentId,
+        preparedToolAllowlist,
+        input.sessionId,
+        undefined,
+        input.projectId,
+        input.projectRootPath,
+        mcpLease?.poolKey ?? null,
+        { excludeRdcLeaseTools, excludeSubagent },
+      );
+      const executionScopeId = resolveExecutionScopeId(input.sessionId);
+      const slotKey = agentSlotKey(executionScopeId, input.agentId);
+      const toolSignature = this.deps.tools.createToolSignature(runtimeTools.definitions);
+      const activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
+      const investigationTools = [
+        'investigation_schema',
+        'investigation_read',
+        'investigation_write',
+        'investigation_list',
+      ];
+      preactivateWorkflowTools(runtimeTools.definitions, activatedDeferredTools, [
         ...(agentCompletionContract(input.effectiveProfile) === 'investigation-report' ? investigationTools : []),
         ...(approvedExecutionOffer?.requiredToolIds ?? []),
-      ],
-    );
-    const { injected, deferredMcp, deferredBuiltin } = partitionDeferredTools(
-      runtimeTools.definitions,
-      activatedDeferredTools,
-    );
-    const activeToolDefinitions = input.routeCapability.toolCallingMode === 'native-structured'
-      ? injected
-      : [];
-    const toolTokens = charsToTokens(JSON.stringify(activeToolDefinitions).length);
-    const fixedTokens = promptPlan.totalTokenEstimate + toolTokens;
-    const compactionThreshold = resolveCompactionThresholdTokens(
-      input.requestPlan.contextBudgetTokens,
-      contextCompactionPercent,
-    );
-    const userTimestamp = nowMs();
-    const userMessage: UserMessage = { role: 'user', content: input.content, timestamp: userTimestamp };
-    const messageBudget = compactionThreshold - fixedTokens - input.imageTokenAdjustment;
-    if (messageBudget <= 0) {
-      throw new Error(
-        'PROMPT_OVERHEAD_EXCEEDS_BUDGET: System prompt, skills, and tool schemas exceed the selected model prompt budget.',
+      ]);
+      const { injected, deferredMcp, deferredBuiltin } = partitionDeferredTools(
+        runtimeTools.definitions,
+        activatedDeferredTools,
       );
-    }
+      const activeToolDefinitions = input.routeCapability.toolCallingMode === 'native-structured' ? injected : [];
+      const toolTokens = charsToTokens(JSON.stringify(activeToolDefinitions).length);
+      const fixedTokens = promptPlan.totalTokenEstimate + toolTokens;
+      const compactionThreshold = resolveCompactionThresholdTokens(
+        input.requestPlan.contextBudgetTokens,
+        contextCompactionPercent,
+      );
+      const userTimestamp = nowMs();
+      const userMessage: UserMessage = { role: 'user', content: input.content, timestamp: userTimestamp };
+      const messageBudget = compactionThreshold - fixedTokens - input.imageTokenAdjustment;
+      if (messageBudget <= 0) {
+        throw new AppError(
+          'PROMPT_OVERHEAD_EXCEEDS_BUDGET',
+          'System prompt, skills, and tool schemas exceed the selected model prompt budget.',
+        );
+      }
 
-    const messages = [...materialized.messages, userMessage];
-    const computation = await turnPreparationWorkerPool.run({
-      messages,
-      modelId: input.requestPlan.effectiveModelId,
-      messageBudget,
-      imageTokenAdjustment: input.imageTokenAdjustment,
-    }, input.signal);
-    throwIfCancelled();
-    const compactedMessages = computation.compactedMessages;
-    const beforeConversationTokens = computation.beforeConversationTokens;
-    const afterConversationTokens = computation.afterConversationTokens;
-    const uncompactedInputTokens = fixedTokens + beforeConversationTokens;
-    const preparedInputTokens = fixedTokens + afterConversationTokens;
-    const compactionApplied = computation.compactionApplied;
-    const promptCache = promptCacheCompiler.compile({
-      promptPlan,
-      requestPlan: input.requestPlan,
-      tools: activeToolDefinitions,
-      affinityScopeId: executionScopeId,
-    });
-    // Preparation measures the complete input. The execution-owned coordinator
-    // validates and compacts at the first provider boundary with a transcript sink.
-
-    const isMcp = (definition: ToolDefinition) => isMcpPrefixedToolName(definition.name);
-    const isSubagent = (definition: ToolDefinition) => definition.name === 'subagent';
-    const mcpDefinitions = activeToolDefinitions.filter(isMcp);
-    const subagentDefinitions = activeToolDefinitions.filter(isSubagent);
-    const systemDefinitions = activeToolDefinitions.filter((definition) => !isMcp(definition) && !isSubagent(definition));
-    const classified = computation.classification;
-    const metrics = promptPlan.metrics;
-    const breakdown: ContextUsageBreakdownEntry[] = [
-      { id: 'system_prompt', tokens: charsToTokens(metrics.systemPrompt) },
-      ...(metrics.scopedInstructions > 0
-        ? [{ id: 'memory_files' as const, tokens: charsToTokens(metrics.scopedInstructions) }]
-        : []),
-      ...(metrics.skills > 0
-        ? [{ id: 'skills' as const, tokens: charsToTokens(metrics.skills) }]
-        : []),
-      { id: 'system_tools', tokens: charsToTokens(JSON.stringify(systemDefinitions).length), count: systemDefinitions.length },
-      ...(mcpDefinitions.length > 0
-        ? [{ id: 'mcp_tools' as const, tokens: charsToTokens(JSON.stringify(mcpDefinitions).length), count: mcpDefinitions.length }]
-        : []),
-      ...(deferredMcp.length > 0
-        ? [{ id: 'mcp_tools_deferred' as const, tokens: charsToTokens(JSON.stringify(deferredMcp).length), count: deferredMcp.length }]
-        : []),
-      ...(deferredBuiltin.length > 0
-        ? [{ id: 'builtin_tools_deferred' as const, tokens: charsToTokens(JSON.stringify(deferredBuiltin).length), count: deferredBuiltin.length }]
-        : []),
-      ...(subagentDefinitions.length > 0
-        ? [{ id: 'subagent_definitions' as const, tokens: charsToTokens(JSON.stringify(subagentDefinitions).length), count: subagentDefinitions.length }]
-        : []),
-      ...(classified.summaryTokens > 0
-        ? [{ id: 'summarized_conversation' as const, tokens: classified.summaryTokens }]
-        : []),
-      { id: 'conversation', tokens: classified.conversationTokens + input.imageTokenAdjustment, count: classified.conversationCount },
-      { id: 'free', tokens: Math.max(0, input.requestPlan.contextBudgetTokens - preparedInputTokens) },
-    ];
-    requestEnvelopeBuilder.build({
-      promptPlan,
-      sessionId: input.sessionId ?? undefined,
-      turnId: input.turnId,
-      callIndex: 0,
-      route: contextRoute,
-      requestPlan: input.requestPlan,
-      messages: compactedMessages,
-      tools: activeToolDefinitions,
-      controls: { ...input.turnControls },
-      reasoning: input.routeCapability.reasoningContract,
-      cache: promptCache,
-    });
-    const lastPreparedMessage = compactedMessages.at(-1);
-    if (
-      lastPreparedMessage?.role !== 'user'
-      || JSON.stringify(lastPreparedMessage.content) !== JSON.stringify(input.content)
-    ) {
-      throw new Error('CONTEXT_CANNOT_FIT: preparation did not preserve the current user message.');
-    }
-    const initialMessages = compactedMessages.slice(0, -1);
-    // prepareTurn 唯一一次解析 settings → 写入 effectivePlan；runAgentTurn/Executor 不得再读。
-    const knowledgeResolution = resolveKnowledgeReadRoots({
-      userKnowledgePath: appPathService.getUserRdcPaths().knowledgePath,
-      projectKnowledgePath: input.projectRootPath
-        ? appPathService.getProjectRdcPaths(input.projectRootPath).knowledgePath
-        : null,
-    });
-    const effectivePlan = buildEffectiveRuntimePlan({
-      rdcBindingFingerprint: rdcBindingFingerprint(rdcBinding),
-      agentId: input.agentId,
-      investigationMission: resolvedSkills.investigationMission,
-      projectRootPath: input.projectRootPath,
-      projectId: input.projectId,
-      profile,
-      profileProvenance: profile.provenance,
-      enabledProfileIds: input.effectiveProfileIds,
-      delegableProfileIds: input.delegableProfileIds,
-      toolAllowlist: input.toolAllowlist,
-      permissionConstraints: turnSettings.agentRuntime.permissions,
-      knowledgeReadRoots: knowledgeResolution.roots,
-      routeCapability: input.routeCapability,
-      requestPlan: input.requestPlan,
-      promptPlan,
-      policy: compiledPolicy,
-      skillIntersection,
-      attachmentManifestFingerprint: input.attachmentManifest
-        ? JSON.stringify(input.attachmentManifest)
-        : null,
-      visibleToolNames: activeToolDefinitions.map((definition) => definition.name),
-      activatedDeferredTools,
-      mcpDescriptorHash: aggregateMcpDescriptorHash(profile, input.projectRootPath),
-      compactionThresholdPercent: turnSettings.agentRuntime.context.compactionThresholdPercent
-        ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
-      excludeRdcLeaseTools,
-      excludeSubagent,
-      delegationCapsule: input.frozenDelegationCapsule ?? null,
-    });
-    bindRdcTurn(effectivePlan, rdcBinding);
-    const summary: PreparedTurnContextSummary = {
-      requestId: input.requestId,
-      turnId: input.turnId,
-      route: {
-        providerId: input.providerId,
-        adapterId: input.requestPlan.adapterId,
-        selectedModelId: input.selectedModelId,
-        effectiveModelId: input.requestPlan.effectiveModelId,
-        protocol: input.requestPlan.route.protocol,
-        catalogRevision: input.requestPlan.catalogRevision,
-        routeRevision: input.requestPlan.routeRevision,
-        bindingIds: [...input.requestPlan.appliedBindingIds],
-      },
-      wirePatch: {
-        headers: requestPlanHeaders(input.requestPlan),
-        body: structuredClone(input.requestPlan.bodyPatch),
-      },
-      controls: { ...input.turnControls },
-      contextMode: input.requestPlan.contextMode,
-      preparedInputTokens,
-      uncompactedInputTokens,
-      promptBudgetTokens: input.requestPlan.contextBudgetTokens,
-      contextWindowTokens: input.requestPlan.contextWindowTokens,
-      maxOutputTokens: input.requestPlan.maxOutputTokens,
-      compactionThresholdTokens: compactionThreshold,
-      usagePercent: Math.min(100, Math.round((preparedInputTokens / input.requestPlan.contextBudgetTokens) * 100)),
-      breakdown,
-      compactionApplied,
-      filteredArtifactCount: materialized.filteredArtifactCount,
-      continuation: {
-        executionFingerprint: input.requestPlan.executionIdentity.fingerprint,
-        strategy: input.requestPlan.contextTransitionPlan.strategy,
-        replayedArtifactCount: materialized.replayedArtifactCount,
-        droppedArtifactCount: materialized.filteredArtifactCount,
-        decisionCounts: countContinuationDecisions(materialized.artifactDecisions),
-      },
-      cache: {
-        enabled: promptCache.enabled,
-        mode: promptCache.mode,
-        keyCarrier: promptCache.keyCarrier,
-        breakpointCarrier: promptCache.breakpointCarrier,
-        ttl: promptCache.ttl,
-        breakpoint: promptCache.breakpoint,
-        ...(promptCache.prefixFingerprint ? { keyFingerprint: promptCache.prefixFingerprint } : {}),
-        stableTokenEstimate: promptCache.stableTokenEstimate,
-        stableSegmentCount: promptCache.stableSegmentIds.length,
-        providerReported: promptCache.providerReported,
-        reason: promptCache.reason,
-      },
-      preparedAt: nowMs(),
-    };
-    return {
-      summary,
-      selectedModelId: input.selectedModelId,
-      effectiveModel: input.effectiveModel,
-      toolAllowlist: [...effectivePlan.toolAllowlist],
-      frozenUserContent: input.frozenUserContent ?? input.content,
-      attachmentManifest: input.attachmentManifest ?? [],
-      inlineTokenBudget: input.inlineTokenBudget ?? 0,
-      initialMessages,
-      contextDiagnostic: {
-        selectedTurnCount: materialized.selectedTurnCount,
-        activeBranchId: input.activeBranchId ?? null,
-        filteredArtifactCount: materialized.filteredArtifactCount,
-        replayedArtifactCount: materialized.replayedArtifactCount,
-        continuationDecisionCounts: countContinuationDecisions(materialized.artifactDecisions),
-        compactionState: compactionApplied ? 'prepared' : 'not-required',
-        knowledgeReadRootDiagnostics: knowledgeResolution.diagnostics,
-      },
-      runtime: {
+      const messages = [...materialized.messages, userMessage];
+      const computation = await turnPreparationWorkerPool.run(
+        {
+          messages,
+          modelId: input.requestPlan.effectiveModelId,
+          messageBudget,
+          imageTokenAdjustment: input.imageTokenAdjustment,
+        },
+        input.signal,
+      );
+      throwIfCancelled();
+      const compactedMessages = computation.compactedMessages;
+      const beforeConversationTokens = computation.beforeConversationTokens;
+      const afterConversationTokens = computation.afterConversationTokens;
+      const uncompactedInputTokens = fixedTokens + beforeConversationTokens;
+      const preparedInputTokens = fixedTokens + afterConversationTokens;
+      const compactionApplied = computation.compactionApplied;
+      const promptCache = promptCacheCompiler.compile({
         promptPlan,
-        runtimeTools,
-        activeToolDefinitions,
+        requestPlan: input.requestPlan,
+        tools: activeToolDefinitions,
+        affinityScopeId: executionScopeId,
+      });
+      // Preparation measures the complete input. The execution-owned coordinator
+      // validates and compacts at the first provider boundary with a transcript sink.
+
+      const isMcp = (definition: ToolDefinition) => isMcpPrefixedToolName(definition.name);
+      const isSubagent = (definition: ToolDefinition) => definition.name === 'subagent';
+      const mcpDefinitions = activeToolDefinitions.filter(isMcp);
+      const subagentDefinitions = activeToolDefinitions.filter(isSubagent);
+      const systemDefinitions = activeToolDefinitions.filter(
+        (definition) => !isMcp(definition) && !isSubagent(definition),
+      );
+      const classified = computation.classification;
+      const metrics = promptPlan.metrics;
+      const breakdown: ContextUsageBreakdownEntry[] = [
+        { id: 'system_prompt', tokens: charsToTokens(metrics.systemPrompt) },
+        ...(metrics.scopedInstructions > 0
+          ? [{ id: 'memory_files' as const, tokens: charsToTokens(metrics.scopedInstructions) }]
+          : []),
+        ...(metrics.skills > 0 ? [{ id: 'skills' as const, tokens: charsToTokens(metrics.skills) }] : []),
+        {
+          id: 'system_tools',
+          tokens: charsToTokens(JSON.stringify(systemDefinitions).length),
+          count: systemDefinitions.length,
+        },
+        ...(mcpDefinitions.length > 0
+          ? [
+              {
+                id: 'mcp_tools' as const,
+                tokens: charsToTokens(JSON.stringify(mcpDefinitions).length),
+                count: mcpDefinitions.length,
+              },
+            ]
+          : []),
+        ...(deferredMcp.length > 0
+          ? [
+              {
+                id: 'mcp_tools_deferred' as const,
+                tokens: charsToTokens(JSON.stringify(deferredMcp).length),
+                count: deferredMcp.length,
+              },
+            ]
+          : []),
+        ...(deferredBuiltin.length > 0
+          ? [
+              {
+                id: 'builtin_tools_deferred' as const,
+                tokens: charsToTokens(JSON.stringify(deferredBuiltin).length),
+                count: deferredBuiltin.length,
+              },
+            ]
+          : []),
+        ...(subagentDefinitions.length > 0
+          ? [
+              {
+                id: 'subagent_definitions' as const,
+                tokens: charsToTokens(JSON.stringify(subagentDefinitions).length),
+                count: subagentDefinitions.length,
+              },
+            ]
+          : []),
+        ...(classified.summaryTokens > 0
+          ? [{ id: 'summarized_conversation' as const, tokens: classified.summaryTokens }]
+          : []),
+        {
+          id: 'conversation',
+          tokens: classified.conversationTokens + input.imageTokenAdjustment,
+          count: classified.conversationCount,
+        },
+        { id: 'free', tokens: Math.max(0, input.requestPlan.contextBudgetTokens - preparedInputTokens) },
+      ];
+      requestEnvelopeBuilder.build({
+        promptPlan,
+        sessionId: input.sessionId ?? undefined,
+        turnId: input.turnId,
+        callIndex: 0,
+        route: contextRoute,
+        requestPlan: input.requestPlan,
+        messages: compactedMessages,
+        tools: activeToolDefinitions,
+        controls: { ...input.turnControls },
+        reasoning: input.routeCapability.reasoningContract,
+        cache: promptCache,
+      });
+      const lastPreparedMessage = compactedMessages.at(-1);
+      if (
+        lastPreparedMessage?.role !== 'user' ||
+        JSON.stringify(lastPreparedMessage.content) !== JSON.stringify(input.content)
+      ) {
+        throw new AppError('CONTEXT_CANNOT_FIT', 'preparation did not preserve the current user message.');
+      }
+      const initialMessages = compactedMessages.slice(0, -1);
+      // prepareTurn 唯一一次解析 settings → 写入 effectivePlan；runAgentTurn/Executor 不得再读。
+      const knowledgeResolution = resolveKnowledgeReadRoots({
+        userKnowledgePath: appPathService.getUserRdcPaths().knowledgePath,
+        projectKnowledgePath: input.projectRootPath
+          ? appPathService.getProjectRdcPaths(input.projectRootPath).knowledgePath
+          : null,
+      });
+      const effectivePlan = buildEffectiveRuntimePlan({
+        rdcBindingFingerprint: rdcBindingFingerprint(rdcBinding),
+        agentId: input.agentId,
+        investigationMission: resolvedSkills.investigationMission,
+        projectRootPath: input.projectRootPath,
+        projectId: input.projectId,
+        profile,
+        profileProvenance: profile.provenance,
+        enabledProfileIds: input.effectiveProfileIds,
+        delegableProfileIds: input.delegableProfileIds,
+        toolAllowlist: input.toolAllowlist,
+        permissionConstraints: turnSettings.agentRuntime.permissions,
+        knowledgeReadRoots: knowledgeResolution.roots,
         routeCapability: input.routeCapability,
-        mcpConnectionErrors,
-        mcpLease,
-        credentialHandle: input.credentialHandle,
-        promptCache,
-        effectivePlan,
-        approvedExecution,
-      },
-    };
+        requestPlan: input.requestPlan,
+        promptPlan,
+        policy: compiledPolicy,
+        skillIntersection,
+        attachmentManifestFingerprint: input.attachmentManifest ? JSON.stringify(input.attachmentManifest) : null,
+        visibleToolNames: activeToolDefinitions.map((definition) => definition.name),
+        activatedDeferredTools,
+        mcpDescriptorHash: aggregateMcpDescriptorHash(profile, input.projectRootPath),
+        compactionThresholdPercent: turnSettings.agentRuntime.context.compactionThresholdPercent,
+        excludeRdcLeaseTools,
+        excludeSubagent,
+        delegationCapsule: input.frozenDelegationCapsule ?? null,
+      });
+      bindRdcTurn(effectivePlan, rdcBinding);
+      const summary: PreparedTurnContextSummary = {
+        requestId: input.requestId,
+        turnId: input.turnId,
+        route: {
+          providerId: input.providerId,
+          adapterId: input.requestPlan.adapterId,
+          selectedModelId: input.selectedModelId,
+          effectiveModelId: input.requestPlan.effectiveModelId,
+          protocol: input.requestPlan.route.protocol,
+          catalogRevision: input.requestPlan.catalogRevision,
+          routeRevision: input.requestPlan.routeRevision,
+          bindingIds: [...input.requestPlan.appliedBindingIds],
+        },
+        wirePatch: {
+          headers: requestPlanHeaders(input.requestPlan),
+          body: structuredClone(input.requestPlan.bodyPatch),
+        },
+        controls: { ...input.turnControls },
+        contextMode: input.requestPlan.contextMode,
+        preparedInputTokens,
+        uncompactedInputTokens,
+        promptBudgetTokens: input.requestPlan.contextBudgetTokens,
+        contextWindowTokens: input.requestPlan.contextWindowTokens,
+        maxOutputTokens: input.requestPlan.maxOutputTokens,
+        compactionThresholdTokens: compactionThreshold,
+        usagePercent: Math.min(100, Math.round((preparedInputTokens / input.requestPlan.contextBudgetTokens) * 100)),
+        breakdown,
+        compactionApplied,
+        filteredArtifactCount: materialized.filteredArtifactCount,
+        continuation: {
+          executionFingerprint: input.requestPlan.executionIdentity.fingerprint,
+          strategy: input.requestPlan.contextTransitionPlan.strategy,
+          replayedArtifactCount: materialized.replayedArtifactCount,
+          droppedArtifactCount: materialized.filteredArtifactCount,
+          decisionCounts: countContinuationDecisions(materialized.artifactDecisions),
+        },
+        cache: {
+          enabled: promptCache.enabled,
+          mode: promptCache.mode,
+          keyCarrier: promptCache.keyCarrier,
+          breakpointCarrier: promptCache.breakpointCarrier,
+          ttl: promptCache.ttl,
+          breakpoint: promptCache.breakpoint,
+          ...(promptCache.prefixFingerprint ? { keyFingerprint: promptCache.prefixFingerprint } : {}),
+          stableTokenEstimate: promptCache.stableTokenEstimate,
+          stableSegmentCount: promptCache.stableSegmentIds.length,
+          providerReported: promptCache.providerReported,
+          reason: promptCache.reason,
+        },
+        preparedAt: nowMs(),
+      };
+      return {
+        summary,
+        selectedModelId: input.selectedModelId,
+        effectiveModel: input.effectiveModel,
+        toolAllowlist: [...effectivePlan.toolAllowlist],
+        frozenUserContent: input.frozenUserContent ?? input.content,
+        attachmentManifest: input.attachmentManifest ?? [],
+        inlineTokenBudget: input.inlineTokenBudget ?? 0,
+        initialMessages,
+        contextDiagnostic: {
+          selectedTurnCount: materialized.selectedTurnCount,
+          activeBranchId: input.activeBranchId ?? null,
+          filteredArtifactCount: materialized.filteredArtifactCount,
+          replayedArtifactCount: materialized.replayedArtifactCount,
+          continuationDecisionCounts: countContinuationDecisions(materialized.artifactDecisions),
+          compactionState: compactionApplied ? 'prepared' : 'not-required',
+          knowledgeReadRootDiagnostics: knowledgeResolution.diagnostics,
+        },
+        runtime: {
+          promptPlan,
+          runtimeTools,
+          activeToolDefinitions,
+          routeCapability: input.routeCapability,
+          mcpConnectionErrors,
+          mcpLease,
+          credentialHandle: input.credentialHandle,
+          promptCache,
+          effectivePlan,
+          approvedExecution,
+        },
+      };
     } catch (error) {
       await mcpLease?.release({ discardIfIdle: true });
       throw error;

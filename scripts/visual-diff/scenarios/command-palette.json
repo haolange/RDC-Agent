@@ -1,0 +1,313 @@
+{
+ "id": "command-palette",
+ "steps": [
+  {
+   "waitFor": "[data-testid=\"sidebar-user-settings-trigger\"]",
+   "waitMs": 600
+  },
+  {
+   "key": "K",
+   "modifiers": [
+    "control"
+   ],
+   "waitMs": 400
+  },
+  {
+   "waitFor": ".command-palette"
+  }
+ ],
+ "settleMs": 1000,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "bd87c4a38a7d5b58606353ed"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-fd0c3621772f-1795681291001",
+       "timestamp": 1795681291001,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-ce9be7082fab-1795681291058",
+       "timestamp": 1795681291058,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-03ba2ae629aa-1795681291059",
+       "timestamp": 1795681291059,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-a13396902bea-1795681291076",
+       "timestamp": 1795681291076,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": []
+    }
+   }
+  ],
+  "command:list": [
+   {
+    "result": {
+     "commands": [
+      {
+       "id": "agents",
+       "name": "agents",
+       "description": "列出可用的 Agent，或切换到其中一个",
+       "aliases": [
+        "agent"
+       ],
+       "category": "workflow"
+      },
+      {
+       "id": "clear",
+       "name": "clear",
+       "description": "清空当前对话的历史",
+       "aliases": [
+        "cls"
+       ],
+       "category": "system"
+      },
+      {
+       "id": "config",
+       "name": "config",
+       "description": "打开设置，可指定分区",
+       "aliases": [],
+       "category": "system"
+      },
+      {
+       "id": "cost",
+       "name": "cost",
+       "description": "显示当前对话已保存的运行统计与费用可用性",
+       "aliases": [],
+       "category": "debug"
+      },
+      {
+       "id": "export",
+       "name": "export",
+       "description": "将当前对话导出为 Markdown 或 JSON",
+       "aliases": [],
+       "category": "workflow"
+      },
+      {
+       "id": "help",
+       "name": "help",
+       "description": "列出可用命令，或查看某个命令的详情",
+       "aliases": [
+        "h",
+        "?"
+       ],
+       "category": "system"
+      },
+      {
+       "id": "mcp",
+       "name": "mcp",
+       "description": "显示 MCP 服务器及其状态，或连接、断开其中一个",
+       "aliases": [],
+       "category": "system"
+      },
+      {
+       "id": "model",
+       "name": "model",
+       "description": "查看或切换当前对话的模型；default 跟随 Agent",
+       "aliases": [],
+       "category": "navigation"
+      },
+      {
+       "id": "permissions",
+       "name": "permissions",
+       "description": "查看或更改权限模式",
+       "aliases": [
+        "perm"
+       ],
+       "category": "system"
+      },
+      {
+       "id": "project",
+       "name": "project",
+       "description": "列出项目；在侧边栏管理项目",
+       "aliases": [
+        "prj"
+       ],
+       "category": "navigation"
+      },
+      {
+       "id": "resume",
+       "name": "resume",
+       "description": "继续一个被中断的对话",
+       "aliases": [
+        "res"
+       ],
+       "category": "session"
+      },
+      {
+       "id": "session",
+       "name": "session",
+       "description": "列出当前项目的对话；在侧边栏管理对话",
+       "aliases": [
+        "sess"
+       ],
+       "category": "navigation"
+      },
+      {
+       "id": "skills",
+       "name": "skills",
+       "description": "列出可用的 Skill，或为下一条消息启用其中一个",
+       "aliases": [
+        "skill"
+       ],
+       "category": "workflow"
+      },
+      {
+       "id": "status",
+       "name": "status",
+       "description": "显示系统状态与诊断信息",
+       "aliases": [
+        "st",
+        "debug",
+        "diag"
+       ],
+       "category": "debug"
+      },
+      {
+       "id": "test",
+       "name": "test",
+       "description": "说明如何运行测试",
+       "aliases": [],
+       "category": "debug"
+      },
+      {
+       "id": "theme",
+       "name": "theme",
+       "description": "查看或切换主题（dark、light 或 system）",
+       "aliases": [],
+       "category": "system"
+      },
+      {
+       "id": "tools",
+       "name": "tools",
+       "description": "列出内置工具",
+       "aliases": [
+        "tool"
+       ],
+       "category": "debug"
+      },
+      {
+       "id": "undo",
+       "name": "undo",
+       "description": "撤销最后一条消息及其回复",
+       "aliases": [],
+       "category": "session"
+      },
+      {
+       "id": "usage",
+       "name": "usage",
+       "description": "按状态显示当前对话已保存的运行",
+       "aliases": [],
+       "category": "debug"
+      },
+      {
+       "id": "version",
+       "name": "version",
+       "description": "显示应用版本",
+       "aliases": [
+        "v"
+       ],
+       "category": "system"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

@@ -12,8 +12,7 @@
   border-radius: var(--radius-md);
   background:
     linear-gradient(to top, rgb(0 0 0), rgb(0 0 0 / 0)),
-    linear-gradient(to right, rgb(255 255 255), rgb(255 255 255 / 0)),
-    var(--color-picker-hue, hsl(0 100% 50%));
+    linear-gradient(to right, rgb(255 255 255), rgb(255 255 255 / 0)), var(--color-picker-hue, hsl(0 100% 50%));
   cursor: crosshair;
   touch-action: none;
 }

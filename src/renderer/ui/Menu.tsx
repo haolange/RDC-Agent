@@ -21,33 +21,21 @@ export interface MenuProps {
   items: MenuItem[];
   align?: 'start' | 'end';
   side?: 'top' | 'bottom';
-  className?: string;
   label?: string;
 }
 
 function enabledIndexes(items: MenuItem[]): number[] {
-  return items.flatMap((item, index) => (
-    item.type !== 'separator' && !item.disabled ? [index] : []
-  ));
+  return items.flatMap((item, index) => (item.type !== 'separator' && !item.disabled ? [index] : []));
 }
 
-export function Menu({
-  open,
-  onOpenChange,
-  trigger,
-  items,
-  align = 'start',
-  side = 'bottom',
-  className,
-  label,
-}: MenuProps) {
+export function Menu({ open, onOpenChange, trigger, items, align = 'start', side = 'bottom', label }: MenuProps) {
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const enabled = useMemo(() => enabledIndexes(items), [items]);
   const [activeIndex, setActiveIndex] = useState(() => enabled[0] ?? -1);
 
   useEffect(() => {
     if (!open) return;
-    setActiveIndex((current) => (enabled.includes(current) ? current : enabled[0] ?? -1));
+    setActiveIndex((current) => (enabled.includes(current) ? current : (enabled[0] ?? -1)));
   }, [open, enabled]);
 
   useEffect(() => {
@@ -69,7 +57,7 @@ export function Menu({
       trigger={trigger}
       align={align}
       side={side}
-      className={cn('ui-menu', className)}
+      className="ui-menu"
       role="presentation"
       dismissOnTab
     >

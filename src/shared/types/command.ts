@@ -53,22 +53,6 @@ export type CommandUiAction =
   | { type: 'clear-session'; payload: { sessionId: string } }
   | { type: 'run-skill'; payload: { skillId: string } };
 
-/** Definition of a slash command. */
-export interface CommandDefinition {
-  /** Unique command ID (kebab-case, e.g. "help", "clear", "git-commit"). */
-  id: string;
-  /** Primary command name (without leading slash). */
-  name: string;
-  /** Short description shown in the command list popover. */
-  description: string;
-  /** Alternative names that trigger this command. */
-  aliases?: string[];
-  /** Category for grouping in the UI. */
-  category: 'workflow' | 'navigation' | 'system' | 'debug' | 'edit' | 'session';
-  /** Execute the command. Receives parsed arguments and context. */
-  execute: (args: string[], context: CommandContext) => Promise<CommandResult>;
-}
-
 /** IPC request to execute a slash command. */
 export interface CommandExecuteRequest {
   /** The raw input string (including leading slash). */

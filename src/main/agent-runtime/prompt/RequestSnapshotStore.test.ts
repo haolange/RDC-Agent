@@ -92,20 +92,29 @@ describe('RequestSnapshotStore', () => {
     store.write(sampleSnapshot({ id: 'child', sessionId: 'session-a::subagent::one', turnId: 'child-turn' }));
     store.write(sampleSnapshot({ id: 'nested', sessionId: 'session-a::subagent::one::subagent::two' }));
     store.write(sampleSnapshot({ id: 'foreign', sessionId: 'session-a-other' }));
-    const read = vi.spyOn(fs, 'readFileSync').mockImplementation(() => { throw new Error('request bodies must not be read'); });
+    const read = vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+      throw new Error('request bodies must not be read');
+    });
     try {
       const usage = store.readUsage('session-a');
-      expect(usage).toMatchObject({ scopeId: 'session-a', committedRequests: 5, isReservation: false,
-        source: 'committed-request-snapshots' });
+      expect(usage).toMatchObject({
+        scopeId: 'session-a',
+        committedRequests: 5,
+        isReservation: false,
+        source: 'committed-request-snapshots',
+      });
       expect(usage.scopes).toHaveLength(3);
-      expect(usage.scopes.find(scope => scope.scopeKey === 'session-a')?.turns).toEqual([
-        { turnId: 'compaction-handoff-one', committedRequests: 1 }, { turnId: 'turn-1', committedRequests: 2 },
+      expect(usage.scopes.find((scope) => scope.scopeKey === 'session-a')?.turns).toEqual([
+        { turnId: 'compaction-handoff-one', committedRequests: 1 },
+        { turnId: 'turn-1', committedRequests: 2 },
       ]);
       expect(store.readUsage('session-a::subagent::one').committedRequests).toBe(2);
       expect(store.readUsage('session-a::subagent::one').scopes).toHaveLength(2);
       expect(store.readUsage('absent').committedRequests).toBe(0);
       expect(read).not.toHaveBeenCalled();
-    } finally { read.mockRestore(); }
+    } finally {
+      read.mockRestore();
+    }
     store.complete('snap-1', 'session-a', 'turn-1', { inputTokens: 1, outputTokens: 1 });
     expect(store.readUsage('session-a').committedRequests).toBe(5);
     expect(new RequestSnapshotStore(rootPath).readUsage('session-a').committedRequests).toBe(5);
@@ -113,9 +122,14 @@ describe('RequestSnapshotStore', () => {
 
   it('fails closed on an unreadable request inventory instead of returning zero attempts', () => {
     store.write(sampleSnapshot());
-    const read = vi.spyOn(fs, 'readdirSync').mockImplementation(() => { throw new Error('EACCES'); });
-    try { expect(() => store.readUsage('session-a')).toThrow('EACCES'); }
-    finally { read.mockRestore(); }
+    const read = vi.spyOn(fs, 'readdirSync').mockImplementation(() => {
+      throw new Error('EACCES');
+    });
+    try {
+      expect(() => store.readUsage('session-a')).toThrow('EACCES');
+    } finally {
+      read.mockRestore();
+    }
   });
 
   it('rejects linked scope inventories without following them', () => {
@@ -173,20 +187,68 @@ describe('RequestSnapshotStore', () => {
     expect(store.get('session-a', 'turn-1', 'snap-1')?.usage).toEqual({ inputTokens: 12, outputTokens: 3 });
   });
 
+  it('writes the request once, compactly, and records its completion beside it', () => {
+    store.write(sampleSnapshot());
+    const turnDir = path.join(rootPath, 'session-a', 'turn-1');
+    const file = path.join(
+      turnDir,
+      fs.readdirSync(turnDir).find((name) => name.endsWith('.json'))!,
+    );
+    const written = fs.readFileSync(file, 'utf8');
+    expect(written).not.toContain('\n');
+
+    store.complete('snap-1', 'session-a', 'turn-1', { inputTokens: 7, outputTokens: 2 });
+    expect(fs.readFileSync(file, 'utf8')).toBe(written);
+    expect(store.get('session-a', 'turn-1', 'snap-1')).toMatchObject({
+      usage: { inputTokens: 7, outputTokens: 2 },
+      completedAt: expect.any(String),
+    });
+    expect(store.nextCallIndex('session-a', 'turn-1')).toBe(2);
+  });
+
+  it('reports a stored snapshot that is not a request snapshot as damaged', () => {
+    store.write(sampleSnapshot());
+    const turnDir = path.join(rootPath, 'session-a', 'turn-1');
+    const file = path.join(
+      turnDir,
+      fs.readdirSync(turnDir).find((name) => name.endsWith('.json'))!,
+    );
+    fs.writeFileSync(file, JSON.stringify({ ...sampleSnapshot(), callIndex: 'first' }));
+    expect(() => store.get('session-a', 'turn-1', 'snap-1')).toThrow(
+      expect.objectContaining({ code: 'STORAGE_CORRUPT' }),
+    );
+  });
+
   it('projects prompt resources and mailbox commits without parsing full current requests', () => {
     const segment = {
-      id: 'project-instruction', kind: 'scoped-instruction' as const, scope: 'project' as const,
-      sourcePath: 'D:/project/AGENTS.md', sourceHash: 'source-hash', precedence: 1,
-      content: 'instruction', stability: 'stable' as const, tokenEstimate: 2,
+      id: 'project-instruction',
+      kind: 'scoped-instruction' as const,
+      scope: 'project' as const,
+      sourcePath: 'D:/project/AGENTS.md',
+      sourceHash: 'source-hash',
+      precedence: 1,
+      content: 'instruction',
+      stability: 'stable' as const,
+      tokenEstimate: 2,
     };
-    const delivery = { executionId: 'execution-1', generation: 1, direction: 'to_parent' as const, throughSequence: 2, messageIds: ['message-1'] };
-    const snapshot = sampleSnapshot({ promptPlan: { ...sampleSnapshot().promptPlan, segments: [segment] }, mailboxDeliveries: [delivery] });
+    const delivery = {
+      executionId: 'execution-1',
+      generation: 1,
+      direction: 'to_parent' as const,
+      throughSequence: 2,
+      messageIds: ['message-1'],
+    };
+    const snapshot = sampleSnapshot({
+      promptPlan: { ...sampleSnapshot().promptPlan, segments: [segment] },
+      mailboxDeliveries: [delivery],
+    });
     store.write(snapshot);
     expect(store.nextCallIndex('session-a', 'turn-1')).toBe(2);
-    const requestFile = fs.readdirSync(path.join(rootPath, 'session-a', 'turn-1')).find((name) => name.endsWith('.json'))!;
+    const requestFile = fs
+      .readdirSync(path.join(rootPath, 'session-a', 'turn-1'))
+      .find((name) => name.endsWith('.json'))!;
     fs.writeFileSync(path.join(rootPath, 'session-a', 'turn-1', requestFile), 'invalid full request', 'utf8');
     expect(store.listPromptSegments('session-a')).toEqual([segment]);
     expect(store.listMailboxDeliveries('session-a')).toEqual([delivery]);
   });
-
 });

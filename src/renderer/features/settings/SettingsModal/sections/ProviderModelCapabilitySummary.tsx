@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { buildCapabilityChips } from '../modelCapabilitySummaryUtils';
 import { errorDetail } from '../../../../lib/errorDetail';
+import { InlineError } from '../../../../ui/InlineError';
 import { Skeleton } from '../../../../ui/Skeleton';
+import { useI18n } from '../../../../i18n';
 import { testModelCapability } from './providerCatalogActions';
 import { ProviderModelProbe } from './ProviderModelProbe';
 import { ProviderModelPreferences } from './ProviderModelPreferences';
 import { ProviderModelDetails } from './ProviderModelDetails';
 import { providerProbeResultText } from './providerProbeResultText';
-import type { useI18n } from '../../../../i18n';
 import type {
   LlmModelCapabilityProbeMode,
   LlmModelCapabilityProbeResult,
@@ -17,17 +18,17 @@ import type {
 } from '@shared/types/settings';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 
-type Translate = ReturnType<typeof useI18n>['t'];
-
 export interface ProviderModelCapabilitySummaryProps {
-  provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured' | 'serviceOperator' | 'authMode'>;
+  provider: Pick<
+    LlmProviderEntry,
+    'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured' | 'serviceOperator' | 'authMode'
+  >;
   model: LlmProviderModel;
   effectiveModel: EffectiveModel | null;
   snapshot: EffectiveCatalogSnapshot | null;
   loading: boolean;
   loadFailed: boolean;
   onModelChange: (patch: Partial<LlmProviderModel>) => void;
-  t: Translate;
 }
 
 export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySummaryProps> = ({
@@ -38,19 +39,24 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
   loading,
   loadFailed,
   onModelChange,
-  t,
 }) => {
+  const { t } = useI18n();
   const [probeMode, setProbeMode] = useState<LlmModelCapabilityProbeMode | null>(null);
   const [probeResult, setProbeResult] = useState<LlmModelCapabilityProbeResult | null>(null);
   const chips = buildCapabilityChips(effectiveModel, t);
   const contextChoices = effectiveModel ? resolveContextTierChoices(effectiveModel) : null;
-  const probeModes: LlmModelCapabilityProbeMode[] = effectiveModel ? [
-    'default',
-    ...(contextChoices?.maxTier ? ['max-context' as const] : []),
-    ...(effectiveModel.controls.fast.state === 'selectable' ? ['fast' as const] : []),
-    ...(effectiveModel.executionBindings?.some(binding => binding.when.fast === true && binding.when.maxContext === true)
-      ? ['fast-max-context' as const] : []),
-  ] : [];
+  const probeModes: LlmModelCapabilityProbeMode[] = effectiveModel
+    ? [
+        'default',
+        ...(contextChoices?.maxTier ? ['max-context' as const] : []),
+        ...(effectiveModel.controls.fast.state === 'selectable' ? ['fast' as const] : []),
+        ...(effectiveModel.executionBindings?.some(
+          (binding) => binding.when.fast === true && binding.when.maxContext === true,
+        )
+          ? ['fast-max-context' as const]
+          : []),
+      ]
+    : [];
   const runProbe = async (mode: LlmModelCapabilityProbeMode) => {
     setProbeMode(mode);
     setProbeResult(null);
@@ -84,11 +90,18 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
   const probeText = probeResult ? providerProbeResultText(probeResult, t) : null;
 
   return (
-    <div className="settings-model-capability-panel" data-testid={`settings-provider-model-capability-panel-${model.id}`}>
+    <div
+      className="settings-model-capability-panel"
+      data-testid={`settings-provider-model-capability-panel-${model.id}`}
+    >
       {loading ? (
-        <div role="status" aria-label={t('settings.providers.capability.loading')}><Skeleton shape="line" count={2} /></div>
+        <div role="status" aria-label={t('settings.providers.capability.loading')}>
+          <Skeleton shape="line" count={2} />
+        </div>
       ) : loadFailed ? (
-        <div className="settings-model-capability-note settings-model-capability-note--error">{t('settings.providers.capability.loadFailed')}</div>
+        <div className="settings-model-capability-note settings-model-capability-note--error">
+          {t('settings.providers.capability.loadFailed')}
+        </div>
       ) : effectiveModel ? (
         <>
           <dl className="settings-model-capability-grid">
@@ -100,9 +113,13 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
             ))}
           </dl>
           {effectiveModel.toolCalling.state === 'unknown' ? (
-            <div className="settings-model-capability-note" data-testid="settings-provider-tool-calling-unverified">{t('settings.providers.capability.toolCallingUnverifiedHint')}</div>
+            <div className="settings-model-capability-note" data-testid="settings-provider-tool-calling-unverified">
+              {t('settings.providers.capability.toolCallingUnverifiedHint')}
+            </div>
           ) : effectiveModel.toolCalling.state === 'unsupported' ? (
-            <div className="settings-model-capability-note" data-testid="settings-provider-tool-calling-unsupported">{t('settings.providers.capability.toolCallingUnsupportedHint')}</div>
+            <div className="settings-model-capability-note" data-testid="settings-provider-tool-calling-unsupported">
+              {t('settings.providers.capability.toolCallingUnsupportedHint')}
+            </div>
           ) : null}
 
           <ProviderModelPreferences {...{ model, effectiveModel, snapshot, loading, onModelChange, t }} />
@@ -117,8 +134,12 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
               {probeText.detail ? <span>{probeText.detail}</span> : null}
             </div>
           ) : null}
-          {snapshot?.refreshing ? <div className="settings-model-capability-note">{t('settings.providers.capability.refreshing')}</div> : null}
-          {snapshot?.stale ? <div className="settings-model-capability-note">{t('settings.providers.capability.stale')}</div> : null}
+          {snapshot?.refreshing ? (
+            <div className="settings-model-capability-note">{t('settings.providers.capability.refreshing')}</div>
+          ) : null}
+          {snapshot?.stale ? (
+            <div className="settings-model-capability-note">{t('settings.providers.capability.stale')}</div>
+          ) : null}
           {effectiveModel.quota ? (
             <div className="settings-model-capability-note settings-model-capability-note--warning">
               {t('settings.providers.capability.quota', {
@@ -127,11 +148,17 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
               })}
             </div>
           ) : null}
-          {effectiveModel.unavailableReason ? <div className="settings-model-capability-note settings-model-capability-note--error">{effectiveModel.unavailableReason}</div> : null}
+          {effectiveModel.unavailableReason ? (
+            <InlineError detail={effectiveModel.unavailableReason}>
+              {t('settings.providers.modelUnavailableReason')}
+            </InlineError>
+          ) : null}
         </>
       ) : (
         <div className="settings-model-capability-note">
-          {provider.catalogOwnership === 'user-managed' ? t('settings.providers.capability.userManagedDetail') : t('settings.providers.capability.modelMissing')}
+          {provider.catalogOwnership === 'user-managed'
+            ? t('settings.providers.capability.userManagedDetail')
+            : t('settings.providers.capability.modelMissing')}
         </div>
       )}
     </div>

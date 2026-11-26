@@ -2,7 +2,6 @@ import os from 'os';
 import { nowMs } from '@shared/utils/id';
 import { requiresCommandInterpreter } from '../platform/shell';
 import { processSupervisor, type SupervisedProcess } from '../runtime/ProcessSupervisor';
-import type { CLIResult } from '@shared/types/tool';
 
 export interface ShellInvocationRequest {
   command: string;
@@ -17,7 +16,7 @@ export interface ShellInvocationRequest {
 }
 
 export function resolveExitCode(code: number | null, signal: NodeJS.Signals | null): number {
-  if (code !== null && code !== undefined) {
+  if (code !== null) {
     return code;
   }
   if (signal) {
@@ -106,7 +105,9 @@ export class ShellInvocationService {
       };
     } finally {
       if (supervised.orphaned) {
-        void supervised.exit.then(() => { this.activeProcesses.delete(procId); });
+        void supervised.exit.then(() => {
+          this.activeProcesses.delete(procId);
+        });
       } else {
         this.activeProcesses.delete(procId);
       }
@@ -114,7 +115,9 @@ export class ShellInvocationService {
   }
 
   hasUnconfirmedProcesses(contextId?: string): boolean {
-    return Array.from(this.activeProcesses.values()).some(({ supervised, contextId: owner }) => supervised.orphaned && (!contextId || owner === contextId));
+    return Array.from(this.activeProcesses.values()).some(
+      ({ supervised, contextId: owner }) => supervised.orphaned && (!contextId || owner === contextId),
+    );
   }
 
   abortRun(runId: string): void {
@@ -133,3 +136,14 @@ export class ShellInvocationService {
 }
 
 export const shellInvocationService = new ShellInvocationService();
+
+export interface CLIResult {
+  processExitReason?:
+    'exit' | 'signal' | 'timeout' | 'abort' | 'spawn_failed' | 'supervisor_kill' | 'unconfirmed_orphan';
+  exitCode: number;
+  stdout: string;
+  stdoutByteLength?: number;
+  stdoutTruncated?: boolean;
+  stderr: string;
+  duration_ms: number;
+}

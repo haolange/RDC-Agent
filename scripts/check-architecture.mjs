@@ -109,11 +109,10 @@ if (browserFallback.length > 12000) {
 }
 
 const removedReasoningKeyPattern = new RegExp(`chat\\.reasoning${'Trace'}`, 'g');
-const removedWorkBlockIdPattern = new RegExp([
-  `co${'work-route'}`,
-  `co${'work-reply'}`,
-  `active-debug${'-reply'}`,
-].join('|'), 'g');
+const removedWorkBlockIdPattern = new RegExp(
+  [`co${'work-route'}`, `co${'work-reply'}`, `active-debug${'-reply'}`].join('|'),
+  'g',
+);
 
 const forbiddenAgentWorkbenchPatterns = [
   { pattern: /\u63a8\u7406\u8f68\u8ff9/g, message: 'Use "工作过程" / "Work process" for visible agent progress UI.' },
@@ -131,13 +130,15 @@ for (const filePath of sourceFiles) {
   }
 }
 
-// R6 — renderer must not re-export symbols listed in shared-exports baseline
+// R6 — renderer must not redeclare a type that src/shared exports; it imports it from @shared instead.
 const rendererRoot = path.join(repoRoot, 'src/renderer');
-const sharedExportsPath = path.join(repoRoot, 'scripts/fidelity/shared-exports.txt');
-if (fs.existsSync(sharedExportsPath)) {
-  const sharedSymbols = new Set(
-    fs.readFileSync(sharedExportsPath, 'utf8').split('\n').map((line) => line.trim()).filter(Boolean),
-  );
+{
+  const sharedSymbols = new Set();
+  const sharedTypeRe = /export\s+(?:type\s+)?(?:interface|type|enum)\s+([A-Za-z0-9_]+)/g;
+  for (const filePath of walk(path.join(repoRoot, 'src/shared'), [], /\.ts$/)) {
+    if (filePath.includes('.test.')) continue;
+    for (const match of fs.readFileSync(filePath, 'utf8').matchAll(sharedTypeRe)) sharedSymbols.add(match[1]);
+  }
   const exportTypeRe = /export\s+(?:type\s+)?(?:interface|type|enum)\s+([A-Za-z0-9_]+)/g;
   for (const filePath of walk(rendererRoot, [], /\.(ts|tsx)$/)) {
     const relativePath = path.relative(repoRoot, filePath).replace(/\\/g, '/');
@@ -166,8 +167,10 @@ const settingsNav = read('src/renderer/features/settings/SettingsModal/useSettin
 if (!settingsNav.includes("id: 'policy'") || settingsNav.includes("id: 'diagnostics'")) {
   fail('Settings nav must list Policy after Hooks and must not list Diagnostics.');
 }
-if (exists('src/renderer/features/debugger/RequestDiagnostics')
-  || exists('src/renderer/features/settings/SettingsModal/sections/DeveloperDiagnosticsSettings.tsx')) {
+if (
+  exists('src/renderer/features/debugger/RequestDiagnostics') ||
+  exists('src/renderer/features/settings/SettingsModal/sections/DeveloperDiagnosticsSettings.tsx')
+) {
   fail('Settings Diagnostics / RequestInspector frontend must remain removed.');
 }
 if (!exists('src/renderer/features/settings/SettingsModal/sections/PolicySettings.tsx')) {

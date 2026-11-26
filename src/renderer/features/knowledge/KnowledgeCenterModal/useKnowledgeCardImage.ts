@@ -1,40 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useAsyncValue } from '../../../lib/useAsyncValue';
 import { isSafeKnowledgePreviewPath, normalizeKnowledgePreviewPath } from './knowledgeCardImages';
 
 export type KnowledgeCardImageState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'ready'; dataUrl: string }
-  | { status: 'missing' };
+  { status: 'idle' } | { status: 'loading' } | { status: 'ready'; dataUrl: string } | { status: 'missing' };
 
-export function useKnowledgeCardImage(spaceId: string | undefined, relativePath: string | undefined): KnowledgeCardImageState {
-  const [state, setState] = useState<KnowledgeCardImageState>({ status: 'idle' });
-  const safePath = relativePath && isSafeKnowledgePreviewPath(relativePath)
-    ? normalizeKnowledgePreviewPath(relativePath)
-    : '';
-
-  useEffect(() => {
-    if (!spaceId || !safePath) {
-      setState({ status: relativePath ? 'missing' : 'idle' });
-      return;
-    }
-    let cancelled = false;
-    setState({ status: 'loading' });
-    void window.electronAPI.knowledge.image({ spaceId, relativePath: safePath }).then((result) => {
-      if (cancelled) return;
-      if (result.dataUrl) {
-        setState({ status: 'ready', dataUrl: result.dataUrl });
-        return;
-      }
-      setState({ status: 'missing' });
-    }).catch(() => {
-      if (cancelled) return;
-      setState({ status: 'missing' });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [relativePath, safePath, spaceId]);
-
-  return state;
+export function useKnowledgeCardImage(
+  spaceId: string | undefined,
+  relativePath: string | undefined,
+): KnowledgeCardImageState {
+  const safePath =
+    relativePath && isSafeKnowledgePreviewPath(relativePath) ? normalizeKnowledgePreviewPath(relativePath) : '';
+  const image = useAsyncValue(
+    spaceId && safePath ? JSON.stringify([spaceId, safePath]) : null,
+    async () =>
+      (await window.electronAPI.knowledge.image({ spaceId: spaceId!, relativePath: safePath })).dataUrl ?? null,
+  );
+  if (image.status === 'idle') return { status: relativePath ? 'missing' : 'idle' };
+  if (image.status === 'loading') return image;
+  return image.status === 'ready' && image.value ? { status: 'ready', dataUrl: image.value } : { status: 'missing' };
 }

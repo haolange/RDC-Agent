@@ -1,11 +1,6 @@
-.settings-model-section-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.settings-actions {
+.settings-manifest-editor-actions,
+.settings-actions,
+.settings-profile-row {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -19,20 +14,13 @@
   background: color-mix(in srgb, var(--token-bg-raised) 36%, transparent);
   color: var(--token-text-secondary);
   font-size: var(--type-body-size);
-  line-height: 1.5;
+  line-height: var(--leading-normal);
 }
 
 .settings-provider-notice.error {
   border-color: color-mix(in srgb, var(--token-status-error) 34%, transparent);
   background: color-mix(in srgb, var(--token-status-error) 8%, transparent);
   color: var(--token-status-error);
-}
-
-.settings-secret-field {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-2);
-  align-items: center;
 }
 
 .settings-secret-input {
@@ -46,13 +34,6 @@
   align-items: center;
   gap: var(--space-2);
   color: var(--token-status-warning);
-}
-
-.settings-provider-connect-body {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
 }
 
 .settings-provider-auth-field {
@@ -99,7 +80,7 @@
   min-width: 0;
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);
-  line-height: 1.5;
+  line-height: var(--type-meta-line);
   overflow-wrap: anywhere;
   white-space: normal;
 }
@@ -142,11 +123,24 @@
 }
 
 @media (max-width: 640px) {
-  .settings-provider-connect-dialog,
-  .settings-provider-connect-dialog[data-model-list-size='short'],
-  .settings-provider-connect-dialog[data-model-list-size='medium'],
-  .settings-provider-connect-dialog[data-model-list-size='long'] {
+  .settings-provider-connect-dialog {
     width: calc(100vw - var(--space-4));
     max-height: calc(100vh - var(--space-4));
   }
+}
+
+/* Connect dialog actions: each button's labels share one cell (see ProviderConnectActions), so pending labels keep
+   the footer still. */
+.settings-provider-action-label {
+  display: grid;
+}
+
+.settings-provider-action-label-option {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+  visibility: hidden;
+}
+
+.settings-provider-action-label-option.is-shown {
+  visibility: visible;
 }

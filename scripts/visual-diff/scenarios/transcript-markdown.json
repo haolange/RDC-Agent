@@ -1,0 +1,631 @@
+{
+ "id": "transcript-markdown",
+ "steps": [
+  {
+   "waitFor": ".markdown-body",
+   "waitMs": 800
+  }
+ ],
+ "settleMs": 1500,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "1acdf969e21954883c0d06a3"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-d93a66ec1077-1795681531068",
+       "timestamp": 1795681531068,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-be25efaf8536-1795681531143",
+       "timestamp": 1795681531143,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-ce44ad128b63-1795681531144",
+       "timestamp": 1795681531144,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-5b47cb258706-1795681531160",
+       "timestamp": 1795681531160,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      },
+      {
+       "id": "rlog-9ae7b437336c-1795681555113",
+       "timestamp": 1795681555113,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_42efafe908c2",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_42efafe908c2",
+        "status": "thinking"
+       }
+      },
+      {
+       "id": "rlog-eef2a2564cc0-1795681557865",
+       "timestamp": 1795681557865,
+       "scope": "session",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General profile turn",
+       "summary": "# 排版样例\n\n这一帧的结论先写在最前面[^1]。\n\n## 关键发现\n\n### 着色阶段\n\n#### 细节\n\n正文段落使用阅读字号，`inline code` 保持等宽。\n\n> [!WARNING]\n> 修改着色器前先备份 capture。\n\n| Pass | 耗时 | 结论 |\n| --- | --- | --- |",
+       "sessionId": "sess_42efafe908c2",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "providerId": "ollama",
+        "modelId": "qa-stub:4b"
+       }
+      },
+      {
+       "id": "rlog-7fafa0b877f6-1795681557865",
+       "timestamp": 1795681557865,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "success",
+       "title": "General",
+       "summary": "Status changed to complete.",
+       "sessionId": "sess_42efafe908c2",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_42efafe908c2",
+        "status": "complete"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-9ae7b437336c-1795681555113",
+       "timestamp": 1795681555113,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_42efafe908c2",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_42efafe908c2",
+        "status": "thinking"
+       }
+      },
+      {
+       "id": "rlog-eef2a2564cc0-1795681557865",
+       "timestamp": 1795681557865,
+       "scope": "session",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General profile turn",
+       "summary": "# 排版样例\n\n这一帧的结论先写在最前面[^1]。\n\n## 关键发现\n\n### 着色阶段\n\n#### 细节\n\n正文段落使用阅读字号，`inline code` 保持等宽。\n\n> [!WARNING]\n> 修改着色器前先备份 capture。\n\n| Pass | 耗时 | 结论 |\n| --- | --- | --- |",
+       "sessionId": "sess_42efafe908c2",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "providerId": "ollama",
+        "modelId": "qa-stub:4b"
+       }
+      },
+      {
+       "id": "rlog-7fafa0b877f6-1795681557865",
+       "timestamp": 1795681557865,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "success",
+       "title": "General",
+       "summary": "Status changed to complete.",
+       "sessionId": "sess_42efafe908c2",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_42efafe908c2",
+        "status": "complete"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-9ae7b437336c-1795681555113",
+       "timestamp": 1795681555113,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_42efafe908c2",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_42efafe908c2",
+        "status": "thinking"
+       }
+      },
+      {
+       "id": "rlog-eef2a2564cc0-1795681557865",
+       "timestamp": 1795681557865,
+       "scope": "session",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General profile turn",
+       "summary": "# 排版样例\n\n这一帧的结论先写在最前面[^1]。\n\n## 关键发现\n\n### 着色阶段\n\n#### 细节\n\n正文段落使用阅读字号，`inline code` 保持等宽。\n\n> [!WARNING]\n> 修改着色器前先备份 capture。\n\n| Pass | 耗时 | 结论 |\n| --- | --- | --- |",
+       "sessionId": "sess_42efafe908c2",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "providerId": "ollama",
+        "modelId": "qa-stub:4b"
+       }
+      },
+      {
+       "id": "rlog-7fafa0b877f6-1795681557865",
+       "timestamp": 1795681557865,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "success",
+       "title": "General",
+       "summary": "Status changed to complete.",
+       "sessionId": "sess_42efafe908c2",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_42efafe908c2",
+        "status": "complete"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   },
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   },
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "settings:getEffectiveCatalog": [
+   {
+    "ref": "6b370c533c81cfc7190694f5"
+   },
+   {
+    "ref": "cbfe65cd51be858be1092f38"
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": [
+      {
+       "projectId": "proj_f475b3416259",
+       "name": "visual-diff-project",
+       "rootPath": "/visual-diff/visual-diff-project",
+       "slug": "visual-diff-project",
+       "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+       "inputs": [],
+       "inputsUpdatedAt": 1795681574794,
+       "createdAt": 1795681532865,
+       "updatedAt": 1795681557887,
+       "lastSessionId": "sess_42efafe908c2"
+      }
+     ]
+    }
+   }
+  ],
+  "project:select": [
+   {
+    "result": {
+     "project": {
+      "projectId": "proj_f475b3416259",
+      "name": "visual-diff-project",
+      "rootPath": "/visual-diff/visual-diff-project",
+      "slug": "visual-diff-project",
+      "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+      "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+      "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+      "inputs": [],
+      "inputsUpdatedAt": 1795681574794,
+      "createdAt": 1795681532865,
+      "updatedAt": 1795681557887,
+      "lastSessionId": "sess_42efafe908c2"
+     },
+     "currentSession": {
+      "record": {
+       "schemaVersion": "1",
+       "sessionId": "sess_42efafe908c2",
+       "projectId": "proj_f475b3416259",
+       "title": "qa:markdown 展示一份排版样例。",
+       "goal": "qa:markdown 展示一份排版样例。",
+       "sessionPath": "/visual-diff/state/sessions/proj_f475b3416259/sess_42efafe908c2",
+       "createdAt": 1795681555038,
+       "updatedAt": 1795681557887,
+       "lastRunId": "run_6583d9e26c4cc4e0",
+       "turnControls": {
+        "reasoningLevel": "on",
+        "maxContextMode": false,
+        "fastModel": false
+       },
+       "agentId": "general"
+      },
+      "revision": {
+       "epoch": "0c8872f2-0fef-48c7-9d9f-a912607dcb6f",
+       "n": 6
+      }
+     },
+     "currentRun": {
+      "schemaVersion": "3",
+      "runId": "run_6583d9e26c4cc4e0",
+      "turnId": "turn-eb5a14f9-644f-4960-9d41-249b556a1226",
+      "projectId": "proj_f475b3416259",
+      "sessionId": "sess_42efafe908c2",
+      "caseId": "sess_42efafe908c2",
+      "profileId": "general",
+      "goal": "qa:markdown 展示一份排版样例。",
+      "captures": [],
+      "startedAt": 1795681555058,
+      "finishedAt": 1795681557883,
+      "status": "completed",
+      "backend": "local",
+      "kind": "conversation"
+     }
+    }
+   }
+  ],
+  "session:list": [
+   {
+    "result": {
+     "sessions": [
+      {
+       "record": {
+        "schemaVersion": "1",
+        "sessionId": "sess_42efafe908c2",
+        "projectId": "proj_f475b3416259",
+        "title": "qa:markdown 展示一份排版样例。",
+        "goal": "qa:markdown 展示一份排版样例。",
+        "sessionPath": "/visual-diff/state/sessions/proj_f475b3416259/sess_42efafe908c2",
+        "createdAt": 1795681555038,
+        "updatedAt": 1795681557887,
+        "lastRunId": "run_6583d9e26c4cc4e0",
+        "turnControls": {
+         "reasoningLevel": "on",
+         "maxContextMode": false,
+         "fastModel": false
+        },
+        "agentId": "general"
+       },
+       "revision": {
+        "epoch": "0c8872f2-0fef-48c7-9d9f-a912607dcb6f",
+        "n": 6
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "session:open": [
+   {
+    "ref": "98716093c8c6775901333240"
+   }
+  ],
+  "capture:getReplayState": [
+   {
+    "result": {
+     "projectId": "proj_f475b3416259",
+     "sessionId": "sess_42efafe908c2",
+     "generation": 0,
+     "revision": 1,
+     "operationId": null,
+     "phase": "closed",
+     "preparation": {
+      "targetDeviceId": null,
+      "phase": "idle",
+      "issue": null
+     },
+     "replayDeviceId": null,
+     "inputId": null,
+     "captureHash": null,
+     "contextId": null,
+     "requestedEventId": null,
+     "appliedEventId": null,
+     "imageEventId": null,
+     "events": [],
+     "targets": [],
+     "target": null,
+     "isFinalOutput": false,
+     "image": null,
+     "observation": null,
+     "devicePresentation": {
+      "status": "not_applicable",
+      "eventId": null,
+      "textureId": null,
+      "sequence": null,
+      "reason": null
+     },
+     "warning": null,
+     "interactionLock": null,
+     "error": null
+    }
+   }
+  ],
+  "workflow:getState": [
+   {
+    "result": {
+     "caseId": "sess_42efafe908c2",
+     "runId": "run_6583d9e26c4cc4e0",
+     "sessionId": "sess_42efafe908c2",
+     "blockers": [],
+     "reasoningSummaries": [],
+     "lastUpdated": "2026-11-26T08:26:17.542Z"
+    }
+   }
+  ],
+  "evidence:getChain": [
+   {
+    "result": {
+     "sessionId": "sess_42efafe908c2",
+     "runId": "run_6583d9e26c4cc4e0",
+     "events": [],
+     "isValid": true
+    }
+   }
+  ],
+  "workflow:getRunUsage": [
+   {
+    "result": {
+     "usage": {
+      "runId": "run_6583d9e26c4cc4e0",
+      "providerId": "ollama",
+      "modelId": "qa-stub:4b",
+      "inputTokens": 1200,
+      "outputTokens": 80,
+      "totalTokens": 1280,
+      "promptBudgetTokens": 32768,
+      "contextWindowTokens": 32768,
+      "maxOutputTokens": 32768,
+      "compactionThresholdTokens": 26214,
+      "usagePercent": 4,
+      "occupiedTokens": 1200,
+      "breakdown": [
+       {
+        "id": "system_prompt",
+        "tokens": 187
+       },
+       {
+        "id": "skills",
+        "tokens": 107
+       },
+       {
+        "id": "system_tools",
+        "tokens": 849,
+        "count": 32
+       },
+       {
+        "id": "summarized_conversation",
+        "tokens": 0
+       },
+       {
+        "id": "conversation",
+        "tokens": 57,
+        "count": 2
+       },
+       {
+        "id": "builtin_tools_deferred",
+        "tokens": 7203,
+        "count": 29
+       },
+       {
+        "id": "free",
+        "tokens": 31568
+       }
+      ],
+      "snapshotAt": 1795681557840
+     },
+     "stale": false
+    }
+   },
+   {
+    "result": {
+     "usage": {
+      "runId": "run_6583d9e26c4cc4e0",
+      "providerId": "ollama",
+      "modelId": "qa-stub:4b",
+      "inputTokens": 1200,
+      "outputTokens": 80,
+      "totalTokens": 1280,
+      "promptBudgetTokens": 32768,
+      "contextWindowTokens": 32768,
+      "maxOutputTokens": 32768,
+      "compactionThresholdTokens": 26214,
+      "usagePercent": 4,
+      "occupiedTokens": 1200,
+      "breakdown": [
+       {
+        "id": "system_prompt",
+        "tokens": 187
+       },
+       {
+        "id": "skills",
+        "tokens": 107
+       },
+       {
+        "id": "system_tools",
+        "tokens": 849,
+        "count": 32
+       },
+       {
+        "id": "summarized_conversation",
+        "tokens": 0
+       },
+       {
+        "id": "conversation",
+        "tokens": 57,
+        "count": 2
+       },
+       {
+        "id": "builtin_tools_deferred",
+        "tokens": 7203,
+        "count": 29
+       },
+       {
+        "id": "free",
+        "tokens": 31568
+       }
+      ],
+      "snapshotAt": 1795681557840
+     },
+     "stale": false
+    }
+   }
+  ],
+  "capture:getOpenedState": [
+   {
+    "result": null
+   }
+  ],
+  "context:get": [
+   {
+    "result": null
+   }
+  ],
+  "project:inputs:list": [
+   {
+    "result": {
+     "inputs": []
+    }
+   }
+  ],
+  "conversation:resolveMedia": [
+   {
+    "result": {
+     "dataUrl": null,
+     "error": "MEDIA_NOT_FOUND"
+    }
+   }
+  ]
+ }
+}

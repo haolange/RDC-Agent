@@ -9,9 +9,22 @@ describe('replay device discovery', () => {
     expect(useDeviceStore.getState().discovery).toEqual({ status: 'failed', error: 'ADB unavailable' });
   });
   it('retains discovery facts independently of a connected session', () => {
-    useDeviceStore.getState().applyStatusPayload({ revision: 13, discovery: { status: 'ready' }, devices: [{ id: 'android-test', label: 'Android', type: 'android', transport: 'adb_android', status: 'online', adbState: 'device' }] });
+    useDeviceStore.getState().applyStatusPayload({
+      revision: 13,
+      discovery: { status: 'ready' },
+      devices: [
+        {
+          id: 'android-test',
+          label: 'Android',
+          type: 'android',
+          transport: 'adb_android',
+          status: 'online',
+          adbState: 'device',
+        },
+      ],
+    });
     expect(useDeviceStore.getState().devices[0].adbState).toBe('device');
     useDeviceStore.getState().applyStatusPayload({ revision: 14, discovery: { status: 'ready' }, devices: [] });
-    expect(useDeviceStore.getState().devices.map(device => device.id)).toEqual(['local']);
+    expect(useDeviceStore.getState().devices.map((device) => device.id)).toEqual(['local']);
   });
 });

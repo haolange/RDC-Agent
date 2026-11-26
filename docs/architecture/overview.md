@@ -34,6 +34,6 @@ RDC-Tool is independently distributed. Settings accepts its root directory; main
 
 ## Verification
 
-Use `pnpm run typecheck` for static validation. For renderer or IPC changes, also run `pnpm run check:architecture`, `pnpm run check:fidelity`, and `pnpm run check:shared-exports`. For shell/window/local invocation boundaries, build first and then run the relevant smoke test.
+Use `pnpm run typecheck` for static validation. For renderer or IPC changes, also run `pnpm run check:architecture` and `pnpm run check:qa-ids`. For shell/window/local invocation boundaries, build first and then run the relevant smoke test.
 
 源码开发、打包与 smoke 的构建约束见根目录 `AGENTS.md` §9。

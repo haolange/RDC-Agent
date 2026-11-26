@@ -11,12 +11,9 @@ describe('normalizeAssistantMarkdown', () => {
   it('compacts nested list spacing without flattening indentation', () => {
     const input = ['- parent', '', '  \u25e6 child one', '', '  \u25e6 child two', '', '- sibling'].join('\n');
 
-    expect(normalizeAssistantMarkdown(input)).toBe([
-      '- parent',
-      '  - child one',
-      '  - child two',
-      '- sibling',
-    ].join('\n'));
+    expect(normalizeAssistantMarkdown(input)).toBe(
+      ['- parent', '  - child one', '  - child two', '- sibling'].join('\n'),
+    );
   });
 
   it('preserves fenced code block content exactly', () => {

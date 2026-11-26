@@ -3,8 +3,7 @@ import { extractDollarSkillRefs, mergeTurnPreloadSkillIds } from './turnSkillRef
 
 describe('extractDollarSkillRefs', () => {
   it('extracts unique kebab-case skill ids', () => {
-    expect(extractDollarSkillRefs('Use $debug and $rdc-context then $debug again'))
-      .toEqual(['debug', 'rdc-context']);
+    expect(extractDollarSkillRefs('Use $debug and $rdc-context then $debug again')).toEqual(['debug', 'rdc-context']);
   });
 
   it('ignores invalid tokens', () => {
@@ -12,17 +11,23 @@ describe('extractDollarSkillRefs', () => {
   });
 
   it('does not invoke Skill names quoted as Markdown code', () => {
-    expect(extractDollarSkillRefs('Open an independent `$skeptic-review`; use $debugger-causal-method here.')).toEqual(['debugger-causal-method']);
-    expect(extractDollarSkillRefs('Example:\n```text\n$rdc-tool-shell\n```\nUse $renderdoc-execution.')).toEqual(['renderdoc-execution']);
+    expect(extractDollarSkillRefs('Open an independent `$skeptic-review`; use $debugger-causal-method here.')).toEqual([
+      'debugger-causal-method',
+    ]);
+    expect(extractDollarSkillRefs('Example:\n```text\n$rdc-tool-shell\n```\nUse $renderdoc-execution.')).toEqual([
+      'renderdoc-execution',
+    ]);
   });
 });
 
 describe('mergeTurnPreloadSkillIds', () => {
   it('merges profile, dollar refs, and pending without duplicates', () => {
-    expect(mergeTurnPreloadSkillIds({
-      profileSkills: ['verify', 'debug'],
-      messageText: 'please $debug and $simplify',
-      pendingSkillIds: ['simplify', 'remember'],
-    })).toEqual(['verify', 'debug', 'simplify', 'remember']);
+    expect(
+      mergeTurnPreloadSkillIds({
+        profileSkills: ['verify', 'debug'],
+        messageText: 'please $debug and $simplify',
+        pendingSkillIds: ['simplify', 'remember'],
+      }),
+    ).toEqual(['verify', 'debug', 'simplify', 'remember']);
   });
 });

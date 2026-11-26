@@ -46,7 +46,10 @@ const ANSWER = [
 ];
 const LONG_ANSWER = [
   '## 结论\n\n工作区只有一个 capture，五轮列举结果一致。\n\n',
-  ...Array.from({ length: 24 }, (_, index) => `- 第 ${index + 1} 项检查：列举结果与上一轮一致，没有新增或缺失的文件。\n`),
+  ...Array.from(
+    { length: 24 },
+    (_, index) => `- 第 ${index + 1} 项检查：列举结果与上一轮一致，没有新增或缺失的文件。\n`,
+  ),
   '\n```text\nvkcube_lavapipe.rdc\n```\n\n',
   '## 下一步\n\n导入这个 capture 后再读取事件树与管线状态。\n',
 ];
@@ -63,8 +66,13 @@ const MARKDOWN_ANSWER = [
   '![修复前的这一帧](docs/frame.png)\n\n',
   '[^1]: 结论来自同一 capture 的两次回放。\n',
 ];
-const PLAN_STEPS = ['列出事件树并确认唯一的 draw 调用', '读取该调用的管线状态', '用三句话总结这一帧画了什么',
-  '对照参考帧复核输出颜色', '记录无法确认的部分和恢复条件'];
+const PLAN_STEPS = [
+  '列出事件树并确认唯一的 draw 调用',
+  '读取该调用的管线状态',
+  '用三句话总结这一帧画了什么',
+  '对照参考帧复核输出颜色',
+  '记录无法确认的部分和恢复条件',
+];
 /** Revision N of the scripted plan: each revision adds one step, so the CoT card visibly changes. */
 const planRevision = (revision) => {
   const steps = PLAN_STEPS.slice(0, Math.min(PLAN_STEPS.length, 2 + revision));
@@ -76,11 +84,19 @@ const planRevision = (revision) => {
   };
 };
 const DELEGATION = {
-  profile: 'verifier', mode: 'wait',
+  profile: 'verifier',
+  mode: 'wait',
   goal: '核对工作区里是否已有可回放的 capture',
   task: '列出工作区文件，确认有没有 .rdc capture，并说明下一步。',
-  scope: '只读工作区文件', acceptedFacts: [], hypotheses: [], challengeRefs: [], negativePaths: [], inputArtifactRefs: [],
-  outputRequirements: '一句话结论', stopConditions: ['列完文件即停止'], requiredSkillIds: [],
+  scope: '只读工作区文件',
+  acceptedFacts: [],
+  hypotheses: [],
+  challengeRefs: [],
+  negativePaths: [],
+  inputArtifactRefs: [],
+  outputRequirements: '一句话结论',
+  stopConditions: ['列完文件即停止'],
+  requiredSkillIds: [],
 };
 const BLOCKED_COMPLETION = {
   disposition: 'blocked',
@@ -88,7 +104,14 @@ const BLOCKED_COMPLETION = {
     summary: '工作区里没有 capture，无法定位 draw 调用。',
     outputs: {},
     counterevidence: [],
-    unresolved: [{ gap: '定位唯一的 draw 调用并读取管线状态', attempted: '列出了工作区文件，没有找到 capture。', blocker: 'external', resumeWhen: '导入 capture 后' }],
+    unresolved: [
+      {
+        gap: '定位唯一的 draw 调用并读取管线状态',
+        attempted: '列出了工作区文件，没有找到 capture。',
+        blocker: 'external',
+        resumeWhen: '导入 capture 后',
+      },
+    ],
     scope: '只读核对工作区文件',
     sideEffects: [],
     recoveryState: [],
@@ -102,8 +125,18 @@ const PARTIAL_COMPLETION = {
     outputs: {},
     counterevidence: [],
     unresolved: [
-      { gap: '定位唯一的 draw 调用', attempted: '列出了工作区文件和 docs 目录，没有找到 .rdc。', blocker: 'external', resumeWhen: '导入 capture 后' },
-      { gap: '读取 draw 调用的管线状态', attempted: '依赖上一项，尚未开始。', blocker: 'external', resumeWhen: '定位到 draw 调用后' },
+      {
+        gap: '定位唯一的 draw 调用',
+        attempted: '列出了工作区文件和 docs 目录，没有找到 .rdc。',
+        blocker: 'external',
+        resumeWhen: '导入 capture 后',
+      },
+      {
+        gap: '读取 draw 调用的管线状态',
+        attempted: '依赖上一项，尚未开始。',
+        blocker: 'external',
+        resumeWhen: '定位到 draw 调用后',
+      },
     ],
     scope: '只读核对工作区文件',
     sideEffects: [],
@@ -136,9 +169,15 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function readBody(request) {
   return new Promise((resolve, reject) => {
     let body = '';
-    request.on('data', (chunk) => { body += chunk; });
+    request.on('data', (chunk) => {
+      body += chunk;
+    });
     request.on('end', () => {
-      try { resolve(body ? JSON.parse(body) : {}); } catch (error) { reject(error); }
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (error) {
+        reject(error);
+      }
     });
     request.on('error', reject);
   });
@@ -149,8 +188,14 @@ function json(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
-const message = (fields) => ({ model: MODEL, created_at: new Date().toISOString(), message: { role: 'assistant', content: '', ...fields }, done: false });
-const toolCalls = (calls) => message({ tool_calls: calls.map(([name, args]) => ({ function: { name, arguments: args } })) });
+const message = (fields) => ({
+  model: MODEL,
+  created_at: new Date().toISOString(),
+  message: { role: 'assistant', content: '', ...fields },
+  done: false,
+});
+const toolCalls = (calls) =>
+  message({ tool_calls: calls.map(([name, args]) => ({ function: { name, arguments: args } })) });
 const thinking = (lines) => lines.map((text) => message({ thinking: text }));
 const text = (lines) => lines.map((content) => message({ content }));
 
@@ -160,15 +205,32 @@ async function streamChat(response, chunks) {
     response.write(`${JSON.stringify(chunk)}\n`);
     await sleep(CHUNK_DELAY_MS);
   }
-  response.end(`${JSON.stringify({ model: MODEL, created_at: new Date().toISOString(), message: { role: 'assistant', content: '' },
-    done: true, done_reason: 'stop', prompt_eval_count: 1200, eval_count: 80 })}\n`);
+  response.end(
+    `${JSON.stringify({
+      model: MODEL,
+      created_at: new Date().toISOString(),
+      message: { role: 'assistant', content: '' },
+      done: true,
+      done_reason: 'stop',
+      prompt_eval_count: 1200,
+      eval_count: 80,
+    })}\n`,
+  );
 }
 
 /** Runtime follow-up prompts are Markdown-headed; they continue the scripted turn rather than start a new one. */
 const isRuntimeFollowUp = (entry) => typeof entry.content === 'string' && entry.content.startsWith('# ');
 
-const lastPlanningPrompt = (messages) => messages.map((entry) => entry.role === 'user' && !isRuntimeFollowUp(entry)
-  && typeof entry.content === 'string' && (entry.content.includes('qa:plan') || entry.content.includes('qa:partial'))).lastIndexOf(true);
+const lastPlanningPrompt = (messages) =>
+  messages
+    .map(
+      (entry) =>
+        entry.role === 'user' &&
+        !isRuntimeFollowUp(entry) &&
+        typeof entry.content === 'string' &&
+        (entry.content.includes('qa:plan') || entry.content.includes('qa:partial')),
+    )
+    .lastIndexOf(true);
 
 /** The latest user message and the tool results that followed it decide where the scripted turn is. */
 function turnState(body) {
@@ -177,15 +239,24 @@ function turnState(body) {
   const after = messages.slice(lastUser + 1);
   const prompt = typeof messages[lastUser]?.content === 'string' ? messages[lastUser].content : '';
   return {
-    scenario: prompt.includes(DELEGATION.task) ? 'qa:subagent-child'
-      : ['qa:loops', 'qa:ask', 'qa:long', 'qa:plan', 'qa:partial', 'qa:subagent', 'qa:markdown'].find((keyword) => prompt.includes(keyword))
-        ?? sessionScenario(messages.slice(0, lastUser)) ?? 'default',
+    scenario: prompt.includes(DELEGATION.task)
+      ? 'qa:subagent-child'
+      : (['qa:loops', 'qa:ask', 'qa:long', 'qa:plan', 'qa:partial', 'qa:subagent', 'qa:markdown'].find((keyword) =>
+          prompt.includes(keyword),
+        ) ??
+        sessionScenario(messages.slice(0, lastUser)) ??
+        'default'),
     step: after.filter((entry) => entry.role === 'assistant').length,
     toolResults: after.filter((entry) => entry.role === 'tool').map((entry) => String(entry.content ?? '')),
     after,
     // Revisions count within the current planning flow, so a later plan in the same session starts at revision 1.
-    planRevisions: messages.slice(lastPlanningPrompt(messages) + 1).filter((entry) => entry.role === 'assistant'
-      && (entry.tool_calls ?? []).some((call) => call.function?.name === 'plan_artifact')).length,
+    planRevisions: messages
+      .slice(lastPlanningPrompt(messages) + 1)
+      .filter(
+        (entry) =>
+          entry.role === 'assistant' &&
+          (entry.tool_calls ?? []).some((call) => call.function?.name === 'plan_artifact'),
+      ).length,
   };
 }
 
@@ -194,33 +265,52 @@ function turnState(body) {
  * message earlier in the session decides which scripted flow they continue.
  */
 function sessionScenario(history) {
-  const prompts = history.filter((entry) => entry.role === 'user' && !isRuntimeFollowUp(entry)).map((entry) => String(entry.content ?? ''));
+  const prompts = history
+    .filter((entry) => entry.role === 'user' && !isRuntimeFollowUp(entry))
+    .map((entry) => String(entry.content ?? ''));
   const planning = prompts.findLast((prompt) => prompt.includes('qa:plan') || prompt.includes('qa:partial'));
   return planning?.includes('qa:partial') ? 'qa:partial-flow' : planning ? 'qa:plan-flow' : undefined;
 }
 
 function loopsScenario(state, tools) {
   if (state.step === 0 && tools.has('task_create')) {
-    return [...thinking(['这次要分三步做，', '先把任务列出来。']), toolCalls([['task_create', { tasks: [
-      { subject: '列出工作区文件' }, { subject: '确认 capture 是否已导入' }, { subject: '整理结论' },
-    ] }]])];
+    return [
+      ...thinking(['这次要分三步做，', '先把任务列出来。']),
+      toolCalls([
+        [
+          'task_create',
+          { tasks: [{ subject: '列出工作区文件' }, { subject: '确认 capture 是否已导入' }, { subject: '整理结论' }] },
+        ],
+      ]),
+    ];
   }
   if (state.step === 1) return [...text(['先看看工作区里有什么。']), toolCalls([['glob', { pattern: '*' }]])];
   // A Task settles only after it started, so the stub starts two first and settles them a loop later.
-  const [first, second, third] = [...state.toolResults.join('\n').matchAll(/Created (\S+?):/g)].map((match) => match[1]);
+  const [first, second, third] = [...state.toolResults.join('\n').matchAll(/Created (\S+?):/g)].map(
+    (match) => match[1],
+  );
   if (state.step === 2 && tools.has('task_update') && first && third) {
-    return [...thinking(['文件已经列出，', '先开始第一项和第三项。']), toolCalls([
-      ['task_update', { taskId: first, status: 'in_progress' }],
-      ['task_update', { taskId: third, status: 'in_progress' }],
-    ])];
+    return [
+      ...thinking(['文件已经列出，', '先开始第一项和第三项。']),
+      toolCalls([
+        ['task_update', { taskId: first, status: 'in_progress' }],
+        ['task_update', { taskId: third, status: 'in_progress' }],
+      ]),
+    ];
   }
   // Every Task ends settled (done, cancelled, blocked), so the runtime does not ask for another loop.
   if (state.step === 3 && tools.has('task_update') && first && second && third) {
-    return [...thinking(['第一项完成了，', '第二项不需要了，第三项要等 capture。']), toolCalls([
-      ['task_update', { taskId: first, status: 'completed' }],
-      ['task_update', { taskId: second, status: 'cancelled', statusReason: '工作区里没有 capture，这一项不再需要。' }],
-      ['task_update', { taskId: third, status: 'blocked', statusReason: '等待 capture 导入后才能整理结论。' }],
-    ])];
+    return [
+      ...thinking(['第一项完成了，', '第二项不需要了，第三项要等 capture。']),
+      toolCalls([
+        ['task_update', { taskId: first, status: 'completed' }],
+        [
+          'task_update',
+          { taskId: second, status: 'cancelled', statusReason: '工作区里没有 capture，这一项不再需要。' },
+        ],
+        ['task_update', { taskId: third, status: 'blocked', statusReason: '等待 capture 导入后才能整理结论。' }],
+      ]),
+    ];
   }
   return [...thinking(['信息已经够了，', '可以给出结论。']), ...text(ANSWER)];
 }
@@ -238,9 +328,14 @@ function longStepCalls(step, tools) {
 
 function longScenario(state, tools) {
   if (state.step < LONG_STEPS && tools.has('glob')) {
-    const lead = state.step === 0 ? thinking(['需要多轮核对列举结果，', '每轮并行执行。'])
-      : state.step % 10 === 0 ? text([`第 ${state.step / 10} 组核对完成，结果与上一组一致，继续下一组。`])
-        : state.step % 7 === 0 ? thinking(['这一轮的结果和上一轮相同，', '继续扩大范围。']) : [];
+    const lead =
+      state.step === 0
+        ? thinking(['需要多轮核对列举结果，', '每轮并行执行。'])
+        : state.step % 10 === 0
+          ? text([`第 ${state.step / 10} 组核对完成，结果与上一组一致，继续下一组。`])
+          : state.step % 7 === 0
+            ? thinking(['这一轮的结果和上一轮相同，', '继续扩大范围。'])
+            : [];
     return [...lead, toolCalls(longStepCalls(state.step, tools))];
   }
   return text(LONG_ANSWER);
@@ -248,7 +343,8 @@ function longScenario(state, tools) {
 
 /** Runtime reassessments arrive either inside a tool result or as a Markdown-headed runtime follow-up. */
 const isReassessment = (entry) => typeof entry.content === 'string' && entry.content.includes('Reassessment');
-const isDeclaration = (entry) => entry.role === 'tool' && String(entry.content ?? '').includes('Turn completion recorded');
+const isDeclaration = (entry) =>
+  entry.role === 'tool' && String(entry.content ?? '').includes('Turn completion recorded');
 
 /**
  * The approved execution of qa:partial: two checks, an honest partial declaration, one more check after each
@@ -260,12 +356,29 @@ function partialExecution(state, tools) {
   const lastReassessment = after.findLastIndex(isReassessment);
   // A reassessment is answered once the stub has declared again after it; three declarations end the script.
   const pending = lastReassessment >= 0 && declarations < 3 && !after.slice(lastReassessment + 1).some(isDeclaration);
-  if (state.toolResults.length === 0) return [...thinking(['先核对工作区里有没有 capture，', '再决定能做到哪一步。']), toolCalls([['glob', { pattern: '*' }]])];
-  if (state.toolResults.length === 1) return [...text(['工作区根目录没有 capture，再看看 docs 目录。']), toolCalls([['glob', { pattern: 'docs/*' }], ['glob', { pattern: '**/*.rdc' }]])];
+  if (state.toolResults.length === 0)
+    return [
+      ...thinking(['先核对工作区里有没有 capture，', '再决定能做到哪一步。']),
+      toolCalls([['glob', { pattern: '*' }]]),
+    ];
+  if (state.toolResults.length === 1)
+    return [
+      ...text(['工作区根目录没有 capture，再看看 docs 目录。']),
+      toolCalls([
+        ['glob', { pattern: 'docs/*' }],
+        ['glob', { pattern: '**/*.rdc' }],
+      ]),
+    ];
   if (declarations === 0) return [toolCalls([['turn_complete', PARTIAL_COMPLETION]])];
   if (pending) {
-    const checkedSince = after.slice(lastReassessment + 1).filter((entry) => entry.role === 'tool' && !isDeclaration(entry)).length;
-    if (checkedSince === 0) return [...thinking(['复评要求再确认一次，', '换个范围找 capture。']), toolCalls([['glob', { pattern: '**/*.rdc' }]])];
+    const checkedSince = after
+      .slice(lastReassessment + 1)
+      .filter((entry) => entry.role === 'tool' && !isDeclaration(entry)).length;
+    if (checkedSince === 0)
+      return [
+        ...thinking(['复评要求再确认一次，', '换个范围找 capture。']),
+        toolCalls([['glob', { pattern: '**/*.rdc' }]]),
+      ];
     return [toolCalls([['turn_complete', PARTIAL_COMPLETION]])];
   }
   return text(PARTIAL_ANSWER);
@@ -284,13 +397,27 @@ function chatChunks(body) {
       return [toolCalls([['tool_search', { query: 'ask_user' }]])];
     }
     if (!tools.has('ask_user')) return text(['The question tool is unavailable.']);
-    return [toolCalls([['ask_user', { questions: [
-      { questionId: 'capture', prompt: 'Which capture should I inspect?', allowFreeform: false, options: [
-        { optionId: 'android', label: 'Android capture' },
-        { optionId: 'local', label: 'Local capture' },
-      ] },
-      { questionId: 'event', prompt: 'Which event should I use as the starting point?', allowFreeform: true },
-    ] }]])];
+    return [
+      toolCalls([
+        [
+          'ask_user',
+          {
+            questions: [
+              {
+                questionId: 'capture',
+                prompt: 'Which capture should I inspect?',
+                allowFreeform: false,
+                options: [
+                  { optionId: 'android', label: 'Android capture' },
+                  { optionId: 'local', label: 'Local capture' },
+                ],
+              },
+              { questionId: 'event', prompt: 'Which event should I use as the starting point?', allowFreeform: true },
+            ],
+          },
+        ],
+      ]),
+    ];
   }
   if (state.scenario === 'qa:long') return longScenario(state, tools);
   if (state.scenario === 'qa:markdown') return text(MARKDOWN_ANSWER);
@@ -298,14 +425,21 @@ function chatChunks(body) {
     // subagent is a deferred tool: load it through tool_search first, then delegate once and answer.
     const delegated = state.toolResults.length >= 2;
     if (!delegated && !tools.has('subagent') && tools.has('tool_search')) {
-      return [...thinking(['这件事交给 Verifier 去核对，', '我等它的结论。']), toolCalls([['tool_search', { query: 'subagent' }]])];
+      return [
+        ...thinking(['这件事交给 Verifier 去核对，', '我等它的结论。']),
+        toolCalls([['tool_search', { query: 'subagent' }]]),
+      ];
     }
     if (!delegated && tools.has('subagent')) return [toolCalls([['subagent', DELEGATION]])];
     return text(['Verifier 核对完了：工作区里没有 capture，需要先导入再继续。']);
   }
   if (state.scenario === 'qa:subagent-child') {
     const declared = state.toolResults.some((result) => result.includes('Turn completion recorded'));
-    if (!declared && tools.has('turn_complete')) return [...thinking(['工作区里没有 .rdc 文件，', '结论可以交回。']), toolCalls([['turn_complete', CHILD_COMPLETION]])];
+    if (!declared && tools.has('turn_complete'))
+      return [
+        ...thinking(['工作区里没有 .rdc 文件，', '结论可以交回。']),
+        toolCalls([['turn_complete', CHILD_COMPLETION]]),
+      ];
     return text(['工作区里没有 .rdc capture，需要先导入。']);
   }
   const planning = ['qa:plan', 'qa:partial', 'qa:plan-flow', 'qa:partial-flow'].includes(state.scenario);
@@ -313,12 +447,17 @@ function chatChunks(body) {
   const rejected = state.toolResults.at(-1)?.startsWith('rejected\nfeedback:');
   if (planning && tools.has('plan_artifact') && (state.step === 0 || rejected)) {
     const revision = state.planRevisions + 1;
-    return [...thinking(revision === 1 ? ['先把调查计划写出来，', '交给用户审阅。'] : ['按反馈修改计划，', '补上复核和未知项的步骤。']),
-      toolCalls([['plan_artifact', planRevision(revision)]])];
+    return [
+      ...thinking(
+        revision === 1 ? ['先把调查计划写出来，', '交给用户审阅。'] : ['按反馈修改计划，', '补上复核和未知项的步骤。'],
+      ),
+      toolCalls([['plan_artifact', planRevision(revision)]]),
+    ];
   }
   if (state.scenario === 'qa:partial-flow' && tools.has('turn_complete')) return partialExecution(state, tools);
   const declared = state.toolResults.some((result) => result.includes('Turn completion recorded'));
-  if (tools.has('turn_complete') && state.toolResults.length > 0 && !declared) return [toolCalls([['turn_complete', BLOCKED_COMPLETION]])];
+  if (tools.has('turn_complete') && state.toolResults.length > 0 && !declared)
+    return [toolCalls([['turn_complete', BLOCKED_COMPLETION]])];
   if (state.toolResults.length > 0 || !tools.has('glob')) return text(ANSWER);
   return [...thinking(THINKING), toolCalls([['glob', { pattern: '*' }]])];
 }
@@ -328,7 +467,9 @@ const server = http.createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
     console.log(`[qa-ollama-stub] ${request.method} ${url.pathname}`);
     if (request.method === 'GET' && url.pathname === '/api/tags') {
-      return json(response, 200, { models: MODELS.map(({ name }) => ({ name, model: name, details: { family: name.split(':')[0] } })) });
+      return json(response, 200, {
+        models: MODELS.map(({ name }) => ({ name, model: name, details: { family: name.split(':')[0] } })),
+      });
     }
     if (request.method === 'POST' && url.pathname === '/api/show') {
       const body = await readBody(request);
@@ -343,7 +484,9 @@ const server = http.createServer(async (request, response) => {
     if (request.method === 'POST' && url.pathname === '/api/chat') {
       const body = await readBody(request);
       const state = turnState(body);
-      console.log(`[qa-ollama-stub]   scenario=${state.scenario} step=${state.step} think=${body.think ?? '(unset)'} tools=${(body.tools ?? []).length}`);
+      console.log(
+        `[qa-ollama-stub]   scenario=${state.scenario} step=${state.step} think=${body.think ?? '(unset)'} tools=${(body.tools ?? []).length}`,
+      );
       // The delegated child answers after a pause so the running subagent card stays on screen long enough to inspect.
       if (state.scenario === 'qa:subagent-child' && state.step === 0) await sleep(CHILD_DELAY_MS);
       return await streamChat(response, chatChunks(body));

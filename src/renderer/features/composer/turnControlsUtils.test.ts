@@ -14,12 +14,20 @@ import type { EffectiveModel } from '@shared/types/providerCapability';
 const levelsCapability: EffectiveModel = {
   providerId: 'openai',
   modelId: 'gpt-5.5',
-  label: 'GPT-5.5', aliases: [], enabled: true,
+  label: 'GPT-5.5',
+  aliases: [],
+  enabled: true,
   route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'catalog' },
   availability: 'available',
   presencePolicy: 'maintained',
   contextTiers: [
-    { id: 'default', label: 'Default', maxPromptTokens: 256_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
+    {
+      id: 'default',
+      label: 'Default',
+      maxPromptTokens: 256_000,
+      activation: { kind: 'implicit' },
+      entitlement: 'granted',
+    },
     { id: 'max', label: 'Max', maxPromptTokens: 1_050_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
   ],
   defaultBudgetTokens: 256_000,
@@ -34,20 +42,32 @@ const levelsCapability: EffectiveModel = {
     fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
     maxContext: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'max' },
   },
-  executionBindings: [{
-    id: 'fast:priority', when: { fast: true }, actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }], entitlement: 'granted',
-  }],
-  toolCalling: { state: 'supported' }, visionInput: { state: 'supported' }, structuredOutput: { state: 'supported' },
+  executionBindings: [
+    {
+      id: 'fast:priority',
+      when: { fast: true },
+      actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
+      entitlement: 'granted',
+    },
+  ],
+  toolCalling: { state: 'supported' },
+  visionInput: { state: 'supported' },
+  structuredOutput: { state: 'supported' },
   provenance: [],
 };
 
 describe('turnControlsUtils', () => {
   it('clamps unsupported reasoning levels to the nearest supported level', () => {
-    expect(sanitizeTurnControls({
-      reasoningLevel: 'max',
-      maxContextMode: true,
-      fastModel: true,
-    }, levelsCapability)).toEqual({
+    expect(
+      sanitizeTurnControls(
+        {
+          reasoningLevel: 'max',
+          maxContextMode: true,
+          fastModel: true,
+        },
+        levelsCapability,
+      ),
+    ).toEqual({
       reasoningLevel: 'xhigh',
       maxContextMode: true,
       fastModel: true,
@@ -55,19 +75,24 @@ describe('turnControlsUtils', () => {
   });
 
   it('disables unavailable fast and 1M toggles when capability is absent', () => {
-    expect(sanitizeTurnControls({
-      reasoningLevel: 'medium',
-      maxContextMode: true,
-      fastModel: true,
-    }, {
-      ...levelsCapability,
-      contextTiers: levelsCapability.contextTiers.slice(0, 1),
-      controls: {
-        ...levelsCapability.controls,
-        fast: { state: 'unsupported', fixedValue: false },
-        maxContext: { state: 'unsupported', fixedValue: false },
-      },
-    })).toEqual({
+    expect(
+      sanitizeTurnControls(
+        {
+          reasoningLevel: 'medium',
+          maxContextMode: true,
+          fastModel: true,
+        },
+        {
+          ...levelsCapability,
+          contextTiers: levelsCapability.contextTiers.slice(0, 1),
+          controls: {
+            ...levelsCapability.controls,
+            fast: { state: 'unsupported', fixedValue: false },
+            maxContext: { state: 'unsupported', fixedValue: false },
+          },
+        },
+      ),
+    ).toEqual({
       reasoningLevel: 'medium',
       maxContextMode: false,
       fastModel: false,
@@ -75,33 +100,43 @@ describe('turnControlsUtils', () => {
   });
 
   it('rejects noncanonical reasoning values instead of translating removed aliases', () => {
-    expect(sanitizeTurnControls({
-      reasoningLevel: 'noncanonical',
-      maxContextMode: false,
-      fastModel: false,
-    }, levelsCapability)).toEqual({
+    expect(
+      sanitizeTurnControls(
+        {
+          reasoningLevel: 'noncanonical',
+          maxContextMode: false,
+          fastModel: false,
+        },
+        levelsCapability,
+      ),
+    ).toEqual({
       reasoningLevel: 'medium',
       maxContextMode: false,
       fastModel: false,
     });
 
-    expect(sanitizeTurnControls({
-      reasoningLevel: 'auto',
-      maxContextMode: false,
-      fastModel: false,
-    }, {
-      ...levelsCapability,
-      controls: {
-        ...levelsCapability.controls,
-        reasoning: {
-          kind: 'toggle',
-          supportsOff: true,
-          levels: [],
-          defaultSelection: 'off',
-          wireProfile: { kind: 'none' },
+    expect(
+      sanitizeTurnControls(
+        {
+          reasoningLevel: 'auto',
+          maxContextMode: false,
+          fastModel: false,
         },
-      },
-    })).toEqual({
+        {
+          ...levelsCapability,
+          controls: {
+            ...levelsCapability.controls,
+            reasoning: {
+              kind: 'toggle',
+              supportsOff: true,
+              levels: [],
+              defaultSelection: 'off',
+              wireProfile: { kind: 'none' },
+            },
+          },
+        },
+      ),
+    ).toEqual({
       reasoningLevel: 'off',
       maxContextMode: false,
       fastModel: false,
@@ -115,11 +150,13 @@ describe('turnControlsUtils', () => {
       fastModel: false,
     });
 
-    expect(buildInitialTurnControls(levelsCapability, {
-      reasoningLevel: 'off',
-      maxContextMode: true,
-      fastModel: true,
-    })).toEqual({
+    expect(
+      buildInitialTurnControls(levelsCapability, {
+        reasoningLevel: 'off',
+        maxContextMode: true,
+        fastModel: true,
+      }),
+    ).toEqual({
       reasoningLevel: 'off',
       maxContextMode: true,
       fastModel: true,
@@ -148,18 +185,20 @@ describe('turnControlsUtils', () => {
         ...levelsCapability.controls,
         maxContext: { ...levelsCapability.controls.maxContext, entitlement: 'unknown' as const },
       },
-      contextTiers: levelsCapability.contextTiers.map((tier, index) => (
-        index === 1 ? { ...tier, entitlement: 'unknown' as const } : tier
-      )),
+      contextTiers: levelsCapability.contextTiers.map((tier, index) =>
+        index === 1 ? { ...tier, entitlement: 'unknown' as const } : tier,
+      ),
     };
     expect(hasSelectableMaxContext(unknownTier)).toBe(true);
     expect(isMaxContextUnverified(unknownTier)).toBe(true);
-    expect(hasSelectableMaxContext({
-      ...unknownTier,
-      contextTiers: unknownTier.contextTiers.map((tier, index) => (
-        index === 1 ? { ...tier, entitlement: 'denied' as const } : tier
-      )),
-    })).toBe(false);
+    expect(
+      hasSelectableMaxContext({
+        ...unknownTier,
+        contextTiers: unknownTier.contextTiers.map((tier, index) =>
+          index === 1 ? { ...tier, entitlement: 'denied' as const } : tier,
+        ),
+      }),
+    ).toBe(false);
   });
 
   it('keeps structural Fast/Max visible when entitlement is denied or unverified', () => {
@@ -168,7 +207,12 @@ describe('turnControlsUtils', () => {
       controls: {
         ...levelsCapability.controls,
         fast: { state: 'selectable' as const, defaultValue: false, entitlement: 'denied' as const },
-        maxContext: { state: 'selectable' as const, defaultValue: false, entitlement: 'denied' as const, tierId: 'max' },
+        maxContext: {
+          state: 'selectable' as const,
+          defaultValue: false,
+          entitlement: 'denied' as const,
+          tierId: 'max',
+        },
       },
     };
     expect(hasSelectableFastMode(deniedFast)).toBe(false);

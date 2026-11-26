@@ -24,15 +24,18 @@ export function useAppContextMenu() {
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const targetRef = useRef<ContextMenuTarget | null>(null);
 
-  const labels = useMemo<ContextMenuLabels>(() => ({
-    undo: t('contextMenu.undo'),
-    redo: t('contextMenu.redo'),
-    cut: t('contextMenu.cut'),
-    copy: t('contextMenu.copy'),
-    paste: t('contextMenu.paste'),
-    pasteSanitized: t('contextMenu.pasteSanitized'),
-    selectAll: t('contextMenu.selectAll'),
-  }), [t]);
+  const labels = useMemo<ContextMenuLabels>(
+    () => ({
+      undo: t('contextMenu.undo'),
+      redo: t('contextMenu.redo'),
+      cut: t('contextMenu.cut'),
+      copy: t('contextMenu.copy'),
+      paste: t('contextMenu.paste'),
+      pasteSanitized: t('contextMenu.pasteSanitized'),
+      selectAll: t('contextMenu.selectAll'),
+    }),
+    [t],
+  );
   const shortcuts = useMemo(() => resolveContextMenuShortcuts(navigator.platform), []);
 
   const close = useCallback(() => {
@@ -69,12 +72,15 @@ export function useAppContextMenu() {
     return () => document.removeEventListener('contextmenu', onContextMenu, true);
   }, [labels, readText, shortcuts]);
 
-  const onSelect = useCallback((id: ContextMenuCommandId) => {
-    const target = targetRef.current;
-    close();
-    if (!target) return;
-    void runContextMenuCommand(target, id, { copyText, readText });
-  }, [close, copyText, readText]);
+  const onSelect = useCallback(
+    (id: ContextMenuCommandId) => {
+      const target = targetRef.current;
+      close();
+      if (!target) return;
+      void runContextMenuCommand(target, id, { copyText, readText });
+    },
+    [close, copyText, readText],
+  );
 
   return { menu, close, onSelect };
 }

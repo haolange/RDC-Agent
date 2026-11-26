@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 /** All UI and Agent operations for a native context share this queue. */
 const queues = new Map<string, Promise<unknown>>();
 const locks = new Map<string, Set<string>>();
@@ -7,24 +8,31 @@ export function beginRdcLifecycle(sessionId: string): () => void {
   lifecycles.set(sessionId, (lifecycles.get(sessionId) ?? 0) + 1);
   return () => {
     const remaining = (lifecycles.get(sessionId) ?? 1) - 1;
-    if (remaining) lifecycles.set(sessionId, remaining); else lifecycles.delete(sessionId);
+    if (remaining) lifecycles.set(sessionId, remaining);
+    else lifecycles.delete(sessionId);
   };
 }
 export function acquireRdcPreparationLock(sessionId: string, owner: string): void {
-  if (lifecycles.has(sessionId)) throw new Error('RDC_REPLAY_BUSY: wait for capture lifecycle completion.');
+  if (lifecycles.has(sessionId)) throw new AppError('RDC_REPLAY_BUSY', 'wait for capture lifecycle completion.');
   setRdcInteractionLock(sessionId, owner, true);
 }
 export function runRdcOperation<T>(contextId: string, operation: () => Promise<T>): Promise<T> {
   const previous = queues.get(contextId) ?? Promise.resolve();
   const pending = previous.catch(() => undefined).then(operation);
   queues.set(contextId, pending);
-  void pending.finally(() => { if (queues.get(contextId) === pending) queues.delete(contextId); }).catch(() => undefined);
+  void pending
+    .finally(() => {
+      if (queues.get(contextId) === pending) queues.delete(contextId);
+    })
+    .catch(() => undefined);
   return pending;
 }
 export function setRdcInteractionLock(sessionId: string, owner: string, locked: boolean): void {
   const entries = locks.get(sessionId) ?? new Set<string>();
-  if (locked) entries.add(owner); else entries.delete(owner);
-  if (entries.size) locks.set(sessionId, entries); else locks.delete(sessionId);
+  if (locked) entries.add(owner);
+  else entries.delete(owner);
+  if (entries.size) locks.set(sessionId, entries);
+  else locks.delete(sessionId);
   for (const listener of listeners) listener(sessionId);
 }
 export function getRdcInteractionLock(sessionId: string): string | null {
@@ -34,5 +42,8 @@ export function ownsRdcInteractionLock(sessionId: string, turnId: string): boole
   return locks.get(sessionId)?.has(turnId) === true;
 }
 export function subscribeRdcInteractionLock(listener: (sessionId: string) => void): () => void {
-  listeners.add(listener); return () => { listeners.delete(listener); };
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }

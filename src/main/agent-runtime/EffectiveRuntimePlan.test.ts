@@ -35,33 +35,74 @@ const basePermission = {
 
 describe('EffectiveRuntimePlan', () => {
   it('rebuilds only the RDC identity and prompt while preserving frozen authority', () => {
-    const original = buildEffectiveRuntimePlan({ agentId: 'general', projectRootPath: 'D:/Project', projectId: 'p',
-      profile: { skills: ['inspect'], maxTurns: 17, agents: ['verifier'], handoffs: [{ agent: 'general', label: 'Execute', prompt: 'Go', requiredSkillIds: ['inspect'] }] },
-      toolAllowlist: ['read_file', 'rdc_probe'], permissionConstraints: basePermission, routeCapability,
-      requestPlan: { executionIdentity: { fingerprint: 'request' } }, promptPlan: { systemPrompt: 'old identity' },
-      policy: compileFixturePolicy({ limits: { maxTurns: 20 } }), rdcBindingFingerprint: 'old-rdc',
-      skillIntersection: ['read_file'], visibleToolNames: ['read_file'], activatedDeferredTools: ['investigation_read'],
-      mcpDescriptorHash: 'mcp', attachmentManifestFingerprint: 'attachments' });
-    const same = rebuildEffectiveRuntimePlan(original, { rdcBindingFingerprint: 'old-rdc', systemPrompt: 'old identity' });
+    const original = buildEffectiveRuntimePlan({
+      agentId: 'general',
+      projectRootPath: 'D:/Project',
+      projectId: 'p',
+      profile: {
+        skills: ['inspect'],
+        maxTurns: 17,
+        agents: ['verifier'],
+        handoffs: [{ agent: 'general', label: 'Execute', prompt: 'Go', requiredSkillIds: ['inspect'] }],
+      },
+      toolAllowlist: ['read_file', 'rdc_probe'],
+      permissionConstraints: basePermission,
+      routeCapability,
+      requestPlan: { executionIdentity: { fingerprint: 'request' } },
+      promptPlan: { systemPrompt: 'old identity' },
+      policy: compileFixturePolicy({ limits: { maxTurns: 20 } }),
+      rdcBindingFingerprint: 'old-rdc',
+      skillIntersection: ['read_file'],
+      visibleToolNames: ['read_file'],
+      activatedDeferredTools: ['investigation_read'],
+      mcpDescriptorHash: 'mcp',
+      attachmentManifestFingerprint: 'attachments',
+    });
+    const same = rebuildEffectiveRuntimePlan(original, {
+      rdcBindingFingerprint: 'old-rdc',
+      systemPrompt: 'old identity',
+    });
     expect(same.fingerprint).toBe(original.fingerprint);
-    const next = rebuildEffectiveRuntimePlan(original, { rdcBindingFingerprint: 'new-rdc', systemPrompt: 'new identity' });
+    const next = rebuildEffectiveRuntimePlan(original, {
+      rdcBindingFingerprint: 'new-rdc',
+      systemPrompt: 'new identity',
+    });
     expect(next.fingerprint).not.toBe(original.fingerprint);
     expect(next.planId).not.toBe(original.planId);
-    expect(next).toMatchObject({ profileSkills: original.profileSkills, profileMaxTurns: 17, profileDelegates: original.profileDelegates,
-      permissionConstraints: original.permissionConstraints, policyFingerprint: original.policyFingerprint,
-      toolAllowlist: original.toolAllowlist, skillIntersection: original.skillIntersection,
-      requestPlanFingerprint: original.requestPlanFingerprint, rdcBindingFingerprint: 'new-rdc' });
+    expect(next).toMatchObject({
+      profileSkills: original.profileSkills,
+      profileMaxTurns: 17,
+      profileDelegates: original.profileDelegates,
+      permissionConstraints: original.permissionConstraints,
+      policyFingerprint: original.policyFingerprint,
+      toolAllowlist: original.toolAllowlist,
+      skillIntersection: original.skillIntersection,
+      requestPlanFingerprint: original.requestPlanFingerprint,
+      rdcBindingFingerprint: 'new-rdc',
+    });
     expect(original.rdcBindingFingerprint).toBe('old-rdc');
   });
   it('freezes declaration translations independently of later profile edits', () => {
     const translations = { 'zh-CN': '执行计划' };
-    const plan = buildEffectiveRuntimePlan({ agentId: 'general', projectRootPath: null,
-      profile: { skills: [], handoffs: [{ agent: 'custom', label: 'Implement Plan', prompt: 'Go', labelTranslations: translations }] },
-      toolAllowlist: [], permissionConstraints: basePermission, routeCapability, policy: compileFixturePolicy({}),
-      requestPlan: { executionIdentity: { fingerprint: 'exec' } }, promptPlan: { systemPrompt: 'system' },
+    const plan = buildEffectiveRuntimePlan({
+      agentId: 'general',
+      projectRootPath: null,
+      profile: {
+        skills: [],
+        handoffs: [{ agent: 'custom', label: 'Implement Plan', prompt: 'Go', labelTranslations: translations }],
+      },
+      toolAllowlist: [],
+      permissionConstraints: basePermission,
+      routeCapability,
+      policy: compileFixturePolicy({}),
+      requestPlan: { executionIdentity: { fingerprint: 'exec' } },
+      promptPlan: { systemPrompt: 'system' },
     });
     translations['zh-CN'] = 'Changed';
-    expect(plan.profileHandoffs[0]).toMatchObject({ label: 'Implement Plan', labelTranslations: { 'zh-CN': '执行计划' } });
+    expect(plan.profileHandoffs[0]).toMatchObject({
+      label: 'Implement Plan',
+      labelTranslations: { 'zh-CN': '执行计划' },
+    });
     expect(Object.isFrozen(plan.profileHandoffs[0].labelTranslations)).toBe(true);
   });
   it('freezes permission/policy/tool allowlist under a stable fingerprint', () => {
@@ -274,10 +315,15 @@ describe('EffectiveRuntimePlan', () => {
       activatedDeferredTools: [],
       mcpDescriptorHash: null,
     });
-    expect(activeToolNamesForPlan([
-      { name: 'read_file', description: '', parameters: { type: 'object', properties: {} } },
-      { name: 'shell', description: '', parameters: { type: 'object', properties: {} } },
-    ], plan)).toEqual(['read_file']);
+    expect(
+      activeToolNamesForPlan(
+        [
+          { name: 'read_file', description: '', parameters: { type: 'object', properties: {} } },
+          { name: 'shell', description: '', parameters: { type: 'object', properties: {} } },
+        ],
+        plan,
+      ),
+    ).toEqual(['read_file']);
 
     const openPlan = buildEffectiveRuntimePlan({
       agentId: 'ask',
@@ -294,10 +340,15 @@ describe('EffectiveRuntimePlan', () => {
       activatedDeferredTools: [],
       mcpDescriptorHash: null,
     });
-    expect(activeToolNamesForPlan([
-      { name: 'a', description: '', parameters: { type: 'object', properties: {} } },
-      { name: 'b', description: '', parameters: { type: 'object', properties: {} } },
-    ], openPlan)).toEqual(['a', 'b']);
+    expect(
+      activeToolNamesForPlan(
+        [
+          { name: 'a', description: '', parameters: { type: 'object', properties: {} } },
+          { name: 'b', description: '', parameters: { type: 'object', properties: {} } },
+        ],
+        openPlan,
+      ),
+    ).toEqual(['a', 'b']);
   });
 
   it('freezes min(user, policy) compaction percent into the fingerprint', () => {
@@ -382,21 +433,33 @@ describe('EffectiveRuntimePlan', () => {
     expect(plan.toolAllowlist).toEqual(['read_file', 'runtime_context', 'shell']);
     expect(plan.skillIntersection).toEqual(['read_file', 'runtime_context']);
     expect(plan.visibleToolNames).toEqual(['read_file', 'runtime_context', 'shell']);
-    expect(activeToolNamesForPlan([
-      { name: 'runtime_context', description: '', parameters: { type: 'object', properties: {} } },
-      { name: 'shell', description: '', parameters: { type: 'object', properties: {} } },
-    ], plan)).toEqual(['runtime_context', 'shell']);
+    expect(
+      activeToolNamesForPlan(
+        [
+          { name: 'runtime_context', description: '', parameters: { type: 'object', properties: {} } },
+          { name: 'shell', description: '', parameters: { type: 'object', properties: {} } },
+        ],
+        plan,
+      ),
+    ).toEqual(['runtime_context', 'shell']);
   });
 
   it('excludes new delegation from every frozen tool view at the depth limit', () => {
     const policy = compileFixturePolicy({ limits: { maxChildDepth: 1 } });
     const base = {
-      agentId: 'general', projectRootPath: 'D:/Project', profile: { skills: [] },
-      toolAllowlist: ['read_file', 'subagent'], permissionConstraints: basePermission,
-      routeCapability, requestPlan: { executionIdentity: { fingerprint: 'depth' } },
-      promptPlan: { systemPrompt: 'system' }, policy,
-      skillIntersection: ['read_file', 'subagent'], visibleToolNames: ['read_file', 'subagent'],
-      activatedDeferredTools: [] as string[], mcpDescriptorHash: null,
+      agentId: 'general',
+      projectRootPath: 'D:/Project',
+      profile: { skills: [] },
+      toolAllowlist: ['read_file', 'subagent'],
+      permissionConstraints: basePermission,
+      routeCapability,
+      requestPlan: { executionIdentity: { fingerprint: 'depth' } },
+      promptPlan: { systemPrompt: 'system' },
+      policy,
+      skillIntersection: ['read_file', 'subagent'],
+      visibleToolNames: ['read_file', 'subagent'],
+      activatedDeferredTools: [] as string[],
+      mcpDescriptorHash: null,
     };
     const root = buildEffectiveRuntimePlan(base);
     const child = buildEffectiveRuntimePlan({ ...base, excludeSubagent: true });
@@ -404,10 +467,15 @@ describe('EffectiveRuntimePlan', () => {
     expect(child.toolAllowlist).toEqual(['read_file']);
     expect(child.skillIntersection).toEqual(['read_file']);
     expect(child.visibleToolNames).toEqual(['read_file']);
-    expect(activeToolNamesForPlan([
-      { name: 'read_file', description: '', parameters: { type: 'object', properties: {} } },
-      { name: 'subagent', description: '', parameters: { type: 'object', properties: {} } },
-    ], child)).toEqual(['read_file']);
+    expect(
+      activeToolNamesForPlan(
+        [
+          { name: 'read_file', description: '', parameters: { type: 'object', properties: {} } },
+          { name: 'subagent', description: '', parameters: { type: 'object', properties: {} } },
+        ],
+        child,
+      ),
+    ).toEqual(['read_file']);
     expect(child.fingerprint).not.toBe(root.fingerprint);
   });
 
@@ -418,11 +486,19 @@ describe('EffectiveRuntimePlan', () => {
       { id: 'retired', enabled: false, disableModelInvocation: false },
     ]);
     expect(delegable).toEqual(['verifier']);
-    const plan = buildEffectiveRuntimePlan({ agentId: 'general', projectRootPath: 'D:/Project', projectId: 'p',
-      profile: { skills: [], agents: ['verifier', 'reviewer', 'retired'] }, delegableProfileIds: delegable,
-      toolAllowlist: ['read_file'], permissionConstraints: basePermission, routeCapability,
-      requestPlan: { executionIdentity: { fingerprint: 'request' } }, promptPlan: { systemPrompt: 'identity' },
-      policy: compileFixturePolicy({}) } as never);
+    const plan = buildEffectiveRuntimePlan({
+      agentId: 'general',
+      projectRootPath: 'D:/Project',
+      projectId: 'p',
+      profile: { skills: [], agents: ['verifier', 'reviewer', 'retired'] },
+      delegableProfileIds: delegable,
+      toolAllowlist: ['read_file'],
+      permissionConstraints: basePermission,
+      routeCapability,
+      requestPlan: { executionIdentity: { fingerprint: 'request' } },
+      promptPlan: { systemPrompt: 'identity' },
+      policy: compileFixturePolicy({}),
+    } as never);
     expect(plan.profileDelegates).toEqual(['verifier']);
   });
 });

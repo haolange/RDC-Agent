@@ -6,39 +6,11 @@
   gap: var(--space-4);
 }
 
-.settings-manifest-toolbar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.settings-manifest-actions {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.settings-manifest-actions .button {
-  min-height: var(--btn-height-md);
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-md);
-}
-
 .settings-manifest-layout {
   display: grid;
   grid-template-columns: minmax(15rem, 0.36fr) minmax(0, 0.64fr);
   min-height: 0;
   flex: 1;
-  gap: var(--space-4);
-}
-
-.settings-manifest-form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
 }
 
@@ -96,33 +68,13 @@
   }
 
   .settings-manifest-page:not(.is-detail-open) .settings-manifest-detail,
-  .settings-manifest-page.is-detail-open :is(
-    .settings-manifest-list-column, .settings-agent-defaults, .settings-manifest-page-toolbar
-  ) {
+  .settings-manifest-page.is-detail-open
+    :is(.settings-manifest-list-column, .settings-agent-defaults, .settings-manifest-page-toolbar) {
     display: none;
   }
 
   .settings-agent-back.button {
     display: inline-flex;
     margin-block-end: var(--space-2);
-  }
-
-  .settings-page-agents .settings-manifest-layout {
-    height: auto;
-    min-height: 0;
-    overflow: visible;
-  }
-}
-
-@container settings-panel (max-width: 48rem) {
-  .settings-page-agents .settings-manifest-page,
-  .settings-page-agents .settings-manifest-layout {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-  }
-
-  .settings-page-agents .settings-manifest-actions {
-    justify-content: flex-start;
   }
 }

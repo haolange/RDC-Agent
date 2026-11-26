@@ -2,42 +2,42 @@ import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { generateEventId } from '@shared/utils/id';
+import { conversationTurnIds } from '@shared/conversation/conversationTurnIds';
+import { AppError } from '@shared/errors/appError';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
-import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
+import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
 import { traceService } from '../agent-trace/TraceService';
-import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
-import { resolvePlanReference } from './planReferenceResolution';
-import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
 import {
-  answerConversationPlanReview,
-  answerConversationToolApproval,
-  answerConversationUserInput,
-} from './ConversationInteractionAnswers';
-import { conversationRdcHost } from './conversationRdcHost';
-import { sessionContextJournal } from './SessionContextJournal';
+  conversationHistoryStore,
+  projectWorkspaceStore,
+  sessionContextStore,
+  sessionRecordStore,
+} from '../sessions/store/sessionStores';
+import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
+import { sessionContextJournal } from '../agent-runtime/context/SessionContextJournal';
 import {
   createDefaultBranchState,
   normalizeBranchId,
   repairConversationBranchState,
   resolveVisibleConversationMessages,
-} from './ConversationBranchResolver';
-import { canonicalJson } from './ConversationRoutePreflight';
-import { prepareConversationPrompt as buildConversationPrompt, type PrepareConversationPromptInput } from './ConversationPromptPreparer';
-import { hashAttachmentContents } from './ConversationAttachmentHashing';
-import { startProfileTurn as runStartProfileTurn } from './ConversationTurnStarter';
-import { completeProfileTurn as runCompleteProfileTurn, type CompleteProfileTurnInput, type ConversationTurnRunnerHost } from './ConversationTurnRunner';
+} from '../sessions/store/ConversationBranchResolver';
+import { hashAttachmentContents } from '../agent-runtime/attachments/ConversationAttachmentHashing';
+import { reportProcessFault } from '../runtime/processFaultHandlers';
+import { resolvePlanReference } from './planReferenceResolution';
 import {
-  persistConversationSnapshot,
-  assertTerminalContextOwnership,
-  emitConversationEvent,
-  publishConversationTrace,
-  publishTraceProjection,
-  ephemeralTraceSessionId,
-} from './ConversationTurnTerminal';
+  reconcileDelegatedInteractionRequests,
+  reconcileInterruptedConversationTurn,
+} from './DelegatedInteractionRecovery';
+import { conversationRdcHost } from './conversationRdcHost';
+import { canonicalJson } from './ConversationRoutePreflight';
+import {
+  startProfileTurn as runStartProfileTurn,
+  type PreparingConversationRequests,
+  type ProfileTurnStart,
+} from './ConversationTurnStarter';
+import { conversationTurnOutput, publishConversationTrace, publishTraceProjection } from './ConversationTurnTerminal';
+import type { ActiveConversationTurns } from './ConversationTurnRunner';
 import type { SessionRecord } from '@shared/types/session';
-import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type {
   ConversationBranchState,
   ConversationSwitchBranchRequest,
@@ -52,11 +52,7 @@ import type {
   ConversationSendRequest,
   ConversationTurnResult,
 } from '@shared/types/conversation';
-import type {
-  ConversationBranchTurnContext,
-  ActiveConversationTurn,
-  ResolvedConversationContext,
-} from './ConversationRoutePreflight';
+import type { ActiveConversationTurn, ResolvedConversationContext } from './ConversationRoutePreflight';
 
 interface ConversationContextInput extends ConversationSendRequest {
   fallbackProjectId?: string | null;
@@ -68,17 +64,21 @@ interface ConversationRewriteContextInput extends ConversationRewriteFromMessage
   fallbackSessionId?: string | null;
   fallbackRunId?: string | null;
 }
-export class ConversationService {
-  private acceptingTurns = true; private activeTurns = new Map<string, ActiveConversationTurn>();
-  private readonly preparingRequests = new Map<string, {
-    requestId: string;
-    controller: AbortController;
-    phase: 'preparing' | 'committing';
-    scopeKey: string;
-    cancelAfterCommit: boolean;
-    credentialHandle?: string;
-    credentialLeaseTransferred: boolean;
-  }>();
+export class ConversationService implements ActiveConversationTurns, PreparingConversationRequests {
+  private acceptingTurns = true;
+  private activeTurns = new Map<string, ActiveConversationTurn>();
+  private readonly preparingRequests = new Map<
+    string,
+    {
+      requestId: string;
+      controller: AbortController;
+      phase: 'preparing' | 'committing';
+      scopeKey: string;
+      cancelAfterCommit: boolean;
+      credentialHandle?: string;
+      credentialLeaseTransferred: boolean;
+    }
+  >();
   private readonly sendRequests = new Map<string, Promise<ConversationTurnResult>>();
   private readonly sendRequestFingerprints = new Map<string, string>();
   private readonly activeSendScopes = new Map<string, string>();
@@ -90,8 +90,12 @@ export class ConversationService {
     return this.activeTurns.get(turnId)?.sessionId === sessionId;
   }
   isSessionBusy(sessionId: string): boolean {
-    return [...this.activeTurns.values()].some(turn => turn.sessionId === sessionId)
-      || [...this.preparingRequests.values()].some(request => request.scopeKey === sessionId || request.scopeKey.endsWith(`:${sessionId}`));
+    return (
+      [...this.activeTurns.values()].some((turn) => turn.sessionId === sessionId) ||
+      [...this.preparingRequests.values()].some(
+        (request) => request.scopeKey === sessionId || request.scopeKey.endsWith(`:${sessionId}`),
+      )
+    );
   }
 
   async abortAllTurns(): Promise<void> {
@@ -112,13 +116,13 @@ export class ConversationService {
     branchState: ConversationBranchState | null;
     planReview: import('@shared/types/planReview').PlanReviewProjection;
   }> {
-    const allMessages = storageAdapter.readConversationHistory(sessionId).map((message) => {
+    const allMessages = conversationHistoryStore.readConversationHistory(sessionId).map((message) => {
       const recovered = reconcileInterruptedConversationTurn(
         reconcileDelegatedInteractionRequests(sessionId, message),
         this.activeTurns.has(message.turnId),
         message.updatedAt,
       );
-      if (recovered !== message) storageAdapter.appendConversationMessage(sessionId, recovered);
+      if (recovered !== message) conversationHistoryStore.appendConversationMessage(sessionId, recovered);
       return recovered;
     });
     const branchState = this.readRepairedBranchState(sessionId, allMessages);
@@ -132,16 +136,16 @@ export class ConversationService {
   }
 
   async clearHistory(sessionId: string): Promise<ConversationMessage[]> {
-    const stopped = await this.cancelActiveTurn({ sessionId });
-    if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${sessionId}.`);
-    storageAdapter.writeConversationHistory(sessionId, []);
-    storageAdapter.clearSessionContextState(sessionId);
+    // With a session id a stop either joins that session's work or rejects; there is no "nothing matched" here.
+    await this.cancelActiveTurn({ sessionId });
+    conversationHistoryStore.writeConversationHistory(sessionId, []);
+    sessionContextStore.clearSessionContextState(sessionId);
     publishConversationTrace(sessionId, [], sessionId, publishTraceProjection);
     return [];
   }
 
   async undoLastTurn(sessionId: string): Promise<ConversationMessage[]> {
-    const history = storageAdapter.readConversationHistory(sessionId);
+    const history = conversationHistoryStore.readConversationHistory(sessionId);
     const lastUserMessage = history
       .slice()
       .reverse()
@@ -151,8 +155,8 @@ export class ConversationService {
     }
 
     const nextHistory = history.filter((message) => message.turnId !== lastUserMessage.turnId);
-    storageAdapter.writeConversationHistory(sessionId, nextHistory);
-    storageAdapter.writeSessionContextJournal(
+    conversationHistoryStore.writeConversationHistory(sessionId, nextHistory);
+    sessionContextStore.writeSessionContextJournal(
       sessionId,
       sessionContextJournal.readEntries(sessionId).filter((entry) => entry.turnId !== lastUserMessage.turnId),
     );
@@ -165,15 +169,13 @@ export class ConversationService {
   ): Promise<ConversationCancelActiveTurnResult> {
     const preparingEntry = request.requestId
       ? Array.from(this.preparingRequests.entries()).find(([, entry]) => {
-        if (entry.requestId !== request.requestId) return false;
-        if (request.sessionId && !entry.scopeKey.includes(request.sessionId)) return false;
-        return true;
-      })
-      : Array.from(this.preparingRequests.entries())
-          .find(([, entry]) => {
-            if (request.sessionId && !entry.scopeKey.includes(request.sessionId)) return false;
-            return entry.phase === 'preparing' || entry.phase === 'committing';
-          });
+          if (entry.requestId !== request.requestId) return false;
+          if (request.sessionId && !entry.scopeKey.includes(request.sessionId)) return false;
+          return true;
+        })
+      : Array.from(this.preparingRequests.entries()).find(
+          ([, entry]) => !request.sessionId || entry.scopeKey.includes(request.sessionId),
+        );
     const preparing = preparingEntry?.[1];
     const preparingRequestId = preparing?.requestId;
     if (preparing && preparingRequestId) {
@@ -196,7 +198,7 @@ export class ConversationService {
         await agentOrchestrator.backgroundSubagents.abortSession(request.sessionId);
         return { success: true, phase: 'running' };
       }
-      return { success: false, error: 'No active conversation turn.' };
+      return { success: false, reason: 'no-active-turn' };
     }
 
     target.stop();
@@ -210,14 +212,11 @@ export class ConversationService {
     };
   }
 
-  answerUserInput = answerConversationUserInput;
-  answerPlanReview = answerConversationPlanReview;
-  answerToolApproval = answerConversationToolApproval;
-  private registerActiveTurn(turn: ActiveConversationTurn): void {
+  registerActiveTurn(turn: ActiveConversationTurn): void {
     this.activeTurns.set(turn.turnId, turn);
     if (turn.sessionId) conversationRdcHost().setInteractionLock(turn.sessionId, turn.turnId, true);
   }
-  private clearActiveTurn(turnId: string, controller: AbortController): void {
+  clearActiveTurn(turnId: string, controller: AbortController): void {
     const active = this.activeTurns.get(turnId);
     if (active?.abortController === controller) {
       const sessionId = active.sessionId;
@@ -226,7 +225,7 @@ export class ConversationService {
       // Background Task settlement updates its own projection, not the parent turn.
     }
   }
-  private getPreparingRequestByRequestId(requestId: string) {
+  getPreparingRequestByRequestId(requestId: string) {
     for (const entry of this.preparingRequests.values()) {
       if (entry.requestId === requestId) return entry;
     }
@@ -248,11 +247,14 @@ export class ConversationService {
     }
   }
 
-  private resolveIdempotencyScope(
-    input: ConversationContextInput | ConversationRewriteContextInput,
-  ): { scopeType: 'session' | 'project'; scopeId: string; scopeKey: string; idempotencyKey: string } {
-    const requestId = input.requestId?.trim();
-    if (!requestId) throw new Error('PREFLIGHT_FAILED: requestId is required.');
+  private resolveIdempotencyScope(input: ConversationContextInput | ConversationRewriteContextInput): {
+    scopeType: 'session' | 'project';
+    scopeId: string;
+    scopeKey: string;
+    idempotencyKey: string;
+  } {
+    const requestId = input.requestId.trim();
+    if (!requestId) throw new AppError('PREFLIGHT_FAILED', 'requestId is required.');
     const sessionId = input.sessionId ?? input.fallbackSessionId ?? null;
     if (sessionId) {
       return {
@@ -279,34 +281,36 @@ export class ConversationService {
     const attachments = stagedAttachments ?? input.attachments ?? [];
     const contentHashes = await hashAttachmentContents(attachments, signal);
     // Preserve attachment order — image order is semantic for multimodal prompts.
-    const attachmentHashes = attachments.map((attachment, index) => (
+    const attachmentHashes = attachments.map((attachment, index) =>
       createHash('sha256')
-        .update(canonicalJson({
-          fileName: attachment.fileName,
-          mimeType: attachment.mimeType ?? null,
-          declaredSize: attachment.size ?? null,
-          material: attachment.material ?? null,
-          contentHash: contentHashes[index],
-        }))
-        .digest('hex')
-    ));
-    const branchAnchor = 'messageId' in input && typeof input.messageId === 'string'
-      ? input.messageId
-      : null;
+        .update(
+          canonicalJson({
+            fileName: attachment.fileName,
+            mimeType: attachment.mimeType ?? null,
+            declaredSize: attachment.size ?? null,
+            material: attachment.material ?? null,
+            contentHash: contentHashes[index],
+          }),
+        )
+        .digest('hex'),
+    );
+    const branchAnchor = 'messageId' in input && typeof input.messageId === 'string' ? input.messageId : null;
     return createHash('sha256')
-      .update(canonicalJson({
-        sessionId: input.sessionId ?? input.fallbackSessionId ?? null,
-        projectId: input.projectId ?? input.fallbackProjectId ?? null,
-        message: input.message.trim(),
-        attachmentHashes,
-        agentId: input.agentId ?? input.profileId ?? null,
-        profileId: input.profileId ?? input.agentId ?? null,
-        turnControls: input.turnControls,
-        preloadSkillIds: [...(input.preloadSkillIds ?? [])].sort(),
-        branchAnchor,
-        configurationCommit: input.configurationCommit ?? null,
-        planReference: input.planReference ?? null,
-      }))
+      .update(
+        canonicalJson({
+          sessionId: input.sessionId ?? input.fallbackSessionId ?? null,
+          projectId: input.projectId ?? input.fallbackProjectId ?? null,
+          message: input.message.trim(),
+          attachmentHashes,
+          agentId: input.agentId ?? input.profileId ?? null,
+          profileId: input.profileId ?? input.agentId ?? null,
+          turnControls: input.turnControls,
+          preloadSkillIds: [...(input.preloadSkillIds ?? [])].sort(),
+          branchAnchor,
+          configurationCommit: input.configurationCommit ?? null,
+          planReference: input.planReference ?? null,
+        }),
+      )
       .digest('hex');
   }
 
@@ -317,7 +321,7 @@ export class ConversationService {
     const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), `rdc-agent-att-fp-${requestId.slice(0, 24)}-`));
     try {
       const sourcePaths = attachments.map((attachment) => attachment.sourcePath);
-      const stagedPaths = storageAdapter.history.stageAttachmentInputs(sourcePaths, stagingDir);
+      const stagedPaths = conversationHistoryStore.stageAttachmentInputs(sourcePaths, stagingDir);
       const stagedAttachments = attachments.map((attachment, index) => ({
         ...attachment,
         sourcePath: stagedPaths[index]!,
@@ -332,7 +336,7 @@ export class ConversationService {
   private assertFingerprintMatch(idempotencyKey: string, fingerprint: string): void {
     const existingFingerprint = this.sendRequestFingerprints.get(idempotencyKey);
     if (existingFingerprint && existingFingerprint !== fingerprint) {
-      throw new Error('REQUEST_ID_CONFLICT: requestId already belongs to a different request fingerprint.');
+      throw new AppError('REQUEST_ID_CONFLICT', 'requestId already belongs to a different request fingerprint.');
     }
   }
 
@@ -344,41 +348,39 @@ export class ConversationService {
     const explicitSessionId = input.sessionId ?? input.fallbackSessionId ?? null;
     const explicitProjectId = input.projectId ?? input.fallbackProjectId ?? null;
     const sessions = explicitSessionId
-      ? [storageAdapter.readSession(explicitSessionId)].filter((entry): entry is SessionRecord => entry !== null)
+      ? [sessionRecordStore.readSession(explicitSessionId)].filter((entry): entry is SessionRecord => entry !== null)
       : explicitProjectId
-        ? storageAdapter.listSessions(explicitProjectId)
+        ? sessionRecordStore.listSessions(explicitProjectId)
         : [];
     for (const session of sessions) {
-      const history = storageAdapter.readConversationHistory(session.sessionId);
+      const history = conversationHistoryStore.readConversationHistory(session.sessionId);
       const requestMessages = history.filter((message) => message.requestId === requestId);
       const userMessage = requestMessages.find((message) => message.role === 'user');
       const assistantDraftMessage = requestMessages.find((message) => message.role === 'assistant');
       const preparedContext = userMessage?.preparedContext ?? assistantDraftMessage?.preparedContext;
       if (!userMessage || !assistantDraftMessage || !preparedContext) continue;
       if (userMessage.content !== input.message.trim()) {
-        throw new Error('REQUEST_ID_CONFLICT: requestId already belongs to a different user message.');
+        throw new AppError('REQUEST_ID_CONFLICT', 'requestId already belongs to a different user message.');
       }
       if (userMessage.requestFingerprint !== requestFingerprint) {
-        throw new Error('REQUEST_ID_CONFLICT: persisted request fingerprint is missing or differs from this request.');
+        throw new AppError(
+          'REQUEST_ID_CONFLICT',
+          'persisted request fingerprint is missing or differs from this request.',
+        );
       }
       const requestedCatalogRevision = input.configurationCommit?.providerCatalogRevision;
-      if (
-        requestedCatalogRevision
-        && requestedCatalogRevision !== preparedContext.route.catalogRevision
-      ) {
-        throw new Error('REQUEST_ID_CONFLICT: requestId already belongs to a different frozen route.');
+      if (requestedCatalogRevision && requestedCatalogRevision !== preparedContext.route.catalogRevision) {
+        throw new AppError('REQUEST_ID_CONFLICT', 'requestId already belongs to a different frozen route.');
       }
       const branchState = this.readRepairedBranchState(session.sessionId, history);
-      const messages = branchState
-        ? resolveVisibleConversationMessages(history, branchState)
-        : history;
-      const tracePresentation = await traceService.buildConversationPresentation(
-        session.sessionId,
-        [userMessage, assistantDraftMessage],
-      );
+      const messages = branchState ? resolveVisibleConversationMessages(history, branchState) : history;
+      const tracePresentation = await traceService.buildConversationPresentation(session.sessionId, [
+        userMessage,
+        assistantDraftMessage,
+      ]);
       return {
         requestId,
-        session,
+        session: sessionRecordStore.readSessionSnapshot(session.sessionId),
         mode: 'talk',
         userMessage,
         assistantDraftMessage,
@@ -386,7 +388,8 @@ export class ConversationService {
         branchState,
         executionTransition: { action: 'none' },
         runUpdate: assistantDraftMessage.runId
-          ? storageAdapter.listRuns(session.sessionId).find(run => run.runId === assistantDraftMessage.runId) ?? null
+          ? (sessionRecordStore.listRuns(session.sessionId).find((run) => run.runId === assistantDraftMessage.runId) ??
+            null)
           : null,
         tracePresentation,
         errorViewModel: assistantDraftMessage.diagnostic
@@ -412,10 +415,10 @@ export class ConversationService {
     ) => Promise<ConversationTurnResult>,
   ): Promise<ConversationTurnResult> {
     if (!this.acceptingTurns) {
-      throw new Error('SHUTTING_DOWN: conversation service is no longer accepting turns.');
+      throw new AppError('SHUTTING_DOWN', 'conversation service is no longer accepting turns.');
     }
-    const requestId = input.requestId?.trim();
-    if (!requestId) throw new Error('PREFLIGHT_FAILED: requestId is required.');
+    const requestId = input.requestId.trim();
+    if (!requestId) throw new AppError('PREFLIGHT_FAILED', 'requestId is required.');
     const { scopeKey, idempotencyKey } = this.resolveIdempotencyScope(input);
 
     const controller = new AbortController();
@@ -426,7 +429,7 @@ export class ConversationService {
     if (ownsPreparation) {
       const scopeOwner = this.activeSendScopes.get(scopeKey);
       if (scopeOwner && scopeOwner !== requestId) {
-        throw new Error('CONVERSATION_BUSY: another request is preparing for this conversation.');
+        throw new AppError('CONVERSATION_BUSY', 'another request is preparing for this conversation.');
       }
       if (scopeKey.startsWith('session:')) conversationRdcHost().acquirePreparationLock(scopeKey.slice(8), requestId);
       this.activeSendScopes.set(scopeKey, requestId);
@@ -441,18 +444,19 @@ export class ConversationService {
     }
     const activeController = existingPreparation?.controller ?? controller;
 
-    const releasePreparation = (releaseRegistry = ownsPreparation): void => {
+    const releasePreparation = (): void => {
       if (stagingDir) {
         fs.rmSync(stagingDir, { recursive: true, force: true });
         stagingDir = null;
       }
-      if (!releaseRegistry) return;
+      if (!ownsPreparation) return;
       const requestState = this.preparingRequests.get(idempotencyKey);
       if (requestState?.credentialHandle && !requestState.credentialLeaseTransferred) {
         agentOrchestrator.releaseProviderRuntimeCredentials(requestState.credentialHandle);
       }
       this.preparingRequests.delete(idempotencyKey);
-      if (scopeKey.startsWith('session:')) conversationRdcHost().setInteractionLock(scopeKey.slice(8), requestId, false);
+      if (scopeKey.startsWith('session:'))
+        conversationRdcHost().setInteractionLock(scopeKey.slice(8), requestId, false);
       if (this.activeSendScopes.get(scopeKey) === requestId) this.activeSendScopes.delete(scopeKey);
     };
 
@@ -460,7 +464,7 @@ export class ConversationService {
       const attachments = input.attachments ?? [];
       for (const attachment of attachments) {
         if (!attachment.sourcePath || typeof attachment.sourcePath !== 'string') {
-          throw new Error('PREFLIGHT_FAILED: attachment sourcePath is required.');
+          throw new AppError('PREFLIGHT_FAILED', 'attachment sourcePath is required.');
         }
       }
       let stagedAttachments = attachments;
@@ -470,7 +474,7 @@ export class ConversationService {
         stagedAttachments = staged.stagedAttachments;
       }
       if (activeController.signal.aborted) {
-        throw new Error('TURN_CANCELLED: preparation aborted.');
+        throw new AppError('TURN_CANCELLED', 'preparation aborted.');
       }
       fingerprint = await this.computeRequestFingerprint(input, activeController.signal, stagedAttachments);
       this.assertFingerprintMatch(idempotencyKey, fingerprint);
@@ -486,10 +490,9 @@ export class ConversationService {
         return persisted;
       }
 
-      const pending = operation(requestId, activeController, fingerprint, stagedAttachments)
-        .finally(() => {
-          releasePreparation();
-        });
+      const pending = operation(requestId, activeController, fingerprint, stagedAttachments).finally(() => {
+        releasePreparation();
+      });
       this.rememberSendRequest(idempotencyKey, fingerprint, pending);
       void pending.catch(() => {
         if (this.sendRequests.get(idempotencyKey) === pending) {
@@ -507,34 +510,34 @@ export class ConversationService {
   async sendMessage(input: ConversationContextInput): Promise<ConversationTurnResult> {
     const trimmed = input.message.trim();
     return this.runIdempotentTurn(input, async (requestId, controller, requestFingerprint, attachments) => {
-        const context = await this.resolveContext(input);
-        if (context.session && Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === context.session?.sessionId)) {
-          throw new Error('CONVERSATION_BUSY: this conversation already has a running turn.');
-        }
-        if (context.session) agentPlanReviewRequestService.retireRecovered(context.session.sessionId);
-        return await this.startProfileTurn(
-          context,
-          input.profileId ?? input.agentId ?? null,
-          input.agentId ?? input.profileId ?? null,
-          trimmed,
-          attachments,
-          input.preloadSkillIds ?? [],
-          undefined,
-          input.turnControls,
-          requestId,
-          controller,
-          input.configurationCommit,
-          requestFingerprint,
-        );
+      const context = await this.resolveContext(input);
+      if (
+        context.session &&
+        Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === context.session?.sessionId)
+      ) {
+        throw new AppError('CONVERSATION_BUSY', 'this conversation already has a running turn.');
+      }
+      if (context.session) agentPlanReviewRequestService.retireRecovered(context.session.sessionId);
+      return await this.startProfileTurn({
+        context,
+        requestedProfileId: input.profileId ?? input.agentId ?? null,
+        requestedAgentId: input.agentId ?? input.profileId ?? null,
+        rawMessage: trimmed,
+        pendingAttachments: attachments,
+        preloadSkillIds: input.preloadSkillIds ?? [],
+        requestTurnControls: input.turnControls,
+        requestId,
+        preparationController: controller,
+        configurationCommit: input.configurationCommit,
+        requestFingerprint,
+      });
     });
   }
 
   async rewriteFromMessage(input: ConversationRewriteContextInput): Promise<ConversationTurnResult> {
-    return this.runIdempotentTurn(input, (requestId, controller, requestFingerprint, attachments) => this.rewriteFromMessageCore(
-      { ...input, requestId, attachments },
-      controller,
-      requestFingerprint,
-    ));
+    return this.runIdempotentTurn(input, (requestId, controller, requestFingerprint, attachments) =>
+      this.rewriteFromMessageCore({ ...input, requestId, attachments }, controller, requestFingerprint),
+    );
   }
 
   private async rewriteFromMessageCore(
@@ -546,62 +549,61 @@ export class ConversationService {
     const context = await this.resolveContext(input);
     const sessionId = input.sessionId ?? context.session?.sessionId ?? null;
     if (!sessionId) {
-      return this.startProfileTurn(
+      return this.startProfileTurn({
         context,
-        input.profileId ?? input.agentId ?? null,
-        input.agentId ?? input.profileId ?? null,
-        trimmed,
-        input.attachments ?? [],
-        input.preloadSkillIds ?? [],
-        undefined,
-        input.turnControls,
-        input.requestId,
+        requestedProfileId: input.profileId ?? input.agentId ?? null,
+        requestedAgentId: input.agentId ?? input.profileId ?? null,
+        rawMessage: trimmed,
+        pendingAttachments: input.attachments ?? [],
+        preloadSkillIds: input.preloadSkillIds ?? [],
+        requestTurnControls: input.turnControls,
+        requestId: input.requestId,
         preparationController,
-        input.configurationCommit,
+        configurationCommit: input.configurationCommit,
         requestFingerprint,
-      );
+      });
     }
 
-    const initialHistory = storageAdapter.readConversationHistory(sessionId);
+    const initialHistory = conversationHistoryStore.readConversationHistory(sessionId);
     const initialTargetIndex = initialHistory.findIndex((message) => message.id === input.messageId);
     const initialTargetMessage = initialTargetIndex >= 0 ? initialHistory[initialTargetIndex] : null;
     if (!initialTargetMessage || initialTargetMessage.role !== 'user') {
       throw new Error('Can only edit and resend an existing user message.');
     }
 
-    const downstreamTurnIds = new Set(
-      initialHistory.slice(initialTargetIndex + 1).map((message) => message.turnId),
-    );
+    const downstreamTurnIds = new Set(initialHistory.slice(initialTargetIndex + 1).map((message) => message.turnId));
     // Also stop the target turn itself if it is still streaming (edit during reply).
     downstreamTurnIds.add(initialTargetMessage.turnId);
-    const turnsToStop = Array.from(this.activeTurns.values()).filter((activeTurn) => (
-      activeTurn.sessionId === sessionId && downstreamTurnIds.has(activeTurn.turnId)
-    ));
+    const turnsToStop = Array.from(this.activeTurns.values()).filter(
+      (activeTurn) => activeTurn.sessionId === sessionId && downstreamTurnIds.has(activeTurn.turnId),
+    );
     for (const activeTurn of turnsToStop) {
       activeTurn.stop();
     }
     // Overlap producer abort with turn exit; sync slots before rehydrate.
     agentOrchestrator.syncSessionSlots(sessionId);
     await Promise.all([
-      turnsToStop.length > 0
-        ? Promise.allSettled(turnsToStop.map((turn) => turn.stopped))
-        : Promise.resolve([]),
-      agentOrchestrator.abortAndJoin(sessionId, { reason: 'edit_resend' }).catch(() => undefined),
+      turnsToStop.length > 0 ? Promise.allSettled(turnsToStop.map((turn) => turn.stopped)) : Promise.resolve([]),
+      agentOrchestrator
+        .abortAndJoin(sessionId, { reason: 'edit_resend' })
+        .catch((error: unknown) => reportProcessFault('Agent turn did not join before edit and resend', error)),
     ]);
 
     // Re-read after every stopped turn has fully left completeProfileTurn. Its
     // terminal flush may have appended a newer snapshot for the target branch.
-    const history = storageAdapter.readConversationHistory(sessionId);
+    const history = conversationHistoryStore.readConversationHistory(sessionId);
     const targetIndex = history.findIndex((message) => message.id === input.messageId);
     const targetMessage = targetIndex >= 0 ? history[targetIndex] : null;
     if (!targetMessage || targetMessage.role !== 'user') {
       throw new Error('Can only edit and resend an existing user message.');
     }
 
-    let branchState = storageAdapter.readConversationBranchState(sessionId) ?? createDefaultBranchState(sessionId);
+    let branchState =
+      conversationHistoryStore.readConversationBranchState(sessionId) ?? createDefaultBranchState(sessionId);
     const targetBranchId = normalizeBranchId(targetMessage.branchId);
     const forkId = targetMessage.forkId ?? targetMessage.id;
-    const anchorMessageId = branchState.forks.find((fork) => fork.forkId === forkId)?.anchorMessageId ?? targetMessage.id;
+    const anchorMessageId =
+      branchState.forks.find((fork) => fork.forkId === forkId)?.anchorMessageId ?? targetMessage.id;
 
     let fork = branchState.forks.find((entry) => entry.forkId === forkId);
     if (!fork) {
@@ -609,13 +611,15 @@ export class ConversationService {
         forkId,
         anchorMessageId,
         activeBranchId: targetBranchId,
-        branches: [{
-          branchId: targetBranchId,
-          parentBranchId: null,
-          variantIndex: targetMessage.variantIndex ?? 0,
-          anchorUserMessageId: targetMessage.id,
-          rootTurnId: targetMessage.turnId,
-        }],
+        branches: [
+          {
+            branchId: targetBranchId,
+            parentBranchId: null,
+            variantIndex: targetMessage.variantIndex ?? 0,
+            anchorUserMessageId: targetMessage.id,
+            rootTurnId: targetMessage.turnId,
+          },
+        ],
       };
       branchState.forks.push(fork);
     } else if (!fork.branches.some((branch) => branch.anchorUserMessageId === targetMessage.id)) {
@@ -631,34 +635,34 @@ export class ConversationService {
       }
     }
 
-    const newBranchId = generateEventId('branch');
+    const newBranchId = conversationTurnIds(input.requestId).branchId;
     const variantIndex = fork.branches.length;
 
     const updatedContext: ResolvedConversationContext = {
       ...context,
-      session: storageAdapter.readSession(sessionId) ?? context.session,
+      session: sessionRecordStore.readSession(sessionId) ?? context.session,
     };
-    return this.startProfileTurn(
-      updatedContext,
-      input.profileId ?? input.agentId ?? null,
-      input.agentId ?? input.profileId ?? null,
-      trimmed,
-      input.attachments ?? [],
-      input.preloadSkillIds ?? [],
-      {
+    return this.startProfileTurn({
+      context: updatedContext,
+      requestedProfileId: input.profileId ?? input.agentId ?? null,
+      requestedAgentId: input.agentId ?? input.profileId ?? null,
+      rawMessage: trimmed,
+      pendingAttachments: input.attachments ?? [],
+      preloadSkillIds: input.preloadSkillIds ?? [],
+      branchContext: {
         branchId: newBranchId,
         forkId,
         variantIndex,
         parentBranchId: targetBranchId,
         branchState,
       },
-      input.turnControls,
-      input.requestId,
+      requestTurnControls: input.turnControls,
+      requestId: input.requestId,
       preparationController,
-      input.configurationCommit,
+      configurationCommit: input.configurationCommit,
       requestFingerprint,
-      targetMessage.turnId,
-    );
+      excludeTurnId: targetMessage.turnId,
+    });
   }
 
   async switchConversationBranch(input: ConversationSwitchBranchRequest): Promise<ConversationSwitchBranchResult> {
@@ -669,68 +673,74 @@ export class ConversationService {
     }
     // Branch switch: discard in-memory agent slot cache; next turn rehydrates from disk.
     agentOrchestrator.syncSessionSlots(input.sessionId);
-    await agentOrchestrator.abortAndJoin(input.sessionId, { reason: 'branch_switch' }).catch(() => undefined);
+    await agentOrchestrator
+      .abortAndJoin(input.sessionId, { reason: 'branch_switch' })
+      .catch((error: unknown) => reportProcessFault('Agent turn did not join before the branch switch', error));
 
-    const allMessages = storageAdapter.readConversationHistory(input.sessionId);
+    const allMessages = conversationHistoryStore.readConversationHistory(input.sessionId);
     const branchState = this.readRepairedBranchState(input.sessionId, allMessages);
-    if (!branchState) {
-      return { success: false, messages: [], error: 'No conversation branch state found.' };
-    }
-    const fork = branchState.forks.find((entry) => entry.forkId === input.forkId);
-    const branch = fork?.branches.find((entry) => entry.branchId === input.branchId);
-    if (!fork || !branch) {
-      return { success: false, messages: [], error: 'Invalid conversation branch selection.' };
+    const fork = branchState?.forks.find((entry) => entry.forkId === input.forkId);
+    if (!branchState || !fork?.branches.some((entry) => entry.branchId === input.branchId)) {
+      throw new AppError('CONVERSATION_BRANCH_INVALID', `${input.forkId}/${input.branchId} is not a branch here.`);
     }
 
     fork.activeBranchId = input.branchId;
     agentPlanReviewRequestService.retireRecovered(input.sessionId);
     branchState.activeLeafBranchId = input.branchId;
-    storageAdapter.writeConversationBranchState(input.sessionId, branchState);
+    conversationHistoryStore.writeConversationBranchState(input.sessionId, branchState);
     agentPlanReviewRequestService.projection(input.sessionId);
 
     const visibleMessages = resolveVisibleConversationMessages(allMessages, branchState);
     const tracePresentation = await traceService.buildConversationPresentation(input.sessionId, visibleMessages);
-    workflowProjectionPublisher.publishTraceProjectionChanged({ projectId: tracePresentation.projectId, sessionId: tracePresentation.sessionId }, tracePresentation);
+    workflowProjectionPublisher.publishTraceProjectionChanged(
+      { projectId: tracePresentation.projectId, sessionId: tracePresentation.sessionId },
+      tracePresentation,
+    );
     publishConversationTrace(input.sessionId, visibleMessages, input.sessionId, publishTraceProjection);
 
-    return {
-      success: true,
-      messages: allMessages,
-      branchState,
-      tracePresentation,
-    };
+    return { messages: allMessages, branchState, tracePresentation };
   }
 
   private readRepairedBranchState(
     sessionId: string,
     allMessages: ConversationMessage[],
   ): ConversationBranchState | null {
-    const current = storageAdapter.readConversationBranchState(sessionId);
+    const current = conversationHistoryStore.readConversationBranchState(sessionId);
     const { branchState, repaired } = repairConversationBranchState(allMessages, current);
     if (branchState && repaired) {
-      storageAdapter.writeConversationBranchState(sessionId, branchState);
+      conversationHistoryStore.writeConversationBranchState(sessionId, branchState);
     }
     return branchState;
   }
 
   private async resolveContext(input: ConversationContextInput): Promise<ResolvedConversationContext> {
-    const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
-    const persistedSessionId = await storageAdapter.getCurrentSessionId();
+    const projectId = input.projectId ?? input.fallbackProjectId ?? projectWorkspaceStore.getCurrentProjectId() ?? null;
+    const persistedSessionId = projectWorkspaceStore.getCurrentSessionId();
     const resolvedSessionId = input.sessionId ?? input.fallbackSessionId ?? persistedSessionId ?? null;
-    const session = resolvedSessionId ? storageAdapter.readSession(resolvedSessionId) : null;
+    const session = resolvedSessionId ? sessionRecordStore.readSession(resolvedSessionId) : null;
     const currentRun = resolvedSessionId
-      ? storageAdapter.listRuns(resolvedSessionId).find((entry) => entry.runId === (input.currentRunId ?? input.fallbackRunId))
-        ?? storageAdapter.getLatestRun(resolvedSessionId)
+      ? (sessionRecordStore
+          .listRuns(resolvedSessionId)
+          .find((entry) => entry.runId === (input.currentRunId ?? input.fallbackRunId)) ??
+        sessionRecordStore.getLatestRun(resolvedSessionId))
       : null;
-    const projectInputs = projectId ? await storageAdapter.listProjectInputs(projectId) : [];
-    const openedCapture = projectId && resolvedSessionId
-      ? conversationRdcHost().snapshotOpenedCapture({ projectId, sessionId: resolvedSessionId })
-      : null;
+    const projectInputs = projectId ? await projectWorkspaceStore.listProjectInputs(projectId) : [];
+    const openedCapture =
+      projectId && resolvedSessionId
+        ? conversationRdcHost().snapshotOpenedCapture({ projectId, sessionId: resolvedSessionId })
+        : null;
     const activeOpenedCapture = openedCapture?.status === 'open' ? openedCapture : null;
-    const replayDevice = conversationRdcHost().replayDevice(input.replayDeviceId || 'local') ?? conversationRdcHost().replayDevice('local');
-    const plan = input.planReference ? resolvePlanReference({
-      request: input.planReference, sessionId: resolvedSessionId, agentId: input.agentId ?? input.profileId ?? null, message: input.message,
-    }) : null;
+    const replayDevice =
+      conversationRdcHost().replayDevice(input.replayDeviceId || 'local') ??
+      conversationRdcHost().replayDevice('local');
+    const plan = input.planReference
+      ? resolvePlanReference({
+          request: input.planReference,
+          sessionId: resolvedSessionId,
+          agentId: input.agentId ?? input.profileId ?? null,
+          message: input.message,
+        })
+      : null;
 
     return {
       projectId,
@@ -750,77 +760,12 @@ export class ConversationService {
    * 顶层身份只有四 builtin：general / debugger / analyzer / optimizer；
    * 自定义 profile 走同一路由，不再把 ask/plan/edit 当 mode。
    */
-  private prepareConversationPrompt(input: PrepareConversationPromptInput) {
-    return buildConversationPrompt(input);
-  }
-
-  private createTurnStarterHost() {
-    return {
-      getPreparingRequestByRequestId: (requestId: string) => this.getPreparingRequestByRequestId(requestId),
-      prepareConversationPrompt: (input: PrepareConversationPromptInput) => this.prepareConversationPrompt(input),
-      persistConversationSnapshot,
-      publishConversationTrace: (
-        traceSessionId: string,
-        messages: ConversationMessage[],
-        persistedSessionId?: string | null,
-      ) => publishConversationTrace(traceSessionId, messages, persistedSessionId, publishTraceProjection),
-      ephemeralTraceSessionId,
-    };
-  }
-
-  private createTurnRunnerHost(): ConversationTurnRunnerHost {
-    return {
-      persistConversationSnapshot,
-      emitConversationEvent,
-      publishRunStatus: (sessionId, runId, status) => workflowProjectionPublisher.publishRunStatus({ sessionId, runId, status }),
-      publishConversationTrace: (
-        traceSessionId: string,
-        messages: ConversationMessage[],
-        persistedSessionId?: string | null,
-      ) => publishConversationTrace(traceSessionId, messages, persistedSessionId, publishTraceProjection),
-      registerActiveTurn: (turn: ActiveConversationTurn) => this.registerActiveTurn(turn),
-      clearActiveTurn: (turnId: string, controller: AbortController) => this.clearActiveTurn(turnId, controller),
-      assertTerminalContextOwnership,
-      ephemeralTraceSessionId,
-    };
-  }
-
+  /** Starts one conversation turn with this service as its request and turn registry. */
   private async startProfileTurn(
-    context: ResolvedConversationContext,
-    requestedProfileId: string | null,
-    requestedAgentId: string | null,
-    rawMessage: string,
-    pendingAttachments: ConversationAttachmentInput[],
-    preloadSkillIds: string[] = [],
-    branchContext?: ConversationBranchTurnContext,
-    requestTurnControls?: ConversationTurnControls,
-    requestId: string = generateEventId('request'),
-    preparationController: AbortController = new AbortController(),
-    configurationCommit?: ConversationSendRequest['configurationCommit'],
-    requestFingerprint?: string,
-    excludeTurnId?: string,
-    policyBudget?: import('../agent-runtime/orchestration/TurnCoordinator').PolicyBudgetState,
+    start: Omit<ProfileTurnStart, 'requests' | 'turns' | 'output'>,
   ): Promise<ConversationTurnResult> {
-    return runStartProfileTurn(
-      this.createTurnStarterHost(),
-      (input: CompleteProfileTurnInput) => runCompleteProfileTurn(this.createTurnRunnerHost(), input),
-      context,
-      requestedProfileId,
-      requestedAgentId,
-      rawMessage,
-      pendingAttachments,
-      preloadSkillIds,
-      branchContext,
-      requestTurnControls,
-      requestId,
-      preparationController,
-      configurationCommit,
-      requestFingerprint,
-      excludeTurnId,
-      policyBudget,
-    );
+    return runStartProfileTurn({ ...start, requests: this, turns: this, output: conversationTurnOutput });
   }
-
 }
 
 export const conversationService = new ConversationService();

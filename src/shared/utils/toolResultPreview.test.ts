@@ -16,23 +16,25 @@ describe('buildToolResultPreview', () => {
   });
 
   it('compacts content/details and keeps metadata', () => {
-    const preview = JSON.parse(buildToolResultPreview({
-      ok: true,
-      duration_ms: 12,
-      trace_id: 'tr-1',
-      data: {
-        content: [{ type: 'text', text: 'line1\nline2' }],
-        details: {
-          pattern: 'foo',
-          results: [
-            { title: 'A', url: 'https://a.test', snippet: 's'.repeat(300) },
-            { title: 'B', url: 'https://b.test' },
-          ],
+    const preview = JSON.parse(
+      buildToolResultPreview({
+        ok: true,
+        duration_ms: 12,
+        trace_id: 'tr-1',
+        data: {
+          content: [{ type: 'text', text: 'line1\nline2' }],
+          details: {
+            pattern: 'foo',
+            results: [
+              { title: 'A', url: 'https://a.test', snippet: 's'.repeat(300) },
+              { title: 'B', url: 'https://b.test' },
+            ],
+          },
+          matches: ['a', 'b'],
+          lineCount: 2,
         },
-        matches: ['a', 'b'],
-        lineCount: 2,
-      },
-    }));
+      }),
+    );
     expect(preview.ok).toBe(true);
     expect(preview.duration_ms).toBe(12);
     expect(preview.trace_id).toBe('tr-1');
@@ -42,18 +44,20 @@ describe('buildToolResultPreview', () => {
   });
 
   it('preserves artifactized ref, hash, and summary', () => {
-    const preview = JSON.parse(buildToolResultPreview({
-      ok: true,
-      data: {
-        content: [{ type: 'text', text: 'stored' }],
-        details: {
-          artifactized: true,
-          ref: 'session://tool-outputs/call-1.json',
-          hash: 'abcdef0123456789',
-          summary: 'Offloaded grep matches',
+    const preview = JSON.parse(
+      buildToolResultPreview({
+        ok: true,
+        data: {
+          content: [{ type: 'text', text: 'stored' }],
+          details: {
+            artifactized: true,
+            ref: 'session://tool-outputs/call-1.json',
+            hash: 'abcdef0123456789',
+            summary: 'Offloaded grep matches',
+          },
         },
-      },
-    }));
+      }),
+    );
     expect(preview.data.details).toMatchObject({
       artifactized: true,
       ref: 'session://tool-outputs/call-1.json',

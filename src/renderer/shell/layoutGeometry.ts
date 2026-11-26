@@ -34,16 +34,8 @@ const reduceOverflow = (
   };
 };
 
-export const getResponsiveMinMainWidth = (_containerWidth: number): number => APP_MIN_MAIN_WIDTH;
-
-const getResizeHandleAllowance = (
-  leftCollapsed: boolean,
-  rightCollapsed: boolean,
-  rightVisible: boolean,
-): number => (
-  (leftCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH)
-  + (!rightVisible || rightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH)
-);
+const getResizeHandleAllowance = (leftCollapsed: boolean, rightCollapsed: boolean, rightVisible: boolean): number =>
+  (leftCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH) + (!rightVisible || rightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH);
 
 const canFitLayout = (
   containerWidth: number,
@@ -55,7 +47,7 @@ const canFitLayout = (
   rightVisible: boolean,
 ): boolean => {
   const desiredLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : leftWidth;
-  const desiredRight = !rightVisible ? 0 : (rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth);
+  const desiredRight = !rightVisible ? 0 : rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth;
   const availableSidebarSpace = Math.max(
     0,
     containerWidth - minMainWidth - getResizeHandleAllowance(leftCollapsed, rightCollapsed, rightVisible),
@@ -79,15 +71,35 @@ export const resolveResponsiveSidebarState = (
     };
   }
 
-  const minMainWidth = getResponsiveMinMainWidth(containerWidth);
+  const minMainWidth = APP_MIN_MAIN_WIDTH;
   let nextLeftCollapsed = leftCollapsed;
   let nextRightCollapsed = rightVisible ? rightCollapsed : true;
 
-  if (!canFitLayout(containerWidth, leftWidth, rightWidth, nextLeftCollapsed, nextRightCollapsed, minMainWidth, rightVisible)) {
+  if (
+    !canFitLayout(
+      containerWidth,
+      leftWidth,
+      rightWidth,
+      nextLeftCollapsed,
+      nextRightCollapsed,
+      minMainWidth,
+      rightVisible,
+    )
+  ) {
     nextRightCollapsed = true;
   }
 
-  if (!canFitLayout(containerWidth, leftWidth, rightWidth, nextLeftCollapsed, nextRightCollapsed, minMainWidth, rightVisible)) {
+  if (
+    !canFitLayout(
+      containerWidth,
+      leftWidth,
+      rightWidth,
+      nextLeftCollapsed,
+      nextRightCollapsed,
+      minMainWidth,
+      rightVisible,
+    )
+  ) {
     nextLeftCollapsed = true;
   }
 
@@ -110,14 +122,14 @@ export const resolveSidebarWidths = (
   if (containerWidth <= 0) {
     return {
       left: leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : leftWidth,
-      right: !rightVisible ? 0 : (rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth),
+      right: !rightVisible ? 0 : rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth,
     };
   }
 
   const desiredLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : leftWidth;
-  const desiredRight = !rightVisible ? 0 : (rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth);
+  const desiredRight = !rightVisible ? 0 : rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth;
   const minLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : LEFT_SIDEBAR_MIN_WIDTH;
-  const minRight = !rightVisible ? 0 : (rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : RIGHT_PANEL_MIN_WIDTH);
+  const minRight = !rightVisible ? 0 : rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : RIGHT_PANEL_MIN_WIDTH;
   const availableSidebarSpace = Math.max(
     0,
     containerWidth - minMainWidth - getResizeHandleAllowance(leftCollapsed, rightCollapsed, rightVisible),

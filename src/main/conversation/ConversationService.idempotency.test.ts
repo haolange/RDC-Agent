@@ -1,27 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { storageAdapter } from '../sessions/store/StorageAdapter';
-import { agentOrchestrator } from '../agent-runtime/orchestration/AgentOrchestrator';
-import { beginRdcLifecycle, getRdcInteractionLock } from '../rdc/RdcOperationCoordinator';
+import { conversationHistoryStore, sessionRecordStore } from '../sessions/store/sessionStores';
+import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
+import {
+  acquireRdcPreparationLock,
+  beginRdcLifecycle,
+  getRdcInteractionLock,
+  setRdcInteractionLock,
+} from '../rdc/RdcOperationCoordinator';
+import { rdcSessionService } from '../rdc/RdcSessionService';
+import { replayDeviceService } from '../rdc/captures/ReplayDeviceService';
 import { conversationService } from './ConversationService';
-import '../rdc/registerConversationRdcHost';
+import { registerConversationRdcHost } from './conversationRdcHost';
 
-vi.mock('../sessions', () => ({
+vi.mock('../rdc/RdcSessionService', () => ({
   rdcSessionService: { snapshotOpenedCaptureForSession: vi.fn(() => null) },
 }));
-vi.mock('../sessions/store/StorageAdapter', () => ({
-  storageAdapter: {
-    readSession: vi.fn(),
-    listSessions: vi.fn(() => []),
+vi.mock('../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { readSession: vi.fn(), listSessions: vi.fn(() => []) },
+  conversationHistoryStore: {
     readConversationHistory: vi.fn(() => []),
     readConversationBranchState: vi.fn(() => null),
-    handoffs: {
-      getActive: vi.fn(() => null),
-      cancel: vi.fn(() => null),
-    },
   },
 }));
-vi.mock('../agent-runtime/orchestration/AgentOrchestrator', () => ({
+vi.mock('../agent-runtime/orchestration/agentRuntimeRoot', () => ({
   agentOrchestrator: {
     releaseProviderRuntimeCredentials: vi.fn(),
     refreshProviderRuntimeCredentials: vi.fn(),
@@ -33,6 +35,13 @@ vi.mock('../agent-trace/TraceService', () => ({
     buildConversationPresentation: vi.fn(async () => null),
   },
 }));
+
+registerConversationRdcHost({
+  acquirePreparationLock: acquireRdcPreparationLock,
+  setInteractionLock: setRdcInteractionLock,
+  snapshotOpenedCapture: (scope) => rdcSessionService.snapshotOpenedCaptureForSession(scope),
+  replayDevice: (deviceId) => replayDeviceService.getDeviceById(deviceId),
+});
 
 type IdempotentService = {
   runIdempotentTurn: (
@@ -55,19 +64,30 @@ describe('ConversationService idempotency scoping', () => {
     const release = beginRdcLifecycle('session-lifecycle');
     const operation = vi.fn();
     try {
-      await expect(service.runIdempotentTurn({ requestId: 'request-lifecycle', sessionId: 'session-lifecycle',
-        projectId: 'project-a', message: 'inspect' }, operation)).rejects.toThrow('RDC_REPLAY_BUSY');
+      await expect(
+        service.runIdempotentTurn(
+          {
+            requestId: 'request-lifecycle',
+            sessionId: 'session-lifecycle',
+            projectId: 'project-a',
+            message: 'inspect',
+          },
+          operation,
+        ),
+      ).rejects.toThrow('RDC_REPLAY_BUSY');
       expect(operation).not.toHaveBeenCalled();
       expect(service.activeSendScopes.size).toBe(0);
       expect(service.preparingRequests.size).toBe(0);
       expect(getRdcInteractionLock('session-lifecycle')).toBeNull();
-    } finally { release(); }
+    } finally {
+      release();
+    }
   });
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(storageAdapter.readSession).mockReturnValue(null);
-    vi.mocked(storageAdapter.listSessions).mockReturnValue([]);
-    vi.mocked(storageAdapter.readConversationHistory).mockReturnValue([]);
+    vi.mocked(sessionRecordStore.readSession).mockReturnValue(null);
+    vi.mocked(sessionRecordStore.listSessions).mockReturnValue([]);
+    vi.mocked(conversationHistoryStore.readConversationHistory).mockReturnValue([]);
     const service = conversationService as unknown as IdempotentService;
     service.sendRequests.clear();
     service.sendRequestFingerprints.clear();
@@ -81,7 +101,12 @@ describe('ConversationService idempotency scoping', () => {
     const service = conversationService as unknown as IdempotentService;
     service.startProfileTurn = vi.fn(async () => ({ requestId: 'auto', session: { sessionId: 'session-a' } }));
     const background = agentOrchestrator.backgroundSubagents as typeof agentOrchestrator.backgroundSubagents & {
-      onEvent?: (event: { sessionId: string; executionId: string; parentAgentId: 'general'; type: 'message' | 'settled' }) => void;
+      onEvent?: (event: {
+        sessionId: string;
+        executionId: string;
+        parentAgentId: 'general';
+        type: 'message' | 'settled';
+      }) => void;
     };
     for (const executionId of ['execution-1', 'execution-2']) {
       background.onEvent?.({ sessionId: 'session-a', executionId, parentAgentId: 'general', type: 'message' });
@@ -89,7 +114,7 @@ describe('ConversationService idempotency scoping', () => {
     }
     await new Promise<void>((resolve) => setImmediate(resolve));
     expect(service.startProfileTurn).not.toHaveBeenCalled();
-    expect(vi.mocked(storageAdapter.readConversationHistory)).not.toHaveBeenCalled();
+    expect(vi.mocked(conversationHistoryStore.readConversationHistory)).not.toHaveBeenCalled();
   });
 
   it('does not share in-flight promises across sessions with the same requestId', async () => {
@@ -176,18 +201,20 @@ describe('ConversationService idempotency scoping', () => {
     await new Promise<void>((resolve) => setImmediate(resolve));
     expect([...service.sendRequestFingerprints.keys()]).toEqual(['session:session-a:req-1']);
 
-    await expect(service.runIdempotentTurn(
-      {
-        requestId: 'req-1',
-        sessionId: 'session-a',
-        projectId: 'project-a',
-        agentId: 'debugger',
-        profileId: 'debugger',
-        message: 'beta',
-        turnControls: { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
-      },
-      async () => ({ requestId: 'req-1' }),
-    )).rejects.toThrow(/REQUEST_ID_CONFLICT/);
+    await expect(
+      service.runIdempotentTurn(
+        {
+          requestId: 'req-1',
+          sessionId: 'session-a',
+          projectId: 'project-a',
+          agentId: 'debugger',
+          profileId: 'debugger',
+          message: 'beta',
+          turnControls: { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
+        },
+        async () => ({ requestId: 'req-1' }),
+      ),
+    ).rejects.toThrow(/REQUEST_ID_CONFLICT/);
 
     release();
     await first;
@@ -195,10 +222,7 @@ describe('ConversationService idempotency scoping', () => {
 
   it('registers preparingRequests before fingerprint hashing so Stop can abort', async () => {
     const service = conversationService as unknown as IdempotentService & {
-      computeRequestFingerprint: (
-        input: Record<string, unknown>,
-        signal?: AbortSignal,
-      ) => Promise<string>;
+      computeRequestFingerprint: (input: Record<string, unknown>, signal?: AbortSignal) => Promise<string>;
     };
 
     service.computeRequestFingerprint = async (_input, signal) => {

@@ -2,13 +2,10 @@ import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
+import { AppError } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 import { hashScopedResource, scopedResourceResolver } from '../../runtime/ScopedResourceResolver';
-import type {
-  CompiledPolicy,
-  PolicyApprovalFloor,
-  RestrictivePolicy,
-} from '@shared/types/rdcRuntime';
+import type { RestrictivePolicy } from '../../runtime/scopedResourceTypes';
 
 const APPROVAL_STRENGTH = { none: 0, destructive: 1, mutation: 2, all: 3 } as const;
 const FLOOR_STRENGTH = { none: 0, auto_review: 1, user: 2 } as const;
@@ -44,40 +41,44 @@ function normalizeToolName(name: string): string {
 
 function assertFiniteNonNegative(key: string, value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
-    throw new Error(`POLICY_INVALID: limit "${key}" must be a non-negative integer.`);
+    throw new AppError('POLICY_INVALID', `limit "${key}" must be a non-negative integer.`);
   }
   return value;
 }
 
 function parseApprovalFloor(value: unknown, toolName: string): PolicyApprovalFloor {
   if (value === 'none' || value === 'auto_review' || value === 'user') return value;
-  throw new Error(`POLICY_INVALID: approvalFloorByTool.${toolName} must be none|auto_review|user.`);
+  throw new AppError('POLICY_INVALID', `approvalFloorByTool.${toolName} must be none|auto_review|user.`);
 }
 
 function sanitizeRestrictivePolicy(raw: unknown, sourcePath: string): RestrictivePolicy {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new Error(`POLICY_INVALID: ${sourcePath} must be a YAML object.`);
+    throw new AppError('POLICY_INVALID', `${sourcePath} must be a YAML object.`);
   }
   const input = raw as Record<string, unknown>;
   const deniedTools = Array.isArray(input.deniedTools)
     ? input.deniedTools
-      .filter((entry): entry is string => typeof entry === 'string')
-      .map((entry) => normalizeToolName(entry))
-      .filter(Boolean)
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => normalizeToolName(entry))
+        .filter(Boolean)
     : [];
   if (Array.isArray(input.deniedTools) && input.deniedTools.some((entry) => typeof entry !== 'string')) {
-    throw new Error(`POLICY_INVALID: ${sourcePath} deniedTools must be string[].`);
+    throw new AppError('POLICY_INVALID', `${sourcePath} deniedTools must be string[].`);
   }
 
   const approval = input.approval ?? 'none';
   if (approval !== 'none' && approval !== 'destructive' && approval !== 'mutation' && approval !== 'all') {
-    throw new Error(`POLICY_INVALID: ${sourcePath} approval must be none|destructive|mutation|all.`);
+    throw new AppError('POLICY_INVALID', `${sourcePath} approval must be none|destructive|mutation|all.`);
   }
 
   const approvalFloorByTool: Record<string, PolicyApprovalFloor> = {};
   if (input.approvalFloorByTool !== undefined) {
-    if (!input.approvalFloorByTool || typeof input.approvalFloorByTool !== 'object' || Array.isArray(input.approvalFloorByTool)) {
-      throw new Error(`POLICY_INVALID: ${sourcePath} approvalFloorByTool must be an object.`);
+    if (
+      !input.approvalFloorByTool ||
+      typeof input.approvalFloorByTool !== 'object' ||
+      Array.isArray(input.approvalFloorByTool)
+    ) {
+      throw new AppError('POLICY_INVALID', `${sourcePath} approvalFloorByTool must be an object.`);
     }
     for (const [toolName, floor] of Object.entries(input.approvalFloorByTool as Record<string, unknown>)) {
       approvalFloorByTool[normalizeToolName(toolName)] = parseApprovalFloor(floor, toolName);
@@ -87,11 +88,11 @@ function sanitizeRestrictivePolicy(raw: unknown, sourcePath: string): Restrictiv
   const limits: Record<string, number> = {};
   if (input.limits !== undefined) {
     if (!input.limits || typeof input.limits !== 'object' || Array.isArray(input.limits)) {
-      throw new Error(`POLICY_INVALID: ${sourcePath} limits must be an object.`);
+      throw new AppError('POLICY_INVALID', `${sourcePath} limits must be an object.`);
     }
     for (const [key, value] of Object.entries(input.limits as Record<string, unknown>)) {
       if (!KNOWN_LIMIT_KEYS.has(key)) {
-        throw new Error(`POLICY_INVALID: unknown limit "${key}".`);
+        throw new AppError('POLICY_INVALID', `unknown limit "${key}".`);
       }
       limits[key] = assertFiniteNonNegative(key, value);
     }
@@ -130,14 +131,19 @@ export interface PolicySource {
 function loadPolicyDirectory(dir: string): PolicySource[] {
   if (!fs.existsSync(dir)) return [];
   const policies: PolicySource[] = [];
-  for (const entry of fs.readdirSync(dir).filter((name) => name.endsWith('.policy.yml')).sort()) {
+  for (const entry of fs
+    .readdirSync(dir)
+    .filter((name) => name.endsWith('.policy.yml'))
+    .sort()) {
     const sourcePath = path.join(dir, entry);
     let raw: unknown;
     try {
       raw = YAML.parse(fs.readFileSync(sourcePath, 'utf8'));
     } catch (error) {
-      throw new Error(
-        `POLICY_INVALID: failed to parse ${sourcePath}: ${error instanceof Error ? error.message : String(error)}`,
+      throw new AppError(
+        'POLICY_INVALID',
+        `failed to parse ${sourcePath}: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
       );
     }
     if (raw && typeof raw === 'object' && !Array.isArray(raw) && (raw as Record<string, unknown>).enabled === false) {
@@ -175,9 +181,10 @@ function compileRestrictivePolicy(policy: RestrictivePolicy, sourceFingerprint: 
     maxSubagents: typeof limits.maxSubagents === 'number' ? limits.maxSubagents : DEFAULT_LIMITS.maxSubagents,
     maxChildDepth: typeof limits.maxChildDepth === 'number' ? limits.maxChildDepth : DEFAULT_LIMITS.maxChildDepth,
     maxWallTimeMs: typeof limits.maxWallTimeMs === 'number' ? limits.maxWallTimeMs : DEFAULT_LIMITS.maxWallTimeMs,
-    contextCompactionPercent: typeof limits.contextCompactionPercent === 'number'
-      ? limits.contextCompactionPercent
-      : DEFAULT_LIMITS.contextCompactionPercent,
+    contextCompactionPercent:
+      typeof limits.contextCompactionPercent === 'number'
+        ? limits.contextCompactionPercent
+        : DEFAULT_LIMITS.contextCompactionPercent,
     sourceFingerprint,
   };
 }
@@ -223,10 +230,7 @@ export function compileEffectivePolicy(projectRoot?: string | null): CompiledPol
  */
 export function compilePolicySources(sources: readonly PolicySource[]): CompiledPolicy {
   const merged = mergePolicies(sources.map((source) => sanitizeRestrictivePolicy(source.raw, source.sourcePath)));
-  const fingerprint = createHash('sha256')
-    .update(hashScopedResource(merged))
-    .digest('hex')
-    .slice(0, 16);
+  const fingerprint = createHash('sha256').update(hashScopedResource(merged)).digest('hex').slice(0, 16);
   return compileRestrictivePolicy(merged, fingerprint);
 }
 
@@ -235,3 +239,23 @@ export function emptyCompiledPolicy(): CompiledPolicy {
 }
 
 export const APPROVAL_STRENGTH_TABLE = APPROVAL_STRENGTH;
+
+export type PolicyApprovalFloor = 'none' | 'auto_review' | 'user';
+
+/**
+ * 编译后的执行期 Policy（不可变快照）。
+ * `.policy.yml` 解析失败必须 fail-closed，不得静默忽略。
+ */
+export interface CompiledPolicy {
+  deniedTools: readonly string[];
+  approvalFloorByTool: Readonly<Record<string, PolicyApprovalFloor>>;
+  approval: 'none' | 'destructive' | 'mutation' | 'all';
+  maxTurns: number;
+  maxToolCalls: number;
+  maxSubagents: number;
+  maxChildDepth: number;
+  maxWallTimeMs: number;
+  /** 100 = unlimited (does not constrain the user compaction percent). */
+  contextCompactionPercent: number;
+  sourceFingerprint: string;
+}

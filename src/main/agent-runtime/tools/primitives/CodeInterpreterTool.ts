@@ -2,13 +2,14 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import { defaultPythonCommand } from '../../../platform/shell';
 import { processSupervisor, type ProcessExitReason } from '../../../runtime/ProcessSupervisor';
 import { settingsService } from '../../../settings/settings-core/SettingsService';
-import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
-import { detectImageMagicMime } from '../../../conversation/ConversationAttachmentMaterializer';
-import { SHELL_MAX_OUTPUT_BYTES } from './toolLimits';
-import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
+import { recordToolImagePreview } from '../../attachments/ToolImagePreviewStore';
+import { detectImageMagicMime } from '../../attachments/ConversationAttachmentMaterializer';
+import { SHELL_MAX_OUTPUT_BYTES } from '../../../runtime/toolLimits';
+import { requireMutationWorkspaceRoot, truncateOutput } from '../../../runtime/toolFiles';
 import type { AgentTool } from '../../agent/AgentTool';
 
 interface InterpreterParams {
@@ -64,22 +65,24 @@ export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetail
   },
   spec: {
     isReadOnly: false,
-    isConcurrencySafe: false,
+    concurrency: 'exclusive',
     isDestructive: false,
     sideEffect: 'process',
     category: 'system',
     requiresApproval: true,
+    // An executed run is evidence whatever its exit status.
+    presentation: { pinEvidence: () => true, keepErrorResults: true },
   },
   permissionHint: 'mutation',
 
   async execute(toolCallId, params, signal, onUpdate, context) {
-    const settings = settingsService.getAll().tooling.codeInterpreter;
+    const settings = settingsService.snapshot().user.tooling.codeInterpreter;
     if (!settings.enabled) {
-      throw new Error('CODE_INTERPRETER_DISABLED: enable the interpreter in Settings → Tools.');
+      throw new AppError('CODE_INTERPRETER_DISABLED', 'enable the interpreter in Settings → Tools.');
     }
     const language = (params.language ?? 'python').trim().toLowerCase();
     if (language && language !== 'python' && language !== 'py') {
-      throw new Error(`CODE_INTERPRETER_UNSUPPORTED_LANGUAGE: ${language}`);
+      throw new AppError('CODE_INTERPRETER_UNSUPPORTED_LANGUAGE', language);
     }
     const cwd = requireMutationWorkspaceRoot(context);
     const command = resolveInterpreterCommand(settings.command);
@@ -116,12 +119,16 @@ export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetail
     stdout = supervised.stdout.toString() || stdout;
     const stderr = supervised.stderr.toString();
     const combined = [stdout, stderr].filter(Boolean).join('\n');
-    const imagePreviews = settings.artifactsEnabled && context?.sessionId
-      ? await collectArtifactPreviews(artifactsDir, context.sessionId, toolCallId)
-      : [];
+    const imagePreviews =
+      settings.artifactsEnabled && context?.sessionId
+        ? await collectArtifactPreviews(artifactsDir, context.sessionId, toolCallId)
+        : [];
     const failed = info.reason !== 'exit' || info.code !== 0;
     const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
-      { type: 'text', text: truncateOutput(combined || (failed ? '[interpreter failed]' : '[ok]'), SHELL_MAX_OUTPUT_BYTES) },
+      {
+        type: 'text',
+        text: truncateOutput(combined || (failed ? '[interpreter failed]' : '[ok]'), SHELL_MAX_OUTPUT_BYTES),
+      },
     ];
     if (context?.visionInputMode === 'native') {
       for (const preview of imagePreviews) {
@@ -165,7 +172,10 @@ async function collectArtifactPreviews(
   for (const entry of entries) {
     if (!entry.isFile() || !IMAGE_EXTS.has(path.extname(entry.name).toLowerCase())) continue;
     const filePath = path.join(artifactsDir, entry.name);
-    const header = await fs.readFile(filePath).then((bytes) => bytes.subarray(0, 16)).catch(() => null);
+    const header = await fs
+      .readFile(filePath)
+      .then((bytes) => bytes.subarray(0, 16))
+      .catch(() => null);
     if (!header) continue;
     const mimeType = detectImageMagicMime(header);
     if (!mimeType || mimeType === 'image/svg+xml') continue;

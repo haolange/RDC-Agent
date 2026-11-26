@@ -3,10 +3,9 @@ import { DiffBlock } from '../../../../ui/DiffBlock';
 import { InlineError } from '../../../../ui/InlineError';
 import { Spinner } from '../../../../ui/Spinner';
 import { TaskDialog } from '../../../../ui/TaskDialog';
-import type { useI18n } from '../../../../i18n';
+import { humanizeError } from '../../../../i18n/humanizeError';
+import { useI18n } from '../../../../i18n';
 import type { DiffLine } from '@shared/utils/lineDiff';
-
-type Translate = ReturnType<typeof useI18n>['t'];
 
 export interface AgentBuiltinDiffState {
   agentId: string;
@@ -17,12 +16,16 @@ export interface AgentBuiltinDiffState {
 }
 
 /** Current builtin against the user's override; restoring removes the override. */
-export function AgentBuiltinDiffDialog({ state, onRestore, onClose, t }: {
+export function AgentBuiltinDiffDialog({
+  state,
+  onRestore,
+  onClose,
+}: {
   state: AgentBuiltinDiffState;
   onRestore: () => void;
   onClose: () => void;
-  t: Translate;
 }) {
+  const { t } = useI18n();
   return (
     <TaskDialog
       open
@@ -33,15 +36,23 @@ export function AgentBuiltinDiffDialog({ state, onRestore, onClose, t }: {
       closeLabel={t('dialog.close')}
       onClose={onClose}
       dataTestId="settings-agent-builtin-diff-dialog"
-      footer={<>
-        <Button variant="secondary" size="sm" onClick={onClose}>{t('dialog.close')}</Button>
-        <Button variant="danger" size="sm" onClick={onRestore} data-testid="settings-agent-builtin-diff-restore">
-          {t('settings.agentRestoreBuiltin')}
-        </Button>
-      </>}
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose}>
+            {t('dialog.close')}
+          </Button>
+          <Button variant="danger" size="sm" onClick={onRestore} data-testid="settings-agent-builtin-diff-restore">
+            {t('settings.agentRestoreBuiltin')}
+          </Button>
+        </>
+      }
     >
       {!state.lines && !state.error ? <Spinner size="sm" /> : null}
-      {state.error ? <InlineError>{state.error}</InlineError> : null}
+      {state.error ? (
+        <InlineError detail={state.error}>
+          {humanizeError(state.error, t, 'settings.agentBuiltinDiffFailed')}
+        </InlineError>
+      ) : null}
       {state.lines ? (
         <DiffBlock
           lines={state.lines}

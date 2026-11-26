@@ -44,9 +44,7 @@ export function hexToRgb(hex: string): Rgb {
 
 export function rgbToHex({ r, g, b }: Rgb): string {
   const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)));
-  return `#${[clamp(r), clamp(g), clamp(b)]
-    .map((n) => n.toString(16).padStart(2, '0'))
-    .join('')}`;
+  return `#${[clamp(r), clamp(g), clamp(b)].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 }
 
 export function rgbToCssTriplet({ r, g, b }: Rgb): string {
@@ -62,8 +60,9 @@ export function relativeLuminance({ r, g, b }: Rgb): number {
 }
 
 export function contrastRatio(a: Rgb, b: Rgb): number {
-  const [lighter, darker] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
-  return (lighter + 0.05) / (darker + 0.05);
+  const luminanceA = relativeLuminance(a);
+  const luminanceB = relativeLuminance(b);
+  return (Math.max(luminanceA, luminanceB) + 0.05) / (Math.min(luminanceA, luminanceB) + 0.05);
 }
 
 const NEAR_BLACK: Rgb = { r: 12, g: 16, b: 22 };
@@ -76,13 +75,17 @@ const INK_FLIP_LUMINANCE = 0.18;
  * just far enough to read at `minRatio` on every one of them.
  */
 export function readableOn(color: Rgb, backgrounds: readonly Rgb[], minRatio = 4.5): Rgb {
-  const worstRatio = (candidate: Rgb) => Math.min(...backgrounds.map((background) => contrastRatio(candidate, background)));
+  const worstRatio = (candidate: Rgb) =>
+    Math.min(...backgrounds.map((background) => contrastRatio(candidate, background)));
   if (worstRatio(color) >= minRatio) return color;
-  const meanLuminance = backgrounds.reduce((sum, background) => sum + relativeLuminance(background), 0) / backgrounds.length;
+  const meanLuminance =
+    backgrounds.reduce((sum, background) => sum + relativeLuminance(background), 0) / backgrounds.length;
   const direction = meanLuminance > INK_FLIP_LUMINANCE ? -1 : 1;
   const hsl = rgbToHsl(color);
   for (let lightness = hsl.l + direction; lightness >= 0 && lightness <= 100; lightness += direction) {
-    const candidate = hslToRgb({ ...hsl, l: lightness });
+    // Judge the color CSS will actually paint: the compiler emits whole channel values.
+    const { r, g, b } = hslToRgb({ ...hsl, l: lightness });
+    const candidate = { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
     if (worstRatio(candidate) >= minRatio) return candidate;
   }
   return direction < 0 ? NEAR_BLACK : NEAR_WHITE;
@@ -218,10 +221,13 @@ export function applyContrastPair(
   };
 }
 
-export function scaleAccentPalette(accent: Rgb): Record<string, Rgb> {
+export type AccentStep = '50' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
+export type SurfaceStep = '0' | '1' | '2' | '3' | '4' | '5';
+export type InkStep = 'primary' | 'secondary' | 'tertiary' | 'muted' | 'disabled';
+
+export function scaleAccentPalette(accent: Rgb): Record<AccentStep, Rgb> {
   const hsl = rgbToHsl(accent);
-  const shade = (l: number, sMul = 1) =>
-    hslToRgb({ h: hsl.h, s: Math.min(100, hsl.s * sMul), l });
+  const shade = (l: number, sMul = 1) => hslToRgb({ h: hsl.h, s: Math.min(100, hsl.s * sMul), l });
   return {
     '50': shade(96, 0.35),
     '100': shade(92, 0.45),
@@ -236,7 +242,7 @@ export function scaleAccentPalette(accent: Rgb): Record<string, Rgb> {
   };
 }
 
-export function scaleSurfacePalette(surface: Rgb, variant: 'dark' | 'light'): Record<string, Rgb> {
+export function scaleSurfacePalette(surface: Rgb, variant: 'dark' | 'light'): Record<SurfaceStep, Rgb> {
   if (variant === 'dark') {
     return {
       '0': mixRgb(surface, { r: 0, g: 0, b: 0 }, 0.35),
@@ -257,7 +263,7 @@ export function scaleSurfacePalette(surface: Rgb, variant: 'dark' | 'light'): Re
   };
 }
 
-export function scaleInkPalette(ink: Rgb, variant: 'dark' | 'light'): Record<string, Rgb> {
+export function scaleInkPalette(ink: Rgb, variant: 'dark' | 'light'): Record<InkStep, Rgb> {
   if (variant === 'dark') {
     return {
       primary: ink,

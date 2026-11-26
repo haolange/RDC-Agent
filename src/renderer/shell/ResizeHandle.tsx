@@ -9,9 +9,7 @@ export interface ResizeHandleProps {
   onDragStart: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }
 
-export const isDockedResizeHandleVisible = (docked: boolean, collapsed: boolean): boolean => (
-  docked && !collapsed
-);
+export const isDockedResizeHandleVisible = (docked: boolean, collapsed: boolean): boolean => docked && !collapsed;
 
 export function bindResizePointerDown(
   disabled: boolean,

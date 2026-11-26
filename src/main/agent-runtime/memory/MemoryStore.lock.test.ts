@@ -23,24 +23,35 @@ describe('memoryDirectoryLock', () => {
     await releaseMemoryDirectoryLock(lockPath);
   });
 
-  it.skipIf(!currentProcessIdentity().birth)('recovers a lock whose pid now belongs to a process with another birth', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-reused-'));
-    roots.push(root);
-    const lockPath = path.join(root, '.memory.lock');
-    await writeFile(lockPath, JSON.stringify({ pid: process.pid, birth: 'stale-birth', createdAt: Date.now() - 120_000 }), 'utf8');
-    const acquired = await acquireMemoryDirectoryLock(root, { maxAttempts: 3 });
-    expect(JSON.parse(await readFile(acquired.lockPath, 'utf8'))).toMatchObject(currentProcessIdentity());
-    await releaseMemoryDirectoryLock(lockPath);
-  });
+  it.skipIf(!currentProcessIdentity().birth)(
+    'recovers a lock whose pid now belongs to a process with another birth',
+    async () => {
+      const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-reused-'));
+      roots.push(root);
+      const lockPath = path.join(root, '.memory.lock');
+      await writeFile(
+        lockPath,
+        JSON.stringify({ pid: process.pid, birth: 'stale-birth', createdAt: Date.now() - 120_000 }),
+        'utf8',
+      );
+      const acquired = await acquireMemoryDirectoryLock(root, { maxAttempts: 3 });
+      expect(JSON.parse(await readFile(acquired.lockPath, 'utf8'))).toMatchObject(currentProcessIdentity());
+      await releaseMemoryDirectoryLock(lockPath);
+    },
+  );
 
   it('does not steal a live-pid lock even when the owner file is older than 30s', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-memory-live-'));
     roots.push(root);
     const first = await acquireMemoryDirectoryLock(root);
-    await writeFile(first.lockPath, JSON.stringify({
-      pid: process.pid,
-      createdAt: Date.now() - 120_000,
-    }), 'utf8');
+    await writeFile(
+      first.lockPath,
+      JSON.stringify({
+        pid: process.pid,
+        createdAt: Date.now() - 120_000,
+      }),
+      'utf8',
+    );
     await expect(acquireMemoryDirectoryLock(root, { maxAttempts: 3 })).rejects.toThrow(/MEMORY_LOCK_TIMEOUT/);
     await releaseMemoryDirectoryLock(first.lockPath);
   });
@@ -53,7 +64,9 @@ describe('MemoryStore cross-process lock', () => {
     const workerPath = path.join(root, 'worker.cjs');
     const registerPath = path.resolve(__dirname, '../../../../scripts/register-ts-source.cjs');
     const storePath = path.resolve(__dirname, './MemoryStore.ts');
-    await writeFile(workerPath, `
+    await writeFile(
+      workerPath,
+      `
 require(${JSON.stringify(registerPath)});
 const { MemoryStore } = require(${JSON.stringify(storePath)});
 const name = process.env.MEMORY_NAME;
@@ -72,36 +85,43 @@ const dir = process.env.MEMORY_DIR;
   console.error(error);
   process.exit(1);
 });
-`, 'utf8');
+`,
+      'utf8',
+    );
 
-    const spawnWorker = (name: string, content: string) => new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
-      const child = spawn(process.execPath, [workerPath], {
-        env: {
-          ...process.env,
-          MEMORY_DIR: root,
-          MEMORY_NAME: name,
-          MEMORY_CONTENT: content,
-        },
-        windowsHide: true,
+    const spawnWorker = (name: string, content: string) =>
+      new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+        const child = spawn(process.execPath, [workerPath], {
+          env: {
+            ...process.env,
+            MEMORY_DIR: root,
+            MEMORY_NAME: name,
+            MEMORY_CONTENT: content,
+          },
+          windowsHide: true,
+        });
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', (chunk) => {
+          stdout += String(chunk);
+        });
+        child.stderr.on('data', (chunk) => {
+          stderr += String(chunk);
+        });
+        child.on('error', reject);
+        child.on('close', (code) => resolve({ code, stdout, stderr }));
       });
-      let stdout = '';
-      let stderr = '';
-      child.stdout.on('data', (chunk) => { stdout += String(chunk); });
-      child.stderr.on('data', (chunk) => { stderr += String(chunk); });
-      child.on('error', reject);
-      child.on('close', (code) => resolve({ code, stdout, stderr }));
-    });
 
-    const [first, second] = await Promise.all([
-      spawnWorker('Process A', 'one'),
-      spawnWorker('Process-B', 'two'),
-    ]);
+    const [first, second] = await Promise.all([spawnWorker('Process A', 'one'), spawnWorker('Process-B', 'two')]);
     expect(first.code, first.stderr).toBe(0);
     expect(second.code, second.stderr).toBe(0);
     const store = new MemoryStore(root);
     const listed = (await store.listMemories()).map((record) => record.displayName).sort();
     expect(listed).toEqual(['Process A', 'Process-B']);
-    const lockExists = await readFile(path.join(root, '.memory.lock'), 'utf8').then(() => true, () => false);
+    const lockExists = await readFile(path.join(root, '.memory.lock'), 'utf8').then(
+      () => true,
+      () => false,
+    );
     expect(lockExists).toBe(false);
   }, 20_000);
 });

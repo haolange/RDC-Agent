@@ -14,11 +14,17 @@ export interface KnowledgeCardActions {
  * One primary action per lifecycle: a draft is submitted as a candidate, a candidate under review is kept as a draft,
  * a stored candidate is verified, a verified card is promoted. Actions that would not change the card are not offered.
  */
-export function knowledgeCardActions(lifecycle: KnowledgeLifecycle | undefined, reviewing: boolean): KnowledgeCardActions {
+export function knowledgeCardActions(
+  lifecycle: KnowledgeLifecycle | undefined,
+  reviewing: boolean,
+): KnowledgeCardActions {
   if (lifecycle === 'draft' && !reviewing) return { primary: 'create-candidate', more: [] };
-  const primary: KnowledgeWriteAction = reviewing ? 'persist-draft'
-    : lifecycle === 'candidate' ? 'promote-verified'
-      : lifecycle === 'verified' ? 'promote-promoted'
+  const primary: KnowledgeWriteAction = reviewing
+    ? 'persist-draft'
+    : lifecycle === 'candidate'
+      ? 'promote-verified'
+      : lifecycle === 'verified'
+        ? 'promote-promoted'
         : 'save';
   const possible: KnowledgeWriteAction[] = [
     ...(lifecycle === 'verified' || lifecycle === 'promoted' ? [] : ['promote-verified' as const]),

@@ -3,13 +3,16 @@ import { toRecord, readNestedValue, stringifyPreview, parsePreview } from './wor
 import { normalizeToolName } from './workProcessToolCatalog';
 import type { WorkProcessRowStatus, WorkProcessWebPage } from './workProcessTypes';
 
-export const getDetailsRecord = (record: Record<string, unknown> | null | undefined): Record<string, unknown> | null => {
+export const getDetailsRecord = (
+  record: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null => {
   if (!record) return null;
-  return toRecord(record.details)
-    ?? toRecord(readNestedValue(record, ['data', 'details']))
-    ?? toRecord(readNestedValue(record, ['result', 'details']));
+  return (
+    toRecord(record.details) ??
+    toRecord(readNestedValue(record, ['data', 'details'])) ??
+    toRecord(readNestedValue(record, ['result', 'details']))
+  );
 };
-
 
 const getRecordArray = (value: unknown): Array<Record<string, unknown>> => {
   if (!Array.isArray(value)) return [];
@@ -17,7 +20,11 @@ const getRecordArray = (value: unknown): Array<Record<string, unknown>> => {
 };
 
 const pageState = (status: WorkProcessRowStatus): WorkProcessWebPage['state'] =>
-  status === 'error' || status === 'cancelled' ? 'failed' : status === 'complete' || status === 'skipped' ? 'done' : 'pending';
+  status === 'error' || status === 'cancelled'
+    ? 'failed'
+    : status === 'complete' || status === 'skipped'
+      ? 'done'
+      : 'pending';
 
 export interface WebToolPresentation {
   /** Search results, or the one page a read targets, in order; each renders as a pill. */
@@ -76,6 +83,10 @@ export const extractWebToolPresentation = (
   const failed = state === 'failed' || (statusCode !== undefined && statusCode >= 400);
   return {
     webPages: [{ url, domain: webHostname(url), title, state: failed ? 'failed' : state }],
-    webMeta: { ...(path ? { path } : {}), ...(statusCode !== undefined ? { status: statusCode } : {}), ...(bytes !== undefined ? { bytes } : {}) },
+    webMeta: {
+      ...(path ? { path } : {}),
+      ...(statusCode !== undefined ? { status: statusCode } : {}),
+      ...(bytes !== undefined ? { bytes } : {}),
+    },
   };
 };

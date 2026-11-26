@@ -1,178 +1,209 @@
 /**
- * SettingsService — persists and normalizes application settings.
+ * SettingsService — the single writer of the user's settings and the owner of their in-memory snapshot.
  *
- * Provider normalization: `capabilities: definition?.capabilities` hydrates builtin
- * provider capabilities from the catalog definition.
+ * Storage: `config.json` (schema v9, `settingsFileSchema.ts`) holds only user state. `initialize` reads it once into
+ * a frozen `SettingsSnapshot { revision, user }`; every later read is in memory. `update` applies `settings:patch` ops
+ * (sections and single Agent model fields; never provider state), sanitizes, writes (compact, atomic, only when the
+ * document changed), bumps the revision and broadcasts `settings:changed { revision, sections }`. Provider state
+ * changes only through the provider commands, one provider at a time.
  *
- * Agent runtime: `agentRuntime` persists agent runtime permission controls.
+ * Narrow reads: `snapshot()` for user sections, `providerConnections` for composed providers (catalog + user state +
+ * secret presence, memoized per settings and secret revision), `agentModelRoutes` for an Agent's model route,
+ * `agentDefinitions` for effective Agent profiles, and `settingsView()` for the renderer's view (no catalog facts).
  *
- * Agent models: `agentModels` (default + per Agent) is the only source of Agent routes;
- * `agentManifestService.routeForAgent` resolves them. Scoped agent-definition saves keep
- * `clientRevision <= latestRevision` conflict detection and never change a route.
+ * External inputs (secrets, Agent manifests and project trust, global instructions) keep their own revisions; edits
+ * made outside the app are re-checked by file stamp in `revalidateExternalInputs` (turn preparation, Settings open).
  */
-import { mergeUiPreferences, sanitizeUiPreferences } from '@shared/theme/uiPreferences';
-import {
-  DEFAULT_APPEARANCE,
-  DEFAULT_LAYOUT,
-  DEFAULT_PROFILE,
-  DEFAULT_CODE_INTERPRETER,
-  DEFAULT_RDC_CLI_INVOKER,
-  DEFAULT_SHELL_TOOLING,
-} from '@shared/constants/appSettingsDefaults';
-import { compiledRoutesFromDefinitions } from '../provider-catalog/compiledAgentRoutes';
+import { deepFreeze } from '@shared/utils/deepFreeze';
+import { diffAgentModels } from '@shared/utils/settingsPatch';
+import { providerConnectionState } from '@shared/utils/providerEntryView';
+import { resolveAgentModel } from '@shared/utils/agentModelRoute';
 import { appPathService } from '../../runtime/AppPathService';
 import { shellResolver } from '../../runtime/ShellResolver';
 import { agentManifestService } from '../agent-manifests/AgentManifestService';
 import { providerCatalogService } from '../provider-catalog/ProviderCatalogService';
 import { resolvePrimaryConnectionSecretFieldId } from '../provider-auth/ProviderConnectionSchema';
 import { auditLog } from '../../runtime/AuditLog';
-import { runtimePermissionStateService } from '../../agent-runtime/permissions/RuntimePermissionStateService';
+import { runtimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
 import { secretStorageService } from './SecretStorageService';
 import { executionProfileService } from './ExecutionProfileService';
 import {
-  createLocalAccountId,
+  createEmptyAgentRoutes,
   getProviderAccountSecretRef,
   getResolvedProviderSecret,
-  normalizeUserProviders,
+  normalizeManifestRoutes,
   resolveAccountRuntimeCredential,
-  sanitizeUserProvider,
-  type ProviderCredentialView,
 } from './settingsProviderSanitize';
-import {
-  LEFT_DEFAULTS,
-  RIGHT_DEFAULTS,
-  SETTINGS_SCHEMA_VERSION,
-  createDefaultPersistedSettings,
-  type PersistedSettingsPayload,
-} from './settingsDefaults';
-import {
-  sanitizeAgentPermissionSettings,
-  sanitizeAgentRuntimeContextSettings,
-  sanitizeAgentShellSettings,
-  sanitizeCodeInterpreterSettings,
-  sanitizeRdcCliInvokerSettings,
-  sanitizeSidebar,
-  sanitizeTerminal,
-  sanitizeWindow,
-} from './settingsSanitize';
+import { composeProviders, toUserProviderState, type ProviderConnections } from './providerUserState';
+import { sanitizeWindow } from './settingsSanitize';
 import { SettingsAgentOps } from './SettingsAgentOps';
 import { SettingsProviderOps } from './SettingsProviderOps';
 import { SettingsAgentOverrideOps } from './SettingsAgentOverrideOps';
-import { sanitizeAgentModelSettings } from './agentModelSettings';
-import {
-  assertPersistedSettingsSchemaVersion,
-  createDefaultRuntimeSettings,
-  deleteSecretsAfterCommit,
-  normalizePersistedSettings,
-  readJsonFile,
-  rebuildPersistedSettings,
-  toRuntimeSettings,
-  writeSettings,
-} from './settingsServiceHelpers';
-import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
+import { planSettingsPatch } from './settingsPatch';
+import { tryCurrentProjectId, tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
+import { SettingsStore, type SettingsSnapshot } from './settingsStore';
+import { orphanProviderDiagnostics, stableSerialize } from './settingsServiceHelpers';
+import type { SettingsFile, UserProviderState } from './settingsFileSchema';
+import type { LLMProviderConfig } from '../provider-auth/ProviderRuntimeCredentialService';
 import type {
   AgentBuiltinComparison,
   AgentDefinitionCommitQuery,
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
+  AgentManifestDefinition,
   AgentModelMigrationPreview,
   AgentOverrideFileRequest,
   ProjectAgentTrustPreview,
 } from '@shared/types/agentManifest';
 import type {
-  AppRuntimePaths,
-  AgentShellSettings,
-  AppSettings,
-  AppSettingsPatch,
+  SettingsView,
+  LlmAgentRoute,
   LlmProviderAuthMode,
   LlmProviderEntry,
   LlmProviderId,
   LlmProviderModel,
   LlmProviderModelPreference,
   ProviderDefinitionCommitSnapshot,
+  SettingsChangedPayload,
+  SettingsFileSection,
+  SettingsPatchChanges,
+  SettingsPatchOp,
+  SettingsPatchResult,
   ProviderDefinitionSaveRequest,
   ProviderDefinitionSaveResult,
   WindowLayoutPreference,
 } from '@shared/types/settings';
 
-export { SETTINGS_SCHEMA_VERSION } from './settingsDefaults';
+export type { SettingsSnapshot } from './settingsStore';
+
+interface ConnectionView {
+  states: SettingsFile['providers'];
+  secretsRevision: number;
+  list: readonly LlmProviderEntry[];
+  byId: ReadonlyMap<string, LlmProviderEntry>;
+  orphanProviderIds: readonly string[];
+}
 
 export class SettingsService {
-  private initialized = false;
+  private readonly store = new SettingsStore();
   private readonly agentOps = new SettingsAgentOps();
   private readonly agentOverrideOps = new SettingsAgentOverrideOps(this);
   private readonly providerOps: SettingsProviderOps;
+  private connections: ConnectionView | null = null;
+
+  /** Composed providers: catalog facts + the user's provider state + which credentials the secret store holds. */
+  readonly providerConnections: ProviderConnections = {
+    get: (providerId) => this.connectionView().byId.get(providerId),
+    list: () => this.connectionView().list,
+  };
+
+  /** The model route Settings → Agents gives an Agent; empty ids when none is configured. */
+  readonly agentModelRoutes = {
+    resolve: (agentId: string): LlmAgentRoute => {
+      const route = resolveAgentModel(agentId, this.snapshot().user.agentModels).route;
+      return { agentId, providerId: route?.providerId ?? '', modelId: route?.modelId ?? '' };
+    },
+  };
 
   constructor() {
     this.providerOps = new SettingsProviderOps(this);
-    // Agent routes are resolved from the committed settings file, the same source getAll() reads.
-    agentManifestService.bindAgentModelSettings(() => {
-      const persisted = readJsonFile<PersistedSettingsPayload>(appPathService.getRuntimePaths().settingsPath);
-      return sanitizeAgentModelSettings(persisted?.agentModels);
-    });
+    agentManifestService.bindAgentModelSettings(() => this.snapshot().user.agentModels);
   }
 
-  initialize(): AppSettings {
-    const runtimePaths = appPathService.initializeRuntime();
-    const rawPersisted = readJsonFile<PersistedSettingsPayload>(runtimePaths.settingsPath);
-    assertPersistedSettingsSchemaVersion(rawPersisted, runtimePaths.settingsPath);
+  /**
+   * Reads the settings file once (strictly; nothing is written) and composes the providers, so an unreadable
+   * settings or secret file fails startup. A missing file means defaults until the user changes something.
+   */
+  initialize(): SettingsSnapshot {
+    if (this.store.loaded) return this.store.snapshot();
+    appPathService.initializeRuntime();
+    const snapshot = this.store.load();
     executionProfileService.ensureScaffold();
-    const rebuildResult = rebuildPersistedSettings(rawPersisted, runtimePaths.userRdcRoot);
-    this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
-
-    this.initialized = true;
-    const settings = this.getAll(runtimePaths);
-    runtimePermissionStateService.initialize(settings.agentRuntime.permissions.mode);
-    return settings;
+    this.connectionView();
+    runtimePermissionStateService.initialize(snapshot.user.agentRuntime.permissions.mode);
+    return snapshot;
   }
 
-  private ensureInitialized(): void {
-    if (!this.initialized) {
-      this.initialize();
+  snapshot(): SettingsSnapshot {
+    if (!this.store.loaded) this.initialize();
+    return this.store.snapshot();
+  }
+
+  onChanged(listener: (change: SettingsChangedPayload) => void): () => void {
+    return this.store.onChanged(listener);
+  }
+
+  /** Re-checks secrets, Agent manifests, trust and global instructions against their files (stamp only). */
+  revalidateExternalInputs(): void {
+    secretStorageService.revalidate();
+    agentManifestService.revalidate();
+  }
+
+  /** Recomposed only when the stored provider states (kept by identity across commits) or the secrets change. */
+  private connectionView(): ConnectionView {
+    const states = this.snapshot().user.providers;
+    if (this.connections?.states === states && this.connections.secretsRevision === secretStorageService.revision) {
+      return this.connections;
     }
+    const { providers, orphanProviderIds } = composeProviders(states, appPathService.getUserRdcRoot());
+    const list = deepFreeze(providers);
+    this.connections = {
+      states,
+      // Read after composing: the first secret read may move the secret store to the current resource root.
+      secretsRevision: secretStorageService.revision,
+      list,
+      byId: new Map(list.map((provider) => [provider.id, provider])),
+      orphanProviderIds,
+    };
+    return this.connections;
   }
 
-  private persistHardRebuild(
-    paths: AppRuntimePaths,
-    _previous: PersistedSettingsPayload | null,
-    result: ReturnType<typeof rebuildPersistedSettings>,
-  ): void {
-    writeSettings(result.settings);
-    shellResolver.clearCache();
-    deleteSecretsAfterCommit(result.secretRefsToDelete, paths.userRdcRoot);
+  /** Effective Agent profiles for a project (the selected one when omitted), as Settings lists them. */
+  agentDefinitions(projectRoot = tryCurrentProjectRoot()): readonly AgentManifestDefinition[] {
+    return agentManifestService.definitions(appPathService.getRuntimePaths(), projectRoot);
   }
 
-  getAll(runtimePaths?: Partial<AppRuntimePaths>): AppSettings {
-    this.ensureInitialized();
+  /** The renderer's settings view: user sections and connection state at the current revision, no catalog facts. */
+  settingsView(): SettingsView {
+    const { revision, user } = this.snapshot();
+    const view = this.connectionView();
     const paths = appPathService.getRuntimePaths();
-    const persisted = readJsonFile<PersistedSettingsPayload>(paths.settingsPath)
-      ?? createDefaultPersistedSettings();
-    assertPersistedSettingsSchemaVersion(persisted, paths.settingsPath);
-    return toRuntimeSettings(persisted, runtimePaths);
+    const projectId = tryCurrentProjectId();
+    const projectRoot = tryCurrentProjectRoot();
+    const agentRoutes = normalizeManifestRoutes(
+      agentManifestService.routesFromDefinitions(createEmptyAgentRoutes(), [...this.agentDefinitions(projectRoot)]),
+    );
+    return {
+      revision,
+      appearance: user.appearance,
+      layout: user.layout,
+      profile: user.profile,
+      tooling: user.tooling,
+      agentRuntime: user.agentRuntime,
+      agentModels: user.agentModels,
+      llm: { connections: view.list.map(providerConnectionState), agentRoutes },
+      agents: { ...agentManifestService.getSettings(paths, projectRoot), projectId: projectRoot ? projectId : null },
+      resourceCatalog: {
+        diagnostics: [
+          ...executionProfileService.getDiagnostics([...view.list]),
+          ...orphanProviderDiagnostics([...view.orphanProviderIds], paths.settingsPath),
+        ],
+      },
+      paths,
+    };
   }
 
-  getProviderSecret(providerId: string, workspaceRoot = appPathService.getUserRdcRoot()): string {
-    this.ensureInitialized();
-
-    const persisted = normalizePersistedSettings(
-      readJsonFile<PersistedSettingsPayload>(appPathService.getRuntimePaths().settingsPath)
-        ?? createDefaultPersistedSettings(),
-      workspaceRoot,
-    );
-    const provider = persisted.llm.providers.find((entry) => entry.id === providerId);
+  getProviderSecret(providerId: string): string {
+    const provider = this.providerConnections.get(providerId);
     if (!provider || !provider.authModeOptions?.includes('api-key')) {
       return '';
     }
-
-    return getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
+    return getResolvedProviderSecret(provider.id, provider.secretRef, appPathService.getUserRdcRoot());
   }
 
-  hasProviderSecret(
-    providerId: string,
-    workspaceRoot = appPathService.getUserRdcRoot(),
-  ): { hasSecret: boolean; maskedPreview?: string } {
-    const plaintext = this.getProviderSecret(providerId, workspaceRoot);
+  hasProviderSecret(providerId: string): { hasSecret: boolean; maskedPreview?: string } {
+    const plaintext = this.getProviderSecret(providerId);
     if (!plaintext) {
       return { hasSecret: false };
     }
@@ -180,29 +211,21 @@ export class SettingsService {
     return maskedPreview ? { hasSecret: true, maskedPreview } : { hasSecret: true };
   }
 
-  getProviderConnectionValues(
-    providerId: string,
-    workspaceRoot = appPathService.getUserRdcRoot(),
-  ): Record<string, string> {
-    this.ensureInitialized();
-    const persisted = normalizePersistedSettings(
-      readJsonFile<PersistedSettingsPayload>(appPathService.getRuntimePaths().settingsPath)
-        ?? createDefaultPersistedSettings(),
-      workspaceRoot,
-    );
-    const provider = persisted.llm.providers.find((entry) => entry.id === providerId);
+  getProviderConnectionValues(providerId: string): Record<string, string> {
+    const provider = this.providerConnections.get(providerId);
     if (!provider) {
       return {};
     }
-
+    const workspaceRoot = appPathService.getUserRdcRoot();
     const values: Record<string, string> = { ...(provider.connectionValues ?? {}) };
     for (const field of provider.connectionSchema?.fields ?? []) {
       if (field.kind !== 'secret') {
         continue;
       }
-      const value = field.id === resolvePrimaryConnectionSecretFieldId(provider.connectionSchema)
-        ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot)
-        : secretStorageService.getSecret(provider.secretRefs?.[field.id], workspaceRoot).trim();
+      const value =
+        field.id === resolvePrimaryConnectionSecretFieldId(provider.connectionSchema)
+          ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot)
+          : secretStorageService.getSecret(provider.secretRefs?.[field.id], workspaceRoot).trim();
       if (value) {
         values[field.id] = value;
       }
@@ -210,228 +233,129 @@ export class SettingsService {
     return values;
   }
 
-  getProviderOAuthSecret(providerId: string, workspaceRoot = appPathService.getUserRdcRoot()): string {
-    this.ensureInitialized();
-    const provider = this.getAll().llm.providers.find((entry) => entry.id === providerId);
+  getProviderOAuthSecret(providerId: string): string {
+    const provider = this.providerConnections.get(providerId);
     return secretStorageService.getSecret(
       getProviderAccountSecretRef(providerId, provider?.authAccountIds?.account, 'oauth'),
-      workspaceRoot,
+      appPathService.getUserRdcRoot(),
     );
+  }
+
+  /** The credentials a verified provider runs with; undefined when it is not configured and verified. */
+  runtimeProviderConfig(providerId: string): LLMProviderConfig | undefined {
+    const provider = this.providerConnections.get(providerId);
+    if (!provider?.enabled || !provider.isConfigured || provider.status !== 'verified') return undefined;
+    const workspaceRoot = appPathService.getUserRdcRoot();
+    const accountCredential =
+      provider.authMode === 'account'
+        ? resolveAccountRuntimeCredential(provider, workspaceRoot)
+        : { apiKey: '', baseUrl: undefined, accountId: undefined };
+    return {
+      id: provider.id,
+      protocol: provider.protocol,
+      label: provider.label,
+      enabled: provider.enabled,
+      apiKey:
+        provider.authMode === 'api-key'
+          ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot)
+          : accountCredential.apiKey,
+      baseUrl: accountCredential.baseUrl ?? provider.baseUrl,
+      accountId: accountCredential.accountId,
+      authMode: provider.authMode,
+      docsUrl: provider.docsUrl,
+    };
+  }
+
+  /** Patch layout.window only; providers are not composed and secrets are not read. */
+  persistWindowLayout(window: WindowLayoutPreference): void {
+    const { user } = this.snapshot();
+    this.store.commit({ ...user, layout: { ...user.layout, window: sanitizeWindow(window, user.layout.window) } });
+  }
+
+  /** Commits one provider's user state and returns it composed; other stored providers stay as they were. */
+  commitProvider(entry: LlmProviderEntry): LlmProviderEntry {
+    const { user } = this.snapshot();
+    const state = toUserProviderState(entry, appPathService.getUserRdcRoot());
+    this.store.commit({ ...user, providers: withProviderState(user.providers, entry.id, state) });
+    const committed = this.providerConnections.get(entry.id);
+    if (!committed) throw new Error(`Provider ${entry.id} disappeared after commit.`);
+    return committed;
   }
 
   /**
-   * Patch layout.window in the same synchronous transaction used by other settings.
-   * Skips provider normalization and secret hydration.
+   * Applies `settings:patch` ops in order and commits once. The result carries the new revision and only what changed:
+   * each changed section as stored, and the Agent model bindings that changed.
    */
-  persistWindowLayout(window: WindowLayoutPreference): void {
-    this.ensureInitialized();
-    const paths = appPathService.getRuntimePaths();
-    const current = readJsonFile<PersistedSettingsPayload>(paths.settingsPath);
-    writeSettings(this.assembleWindowLayoutPayload(window, current));
-  }
-
-  private assembleWindowLayoutPayload(
-    window: WindowLayoutPreference,
-    current: PersistedSettingsPayload | null,
-  ): PersistedSettingsPayload {
-    const base = current ?? createDefaultPersistedSettings();
-    const currentLayout = base.layout ?? {};
-    return {
-      ...base,
-      schemaVersion: base.schemaVersion ?? SETTINGS_SCHEMA_VERSION,
-      layout: {
-        ...currentLayout,
-        leftSidebar: currentLayout.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar,
-        rightPanel: currentLayout.rightPanel ?? DEFAULT_LAYOUT.rightPanel,
-        terminal: currentLayout.terminal ?? DEFAULT_LAYOUT.terminal,
-        window: sanitizeWindow(window, currentLayout.window ?? DEFAULT_LAYOUT.window),
-      },
-    };
-  }
-
-  setAll(patch: AppSettingsPatch, runtimePaths?: Partial<AppRuntimePaths>): AppSettings {
-    this.ensureInitialized();
-
-    const nextPaths = appPathService.initializeRuntime();
-    executionProfileService.ensureScaffold();
-
-    const currentPersisted = normalizePersistedSettings(
-      readJsonFile<PersistedSettingsPayload>(nextPaths.settingsPath) ?? createDefaultPersistedSettings(),
-      nextPaths.userRdcRoot,
-      { credentialView: 'storage-metadata' },
-    );
-
-    const hasProviderPatch = Boolean(patch.llm?.providers);
-    const providerCredentialView: ProviderCredentialView = hasProviderPatch ? 'runtime' : 'storage-metadata';
-    const secretRefsToDelete = new Set<string>();
-    const providerDrafts = (patch.llm?.providers ?? currentPersisted.llm?.providers ?? []).map((provider) => {
-      const authAccountIds = { ...(provider.authAccountIds ?? {}) };
-      if (provider.activeAccountId && !authAccountIds[provider.authMode]) {
-        authAccountIds[provider.authMode] = provider.activeAccountId;
-      }
-      let secretRef = provider.secretRef
-        || getProviderAccountSecretRef(provider.id, authAccountIds['api-key'], 'api-key');
-      const apiKey = provider.apiKey?.trim() ?? '';
-      if (provider.authMode === 'api-key' && apiKey) {
-        const previousSecret = getResolvedProviderSecret(provider.id, secretRef, nextPaths.userRdcRoot);
-        if (!authAccountIds['api-key'] || previousSecret !== apiKey) {
-          const previousRef = secretRef;
-          authAccountIds['api-key'] = createLocalAccountId();
-          secretRef = getProviderAccountSecretRef(provider.id, authAccountIds['api-key'], 'api-key');
-          if (previousRef && previousRef !== secretRef) {
-            secretRefsToDelete.add(previousRef);
-          }
-        }
-        secretStorageService.setSecret(secretRef, apiKey, nextPaths.userRdcRoot);
-      } else if (provider.authMode === 'api-key' && provider.hasStoredSecretByAuthMode?.['api-key'] !== true && !provider.hasStoredSecret) {
-        if (secretRef) secretRefsToDelete.add(secretRef);
-        delete authAccountIds['api-key'];
-      }
-      return sanitizeUserProvider({
-        ...provider,
-        activeAccountId: authAccountIds[provider.authMode],
-        authAccountIds,
-        secretRef,
-      }, nextPaths.userRdcRoot, { credentialView: providerCredentialView });
-    }).filter((provider): provider is LlmProviderEntry => provider !== null);
-    const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.userRdcRoot, {
-      credentialView: providerCredentialView,
-    });
-    if (typeof patch.agents?.globalInstructions === 'string') {
-      agentManifestService.saveGlobalInstructions(nextPaths, patch.agents.globalInstructions);
+  update(ops: readonly SettingsPatchOp[]): SettingsPatchResult {
+    const before = this.snapshot();
+    const current = before.user;
+    const { next, globalInstructions } = planSettingsPatch(current, ops);
+    const extraSections: SettingsFileSection[] = [];
+    if (globalInstructions !== undefined) {
+      agentManifestService.saveGlobalInstructions(appPathService.initializeRuntime(), globalInstructions);
+      extraSections.push('globalInstructions');
     }
 
-    const nextPersisted: PersistedSettingsPayload = {
-      schemaVersion: SETTINGS_SCHEMA_VERSION,
-      appearance: mergeUiPreferences(
-        sanitizeUiPreferences(currentPersisted.appearance, DEFAULT_APPEARANCE),
-        patch.appearance,
-      ),
-      layout: {
-        leftSidebar: sanitizeSidebar(
-          {
-            ...(currentPersisted.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
-            ...(patch.layout?.leftSidebar ?? {}),
-          },
-          LEFT_DEFAULTS,
-          DEFAULT_LAYOUT.leftSidebar,
-        ),
-        rightPanel: sanitizeSidebar(
-          {
-            ...(currentPersisted.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
-            ...(patch.layout?.rightPanel ?? {}),
-          },
-          RIGHT_DEFAULTS,
-          DEFAULT_LAYOUT.rightPanel,
-        ),
-        terminal: sanitizeTerminal(
-          {
-            ...(currentPersisted.layout?.terminal ?? DEFAULT_LAYOUT.terminal),
-            ...(patch.layout?.terminal ?? {}),
-          },
-          DEFAULT_LAYOUT.terminal,
-        ),
-        window: sanitizeWindow(
-          {
-            ...(currentPersisted.layout?.window ?? DEFAULT_LAYOUT.window),
-            ...(patch.layout?.window ?? {}),
-          },
-          DEFAULT_LAYOUT.window,
-        ),
-      },
-      profile: {
-        nickname: typeof patch.profile?.nickname === 'string' && patch.profile.nickname.trim()
-          ? patch.profile.nickname.trim()
-          : currentPersisted.profile?.nickname || DEFAULT_PROFILE.nickname,
-        avatarPath: typeof patch.profile?.avatarPath === 'string'
-          ? patch.profile.avatarPath
-          : currentPersisted.profile?.avatarPath || DEFAULT_PROFILE.avatarPath,
-      },
-      tooling: {
-        rdcCli: sanitizeRdcCliInvokerSettings({
-          ...(currentPersisted.tooling?.rdcCli ?? DEFAULT_RDC_CLI_INVOKER),
-          ...(patch.tooling?.rdcCli ?? {}),
-        }, DEFAULT_RDC_CLI_INVOKER, patch.tooling?.rdcCli !== undefined),
-        codeInterpreter: sanitizeCodeInterpreterSettings({
-          ...(currentPersisted.tooling?.codeInterpreter ?? DEFAULT_CODE_INTERPRETER),
-          ...(patch.tooling?.codeInterpreter ?? {}),
-        }),
-        shell: this.mergeAgentShellSettings(currentPersisted.tooling?.shell, patch.tooling?.shell),
-      },
-      agentRuntime: {
-        permissions: sanitizeAgentPermissionSettings({
-          ...(currentPersisted.agentRuntime?.permissions ?? createDefaultRuntimeSettings().agentRuntime.permissions),
-          ...(patch.agentRuntime?.permissions ?? {}),
-        }),
-        context: sanitizeAgentRuntimeContextSettings({
-          ...(currentPersisted.agentRuntime?.context ?? createDefaultRuntimeSettings().agentRuntime.context),
-          ...(patch.agentRuntime?.context ?? {}),
-        }),
-      },
-      agentModels: sanitizeAgentModelSettings(patch.agentModels ?? currentPersisted.agentModels),
-      llm: {
-        providers: nextProviders.map((provider) => ({ ...provider, apiKey: '' })),
-      },
-    };
-
-    writeSettings(nextPersisted);
-    const previousPermissions = sanitizeAgentPermissionSettings(currentPersisted.agentRuntime?.permissions);
-    const nextPermissions = sanitizeAgentPermissionSettings(nextPersisted.agentRuntime?.permissions);
-    if (JSON.stringify(previousPermissions) !== JSON.stringify(nextPermissions)) {
+    const previousPermissions = current.agentRuntime.permissions;
+    const nextPermissions = next.agentRuntime.permissions;
+    // A permission change is recorded before it is written, so an unrecorded change never takes effect.
+    if (stableSerialize(previousPermissions) !== stableSerialize(nextPermissions)) {
       auditLog.record({ kind: 'permission-settings', from: previousPermissions, to: nextPermissions });
     }
+    const change = this.store.commit(next, extraSections);
+    if (!change) return { revision: before.revision, changed: {} };
+    if (current.tooling.shell.executable !== next.tooling.shell.executable) shellResolver.clearCache();
     runtimePermissionStateService.commitMode(nextPermissions.mode);
-    deleteSecretsAfterCommit(secretRefsToDelete, nextPaths.userRdcRoot);
-    return this.getAll({
-      ...nextPaths,
-      ...(runtimePaths ?? {}),
-    });
+
+    const changed: SettingsPatchChanges = {};
+    for (const section of change.sections) {
+      if (section === 'appearance') changed.appearance = next.appearance;
+      else if (section === 'layout') changed.layout = next.layout;
+      else if (section === 'profile') changed.profile = next.profile;
+      else if (section === 'tooling') changed.tooling = next.tooling;
+      else if (section === 'agentRuntime') changed.agentRuntime = next.agentRuntime;
+      else if (section === 'globalInstructions') changed.globalInstructions = true;
+      else if (section === 'agentModels') {
+        const bindings = diffAgentModels(current.agentModels, next.agentModels);
+        if (bindings) changed.agentModels = bindings;
+      }
+    }
+    return { revision: change.revision, changed };
   }
 
-  async getAgentDefinitionCommit(
-    query: AgentDefinitionCommitQuery,
-  ): Promise<AgentDefinitionCommitSnapshot | null> {
-    this.ensureInitialized();
+  async getAgentDefinitionCommit(query: AgentDefinitionCommitQuery): Promise<AgentDefinitionCommitSnapshot | null> {
     return this.agentOps.getAgentDefinitionCommit(query);
   }
 
   async saveAgentDefinition(request: AgentDefinitionSaveRequest): Promise<AgentDefinitionSaveResult> {
-    this.ensureInitialized();
     return this.agentOps.saveAgentDefinition(request);
   }
 
   previewAgentModelMigration(sourcePath: string): AgentModelMigrationPreview {
-    this.ensureInitialized();
     return this.agentOverrideOps.previewModelMigration(sourcePath);
   }
 
-  async applyAgentModelMigration(request: AgentOverrideFileRequest): Promise<AppSettings> {
-    this.ensureInitialized();
-    return this.agentOverrideOps.applyModelMigration(request);
+  async applyAgentModelMigration(request: AgentOverrideFileRequest): Promise<void> {
+    await this.agentOverrideOps.applyModelMigration(request);
   }
 
-  async deleteAgentOverrideFile(request: AgentOverrideFileRequest): Promise<AppSettings> {
-    this.ensureInitialized();
-    return this.agentOverrideOps.deleteOverrideFile(request);
+  async deleteAgentOverrideFile(request: AgentOverrideFileRequest): Promise<void> {
+    await this.agentOverrideOps.deleteOverrideFile(request);
   }
 
   previewProjectAgentTrust(sourcePath: string): ProjectAgentTrustPreview {
-    this.ensureInitialized();
     return this.agentOverrideOps.previewProjectAgentTrust(sourcePath);
   }
 
-  trustProjectAgent(request: AgentOverrideFileRequest): AppSettings {
-    this.ensureInitialized();
-    return this.agentOverrideOps.trustProjectAgent(request);
+  trustProjectAgent(request: AgentOverrideFileRequest): void {
+    this.agentOverrideOps.trustProjectAgent(request);
   }
 
   getAgentBuiltinComparison(query: AgentDefinitionCommitQuery): AgentBuiltinComparison {
-    this.ensureInitialized();
     return this.agentOverrideOps.getBuiltinComparison(query);
   }
 
   async getProviderDefinitionCommit(providerIdDraft: string): Promise<ProviderDefinitionCommitSnapshot | null> {
-    this.ensureInitialized();
     return this.providerOps.getProviderDefinitionCommit(providerIdDraft);
   }
 
@@ -440,7 +364,6 @@ export class SettingsService {
   }
 
   async saveProviderDefinition(request: ProviderDefinitionSaveRequest): Promise<ProviderDefinitionSaveResult> {
-    this.ensureInitialized();
     return this.providerOps.saveProviderDefinition(request);
   }
 
@@ -453,7 +376,7 @@ export class SettingsService {
     authModeDraft?: LlmProviderAuthMode,
     modelPreferences?: LlmProviderModelPreference[],
     connectionValuesDraft?: Record<string, string>,
-  ): AppSettings {
+  ): LlmProviderEntry {
     return this.providerOps.saveProviderConnection(
       providerId,
       apiKey,
@@ -470,56 +393,31 @@ export class SettingsService {
     providerId: LlmProviderId,
     secretPayload: string,
     models: LlmProviderModel[],
-    accountSummary: Pick<LlmProviderEntry, 'accountLabel' | 'planLabel' | 'oauthExpiresAt' | 'oauthRefreshAvailable'> = {},
-  ): AppSettings {
+    accountSummary: Pick<
+      LlmProviderEntry,
+      'accountLabel' | 'planLabel' | 'oauthExpiresAt' | 'oauthRefreshAvailable'
+    > = {},
+  ): LlmProviderEntry {
     return this.providerOps.saveProviderAccountConnection(providerId, secretPayload, models, accountSummary);
   }
 
   rotateProviderAccountCredential(
     providerId: LlmProviderId,
     secretPayload: string,
-    accountSummary: Pick<LlmProviderEntry, 'accountLabel' | 'planLabel' | 'oauthExpiresAt' | 'oauthRefreshAvailable'> = {},
-  ): AppSettings {
+    accountSummary: Pick<
+      LlmProviderEntry,
+      'accountLabel' | 'planLabel' | 'oauthExpiresAt' | 'oauthRefreshAvailable'
+    > = {},
+  ): LlmProviderEntry {
     return this.providerOps.rotateProviderAccountCredential(providerId, secretPayload, accountSummary);
   }
 
-  markProviderAccountRefreshFailure(providerId: LlmProviderId, message: string): AppSettings {
-    return this.providerOps.markProviderAccountRefreshFailure(providerId, message);
+  markProviderAccountRefreshFailure(providerId: LlmProviderId, message: string): void {
+    this.providerOps.markProviderAccountRefreshFailure(providerId, message);
   }
 
-  disconnectProvider(providerId: LlmProviderId, authModeDraft?: LlmProviderAuthMode): AppSettings {
+  disconnectProvider(providerId: LlmProviderId, authModeDraft?: LlmProviderAuthMode): LlmProviderEntry {
     return this.providerOps.disconnectProvider(providerId, authModeDraft);
-  }
-
-  getLlmConfig(): LLMConfig {
-    const settings = this.getAll();
-    const providers: LLMProviderConfig[] = settings.llm.providers
-      .filter((provider) => provider.enabled && provider.isConfigured && provider.status === 'verified')
-      .map((provider) => {
-        const accountCredential = provider.authMode === 'account'
-          ? resolveAccountRuntimeCredential(provider, settings.paths.userRdcRoot)
-          : { apiKey: '', baseUrl: undefined };
-        return {
-          id: provider.id,
-          protocol: provider.protocol,
-          label: provider.label,
-          enabled: provider.enabled,
-          apiKey: provider.authMode === 'api-key'
-            ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.paths.userRdcRoot)
-            : provider.authMode === 'account'
-              ? accountCredential.apiKey
-              : '',
-          baseUrl: accountCredential.baseUrl ?? provider.baseUrl,
-          accountId: accountCredential.accountId,
-          authMode: provider.authMode,
-          docsUrl: provider.docsUrl,
-        };
-      });
-
-    return {
-      providers,
-      agentRoutes: compiledRoutesFromDefinitions(settings.agents.definitions),
-    };
   }
 
   getProviderCatalog() {
@@ -527,27 +425,17 @@ export class SettingsService {
   }
 
   hasConfiguredProvider(): boolean {
-    return this.getAll().llm.providers.some((provider) => provider.isConfigured);
+    return this.providerConnections.list().some((provider) => provider.isConfigured);
   }
+}
 
-  getSettingsPath(): string {
-    return appPathService.getRuntimePaths().settingsPath;
-  }
-
-  private mergeAgentShellSettings(
-    current: AgentShellSettings | undefined,
-    patch: Partial<AgentShellSettings> | undefined,
-  ): AgentShellSettings {
-    const next = sanitizeAgentShellSettings({
-      ...(current ?? DEFAULT_SHELL_TOOLING),
-      ...(patch ?? {}),
-    });
-    const previous = current?.executable ?? DEFAULT_SHELL_TOOLING.executable;
-    if (previous !== next.executable) {
-      shellResolver.clearCache();
-    }
-    return next;
-  }
+function withProviderState(
+  providers: Record<string, UserProviderState>,
+  providerId: string,
+  state: UserProviderState | undefined,
+): Record<string, UserProviderState> {
+  const { [providerId]: _previous, ...others } = providers;
+  return state ? { ...others, [providerId]: state } : others;
 }
 
 export const settingsService = new SettingsService();

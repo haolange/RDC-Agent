@@ -1,8 +1,8 @@
 import type { WorkProcessRow } from './workProcessTypes';
 
 type ToolRow = Extract<WorkProcessRow, { type: 'tool' }>;
-const eligible = (row: WorkProcessRow): row is ToolRow => row.type === 'tool'
-  && row.toolName === 'read_image' && row.status === 'complete';
+const eligible = (row: WorkProcessRow): row is ToolRow =>
+  row.type === 'tool' && row.toolName === 'read_image' && row.status === 'complete';
 
 /** Presentation only: preserve every receipt and stop at every narrative boundary. */
 export function groupImageRows(rows: WorkProcessRow[]): WorkProcessRow[] {
@@ -15,7 +15,10 @@ export function groupImageRows(rows: WorkProcessRow[]): WorkProcessRow[] {
   };
   for (const row of rows) {
     if (eligible(row)) images.push(...(row.imageCalls ?? [row]));
-    else { flush(); output.push(row); }
+    else {
+      flush();
+      output.push(row);
+    }
   }
   flush();
   return output;

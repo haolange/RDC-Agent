@@ -1,10 +1,12 @@
-vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { getAll: () => ({ appearance: { language: mocks.language } }) } }));
+vi.mock('../settings/settings-core/SettingsService', () => ({
+  settingsService: { snapshot: () => ({ revision: 1, user: { appearance: { language: mocks.language } } }) },
+}));
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parse } from 'yaml';
-import { StorageIo } from '../sessions/store/StorageIo';
+import { StorageIo } from '../runtime/StorageIo';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { conversationService } from '../conversation/ConversationService';
 import { registerPlanHandlers } from './planHandlers';
@@ -13,23 +15,49 @@ import type { WorkbenchIpcContext } from './workbenchContext';
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => Promise<any>>(),
   language: 'zh-CN',
-  read: vi.fn(), saveDialog: vi.fn(), confirm: vi.fn(),
-  location: vi.fn(), paths: vi.fn(),
+  read: vi.fn(),
+  saveDialog: vi.fn(),
+  confirm: vi.fn(),
+  location: vi.fn(),
+  paths: vi.fn(),
 }));
-vi.mock('electron', () => ({ ipcMain: { handle: (id: string, fn: (...args: unknown[]) => Promise<any>) => mocks.handlers.set(id, fn) },
-  BrowserWindow: { getFocusedWindow: () => ({}) }, dialog: { showSaveDialog: mocks.saveDialog, showMessageBox: mocks.confirm } }));
+vi.mock('electron', () => ({
+  ipcMain: { handle: (id: string, fn: (...args: unknown[]) => Promise<any>) => mocks.handlers.set(id, fn) },
+  BrowserWindow: { getFocusedWindow: () => ({}) },
+  dialog: { showSaveDialog: mocks.saveDialog, showMessageBox: mocks.confirm },
+}));
 vi.mock('../sessions/run/sessionPlanReference', () => ({ readReferencedPlan: mocks.read }));
-vi.mock('../sessions/store/StorageAdapter', () => ({ storageAdapter: { sessions: { findSessionLocation: mocks.location }, get io() { return new StorageIo(); } } }));
+vi.mock('../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { findSessionLocation: mocks.location },
+  get storageIo() {
+    return new StorageIo();
+  },
+}));
 vi.mock('../runtime/AppPathService', () => ({ appPathService: { getProjectRdcPaths: mocks.paths } }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
-vi.mock('../conversation/ConversationService', () => ({ conversationService: {
-  isSessionBusy: () => false, isTurnActive: () => false, cancelActiveTurn: vi.fn(),
-} }));
-vi.mock('../agent-runtime/interactions/AgentPlanReviewRequestService', () => ({ agentPlanReviewRequestService: {
-  setBusyChecker: vi.fn(), subscribe: vi.fn(), reopen: vi.fn(), cancel: vi.fn(),
-} }));
+vi.mock('../conversation/ConversationService', () => ({
+  conversationService: {
+    isSessionBusy: () => false,
+    isTurnActive: () => false,
+    cancelActiveTurn: vi.fn(),
+  },
+}));
+vi.mock('../agent-runtime/interactions/AgentPlanReviewRequestService', () => ({
+  agentPlanReviewRequestService: {
+    setBusyChecker: vi.fn(),
+    subscribe: vi.fn(),
+    reopen: vi.fn(),
+    cancel: vi.fn(),
+  },
+}));
 
-const request = { sessionId: 's', planId: 'old-plan', revision: 2, uri: 'session://plans/plan-frozen.md', expectedHash: 'a'.repeat(64) };
+const request = {
+  sessionId: 's',
+  planId: 'old-plan',
+  revision: 2,
+  uri: 'session://plans/plan-frozen.md',
+  expectedHash: 'a'.repeat(64),
+};
 const context = { state: { currentSessionId: 's' } } as WorkbenchIpcContext;
 let root: string;
 const invoke = (channel: string, args: unknown) => mocks.handlers.get(channel)!(null, args);
@@ -39,8 +67,14 @@ beforeEach(() => {
   context.state.currentSessionId = 's';
   mocks.location.mockReturnValue({ project: { rootPath: root } });
   mocks.paths.mockReturnValue({ plansPath: path.join(root, '.rdc-agent', 'plans') });
-  mocks.read.mockReturnValue({ markdown: '# Old body\n', hash: request.expectedHash, uri: request.uri,
-    ownerSessionId: 's', agentId: 'debugger', plan: { planId: request.planId, revision: 2, title: 'Old plan' } });
+  mocks.read.mockReturnValue({
+    markdown: '# Old body\n',
+    hash: request.expectedHash,
+    uri: request.uri,
+    ownerSessionId: 's',
+    agentId: 'debugger',
+    plan: { planId: request.planId, revision: 2, title: 'Old plan' },
+  });
   mocks.saveDialog.mockResolvedValue({ canceled: false, filePath: path.join(root, 'export.md') });
   mocks.confirm.mockResolvedValue({ response: 0 });
   registerPlanHandlers(context);
@@ -50,48 +84,74 @@ afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 describe('plan IPC file authority', () => {
   it('stops the owning parent request when the live review belongs to a delegated child turn', async () => {
     vi.mocked(agentPlanReviewRequestService.cancel).mockReturnValueOnce({ success: true, liveTurnId: 'child-turn' });
-    expect(await invoke('plan:cancelReview', { sessionId: 's', reviewId: 'review' })).toEqual({ success: true });
+    expect(await invoke('plan:cancelReview', { sessionId: 's', reviewId: 'review' })).toBeUndefined();
     expect(conversationService.cancelActiveTurn).toHaveBeenCalledExactlyOnceWith({ sessionId: 's' });
   });
   it('saves selected history metadata, not latest session state', async () => {
     const grant = await invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' });
     const result = await invoke('plan:saveToProject', { ...request, approvalToken: grant.token });
-    expect(result.success).toBe(true);
     const content = fs.readFileSync(result.path, 'utf8');
-    expect(parse(content.split('---')[1])).toMatchObject({ planId: 'old-plan', revision: 2, agent: 'debugger', sha256: request.expectedHash });
+    expect(parse(content.split('---')[1])).toMatchObject({
+      planId: 'old-plan',
+      revision: 2,
+      agent: 'debugger',
+      sha256: request.expectedHash,
+    });
     expect(content).toContain('# Old body');
-    expect((await invoke('plan:saveToProject', { ...request, approvalToken: grant.token })).success).toBe(false);
+    await expect(invoke('plan:saveToProject', { ...request, approvalToken: grant.token })).rejects.toMatchObject({
+      code: 'PLAN_APPROVAL_TOKEN_INVALID',
+    });
   });
-  it.each(['path', 'hash', 'revision'])('rejects substituted %s and consumes the grant', async field => {
+  it.each(['path', 'hash', 'revision'])('rejects substituted %s and consumes the grant', async (field) => {
     const grant = await invoke('plan:issueApprovalToken', { ...request, action: 'plan.export' });
     const args = { ...request, approvalToken: grant.token, targetPath: grant.targetPath };
-    const altered = field === 'path' ? { ...args, targetPath: path.join(root, 'victim.md') }
-      : field === 'hash' ? { ...args, expectedHash: 'b'.repeat(64) } : { ...args, revision: 3 };
-    expect((await invoke('plan:export', altered)).error).toBe('PLAN_APPROVAL_TOKEN_INVALID');
-    expect((await invoke('plan:export', args)).success).toBe(false);
+    const altered =
+      field === 'path'
+        ? { ...args, targetPath: path.join(root, 'victim.md') }
+        : field === 'hash'
+          ? { ...args, expectedHash: 'b'.repeat(64) }
+          : { ...args, revision: 3 };
+    await expect(invoke('plan:export', altered)).rejects.toMatchObject({ code: 'PLAN_APPROVAL_TOKEN_INVALID' });
+    await expect(invoke('plan:export', args)).rejects.toMatchObject({ code: 'PLAN_APPROVAL_TOKEN_INVALID' });
     expect(fs.readdirSync(root)).toEqual([]);
   });
   it('writes the native-selected export and denies cross-session requests', async () => {
     const grant = await invoke('plan:issueApprovalToken', { ...request, action: 'plan.export' });
     const args = { ...request, approvalToken: grant.token, targetPath: grant.targetPath };
-    expect((await invoke('plan:export', args)).success).toBe(true);
+    expect(await invoke('plan:export', args)).toEqual({ path: grant.targetPath });
     expect(fs.readFileSync(grant.targetPath, 'utf8')).toBe('# Old body\n');
     context.state.currentSessionId = 'other';
-    expect((await invoke('plan:export', args)).success).toBe(false);
+    await expect(invoke('plan:export', args)).rejects.toThrow();
   });
   it('does not issue after dialog cancellation or a session switch during confirmation', async () => {
     mocks.saveDialog.mockResolvedValueOnce({ canceled: true });
     expect(await invoke('plan:issueApprovalToken', { ...request, action: 'plan.export' })).toEqual({ cancelled: true });
-    mocks.confirm.mockImplementationOnce(async () => { context.state.currentSessionId = 'other'; return { response: 0 }; });
-    await expect(invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' })).rejects.toThrow(/SESSION_DENIED/);
+    mocks.confirm.mockImplementationOnce(async () => {
+      context.state.currentSessionId = 'other';
+      return { response: 0 };
+    });
+    await expect(invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' })).rejects.toThrow(
+      /SESSION_DENIED/,
+    );
   });
 });
 
-it.each([['zh-CN', '确认写入计划文件', '取消'], ['en', 'Confirm plan file write', 'Cancel']])('localizes %s plan confirmation and does not issue after cancellation', async (language, title, cancel) => {
+it.each([
+  ['zh-CN', '确认写入计划文件', '取消'],
+  ['en', 'Confirm plan file write', 'Cancel'],
+])('localizes %s plan confirmation and does not issue after cancellation', async (language, title, cancel) => {
   mocks.language = language;
   mocks.confirm.mockResolvedValueOnce({ response: 1 });
-  expect(await invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' })).toEqual({ cancelled: true });
-  expect(mocks.confirm).toHaveBeenLastCalledWith(expect.any(Object), expect.objectContaining({
-    title, buttons: [expect.any(String), cancel], defaultId: 1, cancelId: 1,
-  }));
+  expect(await invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' })).toEqual({
+    cancelled: true,
+  });
+  expect(mocks.confirm).toHaveBeenLastCalledWith(
+    expect.any(Object),
+    expect.objectContaining({
+      title,
+      buttons: [expect.any(String), cancel],
+      defaultId: 1,
+      cancelId: 1,
+    }),
+  );
 });

@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import { KnowledgeAssetsMissingError } from './knowledgeErrors';
+import { knowledgeAssetsMissing } from './knowledgeErrors';
 import { resolveWithinRoot } from './knowledgeFs';
 import { isKnowledgeImagePathAllowed, KNOWLEDGE_IMAGE_MAX_BYTES } from './knowledgeImages';
 import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
@@ -12,11 +12,11 @@ export async function assertKnowledgeImagesAvailable(
 ): Promise<void> {
   if (!card.images?.length) return;
   const space = spaces.find((entry) => entry.spaceId === card.spaceId);
-  if (!space) throw new KnowledgeAssetsMissingError();
+  if (!space) throw knowledgeAssetsMissing();
   const staged = new Set(stagedPaths);
   for (const image of card.images) {
     if (!isKnowledgeImagePathAllowed(card.relativePath, image.relativePath, card.caseId)) {
-      throw new KnowledgeAssetsMissingError();
+      throw knowledgeAssetsMissing();
     }
     if (staged.has(image.relativePath)) continue;
     try {
@@ -26,6 +26,6 @@ export async function assertKnowledgeImagesAvailable(
     } catch {
       // Missing, unreadable, or outside the owning space all leave the card a Draft.
     }
-    throw new KnowledgeAssetsMissingError();
+    throw knowledgeAssetsMissing();
   }
 }

@@ -74,8 +74,18 @@ export class AppPathService {
     return resolveCanonicalUserDataPath(process.env.RDC_AGENT_USER_DATA, appDataRoot);
   }
 
+  private isolatedUserRdcRoot: string | null = null;
+
+  /**
+   * The disposable Browser QA instance keeps its user resources inside its own temporary userData, so it never reads
+   * or writes the machine's ~/.rdc-agent. Set once at startup, before anything reads a path.
+   */
+  isolateUserRdcRoot(root: string): void {
+    this.isolatedUserRdcRoot = normalizePath(root);
+  }
+
   getUserRdcRoot(): string {
-    return normalizePath(process.env.RDC_AGENT_HOME?.trim() || path.join(os.homedir(), '.rdc-agent'));
+    return this.isolatedUserRdcRoot ?? normalizePath(path.join(os.homedir(), '.rdc-agent'));
   }
 
   /**
@@ -83,13 +93,16 @@ export class AppPathService {
    * then Electron `process.resourcesPath`. First existing candidate wins.
    */
   getBuiltinAgentRuntimeRoot(): string {
+    const appResources = path.join(app?.getAppPath?.() || process.cwd(), 'resources', 'agent-runtime');
     const candidates = [
-      path.join(app?.getAppPath?.() || process.cwd(), 'resources', 'agent-runtime'),
+      appResources,
       path.join(process.cwd(), 'resources', 'agent-runtime'),
       path.join(process.resourcesPath ?? '', 'agent-runtime'),
     ];
-    return candidates.map((candidate) => path.resolve(candidate)).find((candidate) => fs.existsSync(candidate))
-      ?? path.resolve(candidates[0]);
+    return (
+      candidates.map((candidate) => path.resolve(candidate)).find((candidate) => fs.existsSync(candidate)) ??
+      path.resolve(appResources)
+    );
   }
 
   getBuiltinAgentsPath(): string {
@@ -243,7 +256,11 @@ export class AppPathService {
   }
 
   getLiveReplayPreviewPath(sessionId: string): string {
-    return path.join(this.getAppStatePaths().capturePreviewsPath, 'live', `${sanitizePathSegment(sessionId || 'session')}.png`);
+    return path.join(
+      this.getAppStatePaths().capturePreviewsPath,
+      'live',
+      `${sanitizePathSegment(sessionId || 'session')}.png`,
+    );
   }
 }
 
