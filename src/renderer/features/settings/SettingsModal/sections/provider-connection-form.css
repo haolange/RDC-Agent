@@ -128,3 +128,19 @@
     max-height: calc(100vh - var(--space-4));
   }
 }
+
+/* Connect dialog actions: each button's labels share one cell (see ProviderConnectActions), so pending labels keep
+   the footer still. */
+.settings-provider-action-label {
+  display: grid;
+}
+
+.settings-provider-action-label-option {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+  visibility: hidden;
+}
+
+.settings-provider-action-label-option.is-shown {
+  visibility: visible;
+}

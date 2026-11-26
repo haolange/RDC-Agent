@@ -18,8 +18,28 @@ interface ProviderConnectActionsProps {
 }
 
 /**
- * Single action bar for the connect dialog. Testing swaps only the button
- * label, so the footer keeps its height and baseline throughout a test.
+ * Every label a button can show shares one grid cell, so the button is as wide as the widest of them and a swap to
+ * the pending label never moves its neighbours.
+ */
+function StableLabel({ labels, shown }: { labels: string[]; shown: string }) {
+  return (
+    <span className="settings-provider-action-label">
+      {[...new Set(labels)].map((label) => (
+        <span
+          key={label}
+          className={`settings-provider-action-label-option${label === shown ? ' is-shown' : ''}`}
+          aria-hidden={label === shown ? undefined : true}
+        >
+          {label}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * Single action bar for the connect dialog. Testing and saving swap only the button labels, which keep their width,
+ * so the footer keeps its height, baseline and layout throughout.
  */
 export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
   draft,
@@ -44,6 +64,19 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
   const authModeUnavailable =
     (provider.authModeAvailability?.[draft.authMode] ?? provider.providerAvailability).state === 'unavailable';
 
+  const idleSaveLabel =
+    provider.authMode === 'account'
+      ? accountRequiresCode && !accountConnected
+        ? t('settings.oauthContinue')
+        : provider.isConfigured
+          ? t('settings.save')
+          : t('settings.connect')
+      : provider.isConfigured || hasFreshTest
+        ? t('settings.save')
+        : t('settings.connect');
+  const saveLabel = draft.busy === 'saving' ? t('settings.saving') : idleSaveLabel;
+  const saveLabels = [idleSaveLabel, t('settings.saving')];
+
   return (
     <>
       <Button variant="ghost" onClick={onClose}>
@@ -56,7 +89,10 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
         disabled={commonBlocked || accountTestBlocked || authModeUnavailable}
         data-tooltip={t('settings.providers.checkConnectionHint')}
       >
-        {draft.busy === 'testing' ? t('settings.testing') : t('settings.providers.checkConnection')}
+        <StableLabel
+          labels={[t('settings.providers.checkConnection'), t('settings.testing')]}
+          shown={draft.busy === 'testing' ? t('settings.testing') : t('settings.providers.checkConnection')}
+        />
       </Button>
       <Button
         variant="primary"
@@ -64,17 +100,7 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
         onClick={() => void onSave()}
         disabled={commonBlocked || accountSaveBlocked || noSupportedModels || authModeUnavailable}
       >
-        {draft.busy === 'saving'
-          ? t('settings.saving')
-          : provider.authMode === 'account'
-            ? accountRequiresCode && !accountConnected
-              ? t('settings.oauthContinue')
-              : provider.isConfigured
-                ? t('settings.save')
-                : t('settings.connect')
-            : provider.isConfigured || hasFreshTest
-              ? t('settings.save')
-              : t('settings.connect')}
+        <StableLabel labels={saveLabels} shown={saveLabel} />
       </Button>
     </>
   );
