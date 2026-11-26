@@ -87,12 +87,10 @@ it('canonical background dispatch projects the child approval after parent reply
       if (event.type === 'approval.requested') {
         const { approvalId } = event.payload;
         expect(approvalId).toMatch(/^tool-approval-mutation-.+/);
-        expect(
-          approvals.answer({ sessionId: 'unrelated', turnId: 'child-turn', approvalId, approved: true }).success,
-        ).toBe(false);
-        expect(approvals.answer({ sessionId: 'owner', turnId: 'child-turn', approvalId, approved: true }).success).toBe(
-          true,
-        );
+        expect(() =>
+          approvals.answer({ sessionId: 'unrelated', turnId: 'child-turn', approvalId, approved: true }),
+        ).toThrow();
+        approvals.answer({ sessionId: 'owner', turnId: 'child-turn', approvalId, approved: true });
       }
     },
   } as never;

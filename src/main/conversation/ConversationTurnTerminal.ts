@@ -82,13 +82,11 @@ export function publishTraceProjection(sessionId: string | null | undefined): vo
 
   void traceService
     .getSession(sessionId)
-    .then((result) => {
-      if (result.success && result.presentation) {
-        workflowProjectionPublisher.publishTraceProjectionChanged(
-          { projectId: result.presentation.projectId, sessionId: result.presentation.sessionId },
-          result.presentation,
-        );
-      }
+    .then(({ presentation }) => {
+      workflowProjectionPublisher.publishTraceProjectionChanged(
+        { projectId: presentation.projectId, sessionId: presentation.sessionId },
+        presentation,
+      );
     })
     .catch((error) => {
       console.error('[ConversationService] Failed to publish trace projection:', error);

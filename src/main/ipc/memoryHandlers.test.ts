@@ -54,7 +54,7 @@ describe('memory mutation approval boundaries', () => {
         name: 'qa-memory',
       },
     );
-    expect(result).toEqual({ error: 'Memory mutation was not confirmed by the main-process dialog.' });
+    expect(result).toEqual({ cancelled: true });
   });
 
   it('auto-confirms Browser QA memory approval only with full access', async () => {

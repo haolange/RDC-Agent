@@ -2,6 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import { AppError, errorCodeOf } from '@shared/errors/appError';
 import { useCaptureRecovery } from './useCaptureRecovery';
 import { getCaptureRecovery, restorePreviousCapture } from './capturePanelActions';
 
@@ -24,7 +25,9 @@ it('discards stale status reads and only requests recovery on explicit action', 
       pendingCount: 1,
       original: { inputId: 'new', fileName: 'new.rdc', deviceId: 'local', eventId: 7 },
     });
-  vi.mocked(restorePreviousCapture).mockReset().mockResolvedValue({ success: false, error: 'old process still alive' });
+  vi.mocked(restorePreviousCapture)
+    .mockReset()
+    .mockRejectedValue(new AppError('RDC_RECOVERY_OLD_PROCESS_UNCONFIRMED', 'old process still alive'));
   function Probe({ revision }: { revision: number }) {
     const recovery = useCaptureRecovery(scope, revision);
     return createElement(
@@ -34,7 +37,7 @@ it('discards stale status reads and only requests recovery on explicit action', 
           void recovery.restore(3);
         },
       },
-      recovery.error ?? recovery.status?.original?.fileName ?? 'none',
+      recovery.error ? errorCodeOf(recovery.error.reason) : (recovery.status?.original?.fileName ?? 'none'),
     );
   }
   try {
@@ -48,7 +51,7 @@ it('discards stale status reads and only requests recovery on explicit action', 
     expect(restorePreviousCapture).not.toHaveBeenCalled();
     await act(async () => host.querySelector('button')!.click());
     expect(restorePreviousCapture).toHaveBeenCalledExactlyOnceWith({ ...scope, bindingGeneration: 3 });
-    expect(host.textContent).toBe('old process still alive');
+    expect(host.textContent).toBe('RDC_RECOVERY_OLD_PROCESS_UNCONFIRMED');
   } finally {
     act(() => root.unmount());
   }

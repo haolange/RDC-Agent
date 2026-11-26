@@ -249,7 +249,6 @@
   "project:select": [
    {
     "result": {
-     "success": true,
      "project": {
       "projectId": "proj_3d3b2550a304",
       "name": "visual-diff-project",

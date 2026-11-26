@@ -4,10 +4,10 @@ import { Textarea } from '../../ui/Textarea';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { InlineError } from '../../ui/InlineError';
+import { FailureAlert } from '../../patterns/FailureAlert';
 import { HandoffActionRow } from '../../patterns/HandoffActionRow/HandoffActionRow';
 import { cancelPlanReview } from '../../services/planReviewService';
 import { useElectronApi } from '../../hooks/useElectronApi';
-import { errorDetail } from '../../lib/errorDetail';
 import { ComposerModelEffortControl, type ComposerModelSaveState } from './ComposerModelEffortControl';
 import { capabilityStatusPresentation } from './capabilityPresentation';
 import { useComposerTurnControls } from './ComposerTurnControlsContext';
@@ -51,7 +51,7 @@ export const PlanReviewRequestPanel: React.FC<{
     };
   }, []);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ reason: unknown } | null>(null);
   const canReject = feedback.trim().length > 0;
 
   const run = async (decision: Parameters<typeof submit>[1]) => {
@@ -68,7 +68,7 @@ export const PlanReviewRequestPanel: React.FC<{
     try {
       await submit(request, decision);
     } catch (reason) {
-      if (mounted.current) setError(errorDetail(reason));
+      if (mounted.current) setError({ reason });
     } finally {
       submitting.current = false;
       if (mounted.current) setIsSubmitting(false);
@@ -83,7 +83,7 @@ export const PlanReviewRequestPanel: React.FC<{
     try {
       await cancelPlanReview(api, { sessionId: request.sessionId, reviewId: request.reviewId });
     } catch (reason) {
-      if (mounted.current) setError(errorDetail(reason));
+      if (mounted.current) setError({ reason });
     } finally {
       submitting.current = false;
       if (mounted.current) setIsSubmitting(false);
@@ -154,7 +154,7 @@ export const PlanReviewRequestPanel: React.FC<{
         <span className="composer-transition-announcement" role="status">
           {isSubmitting ? t('composer.handoff.confirming') : ''}
         </span>
-        {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
+        {error ? <FailureAlert reason={error.reason} contextKey="app.error.actionFailed" /> : null}
         {modelStatus.labelKey && (capabilityState.status === 'error' || capabilityState.status === 'unavailable') ? (
           <InlineError
             detail={capabilityState.message}

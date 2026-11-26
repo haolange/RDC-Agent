@@ -49,7 +49,7 @@ describe('AgentUserInputRequestService', () => {
       questions: [{ questionId: 'direction' }, { questionId: 'keyword' }],
     });
 
-    const result = agentUserInputRequestService.answer({
+    agentUserInputRequestService.answer({
       sessionId: 'session-ask-user',
       turnId,
       toolCallId: 'tool-ask-user-batch',
@@ -59,7 +59,6 @@ describe('AgentUserInputRequestService', () => {
       ],
     });
 
-    expect(result).toEqual({ success: true });
     await expect(requestPromise).resolves.toBe(
       'Q1: Where should I start?\nA1: Repo structure\n\nQ2: What keyword should summarize the repo?\nA2: graphics\npipeline',
     );
@@ -84,16 +83,16 @@ describe('AgentUserInputRequestService', () => {
       context: eventContext,
     });
 
-    expect(
+    expect(() =>
       agentUserInputRequestService.answer({
         sessionId: 'session-ask-user',
         turnId,
         toolCallId: 'tool-ask-user-incomplete',
         answers: [{ questionId: 'direction', answer: 'Repo structure', selectedOptionId: 'repo' }],
       }),
-    ).toMatchObject({ success: false });
+    ).toThrow();
 
-    expect(
+    expect(() =>
       agentUserInputRequestService.answer({
         sessionId: 'other-session',
         turnId,
@@ -103,19 +102,17 @@ describe('AgentUserInputRequestService', () => {
           { questionId: 'keyword', answer: 'graphics' },
         ],
       }),
-    ).toMatchObject({ success: false });
+    ).toThrow();
 
-    expect(
-      agentUserInputRequestService.answer({
-        sessionId: 'session-ask-user',
-        turnId,
-        toolCallId: 'tool-ask-user-incomplete',
-        answers: [
-          { questionId: 'direction', answer: 'Repo structure', selectedOptionId: 'repo' },
-          { questionId: 'keyword', answer: 'graphics' },
-        ],
-      }),
-    ).toEqual({ success: true });
+    agentUserInputRequestService.answer({
+      sessionId: 'session-ask-user',
+      turnId,
+      toolCallId: 'tool-ask-user-incomplete',
+      answers: [
+        { questionId: 'direction', answer: 'Repo structure', selectedOptionId: 'repo' },
+        { questionId: 'keyword', answer: 'graphics' },
+      ],
+    });
     await expect(requestPromise).resolves.toContain('Q2: What keyword should summarize the repo?');
   });
 });
@@ -140,7 +137,7 @@ it('preserves unknown and optional skipped answers without selecting a cause or 
     ],
     context: eventContext,
   });
-  expect(
+  expect(() =>
     agentUserInputRequestService.answer({
       sessionId: 'session-ask-user',
       turnId,
@@ -149,19 +146,17 @@ it('preserves unknown and optional skipped answers without selecting a cause or 
         { questionId: 'cause', answer: '', responseKind: 'skipped' },
         { questionId: 'reference', answer: '', responseKind: 'skipped' },
       ],
-    }).success,
-  ).toBe(false);
-  expect(
-    agentUserInputRequestService.answer({
-      sessionId: 'session-ask-user',
-      turnId,
-      toolCallId,
-      answers: [
-        { questionId: 'cause', answer: '', responseKind: 'unknown' },
-        { questionId: 'reference', answer: '', responseKind: 'skipped' },
-      ],
-    }).success,
-  ).toBe(true);
+    }),
+  ).toThrow();
+  agentUserInputRequestService.answer({
+    sessionId: 'session-ask-user',
+    turnId,
+    toolCallId,
+    answers: [
+      { questionId: 'cause', answer: '', responseKind: 'unknown' },
+      { questionId: 'reference', answer: '', responseKind: 'skipped' },
+    ],
+  });
   const result = await pending;
   expect(result).toContain('Response status: unknown');
   expect(result).toContain('Response status: skipped');

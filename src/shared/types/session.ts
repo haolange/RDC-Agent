@@ -46,12 +46,11 @@ export const ProjectInputRecordSchema = z
     }
   }) satisfies z.ZodType<ProjectInputRecord>;
 
+/** A confirmed removal: the single-use approval for `project:inputs:remove` and what it affects. */
 export interface ProjectInputRemovePreparation {
-  success: boolean;
-  approvalToken?: string;
-  input?: ProjectInputRecord;
-  affectedSessionIds?: string[];
-  error?: string;
+  approvalToken: string;
+  input: ProjectInputRecord;
+  affectedSessionIds: string[];
 }
 export interface ProjectInputRemoveResult {
   success: boolean;

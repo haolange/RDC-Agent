@@ -148,11 +148,11 @@ function captureRecoveryChannels({
         broadcastOpenedCapture(scope, rdcSessionService.snapshotOpenedCaptureForSession(scope));
         broadcastContext(scope, rdcSessionService.snapshotContextForSession(scope));
         context.broadcastToRenderer('capture:replayChanged', state);
-        return { success: true, state };
+        return state;
       } catch (error) {
         broadcastOpenedCapture(scope, rdcSessionService.snapshotOpenedCaptureForSession(scope));
         broadcastContext(scope, rdcSessionService.snapshotContextForSession(scope));
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
+        throw error;
       }
     },
   };
@@ -170,32 +170,31 @@ function captureContextChannels({ context, broadcastContext }: CaptureChannelCon
       return { captures: rdcSessionService.snapshotContextForSession(scope)?.captureDescriptors ?? [] };
     },
     'capture:select': async (_event, ...rawArgs: unknown[]) => {
-      try {
-        const [request] = parseIpcArgs(CaptureSelectArgsSchema, rawArgs, {
-          label: 'capture:select',
-          maxBytes: 4 * 1024,
-        });
-        const scope: SessionScope = { projectId: request.projectId, sessionId: request.sessionId };
-        const snapshot = rdcSessionService.snapshotContextForSession(scope);
-        if (!snapshot?.captureDescriptors.some((capture) => capture.id === request.captureId)) {
-          return { success: false, error: 'Capture is not owned by this session.' };
-        }
-        await rdcSessionService.switchActiveCapture(request, request.captureId);
-        context.broadcastToRenderer(
-          'capture:statusChanged',
-          envelope(scope, { captureId: request.captureId, status: 'selected' }),
-        );
-        broadcastContext(scope, rdcSessionService.snapshotContextForSession(scope));
-        return { success: true };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      const [request] = parseIpcArgs(CaptureSelectArgsSchema, rawArgs, {
+        label: 'capture:select',
+        maxBytes: 4 * 1024,
+      });
+      const scope: SessionScope = { projectId: request.projectId, sessionId: request.sessionId };
+      const snapshot = rdcSessionService.snapshotContextForSession(scope);
+      if (!snapshot?.captureDescriptors.some((capture) => capture.id === request.captureId)) {
+        throw new AppError('CAPTURE_SELECTION_INVALID', `${request.captureId} is not owned by this session.`);
       }
+      await rdcSessionService.switchActiveCapture(request, request.captureId);
+      context.broadcastToRenderer(
+        'capture:statusChanged',
+        envelope(scope, { captureId: request.captureId, status: 'selected' }),
+      );
+      broadcastContext(scope, rdcSessionService.snapshotContextForSession(scope));
     },
   };
 }
 
 /** Opening a project input on a replay device, logged and broadcast whether it succeeds or fails. */
-function openProjectInputChannel({ broadcastContext, broadcastOpenedCapture }: CaptureChannelContext): IpcChannelTable {
+function openProjectInputChannel({
+  authorizeReplayScope,
+  broadcastContext,
+  broadcastOpenedCapture,
+}: CaptureChannelContext): IpcChannelTable {
   return {
     'capture:openProjectInput': async (_event, ...rawArgs: unknown[]) => {
       let request:
@@ -206,17 +205,14 @@ function openProjectInputChannel({ broadcastContext, broadcastOpenedCapture }: C
           label: 'capture:openProjectInput',
           maxBytes: 16 * 1024,
         }) as [Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string; bindingGeneration: number }];
-        const session = sessionRecordStore.readSession(request.sessionId);
-        if (!session || session.projectId !== request.projectId) {
-          return { success: false, error: 'Session does not belong to the requested project.' };
-        }
+        authorizeReplayScope(request);
         const input = (await projectWorkspaceStore.listProjectInputs(request.projectId)).find(
           (entry) => entry.inputId === request!.inputId && entry.filePath === request!.filePath,
         );
-        if (!input) return { success: false, error: `Project input not found: ${request.inputId}` };
+        if (!input) throw new AppError('PROJECT_INPUT_NOT_FOUND', request.inputId);
 
         const replayDevice = replayDeviceService.getDeviceById(request.replayDeviceId);
-        if (!replayDevice) return { success: false, error: `Replay device not found: ${request.replayDeviceId}` };
+        if (!replayDevice) throw new AppError('RDC_DEVICE_NOT_FOUND', request.replayDeviceId);
 
         runtimeLogService.log({
           scope: 'session',
@@ -258,7 +254,7 @@ function openProjectInputChannel({ broadcastContext, broadcastOpenedCapture }: C
             captureHash: rdcSessionService.snapshotReplayForSession(scope).captureHash,
           },
         });
-        return { success: true, openedCapture, contextSnapshot };
+        return { openedCapture, contextSnapshot };
       } catch (error) {
         const scope = request ? { projectId: request.projectId, sessionId: request.sessionId } : null;
         if (scope) {
@@ -275,11 +271,7 @@ function openProjectInputChannel({ broadcastContext, broadcastOpenedCapture }: C
           projectId: request?.projectId,
           raw: request ? { inputId: request.inputId, replayDeviceId: request.replayDeviceId } : undefined,
         });
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-          issue: replayDeviceIssue(error),
-        };
+        throw error;
       }
     },
   };
@@ -303,7 +295,7 @@ function openedCaptureChannels({ broadcastContext, broadcastOpenedCapture }: Cap
       const cleared = await rdcSessionService.clearOpenedCaptureForSession(scope, {
         expectedGeneration: scope.bindingGeneration,
       });
-      if (!cleared) return { success: false, error: 'No RDC context is owned by this session.' };
+      if (!cleared) throw new AppError('RDC_NOT_OPEN', 'no RDC context is owned by this session.');
       broadcastOpenedCapture(scope, null);
       broadcastContext(scope, null);
       runtimeLogService.log({
@@ -315,7 +307,6 @@ function openedCaptureChannels({ broadcastContext, broadcastOpenedCapture }: Cap
         sessionId: scope.sessionId,
         projectId: scope.projectId,
       });
-      return { success: true };
     },
   };
 }

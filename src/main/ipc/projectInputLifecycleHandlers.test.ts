@@ -145,7 +145,7 @@ describe('native project input removal approval', () => {
 
   it.each(['zh-CN', 'en'])('localizes the entire reference confirmation in %s', async (language) => {
     mocks.language = language;
-    expect((await invoke('prepareRemove', 'project', 'input')).success).toBe(true);
+    expect(await invoke('prepareRemove', 'project', 'input')).toMatchObject({ approvalToken: expect.any(String) });
     const options = mocks.confirm.mock.calls[0] as unknown as [
       object,
       { buttons: string[]; title: string; message: string; detail: string; defaultId: number; cancelId: number },
@@ -200,29 +200,28 @@ describe('native project input removal approval', () => {
 
   it('cancellation issues no token, while confirmation authorizes exactly one removal', async () => {
     mocks.confirm.mockResolvedValueOnce({ response: 1 });
-    expect(await invoke('prepareRemove', 'project', 'input')).toEqual({ success: false });
+    expect(await invoke('prepareRemove', 'project', 'input')).toBeNull();
     const approved = await invoke('prepareRemove', 'project', 'input');
     expect(typeof approved.approvalToken).toBe('string');
     expect(await invoke('remove', 'project', 'input', approved.approvalToken)).toMatchObject({
       success: true,
       fileDeleted: false,
     });
-    expect(await invoke('remove', 'project', 'input', approved.approvalToken)).toMatchObject({
-      success: false,
-      error: 'PROJECT_INPUT_APPROVAL_INVALID',
+    await expect(invoke('remove', 'project', 'input', approved.approvalToken)).rejects.toMatchObject({
+      code: 'PROJECT_INPUT_APPROVAL_INVALID',
     });
     expect(mocks.remove).toHaveBeenCalledExactlyOnceWith('project', 'input', 'external:identity');
   });
 
   it('fails closed without an owner and does not mistake Browser auto-confirmation for a native dialog', async () => {
     mocks.owner = undefined;
-    expect(await invoke('prepareRemove', 'project', 'input')).toEqual({ success: false });
+    expect(await invoke('prepareRemove', 'project', 'input')).toBeNull();
     vi.stubEnv('RDC_AGENT_BROWSER_QA', '1');
     vi.stubEnv('RDC_AGENT_BROWSER_QA_FULL_ACCESS', '1');
     mocks.isPackaged = true;
-    expect(await invoke('prepareRemove', 'project', 'input')).toEqual({ success: false });
+    expect(await invoke('prepareRemove', 'project', 'input')).toBeNull();
     mocks.isPackaged = false;
-    expect((await invoke('prepareRemove', 'project', 'input')).success).toBe(true);
+    expect(await invoke('prepareRemove', 'project', 'input')).toMatchObject({ approvalToken: expect.any(String) });
     expect(mocks.confirm).not.toHaveBeenCalled();
   });
 });

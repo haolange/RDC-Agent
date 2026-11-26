@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
+import { errorDetail } from '../../lib/errorDetail';
 import { persistSessionTurnControls } from './sessionModelOverride';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 
@@ -21,7 +22,7 @@ export function useTurnControlsSave(sessionId: string | null) {
       const result = await persistSessionTurnControls(sessionId, controls);
       // Only the newest save of the session's controls (its revision lane) speaks for them, while that session shows.
       if (result.latest && useProjectStore.getState().currentSessionId === sessionId) {
-        setSaveState({ sessionId, saving: false, error: result.ok ? undefined : result.error });
+        setSaveState({ sessionId, saving: false, error: result.ok ? undefined : errorDetail(result.error) });
       }
     },
     [sessionId],

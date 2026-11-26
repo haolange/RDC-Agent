@@ -20,9 +20,6 @@
     "src/main/agent-runtime/EffectiveRuntimePlan.ts": {
       "lines": 155
     },
-    "src/main/agent-runtime/interactions/applyDeclaredHandoff.ts": {
-      "complexity": 42
-    },
     "src/main/agent-runtime/orchestration/AgentSlotFactory.ts": {
       "lines": 209
     },
@@ -330,7 +327,7 @@
       "lines": 156
     },
     "src/renderer/features/sidebar/Sidebar/index.tsx": {
-      "lines": 179
+      "lines": 175
     },
     "src/renderer/features/sidebar/Sidebar/RenamePopoverPanels.tsx": {
       "lines": 171

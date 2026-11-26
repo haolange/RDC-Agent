@@ -164,11 +164,10 @@ export function createProviderConnectionDraft(provider: LlmProviderEntry): Provi
 
 /** A coded connection failure in the person's language; otherwise the provider's own message or the generic one. */
 export function connectionFailureText(
-  result: Pick<LlmProviderConnectionResult, 'error' | 'errorCode' | 'errorParams'>,
+  result: Pick<LlmProviderConnectionResult, 'errorCode' | 'errorParams'>,
   t: ReturnType<typeof useI18n>['t'],
   fallback: 'settings.providerTestFailed' | 'settings.providerSaveFailed',
 ): string {
-  return result.errorCode
-    ? t(`settings.providerError.${result.errorCode}` as const, result.errorParams)
-    : (result.error ?? t(fallback));
+  // The provider's own text is technical; without a known code the caller's sentence stands in for it.
+  return result.errorCode ? t(`settings.providerError.${result.errorCode}` as const, result.errorParams) : t(fallback);
 }

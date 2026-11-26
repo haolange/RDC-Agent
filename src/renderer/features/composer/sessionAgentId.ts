@@ -12,7 +12,7 @@ import type { PlanReviewHandoffSuggestion } from '@shared/types/planReview';
 export async function persistSessionAgentId(
   sessionId: string | null | undefined,
   agentId: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: unknown }> {
   if (!sessionId) {
     writeComposerDraftAgent(useProjectStore.getState().currentProject?.projectId, agentId);
     return { ok: true };
@@ -22,12 +22,10 @@ export async function persistSessionAgentId(
   const records = useSessionRecordStore.getState();
   const intentId = records.beginIntent(sessionId, { agentId });
   try {
-    const result = await api.session.setAgentId(sessionId, agentId);
-    if (!result.success || !result.session) {
-      return { ok: false, error: result.error || 'AGENT_UNAVAILABLE' };
-    }
-    records.accept(result.session);
+    records.accept((await api.session.setAgentId(sessionId, agentId)).session);
     return { ok: true };
+  } catch (error) {
+    return { ok: false, error };
   } finally {
     records.settleIntent(sessionId, intentId);
   }
@@ -42,11 +40,9 @@ export async function applyDeclaredHandoffOnClient(
 ): Promise<{ ok: boolean; error?: string; suggestion?: PlanReviewHandoffSuggestion }> {
   const api = getElectronApi();
   if (!api) return { ok: false, error: 'BRIDGE_UNAVAILABLE' };
+  // A failed switch rejects with the main process's coded error; the caller words it.
   const result = await api.session.applyDeclaredHandoff(sessionId, agent, label, expectedPlanHash);
-  if (!result.success) {
-    return { ok: false, error: result.error || 'DECLARED_HANDOFF_FAILED' };
-  }
-  if (result.session) useSessionRecordStore.getState().accept(result.session);
+  useSessionRecordStore.getState().accept(result.session);
   if (!isCurrent()) return { ok: false, error: 'HANDOFF_CONTEXT_CHANGED' };
   return { ok: true, suggestion: result.suggestion };
 }

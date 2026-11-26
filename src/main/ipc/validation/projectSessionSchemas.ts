@@ -34,7 +34,11 @@ export const SessionCreateArgsSchema = z.tuple([
     .transform((title) => title ?? undefined),
 ]);
 
-export const SessionRenameArgsSchema = z.tuple([ipcId(128, 'sessionId'), ipcNonEmptyString(200, 'title')]);
+/** The title is stored trimmed; a blank one is a validation failure. */
+export const SessionRenameArgsSchema = z.tuple([
+  ipcId(128, 'sessionId'),
+  ipcString(200, 'title').trim().min(1, 'title is required'),
+]);
 
 export const SessionIdOnlyArgsSchema = z.tuple([ipcId(128, 'sessionId')]);
 

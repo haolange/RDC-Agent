@@ -14,7 +14,8 @@ type SessionModelField = 'modelOverride' | 'turnControls';
 
 export interface SessionModelSaveResult {
   ok: boolean;
-  error?: string;
+  /** The failure main answered with, for humanizeError; a missing session or bridge is a code string. */
+  error?: unknown;
   /** Whether this was still the newest intent of its field when main answered. */
   latest: boolean;
 }
@@ -42,7 +43,6 @@ async function saveSessionModelField(
   // The chosen model shows while its save is in flight; a failed save drops it again.
   const intentId = field === 'modelOverride' ? records.beginIntent(sessionId, write) : null;
   const saved = api.session.setModelOverride(sessionId, { ...write, clientRevision }).then((result) => {
-    if (!result.success || !result.session) throw new Error(result.error || 'MODEL_UNAVAILABLE');
     records.accept(result.session);
   });
   void lanes.track(lane, clientRevision, saved);
@@ -51,8 +51,7 @@ async function saveSessionModelField(
     await saved;
     return { ok: true, latest: lanes.isLatest(lane, clientRevision) };
   } catch (error) {
-    const message = error instanceof Error && error.message ? error.message : 'MODEL_SAVE_FAILED';
-    return { ok: false, error: message, latest: lanes.isLatest(lane, clientRevision) };
+    return { ok: false, error, latest: lanes.isLatest(lane, clientRevision) };
   } finally {
     if (intentId !== null) records.settleIntent(sessionId, intentId);
   }
@@ -86,7 +85,7 @@ export async function commitComposerModelChoice(
   model: SessionModelOverride,
   sessionId: string | null | undefined,
   projectId: string | null | undefined,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: unknown }> {
   if (sessionId) {
     return persistSessionModelOverride(sessionId, model);
   }
@@ -97,7 +96,7 @@ export async function commitComposerModelChoice(
 export async function clearComposerModelChoice(
   sessionId: string | null | undefined,
   projectId: string | null | undefined,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: unknown }> {
   if (sessionId) {
     return persistSessionModelOverride(sessionId, null);
   }

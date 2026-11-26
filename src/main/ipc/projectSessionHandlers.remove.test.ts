@@ -116,15 +116,14 @@ describe('session:remove slot sync', () => {
     const broadcast = vi.fn();
     registerProjectSessionHandlers({ state: {}, broadcastToRenderer: broadcast } as unknown as WorkbenchIpcContext);
     expect(await handlers.get('project:inputs:reference')!({}, 'proj_1', 'D:/source/original.rdc')).toEqual({
-      success: true,
       inputs,
     });
     expect(storage.projects.referenceProjectInput).toHaveBeenCalledWith('proj_1', 'D:/source/original.rdc');
     expect(broadcast).toHaveBeenCalledWith('project:inputsChanged', { projectId: 'proj_1', inputs });
     storage.projects.referenceProjectInput.mockClear();
-    expect(await handlers.get('project:inputs:reference')!({}, 'proj_1', ['D:/source/original.rdc'])).toMatchObject({
-      success: false,
-    });
+    await expect(
+      Promise.resolve().then(() => handlers.get('project:inputs:reference')!({}, 'proj_1', ['D:/source/original.rdc'])),
+    ).rejects.toMatchObject({ code: 'IPC_VALIDATION_ERROR' });
     expect(storage.projects.referenceProjectInput).not.toHaveBeenCalled();
   });
 
@@ -140,8 +139,7 @@ describe('session:remove slot sync', () => {
       selectCurrentProject: vi.fn(async () => ({ project: null, currentSession: null, currentRun: null })),
       initializeIpcState: vi.fn(async () => undefined),
     } as unknown as WorkbenchIpcContext);
-    const result = await handlers.get('project:remove')!({}, 'proj_1');
-    expect(result).toMatchObject({ success: false, error: 'join not confirmed' });
+    await expect(handlers.get('project:remove')!({}, 'proj_1')).rejects.toThrow('join not confirmed');
     expect(storage.removeProject).not.toHaveBeenCalled();
   });
   it('keeps the project and its visible owner when device installation remains unconfirmed after native cleanup', async () => {
@@ -151,10 +149,7 @@ describe('session:remove slot sync', () => {
     );
     const state = { currentSessionId: 'sess_1', currentProjectId: 'proj_1', currentRunId: 'run_1' };
     registerProjectSessionHandlers({ state, broadcastToRenderer: vi.fn() } as unknown as WorkbenchIpcContext);
-    expect(await handlers.get('project:remove')!({}, 'proj_1')).toEqual({
-      success: false,
-      error: 'RDC_DEVICE_ACTION_UNCONFIRMED',
-    });
+    await expect(handlers.get('project:remove')!({}, 'proj_1')).rejects.toThrow('RDC_DEVICE_ACTION_UNCONFIRMED');
     expect(storage.removeProject).not.toHaveBeenCalled();
     expect(storage.removeSession).not.toHaveBeenCalled();
     expect(state).toEqual({ currentSessionId: 'sess_1', currentProjectId: 'proj_1', currentRunId: 'run_1' });
@@ -183,13 +178,9 @@ describe('session:remove slot sync', () => {
     const handler = handlers.get('session:remove');
     expect(handler).toBeTypeOf('function');
     const result = await handler!({}, 'sess_1');
-    // Diagnosed 2026-09-03: ipcId allows underscore (`sess_1` matches
-    // /^[A-Za-z0-9][A-Za-z0-9._:@+-]*$/). The real payload was
-    // {"success":false,"error":"__vite_ssr_import_0__.projectWorkspaceStore.getProjectById is not a function"}
-    // because unmocked removeSessionWithHooks called projectWorkspaceStore.getProjectById,
-    // which the hoisted storage stub omitted. attachmentStagingService is also
-    // imported by the handler and is mocked so this test does not load AppPathService/HookEngine.
-    expect(result, `session:remove payload=${JSON.stringify(result)}`).toMatchObject({ success: true });
+    // attachmentStagingService is imported by the handler and is mocked so this test does not load
+    // AppPathService/HookEngine; removeSessionWithHooks needs projectWorkspaceStore.getProjectById from the stub.
+    expect(result).toMatchObject({ nextSession: null });
     expect(conversation.cancelActiveTurn).toHaveBeenCalledWith({ sessionId: 'sess_1' });
     expect(storage.removeSession).toHaveBeenCalledWith('sess_1');
     expect(syncSessionSlots).toHaveBeenCalledWith('sess_1');
@@ -219,7 +210,6 @@ describe('session:remove slot sync', () => {
     const handler = handlers.get('session:open');
     const result = await handler!({}, 'sess_1');
     expect(result).toMatchObject({
-      success: true,
       session: {
         record: expect.objectContaining({ sessionId: 'sess_1', agentId: 'general' }),
         revision: { epoch: expect.any(String), n: expect.any(Number) },
@@ -247,7 +237,7 @@ describe('session:remove slot sync', () => {
     } as unknown as WorkbenchIpcContext);
 
     const result = await handlers.get('session:open')!({}, 'sess_1');
-    expect(result).toMatchObject({ success: true, currentRun: running });
+    expect(result).toMatchObject({ currentRun: running });
     expect(conversation.isTurnActive).toHaveBeenCalledWith('sess_1', 'turn_1');
     expect(storage.updateRun).not.toHaveBeenCalled();
   });
@@ -307,7 +297,7 @@ describe('session:remove slot sync', () => {
 
     const handler = handlers.get('session:remove');
     const result = await handler!({}, 'sess_1');
-    expect(result).toMatchObject({ success: true });
+    expect(result).toMatchObject({ nextSession: null });
     expect(setRunLifecycleState).toHaveBeenCalledWith('sess_1', 'run_1', {
       status: 'cancelled',
       stopReason: 'Session removed',

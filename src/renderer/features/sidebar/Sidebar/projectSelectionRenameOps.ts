@@ -43,10 +43,6 @@ export async function commitSessionRenameOp(
   ctx.setIsBusy(true);
   try {
     const result = await window.electronAPI.session.rename(session.sessionId, trimmedTitle);
-    if (!result.success || !result.session) {
-      return;
-    }
-
     acceptSessionSnapshot(result.session);
     const nextSessions = await ctx.loadProjectSessionList(session.projectId);
     if (ctx.getCurrentProject()?.projectId === session.projectId) {

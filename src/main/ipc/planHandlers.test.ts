@@ -84,13 +84,12 @@ afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 describe('plan IPC file authority', () => {
   it('stops the owning parent request when the live review belongs to a delegated child turn', async () => {
     vi.mocked(agentPlanReviewRequestService.cancel).mockReturnValueOnce({ success: true, liveTurnId: 'child-turn' });
-    expect(await invoke('plan:cancelReview', { sessionId: 's', reviewId: 'review' })).toEqual({ success: true });
+    expect(await invoke('plan:cancelReview', { sessionId: 's', reviewId: 'review' })).toBeUndefined();
     expect(conversationService.cancelActiveTurn).toHaveBeenCalledExactlyOnceWith({ sessionId: 's' });
   });
   it('saves selected history metadata, not latest session state', async () => {
     const grant = await invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' });
     const result = await invoke('plan:saveToProject', { ...request, approvalToken: grant.token });
-    expect(result.success).toBe(true);
     const content = fs.readFileSync(result.path, 'utf8');
     expect(parse(content.split('---')[1])).toMatchObject({
       planId: 'old-plan',
@@ -99,7 +98,9 @@ describe('plan IPC file authority', () => {
       sha256: request.expectedHash,
     });
     expect(content).toContain('# Old body');
-    expect((await invoke('plan:saveToProject', { ...request, approvalToken: grant.token })).success).toBe(false);
+    await expect(invoke('plan:saveToProject', { ...request, approvalToken: grant.token })).rejects.toMatchObject({
+      code: 'PLAN_APPROVAL_TOKEN_INVALID',
+    });
   });
   it.each(['path', 'hash', 'revision'])('rejects substituted %s and consumes the grant', async (field) => {
     const grant = await invoke('plan:issueApprovalToken', { ...request, action: 'plan.export' });
@@ -110,17 +111,17 @@ describe('plan IPC file authority', () => {
         : field === 'hash'
           ? { ...args, expectedHash: 'b'.repeat(64) }
           : { ...args, revision: 3 };
-    expect((await invoke('plan:export', altered)).error).toBe('PLAN_APPROVAL_TOKEN_INVALID');
-    expect((await invoke('plan:export', args)).success).toBe(false);
+    await expect(invoke('plan:export', altered)).rejects.toMatchObject({ code: 'PLAN_APPROVAL_TOKEN_INVALID' });
+    await expect(invoke('plan:export', args)).rejects.toMatchObject({ code: 'PLAN_APPROVAL_TOKEN_INVALID' });
     expect(fs.readdirSync(root)).toEqual([]);
   });
   it('writes the native-selected export and denies cross-session requests', async () => {
     const grant = await invoke('plan:issueApprovalToken', { ...request, action: 'plan.export' });
     const args = { ...request, approvalToken: grant.token, targetPath: grant.targetPath };
-    expect((await invoke('plan:export', args)).success).toBe(true);
+    expect(await invoke('plan:export', args)).toEqual({ path: grant.targetPath });
     expect(fs.readFileSync(grant.targetPath, 'utf8')).toBe('# Old body\n');
     context.state.currentSessionId = 'other';
-    expect((await invoke('plan:export', args)).success).toBe(false);
+    await expect(invoke('plan:export', args)).rejects.toThrow();
   });
   it('does not issue after dialog cancellation or a session switch during confirmation', async () => {
     mocks.saveDialog.mockResolvedValueOnce({ canceled: true });

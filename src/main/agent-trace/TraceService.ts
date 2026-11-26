@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { loopFinalAnswerText, loopThinkingItems } from '@shared/conversation/loopItems';
 import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import { nowIso } from '@shared/utils/id';
@@ -130,16 +131,8 @@ export class TraceService {
   }
 
   async getSession(sessionId: string): Promise<TraceSessionResult> {
-    try {
-      const session = sessionRecordStore.readSession(sessionId);
-      if (!session) {
-        return { success: false, error: `Session not found: ${sessionId}` };
-      }
-      const presentation = await this.buildPresentation(sessionId);
-      return { success: true, presentation };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    if (!sessionRecordStore.readSession(sessionId)) throw new AppError('SESSION_NOT_FOUND', sessionId);
+    return { presentation: await this.buildPresentation(sessionId) };
   }
 
   async buildPresentation(sessionId: string): Promise<AgentRunPresentation> {

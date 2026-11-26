@@ -38,14 +38,10 @@ describe('delegated controlled interactions', () => {
     const { approvalId } = approvalPayloads(events)[0];
     expect(approvalId).toMatch(/^tool-approval-tool-.+/);
     for (const sessionId of ['other', 'child', null])
-      expect(service.answer({ sessionId, turnId: 'child-turn', approvalId, approved: true }).success).toBe(false);
-    expect(service.answer({ sessionId: 'parent', turnId: 'child-turn', approvalId, approved: true }).success).toBe(
-      true,
-    );
+      expect(() => service.answer({ sessionId, turnId: 'child-turn', approvalId, approved: true })).toThrow();
+    service.answer({ sessionId: 'parent', turnId: 'child-turn', approvalId, approved: true });
     await expect(pending).resolves.toBe(true);
-    expect(service.answer({ sessionId: 'parent', turnId: 'child-turn', approvalId, approved: true }).success).toBe(
-      false,
-    );
+    expect(() => service.answer({ sessionId: 'parent', turnId: 'child-turn', approvalId, approved: true })).toThrow();
     expect(events[1]).toMatchObject({ sessionId: 'parent', payload: { status: 'approved' } });
   });
   it('answers child information requests through the owner and cancels pending requests', async () => {
@@ -63,35 +59,33 @@ describe('delegated controlled interactions', () => {
       onEvent: (event: AgentEvent) => events.push(event),
     };
     const pending = withDelegatedInteractionOwner(owner, () => service.request(input));
-    expect(
+    expect(() =>
       service.answer({
         sessionId: 'other',
         turnId: 'child-turn',
         toolCallId: 'ask',
         answers: [{ questionId: 'q', answer: 'x' }],
-      }).success,
-    ).toBe(false);
-    expect(
-      service.answer({
-        sessionId: 'parent',
-        turnId: 'child-turn',
-        toolCallId: 'ask',
-        answers: [{ questionId: 'q', answer: 'read-only' }],
-      }).success,
-    ).toBe(true);
+      }),
+    ).toThrow();
+    service.answer({
+      sessionId: 'parent',
+      turnId: 'child-turn',
+      toolCallId: 'ask',
+      answers: [{ questionId: 'q', answer: 'read-only' }],
+    });
     await expect(pending).resolves.toContain('read-only');
     const cancelled = withDelegatedInteractionOwner(owner, () => service.request(input));
     const rejection = expect(cancelled).rejects.toThrow('cancelled');
     controller.abort();
     await rejection;
     expect(events.at(-1)).toMatchObject({ sessionId: 'parent', payload: { status: 'cancelled' } });
-    expect(
+    expect(() =>
       service.answer({
         sessionId: 'parent',
         turnId: 'child-turn',
         toolCallId: 'ask',
         answers: [{ questionId: 'q', answer: 'late' }],
-      }).success,
-    ).toBe(false);
+      }),
+    ).toThrow();
   });
 });

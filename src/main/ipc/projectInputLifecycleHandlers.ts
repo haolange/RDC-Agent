@@ -13,6 +13,7 @@ import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { ProjectInputPrepareRemoveArgsSchema, ProjectInputRemoveArgsSchema } from './validation/projectSessionSchemas';
 import type { WorkbenchIpcContext } from './workbenchContext';
+import type { ProjectInputRemovePreparation } from '@shared/types/session';
 
 export const projectInputLifecycle = new ProjectInputLifecycle(
   {
@@ -76,8 +77,10 @@ export function registerProjectInputLifecycleHandlers(context: WorkbenchIpcConte
   projectWorkspaceStore.setInputCommitListener((projectId, inputs) =>
     context.broadcastToRenderer('project:inputsChanged', { projectId, inputs }),
   );
-  ipcMain.handle('project:inputs:prepareRemove', async (_event, ...rawArgs: unknown[]) => {
-    try {
+  // `null` when the person declines the confirmation dialog.
+  ipcMain.handle(
+    'project:inputs:prepareRemove',
+    async (_event, ...rawArgs: unknown[]): Promise<ProjectInputRemovePreparation | null> => {
       const [projectId, inputId] = parseIpcArgs(ProjectInputPrepareRemoveArgsSchema, rawArgs, {
         label: 'project:inputs:prepareRemove',
         maxBytes: 4096,
@@ -91,42 +94,36 @@ export function registerProjectInputLifecycleHandlers(context: WorkbenchIpcConte
           prepared.input.source === 'external_reference',
         ))
       )
-        return { success: false };
+        return null;
       const approvalToken = ipcApprovalTokenService.issue({
         action: 'project.input.delete',
         scope: 'project',
         projectRoot: prepared.project.rootPath,
         name: prepared.approvalIdentity,
       });
-      return { success: true, approvalToken, input: prepared.input, affectedSessionIds: prepared.affectedSessionIds };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
+      return { approvalToken, input: prepared.input, affectedSessionIds: prepared.affectedSessionIds };
+    },
+  );
   ipcMain.handle('project:inputs:remove', async (_event, ...rawArgs: unknown[]) => {
-    try {
-      const [projectId, inputId, token] = parseIpcArgs(ProjectInputRemoveArgsSchema, rawArgs, {
-        label: 'project:inputs:remove',
-        maxBytes: 4096,
-      });
-      const prepared = await projectInputLifecycle.prepare(projectId, inputId);
-      if (
-        !ipcApprovalTokenService.consume({
-          token,
-          action: 'project.input.delete',
-          scope: 'project',
-          projectRoot: prepared.project.rootPath,
-          name: prepared.approvalIdentity,
-        })
-      )
-        throw new AppError('PROJECT_INPUT_APPROVAL_INVALID');
-      const result = await projectInputLifecycle.remove(projectId, inputId, prepared.approvalIdentity);
-      if (result.success || result.fileDeleted)
-        context.broadcastToRenderer('project:inputsChanged', { projectId, inputs: result.inputs });
-      return result;
-    } catch (error) {
-      return { success: false, inputs: [], error: error instanceof Error ? error.message : String(error) };
-    }
+    const [projectId, inputId, token] = parseIpcArgs(ProjectInputRemoveArgsSchema, rawArgs, {
+      label: 'project:inputs:remove',
+      maxBytes: 4096,
+    });
+    const prepared = await projectInputLifecycle.prepare(projectId, inputId);
+    if (
+      !ipcApprovalTokenService.consume({
+        token,
+        action: 'project.input.delete',
+        scope: 'project',
+        projectRoot: prepared.project.rootPath,
+        name: prepared.approvalIdentity,
+      })
+    )
+      throw new AppError('PROJECT_INPUT_APPROVAL_INVALID');
+    const result = await projectInputLifecycle.remove(projectId, inputId, prepared.approvalIdentity);
+    if (result.success || result.fileDeleted)
+      context.broadcastToRenderer('project:inputsChanged', { projectId, inputs: result.inputs });
+    return result;
   });
   installProjectInputWatchers(context);
 }

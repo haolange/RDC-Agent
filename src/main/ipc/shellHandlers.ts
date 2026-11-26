@@ -187,25 +187,19 @@ function appChannels(): IpcChannelTable {
       }
     },
     'app:openPath': async (_event, ...rawArgs: unknown[]) => {
+      const [targetPath] = parseIpcArgs(AppOpenPathArgsSchema, rawArgs, {
+        label: 'app:openPath',
+        maxBytes: 8 * 1024,
+      });
       try {
-        const [targetPath] = parseIpcArgs(AppOpenPathArgsSchema, rawArgs, {
-          label: 'app:openPath',
-          maxBytes: 8 * 1024,
-        });
-        if (!targetPath) return { success: false, error: 'path is required' };
-        try {
-          const stats = fs.existsSync(targetPath) ? fs.statSync(targetPath) : null;
-          if (stats?.isDirectory()) {
-            await shell.openPath(targetPath);
-          } else {
-            shell.showItemInFolder(targetPath);
-          }
-        } catch {
+        const stats = fs.existsSync(targetPath) ? fs.statSync(targetPath) : null;
+        if (stats?.isDirectory()) {
+          await shell.openPath(targetPath);
+        } else {
           shell.showItemInFolder(targetPath);
         }
-        return { success: true };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      } catch {
+        shell.showItemInFolder(targetPath);
       }
     },
     'app:copyText': async (_event, ...rawArgs: unknown[]) => {

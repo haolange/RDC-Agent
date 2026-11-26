@@ -179,7 +179,7 @@ describe('final tool permission admission', () => {
     await requested.promise;
     const approvalId = approvalPayloads(events)[0].approvalId;
     state.commitMode('full-access');
-    expect(approvals.answer({ sessionId: 'owner', turnId: 'turn', approvalId, approved: true }).success).toBe(false);
+    expect(() => approvals.answer({ sessionId: 'owner', turnId: 'turn', approvalId, approved: true })).toThrow();
     expect(await result).toBe('executed');
     expect(effect).toHaveBeenCalledOnce();
     expect(approvalPayloads(events).some((payload) => payload.errorCode === 'PERMISSION_MODE_CHANGED')).toBe(true);

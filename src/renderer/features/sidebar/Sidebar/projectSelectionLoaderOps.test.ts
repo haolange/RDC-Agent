@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applySessionSwitchHygiene } from '../../../stores/sessionSwitchHygiene';
 import { handleProjectSelectOp, loadProjectsOp, loadSessionsOp } from './projectSelectionProjectOps';
@@ -253,7 +254,13 @@ it('restores the former selection when cross-project activation is rejected', as
   const setCurrentProject = vi.fn();
   const setCurrentSessionId = vi.fn();
   vi.stubGlobal('window', {
-    electronAPI: { project: { select: async () => ({ success: false, error: 'rejected' }) } },
+    electronAPI: {
+      project: {
+        select: async () => {
+          throw new AppError('PROJECT_NOT_FOUND', 'rejected');
+        },
+      },
+    },
   });
   const ctx = {
     t: (key: string) => key,
@@ -277,7 +284,10 @@ it('restores the former selection when cross-project activation is rejected', as
     },
   });
 
-  expect(ctx.setSidebarError).toHaveBeenCalledWith({ contextKey: 'sidebar.selectProjectFailed', detail: 'rejected' });
+  expect(ctx.setSidebarError).toHaveBeenCalledWith({
+    contextKey: 'sidebar.selectProjectFailed',
+    reason: expect.objectContaining({ code: 'PROJECT_NOT_FOUND' }),
+  });
   expect(setCurrentProject).toHaveBeenLastCalledWith(formerProject);
   expect(setCurrentSessionId).toHaveBeenLastCalledWith('session-a');
   expect(activateSession).toHaveBeenCalledWith('session-a');

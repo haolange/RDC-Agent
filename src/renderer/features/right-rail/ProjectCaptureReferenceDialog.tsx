@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { TaskDialog } from '../../ui/TaskDialog';
 import { Input } from '../../ui/Input';
 import { Button } from '../../ui/Button';
-import { InlineError } from '../../ui/InlineError';
+import { FailureAlert } from '../../patterns/FailureAlert';
 import { useI18n } from '../../i18n';
-import { errorDetail } from '../../lib/errorDetail';
 import { isImeComposing } from '../../lib/ime';
 import { referenceProjectInput } from './projectCaptureActions';
 import type { ProjectInputRecord } from '@shared/types/session';
@@ -21,18 +20,17 @@ export function ProjectCaptureReferenceDialog({
   const { t } = useI18n();
   const [filePath, setFilePath] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ reason: unknown } | null>(null);
   const submit = async () => {
     if (busy || !filePath.trim()) return;
     setBusy(true);
-    setError(null);
+    setFailure(null);
     try {
       const result = await referenceProjectInput(projectId, filePath.trim());
-      if (!result.success) throw new Error(result.error ?? t('projectCapture.referenceFailed'));
       onRegistered(projectId, result.inputs);
       onClose();
     } catch (reason) {
-      setError(errorDetail(reason));
+      setFailure({ reason });
     } finally {
       setBusy(false);
     }
@@ -69,7 +67,7 @@ export function ProjectCaptureReferenceDialog({
           }
         }}
       />
-      {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
+      {failure ? <FailureAlert reason={failure.reason} contextKey="projectCapture.referenceFailed" /> : null}
     </TaskDialog>
   );
 }

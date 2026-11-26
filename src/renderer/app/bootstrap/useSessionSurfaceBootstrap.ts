@@ -86,7 +86,7 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
             .getHistory(sessionId)
             .catch(() => ({ messages: [], branchState: null, planReview: null })),
           evidence,
-          electronAPI.trace.getProjection(sessionId).catch(() => ({ success: false, presentation: null })),
+          electronAPI.trace.getProjection(sessionId).catch(() => ({ presentation: null })),
         ]);
         if (!reads.isLatest('surface', read)) return;
         useConversationStore.getState().setHistoryLoadingSessionId(null);

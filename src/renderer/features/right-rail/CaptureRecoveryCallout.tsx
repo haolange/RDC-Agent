@@ -1,5 +1,5 @@
 import { Button } from '../../ui/Button';
-import { InlineError } from '../../ui/InlineError';
+import { FailureAlert } from '../../patterns/FailureAlert';
 import { useI18n } from '../../i18n';
 import type { CaptureRecoveryStatus } from '@shared/types/captureReplay';
 
@@ -15,7 +15,7 @@ export function CaptureRecoveryCallout({
   onRestore,
 }: {
   status: CaptureRecoveryStatus | null;
-  error: string | null;
+  error: { reason: unknown } | null;
   locked: boolean;
   disabled: boolean;
   restoring: boolean;
@@ -51,7 +51,7 @@ export function CaptureRecoveryCallout({
           </Button>
         </div>
       )}
-      {error && <InlineError detail={error}>{t('control.replay.recoveryFailed')}</InlineError>}
+      {error && <FailureAlert reason={error.reason} contextKey="control.replay.recoveryFailed" />}
     </>
   );
 }

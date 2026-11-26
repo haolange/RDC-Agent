@@ -54,7 +54,8 @@ export function collectCaptureCallouts(args: {
   actionFailureTitles?: Partial<Record<CaptureRetryAction, string>>;
   warning: { code: string; message: string } | null;
   finalPresentTitle: string;
-  actionError: { message: string; action: CaptureRetryAction } | null;
+  /** `title` words a coded failure; without one the action's own title stands. */
+  actionError: { message: string; action: CaptureRetryAction; title?: string } | null;
   connectionError: string | null;
   stateError: CaptureReplayError | null;
   factLabels: { no_color_output: string; missing_target: string; export_failure: string };
@@ -73,7 +74,7 @@ export function collectCaptureCallouts(args: {
     items.push({
       id: 'action',
       tone: 'error',
-      title: args.actionFailureTitles?.[args.actionError.action] ?? args.failureTitle,
+      title: args.actionError.title ?? args.actionFailureTitles?.[args.actionError.action] ?? args.failureTitle,
       detail: args.actionError.message,
       retry: args.actionError.action,
     });

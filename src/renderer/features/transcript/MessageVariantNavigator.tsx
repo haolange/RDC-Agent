@@ -52,22 +52,28 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
       const nextBranch = navigator.branches[nextIndex];
       if (!nextBranch) return;
 
-      const result = await switchConversationBranch({
-        sessionId: message.sessionId,
-        forkId: fork.forkId,
-        branchId: nextBranch.branchId,
-      });
-      // A switch that did not happen says so; silently staying on the old branch reads as a broken control.
-      if (!result?.success) {
+      let result: Awaited<ReturnType<typeof switchConversationBranch>>;
+      try {
+        result = await switchConversationBranch({
+          sessionId: message.sessionId,
+          forkId: fork.forkId,
+          branchId: nextBranch.branchId,
+        });
+      } catch (error) {
+        // A switch that did not happen says so; silently staying on the old branch reads as a broken control.
+        notify.failure(error, t, 'chat.messageVariantSwitchFailed');
+        return;
+      }
+      if (!result) {
         notify.error(t('chat.messageVariantSwitchFailed'));
         return;
       }
       hydrateLoadedSessionSurface({
         sessionId: message.sessionId,
         messages: result.messages,
-        branchState: result.branchState ?? null,
-        tracePresentation: result.tracePresentation ?? null,
-        applyTrace: Boolean(result.tracePresentation),
+        branchState: result.branchState,
+        tracePresentation: result.tracePresentation,
+        applyTrace: true,
       });
     },
     [fork, message.sessionId, navigator, t],

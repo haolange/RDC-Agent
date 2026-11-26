@@ -1,10 +1,11 @@
 import { ipcMain } from 'electron';
+import { AppError } from '@shared/errors/appError';
 import { nativeMessage } from '../window/nativeI18n';
 import { confirmInMainProcess } from '../window/mainConfirmation';
 import { MemoryStore } from '../agent-runtime/memory';
 import { appPathService } from '../runtime/AppPathService';
 import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
-import { IpcValidationError, parseIpcArgs } from './validation/IpcPayloadGuard';
+import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import {
   MemoryDeleteArgsSchema,
   MemoryGetArgsSchema,
@@ -39,11 +40,6 @@ async function confirmMemoryMutation(
   });
 }
 
-function validationFailure(error: unknown): { success: false; name?: string; error: string } {
-  const message = error instanceof Error ? error.message : String(error);
-  return { success: false, error: message };
-}
-
 export function registerMemoryHandlers(_context: WorkbenchIpcContext): void {
   const channels: IpcChannelTable = {
     ...memoryChannels(),
@@ -55,21 +51,12 @@ export function registerMemoryHandlers(_context: WorkbenchIpcContext): void {
 function memoryChannels(): IpcChannelTable {
   return {
     'memory:issueApprovalToken': async (_event, ...rawArgs: unknown[]) => {
-      try {
-        const [request] = parseIpcArgs(MemoryIssueApprovalTokenArgsSchema, rawArgs, {
-          label: 'memory:issueApprovalToken',
-          maxBytes: 8 * 1024,
-        });
-        const confirmed = await confirmMemoryMutation(request.action, request.scope, request.name);
-        if (!confirmed) return { error: 'Memory mutation was not confirmed by the main-process dialog.' };
-        const token = ipcApprovalTokenService.issue(request);
-        return { token };
-      } catch (error) {
-        if (error instanceof IpcValidationError) {
-          return { error: error.message };
-        }
-        throw error;
-      }
+      const [request] = parseIpcArgs(MemoryIssueApprovalTokenArgsSchema, rawArgs, {
+        label: 'memory:issueApprovalToken',
+        maxBytes: 8 * 1024,
+      });
+      if (!(await confirmMemoryMutation(request.action, request.scope, request.name))) return { cancelled: true };
+      return { token: ipcApprovalTokenService.issue(request) };
     },
     'memory:list': async (_event, ...rawArgs: unknown[]) => {
       const [scope, projectRoot] = parseIpcArgs(MemoryListArgsSchema, rawArgs, {
@@ -94,64 +81,42 @@ function memoryChannels(): IpcChannelTable {
       return { memory: memory ? { ...memory, scope } : null };
     },
     'memory:write': async (_event, ...rawArgs: unknown[]) => {
-      let request: MemoryWriteRequest;
-      try {
-        [request] = parseIpcArgs(MemoryWriteArgsSchema, rawArgs, {
-          label: 'memory:write',
-          maxBytes: 512 * 1024,
-        }) as [MemoryWriteRequest];
-      } catch (error) {
-        if (error instanceof IpcValidationError) return validationFailure(error);
-        throw error;
-      }
-      try {
-        const consumed = ipcApprovalTokenService.consume({
-          token: request.approvalToken,
-          action: 'memory.write',
-          scope: request.scope,
-          name: request.name,
-          projectRoot: request.projectRoot,
-        });
-        if (!consumed) {
-          return {
-            success: false,
-            name: request.name,
-            error: 'Memory write requires a valid Main-issued approvalToken.',
-          };
-        }
-        const memory = await storeFor(request.scope, request.projectRoot).writeMemory({
-          name: request.name,
-          description: request.description,
-          type: request.type,
-          content: request.content,
-          tags: request.tags,
-        });
-        return { success: true, name: memory.displayName };
-      } catch (error) {
-        return { success: false, name: request.name, error: error instanceof Error ? error.message : String(error) };
-      }
+      const [request] = parseIpcArgs(MemoryWriteArgsSchema, rawArgs, {
+        label: 'memory:write',
+        maxBytes: 512 * 1024,
+      }) as [MemoryWriteRequest];
+      const consumed = ipcApprovalTokenService.consume({
+        token: request.approvalToken,
+        action: 'memory.write',
+        scope: request.scope,
+        name: request.name,
+        projectRoot: request.projectRoot,
+      });
+      if (!consumed) throw new AppError('MEMORY_APPROVAL_TOKEN_INVALID', `memory.write ${request.name}`);
+      const memory = await storeFor(request.scope, request.projectRoot).writeMemory({
+        name: request.name,
+        description: request.description,
+        type: request.type,
+        content: request.content,
+        tags: request.tags,
+      });
+      return { name: memory.displayName };
     },
     'memory:delete': async (_event, ...rawArgs: unknown[]) => {
-      try {
-        const [scope, name, approvalToken, projectRoot] = parseIpcArgs(MemoryDeleteArgsSchema, rawArgs, {
-          label: 'memory:delete',
-          maxBytes: 8 * 1024,
-          padTo: 4,
-        });
-        const consumed = ipcApprovalTokenService.consume({
-          token: approvalToken,
-          action: 'memory.delete',
-          scope,
-          name,
-          projectRoot,
-        });
-        if (!consumed) {
-          return { success: false, error: 'Memory deletion requires a valid Main-issued approvalToken.' };
-        }
-        return { success: await storeFor(scope, projectRoot).deleteMemory(name) };
-      } catch (error) {
-        return validationFailure(error);
-      }
+      const [scope, name, approvalToken, projectRoot] = parseIpcArgs(MemoryDeleteArgsSchema, rawArgs, {
+        label: 'memory:delete',
+        maxBytes: 8 * 1024,
+        padTo: 4,
+      });
+      const consumed = ipcApprovalTokenService.consume({
+        token: approvalToken,
+        action: 'memory.delete',
+        scope,
+        name,
+        projectRoot,
+      });
+      if (!consumed) throw new AppError('MEMORY_APPROVAL_TOKEN_INVALID', `memory.delete ${name}`);
+      return { deleted: await storeFor(scope, projectRoot).deleteMemory(name) };
     },
   };
 }

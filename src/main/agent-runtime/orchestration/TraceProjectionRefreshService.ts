@@ -66,10 +66,8 @@ export class TraceProjectionRefreshService {
 
   private async flush(sessionId: string): Promise<void> {
     try {
-      const result = await this.deps.getProjection(sessionId);
-      if (result.success && result.presentation) {
-        this.deps.publish({ projectId: result.presentation.projectId, sessionId }, result.presentation);
-      }
+      const { presentation } = await this.deps.getProjection(sessionId);
+      this.deps.publish({ projectId: presentation.projectId, sessionId }, presentation);
     } catch (error) {
       console.error('[TraceProjectionRefresh] Failed to refresh task projection:', error);
     }

@@ -4,7 +4,8 @@ import type { CaptureRecoveryStatus, CaptureReplayState } from '@shared/types/ca
 
 export function useCaptureRecovery(scope: CaptureScope, revision: number | undefined) {
   const [status, setStatus] = useState<CaptureRecoveryStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /** The last failed read or restore, worded by humanizeError where it shows. */
+  const [error, setError] = useState<{ reason: unknown } | null>(null);
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
     const current = ++sequence.current;
@@ -15,7 +16,7 @@ export function useCaptureRecovery(scope: CaptureScope, revision: number | undef
         setError(null);
       }
     } catch (reason) {
-      if (current === sequence.current) setError(reason instanceof Error ? reason.message : String(reason));
+      if (current === sequence.current) setError({ reason });
     }
   }, [scope]);
   useEffect(() => {
@@ -28,12 +29,11 @@ export function useCaptureRecovery(scope: CaptureScope, revision: number | undef
     async (bindingGeneration: number): Promise<CaptureReplayState | null> => {
       setError(null);
       try {
-        const result = await restorePreviousCapture({ ...scope, bindingGeneration });
-        if (!result.success || !result.state) throw new Error(result.error ?? 'Capture recovery failed.');
+        const state = await restorePreviousCapture({ ...scope, bindingGeneration });
         await refresh();
-        return result.state;
+        return state;
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : String(reason));
+        setError({ reason });
         return null;
       }
     },

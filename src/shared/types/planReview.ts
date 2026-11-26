@@ -87,9 +87,7 @@ export interface PlanSaveToProjectRequest extends PlanReadRequest {
 }
 
 export interface PlanSaveToProjectResult {
-  success: boolean;
-  path?: string;
-  error?: string;
+  path: string;
 }
 
 export interface PlanExportRequest extends PlanReadRequest {
@@ -98,9 +96,7 @@ export interface PlanExportRequest extends PlanReadRequest {
 }
 
 export interface PlanExportResult {
-  success: boolean;
-  path?: string;
-  error?: string;
+  path: string;
 }
 
 export interface PlanApprovalTokenRequest extends PlanReadRequest {

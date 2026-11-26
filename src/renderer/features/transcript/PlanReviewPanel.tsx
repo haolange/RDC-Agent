@@ -9,10 +9,10 @@ import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../../ui/Button';
 import { ReadingSheet } from '../../ui/ReadingSheet';
 import { InlineError } from '../../ui/InlineError';
+import { FailureAlert } from '../../patterns/FailureAlert';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
 import { reopenPlanReview } from '../../services/planReviewService';
 import { useElectronApi } from '../../hooks/useElectronApi';
-import { errorDetail } from '../../lib/errorDetail';
 import { useAsyncValue } from '../../lib/useAsyncValue';
 import { Skeleton } from '../../ui/Skeleton';
 import { usePlanReviewActions } from './usePlanReviewActions';
@@ -33,7 +33,7 @@ export const PlanReviewPanel: React.FC<{
   const canReopen =
     projection?.recoverable?.planId === plan.planId && projection.recoverable.revision === plan.revision;
   const { readPlan, copyPlan, saveToProject, exportPlan } = usePlanReviewActions();
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{ reason: unknown } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const initialSession = useRef(sessionId);
@@ -55,7 +55,7 @@ export const PlanReviewPanel: React.FC<{
   );
   const markdown = planRead.status === 'ready' ? planRead.value.markdown : '';
   const loading = planRead.status === 'loading';
-  const error = actionError ?? (planRead.status === 'error' ? errorDetail(planRead.error) : null);
+  const failure = actionError ?? (planRead.status === 'error' ? { reason: planRead.error } : null);
   const parts = useMemo(() => splitPlanAppendix(markdown), [markdown]);
   const reference = {
     sessionId: sessionId!,
@@ -73,7 +73,7 @@ export const PlanReviewPanel: React.FC<{
     try {
       if (await action()) setNotice(message);
     } catch (reason) {
-      setActionError(errorDetail(reason));
+      setActionError({ reason });
     } finally {
       setBusy(false);
     }
@@ -135,15 +135,17 @@ export const PlanReviewPanel: React.FC<{
         </>
       }
       status={
-        notice || error || projection?.error ? (
+        notice || failure || projection?.error ? (
           <>
             {notice ? (
               <p className="plan-review-panel__notice" role="status">
                 {notice}
               </p>
             ) : null}
-            {error || projection?.error ? (
-              <InlineError detail={error || projection?.error}>{t('app.error.actionFailed')}</InlineError>
+            {failure ? (
+              <FailureAlert reason={failure.reason} contextKey="app.error.actionFailed" />
+            ) : projection?.error ? (
+              <InlineError detail={projection.error}>{t('app.error.actionFailed')}</InlineError>
             ) : null}
           </>
         ) : undefined

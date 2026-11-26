@@ -1178,10 +1178,7 @@ it('forwards a child approval with its actual execution identity and controlled 
       if (event.type === 'approval.requested') {
         const { approvalId } = event.payload;
         expect(approvalId).toMatch(/^tool-approval-mutation-.+/);
-        expect(
-          approvals.answer({ sessionId: 'parent', turnId: 'child-permission-turn', approvalId, approved: true })
-            .success,
-        ).toBe(true);
+        approvals.answer({ sessionId: 'parent', turnId: 'child-permission-turn', approvalId, approved: true });
       }
     },
   });

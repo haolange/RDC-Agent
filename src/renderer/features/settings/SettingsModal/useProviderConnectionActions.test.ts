@@ -44,7 +44,8 @@ it.each([true, false])(
       expect(update).toHaveBeenLastCalledWith(expect.objectContaining({ accountStatus: status, busy: 'idle' }));
       expect(reload).toHaveBeenCalledExactlyOnceWith(provider.id);
     } else {
-      expect(update).toHaveBeenLastCalledWith(expect.objectContaining({ error: 'credential rejected' }));
+      // The provider's raw text is technical; without a known code the caller's sentence shows.
+      expect(update).toHaveBeenLastCalledWith(expect.objectContaining({ error: 'settings.providerTestFailed' }));
       expect(getStatus).not.toHaveBeenCalled();
       expect(reload).not.toHaveBeenCalled();
     }

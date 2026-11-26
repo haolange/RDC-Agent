@@ -16,25 +16,22 @@ export async function loadSessionsOp(
   options: LoadSessionsOptions = {},
 ) {
   const autoSelectSession = options.autoSelectSession !== false;
-  const projectSelection = await window.electronAPI.project.select(project.projectId).catch((error) => ({
-    success: false,
-    project: undefined,
-    currentSession: null,
-    currentRun: null,
-    error: error instanceof Error ? error.message : String(error),
-  }));
+  const projectSelection = await window.electronAPI.project.select(project.projectId).then(
+    (selection) => ({ selection }),
+    (error: unknown) => ({ error }),
+  );
   if (!ctx.isLatestSelectionRequest(options.requestId)) {
     return;
   }
-  if (!projectSelection.success || !projectSelection.project) {
+  if ('error' in projectSelection) {
     if (options.rollbackState) {
       restoreSelectionSnapshot(ctx, options.rollbackState);
     }
-    ctx.setSidebarError({ contextKey: 'sidebar.selectProjectFailed', detail: projectSelection.error });
+    ctx.setSidebarError({ contextKey: 'sidebar.selectProjectFailed', reason: projectSelection.error });
     return;
   }
 
-  const selectedProject = projectSelection.project;
+  const selectedProject = projectSelection.selection.project;
   const nextSessions = await ctx.loadProjectSessionList(selectedProject.projectId);
   if (!ctx.isLatestSelectionRequest(options.requestId)) {
     return;
@@ -145,12 +142,8 @@ export async function handleAddProjectOp(ctx: ProjectSelectionHandlerOpsContext,
   const requestId = ctx.beginSelectionRequest();
   ctx.setIsBusy(true);
   try {
-    const result = await window.electronAPI.project.add(rootPath);
-    if (!result.success || !result.project) {
-      throw new Error(result.error || 'Project could not be added');
-    }
-
-    await ctx.loadProjects(result.project.projectId, null, {
+    const { project } = await window.electronAPI.project.add(rootPath);
+    await ctx.loadProjects(project.projectId, null, {
       autoSelectSession: false,
       rightRailTarget: 'project',
       requestId,

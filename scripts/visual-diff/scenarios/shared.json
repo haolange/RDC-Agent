@@ -82248,7 +82248,6 @@
  },
  "b47fe6abb40cab6d4c493fca": {
   "result": {
-   "success": true,
    "session": {
     "record": {
      "schemaVersion": "1",
@@ -82735,7 +82734,6 @@
     }
    },
    "trace": {
-    "success": true,
     "presentation": {
      "projectId": "proj_ac8171c63d73",
      "sessionId": "sess_32106351fa72",
@@ -88769,7 +88767,6 @@
  },
  "fd1584ddd4866c805e9a2d08": {
   "result": {
-   "success": true,
    "session": {
     "record": {
      "schemaVersion": "1",
@@ -89765,7 +89762,6 @@
     }
    },
    "trace": {
-    "success": true,
     "presentation": {
      "projectId": "proj_d3e70b3a06ec",
      "sessionId": "sess_9ddc9ef9d35a",

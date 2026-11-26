@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { AppError } from '@shared/errors/appError';
 import { nowIso } from '@shared/utils/id';
 import { traceProjectionRefreshService } from '../agent-runtime/orchestration/TraceProjectionRefreshService';
 import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
@@ -49,54 +50,41 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
   });
 
   ipcMain.handle('workflow:resume', async (_event, ...rawArgs: unknown[]) => {
-    try {
-      const [sessionId] = parseIpcArgs(WorkflowResumeArgsSchema, rawArgs, {
-        label: 'workflow:resume',
-        maxBytes: 4 * 1024,
-        padTo: 1,
-      });
-      if (sessionId) {
-        state.currentSessionId = sessionId;
-        projectWorkspaceStore.setCurrentSessionId(sessionId);
-        state.currentRunId = sessionRecordStore.getLatestRun(sessionId)?.runId || null;
-      }
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: (err as Error).message };
+    const [sessionId] = parseIpcArgs(WorkflowResumeArgsSchema, rawArgs, {
+      label: 'workflow:resume',
+      maxBytes: 4 * 1024,
+      padTo: 1,
+    });
+    if (sessionId) {
+      state.currentSessionId = sessionId;
+      projectWorkspaceStore.setCurrentSessionId(sessionId);
+      state.currentRunId = sessionRecordStore.getLatestRun(sessionId)?.runId || null;
     }
   });
 
   ipcMain.handle('workflow:stop', async (_event, ...rawArgs: unknown[]) => {
-    try {
-      const [runId] = parseIpcArgs(WorkflowStopArgsSchema, rawArgs, {
-        label: 'workflow:stop',
-        maxBytes: 4 * 1024,
-        padTo: 1,
+    const [runId] = parseIpcArgs(WorkflowStopArgsSchema, rawArgs, {
+      label: 'workflow:stop',
+      maxBytes: 4 * 1024,
+      padTo: 1,
+    });
+    const targetRunId = runId || state.currentRunId;
+    if (!targetRunId) throw new AppError('RUN_NOT_ACTIVE', 'no run is selected.');
+    const stopped = runExecutionService.stopRun(targetRunId);
+    const session = state.currentSessionId ? sessionRecordStore.readSession(state.currentSessionId) : null;
+    if (session) {
+      const scope = { projectId: session.projectId, sessionId: session.sessionId };
+      context.broadcastToRenderer('capture:openedStateChanged', {
+        ...scope,
+        payload: rdcSessionService.snapshotOpenedCaptureForSession(scope),
       });
-      const targetRunId = runId || state.currentRunId;
-      if (!targetRunId) {
-        return { success: false, error: 'No active run.' };
-      }
-      const result = runExecutionService.stopRun(targetRunId)
-        ? { success: true }
-        : { success: false, error: 'No active run.' };
-      const session = state.currentSessionId ? sessionRecordStore.readSession(state.currentSessionId) : null;
-      if (session) {
-        const scope = { projectId: session.projectId, sessionId: session.sessionId };
-        context.broadcastToRenderer('capture:openedStateChanged', {
-          ...scope,
-          payload: rdcSessionService.snapshotOpenedCaptureForSession(scope),
-        });
-        context.broadcastToRenderer('context:changed', {
-          ...scope,
-          payload: rdcSessionService.snapshotContextForSession(scope),
-        });
-        traceProjectionRefreshService.schedule(session.sessionId);
-      }
-      return result;
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+      context.broadcastToRenderer('context:changed', {
+        ...scope,
+        payload: rdcSessionService.snapshotContextForSession(scope),
+      });
+      traceProjectionRefreshService.schedule(session.sessionId);
     }
+    if (!stopped) throw new AppError('RUN_NOT_ACTIVE', `${targetRunId} is not running.`);
   });
 
   ipcMain.handle('workflow:getRunUsage', async (_event, ...rawArgs: unknown[]): Promise<RunContextUsageReadResult> => {

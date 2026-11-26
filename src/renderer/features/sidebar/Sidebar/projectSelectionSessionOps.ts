@@ -36,19 +36,19 @@ export async function selectSessionOp(
 
   // The surface bootstraps leave a session being opened here alone, so its history and trace load once.
   useConversationStore.getState().setHistoryLoadingSessionId(sessionId);
-  const result = await window.electronAPI.session.open(sessionId).catch((error): SessionOpenResult => ({
-    success: false,
-    error: error instanceof Error ? error.message : String(error),
-  }));
+  const outcome = await window.electronAPI.session.open(sessionId).then(
+    (opened): { result: SessionOpenResult } => ({ result: opened }),
+    (error: unknown) => ({ error }),
+  );
   if (useConversationStore.getState().historyLoadingSessionId === sessionId) {
     useConversationStore.getState().setHistoryLoadingSessionId(null);
   }
   if (!ctx.isLatestSelectionRequest(options.requestId)) {
     return false;
   }
-  if (!result.success) {
+  if ('error' in outcome) {
     restoreSelectionSnapshot(ctx, rollbackState);
-    ctx.setSidebarError({ contextKey: 'sidebar.selectSessionFailed', detail: result.error });
+    ctx.setSidebarError({ contextKey: 'sidebar.selectSessionFailed', reason: outcome.error });
     if (options.optimisticSession?.projectId) {
       await ctx
         .loadProjectSessionList(options.optimisticSession.projectId)
@@ -57,6 +57,7 @@ export async function selectSessionOp(
     return false;
   }
 
+  const { result } = outcome;
   const opened = result.session.record;
   if ((options.optimisticSession?.sessionId ?? previousSessionId) !== opened.sessionId) {
     applySessionSwitchHygiene({
@@ -71,8 +72,8 @@ export async function selectSessionOp(
     messages: result.history.messages,
     branchState: result.history.branchState ?? null,
     planReview: result.history.planReview,
-    tracePresentation: result.trace.presentation ?? null,
-    applyTrace: Boolean(result.trace.presentation),
+    tracePresentation: result.trace.presentation,
+    applyTrace: true,
   });
   ctx.setRightRailTarget('session');
   ctx.setCurrentRun(result.currentRun);
@@ -92,13 +93,12 @@ export async function handleSessionCreateOp(ctx: ProjectSelectionHandlerOpsConte
   const requestId = ctx.beginSelectionRequest();
   ctx.setIsBusy(true);
   try {
-    const result = await window.electronAPI.session.create(targetProject.projectId).catch((error) => ({
-      success: false,
-      session: undefined,
-      error: error instanceof Error ? error.message : String(error),
-    }));
-    if (!result.success || !result.session) {
-      ctx.setSidebarError({ contextKey: 'sidebar.createSessionFailed', detail: result.error });
+    const result = await window.electronAPI.session.create(targetProject.projectId).then(
+      (value) => ({ session: value.session }),
+      (error: unknown) => ({ error }),
+    );
+    if ('error' in result) {
+      ctx.setSidebarError({ contextKey: 'sidebar.createSessionFailed', reason: result.error });
       return;
     }
 
@@ -151,11 +151,15 @@ export async function handleSessionRemoveOp(
   const isRemovingCurrentSession = ctx.getCurrentSession()?.sessionId === session.sessionId;
   ctx.setIsBusy(true);
   try {
-    const result = await window.electronAPI.session.remove(session.sessionId);
-    if (!result.success) {
-      ctx.setSidebarError({ contextKey: 'sidebar.removeSessionFailed', detail: result.error });
+    const removal = await window.electronAPI.session.remove(session.sessionId).then(
+      (value) => ({ result: value }),
+      (error: unknown) => ({ error }),
+    );
+    if ('error' in removal) {
+      ctx.setSidebarError({ contextKey: 'sidebar.removeSessionFailed', reason: removal.error });
       return;
     }
+    const { result } = removal;
 
     useSessionProjectionStore.getState().evictSession(session.sessionId);
 

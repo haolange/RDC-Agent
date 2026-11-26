@@ -7,10 +7,10 @@ import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { RightRailTarget } from './types';
 import type { SelectionSnapshot } from './types';
 
-/** A failed sidebar operation: its own copy, and the technical reason that only "Copy details" carries. */
+/** A failed sidebar operation: its context copy, and the failure humanizeError words and "Copy details" carries. */
 export interface SidebarError {
   contextKey: TranslationKey;
-  detail?: string;
+  reason?: unknown;
 }
 
 export interface ProjectSelectionLoaderOpsContext {

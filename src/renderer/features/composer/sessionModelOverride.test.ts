@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppError } from '@shared/errors/appError';
 
 const persistInvoke = vi.fn();
 const projection = vi.hoisted(() => ({
@@ -104,7 +105,7 @@ it('sends controls at once beside a model save and holds approval until both hav
 
 it('includes a save begun while approval already waits, and fails approval when the newest save failed', async () => {
   let finishFirst!: (value: unknown) => void;
-  let finishSecond!: (value: unknown) => void;
+  let failSecond!: (reason: unknown) => void;
   persistInvoke
     .mockReset()
     .mockImplementationOnce(
@@ -115,8 +116,8 @@ it('includes a save begun while approval already waits, and fails approval when 
     )
     .mockImplementationOnce(
       () =>
-        new Promise((resolve) => {
-          finishSecond = resolve;
+        new Promise((_resolve, reject) => {
+          failSecond = reject;
         }),
     );
   const first = commitComposerModelChoice({ providerId: 'p', modelId: 'm' }, 'session-a', 'project-a');
@@ -135,8 +136,12 @@ it('includes a save begun while approval already waits, and fails approval when 
   finishFirst(saved());
   await first;
   expect(flushed).toBe(false);
-  finishSecond({ success: false, error: 'MODEL_UNAVAILABLE' });
-  expect(await second).toEqual({ ok: false, error: 'MODEL_UNAVAILABLE', latest: true });
+  failSecond(new AppError('MODEL_UNAVAILABLE'));
+  expect(await second).toEqual({
+    ok: false,
+    error: expect.objectContaining({ code: 'MODEL_UNAVAILABLE' }),
+    latest: true,
+  });
   await expect(barrier).resolves.toBe('MODEL_UNAVAILABLE');
 });
 
@@ -168,17 +173,21 @@ it('reports a save as no longer the latest once a later choice of the same field
 
 it('shows a chosen model while it saves and returns to the saved model when main refuses it', async () => {
   useSessionRecordStore.getState().accept(saved({ modelOverride: { providerId: 'p', modelId: 'old' } }).session);
-  let finish!: (value: unknown) => void;
+  let fail!: (reason: unknown) => void;
   persistInvoke.mockReset().mockImplementationOnce(
     () =>
-      new Promise((resolve) => {
-        finish = resolve;
+      new Promise((_resolve, reject) => {
+        fail = reject;
       }),
   );
   const pending = commitComposerModelChoice({ providerId: 'p', modelId: 'new' }, 'session-a', 'project-a');
   expect(getSessionView('session-a')?.modelOverride).toEqual({ providerId: 'p', modelId: 'new' });
-  finish({ success: false, error: 'MODEL_UNAVAILABLE' });
-  expect(await pending).toEqual({ ok: false, error: 'MODEL_UNAVAILABLE', latest: true });
+  fail(new AppError('MODEL_UNAVAILABLE'));
+  expect(await pending).toEqual({
+    ok: false,
+    error: expect.objectContaining({ code: 'MODEL_UNAVAILABLE' }),
+    latest: true,
+  });
   expect(getSessionView('session-a')?.modelOverride).toEqual({ providerId: 'p', modelId: 'old' });
 });
 

@@ -83,15 +83,9 @@ describe('applyDeclaredHandoff', () => {
   it('refuses a recovered action after its approval changed or a later request was accepted', async () => {
     const input = { sessionId: 'sess', agent: 'general', label: declared.label, expectedPlanHash: 'a'.repeat(64) };
     mocks.planRead.mockReturnValueOnce({ status: 'approved', approvedHash: 'b'.repeat(64), updatedAt: 1234 });
-    expect(await applyDeclaredHandoff(input)).toMatchObject({
-      success: false,
-      error: expect.stringContaining('APPROVAL_CHANGED'),
-    });
+    await expect(applyDeclaredHandoff(input)).rejects.toThrow('APPROVAL_CHANGED');
     mocks.history.mockReturnValue([{ role: 'user', createdAt: 1234 }]);
-    expect(await applyDeclaredHandoff(input)).toMatchObject({
-      success: false,
-      error: expect.stringContaining('APPROVAL_CHANGED'),
-    });
+    await expect(applyDeclaredHandoff(input)).rejects.toThrow('APPROVAL_CHANGED');
     expect(mocks.updateSession).not.toHaveBeenCalled();
     expect(mocks.offerWrite).not.toHaveBeenCalled();
   });
@@ -101,14 +95,14 @@ describe('applyDeclaredHandoff', () => {
       mocks.planRead.mockReturnValue({ status: 'approved', approvedHash: 'b'.repeat(64), updatedAt: 1235 });
       return true;
     });
-    expect(
-      await applyDeclaredHandoff({
+    await expect(
+      applyDeclaredHandoff({
         sessionId: 'sess',
         agent: 'general',
         label: declared.label,
         expectedPlanHash: 'a'.repeat(64),
       }),
-    ).toMatchObject({ success: false, error: expect.stringContaining('APPROVAL_CHANGED') });
+    ).rejects.toThrow('APPROVAL_CHANGED');
     expect(mocks.updateSession).not.toHaveBeenCalled();
     expect(mocks.offerWrite).not.toHaveBeenCalled();
   });
@@ -119,8 +113,7 @@ describe('applyDeclaredHandoff', () => {
       agent: 'general',
       label: 'Execute with General',
     });
-    expect(result.success).toBe(true);
-    expect(result.session?.record.agentId).toBe('general');
+    expect(result.session.record.agentId).toBe('general');
     expect(mocks.offerWrite).toHaveBeenCalledWith(
       'sess',
       expect.objectContaining({
@@ -142,10 +135,9 @@ describe('applyDeclaredHandoff', () => {
             handoffs: [{ ...declared, label: 'Implement Plan', labelTranslations: { 'zh-CN': '执行计划' } }],
           },
     );
-    expect(await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label })).toMatchObject({
-      success: false,
-      error: expect.stringContaining('DECLARED_HANDOFF_NOT_FOUND'),
-    });
+    await expect(applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label })).rejects.toThrow(
+      'DECLARED_HANDOFF_NOT_FOUND',
+    );
     expect(mocks.offerWrite).not.toHaveBeenCalled();
     expect(mocks.updateSession).not.toHaveBeenCalled();
   });
@@ -156,12 +148,10 @@ describe('applyDeclaredHandoff', () => {
         ? { id: 'general', handoffs: [] }
         : { id: 'debugger', handoffs: [{ ...declared, labelTranslations: { 'zh-CN': '执行计划' } }] },
     );
-    expect((await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: '执行计划' })).success).toBe(
-      false,
+    await expect(applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: '执行计划' })).rejects.toThrow(
+      'DECLARED_HANDOFF_NOT_FOUND',
     );
-    expect((await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label })).success).toBe(
-      true,
-    );
+    await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
     expect(mocks.offerWrite.mock.calls[0][1]).not.toHaveProperty('labelTranslations');
   });
   it('rejects changed preparation requirements after approval without rewriting the offer or session', async () => {
@@ -170,8 +160,9 @@ describe('applyDeclaredHandoff', () => {
         ? { id: 'general', handoffs: [] }
         : { id: 'debugger', handoffs: [{ ...declared, requiredSkillIds: ['another-method'] }] },
     );
-    const result = await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
-    expect(result).toMatchObject({ success: false, error: expect.stringContaining('EXECUTION_OFFER_CHANGED') });
+    await expect(applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label })).rejects.toThrow(
+      'EXECUTION_OFFER_CHANGED',
+    );
     expect(mocks.offerWrite).not.toHaveBeenCalled();
     expect(mocks.updateSession).not.toHaveBeenCalled();
   });
@@ -187,8 +178,7 @@ describe('applyDeclaredHandoff', () => {
 
   it.each([null, 9876])('uses the approved decision time even when the offer time is %s', async (offerTime) => {
     mocks.offerRead.mockReturnValue(offerTime === null ? null : { ...mocks.offerRead(), approvedAt: offerTime });
-    const result = await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
-    expect(result.success).toBe(true);
+    await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
     expect(mocks.offerWrite).toHaveBeenCalledWith('sess', expect.objectContaining({ approvedAt: 1234 }));
   });
 
@@ -199,13 +189,9 @@ describe('applyDeclaredHandoff', () => {
   });
 
   it('rejects an undeclared continue action', async () => {
-    const result = await applyDeclaredHandoff({
-      sessionId: 'sess',
-      agent: 'optimizer',
-      label: 'Nope',
+    await expect(applyDeclaredHandoff({ sessionId: 'sess', agent: 'optimizer', label: 'Nope' })).rejects.toMatchObject({
+      code: 'DECLARED_HANDOFF_NOT_FOUND',
     });
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/DECLARED_HANDOFF_NOT_FOUND/);
     expect(mocks.updateSession).not.toHaveBeenCalled();
   });
 
@@ -213,8 +199,9 @@ describe('applyDeclaredHandoff', () => {
     mocks.compatibility.mockImplementationOnce(() => {
       throw new Error('TASK_EXECUTION_REQUIREMENTS: comparison-method missing');
     });
-    const result = await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label });
-    expect(result).toMatchObject({ success: false, error: expect.stringContaining('comparison-method') });
+    await expect(applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label })).rejects.toThrow(
+      'comparison-method',
+    );
     expect(mocks.updateSession).not.toHaveBeenCalled();
     expect(mocks.offerWrite).not.toHaveBeenCalled();
     expect(mocks.dispatchHooks).not.toHaveBeenCalled();
@@ -227,9 +214,9 @@ describe('applyDeclaredHandoff', () => {
       approvedHandoff: { agent: 'optimizer', label: 'Different' },
       updatedAt: 1234,
     });
-    expect(
-      (await applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label })).error,
-    ).toContain('TARGET_MISMATCH');
+    await expect(applyDeclaredHandoff({ sessionId: 'sess', agent: 'general', label: declared.label })).rejects.toThrow(
+      'TARGET_MISMATCH',
+    );
     expect(mocks.updateSession).not.toHaveBeenCalled();
     expect(mocks.offerWrite).not.toHaveBeenCalled();
   });

@@ -161,34 +161,20 @@ function historyChannels(state: WorkbenchIpcState): IpcChannelTable {
       return conversationService.switchConversationBranch(request);
     },
     'conversation:clearHistory': async (_event, ...rawArgs: unknown[]) => {
-      try {
-        const [sessionId] = parseIpcArgs(ConversationClearHistoryArgsSchema, rawArgs, {
-          label: 'conversation:clearHistory',
-          maxBytes: 4 * 1024,
-        });
-        if (!sessionId) {
-          return { success: false, messages: [], error: 'No session selected.' };
-        }
-        requireActiveSessionOwner(state, sessionId);
-        return { success: true, messages: await conversationService.clearHistory(sessionId) };
-      } catch (error) {
-        return { success: false, messages: [], error: error instanceof Error ? error.message : String(error) };
-      }
+      const [sessionId] = parseIpcArgs(ConversationClearHistoryArgsSchema, rawArgs, {
+        label: 'conversation:clearHistory',
+        maxBytes: 4 * 1024,
+      });
+      requireActiveSessionOwner(state, sessionId);
+      return { messages: await conversationService.clearHistory(sessionId) };
     },
     'conversation:undoLastTurn': async (_event, ...rawArgs: unknown[]) => {
-      try {
-        const [sessionId] = parseIpcArgs(ConversationUndoLastTurnArgsSchema, rawArgs, {
-          label: 'conversation:undoLastTurn',
-          maxBytes: 4 * 1024,
-        });
-        if (!sessionId) {
-          return { success: false, messages: [], error: 'No session selected.' };
-        }
-        requireActiveSessionOwner(state, sessionId);
-        return { success: true, messages: await conversationService.undoLastTurn(sessionId) };
-      } catch (error) {
-        return { success: false, messages: [], error: error instanceof Error ? error.message : String(error) };
-      }
+      const [sessionId] = parseIpcArgs(ConversationUndoLastTurnArgsSchema, rawArgs, {
+        label: 'conversation:undoLastTurn',
+        maxBytes: 4 * 1024,
+      });
+      requireActiveSessionOwner(state, sessionId);
+      return { messages: await conversationService.undoLastTurn(sessionId) };
     },
   };
 }

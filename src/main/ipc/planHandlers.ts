@@ -80,10 +80,8 @@ export function registerPlanHandlers(context: WorkbenchIpcContext): void {
     const [request] = parseIpcArgs(PlanCancelReviewArgsSchema, rawArgs, { label: 'plan:cancelReview', maxBytes: 4096 });
     requireCurrentSession(context, request.sessionId);
     const result = agentPlanReviewRequestService.cancel(request.sessionId, request.reviewId);
-    if (result.success && result.liveTurnId) {
-      await conversationService.cancelActiveTurn({ sessionId: request.sessionId });
-    }
-    return { success: result.success };
+    if (!result.success) throw new AppError('PLAN_REVIEW_STATE_MISSING', `${request.reviewId} is no longer current.`);
+    if (result.liveTurnId) await conversationService.cancelActiveTurn({ sessionId: request.sessionId });
   });
   ipcMain.handle('plan:read', async (_event, ...rawArgs: unknown[]) => {
     const [request] = parseIpcArgs(PlanReadArgsSchema, rawArgs, { label: 'plan:read', maxBytes: 8192 }) as [
@@ -131,42 +129,38 @@ export function registerPlanHandlers(context: WorkbenchIpcContext): void {
   for (const action of ['plan.saveToProject', 'plan.export'] as const) {
     const channel = action === 'plan.export' ? 'plan:export' : 'plan:saveToProject';
     ipcMain.handle(channel, async (_event, ...rawArgs: unknown[]) => {
-      try {
-        const [request] = parseIpcArgs(
-          action === 'plan.export' ? PlanExportArgsSchema : PlanSaveToProjectArgsSchema,
-          rawArgs,
-          { label: channel, maxBytes: 8192 },
-        ) as [PlanExportRequest | PlanSaveToProjectRequest];
-        requireCurrentSession(context, request.sessionId);
-        const selected = readReferencedPlan(request);
-        const targetPath = assertPlanWritePath(
-          'targetPath' in request ? request.targetPath : projectTarget(request.sessionId),
-        );
-        if (
-          !ipcApprovalTokenService.consume({
-            token: request.approvalToken,
-            action,
-            scope: 'project',
-            name: binding(request, selected.ownerSessionId, targetPath),
-          })
-        )
-          return { success: false, error: 'PLAN_APPROVAL_TOKEN_INVALID' };
-        const document =
-          action === 'plan.export'
-            ? selected.markdown
-            : composeProjectPlan(selected.markdown, {
-                planId: selected.plan.planId,
-                revision: selected.plan.revision,
-                sha256: selected.hash,
-                agent: selected.agentId,
-                sessionId: selected.ownerSessionId,
-                savedAt: new Date().toISOString(),
-              });
-        writePlanFile(targetPath, document);
-        return { success: true, path: targetPath };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      const [request] = parseIpcArgs(
+        action === 'plan.export' ? PlanExportArgsSchema : PlanSaveToProjectArgsSchema,
+        rawArgs,
+        { label: channel, maxBytes: 8192 },
+      ) as [PlanExportRequest | PlanSaveToProjectRequest];
+      requireCurrentSession(context, request.sessionId);
+      const selected = readReferencedPlan(request);
+      const targetPath = assertPlanWritePath(
+        'targetPath' in request ? request.targetPath : projectTarget(request.sessionId),
+      );
+      if (
+        !ipcApprovalTokenService.consume({
+          token: request.approvalToken,
+          action,
+          scope: 'project',
+          name: binding(request, selected.ownerSessionId, targetPath),
+        })
+      )
+        throw new AppError('PLAN_APPROVAL_TOKEN_INVALID');
+      const document =
+        action === 'plan.export'
+          ? selected.markdown
+          : composeProjectPlan(selected.markdown, {
+              planId: selected.plan.planId,
+              revision: selected.plan.revision,
+              sha256: selected.hash,
+              agent: selected.agentId,
+              sessionId: selected.ownerSessionId,
+              savedAt: new Date().toISOString(),
+            });
+      writePlanFile(targetPath, document);
+      return { path: targetPath };
     });
   }
 }

@@ -500,23 +500,11 @@ export interface ConversationAnswerUserInputRequest {
   answers: ConversationAskUserAnswer[];
 }
 
-export interface ConversationAnswerUserInputResult {
-  success: boolean;
-  error?: string;
-  /** The question whose answer was rejected, so the panel can return to it. */
-  questionId?: string;
-}
-
 export interface ConversationAnswerToolApprovalRequest {
   sessionId?: string | null;
   turnId: string;
   approvalId: string;
   approved: boolean;
-}
-
-export interface ConversationAnswerToolApprovalResult {
-  success: boolean;
-  error?: string;
 }
 
 export type {

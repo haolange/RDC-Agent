@@ -29,10 +29,8 @@ export interface ApplyDeclaredHandoffInput {
 }
 
 export interface ApplyDeclaredHandoffResult {
-  success: boolean;
-  error?: string;
-  session?: SessionRecordSnapshot;
-  suggestion?: PlanReviewHandoffSuggestion;
+  session: SessionRecordSnapshot;
+  suggestion: PlanReviewHandoffSuggestion;
 }
 
 /** The offer a declared handoff of an approved plan writes; the approval decision's time is the offer's time. */
@@ -100,16 +98,16 @@ export function assertDeclaredHandoffForPlan(input: {
   return declared;
 }
 
+const planApprovalChanged = () =>
+  new AppError('PLAN_APPROVAL_CHANGED', 'the approved handoff is no longer the unsent plan.');
+
 export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Promise<ApplyDeclaredHandoffResult> {
   const session = sessionRecordStore.readSession(input.sessionId);
-  if (!session) return { success: false, error: `Session not found: ${input.sessionId}` };
+  if (!session) throw new AppError('SESSION_NOT_FOUND', input.sessionId);
   const projectRoot = projectWorkspaceStore.getProjectById(session.projectId)?.rootPath ?? null;
   const target = resolveEnabledAgentDefinition(input.agent, projectRoot);
   if (!target) {
-    return {
-      success: false,
-      error: `CONVERSATION_AGENT_UNAVAILABLE: requested profile \`${input.agent}\` is not enabled.`,
-    };
+    throw new AppError('CONVERSATION_AGENT_UNAVAILABLE', `requested profile \`${input.agent}\` is not enabled.`);
   }
   const offer = executionOfferStore.read(input.sessionId);
   const sourceAgentId = findDeclaredHandoff(session.agentId ?? '', projectRoot, input.agent, input.label)
@@ -117,14 +115,14 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
     : (offer?.sourceAgentId ?? session.agentId ?? '');
   const declared = findDeclaredHandoff(sourceAgentId, projectRoot, input.agent, input.label);
   if (!declared) {
-    return {
-      success: false,
-      error: 'DECLARED_HANDOFF_NOT_FOUND: continue action is not declared on the current or offering profile.',
-    };
+    throw new AppError(
+      'DECLARED_HANDOFF_NOT_FOUND',
+      'continue action is not declared on the current or offering profile.',
+    );
   }
   const approved = planReviewStateStore.read(input.sessionId);
   if (input.expectedPlanHash && (approved?.status !== 'approved' || approved.approvedHash !== input.expectedPlanHash)) {
-    return { success: false, error: 'PLAN_APPROVAL_CHANGED: the approved handoff is no longer the unsent plan.' };
+    throw planApprovalChanged();
   }
   const approvalChanged = () => {
     if (!input.expectedPlanHash) return false;
@@ -137,38 +135,33 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
         .some((message) => message.role === 'user' && message.createdAt >= latest.updatedAt)
     );
   };
-  if (approvalChanged())
-    return { success: false, error: 'PLAN_APPROVAL_CHANGED: the approved handoff is no longer the unsent plan.' };
+  if (approvalChanged()) throw planApprovalChanged();
   if (approved?.status === 'approved' && approved.approvedHash && approved.frozenUri) {
-    try {
-      if (approved.approvedHandoff?.agent !== input.agent || approved.approvedHandoff.label !== input.label) {
-        throw new AppError('EXECUTION_OFFER_TARGET_MISMATCH', 'declare the handoff selected by the approved plan.');
-      }
-      const offer = executionOfferStore.read(input.sessionId);
-      if (
-        offer &&
-        (offer.plan.hash !== approved.approvedHash ||
-          offer.plan.uri !== approved.frozenUri ||
-          offer.targetAgentId !== input.agent ||
-          offer.label !== input.label ||
-          JSON.stringify([...offer.requiredSkillIds].sort()) !==
-            JSON.stringify([...(declared.requiredSkillIds ?? [])].sort()))
-      ) {
-        throw new AppError(
-          'EXECUTION_OFFER_CHANGED',
-          'preparation declaration changed after approval; revise and review the plan before handoff.',
-        );
-      }
-      const plan = planArtifactWriter.readMarkdown(input.sessionId, approved.frozenUri, approved.approvedHash);
-      assertDeclaredHandoffForPlan({
-        sourceAgentId,
-        projectRoot,
-        handoff: input,
-        tasks: parsePlanTaskRequirements(plan.markdown),
-      });
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    if (approved.approvedHandoff?.agent !== input.agent || approved.approvedHandoff.label !== input.label) {
+      throw new AppError('EXECUTION_OFFER_TARGET_MISMATCH', 'declare the handoff selected by the approved plan.');
     }
+    const offer = executionOfferStore.read(input.sessionId);
+    if (
+      offer &&
+      (offer.plan.hash !== approved.approvedHash ||
+        offer.plan.uri !== approved.frozenUri ||
+        offer.targetAgentId !== input.agent ||
+        offer.label !== input.label ||
+        JSON.stringify([...offer.requiredSkillIds].sort()) !==
+          JSON.stringify([...(declared.requiredSkillIds ?? [])].sort()))
+    ) {
+      throw new AppError(
+        'EXECUTION_OFFER_CHANGED',
+        'preparation declaration changed after approval; revise and review the plan before handoff.',
+      );
+    }
+    const plan = planArtifactWriter.readMarkdown(input.sessionId, approved.frozenUri, approved.approvedHash);
+    assertDeclaredHandoffForPlan({
+      sourceAgentId,
+      projectRoot,
+      handoff: input,
+      tasks: parsePlanTaskRequirements(plan.markdown),
+    });
   }
   const hookContext = {
     agentId: sourceAgentId,
@@ -181,10 +174,9 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
     },
   };
   if (!(await dispatchRuntimeHooks('agent.before-handoff', hookContext))) {
-    return { success: false, error: 'HOOK_DENIED: agent.before-handoff' };
+    throw new AppError('HOOK_DENIED', 'agent.before-handoff');
   }
-  if (approvalChanged())
-    return { success: false, error: 'PLAN_APPROVAL_CHANGED: the approved handoff is no longer the unsent plan.' };
+  if (approvalChanged()) throw planApprovalChanged();
   if (approved?.status === 'approved' && approved.approvedHash && approved.frozenUri) {
     executionOfferStore.write(
       input.sessionId,
@@ -201,11 +193,7 @@ export async function applyDeclaredHandoff(input: ApplyDeclaredHandoffInput): Pr
     sessionRecordStore.updateSession(input.sessionId, { agentId: input.agent }) ?? session,
   );
   if (!(await dispatchRuntimeHooks('agent.after-handoff', hookContext))) {
-    return { success: false, error: 'HOOK_DENIED: agent.after-handoff' };
+    throw new AppError('HOOK_DENIED', 'agent.after-handoff');
   }
-  return {
-    success: true,
-    session: updated,
-    suggestion: declaredHandoffSuggestion(declared),
-  };
+  return { session: updated, suggestion: declaredHandoffSuggestion(declared) };
 }

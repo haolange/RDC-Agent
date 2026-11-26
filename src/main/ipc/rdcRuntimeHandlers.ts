@@ -151,16 +151,11 @@ function scopedResourceChannels(): IpcChannelTable {
       return scopedRuntimeService.overview(ownedRoot);
     },
     'rdc-runtime:reveal': async (_event, ...rawArgs: unknown[]) => {
-      try {
-        const [sourcePath] = parseIpcArgs(RdcRuntimeRevealArgsSchema, rawArgs, {
-          label: 'rdc-runtime:reveal',
-          maxBytes: 8 * 1024,
-        });
-        shell.showItemInFolder(sourcePath);
-        return { success: true };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      const [sourcePath] = parseIpcArgs(RdcRuntimeRevealArgsSchema, rawArgs, {
+        label: 'rdc-runtime:reveal',
+        maxBytes: 8 * 1024,
+      });
+      shell.showItemInFolder(sourcePath);
     },
   };
 }

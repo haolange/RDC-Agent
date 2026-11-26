@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '../../../i18n';
-import { humanizeError } from '../../../i18n/humanizeError';
 import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
-import { InlineError } from '../../../ui/InlineError';
+import { FailureAlert } from '../../../patterns/FailureAlert';
 import { useProjectStore } from '../../../stores/projectStore';
 import { Icon } from '../../../ui/Icon';
 import { Skeleton } from '../../../ui/Skeleton';
@@ -115,11 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
             </div>
           ) : selection.projects.length > 0 ? (
             <div className="project-stack">
-              {selection.sidebarError && (
-                <InlineError className="sidebar-inline-error" detail={selection.sidebarError.detail}>
-                  {humanizeError(selection.sidebarError.detail, t, selection.sidebarError.contextKey)}
-                </InlineError>
-              )}
+              {selection.sidebarError && <FailureAlert className="sidebar-inline-error" {...selection.sidebarError} />}
               {selection.projects.map((project) => {
                 const isCurrentProject = selection.currentProject?.projectId === project.projectId;
                 const isProjectRailActive = isCurrentProject && selection.rightRailTarget === 'project';

@@ -14,13 +14,15 @@ export const useToolApprovalSubmit = () =>
       );
     };
     if (!current()) return;
-    const result = await window.electronAPI.conversation.answerToolApproval({
-      sessionId: request.sessionId,
-      turnId: request.turnId,
-      approvalId: request.approvalId,
-      approved,
-    });
-    if (!result.success && current()) {
-      throw new Error(result.error || 'Unable to submit the approval decision.');
+    try {
+      await window.electronAPI.conversation.answerToolApproval({
+        sessionId: request.sessionId,
+        turnId: request.turnId,
+        approvalId: request.approvalId,
+        approved,
+      });
+    } catch (error) {
+      // A decision for a request that is no longer the pending one has nothing left to report.
+      if (current()) throw error;
     }
   }, []);

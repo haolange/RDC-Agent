@@ -2,6 +2,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { AppError } from '@shared/errors/appError';
 import { ProjectCaptureReferenceDialog } from './ProjectCaptureReferenceDialog';
 
 const reference = vi.hoisted(() => vi.fn());
@@ -44,11 +45,11 @@ it('preserves the trigger for modal focus restoration', () => {
   trigger.remove();
 });
 it('disables empty and pending submission, rejects duplicate Enter, and retains failed drafts for retry', async () => {
-  let finish!: (result: { success: boolean; error: string }) => void;
+  let fail!: (reason: unknown) => void;
   reference.mockImplementation(
     () =>
-      new Promise((resolve) => {
-        finish = resolve;
+      new Promise((_resolve, reject) => {
+        fail = reject;
       }),
   );
   const close = vi.fn(),
@@ -67,16 +68,16 @@ it('disables empty and pending submission, rejects duplicate Enter, and retains 
     document.querySelector('input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })),
   );
   expect(reference).toHaveBeenCalledExactlyOnceWith('project', 'D:/original/capture.rdc');
-  await act(async () => finish({ success: false, error: 'SOURCE_CHANGED' }));
-  // The alert leads with a human sentence; the raw reason leaves only through its copy action.
-  expect(document.querySelector('[role="alert"]')?.textContent).toContain('app.error.actionFailed');
-  expect(document.querySelector('[role="alert"]')?.textContent).not.toContain('SOURCE_CHANGED');
+  await act(async () => fail(new AppError('CAPTURE_REFERENCE_CHANGED', 'source bytes changed')));
+  // The alert leads with the code's human sentence; the raw reason leaves only through its copy action.
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('errors.CAPTURE_REFERENCE_CHANGED');
+  expect(document.querySelector('[role="alert"]')?.textContent).not.toContain('source bytes changed');
   expect(document.querySelector('[role="alert"] button[aria-label="app.copyDetails"]')).not.toBeNull();
   expect(document.querySelector('input')!.value).toBe('D:/original/capture.rdc');
   expect(button().disabled).toBe(false);
   expect(close).not.toHaveBeenCalled();
   expect(registered).not.toHaveBeenCalled();
-  reference.mockResolvedValue({ success: true, inputs: [] });
+  reference.mockResolvedValue({ inputs: [] });
   await act(async () => button().click());
   expect(registered).toHaveBeenCalledWith('project', []);
   expect(close).toHaveBeenCalledOnce();

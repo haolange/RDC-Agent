@@ -679,13 +679,9 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
 
     const allMessages = conversationHistoryStore.readConversationHistory(input.sessionId);
     const branchState = this.readRepairedBranchState(input.sessionId, allMessages);
-    if (!branchState) {
-      return { success: false, messages: [], error: 'No conversation branch state found.' };
-    }
-    const fork = branchState.forks.find((entry) => entry.forkId === input.forkId);
-    const branch = fork?.branches.find((entry) => entry.branchId === input.branchId);
-    if (!fork || !branch) {
-      return { success: false, messages: [], error: 'Invalid conversation branch selection.' };
+    const fork = branchState?.forks.find((entry) => entry.forkId === input.forkId);
+    if (!branchState || !fork?.branches.some((entry) => entry.branchId === input.branchId)) {
+      throw new AppError('CONVERSATION_BRANCH_INVALID', `${input.forkId}/${input.branchId} is not a branch here.`);
     }
 
     fork.activeBranchId = input.branchId;
@@ -702,12 +698,7 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
     );
     publishConversationTrace(input.sessionId, visibleMessages, input.sessionId, publishTraceProjection);
 
-    return {
-      success: true,
-      messages: allMessages,
-      branchState,
-      tracePresentation,
-    };
+    return { messages: allMessages, branchState, tracePresentation };
   }
 
   private readRepairedBranchState(

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import {
   getDelegatedInteractionOwner,
   type DelegatedInteractionOwner,
@@ -32,11 +33,6 @@ export interface ToolApprovalAnswerInput {
   turnId: string;
   approvalId: string;
   approved: boolean;
-}
-
-export interface ToolApprovalAnswerResult {
-  success: boolean;
-  error?: string;
 }
 
 interface PendingToolApprovalRequest extends ToolApprovalRequestInput {
@@ -213,13 +209,13 @@ export class AgentToolApprovalRequestService {
     return !!pending && (pending.delegatedOwner?.ownerSessionId ?? pending.sessionId) === sessionId;
   }
 
-  answer(input: ToolApprovalAnswerInput): ToolApprovalAnswerResult {
+  answer(input: ToolApprovalAnswerInput): void {
     const pending = this.pending.get(keyFor(input.turnId, input.approvalId));
     if (!pending) {
-      return { success: false, error: 'No pending approval request was found for this turn.' };
+      throw new AppError('TOOL_APPROVAL_REQUEST_NOT_FOUND', `${input.turnId}/${input.approvalId}`);
     }
     if ((input.sessionId ?? null) !== (pending.delegatedOwner?.ownerSessionId ?? pending.sessionId)) {
-      return { success: false, error: 'Pending approval request belongs to a different session.' };
+      throw new AppError('SESSION_OWNER_DENIED', 'pending approval request belongs to a different session.');
     }
 
     // Recorded before the request settles: if the record cannot be written the request stays pending and the answer fails.
@@ -247,7 +243,6 @@ export class AgentToolApprovalRequestService {
       risk: pending.risk,
     });
     pending.resolve(input.approved);
-    return { success: true };
   }
 
   cancelTurn(turnId?: string): void {

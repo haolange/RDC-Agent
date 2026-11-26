@@ -206,9 +206,7 @@ export interface BranchNavigatorViewModel {
 }
 
 export interface TraceSessionResult {
-  success: boolean;
-  presentation?: import('./agenticTrace').AgentRunPresentation;
-  error?: string;
+  presentation: import('./agenticTrace').AgentRunPresentation;
 }
 
 /** Read-only pages of the same current Investigation selection used by the rail. */

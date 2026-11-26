@@ -3,10 +3,9 @@ import { useI18n } from '../../../i18n';
 import { TaskDialog } from '../../../ui/TaskDialog';
 import { Input } from '../../../ui/Input';
 import { Button } from '../../../ui/Button';
-import { InlineError } from '../../../ui/InlineError';
+import { FailureAlert } from '../../../patterns/FailureAlert';
 import { isBrowserAppSession } from '../../../platform/browserSession';
 import { browseProjectDirectory } from '../../../platform/projectDirectory';
-import { errorDetail } from '../../../lib/errorDetail';
 import { isImeComposing } from '../../../lib/ime';
 
 export function ProjectAddDialog({
@@ -19,28 +18,28 @@ export function ProjectAddDialog({
   const { t } = useI18n();
   const [rootPath, setRootPath] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ reason: unknown } | null>(null);
   const submit = async () => {
     if (busy || !rootPath.trim()) return;
     setBusy(true);
-    setError(null);
+    setFailure(null);
     try {
       await onAdd(rootPath.trim());
       onClose();
     } catch (reason) {
-      setError(errorDetail(reason));
+      setFailure({ reason });
     } finally {
       setBusy(false);
     }
   };
   const browse = async () => {
     setBusy(true);
-    setError(null);
+    setFailure(null);
     try {
       const selected = await browseProjectDirectory();
       if (selected) setRootPath(selected);
     } catch (reason) {
-      setError(errorDetail(reason));
+      setFailure({ reason });
     } finally {
       setBusy(false);
     }
@@ -82,7 +81,7 @@ export function ProjectAddDialog({
           }
         }}
       />
-      {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
+      {failure ? <FailureAlert reason={failure.reason} contextKey="app.error.actionFailed" /> : null}
     </TaskDialog>
   );
 }

@@ -67,9 +67,11 @@ async function loadSession(sessionId: string): Promise<void> {
   const electronAPI = window.electronAPI;
   const projectStore = useProjectStore.getState();
   const previousSessionId = projectStore.currentSessionId;
-  const result = await electronAPI.session.open(sessionId);
-  if (!result.success) {
-    notify.failure(result.error, currentText, 'composer.commandSessionMissing');
+  let result: Awaited<ReturnType<typeof electronAPI.session.open>>;
+  try {
+    result = await electronAPI.session.open(sessionId);
+  } catch (error) {
+    notify.failure(error, currentText, 'composer.commandSessionMissing');
     return;
   }
 
@@ -86,8 +88,8 @@ async function loadSession(sessionId: string): Promise<void> {
     messages: result.history.messages,
     branchState: result.history.branchState ?? null,
     planReview: result.history.planReview,
-    tracePresentation: result.trace.presentation ?? null,
-    applyTrace: Boolean(result.trace.presentation),
+    tracePresentation: result.trace.presentation,
+    applyTrace: true,
   });
   const sessionsResult = await electronAPI.session.list(opened.projectId);
   projectStore.setSessions(receiveSessionList(sessionsResult.sessions));
@@ -174,9 +176,10 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
         await loadSession(sessionId);
         return;
       }
-      const result = await electronAPI.workflow.resume();
-      if (!result.success) {
-        notify.failure(result.error, currentText, 'composer.commandNoResumable');
+      try {
+        await electronAPI.workflow.resume();
+      } catch (error) {
+        notify.failure(error, currentText, 'composer.commandNoResumable');
       }
       return;
     }
@@ -202,11 +205,10 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
         notify.warning(currentText('composer.commandNoSession'));
         return;
       }
-      const result = await electronAPI.conversation.undoLastTurn(sessionId);
-      if (result.success) {
-        context.setConversationMessages(result.messages);
-      } else {
-        notify.failure(result.error, currentText, 'composer.commandUndoFailed');
+      try {
+        context.setConversationMessages((await electronAPI.conversation.undoLastTurn(sessionId)).messages);
+      } catch (error) {
+        notify.failure(error, currentText, 'composer.commandUndoFailed');
       }
       return;
     }
@@ -216,11 +218,10 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
         notify.warning(currentText('composer.commandNoSession'));
         return;
       }
-      const result = await electronAPI.conversation.clearHistory(sessionId);
-      if (result.success) {
-        context.setConversationMessages(result.messages);
-      } else {
-        notify.failure(result.error, currentText, 'composer.commandClearFailed');
+      try {
+        context.setConversationMessages((await electronAPI.conversation.clearHistory(sessionId)).messages);
+      } catch (error) {
+        notify.failure(error, currentText, 'composer.commandClearFailed');
       }
       return;
     }
