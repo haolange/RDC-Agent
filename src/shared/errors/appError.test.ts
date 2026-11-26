@@ -19,14 +19,14 @@ describe('error contract', () => {
   it('maps failures to the IPC payload, redacting the technical text and defaulting to INTERNAL_ERROR', () => {
     expect(
       toIpcErrorPayload(
-        new AppError('FILE_WRITE_PROTECTED', 'secret-abc is protected', { params: { path: 'config.json' } }),
+        new AppError('STORAGE_CORRUPT', 'secret-abc is damaged', { params: { file: 'config.json' } }),
         redact,
       ),
     ).toEqual({
-      code: 'FILE_WRITE_PROTECTED',
-      params: { path: 'config.json' },
-      category: 'security',
-      technical: 'FILE_WRITE_PROTECTED: [REDACTED] is protected',
+      code: 'STORAGE_CORRUPT',
+      params: { file: 'config.json' },
+      category: 'integrity',
+      technical: 'STORAGE_CORRUPT: [REDACTED] is damaged',
     });
     expect(toIpcErrorPayload(new TypeError('x is undefined'), redact)).toMatchObject({
       code: 'INTERNAL_ERROR',
@@ -42,6 +42,14 @@ describe('error contract', () => {
     });
     expect(errorCodeOf(error)).toBe('CONVERSATION_BUSY');
     expect(error.message).toBe('CONVERSATION_BUSY');
+  });
+
+  it('rejects params outside the code schema where the error is built', () => {
+    expect(() => new AppError('PLAN_REVIEW_BUSY', 'busy', { params: { reviews: 2 } })).toThrow();
+    expect(() => new AppError('KNOWLEDGE_DRAFT_MIGRATION_CONFLICT', 'a,b')).toThrow();
+    expect(new AppError('KNOWLEDGE_DRAFT_MIGRATION_CONFLICT', 'a,b', { params: { cards: 2 } }).params).toEqual({
+      cards: 2,
+    });
   });
 
   it('places every registered code in exactly one failure class', () => {

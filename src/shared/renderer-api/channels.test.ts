@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isHighImpactChannel, RENDERER_INVOKE_CHANNELS, resolveBridgeChannelCapability } from './channels';
+import { resolveBridgeChannelCapability } from './bridgeCapability';
+import { isHighImpactChannel, RENDERER_INVOKE_CHANNELS } from './channels';
 
 describe('renderer invoke channel table', () => {
   it('gives every declared channel one of the four capabilities', () => {

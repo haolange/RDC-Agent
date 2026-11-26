@@ -1,28 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { AppError, RendererIpcError } from '@shared/errors/appError';
-import { isErrorCode } from '@shared/errors/errorCodes';
 import { errorDetails, humanizeError } from './humanizeError';
 import { englishTranslations, translate, type TranslationKey } from './messages';
 
 const t = (key: TranslationKey, params?: Record<string, string | number>) => translate('en', key, params);
 
 describe('humanizeError', () => {
-  it('only words registered codes', () => {
-    const coded = Object.keys(englishTranslations).filter(
-      (key) => key.startsWith('errors.') && !key.startsWith('errors.category.'),
-    );
-    expect(coded.filter((key) => !isErrorCode(key.slice('errors.'.length)))).toEqual([]);
-  });
-
-  it('prefers the code copy, then the context copy, then the failure class', () => {
+  it('words a coded failure with its own copy and params, an uncoded one with the context copy', () => {
     expect(humanizeError(new AppError('CONVERSATION_BUSY', 'turn t-1 is running'), t, 'app.stopRunFailed')).toBe(
       englishTranslations['errors.CONVERSATION_BUSY'],
     );
-    expect(humanizeError(new AppError('RDC_SWITCH_CHILD_ACTIVE', 'child 42'), t, 'app.stopRunFailed')).toBe(
+    expect(
+      humanizeError(new AppError('KNOWLEDGE_DRAFT_MIGRATION_CONFLICT', 'card-a,card-b', { params: { cards: 2 } }), t),
+    ).toBe("Drafts weren't moved because 2 of them conflict with existing cards.");
+    expect(humanizeError(new TypeError('cannot read properties of undefined'), t, 'app.stopRunFailed')).toBe(
       englishTranslations['app.stopRunFailed'],
-    );
-    expect(humanizeError(new AppError('RDC_SWITCH_CHILD_ACTIVE', 'child 42'), t)).toBe(
-      englishTranslations['errors.category.integrity'],
     );
     expect(humanizeError(new TypeError('cannot read properties of undefined'), t)).toBe(
       englishTranslations['errors.INTERNAL_ERROR'],

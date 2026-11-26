@@ -1,4 +1,5 @@
-import { AppError } from '../errors/appError';
+// The sandboxed preload imports this module, and it can load no npm package: keep it free of the error registry,
+// whose params schemas are zod (resolveBridgeChannelCapability lives in bridgeCapability.ts for that reason).
 
 /**
  * How the Browser QA bridge treats an invoke channel: `read` and `mutation` are allowed, `high-impact` needs
@@ -255,12 +256,6 @@ export function isRendererInvokeChannel(channel: string): channel is RendererInv
 
 export function isRendererEventChannel(channel: string): channel is RendererEventChannel {
   return rendererEventChannelSet.has(channel);
-}
-
-/** The capability of a declared channel; an undeclared channel fails closed. */
-export function resolveBridgeChannelCapability(channel: string): BridgeChannelCapability {
-  if (!isRendererInvokeChannel(channel)) throw new AppError('BRIDGE_CAPABILITY_MISSING', channel);
-  return RENDERER_INVOKE_CHANNEL_TABLE[channel];
 }
 
 /** High-impact channels are confirmed and audited on every transport. */

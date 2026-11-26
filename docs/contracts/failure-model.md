@@ -30,11 +30,11 @@
 
 跨边界的失败只有一种形状：`AppError(code, detail?, { params?, cause? })`（`src/shared/errors/appError.ts`）。
 
-- **登记表**：`src/shared/errors/errorCodes.ts` 按 security / integrity / availability 三类登记全部错误码；`AppError` 只接受登记过的码，新增失败就是在这里加一行。分类决定调用方的反应（本文三类），也决定 renderer 在缺少专属文案时的兜底文案。
+- **登记表**：`src/shared/errors/errorCodes.ts` 是封闭登记表，每个码写明分类（security / integrity / availability）与 params 的 zod schema（strict object，值为字符串或数字）；`AppError` 只接受登记过的码，新增失败就是在这里加一行并补中英文案。分类决定调用方的反应（本文三类）；params 是文案可插值的全部字段。开发与测试运行（`NODE_ENV=development` 或 Vitest）构造 `AppError` 时按 schema 校验 params，形状不符当场抛错。
 - **消息形状**：`message` 保持 `CODE: detail`，日志、工具结果与诊断照旧可读；分支只看 `code`，不解析消息文本。catch 内重抛必须带 `{ cause }`，保留原始失败（ESLint `preserve-caught-error` 与错误契约规则执行；`new Error('CODE: …')` 写法被禁止）。
 - **IPC 唯一出口**：`invokeRegistry.dispatch` 是桌面与 Browser QA 共同的出口。处理器失败时返回错误结果 `{ __rdcIpcError: { code, params, category, technical } }`：没有登记码的失败归 `INTERNAL_ERROR`，`technical` 经凭据脱敏；high-impact 通道的审计 outcome 记录同一个 `code`。成功值原样返回。Browser QA 桥把错误结果作为 `{ success: false, error, appError }` 返回（`INTERNAL_ERROR` 为 500，其余 422）。
 - **renderer**：`createRendererApi` 在 renderer 自己的 realm 里把错误结果抛成 `RendererIpcError`（带 `code`、`params`、`category`、`channel`）。preload 只暴露按通道白名单检查的 `rdcIpc`，不在 preload 里抛错——context bridge 会剥掉自定义错误的属性。
-- **说人话**：`humanizeError(error, t, contextKey?)` 依次取 `errors.<CODE>` 专属文案、调用方的情境文案、失败分类文案；技术文本只经「复制详情」进剪贴板。用户经界面会遇到的码有专属中英文案（`src/renderer/i18n/locales/*/errors.ts`），其余码只到达模型或日志，用分类文案。`notify.failure` 发出的错误提示常驻到用户关闭，并带「复制详情」。门禁：每个专属文案键都是登记码，中英键集合由类型保证一致。
+- **说人话**：`humanizeError(error, t, contextKey?)` 对带登记码的失败取 `errors.<CODE>` 文案并以其 params 插值；没有登记码的失败取调用方的情境文案，缺省为 `errors.INTERNAL_ERROR`。技术文本只经「复制详情」进剪贴板。每个登记码都有中英文案（`src/renderer/i18n/locales/*/errors.ts`）。`notify.failure` 发出的错误提示常驻到用户关闭，并带「复制详情」。门禁（`check:i18n`）：每个登记码都有中英文案，每个 `errors.*` 键都是登记码，文案里的占位符必须是该码 params schema 的必填字段。
 - **领域结果值不在此列**：Provider 连接结果（`errorCode` 为 kebab-case）、发送预检结果等以返回值表达的领域状态保留各自的码与文案。
 
 ## 存储原语

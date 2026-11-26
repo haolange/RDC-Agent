@@ -5,8 +5,8 @@ export {
   isHighImpactChannel,
   isRendererEventChannel,
   isRendererInvokeChannel,
-  resolveBridgeChannelCapability,
 } from './channels';
+export { resolveBridgeChannelCapability } from './bridgeCapability';
 export type { BridgeChannelCapability, RendererEventChannel, RendererInvokeChannel } from './channels';
 export { createRendererApi } from './createRendererApi';
 export type { RendererApiTransport, RendererEventCallback } from './transport';

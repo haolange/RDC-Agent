@@ -1,6 +1,5 @@
-import { errorCodeOf, RendererIpcError } from '@shared/errors/appError';
-import { errorCategory } from '@shared/errors/errorCodes';
-import { englishTranslations, type TranslationKey, type Translator } from './messages';
+import { AppError, errorCodeOf, RendererIpcError } from '@shared/errors/appError';
+import type { TranslationKey, Translator } from './messages';
 
 /** One line for "Copy details": support-facing facts, never shown on a surface. */
 export interface ErrorDetail {
@@ -9,19 +8,17 @@ export interface ErrorDetail {
 }
 
 /**
- * The sentence a person reads for a failure. Order: the code's own copy, then the caller's context copy ("Couldn't
- * stop the run"), then the code's failure class, then a generic line. Technical text is never the answer.
+ * The sentence a person reads for a failure. Every registered code has its own copy (`check:i18n` enforces it), filled
+ * from the error's params; a failure without a registered code reads as the caller's context copy ("Couldn't stop the
+ * run"), else a generic line. Technical text is never the answer.
  */
 export function humanizeError(error: unknown, t: Translator, contextKey?: TranslationKey): string {
   const code = errorCodeOf(error);
   if (code) {
-    const key = `errors.${code}`;
-    if (Object.hasOwn(englishTranslations, key)) {
-      return t(key as TranslationKey, error instanceof RendererIpcError ? error.params : undefined);
-    }
+    const params = error instanceof RendererIpcError || error instanceof AppError ? error.params : undefined;
+    return t(`errors.${code}`, params);
   }
-  if (contextKey) return t(contextKey);
-  return t(code ? `errors.category.${errorCategory(code)}` : 'errors.INTERNAL_ERROR');
+  return t(contextKey ?? 'errors.INTERNAL_ERROR');
 }
 
 /** The technical facts behind a failure, for the clipboard only. */

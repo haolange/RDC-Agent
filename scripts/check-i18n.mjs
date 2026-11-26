@@ -8,6 +8,7 @@ require('./register-ts-source.cjs');
 const { englishTranslations, chineseTranslations } = require('../src/renderer/i18n/messages.ts');
 const { nativeEnglish, nativeChinese } = require('../src/main/window/nativeMessages.ts');
 const { BUILTIN_AGENT_TOOL_IDS } = require('../src/shared/constants/agentToolTokens.ts');
+const { ERROR_CODES, errorParamsSchema } = require('../src/shared/errors/errorCodes.ts');
 const { WORK_PROCESS_TOOL_DISPLAY_CATALOG } = require('../src/renderer/features/transcript/workProcessToolCatalog.ts');
 const root = path.resolve(import.meta.dirname, '..');
 const errors = [];
@@ -54,6 +55,26 @@ function compare(en, zh, label) {
   }
 }
 compare(englishTranslations, chineseTranslations, 'renderer');
+
+// Every registered error code has its own copy in both languages, every `errors.<CODE>` key is a registered code, and
+// a placeholder in that copy names a required param of the code's schema, so interpolation never shows `{name}`.
+const registeredCodes = new Set(ERROR_CODES);
+for (const key of Object.keys(englishTranslations).filter((name) => name.startsWith('errors.'))) {
+  if (!registeredCodes.has(key.slice('errors.'.length))) errors.push(`error copy for an unregistered code: ${key}`);
+}
+for (const code of ERROR_CODES) {
+  const key = `errors.${code}`;
+  if (!Object.hasOwn(englishTranslations, key) || !Object.hasOwn(chineseTranslations, key)) {
+    errors.push(`error code without copy: ${code}`);
+    continue;
+  }
+  const shape = errorParamsSchema(code).shape;
+  for (const placeholder of placeholders(englishTranslations[key]).split(',').filter(Boolean)) {
+    const name = placeholder.slice(1, -1);
+    if (!Object.hasOwn(shape, name) || shape[name].safeParse(undefined).success)
+      errors.push(`error copy ${key} interpolates {${name}}, which is not a required param of ${code}`);
+  }
+}
 compare(nativeEnglish, nativeChinese, 'native');
 
 for (const language of ['en', 'zh-CN']) {
@@ -208,5 +229,5 @@ if (errors.length) {
   throw new Error(message);
 }
 console.log(
-  `[i18n] ${Object.keys(englishTranslations).length} bilingual renderer keys, ${Object.keys(nativeEnglish).length} native keys, ${expected.size} builtin tools verified.`,
+  `[i18n] ${Object.keys(englishTranslations).length} bilingual renderer keys, ${ERROR_CODES.length} error codes, ${Object.keys(nativeEnglish).length} native keys, ${expected.size} builtin tools verified.`,
 );

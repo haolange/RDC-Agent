@@ -1,4 +1,4 @@
-import { errorCategory, isErrorCode, type ErrorCategory, type ErrorCode } from './errorCodes';
+import { errorCategory, errorParamsSchema, isErrorCode, type ErrorCategory, type ErrorCode } from './errorCodes';
 
 export type ErrorParams = Record<string, string | number>;
 
@@ -26,6 +26,13 @@ export interface AppErrorOptions {
 }
 
 /**
+ * Development and test runs check every `AppError`'s params against its code's schema, so a wrong shape fails where
+ * the error is built instead of reaching copy that interpolates it. The sandboxed renderer has no `process`.
+ */
+const checksParams =
+  typeof process !== 'undefined' && (process.env.VITEST === 'true' || process.env.NODE_ENV === 'development');
+
+/**
  * The one error type that crosses a boundary. The message keeps the `CODE: detail` form, so logs, tool results and
  * diagnostics read the same as before; callers branch on `code`, never on the message text.
  */
@@ -40,6 +47,7 @@ export class AppError extends Error {
     super(detail ? `${code}: ${detail}` : code, options.cause === undefined ? undefined : { cause: options.cause });
     this.name = 'AppError';
     this.params = options.params ?? {};
+    if (checksParams) errorParamsSchema(code).parse(this.params);
   }
 
   get category(): ErrorCategory {
