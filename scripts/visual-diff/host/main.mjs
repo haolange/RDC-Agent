@@ -414,6 +414,7 @@ async function openWindow({ theme, width, height, freeze, partition, answerer, q
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      backgroundThrottling: !freeze,
       // A fresh in-memory session per render, so no variant or scenario sees another's storage.
       ...(partition ? { partition } : {}),
     },
@@ -428,6 +429,8 @@ async function openWindow({ theme, width, height, freeze, partition, answerer, q
   await cdp.sendCommand('Page.enable');
   await cdp.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
   if (freeze) {
+    // Parallel replay hosts share the Windows desktop. Keep each fixture's DOM focus independent of window activation.
+    await cdp.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true });
     await cdp.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: FREEZE_SCRIPT });
     await cdp.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: L3_SCRIPT });
   }

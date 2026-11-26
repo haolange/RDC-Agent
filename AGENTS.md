@@ -137,6 +137,7 @@
   - 场景可以注入迟到响应（`respond`：`delayMs`、`hold` 配合 `release` 步骤，按 `call` 释放可模拟乱序）与失败响应（`error`，或用 `result` 替换某次回答，模拟失败写入后的状态）；host 不转发主进程事件，需要时用 `emit` 步骤推送一个事件，载荷里的 id 绑定最近的应答或调用参数（见 `scripts/visual-diff/host/main.mjs` 的 `resolveEmit`）。产品自身的时序竞争只能用带 `reason` 的 `focus` 步骤或 `l3Ignore` 固定，原因写明竞争点。
   - IPC 契约变化或新增场景时用 `run.mjs record <id…>` 录制（启动一次性 Browser QA 实例，从真实后端取响应；设 `VISUAL_DIFF_ELECTRON` 时直接用该 Electron 运行当前构建）。定义在 `scripts/visual-diff/scenarios.json`，可复用的准备步骤放在 `presets`；用到 Ollama 的场景需要先运行 `node scripts/qa-ollama-stub.mjs`。
   - `capture` 默认并行 3 个 host（`VISUAL_DIFF_JOBS` 可调），渲染失败时把当时的画面存为 `<id>@<变体>.failed.png`。
+  - 回放 host 为每个窗口模拟独立焦点并关闭后台节流。Windows 并行采集时，其他 host 切到前台不会改变被测页面的焦点语义或阻塞逐帧采样。
 
 **脚本清单**：`package.json` 的全部脚本按用途分组如下，增删脚本时同步本表。
 
