@@ -136,6 +136,11 @@ export interface AgentTool<TParams extends object = Record<string, unknown>, TDe
   readonly label?: string;
   readonly description: string;
   readonly parameters: JsonSchema;
+  /**
+   * The schema arguments are validated against when it differs from the provider-facing `parameters`: an MCP tool
+   * validates against its server's declared schema and sends providers a projection of it.
+   */
+  readonly argumentSchema?: JsonSchema;
   readonly pollable?: boolean;
   readonly permissionHint?: AgentToolPermissionHint;
   readonly spec: AgentToolSpec;

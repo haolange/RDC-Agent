@@ -170,11 +170,12 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
   - 可写时 `task_create` 一次批量建全表；开工前仅一条 `in_progress`；完成后立即标 `completed` 再开下一条；`blocked` 必须带 `statusReason`；单步或琐碎工作不建任务。
 - **Tool search 无匹配**：返回 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 与有效工具集 fingerprint；fingerprint 未变化时不重复同一搜索。
 - **Capability unknown**：`toolCalling.state === unknown` → text-only，不进入 Agent/Composer 可执行集合；仅 `supported` 且具备已实现的 structured-tool adapter 才是 `native-structured`。`unsupported` 保持明确的拒绝诊断，不复用到 unknown。
-- **ToolValidator**（`src/main/agent-runtime/core/ToolValidator.ts`）：工具参数只按 `SUPPORTED_SCHEMA_KEYS` 白名单内的 JSON Schema 子集校验。
-  - 支持 `oneOf` / `anyOf` / `allOf` / `not`、类型数组、`additionalProperties`（布尔或 schema）、数值与数组的边界约束；schema 的深度、节点数、对象键与数组项都有上限。
-  - 声明了 `properties` 而省略 `additionalProperties` 时拒绝未声明字段；缺省字段按 `default` 补齐。路径、命令、URL 类参数不做类型转换，其他字段只允许温和转换。
-  - 白名单外的关键字 fail-closed。MCP 工具在连接时经 `compileMcpInputSchema`（去注解、内联本地 `$ref`）编译一次，编译不过的工具不提供给模型，并在服务器状态 `unavailableTools` 中写明 `MCP_TOOL_SCHEMA_UNSUPPORTED`。
-  - schema 只编译一次，`ToolValidator` 按 schema 对象身份记住已编译的 schema：内置工具在 `RuntimeToolAssembly.resolveRuntimeTools` 装配工具集时编译（含 `tool_search`，不论本轮是否放行该工具），不支持的关键字使装配失败；MCP 工具在连接时编译。`validate` 只对没见过的 schema 先编译再校验，已编译的不再重走。`RuntimeToolAssembly.test.ts` 装配全部内置工具，并验证带不支持关键字的内置工具在装配时失败。
+- **ToolValidator**（`src/main/agent-runtime/core/ToolValidator.ts`）：工具参数由 Ajv 按 JSON Schema 2020-12 校验，`ajv-formats` 校验 `format`。
+  - `$schema` / `$defs` / `$ref`、`anyOf` / `allOf` / `oneOf` / `not`、类型数组、`prefixItems` 与全部边界约束按规范生效；`title`、`description`、`examples`、`$comment`、`deprecated` 等注解关键字允许出现且不约束取值。未知关键字与未知 `format` 使编译失败。
+  - 声明了 `properties` 而省略 `additionalProperties` / `unevaluatedProperties` 的对象 schema 拒绝未声明字段；没有 `properties` 的对象是不透明包。缺省字段按 `default` 补齐。
+  - 类型转换是显式规则而不是 Ajv `coerceTypes`：校验前沿 `properties` / `items` / `additionalProperties` 路径，把类型不符的标量温和转换（数字串与布尔转数值，`"true"` / `"false"` 与 1 / 0 转布尔，数值与布尔转字符串）；路径、命令、URL 类参数不转换，组合关键字的分支按原值匹配。
+  - 校验器按 schema 规范 JSON 的 hash 缓存，与 schema 对象身份无关。内置工具在 `RuntimeToolAssembly.resolveRuntimeTools` 装配工具集时经 `assertCompilable` 以 Ajv strict 模式编译（含 `tool_search`，不论本轮是否放行该工具），编译失败使装配失败；`RuntimeToolAssembly.test.ts` 装配全部内置工具，并验证带未知关键字的内置工具在装配时失败。
+  - MCP 工具在连接时经 `compileMcpInputSchema` 以服务器声明的方言（2020-12 或 draft-07）编译服务器原样声明的 schema（`compileExternal`），参数按它校验（`AgentTool.argumentSchema`）；发给 Provider 的 `parameters` 是它的投影（去注解与 `format`、内联本地 `$ref`）。编译不过的工具不提供给模型，并在服务器状态 `unavailableTools` 中写明 `MCP_TOOL_SCHEMA_UNSUPPORTED`，同一服务器的其他工具照常可用。
   - 准入（`validateToolArguments`）在权限与人工审批之前执行：参数文本不是 JSON 对象为 `TOOL_ARGUMENTS_INVALID`；schema 或工具自身 `validateArgs` 不通过为 `TOOL_SCHEMA_VIOLATION`，无效请求不展示审批。
 - **输出通道**：`ProviderOutputRef` 一经声明永久归属 `thinking` | `text` | `tool_call` 之一。
   - ref 承载 provider 侧 block 身份，已关闭的 block 不复用，多 part / 多 item 映射到不同 ref；普通 assistant text 永不合成 thinking。

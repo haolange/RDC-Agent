@@ -146,7 +146,11 @@ export function validateToolArguments(
     };
   }
   try {
-    const validatedArgs = toolValidator.validate(toolToDefinition(tool), toolCall.arguments);
+    const definition = toolToDefinition(tool);
+    const validatedArgs = toolValidator.validate(
+      tool.argumentSchema ? { ...definition, parameters: tool.argumentSchema } : definition,
+      toolCall.arguments,
+    );
     tool.validateArgs?.(validatedArgs);
     return { ok: true, value: validatedArgs };
   } catch (error) {

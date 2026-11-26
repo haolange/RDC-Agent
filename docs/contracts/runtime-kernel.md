@@ -318,8 +318,8 @@ Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only
 执行前先经准入 `validateToolArguments`，再进入 Permission/人工审批，无效请求不展示审批：
 
 - 参数文本不是 JSON 对象时返回 `TOOL_ARGUMENTS_INVALID`。
-- `toolValidator.validate` 按 schema 校验参数；没编译过的 schema 先检查只用 `SUPPORTED_SCHEMA_KEYS` 白名单内的关键字，再按对象身份记住。参数校验与工具自身的语义参数校验（`validateArgs`）失败都返回 `TOOL_SCHEMA_VIOLATION`。
-- 内置工具的 schema 在 `RuntimeToolAssembly.resolveRuntimeTools` 装配工具集时编译一次（`toolValidator.assertCompilable`），不支持的关键字使装配失败，而不是让该工具的每次调用失败；MCP 工具的 schema 在连接时经 `compileMcpInputSchema` 编译一次，编译不过的工具不提供给模型，并以 `MCP_TOOL_SCHEMA_UNSUPPORTED` 写入服务器状态的 `unavailableTools`。
+- `toolValidator.validate` 用 Ajv（JSON Schema 2020-12，`ajv-formats` 校验 `format`）按 schema 校验参数，校验器按 schema 规范 JSON 的 hash 缓存；校验前按显式规则温和转换类型不符的标量（路径、命令、URL 类参数除外），缺省字段按 `default` 补齐。参数校验与工具自身的语义参数校验（`validateArgs`）失败都返回 `TOOL_SCHEMA_VIOLATION`，消息带失败字段的 `args.` 路径。
+- 内置工具的 schema 在 `RuntimeToolAssembly.resolveRuntimeTools` 装配工具集时以 Ajv strict 模式编译一次（`toolValidator.assertCompilable`），编译失败使装配失败，而不是让该工具的每次调用失败；MCP 工具服务器声明的 schema 在连接时经 `compileMcpInputSchema`（`toolValidator.compileExternal`）编译一次，参数按它校验（`AgentTool.argumentSchema`），编译不过的工具不提供给模型，并以 `MCP_TOOL_SCHEMA_UNSUPPORTED` 写入服务器状态的 `unavailableTools`，其他工具照常可用。
 
 `shell` 的 provider 参数根保持普通 object，但只能提供非空 `command` 或 `rdc` 其中之一；同一规则在执行入口再次校验。`CompiledPolicy.deniedTools` 进入 Permission + Executor。非法 policy → fail-closed。
 

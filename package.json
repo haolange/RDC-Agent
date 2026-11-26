@@ -99,6 +99,8 @@
     "@jerome-benoit/sap-ai-provider-v2": "4.8.0",
     "@sap-ai-sdk/ai-api": "2.12.0",
     "ai": "6.0.226",
+    "ajv": "8.20.0",
+    "ajv-formats": "^3.0.1",
     "aws4fetch": "1.0.20",
     "fflate": "^0.8.3",
     "gitlab-ai-provider": "6.11.1",

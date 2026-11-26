@@ -439,9 +439,9 @@ describe('RuntimeToolAssembly', () => {
     const resolved = createAssembly().resolveRuntimeTools('general', ['*'], 'schema-session');
     expect(resolved.toolMap.size).toBeGreaterThan(20);
     const unsupported = {
-      name: 'format_probe',
+      name: 'keyword_probe',
       description: 'probe',
-      parameters: { type: 'object', properties: { url: { type: 'string', format: 'uri' } } },
+      parameters: { type: 'object', properties: { url: { type: 'string', formatHint: 'uri' } } },
       spec: {
         isReadOnly: true,
         concurrency: 'shared',
@@ -464,7 +464,7 @@ describe('RuntimeToolAssembly', () => {
     });
     // The tool is not even allowed for this turn: a built-in definition the validator cannot enforce fails the assembly.
     expect(() => assembly.resolveRuntimeTools('general', ['read_file'], 'schema-session')).toThrow(
-      /\[format_probe\] parameters\.properties\.url: 不支持的 schema 关键字 "format"/,
+      /\[keyword_probe\] parameters: schema 无法编译: strict mode: unknown keyword: "formatHint"/,
     );
   });
 

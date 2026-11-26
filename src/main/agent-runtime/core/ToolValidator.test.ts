@@ -156,26 +156,62 @@ describe('ToolValidator', () => {
       },
     });
     expect(validator.validate(tool, { mode: 'fast', note: null })).toEqual({ mode: 'fast', note: null });
-    expect(() => validator.validate(tool, { mode: 'slow' })).toThrow(/anyOf/);
+    expect(() => validator.validate(tool, { mode: 'slow' })).toThrow(/anyOf 要求至少匹配一个 schema（分支：/);
   });
 
-  it('rejects keywords outside the supported set', () => {
-    const unsupported = ['prefixItems', 'patternProperties', 'if', 'contains', 'dependentRequired', '$id'];
-    for (const key of unsupported) {
+  it('fails the compile on a keyword or format it cannot enforce', () => {
+    for (const extra of [{ patternMatch: 'x' }, { 'x-vendor': 1 }, { format: 'banana' }]) {
       expect(
-        () =>
-          validator.validate(
-            def({
-              type: 'object',
-              properties: {
-                n: { type: 'number', [key]: 1 } as never,
-              },
-            }),
-            { n: 1 },
-          ),
-        key,
-      ).toThrow(/不支持的 schema 关键字/);
+        () => validator.assertCompilable({ type: 'object', properties: { n: { type: 'string', ...extra } } }, 'demo'),
+        JSON.stringify(extra),
+      ).toThrow(/\[demo\] parameters: schema 无法编译/);
     }
+  });
+
+  it('accepts annotation keywords and enforces format, prefixItems, $defs references and type arrays', () => {
+    const tool = def({
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      $comment: 'fixture',
+      title: 'Fixture',
+      type: 'object',
+      properties: {
+        when: { type: 'string', format: 'date-time', examples: ['2026-01-01T00:00:00Z'], deprecated: true },
+        pair: { type: 'array', prefixItems: [{ type: 'string' }, { type: 'integer' }], minItems: 2, maxItems: 2 },
+        target: { $ref: '#/$defs/Target' },
+        note: { type: ['string', 'null'] },
+      },
+      $defs: { Target: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } } },
+    });
+    const valid = { when: '2026-11-26T10:00:00Z', pair: ['a', 1], target: { id: 'x' }, note: null };
+    expect(validator.validate(tool, valid)).toEqual(valid);
+    expect(() => validator.validate(tool, { when: 'yesterday' })).toThrow(/args\.when: 值不符合 format "date-time"/);
+    expect(() => validator.validate(tool, { pair: ['a', 'b'] })).toThrow(/args\.pair\[1\]: 期望 integer/);
+    expect(() => validator.validate(tool, { pair: ['a', 1, 2] })).toThrow(/args\.pair/);
+    expect(() => validator.validate(tool, { target: {} })).toThrow(/args\.target\.id: 缺少必填字段 "id"/);
+    expect(() => validator.validate(tool, { target: { id: 'x', extra: 1 } })).toThrow(/未声明字段 "extra"/);
+    expect(() => validator.validate(tool, { note: { nested: true } })).toThrow(
+      /期望类型之一 string \| null，实际为 object/,
+    );
+  });
+
+  it('fills declared defaults for missing fields', () => {
+    const tool = def({
+      type: 'object',
+      required: ['limit'],
+      properties: { limit: { type: 'integer', default: 20 }, query: { type: 'string' } },
+    });
+    expect(validator.validate(tool, { query: 'q' })).toEqual({ query: 'q', limit: 20 });
+  });
+
+  it('finds a compiled validator by schema content, not by object identity', () => {
+    const local = new ToolValidator();
+    // An open tuple compiles only under the external (MCP) options; strict built-in compilation rejects it.
+    const schema = { type: 'object', properties: { pair: { type: 'array', prefixItems: [{ type: 'string' }] } } };
+    expect(() => new ToolValidator().assertCompilable(schema, 'strict')).toThrow(/"prefixItems" is 1-tuple/);
+    local.compileExternal(schema, 'external');
+    const copy = def(structuredClone(schema), 'copy');
+    expect(local.validate(copy, { pair: ['a', 2] })).toEqual({ pair: ['a', 2] });
+    expect(() => local.validate(copy, { pair: [1] })).toThrow(/\[copy\] args\.pair\[0\]: 期望 string/);
   });
 
   it('enforces const and numeric minimum/maximum', () => {

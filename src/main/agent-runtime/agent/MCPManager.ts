@@ -102,7 +102,10 @@ export interface MCPDiscoveredTool {
   /** 带前缀的名称：mcp__{server}__{tool}。 */
   prefixedName: string;
   description: string;
+  /** Provider projection of the declared schema (see `compileMcpInputSchema`). */
   inputSchema: JsonSchema;
+  /** The schema the server declared; tool arguments are validated against it. */
+  argumentSchema: JsonSchema;
 }
 
 /** 内部连接对象。 */
@@ -136,6 +139,7 @@ class MCPAgentTool implements AgentTool {
   readonly name: string;
   readonly description: string;
   readonly parameters: JsonSchema;
+  readonly argumentSchema: JsonSchema;
   readonly permissionHint = 'mutation' as const;
   readonly spec = MCP_TOOL_SPEC;
 
@@ -146,6 +150,7 @@ class MCPAgentTool implements AgentTool {
     this.name = tool.prefixedName;
     this.description = tool.description;
     this.parameters = tool.inputSchema;
+    this.argumentSchema = tool.argumentSchema;
   }
 
   async execute(_toolCallId: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<AgentToolResult> {
@@ -596,6 +601,7 @@ export class MCPManager {
         prefixedName: buildMcpPrefixedName(serverId, originalName),
         description: typeof raw.description === 'string' ? raw.description : '',
         inputSchema: compiled.schema,
+        argumentSchema: compiled.argumentSchema,
       });
     }
   }

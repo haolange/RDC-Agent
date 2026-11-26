@@ -2,9 +2,12 @@
  * MCPManager 单元测试。
  * 测试核心逻辑：工具名称前缀、解析、工具注册/发现。
  */
+import { createServer } from 'node:http';
 import { describe, it, expect, beforeEach } from 'vitest';
+import { toolValidator } from '../core/ToolValidator';
 import { MCPManager } from './MCPManager';
 import { buildMcpPrefixedName, decodeMcpNameSegment, encodeMcpNameSegment } from './mcpToolNames';
+import type { AddressInfo } from 'node:net';
 
 describe('MCPManager', () => {
   let manager: MCPManager;
@@ -109,6 +112,55 @@ describe('MCPManager', () => {
           lastError: 'MCP stdio server "broken" missing command',
         },
       ]);
+    });
+  });
+
+  describe('tool schema compilation at connect', () => {
+    it('withholds only the tool whose schema cannot compile and validates the rest against their declared schema', async () => {
+      const tools = [
+        {
+          name: 'lookup',
+          inputSchema: {
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'object',
+            required: ['when'],
+            properties: { when: { type: 'string', format: 'date', examples: ['2026-01-01'] } },
+          },
+        },
+        { name: 'broken', inputSchema: { type: 'object', properties: { n: { type: 'string', format: 'banana' } } } },
+      ];
+      const server = createServer((request, response) => {
+        let body = '';
+        request.on('data', (chunk: Buffer) => (body += chunk.toString('utf8')));
+        request.on('end', () => {
+          const { id, method } = JSON.parse(body) as { id: number; method: string };
+          response.setHeader('Content-Type', 'application/json');
+          response.end(JSON.stringify({ jsonrpc: '2.0', id, result: method === 'tools/list' ? { tools } : {} }));
+        });
+      });
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      try {
+        const { port } = server.address() as AddressInfo;
+        const names = await manager.connect({ name: 'fixture', type: 'http', url: `http://127.0.0.1:${port}/rpc` });
+        expect(names).toEqual([buildMcpPrefixedName('fixture', 'lookup')]);
+        expect(manager.getServerStatusSummary()[0]).toMatchObject({
+          connectionStatus: 'connected',
+          tools: ['lookup'],
+          unavailableTools: [{ name: 'broken', reason: expect.stringMatching(/^MCP_TOOL_SCHEMA_UNSUPPORTED: /) }],
+        });
+        const [tool] = manager.getAgentTools();
+        expect(tool.parameters).toEqual({
+          type: 'object',
+          required: ['when'],
+          properties: { when: { type: 'string' } },
+        });
+        const declared = { name: tool.name, description: '', parameters: tool.argumentSchema ?? tool.parameters };
+        expect(toolValidator.validate(declared, { when: '2026-11-26' })).toEqual({ when: '2026-11-26' });
+        expect(() => toolValidator.validate(declared, { when: 'tomorrow' })).toThrow(/format "date"/);
+      } finally {
+        await manager.disconnectAll();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
     });
   });
 

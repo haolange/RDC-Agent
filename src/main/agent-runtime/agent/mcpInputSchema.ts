@@ -1,7 +1,10 @@
 import { toolValidator } from '../core/ToolValidator';
 import type { JsonSchema } from '../core/types';
 
-/** Keywords that describe a value without constraining it; they are dropped before validation. */
+/**
+ * Keywords dropped from the schema sent to providers: annotations, dialect metadata and `format`, which several
+ * provider wire formats reject. Arguments are still validated against the server's declared schema, `format` included.
+ */
 const ANNOTATION_KEYS = new Set([
   '$schema',
   '$id',
@@ -20,25 +23,26 @@ const ANNOTATION_KEYS = new Set([
 
 const MAX_REF_DEPTH = 8;
 
-export type McpInputSchemaResult = { ok: true; schema: JsonSchema } | { ok: false; reason: string };
+export type McpInputSchemaResult =
+  { ok: true; schema: JsonSchema; argumentSchema: JsonSchema } | { ok: false; reason: string };
 
 /**
- * Turns the JSON Schema an MCP server declares into the schema the tool validator enforces: annotation keywords are
- * removed and local `$ref`s into `$defs` / `definitions` are inlined. The result is compiled once here, so a tool
- * whose constraints the validator cannot enforce is reported at connect time instead of failing every call.
+ * Compiles the JSON Schema an MCP server declares for a tool at connect time, so a tool whose schema the validator
+ * cannot compile is reported then instead of failing every call. `argumentSchema` is the declared schema arguments
+ * are validated against; `schema` is its provider projection, with annotation keywords removed and local `$ref`s into
+ * `$defs` / `definitions` inlined.
  */
 export function compileMcpInputSchema(raw: unknown, toolName: string): McpInputSchemaResult {
-  if (raw === undefined || raw === null) return { ok: true, schema: { type: 'object', properties: {} } };
+  if (raw === undefined || raw === null) raw = { type: 'object', properties: {} };
   if (typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, reason: 'inputSchema is not an object' };
-  const root = raw as Record<string, unknown>;
+  const root = raw as JsonSchema;
   const definitions = {
     ...(isRecord(root.definitions) ? root.definitions : {}),
     ...(isRecord(root.$defs) ? root.$defs : {}),
   };
   try {
-    const schema = normalize(root, definitions, 0) as JsonSchema;
-    toolValidator.assertCompilable(schema, toolName);
-    return { ok: true, schema };
+    toolValidator.compileExternal(root, toolName);
+    return { ok: true, schema: normalize(root, definitions, 0) as JsonSchema, argumentSchema: root };
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) };
   }

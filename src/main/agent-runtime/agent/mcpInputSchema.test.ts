@@ -12,6 +12,7 @@ const SDK_SCHEMA = {
     query: { type: 'string', minLength: 1, examples: ['shadow pass'] },
     options: { $ref: '#/$defs/Options' },
     since: { anyOf: [{ type: 'string', format: 'date-time' }, { type: 'null' }] },
+    range: { type: 'array', items: [{ type: 'integer' }, { type: 'integer' }] },
     tags: { type: 'array', items: { type: 'string' }, uniqueItems: true },
     extra: { type: 'object', additionalProperties: true },
   },
@@ -28,21 +29,39 @@ describe('MCP input schema compilation', () => {
   it('compiles an SDK schema and validates arguments against every constraint it declares', () => {
     const compiled = compileMcpInputSchema(SDK_SCHEMA, 'search');
     if (!compiled.ok) throw new Error(compiled.reason);
-    const definition = { name: 'search', description: '', parameters: compiled.schema };
+    expect(compiled.schema).not.toHaveProperty('$defs');
+    expect(compiled.schema.properties?.since).toEqual({ anyOf: [{ type: 'string' }, { type: 'null' }] });
+    const definition = { name: 'search', description: '', parameters: compiled.argumentSchema };
     expect(
       toolValidator.validate(definition, {
         query: 'shadow',
         options: { limit: 5 },
         since: null,
+        range: [1, 2],
         tags: ['a', 'b'],
         extra: { any: 1 },
       }),
-    ).toEqual({ query: 'shadow', options: { limit: 5 }, since: null, tags: ['a', 'b'], extra: { any: 1 } });
+    ).toEqual({
+      query: 'shadow',
+      options: { limit: 5 },
+      since: null,
+      range: [1, 2],
+      tags: ['a', 'b'],
+      extra: { any: 1 },
+    });
     expect(() => toolValidator.validate(definition, { query: 'shadow', options: { limit: 0 } })).toThrow(/大于 0/);
-    expect(() => toolValidator.validate(definition, { query: 'shadow', options: {} })).toThrow(/allOf/);
+    expect(() => toolValidator.validate(definition, { query: 'shadow', options: {} })).toThrow(
+      /args\.options\.limit: 缺少必填字段/,
+    );
     expect(() =>
       toolValidator.validate(definition, { query: 'shadow', options: { limit: 1 }, since: { day: 1 } }),
     ).toThrow(/anyOf/);
+    expect(() => toolValidator.validate(definition, { query: 'shadow', options: { limit: 1 }, since: 'soon' })).toThrow(
+      /format "date-time"/,
+    );
+    expect(() =>
+      toolValidator.validate(definition, { query: 'shadow', options: { limit: 1 }, range: [1, 'x'] }),
+    ).toThrow(/args\.range\[1\]: 期望 integer/);
     expect(() =>
       toolValidator.validate(definition, { query: 'shadow', options: { limit: 1 }, tags: ['a', 'a'] }),
     ).toThrow(/互不相同/);
@@ -57,20 +76,20 @@ describe('MCP input schema compilation', () => {
       'note',
     );
     if (!compiled.ok) throw new Error(compiled.reason);
-    const definition = { name: 'note', description: '', parameters: compiled.schema };
+    const definition = { name: 'note', description: '', parameters: compiled.argumentSchema };
     expect(toolValidator.validate(definition, { note: null })).toEqual({ note: null });
     expect(() => toolValidator.validate(definition, { note: { nested: true } })).toThrow(/类型之一/);
   });
 
-  it('reports a schema the validator cannot enforce at connect time', () => {
+  it('reports a schema the validator cannot compile at connect time', () => {
     expect(
-      compileMcpInputSchema(
-        { type: 'object', properties: { pair: { type: 'array', prefixItems: [{ type: 'string' }] } } },
-        'pair',
-      ),
-    ).toMatchObject({ ok: false, reason: expect.stringContaining('prefixItems') });
+      compileMcpInputSchema({ type: 'object', properties: { n: { type: 'string', format: 'banana' } } }, 'n'),
+    ).toMatchObject({ ok: false, reason: expect.stringContaining('unknown format') });
     expect(
       compileMcpInputSchema({ type: 'object', properties: { item: { $ref: '#/$defs/Missing' } } }, 'item'),
-    ).toMatchObject({ ok: false, reason: expect.stringContaining('unresolvable $ref') });
+    ).toMatchObject({ ok: false, reason: expect.stringContaining('#/$defs/Missing') });
+    expect(
+      compileMcpInputSchema({ $schema: 'http://json-schema.org/draft-04/schema#', type: 'object' }, 'old'),
+    ).toMatchObject({ ok: false, reason: expect.stringContaining('$schema') });
   });
 });

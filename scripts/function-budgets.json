@@ -17,9 +17,6 @@
     "src/main/agent-runtime/context/RecoverableContextWindow.ts": {
       "complexity": 43
     },
-    "src/main/agent-runtime/core/ToolValidator.ts": {
-      "complexity": 41
-    },
     "src/main/agent-runtime/EffectiveRuntimePlan.ts": {
       "lines": 155
     },
