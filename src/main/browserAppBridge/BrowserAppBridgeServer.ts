@@ -24,6 +24,7 @@ import {
   tokensMatch,
   cookieOriginRequiredForPath,
 } from './bridgeSecurity';
+import type { Socket } from 'net';
 
 type BridgeOptions = {
   devRendererUrl: string | null;
@@ -48,6 +49,7 @@ interface BrowserHealthMetadata {
 }
 
 let server: Server | null = null;
+const bridgeConnections = new Set<Socket>();
 let bridgeUrl: string | null = null;
 let bridgeToken: string | null = null;
 let qaBootstrapToken: string | null = null;
@@ -462,6 +464,10 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
       );
     });
   });
+  server.on('connection', (socket) => {
+    bridgeConnections.add(socket);
+    socket.once('close', () => bridgeConnections.delete(socket));
+  });
   attachDevRendererWebSocketProxy(server, () => activeDevRendererUrl);
 
   await new Promise<void>((resolveListen, rejectListen) => {
@@ -521,5 +527,9 @@ export async function stopBrowserAppBridge(): Promise<void> {
   if (!activeServer) {
     return;
   }
-  await new Promise<void>((resolveClose) => activeServer.close(() => resolveClose()));
+  await new Promise<void>((resolveClose) => {
+    activeServer.close(() => resolveClose());
+    // Tear down event streams and upgraded connections after the listener stops accepting them.
+    for (const socket of bridgeConnections) socket.destroy();
+  });
 }

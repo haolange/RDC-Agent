@@ -61,6 +61,8 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 
 `instance.lock` 回收不能只凭 PID 存活判断 owner：锁记录 owner 的进程身份（pid 与 birth，见 [`host-platform.md`](host-platform.md)），只有身份证明已退出（pid 不存在或 birth 不同，即 PID 被复用）才回收；身份不可读或未记录 birth 的活 pid 保持拒绝，也不向该进程发送终止信号。
 
+应用正常退出时先停止接收请求、结束活跃回合，再停用 Browser QA 桥接。桥接停止监听后断开它拥有的事件流和开发态 WebSocket，已打开的浏览器页可以保留，应用仍能释放实例锁。
+
 ## 验证
 
 - Ask 专项可用 `qa:ask` 经 Composer 发出双题请求。Working 展开后同时显示两题，Composer 完成选择和自由输入后核对两条回答都进入原卡。

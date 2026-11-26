@@ -183,6 +183,8 @@ export function attachDevRendererWebSocketProxy(server: Server, resolveDevRender
       lines.push('', '');
       socket.write(lines.join('\r\n'));
       if (upstreamHead.length > 0) socket.write(upstreamHead);
+      socket.once('close', () => upstreamSocket.destroy());
+      upstreamSocket.once('close', () => socket.destroy());
       upstreamSocket.pipe(socket);
       socket.pipe(upstreamSocket);
     });
@@ -191,6 +193,9 @@ export function attachDevRendererWebSocketProxy(server: Server, resolveDevRender
       socket.destroy();
     });
     socket.on('error', () => {
+      upstream.destroy();
+    });
+    socket.once('close', () => {
       upstream.destroy();
     });
 

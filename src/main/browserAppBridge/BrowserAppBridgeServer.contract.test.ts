@@ -1,7 +1,12 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
+import { mkdtemp, rm, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { rendererEventHub } from '../runtime/rendererEventHub';
 import { buildBridgeAuthCookie, extractBearerToken, resolveBridgeCookieToken, tokensMatch } from './bridgeSecurity';
+import { startBrowserAppBridge, stopBrowserAppBridge } from './BrowserAppBridgeServer';
 import type { AddressInfo } from 'net';
 
 /**
@@ -12,6 +17,12 @@ import type { AddressInfo } from 'net';
 vi.mock('../ipc/invokeRegistry', () => ({
   hasRegisteredIpcChannel: () => true,
   invokeRegisteredIpcChannel: async () => ({}),
+}));
+vi.mock('../runtime/browserQaRun', () => ({ isBrowserQaRun: () => true }));
+vi.mock('../conversation/AttachmentStagingService', () => ({ attachmentStagingService: { clearAll: () => {} } }));
+vi.mock('../provider-catalog/ProviderCatalogRegistry', () => ({
+  getProviderCatalogRevision: () => 'test-catalog',
+  listProviderSummaries: () => [],
 }));
 
 const EXPECTED = 'a'.repeat(64);
@@ -116,4 +127,47 @@ describe('BrowserAppBridge /qa auth contract', () => {
     expect(() => JSON.parse(text)).not.toThrow();
     expect(text).not.toContain('<!doctype');
   });
+});
+
+it('closes the real bridge while an authenticated browser is still subscribed to events', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'browser-bridge-close-'));
+  const mainBundlePath = join(root, 'entry.js');
+  const bootstrap = 'bridge-close-test';
+  vi.stubEnv('RDC_AGENT_BROWSER_QA_BOOTSTRAP', bootstrap);
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  let stop: Promise<void> | undefined;
+  let client: AbortController | undefined;
+  try {
+    await Promise.all([writeFile(join(root, 'index.html'), '<html></html>'), writeFile(mainBundlePath, 'export {};')]);
+    const origin = await startBrowserAppBridge({
+      devRendererUrl: null,
+      rendererRoot: root,
+      mainBundlePath,
+      appVersion: 'test',
+      preferredPort: 0,
+    });
+    const entry = await fetch(`${origin}/qa?qaBootstrap=${bootstrap}`, { redirect: 'manual' });
+    const cookie = entry.headers.get('set-cookie')?.split(';')[0] ?? '';
+    client = new AbortController();
+    const events = await fetch(`${origin}/events`, {
+      method: 'POST',
+      headers: { Cookie: cookie, Origin: origin },
+      signal: client.signal,
+    });
+    expect(events.status).toBe(200);
+    expect(rendererEventHub.hasClients()).toBe(true);
+
+    let closed = false;
+    stop = stopBrowserAppBridge().then(() => {
+      closed = true;
+    });
+    await vi.waitFor(() => expect(closed).toBe(true));
+    expect(rendererEventHub.hasClients()).toBe(false);
+  } finally {
+    client?.abort();
+    await (stop ?? stopBrowserAppBridge());
+    log.mockRestore();
+    vi.unstubAllEnvs();
+    await rm(root, { recursive: true, force: true });
+  }
 });
