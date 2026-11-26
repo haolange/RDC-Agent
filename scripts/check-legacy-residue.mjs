@@ -264,6 +264,74 @@ const rules = [
   { id: 'cold-data', hits: collectPatternHits(FORBIDDEN.coldDataKebab) },
 ];
 
+// Version numbers (AGENTS.md §2.3): persisted formats carry no version marker and our own names, ids and files carry
+// no iteration number; a format change fails fast and the user deletes the data. Names owned by other programs keep
+// theirs and are listed below with the reason.
+const VERSION_SCAN_ROOT = 'src';
+const VERSION_SCAN_FILES = [
+  'resources/agent-runtime/rdc-tool-catalog-identity.json',
+  'resources/agent-runtime/rdc-tool-guide-members.json',
+];
+const CODE_FILE = /\.(?:ts|tsx|js|mjs|cjs)$/;
+const TEST_FILE = /\.test\.(?:ts|tsx)$/;
+const FORMAT_MARKER = /\b(?:schema|record|format)Version\b|\b(?:[A-Z][A-Z0-9]*_)*SCHEMA_VERSION\b/;
+const VERSIONED_IDENTIFIER = /\b[A-Za-z_$][\w$]*?(?:[a-z0-9]V|_V)\d+(?!\d)[\w$]*|\bv\d+[A-Z][\w$]*/g;
+const VERSIONED_ID = /(?<![\w/@.-])(?:[A-Za-z][A-Za-z0-9]*[-.])+v\d+(?!\d)(?:[-.:][\w.:-]*)?/g;
+const VERSIONED_NAMESPACE = /['"`][a-z][a-z0-9]*(?:[.-][a-z0-9]+)+\/\d+['"`]/g;
+const VERSIONED_PATH_SEGMENT = /(?:^|[-_.])v\d+(?=$|[-_.])|[a-z0-9]V\d+(?![a-z0-9])/;
+const EXTERNAL_IDENTIFIERS = [
+  /^SigV4$/, // AWS Signature Version 4
+  /^AwsV4Signer$/, // aws4fetch signer class
+  /^(?:Shared|LanguageModel|EmbeddingModel|ImageModel|SpeechModel|TranscriptionModel|Provider)V\d+\w*$/, // AI SDK types
+];
+const EXTERNAL_IDS = [
+  /^(?:deepseek|mimo|moonshot|cohere|bge|nomic|text-embedding)-/i, // vendor model ids
+  /^amazon\.nova-/, // Bedrock model id
+  /^codex-theme-v1:?$/, // the Codex theme share format, which the theme import names to refuse
+  /^sk-or-v1-$/, // OpenRouter API key prefix
+  /^steps-v1$/, // Google Interactions reasoning artifact version from its provider manifest
+  /^jerome-benoit\/sap-ai-provider-v2$/, // npm package name
+];
+const EXTERNAL_PATHS = new Set([
+  // The Vercel v0 provider: manifest files are named by provider id.
+  'src/shared/provider-catalog/manifests/identities/v0.json',
+  'src/shared/provider-catalog/manifests/surfaces/v0.json',
+]);
+
+const versionScanFiles = [
+  ...walkFiles(VERSION_SCAN_ROOT),
+  ...VERSION_SCAN_FILES.filter((rel) => existsSync(path.join(repoRoot, rel))),
+];
+
+const versionPathHits = walkFiles(VERSION_SCAN_ROOT).filter(
+  (rel) => !EXTERNAL_PATHS.has(rel) && rel.split('/').some((segment) => VERSIONED_PATH_SEGMENT.test(segment)),
+);
+
+const versionContentHits = [];
+for (const rel of versionScanFiles) {
+  const code = CODE_FILE.test(rel);
+  const checksMarkers = !TEST_FILE.test(rel);
+  readFileSync(path.join(repoRoot, rel), 'utf8')
+    .split(/\r?\n/)
+    .forEach((line, index) => {
+      const where = `${rel}:${index + 1}`;
+      if (checksMarkers && FORMAT_MARKER.test(line)) versionContentHits.push(`${where}: format version ${line.trim()}`);
+      if (!code) return;
+      for (const match of line.matchAll(VERSIONED_IDENTIFIER)) {
+        if (!EXTERNAL_IDENTIFIERS.some((allowed) => allowed.test(match[0])))
+          versionContentHits.push(`${where}: versioned identifier ${match[0]}`);
+      }
+      for (const match of line.matchAll(VERSIONED_ID)) {
+        if (!EXTERNAL_IDS.some((allowed) => allowed.test(match[0])))
+          versionContentHits.push(`${where}: versioned id ${match[0]}`);
+      }
+      for (const match of line.matchAll(VERSIONED_NAMESPACE))
+        versionContentHits.push(`${where}: versioned id ${match[0]}`);
+    });
+}
+
+rules.push({ id: 'version-numbered-path', hits: versionPathHits }, { id: 'version-numbers', hits: versionContentHits });
+
 for (const rule of rules) {
   reportHits(rule.id, [...new Set(rule.hits)]);
 }

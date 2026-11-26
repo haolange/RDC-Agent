@@ -512,7 +512,7 @@ Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 
   - revise 必须是当前被拒版本，且由原规划 Agent 发起。
   - 核验通过的引用持久化在该用户消息上；转录仍按普通用户消息显示交接 prompt，只隐藏编辑重发。没有引用的旧消息照原文显示，不推断。
 - **交接之后**：General 就地终答，不自动回 Mission；用户用 Agent pill 或历史建议行切回 Mission。Pill 切换不写 offer、不预载调查 Skill。
-- **已删除的结构**：`handoff` / `agent` / `agent_handoff` token 拒绝，不静默映射到 `subagent`。不存在 `agent_handoff` 工具与 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。
+- **已删除的结构**：`handoff` / `agent` / `agent_handoff` token 拒绝，不静默映射到 `subagent`。不存在 `agent_handoff` 工具与 `prepared → committed → consumed` 状态机。
 - 预载规则见「Plan 与 generation」。
 
 ### E. Investigation Vertical Schema
@@ -587,7 +587,7 @@ Knowledge 位于 `src/main/knowledge/`。Knowledge Center 为三列 UI（Spaces 
 - 平台级 Investigation Graph、第二 TaskStore、Mailbox / Blackboard。
 - 交互式 Profile 导出选择面、把 `AgentHandoffDefinition` 当成 durable 状态、把 embedding 并入 agent catalog。
 - 三卡或四卡 Right Rail。
-- Ask/Plan/Edit 作为运行时 fallback、ask/plan/edit 运行通道、custom manifest fallback、Run v2 双读、Mission generic `shell`。
+- Ask/Plan/Edit 作为运行时 fallback、ask/plan/edit 运行通道、custom manifest fallback、Run 旧格式双读、Mission generic `shell`。
 - Embedding 相关能力（禁止清单见本节开头）。
 
 保留的相邻结构及其边界：

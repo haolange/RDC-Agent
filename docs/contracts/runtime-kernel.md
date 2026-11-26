@@ -431,7 +431,6 @@ handoff 名称来自声明的 `label` 与可选 `labelTranslations`（`zh-CN` / 
 - 人点回合结束的建议行，或重启后继续一份已批准未发送的计划时，主进程 `applyDeclaredHandoff` 校验选项属于当前（或提出 offer 的）profile，触发 `agent.before-handoff` / `agent.after-handoff`，写入 `<sessionPath>/execution-offer.json`，并 persist `session.agentId`。
 - 计划门的批准不走这条链，而是一次 `PlanApprovalTransaction`（见下）。
 - 不存在 `agent_handoff` 工具，也不存在 `prepared → committed → consumed` 状态机。
-- 打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse、不迁移。
 
 计划门是另一条人机停顿：`plan_artifact` 写活计划并挂起，`approval.requested kind=plan_review`；拒绝意见回同一 tool result。
 
