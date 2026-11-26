@@ -135,7 +135,6 @@ export function useKnowledgeImport(options: {
         window.electronAPI.knowledge.import({
           operationId,
           spaceId,
-          ...(options.sessionId ? { sessionId: options.sessionId } : {}),
           ...(filePath ? { filePath } : { source }),
         }),
       );

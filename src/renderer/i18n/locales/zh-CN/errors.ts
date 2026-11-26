@@ -226,7 +226,6 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.KNOWLEDGE_ASSET_PATH_INVALID': '知识附件路径无效。',
   'errors.KNOWLEDGE_CANDIDATE_REQUIRES_INTENT': '保存知识候选需要你明确提出。',
   'errors.KNOWLEDGE_CARD_IDENTITY_CHANGED': '搜索后此卡片已变化，请刷新搜索。',
-  'errors.KNOWLEDGE_DRAFT_MIGRATION_CONFLICT': '有 {cards} 张草稿与现有卡片冲突，草稿未迁移。',
   'errors.KNOWLEDGE_EXPORT_EMPTY_SELECTION': '请至少选择一张卡片导出。',
   'errors.KNOWLEDGE_EXPORT_SPACE_REQUIRED': '请选择要导出的知识空间。',
   'errors.KNOWLEDGE_EXPORT_TARGET_INVALID': '该导出位置不可用。',

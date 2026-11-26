@@ -230,6 +230,19 @@ const card = JSON.parse(process.env.KNOW_CARD);
     const listed = (await store.listCandidates('sess-x')).map((entry) => entry.candidate.card.cardId).sort();
     expect(listed).toEqual(['user:facts/proc-a.md', 'user:facts/proc-b.md']);
   }, 20_000);
+
+  it('refuses a session state that still carries leftover drafts and names the file', async () => {
+    const root = tempRoot('rdc-know-drafts-');
+    const statePath = path.join(root, 'sess-old', 'knowledge-state.json');
+    mkdirSync(path.dirname(statePath), { recursive: true });
+    const old = JSON.stringify({ candidates: [], reviews: [], drafts: [] });
+    writeFileSync(statePath, old, 'utf8');
+    const store = createSessionScopedKnowledgeStore(root);
+    await expect(store.listCandidates('sess-old')).rejects.toThrow(
+      expect.objectContaining({ code: 'STORAGE_CORRUPT', params: { file: 'knowledge-state.json' } }),
+    );
+    expect(readFileSync(statePath, 'utf8')).toBe(old);
+  });
 });
 
 describe('knowledge path ingest', () => {

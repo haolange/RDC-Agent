@@ -257,9 +257,6 @@
     "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeExport.ts": {
       "lines": 162
     },
-    "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeImport.ts": {
-      "lines": 151
-    },
     "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeWriteConfirm.ts": {
       "lines": 165
     },

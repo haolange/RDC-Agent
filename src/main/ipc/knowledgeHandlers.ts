@@ -8,7 +8,6 @@ import { KNOWLEDGE_IMPORT_MAX_BYTES } from '../knowledge/knowledgeIngest';
 import { readKnowledgeImagePreview } from '../knowledge/knowledgeImagePreview';
 import { knowledgeCandidateService } from '../knowledge/KnowledgeCandidateService';
 import { knowledgeImportService } from '../knowledge/KnowledgeImportService';
-import { KnowledgeDraftMigrationConflictError } from '../knowledge/knowledgeErrors';
 import { knowledgeCompileService } from '../knowledge/KnowledgeCompileService';
 import { createDefaultExportDependencies, KnowledgeExportService } from '../knowledge/KnowledgeExportService';
 import { knowledgeIndexService } from '../knowledge/KnowledgeIndexService';
@@ -17,7 +16,6 @@ import { knowledgeWriteService } from '../knowledge/KnowledgeWriteService';
 import { knowledgeTopicService } from '../knowledge/KnowledgeTopicService';
 import { KnowledgeOperationRegistry } from '../knowledge/knowledgeOperations';
 import { shutdownCoordinator } from '../lifecycle/ShutdownCoordinator';
-import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { ipcApprovalTokenService } from '../runtime/IpcApprovalTokenService';
 import { sha256Hex } from '../runtime/contentHash';
 import { serializeKnowledgeCard } from '../knowledge/knowledgeCardSchema';
@@ -324,22 +322,6 @@ function knowledgeIntakeChannels(operations: KnowledgeOperationRegistry): IpcCha
         label: 'knowledge:candidates',
         maxBytes: 4 * 1024,
       });
-      try {
-        await knowledgeImportService.migrateSessionDrafts(sessionId);
-      } catch (error) {
-        if (!(error instanceof KnowledgeDraftMigrationConflictError)) {
-          rethrowKnowledgeError(error);
-        }
-        runtimeLogService.log({
-          scope: 'app',
-          namespace: 'context',
-          severity: 'warning',
-          title: 'Knowledge session draft migration conflict',
-          summary:
-            'Unreviewed session drafts were not written because the target space already has a different card at the same identity.',
-          raw: { sessionId, cardIds: error.cardIds },
-        });
-      }
       return {
         candidates: await knowledgeCandidateService.listCandidates(sessionId),
       };
@@ -390,22 +372,6 @@ function knowledgeIntakeChannels(operations: KnowledgeOperationRegistry): IpcCha
           if (!(await confirmKnowledgeMutation('knowledge.write', input.spaceId, importedFrom)))
             return { cancelled: true as const };
           options.signal.throwIfAborted();
-          if (input.sessionId) {
-            try {
-              await knowledgeImportService.migrateSessionDrafts(input.sessionId);
-            } catch (error) {
-              if (!(error instanceof KnowledgeDraftMigrationConflictError)) throw error;
-              runtimeLogService.log({
-                scope: 'app',
-                namespace: 'context',
-                severity: 'warning',
-                title: 'Knowledge session draft migration conflict',
-                summary:
-                  'Unreviewed session drafts were not written because the target space already has a different card at the same identity.',
-                raw: { sessionId: input.sessionId, cardIds: error.cardIds },
-              });
-            }
-          }
           return await knowledgeImportService.importToSpace(
             {
               spaceId: input.spaceId,

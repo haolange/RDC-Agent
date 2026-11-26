@@ -338,7 +338,6 @@ export interface ElectronAPI {
     import: (
       request: KnowledgeOperationRef & {
         spaceId: string;
-        sessionId?: string;
         source?: string;
         filePath?: string;
       },

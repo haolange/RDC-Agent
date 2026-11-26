@@ -244,8 +244,6 @@ export const enErrors = {
   'errors.KNOWLEDGE_ASSET_PATH_INVALID': "A knowledge attachment path isn't valid.",
   'errors.KNOWLEDGE_CANDIDATE_REQUIRES_INTENT': 'Saving a knowledge candidate needs your explicit request.',
   'errors.KNOWLEDGE_CARD_IDENTITY_CHANGED': 'This card changed since the search. Refresh the search.',
-  'errors.KNOWLEDGE_DRAFT_MIGRATION_CONFLICT':
-    "Drafts weren't moved because {cards} of them conflict with existing cards.",
   'errors.KNOWLEDGE_EXPORT_EMPTY_SELECTION': 'Choose at least one card to export.',
   'errors.KNOWLEDGE_EXPORT_SPACE_REQUIRED': 'Choose a knowledge space to export.',
   'errors.KNOWLEDGE_EXPORT_TARGET_INVALID': "That export location can't be used.",

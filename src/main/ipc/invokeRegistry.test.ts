@@ -37,21 +37,21 @@ describe('IPC dispatch', () => {
 
   it('returns a failure as its code, params and class, and audits the code', async () => {
     ipcMain.handle('conversation:answerToolApproval', () => {
-      throw new AppError('KNOWLEDGE_DRAFT_MIGRATION_CONFLICT', 'card-a,card-b', { params: { cards: 2 } });
+      throw new AppError('STORAGE_CORRUPT', 'state.json is damaged', { params: { file: 'state.json' } });
     });
     audit.record.mockReset();
 
     await expect(invokeRegisteredIpcChannel('conversation:answerToolApproval', [{}])).resolves.toEqual({
       [IPC_ERROR_KEY]: {
-        code: 'KNOWLEDGE_DRAFT_MIGRATION_CONFLICT',
-        params: { cards: 2 },
+        code: 'STORAGE_CORRUPT',
+        params: { file: 'state.json' },
         category: 'integrity',
-        technical: 'KNOWLEDGE_DRAFT_MIGRATION_CONFLICT: card-a,card-b',
+        technical: 'STORAGE_CORRUPT: state.json is damaged',
       },
     });
     expect(audit.record.mock.calls.at(-1)?.[0]).toMatchObject({
       outcome: 'error',
-      errorCode: 'KNOWLEDGE_DRAFT_MIGRATION_CONFLICT',
+      errorCode: 'STORAGE_CORRUPT',
     });
   });
 
