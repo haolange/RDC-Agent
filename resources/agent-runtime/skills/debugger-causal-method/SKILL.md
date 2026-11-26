@@ -1,6 +1,6 @@
 ---
 name: debugger-causal-method
-description: Write Debugger First Bad Event, Hypothesis Matrix, and Counterfactual records on existing rdc.investigation.v1 kinds.
+description: Write Debugger First Bad Event, Hypothesis Matrix, and Counterfactual records on existing rdc.investigation kinds.
 ---
 
 # Debugger Causal Method

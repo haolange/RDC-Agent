@@ -94,7 +94,7 @@ function createInvestigationSchemaTool(): AgentTool {
     name: 'investigation_schema',
     label: 'Read Investigation Schema',
     description:
-      'Read the authoritative rdc.investigation.v1 input shape for one kind. This does not read records; use tool_search to activate investigation_read or investigation_list for existing records, or investigation_write to save one.',
+      'Read the authoritative rdc.investigation input shape for one kind. This does not read records; use tool_search to activate investigation_read or investigation_list for existing records, or investigation_write to save one.',
     parameters: {
       type: 'object',
       required: ['kind'],
@@ -150,7 +150,7 @@ function createInvestigationReadTool(
     name: 'investigation_read',
     label: 'Read Investigation Artifact',
     description:
-      'Read one session-owned rdc.investigation.v1 artifact by artifactId. Fails closed if the hash or schema does not match.',
+      'Read one session-owned rdc.investigation artifact by artifactId. Fails closed if the hash or schema does not match.',
     parameters: {
       type: 'object',
       required: ['artifactId'],
@@ -205,7 +205,7 @@ function createInvestigationWriteTool(
     name: 'investigation_write',
     label: 'Write Investigation Artifact',
     description:
-      'Write or version a session-owned rdc.investigation.v1 record through InvestigationArtifactService. Schema and invariants fail closed; ready is never set on invalid records. A delegated read grant does not authorize replacing its source record. Independent reviewers return findings and their own outputs; the owning parent versions parent records.',
+      'Write or version a session-owned rdc.investigation record through InvestigationArtifactService. Schema and invariants fail closed; ready is never set on invalid records. A delegated read grant does not authorize replacing its source record. Independent reviewers return findings and their own outputs; the owning parent versions parent records.',
     parameters: {
       type: 'object',
       required: ['kind', 'mission', 'title', 'summary', 'record'],
@@ -308,7 +308,7 @@ function createInvestigationListTool(
     name: 'investigation_list',
     label: 'List Investigation Artifacts',
     description:
-      'List session-owned rdc.investigation.v1 artifact manifests with contentUri and contentHash. Kind filters select artifact kinds, not records embedded in a ClaimSet. Use kind/status "any" (or omit a filter) to include every value; invalid filters fail instead of looking like an empty session. To delegate a record for child investigation_read, place its exact contentUri in the Capsule read refs; an artifactId in scope does not grant access. Does not invent a graph.',
+      'List session-owned rdc.investigation artifact manifests with contentUri and contentHash. Kind filters select artifact kinds, not records embedded in a ClaimSet. Use kind/status "any" (or omit a filter) to include every value; invalid filters fail instead of looking like an empty session. To delegate a record for child investigation_read, place its exact contentUri in the Capsule read refs; an artifactId in scope does not grant access. Does not invent a graph.',
     parameters: {
       type: 'object',
       properties: {

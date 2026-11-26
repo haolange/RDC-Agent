@@ -12,7 +12,6 @@ import {
   type WorldState,
 } from '@shared/types/renderdocInvestigation';
 import { formatSessionArtifactUri } from '../sessions/artifacts/sessionArtifactContract';
-import { INVESTIGATION_SCHEMA_NAMESPACE } from './investigationKindRegistry';
 
 export const INDEX_URI = formatSessionArtifactUri('investigation', 'index.json');
 
@@ -30,14 +29,13 @@ export interface InvestigationIndexEntry {
 }
 
 export interface InvestigationIndexDocument {
-  schemaVersion: typeof INVESTIGATION_SCHEMA_NAMESPACE;
   artifacts: InvestigationIndexEntry[];
 }
 
 type RecordKeySpace = 'world_state' | 'evidence' | 'claim' | 'experiment' | 'challenge' | 'checkpoint';
 
 export function emptyIndex(): InvestigationIndexDocument {
-  return { schemaVersion: INVESTIGATION_SCHEMA_NAMESPACE, artifacts: [] };
+  return { artifacts: [] };
 }
 
 export function directoryHasJson(dir: string): boolean {

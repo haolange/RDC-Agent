@@ -292,7 +292,7 @@ Settings → Appearance 为权威。双体系：全局 chrome vs Composer agent 
   - 生命周期状态与阻塞原因始终是 TaskRegistry 的事实，即使所属回合已结束也不改写；禁止由阶段、harness 或 UI 合成进度。
   - runtime 自带的 Stop 原因只在显示时翻译，存储值和用户原文不变。
   - Stop 在 producer join 之后把被停止回合创建、尚未开始的任务结算为 cancelled；没有可知回合归属的旧任务保持不变。
-- **Artifacts**：只投影主进程持有的 `rdc.investigation.v1` 记录。
+- **Artifacts**：只投影主进程持有的 `rdc.investigation` 记录。
   - renderer 不得从 action 事件、工作目录扫描或工具目录重建该清单。
   - 行内只显示标题；点击经所属会话的 `investigation:read` 与期望内容 hash 打开只读预览，预览先给人读的内容，ID、sha256、版本时间与状态不显示，只经预览底部的「复制诊断信息」进剪贴板，哈希校验失败在预览顶部明示。
   - 报告预览把既有类型化记录分成七个可读分组（不编号，Claim 等级写人话：已观察 / 已复现 / 推断），缺失数据标为未记录；不新增报告 schema，也不提升 Claim 等级。

@@ -165,7 +165,6 @@ describe('InvestigationArtifactService transactions', () => {
     writeFileSync(
       path.join(root, INVESTIGATION_TXN_JOURNAL),
       `${JSON.stringify({
-        schemaVersion: 1,
         txnId: 'invtxn-incomplete',
         sessionId: SESSION_ID,
         createdAt: '2026-09-01T00:00:00.000Z',
@@ -180,7 +179,6 @@ describe('InvestigationArtifactService transactions', () => {
     writeFileSync(
       path.join(root, INVESTIGATION_TXN_JOURNAL),
       `${JSON.stringify({
-        schemaVersion: 1,
         txnId: 'invtxn-journal',
         sessionId: SESSION_ID,
         createdAt: '2026-09-01T00:00:00.000Z',
@@ -191,7 +189,6 @@ describe('InvestigationArtifactService transactions', () => {
     writeFileSync(
       path.join(root, INVESTIGATION_TXN_COMMIT),
       `${JSON.stringify({
-        schemaVersion: 1,
         txnId: 'invtxn-other',
         mutationCount: 1,
         planHash: sha256Prefixed(JSON.stringify([mutation])),

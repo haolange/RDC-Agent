@@ -14,7 +14,6 @@ import {
   type MissionCheckpoint,
   type WorldState,
 } from '@shared/types/renderdocInvestigation';
-import { INVESTIGATION_SCHEMA_NAMESPACE } from '../investigation/investigationKindRegistry';
 import { formatSessionArtifactUri } from '../sessions/artifacts/sessionArtifactContract';
 import { formatInvestigationContentHash } from '../investigation/investigationHash';
 import { SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
@@ -386,15 +385,7 @@ export function plantInvestigationRecord(
     createdAt: '2026-09-01T00:00:00.000Z',
     recordKey: input.recordKey,
   });
-  resolver.write(
-    SESSION_ID,
-    indexUri,
-    serializeInvestigationJson({
-      schemaVersion: INVESTIGATION_SCHEMA_NAMESPACE,
-      artifacts,
-    }),
-    { mimeType: 'application/json' },
-  );
+  resolver.write(SESSION_ID, indexUri, serializeInvestigationJson({ artifacts }), { mimeType: 'application/json' });
 }
 
 export function overwriteInvestigationRecordBody(
@@ -439,7 +430,6 @@ export function forceReadyEmptySourceRefs(resolver: SessionArtifactResolver, art
     { mimeType: 'application/json' },
   );
   const index = JSON.parse(resolver.read(SESSION_ID, indexUri).text ?? '{}') as {
-    schemaVersion: string;
     artifacts: Array<Record<string, unknown>>;
   };
   resolver.write(

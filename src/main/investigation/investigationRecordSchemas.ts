@@ -37,7 +37,6 @@ import {
   type MissionCheckpoint,
   type WorldState,
 } from '@shared/types/renderdocInvestigation';
-import { INVESTIGATION_SCHEMA_NAMESPACE } from './investigationKindRegistry';
 import { isCausalOrCounterfactualClaim } from './investigationInvariants';
 
 const nonEmpty = z.string().trim().min(1);
@@ -438,7 +437,6 @@ export const InvestigationIndexEntrySchema = z
 
 export const InvestigationIndexDocumentSchema = z
   .object({
-    schemaVersion: z.literal(INVESTIGATION_SCHEMA_NAMESPACE),
     artifacts: z.array(InvestigationIndexEntrySchema),
   })
   .strict();

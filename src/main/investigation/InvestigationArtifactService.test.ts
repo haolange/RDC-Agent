@@ -298,7 +298,6 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     });
     const indexUri = 'session://investigation/index.json';
     const index = JSON.parse(resolver.read(SESSION_ID, indexUri).text ?? '{}') as {
-      schemaVersion: string;
       artifacts: Array<{ artifactId: string; status: string; supersedes?: string }>;
     };
     index.artifacts.find((item) => item.artifactId === world.manifest.artifactId)!.status = 'superseded';

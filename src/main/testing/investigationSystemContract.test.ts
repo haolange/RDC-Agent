@@ -15,10 +15,7 @@ import {
   isSkillVisibleToProfile,
   MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS,
 } from '@shared/constants/canonicalSkills';
-import {
-  INVESTIGATION_KIND_REGISTRY,
-  INVESTIGATION_SCHEMA_NAMESPACE,
-} from '../investigation/investigationKindRegistry';
+import { INVESTIGATION_KIND_REGISTRY, INVESTIGATION_NAMESPACE } from '../investigation/investigationKindRegistry';
 import { epistemicRank, isCausalOrCounterfactualClaim } from '../investigation/investigationInvariants';
 import { InvestigationError } from '../investigation/investigationErrors';
 import { createInvestigationTools } from '../investigation/InvestigationTools';
@@ -89,7 +86,7 @@ describe('investigation system contract', () => {
 
   it('investigation.contract.schema.namespace-fields', () => {
     expect.hasAssertions();
-    expect(INVESTIGATION_SCHEMA_NAMESPACE).toBe('rdc.investigation.v1');
+    expect(INVESTIGATION_NAMESPACE).toBe('rdc.investigation');
     const source = readRepo('src/shared/types/renderdocInvestigation.ts');
     expect(source).toMatch(/export (?:interface|type) WorldState/);
     expect(source).toMatch(/export (?:interface|type) EvidenceRecord/);

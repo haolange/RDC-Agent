@@ -3,7 +3,7 @@ import { AppError } from '@shared/errors/appError';
 
 /**
  * session:// Artifact 契约与配额：grammar、category 闭集与配额数字的单一事实源。
- * investigation category 由 InvestigationArtifactService 写入 rdc.investigation.v1 垂直记录。
+ * investigation category 由 InvestigationArtifactService 写入 rdc.investigation 垂直记录。
  */
 
 export const SESSION_ARTIFACT_CATEGORIES = ['plans', 'investigation', 'tool-outputs'] as const;
