@@ -198,7 +198,7 @@ Open 失败、图片获取失败、设备显示不支持、Close 未确认分别
 
 ## 生命周期账本与崩溃追踪
 
-**账本**：`src/main/runtime/LifecycleLedger.ts`，文件 `<appStateRoot>/lifecycle/ledger.jsonl`，每条经 `appendJsonlDurable`（open → write → fsync → close）写入，4 MiB 封顶并保留一代 `ledger.previous.jsonl`。每次启动一个 `instanceId`（Task execution 的 `runtimeInstanceId` 用同一个）。事件为严格 zod 联合：实例启动与退出、关停（起因、阶段超时、结束）、进程死亡、worker 线程、受监管子进程、`fault`、回合开始与结束（含停止原因）、续接丢弃决策、上次启动诊断、renderer 恢复动作，以及留给 RDC 执行层的 `rdc_operation`（started / terminal）与 `recovery_step`。账本只记事实，不记 prompt、工具参数、文件内容与凭据；自由文本经 `redactSecretsDeep` 与家目录、数据目录替换。写入失败只写 stderr，不让生产者抛错；读取（`tail()`）跳过追加中断的末行，其他坏行计数为 damaged。
+**账本**：`src/main/runtime/LifecycleLedger.ts`，文件 `<appStateRoot>/lifecycle/ledger.jsonl`，每条经 `appendJsonlDurable`（open → write → fsync → close）写入，4 MiB 封顶并保留一代 `ledger.previous.jsonl`。每次启动一个 `instanceId`（Task execution 的 `runtimeInstanceId` 用同一个）。事件为严格 zod 联合：实例启动与退出、关停（起因、阶段超时、结束）、进程死亡、worker 线程、受监管子进程、`fault`、回合开始与结束（含停止原因）、续接丢弃决策、上次启动诊断、renderer 恢复动作，以及 RDC 执行层的 `rdc_operation`（started / terminal）与 `recovery_step`（Agent 恢复的判定、成功与失败，以及用户在 Capture 恢复时的判定，带结论、尝试次数与阻塞码）。账本只记事实，不记 prompt、工具参数、文件内容与凭据；自由文本经 `redactSecretsDeep` 与家目录、数据目录替换。写入失败只写 stderr，不让生产者抛错；读取（`tail()`）跳过追加中断的末行，其他坏行计数为 damaged。
 
 **本地崩溃文件**：拿到 `instance.lock` 后，主进程把 `crashDumps` 指到 `<appStateRoot>/crash` 并以 `uploadToServer: false` 启动 Electron crash reporter（Crashpad 在进程外写 minidump，主进程自身崩溃也会留下）。disposable Browser QA 不启用。启动时最多保留最新 5 个、不超过 14 天的 minidump；「设置 › 常规 › 崩溃报告」显示数量与大小并可清除（只删 `.dmp`，保留 Crashpad 自身记录）。没有任何导出读取 `state/`：知识导出只读知识空间内的卡片与图片，计划导出只写计划文档，崩溃文件不会经应用离开本机。
 

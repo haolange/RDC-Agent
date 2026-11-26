@@ -3,6 +3,7 @@ import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { probeProcess } from '../platform/process';
+import { lifecycleLedger } from '../runtime/LifecycleLedger';
 import { verifyPlanInput } from './prepareInvestigationPlan';
 import { rdcSessionService } from './RdcSessionService';
 import { replayDeviceService } from './captures/ReplayDeviceService';
@@ -258,6 +259,14 @@ async function admitQuarantinedContext(
     status,
     deviceActionPending: !!rdcSessionService.snapshotReplayForSession(scope).preparation.issue?.deviceAction,
     budget: null,
+  });
+  lifecycleLedger.record({
+    kind: 'recovery_step',
+    sessionId: scope.sessionId,
+    step: 'user-restore-classified',
+    decision: classification.decision,
+    reason: classification.reason,
+    ...(classification.decision === 'quarantined' ? { errorCode: classification.code } : {}),
   });
   if (classification.decision === 'quarantined') throw new AppError(classification.code, classification.reason);
 }

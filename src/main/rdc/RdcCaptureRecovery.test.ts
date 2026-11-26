@@ -24,6 +24,7 @@ const mock = vi.hoisted(() => ({
   native: vi.fn(),
   daemons: vi.fn(),
   status: vi.fn(),
+  ledger: vi.fn(),
 }));
 vi.mock('./RdcSessionService', () => ({
   rdcSessionService: {
@@ -53,6 +54,7 @@ vi.mock('./RdcRuntimeContextRegistry', () => ({
   assertRdcContextLeaseOwnership: mock.owner,
 }));
 vi.mock('./RdcSwitchSnapshot', () => ({ readRdcSwitchSnapshot: mock.native }));
+vi.mock('../runtime/LifecycleLedger', () => ({ lifecycleLedger: { record: mock.ledger } }));
 vi.mock('./RdcContextStatus', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./RdcContextStatus')>()),
   readRdcContextStatus: mock.status,
@@ -276,8 +278,17 @@ it('closes a quarantined replay only when the shared admission explains its proc
   mock.status.mockResolvedValueOnce(replaced);
   await expect(restorePreviousCapture(scope)).rejects.toThrow('RDC_RECOVERY_PROCESS_UNEXPLAINED');
   expect(mock.clear).not.toHaveBeenCalled();
+  expect(mock.ledger).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      kind: 'recovery_step',
+      step: 'user-restore-classified',
+      decision: 'quarantined',
+      errorCode: 'RDC_RECOVERY_PROCESS_UNEXPLAINED',
+    }),
+  );
   mock.status.mockResolvedValueOnce(stuckContextStatus());
   expect((await restorePreviousCapture(scope)).appliedEventId).toBe(42);
   expect(mock.clear).toHaveBeenCalledOnce();
   expect(mock.status).toHaveBeenLastCalledWith(expect.objectContaining({ contextId: 'old' }));
+  expect(mock.ledger).toHaveBeenLastCalledWith(expect.objectContaining({ decision: 'rebuild' }));
 });
