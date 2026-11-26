@@ -6,14 +6,30 @@ export interface ArtifactTextSearch {
   totalMatches: number;
   returnedMatches: number;
 }
-interface Match { line: number; column: number; excerpt: string; excerptColumn: number }
-interface Cursor { offset: number; column: number }
+interface Match {
+  line: number;
+  column: number;
+  excerpt: string;
+  excerptColumn: number;
+}
+interface Cursor {
+  offset: number;
+  column: number;
+}
 
 /** Literal data search, never regex/code execution; counts the whole selected bounded text. */
 export function searchArtifactText(text: string, query: string, cursor: Cursor, limit: number, maxBytes: number) {
-  if (typeof query !== 'string' || query.length === 0 || query.length > 256 || /[\r\n]/.test(query)
-    || Buffer.from(query, 'utf8').toString('utf8') !== query) {
-    throw new SessionArtifactError('ARTIFACT_URI_INVALID', 'Search must be a nonempty single-line literal of at most 256 UTF-16 characters.');
+  if (
+    typeof query !== 'string' ||
+    query.length === 0 ||
+    query.length > 256 ||
+    /[\r\n]/.test(query) ||
+    Buffer.from(query, 'utf8').toString('utf8') !== query
+  ) {
+    throw new SessionArtifactError(
+      'ARTIFACT_URI_INVALID',
+      'Search must be a nonempty single-line literal of at most 256 UTF-16 characters.',
+    );
   }
   const matches: Match[] = [];
   const matchLimit = Math.min(limit, ARTIFACT_TEXT_SEARCH_MAX_MATCHES);
@@ -48,7 +64,14 @@ export function searchArtifactText(text: string, query: string, cursor: Cursor, 
     body = render();
   }
   if (Buffer.byteLength(body) > maxBytes || (afterCursor > 0 && matches.length === 0)) {
-    throw new SessionArtifactError('ARTIFACT_URI_INVALID', 'Output byte bound is too small for a search match; increase maxBytes.');
+    throw new SessionArtifactError(
+      'ARTIFACT_URI_INVALID',
+      'Output byte bound is too small for a search match; increase maxBytes.',
+    );
   }
-  return { text: body, next, search: { query, totalMatches, returnedMatches: matches.length } satisfies ArtifactTextSearch };
+  return {
+    text: body,
+    next,
+    search: { query, totalMatches, returnedMatches: matches.length } satisfies ArtifactTextSearch,
+  };
 }

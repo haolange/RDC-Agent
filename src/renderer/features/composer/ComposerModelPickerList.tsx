@@ -9,7 +9,14 @@ import type { ComposerPickerProviderNotice, useComposerModelPickerOptions } from
 type ProviderSection = ReturnType<typeof useComposerModelPickerOptions>['providerStates'][number];
 
 /** One group per connected provider: its matching models and, when it has one, its loading or failure notice. */
-export function ComposerModelList({ sections, loading, effective, saving, onSelect, onRetry }: {
+export function ComposerModelList({
+  sections,
+  loading,
+  effective,
+  saving,
+  onSelect,
+  onRetry,
+}: {
   sections: ProviderSection[];
   loading: boolean;
   effective: { providerId: string; modelId: string } | null;
@@ -25,16 +32,20 @@ export function ComposerModelList({ sections, loading, effective, saving, onSele
       ) : (
         <div className="composer-model-list">
           {sections.map((section) => (
-            <div key={section.id} className="composer-model-group" data-testid={`composer-model-provider-${section.id}`}>
+            <div
+              key={section.id}
+              className="composer-model-group"
+              data-testid={`composer-model-provider-${section.id}`}
+            >
               <p className="composer-model-group-label">{section.label}</p>
               {section.models.map((option) => {
                 const selected = Boolean(
-                  effective
-                  && option.providerId === effective.providerId
-                  && option.modelId === effective.modelId,
+                  effective && option.providerId === effective.providerId && option.modelId === effective.modelId,
                 );
                 return (
-                  <Button variant="ghost" size="sm"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     key={`${option.providerId}:${option.modelId}`}
                     type="button"
                     className={`composer-model-item ${selected ? 'is-selected' : ''}`}
@@ -42,15 +53,19 @@ export function ComposerModelList({ sections, loading, effective, saving, onSele
                     role="menuitemradio"
                     disabled={saving}
                     aria-checked={selected}
-                    onClick={() => onSelect({
-                      providerId: option.providerId,
-                      modelId: option.modelId,
-                    })}
+                    onClick={() =>
+                      onSelect({
+                        providerId: option.providerId,
+                        modelId: option.modelId,
+                      })
+                    }
                   >
                     <span className="composer-model-item-text">
                       <span className="composer-model-item-label">{option.label}</span>
                       {option.contextWindowLabel ? (
-                        <span className="composer-model-item-meta">{t('composer.model.contextWindow', { tokens: option.contextWindowLabel })}</span>
+                        <span className="composer-model-item-meta">
+                          {t('composer.model.contextWindow', { tokens: option.contextWindowLabel })}
+                        </span>
                       ) : null}
                     </span>
                     <ModelCapabilities option={option} />
@@ -85,7 +100,13 @@ const ModelCapabilities: React.FC<{ option: ComposerModelPickerOption }> = ({ op
   return (
     <span className="composer-model-capabilities">
       {capabilities.map((capability) => (
-        <span key={capability.icon} className="composer-model-capability" data-tooltip={capability.label} aria-label={capability.label} role="img">
+        <span
+          key={capability.icon}
+          className="composer-model-capability"
+          data-tooltip={capability.label}
+          aria-label={capability.label}
+          role="img"
+        >
           <Icon name={capability.icon} size={14} />
         </span>
       ))}
@@ -103,8 +124,13 @@ const ProviderNotice: React.FC<{
   if (notice.kind === 'failed') {
     return (
       <div className="composer-model-notice" data-notice={notice.kind}>
-        <InlineError className="composer-model-notice-text" detail={notice.error}
-          onRetry={onRetry} retryLabel={t('settings.retry')} retryDisabled={retrying}>
+        <InlineError
+          className="composer-model-notice-text"
+          detail={notice.error}
+          onRetry={onRetry}
+          retryLabel={t('settings.retry')}
+          retryDisabled={retrying}
+        >
           {t('composer.model.refreshFailed')}
         </InlineError>
       </div>
@@ -112,9 +138,13 @@ const ProviderNotice: React.FC<{
   }
   return (
     <div className="composer-model-notice" role="status" data-notice={notice.kind}>
-      <span className="composer-model-notice-text">{t(notice.kind === 'loading' ? 'composer.model.loading' : 'composer.model.providerEmpty')}</span>
+      <span className="composer-model-notice-text">
+        {t(notice.kind === 'loading' ? 'composer.model.loading' : 'composer.model.providerEmpty')}
+      </span>
       {notice.kind === 'loading' ? null : (
-        <Button variant="secondary" size="sm" disabled={retrying} onClick={onRetry}>{t('settings.retry')}</Button>
+        <Button variant="secondary" size="sm" disabled={retrying} onClick={onRetry}>
+          {t('settings.retry')}
+        </Button>
       )}
     </div>
   );

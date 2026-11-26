@@ -46,7 +46,9 @@ export interface AppSettingsState {
   /** `settings:changed`: reads the view again for a change this renderer did not make (see `SettingsViewSync`). */
   adoptSettingsChange: (change: SettingsChangedPayload) => void;
   /** Saves one Agent definition on its revision lane (the store takes the lane's next client revision). */
-  saveAgentDefinition: (request: Omit<AgentDefinitionSaveRequest, 'clientRevision'>) => Promise<AgentDefinitionSaveResult>;
+  saveAgentDefinition: (
+    request: Omit<AgentDefinitionSaveRequest, 'clientRevision'>,
+  ) => Promise<AgentDefinitionSaveResult>;
   /** Waits for the Agent file's saves in flight (failing if the newest failed) and reads main's commit. */
   flushAgentDefinitionSaves: (query: AgentDefinitionCommitQuery) => Promise<AgentDefinitionCommitSnapshot | null>;
   /**
@@ -62,7 +64,9 @@ export interface AppSettingsState {
   setComposerMarkdown: (composerMarkdown: boolean) => Promise<void>;
   setChromeTheme: (variant: ThemeVariant, chrome: Partial<ThemeChromeConfig>) => Promise<void>;
   setContextBreakdownExpanded: (contextBreakdownExpanded: boolean) => Promise<void>;
-  setWorkProcessExpansion: (workProcessExpansion: import('@shared/types/settings').WorkProcessExpansion) => Promise<void>;
+  setWorkProcessExpansion: (
+    workProcessExpansion: import('@shared/types/settings').WorkProcessExpansion,
+  ) => Promise<void>;
   updateProfile: (profile: Partial<ProfileSettings>) => Promise<void>;
   /** Saves the provider's model choices on its revision lane; a later choice or another connection supersedes it. */
   saveProvider: (provider: LlmProviderEntry) => Promise<ProviderDefinitionSaveResult>;

@@ -30,14 +30,18 @@ function readCssColor(el: HTMLElement, name: string, fallbackName: string): stri
 
 function readFieldColors(el: HTMLElement): FieldColors {
   return {
-    from: readCssColor(el, '--composer-effort-max-from', '--token-effort-max-from')
-      || readCssColor(el, '--token-effort-fill-5', '--composer-effort-fill-5'),
-    mid: readCssColor(el, '--composer-effort-max-mid', '--token-effort-max-mid')
-      || readCssColor(el, '--token-effort-fill-4', '--composer-effort-fill-4'),
-    to: readCssColor(el, '--composer-effort-max-to', '--token-effort-max-to')
-      || readCssColor(el, '--token-effort-fill-4', '--composer-effort-fill-4'),
-    sparkle: readCssColor(el, '--composer-effort-max-sparkle', '--token-effort-max-sparkle')
-      || readCssColor(el, '--token-control-knob', '--composer-effort-max-sparkle'),
+    from:
+      readCssColor(el, '--composer-effort-max-from', '--token-effort-max-from') ||
+      readCssColor(el, '--token-effort-fill-5', '--composer-effort-fill-5'),
+    mid:
+      readCssColor(el, '--composer-effort-max-mid', '--token-effort-max-mid') ||
+      readCssColor(el, '--token-effort-fill-4', '--composer-effort-fill-4'),
+    to:
+      readCssColor(el, '--composer-effort-max-to', '--token-effort-max-to') ||
+      readCssColor(el, '--token-effort-fill-4', '--composer-effort-fill-4'),
+    sparkle:
+      readCssColor(el, '--composer-effort-max-sparkle', '--token-effort-max-sparkle') ||
+      readCssColor(el, '--token-control-knob', '--composer-effort-max-sparkle'),
   };
 }
 
@@ -47,9 +51,8 @@ function mixCssColor(a: string, b: string, amount: number): string {
 }
 
 function resolveCellColor(colors: FieldColors, tone: number, sparkle: number): string {
-  const base = tone < 0.5
-    ? mixCssColor(colors.from, colors.mid, tone * 2)
-    : mixCssColor(colors.mid, colors.to, (tone - 0.5) * 2);
+  const base =
+    tone < 0.5 ? mixCssColor(colors.from, colors.mid, tone * 2) : mixCssColor(colors.mid, colors.to, (tone - 0.5) * 2);
   if (sparkle > 0.985) return colors.sparkle;
   if (sparkle > 0.94) return mixCssColor(base, colors.sparkle, 0.2);
   return base;
@@ -92,23 +95,14 @@ function paintField(
       if (!sample.visible || sample.alpha <= 0.018) continue;
       ctx.globalAlpha = sample.alpha;
       ctx.fillStyle = resolveCellColor(colors, sample.tone, maxFieldNoise(col, row, 0));
-      ctx.fillRect(
-        GAP + col * STRIDE,
-        originY + row * STRIDE,
-        CELL,
-        CELL,
-      );
+      ctx.fillRect(GAP + col * STRIDE, originY + row * STRIDE, CELL, CELL);
     }
   }
   ctx.restore();
   ctx.globalAlpha = 1;
 }
 
-function syncVisualHost(
-  host: HTMLElement,
-  frame: MaxVisualFrame,
-  emitterRatio: number,
-): void {
+function syncVisualHost(host: HTMLElement, frame: MaxVisualFrame, emitterRatio: number): void {
   const stopsOpacity = clampMaxProgress(frame.stopsOpacity);
   const clipRatio = clampMaxProgress(emitterRatio);
   assignDynStyle(host, { '--composer-effort-stops-opacity': stopsOpacity.toFixed(3) });

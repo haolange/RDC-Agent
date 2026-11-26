@@ -8,13 +8,7 @@
  */
 
 import type { EventStream } from './EventStream';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Model,
-  StreamOptions,
-} from './types';
+import type { AssistantMessage, AssistantMessageEvent, Context, Model, StreamOptions } from './types';
 
 /**
  * LLM Provider 策略接口。
@@ -34,12 +28,7 @@ export interface ProviderStrategy {
    * - `await stream.result()` 获取最终 `AssistantMessage`；
    * - `stream.abort()` 主动中止。
    */
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage>;
-
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage>;
 }
 
 /**
@@ -79,16 +68,10 @@ export class ProviderRegistry {
    *
    * 未找到对应 Provider 时会抛出错误，避免静默 fallback。
    */
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage> {
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     const strategy = this.providers.get(model.api);
     if (!strategy) {
-      throw new Error(
-        `ProviderRegistry: no provider registered for api "${model.api}" (model "${model.id}")`,
-      );
+      throw new Error(`ProviderRegistry: no provider registered for api "${model.api}" (model "${model.id}")`);
     }
     return strategy.stream(model, context, options);
   }

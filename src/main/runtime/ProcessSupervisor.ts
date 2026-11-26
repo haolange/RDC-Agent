@@ -6,33 +6,15 @@
  * process-tree kill on Windows (Job Object not available without native addon).
  */
 
-import {
-  spawn,
-  type ChildProcess,
-  type SpawnOptions,
-  type StdioOptions,
-} from 'child_process';
+import { spawn, type ChildProcess, type SpawnOptions, type StdioOptions } from 'child_process';
 import { generateEventId } from '@shared/utils/id';
 import { isolatedChildSpawnOptions, signalChildProcessTree } from '../platform/process';
 import { retainResourceUntilExit, currentProcessExecutionOwner } from './ResourceExecutionLifetime';
 
 export type ProcessExitReason =
-  | 'exit'
-  | 'signal'
-  | 'timeout'
-  | 'abort'
-  | 'spawn_failed'
-  | 'supervisor_kill'
-  | 'unconfirmed_orphan';
+  'exit' | 'signal' | 'timeout' | 'abort' | 'spawn_failed' | 'supervisor_kill' | 'unconfirmed_orphan';
 
-export type ProcessOwner =
-  | 'mcp'
-  | 'shell'
-  | 'hook'
-  | 'replay'
-  | 'agent-shell'
-  | 'background'
-  | 'other';
+export type ProcessOwner = 'mcp' | 'shell' | 'hook' | 'replay' | 'agent-shell' | 'background' | 'other';
 
 export interface SupervisedSpawnOptions {
   cwd?: string;
@@ -81,8 +63,10 @@ export const PROCESS_TERMINATION_POLICY = Object.freeze({
   ...PROCESS_TERMINATION_TIMING,
   maxTreeKillAttempts: 2,
   // One idempotent initial termination and one escalation; not a native-exit guarantee.
-  joinTerminationAdditionalWaitMs: 2 * PROCESS_TERMINATION_TIMING.treeKillTimeoutMs
-    + PROCESS_TERMINATION_TIMING.killEscalationDelayMs + PROCESS_TERMINATION_TIMING.joinObservationSlackMs,
+  joinTerminationAdditionalWaitMs:
+    2 * PROCESS_TERMINATION_TIMING.treeKillTimeoutMs +
+    PROCESS_TERMINATION_TIMING.killEscalationDelayMs +
+    PROCESS_TERMINATION_TIMING.joinObservationSlackMs,
 });
 const DEFAULT_GRACE_MS = PROCESS_TERMINATION_POLICY.killEscalationDelayMs;
 
@@ -165,9 +149,11 @@ export class ProcessSupervisor {
   }
 
   async joinExecutionProcesses(sessionId: string): Promise<void> {
-    await Promise.all([...this.registry.values()]
-      .filter((entry) => entry.executionSessionId === sessionId)
-      .map((entry) => entry.supervised.exit));
+    await Promise.all(
+      [...this.registry.values()]
+        .filter((entry) => entry.executionSessionId === sessionId)
+        .map((entry) => entry.supervised.exit),
+    );
   }
 
   spawn(

@@ -27,7 +27,10 @@ export function SidebarFooter({
         variant="ghost"
         className="footer-entry sidebar-footer-entry"
         data-testid="sidebar-knowledge-center-trigger"
-        onClick={() => { onCloseLeftDrawer(); onOpenKnowledgeCenter(); }}
+        onClick={() => {
+          onCloseLeftDrawer();
+          onOpenKnowledgeCenter();
+        }}
         data-tooltip={t('knowledgeCenter.title')}
         aria-label={t('knowledgeCenter.title')}
       >
@@ -47,7 +50,10 @@ export function SidebarFooter({
         aria-haspopup="dialog"
         aria-expanded={isUserMenuOpen}
         aria-controls={isUserMenuOpen ? 'sidebar-user-menu' : undefined}
-        onClick={(event) => { onCloseLeftDrawer(); onUserMenuToggle(event); }}
+        onClick={(event) => {
+          onCloseLeftDrawer();
+          onUserMenuToggle(event);
+        }}
         data-tooltip={t('sidebar.userSettings')}
         aria-label={t('sidebar.userSettings')}
       >

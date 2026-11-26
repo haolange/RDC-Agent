@@ -5,7 +5,13 @@ import { AttachmentPreviewDialog, type AttachmentView } from './AttachmentPrevie
 import type { AttachmentItem } from './attachmentItem';
 import './attachment-shelf.css';
 
-export function AttachmentShelf({ items, className, testId, onRemove, children }: {
+export function AttachmentShelf({
+  items,
+  className,
+  testId,
+  onRemove,
+  children,
+}: {
   items: readonly AttachmentItem[];
   className: string;
   testId: string;
@@ -19,15 +25,27 @@ export function AttachmentShelf({ items, className, testId, onRemove, children }
   return (
     <div className={className} data-testid={testId}>
       {children}
-      {items.map((item) => <AttachmentTile key={item.id} item={item}
-        removeLabel={onRemove ? t('app.removeAttachment', { fileName: item.fileName }) : undefined}
-        onRemove={onRemove ? () => onRemove(item.id) : undefined}
-        onPreview={() => {
-          if (item.mode === 'image' || item.mode === 'markdown') setView({ item, mode: item.mode, open: true });
-        }}
-        onNotes={() => setView({ item, mode: 'notes', open: true })} />)}
-      {view && items.some((item) => item.id === view.item.id) ? <AttachmentPreviewDialog
-        view={view} items={items} onSelectImage={selectImage} onClose={close} onExited={() => setView(null)} /> : null}
+      {items.map((item) => (
+        <AttachmentTile
+          key={item.id}
+          item={item}
+          removeLabel={onRemove ? t('app.removeAttachment', { fileName: item.fileName }) : undefined}
+          onRemove={onRemove ? () => onRemove(item.id) : undefined}
+          onPreview={() => {
+            if (item.mode === 'image' || item.mode === 'markdown') setView({ item, mode: item.mode, open: true });
+          }}
+          onNotes={() => setView({ item, mode: 'notes', open: true })}
+        />
+      ))}
+      {view && items.some((item) => item.id === view.item.id) ? (
+        <AttachmentPreviewDialog
+          view={view}
+          items={items}
+          onSelectImage={selectImage}
+          onClose={close}
+          onExited={() => setView(null)}
+        />
+      ) : null}
     </div>
   );
 }

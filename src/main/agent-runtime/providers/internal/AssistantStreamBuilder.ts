@@ -69,7 +69,11 @@ export function parseProviderFrame<T>(data: string, providerApi: string, schema:
   try {
     value = JSON.parse(data);
   } catch {
-    throw new ProviderStreamProtocolError('PROVIDER_STREAM_MALFORMED_FRAME', ref, `${providerApi} sent a stream frame that is not valid JSON.`);
+    throw new ProviderStreamProtocolError(
+      'PROVIDER_STREAM_MALFORMED_FRAME',
+      ref,
+      `${providerApi} sent a stream frame that is not valid JSON.`,
+    );
   }
   const frame = schema.safeParse(value);
   if (!frame.success) {
@@ -87,7 +91,8 @@ export function parseProviderFrame<T>(data: string, providerApi: string, schema:
  * did; a frame of a handled type that does not match its schema is still a protocol violation.
  */
 export function unhandledProviderEvent(handledTypes: readonly string[]) {
-  return z.object({ type: z.string().refine((type) => !handledTypes.includes(type)) })
+  return z
+    .object({ type: z.string().refine((type) => !handledTypes.includes(type)) })
     .transform(() => ({ type: 'unhandled' as const }));
 }
 
@@ -102,13 +107,9 @@ export function createProviderOutputRef(input: ProviderOutputRef): ProviderOutpu
 }
 
 function outputRefKey(ref: ProviderOutputRef): string {
-  return [
-    ref.protocol,
-    ref.responseId ?? '',
-    ref.providerBlockKey,
-    ref.sourceIndex ?? '',
-    ref.itemId ?? '',
-  ].join('\u0000');
+  return [ref.protocol, ref.responseId ?? '', ref.providerBlockKey, ref.sourceIndex ?? '', ref.itemId ?? ''].join(
+    '\u0000',
+  );
 }
 
 export class AssistantStreamBuilder {
@@ -125,11 +126,7 @@ export class AssistantStreamBuilder {
   private finished = false;
   private terminalReason: StopReason | null = null;
 
-  constructor(
-    stream: EventStream<AssistantMessageEvent, AssistantMessage>,
-    modelId: string,
-    providerId: string,
-  ) {
+  constructor(stream: EventStream<AssistantMessageEvent, AssistantMessage>, modelId: string, providerId: string) {
     this.stream = stream;
     this.modelId = modelId;
     this.providerId = providerId;
@@ -181,7 +178,8 @@ export class AssistantStreamBuilder {
 
   updateTextPhase(ref: ProviderOutputRef, phase: NonNullable<TextContent['phase']>): void {
     const block = this.requireOpenBlock(ref, 'text', 'update');
-    if (block.phase && block.phase !== phase) throw new Error(`Provider changed text phase for ${ref.providerBlockKey}.`);
+    if (block.phase && block.phase !== phase)
+      throw new Error(`Provider changed text phase for ${ref.providerBlockKey}.`);
     block.phase = phase;
   }
 
@@ -302,9 +300,8 @@ export class AssistantStreamBuilder {
       inputTokens: partial.inputTokens ?? this.usage.inputTokens,
       outputTokens: partial.outputTokens ?? this.usage.outputTokens,
       totalTokens:
-        partial.totalTokens
-        ?? (partial.inputTokens ?? this.usage.inputTokens)
-          + (partial.outputTokens ?? this.usage.outputTokens),
+        partial.totalTokens ??
+        (partial.inputTokens ?? this.usage.inputTokens) + (partial.outputTokens ?? this.usage.outputTokens),
       cost: partial.cost ?? this.usage.cost,
       cacheReadTokens: partial.cacheReadTokens ?? this.usage.cacheReadTokens,
       cacheWriteTokens: partial.cacheWriteTokens ?? this.usage.cacheWriteTokens,
@@ -374,11 +371,7 @@ export class AssistantStreamBuilder {
     }
   }
 
-  private claim<T extends Block>(
-    ref: ProviderOutputRef,
-    kind: BlockKind,
-    block: T,
-  ): T {
+  private claim<T extends Block>(ref: ProviderOutputRef, kind: BlockKind, block: T): T {
     this.assertSemanticEvent(ref);
     const key = outputRefKey(ref);
     const existing = this.blocks.get(key);
@@ -517,15 +510,17 @@ export class AssistantStreamBuilder {
       usage: { ...this.usage },
       ...(this.execution ? { execution: { ...this.execution } } : {}),
       stopReason: reason,
-      ...(this.providerState ? {
-        providerState: {
-          ...this.providerState,
-          origin: {
-            ...this.providerState.origin,
-            bindingIds: [...this.providerState.origin.bindingIds],
-          },
-        },
-      } : {}),
+      ...(this.providerState
+        ? {
+            providerState: {
+              ...this.providerState,
+              origin: {
+                ...this.providerState.origin,
+                bindingIds: [...this.providerState.origin.bindingIds],
+              },
+            },
+          }
+        : {}),
       timestamp: Date.now(),
     };
   }

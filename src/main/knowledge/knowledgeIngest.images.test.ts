@@ -8,7 +8,12 @@ import { currentHost } from '../platform/host';
 import { KNOWLEDGE_PACKAGE_SCHEMA } from './knowledgePackage';
 import { createDisposableImportService } from './KnowledgeImportService';
 import { ingestKnowledge, ingestKnowledgeFromPath } from './knowledgeIngest';
-import { KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED, unzipKnowledgeFiles, utf8ToZip, zipKnowledgeFiles } from './knowledgeZip';
+import {
+  KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED,
+  unzipKnowledgeFiles,
+  utf8ToZip,
+  zipKnowledgeFiles,
+} from './knowledgeZip';
 
 const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
@@ -126,10 +131,13 @@ describe('knowledge import images', () => {
       '    title: Card B',
       '    body: Body B',
     ].join('\n');
-    writeFileSync(zipPath, zipKnowledgeFiles([
-      { name: 'knowledge.yaml', data: utf8ToZip(yaml) },
-      { name: 'cases/a/observed.png', data: PNG_1X1 },
-    ]));
+    writeFileSync(
+      zipPath,
+      zipKnowledgeFiles([
+        { name: 'knowledge.yaml', data: utf8ToZip(yaml) },
+        { name: 'cases/a/observed.png', data: PNG_1X1 },
+      ]),
+    );
     const spaceRoot = tempRoot('rdc-know-img-multi-space-');
     const importer = createDisposableImportService({ spaceRoot });
     const result = await importer.importToSpace({ spaceId: 'user', filePath: zipPath });
@@ -144,10 +152,13 @@ describe('knowledge import images', () => {
   it('quarantines zip-slip entries and oversized zip payloads', async () => {
     const sourceRoot = tempRoot('rdc-know-img-zip-');
     const slipPath = path.join(sourceRoot, 'slip.zip');
-    writeFileSync(slipPath, zipSync({
-      '../escape.png': PNG_1X1,
-      'knowledge.yaml': utf8ToZip(`schema: ${KNOWLEDGE_PACKAGE_SCHEMA}\ncards: []\n`),
-    }));
+    writeFileSync(
+      slipPath,
+      zipSync({
+        '../escape.png': PNG_1X1,
+        'knowledge.yaml': utf8ToZip(`schema: ${KNOWLEDGE_PACKAGE_SCHEMA}\ncards: []\n`),
+      }),
+    );
     const slipped = await ingestKnowledgeFromPath(slipPath, { spaceId: 'user' });
     expect(slipped.items[0]?.status).toBe('quarantine');
     expect(slipped.items[0]?.reason).toBe('zip-path-invalid');
@@ -170,28 +181,35 @@ describe('folder package asset boundary', () => {
     const sourceRoot = path.join(root, 'package');
     mkdirSync(sourceRoot);
     writeFileSync(path.join(root, 'private.png'), PNG_1X1);
-    writeFileSync(path.join(sourceRoot, 'case.yaml'), caseYaml('boundary-case').replace('observed.png', assetFile), 'utf8');
+    writeFileSync(
+      path.join(sourceRoot, 'case.yaml'),
+      caseYaml('boundary-case').replace('observed.png', assetFile),
+      'utf8',
+    );
     return { root, sourceRoot };
   };
 
   it('refuses an asset path that leaves the package directory', async () => {
     const { sourceRoot } = packageWith('../private.png');
-    await expect(ingestKnowledgeFromPath(path.join(sourceRoot, 'case.yaml'), { spaceId: 'user' }))
-      .rejects.toThrow(/KNOWLEDGE_ASSET_PATH_INVALID/);
+    await expect(ingestKnowledgeFromPath(path.join(sourceRoot, 'case.yaml'), { spaceId: 'user' })).rejects.toThrow(
+      /KNOWLEDGE_ASSET_PATH_INVALID/,
+    );
   });
 
   it.skipIf(currentHost().isWindows)('refuses an asset that is a link to a file outside the package', async () => {
     const { root, sourceRoot } = packageWith('observed.png');
     symlinkSync(path.join(root, 'private.png'), path.join(sourceRoot, 'observed.png'));
-    await expect(ingestKnowledgeFromPath(path.join(sourceRoot, 'case.yaml'), { spaceId: 'user' }))
-      .rejects.toThrow(/KNOWLEDGE_ASSET_LINK_REJECTED/);
+    await expect(ingestKnowledgeFromPath(path.join(sourceRoot, 'case.yaml'), { spaceId: 'user' })).rejects.toThrow(
+      /KNOWLEDGE_ASSET_LINK_REJECTED/,
+    );
   });
 
   it('refuses image bytes that are not the format the name declares', async () => {
     const { sourceRoot } = packageWith('observed.png');
     writeFileSync(path.join(sourceRoot, 'observed.png'), 'not an image');
-    await expect(ingestKnowledgeFromPath(path.join(sourceRoot, 'case.yaml'), { spaceId: 'user' }))
-      .rejects.toThrow(/KNOWLEDGE_IMAGE_INVALID/);
+    await expect(ingestKnowledgeFromPath(path.join(sourceRoot, 'case.yaml'), { spaceId: 'user' })).rejects.toThrow(
+      /KNOWLEDGE_IMAGE_INVALID/,
+    );
   });
 });
 

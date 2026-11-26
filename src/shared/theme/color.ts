@@ -44,9 +44,7 @@ export function hexToRgb(hex: string): Rgb {
 
 export function rgbToHex({ r, g, b }: Rgb): string {
   const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)));
-  return `#${[clamp(r), clamp(g), clamp(b)]
-    .map((n) => n.toString(16).padStart(2, '0'))
-    .join('')}`;
+  return `#${[clamp(r), clamp(g), clamp(b)].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 }
 
 export function rgbToCssTriplet({ r, g, b }: Rgb): string {
@@ -77,9 +75,11 @@ const INK_FLIP_LUMINANCE = 0.18;
  * just far enough to read at `minRatio` on every one of them.
  */
 export function readableOn(color: Rgb, backgrounds: readonly Rgb[], minRatio = 4.5): Rgb {
-  const worstRatio = (candidate: Rgb) => Math.min(...backgrounds.map((background) => contrastRatio(candidate, background)));
+  const worstRatio = (candidate: Rgb) =>
+    Math.min(...backgrounds.map((background) => contrastRatio(candidate, background)));
   if (worstRatio(color) >= minRatio) return color;
-  const meanLuminance = backgrounds.reduce((sum, background) => sum + relativeLuminance(background), 0) / backgrounds.length;
+  const meanLuminance =
+    backgrounds.reduce((sum, background) => sum + relativeLuminance(background), 0) / backgrounds.length;
   const direction = meanLuminance > INK_FLIP_LUMINANCE ? -1 : 1;
   const hsl = rgbToHsl(color);
   for (let lightness = hsl.l + direction; lightness >= 0 && lightness <= 100; lightness += direction) {
@@ -227,8 +227,7 @@ export type InkStep = 'primary' | 'secondary' | 'tertiary' | 'muted' | 'disabled
 
 export function scaleAccentPalette(accent: Rgb): Record<AccentStep, Rgb> {
   const hsl = rgbToHsl(accent);
-  const shade = (l: number, sMul = 1) =>
-    hslToRgb({ h: hsl.h, s: Math.min(100, hsl.s * sMul), l });
+  const shade = (l: number, sMul = 1) => hslToRgb({ h: hsl.h, s: Math.min(100, hsl.s * sMul), l });
   return {
     '50': shade(96, 0.35),
     '100': shade(92, 0.45),

@@ -99,7 +99,8 @@ export function getThemePreset(id: ThemePresetId): ThemePresetDefinition {
 
 export function getPresetChrome(id: ThemePresetId, variant: ThemeVariant): ThemeChromeConfig {
   const preset = getThemePreset(id);
-  return variant === 'light' ? { ...preset.light, fonts: { ...preset.light.fonts } }
+  return variant === 'light'
+    ? { ...preset.light, fonts: { ...preset.light.fonts } }
     : { ...preset.dark, fonts: { ...preset.dark.fonts } };
 }
 

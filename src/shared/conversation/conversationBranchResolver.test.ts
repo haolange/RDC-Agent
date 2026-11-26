@@ -28,8 +28,10 @@ describe('conversation message ordering', () => {
   it('keeps the user before the assistant when same-turn timestamps collide', () => {
     const user = msg('user', 'user', { turnId: 'turn-1', createdAt: 10, updatedAt: 30 });
     const assistant = msg('assistant', 'assistant', { turnId: 'turn-1', createdAt: 10, updatedAt: 20 });
-    expect([assistant, user].sort(compareConversationMessages).map((message) => message.role))
-      .toEqual(['user', 'assistant']);
+    expect([assistant, user].sort(compareConversationMessages).map((message) => message.role)).toEqual([
+      'user',
+      'assistant',
+    ]);
   });
 });
 

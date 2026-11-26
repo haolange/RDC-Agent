@@ -7,13 +7,42 @@ vi.mock('../../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }
 
 type Props = ComponentProps<typeof AgentSkillPicker>;
 const props: Props = {
-  targetAgentId: 'analyzer', value: ['missing', 'restricted'], onChange: vi.fn(),
-  skills: { enabled: true, loading: false, error: '', refresh: vi.fn(), catalog: {
-    status: 'ready', options: [
-      { id: 'visible', name: 'Visible skill', description: 'not a list description', scope: 'user', sourcePath: '/skill', sourceHash: 'hash', effectiveStatus: 'effective', allowedTools: [], unavailableToAgentIds: [] },
-      { id: 'restricted', name: 'Restricted skill', description: '', scope: 'builtin', sourcePath: '/skill', sourceHash: 'hash', effectiveStatus: 'effective', allowedTools: [], unavailableToAgentIds: ['analyzer'] },
-    ],
-  } },
+  targetAgentId: 'analyzer',
+  value: ['missing', 'restricted'],
+  onChange: vi.fn(),
+  skills: {
+    enabled: true,
+    loading: false,
+    error: '',
+    refresh: vi.fn(),
+    catalog: {
+      status: 'ready',
+      options: [
+        {
+          id: 'visible',
+          name: 'Visible skill',
+          description: 'not a list description',
+          scope: 'user',
+          sourcePath: '/skill',
+          sourceHash: 'hash',
+          effectiveStatus: 'effective',
+          allowedTools: [],
+          unavailableToAgentIds: [],
+        },
+        {
+          id: 'restricted',
+          name: 'Restricted skill',
+          description: '',
+          scope: 'builtin',
+          sourcePath: '/skill',
+          sourceHash: 'hash',
+          effectiveStatus: 'effective',
+          allowedTools: [],
+          unavailableToAgentIds: ['analyzer'],
+        },
+      ],
+    },
+  },
 };
 
 describe('AgentSkillPicker', () => {
@@ -34,9 +63,9 @@ describe('AgentSkillPicker', () => {
     expect(props.onChange).not.toHaveBeenCalled();
   });
   it('renders failed reads with retry rather than empty or missing status', () => {
-    const html = renderToStaticMarkup(createElement(AgentSkillPicker, { ...props,
-      skills: { ...props.skills, catalog: null, error: 'read denied' },
-    }));
+    const html = renderToStaticMarkup(
+      createElement(AgentSkillPicker, { ...props, skills: { ...props.skills, catalog: null, error: 'read denied' } }),
+    );
     expect(html).toContain('settings.skillSelectionReadFailed');
     expect(html).not.toContain('read denied');
     expect(html).toContain('settings.skillSelectionRetry');

@@ -2,16 +2,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import http from 'node:http';
 import net from 'node:net';
@@ -69,11 +60,14 @@ function parseArgs(argv) {
 
 function assertNodeVersion() {
   const current = process.versions.node.split('.').map(Number);
-  const supported = current[0] > REQUIRED_NODE[0]
-    || (current[0] === REQUIRED_NODE[0] && current[1] > REQUIRED_NODE[1])
-    || (current[0] === REQUIRED_NODE[0] && current[1] === REQUIRED_NODE[1] && current[2] >= REQUIRED_NODE[2]);
+  const supported =
+    current[0] > REQUIRED_NODE[0] ||
+    (current[0] === REQUIRED_NODE[0] && current[1] > REQUIRED_NODE[1]) ||
+    (current[0] === REQUIRED_NODE[0] && current[1] === REQUIRED_NODE[1] && current[2] >= REQUIRED_NODE[2]);
   if (!supported) {
-    fail(`Node.js >=${REQUIRED_NODE.join('.')} is required; current runtime is ${process.versions.node} (${process.execPath}).`);
+    fail(
+      `Node.js >=${REQUIRED_NODE.join('.')} is required; current runtime is ${process.versions.node} (${process.execPath}).`,
+    );
   }
   console.log(`[RDC-Agent] Node runtime: ${process.execPath} (${process.versions.node}).`);
 }
@@ -102,14 +96,20 @@ function resolvePnpm() {
 function runPnpm(pnpm, args, options = {}) {
   const result = runSync(pnpm.command, [...pnpm.prefix, ...args], { capture: options.capture });
   if (result.status !== 0) {
-    fail(`pnpm ${args.join(' ')} failed (Node: ${process.execPath}, pnpm: ${pnpm.label}, lockfile: ${path.join(repoRoot, 'pnpm-lock.yaml')}).${result.output ? `\n${result.output}` : ''}`);
+    fail(
+      `pnpm ${args.join(' ')} failed (Node: ${process.execPath}, pnpm: ${pnpm.label}, lockfile: ${path.join(repoRoot, 'pnpm-lock.yaml')}).${result.output ? `\n${result.output}` : ''}`,
+    );
   }
   return result.output;
 }
 
 function resolvePnpmStore(pnpm) {
   const output = runPnpm(pnpm, ['store', 'path'], { capture: true });
-  const storePath = output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).at(-1);
+  const storePath = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .at(-1);
   if (!storePath || !path.isAbsolute(storePath)) {
     fail(`pnpm returned an invalid store path: ${output || '(empty)'}.`);
   }
@@ -186,7 +186,9 @@ async function installElectronBinaryWithSystemTar() {
 
   const tarResult = runSync('tar', ['-xf', zipPath, '-C', distPath], { capture: true });
   if (tarResult.status !== 0) {
-    fail(`System tar failed to extract Electron ${version} from ${zipPath}.${tarResult.output ? `\n${tarResult.output}` : ''}`);
+    fail(
+      `System tar failed to extract Electron ${version} from ${zipPath}.${tarResult.output ? `\n${tarResult.output}` : ''}`,
+    );
   }
 
   writeFileSync(path.join(electronRoot, 'path.txt'), platformPath, 'utf8');
@@ -212,8 +214,8 @@ async function ensureElectronRuntime(pnpm, { force = false } = {}) {
   electronExecutable = resolveElectronExecutable();
   if (!electronExecutable) {
     fail(
-      `Electron runtime is unavailable after rebuild and tar recovery (Node: ${process.execPath}, pnpm: ${pnpm.label}). `
-      + 'If Node is >=24.16.0, confirm package.json overrides pin yauzl@3.3.1 and re-run with --force-prepare.',
+      `Electron runtime is unavailable after rebuild and tar recovery (Node: ${process.execPath}, pnpm: ${pnpm.label}). ` +
+        'If Node is >=24.16.0, confirm package.json overrides pin yauzl@3.3.1 and re-run with --force-prepare.',
     );
   }
   return electronExecutable;
@@ -273,15 +275,19 @@ function dependencyFingerprint(storePath) {
     path.join(repoRoot, 'pnpm-lock.yaml'),
     path.join(repoRoot, 'pnpm-workspace.yaml'),
   ]);
-  return createHash('sha256').update(JSON.stringify({
-    schemaVersion: STATE_SCHEMA_VERSION,
-    inputHash,
-    pnpmVersion: REQUIRED_PNPM,
-    platform: process.platform,
-    arch: process.arch,
-    nodeAbi: process.versions.modules,
-    storePath: path.resolve(storePath),
-  })).digest('hex');
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        schemaVersion: STATE_SCHEMA_VERSION,
+        inputHash,
+        pnpmVersion: REQUIRED_PNPM,
+        platform: process.platform,
+        arch: process.arch,
+        nodeAbi: process.versions.modules,
+        storePath: path.resolve(storePath),
+      }),
+    )
+    .digest('hex');
 }
 
 function criticalDependencyPaths() {
@@ -298,11 +304,12 @@ async function ensureDependencies(pnpm, storePath, forcePrepare) {
   const installedStore = modulesStorePath();
   const storeMatches = Boolean(installedStore && pathEquals(installedStore, storePath));
   const criticalDependenciesExist = criticalDependencyPaths().every(existsSync);
-  const installRequired = forcePrepare
-    || state?.schemaVersion !== STATE_SCHEMA_VERSION
-    || state?.fingerprint !== fingerprint
-    || !storeMatches
-    || !criticalDependenciesExist;
+  const installRequired =
+    forcePrepare ||
+    state?.schemaVersion !== STATE_SCHEMA_VERSION ||
+    state?.fingerprint !== fingerprint ||
+    !storeMatches ||
+    !criticalDependenciesExist;
 
   if (installRequired) {
     if (installedStore && !storeMatches) {
@@ -324,7 +331,9 @@ async function ensureDependencies(pnpm, storePath, forcePrepare) {
 
   const resultingStore = modulesStorePath();
   if (!resultingStore || !pathEquals(resultingStore, storePath) || !criticalDependencyPaths().every(existsSync)) {
-    fail(`Dependency preparation completed with an invalid node_modules state (expected store: ${storePath}, actual store: ${resultingStore ?? 'missing'}).`);
+    fail(
+      `Dependency preparation completed with an invalid node_modules state (expected store: ${storePath}, actual store: ${resultingStore ?? 'missing'}).`,
+    );
   }
   writeJsonAtomic(dependencyStatePath, {
     schemaVersion: STATE_SCHEMA_VERSION,
@@ -367,10 +376,11 @@ function ensureBuild(dependencyKey, env, forcePrepare) {
   ];
   const fingerprint = buildFingerprint(dependencyKey);
   const state = readJson(buildStatePath);
-  const buildRequired = forcePrepare
-    || state?.schemaVersion !== STATE_SCHEMA_VERSION
-    || state?.fingerprint !== fingerprint
-    || !outputs.every(existsSync);
+  const buildRequired =
+    forcePrepare ||
+    state?.schemaVersion !== STATE_SCHEMA_VERSION ||
+    state?.fingerprint !== fingerprint ||
+    !outputs.every(existsSync);
   if (buildRequired) {
     console.log('[RDC-Agent] Building current application sources...');
     runNodeCli(electronVite, ['build'], env);
@@ -409,10 +419,20 @@ function waitForExit(child) {
 async function startRendererDevServer(env) {
   // Prefer OS-assigned port via Vite (no pre-probe race). Parse the bound URL from stdout.
   // Pipe stdout/stderr so we can read the URL while still echoing to the terminal.
-  const renderer = runChild(process.execPath, [
-    path.join(nodeModulesPath, 'vite', 'bin', 'vite.js'),
-    '--config', 'vite.renderer.config.ts', '--host', '127.0.0.1', '--port', '0',
-  ], env, ['inherit', 'pipe', 'pipe']);
+  const renderer = runChild(
+    process.execPath,
+    [
+      path.join(nodeModulesPath, 'vite', 'bin', 'vite.js'),
+      '--config',
+      'vite.renderer.config.ts',
+      '--host',
+      '127.0.0.1',
+      '--port',
+      '0',
+    ],
+    env,
+    ['inherit', 'pipe', 'pipe'],
+  );
   const rendererUrl = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Timed out waiting for Vite to report its port.')), 20_000);
     let resolved = false;
@@ -446,7 +466,10 @@ async function waitForRenderer(child, rendererUrl, timeoutMs = 15_000) {
         response.resume();
         resolve((response.statusCode ?? 500) < 500);
       });
-      request.setTimeout(750, () => { request.destroy(); resolve(false); });
+      request.setTimeout(750, () => {
+        request.destroy();
+        resolve(false);
+      });
       request.once('error', () => resolve(false));
     });
     if (ready) return;
@@ -466,7 +489,8 @@ async function main() {
   const { mode, prepareOnly, forcePrepare } = parseArgs(process.argv.slice(2));
   assertNodeVersion();
   for (const requiredFile of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
-    if (!existsSync(path.join(repoRoot, requiredFile))) fail(`Required repository file is missing: ${requiredFile} (${repoRoot}).`);
+    if (!existsSync(path.join(repoRoot, requiredFile)))
+      fail(`Required repository file is missing: ${requiredFile} (${repoRoot}).`);
   }
 
   const pnpm = resolvePnpm();
@@ -483,7 +507,9 @@ async function main() {
 
   ensureBuild(dependencyState.fingerprint, env, forcePrepare);
   if (prepareOnly) {
-    console.log(`[RDC-Agent] Preparation complete (${process.platform}, ${process.arch}, Electron: ${dependencyState.electronExecutable}).`);
+    console.log(
+      `[RDC-Agent] Preparation complete (${process.platform}, ${process.arch}, Electron: ${dependencyState.electronExecutable}).`,
+    );
     return;
   }
 
@@ -491,7 +517,9 @@ async function main() {
     console.log('[RDC-Agent] Starting renderer dev server (OS-assigned port)...');
     const { renderer, rendererUrl } = await startRendererDevServer(env);
     console.log(`[RDC-Agent] Renderer ready at ${rendererUrl}/`);
-    const cleanup = () => { void terminate(renderer); };
+    const cleanup = () => {
+      void terminate(renderer);
+    };
     process.once('SIGINT', cleanup);
     process.once('SIGTERM', cleanup);
     try {
@@ -508,9 +536,11 @@ async function main() {
     return;
   }
 
-  console.log(effectiveMode === 'browser'
-    ? '[RDC-Agent] Starting headless main process for browser verification...'
-    : '[RDC-Agent] Starting visible Electron app from build output...');
+  console.log(
+    effectiveMode === 'browser'
+      ? '[RDC-Agent] Starting headless main process for browser verification...'
+      : '[RDC-Agent] Starting visible Electron app from build output...',
+  );
   const electron = runChild(dependencyState.electronExecutable, [repoRoot], env);
   process.exitCode = await waitForExit(electron);
 }

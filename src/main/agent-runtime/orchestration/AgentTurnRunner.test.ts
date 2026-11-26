@@ -43,17 +43,22 @@ function createRunner(): AgentTurnRunner {
       resolveActivatedSet: () => new Set<string>(),
     } as unknown as DeferredToolActivationTracker,
     tokenizerService: new TokenizerService(),
-    tools: { resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }), createToolSignature: () => '' },
-    toolExecutors: { createToolExecutor: () => ({
-      execute: async (): Promise<ToolResultMessage> => ({
-        role: 'toolResult',
-        toolCallId: '',
-        toolName: '',
-        content: [],
-        isError: false,
-        timestamp: 0,
+    tools: {
+      resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }),
+      createToolSignature: () => '',
+    },
+    toolExecutors: {
+      createToolExecutor: () => ({
+        execute: async (): Promise<ToolResultMessage> => ({
+          role: 'toolResult',
+          toolCallId: '',
+          toolName: '',
+          content: [],
+          isError: false,
+          timestamp: 0,
+        }),
       }),
-    }) },
+    },
   });
 }
 
@@ -116,20 +121,26 @@ describe('AgentTurnRunner', () => {
 
   it('getOrCreateAgentSlot requires PromptPlan', () => {
     const runner = createRunner();
-    expect(() => runner.getOrCreateAgentSlot({
-      agentId: 'general',
-      providerId: 'provider',
-      modelId: 'model',
-      systemPrompt: 'system',
-      streamOptions: { requestPlan: {} as RequestPlan },
-      tools: [],
-      toolExecutor: { execute: async () => { throw new Error('unused'); } } as never,
-      turnSignature: '',
-      sessionId: 'test-scope',
-      contextWindow: 1000,
-      contextTokenLimit: 800,
-      initialMessages: [],
-    })).toThrow(/PromptPlan is required/);
+    expect(() =>
+      runner.getOrCreateAgentSlot({
+        agentId: 'general',
+        providerId: 'provider',
+        modelId: 'model',
+        systemPrompt: 'system',
+        streamOptions: { requestPlan: {} as RequestPlan },
+        tools: [],
+        toolExecutor: {
+          execute: async () => {
+            throw new Error('unused');
+          },
+        } as never,
+        turnSignature: '',
+        sessionId: 'test-scope',
+        contextWindow: 1000,
+        contextTokenLimit: 800,
+        initialMessages: [],
+      }),
+    ).toThrow(/PromptPlan is required/);
   });
 
   it('rejects runAgentTurn without preparedRuntime', async () => {
@@ -153,210 +164,257 @@ describe('AgentTurnRunner', () => {
       reasoningWire: {
         selection: 'off',
         control: {
-          kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' },
+          kind: 'none',
+          supportsOff: true,
+          levels: [],
+          defaultSelection: 'off',
+          wireProfile: { kind: 'none' },
         },
       },
     });
-    await expect(runner.runAgentTurn({
-      agentId: 'ask',
-      content: 'x',
-      providerId: 'test',
-      modelId: 'model',
-      profileId: 'general',
-      toolAllowlist: [],
-      contextTokenLimit: 800,
-      sessionId: 's',
-      turnId: 't',
-      options: { requestPlan },
-    })).rejects.toThrow(/TURN_NOT_PREPARED/);
+    await expect(
+      runner.runAgentTurn({
+        agentId: 'ask',
+        content: 'x',
+        providerId: 'test',
+        modelId: 'model',
+        profileId: 'general',
+        toolAllowlist: [],
+        contextTokenLimit: 800,
+        sessionId: 's',
+        turnId: 't',
+        options: { requestPlan },
+      }),
+    ).rejects.toThrow(/TURN_NOT_PREPARED/);
   });
 
   it.each([
     { maxWallTimeMs: 10_000, inherited: false },
     { maxWallTimeMs: 900_000, inherited: false },
     { maxWallTimeMs: 900_000, inherited: true },
-  ])('freezes child wall admission from policy and preserves inherited consumption ($maxWallTimeMs/$inherited)', async ({ maxWallTimeMs, inherited }) => {
-    const release = vi.fn(async () => undefined);
-    const runner = createRunner();
-    const inheritedBudget = inherited ? createSubagentBudgetState({
-      maxDepth: 2, maxChildren: 4, maxAggregateToolCalls: 8, maxAggregateWallMs: 30_000,
-    }) : undefined;
-    if (inheritedBudget) {
-      inheritedBudget.childrenSpawned = 2;
-      inheritedBudget.aggregateToolCalls = 3;
-      inheritedBudget.wallStartedAt = 1_000;
-      inheritedBudget.wallPausedAt = 2_000;
-    }
-    let observedBudget: SubagentBudgetState | undefined;
-    const setup = vi.spyOn(runner, 'getOrCreateAgentSlot').mockImplementation(() => {
-      observedBudget = turnCoordinator.getActive('setup-session')?.subagentBudget;
-      throw new Error('slot setup failed');
-    });
-    const requestPlan = createTestRequestPlan({
-      providerId: 'test',
-      adapterId: 'openai-compatible',
-      catalogRevision: 'test',
-      routeRevision: 'test',
-      selectedModelId: 'model',
-      effectiveModelId: 'model',
-      appliedBindingIds: [],
-      route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'catalog' },
-      headers: {},
-      bodyPatch: {},
-      contextBudgetTokens: 1000,
-      contextMode: 'normal',
-      contextWindowTokens: 2000,
-      activeTierId: 'normal',
-      fastMode: false,
-      reasoningWire: {
-        selection: 'off',
-        control: {
-          kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' },
+  ])(
+    'freezes child wall admission from policy and preserves inherited consumption ($maxWallTimeMs/$inherited)',
+    async ({ maxWallTimeMs, inherited }) => {
+      const release = vi.fn(async () => undefined);
+      const runner = createRunner();
+      const inheritedBudget = inherited
+        ? createSubagentBudgetState({
+            maxDepth: 2,
+            maxChildren: 4,
+            maxAggregateToolCalls: 8,
+            maxAggregateWallMs: 30_000,
+          })
+        : undefined;
+      if (inheritedBudget) {
+        inheritedBudget.childrenSpawned = 2;
+        inheritedBudget.aggregateToolCalls = 3;
+        inheritedBudget.wallStartedAt = 1_000;
+        inheritedBudget.wallPausedAt = 2_000;
+      }
+      let observedBudget: SubagentBudgetState | undefined;
+      const setup = vi.spyOn(runner, 'getOrCreateAgentSlot').mockImplementation(() => {
+        observedBudget = turnCoordinator.getActive('setup-session')?.subagentBudget;
+        throw new Error('slot setup failed');
+      });
+      const requestPlan = createTestRequestPlan({
+        providerId: 'test',
+        adapterId: 'openai-compatible',
+        catalogRevision: 'test',
+        routeRevision: 'test',
+        selectedModelId: 'model',
+        effectiveModelId: 'model',
+        appliedBindingIds: [],
+        route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'catalog' },
+        headers: {},
+        bodyPatch: {},
+        contextBudgetTokens: 1000,
+        contextMode: 'normal',
+        contextWindowTokens: 2000,
+        activeTierId: 'normal',
+        fastMode: false,
+        reasoningWire: {
+          selection: 'off',
+          control: {
+            kind: 'none',
+            supportsOff: true,
+            levels: [],
+            defaultSelection: 'off',
+            wireProfile: { kind: 'none' },
+          },
         },
-      },
-    });
-    const lease = {
-      poolKey: 'pool',
-      projectRootPath: null,
-      projectId: 'project',
-      descriptorHash: 'descriptor',
-      release,
-    } as McpConnectionLease;
-    const policy = {
-      maxTurns: 5,
-      maxToolCalls: 5,
-      maxSubagents: 2,
-      maxChildDepth: 2,
-      maxWallTimeMs,
-    } as EffectiveRuntimePlan['policy'];
-    const preparedRuntime = {
-      promptPlan: { systemPrompt: 'prepared-system', segments: [
-        { id: 'skill:actual-analysis', kind: 'preloaded-skill', sourceHash: 'd'.repeat(64) },
-      ] } as PromptPlan,
-      runtimeTools: { definitions: [], toolMap: new Map() },
-      activeToolDefinitions: [],
-      routeCapability: { toolCallingMode: 'disabled' } as AgentRouteCapability,
-      mcpConnectionErrors: [],
-      mcpLease: lease,
-      credentialHandle: 'credential',
-      promptCache: {},
-      effectivePlan: { policy, fingerprint: 'e'.repeat(24), toolAllowlist: [], routeCapability: { toolCallingMode: 'disabled' } } as unknown as EffectiveRuntimePlan,
-    } as unknown as PreparedAgentRuntime;
+      });
+      const lease = {
+        poolKey: 'pool',
+        projectRootPath: null,
+        projectId: 'project',
+        descriptorHash: 'descriptor',
+        release,
+      } as McpConnectionLease;
+      const policy = {
+        maxTurns: 5,
+        maxToolCalls: 5,
+        maxSubagents: 2,
+        maxChildDepth: 2,
+        maxWallTimeMs,
+      } as EffectiveRuntimePlan['policy'];
+      const preparedRuntime = {
+        promptPlan: {
+          systemPrompt: 'prepared-system',
+          segments: [{ id: 'skill:actual-analysis', kind: 'preloaded-skill', sourceHash: 'd'.repeat(64) }],
+        } as PromptPlan,
+        runtimeTools: { definitions: [], toolMap: new Map() },
+        activeToolDefinitions: [],
+        routeCapability: { toolCallingMode: 'disabled' } as AgentRouteCapability,
+        mcpConnectionErrors: [],
+        mcpLease: lease,
+        credentialHandle: 'credential',
+        promptCache: {},
+        effectivePlan: {
+          policy,
+          fingerprint: 'e'.repeat(24),
+          toolAllowlist: [],
+          routeCapability: { toolCallingMode: 'disabled' },
+        } as unknown as EffectiveRuntimePlan,
+      } as unknown as PreparedAgentRuntime;
 
-    const onTaskPreparation = vi.fn(async () => undefined);
-    await expect(runner.runAgentTurn({
-      agentId: 'ask',
-      content: 'setup',
-      providerId: 'test',
-      modelId: 'model',
-      profileId: 'general',
-      toolAllowlist: [],
-      contextTokenLimit: 800,
-      sessionId: 'setup-session',
-      turnId: 'setup-turn',
-      effectiveModel: {} as never,
-      preparedRuntime,
-      options: { requestPlan, subagentBudget: inheritedBudget, onTaskPreparation },
-    })).rejects.toThrow('slot setup failed');
-    expect(onTaskPreparation).toHaveBeenCalledWith(expect.objectContaining({
-      sessionId: 'setup-session', turnId: 'setup-turn', runtimeFingerprint: 'e'.repeat(24),
-      skills: [{ id: 'actual-analysis', hash: 'd'.repeat(64) }], selectedTurnCount: null,
-    }));
+      const onTaskPreparation = vi.fn(async () => undefined);
+      await expect(
+        runner.runAgentTurn({
+          agentId: 'ask',
+          content: 'setup',
+          providerId: 'test',
+          modelId: 'model',
+          profileId: 'general',
+          toolAllowlist: [],
+          contextTokenLimit: 800,
+          sessionId: 'setup-session',
+          turnId: 'setup-turn',
+          effectiveModel: {} as never,
+          preparedRuntime,
+          options: { requestPlan, subagentBudget: inheritedBudget, onTaskPreparation },
+        }),
+      ).rejects.toThrow('slot setup failed');
+      expect(onTaskPreparation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: 'setup-session',
+          turnId: 'setup-turn',
+          runtimeFingerprint: 'e'.repeat(24),
+          skills: [{ id: 'actual-analysis', hash: 'd'.repeat(64) }],
+          selectedTurnCount: null,
+        }),
+      );
 
-    if (inheritedBudget) {
-      expect(observedBudget).toBe(inheritedBudget);
-      expect(observedBudget).toMatchObject({ childrenSpawned: 2, aggregateToolCalls: 3,
-        wallStartedAt: 1_000, wallPausedAt: 2_000, budget: { maxAggregateWallMs: 30_000 } });
-    } else {
-      expect(observedBudget?.budget.maxAggregateWallMs).toBe(maxWallTimeMs);
-    }
+      if (inheritedBudget) {
+        expect(observedBudget).toBe(inheritedBudget);
+        expect(observedBudget).toMatchObject({
+          childrenSpawned: 2,
+          aggregateToolCalls: 3,
+          wallStartedAt: 1_000,
+          wallPausedAt: 2_000,
+          budget: { maxAggregateWallMs: 30_000 },
+        });
+      } else {
+        expect(observedBudget?.budget.maxAggregateWallMs).toBe(maxWallTimeMs);
+      }
 
-    expect(setup.mock.calls[0]?.[0].systemPrompt).toBe('prepared-system');
-    expect(setup.mock.calls[0]?.[0].promptPlan).toBe(preparedRuntime.promptPlan);
+      expect(setup.mock.calls[0]?.[0].systemPrompt).toBe('prepared-system');
+      expect(setup.mock.calls[0]?.[0].promptPlan).toBe(preparedRuntime.promptPlan);
 
-    expect(release).toHaveBeenCalledWith({ discardIfIdle: false });
-    expect(turnCoordinator.getActive('setup-session')).toBeNull();
-    expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
-      'turn.before-start',
-      expect.objectContaining({ sessionId: 'setup-session', agentId: 'ask' }),
-    );
-    expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
-      'turn.after-end',
-      expect.objectContaining({ sessionId: 'setup-session', agentId: 'ask' }),
-    );
-  });
+      expect(release).toHaveBeenCalledWith({ discardIfIdle: false });
+      expect(turnCoordinator.getActive('setup-session')).toBeNull();
+      expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
+        'turn.before-start',
+        expect.objectContaining({ sessionId: 'setup-session', agentId: 'ask' }),
+      );
+      expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
+        'turn.after-end',
+        expect.objectContaining({ sessionId: 'setup-session', agentId: 'ask' }),
+      );
+    },
+  );
 
   it.each([null, '', '   ', '\t'] as const)(
     'rejects empty execution scope %j before beginTurn and releases MCP lease',
     async (sessionId) => {
-    const release = vi.fn(async () => undefined);
-    const runner = createRunner();
-    const beginSpy = vi.spyOn(turnCoordinator, 'beginTurn');
-    const requestPlan = createTestRequestPlan({
-      providerId: 'test',
-      adapterId: 'openai-compatible',
-      catalogRevision: 'test',
-      routeRevision: 'test',
-      selectedModelId: 'model',
-      effectiveModelId: 'model',
-      appliedBindingIds: [],
-      route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'catalog' },
-      headers: {},
-      bodyPatch: {},
-      contextBudgetTokens: 1000,
-      contextMode: 'normal',
-      contextWindowTokens: 2000,
-      activeTierId: 'normal',
-      fastMode: false,
-      reasoningWire: {
-        selection: 'off',
-        control: {
-          kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' },
+      const release = vi.fn(async () => undefined);
+      const runner = createRunner();
+      const beginSpy = vi.spyOn(turnCoordinator, 'beginTurn');
+      const requestPlan = createTestRequestPlan({
+        providerId: 'test',
+        adapterId: 'openai-compatible',
+        catalogRevision: 'test',
+        routeRevision: 'test',
+        selectedModelId: 'model',
+        effectiveModelId: 'model',
+        appliedBindingIds: [],
+        route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'catalog' },
+        headers: {},
+        bodyPatch: {},
+        contextBudgetTokens: 1000,
+        contextMode: 'normal',
+        contextWindowTokens: 2000,
+        activeTierId: 'normal',
+        fastMode: false,
+        reasoningWire: {
+          selection: 'off',
+          control: {
+            kind: 'none',
+            supportsOff: true,
+            levels: [],
+            defaultSelection: 'off',
+            wireProfile: { kind: 'none' },
+          },
         },
-      },
-    });
-    const lease = {
-      poolKey: 'pool',
-      projectRootPath: null,
-      projectId: 'project',
-      descriptorHash: 'descriptor',
-      release,
-    } as McpConnectionLease;
-    const policy = {
-      maxTurns: 5,
-      maxToolCalls: 5,
-      maxSubagents: 2,
-      maxChildDepth: 2,
-      maxWallTimeMs: 10_000,
-    } as EffectiveRuntimePlan['policy'];
-    const preparedRuntime = {
-      runtimeTools: { definitions: [], toolMap: new Map() },
-      activeToolDefinitions: [],
-      routeCapability: { toolCallingMode: 'disabled' } as AgentRouteCapability,
-      mcpConnectionErrors: [],
-      mcpLease: lease,
-      credentialHandle: 'credential',
-      promptCache: {},
-      effectivePlan: { policy, toolAllowlist: [], routeCapability: { toolCallingMode: 'disabled' } } as unknown as EffectiveRuntimePlan,
-    } as unknown as PreparedAgentRuntime;
+      });
+      const lease = {
+        poolKey: 'pool',
+        projectRootPath: null,
+        projectId: 'project',
+        descriptorHash: 'descriptor',
+        release,
+      } as McpConnectionLease;
+      const policy = {
+        maxTurns: 5,
+        maxToolCalls: 5,
+        maxSubagents: 2,
+        maxChildDepth: 2,
+        maxWallTimeMs: 10_000,
+      } as EffectiveRuntimePlan['policy'];
+      const preparedRuntime = {
+        runtimeTools: { definitions: [], toolMap: new Map() },
+        activeToolDefinitions: [],
+        routeCapability: { toolCallingMode: 'disabled' } as AgentRouteCapability,
+        mcpConnectionErrors: [],
+        mcpLease: lease,
+        credentialHandle: 'credential',
+        promptCache: {},
+        effectivePlan: {
+          policy,
+          toolAllowlist: [],
+          routeCapability: { toolCallingMode: 'disabled' },
+        } as unknown as EffectiveRuntimePlan,
+      } as unknown as PreparedAgentRuntime;
 
-    await expect(runner.runAgentTurn({
-      agentId: 'ask',
-      content: 'no-scope',
-      providerId: 'test',
-      modelId: 'model',
-      profileId: 'general',
-      toolAllowlist: [],
-      contextTokenLimit: 800,
-      sessionId,
-      turnId: 'no-scope-turn',
-      effectiveModel: {} as never,
-      preparedRuntime,
-      options: { requestPlan },
-    })).rejects.toThrow(/EXECUTION_SCOPE_REQUIRED/);
+      await expect(
+        runner.runAgentTurn({
+          agentId: 'ask',
+          content: 'no-scope',
+          providerId: 'test',
+          modelId: 'model',
+          profileId: 'general',
+          toolAllowlist: [],
+          contextTokenLimit: 800,
+          sessionId,
+          turnId: 'no-scope-turn',
+          effectiveModel: {} as never,
+          preparedRuntime,
+          options: { requestPlan },
+        }),
+      ).rejects.toThrow(/EXECUTION_SCOPE_REQUIRED/);
 
-    expect(beginSpy).not.toHaveBeenCalled();
-    expect(release).toHaveBeenCalledWith({ discardIfIdle: true });
-    beginSpy.mockRestore();
-  });
+      expect(beginSpy).not.toHaveBeenCalled();
+      expect(release).toHaveBeenCalledWith({ discardIfIdle: true });
+      beginSpy.mockRestore();
+    },
+  );
 });

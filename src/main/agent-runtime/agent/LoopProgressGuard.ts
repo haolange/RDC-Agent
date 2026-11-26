@@ -1,9 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { AssistantMessage, ToolCallContent, ToolDefinition, ToolResultMessage } from '../core/types';
 
-export type AgentLoopTerminationCode =
-  | 'AGENT_NO_PROGRESS'
-  | 'AGENT_MAX_TURNS_EXCEEDED';
+export type AgentLoopTerminationCode = 'AGENT_NO_PROGRESS' | 'AGENT_MAX_TURNS_EXCEEDED';
 
 export class AgentLoopTerminationError extends Error {
   readonly code: AgentLoopTerminationCode;
@@ -55,18 +53,11 @@ export class LoopProgressGuard {
     runtimeRevision: number,
     toolDefinitions: readonly ToolDefinition[] = [],
   ): LoopProgressObservation {
-    const fingerprint = createToolRoundFingerprint(
-      assistantMessage,
-      toolResults,
-      runtimeRevision,
-    );
-    const toolCalls = assistantMessage.content.filter(
-      (block): block is ToolCallContent => block.type === 'toolCall',
-    );
+    const fingerprint = createToolRoundFingerprint(assistantMessage, toolResults, runtimeRevision);
+    const toolCalls = assistantMessage.content.filter((block): block is ToolCallContent => block.type === 'toolCall');
     const definitions = new Map(toolDefinitions.map((definition) => [definition.name, definition]));
-    const allPollable = toolCalls.length > 0 && toolCalls.every((toolCall) => (
-      definitions.get(toolCall.name)?.pollable === true
-    ));
+    const allPollable =
+      toolCalls.length > 0 && toolCalls.every((toolCall) => definitions.get(toolCall.name)?.pollable === true);
     if (allPollable) {
       this.previousFingerprint = null;
       this.consecutiveMatches = 0;
@@ -82,11 +73,8 @@ export class LoopProgressGuard {
     return {
       fingerprint,
       consecutiveMatches: this.consecutiveMatches,
-      action: this.consecutiveMatches >= 3
-        ? 'terminate'
-        : this.consecutiveMatches === 2
-          ? 'inject-guidance'
-          : 'continue',
+      action:
+        this.consecutiveMatches >= 3 ? 'terminate' : this.consecutiveMatches === 2 ? 'inject-guidance' : 'continue',
     };
   }
 }
@@ -96,9 +84,7 @@ export function createToolRoundFingerprint(
   toolResults: readonly ToolResultMessage[],
   runtimeRevision: number,
 ): string {
-  const toolCalls = assistantMessage.content.filter(
-    (block): block is ToolCallContent => block.type === 'toolCall',
-  );
+  const toolCalls = assistantMessage.content.filter((block): block is ToolCallContent => block.type === 'toolCall');
   const round = {
     runtimeRevision,
     tools: toolCalls.map((toolCall, index) => {
@@ -111,20 +97,20 @@ export function createToolRoundFingerprint(
       };
     }),
   };
-  return createHash('sha256')
-    .update(stableSerialize(round))
-    .digest('hex');
+  return createHash('sha256').update(stableSerialize(round)).digest('hex');
 }
 
 function normalizeToolResult(result: ToolResultMessage): unknown {
   return {
-    content: result.content.map((block) => block.type === 'text'
-      ? { type: 'text', text: normalizeText(block.text) }
-      : {
-          type: 'image',
-          mimeType: block.mimeType,
-          digest: createHash('sha256').update(block.data).digest('hex'),
-        }),
+    content: result.content.map((block) =>
+      block.type === 'text'
+        ? { type: 'text', text: normalizeText(block.text) }
+        : {
+            type: 'image',
+            mimeType: block.mimeType,
+            digest: createHash('sha256').update(block.data).digest('hex'),
+          },
+    ),
     details: normalizeSemanticValue(result.details),
   };
 }
@@ -148,18 +134,20 @@ function normalizeSemanticValue(value: unknown, key?: string): unknown {
 
 function isVolatileKey(key: string): boolean {
   const normalized = key.replace(/[-_]/g, '').toLowerCase();
-  return normalized === 'callid'
-    || normalized === 'toolcallid'
-    || normalized === 'timestamp'
-    || normalized.endsWith('timestamp')
-    || normalized === 'duration'
-    || normalized.endsWith('duration')
-    || normalized === 'durationms'
-    || normalized === 'elapsedms'
-    || normalized === 'startedat'
-    || normalized === 'completedat'
-    || normalized === 'createdat'
-    || normalized === 'updatedat';
+  return (
+    normalized === 'callid' ||
+    normalized === 'toolcallid' ||
+    normalized === 'timestamp' ||
+    normalized.endsWith('timestamp') ||
+    normalized === 'duration' ||
+    normalized.endsWith('duration') ||
+    normalized === 'durationms' ||
+    normalized === 'elapsedms' ||
+    normalized === 'startedat' ||
+    normalized === 'completedat' ||
+    normalized === 'createdat' ||
+    normalized === 'updatedat'
+  );
 }
 
 function normalizeText(value: string): string {

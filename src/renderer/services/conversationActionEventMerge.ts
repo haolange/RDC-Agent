@@ -37,14 +37,24 @@ export const mergeToolExecutionActionEvent = (
     const nextToolCall = {
       id: event.event_id,
       toolName,
-      status: event.status === 'error' ? 'error' as const : 'complete' as const,
+      status: event.status === 'error' ? ('error' as const) : ('complete' as const),
       argsPreview: JSON.stringify(event.payload.args ?? {}, null, 2),
-      resultPreview: event.status === 'error'
-        ? String((event.payload.error as { message?: string } | undefined)?.message || event.payload.error || 'Tool execution failed')
-        : JSON.stringify(event.payload.data ?? event.payload.result ?? {}, null, 2),
-      error: event.status === 'error'
-        ? String((event.payload.error as { message?: string } | undefined)?.message || event.payload.error || 'Tool execution failed')
-        : undefined,
+      resultPreview:
+        event.status === 'error'
+          ? String(
+              (event.payload.error as { message?: string } | undefined)?.message ||
+                event.payload.error ||
+                'Tool execution failed',
+            )
+          : JSON.stringify(event.payload.data ?? event.payload.result ?? {}, null, 2),
+      error:
+        event.status === 'error'
+          ? String(
+              (event.payload.error as { message?: string } | undefined)?.message ||
+                event.payload.error ||
+                'Tool execution failed',
+            )
+          : undefined,
       startedAt: eventTime,
       completedAt: eventTime + event.duration_ms,
     };

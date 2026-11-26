@@ -1,8 +1,15 @@
 import { beforeEach, expect, it } from 'vitest';
 import { isCurrentPlanReview, usePlanReviewStore } from '../../stores/planReviewStore';
 import { planReviewRequestKey, type PendingPlanReviewRequest } from './planReviewRequestModel';
-const review = { sessionId: 'session', reviewId: 'attempt', turnId: 'turn', toolCallId: 'call',
-  agentId: 'debugger', recovered: true, planReview: { planId: 'plan', revision: 1 } } as PendingPlanReviewRequest;
+const review = {
+  sessionId: 'session',
+  reviewId: 'attempt',
+  turnId: 'turn',
+  toolCallId: 'call',
+  agentId: 'debugger',
+  recovered: true,
+  planReview: { planId: 'plan', revision: 1 },
+} as PendingPlanReviewRequest;
 beforeEach(() => usePlanReviewStore.getState().reset());
 it('identifies an approval attempt independently of the stopped source turn', () => {
   usePlanReviewStore.getState().accept({ sessionId: 'session', projectionVersion: 1, review, recoverable: null });
@@ -12,8 +19,13 @@ it('identifies an approval attempt independently of the stopped source turn', ()
 });
 it('rejects old projections and permits only the matching committed continuation', () => {
   const store = usePlanReviewStore.getState();
-  store.accept({ sessionId: 'session', projectionVersion: 2, review: null, recoverable: null,
-    decision: { reviewId: 'attempt', kind: 'approve' } });
+  store.accept({
+    sessionId: 'session',
+    projectionVersion: 2,
+    review: null,
+    recoverable: null,
+    decision: { reviewId: 'attempt', kind: 'approve' },
+  });
   store.accept({ sessionId: 'session', projectionVersion: 1, review, recoverable: null });
   expect(isCurrentPlanReview(review)).toBe(false);
   expect(isCurrentPlanReview(review, 'approve')).toBe(true);

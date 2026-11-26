@@ -63,7 +63,11 @@ describe('settings view reads', () => {
 
   it('needs no read for the change its own patch made, and keeps the patch over an older read', async () => {
     let answer!: (result: SettingsPatchResult) => void;
-    patch.mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    patch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
     const saving = store().patchSettings([{ op: 'agentModels.setDefault', field: 'model', value: 'p:m' }]);
     store().adoptSettingsChange({ revision: base + 2, sections: ['agentModels'] });
     await settle();
@@ -79,7 +83,11 @@ describe('settings view reads', () => {
 
   it('reads after its own write settles when another writer changed providers meanwhile', async () => {
     let answer!: (result: SettingsPatchResult) => void;
-    patch.mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    patch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
     const saving = store().patchSettings([{ op: 'appearance', value: { theme: 'light' } }]);
     get.mockResolvedValueOnce(view(5, { appearance: { ...DEFAULT_SETTINGS.appearance, theme: 'light' } }));
     store().adoptSettingsChange({ revision: base + 2, sections: ['providers'] });

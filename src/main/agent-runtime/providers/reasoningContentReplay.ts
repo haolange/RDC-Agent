@@ -6,14 +6,13 @@ import type { RequestPlan } from '@shared/types/providerCapability';
  * every outbound assistant message must carry `reasoning_content` (empty
  * string if no replayable artifact). Driven by toolLoop fields, not provider names.
  */
-export function requiresAssistantReasoningContent(
-  requestPlan: RequestPlan | undefined,
-  hasTools: boolean,
-): boolean {
+export function requiresAssistantReasoningContent(requestPlan: RequestPlan | undefined, hasTools: boolean): boolean {
   if (!requestPlan || !hasTools) return false;
   const { artifactPolicy, artifactScope } = requestPlan.contracts.toolLoop;
   if (artifactPolicy !== 'preserve-reasoning-content') return false;
-  return artifactScope === 'all-assistant-turns'
-    || artifactScope === 'tool-call-turn'
-    || artifactScope === 'provider-managed';
+  return (
+    artifactScope === 'all-assistant-turns' ||
+    artifactScope === 'tool-call-turn' ||
+    artifactScope === 'provider-managed'
+  );
 }

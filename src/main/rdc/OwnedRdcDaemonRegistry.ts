@@ -61,25 +61,34 @@ interface RegistryDocument {
 }
 
 const pid = z.number().int().nonnegative();
-const RegistryDocumentSchema = z.object({
-  schemaVersion: z.literal(REGISTRY_SCHEMA),
-  records: z.record(z.string(), z.object({
-    contextId: z.string().regex(APP_RDC_CONTEXT_ID),
-    command: z.string(),
-    intermediateRoot: z.string(),
-    ownerPid: pid,
-    ownerBirth: z.string(),
-    daemonPid: pid,
-    daemonBirth: z.string(),
-    workerPid: pid,
-    workerBirth: z.string(),
-    startedAt: z.number(),
-  }).strict()),
-}).strict().superRefine((document, context) => {
-  for (const [contextId, record] of Object.entries(document.records)) {
-    if (record.contextId !== contextId) context.addIssue({ code: 'custom', message: `record ${contextId} names ${record.contextId}` });
-  }
-});
+const RegistryDocumentSchema = z
+  .object({
+    schemaVersion: z.literal(REGISTRY_SCHEMA),
+    records: z.record(
+      z.string(),
+      z
+        .object({
+          contextId: z.string().regex(APP_RDC_CONTEXT_ID),
+          command: z.string(),
+          intermediateRoot: z.string(),
+          ownerPid: pid,
+          ownerBirth: z.string(),
+          daemonPid: pid,
+          daemonBirth: z.string(),
+          workerPid: pid,
+          workerBirth: z.string(),
+          startedAt: z.number(),
+        })
+        .strict(),
+    ),
+  })
+  .strict()
+  .superRefine((document, context) => {
+    for (const [contextId, record] of Object.entries(document.records)) {
+      if (record.contextId !== contextId)
+        context.addIssue({ code: 'custom', message: `record ${contextId} names ${record.contextId}` });
+    }
+  });
 const RegistryVersionSchema = z.object({ schemaVersion: z.unknown().optional() });
 
 /** The registry as this build writes it; another schema version is left for the build that wrote it. */
@@ -102,7 +111,8 @@ export function ownedRdcDaemonRegistryPath(): string {
 export function listAppDaemonContextsInIntermediateRoot(intermediateRoot: string): string[] {
   const directory = path.join(intermediateRoot, 'runtime', 'rdc_tool_cli');
   if (!fs.existsSync(directory)) return [];
-  return fs.readdirSync(directory)
+  return fs
+    .readdirSync(directory)
     .flatMap((name) => {
       const match = /^daemon_state_(rdc-.+)\.json$/i.exec(name);
       return match && isAppRdcContextId(match[1]) ? [match[1]] : [];
@@ -139,9 +149,18 @@ type OwnedRdcDaemonHarvestOptions = OwnedRdcDaemonStoreOptions & {
   terminateProcess?: (identity: ProcessIdentity) => ProcessTermination;
 };
 
-const ownerIdentity = (record: OwnedRdcDaemonRecord): ProcessIdentity => ({ pid: record.ownerPid, birth: record.ownerBirth });
-const daemonIdentity = (record: OwnedRdcDaemonRecord): ProcessIdentity => ({ pid: record.daemonPid, birth: record.daemonBirth });
-const workerIdentity = (record: OwnedRdcDaemonRecord): ProcessIdentity => ({ pid: record.workerPid, birth: record.workerBirth });
+const ownerIdentity = (record: OwnedRdcDaemonRecord): ProcessIdentity => ({
+  pid: record.ownerPid,
+  birth: record.ownerBirth,
+});
+const daemonIdentity = (record: OwnedRdcDaemonRecord): ProcessIdentity => ({
+  pid: record.daemonPid,
+  birth: record.daemonBirth,
+});
+const workerIdentity = (record: OwnedRdcDaemonRecord): ProcessIdentity => ({
+  pid: record.workerPid,
+  birth: record.workerBirth,
+});
 
 export async function harvestOwnedRdcDaemons(
   options: OwnedRdcDaemonHarvestOptions = {},
@@ -160,7 +179,9 @@ export async function harvestOwnedRdcDaemons(
   // Another instance (for example a Browser QA run with its own userData) may own these; they are not stopped.
   const unconfirmed = discovered.filter((contextId) => !records.has(contextId));
   if (unconfirmed.length) {
-    logHarvest('warning', 'RDC daemon state without an ownership record left running', unconfirmed.join(', '), { unconfirmed });
+    logHarvest('warning', 'RDC daemon state without an ownership record left running', unconfirmed.join(', '), {
+      unconfirmed,
+    });
   }
 
   const released: string[] = [];
@@ -171,10 +192,20 @@ export async function harvestOwnedRdcDaemons(
       const probe = options.probeProcess ?? probeProcess;
       const owner = probe(ownerIdentity(record));
       if (record.ownerPid !== process.pid && owner !== 'exited') {
-        throw new AppError('RDC_OWNERSHIP_BUSY', `owner ${record.ownerPid} is ${owner === 'alive' ? 'still alive' : 'unverifiable'}.`);
+        throw new AppError(
+          'RDC_OWNERSHIP_BUSY',
+          `owner ${record.ownerPid} is ${owner === 'alive' ? 'still alive' : 'unverifiable'}.`,
+        );
       }
-      const stateFile = path.join(record.intermediateRoot, 'runtime', 'rdc_tool_cli', `daemon_state_${record.contextId}.json`);
-      const dead = owner === 'exited' && [daemonIdentity(record), workerIdentity(record)].every((identity) => probe(identity) === 'exited');
+      const stateFile = path.join(
+        record.intermediateRoot,
+        'runtime',
+        'rdc_tool_cli',
+        `daemon_state_${record.contextId}.json`,
+      );
+      const dead =
+        owner === 'exited' &&
+        [daemonIdentity(record), workerIdentity(record)].every((identity) => probe(identity) === 'exited');
       // A dead owner, no native processes and no endpoint state need no CLI mutation.
       if (!dead || fs.existsSync(stateFile)) await stopOwnedDaemon(record, options);
       forgetOwnedRdcDaemon(record.contextId, options);
@@ -182,7 +213,10 @@ export async function harvestOwnedRdcDaemons(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       failed.push({ contextId: record.contextId, error: message });
-      logHarvest('error', 'RDC daemon harvest failed', `${record.contextId}: ${message}`, { contextId: record.contextId, error: message });
+      logHarvest('error', 'RDC daemon harvest failed', `${record.contextId}: ${message}`, {
+        contextId: record.contextId,
+        error: message,
+      });
     }
   }
   return { released, failed, unconfirmed };
@@ -192,37 +226,49 @@ function logHarvest(severity: 'error' | 'warning', title: string, summary: strin
   runtimeLogService.log({ scope: 'app', namespace: 'context', severity, title, summary, raw });
 }
 
-async function stopOwnedDaemon(
-  record: OwnedRdcDaemonRecord,
-  options: OwnedRdcDaemonHarvestOptions,
-): Promise<void> {
+async function stopOwnedDaemon(record: OwnedRdcDaemonRecord, options: OwnedRdcDaemonHarvestOptions): Promise<void> {
   const current = withRdcHostRuntimeEnv(options.settings ?? settingsService.snapshot().user.tooling.rdcCli);
   const command = record.command.trim() || current.command.trim();
-  const commandMissing = Boolean(command) && (path.isAbsolute(command) || command.includes(path.sep)) && !fs.existsSync(command);
+  const commandMissing =
+    Boolean(command) && (path.isAbsolute(command) || command.includes(path.sep)) && !fs.existsSync(command);
   if (!command || commandMissing) {
     killVerifiedOwnedPids(record, options);
     return;
   }
   const binding = path.isAbsolute(command)
-    ? resolveRdcInstallation({ root: installationRootOfPython(command), timeoutMs: current.timeoutMs, env: current.env })
+    ? resolveRdcInstallation({
+        root: installationRootOfPython(command),
+        timeoutMs: current.timeoutMs,
+        env: current.env,
+      })
     : current;
   const settings = withRdcHostRuntimeEnv({
     ...binding,
     enabled: true,
     command,
-    env: { ...current.env, [RDC_INTERMEDIATE_ROOT_ENV]: record.intermediateRoot || current.env[RDC_INTERMEDIATE_ROOT_ENV] },
+    env: {
+      ...current.env,
+      [RDC_INTERMEDIATE_ROOT_ENV]: record.intermediateRoot || current.env[RDC_INTERMEDIATE_ROOT_ENV],
+    },
   });
-  const execute = options.execute ?? ((...args: Parameters<typeof rdcCliInvokerService.executeCLI>) => rdcCliInvokerService.executeCLI(...args));
-  const invoke = async (cliCommand: string, args: string[], kind: string) => parseRdcNativeResult(
-    await execute(cliCommand, args, {
-      contextId: record.contextId,
-      abortSignal: options.signal,
-      settings: settings,
-    }),
-    record.contextId,
-    kind,
-  );
-  const cleared = await invoke('context', ['clear', '--daemon-context', record.contextId], 'rdc_tool.context.clear').catch((error: unknown) => {
+  const execute =
+    options.execute ??
+    ((...args: Parameters<typeof rdcCliInvokerService.executeCLI>) => rdcCliInvokerService.executeCLI(...args));
+  const invoke = async (cliCommand: string, args: string[], kind: string) =>
+    parseRdcNativeResult(
+      await execute(cliCommand, args, {
+        contextId: record.contextId,
+        abortSignal: options.signal,
+        settings: settings,
+      }),
+      record.contextId,
+      kind,
+    );
+  const cleared = await invoke(
+    'context',
+    ['clear', '--daemon-context', record.contextId],
+    'rdc_tool.context.clear',
+  ).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     if (/no active daemon/i.test(message)) return null;
     throw error;
@@ -240,10 +286,7 @@ async function stopOwnedDaemon(
   }
 }
 
-function killVerifiedOwnedPids(
-  record: OwnedRdcDaemonRecord,
-  options: OwnedRdcDaemonHarvestOptions,
-): void {
+function killVerifiedOwnedPids(record: OwnedRdcDaemonRecord, options: OwnedRdcDaemonHarvestOptions): void {
   const probe = options.probeProcess ?? probeProcess;
   const readCommandLine = options.readCommandLine ?? readProcessCommandLine;
   const terminate = options.terminateProcess ?? terminateProcessTree;
@@ -257,7 +300,10 @@ function killVerifiedOwnedPids(
     // An unreadable identity or command line is never proof of exit and never authorizes a kill.
     const commandLine = liveness === 'alive' ? readCommandLine(identity.pid) : null;
     if (!commandLine?.includes(expected) || !commandLine.includes(record.contextId)) {
-      throw new AppError('RDC_CLOSE_FAILED', `pid ${identity.pid} is not a confirmed ${expected} for ${record.contextId}.`);
+      throw new AppError(
+        'RDC_CLOSE_FAILED',
+        `pid ${identity.pid} is not a confirmed ${expected} for ${record.contextId}.`,
+      );
     }
     if (terminate(identity) === 'unconfirmed') remaining.push(identity.pid);
   }
@@ -265,13 +311,20 @@ function killVerifiedOwnedPids(
 }
 
 function hostIntermediateRoot(settings?: RdcCliInvokerSettings): string {
-  return withRdcHostRuntimeEnv(settings ?? settingsService.snapshot().user.tooling.rdcCli).env[RDC_INTERMEDIATE_ROOT_ENV] ?? '';
+  return (
+    withRdcHostRuntimeEnv(settings ?? settingsService.snapshot().user.tooling.rdcCli).env[RDC_INTERMEDIATE_ROOT_ENV] ??
+    ''
+  );
 }
 
 /** A missing registry is empty; a damaged one throws `STORAGE_CORRUPT`, so no daemon is treated as ours. */
 function readRegistry(registryPath?: string): RegistryDocument {
-  return readValidatedSync(registryPath ?? ownedRdcDaemonRegistryPath(), parseJsonWith(parseRegistry))
-    ?? { schemaVersion: REGISTRY_SCHEMA, records: {} };
+  return (
+    readValidatedSync(registryPath ?? ownedRdcDaemonRegistryPath(), parseJsonWith(parseRegistry)) ?? {
+      schemaVersion: REGISTRY_SCHEMA,
+      records: {},
+    }
+  );
 }
 
 function writeRegistry(document: RegistryDocument, registryPath?: string): void {

@@ -18,7 +18,8 @@ interface DeleteFileDetails {
 export const deleteFileTool: AgentTool<DeleteFileParams, DeleteFileDetails> = {
   name: 'delete_file',
   label: '删除文件',
-  description: 'Delete a file inside the workspace. Returns whether the file existed before deletion. Refuses paths under .git.',
+  description:
+    'Delete a file inside the workspace. Returns whether the file existed before deletion. Refuses paths under .git.',
   parameters: {
     type: 'object',
     properties: {
@@ -26,7 +27,14 @@ export const deleteFileTool: AgentTool<DeleteFileParams, DeleteFileDetails> = {
     },
     required: ['path'],
   },
-  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: {
+    isReadOnly: false,
+    concurrency: 'exclusive',
+    isDestructive: true,
+    sideEffect: 'filesystem',
+    category: 'file',
+    requiresApproval: true,
+  },
   permissionHint: 'destructive',
   effects: { writes: ['path'] },
 

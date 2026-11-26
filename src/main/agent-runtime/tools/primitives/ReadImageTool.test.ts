@@ -13,8 +13,10 @@ import { readImageTool } from './ReadImageTool';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 const imageMock = vi.hoisted(() => ({ create: vi.fn() }));
-vi.mock('electron', () => ({ nativeImage: { createFromBuffer: imageMock.create },
-  app: { getAppPath: () => process.cwd(), getPath: () => process.env.TEMP ?? process.cwd() } }));
+vi.mock('electron', () => ({
+  nativeImage: { createFromBuffer: imageMock.create },
+  app: { getAppPath: () => process.cwd(), getPath: () => process.env.TEMP ?? process.cwd() },
+}));
 vi.mock('../../attachments/ToolImagePreviewStore', () => ({
   recordToolImagePreview: vi.fn(async () => ({
     previewId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
@@ -33,14 +35,23 @@ const PNG_1X1 = Buffer.from(
 function solidPng(width: number, height: number): Buffer {
   const chunk = (name: string, data: Buffer) => {
     const body = Buffer.concat([Buffer.from(name), data]);
-    const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
-    const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(body));
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
     return Buffer.concat([length, body, crc]);
   };
   const header = Buffer.alloc(13);
-  header.writeUInt32BE(width, 0); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = 6;
-  return Buffer.concat([PNG_1X1.subarray(0, 8), chunk('IHDR', header),
-    chunk('IDAT', deflateSync(Buffer.alloc((width * 4 + 1) * height))), chunk('IEND', Buffer.alloc(0))]);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  header[9] = 6;
+  return Buffer.concat([
+    PNG_1X1.subarray(0, 8),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(Buffer.alloc((width * 4 + 1) * height))),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
 }
 
 const roots: string[] = [];
@@ -58,60 +69,141 @@ function context(root: string, vision: 'native' | 'disabled' = 'native'): ToolEx
 
 describe('ReadImageTool', () => {
   it('returns a bounded region with both source and delivered-image identities', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-image-region-')); roots.push(root);
-    const sourceBytes = solidPng(2, 2); await writeFile(path.join(root, 'frame.png'), sourceBytes);
-    const crop = vi.fn(() => ({ isEmpty: () => false, getSize: () => ({ width: 1, height: 1 }), toPNG: () => PNG_1X1 }));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-image-region-'));
+    roots.push(root);
+    const sourceBytes = solidPng(2, 2);
+    await writeFile(path.join(root, 'frame.png'), sourceBytes);
+    const crop = vi.fn(() => ({
+      isEmpty: () => false,
+      getSize: () => ({ width: 1, height: 1 }),
+      toPNG: () => PNG_1X1,
+    }));
     imageMock.create.mockReturnValueOnce({ isEmpty: () => false, getSize: () => ({ width: 2, height: 2 }), crop });
     const region = { x: 1, y: 0, width: 1, height: 1 };
-    const result = await readImageTool.execute('region', { path: 'frame.png', region }, undefined, undefined, context(root));
+    const result = await readImageTool.execute(
+      'region',
+      { path: 'frame.png', region },
+      undefined,
+      undefined,
+      context(root),
+    );
     expect(crop).toHaveBeenCalledWith(region);
     expect(result.content[1]).toEqual({ type: 'image', mimeType: 'image/png', data: PNG_1X1.toString('base64') });
-    expect(result.details).toMatchObject({ sha256: createHash('sha256').update(PNG_1X1).digest('hex'),
-      source: { sha256: createHash('sha256').update(sourceBytes).digest('hex'), width: 2, height: 2, region } });
+    expect(result.details).toMatchObject({
+      sha256: createHash('sha256').update(PNG_1X1).digest('hex'),
+      source: { sha256: createHash('sha256').update(sourceBytes).digest('hex'), width: 2, height: 2, region },
+    });
     expect(result.content[0]).toMatchObject({ text: expect.stringContaining('source size=2x2') });
-    expect(recordToolImagePreview).toHaveBeenLastCalledWith(expect.objectContaining({ bytes: PNG_1X1, fileName: 'frame-region.png' }));
+    expect(recordToolImagePreview).toHaveBeenLastCalledWith(
+      expect.objectContaining({ bytes: PNG_1X1, fileName: 'frame-region.png' }),
+    );
   });
 
   it('rejects out-of-bounds regions without producing an image', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-image-region-invalid-')); roots.push(root);
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-image-region-invalid-'));
+    roots.push(root);
     await writeFile(path.join(root, 'frame.png'), PNG_1X1);
     const crop = vi.fn();
     imageMock.create.mockReturnValueOnce({ isEmpty: () => false, getSize: () => ({ width: 1, height: 1 }), crop });
-    await expect(readImageTool.execute('region', { path: 'frame.png', region: { x: 1, y: 0, width: 1, height: 1 } }, undefined, undefined, context(root)))
-      .rejects.toThrow('IMAGE_REGION_INVALID');
+    await expect(
+      readImageTool.execute(
+        'region',
+        { path: 'frame.png', region: { x: 1, y: 0, width: 1, height: 1 } },
+        undefined,
+        undefined,
+        context(root),
+      ),
+    ).rejects.toThrow('IMAGE_REGION_INVALID');
     expect(crop).not.toHaveBeenCalled();
   });
 
   it('delivers native 1552×720 PNG bytes through the tool-image bridge into Responses independently of the UI preview', async () => {
     const chunk = (name: string, data: Buffer) => {
       const body = Buffer.concat([Buffer.from(name), data]);
-      const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
-      const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(body));
+      const length = Buffer.alloc(4);
+      length.writeUInt32BE(data.length);
+      const crc = Buffer.alloc(4);
+      crc.writeUInt32BE(crc32(body));
       return Buffer.concat([length, body, crc]);
     };
     const header = Buffer.alloc(13);
-    header.writeUInt32BE(1552, 0); header.writeUInt32BE(720, 4); header[8] = 8; header[9] = 6;
-    const bytes = Buffer.concat([PNG_1X1.subarray(0, 8), chunk('IHDR', header),
-      chunk('IDAT', deflateSync(Buffer.alloc((1552 * 4 + 1) * 720))), chunk('IEND', Buffer.alloc(0))]);
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-image-wire-')); roots.push(root);
+    header.writeUInt32BE(1552, 0);
+    header.writeUInt32BE(720, 4);
+    header[8] = 8;
+    header[9] = 6;
+    const bytes = Buffer.concat([
+      PNG_1X1.subarray(0, 8),
+      chunk('IHDR', header),
+      chunk('IDAT', deflateSync(Buffer.alloc((1552 * 4 + 1) * 720))),
+      chunk('IEND', Buffer.alloc(0)),
+    ]);
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-image-wire-'));
+    roots.push(root);
     await writeFile(path.join(root, 'frame.png'), bytes);
-    const result = await readImageTool.execute('native-image', { path: 'frame.png' }, undefined, undefined, context(root));
-    const messages = convertAgentMessagesToLlm([{ role: 'toolResult', toolCallId: 'native-image', toolName: 'read_image',
-      content: result.content, isError: false, timestamp: 1 }]);
-    const body = responses.buildRequestBody({ id: 'vision', name: 'Vision', provider: 'account', api: 'openai-responses',
-      contextWindow: 32768, maxTokens: 1024, reasoning: true, vision: true }, { messages }, {
-      requestPlan: createTestRequestPlan({ providerId: 'account', adapterId: 'openai-responses', catalogRevision: 'test',
-        routeRevision: 'test', selectedModelId: 'vision', effectiveModelId: 'vision', appliedBindingIds: [],
-        route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.invalid', source: 'catalog' },
-        headers: {}, bodyPatch: {}, contextBudgetTokens: 32768, contextWindowTokens: 32768, contextMode: 'normal',
-        activeTierId: 'default', fastMode: false, reasoningWire: { selection: 'off', control: {
-          kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' },
-        } },
-      }),
-    });
+    const result = await readImageTool.execute(
+      'native-image',
+      { path: 'frame.png' },
+      undefined,
+      undefined,
+      context(root),
+    );
+    const messages = convertAgentMessagesToLlm([
+      {
+        role: 'toolResult',
+        toolCallId: 'native-image',
+        toolName: 'read_image',
+        content: result.content,
+        isError: false,
+        timestamp: 1,
+      },
+    ]);
+    const body = responses.buildRequestBody(
+      {
+        id: 'vision',
+        name: 'Vision',
+        provider: 'account',
+        api: 'openai-responses',
+        contextWindow: 32768,
+        maxTokens: 1024,
+        reasoning: true,
+        vision: true,
+      },
+      { messages },
+      {
+        requestPlan: createTestRequestPlan({
+          providerId: 'account',
+          adapterId: 'openai-responses',
+          catalogRevision: 'test',
+          routeRevision: 'test',
+          selectedModelId: 'vision',
+          effectiveModelId: 'vision',
+          appliedBindingIds: [],
+          route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.invalid', source: 'catalog' },
+          headers: {},
+          bodyPatch: {},
+          contextBudgetTokens: 32768,
+          contextWindowTokens: 32768,
+          contextMode: 'normal',
+          activeTierId: 'default',
+          fastMode: false,
+          reasoningWire: {
+            selection: 'off',
+            control: {
+              kind: 'none',
+              supportsOff: true,
+              levels: [],
+              defaultSelection: 'off',
+              wireProfile: { kind: 'none' },
+            },
+          },
+        }),
+      },
+    );
     const imageUrl = `data:image/png;base64,${bytes.toString('base64')}`;
-    const parts = (body.input as Array<{ content?: Array<{ type: string; image_url?: string }> }>).flatMap(item => item.content ?? []);
-    const wireImage = parts.find(part => part.type === 'input_image')?.image_url;
+    const parts = (body.input as Array<{ content?: Array<{ type: string; image_url?: string }> }>).flatMap(
+      (item) => item.content ?? [],
+    );
+    const wireImage = parts.find((part) => part.type === 'input_image')?.image_url;
     expect(wireImage).toBe(imageUrl);
     const delivered = Buffer.from(wireImage!.split(',')[1], 'base64');
     expect(delivered.readUInt32BE(16)).toBe(1552);
@@ -125,8 +217,9 @@ describe('ReadImageTool', () => {
     roots.push(root);
     await writeFile(path.join(root, 'frame.png'), PNG_1X1);
 
-    await expect(readImageTool.execute('img-1', { path: 'frame.png' }, undefined, undefined, context(root, 'disabled')))
-      .rejects.toThrow('VISION_INPUT_UNSUPPORTED');
+    await expect(
+      readImageTool.execute('img-1', { path: 'frame.png' }, undefined, undefined, context(root, 'disabled')),
+    ).rejects.toThrow('VISION_INPUT_UNSUPPORTED');
   });
 
   it('returns a text block plus image block on vision routes', async () => {
@@ -146,7 +239,10 @@ describe('ReadImageTool', () => {
     const image = result.content[1];
     if (image.type !== 'image') throw new Error('Expected image block');
     expect(createHash('sha256').update(Buffer.from(image.data, 'base64')).digest('hex')).toBe(result.details?.sha256);
-    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining(`sha256=${result.details?.sha256}`) });
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining(`sha256=${result.details?.sha256}`),
+    });
     expect(recordToolImagePreview).toHaveBeenLastCalledWith(expect.objectContaining({ bytes: PNG_1X1 }));
   });
 
@@ -154,21 +250,29 @@ describe('ReadImageTool', () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-image-escape-'));
     roots.push(root);
 
-    await expect(readImageTool.execute('img-2', { path: '../outside.png' }, undefined, undefined, context(root)))
-      .rejects.toThrow(/超出 workspace/);
+    await expect(
+      readImageTool.execute('img-2', { path: '../outside.png' }, undefined, undefined, context(root)),
+    ).rejects.toThrow(/超出 workspace/);
   });
 
   it('reads granted Knowledge image bytes without retaining access outside that call', async () => {
     const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdc-knowledge-image-workspace-'));
     const knowledge = await mkdtemp(path.join(os.tmpdir(), 'rdc-knowledge-image-root-'));
     roots.push(workspace, knowledge);
-    const imagePath = path.join(knowledge, 'reference.png'); await writeFile(imagePath, PNG_1X1);
+    const imagePath = path.join(knowledge, 'reference.png');
+    await writeFile(imagePath, PNG_1X1);
     const execution = { ...context(workspace), knowledgeReadRoots: [knowledge] };
-    const result = await withTemporaryPathAccess(execution, [knowledge], scoped =>
-      readImageTool.execute('knowledge-pixels', { path: imagePath }, undefined, undefined, scoped));
-    expect(result.details).toMatchObject({ path: imagePath, sha256: createHash('sha256').update(PNG_1X1).digest('hex') });
+    const result = await withTemporaryPathAccess(execution, [knowledge], (scoped) =>
+      readImageTool.execute('knowledge-pixels', { path: imagePath }, undefined, undefined, scoped),
+    );
+    expect(result.details).toMatchObject({
+      path: imagePath,
+      sha256: createHash('sha256').update(PNG_1X1).digest('hex'),
+    });
     expect(result.content[1]).toEqual({ type: 'image', mimeType: 'image/png', data: PNG_1X1.toString('base64') });
-    await expect(readImageTool.execute('not-granted', { path: imagePath }, undefined, undefined, execution)).rejects.toThrow(/超出 workspace/);
+    await expect(
+      readImageTool.execute('not-granted', { path: imagePath }, undefined, undefined, execution),
+    ).rejects.toThrow(/超出 workspace/);
   });
 
   it('views an immutable extensionless raster artifact using its verified content type', async () => {
@@ -178,7 +282,11 @@ describe('ReadImageTool', () => {
     await writeFile(path.join(root, fileName), PNG_1X1);
     const result = await readImageTool.execute('img-content', { path: fileName }, undefined, undefined, context(root));
     expect(result.content[1]).toEqual({ type: 'image', mimeType: 'image/png', data: PNG_1X1.toString('base64') });
-    expect(result.details).toMatchObject({ path: path.join(root, fileName), mimeType: 'image/png', bytes: PNG_1X1.length });
+    expect(result.details).toMatchObject({
+      path: path.join(root, fileName),
+      mimeType: 'image/png',
+      bytes: PNG_1X1.length,
+    });
   });
 
   it.each([
@@ -194,7 +302,8 @@ describe('ReadImageTool', () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-read-image-reject-'));
     roots.push(root);
     await writeFile(path.join(root, fileName), bytes);
-    await expect(readImageTool.execute('img-reject', { path: fileName }, undefined, undefined, context(root)))
-      .rejects.toThrow(/ATTACHMENT_(MEDIA_UNSUPPORTED|INVALID)/);
+    await expect(
+      readImageTool.execute('img-reject', { path: fileName }, undefined, undefined, context(root)),
+    ).rejects.toThrow(/ATTACHMENT_(MEDIA_UNSUPPORTED|INVALID)/);
   });
 });

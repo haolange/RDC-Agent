@@ -11,7 +11,9 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock('../../stores/projectStore', () => ({ useProjectStore: { getState: () => state.project } }));
 vi.mock('../../stores/captureStore', () => ({ useCaptureStore: { getState: () => state.capture } }));
-vi.mock('../../stores/sessionProjectionStore', () => ({ useSessionProjectionStore: { getState: () => state.projection } }));
+vi.mock('../../stores/sessionProjectionStore', () => ({
+  useSessionProjectionStore: { getState: () => state.projection },
+}));
 vi.mock('../../stores/deviceStore', () => ({ useDeviceStore: { getState: () => state.device } }));
 
 describe('capture event subscriptions', () => {
@@ -33,7 +35,9 @@ describe('capture event subscriptions', () => {
 
   it('late initial hydration after a session switch cannot overwrite the new session', async () => {
     let resolveContext!: (value: ContextSnapshot | null) => void;
-    const context = new Promise<ContextSnapshot | null>((resolve) => { resolveContext = resolve; });
+    const context = new Promise<ContextSnapshot | null>((resolve) => {
+      resolveContext = resolve;
+    });
     const api = { context: { get: vi.fn(() => context) }, capture: { getOpenedState: vi.fn(async () => null) } };
     createCaptureProjection(api as unknown as ElectronAPI, vi.fn()).hydrate();
     state.project.currentSessionId = 'b';
@@ -49,7 +53,15 @@ describe('capture event subscriptions', () => {
     let handler!: (value: unknown) => void;
     const unsubscribe = vi.fn();
     const get = vi.fn(async () => null);
-    const api = { context: { get }, events: { onCaptureStatusChanged: (callback: typeof handler) => { handler = callback; return unsubscribe; } } };
+    const api = {
+      context: { get },
+      events: {
+        onCaptureStatusChanged: (callback: typeof handler) => {
+          handler = callback;
+          return unsubscribe;
+        },
+      },
+    };
     const dispose = subscribeCaptureStatusChanged(api as unknown as ElectronAPI, vi.fn());
     handler({ projectId: 'project', sessionId: 'b' });
     expect(get).not.toHaveBeenCalled();

@@ -84,16 +84,17 @@ describe('concurrencyContract: temporary path roots', () => {
     });
     expect(allowed).toBe(path.resolve(externalFile));
 
-    expect(() => safeResolvePath(externalFile, workspace, {
-      workspaceRoot: workspace,
-      projectRootPath: workspace,
-      projectId: null,
-      sessionId: 's2',
-      temporaryAllowedPathRoots: [],
-    })).toThrow(/超出 workspace/);
+    expect(() =>
+      safeResolvePath(externalFile, workspace, {
+        workspaceRoot: workspace,
+        projectRootPath: workspace,
+        projectId: null,
+        sessionId: 's2',
+        temporaryAllowedPathRoots: [],
+      }),
+    ).toThrow(/超出 workspace/);
   });
 });
-
 
 describe('concurrencyContract: orphan ownership', () => {
   it('fail-closed beginTurn while previous orphan is unsettled', async () => {
@@ -104,7 +105,9 @@ describe('concurrencyContract: orphan ownership', () => {
       eventSink: { sessionId: 'orphan-session' },
     });
     let resolveJoin!: () => void;
-    const joinPromise = new Promise<void>((resolve) => { resolveJoin = resolve; });
+    const joinPromise = new Promise<void>((resolve) => {
+      resolveJoin = resolve;
+    });
     first.registerProducer({
       id: 'hang',
       abort: () => undefined,
@@ -113,10 +116,12 @@ describe('concurrencyContract: orphan ownership', () => {
     await first.abortAndJoin({ reason: 'user_stop', graceMs: 5, forceAfterMs: 5 });
     expect(first.isOrphaned).toBe(true);
     coordinator.endTurn(first);
-    await expect(coordinator.beginTurn({
-      sessionKey: 'orphan-session',
-      turnId: 't-next',
-    })).rejects.toThrow(/TURN_ORPHANED/);
+    await expect(
+      coordinator.beginTurn({
+        sessionKey: 'orphan-session',
+        turnId: 't-next',
+      }),
+    ).rejects.toThrow(/TURN_ORPHANED/);
     resolveJoin();
     await first.whenSettled();
     await new Promise((r) => setTimeout(r, 10));

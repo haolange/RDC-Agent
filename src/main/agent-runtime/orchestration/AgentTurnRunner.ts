@@ -8,7 +8,11 @@ import { AppError } from '@shared/errors/appError';
 
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { generateEventId, nowMs } from '@shared/utils/id';
-import { permissionReviewAuthority, permissionReviewCaptureBaseline, permissionReviewEvidence } from '../permissions/PermissionReviewAuthority';
+import {
+  permissionReviewAuthority,
+  permissionReviewCaptureBaseline,
+  permissionReviewEvidence,
+} from '../permissions/PermissionReviewAuthority';
 import { executePermissionReview } from '../permissions/PermissionReviewRuntime';
 import { delegatedArtifactReferences } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { TokenizerService } from '../core/TokenizerService';
@@ -40,7 +44,11 @@ import {
 import { subscribeAgentTurnEvents, type AgentTurnOutput } from './AgentTurnSubscription';
 import { persistToolCallingRejection, reportRouteDiagnostics } from './AgentTurnCapabilityObservations';
 import type { AgentEventBridgeContext } from '../AgentEventBridge';
-import type { TurnCompletionReadinessValidator, TurnCompletionReceipt, TurnCompletionValidator } from '../agent/TurnCompletionValidator';
+import type {
+  TurnCompletionReadinessValidator,
+  TurnCompletionReceipt,
+  TurnCompletionValidator,
+} from '../agent/TurnCompletionValidator';
 import type {
   AgentTurnOptions,
   PreparedAgentRuntime,
@@ -51,12 +59,7 @@ import type {
 import type { McpConnectionLease } from './McpConnectionCoordinator';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type {
-  Message,
-  StreamOptions,
-  ToolDefinition,
-  UserMessage,
-} from '../core/types';
+import type { Message, StreamOptions, ToolDefinition, UserMessage } from '../core/types';
 import type { ToolExecutor } from '../agent/AgentLoop';
 import type { AgentRole } from '@shared/types/agent';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
@@ -100,7 +103,14 @@ export interface AgentTurnInput {
   initialMessages?: Message[];
   contextDiagnostic?: Record<string, unknown>;
   preparedRuntime?: PreparedAgentRuntime;
-  terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error', pendingHandoff?: import('./TurnCoordinator').PendingHandoff, completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null, approvedPlan?: TurnHandle['approvedPlan'], completionReceipt?: TurnCompletionReceipt) => void;
+  terminalContext?: (
+    messages: Message[],
+    status: 'complete' | 'stopped' | 'error',
+    pendingHandoff?: import('./TurnCoordinator').PendingHandoff,
+    completionDeclaration?: import('./TurnCoordinator').TurnCompletionDeclaration | null,
+    approvedPlan?: TurnHandle['approvedPlan'],
+    completionReceipt?: TurnCompletionReceipt,
+  ) => void;
 }
 
 /** What one turn owns from beginTurn to endTurn; every later phase reads and updates it. */
@@ -166,7 +176,10 @@ export class AgentTurnRunner {
       throw new Error('RequestPlan is required for every provider request.');
     }
     if (!input.preparedRuntime) {
-      throw new AppError('TURN_NOT_PREPARED', 'preparedRuntime is required; call prepareTurnContext/prepareProfileTurn before runAgentTurn.');
+      throw new AppError(
+        'TURN_NOT_PREPARED',
+        'preparedRuntime is required; call prepareTurnContext/prepareProfileTurn before runAgentTurn.',
+      );
     }
     const preparedRuntime = input.preparedRuntime;
     const turnPolicy = preparedRuntime.effectivePlan.policy;
@@ -196,13 +209,15 @@ export class AgentTurnRunner {
         turnId: input.turnId ?? generateEventId('turn'),
         runId: input.runId,
         parentSignal: input.options?.signal,
-        subagentBudget: input.options?.subagentBudget ?? createSubagentBudgetState({
-          ...DEFAULT_SUBAGENT_BUDGET,
-          maxDepth: turnPolicy.maxChildDepth,
-          maxChildren: turnPolicy.maxSubagents,
-          maxAggregateToolCalls: turnPolicy.maxToolCalls,
-          maxAggregateWallMs: turnPolicy.maxWallTimeMs,
-        }),
+        subagentBudget:
+          input.options?.subagentBudget ??
+          createSubagentBudgetState({
+            ...DEFAULT_SUBAGENT_BUDGET,
+            maxDepth: turnPolicy.maxChildDepth,
+            maxChildren: turnPolicy.maxSubagents,
+            maxAggregateToolCalls: turnPolicy.maxToolCalls,
+            maxAggregateWallMs: turnPolicy.maxWallTimeMs,
+          }),
         policyBudget: createPolicyBudgetState(
           turnPolicy,
           input.options?.subagentBudget?.depth ?? 0,
@@ -214,9 +229,22 @@ export class AgentTurnRunner {
       throw error;
     }
     return {
-      input, preparedRuntime, requestPlan, effectiveModel: input.effectiveModel ?? null, executionScopeId, turnHandle, mcpLease,
-      slotKey: '', slot: null, unsubscribe: null, unregisterAgentProducer: null, abortListener: null,
-      turnEnded: false, setupCleanupComplete: false, captureRestoreFailure: null, captureRestorationNeededForPartial: false,
+      input,
+      preparedRuntime,
+      requestPlan,
+      effectiveModel: input.effectiveModel ?? null,
+      executionScopeId,
+      turnHandle,
+      mcpLease,
+      slotKey: '',
+      slot: null,
+      unsubscribe: null,
+      unregisterAgentProducer: null,
+      abortListener: null,
+      turnEnded: false,
+      setupCleanupComplete: false,
+      captureRestoreFailure: null,
+      captureRestorationNeededForPartial: false,
     };
   }
 
@@ -274,16 +302,20 @@ export class AgentTurnRunner {
       contextDiagnostic: input.contextDiagnostic,
       signatureTools: runtimeTools.definitions,
       routeCapabilityOverride: routeCapability,
-      policyMaxTurns: effectivePlan.policy.maxTurns === Number.MAX_SAFE_INTEGER
-        ? undefined
-        : effectivePlan.policy.maxTurns,
+      policyMaxTurns:
+        effectivePlan.policy.maxTurns === Number.MAX_SAFE_INTEGER ? undefined : effectivePlan.policy.maxTurns,
       profileMaxTurns: effectivePlan.profileMaxTurns,
-      onLoopBudget: (remaining, limit) => { turnHandle.providerLoopBudget = { remaining, limit }; },
+      onLoopBudget: (remaining, limit) => {
+        turnHandle.providerLoopBudget = { remaining, limit };
+      },
       resolvePromptPlan: () => turnHandle.promptPlan ?? promptPlan,
       resolveRuntimeFingerprint: () => turnHandle.runtimePlan?.fingerprint ?? effectivePlan.fingerprint,
       beforeTerminalResponse: createTerminalResponseGuard(run, {
         validateCompletion: this.deps.validateCompletion,
-        approvedGoalContinuation, captureRestorationFeedback, missionPlanningFeedback, toolCallsAtEntry,
+        approvedGoalContinuation,
+        captureRestorationFeedback,
+        missionPlanningFeedback,
+        toolCallsAtEntry,
       }),
       beforeRequestMessages: input.options?.beforeProviderRequestMessages,
       onProviderRequestCommitted: input.options?.onProviderRequestCommitted,
@@ -293,7 +325,15 @@ export class AgentTurnRunner {
       content: input.options?.userContent ?? input.content,
       timestamp: nowMs(),
     };
-    return { activeSlot: run.slot, effectivePlan, runtimeTools, sharedEventContext, turnGeneration, missionPlanningFeedback, userMessage };
+    return {
+      activeSlot: run.slot,
+      effectivePlan,
+      runtimeTools,
+      sharedEventContext,
+      turnGeneration,
+      missionPlanningFeedback,
+      userMessage,
+    };
   }
 
   /** Approved-goal review, the approved capture scope requirement and the completion readiness validator. */
@@ -302,10 +342,16 @@ export class AgentTurnRunner {
     turnHandle.requiresApprovedGoalClosure = Boolean(preparedRuntime.approvedExecution);
     const approvedGoalContinuation = createApprovedGoalContinuation(turnHandle, executionScopeId);
     turnHandle.reviewCompletionDeclaration = (declaration) => approvedGoalContinuation.reviewDeclaration(declaration);
-    turnHandle.requiresApprovedCaptureScope = Boolean(preparedRuntime.approvedExecution?.investigation
-      && !preparedRuntime.approvedExecution.investigation.captureScope);
+    turnHandle.requiresApprovedCaptureScope = Boolean(
+      preparedRuntime.approvedExecution?.investigation && !preparedRuntime.approvedExecution.investigation.captureScope,
+    );
     const captureRestorationFeedback = createCaptureRestorationFeedback(run);
-    installCompletionReadinessValidator(run, this.deps.validateCompletionReadiness, approvedGoalContinuation, captureRestorationFeedback);
+    installCompletionReadinessValidator(
+      run,
+      this.deps.validateCompletionReadiness,
+      approvedGoalContinuation,
+      captureRestorationFeedback,
+    );
     return { approvedGoalContinuation, captureRestorationFeedback };
   }
 
@@ -325,8 +371,10 @@ export class AgentTurnRunner {
       input.projectId,
       input.projectRootPath,
       mcpLease?.poolKey ?? null,
-      { excludeRdcLeaseTools: preparedRuntime.effectivePlan.excludeRdcLeaseTools === true,
-        excludeSubagent: preparedRuntime.effectivePlan.excludeSubagent === true },
+      {
+        excludeRdcLeaseTools: preparedRuntime.effectivePlan.excludeRdcLeaseTools === true,
+        excludeSubagent: preparedRuntime.effectivePlan.excludeSubagent === true,
+      },
     );
     // Preparation freezes the schemas sent to the provider before a staged
     // conversation session has a durable run. Rebuild tool instances here so
@@ -341,9 +389,8 @@ export class AgentTurnRunner {
     const injectedToolDefinitions = preparedRuntime.activeToolDefinitions;
     // native-structured：core 常驻注入，mcp__* 与 extended builtin 默认 deferred；
     // 其它路由不注入工具 schema。
-    const activeToolDefinitions = routeCapability.toolCallingMode === 'native-structured'
-      ? injectedToolDefinitions
-      : [];
+    const activeToolDefinitions =
+      routeCapability.toolCallingMode === 'native-structured' ? injectedToolDefinitions : [];
     const activeToolAllowlist = activeToolDefinitions.map((tool) => tool.name);
     const sharedEventContext: AgentEventBridgeContext = {
       agentId: input.agentId,
@@ -368,14 +415,17 @@ export class AgentTurnRunner {
   }
 
   /** The executor for this turn, with the frozen plan, budget and the permission reviewer. */
-  private createTurnToolExecutor(run: AgentTurnRun, sharedEventContext: AgentEventBridgeContext, activeToolDefinitions: ToolDefinition[]): ToolExecutor {
+  private createTurnToolExecutor(
+    run: AgentTurnRun,
+    sharedEventContext: AgentEventBridgeContext,
+    activeToolDefinitions: ToolDefinition[],
+  ): ToolExecutor {
     const { input, preparedRuntime, requestPlan, turnHandle, executionScopeId, mcpLease } = run;
     const { promptPlan, routeCapability, effectivePlan } = preparedRuntime;
     const activeToolAllowlist = activeToolDefinitions.map((tool) => tool.name);
     // native-structured：执行器用 plan 冻结 allowlist；其它路由与注入列表一致。
-    const executorAllowlist = routeCapability.toolCallingMode === 'native-structured'
-      ? [...effectivePlan.toolAllowlist]
-      : activeToolAllowlist;
+    const executorAllowlist =
+      routeCapability.toolCallingMode === 'native-structured' ? [...effectivePlan.toolAllowlist] : activeToolAllowlist;
     return this.deps.toolExecutors.createToolExecutor(input.agentId, executorAllowlist, executionScopeId, {
       sessionId: executionScopeId,
       runId: input.runId,
@@ -387,18 +437,39 @@ export class AgentTurnRunner {
       mcpPoolKey: mcpLease?.poolKey ?? null,
       effectivePlan,
       policyBudget: turnHandle.policyBudget,
-      reviewPermission: (action, signal, tool) => executePermissionReview({
-        sessionId: executionScopeId, plan: requestPlan, credentialHandle: preparedRuntime.credentialHandle,
-        reasoning: routeCapability.reasoningContract, evidence: {
-          ...permissionReviewEvidence(run.slot?.agent.messages ?? [], executionScopeId, action.arguments),
-          ...(tool?.spec.capture?.replayLifecycle?.(action.arguments) === 'capture_restore'
-            ? { captureBaseline: permissionReviewCaptureBaseline({ controller: turnHandle.captureControl, sessionId: executionScopeId,
-              projectId: input.projectId, turnId: turnHandle.turnId, agentId: input.agentId, accessCeiling: effectivePlan.accessCeiling }) } : {}),
-        },
-        authority: permissionReviewAuthority({ sessionId: executionScopeId, messages: input.initialMessages ?? [],
-          currentRequest: input.content, promptPlan, workspace: effectivePlan.projectRootPath, agentId: input.agentId,
-          delegated: !!effectivePlan.delegationCapsule }), action, signal,
-      }),
+      reviewPermission: (action, signal, tool) =>
+        executePermissionReview({
+          sessionId: executionScopeId,
+          plan: requestPlan,
+          credentialHandle: preparedRuntime.credentialHandle,
+          reasoning: routeCapability.reasoningContract,
+          evidence: {
+            ...permissionReviewEvidence(run.slot?.agent.messages ?? [], executionScopeId, action.arguments),
+            ...(tool?.spec.capture?.replayLifecycle?.(action.arguments) === 'capture_restore'
+              ? {
+                  captureBaseline: permissionReviewCaptureBaseline({
+                    controller: turnHandle.captureControl,
+                    sessionId: executionScopeId,
+                    projectId: input.projectId,
+                    turnId: turnHandle.turnId,
+                    agentId: input.agentId,
+                    accessCeiling: effectivePlan.accessCeiling,
+                  }),
+                }
+              : {}),
+          },
+          authority: permissionReviewAuthority({
+            sessionId: executionScopeId,
+            messages: input.initialMessages ?? [],
+            currentRequest: input.content,
+            promptPlan,
+            workspace: effectivePlan.projectRootPath,
+            agentId: input.agentId,
+            delegated: !!effectivePlan.delegationCapsule,
+          }),
+          action,
+          signal,
+        }),
     });
   }
 
@@ -407,24 +478,39 @@ export class AgentTurnRunner {
     const { input, preparedRuntime, requestPlan, turnHandle, executionScopeId } = run;
     const capsule = preparedRuntime.effectivePlan.delegationCapsule;
     return {
-      sessionId: executionScopeId, turnId: turnHandle.turnId,
+      sessionId: executionScopeId,
+      turnId: turnHandle.turnId,
       runtimeFingerprint: preparedRuntime.effectivePlan.fingerprint,
       profileId: preparedRuntime.effectivePlan.agentId,
       ...(preparedRuntime.effectivePlan.profileProvenance?.sourceHash
-        ? { profileSourceHash: preparedRuntime.effectivePlan.profileProvenance.sourceHash } : {}),
+        ? { profileSourceHash: preparedRuntime.effectivePlan.profileProvenance.sourceHash }
+        : {}),
       ...(preparedRuntime.effectivePlan.profileProvenance
-        ? { profileSource: { scope: preparedRuntime.effectivePlan.profileProvenance.scope,
-          path: preparedRuntime.effectivePlan.profileProvenance.sourcePath } } : {}),
+        ? {
+            profileSource: {
+              scope: preparedRuntime.effectivePlan.profileProvenance.scope,
+              path: preparedRuntime.effectivePlan.profileProvenance.sourcePath,
+            },
+          }
+        : {}),
       providerId: requestPlan.providerId,
       modelId: requestPlan.effectiveModelId,
       reasoningLevel: requestPlan.reasoningWire.selection,
-      skills: preparedRuntime.promptPlan.segments.filter(segment => segment.kind === 'preloaded-skill').map(segment => ({
-        id: segment.id.replace(/^skill:/, ''), hash: segment.sourceHash.replace(/^sha256:/, ''),
-      })),
+      skills: preparedRuntime.promptPlan.segments
+        .filter((segment) => segment.kind === 'preloaded-skill')
+        .map((segment) => ({
+          id: segment.id.replace(/^skill:/, ''),
+          hash: segment.sourceHash.replace(/^sha256:/, ''),
+        })),
       inputArtifacts: delegatedArtifactReferences(executionScopeId) ?? [],
-      selectedTurnCount: typeof input.contextDiagnostic?.selectedTurnCount === 'number' ? input.contextDiagnostic.selectedTurnCount : null,
+      selectedTurnCount:
+        typeof input.contextDiagnostic?.selectedTurnCount === 'number'
+          ? input.contextDiagnostic.selectedTurnCount
+          : null,
       ...(capsule ? { capsuleHash: createHash('sha256').update(JSON.stringify(capsule)).digest('hex') } : {}),
-      requestsDomainCapability: Object.values(capsule?.domainExtensions ?? {}).some(flags => Object.values(flags).some(Boolean)),
+      requestsDomainCapability: Object.values(capsule?.domainExtensions ?? {}).some((flags) =>
+        Object.values(flags).some(Boolean),
+      ),
     };
   }
 
@@ -433,14 +519,31 @@ export class AgentTurnRunner {
     const { input, preparedRuntime, turnHandle, executionScopeId } = run;
     const approvedCapture = preparedRuntime.approvedExecution?.investigation?.captureScope;
     if (!approvedCapture) return;
-    if (!input.sessionId || !input.projectId || input.agentId !== GENERAL_AGENT_ID || !preparedRuntime.approvedExecution?.investigation) {
+    if (
+      !input.sessionId ||
+      !input.projectId ||
+      input.agentId !== GENERAL_AGENT_ID ||
+      !preparedRuntime.approvedExecution?.investigation
+    ) {
       throw new AppError('RDC_CAPTURE_SCOPE_INVALID', 'approved capture work requires the owning General session.');
     }
     const approved = preparedRuntime.approvedExecution;
-    const host = createApprovedCaptureHost({ sessionId: executionScopeId, projectId: input.projectId,
-      offer: approved.offer, contract: approved.investigation!, turn: turnHandle });
-    turnHandle.captureControl = new ApprovedCaptureController({ sessionId: executionScopeId, projectId: input.projectId,
-      planUri: approved.offer.plan.uri, planHash: approved.offer.plan.hash, captureScope: approvedCapture, turn: turnHandle, host });
+    const host = createApprovedCaptureHost({
+      sessionId: executionScopeId,
+      projectId: input.projectId,
+      offer: approved.offer,
+      contract: approved.investigation!,
+      turn: turnHandle,
+    });
+    turnHandle.captureControl = new ApprovedCaptureController({
+      sessionId: executionScopeId,
+      projectId: input.projectId,
+      planUri: approved.offer.plan.uri,
+      planHash: approved.offer.plan.hash,
+      captureScope: approvedCapture,
+      turn: turnHandle,
+      host,
+    });
     await turnHandle.captureControl.initialize();
   }
 
@@ -449,13 +552,24 @@ export class AgentTurnRunner {
     const { input, preparedRuntime, turnHandle, executionScopeId } = run;
     const { activeSlot, effectivePlan } = setup;
     const initialMessageCount = activeSlot.agent.messages.length;
-    const settleDirectTasks = (stopped: boolean) => settleUnfinishedDirectTasks({ sessionId: input.sessionId, turnId: turnHandle.turnId, generation: turnHandle.generation, stopped });
+    const settleDirectTasks = (stopped: boolean) =>
+      settleUnfinishedDirectTasks({
+        sessionId: input.sessionId,
+        turnId: turnHandle.turnId,
+        generation: turnHandle.generation,
+        stopped,
+      });
     let terminalStatus: TerminalStatus = 'complete';
     let completionReceipt: TurnCompletionReceipt | undefined;
     try {
       await activeSlot.agent.prompt(setup.userMessage);
-      if (!turnHandle.isAborted && setup.missionPlanningFeedback()) throw new AppError('MISSION_PLAN_REQUIRED', 'the planning turn ended without a reviewed plan.');
-      if (await settleDirectTasks(false)) throw new AppError('TASK_COMPLETION_DENIED', 'Direct Task executions must be settled before the parent turn completes.');
+      if (!turnHandle.isAborted && setup.missionPlanningFeedback())
+        throw new AppError('MISSION_PLAN_REQUIRED', 'the planning turn ended without a reviewed plan.');
+      if (await settleDirectTasks(false))
+        throw new AppError(
+          'TASK_COMPLETION_DENIED',
+          'Direct Task executions must be settled before the parent turn completes.',
+        );
       if (turnHandle.completionDeclaration?.disposition === 'cancelled' && !turnHandle.isAborted) {
         throw new AppError('TURN_COMPLETION_INVALID', 'cancelled requires an actual abort and joined execution.');
       }
@@ -464,8 +578,13 @@ export class AgentTurnRunner {
       }
       const completionInput = {
         profileId: input.agentId,
-        completionContract: preparedRuntime.approvedExecution?.investigation ? 'investigation-report' as const : turnHandle.runtimePlan?.completionContract,
-        investigationMission: preparedRuntime.approvedExecution?.investigation?.mission ?? turnHandle.runtimePlan?.investigationMission ?? undefined,
+        completionContract: preparedRuntime.approvedExecution?.investigation
+          ? ('investigation-report' as const)
+          : turnHandle.runtimePlan?.completionContract,
+        investigationMission:
+          preparedRuntime.approvedExecution?.investigation?.mission ??
+          turnHandle.runtimePlan?.investigationMission ??
+          undefined,
         turnId: turnHandle.turnId,
         sessionId: executionScopeId,
         finalAnswerText: output.canonicalFinalAnswerText,
@@ -476,10 +595,16 @@ export class AgentTurnRunner {
       this.deps.validateCompletion(completionInput);
       if (turnHandle.captureControl) {
         let restored = false;
-        try { restored = await turnHandle.captureControl.recordTerminalRestoration(turnHandle.signal); }
-        catch (error) { if (turnHandle.completionDeclaration?.disposition === 'completed') throw error; }
+        try {
+          restored = await turnHandle.captureControl.recordTerminalRestoration(turnHandle.signal);
+        } catch (error) {
+          if (turnHandle.completionDeclaration?.disposition === 'completed') throw error;
+        }
         if (!restored && turnHandle.completionDeclaration?.disposition === 'completed') {
-          throw new AppError('RDC_RESTORE_UNCONFIRMED', 'the original capture position has no verified terminal receipt.');
+          throw new AppError(
+            'RDC_RESTORE_UNCONFIRMED',
+            'the original capture position has no verified terminal receipt.',
+          );
         }
       }
       completionReceipt = {
@@ -520,13 +645,25 @@ export class AgentTurnRunner {
       input.options.signal.removeEventListener('abort', run.abortListener);
     }
     cancelTurnInteractionRequests(turnHandle.turnId);
-    input.terminalContext?.(activeSlot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined, turnHandle.completionDeclaration, terminalStatus === 'complete' ? turnHandle.approvedPlan : null, terminalStatus === 'complete' ? completionReceipt : undefined);
+    input.terminalContext?.(
+      activeSlot.agent.messages.slice(initialMessageCount) as Message[],
+      terminalStatus,
+      turnHandle.pendingHandoff ?? undefined,
+      turnHandle.completionDeclaration,
+      terminalStatus === 'complete' ? turnHandle.approvedPlan : null,
+      terminalStatus === 'complete' ? completionReceipt : undefined,
+    );
     this.deps.slots.flush(activeSlot);
     if (turnHandle.isAborted) {
       await turnHandle.abortAndJoin({ reason: turnHandle.reason ?? 'user_stop' });
     }
-    await settleJoinedTurnTaskExecutions({ sessionId: input.sessionId, turnId: turnHandle.turnId,
-      generation: turnHandle.generation, stopped: turnHandle.isAborted, orphaned: turnHandle.isOrphaned });
+    await settleJoinedTurnTaskExecutions({
+      sessionId: input.sessionId,
+      turnId: turnHandle.turnId,
+      generation: turnHandle.generation,
+      stopped: turnHandle.isAborted,
+      orphaned: turnHandle.isOrphaned,
+    });
     if (turnHandle.isOrphaned) {
       // Reserve the key until the orphaned provider/tool loop actually settles.
       this.deps.slots.quarantineSlot(slotKey, activeSlot.agent.activeLoopPromise ?? Promise.resolve());

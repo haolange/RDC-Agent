@@ -4,8 +4,8 @@ import { z, type ZodType } from 'zod';
 import { generateEventId, nowIso } from '@shared/utils/id';
 import { parseJsonWith, readValidatedSync } from '../../runtime/atomicFile';
 import { sessionRecordStore } from '../../sessions/store/sessionStores';
-import { runScopedStore } from '../../sessions/store/RunScopedStore';import type { RequestBranch } from '@shared/types/trace';
-
+import { runScopedStore } from '../../sessions/store/RunScopedStore';
+import type { RequestBranch } from '@shared/types/trace';
 
 const STORE_FILE = 'agentic-trace-state.json';
 
@@ -18,43 +18,57 @@ export interface TracePersistedState {
   updatedAt: string;
 }
 
-const UserRequestRevisionSchema = z.object({
-  id: z.string(),
-  requestId: z.string(),
-  branchId: z.string(),
-  parentRevisionId: z.string().optional(),
-  prompt: z.string(),
-  createdAt: z.string(),
-  resultingTraceLaneIds: z.array(z.string()),
-}).strict();
-
-const RequestBranchSchema = z.object({
-  id: z.string(),
-  parentBranchId: z.string().optional(),
-  revisionId: z.string(),
-  status: z.enum(['active', 'inactive', 'abandoned', 'completed']),
-  traceLaneIds: z.array(z.string()),
-}).strict();
-
-const TracePersistedStateSchema: ZodType<TracePersistedState> = z.object({
-  schemaVersion: z.literal('1'),
-  sessionId: z.string(),
-  activeBranchId: z.string(),
-  userRequests: z.array(z.object({
+const UserRequestRevisionSchema = z
+  .object({
     id: z.string(),
+    requestId: z.string(),
+    branchId: z.string(),
+    parentRevisionId: z.string().optional(),
+    prompt: z.string(),
+    createdAt: z.string(),
+    resultingTraceLaneIds: z.array(z.string()),
+  })
+  .strict();
+
+const RequestBranchSchema = z
+  .object({
+    id: z.string(),
+    parentBranchId: z.string().optional(),
+    revisionId: z.string(),
+    status: z.enum(['active', 'inactive', 'abandoned', 'completed']),
+    traceLaneIds: z.array(z.string()),
+  })
+  .strict();
+
+const TracePersistedStateSchema: ZodType<TracePersistedState> = z
+  .object({
+    schemaVersion: z.literal('1'),
     sessionId: z.string(),
-    rootRevisionId: z.string(),
-    activeRevisionId: z.string(),
-    revisions: z.array(UserRequestRevisionSchema),
-  }).strict()),
-  branches: z.array(z.object({
-    id: z.string(),
-    rootRequestId: z.string(),
     activeBranchId: z.string(),
-    branches: z.array(RequestBranchSchema),
-  }).strict()),
-  updatedAt: z.string(),
-}).strict();
+    userRequests: z.array(
+      z
+        .object({
+          id: z.string(),
+          sessionId: z.string(),
+          rootRevisionId: z.string(),
+          activeRevisionId: z.string(),
+          revisions: z.array(UserRequestRevisionSchema),
+        })
+        .strict(),
+    ),
+    branches: z.array(
+      z
+        .object({
+          id: z.string(),
+          rootRequestId: z.string(),
+          activeBranchId: z.string(),
+          branches: z.array(RequestBranchSchema),
+        })
+        .strict(),
+    ),
+    updatedAt: z.string(),
+  })
+  .strict();
 
 const defaultState = (sessionId: string): TracePersistedState => ({
   schemaVersion: '1',
@@ -96,9 +110,11 @@ export class TraceStateStore {
     traceLaneId: string;
   }): TracePersistedState {
     const state = this.read(input.sessionId);
-    if (state.userRequests.some((request) => (
-      request.revisions.some((revision) => revision.resultingTraceLaneIds.includes(input.traceLaneId))
-    ))) {
+    if (
+      state.userRequests.some((request) =>
+        request.revisions.some((revision) => revision.resultingTraceLaneIds.includes(input.traceLaneId)),
+      )
+    ) {
       return state;
     }
 
@@ -191,9 +207,9 @@ export class TraceStateStore {
           ...branchGroup,
           activeBranchId: branchId,
           branches: branchGroup.branches
-            .map((branch): RequestBranch => (
-              branch.id === state.activeBranchId ? { ...branch, status: 'inactive' } : branch
-            ))
+            .map((branch): RequestBranch =>
+              branch.id === state.activeBranchId ? { ...branch, status: 'inactive' } : branch,
+            )
             .concat(nextBranch),
         }
       : {
@@ -207,10 +223,10 @@ export class TraceStateStore {
       ...state,
       activeBranchId: branchId,
       userRequests: rootRequest
-        ? state.userRequests.map((request) => request.id === rootRequest.id ? nextRequest : request)
+        ? state.userRequests.map((request) => (request.id === rootRequest.id ? nextRequest : request))
         : [...state.userRequests, nextRequest],
       branches: branchGroup
-        ? state.branches.map((group) => group.id === branchGroup.id ? nextBranchGroup : group)
+        ? state.branches.map((group) => (group.id === branchGroup.id ? nextBranchGroup : group))
         : [...state.branches, nextBranchGroup],
     });
   }

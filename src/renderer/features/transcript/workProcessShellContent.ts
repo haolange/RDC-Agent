@@ -1,4 +1,10 @@
-import { type ToolContentInput, type UnwrappedToolContent, SHELL_PREVIEW_MAX_LINES, sanitizeContentText, filterEnvelopeLines } from './workProcessToolContentShared';
+import {
+  type ToolContentInput,
+  type UnwrappedToolContent,
+  SHELL_PREVIEW_MAX_LINES,
+  sanitizeContentText,
+  filterEnvelopeLines,
+} from './workProcessToolContentShared';
 import { stringifyPreview, createDetailLines, readNestedValue, isLikelyBinaryText } from './workProcessContentText';
 
 /** A shell command (any tool named like one): the command and its output; binary output is left out. */
@@ -6,20 +12,17 @@ export function presentShellContent(input: ToolContentInput): UnwrappedToolConte
   const { t, record, details, argsRecord, contentText } = input;
   const commandText = sanitizeContentText(
     stringifyPreview(
-      argsRecord?.command
-      ?? readNestedValue(argsRecord ?? {}, ['rdc', 'operation'])
-      ?? argsRecord?.cmd
-      ?? details?.command
-      ?? record?.command
-      ?? readNestedValue(record ?? {}, ['data', 'details', 'command']),
+      argsRecord?.command ??
+        readNestedValue(argsRecord ?? {}, ['rdc', 'operation']) ??
+        argsRecord?.cmd ??
+        details?.command ??
+        record?.command ??
+        readNestedValue(record ?? {}, ['data', 'details', 'command']),
     ),
   );
   const stdout = sanitizeContentText(
-    stringifyPreview(
-      record?.stdout
-      ?? readNestedValue(record ?? {}, ['result', 'stdout'])
-      ?? details?.stdout,
-    ) || contentText,
+    stringifyPreview(record?.stdout ?? readNestedValue(record ?? {}, ['result', 'stdout']) ?? details?.stdout) ||
+      contentText,
   );
   if (isLikelyBinaryText(stdout)) {
     return {

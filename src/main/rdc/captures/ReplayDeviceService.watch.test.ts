@@ -1,14 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdbExecutableCache } from './adbExecutable';
 import * as adbServerClient from './adbServerClient';
-import {
-  ReplayDeviceService,
-  WATCH_LEASE_TTL_MS,
-  WATCH_POLL_MS,
-} from './ReplayDeviceService';
+import { ReplayDeviceService, WATCH_LEASE_TTL_MS, WATCH_POLL_MS } from './ReplayDeviceService';
 import { POLL_BASE_MS } from './replayDeviceDiff';
 
-vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: { snapshot: () => ({ revision: 1, user: { tooling: { rdcCli: { env: {} } } } }) } }));
+vi.mock('../../settings/settings-core/SettingsService', () => ({
+  settingsService: { snapshot: () => ({ revision: 1, user: { tooling: { rdcCli: { env: {} } } } }) },
+}));
 vi.mock('../RdcCliInvokerService', () => ({ rdcCliInvokerService: { loadCatalog: vi.fn(async () => ({})) } }));
 vi.mock('../withRdcHostRuntimeEnv', () => ({ withRdcHostRuntimeEnv: (value: unknown) => value }));
 
@@ -65,19 +63,38 @@ describe('ReplayDeviceService watch lease', () => {
     vi.mocked(adbServerClient.queryAdbDevicesLinesWithServerBootstrap).mockRejectedValueOnce(new Error('ADB missing'));
     const service = createService();
     await service.refreshDevices();
-    expect(service.getSnapshot()).toMatchObject({ discovery: { status: 'failed', error: 'ADB missing' }, devices: [{ id: 'local' }] });
+    expect(service.getSnapshot()).toMatchObject({
+      discovery: { status: 'failed', error: 'ADB missing' },
+      devices: [{ id: 'local' }],
+    });
     service.dispose();
   });
 
   it('detects a hot-plugged device and does not publish a cancelled late scan', async () => {
-    const service = createService(); service.startWatch(); await flushWatchRefresh();
-    vi.mocked(adbServerClient.queryAdbDevicesLinesWithServerBootstrap).mockResolvedValueOnce(['PHONE\tdevice model:Phone']);
-    service.renewWatch(); await vi.advanceTimersByTimeAsync(POLL_BASE_MS);
-    expect(service.getSnapshot().devices).toContainEqual(expect.objectContaining({ serial: 'PHONE', adbState: 'device' }));
+    const service = createService();
+    service.startWatch();
+    await flushWatchRefresh();
+    vi.mocked(adbServerClient.queryAdbDevicesLinesWithServerBootstrap).mockResolvedValueOnce([
+      'PHONE\tdevice model:Phone',
+    ]);
+    service.renewWatch();
+    await vi.advanceTimersByTimeAsync(POLL_BASE_MS);
+    expect(service.getSnapshot().devices).toContainEqual(
+      expect.objectContaining({ serial: 'PHONE', adbState: 'device' }),
+    );
     let finish!: (rows: string[]) => void;
-    vi.mocked(adbServerClient.queryAdbDevicesLinesWithServerBootstrap).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
-    const scan = service.refreshDevices(); await flushWatchRefresh(); service.stopWatch();
-    const revision = service.getSnapshot().revision; finish(['LATE\tdevice']); await scan;
+    vi.mocked(adbServerClient.queryAdbDevicesLinesWithServerBootstrap).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const scan = service.refreshDevices();
+    await flushWatchRefresh();
+    service.stopWatch();
+    const revision = service.getSnapshot().revision;
+    finish(['LATE\tdevice']);
+    await scan;
     expect(service.getSnapshot().revision).toBe(revision);
     expect(service.getSnapshot().devices.some((device) => device.serial === 'LATE')).toBe(false);
     service.dispose();
@@ -95,12 +112,22 @@ describe('ReplayDeviceService watch lease', () => {
   it('coalesces concurrent scans and resets the bootstrap attempt on reopening', async () => {
     const service = createService();
     let finish!: (rows: string[]) => void;
-    vi.mocked(adbServerClient.queryAdbDevicesLinesWithServerBootstrap).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
-    const first = service.refreshDevices(); const second = service.refreshDevices(); await flushWatchRefresh();
-    expect(refreshCallCount()).toBe(1); finish([]); await Promise.all([first, second]);
+    vi.mocked(adbServerClient.queryAdbDevicesLinesWithServerBootstrap).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const first = service.refreshDevices();
+    const second = service.refreshDevices();
+    await flushWatchRefresh();
+    expect(refreshCallCount()).toBe(1);
+    finish([]);
+    await Promise.all([first, second]);
     const internals = service as unknown as { adbStartServerState: { startServerAttempted: boolean } };
     internals.adbStartServerState.startServerAttempted = true;
-    service.startWatch(); await flushWatchRefresh();
+    service.startWatch();
+    await flushWatchRefresh();
     expect(internals.adbStartServerState.startServerAttempted).toBe(false);
     service.dispose();
   });
@@ -108,13 +135,17 @@ describe('ReplayDeviceService watch lease', () => {
   it('distinguishes unauthorized, authorized, unplugged and reconnected transport state', async () => {
     const service = createService();
     const rows = vi.mocked(adbServerClient.queryAdbDevicesLinesWithServerBootstrap);
-    rows.mockResolvedValueOnce(['PHONE\tunauthorized']); await service.refreshDevices();
+    rows.mockResolvedValueOnce(['PHONE\tunauthorized']);
+    await service.refreshDevices();
     expect(service.getSnapshot().devices[1]).toMatchObject({ adbState: 'unauthorized', status: 'offline' });
-    rows.mockResolvedValueOnce(['PHONE\tdevice']); await service.refreshDevices();
+    rows.mockResolvedValueOnce(['PHONE\tdevice']);
+    await service.refreshDevices();
     expect(service.getSnapshot().devices[1]).toMatchObject({ adbState: 'device', status: 'online' });
-    rows.mockResolvedValueOnce([]); await service.refreshDevices();
+    rows.mockResolvedValueOnce([]);
+    await service.refreshDevices();
     expect(service.getSnapshot().devices[1]).toMatchObject({ adbState: 'missing', status: 'offline' });
-    rows.mockResolvedValueOnce(['PHONE\tdevice transport_id:2']); await service.refreshDevices();
+    rows.mockResolvedValueOnce(['PHONE\tdevice transport_id:2']);
+    await service.refreshDevices();
     expect(service.getSnapshot().devices[1]).toMatchObject({ adbState: 'device', status: 'online' });
     service.dispose();
   });

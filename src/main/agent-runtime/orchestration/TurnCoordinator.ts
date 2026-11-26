@@ -209,16 +209,12 @@ export function assertSubagentBudgetAllowsChild(state: SubagentBudgetState, now 
     throw new AppError('SUBAGENT_BUDGET', `maxChildren ${state.budget.maxChildren} exceeded.`);
   }
   if (state.aggregateToolCalls >= state.budget.maxAggregateToolCalls) {
-    throw new AppError(
-      'SUBAGENT_BUDGET', `maxAggregateToolCalls ${state.budget.maxAggregateToolCalls} exceeded.`,
-    );
+    throw new AppError('SUBAGENT_BUDGET', `maxAggregateToolCalls ${state.budget.maxAggregateToolCalls} exceeded.`);
   }
   // Only time with an active child spends the child wall window. Parent work
   // between delegations must not consume time reserved for child execution.
   if (subagentActiveWallMs(state, now) >= state.budget.maxAggregateWallMs) {
-    throw new AppError(
-      'SUBAGENT_BUDGET', `maxAggregateWallMs ${state.budget.maxAggregateWallMs} exceeded.`,
-    );
+    throw new AppError('SUBAGENT_BUDGET', `maxAggregateWallMs ${state.budget.maxAggregateWallMs} exceeded.`);
   }
 }
 
@@ -228,7 +224,8 @@ export type TurnProducer = {
   join: () => Promise<void>;
 };
 
-export const APPROVED_CAPTURE_SCOPE_REQUIRED = 'APPROVED_CAPTURE_SCOPE_REQUIRED: This approved Mission has no frozen capture scope. Return to the Mission and submit plan_artifact.captureScope with the intended registered inputs and selected device for review before using live RDC.';
+export const APPROVED_CAPTURE_SCOPE_REQUIRED =
+  'APPROVED_CAPTURE_SCOPE_REQUIRED: This approved Mission has no frozen capture scope. Return to the Mission and submit plan_artifact.captureScope with the intended registered inputs and selected device for review before using live RDC.';
 
 export interface AbortAndJoinOptions {
   graceMs?: number;
@@ -307,9 +304,12 @@ export class TurnHandle {
     assertPolicyWallTimeAllowed(this.policyBudget.maxWallTimeMs);
     const remainingWallMs = this.policyBudget.maxWallTimeMs - (Date.now() - this.policyBudget.wallStartedAt);
     if (remainingWallMs < 2_147_000_000) {
-      this.wallTimer = setTimeout(() => {
-        void this.abortAndJoin({ reason: 'timeout' });
-      }, Math.max(0, remainingWallMs));
+      this.wallTimer = setTimeout(
+        () => {
+          void this.abortAndJoin({ reason: 'timeout' });
+        },
+        Math.max(0, remainingWallMs),
+      );
       this.wallTimer.unref();
     }
 
@@ -330,7 +330,10 @@ export class TurnHandle {
   }
 
   private releaseTimers(): void {
-    if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
+    if (this.wallTimer) {
+      clearTimeout(this.wallTimer);
+      this.wallTimer = null;
+    }
     this.detachParentSignal?.();
     this.detachParentSignal = null;
   }
@@ -379,7 +382,10 @@ export class TurnHandle {
       }
       await Promise.allSettled(
         entries.map(([, producer]) =>
-          producer.join().then(() => undefined, () => undefined),
+          producer.join().then(
+            () => undefined,
+            () => undefined,
+          ),
         ),
       );
       // Joins may settle without unregister callbacks; drop settled entries so
@@ -606,7 +612,8 @@ export class TurnCoordinator {
     const orphaned = this.orphanedBySession.get(input.sessionKey);
     if (orphaned && !orphaned.isSettled) {
       throw new AppError(
-        'TURN_ORPHANED', `session ${input.sessionKey} still has an orphaned turn (${orphaned.turnId}) awaiting producer settlement.`,
+        'TURN_ORPHANED',
+        `session ${input.sessionKey} still has an orphaned turn (${orphaned.turnId}) awaiting producer settlement.`,
       );
     }
     if (orphaned && orphaned.isSettled) {
@@ -619,7 +626,8 @@ export class TurnCoordinator {
       if (previous.isOrphaned && !previous.isSettled) {
         this.retainOrphan(previous);
         throw new AppError(
-          'TURN_ORPHANED', `session ${input.sessionKey} previous turn (${previous.turnId}) is orphaned and not settled.`,
+          'TURN_ORPHANED',
+          `session ${input.sessionKey} previous turn (${previous.turnId}) is orphaned and not settled.`,
         );
       }
       if (this.activeBySession.get(input.sessionKey) === previous) {
@@ -682,12 +690,14 @@ export class TurnCoordinator {
   async abortAll(reason: AbortReason = 'app_shutdown'): Promise<void> {
     const handles = Array.from(this.activeBySession.values());
     this.activeBySession.clear();
-    await Promise.allSettled(handles.map(async (h) => {
-      await h.abortAndJoin({ reason });
-      if (h.isOrphaned && !h.isSettled) {
-        this.retainOrphan(h);
-      }
-    }));
+    await Promise.allSettled(
+      handles.map(async (h) => {
+        await h.abortAndJoin({ reason });
+        if (h.isOrphaned && !h.isSettled) {
+          this.retainOrphan(h);
+        }
+      }),
+    );
   }
 }
 

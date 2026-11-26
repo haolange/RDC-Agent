@@ -18,7 +18,12 @@ export async function hashCaptureFile(filePath: string): Promise<{ sha256: strin
     const after = await handle.stat({ bigint: true });
     const named = await openedFileIdentity(filePath);
     const linkAfter = await fs.lstat(filePath);
-    if (!sameFileState(before, after) || !sameFileState(after, named) || !linkAfter.isFile() || linkAfter.isSymbolicLink()) {
+    if (
+      !sameFileState(before, after) ||
+      !sameFileState(after, named) ||
+      !linkAfter.isFile() ||
+      linkAfter.isSymbolicLink()
+    ) {
       throw new AppError('CAPTURE_CHANGED_DURING_HASH');
     }
     return { sha256: hash.digest('hex'), size: Number(after.size), mtimeMs: Number(after.mtimeNs) / 1e6 };

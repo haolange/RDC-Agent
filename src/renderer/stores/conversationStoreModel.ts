@@ -1,23 +1,18 @@
-import { compareConversationMessages, resolveVisibleConversationMessages } from '@shared/conversation/conversationBranchResolver';
+import {
+  compareConversationMessages,
+  resolveVisibleConversationMessages,
+} from '@shared/conversation/conversationBranchResolver';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ReasoningSummary } from '@shared/types/workflow';
 
-const TERMINAL_ASSISTANT_STATUSES = new Set<ConversationMessage['status']>([
-  'complete',
-  'error',
-  'stopped',
-]);
+const TERMINAL_ASSISTANT_STATUSES = new Set<ConversationMessage['status']>(['complete', 'error', 'stopped']);
 
-export const ACTIVE_ASSISTANT_STATUSES = new Set<ConversationMessage['status']>([
-  'draft',
-  'streaming',
-]);
+export const ACTIVE_ASSISTANT_STATUSES = new Set<ConversationMessage['status']>(['draft', 'streaming']);
 
 export const sortConversationMessages = (messages: ConversationMessage[]): ConversationMessage[] =>
   messages.slice().sort(compareConversationMessages);
-
 
 /** True when a late streaming/draft patch must not reopen a monotonically stopped turn. */
 export function shouldRejectActivePatchForMonotonicStop(
@@ -83,7 +78,10 @@ export interface ConversationState {
   upsertConversationMessage: (message: ConversationMessage) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
   patchAssistantMessageByTurnId: (turnId: string, patch: Partial<ConversationMessage>) => void;
-  updateAssistantMessageByTurnId: (turnId: string, updater: (message: ConversationMessage) => ConversationMessage) => void;
+  updateAssistantMessageByTurnId: (
+    turnId: string,
+    updater: (message: ConversationMessage) => ConversationMessage,
+  ) => void;
   markTurnMonotonicallyStopped: (turnId: string) => void;
   markRequestMonotonicallyStopped: (requestId: string) => void;
   markRequestRevoked: (requestId: string) => void;

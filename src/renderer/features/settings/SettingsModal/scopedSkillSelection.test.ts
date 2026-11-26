@@ -3,8 +3,15 @@ import { projectSkillSelection, resolveSkillSelectionRequest } from './scopedSki
 import type { SkillSelectionOption } from '@shared/types/rdcRuntime';
 
 const skill = (id: string, unavailableToAgentIds: string[] = []): SkillSelectionOption => ({
-  id, name: id, description: '', allowedTools: [], scope: 'builtin', sourcePath: '/skills',
-  sourceHash: 'hash', effectiveStatus: 'effective', unavailableToAgentIds,
+  id,
+  name: id,
+  description: '',
+  allowedTools: [],
+  scope: 'builtin',
+  sourcePath: '/skills',
+  sourceHash: 'hash',
+  effectiveStatus: 'effective',
+  unavailableToAgentIds,
 });
 
 describe('scoped skill selection', () => {
@@ -23,7 +30,15 @@ describe('scoped skill selection', () => {
     expect(projectSkillSelection(catalog, 'general', selected).options).toHaveLength(2);
   });
   it('distinguishes read errors from an empty resolved catalog', () => {
-    expect(projectSkillSelection({ status: 'ready', options: [] }, 'general', ['a']).unavailable).toEqual({ a: 'missing' });
-    expect(projectSkillSelection({ status: 'error', options: [], error: { code: 'SKILL_CATALOG_READ_FAILED', message: 'denied' } }, 'general', ['a']).unavailable).toEqual({ a: 'catalog-error' });
+    expect(projectSkillSelection({ status: 'ready', options: [] }, 'general', ['a']).unavailable).toEqual({
+      a: 'missing',
+    });
+    expect(
+      projectSkillSelection(
+        { status: 'error', options: [], error: { code: 'SKILL_CATALOG_READ_FAILED', message: 'denied' } },
+        'general',
+        ['a'],
+      ).unavailable,
+    ).toEqual({ a: 'catalog-error' });
   });
 });

@@ -18,7 +18,13 @@ interface ReadImageDetails {
   mimeType: string;
   bytes: number;
   sha256: string;
-  source?: { sha256: string; mimeType: string; width: number; height: number; region: NonNullable<ReadImageParams['region']> };
+  source?: {
+    sha256: string;
+    mimeType: string;
+    width: number;
+    height: number;
+    region: NonNullable<ReadImageParams['region']>;
+  };
   imagePreviews?: Array<{
     previewId: string;
     fileName: string;
@@ -44,11 +50,23 @@ export const readImageTool: AgentTool<ReadImageParams, ReadImageDetails> = {
   parameters: {
     type: 'object',
     properties: {
-      path: { type: 'string', description: 'Workspace-relative path, or absolute path inside the workspace or frozen Knowledge read scope. Use returned readImageArgs for Knowledge images; do not guess a knowledge root.' },
-      region: { type: 'object', description: 'Optional source-image pixel rectangle; origin is top left.',
-        properties: { x: { type: 'integer', minimum: 0 }, y: { type: 'integer', minimum: 0 },
-          width: { type: 'integer', minimum: 1 }, height: { type: 'integer', minimum: 1 } },
-        required: ['x', 'y', 'width', 'height'], additionalProperties: false },
+      path: {
+        type: 'string',
+        description:
+          'Workspace-relative path, or absolute path inside the workspace or frozen Knowledge read scope. Use returned readImageArgs for Knowledge images; do not guess a knowledge root.',
+      },
+      region: {
+        type: 'object',
+        description: 'Optional source-image pixel rectangle; origin is top left.',
+        properties: {
+          x: { type: 'integer', minimum: 0 },
+          y: { type: 'integer', minimum: 0 },
+          width: { type: 'integer', minimum: 1 },
+          height: { type: 'integer', minimum: 1 },
+        },
+        required: ['x', 'y', 'width', 'height'],
+        additionalProperties: false,
+      },
     },
     required: ['path'],
   },
@@ -72,7 +90,7 @@ export const readImageTool: AgentTool<ReadImageParams, ReadImageDetails> = {
     const absolute = safeResolvePath(params.path, undefined, context);
     const fileName = path.basename(absolute);
     const extension = path.extname(absolute).toLowerCase();
-    const mimeType = extension ? MIME_BY_EXT[extension] ?? 'application/octet-stream' : null;
+    const mimeType = extension ? (MIME_BY_EXT[extension] ?? 'application/octet-stream') : null;
     const checked = await assertSafeImageAttachment(absolute, mimeType, fileName);
     const sourceBytes = await fs.readFile(absolute);
     if (signal?.aborted) throw new Error('Aborted');
@@ -88,7 +106,8 @@ export const readImageTool: AgentTool<ReadImageParams, ReadImageDetails> = {
       const image = nativeImage.createFromBuffer(sourceBytes);
       if (image.isEmpty()) throw new AppError('IMAGE_REGION_INVALID', 'source image could not be decoded.');
       const size = image.getSize();
-      if (x + width > size.width || y + height > size.height) throw new AppError('IMAGE_REGION_INVALID', 'rectangle exceeds source dimensions.');
+      if (x + width > size.width || y + height > size.height)
+        throw new AppError('IMAGE_REGION_INVALID', 'rectangle exceeds source dimensions.');
       const cropped = image.crop({ x, y, width, height });
       const croppedSize = cropped.getSize();
       if (cropped.isEmpty() || croppedSize.width !== width || croppedSize.height !== height) {
@@ -97,22 +116,32 @@ export const readImageTool: AgentTool<ReadImageParams, ReadImageDetails> = {
       bytes = cropped.toPNG();
       outputMimeType = 'image/png';
       outputFileName = `${path.parse(fileName).name}-region.png`;
-      source = { sha256: createHash('sha256').update(sourceBytes).digest('hex'), mimeType: checked.mimeType,
-        width: size.width, height: size.height, region: { x, y, width, height } };
+      source = {
+        sha256: createHash('sha256').update(sourceBytes).digest('hex'),
+        mimeType: checked.mimeType,
+        width: size.width,
+        height: size.height,
+        region: { x, y, width, height },
+      };
     }
     const sha256 = createHash('sha256').update(bytes).digest('hex');
     const imagePreviews = context.sessionId
-      ? [await recordToolImagePreview({
-          sessionId: context.sessionId,
-          toolCallId,
-          fileName: outputFileName,
-          bytes,
-          mimeType: outputMimeType,
-        })]
+      ? [
+          await recordToolImagePreview({
+            sessionId: context.sessionId,
+            toolCallId,
+            fileName: outputFileName,
+            bytes,
+            mimeType: outputMimeType,
+          }),
+        ]
       : [];
     return {
       content: [
-        { type: 'text', text: `Viewed image ${outputFileName} (${outputMimeType}, ${bytes.length} bytes) · sha256=${sha256}${source ? ` · source sha256=${source.sha256} · source size=${source.width}x${source.height} · region=${JSON.stringify(source.region)}` : ''}` },
+        {
+          type: 'text',
+          text: `Viewed image ${outputFileName} (${outputMimeType}, ${bytes.length} bytes) · sha256=${sha256}${source ? ` · source sha256=${source.sha256} · source size=${source.width}x${source.height} · region=${JSON.stringify(source.region)}` : ''}`,
+        },
         { type: 'image', data: bytes.toString('base64'), mimeType: outputMimeType },
       ],
       details: {

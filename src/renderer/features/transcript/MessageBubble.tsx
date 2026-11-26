@@ -21,23 +21,15 @@ import { MessageAttachments } from './MessageAttachments';
 import { HandoffSuggestionRow } from './HandoffSuggestionRow';
 import { SystemMessage } from './SystemMessage';
 import { answerSources } from './answerSources';
-import type {
-  ConversationMessage,
-  ConversationMessageStatus,
-} from '@shared/types/conversation';
+import type { ConversationMessage, ConversationMessageStatus } from '@shared/types/conversation';
 
 interface MessageBubbleProps {
   message: ConversationMessage;
 }
 
-const StreamingCursor: React.FC = () => (
-  <span className="conversation-streaming-cursor" aria-hidden="true" />
-);
+const StreamingCursor: React.FC = () => <span className="conversation-streaming-cursor" aria-hidden="true" />;
 
-const renderContentWithCursor = (
-  content: string,
-  status: ConversationMessageStatus | undefined,
-): React.ReactNode => {
+const renderContentWithCursor = (content: string, status: ConversationMessageStatus | undefined): React.ReactNode => {
   const showCursor = status === 'streaming' || status === 'draft';
   if (!content && showCursor) {
     return (
@@ -59,31 +51,24 @@ const MessageMetaBar: React.FC<{
   time: string;
   status?: ConversationMessageStatus;
   onEditResend?: (content: string) => void;
-}> = ({
-  message,
-  time,
-  status,
-  onEditResend,
-}) => {
+}> = ({ message, time, status, onEditResend }) => {
   const { t } = useI18n();
   const branchState = useConversationStore((state) => state.branchState);
   return (
-  <footer className="conversation-message-footer">
-    {time ? (
-      <span className="conversation-message-time">{time}</span>
-    ) : null}
-    {status === 'streaming' ? (
-      <span className="conversation-message-streaming-tag">{t('chat.messageStreaming')}</span>
-    ) : null}
-    {status === 'error' ? (
-      <span className="conversation-message-status-tag is-error">{t('chat.messageError')}</span>
-    ) : null}
-    {/* A Working header already says 已停止; the tag only speaks for replies stopped before any work showed. */}
-    {status === 'stopped' && !message.workTrace?.blocks.length ? (
-      <span className="conversation-message-status-tag is-stopped">{t('chat.messageStopped')}</span>
-    ) : null}
-    <MessageActions message={message} branchState={branchState} onEditResend={onEditResend} />
-  </footer>
+    <footer className="conversation-message-footer">
+      {time ? <span className="conversation-message-time">{time}</span> : null}
+      {status === 'streaming' ? (
+        <span className="conversation-message-streaming-tag">{t('chat.messageStreaming')}</span>
+      ) : null}
+      {status === 'error' ? (
+        <span className="conversation-message-status-tag is-error">{t('chat.messageError')}</span>
+      ) : null}
+      {/* A Working header already says 已停止; the tag only speaks for replies stopped before any work showed. */}
+      {status === 'stopped' && !message.workTrace?.blocks.length ? (
+        <span className="conversation-message-status-tag is-stopped">{t('chat.messageStopped')}</span>
+      ) : null}
+      <MessageActions message={message} branchState={branchState} onEditResend={onEditResend} />
+    </footer>
   );
 };
 
@@ -193,8 +178,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   const showContentBubble = hasContent || (!trace && isInProgress);
   // 诊断文案已由气泡正文承载时不再重复渲染独立诊断块，避免同一信息三重显示。
   const showDiagnosticBlock = Boolean(
-    message.diagnostic
-    && message.diagnostic.userMessage.trim() !== message.content.trim(),
+    message.diagnostic && message.diagnostic.userMessage.trim() !== message.content.trim(),
   );
   // Links to pages this turn read become citations, in the Work Process final answer and in the bubble alike.
   const sources = useMemo(() => answerSources(trace), [trace]);
@@ -210,10 +194,12 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
           <div className="conversation-message-stack">
             {/* Working appears with its first content; a request still preparing shows no empty card. */}
             {trace && (trace.blocks.length > 0 || trace.summary) ? (
-                <WorkProcess trace={trace} sessionId={message.sessionId} rowKey={message.id} answer={message.content} />
+              <WorkProcess trace={trace} sessionId={message.sessionId} rowKey={message.id} answer={message.content} />
             ) : null}
             {message.workTraceDiscarded ? (
-              <p className="conversation-message-trace-note" data-testid="conversation-trace-discarded">{t('chat.workTraceDiscarded')}</p>
+              <p className="conversation-message-trace-note" data-testid="conversation-trace-discarded">
+                {t('chat.workTraceDiscarded')}
+              </p>
             ) : null}
             {message.attachments && message.attachments.length > 0 ? (
               <MessageAttachments attachments={message.attachments} />
@@ -223,19 +209,22 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
                 {renderContentWithCursor(message.content, status)}
               </div>
             ) : null}
-            {!isInProgress && !hasPlanReviewInteraction(trace) && message.handoffSuggestions && message.handoffSuggestions.length > 0 ? (
+            {!isInProgress &&
+            !hasPlanReviewInteraction(trace) &&
+            message.handoffSuggestions &&
+            message.handoffSuggestions.length > 0 ? (
               <HandoffSuggestionRow suggestions={message.handoffSuggestions} />
             ) : null}
             {showDiagnosticBlock && message.diagnostic ? (
-              <InlineError data-testid="conversation-message-diagnostic"
-                detail={[message.diagnostic.code, message.diagnostic.technicalMessage].filter(Boolean).join('\n')}>
+              <InlineError
+                data-testid="conversation-message-diagnostic"
+                detail={[message.diagnostic.code, message.diagnostic.technicalMessage].filter(Boolean).join('\n')}
+              >
                 {message.diagnostic.userMessage}
               </InlineError>
             ) : null}
             {!isInProgress && hasContent ? <MarkdownSourcesRow content={message.content} /> : null}
-            {!isInProgress ? (
-              <MessageMetaBar message={message} time={time} status={status} />
-            ) : null}
+            {!isInProgress ? <MessageMetaBar message={message} time={time} status={status} /> : null}
           </div>
         </div>
       </article>

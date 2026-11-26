@@ -1,4 +1,3 @@
-
 import type { ToolCallResult } from '@shared/types/tool';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ArtifactRef } from './traceNodes';

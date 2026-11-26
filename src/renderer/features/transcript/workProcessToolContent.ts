@@ -71,10 +71,21 @@ export const unwrapToolContentLayer = (
   const argsRecord = toRecord(parsePreview(argsPreview));
   const contentText = sanitizeContentText(extractContentLayerText(parsed, raw));
   const input: ToolContentInput = {
-    toolName, parsed, raw, argsPreview, t, normalized, record, details, argsRecord, contentText,
+    toolName,
+    parsed,
+    raw,
+    argsPreview,
+    t,
+    normalized,
+    record,
+    details,
+    argsRecord,
+    contentText,
   };
   const type = presentationType(normalized);
-  const presenter = Object.hasOwn(TOOL_CONTENT_PRESENTERS, type) ? TOOL_CONTENT_PRESENTERS[type]! : presentGenericContent;
+  const presenter = Object.hasOwn(TOOL_CONTENT_PRESENTERS, type)
+    ? TOOL_CONTENT_PRESENTERS[type]!
+    : presentGenericContent;
   // A result moved into a session file reads from its display gist, whatever the tool.
   return unwrapArtifactContent(input) ?? presenter(input);
 };

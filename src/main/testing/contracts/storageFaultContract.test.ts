@@ -7,11 +7,7 @@ import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import {
-  assertNoJsonlDiagnostics,
-  readJsonl,
-  writeJsonl,
-} from '../../runtime/jsonl';
+import { assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '../../runtime/jsonl';
 import { StorageIo } from '../../runtime/StorageIo';
 
 const IdRecord = z.object({ id: z.string() });

@@ -42,10 +42,11 @@ export function decideContinuationReplay(
     return drop('model-not-admitted');
   }
   if (
-    target.contracts.toolLoop.artifactPolicy === 'discard'
-    || artifact.scope === 'none'
-    || artifact.scope === 'unknown'
-  ) return drop('contract-discard');
+    target.contracts.toolLoop.artifactPolicy === 'discard' ||
+    artifact.scope === 'none' ||
+    artifact.scope === 'unknown'
+  )
+    return drop('contract-discard');
   if (artifact.scope === 'tool-call-turn' && !context.sameToolLoop) return drop('scope-ended');
   if (!containerMatches(artifact, context)) return drop('container-mismatch');
 
@@ -70,72 +71,79 @@ export function decideContinuationReplay(
 function exactExecutionMatches(artifact: ProviderContinuationArtifact, target: RequestPlan): boolean {
   const source = artifact.origin;
   const next = target.executionIdentity;
-  return source.providerId === next.providerId
-    && source.credentialScopeHash === next.credentialScopeHash
-    && source.endpointHash === next.endpointHash
-    && source.protocolFamily === next.protocolFamily
-    && source.protocolDialect === next.protocolDialect
-    && source.protocolVersion === next.protocolVersion
-    && source.catalogRevision === next.catalogRevision
-    && source.routeRevision === next.routeRevision
-    && source.selectedModelId === next.selectedModelId
-    && source.effectiveModelId === next.effectiveModelId
-    && source.canonicalModelId === next.canonicalModelId
-    && source.modelSnapshotId === next.modelSnapshotId
-    && source.variantKey === next.variantKey
-    && equalArray(source.bindingIds, next.bindingIds)
-    && source.reasoningMode === next.reasoningMode
-    && source.contextMode === next.contextMode
-    && source.stateMode === next.stateMode
-    && source.artifactFormat === next.artifactFormat
-    && source.artifactVersion === next.artifactVersion
-    && source.contractHash === next.contractHash;
+  return (
+    source.providerId === next.providerId &&
+    source.credentialScopeHash === next.credentialScopeHash &&
+    source.endpointHash === next.endpointHash &&
+    source.protocolFamily === next.protocolFamily &&
+    source.protocolDialect === next.protocolDialect &&
+    source.protocolVersion === next.protocolVersion &&
+    source.catalogRevision === next.catalogRevision &&
+    source.routeRevision === next.routeRevision &&
+    source.selectedModelId === next.selectedModelId &&
+    source.effectiveModelId === next.effectiveModelId &&
+    source.canonicalModelId === next.canonicalModelId &&
+    source.modelSnapshotId === next.modelSnapshotId &&
+    source.variantKey === next.variantKey &&
+    equalArray(source.bindingIds, next.bindingIds) &&
+    source.reasoningMode === next.reasoningMode &&
+    source.contextMode === next.contextMode &&
+    source.stateMode === next.stateMode &&
+    source.artifactFormat === next.artifactFormat &&
+    source.artifactVersion === next.artifactVersion &&
+    source.contractHash === next.contractHash
+  );
 }
 
 function sameProviderModelMatches(artifact: ProviderContinuationArtifact, target: RequestPlan): boolean {
   const source = artifact.origin;
   const next = target.executionIdentity;
-  return sameProviderBoundary(artifact, target)
-    && source.effectiveModelId === next.effectiveModelId
-    && source.canonicalModelId === next.canonicalModelId
-    && source.modelSnapshotId === next.modelSnapshotId
-    && source.variantKey === next.variantKey
-    && source.reasoningMode === next.reasoningMode;
+  return (
+    sameProviderBoundary(artifact, target) &&
+    source.effectiveModelId === next.effectiveModelId &&
+    source.canonicalModelId === next.canonicalModelId &&
+    source.modelSnapshotId === next.modelSnapshotId &&
+    source.variantKey === next.variantKey &&
+    source.reasoningMode === next.reasoningMode
+  );
 }
 
 function sameCompatibilityGroupMatches(artifact: ProviderContinuationArtifact, target: RequestPlan): boolean {
   const next = target.executionIdentity;
-  return sameProviderBoundary(artifact, target)
-    && artifact.compatibilityGroup === target.contracts.reasoning.compatibilityGroup
-    && artifact.compatibilityGroup === next.compatibilityGroup;
+  return (
+    sameProviderBoundary(artifact, target) &&
+    artifact.compatibilityGroup === target.contracts.reasoning.compatibilityGroup &&
+    artifact.compatibilityGroup === next.compatibilityGroup
+  );
 }
 
 function sameProviderBoundary(artifact: ProviderContinuationArtifact, target: RequestPlan): boolean {
   const source = artifact.origin;
   const next = target.executionIdentity;
-  return source.providerId === next.providerId
-    && source.credentialScopeHash === next.credentialScopeHash
-    && source.endpointHash === next.endpointHash
-    && source.protocolFamily === next.protocolFamily
-    && source.protocolDialect === next.protocolDialect
-    && source.protocolVersion === next.protocolVersion
-    && artifact.format === next.artifactFormat
-    && artifact.version === next.artifactVersion;
+  return (
+    source.providerId === next.providerId &&
+    source.credentialScopeHash === next.credentialScopeHash &&
+    source.endpointHash === next.endpointHash &&
+    source.protocolFamily === next.protocolFamily &&
+    source.protocolDialect === next.protocolDialect &&
+    source.protocolVersion === next.protocolVersion &&
+    artifact.format === next.artifactFormat &&
+    artifact.version === next.artifactVersion
+  );
 }
 
 function providerStateMatches(artifact: ProviderContinuationArtifact, target: RequestPlan): boolean {
   const next = target.executionIdentity;
-  return target.statePlan.mode === 'provider-managed'
-    && target.contracts.reasoning.continuation === 'provider-managed'
-    && sameProviderBoundary(artifact, target)
-    && artifact.origin.effectiveModelId === next.effectiveModelId
-    && artifact.origin.canonicalModelId === next.canonicalModelId;
+  return (
+    target.statePlan.mode === 'provider-managed' &&
+    target.contracts.reasoning.continuation === 'provider-managed' &&
+    sameProviderBoundary(artifact, target) &&
+    artifact.origin.effectiveModelId === next.effectiveModelId &&
+    artifact.origin.canonicalModelId === next.canonicalModelId
+  );
 }
 
-function containerMatches(
-  artifact: ProviderContinuationArtifact,
-  context: ContinuationReplayContext,
-): boolean {
+function containerMatches(artifact: ProviderContinuationArtifact, context: ContinuationReplayContext): boolean {
   if (artifact.mutationPolicy !== 'container-bound') return true;
   const binding = artifact.containerBinding;
   if (!binding || binding.providerBlockKey !== context.providerBlockKey) return false;

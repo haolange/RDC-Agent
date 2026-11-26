@@ -6,7 +6,8 @@ export function resolveAgentMaxTurns(policyMaxTurns?: number, profileMaxTurns?: 
     if (policyMaxTurns === 0) {
       throw new AppError('POLICY_MAX_TURNS_ZERO', 'maxTurns must be greater than zero for an executable turn.');
     }
-    if (policyMaxTurns > 0 && policyMaxTurns < Number.MAX_SAFE_INTEGER) return Math.min(policyMaxTurns, profileMax ?? Infinity);
+    if (policyMaxTurns > 0 && policyMaxTurns < Number.MAX_SAFE_INTEGER)
+      return Math.min(policyMaxTurns, profileMax ?? Infinity);
   }
   return profileMax;
 }

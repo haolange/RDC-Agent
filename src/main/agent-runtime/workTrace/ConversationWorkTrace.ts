@@ -69,9 +69,18 @@ function cloneToolCall(toolCall: ConversationToolCall): ConversationToolCall {
       ...question,
       options: question.options.map((option) => ({ ...option })),
     })),
-    planReview: toolCall.planReview ? { ...toolCall.planReview, summary: [...toolCall.planReview.summary], sections: toolCall.planReview.sections.map((section) => ({ ...section })), handoffOptions: toolCall.planReview.handoffOptions.map((option) => ({ ...option,
-      ...(option.labelTranslations ? { labelTranslations: { ...option.labelTranslations } } : {}),
-    })), decision: toolCall.planReview.decision ? { ...toolCall.planReview.decision } : undefined } : undefined,
+    planReview: toolCall.planReview
+      ? {
+          ...toolCall.planReview,
+          summary: [...toolCall.planReview.summary],
+          sections: toolCall.planReview.sections.map((section) => ({ ...section })),
+          handoffOptions: toolCall.planReview.handoffOptions.map((option) => ({
+            ...option,
+            ...(option.labelTranslations ? { labelTranslations: { ...option.labelTranslations } } : {}),
+          })),
+          decision: toolCall.planReview.decision ? { ...toolCall.planReview.decision } : undefined,
+        }
+      : undefined,
     resourceRefs: toolCall.resourceRefs?.map((resource) => ({ ...resource })),
     imagePreviews: toolCall.imagePreviews?.map((preview) => ({ ...preview })),
     approval: toolCall.approval ? { ...toolCall.approval } : undefined,
@@ -105,9 +114,10 @@ function cloneLoopItem(item: ConversationLoopItem): ConversationLoopItem {
 
 function cloneWorkBlock(block: ConversationWorkBlock): ConversationWorkBlock {
   const toolCalls = block.toolCalls.map(cloneToolCall);
-  const result = block.kind === 'llm_turn'
-    ? normalizeLoopResult(block.result, block.status, toolCalls)
-    : cloneLoopResult(block.result);
+  const result =
+    block.kind === 'llm_turn'
+      ? normalizeLoopResult(block.result, block.status, toolCalls)
+      : cloneLoopResult(block.result);
   return {
     ...block,
     ...(result ? { result } : {}),
@@ -139,13 +149,22 @@ export function upsertLoopTextItem(
   if (nextTrace.status === 'stopped') return nextTrace;
   const block = ensureLoopBlock(nextTrace, loopId);
   const items = block.items ?? [];
-  const existing = items.find((item) => item.kind === 'text' && providerOutputRefKey(item.providerOutputRef) === providerOutputRefKey(ref));
+  const existing = items.find(
+    (item) => item.kind === 'text' && providerOutputRefKey(item.providerOutputRef) === providerOutputRefKey(ref),
+  );
   if (existing?.kind === 'text') {
     existing.text = text;
     existing.phase = phase ?? existing.phase;
     existing.status = status;
   } else {
-    items.push({ kind: 'text', providerOutputRef: { ...ref }, text, phase, status, displayOrder: nextDisplayOrder(nextTrace) });
+    items.push({
+      kind: 'text',
+      providerOutputRef: { ...ref },
+      text,
+      phase,
+      status,
+      displayOrder: nextDisplayOrder(nextTrace),
+    });
   }
   block.items = items;
   nextTrace.updatedAt = nowMs();
@@ -167,7 +186,9 @@ export function upsertLoopThinkingItem(
   if (nextTrace.status === 'stopped') return nextTrace;
   const block = ensureLoopBlock(nextTrace, loopId);
   const items = block.items ?? [];
-  const existing = items.find((item) => item.kind === 'thinking' && providerOutputRefKey(item.providerOutputRef) === providerOutputRefKey(ref));
+  const existing = items.find(
+    (item) => item.kind === 'thinking' && providerOutputRefKey(item.providerOutputRef) === providerOutputRefKey(ref),
+  );
   const now = nowMs();
   const visible = Boolean(thinking.text?.trim());
   // Text that first shows up already complete (a whole summary) was thought out while the loop waited for it,
@@ -176,11 +197,15 @@ export function upsertLoopThinkingItem(
   if (existing?.kind === 'thinking') {
     if (shouldReplaceThinking(existing.thinking, thinking)) existing.thinking = cloneThinkingArtifact(thinking)!;
     if (existing.startedAt === undefined && visible) existing.startedAt = visibleSince;
-    if (status === 'complete' && existing.status !== 'complete' && existing.startedAt !== undefined) existing.completedAt = now;
+    if (status === 'complete' && existing.status !== 'complete' && existing.startedAt !== undefined)
+      existing.completedAt = now;
     existing.status = status;
   } else {
     items.push({
-      kind: 'thinking', providerOutputRef: { ...ref }, thinking: cloneThinkingArtifact(thinking)!, status,
+      kind: 'thinking',
+      providerOutputRef: { ...ref },
+      thinking: cloneThinkingArtifact(thinking)!,
+      status,
       displayOrder: nextDisplayOrder(nextTrace),
       ...(visible ? { startedAt: visibleSince } : {}),
       ...(visible && status === 'complete' ? { completedAt: now } : {}),
@@ -229,11 +254,13 @@ function writableBlock(
 }
 
 function nextDisplayOrder(trace: ConversationWorkTrace): number {
-  return trace.blocks.reduce((highest, block) => {
-    const withBlock = Math.max(highest, block.displayOrder ?? 0);
-    const withTools = block.toolCalls.reduce((value, call) => Math.max(value, call.displayOrder ?? 0), withBlock);
-    return (block.items ?? []).reduce((value, item) => Math.max(value, item.displayOrder), withTools);
-  }, 0) + 1;
+  return (
+    trace.blocks.reduce((highest, block) => {
+      const withBlock = Math.max(highest, block.displayOrder ?? 0);
+      const withTools = block.toolCalls.reduce((value, call) => Math.max(value, call.displayOrder ?? 0), withBlock);
+      return (block.items ?? []).reduce((value, item) => Math.max(value, item.displayOrder), withTools);
+    }, 0) + 1
+  );
 }
 
 export function upsertWorkBlock(
@@ -248,19 +275,19 @@ export function upsertWorkBlock(
     nextTrace.blocks[blockIndex] = cloneWorkBlock({
       ...existingBlock,
       ...patch,
-      toolCalls: patch.toolCalls
-        ? patch.toolCalls.map(cloneToolCall)
-        : existingBlock.toolCalls.map(cloneToolCall),
+      toolCalls: patch.toolCalls ? patch.toolCalls.map(cloneToolCall) : existingBlock.toolCalls.map(cloneToolCall),
     });
   } else {
     const kind = patch.kind && normalizeWorkBlockKind(patch.kind) ? patch.kind : 'reasoning';
-    nextTrace.blocks.push(cloneWorkBlock({
-      ...createWorkBlock(blockId, patch.title || blockId, patch.stage, kind),
-      ...patch,
-      ...(kind === 'task_snapshot' ? { displayOrder: patch.displayOrder ?? nextDisplayOrder(nextTrace) } : {}),
-      kind,
-      toolCalls: patch.toolCalls ? patch.toolCalls.map(cloneToolCall) : [],
-    }));
+    nextTrace.blocks.push(
+      cloneWorkBlock({
+        ...createWorkBlock(blockId, patch.title || blockId, patch.stage, kind),
+        ...patch,
+        ...(kind === 'task_snapshot' ? { displayOrder: patch.displayOrder ?? nextDisplayOrder(nextTrace) } : {}),
+        kind,
+        toolCalls: patch.toolCalls ? patch.toolCalls.map(cloneToolCall) : [],
+      }),
+    );
   }
   nextTrace.updatedAt = nowMs();
   return nextTrace;
@@ -275,21 +302,16 @@ export function finalizeTrace(
   const nextTrace = cloneTrace(trace);
   if (status === 'stopped') return cancelWorkTrace(nextTrace, terminalAt);
   const terminalBlockStatus: ConversationWorkBlock['status'] | null =
-    status === 'complete'
-      ? 'complete'
-      : status === 'error'
-        ? 'error'
-        : null;
+    status === 'complete' ? 'complete' : status === 'error' ? 'error' : null;
 
   if (terminalBlockStatus) {
     nextTrace.blocks = nextTrace.blocks.map((block) => {
       const isTaskLifecycleBlock = block.stage === 'task';
-      const blockStatus = !isTaskLifecycleBlock && (block.status === 'pending' || block.status === 'running')
-        ? terminalBlockStatus
-        : block.status;
-      const blockCompletedAt = isTaskLifecycleBlock
-        ? block.completedAt
-        : block.completedAt ?? terminalAt;
+      const blockStatus =
+        !isTaskLifecycleBlock && (block.status === 'pending' || block.status === 'running')
+          ? terminalBlockStatus
+          : block.status;
+      const blockCompletedAt = isTaskLifecycleBlock ? block.completedAt : (block.completedAt ?? terminalAt);
       const toolCalls = block.toolCalls.map((toolCall) => {
         const cloned = cloneToolCall(toolCall);
         if (status === 'error' && cloned.planReview?.status === 'awaiting') {
@@ -298,36 +320,43 @@ export function finalizeTrace(
         if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
           return cloned;
         }
-        const terminalToolStatus: ConversationToolCall['status'] = toolCall.status === 'pending'
-          ? 'skipped'
-          : 'error';
+        const terminalToolStatus: ConversationToolCall['status'] = toolCall.status === 'pending' ? 'skipped' : 'error';
         return {
           ...cloned,
           status: terminalToolStatus,
           completedAt: toolCall.completedAt ?? terminalAt,
-          resultPreview: terminalToolStatus === 'skipped'
-            ? (toolCall.resultPreview ?? (status === 'complete'
-                ? 'Run completed before this tool call executed.'
-                : 'Run ended before this tool call executed.'))
-            : toolCall.resultPreview,
-          error: terminalToolStatus === 'error'
-            ? (toolCall.error ?? 'Run ended before this tool call completed.')
-            : toolCall.error,
+          resultPreview:
+            terminalToolStatus === 'skipped'
+              ? (toolCall.resultPreview ??
+                (status === 'complete'
+                  ? 'Run completed before this tool call executed.'
+                  : 'Run ended before this tool call executed.'))
+              : toolCall.resultPreview,
+          error:
+            terminalToolStatus === 'error'
+              ? (toolCall.error ?? 'Run ended before this tool call completed.')
+              : toolCall.error,
         };
       });
-      const result = block.kind === 'llm_turn'
-        ? {
-            ...ensureLoopResult({ ...block, toolCalls }),
-            status: 'complete' as const,
-            toolCallIds: uniqueStrings([...(block.result?.toolCallIds ?? []), ...toolCalls.map((toolCall) => toolCall.id)]),
-          }
-        : block.result;
+      const result =
+        block.kind === 'llm_turn'
+          ? {
+              ...ensureLoopResult({ ...block, toolCalls }),
+              status: 'complete' as const,
+              toolCallIds: uniqueStrings([
+                ...(block.result?.toolCallIds ?? []),
+                ...toolCalls.map((toolCall) => toolCall.id),
+              ]),
+            }
+          : block.result;
       return {
         ...block,
         status: blockStatus,
         completedAt: blockCompletedAt,
         ...(result ? { result } : {}),
-        ...(block.items ? { items: block.items.map((item) => ({ ...cloneLoopItem(item), status: 'complete' as const })) } : {}),
+        ...(block.items
+          ? { items: block.items.map((item) => ({ ...cloneLoopItem(item), status: 'complete' as const })) }
+          : {}),
         toolCalls,
       };
     });
@@ -348,15 +377,18 @@ export function upsertRuntimeToolCall(
   if (nextTrace.status === 'stopped') return nextTrace;
   const blockMeta = getRuntimeToolBlockMeta(patch.toolName, patch.id, options?.loopId);
   const blockId = blockMeta.id;
-  if (options?.loopId && (blockMeta.kind === 'user_input' || blockMeta.kind === 'plan_review')
-    && !nextTrace.blocks.some((entry) => entry.id === options.loopId)) {
+  if (
+    options?.loopId &&
+    (blockMeta.kind === 'user_input' || blockMeta.kind === 'plan_review') &&
+    !nextTrace.blocks.some((entry) => entry.id === options.loopId)
+  ) {
     const owner = createWorkBlock(options.loopId, 'LLM turn', 'model', 'llm_turn');
     owner.status = 'running';
     nextTrace.blocks.push(owner);
   }
-  const existingBlock = writableBlock(nextTrace, (entry) => (
-    entry.toolCalls.some((toolCall) => toolCall.id === patch.id)
-  ));
+  const existingBlock = writableBlock(nextTrace, (entry) =>
+    entry.toolCalls.some((toolCall) => toolCall.id === patch.id),
+  );
   let block = existingBlock ?? writableBlock(nextTrace, (entry) => entry.id === blockId);
   if (!block) {
     block = createWorkBlock(blockId, blockMeta.title, blockMeta.stage, blockMeta.kind);
@@ -370,22 +402,33 @@ export function upsertRuntimeToolCall(
     applyLoopFields(block, options);
   }
   const toolIndex = block.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
-  const becomesVisible = Boolean(patch.approval || patch.planReview || patch.userInputQuestions
-    || patch.executionStartedAt !== undefined || patch.status === 'running' || patch.status === 'complete' || patch.status === 'error');
+  const becomesVisible = Boolean(
+    patch.approval ||
+    patch.planReview ||
+    patch.userInputQuestions ||
+    patch.executionStartedAt !== undefined ||
+    patch.status === 'running' ||
+    patch.status === 'complete' ||
+    patch.status === 'error',
+  );
   if (toolIndex >= 0) {
     const existingToolCall = block.toolCalls[toolIndex]!;
     const nextApproval = patch.approval
       ? existingToolCall.approval?.approvalId === patch.approval.approvalId
         ? { ...existingToolCall.approval, ...patch.approval }
         : { ...patch.approval }
-      : existingToolCall.approval ? { ...existingToolCall.approval } : undefined;
+      : existingToolCall.approval
+        ? { ...existingToolCall.approval }
+        : undefined;
     block.toolCalls[toolIndex] = {
       ...existingToolCall,
       ...patch,
       displayOrder: existingToolCall.displayOrder ?? (becomesVisible ? nextDisplayOrder(nextTrace) : undefined),
       executionStartedAt: existingToolCall.executionStartedAt ?? patch.executionStartedAt,
-      status: existingToolCall.completedAt || (existingToolCall.executionStartedAt && patch.status === 'pending')
-        ? existingToolCall.status : patch.status ?? existingToolCall.status,
+      status:
+        existingToolCall.completedAt || (existingToolCall.executionStartedAt && patch.status === 'pending')
+          ? existingToolCall.status
+          : (patch.status ?? existingToolCall.status),
       userInputQuestions: patch.userInputQuestions
         ? patch.userInputQuestions.map((question) => ({
             ...question,
@@ -427,11 +470,21 @@ export function upsertRuntimeToolCall(
     });
   }
   syncLoopResultToolIds(block);
-  if (block.toolCalls.length > 0 && block.toolCalls.every((toolCall) => (
-    toolCall.status === 'complete' || toolCall.status === 'error' || toolCall.status === 'skipped' || toolCall.status === 'cancelled'
-  ))) {
-    block.status = block.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error'
-      : block.toolCalls.some((toolCall) => toolCall.status === 'cancelled') ? 'cancelled' : 'complete';
+  if (
+    block.toolCalls.length > 0 &&
+    block.toolCalls.every(
+      (toolCall) =>
+        toolCall.status === 'complete' ||
+        toolCall.status === 'error' ||
+        toolCall.status === 'skipped' ||
+        toolCall.status === 'cancelled',
+    )
+  ) {
+    block.status = block.toolCalls.some((toolCall) => toolCall.status === 'error')
+      ? 'error'
+      : block.toolCalls.some((toolCall) => toolCall.status === 'cancelled')
+        ? 'cancelled'
+        : 'complete';
     block.completedAt ??= nowMs();
     if (block.kind === 'llm_turn') {
       block.result = { ...ensureLoopResult(block), status: 'complete' };
@@ -465,8 +518,10 @@ export function supersedePreviousPlanReviews(
   currentToolCallId: string,
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
-  const supersedes = (toolCall: ConversationToolCall) => toolCall.id !== currentToolCallId
-    && toolCall.toolName === 'plan_artifact' && toolCall.planReview?.status === 'awaiting';
+  const supersedes = (toolCall: ConversationToolCall) =>
+    toolCall.id !== currentToolCallId &&
+    toolCall.toolName === 'plan_artifact' &&
+    toolCall.planReview?.status === 'awaiting';
   nextTrace.blocks = nextTrace.blocks.map((original) => {
     if (!original.toolCalls.some(supersedes)) return original;
     const block = cloneWorkBlock(original);
@@ -530,11 +585,18 @@ export function upsertRuntimeToolApproval(
   const toolPatch: Partial<ConversationToolCall> & { id: string; toolName: string } = {
     id: input.toolCallId,
     toolName: input.toolName,
-    status: settled || superseded ? existingToolCall?.status ?? 'pending' : toolCancelled ? 'cancelled' : failed
-      ? 'error'
-      : existingToolCall?.status === 'complete'
-        ? 'complete'
-        : existingToolCall?.executionStartedAt !== undefined ? 'running' : 'pending',
+    status:
+      settled || superseded
+        ? (existingToolCall?.status ?? 'pending')
+        : toolCancelled
+          ? 'cancelled'
+          : failed
+            ? 'error'
+            : existingToolCall?.status === 'complete'
+              ? 'complete'
+              : existingToolCall?.executionStartedAt !== undefined
+                ? 'running'
+                : 'pending',
     approval,
   };
   if (toolCancelled && !settled) toolPatch.completedAt = existingToolCall?.completedAt ?? now;
@@ -594,13 +656,18 @@ function applyLoopFields(block: ConversationWorkBlock, options: LoopTraceOptions
  * tool calls it declared but never started, are dropped so the retry does not show them twice.
  * A loop that already settled is not part of the retried attempt and stays as it is.
  */
-export function discardLoopAttempt(trace: ConversationWorkTrace | null | undefined, loopId: string): ConversationWorkTrace {
+export function discardLoopAttempt(
+  trace: ConversationWorkTrace | null | undefined,
+  loopId: string,
+): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
   const current = nextTrace.blocks.find((entry) => entry.id === loopId && entry.kind === 'llm_turn');
   if (!current || nextTrace.status === 'stopped' || current.result?.status === 'complete') return nextTrace;
   const block = writableBlock(nextTrace, (entry) => entry === current)!;
   delete block.items;
-  block.toolCalls = block.toolCalls.filter((call) => call.status !== 'pending' || call.executionStartedAt !== undefined);
+  block.toolCalls = block.toolCalls.filter(
+    (call) => call.status !== 'pending' || call.executionStartedAt !== undefined,
+  );
   block.result = normalizeLoopResult({ status: 'streaming', toolCallIds: [] }, 'running', block.toolCalls);
   nextTrace.updatedAt = nowMs();
   return nextTrace;
@@ -623,16 +690,25 @@ export function settleLoopItems(
   const block = next.blocks.find((entry) => entry.id === loopId);
   const existingText = loopTextItems(block);
   for (const item of completed.textItems ?? existingText) {
-    const prior = existingText.find((candidate) => sameProviderBlock(candidate.providerOutputRef, item.providerOutputRef));
-    next = upsertLoopTextItem(next, loopId, item.providerOutputRef, item.text,
-      settleTextPhase(item.phase ?? prior?.phase, loop), 'complete');
+    const prior = existingText.find((candidate) =>
+      sameProviderBlock(candidate.providerOutputRef, item.providerOutputRef),
+    );
+    next = upsertLoopTextItem(
+      next,
+      loopId,
+      item.providerOutputRef,
+      item.text,
+      settleTextPhase(item.phase ?? prior?.phase, loop),
+      'complete',
+    );
   }
   const completedThinking = (completed.thinking ?? []).filter((artifact) => artifact.providerOutputRef);
   for (const artifact of completedThinking) {
     next = upsertLoopThinkingItem(next, loopId, artifact.providerOutputRef!, artifact, 'complete');
   }
   for (const item of loopThinkingItems(next.blocks.find((entry) => entry.id === loopId))) {
-    if (item.status !== 'complete') next = upsertLoopThinkingItem(next, loopId, item.providerOutputRef, item.thinking, 'complete');
+    if (item.status !== 'complete')
+      next = upsertLoopThinkingItem(next, loopId, item.providerOutputRef, item.thinking, 'complete');
   }
   return next;
 }
@@ -659,8 +735,11 @@ export function upsertLoopResult(
     block.status = 'running';
     delete block.completedAt;
   } else {
-    block.status = block.toolCalls.some((call) => call.status === 'error') ? 'error'
-      : block.toolCalls.some((call) => call.status === 'cancelled') ? 'cancelled' : 'complete';
+    block.status = block.toolCalls.some((call) => call.status === 'error')
+      ? 'error'
+      : block.toolCalls.some((call) => call.status === 'cancelled')
+        ? 'cancelled'
+        : 'complete';
     block.completedAt ??= nowMs();
   }
   nextTrace.status = 'running';
@@ -669,7 +748,8 @@ export function upsertLoopResult(
 }
 
 function ensureLoopResult(block: ConversationWorkBlock): ConversationLoopResult {
-  const status: ConversationLoopResultStatus = block.status === 'running' || block.status === 'pending' ? 'streaming' : 'complete';
+  const status: ConversationLoopResultStatus =
+    block.status === 'running' || block.status === 'pending' ? 'streaming' : 'complete';
   const result = normalizeLoopResult(block.result, status, block.toolCalls);
   block.result = result;
   return result;
@@ -680,8 +760,9 @@ function normalizeLoopResult(
   blockStatus: ConversationWorkBlock['status'] | ConversationLoopResultStatus,
   toolCalls: ConversationToolCall[],
 ): ConversationLoopResult {
-  const status: ConversationLoopResultStatus = result?.status
-    ?? (blockStatus === 'running' || blockStatus === 'pending' || blockStatus === 'streaming' ? 'streaming' : 'complete');
+  const status: ConversationLoopResultStatus =
+    result?.status ??
+    (blockStatus === 'running' || blockStatus === 'pending' || blockStatus === 'streaming' ? 'streaming' : 'complete');
   return {
     ...(result?.stopReason ? { stopReason: result.stopReason } : {}),
     ...(result?.outputPhase ? { outputPhase: result.outputPhase } : {}),

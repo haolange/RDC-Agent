@@ -16,7 +16,11 @@ const FRONTMATTER = /^(﻿?---\r?\n)([\s\S]*?)(\r?\n---\r?\n?)([\s\S]*)$/u;
 
 const stringValues = (value: unknown): string[] => {
   if (typeof value === 'string') return [value.trim()].filter(Boolean);
-  if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim()).filter(Boolean);
+  if (Array.isArray(value))
+    return value
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
   return value === undefined || value === null ? [] : [String(value)];
 };
 
@@ -52,7 +56,7 @@ export function planAgentModelFieldMigration(rawContent: string): AgentModelFiel
 
   const droppedHandoffModels: AgentModelFieldMigrationPlan['droppedHandoffModels'] = [];
   const handoffs = document.get('handoffs');
-  const handoffValues = Array.isArray(record.handoffs) ? record.handoffs as Array<Record<string, unknown>> : [];
+  const handoffValues = Array.isArray(record.handoffs) ? (record.handoffs as Array<Record<string, unknown>>) : [];
   if (YAML.isSeq(handoffs)) {
     handoffs.items.forEach((item, index) => {
       if (!YAML.isMap(item) || !item.has('model')) return;
@@ -67,6 +71,9 @@ export function planAgentModelFieldMigration(rawContent: string): AgentModelFiel
   }
 
   const newline = close.startsWith('\r\n') ? '\r\n' : '\n';
-  const serialized = document.toString({ lineWidth: 0, flowCollectionPadding: false }).replace(/\r?\n$/u, '').replace(/\r?\n/gu, newline);
+  const serialized = document
+    .toString({ lineWidth: 0, flowCollectionPadding: false })
+    .replace(/\r?\n$/u, '')
+    .replace(/\r?\n/gu, newline);
   return { binding, droppedHandoffModels, ignoredValues, content: `${open}${serialized}${close}${body}` };
 }

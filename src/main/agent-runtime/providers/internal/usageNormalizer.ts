@@ -21,7 +21,8 @@ export interface UsageFieldMap<WireUsage> {
   speed?: (usage: WireUsage) => Usage['speed'];
 }
 
-type OptionalTokenCount = 'cacheReadTokens' | 'cacheWriteTokens' | 'reasoningTokens' | 'promptCacheHitTokens' | 'promptCacheMissTokens';
+type OptionalTokenCount =
+  'cacheReadTokens' | 'cacheWriteTokens' | 'reasoningTokens' | 'promptCacheHitTokens' | 'promptCacheMissTokens';
 
 const OPTIONAL_TOKEN_COUNTS: readonly OptionalTokenCount[] = [
   'cacheReadTokens',

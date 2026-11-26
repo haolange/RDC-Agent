@@ -6,16 +6,11 @@ export function useComposerDomEffects(input: {
   userInvocableAgents: AgentManifestDefinition[];
   setSelectedAgentId: (agentId: string) => void;
 }): void {
-  const {
-    selectedAgentId,
-    userInvocableAgents,
-    setSelectedAgentId,
-  } = input;
+  const { selectedAgentId, userInvocableAgents, setSelectedAgentId } = input;
 
   useEffect(() => {
     const fallback = userInvocableAgents[0];
     if (!fallback || userInvocableAgents.some((agent) => agent.id === selectedAgentId)) return;
     setSelectedAgentId(fallback.id);
   }, [selectedAgentId, setSelectedAgentId, userInvocableAgents]);
-
 }

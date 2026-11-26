@@ -14,11 +14,13 @@ interface ConflictRowProps {
 /** Titles identify a pair in the review queue. The more recent timestamp distinguishes updates. */
 export function ConflictRow({ left, right, selected = false, onSelect }: ConflictRowProps) {
   const { t, language } = useI18n();
-  const title = <span className="knowledge-center-card-title">
-    {left?.title ?? t('knowledgeCenter.conflictCardA')}
-    <Icon name="conflict" className="knowledge-center-conflict-swap" size={14} />
-    {right?.title ?? t('knowledgeCenter.conflictCardB')}
-  </span>;
+  const title = (
+    <span className="knowledge-center-card-title">
+      {left?.title ?? t('knowledgeCenter.conflictCardA')}
+      <Icon name="conflict" className="knowledge-center-conflict-swap" size={14} />
+      {right?.title ?? t('knowledgeCenter.conflictCardB')}
+    </span>
+  );
   const updated = formatDateTime(language, Math.max(left?.updatedAt ?? 0, right?.updatedAt ?? 0) || undefined);
   if (!onSelect) return <p className="knowledge-write-conflict">{title}</p>;
   return (

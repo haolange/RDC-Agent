@@ -14,12 +14,13 @@ applyBootTheme();
 installRendererApi();
 installInteractionPerformanceProbe();
 // Browser QA can render English pseudo-localized (?pseudoLocale) to prove every string is translated and layouts stretch.
-if (browserAppBridgeInstalled() && new URLSearchParams(window.location.search).has('pseudoLocale')) enablePseudoLocale();
+if (browserAppBridgeInstalled() && new URLSearchParams(window.location.search).has('pseudoLocale'))
+  enablePseudoLocale();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );
 
 // Code highlighting and math rendering are not needed for the first paint; fetch them once the app is idle.

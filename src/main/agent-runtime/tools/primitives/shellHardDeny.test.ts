@@ -9,7 +9,9 @@ import {
 
 describe('PowerShell normalization', () => {
   it('strips call operator, quotes, .exe and path prefixes', () => {
-    expect(normalizeCommandToken('& "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"')).toBe('powershell');
+    expect(normalizeCommandToken('& "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"')).toBe(
+      'powershell',
+    );
     expect(normalizeCommandToken('/usr/bin/rm')).toBe('rm');
   });
 
@@ -73,7 +75,9 @@ describe('matchShellHardDeny PowerShell dialect', () => {
 
   it('denies call-operator and nested launcher forms of Remove-Item', () => {
     expect(matchShellHardDeny('& Remove-Item -Recurse -Force C:\\', 'pwsh')).toBe('Remove-Item -Recurse -Force');
-    expect(matchShellHardDeny('powershell -Command "Remove-Item -Recurse -Force C:\\"', 'pwsh')).toBe('Remove-Item -Recurse -Force');
+    expect(matchShellHardDeny('powershell -Command "Remove-Item -Recurse -Force C:\\"', 'pwsh')).toBe(
+      'Remove-Item -Recurse -Force',
+    );
     expect(matchShellHardDeny('pwsh -c "ri -r -fo C:\\"', 'pwsh')).toBe('Remove-Item -Recurse -Force');
     expect(matchShellHardDeny('cmd /c rd /s /q C:\\', 'pwsh')).toBe('rd /s /q');
   });

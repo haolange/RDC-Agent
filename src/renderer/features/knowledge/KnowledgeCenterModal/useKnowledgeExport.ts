@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { errorDetail } from '../../../lib/errorDetail';
 import { useKnowledgeOperation } from './useKnowledgeOperation';
 import { useKnowledgeRequestScope } from './useKnowledgeRequestScope';
-import { beginSynchronousFlight, filterPickableCards, knowledgeCardKey, knowledgeExportScopeCounts } from './knowledgeImportExportModel';
-import type {
-  KnowledgeExportFormat,
-  KnowledgeExportResult,
-  KnowledgeExportScope,
-} from '@shared/types/knowledgeExport';
+import {
+  beginSynchronousFlight,
+  filterPickableCards,
+  knowledgeCardKey,
+  knowledgeExportScopeCounts,
+} from './knowledgeImportExportModel';
+import type { KnowledgeExportFormat, KnowledgeExportResult, KnowledgeExportScope } from '@shared/types/knowledgeExport';
 import type { KnowledgeLaneHit, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
 
 export function useKnowledgeExport(options: {
@@ -40,20 +41,27 @@ export function useKnowledgeExport(options: {
   useEffect(() => {
     if (!open) return;
     const seq = request.next();
-    void window.electronAPI.knowledge.query({ spaceIds: [spaceId] }).then((listed) => {
-      if (request.isCurrent(seq)) setSpaceCount(listed.hits.length);
-    }).catch((err) => {
-      if (request.isCurrent(seq)) setError(errorDetail(err));
-    });
+    void window.electronAPI.knowledge
+      .query({ spaceIds: [spaceId] })
+      .then((listed) => {
+        if (request.isCurrent(seq)) setSpaceCount(listed.hits.length);
+      })
+      .catch((err) => {
+        if (request.isCurrent(seq)) setError(errorDetail(err));
+      });
   }, [open, request, spaceId]);
 
   /** Space count comes from listCards/query of that spaceId, not the filtered Cards hits. */
-  const counts = useMemo(() => knowledgeExportScopeCounts({
-    picked: picked.size,
-    hits: options.hits,
-    filteredCount: options.filteredCount,
-    spaceCount,
-  }), [options.filteredCount, options.hits, picked, spaceCount]);
+  const counts = useMemo(
+    () =>
+      knowledgeExportScopeCounts({
+        picked: picked.size,
+        hits: options.hits,
+        filteredCount: options.filteredCount,
+        spaceCount,
+      }),
+    [options.filteredCount, options.hits, picked, spaceCount],
+  );
 
   const canExport = options.hits.length > 0 || Boolean(options.selected) || options.spaces.length > 0;
   const pendingCount = counts[scope];
@@ -68,7 +76,9 @@ export function useKnowledgeExport(options: {
     setCancelled(false);
   }, [request]);
 
-  useEffect(() => { if (!options.active) close(); }, [close, options.active]);
+  useEffect(() => {
+    if (!options.active) close();
+  }, [close, options.active]);
 
   const togglePicked = useCallback((card: { spaceId: string; relativePath: string }) => {
     setPicked((current) => {
@@ -79,7 +89,10 @@ export function useKnowledgeExport(options: {
       return next;
     });
   }, []);
-  const pickAll = useCallback(() => setPicked((current) => new Set([...current, ...pickable.map(knowledgeCardKey)])), [pickable]);
+  const pickAll = useCallback(
+    () => setPicked((current) => new Set([...current, ...pickable.map(knowledgeCardKey)])),
+    [pickable],
+  );
   const clearPicked = useCallback(() => setPicked(new Set()), []);
 
   const openPanel = useCallback(() => {
@@ -100,19 +113,28 @@ export function useKnowledgeExport(options: {
     setCancelled(false);
     setBusy(true);
     try {
-      const filtered = scope === 'filtered'
-        ? await window.electronAPI.knowledge.query({ ...options.queryRequest, ...(options.queryRevision ? { expectedRevision: options.queryRevision } : {}) })
-        : null;
+      const filtered =
+        scope === 'filtered'
+          ? await window.electronAPI.knowledge.query({
+              ...options.queryRequest,
+              ...(options.queryRevision ? { expectedRevision: options.queryRevision } : {}),
+            })
+          : null;
       if (!request.isCurrent(seq)) return;
-      const cardRefs = scope === 'selected'
-        ? options.hits.filter((hit) => picked.has(knowledgeCardKey(hit))).map((hit) => ({ spaceId: hit.spaceId, relativePath: hit.relativePath }))
-        : (filtered?.hits ?? []).map((hit) => ({ spaceId: hit.spaceId, relativePath: hit.relativePath }));
-      const outcome = await runOperation((operationId) => window.electronAPI.knowledge.export({
-        operationId,
-        format,
-        scope,
-        ...(scope === 'space' ? { spaceId } : { cardRefs }),
-      }));
+      const cardRefs =
+        scope === 'selected'
+          ? options.hits
+              .filter((hit) => picked.has(knowledgeCardKey(hit)))
+              .map((hit) => ({ spaceId: hit.spaceId, relativePath: hit.relativePath }))
+          : (filtered?.hits ?? []).map((hit) => ({ spaceId: hit.spaceId, relativePath: hit.relativePath }));
+      const outcome = await runOperation((operationId) =>
+        window.electronAPI.knowledge.export({
+          operationId,
+          format,
+          scope,
+          ...(scope === 'space' ? { spaceId } : { cardRefs }),
+        }),
+      );
       if (!request.isCurrent(seq)) return;
       if (outcome.cancelled) setCancelled(true);
       // `null`: the person dismissed main's save dialog; the panel stays as it was.
@@ -123,7 +145,17 @@ export function useKnowledgeExport(options: {
       inFlight.current = false;
       if (request.isCurrent(seq)) setBusy(false);
     }
-  }, [format, options.hits, options.queryRequest, options.queryRevision, picked, request, runOperation, scope, spaceId]);
+  }, [
+    format,
+    options.hits,
+    options.queryRequest,
+    options.queryRevision,
+    picked,
+    request,
+    runOperation,
+    scope,
+    spaceId,
+  ]);
 
   return {
     open,

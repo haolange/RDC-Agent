@@ -11,7 +11,13 @@ vi.mock('dns/promises', () => ({
 
 vi.mock('../../../runtime/net/pinnedTransport', () => ({ requestPinned: requestPinnedMock }));
 
-import { webFetchTool, webSearchTool, parseBingResults, parseDuckDuckGoResults, extractPublishedDate } from './WebTools';
+import {
+  webFetchTool,
+  webSearchTool,
+  parseBingResults,
+  parseDuckDuckGoResults,
+  extractPublishedDate,
+} from './WebTools';
 
 function responseWithUrl(body: string, url: string, init?: ResponseInit): Response {
   const response = new Response(body, init);
@@ -30,7 +36,9 @@ describe('WebTools', () => {
   });
 
   it('fetches public HTTP text and returns structured details', async () => {
-    requestPinnedMock.mockResolvedValue(responseWithUrl('Example Domain', 'https://example.com/', { status: 200, statusText: 'OK' }));
+    requestPinnedMock.mockResolvedValue(
+      responseWithUrl('Example Domain', 'https://example.com/', { status: 200, statusText: 'OK' }),
+    );
 
     const result = await webFetchTool.execute('fetch-1', { url: 'https://example.com' });
 
@@ -47,29 +55,35 @@ describe('WebTools', () => {
   });
 
   it('blocks localhost and private network targets before fetch', async () => {
-    await expect(webFetchTool.execute('fetch-local', { url: 'http://localhost:3000' }))
-      .rejects.toThrow('Blocked local host');
+    await expect(webFetchTool.execute('fetch-local', { url: 'http://localhost:3000' })).rejects.toThrow(
+      'Blocked local host',
+    );
 
     lookupMock.mockResolvedValueOnce([{ address: '10.0.0.5', family: 4 }]);
-    await expect(webFetchTool.execute('fetch-private', { url: 'https://example.internal' }))
-      .rejects.toThrow('Blocked private network address');
+    await expect(webFetchTool.execute('fetch-private', { url: 'https://example.internal' })).rejects.toThrow(
+      'Blocked private network address',
+    );
     expect(requestPinnedMock).not.toHaveBeenCalled();
   });
 
   it('blocks redirect hops that land on private addresses', async () => {
-    requestPinnedMock.mockResolvedValueOnce(new Response(null, {
-      status: 302,
-      headers: { Location: 'http://127.0.0.1/secret' },
-    }));
+    requestPinnedMock.mockResolvedValueOnce(
+      new Response(null, {
+        status: 302,
+        headers: { Location: 'http://127.0.0.1/secret' },
+      }),
+    );
 
-    await expect(webFetchTool.execute('fetch-redirect', { url: 'https://example.com/start' }))
-      .rejects.toThrow(/Blocked local host|Blocked private network/i);
+    await expect(webFetchTool.execute('fetch-redirect', { url: 'https://example.com/start' })).rejects.toThrow(
+      /Blocked local host|Blocked private network/i,
+    );
   });
 
   it('fails closed when DNS lookup fails', async () => {
     lookupMock.mockRejectedValueOnce(new Error('ENOTFOUND'));
-    await expect(webFetchTool.execute('fetch-dns', { url: 'https://missing.example' }))
-      .rejects.toThrow(/DNS lookup failed/i);
+    await expect(webFetchTool.execute('fetch-dns', { url: 'https://missing.example' })).rejects.toThrow(
+      /DNS lookup failed/i,
+    );
     expect(requestPinnedMock).not.toHaveBeenCalled();
   });
 
@@ -77,8 +91,9 @@ describe('WebTools', () => {
     const cause = Object.assign(new Error('Client network socket disconnected'), { code: 'ECONNRESET' });
     requestPinnedMock.mockRejectedValue(Object.assign(new TypeError('fetch failed'), { cause }));
 
-    await expect(webFetchTool.execute('fetch-reset', { url: 'https://example.com' }))
-      .rejects.toThrow('Network request failed for example.com: ECONNRESET');
+    await expect(webFetchTool.execute('fetch-reset', { url: 'https://example.com' })).rejects.toThrow(
+      'Network request failed for example.com: ECONNRESET',
+    );
   });
 
   it('parses DuckDuckGo HTML results', () => {
@@ -131,10 +146,16 @@ describe('WebTools', () => {
   });
 
   it('searches with the zero-config provider and returns result details', async () => {
-    requestPinnedMock.mockResolvedValue(responseWithUrl(`
+    requestPinnedMock.mockResolvedValue(
+      responseWithUrl(
+        `
       <a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Frenderdoc.org%2F&amp;rut=abc">RenderDoc</a>
       <a class="result__snippet">Jun 30, 2026 - A stand-alone graphics debugger.</a>
-    `, 'https://html.duckduckgo.com/html/?q=RenderDoc', { status: 200, statusText: 'OK' }));
+    `,
+        'https://html.duckduckgo.com/html/?q=RenderDoc',
+        { status: 200, statusText: 'OK' },
+      ),
+    );
 
     const result = await webSearchTool.execute('search-1', { query: 'RenderDoc' });
     const text = result.content[0].type === 'text' ? result.content[0].text : '';
@@ -147,14 +168,27 @@ describe('WebTools', () => {
       query: 'RenderDoc',
       provider: 'DuckDuckGo HTML',
       resultCount: 1,
-      results: [{ title: 'RenderDoc', url: 'https://renderdoc.org/', source: 'renderdoc.org', publishedAt: '2026-06-30' }],
+      results: [
+        { title: 'RenderDoc', url: 'https://renderdoc.org/', source: 'renderdoc.org', publishedAt: '2026-06-30' },
+      ],
     });
   });
 
   it('falls back to Bing when the first provider has no parseable results', async () => {
     requestPinnedMock
-      .mockResolvedValueOnce(responseWithUrl('<html>No results</html>', 'https://html.duckduckgo.com/html/?q=RenderDoc', { status: 200, statusText: 'OK' }))
-      .mockResolvedValueOnce(responseWithUrl('<li class="b_algo"><h2><a href="https://renderdoc.org/">RenderDoc</a></h2><p>Graphics debugger.</p></li>', 'https://www.bing.com/search?q=RenderDoc', { status: 200, statusText: 'OK' }));
+      .mockResolvedValueOnce(
+        responseWithUrl('<html>No results</html>', 'https://html.duckduckgo.com/html/?q=RenderDoc', {
+          status: 200,
+          statusText: 'OK',
+        }),
+      )
+      .mockResolvedValueOnce(
+        responseWithUrl(
+          '<li class="b_algo"><h2><a href="https://renderdoc.org/">RenderDoc</a></h2><p>Graphics debugger.</p></li>',
+          'https://www.bing.com/search?q=RenderDoc',
+          { status: 200, statusText: 'OK' },
+        ),
+      );
 
     const result = await webSearchTool.execute('search-2', { query: 'RenderDoc' });
 

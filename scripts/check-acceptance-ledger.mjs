@@ -15,7 +15,8 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const LEDGER_REL = 'docs/product/acceptance-ledger.md';
 const SECTION_RE = /^## (\d{4}-\d{2}-\d{2})：/;
 const COMMIT_RE = /^\s*-\s*提交[:：].*?`([0-9a-f]{7,40})`/g;
-const EVIDENCE_RE = /https:\/\/github\.com\/[^\s)]+\/actions\/runs\/\d+|`[^`]+\.(?:json|png|log|txt|md|zip)`|本地[:：]\s*`[^`]+`/;
+const EVIDENCE_RE =
+  /https:\/\/github\.com\/[^\s)]+\/actions\/runs\/\d+|`[^`]+\.(?:json|png|log|txt|md|zip)`|本地[:：]\s*`[^`]+`/;
 
 const git = (args) => spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8', windowsHide: true });
 const failures = [];
@@ -25,14 +26,21 @@ if (listed.status !== 0) {
   console.error(`[acceptance-ledger] git rev-list HEAD failed: ${(listed.stderr || listed.stdout || '').trim()}`);
   process.exit(1);
 }
-const ancestors = new Set(listed.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+const ancestors = new Set(
+  listed.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean),
+);
 const resolveCommit = (sha) => {
   const result = git(['rev-parse', '--verify', `${sha}^{commit}`]);
   return result.status === 0 ? result.stdout.trim() : null;
 };
 
 const lines = readFileSync(path.join(repoRoot, LEDGER_REL), 'utf8').split(/\r?\n/);
-const headings = lines.flatMap((line, index) => (line.startsWith('## ') ? [{ index, dated: SECTION_RE.test(line), title: line }] : []));
+const headings = lines.flatMap((line, index) =>
+  line.startsWith('## ') ? [{ index, dated: SECTION_RE.test(line), title: line }] : [],
+);
 headings.forEach((heading, position) => {
   if (!heading.dated) return;
   const body = lines.slice(heading.index + 1, headings[position + 1]?.index ?? lines.length);
@@ -44,7 +52,9 @@ headings.forEach((heading, position) => {
     if (!resolved || !ancestors.has(resolved)) failures.push(`${where} commit ${sha} is not in git rev-list HEAD.`);
   }
   if (!body.some((line) => /^\s*-\s*证据[:：]/.test(line) && EVIDENCE_RE.test(line))) {
-    failures.push(`${where} "${heading.title}" has no evidence line with a CI run URL, an artifact path or 本地：\`<command>\`.`);
+    failures.push(
+      `${where} "${heading.title}" has no evidence line with a CI run URL, an artifact path or 本地：\`<command>\`.`,
+    );
   }
 });
 

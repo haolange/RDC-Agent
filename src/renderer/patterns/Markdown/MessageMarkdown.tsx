@@ -31,17 +31,29 @@ interface MessageMarkdownProps {
   interactive?: boolean;
 }
 
-const STREAMING_REMARK_PLUGINS: NonNullable<Options['remarkPlugins']> = [remarkGfm, remarkCallouts, remarkCodeFenceTitle];
-const FULL_REMARK_PLUGINS: NonNullable<Options['remarkPlugins']> = [remarkGfm, remarkMath, remarkCallouts, remarkCodeFenceTitle];
+const STREAMING_REMARK_PLUGINS: NonNullable<Options['remarkPlugins']> = [
+  remarkGfm,
+  remarkCallouts,
+  remarkCodeFenceTitle,
+];
+const FULL_REMARK_PLUGINS: NonNullable<Options['remarkPlugins']> = [
+  remarkGfm,
+  remarkMath,
+  remarkCallouts,
+  remarkCodeFenceTitle,
+];
 
 const CALLOUT_ICONS: Record<CalloutKind, IconName> = {
-  note: 'info', tip: 'spark', important: 'lightning', warning: 'warning', caution: 'error',
+  note: 'info',
+  tip: 'spark',
+  important: 'lightning',
+  warning: 'warning',
+  caution: 'error',
 };
 
 /** Session artifacts and Windows paths survive the URL filter for images only; they resolve through the media channel. */
-const urlTransform: NonNullable<Options['urlTransform']> = (url, key) => (
-  key === 'src' && (isSessionArtifactUri(url) || /^[a-z]:[\\/]/i.test(url)) ? url : defaultUrlTransform(url)
-);
+const urlTransform: NonNullable<Options['urlTransform']> = (url, key) =>
+  key === 'src' && (isSessionArtifactUri(url) || /^[a-z]:[\\/]/i.test(url)) ? url : defaultUrlTransform(url);
 
 type CodeElement = React.ReactElement<{ className?: string; children?: React.ReactNode }>;
 type PreNode = { children?: Array<{ tagName?: string; data?: { meta?: unknown } }> };
@@ -50,7 +62,10 @@ const Callout: React.FC<{ kind: CalloutKind; children: React.ReactNode }> = ({ k
   const { t } = useI18n();
   return (
     <div className={`markdown-callout is-${kind}`} role="note">
-      <span className="markdown-callout-title"><Icon name={CALLOUT_ICONS[kind]} size={16} />{t(`chat.markdownCallout.${kind}`)}</span>
+      <span className="markdown-callout-title">
+        <Icon name={CALLOUT_ICONS[kind]} size={16} />
+        {t(`chat.markdownCallout.${kind}`)}
+      </span>
       {children}
     </div>
   );
@@ -62,7 +77,8 @@ function createMarkdownComponents(
   interactive: boolean,
 ): Components {
   return {
-    a: (props) => renderLink ? renderLink(props) : interactive ? <MarkdownLink {...props} /> : <span>{props.children}</span>,
+    a: (props) =>
+      renderLink ? renderLink(props) : interactive ? <MarkdownLink {...props} /> : <span>{props.children}</span>,
     img: ({ src, alt }) => {
       const source = typeof src === 'string' ? src : undefined;
       if (renderImage) return renderImage({ src: source, alt });
@@ -132,18 +148,29 @@ const MessageMarkdownInner: React.FC<MessageMarkdownProps> = ({
   interactive = true,
 }) => {
   const { t } = useI18n();
-  const normalized = useMemo(() => preserveSource ? content : normalizeAssistantMarkdown(content), [content, preserveSource]);
-  const components = useMemo(() => createMarkdownComponents(renderImage, renderLink, interactive), [renderImage, renderLink, interactive]);
+  const normalized = useMemo(
+    () => (preserveSource ? content : normalizeAssistantMarkdown(content)),
+    [content, preserveSource],
+  );
+  const components = useMemo(
+    () => createMarkdownComponents(renderImage, renderLink, interactive),
+    [renderImage, renderLink, interactive],
+  );
   const enhancers = useMarkdownEnhancers();
-  const rehypePlugins = useMemo<NonNullable<Options['rehypePlugins']>>(() => (
-    deferHeavyPlugins
-      ? [rehypeOpenFence, ...(enhancers?.streamingRehypePlugins ?? [])]
-      : enhancers?.fullRehypePlugins ?? []
-  ), [deferHeavyPlugins, enhancers]);
-  const remarkRehypeOptions = useMemo(() => ({
-    footnoteLabel: t('chat.markdownFootnotes'),
-    footnoteBackLabel: t('chat.markdownFootnoteBack'),
-  }), [t]);
+  const rehypePlugins = useMemo<NonNullable<Options['rehypePlugins']>>(
+    () =>
+      deferHeavyPlugins
+        ? [rehypeOpenFence, ...(enhancers?.streamingRehypePlugins ?? [])]
+        : (enhancers?.fullRehypePlugins ?? []),
+    [deferHeavyPlugins, enhancers],
+  );
+  const remarkRehypeOptions = useMemo(
+    () => ({
+      footnoteLabel: t('chat.markdownFootnotes'),
+      footnoteBackLabel: t('chat.markdownFootnoteBack'),
+    }),
+    [t],
+  );
 
   return (
     <div className="markdown-body">

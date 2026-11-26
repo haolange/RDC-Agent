@@ -11,9 +11,16 @@ it('keeps a multiword font name editable while settings writes are in flight', a
   const root = createRoot(host);
   const onChange = vi.fn();
   try {
-    await act(async () => root.render(createElement(AppearanceFontField, {
-      kind: 'code', variant: 'dark', value: null, onChange,
-    })));
+    await act(async () =>
+      root.render(
+        createElement(AppearanceFontField, {
+          kind: 'code',
+          variant: 'dark',
+          value: null,
+          onChange,
+        }),
+      ),
+    );
     const input = host.querySelector('input')!;
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
     for (const text of ['Example', 'Example ', 'Example Mono', '']) {

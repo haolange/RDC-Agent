@@ -47,10 +47,18 @@ export class SecretStorageService {
   }
 
   private createSecretMapCache(): StampedValue<SecretMap> {
-    return new StampedValue(() => fileStamp(this.secretFilePath), () => readValidatedSync(this.secretFilePath, parseJsonWith((value) => {
-      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('secret map is not an object');
-      return value as SecretMap;
-    })) ?? {});
+    return new StampedValue(
+      () => fileStamp(this.secretFilePath),
+      () =>
+        readValidatedSync(
+          this.secretFilePath,
+          parseJsonWith((value) => {
+            if (!value || typeof value !== 'object' || Array.isArray(value))
+              throw new Error('secret map is not an object');
+            return value as SecretMap;
+          }),
+        ) ?? {},
+    );
   }
 
   /** A damaged secret map is STORAGE_CORRUPT on every read (never an empty map), so credentials are not silently dropped. */
@@ -104,11 +112,7 @@ export class SecretStorageService {
     return `provider-${sanitizeToken(providerId)}-oauth`;
   }
 
-  createProviderAccountSecretRef(
-    providerId: string,
-    accountId: string,
-    kind: 'api-key' | 'oauth',
-  ): string {
+  createProviderAccountSecretRef(providerId: string, accountId: string, kind: 'api-key' | 'oauth'): string {
     return `provider-${sanitizeToken(providerId)}-account-${sanitizeToken(accountId)}-${kind}`;
   }
 

@@ -10,12 +10,20 @@ const fixture = vi.hoisted(() => ({
   state: { mode: 'default', revision: 1 } as RuntimePermissionState,
 }));
 vi.mock('electron', () => ({ ipcMain: { handle: fixture.handle } }));
-vi.mock('../runtime/RuntimePermissionStateService', () => ({ runtimePermissionStateService: {
-  getSnapshot: () => fixture.state,
-  subscribe: (listener: (state: RuntimePermissionState) => void) => { fixture.listener = listener; return fixture.unsubscribe; },
-} }));
+vi.mock('../runtime/RuntimePermissionStateService', () => ({
+  runtimePermissionStateService: {
+    getSnapshot: () => fixture.state,
+    subscribe: (listener: (state: RuntimePermissionState) => void) => {
+      fixture.listener = listener;
+      return fixture.unsubscribe;
+    },
+  },
+}));
 
-beforeEach(() => { fixture.handle.mockClear(); fixture.unsubscribe.mockClear(); });
+beforeEach(() => {
+  fixture.handle.mockClear();
+  fixture.unsubscribe.mockClear();
+});
 
 it('exposes only the current state and rejects arguments on the readonly channel', () => {
   registerRuntimePermissionHandlers({ broadcastToRenderer: vi.fn() } as unknown as WorkbenchIpcContext);
@@ -31,5 +39,8 @@ it('replaces the previous subscription and broadcasts current revisions without 
   registerRuntimePermissionHandlers({ broadcastToRenderer } as unknown as WorkbenchIpcContext);
   expect(fixture.unsubscribe).toHaveBeenCalled();
   fixture.listener!({ mode: 'full-access', revision: 2 });
-  expect(broadcastToRenderer).toHaveBeenCalledWith('runtime:permissionStateChanged', { mode: 'full-access', revision: 2 });
+  expect(broadcastToRenderer).toHaveBeenCalledWith('runtime:permissionStateChanged', {
+    mode: 'full-access',
+    revision: 2,
+  });
 });

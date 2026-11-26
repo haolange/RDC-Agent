@@ -23,12 +23,9 @@ export class StreamChannelRefs {
   }
 
   ref(input: StreamChannelRefInput): ProviderOutputRef {
-    const key = [
-      input.responseId ?? '',
-      input.providerBlockKey,
-      input.sourceIndex ?? '',
-      input.itemId ?? '',
-    ].join('\u0000');
+    const key = [input.responseId ?? '', input.providerBlockKey, input.sourceIndex ?? '', input.itemId ?? ''].join(
+      '\u0000',
+    );
     const existing = this.refs.get(key);
     if (existing) return existing;
     const contentIndex = input.contentIndex ?? this.nextContentIndex;

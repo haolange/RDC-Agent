@@ -89,7 +89,9 @@ vi.mock('../../runtime/AppPathService', () => {
   };
 });
 
-function makeMessage(overrides: Partial<ConversationMessage> & Pick<ConversationMessage, 'id' | 'content'>): ConversationMessage {
+function makeMessage(
+  overrides: Partial<ConversationMessage> & Pick<ConversationMessage, 'id' | 'content'>,
+): ConversationMessage {
   return {
     turnId: 'turn-1',
     sessionId: 'session',
@@ -128,10 +130,12 @@ describe('conversationHistoryStore streaming I/O', () => {
     const rawLines = fs.readFileSync(conversationPath, 'utf8').split('\n').filter(Boolean);
     expect(rawLines.length).toBeGreaterThan(1);
     expect(rawLines.some((line) => line.includes('"op":"delta"'))).toBe(true);
-    expect(rawLines.every((line) => {
-      if (!line.includes('"op":"delta"')) return true;
-      return !line.includes('"role":"assistant"');
-    })).toBe(true);
+    expect(
+      rawLines.every((line) => {
+        if (!line.includes('"op":"delta"')) return true;
+        return !line.includes('"role":"assistant"');
+      }),
+    ).toBe(true);
 
     const history = conversationHistoryStore.readConversationHistory(session.sessionId);
     expect(history).toHaveLength(1);
@@ -157,13 +161,22 @@ describe('conversationHistoryStore streaming I/O', () => {
     fs.mkdirSync(projectRoot, { recursive: true });
     const project = await projectWorkspaceStore.createProject(projectRoot);
     const session = sessionRecordStore.createSession(project.projectId, 'corrupt-io');
-    conversationHistoryStore.appendConversationMessage(session.sessionId, makeMessage({ id: 'user-1', content: 'Inspect', sessionId: session.sessionId, projectId: project.projectId }));
-    fs.appendFileSync(conversationHistoryStore.getConversationPath(session.sessionId), `${JSON.stringify({ id: 'assistant-1', content: 'no owner' })}\n`);
-    expect(() => conversationHistoryStore.readConversationHistory(session.sessionId)).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+    conversationHistoryStore.appendConversationMessage(
+      session.sessionId,
+      makeMessage({ id: 'user-1', content: 'Inspect', sessionId: session.sessionId, projectId: project.projectId }),
+    );
+    fs.appendFileSync(
+      conversationHistoryStore.getConversationPath(session.sessionId),
+      `${JSON.stringify({ id: 'assistant-1', content: 'no owner' })}\n`,
+    );
+    expect(() => conversationHistoryStore.readConversationHistory(session.sessionId)).toThrow(
+      expect.objectContaining({ code: 'STORAGE_CORRUPT' }),
+    );
   });
 
   it('keeps a streamed delta durable when a reader blocks journal compaction', async () => {
-    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, storageIo } = await import('./sessionStores');
+    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, storageIo } =
+      await import('./sessionStores');
     await projectWorkspaceStore.initializeWorkspace();
     const projectRoot = path.join(tempRoot, 'project-root-busy');
     fs.mkdirSync(projectRoot, { recursive: true });
@@ -171,7 +184,10 @@ describe('conversationHistoryStore streaming I/O', () => {
     const session = sessionRecordStore.createSession(project.projectId, 'busy-stream-io');
     const conversationPath = conversationHistoryStore.getConversationPath(session.sessionId);
     const base = makeMessage({
-      id: 'assistant-busy', content: 'start', sessionId: session.sessionId, projectId: project.projectId,
+      id: 'assistant-busy',
+      content: 'start',
+      sessionId: session.sessionId,
+      projectId: project.projectId,
     });
     conversationHistoryStore.appendConversationMessage(session.sessionId, base);
 
@@ -188,26 +204,42 @@ describe('conversationHistoryStore streaming I/O', () => {
     try {
       for (let index = 1; index <= CONVERSATION_COMPACTION_DELTA_THRESHOLD; index += 1) {
         conversationHistoryStore.appendConversationMessage(session.sessionId, {
-          ...base, content: `update-${index}`, updatedAt: index + 1,
+          ...base,
+          content: `update-${index}`,
+          updatedAt: index + 1,
         });
       }
       await new Promise((resolve) => setImmediate(resolve));
       expect(blockedOnce).toBe(true);
       expect(warning).toHaveBeenCalledTimes(1);
-      expect(conversationHistoryStore.conversationPendingDeltaCounts.get(session.sessionId)).toBe(CONVERSATION_COMPACTION_DELTA_THRESHOLD);
-      expect(fs.readFileSync(conversationPath, 'utf8').split('\n').filter(Boolean)).toHaveLength(CONVERSATION_COMPACTION_DELTA_THRESHOLD + 1);
-      expect(conversationHistoryStore.readConversationHistory(session.sessionId)[0]?.content).toBe(`update-${CONVERSATION_COMPACTION_DELTA_THRESHOLD}`);
+      expect(conversationHistoryStore.conversationPendingDeltaCounts.get(session.sessionId)).toBe(
+        CONVERSATION_COMPACTION_DELTA_THRESHOLD,
+      );
+      expect(fs.readFileSync(conversationPath, 'utf8').split('\n').filter(Boolean)).toHaveLength(
+        CONVERSATION_COMPACTION_DELTA_THRESHOLD + 1,
+      );
+      expect(conversationHistoryStore.readConversationHistory(session.sessionId)[0]?.content).toBe(
+        `update-${CONVERSATION_COMPACTION_DELTA_THRESHOLD}`,
+      );
 
-      for (let index = CONVERSATION_COMPACTION_DELTA_THRESHOLD + 1; index <= 2 * CONVERSATION_COMPACTION_DELTA_THRESHOLD; index += 1) {
+      for (
+        let index = CONVERSATION_COMPACTION_DELTA_THRESHOLD + 1;
+        index <= 2 * CONVERSATION_COMPACTION_DELTA_THRESHOLD;
+        index += 1
+      ) {
         conversationHistoryStore.appendConversationMessage(session.sessionId, {
-          ...base, content: `update-${index}`, updatedAt: index + 1,
+          ...base,
+          content: `update-${index}`,
+          updatedAt: index + 1,
         });
       }
       await new Promise((resolve) => setImmediate(resolve));
       expect(warning).toHaveBeenCalledTimes(1);
       expect(writeSpy).toHaveBeenCalledTimes(2);
       expect(fs.readFileSync(conversationPath, 'utf8').split('\n').filter(Boolean)).toHaveLength(1);
-      expect(conversationHistoryStore.readConversationHistory(session.sessionId)[0]?.content).toBe(`update-${2 * CONVERSATION_COMPACTION_DELTA_THRESHOLD}`);
+      expect(conversationHistoryStore.readConversationHistory(session.sessionId)[0]?.content).toBe(
+        `update-${2 * CONVERSATION_COMPACTION_DELTA_THRESHOLD}`,
+      );
     } finally {
       writeSpy.mockRestore();
       warning.mockRestore();
@@ -225,7 +257,13 @@ describe('conversationHistoryStore streaming I/O', () => {
     const ref = (index: number) => ({ protocol: 'test', providerBlockKey: `text:${index}`, contentIndex: index });
     let trace = upsertLoopTextItem(undefined, 'loop-1', ref(0), 'A long finished loop', 'commentary', 'complete');
     trace = upsertLoopTextItem(trace, 'loop-2', ref(1), 'Str', undefined, 'streaming');
-    const base = makeMessage({ id: 'assistant-blocks', content: '', sessionId: session.sessionId, projectId: project.projectId, workTrace: trace });
+    const base = makeMessage({
+      id: 'assistant-blocks',
+      content: '',
+      sessionId: session.sessionId,
+      projectId: project.projectId,
+      workTrace: trace,
+    });
     conversationHistoryStore.appendConversationMessage(session.sessionId, base);
 
     trace = upsertLoopTextItem(trace, 'loop-2', ref(1), 'Streaming on', undefined, 'streaming');
@@ -239,7 +277,9 @@ describe('conversationHistoryStore streaming I/O', () => {
 
     conversationHistoryStore.conversationHistoryCache.delete(session.sessionId);
     const replayed = conversationHistoryStore.readConversationHistory(session.sessionId)[0]!.workTrace!;
-    expect(replayed.blocks.map((block) => block.items?.[0]?.kind === 'text' && block.items[0].text))
-      .toEqual(['A long finished loop', 'Streaming on']);
+    expect(replayed.blocks.map((block) => block.items?.[0]?.kind === 'text' && block.items[0].text)).toEqual([
+      'A long finished loop',
+      'Streaming on',
+    ]);
   });
 });

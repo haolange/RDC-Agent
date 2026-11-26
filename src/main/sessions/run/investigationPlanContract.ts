@@ -7,21 +7,30 @@ const id = z.string().trim().min(1).max(256);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 
 /** Main-generated facts included in the plan the user reviews and approves. */
-export const InvestigationPlanContractSchema = z.object({
-  schemaVersion: z.literal(1),
-  mission: z.enum(['debugger', 'analyzer', 'optimizer']),
-  captureScope: z.object({
-    projectId: id,
-    deviceId: id,
-    comparisonGoal: z.string().trim().min(1).max(4000),
-    inputs: z.array(z.object({ inputId: id, fileName: z.string().min(1), contentSha256: hash }).strict()).min(1).max(32),
-  }).strict().optional(),
-}).strict().superRefine((value, context) => {
-  const inputs = value.captureScope?.inputs ?? [];
-  if (new Set(inputs.map(input => input.inputId)).size !== inputs.length) {
-    context.addIssue({ code: 'custom', message: 'Capture input IDs must be unique.' });
-  }
-});
+export const InvestigationPlanContractSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    mission: z.enum(['debugger', 'analyzer', 'optimizer']),
+    captureScope: z
+      .object({
+        projectId: id,
+        deviceId: id,
+        comparisonGoal: z.string().trim().min(1).max(4000),
+        inputs: z
+          .array(z.object({ inputId: id, fileName: z.string().min(1), contentSha256: hash }).strict())
+          .min(1)
+          .max(32),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const inputs = value.captureScope?.inputs ?? [];
+    if (new Set(inputs.map((input) => input.inputId)).size !== inputs.length) {
+      context.addIssue({ code: 'custom', message: 'Capture input IDs must be unique.' });
+    }
+  });
 
 export type InvestigationPlanContract = z.infer<typeof InvestigationPlanContractSchema>;
 

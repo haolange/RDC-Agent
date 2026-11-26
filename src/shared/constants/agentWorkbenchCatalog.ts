@@ -1,10 +1,6 @@
 import { DELEGATION_CAPSULE_JSON_SCHEMA } from '../types/delegationCapsule';
 import { RDC_PROBE_ACTIONS } from './rdcProbe';
-export type AgentWorkbenchToolPermission =
-  | 'readonly'
-  | 'mutation'
-  | 'destructive'
-  | 'approval';
+export type AgentWorkbenchToolPermission = 'readonly' | 'mutation' | 'destructive' | 'approval';
 
 export interface AgentWorkbenchToolDeclaration {
   id: string;
@@ -52,7 +48,11 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
   {
     id: 'grep',
     permission: 'readonly',
-    inputSchema: { type: 'object', required: ['pattern'], properties: { pattern: { type: 'string' }, path: { type: 'string' } } },
+    inputSchema: {
+      type: 'object',
+      required: ['pattern'],
+      properties: { pattern: { type: 'string' }, path: { type: 'string' } },
+    },
     icon: 'search',
     approvalRequired: false,
   },
@@ -80,14 +80,22 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
   {
     id: 'write_file',
     permission: 'mutation',
-    inputSchema: { type: 'object', required: ['path', 'content'], properties: { path: { type: 'string' }, content: { type: 'string' } } },
+    inputSchema: {
+      type: 'object',
+      required: ['path', 'content'],
+      properties: { path: { type: 'string' }, content: { type: 'string' } },
+    },
     icon: 'file-plus',
     approvalRequired: true,
   },
   {
     id: 'edit_file',
     permission: 'mutation',
-    inputSchema: { type: 'object', required: ['path'], properties: { path: { type: 'string' }, patch: { type: 'string' } } },
+    inputSchema: {
+      type: 'object',
+      required: ['path'],
+      properties: { path: { type: 'string' }, patch: { type: 'string' } },
+    },
     icon: 'pencil',
     approvalRequired: true,
   },
@@ -191,7 +199,8 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
         evidenceRefs: {
           type: 'array',
           items: {
-            type: 'object', required: ['uri', 'hash'],
+            type: 'object',
+            required: ['uri', 'hash'],
             properties: { uri: { type: 'string' }, hash: { type: 'string' } },
           },
         },
@@ -201,9 +210,18 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     approvalRequired: false,
   },
   {
-    id: 'subagent_report', permission: 'readonly',
-    inputSchema: { type: 'object', required: ['kind', 'body'], properties: { kind: { type: 'string', enum: ['progress', 'blocked', 'decision_required'] }, body: { type: 'string' } } },
-    icon: 'workflow', approvalRequired: false,
+    id: 'subagent_report',
+    permission: 'readonly',
+    inputSchema: {
+      type: 'object',
+      required: ['kind', 'body'],
+      properties: {
+        kind: { type: 'string', enum: ['progress', 'blocked', 'decision_required'] },
+        body: { type: 'string' },
+      },
+    },
+    icon: 'workflow',
+    approvalRequired: false,
   },
   ...[
     'background_query',
@@ -213,9 +231,20 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     'background_cancel',
     'background_join',
   ].map((id) => ({
-    id, permission: 'readonly' as const,
-    inputSchema: { type: 'object', required: ['executionId'], properties: { executionId: { type: 'string' }, generation: { type: 'number' }, cursor: { type: 'number' }, body: { type: 'string' } } },
-    icon: 'workflow', approvalRequired: false,
+    id,
+    permission: 'readonly' as const,
+    inputSchema: {
+      type: 'object',
+      required: ['executionId'],
+      properties: {
+        executionId: { type: 'string' },
+        generation: { type: 'number' },
+        cursor: { type: 'number' },
+        body: { type: 'string' },
+      },
+    },
+    icon: 'workflow',
+    approvalRequired: false,
   })),
   {
     id: 'task_list',
@@ -328,14 +357,26 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
   {
     id: 'memory_search',
     permission: 'readonly',
-    inputSchema: { type: 'object', required: ['scope'], properties: { scope: { type: 'string', enum: ['user', 'project'] }, query: { type: 'string' }, limit: { type: 'number' } } },
+    inputSchema: {
+      type: 'object',
+      required: ['scope'],
+      properties: {
+        scope: { type: 'string', enum: ['user', 'project'] },
+        query: { type: 'string' },
+        limit: { type: 'number' },
+      },
+    },
     icon: 'brain',
     approvalRequired: false,
   },
   {
     id: 'memory_read',
     permission: 'readonly',
-    inputSchema: { type: 'object', required: ['scope', 'name'], properties: { scope: { type: 'string', enum: ['user', 'project'] }, name: { type: 'string' } } },
+    inputSchema: {
+      type: 'object',
+      required: ['scope', 'name'],
+      properties: { scope: { type: 'string', enum: ['user', 'project'] }, name: { type: 'string' } },
+    },
     icon: 'brain',
     approvalRequired: false,
   },
@@ -361,7 +402,15 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
   {
     id: 'memory_delete',
     permission: 'mutation',
-    inputSchema: { type: 'object', required: ['scope', 'name', 'confirmed'], properties: { scope: { type: 'string', enum: ['user', 'project'] }, name: { type: 'string' }, confirmed: { type: 'boolean' } } },
+    inputSchema: {
+      type: 'object',
+      required: ['scope', 'name', 'confirmed'],
+      properties: {
+        scope: { type: 'string', enum: ['user', 'project'] },
+        name: { type: 'string' },
+        confirmed: { type: 'boolean' },
+      },
+    },
     icon: 'brain',
     approvalRequired: true,
   },
@@ -383,7 +432,11 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
   {
     id: 'output_register',
     permission: 'mutation',
-    inputSchema: { type: 'object', required: ['path'], properties: { path: { type: 'string' }, title: { type: 'string' }, kind: { type: 'string' } } },
+    inputSchema: {
+      type: 'object',
+      required: ['path'],
+      properties: { path: { type: 'string' }, title: { type: 'string' }, kind: { type: 'string' } },
+    },
     icon: 'file-export',
     approvalRequired: false,
   },
@@ -505,7 +558,10 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
         spaceId: { type: 'string' },
         relativePath: { type: 'string' },
         mode: { type: 'string', enum: ['summary', 'section', 'range', 'full'] },
-        contentHash: { type: 'string', description: 'Required for section, range and full; use the current search or summary hash.' },
+        contentHash: {
+          type: 'string',
+          description: 'Required for section, range and full; use the current search or summary hash.',
+        },
         heading: { type: 'string' },
         headingLine: { type: 'integer', minimum: 1 },
         startLine: { type: 'integer', minimum: 1 },

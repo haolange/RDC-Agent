@@ -61,7 +61,8 @@ export type LocalizedCommand = CommandListResult['commands'][number] & { categor
 
 /** The command list stays main-owned; only builtin display copy is localized here. The raw category stays for icons. */
 export function localizeCommands(commands: CommandListResult['commands'], t: Translator): LocalizedCommand[] {
-  return commands.map(command => ({ ...command,
+  return commands.map((command) => ({
+    ...command,
     description: DESCRIPTION_KEYS[command.id] ? t(DESCRIPTION_KEYS[command.id]) : command.description,
     categoryLabel: CATEGORY_KEYS[command.category] ? t(CATEGORY_KEYS[command.category]) : command.category,
   }));

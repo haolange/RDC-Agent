@@ -76,11 +76,35 @@ export function WorkbenchShell({
   const { t } = useI18n();
   const workArea = useRef<HTMLElement>(null);
   const [composerShell, setComposerShell] = useState<HTMLDivElement | null>(null);
-  const readingLayout = useMemo(() => ({ workArea, composerShell,
-    layoutRevision: [resolvedWidths.left, resolvedWidths.right, effectiveLeftCollapsed, effectiveRightCollapsed,
-      isLeftDrawerMode, isRightRailDrawerMode, isRightRailVisible, isTerminalOpen, workbenchRailMaxWidth].join(':'),
-  }), [composerShell, resolvedWidths.left, resolvedWidths.right, effectiveLeftCollapsed, effectiveRightCollapsed,
-    isLeftDrawerMode, isRightRailDrawerMode, isRightRailVisible, isTerminalOpen, workbenchRailMaxWidth]);
+  const readingLayout = useMemo(
+    () => ({
+      workArea,
+      composerShell,
+      layoutRevision: [
+        resolvedWidths.left,
+        resolvedWidths.right,
+        effectiveLeftCollapsed,
+        effectiveRightCollapsed,
+        isLeftDrawerMode,
+        isRightRailDrawerMode,
+        isRightRailVisible,
+        isTerminalOpen,
+        workbenchRailMaxWidth,
+      ].join(':'),
+    }),
+    [
+      composerShell,
+      resolvedWidths.left,
+      resolvedWidths.right,
+      effectiveLeftCollapsed,
+      effectiveRightCollapsed,
+      isLeftDrawerMode,
+      isRightRailDrawerMode,
+      isRightRailVisible,
+      isTerminalOpen,
+      workbenchRailMaxWidth,
+    ],
+  );
   const showDockedRightRail = isRightRailVisible && !isRightRailDrawerMode;
   const showLeftResizeHandle = isDockedResizeHandleVisible(!isLeftDrawerMode, effectiveLeftCollapsed);
   const showRightResizeHandle = isDockedResizeHandleVisible(showDockedRightRail, effectiveRightCollapsed);
@@ -93,95 +117,108 @@ export function WorkbenchShell({
     '--workbench-inline-mode': bothSidebarsCollapsed ? 'dual-collapsed' : 'sidebar-open',
   });
 
-  const sidebarContent = <>
-    <nav className="sidebar-nav">
-      <Sidebar collapsed={isLeftDrawerMode ? false : effectiveLeftCollapsed} />
-    </nav>
-    {(isLeftDrawerMode || !effectiveLeftCollapsed) && (
-      <SidebarFooter
-        nickname={nickname}
-        avatarPath={avatarPath}
-        isUserMenuOpen={isUserMenuOpen}
-        onCloseLeftDrawer={onCloseLeftDrawer}
-        onOpenKnowledgeCenter={onOpenKnowledgeCenter}
-        onUserMenuToggle={onUserMenuToggle}
-      />
-    )}
-  </>;
+  const sidebarContent = (
+    <>
+      <nav className="sidebar-nav">
+        <Sidebar collapsed={isLeftDrawerMode ? false : effectiveLeftCollapsed} />
+      </nav>
+      {(isLeftDrawerMode || !effectiveLeftCollapsed) && (
+        <SidebarFooter
+          nickname={nickname}
+          avatarPath={avatarPath}
+          isUserMenuOpen={isUserMenuOpen}
+          onCloseLeftDrawer={onCloseLeftDrawer}
+          onOpenKnowledgeCenter={onOpenKnowledgeCenter}
+          onUserMenuToggle={onUserMenuToggle}
+        />
+      )}
+    </>
+  );
 
   return (
     <WorkbenchReadingLayoutContext.Provider value={readingLayout}>
-    <PlanReaderHost>
-    <div
-      ref={appBodyRef}
-      className={`app-body ${isResizing ? 'is-resizing' : ''} ${isLeftDrawerMode ? 'has-left-drawer' : ''}${columnsAnimating ? ' is-animating-columns' : ''}`}
-      {...shellDynStyle}
-      onTransitionEnd={(event) => {
-        if (event.target === event.currentTarget && event.propertyName === 'grid-template-columns') onColumnsSettled();
-      }}
-    >
-      <aside
-        className={`app-sidebar-left ${effectiveLeftCollapsed ? 'collapsed' : ''}`}
-        data-testid="app-sidebar-left"
-      >
-        {!isLeftDrawerMode ? sidebarContent : null}
-      </aside>
+      <PlanReaderHost>
+        <div
+          ref={appBodyRef}
+          className={`app-body ${isResizing ? 'is-resizing' : ''} ${isLeftDrawerMode ? 'has-left-drawer' : ''}${columnsAnimating ? ' is-animating-columns' : ''}`}
+          {...shellDynStyle}
+          onTransitionEnd={(event) => {
+            if (event.target === event.currentTarget && event.propertyName === 'grid-template-columns')
+              onColumnsSettled();
+          }}
+        >
+          <aside
+            className={`app-sidebar-left ${effectiveLeftCollapsed ? 'collapsed' : ''}`}
+            data-testid="app-sidebar-left"
+          >
+            {!isLeftDrawerMode ? sidebarContent : null}
+          </aside>
 
-      {showLeftResizeHandle ? (
-        <ResizeHandle side="left" onDragStart={onStartDrag('left', resolvedWidths.left)} />
-      ) : (
-        <div aria-hidden="true" />
-      )}
-
-      <main ref={workArea} className={`app-main ${isTerminalOpen ? 'terminal-open' : ''}`}>
-        <div className="main-content">
-          <div className="main-page-shell">{mainPage}</div>
-        </div>
-        {showMainPromptBar && (
-          <div className="main-input-bar">
-            <Composer
-              composer={composer}
-              shellRef={setComposerShell}
-            />
-          </div>
-        )}
-        <TerminalDrawer />
-      </main>
-
-      {showDockedRightRail && (
-        <>
-          {showRightResizeHandle ? (
-            <ResizeHandle side="right" onDragStart={onStartDrag('right', resolvedWidths.right)} />
+          {showLeftResizeHandle ? (
+            <ResizeHandle side="left" onDragStart={onStartDrag('left', resolvedWidths.left)} />
           ) : (
             <div aria-hidden="true" />
           )}
 
-          <aside
-            className={`app-sidebar-right ${effectiveRightCollapsed ? 'collapsed' : ''}`}
-            data-testid="app-sidebar-right"
-          >
-            <div
-              className={`right-panel-body ${effectiveRightCollapsed ? 'collapsed' : ''}`}
-              data-testid="right-rail-scroll"
+          <main ref={workArea} className={`app-main ${isTerminalOpen ? 'terminal-open' : ''}`}>
+            <div className="main-content">
+              <div className="main-page-shell">{mainPage}</div>
+            </div>
+            {showMainPromptBar && (
+              <div className="main-input-bar">
+                <Composer composer={composer} shellRef={setComposerShell} />
+              </div>
+            )}
+            <TerminalDrawer />
+          </main>
+
+          {showDockedRightRail && (
+            <>
+              {showRightResizeHandle ? (
+                <ResizeHandle side="right" onDragStart={onStartDrag('right', resolvedWidths.right)} />
+              ) : (
+                <div aria-hidden="true" />
+              )}
+
+              <aside
+                className={`app-sidebar-right ${effectiveRightCollapsed ? 'collapsed' : ''}`}
+                data-testid="app-sidebar-right"
+              >
+                <div
+                  className={`right-panel-body ${effectiveRightCollapsed ? 'collapsed' : ''}`}
+                  data-testid="right-rail-scroll"
+                >
+                  <RightRail />
+                </div>
+              </aside>
+            </>
+          )}
+          {isLeftDrawerMode ? (
+            <WorkbenchPanelDrawer
+              data-testid="left-navigation-drawer"
+              keepMounted
+              side="left"
+              title={t('sidebar.projects')}
+              closeLabel={t('app.closePanel')}
+              open={isLeftDrawerOpen}
+              onClose={onCloseLeftDrawer}
+            >
+              {sidebarContent}
+            </WorkbenchPanelDrawer>
+          ) : null}
+          {isRightRailVisible && isRightRailDrawerMode ? (
+            <WorkbenchPanelDrawer
+              data-testid="right-rail-drawer"
+              title={t('app.inspector')}
+              closeLabel={t('app.closePanel')}
+              open={isRightRailDrawerOpen}
+              onClose={onCloseRightRailDrawer}
             >
               <RightRail />
-            </div>
-          </aside>
-        </>
-      )}
-      {isLeftDrawerMode ? (
-        <WorkbenchPanelDrawer data-testid="left-navigation-drawer" keepMounted side="left" title={t('sidebar.projects')} closeLabel={t('app.closePanel')} open={isLeftDrawerOpen} onClose={onCloseLeftDrawer}>
-          {sidebarContent}
-        </WorkbenchPanelDrawer>
-      ) : null}
-      {isRightRailVisible && isRightRailDrawerMode ? (
-        <WorkbenchPanelDrawer data-testid="right-rail-drawer" title={t('app.inspector')} closeLabel={t('app.closePanel')} open={isRightRailDrawerOpen} onClose={onCloseRightRailDrawer}>
-          <RightRail />
-        </WorkbenchPanelDrawer>
-      ) : null}
-
-    </div>
-    </PlanReaderHost>
+            </WorkbenchPanelDrawer>
+          ) : null}
+        </div>
+      </PlanReaderHost>
     </WorkbenchReadingLayoutContext.Provider>
   );
 }

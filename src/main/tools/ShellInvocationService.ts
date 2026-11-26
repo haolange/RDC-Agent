@@ -105,7 +105,9 @@ export class ShellInvocationService {
       };
     } finally {
       if (supervised.orphaned) {
-        void supervised.exit.then(() => { this.activeProcesses.delete(procId); });
+        void supervised.exit.then(() => {
+          this.activeProcesses.delete(procId);
+        });
       } else {
         this.activeProcesses.delete(procId);
       }
@@ -113,7 +115,9 @@ export class ShellInvocationService {
   }
 
   hasUnconfirmedProcesses(contextId?: string): boolean {
-    return Array.from(this.activeProcesses.values()).some(({ supervised, contextId: owner }) => supervised.orphaned && (!contextId || owner === contextId));
+    return Array.from(this.activeProcesses.values()).some(
+      ({ supervised, contextId: owner }) => supervised.orphaned && (!contextId || owner === contextId),
+    );
   }
 
   abortRun(runId: string): void {
@@ -134,7 +138,8 @@ export class ShellInvocationService {
 export const shellInvocationService = new ShellInvocationService();
 
 export interface CLIResult {
-  processExitReason?: 'exit' | 'signal' | 'timeout' | 'abort' | 'spawn_failed' | 'supervisor_kill' | 'unconfirmed_orphan';
+  processExitReason?:
+    'exit' | 'signal' | 'timeout' | 'abort' | 'spawn_failed' | 'supervisor_kill' | 'unconfirmed_orphan';
   exitCode: number;
   stdout: string;
   stdoutByteLength?: number;

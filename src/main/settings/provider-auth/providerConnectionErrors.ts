@@ -10,7 +10,9 @@ export class ProviderConnectionError extends Error {
     readonly httpStatus?: number,
     readonly code?: ProviderConnectionErrorCode,
     readonly params?: ProviderConnectionErrorParams,
-  ) { super(message); }
+  ) {
+    super(message);
+  }
 }
 
 export function providerConnectionError(

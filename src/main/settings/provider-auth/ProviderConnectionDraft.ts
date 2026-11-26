@@ -6,10 +6,7 @@ import {
   resolveProviderEndpointTemplate,
 } from './ProviderConnectionSchema';
 import { ProviderConnectionError } from './providerConnectionErrors';
-import type {
-  LlmProviderDraftRequest,
-  LlmProviderEntry,
-} from '@shared/types/settings';
+import type { LlmProviderDraftRequest, LlmProviderEntry } from '@shared/types/settings';
 
 interface ResolvedProviderConnectionDraft {
   apiKey: string;
@@ -31,9 +28,7 @@ export function resolveProviderConnectionDraft(
   if (apiKeyDraft && primarySecretFieldId) {
     values[primarySecretFieldId] = apiKeyDraft;
   }
-  const apiKey = primarySecretFieldId
-    ? values[primarySecretFieldId]?.trim() ?? ''
-    : apiKeyDraft;
+  const apiKey = primarySecretFieldId ? (values[primarySecretFieldId]?.trim() ?? '') : apiKeyDraft;
   if (provider.authMode === 'api-key') {
     const schemaSatisfied = provider.connectionSchema?.fields.length
       ? isProviderConnectionSchemaSatisfied(provider.connectionSchema, values)

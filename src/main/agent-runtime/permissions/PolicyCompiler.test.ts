@@ -57,9 +57,11 @@ describe('PolicyCompiler', () => {
   });
 
   it('compiles contextCompactionPercent and lets project policy only tighten it', () => {
-    expect(compileFixturePolicy({
-      limits: { contextCompactionPercent: 70 },
-    }).contextCompactionPercent).toBe(70);
+    expect(
+      compileFixturePolicy({
+        limits: { contextCompactionPercent: 70 },
+      }).contextCompactionPercent,
+    ).toBe(70);
 
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-user-'));
     const userRoot = path.join(home, '.rdc-agent');
@@ -93,14 +95,17 @@ describe('PolicyCompiler', () => {
     }
   });
 
-
   it('filters disabled policies before restrictive merge', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-policy-'));
     const restoreHome = isolateHome(root);
     try {
       const policies = path.join(root, '.rdc-agent', 'policies');
       fs.mkdirSync(policies, { recursive: true });
-      fs.writeFileSync(path.join(policies, '01-disabled.policy.yml'), 'enabled: false\nlimits:\n  maxTurns: 0\n', 'utf8');
+      fs.writeFileSync(
+        path.join(policies, '01-disabled.policy.yml'),
+        'enabled: false\nlimits:\n  maxTurns: 0\n',
+        'utf8',
+      );
       fs.writeFileSync(path.join(policies, '02-active.policy.yml'), 'limits:\n  maxTurns: 7\n', 'utf8');
       expect(compileEffectivePolicy(null).maxTurns).toBe(7);
     } finally {
@@ -110,20 +115,30 @@ describe('PolicyCompiler', () => {
   });
 
   it('fail-closed on invalid policy fields', () => {
-    expect(() => compileFixturePolicy({
-      deniedTools: [1 as unknown as string],
-    })).toThrow(/POLICY_INVALID/);
-    expect(() => compileFixturePolicy({
-      approval: 'maybe' as 'none',
-    })).toThrow(/POLICY_INVALID/);
-    expect(() => compileFixturePolicy({
-      limits: { maxTurns: -1 },
-    })).toThrow(/POLICY_INVALID/);
-    expect(() => compileFixturePolicy({
-      limits: { maxTurns: 1.5 },
-    })).toThrow(/non-negative integer/);
-    expect(() => compileFixturePolicy({
-      limits: { maxOutputBytes: 10 },
-    })).toThrow(/unknown limit/);
+    expect(() =>
+      compileFixturePolicy({
+        deniedTools: [1 as unknown as string],
+      }),
+    ).toThrow(/POLICY_INVALID/);
+    expect(() =>
+      compileFixturePolicy({
+        approval: 'maybe' as 'none',
+      }),
+    ).toThrow(/POLICY_INVALID/);
+    expect(() =>
+      compileFixturePolicy({
+        limits: { maxTurns: -1 },
+      }),
+    ).toThrow(/POLICY_INVALID/);
+    expect(() =>
+      compileFixturePolicy({
+        limits: { maxTurns: 1.5 },
+      }),
+    ).toThrow(/non-negative integer/);
+    expect(() =>
+      compileFixturePolicy({
+        limits: { maxOutputBytes: 10 },
+      }),
+    ).toThrow(/unknown limit/);
   });
 });

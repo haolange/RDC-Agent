@@ -20,12 +20,7 @@ import { AppError } from '@shared/errors/appError';
 import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
 import { normalizeSha256 } from '../../runtime/contentHash';
 import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from './taskExecutionSchemas';
-import {
-  INVALIDATED_REVIEW_GUIDANCE,
-  TaskRegistry,
-  type TaskRecord,
-  type TaskStatus,
-} from './TaskRegistry';
+import { INVALIDATED_REVIEW_GUIDANCE, TaskRegistry, type TaskRecord, type TaskStatus } from './TaskRegistry';
 import { readTaskBudgetSnapshot, type TaskLiveBudgetSnapshot } from './TaskBudgetSnapshot';
 import type { TaskExecutionRequirements } from './taskExecutionSchemas';
 import type { AgentTool, AgentToolResult } from '../agent/AgentTool';
@@ -33,7 +28,9 @@ import type { StartTaskExecutionOptions } from './TaskContracts';
 import type { RequestUsageSnapshot } from '../prompt/RequestUsageSnapshot';
 
 export interface TaskToolExecutionContext {
-  startOptions?: (taskId: string) => Omit<StartTaskExecutionOptions, 'mode'> | Promise<Omit<StartTaskExecutionOptions, 'mode'>>;
+  startOptions?: (
+    taskId: string,
+  ) => Omit<StartTaskExecutionOptions, 'mode'> | Promise<Omit<StartTaskExecutionOptions, 'mode'>>;
   readLiveBudget?: (rootBudgetId: string) => TaskLiveBudgetSnapshot | null;
   readRequestUsage?: () => RequestUsageSnapshot;
   getCreationTurnRef?: () => string | undefined;
@@ -42,13 +39,7 @@ export interface TaskToolExecutionContext {
 }
 
 /** 允许工具更新的状态值。 */
-const ALLOWED_STATUS: TaskStatus[] = [
-  'pending',
-  'in_progress',
-  'blocked',
-  'completed',
-  'cancelled',
-];
+const ALLOWED_STATUS: TaskStatus[] = ['pending', 'in_progress', 'blocked', 'completed', 'cancelled'];
 
 /**
  * 基于一个 `TaskRegistry` 实例创建 5 个工具。
@@ -89,7 +80,8 @@ export function createTaskCreateTool(
   return {
     name: 'task_create',
     label: 'Create Tasks',
-    description: 'Create the full task list for this turn in one call. blockedBy accepts only existing Task IDs; Tasks created together receive their IDs in the result. If task_update is available, use those returned IDs with addBlockedBy to link same-batch prerequisites. For independent review, also set executionRequirements.independentOfTaskIds to the returned source IDs; waiting for a prerequisite alone does not bind independent review. Do this before starting work or submitting a plan.',
+    description:
+      'Create the full task list for this turn in one call. blockedBy accepts only existing Task IDs; Tasks created together receive their IDs in the result. If task_update is available, use those returned IDs with addBlockedBy to link same-batch prerequisites. For independent review, also set executionRequirements.independentOfTaskIds to the returned source IDs; waiting for a prerequisite alone does not bind independent review. Do this before starting work or submitting a plan.',
     parameters: {
       type: 'object',
       properties: {
@@ -110,12 +102,14 @@ export function createTaskCreateTool(
               blockedBy: {
                 type: 'array',
                 items: { type: 'string' },
-                description: 'Existing prerequisite Task IDs only. Link prerequisites created in this same batch afterward using task_update and the returned IDs. Waiting for these keeps the new Task pending; dependencies are not a blocked execution outcome.',
+                description:
+                  'Existing prerequisite Task IDs only. Link prerequisites created in this same batch afterward using task_update and the returned IDs. Waiting for these keeps the new Task pending; dependencies are not a blocked execution outcome.',
               },
               completionRequirements: {
                 type: 'array',
                 items: { type: 'string' },
-                description: 'Exact keys required in result.outputs before completion, e.g. ["analysis"]. Put acceptance prose in description, not here. Every listed string must be returned verbatim as an output key.',
+                description:
+                  'Exact keys required in result.outputs before completion, e.g. ["analysis"]. Put acceptance prose in description, not here. Every listed string must be returned verbatim as an output key.',
               },
               parentTaskId: { type: 'string', description: 'Optional parent logical Task id.' },
               executionRequirements: TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA,
@@ -128,11 +122,20 @@ export function createTaskCreateTool(
       required: ['tasks'],
     },
     permissionHint: 'readonly',
-    spec: { isReadOnly: false, concurrency: 'orchestration-serial', isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
+    spec: {
+      isReadOnly: false,
+      concurrency: 'orchestration-serial',
+      isDestructive: false,
+      sideEffect: 'session',
+      category: 'task',
+      requiresApproval: false,
+    },
 
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
-      const items = readTaskItems(params).map((item) => context.scopeRootTaskId && !item.parentTaskId ? { ...item, parentTaskId: context.scopeRootTaskId } : item);
+      const items = readTaskItems(params).map((item) =>
+        context.scopeRootTaskId && !item.parentTaskId ? { ...item, parentTaskId: context.scopeRootTaskId } : item,
+      );
       for (const item of items) {
         if (item.parentTaskId) await assertTaskInScope(registry, item.parentTaskId, context.scopeRootTaskId, true);
         for (const dependencyId of item.blockedBy ?? []) {
@@ -143,13 +146,13 @@ export function createTaskCreateTool(
       const created = await registry.createTasks(items.map((item) => ({ ...item, creationTurnRef })));
       let text = created
         .map((task) => {
-          const depsText = task.blockedBy.length > 0
-            ? ` (blockedBy: ${task.blockedBy.join(', ')})`
-            : '';
+          const depsText = task.blockedBy.length > 0 ? ` (blockedBy: ${task.blockedBy.join(', ')})` : '';
           return `Created ${task.id}: ${task.subject}${depsText}`;
         })
         .join('\n');
-      if (created.length > 1) text += '\nIf task_update is available, link prerequisites among these new Tasks using their returned IDs and addBlockedBy before starting work or submitting a plan. For independent review, also set executionRequirements.independentOfTaskIds to the source IDs while preserving the review mode, profile and required Skills; blockedBy alone is not independence.';
+      if (created.length > 1)
+        text +=
+          '\nIf task_update is available, link prerequisites among these new Tasks using their returned IDs and addBlockedBy before starting work or submitting a plan. For independent review, also set executionRequirements.independentOfTaskIds to the source IDs while preserving the review mode, profile and required Skills; blockedBy alone is not independence.';
 
       return {
         content: [{ type: 'text', text }],
@@ -173,7 +176,14 @@ interface TaskUpdateParams {
   addBlocks?: string[];
   metadata?: Record<string, unknown>;
   executionRequirements?: TaskExecutionRequirements;
-  result?: { disposition: 'completed' | 'partial' | 'blocked' | 'cancelled'; summary: string; outputs: Record<string, string>; missingRequirements?: string[]; resultRef?: string; resultHash?: string };
+  result?: {
+    disposition: 'completed' | 'partial' | 'blocked' | 'cancelled';
+    summary: string;
+    outputs: Record<string, string>;
+    missingRequirements?: string[];
+    resultRef?: string;
+    resultHash?: string;
+  };
 }
 
 interface TaskUpdateDetails {
@@ -190,7 +200,8 @@ export function createTaskUpdateTool(
   return {
     name: 'task_update',
     label: 'Update Task',
-    description: 'Update an existing Task. Unfinished prerequisites keep a Task pending; blocked records a real obstacle or incomplete execution result, not ordinary dependency waiting. status=in_progress starts a new direct execution; call it once per execution, never as a progress note or before dispatching Task-owned delegated work. After the user explicitly requests continuation in a later turn, resumeCancelled=true can continue the same cancelled goal after all producers joined; history and consumed budgets remain. A completed source Task may run again after its actual result has been independently reviewed, including when the original snapshot remains readable; settle the new execution with the revised resultRef and resultHash, then dispatch the same review Task against that version. A source that became invalid or a review bound to a superseded source can also be reexecuted. Prior executions, consumption and deadlines remain. The delegated runner claims its own execution in both wait and background modes. Do the Task work before status=completed or blocked settles its direct execution; a partial result leaves the Task blocked. Send result in the same call as status=completed or blocked; a settled execution cannot be rewritten. To continue useful work, start a new execution of the same Task with its existing consumption and deadline. For independent review, result.resultRef and result.resultHash must identify the actual result being reviewed, not merely a supporting receipt. For a workspace text result, a permitted read_file with pinEvidence=true can provide a session URI/hash for the returned window; verify completeness and explicitly grant every needed window. A later revision is a different result version. status=pending cannot release an active execution. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
+    description:
+      'Update an existing Task. Unfinished prerequisites keep a Task pending; blocked records a real obstacle or incomplete execution result, not ordinary dependency waiting. status=in_progress starts a new direct execution; call it once per execution, never as a progress note or before dispatching Task-owned delegated work. After the user explicitly requests continuation in a later turn, resumeCancelled=true can continue the same cancelled goal after all producers joined; history and consumed budgets remain. A completed source Task may run again after its actual result has been independently reviewed, including when the original snapshot remains readable; settle the new execution with the revised resultRef and resultHash, then dispatch the same review Task against that version. A source that became invalid or a review bound to a superseded source can also be reexecuted. Prior executions, consumption and deadlines remain. The delegated runner claims its own execution in both wait and background modes. Do the Task work before status=completed or blocked settles its direct execution; a partial result leaves the Task blocked. Send result in the same call as status=completed or blocked; a settled execution cannot be rewritten. To continue useful work, start a new execution of the same Task with its existing consumption and deadline. For independent review, result.resultRef and result.resultHash must identify the actual result being reviewed, not merely a supporting receipt. For a workspace text result, a permitted read_file with pinEvidence=true can provide a session URI/hash for the returned window; verify completeness and explicitly grant every needed window. A later revision is a different result version. status=pending cannot release an active execution. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
     parameters: {
       type: 'object',
       properties: {
@@ -200,11 +211,20 @@ export function createTaskUpdateTool(
           enum: ['pending', 'in_progress', 'blocked', 'completed', 'cancelled'],
         },
         statusReason: { type: 'string' },
-        resumeCancelled: { type: 'boolean', description: 'Only with status=in_progress after explicit user continuation in a later owning turn; preserve the cancelled execution and all consumed budgets.' },
+        resumeCancelled: {
+          type: 'boolean',
+          description:
+            'Only with status=in_progress after explicit user continuation in a later owning turn; preserve the cancelled execution and all consumed budgets.',
+        },
         subject: { type: 'string' },
         description: { type: 'string' },
         owner: { type: 'string' },
-        addBlockedBy: { type: 'array', items: { type: 'string' }, description: 'Existing prerequisite Task IDs, including IDs returned by the same task_create batch. Add dependencies before starting work or submitting a plan; omit status in this update.' },
+        addBlockedBy: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Existing prerequisite Task IDs, including IDs returned by the same task_create batch. Add dependencies before starting work or submitting a plan; omit status in this update.',
+        },
         addBlocks: { type: 'array', items: { type: 'string' } },
         metadata: { type: 'object' },
         executionRequirements: TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA,
@@ -215,8 +235,16 @@ export function createTaskUpdateTool(
             summary: { type: 'string' },
             outputs: { type: 'object' },
             missingRequirements: { type: 'array', items: { type: 'string' } },
-            resultRef: { type: 'string', description: 'Owning-session reference to the actual result under review, not an unrelated supporting receipt.' },
-            resultHash: { type: 'string', description: 'Exact SHA-256 of that result reference, with or without the sha256: prefix; do not substitute a source capture or another artifact hash.' },
+            resultRef: {
+              type: 'string',
+              description:
+                'Owning-session reference to the actual result under review, not an unrelated supporting receipt.',
+            },
+            resultHash: {
+              type: 'string',
+              description:
+                'Exact SHA-256 of that result reference, with or without the sha256: prefix; do not substitute a source capture or another artifact hash.',
+            },
           },
           required: ['disposition', 'summary', 'outputs'],
         },
@@ -224,7 +252,14 @@ export function createTaskUpdateTool(
       required: ['taskId'],
     },
     permissionHint: 'readonly',
-    spec: { isReadOnly: false, concurrency: 'orchestration-serial', isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
+    spec: {
+      isReadOnly: false,
+      concurrency: 'orchestration-serial',
+      isDestructive: false,
+      sideEffect: 'session',
+      category: 'task',
+      requiresApproval: false,
+    },
 
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
@@ -232,9 +267,17 @@ export function createTaskUpdateTool(
       await assertTaskInScope(registry, taskId, context.scopeRootTaskId, false);
 
       const status = readEnum(params, 'status', ALLOWED_STATUS);
-      const executionRequirements = params.executionRequirements === undefined ? undefined : TaskExecutionRequirementsSchema.parse(params.executionRequirements);
-      if (executionRequirements && status && status !== 'pending') throw new AppError('TASK_EXECUTION_REQUIREMENTS', 'revise requirements separately before starting or settling work.');
-      if (params.resumeCancelled !== undefined && typeof params.resumeCancelled !== 'boolean') throw new Error('resumeCancelled must be boolean.');
+      const executionRequirements =
+        params.executionRequirements === undefined
+          ? undefined
+          : TaskExecutionRequirementsSchema.parse(params.executionRequirements);
+      if (executionRequirements && status && status !== 'pending')
+        throw new AppError(
+          'TASK_EXECUTION_REQUIREMENTS',
+          'revise requirements separately before starting or settling work.',
+        );
+      if (params.resumeCancelled !== undefined && typeof params.resumeCancelled !== 'boolean')
+        throw new Error('resumeCancelled must be boolean.');
       const resumeCancelled = params.resumeCancelled === true;
       if (resumeCancelled && (status !== 'in_progress' || context.scopeRootTaskId)) {
         throw new Error('Cancelled Task continuation requires status=in_progress in the owning non-delegated turn.');
@@ -257,10 +300,18 @@ export function createTaskUpdateTool(
 
       const result = readCompletionResult(params.result);
       if (result && status !== 'completed' && status !== 'blocked') {
-        throw new Error('Task result must accompany status=completed or blocked when settling a direct execution. A settled execution cannot be rewritten; start a new execution of the same Task to continue.');
+        throw new Error(
+          'Task result must accompany status=completed or blocked when settling a direct execution. A settled execution cannot be rewritten; start a new execution of the same Task to continue.',
+        );
       }
-      const hasSemanticUpdates = subject !== undefined || description !== undefined || owner !== undefined
-        || Boolean(addBlockedBy?.length) || Boolean(addBlocks?.length) || metadata !== undefined || executionRequirements !== undefined;
+      const hasSemanticUpdates =
+        subject !== undefined ||
+        description !== undefined ||
+        owner !== undefined ||
+        Boolean(addBlockedBy?.length) ||
+        Boolean(addBlocks?.length) ||
+        metadata !== undefined ||
+        executionRequirements !== undefined;
       if (status && hasSemanticUpdates) {
         const task = await registry.getTask(taskId);
         if (task?.status === 'completed' && task.executionRequirements?.independentOfTaskIds.length) {
@@ -284,37 +335,39 @@ export function createTaskUpdateTool(
         if (!task?.currentExecutionId) throw new Error('Task must be started before it can be settled.');
         const execution = await registry.getExecution(task.currentExecutionId);
         if (!execution) throw new Error('Current task execution is missing.');
-        if (execution.mode !== 'direct') throw new Error('Managed subagent and handoff executions are settled by their execution owner.');
+        if (execution.mode !== 'direct')
+          throw new Error('Managed subagent and handoff executions are settled by their execution owner.');
         const disposition = status === 'completed' ? 'completed' : status;
         const effective = result ?? { disposition, summary: statusReason ?? `Task ${status}.`, outputs: {} };
         const executionStatus = effective.disposition === 'partial' ? 'partial' : status;
-        await registry.settleExecution(execution.id, { status: executionStatus, result: effective, expectedGeneration: execution.generation });
+        await registry.settleExecution(execution.id, {
+          status: executionStatus,
+          result: effective,
+          expectedGeneration: execution.generation,
+        });
         updated = (await registry.getTask(taskId))!;
-      } else updated = await registry.updateTask(taskId, {
-        status,
-        statusReason,
-        subject,
-        description,
-        owner,
-        addBlockedBy,
-        addBlocks,
-        metadata,
-        executionRequirements,
-        result,
-      });
+      } else
+        updated = await registry.updateTask(taskId, {
+          status,
+          statusReason,
+          subject,
+          description,
+          owner,
+          addBlockedBy,
+          addBlocks,
+          metadata,
+          executionRequirements,
+          result,
+        });
 
       let unblocked: TaskRecord[] = [];
       if (status === 'completed') {
         unblocked = await registry.getUnblockedTasks(updated.id);
       }
 
-      const lines: string[] = [
-        `Updated ${updated.id}: ${updated.subject} [${updated.status}]`,
-      ];
+      const lines: string[] = [`Updated ${updated.id}: ${updated.subject} [${updated.status}]`];
       if (unblocked.length > 0) {
-        lines.push(
-          `Unblocked: ${unblocked.map((t) => `${t.id} (${t.subject})`).join(', ')}`,
-        );
+        lines.push(`Unblocked: ${unblocked.map((t) => `${t.id} (${t.subject})`).join(', ')}`);
       }
 
       return {
@@ -343,7 +396,8 @@ export function createTaskGetTool(
   return {
     name: 'task_get',
     label: 'Get Task',
-    description: 'Get Task fields, budgetSnapshot (execution/root tool and time counters, live policy capacity and subagent admission), and requestUsage (committed model request attempts by turn in the calling execution scope and its descendants, including auxiliary, failed and retried requests). Request counts are local attempt accounting, not provider billing or remaining quota. Null means unavailable. This read does not reserve resources or grant permissions; delegated work still needs an accepted Capsule allocation.',
+    description:
+      'Get Task fields, budgetSnapshot (execution/root tool and time counters, live policy capacity and subagent admission), and requestUsage (committed model request attempts by turn in the calling execution scope and its descendants, including auxiliary, failed and retried requests). Request counts are local attempt accounting, not provider billing or remaining quota. Null means unavailable. This read does not reserve resources or grant permissions; delegated work still needs an accepted Capsule allocation.',
     pollable: true,
     parameters: {
       type: 'object',
@@ -353,7 +407,14 @@ export function createTaskGetTool(
       required: ['taskId'],
     },
     permissionHint: 'readonly',
-    spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'task', requiresApproval: false },
+    spec: {
+      isReadOnly: true,
+      concurrency: 'shared',
+      isDestructive: false,
+      sideEffect: 'none',
+      category: 'task',
+      requiresApproval: false,
+    },
 
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
@@ -394,12 +455,21 @@ export function createTaskListTool(
       properties: {},
     },
     permissionHint: 'readonly',
-    spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'task', requiresApproval: false },
+    spec: {
+      isReadOnly: true,
+      concurrency: 'shared',
+      isDestructive: false,
+      sideEffect: 'none',
+      category: 'task',
+      requiresApproval: false,
+    },
 
     async execute(_toolCallId, _params, signal) {
       throwIfAborted(signal);
       const { tasks: allTasks } = await registry.readConsistentSnapshot();
-      const tasks = context.scopeRootTaskId ? allTasks.filter((task) => isTaskInScope(task.id, context.scopeRootTaskId!, allTasks, false)) : allTasks;
+      const tasks = context.scopeRootTaskId
+        ? allTasks.filter((task) => isTaskInScope(task.id, context.scopeRootTaskId!, allTasks, false))
+        : allTasks;
       if (tasks.length === 0) {
         return {
           content: [
@@ -443,7 +513,14 @@ export function createTaskStopTool(
       required: ['taskId'],
     },
     permissionHint: 'readonly',
-    spec: { isReadOnly: false, concurrency: 'orchestration-serial', isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
+    spec: {
+      isReadOnly: false,
+      concurrency: 'orchestration-serial',
+      isDestructive: false,
+      sideEffect: 'session',
+      category: 'task',
+      requiresApproval: false,
+    },
 
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
@@ -458,7 +535,12 @@ export function createTaskStopTool(
       }
       if (context.requestCurrentTurnStop?.(taskId)) {
         return {
-          content: [{ type: 'text', text: `Stop requested for ${taskId}; terminal state will be recorded after its turn producers join.` }],
+          content: [
+            {
+              type: 'text',
+              text: `Stop requested for ${taskId}; terminal state will be recorded after its turn producers join.`,
+            },
+          ],
           details: { id: taskId },
         } satisfies AgentToolResult<{ id: string }>;
       }
@@ -471,10 +553,16 @@ export function createTaskStopTool(
   };
 }
 
-async function assertTaskInScope(registry: TaskRegistry, taskId: string, rootTaskId: string | undefined, allowRoot: boolean): Promise<void> {
+async function assertTaskInScope(
+  registry: TaskRegistry,
+  taskId: string,
+  rootTaskId: string | undefined,
+  allowRoot: boolean,
+): Promise<void> {
   if (!rootTaskId) return;
   const tasks = await registry.listTasks();
-  if (!isTaskInScope(taskId, rootTaskId, tasks, allowRoot)) throw new AppError('TASK_SCOPE_DENIED', 'delegated agents may access only descendants of their owning Task.');
+  if (!isTaskInScope(taskId, rootTaskId, tasks, allowRoot))
+    throw new AppError('TASK_SCOPE_DENIED', 'delegated agents may access only descendants of their owning Task.');
 }
 
 function isTaskInScope(taskId: string, rootTaskId: string, tasks: readonly TaskRecord[], allowRoot: boolean): boolean {
@@ -501,11 +589,7 @@ function readString(params: object, key: string, required: true): string;
 
 function readString(params: object, key: string, required: false): string | undefined;
 
-function readString(
-  params: object,
-  key: string,
-  required: boolean,
-): string | undefined {
+function readString(params: object, key: string, required: boolean): string | undefined {
   const value = (params as Record<string, unknown>)[key];
   if (value === undefined || value === null || value === '') {
     if (required) throw new Error(`参数 "${key}" 不能为空`);
@@ -535,7 +619,10 @@ function readTaskItems(params: object): TaskCreateItem[] {
       blockedBy: readStringArray(record, 'blockedBy'),
       completionRequirements: readStringArray(record, 'completionRequirements'),
       parentTaskId: readString(record, 'parentTaskId', false),
-      executionRequirements: record.executionRequirements === undefined ? undefined : TaskExecutionRequirementsSchema.parse(record.executionRequirements),
+      executionRequirements:
+        record.executionRequirements === undefined
+          ? undefined
+          : TaskExecutionRequirementsSchema.parse(record.executionRequirements),
     };
   });
 }
@@ -548,18 +635,26 @@ function readCompletionResult(value: unknown): TaskUpdateParams['result'] {
   const summary = readString(record, 'summary', true);
   if (!disposition) throw new Error('参数 "result.disposition" 不能为空');
   const outputsValue = record.outputs;
-  if (!outputsValue || typeof outputsValue !== 'object' || Array.isArray(outputsValue)) throw new Error('参数 "result.outputs" 必须是对象');
+  if (!outputsValue || typeof outputsValue !== 'object' || Array.isArray(outputsValue))
+    throw new Error('参数 "result.outputs" 必须是对象');
   const outputs: Record<string, string> = {};
-  for (const [key, item] of Object.entries(outputsValue)) { if (typeof item !== 'string') throw new Error('参数 "result.outputs" 的值必须是字符串'); outputs[key] = item; }
+  for (const [key, item] of Object.entries(outputsValue)) {
+    if (typeof item !== 'string') throw new Error('参数 "result.outputs" 的值必须是字符串');
+    outputs[key] = item;
+  }
   const resultHash = readString(record, 'resultHash', false);
-  return { disposition, summary, outputs, missingRequirements: readStringArray(record, 'missingRequirements'), resultRef: readString(record, 'resultRef', false), resultHash: resultHash ? normalizeSha256(resultHash) : undefined };
+  return {
+    disposition,
+    summary,
+    outputs,
+    missingRequirements: readStringArray(record, 'missingRequirements'),
+    resultRef: readString(record, 'resultRef', false),
+    resultHash: resultHash ? normalizeSha256(resultHash) : undefined,
+  };
 }
 
 /** 从未知入参中读取字符串数组字段。 */
-function readStringArray(
-  params: object,
-  key: string,
-): string[] | undefined {
+function readStringArray(params: object, key: string): string[] | undefined {
   const value = (params as Record<string, unknown>)[key];
   if (value === undefined || value === null) return undefined;
   if (!Array.isArray(value)) {
@@ -576,17 +671,11 @@ function readStringArray(
 }
 
 /** 读取受限的枚举字段；不在白名单内时抛错。 */
-function readEnum<T extends string>(
-  params: object,
-  key: string,
-  allowed: readonly T[],
-): T | undefined {
+function readEnum<T extends string>(params: object, key: string, allowed: readonly T[]): T | undefined {
   const value = (params as Record<string, unknown>)[key];
   if (value === undefined || value === null || value === '') return undefined;
   if (typeof value !== 'string' || !allowed.includes(value as T)) {
-    throw new Error(
-      `参数 "${key}" 必须是以下之一：${allowed.join(', ')}`,
-    );
+    throw new Error(`参数 "${key}" 必须是以下之一：${allowed.join(', ')}`);
   }
   return value as T;
 }
@@ -595,10 +684,7 @@ function readEnum<T extends string>(
 function formatTaskLine(task: TaskRecord): string {
   const icon = STATUS_ICON[task.status];
   const owner = task.owner ? ` [${task.owner}]` : '';
-  const deps =
-    task.blockedBy.length > 0
-      ? ` (blockedBy: ${task.blockedBy.join(', ')})`
-      : '';
+  const deps = task.blockedBy.length > 0 ? ` (blockedBy: ${task.blockedBy.join(', ')})` : '';
   const reason = task.statusReason ? ` — ${task.statusReason}` : '';
   return `  ${icon} ${task.id}: ${task.subject} [${task.status}]${owner}${deps}${reason}`;
 }

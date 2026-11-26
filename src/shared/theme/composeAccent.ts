@@ -1,13 +1,4 @@
-import {
-  hexToRgb,
-  hslToRgb,
-  inkOn,
-  normalizeHexColor,
-  rgbToCssTriplet,
-  rgbToHex,
-  rgbToHsl,
-  mixRgb,
-} from './color';
+import { hexToRgb, hslToRgb, inkOn, normalizeHexColor, rgbToCssTriplet, rgbToHex, rgbToHsl, mixRgb } from './color';
 import type { ResolvedTheme } from '../types/settings';
 
 /** Last-resort compose accent when manifest accent is missing (not a product authority). */
@@ -36,10 +27,7 @@ export interface ComposeAccentCssVars {
  * Derive compose-scoped accent + Effort/Max visuals from agent accent.
  * Light/Dark only modulates luminance; hue stays agent-owned.
  */
-export function deriveComposeAccentVars(
-  accentHex: string,
-  resolvedTheme: ResolvedTheme,
-): ComposeAccentCssVars {
+export function deriveComposeAccentVars(accentHex: string, resolvedTheme: ResolvedTheme): ComposeAccentCssVars {
   const accent = normalizeHexColor(accentHex, COMPOSE_ACCENT_FALLBACK);
   const base = hexToRgb(accent);
   const hsl = rgbToHsl(base);
@@ -49,9 +37,7 @@ export function deriveComposeAccentVars(
   // Fixed dark-theme luminance previously pushed light violet agents into
   // saturated indigo, so the control no longer looked related to its agent.
   const fill = (level: number) => {
-    const lightnessOffsets = isLight
-      ? [2, -4, -10, -16, -22]
-      : [8, 4, 0, -4, -8];
+    const lightnessOffsets = isLight ? [2, -4, -10, -16, -22] : [8, 4, 0, -4, -8];
     const bounds = isLight ? { min: 38, max: 78 } : { min: 52, max: 84 };
     const l = Math.min(bounds.max, Math.max(bounds.min, hsl.l + (lightnessOffsets[level - 1] ?? 0)));
     const s = Math.min(100, hsl.s * (0.85 + level * 0.04));

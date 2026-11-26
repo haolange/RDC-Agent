@@ -1,14 +1,17 @@
 import { generateEventId } from '@shared/utils/id';
 import type { TraceEvent } from './TraceEventStore';
-import type { TraceNode, ToolActionNode, PhaseGroupNode, FinalResponseNode, SubAgentNode, ErrorNode } from './traceNodes';
+import type {
+  TraceNode,
+  ToolActionNode,
+  PhaseGroupNode,
+  FinalResponseNode,
+  SubAgentNode,
+  ErrorNode,
+} from './traceNodes';
 import type { AgentProfile } from './manifests/traceManifest';
 
-const isTraceNode = (payload: unknown): payload is TraceNode => (
-  typeof payload === 'object'
-  && payload !== null
-  && 'kind' in payload
-  && 'id' in payload
-);
+const isTraceNode = (payload: unknown): payload is TraceNode =>
+  typeof payload === 'object' && payload !== null && 'kind' in payload && 'id' in payload;
 
 export class TraceTreeBuilder {
   build(events: TraceEvent[], profile: AgentProfile): TraceNode[] {

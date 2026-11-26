@@ -15,7 +15,10 @@ import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/Route
 import { appPathService } from '../runtime/AppPathService';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentManifestService } from '../settings/agent-manifests/AgentManifestService';
-import { resolveEffectiveAgentSnapshot, resolveEnabledAgentDefinition } from '../settings/agent-manifests/effectiveAgentSnapshot';
+import {
+  resolveEffectiveAgentSnapshot,
+  resolveEnabledAgentDefinition,
+} from '../settings/agent-manifests/effectiveAgentSnapshot';
 import { resolveEffectiveModelSelection } from '../settings/provider-catalog/EffectiveModelResolver';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { diagnosticText } from './diagnosticText';
@@ -119,9 +122,7 @@ export function resolveConversationAgentId(
   if (findEffectiveAgentProfile(DEFAULT_AGENT_ID, projectRootPath).enabled) {
     return DEFAULT_AGENT_ID;
   }
-  throw new AppError(
-    'CONVERSATION_AGENT_UNAVAILABLE', `default profile \`${DEFAULT_AGENT_ID}\` is not enabled.`,
-  );
+  throw new AppError('CONVERSATION_AGENT_UNAVAILABLE', `default profile \`${DEFAULT_AGENT_ID}\` is not enabled.`);
 }
 
 const ACTIVE_RUN_STATUSES: Array<RunSummary['status']> = [
@@ -290,18 +291,13 @@ export function resolveAgentRoutePreflight(
   const effectiveProfile = snapshot.profile;
   const compiled = effectiveProfile?.compiledRoute;
   const fallbackProfile = fallbackAgentId ? resolveEnabledAgentDefinition(fallbackAgentId, projectRootPath) : null;
-  const route = compiled?.providerId && compiled.modelId
-    ? compiled
-    : fallbackProfile?.compiledRoute;
+  const route = compiled?.providerId && compiled.modelId ? compiled : fallbackProfile?.compiledRoute;
   const routeAgentId = (route?.agentId ?? agentId) as AgentRole;
   const label = getAgentLabel(agentId);
   const providerId = modelOverride?.providerId || route?.providerId;
   const modelId = modelOverride?.modelId || route?.modelId;
-  const withOverlay = <T extends AgentRoutePreflight>(result: T): T => (
-    snapshot.overlayDiagnostics.length > 0
-      ? { ...result, overlayDiagnostics: snapshot.overlayDiagnostics }
-      : result
-  );
+  const withOverlay = <T extends AgentRoutePreflight>(result: T): T =>
+    snapshot.overlayDiagnostics.length > 0 ? { ...result, overlayDiagnostics: snapshot.overlayDiagnostics } : result;
   if (!providerId || !modelId) {
     return withOverlay({
       ok: false,
@@ -366,22 +362,24 @@ export function resolveAgentRoutePreflight(
   const effectiveModelId = effectiveModel.modelId;
   if (!isAgentToolExecutableModel(effectiveModel)) {
     const eligibility = classifyAgentToolEligibility(effectiveModel);
-    const detail = eligibility === 'executable'
-      ? {
-          technicalCode: 'MODEL_UNAVAILABLE',
-          userMessage: diagnosticText('modelNotExecutable', { agent: label, model: effectiveModelId }),
-          technicalMessage: `MODEL_UNAVAILABLE: ${providerId}/${effectiveModelId} is not Agent-executable.`,
-        }
-      : describeAgentToolIneligibility(eligibility, providerId, effectiveModelId);
+    const detail =
+      eligibility === 'executable'
+        ? {
+            technicalCode: 'MODEL_UNAVAILABLE',
+            userMessage: diagnosticText('modelNotExecutable', { agent: label, model: effectiveModelId }),
+            technicalMessage: `MODEL_UNAVAILABLE: ${providerId}/${effectiveModelId} is not Agent-executable.`,
+          }
+        : describeAgentToolIneligibility(eligibility, providerId, effectiveModelId);
     const recommendationText = selection.recommendations.map((entry) => entry.modelId).join(', ');
     return withOverlay({
       ok: false,
       diagnostic: createConversationDiagnostic({
         agentId,
         // Unknown availability is a catalog state, not a tools verdict; keep them apart for the UI and logs.
-        code: eligibility === 'availability-unknown'
-          ? 'CONVERSATION_LLM_MODEL_AVAILABILITY_UNVERIFIED'
-          : 'CONVERSATION_LLM_TOOLS_UNAVAILABLE',
+        code:
+          eligibility === 'availability-unknown'
+            ? 'CONVERSATION_LLM_MODEL_AVAILABILITY_UNVERIFIED'
+            : 'CONVERSATION_LLM_TOOLS_UNAVAILABLE',
         severity: 'warning',
         userMessage: recommendationText
           ? diagnosticText('modelAlternatives', { reason: detail.userMessage, alternatives: recommendationText })
@@ -400,14 +398,8 @@ export function resolveAgentRoutePreflight(
     routeAgentId,
     providerId,
     modelId: effectiveModelId,
-    routeCapability: resolveAgentRouteCapability(
-      provider,
-      effectiveModelId,
-      effectiveModel,
-    ),
-    ...(selection.remappedFrom
-      ? { aliasRemap: { from: selection.remappedFrom, to: effectiveModelId } }
-      : {}),
+    routeCapability: resolveAgentRouteCapability(provider, effectiveModelId, effectiveModel),
+    ...(selection.remappedFrom ? { aliasRemap: { from: selection.remappedFrom, to: effectiveModelId } } : {}),
   });
 }
 
@@ -419,16 +411,19 @@ export function recordOverlayProfileDiagnostics(
 ): void {
   if (!overlayDiagnostics?.length) return;
   for (const entry of overlayDiagnostics) {
-    recordLlmDiagnostic(context, createConversationDiagnostic({
-      agentId,
-      code: 'CONVERSATION_PROFILE_OVERLAY_INVALID',
-      severity: 'warning',
-      userMessage: diagnosticText(continuedWithLowerScope ? 'profileOverrideFallback' : 'profileOverrideBlocked', {
-        scope: diagnosticText(entry.scope === 'user' ? 'scopeUser' : 'scopeProject'),
-        detail: formatAgentManifestDiagnostic(entry),
+    recordLlmDiagnostic(
+      context,
+      createConversationDiagnostic({
+        agentId,
+        code: 'CONVERSATION_PROFILE_OVERLAY_INVALID',
+        severity: 'warning',
+        userMessage: diagnosticText(continuedWithLowerScope ? 'profileOverrideFallback' : 'profileOverrideBlocked', {
+          scope: diagnosticText(entry.scope === 'user' ? 'scopeUser' : 'scopeProject'),
+          detail: formatAgentManifestDiagnostic(entry),
+        }),
+        technicalMessage: formatAgentManifestDiagnostic(entry),
       }),
-      technicalMessage: formatAgentManifestDiagnostic(entry),
-    }));
+    );
   }
 }
 

@@ -21,14 +21,19 @@ const FACT_LABELS: Record<string, TranslationKey> = {
 };
 
 const BUSY_PHASES = new Set<CaptureReplayPhase>([
-  'validating', 'connecting', 'transferring', 'opening', 'loading_image', 'closing', 'applying',
+  'validating',
+  'connecting',
+  'transferring',
+  'opening',
+  'loading_image',
+  'closing',
+  'applying',
 ]);
 
 export function isCapturePartialReady(state: CaptureReplayState | null): boolean {
-  return state?.phase === 'ready' && Boolean(
-    state.error
-    || state.warning
-    || ['unsupported', 'unavailable'].includes(state.devicePresentation.status),
+  return (
+    state?.phase === 'ready' &&
+    Boolean(state.error || state.warning || ['unsupported', 'unavailable'].includes(state.devicePresentation.status))
   );
 }
 
@@ -57,14 +62,31 @@ export function collectCaptureCallouts(args: {
   const items: CaptureCallout[] = [];
   // The only replay warning is the final-output one; its tool text is a detail, never the title.
   if (args.warning) {
-    items.push({ id: `warning:${args.warning.code}`, tone: 'warning', title: args.finalPresentTitle, detail: args.warning.message });
+    items.push({
+      id: `warning:${args.warning.code}`,
+      tone: 'warning',
+      title: args.finalPresentTitle,
+      detail: args.warning.message,
+    });
   }
   if (args.actionError) {
-    items.push({ id: 'action', tone: 'error', title: args.actionFailureTitles?.[args.actionError.action] ?? args.failureTitle, detail: args.actionError.message, retry: args.actionError.action });
+    items.push({
+      id: 'action',
+      tone: 'error',
+      title: args.actionFailureTitles?.[args.actionError.action] ?? args.failureTitle,
+      detail: args.actionError.message,
+      retry: args.actionError.action,
+    });
     return items;
   }
   if (args.connectionError) {
-    items.push({ id: 'connection', tone: 'error', title: args.actionFailureTitles?.refresh ?? args.failureTitle, detail: args.connectionError, retry: 'refresh' });
+    items.push({
+      id: 'connection',
+      tone: 'error',
+      title: args.actionFailureTitles?.refresh ?? args.failureTitle,
+      detail: args.connectionError,
+      retry: 'refresh',
+    });
     return items;
   }
   const error = args.stateError;
@@ -79,7 +101,14 @@ export function collectCaptureCallouts(args: {
     tone: 'error',
     title: error.code === 'export_failure' ? args.factLabels.export_failure : args.failureTitle,
     detail: error.message,
-    retry: error.retry === 'close' ? 'close' : error.retry === 'open' ? 'open' : error.retry === 'apply' ? 'image' : error.retry ?? undefined,
+    retry:
+      error.retry === 'close'
+        ? 'close'
+        : error.retry === 'open'
+          ? 'open'
+          : error.retry === 'apply'
+            ? 'image'
+            : (error.retry ?? undefined),
   });
   return items;
 }
@@ -95,7 +124,11 @@ export function captureStatusLabelKey(args: {
 }
 
 export function CaptureReplayStatusChip({ label, tone }: { label: string; tone: CaptureStatusTone }) {
-  return <span role="status" className={`capture-replay-status is-${tone}`}>{label}</span>;
+  return (
+    <span role="status" className={`capture-replay-status is-${tone}`}>
+      {label}
+    </span>
+  );
 }
 
 export function CaptureReplayCallouts({
@@ -114,16 +147,23 @@ export function CaptureReplayCallouts({
   if (!callouts.length) return null;
   return (
     <div className="capture-replay-callouts">
-      {callouts.map(({ id, tone, title, detail, retry }) => tone === 'error' ? (
-        <InlineError key={id} detail={detail} retryDisabled={retry === 'refresh' ? refreshDisabled : disabled}
-          onRetry={retry ? () => onRetry(retry) : undefined} retryLabel={retry ? retryLabels[retry] : undefined}>
-          {title}
-        </InlineError>
-      ) : (
-        <div key={id} className={`capture-replay-callout is-${tone}`} role="status">
-          <span>{title}</span>
-        </div>
-      ))}
+      {callouts.map(({ id, tone, title, detail, retry }) =>
+        tone === 'error' ? (
+          <InlineError
+            key={id}
+            detail={detail}
+            retryDisabled={retry === 'refresh' ? refreshDisabled : disabled}
+            onRetry={retry ? () => onRetry(retry) : undefined}
+            retryLabel={retry ? retryLabels[retry] : undefined}
+          >
+            {title}
+          </InlineError>
+        ) : (
+          <div key={id} className={`capture-replay-callout is-${tone}`} role="status">
+            <span>{title}</span>
+          </div>
+        ),
+      )}
     </div>
   );
 }

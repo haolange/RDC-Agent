@@ -31,7 +31,6 @@ export interface ProjectWorkspaceLinks {
   turnCommits: ConversationTurnRecovery;
 }
 
-
 export class ProjectWorkspaceStore {
   private readonly verifiedInputs = new Map<string, { fingerprint: string; sha256: string }>();
   private readonly inputRefreshes = new Map<string, Promise<ProjectInputRecord[]>>();
@@ -81,8 +80,8 @@ export class ProjectWorkspaceStore {
   }
 
   listProjects(): ProjectRecord[] {
-    return this.readRegistry().projects
-      .slice()
+    return this.readRegistry()
+      .projects.slice()
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
@@ -183,11 +182,18 @@ export class ProjectWorkspaceStore {
     return this.queueInputUpdate(projectId, () => this.refreshInputsNow(projectId));
   }
 
-  private async queueInputUpdate(projectId: string, operation: () => Promise<ProjectInputRecord[]>): Promise<ProjectInputRecord[]> {
+  private async queueInputUpdate(
+    projectId: string,
+    operation: () => Promise<ProjectInputRecord[]>,
+  ): Promise<ProjectInputRecord[]> {
     const previous = this.inputRefreshes.get(projectId) ?? Promise.resolve([]);
     const next = previous.catch(() => []).then(operation);
     this.inputRefreshes.set(projectId, next);
-    try { return await next; } finally { if (this.inputRefreshes.get(projectId) === next) this.inputRefreshes.delete(projectId); }
+    try {
+      return await next;
+    } finally {
+      if (this.inputRefreshes.get(projectId) === next) this.inputRefreshes.delete(projectId);
+    }
   }
 
   private async refreshInputsNow(projectId: string): Promise<ProjectInputRecord[]> {
@@ -198,24 +204,34 @@ export class ProjectWorkspaceStore {
     await safePath(project.rootPath, project.inputsPath);
     const normalizedProject = this.normalizeProjectRecord(project);
     const inputs = [
-      ...await this.collectProjectInputs(normalizedProject.inputsPath),
-      ...await Promise.all(project.inputs.filter(input => input.source === 'external_reference').map(verifyExternalCaptureReference)),
+      ...(await this.collectProjectInputs(normalizedProject.inputsPath)),
+      ...(await Promise.all(
+        project.inputs.filter((input) => input.source === 'external_reference').map(verifyExternalCaptureReference),
+      )),
     ];
     return this.commitProjectInputs(project, inputs);
   }
 
-  private async commitProjectInputs(project: ProjectRecord, inputs: ProjectInputRecord[]): Promise<ProjectInputRecord[]> {
+  private async commitProjectInputs(
+    project: ProjectRecord,
+    inputs: ProjectInputRecord[],
+  ): Promise<ProjectInputRecord[]> {
     const projectId = project.projectId;
     const nextProject: ProjectRecord = {
       ...this.normalizeProjectRecord(project),
       inputs,
       inputsUpdatedAt: nowMs(),
     };
-    if (this.inputReconciler) nextProject.replayCleanupPending = {
-      requestedAt: project.replayCleanupPending?.requestedAt ?? nowMs(),
-      captureHashes: [...new Set([...project.inputs.flatMap(input => input.contentSha256 ? [input.contentSha256] : []),
-        ...(project.replayCleanupPending?.captureHashes ?? [])])],
-    };
+    if (this.inputReconciler)
+      nextProject.replayCleanupPending = {
+        requestedAt: project.replayCleanupPending?.requestedAt ?? nowMs(),
+        captureHashes: [
+          ...new Set([
+            ...project.inputs.flatMap((input) => (input.contentSha256 ? [input.contentSha256] : [])),
+            ...(project.replayCleanupPending?.captureHashes ?? []),
+          ]),
+        ],
+      };
     // A complete filesystem scan defines the active inputs even if subsequent native/cache cleanup fails.
     this.persistProject(nextProject);
     this.inputCommitListener?.(projectId, inputs);
@@ -225,7 +241,10 @@ export class ProjectWorkspaceStore {
         delete nextProject.replayCleanupPending;
         this.persistProject(nextProject);
       } catch (error) {
-        nextProject.replayCleanupPending = { ...nextProject.replayCleanupPending!, error: error instanceof Error ? error.message : String(error) };
+        nextProject.replayCleanupPending = {
+          ...nextProject.replayCleanupPending!,
+          error: error instanceof Error ? error.message : String(error),
+        };
         this.persistProject(nextProject);
         throw error;
       }
@@ -263,13 +282,17 @@ export class ProjectWorkspaceStore {
       const project = this.getProjectById(projectId);
       if (!project) throw new AppError('PROJECT_NOT_FOUND');
       const registered = await createExternalCaptureReference(filePath);
-      const previous = project.inputs.find(entry => entry.inputId === registered.inputId);
+      const previous = project.inputs.find((entry) => entry.inputId === registered.inputId);
       const input = { ...registered, discoveredAt: previous?.discoveredAt ?? registered.discoveredAt };
       // Re-registration is explicit; refresh never silently accepts changed bytes.
       const inputs = [
-        ...await this.collectProjectInputs(project.inputsPath),
-        ...await Promise.all(project.inputs.filter(entry => entry.source === 'external_reference' && entry.inputId !== input.inputId)
-          .map(verifyExternalCaptureReference)), input,
+        ...(await this.collectProjectInputs(project.inputsPath)),
+        ...(await Promise.all(
+          project.inputs
+            .filter((entry) => entry.source === 'external_reference' && entry.inputId !== input.inputId)
+            .map(verifyExternalCaptureReference),
+        )),
+        input,
       ];
       return this.commitProjectInputs(project, inputs);
     });
@@ -278,9 +301,9 @@ export class ProjectWorkspaceStore {
   async detachProjectInputReference(projectId: string, inputId: string): Promise<ProjectInputRecord[]> {
     return this.queueInputUpdate(projectId, async () => {
       const project = this.getProjectById(projectId);
-      const input = project?.inputs.find(entry => entry.inputId === inputId);
+      const input = project?.inputs.find((entry) => entry.inputId === inputId);
       if (!project || input?.source !== 'external_reference') throw new AppError('CAPTURE_REFERENCE_NOT_FOUND');
-      const inputs = project.inputs.filter(entry => entry.inputId !== inputId);
+      const inputs = project.inputs.filter((entry) => entry.inputId !== inputId);
       // Never touch the source file, even when it is missing or has changed.
       return this.commitProjectInputs(project, inputs);
     });
@@ -384,10 +407,14 @@ export class ProjectWorkspaceStore {
   }
 
   private withRegistryLock<T>(operation: () => T): T {
-    return withDirectoryFileLockSync(path.dirname(this.registryPath), {
-      lockFileName: '.registry.lock',
-      timeoutCode: 'PROJECT_REGISTRY_LOCK_TIMEOUT',
-    }, operation);
+    return withDirectoryFileLockSync(
+      path.dirname(this.registryPath),
+      {
+        lockFileName: '.registry.lock',
+        timeoutCode: 'PROJECT_REGISTRY_LOCK_TIMEOUT',
+      },
+      operation,
+    );
   }
 
   private loadRegistryUnlocked(): ProjectRegistry {
@@ -452,9 +479,7 @@ export class ProjectWorkspaceStore {
     this.mutateRegistry((registry) => {
       registry.projects = registry.projects.map((entry) => {
         if (entry.projectId !== projectId) return entry;
-        const nextLastSessionId = lastSessionId === undefined
-          ? entry.lastSessionId
-          : lastSessionId || undefined;
+        const nextLastSessionId = lastSessionId === undefined ? entry.lastSessionId : lastSessionId || undefined;
         return {
           ...entry,
           updatedAt,
@@ -512,9 +537,7 @@ export class ProjectWorkspaceStore {
 
   persistProject(project: ProjectRecord): void {
     this.mutateRegistry((registry) => {
-      registry.projects = registry.projects.map((entry) => (
-        entry.projectId === project.projectId ? project : entry
-      ));
+      registry.projects = registry.projects.map((entry) => (entry.projectId === project.projectId ? project : entry));
     });
     this.writeProjectMetadata(project);
   }
@@ -565,7 +588,9 @@ export class ProjectWorkspaceStore {
     const projectRoot = path.resolve(inputsPath, '..', '..');
     await fs.promises.access(projectRoot);
     await safePath(projectRoot, inputsPath);
-    try { await fs.promises.access(inputsPath); } catch (error) {
+    try {
+      await fs.promises.access(inputsPath);
+    } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
       throw error;
     }
@@ -575,13 +600,19 @@ export class ProjectWorkspaceStore {
 
     const walk = async (dirPath: string, depth: number): Promise<void> => {
       if (depth > ProjectWorkspaceStore.PROJECT_INPUTS_MAX_DEPTH) {
-        throw new AppError('PROJECT_INPUTS_BUDGET_EXCEEDED', `maxDepth ${ProjectWorkspaceStore.PROJECT_INPUTS_MAX_DEPTH} exceeded under ${inputsPath}`);
+        throw new AppError(
+          'PROJECT_INPUTS_BUDGET_EXCEEDED',
+          `maxDepth ${ProjectWorkspaceStore.PROJECT_INPUTS_MAX_DEPTH} exceeded under ${inputsPath}`,
+        );
       }
       const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
       for (const entry of entries) {
         visited += 1;
         if (visited > ProjectWorkspaceStore.PROJECT_INPUTS_MAX_ENTRIES) {
-          throw new AppError('PROJECT_INPUTS_BUDGET_EXCEEDED', `maxEntries ${ProjectWorkspaceStore.PROJECT_INPUTS_MAX_ENTRIES} exceeded under ${inputsPath}`);
+          throw new AppError(
+            'PROJECT_INPUTS_BUDGET_EXCEEDED',
+            `maxEntries ${ProjectWorkspaceStore.PROJECT_INPUTS_MAX_ENTRIES} exceeded under ${inputsPath}`,
+          );
         }
         if (visited % ProjectWorkspaceStore.PROJECT_INPUTS_YIELD_EVERY === 0) {
           await new Promise<void>((resolve) => setImmediate(resolve));
@@ -601,7 +632,8 @@ export class ProjectWorkspaceStore {
         const stats = await fs.promises.stat(fullPath);
         const fingerprint = `${stats.dev}:${stats.ino}:${stats.size}:${stats.mtimeMs}:${stats.ctimeMs}`;
         const cached = this.verifiedInputs.get(fullPath);
-        const contentSha256 = cached?.fingerprint === fingerprint ? cached.sha256 : (await hashCaptureFile(fullPath)).sha256;
+        const contentSha256 =
+          cached?.fingerprint === fingerprint ? cached.sha256 : (await hashCaptureFile(fullPath)).sha256;
         this.verifiedInputs.set(fullPath, { fingerprint, sha256: contentSha256 });
         records.push({
           inputId: this.createProjectInputId(inputsPath, fullPath),

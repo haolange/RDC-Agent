@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  type WheelEvent,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useDynStyle } from '../lib/useDynStyle';
 import { useModalFocus } from '../lib/useModalFocus';
@@ -37,7 +45,18 @@ const ZOOM_STEP = 1.25;
 const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
 
 /** The one image viewer: zoom (buttons, wheel, double click), pan by dragging, previous / next, open original. */
-export function ImageViewer({ open, items, index, onIndexChange, onClose, onExited, actions, status, onImageError, onOpenOriginal }: ImageViewerProps) {
+export function ImageViewer({
+  open,
+  items,
+  index,
+  onIndexChange,
+  onClose,
+  onExited,
+  actions,
+  status,
+  onImageError,
+  onOpenOriginal,
+}: ImageViewerProps) {
   const labels = useUiLabels().imageViewer;
   const overlayRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -54,9 +73,12 @@ export function ImageViewer({ open, items, index, onIndexChange, onClose, onExit
   const reset = useCallback(() => setView({ scale: 1, x: 0, y: 0 }), []);
   useEffect(reset, [index, open, reset]);
 
-  const step = useCallback((delta: number) => {
-    if (count > 1) onIndexChange((index + delta + count) % count);
-  }, [count, index, onIndexChange]);
+  const step = useCallback(
+    (delta: number) => {
+      if (count > 1) onIndexChange((index + delta + count) % count);
+    },
+    [count, index, onIndexChange],
+  );
 
   const zoom = useCallback((factor: number) => {
     setView((current) => {
@@ -89,29 +111,69 @@ export function ImageViewer({ open, items, index, onIndexChange, onClose, onExit
   const onPointerMove = (event: ReactPointerEvent<HTMLImageElement>) => {
     const start = drag.current;
     if (!start) return;
-    setView((current) => ({ ...current, x: start.offsetX + event.clientX - start.x, y: start.offsetY + event.clientY - start.y }));
+    setView((current) => ({
+      ...current,
+      x: start.offsetX + event.clientX - start.x,
+      y: start.offsetY + event.clientY - start.y,
+    }));
   };
 
   if (!presence.mounted || !item || typeof document === 'undefined') return null;
   return createPortal(
-    <div ref={overlayRef} className="ui-image-viewer" data-state={presence.state}
-      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div ref={stageRef} className="ui-image-viewer-stage" role="dialog" aria-modal="true" aria-label={item.title} tabIndex={-1}>
+    <div
+      ref={overlayRef}
+      className="ui-image-viewer"
+      data-state={presence.state}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={stageRef}
+        className="ui-image-viewer-stage"
+        role="dialog"
+        aria-modal="true"
+        aria-label={item.title}
+        tabIndex={-1}
+      >
         <header className="ui-image-viewer-bar">
           <span className="ui-image-viewer-title">{item.title}</span>
           {count > 1 ? <span className="ui-image-viewer-position">{labels.position(index + 1, count)}</span> : null}
           <div className="ui-image-viewer-actions">
-            <IconButton label={labels.zoomOut} data-tooltip={labels.zoomOut} size="sm" disabled={!hasImage || view.scale <= MIN_SCALE} onClick={() => zoom(1 / ZOOM_STEP)}>
+            <IconButton
+              label={labels.zoomOut}
+              data-tooltip={labels.zoomOut}
+              size="sm"
+              disabled={!hasImage || view.scale <= MIN_SCALE}
+              onClick={() => zoom(1 / ZOOM_STEP)}
+            >
               <Icon name="minus" />
             </IconButton>
-            <IconButton label={labels.reset} data-tooltip={labels.reset} size="sm" disabled={!hasImage || view.scale === MIN_SCALE} onClick={reset}>
+            <IconButton
+              label={labels.reset}
+              data-tooltip={labels.reset}
+              size="sm"
+              disabled={!hasImage || view.scale === MIN_SCALE}
+              onClick={reset}
+            >
               <Icon name="refresh" />
             </IconButton>
-            <IconButton label={labels.zoomIn} data-tooltip={labels.zoomIn} size="sm" disabled={!hasImage || view.scale >= MAX_SCALE} onClick={() => zoom(ZOOM_STEP)}>
+            <IconButton
+              label={labels.zoomIn}
+              data-tooltip={labels.zoomIn}
+              size="sm"
+              disabled={!hasImage || view.scale >= MAX_SCALE}
+              onClick={() => zoom(ZOOM_STEP)}
+            >
               <Icon name="plus" />
             </IconButton>
             {onOpenOriginal ? (
-              <IconButton label={labels.openOriginal} data-tooltip={labels.openOriginal} size="sm" onClick={() => onOpenOriginal(index)}>
+              <IconButton
+                label={labels.openOriginal}
+                data-tooltip={labels.openOriginal}
+                size="sm"
+                onClick={() => onOpenOriginal(index)}
+              >
                 <Icon name="external" />
               </IconButton>
             ) : null}
@@ -123,27 +185,45 @@ export function ImageViewer({ open, items, index, onIndexChange, onClose, onExit
         </header>
         {status ? <div className="ui-image-viewer-status">{status}</div> : null}
         <div className="ui-image-viewer-canvas" onWheel={hasImage ? onWheel : undefined}>
-          {item.src ? <img
-            className={`ui-image-viewer-image${view.scale > MIN_SCALE ? ' is-zoomed' : ''}`}
-            src={item.src}
-            alt={item.title}
-            draggable={false}
-            onDoubleClick={() => (view.scale === MIN_SCALE ? zoom(2) : reset())}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={() => { drag.current = null; }}
-            onPointerCancel={() => { drag.current = null; }}
-            onError={onImageError}
-            {...transform}
-          /> : null}
-          {count > 1 ? <>
-            <IconButton label={labels.previous} data-tooltip={labels.previous} className="ui-image-viewer-step is-previous" onClick={() => step(-1)}>
-              <Chevron direction="left" size={18} />
-            </IconButton>
-            <IconButton label={labels.next} data-tooltip={labels.next} className="ui-image-viewer-step is-next" onClick={() => step(1)}>
-              <Chevron size={18} />
-            </IconButton>
-          </> : null}
+          {item.src ? (
+            <img
+              className={`ui-image-viewer-image${view.scale > MIN_SCALE ? ' is-zoomed' : ''}`}
+              src={item.src}
+              alt={item.title}
+              draggable={false}
+              onDoubleClick={() => (view.scale === MIN_SCALE ? zoom(2) : reset())}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={() => {
+                drag.current = null;
+              }}
+              onPointerCancel={() => {
+                drag.current = null;
+              }}
+              onError={onImageError}
+              {...transform}
+            />
+          ) : null}
+          {count > 1 ? (
+            <>
+              <IconButton
+                label={labels.previous}
+                data-tooltip={labels.previous}
+                className="ui-image-viewer-step is-previous"
+                onClick={() => step(-1)}
+              >
+                <Chevron direction="left" size={18} />
+              </IconButton>
+              <IconButton
+                label={labels.next}
+                data-tooltip={labels.next}
+                className="ui-image-viewer-step is-next"
+                onClick={() => step(1)}
+              >
+                <Chevron size={18} />
+              </IconButton>
+            </>
+          ) : null}
         </div>
       </div>
     </div>,

@@ -7,11 +7,7 @@ import { appPathService } from '../runtime/AppPathService';
 import { samePath } from '../platform/paths';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
-import {
-  AppCopyTextArgsSchema,
-  AppGetAvatarDataUrlArgsSchema,
-  AppOpenPathArgsSchema,
-} from './validation/shellSchemas';
+import { AppCopyTextArgsSchema, AppGetAvatarDataUrlArgsSchema, AppOpenPathArgsSchema } from './validation/shellSchemas';
 import type { IpcChannelTable } from './invokeRegistry';
 
 const AVATAR_MIME_BY_EXTENSION: Record<string, string> = {
@@ -92,7 +88,7 @@ function dialogChannels(): IpcChannelTable {
         ],
         properties: ['openFile'],
       });
-      return result.canceled ? null : result.filePaths[0] ?? null;
+      return result.canceled ? null : (result.filePaths[0] ?? null);
     },
     'dialog:selectFiles': async (_event, ...rawArgs: unknown[]) => {
       parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectFiles', maxBytes: 1024 });

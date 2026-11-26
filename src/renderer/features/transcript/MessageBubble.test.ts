@@ -7,30 +7,94 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import type { PlanReviewStatus } from '@shared/types/planReview';
 vi.mock('./WorkProcess', () => ({ WorkProcess: () => createElement('div', null, 'work-process') }));
 vi.mock('./MessageActions', () => ({ MessageActions: () => null }));
-vi.mock('./HandoffSuggestionRow', () => ({ HandoffSuggestionRow: () => createElement('button', null, 'Continue handoff') }));
-vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({ MessageMarkdown: ({ content }: { content: string }) => content }));
+vi.mock('./HandoffSuggestionRow', () => ({
+  HandoffSuggestionRow: () => createElement('button', null, 'Continue handoff'),
+}));
+vi.mock('../../patterns/Markdown/MessageMarkdown', () => ({
+  MessageMarkdown: ({ content }: { content: string }) => content,
+}));
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
-const base: ConversationMessage = { id: 'm', turnId: 't', sessionId: 's', projectId: 'p', role: 'assistant', content: 'Original result',
-  createdAt: 1, status: 'complete', handoffSuggestions: [{ agent: 'helper', label: 'Continue', prompt: 'Go', send: true }] };
-it.each<PlanReviewStatus>(['awaiting', 'approved', 'rejected', 'superseded', 'cancelled'])('never repeats %s plan actions from a stored result snapshot', status => {
-  const message = { ...base, workTrace: { status: 'complete' as const, updatedAt: 1, blocks: [{
-    id: 'b', kind: 'plan_review' as const, title: 'Plan', status: 'complete' as const, startedAt: 1,
-    toolCalls: [{ id: 'c', toolName: 'plan_artifact', status: 'complete' as const, startedAt: 1,
-      planReview: { status, planId: 'p', revision: 1, title: 'Plan', hash: 'h', uri: 'session://plans/plan.md',
-        summary: [], sections: [], handoffOptions: [] } }],
-  }] } };
-  const html = renderToStaticMarkup(createElement(MessageBubble, { message }));
-  expect(html).toContain('Original result');
-  expect(html).not.toContain('Continue handoff');
-  // The plan card lives inside Working only; the reply never repeats it.
-  expect(html).not.toContain('plan-card');
-});
+const base: ConversationMessage = {
+  id: 'm',
+  turnId: 't',
+  sessionId: 's',
+  projectId: 'p',
+  role: 'assistant',
+  content: 'Original result',
+  createdAt: 1,
+  status: 'complete',
+  handoffSuggestions: [{ agent: 'helper', label: 'Continue', prompt: 'Go', send: true }],
+};
+it.each<PlanReviewStatus>(['awaiting', 'approved', 'rejected', 'superseded', 'cancelled'])(
+  'never repeats %s plan actions from a stored result snapshot',
+  (status) => {
+    const message = {
+      ...base,
+      workTrace: {
+        status: 'complete' as const,
+        updatedAt: 1,
+        blocks: [
+          {
+            id: 'b',
+            kind: 'plan_review' as const,
+            title: 'Plan',
+            status: 'complete' as const,
+            startedAt: 1,
+            toolCalls: [
+              {
+                id: 'c',
+                toolName: 'plan_artifact',
+                status: 'complete' as const,
+                startedAt: 1,
+                planReview: {
+                  status,
+                  planId: 'p',
+                  revision: 1,
+                  title: 'Plan',
+                  hash: 'h',
+                  uri: 'session://plans/plan.md',
+                  summary: [],
+                  sections: [],
+                  handoffOptions: [],
+                },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const html = renderToStaticMarkup(createElement(MessageBubble, { message }));
+    expect(html).toContain('Original result');
+    expect(html).not.toContain('Continue handoff');
+    // The plan card lives inside Working only; the reply never repeats it.
+    expect(html).not.toContain('plan-card');
+  },
+);
 it('shows no Working for a request that has produced nothing yet', () => {
-  const draft = { ...base, content: '', status: 'streaming' as const, handoffSuggestions: undefined,
-    workTrace: { status: 'running' as const, updatedAt: 1, blocks: [] } };
+  const draft = {
+    ...base,
+    content: '',
+    status: 'streaming' as const,
+    handoffSuggestions: undefined,
+    workTrace: { status: 'running' as const, updatedAt: 1, blocks: [] },
+  };
   expect(renderToStaticMarkup(createElement(MessageBubble, { message: draft }))).not.toContain('work-process');
-  const started = { ...draft, workTrace: { ...draft.workTrace, blocks: [{ id: 'loop', kind: 'llm_turn' as const, title: 'Turn',
-    status: 'running' as const, startedAt: 1, toolCalls: [] }] } };
+  const started = {
+    ...draft,
+    workTrace: {
+      ...draft.workTrace,
+      blocks: [
+        {
+          id: 'loop',
+          kind: 'llm_turn' as const,
+          title: 'Turn',
+          status: 'running' as const,
+          startedAt: 1,
+          toolCalls: [],
+        },
+      ],
+    },
+  };
   expect(renderToStaticMarkup(createElement(MessageBubble, { message: started }))).toContain('work-process');
 });
 
@@ -39,17 +103,48 @@ it('preserves ordinary handoffs and says once that a reply stopped', () => {
   const html = renderToStaticMarkup(createElement(MessageBubble, { message: { ...base, status: 'stopped' } }));
   expect(html).toContain('Original result');
   expect(html.match(/is-stopped/g)).toHaveLength(1);
-  const withWork = renderToStaticMarkup(createElement(MessageBubble, { message: { ...base, status: 'stopped', workTrace: {
-    status: 'stopped', updatedAt: 1, blocks: [{ id: 'b', kind: 'llm_turn', title: 'Turn', status: 'cancelled', startedAt: 1, toolCalls: [] }],
-  } } }));
+  const withWork = renderToStaticMarkup(
+    createElement(MessageBubble, {
+      message: {
+        ...base,
+        status: 'stopped',
+        workTrace: {
+          status: 'stopped',
+          updatedAt: 1,
+          blocks: [{ id: 'b', kind: 'llm_turn', title: 'Turn', status: 'cancelled', startedAt: 1, toolCalls: [] }],
+        },
+      },
+    }),
+  );
   expect(withWork).not.toContain('conversation-message-status-tag is-stopped');
 });
 it('shows a plan-executing handoff as a plain user message and keeps it out of edit-and-resend', () => {
-  const user: ConversationMessage = { id: 'u', turnId: 't2', sessionId: 's', projectId: 'p', role: 'user', content: 'Execute the frozen plan.',
-    createdAt: 2, status: 'complete' };
-  const referenced = renderToStaticMarkup(createElement(MessageBubble, { message: { ...user, planReference: {
-    intent: 'execute', planId: 'plan', revision: 3, hash: 'a'.repeat(64), uri: 'session://plans/frozen.md', title: 'Find the draw', agentId: 'general',
-  } } }));
+  const user: ConversationMessage = {
+    id: 'u',
+    turnId: 't2',
+    sessionId: 's',
+    projectId: 'p',
+    role: 'user',
+    content: 'Execute the frozen plan.',
+    createdAt: 2,
+    status: 'complete',
+  };
+  const referenced = renderToStaticMarkup(
+    createElement(MessageBubble, {
+      message: {
+        ...user,
+        planReference: {
+          intent: 'execute',
+          planId: 'plan',
+          revision: 3,
+          hash: 'a'.repeat(64),
+          uri: 'session://plans/frozen.md',
+          title: 'Find the draw',
+          agentId: 'general',
+        },
+      },
+    }),
+  );
   expect(referenced).toContain('conversation-bubble-user');
   expect(referenced).toContain('Execute the frozen plan.');
   expect(referenced).not.toContain('Find the draw');

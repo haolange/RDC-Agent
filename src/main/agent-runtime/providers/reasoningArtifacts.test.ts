@@ -37,8 +37,15 @@ type PlanInput = {
   modelId: string;
   reasoning: Pick<
     ProviderReasoningContract,
-    'semantic' | 'displayLabel' | 'carrier' | 'artifactFormat' | 'artifactVersion' | 'compatibilityGroup' | 'continuation'
-  > & Partial<Pick<ProviderReasoningContract, 'visibilityRequest'>>;
+    | 'semantic'
+    | 'displayLabel'
+    | 'carrier'
+    | 'artifactFormat'
+    | 'artifactVersion'
+    | 'compatibilityGroup'
+    | 'continuation'
+  > &
+    Partial<Pick<ProviderReasoningContract, 'visibilityRequest'>>;
   toolLoop: Pick<ProviderToolLoopContract, 'artifactPolicy' | 'artifactScope' | 'ordering'>;
 };
 
@@ -150,7 +157,11 @@ const geminiPlan = createPlan({
     compatibilityGroup: 'gemini-generate-content-v1',
     continuation: 'exact-execution',
   },
-  toolLoop: { artifactPolicy: 'preserve-thought-signature', artifactScope: 'tool-call-turn', ordering: 'provider-native' },
+  toolLoop: {
+    artifactPolicy: 'preserve-thought-signature',
+    artifactScope: 'tool-call-turn',
+    ordering: 'provider-native',
+  },
 });
 
 const reasoningContentPlan = createPlan({
@@ -197,13 +208,15 @@ const assistant = (content: AssistantMessage['content']): AssistantMessage => ({
 
 describe('provider continuation artifact delivery', () => {
   it('preserves Claude Account identity betas when a context tier adds another beta', () => {
-    expect(anthropicTesting.mergeAnthropicRequestHeaders(
-      {
-        'anthropic-beta': 'claude-code-20250219,oauth-2025-04-20',
-        'User-Agent': 'claude-cli/2.1.119 (external, cli)',
-      },
-      { 'Anthropic-Beta': 'context-1m-2025-08-07,oauth-2025-04-20' },
-    )).toEqual({
+    expect(
+      anthropicTesting.mergeAnthropicRequestHeaders(
+        {
+          'anthropic-beta': 'claude-code-20250219,oauth-2025-04-20',
+          'User-Agent': 'claude-cli/2.1.119 (external, cli)',
+        },
+        { 'Anthropic-Beta': 'context-1m-2025-08-07,oauth-2025-04-20' },
+      ),
+    ).toEqual({
       'anthropic-beta': 'claude-code-20250219,oauth-2025-04-20,context-1m-2025-08-07',
       'User-Agent': 'claude-cli/2.1.119 (external, cli)',
     });
@@ -213,7 +226,11 @@ describe('provider continuation artifact delivery', () => {
     const offResponsesBody = openAIResponsesTesting.buildRequestBody(
       { ...model('openai-responses'), id: 'gpt-5.5', provider: 'openai' },
       baseContext,
-      { requestPlan: responsesPlan, reasoning: { selection: 'off', control: openAiLevels }, reasoningVisibility: 'summary-events' },
+      {
+        requestPlan: responsesPlan,
+        reasoning: { selection: 'off', control: openAiLevels },
+        reasoningVisibility: 'summary-events',
+      },
     );
     expect(offResponsesBody.reasoning).toBeUndefined();
     expect(offResponsesBody.include).toBeUndefined();
@@ -221,26 +238,35 @@ describe('provider continuation artifact delivery', () => {
     const levelResponsesBody = openAIResponsesTesting.buildRequestBody(
       { ...model('openai-responses'), id: 'gpt-5.5', provider: 'openai' },
       baseContext,
-      { requestPlan: responsesPlan, reasoning: { selection: 'xhigh', control: openAiLevels }, reasoningVisibility: 'summary-events' },
+      {
+        requestPlan: responsesPlan,
+        reasoning: { selection: 'xhigh', control: openAiLevels },
+        reasoningVisibility: 'summary-events',
+      },
     );
     expect(levelResponsesBody.reasoning).toMatchObject({ effort: 'xhigh', summary: 'auto' });
     expect(levelResponsesBody.include).toEqual(['reasoning.encrypted_content']);
   });
 
   it('never promotes raw Chat Completions thinking to ordinary assistant text', () => {
-    const messages = openAICompatibleTesting.toOpenAIMessages({
-      ...baseContext,
-      messages: [assistant([
-        {
-          type: 'thinking',
-          text: 'raw model thinking',
-          kind: 'raw',
-          source: 'openai-compatible-raw',
-          visibility: 'raw-collapsed',
-        },
-        { type: 'text', text: 'final answer' },
-      ])],
-    }, statelessChatPlan);
+    const messages = openAICompatibleTesting.toOpenAIMessages(
+      {
+        ...baseContext,
+        messages: [
+          assistant([
+            {
+              type: 'thinking',
+              text: 'raw model thinking',
+              kind: 'raw',
+              source: 'openai-compatible-raw',
+              visibility: 'raw-collapsed',
+            },
+            { type: 'text', text: 'final answer' },
+          ]),
+        ],
+      },
+      statelessChatPlan,
+    );
 
     expect(JSON.stringify(messages)).not.toContain('raw model thinking');
     expect(messages).toEqual([{ role: 'assistant', content: 'final answer' }]);
@@ -257,12 +283,12 @@ describe('provider continuation artifact delivery', () => {
       },
       { type: 'text', text: 'visible answer' },
     ]);
-    expect(JSON.stringify(geminiTesting.toGeminiContents(
-      { ...baseContext, messages: [assistantMessage] },
-      geminiPlan,
-    ))).not.toContain('raw local thinking');
-    expect(JSON.stringify(ollamaTesting.toOllamaMessages({ ...baseContext, messages: [assistantMessage] })))
-      .not.toContain('raw local thinking');
+    expect(
+      JSON.stringify(geminiTesting.toGeminiContents({ ...baseContext, messages: [assistantMessage] }, geminiPlan)),
+    ).not.toContain('raw local thinking');
+    expect(
+      JSON.stringify(ollamaTesting.toOllamaMessages({ ...baseContext, messages: [assistantMessage] })),
+    ).not.toContain('raw local thinking');
   });
 
   it('replays OpenAI Responses encrypted reasoning only as a provider item', () => {
@@ -273,20 +299,25 @@ describe('provider continuation artifact delivery', () => {
     });
     expect(continuation).toBeDefined();
 
-    const input = openAIResponsesTesting.toResponsesInput({
-      ...baseContext,
-      messages: [assistant([
-        {
-          type: 'thinking',
-          text: 'provider summary',
-          kind: 'summary',
-          source: 'openai-responses-summary',
-          visibility: 'summary',
-          continuation,
-        },
-        { type: 'text', text: 'answer' },
-      ])],
-    }, responsesPlan);
+    const input = openAIResponsesTesting.toResponsesInput(
+      {
+        ...baseContext,
+        messages: [
+          assistant([
+            {
+              type: 'thinking',
+              text: 'provider summary',
+              kind: 'summary',
+              source: 'openai-responses-summary',
+              visibility: 'summary',
+              continuation,
+            },
+            { type: 'text', text: 'answer' },
+          ]),
+        ],
+      },
+      responsesPlan,
+    );
 
     expect(input).toContainEqual({ type: 'reasoning', id: 'rs_1', encrypted_content: 'encrypted' });
     expect(JSON.stringify(input)).not.toContain('provider summary');
@@ -298,27 +329,32 @@ describe('provider continuation artifact delivery', () => {
       type: 'redacted_thinking',
       redactedContent: 'redacted',
     });
-    const result = anthropicTesting.toAnthropicMessages({
-      ...baseContext,
-      messages: [assistant([
-        {
-          type: 'thinking',
-          text: 'signed thinking',
-          kind: 'raw',
-          source: 'anthropic-thinking',
-          visibility: 'raw-collapsed',
-          continuation: signed,
-        },
-        {
-          type: 'thinking',
-          kind: 'opaque',
-          source: 'anthropic-redacted-thinking',
-          visibility: 'hidden',
-          continuation: redacted,
-        },
-        { type: 'toolCall', id: 'tool_1', name: 'read_file', arguments: { path: 'README.md' } },
-      ])],
-    }, anthropicPlan);
+    const result = anthropicTesting.toAnthropicMessages(
+      {
+        ...baseContext,
+        messages: [
+          assistant([
+            {
+              type: 'thinking',
+              text: 'signed thinking',
+              kind: 'raw',
+              source: 'anthropic-thinking',
+              visibility: 'raw-collapsed',
+              continuation: signed,
+            },
+            {
+              type: 'thinking',
+              kind: 'opaque',
+              source: 'anthropic-redacted-thinking',
+              visibility: 'hidden',
+              continuation: redacted,
+            },
+            { type: 'toolCall', id: 'tool_1', name: 'read_file', arguments: { path: 'README.md' } },
+          ]),
+        ],
+      },
+      anthropicPlan,
+    );
 
     expect(result.messages[0].content).toContainEqual({
       type: 'thinking',
@@ -337,19 +373,24 @@ describe('provider continuation artifact delivery', () => {
         toolCallIds: ['tool_1'],
       },
     });
-    const result = geminiTesting.toGeminiContents({
-      ...baseContext,
-      messages: [assistant([
-        {
-          type: 'thinking',
-          kind: 'opaque',
-          source: 'gemini-thought-signature',
-          visibility: 'hidden',
-          continuation,
-        },
-        { type: 'toolCall', id: 'tool_1', name: 'read_file', arguments: { path: 'README.md' } },
-      ])],
-    }, geminiPlan);
+    const result = geminiTesting.toGeminiContents(
+      {
+        ...baseContext,
+        messages: [
+          assistant([
+            {
+              type: 'thinking',
+              kind: 'opaque',
+              source: 'gemini-thought-signature',
+              visibility: 'hidden',
+              continuation,
+            },
+            { type: 'toolCall', id: 'tool_1', name: 'read_file', arguments: { path: 'README.md' } },
+          ]),
+        ],
+      },
+      geminiPlan,
+    );
 
     expect(result.contents[0].parts).toContainEqual({
       functionCall: { name: 'read_file', args: { path: 'README.md' } },
@@ -362,19 +403,24 @@ describe('provider continuation artifact delivery', () => {
       type: 'reasoning_content',
       reasoningContent: 'required tool-loop reasoning',
     });
-    const result = openAICompatibleTesting.toOpenAIMessages({
-      ...baseContext,
-      messages: [assistant([
-        {
-          type: 'thinking',
-          kind: 'raw',
-          source: 'deepseek-raw',
-          visibility: 'raw-collapsed',
-          continuation,
-        },
-        { type: 'toolCall', id: 'tool_1', name: 'read_file', arguments: {} },
-      ])],
-    }, reasoningContentPlan);
+    const result = openAICompatibleTesting.toOpenAIMessages(
+      {
+        ...baseContext,
+        messages: [
+          assistant([
+            {
+              type: 'thinking',
+              kind: 'raw',
+              source: 'deepseek-raw',
+              visibility: 'raw-collapsed',
+              continuation,
+            },
+            { type: 'toolCall', id: 'tool_1', name: 'read_file', arguments: {} },
+          ]),
+        ],
+      },
+      reasoningContentPlan,
+    );
 
     expect(result[0]).toMatchObject({
       role: 'assistant',
@@ -383,15 +429,20 @@ describe('provider continuation artifact delivery', () => {
   });
 
   it('emits empty reasoning_content on later assistant turns when the contract requires it', () => {
-    const result = openAICompatibleTesting.toOpenAIMessages({
-      ...baseContext,
-      tools: [{
-        name: 'read_file',
-        description: 'Read a file',
-        parameters: { type: 'object', properties: {} },
-      }],
-      messages: [assistant([{ type: 'text', text: 'no thinking this turn' }])],
-    }, reasoningContentPlan);
+    const result = openAICompatibleTesting.toOpenAIMessages(
+      {
+        ...baseContext,
+        tools: [
+          {
+            name: 'read_file',
+            description: 'Read a file',
+            parameters: { type: 'object', properties: {} },
+          },
+        ],
+        messages: [assistant([{ type: 'text', text: 'no thinking this turn' }])],
+      },
+      reasoningContentPlan,
+    );
 
     expect(result[0]).toMatchObject({
       role: 'assistant',
@@ -425,20 +476,25 @@ describe('provider continuation artifact delivery', () => {
       type: 'thinking',
       reasoningContent: 'native thinking',
     });
-    const replayed = ollamaTesting.toOllamaMessages({
-      ...baseContext,
-      messages: [assistant([
-        {
-          type: 'thinking',
-          kind: 'raw',
-          source: 'ollama-raw',
-          visibility: 'raw-collapsed',
-          continuation,
-        },
-        { type: 'text', text: 'visible answer' },
-        { type: 'toolCall', id: 'tool_1', name: 'read_file', arguments: {} },
-      ])],
-    }, ollamaPlan);
+    const replayed = ollamaTesting.toOllamaMessages(
+      {
+        ...baseContext,
+        messages: [
+          assistant([
+            {
+              type: 'thinking',
+              kind: 'raw',
+              source: 'ollama-raw',
+              visibility: 'raw-collapsed',
+              continuation,
+            },
+            { type: 'text', text: 'visible answer' },
+            { type: 'toolCall', id: 'tool_1', name: 'read_file', arguments: {} },
+          ]),
+        ],
+      },
+      ollamaPlan,
+    );
     expect(replayed[0]).toMatchObject({
       role: 'assistant',
       thinking: 'native thinking',
@@ -447,31 +503,34 @@ describe('provider continuation artifact delivery', () => {
   });
 
   it('groups consecutive Anthropic tool results into the immediate next user message', () => {
-    const result = anthropicTesting.toAnthropicMessages({
-      ...baseContext,
-      messages: [
-        assistant([
-          { type: 'toolCall', id: 'tool_1', name: 'memory_read', arguments: { name: 'project-identity' } },
-          { type: 'toolCall', id: 'tool_2', name: 'memory_read', arguments: { name: 'project-model' } },
-        ]),
-        {
-          role: 'toolResult',
-          toolCallId: 'tool_1',
-          toolName: 'memory_read',
-          content: [{ type: 'text', text: 'identity' }],
-          isError: false,
-          timestamp: 1,
-        },
-        {
-          role: 'toolResult',
-          toolCallId: 'tool_2',
-          toolName: 'memory_read',
-          content: [{ type: 'text', text: 'model' }],
-          isError: false,
-          timestamp: 1,
-        },
-      ],
-    }, anthropicPlan);
+    const result = anthropicTesting.toAnthropicMessages(
+      {
+        ...baseContext,
+        messages: [
+          assistant([
+            { type: 'toolCall', id: 'tool_1', name: 'memory_read', arguments: { name: 'project-identity' } },
+            { type: 'toolCall', id: 'tool_2', name: 'memory_read', arguments: { name: 'project-model' } },
+          ]),
+          {
+            role: 'toolResult',
+            toolCallId: 'tool_1',
+            toolName: 'memory_read',
+            content: [{ type: 'text', text: 'identity' }],
+            isError: false,
+            timestamp: 1,
+          },
+          {
+            role: 'toolResult',
+            toolCallId: 'tool_2',
+            toolName: 'memory_read',
+            content: [{ type: 'text', text: 'model' }],
+            isError: false,
+            timestamp: 1,
+          },
+        ],
+      },
+      anthropicPlan,
+    );
 
     expect(result.messages).toHaveLength(2);
     expect(result.messages[1]).toMatchObject({ role: 'user' });
@@ -482,20 +541,23 @@ describe('provider continuation artifact delivery', () => {
   });
 
   it('does not send empty Anthropic message content', () => {
-    const result = anthropicTesting.toAnthropicMessages({
-      ...baseContext,
-      messages: [
-        assistant([]),
-        {
-          role: 'toolResult',
-          toolCallId: 'tool_empty',
-          toolName: 'memory_read',
-          content: [],
-          isError: false,
-          timestamp: 1,
-        },
-      ],
-    }, anthropicPlan);
+    const result = anthropicTesting.toAnthropicMessages(
+      {
+        ...baseContext,
+        messages: [
+          assistant([]),
+          {
+            role: 'toolResult',
+            toolCallId: 'tool_empty',
+            toolName: 'memory_read',
+            content: [],
+            isError: false,
+            timestamp: 1,
+          },
+        ],
+      },
+      anthropicPlan,
+    );
 
     expect(result.messages).toHaveLength(1);
     expect(result.messages[0].content).toMatchObject([

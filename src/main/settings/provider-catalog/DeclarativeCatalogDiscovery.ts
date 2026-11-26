@@ -26,11 +26,13 @@ export interface DeclarativeDiscoveredModel {
 
 function readPath(value: unknown, path: string | undefined): unknown {
   if (!path || path === '$') return value;
-  return path.split('.').reduce<unknown>((current, segment) => (
-    current && typeof current === 'object'
-      ? (current as Record<string, unknown>)[segment]
-      : undefined
-  ), value);
+  return path
+    .split('.')
+    .reduce<unknown>(
+      (current, segment) =>
+        current && typeof current === 'object' ? (current as Record<string, unknown>)[segment] : undefined,
+      value,
+    );
 }
 
 function toString(value: unknown): string | undefined {
@@ -72,9 +74,9 @@ function resolveRouteRule(
   modelId: string,
   discovery: JsonCatalogDiscovery,
 ): Omit<CatalogModelRoute, 'source'> | undefined {
-  const rule = discovery.routeRules?.find((candidate) => (
-    candidate.allowPatterns.some((pattern) => globMatches(modelId, pattern))
-  ));
+  const rule = discovery.routeRules?.find((candidate) =>
+    candidate.allowPatterns.some((pattern) => globMatches(modelId, pattern)),
+  );
   return rule
     ? {
         protocol: rule.protocol,
@@ -87,11 +89,13 @@ function resolveRouteRule(
 function admittedByCatalog(model: DeclarativeDiscoveredModel, discovery: JsonCatalogDiscovery): boolean {
   const admission = discovery.admission;
   if (!admission) return true;
-  if (admission.allowPatterns?.length && !admission.allowPatterns.some((pattern) => globMatches(model.id, pattern))) return false;
+  if (admission.allowPatterns?.length && !admission.allowPatterns.some((pattern) => globMatches(model.id, pattern)))
+    return false;
   if (admission.denyPatterns?.some((pattern) => globMatches(model.id, pattern))) return false;
   if (admission.allowedModalities?.length) {
     const modalities = Array.isArray(model.modality) ? model.modality : model.modality ? [model.modality] : [];
-    if (modalities.length > 0 && !modalities.some((value) => admission.allowedModalities?.includes(value))) return false;
+    if (modalities.length > 0 && !modalities.some((value) => admission.allowedModalities?.includes(value)))
+      return false;
   }
   if (admission.requireContextWindow && model.contextWindow === undefined) return false;
   return true;
@@ -139,24 +143,21 @@ export function parseDeclarativeCatalog(
       protocol: routeRule?.protocol ?? protocol,
       route: routeRule ?? (protocol ? { protocol } : undefined),
       modality: Array.isArray(modalityValue) ? toStringArray(modalityValue) : toString(modalityValue),
-      toolCalling: capabilityState(
-        readPath(value, discovery.mapping.toolCalling?.path),
-        discovery.mapping.toolCalling,
-      ),
-      visionInput: capabilityState(
-        readPath(value, discovery.mapping.visionInput?.path),
-        discovery.mapping.visionInput,
-      ),
+      toolCalling: capabilityState(readPath(value, discovery.mapping.toolCalling?.path), discovery.mapping.toolCalling),
+      visionInput: capabilityState(readPath(value, discovery.mapping.visionInput?.path), discovery.mapping.visionInput),
       structuredOutput: capabilityState(
         readPath(value, discovery.mapping.structuredOutput?.path),
         discovery.mapping.structuredOutput,
       ),
     };
     const admittedIdentity = { ...value, id };
-    if (!isAdmittedDiscoveredModel(admittedIdentity)
-      || !rawAdmissionPredicates(value, discovery)
-      || !admittedByCatalog(model, discovery)
-      || models.has(id)) continue;
+    if (
+      !isAdmittedDiscoveredModel(admittedIdentity) ||
+      !rawAdmissionPredicates(value, discovery) ||
+      !admittedByCatalog(model, discovery) ||
+      models.has(id)
+    )
+      continue;
     models.set(id, model);
   }
   return [...models.values()].sort((left, right) => left.id.localeCompare(right.id));
@@ -189,36 +190,39 @@ export function toDeclarativeCatalogContributions(
     // merely because the provider default is Responses. User-managed models are
     // created with the request fallback before this patch is merged, so omitting
     // an unobserved route remains executable without inventing live facts.
-    ...(model.route || model.protocol
-      ? { route: discoveredModelRoute(model, fallbackRoute) }
-      : {}),
+    ...(model.route || model.protocol ? { route: discoveredModelRoute(model, fallbackRoute) } : {}),
     ...(model.contextWindow !== undefined
       ? {
-          contextTiers: [{
-            id: 'default',
-            label: 'Default',
-            ...(model.contextWindowKind === 'prompt'
-              ? { maxPromptTokens: model.contextWindow }
-              : { maxTotalTokens: model.contextWindow }),
-            ...(typeof model.maxOutputTokens === 'number' && model.maxOutputTokens > 0
-              ? { maxOutputTokens: model.maxOutputTokens }
-              : {}),
-            activation: { kind: 'implicit' as const },
-            entitlement: model.contextWindowAuthority === 'model-catalog' ? 'unknown' : 'granted',
-          }],
-          defaultBudgetTokens: Math.min(256_000, Math.max(
-            1,
-            model.contextWindowKind === 'prompt'
-              ? model.contextWindow
-              : model.contextWindow - (model.maxOutputTokens ?? 0),
-          )),
+          contextTiers: [
+            {
+              id: 'default',
+              label: 'Default',
+              ...(model.contextWindowKind === 'prompt'
+                ? { maxPromptTokens: model.contextWindow }
+                : { maxTotalTokens: model.contextWindow }),
+              ...(typeof model.maxOutputTokens === 'number' && model.maxOutputTokens > 0
+                ? { maxOutputTokens: model.maxOutputTokens }
+                : {}),
+              activation: { kind: 'implicit' as const },
+              entitlement: model.contextWindowAuthority === 'model-catalog' ? 'unknown' : 'granted',
+            },
+          ],
+          defaultBudgetTokens: Math.min(
+            256_000,
+            Math.max(
+              1,
+              model.contextWindowKind === 'prompt'
+                ? model.contextWindow
+                : model.contextWindow - (model.maxOutputTokens ?? 0),
+            ),
+          ),
           controls: {
             ...(model.contextWindowAuthority === 'model-catalog'
               ? {
                   maxContext: {
                     state: 'unknown' as const,
                     defaultValue: false,
-                    reason: 'The live catalog reports a model maximum; account entitlement is not verified.'
+                    reason: 'The live catalog reports a model maximum; account entitlement is not verified.',
                   },
                 }
               : {

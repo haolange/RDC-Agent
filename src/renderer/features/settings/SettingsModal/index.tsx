@@ -80,24 +80,25 @@ export const SettingsModal = React.memo<SettingsModalProps>(({ open, settings, o
   });
 
   // A service's panel opens over the card grid; closing it returns to the grid.
-  const providerDialog = connectionDraft && connectionProvider ? (
-    <ProviderConnectDialog
-      connectionDraft={connectionDraft}
-      connectionProvider={connectionProvider}
-      getResolvedProviderLabel={getResolvedProviderLabel}
-      connectionAccountConnected={connectionAccountConnected}
-      connectionDevicePending={connectionDevicePending}
-      connectionNeedsCredentials={connectionNeedsCredentials}
-      connectionNeedsBaseUrl={connectionNeedsBaseUrl}
-      connectionHasFreshTest={connectionHasFreshTest}
-      onClose={() => setConnectionDraft(null)}
-      onUpdateConnectionDraft={updateConnectionDraft}
-      onModelChange={updateConnectionModelPreference}
-      onTest={handleTestProviderDraft}
-      onSave={handleSaveProviderConnection}
-      onStartAccountLogin={handleStartAccountLogin}
-    />
-  ) : null;
+  const providerDialog =
+    connectionDraft && connectionProvider ? (
+      <ProviderConnectDialog
+        connectionDraft={connectionDraft}
+        connectionProvider={connectionProvider}
+        getResolvedProviderLabel={getResolvedProviderLabel}
+        connectionAccountConnected={connectionAccountConnected}
+        connectionDevicePending={connectionDevicePending}
+        connectionNeedsCredentials={connectionNeedsCredentials}
+        connectionNeedsBaseUrl={connectionNeedsBaseUrl}
+        connectionHasFreshTest={connectionHasFreshTest}
+        onClose={() => setConnectionDraft(null)}
+        onUpdateConnectionDraft={updateConnectionDraft}
+        onModelChange={updateConnectionModelPreference}
+        onTest={handleTestProviderDraft}
+        onSave={handleSaveProviderConnection}
+        onStartAccountLogin={handleStartAccountLogin}
+      />
+    ) : null;
 
   useEffect(() => {
     if (!open) return;
@@ -119,9 +120,14 @@ export const SettingsModal = React.memo<SettingsModalProps>(({ open, settings, o
 
   return createPortal(
     <>
-      <div ref={backdropRef} className="settings-modal-backdrop" data-state={presence.state} onMouseDown={(event) => {
-        if (event.target === event.currentTarget && isTopOverlayLayer(layerId)) requestClose();
-      }}>
+      <div
+        ref={backdropRef}
+        className="settings-modal-backdrop"
+        data-state={presence.state}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget && isTopOverlayLayer(layerId)) requestClose();
+        }}
+      >
         <div
           ref={dialogRef}
           className="settings-modal settings-center"
@@ -144,17 +150,22 @@ export const SettingsModal = React.memo<SettingsModalProps>(({ open, settings, o
             <SettingsCenterNav
               sections={sections}
               activeSection={activeSection}
-              onSelectSection={(section) => guardLeave(() => {
-                if (section !== 'agents') clearAgentRequest();
-                setActiveSection(section);
-              })}
+              onSelectSection={(section) =>
+                guardLeave(() => {
+                  if (section !== 'agents') clearAgentRequest();
+                  setActiveSection(section);
+                })
+              }
               providers={[...modal.accountProviders, ...modal.providerCatalog].map((provider) => ({
                 id: provider.id,
                 label: modal.getResolvedProviderLabel(provider),
-                open: () => guardLeave(() => { setActiveSection('models'); modal.openProviderConnection(provider); }),
+                open: () =>
+                  guardLeave(() => {
+                    setActiveSection('models');
+                    modal.openProviderConnection(provider);
+                  }),
               }))}
             />
-
           </div>
 
           <div className="settings-center-content">
@@ -165,19 +176,20 @@ export const SettingsModal = React.memo<SettingsModalProps>(({ open, settings, o
                 </div>
                 {activeSectionMeta ? <p className="settings-modal-subtitle">{activeSectionMeta.subtitle}</p> : null}
               </div>
-              <IconButton
-                className="settings-modal-close"
-                label={t('settings.close')}
-                onClick={requestClose}
-              >
+              <IconButton className="settings-modal-close" label={t('settings.close')} onClick={requestClose}>
                 <Icon name="close" size={16} />
               </IconButton>
             </div>
 
             <div ref={panelRef} className="settings-center-panel scrollbar-thin" data-testid="settings-center-panel">
-              <SettingsPageContent modal={modal} settings={settings} runtime={runtime}
-                resourceScope={resourceScope} setResourceScope={setResourceScope}
-                setResourceDraftDirty={setResourceDraftDirty} />
+              <SettingsPageContent
+                modal={modal}
+                settings={settings}
+                runtime={runtime}
+                resourceScope={resourceScope}
+                setResourceScope={setResourceScope}
+                setResourceDraftDirty={setResourceDraftDirty}
+              />
             </div>
           </div>
         </div>

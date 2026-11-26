@@ -11,11 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { resolvedPathKey } from '../platform/paths';
 
-export type KnowledgeReadRootSkipReason =
-  | 'missing'
-  | 'not-directory'
-  | 'symlink-or-junction'
-  | 'realpath-failed';
+export type KnowledgeReadRootSkipReason = 'missing' | 'not-directory' | 'symlink-or-junction' | 'realpath-failed';
 
 export interface KnowledgeReadRootDiagnostic {
   candidate: string;
@@ -33,18 +29,11 @@ export interface ResolveKnowledgeReadRootsInput {
   projectKnowledgePath?: string | null;
 }
 
-function skip(
-  candidate: string,
-  reason: KnowledgeReadRootSkipReason,
-  message: string,
-): KnowledgeReadRootDiagnostic {
+function skip(candidate: string, reason: KnowledgeReadRootSkipReason, message: string): KnowledgeReadRootDiagnostic {
   return { candidate, reason, message };
 }
 
-function considerCandidate(
-  candidate: string,
-  diagnostics: KnowledgeReadRootDiagnostic[],
-): string | null {
+function considerCandidate(candidate: string, diagnostics: KnowledgeReadRootDiagnostic[]): string | null {
   const resolved = path.resolve(candidate);
   if (!fs.existsSync(resolved)) {
     return null;
@@ -54,22 +43,26 @@ function considerCandidate(
   try {
     lexicalStat = fs.lstatSync(resolved);
   } catch (error) {
-    diagnostics.push(skip(
-      resolved,
-      'realpath-failed',
-      `KNOWLEDGE_READ_ROOT_SKIPPED: cannot stat knowledge root ${resolved}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    ));
+    diagnostics.push(
+      skip(
+        resolved,
+        'realpath-failed',
+        `KNOWLEDGE_READ_ROOT_SKIPPED: cannot stat knowledge root ${resolved}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      ),
+    );
     return null;
   }
 
   if (lexicalStat.isSymbolicLink()) {
-    diagnostics.push(skip(
-      resolved,
-      'symlink-or-junction',
-      `KNOWLEDGE_READ_ROOT_SKIPPED: refusing symlink/junction knowledge root ${resolved}.`,
-    ));
+    diagnostics.push(
+      skip(
+        resolved,
+        'symlink-or-junction',
+        `KNOWLEDGE_READ_ROOT_SKIPPED: refusing symlink/junction knowledge root ${resolved}.`,
+      ),
+    );
     return null;
   }
   if (!lexicalStat.isDirectory()) {
@@ -80,11 +73,13 @@ function considerCandidate(
     const real = fs.realpathSync.native(resolved);
     const realStat = fs.lstatSync(real);
     if (realStat.isSymbolicLink()) {
-      diagnostics.push(skip(
-        resolved,
-        'symlink-or-junction',
-        `KNOWLEDGE_READ_ROOT_SKIPPED: refusing symlink/junction knowledge root ${resolved}.`,
-      ));
+      diagnostics.push(
+        skip(
+          resolved,
+          'symlink-or-junction',
+          `KNOWLEDGE_READ_ROOT_SKIPPED: refusing symlink/junction knowledge root ${resolved}.`,
+        ),
+      );
       return null;
     }
     if (!fs.statSync(real).isDirectory()) {
@@ -92,13 +87,15 @@ function considerCandidate(
     }
     return path.resolve(real);
   } catch (error) {
-    diagnostics.push(skip(
-      resolved,
-      'realpath-failed',
-      `KNOWLEDGE_READ_ROOT_SKIPPED: cannot realpath knowledge root ${resolved}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    ));
+    diagnostics.push(
+      skip(
+        resolved,
+        'realpath-failed',
+        `KNOWLEDGE_READ_ROOT_SKIPPED: cannot realpath knowledge root ${resolved}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      ),
+    );
     return null;
   }
 }
@@ -107,9 +104,7 @@ function considerCandidate(
  * Resolve user + project knowledge directories into existing, real directories.
  * Canonical order is user then project. Duplicate identities (8.3 / case) collapse.
  */
-export function resolveKnowledgeReadRoots(
-  input: ResolveKnowledgeReadRootsInput,
-): KnowledgeReadRootResolution {
+export function resolveKnowledgeReadRoots(input: ResolveKnowledgeReadRootsInput): KnowledgeReadRootResolution {
   const diagnostics: KnowledgeReadRootDiagnostic[] = [];
   const roots: string[] = [];
   const seen = new Set<string>();

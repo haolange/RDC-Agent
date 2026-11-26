@@ -50,8 +50,15 @@ function compareBytes(left: Buffer, right: Buffer) {
     return { bytesEqual: true, firstDifferenceOffset: null, differenceWindow: null };
   }
   const start = Math.max(0, offset - 8);
-  return { bytesEqual: false, firstDifferenceOffset: offset,
-    differenceWindow: { offset: start, leftHex: left.subarray(start, start + 32).toString('hex'), rightHex: right.subarray(start, start + 32).toString('hex') } };
+  return {
+    bytesEqual: false,
+    firstDifferenceOffset: offset,
+    differenceWindow: {
+      offset: start,
+      leftHex: left.subarray(start, start + 32).toString('hex'),
+      rightHex: right.subarray(start, start + 32).toString('hex'),
+    },
+  };
 }
 
 function expectedDigest(value: string | undefined): string {
@@ -92,7 +99,8 @@ function normalizedText(bytes: Buffer): string {
   } catch {
     text = '\0';
   }
-  if (text.includes('\0')) throw new AppError('FILE_AUDIT_UTF8_REQUIRED', 'text comparison requires NUL-free, valid UTF-8 inputs.');
+  if (text.includes('\0'))
+    throw new AppError('FILE_AUDIT_UTF8_REQUIRED', 'text comparison requires NUL-free, valid UTF-8 inputs.');
   return text.replace(/\r\n/g, '\n');
 }
 
@@ -101,10 +109,13 @@ function textIdentity(text: string): TextIdentity {
 }
 
 function compareText(left: string, right: string) {
-  const a = left.split('\n'), b = right.split('\n');
-  let prefix = 0, suffix = 0;
+  const a = left.split('\n'),
+    b = right.split('\n');
+  let prefix = 0,
+    suffix = 0;
   while (prefix < Math.min(a.length, b.length) && a[prefix] === b[prefix]) prefix += 1;
-  while (suffix < Math.min(a.length, b.length) - prefix && a[a.length - 1 - suffix] === b[b.length - 1 - suffix]) suffix += 1;
+  while (suffix < Math.min(a.length, b.length) - prefix && a[a.length - 1 - suffix] === b[b.length - 1 - suffix])
+    suffix += 1;
   const leftChanged = a.slice(prefix, a.length - suffix).join('\n');
   const rightChanged = b.slice(prefix, b.length - suffix).join('\n');
   return {
@@ -115,12 +126,17 @@ function compareText(left: string, right: string) {
     rightTotalLines: b.length,
     leftChanged: truncateOutput(leftChanged, CHANGE_PREVIEW_BYTES),
     rightChanged: truncateOutput(rightChanged, CHANGE_PREVIEW_BYTES),
-    truncated: Buffer.byteLength(leftChanged) > CHANGE_PREVIEW_BYTES || Buffer.byteLength(rightChanged) > CHANGE_PREVIEW_BYTES,
+    truncated:
+      Buffer.byteLength(leftChanged) > CHANGE_PREVIEW_BYTES || Buffer.byteLength(rightChanged) > CHANGE_PREVIEW_BYTES,
   };
 }
 
 /** Audits the bytes actually read. No mutation, executable parser, edit grant, or domain interpretation. */
-export async function auditFiles(params: FileAuditParams, context?: ToolExecutionContext, signal?: AbortSignal): Promise<FileAuditDetails> {
+export async function auditFiles(
+  params: FileAuditParams,
+  context?: ToolExecutionContext,
+  signal?: AbortSignal,
+): Promise<FileAuditDetails> {
   const leftHash = expectedDigest(params.expectedHash);
   const rightHash = params.compareWith ? expectedDigest(params.compareWith.expectedHash) : undefined;
   const left = await readBoundFile(params.path, leftHash, context, signal);

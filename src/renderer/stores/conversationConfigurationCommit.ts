@@ -23,9 +23,9 @@ export async function buildConversationConfigurationCommit(input: {
   modelId?: string;
   configurationCommit: NonNullable<ConversationSendRequest['configurationCommit']>;
 }> {
-  const definition = useAppSettingsStore.getState().settings.agents.definitions.find(
-    (entry) => entry.id === input.selectedAgentId,
-  );
+  const definition = useAppSettingsStore
+    .getState()
+    .settings.agents.definitions.find((entry) => entry.id === input.selectedAgentId);
   const writeTarget = resolveAgentWriteTarget(definition, input.currentProjectId);
   const agentCommit = await useAppSettingsStore.getState().flushAgentDefinitionSaves({
     agentId: input.selectedAgentId,
@@ -35,12 +35,8 @@ export async function buildConversationConfigurationCommit(input: {
   const modelId = input.modelOverride?.modelId || agentCommit?.route?.modelId;
   const provider = useAppSettingsStore.getState().settings.llm.providers.find((entry) => entry.id === providerId);
   if (!isProviderExecutable(provider)) throw new AppError('MODEL_UNAVAILABLE', 'provider is disabled or disconnected.');
-  const providerCommit = providerId
-    ? await useAppSettingsStore.getState().flushProviderSaves(providerId)
-    : null;
-  const effectiveCatalog = providerId
-    ? await input.getEffectiveCatalog(providerId)
-    : null;
+  const providerCommit = providerId ? await useAppSettingsStore.getState().flushProviderSaves(providerId) : null;
+  const effectiveCatalog = providerId ? await input.getEffectiveCatalog(providerId) : null;
   const selectedModel = effectiveCatalog?.models.find((model) => model.modelId === modelId);
   return {
     agentId: input.selectedAgentId,

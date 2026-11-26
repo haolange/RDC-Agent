@@ -26,8 +26,29 @@ import type { LanguageFn } from 'highlight.js';
 
 /** The one language set: answers (rehype-highlight) and tool output (WorkProcessHighlightedCode) highlight the same way. */
 export const MARKDOWN_LANGUAGES: Readonly<Record<string, LanguageFn>> = {
-  bash, c, cpp, csharp, css, diff, glsl, go, hlsl, java, javascript, json, kotlin, markdown, php, python, ruby, rust,
-  sql, swift, typescript, xml, yaml,
+  bash,
+  c,
+  cpp,
+  csharp,
+  css,
+  diff,
+  glsl,
+  go,
+  hlsl,
+  java,
+  javascript,
+  json,
+  kotlin,
+  markdown,
+  php,
+  python,
+  ruby,
+  rust,
+  sql,
+  swift,
+  typescript,
+  xml,
+  yaml,
 };
 
 export const MARKDOWN_LANGUAGE_ALIASES: Readonly<Record<string, readonly string[]>> = {

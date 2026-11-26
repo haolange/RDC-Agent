@@ -1,6 +1,11 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { assertFileSizeCap, isPathExisting, requireMutationWorkspaceRoot, safeResolvePath } from '../../../runtime/toolFiles';
+import {
+  assertFileSizeCap,
+  isPathExisting,
+  requireMutationWorkspaceRoot,
+  safeResolvePath,
+} from '../../../runtime/toolFiles';
 import { COPY_MOVE_MAX_BYTES } from '../../../runtime/toolLimits';
 import { renameWithRetry } from '../../../platform/fileRename';
 import type { AgentTool } from '../../agent/AgentTool';
@@ -29,7 +34,14 @@ export const moveFileTool: AgentTool<MoveFileParams, MoveFileDetails> = {
     },
     required: ['source', 'destination'],
   },
-  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: {
+    isReadOnly: false,
+    concurrency: 'exclusive',
+    isDestructive: true,
+    sideEffect: 'filesystem',
+    category: 'file',
+    requiresApproval: true,
+  },
   permissionHint: 'mutation',
   effects: { writes: ['source', 'destination'] },
 

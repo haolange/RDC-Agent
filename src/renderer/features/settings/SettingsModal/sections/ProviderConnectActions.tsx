@@ -35,20 +35,20 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
 }) => {
   const { t } = useI18n();
   const accountRequiresCode = provider.authMode === 'account' && draft.accountStatus?.requiresCodeInput;
-  const accountSaveBlocked = provider.authMode === 'account'
-    && !accountConnected
-    && (!accountRequiresCode || !draft.authCode.trim());
-  const accountTestBlocked = provider.authMode === 'account'
-    && !accountConnected
-    && provider.hasStoredSecretByAuthMode?.account !== true;
+  const accountSaveBlocked =
+    provider.authMode === 'account' && !accountConnected && (!accountRequiresCode || !draft.authCode.trim());
+  const accountTestBlocked =
+    provider.authMode === 'account' && !accountConnected && provider.hasStoredSecretByAuthMode?.account !== true;
   const commonBlocked = draft.busy !== 'idle' || needsCredentials || needsBaseUrl || devicePending;
   const noSupportedModels = provider.catalogOwnership !== 'user-managed' && hasFreshTest && draft.models.length === 0;
-  const authModeUnavailable = (provider.authModeAvailability?.[draft.authMode]
-    ?? provider.providerAvailability).state === 'unavailable';
+  const authModeUnavailable =
+    (provider.authModeAvailability?.[draft.authMode] ?? provider.providerAvailability).state === 'unavailable';
 
   return (
     <>
-      <Button variant="ghost" onClick={onClose}>{t('settings.cancel')}</Button>
+      <Button variant="ghost" onClick={onClose}>
+        {t('settings.cancel')}
+      </Button>
       <Button
         variant="secondary"
         data-testid="settings-provider-connect-test"
@@ -69,8 +69,12 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
           : provider.authMode === 'account'
             ? accountRequiresCode && !accountConnected
               ? t('settings.oauthContinue')
-              : provider.isConfigured ? t('settings.save') : t('settings.connect')
-            : provider.isConfigured || hasFreshTest ? t('settings.save') : t('settings.connect')}
+              : provider.isConfigured
+                ? t('settings.save')
+                : t('settings.connect')
+            : provider.isConfigured || hasFreshTest
+              ? t('settings.save')
+              : t('settings.connect')}
       </Button>
     </>
   );

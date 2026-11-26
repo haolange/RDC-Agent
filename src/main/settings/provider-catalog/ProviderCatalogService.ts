@@ -1,12 +1,6 @@
 import { LLM_PROVIDER_CATEGORY_DEFINITIONS, LLM_PROVIDER_PROTOCOL_DEFINITIONS } from '@shared/constants/llm';
-import {
-  createProviderEntryFromCatalog,
-  listProviderSummaries,
-} from '../../provider-catalog/ProviderCatalogRegistry';
-import type {
-  LlmProviderCatalogEntry,
-  LlmProviderCatalogResponse,
-} from '@shared/types/settings';
+import { createProviderEntryFromCatalog, listProviderSummaries } from '../../provider-catalog/ProviderCatalogRegistry';
+import type { LlmProviderCatalogEntry, LlmProviderCatalogResponse } from '@shared/types/settings';
 
 const categoryRank = new Map(LLM_PROVIDER_CATEGORY_DEFINITIONS.map((entry, index) => [entry.id, index]));
 
@@ -29,8 +23,10 @@ function toCatalogEntry(provider: ReturnType<typeof createProviderEntryFromCatal
       ? {
           ...provider.connectionSchema,
           fields: provider.connectionSchema.fields.map((field) => ({ ...field })),
-          credentialAlternatives: provider.connectionSchema.credentialAlternatives
-            ?.map((alternative) => ({ ...alternative, fieldIds: [...alternative.fieldIds] })),
+          credentialAlternatives: provider.connectionSchema.credentialAlternatives?.map((alternative) => ({
+            ...alternative,
+            fieldIds: [...alternative.fieldIds],
+          })),
           headerMappings: provider.connectionSchema.headerMappings?.map((mapping) => ({ ...mapping })),
         }
       : undefined,

@@ -39,13 +39,16 @@ const add = (notification: Omit<Notification, 'id'>): string => useNotificationS
 /** The one way features raise a toast. */
 export const notify = {
   info: (title: string, message?: string): string => add({ tone: 'info', title, ...(message ? { message } : {}) }),
-  success: (title: string, message?: string): string => add({ tone: 'success', title, ...(message ? { message } : {}) }),
-  warning: (title: string, message?: string): string => add({ tone: 'warning', title, ...(message ? { message } : {}) }),
+  success: (title: string, message?: string): string =>
+    add({ tone: 'success', title, ...(message ? { message } : {}) }),
+  warning: (title: string, message?: string): string =>
+    add({ tone: 'warning', title, ...(message ? { message } : {}) }),
   error: (title: string, message?: string): string => add({ tone: 'error', title, ...(message ? { message } : {}) }),
   /** A failed operation: worded by `humanizeError`, kept until dismissed, technical facts behind "Copy details". */
-  failure: (error: unknown, t: Translator, contextKey?: TranslationKey): string => add({
-    tone: 'error',
-    title: humanizeError(error, t, contextKey),
-    details: errorDetails(error),
-  }),
+  failure: (error: unknown, t: Translator, contextKey?: TranslationKey): string =>
+    add({
+      tone: 'error',
+      title: humanizeError(error, t, contextKey),
+      details: errorDetails(error),
+    }),
 };

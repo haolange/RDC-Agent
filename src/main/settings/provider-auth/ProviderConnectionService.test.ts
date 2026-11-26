@@ -24,12 +24,13 @@ import {
 } from './ProviderConnectionService';
 import type { LlmProviderModel } from '@shared/types/settings';
 
-const managed = (...ids: string[]): LlmProviderModel[] => ids.map((id) => ({
-  id,
-  label: id,
-  enabled: true,
-  availability: 'unknown',
-}));
+const managed = (...ids: string[]): LlmProviderModel[] =>
+  ids.map((id) => ({
+    id,
+    label: id,
+    enabled: true,
+    availability: 'unknown',
+  }));
 
 beforeAll(async () => {
   await loadProviderSurface('bailing');
@@ -37,18 +38,12 @@ beforeAll(async () => {
 
 describe('resolveCodingPlanModelsUrl', () => {
   it('appends /v1/models when the coding base has no /v1 suffix', () => {
-    expect(resolveCodingPlanModelsUrl('https://api.kimi.com/coding/')).toBe(
-      'https://api.kimi.com/coding/v1/models',
-    );
-    expect(resolveCodingPlanModelsUrl('https://api.kimi.com/coding')).toBe(
-      'https://api.kimi.com/coding/v1/models',
-    );
+    expect(resolveCodingPlanModelsUrl('https://api.kimi.com/coding/')).toBe('https://api.kimi.com/coding/v1/models');
+    expect(resolveCodingPlanModelsUrl('https://api.kimi.com/coding')).toBe('https://api.kimi.com/coding/v1/models');
   });
 
   it('appends /models when the base already ends with /v1', () => {
-    expect(resolveCodingPlanModelsUrl('https://api.kimi.com/coding/v1')).toBe(
-      'https://api.kimi.com/coding/v1/models',
-    );
+    expect(resolveCodingPlanModelsUrl('https://api.kimi.com/coding/v1')).toBe('https://api.kimi.com/coding/v1/models');
   });
 });
 
@@ -66,9 +61,7 @@ describe('resolveClineCatalogUrl', () => {
     expect(resolveClineCredentialProbeUrl('https://api.cline.bot/api/v1')).toBe(
       'https://api.cline.bot/api/v1/users/me',
     );
-    expect(resolveClineCredentialProbeUrl('https://api.cline.bot')).toBe(
-      'https://api.cline.bot/api/v1/users/me',
-    );
+    expect(resolveClineCredentialProbeUrl('https://api.cline.bot')).toBe('https://api.cline.bot/api/v1/users/me');
   });
 });
 
@@ -82,26 +75,41 @@ describe('resolveTestDiscoveryAccountId', () => {
   };
 
   it('uses the live account when testing with stored credentials', () => {
-    expect(resolveTestDiscoveryAccountId({
-      ...base,
-      activeAccountId: 'acct-live',
-      isConfigured: true,
-    }, {})).toBe('acct-live');
+    expect(
+      resolveTestDiscoveryAccountId(
+        {
+          ...base,
+          activeAccountId: 'acct-live',
+          isConfigured: true,
+        },
+        {},
+      ),
+    ).toBe('acct-live');
   });
 
   it('uses anonymous scope for first-time unconfigured providers', () => {
-    expect(resolveTestDiscoveryAccountId({
-      ...base,
-      isConfigured: false,
-    }, { apiKey: 'sk_new' })).toBe('anonymous:cline-pass');
+    expect(
+      resolveTestDiscoveryAccountId(
+        {
+          ...base,
+          isConfigured: false,
+        },
+        { apiKey: 'sk_new' },
+      ),
+    ).toBe('anonymous:cline-pass');
   });
 
   it('does not overwrite a live account when testing an uncommitted replacement key', () => {
-    expect(resolveTestDiscoveryAccountId({
-      ...base,
-      activeAccountId: 'acct-live',
-      isConfigured: true,
-    }, { apiKey: 'sk_replacement' })).toBe('anonymous:cline-pass');
+    expect(
+      resolveTestDiscoveryAccountId(
+        {
+          ...base,
+          activeAccountId: 'acct-live',
+          isConfigured: true,
+        },
+        { apiKey: 'sk_replacement' },
+      ),
+    ).toBe('anonymous:cline-pass');
   });
 });
 
@@ -132,19 +140,25 @@ describe('typed provider connection resolution', () => {
   });
 
   it('expands Snowflake, Bedrock, Vertex and PrivateMode endpoints from typed fields', () => {
-    expect(resolveProviderConnectionDraft(createProviderEntryFromCatalog('snowflake-cortex'), {
-      connectionValues: { SNOWFLAKE_ACCOUNT: 'org-account', SNOWFLAKE_CORTEX_PAT: 'pat' },
-    }).baseUrl).toBe('https://org-account.snowflakecomputing.com/api/v2/cortex/v1');
-    expect(resolveProviderConnectionDraft(createProviderEntryFromCatalog('amazon-bedrock'), {
-      connectionValues: { AWS_REGION: 'us-east-1', AWS_BEARER_TOKEN_BEDROCK: 'bedrock-key' },
-    }).baseUrl).toBe('https://bedrock-mantle.us-east-1.api.aws/v1');
-    expect(resolveProviderConnectionDraft(createProviderEntryFromCatalog('amazon-bedrock'), {
-      connectionValues: {
-        AWS_REGION: 'us-west-2',
-        AWS_ACCESS_KEY_ID: 'access-key',
-        AWS_SECRET_ACCESS_KEY: 'secret-key',
-      },
-    })).toMatchObject({
+    expect(
+      resolveProviderConnectionDraft(createProviderEntryFromCatalog('snowflake-cortex'), {
+        connectionValues: { SNOWFLAKE_ACCOUNT: 'org-account', SNOWFLAKE_CORTEX_PAT: 'pat' },
+      }).baseUrl,
+    ).toBe('https://org-account.snowflakecomputing.com/api/v2/cortex/v1');
+    expect(
+      resolveProviderConnectionDraft(createProviderEntryFromCatalog('amazon-bedrock'), {
+        connectionValues: { AWS_REGION: 'us-east-1', AWS_BEARER_TOKEN_BEDROCK: 'bedrock-key' },
+      }).baseUrl,
+    ).toBe('https://bedrock-mantle.us-east-1.api.aws/v1');
+    expect(
+      resolveProviderConnectionDraft(createProviderEntryFromCatalog('amazon-bedrock'), {
+        connectionValues: {
+          AWS_REGION: 'us-west-2',
+          AWS_ACCESS_KEY_ID: 'access-key',
+          AWS_SECRET_ACCESS_KEY: 'secret-key',
+        },
+      }),
+    ).toMatchObject({
       apiKey: '',
       baseUrl: 'https://bedrock-mantle.us-west-2.api.aws/v1',
     });
@@ -153,41 +167,54 @@ describe('typed provider connection resolution', () => {
       authMode: 'api-key',
       authModeOptions: ['api-key', 'environment'],
     });
-    expect(resolveProviderConnectionDraft(vertexProvider, {
-      connectionValues: {
-        GOOGLE_VERTEX_PROJECT: 'project-id',
-        GOOGLE_VERTEX_LOCATION: 'us-central1',
-        GOOGLE_VERTEX_ACCESS_TOKEN: 'oauth-token',
-      },
-    }).baseUrl).toBe(
+    expect(
+      resolveProviderConnectionDraft(vertexProvider, {
+        connectionValues: {
+          GOOGLE_VERTEX_PROJECT: 'project-id',
+          GOOGLE_VERTEX_LOCATION: 'us-central1',
+          GOOGLE_VERTEX_ACCESS_TOKEN: 'oauth-token',
+        },
+      }).baseUrl,
+    ).toBe(
       'https://us-central1-aiplatform.googleapis.com/v1/projects/project-id/locations/us-central1/publishers/google',
     );
-    expect(resolveProviderConnectionDraft(createProviderEntryFromCatalog('privatemode-ai'), {
-      connectionValues: { PRIVATEMODE_ENDPOINT: 'http://localhost:8080/v1', PRIVATEMODE_API_KEY: 'key' },
-    }).baseUrl).toBe('http://localhost:8080/v1');
+    expect(
+      resolveProviderConnectionDraft(createProviderEntryFromCatalog('privatemode-ai'), {
+        connectionValues: { PRIVATEMODE_ENDPOINT: 'http://localhost:8080/v1', PRIVATEMODE_API_KEY: 'key' },
+      }).baseUrl,
+    ).toBe('http://localhost:8080/v1');
   });
 
   it('keeps Gemini OpenAI discovery and Anthropic native Model Garden discovery separate', () => {
-    expect(resolveGoogleVertexOpenAiBaseUrl(
-      'https://us-east5-aiplatform.googleapis.com/v1/projects/p/locations/us-east5/publishers/google',
-    )).toBe(
-      'https://us-east5-aiplatform.googleapis.com/v1beta1/projects/p/locations/us-east5/endpoints/openapi',
-    );
-    expect(() => resolveGoogleVertexOpenAiBaseUrl(
-      'https://us-east5-aiplatform.googleapis.com/v1/projects/p/locations/us-east5/publishers/anthropic',
-    )).toThrow(/does not match/u);
-    expect(resolveGoogleVertexPublisherModelsUrl(
-      'https://us-east5-aiplatform.googleapis.com/v1/projects/p/locations/us-east5/publishers/anthropic',
-      'anthropic',
-    )).toBe(
+    expect(
+      resolveGoogleVertexOpenAiBaseUrl(
+        'https://us-east5-aiplatform.googleapis.com/v1/projects/p/locations/us-east5/publishers/google',
+      ),
+    ).toBe('https://us-east5-aiplatform.googleapis.com/v1beta1/projects/p/locations/us-east5/endpoints/openapi');
+    expect(() =>
+      resolveGoogleVertexOpenAiBaseUrl(
+        'https://us-east5-aiplatform.googleapis.com/v1/projects/p/locations/us-east5/publishers/anthropic',
+      ),
+    ).toThrow(/does not match/u);
+    expect(
+      resolveGoogleVertexPublisherModelsUrl(
+        'https://us-east5-aiplatform.googleapis.com/v1/projects/p/locations/us-east5/publishers/anthropic',
+        'anthropic',
+      ),
+    ).toBe(
       'https://us-east5-aiplatform.googleapis.com/v1beta1/publishers/anthropic/models?pageSize=1000&listAllVersions=true',
     );
-    expect(parseGoogleVertexPublisherModels({
-      publisherModels: [
-        { name: 'publishers/anthropic/models/claude-sonnet-4-6', versionId: '20260217' },
-        { name: 'publishers/google/models/gemini-3.1-pro' },
-      ],
-    }, 'anthropic')).toEqual([
+    expect(
+      parseGoogleVertexPublisherModels(
+        {
+          publisherModels: [
+            { name: 'publishers/anthropic/models/claude-sonnet-4-6', versionId: '20260217' },
+            { name: 'publishers/google/models/gemini-3.1-pro' },
+          ],
+        },
+        'anthropic',
+      ),
+    ).toEqual([
       expect.objectContaining({
         id: 'claude-sonnet-4-6@20260217',
         availability: 'unknown',
@@ -212,12 +239,11 @@ describe('typed provider connection resolution', () => {
       '',
       'GoogleVertexAnthropic',
     );
-    expect(vertexAnthropic[0]?.routeOptions?.map((option) => option.id)).toEqual([
-      'GoogleVertexAnthropic',
-    ]);
+    expect(vertexAnthropic[0]?.routeOptions?.map((option) => option.id)).toEqual(['GoogleVertexAnthropic']);
 
-    expect(resolveBedrockResponsesBaseUrl('https://bedrock-mantle.us-east-1.api.aws/v1'))
-      .toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1');
+    expect(resolveBedrockResponsesBaseUrl('https://bedrock-mantle.us-east-1.api.aws/v1')).toBe(
+      'https://bedrock-mantle.us-east-1.api.aws/openai/v1',
+    );
     const bedrock = projectBedrockMantleModelRoutes(
       managed('amazon.nova-pro-v1:0'),
       'https://bedrock-mantle.us-east-1.api.aws/v1',
@@ -251,23 +277,26 @@ describe('coding-plan discovery routing', () => {
 
 describe('mergeManagedModelAvailability', () => {
   it('collapses proven discovery aliases into one canonical model row', () => {
-    expect(normalizeDiscoveredModels([
-      { id: 'vendor-2026-07' },
-      { id: 'vendor-latest', type: 'alias', canonical_id: 'vendor-2026-07' },
-      { id: 'vendor-floating', type: 'alias' },
-    ])).toEqual([{
-      id: 'vendor-2026-07',
-      label: 'vendor-2026-07',
-      enabled: true,
-      aliases: ['vendor-latest'],
-    }]);
+    expect(
+      normalizeDiscoveredModels([
+        { id: 'vendor-2026-07' },
+        { id: 'vendor-latest', type: 'alias', canonical_id: 'vendor-2026-07' },
+        { id: 'vendor-floating', type: 'alias' },
+      ]),
+    ).toEqual([
+      {
+        id: 'vendor-2026-07',
+        label: 'vendor-2026-07',
+        enabled: true,
+        aliases: ['vendor-latest'],
+      },
+    ]);
   });
 
   it('keeps app-managed catalog rows and disables models missing from the endpoint', () => {
-    const models = mergeManagedModelAvailability(
-      managed('kimi-for-coding', 'catalog-only-model'),
-      [{ id: 'kimi-for-coding', label: 'kimi-for-coding', enabled: true }],
-    );
+    const models = mergeManagedModelAvailability(managed('kimi-for-coding', 'catalog-only-model'), [
+      { id: 'kimi-for-coding', label: 'kimi-for-coding', enabled: true },
+    ]);
 
     expect(models).toEqual([
       expect.objectContaining({
@@ -283,7 +312,6 @@ describe('mergeManagedModelAvailability', () => {
       }),
     ]);
   });
-
 
   it('treats catalog aliases as available when the endpoint returns the alias id', () => {
     const models = mergeManagedModelAvailability(
@@ -327,13 +355,10 @@ describe('mergeManagedModelAvailability', () => {
   });
 
   it('matches vendor-prefixed and mini→lite Coding Plan list ids', () => {
-    const models = mergeManagedModelAvailability(
-      managed('doubao-seed-2.0-pro', 'doubao-seed-2.0-lite'),
-      [
-        { id: 'volcengine/doubao-seed-2-0-pro-260215', label: 'volcengine/doubao-seed-2-0-pro-260215', enabled: true },
-        { id: 'doubao-seed-2-0-mini-260215', label: 'doubao-seed-2-0-mini-260215', enabled: true },
-      ],
-    );
+    const models = mergeManagedModelAvailability(managed('doubao-seed-2.0-pro', 'doubao-seed-2.0-lite'), [
+      { id: 'volcengine/doubao-seed-2-0-pro-260215', label: 'volcengine/doubao-seed-2-0-pro-260215', enabled: true },
+      { id: 'doubao-seed-2-0-mini-260215', label: 'doubao-seed-2-0-mini-260215', enabled: true },
+    ]);
     expect(models.every((model) => model.enabled && model.availability === 'available')).toBe(true);
   });
 
@@ -347,10 +372,9 @@ describe('mergeManagedModelAvailability', () => {
   });
 
   it('explains meta-only discovery when the endpoint returns ark-code-latest style ids', () => {
-    const models = mergeManagedModelAvailability(
-      managed('glm-5.2'),
-      [{ id: 'ark-code-latest', label: 'ark-code-latest', enabled: true }],
-    );
+    const models = mergeManagedModelAvailability(managed('glm-5.2'), [
+      { id: 'ark-code-latest', label: 'ark-code-latest', enabled: true },
+    ]);
     expect(models[0]).toMatchObject({
       id: 'glm-5.2',
       enabled: false,
@@ -360,10 +384,9 @@ describe('mergeManagedModelAvailability', () => {
   });
 
   it('hides Volcengine catalog models that were not confirmed by discovery', () => {
-    const models = mergeManagedModelAvailability(
-      managed('doubao-seed-2.0-code', 'glm-5.2'),
-      [{ id: 'ark-code-latest', label: 'ark-code-latest', enabled: true }],
-    );
+    const models = mergeManagedModelAvailability(managed('doubao-seed-2.0-code', 'glm-5.2'), [
+      { id: 'ark-code-latest', label: 'ark-code-latest', enabled: true },
+    ]);
     expect(selectAvailableCodingPlanModels(models)).toEqual([]);
   });
 

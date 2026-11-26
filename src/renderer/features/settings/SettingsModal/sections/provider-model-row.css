@@ -16,7 +16,7 @@
 .settings-model-columns,
 .settings-model-row-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(6rem, .38fr) minmax(7.75rem, .4fr) 4rem var(--control-height-md);
+  grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.38fr) minmax(7.75rem, 0.4fr) 4rem var(--control-height-md);
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
@@ -60,9 +60,13 @@
   overflow-wrap: anywhere;
 }
 
-.settings-model-row-check.is-unverified { color: var(--token-status-warning); }
+.settings-model-row-check.is-unverified {
+  color: var(--token-status-warning);
+}
 .settings-model-row-check.is-unavailable,
-.settings-model-row-check.is-refresh-failed { color: var(--token-status-error); }
+.settings-model-row-check.is-refresh-failed {
+  color: var(--token-status-error);
+}
 
 .settings-model-row-capabilities,
 .settings-model-capability-icons,
@@ -89,17 +93,31 @@
 }
 
 @container provider-model-list (max-width: 38rem) {
-  .settings-model-columns { display: none; }
+  .settings-model-columns {
+    display: none;
+  }
 
   .settings-model-row-main {
     grid-template-columns: minmax(0, 1fr) auto auto;
-    grid-template-areas: "model enabled expand" "status capabilities capabilities";
+    grid-template-areas: 'model enabled expand' 'status capabilities capabilities';
     gap: var(--space-1) var(--space-3);
   }
 
-  .settings-model-row-identity { grid-area: model; }
-  .settings-model-row-check { grid-area: status; font-size: var(--type-meta-size); }
-  .settings-model-row-capabilities { grid-area: capabilities; justify-self: end; }
-  .settings-model-row-main > .ui-switch { grid-area: enabled; }
-  .settings-model-capability-toggle { grid-area: expand; }
+  .settings-model-row-identity {
+    grid-area: model;
+  }
+  .settings-model-row-check {
+    grid-area: status;
+    font-size: var(--type-meta-size);
+  }
+  .settings-model-row-capabilities {
+    grid-area: capabilities;
+    justify-self: end;
+  }
+  .settings-model-row-main > .ui-switch {
+    grid-area: enabled;
+  }
+  .settings-model-capability-toggle {
+    grid-area: expand;
+  }
 }

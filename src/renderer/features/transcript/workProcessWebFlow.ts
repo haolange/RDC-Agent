@@ -13,7 +13,8 @@ const readMembers = (row: WorkProcessRow | undefined): ToolRow[] | null => {
   return null;
 };
 
-const hasLead = (section: SectionRow) => section.visibleSteps.some((step) => step.type === 'thinking' || step.type === 'output');
+const hasLead = (section: SectionRow) =>
+  section.visibleSteps.some((step) => step.type === 'thinking' || step.type === 'output');
 
 /**
  * Reads that continue across model steps with nothing visible in between (no thinking, commentary or other tool)

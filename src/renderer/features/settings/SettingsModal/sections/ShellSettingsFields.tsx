@@ -47,10 +47,16 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft,
   return (
     <section className="settings-local-tool-form" data-testid="settings-agent-shell" data-settings-search="agent-shell">
       <div className="settings-local-tool-grid">
-        <SettingsField label={t('settings.shellExecutable')} htmlFor="settings-shell-executable" description={t('settings.shellHint')}
-          warning={resolved?.ok && resolved.kind === 'windows-powershell' ? (
-            <span data-testid="settings-agent-shell-upgrade">{t('settings.shellUpgradePwsh')}</span>
-          ) : undefined}>
+        <SettingsField
+          label={t('settings.shellExecutable')}
+          htmlFor="settings-shell-executable"
+          description={t('settings.shellHint')}
+          warning={
+            resolved?.ok && resolved.kind === 'windows-powershell' ? (
+              <span data-testid="settings-agent-shell-upgrade">{t('settings.shellUpgradePwsh')}</span>
+            ) : undefined
+          }
+        >
           <div className="settings-input-with-action">
             <Input
               type="text"
@@ -61,7 +67,12 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft,
               onChange={(event) => onChange({ ...draft, executable: event.target.value })}
               placeholder={shellPlaceholder(api)}
             />
-            <Button variant="secondary" size="md" onClick={() => void browse()} data-testid="settings-agent-shell-browse">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => void browse()}
+              data-testid="settings-agent-shell-browse"
+            >
               {t('settings.browse')}
             </Button>
           </div>
@@ -77,14 +88,15 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({ draft,
                 </strong>
               </>
             ) : resolved ? (
-              <InlineError data-testid="settings-agent-shell-error" detail={resolved.error}>{t('settings.shellResolveFailed')}</InlineError>
+              <InlineError data-testid="settings-agent-shell-error" detail={resolved.error}>
+                {t('settings.shellResolveFailed')}
+              </InlineError>
             ) : (
               <span className="settings-readonly-status-pending">{t('settings.shellDetecting')}</span>
             )}
           </div>
         </SettingsField>
       </div>
-
     </section>
   );
 };

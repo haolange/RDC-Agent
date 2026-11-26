@@ -18,11 +18,18 @@ const GalleryContext = createContext<GalleryControl | null>(null);
  * the answer's images the way a reader sees them.
  */
 export const MarkdownGallery: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [view, setView] = useState<{ items: ImageViewerItem[]; originals: (string | undefined)[]; index: number } | null>(null);
+  const [view, setView] = useState<{
+    items: ImageViewerItem[];
+    originals: (string | undefined)[];
+    index: number;
+  } | null>(null);
   const open = useCallback((from: HTMLElement) => {
     const body = from.closest('.markdown-body') ?? from.parentElement;
     const images = [...(body?.querySelectorAll<HTMLImageElement>('img.markdown-media-image') ?? [])];
-    const index = Math.max(0, images.findIndex((image) => from.contains(image)));
+    const index = Math.max(
+      0,
+      images.findIndex((image) => from.contains(image)),
+    );
     setView({
       items: images.map((image) => ({ src: image.src, title: image.alt })),
       originals: images.map((image) => image.dataset.original),
@@ -34,10 +41,20 @@ export const MarkdownGallery: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <GalleryContext.Provider value={control}>
       {children}
-      <ImageViewer open={Boolean(view)} items={view?.items ?? []} index={view?.index ?? 0}
+      <ImageViewer
+        open={Boolean(view)}
+        items={view?.items ?? []}
+        index={view?.index ?? 0}
         onIndexChange={(index) => setView((current) => (current ? { ...current, index } : current))}
         onClose={() => setView(null)}
-        onOpenOriginal={originals[view?.index ?? 0] ? (index) => { window.open(originals[index], '_blank', 'noopener'); } : undefined} />
+        onOpenOriginal={
+          originals[view?.index ?? 0]
+            ? (index) => {
+                window.open(originals[index], '_blank', 'noopener');
+              }
+            : undefined
+        }
+      />
     </GalleryContext.Provider>
   );
 };
@@ -60,8 +77,12 @@ export const MarkdownMedia: React.FC<{ src?: string; alt?: string }> = ({ src, a
       <span className="markdown-media-pending" data-testid="markdown-media-pending">
         <Icon name="image" size={14} />
         <span className="markdown-media-pending-label">{alt || media.host}</span>
-        <Button variant="secondary" size="sm" onClick={loadRequested}
-          data-tooltip={t('chat.markdownImageLoadHint', { host: media.host })}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={loadRequested}
+          data-tooltip={t('chat.markdownImageLoadHint', { host: media.host })}
+        >
           {t('chat.markdownImageLoad')}
         </Button>
       </span>
@@ -78,8 +99,12 @@ export const MarkdownMedia: React.FC<{ src?: string; alt?: string }> = ({ src, a
   return (
     <span className="markdown-media" role="figure" aria-label={alt || undefined}>
       <button type="button" className="markdown-media-open" onClick={(event) => gallery?.open(event.currentTarget)}>
-        <img className="markdown-media-image" src={media.url} alt={alt}
-          data-original={src?.startsWith('https://') ? src : undefined} />
+        <img
+          className="markdown-media-image"
+          src={media.url}
+          alt={alt}
+          data-original={src?.startsWith('https://') ? src : undefined}
+        />
       </button>
       {alt ? <span className="markdown-media-caption">{alt}</span> : null}
     </span>

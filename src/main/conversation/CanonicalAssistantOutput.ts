@@ -22,7 +22,8 @@ export function requireCanonicalFinalAnswer(state: CanonicalAssistantOutputState
   const finalAnswer = state.finalAnswerText.trim();
   if (!finalAnswer) {
     throw new AppError(
-      'PROVIDER_STREAM_MISSING_FINAL_ANSWER', 'provider completed without a canonical final_answer block.',
+      'PROVIDER_STREAM_MISSING_FINAL_ANSWER',
+      'provider completed without a canonical final_answer block.',
     );
   }
   return finalAnswer;

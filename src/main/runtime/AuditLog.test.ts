@@ -7,7 +7,12 @@ import { AuditLog, AuditWriteFailedError, auditArgumentsHash, runWithAuditOrigin
 const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => fs.rmSync(root, { recursive: true, force: true })));
 
-const readRecords = (filePath: string): AuditRecord[] => fs.readFileSync(filePath, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as AuditRecord);
+const readRecords = (filePath: string): AuditRecord[] =>
+  fs
+    .readFileSync(filePath, 'utf8')
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line) as AuditRecord);
 
 describe('audit log', () => {
   it('appends one record per decision, tagged with the origin that asked, across awaits', async () => {
@@ -16,10 +21,24 @@ describe('audit log', () => {
     const log = new AuditLog(path.join(root, 'state', 'audit.jsonl'));
     const argumentsSha256 = auditArgumentsHash({ command: 'git push' });
 
-    log.record({ kind: 'tool-decision', decidedBy: 'policy', approved: false, tool: 'shell', toolCallId: 'a', argumentsSha256 });
+    log.record({
+      kind: 'tool-decision',
+      decidedBy: 'policy',
+      approved: false,
+      tool: 'shell',
+      toolCallId: 'a',
+      argumentsSha256,
+    });
     await runWithAuditOrigin('browser-qa', async () => {
       await Promise.resolve();
-      log.record({ kind: 'tool-decision', decidedBy: 'user', approved: true, tool: 'shell', toolCallId: 'b', argumentsSha256 });
+      log.record({
+        kind: 'tool-decision',
+        decidedBy: 'user',
+        approved: true,
+        tool: 'shell',
+        toolCallId: 'b',
+        argumentsSha256,
+      });
     });
 
     const records = readRecords(log.filePath);
@@ -38,7 +57,8 @@ describe('audit log failure', () => {
     fs.writeFileSync(path.join(root, 'state'), 'not a directory');
     const log = new AuditLog(path.join(root, 'state', 'audit.jsonl'));
 
-    expect(() => log.record({ kind: 'ipc', channel: 'settings:patch', argumentsSha256: 'x', outcome: 'requested' }))
-      .toThrow(AuditWriteFailedError);
+    expect(() =>
+      log.record({ kind: 'ipc', channel: 'settings:patch', argumentsSha256: 'x', outcome: 'requested' }),
+    ).toThrow(AuditWriteFailedError);
   });
 });

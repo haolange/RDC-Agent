@@ -86,10 +86,19 @@ export function TaskDialog({
         <header className="task-dialog-header">
           <div className="task-dialog-heading">
             <h2 id={titleId} className="task-dialog-title">
-              {titleIcon ? <span className="task-dialog-title-with-icon">{titleIcon}{title}</span> : title}
+              {titleIcon ? (
+                <span className="task-dialog-title-with-icon">
+                  {titleIcon}
+                  {title}
+                </span>
+              ) : (
+                title
+              )}
             </h2>
             {description ? (
-              <p id={descriptionId} className="task-dialog-description">{description}</p>
+              <p id={descriptionId} className="task-dialog-description">
+                {description}
+              </p>
             ) : null}
           </div>
           {headerActions}

@@ -24,11 +24,16 @@ vi.mock('../../rdc/RdcRuntimeContextRegistry', () => ({
   setRdcRuntimeContextForSession: vi.fn(() => null),
 }));
 
-vi.mock('../../rdc/RdcSessionService', () => ({ rdcSessionService: {
-  listBindingsForProject: vi.fn(() => []),
-  snapshotOpenedCaptureForSession: vi.fn(() => null),
-  snapshotReplayForSession: vi.fn(() => ({ replayDeviceId: null, preparation: { targetDeviceId: null, phase: 'idle' } })),
-} }));
+vi.mock('../../rdc/RdcSessionService', () => ({
+  rdcSessionService: {
+    listBindingsForProject: vi.fn(() => []),
+    snapshotOpenedCaptureForSession: vi.fn(() => null),
+    snapshotReplayForSession: vi.fn(() => ({
+      replayDeviceId: null,
+      preparation: { targetDeviceId: null, phase: 'idle' },
+    })),
+  },
+}));
 
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcSessionService } from '../../rdc/RdcSessionService';
@@ -37,13 +42,30 @@ import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { toolValidator } from '../core/ToolValidator';
 import { toolToDefinition } from '../agent/AgentTool';
-import { TaskRegistry, FileTaskStore, createSessionTaskStore, registerDelegatedTaskScope, resolveSessionTasksDir } from '../tasks';
+import {
+  TaskRegistry,
+  FileTaskStore,
+  createSessionTaskStore,
+  registerDelegatedTaskScope,
+  resolveSessionTasksDir,
+} from '../tasks';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
 import { requestSnapshotStore } from '../prompt/RequestSnapshotStore';
-import { assertMissionTurnCompletion, enforceMissionTurnReadiness, MissionCompletionError } from '../../investigation/missionCompletionContract';
 import {
-  SESSION_ID, baselineWorld, createInvestigationHarness, hypothesisClaim, projectClaim,
-  sampleChallenge, sampleCheckpoint, writeDraft, writeReadyReport,
+  assertMissionTurnCompletion,
+  enforceMissionTurnReadiness,
+  MissionCompletionError,
+} from '../../investigation/missionCompletionContract';
+import {
+  SESSION_ID,
+  baselineWorld,
+  createInvestigationHarness,
+  hypothesisClaim,
+  projectClaim,
+  sampleChallenge,
+  sampleCheckpoint,
+  writeDraft,
+  writeReadyReport,
 } from '../../testing/investigationTestFixtures';
 import { isolateHome } from '../../testing/isolatedHome';
 import { createApprovedGoalContinuation } from './ApprovedGoalContinuation';
@@ -77,69 +99,176 @@ describe('RuntimeToolAssembly', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'document-method-'));
     fs.mkdirSync(path.join(root, 'references'));
     fs.writeFileSync(path.join(root, 'references', 'terms.md'), 'Term A means a bounded claim.');
-    const method: SkillLoadResult = { id: 'document-review', name: 'Document review', description: 'Compare document claims.',
-      instructions: 'Read the terminology reference before comparing claims.', sourcePath: path.join(root, 'SKILL.md'),
-      sourceHash: 'a'.repeat(64), scope: 'user', effectiveStatus: 'effective', allowedTools: ['read_file'] };
+    const method: SkillLoadResult = {
+      id: 'document-review',
+      name: 'Document review',
+      description: 'Compare document claims.',
+      instructions: 'Read the terminology reference before comparing claims.',
+      sourcePath: path.join(root, 'SKILL.md'),
+      sourceHash: 'a'.repeat(64),
+      scope: 'user',
+      effectiveStatus: 'effective',
+      allowedTools: ['read_file'],
+    };
     const load = vi.spyOn(agentRuntimeConfigService, 'loadSkill').mockReturnValue(method);
-    const catalog = vi.spyOn(agentRuntimeConfigService, 'listSkills').mockReturnValue([{ id: method.id, name: method.name,
-      label: method.name, description: method.description, source: 'user', path: method.sourcePath, enabledByDefault: true }]);
-    const preparation = { sessionId: 'document-owner', turnId: 'document-turn', runtimeFingerprint: 'b'.repeat(24),
-      skills: [], inputArtifacts: [], selectedTurnCount: 0, requestsDomainCapability: false };
+    const catalog = vi.spyOn(agentRuntimeConfigService, 'listSkills').mockReturnValue([
+      {
+        id: method.id,
+        name: method.name,
+        label: method.name,
+        description: method.description,
+        source: 'user',
+        path: method.sourcePath,
+        enabledByDefault: true,
+      },
+    ]);
+    const preparation = {
+      sessionId: 'document-owner',
+      turnId: 'document-turn',
+      runtimeFingerprint: 'b'.repeat(24),
+      skills: [],
+      inputArtifacts: [],
+      selectedTurnCount: 0,
+      requestsDomainCapability: false,
+    };
     const original = JSON.stringify(preparation);
     const reads = new Set<string>();
-    const context = { workspaceRoot: root, projectRootPath: root, projectId: 'document-project', sessionId: preparation.sessionId, successfulFileReads: reads };
+    const context = {
+      workspaceRoot: root,
+      projectRootPath: root,
+      projectId: 'document-project',
+      sessionId: preparation.sessionId,
+      successfulFileReads: reads,
+    };
     try {
       const registry = new TaskRegistry(new FileTaskStore(path.join(root, 'tasks')));
-      const task = await registry.createTask('Compare the claims', { description: 'Read document-review and its terminology before use.', completionRequirements: ['comparison'] });
-      const index = await createSkillsCatalogTool('general').execute('discover', { query: 'document' }, undefined, undefined, context);
+      const task = await registry.createTask('Compare the claims', {
+        description: 'Read document-review and its terminology before use.',
+        completionRequirements: ['comparison'],
+      });
+      const index = await createSkillsCatalogTool('general').execute(
+        'discover',
+        { query: 'document' },
+        undefined,
+        undefined,
+        context,
+      );
       expect(JSON.stringify(index.content)).toContain('document-review');
       const reader = createSkillReadTool('general');
-      expect((await reader.execute('read', { skill_id: 'document-review' }, undefined, undefined, context)).isError).not.toBe(true);
-      const terms = await reader.execute('reference', { skill_id: 'document-review', reference: 'references/terms.md' }, undefined, undefined, context);
+      expect(
+        (await reader.execute('read', { skill_id: 'document-review' }, undefined, undefined, context)).isError,
+      ).not.toBe(true);
+      const terms = await reader.execute(
+        'reference',
+        { skill_id: 'document-review', reference: 'references/terms.md' },
+        undefined,
+        undefined,
+        context,
+      );
       expect(JSON.stringify(terms.content)).toContain('bounded claim');
       const execution = await registry.startExecution(task.id, { mode: 'direct', preparation });
-      await registry.settleExecution(execution.id, { expectedGeneration: execution.generation, status: 'completed',
-        result: { disposition: 'completed', summary: 'Compared using the read terminology.', outputs: { comparison: 'Term A denotes a bounded claim.' } } });
+      await registry.settleExecution(execution.id, {
+        expectedGeneration: execution.generation,
+        status: 'completed',
+        result: {
+          disposition: 'completed',
+          summary: 'Compared using the read terminology.',
+          outputs: { comparison: 'Term A denotes a bounded claim.' },
+        },
+      });
       expect((await registry.getTask(task.id))?.status).toBe('completed');
-      const constrained = await registry.createTask('Freeze comparison procedure', { executionRequirements: { mode: 'direct', requiredSkillIds: ['document-review'], independentOfTaskIds: [] } });
-      await expect(registry.startExecution(constrained.id, { mode: 'direct', preparation })).rejects.toThrow('Required methods');
+      const constrained = await registry.createTask('Freeze comparison procedure', {
+        executionRequirements: { mode: 'direct', requiredSkillIds: ['document-review'], independentOfTaskIds: [] },
+      });
+      await expect(registry.startExecution(constrained.id, { mode: 'direct', preparation })).rejects.toThrow(
+        'Required methods',
+      );
       expect(JSON.stringify(preparation)).toBe(original);
       expect(reads.size).toBe(0);
-    } finally { load.mockRestore(); catalog.mockRestore(); await rm(root, { recursive: true, force: true }); }
-  });
-  it.each(['debugger', 'analyzer', 'optimizer'] as const)('lets %s read its operation knowledge without execution or workspace edit rights', async (mission) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-planning-knowledge-'));
-    const restoreHome = isolateHome(path.join(root, 'home'));
-    const reads = new Set<string>();
-    const context = { workspaceRoot: root, projectRootPath: root, projectId: 'p', sessionId: 's', successfulFileReads: reads };
-    try {
-      const index = await createSkillsCatalogTool(mission).execute('discover', { query: 'rdc' }, undefined, undefined, context);
-      expect(index.content).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'text', text: expect.stringContaining(`${mission}-rdc-tools`) })]));
-      const tool = createSkillReadTool(mission);
-      const shared = await tool.execute('shared', { skill_id: 'rdc-tool-shell' }, undefined, undefined, context);
-      expect(shared.isError).not.toBe(true);
-      const page = await tool.execute('method', { skill_id: `${mission}-rdc-tools`, reference: 'references/tools.md', offset: 1, limit: 30 }, undefined, undefined, context);
-      const source = path.join(process.cwd(), 'resources/agent-runtime/skills', `${mission}-rdc-tools`, 'references/tools.md');
-      expect(page.isError).not.toBe(true);
-      expect(page.details).toMatchObject({ skillId: `${mission}-rdc-tools`, scope: 'builtin', reference: {
-        sha256: createHash('sha256').update(fs.readFileSync(source)).digest('hex'), truncated: true,
-      } });
-      const other = mission === 'debugger' ? 'optimizer' : 'debugger';
-      const hidden = await tool.execute('other-specialty', { skill_id: `${other}-rdc-tools`, reference: 'references/tools.md' }, undefined, undefined, context);
-      expect(hidden.isError).toBe(true);
-      expect(reads.size).toBe(0);
-      const profile = resolveAgentToolAllowlistFromDefinition(mission, ['read', 'search', 'skill', 'shell', 'interpreter', 'write'], 'read-only');
-      for (const declarations of [[], ['*'], ['shell', 'write_file', 'code_interpreter']]) {
-        const effective = combineActiveSkillAllowlists(profile, [declarations]) ?? profile;
-        for (const forbidden of ['shell', 'write_file', 'edit_file', 'code_interpreter']) {
-          expect(isToolAllowedByFrozenAllowlist(forbidden, mission, effective)).toBe(false);
-        }
-      }
     } finally {
-      restoreHome();
+      load.mockRestore();
+      catalog.mockRestore();
       await rm(root, { recursive: true, force: true });
     }
   });
+  it.each(['debugger', 'analyzer', 'optimizer'] as const)(
+    'lets %s read its operation knowledge without execution or workspace edit rights',
+    async (mission) => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-planning-knowledge-'));
+      const restoreHome = isolateHome(path.join(root, 'home'));
+      const reads = new Set<string>();
+      const context = {
+        workspaceRoot: root,
+        projectRootPath: root,
+        projectId: 'p',
+        sessionId: 's',
+        successfulFileReads: reads,
+      };
+      try {
+        const index = await createSkillsCatalogTool(mission).execute(
+          'discover',
+          { query: 'rdc' },
+          undefined,
+          undefined,
+          context,
+        );
+        expect(index.content).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ type: 'text', text: expect.stringContaining(`${mission}-rdc-tools`) }),
+          ]),
+        );
+        const tool = createSkillReadTool(mission);
+        const shared = await tool.execute('shared', { skill_id: 'rdc-tool-shell' }, undefined, undefined, context);
+        expect(shared.isError).not.toBe(true);
+        const page = await tool.execute(
+          'method',
+          { skill_id: `${mission}-rdc-tools`, reference: 'references/tools.md', offset: 1, limit: 30 },
+          undefined,
+          undefined,
+          context,
+        );
+        const source = path.join(
+          process.cwd(),
+          'resources/agent-runtime/skills',
+          `${mission}-rdc-tools`,
+          'references/tools.md',
+        );
+        expect(page.isError).not.toBe(true);
+        expect(page.details).toMatchObject({
+          skillId: `${mission}-rdc-tools`,
+          scope: 'builtin',
+          reference: {
+            sha256: createHash('sha256').update(fs.readFileSync(source)).digest('hex'),
+            truncated: true,
+          },
+        });
+        const other = mission === 'debugger' ? 'optimizer' : 'debugger';
+        const hidden = await tool.execute(
+          'other-specialty',
+          { skill_id: `${other}-rdc-tools`, reference: 'references/tools.md' },
+          undefined,
+          undefined,
+          context,
+        );
+        expect(hidden.isError).toBe(true);
+        expect(reads.size).toBe(0);
+        const profile = resolveAgentToolAllowlistFromDefinition(
+          mission,
+          ['read', 'search', 'skill', 'shell', 'interpreter', 'write'],
+          'read-only',
+        );
+        for (const declarations of [[], ['*'], ['shell', 'write_file', 'code_interpreter']]) {
+          const effective = combineActiveSkillAllowlists(profile, [declarations]) ?? profile;
+          for (const forbidden of ['shell', 'write_file', 'edit_file', 'code_interpreter']) {
+            expect(isToolAllowedByFrozenAllowlist(forbidden, mission, effective)).toBe(false);
+          }
+        }
+      } finally {
+        restoreHome();
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it('reads a selected effective Skill reference in bounded windows without granting workspace edits', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-skill-reference-'));
@@ -149,21 +278,55 @@ describe('RuntimeToolAssembly', () => {
     fs.writeFileSync(path.join(root, 'references', 'tools.md'), bytes);
     fs.writeFileSync(source, '# fixture');
     const load = vi.spyOn(agentRuntimeConfigService, 'loadSkill').mockReturnValue({
-      id: 'fixture', name: 'fixture', description: '', instructions: '# fixture', sourcePath: source,
-      sourceHash: 'skill-source', scope: 'project', effectiveStatus: 'effective', allowedTools: [],
+      id: 'fixture',
+      name: 'fixture',
+      description: '',
+      instructions: '# fixture',
+      sourcePath: source,
+      sourceHash: 'skill-source',
+      scope: 'project',
+      effectiveStatus: 'effective',
+      allowedTools: [],
     } as SkillLoadResult);
     const reads = new Set<string>();
-    const context = { workspaceRoot: path.join(root, 'workspace'), projectRootPath: '/project', projectId: 'p', sessionId: 's', successfulFileReads: reads };
+    const context = {
+      workspaceRoot: path.join(root, 'workspace'),
+      projectRootPath: '/project',
+      projectId: 'p',
+      sessionId: 's',
+      successfulFileReads: reads,
+    };
     try {
       const tool = createSkillReadTool('general');
-      const args = toolValidator.validate(toolToDefinition(tool), { skill_id: 'fixture', reference: 'references/tools.md', offset: 2, limit: 1 });
+      const args = toolValidator.validate(toolToDefinition(tool), {
+        skill_id: 'fixture',
+        reference: 'references/tools.md',
+        offset: 2,
+        limit: 1,
+      });
       const page = await tool.execute('reference', args, undefined, undefined, context);
       expect(page.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('2→second') });
-      expect(page.details).toMatchObject({ skillId: 'fixture', sourcePath: source, reference: {
-        path: path.join(root, 'references', 'tools.md'), sha256: createHash('sha256').update(bytes).digest('hex'), offset: 2, totalLines: 3, truncated: true,
-      } });
-      const end = await tool.execute('reference-end', { skill_id: 'fixture', reference: 'references/tools.md', offset: 3, limit: 1 }, undefined, undefined, context);
-      expect(end.details).toMatchObject({ reference: { truncated: false, sha256: createHash('sha256').update(bytes).digest('hex') } });
+      expect(page.details).toMatchObject({
+        skillId: 'fixture',
+        sourcePath: source,
+        reference: {
+          path: path.join(root, 'references', 'tools.md'),
+          sha256: createHash('sha256').update(bytes).digest('hex'),
+          offset: 2,
+          totalLines: 3,
+          truncated: true,
+        },
+      });
+      const end = await tool.execute(
+        'reference-end',
+        { skill_id: 'fixture', reference: 'references/tools.md', offset: 3, limit: 1 },
+        undefined,
+        undefined,
+        context,
+      );
+      expect(end.details).toMatchObject({
+        reference: { truncated: false, sha256: createHash('sha256').update(bytes).digest('hex') },
+      });
       expect(reads.size).toBe(0);
       expect(load).toHaveBeenCalledWith('fixture', '/project', 'general');
     } finally {
@@ -180,21 +343,46 @@ describe('RuntimeToolAssembly', () => {
     fs.writeFileSync(path.join(root, 'references', 'binary.md'), Buffer.from([0, 1, 2]));
     fs.symlinkSync(path.join(root, 'outside'), path.join(root, 'references', 'escape'), 'junction');
     const load = vi.spyOn(agentRuntimeConfigService, 'loadSkill').mockReturnValue({
-      id: 'fixture', name: 'fixture', description: '', instructions: '# fixture', sourcePath: path.join(root, 'SKILL.md'),
-      sourceHash: 'skill-source', scope: 'builtin', effectiveStatus: 'effective', allowedTools: [],
+      id: 'fixture',
+      name: 'fixture',
+      description: '',
+      instructions: '# fixture',
+      sourcePath: path.join(root, 'SKILL.md'),
+      sourceHash: 'skill-source',
+      scope: 'builtin',
+      effectiveStatus: 'effective',
+      allowedTools: [],
     } as SkillLoadResult);
     try {
       const tool = createSkillReadTool('general');
-      for (const reference of ['../outside/secret.md', 'references/../outside/secret.md', path.join(root, 'outside', 'secret.md'), 'scripts/run.py', 'references/secret.md:stream']) {
-        await expect(tool.execute('denied', { skill_id: 'fixture', reference })).rejects.toThrow('SKILL_REFERENCE_PATH_DENIED');
+      for (const reference of [
+        '../outside/secret.md',
+        'references/../outside/secret.md',
+        path.join(root, 'outside', 'secret.md'),
+        'scripts/run.py',
+        'references/secret.md:stream',
+      ]) {
+        await expect(tool.execute('denied', { skill_id: 'fixture', reference })).rejects.toThrow(
+          'SKILL_REFERENCE_PATH_DENIED',
+        );
       }
-      await expect(tool.execute('binary', { skill_id: 'fixture', reference: 'references/binary.md' })).rejects.toThrow(/binary/iu);
-      await expect(tool.execute('symlink', { skill_id: 'fixture', reference: 'references/escape/secret.md' })).rejects.toThrow('SYMLINK_PATH_REJECTED');
-      await expect(tool.execute('missing', { skill_id: 'fixture', reference: 'references/missing.md' })).rejects.toThrow('ENOENT');
-      await expect(tool.execute('window-without-reference', { skill_id: 'fixture', offset: 1 })).rejects.toThrow('SKILL_REFERENCE_REQUIRED');
+      await expect(tool.execute('binary', { skill_id: 'fixture', reference: 'references/binary.md' })).rejects.toThrow(
+        /binary/iu,
+      );
+      await expect(
+        tool.execute('symlink', { skill_id: 'fixture', reference: 'references/escape/secret.md' }),
+      ).rejects.toThrow('SYMLINK_PATH_REJECTED');
+      await expect(
+        tool.execute('missing', { skill_id: 'fixture', reference: 'references/missing.md' }),
+      ).rejects.toThrow('ENOENT');
+      await expect(tool.execute('window-without-reference', { skill_id: 'fixture', offset: 1 })).rejects.toThrow(
+        'SKILL_REFERENCE_REQUIRED',
+      );
       const abort = new AbortController();
       abort.abort();
-      await expect(tool.execute('cancelled', { skill_id: 'fixture', reference: 'references/binary.md' }, abort.signal)).rejects.toThrow('Aborted');
+      await expect(
+        tool.execute('cancelled', { skill_id: 'fixture', reference: 'references/binary.md' }, abort.signal),
+      ).rejects.toThrow('Aborted');
       const body = await tool.execute('body', { skill_id: 'fixture' });
       expect(body.content).toEqual([{ type: 'text', text: '# fixture' }]);
       load.mockReturnValue(null);
@@ -208,55 +396,76 @@ describe('RuntimeToolAssembly', () => {
     }
   });
 
-  it.each([
-    { intersection: ['artifact_read', 'tool_search'] },
-    { intersection: null },
-    { intersection: [] },
-  ])('keeps executor discovery on the frozen Skill intersection $intersection', async ({ intersection }) => {
-    const assembly = createAssembly();
-    let resolved: ResolvedRuntimeTools | undefined;
-    const factory = new ToolExecutorFactory({
-      slots: { getSlot: () => undefined } as never,
-      deferredActivation: {} as never,
-      activeTurns: { getActiveTurn: () => null },
-      tools: { resolveRuntimeTools: (...args) => {
-        resolved = assembly.resolveRuntimeTools(...args);
-        return resolved;
-      } },
-      toolPolicy: { isAllowedForRuntime: (...args) => assembly.isAllowedForRuntime(...args), matchesToolAllowlist: (...args) => assembly.matchesToolAllowlist(...args) },
-    });
-    factory.createToolExecutor('general', ['read_file'], 'session-skill-discovery', {
-      effectivePlan: { toolAllowlist: ['*'], skillIntersection: intersection } as never,
-    });
-    const search = resolved!.toolMap.get('tool_search');
-    if (intersection?.length === 0) {
-      expect(search).toBeUndefined();
-      expect(resolved!.toolMap.size).toBe(0);
-      return;
-    }
-    const denied = await search!.execute('search-file', { query: 'read_file', limit: 1 });
-    const allowed = await search!.execute('search-artifact', { query: 'artifact_read', limit: 1 });
-    if (intersection) expect(denied.details).toMatchObject({ total: 0, matches: [] });
-    else expect(denied.details).toMatchObject({ matches: [{ name: 'read_file' }] });
-    expect(allowed.details).toMatchObject({ matches: [{ name: 'artifact_read' }] });
-    expect(resolved!.toolMap.has('read_file')).toBe(intersection === null);
-  }, 15_000);
+  it.each([{ intersection: ['artifact_read', 'tool_search'] }, { intersection: null }, { intersection: [] }])(
+    'keeps executor discovery on the frozen Skill intersection $intersection',
+    async ({ intersection }) => {
+      const assembly = createAssembly();
+      let resolved: ResolvedRuntimeTools | undefined;
+      const factory = new ToolExecutorFactory({
+        slots: { getSlot: () => undefined } as never,
+        deferredActivation: {} as never,
+        activeTurns: { getActiveTurn: () => null },
+        tools: {
+          resolveRuntimeTools: (...args) => {
+            resolved = assembly.resolveRuntimeTools(...args);
+            return resolved;
+          },
+        },
+        toolPolicy: {
+          isAllowedForRuntime: (...args) => assembly.isAllowedForRuntime(...args),
+          matchesToolAllowlist: (...args) => assembly.matchesToolAllowlist(...args),
+        },
+      });
+      factory.createToolExecutor('general', ['read_file'], 'session-skill-discovery', {
+        effectivePlan: { toolAllowlist: ['*'], skillIntersection: intersection } as never,
+      });
+      const search = resolved!.toolMap.get('tool_search');
+      if (intersection?.length === 0) {
+        expect(search).toBeUndefined();
+        expect(resolved!.toolMap.size).toBe(0);
+        return;
+      }
+      const denied = await search!.execute('search-file', { query: 'read_file', limit: 1 });
+      const allowed = await search!.execute('search-artifact', { query: 'artifact_read', limit: 1 });
+      if (intersection) expect(denied.details).toMatchObject({ total: 0, matches: [] });
+      else expect(denied.details).toMatchObject({ matches: [{ name: 'read_file' }] });
+      expect(allowed.details).toMatchObject({ matches: [{ name: 'artifact_read' }] });
+      expect(resolved!.toolMap.has('read_file')).toBe(intersection === null);
+    },
+    15_000,
+  );
 
   it('compiles every built-in tool when the tool set is assembled and fails on a keyword the validator cannot enforce', () => {
     const resolved = createAssembly().resolveRuntimeTools('general', ['*'], 'schema-session');
     expect(resolved.toolMap.size).toBeGreaterThan(20);
-    const unsupported = { name: 'format_probe', description: 'probe', parameters: { type: 'object', properties: { url: { type: 'string', format: 'uri' } } },
-      spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
-      execute: async () => ({ content: [] }) } as unknown as AgentTool;
+    const unsupported = {
+      name: 'format_probe',
+      description: 'probe',
+      parameters: { type: 'object', properties: { url: { type: 'string', format: 'uri' } } },
+      spec: {
+        isReadOnly: true,
+        concurrency: 'shared',
+        isDestructive: false,
+        sideEffect: 'none',
+        category: 'system',
+        requiresApproval: false,
+      },
+      execute: async () => ({ content: [] }),
+    } as unknown as AgentTool;
     const assembly = new RuntimeToolAssembly({
-      mcp: { getConnectedTools: () => [], getAgentTools: () => [], getMcpServerStatusSummary: () => [] } as unknown as McpConnectionCoordinator,
+      mcp: {
+        getConnectedTools: () => [],
+        getAgentTools: () => [],
+        getMcpServerStatusSummary: () => [],
+      } as unknown as McpConnectionCoordinator,
       memory: { memoryStore: () => ({}) as never },
       activeTurns: { getActiveTurn: () => null },
       subagentTools: { createSubagentTools: () => [unsupported] },
     });
     // The tool is not even allowed for this turn: a built-in definition the validator cannot enforce fails the assembly.
-    expect(() => assembly.resolveRuntimeTools('general', ['read_file'], 'schema-session'))
-      .toThrow(/\[format_probe\] parameters\.properties\.url: 不支持的 schema 关键字 "format"/);
+    expect(() => assembly.resolveRuntimeTools('general', ['read_file'], 'schema-session')).toThrow(
+      /\[format_probe\] parameters\.properties\.url: 不支持的 schema 关键字 "format"/,
+    );
   });
 
   it('validates structured completion through the actual executor schema boundary', async () => {
@@ -264,26 +473,57 @@ describe('RuntimeToolAssembly', () => {
     const tool = createTurnCompletionTool(turn);
     const args = {
       disposition: 'completed',
-      result: { summary: 'Verified', outputs: { analysis: 'Scoped evidence' }, counterevidence: [], unresolved: [], scope: 'fixture', sideEffects: [], recoveryState: [] },
+      result: {
+        summary: 'Verified',
+        outputs: { analysis: 'Scoped evidence' },
+        counterevidence: [],
+        unresolved: [],
+        scope: 'fixture',
+        sideEffects: [],
+        recoveryState: [],
+      },
     };
     const validated = toolValidator.validate(toolToDefinition(tool), args);
     await tool.execute('completion', validated);
     expect(turn.completionDeclaration).toMatchObject(args);
-    await expect(tool.execute('invalid-output', toolValidator.validate(toolToDefinition(tool), {
-      ...args, result: { ...args.result, outputs: { analysis: { unauthorized: true } } },
-    }))).rejects.toThrow('result.outputs values must be strings');
-    expect(() => toolValidator.validate(toolToDefinition(tool), {
-      ...args, result: { ...args.result, authority: 'expanded' },
-    })).toThrow('未声明字段');
+    await expect(
+      tool.execute(
+        'invalid-output',
+        toolValidator.validate(toolToDefinition(tool), {
+          ...args,
+          result: { ...args.result, outputs: { analysis: { unauthorized: true } } },
+        }),
+      ),
+    ).rejects.toThrow('result.outputs values must be strings');
+    expect(() =>
+      toolValidator.validate(toolToDefinition(tool), {
+        ...args,
+        result: { ...args.result, authority: 'expanded' },
+      }),
+    ).toThrow('未声明字段');
   });
 
   it('returns the review of a recorded partial declaration in the same tool result', async () => {
     const review = vi.fn(async () => '# Approved Goal Reassessment\nOne approved check remains.');
     const turn = { completionDeclaration: undefined, reviewCompletionDeclaration: review } as unknown as TurnHandle;
     const tool = createTurnCompletionTool(turn);
-    const result = await tool.execute('partial', toolValidator.validate(toolToDefinition(tool), { disposition: 'partial',
-      result: { summary: 'Half done', outputs: {}, counterevidence: [], scope: 'fixture', sideEffects: [], recoveryState: [],
-        unresolved: [{ gap: 'Second check', attempted: 'First check only.', blocker: 'external', resumeWhen: 'Input arrives.' }] } }));
+    const result = await tool.execute(
+      'partial',
+      toolValidator.validate(toolToDefinition(tool), {
+        disposition: 'partial',
+        result: {
+          summary: 'Half done',
+          outputs: {},
+          counterevidence: [],
+          scope: 'fixture',
+          sideEffects: [],
+          recoveryState: [],
+          unresolved: [
+            { gap: 'Second check', attempted: 'First check only.', blocker: 'external', resumeWhen: 'Input arrives.' },
+          ],
+        },
+      }),
+    );
     expect(turn.completionDeclaration?.disposition).toBe('partial');
     expect(review).toHaveBeenCalledWith(turn.completionDeclaration);
     expect(JSON.stringify(result.content)).toContain('Turn completion recorded: partial.');
@@ -292,7 +532,7 @@ describe('RuntimeToolAssembly', () => {
 
   it('returns domain rejection before recording completion so the model can correct its declaration', async () => {
     const turn = { completionDeclaration: undefined } as unknown as TurnHandle;
-    const tool = createTurnCompletionTool(turn, async value => {
+    const tool = createTurnCompletionTool(turn, async (value) => {
       await Promise.resolve();
       if (value.disposition === 'completed') throw new Error('REPORT_REQUIRED');
     });
@@ -309,7 +549,9 @@ describe('RuntimeToolAssembly', () => {
     });
     turn.validateCompletionReadiness = validate;
     const tool = createAssembly().resolveRuntimeTools('general', ['*'], undefined, turn).toolMap.get('turn_complete')!;
-    await expect(tool.execute('premature', { disposition: 'completed' })).rejects.toThrow('MISSION_COMPLETION_DENIED: checkpoint missing');
+    await expect(tool.execute('premature', { disposition: 'completed' })).rejects.toThrow(
+      'MISSION_COMPLETION_DENIED: checkpoint missing',
+    );
     expect(turn.completionDeclaration).toBeNull();
     await tool.execute('partial', { disposition: 'partial' });
     expect(turn.completionDeclaration?.disposition).toBe('partial');
@@ -320,34 +562,82 @@ describe('RuntimeToolAssembly', () => {
     const { service, sessionPath } = createInvestigationHarness();
     try {
       writeDraft(service, 'world_state', baselineWorld('ws-baseline'), { mission: 'debugger' });
-      writeDraft(service, 'checkpoint', sampleCheckpoint({ currentWorldStateId: 'ws-baseline' }), { mission: 'debugger' });
-      const source = writeDraft(service, 'claim', hypothesisClaim('ws-baseline', 'claim-assembly'), { mission: 'debugger' });
-      const report = writeReadyReport(service, { mission: 'debugger', source,
-        claims: [projectClaim(source.record as never, 'claim-assembly-projected')] });
-      const challenge = writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'challenge-assembly', targetId: 'claim-assembly' }));
-      const turn = new TurnHandle({ sessionKey: SESSION_ID, turnId: 'turn-assembly', generation: 1 });
-      turn.validateCompletionReadiness = declaration => enforceMissionTurnReadiness({
-        profileId: 'general', completionContract: 'investigation-report', investigationMission: 'debugger',
-        sessionId: SESSION_ID, disposition: declaration.disposition, evidenceRefs: declaration.evidenceRefs, service,
+      writeDraft(service, 'checkpoint', sampleCheckpoint({ currentWorldStateId: 'ws-baseline' }), {
+        mission: 'debugger',
       });
-      const tool = createAssembly().resolveRuntimeTools('general', ['*'], undefined, turn).toolMap.get('turn_complete')!;
-      await expect(tool.execute('premature', { disposition: 'completed',
-        evidenceRefs: [{ uri: report.contentUri, hash: report.contentHash }] })).rejects.toThrow('challenge-assembly');
+      const source = writeDraft(service, 'claim', hypothesisClaim('ws-baseline', 'claim-assembly'), {
+        mission: 'debugger',
+      });
+      const report = writeReadyReport(service, {
+        mission: 'debugger',
+        source,
+        claims: [projectClaim(source.record as never, 'claim-assembly-projected')],
+      });
+      const challenge = writeDraft(
+        service,
+        'challenge',
+        sampleChallenge({ challengeId: 'challenge-assembly', targetId: 'claim-assembly' }),
+      );
+      const turn = new TurnHandle({ sessionKey: SESSION_ID, turnId: 'turn-assembly', generation: 1 });
+      turn.validateCompletionReadiness = (declaration) =>
+        enforceMissionTurnReadiness({
+          profileId: 'general',
+          completionContract: 'investigation-report',
+          investigationMission: 'debugger',
+          sessionId: SESSION_ID,
+          disposition: declaration.disposition,
+          evidenceRefs: declaration.evidenceRefs,
+          service,
+        });
+      const tool = createAssembly()
+        .resolveRuntimeTools('general', ['*'], undefined, turn)
+        .toolMap.get('turn_complete')!;
+      await expect(
+        tool.execute('premature', {
+          disposition: 'completed',
+          evidenceRefs: [{ uri: report.contentUri, hash: report.contentHash }],
+        }),
+      ).rejects.toThrow('challenge-assembly');
       expect(turn.completionDeclaration).toBeNull();
       await tool.execute('partial', { disposition: 'partial' });
       expect(turn.completionDeclaration?.disposition).toBe('partial');
-      writeDraft(service, 'challenge', sampleChallenge({ challengeId: 'challenge-assembly', targetId: 'claim-assembly',
-        status: 'resolved', resolutionClaimId: 'claim-assembly' }), { supersedes: challenge.manifest.artifactId });
-      await tool.execute('completed', { disposition: 'completed', evidenceRefs: [{ uri: report.contentUri, hash: report.contentHash }] });
-      expect(assertMissionTurnCompletion({ profileId: 'general', completionContract: 'investigation-report',
-        investigationMission: 'debugger', sessionId: SESSION_ID, finalAnswerText: 'See the report.',
-        evidenceRefs: turn.completionDeclaration?.evidenceRefs, service }).reportArtifactId).toBe(report.manifest.artifactId);
+      writeDraft(
+        service,
+        'challenge',
+        sampleChallenge({
+          challengeId: 'challenge-assembly',
+          targetId: 'claim-assembly',
+          status: 'resolved',
+          resolutionClaimId: 'claim-assembly',
+        }),
+        { supersedes: challenge.manifest.artifactId },
+      );
+      await tool.execute('completed', {
+        disposition: 'completed',
+        evidenceRefs: [{ uri: report.contentUri, hash: report.contentHash }],
+      });
+      expect(
+        assertMissionTurnCompletion({
+          profileId: 'general',
+          completionContract: 'investigation-report',
+          investigationMission: 'debugger',
+          sessionId: SESSION_ID,
+          finalAnswerText: 'See the report.',
+          evidenceRefs: turn.completionDeclaration?.evidenceRefs,
+          service,
+        }).reportArtifactId,
+      ).toBe(report.manifest.artifactId);
     } finally {
       const tempRoot = fs.realpathSync(os.tmpdir());
       const realSessionPath = fs.realpathSync(sessionPath);
       const relativeSessionPath = path.relative(tempRoot, realSessionPath);
-      if (!relativeSessionPath || relativeSessionPath.startsWith('..') || path.isAbsolute(relativeSessionPath)
-        || fs.lstatSync(sessionPath).isSymbolicLink()) throw new Error('Unexpected investigation fixture path');
+      if (
+        !relativeSessionPath ||
+        relativeSessionPath.startsWith('..') ||
+        path.isAbsolute(relativeSessionPath) ||
+        fs.lstatSync(sessionPath).isSymbolicLink()
+      )
+        throw new Error('Unexpected investigation fixture path');
       await rm(sessionPath, { recursive: true, force: true });
     }
   });
@@ -359,15 +649,19 @@ describe('RuntimeToolAssembly', () => {
     try {
       const task = await registry.createTask('Verify the result');
       const execution = await registry.startExecution(task.id, {
-        mode: 'direct', frozenPlanRef: `turn:${turn.turnId}:generation:${turn.generation}`,
+        mode: 'direct',
+        frozenPlanRef: `turn:${turn.turnId}:generation:${turn.generation}`,
       });
-      const tool = createAssembly().resolveRuntimeTools('general', ['*'], sessionId, turn).toolMap.get('turn_complete')!;
+      const tool = createAssembly()
+        .resolveRuntimeTools('general', ['*'], sessionId, turn)
+        .toolMap.get('turn_complete')!;
       await expect(tool.execute('premature', { disposition: 'partial' })).rejects.toThrow(
         `TASK_COMPLETION_DENIED: Settle direct Tasks before turn_complete with task_update(status=completed or blocked): ${task.id}. If useful work remains executable, keep its Task in progress and continue`,
       );
       expect(turn.completionDeclaration).toBeNull();
       await registry.settleExecution(execution.id, {
-        expectedGeneration: execution.generation, status: 'blocked',
+        expectedGeneration: execution.generation,
+        status: 'blocked',
         result: { disposition: 'blocked', summary: 'Evidence is insufficient.', outputs: {} },
       });
       await tool.execute('settled', { disposition: 'partial' });
@@ -385,11 +679,16 @@ describe('RuntimeToolAssembly', () => {
     try {
       const task = await registry.createTask('Independent work');
       const execution = await registry.startExecution(task.id, { mode: 'subagent' });
-      const tool = createAssembly().resolveRuntimeTools('general', ['*'], sessionId, turn).toolMap.get('turn_complete')!;
+      const tool = createAssembly()
+        .resolveRuntimeTools('general', ['*'], sessionId, turn)
+        .toolMap.get('turn_complete')!;
       await expect(tool.execute('premature', { disposition: 'completed' })).rejects.toThrow(execution.id);
       expect(turn.completionDeclaration).toBeNull();
-      await registry.settleExecution(execution.id, { expectedGeneration: execution.generation, status: 'completed',
-        result: { disposition: 'completed', summary: 'done', outputs: {} } });
+      await registry.settleExecution(execution.id, {
+        expectedGeneration: execution.generation,
+        status: 'completed',
+        result: { disposition: 'completed', summary: 'done', outputs: {} },
+      });
       await tool.execute('settled', { disposition: 'completed' });
       expect(turn.completionDeclaration?.disposition).toBe('completed');
     } finally {
@@ -410,8 +709,11 @@ describe('RuntimeToolAssembly', () => {
       expect(turn.completionDeclaration).toBeNull();
       turn.completionDeclaration = { disposition: 'partial', evidenceRefs: [] };
       expect(await approvedGoalContinuation.closingCheck()).toBeUndefined();
-      await registry.settleExecution(execution.id, { expectedGeneration: execution.generation, status: 'completed',
-        result: { disposition: 'completed', summary: 'done', outputs: {} } });
+      await registry.settleExecution(execution.id, {
+        expectedGeneration: execution.generation,
+        status: 'completed',
+        result: { disposition: 'completed', summary: 'done', outputs: {} },
+      });
       turn.completionDeclaration = null;
       expect(await approvedGoalContinuation.closingCheck()).toContain('turn_complete');
     } finally {
@@ -443,29 +745,52 @@ describe('RuntimeToolAssembly', () => {
     turn.requiresApprovedGoalClosure = true;
     const tool = createAssembly().resolveRuntimeTools('general', ['*'], sessionId, turn).toolMap.get('turn_complete')!;
     try {
-      const result = (unresolved: unknown[]) => ({ summary: 'Device unavailable', outputs: {}, counterevidence: [], unresolved,
-        scope: 'one capture', sideEffects: [], recoveryState: [] });
-      const offline = { gap: 'Replay and restore remain unverified.', attempted: 'Opened the capture remotely; the connection dropped.',
-        blocker: 'external', resumeWhen: 'The Android device is back online.' };
+      const result = (unresolved: unknown[]) => ({
+        summary: 'Device unavailable',
+        outputs: {},
+        counterevidence: [],
+        unresolved,
+        scope: 'one capture',
+        sideEffects: [],
+        recoveryState: [],
+      });
+      const offline = {
+        gap: 'Replay and restore remain unverified.',
+        attempted: 'Opened the capture remotely; the connection dropped.',
+        blocker: 'external',
+        resumeWhen: 'The Android device is back online.',
+      };
       await expect(tool.execute('empty', { disposition: 'partial' })).rejects.toThrow('blocker prevents the work now');
-      await expect(tool.execute('string', { disposition: 'partial', result: result(['Android device offline.']) })).rejects.toThrow('result.unresolved[0]');
-      await expect(tool.execute('no-blocker', { disposition: 'partial', result: result([{ ...offline, blocker: 'none' }]) })).rejects.toThrow('not a reason to stop');
-      await expect(tool.execute('not-required', { disposition: 'blocked', result: result([{ ...offline, blocker: 'not_required' }]) }))
-        .rejects.toThrow('blocker prevents the work now');
+      await expect(
+        tool.execute('string', { disposition: 'partial', result: result(['Android device offline.']) }),
+      ).rejects.toThrow('result.unresolved[0]');
+      await expect(
+        tool.execute('no-blocker', { disposition: 'partial', result: result([{ ...offline, blocker: 'none' }]) }),
+      ).rejects.toThrow('not a reason to stop');
+      await expect(
+        tool.execute('not-required', {
+          disposition: 'blocked',
+          result: result([{ ...offline, blocker: 'not_required' }]),
+        }),
+      ).rejects.toThrow('blocker prevents the work now');
       expect(turn.completionDeclaration).toBeNull();
       const recorded = await tool.execute('qualified', { disposition: 'partial', result: result([offline]) });
       expect(turn.completionDeclaration?.disposition).toBe('partial');
       expect(turn.completionDeclaration?.result?.unresolved).toEqual([offline]);
       expect(recorded.details).toEqual({ disposition: 'partial', unresolved: [offline] });
-    } finally { await rm(resolveSessionTasksDir(sessionId), { recursive: true, force: true }); }
+    } finally {
+      await rm(resolveSessionTasksDir(sessionId), { recursive: true, force: true });
+    }
   });
 
   it('createToolSignature sorts tool names', () => {
     const assembly = createAssembly();
-    expect(assembly.createToolSignature([
-      { name: 'b', description: '', parameters: { type: 'object', properties: {} } },
-      { name: 'a', description: '', parameters: { type: 'object', properties: {} } },
-    ])).toBe('a|b');
+    expect(
+      assembly.createToolSignature([
+        { name: 'b', description: '', parameters: { type: 'object', properties: {} } },
+        { name: 'a', description: '', parameters: { type: 'object', properties: {} } },
+      ]),
+    ).toBe('a|b');
   });
 
   it('matchesToolAllowlist supports exact, star, and prefix wildcards', () => {
@@ -508,7 +833,9 @@ describe('RuntimeToolAssembly', () => {
 
   it('createRuntimeContextTool reports controlled recovery for its quarantined capture', async () => {
     vi.mocked(getRdcContextLease).mockReturnValueOnce({
-      ownerSessionId: 'sess-1', ownerProjectId: 'proj-1', quarantineReason: 'uncertain native result',
+      ownerSessionId: 'sess-1',
+      ownerProjectId: 'proj-1',
+      quarantineReason: 'uncertain native result',
     } as never);
     const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('tc-1', {});
     expect(result.details).toEqual({ available: false, requiresRecovery: true });
@@ -518,7 +845,9 @@ describe('RuntimeToolAssembly', () => {
 
   it('createRuntimeContextTool does not disclose another project’s retained lease', async () => {
     vi.mocked(getRdcContextLease).mockReturnValueOnce({
-      ownerSessionId: 'sess-1', ownerProjectId: 'other-project', quarantineReason: 'uncertain native result',
+      ownerSessionId: 'sess-1',
+      ownerProjectId: 'other-project',
+      quarantineReason: 'uncertain native result',
     } as never);
     const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('tc-1', {});
     expect(result.details).toEqual({ available: false, requiresRecovery: false });
@@ -527,17 +856,36 @@ describe('RuntimeToolAssembly', () => {
 
   it('shows the owning planner registered capture identities and selected device without paths', async () => {
     const session = vi.spyOn(sessionRecordStore, 'readSessionRecord').mockReturnValue({ projectId: 'proj-1' } as never);
-    const project = vi.spyOn(projectWorkspaceStore, 'getProjectById').mockReturnValue({ inputs: [{ inputId: 'capture-1', fileName: 'one.rdc',
-      filePath: 'D:/private/one.rdc', source: 'external_reference', contentSha256: 'a'.repeat(64) }] } as never);
-    vi.mocked(rdcSessionService.snapshotReplayForSession).mockReturnValueOnce({ replayDeviceId: null,
-      preparation: { targetDeviceId: 'android-1', phase: 'ready', issue: null } } as never);
+    const project = vi.spyOn(projectWorkspaceStore, 'getProjectById').mockReturnValue({
+      inputs: [
+        {
+          inputId: 'capture-1',
+          fileName: 'one.rdc',
+          filePath: 'D:/private/one.rdc',
+          source: 'external_reference',
+          contentSha256: 'a'.repeat(64),
+        },
+      ],
+    } as never);
+    vi.mocked(rdcSessionService.snapshotReplayForSession).mockReturnValueOnce({
+      replayDeviceId: null,
+      preparation: { targetDeviceId: 'android-1', phase: 'ready', issue: null },
+    } as never);
     try {
       const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('inventory', {});
       const body = JSON.parse((result.content[0] as { text: string }).text);
-      expect(body.capturePlanning).toEqual({ inputs: [{ inputId: 'capture-1', fileName: 'one.rdc', source: 'external_reference', contentSha256: 'a'.repeat(64) }],
-        deviceId: 'android-1', devicePreparation: 'ready' });
+      expect(body.capturePlanning).toEqual({
+        inputs: [
+          { inputId: 'capture-1', fileName: 'one.rdc', source: 'external_reference', contentSha256: 'a'.repeat(64) },
+        ],
+        deviceId: 'android-1',
+        devicePreparation: 'ready',
+      });
       expect(JSON.stringify(body)).not.toContain('D:/private');
-    } finally { session.mockRestore(); project.mockRestore(); }
+    } finally {
+      session.mockRestore();
+      project.mockRestore();
+    }
   });
 
   it('createRuntimeContextTool returns runtime context when lease exists', async () => {
@@ -550,27 +898,60 @@ describe('RuntimeToolAssembly', () => {
     expect(result.content[0]).toMatchObject({ type: 'text' });
   });
 
-  it('omits the stale open-time payload and exposes the owning turn\'s frozen restoration baseline separately', async () => {
+  it("omits the stale open-time payload and exposes the owning turn's frozen restoration baseline separately", async () => {
     vi.mocked(assertRdcContextLeaseOwnership).mockReturnValueOnce({
-      runtimeContext: { contextId: 'context', captureFileId: 'capture', replaySessionId: 'replay', raw: { active_event_id: 11 } },
+      runtimeContext: {
+        contextId: 'context',
+        captureFileId: 'capture',
+        replaySessionId: 'replay',
+        raw: { active_event_id: 11 },
+      },
     } as never);
-    const restorationBaselineFor = vi.fn(() => ({ available: true, original: { native: { eventId: 14 } },
-      receipt: { uri: 'session://tool-outputs/baseline.json', expectedHash: `sha256:${'a'.repeat(64)}` } }));
-    const context = { workspaceRoot: '/project', projectRootPath: '/project', projectId: 'proj-1', sessionId: 'sess-1',
-      turnId: 'turn-1', agentId: 'general', accessCeiling: 'full', captureControl: { restorationBaselineFor } } as never;
-    const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('context', {}, undefined, undefined, context);
+    const restorationBaselineFor = vi.fn(() => ({
+      available: true,
+      original: { native: { eventId: 14 } },
+      receipt: { uri: 'session://tool-outputs/baseline.json', expectedHash: `sha256:${'a'.repeat(64)}` },
+    }));
+    const context = {
+      workspaceRoot: '/project',
+      projectRootPath: '/project',
+      projectId: 'proj-1',
+      sessionId: 'sess-1',
+      turnId: 'turn-1',
+      agentId: 'general',
+      accessCeiling: 'full',
+      captureControl: { restorationBaselineFor },
+    } as never;
+    const result = await createRuntimeContextTool('sess-1', 'proj-1').execute(
+      'context',
+      {},
+      undefined,
+      undefined,
+      context,
+    );
     const body = JSON.parse((result.content[0] as { text: string }).text);
     expect(body.rdc).not.toHaveProperty('raw');
-    expect(body.captureRestoration).toMatchObject({ available: true, original: { native: { eventId: 14 } },
-      receipt: { uri: 'session://tool-outputs/baseline.json' } });
+    expect(body.captureRestoration).toMatchObject({
+      available: true,
+      original: { native: { eventId: 14 } },
+      receipt: { uri: 'session://tool-outputs/baseline.json' },
+    });
     expect(restorationBaselineFor).toHaveBeenCalledWith(context);
   });
 
   it('does not expose a controller baseline to an unrelated or offline tool context', async () => {
     const restorationBaselineFor = vi.fn(() => ({ available: true, original: null }));
     const tool = createRuntimeContextTool('sess-1', 'proj-1');
-    const base = { workspaceRoot: '/project', projectRootPath: '/project', projectId: 'proj-1', sessionId: 'foreign',
-      turnId: 'turn-1', agentId: 'general', accessCeiling: 'full', captureControl: { restorationBaselineFor } };
+    const base = {
+      workspaceRoot: '/project',
+      projectRootPath: '/project',
+      projectId: 'proj-1',
+      sessionId: 'foreign',
+      turnId: 'turn-1',
+      agentId: 'general',
+      accessCeiling: 'full',
+      captureControl: { restorationBaselineFor },
+    };
     for (const context of [base, { ...base, sessionId: 'sess-1', excludeRdcLeaseTools: true }]) {
       const result = await tool.execute('context', {}, undefined, undefined, context as never);
       expect(JSON.parse((result.content[0] as { text: string }).text)).not.toHaveProperty('captureRestoration');
@@ -579,76 +960,177 @@ describe('RuntimeToolAssembly', () => {
   });
 
   it('keeps a verified empty entry baseline visible to its owner when no capture is open', async () => {
-    const restorationBaselineFor = vi.fn(() => ({ available: true, original: null, receipt: { uri: 'session://tool-outputs/baseline.json' } }));
-    const context = { workspaceRoot: '/project', projectRootPath: '/project', projectId: 'proj-1', sessionId: 'sess-1',
-      turnId: 'turn-1', agentId: 'general', accessCeiling: 'full', captureControl: { restorationBaselineFor } } as never;
-    const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('context', {}, undefined, undefined, context);
+    const restorationBaselineFor = vi.fn(() => ({
+      available: true,
+      original: null,
+      receipt: { uri: 'session://tool-outputs/baseline.json' },
+    }));
+    const context = {
+      workspaceRoot: '/project',
+      projectRootPath: '/project',
+      projectId: 'proj-1',
+      sessionId: 'sess-1',
+      turnId: 'turn-1',
+      agentId: 'general',
+      accessCeiling: 'full',
+      captureControl: { restorationBaselineFor },
+    } as never;
+    const result = await createRuntimeContextTool('sess-1', 'proj-1').execute(
+      'context',
+      {},
+      undefined,
+      undefined,
+      context,
+    );
     expect(JSON.parse((result.content[0] as { text: string }).text)).toMatchObject({
-      captureRestoration: { available: true, original: null }, rdc: { available: false },
+      captureRestoration: { available: true, original: null },
+      rdc: { available: false },
     });
   });
 
   it('passes the actual execution binding to the owning host-control projection', async () => {
     vi.mocked(assertRdcContextLeaseOwnership).mockReturnValueOnce({
-      contextId: 'context', version: 4, ownerSessionId: 'sess-1', ownerProjectId: 'proj-1',
+      contextId: 'context',
+      version: 4,
+      ownerSessionId: 'sess-1',
+      ownerProjectId: 'proj-1',
       runtimeContext: { contextId: 'context', captureFileId: 'capture', replaySessionId: 'replay' },
     } as never);
     const capacity = vi.spyOn(sessionArtifactResolver, 'getQuotaCapacity').mockReturnValue({
-      usage: { diskBytes: 5, reservedBytes: 3, liveBytes: 8,
-        diskToolOutputFiles: 1, reservedToolOutputFiles: 1, liveToolOutputFiles: 2 },
+      usage: {
+        diskBytes: 5,
+        reservedBytes: 3,
+        liveBytes: 8,
+        diskToolOutputFiles: 1,
+        reservedToolOutputFiles: 1,
+        liveToolOutputFiles: 2,
+      },
       limits: { maxFileBytes: 20, maxImageBytes: 20, maxSessionBytes: 30, maxToolOutputFiles: 3 },
-      remaining: { bytes: 22, toolOutputFiles: 1 }, isReservation: false,
+      remaining: { bytes: 22, toolOutputFiles: 1 },
+      isReservation: false,
     });
     try {
       const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('controls', {}, undefined, undefined, {
-        workspaceRoot: '/project', projectRootPath: '/project', projectId: 'proj-1', sessionId: 'sess-1',
-        rdcBinding: freezeRdcTurnBinding({ enabled: true, command: 'private-command', argsPrefix: ['private-entry'],
-          workingDirectory: 'private-directory', env: { SECRET: 'private-secret' }, timeoutMs: 20000 }, [], {
-          contextId: 'context', version: 4, ownerSessionId: 'sess-1',
-        }),
+        workspaceRoot: '/project',
+        projectRootPath: '/project',
+        projectId: 'proj-1',
+        sessionId: 'sess-1',
+        rdcBinding: freezeRdcTurnBinding(
+          {
+            enabled: true,
+            command: 'private-command',
+            argsPrefix: ['private-entry'],
+            workingDirectory: 'private-directory',
+            env: { SECRET: 'private-secret' },
+            timeoutMs: 20000,
+          },
+          [],
+          {
+            contextId: 'context',
+            version: 4,
+            ownerSessionId: 'sess-1',
+          },
+        ),
       });
       const body = JSON.parse((result.content[0] as { text: string }).text);
-      expect(body.rdc.hostControls).toMatchObject({ available: true,
+      expect(body.rdc.hostControls).toMatchObject({
+        available: true,
         artifactCapacity: { remaining: { bytes: 22, toolOutputFiles: 1 }, isReservation: false },
         cliProcess: { timeoutMs: 20000, wholeOperationDeadline: false, nativeTerminationGuaranteed: false },
       });
       expect(JSON.stringify(body)).not.toContain('private-');
-    } finally { capacity.mockRestore(); }
+    } finally {
+      capacity.mockRestore();
+    }
   });
 
-  it.each([undefined, 'parent-session'])('exposes the main-owned capture byte hash for the matching lease (delegatedFrom=%s)', async (delegatedFrom) => {
-    const ownerSession = delegatedFrom ?? 'sess-1';
-    const runtimeContext = { contextId: 'ctx', captureFileId: 'cap', replaySessionId: 'replay' };
-    vi.mocked(assertRdcContextLeaseOwnership).mockReturnValueOnce({ runtimeContext, delegatedFrom } as never);
-    vi.mocked(rdcSessionService.listBindingsForProject).mockReturnValueOnce([{
-      scope: { projectId: 'proj-1', sessionId: ownerSession }, phase: 'ready', contextId: 'ctx', captureHash: 'a'.repeat(64),
-    }] as never);
-    vi.mocked(rdcSessionService.snapshotOpenedCaptureForSession).mockReturnValueOnce({ ...runtimeContext, status: 'open' } as never);
-    const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('hash', {});
-    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining(`"captureContentSha256": "${'a'.repeat(64)}"`) });
-    expect(rdcSessionService.snapshotOpenedCaptureForSession).toHaveBeenLastCalledWith({ projectId: 'proj-1', sessionId: ownerSession });
-  });
+  it.each([undefined, 'parent-session'])(
+    'exposes the main-owned capture byte hash for the matching lease (delegatedFrom=%s)',
+    async (delegatedFrom) => {
+      const ownerSession = delegatedFrom ?? 'sess-1';
+      const runtimeContext = { contextId: 'ctx', captureFileId: 'cap', replaySessionId: 'replay' };
+      vi.mocked(assertRdcContextLeaseOwnership).mockReturnValueOnce({ runtimeContext, delegatedFrom } as never);
+      vi.mocked(rdcSessionService.listBindingsForProject).mockReturnValueOnce([
+        {
+          scope: { projectId: 'proj-1', sessionId: ownerSession },
+          phase: 'ready',
+          contextId: 'ctx',
+          captureHash: 'a'.repeat(64),
+        },
+      ] as never);
+      vi.mocked(rdcSessionService.snapshotOpenedCaptureForSession).mockReturnValueOnce({
+        ...runtimeContext,
+        status: 'open',
+      } as never);
+      const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('hash', {});
+      expect(result.content[0]).toMatchObject({
+        type: 'text',
+        text: expect.stringContaining(`"captureContentSha256": "${'a'.repeat(64)}"`),
+      });
+      expect(rdcSessionService.snapshotOpenedCaptureForSession).toHaveBeenLastCalledWith({
+        projectId: 'proj-1',
+        sessionId: ownerSession,
+      });
+    },
+  );
 
-  it.each(['contextId', 'captureFileId', 'replaySessionId', 'sessionId', 'projectId', 'captureHash', 'phase', 'status'])('does not bind a stale or foreign byte hash (%s)', async (mismatch) => {
+  it.each([
+    'contextId',
+    'captureFileId',
+    'replaySessionId',
+    'sessionId',
+    'projectId',
+    'captureHash',
+    'phase',
+    'status',
+  ])('does not bind a stale or foreign byte hash (%s)', async (mismatch) => {
     const runtimeContext = { contextId: 'ctx', captureFileId: 'cap', replaySessionId: 'replay' };
     vi.mocked(assertRdcContextLeaseOwnership).mockReturnValueOnce({ runtimeContext } as never);
-    vi.mocked(rdcSessionService.listBindingsForProject).mockReturnValueOnce([{
-      scope: { projectId: mismatch === 'projectId' ? 'foreign' : 'proj-1', sessionId: mismatch === 'sessionId' ? 'foreign' : 'sess-1' },
-      phase: mismatch === 'phase' ? 'opening' : 'ready', contextId: 'ctx', captureHash: mismatch === 'captureHash' ? 'identity-digest' : 'a'.repeat(64),
-    }] as never);
+    vi.mocked(rdcSessionService.listBindingsForProject).mockReturnValueOnce([
+      {
+        scope: {
+          projectId: mismatch === 'projectId' ? 'foreign' : 'proj-1',
+          sessionId: mismatch === 'sessionId' ? 'foreign' : 'sess-1',
+        },
+        phase: mismatch === 'phase' ? 'opening' : 'ready',
+        contextId: 'ctx',
+        captureHash: mismatch === 'captureHash' ? 'identity-digest' : 'a'.repeat(64),
+      },
+    ] as never);
     vi.mocked(rdcSessionService.snapshotOpenedCaptureForSession).mockReturnValueOnce({
-      ...runtimeContext, status: mismatch === 'status' ? 'error' : 'open', ...(mismatch in runtimeContext ? { [mismatch]: 'foreign' } : {}),
+      ...runtimeContext,
+      status: mismatch === 'status' ? 'error' : 'open',
+      ...(mismatch in runtimeContext ? { [mismatch]: 'foreign' } : {}),
     } as never);
     const result = await createRuntimeContextTool('sess-1', 'proj-1').execute('hash', {});
-    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('"captureContentSha256": null') });
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('"captureContentSha256": null'),
+    });
   });
 
   it('validates plan Task obligations through the actual strict tool schema', () => {
     const tool = createAssembly().createPlanArtifactTool('sess-1');
-    const input = { title: 'Plan', summary: ['Work'], content: '## Work\nRead material.', requiredTaskIds: ['analysis'],
-      taskRevisions: [{ taskId: 'analysis', expectedRevision: 1, executionRequirements: { mode: 'subagent', requiredSkillIds: ['shader-ir-analysis'] } }] };
+    const input = {
+      title: 'Plan',
+      summary: ['Work'],
+      content: '## Work\nRead material.',
+      requiredTaskIds: ['analysis'],
+      taskRevisions: [
+        {
+          taskId: 'analysis',
+          expectedRevision: 1,
+          executionRequirements: { mode: 'subagent', requiredSkillIds: ['shader-ir-analysis'] },
+        },
+      ],
+    };
     expect(toolValidator.validate(toolToDefinition(tool), input)).toEqual(input);
-    expect(() => toolValidator.validate(toolToDefinition(tool), { ...input, taskRevisions: [{ taskId: 'analysis', expectedRevision: 0 }] })).toThrow();
+    expect(() =>
+      toolValidator.validate(toolToDefinition(tool), {
+        ...input,
+        taskRevisions: [{ taskId: 'analysis', expectedRevision: 0 }],
+      }),
+    ).toThrow();
   });
 
   it('createPlanArtifactTool is a fail-closed stub', async () => {
@@ -662,7 +1144,9 @@ describe('RuntimeToolAssembly', () => {
   it('createTaskRuntimeTools uses memory store for subagent sessions', () => {
     const assembly = createAssembly();
     const tools = assembly.createTaskRuntimeTools('parent::subagent::child');
-    expect(tools.some((tool) => tool.name.includes('task') || tool.name === 'task_create' || tool.name.length > 0)).toBe(true);
+    expect(
+      tools.some((tool) => tool.name.includes('task') || tool.name === 'task_create' || tool.name.length > 0),
+    ).toBe(true);
   });
 
   it('limits a Task-owned child session to a durable descendant subtree', async () => {
@@ -671,9 +1155,20 @@ describe('RuntimeToolAssembly', () => {
     const registry = new TaskRegistry(createSessionTaskStore(ownerSessionId));
     const root = await registry.createTask('Owned root');
     const execution = await registry.startExecution(root.id, { mode: 'subagent' });
-    const release = registerDelegatedTaskScope(childSessionId, { ownerSessionId, rootTaskId: root.id, executionId: execution.id, generation: execution.generation });
-    const usage = vi.spyOn(requestSnapshotStore, 'readUsage').mockReturnValue({ observedAt: 1, isReservation: false,
-      source: 'committed-request-snapshots', scopeId: childSessionId, committedRequests: 2, scopes: [] });
+    const release = registerDelegatedTaskScope(childSessionId, {
+      ownerSessionId,
+      rootTaskId: root.id,
+      executionId: execution.id,
+      generation: execution.generation,
+    });
+    const usage = vi.spyOn(requestSnapshotStore, 'readUsage').mockReturnValue({
+      observedAt: 1,
+      isReservation: false,
+      source: 'committed-request-snapshots',
+      scopeId: childSessionId,
+      committedRequests: 2,
+      scopes: [],
+    });
     try {
       const tools = createAssembly().createTaskRuntimeTools(childSessionId);
       const create = tools.find((tool) => tool.name === 'task_create')!;
@@ -682,13 +1177,18 @@ describe('RuntimeToolAssembly', () => {
       const childId = (created.details as { ids: string[] }).ids[0]!;
       await expect(registry.getTask(childId)).resolves.toMatchObject({ parentTaskId: root.id });
       const observed = await get.execute('read-child', { taskId: childId });
-      expect(observed.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('"committedRequests": 2') });
+      expect(observed.content[0]).toMatchObject({
+        type: 'text',
+        text: expect.stringContaining('"committedRequests": 2'),
+      });
       expect(usage).toHaveBeenCalledExactlyOnceWith(childSessionId);
       await expect(get.execute('read-root', { taskId: root.id })).rejects.toThrow(/TASK_SCOPE_DENIED/);
       expect(usage).toHaveBeenCalledTimes(1);
       const report = tools.find((tool) => tool.name === 'subagent_report')!;
       await report.execute('report', { kind: 'progress', body: 'Evidence search complete.' });
-      await expect(registry.consumeExecutionMessages(execution.id, 0, 'to_parent')).resolves.toMatchObject({ messages: [expect.objectContaining({ body: 'Evidence search complete.' })] });
+      await expect(registry.consumeExecutionMessages(execution.id, 0, 'to_parent')).resolves.toMatchObject({
+        messages: [expect.objectContaining({ body: 'Evidence search complete.' })],
+      });
     } finally {
       usage.mockRestore();
       release();

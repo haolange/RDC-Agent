@@ -16,7 +16,12 @@ import { configStatus, provenanceLabel } from './agentConfigStatus';
 import { AgentEditorPanels } from './AgentEditorPanels';
 import type { AgentSkillCatalog } from './AgentSkillPicker';
 import type { AppSettings } from '@shared/types/settings';
-import type { AgentManifestDefinition, AgentManifestDraft, AgentManifestProvenance, AgentModelOption } from '@shared/types/agentManifest';
+import type {
+  AgentManifestDefinition,
+  AgentManifestDraft,
+  AgentManifestProvenance,
+  AgentModelOption,
+} from '@shared/types/agentManifest';
 
 interface AgentManifestEditorProps {
   skills: AgentSkillCatalog;
@@ -76,21 +81,42 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             <div className="settings-agent-editor-name-row">
               <span className="settings-agent-editor-name">{selectedAgent.name}</span>
               {provenanceScope ? (
-                <Badge tone={provenanceScope === 'builtin' ? 'accent' : 'neutral'} variant="outline" data-testid="settings-agent-provenance">
+                <Badge
+                  tone={provenanceScope === 'builtin' ? 'accent' : 'neutral'}
+                  variant="outline"
+                  data-testid="settings-agent-provenance"
+                >
                   {provenanceLabel(provenanceScope, t)}
                 </Badge>
               ) : null}
             </div>
             {description ? <p className="settings-agent-editor-description">{description}</p> : null}
             {builtinUpdate ? (
-              <div className="settings-agent-editor-override" data-testid="settings-agent-override"
-                data-tone={builtinUpdate.status === 'updated' ? 'warning' : undefined}>
+              <div
+                className="settings-agent-editor-override"
+                data-testid="settings-agent-override"
+                data-tone={builtinUpdate.status === 'updated' ? 'warning' : undefined}
+              >
                 {/* The change itself is one click away: the comparison, which can also restore. */}
-                <button type="button" className="settings-agent-editor-link" onClick={onShowBuiltinDiff} data-testid="settings-agent-builtin-diff-open"
-                  data-tooltip={t('settings.agentBuiltinDiffOpen')}>
-                  {t(builtinUpdate.status === 'updated' ? 'settings.agentBuiltinUpdated' : 'settings.agentOverridesBuiltin')}
+                <button
+                  type="button"
+                  className="settings-agent-editor-link"
+                  onClick={onShowBuiltinDiff}
+                  data-testid="settings-agent-builtin-diff-open"
+                  data-tooltip={t('settings.agentBuiltinDiffOpen')}
+                >
+                  {t(
+                    builtinUpdate.status === 'updated'
+                      ? 'settings.agentBuiltinUpdated'
+                      : 'settings.agentOverridesBuiltin',
+                  )}
                 </button>
-                <button type="button" className="settings-agent-editor-link" onClick={onDeleteAgent} data-testid="settings-agent-restore">
+                <button
+                  type="button"
+                  className="settings-agent-editor-link"
+                  onClick={onDeleteAgent}
+                  data-testid="settings-agent-restore"
+                >
                   {t('settings.agentRestore')}
                 </button>
               </div>
@@ -103,16 +129,23 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           </Button>
           {/* A builtin cannot be deleted, only switched off; an override is restored from the header line. */}
           {!builtinUpdate && provenanceScope !== 'builtin' ? (
-            <Button variant="danger" size="sm" onClick={onDeleteAgent}>{t('settings.deleteAgent')}</Button>
+            <Button variant="danger" size="sm" onClick={onDeleteAgent}>
+              {t('settings.deleteAgent')}
+            </Button>
           ) : null}
-          <CopyDiagnosticsMenu testId="settings-agent-diagnostics" facts={[
-            { label: t('settings.resourceFieldId'), value: selectedAgent.id },
-            { label: t('settings.resourceScope'), value: provenanceLabel(provenanceScope, t) },
-            ...(provenance ? [
-              { label: t('settings.scopeResourceLocation'), value: provenance.sourcePath },
-              { label: t('settings.contentFingerprint'), value: provenance.sourceHash },
-            ] : []),
-          ]} />
+          <CopyDiagnosticsMenu
+            testId="settings-agent-diagnostics"
+            facts={[
+              { label: t('settings.resourceFieldId'), value: selectedAgent.id },
+              { label: t('settings.resourceScope'), value: provenanceLabel(provenanceScope, t) },
+              ...(provenance
+                ? [
+                    { label: t('settings.scopeResourceLocation'), value: provenance.sourcePath },
+                    { label: t('settings.contentFingerprint'), value: provenance.sourceHash },
+                  ]
+                : []),
+            ]}
+          />
         </div>
       </div>
 
@@ -126,31 +159,58 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
               onChange={onModelFieldChange}
               testIdPrefix="settings-agent"
             />
-            {modelError ? <InlineError detail={modelError}>{humanizeError(modelError, t, 'settings.agentModelSaveFailed')}</InlineError> : null}
+            {modelError ? (
+              <InlineError detail={modelError}>
+                {humanizeError(modelError, t, 'settings.agentModelSaveFailed')}
+              </InlineError>
+            ) : null}
             {statusProblem ? (
-              <div className="settings-agent-config-status" data-testid="settings-agent-config-status" data-tone={status.tone}
-                role="status" tabIndex={status.detail ? 0 : undefined} data-tooltip={status.detail}>
+              <div
+                className="settings-agent-config-status"
+                data-testid="settings-agent-config-status"
+                data-tone={status.tone}
+                role="status"
+                tabIndex={status.detail ? 0 : undefined}
+                data-tooltip={status.detail}
+              >
                 <span className="settings-agent-config-status-dot" aria-hidden="true" />
                 {status.label}
               </div>
             ) : null}
 
             <div className="settings-agent-flags" role="group" aria-label={t('settings.agentAvailability')}>
-              <Switch className="settings-agent-flag" label={t('settings.agentEnabled')} checked={selectedAgent.enabled}
-                onCheckedChange={(enabled) => onUpdateAgent({ enabled })} disabled={selectedAgent.id === GENERAL_AGENT_ID}
-                data-tooltip={selectedAgent.id === GENERAL_AGENT_ID ? t('settings.agentDefaultRequired') : undefined} />
-              <Switch className="settings-agent-flag" label={t('settings.userInvocable')} checked={selectedAgent.userInvocable}
-                onCheckedChange={(userInvocable) => onUpdateAgent({ userInvocable })} />
-              <Switch className="settings-agent-flag" label={t('settings.modelInvocable')} checked={!selectedAgent.disableModelInvocation}
-                onCheckedChange={(callable) => onUpdateAgent({ disableModelInvocation: !callable })} />
+              <Switch
+                className="settings-agent-flag"
+                label={t('settings.agentEnabled')}
+                checked={selectedAgent.enabled}
+                onCheckedChange={(enabled) => onUpdateAgent({ enabled })}
+                disabled={selectedAgent.id === GENERAL_AGENT_ID}
+                data-tooltip={selectedAgent.id === GENERAL_AGENT_ID ? t('settings.agentDefaultRequired') : undefined}
+              />
+              <Switch
+                className="settings-agent-flag"
+                label={t('settings.userInvocable')}
+                checked={selectedAgent.userInvocable}
+                onCheckedChange={(userInvocable) => onUpdateAgent({ userInvocable })}
+              />
+              <Switch
+                className="settings-agent-flag"
+                label={t('settings.modelInvocable')}
+                checked={!selectedAgent.disableModelInvocation}
+                onCheckedChange={(callable) => onUpdateAgent({ disableModelInvocation: !callable })}
+              />
             </div>
             <AgentContractFields agent={selectedAgent} onChange={onUpdateAgent} />
           </div>
         </SettingsSection>
 
-        <AgentEditorPanels skills={skills} settings={settings} selectedAgent={selectedAgent} onUpdateAgent={onUpdateAgent}
-          agentManifestSaveBlocked={agentManifestSaveBlocked} />
-
+        <AgentEditorPanels
+          skills={skills}
+          settings={settings}
+          selectedAgent={selectedAgent}
+          onUpdateAgent={onUpdateAgent}
+          agentManifestSaveBlocked={agentManifestSaveBlocked}
+        />
       </div>
     </div>
   );

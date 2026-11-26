@@ -15,10 +15,14 @@ describe('knowledge image paths', () => {
   });
 
   it('drops unsafe image refs from frontmatter', () => {
-    const images = sanitizeKnowledgeImages([
-      { relativePath: 'cases/AIRD-1/observed.png', role: 'observed' },
-      { relativePath: '../escape.png', role: 'reference' },
-    ], 'cases/AIRD-1.md', 'AIRD-1');
+    const images = sanitizeKnowledgeImages(
+      [
+        { relativePath: 'cases/AIRD-1/observed.png', role: 'observed' },
+        { relativePath: '../escape.png', role: 'reference' },
+      ],
+      'cases/AIRD-1.md',
+      'AIRD-1',
+    );
     expect(images).toEqual([{ relativePath: 'cases/AIRD-1/observed.png', role: 'observed' }]);
   });
 });

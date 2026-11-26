@@ -137,7 +137,6 @@
   max-width: max-content;
 }
 
-
 .color-field--inline .color-field-control {
   box-sizing: border-box;
   min-height: var(--control-height-md);
@@ -148,13 +147,11 @@
   background: var(--token-bg-shell);
 }
 
-
 .color-field--inline .color-field-swatch {
   width: var(--space-5);
   height: var(--space-5);
   box-shadow: none;
 }
-
 
 .color-field--inline .color-field-hex {
   height: var(--control-height-sm);
@@ -165,13 +162,11 @@
   font-size: var(--type-meta-size);
 }
 
-
 .color-field--inline .color-field-control:focus-within {
   border-color: var(--token-border-focus);
   outline: 2px solid var(--token-border-focus);
   outline-offset: var(--focus-ring-offset);
 }
-
 
 .color-field-label {
   color: var(--token-text-secondary);

@@ -54,7 +54,10 @@ export function createPosixProcessBackend(deps: PosixProcessDeps = defaultDeps):
       throw error;
     }
     // Fields after the parenthesised command name start at field 3 (state).
-    const fields = text.slice(text.lastIndexOf(')') + 2).trim().split(/\s+/);
+    const fields = text
+      .slice(text.lastIndexOf(')') + 2)
+      .trim()
+      .split(/\s+/);
     if (fields.length < 20) throw new AppError('PROCESS_QUERY_FAILED', `malformed stat for pid ${pid}.`);
     return { state: fields[0]!, processGroup: Number(fields[2]), startTicks: fields[19]! };
   };
@@ -87,7 +90,10 @@ export function createPosixProcessBackend(deps: PosixProcessDeps = defaultDeps):
     },
     readCommandLine(pid) {
       try {
-        const commandLine = deps.readFile(procFile(String(pid), 'cmdline')).replace(/\0/g, ' ').trim();
+        const commandLine = deps
+          .readFile(procFile(String(pid), 'cmdline'))
+          .replace(/\0/g, ' ')
+          .trim();
         return commandLine || null;
       } catch {
         return null;

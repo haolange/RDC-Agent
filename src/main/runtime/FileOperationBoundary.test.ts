@@ -22,7 +22,7 @@ function useFixtureRoots(): void {
 afterEach(() => vi.restoreAllMocks());
 
 describe('application-owned files', () => {
-  it('refuses writes that would forge history or widen the agent\'s own authority', () => {
+  it("refuses writes that would forge history or widen the agent's own authority", () => {
     useFixtureRoots();
     for (const target of [
       path.join(userData, 'state', 'audit.jsonl'),
@@ -42,6 +42,9 @@ describe('application-owned files', () => {
     useFixtureRoots();
     const artifact = path.join(userData, 'state', 'sessions', 's1', 'runs', 'r1', 'artifacts', 'texture.png');
     expect(fileOperationBoundary(artifact)).toMatchObject({ readOnly: false, protected: false });
-    expect(fileOperationBoundary(path.join(userRoot, 'policies', 'team.policy.yml'))).toMatchObject({ readOnly: false, protected: true });
+    expect(fileOperationBoundary(path.join(userRoot, 'policies', 'team.policy.yml'))).toMatchObject({
+      readOnly: false,
+      protected: true,
+    });
   });
 });

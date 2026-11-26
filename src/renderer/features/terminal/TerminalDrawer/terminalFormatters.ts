@@ -1,7 +1,6 @@
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 
-export const clamp = (value: number, min: number, max: number): number =>
-  Math.min(max, Math.max(min, value));
+export const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 export const formatTimestamp = (timestamp: number): string =>
   new Date(timestamp).toLocaleTimeString([], {
@@ -27,27 +26,34 @@ export const formatShortId = (value?: string | null): string => {
   return value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
 };
 
-export const stringifyEntryForSearch = (entry: RuntimeLogEntry): string => [
-  entry.title,
-  entry.summary,
-  entry.detail,
-  entry.namespace,
-  entry.severity,
-  entry.sessionId,
-  entry.projectId,
-  entry.runId,
-  formatRaw(entry.raw),
-].filter(Boolean).join('\n').toLowerCase();
+export const stringifyEntryForSearch = (entry: RuntimeLogEntry): string =>
+  [
+    entry.title,
+    entry.summary,
+    entry.detail,
+    entry.namespace,
+    entry.severity,
+    entry.sessionId,
+    entry.projectId,
+    entry.runId,
+    formatRaw(entry.raw),
+  ]
+    .filter(Boolean)
+    .join('\n')
+    .toLowerCase();
 
-export const buildEntryCopy = (entry: RuntimeLogEntry): string => [
-  `time: ${new Date(entry.timestamp).toISOString()}`,
-  `severity: ${entry.severity}`,
-  `source: ${entry.namespace}`,
-  `title: ${entry.title}`,
-  `summary: ${entry.summary}`,
-  entry.detail ? `detail: ${entry.detail}` : '',
-  `sessionId: ${entry.sessionId ?? ''}`,
-  `runId: ${entry.runId ?? ''}`,
-  `projectId: ${entry.projectId ?? ''}`,
-  entry.raw != null ? `raw:\n${formatRaw(entry.raw)}` : '',
-].filter(Boolean).join('\n');
+export const buildEntryCopy = (entry: RuntimeLogEntry): string =>
+  [
+    `time: ${new Date(entry.timestamp).toISOString()}`,
+    `severity: ${entry.severity}`,
+    `source: ${entry.namespace}`,
+    `title: ${entry.title}`,
+    `summary: ${entry.summary}`,
+    entry.detail ? `detail: ${entry.detail}` : '',
+    `sessionId: ${entry.sessionId ?? ''}`,
+    `runId: ${entry.runId ?? ''}`,
+    `projectId: ${entry.projectId ?? ''}`,
+    entry.raw != null ? `raw:\n${formatRaw(entry.raw)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');

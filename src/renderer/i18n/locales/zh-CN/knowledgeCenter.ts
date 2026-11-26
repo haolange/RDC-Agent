@@ -2,8 +2,10 @@ export const zhKnowledgeCenter = {
   'knowledgeCenter.title': '知识中心',
   'knowledgeCenter.topicsTitle': '主题与同义词',
   'knowledgeCenter.metaTopics': '主题',
-  'knowledgeCenter.topicsDescription': '根据用户空间的原文提出建议。勾选要分类的卡片并检查同义词；保存前会显示完整预览。',
-  'knowledgeCenter.topicsPreviewDescription': '核对主题、同义词和受影响的卡片。确认后才会应用；原始 Markdown 内容不会改写。',
+  'knowledgeCenter.topicsDescription':
+    '根据用户空间的原文提出建议。勾选要分类的卡片并检查同义词；保存前会显示完整预览。',
+  'knowledgeCenter.topicsPreviewDescription':
+    '核对主题、同义词和受影响的卡片。确认后才会应用；原始 Markdown 内容不会改写。',
   'knowledgeCenter.topicsNoSuggestions': '没有可提议的主题。可以添加一个主题。',
   'knowledgeCenter.topicsSynonyms': '同义词（逗号分隔）',
   'knowledgeCenter.topicsMergeInto': '合并到',
@@ -52,7 +54,8 @@ export const zhKnowledgeCenter = {
   'knowledgeCenter.indexRebuild': '重建索引',
   'knowledgeCenter.indexNeverBuilt': '尚未构建',
   'knowledgeCenter.indexRebuilding': '正在重建…',
-  'knowledgeCenter.indexRebuildHint': '重新扫描所有空间的卡片并重建索引。索引平时会自己跟上变化，只有搜索结果明显不对时才需要。',
+  'knowledgeCenter.indexRebuildHint':
+    '重新扫描所有空间的卡片并重建索引。索引平时会自己跟上变化，只有搜索结果明显不对时才需要。',
   'knowledgeCenter.indexRebuildFailed': '索引未能重建，搜索仍使用原来的索引。',
   'knowledgeCenter.progressReading': '正在读取来源…',
   'knowledgeCenter.progressImporting': '正在导入卡片…',
@@ -77,7 +80,8 @@ export const zhKnowledgeCenter = {
   'knowledgeCenter.exportFormat': '导出格式',
   'knowledgeCenter.exportFormatPackage': '知识包（zip，可再导入，含对照图）',
   'knowledgeCenter.exportFormatMarkdown': 'Markdown（阅读用途）',
-  'knowledgeCenter.exportLocationHint': '可再导入的知识包是一个 zip，正文和对照图在一起。不会导出凭据、provider 配置或会话数据。',
+  'knowledgeCenter.exportLocationHint':
+    '可再导入的知识包是一个 zip，正文和对照图在一起。不会导出凭据、provider 配置或会话数据。',
   'knowledgeCenter.exportRun': '导出',
   'knowledgeCenter.exportDone': '已导出 {count} 条知识。',
   'knowledgeCenter.exportExcluded': '{count} 条因缺失附件、含密钥或绝对路径被跳过。',

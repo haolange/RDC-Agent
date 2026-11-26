@@ -31,12 +31,8 @@ export const PolicySettings: React.FC<{
   onChanged: (overview: RdcRuntimeOverview) => void;
 }> = ({ overview, scope, onScopeChange, onChanged }) => {
   const { t } = useI18n();
-  const percent = useAppSettingsStore(
-    (state) => state.settings.agentRuntime.context.compactionThresholdPercent,
-  );
-  const setCompactionThresholdPercent = useAppSettingsStore(
-    (state) => state.setCompactionThresholdPercent,
-  );
+  const percent = useAppSettingsStore((state) => state.settings.agentRuntime.context.compactionThresholdPercent);
+  const setCompactionThresholdPercent = useAppSettingsStore((state) => state.setCompactionThresholdPercent);
 
   return (
     <section className="settings-page settings-page-policy" data-settings-search="policy">
@@ -49,7 +45,8 @@ export const PolicySettings: React.FC<{
         editorPresentation="dialog"
         emptyDescriptionExtra={t('settings.policyEmptyBaseline')}
       />
-      <SettingsSection variant="rows"
+      <SettingsSection
+        variant="rows"
         title={t('settings.globalRuntimeSettings')}
         description={t('settings.compactionThresholdHint')}
         data-testid="settings-agent-runtime-block"

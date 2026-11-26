@@ -17,16 +17,8 @@ import { appendRuntimePermissionContext } from '../permissions/RuntimePermission
  */
 
 import { EventStream } from '../core/EventStream';
-import {
-  AgentRecoveryAbortError,
-  ErrorRecovery,
-  type RecoveryAction,
-} from './ErrorRecovery';
-import {
-  AgentLoopTerminationError,
-  LoopProgressGuard,
-  RUNTIME_NO_PROGRESS_INSTRUCTION,
-} from './LoopProgressGuard';
+import { AgentRecoveryAbortError, ErrorRecovery, type RecoveryAction } from './ErrorRecovery';
+import { AgentLoopTerminationError, LoopProgressGuard, RUNTIME_NO_PROGRESS_INSTRUCTION } from './LoopProgressGuard';
 import { executeToolCalls } from './ToolCallDispatch';
 import { RuntimeContinuationGuard } from './RuntimeContinuation';
 import { recoveryStartMessage } from './RecoveryDiagnosticText';
@@ -97,7 +89,11 @@ export interface AgentLoopConfig {
   }) => Promise<string | undefined> | string | undefined;
   onResponse?: (requestId: string | undefined, message: AssistantMessage) => Promise<void> | void;
   resolvePermissionState?: () => RuntimePermissionState;
-  beforeRequestMessages?: () => Promise<{ messages: Message[]; mailboxDeliveries?: import('@shared/types/rdcRuntime').RequestEnvelopeSnapshot['mailboxDeliveries']; commit?: () => Promise<void> }>;
+  beforeRequestMessages?: () => Promise<{
+    messages: Message[];
+    mailboxDeliveries?: import('@shared/types/rdcRuntime').RequestEnvelopeSnapshot['mailboxDeliveries'];
+    commit?: () => Promise<void>;
+  }>;
   /** Runtime-owned incomplete obligation, or undefined when this response may end. */
   beforeTerminalResponse?: (message: AssistantMessage) => Promise<string | undefined>;
   onLoopBudget?: (remaining: number, limit: number) => void;
@@ -173,14 +169,7 @@ export function agentLoop(
   const producerCompletion = new Promise<void>((resolve) => {
     settleProducer = resolve;
   });
-  void runAgentLoop(
-    [...pendingMessages],
-    context,
-    config,
-    providerStrategy,
-    toolExecutor,
-    stream,
-  ).finally(() => {
+  void runAgentLoop([...pendingMessages], context, config, providerStrategy, toolExecutor, stream).finally(() => {
     settleProducer();
   });
   return { stream, producerCompletion };
@@ -295,21 +284,23 @@ async function runAgentLoop(
       // 5. 调用 LLM 生成助手消息（带错误恢复，内部是独立 transition 子状态机）
       const remainingTurns = maxTurns - state.turn + 1;
       config.onLoopBudget?.(remainingTurns, maxTurns);
-      const turnBudgetInstruction = remainingTurns <= 5
-        ? [
-          `<runtime_turn_budget remaining="${remainingTurns}" limit="${maxTurns}">`,
-          remainingTurns === 1
-            ? 'This is the final, text-only provider request in this turn. No tools are offered. Give the canonical final answer now, accurately marking unfinished work and unresolved evidence; do not claim structured completion unless it was already recorded.'
-            : remainingTurns === 2
-              ? 'This is the last request with tools. Settle open Tasks and call turn_complete now if a structured declaration is required; the next and final request is text-only. Preserve a truthful checkpoint and all approval, identity, experiment-restoration, and completion gates. Do not invent missing evidence.'
-              : 'The turn is near its request limit. Prioritize settling open Tasks, preserving a truthful checkpoint when available, and producing an honest final answer before the limit. Keep all approval, identity, experiment-restoration, and completion gates intact; do not invent missing evidence.',
-          '</runtime_turn_budget>',
-        ].join('\n')
-        : undefined;
+      const turnBudgetInstruction =
+        remainingTurns <= 5
+          ? [
+              `<runtime_turn_budget remaining="${remainingTurns}" limit="${maxTurns}">`,
+              remainingTurns === 1
+                ? 'This is the final, text-only provider request in this turn. No tools are offered. Give the canonical final answer now, accurately marking unfinished work and unresolved evidence; do not claim structured completion unless it was already recorded.'
+                : remainingTurns === 2
+                  ? 'This is the last request with tools. Settle open Tasks and call turn_complete now if a structured declaration is required; the next and final request is text-only. Preserve a truthful checkpoint and all approval, identity, experiment-restoration, and completion gates. Do not invent missing evidence.'
+                  : 'The turn is near its request limit. Prioritize settling open Tasks, preserving a truthful checkpoint when available, and producing an honest final answer before the limit. Keep all approval, identity, experiment-restoration, and completion gates intact; do not invent missing evidence.',
+              '</runtime_turn_budget>',
+            ].join('\n')
+          : undefined;
       // Request-local host facts ride at the end of the request so the cached prefix stays intact.
-      const ephemeralInstruction = [runtimeContinuationInstruction, runtimeNoProgressInstruction, turnBudgetInstruction]
-        .filter((instruction): instruction is string => Boolean(instruction))
-        .join('\n\n') || undefined;
+      const ephemeralInstruction =
+        [runtimeContinuationInstruction, runtimeNoProgressInstruction, turnBudgetInstruction]
+          .filter((instruction): instruction is string => Boolean(instruction))
+          .join('\n\n') || undefined;
       runtimeNoProgressInstruction = undefined;
       runtimeContinuationInstruction = undefined;
       const { message: assistantMessage } = await streamAssistantResponseWithRecovery(
@@ -333,9 +324,14 @@ async function runAgentLoop(
       // 7. 非 toolUse 停止 → terminal
       if (assistantMessage.stopReason !== 'toolUse') {
         stream.push({ type: 'turn_end', turn: state.turn, message: assistantMessage });
-        const continuation = await continuationGuard.next({ reason: assistantMessage.stopReason, isDone: stream.isDone,
-          remaining: remainingTurns, turn: state.turn, maxTurns,
-          check: config.beforeTerminalResponse ? () => config.beforeTerminalResponse!(assistantMessage) : undefined });
+        const continuation = await continuationGuard.next({
+          reason: assistantMessage.stopReason,
+          isDone: stream.isDone,
+          remaining: remainingTurns,
+          turn: state.turn,
+          maxTurns,
+          check: config.beforeTerminalResponse ? () => config.beforeTerminalResponse!(assistantMessage) : undefined,
+        });
         if (continuation) {
           runtimeContinuationInstruction = continuation;
           state = { pending: [], turn: state.turn, transition: 'next_turn' };
@@ -345,12 +341,7 @@ async function runAgentLoop(
       }
 
       // 8. 执行工具调用
-      const toolResults = await executeToolCalls(
-        assistantMessage,
-        toolExecutor,
-        stream,
-        config.maxToolConcurrency,
-      );
+      const toolResults = await executeToolCalls(assistantMessage, toolExecutor, stream, config.maxToolConcurrency);
       continuationGuard.reset();
       for (const result of toolResults.results) {
         context.messages.push(result);
@@ -363,7 +354,7 @@ async function runAgentLoop(
         toolResults: toolResults.results,
       });
 
-      if (toolResults.results.some(result => toolExecutor?.shouldEndTurnAfterToolResult?.(result))) break;
+      if (toolResults.results.some((result) => toolExecutor?.shouldEndTurnAfterToolResult?.(result))) break;
 
       const progress = progressGuard.observe(
         assistantMessage,
@@ -417,9 +408,7 @@ function emitRecoveryDiagnostic(
   attempt = 1,
 ): void {
   const code = recoveryDiagnosticCode(action);
-  const message = phase === 'completed'
-    ? '错误恢复成功，继续生成回复'
-    : recoveryStartMessage(action, attempt);
+  const message = phase === 'completed' ? '错误恢复成功，继续生成回复' : recoveryStartMessage(action, attempt);
   if (!message) {
     return;
   }
@@ -539,16 +528,13 @@ async function streamAssistantResponseWithRecovery(
           consecutiveCompactionFailures++;
           if (consecutiveCompactionFailures >= CIRCUIT_BREAKER_LIMIT) {
             throw new Error(
-              `[Circuit breaker] ${CIRCUIT_BREAKER_LIMIT} consecutive compaction attempts failed; aborting`, { cause: err },
+              `[Circuit breaker] ${CIRCUIT_BREAKER_LIMIT} consecutive compaction attempts failed; aborting`,
+              { cause: err },
             );
           }
           recovery.markReactiveCompactAttempted();
           if (config.transformContext) {
-            await applyTransformContext(
-              context.messages,
-              config,
-              stream,
-            );
+            await applyTransformContext(context.messages, config, stream);
           }
           continue;
         }
@@ -570,11 +556,7 @@ async function streamAssistantResponseWithRecovery(
   }
 }
 
-function createRecoveryAbortError(
-  original: Error,
-  reason: string,
-  recovery: ErrorRecovery,
-): AgentRecoveryAbortError {
+function createRecoveryAbortError(original: Error, reason: string, recovery: ErrorRecovery): AgentRecoveryAbortError {
   return recovery.createAbortError(original, reason);
 }
 
@@ -646,9 +628,7 @@ async function streamAssistantResponse(
   if (config.resolveMaxTokens) {
     const dynamicMaxTokens = config.resolveMaxTokens(llmMessages);
     if (dynamicMaxTokens == null || dynamicMaxTokens <= 0) {
-      throw new AppError(
-        'CONTEXT_CANNOT_FIT', 'remaining context window cannot admit any output tokens.',
-      );
+      throw new AppError('CONTEXT_CANNOT_FIT', 'remaining context window cannot admit any output tokens.');
     }
     resolvedMaxTokens = dynamicMaxTokens;
   }
@@ -659,13 +639,11 @@ async function streamAssistantResponse(
     systemPrompt: currentPrompt?.systemPrompt ?? context.systemPrompt,
     systemPromptSegments: currentPrompt?.segments ?? context.systemPromptSegments,
     messages: llmMessages,
-    tools: allowToolUse ? context.runtime?.current.activeTools ?? context.tools : [],
+    tools: allowToolUse ? (context.runtime?.current.activeTools ?? context.tools) : [],
   };
 
   // 4. 解析 API key（优先动态获取）
-  const dynamicKey = config.getApiKey
-    ? await config.getApiKey(config.model.provider)
-    : undefined;
+  const dynamicKey = config.getApiKey ? await config.getApiKey(config.model.provider) : undefined;
   const apiKey = dynamicKey ?? config.streamOptions.apiKey;
 
   // 5. 合并 stream options，传入 abort 信号
@@ -676,8 +654,14 @@ async function streamAssistantResponse(
     signal: stream.signal,
   };
 
-  if (config.resolvePermissionState) Object.assign(llmContext, appendRuntimePermissionContext(llmContext, config.resolvePermissionState()));
-  const requestId = await config.onRequest?.({ model: config.model, context: llmContext, streamOptions, mailboxDeliveries: pendingMailbox?.mailboxDeliveries });
+  if (config.resolvePermissionState)
+    Object.assign(llmContext, appendRuntimePermissionContext(llmContext, config.resolvePermissionState()));
+  const requestId = await config.onRequest?.({
+    model: config.model,
+    context: llmContext,
+    streamOptions,
+    mailboxDeliveries: pendingMailbox?.mailboxDeliveries,
+  });
   await pendingMailbox?.commit?.();
   if (pendingMailbox?.messages.length) context.messages.push(...pendingMailbox.messages);
 
@@ -768,8 +752,9 @@ async function applyTransformContext(
     return currentMessages;
   }
   let reported = false as boolean;
-  const result = await config.transformContext([...currentMessages], stream.signal, progress => {
-    reported = true; stream.push({ type: 'compaction', ...progress });
+  const result = await config.transformContext([...currentMessages], stream.signal, (progress) => {
+    reported = true;
+    stream.push({ type: 'compaction', ...progress });
   });
   if (Array.isArray(result)) {
     return result;

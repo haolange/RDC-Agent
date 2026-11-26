@@ -30,9 +30,28 @@ export interface StagedAttachmentRecord {
 
 const PREVIEW_ID_RE = /^[a-f0-9]{16,64}$/;
 const WINDOWS_RESERVED_NAMES = new Set([
-  'CON', 'PRN', 'AUX', 'NUL',
-  'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
-  'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9',
+  'CON',
+  'PRN',
+  'AUX',
+  'NUL',
+  'COM1',
+  'COM2',
+  'COM3',
+  'COM4',
+  'COM5',
+  'COM6',
+  'COM7',
+  'COM8',
+  'COM9',
+  'LPT1',
+  'LPT2',
+  'LPT3',
+  'LPT4',
+  'LPT5',
+  'LPT6',
+  'LPT7',
+  'LPT8',
+  'LPT9',
 ]);
 const MAX_STAGED_ITEMS = 64;
 const MAX_STAGED_BYTES = 256 * 1024 * 1024;
@@ -44,7 +63,8 @@ function isPathItem(item: ConversationAttachmentStageItem): item is { sourcePath
 }
 
 export function sanitizeFileName(fileName: string): string {
-  const stripped = path.basename(fileName)
+  const stripped = path
+    .basename(fileName)
     .replace(/[. ]+$/u, '')
     .split('')
     .map((character) => {
@@ -148,10 +168,7 @@ export class AttachmentStagingService {
   releaseBySessionId(sessionId: string): string[] {
     return this.release(
       [...this.records.values()]
-        .filter((record) => (
-          record.composerScopeKey === sessionId
-          || record.composerScopeKey.endsWith(`:${sessionId}`)
-        ))
+        .filter((record) => record.composerScopeKey === sessionId || record.composerScopeKey.endsWith(`:${sessionId}`))
         .map((record) => record.descriptor.stagingId),
     );
   }
@@ -165,13 +182,15 @@ export class AttachmentStagingService {
 
   getOwnedAttachment(stagingId: string, composerScopeKey: string): OwnedAttachment | undefined {
     const record = this.getByPreviewId(stagingId, composerScopeKey);
-    return record && {
-      root: path.join(this.stagingRoot(), stagingId),
-      filePath: record.bytesPath,
-      fileName: record.descriptor.fileName,
-      mimeType: record.descriptor.mimeType,
-      layer: record.descriptor.layer,
-    };
+    return (
+      record && {
+        root: path.join(this.stagingRoot(), stagingId),
+        filePath: record.bytesPath,
+        fileName: record.descriptor.fileName,
+        mimeType: record.descriptor.mimeType,
+        layer: record.descriptor.layer,
+      }
+    );
   }
 
   private sweepExpired(): void {
@@ -202,13 +221,11 @@ export class AttachmentStagingService {
     const stagingId = crypto.randomBytes(16).toString('hex');
     let fileName: string;
     try {
-      fileName = sanitizeFileName(isPathItem(item)
-        ? (item.fileName || path.basename(item.sourcePath))
-        : item.fileName);
+      fileName = sanitizeFileName(isPathItem(item) ? item.fileName || path.basename(item.sourcePath) : item.fileName);
     } catch (error) {
       return this.reject(
         stagingId,
-        isPathItem(item) ? (item.fileName || 'attachment.bin') : item.fileName,
+        isPathItem(item) ? item.fileName || 'attachment.bin' : item.fileName,
         'ATTACHMENT_INVALID',
         error instanceof Error ? error.message.replace(/^ATTACHMENT_INVALID:\s*/u, '') : 'Invalid file name.',
       );
@@ -237,7 +254,12 @@ export class AttachmentStagingService {
     }
     const classification = classifyAttachmentBytes(fileName, bytes, declaredMime);
     if (classification.rejectCode) {
-      return this.reject(stagingId, fileName, classification.rejectCode, classification.rejectMessage ?? classification.rejectCode);
+      return this.reject(
+        stagingId,
+        fileName,
+        classification.rejectCode,
+        classification.rejectMessage ?? classification.rejectCode,
+      );
     }
     const dir = path.join(this.stagingRoot(), stagingId);
     const originals = path.join(dir, 'original');
@@ -300,7 +322,10 @@ export class AttachmentStagingService {
       const sourcePath = path.resolve(item.sourcePath);
       const stats = await fs.promises.stat(sourcePath).catch(() => null);
       if (!stats?.isFile()) {
-        return { bytes: Buffer.alloc(0), error: { code: 'ATTACHMENT_NOT_FOUND', message: `${fileName} was not found.` } };
+        return {
+          bytes: Buffer.alloc(0),
+          error: { code: 'ATTACHMENT_NOT_FOUND', message: `${fileName} was not found.` },
+        };
       }
       if (stats.size > MAX_ATTACHMENT_BYTES_PER_FILE) {
         return {
@@ -327,7 +352,10 @@ export class AttachmentStagingService {
       }
       return { bytes, declaredMime: item.mimeType };
     } catch {
-      return { bytes: Buffer.alloc(0), error: { code: 'ATTACHMENT_INVALID', message: `${fileName} is not valid base64.` } };
+      return {
+        bytes: Buffer.alloc(0),
+        error: { code: 'ATTACHMENT_INVALID', message: `${fileName} is not valid base64.` },
+      };
     }
   }
 

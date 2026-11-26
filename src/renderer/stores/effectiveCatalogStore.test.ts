@@ -1,20 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { diffEffectiveCatalog } from '@shared/utils/effectiveCatalogChange';
-import { catalogScopeKey, reconcileCatalogProviders, resetCatalogProjection, useEffectiveCatalogStore } from './effectiveCatalogStore';
+import {
+  catalogScopeKey,
+  reconcileCatalogProviders,
+  resetCatalogProjection,
+  useEffectiveCatalogStore,
+} from './effectiveCatalogStore';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { LlmProviderEntry } from '@shared/types/settings';
 
 const { read, refresh } = vi.hoisted(() => ({ read: vi.fn(), refresh: vi.fn() }));
 vi.mock('../platform/getElectronApi', () => ({ getElectronApi: () => undefined }));
-vi.mock('../services/effectiveCatalogService', () => ({ readEffectiveCatalog: read, refreshEffectiveCatalog: refresh, observeEffectiveCatalog: () => () => undefined }));
+vi.mock('../services/effectiveCatalogService', () => ({
+  readEffectiveCatalog: read,
+  refreshEffectiveCatalog: refresh,
+  observeEffectiveCatalog: () => () => undefined,
+}));
 const scope = { id: 'grok-account', activeAccountId: 'a', protocol: 'OpenAIResponses' as const };
 const snapshot = (accountId = 'a', generatedAt = '2026-10-25T01:00:00Z'): EffectiveCatalogSnapshot => ({
-  scopeGeneration: 'scope-a', projectionVersion: Date.parse(generatedAt),
-  providerId: scope.id, accountId, protocol: scope.protocol, catalogRevision: 'revision',
-  models: [], generatedAt, stale: false, refreshing: false,
+  scopeGeneration: 'scope-a',
+  projectionVersion: Date.parse(generatedAt),
+  providerId: scope.id,
+  accountId,
+  protocol: scope.protocol,
+  catalogRevision: 'revision',
+  models: [],
+  generatedAt,
+  stale: false,
+  refreshing: false,
 });
 const store = () => useEffectiveCatalogStore.getState();
-const model = (modelId: string): EffectiveModel => ({ modelId, label: modelId, catalogRevision: 'revision' } as EffectiveModel);
+const model = (modelId: string): EffectiveModel =>
+  ({ modelId, label: modelId, catalogRevision: 'revision' }) as EffectiveModel;
 describe('effective catalog projection', () => {
   it('applies a change to the snapshot it names and rereads when it names another', async () => {
     const held = { ...snapshot(), projectionVersion: 1, models: [model('a')] };
@@ -22,7 +39,10 @@ describe('effective catalog projection', () => {
     await store().load(scope);
     const next = { ...held, projectionVersion: 2, catalogRevision: 'next', models: [model('a'), model('b')] };
     store().accept(diffEffectiveCatalog(held, next));
-    expect(store().entries[catalogScopeKey(scope)].snapshot).toEqual({ ...next, models: next.models.map((entry) => ({ ...entry, catalogRevision: 'next' })) });
+    expect(store().entries[catalogScopeKey(scope)].snapshot).toEqual({
+      ...next,
+      models: next.models.map((entry) => ({ ...entry, catalogRevision: 'next' })),
+    });
     expect(read).toHaveBeenCalledTimes(1);
 
     read.mockResolvedValueOnce({ ...next, projectionVersion: 4 });
@@ -42,34 +62,56 @@ describe('effective catalog projection', () => {
   });
   it('applies a change that names the snapshot a pending read returns, even when it arrives first', async () => {
     let finish!: (value: EffectiveCatalogSnapshot) => void;
-    read.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    read.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
     const pending = store().load(scope);
     const response = { ...snapshot(), projectionVersion: 1, models: [model('a')] };
     const later = { ...response, projectionVersion: 2, catalogRevision: 'later', models: [model('a'), model('b')] };
     store().accept(diffEffectiveCatalog({ ...response, projectionVersion: 0 }, { ...response, projectionVersion: 1 }));
     store().accept(diffEffectiveCatalog(response, later));
-    finish(response); await pending;
+    finish(response);
+    await pending;
     expect(store().entries[catalogScopeKey(scope)].snapshot?.catalogRevision).toBe('later');
     expect(store().entries[catalogScopeKey(scope)].snapshot?.models.map((entry) => entry.modelId)).toEqual(['a', 'b']);
   });
-  beforeEach(() => { resetCatalogProjection(); read.mockReset(); refresh.mockReset().mockResolvedValue(undefined); });
+  beforeEach(() => {
+    resetCatalogProjection();
+    read.mockReset();
+    refresh.mockReset().mockResolvedValue(undefined);
+  });
   it('explicit retry refreshes the provider directory instead of rereading the same rejected snapshot', async () => {
-    read.mockResolvedValueOnce({ ...snapshot(), projectionVersion: 0, lastRefreshError: 'HTTP 401' }).mockResolvedValueOnce(snapshot());
+    read
+      .mockResolvedValueOnce({ ...snapshot(), projectionVersion: 0, lastRefreshError: 'HTTP 401' })
+      .mockResolvedValueOnce(snapshot());
     await store().load(scope);
     const first = store().load(scope, true);
     const duplicate = store().load(scope, true);
     expect(first).toBe(duplicate);
     await first;
-    expect(refresh).toHaveBeenCalledExactlyOnceWith(undefined, 'grok-account', { accountId: 'a', protocol: 'OpenAIResponses' });
+    expect(refresh).toHaveBeenCalledExactlyOnceWith(undefined, 'grok-account', {
+      accountId: 'a',
+      protocol: 'OpenAIResponses',
+    });
     expect(read).toHaveBeenCalledTimes(2);
     expect(store().entries[catalogScopeKey(scope)].error).toBeUndefined();
   });
   it('coalesces requests and reuses snapshots when a menu remounts', async () => {
     let finish!: (value: EffectiveCatalogSnapshot) => void;
-    read.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
-    const a = store().load(scope); const b = store().load(scope);
-    expect(a).toBe(b); expect(read).toHaveBeenCalledTimes(1);
-    finish(snapshot()); await a; await store().load(scope);
+    read.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const a = store().load(scope);
+    const b = store().load(scope);
+    expect(a).toBe(b);
+    expect(read).toHaveBeenCalledTimes(1);
+    finish(snapshot());
+    await a;
+    await store().load(scope);
     expect(read).toHaveBeenCalledTimes(1);
   });
   it('publishes a fast provider while another provider is still pending', async () => {
@@ -82,9 +124,16 @@ describe('effective catalog projection', () => {
   });
   it('isolates cancelled scopes and mismatched accounts', async () => {
     let finish!: (value: EffectiveCatalogSnapshot) => void;
-    read.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
-    const pending = store().load(scope); store().invalidate(scope);
-    finish(snapshot()); await pending; store().accept(diffEffectiveCatalog(null, snapshot()));
+    read.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const pending = store().load(scope);
+    store().invalidate(scope);
+    finish(snapshot());
+    await pending;
+    store().accept(diffEffectiveCatalog(null, snapshot()));
     expect(store().entries[catalogScopeKey(scope)]).toBeUndefined();
     read.mockResolvedValueOnce(snapshot('other'));
     await store().load(scope);
@@ -92,24 +141,40 @@ describe('effective catalog projection', () => {
     expect(store().entries[catalogScopeKey(scope)].snapshot).toBeNull();
   });
   it('retains usable rows during failed refresh and supports explicit retry', async () => {
-    read.mockResolvedValueOnce(snapshot()).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(snapshot());
-    await store().load(scope); await store().load(scope, true);
-    expect(store().entries[catalogScopeKey(scope)]).toMatchObject({ snapshot: snapshot(), error: 'offline', loading: false });
+    read
+      .mockResolvedValueOnce(snapshot())
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(snapshot());
+    await store().load(scope);
+    await store().load(scope, true);
+    expect(store().entries[catalogScopeKey(scope)]).toMatchObject({
+      snapshot: snapshot(),
+      error: 'offline',
+      loading: false,
+    });
     await store().load(scope, true);
     expect(store().entries[catalogScopeKey(scope)].error).toBeUndefined();
   });
   it('reads nothing for a model choice of the same connection and discards the catalog for a new endpoint', async () => {
     const initial = snapshot();
     read.mockResolvedValueOnce(initial);
-    const provider = { ...scope, enabled: true, isConfigured: true, baseUrl: 'https://example.test', models: [
-      { id: 'model-a', enabled: true, preferredRouteOptionId: 'responses' },
-    ] } as LlmProviderEntry;
+    const provider = {
+      ...scope,
+      enabled: true,
+      isConfigured: true,
+      baseUrl: 'https://example.test',
+      models: [{ id: 'model-a', enabled: true, preferredRouteOptionId: 'responses' }],
+    } as LlmProviderEntry;
     const key = catalogScopeKey(provider);
     reconcileCatalogProviders([provider]);
     await store().load(scope);
 
     // The model choice arrives as a catalog change; settings only carry the new rows.
-    const disabled = { ...provider, enabled: false, models: [{ ...provider.models[0], enabled: false, preferredRouteOptionId: 'chat' }] };
+    const disabled = {
+      ...provider,
+      enabled: false,
+      models: [{ ...provider.models[0], enabled: false, preferredRouteOptionId: 'chat' }],
+    };
     reconcileCatalogProviders([disabled], new Set());
     await store().load(scope);
     expect(read).toHaveBeenCalledTimes(1);

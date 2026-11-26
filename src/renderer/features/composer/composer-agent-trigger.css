@@ -14,7 +14,10 @@
   background: var(--token-surface-sunken);
   color: var(--token-text-primary);
   cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    transform var(--transition-fast);
 }
 .composer-agent-pill:hover,
 .composer-agent-pill.is-open,

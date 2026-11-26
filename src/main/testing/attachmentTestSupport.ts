@@ -34,5 +34,5 @@ export function writeFileAttachment(
 export function materializedText(content: string | ReadonlyArray<{ type: string; text?: string }>): string {
   if (typeof content === 'string') return content;
   const [first] = content;
-  return first?.type === 'text' ? first.text ?? '' : '';
+  return first?.type === 'text' ? (first.text ?? '') : '';
 }

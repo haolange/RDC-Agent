@@ -91,23 +91,21 @@ export function buildOptimisticConversationTurn(options: {
 }
 
 /** The messages without those of `requestId`: a request main refused, or Stop revoked while it prepared. */
-export const removeRequestMessages = (
-  messages: ConversationMessage[],
-  requestId: string,
-): ConversationMessage[] => {
+export const removeRequestMessages = (messages: ConversationMessage[], requestId: string): ConversationMessage[] => {
   const kept = messages.filter((message) => message.requestId !== requestId);
   return kept.length === messages.length ? messages : kept;
 };
 
 export const toConversationAttachmentInputs = (
   pendingAttachments: PendingAttachmentDraft[],
-): ConversationAttachmentInput[] => pendingAttachments
-  .filter((attachment) => !attachment.error && attachment.sourcePath)
-  .map((attachment) => ({
-    sourcePath: attachment.sourcePath,
-    fileName: attachment.fileName,
-    mimeType: attachment.mimeType,
-    size: attachment.size,
-    stagingId: attachment.stagingId,
-    material: attachment.material,
-  }));
+): ConversationAttachmentInput[] =>
+  pendingAttachments
+    .filter((attachment) => !attachment.error && attachment.sourcePath)
+    .map((attachment) => ({
+      sourcePath: attachment.sourcePath,
+      fileName: attachment.fileName,
+      mimeType: attachment.mimeType,
+      size: attachment.size,
+      stagingId: attachment.stagingId,
+      material: attachment.material,
+    }));

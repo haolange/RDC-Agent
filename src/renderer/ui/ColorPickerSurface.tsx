@@ -20,13 +20,7 @@ const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(ma
  * Self-drawn saturation x value plane plus hue rail. Pointer and keyboard both
  * drive the same HSV state, so the plane, the rail and the hex field stay in sync.
  */
-export function ColorPickerSurface({
-  value,
-  onChange,
-  testId,
-  areaLabel,
-  hueLabel,
-}: ColorPickerSurfaceProps) {
+export function ColorPickerSurface({ value, onChange, testId, areaLabel, hueLabel }: ColorPickerSurfaceProps) {
   const areaRef = useRef<HTMLDivElement>(null);
   const hueRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<'area' | 'hue' | null>(null);
@@ -36,11 +30,11 @@ export function ColorPickerSurface({
   // hue is mathematically undefined and would otherwise snap to 0.
   useEffect(() => {
     const next = hexToHsv(value);
-    setHsv((current) => (
+    setHsv((current) =>
       hsvToHex(current).toLowerCase() === value.toLowerCase()
         ? current
-        : { ...next, h: next.s === 0 || next.v === 0 ? current.h : next.h }
-    ));
+        : { ...next, h: next.s === 0 || next.v === 0 ? current.h : next.h },
+    );
   }, [value]);
 
   const commit = (next: Hsv) => {

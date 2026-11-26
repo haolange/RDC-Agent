@@ -2,12 +2,19 @@ import * as fs from 'node:fs';
 import { basename } from 'node:path';
 import { associatedDocumentMime, attachmentExtension, isMarkdownAttachment } from '@shared/attachmentPresentation';
 import {
-  assertSafeImageBytes, MAX_ATTACHMENT_BYTES_PER_FILE, MAX_DECODED_IMAGE_BYTES, NATIVE_IMAGE_MIME_TYPES,
+  assertSafeImageBytes,
+  MAX_ATTACHMENT_BYTES_PER_FILE,
+  MAX_DECODED_IMAGE_BYTES,
+  NATIVE_IMAGE_MIME_TYPES,
 } from '../runtime/attachmentClassify';
 import { assertAttachmentPreviewPath, toDataUrl } from '../runtime/attachmentPreview';
 import { openAttachmentDocumentCopy } from './AttachmentDocumentOpen';
 import { isOfficeDocument } from './attachmentOfficeDocument';
-import type { AttachmentLayer, ConversationAccessAttachmentRequest, ConversationAccessAttachmentResult } from '@shared/types/conversation';
+import type {
+  AttachmentLayer,
+  ConversationAccessAttachmentRequest,
+  ConversationAccessAttachmentResult,
+} from '@shared/types/conversation';
 
 export interface OwnedAttachment {
   root: string;
@@ -23,8 +30,10 @@ interface AttachmentShell {
 }
 
 function matchingDocumentMime(mime: string, expected: string): boolean {
-  return mime === expected || (expected !== 'application/pdf'
-    && (mime === 'application/zip' || mime === 'application/octet-stream'));
+  return (
+    mime === expected ||
+    (expected !== 'application/pdf' && (mime === 'application/zip' || mime === 'application/octet-stream'))
+  );
 }
 
 function isPdfDocument(bytes: Buffer): boolean {
@@ -33,8 +42,10 @@ function isPdfDocument(bytes: Buffer): boolean {
   const offset = Number(trailer?.[1]);
   if (!Number.isSafeInteger(offset) || offset < 9 || offset >= bytes.length) return false;
   const xref = bytes.toString('latin1', offset, Math.min(offset + 8192, bytes.length));
-  return /^xref\s+\d+\s+\d+\s+\d{10} \d{5} [nf](?:[\r\n ]|$)/u.test(xref)
-    || /^\d+\s+\d+\s+obj\s*<<[\s\S]*?\/Type\s*\/XRef\b/u.test(xref.split(/\bstream\b/u, 1)[0]);
+  return (
+    /^xref\s+\d+\s+\d+\s+\d{10} \d{5} [nf](?:[\r\n ]|$)/u.test(xref) ||
+    /^\d+\s+\d+\s+obj\s*<<[\s\S]*?\/Type\s*\/XRef\b/u.test(xref.split(/\bstream\b/u, 1)[0])
+  );
 }
 
 function scopedFile(attachment: OwnedAttachment): string | null {
@@ -47,8 +58,13 @@ function scopedFile(attachment: OwnedAttachment): string | null {
 
 /** Compares two stats taken through the same API: handle against handle, or path against path. */
 function sameSnapshot(before: fs.Stats, after: fs.Stats): boolean {
-  return before.dev === after.dev && before.ino === after.ino && before.size === after.size
-    && before.mtimeMs === after.mtimeMs && before.ctimeMs === after.ctimeMs;
+  return (
+    before.dev === after.dev &&
+    before.ino === after.ino &&
+    before.size === after.size &&
+    before.mtimeMs === after.mtimeMs &&
+    before.ctimeMs === after.ctimeMs
+  );
 }
 
 /**
@@ -100,8 +116,11 @@ export async function accessOwnedAttachment(
   const storedExtension = attachmentExtension(basename(file));
   const mime = attachment.mimeType;
   const image = action === 'preview' && NATIVE_IMAGE_MIME_TYPES.has(mime);
-  const markdown = action === 'preview' && attachment.layer === 'text'
-    && isMarkdownAttachment(extension) && storedExtension === extension;
+  const markdown =
+    action === 'preview' &&
+    attachment.layer === 'text' &&
+    isMarkdownAttachment(extension) &&
+    storedExtension === extension;
   const document = action === 'open' && storedExtension === extension ? associatedDocumentMime(extension) : undefined;
   if (!image && !markdown && (!document || !matchingDocumentMime(mime, document))) {
     return { kind: 'error', code: 'unsupported' };

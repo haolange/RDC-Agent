@@ -1,19 +1,8 @@
 export type NamedReasoningLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
-const NAMED_REASONING_LEVELS: readonly NamedReasoningLevel[] = [
-  'minimal',
-  'low',
-  'medium',
-  'high',
-  'xhigh',
-  'max',
-];
+const NAMED_REASONING_LEVELS: readonly NamedReasoningLevel[] = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 export type ReasoningSelection = 'off' | 'on' | NamedReasoningLevel;
-export const REASONING_SELECTIONS: readonly ReasoningSelection[] = [
-  'off',
-  'on',
-  ...NAMED_REASONING_LEVELS,
-];
+export const REASONING_SELECTIONS: readonly ReasoningSelection[] = ['off', 'on', ...NAMED_REASONING_LEVELS];
 
 type ReasoningControlKind = 'unknown' | 'none' | 'toggle' | 'levels' | 'always-on';
 
@@ -120,9 +109,7 @@ function resolveOnSelection(control: ReasoningControl): ReasoningSelection {
     return control.lockedSelection ?? 'on';
   }
   if (control.kind === 'levels') {
-    return control.defaultSelection === 'off'
-      ? control.levels[0] ?? 'off'
-      : control.defaultSelection;
+    return control.defaultSelection === 'off' ? (control.levels[0] ?? 'off') : control.defaultSelection;
   }
   return 'on';
 }

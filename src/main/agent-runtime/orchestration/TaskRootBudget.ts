@@ -29,12 +29,9 @@ export async function bindTaskRootBudget(
   existingRootBudgetId?: string,
 ): Promise<string> {
   const rootPolicyBudget = policyBudgetChain(policyBudget).at(-1) ?? policyBudget;
-  return withBindingLock(rootPolicyBudget, async () => bindRootBudgetLocked(
-    registry,
-    ownerSessionId,
-    rootPolicyBudget,
-    existingRootBudgetId,
-  ));
+  return withBindingLock(rootPolicyBudget, async () =>
+    bindRootBudgetLocked(registry, ownerSessionId, rootPolicyBudget, existingRootBudgetId),
+  );
 }
 
 async function bindRootBudgetLocked(
@@ -46,7 +43,10 @@ async function bindRootBudgetLocked(
   const state = bindings.get(rootPolicyBudget);
   const id = existingRootBudgetId ?? state?.rootBudgetId ?? taskRootBudgetId(rootPolicyBudget);
   if (state && state.rootBudgetId !== id) {
-    throw new AppError('TASK_ROOT_BUDGET_REBIND_DENIED', 'this turn is bound to a different durable root; continue the Task in a new turn and bind its existing root before other Task work.');
+    throw new AppError(
+      'TASK_ROOT_BUDGET_REBIND_DENIED',
+      'this turn is bound to a different durable root; continue the Task in a new turn and bind its existing root before other Task work.',
+    );
   }
   const durable = await registry.getRootBudget(id);
   const observers = state?.observers ?? new Map<string, () => void>();
@@ -71,15 +71,18 @@ async function bindRootBudgetLocked(
       Math.max(0, durable.deadlineAt - rootPolicyBudget.wallStartedAt),
     );
   }
-  const persist = (snapshot: PolicyBudgetState) => registry.updateRootBudget(id, {
-    toolCalls: snapshot.toolCalls,
-    subagents: snapshot.subagents,
-    maxToolCalls: snapshot.maxToolCalls,
-    maxSubagents: snapshot.maxSubagents,
-    maxChildDepth: snapshot.maxChildDepth,
-    deadlineAt: snapshot.wallStartedAt + snapshot.maxWallTimeMs,
-    startedAt: snapshot.wallStartedAt,
-  }).then(() => undefined);
+  const persist = (snapshot: PolicyBudgetState) =>
+    registry
+      .updateRootBudget(id, {
+        toolCalls: snapshot.toolCalls,
+        subagents: snapshot.subagents,
+        maxToolCalls: snapshot.maxToolCalls,
+        maxSubagents: snapshot.maxSubagents,
+        maxChildDepth: snapshot.maxChildDepth,
+        deadlineAt: snapshot.wallStartedAt + snapshot.maxWallTimeMs,
+        startedAt: snapshot.wallStartedAt,
+      })
+      .then(() => undefined);
   await persist(rootPolicyBudget);
   if (!alreadyBound) observers.set(ownerSessionId, registerPolicyBudgetObserver(rootPolicyBudget, persist));
   bindings.set(rootPolicyBudget, { rootBudgetId: id, observers });
@@ -89,7 +92,9 @@ async function bindRootBudgetLocked(
 async function withBindingLock<T>(budget: PolicyBudgetState, action: () => Promise<T>): Promise<T> {
   const previous = bindingQueues.get(budget) ?? Promise.resolve();
   let release!: () => void;
-  const current = new Promise<void>((resolve) => { release = resolve; });
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   const tail = previous.then(() => current);
   bindingQueues.set(budget, tail);
   await previous;

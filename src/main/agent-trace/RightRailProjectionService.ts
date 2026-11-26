@@ -23,12 +23,21 @@ const emptyRightPanel = (sessionId: string): RightPanelViewModel => ({
   outputs: { current: [], previous: [] },
   context: {
     task: {
-      projectId: '', projectName: '', sessionId, sessionTitle: '', workingDirectory: '',
-      configurationPhase: 'next_turn', agentProfile: '', permission: 'default', resources: [],
+      projectId: '',
+      projectName: '',
+      sessionId,
+      sessionTitle: '',
+      workingDirectory: '',
+      configurationPhase: 'next_turn',
+      agentProfile: '',
+      permission: 'default',
+      resources: [],
     },
     rdc: {
-      capture: null, availableCaptures: [],
-      runtime: {}, diagnostics: [],
+      capture: null,
+      availableCaptures: [],
+      runtime: {},
+      diagnostics: [],
     },
   },
 });
@@ -49,7 +58,9 @@ export class RightRailProjectionService {
       listSessionArtifactSources(input.sessionId),
       taskRegistry.reconcileInterruptedExecutions().then(() => taskRegistry.readConsistentSnapshot()),
       Promise.resolve(conversationHistoryStore.readConversationHistory(input.sessionId)),
-      Promise.resolve().then(() => requestSnapshotStore.listPromptSegments(input.sessionId)).catch(() => []),
+      Promise.resolve()
+        .then(() => requestSnapshotStore.listPromptSegments(input.sessionId))
+        .catch(() => []),
       Promise.resolve().then(() => mapRightRailInvestigationArtifacts(input.sessionId)),
     ]);
     const project = projectWorkspaceStore.getProjectById(session.projectId);
@@ -63,7 +74,10 @@ export class RightRailProjectionService {
     });
     const tasks = mapRightRailTasks(input.sessionId, input.branchId, taskSnapshot.tasks, taskSnapshot.executions);
     const outputs = mapRightRailOutputs({
-      sessionId: input.sessionId, branchId: input.branchId, sources, runs: input.runs,
+      sessionId: input.sessionId,
+      branchId: input.branchId,
+      sources,
+      runs: input.runs,
     });
     const permissionState = runtimePermissionStateService.getSnapshot();
     const taskResources = collectSessionTaskContextResources({
@@ -72,8 +86,12 @@ export class RightRailProjectionService {
       projectRoot: project?.rootPath,
     });
     const task = buildTaskContext({
-      session, project, runs: input.runs, profileId: input.profileId,
-      attachments: sources, resources: taskResources,
+      session,
+      project,
+      runs: input.runs,
+      profileId: input.profileId,
+      attachments: sources,
+      resources: taskResources,
       permissionMode: permissionState.mode,
     });
     // Projection consumes the last committed scan; it must not enqueue a new
@@ -84,7 +102,10 @@ export class RightRailProjectionService {
       openedCapture,
       contextSnapshot,
       availableCaptures: projectInputs.map((capture) => ({
-        inputId: capture.inputId, fileName: capture.fileName, filePath: capture.filePath, sizeBytes: capture.size,
+        inputId: capture.inputId,
+        fileName: capture.fileName,
+        filePath: capture.filePath,
+        sizeBytes: capture.size,
       })),
     });
     return {

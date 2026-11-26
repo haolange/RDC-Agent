@@ -126,11 +126,7 @@ function isAbortError(error: unknown, name: string, lowerMessage: string): boole
   return false;
 }
 
-function classifyByHttpStatus(
-  status: number,
-  lowerMessage: string,
-  message: string,
-): ProviderErrorInfo | null {
+function classifyByHttpStatus(status: number, lowerMessage: string, message: string): ProviderErrorInfo | null {
   // Retryable server/rate-limit statuses
   if (status === 429) {
     return { code: 'rate_limit', retryable: true, httpStatus: status, message };
@@ -193,11 +189,7 @@ function classifyByMessagePattern(
   }
 
   // Timeout patterns
-  if (
-    lowerMessage.includes('timeout') ||
-    lowerMessage.includes('timed out') ||
-    lowerMessage.includes('etimedout')
-  ) {
+  if (lowerMessage.includes('timeout') || lowerMessage.includes('timed out') || lowerMessage.includes('etimedout')) {
     return { code: 'timeout', retryable: true, httpStatus, message };
   }
 
@@ -236,9 +228,9 @@ function classifyByMessagePattern(
   }
 
   if (
-    lowerMessage.includes('model_not_found')
-    || lowerMessage.includes('model not found')
-    || lowerMessage.includes('unknown model')
+    lowerMessage.includes('model_not_found') ||
+    lowerMessage.includes('model not found') ||
+    lowerMessage.includes('unknown model')
   ) {
     return { code: 'model_source', retryable: false, httpStatus, message };
   }
@@ -248,19 +240,17 @@ function classifyByMessagePattern(
 
 function isScopeRelated(lowerMessage: string): boolean {
   return (
-    lowerMessage.includes('scope') ||
-    lowerMessage.includes('permission') ||
-    lowerMessage.includes('access denied')
+    lowerMessage.includes('scope') || lowerMessage.includes('permission') || lowerMessage.includes('access denied')
   );
 }
 
 function isRequestRejected(lowerMessage: string): boolean {
   return (
-    lowerMessage.includes('invalid-argument')
-    || lowerMessage.includes('tool parameter')
-    || lowerMessage.includes('root schema')
-    || lowerMessage.includes('unsupported parameter')
-    || lowerMessage.includes('invalid request')
+    lowerMessage.includes('invalid-argument') ||
+    lowerMessage.includes('tool parameter') ||
+    lowerMessage.includes('root schema') ||
+    lowerMessage.includes('unsupported parameter') ||
+    lowerMessage.includes('invalid request')
   );
 }
 

@@ -12,18 +12,27 @@ function investigationOpaqueId(maxLength: number, label: string) {
 }
 
 export const InvestigationReadArgsSchema = z.tuple([
-  z.object({
-    sessionId: investigationOpaqueId(128, 'sessionId'),
-    artifactId: investigationOpaqueId(128, 'artifactId'),
-    expectedHash: ipcNonEmptyString(80, 'expectedHash').regex(
-      INVESTIGATION_HASH_RE,
-      'expectedHash must be sha256:<64 hex>',
-    ),
-  }).strict(),
+  z
+    .object({
+      sessionId: investigationOpaqueId(128, 'sessionId'),
+      artifactId: investigationOpaqueId(128, 'artifactId'),
+      expectedHash: ipcNonEmptyString(80, 'expectedHash').regex(
+        INVESTIGATION_HASH_RE,
+        'expectedHash must be sha256:<64 hex>',
+      ),
+    })
+    .strict(),
 ]);
 
-export const InvestigationListArgsSchema = z.tuple([z.object({
-  projectId: investigationOpaqueId(128, 'projectId'),
-  sessionId: investigationOpaqueId(128, 'sessionId'),
-  cursor: z.object({ createdAt: z.iso.datetime(), artifactId: investigationOpaqueId(128, 'artifactId') }).strict().optional(),
-}).strict()]);
+export const InvestigationListArgsSchema = z.tuple([
+  z
+    .object({
+      projectId: investigationOpaqueId(128, 'projectId'),
+      sessionId: investigationOpaqueId(128, 'sessionId'),
+      cursor: z
+        .object({ createdAt: z.iso.datetime(), artifactId: investigationOpaqueId(128, 'artifactId') })
+        .strict()
+        .optional(),
+    })
+    .strict(),
+]);

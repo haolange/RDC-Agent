@@ -10,10 +10,7 @@ import {
 } from '@shared/constants/layout';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useProjectStore } from '../stores/projectStore';
-import {
-  resolveResponsiveSidebarState,
-  resolveSidebarWidths,
-} from '../shell/layoutGeometry';
+import { resolveResponsiveSidebarState, resolveSidebarWidths } from '../shell/layoutGeometry';
 import { usePanelDrawer } from './usePanelDrawer';
 import { useNarrowViewport } from './useNarrowViewport';
 
@@ -23,7 +20,9 @@ type RightRailMode = 'hidden' | 'project' | 'session';
 const COLUMNS_SETTLE_MS = 400;
 
 export function useWorkbenchLayout(isReady: boolean) {
-  const [appBodyWidth, setAppBodyWidth] = useState(() => (typeof window === 'undefined' ? 0 : Math.max(0, Math.round(window.innerWidth))));
+  const [appBodyWidth, setAppBodyWidth] = useState(() =>
+    typeof window === 'undefined' ? 0 : Math.max(0, Math.round(window.innerWidth)),
+  );
   const [isResizing, setIsResizing] = useState(false);
   // Columns move with a transition only for a person's collapse or expand; restore and selection settle in place.
   const [columnsAnimating, setColumnsAnimating] = useState(false);
@@ -51,14 +50,15 @@ export function useWorkbenchLayout(isReady: boolean) {
   const isRightRailVisible = rightRailMode !== 'hidden';
 
   const responsiveSidebarState = useMemo(
-    () => resolveResponsiveSidebarState(
-      appBodyWidth,
-      leftSidebarWidth,
-      rightPanelWidth,
-      leftSidebarCollapsed,
-      rightPanelCollapsed,
-      isRightRailVisible,
-    ),
+    () =>
+      resolveResponsiveSidebarState(
+        appBodyWidth,
+        leftSidebarWidth,
+        rightPanelWidth,
+        leftSidebarCollapsed,
+        rightPanelCollapsed,
+        isRightRailVisible,
+      ),
     [appBodyWidth, isRightRailVisible, leftSidebarCollapsed, leftSidebarWidth, rightPanelCollapsed, rightPanelWidth],
   );
 
@@ -77,15 +77,16 @@ export function useWorkbenchLayout(isReady: boolean) {
   }, [currentProject?.projectId, currentSessionId, closeLeftDrawer]);
 
   const resolvedWidths = useMemo(
-    () => resolveSidebarWidths(
-      appBodyWidth,
-      leftSidebarWidth,
-      rightPanelWidth,
-      effectiveLeftCollapsed,
-      effectiveRightCollapsed,
-      responsiveSidebarState.minMainWidth,
-      isRightRailVisible,
-    ),
+    () =>
+      resolveSidebarWidths(
+        appBodyWidth,
+        leftSidebarWidth,
+        rightPanelWidth,
+        effectiveLeftCollapsed,
+        effectiveRightCollapsed,
+        responsiveSidebarState.minMainWidth,
+        isRightRailVisible,
+      ),
     [
       appBodyWidth,
       effectiveLeftCollapsed,
@@ -152,10 +153,7 @@ export function useWorkbenchLayout(isReady: boolean) {
       if (dragState.side === 'right' && !effectiveRightCollapsed) {
         const maxByMain = Math.max(
           RIGHT_PANEL_MIN_WIDTH,
-          Math.min(
-            SIDEBAR_MAX_WIDTH,
-            containerWidth - APP_MIN_MAIN_WIDTH - APP_RESIZE_HANDLE_WIDTH * 2 - resolvedLeft,
-          ),
+          Math.min(SIDEBAR_MAX_WIDTH, containerWidth - APP_MIN_MAIN_WIDTH - APP_RESIZE_HANDLE_WIDTH * 2 - resolvedLeft),
         );
         setRightPanelWidth(Math.min(maxByMain, dragState.startWidth - (event.clientX - dragState.startX)));
       }
@@ -199,10 +197,13 @@ export function useWorkbenchLayout(isReady: boolean) {
   }, []);
   useEffect(() => () => window.clearTimeout(columnsSettleTimer.current), []);
 
-  const startDragging = useCallback((side: DragSide, startWidth: number) => (event: React.PointerEvent<HTMLDivElement>) => {
-    dragStateRef.current = { side, startX: event.clientX, startWidth };
-    setIsResizing(true);
-  }, []);
+  const startDragging = useCallback(
+    (side: DragSide, startWidth: number) => (event: React.PointerEvent<HTMLDivElement>) => {
+      dragStateRef.current = { side, startX: event.clientX, startWidth };
+      setIsResizing(true);
+    },
+    [],
+  );
 
   return {
     appBodyRef,

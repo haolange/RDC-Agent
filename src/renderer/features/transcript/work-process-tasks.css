@@ -75,7 +75,15 @@
   list-style: none;
   cursor: pointer;
 }
-.work-process-task-snapshot-copy summary::-webkit-details-marker { display: none; }
-.work-process-task-snapshot-copy[open] > summary .work-process-row-caret { transform: rotate(90deg); }
-.work-process-task-snapshot-copy summary:focus-visible { outline: 2px solid var(--token-border-focus); }
-.work-process-task-snapshot-reason { margin: var(--space-1) 0 0; }
+.work-process-task-snapshot-copy summary::-webkit-details-marker {
+  display: none;
+}
+.work-process-task-snapshot-copy[open] > summary .work-process-row-caret {
+  transform: rotate(90deg);
+}
+.work-process-task-snapshot-copy summary:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+}
+.work-process-task-snapshot-reason {
+  margin: var(--space-1) 0 0;
+}

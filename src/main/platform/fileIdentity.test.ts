@@ -5,7 +5,9 @@ import { afterEach, expect, it } from 'vitest';
 import { openedFileIdentity, sameFileState } from './fileIdentity';
 
 const roots: string[] = [];
-afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
+afterEach(() => {
+  for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
+});
 
 it('reports one state for an unchanged file and a different one after the name is replaced', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-file-identity-'));

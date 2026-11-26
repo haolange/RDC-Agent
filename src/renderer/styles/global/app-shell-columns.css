@@ -39,7 +39,9 @@
   background: var(--token-bg-shell);
   overflow: hidden;
   border-right: 1px solid var(--token-border-card);
-  transition: background var(--transition-base), border-color var(--transition-base);
+  transition:
+    background var(--transition-base),
+    border-color var(--transition-base);
 }
 
 .app-logo {
@@ -236,7 +238,9 @@
   background: var(--token-bg-shell);
   overflow: hidden;
   border-left: 1px solid var(--token-border-card);
-  transition: background var(--transition-base), border-color var(--transition-base);
+  transition:
+    background var(--transition-base),
+    border-color var(--transition-base);
 }
 
 .shell-panel-toggle {
@@ -249,7 +253,10 @@
   background: color-mix(in srgb, var(--token-bg-panel) 92%, transparent);
   color: var(--token-text-primary);
   cursor: pointer;
-  transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .shell-panel-toggle:hover,
@@ -295,7 +302,9 @@
   overscroll-behavior: contain;
   opacity: 1;
   transform: translateX(0);
-  transition: opacity var(--transition-base), transform var(--transition-base);
+  transition:
+    opacity var(--transition-base),
+    transform var(--transition-base);
 }
 
 .right-panel-body.collapsed {

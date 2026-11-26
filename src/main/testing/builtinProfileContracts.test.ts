@@ -21,11 +21,9 @@ afterEach(() => {
 function copyBuiltinRuntime(): string {
   const root = mkdtempSync(path.join(os.tmpdir(), 'rdc-profile-contract-'));
   tempRoots.push(root);
-  cpSync(
-    path.join(repoRoot, 'resources', 'agent-runtime'),
-    path.join(root, 'resources', 'agent-runtime'),
-    { recursive: true },
-  );
+  cpSync(path.join(repoRoot, 'resources', 'agent-runtime'), path.join(root, 'resources', 'agent-runtime'), {
+    recursive: true,
+  });
   return root;
 }
 
@@ -51,13 +49,19 @@ describe('builtin profile contracts', () => {
       .replace('  - planArtifact\n', '  - write\n  - planArtifact\n')
       .replace('  - debugger-coordinator\n', '  - execution-orchestrator\n');
     writeFileSync(debuggerPath, mutated, 'utf8');
-    expect(() => assertBuiltinProfileContracts(root)).toThrow(/debugger tools must not include write|must arm debugger-coordinator/);
+    expect(() => assertBuiltinProfileContracts(root)).toThrow(
+      /debugger tools must not include write|must arm debugger-coordinator/,
+    );
   });
 
   it('fails when builtin General imposes a default loop ceiling', () => {
     const root = copyBuiltinRuntime();
     const generalPath = path.join(root, 'resources', 'agent-runtime', 'agents', 'general.agent.md');
-    writeFileSync(generalPath, readFileSync(generalPath, 'utf8').replace('enabled: true\n', 'enabled: true\nmax-turns: 50\n'), 'utf8');
+    writeFileSync(
+      generalPath,
+      readFileSync(generalPath, 'utf8').replace('enabled: true\n', 'enabled: true\nmax-turns: 50\n'),
+      'utf8',
+    );
     expect(() => assertBuiltinProfileContracts(root)).toThrow(/must not impose a default/);
   });
 
@@ -72,8 +76,9 @@ handoffs: []
 
 body
 `;
-    expect(() => assertManifestSourceContracts('general', unknownToken, 'general.agent.md'))
-      .toThrow(/failed strict manifest parse|diagnoseManifestToolTokens|bash/);
+    expect(() => assertManifestSourceContracts('general', unknownToken, 'general.agent.md')).toThrow(
+      /failed strict manifest parse|diagnoseManifestToolTokens|bash/,
+    );
 
     const malformedHandoff = `---
 name: General
@@ -88,7 +93,8 @@ handoffs:
 
 body
 `;
-    expect(() => assertManifestSourceContracts('general', malformedHandoff, 'general.agent.md'))
-      .toThrow(/failed strict manifest parse|requires non-empty label, agent, and prompt/);
+    expect(() => assertManifestSourceContracts('general', malformedHandoff, 'general.agent.md')).toThrow(
+      /failed strict manifest parse|requires non-empty label, agent, and prompt/,
+    );
   });
 });

@@ -1,6 +1,8 @@
 /** `NAME=value` per line ⇄ record, shared by the local tool forms (RDC-Tool, RDC actions). */
 export function envToText(env: Record<string, string>): string {
-  return Object.entries(env).map(([key, value]) => `${key}=${value}`).join('\n');
+  return Object.entries(env)
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n');
 }
 
 export function textToEnv(text: string): Record<string, string> {
@@ -16,5 +18,8 @@ export function textToEnv(text: string): Record<string, string> {
 }
 
 export function splitArgs(text: string): string[] {
-  return text.split(/\s+/).map((entry) => entry.trim()).filter(Boolean);
+  return text
+    .split(/\s+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }

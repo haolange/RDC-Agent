@@ -13,7 +13,10 @@ vi.mock('../hooks/useWorkbenchSetup', () => ({
   ],
 }));
 
-afterEach(() => { document.body.innerHTML = ''; vi.unstubAllGlobals(); });
+afterEach(() => {
+  document.body.innerHTML = '';
+  vi.unstubAllGlobals();
+});
 
 it('reopens the setup checklist from the title bar and closes it when a step is acted on', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

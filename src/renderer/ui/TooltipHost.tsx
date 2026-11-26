@@ -29,8 +29,9 @@ const normalized = (text: string) => text.replace(/\s+/gu, ' ').trim();
  */
 const repeatsVisibleText = (target: HTMLElement, text: string): boolean => {
   if (normalized(target.textContent) !== normalized(text)) return false;
-  return ![target, ...target.querySelectorAll<HTMLElement>('*')]
-    .some((element) => element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1);
+  return ![target, ...target.querySelectorAll<HTMLElement>('*')].some(
+    (element) => element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1,
+  );
 };
 
 /** The accessible name a tooltip would repeat; describing an element with its own name adds nothing. */
@@ -87,7 +88,9 @@ export function TooltipHost() {
     const onFocusIn = (event: FocusEvent) => {
       const focused = event.target;
       if (!(focused instanceof HTMLElement) || !focused.matches(':focus-visible')) return;
-      const target = focused.hasAttribute('data-tooltip') ? focused : focused.querySelector<HTMLElement>('[data-tooltip]');
+      const target = focused.hasAttribute('data-tooltip')
+        ? focused
+        : focused.querySelector<HTMLElement>('[data-tooltip]');
       if (target) show(target, true, focused);
     };
     const onKeyDown = (event: KeyboardEvent) => {

@@ -6,9 +6,9 @@ import { compileProviderCatalog } from '../../provider-catalog/catalogCompiler';
 import { loadProviderCatalogManifestInput } from '../../provider-catalog/manifestLoader';
 import { applyAnthropicReasoning, applyOpenAiCompatibleReasoning } from './reasoningWire';
 
-const surface = compileProviderCatalog(loadProviderCatalogManifestInput(path.resolve(
-  process.cwd(), 'src/shared/provider-catalog/manifests',
-))).surfaces.get('kimi-coding-plan')!.surface;
+const surface = compileProviderCatalog(
+  loadProviderCatalogManifestInput(path.resolve(process.cwd(), 'src/shared/provider-catalog/manifests')),
+).surfaces.get('kimi-coding-plan')!.surface;
 
 describe('Kimi K2.8 Preview reasoning from the maintained catalog', () => {
   it('emits explicit Off for both protocols without changing the selected model', () => {
@@ -20,8 +20,9 @@ describe('Kimi K2.8 Preview reasoning from the maintained catalog', () => {
     expect(anthropicBody).toEqual({ model: 'kimi-for-coding', thinking: { type: 'disabled' } });
 
     const chat = createReasoningControl({
-      ...surface.protocolOverrides.find((entry) => entry.modelId === model.modelId
-        && entry.protocol === 'OpenAICompatibleChatCompletions')!.patch.controls!.reasoning!,
+      ...surface.protocolOverrides.find(
+        (entry) => entry.modelId === model.modelId && entry.protocol === 'OpenAICompatibleChatCompletions',
+      )!.patch.controls!.reasoning!,
       defaultSelection: 'max',
     });
     expect(clampReasoningSelection('off', chat)).toBe('off');
@@ -29,8 +30,9 @@ describe('Kimi K2.8 Preview reasoning from the maintained catalog', () => {
     applyOpenAiCompatibleReasoning(chatBody, { selection: 'off', control: chat });
     expect(chatBody).toEqual({ model: 'kimi-for-coding', thinking: { type: 'disabled' } });
     expect(model.liveProjection?.reasoning?.wireProfiles.AnthropicMessages).toMatchObject({ offMode: 'disabled' });
-    expect(model.liveProjection?.reasoning?.wireProfiles.OpenAICompatibleChatCompletions)
-      .toMatchObject({ offMode: 'thinking-disabled' });
+    expect(model.liveProjection?.reasoning?.wireProfiles.OpenAICompatibleChatCompletions).toMatchObject({
+      offMode: 'thinking-disabled',
+    });
   });
 
   it('keeps K3 Off forbidden because that would route to another model', () => {

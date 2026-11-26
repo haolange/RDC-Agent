@@ -1,9 +1,7 @@
 import type { ProviderProbeBatch, ProviderProbeBatchRequest } from './providerProbe';
 import type { RendererEventChannel } from '../renderer-api/channels';
 import type { CaptureReplayState, CaptureReplayApplyRequest } from './captureReplay';
-import type {
-  WorkflowState,
-} from './workflow';
+import type { WorkflowState } from './workflow';
 import type {
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
@@ -95,7 +93,14 @@ import type { MCPServerStatusSummary } from './mcp';
 import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
 import type { TraceProjectionChangedPayload } from './agenticTrace';
 import type { TraceSessionResult } from './trace';
-import type { HookEvent, RdcRuntimeOverview, RequestEnvelopeSnapshot, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from './rdcRuntime';
+import type {
+  HookEvent,
+  RdcRuntimeOverview,
+  RequestEnvelopeSnapshot,
+  ScopedResourceImportRequest,
+  ScopedResourceKind,
+  ScopedResourceWriteRequest,
+} from './rdcRuntime';
 import type {
   KnowledgeImportResult,
   KnowledgeCandidatesResult,
@@ -115,22 +120,23 @@ import type {
 } from './knowledge';
 import type { KnowledgeExportRequest, KnowledgeExportResult } from './knowledgeExport';
 import type { KnowledgeOperationProgress, KnowledgeOperationRef } from './knowledgeOperation';
-import type {
-  InvestigationReadIpcResult,
-  InvestigationReadRequest,
-} from './renderdocInvestigation';
+import type { InvestigationReadIpcResult, InvestigationReadRequest } from './renderdocInvestigation';
 
 /** Memory 面板列表项摘要（对应 MemoryRecord 的精简视图）。 */
 /** `session:open`: the opened session with its history, trace projection and runs, or why it could not open. */
 export type SessionOpenResult =
   | {
-    success: true;
-    session: SessionRecordSnapshot;
-    currentRun: RunSummary | null;
-    runs: RunSummary[];
-    history: { messages: ConversationMessage[]; planReview: PlanReviewProjection | null; branchState?: import('./conversationBranch').ConversationBranchState | null };
-    trace: TraceSessionResult;
-  }
+      success: true;
+      session: SessionRecordSnapshot;
+      currentRun: RunSummary | null;
+      runs: RunSummary[];
+      history: {
+        messages: ConversationMessage[];
+        planReview: PlanReviewProjection | null;
+        branchState?: import('./conversationBranch').ConversationBranchState | null;
+      };
+      trace: TraceSessionResult;
+    }
   | { success: false; error: string };
 
 interface MemorySummary {
@@ -206,7 +212,11 @@ export interface ElectronAPI {
     }>;
     /** An https image an answer embeds, fetched by the main process (≤5 MB, sniffed raster types only). */
     /** `auto` loads only URLs a non-model source supplied in this session; `click` is the person asking (audited). */
-    fetchImage: (request: { sessionId: string; url: string; intent: 'auto' | 'click' }) => Promise<{ dataUrl: string } | { dataUrl: null; error: string }>;
+    fetchImage: (request: {
+      sessionId: string;
+      url: string;
+      intent: 'auto' | 'click';
+    }) => Promise<{ dataUrl: string } | { dataUrl: null; error: string }>;
   };
 
   conversation: {
@@ -214,7 +224,9 @@ export interface ElectronAPI {
     rewriteFromMessage: (request: ConversationRewriteFromMessageRequest) => Promise<ConversationTurnResult>;
     cancelActiveTurn: (request?: ConversationCancelActiveTurnRequest) => Promise<ConversationCancelActiveTurnResult>;
     answerUserInput: (request: ConversationAnswerUserInputRequest) => Promise<ConversationAnswerUserInputResult>;
-    answerToolApproval: (request: ConversationAnswerToolApprovalRequest) => Promise<ConversationAnswerToolApprovalResult>;
+    answerToolApproval: (
+      request: ConversationAnswerToolApprovalRequest,
+    ) => Promise<ConversationAnswerToolApprovalResult>;
     answerPlanReview: (request: ConversationAnswerPlanReviewRequest) => Promise<ConversationAnswerPlanReviewResult>;
     getHistory: (sessionId: string) => Promise<{
       messages: ConversationMessage[];
@@ -222,10 +234,23 @@ export interface ElectronAPI {
       branchState?: import('./conversationBranch').ConversationBranchState | null;
     }>;
     /** The last streamed state of a message; `null` when it is not streaming (any more). */
-    getMessageSnapshot: (sessionId: string, messageId: string) => Promise<{ seq: number; message: ConversationMessage } | null>;
-    getDelegationTrace: (request: { sessionId: string; parentToolCallId: string; cursor: number; pageSize: number; sinceRevision?: number }) => Promise<import('./delegationTrace').DelegationTracePage>;
-    getDelegationContent: (request: import('./delegationTrace').DelegationContentRequest) => Promise<import('./delegationTrace').DelegationContentPage>;
-    switchBranch: (request: import('./conversationBranch').ConversationSwitchBranchRequest) => Promise<import('./conversationBranch').ConversationSwitchBranchResult>;
+    getMessageSnapshot: (
+      sessionId: string,
+      messageId: string,
+    ) => Promise<{ seq: number; message: ConversationMessage } | null>;
+    getDelegationTrace: (request: {
+      sessionId: string;
+      parentToolCallId: string;
+      cursor: number;
+      pageSize: number;
+      sinceRevision?: number;
+    }) => Promise<import('./delegationTrace').DelegationTracePage>;
+    getDelegationContent: (
+      request: import('./delegationTrace').DelegationContentRequest,
+    ) => Promise<import('./delegationTrace').DelegationContentPage>;
+    switchBranch: (
+      request: import('./conversationBranch').ConversationSwitchBranchRequest,
+    ) => Promise<import('./conversationBranch').ConversationSwitchBranchResult>;
     clearHistory: (sessionId: string) => Promise<{
       success: boolean;
       messages: ConversationMessage[];
@@ -240,22 +265,19 @@ export interface ElectronAPI {
       dataUrl: string | null;
       error?: string;
     }>;
-    stageAttachments: (
-      request: ConversationStageAttachmentsRequest,
-    ) => Promise<ConversationStageAttachmentsResult>;
+    stageAttachments: (request: ConversationStageAttachmentsRequest) => Promise<ConversationStageAttachmentsResult>;
     releaseAttachments: (
       request: ConversationReleaseAttachmentsRequest,
     ) => Promise<ConversationReleaseAttachmentsResult>;
     getAttachmentPreview: (
       request: ConversationGetAttachmentPreviewRequest,
     ) => Promise<ConversationGetAttachmentPreviewResult>;
-    accessAttachment: (
-      request: ConversationAccessAttachmentRequest,
-    ) => Promise<ConversationAccessAttachmentResult>;
+    accessAttachment: (request: ConversationAccessAttachmentRequest) => Promise<ConversationAccessAttachmentResult>;
     /** A session artifact, attachment or project file an answer embeds; images and mp4/webm video only. */
-    resolveMedia: (request: { sessionId: string; src: string }) => Promise<
-      { dataUrl: string; kind: 'image' | 'video' } | { dataUrl: null; error: string }
-    >;
+    resolveMedia: (request: {
+      sessionId: string;
+      src: string;
+    }) => Promise<{ dataUrl: string; kind: 'image' | 'video' } | { dataUrl: null; error: string }>;
     onEvent: (callback: (event: ConversationStreamEvent) => void) => void;
     offEvent: (callback: (event: ConversationStreamEvent) => void) => void;
   };
@@ -287,7 +309,12 @@ export interface ElectronAPI {
     list: (scope: 'user' | 'project', projectRoot?: string) => Promise<{ memories: MemorySummary[] }>;
     get: (scope: 'user' | 'project', name: string, projectRoot?: string) => Promise<{ memory: MemoryDetail | null }>;
     write: (request: MemoryWriteRequest) => Promise<{ success: boolean; name: string; error?: string }>;
-    delete: (scope: 'user' | 'project', name: string, approvalToken: string, projectRoot?: string) => Promise<{ success: boolean; error?: string }>;
+    delete: (
+      scope: 'user' | 'project',
+      name: string,
+      approvalToken: string,
+      projectRoot?: string,
+    ) => Promise<{ success: boolean; error?: string }>;
   };
 
   investigation: {
@@ -299,7 +326,9 @@ export interface ElectronAPI {
     reopenReview: (request: PlanReadRequest) => Promise<PlanReviewProjection>;
     cancelReview: (request: PlanCancelReviewRequest) => Promise<{ success: boolean }>;
     read: (request: PlanReadRequest) => Promise<PlanReadResult>;
-    issueApprovalToken: (request: PlanApprovalTokenRequest) => Promise<{ token?: string; targetPath?: string; cancelled?: boolean; error?: string }>;
+    issueApprovalToken: (
+      request: PlanApprovalTokenRequest,
+    ) => Promise<{ token?: string; targetPath?: string; cancelled?: boolean; error?: string }>;
     saveToProject: (request: PlanSaveToProjectRequest) => Promise<PlanSaveToProjectResult>;
     export: (request: PlanExportRequest) => Promise<PlanExportResult>;
   };
@@ -308,11 +337,17 @@ export interface ElectronAPI {
     overview: () => Promise<KnowledgeOverviewResult>;
     topicSuggest: () => Promise<KnowledgeTopicProposal>;
     topicPreview: (changes: KnowledgeTopicChanges) => Promise<KnowledgeTopicPreview>;
-    topicApply: (request: { changes: KnowledgeTopicChanges; changeHash: string; confirmation: KnowledgeHumanConfirmation }) => Promise<{ revision: string } | { cancelled: true }>;
+    topicApply: (request: {
+      changes: KnowledgeTopicChanges;
+      changeHash: string;
+      confirmation: KnowledgeHumanConfirmation;
+    }) => Promise<{ revision: string } | { cancelled: true }>;
     query: (request: KnowledgeQueryRequest) => Promise<KnowledgeQueryResult>;
     card: (spaceId: string, relativePath: string) => Promise<{ card: KnowledgeCardDetail | null }>;
     compile: (request: KnowledgeQueryRequest & { limit?: number }) => Promise<KnowledgePack>;
-    indexRebuild: (request: KnowledgeOperationRef) => Promise<Pick<KnowledgeIndexOverview, 'revision' | 'builtAt' | 'cardCount'>>;
+    indexRebuild: (
+      request: KnowledgeOperationRef,
+    ) => Promise<Pick<KnowledgeIndexOverview, 'revision' | 'builtAt' | 'cardCount'>>;
     candidates: (sessionId: string) => Promise<KnowledgeCandidatesResult>;
     candidateCreate: (request: {
       sessionId: string;
@@ -320,21 +355,16 @@ export interface ElectronAPI {
       explicitUserIntent: true;
     }) => Promise<SessionKnowledgeCandidate>;
     /** What importing this source would do, item by item; nothing is written and nothing asks for confirmation. */
-    previewImport: (request: {
-      spaceId: string;
-      source?: string;
-      filePath?: string;
-    }) => Promise<KnowledgeImportResult>;
-    import: (request: KnowledgeOperationRef & {
-      spaceId: string;
-      sessionId?: string;
-      source?: string;
-      filePath?: string;
-    }) => Promise<KnowledgeImportResult | { cancelled: true }>;
-    image: (request: {
-      spaceId: string;
-      relativePath: string;
-    }) => Promise<{ dataUrl: string | null; error?: string }>;
+    previewImport: (request: { spaceId: string; source?: string; filePath?: string }) => Promise<KnowledgeImportResult>;
+    import: (
+      request: KnowledgeOperationRef & {
+        spaceId: string;
+        sessionId?: string;
+        source?: string;
+        filePath?: string;
+      },
+    ) => Promise<KnowledgeImportResult | { cancelled: true }>;
+    image: (request: { spaceId: string; relativePath: string }) => Promise<{ dataUrl: string | null; error?: string }>;
     issueApprovalToken: (request: {
       action: 'knowledge.write' | 'knowledge.promote';
       spaceId: string;
@@ -366,8 +396,15 @@ export interface ElectronAPI {
     validateResource: (request: ScopedResourceWriteRequest) => Promise<{ valid: boolean; diagnostics: string[] }>;
     upsertResource: (request: ScopedResourceWriteRequest) => Promise<RdcRuntimeOverview>;
     /** `null` when the person cancels main's file picker. */
-    importResource: (request: ScopedResourceImportRequest) => Promise<{ overview: RdcRuntimeOverview; id: string } | null>;
-    deleteResource: (kind: ScopedResourceKind, scope: 'user' | 'project', id: string, projectRoot?: string) => Promise<RdcRuntimeOverview>;
+    importResource: (
+      request: ScopedResourceImportRequest,
+    ) => Promise<{ overview: RdcRuntimeOverview; id: string } | null>;
+    deleteResource: (
+      kind: ScopedResourceKind,
+      scope: 'user' | 'project',
+      id: string,
+      projectRoot?: string,
+    ) => Promise<RdcRuntimeOverview>;
     revealResource: (sourcePath: string) => Promise<{ success: boolean; error?: string }>;
     trustHook: (projectRoot: string | undefined | null, hookId: string) => Promise<RdcRuntimeOverview>;
     revokeHook: (projectRoot: string | undefined | null, hookId: string) => Promise<RdcRuntimeOverview>;
@@ -375,7 +412,11 @@ export interface ElectronAPI {
     revokeMcp: (projectRoot: string, descriptorId: string) => Promise<RdcRuntimeOverview>;
     testHook: (event: HookEvent, projectRoot?: string, hookId?: string) => Promise<unknown>;
     listRequestSnapshots: (sessionId: string, turnId?: string) => Promise<RequestEnvelopeSnapshot[]>;
-    getRequestSnapshot: (sessionId: string, turnId: string, snapshotId: string) => Promise<RequestEnvelopeSnapshot | null>;
+    getRequestSnapshot: (
+      sessionId: string,
+      turnId: string,
+      snapshotId: string,
+    ) => Promise<RequestEnvelopeSnapshot | null>;
   };
 
   command: {
@@ -388,8 +429,12 @@ export interface ElectronAPI {
 
   tool: {
     detectInstallations: () => Promise<import('./rdcInstallation').RdcInstallationCandidate[]>;
-    resolveInstallation: (request: import('./rdcInstallation').RdcInstallationRequest) => Promise<import('./settings').RdcCliInvokerSettings>;
-    verifyInstallation: (request: import('./rdcInstallation').RdcInstallationRequest) => Promise<{ settings: import('./settings').RdcCliInvokerSettings; summary: ToolRuntimeSummary }>;
+    resolveInstallation: (
+      request: import('./rdcInstallation').RdcInstallationRequest,
+    ) => Promise<import('./settings').RdcCliInvokerSettings>;
+    verifyInstallation: (
+      request: import('./rdcInstallation').RdcInstallationRequest,
+    ) => Promise<{ settings: import('./settings').RdcCliInvokerSettings; summary: ToolRuntimeSummary }>;
   };
 
   mcp: {
@@ -413,7 +458,10 @@ export interface ElectronAPI {
     testProviderDraft: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
     testModelCapability: (request: LlmModelCapabilityProbeRequest) => Promise<LlmModelCapabilityProbeResult>;
     connectProvider: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
-    refreshProviderModels: (providerId: LlmProviderId, scope?: { accountId: string; protocol: LlmProviderProtocol }) => Promise<LlmProviderConnectionResult>;
+    refreshProviderModels: (
+      providerId: LlmProviderId,
+      scope?: { accountId: string; protocol: LlmProviderProtocol },
+    ) => Promise<LlmProviderConnectionResult>;
     disconnectProvider: (providerId: LlmProviderId) => Promise<LlmProviderConnectionResult>;
     startProviderAccountLogin: (request: LlmProviderAccountLoginStartRequest) => Promise<LlmProviderAccountStatus>;
     getProviderAccountStatus: (providerId: LlmProviderId) => Promise<LlmProviderAccountStatus>;
@@ -430,13 +478,17 @@ export interface ElectronAPI {
     hasProviderSecret: (providerId: string) => Promise<{ hasSecret: boolean; maskedPreview?: string }>;
     importAgentManifest: (filePath: string) => Promise<SettingsView>;
     saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
-    getAgentDefinitionCommit: (query: import('./agentManifest').AgentDefinitionCommitQuery) => Promise<AgentDefinitionCommitSnapshot | null>;
+    getAgentDefinitionCommit: (
+      query: import('./agentManifest').AgentDefinitionCommitQuery,
+    ) => Promise<AgentDefinitionCommitSnapshot | null>;
     previewAgentModelMigration: (sourcePath: string) => Promise<import('./agentManifest').AgentModelMigrationPreview>;
     applyAgentModelMigration: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
     deleteAgentOverrideFile: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
     previewProjectAgentTrust: (sourcePath: string) => Promise<import('./agentManifest').ProjectAgentTrustPreview>;
     trustProjectAgent: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
-    getAgentBuiltinComparison: (query: import('./agentManifest').AgentDefinitionCommitQuery) => Promise<import('./agentManifest').AgentBuiltinComparison>;
+    getAgentBuiltinComparison: (
+      query: import('./agentManifest').AgentDefinitionCommitQuery,
+    ) => Promise<import('./agentManifest').AgentBuiltinComparison>;
     saveProviderDefinition: (request: ProviderDefinitionSaveRequest) => Promise<ProviderDefinitionSaveResult>;
     getProviderDefinitionCommit: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
     getModelsOverride: () => Promise<ModelsOverride>;
@@ -460,7 +512,10 @@ export interface ElectronAPI {
       currentRun?: RunSummary | null;
       error?: string;
     }>;
-    rename: (projectId: string, newName: string) => Promise<{
+    rename: (
+      projectId: string,
+      newName: string,
+    ) => Promise<{
       success: boolean;
       project?: ProjectRecord;
       error?: string;
@@ -470,11 +525,20 @@ export interface ElectronAPI {
       error?: string;
     }>;
     inputs: {
-      referencePath: (projectId: string, filePath: string) => Promise<{
-        success: boolean; inputs: ProjectInputRecord[]; error?: string;
+      referencePath: (
+        projectId: string,
+        filePath: string,
+      ) => Promise<{
+        success: boolean;
+        inputs: ProjectInputRecord[];
+        error?: string;
       }>;
       prepareRemove: (projectId: string, inputId: string) => Promise<import('./session').ProjectInputRemovePreparation>;
-      remove: (projectId: string, inputId: string, approvalToken: string) => Promise<import('./session').ProjectInputRemoveResult>;
+      remove: (
+        projectId: string,
+        inputId: string,
+        approvalToken: string,
+      ) => Promise<import('./session').ProjectInputRemoveResult>;
       list: (projectId: string) => Promise<{ inputs: ProjectInputRecord[] }>;
       refresh: (projectId: string) => Promise<{ inputs: ProjectInputRecord[] }>;
       import: (projectId: string) => Promise<{
@@ -482,7 +546,10 @@ export interface ElectronAPI {
         inputs: ProjectInputRecord[];
         error?: string;
       }>;
-      importPaths: (projectId: string, filePaths: string[]) => Promise<{
+      importPaths: (
+        projectId: string,
+        filePaths: string[],
+      ) => Promise<{
         success: boolean;
         inputs: ProjectInputRecord[];
         error?: string;
@@ -492,7 +559,9 @@ export interface ElectronAPI {
 
   device: {
     prepare: (request: DevicePreparationRequest) => Promise<DevicePreparationResult>;
-    cancelPreparation: (request: import('./captureReplay').CaptureReplayBindingRequest) => Promise<DevicePreparationResult>;
+    cancelPreparation: (
+      request: import('./captureReplay').CaptureReplayBindingRequest,
+    ) => Promise<DevicePreparationResult>;
     list: () => Promise<ReplayDeviceSnapshot>;
     refresh: () => Promise<ReplayDeviceSnapshot>;
     watchStart: () => Promise<void>;
@@ -502,12 +571,18 @@ export interface ElectronAPI {
 
   session: {
     list: (projectId?: string) => Promise<{ sessions: SessionRecordSnapshot[] }>;
-    create: (projectId: string, title?: string) => Promise<{
+    create: (
+      projectId: string,
+      title?: string,
+    ) => Promise<{
       success: boolean;
       session?: SessionRecordSnapshot;
       error?: string;
     }>;
-    rename: (id: string, title: string) => Promise<{
+    rename: (
+      id: string,
+      title: string,
+    ) => Promise<{
       success: boolean;
       session?: SessionRecordSnapshot;
       error?: string;
@@ -548,7 +623,6 @@ export interface ElectronAPI {
       suggestion?: PlanReviewHandoffSuggestion;
       error?: string;
     }>;
-
   };
 
   runtime: {
@@ -566,7 +640,9 @@ export interface ElectronAPI {
     readLivePreview: (scope: SessionScope) => Promise<Uint8Array>;
     getReplayState: (scope: SessionScope) => Promise<CaptureReplayState>;
     getRecovery: (scope: SessionScope) => Promise<import('./captureReplay').CaptureRecoveryStatus | null>;
-    restorePrevious: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<{ success: boolean; state?: CaptureReplayState; error?: string }>;
+    restorePrevious: (
+      scope: import('./captureReplay').CaptureReplayBindingRequest,
+    ) => Promise<{ success: boolean; state?: CaptureReplayState; error?: string }>;
     applyReplayEvent: (request: CaptureReplayApplyRequest) => Promise<CaptureReplayState>;
     refreshFrame: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<CaptureReplayState>;
     list: (scope: SessionScope) => Promise<{ captures: CaptureDescriptor[] }>;
@@ -575,7 +651,7 @@ export interface ElectronAPI {
       error?: string;
     }>;
     openProjectInput: (
-      request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string; bindingGeneration: number }
+      request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string; bindingGeneration: number },
     ) => Promise<{
       success: boolean;
       openedCapture?: OpenedCaptureState;
@@ -592,7 +668,6 @@ export interface ElectronAPI {
 
   context: {
     get: (scope: SessionScope) => Promise<ContextSnapshot | null>;
-
   };
 
   trace: {
@@ -601,12 +676,14 @@ export interface ElectronAPI {
 
   events: {
     onCaptureReplayChanged: (callback: (state: CaptureReplayState) => void) => () => void;
-    onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; stopReason?: string }) => void) => () => void;
-    onRunUsageChanged: (
-      callback: (summary: SessionScopedPayload<RunContextUsageSummary>) => void
+    onRunStatusChanged: (
+      callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; stopReason?: string }) => void,
     ) => () => void;
+    onRunUsageChanged: (callback: (summary: SessionScopedPayload<RunContextUsageSummary>) => void) => () => void;
     onTraceProjectionChanged: (callback: (payload: TraceProjectionChangedPayload) => void) => () => void;
-    onDelegationTraceChanged: (callback: (payload: { sessionId: string; parentToolCallId: string; revision: number }) => void) => () => void;
+    onDelegationTraceChanged: (
+      callback: (payload: { sessionId: string; parentToolCallId: string; revision: number }) => void,
+    ) => () => void;
     onProbeBatchChanged: (callback: (batch: ProviderProbeBatch) => void) => () => void;
     onKnowledgeProgress: (callback: (progress: KnowledgeOperationProgress) => void) => () => void;
     onEffectiveCatalogChanged: (callback: (change: EffectiveCatalogChange) => void) => () => void;
@@ -617,9 +694,13 @@ export interface ElectronAPI {
     onDeviceStatusChanged: (callback: (status: ReplayDeviceStatusChangedPayload) => void) => () => void;
     onCaptureStatusChanged: (callback: (status: SessionScopedPayload<unknown>) => void) => () => void;
     onContextChanged: (callback: (snapshot: SessionScopedPayload<ContextSnapshot | null>) => void) => () => void;
-    onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void) => () => void;
+    onProjectInputsChanged: (
+      callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void,
+    ) => () => void;
     onProjectInputsError: (callback: (payload: { projectId: string; error: string }) => void) => () => void;
-    onOpenedCaptureStateChanged: (callback: (state: SessionScopedPayload<OpenedCaptureState | null>) => void) => () => void;
+    onOpenedCaptureStateChanged: (
+      callback: (state: SessionScopedPayload<OpenedCaptureState | null>) => void,
+    ) => () => void;
     onPermissionStateChanged: (callback: (state: RuntimePermissionState) => void) => () => void;
     onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void) => () => void;
     onSettingsChanged: (callback: (change: SettingsChangedPayload) => void) => () => void;

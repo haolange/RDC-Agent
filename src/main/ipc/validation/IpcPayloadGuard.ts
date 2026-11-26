@@ -73,14 +73,9 @@ export function ipcNonEmptyString(maxLength: number, label = 'string'): z.ZodStr
 
 /** Opaque id: alphanumeric + common separators, fail-closed on path traversal chars. */
 export function ipcId(maxLength = 128, label = 'id'): z.ZodString {
-  return ipcNonEmptyString(maxLength, label).regex(
-    /^[A-Za-z0-9][A-Za-z0-9._:@+-]*$/,
-    `${label} has invalid format`,
-  );
+  return ipcNonEmptyString(maxLength, label).regex(/^[A-Za-z0-9][A-Za-z0-9._:@+-]*$/, `${label} has invalid format`);
 }
 
 export function ipcStringArray(maxItems: number, maxItemLength: number, label = 'array'): z.ZodArray<z.ZodString> {
-  return z
-    .array(ipcString(maxItemLength, `${label} item`))
-    .max(maxItems, `${label} exceeds ${maxItems} items`);
+  return z.array(ipcString(maxItemLength, `${label} item`)).max(maxItems, `${label} exceeds ${maxItems} items`);
 }

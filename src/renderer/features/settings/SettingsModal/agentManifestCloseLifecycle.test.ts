@@ -10,17 +10,35 @@ import type { AgentManifestDefinition, AgentDefinitionSaveResult } from '@shared
 import type { AgentManifestSaveBatch } from './settingsModalActions';
 
 const definition = (scope: 'project' | 'user'): AgentManifestDefinition => ({
-  id: 'general', fileName: 'general.agent.md', filePath: '/general.agent.md', name: 'General',
-  description: '', argumentHint: '', target: 'rdc-agent', icon: 'spark', accent: '#33d1ff',
-  disableModelInvocation: false, userInvocable: true, tools: [], skills: [], mcpServers: [], agents: [],
-  handoffs: [], metadata: {}, instructions: 'original', builtin: false, enabled: true,
+  id: 'general',
+  fileName: 'general.agent.md',
+  filePath: '/general.agent.md',
+  name: 'General',
+  description: '',
+  argumentHint: '',
+  target: 'rdc-agent',
+  icon: 'spark',
+  accent: '#33d1ff',
+  disableModelInvocation: false,
+  userInvocable: true,
+  tools: [],
+  skills: [],
+  mcpServers: [],
+  agents: [],
+  handoffs: [],
+  metadata: {},
+  instructions: 'original',
+  builtin: false,
+  enabled: true,
   provenance: { scope, sourcePath: '/general.agent.md', sourceHash: 'original-hash' },
 });
-const makeSettings = (entry: AgentManifestDefinition) => ({
-  profile: {}, llm: { providers: [], agentRoutes: [] },
-  tooling: { rdcCli: {}, codeInterpreter: {}, shell: {} },
-  agents: { definitions: [entry], globalInstructions: '' },
-}) as unknown as AppSettings;
+const makeSettings = (entry: AgentManifestDefinition) =>
+  ({
+    profile: {},
+    llm: { providers: [], agentRoutes: [] },
+    tooling: { rdcCli: {}, codeInterpreter: {}, shell: {} },
+    agents: { definitions: [entry], globalInstructions: '' },
+  }) as unknown as AppSettings;
 
 describe('mounted settings state and autosave close lifecycle', () => {
   let root: Root | undefined;
@@ -51,55 +69,89 @@ describe('mounted settings state and autosave close lifecycle', () => {
         writes.push({ ...target, instructions: draft.instructions });
         const entry = { ...definition(scope), instructions: draft.instructions };
         settings = makeSettings(entry);
-        return { clientRevision: 1, status: 'committed', commitHash: 'saved',
-          definition: entry, route: null, lastSuccessful: null };
+        return {
+          clientRevision: 1,
+          status: 'committed',
+          commitHash: 'saved',
+          definition: entry,
+          route: null,
+          lastSuccessful: null,
+        };
       });
     });
     function Probe() {
       state = useSettingsModalState(open, settings, projectId);
       useAgentManifestAutosave({
-        open: open && state.agentManifestContextReady, settings,
-        agentManifestDrafts: state.agentManifestAutosaveDrafts, currentProjectId: projectId,
-        onSave: save, onRollback: vi.fn(), onSaveStateChange: state.setAgentManifestSaveState,
-        onSaveMessageChange: state.setAgentManifestSaveMessage, onBlockedChange: state.setAgentManifestSaveBlocked,
-        savedMessage: 'saved', failedMessage: 'failed',
+        open: open && state.agentManifestContextReady,
+        settings,
+        agentManifestDrafts: state.agentManifestAutosaveDrafts,
+        currentProjectId: projectId,
+        onSave: save,
+        onRollback: vi.fn(),
+        onSaveStateChange: state.setAgentManifestSaveState,
+        onSaveMessageChange: state.setAgentManifestSaveMessage,
+        onBlockedChange: state.setAgentManifestSaveBlocked,
+        savedMessage: 'saved',
+        failedMessage: 'failed',
       });
       return null;
     }
-    act(() => { root = createRoot(container); root.render(createElement(Probe)); });
+    act(() => {
+      root = createRoot(container);
+      root.render(createElement(Probe));
+    });
     return {
-      save, writes, state: () => state,
-      edit: () => act(() => state.setAgentManifestDrafts((drafts) => drafts.map((draft) => ({ ...draft, instructions: 'last edit' })))),
+      save,
+      writes,
+      state: () => state,
+      edit: () =>
+        act(() =>
+          state.setAgentManifestDrafts((drafts) => drafts.map((draft) => ({ ...draft, instructions: 'last edit' }))),
+        ),
       render: async (nextOpen: boolean, nextProjectId = projectId) => {
-        open = nextOpen; projectId = nextProjectId;
-        await act(async () => { root!.render(createElement(Probe)); });
+        open = nextOpen;
+        projectId = nextProjectId;
+        await act(async () => {
+          root!.render(createElement(Probe));
+        });
       },
     };
   }
 
-  it.each(['user', 'project'] as const)('flushes %s edits before 300ms on close, preserving ownership and reopening saved text', async (scope) => {
-    const test = harness(scope, 'project-a');
-    test.edit();
-    act(() => vi.advanceTimersByTime(100));
-    expect(test.save).not.toHaveBeenCalled();
-    await test.render(false);
-    expect(test.writes).toEqual([{ scope, ...(scope === 'project' ? { projectId: 'project-a' } : {}), instructions: 'last edit' }]);
-    expect(test.state().agentManifestDrafts).toEqual([]);
-    await test.render(true);
-    expect(test.state().agentManifestDrafts[0].instructions).toBe('last edit');
-    await act(async () => { vi.advanceTimersByTime(500); });
-    expect(test.save).toHaveBeenCalledTimes(1);
-  });
+  it.each(['user', 'project'] as const)(
+    'flushes %s edits before 300ms on close, preserving ownership and reopening saved text',
+    async (scope) => {
+      const test = harness(scope, 'project-a');
+      test.edit();
+      act(() => vi.advanceTimersByTime(100));
+      expect(test.save).not.toHaveBeenCalled();
+      await test.render(false);
+      expect(test.writes).toEqual([
+        { scope, ...(scope === 'project' ? { projectId: 'project-a' } : {}), instructions: 'last edit' },
+      ]);
+      expect(test.state().agentManifestDrafts).toEqual([]);
+      await test.render(true);
+      expect(test.state().agentManifestDrafts[0].instructions).toBe('last edit');
+      await act(async () => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(test.save).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('never submits startup project profiles without a ready identity', async () => {
     const test = harness('project', null);
     expect(test.state().agentManifestAutosaveDrafts).toEqual([]);
     await test.render(false);
-    await act(async () => { vi.advanceTimersByTime(500); });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
     expect(test.save).not.toHaveBeenCalled();
     await test.render(true, 'project-a');
     expect(test.state().agentManifestDrafts[0].writeProjectId).toBe('project-a');
-    await act(async () => { vi.advanceTimersByTime(500); });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
     expect(test.save).not.toHaveBeenCalled();
   });
 
@@ -107,7 +159,9 @@ describe('mounted settings state and autosave close lifecycle', () => {
     const test = harness('project', 'project-a');
     test.edit();
     await test.render(false, 'project-b');
-    await act(async () => { vi.advanceTimersByTime(500); });
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
     expect(test.save).not.toHaveBeenCalled();
     expect(test.state().agentManifestAutosaveDrafts).toEqual([]);
   });

@@ -14,7 +14,10 @@ export function usePlanPreviewOverflow(content: string) {
       if (!active) return;
       const clipped = preview.scrollHeight > preview.clientHeight + 1;
       setOverflowing(clipped);
-      if (!clipped) { clearDynStyle(preview); return; }
+      if (!clipped) {
+        clearDynStyle(preview);
+        return;
+      }
       const bounds = preview.getBoundingClientRect();
       const walker = document.createTreeWalker(preview, NodeFilter.SHOW_TEXT);
       const range = document.createRange();
@@ -24,7 +27,7 @@ export function usePlanPreviewOverflow(content: string) {
         if (!node.textContent?.trim()) continue;
         range.selectNodeContents(node);
         for (const rect of Array.from(range.getClientRects())) {
-          if (rect.width > 0 && rect.bottom > bounds.top && rect.top < bounds.bottom - .5) {
+          if (rect.width > 0 && rect.bottom > bounds.top && rect.top < bounds.bottom - 0.5) {
             lastTextBottom = Math.max(lastTextBottom, Math.min(rect.bottom, bounds.bottom) - bounds.top);
             textLineHeight = rect.height;
           }

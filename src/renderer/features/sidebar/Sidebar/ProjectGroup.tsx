@@ -55,9 +55,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
   // a former project's rows beneath the newly selected project.
   const scopedSessions = projectSessions.filter((session) => session.projectId === project.projectId);
   const hasOverflowSessions = scopedSessions.length > 5;
-  const visibleSessions = hasOverflowSessions && !showAllSessions
-    ? scopedSessions.slice(0, 5)
-    : scopedSessions;
+  const visibleSessions = hasOverflowSessions && !showAllSessions ? scopedSessions.slice(0, 5) : scopedSessions;
   const projectOriginName = getProjectOriginName(project);
   const shouldShowProjectOriginName = project.name.trim() !== projectOriginName.trim();
 
@@ -65,9 +63,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
     <section
       className={`project-stack-item ${isCurrentProject ? 'is-current' : ''} ${isProjectRailActive ? 'is-selected' : ''} ${isExpanded ? 'is-expanded' : ''}`}
     >
-      <div
-        className={`session-item project-item ${isProjectRailActive ? 'is-selected' : ''}`}
-      >
+      <div className={`session-item project-item ${isProjectRailActive ? 'is-selected' : ''}`}>
         <div className="session-item-header">
           <span className="project-item-leading">
             <button
@@ -95,9 +91,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
             >
               <span className="project-item-title-wrap">
                 <span className="project-item-title">{project.name}</span>
-                {shouldShowProjectOriginName && (
-                  <span className="project-item-origin-name">/ {projectOriginName}</span>
-                )}
+                {shouldShowProjectOriginName && <span className="project-item-origin-name">/ {projectOriginName}</span>}
               </span>
             </button>
           </span>

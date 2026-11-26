@@ -10,37 +10,40 @@ export function projectGoogleVertexModelRoutes(
 ): CatalogModelContribution[] {
   return models.map((model): CatalogModelContribution => {
     const nativeRoute = { protocol, baseUrl: nativeBaseUrl, source: 'model' as const };
-    const routeOptions = protocol === 'GoogleVertexGemini'
-      ? [
-          {
-            id: 'GoogleVertexGemini',
-            route: nativeRoute,
-            availability: 'available' as const,
-            protocolOwner: 'google',
-            endpointOwner: 'google-cloud',
-            authMode: 'api-key' as const,
-          },
-          {
-            id: 'OpenAICompatibleChatCompletions',
-            route: {
-              protocol: 'OpenAICompatibleChatCompletions' as const,
-              baseUrl: openAiBaseUrl,
-              source: 'model' as const,
+    const routeOptions =
+      protocol === 'GoogleVertexGemini'
+        ? [
+            {
+              id: 'GoogleVertexGemini',
+              route: nativeRoute,
+              availability: 'available' as const,
+              protocolOwner: 'google',
+              endpointOwner: 'google-cloud',
+              authMode: 'api-key' as const,
             },
-            availability: 'available' as const,
-            protocolOwner: 'openai',
-            endpointOwner: 'google-cloud',
-            authMode: 'api-key' as const,
-          },
-        ]
-      : [{
-          id: 'GoogleVertexAnthropic',
-          route: nativeRoute,
-          availability: 'available' as const,
-          protocolOwner: 'google',
-          endpointOwner: 'google-cloud',
-          authMode: 'api-key' as const,
-        }];
+            {
+              id: 'OpenAICompatibleChatCompletions',
+              route: {
+                protocol: 'OpenAICompatibleChatCompletions' as const,
+                baseUrl: openAiBaseUrl,
+                source: 'model' as const,
+              },
+              availability: 'available' as const,
+              protocolOwner: 'openai',
+              endpointOwner: 'google-cloud',
+              authMode: 'api-key' as const,
+            },
+          ]
+        : [
+            {
+              id: 'GoogleVertexAnthropic',
+              route: nativeRoute,
+              availability: 'available' as const,
+              protocolOwner: 'google',
+              endpointOwner: 'google-cloud',
+              authMode: 'api-key' as const,
+            },
+          ];
     return {
       modelId: model.id,
       label: model.label,
@@ -135,14 +138,9 @@ function resolveClineAppBaseUrl(baseUrl: string): string {
   return /^https:\/\/api\.cline\.bot$/i.test(trimmed) ? `${trimmed}/api/v1` : trimmed;
 }
 
-export const resolveClineCatalogUrl = (
-  baseUrl: string,
-  catalog: 'usage' | 'pass',
-): string => {
+export const resolveClineCatalogUrl = (baseUrl: string, catalog: 'usage' | 'pass'): string => {
   const trimmed = resolveClineAppBaseUrl(baseUrl);
-  return catalog === 'pass'
-    ? `${trimmed}/ai/cline/recommended-models`
-    : `${trimmed}/ai/cline/models`;
+  return catalog === 'pass' ? `${trimmed}/ai/cline/recommended-models` : `${trimmed}/ai/cline/models`;
 };
 
 /** Account probe for Cline API keys; catalog endpoints do not validate credentials. */
@@ -156,18 +154,19 @@ export const resolveGoogleVertexOpenAiBaseUrl = (baseUrl: string): string => {
     if (/\/v1beta1\/projects\/[^/]+\/locations\/[^/]+\/endpoints\/openapi$/u.test(trimmed)) {
       return trimmed;
     }
-    throw new ProviderConnectionError('Vertex endpoint does not match a supported publisher or OpenAI-compatible route.');
+    throw new ProviderConnectionError(
+      'Vertex endpoint does not match a supported publisher or OpenAI-compatible route.',
+    );
   }
   const [, origin, project, location] = match;
   return `${origin}/v1beta1/projects/${project}/locations/${location}/endpoints/openapi`;
 };
 
-export const resolveGoogleVertexPublisherModelsUrl = (
-  baseUrl: string,
-  publisher: 'google' | 'anthropic',
-): string => {
+export const resolveGoogleVertexPublisherModelsUrl = (baseUrl: string, publisher: 'google' | 'anthropic'): string => {
   const trimmed = baseUrl.trim().replace(/\/+$/u, '');
-  const match = trimmed.match(/^(https:\/\/[^/]+)\/v1\/projects\/[^/]+\/locations\/[^/]+\/publishers\/(google|anthropic)$/u);
+  const match = trimmed.match(
+    /^(https:\/\/[^/]+)\/v1\/projects\/[^/]+\/locations\/[^/]+\/publishers\/(google|anthropic)$/u,
+  );
   if (!match || match[2] !== publisher) {
     throw new ProviderConnectionError(`Vertex ${publisher} endpoint does not match the native publisher route.`);
   }
@@ -195,16 +194,15 @@ export const parseGoogleVertexPublisherModels = (
     const baseId = entry.name.slice(prefix.length).trim();
     if (!baseId) continue;
     const versionId = typeof entry.versionId === 'string' ? entry.versionId.trim() : '';
-    const id = publisher === 'anthropic' && versionId && !baseId.includes('@')
-      ? `${baseId}@${versionId}`
-      : baseId;
+    const id = publisher === 'anthropic' && versionId && !baseId.includes('@') ? `${baseId}@${versionId}` : baseId;
     const normalized = id.toLowerCase();
     if (publisher === 'google' ? !normalized.includes('gemini') : !normalized.includes('claude')) continue;
-    const label = typeof entry.modelDisplayName === 'string' && entry.modelDisplayName.trim()
-      ? entry.modelDisplayName.trim()
-      : typeof entry.displayName === 'string' && entry.displayName.trim()
-        ? entry.displayName.trim()
-        : id;
+    const label =
+      typeof entry.modelDisplayName === 'string' && entry.modelDisplayName.trim()
+        ? entry.modelDisplayName.trim()
+        : typeof entry.displayName === 'string' && entry.displayName.trim()
+          ? entry.displayName.trim()
+          : id;
     byId.set(id, {
       id,
       label,

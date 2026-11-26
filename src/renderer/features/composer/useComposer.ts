@@ -22,7 +22,6 @@ import { persistSessionAgentId } from './sessionAgentId';
 import { useQueuedHandoffSuggestion } from './useQueuedHandoffSuggestion';
 import type { AgentMode, ModeConfig } from '@shared/types/layout';
 
-
 export function useComposer(options: {
   effectiveLeftCollapsed: boolean;
   leftToggleDisabled: boolean;
@@ -42,8 +41,11 @@ export function useComposer(options: {
   const preparedTurnContext = useSessionStore((state) => state.preparedTurnContext);
   const conversationPreparationPhase = useSessionStore((state) => state.conversationPreparationPhase);
   // Only whether a turn is active: subscribing to the messages re-rendered App on every streaming commit.
-  const hasActiveConversationTurn = useConversationStore((state) => state.conversationMessages.some((message) =>
-    message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming')));
+  const hasActiveConversationTurn = useConversationStore((state) =>
+    state.conversationMessages.some(
+      (message) => message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming'),
+    ),
+  );
   const selectedAgentId = useComposerAgentId();
   const currentMode = selectedAgentId as AgentMode;
   const setSelectedAgentId = useCallback((agentId: string) => {
@@ -53,17 +55,19 @@ export function useComposer(options: {
   const userInvocableAgents = agentDefinitions.filter((agent) => agent.enabled && agent.userInvocable);
 
   useEffect(() => {
-    void useAppSettingsStore.getState().reloadSettings()
+    void useAppSettingsStore
+      .getState()
+      .reloadSettings()
       .catch((error: unknown) => console.warn('[composer] could not reload settings for the project', error));
   }, [currentProject?.projectId]);
 
   const selectedDeviceEntry = usePreparedSessionDevice(currentProject?.projectId, currentSession?.sessionId);
-  const { promptValue, setPromptValue } = useScopedPromptDraft(
-    currentProject?.projectId,
-    currentSession?.sessionId,
-  );
+  const { promptValue, setPromptValue } = useScopedPromptDraft(currentProject?.projectId, currentSession?.sessionId);
 
-  const hasActiveDebugRun = Boolean(currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status));
+  const hasActiveDebugRun = Boolean(
+    currentRun &&
+    ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status),
+  );
 
   const attachments = useComposerAttachments({
     t,
@@ -131,12 +135,17 @@ export function useComposer(options: {
   });
   const capabilityState = useTurnControlsStore((state) => state.capabilityState);
   const modelReady = capabilityState.status === 'ready' || capabilityState.status === 'refreshing';
-  const primaryButtonDisabled = send.stopPending || (send.isComposerBusy
-    ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !send.isPromptSending
-    : (!modelReady || (!hasMessageContent && !hasPendingAttachments)));
+  const primaryButtonDisabled =
+    send.stopPending ||
+    (send.isComposerBusy
+      ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !send.isPromptSending
+      : !modelReady || (!hasMessageContent && !hasPendingAttachments));
   const handoff = useQueuedHandoffSuggestion({
     isComposerBusy: send.isPromptSending || hasActiveConversationTurn || hasActiveDebugRun,
-    sessionId: currentSession?.sessionId, setPromptValue, sendPrompt: send.sendHandoffPrompt, inspectRequest: send.inspectHandoff,
+    sessionId: currentSession?.sessionId,
+    setPromptValue,
+    sendPrompt: send.sendHandoffPrompt,
+    inspectRequest: send.inspectHandoff,
   });
 
   useComposerDomEffects({

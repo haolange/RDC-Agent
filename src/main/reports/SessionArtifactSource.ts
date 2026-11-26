@@ -23,10 +23,18 @@ export interface SessionArtifactSource {
 }
 
 const MIME_BY_EXTENSION: Record<string, string> = {
-  '.md': 'text/markdown', '.txt': 'text/plain', '.log': 'text/plain',
-  '.json': 'application/json', '.html': 'text/html', '.htm': 'text/html',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp', '.gif': 'image/gif', '.csv': 'text/csv',
+  '.md': 'text/markdown',
+  '.txt': 'text/plain',
+  '.log': 'text/plain',
+  '.json': 'application/json',
+  '.html': 'text/html',
+  '.htm': 'text/html',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.csv': 'text/csv',
 };
 
 const inferMimeType = (filePath: string): string | undefined => MIME_BY_EXTENSION[path.extname(filePath).toLowerCase()];
@@ -37,7 +45,9 @@ const toTimestamp = (value: string | number | undefined): number | undefined => 
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
-const fileMetadata = (filePath: string): Pick<SessionArtifactSource, 'exists' | 'sizeBytes' | 'createdAt' | 'updatedAt'> => {
+const fileMetadata = (
+  filePath: string,
+): Pick<SessionArtifactSource, 'exists' | 'sizeBytes' | 'createdAt' | 'updatedAt'> => {
   try {
     const stat = fs.statSync(filePath);
     if (!stat.isFile()) return { exists: false };
@@ -47,14 +57,26 @@ const fileMetadata = (filePath: string): Pick<SessionArtifactSource, 'exists' | 
   }
 };
 
-const categorizeOutput = (input: { kind?: string; mimeType?: string; filePath: string }): TraceArtifactRecord['source'] => {
+const categorizeOutput = (input: {
+  kind?: string;
+  mimeType?: string;
+  filePath: string;
+}): TraceArtifactRecord['source'] => {
   const extension = path.extname(input.filePath).toLowerCase();
   if (input.mimeType?.startsWith('image/') || input.kind === 'screenshot') return 'image';
   if (input.kind === 'report') return 'report';
   if (input.kind === 'trace' || input.kind === 'shader' || input.kind === 'capture') return 'evidence';
-  if (input.kind === 'data' || input.mimeType === 'application/json' || input.mimeType === 'text/csv' || extension === '.json' || extension === '.csv') return 'data';
+  if (
+    input.kind === 'data' ||
+    input.mimeType === 'application/json' ||
+    input.mimeType === 'text/csv' ||
+    extension === '.json' ||
+    extension === '.csv'
+  )
+    return 'data';
   if (input.kind === 'log' || extension === '.log') return 'evidence';
-  if (input.kind === 'note' || input.mimeType?.startsWith('text/') || ['.md', '.txt'].includes(extension)) return 'document';
+  if (input.kind === 'note' || input.mimeType?.startsWith('text/') || ['.md', '.txt'].includes(extension))
+    return 'document';
   return 'other';
 };
 
@@ -124,5 +146,7 @@ export async function listSessionArtifactSources(sessionId: string): Promise<Ses
     }
   }
 
-  return dedupeSessionArtifactSources(items).sort((left, right) => (right.updatedAt ?? right.createdAt ?? 0) - (left.updatedAt ?? left.createdAt ?? 0));
+  return dedupeSessionArtifactSources(items).sort(
+    (left, right) => (right.updatedAt ?? right.createdAt ?? 0) - (left.updatedAt ?? left.createdAt ?? 0),
+  );
 }

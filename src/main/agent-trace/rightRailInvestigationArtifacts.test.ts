@@ -69,50 +69,76 @@ describe('mapRightRailInvestigationArtifacts', () => {
     const late = entry('b-late', '2026-01-02T00:00:00.000Z');
     const earlyB = entry('b-early', '2026-01-01T00:00:00.000Z');
     const earlyA = entry('a-early', '2026-01-01T00:00:00.000Z');
-    const result = mapRightRailInvestigationArtifacts('session-a', sourceOf(
-      [late, earlyB, earlyA],
-      [earlyA, earlyB, late].map((item) => [item.artifactId, manifestOf(item.artifactId)]),
-    ));
+    const result = mapRightRailInvestigationArtifacts(
+      'session-a',
+      sourceOf(
+        [late, earlyB, earlyA],
+        [earlyA, earlyB, late].map((item) => [item.artifactId, manifestOf(item.artifactId)]),
+      ),
+    );
     expect(result.rows.map((row) => row.artifactId)).toEqual(['b-late', 'b-early', 'a-early']);
     expect(result.rows.every((row) => !row.degraded)).toBe(true);
-    expect(result.rows.every((row) => row.contentHash.startsWith('sha256:') && row.contentHash.length === 71)).toBe(true);
+    expect(result.rows.every((row) => row.contentHash.startsWith('sha256:') && row.contentHash.length === 71)).toBe(
+      true,
+    );
     expect(result.rows.every((row) => row.contentHashShort === 'sha256:aaaaaaaaaaaa')).toBe(true);
   });
 
   it('counts superseded ids and keeps them out of rows', () => {
     const old = entry('old', '2026-01-01T00:00:00.000Z', { status: 'superseded' });
     const next = entry('next', '2026-01-02T00:00:00.000Z', { supersedes: 'old' });
-    const result = mapRightRailInvestigationArtifacts('session-a', sourceOf(
-      [old, next],
-      [[old.artifactId, manifestOf('old')], [next.artifactId, manifestOf('next')]],
-    ));
+    const result = mapRightRailInvestigationArtifacts(
+      'session-a',
+      sourceOf(
+        [old, next],
+        [
+          [old.artifactId, manifestOf('old')],
+          [next.artifactId, manifestOf('next')],
+        ],
+      ),
+    );
     expect(result.rows.map((row) => row.artifactId)).toEqual(['next']);
     expect(result.totalCount).toBe(1);
   });
 
   it('projects newest five and pages beyond fifty without dropping or repeating ties', () => {
-    const entries = Array.from({ length: 57 }, (_, index) => entry(`art-${String(index).padStart(3, '0')}`, '2026-01-01T00:00:00.000Z'));
-    const source = sourceOf(entries, entries.map(item => [item.artifactId, manifestOf(item.artifactId)]));
+    const entries = Array.from({ length: 57 }, (_, index) =>
+      entry(`art-${String(index).padStart(3, '0')}`, '2026-01-01T00:00:00.000Z'),
+    );
+    const source = sourceOf(
+      entries,
+      entries.map((item) => [item.artifactId, manifestOf(item.artifactId)]),
+    );
     const result = mapRightRailInvestigationArtifacts('session-a', source);
     expect(result.totalCount).toBe(57);
-    expect(result.rows.map(row => row.artifactId)).toEqual(['art-056','art-055','art-054','art-053','art-052']);
+    expect(result.rows.map((row) => row.artifactId)).toEqual(['art-056', 'art-055', 'art-054', 'art-053', 'art-052']);
     const first = listInvestigationArtifacts('session-a', undefined, source);
     expect(first.rows).toHaveLength(50);
     expect(first.nextCursor).toEqual({ createdAt: entries[0].createdAt, artifactId: 'art-007' });
     const second = listInvestigationArtifacts('session-a', first.nextCursor, source);
     expect(second.rows).toHaveLength(7);
     expect(second.nextCursor).toBeUndefined();
-    expect(new Set([...first.rows,...second.rows].map(row => row.artifactId)).size).toBe(57);
+    expect(new Set([...first.rows, ...second.rows].map((row) => row.artifactId)).size).toBe(57);
     expect(second.rows.at(-1)?.artifactId).toBe('art-000');
   });
 
   it('marks a missing or mismatched manifest as degraded instead of dropping the row', () => {
     const missing = entry('missing', '2026-01-01T00:00:00.000Z');
     const drifted = entry('drifted', '2026-01-02T00:00:00.000Z');
-    const result = mapRightRailInvestigationArtifacts('session-a', sourceOf(
-      [missing, drifted],
-      [[drifted.artifactId, manifestOf('drifted', { contentHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' })]],
-    ));
+    const result = mapRightRailInvestigationArtifacts(
+      'session-a',
+      sourceOf(
+        [missing, drifted],
+        [
+          [
+            drifted.artifactId,
+            manifestOf('drifted', {
+              contentHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            }),
+          ],
+        ],
+      ),
+    );
     expect(result.rows).toHaveLength(2);
     expect(result.rows[1]).toMatchObject({
       artifactId: 'missing',
@@ -141,10 +167,14 @@ describe('mapRightRailInvestigationArtifacts', () => {
     expect(() => service.list(SESSION_ID)).toThrow(/INVESTIGATION_INDEX_CORRUPT|INVESTIGATION_HASH_MISMATCH/);
     const result = mapRightRailInvestigationArtifacts(SESSION_ID, service);
     expect(result.rows).toHaveLength(2);
-    expect(result.rows.find((row) => row.artifactId === good.manifest.artifactId))
-      .toMatchObject({ degraded: false, title: 'good world' });
-    expect(result.rows.find((row) => row.artifactId === bad.manifest.artifactId))
-      .toMatchObject({ degraded: true, title: '' });
+    expect(result.rows.find((row) => row.artifactId === good.manifest.artifactId)).toMatchObject({
+      degraded: false,
+      title: 'good world',
+    });
+    expect(result.rows.find((row) => row.artifactId === bad.manifest.artifactId)).toMatchObject({
+      degraded: true,
+      title: '',
+    });
   });
 
   it('empties the card only when the investigation index itself is unavailable', () => {
@@ -164,9 +194,12 @@ describe('mapRightRailInvestigationArtifacts', () => {
   });
 
   it('returns an honest empty view model when the index itself is unavailable', () => {
-    const result = mapRightRailInvestigationArtifacts('session-a', sourceOf([], [], () => {
-      throw new Error('INVESTIGATION_INDEX_CORRUPT');
-    }));
+    const result = mapRightRailInvestigationArtifacts(
+      'session-a',
+      sourceOf([], [], () => {
+        throw new Error('INVESTIGATION_INDEX_CORRUPT');
+      }),
+    );
     expect(result).toEqual({ rows: [], totalCount: 0, storeDegraded: true });
   });
 
@@ -182,19 +215,30 @@ describe('mapRightRailInvestigationArtifacts', () => {
   });
 
   it('does not mix output_register files into investigation rows', () => {
-    const investigation = mapRightRailInvestigationArtifacts('session-a', sourceOf(
-      [entry('inv-1', '2026-01-01T00:00:00.000Z')],
-      [['inv-1', manifestOf('inv-1')]],
-    ));
+    const investigation = mapRightRailInvestigationArtifacts(
+      'session-a',
+      sourceOf([entry('inv-1', '2026-01-01T00:00:00.000Z')], [['inv-1', manifestOf('inv-1')]]),
+    );
     const outputs = mapRightRailOutputs({
       sessionId: 'session-a',
       branchId: 'branch-a',
       runs: [{ runId: 'run-1', startedAt: 1 } as never],
-      sources: [{
-        id: 'out-1', kind: 'output', runId: 'run-1', title: 'report.md', fileName: 'report.md',
-        filePath: 'D:/out/report.md', source: 'report', mimeType: 'text/markdown', sizeBytes: 12,
-        createdAt: 1, updatedAt: 1, exists: true,
-      }],
+      sources: [
+        {
+          id: 'out-1',
+          kind: 'output',
+          runId: 'run-1',
+          title: 'report.md',
+          fileName: 'report.md',
+          filePath: 'D:/out/report.md',
+          source: 'report',
+          mimeType: 'text/markdown',
+          sizeBytes: 12,
+          createdAt: 1,
+          updatedAt: 1,
+          exists: true,
+        },
+      ],
     });
     expect(investigation.rows.some((row) => row.artifactId === 'out-1' || 'path' in row)).toBe(false);
     expect(outputs.current.some((item) => item.id === 'inv-1')).toBe(false);
@@ -203,6 +247,12 @@ describe('mapRightRailInvestigationArtifacts', () => {
 });
 
 it('does not report a failed filesystem read as an empty successful page', () => {
-  const source = sourceOf([], [], () => { throw new Error('EACCES'); });
-  expect(listInvestigationArtifacts('session-a', undefined, source)).toEqual({ rows: [], totalCount: 0, storeDegraded: true });
+  const source = sourceOf([], [], () => {
+    throw new Error('EACCES');
+  });
+  expect(listInvestigationArtifacts('session-a', undefined, source)).toEqual({
+    rows: [],
+    totalCount: 0,
+    storeDegraded: true,
+  });
 });

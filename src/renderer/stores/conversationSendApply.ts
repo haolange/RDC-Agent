@@ -40,10 +40,7 @@ export async function applyConversationTurnResult(options: {
   setTracePresentation: (presentation: AgentRunPresentation | null) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   setBranchState: (branchState: ConversationBranchState | null) => void;
-  setConversationSnapshot?: (
-    messages: ConversationMessage[],
-    branchState?: ConversationBranchState | null,
-  ) => void;
+  setConversationSnapshot?: (messages: ConversationMessage[], branchState?: ConversationBranchState | null) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
 }) {
   const {
@@ -59,13 +56,9 @@ export async function applyConversationTurnResult(options: {
     upsertConversationMessages,
   } = options;
   const refreshTasks: Array<Promise<void>> = [];
-  const requestId = result.userMessage.requestId
-    ?? result.assistantDraftMessage.requestId
-    ?? null;
-  const turnSessionId = result.session?.record.sessionId
-    ?? result.userMessage.sessionId
-    ?? result.assistantDraftMessage.sessionId
-    ?? null;
+  const requestId = result.userMessage.requestId ?? result.assistantDraftMessage.requestId ?? null;
+  const turnSessionId =
+    result.session?.record.sessionId ?? result.userMessage.sessionId ?? result.assistantDraftMessage.sessionId ?? null;
   const conversationState = useConversationStore.getState();
 
   // Preparing revoke already cleaned UI; do not re-apply streaming turn.
@@ -74,18 +67,15 @@ export async function applyConversationTurnResult(options: {
     return;
   }
 
-  const requestStopped = Boolean(
-    requestId && conversationState.monotonicStoppedRequestIds.includes(requestId),
-  );
+  const requestStopped = Boolean(requestId && conversationState.monotonicStoppedRequestIds.includes(requestId));
 
   const forceStoppedMessages = (messages: ConversationMessage[]): ConversationMessage[] => {
     if (!requestStopped) return messages;
-    return messages.map((message) => (
-      message.role === 'assistant'
-        && (message.status === 'draft' || message.status === 'streaming')
+    return messages.map((message) =>
+      message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming')
         ? stopWorkTrace(message)
-        : message
-    ));
+        : message,
+    );
   };
 
   // A project-only selection has no active session. A turn sent from another
@@ -100,10 +90,7 @@ export async function applyConversationTurnResult(options: {
   // Records are keyed by session and kept by revision, so a background turn's session is current data too.
   if (result.session) acceptSessionSnapshot(result.session);
   if (turnSessionId && backgroundTurn) {
-    for (const message of forceStoppedMessages(result.messages ?? [
-      result.userMessage,
-      result.assistantDraftMessage,
-    ])) {
+    for (const message of forceStoppedMessages(result.messages ?? [result.userMessage, result.assistantDraftMessage])) {
       useSessionProjectionStore.getState().projectConversationMessage(turnSessionId, message);
     }
     if (result.tracePresentation) {
@@ -114,12 +101,14 @@ export async function applyConversationTurnResult(options: {
 
   const turnSession = result.session?.record;
   if (turnSession && currentProject?.projectId !== turnSession.projectId) {
-    refreshTasks.push(electronAPI.project.list().then((projectsResult) => {
-      const nextProjects = projectsResult.projects;
-      useProjectStore.getState().setProjects(nextProjects);
-      const matchedProject = nextProjects.find((project) => project.projectId === turnSession.projectId) ?? null;
-      useProjectStore.getState().setCurrentProject(matchedProject);
-    }));
+    refreshTasks.push(
+      electronAPI.project.list().then((projectsResult) => {
+        const nextProjects = projectsResult.projects;
+        useProjectStore.getState().setProjects(nextProjects);
+        const matchedProject = nextProjects.find((project) => project.projectId === turnSession.projectId) ?? null;
+        useProjectStore.getState().setCurrentProject(matchedProject);
+      }),
+    );
   }
 
   if (turnSession) {
@@ -128,9 +117,11 @@ export async function applyConversationTurnResult(options: {
     // The authoritative result now owns a session, so the rail must immediately show
     // the session inspector instead of leaving the project import surface visible.
     useProjectStore.getState().setRightRailTarget('session');
-    refreshTasks.push(electronAPI.session.list(turnSession.projectId).then((sessionsResult) => {
-      setSessions(receiveSessionList(sessionsResult.sessions));
-    }));
+    refreshTasks.push(
+      electronAPI.session.list(turnSession.projectId).then((sessionsResult) => {
+        setSessions(receiveSessionList(sessionsResult.sessions));
+      }),
+    );
   }
 
   if (result.messages) {
@@ -139,10 +130,7 @@ export async function applyConversationTurnResult(options: {
     const allMessages = useConversationStore.getState().allConversationMessages;
     const reconciled = forceStoppedMessages(reconcileTurnMessages(allMessages, result.messages));
     const reconciledIds = new Set(reconciled.map((message) => message.id));
-    const merged = [
-      ...allMessages.filter((message) => !reconciledIds.has(message.id)),
-      ...reconciled,
-    ];
+    const merged = [...allMessages.filter((message) => !reconciledIds.has(message.id)), ...reconciled];
     // Atomically align messages + branchState so upsert races cannot leak sibling branches.
     if (setConversationSnapshot && result.branchState !== undefined) {
       setConversationSnapshot(merged, result.branchState ?? null);
@@ -153,10 +141,7 @@ export async function applyConversationTurnResult(options: {
       }
     }
   } else {
-    upsertConversationMessages(forceStoppedMessages([
-      result.userMessage,
-      result.assistantDraftMessage,
-    ]));
+    upsertConversationMessages(forceStoppedMessages([result.userMessage, result.assistantDraftMessage]));
     if (result.branchState !== undefined) {
       setBranchState(result.branchState ?? null);
     }

@@ -41,9 +41,7 @@ export async function executeToolCalls(
   stream: EventStream<AgentLoopEvent, Message[]>,
   _maxConcurrency?: number,
 ): Promise<ExecuteToolCallsResult> {
-  const toolCalls = assistantMessage.content.filter(
-    (c): c is ToolCallContent => c.type === 'toolCall',
-  );
+  const toolCalls = assistantMessage.content.filter((c): c is ToolCallContent => c.type === 'toolCall');
 
   const executeOne = async (toolCall: ToolCallContent, index: number): Promise<ToolResultMessage> => {
     void index;
@@ -51,7 +49,13 @@ export async function executeToolCalls(
     const onExecutionStart = (permissionState?: RuntimePermissionState) => {
       if (startTime !== undefined) return;
       startTime = Date.now();
-      stream.push({ type: 'tool_execution_start', toolCallId: toolCall.id, toolName: toolCall.name, args: toolCall.arguments, permissionState });
+      stream.push({
+        type: 'tool_execution_start',
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        args: toolCall.arguments,
+        permissionState,
+      });
     };
 
     let result: ToolResultMessage;
@@ -75,10 +79,7 @@ export async function executeToolCalls(
         result = createToolCallFailure(toolCall, `Error: ${message}`);
       }
     } else {
-      result = createToolCallFailure(
-        toolCall,
-        `Tool "${toolCall.name}" not available (no executor configured)`,
-      );
+      result = createToolCallFailure(toolCall, `Tool "${toolCall.name}" not available (no executor configured)`);
     }
 
     stream.push({
@@ -96,16 +97,13 @@ export async function executeToolCalls(
     isSafe: (toolCall) => toolExecutor?.isConcurrencySafe?.(toolCall) === true,
     reserve: (group) => toolExecutor?.reserveDispatchBudget?.([...group]) ?? { ok: true },
     executeOne,
-    createBudgetFailure: (toolCall, _index, limit) => createToolCallFailure(
-      toolCall,
-      `POLICY_LIMIT_EXCEEDED: ${limit}; tool execution was not started.`,
-      { code: 'POLICY_LIMIT_EXCEEDED', limit },
-    ),
-    createNotStarted: (toolCall, _index, reason) => createToolCallFailure(
-      toolCall,
-      `TOOL_GROUP_NOT_STARTED: ${reason}`,
-      { code: 'TOOL_GROUP_NOT_STARTED', reason },
-    ),
+    createBudgetFailure: (toolCall, _index, limit) =>
+      createToolCallFailure(toolCall, `POLICY_LIMIT_EXCEEDED: ${limit}; tool execution was not started.`, {
+        code: 'POLICY_LIMIT_EXCEEDED',
+        limit,
+      }),
+    createNotStarted: (toolCall, _index, reason) =>
+      createToolCallFailure(toolCall, `TOOL_GROUP_NOT_STARTED: ${reason}`, { code: 'TOOL_GROUP_NOT_STARTED', reason }),
     isErrorResult: (result) => result.isError === true,
     shouldStopAfterResult: (result) => toolExecutor?.shouldEndTurnAfterToolResult?.(result) === true,
     signal: stream.signal,

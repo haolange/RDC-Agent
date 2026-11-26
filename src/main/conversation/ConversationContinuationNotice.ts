@@ -10,9 +10,11 @@ export function shouldAnnounceContinuationDrop(
 ): boolean {
   const previousRoute = previous && 'route' in previous ? previous.route : previous;
   if (!previousRoute) return false;
-  return previousRoute.providerId !== next.providerId
-    || previousRoute.effectiveModelId !== next.effectiveModelId
-    || previousRoute.protocol !== next.route.protocol;
+  return (
+    previousRoute.providerId !== next.providerId ||
+    previousRoute.effectiveModelId !== next.effectiveModelId ||
+    previousRoute.protocol !== next.route.protocol
+  );
 }
 
 export function createContinuationDropNotice(options: {
@@ -49,11 +51,10 @@ export function createContinuationDropNotice(options: {
         userMessage: 'Model switched. Reasoning continuation from the previous model cannot be reused.',
         providerId: options.next.providerId,
         modelId: options.next.effectiveModelId,
-        technicalMessage: [
-          options.previous?.providerId,
-          options.previous?.effectiveModelId,
-          options.previous?.protocol,
-        ].filter(Boolean).join('/') || undefined,
+        technicalMessage:
+          [options.previous?.providerId, options.previous?.effectiveModelId, options.previous?.protocol]
+            .filter(Boolean)
+            .join('/') || undefined,
       },
     },
   );

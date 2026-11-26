@@ -7,21 +7,29 @@ import { z } from 'zod';
 import { ProjectInputRecordSchema } from '@shared/types/session';
 import type { StorageMigration } from './storedDocument';
 
-const ProjectRecordSchema = z.object({
-  projectId: z.string().min(1),
-  name: z.string().min(1),
-  rootPath: z.string().min(1),
-  slug: z.string().min(1),
-  resourcePath: z.string().min(1),
-  knowledgePath: z.string().min(1),
-  inputsPath: z.string().min(1),
-  inputs: z.array(ProjectInputRecordSchema).default([]),
-  inputsUpdatedAt: z.number(),
-  replayCleanupPending: z.object({ requestedAt: z.number(), captureHashes: z.array(z.string().regex(/^[a-f0-9]{64}$/u)), error: z.string().optional() }).optional(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  lastSessionId: z.string().optional(),
-}).passthrough();
+const ProjectRecordSchema = z
+  .object({
+    projectId: z.string().min(1),
+    name: z.string().min(1),
+    rootPath: z.string().min(1),
+    slug: z.string().min(1),
+    resourcePath: z.string().min(1),
+    knowledgePath: z.string().min(1),
+    inputsPath: z.string().min(1),
+    inputs: z.array(ProjectInputRecordSchema).default([]),
+    inputsUpdatedAt: z.number(),
+    replayCleanupPending: z
+      .object({
+        requestedAt: z.number(),
+        captureHashes: z.array(z.string().regex(/^[a-f0-9]{64}$/u)),
+        error: z.string().optional(),
+      })
+      .optional(),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    lastSessionId: z.string().optional(),
+  })
+  .passthrough();
 
 export const ProjectRegistryV1Schema = z.object({
   schemaVersion: z.literal('1'),

@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  projectContextUsagePreview,
-  shouldProjectContextUsagePreview,
-} from './projectContextUsagePreview';
+import { projectContextUsagePreview, shouldProjectContextUsagePreview } from './projectContextUsagePreview';
 import type { RunContextUsageSummary } from '@shared/types/session';
 import type { SelectedContextProfile } from './selectedContextProfile';
 
@@ -58,9 +55,13 @@ describe('projectContextUsagePreview', () => {
   });
 
   it('inserts a rescaled free segment when the last snapshot omitted one', () => {
-    const result = projectContextUsagePreview(usage({
-      breakdown: [{ id: 'conversation', tokens: 80_000 }],
-    }), profile(), 'idle');
+    const result = projectContextUsagePreview(
+      usage({
+        breakdown: [{ id: 'conversation', tokens: 80_000 }],
+      }),
+      profile(),
+      'idle',
+    );
     expect(result.usage?.breakdown).toEqual([
       { id: 'conversation', tokens: 80_000 },
       { id: 'free', tokens: 884_800 },

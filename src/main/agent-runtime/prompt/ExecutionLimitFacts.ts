@@ -2,13 +2,17 @@ import { resolveAgentMaxTurns } from '../agent/ExecutionLimits';
 import { applyRuntimeFact } from './RuntimeFactSegment';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 
-export function applyExecutionLimitFacts(plan: PromptPlan, limits: {
-  policyMaxTurns?: number;
-  profileMaxTurns?: number | null;
-}): PromptPlan {
+export function applyExecutionLimitFacts(
+  plan: PromptPlan,
+  limits: {
+    policyMaxTurns?: number;
+    profileMaxTurns?: number | null;
+  },
+): PromptPlan {
   const maximum = resolveAgentMaxTurns(limits.policyMaxTurns, limits.profileMaxTurns);
   return applyRuntimeFact(plan, {
-    id: 'runtime:execution-limits', sourcePath: 'runtime://execution-limits',
+    id: 'runtime:execution-limits',
+    sourcePath: 'runtime://execution-limits',
     content: [
       '# Frozen Execution Limits',
       `Ordinary provider loop maximum for this prepared turn: ${maximum ?? 'not configured'}`,

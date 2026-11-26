@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EventStream } from '../../core/EventStream';
 import { AssistantStreamBuilder, ProviderStreamProtocolError } from './AssistantStreamBuilder';
-import {
-  AlternatingTextThinkingChannels,
-  StreamChannelRefs,
-  closeSwitchedChannel,
-} from './streamChannelRefs';
+import { AlternatingTextThinkingChannels, StreamChannelRefs, closeSwitchedChannel } from './streamChannelRefs';
 import type { AssistantMessage, AssistantMessageEvent } from '../../core/types';
 
 function makeBuilder() {

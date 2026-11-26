@@ -95,46 +95,45 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   setOpen: (open) => set({ isOpen: open }),
   toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
-  setActiveContext: (context) => set((state) => {
-    const sessionId = Object.prototype.hasOwnProperty.call(context, 'sessionId')
-      ? context.sessionId ?? null
-      : state.sessionId;
-    const projectId = Object.prototype.hasOwnProperty.call(context, 'projectId')
-      ? context.projectId ?? null
-      : state.projectId;
-    const runId = Object.prototype.hasOwnProperty.call(context, 'runId')
-      ? context.runId ?? null
-      : state.runId;
-    const changed = sessionId !== state.sessionId
-      || projectId !== state.projectId
-      || runId !== state.runId;
+  setActiveContext: (context) =>
+    set((state) => {
+      const sessionId = Object.prototype.hasOwnProperty.call(context, 'sessionId')
+        ? (context.sessionId ?? null)
+        : state.sessionId;
+      const projectId = Object.prototype.hasOwnProperty.call(context, 'projectId')
+        ? (context.projectId ?? null)
+        : state.projectId;
+      const runId = Object.prototype.hasOwnProperty.call(context, 'runId') ? (context.runId ?? null) : state.runId;
+      const changed = sessionId !== state.sessionId || projectId !== state.projectId || runId !== state.runId;
 
-    return {
+      return {
+        sessionId,
+        projectId,
+        runId,
+        entries: changed ? [] : state.entries,
+        expandedEntryIds: changed ? [] : state.expandedEntryIds,
+        isLoading: changed ? false : state.isLoading,
+      };
+    }),
+  setActiveSessionId: (sessionId) =>
+    set((state) => ({
       sessionId,
-      projectId,
-      runId,
-      entries: changed ? [] : state.entries,
-      expandedEntryIds: changed ? [] : state.expandedEntryIds,
-      isLoading: changed ? false : state.isLoading,
-    };
-  }),
-  setActiveSessionId: (sessionId) => set((state) => ({
-    sessionId,
-    entries: sessionId === state.sessionId ? state.entries : [],
-    expandedEntryIds: sessionId === state.sessionId ? state.expandedEntryIds : [],
-    isLoading: sessionId === state.sessionId ? state.isLoading : false,
-  })),
+      entries: sessionId === state.sessionId ? state.entries : [],
+      expandedEntryIds: sessionId === state.sessionId ? state.expandedEntryIds : [],
+      isLoading: sessionId === state.sessionId ? state.isLoading : false,
+    })),
   setScopeFilter: (scopeFilter) => set({ scopeFilter, expandedEntryIds: [] }),
   setNamespaceFilter: (namespaceFilter) => set({ namespaceFilter }),
   setSeverityFilter: (severityFilter) => set({ severityFilter }),
   setDensity: (density) => set({ density }),
   setQuery: (query) => set({ query }),
   setFollowOutput: (followOutput) => set({ followOutput }),
-  toggleEntryExpanded: (entryId) => set((state) => ({
-    expandedEntryIds: state.expandedEntryIds.includes(entryId)
-      ? state.expandedEntryIds.filter((id) => id !== entryId)
-      : [...state.expandedEntryIds, entryId],
-  })),
+  toggleEntryExpanded: (entryId) =>
+    set((state) => ({
+      expandedEntryIds: state.expandedEntryIds.includes(entryId)
+        ? state.expandedEntryIds.filter((id) => id !== entryId)
+        : [...state.expandedEntryIds, entryId],
+    })),
 
   appendEntry: (entry) => {
     const state = get();
@@ -156,14 +155,15 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     };
     const requestScopeFilter = state.scopeFilter;
     const request = resolveRuntimeLogRequest(requestScopeFilter, requestContext.sessionId);
-    const isCurrent = (latest: TerminalState) => latest.scopeFilter === requestScopeFilter
-      && latest.sessionId === requestContext.sessionId
-      && latest.projectId === requestContext.projectId
-      && latest.runId === requestContext.runId;
+    const isCurrent = (latest: TerminalState) =>
+      latest.scopeFilter === requestScopeFilter &&
+      latest.sessionId === requestContext.sessionId &&
+      latest.projectId === requestContext.projectId &&
+      latest.runId === requestContext.runId;
     // Lines that stream in while the list is in flight may be missing from its snapshot; they survive the refresh.
     const knownAtRequest = new Set(state.entries.map((entry) => entry.id));
-    const appendedSince = (entries: RuntimeLogEntry[], listed: ReadonlySet<string>) => entries
-      .filter((entry) => !knownAtRequest.has(entry.id) && !listed.has(entry.id));
+    const appendedSince = (entries: RuntimeLogEntry[], listed: ReadonlySet<string>) =>
+      entries.filter((entry) => !knownAtRequest.has(entry.id) && !listed.has(entry.id));
     set({ isLoading: true });
     try {
       const result = await window.electronAPI.runtimeLog.list(request);

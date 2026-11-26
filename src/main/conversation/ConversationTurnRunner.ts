@@ -14,7 +14,10 @@ import { finalizeTrace, upsertWorkBlock } from '../agent-runtime/workTrace/Conve
 import { hydrateFrozenUserContent } from '../agent-runtime/attachments/ConversationAttachmentMaterializer';
 import { diagnosticText } from './diagnosticText';
 import { shouldSnapshotHandoffSuggestions } from './missionHandoffSuggestions';
-import { ConversationStreamPatchScheduler, type ConversationStreamPatchCommitOptions } from './ConversationStreamPatchScheduler';
+import {
+  ConversationStreamPatchScheduler,
+  type ConversationStreamPatchCommitOptions,
+} from './ConversationStreamPatchScheduler';
 import { attachToolExecutionEvidence } from './ConversationToolEvidence';
 import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeState';
 import { verifyApprovedPlanExit } from './approvedPlanExit';
@@ -23,11 +26,7 @@ import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
 import { reconcileTerminalToolReceipts } from './ConversationTerminalToolReceipts';
 import { assertTurnRuntimeEpochs } from './TurnRuntimeEpochs';
-import {
-  getAgentLabel,
-  isActiveRun,
-  recordLlmDiagnostic,
-} from './ConversationRoutePreflight';
+import { getAgentLabel, isActiveRun, recordLlmDiagnostic } from './ConversationRoutePreflight';
 import type { PreparedAgentTurnContext } from '../agent-runtime/orchestration/orchestratorTypes';
 import type {
   ActiveConversationTurn,
@@ -80,7 +79,11 @@ export interface ConversationTurnOutput {
   persistConversationSnapshot(sessionId: string | null | undefined, message: ConversationMessage): Error | null;
   emitConversationEvent(event: ConversationStreamEvent): void;
   publishRunStatus(sessionId: string, runId: string, status: RunSummary['status']): void;
-  publishConversationTrace(traceSessionId: string, messages: ConversationMessage[], persistedSessionId?: string | null): void;
+  publishConversationTrace(
+    traceSessionId: string,
+    messages: ConversationMessage[],
+    persistedSessionId?: string | null,
+  ): void;
   assertTerminalContextOwnership(
     sessionId: string,
     turnId: string,
@@ -154,15 +157,17 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
   private lastTracePublishedAt = 0;
   private settleStopped = () => {};
 
-  constructor(private readonly turns: ActiveConversationTurns, output: ConversationTurnOutput, readonly input: CompleteProfileTurnInput) {
+  constructor(
+    private readonly turns: ActiveConversationTurns,
+    output: ConversationTurnOutput,
+    readonly input: CompleteProfileTurnInput,
+  ) {
     this.host = output;
     this.assistantMessage = input.assistantDraftMessage;
     this.sessionId = input.context.session?.sessionId ?? null;
     this.traceSessionId = this.sessionId ?? output.ephemeralTraceSessionId(input.assistantDraftMessage.turnId);
     this.conversationAgentId = input.requestedAgentId;
-    this.capturedBranchId = input.assistantDraftMessage.branchId
-      ?? input.userMessage.branchId
-      ?? ROOT_BRANCH_ID;
+    this.capturedBranchId = input.assistantDraftMessage.branchId ?? input.userMessage.branchId ?? ROOT_BRANCH_ID;
     this.agentLabel = getAgentLabel(this.conversationAgentId);
   }
 
@@ -282,8 +287,9 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
           completionReceipt: result.completionReceipt,
           completionDeclaration: result.completionDeclaration,
         };
-        this.approvedPlanExit = result.status === 'complete'
-          && verifyApprovedPlanExit(sessionId, this.assistantMessage.turnId, result.approvedPlan);
+        this.approvedPlanExit =
+          result.status === 'complete' &&
+          verifyApprovedPlanExit(sessionId, this.assistantMessage.turnId, result.approvedPlan);
       },
       onEvent: createAgentEventHandler(this),
     });
@@ -292,13 +298,16 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
   /** The owning Agent turn must confirm completion with a receipt for this turn and the same runtime epochs. */
   private acceptCompletionReceipt(): void {
     const receipt = this.terminalContext?.completionReceipt;
-    if (this.terminalContext?.status !== 'complete' || !receipt
-      || receipt.turnId !== this.assistantMessage.turnId) {
+    if (this.terminalContext?.status !== 'complete' || !receipt || receipt.turnId !== this.assistantMessage.turnId) {
       throw new AppError('TURN_COMPLETION_RECEIPT_INVALID', 'the owning Agent turn did not confirm completion.');
     }
-    assertTurnRuntimeEpochs({ sessionId: this.sessionId, turnId: this.assistantMessage.turnId,
-      initialFingerprint: this.input.preparedTurn.runtime.effectivePlan.fingerprint, receipt,
-      offer: this.input.preparedTurn.runtime.approvedExecution?.offer });
+    assertTurnRuntimeEpochs({
+      sessionId: this.sessionId,
+      turnId: this.assistantMessage.turnId,
+      initialFingerprint: this.input.preparedTurn.runtime.effectivePlan.fingerprint,
+      receipt,
+      offer: this.input.preparedTurn.runtime.approvedExecution?.offer,
+    });
     this.canonicalOutput = { finalAnswerText: receipt.finalAnswerText };
     if (!this.approvedPlanExit) requireCanonicalFinalAnswer(this.canonicalOutput);
   }
@@ -323,7 +332,9 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
     const { llmDiagnostic } = this;
     const assistantContent = llmDiagnostic
       ? llmDiagnostic.userMessage.trim()
-      : this.approvedPlanExit ? '' : requireCanonicalFinalAnswer(this.canonicalOutput);
+      : this.approvedPlanExit
+        ? ''
+        : requireCanonicalFinalAnswer(this.canonicalOutput);
     this.visibleResponse = assistantContent;
     const isRouteMissingDiagnostic = llmDiagnostic?.code === 'CONVERSATION_LLM_ROUTE_MISSING';
     const finalStatus: ConversationMessage['status'] = this.runWasCancelled
@@ -339,33 +350,31 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
 
     if (this.abortController.signal.aborted || this.runWasCancelled) return;
 
-    const traceWithOutput = this.approvedPlanExit && this.assistantMessage.workTrace
-      ? this.assistantMessage.workTrace
-      : upsertWorkBlock(this.assistantMessage.workTrace, 'assistant-output', {
-        kind: 'output',
-        status: finalStatus === 'error' ? 'error' : 'complete',
-        summary: outputSummary(llmDiagnostic, this.approvedPlanExit),
-        completedAt: nowMs(),
-      });
+    const traceWithOutput =
+      this.approvedPlanExit && this.assistantMessage.workTrace
+        ? this.assistantMessage.workTrace
+        : upsertWorkBlock(this.assistantMessage.workTrace, 'assistant-output', {
+            kind: 'output',
+            status: finalStatus === 'error' ? 'error' : 'complete',
+            summary: outputSummary(llmDiagnostic, this.approvedPlanExit),
+            completedAt: nowMs(),
+          });
     const traceWithEvidence = attachToolExecutionEvidence(traceWithOutput);
-    const terminalSummary = (traceWithEvidence.toolEvidence?.total ?? 0) > 0
-      ? undefined
-      : llmDiagnostic
-        ? finalStatus === 'error'
-          ? diagnosticText('turnFailed')
-          : diagnosticText('turnWaitingModel')
-        : diagnosticText('turnCompleted');
+    const terminalSummary =
+      (traceWithEvidence.toolEvidence?.total ?? 0) > 0
+        ? undefined
+        : llmDiagnostic
+          ? finalStatus === 'error'
+            ? diagnosticText('turnFailed')
+            : diagnosticText('turnWaitingModel')
+          : diagnosticText('turnCompleted');
     const handoffSuggestions = this.handoffSuggestions(finalStatus, traceWithEvidence);
     this.commitTerminalAssistantMessage(finalStatus === 'error' ? 'message_errored' : 'message_completed', {
       status: finalStatus,
       content: assistantContent,
       diagnostic: llmDiagnostic,
       ...(handoffSuggestions && handoffSuggestions.length > 0 ? { handoffSuggestions } : {}),
-      ...this.withWorkTrace(finalizeTrace(
-        traceWithEvidence,
-        traceStatus,
-        terminalSummary,
-      )),
+      ...this.withWorkTrace(finalizeTrace(traceWithEvidence, traceStatus, terminalSummary)),
     });
   }
 
@@ -373,7 +382,8 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
     finalStatus: NonNullable<ConversationMessage['status']>,
     workTrace: ConversationWorkTrace,
   ): PlanReviewHandoffSuggestion[] | undefined {
-    if (!shouldSnapshotHandoffSuggestions({ agentId: this.conversationAgentId, finalStatus, workTrace })) return undefined;
+    if (!shouldSnapshotHandoffSuggestions({ agentId: this.conversationAgentId, finalStatus, workTrace }))
+      return undefined;
     return this.input.preparedTurn.runtime.effectivePlan.profileHandoffs
       .filter((handoff) => isHandoffOfferedAtTurnEnd(handoff) && handoff.label.trim() && handoff.agent.trim())
       .map((handoff) => ({
@@ -409,11 +419,12 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
   /** Writes the terminal message and its session-context entry in one transaction, then publishes it. */
   private commitTerminalTransaction(sessionId: string, eventType: MessageUpdateType): void {
     const { input } = this;
-    const terminalStatus = this.assistantMessage.status === 'stopped'
-      ? 'stopped'
-      : this.assistantMessage.status === 'error'
-        ? 'error'
-        : 'complete';
+    const terminalStatus =
+      this.assistantMessage.status === 'stopped'
+        ? 'stopped'
+        : this.assistantMessage.status === 'error'
+          ? 'error'
+          : 'complete';
     const capturedContext = this.terminalContext ?? this.fallbackTerminalContext(terminalStatus);
     try {
       this.host.assertTerminalContextOwnership(
@@ -482,7 +493,12 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
           model: plan.effectiveModelId,
           provider: plan.providerId,
           usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-          stopReason: terminalStatus === 'stopped' ? 'aborted' as const : terminalStatus === 'error' ? 'error' as const : 'stop' as const,
+          stopReason:
+            terminalStatus === 'stopped'
+              ? ('aborted' as const)
+              : terminalStatus === 'error'
+                ? ('error' as const)
+                : ('stop' as const),
           timestamp: this.assistantMessage.updatedAt ?? nowMs(),
         },
       ],
@@ -506,26 +522,30 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
       messages: capturedContext.messages,
       createdAt: input.userMessage.createdAt,
       completedAt: this.assistantMessage.updatedAt ?? nowMs(),
-      ...(terminalStatus === 'complete' && capturedContext.status === 'complete'
-        && this.terminalContext?.completionDeclaration?.disposition === 'completed'
-        && approvedExecution ? {
-          approvedExecutionCompletion: {
-            ...(approvedExecution.offer.offerId ? { offerId: approvedExecution.offer.offerId } : {}),
-            planUri: approvedExecution.offer.plan.uri,
-            planHash: approvedExecution.offer.plan.hash,
-          },
-        } : {}),
+      ...(terminalStatus === 'complete' &&
+      capturedContext.status === 'complete' &&
+      this.terminalContext?.completionDeclaration?.disposition === 'completed' &&
+      approvedExecution
+        ? {
+            approvedExecutionCompletion: {
+              ...(approvedExecution.offer.offerId ? { offerId: approvedExecution.offer.offerId } : {}),
+              planUri: approvedExecution.offer.plan.uri,
+              planHash: approvedExecution.offer.plan.hash,
+            },
+          }
+        : {}),
     });
   }
 
   private async finalizeOwnedRun(): Promise<void> {
     const ownedRun = this.input.context.currentRun;
     if (!this.sessionId || !isActiveRun(ownedRun)) return;
-    const terminalRunStatus = this.assistantMessage.status === 'stopped'
-      ? 'cancelled'
-      : this.assistantMessage.status === 'error'
-        ? 'failed'
-        : 'completed';
+    const terminalRunStatus =
+      this.assistantMessage.status === 'stopped'
+        ? 'cancelled'
+        : this.assistantMessage.status === 'error'
+          ? 'failed'
+          : 'completed';
     try {
       await sessionRecordStore.updateRun(this.sessionId, ownedRun.runId, {
         status: terminalRunStatus,
@@ -573,7 +593,11 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
           turnId: this.assistantMessage.turnId,
           message: this.assistantMessage,
         });
-        this.host.publishConversationTrace(this.traceSessionId, [this.input.userMessage, this.assistantMessage], this.sessionId);
+        this.host.publishConversationTrace(
+          this.traceSessionId,
+          [this.input.userMessage, this.assistantMessage],
+          this.sessionId,
+        );
         return;
       }
     }
@@ -582,13 +606,19 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
     }
     if (options.publishTrace) {
       const now = nowMs();
-      const isTerminal = type === 'message_completed' || type === 'message_errored'
-        || patch.status === 'stopped'
-        || patch.status === 'complete'
-        || patch.status === 'error';
+      const isTerminal =
+        type === 'message_completed' ||
+        type === 'message_errored' ||
+        patch.status === 'stopped' ||
+        patch.status === 'complete' ||
+        patch.status === 'error';
       if (isTerminal || now - this.lastTracePublishedAt >= TRACE_PUBLISH_MIN_INTERVAL_MS) {
         this.lastTracePublishedAt = now;
-        this.host.publishConversationTrace(this.traceSessionId, [this.input.userMessage, this.assistantMessage], this.sessionId);
+        this.host.publishConversationTrace(
+          this.traceSessionId,
+          [this.input.userMessage, this.assistantMessage],
+          this.sessionId,
+        );
       }
     }
   }
@@ -617,7 +647,9 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
     agentPlanReviewRequestService.cancelTurn(this.assistantMessage.turnId);
     agentToolApprovalRequestService.cancelTurn(this.assistantMessage.turnId);
     const stoppedTrace = reconcileTerminalToolReceipts(
-      this.assistantMessage.workTrace, this.terminalContext?.messages ?? [], this.input.userMessage.createdAt,
+      this.assistantMessage.workTrace,
+      this.terminalContext?.messages ?? [],
+      this.input.userMessage.createdAt,
     );
     this.commitTerminalAssistantMessage('message_completed', {
       status: 'stopped',
@@ -653,13 +685,14 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
 
   readonly recordProviderOutputRefs = (refs: ProviderOutputRef[] | undefined): void => {
     for (const ref of refs ?? []) {
-      const duplicate = this.currentLoopProviderOutputRefs.some((candidate) => (
-        candidate.protocol === ref.protocol
-        && candidate.responseId === ref.responseId
-        && candidate.providerBlockKey === ref.providerBlockKey
-        && candidate.sourceIndex === ref.sourceIndex
-        && candidate.itemId === ref.itemId
-      ));
+      const duplicate = this.currentLoopProviderOutputRefs.some(
+        (candidate) =>
+          candidate.protocol === ref.protocol &&
+          candidate.responseId === ref.responseId &&
+          candidate.providerBlockKey === ref.providerBlockKey &&
+          candidate.sourceIndex === ref.sourceIndex &&
+          candidate.itemId === ref.itemId,
+      );
       if (!duplicate) this.currentLoopProviderOutputRefs.push({ ...ref });
     }
   };
@@ -693,18 +726,28 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
 function outputSummary(llmDiagnostic: ConversationMessageDiagnostic | null, approvedPlanExit: boolean): string {
   if (!llmDiagnostic) return approvedPlanExit ? 'Plan approved; declared handoff ready.' : 'Final answer generated.';
   switch (llmDiagnostic.code) {
-    case 'CONVERSATION_LLM_ROUTE_MISSING': return 'Model route unavailable; configuration diagnostic returned.';
-    case 'CONVERSATION_AGENT_LOOP_STALLED': return 'Agent loop stopped after no progress.';
-    case 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED': return 'Agent loop stopped at the configured turn limit.';
-    case 'CONVERSATION_TASK_COMPLETION_DENIED': return 'An unfinished direct Task prevented turn completion.';
-    case 'CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION': return 'Provider stream protocol integrity check failed.';
-    case 'MISSION_COMPLETION_DENIED': return 'Mission completion contract was not satisfied.';
-    default: return 'Model request failed; diagnostic recorded.';
+    case 'CONVERSATION_LLM_ROUTE_MISSING':
+      return 'Model route unavailable; configuration diagnostic returned.';
+    case 'CONVERSATION_AGENT_LOOP_STALLED':
+      return 'Agent loop stopped after no progress.';
+    case 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED':
+      return 'Agent loop stopped at the configured turn limit.';
+    case 'CONVERSATION_TASK_COMPLETION_DENIED':
+      return 'An unfinished direct Task prevented turn completion.';
+    case 'CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION':
+      return 'Provider stream protocol integrity check failed.';
+    case 'MISSION_COMPLETION_DENIED':
+      return 'Mission completion contract was not satisfied.';
+    default:
+      return 'Model request failed; diagnostic recorded.';
   }
 }
 
 /** Runs one committed conversation turn to its terminal state: begin, run the Agent turn, commit, finish. */
-export async function completeProfileTurn(host: ConversationTurnRunnerHost, input: CompleteProfileTurnInput): Promise<void> {
+export async function completeProfileTurn(
+  host: ConversationTurnRunnerHost,
+  input: CompleteProfileTurnInput,
+): Promise<void> {
   const turn = new ConversationTurnCompletion(host.turns, host.output, input);
   turn.begin();
   try {

@@ -98,23 +98,25 @@ describe('ContextBreakdownContent phase authority', () => {
   });
 
   it('labels the full-history estimate while the execution window is unresolved', () => {
-    const html = renderToStaticMarkup(React.createElement(ContextBreakdownContent, {
-      detailsExpanded: true,
-      onDetailsExpandedChange: () => undefined,
-      prepared: {
-        ...prepared,
-        preparedInputTokens: 943_100,
-        uncompactedInputTokens: 943_100,
-        promptBudgetTokens: 272_000,
-        compactionThresholdTokens: 217_600,
-        usagePercent: 100,
-        breakdown: [{ id: 'conversation', tokens: 930_000 }],
-      },
-      phase: 'current',
-      usage,
-      selectedProfile: profile({ contextBudgetTokens: 272_000 }),
-      stale: false,
-    }));
+    const html = renderToStaticMarkup(
+      React.createElement(ContextBreakdownContent, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
+        prepared: {
+          ...prepared,
+          preparedInputTokens: 943_100,
+          uncompactedInputTokens: 943_100,
+          promptBudgetTokens: 272_000,
+          compactionThresholdTokens: 217_600,
+          usagePercent: 100,
+          breakdown: [{ id: 'conversation', tokens: 930_000 }],
+        },
+        phase: 'current',
+        usage,
+        selectedProfile: profile({ contextBudgetTokens: 272_000 }),
+        stale: false,
+      }),
+    );
     expect(html).toContain('contextBreakdown.windowPending');
     expect(html).toContain('contextBreakdown.windowPendingNote');
     expect(html).toContain('data-phase="unavailable"');
@@ -243,8 +245,14 @@ describe('ContextBreakdownContent phase authority', () => {
     expect(html).toContain('contextBreakdown.groupDeferred');
     expect(html).toContain('contextBreakdown.reasoningLabel');
     expect(html).toContain('context-breakdown-meter-row');
-    const sections = ['data-col="tokens"', 'data-col="cache"', 'data-col="reasoning"',
-      'data-testid="context-breakdown-cost"', 'contextBreakdown.latestBreakdown', 'contextBreakdown.groupDeferred'];
+    const sections = [
+      'data-col="tokens"',
+      'data-col="cache"',
+      'data-col="reasoning"',
+      'data-testid="context-breakdown-cost"',
+      'contextBreakdown.latestBreakdown',
+      'contextBreakdown.groupDeferred',
+    ];
     const positions = sections.map((section) => html.indexOf(section));
     expect(positions.every((index) => index >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
@@ -260,10 +268,17 @@ describe('ContextBreakdownContent phase authority', () => {
   });
 
   it('keeps a reported cumulative zero cost without inventing a request cost', () => {
-    const html = renderToStaticMarkup(React.createElement(ContextBreakdownContent, {
-      detailsExpanded: true, onDetailsExpandedChange: () => undefined,
-      prepared: null, phase: 'idle', usage: { ...usage, cumulativeCost: 0 }, selectedProfile: profile(), stale: true,
-    }));
+    const html = renderToStaticMarkup(
+      React.createElement(ContextBreakdownContent, {
+        detailsExpanded: true,
+        onDetailsExpandedChange: () => undefined,
+        prepared: null,
+        phase: 'idle',
+        usage: { ...usage, cumulativeCost: 0 },
+        selectedProfile: profile(),
+        stale: true,
+      }),
+    );
     expect(html).toContain('contextBreakdown.lastRunTotals');
     expect(html).toContain('<dt>contextBreakdown.costThisRun</dt><dd>$0.00</dd>');
     expect(html).not.toContain('contextBreakdown.costThisTurn');

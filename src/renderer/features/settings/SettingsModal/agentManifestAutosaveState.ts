@@ -1,28 +1,29 @@
 import { toAgentManifestEditorDraft } from '@shared/types/agentManifest';
 import type { AgentDefinitionSaveResult, AgentManifestDraft } from '@shared/types/agentManifest';
 
-export const serializeAgentManifestDraft = (draft: AgentManifestDraft): string => JSON.stringify({
-  id: draft.id,
-  fileName: draft.fileName,
-  name: draft.name,
-  description: draft.description,
-  argumentHint: draft.argumentHint,
-  target: draft.target,
-  icon: draft.icon,
-  accent: draft.accent,
-  disableModelInvocation: draft.disableModelInvocation,
-  userInvocable: draft.userInvocable,
-  tools: draft.tools,
-  skills: draft.skills,
-  mcpServers: draft.mcpServers,
-  agents: draft.agents,
-  handoffs: draft.handoffs,
-  metadata: draft.metadata,
-  instructions: draft.instructions,
-  enabled: draft.enabled,
-  maxTurns: draft.maxTurns,
-  delete: Boolean(draft.delete),
-});
+export const serializeAgentManifestDraft = (draft: AgentManifestDraft): string =>
+  JSON.stringify({
+    id: draft.id,
+    fileName: draft.fileName,
+    name: draft.name,
+    description: draft.description,
+    argumentHint: draft.argumentHint,
+    target: draft.target,
+    icon: draft.icon,
+    accent: draft.accent,
+    disableModelInvocation: draft.disableModelInvocation,
+    userInvocable: draft.userInvocable,
+    tools: draft.tools,
+    skills: draft.skills,
+    mcpServers: draft.mcpServers,
+    agents: draft.agents,
+    handoffs: draft.handoffs,
+    metadata: draft.metadata,
+    instructions: draft.instructions,
+    enabled: draft.enabled,
+    maxTurns: draft.maxTurns,
+    delete: Boolean(draft.delete),
+  });
 
 export const getChangedAgentManifestDrafts = (
   current: AgentManifestDraft[],
@@ -82,11 +83,11 @@ export function selectSubmittableAgentManifestDrafts(
   let blockedReason: string | null = null;
   const drafts = blockSubmit
     ? changed.filter((draft) => {
-      const reason = blockSubmit(draft);
-      if (!reason) return true;
-      blockedReason = reason;
-      return false;
-    })
+        const reason = blockSubmit(draft);
+        if (!reason) return true;
+        blockedReason = reason;
+        return false;
+      })
     : changed;
   if (drafts.length === 0) return { drafts, blockedReason };
   if (!blockProjected || !projectedDrafts) return { drafts, blockedReason };

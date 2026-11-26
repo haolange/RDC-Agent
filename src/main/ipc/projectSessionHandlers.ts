@@ -37,25 +37,17 @@ import { requireActiveSessionOwner } from './sessionOwnerGate';
 import { SessionModelLanes } from './sessionModelLanes';
 import { registerProjectInputLifecycleHandlers } from './projectInputLifecycleHandlers';
 import type { WorkbenchIpcContext } from './workbenchContext';
-import type {
-  ProjectInputRecord,
-  RunSummary,
-  SessionRecordSnapshot,
-} from '@shared/types/session';
+import type { ProjectInputRecord, RunSummary, SessionRecordSnapshot } from '@shared/types/session';
 
-const STALE_RECOVERABLE_RUN_STATUSES: Array<RunSummary['status']> = [
-  'planning',
-  'queued',
-  'running',
-  'stopping',
-];
+const STALE_RECOVERABLE_RUN_STATUSES: Array<RunSummary['status']> = ['planning', 'queued', 'running', 'stopping'];
 
 async function recoverStaleRunOnSelection(run: RunSummary | null): Promise<RunSummary | null> {
   if (!run || !STALE_RECOVERABLE_RUN_STATUSES.includes(run.status)) {
     return run;
   }
-  const isActive = (run.turnId ? conversationService.isTurnActive(run.sessionId, run.turnId) : false)
-    || runExecutionService.listActiveRuns().some((activeRun) => activeRun.runId === run.runId);
+  const isActive =
+    (run.turnId ? conversationService.isTurnActive(run.sessionId, run.turnId) : false) ||
+    runExecutionService.listActiveRuns().some((activeRun) => activeRun.runId === run.runId);
   if (isActive) {
     return run;
   }
@@ -134,11 +126,13 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'project:remove',
         maxBytes: 4 * 1024,
       });
-      await Promise.all(sessionRecordStore.listSessions(projectId).map(async (session) => {
-        const stopped = await conversationService.cancelActiveTurn({ sessionId: session.sessionId });
-        if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${session.sessionId}.`);
-        await rdcSessionService.clearOpenedCaptureForSession({ projectId, sessionId: session.sessionId });
-      }));
+      await Promise.all(
+        sessionRecordStore.listSessions(projectId).map(async (session) => {
+          const stopped = await conversationService.cancelActiveTurn({ sessionId: session.sessionId });
+          if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${session.sessionId}.`);
+          await rdcSessionService.clearOpenedCaptureForSession({ projectId, sessionId: session.sessionId });
+        }),
+      );
       projectWorkspaceStore.removeProject(projectId);
       if (state.currentProjectId === projectId) {
         state.currentProjectId = null;
@@ -210,7 +204,8 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
   ipcMain.handle('project:inputs:reference', async (_event, ...rawArgs: unknown[]) => {
     try {
       const [projectId, filePath] = parseIpcArgs(ProjectInputReferenceArgsSchema, rawArgs, {
-        label: 'project:inputs:reference', maxBytes: 8192,
+        label: 'project:inputs:reference',
+        maxBytes: 8192,
       });
       const inputs = await projectWorkspaceStore.referenceProjectInput(projectId, filePath);
       context.broadcastToRenderer('project:inputsChanged', { projectId, inputs });
@@ -230,7 +225,9 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
     if (!resolvedProjectId) {
       return { sessions: [] as SessionRecordSnapshot[] };
     }
-    return { sessions: sessionRecordStore.listSessions(resolvedProjectId).map((session) => sessionRevisions.snapshot(session)) };
+    return {
+      sessions: sessionRecordStore.listSessions(resolvedProjectId).map((session) => sessionRevisions.snapshot(session)),
+    };
   });
 
   ipcMain.handle('session:create', async (_event, ...rawArgs: unknown[]) => {
@@ -305,9 +302,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       agentOrchestrator.syncSessionSlots(id);
       agentOrchestrator.releaseSessionToolState(id);
       const remainingSessions = sessionRecordStore.listSessions(session.projectId);
-      const nextSession = remainingSessions[0]
-        ? sessionRevisions.snapshot(remainingSessions[0])
-        : null;
+      const nextSession = remainingSessions[0] ? sessionRevisions.snapshot(remainingSessions[0]) : null;
       let nextRun: RunSummary | null = null;
       if (state.currentSessionId === id) {
         state.currentSessionId = nextSession?.record.sessionId || null;
@@ -376,7 +371,10 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       if (request.modelOverride) await assertSessionModelExecutable(request.modelOverride);
       // Checked after the await and written in the same synchronous step: a newer intent's field is never overwritten.
       const fields = sessionModelLanes.newer(id, request);
-      const updated = Object.keys(fields).length > 0 ? sessionRecordStore.updateSession(id, fields) : sessionRecordStore.readSession(id);
+      const updated =
+        Object.keys(fields).length > 0
+          ? sessionRecordStore.updateSession(id, fields)
+          : sessionRecordStore.readSession(id);
       if (updated) sessionModelLanes.wrote(id, request.clientRevision, fields);
       return { success: true, session: updated ? sessionRevisions.snapshot(updated) : undefined };
     } catch (err) {
@@ -398,7 +396,10 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       const projectRoot = projectWorkspaceStore.getProjectById(session.projectId)?.rootPath ?? null;
       const definition = resolveEnabledAgentDefinition(agentId, projectRoot);
       if (!definition) {
-        return { success: false, error: `CONVERSATION_AGENT_UNAVAILABLE: requested profile \`${agentId}\` is not enabled.` };
+        return {
+          success: false,
+          error: `CONVERSATION_AGENT_UNAVAILABLE: requested profile \`${agentId}\` is not enabled.`,
+        };
       }
       const updated = sessionRecordStore.updateSession(id, { agentId });
       return { success: true, session: updated ? sessionRevisions.snapshot(updated) : undefined };

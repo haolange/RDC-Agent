@@ -1,9 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  TERMINAL_DEFAULT_HEIGHT,
-  TERMINAL_MAX_HEIGHT,
-  TERMINAL_MIN_HEIGHT,
-} from '@shared/constants/layout';
+import { TERMINAL_DEFAULT_HEIGHT, TERMINAL_MAX_HEIGHT, TERMINAL_MIN_HEIGHT } from '@shared/constants/layout';
 import { useLayoutStore } from '../../../stores/layoutStore';
 import { clamp } from './terminalFormatters';
 
@@ -53,10 +49,8 @@ export function useTerminalDrawerResize() {
   }, [persistLayout, setTerminalHeight]);
 
   const handleResizePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    const appMain = (event.currentTarget.closest('.app-main') as HTMLElement | null);
-    const maxByViewport = appMain
-      ? Math.floor(appMain.getBoundingClientRect().height * 0.65)
-      : TERMINAL_MAX_HEIGHT;
+    const appMain = event.currentTarget.closest('.app-main') as HTMLElement | null;
+    const maxByViewport = appMain ? Math.floor(appMain.getBoundingClientRect().height * 0.65) : TERMINAL_MAX_HEIGHT;
     resizeStateRef.current = {
       startY: event.clientY,
       startHeight: terminalHeight,

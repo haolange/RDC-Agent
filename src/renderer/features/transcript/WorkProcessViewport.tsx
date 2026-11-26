@@ -7,8 +7,8 @@ import { assignDynStyles, clearDynStyles } from '../../lib/useDynStyle';
 const BOTTOM_SLACK = 24;
 const FOLLOW_MS = 200;
 
-const prefersReducedMotion = () => typeof window.matchMedia === 'function'
-  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const prefersReducedMotion = () =>
+  typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const easeOut = (progress: number) => 1 - (1 - progress) ** 3;
 
 /**
@@ -22,7 +22,10 @@ const easeOut = (progress: number) => 1 - (1 - progress) ** 3;
  * next animation frame instead, and "at the bottom" is judged against the heights from the last layout read (what
  * the reader saw), so content added in that frame does not count as the reader leaving the bottom.
  */
-export const WorkProcessViewport: React.FC<{ following: boolean; children: React.ReactNode }> = ({ following, children }) => {
+export const WorkProcessViewport: React.FC<{ following: boolean; children: React.ReactNode }> = ({
+  following,
+  children,
+}) => {
   const { t } = useI18n();
   const scrollerRef = React.useRef<HTMLDivElement>(null);
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -40,25 +43,28 @@ export const WorkProcessViewport: React.FC<{ following: boolean; children: React
     return laidOut.current.scrollHeight - laidOut.current.clientHeight;
   }, []);
 
-  const scrollToLatest = React.useCallback((smooth: boolean) => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    window.cancelAnimationFrame(animating.current);
-    const target = readLayout(scroller);
-    const from = scroller.scrollTop;
-    if (!smooth || prefersReducedMotion() || Math.abs(target - from) < 2) {
-      scroller.scrollTop = target;
-      animating.current = 0;
-      return;
-    }
-    const startedAt = performance.now();
-    const step = (now: number) => {
-      const progress = Math.min(1, (now - startedAt) / FOLLOW_MS);
-      scroller.scrollTop = from + (readLayout(scroller) - from) * easeOut(progress);
-      animating.current = progress < 1 ? window.requestAnimationFrame(step) : 0;
-    };
-    animating.current = window.requestAnimationFrame(step);
-  }, [readLayout]);
+  const scrollToLatest = React.useCallback(
+    (smooth: boolean) => {
+      const scroller = scrollerRef.current;
+      if (!scroller) return;
+      window.cancelAnimationFrame(animating.current);
+      const target = readLayout(scroller);
+      const from = scroller.scrollTop;
+      if (!smooth || prefersReducedMotion() || Math.abs(target - from) < 2) {
+        scroller.scrollTop = target;
+        animating.current = 0;
+        return;
+      }
+      const startedAt = performance.now();
+      const step = (now: number) => {
+        const progress = Math.min(1, (now - startedAt) / FOLLOW_MS);
+        scroller.scrollTop = from + (readLayout(scroller) - from) * easeOut(progress);
+        animating.current = progress < 1 ? window.requestAnimationFrame(step) : 0;
+      };
+      animating.current = window.requestAnimationFrame(step);
+    },
+    [readLayout],
+  );
 
   const readScroll = React.useCallback(() => {
     scrollRead.current = 0;
@@ -113,10 +119,13 @@ export const WorkProcessViewport: React.FC<{ following: boolean; children: React
     };
   }, [following, readLayout, readScroll, scrollToLatest]);
 
-  React.useEffect(() => () => {
-    window.cancelAnimationFrame(animating.current);
-    window.cancelAnimationFrame(scrollRead.current);
-  }, []);
+  React.useEffect(
+    () => () => {
+      window.cancelAnimationFrame(animating.current);
+      window.cancelAnimationFrame(scrollRead.current);
+    },
+    [],
+  );
 
   const onScroll = () => {
     if (!scrollerRef.current || !following) return;
@@ -124,13 +133,22 @@ export const WorkProcessViewport: React.FC<{ following: boolean; children: React
   };
 
   return (
-    <div className={`work-process-viewport${following ? ' is-following' : ''}${following && hiddenAbove ? ' has-hidden-above' : ''}`}>
+    <div
+      className={`work-process-viewport${following ? ' is-following' : ''}${following && hiddenAbove ? ' has-hidden-above' : ''}`}
+    >
       <div ref={scrollerRef} className="work-process-viewport-scroller" onScroll={onScroll}>
         <div ref={contentRef}>{children}</div>
       </div>
       {following && paused ? (
-        <button type="button" className="work-process-viewport-latest"
-          onClick={() => { stick.current = true; setPaused(false); scrollToLatest(true); }}>
+        <button
+          type="button"
+          className="work-process-viewport-latest"
+          onClick={() => {
+            stick.current = true;
+            setPaused(false);
+            scrollToLatest(true);
+          }}
+        >
           <Chevron direction="down" size={12} />
           {t('chat.workProcessBackToLatest')}
         </button>

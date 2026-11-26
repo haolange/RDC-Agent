@@ -1,7 +1,4 @@
-import {
-  getProviderModelDefinitions,
-  getProviderModelSummaries,
-} from '../../provider-catalog/ProviderCatalogRegistry';
+import { getProviderModelDefinitions, getProviderModelSummaries } from '../../provider-catalog/ProviderCatalogRegistry';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from '../provider-catalog/DiscoveryAdmission';
 import { ProviderConnectionError, providerConnectionError } from './providerConnectionErrors';
 import type { LlmProviderModel } from '@shared/types/settings';
@@ -17,14 +14,18 @@ export function normalizeDiscoveredModels(
     if (!isAdmittedDiscoveredModel(value) || isExcludedDiscoveredModel(id) || !filterModelId(id)) {
       continue;
     }
-    const label = value && typeof value === 'object' && typeof (value as { display_name?: unknown }).display_name === 'string'
-      ? ((value as { display_name: string }).display_name.trim() || id)
-      : id;
+    const label =
+      value && typeof value === 'object' && typeof (value as { display_name?: unknown }).display_name === 'string'
+        ? (value as { display_name: string }).display_name.trim() || id
+        : id;
     const existing = models.get(id);
     const aliases = [...new Set([...(existing?.aliases ?? []), ...identity.aliases])];
-    models.set(id, existing
-      ? { ...existing, ...(aliases.length > 0 ? { aliases } : {}) }
-      : { id, label, enabled: true, ...(aliases.length > 0 ? { aliases } : {}) });
+    models.set(
+      id,
+      existing
+        ? { ...existing, ...(aliases.length > 0 ? { aliases } : {}) }
+        : { id, label, enabled: true, ...(aliases.length > 0 ? { aliases } : {}) },
+    );
   }
   return Array.from(models.values()).sort((left, right) => left.id.localeCompare(right.id));
 }
@@ -32,10 +33,10 @@ export function normalizeDiscoveredModels(
 const isExcludedDiscoveredModel = (modelId: string): boolean => {
   const normalized = modelId.toLowerCase();
   return (
-    normalized.includes('deprecated')
-    || normalized.startsWith('gpt-3.5')
-    || normalized.startsWith('claude-2')
-    || normalized.startsWith('claude-instant')
+    normalized.includes('deprecated') ||
+    normalized.startsWith('gpt-3.5') ||
+    normalized.startsWith('claude-2') ||
+    normalized.startsWith('claude-instant')
   );
 };
 
@@ -46,9 +47,8 @@ export const requireModels = (models: LlmProviderModel[]): LlmProviderModel[] =>
   return models;
 };
 
-export const toStaticModels = (modelIds: string[]): LlmProviderModel[] => requireModels(
-  normalizeDiscoveredModels(modelIds),
-);
+export const toStaticModels = (modelIds: string[]): LlmProviderModel[] =>
+  requireModels(normalizeDiscoveredModels(modelIds));
 
 export const requireManagedModels = (providerId: string): LlmProviderModel[] => {
   const models = getProviderModelSummaries(providerId);
@@ -79,15 +79,14 @@ export const normalizeCodingPlanModelMatchKey = (modelId: string): string => {
 };
 
 const isCodingPlanMetaModelId = (modelId: string): boolean => {
-  const normalized = modelId.trim().toLowerCase().replace(/^[^/\s]+\/+/, '');
-  return normalized === 'ark-code-latest'
-    || normalized.endsWith('-latest')
-    || normalized.startsWith('ark-code-');
+  const normalized = modelId
+    .trim()
+    .toLowerCase()
+    .replace(/^[^/\s]+\/+/, '');
+  return normalized === 'ark-code-latest' || normalized.endsWith('-latest') || normalized.startsWith('ark-code-');
 };
 
-const isConcreteCodingPlanDiscovery = (model: LlmProviderModel): boolean => (
-  !isCodingPlanMetaModelId(model.id)
-);
+const isConcreteCodingPlanDiscovery = (model: LlmProviderModel): boolean => !isCodingPlanMetaModelId(model.id);
 
 export const mergeManagedModelAvailability = (
   managedModels: LlmProviderModel[],
@@ -100,17 +99,14 @@ export const mergeManagedModelAvailability = (
     return managedModels;
   }
   const discoveredKeys = new Set(
-    discoveredModels.flatMap((model) => [
-      model.id.toLowerCase(),
-      normalizeCodingPlanModelMatchKey(model.id),
-    ]),
+    discoveredModels.flatMap((model) => [model.id.toLowerCase(), normalizeCodingPlanModelMatchKey(model.id)]),
   );
   const isDiscovered = (modelId: string, aliases?: readonly string[]): boolean => {
     const candidates = [modelId, ...(aliases ?? [])];
-    return candidates.some((candidate) => (
-      discoveredKeys.has(candidate.toLowerCase())
-      || discoveredKeys.has(normalizeCodingPlanModelMatchKey(candidate))
-    ));
+    return candidates.some(
+      (candidate) =>
+        discoveredKeys.has(candidate.toLowerCase()) || discoveredKeys.has(normalizeCodingPlanModelMatchKey(candidate)),
+    );
   };
   const concreteDiscovery = discoveredModels.filter(isConcreteCodingPlanDiscovery);
   const metaOnlyDiscovery = concreteDiscovery.length === 0;
@@ -145,9 +141,8 @@ export const mergeManagedModelAvailability = (
 };
 
 /** A coding plan exposes only the models its subscription currently serves. */
-export const selectAvailableCodingPlanModels = (models: LlmProviderModel[]): LlmProviderModel[] => (
-  models.filter((model) => model.enabled !== false && model.availability === 'available')
-);
+export const selectAvailableCodingPlanModels = (models: LlmProviderModel[]): LlmProviderModel[] =>
+  models.filter((model) => model.enabled !== false && model.availability === 'available');
 
 export const buildManagedAliasIndex = (providerId: string): Map<string, readonly string[]> => {
   const map = new Map<string, readonly string[]>();

@@ -52,17 +52,19 @@ export class ToolManifestRegistry {
   }
 
   get(toolName: string): ToolManifest {
-    return this.manifests.get(toolName) ?? {
-      toolName,
-      displayName: displayNameFromTool(toolName),
-      category: categoryFromNamespace(toolName),
-      renderer: {
-        key: 'tool.unknown',
-        defaultCollapsed: true,
-        supportsPreview: true,
-        supportsRawJson: true,
-      },
-    };
+    return (
+      this.manifests.get(toolName) ?? {
+        toolName,
+        displayName: displayNameFromTool(toolName),
+        category: categoryFromNamespace(toolName),
+        renderer: {
+          key: 'tool.unknown',
+          defaultCollapsed: true,
+          supportsPreview: true,
+          supportsRawJson: true,
+        },
+      }
+    );
   }
 
   list(): ToolManifest[] {

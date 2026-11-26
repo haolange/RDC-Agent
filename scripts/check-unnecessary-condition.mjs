@@ -22,22 +22,25 @@ const RULE = '@typescript-eslint/no-unnecessary-condition';
 const eslint = new ESLint({
   cwd: repoRoot,
   overrideConfigFile: true,
-  overrideConfig: [{
-    files: typedLint.files,
-    ignores: typedLint.ignores,
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: { ...typedLint.languageOptions.parserOptions, ecmaFeatures: { jsx: true } },
+  overrideConfig: [
+    {
+      files: typedLint.files,
+      ignores: typedLint.ignores,
+      languageOptions: {
+        parser: tsParser,
+        parserOptions: { ...typedLint.languageOptions.parserOptions, ecmaFeatures: { jsx: true } },
+      },
+      plugins: { '@typescript-eslint': tsPlugin },
+      rules: typedLint.rules,
     },
-    plugins: { '@typescript-eslint': tsPlugin },
-    rules: typedLint.rules,
-  }],
+  ],
 });
 
 const failures = [];
 const lintable = [];
 for (const [file, reason] of Object.entries(UNNECESSARY_CONDITION_PENDING)) {
-  if (typeof reason !== 'string' || !reason.trim()) failures.push(`${file} needs a reason in UNNECESSARY_CONDITION_PENDING.`);
+  if (typeof reason !== 'string' || !reason.trim())
+    failures.push(`${file} needs a reason in UNNECESSARY_CONDITION_PENDING.`);
   if (!fs.existsSync(path.join(repoRoot, file))) {
     failures.push(`${file} no longer exists; remove it from UNNECESSARY_CONDITION_PENDING.`);
     continue;
@@ -59,7 +62,8 @@ for (const result of lintable.length > 0 ? await eslint.lintFiles(lintable) : []
     continue;
   }
   const violations = result.messages.filter((message) => message.ruleId === RULE).length;
-  if (violations === 0) failures.push(`${file} has no ${RULE} violations; remove it from UNNECESSARY_CONDITION_PENDING.`);
+  if (violations === 0)
+    failures.push(`${file} has no ${RULE} violations; remove it from UNNECESSARY_CONDITION_PENDING.`);
   pendingViolations += violations;
 }
 

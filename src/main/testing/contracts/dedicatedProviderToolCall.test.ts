@@ -10,23 +10,20 @@ import type { LlmProviderProtocol } from '@shared/types/settings';
 const context: Context = {
   systemPrompt: 'Use tools precisely.',
   messages: [{ role: 'user', content: 'Look up id 1.', timestamp: 1 }],
-  tools: [{
-    name: 'lookup',
-    description: 'Look up an id.',
-    parameters: {
-      type: 'object',
-      properties: { id: { type: 'number' } },
-      required: ['id'],
+  tools: [
+    {
+      name: 'lookup',
+      description: 'Look up an id.',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'number' } },
+        required: ['id'],
+      },
     },
-  }],
+  ],
 };
 
-function plan(
-  providerId: string,
-  adapterId: ProviderAdapterId,
-  protocol: LlmProviderProtocol,
-  baseUrl: string,
-) {
+function plan(providerId: string, adapterId: ProviderAdapterId, protocol: LlmProviderProtocol, baseUrl: string) {
   return createTestRequestPlan({
     providerId,
     adapterId,
@@ -57,16 +54,34 @@ function plan(
 }
 
 const azureModel: Model = {
-  id: 'fixture-model', name: 'Fixture Azure model', provider: 'azure', api: 'azure-openai-responses',
-  contextWindow: 128_000, maxTokens: 4096, reasoning: false, vision: false,
+  id: 'fixture-model',
+  name: 'Fixture Azure model',
+  provider: 'azure',
+  api: 'azure-openai-responses',
+  contextWindow: 128_000,
+  maxTokens: 4096,
+  reasoning: false,
+  vision: false,
 };
 const mistralModel: Model = {
-  id: 'fixture-model', name: 'Fixture Mistral model', provider: 'mistral', api: 'mistral-conversations',
-  contextWindow: 128_000, maxTokens: 4096, reasoning: false, vision: false,
+  id: 'fixture-model',
+  name: 'Fixture Mistral model',
+  provider: 'mistral',
+  api: 'mistral-conversations',
+  contextWindow: 128_000,
+  maxTokens: 4096,
+  reasoning: false,
+  vision: false,
 };
 const bedrockModel: Model = {
-  id: 'fixture-model', name: 'Fixture Bedrock model', provider: 'amazon-bedrock', api: 'bedrock-converse-stream',
-  contextWindow: 128_000, maxTokens: 4096, reasoning: false, vision: false,
+  id: 'fixture-model',
+  name: 'Fixture Bedrock model',
+  provider: 'amazon-bedrock',
+  api: 'bedrock-converse-stream',
+  contextWindow: 128_000,
+  maxTokens: 4096,
+  reasoning: false,
+  vision: false,
 };
 
 function sse(...events: Record<string, unknown>[]): Response {
@@ -86,23 +101,43 @@ describe('dedicated structured-tool provider adapters', () => {
     vi.stubGlobal('fetch', async (_url: string | URL | Request, init?: RequestInit) => {
       request = init;
       return sse(
-        { type: 'response.output_item.added', output_index: 0, item: { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'lookup' } },
+        {
+          type: 'response.output_item.added',
+          output_index: 0,
+          item: { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'lookup' },
+        },
         { type: 'response.function_call_arguments.delta', output_index: 0, item_id: 'fc_1', delta: '{"id":1}' },
         { type: 'response.function_call_arguments.done', output_index: 0, item_id: 'fc_1', arguments: '{"id":1}' },
-        { type: 'response.output_item.done', output_index: 0, item: { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'lookup', arguments: '{"id":1}' } },
-        { type: 'response.completed', response: { id: 'resp_1', status: 'completed', output: [{ type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'lookup', arguments: '{"id":1}' }], usage: { input_tokens: 3, output_tokens: 2, total_tokens: 5 } } },
+        {
+          type: 'response.output_item.done',
+          output_index: 0,
+          item: { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'lookup', arguments: '{"id":1}' },
+        },
+        {
+          type: 'response.completed',
+          response: {
+            id: 'resp_1',
+            status: 'completed',
+            output: [{ type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'lookup', arguments: '{"id":1}' }],
+            usage: { input_tokens: 3, output_tokens: 2, total_tokens: 5 },
+          },
+        },
       );
     });
 
     const message = await new AzureOpenAIResponsesProvider({ baseUrl: 'https://azure.test', apiKey: 'secret' })
-      .stream(azureModel, context, { requestPlan: plan('azure', 'azure-openai-responses', 'AzureOpenAIResponses', 'https://azure.test') })
+      .stream(azureModel, context, {
+        requestPlan: plan('azure', 'azure-openai-responses', 'AzureOpenAIResponses', 'https://azure.test'),
+      })
       .result();
 
     const body = JSON.parse(String(request?.body)) as Record<string, unknown>;
     expect(body).toMatchObject({ model: 'fixture-model', stream: true, tool_choice: 'auto' });
     expect(body.tools).toEqual([expect.objectContaining({ type: 'function', name: 'lookup' })]);
     expect(message.stopReason).toBe('toolUse');
-    expect(message.content).toEqual([expect.objectContaining({ type: 'toolCall', id: 'call_1', name: 'lookup', arguments: { id: 1 } })]);
+    expect(message.content).toEqual([
+      expect.objectContaining({ type: 'toolCall', id: 'call_1', name: 'lookup', arguments: { id: 1 } }),
+    ]);
   });
 
   it('sends Mistral tools and reconstructs Chat Completions tool calls', async () => {
@@ -110,20 +145,39 @@ describe('dedicated structured-tool provider adapters', () => {
     vi.stubGlobal('fetch', async (_url: string | URL | Request, init?: RequestInit) => {
       request = init;
       return sse(
-        { choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_1', type: 'function', function: { name: 'lookup', arguments: '{"id":1}' } }] } }] },
-        { choices: [{ delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 } },
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  { index: 0, id: 'call_1', type: 'function', function: { name: 'lookup', arguments: '{"id":1}' } },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          choices: [{ delta: {}, finish_reason: 'tool_calls' }],
+          usage: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 },
+        },
       );
     });
 
     const message = await new MistralProvider({ baseUrl: 'https://mistral.test/v1', apiKey: 'secret' })
-      .stream(mistralModel, context, { requestPlan: plan('mistral', 'mistral-conversations', 'MistralConversations', 'https://mistral.test/v1') })
+      .stream(mistralModel, context, {
+        requestPlan: plan('mistral', 'mistral-conversations', 'MistralConversations', 'https://mistral.test/v1'),
+      })
       .result();
 
     const body = JSON.parse(String(request?.body)) as Record<string, unknown>;
     expect(body).toMatchObject({ model: 'fixture-model', stream: true, tool_choice: 'auto' });
-    expect(body.tools).toEqual([expect.objectContaining({ type: 'function', function: expect.objectContaining({ name: 'lookup' }) })]);
+    expect(body.tools).toEqual([
+      expect.objectContaining({ type: 'function', function: expect.objectContaining({ name: 'lookup' }) }),
+    ]);
     expect(message.stopReason).toBe('toolUse');
-    expect(message.content).toEqual([expect.objectContaining({ type: 'toolCall', id: 'call_1', name: 'lookup', arguments: { id: 1 } })]);
+    expect(message.content).toEqual([
+      expect.objectContaining({ type: 'toolCall', id: 'call_1', name: 'lookup', arguments: { id: 1 } }),
+    ]);
   });
 
   it('sends Bedrock toolConfig and reconstructs Converse toolUse events', async () => {
@@ -140,14 +194,23 @@ describe('dedicated structured-tool provider adapters', () => {
       );
     });
 
-    const message = await new BedrockConverseProvider({ baseUrl: 'https://bedrock.test', requestAuthorizer: async ({ headers }) => ({ ...headers, authorization: 'sigv4-fixture' }) })
-      .stream(bedrockModel, context, { requestPlan: plan('amazon-bedrock', 'bedrock-converse-stream', 'BedrockConverseStream', 'https://bedrock.test') })
+    const message = await new BedrockConverseProvider({
+      baseUrl: 'https://bedrock.test',
+      requestAuthorizer: async ({ headers }) => ({ ...headers, authorization: 'sigv4-fixture' }),
+    })
+      .stream(bedrockModel, context, {
+        requestPlan: plan('amazon-bedrock', 'bedrock-converse-stream', 'BedrockConverseStream', 'https://bedrock.test'),
+      })
       .result();
 
     const body = JSON.parse(String(request?.body)) as Record<string, unknown>;
     expect(body).toMatchObject({ toolConfig: { toolChoice: { auto: {} } } });
-    expect((body.toolConfig as { tools: unknown[] }).tools).toEqual([expect.objectContaining({ toolSpec: expect.objectContaining({ name: 'lookup' }) })]);
+    expect((body.toolConfig as { tools: unknown[] }).tools).toEqual([
+      expect.objectContaining({ toolSpec: expect.objectContaining({ name: 'lookup' }) }),
+    ]);
     expect(message.stopReason).toBe('toolUse');
-    expect(message.content).toEqual([expect.objectContaining({ type: 'toolCall', id: 'tool_1', name: 'lookup', arguments: { id: 1 } })]);
+    expect(message.content).toEqual([
+      expect.objectContaining({ type: 'toolCall', id: 'tool_1', name: 'lookup', arguments: { id: 1 } }),
+    ]);
   });
 });

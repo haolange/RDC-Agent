@@ -10,10 +10,7 @@ import {
   isOriginAllowed,
   tokensMatch,
 } from '../../browserAppBridge/bridgeSecurity';
-import {
-  mcpExecutableFingerprint,
-  projectOverridesUserExecutable,
-} from '../../settings/settings-core/McpTrustService';
+import { mcpExecutableFingerprint, projectOverridesUserExecutable } from '../../settings/settings-core/McpTrustService';
 import type { AgentRuntimeMcpDescriptor } from '../../settings/agent-manifests/agentRuntimeTypes';
 
 vi.mock('../../ipc/invokeRegistry', () => ({

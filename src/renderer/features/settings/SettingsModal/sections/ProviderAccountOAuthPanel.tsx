@@ -23,14 +23,14 @@ const copyText = (value?: string) => {
 
 type StepState = 'pending' | 'active' | 'done';
 
-const Step: React.FC<{ index: number; state: StepState; title: string; description?: string; children?: ReactNode; testId?: string }> = ({
-  index,
-  state,
-  title,
-  description,
-  children,
-  testId,
-}) => (
+const Step: React.FC<{
+  index: number;
+  state: StepState;
+  title: string;
+  description?: string;
+  children?: ReactNode;
+  testId?: string;
+}> = ({ index, state, title, description, children, testId }) => (
   <li className="settings-oauth-step" data-state={state} data-testid={testId}>
     <span className="settings-oauth-step-index" aria-hidden="true">
       {state === 'done' ? <Icon name="check" size={12} /> : index}
@@ -64,12 +64,14 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   const busy = connectionDraft.busy !== 'idle';
   const isAuthorizationPending = connectionDevicePending || busy;
   const isBrowserCodePending = selectedMode === 'browser' && status?.requiresCodeInput === true;
-  const started = Boolean(status?.verificationUri || status?.authUrl || connectionDevicePending || isBrowserCodePending);
+  const started = Boolean(
+    status?.verificationUri || status?.authUrl || connectionDevicePending || isBrowserCodePending,
+  );
 
   if (connectionAccountConnected) {
     return (
       <div className="settings-provider-oauth-panel">
-        {(status?.accountLabel || status?.planLabel) ? (
+        {status?.accountLabel || status?.planLabel ? (
           <p className="settings-provider-oauth-account" data-testid="settings-provider-oauth-summary">
             {[status.accountLabel, status.planLabel].filter(Boolean).join(' · ')}
           </p>
@@ -79,30 +81,35 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   }
 
   // A failed callback flow starts over instead of reopening its stale authorization page.
-  const openPageButton = status?.authUrl && (!browserCallback || connectionDevicePending) ? (
-    <a
-      className="button button-primary button-sm settings-oauth-link-button"
-      href={status.authUrl}
-      target="_blank"
-      rel="noreferrer"
-      data-testid="settings-provider-oauth-open-page"
-    >
-      <Icon name="external" size={14} />
-      {t(started && (isBrowserCodePending || connectionDevicePending) ? 'settings.reopenAuthPage' : 'settings.openAuthPage')}
-    </a>
-  ) : (
-    <Button
-      variant="primary"
-      size="sm"
-      data-testid="settings-provider-oauth-start"
-      onClick={() => void onStartAccountLogin()}
-      disabled={busy || connectionDevicePending}
-    >
-      {isAuthorizationPending
-        ? t(selectedMode === 'browser' ? 'settings.oauthWaitingBrowser' : 'settings.oauthWaitingDevice')
-        : t(selectedMode === 'browser' ? 'settings.oauthStartBrowser' : 'settings.oauthStartDevice')}
-    </Button>
-  );
+  const openPageButton =
+    status?.authUrl && (!browserCallback || connectionDevicePending) ? (
+      <a
+        className="button button-primary button-sm settings-oauth-link-button"
+        href={status.authUrl}
+        target="_blank"
+        rel="noreferrer"
+        data-testid="settings-provider-oauth-open-page"
+      >
+        <Icon name="external" size={14} />
+        {t(
+          started && (isBrowserCodePending || connectionDevicePending)
+            ? 'settings.reopenAuthPage'
+            : 'settings.openAuthPage',
+        )}
+      </a>
+    ) : (
+      <Button
+        variant="primary"
+        size="sm"
+        data-testid="settings-provider-oauth-start"
+        onClick={() => void onStartAccountLogin()}
+        disabled={busy || connectionDevicePending}
+      >
+        {isAuthorizationPending
+          ? t(selectedMode === 'browser' ? 'settings.oauthWaitingBrowser' : 'settings.oauthWaitingDevice')
+          : t(selectedMode === 'browser' ? 'settings.oauthStartBrowser' : 'settings.oauthStartDevice')}
+      </Button>
+    );
 
   return (
     <div className="settings-provider-oauth-panel">
@@ -174,7 +181,9 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
                       {t('settings.reopenBrowser')}
                     </Button>
                   </div>
-                ) : openPageButton}
+                ) : (
+                  openPageButton
+                )}
               </div>
             </Step>
             <Step
@@ -194,7 +203,6 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
                     value={connectionDraft.authCode}
                     onChange={(event) => onUpdateConnectionDraft({ authCode: event.target.value, error: '' })}
                   />
-
                 </div>
               ) : null}
             </Step>
@@ -204,10 +212,11 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
 
       {diagnostic?.checklist && diagnostic.checklist.length > 0 ? (
         <ul className="settings-provider-oauth-checklist">
-          {diagnostic.checklist.map((item) => <li key={item}>{item}</li>)}
+          {diagnostic.checklist.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
         </ul>
       ) : null}
-
     </div>
   );
 };

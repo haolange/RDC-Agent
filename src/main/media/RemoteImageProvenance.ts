@@ -23,7 +23,8 @@ export function normalizeRemoteImageUrl(raw: string): string | null {
 function nonModelTexts(message: ConversationMessage): string[] {
   if (message.role === 'user') return [message.content];
   if (message.role !== 'assistant') return [];
-  return (message.workTrace?.blocks ?? []).flatMap((block) => block.toolCalls)
+  return (message.workTrace?.blocks ?? [])
+    .flatMap((block) => block.toolCalls)
     .filter((call) => NON_MODEL_TOOLS.has(call.toolName) && call.status === 'complete')
     .map((call) => call.resultPreview ?? '');
 }

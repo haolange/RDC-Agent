@@ -18,7 +18,9 @@ describe('faultInjectionContract: main crash storage recovery', () => {
     roots.push(root);
     const filePath = path.join(root, 'projects.json');
     const worker = path.join(root, 'writer.cjs');
-    fs.writeFileSync(worker, `
+    fs.writeFileSync(
+      worker,
+      `
 const fs = require('fs');
 const path = require('path');
 const filePath = process.env.FAULT_FILE;
@@ -27,7 +29,9 @@ const tmp = filePath + '.' + process.pid + '.tmp';
 fs.writeFileSync(tmp, JSON.stringify({ schemaVersion: '1', projects: [{ projectId: 'p1' }] }));
 fs.renameSync(tmp, filePath);
 process.exit(1);
-`, 'utf8');
+`,
+      'utf8',
+    );
 
     const result = await new Promise<{ code: number | null }>((resolve, reject) => {
       const child = spawn(process.execPath, [worker], {
@@ -50,13 +54,17 @@ process.exit(1);
     const durable = { schemaVersion: '1', projects: [{ projectId: 'kept' }] };
     io.writeJsonAtomic(filePath, durable);
     const worker = path.join(root, 'writer-pre-rename.cjs');
-    fs.writeFileSync(worker, `
+    fs.writeFileSync(
+      worker,
+      `
 const fs = require('fs');
 const filePath = process.env.FAULT_FILE;
 const tmp = filePath + '.' + process.pid + '.tmp';
 fs.writeFileSync(tmp, JSON.stringify({ schemaVersion: '1', projects: [{ projectId: 'lost' }] }));
 process.exit(1);
-`, 'utf8');
+`,
+      'utf8',
+    );
 
     const result = await new Promise<{ code: number | null }>((resolve, reject) => {
       const child = spawn(process.execPath, [worker], {
@@ -84,7 +92,9 @@ describe('faultInjectionContract: two processes writing project registry', () =>
     const lockPath = path.resolve(__dirname, '../../sessions/store/directoryFileLock.ts');
     const ioPath = path.resolve(__dirname, '../../runtime/StorageIo.ts');
     const schemaPath = path.resolve(__dirname, '../../sessions/store/storageSchema.ts');
-    fs.writeFileSync(workerPath, `
+    fs.writeFileSync(
+      workerPath,
+      `
 require(${JSON.stringify(registerPath)});
 const { withDirectoryFileLockSync } = require(${JSON.stringify(lockPath)});
 const { StorageIo } = require(${JSON.stringify(ioPath)});
@@ -98,7 +108,9 @@ withDirectoryFileLockSync(dir, { lockFileName: '.registry.lock', timeoutCode: 'P
   current.projects.push(project);
   io.writeJsonAtomic(filePath, current);
 });
-`, 'utf8');
+`,
+      'utf8',
+    );
 
     const makeProject = (projectId: string) => ({
       projectId,
@@ -114,25 +126,25 @@ withDirectoryFileLockSync(dir, { lockFileName: '.registry.lock', timeoutCode: 'P
       updatedAt: 1,
     });
 
-    const spawnWorker = (projectId: string) => new Promise<{ code: number | null; stderr: string }>((resolve, reject) => {
-      const child = spawn(process.execPath, [workerPath], {
-        env: {
-          ...process.env,
-          REGISTRY_FILE: filePath,
-          REGISTRY_PROJECT: JSON.stringify(makeProject(projectId)),
-        },
-        windowsHide: true,
+    const spawnWorker = (projectId: string) =>
+      new Promise<{ code: number | null; stderr: string }>((resolve, reject) => {
+        const child = spawn(process.execPath, [workerPath], {
+          env: {
+            ...process.env,
+            REGISTRY_FILE: filePath,
+            REGISTRY_PROJECT: JSON.stringify(makeProject(projectId)),
+          },
+          windowsHide: true,
+        });
+        let stderr = '';
+        child.stderr.on('data', (chunk) => {
+          stderr += String(chunk);
+        });
+        child.on('error', reject);
+        child.on('close', (code) => resolve({ code, stderr }));
       });
-      let stderr = '';
-      child.stderr.on('data', (chunk) => { stderr += String(chunk); });
-      child.on('error', reject);
-      child.on('close', (code) => resolve({ code, stderr }));
-    });
 
-    const [first, second] = await Promise.all([
-      spawnWorker('proj_a'),
-      spawnWorker('proj_b'),
-    ]);
+    const [first, second] = await Promise.all([spawnWorker('proj_a'), spawnWorker('proj_b')]);
     expect(first.code, first.stderr).toBe(0);
     expect(second.code, second.stderr).toBe(0);
     const { parseStoredDocument } = await import('../../runtime/storedDocument');

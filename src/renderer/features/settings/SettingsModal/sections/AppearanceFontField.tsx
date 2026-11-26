@@ -44,7 +44,9 @@ function FontOption({ family, selected, sample, label, onSelect }: FontOptionPro
     >
       <span className="appearance-font-option-mark" aria-hidden="true" />
       <span className="appearance-font-option-copy">
-        <span className="appearance-font-option-sample" {...style}>{sample}</span>
+        <span className="appearance-font-option-sample" {...style}>
+          {sample}
+        </span>
         <span className="appearance-font-option-name">{label}</span>
       </span>
     </Button>
@@ -56,7 +58,9 @@ function FontPreview({ family, sample, title }: { family: string; sample: string
   return (
     <div className="appearance-font-preview">
       <div className="appearance-font-preview-title">{title}</div>
-      <div className="appearance-font-option-sample appearance-font-preview-sample" {...style}>{sample}</div>
+      <div className="appearance-font-option-sample appearance-font-preview-sample" {...style}>
+        {sample}
+      </div>
     </div>
   );
 }
@@ -78,7 +82,9 @@ export function AppearanceFontField({ kind, variant, value, onChange }: Appearan
 
   return (
     <div className="appearance-text-field">
-      <span className="settings-field-label" id={`appearance-font-${kind}-${variant}`}>{label}</span>
+      <span className="settings-field-label" id={`appearance-font-${kind}-${variant}`}>
+        {label}
+      </span>
       <div className="appearance-font-control">
         <Input
           value={draft ?? value ?? ''}
@@ -98,7 +104,7 @@ export function AppearanceFontField({ kind, variant, value, onChange }: Appearan
           onOpenChange={setOpen}
           align="end"
           className="appearance-font-popover"
-          trigger={(
+          trigger={
             <IconButton
               label={t('settings.appearanceFontSuggestions')}
               size="sm"
@@ -106,7 +112,7 @@ export function AppearanceFontField({ kind, variant, value, onChange }: Appearan
             >
               <Chevron direction="down" />
             </IconButton>
-          )}
+          }
         >
           <div className="appearance-font-popover-head">
             <div className="appearance-font-popover-title">{t('settings.appearanceFontSuggestions')}</div>

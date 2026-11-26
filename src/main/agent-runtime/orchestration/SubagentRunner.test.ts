@@ -18,13 +18,22 @@ import {
 } from '../../rdc/RdcRuntimeContextRegistry';
 import { wireSubagentRunner } from '../../testing/subagentRunnerDoubles';
 import { DelegationConfigurationError } from './DelegationConfigurationError';
-import { createSubagentBudgetState, createPolicyBudgetState, reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
+import {
+  createSubagentBudgetState,
+  createPolicyBudgetState,
+  reserveDispatchBudget,
+  type TurnHandle,
+} from './TurnCoordinator';
 import type { AgentProfileTurnOptions } from './orchestratorTypes';
 import type { DelegationCapsule } from './delegationCapsule';
 import type { RdcRuntimeContext } from '@shared/types/session';
 
 vi.mock('electron', () => ({
-  BrowserWindow: class { static getAllWindows() { return []; } },
+  BrowserWindow: class {
+    static getAllWindows() {
+      return [];
+    }
+  },
   app: {
     getPath: () => process.env.TEMP ?? process.env.TMP ?? process.cwd(),
     getAppPath: () => process.cwd(),
@@ -39,9 +48,40 @@ vi.mock('../../settings/settings-core/SettingsService', () => ({
 vi.mock('../../settings/agent-manifests/AgentManifestService', () => ({
   agentManifestService: {
     getEffectiveProfiles: () => [
-      { id: 'ask', enabled: true, instructions: 'Ask profile instructions', tools: ['shell'], skills: [], mcpServers: [], handoffs: [], agents: ['general'], reasoningLevel: 'low', compiledRoute: { agentId: 'ask', providerId: 'openai', modelId: 'gpt-5.6-sol' } },
-      { id: 'debugger', enabled: true, instructions: 'Debugger profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'], compiledRoute: { agentId: 'debugger', providerId: 'openai', modelId: 'gpt-5.6-sol' } },
-      { id: 'general', enabled: true, instructions: 'General profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['debugger'], compiledRoute: { agentId: 'general', providerId: 'openai', modelId: 'gpt-5.6-sol' } },
+      {
+        id: 'ask',
+        enabled: true,
+        instructions: 'Ask profile instructions',
+        tools: ['shell'],
+        skills: [],
+        mcpServers: [],
+        handoffs: [],
+        agents: ['general'],
+        reasoningLevel: 'low',
+        compiledRoute: { agentId: 'ask', providerId: 'openai', modelId: 'gpt-5.6-sol' },
+      },
+      {
+        id: 'debugger',
+        enabled: true,
+        instructions: 'Debugger profile instructions',
+        tools: [],
+        skills: [],
+        mcpServers: [],
+        handoffs: [],
+        agents: ['general'],
+        compiledRoute: { agentId: 'debugger', providerId: 'openai', modelId: 'gpt-5.6-sol' },
+      },
+      {
+        id: 'general',
+        enabled: true,
+        instructions: 'General profile instructions',
+        tools: [],
+        skills: [],
+        mcpServers: [],
+        handoffs: [],
+        agents: ['debugger'],
+        compiledRoute: { agentId: 'general', providerId: 'openai', modelId: 'gpt-5.6-sol' },
+      },
     ],
   },
 }));
@@ -60,21 +100,35 @@ vi.mock('../../settings/provider-catalog/EffectiveModelResolver', () => ({
   },
 }));
 /** The live turn a `subagent` tool call runs inside: its frozen plan carries delegates and ceiling. */
-const delegatingTurn = (): TurnHandle => ({
-  runtimePlan: { profileDelegates: [], accessCeiling: 'full' },
-  registerProducer: () => () => undefined,
-  subagentBudget: createSubagentBudgetState(),
-  generation: 1, signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
-  isLive: () => true,
-}) as unknown as TurnHandle;
+const delegatingTurn = (): TurnHandle =>
+  ({
+    runtimePlan: { profileDelegates: [], accessCeiling: 'full' },
+    registerProducer: () => () => undefined,
+    subagentBudget: createSubagentBudgetState(),
+    generation: 1,
+    signal: new AbortController().signal,
+    policyBudget: createPolicyBudgetState(),
+    isLive: () => true,
+  }) as unknown as TurnHandle;
 
 function testCapsule(overrides: Partial<DelegationCapsule> = {}): DelegationCapsule {
   return {
     goal: 'Inspect the capture',
     task: 'inspect',
     acceptedFacts: [{ statement: 'Frame presents a triangle', sourceRefs: [], qualification: 'caller observation' }],
-    negativePaths: [{ path: 'shader mutation', reason: 'read-only task', applicableWhen: 'current scope', recheckWhen: 'explicit new authorization' }],
-    scope: 'bounded read-only inspection', hypotheses: [], challengeRefs: [], stopConditions: [], requiredSkillIds: [],
+    negativePaths: [
+      {
+        path: 'shader mutation',
+        reason: 'read-only task',
+        applicableWhen: 'current scope',
+        recheckWhen: 'explicit new authorization',
+      },
+    ],
+    scope: 'bounded read-only inspection',
+    hypotheses: [],
+    challengeRefs: [],
+    stopConditions: [],
+    requiredSkillIds: [],
     inputArtifactRefs: [],
     outputRequirements: 'Return a short evidence summary',
     budget: { maxToolCalls: 8, maxWallTimeMs: 60_000 },
@@ -84,52 +138,84 @@ function testCapsule(overrides: Partial<DelegationCapsule> = {}): DelegationCaps
 }
 
 describe('SubagentRunner', () => {
-  it.each(['prepared', 'missing-method', 'missing-proof'])('settles constrained work only with actual child preparation (%s)', async state => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-subagent-preparation-'));
-    const originalUserData = process.env.RDC_AGENT_USER_DATA;
-    process.env.RDC_AGENT_USER_DATA = root;
-    try {
-      const projectRoot = path.join(root, 'project'); fs.mkdirSync(projectRoot);
-      const project = await projectWorkspaceStore.createProject(projectRoot);
-      const sessionId = sessionRecordStore.createSession(project.projectId).sessionId;
-      const registry = new TaskRegistry(createSessionTaskStore(sessionId));
-      const task = await registry.createTask('Isolated analysis', {
-        completionRequirements: ['analysis'],
-        executionRequirements: { mode: 'subagent', requiredSkillIds: ['analysis-method'], independentOfTaskIds: [] },
-      });
-      const sendProfileMessage = vi.fn(async (_agent: string, _content: string, options?: AgentProfileTurnOptions) => {
-        expect(options?.preloadSkillIds).toEqual(['analysis-method']);
-        if (state !== 'missing-proof') await options?.onTaskPreparation?.({
-          sessionId: options.sessionId!, turnId: 'child-turn', runtimeFingerprint: 'a'.repeat(24),
-          capsuleHash: createHash('sha256').update(JSON.stringify(options.frozenDelegationCapsule)).digest('hex'),
-          skills: state === 'prepared' ? [{ id: 'analysis-method', hash: 'b'.repeat(64) }] : [],
-          selectedTurnCount: 0, inputArtifacts: [], requestsDomainCapability: false,
+  it.each(['prepared', 'missing-method', 'missing-proof'])(
+    'settles constrained work only with actual child preparation (%s)',
+    async (state) => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-subagent-preparation-'));
+      const originalUserData = process.env.RDC_AGENT_USER_DATA;
+      process.env.RDC_AGENT_USER_DATA = root;
+      try {
+        const projectRoot = path.join(root, 'project');
+        fs.mkdirSync(projectRoot);
+        const project = await projectWorkspaceStore.createProject(projectRoot);
+        const sessionId = sessionRecordStore.createSession(project.projectId).sessionId;
+        const registry = new TaskRegistry(createSessionTaskStore(sessionId));
+        const task = await registry.createTask('Isolated analysis', {
+          completionRequirements: ['analysis'],
+          executionRequirements: { mode: 'subagent', requiredSkillIds: ['analysis-method'], independentOfTaskIds: [] },
         });
-        options?.onTerminalContext?.({
-          messages: [], status: 'complete', selectedTurnCount: 0, filteredArtifactCount: 0,
-          executionIdentity: {} as never,
-          completionDeclaration: { disposition: 'completed', evidenceRefs: [], result: {
-            summary: 'Read bounded inputs.', outputs: { analysis: 'Findings, source ranges and limitations.' },
-            counterevidence: [], unresolved: [], scope: 'offline analysis', sideEffects: [], recoveryState: [],
-          } },
+        const sendProfileMessage = vi.fn(
+          async (_agent: string, _content: string, options?: AgentProfileTurnOptions) => {
+            expect(options?.preloadSkillIds).toEqual(['analysis-method']);
+            if (state !== 'missing-proof')
+              await options?.onTaskPreparation?.({
+                sessionId: options.sessionId!,
+                turnId: 'child-turn',
+                runtimeFingerprint: 'a'.repeat(24),
+                capsuleHash: createHash('sha256').update(JSON.stringify(options.frozenDelegationCapsule)).digest('hex'),
+                skills: state === 'prepared' ? [{ id: 'analysis-method', hash: 'b'.repeat(64) }] : [],
+                selectedTurnCount: 0,
+                inputArtifacts: [],
+                requestsDomainCapability: false,
+              });
+            options?.onTerminalContext?.({
+              messages: [],
+              status: 'complete',
+              selectedTurnCount: 0,
+              filteredArtifactCount: 0,
+              executionIdentity: {} as never,
+              completionDeclaration: {
+                disposition: 'completed',
+                evidenceRefs: [],
+                result: {
+                  summary: 'Read bounded inputs.',
+                  outputs: { analysis: 'Findings, source ranges and limitations.' },
+                  counterevidence: [],
+                  unresolved: [],
+                  scope: 'offline analysis',
+                  sideEffects: [],
+                  recoveryState: [],
+                },
+              },
+            });
+            return 'Findings, source ranges and limitations.';
+          },
+        );
+        const runner = wireSubagentRunner({
+          sendProfileMessage,
+          systemPromptForAgent: () => 'profile',
+          getActiveTurn: () => delegatingTurn(),
         });
-        return 'Findings, source ranges and limitations.';
-      });
-      const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'profile', getActiveTurn: () => delegatingTurn() });
-      const [tool] = runner.createSubagentTools('general', sessionId);
-      const promise = tool.execute('analysis-call', { ...testCapsule({ requiredSkillIds: ['analysis-method'] }), taskId: task.id, profile: 'general' } as never);
-      if (state === 'missing-proof') await expect(promise).rejects.toThrow('preparation proof');
-      else expect((await promise).isError).toBe(state !== 'prepared');
-      expect((await registry.getTask(task.id))?.status).toBe(state === 'prepared' ? 'completed' : 'blocked');
-      const execution = (await registry.listExecutions(task.id))[0];
-      if (state === 'prepared') expect(execution.preparation?.skills).toEqual([{ id: 'analysis-method', hash: 'b'.repeat(64) }]);
-      expect(sendProfileMessage).toHaveBeenCalledOnce();
-    } finally {
-      if (originalUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
-      else process.env.RDC_AGENT_USER_DATA = originalUserData;
-      fs.rmSync(root, { recursive: true, force: true });
-    }
-  });
+        const [tool] = runner.createSubagentTools('general', sessionId);
+        const promise = tool.execute('analysis-call', {
+          ...testCapsule({ requiredSkillIds: ['analysis-method'] }),
+          taskId: task.id,
+          profile: 'general',
+        } as never);
+        if (state === 'missing-proof') await expect(promise).rejects.toThrow('preparation proof');
+        else expect((await promise).isError).toBe(state !== 'prepared');
+        expect((await registry.getTask(task.id))?.status).toBe(state === 'prepared' ? 'completed' : 'blocked');
+        const execution = (await registry.listExecutions(task.id))[0];
+        if (state === 'prepared')
+          expect(execution.preparation?.skills).toEqual([{ id: 'analysis-method', hash: 'b'.repeat(64) }]);
+        expect(sendProfileMessage).toHaveBeenCalledOnce();
+      } finally {
+        if (originalUserData === undefined) delete process.env.RDC_AGENT_USER_DATA;
+        else process.env.RDC_AGENT_USER_DATA = originalUserData;
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it('runSubagent completes and forwards tool/assistant events', async () => {
     const parentEvents: Array<{ type: string }> = [];
@@ -141,7 +227,10 @@ describe('SubagentRunner', () => {
           timestamp: Date.now(),
           sessionId: 's',
           agentId: 'ask',
-          payload: { text: 'partial', providerOutputRef: { protocol: 'test', providerBlockKey: 'text:0', contentIndex: 0 } },
+          payload: {
+            text: 'partial',
+            providerOutputRef: { protocol: 'test', providerBlockKey: 'text:0', contentIndex: 0 },
+          },
         });
         options?.onEvent?.({
           id: 'e2',
@@ -171,7 +260,8 @@ describe('SubagentRunner', () => {
 
     const parentTurn = {
       subagentBudget: createSubagentBudgetState(),
-      signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
+      signal: new AbortController().signal,
+      policyBudget: createPolicyBudgetState(),
       generation: 1,
       isLive: () => true,
       registerProducer: () => () => undefined,
@@ -179,7 +269,8 @@ describe('SubagentRunner', () => {
     } as unknown as TurnHandle;
 
     const result = await runner.runSubagent({
-      parentAgentId: 'debugger', parentAccessCeiling: 'full',
+      parentAgentId: 'debugger',
+      parentAccessCeiling: 'full',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
       capsule: testCapsule(),
@@ -193,7 +284,7 @@ describe('SubagentRunner', () => {
     expect(parentEvents).toEqual([]);
   });
 
-  it('runs a child with the stricter of its own and the delegating turn\'s access ceiling', async () => {
+  it("runs a child with the stricter of its own and the delegating turn's access ceiling", async () => {
     const launched: Array<string | undefined> = [];
     const runner = wireSubagentRunner({
       sendProfileMessage: async (_profile, _content, options) => {
@@ -204,8 +295,22 @@ describe('SubagentRunner', () => {
       getActiveTurn: () => null,
     });
     // `ask` declares no ceiling (full) and lists shell; a read-only parent must not hand it either.
-    await runner.runSubagent({ parentAgentId: 'general', parentAccessCeiling: 'read-only', parentSessionId: 'ceiling-parent', parentToolCallId: 'narrow', targetProfile: 'ask', capsule: testCapsule() });
-    await runner.runSubagent({ parentAgentId: 'general', parentAccessCeiling: 'full', parentSessionId: 'ceiling-parent', parentToolCallId: 'keep', targetProfile: 'ask', capsule: testCapsule() });
+    await runner.runSubagent({
+      parentAgentId: 'general',
+      parentAccessCeiling: 'read-only',
+      parentSessionId: 'ceiling-parent',
+      parentToolCallId: 'narrow',
+      targetProfile: 'ask',
+      capsule: testCapsule(),
+    });
+    await runner.runSubagent({
+      parentAgentId: 'general',
+      parentAccessCeiling: 'full',
+      parentSessionId: 'ceiling-parent',
+      parentToolCallId: 'keep',
+      targetProfile: 'ask',
+      capsule: testCapsule(),
+    });
     expect(launched).toEqual(['read-only', 'full']);
   });
 
@@ -214,25 +319,46 @@ describe('SubagentRunner', () => {
     const runner = wireSubagentRunner({
       sendProfileMessage,
       systemPromptForAgent: () => 'fallback',
-      getActiveTurn: () => ({ runtimePlan: null, eventSink: { sessionId: 'sess-1', onEvent: () => undefined } } as unknown as TurnHandle),
+      getActiveTurn: () =>
+        ({ runtimePlan: null, eventSink: { sessionId: 'sess-1', onEvent: () => undefined } }) as unknown as TurnHandle,
     });
     const [tool] = runner.createSubagentTools('general', 'sess-1');
-    await expect(tool.execute('tc-no-plan', testCapsule({ task: 'do work' }) as unknown as Record<string, unknown>))
-      .rejects.toThrow(/SUBAGENT_PARENT_PLAN_REQUIRED/);
+    await expect(
+      tool.execute('tc-no-plan', testCapsule({ task: 'do work' }) as unknown as Record<string, unknown>),
+    ).rejects.toThrow(/SUBAGENT_PARENT_PLAN_REQUIRED/);
     expect(sendProfileMessage).not.toHaveBeenCalled();
   });
 
   it('passes authoritative Task output keys to the isolated child without parent history', async () => {
-    const getTask = vi.spyOn(TaskRegistry.prototype, 'getTask').mockResolvedValue({ id: 'owned', completionRequirements: ['analysis', 'limitations'] } as TaskRecord);
+    const getTask = vi
+      .spyOn(TaskRegistry.prototype, 'getTask')
+      .mockResolvedValue({ id: 'owned', completionRequirements: ['analysis', 'limitations'] } as TaskRecord);
     let request = '';
-    const runner = wireSubagentRunner({ sendProfileMessage: async (_profile, content) => { request = content; return 'done'; }, systemPromptForAgent: () => 'stable', getActiveTurn: () => null });
+    const runner = wireSubagentRunner({
+      sendProfileMessage: async (_profile, content) => {
+        request = content;
+        return 'done';
+      },
+      systemPromptForAgent: () => 'stable',
+      getActiveTurn: () => null,
+    });
     try {
-      const result = await runner.runSubagent({ parentAgentId: 'general', parentAccessCeiling: 'full', parentSessionId: 'task-contract-parent', parentToolCallId: 'call', taskId: 'owned', targetProfile: 'general', capsule: testCapsule() });
+      const result = await runner.runSubagent({
+        parentAgentId: 'general',
+        parentAccessCeiling: 'full',
+        parentSessionId: 'task-contract-parent',
+        parentToolCallId: 'call',
+        taskId: 'owned',
+        targetProfile: 'general',
+        capsule: testCapsule(),
+      });
       expect(result.status).toBe('complete');
       expect(getTask).toHaveBeenCalledWith('owned');
       expect(request).toContain('"completionRequirements":["analysis","limitations"]');
       expect(request).toContain('Delegated task capsule');
-    } finally { getTask.mockRestore(); }
+    } finally {
+      getTask.mockRestore();
+    }
   });
 
   it('runSubagent marks cancelled when parent already aborted', async () => {
@@ -244,7 +370,8 @@ describe('SubagentRunner', () => {
       getActiveTurn: () => null,
     });
     const result = await runner.runSubagent({
-      parentAgentId: 'debugger', parentAccessCeiling: 'full',
+      parentAgentId: 'debugger',
+      parentAccessCeiling: 'full',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
       capsule: testCapsule(),
@@ -262,7 +389,8 @@ describe('SubagentRunner', () => {
       getActiveTurn: () => null,
     });
     const result = await runner.runSubagent({
-      parentAgentId: 'debugger', parentAccessCeiling: 'full',
+      parentAgentId: 'debugger',
+      parentAccessCeiling: 'full',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
       capsule: testCapsule(),
@@ -273,14 +401,16 @@ describe('SubagentRunner', () => {
 
   it('reports the child wall deadline instead of a provider stream abort', async () => {
     const runner = wireSubagentRunner({
-      sendProfileMessage: async (_agentId, _content, options) => new Promise<string>((_resolve, reject) => {
-        options?.signal?.addEventListener('abort', () => reject(new Error('EventStream aborted')), { once: true });
-      }),
+      sendProfileMessage: async (_agentId, _content, options) =>
+        new Promise<string>((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () => reject(new Error('EventStream aborted')), { once: true });
+        }),
       systemPromptForAgent: () => 'fallback',
       getActiveTurn: () => null,
     });
     const result = await runner.runSubagent({
-      parentAgentId: 'debugger', parentAccessCeiling: 'full',
+      parentAgentId: 'debugger',
+      parentAccessCeiling: 'full',
       parentToolCallId: 'deadline-tool',
       targetProfile: 'ask',
       capsule: testCapsule({ budget: { maxToolCalls: 8, maxWallTimeMs: 10 } }),
@@ -302,16 +432,22 @@ describe('SubagentRunner', () => {
       const registry = new TaskRegistry(createSessionTaskStore(sessionId));
       const task = await registry.createTask('Timed review');
       const runner = wireSubagentRunner({
-        sendProfileMessage: async (_agentId, _content, options) => new Promise<string>((_resolve, reject) => {
-          if (options?.signal?.aborted) { reject(new Error('EventStream aborted')); return; }
-          options?.signal?.addEventListener('abort', () => reject(new Error('EventStream aborted')), { once: true });
-        }),
-        systemPromptForAgent: () => 'profile', getActiveTurn: () => delegatingTurn(),
+        sendProfileMessage: async (_agentId, _content, options) =>
+          new Promise<string>((_resolve, reject) => {
+            if (options?.signal?.aborted) {
+              reject(new Error('EventStream aborted'));
+              return;
+            }
+            options?.signal?.addEventListener('abort', () => reject(new Error('EventStream aborted')), { once: true });
+          }),
+        systemPromptForAgent: () => 'profile',
+        getActiveTurn: () => delegatingTurn(),
       });
       const [tool] = runner.createSubagentTools('general', sessionId);
       const result = await tool.execute('deadline-call', {
         ...testCapsule({ budget: { maxToolCalls: 8, maxWallTimeMs: 100 } }),
-        taskId: task.id, profile: 'general',
+        taskId: task.id,
+        profile: 'general',
       } as unknown as Record<string, unknown>);
       expect(result.details).toMatchObject({ errorCode: 'POLICY_LIMIT_EXCEEDED' });
       const [execution] = await registry.listExecutions(task.id);
@@ -334,19 +470,35 @@ describe('SubagentRunner', () => {
     const runner = wireSubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => {
         options?.onEvent?.({
-          id: 'e1', type: 'tool.started', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          id: 'e1',
+          type: 'tool.started',
+          timestamp: Date.now(),
+          sessionId: 's',
+          agentId: 'ask',
           payload: { toolCallId: 'same', toolName: 'grep', args: {} },
         });
         options?.onEvent?.({
-          id: 'e2', type: 'tool.completed', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          id: 'e2',
+          type: 'tool.completed',
+          timestamp: Date.now(),
+          sessionId: 's',
+          agentId: 'ask',
           payload: { toolCallId: 'same', toolName: 'grep', result: { ok: true, duration_ms: 1 } },
         });
         options?.onEvent?.({
-          id: 'e3', type: 'tool.denied', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          id: 'e3',
+          type: 'tool.denied',
+          timestamp: Date.now(),
+          sessionId: 's',
+          agentId: 'ask',
           payload: { toolCallId: 'same', toolName: 'grep', reason: 'no' },
         });
         options?.onEvent?.({
-          id: 'e4', type: 'tool.started', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          id: 'e4',
+          type: 'tool.started',
+          timestamp: Date.now(),
+          sessionId: 's',
+          agentId: 'ask',
           payload: { toolCallId: 'other', toolName: 'read', args: {} },
         });
         return 'ok';
@@ -356,14 +508,16 @@ describe('SubagentRunner', () => {
     });
     const parentTurn = {
       subagentBudget: parentBudget,
-      signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
+      signal: new AbortController().signal,
+      policyBudget: createPolicyBudgetState(),
       generation: 1,
       isLive: () => true,
       registerProducer: () => () => undefined,
       eventSink: { sessionId: 'parent', onEvent: () => undefined },
     } as unknown as TurnHandle;
     await runner.runSubagent({
-      parentAgentId: 'debugger', parentAccessCeiling: 'full',
+      parentAgentId: 'debugger',
+      parentAccessCeiling: 'full',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
       capsule: testCapsule(),
@@ -380,15 +534,27 @@ describe('SubagentRunner', () => {
     const runner = wireSubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => {
         options?.onEvent?.({
-          id: 'e1', type: 'tool.started', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          id: 'e1',
+          type: 'tool.started',
+          timestamp: Date.now(),
+          sessionId: 's',
+          agentId: 'ask',
           payload: { toolCallId: '', toolName: 'grep', args: {} },
         });
         options?.onEvent?.({
-          id: 'e2', type: 'tool.completed', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          id: 'e2',
+          type: 'tool.completed',
+          timestamp: Date.now(),
+          sessionId: 's',
+          agentId: 'ask',
           payload: { toolCallId: '   ', toolName: 'grep', result: { ok: true, duration_ms: 1 } },
         });
         options?.onEvent?.({
-          id: 'e3', type: 'tool.denied', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          id: 'e3',
+          type: 'tool.denied',
+          timestamp: Date.now(),
+          sessionId: 's',
+          agentId: 'ask',
           payload: { toolCallId: '', toolName: 'grep', reason: 'no' },
         });
         return 'ok';
@@ -398,14 +564,16 @@ describe('SubagentRunner', () => {
     });
     const parentTurn = {
       subagentBudget: parentBudget,
-      signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
+      signal: new AbortController().signal,
+      policyBudget: createPolicyBudgetState(),
       generation: 1,
       isLive: () => true,
       registerProducer: () => () => undefined,
       eventSink: { sessionId: 'parent', onEvent: () => undefined },
     } as unknown as TurnHandle;
     await runner.runSubagent({
-      parentAgentId: 'debugger', parentAccessCeiling: 'full',
+      parentAgentId: 'debugger',
+      parentAccessCeiling: 'full',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
       capsule: testCapsule(),
@@ -425,7 +593,10 @@ describe('SubagentRunner', () => {
     expect(tool.name).toBe('subagent');
     const result = await tool.execute('tc-1', testCapsule({ task: 'do work' }) as unknown as Record<string, unknown>);
     expect(result.details).toMatchObject({ profile: 'debugger', status: 'complete' });
-    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('Subagent result persistence failed') });
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('Subagent result persistence failed'),
+    });
     expect((result.content[0] as { text: string }).text).not.toContain('child done');
   });
 
@@ -454,26 +625,47 @@ describe('SubagentRunner', () => {
     try {
       const sessionId = 'spent-parent-budget';
       const registry = new TaskRegistry(createSessionTaskStore(sessionId));
-      const task = await registry.createTask('Independent review', { completionRequirements: ['skeptic_review_result'] });
-      const parentPolicy = createPolicyBudgetState({ maxToolCalls: 1000, maxSubagents: 12, maxChildDepth: 2, maxWallTimeMs: 60_000 });
+      const task = await registry.createTask('Independent review', {
+        completionRequirements: ['skeptic_review_result'],
+      });
+      const parentPolicy = createPolicyBudgetState({
+        maxToolCalls: 1000,
+        maxSubagents: 12,
+        maxChildDepth: 2,
+        maxWallTimeMs: 60_000,
+      });
       parentPolicy.toolCalls = 800;
       parentPolicy.subagents = 10;
-      const sendProfileMessage = vi.fn(async (_agent: string, _content: string, options?: { policyBudget?: { toolCalls: number; maxToolCalls: number } }) => {
-        expect(options?.policyBudget).toMatchObject({ toolCalls: 0, maxToolCalls: 8 });
-        return 'Review has no completed declaration';
-      });
+      const sendProfileMessage = vi.fn(
+        async (
+          _agent: string,
+          _content: string,
+          options?: { policyBudget?: { toolCalls: number; maxToolCalls: number } },
+        ) => {
+          expect(options?.policyBudget).toMatchObject({ toolCalls: 0, maxToolCalls: 8 });
+          return 'Review has no completed declaration';
+        },
+      );
       const turn = {
         runtimePlan: { profileDelegates: [], accessCeiling: 'full' },
         policyBudget: parentPolicy,
         subagentBudget: createSubagentBudgetState(),
-        generation: 1, signal: new AbortController().signal,
+        generation: 1,
+        signal: new AbortController().signal,
         isLive: () => true,
         registerProducer: () => () => undefined,
         eventSink: { sessionId, onEvent: () => undefined },
       } as unknown as TurnHandle;
-      const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'profile', getActiveTurn: () => turn });
+      const runner = wireSubagentRunner({
+        sendProfileMessage,
+        systemPromptForAgent: () => 'profile',
+        getActiveTurn: () => turn,
+      });
       const [tool] = runner.createSubagentTools('general', sessionId);
-      await tool.execute('review-call', { ...testCapsule(), taskId: task.id, profile: 'general' } as unknown as Record<string, unknown>);
+      await tool.execute('review-call', { ...testCapsule(), taskId: task.id, profile: 'general' } as unknown as Record<
+        string,
+        unknown
+      >);
       expect(sendProfileMessage).toHaveBeenCalledOnce();
       const execution = (await registry.listExecutions(task.id))[0];
       expect(execution?.budget).toMatchObject({ toolCalls: 0, maxToolCalls: 8 });
@@ -486,12 +678,17 @@ describe('SubagentRunner', () => {
           options!.policyBudget!.toolCalls = 9;
           return 'Untrusted child result';
         },
-        systemPromptForAgent: () => 'profile', getActiveTurn: () => turn,
+        systemPromptForAgent: () => 'profile',
+        getActiveTurn: () => turn,
       });
       const [inconsistentTool] = inconsistentRunner.createSubagentTools('general', sessionId);
-      await expect(inconsistentTool.execute('inconsistent-call', {
-        ...testCapsule(), taskId: inconsistentTask.id, profile: 'general',
-      } as unknown as Record<string, unknown>)).rejects.toThrow(/budget/i);
+      await expect(
+        inconsistentTool.execute('inconsistent-call', {
+          ...testCapsule(),
+          taskId: inconsistentTask.id,
+          profile: 'general',
+        } as unknown as Record<string, unknown>),
+      ).rejects.toThrow(/budget/i);
       const inconsistentExecution = (await registry.listExecutions(inconsistentTask.id))[0];
       expect(inconsistentExecution?.status).toBe('failed');
       expect((await registry.getTask(inconsistentTask.id))?.status).toBe('blocked');
@@ -512,7 +709,10 @@ describe('SubagentRunner', () => {
     const [tool] = runner.createSubagentTools('debugger', 'sess-1');
     const result = await tool.execute('tc-missing', { task: 'do work' } as never);
     expect(result.isError).toBe(true);
-    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('DELEGATION_CAPSULE_INVALID') });
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('DELEGATION_CAPSULE_INVALID'),
+    });
     expect(sendProfileMessage).not.toHaveBeenCalled();
   });
 
@@ -520,42 +720,60 @@ describe('SubagentRunner', () => {
     const runner = wireSubagentRunner({
       sendProfileMessage: async () => 'child done',
       systemPromptForAgent: () => 'fallback',
-      getActiveTurn: () => ({
-        runtimePlan: { profileDelegates: ['general'], accessCeiling: 'full' },
-        registerProducer: () => () => undefined,
-        subagentBudget: createSubagentBudgetState(),
-        signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
-        generation: 1,
-        isLive: () => true,
-        eventSink: { sessionId: 'sess-1', onEvent: () => undefined },
-      } as unknown as TurnHandle),
+      getActiveTurn: () =>
+        ({
+          runtimePlan: { profileDelegates: ['general'], accessCeiling: 'full' },
+          registerProducer: () => () => undefined,
+          subagentBudget: createSubagentBudgetState(),
+          signal: new AbortController().signal,
+          policyBudget: createPolicyBudgetState(),
+          generation: 1,
+          isLive: () => true,
+          eventSink: { sessionId: 'sess-1', onEvent: () => undefined },
+        }) as unknown as TurnHandle,
     });
     const [tool] = runner.createSubagentTools('debugger', 'sess-1');
-    const allowed = await tool.execute('tc-allowed', testCapsule({ task: 'do work', profile: 'general' }) as unknown as Record<string, unknown>);
+    const allowed = await tool.execute(
+      'tc-allowed',
+      testCapsule({ task: 'do work', profile: 'general' }) as unknown as Record<string, unknown>,
+    );
     expect(allowed.details).toMatchObject({ profile: 'general', status: 'complete' });
-    await expect(tool.execute('tc-denied', testCapsule({ task: 'do work', profile: 'ask' }) as unknown as Record<string, unknown>))
-      .rejects.toThrow(/SUBAGENT_DELEGATE_DENIED/);
+    await expect(
+      tool.execute('tc-denied', testCapsule({ task: 'do work', profile: 'ask' }) as unknown as Record<string, unknown>),
+    ).rejects.toThrow(/SUBAGENT_DELEGATE_DENIED/);
   });
 
-  it.each([{ model: 'openai:gpt-5.6-sol' }, { reasoningLevel: 'low' }])('rejects parent-provided model controls in the Capsule', async (override) => {
-    const sendProfileMessage = vi.fn(async () => 'should-not-run');
-    const runner = wireSubagentRunner({
-      sendProfileMessage,
-      systemPromptForAgent: () => 'fallback',
-      getActiveTurn: () => null,
-    });
-    const [tool] = runner.createSubagentTools('debugger', 'owner');
-    const result = await tool.execute('parent-tool', { ...testCapsule(), ...override });
-    expect(result.isError).toBe(true);
-    expect(result.content[0]).toMatchObject({ text: expect.stringContaining('DELEGATION_CAPSULE_INVALID') });
-    expect(sendProfileMessage).not.toHaveBeenCalled();
-  });
+  it.each([{ model: 'openai:gpt-5.6-sol' }, { reasoningLevel: 'low' }])(
+    'rejects parent-provided model controls in the Capsule',
+    async (override) => {
+      const sendProfileMessage = vi.fn(async () => 'should-not-run');
+      const runner = wireSubagentRunner({
+        sendProfileMessage,
+        systemPromptForAgent: () => 'fallback',
+        getActiveTurn: () => null,
+      });
+      const [tool] = runner.createSubagentTools('debugger', 'owner');
+      const result = await tool.execute('parent-tool', { ...testCapsule(), ...override });
+      expect(result.isError).toBe(true);
+      expect(result.content[0]).toMatchObject({ text: expect.stringContaining('DELEGATION_CAPSULE_INVALID') });
+      expect(sendProfileMessage).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects a child without an explicit model or configured profile route before dispatch', async () => {
     const finish = vi.spyOn(delegationTraceStore, 'finish').mockImplementation(() => undefined);
     const profiles = vi.spyOn(agentManifestService, 'getEffectiveProfiles').mockReturnValueOnce([
-      { id: 'general', enabled: true, instructions: 'General profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: [],
-        compiledRoute: { agentId: 'general', providerId: '', modelId: '' } },
+      {
+        id: 'general',
+        enabled: true,
+        instructions: 'General profile instructions',
+        tools: [],
+        skills: [],
+        mcpServers: [],
+        handoffs: [],
+        agents: [],
+        compiledRoute: { agentId: 'general', providerId: '', modelId: '' },
+      },
     ] as never);
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
     try {
@@ -565,12 +783,23 @@ describe('SubagentRunner', () => {
         getActiveTurn: () => null,
       });
       const result = await runner.runSubagent({
-        parentAgentId: 'debugger', parentAccessCeiling: 'full', parentToolCallId: 'parent-tool', targetProfile: 'general',
-        capsule: testCapsule(), parentSessionId: 'owner',
+        parentAgentId: 'debugger',
+        parentAccessCeiling: 'full',
+        parentToolCallId: 'parent-tool',
+        targetProfile: 'general',
+        capsule: testCapsule(),
+        parentSessionId: 'owner',
       });
       expect(result.status).toBe('failed');
       expect(result.text).toMatch(/MODEL_ROUTE_REQUIRED.*Settings/);
-      expect(finish).toHaveBeenCalledWith('owner', 'parent-tool', expect.any(String), 'failed', expect.any(String), 'MODEL_ROUTE_REQUIRED');
+      expect(finish).toHaveBeenCalledWith(
+        'owner',
+        'parent-tool',
+        expect.any(String),
+        'failed',
+        expect.any(String),
+        'MODEL_ROUTE_REQUIRED',
+      );
       expect(sendProfileMessage).not.toHaveBeenCalled();
     } finally {
       profiles.mockRestore();
@@ -583,30 +812,75 @@ describe('SubagentRunner', () => {
     const finish = vi.spyOn(delegationTraceStore, 'finish').mockImplementation(() => undefined);
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
     try {
-      const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'fallback', getActiveTurn: () => null });
-      const result = await runner.runSubagent({ parentAgentId: 'debugger', parentAccessCeiling: 'full', parentToolCallId: 'missing-agent',
-        targetProfile: 'general', capsule: testCapsule(), parentSessionId: 'owner' });
+      const runner = wireSubagentRunner({
+        sendProfileMessage,
+        systemPromptForAgent: () => 'fallback',
+        getActiveTurn: () => null,
+      });
+      const result = await runner.runSubagent({
+        parentAgentId: 'debugger',
+        parentAccessCeiling: 'full',
+        parentToolCallId: 'missing-agent',
+        targetProfile: 'general',
+        capsule: testCapsule(),
+        parentSessionId: 'owner',
+      });
       expect(result.status).toBe('failed');
-      expect(finish).toHaveBeenCalledWith('owner', 'missing-agent', expect.any(String), 'failed',
-        'AGENT_PROFILE_UNAVAILABLE: general', 'AGENT_PROFILE_UNAVAILABLE');
+      expect(finish).toHaveBeenCalledWith(
+        'owner',
+        'missing-agent',
+        expect.any(String),
+        'failed',
+        'AGENT_PROFILE_UNAVAILABLE: general',
+        'AGENT_PROFILE_UNAVAILABLE',
+      );
       expect(sendProfileMessage).not.toHaveBeenCalled();
-    } finally { profiles.mockRestore(); finish.mockRestore(); }
+    } finally {
+      profiles.mockRestore();
+      finish.mockRestore();
+    }
   });
 
   it.each([
-    { error: new DelegationConfigurationError('MODEL_UNAVAILABLE', 'MODEL_UNAVAILABLE: route'), expected: 'MODEL_UNAVAILABLE' },
-    { error: new DelegationConfigurationError('DELEGATION_REASONING_UNSUPPORTED', 'unsupported'), expected: 'DELEGATION_REASONING_UNSUPPORTED' },
+    {
+      error: new DelegationConfigurationError('MODEL_UNAVAILABLE', 'MODEL_UNAVAILABLE: route'),
+      expected: 'MODEL_UNAVAILABLE',
+    },
+    {
+      error: new DelegationConfigurationError('DELEGATION_REASONING_UNSUPPORTED', 'unsupported'),
+      expected: 'DELEGATION_REASONING_UNSUPPORTED',
+    },
     { error: new Error('MODEL_UNAVAILABLE: arbitrary execution error'), expected: undefined },
   ])('projects only trusted preparation failures as configuration errors', async ({ error, expected }) => {
     const finish = vi.spyOn(delegationTraceStore, 'finish').mockImplementation(() => undefined);
     try {
-      const runner = wireSubagentRunner({ sendProfileMessage: async () => { throw error; },
-        systemPromptForAgent: () => 'fallback', getActiveTurn: () => null });
-      const result = await runner.runSubagent({ parentAgentId: 'debugger', parentAccessCeiling: 'full', parentToolCallId: 'typed-error',
-        targetProfile: 'general', capsule: testCapsule(), parentSessionId: 'owner' });
+      const runner = wireSubagentRunner({
+        sendProfileMessage: async () => {
+          throw error;
+        },
+        systemPromptForAgent: () => 'fallback',
+        getActiveTurn: () => null,
+      });
+      const result = await runner.runSubagent({
+        parentAgentId: 'debugger',
+        parentAccessCeiling: 'full',
+        parentToolCallId: 'typed-error',
+        targetProfile: 'general',
+        capsule: testCapsule(),
+        parentSessionId: 'owner',
+      });
       expect(result.status).toBe('failed');
-      expect(finish).toHaveBeenCalledWith('owner', 'typed-error', expect.any(String), 'failed', error.message, expected);
-    } finally { finish.mockRestore(); }
+      expect(finish).toHaveBeenCalledWith(
+        'owner',
+        'typed-error',
+        expect.any(String),
+        'failed',
+        error.message,
+        expected,
+      );
+    } finally {
+      finish.mockRestore();
+    }
   });
 
   it('uses the selected Agent model and reasoning without inheriting the parent override', async () => {
@@ -617,7 +891,8 @@ describe('SubagentRunner', () => {
       getActiveTurn: () => null,
     });
     await runner.runSubagent({
-      parentAgentId: 'debugger', parentAccessCeiling: 'full',
+      parentAgentId: 'debugger',
+      parentAccessCeiling: 'full',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
       capsule: testCapsule(),
@@ -641,39 +916,78 @@ describe('SubagentRunner', () => {
 
   it('does not delegate the live lease from an approved Mission without a frozen capture scope', async () => {
     clearRdcContextLeases();
-    setRdcRuntimeContextForSession('parent', { contextId: 'ctx-live', runtimeOwner: 'local', ownerLeaseId: 'lease:live',
-      backend: 'local', updatedAt: Date.now(), captureId: 'cap-live' } satisfies RdcRuntimeContext, { projectId: 'proj-1' });
+    setRdcRuntimeContextForSession(
+      'parent',
+      {
+        contextId: 'ctx-live',
+        runtimeOwner: 'local',
+        ownerLeaseId: 'lease:live',
+        backend: 'local',
+        updatedAt: Date.now(),
+        captureId: 'cap-live',
+      } satisfies RdcRuntimeContext,
+      { projectId: 'proj-1' },
+    );
     const sendProfileMessage = vi.fn(async () => 'should-not-run');
-    const runner = wireSubagentRunner({ sendProfileMessage, systemPromptForAgent: () => 'fallback', getActiveTurn: () => null });
-    const parentTurn = { turnId: 'turn-parent', requiresApprovedCaptureScope: true,
-      subagentBudget: createSubagentBudgetState(), registerProducer: () => () => undefined,
-      generation: 1, signal: new AbortController().signal, policyBudget: createPolicyBudgetState(), isLive: () => true, eventSink: { sessionId: 'parent' } } as unknown as TurnHandle;
+    const runner = wireSubagentRunner({
+      sendProfileMessage,
+      systemPromptForAgent: () => 'fallback',
+      getActiveTurn: () => null,
+    });
+    const parentTurn = {
+      turnId: 'turn-parent',
+      requiresApprovedCaptureScope: true,
+      subagentBudget: createSubagentBudgetState(),
+      registerProducer: () => () => undefined,
+      generation: 1,
+      signal: new AbortController().signal,
+      policyBudget: createPolicyBudgetState(),
+      isLive: () => true,
+      eventSink: { sessionId: 'parent' },
+    } as unknown as TurnHandle;
     try {
-      await expect(runner.runSubagent({ parentAgentId: 'general', parentAccessCeiling: 'full', parentToolCallId: 'parent-tool', targetProfile: 'ask',
-        capsule: testCapsule({ domainExtensions: { rdc: { requiresLease: true } } }),
-        parentSessionId: 'parent', projectId: 'proj-1', parentTurn })).rejects.toThrow('APPROVED_CAPTURE_SCOPE_REQUIRED');
+      await expect(
+        runner.runSubagent({
+          parentAgentId: 'general',
+          parentAccessCeiling: 'full',
+          parentToolCallId: 'parent-tool',
+          targetProfile: 'ask',
+          capsule: testCapsule({ domainExtensions: { rdc: { requiresLease: true } } }),
+          parentSessionId: 'parent',
+          projectId: 'proj-1',
+          parentTurn,
+        }),
+      ).rejects.toThrow('APPROVED_CAPTURE_SCOPE_REQUIRED');
       expect(sendProfileMessage).not.toHaveBeenCalled();
-    } finally { clearRdcContextLeases(); }
+    } finally {
+      clearRdcContextLeases();
+    }
   });
 
   it('grants a delegated lease before the child turn and revokes it after', async () => {
     clearRdcContextLeases();
-    setRdcRuntimeContextForSession('parent', {
-      contextId: 'ctx-live',
-      runtimeOwner: 'local',
-      ownerLeaseId: 'lease:live',
-      backend: 'local',
-      updatedAt: Date.now(),
-      captureId: 'cap-live',
-    } satisfies RdcRuntimeContext, { projectId: 'proj-1' });
+    setRdcRuntimeContextForSession(
+      'parent',
+      {
+        contextId: 'ctx-live',
+        runtimeOwner: 'local',
+        ownerLeaseId: 'lease:live',
+        backend: 'local',
+        updatedAt: Date.now(),
+        captureId: 'cap-live',
+      } satisfies RdcRuntimeContext,
+      { projectId: 'proj-1' },
+    );
     let childSessionId = '';
     const runner = wireSubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => {
         childSessionId = options?.sessionId ?? '';
-        expect(assertRdcContextLeaseOwnership({
-          sessionId: childSessionId,
-          projectId: 'proj-1',
-        })?.contextId).toBe('ctx-live');
+        expect(
+          assertRdcContextLeaseOwnership({
+            sessionId: childSessionId,
+            projectId: 'proj-1',
+          })?.contextId,
+        ).toBe('ctx-live');
         expect(options?.excludeRdcLeaseTools).toBe(false);
         return 'used rdc';
       },
@@ -683,14 +997,16 @@ describe('SubagentRunner', () => {
     const parentTurn = {
       turnId: 'turn-parent',
       subagentBudget: createSubagentBudgetState(),
-      signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
+      signal: new AbortController().signal,
+      policyBudget: createPolicyBudgetState(),
       generation: 1,
       isLive: () => true,
       registerProducer: () => () => undefined,
       eventSink: { sessionId: 'parent', projectId: 'proj-1', onEvent: () => undefined },
     } as unknown as TurnHandle;
     const result = await runner.runSubagent({
-      parentAgentId: 'debugger', parentAccessCeiling: 'full',
+      parentAgentId: 'debugger',
+      parentAccessCeiling: 'full',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
       capsule: testCapsule({ domainExtensions: { rdc: { requiresLease: true } } }),
@@ -707,13 +1023,17 @@ describe('SubagentRunner', () => {
 
   it('revokes the delegated lease when the child throws', async () => {
     clearRdcContextLeases();
-    setRdcRuntimeContextForSession('parent', {
-      contextId: 'ctx-live',
-      runtimeOwner: 'local',
-      ownerLeaseId: 'lease:live',
-      backend: 'local',
-      updatedAt: Date.now(),
-    } satisfies RdcRuntimeContext, { projectId: 'proj-1' });
+    setRdcRuntimeContextForSession(
+      'parent',
+      {
+        contextId: 'ctx-live',
+        runtimeOwner: 'local',
+        ownerLeaseId: 'lease:live',
+        backend: 'local',
+        updatedAt: Date.now(),
+      } satisfies RdcRuntimeContext,
+      { projectId: 'proj-1' },
+    );
     let childSessionId = '';
     const runner = wireSubagentRunner({
       sendProfileMessage: async (_agentId, _content, options) => {
@@ -725,7 +1045,8 @@ describe('SubagentRunner', () => {
       getActiveTurn: () => null,
     });
     const result = await runner.runSubagent({
-      parentAgentId: 'debugger', parentAccessCeiling: 'full',
+      parentAgentId: 'debugger',
+      parentAccessCeiling: 'full',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
       capsule: testCapsule({ domainExtensions: { rdc: { requiresLease: true } } }),
@@ -735,7 +1056,9 @@ describe('SubagentRunner', () => {
         turnId: 'turn-parent',
         subagentBudget: createSubagentBudgetState(),
         registerProducer: () => () => undefined,
-        generation: 1, signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
+        generation: 1,
+        signal: new AbortController().signal,
+        policyBudget: createPolicyBudgetState(),
         isLive: () => true,
         eventSink: { sessionId: 'parent', projectId: 'proj-1' },
       } as unknown as TurnHandle,
@@ -756,7 +1079,8 @@ describe('SubagentRunner', () => {
       getActiveTurn: () => null,
     });
     const result = await runner.runSubagent({
-      parentAgentId: 'debugger', parentAccessCeiling: 'full',
+      parentAgentId: 'debugger',
+      parentAccessCeiling: 'full',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
       capsule: testCapsule({ domainExtensions: { rdc: { requiresLease: true } } }),
@@ -766,7 +1090,9 @@ describe('SubagentRunner', () => {
         turnId: 'turn-parent',
         subagentBudget: createSubagentBudgetState(),
         registerProducer: () => () => undefined,
-        generation: 1, signal: new AbortController().signal, policyBudget: createPolicyBudgetState(),
+        generation: 1,
+        signal: new AbortController().signal,
+        policyBudget: createPolicyBudgetState(),
         isLive: () => true,
         eventSink: { sessionId: 'parent' },
       } as unknown as TurnHandle,
@@ -778,7 +1104,12 @@ describe('SubagentRunner', () => {
 });
 
 it('enforces Capsule budget in child requests and aborts a pending provider at its deadline', async () => {
-  const parent = createPolicyBudgetState({ maxToolCalls: 100, maxSubagents: 10, maxChildDepth: 3, maxWallTimeMs: 60000 });
+  const parent = createPolicyBudgetState({
+    maxToolCalls: 100,
+    maxSubagents: 10,
+    maxChildDepth: 3,
+    maxWallTimeMs: 60000,
+  });
   let captured = false;
   const runner = wireSubagentRunner({
     sendProfileMessage: async (_agent, _content, options) => {
@@ -787,35 +1118,79 @@ it('enforces Capsule budget in child requests and aborts a pending provider at i
       expect(reserveDispatchBudget(options?.policyBudget, { toolCalls: 1, subagents: 0 }).ok).toBe(true);
       expect(reserveDispatchBudget(options?.policyBudget, { toolCalls: 1, subagents: 0 }).ok).toBe(false);
       return new Promise<string>((_resolve, reject) => {
-        options?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+        options?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), {
+          once: true,
+        });
       });
     },
     systemPromptForAgent: () => 'profile',
     getActiveTurn: () => null,
   });
-  const result = await runner.runSubagent({ parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', parentToolCallId: 'dispatch', parentSessionId: 'budget-parent', policyBudget: parent, capsule: testCapsule({ budget: { maxToolCalls: 1, maxSubagents: 0, maxWallTimeMs: 30 } }) });
-  expect(captured).toBe(true); expect(result.status).toBe('cancelled');
-  expect(parent.maxToolCalls).toBe(100); expect(parent.toolCalls).toBe(1); expect(parent.subagents).toBe(1);
+  const result = await runner.runSubagent({
+    parentAgentId: 'general',
+    parentAccessCeiling: 'full',
+    targetProfile: 'general',
+    parentToolCallId: 'dispatch',
+    parentSessionId: 'budget-parent',
+    policyBudget: parent,
+    capsule: testCapsule({ budget: { maxToolCalls: 1, maxSubagents: 0, maxWallTimeMs: 30 } }),
+  });
+  expect(captured).toBe(true);
+  expect(result.status).toBe('cancelled');
+  expect(parent.maxToolCalls).toBe(100);
+  expect(parent.toolCalls).toBe(1);
+  expect(parent.subagents).toBe(1);
 });
 
 it('forwards a child approval with its actual execution identity and controlled parent answer', async () => {
   const approvals = new AgentToolApprovalRequestService();
   const events: import('@shared/types/agentRuntime').AgentEvent[] = [];
   const runner = wireSubagentRunner({
-    getActiveTurn: () => null, systemPromptForAgent: () => 'profile',
+    getActiveTurn: () => null,
+    systemPromptForAgent: () => 'profile',
     sendProfileMessage: async (_agent, _content, options) => {
-      const approved = await approvals.request({ agentId: 'general', sessionId: options!.sessionId, turnId: 'child-permission-turn', toolCallId: 'mutation', toolName: 'shell', argumentsSha256: 'a'.repeat(64), reason: 'Write scoped output', risk: 'high', context: { sessionId: options!.sessionId, turnId: 'child-permission-turn' }, signal: options?.signal, onEvent: options?.onEvent });
+      const approved = await approvals.request({
+        agentId: 'general',
+        sessionId: options!.sessionId,
+        turnId: 'child-permission-turn',
+        toolCallId: 'mutation',
+        toolName: 'shell',
+        argumentsSha256: 'a'.repeat(64),
+        reason: 'Write scoped output',
+        risk: 'high',
+        context: { sessionId: options!.sessionId, turnId: 'child-permission-turn' },
+        signal: options?.signal,
+        onEvent: options?.onEvent,
+      });
       return approved ? 'approved child output' : 'denied';
     },
   });
-  const result = await runner.runSubagent({ parentAgentId: 'general', parentAccessCeiling: 'full', targetProfile: 'general', parentToolCallId: 'dispatch-tool', executionId: 'durable-execution-7', parentSessionId: 'parent', capsule: testCapsule(), parentOnEvent: (event) => {
-    events.push(event);
-    if (event.type === 'approval.requested') {
-      const { approvalId } = event.payload;
-      expect(approvalId).toMatch(/^tool-approval-mutation-.+/);
-      expect(approvals.answer({ sessionId: 'parent', turnId: 'child-permission-turn', approvalId, approved: true }).success).toBe(true);
-    }
-  } });
+  const result = await runner.runSubagent({
+    parentAgentId: 'general',
+    parentAccessCeiling: 'full',
+    targetProfile: 'general',
+    parentToolCallId: 'dispatch-tool',
+    executionId: 'durable-execution-7',
+    parentSessionId: 'parent',
+    capsule: testCapsule(),
+    parentOnEvent: (event) => {
+      events.push(event);
+      if (event.type === 'approval.requested') {
+        const { approvalId } = event.payload;
+        expect(approvalId).toMatch(/^tool-approval-mutation-.+/);
+        expect(
+          approvals.answer({ sessionId: 'parent', turnId: 'child-permission-turn', approvalId, approved: true })
+            .success,
+        ).toBe(true);
+      }
+    },
+  });
   expect(result.status).toBe('complete');
-  expect(events.find((event) => event.type === 'approval.requested')).toMatchObject({ sessionId: 'parent', payload: { delegatedRequest: { executionId: 'durable-execution-7', turnId: 'child-permission-turn' }, risk: 'high' } });
+  expect(events.find((event) => event.type === 'approval.requested')).toMatchObject({
+    sessionId: 'parent',
+    payload: {
+      delegatedRequest: { executionId: 'durable-execution-7', turnId: 'child-permission-turn' },
+      risk: 'high',
+    },
+  });
 });

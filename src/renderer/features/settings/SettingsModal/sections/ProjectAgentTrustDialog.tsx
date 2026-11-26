@@ -20,7 +20,11 @@ export interface ProjectAgentTrustReview {
  * The whole profile is shown before trusting it, because its instructions and tool list run in every
  * turn of this project. Trust covers these bytes only; a later edit outside Settings asks again.
  */
-export function ProjectAgentTrustDialog({ review, onConfirm, onClose }: {
+export function ProjectAgentTrustDialog({
+  review,
+  onConfirm,
+  onClose,
+}: {
   review: ProjectAgentTrustReview;
   onConfirm: (preview: ProjectAgentTrustPreview) => Promise<void>;
   onClose: () => void;
@@ -52,24 +56,42 @@ export function ProjectAgentTrustDialog({ review, onConfirm, onClose }: {
       closeLabel={t('dialog.close')}
       onClose={onClose}
       dataTestId="settings-agent-trust-dialog"
-      footer={<>
-        <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>{t('dialog.cancel')}</Button>
-        <Button variant="primary" size="sm" loading={busy} disabled={!preview}
-          onClick={() => void confirm()} data-testid="settings-agent-trust-confirm">
-          {t('settings.agentTrustConfirm')}
-        </Button>
-      </>}
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>
+            {t('dialog.cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            loading={busy}
+            disabled={!preview}
+            onClick={() => void confirm()}
+            data-testid="settings-agent-trust-confirm"
+          >
+            {t('settings.agentTrustConfirm')}
+          </Button>
+        </>
+      }
     >
       {!preview && !review.error ? <Spinner size="sm" /> : null}
-      {review.error ? <InlineError detail={review.error}>{humanizeError(review.error, t, 'app.error.loadFailed')}</InlineError> : null}
+      {review.error ? (
+        <InlineError detail={review.error}>{humanizeError(review.error, t, 'app.error.loadFailed')}</InlineError>
+      ) : null}
       {preview ? (
         <>
           <dl className="settings-agent-migration-facts">
             <dt>{t('settings.agentModelMigrationFile')}</dt>
-            <dd><code>{preview.sourcePath}</code></dd>
+            <dd>
+              <code>{preview.sourcePath}</code>
+            </dd>
           </dl>
-          <pre className="settings-agent-trust-content scrollbar-thin" tabIndex={0}
-            aria-label={t('settings.agentTrustContent')} data-testid="settings-agent-trust-content">
+          <pre
+            className="settings-agent-trust-content scrollbar-thin"
+            tabIndex={0}
+            aria-label={t('settings.agentTrustContent')}
+            data-testid="settings-agent-trust-content"
+          >
             {preview.content}
           </pre>
         </>

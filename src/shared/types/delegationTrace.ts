@@ -27,7 +27,17 @@ export interface DelegationTraceHeader {
   childSessionId: string;
   status: 'running' | 'complete' | 'failed' | 'cancelled' | 'interrupted';
   /** Durable Task Execution lifecycle for background delegations; distinct from the child turn result. */
-  executionStatus?: 'queued' | 'running' | 'waiting' | 'cancelling' | 'completed' | 'partial' | 'blocked' | 'failed' | 'cancelled' | 'interrupted';
+  executionStatus?:
+    | 'queued'
+    | 'running'
+    | 'waiting'
+    | 'cancelling'
+    | 'completed'
+    | 'partial'
+    | 'blocked'
+    | 'failed'
+    | 'cancelled'
+    | 'interrupted';
   startedAt: number;
   updatedAt: number;
   completedAt?: number;
@@ -37,7 +47,11 @@ export interface DelegationTraceHeader {
   finalUnavailableReason?: string;
   error?: string;
   /** Structured main-process request-preparation failure, never inferred from model output. */
-  configurationError?: import('./providerCapability').RequestPlanningErrorCode | 'AGENT_PROFILE_UNAVAILABLE' | 'MODEL_ROUTE_REQUIRED' | 'DELEGATION_REASONING_UNSUPPORTED';
+  configurationError?:
+    | import('./providerCapability').RequestPlanningErrorCode
+    | 'AGENT_PROFILE_UNAVAILABLE'
+    | 'MODEL_ROUTE_REQUIRED'
+    | 'DELEGATION_REASONING_UNSUPPORTED';
   parentReceiptPreview?: string;
   parentReceiptAvailable?: boolean;
   latestAction?: string;

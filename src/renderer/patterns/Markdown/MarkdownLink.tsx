@@ -6,11 +6,18 @@ import { useMarkdownSourceScope, type MarkdownSource } from './markdownSources';
 
 type AnchorProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & { node?: unknown };
 
-const sourceTooltip = (source: MarkdownSource) => [source.title, source.summary].filter(Boolean).join('\n') || source.url;
+const sourceTooltip = (source: MarkdownSource) =>
+  [source.title, source.summary].filter(Boolean).join('\n') || source.url;
 
 /** A page this turn read, cited inline: favicon and site, the title and summary on hover. */
 export const CitationPill: React.FC<{ source: MarkdownSource }> = ({ source }) => (
-  <a className="markdown-citation" href={source.url} target="_blank" rel="noreferrer noopener" data-tooltip={sourceTooltip(source)}>
+  <a
+    className="markdown-citation"
+    href={source.url}
+    target="_blank"
+    rel="noreferrer noopener"
+    data-tooltip={sourceTooltip(source)}
+  >
     <FaviconImage domain={source.domain} />
     <OverflowFade className="markdown-citation-label" text={source.domain} />
   </a>
@@ -24,8 +31,17 @@ export const CitationPill: React.FC<{ source: MarkdownSource }> = ({ source }) =
 export const MarkdownLink: React.FC<AnchorProps> = ({ href, children, node: _node, ...rest }) => {
   const { sources } = useMarkdownSourceScope();
   if (!href) return <span>{children}</span>;
-  if (href.startsWith('#')) return <a href={href} {...rest}>{children}</a>;
+  if (href.startsWith('#'))
+    return (
+      <a href={href} {...rest}>
+        {children}
+      </a>
+    );
   const source = sources.get(normalizeWebUrl(href));
   if (source) return <CitationPill source={source} />;
-  return <a href={href} target="_blank" rel="noreferrer noopener" data-tooltip={webHostname(href)} {...rest}>{children}</a>;
+  return (
+    <a href={href} target="_blank" rel="noreferrer noopener" data-tooltip={webHostname(href)} {...rest}>
+      {children}
+    </a>
+  );
 };

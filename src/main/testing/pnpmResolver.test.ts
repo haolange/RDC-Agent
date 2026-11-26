@@ -57,23 +57,22 @@ describe('pnpm resolver', () => {
         { command: 'wrong', prefix: [], label: 'path pnpm', shell: false },
         { command: 'corepack', prefix: ['pnpm'], label: 'corepack pnpm', shell: false },
       ],
-      runSync: (command: string) => (
-        command === 'corepack'
-          ? { status: 0, output: '11.7.0' }
-          : { status: 0, output: '11.6.2' }
-      ),
+      runSync: (command: string) =>
+        command === 'corepack' ? { status: 0, output: '11.7.0' } : { status: 0, output: '11.6.2' },
       fail: (message: string) => {
         throw new Error(message);
       },
     });
     expect(picked.label).toBe('corepack pnpm');
 
-    expect(() => resolvePnpm({
-      candidates: [{ command: 'path', prefix: [], label: 'pnpm', shell: false }],
-      runSync: () => ({ status: 0, output: '11.6.2' }),
-      fail: (message: string) => {
-        throw new Error(message);
-      },
-    })).toThrow(/pnpm 11\.7\.0 is required\. Checked: pnpm=11\.6\.2/);
+    expect(() =>
+      resolvePnpm({
+        candidates: [{ command: 'path', prefix: [], label: 'pnpm', shell: false }],
+        runSync: () => ({ status: 0, output: '11.6.2' }),
+        fail: (message: string) => {
+          throw new Error(message);
+        },
+      }),
+    ).toThrow(/pnpm 11\.7\.0 is required\. Checked: pnpm=11\.6\.2/);
   });
 });

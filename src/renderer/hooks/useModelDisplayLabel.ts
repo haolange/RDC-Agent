@@ -6,7 +6,9 @@ export function useModelDisplayLabel(providerId: string | undefined, modelId: st
     if (!providerId || !modelId) return undefined;
     for (const entry of Object.values(state.entries)) {
       if (entry.snapshot?.providerId !== providerId) continue;
-      const model = entry.snapshot.models.find((candidate) => candidate.modelId === modelId || candidate.aliases.includes(modelId));
+      const model = entry.snapshot.models.find(
+        (candidate) => candidate.modelId === modelId || candidate.aliases.includes(modelId),
+      );
       if (model?.label) return model.label;
     }
     return modelId.split('/').at(-1);

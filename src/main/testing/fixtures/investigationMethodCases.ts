@@ -78,20 +78,27 @@ export const investigationMethodCapsule = {
   goal: 'Investigate the synthetic washedout surface without claiming a root cause.',
   task: 'Compare inputradiance and transfercurve with matched sources.',
   scope: 'FixtureA, read-only synthetic material',
-  acceptedFacts: [{
-    statement: 'The fixture describes a washedout surface; no first bad event has been proven.',
-    sourceRefs: ['session://tool-outputs/fixture/observation.json'],
-    qualification: 'synthetic source description, not a real capture observation',
-  }],
+  acceptedFacts: [
+    {
+      statement: 'The fixture describes a washedout surface; no first bad event has been proven.',
+      sourceRefs: ['session://tool-outputs/fixture/observation.json'],
+      qualification: 'synthetic source description, not a real capture observation',
+    },
+  ],
   hypotheses: ['inputradiance may be high before transfer', 'transfercurve may alter the output'],
   challengeRefs: ['session://tool-outputs/fixture/challenge.json'],
-  negativePaths: [{
-    path: 'prior transfer comparison',
-    reason: 'the previous negative was restricted to its recorded settings, not a universal exclusion',
-    applicableWhen: 'same capture and transfer settings',
-    recheckWhen: 'capture or transfer settings change',
-  }],
-  inputArtifactRefs: ['session://tool-outputs/fixture/observation.json', 'session://tool-outputs/fixture/challenge.json'],
+  negativePaths: [
+    {
+      path: 'prior transfer comparison',
+      reason: 'the previous negative was restricted to its recorded settings, not a universal exclusion',
+      applicableWhen: 'same capture and transfer settings',
+      recheckWhen: 'capture or transfer settings change',
+    },
+  ],
+  inputArtifactRefs: [
+    'session://tool-outputs/fixture/observation.json',
+    'session://tool-outputs/fixture/challenge.json',
+  ],
   outputRequirements: 'Return evidence, counterevidence, unresolved hypotheses, applicability and next checks.',
   stopConditions: ['Stop live inspection if replay identity is unverified; resume only after a verified reopen.'],
   requiredSkillIds: [],

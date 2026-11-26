@@ -36,8 +36,9 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
-  const selected = options.find((option) => option.canonicalId === value
-    && (option.configured || option.status === 'provider-unavailable'));
+  const selected = options.find(
+    (option) => option.canonicalId === value && (option.configured || option.status === 'provider-unavailable'),
+  );
   const invalidSelection = isAgentModelSelectionInvalid(value, options);
   const providerUnavailable = selected?.status === 'provider-unavailable';
   const groups = useMemo(() => buildAgentModelGroups(options, query), [options, query]);
@@ -49,9 +50,12 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
     if (items.length === 0) return;
     event.preventDefault();
     const current = items.indexOf(document.activeElement as HTMLButtonElement);
-    const index = event.key === 'Home' ? 0
-      : event.key === 'End' ? items.length - 1
-        : (current + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
+    const index =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? items.length - 1
+          : (current + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
     items[index]?.focus();
   };
 
@@ -61,9 +65,11 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
     setQuery('');
   };
 
-  const triggerPrimary = selected ? selected.modelLabel
-    : invalidSelection ? t('composer.model.unavailable')
-      : followDefaultLabel ?? t('settings.selectModelPlaceholder');
+  const triggerPrimary = selected
+    ? selected.modelLabel
+    : invalidSelection
+      ? t('composer.model.unavailable')
+      : (followDefaultLabel ?? t('settings.selectModelPlaceholder'));
   const followsDefault = Boolean(followDefaultLabel) && !value;
 
   return (
@@ -73,7 +79,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
         onOpenChange={setOpen}
         align="start"
         className="settings-model-cascade-menu"
-        trigger={(
+        trigger={
           <button
             type="button"
             className="settings-model-cascade-trigger"
@@ -84,11 +90,16 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
           >
             <span className="settings-model-cascade-trigger-copy">
               <strong>{triggerPrimary}</strong>
-              {selected ? <span className="settings-service-title"><ProviderMark id={selected.providerId} size={14} />{selected.providerLabel}</span> : null}
+              {selected ? (
+                <span className="settings-service-title">
+                  <ProviderMark id={selected.providerId} size={14} />
+                  {selected.providerLabel}
+                </span>
+              ) : null}
             </span>
             <Chevron direction="down" />
           </button>
-        )}
+        }
       >
         <div className="settings-model-cascade-search">
           <SearchField
@@ -102,7 +113,12 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
           />
         </div>
         {followDefaultLabel && !query ? (
-          <div className="settings-model-cascade-list" role="listbox" aria-label={t('settings.modelFieldLabel')} onKeyDown={onMenuKeyDown}>
+          <div
+            className="settings-model-cascade-list"
+            role="listbox"
+            aria-label={t('settings.modelFieldLabel')}
+            onKeyDown={onMenuKeyDown}
+          >
             <button
               type="button"
               className={`settings-model-option settings-model-option--default${followsDefault ? ' is-selected' : ''}`}
@@ -131,9 +147,18 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
             onKeyDown={onMenuKeyDown}
           >
             {groups.map((group) => (
-              <div key={group.providerId} className="settings-model-group" role="group" aria-label={group.label} data-provider-id={group.providerId}>
+              <div
+                key={group.providerId}
+                className="settings-model-group"
+                role="group"
+                aria-label={group.label}
+                data-provider-id={group.providerId}
+              >
                 <div className="settings-model-group-title">
-                  <span className="settings-service-title"><ProviderMark id={group.providerId} size={16} />{group.label}</span>
+                  <span className="settings-service-title">
+                    <ProviderMark id={group.providerId} size={16} />
+                    {group.label}
+                  </span>
                   <span>{group.availableCount}</span>
                 </div>
                 {group.options.map((option) => {

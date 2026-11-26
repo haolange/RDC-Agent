@@ -2,19 +2,10 @@ import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import { parseSSE, ProviderHttpError } from './internal/http';
 import { sendProviderRequest, startProviderStream, type ProviderStreamRun } from './internal/providerStreamDriver';
-import {
-  buildGoogleInteractionsRequest,
-  buildGoogleInteractionsUrl,
-} from './GoogleInteractionsWire';
+import { buildGoogleInteractionsRequest, buildGoogleInteractionsUrl } from './GoogleInteractionsWire';
 import { GoogleInteractionsStreamState } from './GoogleInteractionsStreamState';
 import type { EventStream } from '../core/EventStream';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Model,
-  StreamOptions,
-} from '../core/types';
+import type { AssistantMessage, AssistantMessageEvent, Context, Model, StreamOptions } from '../core/types';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1';
@@ -38,11 +29,7 @@ export class GoogleInteractionsProvider implements ProviderStrategy {
     this.defaultHeaders = { ...(options.headers ?? {}) };
   }
 
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage> {
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
       const response = await this.send(model, context, options, run.signal);
       return consumeGoogleInteractionsStream(response, run, options);
@@ -55,10 +42,7 @@ export class GoogleInteractionsProvider implements ProviderStrategy {
     if (!apiKey) {
       throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for Google Interactions provider');
     }
-    const body = applyRequestPlanBody(
-      buildGoogleInteractionsRequest(model, context, options),
-      options.requestPlan,
-    );
+    const body = applyRequestPlanBody(buildGoogleInteractionsRequest(model, context, options), options.requestPlan);
     return sendProviderRequest(PROVIDER_API, options.requestPlan, signal, {
       url: buildGoogleInteractionsUrl(baseUrl),
       headers: {
@@ -102,9 +86,7 @@ export { buildGoogleInteractionsUrl };
 function parseEvent(raw: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
   } catch {
     return null;
   }

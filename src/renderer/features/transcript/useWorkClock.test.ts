@@ -17,7 +17,10 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   seen.clear();
 });
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 it('drives every running Working timer from one 1 s interval and stops it when none runs', async () => {
   const intervals = vi.spyOn(window, 'setInterval');
@@ -25,18 +28,31 @@ it('drives every running Working timer from one 1 s interval and stops it when n
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
-  const render = (header: boolean, subagent: boolean) => act(async () => root.render(createElement('div', null,
-    createElement(Timer, { id: 'header', running: header }), createElement(Timer, { id: 'subagent', running: subagent }))));
+  const render = (header: boolean, subagent: boolean) =>
+    act(async () =>
+      root.render(
+        createElement(
+          'div',
+          null,
+          createElement(Timer, { id: 'header', running: header }),
+          createElement(Timer, { id: 'subagent', running: subagent }),
+        ),
+      ),
+    );
   try {
     await render(true, true);
     expect(intervals).toHaveBeenCalledTimes(1);
-    await act(async () => { vi.advanceTimersByTime(1_000); });
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
     expect(seen.get('header')?.at(-1)).toBe(11_000);
     expect(seen.get('subagent')?.at(-1)).toBe(11_000);
     // A settled timer reads undefined and leaves the clock to the one still running.
     await render(true, false);
     expect(seen.get('subagent')?.at(-1)).toBeUndefined();
-    await act(async () => { vi.advanceTimersByTime(1_000); });
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
     expect(seen.get('header')?.at(-1)).toBe(12_000);
     expect(intervals).toHaveBeenCalledTimes(1);
     await render(false, false);

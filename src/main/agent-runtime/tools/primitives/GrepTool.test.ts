@@ -39,13 +39,12 @@ describe('grepTool', () => {
     );
     expect(fileHit.details?.matchedFiles).toBe(1);
 
-    const none = await grepTool.execute(
-      'tc-3',
-      { pattern: 'zzz-not-found' },
-      undefined,
-      undefined,
-      { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null },
-    );
+    const none = await grepTool.execute('tc-3', { pattern: 'zzz-not-found' }, undefined, undefined, {
+      workspaceRoot: root,
+      projectRootPath: root,
+      projectId: null,
+      sessionId: null,
+    });
     expect(none.content[0]).toMatchObject({ type: 'text' });
     expect(String((none.content[0] as { text: string }).text)).toMatch(/no matches/);
   });
@@ -56,13 +55,14 @@ describe('grepTool', () => {
     fs.writeFileSync(path.join(root, 'a.ts'), 'hello');
     const controller = new AbortController();
     controller.abort();
-    await expect(grepTool.execute(
-      'tc-4',
-      { pattern: 'hello' },
-      controller.signal,
-      undefined,
-      { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null },
-    )).rejects.toThrow(/Abort/i);
+    await expect(
+      grepTool.execute('tc-4', { pattern: 'hello' }, controller.signal, undefined, {
+        workspaceRoot: root,
+        projectRootPath: root,
+        projectId: null,
+        sessionId: null,
+      }),
+    ).rejects.toThrow(/Abort/i);
   });
 
   it('searches beyond the display limit and returns the matching part of a long line', async () => {
@@ -71,8 +71,11 @@ describe('grepTool', () => {
     const needle = 'call_e5b6fbad7251494d805e5f264d695030';
     fs.writeFileSync(path.join(root, 'history.jsonl'), `${'x'.repeat(GREP_MAX_LINE_CHARS + 50)}${needle}\n`);
     const result = await grepTool.execute(
-      'long-line', { pattern: `${needle}|call_7da5972126ee4fb5a9314b679b9bc6b0`, path: 'history.jsonl' },
-      undefined, undefined, { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null },
+      'long-line',
+      { pattern: `${needle}|call_7da5972126ee4fb5a9314b679b9bc6b0`, path: 'history.jsonl' },
+      undefined,
+      undefined,
+      { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null },
     );
     expect(result.details).toMatchObject({ matchedFiles: 1, matchedLines: 1, truncated: true });
     expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining(needle) });
@@ -83,11 +86,29 @@ describe('grepTool', () => {
     tempDirs.push(root);
     fs.writeFileSync(path.join(root, 'history.txt'), `begin-${'x'.repeat(GREP_MAX_LINE_CHARS + 50)}-end\n`);
     const context = { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null };
-    const hit = await grepTool.execute('anchored', { pattern: '^begin-x+-end$', path: 'history.txt' }, undefined, undefined, context);
+    const hit = await grepTool.execute(
+      'anchored',
+      { pattern: '^begin-x+-end$', path: 'history.txt' },
+      undefined,
+      undefined,
+      context,
+    );
     expect(hit.details).toMatchObject({ matchedFiles: 1, matchedLines: 1, truncated: true });
-    const miss = await grepTool.execute('miss', { pattern: '^begin-x+-absent$', path: 'history.txt' }, undefined, undefined, context);
+    const miss = await grepTool.execute(
+      'miss',
+      { pattern: '^begin-x+-absent$', path: 'history.txt' },
+      undefined,
+      undefined,
+      context,
+    );
     expect(miss.details).toMatchObject({ matchedFiles: 0, matchedLines: 0, truncated: false });
-    const ellipsis = await grepTool.execute('ellipsis', { pattern: '…', path: 'history.txt' }, undefined, undefined, context);
+    const ellipsis = await grepTool.execute(
+      'ellipsis',
+      { pattern: '…', path: 'history.txt' },
+      undefined,
+      undefined,
+      context,
+    );
     expect(ellipsis.details).toMatchObject({ matchedFiles: 0, matchedLines: 0, truncated: false });
   });
 
@@ -96,8 +117,12 @@ describe('grepTool', () => {
     tempDirs.push(root);
     fs.writeFileSync(path.join(root, 'history.txt'), `${'x'.repeat(GREP_MAX_LINE_CHARS + 50)}!`);
     const context = { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null };
-    const outcome = grepTool.execute('timeout', { pattern: '^(x+)+$', path: 'history.txt' }, undefined, undefined, context)
-      .then(() => null, (error: Error) => error);
+    const outcome = grepTool
+      .execute('timeout', { pattern: '^(x+)+$', path: 'history.txt' }, undefined, undefined, context)
+      .then(
+        () => null,
+        (error: Error) => error,
+      );
     const tick = new Promise<'tick'>((resolve) => setTimeout(() => resolve('tick'), 20));
     expect(await Promise.race([outcome, tick])).toBe('tick');
     expect(await outcome).toMatchObject({ message: expect.stringMatching(/grep pattern timed out/) });
@@ -109,7 +134,13 @@ describe('grepTool', () => {
     fs.writeFileSync(path.join(root, 'history.txt'), `${'x'.repeat(GREP_MAX_LINE_CHARS + 50)}!`);
     const controller = new AbortController();
     const context = { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null };
-    const outcome = grepTool.execute('cancel', { pattern: '^(x+)+$', path: 'history.txt' }, controller.signal, undefined, context);
+    const outcome = grepTool.execute(
+      'cancel',
+      { pattern: '^(x+)+$', path: 'history.txt' },
+      controller.signal,
+      undefined,
+      context,
+    );
     setTimeout(() => controller.abort(), 50);
     await expect(outcome).rejects.toThrow(/Aborted/);
   });

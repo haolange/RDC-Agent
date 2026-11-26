@@ -33,7 +33,9 @@
   height: var(--space-6);
   border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--token-text-secondary) 0%, transparent);
-  transition: background var(--transition-base), height var(--transition-base);
+  transition:
+    background var(--transition-base),
+    height var(--transition-base);
   pointer-events: none;
 }
 

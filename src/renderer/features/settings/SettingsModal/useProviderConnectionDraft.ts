@@ -51,17 +51,17 @@ export const useProviderConnectionDraft = ({
         ? preferredProviderId
         : selectedProviderId && nextProviders.some((provider) => provider.id === selectedProviderId)
           ? selectedProviderId
-          : nextProviders[0]?.id ?? null,
+          : (nextProviders[0]?.id ?? null),
     );
     return nextSettings;
   };
 
   useEffect(() => {
     if (
-      !open
-      || !connectionDraft
-      || connectionProvider?.authMode !== 'account'
-      || connectionDraft.accountStatus?.state !== 'pending'
+      !open ||
+      !connectionDraft ||
+      connectionProvider?.authMode !== 'account' ||
+      connectionDraft.accountStatus?.state !== 'pending'
     ) {
       return;
     }
@@ -81,25 +81,29 @@ export const useProviderConnectionDraft = ({
           setSelectedProviderId(
             nextProviders.some((provider) => provider.id === connectionDraft.providerId)
               ? connectionDraft.providerId
-              : nextProviders[0]?.id ?? null,
+              : (nextProviders[0]?.id ?? null),
           );
           setConnectionDraft(null);
           return;
         }
         if (status.state === 'failed' || status.state === 'unavailable') {
-          setConnectionDraft((current) => current && current.providerId === connectionDraft.providerId
-            ? {
-              ...current,
-              busy: 'idle',
-              accountStatus: status,
-              error: status.error ?? status.message ?? t('settings.providerSaveFailed'),
-            }
-            : current);
+          setConnectionDraft((current) =>
+            current && current.providerId === connectionDraft.providerId
+              ? {
+                  ...current,
+                  busy: 'idle',
+                  accountStatus: status,
+                  error: status.error ?? status.message ?? t('settings.providerSaveFailed'),
+                }
+              : current,
+          );
           return;
         }
-        setConnectionDraft((current) => current && current.providerId === connectionDraft.providerId
-          ? { ...current, accountStatus: status, error: '' }
-          : current);
+        setConnectionDraft((current) =>
+          current && current.providerId === connectionDraft.providerId
+            ? { ...current, accountStatus: status, error: '' }
+            : current,
+        );
       })();
     }, 1200);
 
@@ -120,48 +124,54 @@ export const useProviderConnectionDraft = ({
   ]);
 
   const loginOwner = open && connectionDraft ? connectionDraft.providerId : null;
-  useEffect(() => () => {
-    if (loginOwner) {
-      void window.electronAPI.llm.cancelProviderAccountLogin(loginOwner)
-        .catch((error: unknown) => console.warn('[settings] could not cancel the account login', error));
-    }
-  }, [loginOwner]);
+  useEffect(
+    () => () => {
+      if (loginOwner) {
+        void window.electronAPI.llm
+          .cancelProviderAccountLogin(loginOwner)
+          .catch((error: unknown) => console.warn('[settings] could not cancel the account login', error));
+      }
+    },
+    [loginOwner],
+  );
 
   const openProviderConnection = (provider: LlmProviderEntry) => {
     setConnectionDraft(createProviderConnectionDraft(provider));
   };
 
   const updateConnectionDraft = (patch: Partial<ProviderConnectionDraft>) => {
-    setConnectionDraft((current) => current && current.providerId === connectionDraft?.providerId ? { ...current, ...patch } : current);
+    setConnectionDraft((current) =>
+      current && current.providerId === connectionDraft?.providerId ? { ...current, ...patch } : current,
+    );
   };
 
   const connectionNeedsCredentials = Boolean(
-    connectionDraft
-    && connectionProvider?.authMode === 'api-key'
-    && !isConnectionDraftComplete(connectionProvider, connectionDraft),
+    connectionDraft &&
+    connectionProvider?.authMode === 'api-key' &&
+    !isConnectionDraftComplete(connectionProvider, connectionDraft),
   );
   const connectionNeedsBaseUrl = Boolean(
-    connectionDraft
-    && connectionProvider?.baseUrlEditable
-    && !connectionProvider.connectionSchema?.endpointTemplate
-    && !connectionDraft.baseUrl.trim(),
+    connectionDraft &&
+    connectionProvider?.baseUrlEditable &&
+    !connectionProvider.connectionSchema?.endpointTemplate &&
+    !connectionDraft.baseUrl.trim(),
   );
   const connectionHasFreshTest = Boolean(
-    connectionDraft
-    && connectionDraft.models.length > 0
-    && connectionDraft.testedConnectionSignature === getConnectionDraftSignature(connectionDraft),
+    connectionDraft &&
+    connectionDraft.models.length > 0 &&
+    connectionDraft.testedConnectionSignature === getConnectionDraftSignature(connectionDraft),
   );
   const connectionAccountConnected = Boolean(
-    connectionDraft
-    && connectionProvider?.authMode === 'account'
-    && connectionProvider.isConfigured
-    && connectionDraft.accountStatus?.connected,
+    connectionDraft &&
+    connectionProvider?.authMode === 'account' &&
+    connectionProvider.isConfigured &&
+    connectionDraft.accountStatus?.connected,
   );
   const connectionDevicePending = Boolean(
-    connectionDraft
-    && connectionProvider?.authMode === 'account'
-    && connectionDraft.accountStatus?.state === 'pending'
-    && !connectionDraft.accountStatus.requiresCodeInput,
+    connectionDraft &&
+    connectionProvider?.authMode === 'account' &&
+    connectionDraft.accountStatus?.state === 'pending' &&
+    !connectionDraft.accountStatus.requiresCodeInput,
   );
 
   return {

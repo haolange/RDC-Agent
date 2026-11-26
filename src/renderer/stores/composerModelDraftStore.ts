@@ -15,20 +15,23 @@ interface ComposerModelDraftState {
 export const useComposerModelDraftStore = create<ComposerModelDraftState>((set) => ({
   draftByScope: {},
   agentDraftByScope: {},
-  setDraft: (scopeKey, model) => set((state) => ({
-    draftByScope: { ...state.draftByScope, [scopeKey]: model },
-  })),
-  clearDraft: (scopeKey) => set((state) => {
-    const next = { ...state.draftByScope };
-    delete next[scopeKey];
-    return { draftByScope: next };
-  }),
-  setAgentDraft: (scopeKey, agentId) => set((state) => {
-    const next = { ...state.agentDraftByScope };
-    if (agentId) next[scopeKey] = agentId;
-    else delete next[scopeKey];
-    return { agentDraftByScope: next };
-  }),
+  setDraft: (scopeKey, model) =>
+    set((state) => ({
+      draftByScope: { ...state.draftByScope, [scopeKey]: model },
+    })),
+  clearDraft: (scopeKey) =>
+    set((state) => {
+      const next = { ...state.draftByScope };
+      delete next[scopeKey];
+      return { draftByScope: next };
+    }),
+  setAgentDraft: (scopeKey, agentId) =>
+    set((state) => {
+      const next = { ...state.agentDraftByScope };
+      if (agentId) next[scopeKey] = agentId;
+      else delete next[scopeKey];
+      return { agentDraftByScope: next };
+    }),
   reset: () => set({ draftByScope: {}, agentDraftByScope: {} }),
 }));
 
@@ -36,16 +39,11 @@ export function composerNoSessionScopeKey(projectId: string | null | undefined):
   return buildComposerSessionScopeKey(projectId, null);
 }
 
-export function readComposerDraftModel(
-  projectId: string | null | undefined,
-): SessionModelOverride | null {
+export function readComposerDraftModel(projectId: string | null | undefined): SessionModelOverride | null {
   return useComposerModelDraftStore.getState().draftByScope[composerNoSessionScopeKey(projectId)] ?? null;
 }
 
-export function writeComposerDraftModel(
-  projectId: string | null | undefined,
-  model: SessionModelOverride,
-): void {
+export function writeComposerDraftModel(projectId: string | null | undefined, model: SessionModelOverride): void {
   useComposerModelDraftStore.getState().setDraft(composerNoSessionScopeKey(projectId), model);
 }
 

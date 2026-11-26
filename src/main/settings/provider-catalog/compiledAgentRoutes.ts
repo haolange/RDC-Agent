@@ -25,6 +25,9 @@ export function compiledRoutesFromDefinitions(
 }
 
 export function resolveCompiledRouteForAgent(agentId: string, projectRoot?: string | null): LlmAgentRoute | null {
-  const snapshot = agentManifestService.resolveEffectiveSnapshot(appPathService.getRuntimePaths(), projectRoot ?? undefined);
+  const snapshot = agentManifestService.resolveEffectiveSnapshot(
+    appPathService.getRuntimePaths(),
+    projectRoot ?? undefined,
+  );
   return compiledRouteFromDefinition(snapshot.profiles.find((profile) => profile.id === agentId));
 }

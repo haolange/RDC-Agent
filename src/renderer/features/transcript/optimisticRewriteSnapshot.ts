@@ -20,14 +20,7 @@ export function buildOptimisticRewriteSnapshot(input: {
   messages: ConversationMessage[];
   branchState: ConversationBranchState;
 } {
-  const {
-    requestId,
-    sourceMessage,
-    nextContent,
-    allMessages,
-    branchState,
-    agentId,
-  } = input;
+  const { requestId, sourceMessage, nextContent, allMessages, branchState, agentId } = input;
   const now = Date.now();
   const sessionId = sourceMessage.sessionId ?? '';
   const {
@@ -39,9 +32,7 @@ export function buildOptimisticRewriteSnapshot(input: {
   const parentBranchId = normalizeBranchId(sourceMessage.branchId);
   const forkId = sourceMessage.forkId ?? sourceMessage.id;
 
-  const baseState = branchState
-    ? structuredClone(branchState)
-    : createDefaultBranchState(sessionId);
+  const baseState = branchState ? structuredClone(branchState) : createDefaultBranchState(sessionId);
   if (!baseState.sessionId && sessionId) {
     baseState.sessionId = sessionId;
   }
@@ -52,13 +43,15 @@ export function buildOptimisticRewriteSnapshot(input: {
       forkId,
       anchorMessageId: sourceMessage.id,
       activeBranchId: parentBranchId,
-      branches: [{
-        branchId: parentBranchId === ROOT_BRANCH_ID ? ROOT_BRANCH_ID : parentBranchId,
-        parentBranchId: parentBranchId === ROOT_BRANCH_ID ? null : null,
-        variantIndex: sourceMessage.variantIndex ?? 0,
-        anchorUserMessageId: sourceMessage.id,
-        rootTurnId: sourceMessage.turnId,
-      }],
+      branches: [
+        {
+          branchId: parentBranchId === ROOT_BRANCH_ID ? ROOT_BRANCH_ID : parentBranchId,
+          parentBranchId: parentBranchId === ROOT_BRANCH_ID ? null : null,
+          variantIndex: sourceMessage.variantIndex ?? 0,
+          anchorUserMessageId: sourceMessage.id,
+          rootTurnId: sourceMessage.turnId,
+        },
+      ],
     };
     baseState.forks.push(fork);
   }

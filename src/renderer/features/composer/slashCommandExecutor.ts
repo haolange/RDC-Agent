@@ -10,17 +10,15 @@ import { readComposerEffectiveModel } from '../../hooks/useComposerEffectiveMode
 import { notify } from '../../stores/notificationStore';
 import { resolveComposerModelOverride } from './resolveComposerModelOverride';
 import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
-import {
-  isComposerAgentDefaultToken,
-  resolveComposerAgentDefaultState,
-} from './composerAgentDefaultModel';
+import { isComposerAgentDefaultToken, resolveComposerAgentDefaultState } from './composerAgentDefaultModel';
 import { loadComposerModelPickerOptions } from './useComposerModelPickerOptions';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { CommandUiAction } from '@shared/types/command';
 import type { AgentPermissionMode, AppTheme } from '@shared/types/settings';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
-const currentText = (key: TranslationKey, params?: Record<string, string | number>) => translate(useAppSettingsStore.getState().settings.appearance.language, key, params);
+const currentText = (key: TranslationKey, params?: Record<string, string | number>) =>
+  translate(useAppSettingsStore.getState().settings.appearance.language, key, params);
 
 interface SlashCommandContext {
   currentSession: SessionRecord | null;
@@ -33,8 +31,7 @@ interface SlashCommandContext {
   armPendingSkill?: (skillId: string, skillName?: string) => void;
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value && typeof value === 'object');
+const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
 
 const getPayloadString = (action: CommandUiAction, key: string): string | null => {
   if (!('payload' in action) || !isRecord(action.payload)) {
@@ -46,10 +43,12 @@ const getPayloadString = (action: CommandUiAction, key: string): string | null =
 };
 
 const toMarkdown = (messages: ConversationMessage[]): string =>
-  messages.map((message) => {
-    const timestamp = new Date(message.createdAt).toISOString();
-    return `## ${message.role} - ${timestamp}\n\n${message.content || ''}`;
-  }).join('\n\n');
+  messages
+    .map((message) => {
+      const timestamp = new Date(message.createdAt).toISOString();
+      return `## ${message.role} - ${timestamp}\n\n${message.content || ''}`;
+    })
+    .join('\n\n');
 
 const downloadTextFile = (fileName: string, content: string, mimeType: string): void => {
   const blob = new Blob([content], { type: mimeType });
@@ -101,10 +100,12 @@ async function switchModel(modelId: string, context: SlashCommandContext): Promi
   if (isComposerAgentDefaultToken(modelId)) {
     const state = resolveComposerAgentDefaultState(route, options, true);
     if (!state.selectable) {
-      notify.warning(translate(
-        language,
-        state.kind === 'unset' ? 'composer.model.agentDefaultUnset' : 'composer.model.agentDefaultUnavailable',
-      ));
+      notify.warning(
+        translate(
+          language,
+          state.kind === 'unset' ? 'composer.model.agentDefaultUnset' : 'composer.model.agentDefaultUnavailable',
+        ),
+      );
       return;
     }
     const cleared = await clearComposerModelChoice(
@@ -186,9 +187,7 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
       }
       const format = getPayloadString(action, 'format') === 'json' ? 'json' : 'markdown';
       const history = await electronAPI.conversation.getHistory(sessionId);
-      const content = format === 'json'
-        ? JSON.stringify(history.messages, null, 2)
-        : toMarkdown(history.messages);
+      const content = format === 'json' ? JSON.stringify(history.messages, null, 2) : toMarkdown(history.messages);
       downloadTextFile(
         `${sessionId}.${format === 'json' ? 'json' : 'md'}`,
         content,
@@ -257,9 +256,7 @@ export async function executeSlashCommand(input: string, context: SlashCommandCo
         workspaceRoot: context.currentProject?.rootPath,
         agentId: context.selectedAgentId,
         currentMode: context.selectedAgentId,
-        currentModelId: effectiveModel
-          ? `${effectiveModel.providerId}:${effectiveModel.modelId}`
-          : undefined,
+        currentModelId: effectiveModel ? `${effectiveModel.providerId}:${effectiveModel.modelId}` : undefined,
         currentTheme: settings.appearance.theme,
       },
     });

@@ -42,12 +42,16 @@ describe('browserAppBridge security', () => {
   });
 
   it('does not accept bridge tokens from URL query parameters', () => {
-    expect(resolveProvidedBridgeToken({
-      cookieHeader: 'rdcBridgeToken=from-cookie',
-    })).toBe('from-cookie');
-    expect(resolveProvidedBridgeToken({
-      cookieHeader: undefined,
-    })).toBeNull();
+    expect(
+      resolveProvidedBridgeToken({
+        cookieHeader: 'rdcBridgeToken=from-cookie',
+      }),
+    ).toBe('from-cookie');
+    expect(
+      resolveProvidedBridgeToken({
+        cookieHeader: undefined,
+      }),
+    ).toBeNull();
   });
 
   it('reads an HttpOnly strict bridge auth cookie set by /qa entry', () => {
@@ -60,13 +64,17 @@ describe('browserAppBridge security', () => {
   });
 
   it('resolves auth from Bearer before cookie', () => {
-    expect(resolveProvidedBridgeToken({
-      authorizationHeader: 'Bearer from-header',
-      cookieHeader: 'rdcBridgeToken=from-cookie',
-    })).toBe('from-header');
-    expect(resolveProvidedBridgeToken({
-      cookieHeader: 'rdcBridgeToken=from-cookie',
-    })).toBe('from-cookie');
+    expect(
+      resolveProvidedBridgeToken({
+        authorizationHeader: 'Bearer from-header',
+        cookieHeader: 'rdcBridgeToken=from-cookie',
+      }),
+    ).toBe('from-header');
+    expect(
+      resolveProvidedBridgeToken({
+        cookieHeader: 'rdcBridgeToken=from-cookie',
+      }),
+    ).toBe('from-cookie');
     expect(resolveProvidedBridgeToken({})).toBeNull();
   });
 
@@ -81,11 +89,31 @@ describe('browserAppBridge security', () => {
   });
 
   it('requires full-access opt-in for high-risk browser channels', () => {
-    for (const channel of ['command:execute', 'settings:patch', 'rdc-runtime:trustMcp', 'rdc-runtime:revokeMcp', 'memory:issueApprovalToken', 'device:prepare', 'conversation:answerPlanReview', 'conversation:answerToolApproval', 'conversation:answerUserInput']) {
+    for (const channel of [
+      'command:execute',
+      'settings:patch',
+      'rdc-runtime:trustMcp',
+      'rdc-runtime:revokeMcp',
+      'memory:issueApprovalToken',
+      'device:prepare',
+      'conversation:answerPlanReview',
+      'conversation:answerToolApproval',
+      'conversation:answerUserInput',
+    ]) {
       expect(isBridgeChannelAllowed(channel), channel).toBe(false);
     }
     process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS = '1';
-    for (const channel of ['command:execute', 'settings:patch', 'rdc-runtime:trustMcp', 'rdc-runtime:revokeMcp', 'memory:issueApprovalToken', 'device:prepare', 'conversation:answerPlanReview', 'conversation:answerToolApproval', 'conversation:answerUserInput']) {
+    for (const channel of [
+      'command:execute',
+      'settings:patch',
+      'rdc-runtime:trustMcp',
+      'rdc-runtime:revokeMcp',
+      'memory:issueApprovalToken',
+      'device:prepare',
+      'conversation:answerPlanReview',
+      'conversation:answerToolApproval',
+      'conversation:answerUserInput',
+    ]) {
       expect(isBridgeChannelAllowed(channel), channel).toBe(true);
     }
     // desktop-only stays denied even with FULL_ACCESS
@@ -111,14 +139,18 @@ describe('browserAppBridge security', () => {
     expect(allowed.has('http://127.0.0.1:54431')).toBe(false);
     expect(isOriginAllowed('https://evil.example', allowed)).toBe(false);
     expect(isOriginAllowed(undefined, allowed)).toBe(true);
-    expect(isOriginAllowed(undefined, allowed, {
-      authViaCookie: true,
-      bridgeOrigin: 'http://127.0.0.1:5127',
-    })).toBe(false);
-    expect(isOriginAllowed('http://127.0.0.1:5127', allowed, {
-      authViaCookie: true,
-      bridgeOrigin: 'http://127.0.0.1:5127',
-    })).toBe(true);
+    expect(
+      isOriginAllowed(undefined, allowed, {
+        authViaCookie: true,
+        bridgeOrigin: 'http://127.0.0.1:5127',
+      }),
+    ).toBe(false);
+    expect(
+      isOriginAllowed('http://127.0.0.1:5127', allowed, {
+        authViaCookie: true,
+        bridgeOrigin: 'http://127.0.0.1:5127',
+      }),
+    ).toBe(true);
   });
 
   it('requires cookie Origin for /invoke, /events, and /api/*', () => {

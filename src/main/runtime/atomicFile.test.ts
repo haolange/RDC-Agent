@@ -6,8 +6,12 @@ import { AppError } from '@shared/errors/appError';
 import { parseJsonWith, readValidatedSync, writeFileAtomic, writeFileAtomicSync } from './atomicFile';
 
 let root: string;
-beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-atomic-')); });
-afterEach(() => { fs.rmSync(root, { recursive: true, force: true }); });
+beforeEach(() => {
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-atomic-'));
+});
+afterEach(() => {
+  fs.rmSync(root, { recursive: true, force: true });
+});
 
 const parseCount = parseJsonWith((value) => {
   if (typeof (value as { count?: unknown }).count !== 'number') throw new Error('count must be a number');
@@ -54,8 +58,11 @@ describe('validated reads', () => {
   it('passes an unsupported schema through without treating the file as damaged', () => {
     const target = path.join(root, 'state.json');
     fs.writeFileSync(target, '{"schemaVersion":99}');
-    expect(() => readValidatedSync(target, () => { throw new AppError('STORAGE_SCHEMA_UNSUPPORTED', 'newer'); }))
-      .toThrow(expect.objectContaining({ code: 'STORAGE_SCHEMA_UNSUPPORTED' }));
+    expect(() =>
+      readValidatedSync(target, () => {
+        throw new AppError('STORAGE_SCHEMA_UNSUPPORTED', 'newer');
+      }),
+    ).toThrow(expect.objectContaining({ code: 'STORAGE_SCHEMA_UNSUPPORTED' }));
     expect(fs.readdirSync(root)).toEqual(['state.json']);
   });
 });

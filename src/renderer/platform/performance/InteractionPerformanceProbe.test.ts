@@ -3,13 +3,7 @@ import { summarizeInteractionPerformance } from './InteractionPerformanceProbe';
 
 describe('summarizeInteractionPerformance', () => {
   it('reports a deterministic p95 and long-task maximum', () => {
-    const snapshot = summarizeInteractionPerformance(
-      20,
-      [24, 40],
-      [51.2346, 63.4567],
-      true,
-      true,
-    );
+    const snapshot = summarizeInteractionPerformance(20, [24, 40], [51.2346, 63.4567], true, true);
 
     expect(snapshot).toEqual({
       schemaVersion: 2,

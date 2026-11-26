@@ -152,7 +152,10 @@ export class AgentSlotRegistry {
   /** Keep an orphaned slot key reserved until its provider/tool loop settles. */
   quarantineSlot(slotKey: string, completion: Promise<unknown>): void {
     if (this.quarantinedSlots.has(slotKey)) return;
-    const tracked = Promise.resolve(completion).then(() => undefined, () => undefined);
+    const tracked = Promise.resolve(completion).then(
+      () => undefined,
+      () => undefined,
+    );
     this.quarantinedSlots.set(slotKey, tracked);
     void tracked.then(() => {
       if (this.quarantinedSlots.get(slotKey) === tracked) {
@@ -207,7 +210,6 @@ export class AgentSlotRegistry {
     }
     this.purgeAgentStatesForScope(sessionId);
   }
-
 }
 
 export type AgentStatus = 'idle' | 'thinking' | 'executing' | 'waiting' | 'complete' | 'error';

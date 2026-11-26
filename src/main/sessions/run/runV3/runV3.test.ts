@@ -32,7 +32,15 @@ function v3Base() {
     caseId: 'sess',
     profileId: 'general',
     goal: 'g',
-    captures: [{ id: 'cap', filePath: 'a.rdc', role: 'primary' as const, backendHint: 'local' as const, status: 'pending' as const }],
+    captures: [
+      {
+        id: 'cap',
+        filePath: 'a.rdc',
+        role: 'primary' as const,
+        backendHint: 'local' as const,
+        status: 'pending' as const,
+      },
+    ],
     startedAt: 1,
     status: 'running' as const,
     backend: 'local' as const,
@@ -56,13 +64,23 @@ describe('Run v3 schema', () => {
     expect(conversation.kind).toBe('conversation');
     expect(conversation.captures).toEqual([]);
     expect(PersistedRunRecordV3Schema.safeParse(conversation).success).toBe(true);
-    for (const field of ['mode', 'lastStage', 'last_stage', 'workflow_stage', 'recommendedSpecialists', 'availableStages', 'currentStage']) {
+    for (const field of [
+      'mode',
+      'lastStage',
+      'last_stage',
+      'workflow_stage',
+      'recommendedSpecialists',
+      'availableStages',
+      'currentStage',
+    ]) {
       expect(PersistedRunRecordV3Schema.safeParse({ ...conversation, [field]: 'obsolete' }).success).toBe(false);
     }
-    expect(PersistedRunRecordV3Schema.safeParse({
-      ...conversation,
-      runtime: { ...runtime, workflow_stage: 'investigate' },
-    }).success).toBe(false);
+    expect(
+      PersistedRunRecordV3Schema.safeParse({
+        ...conversation,
+        runtime: { ...runtime, workflow_stage: 'investigate' },
+      }).success,
+    ).toBe(false);
     expect(PersistedRunRecordV3Schema.safeParse({ ...conversation, mission: 'debugger' }).success).toBe(false);
     expect(PersistedRunRecordV3Schema.safeParse({ ...conversation, captures: v3Base().captures }).success).toBe(false);
 
@@ -101,7 +119,10 @@ describe('current Run persistence', () => {
     const run = toPersistedRunV3(v3Base());
     writeRunFiles(storageIo(), runPath, run);
     expect(fs.existsSync(path.join(runPath, 'run.yaml'))).toBe(true);
-    expect(JSON.parse(await readFile(path.join(runPath, 'run.json'), 'utf8'))).toMatchObject({ schemaVersion: '3', runId: 'run_c' });
+    expect(JSON.parse(await readFile(path.join(runPath, 'run.json'), 'utf8'))).toMatchObject({
+      schemaVersion: '3',
+      runId: 'run_c',
+    });
     expect(readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toEqual(run);
   });
 
@@ -119,14 +140,17 @@ describe('current Run persistence', () => {
     expect(fs.existsSync(path.join(runPath, 'run.json'))).toBe(false);
   });
 
-  it.each([undefined, '0', '1', '2', '99'])('rejects unsupported version %s without touching the source', async (version) => {
-    const runPath = await tempRun();
-    const filePath = path.join(runPath, 'run.json');
-    const raw = JSON.stringify({ ...toPersistedRunV3(v3Base()), schemaVersion: version });
-    await writeFile(filePath, raw, 'utf8');
-    expect(() => readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-    expect(await readFile(filePath, 'utf8')).toBe(raw);
-  });
+  it.each([undefined, '0', '1', '2', '99'])(
+    'rejects unsupported version %s without touching the source',
+    async (version) => {
+      const runPath = await tempRun();
+      const filePath = path.join(runPath, 'run.json');
+      const raw = JSON.stringify({ ...toPersistedRunV3(v3Base()), schemaVersion: version });
+      await writeFile(filePath, raw, 'utf8');
+      expect(() => readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+      expect(await readFile(filePath, 'utf8')).toBe(raw);
+    },
+  );
 
   it('rejects invalid v3 and mismatched directory identity without rewriting', async () => {
     const runPath = await tempRun();
@@ -169,12 +193,26 @@ describe('current Run persistence', () => {
       },
     } as unknown as SessionRecordHost);
     await mkdir(runPath, { recursive: true });
-    await writeFile(path.join(sessionPath, 'session.json'), JSON.stringify({
-      sessionId: 'sess', projectId: 'p', title: 't', goal: '', sessionPath, createdAt: 1, updatedAt: 1,
-    }), 'utf8');
+    await writeFile(
+      path.join(sessionPath, 'session.json'),
+      JSON.stringify({
+        sessionId: 'sess',
+        projectId: 'p',
+        title: 't',
+        goal: '',
+        sessionPath,
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+      'utf8',
+    );
     writeRunFiles(io, runPath, toPersistedRunV3({ ...v3Base(), runId: 'r-final' }));
-    await expect(store.updateRun('sess', 'r-final', { lastStage: 'finalize', status: 'running' })).rejects.toThrow(/RUN_V3_STAGE_FIELD/);
-    await expect(store.updateRun('sess', 'r-final', { runtime: { workflow_stage: 'finalize' }, status: 'running' })).rejects.toThrow(/RUN_V3_STAGE_FIELD/);
+    await expect(store.updateRun('sess', 'r-final', { lastStage: 'finalize', status: 'running' })).rejects.toThrow(
+      /RUN_V3_STAGE_FIELD/,
+    );
+    await expect(
+      store.updateRun('sess', 'r-final', { runtime: { workflow_stage: 'finalize' }, status: 'running' }),
+    ).rejects.toThrow(/RUN_V3_STAGE_FIELD/);
     expect(store.readPersistedRun('sess', 'r-final')?.status).toBe('running');
   });
 });

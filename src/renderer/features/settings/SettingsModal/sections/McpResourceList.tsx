@@ -6,7 +6,14 @@ import type { ScopedResourceDocument } from '@shared/types/rdcRuntime';
 import type { ReactNode } from 'react';
 
 /** MCP servers as rows of name · status · switch; how a server is reached lives in its 诊断. */
-export function McpResourceList({ resources, selectedId, busyId, onSelect, onToggle, renderStatus }: {
+export function McpResourceList({
+  resources,
+  selectedId,
+  busyId,
+  onSelect,
+  onToggle,
+  renderStatus,
+}: {
   resources: ScopedResourceDocument[];
   selectedId: string | null;
   /** The server whose switch is being saved. */
@@ -24,7 +31,12 @@ export function McpResourceList({ resources, selectedId, busyId, onSelect, onTog
         const selected = resource.id === selectedId;
         return (
           <li key={`${resource.scope}:${resource.id}`} className={cn('settings-mcp-row', selected && 'is-selected')}>
-            <button type="button" className="settings-mcp-row-main" aria-pressed={selected} onClick={() => onSelect(resource)}>
+            <button
+              type="button"
+              className="settings-mcp-row-main"
+              aria-pressed={selected}
+              onClick={() => onSelect(resource)}
+            >
               <span className="settings-mcp-row-name">{name}</span>
               {renderStatus(resource)}
             </button>

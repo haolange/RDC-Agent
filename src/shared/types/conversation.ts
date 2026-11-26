@@ -4,10 +4,7 @@ import type { ConversationTurnControls } from './modelCapability';
 import type { AgentEvent } from './agentRuntime';
 import type { ConversationBranchState } from './conversationBranch';
 import type { ProviderOutputRef, ThinkingArtifact } from './reasoning';
-import type {
-  ConversationPlanReview,
-  PlanReviewHandoffSuggestion,
-} from './planReview';
+import type { ConversationPlanReview, PlanReviewHandoffSuggestion } from './planReview';
 import type {
   PreparedTurnContextSummary,
   RunSummary,
@@ -109,13 +106,7 @@ export type ConversationThinkingStatus = 'streaming' | 'complete';
 
 export type ConversationLoopResultStatus = 'streaming' | 'complete';
 
-export type ConversationLoopStopReason =
-  | 'end_turn'
-  | 'tool_use'
-  | 'max_tokens'
-  | 'refusal'
-  | 'error'
-  | 'aborted';
+export type ConversationLoopStopReason = 'end_turn' | 'tool_use' | 'max_tokens' | 'refusal' | 'error' | 'aborted';
 
 export type ConversationLoopOutputPhase = 'commentary' | 'final_answer';
 
@@ -365,8 +356,7 @@ interface ConversationAttachmentStageBytesItem {
 }
 
 export type ConversationAttachmentStageItem =
-  | ConversationAttachmentStagePathItem
-  | ConversationAttachmentStageBytesItem;
+  ConversationAttachmentStagePathItem | ConversationAttachmentStageBytesItem;
 
 export interface ConversationStageAttachmentsRequest {
   items: ConversationAttachmentStageItem[];

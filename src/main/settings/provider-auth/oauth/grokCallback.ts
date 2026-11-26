@@ -27,12 +27,20 @@ export async function listenGrokCallback(
       return;
     }
     flow.exchanging = true;
-    void complete(code).then(() => reply(200, 'Grok sign-in complete. Return to RDC-Agent.'))
+    void complete(code)
+      .then(() => reply(200, 'Grok sign-in complete. Return to RDC-Agent.'))
       .catch(() => reply(400, 'Grok sign-in failed. Return to RDC-Agent for details.'))
-      .finally(() => { server.close(); clearTimeout(flow.timeout); });
+      .finally(() => {
+        server.close();
+        clearTimeout(flow.timeout);
+      });
   });
   flow.server = server;
-  const close = () => { clearTimeout(flow.timeout); server.close(); server.closeIdleConnections(); };
+  const close = () => {
+    clearTimeout(flow.timeout);
+    server.close();
+    server.closeIdleConnections();
+  };
   flow.abortController?.signal.addEventListener('abort', close, { once: true });
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
@@ -43,10 +51,16 @@ export async function listenGrokCallback(
       resolve();
     });
   });
-  if (flow.abortController?.signal.aborted) { close(); throw new Error('Sign-in was cancelled.'); }
-  flow.timeout = setTimeout(() => {
-    flow.error = 'Grok sign-in timed out. Try signing in again.';
-    flow.abortController?.abort();
-  }, Math.max(0, flow.expiresAt - Date.now()));
+  if (flow.abortController?.signal.aborted) {
+    close();
+    throw new Error('Sign-in was cancelled.');
+  }
+  flow.timeout = setTimeout(
+    () => {
+      flow.error = 'Grok sign-in timed out. Try signing in again.';
+      flow.abortController?.abort();
+    },
+    Math.max(0, flow.expiresAt - Date.now()),
+  );
   flow.timeout.unref();
 }

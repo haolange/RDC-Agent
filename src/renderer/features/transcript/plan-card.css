@@ -13,8 +13,13 @@
   cursor: var(--cursor-pointer, pointer);
 }
 
-.plan-card:hover { border-color: var(--token-border-focus); }
-.plan-card:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset); }
+.plan-card:hover {
+  border-color: var(--token-border-focus);
+}
+.plan-card:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
+}
 
 .plan-card__head {
   display: flex;
@@ -47,14 +52,22 @@
 }
 
 .plan-card__preview.is-overflowing {
-  mask-image: linear-gradient(to bottom,
+  mask-image: linear-gradient(
+    to bottom,
     black var(--plan-fade-start),
-    rgb(0 0 0 / 94%) calc(var(--plan-fade-start) + var(--plan-fade-length) * .25),
-    rgb(0 0 0 / 75%) calc(var(--plan-fade-start) + var(--plan-fade-length) * .5),
-    rgb(0 0 0 / 44%) calc(var(--plan-fade-start) + var(--plan-fade-length) * .75),
-    transparent calc(var(--plan-fade-start) + var(--plan-fade-length)));
+    rgb(0 0 0 / 94%) calc(var(--plan-fade-start) + var(--plan-fade-length) * 0.25),
+    rgb(0 0 0 / 75%) calc(var(--plan-fade-start) + var(--plan-fade-length) * 0.5),
+    rgb(0 0 0 / 44%) calc(var(--plan-fade-start) + var(--plan-fade-length) * 0.75),
+    transparent calc(var(--plan-fade-start) + var(--plan-fade-length))
+  );
 }
 
-.plan-card__preview .markdown-body { font-size: inherit; }
-.plan-card__preview .markdown-body > :first-child { margin-top: 0; }
-.plan-card__preview .markdown-body > :last-child { margin-bottom: 0; }
+.plan-card__preview .markdown-body {
+  font-size: inherit;
+}
+.plan-card__preview .markdown-body > :first-child {
+  margin-top: 0;
+}
+.plan-card__preview .markdown-body > :last-child {
+  margin-bottom: 0;
+}

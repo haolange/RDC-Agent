@@ -9,13 +9,19 @@ import type { ElectronAPI } from '@shared/types/electron';
 import type { EventBridgeOptions } from './eventBridgeOptions';
 const projection = () => useSessionProjectionStore.getState();
 
-export function subscribeCaptureStatusChanged(electronAPI: ElectronAPI, projectScopedContext: (event: SessionScopedPayload<ContextSnapshot | null>) => void) {
+export function subscribeCaptureStatusChanged(
+  electronAPI: ElectronAPI,
+  projectScopedContext: (event: SessionScopedPayload<ContextSnapshot | null>) => void,
+) {
   return electronAPI.events.onCaptureStatusChanged((scoped) => {
     if (!isActiveSessionScope(scoped)) return;
-    electronAPI.context.get({ projectId: scoped.projectId, sessionId: scoped.sessionId }).then((snapshot) => {
-      const payload: SessionScopedPayload<ContextSnapshot | null> = { ...scoped, payload: snapshot };
-      projectScopedContext(payload);
-    }).catch (() => undefined);
+    electronAPI.context
+      .get({ projectId: scoped.projectId, sessionId: scoped.sessionId })
+      .then((snapshot) => {
+        const payload: SessionScopedPayload<ContextSnapshot | null> = { ...scoped, payload: snapshot };
+        projectScopedContext(payload);
+      })
+      .catch(() => undefined);
   });
 }
 
@@ -25,7 +31,10 @@ export function subscribeDeviceStatusChanged(electronAPI: ElectronAPI) {
   });
 }
 
-export function createCaptureProjection(electronAPI: ElectronAPI, syncCapturesFromSnapshot: EventBridgeOptions['syncCapturesFromSnapshot']) {
+export function createCaptureProjection(
+  electronAPI: ElectronAPI,
+  syncCapturesFromSnapshot: EventBridgeOptions['syncCapturesFromSnapshot'],
+) {
   const projectScopedContext = (event: SessionScopedPayload<ContextSnapshot | null>) => {
     projection().projectContextSnapshot(event.sessionId, event.payload);
     if (!isActiveSessionScope(event)) return;
@@ -34,26 +43,31 @@ export function createCaptureProjection(electronAPI: ElectronAPI, syncCapturesFr
     else useCaptureStore.getState().setCaptures([]);
   };
 
-  const projectScopedOpenedCapture = (event: SessionScopedPayload<ReturnType<typeof useCaptureStore.getState>['openedCapture']>) => {
+  const projectScopedOpenedCapture = (
+    event: SessionScopedPayload<ReturnType<typeof useCaptureStore.getState>['openedCapture']>,
+  ) => {
     projection().projectOpenedCapture(event.sessionId, event.payload);
     if (isActiveSessionScope(event)) useCaptureStore.getState().setOpenedCapture(event.payload);
   };
 
   return {
-    projectScopedContext, projectScopedOpenedCapture, hydrate() {
+    projectScopedContext,
+    projectScopedOpenedCapture,
+    hydrate() {
       void useDeviceStore.getState().loadDevices();
       const initialProject = useProjectStore.getState().currentProject;
       const initialSessionId = useProjectStore.getState().currentSessionId;
       if (initialProject && initialSessionId) {
         const scope = { projectId: initialProject.projectId, sessionId: initialSessionId };
-        void electronAPI.capture.getOpenedState(scope)
+        void electronAPI.capture
+          .getOpenedState(scope)
           .then((payload) => projectScopedOpenedCapture({ ...scope, payload }))
-          .catch (() => undefined);
-        void electronAPI.context.get(scope)
+          .catch(() => undefined);
+        void electronAPI.context
+          .get(scope)
           .then((payload) => projectScopedContext({ ...scope, payload }))
-          .catch (() => undefined);
+          .catch(() => undefined);
       }
-
-    }
+    },
   };
 }

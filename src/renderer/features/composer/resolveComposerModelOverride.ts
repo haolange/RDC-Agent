@@ -10,13 +10,13 @@ export function resolveComposerModelOverride(
   if (!trimmed) return null;
   const canonical = splitCanonicalAgentModelId(trimmed);
   if (canonical) {
-    return options.some((option) => (
-      option.providerId === canonical.providerId && option.modelId === canonical.modelId
-    )) ? canonical : null;
+    return options.some((option) => option.providerId === canonical.providerId && option.modelId === canonical.modelId)
+      ? canonical
+      : null;
   }
-  const matches = options.filter((option) => (
-    option.modelId === trimmed || `${option.providerId}:${option.modelId}` === trimmed
-  ));
+  const matches = options.filter(
+    (option) => option.modelId === trimmed || `${option.providerId}:${option.modelId}` === trimmed,
+  );
   if (matches.length !== 1) return null;
   return { providerId: matches[0].providerId, modelId: matches[0].modelId };
 }

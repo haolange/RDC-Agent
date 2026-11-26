@@ -24,7 +24,11 @@ const storeFor = (scope: 'user' | 'project', projectRoot?: string): MemoryStore 
   return new MemoryStore(appPathService.getUserRdcPaths().memoryPath);
 };
 
-async function confirmMemoryMutation(action: 'memory.write' | 'memory.delete', scope: 'user' | 'project', name?: string): Promise<boolean> {
+async function confirmMemoryMutation(
+  action: 'memory.write' | 'memory.delete',
+  scope: 'user' | 'project',
+  name?: string,
+): Promise<boolean> {
   return confirmInMainProcess({
     action,
     title: nativeMessage('memoryTitle'),
@@ -109,7 +113,11 @@ function memoryChannels(): IpcChannelTable {
           projectRoot: request.projectRoot,
         });
         if (!consumed) {
-          return { success: false, name: request.name, error: 'Memory write requires a valid Main-issued approvalToken.' };
+          return {
+            success: false,
+            name: request.name,
+            error: 'Memory write requires a valid Main-issued approvalToken.',
+          };
         }
         const memory = await storeFor(request.scope, request.projectRoot).writeMemory({
           name: request.name,

@@ -5,12 +5,20 @@ import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { executionOfferStore, projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { sessionRevisions } from '../../sessions/store/SessionRevisionRegistry';
 import { assertSessionModelAndControls } from './sessionModelGate';
-import { assertDeclaredHandoffForPlan, declaredExecutionOffer, declaredHandoffSuggestion } from './applyDeclaredHandoff';
+import {
+  assertDeclaredHandoffForPlan,
+  declaredExecutionOffer,
+  declaredHandoffSuggestion,
+} from './applyDeclaredHandoff';
 import type { PlanArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import type { PlanReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
 import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import type { ConversationPlanReview, PlanReviewHandoffIdentity, PlanReviewHandoffSuggestion } from '@shared/types/planReview';
+import type {
+  ConversationPlanReview,
+  PlanReviewHandoffIdentity,
+  PlanReviewHandoffSuggestion,
+} from '@shared/types/planReview';
 import type { PlanReviewStateDocument } from '../../sessions/run/PlanReviewStateStore';
 import type { SessionModelOverride, SessionRecordSnapshot, SessionRevision } from '@shared/types/session';
 
@@ -58,14 +66,24 @@ function sameRevision(left: SessionRevision, right: SessionRevision): boolean {
  * 6. run `agent.after-handoff`; its failure yields a diagnostic and no rollback.
  * The approved plan's Task revisions install idempotently before the commit, so a retried approval finds them done.
  */
-export async function runPlanApprovalTransaction(input: PlanApprovalInput, deps: PlanApprovalDeps): Promise<PlanApprovalCommit> {
+export async function runPlanApprovalTransaction(
+  input: PlanApprovalInput,
+  deps: PlanApprovalDeps,
+): Promise<PlanApprovalCommit> {
   const { sessionId } = input;
   const owner = { turnId: input.turnId, planId: input.planReview.planId, revision: input.planReview.revision };
   if (input.expectedPlanHash !== input.planReview.hash) {
     throw new AppError('PLAN_HASH_MISMATCH', 'the approval names a plan revision other than the one under review.');
   }
-  if (!input.planReview.handoffOptions.some((option) => option.agent === input.handoff.agent && option.label === input.handoff.label)) {
-    throw new AppError('DECLARED_HANDOFF_NOT_FOUND', 'the approved handoff is not one of the plan\'s declared continue actions.');
+  if (
+    !input.planReview.handoffOptions.some(
+      (option) => option.agent === input.handoff.agent && option.label === input.handoff.label,
+    )
+  ) {
+    throw new AppError(
+      'DECLARED_HANDOFF_NOT_FOUND',
+      "the approved handoff is not one of the plan's declared continue actions.",
+    );
   }
   // The person chose on this record; this flow's own writes (Task events) may advance it later, so it is checked here.
   if (!sameRevision(sessionRevisions.revisionOf(sessionId), input.baseRevision)) {
@@ -77,7 +95,10 @@ export async function runPlanApprovalTransaction(input: PlanApprovalInput, deps:
   const projectRoot = projectWorkspaceStore.getProjectById(session.projectId)?.rootPath ?? null;
   const staged = deps.writer.stageFrozenPlan(sessionId, input.expectedPlanHash);
   const declared = assertDeclaredHandoffForPlan({
-    sourceAgentId: input.sourceAgentId, projectRoot, handoff: input.handoff, tasks: staged.taskRequirements,
+    sourceAgentId: input.sourceAgentId,
+    projectRoot,
+    handoff: input.handoff,
+    tasks: staged.taskRequirements,
   });
 
   await assertSessionModelAndControls(input.model, input.controls, projectRoot);
@@ -88,11 +109,12 @@ export async function runPlanApprovalTransaction(input: PlanApprovalInput, deps:
     projectRoot: projectRoot ?? undefined,
     payload: { toAgentId: declared.agent, prompt: declared.prompt, label: declared.label },
   };
-  if (!await dispatchRuntimeHooks('agent.before-handoff', hookContext)) {
+  if (!(await dispatchRuntimeHooks('agent.before-handoff', hookContext))) {
     throw new AppError('HOOK_DENIED', 'agent.before-handoff');
   }
   if (staged.taskRequirements.length) await deps.installTaskRevisions(sessionId, staged.taskRequirements);
-  if (!deps.isCurrent()) throw new AppError('PLAN_REVIEW_SCOPE_CHANGED', 'the review was cancelled while the approval committed.');
+  if (!deps.isCurrent())
+    throw new AppError('PLAN_REVIEW_SCOPE_CHANGED', 'the review was cancelled while the approval committed.');
 
   const approvedAt = nowMs();
   const previousState = deps.store.assertAwaiting(sessionId, owner);
@@ -105,8 +127,11 @@ export async function runPlanApprovalTransaction(input: PlanApprovalInput, deps:
     updatedAt: approvedAt,
   };
   const previousOffer = executionOfferStore.read(sessionId);
-  const sameApproval = previousOffer?.plan.uri === staged.uri && previousOffer.plan.hash === staged.hash
-    && previousOffer.sourceAgentId === input.sourceAgentId && previousOffer.targetAgentId === declared.agent;
+  const sameApproval =
+    previousOffer?.plan.uri === staged.uri &&
+    previousOffer.plan.hash === staged.hash &&
+    previousOffer.sourceAgentId === input.sourceAgentId &&
+    previousOffer.targetAgentId === declared.agent;
   const offer = declaredExecutionOffer({
     offerId: (sameApproval && previousOffer.offerId) || randomUUID(),
     sourceAgentId: input.sourceAgentId,
@@ -123,26 +148,33 @@ export async function runPlanApprovalTransaction(input: PlanApprovalInput, deps:
     deps.store.replace(sessionId, planState);
     undo.push(() => deps.store.replace(sessionId, previousState));
     executionOfferStore.write(sessionId, offer);
-    undo.push(() => (previousOffer
-      ? executionOfferStore.write(sessionId, previousOffer)
-      : executionOfferStore.clear(sessionId)));
+    undo.push(() =>
+      previousOffer ? executionOfferStore.write(sessionId, previousOffer) : executionOfferStore.clear(sessionId),
+    );
     // The last step: an atomic write that either lands whole or leaves session.json as it was.
     const updated = sessionRecordStore.updateSession(sessionId, {
-      agentId: declared.agent, modelOverride: { ...input.model }, turnControls: { ...input.controls },
+      agentId: declared.agent,
+      modelOverride: { ...input.model },
+      turnControls: { ...input.controls },
     });
     if (!updated) throw new AppError('PLAN_SESSION_NOT_FOUND', sessionId);
     committed = sessionRevisions.snapshot(updated);
   } catch (error) {
     for (const step of undo.reverse()) {
-      try { step(); } catch (rollbackError) {
-        deps.onDiagnostic(`Plan approval rollback step failed: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+      try {
+        step();
+      } catch (rollbackError) {
+        deps.onDiagnostic(
+          `Plan approval rollback step failed: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`,
+        );
       }
     }
     throw error;
   }
 
   try {
-    if (!await dispatchRuntimeHooks('agent.after-handoff', hookContext)) deps.onDiagnostic('HOOK_DENIED: agent.after-handoff');
+    if (!(await dispatchRuntimeHooks('agent.after-handoff', hookContext)))
+      deps.onDiagnostic('HOOK_DENIED: agent.after-handoff');
   } catch (error) {
     deps.onDiagnostic(`agent.after-handoff failed: ${error instanceof Error ? error.message : String(error)}`);
   }

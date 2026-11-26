@@ -18,72 +18,85 @@ import { sanitizeKnowledgeImages } from './knowledgeImages';
 
 const optionalString = z.string().trim().min(1).optional();
 
-export const KnowledgeScopeSchema = z.object({
-  project: optionalString,
-  engine: optionalString,
-  engineVersion: optionalString,
-  api: optionalString,
-  platform: optionalString,
-  gpuVendor: optionalString,
-  gpuArch: optionalString,
-  device: optionalString,
-  driver: optionalString,
-  capture: optionalString,
-  pipelineStage: optionalString,
-  pass: optionalString,
-  shaderFamily: optionalString,
-  materialFamily: optionalString,
-  quality: optionalString,
-  resolution: optionalString,
-  featureConfiguration: optionalString,
-  exclusions: z.partialRecord(z.enum(KNOWLEDGE_SCOPE_AXES), z.array(z.string().trim().min(1))).optional(),
-}).strict();
+export const KnowledgeScopeSchema = z
+  .object({
+    project: optionalString,
+    engine: optionalString,
+    engineVersion: optionalString,
+    api: optionalString,
+    platform: optionalString,
+    gpuVendor: optionalString,
+    gpuArch: optionalString,
+    device: optionalString,
+    driver: optionalString,
+    capture: optionalString,
+    pipelineStage: optionalString,
+    pass: optionalString,
+    shaderFamily: optionalString,
+    materialFamily: optionalString,
+    quality: optionalString,
+    resolution: optionalString,
+    featureConfiguration: optionalString,
+    exclusions: z.partialRecord(z.enum(KNOWLEDGE_SCOPE_AXES), z.array(z.string().trim().min(1))).optional(),
+  })
+  .strict();
 
-export const KnowledgeRelationSchema = z.object({
-  kind: z.enum(KNOWLEDGE_RELATION_KINDS),
-  targetCardId: z.string().trim().min(1),
-}).strict();
+export const KnowledgeRelationSchema = z
+  .object({
+    kind: z.enum(KNOWLEDGE_RELATION_KINDS),
+    targetCardId: z.string().trim().min(1),
+  })
+  .strict();
 
-export const KnowledgeImageRefSchema = z.object({
-  relativePath: z.string().trim().min(1),
-  role: z.enum(KNOWLEDGE_IMAGE_ROLES),
-  alt: optionalString,
-}).strict();
+export const KnowledgeImageRefSchema = z
+  .object({
+    relativePath: z.string().trim().min(1),
+    role: z.enum(KNOWLEDGE_IMAGE_ROLES),
+    alt: optionalString,
+  })
+  .strict();
 
-export const KnowledgeCaseChaptersSchema = z.object({
-  claim: optionalString,
-  scopeExclusions: optionalString,
-  symptoms: optionalString,
-  evidence: optionalString,
-  rootCause: optionalString,
-  experimentVerification: optionalString,
-  fix: optionalString,
-  negative: optionalString,
-  openChallenges: optionalString,
-  derived: optionalString,
-}).strict();
+export const KnowledgeCaseChaptersSchema = z
+  .object({
+    claim: optionalString,
+    scopeExclusions: optionalString,
+    symptoms: optionalString,
+    evidence: optionalString,
+    rootCause: optionalString,
+    experimentVerification: optionalString,
+    fix: optionalString,
+    negative: optionalString,
+    openChallenges: optionalString,
+    derived: optionalString,
+  })
+  .strict();
 
-export const KnowledgeCardRecordSchema = z.object({
-  cardId: z.string().trim().min(1),
-  spaceId: z.string().trim().min(1),
-  relativePath: z.string().trim().min(1),
-  type: z.enum(KNOWLEDGE_CARD_TYPES),
-  lifecycle: z.enum(KNOWLEDGE_LIFECYCLES),
-  title: z.string().trim().min(1),
-  scope: KnowledgeScopeSchema.default({}),
-  relations: z.array(KnowledgeRelationSchema).default([]),
-  body: z.string(),
-  preview: optionalString,
-  updatedAt: z.number().int().nonnegative().optional(),
-  sourceStatus: optionalString,
-  caseId: optionalString,
-  chapters: KnowledgeCaseChaptersSchema.optional(),
-  images: z.array(KnowledgeImageRefSchema).default([]),
-  missingAssets: z.array(z.string().trim().min(1)).optional(),
-  sourceHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  sourceMtimeMs: z.number().int().nonnegative().optional(),
-  sourceSize: z.number().int().nonnegative().optional(),
-}).strict();
+export const KnowledgeCardRecordSchema = z
+  .object({
+    cardId: z.string().trim().min(1),
+    spaceId: z.string().trim().min(1),
+    relativePath: z.string().trim().min(1),
+    type: z.enum(KNOWLEDGE_CARD_TYPES),
+    lifecycle: z.enum(KNOWLEDGE_LIFECYCLES),
+    title: z.string().trim().min(1),
+    scope: KnowledgeScopeSchema.default({}),
+    relations: z.array(KnowledgeRelationSchema).default([]),
+    body: z.string(),
+    preview: optionalString,
+    updatedAt: z.number().int().nonnegative().optional(),
+    sourceStatus: optionalString,
+    caseId: optionalString,
+    chapters: KnowledgeCaseChaptersSchema.optional(),
+    images: z.array(KnowledgeImageRefSchema).default([]),
+    missingAssets: z.array(z.string().trim().min(1)).optional(),
+    sourceHash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    sourceMtimeMs: z.number().int().nonnegative().optional(),
+    sourceSize: z.number().int().nonnegative().optional(),
+  })
+  .strict();
 
 export function splitFrontmatter(source: string): { rawMeta: string | null; body: string } {
   const normalized = source.replace(/^\uFEFF/, '');
@@ -107,7 +120,11 @@ export function parseLooseMeta(rawMeta: string): Record<string, unknown> {
     if (separator < 1) continue;
     const key = line.slice(0, separator).trim();
     const raw = line.slice(separator + 1).trim();
-    try { meta[key] = JSON.parse(raw); } catch { meta[key] = raw; }
+    try {
+      meta[key] = JSON.parse(raw);
+    } catch {
+      meta[key] = raw;
+    }
   }
   return meta;
 }
@@ -119,7 +136,7 @@ export interface ParsedKnowledgeSource {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function readString(value: unknown): string | undefined {
@@ -182,11 +199,14 @@ export function missingCaseChapters(chapters: KnowledgeCaseChapters | undefined)
   return KNOWLEDGE_CASE_CHAPTERS.filter((chapter) => !chapters?.[chapter]?.trim());
 }
 
-export function parseKnowledgeFrontmatter(source: string, options: {
-  spaceId?: string;
-  relativePath?: string;
-  fallbackTitle?: string;
-} = {}): ParsedKnowledgeSource {
+export function parseKnowledgeFrontmatter(
+  source: string,
+  options: {
+    spaceId?: string;
+    relativePath?: string;
+    fallbackTitle?: string;
+  } = {},
+): ParsedKnowledgeSource {
   const { rawMeta, body } = splitFrontmatter(source);
   const meta = rawMeta ? parseLooseMeta(rawMeta) : {};
   const relativePath = options.relativePath?.replace(/^\/+/, '') || 'untitled.md';
@@ -215,13 +235,15 @@ export function parseKnowledgeFrontmatter(source: string, options: {
   if (lifecycleParsed.success) record.lifecycle = lifecycleParsed.data;
   if (record.type === 'case') record.chapters = parseChapters(meta.chapters, body);
   const images = sanitizeKnowledgeImages(
-    Array.isArray(meta.images) ? meta.images as KnowledgeImageRef[] : undefined,
+    Array.isArray(meta.images) ? (meta.images as KnowledgeImageRef[]) : undefined,
     relativePath,
     record.caseId,
   );
   if (images.length > 0) record.images = images;
   if (Array.isArray(meta.missingAssets)) {
-    const missing = meta.missingAssets.filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+    const missing = meta.missingAssets.filter(
+      (value): value is string => typeof value === 'string' && value.trim().length > 0,
+    );
     if (missing.length > 0) record.missingAssets = missing;
   }
   return { meta, body, record };
@@ -267,7 +289,9 @@ export function normalizeLifecycle(value: unknown, fallback: KnowledgeLifecycle 
 }
 
 export function isStructuredCard(record: ParsedKnowledgeSource['record']): record is KnowledgeCardRecord {
-  return Boolean(record.type && record.lifecycle && record.cardId && record.spaceId && record.relativePath && record.title);
+  return Boolean(
+    record.type && record.lifecycle && record.cardId && record.spaceId && record.relativePath && record.title,
+  );
 }
 
 /** `sourceStatus=fixed` is historical provenance, never verification. */

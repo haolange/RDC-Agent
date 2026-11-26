@@ -19,7 +19,10 @@ import {
 import type { AgentToolSpec } from './AgentTool';
 
 const spec = (concurrency: AgentToolSpec['concurrency'], extra: Partial<AgentToolSpec> = {}): AgentToolSpec => ({
-  concurrency, isReadOnly: true, isDestructive: false, ...extra,
+  concurrency,
+  isReadOnly: true,
+  isDestructive: false,
+  ...extra,
 });
 
 describe('toolConcurrency', () => {
@@ -52,7 +55,10 @@ describe('toolConcurrency', () => {
       ['rdc_probe', RDC_PROBE_TOOL_SPEC],
       ['ask_user', createAskUserTool('general').spec],
       ['plan_artifact', assembly.createPlanArtifactTool('session').spec],
-      ['output_register', createOutputRegistrationTool({ sessionId: 'session', runId: undefined, projectRootPath: undefined }).spec],
+      [
+        'output_register',
+        createOutputRegistrationTool({ sessionId: 'session', runId: undefined, projectRootPath: undefined }).spec,
+      ],
       ['investigation_write', investigationWrite?.spec],
       ['mcp__fs__read', MCP_TOOL_SPEC],
     ];

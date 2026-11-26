@@ -65,23 +65,26 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
     agent: false,
     prompt: false,
   });
-  const visible = (field: Field) => issues.filter((issue) => (
-    issue.field === field
-    && (forceShowRequired || IMMEDIATE_HANDOFF_ISSUE_CODES.has(issue.code) || touched[field])
-  ));
+  const visible = (field: Field) =>
+    issues.filter(
+      (issue) =>
+        issue.field === field && (forceShowRequired || IMMEDIATE_HANDOFF_ISSUE_CODES.has(issue.code) || touched[field]),
+    );
   const patch = (partial: Partial<AgentHandoffDefinition>) => onChange(persistAgentHandoff({ ...handoff, ...partial }));
   const staleTarget = Boolean(handoff.agent) && !targets.some((agent) => agent.id === handoff.agent);
   const shown = issues.some((issue) => visible(issue.field).includes(issue));
   const errorId = (field: Field) => `settings-handoff-error-${field}-${index}`;
-  const errorText = (issue: AgentHandoffIssue) => t(
-    AGENT_HANDOFF_ISSUE_KEYS[issue.code] as TranslationKey,
-    issue.code === 'target-unknown' || issue.code === 'target-disabled'
-      ? { id: handoff.agent }
-      : undefined,
-  );
-  const renderErrors = (field: Field) => visible(field).map((issue) => (
-    <small key={issue.code} id={errorId(field)} className="settings-handoff-error" role="alert">{errorText(issue)}</small>
-  ));
+  const errorText = (issue: AgentHandoffIssue) =>
+    t(
+      AGENT_HANDOFF_ISSUE_KEYS[issue.code] as TranslationKey,
+      issue.code === 'target-unknown' || issue.code === 'target-disabled' ? { id: handoff.agent } : undefined,
+    );
+  const renderErrors = (field: Field) =>
+    visible(field).map((issue) => (
+      <small key={issue.code} id={errorId(field)} className="settings-handoff-error" role="alert">
+        {errorText(issue)}
+      </small>
+    ));
   const targetName = targets.find((agent) => agent.id === handoff.agent)?.name || handoff.agent;
   const bodyId = `settings-handoff-body-${index}`;
 
@@ -114,7 +117,13 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
           <IconButton label={t('settings.agentHandoffMoveDown')} size="sm" disabled={isLast} onClick={onMoveDown}>
             <Icon name="arrow-down" size={14} />
           </IconButton>
-          <IconButton label={t('settings.delete')} size="sm" className="settings-handoff-delete" ref={deleteRef} onClick={onDelete}>
+          <IconButton
+            label={t('settings.delete')}
+            size="sm"
+            className="settings-handoff-delete"
+            ref={deleteRef}
+            onClick={onDelete}
+          >
             <Icon name="trash" size={14} />
           </IconButton>
         </div>
@@ -136,9 +145,12 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
         </SettingsField>
 
         {(['zh-CN', 'en'] as const).map((language) => (
-          <SettingsField key={language} label={t(language === 'zh-CN'
-            ? 'settings.agentHandoffLabelChinese' : 'settings.agentHandoffLabelEnglish')}
-            htmlFor={`settings-handoff-label-${language}-${index}`} layout="row">
+          <SettingsField
+            key={language}
+            label={t(language === 'zh-CN' ? 'settings.agentHandoffLabelChinese' : 'settings.agentHandoffLabelEnglish')}
+            htmlFor={`settings-handoff-label-${language}-${index}`}
+            layout="row"
+          >
             <Input
               id={`settings-handoff-label-${language}-${index}`}
               value={handoff.labelTranslations?.[language] ?? ''}
@@ -169,7 +181,9 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
               patch({ agent: value });
             }}
             options={[
-              ...(staleTarget ? [{ value: handoff.agent, label: `${handoff.agent} ${t('settings.resourceEnumUnsupported')}` }] : []),
+              ...(staleTarget
+                ? [{ value: handoff.agent, label: `${handoff.agent} ${t('settings.resourceEnumUnsupported')}` }]
+                : []),
               ...targets.map((agent) => ({ value: agent.id, label: agent.name })),
             ]}
           />
@@ -201,7 +215,9 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
             dataTestId="settings-agent-handoff-surface"
             ariaLabel={t('settings.agentHandoffSurface')}
             value={handoff.surface ?? 'turn-end'}
-            onChange={(surface) => patch({ surface: surface === 'turn-end' ? undefined : surface as 'plan-gate' | 'hidden' })}
+            onChange={(surface) =>
+              patch({ surface: surface === 'turn-end' ? undefined : (surface as 'plan-gate' | 'hidden') })
+            }
             options={[
               { value: 'turn-end', label: t('settings.agentHandoffSurfaceTurnEnd') },
               { value: 'plan-gate', label: t('settings.agentHandoffSurfacePlanGate') },
@@ -215,14 +231,21 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
             value={(handoff.requiredToolIds ?? []).join('\n')}
             placeholder={t('settings.agentHandoffRequiredToolsHelp')}
             onChange={(event) => {
-              const requiredToolIds = event.currentTarget.value.split(/\r?\n/).map((id) => id.trim()).filter(Boolean);
+              const requiredToolIds = event.currentTarget.value
+                .split(/\r?\n/)
+                .map((id) => id.trim())
+                .filter(Boolean);
               patch({ requiredToolIds: requiredToolIds.length > 0 ? requiredToolIds : undefined });
             }}
           />
         </SettingsField>
         <SettingsField label={t('settings.agentHandoffRequiredSkills')} layout="stack">
-          <AgentSkillPicker skills={skills} targetAgentId={handoff.agent}
-            value={handoff.requiredSkillIds ?? []} onChange={(requiredSkillIds) => patch({ requiredSkillIds })} />
+          <AgentSkillPicker
+            skills={skills}
+            targetAgentId={handoff.agent}
+            value={handoff.requiredSkillIds ?? []}
+            onChange={(requiredSkillIds) => patch({ requiredSkillIds })}
+          />
         </SettingsField>
       </div>
     </article>

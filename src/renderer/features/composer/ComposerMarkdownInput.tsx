@@ -11,7 +11,6 @@ import './ComposerMarkdownInput.css';
 
 export type ComposerMarkdownMode = 'write' | 'preview';
 
-
 interface ComposerMarkdownInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -100,13 +99,17 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
 }) => {
   const hostRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => () => {
-    if (hostRef.current) registerCodeMirrorView(hostRef.current, null);
-  }, []);
+  useEffect(
+    () => () => {
+      if (hostRef.current) registerCodeMirrorView(hostRef.current, null);
+    },
+    [],
+  );
 
   const syncHostHeight = useComposerMarkdownSizing(hostRef, value, mode);
 
-  const extensions = useMemo((): Extension[] => [
+  const extensions = useMemo(
+    (): Extension[] => [
       markdown(),
       composerEditorTheme,
       cmPlaceholder(placeholder),
@@ -149,15 +152,12 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
         }
         syncHostHeight();
       }),
-    ], [disabled, mode, onPasteFiles, onSend, placeholder, syncHostHeight]);
+    ],
+    [disabled, mode, onPasteFiles, onSend, placeholder, syncHostHeight],
+  );
 
   return (
-    <div
-      ref={hostRef}
-      className="composer-markdown-input"
-      data-testid="composer-markdown-input"
-      data-mode={mode}
-    >
+    <div ref={hostRef} className="composer-markdown-input" data-testid="composer-markdown-input" data-mode={mode}>
       <div className="composer-markdown-stage">
         <div
           className={`composer-markdown-pane composer-markdown-editor-pane ${mode === 'write' ? 'is-active' : 'is-inactive'}`}

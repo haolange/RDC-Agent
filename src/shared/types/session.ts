@@ -24,21 +24,27 @@ export interface ProjectInputRecord {
 }
 
 /** A project input as the registry stores it and `project:inputsChanged` carries it. */
-export const ProjectInputRecordSchema = z.object({
-  inputId: z.string().min(1),
-  fileName: z.string().min(1),
-  filePath: z.string().min(1),
-  source: z.enum(['project_resource', 'external_reference']),
-  referenceIdentity: z.object({ device: z.string(), inode: z.string(), birthtimeNs: z.string() }).optional(),
-  discoveredAt: z.number(),
-  lastModifiedAt: z.number(),
-  size: z.number(),
-  contentSha256: z.string().regex(/^[a-f0-9]{64}$/u).optional(),
-}).passthrough().superRefine((input, ctx) => {
-  if (input.source === 'external_reference' && (!input.referenceIdentity || !input.contentSha256)) {
-    ctx.addIssue({ code: 'custom', message: 'External capture references require file identity and content hash.' });
-  }
-}) satisfies z.ZodType<ProjectInputRecord>;
+export const ProjectInputRecordSchema = z
+  .object({
+    inputId: z.string().min(1),
+    fileName: z.string().min(1),
+    filePath: z.string().min(1),
+    source: z.enum(['project_resource', 'external_reference']),
+    referenceIdentity: z.object({ device: z.string(), inode: z.string(), birthtimeNs: z.string() }).optional(),
+    discoveredAt: z.number(),
+    lastModifiedAt: z.number(),
+    size: z.number(),
+    contentSha256: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/u)
+      .optional(),
+  })
+  .passthrough()
+  .superRefine((input, ctx) => {
+    if (input.source === 'external_reference' && (!input.referenceIdentity || !input.contentSha256)) {
+      ctx.addIssue({ code: 'custom', message: 'External capture references require file identity and content hash.' });
+    }
+  }) satisfies z.ZodType<ProjectInputRecord>;
 
 export interface ProjectInputRemovePreparation {
   success: boolean;
@@ -303,19 +309,23 @@ export interface RunContextUsageSummary {
   cumulativeCost?: number;
 }
 
-const ContextUsageBreakdownEntrySchema = z.object({
-  id: z.custom<ContextUsageBreakdownId>((value) => typeof value === 'string' && value.length > 0),
-  tokens: z.number(),
-  count: z.number().optional(),
-}).passthrough();
+const ContextUsageBreakdownEntrySchema = z
+  .object({
+    id: z.custom<ContextUsageBreakdownId>((value) => typeof value === 'string' && value.length > 0),
+    tokens: z.number(),
+    count: z.number().optional(),
+  })
+  .passthrough();
 
-const LlmUsageCostSchema = z.object({
-  input: z.number(),
-  output: z.number(),
-  cacheRead: z.number().optional(),
-  cacheWrite: z.number().optional(),
-  total: z.number(),
-}).passthrough();
+const LlmUsageCostSchema = z
+  .object({
+    input: z.number(),
+    output: z.number(),
+    cacheRead: z.number().optional(),
+    cacheWrite: z.number().optional(),
+    total: z.number(),
+  })
+  .passthrough();
 
 const UsageCoreFields = {
   runId: z.string().min(1),
@@ -345,11 +355,13 @@ const UsageCoreFields = {
 };
 
 /** A run's context usage as the session usage file stores it and `workflow:runUsageChanged` carries it. */
-export const RunContextUsageSummarySchema: z.ZodType<RunContextUsageSummary> = z.object({
-  ...UsageCoreFields,
-  maxOutputTokens: z.number().nullable(),
-  compactionThresholdTokens: z.number().nullable(),
-}).strict();
+export const RunContextUsageSummarySchema: z.ZodType<RunContextUsageSummary> = z
+  .object({
+    ...UsageCoreFields,
+    maxOutputTokens: z.number().nullable(),
+    compactionThresholdTokens: z.number().nullable(),
+  })
+  .strict();
 
 export interface RunContextUsageRequest {
   sessionId: string;

@@ -44,7 +44,9 @@ describe('knowledge operation registry', () => {
     let release!: () => void;
     const running = registry.run('op-3', async ({ signal, onProgress }) => {
       onProgress('reading', 0, 2);
-      await new Promise<void>((resolve) => { release = resolve; });
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
       signal.throwIfAborted();
       onProgress('reading', 1, 2);
       return 'done';
@@ -63,12 +65,19 @@ describe('knowledge operation registry', () => {
   it('stops every running operation on shutdown and waits for each to settle', async () => {
     const registry = new KnowledgeOperationRegistry(() => undefined);
     const settled: string[] = [];
-    const work = (id: string) => registry.run(id, ({ signal }) => new Promise<void>((resolve) => {
-      signal.addEventListener('abort', () => setTimeout(() => {
-        settled.push(id);
-        resolve();
-      }, 5));
-    }));
+    const work = (id: string) =>
+      registry.run(
+        id,
+        ({ signal }) =>
+          new Promise<void>((resolve) => {
+            signal.addEventListener('abort', () =>
+              setTimeout(() => {
+                settled.push(id);
+                resolve();
+              }, 5),
+            );
+          }),
+      );
     const runs = [work('a'), work('b')];
     await registry.abortAll();
     expect(settled.sort()).toEqual(['a', 'b']);

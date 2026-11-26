@@ -17,8 +17,7 @@ export interface AgentModelFallback {
 
 /** One field set (or cleared, with no value) on a binding. */
 export type AgentModelFieldChange =
-  | { field: 'model'; value?: string }
-  | { field: 'reasoningLevel'; value?: ReasoningSelection };
+  { field: 'model'; value?: string } | { field: 'reasoningLevel'; value?: ReasoningSelection };
 
 interface AgentModelBindingFieldsProps {
   binding: AgentModelBinding;
@@ -41,10 +40,12 @@ export const AgentModelBindingFields: React.FC<AgentModelBindingFieldsProps> = (
   const effectiveModel = binding.model ?? fallback?.model;
   const supported = options.find((option) => option.canonicalId === effectiveModel)?.reasoningSelections;
   // A saved level the current model does not list stays selectable; the status row reports it.
-  const reasoningChoices = [...new Set([
-    ...(supported && supported.length > 0 ? supported : REASONING_SELECTIONS),
-    ...(binding.reasoningLevel ? [binding.reasoningLevel] : []),
-  ])];
+  const reasoningChoices = [
+    ...new Set([
+      ...(supported && supported.length > 0 ? supported : REASONING_SELECTIONS),
+      ...(binding.reasoningLevel ? [binding.reasoningLevel] : []),
+    ]),
+  ];
   const fallbackModelLabel = modelOptionLabel(fallback?.model, options) ?? t('settings.agentModelNotSet');
   const levelLabel = (level: string): string => (isReasoningLevelLabel(level) ? t(EFFORT_LABEL_KEYS[level]) : level);
 
@@ -63,12 +64,16 @@ export const AgentModelBindingFields: React.FC<AgentModelBindingFieldsProps> = (
           ariaLabel={t('settings.agentReasoningLevel')}
           dataTestId={`${testIdPrefix}-reasoning-level`}
           value={binding.reasoningLevel ?? ''}
-          onChange={(value) => onChange({ field: 'reasoningLevel', value: value ? value as ReasoningSelection : undefined })}
+          onChange={(value) =>
+            onChange({ field: 'reasoningLevel', value: value ? (value as ReasoningSelection) : undefined })
+          }
           options={[
             {
               value: '',
-              label: !fallback ? t('settings.agentReasoningDefault')
-                : fallback.reasoningLevel ? t('settings.agentReasoningUseDefault', { level: levelLabel(fallback.reasoningLevel) })
+              label: !fallback
+                ? t('settings.agentReasoningDefault')
+                : fallback.reasoningLevel
+                  ? t('settings.agentReasoningUseDefault', { level: levelLabel(fallback.reasoningLevel) })
                   : t('settings.agentReasoningFollowDefault'),
             },
             ...reasoningChoices.map((value) => ({ value, label: levelLabel(value) })),

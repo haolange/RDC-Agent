@@ -31,14 +31,15 @@ export function WriteConfirmDialog({ write, spaces }: WriteConfirmDialogProps) {
   const space = spaces.find(({ spaceId }) => spaceId === write.after?.spaceId);
   const spaceLabel = space?.kind === 'user' ? t('knowledgeCenter.userSpace') : space?.label;
   const hasContradicts = write.contradicts.length > 0;
-  const conflictHit = (id: string) => write.after?.cardId === id
-    ? write.after : write.conflictHits.find((hit) => hit.cardId === id);
-  const blocked = Boolean(write.block)
-    || write.versionStale
-    || !write.packReady
-    || !write.changeReason.trim()
-    || !write.confirmed
-    || (hasContradicts && !write.acknowledgedConflicts);
+  const conflictHit = (id: string) =>
+    write.after?.cardId === id ? write.after : write.conflictHits.find((hit) => hit.cardId === id);
+  const blocked =
+    Boolean(write.block) ||
+    write.versionStale ||
+    !write.packReady ||
+    !write.changeReason.trim() ||
+    !write.confirmed ||
+    (hasContradicts && !write.acknowledgedConflicts);
 
   const fact = (label: string, value: ReactNode) => (
     <div className="knowledge-write-fact">
@@ -57,14 +58,21 @@ export function WriteConfirmDialog({ write, spaces }: WriteConfirmDialogProps) {
       closeLabel={t('knowledgeCenter.confirmCancel')}
       busy={write.busy}
       dataTestId="knowledge-center-confirm"
-      headerActions={write.basis ? (
-        <CopyDiagnosticsMenu facts={[
-          { label: t('knowledgeCenter.confirmTarget'), value: `${write.after.spaceId} / ${write.after.relativePath}` },
-          { label: t('knowledgeCenter.confirmRollbackBasis'), value: write.basis.hash },
-          { label: 'bytes', value: write.basis.bytes },
-        ]} />
-      ) : undefined}
-      footer={(
+      headerActions={
+        write.basis ? (
+          <CopyDiagnosticsMenu
+            facts={[
+              {
+                label: t('knowledgeCenter.confirmTarget'),
+                value: `${write.after.spaceId} / ${write.after.relativePath}`,
+              },
+              { label: t('knowledgeCenter.confirmRollbackBasis'), value: write.basis.hash },
+              { label: 'bytes', value: write.basis.bytes },
+            ]}
+          />
+        ) : undefined
+      }
+      footer={
         <>
           <Button variant="ghost" disabled={write.busy} onClick={write.close}>
             {t('knowledgeCenter.confirmCancel')}
@@ -78,7 +86,7 @@ export function WriteConfirmDialog({ write, spaces }: WriteConfirmDialogProps) {
             {t('knowledgeCenter.confirmWrite')}
           </Button>
         </>
-      )}
+      }
     >
       <dl className="knowledge-write-facts">
         {fact(t('knowledgeCenter.confirmTarget'), [write.after.title, spaceLabel].filter(Boolean).join(' · '))}
@@ -86,10 +94,7 @@ export function WriteConfirmDialog({ write, spaces }: WriteConfirmDialogProps) {
           t('knowledgeCenter.confirmCurrentStatus'),
           <KnowledgeStatusTag lifecycle={write.before?.lifecycle} sourceStatus={write.before?.sourceStatus} />,
         )}
-        {fact(
-          t('knowledgeCenter.confirmVersion'),
-          formatDateTime(language, write.after.updatedAt) || '—',
-        )}
+        {fact(t('knowledgeCenter.confirmVersion'), formatDateTime(language, write.after.updatedAt) || '—')}
         {fact(
           t('knowledgeCenter.confirmConflict'),
           hasContradicts ? String(write.contradicts.length) : t('knowledgeCenter.confirmNoConflict'),
@@ -98,7 +103,12 @@ export function WriteConfirmDialog({ write, spaces }: WriteConfirmDialogProps) {
 
       <section className="knowledge-write-section">
         <h3 className="knowledge-write-section-title">{t('knowledgeCenter.confirmDiff')}</h3>
-        <DiffBlock lines={write.diff} beforeLabel={t('knowledgeCenter.diffBefore')} afterLabel={t('knowledgeCenter.diffAfter')} dataTestId="knowledge-center-confirm-diff" />
+        <DiffBlock
+          lines={write.diff}
+          beforeLabel={t('knowledgeCenter.diffBefore')}
+          afterLabel={t('knowledgeCenter.diffAfter')}
+          dataTestId="knowledge-center-confirm-diff"
+        />
       </section>
 
       {hasContradicts ? (
@@ -130,9 +140,13 @@ export function WriteConfirmDialog({ write, spaces }: WriteConfirmDialogProps) {
       <p className="knowledge-write-hint">{t('knowledgeCenter.confirmNoAutoRollback')}</p>
 
       {write.block === 'draft-to-verified' && <InlineError>{t('knowledgeCenter.confirmBlockedLifecycle')}</InlineError>}
-      {write.block?.startsWith('missing-chapters') && <InlineError>{t('knowledgeCenter.confirmMissingChapters')}</InlineError>}
+      {write.block?.startsWith('missing-chapters') && (
+        <InlineError>{t('knowledgeCenter.confirmMissingChapters')}</InlineError>
+      )}
       {write.versionStale && <InlineError>{t('knowledgeCenter.confirmVersionStale')}</InlineError>}
-      {write.error && <InlineError detail={write.error}>{humanizeError(write.error, t, 'app.error.actionFailed')}</InlineError>}
+      {write.error && (
+        <InlineError detail={write.error}>{humanizeError(write.error, t, 'app.error.actionFailed')}</InlineError>
+      )}
 
       <Checkbox
         className="knowledge-center-check"

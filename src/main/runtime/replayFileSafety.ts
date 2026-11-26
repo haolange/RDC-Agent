@@ -29,14 +29,22 @@ export async function safePath(projectRoot: string, target: string): Promise<voi
       const resolved = await fs.realpath(current);
       const actual = path.relative(realRoot, resolved);
       if (actual.startsWith('..') || path.isAbsolute(actual)) throw new AppError('REPLAY_PATH_ESCAPE');
-    } catch (error) { if (missing(error)) return; throw error; }
+    } catch (error) {
+      if (missing(error)) return;
+      throw error;
+    }
   }
 }
 
 export async function treeBytes(projectRoot: string, root: string): Promise<number> {
   await safePath(projectRoot, root);
   let entries;
-  try { entries = await fs.readdir(root, { withFileTypes: true }); } catch (error) { if (missing(error)) return 0; throw error; }
+  try {
+    entries = await fs.readdir(root, { withFileTypes: true });
+  } catch (error) {
+    if (missing(error)) return 0;
+    throw error;
+  }
   let total = 0;
   for (const entry of entries) {
     const target = path.join(root, entry.name);
@@ -53,10 +61,17 @@ export async function atomicWrite(projectRoot: string, target: string, bytes: Bu
   const temporary = path.join(path.dirname(target), `.pending-${process.pid}-${randomUUID()}`);
   try {
     const handle = await fs.open(temporary, 'wx');
-    try { await handle.writeFile(bytes); await handle.sync(); } finally { await handle.close(); }
+    try {
+      await handle.writeFile(bytes);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
     await safePath(projectRoot, target);
     await renameWithRetry(temporary, target);
-  } finally { await fs.rm(temporary, { force: true }); }
+  } finally {
+    await fs.rm(temporary, { force: true });
+  }
 }
 
 const ReplayLockOwnerSchema = z.object({ pid: z.number().int().positive().safe(), token: z.string() });
@@ -89,8 +104,11 @@ async function diskLock(projectRoot: string): Promise<() => Promise<void>> {
       // and write otherwise leaves an empty lock with no pid to verify.
       const handle = await fs.open(pending, 'wx');
       try {
-        await handle.writeFile(JSON.stringify({ pid: process.pid, token })); await handle.sync();
-      } finally { await handle.close(); }
+        await handle.writeFile(JSON.stringify({ pid: process.pid, token }));
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
       // A hard link has create-if-absent semantics on the same volume; unlike
       // rename it cannot replace another process's replay.lock.
       await fs.link(pending, target);
@@ -104,13 +122,21 @@ async function diskLock(projectRoot: string): Promise<() => Promise<void>> {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       const before = await fs.stat(target);
       let text: string;
-      try { text = await fs.readFile(target, 'utf8'); } catch (readError) { throw new AppError('REPLAY_LOCK_CORRUPT', undefined, { cause: readError }); }
+      try {
+        text = await fs.readFile(target, 'utf8');
+      } catch (readError) {
+        throw new AppError('REPLAY_LOCK_CORRUPT', undefined, { cause: readError });
+      }
       const owner = parseLockOwner(text);
-      try { process.kill(owner.pid, 0); throw new AppError('REPLAY_STORE_BUSY', undefined, { cause: error }); } catch (probeError) {
+      try {
+        process.kill(owner.pid, 0);
+        throw new AppError('REPLAY_STORE_BUSY', undefined, { cause: error });
+      } catch (probeError) {
         if ((probeError as NodeJS.ErrnoException).code !== 'ESRCH') throw probeError;
       }
       const after = await fs.stat(target);
-      if (before.ino !== after.ino || before.mtimeMs !== after.mtimeMs || before.size !== after.size) throw new AppError('REPLAY_STORE_BUSY', undefined, { cause: error });
+      if (before.ino !== after.ino || before.mtimeMs !== after.mtimeMs || before.size !== after.size)
+        throw new AppError('REPLAY_STORE_BUSY', undefined, { cause: error });
       await fs.unlink(target);
     } finally {
       await fs.rm(pending, { force: true });
@@ -123,16 +149,26 @@ export async function projectLock<T>(projectRoot: string, operation: () => Promi
   const key = await fs.realpath(projectRoot);
   const previous = queues.get(key) ?? Promise.resolve();
   let release!: () => void;
-  const tail = previous.then(() => new Promise<void>((resolve) => { release = resolve; }));
+  const tail = previous.then(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+  );
   queues.set(key, tail);
   await previous;
   // Let the tail's synchronous executor install the release callback.
   await Promise.resolve();
   let unlock: (() => Promise<void>) | undefined;
-  try { unlock = await diskLock(projectRoot); return await operation(); } finally {
-    try { await unlock?.(); } finally {
-    release();
-    if (queues.get(key) === tail) queues.delete(key);
+  try {
+    unlock = await diskLock(projectRoot);
+    return await operation();
+  } finally {
+    try {
+      await unlock?.();
+    } finally {
+      release();
+      if (queues.get(key) === tail) queues.delete(key);
     }
   }
 }

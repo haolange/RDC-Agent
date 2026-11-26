@@ -7,13 +7,7 @@ import { SettingsField, SettingsSection } from '../parts';
 import { useI18n } from '../../../../i18n';
 import { AppearanceChromePreview } from './AppearanceChromePreview';
 import { ChromeThemeCard } from './AppearanceChromeParts';
-import type {
-  AppSettings,
-  AppTheme,
-  FontScale,
-  ThemeChromeConfig,
-  ThemeVariant,
-} from '@shared/types/settings';
+import type { AppSettings, AppTheme, FontScale, ThemeChromeConfig, ThemeVariant } from '@shared/types/settings';
 
 interface AppearanceSettingsProps {
   settings: AppSettings;
@@ -35,7 +29,11 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
   const [editing, setEditing] = useState<ThemeVariant>(resolvedTheme);
 
   return (
-    <section className="settings-page settings-page-appearance" data-testid="settings-appearance-page" data-settings-search="appearance">
+    <section
+      className="settings-page settings-page-appearance"
+      data-testid="settings-appearance-page"
+      data-settings-search="appearance"
+    >
       <SettingsField layout="row" label={t('userMenu.theme')} search="theme">
         <Tabs
           className="appearance-mode-tabs"
@@ -50,35 +48,59 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
       <SettingsSection variant="rows" title={t('settings.appearanceThemeEditor')}>
         <div className="appearance-theme-previews" role="group" aria-label={t('settings.appearanceThemeEditor')}>
           {(['light', 'dark'] as const).map((variant) => (
-            <Button key={variant} variant="ghost" className="appearance-theme-preview-button"
-              aria-pressed={editing === variant} onClick={() => setEditing(variant)}>
+            <Button
+              key={variant}
+              variant="ghost"
+              className="appearance-theme-preview-button"
+              aria-pressed={editing === variant}
+              onClick={() => setEditing(variant)}
+            >
               <span>{t(variant === 'light' ? 'settings.appearanceLightTheme' : 'settings.appearanceDarkTheme')}</span>
-              <AppearanceChromePreview chrome={settings.appearance.chromeThemes[variant]} variant={variant}
-                data-testid={`appearance-preview-${variant}`} />
+              <AppearanceChromePreview
+                chrome={settings.appearance.chromeThemes[variant]}
+                variant={variant}
+                data-testid={`appearance-preview-${variant}`}
+              />
             </Button>
           ))}
         </div>
-        <ChromeThemeCard key={editing} variant={editing} chrome={settings.appearance.chromeThemes[editing]}
-          onChange={(chrome) => void onChromeThemeChange(editing, chrome)} />
+        <ChromeThemeCard
+          key={editing}
+          variant={editing}
+          chrome={settings.appearance.chromeThemes[editing]}
+          onChange={(chrome) => void onChromeThemeChange(editing, chrome)}
+        />
       </SettingsSection>
 
       <SettingsSection variant="rows" title={t('settings.appearancePreferences')}>
-          <SettingsField layout="row" label={t('userMenu.fontScale')} description={t('settings.appearanceFontScaleHelp')} search="font-scale">
-            <Tabs
-              variant="segmented"
-              label={t('userMenu.fontScale')}
-              value={settings.appearance.fontScale}
-              onChange={(value) => void onFontScaleChange(value as FontScale)}
-              tabs={(['small', 'medium', 'large'] as FontScale[]).map((fontScale) => ({ id: fontScale, label: t(`font.${fontScale}`) }))}
-            />
-          </SettingsField>
-          <SettingsField layout="row" label={t('settings.composerMarkdown')} description={t('settings.composerMarkdownHelp')}>
-            <Switch
-              checked={settings.appearance.composerMarkdown}
-              onCheckedChange={(enabled) => void onComposerMarkdownChange(enabled)}
-              aria-label={t('settings.composerMarkdown')}
-            />
-          </SettingsField>
+        <SettingsField
+          layout="row"
+          label={t('userMenu.fontScale')}
+          description={t('settings.appearanceFontScaleHelp')}
+          search="font-scale"
+        >
+          <Tabs
+            variant="segmented"
+            label={t('userMenu.fontScale')}
+            value={settings.appearance.fontScale}
+            onChange={(value) => void onFontScaleChange(value as FontScale)}
+            tabs={(['small', 'medium', 'large'] as FontScale[]).map((fontScale) => ({
+              id: fontScale,
+              label: t(`font.${fontScale}`),
+            }))}
+          />
+        </SettingsField>
+        <SettingsField
+          layout="row"
+          label={t('settings.composerMarkdown')}
+          description={t('settings.composerMarkdownHelp')}
+        >
+          <Switch
+            checked={settings.appearance.composerMarkdown}
+            onCheckedChange={(enabled) => void onComposerMarkdownChange(enabled)}
+            aria-label={t('settings.composerMarkdown')}
+          />
+        </SettingsField>
       </SettingsSection>
     </section>
   );

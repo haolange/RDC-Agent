@@ -10,7 +10,12 @@ import type {
 /** The settings view joined with the catalog read once: what components read as `AppSettings`. */
 export function joinSettingsView(view: SettingsView, catalog: LlmProviderCatalogResponse): AppSettings {
   const catalogById = new Map(catalog.providers.map((entry) => [entry.id, entry]));
-  const { revision: _revision, llm, agents: { projectId: _projectId, ...agents }, ...sections } = view;
+  const {
+    revision: _revision,
+    llm,
+    agents: { projectId: _projectId, ...agents },
+    ...sections
+  } = view;
   return {
     ...sections,
     llm: {
@@ -87,7 +92,11 @@ export class SettingsViewSync {
   /** Brings the view up to date for `projectId`; a read in flight that already covers the reason is joined. */
   readFor(projectId: string | null | undefined): Promise<void> {
     const reading = this.reading;
-    if (reading && reading.covers >= this.newestUnseen() && (projectId === undefined || reading.projectId === projectId)) {
+    if (
+      reading &&
+      reading.covers >= this.newestUnseen() &&
+      (projectId === undefined || reading.projectId === projectId)
+    ) {
       return reading.promise;
     }
     return this.readFresh(projectId);
@@ -99,7 +108,9 @@ export class SettingsViewSync {
     const read: Read = {
       projectId,
       covers: this.newestUnseen(),
-      promise: this.read().finally(() => { if (this.reading === read) this.reading = null; }),
+      promise: this.read().finally(() => {
+        if (this.reading === read) this.reading = null;
+      }),
     };
     this.reading = read;
     await read.promise;
@@ -111,7 +122,9 @@ export class SettingsViewSync {
 
   private readWhenIdle(): void {
     if (this.ownWrites === 0 && this.unseen.size > 0) {
-      void this.readFor(undefined).catch((error: unknown) => console.warn('[settings] could not read a changed settings view', error));
+      void this.readFor(undefined).catch((error: unknown) =>
+        console.warn('[settings] could not read a changed settings view', error),
+      );
     }
   }
 }

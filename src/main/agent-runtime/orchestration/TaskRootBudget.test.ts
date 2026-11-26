@@ -30,10 +30,20 @@ describe('Task root budget binding', () => {
 
   it('restores an existing root id and never refreshes its counters or deadline', async () => {
     const registry = new TaskRegistry(new MemoryTaskStore());
-    const original = createPolicyBudgetState({ maxToolCalls: 8, maxSubagents: 3, maxChildDepth: 3, maxWallTimeMs: 60_000 });
+    const original = createPolicyBudgetState({
+      maxToolCalls: 8,
+      maxSubagents: 3,
+      maxChildDepth: 3,
+      maxWallTimeMs: 60_000,
+    });
     original.toolCalls = 5;
     const id = await bindTaskRootBudget(registry, 'owner', original);
-    const retry = createPolicyBudgetState({ maxToolCalls: 20, maxSubagents: 10, maxChildDepth: 5, maxWallTimeMs: 120_000 });
+    const retry = createPolicyBudgetState({
+      maxToolCalls: 20,
+      maxSubagents: 10,
+      maxChildDepth: 5,
+      maxWallTimeMs: 120_000,
+    });
     retry.toolCalls = 1;
     await bindTaskRootBudget(registry, 'owner', retry, id);
     expect(retry.toolCalls).toBe(6);
@@ -47,8 +57,13 @@ describe('Task root budget binding', () => {
     const live = createPolicyBudgetState({ maxToolCalls: 8, maxSubagents: 3, maxChildDepth: 3, maxWallTimeMs: 60_000 });
     await bindTaskRootBudget(registry, 'owner', live, 'root-a');
     await registry.updateRootBudget('root-b', {
-      toolCalls: 2, subagents: 0, maxToolCalls: 8, maxSubagents: 3,
-      maxChildDepth: 3, deadlineAt: live.wallStartedAt + 60_000, startedAt: live.wallStartedAt,
+      toolCalls: 2,
+      subagents: 0,
+      maxToolCalls: 8,
+      maxSubagents: 3,
+      maxChildDepth: 3,
+      deadlineAt: live.wallStartedAt + 60_000,
+      startedAt: live.wallStartedAt,
     });
     await expect(bindTaskRootBudget(registry, 'owner', live, 'root-b')).rejects.toThrow(/new turn.*existing root/);
     expect((await registry.getRootBudget('root-a'))?.toolCalls).toBe(0);

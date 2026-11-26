@@ -10,7 +10,12 @@ describe('turn preparation worker computation', () => {
     const messages = Array.from({ length: 60 }, (_, index) => user(`history-${index}-${'x'.repeat(40)}`, index));
     messages.push(user('current prompt', 100));
     const original = structuredClone(messages);
-    const result = await computeTurnPreparation({ messages, modelId: 'model', messageBudget: 80, imageTokenAdjustment: 0 });
+    const result = await computeTurnPreparation({
+      messages,
+      modelId: 'model',
+      messageBudget: 80,
+      imageTokenAdjustment: 0,
+    });
     expect(result.compactedMessages).toEqual(original);
     expect(result.compactionApplied).toBe(false);
     expect(messages).toEqual(original);
@@ -21,11 +26,16 @@ describe('turn preparation worker computation', () => {
     const controller = new AbortController();
     controller.abort();
 
-    await expect(pool.run({
-      messages: [user('current prompt', 1)],
-      modelId: 'model',
-      messageBudget: 1_000,
-      imageTokenAdjustment: 0,
-    }, controller.signal)).rejects.toThrow('REQUEST_CANCELLED');
+    await expect(
+      pool.run(
+        {
+          messages: [user('current prompt', 1)],
+          modelId: 'model',
+          messageBudget: 1_000,
+          imageTokenAdjustment: 0,
+        },
+        controller.signal,
+      ),
+    ).rejects.toThrow('REQUEST_CANCELLED');
   });
 });

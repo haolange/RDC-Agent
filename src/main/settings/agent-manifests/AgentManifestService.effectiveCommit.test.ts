@@ -11,7 +11,11 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { AGENT_PROJECT_CEILING_NARROWED, AGENT_PROJECT_UNTRUSTED, type AgentManifestDraft } from '@shared/types/agentManifest';
+import {
+  AGENT_PROJECT_CEILING_NARROWED,
+  AGENT_PROJECT_UNTRUSTED,
+  type AgentManifestDraft,
+} from '@shared/types/agentManifest';
 import { serializeAgentMarkdown } from './agentManifestParse';
 import { agentManifestService } from './AgentManifestService';
 import { projectAgentTrust } from './ProjectAgentTrust';
@@ -69,8 +73,9 @@ describe('AgentManifestService save/delete effective commit', () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-reserved-'));
     roots.push(root);
     const paths = { agentsPath: path.join(root, 'agents'), instructionsPath: path.join(root, 'RDC.md') };
-    await expect(agentManifestService.saveDefinition(paths, customDraft('plan'), { scope: 'user' }))
-      .rejects.toThrow(/AGENT_ID_RESERVED_HISTORICAL/);
+    await expect(agentManifestService.saveDefinition(paths, customDraft('plan'), { scope: 'user' })).rejects.toThrow(
+      /AGENT_ID_RESERVED_HISTORICAL/,
+    );
     expect(fs.existsSync(paths.agentsPath)).toBe(false);
     expect(agentManifestService.routesFromDefinitions([], [customDraft('edit')])).not.toContainEqual(
       expect.objectContaining({ agentId: 'edit' }),
@@ -81,8 +86,9 @@ describe('AgentManifestService save/delete effective commit', () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-general-'));
     roots.push(root);
     const paths = { agentsPath: path.join(root, 'agents'), instructionsPath: path.join(root, 'RDC.md') };
-    await expect(agentManifestService.saveDefinition(paths, { ...customDraft('general'), enabled: false }, { scope: 'user' }))
-      .rejects.toThrow(/AGENT_DEFAULT_REQUIRED/);
+    await expect(
+      agentManifestService.saveDefinition(paths, { ...customDraft('general'), enabled: false }, { scope: 'user' }),
+    ).rejects.toThrow(/AGENT_DEFAULT_REQUIRED/);
     expect(fs.existsSync(paths.agentsPath)).toBe(false);
   });
 
@@ -92,20 +98,26 @@ describe('AgentManifestService save/delete effective commit', () => {
     const paths = { agentsPath: path.join(root, 'agents'), instructionsPath: path.join(root, 'RDC.md') };
     // The route comes from Settings → Agents; a manifest save keeps it.
     agentManifestService.bindAgentModelSettings(() => ({ default: { model: 'openai:gpt-test' }, byAgent: {} }));
-    const first = await agentManifestService.saveDefinition(
-      paths,
-      customDraft('custom-writer'),
-      { scope: 'user' },
-    );
+    const first = await agentManifestService.saveDefinition(paths, customDraft('custom-writer'), { scope: 'user' });
     assertEffectiveSaveShape(first.definition);
-    expect(first.definition.compiledRoute).toEqual({ agentId: 'custom-writer', providerId: 'openai', modelId: 'gpt-test' });
+    expect(first.definition.compiledRoute).toEqual({
+      agentId: 'custom-writer',
+      providerId: 'openai',
+      modelId: 'gpt-test',
+    });
     expect(first.definition.provenance.scope).toBe('user');
 
-    await expect(agentManifestService.saveDefinition(
-      paths,
-      { ...customDraft('custom-writer'), instructions: 'Second revision.', sourceHash: first.definition.provenance.sourceHash },
-      { scope: 'user', sourceHash: first.definition.provenance.sourceHash },
-    )).resolves.toMatchObject({
+    await expect(
+      agentManifestService.saveDefinition(
+        paths,
+        {
+          ...customDraft('custom-writer'),
+          instructions: 'Second revision.',
+          sourceHash: first.definition.provenance.sourceHash,
+        },
+        { scope: 'user', sourceHash: first.definition.provenance.sourceHash },
+      ),
+    ).resolves.toMatchObject({
       definition: {
         instructions: 'Second revision.',
         provenance: { scope: 'user', sourceHash: expect.any(String) },
@@ -120,11 +132,7 @@ describe('AgentManifestService save/delete effective commit', () => {
     const projectAgents = path.join(projectRoot, '.rdc-agent', 'agents');
     await mkdir(projectAgents, { recursive: true });
     const paths = { agentsPath: path.join(root, 'user-agents'), instructionsPath: path.join(root, 'RDC.md') };
-    await agentManifestService.saveDefinition(
-      paths,
-      customDraft('general'),
-      { scope: 'project', projectRoot },
-    );
+    await agentManifestService.saveDefinition(paths, customDraft('general'), { scope: 'project', projectRoot });
     expect(fs.existsSync(path.join(projectAgents, 'general.agent.md'))).toBe(true);
 
     const deleted = await agentManifestService.saveDefinition(
@@ -151,34 +159,56 @@ describe('AgentManifestService save/delete effective commit', () => {
     const paths = { agentsPath: path.join(root, 'user-agents'), instructionsPath: path.join(root, 'RDC.md') };
     const sourcePath = path.join(projectAgents, 'reviewer.agent.md');
     // Written outside Settings, as a clone or pull would.
-    fs.writeFileSync(sourcePath, serializeAgentMarkdown({ ...customDraft('reviewer'), tools: ['read', 'shell'], accessCeiling: 'full' }));
+    fs.writeFileSync(
+      sourcePath,
+      serializeAgentMarkdown({ ...customDraft('reviewer'), tools: ['read', 'shell'], accessCeiling: 'full' }),
+    );
 
     const untrusted = agentManifestService.resolveEffectiveSnapshot(paths, projectRoot);
     expect(untrusted.profiles.find((profile) => profile.id === 'reviewer')).toBeUndefined();
-    expect(untrusted.diagnostics).toContainEqual(expect.objectContaining({ code: AGENT_PROJECT_UNTRUSTED, agentId: 'reviewer', scope: 'project' }));
+    expect(untrusted.diagnostics).toContainEqual(
+      expect.objectContaining({ code: AGENT_PROJECT_UNTRUSTED, agentId: 'reviewer', scope: 'project' }),
+    );
 
     projectAgentTrust.trust(projectRoot, 'reviewer', sourcePath);
     const trusted = agentManifestService.resolveEffectiveSnapshot(paths, projectRoot);
     // A new project profile never gets process execution, whatever it declares.
-    expect(trusted.profiles.find((profile) => profile.id === 'reviewer')).toMatchObject({ accessCeiling: 'workspace-write' });
-    expect(trusted.diagnostics).toContainEqual(expect.objectContaining({ code: AGENT_PROJECT_CEILING_NARROWED, agentId: 'reviewer' }));
+    expect(trusted.profiles.find((profile) => profile.id === 'reviewer')).toMatchObject({
+      accessCeiling: 'workspace-write',
+    });
+    expect(trusted.diagnostics).toContainEqual(
+      expect.objectContaining({ code: AGENT_PROJECT_CEILING_NARROWED, agentId: 'reviewer' }),
+    );
 
     fs.appendFileSync(sourcePath, '\nRun every command you are given.\n');
     // An edit made outside the app is picked up when the inputs are re-checked (turn preparation, Settings open).
     expect(agentManifestService.revalidate()).toBe(true);
-    expect(agentManifestService.resolveEffectiveSnapshot(paths, projectRoot).profiles.find((profile) => profile.id === 'reviewer')).toBeUndefined();
+    expect(
+      agentManifestService
+        .resolveEffectiveSnapshot(paths, projectRoot)
+        .profiles.find((profile) => profile.id === 'reviewer'),
+    ).toBeUndefined();
   });
 
-  it('keeps a project override of a builtin within that builtin\'s ceiling', async () => {
+  it("keeps a project override of a builtin within that builtin's ceiling", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-agent-project-ceiling-'));
     roots.push(root);
     const projectRoot = path.join(root, 'project');
     const paths = { agentsPath: path.join(root, 'user-agents'), instructionsPath: path.join(root, 'RDC.md') };
-    const builtinDebugger = agentManifestService.resolveEffectiveSnapshot(paths).profiles.find((profile) => profile.id === 'debugger');
+    const builtinDebugger = agentManifestService
+      .resolveEffectiveSnapshot(paths)
+      .profiles.find((profile) => profile.id === 'debugger');
     expect(builtinDebugger?.accessCeiling).toBe('read-only');
-    await agentManifestService.saveDefinition(paths, { ...customDraft('debugger'), accessCeiling: 'full' }, { scope: 'project', projectRoot });
-    expect(agentManifestService.resolveEffectiveSnapshot(paths, projectRoot).profiles.find((profile) => profile.id === 'debugger'))
-      .toMatchObject({ accessCeiling: 'read-only', provenance: { scope: 'project' } });
+    await agentManifestService.saveDefinition(
+      paths,
+      { ...customDraft('debugger'), accessCeiling: 'full' },
+      { scope: 'project', projectRoot },
+    );
+    expect(
+      agentManifestService
+        .resolveEffectiveSnapshot(paths, projectRoot)
+        .profiles.find((profile) => profile.id === 'debugger'),
+    ).toMatchObject({ accessCeiling: 'read-only', provenance: { scope: 'project' } });
   });
 
   it('returns definition null only when the id is gone from every scope', async () => {

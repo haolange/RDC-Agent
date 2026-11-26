@@ -15,9 +15,22 @@ it('counts each failed action once, inside steps and groups, and not declined ap
   const rows = [
     tool('read', 'error'),
     { ...tool('images', 'complete'), imageCalls: [tool('a', 'complete'), tool('b', 'error'), tool('c', 'error')] },
-    { type: 'webGroup', id: 'pages', status: 'complete', members: [tool('p1', 'error'), tool('p2', 'complete')], pages: [], duration: '' },
+    {
+      type: 'webGroup',
+      id: 'pages',
+      status: 'complete',
+      members: [tool('p1', 'error'), tool('p2', 'complete')],
+      pages: [],
+      duration: '',
+    },
     { type: 'approval', id: 'declined', status: 'error', duration: '' },
-    { type: 'section', id: 'step', status: 'error', visibleSteps: [tool('nested', 'error'), tool('ok', 'complete')], steps: [] },
+    {
+      type: 'section',
+      id: 'step',
+      status: 'error',
+      visibleSteps: [tool('nested', 'error'), tool('ok', 'complete')],
+      steps: [],
+    },
   ] as unknown as WorkProcessRow[];
   expect(countFailedActions(rows)).toBe(5);
 });

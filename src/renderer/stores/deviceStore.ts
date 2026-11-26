@@ -31,9 +31,15 @@ export const useDeviceStore = create<DeviceState>((set, get) => ({
   discovery: { status: 'idle' },
 
   applyStatusPayload: (payload) => {
-    set((state) => payload.revision < state.revision ? state : ({
-      devices: payload.devices.length ? payload.devices : [LOCAL_DEVICE], revision: payload.revision, discovery: payload.discovery,
-    }));
+    set((state) =>
+      payload.revision < state.revision
+        ? state
+        : {
+            devices: payload.devices.length ? payload.devices : [LOCAL_DEVICE],
+            revision: payload.revision,
+            discovery: payload.discovery,
+          },
+    );
   },
 
   loadDevices: async () => {
@@ -57,7 +63,8 @@ export const useDeviceStore = create<DeviceState>((set, get) => ({
     try {
       await window.electronAPI.device.watchStart();
     } catch (error) {
-      if (generation === watchGeneration) set({ discovery: { status: 'failed', error: error instanceof Error ? error.message : String(error) } });
+      if (generation === watchGeneration)
+        set({ discovery: { status: 'failed', error: error instanceof Error ? error.message : String(error) } });
       return;
     }
 
@@ -87,5 +94,4 @@ export const useDeviceStore = create<DeviceState>((set, get) => ({
       console.warn('[devices] could not stop the device watch', error);
     }
   },
-
 }));

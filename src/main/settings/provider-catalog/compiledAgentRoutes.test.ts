@@ -16,10 +16,12 @@ vi.mock('../agent-manifests/AgentManifestService', () => ({
 describe('compiledAgentRoutes leftover isolation', () => {
   it('reads compiledRoute and never leftover agentRoutes', () => {
     const leftover = [{ agentId: 'general', providerId: 'leftover', modelId: 'leftover-model' }];
-    const definitions = [{
-      id: 'general',
-      compiledRoute: { agentId: 'general', providerId: 'real', modelId: 'real-model' },
-    }];
+    const definitions = [
+      {
+        id: 'general',
+        compiledRoute: { agentId: 'general', providerId: 'real', modelId: 'real-model' },
+      },
+    ];
     expect(compiledRouteFromDefinition(definitions[0])).toEqual({
       agentId: 'general',
       providerId: 'real',
@@ -33,10 +35,12 @@ describe('compiledAgentRoutes leftover isolation', () => {
 
   it('resolveCompiledRouteForAgent uses the snapshot compiledRoute instead of leftover agentRoutes', () => {
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockReturnValue({
-      profiles: [{
-        id: 'general',
-        compiledRoute: { agentId: 'general', providerId: 'real', modelId: 'real-model' },
-      }],
+      profiles: [
+        {
+          id: 'general',
+          compiledRoute: { agentId: 'general', providerId: 'real', modelId: 'real-model' },
+        },
+      ],
       diagnostics: [],
     } as never);
     expect(resolveCompiledRouteForAgent('general', 'D:/Project')).toEqual({

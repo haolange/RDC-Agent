@@ -12,30 +12,78 @@ import { applyPlanReviewRequested } from './ConversationPlanReviewEvents';
 
 describe('ConversationService work trace tool approvals', () => {
   it('keeps a question owned by the model loop across later updates', () => {
-    let trace = upsertRuntimeToolCall(undefined, { id: 'ask', toolName: 'ask_user', status: 'pending' }, { loopId: 'loop' });
-    trace = upsertRuntimeToolCall(trace, { id: 'ask', toolName: 'ask_user', status: 'running',
-      userInputQuestions: [{ questionId: 'q', prompt: 'Proceed?', options: [], allowFreeform: true }] });
+    let trace = upsertRuntimeToolCall(
+      undefined,
+      { id: 'ask', toolName: 'ask_user', status: 'pending' },
+      { loopId: 'loop' },
+    );
+    trace = upsertRuntimeToolCall(trace, {
+      id: 'ask',
+      toolName: 'ask_user',
+      status: 'running',
+      userInputQuestions: [{ questionId: 'q', prompt: 'Proceed?', options: [], allowFreeform: true }],
+    });
     expect(trace.blocks.map((block) => [block.id, block.parentLoopId])).toEqual([
-      ['loop', undefined], ['runtime-user-input-ask', 'loop'],
+      ['loop', undefined],
+      ['runtime-user-input-ask', 'loop'],
     ]);
     expect(trace.blocks[1].toolCalls[0].displayOrder).toBe(1);
   });
   it('preserves the real execution start and terminal status under late declarations', () => {
-    let trace = upsertRuntimeToolCall(undefined, { id: 'call', toolName: 'read_file', status: 'pending', startedAt: 100 });
-    trace = upsertRuntimeToolCall(trace, { id: 'call', toolName: 'read_file', status: 'running', executionStartedAt: 500 });
-    trace = upsertRuntimeToolCall(trace, { id: 'call', toolName: 'read_file', status: 'pending', argsPreview: 'complete args' });
-    expect(trace.blocks[0].toolCalls[0]).toMatchObject({ status: 'running', startedAt: 100, executionStartedAt: 500, argsPreview: 'complete args' });
+    let trace = upsertRuntimeToolCall(undefined, {
+      id: 'call',
+      toolName: 'read_file',
+      status: 'pending',
+      startedAt: 100,
+    });
+    trace = upsertRuntimeToolCall(trace, {
+      id: 'call',
+      toolName: 'read_file',
+      status: 'running',
+      executionStartedAt: 500,
+    });
+    trace = upsertRuntimeToolCall(trace, {
+      id: 'call',
+      toolName: 'read_file',
+      status: 'pending',
+      argsPreview: 'complete args',
+    });
+    expect(trace.blocks[0].toolCalls[0]).toMatchObject({
+      status: 'running',
+      startedAt: 100,
+      executionStartedAt: 500,
+      argsPreview: 'complete args',
+    });
     trace = upsertRuntimeToolCall(trace, { id: 'call', toolName: 'read_file', status: 'complete', completedAt: 800 });
-    trace = upsertRuntimeToolCall(trace, { id: 'call', toolName: 'read_file', status: 'running', executionStartedAt: 900 });
-    expect(sanitizeStoredWorkTrace(trace)?.blocks[0].toolCalls[0]).toMatchObject({ status: 'complete', executionStartedAt: 500, completedAt: 800 });
+    trace = upsertRuntimeToolCall(trace, {
+      id: 'call',
+      toolName: 'read_file',
+      status: 'running',
+      executionStartedAt: 900,
+    });
+    expect(sanitizeStoredWorkTrace(trace)?.blocks[0].toolCalls[0]).toMatchObject({
+      status: 'complete',
+      executionStartedAt: 500,
+      completedAt: 800,
+    });
   });
   it('associates multiple Hook events by exact tool ID without changing tool status', () => {
     let trace = upsertRuntimeToolCall(undefined, { id: 'tool-a', toolName: 'shell.command', status: 'complete' });
     trace = upsertRuntimeToolCall(trace, { id: 'tool-b', toolName: 'shell.command', status: 'complete' });
-    const first = { id: 'event-1', code: 'hook.completed', severity: 'info' as const,
-      message: 'Hook audit: completed', timestamp: 100 };
-    const second = { id: 'event-2', code: 'hook.failed', severity: 'warning' as const,
-      message: 'Hook audit: failed', timestamp: 101 };
+    const first = {
+      id: 'event-1',
+      code: 'hook.completed',
+      severity: 'info' as const,
+      message: 'Hook audit: completed',
+      timestamp: 100,
+    };
+    const second = {
+      id: 'event-2',
+      code: 'hook.failed',
+      severity: 'warning' as const,
+      message: 'Hook audit: failed',
+      timestamp: 101,
+    };
     trace = attachRuntimeHookDiagnostic(trace, 'tool-b', first)!;
     trace = attachRuntimeHookDiagnostic(trace, 'tool-b', second)!;
     trace = attachRuntimeHookDiagnostic(trace, 'tool-b', first)!;
@@ -43,7 +91,8 @@ describe('ConversationService work trace tool approvals', () => {
     const calls = trace.blocks.flatMap((block) => block.toolCalls);
     expect(calls.find((call) => call.id === 'tool-a')?.hookDiagnostics).toBeUndefined();
     expect(calls.find((call) => call.id === 'tool-b')).toMatchObject({
-      status: 'complete', hookDiagnostics: [first, second],
+      status: 'complete',
+      hookDiagnostics: [first, second],
     });
     expect(sanitizeStoredWorkTrace(trace)).not.toBeNull();
     const invalid = structuredClone(trace);
@@ -55,23 +104,27 @@ describe('ConversationService work trace tool approvals', () => {
     const diagnosticTrace = {
       status: 'complete' as const,
       updatedAt: 100,
-      blocks: [{
-        id: 'route-warning',
-        kind: 'diagnostic' as const,
-        title: 'Tool calling unsupported',
-        status: 'complete' as const,
-        diagnosticSeverity: 'warning' as const,
-        toolCalls: [],
-        startedAt: 90,
-        completedAt: 100,
-      }],
+      blocks: [
+        {
+          id: 'route-warning',
+          kind: 'diagnostic' as const,
+          title: 'Tool calling unsupported',
+          status: 'complete' as const,
+          diagnosticSeverity: 'warning' as const,
+          toolCalls: [],
+          startedAt: 90,
+          completedAt: 100,
+        },
+      ],
     };
 
     expect(sanitizeStoredWorkTrace(diagnosticTrace)?.blocks[0].diagnosticSeverity).toBe('warning');
-    expect(sanitizeStoredWorkTrace({
-      ...diagnosticTrace,
-      blocks: [{ ...diagnosticTrace.blocks[0], kind: 'reasoning' as const }],
-    })).toBeNull();
+    expect(
+      sanitizeStoredWorkTrace({
+        ...diagnosticTrace,
+        blocks: [{ ...diagnosticTrace.blocks[0], kind: 'reasoning' as const }],
+      }),
+    ).toBeNull();
   });
 
   it('preserves source refs and rejects a persisted cross-channel collision', () => {
@@ -100,64 +153,97 @@ describe('ConversationService work trace tool approvals', () => {
     const trace = {
       status: 'complete' as const,
       updatedAt: 100,
-      blocks: [{
-        id: 'runtime-loop-1',
-        kind: 'llm_turn' as const,
-        title: 'LLM turn',
-        status: 'complete' as const,
-        items: [{
-          kind: 'thinking' as const,
-          providerOutputRef: thinkingRef,
-          thinking: { text: 'reasoning', kind: 'raw' as const, source: 'anthropic-thinking' as const, visibility: 'raw-collapsed' as const },
+      blocks: [
+        {
+          id: 'runtime-loop-1',
+          kind: 'llm_turn' as const,
+          title: 'LLM turn',
           status: 'complete' as const,
-          displayOrder: 1,
-        }, {
-          kind: 'text' as const,
-          providerOutputRef: textRef,
-          text: 'answer',
-          phase: 'final_answer' as const,
-          status: 'complete' as const,
-          displayOrder: 2,
-        }],
-        result: {
-          status: 'complete' as const,
-          outputPhase: 'final_answer' as const,
-          providerOutputRefs: [textRef],
-          toolCallIds: ['tool-1'],
-        },
-        toolCalls: [{
-          id: 'tool-1',
-          toolName: 'read_file',
-          status: 'complete' as const,
-          providerOutputRef: toolRef,
-          startedAt: 90,
+          items: [
+            {
+              kind: 'thinking' as const,
+              providerOutputRef: thinkingRef,
+              thinking: {
+                text: 'reasoning',
+                kind: 'raw' as const,
+                source: 'anthropic-thinking' as const,
+                visibility: 'raw-collapsed' as const,
+              },
+              status: 'complete' as const,
+              displayOrder: 1,
+            },
+            {
+              kind: 'text' as const,
+              providerOutputRef: textRef,
+              text: 'answer',
+              phase: 'final_answer' as const,
+              status: 'complete' as const,
+              displayOrder: 2,
+            },
+          ],
+          result: {
+            status: 'complete' as const,
+            outputPhase: 'final_answer' as const,
+            providerOutputRefs: [textRef],
+            toolCallIds: ['tool-1'],
+          },
+          toolCalls: [
+            {
+              id: 'tool-1',
+              toolName: 'read_file',
+              status: 'complete' as const,
+              providerOutputRef: toolRef,
+              startedAt: 90,
+              completedAt: 100,
+            },
+          ],
+          startedAt: 80,
           completedAt: 100,
-        }],
-        startedAt: 80,
-        completedAt: 100,
-      }],
+        },
+      ],
     };
 
     expect(sanitizeStoredWorkTrace(trace)).not.toBeNull();
-    expect(sanitizeStoredWorkTrace({
-      ...trace,
-      blocks: [{
-        ...trace.blocks[0],
-        result: { ...trace.blocks[0].result, providerOutputRefs: [thinkingRef] },
-      }],
-    })).toBeNull();
+    expect(
+      sanitizeStoredWorkTrace({
+        ...trace,
+        blocks: [
+          {
+            ...trace.blocks[0],
+            result: { ...trace.blocks[0].result, providerOutputRefs: [thinkingRef] },
+          },
+        ],
+      }),
+    ).toBeNull();
     const [thinkingItem, textItem] = trace.blocks[0].items;
-    expect(sanitizeStoredWorkTrace({
-      ...trace,
-      blocks: [{ ...trace.blocks[0], items: [{ ...thinkingItem, thinking: { ...thinkingItem.thinking, kind: 'condensed' } }, textItem] }],
-    } as unknown as Parameters<typeof sanitizeStoredWorkTrace>[0])).toBeNull();
+    expect(
+      sanitizeStoredWorkTrace({
+        ...trace,
+        blocks: [
+          {
+            ...trace.blocks[0],
+            items: [{ ...thinkingItem, thinking: { ...thinkingItem.thinking, kind: 'condensed' } }, textItem],
+          },
+        ],
+      } as unknown as Parameters<typeof sanitizeStoredWorkTrace>[0]),
+    ).toBeNull();
   });
 
   it('reads a process record in the older single-thinking shape as discarded, not as a trace', () => {
     const legacy = {
-      status: 'complete' as const, updatedAt: 100,
-      blocks: [{ id: 'loop', kind: 'llm_turn' as const, title: 'LLM turn', status: 'complete' as const, toolCalls: [],
-        startedAt: 1, thinking: { text: 'old', kind: 'raw', source: 'unknown', visibility: 'raw-collapsed' } }],
+      status: 'complete' as const,
+      updatedAt: 100,
+      blocks: [
+        {
+          id: 'loop',
+          kind: 'llm_turn' as const,
+          title: 'LLM turn',
+          status: 'complete' as const,
+          toolCalls: [],
+          startedAt: 1,
+          thinking: { text: 'old', kind: 'raw', source: 'unknown', visibility: 'raw-collapsed' },
+        },
+      ],
     } as unknown as Parameters<typeof readStoredWorkTrace>[0];
     expect(readStoredWorkTrace(legacy)).toEqual({ workTrace: null, workTraceDiscarded: true });
     expect(readStoredWorkTrace(null)).toEqual({ workTrace: null });
@@ -225,17 +311,28 @@ describe('ConversationService work trace tool approvals', () => {
 
   it('preserves host review failures through stored work trace without deriving them from reason text', () => {
     const trace = upsertRuntimeToolApproval(undefined, {
-      approvalId: 'auto-review-timeout', toolCallId: 'timeout', toolName: 'shell',
-      status: 'rejected', reviewer: 'auto_review', reviewMethod: 'model',
-      errorCode: 'PERMISSION_REVIEW_TIMEOUT', answer: 'No verdict within 30 seconds.',
+      approvalId: 'auto-review-timeout',
+      toolCallId: 'timeout',
+      toolName: 'shell',
+      status: 'rejected',
+      reviewer: 'auto_review',
+      reviewMethod: 'model',
+      errorCode: 'PERMISSION_REVIEW_TIMEOUT',
+      answer: 'No verdict within 30 seconds.',
     });
     const stored = sanitizeStoredWorkTrace(JSON.parse(JSON.stringify(trace)));
     expect(stored?.blocks[0].toolCalls[0].approval).toMatchObject({
-      status: 'rejected', reviewMethod: 'model', errorCode: 'PERMISSION_REVIEW_TIMEOUT',
+      status: 'rejected',
+      reviewMethod: 'model',
+      errorCode: 'PERMISSION_REVIEW_TIMEOUT',
     });
     const historical = upsertRuntimeToolApproval(undefined, {
-      approvalId: 'auto-review-old', toolCallId: 'old', toolName: 'shell',
-      status: 'rejected', reviewer: 'auto_review', reason: 'PERMISSION_REVIEW_TIMEOUT',
+      approvalId: 'auto-review-old',
+      toolCallId: 'old',
+      toolName: 'shell',
+      status: 'rejected',
+      reviewer: 'auto_review',
+      reason: 'PERMISSION_REVIEW_TIMEOUT',
       reviewMethod: 'invented',
     });
     expect(historical.blocks[0].toolCalls[0].approval?.reviewMethod).toBeUndefined();
@@ -296,9 +393,15 @@ describe('ConversationService work trace tool approvals', () => {
       toolName: 'plan_artifact',
       status: 'running',
       planReview: {
-        planId: 'plan-1', revision: 1, uri: 'session://plans/plan.md',
-        hash: 'a'.repeat(64), title: 'Plan', summary: [], sections: [],
-        status: 'awaiting', handoffOptions: [{ label: 'Execute with General', agent: 'general' }],
+        planId: 'plan-1',
+        revision: 1,
+        uri: 'session://plans/plan.md',
+        hash: 'a'.repeat(64),
+        title: 'Plan',
+        summary: [],
+        sections: [],
+        status: 'awaiting',
+        handoffOptions: [{ label: 'Execute with General', agent: 'general' }],
       },
     });
 
@@ -310,27 +413,45 @@ describe('ConversationService work trace tool approvals', () => {
   });
 
   it('settles visible thinking when a plan enters human review', () => {
-    const trace = upsertLoopThinkingItem(undefined, 'runtime-loop-1', { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 },
-      { text: 'Preparing the plan', kind: 'summary', source: 'openai-responses-summary', visibility: 'summary' }, 'streaming');
+    const trace = upsertLoopThinkingItem(
+      undefined,
+      'runtime-loop-1',
+      { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 },
+      { text: 'Preparing the plan', kind: 'summary', source: 'openai-responses-summary', visibility: 'summary' },
+      'streaming',
+    );
     const paused = applyPlanReviewRequested({
       payload: {
         toolCallId: 'plan-call',
         planReview: {
-          planId: 'plan-1', revision: 1, uri: 'session://plans/plan.md',
-          hash: 'a'.repeat(64), title: 'Plan', summary: [], sections: [],
-          status: 'awaiting', handoffOptions: [{ label: 'Execute with General', agent: 'general' }],
+          planId: 'plan-1',
+          revision: 1,
+          uri: 'session://plans/plan.md',
+          hash: 'a'.repeat(64),
+          title: 'Plan',
+          summary: [],
+          sections: [],
+          status: 'awaiting',
+          handoffOptions: [{ label: 'Execute with General', agent: 'general' }],
         },
       },
       workTrace: trace,
     });
     expect(paused?.blocks.find((block) => block.id === 'runtime-loop-1')?.items?.[0]?.status).toBe('complete');
-    expect(paused?.blocks.flatMap((block) => block.toolCalls).find((call) => call.id === 'plan-call'))
-      .toMatchObject({ status: 'running', planReview: { status: 'awaiting' } });
+    expect(paused?.blocks.flatMap((block) => block.toolCalls).find((call) => call.id === 'plan-call')).toMatchObject({
+      status: 'running',
+      planReview: { status: 'awaiting' },
+    });
   });
 
   it('closes a streaming Thinking block when persistence fails', () => {
-    const trace = upsertLoopThinkingItem(undefined, 'llm-turn-1', { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 },
-      { text: 'Working', kind: 'raw', source: 'unknown', visibility: 'raw-collapsed' }, 'streaming');
+    const trace = upsertLoopThinkingItem(
+      undefined,
+      'llm-turn-1',
+      { protocol: 'test', providerBlockKey: 'thinking:0', contentIndex: 0 },
+      { text: 'Working', kind: 'raw', source: 'unknown', visibility: 'raw-collapsed' },
+      'streaming',
+    );
     const failed = finalizeTrace(trace, 'error', '会话状态保存失败');
     expect(failed).toMatchObject({ status: 'error', summary: '会话状态保存失败' });
     expect(failed.blocks[0]).toMatchObject({ status: 'error', items: [{ kind: 'thinking', status: 'complete' }] });
@@ -424,21 +545,29 @@ describe('ConversationService work trace tool approvals', () => {
   });
 
   it('updates a tool call by id instead of duplicating it when the active loop advances', () => {
-    let trace = upsertRuntimeToolCall(undefined, {
-      id: 'tool-read-file',
-      toolName: 'read_file',
-      status: 'pending',
-      argsPreview: JSON.stringify({ path: 'package.json' }),
-      startedAt: 100,
-    }, { loopId: 'runtime-loop-1' });
+    let trace = upsertRuntimeToolCall(
+      undefined,
+      {
+        id: 'tool-read-file',
+        toolName: 'read_file',
+        status: 'pending',
+        argsPreview: JSON.stringify({ path: 'package.json' }),
+        startedAt: 100,
+      },
+      { loopId: 'runtime-loop-1' },
+    );
 
-    trace = upsertRuntimeToolCall(trace, {
-      id: 'tool-read-file',
-      toolName: 'read_file',
-      status: 'complete',
-      resultPreview: JSON.stringify({ ok: true, lines: 20 }),
-      completedAt: 200,
-    }, { loopId: 'runtime-loop-2' });
+    trace = upsertRuntimeToolCall(
+      trace,
+      {
+        id: 'tool-read-file',
+        toolName: 'read_file',
+        status: 'complete',
+        resultPreview: JSON.stringify({ ok: true, lines: 20 }),
+        completedAt: 200,
+      },
+      { loopId: 'runtime-loop-2' },
+    );
 
     expect(trace.blocks).toHaveLength(1);
     expect(trace.blocks[0]).toMatchObject({ id: 'runtime-loop-1', status: 'complete' });
@@ -484,7 +613,11 @@ describe('ConversationService work trace tool approvals', () => {
       toolCalls: [],
     });
 
-    expect(trace.blocks.map((block) => block.id)).toEqual(['task-snapshot-created', 'loop-shell', 'task-snapshot-updated']);
+    expect(trace.blocks.map((block) => block.id)).toEqual([
+      'task-snapshot-created',
+      'loop-shell',
+      'task-snapshot-updated',
+    ]);
     expect(trace.blocks[0]?.taskSnapshot).toMatchObject({ completed: 0, total: 1 });
     expect(trace.blocks[2]?.taskSnapshot).toMatchObject({ completed: 1, total: 1 });
   });

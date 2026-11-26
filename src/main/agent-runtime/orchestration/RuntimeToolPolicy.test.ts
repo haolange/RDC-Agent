@@ -33,7 +33,7 @@ function readSkillAllowedTools(skillId: string): string[] {
   const sourcePath = path.resolve(__dirname, '../../../../resources/agent-runtime/skills', skillId, 'SKILL.md');
   const raw = fs.readFileSync(sourcePath, 'utf8').replace(/^\uFEFF/u, '');
   const match = /^---\r?\n([\s\S]*?)\r?\n---/u.exec(raw);
-  const frontmatter = match ? YAML.parse(match[1]) as Record<string, unknown> : {};
+  const frontmatter = match ? (YAML.parse(match[1]) as Record<string, unknown>) : {};
   return Array.isArray(frontmatter['allowed-tools'])
     ? frontmatter['allowed-tools'].filter((entry): entry is string => typeof entry === 'string')
     : [];
@@ -72,24 +72,14 @@ describe('RuntimeToolPolicy tool tokens', () => {
   });
 
   it('expands Mission allowlists without shell, interpreter, or output_register', () => {
-    const expanded = resolveAgentToolAllowlistFromDefinition('debugger', [
-      'read',
-      'search',
-      'web',
-      'shell',
-      'interpreter',
-      'task',
-      'output',
-      'runtimeContext',
-      'rdc_probe',
-    ], 'read-only');
-    expect(expanded).toEqual(expect.arrayContaining([
-      'read_file',
-      'task_create',
-      'task_stop',
-      'runtime_context',
-      'rdc_probe',
-    ]));
+    const expanded = resolveAgentToolAllowlistFromDefinition(
+      'debugger',
+      ['read', 'search', 'web', 'shell', 'interpreter', 'task', 'output', 'runtimeContext', 'rdc_probe'],
+      'read-only',
+    );
+    expect(expanded).toEqual(
+      expect.arrayContaining(['read_file', 'task_create', 'task_stop', 'runtime_context', 'rdc_probe']),
+    );
     expect(expanded).not.toContain('shell');
     expect(expanded).not.toContain('code_interpreter');
     expect(expanded).not.toContain('output_register');
@@ -164,11 +154,7 @@ describe('combineActiveSkillAllowlists', () => {
   });
 
   it('ignores empty skill declarations while intersecting the rest', () => {
-    const combined = combineActiveSkillAllowlists(runtime, [
-      [],
-      ['read'],
-      ['read_file', 'grep'],
-    ]);
+    const combined = combineActiveSkillAllowlists(runtime, [[], ['read'], ['read_file', 'grep']]);
     expect(combined).toContain('read_file');
     expect(combined).not.toContain('grep');
   });
@@ -195,7 +181,9 @@ describe('combineActiveSkillAllowlists', () => {
       'skill_read',
       'tool_search',
     ];
-    const skillLists = DEBUGGER_LOOP_SKILLS.filter((id) => id !== 'skeptic-review').map((skillId) => readSkillAllowedTools(skillId));
+    const skillLists = DEBUGGER_LOOP_SKILLS.filter((id) => id !== 'skeptic-review').map((skillId) =>
+      readSkillAllowedTools(skillId),
+    );
     expect(skillLists.every((list) => list.length === 0)).toBe(true);
     const combined = combineActiveSkillAllowlists(runtime, skillLists);
     expect(combined).toBeNull(); // no skill restriction: profile remains authoritative

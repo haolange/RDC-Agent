@@ -12,7 +12,10 @@ describe('command palette controller lifecycle', () => {
     const host = document.createElement('div');
     document.body.append(host);
     const root = createRoot(host);
-    function Controller() { useCommandPalette(); return null; }
+    function Controller() {
+      useCommandPalette();
+      return null;
+    }
     try {
       act(() => root.render(createElement(StrictMode, null, createElement(Controller))));
       act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })));
@@ -23,6 +26,8 @@ describe('command palette controller lifecycle', () => {
       act(() => root.unmount());
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
       expect(useCommandPaletteStore.getState().open).toBe(false);
-    } finally { host.remove(); }
+    } finally {
+      host.remove();
+    }
   });
 });

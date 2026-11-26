@@ -7,7 +7,12 @@ import { AppError } from '@shared/errors/appError';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
 import { traceService } from '../agent-trace/TraceService';
-import { conversationHistoryStore, projectWorkspaceStore, sessionContextStore, sessionRecordStore } from '../sessions/store/sessionStores';
+import {
+  conversationHistoryStore,
+  projectWorkspaceStore,
+  sessionContextStore,
+  sessionRecordStore,
+} from '../sessions/store/sessionStores';
 import { workflowProjectionPublisher } from '../agent-runtime/orchestration/WorkflowProjectionPublisher';
 import { sessionContextJournal } from '../agent-runtime/context/SessionContextJournal';
 import {
@@ -19,10 +24,17 @@ import {
 import { hashAttachmentContents } from '../agent-runtime/attachments/ConversationAttachmentHashing';
 import { reportProcessFault } from '../runtime/processFaultHandlers';
 import { resolvePlanReference } from './planReferenceResolution';
-import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
+import {
+  reconcileDelegatedInteractionRequests,
+  reconcileInterruptedConversationTurn,
+} from './DelegatedInteractionRecovery';
 import { conversationRdcHost } from './conversationRdcHost';
 import { canonicalJson } from './ConversationRoutePreflight';
-import { startProfileTurn as runStartProfileTurn, type PreparingConversationRequests, type ProfileTurnStart } from './ConversationTurnStarter';
+import {
+  startProfileTurn as runStartProfileTurn,
+  type PreparingConversationRequests,
+  type ProfileTurnStart,
+} from './ConversationTurnStarter';
 import { conversationTurnOutput, publishConversationTrace, publishTraceProjection } from './ConversationTurnTerminal';
 import type { ActiveConversationTurns } from './ConversationTurnRunner';
 import type { SessionRecord } from '@shared/types/session';
@@ -40,10 +52,7 @@ import type {
   ConversationSendRequest,
   ConversationTurnResult,
 } from '@shared/types/conversation';
-import type {
-  ActiveConversationTurn,
-  ResolvedConversationContext,
-} from './ConversationRoutePreflight';
+import type { ActiveConversationTurn, ResolvedConversationContext } from './ConversationRoutePreflight';
 
 interface ConversationContextInput extends ConversationSendRequest {
   fallbackProjectId?: string | null;
@@ -56,16 +65,20 @@ interface ConversationRewriteContextInput extends ConversationRewriteFromMessage
   fallbackRunId?: string | null;
 }
 export class ConversationService implements ActiveConversationTurns, PreparingConversationRequests {
-  private acceptingTurns = true; private activeTurns = new Map<string, ActiveConversationTurn>();
-  private readonly preparingRequests = new Map<string, {
-    requestId: string;
-    controller: AbortController;
-    phase: 'preparing' | 'committing';
-    scopeKey: string;
-    cancelAfterCommit: boolean;
-    credentialHandle?: string;
-    credentialLeaseTransferred: boolean;
-  }>();
+  private acceptingTurns = true;
+  private activeTurns = new Map<string, ActiveConversationTurn>();
+  private readonly preparingRequests = new Map<
+    string,
+    {
+      requestId: string;
+      controller: AbortController;
+      phase: 'preparing' | 'committing';
+      scopeKey: string;
+      cancelAfterCommit: boolean;
+      credentialHandle?: string;
+      credentialLeaseTransferred: boolean;
+    }
+  >();
   private readonly sendRequests = new Map<string, Promise<ConversationTurnResult>>();
   private readonly sendRequestFingerprints = new Map<string, string>();
   private readonly activeSendScopes = new Map<string, string>();
@@ -77,8 +90,12 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
     return this.activeTurns.get(turnId)?.sessionId === sessionId;
   }
   isSessionBusy(sessionId: string): boolean {
-    return [...this.activeTurns.values()].some(turn => turn.sessionId === sessionId)
-      || [...this.preparingRequests.values()].some(request => request.scopeKey === sessionId || request.scopeKey.endsWith(`:${sessionId}`));
+    return (
+      [...this.activeTurns.values()].some((turn) => turn.sessionId === sessionId) ||
+      [...this.preparingRequests.values()].some(
+        (request) => request.scopeKey === sessionId || request.scopeKey.endsWith(`:${sessionId}`),
+      )
+    );
   }
 
   async abortAllTurns(): Promise<void> {
@@ -152,12 +169,13 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
   ): Promise<ConversationCancelActiveTurnResult> {
     const preparingEntry = request.requestId
       ? Array.from(this.preparingRequests.entries()).find(([, entry]) => {
-        if (entry.requestId !== request.requestId) return false;
-        if (request.sessionId && !entry.scopeKey.includes(request.sessionId)) return false;
-        return true;
-      })
-      : Array.from(this.preparingRequests.entries())
-          .find(([, entry]) => !request.sessionId || entry.scopeKey.includes(request.sessionId));
+          if (entry.requestId !== request.requestId) return false;
+          if (request.sessionId && !entry.scopeKey.includes(request.sessionId)) return false;
+          return true;
+        })
+      : Array.from(this.preparingRequests.entries()).find(
+          ([, entry]) => !request.sessionId || entry.scopeKey.includes(request.sessionId),
+        );
     const preparing = preparingEntry?.[1];
     const preparingRequestId = preparing?.requestId;
     if (preparing && preparingRequestId) {
@@ -229,9 +247,12 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
     }
   }
 
-  private resolveIdempotencyScope(
-    input: ConversationContextInput | ConversationRewriteContextInput,
-  ): { scopeType: 'session' | 'project'; scopeId: string; scopeKey: string; idempotencyKey: string } {
+  private resolveIdempotencyScope(input: ConversationContextInput | ConversationRewriteContextInput): {
+    scopeType: 'session' | 'project';
+    scopeId: string;
+    scopeKey: string;
+    idempotencyKey: string;
+  } {
     const requestId = input.requestId.trim();
     if (!requestId) throw new AppError('PREFLIGHT_FAILED', 'requestId is required.');
     const sessionId = input.sessionId ?? input.fallbackSessionId ?? null;
@@ -260,34 +281,36 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
     const attachments = stagedAttachments ?? input.attachments ?? [];
     const contentHashes = await hashAttachmentContents(attachments, signal);
     // Preserve attachment order — image order is semantic for multimodal prompts.
-    const attachmentHashes = attachments.map((attachment, index) => (
+    const attachmentHashes = attachments.map((attachment, index) =>
       createHash('sha256')
-        .update(canonicalJson({
-          fileName: attachment.fileName,
-          mimeType: attachment.mimeType ?? null,
-          declaredSize: attachment.size ?? null,
-          material: attachment.material ?? null,
-          contentHash: contentHashes[index],
-        }))
-        .digest('hex')
-    ));
-    const branchAnchor = 'messageId' in input && typeof input.messageId === 'string'
-      ? input.messageId
-      : null;
+        .update(
+          canonicalJson({
+            fileName: attachment.fileName,
+            mimeType: attachment.mimeType ?? null,
+            declaredSize: attachment.size ?? null,
+            material: attachment.material ?? null,
+            contentHash: contentHashes[index],
+          }),
+        )
+        .digest('hex'),
+    );
+    const branchAnchor = 'messageId' in input && typeof input.messageId === 'string' ? input.messageId : null;
     return createHash('sha256')
-      .update(canonicalJson({
-        sessionId: input.sessionId ?? input.fallbackSessionId ?? null,
-        projectId: input.projectId ?? input.fallbackProjectId ?? null,
-        message: input.message.trim(),
-        attachmentHashes,
-        agentId: input.agentId ?? input.profileId ?? null,
-        profileId: input.profileId ?? input.agentId ?? null,
-        turnControls: input.turnControls,
-        preloadSkillIds: [...(input.preloadSkillIds ?? [])].sort(),
-        branchAnchor,
-        configurationCommit: input.configurationCommit ?? null,
-        planReference: input.planReference ?? null,
-      }))
+      .update(
+        canonicalJson({
+          sessionId: input.sessionId ?? input.fallbackSessionId ?? null,
+          projectId: input.projectId ?? input.fallbackProjectId ?? null,
+          message: input.message.trim(),
+          attachmentHashes,
+          agentId: input.agentId ?? input.profileId ?? null,
+          profileId: input.profileId ?? input.agentId ?? null,
+          turnControls: input.turnControls,
+          preloadSkillIds: [...(input.preloadSkillIds ?? [])].sort(),
+          branchAnchor,
+          configurationCommit: input.configurationCommit ?? null,
+          planReference: input.planReference ?? null,
+        }),
+      )
       .digest('hex');
   }
 
@@ -340,23 +363,21 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
         throw new AppError('REQUEST_ID_CONFLICT', 'requestId already belongs to a different user message.');
       }
       if (userMessage.requestFingerprint !== requestFingerprint) {
-        throw new AppError('REQUEST_ID_CONFLICT', 'persisted request fingerprint is missing or differs from this request.');
+        throw new AppError(
+          'REQUEST_ID_CONFLICT',
+          'persisted request fingerprint is missing or differs from this request.',
+        );
       }
       const requestedCatalogRevision = input.configurationCommit?.providerCatalogRevision;
-      if (
-        requestedCatalogRevision
-        && requestedCatalogRevision !== preparedContext.route.catalogRevision
-      ) {
+      if (requestedCatalogRevision && requestedCatalogRevision !== preparedContext.route.catalogRevision) {
         throw new AppError('REQUEST_ID_CONFLICT', 'requestId already belongs to a different frozen route.');
       }
       const branchState = this.readRepairedBranchState(session.sessionId, history);
-      const messages = branchState
-        ? resolveVisibleConversationMessages(history, branchState)
-        : history;
-      const tracePresentation = await traceService.buildConversationPresentation(
-        session.sessionId,
-        [userMessage, assistantDraftMessage],
-      );
+      const messages = branchState ? resolveVisibleConversationMessages(history, branchState) : history;
+      const tracePresentation = await traceService.buildConversationPresentation(session.sessionId, [
+        userMessage,
+        assistantDraftMessage,
+      ]);
       return {
         requestId,
         session: sessionRecordStore.readSessionSnapshot(session.sessionId),
@@ -367,7 +388,8 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
         branchState,
         executionTransition: { action: 'none' },
         runUpdate: assistantDraftMessage.runId
-          ? sessionRecordStore.listRuns(session.sessionId).find(run => run.runId === assistantDraftMessage.runId) ?? null
+          ? (sessionRecordStore.listRuns(session.sessionId).find((run) => run.runId === assistantDraftMessage.runId) ??
+            null)
           : null,
         tracePresentation,
         errorViewModel: assistantDraftMessage.diagnostic
@@ -433,7 +455,8 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
         agentOrchestrator.releaseProviderRuntimeCredentials(requestState.credentialHandle);
       }
       this.preparingRequests.delete(idempotencyKey);
-      if (scopeKey.startsWith('session:')) conversationRdcHost().setInteractionLock(scopeKey.slice(8), requestId, false);
+      if (scopeKey.startsWith('session:'))
+        conversationRdcHost().setInteractionLock(scopeKey.slice(8), requestId, false);
       if (this.activeSendScopes.get(scopeKey) === requestId) this.activeSendScopes.delete(scopeKey);
     };
 
@@ -467,10 +490,9 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
         return persisted;
       }
 
-      const pending = operation(requestId, activeController, fingerprint, stagedAttachments)
-        .finally(() => {
-          releasePreparation();
-        });
+      const pending = operation(requestId, activeController, fingerprint, stagedAttachments).finally(() => {
+        releasePreparation();
+      });
       this.rememberSendRequest(idempotencyKey, fingerprint, pending);
       void pending.catch(() => {
         if (this.sendRequests.get(idempotencyKey) === pending) {
@@ -488,33 +510,34 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
   async sendMessage(input: ConversationContextInput): Promise<ConversationTurnResult> {
     const trimmed = input.message.trim();
     return this.runIdempotentTurn(input, async (requestId, controller, requestFingerprint, attachments) => {
-        const context = await this.resolveContext(input);
-        if (context.session && Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === context.session?.sessionId)) {
-          throw new AppError('CONVERSATION_BUSY', 'this conversation already has a running turn.');
-        }
-        if (context.session) agentPlanReviewRequestService.retireRecovered(context.session.sessionId);
-        return await this.startProfileTurn({
-          context,
-          requestedProfileId: input.profileId ?? input.agentId ?? null,
-          requestedAgentId: input.agentId ?? input.profileId ?? null,
-          rawMessage: trimmed,
-          pendingAttachments: attachments,
-          preloadSkillIds: input.preloadSkillIds ?? [],
-          requestTurnControls: input.turnControls,
-          requestId,
-          preparationController: controller,
-          configurationCommit: input.configurationCommit,
-          requestFingerprint,
-        });
+      const context = await this.resolveContext(input);
+      if (
+        context.session &&
+        Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === context.session?.sessionId)
+      ) {
+        throw new AppError('CONVERSATION_BUSY', 'this conversation already has a running turn.');
+      }
+      if (context.session) agentPlanReviewRequestService.retireRecovered(context.session.sessionId);
+      return await this.startProfileTurn({
+        context,
+        requestedProfileId: input.profileId ?? input.agentId ?? null,
+        requestedAgentId: input.agentId ?? input.profileId ?? null,
+        rawMessage: trimmed,
+        pendingAttachments: attachments,
+        preloadSkillIds: input.preloadSkillIds ?? [],
+        requestTurnControls: input.turnControls,
+        requestId,
+        preparationController: controller,
+        configurationCommit: input.configurationCommit,
+        requestFingerprint,
+      });
     });
   }
 
   async rewriteFromMessage(input: ConversationRewriteContextInput): Promise<ConversationTurnResult> {
-    return this.runIdempotentTurn(input, (requestId, controller, requestFingerprint, attachments) => this.rewriteFromMessageCore(
-      { ...input, requestId, attachments },
-      controller,
-      requestFingerprint,
-    ));
+    return this.runIdempotentTurn(input, (requestId, controller, requestFingerprint, attachments) =>
+      this.rewriteFromMessageCore({ ...input, requestId, attachments }, controller, requestFingerprint),
+    );
   }
 
   private async rewriteFromMessageCore(
@@ -548,24 +571,21 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
       throw new Error('Can only edit and resend an existing user message.');
     }
 
-    const downstreamTurnIds = new Set(
-      initialHistory.slice(initialTargetIndex + 1).map((message) => message.turnId),
-    );
+    const downstreamTurnIds = new Set(initialHistory.slice(initialTargetIndex + 1).map((message) => message.turnId));
     // Also stop the target turn itself if it is still streaming (edit during reply).
     downstreamTurnIds.add(initialTargetMessage.turnId);
-    const turnsToStop = Array.from(this.activeTurns.values()).filter((activeTurn) => (
-      activeTurn.sessionId === sessionId && downstreamTurnIds.has(activeTurn.turnId)
-    ));
+    const turnsToStop = Array.from(this.activeTurns.values()).filter(
+      (activeTurn) => activeTurn.sessionId === sessionId && downstreamTurnIds.has(activeTurn.turnId),
+    );
     for (const activeTurn of turnsToStop) {
       activeTurn.stop();
     }
     // Overlap producer abort with turn exit; sync slots before rehydrate.
     agentOrchestrator.syncSessionSlots(sessionId);
     await Promise.all([
-      turnsToStop.length > 0
-        ? Promise.allSettled(turnsToStop.map((turn) => turn.stopped))
-        : Promise.resolve([]),
-      agentOrchestrator.abortAndJoin(sessionId, { reason: 'edit_resend' })
+      turnsToStop.length > 0 ? Promise.allSettled(turnsToStop.map((turn) => turn.stopped)) : Promise.resolve([]),
+      agentOrchestrator
+        .abortAndJoin(sessionId, { reason: 'edit_resend' })
         .catch((error: unknown) => reportProcessFault('Agent turn did not join before edit and resend', error)),
     ]);
 
@@ -578,10 +598,12 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
       throw new Error('Can only edit and resend an existing user message.');
     }
 
-    let branchState = conversationHistoryStore.readConversationBranchState(sessionId) ?? createDefaultBranchState(sessionId);
+    let branchState =
+      conversationHistoryStore.readConversationBranchState(sessionId) ?? createDefaultBranchState(sessionId);
     const targetBranchId = normalizeBranchId(targetMessage.branchId);
     const forkId = targetMessage.forkId ?? targetMessage.id;
-    const anchorMessageId = branchState.forks.find((fork) => fork.forkId === forkId)?.anchorMessageId ?? targetMessage.id;
+    const anchorMessageId =
+      branchState.forks.find((fork) => fork.forkId === forkId)?.anchorMessageId ?? targetMessage.id;
 
     let fork = branchState.forks.find((entry) => entry.forkId === forkId);
     if (!fork) {
@@ -589,13 +611,15 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
         forkId,
         anchorMessageId,
         activeBranchId: targetBranchId,
-        branches: [{
-          branchId: targetBranchId,
-          parentBranchId: null,
-          variantIndex: targetMessage.variantIndex ?? 0,
-          anchorUserMessageId: targetMessage.id,
-          rootTurnId: targetMessage.turnId,
-        }],
+        branches: [
+          {
+            branchId: targetBranchId,
+            parentBranchId: null,
+            variantIndex: targetMessage.variantIndex ?? 0,
+            anchorUserMessageId: targetMessage.id,
+            rootTurnId: targetMessage.turnId,
+          },
+        ],
       };
       branchState.forks.push(fork);
     } else if (!fork.branches.some((branch) => branch.anchorUserMessageId === targetMessage.id)) {
@@ -649,7 +673,8 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
     }
     // Branch switch: discard in-memory agent slot cache; next turn rehydrates from disk.
     agentOrchestrator.syncSessionSlots(input.sessionId);
-    await agentOrchestrator.abortAndJoin(input.sessionId, { reason: 'branch_switch' })
+    await agentOrchestrator
+      .abortAndJoin(input.sessionId, { reason: 'branch_switch' })
       .catch((error: unknown) => reportProcessFault('Agent turn did not join before the branch switch', error));
 
     const allMessages = conversationHistoryStore.readConversationHistory(input.sessionId);
@@ -671,7 +696,10 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
 
     const visibleMessages = resolveVisibleConversationMessages(allMessages, branchState);
     const tracePresentation = await traceService.buildConversationPresentation(input.sessionId, visibleMessages);
-    workflowProjectionPublisher.publishTraceProjectionChanged({ projectId: tracePresentation.projectId, sessionId: tracePresentation.sessionId }, tracePresentation);
+    workflowProjectionPublisher.publishTraceProjectionChanged(
+      { projectId: tracePresentation.projectId, sessionId: tracePresentation.sessionId },
+      tracePresentation,
+    );
     publishConversationTrace(input.sessionId, visibleMessages, input.sessionId, publishTraceProjection);
 
     return {
@@ -700,18 +728,28 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
     const resolvedSessionId = input.sessionId ?? input.fallbackSessionId ?? persistedSessionId ?? null;
     const session = resolvedSessionId ? sessionRecordStore.readSession(resolvedSessionId) : null;
     const currentRun = resolvedSessionId
-      ? sessionRecordStore.listRuns(resolvedSessionId).find((entry) => entry.runId === (input.currentRunId ?? input.fallbackRunId))
-        ?? sessionRecordStore.getLatestRun(resolvedSessionId)
+      ? (sessionRecordStore
+          .listRuns(resolvedSessionId)
+          .find((entry) => entry.runId === (input.currentRunId ?? input.fallbackRunId)) ??
+        sessionRecordStore.getLatestRun(resolvedSessionId))
       : null;
     const projectInputs = projectId ? await projectWorkspaceStore.listProjectInputs(projectId) : [];
-    const openedCapture = projectId && resolvedSessionId
-      ? conversationRdcHost().snapshotOpenedCapture({ projectId, sessionId: resolvedSessionId })
-      : null;
+    const openedCapture =
+      projectId && resolvedSessionId
+        ? conversationRdcHost().snapshotOpenedCapture({ projectId, sessionId: resolvedSessionId })
+        : null;
     const activeOpenedCapture = openedCapture?.status === 'open' ? openedCapture : null;
-    const replayDevice = conversationRdcHost().replayDevice(input.replayDeviceId || 'local') ?? conversationRdcHost().replayDevice('local');
-    const plan = input.planReference ? resolvePlanReference({
-      request: input.planReference, sessionId: resolvedSessionId, agentId: input.agentId ?? input.profileId ?? null, message: input.message,
-    }) : null;
+    const replayDevice =
+      conversationRdcHost().replayDevice(input.replayDeviceId || 'local') ??
+      conversationRdcHost().replayDevice('local');
+    const plan = input.planReference
+      ? resolvePlanReference({
+          request: input.planReference,
+          sessionId: resolvedSessionId,
+          agentId: input.agentId ?? input.profileId ?? null,
+          message: input.message,
+        })
+      : null;
 
     return {
       projectId,
@@ -737,7 +775,6 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
   ): Promise<ConversationTurnResult> {
     return runStartProfileTurn({ ...start, requests: this, turns: this, output: conversationTurnOutput });
   }
-
 }
 
 export const conversationService = new ConversationService();

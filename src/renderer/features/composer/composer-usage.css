@@ -10,7 +10,10 @@
   border: 1px solid var(--token-border-default);
   background: color-mix(in srgb, var(--token-bg-shell) 82%, transparent);
   color: var(--token-text-secondary);
-  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .composer-usage-indicator:hover,
@@ -46,7 +49,9 @@
 .composer-usage-ring-progress {
   stroke: var(--composer-mode-accent);
   stroke-linecap: round;
-  transition: stroke-dashoffset var(--transition-fast), stroke var(--transition-fast);
+  transition:
+    stroke-dashoffset var(--transition-fast),
+    stroke var(--transition-fast);
 }
 
 .composer-usage-value {

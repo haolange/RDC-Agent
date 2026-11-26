@@ -48,14 +48,17 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
       onContextMenu={(event) => onContextMenu(event, session)}
     >
       <div className="session-item-header">
-        <button
-          type="button"
-          className="session-item-select"
-          onClick={() => void onActivate(project, session)}
-        >
+        <button type="button" className="session-item-select" onClick={() => void onActivate(project, session)}>
           {/* Rows carry no icon of their own; the gutter only marks a session with a reply in flight. */}
           <span className="session-item-gutter">
-            {running ? <span className="session-item-running" role="img" aria-label={t('sidebar.sessionRunning')} data-tooltip={t('sidebar.sessionRunning')} /> : null}
+            {running ? (
+              <span
+                className="session-item-running"
+                role="img"
+                aria-label={t('sidebar.sessionRunning')}
+                data-tooltip={t('sidebar.sessionRunning')}
+              />
+            ) : null}
           </span>
           <span className="session-item-title">{session.title}</span>
         </button>

@@ -40,7 +40,6 @@ export function hasComposerModelChoice(
   draftModel: SessionModelOverride | null | undefined,
 ): boolean {
   return Boolean(
-    (sessionOverride?.providerId && sessionOverride.modelId)
-    || (draftModel?.providerId && draftModel.modelId),
+    (sessionOverride?.providerId && sessionOverride.modelId) || (draftModel?.providerId && draftModel.modelId),
   );
 }

@@ -34,7 +34,9 @@ export function SettingsField({
     >
       <div className="settings-field-copy">
         {htmlFor ? (
-          <label className="settings-field-label" htmlFor={htmlFor}>{label}</label>
+          <label className="settings-field-label" htmlFor={htmlFor}>
+            {label}
+          </label>
         ) : (
           <div className="settings-field-label">{label}</div>
         )}

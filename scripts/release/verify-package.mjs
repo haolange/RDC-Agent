@@ -14,7 +14,7 @@ const builderRequire = createRequire(require.resolve('electron-builder'));
 const libraryRequire = createRequire(builderRequire.resolve('app-builder-lib'));
 const asar = libraryRequire('@electron/asar');
 const archive = path.join(unpacked, 'resources/app.asar');
-const files = asar.listPackage(archive).map(name => name.replaceAll('\\', '/').replace(/^\//, ''));
+const files = asar.listPackage(archive).map((name) => name.replaceAll('\\', '/').replace(/^\//, ''));
 const sourcePackage = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 const packaged = JSON.parse(asar.extractFile(archive, 'package.json').toString());
 assert.equal(packaged.version, sourcePackage.version, 'packaged version');
@@ -28,7 +28,7 @@ for (const entry of files) {
   assert(!/^(?:pnpm-lock\.yaml|pnpm-workspace\.yaml)$/.test(entry), `development config: ${entry}`);
   assert(!/^node_modules\/(?:pnpm|npm|yarn)(?:\/|$)/.test(entry), `package manager: ${entry}`);
 }
-const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 let resources = 0;
 function checkResources(directory, prefix) {
   for (const item of readdirSync(directory, { withFileTypes: true })) {
@@ -37,19 +37,39 @@ function checkResources(directory, prefix) {
     const relative = `${prefix}/${item.name}`;
     if (item.isDirectory()) checkResources(source, relative);
     else {
-      assert.equal(digest(asar.extractFile(archive, path.join(...relative.split('/')))), digest(readFileSync(source)), `resource differs: ${relative}`);
+      assert.equal(
+        digest(asar.extractFile(archive, path.join(...relative.split('/')))),
+        digest(readFileSync(source)),
+        `resource differs: ${relative}`,
+      );
       resources += 1;
       if (relative.startsWith('resources/agent-runtime/hooks/') && relative.endsWith('.mjs')) {
         const external = path.join(unpacked, 'resources/agent-runtime/hooks', item.name);
-        assert.equal(digest(readFileSync(external)), digest(readFileSync(source)), `executable hook differs: ${item.name}`);
+        assert.equal(
+          digest(readFileSync(external)),
+          digest(readFileSync(source)),
+          `executable hook differs: ${item.name}`,
+        );
       }
     }
   }
 }
 checkResources(path.join(root, 'resources/agent-runtime'), 'resources/agent-runtime');
 const brand = readFileSync(path.join(root, 'resources/brand/rdc-agent-logo.png'));
-assert.equal(digest(readFileSync(path.join(unpacked, 'resources/brand/rdc-agent-logo.png'))), digest(brand), 'native brand resource differs');
-const logoAssets = files.filter(file => file.startsWith('out/renderer/assets/rdc-agent-logo-') && file.endsWith('.png'));
+assert.equal(
+  digest(readFileSync(path.join(unpacked, 'resources/brand/rdc-agent-logo.png'))),
+  digest(brand),
+  'native brand resource differs',
+);
+const logoAssets = files.filter(
+  (file) => file.startsWith('out/renderer/assets/rdc-agent-logo-') && file.endsWith('.png'),
+);
 assert.equal(logoAssets.length, 1, 'exactly one renderer brand resource');
-assert.equal(digest(asar.extractFile(archive, path.join(...logoAssets[0].split('/')))), digest(brand), 'renderer brand resource differs');
-console.log(`[release:verify] PASS version=${packaged.version}, bundled resources=${resources}, no development entry or package manager`);
+assert.equal(
+  digest(asar.extractFile(archive, path.join(...logoAssets[0].split('/')))),
+  digest(brand),
+  'renderer brand resource differs',
+);
+console.log(
+  `[release:verify] PASS version=${packaged.version}, bundled resources=${resources}, no development entry or package manager`,
+);

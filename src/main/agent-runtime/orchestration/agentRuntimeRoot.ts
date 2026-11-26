@@ -4,7 +4,10 @@
  * turn runs through the same profile-turn runner whose tools include the subagent runner's.
  */
 
-import { enforceMissionTurnCompletion, enforceMissionTurnReadiness } from '../../investigation/missionCompletionContract';
+import {
+  enforceMissionTurnCompletion,
+  enforceMissionTurnReadiness,
+} from '../../investigation/missionCompletionContract';
 import { TokenizerService } from '../core/TokenizerService';
 import { scopedMemoryStores } from '../memory/MemoryStore';
 import { AgentOrchestrator } from './AgentOrchestrator';

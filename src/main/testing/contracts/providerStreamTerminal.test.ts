@@ -24,7 +24,13 @@ interface WireFamily {
   adapterId: string;
   api: string;
   contentType: string;
-  create: () => { stream: (model: Model, context: Context, options: StreamOptions) => AsyncIterable<unknown> & { result(): Promise<unknown> } };
+  create: () => {
+    stream: (
+      model: Model,
+      context: Context,
+      options: StreamOptions,
+    ) => AsyncIterable<unknown> & { result(): Promise<unknown> };
+  };
   complete: string[];
   truncated: string[];
   malformed: string[];
@@ -34,7 +40,10 @@ interface WireFamily {
 
 const chat = (delta: Record<string, unknown>, finishReason: string | null = null) =>
   sse({ choices: [{ index: 0, delta, finish_reason: finishReason }] });
-const anthropicStart = sse({ type: 'message_start', message: { id: 'msg_1', model: 'm', usage: { input_tokens: 1, output_tokens: 0 } } }, 'message_start');
+const anthropicStart = sse(
+  { type: 'message_start', message: { id: 'msg_1', model: 'm', usage: { input_tokens: 1, output_tokens: 0 } } },
+  'message_start',
+);
 const anthropicText = [
   sse({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }, 'content_block_start'),
   sse({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Hello' } }, 'content_block_delta'),
@@ -56,7 +65,12 @@ const FAMILIES: WireFamily[] = [
     create: () => new OpenAICompatibleProvider({ apiKey: 'fixture', baseUrl: BASE_URL }),
     complete: [chat({ content: 'Hello' }), chat({}, 'stop'), 'data: [DONE]\n\n'],
     truncated: [chat({ content: 'Hello wor' })],
-    malformed: [chat({ content: 'A' }), sse('{"choices":[{"delta":{"content":"B'), chat({ content: 'C' }), chat({}, 'stop')],
+    malformed: [
+      chat({ content: 'A' }),
+      sse('{"choices":[{"delta":{"content":"B'),
+      chat({ content: 'C' }),
+      chat({}, 'stop'),
+    ],
     mismatched: [chat({ content: 'A' }), chat({ tool_calls: { index: 0 } }), chat({}, 'stop')],
   },
   {
@@ -75,8 +89,14 @@ const FAMILIES: WireFamily[] = [
     ],
     truncated: [anthropicStart, ...anthropicText],
     malformed: [anthropicStart, ...anthropicText, sse('{garbled'), sse({ type: 'message_stop' }, 'message_stop')],
-    mismatched: [anthropicStart, sse({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', name: 'read' } }, 'content_block_start'),
-      sse({ type: 'message_stop' }, 'message_stop')],
+    mismatched: [
+      anthropicStart,
+      sse(
+        { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', name: 'read' } },
+        'content_block_start',
+      ),
+      sse({ type: 'message_stop' }, 'message_stop'),
+    ],
   },
   {
     name: 'ollama json lines',
@@ -110,7 +130,11 @@ const FAMILIES: WireFamily[] = [
     complete: [gemini('Hello'), gemini('', 'STOP')],
     truncated: [gemini('Hello wor')],
     malformed: [gemini('A'), sse('{"candidates":[{'), gemini('', 'STOP')],
-    mismatched: [gemini('A'), sse({ candidates: [{ content: { parts: [{ functionCall: { args: {} } }] } }] }), gemini('', 'STOP')],
+    mismatched: [
+      gemini('A'),
+      sse({ candidates: [{ content: { parts: [{ functionCall: { args: {} } }] } }] }),
+      gemini('', 'STOP'),
+    ],
   },
   {
     name: 'openai responses',
@@ -126,8 +150,16 @@ const FAMILIES: WireFamily[] = [
       sse({ type: 'response.completed', response: { id: 'resp_1', status: 'completed', output: [] } }),
     ],
     truncated: responsesText,
-    malformed: [...responsesText, sse('{not json'), sse({ type: 'response.completed', response: { id: 'resp_1', status: 'completed', output: [] } })],
-    mismatched: [...responsesText, sse(['response.completed']), sse({ type: 'response.completed', response: { id: 'resp_1', status: 'completed', output: [] } })],
+    malformed: [
+      ...responsesText,
+      sse('{not json'),
+      sse({ type: 'response.completed', response: { id: 'resp_1', status: 'completed', output: [] } }),
+    ],
+    mismatched: [
+      ...responsesText,
+      sse(['response.completed']),
+      sse({ type: 'response.completed', response: { id: 'resp_1', status: 'completed', output: [] } }),
+    ],
   },
 ];
 
@@ -153,12 +185,29 @@ function plan(family: WireFamily) {
 }
 
 async function run(family: WireFamily, frames: string[]): Promise<{ result?: unknown; error?: { code?: string } }> {
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(frames.join(''), {
-    status: 200,
-    headers: { 'Content-Type': family.contentType },
-  })));
-  const model = { id: 'm', name: 'm', provider: 'fixture', api: family.api, contextWindow: 128_000, maxTokens: 1024 } as Model;
-  const context = { systemPrompt: 'system', messages: [{ role: 'user', content: 'hi', timestamp: 1 }], tools: [] } as unknown as Context;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async () =>
+        new Response(frames.join(''), {
+          status: 200,
+          headers: { 'Content-Type': family.contentType },
+        }),
+    ),
+  );
+  const model = {
+    id: 'm',
+    name: 'm',
+    provider: 'fixture',
+    api: family.api,
+    contextWindow: 128_000,
+    maxTokens: 1024,
+  } as Model;
+  const context = {
+    systemPrompt: 'system',
+    messages: [{ role: 'user', content: 'hi', timestamp: 1 }],
+    tools: [],
+  } as unknown as Context;
   const stream = family.create().stream(model, context, {
     requestPlan: plan(family),
     firstChunkTimeoutMs: 2_000,

@@ -10,7 +10,11 @@ interface WorkbenchUtilitiesProps {
 }
 
 /** Title-bar utilities: the setup guide, the replay device and the terminal drawer. */
-export function WorkbenchUtilities({ isTerminalOpen, activityAlertSeverity, onToggleTerminal }: WorkbenchUtilitiesProps) {
+export function WorkbenchUtilities({
+  isTerminalOpen,
+  activityAlertSeverity,
+  onToggleTerminal,
+}: WorkbenchUtilitiesProps) {
   const { t } = useI18n();
   const label = isTerminalOpen ? t('terminal.close') : t('terminal.open');
   return (
@@ -27,7 +31,9 @@ export function WorkbenchUtilities({ isTerminalOpen, activityAlertSeverity, onTo
         data-tooltip={label}
       >
         <Icon name="terminal" />
-        {activityAlertSeverity && <span className={`terminal-status-badge ${activityAlertSeverity}`} aria-hidden="true" />}
+        {activityAlertSeverity && (
+          <span className={`terminal-status-badge ${activityAlertSeverity}`} aria-hidden="true" />
+        )}
       </button>
     </div>
   );

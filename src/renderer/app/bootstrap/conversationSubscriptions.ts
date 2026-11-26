@@ -15,8 +15,8 @@ export function subscribeToolExecutionComplete(electronAPI: ElectronAPI) {
     const conversation = useConversationStore.getState();
     const message = trace.turnId
       ? conversation.allConversationMessages.find(
-        (entry) => entry.turnId === trace.turnId && entry.role === 'assistant',
-      )
+          (entry) => entry.turnId === trace.turnId && entry.role === 'assistant',
+        )
       : undefined;
     const sessionId = message?.sessionId ?? null;
     if (sessionId && !isActiveSessionEvent(sessionId)) {
@@ -67,10 +67,7 @@ export function subscribeConversation(electronAPI: ElectronAPI) {
       conversation.upsertConversationMessage(event.message);
       if (terminal) {
         projection().projectConversationTerminal(sessionId, event.turnId, event.type === 'message_completed');
-        useSessionStore.getState().markConversationTurnTerminal(
-          event.turnId,
-          event.type === 'message_completed',
-        );
+        useSessionStore.getState().markConversationTurnTerminal(event.turnId, event.type === 'message_completed');
       }
     },
   });

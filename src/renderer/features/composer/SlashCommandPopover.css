@@ -20,7 +20,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .slash-command-popover { animation: none; }
+  .slash-command-popover {
+    animation: none;
+  }
 }
 
 /* Command groups and model-provider sections are caption-headed runs of rows, not boxed cards. */

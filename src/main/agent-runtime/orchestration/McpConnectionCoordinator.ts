@@ -93,19 +93,19 @@ export function classifyMcpFailure(err: unknown): McpFailureKind {
   const message = err instanceof Error ? err.message : String(err);
   const lower = message.toLowerCase();
   if (
-    message.includes('MCP_TRANSPORT_UNSUPPORTED')
-    || /needs trust/i.test(message)
-    || /trust denied|not trusted|requires a trusted project root/i.test(message)
-    || /invalid descriptor|missing command|missing url/i.test(message)
-    || /configuration error|misconfigured|blockedreason/i.test(lower)
-    || /executableoverriderejected/i.test(lower)
+    message.includes('MCP_TRANSPORT_UNSUPPORTED') ||
+    /needs trust/i.test(message) ||
+    /trust denied|not trusted|requires a trusted project root/i.test(message) ||
+    /invalid descriptor|missing command|missing url/i.test(message) ||
+    /configuration error|misconfigured|blockedreason/i.test(lower) ||
+    /executableoverriderejected/i.test(lower)
   ) {
     return 'permanent';
   }
   if (
-    /econnrefused|etimedout|enotfound|econnreset|eai_again|ehostunreach|enetunreach/i.test(message)
-    || /timeout|timed out|spawn|network|temporarily unavailable|eperm|eacces|pipe|broken pipe/i.test(lower)
-    || /unconfirmed orphan|failed to spawn/i.test(lower)
+    /econnrefused|etimedout|enotfound|econnreset|eai_again|ehostunreach|enetunreach/i.test(message) ||
+    /timeout|timed out|spawn|network|temporarily unavailable|eperm|eacces|pipe|broken pipe/i.test(lower) ||
+    /unconfirmed orphan|failed to spawn/i.test(lower)
   ) {
     return 'retryable';
   }
@@ -115,7 +115,7 @@ export function classifyMcpFailure(err: unknown): McpFailureKind {
 
 function computeNextRetryAt(attempts: number): number {
   const exp = Math.max(0, attempts - 1);
-  const delay = Math.min(MCP_RETRY_CAP_MS, MCP_RETRY_BASE_MS * (2 ** exp));
+  const delay = Math.min(MCP_RETRY_CAP_MS, MCP_RETRY_BASE_MS * 2 ** exp);
   return Date.now() + delay;
 }
 
@@ -129,11 +129,14 @@ export class McpConnectionCoordinator {
   private readonly orphanedPools = new Map<string, OrphanedPoolRecord>();
 
   getAgentTools(projectRootPath?: string | null, poolKey?: string | null): AgentTool[] {
-    const pool = poolKey
-      ? this.pools.get(poolKey)
-      : this.resolveActivePool(projectRootPath);
+    const pool = poolKey ? this.pools.get(poolKey) : this.resolveActivePool(projectRootPath);
     if (!pool || pool.closing || pool.quarantined) return [];
-    if (poolKey && projectRootPath && pool.projectRootPath && this.projectKey(pool.projectRootPath) !== this.projectKey(projectRootPath)) {
+    if (
+      poolKey &&
+      projectRootPath &&
+      pool.projectRootPath &&
+      this.projectKey(pool.projectRootPath) !== this.projectKey(projectRootPath)
+    ) {
       return [];
     }
     return pool.manager.getAgentTools();
@@ -146,12 +149,14 @@ export class McpConnectionCoordinator {
   /** Settings / IPC status is scoped to the requested project and never merges pools. */
   getMcpServerStatusSummary(projectRootPath?: string | null, query?: string): MCPServerStatusSummary[] {
     const normalizedQuery = query?.trim().toLowerCase() ?? '';
-    const configured = agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
-      .filter((server) => !normalizedQuery
-        || (server.id + ' ' + server.name + ' ' + server.description).toLowerCase().includes(normalizedQuery));
-    const runtimeById = new Map(
-      this.getRuntimeStatusSummary(projectRootPath).map((entry) => [entry.id, entry]),
-    );
+    const configured = agentRuntimeConfigService
+      .listMcpServers(projectRootPath ?? undefined)
+      .filter(
+        (server) =>
+          !normalizedQuery ||
+          (server.id + ' ' + server.name + ' ' + server.description).toLowerCase().includes(normalizedQuery),
+      );
+    const runtimeById = new Map(this.getRuntimeStatusSummary(projectRootPath).map((entry) => [entry.id, entry]));
     return configured.map((server) => {
       const runtime = runtimeById.get(server.id) ?? runtimeById.get(server.name);
       const summary: MCPServerStatusSummary = {
@@ -169,10 +174,12 @@ export class McpConnectionCoordinator {
   async disconnectAll(): Promise<void> {
     const pools = Array.from(this.pools.values());
     for (const pool of pools) pool.closing = true;
-    const statuses = await Promise.all(pools.map(async (pool) => {
-      await Promise.allSettled(pool.connecting.values());
-      return pool.manager.disconnectAll();
-    }));
+    const statuses = await Promise.all(
+      pools.map(async (pool) => {
+        await Promise.allSettled(pool.connecting.values());
+        return pool.manager.disconnectAll();
+      }),
+    );
     this.reportOrphanedDisconnects(
       statuses.flat().map((detail) => detail.status),
       'MCP shutdown left an orphaned process',
@@ -233,10 +240,10 @@ export class McpConnectionCoordinator {
             const activePool = activeKey ? this.pools.get(activeKey) : undefined;
             return activePool ? [activePool] : [];
           })()
-        : Array.from(this.pools.values()).filter((pool) => (
-          pool.projectRootPath === null
-          && (normalizedProjectId === null || pool.projectId === normalizedProjectId)
-        ));
+        : Array.from(this.pools.values()).filter(
+            (pool) =>
+              pool.projectRootPath === null && (normalizedProjectId === null || pool.projectId === normalizedProjectId),
+          );
       for (const pool of pools) {
         if (pool.activeTurnRefs === 0) await this.evictPool(pool);
         else pool.superseded = true;
@@ -282,10 +289,10 @@ export class McpConnectionCoordinator {
       this.activePoolByProject.set(activeMapKey, poolKey);
       for (const candidate of this.pools.values()) {
         if (
-          candidate.key !== poolKey
-          && candidate.projectRootPath
-          && this.projectKey(candidate.projectRootPath) === this.projectKey(root)
-          && (candidate.projectId ?? null) === normalizedProjectId
+          candidate.key !== poolKey &&
+          candidate.projectRootPath &&
+          this.projectKey(candidate.projectRootPath) === this.projectKey(root) &&
+          (candidate.projectId ?? null) === normalizedProjectId
         ) {
           candidate.superseded = true;
         }
@@ -306,12 +313,12 @@ export class McpConnectionCoordinator {
         }
         if (now < previous.nextRetryAt) {
           errors.push(
-            descriptor.id
-              + ': retry deferred until '
-              + new Date(previous.nextRetryAt).toISOString()
-              + ' ('
-              + previous.lastError
-              + ')',
+            descriptor.id +
+              ': retry deferred until ' +
+              new Date(previous.nextRetryAt).toISOString() +
+              ' (' +
+              previous.lastError +
+              ')',
           );
           continue;
         }
@@ -322,9 +329,9 @@ export class McpConnectionCoordinator {
       } catch (error) {
         // Cancellation must not poison the failure/backoff cache.
         if (
-          signal?.aborted
-          || (error instanceof Error && error.name === 'AbortError')
-          || (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError')
+          signal?.aborted ||
+          (error instanceof Error && error.name === 'AbortError') ||
+          (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError')
         ) {
           throw error instanceof Error ? error : new DOMException('The operation was aborted', 'AbortError');
         }
@@ -600,14 +607,16 @@ export class McpConnectionCoordinator {
 
   private hashMcpDescriptor(descriptor: AgentRuntimeMcpDescriptor): string {
     return createHash('sha256')
-      .update(JSON.stringify({
-        id: descriptor.id,
-        transport: descriptor.transport,
-        command: descriptor.command ?? null,
-        args: descriptor.args ?? [],
-        url: descriptor.url ?? null,
-        env: descriptor.env ?? {},
-      }))
+      .update(
+        JSON.stringify({
+          id: descriptor.id,
+          transport: descriptor.transport,
+          command: descriptor.command ?? null,
+          args: descriptor.args ?? [],
+          url: descriptor.url ?? null,
+          env: descriptor.env ?? {},
+        }),
+      )
       .digest('hex')
       .slice(0, 16);
   }
@@ -622,7 +631,8 @@ export class McpConnectionCoordinator {
     // back to user settings would reintroduce prompt/runtime split-brain.
     const ids = enabledMcpIds ?? [];
     const enabledIds = new Set(ids);
-    return agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
+    return agentRuntimeConfigService
+      .listMcpServers(projectRootPath ?? undefined)
       .filter((server) => enabledIds.has(server.id) || enabledIds.has(server.name));
   }
 

@@ -37,7 +37,8 @@ export class ScopedInstructionResolver {
 
     for (const activePath of input.activePaths) {
       const resolved = path.resolve(activePath);
-      const lexicalTarget = fs.existsSync(resolved) && fs.statSync(resolved).isFile() ? path.dirname(resolved) : resolved;
+      const lexicalTarget =
+        fs.existsSync(resolved) && fs.statSync(resolved).isFile() ? path.dirname(resolved) : resolved;
       const realTarget = realPathIfPresent(lexicalTarget);
       if (!isWithinRoot(realTarget, realProjectRoot)) {
         diagnostics.push({
@@ -79,7 +80,10 @@ export class ScopedInstructionResolver {
         });
         return;
       }
-      const content = fs.readFileSync(candidate.sourcePath, 'utf8').replace(/^\uFEFF/u, '').trim();
+      const content = fs
+        .readFileSync(candidate.sourcePath, 'utf8')
+        .replace(/^\uFEFF/u, '')
+        .trim();
       if (!content) return;
       const byteLength = Buffer.byteLength(content, 'utf8');
       if (totalBytes + byteLength > budget) {

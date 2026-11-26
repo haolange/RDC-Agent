@@ -22,7 +22,9 @@ export class StorageSchemaError extends AppError {
  * `params.storageCode: 'STORAGE_SCHEMA_UNSUPPORTED'`, which callers keep visible instead of quarantining.
  */
 export function schemaValidationError(filePath: string, issues: readonly ZodIssue[]): StorageSchemaError {
-  const unsupported = issues.some((issue) => issue.code === 'custom' && issue.params?.storageCode === 'STORAGE_SCHEMA_UNSUPPORTED');
+  const unsupported = issues.some(
+    (issue) => issue.code === 'custom' && issue.params?.storageCode === 'STORAGE_SCHEMA_UNSUPPORTED',
+  );
   return new StorageSchemaError(
     unsupported ? 'STORAGE_SCHEMA_UNSUPPORTED' : 'STORAGE_SCHEMA',
     `${filePath} failed runtime validation: ${issues.map((issue) => issue.message).join('; ')}`,
@@ -37,8 +39,12 @@ export function readCurrentStoredJson<T>(
 ): T | null {
   const raw = io.readJson<unknown>(filePath);
   if (raw === null) return null;
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)
-    || (raw as { schemaVersion?: unknown }).schemaVersion !== schemaVersion) {
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    Array.isArray(raw) ||
+    (raw as { schemaVersion?: unknown }).schemaVersion !== schemaVersion
+  ) {
     throw new StorageSchemaError('STORAGE_SCHEMA_UNSUPPORTED', `${filePath} requires schemaVersion ${schemaVersion}`);
   }
   const parsed = schema.safeParse(raw);
@@ -66,27 +72,20 @@ function readSchemaVersion(raw: unknown): string | null {
 
 export const CURRENT_STORE_SCHEMA_VERSION = '1';
 
-export function assertNoUnsupportedSchemaVersion(
-  raw: unknown,
-  currentVersion: string,
-  filePath: string,
-): void {
+export function assertNoUnsupportedSchemaVersion(raw: unknown, currentVersion: string, filePath: string): void {
   const version = readSchemaVersion(raw);
   if (version === null) return;
   const numeric = Number(version);
   const currentNumeric = Number(currentVersion);
   if (Number.isFinite(numeric) && Number.isFinite(currentNumeric) && numeric > currentNumeric) {
     throw new StorageSchemaError(
-      'STORAGE_SCHEMA_UNSUPPORTED', `${filePath} has schemaVersion ${version}; supported up to ${currentVersion}`,
+      'STORAGE_SCHEMA_UNSUPPORTED',
+      `${filePath} has schemaVersion ${version}; supported up to ${currentVersion}`,
     );
   }
 }
 
-export function parseStoredDocument<T>(
-  raw: unknown,
-  migrations: readonly StorageMigration<T>[],
-  filePath: string,
-): T {
+export function parseStoredDocument<T>(raw: unknown, migrations: readonly StorageMigration<T>[], filePath: string): T {
   if (migrations.length === 0) {
     throw new StorageSchemaError('STORAGE_SCHEMA', `no migrations registered for ${filePath}`);
   }
@@ -107,11 +106,13 @@ export function parseStoredDocument<T>(
     const currentNumeric = Number(current.schemaVersion);
     if (Number.isFinite(numeric) && Number.isFinite(currentNumeric) && numeric > currentNumeric) {
       throw new StorageSchemaError(
-        'STORAGE_SCHEMA_UNSUPPORTED', `${filePath} has schemaVersion ${version}; supported up to ${current.schemaVersion}`,
+        'STORAGE_SCHEMA_UNSUPPORTED',
+        `${filePath} has schemaVersion ${version}; supported up to ${current.schemaVersion}`,
       );
     }
     throw new StorageSchemaError(
-      'STORAGE_SCHEMA', `unknown schemaVersion ${version} in ${filePath} (known: ${knownVersions.join(', ')})`,
+      'STORAGE_SCHEMA',
+      `unknown schemaVersion ${version} in ${filePath} (known: ${knownVersions.join(', ')})`,
     );
   }
 

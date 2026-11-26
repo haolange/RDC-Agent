@@ -96,9 +96,16 @@ describe('executionOfferRequiredSkillIds', () => {
     const oldId = '11111111-1111-4111-8111-111111111111';
     const newId = '22222222-2222-4222-8222-222222222222';
     mocks.offerRead.mockReturnValue({ ...offer, offerId: oldId });
-    mocks.journalRead.mockReturnValue([{ status: 'complete', approvedExecutionCompletion: {
-      offerId: oldId, planUri: offer.plan.uri, planHash: offer.plan.hash,
-    } }]);
+    mocks.journalRead.mockReturnValue([
+      {
+        status: 'complete',
+        approvedExecutionCompletion: {
+          offerId: oldId,
+          planUri: offer.plan.uri,
+          planHash: offer.plan.hash,
+        },
+      },
+    ]);
     expect(approvedExecutionOfferForAgent('sess', 'general')).toBeNull();
     mocks.offerRead.mockReturnValue({ ...offer, offerId: newId });
     expect(approvedExecutionOfferForAgent('sess', 'general')?.offerId).toBe(newId);

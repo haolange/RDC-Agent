@@ -28,5 +28,10 @@ export function useSettingsAutosave(draft: unknown, pending: boolean, save: () =
     timer.current = window.setTimeout(() => void run(), IDLE_MS);
     return () => window.clearTimeout(timer.current);
   }, [draft, pending, run]);
-  return { status, flush: () => { if (pending) void run(); } };
+  return {
+    status,
+    flush: () => {
+      if (pending) void run();
+    },
+  };
 }

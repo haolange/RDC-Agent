@@ -1,13 +1,7 @@
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 
 /** Max is the sole top-tier visual pipeline. */
-export type MaxVisualPhase =
-  | 'idle'
-  | 'ingress-drag'
-  | 'ingress-committed'
-  | 'ingress-reopen'
-  | 'active'
-  | 'egress';
+export type MaxVisualPhase = 'idle' | 'ingress-drag' | 'ingress-committed' | 'ingress-reopen' | 'active' | 'egress';
 
 export type MaxFieldMode = 'propagate' | 'dissolve';
 
@@ -115,11 +109,12 @@ export function createMaxTimeline(input: {
   const fieldMode = input.fieldMode ?? (input.phase === 'egress' ? 'dissolve' : 'propagate');
   const formationEnergy = clampMaxProgress(input.formationEnergy ?? fromEnergy);
   const remainingIngressMs = (1 - fromEnergy) * MAX_VISUAL_INGRESS_MS;
-  const durationMs = input.phase === 'egress'
-    ? MAX_VISUAL_EGRESS_MS
-    : input.phase === 'ingress-committed'
-      ? Math.max(MAX_VISUAL_EGRESS_MS, remainingIngressMs)
-      : remainingIngressMs;
+  const durationMs =
+    input.phase === 'egress'
+      ? MAX_VISUAL_EGRESS_MS
+      : input.phase === 'ingress-committed'
+        ? Math.max(MAX_VISUAL_EGRESS_MS, remainingIngressMs)
+        : remainingIngressMs;
   return {
     phase: input.phase,
     revision: input.revision,
@@ -144,11 +139,7 @@ export function createReopenMaxTimeline(revision: number, now: number): MaxVisua
   });
 }
 
-export function createActiveMaxTimeline(
-  revision: number,
-  now: number,
-  fieldEpoch = now,
-): MaxVisualTimeline {
+export function createActiveMaxTimeline(revision: number, now: number, fieldEpoch = now): MaxVisualTimeline {
   return {
     phase: 'active',
     revision,
@@ -162,10 +153,7 @@ export function createActiveMaxTimeline(
   };
 }
 
-export function resolveMaxVisualFrame(
-  timeline: MaxVisualTimeline,
-  now: number,
-): MaxVisualFrame {
+export function resolveMaxVisualFrame(timeline: MaxVisualTimeline, now: number): MaxVisualFrame {
   if (timeline.phase === 'idle') {
     return {
       phase: timeline.phase,
@@ -209,9 +197,7 @@ export function resolveMaxVisualFrame(
     phase: timeline.phase,
     progress,
     energy,
-    stopsOpacity: dragPreview
-      ? timeline.fromStopsOpacity
-      : timeline.fromStopsOpacity * (1 - stopsProgress),
+    stopsOpacity: dragPreview ? timeline.fromStopsOpacity : timeline.fromStopsOpacity * (1 - stopsProgress),
     running: dragPreview || progress < 1,
     complete: !dragPreview && progress >= 1,
   };
@@ -235,18 +221,12 @@ function coherentFieldNoise(col: number, row: number, salt: number): number {
   const y0 = Math.floor(y);
   const tx = smoothUnit(x - x0);
   const ty = smoothUnit(y - y0);
-  const top = maxFieldNoise(x0, y0, salt) * (1 - tx)
-    + maxFieldNoise(x0 + 1, y0, salt) * tx;
-  const bottom = maxFieldNoise(x0, y0 + 1, salt) * (1 - tx)
-    + maxFieldNoise(x0 + 1, y0 + 1, salt) * tx;
+  const top = maxFieldNoise(x0, y0, salt) * (1 - tx) + maxFieldNoise(x0 + 1, y0, salt) * tx;
+  const bottom = maxFieldNoise(x0, y0 + 1, salt) * (1 - tx) + maxFieldNoise(x0 + 1, y0 + 1, salt) * tx;
   return top * (1 - ty) + bottom * ty;
 }
 
-export function resolveMaxTravelingAmplitude(
-  position: number,
-  fieldTimeMs: number,
-  phaseOffset = 0,
-): number {
+export function resolveMaxTravelingAmplitude(position: number, fieldTimeMs: number, phaseOffset = 0): number {
   const temporalPhase = (Math.max(0, fieldTimeMs) / MAX_TRAVEL_CYCLE_MS) * Math.PI * 2;
   const spatialPhase = clampMaxProgress(position) * MAX_TRAVEL_SPATIAL_CYCLES * Math.PI * 2;
   // Positive time plus positive x means an equal phase point moves toward smaller x.
@@ -271,9 +251,7 @@ export function resolveMaxFieldCell(input: {
   // Egress freezes the field's formed spatial range. Only the live thumb clip and
   // distributed cell decay may remove pixels; the birth front must not run backward.
   const formationEmitterRatio = fieldMode === 'dissolve' ? 1 : emitterRatio;
-  const normalizedPosition = formationEmitterRatio > 0
-    ? clampMaxProgress(position / formationEmitterRatio)
-    : 0;
+  const normalizedPosition = formationEmitterRatio > 0 ? clampMaxProgress(position / formationEmitterRatio) : 0;
   const distanceFromSource = 1 - normalizedPosition;
   // Full lattice: no static occupancy holes. Brightness comes only from
   // breath / shimmer / traveling amplitude — dead-black pores read as stuck dots.
@@ -307,35 +285,32 @@ export function resolveMaxFieldCell(input: {
   const rowWeight = 0.8 + (1 - Math.abs(input.row - rowMid) / (rowMid + 0.5)) * 0.2;
   const breath = Math.sin((input.fieldTimeMs / 1_800) * Math.PI * 2 + coherentNoise * 0.7) * 0.025;
   const localPeriodMs = 1_000 + coherentNoise * 450;
-  const shimmer = Math.sin(
-    (input.fieldTimeMs / localPeriodMs) * Math.PI * 2
-      + coherentNoise * Math.PI * 2
-      + normalizedPosition * 0.8,
-  ) * 0.035;
-  const traveling = resolveMaxTravelingAmplitude(
-    normalizedPosition,
-    input.fieldTimeMs,
-    coherentNoise * Math.PI * 1.6 + input.row * 0.34,
-  ) * (0.035 + coherentNoise * 0.035);
+  const shimmer =
+    Math.sin(
+      (input.fieldTimeMs / localPeriodMs) * Math.PI * 2 + coherentNoise * Math.PI * 2 + normalizedPosition * 0.8,
+    ) * 0.035;
+  const traveling =
+    resolveMaxTravelingAmplitude(
+      normalizedPosition,
+      input.fieldTimeMs,
+      coherentNoise * Math.PI * 1.6 + input.row * 0.34,
+    ) *
+    (0.035 + coherentNoise * 0.035);
 
   // Right keeps a smoother ramp; left leans on per-cell noise so alpha is non-uniform.
   const leftBias = distanceFromSource;
-  const cellMottle = (detailNoise - 0.5) * (0.025 + leftBias * 0.22)
-    + (coherentNoise - 0.5) * (0.012 + leftBias * 0.14)
-    + (maxFieldNoise(input.col, input.row, 3) - 0.5) * leftBias * 0.1;
+  const cellMottle =
+    (detailNoise - 0.5) * (0.025 + leftBias * 0.22) +
+    (coherentNoise - 0.5) * (0.012 + leftBias * 0.14) +
+    (maxFieldNoise(input.col, input.row, 3) - 0.5) * leftBias * 0.1;
   const alphaGradient = normalizedPosition ** 1.6;
   const base = 0.07 + alphaGradient * 0.38 + cellMottle;
   // Temporal motion stays stronger on the right; left relies more on static cell mottle.
   const temporalScale = 0.22 + alphaGradient * 0.78;
   const alphaFloor = 0.045 + alphaGradient * 0.055;
-  const fieldAlpha = Math.max(
-    alphaFloor,
-    rowWeight * (base + (breath + shimmer + traveling) * temporalScale),
-  );
+  const fieldAlpha = Math.max(alphaFloor, rowWeight * (base + (breath + shimmer + traveling) * temporalScale));
   const alpha = clampMaxProgress(cellEnvelope * fieldAlpha);
-  const tone = clampMaxProgress(
-    normalizedPosition * 0.5 + detailNoise * 0.24 + Math.max(0, traveling) * 1.4 + 0.08,
-  );
+  const tone = clampMaxProgress(normalizedPosition * 0.5 + detailNoise * 0.24 + Math.max(0, traveling) * 1.4 + 0.08);
   return {
     occupied,
     visible: alpha > 0.018,

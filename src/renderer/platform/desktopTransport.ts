@@ -16,7 +16,8 @@ export function createDesktopTransport(ipc: DesktopIpc): RendererApiTransport {
   };
 
   return {
-    invoke: <TResult>(channel: Parameters<DesktopIpc['invoke']>[0], ...args: unknown[]) => ipc.invoke(channel, ...args) as Promise<TResult>,
+    invoke: <TResult>(channel: Parameters<DesktopIpc['invoke']>[0], ...args: unknown[]) =>
+      ipc.invoke(channel, ...args) as Promise<TResult>,
     subscribe: (channel, callback) => ipc.subscribe(channel, callback),
     addListener: (channel, callback) => {
       removeListener(channel, callback);

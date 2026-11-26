@@ -26,12 +26,28 @@ export function freezeRdcTurnBinding(
     cli,
     definitions,
     definitionsFingerprint: operationFingerprint(definitions),
-    identity: identity ? { contextId: identity.contextId, version: identity.version, ownerSessionId: identity.ownerSessionId, runtimeContext: identity.runtimeContext ? { captureFileId: identity.runtimeContext.captureFileId, replaySessionId: identity.runtimeContext.replaySessionId } : undefined } : null,
+    identity: identity
+      ? {
+          contextId: identity.contextId,
+          version: identity.version,
+          ownerSessionId: identity.ownerSessionId,
+          runtimeContext: identity.runtimeContext
+            ? {
+                captureFileId: identity.runtimeContext.captureFileId,
+                replaySessionId: identity.runtimeContext.replaySessionId,
+              }
+            : undefined,
+        }
+      : null,
   });
   return deepFreeze(copy);
 }
 export function rdcBindingFingerprint(binding: RdcTurnBinding): string {
   return createHash('sha256').update(JSON.stringify(binding)).digest('hex');
 }
-export function bindRdcTurn(plan: object, binding: RdcTurnBinding): void { bindings.set(plan, binding); }
-export function getRdcTurnBinding(plan: object): RdcTurnBinding | undefined { return bindings.get(plan); }
+export function bindRdcTurn(plan: object, binding: RdcTurnBinding): void {
+  bindings.set(plan, binding);
+}
+export function getRdcTurnBinding(plan: object): RdcTurnBinding | undefined {
+  return bindings.get(plan);
+}

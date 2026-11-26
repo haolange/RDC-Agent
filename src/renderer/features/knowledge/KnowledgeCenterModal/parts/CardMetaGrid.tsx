@@ -30,7 +30,7 @@ export function CardMetaGrid({ card, spaceLabel, resolveRelation, onOpenRelation
           </div>
           <div>
             <dt>{t('knowledgeCenter.metaTopics')}</dt>
-            <dd>{card.topics?.map(topic => topic.label).join(', ') || '—'}</dd>
+            <dd>{card.topics?.map((topic) => topic.label).join(', ') || '—'}</dd>
           </div>
           <div>
             <dt>{t('knowledgeCenter.metaLifecycle')}</dt>
@@ -48,13 +48,17 @@ export function CardMetaGrid({ card, spaceLabel, resolveRelation, onOpenRelation
         <div className="knowledge-center-meta-side">
           <section className="knowledge-center-meta-section">
             <h4>{t('knowledgeCenter.metaScope')}</h4>
-            {axes.length === 0 ? <p className="knowledge-center-meta-empty">—</p> : (
+            {axes.length === 0 ? (
+              <p className="knowledge-center-meta-empty">—</p>
+            ) : (
               <dl className="knowledge-center-meta knowledge-center-meta--compact">
                 {axes.map((axis) => (
                   <div key={axis}>
                     <dt>{t(SCOPE_LABEL_KEYS[axis])}</dt>
                     <dd>
-                      {card.scope[axis]?.trim().toLowerCase() === 'unknown' ? t('knowledgeCenter.valueUnknown') : card.scope[axis] ?? '—'}
+                      {card.scope[axis]?.trim().toLowerCase() === 'unknown'
+                        ? t('knowledgeCenter.valueUnknown')
+                        : (card.scope[axis] ?? '—')}
                       {exclusions[axis]?.length ? (
                         <span className="knowledge-center-scope-chip">
                           {t('knowledgeCenter.metaExclusions')}: {exclusions[axis].join(', ')}
@@ -68,19 +72,29 @@ export function CardMetaGrid({ card, spaceLabel, resolveRelation, onOpenRelation
           </section>
           <section className="knowledge-center-meta-section">
             <h4>{t('knowledgeCenter.metaRelations')}</h4>
-            {card.relations.length === 0 ? <p className="knowledge-center-meta-empty">—</p> : (
+            {card.relations.length === 0 ? (
+              <p className="knowledge-center-meta-empty">—</p>
+            ) : (
               <ul className="knowledge-center-relation-list">
                 {card.relations.map((relation) => {
                   const hit = resolveRelation(relation.targetCardId);
-                  return <li key={`${relation.kind}:${relation.targetCardId}`}>
-                    <span className="knowledge-center-relation-kind">{t(RELATION_LABEL_KEYS[relation.kind])}</span>
-                    {hit ? (
-                      <Button variant="ghost" size="sm" className="knowledge-center-relation-target"
-                        onClick={() => onOpenRelation(hit)}>
-                        {hit.title}
-                      </Button>
-                    ) : <span>{t('knowledgeCenter.relationUnavailable')}</span>}
-                  </li>;
+                  return (
+                    <li key={`${relation.kind}:${relation.targetCardId}`}>
+                      <span className="knowledge-center-relation-kind">{t(RELATION_LABEL_KEYS[relation.kind])}</span>
+                      {hit ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="knowledge-center-relation-target"
+                          onClick={() => onOpenRelation(hit)}
+                        >
+                          {hit.title}
+                        </Button>
+                      ) : (
+                        <span>{t('knowledgeCenter.relationUnavailable')}</span>
+                      )}
+                    </li>
+                  );
                 })}
               </ul>
             )}

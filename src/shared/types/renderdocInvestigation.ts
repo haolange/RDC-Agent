@@ -94,13 +94,7 @@ export const INVESTIGATION_ARTIFACT_KINDS = [
 ] as const;
 export type InvestigationArtifactKind = (typeof INVESTIGATION_ARTIFACT_KINDS)[number];
 
-export const INVESTIGATION_ARTIFACT_STATUSES = [
-  'draft',
-  'ready',
-  'stale',
-  'failed',
-  'superseded',
-] as const;
+export const INVESTIGATION_ARTIFACT_STATUSES = ['draft', 'ready', 'stale', 'failed', 'superseded'] as const;
 export type InvestigationArtifactStatus = (typeof INVESTIGATION_ARTIFACT_STATUSES)[number];
 
 export const INVESTIGATION_RECORD_TYPES = [
@@ -316,7 +310,10 @@ interface ExperimentRollback {
 
 export interface ExperimentRecord {
   /** Main-signed native execution receipts; absent on historical records. */
-  executionEvidence?: Record<"baseline" | "intervention" | "variant" | "rollback" | "restored", InvestigationContentRef>;
+  executionEvidence?: Record<
+    'baseline' | 'intervention' | 'variant' | 'rollback' | 'restored',
+    InvestigationContentRef
+  >;
   experimentId: string;
   hypothesisClaimId: string;
   intervention: ExperimentIntervention;
@@ -420,7 +417,10 @@ export type InvestigationRecord =
   | InvestigationReport;
 
 export function bareInvestigationHash(value: string): string {
-  return value.trim().toLowerCase().replace(/^sha256:/, '');
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^sha256:/, '');
 }
 
 type InvestigationReadIpcStatus = 'ready' | 'degraded' | 'error' | 'hash-mismatch';

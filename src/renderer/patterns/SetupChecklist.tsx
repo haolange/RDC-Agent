@@ -22,7 +22,12 @@ export const SetupChecklist: React.FC<{ steps: WorkbenchSetupStep[] }> = ({ step
         <p className="setup-checklist-done" data-testid="setup-checklist-done">
           <Icon name="check" size={14} />
           {done.map((step) => (
-            <span key={step.id} className="setup-checklist-done-item" data-state="done" data-testid={`setup-step-${step.id}`}>
+            <span
+              key={step.id}
+              className="setup-checklist-done-item"
+              data-state="done"
+              data-testid={`setup-step-${step.id}`}
+            >
               {t(`setup.${step.id}.doneTitle`)}
             </span>
           ))}
@@ -34,10 +39,14 @@ export const SetupChecklist: React.FC<{ steps: WorkbenchSetupStep[] }> = ({ step
           const state = step.id === activeId ? 'active' : 'pending';
           return (
             <li key={step.id} className="setup-checklist-step" data-state={state} data-testid={`setup-step-${step.id}`}>
-              <span className="setup-checklist-index" aria-hidden="true">{index + 1}</span>
+              <span className="setup-checklist-index" aria-hidden="true">
+                {index + 1}
+              </span>
               <div className="setup-checklist-copy">
                 <span className="setup-checklist-step-title">{t(`setup.${step.id}.title`)}</span>
-                {state === 'active' ? <span className="setup-checklist-step-body">{t(`setup.${step.id}.body`)}</span> : null}
+                {state === 'active' ? (
+                  <span className="setup-checklist-step-body">{t(`setup.${step.id}.body`)}</span>
+                ) : null}
                 <Button variant={state === 'active' ? 'primary' : 'secondary'} size="sm" onClick={step.act}>
                   {t(`setup.${step.id}.action`)}
                 </Button>

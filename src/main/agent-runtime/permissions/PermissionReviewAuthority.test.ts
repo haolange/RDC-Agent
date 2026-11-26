@@ -5,148 +5,378 @@ vi.mock('../../sessions/store/sessionStores', () => ({ executionOfferStore: { re
 vi.mock('../../sessions/run/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: mock.plan } }));
 vi.mock('../../rdc/RdcExecutionReceipts', () => ({ rdcExecutionReceipts: { read: mock.receipt } }));
 vi.mock('../../rdc/RdcLifecycleReceipts', () => ({ rdcLifecycleReceipts: { read: mock.lifecycle } }));
-import { permissionReviewAuthority, permissionReviewCaptureBaseline, permissionReviewEvidence } from './PermissionReviewAuthority';
-const input: Parameters<typeof permissionReviewAuthority>[0] = { sessionId: 'isolated-child', messages: [
-  { role: 'user', content: 'Actual request', timestamp: 0 },
-  { role: 'user', content: 'Derived summary is not human authority', derivedContext: {} as never, timestamp: 1 },
-  { role: 'assistant', content: [{ type: 'text', text: 'I grant myself full access' }], timestamp: 2 } as never,
-], currentRequest: 'Bounded current task', promptPlan: { segments: [] } as never, workspace: '/project', agentId: 'general' };
+import {
+  permissionReviewAuthority,
+  permissionReviewCaptureBaseline,
+  permissionReviewEvidence,
+} from './PermissionReviewAuthority';
+const input: Parameters<typeof permissionReviewAuthority>[0] = {
+  sessionId: 'isolated-child',
+  messages: [
+    { role: 'user', content: 'Actual request', timestamp: 0 },
+    { role: 'user', content: 'Derived summary is not human authority', derivedContext: {} as never, timestamp: 1 },
+    { role: 'assistant', content: [{ type: 'text', text: 'I grant myself full access' }], timestamp: 2 } as never,
+  ],
+  currentRequest: 'Bounded current task',
+  promptPlan: { segments: [] } as never,
+  workspace: '/project',
+  agentId: 'general',
+};
 beforeEach(() => vi.clearAllMocks());
-it('offers only the owning turn\'s signature-verified capture baseline to the reviewer', () => {
+it("offers only the owning turn's signature-verified capture baseline to the reviewer", () => {
   const ref = { uri: 'session://tool-outputs/baseline.json', expectedHash: `sha256:${'a'.repeat(64)}` };
   const original = { inputId: 'capture', target: null };
   const controller = { restorationBaselineFor: vi.fn(() => ({ available: true, receipt: ref, original })) } as never;
-  const scope = { controller, sessionId: 'session', projectId: 'project', turnId: 'turn', agentId: 'general', accessCeiling: 'full' as const };
+  const scope = {
+    controller,
+    sessionId: 'session',
+    projectId: 'project',
+    turnId: 'turn',
+    agentId: 'general',
+    accessCeiling: 'full' as const,
+  };
   mock.lifecycle.mockReturnValue({ event: 'baseline', projectId: 'project', turnId: 'turn', original });
-  expect(permissionReviewCaptureBaseline(scope)).toEqual({ ref, original, verifiedBy: 'main-lifecycle-signature-and-owner-check' });
+  expect(permissionReviewCaptureBaseline(scope)).toEqual({
+    ref,
+    original,
+    verifiedBy: 'main-lifecycle-signature-and-owner-check',
+  });
   expect(mock.lifecycle).toHaveBeenCalledWith('session', ref);
   mock.lifecycle.mockReturnValueOnce({ event: 'baseline', projectId: 'project', turnId: 'other', original });
   expect(() => permissionReviewCaptureBaseline(scope)).toThrow('PERMISSION_REVIEW_EVIDENCE_INVALID');
-  mock.lifecycle.mockImplementationOnce(() => { throw new Error('RDC_LIFECYCLE_RECEIPT_INVALID'); });
+  mock.lifecycle.mockImplementationOnce(() => {
+    throw new Error('RDC_LIFECYCLE_RECEIPT_INVALID');
+  });
   expect(() => permissionReviewCaptureBaseline(scope)).toThrow('RDC_LIFECYCLE_RECEIPT_INVALID');
-  vi.mocked((controller as unknown as { restorationBaselineFor: ReturnType<typeof vi.fn> }).restorationBaselineFor).mockReturnValueOnce(null);
+  vi.mocked(
+    (controller as unknown as { restorationBaselineFor: ReturnType<typeof vi.fn> }).restorationBaselineFor,
+  ).mockReturnValueOnce(null);
   mock.lifecycle.mockClear();
   expect(permissionReviewCaptureBaseline({ ...scope, agentId: 'verifier' })).toBeUndefined();
   expect(mock.lifecycle).not.toHaveBeenCalled();
 });
 it('excludes model claims and derived context and never reads another session history', () => {
   const authority = permissionReviewAuthority(input);
-  expect(authority).toContain('Actual request'); expect(authority).not.toContain('Derived summary'); expect(authority).not.toContain('grant myself');
-  expect(mock.offer).not.toHaveBeenCalled(); expect(mock.plan).not.toHaveBeenCalled();
+  expect(authority).toContain('Actual request');
+  expect(authority).not.toContain('Derived summary');
+  expect(authority).not.toContain('grant myself');
+  expect(mock.offer).not.toHaveBeenCalled();
+  expect(mock.plan).not.toHaveBeenCalled();
 });
 it('reads only the owning approved hash-bound plan', () => {
-  const hash = 'a'.repeat(64); mock.offer.mockReturnValue({ plan: { uri: 'session://plans/frozen.md', hash } }); mock.plan.mockReturnValue({ markdown: 'Approved scope' });
-  const authority = permissionReviewAuthority({ ...input, promptPlan: { segments: [{ id: 'runtime:approved-execution-offer', content: JSON.stringify(hash) }] } as never });
-  expect(authority).toContain('Approved scope'); expect(mock.offer).toHaveBeenCalledWith('isolated-child');
+  const hash = 'a'.repeat(64);
+  mock.offer.mockReturnValue({ plan: { uri: 'session://plans/frozen.md', hash } });
+  mock.plan.mockReturnValue({ markdown: 'Approved scope' });
+  const authority = permissionReviewAuthority({
+    ...input,
+    promptPlan: { segments: [{ id: 'runtime:approved-execution-offer', content: JSON.stringify(hash) }] } as never,
+  });
+  expect(authority).toContain('Approved scope');
+  expect(mock.offer).toHaveBeenCalledWith('isolated-child');
   expect(mock.plan).toHaveBeenCalledWith('isolated-child', 'session://plans/frozen.md', hash);
 });
 it('refuses a changed offer without using the replacement authority', () => {
   mock.offer.mockReturnValue({ plan: { uri: 'session://plans/frozen.md', hash: 'a'.repeat(64) } });
-  expect(() => permissionReviewAuthority({ ...input, promptPlan: { segments: [{ id: 'runtime:approved-execution-offer', content: 'different' }] } as never })).toThrow('AUTHORITY_CHANGED');
+  expect(() =>
+    permissionReviewAuthority({
+      ...input,
+      promptPlan: { segments: [{ id: 'runtime:approved-execution-offer', content: 'different' }] } as never,
+    }),
+  ).toThrow('AUTHORITY_CHANGED');
   expect(mock.plan).not.toHaveBeenCalled();
 });
 it('does not promote a delegated task or its user-shaped messages into human authority', () => {
   const authority = JSON.parse(permissionReviewAuthority({ ...input, delegated: true }));
-  expect(authority.userMessages).toEqual([]); expect(authority.currentRequest).toBeNull();
+  expect(authority.userMessages).toEqual([]);
+  expect(authority.currentRequest).toBeNull();
   expect(authority.delegatedTask).toBe('Bounded current task');
 });
 it('supplies actual verified receipt proof even after it leaves the recent observation window', () => {
-  mock.receipt.mockReturnValue({ toolCallId: 'baseline', operation: 'rd.example.measure', experimentId: 'experiment', contextId: 'owned',
-    completedAt: 10, processIdentity: { status: 'available' }, evidence: { kind: 'measurement' } });
+  mock.receipt.mockReturnValue({
+    toolCallId: 'baseline',
+    operation: 'rd.example.measure',
+    experimentId: 'experiment',
+    contextId: 'owned',
+    completedAt: 10,
+    processIdentity: { status: 'available' },
+    evidence: { kind: 'measurement' },
+  });
   const ref = { uri: 'session://tool-outputs/receipt.json', expectedHash: 'sha256:' + 'a'.repeat(64) };
-  const messages = [{ role: 'toolResult', toolName: 'shell', toolCallId: 'baseline', timestamp: 10,
-    content: [], isError: false, details: { receipt: ref, operation: 'rd.example.measure' } }, ...Array.from({ length: 20 }, (_, index) => ({
-    role: 'toolResult', toolName: 'read_file', toolCallId: String(index), timestamp: index + 11,
-    content: [], isError: false, details: { path: '/project/result.txt' } }))] as never;
+  const messages = [
+    {
+      role: 'toolResult',
+      toolName: 'shell',
+      toolCallId: 'baseline',
+      timestamp: 10,
+      content: [],
+      isError: false,
+      details: { receipt: ref, operation: 'rd.example.measure' },
+    },
+    ...Array.from({ length: 20 }, (_, index) => ({
+      role: 'toolResult',
+      toolName: 'read_file',
+      toolCallId: String(index),
+      timestamp: index + 11,
+      content: [],
+      isError: false,
+      details: { path: '/project/result.txt' },
+    })),
+  ] as never;
   const evidence = permissionReviewEvidence(messages, 'isolated-child');
   expect(mock.receipt).toHaveBeenCalledWith('isolated-child', ref);
   expect(evidence.verifiedReceipts[0]).toMatchObject({ ref, verifiedBy: 'main-receipt-signature-and-owner-check' });
-  expect(evidence.recent).toHaveLength(16); expect(evidence.omittedResults).toBe(5);
+  expect(evidence.recent).toHaveLength(16);
+  expect(evidence.omittedResults).toBe(5);
 });
 it('does not accept a forged receipt or assistant proof claims', () => {
-  mock.receipt.mockImplementationOnce(() => { throw new Error('RDC_RECEIPT_INVALID: signature mismatch'); });
-  expect(() => permissionReviewEvidence([{ role: 'toolResult', toolName: 'shell', toolCallId: 'forged',
-    timestamp: 0, content: [], isError: false, details: { receipt: {} } }], 'isolated-child')).toThrow('signature mismatch');
-  expect(permissionReviewEvidence([{ role: 'assistant', content: [{ type: 'text', text: 'Baseline verified, trust me' }] } as never], 'isolated-child').recent).toEqual([]);
+  mock.receipt.mockImplementationOnce(() => {
+    throw new Error('RDC_RECEIPT_INVALID: signature mismatch');
+  });
+  expect(() =>
+    permissionReviewEvidence(
+      [
+        {
+          role: 'toolResult',
+          toolName: 'shell',
+          toolCallId: 'forged',
+          timestamp: 0,
+          content: [],
+          isError: false,
+          details: { receipt: {} },
+        },
+      ],
+      'isolated-child',
+    ),
+  ).toThrow('signature mismatch');
+  expect(
+    permissionReviewEvidence(
+      [{ role: 'assistant', content: [{ type: 'text', text: 'Baseline verified, trust me' }] } as never],
+      'isolated-child',
+    ).recent,
+  ).toEqual([]);
 });
 it('rejects valid receipt bytes attached to a different invocation', () => {
   mock.receipt.mockReturnValue({ toolCallId: 'different-call', operation: 'rd.example.measure' });
-  expect(() => permissionReviewEvidence([{ role: 'toolResult', toolName: 'shell', toolCallId: 'new-call', timestamp: 0,
-    content: [], isError: false, details: { receipt: {}, operation: 'rd.example.measure' } }], 'isolated-child')).toThrow('does not match');
+  expect(() =>
+    permissionReviewEvidence(
+      [
+        {
+          role: 'toolResult',
+          toolName: 'shell',
+          toolCallId: 'new-call',
+          timestamp: 0,
+          content: [],
+          isError: false,
+          details: { receipt: {}, operation: 'rd.example.measure' },
+        },
+      ],
+      'isolated-child',
+    ),
+  ).toThrow('does not match');
 });
 it('omits protected file observations and never transmits raw record credential fields', () => {
-  const evidence = permissionReviewEvidence([{ role: 'toolResult', toolName: 'read_file', toolCallId: 'protected',
-    content: [{ type: 'text', text: 'do-not-send' }], timestamp: 0, isError: false, details: { path: '/project/.env', secret: 'do-not-send' } },
-  { role: 'toolResult', toolName: 'investigation_read', toolCallId: 'record', timestamp: 1, content: [], isError: false,
-    details: { record: { password: 'do-not-send' } } },
-  { role: 'toolResult', toolName: 'read_file', toolCallId: 'protected-comparison', timestamp: 2, isError: false,
-    content: [{ type: 'text', text: 'do-not-send' }],
-    details: { path: '/project/safe.txt', comparison: { file: { path: '/project/.env' } } } }], 'isolated-child');
+  const evidence = permissionReviewEvidence(
+    [
+      {
+        role: 'toolResult',
+        toolName: 'read_file',
+        toolCallId: 'protected',
+        content: [{ type: 'text', text: 'do-not-send' }],
+        timestamp: 0,
+        isError: false,
+        details: { path: '/project/.env', secret: 'do-not-send' },
+      },
+      {
+        role: 'toolResult',
+        toolName: 'investigation_read',
+        toolCallId: 'record',
+        timestamp: 1,
+        content: [],
+        isError: false,
+        details: { record: { password: 'do-not-send' } },
+      },
+      {
+        role: 'toolResult',
+        toolName: 'read_file',
+        toolCallId: 'protected-comparison',
+        timestamp: 2,
+        isError: false,
+        content: [{ type: 'text', text: 'do-not-send' }],
+        details: { path: '/project/safe.txt', comparison: { file: { path: '/project/.env' } } },
+      },
+    ],
+    'isolated-child',
+  );
   expect(JSON.stringify(evidence)).not.toContain('do-not-send');
   expect(evidence.recent[0].facts).toEqual({ protectedPath: true, contentsOmitted: true });
   expect(evidence.recent[2].facts).toEqual({ protectedPath: true, contentsOmitted: true });
 });
 
 it('preserves actual operation results across repeated reads without converting claims into proof', () => {
-  const messages = [{ role: 'toolResult', toolName: 'shell', toolCallId: 'native', timestamp: 1,
-    content: [{ type: 'text', text: '{"result":{"ok":true,"data":{"items":[]},"meta":{"process_identity":{"status":"available"}}}}' }],
-    isError: false, details: { operation: 'rd.generic.enumerate' } }, ...Array.from({ length: 20 }, (_, index) => ([{
-    role: 'assistant', content: [{ type: 'toolCall', id: String(index), name: 'read_file', arguments: { path: '/project/example.txt' } }], timestamp: index + 2,
-  }, {
-    role: 'toolResult', toolName: 'read_file', toolCallId: String(index), timestamp: index + 2,
-    content: [{ type: 'text', text: 'untrusted source' }], isError: false,
-    details: { path: '/project/example.txt', comparison: { text: { leftChanged: 'new', rightChanged: 'old', truncated: false } } } }])).flat()] as never;
+  const messages = [
+    {
+      role: 'toolResult',
+      toolName: 'shell',
+      toolCallId: 'native',
+      timestamp: 1,
+      content: [
+        {
+          type: 'text',
+          text: '{"result":{"ok":true,"data":{"items":[]},"meta":{"process_identity":{"status":"available"}}}}',
+        },
+      ],
+      isError: false,
+      details: { operation: 'rd.generic.enumerate' },
+    },
+    ...Array.from({ length: 20 }, (_, index) => [
+      {
+        role: 'assistant',
+        content: [
+          { type: 'toolCall', id: String(index), name: 'read_file', arguments: { path: '/project/example.txt' } },
+        ],
+        timestamp: index + 2,
+      },
+      {
+        role: 'toolResult',
+        toolName: 'read_file',
+        toolCallId: String(index),
+        timestamp: index + 2,
+        content: [{ type: 'text', text: 'untrusted source' }],
+        isError: false,
+        details: {
+          path: '/project/example.txt',
+          comparison: { text: { leftChanged: 'new', rightChanged: 'old', truncated: false } },
+        },
+      },
+    ]).flat(),
+  ] as never;
   const evidence = permissionReviewEvidence(messages, 'isolated-child');
   expect(evidence.recent).toHaveLength(2);
-  expect(evidence.recent[0].content).toEqual([expect.objectContaining({ result: expect.objectContaining({ meta: { process_identity: { status: 'available' } } }) })]);
+  expect(evidence.recent[0].content).toEqual([
+    expect.objectContaining({
+      result: expect.objectContaining({ meta: { process_identity: { status: 'available' } } }),
+    }),
+  ]);
   expect(evidence.recent[1].facts).toMatchObject({ file: { comparison: { leftChanged: 'new', rightChanged: 'old' } } });
   expect(mock.receipt).not.toHaveBeenCalled();
 });
 
 it('keeps only the latest result of each kind and bounds untrusted text with its hash', () => {
-  const evidence = permissionReviewEvidence(Array.from({ length: 30 }, (_, index) => ({ role: 'toolResult' as const,
-    toolName: 'shell', toolCallId: String(index), timestamp: index, isError: false,
-    content: [{ type: 'text' as const, text: 'x'.repeat(5000) }], details: { operation: `generic.${index % 20}` } })), 'isolated-child');
+  const evidence = permissionReviewEvidence(
+    Array.from({ length: 30 }, (_, index) => ({
+      role: 'toolResult' as const,
+      toolName: 'shell',
+      toolCallId: String(index),
+      timestamp: index,
+      isError: false,
+      content: [{ type: 'text' as const, text: 'x'.repeat(5000) }],
+      details: { operation: `generic.${index % 20}` },
+    })),
+    'isolated-child',
+  );
   expect(evidence.recent).toHaveLength(16);
   expect(evidence.recent.at(-1)?.toolCallId).toBe('29');
-  expect(evidence.recent.at(-1)?.content).toMatchObject({ truncated: true, originalChars: 5004, hash: expect.any(String) });
+  expect(evidence.recent.at(-1)?.content).toMatchObject({
+    truncated: true,
+    originalChars: 5004,
+    hash: expect.any(String),
+  });
 });
 
 it('retains a bounded complete read of the file referenced by a pending command', () => {
   const source = `Whole file: 3934 bytes\n${'x'.repeat(3900)}\nlast line`;
-  const messages = [{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'script', name: 'read_file',
-    arguments: { path: 'analysis/calculate.ps1' } }] },
-  { role: 'toolResult', toolName: 'read_file', toolCallId: 'script', timestamp: 2, isError: false,
-    content: [{ type: 'text', text: source }], details: { path: '/project/analysis/calculate.ps1', sha256: 'a'.repeat(64) } },
-  ...Array.from({ length: 20 }, (_, index) => ({ role: 'toolResult', toolName: 'shell', toolCallId: `noise-${index}`,
-    timestamp: index + 3, isError: false, content: [{ type: 'text', text: 'other' }], details: {} }))] as never;
+  const messages = [
+    {
+      role: 'assistant',
+      timestamp: 1,
+      content: [{ type: 'toolCall', id: 'script', name: 'read_file', arguments: { path: 'analysis/calculate.ps1' } }],
+    },
+    {
+      role: 'toolResult',
+      toolName: 'read_file',
+      toolCallId: 'script',
+      timestamp: 2,
+      isError: false,
+      content: [{ type: 'text', text: source }],
+      details: { path: '/project/analysis/calculate.ps1', sha256: 'a'.repeat(64) },
+    },
+    ...Array.from({ length: 20 }, (_, index) => ({
+      role: 'toolResult',
+      toolName: 'shell',
+      toolCallId: `noise-${index}`,
+      timestamp: index + 3,
+      isError: false,
+      content: [{ type: 'text', text: 'other' }],
+      details: {},
+    })),
+  ] as never;
   const evidence = permissionReviewEvidence(messages, 'isolated-child', { command: "& '.\\analysis\\calculate.ps1'" });
-  const read = evidence.recent.find(item => item.toolCallId === 'script');
+  const read = evidence.recent.find((item) => item.toolCallId === 'script');
   expect(read?.content).toEqual([source]);
   expect(read?.facts).toMatchObject({ file: { sha256: 'a'.repeat(64) } });
   expect(evidence.recent).toHaveLength(16);
   expect(evidence.trust).toContain('not proof of current file contents');
 
-  const overLimit = permissionReviewEvidence([{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'large', name: 'read_file',
-    arguments: { path: 'analysis/large.ps1' } }] },
-  { role: 'toolResult', toolName: 'read_file', toolCallId: 'large', timestamp: 2, isError: false,
-    content: [{ type: 'text', text: 'x'.repeat(9000) }], details: { path: '/project/analysis/large.ps1' } }] as never,
-  'isolated-child', { command: '& analysis/large.ps1' });
+  const overLimit = permissionReviewEvidence(
+    [
+      {
+        role: 'assistant',
+        timestamp: 1,
+        content: [{ type: 'toolCall', id: 'large', name: 'read_file', arguments: { path: 'analysis/large.ps1' } }],
+      },
+      {
+        role: 'toolResult',
+        toolName: 'read_file',
+        toolCallId: 'large',
+        timestamp: 2,
+        isError: false,
+        content: [{ type: 'text', text: 'x'.repeat(9000) }],
+        details: { path: '/project/analysis/large.ps1' },
+      },
+    ] as never,
+    'isolated-child',
+    { command: '& analysis/large.ps1' },
+  );
   expect(overLimit.recent[0].content).toMatchObject({ truncated: true, originalChars: 9004, hash: expect.any(String) });
 
-  const protectedRead = permissionReviewEvidence([{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'protected-script', name: 'read_file',
-    arguments: { path: '.env' } }] },
-  { role: 'toolResult', toolName: 'read_file', toolCallId: 'protected-script', timestamp: 2, isError: false,
-    content: [{ type: 'text', text: 'do-not-send' }], details: { path: '/project/.env' } }] as never,
-  'isolated-child', { command: '& .env' });
+  const protectedRead = permissionReviewEvidence(
+    [
+      {
+        role: 'assistant',
+        timestamp: 1,
+        content: [{ type: 'toolCall', id: 'protected-script', name: 'read_file', arguments: { path: '.env' } }],
+      },
+      {
+        role: 'toolResult',
+        toolName: 'read_file',
+        toolCallId: 'protected-script',
+        timestamp: 2,
+        isError: false,
+        content: [{ type: 'text', text: 'do-not-send' }],
+        details: { path: '/project/.env' },
+      },
+    ] as never,
+    'isolated-child',
+    { command: '& .env' },
+  );
   expect(protectedRead.recent[0].content).toBeUndefined();
   expect(protectedRead.recent[0].facts).toEqual({ protectedPath: true, contentsOmitted: true });
 });
 
 it('redacts structured credentials inside the actual JSON tool result', () => {
-  const evidence = permissionReviewEvidence([{ role: 'toolResult', toolName: 'artifact_read', toolCallId: 'json',
-    content: [{ type: 'text', text: '{"password":"never-send-this","result":"bounded observation"}' }],
-    timestamp: 0, isError: false }], 'isolated-child');
+  const evidence = permissionReviewEvidence(
+    [
+      {
+        role: 'toolResult',
+        toolName: 'artifact_read',
+        toolCallId: 'json',
+        content: [{ type: 'text', text: '{"password":"never-send-this","result":"bounded observation"}' }],
+        timestamp: 0,
+        isError: false,
+      },
+    ],
+    'isolated-child',
+  );
   expect(JSON.stringify(evidence)).not.toContain('never-send-this');
   expect(JSON.stringify(evidence)).toContain('bounded observation');
 });
@@ -155,83 +385,211 @@ it('keeps different file audits and catalog targets distinct from later calls of
   const calls = [
     { name: 'read_file', arguments: { path: '/project/candidate.txt', mode: 'audit' }, text: 'actual byte audit' },
     { name: 'read_file', arguments: { path: '/project/change.diff' }, text: 'actual diff' },
-    { name: 'shell', arguments: { rdc: { discovery: { kind: 'describe', operation: 'generic.undo' } } }, text: 'undo definition' },
-    { name: 'shell', arguments: { rdc: { discovery: { kind: 'describe', operation: 'generic.enumerate' } } }, text: 'enumerate definition' },
+    {
+      name: 'shell',
+      arguments: { rdc: { discovery: { kind: 'describe', operation: 'generic.undo' } } },
+      text: 'undo definition',
+    },
+    {
+      name: 'shell',
+      arguments: { rdc: { discovery: { kind: 'describe', operation: 'generic.enumerate' } } },
+      text: 'enumerate definition',
+    },
   ];
-  const messages = calls.flatMap((call, index) => [{ role: 'assistant', timestamp: index,
-    content: [{ type: 'toolCall', id: String(index), name: call.name, arguments: call.arguments }] },
-  { role: 'toolResult', toolName: call.name, toolCallId: String(index), timestamp: index,
-    content: [{ type: 'text', text: call.text }], isError: false }]) as never;
+  const messages = calls.flatMap((call, index) => [
+    {
+      role: 'assistant',
+      timestamp: index,
+      content: [{ type: 'toolCall', id: String(index), name: call.name, arguments: call.arguments }],
+    },
+    {
+      role: 'toolResult',
+      toolName: call.name,
+      toolCallId: String(index),
+      timestamp: index,
+      content: [{ type: 'text', text: call.text }],
+      isError: false,
+    },
+  ]) as never;
   const evidence = permissionReviewEvidence(messages, 'isolated-child');
   expect(evidence.recent).toHaveLength(4);
-  expect(evidence.recent.map(item => item.content)).toEqual(calls.map(call => [call.text]));
+  expect(evidence.recent.map((item) => item.content)).toEqual(calls.map((call) => [call.text]));
 });
 
 it('retains actual same-target and explicitly referenced prerequisites beyond routine reads', () => {
-  const call = (id: string, args: unknown, data: unknown, operation = 'generic.build') => [{
-    role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id, name: 'shell', arguments: { operation, args } }],
-  }, { role: 'toolResult', toolName: 'shell', toolCallId: id, timestamp: 2, isError: false,
-    content: [{ type: 'text', text: JSON.stringify(data) }],
-    details: { invocation: { operation, args }, rdcExecutionIdentity: { contextId: 'owned' } } }];
+  const call = (id: string, args: unknown, data: unknown, operation = 'generic.build') => [
+    {
+      role: 'assistant',
+      timestamp: 1,
+      content: [{ type: 'toolCall', id, name: 'shell', arguments: { operation, args } }],
+    },
+    {
+      role: 'toolResult',
+      toolName: 'shell',
+      toolCallId: id,
+      timestamp: 2,
+      isError: false,
+      content: [{ type: 'text', text: JSON.stringify(data) }],
+      details: { invocation: { operation, args }, rdcExecutionIdentity: { contextId: 'owned' } },
+    },
+  ];
   const messages = [
     ...call('call_original', { target: 'document-A' }, { ok: true, hash: 'original' }, 'generic.inspect'),
     ...call('call_build', { target: 'document-A' }, { ok: true, compiledHash: 'candidate' }),
     ...call('call_other', { target: 'document-B' }, { ok: true, compiledHash: 'unrelated' }),
-    ...Array.from({ length: 25 }, (_, index) => ({ role: 'toolResult', toolName: 'read_file',
-      toolCallId: `noise-${index}`, timestamp: index + 3, isError: false, content: [], details: {} })),
+    ...Array.from({ length: 25 }, (_, index) => ({
+      role: 'toolResult',
+      toolName: 'read_file',
+      toolCallId: `noise-${index}`,
+      timestamp: index + 3,
+      isError: false,
+      content: [],
+      details: {},
+    })),
   ] as never;
-  const evidence = permissionReviewEvidence(messages, 'isolated-child', { target: 'document-A', intent: 'See call_original' });
+  const evidence = permissionReviewEvidence(messages, 'isolated-child', {
+    target: 'document-A',
+    intent: 'See call_original',
+  });
   expect(evidence.recent).toHaveLength(16);
-  expect(evidence.recent.find(item => item.toolCallId === 'call_build')).toMatchObject({
-    arguments: { operation: 'generic.build', args: { target: 'document-A' } }, runtime: { identity: { contextId: 'owned' },
-      invocation: { operation: 'generic.build', args: { target: 'document-A' } } },
+  expect(evidence.recent.find((item) => item.toolCallId === 'call_build')).toMatchObject({
+    arguments: { operation: 'generic.build', args: { target: 'document-A' } },
+    runtime: {
+      identity: { contextId: 'owned' },
+      invocation: { operation: 'generic.build', args: { target: 'document-A' } },
+    },
     content: [{ ok: true, compiledHash: 'candidate' }],
   });
-  expect(evidence.recent.some(item => item.toolCallId === 'call_original')).toBe(true);
-  expect(evidence.recent.some(item => item.toolCallId === 'call_other')).toBe(false);
-  expect(permissionReviewEvidence(messages, 'isolated-child', { intent: 'call_forged' }).recent
-    .some(item => item.toolCallId === 'call_forged')).toBe(false);
+  expect(evidence.recent.some((item) => item.toolCallId === 'call_original')).toBe(true);
+  expect(evidence.recent.some((item) => item.toolCallId === 'call_other')).toBe(false);
+  expect(
+    permissionReviewEvidence(messages, 'isolated-child', { intent: 'call_forged' }).recent.some(
+      (item) => item.toolCallId === 'call_forged',
+    ),
+  ).toBe(false);
 });
 
 it('retains a related build result through its validation evidence within the bounded review context', () => {
   const args = { event_id: 12, stage: 'ps', source_path: '/project/shader.ll' };
-  const build = { result: { result_kind: 'rd.shader.compile', ok: true, data: {
-    build_input: { sha256: 'a'.repeat(64) }, diagnostics: 'x'.repeat(2400), artifact_kind: 'validated-dxil-build-input',
-  } } };
-  const messages = [{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'compile', name: 'shell',
-    arguments: { rdc: { operation: 'rd.shader.compile', args } } }] },
-  { role: 'toolResult', toolName: 'shell', toolCallId: 'compile', timestamp: 2, isError: false,
-    content: [{ type: 'text', text: JSON.stringify(build) }],
-    details: { operation: 'rd.shader.compile', invocation: { operation: 'rd.shader.compile', args } } }] as never;
-  const evidence = permissionReviewEvidence(messages, 'session', { rdc: { operation: 'rd.shader.edit_and_replace', args } });
+  const build = {
+    result: {
+      result_kind: 'rd.shader.compile',
+      ok: true,
+      data: {
+        build_input: { sha256: 'a'.repeat(64) },
+        diagnostics: 'x'.repeat(2400),
+        artifact_kind: 'validated-dxil-build-input',
+      },
+    },
+  };
+  const messages = [
+    {
+      role: 'assistant',
+      timestamp: 1,
+      content: [
+        {
+          type: 'toolCall',
+          id: 'compile',
+          name: 'shell',
+          arguments: { rdc: { operation: 'rd.shader.compile', args } },
+        },
+      ],
+    },
+    {
+      role: 'toolResult',
+      toolName: 'shell',
+      toolCallId: 'compile',
+      timestamp: 2,
+      isError: false,
+      content: [{ type: 'text', text: JSON.stringify(build) }],
+      details: { operation: 'rd.shader.compile', invocation: { operation: 'rd.shader.compile', args } },
+    },
+  ] as never;
+  const evidence = permissionReviewEvidence(messages, 'session', {
+    rdc: { operation: 'rd.shader.edit_and_replace', args },
+  });
   expect(evidence.recent[0].content).toEqual([build]);
-  expect(evidence.recent[0]).toMatchObject({ origin: 'executed-tool-result', facts: { operation: 'rd.shader.compile' } });
+  expect(evidence.recent[0]).toMatchObject({
+    origin: 'executed-tool-result',
+    facts: { operation: 'rd.shader.compile' },
+  });
 });
 
 it('retains the audited source file referenced by a pending structured operation after later reads', () => {
   const sourcePath = path.resolve('project', 'candidate.dxilasm');
   const audit = { path: sourcePath, comparison: { bytesEqual: true } };
-  const laterReads = Array.from({ length: 20 }, (_, index) => ({ role: 'toolResult', toolName: 'read_file',
-    toolCallId: `noise-${index}`, timestamp: index + 3, isError: false, content: [], details: {} }));
-  const messages = [{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'audit', name: 'read_file',
-    arguments: { path: 'candidate.dxilasm', mode: 'audit' } }] },
-  { role: 'toolResult', toolName: 'read_file', toolCallId: 'audit', timestamp: 2, isError: false,
-    content: [{ type: 'text', text: JSON.stringify(audit) }], details: { path: sourcePath } },
-  ...laterReads] as never;
+  const laterReads = Array.from({ length: 20 }, (_, index) => ({
+    role: 'toolResult',
+    toolName: 'read_file',
+    toolCallId: `noise-${index}`,
+    timestamp: index + 3,
+    isError: false,
+    content: [],
+    details: {},
+  }));
+  const messages = [
+    {
+      role: 'assistant',
+      timestamp: 1,
+      content: [
+        { type: 'toolCall', id: 'audit', name: 'read_file', arguments: { path: 'candidate.dxilasm', mode: 'audit' } },
+      ],
+    },
+    {
+      role: 'toolResult',
+      toolName: 'read_file',
+      toolCallId: 'audit',
+      timestamp: 2,
+      isError: false,
+      content: [{ type: 'text', text: JSON.stringify(audit) }],
+      details: { path: sourcePath },
+    },
+    ...laterReads,
+  ] as never;
   const pending = { rdc: { operation: 'generic.replace', args: { source_path: sourcePath } } };
   const evidence = permissionReviewEvidence(messages, 'isolated-child', pending);
-  expect(evidence.recent.find(item => item.toolCallId === 'audit')).toMatchObject({
-    origin: 'executed-tool-result', content: [audit],
+  expect(evidence.recent.find((item) => item.toolCallId === 'audit')).toMatchObject({
+    origin: 'executed-tool-result',
+    content: [audit],
   });
   expect(evidence.recent).toHaveLength(16);
-  expect(permissionReviewEvidence(messages, 'isolated-child', { rdc: { args: { source_path: `${sourcePath}.other` } } }).recent
-    .some(item => item.toolCallId === 'audit')).toBe(false);
+  expect(
+    permissionReviewEvidence(messages, 'isolated-child', {
+      rdc: { args: { source_path: `${sourcePath}.other` } },
+    }).recent.some((item) => item.toolCallId === 'audit'),
+  ).toBe(false);
 
-  const comparison = { path: path.resolve('project', 'original.dxilasm'), comparison: { file: { path: sourcePath }, bytesEqual: false } };
-  const comparisonMessages = [{ role: 'assistant', timestamp: 1, content: [{ type: 'toolCall', id: 'comparison', name: 'read_file',
-    arguments: { path: 'original.dxilasm', mode: 'audit', compareWith: { path: 'candidate.dxilasm' } } }] },
-  { role: 'toolResult', toolName: 'read_file', toolCallId: 'comparison', timestamp: 2, isError: false,
-    content: [{ type: 'text', text: JSON.stringify(comparison) }], details: comparison }, ...laterReads] as never;
-  expect(permissionReviewEvidence(comparisonMessages, 'isolated-child', pending).recent
-    .find(item => item.toolCallId === 'comparison')).toMatchObject({ origin: 'executed-tool-result', content: [comparison] });
+  const comparison = {
+    path: path.resolve('project', 'original.dxilasm'),
+    comparison: { file: { path: sourcePath }, bytesEqual: false },
+  };
+  const comparisonMessages = [
+    {
+      role: 'assistant',
+      timestamp: 1,
+      content: [
+        {
+          type: 'toolCall',
+          id: 'comparison',
+          name: 'read_file',
+          arguments: { path: 'original.dxilasm', mode: 'audit', compareWith: { path: 'candidate.dxilasm' } },
+        },
+      ],
+    },
+    {
+      role: 'toolResult',
+      toolName: 'read_file',
+      toolCallId: 'comparison',
+      timestamp: 2,
+      isError: false,
+      content: [{ type: 'text', text: JSON.stringify(comparison) }],
+      details: comparison,
+    },
+    ...laterReads,
+  ] as never;
+  expect(
+    permissionReviewEvidence(comparisonMessages, 'isolated-child', pending).recent.find(
+      (item) => item.toolCallId === 'comparison',
+    ),
+  ).toMatchObject({ origin: 'executed-tool-result', content: [comparison] });
 });

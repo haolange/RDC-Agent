@@ -21,7 +21,13 @@ function model(partial: Record<string, unknown> & { modelId: string }): Effectiv
     controls: {
       fast: { state: 'unsupported' },
       maxContext: { state: 'unsupported' },
-      reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+      reasoning: {
+        kind: 'none',
+        supportsOff: true,
+        levels: [],
+        defaultSelection: 'off',
+        wireProfile: { kind: 'none' },
+      },
     },
     route: { protocol: 'OpenAIResponses', source: 'catalog' },
     toolCalling: { state: 'supported' },
@@ -35,28 +41,46 @@ function model(partial: Record<string, unknown> & { modelId: string }): Effectiv
 describe('composerModelPicker', () => {
   it('admits only Agent-executable models with source-backed tools', () => {
     expect(isComposerPickerModel(model({ modelId: 'ok' }))).toBe(true);
-    expect(isComposerPickerModel(model({
-      modelId: 'unverified',
-      availability: 'unknown',
-      toolCalling: { state: 'unknown' },
-    }))).toBe(false);
-    expect(isComposerPickerModel(model({
-      modelId: 'unsupported',
-      toolCalling: { state: 'unsupported' },
-    }))).toBe(false);
+    expect(
+      isComposerPickerModel(
+        model({
+          modelId: 'unverified',
+          availability: 'unknown',
+          toolCalling: { state: 'unknown' },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      isComposerPickerModel(
+        model({
+          modelId: 'unsupported',
+          toolCalling: { state: 'unsupported' },
+        }),
+      ),
+    ).toBe(false);
     expect(isComposerPickerModel(model({ modelId: 'off', enabled: false }))).toBe(false);
     expect(isComposerPickerModel(model({ modelId: 'gone', availability: 'unavailable' }))).toBe(false);
-    expect(isComposerPickerModel(model({
-      modelId: 'hidden',
-      selection: { pickerVisibility: 'internal' },
-    }))).toBe(false);
+    expect(
+      isComposerPickerModel(
+        model({
+          modelId: 'hidden',
+          selection: { pickerVisibility: 'internal' },
+        }),
+      ),
+    ).toBe(false);
   });
 
   it('uses the authoritative context range when a larger Max tier is reachable', () => {
     const entry = model({
       modelId: 'gpt',
       contextTiers: [
-        { id: 'default', label: 'default', maxPromptTokens: 128000, activation: { kind: 'implicit' }, entitlement: 'granted' },
+        {
+          id: 'default',
+          label: 'default',
+          maxPromptTokens: 128000,
+          activation: { kind: 'implicit' },
+          entitlement: 'granted',
+        },
         { id: 'max', label: 'max', maxTotalTokens: 272000, activation: { kind: 'implicit' }, entitlement: 'granted' },
       ],
       controls: {
@@ -80,15 +104,23 @@ describe('composerModelPicker', () => {
 
   it('filters by provider, model, label, and alias', () => {
     const options = [
-      toComposerPickerOption('openai', 'OpenAI', model({
-        modelId: 'gpt-5.6-sol',
-        label: 'GPT-5.6 Sol',
-        aliases: ['sol'],
-      })),
-      toComposerPickerOption('kimi-coding-plan', 'Kimi Coding', model({
-        modelId: 'k3',
-        label: 'Kimi K3',
-      })),
+      toComposerPickerOption(
+        'openai',
+        'OpenAI',
+        model({
+          modelId: 'gpt-5.6-sol',
+          label: 'GPT-5.6 Sol',
+          aliases: ['sol'],
+        }),
+      ),
+      toComposerPickerOption(
+        'kimi-coding-plan',
+        'Kimi Coding',
+        model({
+          modelId: 'k3',
+          label: 'Kimi K3',
+        }),
+      ),
     ];
     expect(filterComposerPickerOptions(options, 'sol').map((item) => item.modelId)).toEqual(['gpt-5.6-sol']);
     expect(filterComposerPickerOptions(options, 'kimi').map((item) => item.modelId)).toEqual(['k3']);

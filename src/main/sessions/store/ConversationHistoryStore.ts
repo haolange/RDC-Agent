@@ -16,11 +16,23 @@ import {
   type ConversationTurnCommitJournal,
   type ExistingConversationTurnCommit,
 } from './storageCommitTypes';
-import { CONVERSATION_TERMINAL_COMMIT_MIGRATIONS, CONVERSATION_TURN_COMMIT_MIGRATIONS, ConversationHistoryRecordSchema, SessionAttachmentManifestSchema, SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
+import {
+  CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
+  CONVERSATION_TURN_COMMIT_MIGRATIONS,
+  ConversationHistoryRecordSchema,
+  SessionAttachmentManifestSchema,
+  SessionRecordSchema,
+  toSessionAttachmentManifest,
+} from './storageSchema';
 import { applyTerminalAppend, prepareTerminalAppend } from './ConversationTerminalAppend';
 import { readProjectSessions } from './sessionRecordReconcile';
 import type { SessionContextTurnEntry } from '../../agent-runtime/context/SessionContextJournal';
-import type { SessionAttachmentKind, SessionAttachmentLayer, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
+import type {
+  SessionAttachmentKind,
+  SessionAttachmentLayer,
+  SessionAttachmentRecord,
+  SessionRecord,
+} from '@shared/types/session';
 import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
@@ -33,17 +45,17 @@ export interface ConversationHistoryHost {
   io: StorageIo;
   sessions: Pick<
     SessionRecordStore,
-    'findSessionLocation' | 'readSessionRecord' | 'updateSession' | 'getSessionAttachmentsDir' | 'getSessionAttachmentsManifestPath'
+    | 'findSessionLocation'
+    | 'readSessionRecord'
+    | 'updateSession'
+    | 'getSessionAttachmentsDir'
+    | 'getSessionAttachmentsManifestPath'
   >;
   projects: Pick<ProjectWorkspaceStore, 'touchProject' | 'readRegistry' | 'ensureProjectSessionsRoot'>;
   context: Pick<SessionContextStore, 'readSessionContextJournal'>;
 }
 
-export type {
-  ExistingConversationTurnCommit,
-  StagedConversationSessionCommit,
-} from './storageCommitTypes';
-
+export type { ExistingConversationTurnCommit, StagedConversationSessionCommit } from './storageCommitTypes';
 
 /** The blocks of `next` that are not the very same object in `previous`; untouched blocks are shared. */
 function traceBlocksPatch(previous: ConversationWorkTrace, next: ConversationWorkTrace): ConversationTraceBlocksPatch {
@@ -76,7 +88,10 @@ function deltaRecord(
   };
 }
 
-function applyTraceBlocksPatch(previous: ConversationWorkTrace, patch: ConversationTraceBlocksPatch): ConversationWorkTrace {
+function applyTraceBlocksPatch(
+  previous: ConversationWorkTrace,
+  patch: ConversationTraceBlocksPatch,
+): ConversationWorkTrace {
   const byId = new Map(previous.blocks.map((block) => [block.id, block] as const));
   for (const block of patch.changedBlocks) byId.set(block.id, block);
   return {
@@ -117,7 +132,8 @@ export class ConversationHistoryStore {
     const beforeBranch = this.readConversationBranchState(sessionId);
     const beforeAttachments = this.readSessionAttachments(sessionId);
     const attachmentsDir = this.host.sessions.getSessionAttachmentsDir(sessionId);
-    const attachments = plannedAttachments ?? this.planAttachmentsForTurn(session, sourceAttachmentPaths, attachmentsDir);
+    const attachments =
+      plannedAttachments ?? this.planAttachmentsForTurn(session, sourceAttachmentPaths, attachmentsDir);
     const afterAttachments = beforeAttachments.concat(attachments);
     const journal: ConversationTurnCommitJournal = {
       schemaVersion: '1',
@@ -201,7 +217,9 @@ export class ConversationHistoryStore {
     return path.join(location.sessionPath, 'conversation-branches.json');
   }
 
-  readConversationBranchState(sessionId: string): import('@shared/types/conversationBranch').ConversationBranchState | null {
+  readConversationBranchState(
+    sessionId: string,
+  ): import('@shared/types/conversationBranch').ConversationBranchState | null {
     const filePath = this.getConversationBranchStatePath(sessionId);
     if (!fs.existsSync(filePath)) {
       return null;
@@ -236,9 +254,9 @@ export class ConversationHistoryStore {
     const session = this.host.sessions.readSessionRecord(sessionId);
     if (!session) throw new Error(`Session not found: ${sessionId}`);
     if (
-      contextEntry.turnId !== turnId
-      || contextEntry.assistantMessageId !== assistantMessage.id
-      || assistantMessage.turnId !== turnId
+      contextEntry.turnId !== turnId ||
+      contextEntry.assistantMessageId !== assistantMessage.id ||
+      assistantMessage.turnId !== turnId
     ) {
       throw new Error('Conversation terminal commit ownership mismatch.');
     }
@@ -247,8 +265,18 @@ export class ConversationHistoryStore {
     if (duplicate && JSON.stringify(duplicate) !== JSON.stringify(contextEntry)) {
       throw new Error(`Conflicting session context entry for turn ${turnId}.`);
     }
-    const replaceAssistant = this.readConversationHistory(sessionId).some((message) => message.id === assistantMessage.id);
-    const journal = prepareTerminalAppend(session.sessionPath, requestId, turnId, assistantMessage, contextEntry, !duplicate, replaceAssistant);
+    const replaceAssistant = this.readConversationHistory(sessionId).some(
+      (message) => message.id === assistantMessage.id,
+    );
+    const journal = prepareTerminalAppend(
+      session.sessionPath,
+      requestId,
+      turnId,
+      assistantMessage,
+      contextEntry,
+      !duplicate,
+      replaceAssistant,
+    );
     const journalPath = this.getConversationTerminalCommitJournalPath(session.sessionPath);
     this.host.io.writeUtf8Atomic(journalPath, JSON.stringify(journal));
     this.terminalCommitSessionIds.add(sessionId);
@@ -299,11 +327,7 @@ export class ConversationHistoryStore {
     this.scheduleCompaction(sessionId, nextDeltaCount);
   }
 
-  appendConversationDelta(
-    sessionId: string,
-    messageId: string,
-    patch: Partial<ConversationMessage>,
-  ): void {
+  appendConversationDelta(sessionId: string, messageId: string, patch: Partial<ConversationMessage>): void {
     const filePath = this.getConversationPath(sessionId);
     const normalizedPatch = { ...patch };
     delete (normalizedPatch as { id?: string }).id;
@@ -318,9 +342,7 @@ export class ConversationHistoryStore {
       ...existing,
       ...normalizedPatch,
       id: messageId,
-      updatedAt: typeof normalizedPatch.updatedAt === 'number'
-        ? normalizedPatch.updatedAt
-        : nowMs(),
+      updatedAt: typeof normalizedPatch.updatedAt === 'number' ? normalizedPatch.updatedAt : nowMs(),
     };
     appendJsonl(filePath, deltaRecord(existing, messageId, normalizedPatch, nextMessage.updatedAt ?? nowMs()));
     this.applyConversationMessageToCache(sessionId, filePath, nextMessage);
@@ -333,7 +355,11 @@ export class ConversationHistoryStore {
    * update. It reads and replaces the file in one synchronous step, so no append can fall between the two.
    */
   private scheduleCompaction(sessionId: string, pendingDeltaCount: number): void {
-    if (pendingDeltaCount < CONVERSATION_COMPACTION_DELTA_THRESHOLD || pendingDeltaCount % CONVERSATION_COMPACTION_DELTA_THRESHOLD !== 0) return;
+    if (
+      pendingDeltaCount < CONVERSATION_COMPACTION_DELTA_THRESHOLD ||
+      pendingDeltaCount % CONVERSATION_COMPACTION_DELTA_THRESHOLD !== 0
+    )
+      return;
     if (this.compactionsPending.has(sessionId)) return;
     this.compactionsPending.add(sessionId);
     setImmediate(() => {
@@ -343,7 +369,9 @@ export class ConversationHistoryStore {
       } catch (error) {
         // Every delta is already durable. A busy journal on Windows, or a session deleted meanwhile, only
         // postpones maintenance to the next threshold.
-        console.warn(`[ConversationHistoryStore] Deferred conversation compaction for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`);
+        console.warn(
+          `[ConversationHistoryStore] Deferred conversation compaction for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -412,10 +440,7 @@ export class ConversationHistoryStore {
     return imported;
   }
 
-  rollbackImportedSessionAttachments(
-    sessionId: string,
-    attachments: SessionAttachmentRecord[],
-  ): void {
+  rollbackImportedSessionAttachments(sessionId: string, attachments: SessionAttachmentRecord[]): void {
     if (attachments.length === 0) return;
     const attachmentsDir = path.resolve(this.host.sessions.getSessionAttachmentsDir(sessionId));
     const ids = new Set(attachments.map((entry) => entry.attachmentId));
@@ -425,8 +450,7 @@ export class ConversationHistoryStore {
         fs.unlinkSync(resolvedPath);
       }
     }
-    const remaining = this.readSessionAttachments(sessionId)
-      .filter((entry) => !ids.has(entry.attachmentId));
+    const remaining = this.readSessionAttachments(sessionId).filter((entry) => !ids.has(entry.attachmentId));
     this.writeSessionAttachments(sessionId, remaining);
   }
 
@@ -475,10 +499,7 @@ export class ConversationHistoryStore {
     return { messages, rawRecordCount: result.records.length };
   }
 
-  private readConversationHistoryCache(
-    sessionId: string,
-    filePath: string,
-  ): ConversationHistoryCacheEntry | null {
+  private readConversationHistoryCache(sessionId: string, filePath: string): ConversationHistoryCacheEntry | null {
     const cached = this.conversationHistoryCache.get(sessionId);
     if (!cached) return null;
     if (!fs.existsSync(filePath)) {
@@ -522,11 +543,7 @@ export class ConversationHistoryStore {
     this.conversationHistoryCache.delete(sessionId);
   }
 
-  private applyConversationMessageToCache(
-    sessionId: string,
-    filePath: string,
-    message: ConversationMessage,
-  ): void {
+  private applyConversationMessageToCache(sessionId: string, filePath: string, message: ConversationMessage): void {
     const cached = this.conversationHistoryCache.get(sessionId);
     let messages: ConversationMessage[];
     let previousRawCount: number;
@@ -546,12 +563,7 @@ export class ConversationHistoryStore {
     if (index >= 0) messages[index] = sanitized;
     else messages.push(sanitized);
     messages.sort((left, right) => left.createdAt - right.createdAt);
-    this.writeConversationHistoryCache(
-      sessionId,
-      filePath,
-      messages,
-      previousRawCount + 1,
-    );
+    this.writeConversationHistoryCache(sessionId, filePath, messages, previousRawCount + 1);
   }
 
   private findCachedConversationMessage(
@@ -573,10 +585,7 @@ export class ConversationHistoryStore {
     next: ConversationMessage,
   ): Partial<ConversationMessage> {
     const patch: Partial<ConversationMessage> = {};
-    const keys = new Set([
-      ...Object.keys(previous),
-      ...Object.keys(next),
-    ]) as Set<keyof ConversationMessage>;
+    const keys = new Set([...Object.keys(previous), ...Object.keys(next)]) as Set<keyof ConversationMessage>;
     for (const key of keys) {
       if (key === 'id' || previous[key] === next[key]) continue;
       // Traces are updated copy-on-write: a new object is a change, and the delta stores only changed blocks.
@@ -626,9 +635,10 @@ export class ConversationHistoryStore {
     if (!journal) return;
     const session = this.host.io.readJson(path.join(location.sessionPath, 'session.json'), SessionRecordSchema);
     if (!session) return;
-    const shouldRollForward = !forceRollback
-      && (journal.phase === 'committing' || journal.phase === 'committed')
-      && Array.isArray(journal.afterHistory);
+    const shouldRollForward =
+      !forceRollback &&
+      (journal.phase === 'committing' || journal.phase === 'committed') &&
+      Array.isArray(journal.afterHistory);
     this.applyConversationTurnJournal(session, journal, shouldRollForward);
     fs.rmSync(journalPath, { force: true });
   }
@@ -653,7 +663,8 @@ export class ConversationHistoryStore {
   ): void {
     if (journal.schemaVersion === '2') {
       const assistant = applyTerminalAppend(session.sessionPath, journal, useAfter);
-      if (useAfter) this.applyConversationMessageToCache(session.sessionId, this.getConversationPath(session.sessionId), assistant);
+      if (useAfter)
+        this.applyConversationMessageToCache(session.sessionId, this.getConversationPath(session.sessionId), assistant);
       else {
         this.invalidateConversationHistoryCache(session.sessionId);
         this.conversationPendingDeltaCounts.delete(session.sessionId);
@@ -703,12 +714,14 @@ export class ConversationHistoryStore {
   }
 
   readSessionAttachments(sessionId: string): SessionAttachmentRecord[] {
-    return readCurrentStoredJson(
-      this.host.io,
-      this.host.sessions.getSessionAttachmentsManifestPath(sessionId),
-      CURRENT_STORE_SCHEMA_VERSION,
-      SessionAttachmentManifestSchema,
-    ) ?? [];
+    return (
+      readCurrentStoredJson(
+        this.host.io,
+        this.host.sessions.getSessionAttachmentsManifestPath(sessionId),
+        CURRENT_STORE_SCHEMA_VERSION,
+        SessionAttachmentManifestSchema,
+      ) ?? []
+    );
   }
 
   writeSessionAttachments(sessionId: string, attachments: SessionAttachmentRecord[]): void {
@@ -750,12 +763,12 @@ export class ConversationHistoryStore {
         counter += 1;
       }
       reserved.add(targetPath.toLowerCase());
-      const classified = classification ?? this.classifySource(
-        fileName,
-        fs.readFileSync(sourcePath).subarray(0, Math.min(stats.size, 64 * 1024)),
-      );
+      const classified =
+        classification ??
+        this.classifySource(fileName, fs.readFileSync(sourcePath).subarray(0, Math.min(stats.size, 64 * 1024)));
       return {
-        material: classification?.material, sourceHash: classification?.sourceHash,
+        material: classification?.material,
+        sourceHash: classification?.sourceHash,
         attachmentId: `att_${generateShortId()}`,
         sessionId: session.sessionId,
         projectId: session.projectId,
@@ -824,7 +837,10 @@ export class ConversationHistoryStore {
     return candidate;
   }
 
-  private classifySource(fileName: string, header: Buffer): {
+  private classifySource(
+    fileName: string,
+    header: Buffer,
+  ): {
     kind: SessionAttachmentKind;
     layer: SessionAttachmentLayer;
     mimeType: string;

@@ -92,7 +92,13 @@ export function TitleBar({
         )}
         <WindowControls
           maximized={windowMaximized}
-          labels={{ group: windowControlsLabel, minimize: windowMinimizeLabel, maximize: windowMaximizeLabel, restore: windowRestoreLabel, close: windowCloseLabel }}
+          labels={{
+            group: windowControlsLabel,
+            minimize: windowMinimizeLabel,
+            maximize: windowMaximizeLabel,
+            restore: windowRestoreLabel,
+            close: windowCloseLabel,
+          }}
           onMinimize={onMinimize}
           onToggleMaximize={onToggleMaximize}
           onClose={onClose}

@@ -42,37 +42,49 @@ export function planSettingsPatch(current: SettingsFile, ops: readonly SettingsP
         break;
       case 'layout': {
         const merged = mergeLayoutPatch(next.layout, op.value);
-        next = { ...next, layout: {
-          leftSidebar: sanitizeSidebar(merged.leftSidebar, LEFT_DEFAULTS, next.layout.leftSidebar),
-          rightPanel: sanitizeSidebar(merged.rightPanel, RIGHT_DEFAULTS, next.layout.rightPanel),
-          terminal: sanitizeTerminal(merged.terminal, next.layout.terminal),
-          window: sanitizeWindow(merged.window, next.layout.window),
-        } };
+        next = {
+          ...next,
+          layout: {
+            leftSidebar: sanitizeSidebar(merged.leftSidebar, LEFT_DEFAULTS, next.layout.leftSidebar),
+            rightPanel: sanitizeSidebar(merged.rightPanel, RIGHT_DEFAULTS, next.layout.rightPanel),
+            terminal: sanitizeTerminal(merged.terminal, next.layout.terminal),
+            window: sanitizeWindow(merged.window, next.layout.window),
+          },
+        };
         break;
       }
       case 'profile': {
         const nickname = op.value.nickname?.trim();
-        next = { ...next, profile: {
-          nickname: nickname || next.profile.nickname,
-          avatarPath: typeof op.value.avatarPath === 'string' ? op.value.avatarPath : next.profile.avatarPath,
-        } };
+        next = {
+          ...next,
+          profile: {
+            nickname: nickname || next.profile.nickname,
+            avatarPath: typeof op.value.avatarPath === 'string' ? op.value.avatarPath : next.profile.avatarPath,
+          },
+        };
         break;
       }
       case 'tooling': {
         const merged = mergeToolingPatch(next.tooling, op.value);
-        next = { ...next, tooling: {
-          rdcCli: sanitizeRdcCliInvokerSettings(merged.rdcCli, next.tooling.rdcCli, op.value.rdcCli !== undefined),
-          codeInterpreter: sanitizeCodeInterpreterSettings(merged.codeInterpreter, next.tooling.codeInterpreter),
-          shell: sanitizeAgentShellSettings(merged.shell, next.tooling.shell),
-        } };
+        next = {
+          ...next,
+          tooling: {
+            rdcCli: sanitizeRdcCliInvokerSettings(merged.rdcCli, next.tooling.rdcCli, op.value.rdcCli !== undefined),
+            codeInterpreter: sanitizeCodeInterpreterSettings(merged.codeInterpreter, next.tooling.codeInterpreter),
+            shell: sanitizeAgentShellSettings(merged.shell, next.tooling.shell),
+          },
+        };
         break;
       }
       case 'agentRuntime': {
         const merged = mergeAgentRuntimePatch(next.agentRuntime, op.value);
-        next = { ...next, agentRuntime: {
-          permissions: sanitizeAgentPermissionSettings(merged.permissions, next.agentRuntime.permissions),
-          context: sanitizeAgentRuntimeContextSettings(merged.context, next.agentRuntime.context),
-        } };
+        next = {
+          ...next,
+          agentRuntime: {
+            permissions: sanitizeAgentPermissionSettings(merged.permissions, next.agentRuntime.permissions),
+            context: sanitizeAgentRuntimeContextSettings(merged.context, next.agentRuntime.context),
+          },
+        };
         break;
       }
       case 'globalInstructions':

@@ -21,7 +21,8 @@ describe('verified compaction references', () => {
       criticalContext: [],
     };
     const result = reconcileHandoffReferences(input, [
-      { uri: plan, hash: actual }, { uri: evidence, hash: `sha256:${other}` },
+      { uri: plan, hash: actual },
+      { uri: evidence, hash: `sha256:${other}` },
     ]);
     expect(result.corrected).toBe(3);
     expect(result.sections.constraints[0]).toContain(`authorized source sha256:${actual}`);
@@ -40,16 +41,24 @@ describe('verified compaction references', () => {
     const uri = 'session://plans/ambiguous.md';
     const original = `Read ${uri} hash ${'e'.repeat(64)} and compare ${'f'.repeat(65)}.`;
     const sections: ModelHandoffSections = {
-      objective: original, constraints: [], progress: { done: [], inProgress: [], blocked: [] },
-      decisions: [], failedAttempts: [], nextSteps: [], criticalContext: [],
+      objective: original,
+      constraints: [],
+      progress: { done: [], inProgress: [], blocked: [] },
+      decisions: [],
+      failedAttempts: [],
+      nextSteps: [],
+      criticalContext: [],
     };
     const result = reconcileHandoffReferences(sections, [
-      { uri, hash: 'a'.repeat(64) }, { uri, hash: 'b'.repeat(64) },
+      { uri, hash: 'a'.repeat(64) },
+      { uri, hash: 'b'.repeat(64) },
     ]);
     expect(result.corrected).toBe(0);
     expect(result.sections.objective).toBe(original);
     const malformed = `Read ${uri} hash ${'e'.repeat(65)}.`;
-    const singleAuthority = reconcileHandoffReferences({ ...sections, objective: malformed }, [{ uri, hash: 'a'.repeat(64) }]);
+    const singleAuthority = reconcileHandoffReferences({ ...sections, objective: malformed }, [
+      { uri, hash: 'a'.repeat(64) },
+    ]);
     expect(singleAuthority.corrected).toBe(0);
     expect(singleAuthority.sections.objective).toBe(malformed);
   });

@@ -35,7 +35,11 @@ export interface WindowedList<T extends HTMLElement> {
 }
 
 /** Rows are keyed, so a row keeps its measured height and DOM while rows arrive before or after it. */
-export function windowOffsets(keys: readonly string[], heights: ReadonlyMap<string, number>, estimate: number): number[] {
+export function windowOffsets(
+  keys: readonly string[],
+  heights: ReadonlyMap<string, number>,
+  estimate: number,
+): number[] {
   const offsets = [0];
   for (const key of keys) offsets.push(offsets[offsets.length - 1] + (heights.get(key) ?? estimate));
   return offsets;
@@ -79,7 +83,7 @@ export function useWindowedList<T extends HTMLElement>(options: WindowedListOpti
     if (!list || !enabled) return;
     const scroller = latest.current.scrollerOf(list);
     if (!scroller) {
-      setRange((current) => current.start === 0 && current.end === count ? current : { start: 0, end: count });
+      setRange((current) => (current.start === 0 && current.end === count ? current : { start: 0, end: count }));
       return;
     }
     const { viewStart: top } = viewportOf(list, scroller);
@@ -87,7 +91,7 @@ export function useWindowedList<T extends HTMLElement>(options: WindowedListOpti
     const viewEnd = viewStart + scroller.clientHeight;
     const start = Math.max(0, indexAtOffset(latest.current.offsets, viewStart) - overscan);
     const end = Math.min(count, indexAtOffset(latest.current.offsets, viewEnd) + overscan + 1);
-    setRange((current) => current.start === start && current.end === end ? current : { start, end });
+    setRange((current) => (current.start === start && current.end === end ? current : { start, end }));
   }, [count, enabled, overscan]);
   const rowOffset = useCallback((index: number) => latest.current.offsets[index] ?? 0, []);
 
@@ -106,7 +110,13 @@ export function useWindowedList<T extends HTMLElement>(options: WindowedListOpti
     scroller.addEventListener('scroll', onChange, { passive: true });
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(onChange);
     observer?.observe(scroller);
-    binding.current = { scroller, release: () => { scroller.removeEventListener('scroll', onChange); observer?.disconnect(); } };
+    binding.current = {
+      scroller,
+      release: () => {
+        scroller.removeEventListener('scroll', onChange);
+        observer?.disconnect();
+      },
+    };
     onChange();
   });
   useEffect(updateRange, [count, revision, updateRange]);
@@ -162,12 +172,15 @@ export function useWindowedList<T extends HTMLElement>(options: WindowedListOpti
     for (const element of rows.keys()) if (!state.rows.has(element)) state.observer.observe(element);
     state.rows = rows;
   });
-  useEffect(() => () => {
-    binding.current?.release();
-    binding.current = null;
-    measuring.current?.observer.disconnect();
-    measuring.current = null;
-  }, []);
+  useEffect(
+    () => () => {
+      binding.current?.release();
+      binding.current = null;
+      measuring.current?.observer.disconnect();
+      measuring.current = null;
+    },
+    [],
+  );
 
   return { listRef, range, offsets, rowOffset, updateRange };
 }

@@ -28,11 +28,7 @@ import {
 import { delegationTraceStore } from '../agent-runtime/workTrace/DelegationTraceStore';
 import { normalizeTaskSnapshotItems } from '../agent-runtime/workTrace/ConversationTaskSnapshot';
 import { mergeThinkingPayload } from '../agent-runtime/workTrace/ConversationThinkingArtifacts';
-import {
-  isActiveRun,
-  isLoopTool,
-  summarizeRuntimePayload,
-} from './ConversationRoutePreflight';
+import { isActiveRun, isLoopTool, summarizeRuntimePayload } from './ConversationRoutePreflight';
 import {
   applyPlanReviewAnswered,
   applyPlanReviewRequested,
@@ -61,7 +57,10 @@ export interface TurnStreamState {
 
 /** The conversation turn the agent events update (ConversationTurnCompletion implements it). */
 export interface AgentEventTurn {
-  readonly host: Pick<ConversationTurnOutput, 'emitConversationEvent' | 'persistConversationSnapshot' | 'publishConversationTrace'>;
+  readonly host: Pick<
+    ConversationTurnOutput,
+    'emitConversationEvent' | 'persistConversationSnapshot' | 'publishConversationTrace'
+  >;
   readonly sessionId: string | null;
   readonly input: Pick<CompleteProfileTurnInput, 'userMessage' | 'context' | 'preparedTurn'>;
   readonly agentLabel: string;
@@ -92,37 +91,54 @@ export function createAgentEventHandler(turn: AgentEventTurn): (event: AgentEven
       event,
     });
     switch (event.type) {
-      case 'run.started': return onRunStarted(turn, event);
-      case 'context.compacted': return onContextCompacted(turn, event);
-      case 'assistant.delta': return onAssistantDelta(turn, event);
-      case 'assistant.text_end': return onAssistantTextEnd(turn, event);
+      case 'run.started':
+        return onRunStarted(turn, event);
+      case 'context.compacted':
+        return onContextCompacted(turn, event);
+      case 'assistant.delta':
+        return onAssistantDelta(turn, event);
+      case 'assistant.text_end':
+        return onAssistantTextEnd(turn, event);
       case 'assistant.thinking_delta':
-      case 'assistant.thinking_end': return onAssistantThinking(turn, event);
-      case 'diagnostic': return onDiagnostic(turn, event);
-      case 'tool.requested': return onToolRequested(turn, event);
-      case 'tool.started': return onToolStarted(turn, event);
-      case 'tool.denied': return onToolDenied(turn, event);
+      case 'assistant.thinking_end':
+        return onAssistantThinking(turn, event);
+      case 'diagnostic':
+        return onDiagnostic(turn, event);
+      case 'tool.requested':
+        return onToolRequested(turn, event);
+      case 'tool.started':
+        return onToolStarted(turn, event);
+      case 'tool.denied':
+        return onToolDenied(turn, event);
       case 'approval.requested':
         if (!onDelegatedInteraction(turn, event)) onApprovalRequested(turn, event);
         return;
       case 'approval.answered':
         if (!onDelegatedInteraction(turn, event)) onApprovalAnswered(turn, event);
         return;
-      case 'tool.completed': return onToolCompleted(turn, event);
+      case 'tool.completed':
+        return onToolCompleted(turn, event);
       case 'task.created':
-      case 'task.updated': return onTaskChanged(turn, event);
-      case 'assistant.completed': return onAssistantCompleted(turn, event);
-      case 'run.completed': return onRunCompleted(turn);
-      case 'run.failed': return onRunFailed(turn, event);
-      case 'run.cancelled': return onRunCancelled(turn);
-      default: return assertNever(event);
+      case 'task.updated':
+        return onTaskChanged(turn, event);
+      case 'assistant.completed':
+        return onAssistantCompleted(turn, event);
+      case 'run.completed':
+        return onRunCompleted(turn);
+      case 'run.failed':
+        return onRunFailed(turn, event);
+      case 'run.cancelled':
+        return onRunCancelled(turn);
+      default:
+        return assertNever(event);
     }
   };
 }
 
-const currentLoopItem = (turn: AgentEventTurn, kind: 'text' | 'thinking', ref: ProviderOutputRef) => turn.turnStreamState.assistantMessage.workTrace
-  ?.blocks.find((block) => block.id === turn.currentLoopId())
-  ?.items?.find((item) => item.kind === kind && sameProviderBlock(item.providerOutputRef, ref));
+const currentLoopItem = (turn: AgentEventTurn, kind: 'text' | 'thinking', ref: ProviderOutputRef) =>
+  turn.turnStreamState.assistantMessage.workTrace?.blocks
+    .find((block) => block.id === turn.currentLoopId())
+    ?.items?.find((item) => item.kind === kind && sameProviderBlock(item.providerOutputRef, ref));
 
 /** The retried request streams the loop again from its first token; nothing from the failed try survives. */
 function discardFailedAttempt(turn: AgentEventTurn): void {
@@ -140,20 +156,17 @@ function onRunStarted(turn: AgentEventTurn, event: AgentEventOf<'run.started'>):
   const { payload } = event;
   const details = [
     payload.providerId && payload.modelId ? `Model: ${payload.providerId} / ${payload.modelId}` : '',
-    payload.toolAllowlist.length > 0
-      ? `Tools: ${payload.toolAllowlist.join(', ')}`
-      : '',
-  ].filter(Boolean).join('\n');
+    payload.toolAllowlist.length > 0 ? `Tools: ${payload.toolAllowlist.join(', ')}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
   commitAssistantMessage('message_patched', {
     workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, 'runtime-run', {
       kind: 'reasoning',
       title: 'Start Agent Loop',
       stage: 'preflight',
       status: 'running',
-      summary: [
-        `${agentLabel} started the model and tool loop.`,
-        details,
-      ].filter(Boolean).join('\n'),
+      summary: [`${agentLabel} started the model and tool loop.`, details].filter(Boolean).join('\n'),
       startedAt: nowMs(),
     }),
   });
@@ -192,7 +205,14 @@ function onContextCompacted(turn: AgentEventTurn, event: AgentEventOf<'context.c
 
 /** Streamed assistant text extends its text item in the current loop. */
 function onAssistantDelta(turn: AgentEventTurn, event: AgentEventOf<'assistant.delta'>): void {
-  const { commitThinkingTrace, beginAssistantContentLoop, currentLoopId, resolveStreamingOutputPhase, recordProviderOutputRefs, turnStreamState } = turn;
+  const {
+    commitThinkingTrace,
+    beginAssistantContentLoop,
+    currentLoopId,
+    resolveStreamingOutputPhase,
+    recordProviderOutputRefs,
+    turnStreamState,
+  } = turn;
   const { payload } = event;
   const chunk = payload.text;
   if (chunk) {
@@ -200,21 +220,36 @@ function onAssistantDelta(turn: AgentEventTurn, event: AgentEventOf<'assistant.d
     recordProviderOutputRefs([payload.providerOutputRef]);
     turnStreamState.currentLoopText += chunk;
     const previous = currentLoopItem(turn, 'text', payload.providerOutputRef);
-    const trace = upsertLoopResult(turnStreamState.assistantMessage.workTrace, currentLoopId(), { status: 'streaming', outputPhase: resolveStreamingOutputPhase(), providerOutputRefs: turnStreamState.currentLoopProviderOutputRefs });
-    commitThinkingTrace(upsertLoopTextItem(trace, currentLoopId(), payload.providerOutputRef,
-      (previous?.kind === 'text' ? previous.text : '') + chunk, payload.phase, 'streaming'));
+    const trace = upsertLoopResult(turnStreamState.assistantMessage.workTrace, currentLoopId(), {
+      status: 'streaming',
+      outputPhase: resolveStreamingOutputPhase(),
+      providerOutputRefs: turnStreamState.currentLoopProviderOutputRefs,
+    });
+    commitThinkingTrace(
+      upsertLoopTextItem(
+        trace,
+        currentLoopId(),
+        payload.providerOutputRef,
+        (previous?.kind === 'text' ? previous.text : '') + chunk,
+        payload.phase,
+        'streaming',
+      ),
+    );
   }
 }
 
 /** A text block closed. */
 function onAssistantTextEnd(turn: AgentEventTurn, event: AgentEventOf<'assistant.text_end'>): void {
-  const { commitThinkingTrace, beginAssistantContentLoop, currentLoopId, recordProviderOutputRefs, turnStreamState } = turn;
+  const { commitThinkingTrace, beginAssistantContentLoop, currentLoopId, recordProviderOutputRefs, turnStreamState } =
+    turn;
   const { payload } = event;
   beginAssistantContentLoop();
   recordProviderOutputRefs([payload.providerOutputRef]);
   const trace = turnStreamState.assistantMessage.workTrace;
-  if (trace) commitThinkingTrace(upsertLoopTextItem(trace, currentLoopId(), payload.providerOutputRef,
-    payload.text, payload.phase, 'complete'));
+  if (trace)
+    commitThinkingTrace(
+      upsertLoopTextItem(trace, currentLoopId(), payload.providerOutputRef, payload.text, payload.phase, 'complete'),
+    );
 }
 
 /** Readable thinking extends or closes its thinking item. */
@@ -233,8 +268,15 @@ function onAssistantThinking(
     payload.text,
   );
   if (thinking) {
-    commitThinkingTrace(upsertLoopThinkingItem(turnStreamState.assistantMessage.workTrace, currentLoopId(),
-      payload.providerOutputRef, thinking, event.type === 'assistant.thinking_end' ? 'complete' : 'streaming'));
+    commitThinkingTrace(
+      upsertLoopThinkingItem(
+        turnStreamState.assistantMessage.workTrace,
+        currentLoopId(),
+        payload.providerOutputRef,
+        thinking,
+        event.type === 'assistant.thinking_end' ? 'complete' : 'streaming',
+      ),
+    );
   }
 }
 
@@ -250,11 +292,7 @@ function onDiagnostic(turn: AgentEventTurn, event: AgentEventOf<'diagnostic'>): 
       runtimeLogService.log({
         scope: sessionId ? 'session' : 'app',
         namespace: 'agent',
-        severity: payload.severity === 'error'
-          ? 'error'
-          : payload.severity === 'warning'
-            ? 'warning'
-            : 'info',
+        severity: payload.severity === 'error' ? 'error' : payload.severity === 'warning' ? 'warning' : 'info',
         title: payload.phase === 'started' ? 'Provider recovery' : 'Provider recovery complete',
         summary,
         sessionId,
@@ -270,62 +308,90 @@ function onDiagnostic(turn: AgentEventTurn, event: AgentEventOf<'diagnostic'>): 
     }
     return;
   }
-  const blockStatus = payload.phase === 'started'
-    ? 'running'
-    : payload.severity === 'error'
-      ? 'error'
-      : 'complete';
-  const hookTrace = payload.code.startsWith('hook.') && payload.toolCallId !== undefined
-    ? attachRuntimeHookDiagnostic(turnStreamState.assistantMessage.workTrace, payload.toolCallId, {
-      id: event.id,
-      code: payload.code,
-      severity: payload.severity,
-      message: summary,
-      timestamp: event.timestamp,
-    })
-    : null;
+  const blockStatus = payload.phase === 'started' ? 'running' : payload.severity === 'error' ? 'error' : 'complete';
+  const hookTrace =
+    payload.code.startsWith('hook.') && payload.toolCallId !== undefined
+      ? attachRuntimeHookDiagnostic(turnStreamState.assistantMessage.workTrace, payload.toolCallId, {
+          id: event.id,
+          code: payload.code,
+          severity: payload.severity,
+          message: summary,
+          timestamp: event.timestamp,
+        })
+      : null;
   commitAssistantMessage('message_patched', {
-    workTrace: hookTrace ?? upsertWorkBlock(turnStreamState.assistantMessage.workTrace,
-      `runtime-diagnostic-${payload.code.startsWith('hook.') ? `hook.${event.id}` : payload.code}`, {
-      kind: 'diagnostic',
-      status: blockStatus,
-      diagnosticSeverity: payload.severity,
-      title: 'Runtime diagnostic',
-      summary,
-      completedAt: blockStatus === 'running' ? undefined : nowMs(),
-    }),
+    workTrace:
+      hookTrace ??
+      upsertWorkBlock(
+        turnStreamState.assistantMessage.workTrace,
+        `runtime-diagnostic-${payload.code.startsWith('hook.') ? `hook.${event.id}` : payload.code}`,
+        {
+          kind: 'diagnostic',
+          status: blockStatus,
+          diagnosticSeverity: payload.severity,
+          title: 'Runtime diagnostic',
+          summary,
+          completedAt: blockStatus === 'running' ? undefined : nowMs(),
+        },
+      ),
   });
 }
 
 /** A structured tool call was requested in the current loop. */
 function onToolRequested(turn: AgentEventTurn, event: AgentEventOf<'tool.requested'>): void {
-  const { commitAssistantMessage, commitThinkingTrace, beginAssistantContentLoop, markLoopCommentary, currentLoopId, currentLoopOptions, turnStreamState } = turn;
+  const {
+    commitAssistantMessage,
+    commitThinkingTrace,
+    beginAssistantContentLoop,
+    markLoopCommentary,
+    currentLoopId,
+    currentLoopOptions,
+    turnStreamState,
+  } = turn;
   const { payload } = event;
   if (payload.toolCall.id && payload.toolCall.name) {
     beginAssistantContentLoop();
     turnStreamState.loopHasTools = true;
     markLoopCommentary();
     let trace = turnStreamState.assistantMessage.workTrace;
-    const textItems = (trace?.blocks.find((block) => block.id === currentLoopId())?.items ?? [])
-      .filter((item) => item.kind === 'text');
+    const textItems = (trace?.blocks.find((block) => block.id === currentLoopId())?.items ?? []).filter(
+      (item) => item.kind === 'text',
+    );
     for (const item of textItems) {
-      if (trace && !item.phase) trace = upsertLoopTextItem(trace, currentLoopId(), item.providerOutputRef,
-        item.text, 'commentary', item.status);
+      if (trace && !item.phase)
+        trace = upsertLoopTextItem(
+          trace,
+          currentLoopId(),
+          item.providerOutputRef,
+          item.text,
+          'commentary',
+          item.status,
+        );
     }
     if (trace && textItems.length) commitThinkingTrace(trace);
     // Stamp commentary explicitly so projection does not hide pre-tool narrative.
     if (turnStreamState.currentLoopText.trim()) {
-      commitThinkingTrace(upsertLoopResult(turnStreamState.assistantMessage.workTrace, currentLoopId(), { status: 'streaming', outputPhase: 'commentary', providerOutputRefs: turnStreamState.currentLoopProviderOutputRefs }));
+      commitThinkingTrace(
+        upsertLoopResult(turnStreamState.assistantMessage.workTrace, currentLoopId(), {
+          status: 'streaming',
+          outputPhase: 'commentary',
+          providerOutputRefs: turnStreamState.currentLoopProviderOutputRefs,
+        }),
+      );
     }
     commitAssistantMessage('message_patched', {
-      workTrace: upsertRuntimeToolCall(turnStreamState.assistantMessage.workTrace, {
-        id: payload.toolCall.id,
-        toolName: payload.toolCall.name,
-        status: 'pending',
-        providerOutputRef: { ...payload.providerOutputRef },
-        argsPreview: redactedArgumentsPreview(payload.toolCall.arguments),
-        startedAt: nowMs(),
-      }, currentLoopOptions()),
+      workTrace: upsertRuntimeToolCall(
+        turnStreamState.assistantMessage.workTrace,
+        {
+          id: payload.toolCall.id,
+          toolName: payload.toolCall.name,
+          status: 'pending',
+          providerOutputRef: { ...payload.providerOutputRef },
+          argsPreview: redactedArgumentsPreview(payload.toolCall.arguments),
+          startedAt: nowMs(),
+        },
+        currentLoopOptions(),
+      ),
     });
   }
 }
@@ -343,21 +409,27 @@ function onToolStarted(turn: AgentEventTurn, event: AgentEventOf<'tool.started'>
     markLoopCommentary();
   }
   commitAssistantMessage('message_patched', {
-    workTrace: upsertRuntimeToolCall(turnStreamState.assistantMessage.workTrace, {
-      id: payload.toolCallId,
-      toolName: payload.toolName,
-      status: 'running',
-      executionStartedAt: event.timestamp,
-      argsPreview: redactedArgumentsPreview(payload.args),
-      ...(isSubagent ? {
-        delegation: {
-          task: redactCredentialLikeText(String(payload.args.task ?? '')),
-          profile: String(payload.args.profile ?? event.agentId ?? ''),
-          mode: payload.args.mode === 'background' ? 'background' as const : 'wait' as const,
-        },
-      } : {}),
-      startedAt: nowMs(),
-    }, loopScoped ? currentLoopOptions() : undefined),
+    workTrace: upsertRuntimeToolCall(
+      turnStreamState.assistantMessage.workTrace,
+      {
+        id: payload.toolCallId,
+        toolName: payload.toolName,
+        status: 'running',
+        executionStartedAt: event.timestamp,
+        argsPreview: redactedArgumentsPreview(payload.args),
+        ...(isSubagent
+          ? {
+              delegation: {
+                task: redactCredentialLikeText(String(payload.args.task ?? '')),
+                profile: String(payload.args.profile ?? event.agentId ?? ''),
+                mode: payload.args.mode === 'background' ? ('background' as const) : ('wait' as const),
+              },
+            }
+          : {}),
+        startedAt: nowMs(),
+      },
+      loopScoped ? currentLoopOptions() : undefined,
+    ),
   });
 }
 
@@ -372,14 +444,18 @@ function onToolDenied(turn: AgentEventTurn, event: AgentEventOf<'tool.denied'>):
     markLoopCommentary();
   }
   commitAssistantMessage('message_patched', {
-    workTrace: upsertRuntimeToolCall(turnStreamState.assistantMessage.workTrace, {
-      id: payload.toolCallId,
-      toolName: payload.toolName,
-      status: 'error',
-      resultPreview: buildToolResultPreview(payload.result ?? { reason }),
-      error: reason,
-      completedAt: nowMs(),
-    }, loopScopedDenied ? currentLoopOptions() : undefined),
+    workTrace: upsertRuntimeToolCall(
+      turnStreamState.assistantMessage.workTrace,
+      {
+        id: payload.toolCallId,
+        toolName: payload.toolName,
+        status: 'error',
+        resultPreview: buildToolResultPreview(payload.result ?? { reason }),
+        error: reason,
+        completedAt: nowMs(),
+      },
+      loopScopedDenied ? currentLoopOptions() : undefined,
+    ),
   });
 }
 
@@ -396,27 +472,42 @@ function onDelegatedInteraction(
     const pending = payload.status === 'pending';
     const rejected = payload.status === 'rejected' || payload.status === 'cancelled';
     if (event.sessionId !== sessionId && event.sessionId !== delegatedRequest.childSessionId) return true;
-    const message = { ...turnStreamState.assistantMessage, updatedAt: nowMs(),
+    const message = {
+      ...turnStreamState.assistantMessage,
+      updatedAt: nowMs(),
       workTrace: upsertRuntimeToolCall(turnStreamState.assistantMessage.workTrace, {
         id: `${delegatedRequest.childSessionId}::${originalToolCallId}`,
         toolName: payload.toolName ?? 'approval',
         delegatedRequest,
         status: pending ? 'running' : rejected ? 'error' : 'complete',
         argsPreview: `Child execution ${delegatedRequest.executionId}`,
-        userInputQuestions: payload.kind === 'ask_user' ? normalizeAskUserQuestions({ questions: payload.questions }) : undefined,
+        userInputQuestions:
+          payload.kind === 'ask_user' ? normalizeAskUserQuestions({ questions: payload.questions }) : undefined,
         planReview: payload.kind === 'plan_review' ? payload.planReview : undefined,
         resultPreview: pending ? undefined : String(payload.answer ?? 'Response delivered to child execution.'),
-        approval: payload.kind === 'ask_user' || payload.kind === 'plan_review' ? undefined : {
-          approvalId: payload.approvalId, status: payload.status, reason: payload.reason,
-          risk: payload.risk, reviewer: payload.reviewer,
-          reviewMethod: payload.reviewMethod, errorCode: payload.errorCode,
-        },
+        approval:
+          payload.kind === 'ask_user' || payload.kind === 'plan_review'
+            ? undefined
+            : {
+                approvalId: payload.approvalId,
+                status: payload.status,
+                reason: payload.reason,
+                risk: payload.risk,
+                reviewer: payload.reviewer,
+                reviewMethod: payload.reviewMethod,
+                errorCode: payload.errorCode,
+              },
       }),
     };
     const failure = host.persistConversationSnapshot(sessionId, message);
     if (failure) throw failure;
     turnStreamState.assistantMessage = message;
-    host.emitConversationEvent({ type: 'message_patched', sessionId: sessionId ?? '', turnId: message.turnId, message });
+    host.emitConversationEvent({
+      type: 'message_patched',
+      sessionId: sessionId ?? '',
+      turnId: message.turnId,
+      message,
+    });
     host.publishConversationTrace(sessionId ?? '', [input.userMessage, message], sessionId);
     // A child question does not retract the parent's final reply or mutate its loop continuation.
     return true;
@@ -426,7 +517,14 @@ function onDelegatedInteraction(
 
 /** The turn asks for approval, a user answer or plan review. */
 function onApprovalRequested(turn: AgentEventTurn, event: AgentEventOf<'approval.requested'>): void {
-  const { commitAssistantMessage, markLoopCommentary, currentLoopId, currentLoopOptions, pendingContinuation, turnStreamState } = turn;
+  const {
+    commitAssistantMessage,
+    markLoopCommentary,
+    currentLoopId,
+    currentLoopOptions,
+    pendingContinuation,
+    turnStreamState,
+  } = turn;
   const { payload } = event;
   const { approvalId } = payload;
   const toolCallId = payload.toolCallId ?? approvalId;
@@ -452,14 +550,30 @@ function onApprovalRequested(turn: AgentEventTurn, event: AgentEventOf<'approval
     markLoopCommentary();
     const questions = normalizeAskUserQuestions({ questions: payload.questions });
     commitAssistantMessage('message_patched', {
-      workTrace: upsertLoopResult(upsertRuntimeToolCall(turnStreamState.assistantMessage.workTrace, {
-          id: toolCallId,
-          toolName: 'ask_user',
-          status: 'running',
-          userInputQuestions: questions,
-          argsPreview: questions.map((question) => question.prompt).join(' | ').slice(0, 600),
-          startedAt: nowMs(),
-        }, currentLoopOptions()), currentLoopId(), { status: 'complete', stopReason: 'tool_use', outputPhase: 'commentary', providerOutputRefs: turnStreamState.currentLoopProviderOutputRefs }),
+      workTrace: upsertLoopResult(
+        upsertRuntimeToolCall(
+          turnStreamState.assistantMessage.workTrace,
+          {
+            id: toolCallId,
+            toolName: 'ask_user',
+            status: 'running',
+            userInputQuestions: questions,
+            argsPreview: questions
+              .map((question) => question.prompt)
+              .join(' | ')
+              .slice(0, 600),
+            startedAt: nowMs(),
+          },
+          currentLoopOptions(),
+        ),
+        currentLoopId(),
+        {
+          status: 'complete',
+          stopReason: 'tool_use',
+          outputPhase: 'commentary',
+          providerOutputRefs: turnStreamState.currentLoopProviderOutputRefs,
+        },
+      ),
     });
     return;
   }
@@ -467,17 +581,21 @@ function onApprovalRequested(turn: AgentEventTurn, event: AgentEventOf<'approval
   if (!isAutomaticToolApproval(payload)) pendingContinuation.approval = true;
   markLoopCommentary();
   commitAssistantMessage('message_patched', {
-    workTrace: upsertRuntimeToolApproval(turnStreamState.assistantMessage.workTrace, {
-      approvalId,
-      toolCallId,
-      toolName,
-      status: 'pending',
-      reason,
-      risk: payload.risk,
-      reviewer: payload.reviewer,
-      reviewMethod: payload.reviewMethod,
-      errorCode: payload.errorCode,
-    }, currentLoopOptions()),
+    workTrace: upsertRuntimeToolApproval(
+      turnStreamState.assistantMessage.workTrace,
+      {
+        approvalId,
+        toolCallId,
+        toolName,
+        status: 'pending',
+        reason,
+        risk: payload.risk,
+        reviewer: payload.reviewer,
+        reviewMethod: payload.reviewMethod,
+        errorCode: payload.errorCode,
+      },
+      currentLoopOptions(),
+    ),
   });
 }
 
@@ -519,22 +637,35 @@ function onApprovalAnswered(turn: AgentEventTurn, event: AgentEventOf<'approval.
     return;
   }
   const approvalStatus = payload.status;
-  pendingContinuation.approval = (turnStreamState.assistantMessage.workTrace?.blocks ?? []).some(block => block.toolCalls.some(call => !call.delegatedRequest && call.approval?.status === 'pending' && call.approval.approvalId !== approvalId && !isAutomaticToolApproval(call.approval)));
-  const answerText = payload.answer === undefined || payload.answer === null
-    ? ''
-    : typeof payload.answer === 'string'
-      ? payload.answer.trim()
-      : String(payload.answer).trim();
+  pendingContinuation.approval = (turnStreamState.assistantMessage.workTrace?.blocks ?? []).some((block) =>
+    block.toolCalls.some(
+      (call) =>
+        !call.delegatedRequest &&
+        call.approval?.status === 'pending' &&
+        call.approval.approvalId !== approvalId &&
+        !isAutomaticToolApproval(call.approval),
+    ),
+  );
+  const answerText =
+    payload.answer === undefined || payload.answer === null
+      ? ''
+      : typeof payload.answer === 'string'
+        ? payload.answer.trim()
+        : String(payload.answer).trim();
   commitAssistantMessage('message_patched', {
-    workTrace: upsertRuntimeToolApproval(turnStreamState.assistantMessage.workTrace, {
-      approvalId,
-      toolCallId: payload.toolCallId ?? approvalId,
-      toolName: payload.toolName ?? 'approval',
-      status: approvalStatus,
-      answer: answerText,
-      reviewMethod: payload.reviewMethod,
-      errorCode: payload.errorCode,
-    }, currentLoopOptions()),
+    workTrace: upsertRuntimeToolApproval(
+      turnStreamState.assistantMessage.workTrace,
+      {
+        approvalId,
+        toolCallId: payload.toolCallId ?? approvalId,
+        toolName: payload.toolName ?? 'approval',
+        status: approvalStatus,
+        answer: answerText,
+        reviewMethod: payload.reviewMethod,
+        errorCode: payload.errorCode,
+      },
+      currentLoopOptions(),
+    ),
   });
 }
 
@@ -553,11 +684,10 @@ function onToolCompleted(turn: AgentEventTurn, event: AgentEventOf<'tool.complet
   if (isPlanArtifactTool && result.ok) {
     pendingContinuation.planReview = false;
   }
-  const existing = turnStreamState.assistantMessage.workTrace?.blocks.flatMap((block) => block.toolCalls)
+  const existing = turnStreamState.assistantMessage.workTrace?.blocks
+    .flatMap((block) => block.toolCalls)
     .find((call) => call.id === toolCallId);
-  const toolCallPatch = buildConversationToolCompletion(
-    toolCallId, toolName, result, existing, nowMs(),
-  );
+  const toolCallPatch = buildConversationToolCompletion(toolCallId, toolName, result, existing, nowMs());
   const loopScopedCompleted = isLoopTool(toolName);
   commitAssistantMessage('message_patched', {
     workTrace: upsertRuntimeToolCall(
@@ -581,7 +711,12 @@ function onTaskChanged(turn: AgentEventTurn, event: AgentEventOf<'task.created' 
       title: event.type === 'task.created' ? 'Tasks added' : 'Tasks updated',
       stage: 'task',
       status: 'complete',
-      taskSnapshot: { change: event.type === 'task.created' ? 'created' : 'updated', completed, total: items.length, items },
+      taskSnapshot: {
+        change: event.type === 'task.created' ? 'created' : 'updated',
+        completed,
+        total: items.length,
+        items,
+      },
       summary: `${completed} of ${items.length} completed`,
       startedAt: event.timestamp,
       completedAt: event.timestamp,
@@ -591,7 +726,15 @@ function onTaskChanged(turn: AgentEventTurn, event: AgentEventOf<'task.created' 
 
 /** The provider finished one loop: its result, stop reason and phase settle. */
 function onAssistantCompleted(turn: AgentEventTurn, event: AgentEventOf<'assistant.completed'>): void {
-  const { input, commitAssistantMessage, beginAssistantContentLoop, currentLoopId, recordProviderOutputRefs, pendingContinuation, turnStreamState } = turn;
+  const {
+    input,
+    commitAssistantMessage,
+    beginAssistantContentLoop,
+    currentLoopId,
+    recordProviderOutputRefs,
+    pendingContinuation,
+    turnStreamState,
+  } = turn;
   const { payload } = event;
   beginAssistantContentLoop();
   const loopResult = payload.text.trim();
@@ -605,10 +748,22 @@ function onAssistantCompleted(turn: AgentEventTurn, event: AgentEventOf<'assista
   const outputPhase = turnStreamState.currentLoopOutputPhase ?? resolvedOutputPhase;
   turnStreamState.currentLoopOutputPhase = outputPhase;
   const completedTrace = turnStreamState.assistantMessage.workTrace;
-  if (loopResult || completedTrace?.blocks.some((block) => block.id === currentLoopId()) || payload.thinking?.length || stopReason) {
+  if (
+    loopResult ||
+    completedTrace?.blocks.some((block) => block.id === currentLoopId()) ||
+    payload.thinking?.length ||
+    stopReason
+  ) {
     let trace = settleLoopItems(
-      upsertLoopResult(completedTrace, currentLoopId(), { status: 'complete', stopReason, outputPhase, providerOutputRefs: turnStreamState.currentLoopProviderOutputRefs }),
-      currentLoopId(), { stopReason, outputPhase }, { textItems: payload.textItems, thinking: payload.thinking },
+      upsertLoopResult(completedTrace, currentLoopId(), {
+        status: 'complete',
+        stopReason,
+        outputPhase,
+        providerOutputRefs: turnStreamState.currentLoopProviderOutputRefs,
+      }),
+      currentLoopId(),
+      { stopReason, outputPhase },
+      { textItems: payload.textItems, thinking: payload.thinking },
     );
     const reasoningState = resolveConversationReasoningState(
       lastLoopThinking(trace.blocks.find((block) => block.id === currentLoopId())),

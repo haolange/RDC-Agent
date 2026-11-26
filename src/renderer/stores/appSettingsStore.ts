@@ -14,7 +14,8 @@ const EMPTY_PROVIDER_CATALOG: LlmProviderCatalogResponse = { categories: [], pro
 export const useAppSettingsStore = create<AppSettingsState>((set, get) => {
   /** Confirmed settings plus every intent in flight; the store's `settings` is always its projection. */
   const intents = new SettingsIntents(createDefaultAppSettings());
-  const join = (view: SettingsView): AppSettings => joinSettingsView(view, get().providerCatalog ?? EMPTY_PROVIDER_CATALOG);
+  const join = (view: SettingsView): AppSettings =>
+    joinSettingsView(view, get().providerCatalog ?? EMPTY_PROVIDER_CATALOG);
   /** Joins a view main sent whole and adopts it by revision; intents in flight stay on top. */
   const adoptView = (view: SettingsView): void => {
     viewSync.adopted(view);
@@ -22,11 +23,15 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => {
   };
   const viewSync = new SettingsViewSync(async () => {
     const api = window.electronAPI;
-    const [view, catalog] = await Promise.all([api.settings.get(), get().providerCatalog ?? api.settings.getProviderCatalog()]);
+    const [view, catalog] = await Promise.all([
+      api.settings.get(),
+      get().providerCatalog ?? api.settings.getProviderCatalog(),
+    ]);
     if (!get().providerCatalog) set({ providerCatalog: catalog });
     adoptView(view);
   });
-  const show = (settings: AppSettings, confirmed = false): void => set(confirmed ? { settings, hydrated: true } : { settings });
+  const show = (settings: AppSettings, confirmed = false): void =>
+    set(confirmed ? { settings, hydrated: true } : { settings });
   return {
     settings: createDefaultAppSettings(),
     providerCatalog: null,
@@ -43,7 +48,10 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => {
       const intent = intents.begin(patchOverlay(ops));
       show(intent.settings);
       try {
-        const result = await viewSync.ownWrite(() => window.electronAPI.settings.patch(ops), (committed) => committed.revision);
+        const result = await viewSync.ownWrite(
+          () => window.electronAPI.settings.patch(ops),
+          (committed) => committed.revision,
+        );
         show(intents.settle(intent.id, patchCommit(ops, result), result.revision), true);
         return get().settings;
       } catch (error) {
@@ -56,7 +64,8 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => {
     ...createSettingsDefinitionActions({ intents, viewSync, settings: () => get().settings, show }),
     reloadSettings: async (forProjectId) => {
       // Without a project named, the selected one; with none selected yet there is no project to compare.
-      const projectId = forProjectId !== undefined ? forProjectId : useProjectStore.getState().currentProject?.projectId;
+      const projectId =
+        forProjectId !== undefined ? forProjectId : useProjectStore.getState().currentProject?.projectId;
       if (viewSync.stale(projectId)) await viewSync.readFor(projectId);
       return get().settings;
     },
@@ -74,10 +83,15 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => {
       } finally {
         const snapshot = useRuntimePermissionStore.getState().snapshot;
         if (snapshot) {
-          show(intents.confirm((settings) => ({
-            ...settings,
-            agentRuntime: { ...settings.agentRuntime, permissions: { ...settings.agentRuntime.permissions, mode: snapshot.mode } },
-          })));
+          show(
+            intents.confirm((settings) => ({
+              ...settings,
+              agentRuntime: {
+                ...settings.agentRuntime,
+                permissions: { ...settings.agentRuntime.permissions, mode: snapshot.mode },
+              },
+            })),
+          );
         }
       }
     },

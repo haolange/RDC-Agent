@@ -6,7 +6,11 @@ import type { ReasoningSelection } from './modelCapability';
 
 /** Upper bound on what any tool may do for a profile; no permission mode can exceed it. */
 export type AgentAccessCeiling = 'read-only' | 'workspace-write' | 'full';
-export const AGENT_ACCESS_CEILINGS = ['read-only', 'workspace-write', 'full'] as const satisfies readonly AgentAccessCeiling[];
+export const AGENT_ACCESS_CEILINGS = [
+  'read-only',
+  'workspace-write',
+  'full',
+] as const satisfies readonly AgentAccessCeiling[];
 export const DEFAULT_AGENT_ACCESS_CEILING: AgentAccessCeiling = 'full';
 
 /** Manifest diagnostics the Agents settings page acts on. */
@@ -15,7 +19,10 @@ export const AGENT_PROJECT_CEILING_NARROWED = 'AGENT_PROJECT_CEILING_NARROWED';
 
 /** Obligation a turn must satisfy before it may declare `turn_complete(completed)`. */
 export type AgentCompletionContract = 'final-answer' | 'investigation-report';
-export const AGENT_COMPLETION_CONTRACTS = ['final-answer', 'investigation-report'] as const satisfies readonly AgentCompletionContract[];
+export const AGENT_COMPLETION_CONTRACTS = [
+  'final-answer',
+  'investigation-report',
+] as const satisfies readonly AgentCompletionContract[];
 const DEFAULT_AGENT_COMPLETION_CONTRACT: AgentCompletionContract = 'final-answer';
 
 /**
@@ -40,11 +47,15 @@ export interface AgentHandoffDefinition {
   requiredToolIds?: string[];
 }
 
-export function agentAccessCeiling(profile: { accessCeiling?: AgentAccessCeiling } | null | undefined): AgentAccessCeiling {
+export function agentAccessCeiling(
+  profile: { accessCeiling?: AgentAccessCeiling } | null | undefined,
+): AgentAccessCeiling {
   return profile?.accessCeiling ?? DEFAULT_AGENT_ACCESS_CEILING;
 }
 
-export function agentCompletionContract(profile: { completionContract?: AgentCompletionContract } | null | undefined): AgentCompletionContract {
+export function agentCompletionContract(
+  profile: { completionContract?: AgentCompletionContract } | null | undefined,
+): AgentCompletionContract {
   return profile?.completionContract ?? DEFAULT_AGENT_COMPLETION_CONTRACT;
 }
 
@@ -107,8 +118,16 @@ export interface AgentManifestProvenance {
 
 export interface AgentManifestDraft extends Omit<
   AgentManifestDefinition,
-  'filePath' | 'builtin' | 'updatedAt' | 'provenance' | 'compiledRoute' | 'reasoningLevel' | 'modelSource' | 'builtinUpdate'
-  | 'descriptionTranslations' | 'argumentHintTranslations'
+  | 'filePath'
+  | 'builtin'
+  | 'updatedAt'
+  | 'provenance'
+  | 'compiledRoute'
+  | 'reasoningLevel'
+  | 'modelSource'
+  | 'builtinUpdate'
+  | 'descriptionTranslations'
+  | 'argumentHintTranslations'
 > {
   delete?: boolean;
   writeScope?: AgentManifestWriteScope;
@@ -208,7 +227,10 @@ export function resolveAgentWriteTarget(
   if (definition?.provenance?.scope === 'project') {
     const projectId = currentProjectId?.trim();
     if (!projectId) {
-      throw new AppError('AGENT_MANIFEST_PROJECT_ID_REQUIRED', 'project effective profile requires a current projectId.');
+      throw new AppError(
+        'AGENT_MANIFEST_PROJECT_ID_REQUIRED',
+        'project effective profile requires a current projectId.',
+      );
     }
     return { scope: 'project', projectId };
   }
@@ -222,7 +244,10 @@ export function resolveAgentWriteTargetFromDraft(
   if (draft.writeScope === 'project') {
     const projectId = draft.writeProjectId?.trim() || currentProjectId?.trim();
     if (!projectId) {
-      throw new AppError('AGENT_MANIFEST_PROJECT_ID_REQUIRED', 'project-scoped editor draft requires a current projectId.');
+      throw new AppError(
+        'AGENT_MANIFEST_PROJECT_ID_REQUIRED',
+        'project-scoped editor draft requires a current projectId.',
+      );
     }
     return { scope: 'project', projectId };
   }

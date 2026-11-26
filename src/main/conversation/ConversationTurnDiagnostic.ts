@@ -43,12 +43,12 @@ export function createTurnFailedDiagnostic(
     const isNoProgress = error.code === 'AGENT_NO_PROGRESS';
     return createConversationDiagnostic({
       agentId: route.agentId,
-      code: isNoProgress
-        ? 'CONVERSATION_AGENT_LOOP_STALLED'
-        : 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED',
+      code: isNoProgress ? 'CONVERSATION_AGENT_LOOP_STALLED' : 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED',
       severity: 'error',
       userMessage: isNoProgress
-        ? diagnosticText(error.noProgressReason === 'runtime-obligation' ? 'loopObligationIgnored' : 'loopRepeated', { agent: label })
+        ? diagnosticText(error.noProgressReason === 'runtime-obligation' ? 'loopObligationIgnored' : 'loopRepeated', {
+            agent: label,
+          })
         : diagnosticText('loopTurnLimit', { agent: label, turns: error.maxTurns ?? error.turn }),
       providerId: route.providerId,
       modelId: route.modelId,
@@ -100,9 +100,10 @@ export function createTurnFailedDiagnostic(
       technicalMessage: redactTechnicalMessage(compactionFailure),
     });
   }
-  const compactionCode = compactionFailure instanceof Error && compactionFailure.name === 'Error'
-    ? compactionFailure.message.match(/^(COMPACTION_[A-Z_]+):/u)?.[1]
-    : undefined;
+  const compactionCode =
+    compactionFailure instanceof Error && compactionFailure.name === 'Error'
+      ? compactionFailure.message.match(/^(COMPACTION_[A-Z_]+):/u)?.[1]
+      : undefined;
   if (compactionCode) {
     return createConversationDiagnostic({
       agentId: route.agentId,
@@ -127,21 +128,23 @@ export function createTurnFailedDiagnostic(
       technicalMessage,
     });
   }
-  const attachmentCode = matchedCode === 'ATTACHMENT_LIMIT_EXCEEDED'
-    || matchedCode === 'ATTACHMENT_MEDIA_UNSUPPORTED'
-    || matchedCode === 'ATTACHMENT_NOT_FOUND'
-    || matchedCode === 'ATTACHMENT_INVALID'
-    || matchedCode === 'VISION_INPUT_UNSUPPORTED'
-    ? matchedCode
-    : null;
+  const attachmentCode =
+    matchedCode === 'ATTACHMENT_LIMIT_EXCEEDED' ||
+    matchedCode === 'ATTACHMENT_MEDIA_UNSUPPORTED' ||
+    matchedCode === 'ATTACHMENT_NOT_FOUND' ||
+    matchedCode === 'ATTACHMENT_INVALID' ||
+    matchedCode === 'VISION_INPUT_UNSUPPORTED'
+      ? matchedCode
+      : null;
   if (attachmentCode) {
     return createConversationDiagnostic({
       agentId: route.agentId,
       code: attachmentCode,
       severity: 'error',
-      userMessage: attachmentCode === 'VISION_INPUT_UNSUPPORTED'
-        ? diagnosticText('imageUnsupported', { agent: label })
-        : diagnosticText('attachmentRejected'),
+      userMessage:
+        attachmentCode === 'VISION_INPUT_UNSUPPORTED'
+          ? diagnosticText('imageUnsupported', { agent: label })
+          : diagnosticText('attachmentRejected'),
       providerId: route.providerId,
       modelId: route.modelId,
       technicalMessage,
@@ -166,7 +169,8 @@ function isStreamProtocolTurnFailure(error: unknown): boolean {
   return error instanceof AgentRecoveryAbortError && error.category === 'stream_protocol';
 }
 
-type LlmFailureClass = 'auth' | 'quota' | 'overloaded' | 'server' | 'empty_stream' | 'network' | 'request' | 'model' | 'generic';
+type LlmFailureClass =
+  'auth' | 'quota' | 'overloaded' | 'server' | 'empty_stream' | 'network' | 'request' | 'model' | 'generic';
 
 interface LlmRequestFailure {
   kind: LlmFailureClass;
@@ -182,9 +186,7 @@ function classifyLlmRequestFailure(error: unknown): LlmRequestFailure {
   const status = abort?.lastStatus ?? http?.status ?? extractStatusFromMessage(error);
   const attempts = abort?.attempts ?? 1;
   const maxAttempts = abort?.maxAttempts ?? 1;
-  const snippetSource = abort?.bodySnippet
-    ?? http?.bodyText
-    ?? causeSnippet(error);
+  const snippetSource = abort?.bodySnippet ?? http?.bodyText ?? causeSnippet(error);
   const snippet = redactTechnicalMessage(snippetSource);
   const category = abort?.category ?? inferLlmFailureCategory(error, status);
   const kind = llmFailureKind(category, status, error);
@@ -230,26 +232,27 @@ function inferLlmFailureCategory(error: unknown, status: number | undefined): Er
     return 'server_error';
   }
   const wire = isProviderWireFailureError(error) ? error : undefined;
-  const raw = `${error instanceof Error ? `${error.message} ${error.name}` : String(error)} ${wire?.bodyText ?? ''}`.toLowerCase();
+  const raw =
+    `${error instanceof Error ? `${error.message} ${error.name}` : String(error)} ${wire?.bodyText ?? ''}`.toLowerCase();
   if (raw.includes('quota') || raw.includes('rate_limit') || (raw.includes('rate') && raw.includes('limit'))) {
     return 'rate_limit';
   }
   if (
-    raw.includes('overloaded')
-    || raw.includes('service unavailable')
-    || raw.includes('at capacity')
-    || raw.includes('high demand')
+    raw.includes('overloaded') ||
+    raw.includes('service unavailable') ||
+    raw.includes('at capacity') ||
+    raw.includes('high demand')
   ) {
     return 'overloaded';
   }
   if (
-    raw.includes('econnrefused')
-    || raw.includes('econnreset')
-    || raw.includes('etimedout')
-    || raw.includes('enotfound')
-    || raw.includes('timeout')
-    || raw.includes('socket')
-    || raw.includes('network')
+    raw.includes('econnrefused') ||
+    raw.includes('econnreset') ||
+    raw.includes('etimedout') ||
+    raw.includes('enotfound') ||
+    raw.includes('timeout') ||
+    raw.includes('socket') ||
+    raw.includes('network')
   ) {
     return 'network_error';
   }
@@ -301,25 +304,29 @@ function failureText(error: unknown): string {
 
 function isRequestSchemaFailure(status: number | undefined, error: unknown): boolean {
   const raw = failureText(error);
-  return raw.includes('invalid-argument')
-    || raw.includes('tool parameter')
-    || raw.includes('root schema')
-    || raw.includes('oneof')
-    || raw.includes('anyof')
-    || raw.includes('missingsessionid')
-    || raw.includes('x-opencode-session')
-    || raw.includes('input must be a list')
-    || raw.includes('stream must be set')
-    || (status === 400 && (raw.includes('invalid request') || raw.includes('unsupported parameter')));
+  return (
+    raw.includes('invalid-argument') ||
+    raw.includes('tool parameter') ||
+    raw.includes('root schema') ||
+    raw.includes('oneof') ||
+    raw.includes('anyof') ||
+    raw.includes('missingsessionid') ||
+    raw.includes('x-opencode-session') ||
+    raw.includes('input must be a list') ||
+    raw.includes('stream must be set') ||
+    (status === 400 && (raw.includes('invalid request') || raw.includes('unsupported parameter')))
+  );
 }
 
 function isModelUnavailableFailure(status: number | undefined, error: unknown): boolean {
   const raw = failureText(error);
-  return status === 404
-    || raw.includes('model_not_found')
-    || raw.includes('model not found')
-    || raw.includes('unknown model')
-    || raw.includes('does not have access to model');
+  return (
+    status === 404 ||
+    raw.includes('model_not_found') ||
+    raw.includes('model not found') ||
+    raw.includes('unknown model') ||
+    raw.includes('does not have access to model')
+  );
 }
 
 function extractStatusFromMessage(error: unknown): number | undefined {
@@ -340,15 +347,24 @@ function llmRequestFailureUserMessage(
 ): string {
   const params = { agent: label, model: modelId, provider: providerId };
   switch (failure.kind) {
-    case 'auth': return diagnosticText('requestAuth', params);
-    case 'quota': return diagnosticText('requestQuota', params);
-    case 'overloaded': return diagnosticText('requestOverloaded', params);
-    case 'server': return diagnosticText('requestServer', params);
-    case 'empty_stream': return diagnosticText('requestEmpty', params);
-    case 'network': return diagnosticText('requestNetwork', params);
-    case 'request': return diagnosticText('requestRejected', params);
-    case 'model': return diagnosticText('requestModelMissing', params);
-    default: return diagnosticText('requestFailed', params);
+    case 'auth':
+      return diagnosticText('requestAuth', params);
+    case 'quota':
+      return diagnosticText('requestQuota', params);
+    case 'overloaded':
+      return diagnosticText('requestOverloaded', params);
+    case 'server':
+      return diagnosticText('requestServer', params);
+    case 'empty_stream':
+      return diagnosticText('requestEmpty', params);
+    case 'network':
+      return diagnosticText('requestNetwork', params);
+    case 'request':
+      return diagnosticText('requestRejected', params);
+    case 'model':
+      return diagnosticText('requestModelMissing', params);
+    default:
+      return diagnosticText('requestFailed', params);
   }
 }
 

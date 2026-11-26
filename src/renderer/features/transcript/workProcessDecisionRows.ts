@@ -17,14 +17,19 @@ export const createPlanReviewRow = (call: ConversationToolCall, t: LocalizedTran
 
 export const createPlanReviewShellRow = (call: ConversationToolCall, t: LocalizedTranslator): WorkProcessRow => {
   const rejected = call.planReview?.status === 'rejected';
-  const feedback = call.planReview?.decision?.kind === 'reject' ? call.planReview.decision.feedback : call.resultPreview;
+  const feedback =
+    call.planReview?.decision?.kind === 'reject' ? call.planReview.decision.feedback : call.resultPreview;
   return {
     type: 'tool',
     planReview: call.planReview,
     id: call.id,
     status: call.status,
-    verb: call.planReview?.status === 'cancelled' ? t('chat.planShellCancelled')
-      : rejected ? t('chat.planShellFeedback') : t('chat.planUpdated'),
+    verb:
+      call.planReview?.status === 'cancelled'
+        ? t('chat.planShellCancelled')
+        : rejected
+          ? t('chat.planShellFeedback')
+          : t('chat.planUpdated'),
     category: t('chat.toolDisplay.plan_artifact.category'),
     icon: 'plan-artifact',
     groupKind: 'runtime',
@@ -42,17 +47,18 @@ export const createPlanReviewShellRow = (call: ConversationToolCall, t: Localize
 export const createUserInputRow = (call: ConversationToolCall, t: LocalizedTranslator): WorkProcessRow => {
   const questions = call.userInputQuestions ?? [];
   const incomplete = questions.length === 0;
-  const status = call.status === 'cancelled' ? 'cancelled' : incomplete
-    ? 'error'
-    : call.status === 'complete'
-    ? 'complete'
-    : call.status === 'error' || call.error
-      ? 'error'
-      : 'running';
+  const status =
+    call.status === 'cancelled'
+      ? 'cancelled'
+      : incomplete
+        ? 'error'
+        : call.status === 'complete'
+          ? 'complete'
+          : call.status === 'error' || call.error
+            ? 'error'
+            : 'running';
   const result = parsePreview(call.resultPreview);
-  const answers = status === 'complete'
-    ? normalizeAskUserAnswers(questions, result)
-    : [];
+  const answers = status === 'complete' ? normalizeAskUserAnswers(questions, result) : [];
   const answerByQuestionId = new Map(answers.map((entry) => [entry.questionId, entry]));
   const items: WorkProcessUserInputItem[] = questions.map((question) => {
     const answer = answerByQuestionId.get(question.questionId);
@@ -67,7 +73,16 @@ export const createUserInputRow = (call: ConversationToolCall, t: LocalizedTrans
     type: 'userInput',
     id: call.id,
     status,
-    verb: status === 'cancelled' ? t('chat.workProcessApprovalCancelled') : incomplete ? t('chat.workProcessAskIncomplete') : status === 'complete' ? t('chat.workProcessAskComplete') : status === 'error' ? t('chat.workProcessAskInterrupted') : t('chat.workProcessAskRunning'),
+    verb:
+      status === 'cancelled'
+        ? t('chat.workProcessApprovalCancelled')
+        : incomplete
+          ? t('chat.workProcessAskIncomplete')
+          : status === 'complete'
+            ? t('chat.workProcessAskComplete')
+            : status === 'error'
+              ? t('chat.workProcessAskInterrupted')
+              : t('chat.workProcessAskRunning'),
     questionCount: questions.length,
     items,
     answeredCount: items.filter((item) => Boolean(item.answer)).length,
@@ -97,7 +112,9 @@ export const createApprovalRow = (block: ConversationWorkBlock, t: LocalizedTran
 
 const getApprovalVerb = (status: WorkProcessRowStatus, isAutoReview: boolean, t: Translator): string => {
   if (status === 'cancelled') return t('chat.workProcessApprovalCancelled');
-  if (status === 'error') return isAutoReview ? t('chat.workProcessAutoReviewRejected') : t('chat.workProcessApprovalRejected');
-  if (status === 'running' || status === 'pending') return isAutoReview ? t('chat.workProcessAutoReviewPending') : t('chat.workProcessApprovalPending');
+  if (status === 'error')
+    return isAutoReview ? t('chat.workProcessAutoReviewRejected') : t('chat.workProcessApprovalRejected');
+  if (status === 'running' || status === 'pending')
+    return isAutoReview ? t('chat.workProcessAutoReviewPending') : t('chat.workProcessApprovalPending');
   return isAutoReview ? t('chat.workProcessAutoReviewApproved') : t('chat.workProcessApprovalApproved');
 };

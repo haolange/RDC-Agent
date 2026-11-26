@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 
 /** The hidden semibold copy reserves space for mouse and keyboard emphasis. */
-export function WorkRowTitle({ text, children, wrap = false }: {
-  text: string;
-  children?: ReactNode;
-  wrap?: boolean;
-}) {
+export function WorkRowTitle({ text, children, wrap = false }: { text: string; children?: ReactNode; wrap?: boolean }) {
   const classes = ['work-row-title', wrap && 'is-wrapping'].filter(Boolean).join(' ');
-  return <span className={classes} data-text={text}><span>{children ?? text}</span></span>;
+  return (
+    <span className={classes} data-text={text}>
+      <span>{children ?? text}</span>
+    </span>
+  );
 }

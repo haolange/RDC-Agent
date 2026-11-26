@@ -11,7 +11,13 @@ export interface SettingsSnapshot {
 }
 
 const FILE_SECTIONS = [
-  'appearance', 'layout', 'profile', 'tooling', 'agentRuntime', 'agentModels', 'providers',
+  'appearance',
+  'layout',
+  'profile',
+  'tooling',
+  'agentRuntime',
+  'agentModels',
+  'providers',
 ] as const satisfies ReadonlyArray<SettingsFileSection & keyof SettingsFile>;
 
 /**
@@ -50,7 +56,11 @@ export class SettingsStore {
     const change = { revision: this.current.revision, sections };
     for (const listener of [...this.listeners]) {
       // The committed file stays authoritative when an observer fails; the failure is reported, not rethrown.
-      try { listener(change); } catch (error) { console.error('[SettingsStore] A settings change observer failed:', error); }
+      try {
+        listener(change);
+      } catch (error) {
+        console.error('[SettingsStore] A settings change observer failed:', error);
+      }
     }
     return change;
   }

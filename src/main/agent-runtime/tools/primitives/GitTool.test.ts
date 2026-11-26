@@ -22,10 +22,12 @@ function contextFor(root: string): ToolExecutionContext {
 
 describe('GitTool', () => {
   it('rejects absolute and parent-escaping paths before git runs', async () => {
-    await expect(gitAddTool.execute('g1', { path: '../escape.txt' }, undefined, undefined, contextFor(process.cwd())))
-      .rejects.toThrow(/Invalid git path/);
-    await expect(gitAddTool.execute('g2', { path: 'C:\\Windows\\system32' }, undefined, undefined, contextFor(process.cwd())))
-      .rejects.toThrow(/Invalid git path/);
+    await expect(
+      gitAddTool.execute('g1', { path: '../escape.txt' }, undefined, undefined, contextFor(process.cwd())),
+    ).rejects.toThrow(/Invalid git path/);
+    await expect(
+      gitAddTool.execute('g2', { path: 'C:\\Windows\\system32' }, undefined, undefined, contextFor(process.cwd())),
+    ).rejects.toThrow(/Invalid git path/);
   });
 
   it('runs git_status in a temporary repository', { timeout: 30_000 }, async () => {
@@ -47,11 +49,20 @@ describe('GitTool', () => {
     roots.push(root);
     const marker = path.join(root, 'fsmonitor-ran');
     await execFileAsync('git', ['init'], { cwd: root, windowsHide: true });
-    await execFileAsync('git', ['config', 'core.fsmonitor', `node -e "require('fs').writeFileSync(process.argv[1],'x')" ${JSON.stringify(marker)}`], { cwd: root, windowsHide: true });
+    await execFileAsync(
+      'git',
+      [
+        'config',
+        'core.fsmonitor',
+        `node -e "require('fs').writeFileSync(process.argv[1],'x')" ${JSON.stringify(marker)}`,
+      ],
+      { cwd: root, windowsHide: true },
+    );
     await writeFile(path.join(root, 'readme.txt'), 'hello\n', 'utf8');
 
-    await expect(gitStatusTool.execute('g4', { short: true }, undefined, undefined, contextFor(root)))
-      .rejects.toThrow(/GIT_REPOSITORY_CONFIG_EXECUTABLE: .*core\.fsmonitor/);
+    await expect(gitStatusTool.execute('g4', { short: true }, undefined, undefined, contextFor(root))).rejects.toThrow(
+      /GIT_REPOSITORY_CONFIG_EXECUTABLE: .*core\.fsmonitor/,
+    );
     await expect(access(marker)).rejects.toThrow();
   });
 });

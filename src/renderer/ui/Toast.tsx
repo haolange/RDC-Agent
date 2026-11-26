@@ -30,7 +30,17 @@ export interface ToastProps {
 }
 
 /** One toast: a tone icon, one sentence and an optional second, a dismiss button; enters and leaves with motion. */
-export function Toast({ open, title, message, tone = 'info', dismissLabel, onDismiss, onExited, onHoldChange, action }: ToastProps) {
+export function Toast({
+  open,
+  title,
+  message,
+  tone = 'info',
+  dismissLabel,
+  onDismiss,
+  onExited,
+  onHoldChange,
+  action,
+}: ToastProps) {
   const ref = useRef<HTMLDivElement>(null);
   const presence = usePresence(open, ref, onExited);
   if (!presence.mounted) return null;
@@ -59,5 +69,9 @@ export function Toast({ open, title, message, tone = 'info', dismissLabel, onDis
 }
 
 export function ToastStack({ children }: { children: ReactNode }) {
-  return <div className="ui-toast-stack" aria-live="polite">{children}</div>;
+  return (
+    <div className="ui-toast-stack" aria-live="polite">
+      {children}
+    </div>
+  );
 }

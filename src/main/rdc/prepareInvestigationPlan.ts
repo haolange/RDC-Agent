@@ -9,11 +9,13 @@ import type { ProjectInputRecord, ProjectRecord } from '@shared/types/session';
 import type { InvestigationPlanContract } from '../sessions/run/investigationPlanContract';
 import type { CaptureReplayState } from '@shared/types/captureReplay';
 
-const proposalSchema = z.object({
-  inputIds: z.array(z.string().trim().min(1).max(256)).min(1).max(32),
-  deviceId: z.string().trim().min(1).max(256),
-  comparisonGoal: z.string().trim().min(1).max(4000),
-}).strict();
+const proposalSchema = z
+  .object({
+    inputIds: z.array(z.string().trim().min(1).max(256)).min(1).max(32),
+    deviceId: z.string().trim().min(1).max(256),
+    comparisonGoal: z.string().trim().min(1).max(4000),
+  })
+  .strict();
 
 export interface InvestigationPlanHost {
   sessionProjectId(sessionId: string): string | null;
@@ -23,34 +25,54 @@ export interface InvestigationPlanHost {
 
 /** Snapshot verified registered inputs without refreshing or reconciling an active replay. */
 export async function prepareInvestigationPlan(input: {
-  mission: InvestigationPlanContract['mission']; sessionId: string; projectId: string | null;
-  captureScope?: unknown; host: InvestigationPlanHost;
+  mission: InvestigationPlanContract['mission'];
+  sessionId: string;
+  projectId: string | null;
+  captureScope?: unknown;
+  host: InvestigationPlanHost;
 }): Promise<InvestigationPlanContract> {
   if (input.captureScope === undefined) return { schemaVersion: 1, mission: input.mission };
   const proposal = proposalSchema.parse(input.captureScope);
-  if (new Set(proposal.inputIds).size !== proposal.inputIds.length) throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', 'duplicate inputs.');
-  if (!input.projectId || input.host.sessionProjectId(input.sessionId) !== input.projectId) throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', 'session/project mismatch.');
+  if (new Set(proposal.inputIds).size !== proposal.inputIds.length)
+    throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', 'duplicate inputs.');
+  if (!input.projectId || input.host.sessionProjectId(input.sessionId) !== input.projectId)
+    throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', 'session/project mismatch.');
   const project = input.host.project(input.projectId);
   if (!project) throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', 'project is unavailable.');
   const deviceId = selectedProbeDeviceId(input.host.replayState(input.sessionId, input.projectId));
-  if (deviceId !== proposal.deviceId) throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', 'device differs from the prepared selection.');
+  if (deviceId !== proposal.deviceId)
+    throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', 'device differs from the prepared selection.');
   const inputs = [];
   for (const inputId of proposal.inputIds) {
-    const capture = project.inputs.find(item => item.inputId === inputId);
-    if (!capture || !capture.contentSha256) throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', `input ${inputId} is not registered and verified.`);
+    const capture = project.inputs.find((item) => item.inputId === inputId);
+    if (!capture || !capture.contentSha256)
+      throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', `input ${inputId} is not registered and verified.`);
     const hash = await verifyPlanInput(project, capture);
-    if (hash !== capture.contentSha256) throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', `input ${inputId} changed since registration.`);
+    if (hash !== capture.contentSha256)
+      throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', `input ${inputId} changed since registration.`);
     inputs.push({ inputId, fileName: capture.fileName, contentSha256: hash });
   }
-  return { schemaVersion: 1, mission: input.mission, captureScope: {
-    projectId: input.projectId, deviceId, comparisonGoal: proposal.comparisonGoal, inputs,
-  } };
+  return {
+    schemaVersion: 1,
+    mission: input.mission,
+    captureScope: {
+      projectId: input.projectId,
+      deviceId,
+      comparisonGoal: proposal.comparisonGoal,
+      inputs,
+    },
+  };
 }
 
 export async function verifyPlanInput(project: ProjectRecord, input: ProjectInputRecord): Promise<string> {
   if (input.source === 'external_reference') return (await verifyExternalCaptureReference(input)).contentSha256!;
   const relative = path.relative(project.inputsPath, input.filePath);
-  if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || path.extname(input.filePath).toLowerCase() !== '.rdc') {
+  if (
+    !relative ||
+    relative.startsWith('..') ||
+    path.isAbsolute(relative) ||
+    path.extname(input.filePath).toLowerCase() !== '.rdc'
+  ) {
     throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', 'project input path is outside the registered inputs directory.');
   }
   await safePath(project.rootPath, input.filePath);

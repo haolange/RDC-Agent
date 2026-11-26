@@ -16,7 +16,11 @@ export interface AgentBuiltinDiffState {
 }
 
 /** Current builtin against the user's override; restoring removes the override. */
-export function AgentBuiltinDiffDialog({ state, onRestore, onClose }: {
+export function AgentBuiltinDiffDialog({
+  state,
+  onRestore,
+  onClose,
+}: {
   state: AgentBuiltinDiffState;
   onRestore: () => void;
   onClose: () => void;
@@ -32,15 +36,23 @@ export function AgentBuiltinDiffDialog({ state, onRestore, onClose }: {
       closeLabel={t('dialog.close')}
       onClose={onClose}
       dataTestId="settings-agent-builtin-diff-dialog"
-      footer={<>
-        <Button variant="secondary" size="sm" onClick={onClose}>{t('dialog.close')}</Button>
-        <Button variant="danger" size="sm" onClick={onRestore} data-testid="settings-agent-builtin-diff-restore">
-          {t('settings.agentRestoreBuiltin')}
-        </Button>
-      </>}
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose}>
+            {t('dialog.close')}
+          </Button>
+          <Button variant="danger" size="sm" onClick={onRestore} data-testid="settings-agent-builtin-diff-restore">
+            {t('settings.agentRestoreBuiltin')}
+          </Button>
+        </>
+      }
     >
       {!state.lines && !state.error ? <Spinner size="sm" /> : null}
-      {state.error ? <InlineError detail={state.error}>{humanizeError(state.error, t, 'settings.agentBuiltinDiffFailed')}</InlineError> : null}
+      {state.error ? (
+        <InlineError detail={state.error}>
+          {humanizeError(state.error, t, 'settings.agentBuiltinDiffFailed')}
+        </InlineError>
+      ) : null}
       {state.lines ? (
         <DiffBlock
           lines={state.lines}

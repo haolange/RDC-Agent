@@ -3,7 +3,12 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { AppError } from '@shared/errors/appError';
-import { getWorkspaceRoot, isWithinRoot, requireMutationWorkspaceRoot, truncateOutput } from '../../../runtime/toolFiles';
+import {
+  getWorkspaceRoot,
+  isWithinRoot,
+  requireMutationWorkspaceRoot,
+  truncateOutput,
+} from '../../../runtime/toolFiles';
 import { GIT_MAX_OUTPUT_BYTES, GIT_TIMEOUT_MS } from '../../../runtime/toolLimits';
 import type { AgentTool, AgentToolResult } from '../../agent/AgentTool';
 
@@ -46,23 +51,25 @@ interface GitOutput {
  * repository from turning an observe-class git call into code execution.
  */
 const INERT_GIT_CONFIG = [
-  '-c', 'core.quotepath=false',
-  '-c', 'core.fsmonitor=false',
-  '-c', `core.hooksPath=${os.devNull}`,
-  '-c', 'core.sshCommand=',
-  '-c', 'diff.external=',
+  '-c',
+  'core.quotepath=false',
+  '-c',
+  'core.fsmonitor=false',
+  '-c',
+  `core.hooksPath=${os.devNull}`,
+  '-c',
+  'core.sshCommand=',
+  '-c',
+  'diff.external=',
 ];
 
 /** Repository-local keys that name a program git may run; their presence fails closed. */
-const EXECUTABLE_CONFIG_KEY = /^(?:core\.(?:fsmonitor|hookspath|sshcommand|pager|editor|askpass)|diff\..+\.(?:textconv|command)|merge\..+\.driver|filter\..+\.(?:clean|smudge|process)|include(?:if\..+)?\.path|credential\..*helper|gpg\..*program|uploadpack\.packobjectshook)$/i;
+const EXECUTABLE_CONFIG_KEY =
+  /^(?:core\.(?:fsmonitor|hookspath|sshcommand|pager|editor|askpass)|diff\..+\.(?:textconv|command)|merge\..+\.driver|filter\..+\.(?:clean|smudge|process)|include(?:if\..+)?\.path|credential\..*helper|gpg\..*program|uploadpack\.packobjectshook)$/i;
 
 const GIT_ENVIRONMENT = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' };
 
-async function runGit(
-  cwd: string,
-  args: string[],
-  signal?: AbortSignal,
-): Promise<GitOutput> {
+async function runGit(cwd: string, args: string[], signal?: AbortSignal): Promise<GitOutput> {
   try {
     const result = await execFileAsync('git', [...INERT_GIT_CONFIG, ...args], {
       cwd,
@@ -90,9 +97,7 @@ async function resolveGitRoot(workspaceRoot: string, signal?: AbortSignal): Prom
   const output = await runGit(workspaceRoot, ['rev-parse', '--show-toplevel'], signal);
   const gitRoot = path.resolve(output.stdout.trim());
   // Accept equal roots, workspace-inside-repo, or repo-inside-workspace; reject unrelated trees.
-  const related =
-    isWithinRoot(gitRoot, workspaceRoot)
-    || isWithinRoot(workspaceRoot, gitRoot);
+  const related = isWithinRoot(gitRoot, workspaceRoot) || isWithinRoot(workspaceRoot, gitRoot);
   if (!related) {
     throw new Error(`Git root ${gitRoot} is outside workspace ${workspaceRoot}`);
   }
@@ -120,9 +125,15 @@ function createResult(cwd: string, args: string[], output: string): AgentToolRes
 /** `git config --list` only reads files; it never runs a configured program. */
 async function assertInertRepositoryConfig(gitRoot: string, signal?: AbortSignal): Promise<void> {
   const output = await runGit(gitRoot, ['config', '--local', '--name-only', '--list'], signal);
-  const executable = output.stdout.split(/\r?\n/).map((key) => key.trim()).filter((key) => EXECUTABLE_CONFIG_KEY.test(key));
+  const executable = output.stdout
+    .split(/\r?\n/)
+    .map((key) => key.trim())
+    .filter((key) => EXECUTABLE_CONFIG_KEY.test(key));
   if (executable.length > 0) {
-    throw new AppError('GIT_REPOSITORY_CONFIG_EXECUTABLE', `repository config names programs git would run (${[...new Set(executable)].join(', ')}). Review the repository configuration before using git tools.`);
+    throw new AppError(
+      'GIT_REPOSITORY_CONFIG_EXECUTABLE',
+      `repository config names programs git would run (${[...new Set(executable)].join(', ')}). Review the repository configuration before using git tools.`,
+    );
   }
 }
 
@@ -134,9 +145,7 @@ async function executeGit(
   const gitRoot = await resolveGitRoot(contextRoot, signal);
   await assertInertRepositoryConfig(gitRoot, signal);
   const output = await runGit(gitRoot, args, signal);
-  const text = [output.stdout.trim(), output.stderr.trim()]
-    .filter(Boolean)
-    .join('\n');
+  const text = [output.stdout.trim(), output.stderr.trim()].filter(Boolean).join('\n');
   return createResult(gitRoot, args, text);
 }
 
@@ -150,14 +159,19 @@ export const gitStatusTool: AgentTool<GitStatusParams, GitDetails> = {
       short: { type: 'boolean', description: 'Use concise porcelain output. Defaults to true.' },
     },
   },
-  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
+  spec: {
+    isReadOnly: true,
+    concurrency: 'shared',
+    isDestructive: false,
+    sideEffect: 'none',
+    category: 'system',
+    requiresApproval: false,
+  },
   permissionHint: 'readonly',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     const root = getWorkspaceRoot(context);
-    const args = params.short === false
-      ? ['status', '-sb']
-      : ['status', '--porcelain=v1', '-b', '-uall'];
+    const args = params.short === false ? ['status', '-sb'] : ['status', '--porcelain=v1', '-b', '-uall'];
     return executeGit(args, root, signal);
   },
 };
@@ -174,7 +188,14 @@ export const gitDiffTool: AgentTool<GitDiffParams, GitDetails> = {
       stat: { type: 'boolean', description: 'Show diff stat instead of patch.' },
     },
   },
-  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
+  spec: {
+    isReadOnly: true,
+    concurrency: 'shared',
+    isDestructive: false,
+    sideEffect: 'none',
+    category: 'system',
+    requiresApproval: false,
+  },
   permissionHint: 'readonly',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
@@ -197,7 +218,14 @@ export const gitLogTool: AgentTool<GitLogParams, GitDetails> = {
       limit: { type: 'integer', description: 'Maximum commits to show, 1-50. Defaults to 10.' },
     },
   },
-  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
+  spec: {
+    isReadOnly: true,
+    concurrency: 'shared',
+    isDestructive: false,
+    sideEffect: 'none',
+    category: 'system',
+    requiresApproval: false,
+  },
   permissionHint: 'readonly',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
@@ -218,7 +246,14 @@ export const gitAddTool: AgentTool<GitPathParams, GitDetails> = {
     },
     required: ['path'],
   },
-  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: false, sideEffect: 'filesystem', category: 'system', requiresApproval: true },
+  spec: {
+    isReadOnly: false,
+    concurrency: 'exclusive',
+    isDestructive: false,
+    sideEffect: 'filesystem',
+    category: 'system',
+    requiresApproval: true,
+  },
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
@@ -238,7 +273,14 @@ export const gitUnstageTool: AgentTool<GitPathParams, GitDetails> = {
     },
     required: ['path'],
   },
-  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: false, sideEffect: 'filesystem', category: 'system', requiresApproval: true },
+  spec: {
+    isReadOnly: false,
+    concurrency: 'exclusive',
+    isDestructive: false,
+    sideEffect: 'filesystem',
+    category: 'system',
+    requiresApproval: true,
+  },
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
@@ -258,7 +300,14 @@ export const gitCommitTool: AgentTool<GitCommitParams, GitDetails> = {
     },
     required: ['message'],
   },
-  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: false, sideEffect: 'filesystem', category: 'system', requiresApproval: true },
+  spec: {
+    isReadOnly: false,
+    concurrency: 'exclusive',
+    isDestructive: false,
+    sideEffect: 'filesystem',
+    category: 'system',
+    requiresApproval: true,
+  },
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {

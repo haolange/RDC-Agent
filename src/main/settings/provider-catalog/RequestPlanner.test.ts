@@ -12,7 +12,13 @@ const reasoning = {
   wireProfile: {
     kind: 'openai-responses' as const,
     on: 'medium' as const,
-    levels: { low: 'low' as const, medium: 'medium' as const, high: 'high' as const, xhigh: 'xhigh' as const, max: 'max' as const },
+    levels: {
+      low: 'low' as const,
+      medium: 'medium' as const,
+      high: 'high' as const,
+      xhigh: 'xhigh' as const,
+      max: 'max' as const,
+    },
   },
 };
 
@@ -24,21 +30,25 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
     aliases: [],
     enabled: true,
     route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test/v1', source: 'catalog' },
-    routeOptions: [{
-      id: 'responses',
-      route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test/v1', source: 'catalog' },
-      availability: 'available',
-    }],
+    routeOptions: [
+      {
+        id: 'responses',
+        route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test/v1', source: 'catalog' },
+        availability: 'available',
+      },
+    ],
     availability: 'available',
     presencePolicy: 'maintained',
-    contextTiers: [{
-      id: 'default',
-      label: 'Default',
-      maxTotalTokens: 256_000,
-      maxOutputTokens: 16_000,
-      activation: { kind: 'implicit' },
-      entitlement: 'granted',
-    }],
+    contextTiers: [
+      {
+        id: 'default',
+        label: 'Default',
+        maxTotalTokens: 256_000,
+        maxOutputTokens: 16_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      },
+    ],
     defaultBudgetTokens: 240_000,
     controls: {
       fast: { state: 'unsupported', fixedValue: false },
@@ -55,15 +65,40 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
 
 describe('planModelRequest', () => {
   it('keeps model identity stable when only evidence freshness timestamps change', () => {
-    const evidence = { field: 'toolCalling.state', source: 'discovery' as const, value: 'supported',
-      observedAt: '2026-11-01T00:00:00.000Z', refreshedAt: '2026-11-01T00:00:00.000Z',
-      expiresAt: '2026-11-02T00:00:00.000Z', sourceRevision: 'catalog-v1', sourceHash: 'source-a' };
-    const first = planModelRequest({ model: model({ catalogRevision: 'catalog', routeRevision: 'route', provenance: [evidence] }) });
-    const refreshed = planModelRequest({ model: model({ catalogRevision: 'catalog', routeRevision: 'route', provenance: [{ ...evidence,
-      observedAt: '2026-11-03T00:00:00.000Z', refreshedAt: '2026-11-03T00:00:00.000Z', expiresAt: '2026-11-04T00:00:00.000Z',
-    }] }) });
-    const changedSource = planModelRequest({ model: model({ catalogRevision: 'catalog', routeRevision: 'route',
-      provenance: [{ ...evidence, sourceHash: 'source-b' }] }) });
+    const evidence = {
+      field: 'toolCalling.state',
+      source: 'discovery' as const,
+      value: 'supported',
+      observedAt: '2026-11-01T00:00:00.000Z',
+      refreshedAt: '2026-11-01T00:00:00.000Z',
+      expiresAt: '2026-11-02T00:00:00.000Z',
+      sourceRevision: 'catalog-v1',
+      sourceHash: 'source-a',
+    };
+    const first = planModelRequest({
+      model: model({ catalogRevision: 'catalog', routeRevision: 'route', provenance: [evidence] }),
+    });
+    const refreshed = planModelRequest({
+      model: model({
+        catalogRevision: 'catalog',
+        routeRevision: 'route',
+        provenance: [
+          {
+            ...evidence,
+            observedAt: '2026-11-03T00:00:00.000Z',
+            refreshedAt: '2026-11-03T00:00:00.000Z',
+            expiresAt: '2026-11-04T00:00:00.000Z',
+          },
+        ],
+      }),
+    });
+    const changedSource = planModelRequest({
+      model: model({
+        catalogRevision: 'catalog',
+        routeRevision: 'route',
+        provenance: [{ ...evidence, sourceHash: 'source-b' }],
+      }),
+    });
     expect(first.ok && refreshed.ok && changedSource.ok).toBe(true);
     if (!first.ok || !refreshed.ok || !changedSource.ok) return;
     expect(refreshed.plan.executionIdentity.modelSnapshotId).toBe(first.plan.executionIdentity.modelSnapshotId);
@@ -71,12 +106,24 @@ describe('planModelRequest', () => {
     expect(changedSource.plan.executionIdentity.modelSnapshotId).not.toBe(first.plan.executionIdentity.modelSnapshotId);
 
     const withoutCatalog = planModelRequest({ model: model({ routeRevision: 'route', provenance: [evidence] }) });
-    const renewedWithoutCatalog = planModelRequest({ model: model({ routeRevision: 'route', provenance: [{ ...evidence,
-      observedAt: '2026-11-03T00:00:00.000Z', refreshedAt: '2026-11-03T00:00:00.000Z', expiresAt: '2026-11-04T00:00:00.000Z',
-    }] }) });
+    const renewedWithoutCatalog = planModelRequest({
+      model: model({
+        routeRevision: 'route',
+        provenance: [
+          {
+            ...evidence,
+            observedAt: '2026-11-03T00:00:00.000Z',
+            refreshedAt: '2026-11-03T00:00:00.000Z',
+            expiresAt: '2026-11-04T00:00:00.000Z',
+          },
+        ],
+      }),
+    });
     expect(withoutCatalog.ok && renewedWithoutCatalog.ok).toBe(true);
     if (!withoutCatalog.ok || !renewedWithoutCatalog.ok) return;
-    expect(renewedWithoutCatalog.plan.executionIdentity.fingerprint).toBe(withoutCatalog.plan.executionIdentity.fingerprint);
+    expect(renewedWithoutCatalog.plan.executionIdentity.fingerprint).toBe(
+      withoutCatalog.plan.executionIdentity.fingerprint,
+    );
   });
 
   it('records unknown provider reasoning without emitting an Off selection or wire patch', () => {
@@ -109,12 +156,14 @@ describe('planModelRequest', () => {
         ...model().controls,
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
       },
-      executionBindings: [{
-        id: 'fast:priority',
-        when: { fast: true },
-        actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
-        entitlement: 'granted',
-      }],
+      executionBindings: [
+        {
+          id: 'fast:priority',
+          when: { fast: true },
+          actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
+          entitlement: 'granted',
+        },
+      ],
     });
     const result = planModelRequest({ model: base, catalogModels: [base], controls: { fastModel: true } });
     expect(result.ok).toBe(true);
@@ -135,15 +184,17 @@ describe('planModelRequest', () => {
         ...model().controls,
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
       },
-      executionBindings: [{
-        id: 'fast:anthropic-speed',
-        when: { fast: true },
-        actions: [
-          { kind: 'request-patch', patch: { speed: 'fast' } },
-          { kind: 'request-headers', headers: { 'anthropic-beta': 'fast-mode-2026-02-01' } },
-        ],
-        entitlement: 'granted',
-      }],
+      executionBindings: [
+        {
+          id: 'fast:anthropic-speed',
+          when: { fast: true },
+          actions: [
+            { kind: 'request-patch', patch: { speed: 'fast' } },
+            { kind: 'request-headers', headers: { 'anthropic-beta': 'fast-mode-2026-02-01' } },
+          ],
+          entitlement: 'granted',
+        },
+      ],
     });
 
     const result = planModelRequest({ model: base, catalogModels: [base], controls: { fastModel: true } });
@@ -156,15 +207,19 @@ describe('planModelRequest', () => {
 
   it('applies an unconditional route parameter policy without inventing a UI control', () => {
     const base = model({
-      executionBindings: [{
-        id: 'route:chatgpt-codex-parameter-policy',
-        when: {},
-        actions: [{
-          kind: 'request-patch',
-          patch: { temperature: null, top_p: null, max_output_tokens: null },
-        }],
-        entitlement: 'granted',
-      }],
+      executionBindings: [
+        {
+          id: 'route:chatgpt-codex-parameter-policy',
+          when: {},
+          actions: [
+            {
+              kind: 'request-patch',
+              patch: { temperature: null, top_p: null, max_output_tokens: null },
+            },
+          ],
+          entitlement: 'granted',
+        },
+      ],
     });
     const result = planModelRequest({ model: base, catalogModels: [base] });
     expect(result.ok).toBe(true);
@@ -174,8 +229,16 @@ describe('planModelRequest', () => {
   });
   it('switches Kimi Fast to its hidden highspeed target on the selected protocol', () => {
     const routes: EffectiveModel['routeOptions'] = [
-      { id: 'anthropic', route: { protocol: 'AnthropicMessages', baseUrl: 'https://kimi.test/v1', source: 'catalog' }, availability: 'available' },
-      { id: 'openai', route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://kimi.test/v1', source: 'catalog' }, availability: 'available' },
+      {
+        id: 'anthropic',
+        route: { protocol: 'AnthropicMessages', baseUrl: 'https://kimi.test/v1', source: 'catalog' },
+        availability: 'available',
+      },
+      {
+        id: 'openai',
+        route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://kimi.test/v1', source: 'catalog' },
+        availability: 'available',
+      },
     ];
     const base = model({
       modelId: 'kimi-for-coding',
@@ -187,12 +250,14 @@ describe('planModelRequest', () => {
         ...model().controls,
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
       },
-      executionBindings: [{
-        id: 'fast:kimi-highspeed',
-        when: { fast: true },
-        actions: [{ kind: 'model-switch', targetModelId: 'kimi-for-coding-highspeed' }],
-        entitlement: 'granted',
-      }],
+      executionBindings: [
+        {
+          id: 'fast:kimi-highspeed',
+          when: { fast: true },
+          actions: [{ kind: 'model-switch', targetModelId: 'kimi-for-coding-highspeed' }],
+          entitlement: 'granted',
+        },
+      ],
     });
     const highspeed = model({
       modelId: 'kimi-for-coding-highspeed',
@@ -222,12 +287,14 @@ describe('planModelRequest', () => {
         ...model().controls,
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
       },
-      executionBindings: [{
-        id: 'fast:missing',
-        when: { fast: true },
-        actions: [{ kind: 'model-switch', targetModelId: 'missing' }],
-        entitlement: 'granted',
-      }],
+      executionBindings: [
+        {
+          id: 'fast:missing',
+          when: { fast: true },
+          actions: [{ kind: 'model-switch', targetModelId: 'missing' }],
+          entitlement: 'granted',
+        },
+      ],
     });
     const controls = resolveModelControls(base, { fastModel: true }, [base]);
     const result = planModelRequest({ model: base, catalogModels: [base], controls: { fastModel: true } });
@@ -264,7 +331,11 @@ describe('planModelRequest', () => {
   it('returns the same protocol-conflict reason in Composer resolution and planning', () => {
     const openAi = {
       id: 'openai',
-      route: { protocol: 'OpenAICompatibleChatCompletions' as const, baseUrl: 'https://example.test/v1', source: 'catalog' as const },
+      route: {
+        protocol: 'OpenAICompatibleChatCompletions' as const,
+        baseUrl: 'https://example.test/v1',
+        source: 'catalog' as const,
+      },
       availability: 'available' as const,
     };
     const base = model({
@@ -275,21 +346,25 @@ describe('planModelRequest', () => {
         ...model().controls,
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
       },
-      executionBindings: [{
-        id: 'fast:anthropic-only',
-        when: { fast: true },
-        actions: [{ kind: 'model-switch', targetModelId: 'anthropic-only' }],
-        entitlement: 'granted',
-      }],
+      executionBindings: [
+        {
+          id: 'fast:anthropic-only',
+          when: { fast: true },
+          actions: [{ kind: 'model-switch', targetModelId: 'anthropic-only' }],
+          entitlement: 'granted',
+        },
+      ],
     });
     const target = model({
       modelId: 'anthropic-only',
       route: { protocol: 'AnthropicMessages', baseUrl: 'https://example.test/v1', source: 'catalog' },
-      routeOptions: [{
-        id: 'anthropic',
-        route: { protocol: 'AnthropicMessages', baseUrl: 'https://example.test/v1', source: 'catalog' },
-        availability: 'available',
-      }],
+      routeOptions: [
+        {
+          id: 'anthropic',
+          route: { protocol: 'AnthropicMessages', baseUrl: 'https://example.test/v1', source: 'catalog' },
+          availability: 'available',
+        },
+      ],
     });
     const controls = resolveModelControls(base, { fastModel: true }, [base, target]);
     const result = planModelRequest({ model: base, catalogModels: [base, target], controls: { fastModel: true } });
@@ -303,35 +378,42 @@ describe('planModelRequest', () => {
         ...model().controls,
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
       },
-      executionBindings: [{
-        id: 'fast:unverified-route',
-        when: { fast: true },
-        actions: [{ kind: 'model-switch', targetModelId: 'target' }],
-        entitlement: 'granted',
-      }],
+      executionBindings: [
+        {
+          id: 'fast:unverified-route',
+          when: { fast: true },
+          actions: [{ kind: 'model-switch', targetModelId: 'target' }],
+          entitlement: 'granted',
+        },
+      ],
     });
     const target = model({
       modelId: 'target',
-      routeOptions: [{
-        id: 'responses',
-        route: model().route,
-        availability: 'unknown',
-      }],
+      routeOptions: [
+        {
+          id: 'responses',
+          route: model().route,
+          availability: 'unknown',
+        },
+      ],
     });
-    expect(planModelRequest({ model: base, catalogModels: [base, target], controls: { fastModel: true } }))
-      .toMatchObject({ ok: false, code: 'MODEL_UNAVAILABLE', message: expect.stringContaining('unknown') });
+    expect(
+      planModelRequest({ model: base, catalogModels: [base, target], controls: { fastModel: true } }),
+    ).toMatchObject({ ok: false, code: 'MODEL_UNAVAILABLE', message: expect.stringContaining('unknown') });
   });
 
   it('keeps fixed Max mode enabled and disabled in UI while planning the explicit tier', () => {
     const fixed = model({
-      contextTiers: [{
-        id: 'fixed-1m',
-        label: 'Max mode',
-        maxTotalTokens: 1_000_000,
-        maxOutputTokens: 64_000,
-        activation: { kind: 'implicit' },
-        entitlement: 'granted',
-      }],
+      contextTiers: [
+        {
+          id: 'fixed-1m',
+          label: 'Max mode',
+          maxTotalTokens: 1_000_000,
+          maxOutputTokens: 64_000,
+          activation: { kind: 'implicit' },
+          entitlement: 'granted',
+        },
+      ],
       controls: {
         ...model().controls,
         maxContext: { state: 'fixed', fixedValue: true, tierId: 'fixed-1m' },
@@ -375,14 +457,16 @@ describe('planModelRequest', () => {
 
   it('uses the full 200k window as prompt budget when maxTotal equals the window', () => {
     const haiku = model({
-      contextTiers: [{
-        id: 'default',
-        label: 'Default',
-        maxTotalTokens: 200_000,
-        maxOutputTokens: 64_000,
-        activation: { kind: 'implicit' },
-        entitlement: 'granted',
-      }],
+      contextTiers: [
+        {
+          id: 'default',
+          label: 'Default',
+          maxTotalTokens: 200_000,
+          maxOutputTokens: 64_000,
+          activation: { kind: 'implicit' },
+          entitlement: 'granted',
+        },
+      ],
       defaultBudgetTokens: 200_000,
     });
     const result = planModelRequest({ model: haiku, catalogModels: [haiku] });
@@ -396,14 +480,16 @@ describe('planModelRequest', () => {
 
   it('keeps an explicit prompt cap without subtracting max output', () => {
     const split = model({
-      contextTiers: [{
-        id: 'default',
-        label: 'Default',
-        maxPromptTokens: 936_000,
-        maxOutputTokens: 64_000,
-        activation: { kind: 'implicit' },
-        entitlement: 'granted',
-      }],
+      contextTiers: [
+        {
+          id: 'default',
+          label: 'Default',
+          maxPromptTokens: 936_000,
+          maxOutputTokens: 64_000,
+          activation: { kind: 'implicit' },
+          entitlement: 'granted',
+        },
+      ],
       defaultBudgetTokens: 1_000_000,
     });
     const result = planModelRequest({ model: split, catalogModels: [split] });
@@ -417,13 +503,15 @@ describe('planModelRequest', () => {
 
   it('derives output tokens from the window when the tier omits maxOutputTokens', () => {
     const promptOnly = model({
-      contextTiers: [{
-        id: 'default',
-        label: 'Codex service limit',
-        maxPromptTokens: 272_000,
-        activation: { kind: 'implicit' },
-        entitlement: 'granted',
-      }],
+      contextTiers: [
+        {
+          id: 'default',
+          label: 'Codex service limit',
+          maxPromptTokens: 272_000,
+          activation: { kind: 'implicit' },
+          entitlement: 'granted',
+        },
+      ],
       defaultBudgetTokens: 272_000,
     });
     const result = planModelRequest({ model: promptOnly, catalogModels: [promptOnly] });
@@ -436,12 +524,14 @@ describe('planModelRequest', () => {
 
   it('uses a model-switch reasoning Max binding and suppresses duplicate wire effort', () => {
     const base = model({
-      executionBindings: [{
-        id: 'reasoning:max-model',
-        when: { reasoning: ['max'] },
-        actions: [{ kind: 'model-switch', targetModelId: 'max-model', suppressReasoningWire: true }],
-        entitlement: 'granted',
-      }],
+      executionBindings: [
+        {
+          id: 'reasoning:max-model',
+          when: { reasoning: ['max'] },
+          actions: [{ kind: 'model-switch', targetModelId: 'max-model', suppressReasoningWire: true }],
+          entitlement: 'granted',
+        },
+      ],
     });
     const max = model({
       modelId: 'max-model',
@@ -462,7 +552,13 @@ describe('planModelRequest', () => {
     const combined = model({
       contextTiers: [
         model().contextTiers[0],
-        { id: 'long', label: '1M', maxTotalTokens: 1_000_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
+        {
+          id: 'long',
+          label: '1M',
+          maxTotalTokens: 1_000_000,
+          activation: { kind: 'implicit' },
+          entitlement: 'granted',
+        },
       ],
       controls: {
         ...model().controls,
@@ -470,8 +566,18 @@ describe('planModelRequest', () => {
         maxContext: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'long' },
       },
       executionBindings: [
-        { id: 'fast', when: { fast: true }, actions: [{ kind: 'request-patch', patch: { mode: 'fast' } }], entitlement: 'granted' },
-        { id: 'fast+1m', when: { fast: true, maxContext: true }, actions: [{ kind: 'request-patch', patch: { mode: 'fast-long' } }], entitlement: 'granted' },
+        {
+          id: 'fast',
+          when: { fast: true },
+          actions: [{ kind: 'request-patch', patch: { mode: 'fast' } }],
+          entitlement: 'granted',
+        },
+        {
+          id: 'fast+1m',
+          when: { fast: true, maxContext: true },
+          actions: [{ kind: 'request-patch', patch: { mode: 'fast-long' } }],
+          entitlement: 'granted',
+        },
       ],
     });
     const result = planModelRequest({
@@ -513,11 +619,13 @@ describe('planModelRequest', () => {
     const cached = model({
       cacheContract,
       route: { ...model().route, contracts: routeContracts },
-      routeOptions: [{
-        id: 'responses',
-        route: { ...model().route, contracts: routeContracts },
-        availability: 'available',
-      }],
+      routeOptions: [
+        {
+          id: 'responses',
+          route: { ...model().route, contracts: routeContracts },
+          availability: 'available',
+        },
+      ],
     });
 
     const result = planModelRequest({ model: cached, catalogModels: [cached] });
@@ -541,11 +649,13 @@ describe('planModelRequest', () => {
     };
     const stateful = model({
       route: { ...model().route, contracts },
-      routeOptions: [{
-        id: 'responses',
-        route: { ...model().route, contracts },
-        availability: 'available',
-      }],
+      routeOptions: [
+        {
+          id: 'responses',
+          route: { ...model().route, contracts },
+          availability: 'available',
+        },
+      ],
     });
     const secretScope = 'account-secret-that-must-not-be-persisted';
     const result = planModelRequest({ model: stateful, credentialScopeId: secretScope });
@@ -580,11 +690,13 @@ describe('planModelRequest', () => {
     };
     const stateful = model({
       route: { ...model().route, contracts },
-      routeOptions: [{
-        id: 'responses',
-        route: { ...model().route, contracts },
-        availability: 'available',
-      }],
+      routeOptions: [
+        {
+          id: 'responses',
+          route: { ...model().route, contracts },
+          availability: 'available',
+        },
+      ],
     });
     const enabled = planModelRequest({ model: stateful, stateMode: 'provider-managed' });
     expect(enabled.ok).toBe(true);
@@ -600,8 +712,10 @@ describe('planModelRequest', () => {
       portable: false,
     });
 
-    expect(planModelRequest({ model: model(), stateMode: 'provider-managed' }))
-      .toMatchObject({ ok: false, code: 'CONSTRAINT_REJECTED' });
+    expect(planModelRequest({ model: model(), stateMode: 'provider-managed' })).toMatchObject({
+      ok: false,
+      code: 'CONSTRAINT_REJECTED',
+    });
   });
 
   it('changes execution identity for account, endpoint, control, and binding changes', () => {
@@ -619,11 +733,13 @@ describe('planModelRequest', () => {
     const accountB = getPlan(base, { model: base, credentialScopeId: 'account-b' });
     const endpoint = model({
       route: { ...base.route, baseUrl: 'https://other.example.test/v1' },
-      routeOptions: [{
-        id: 'responses',
-        route: { ...base.route, baseUrl: 'https://other.example.test/v1' },
-        availability: 'available',
-      }],
+      routeOptions: [
+        {
+          id: 'responses',
+          route: { ...base.route, baseUrl: 'https://other.example.test/v1' },
+          availability: 'available',
+        },
+      ],
     });
     const endpointPlan = getPlan(endpoint);
     const high = getPlan(base, { model: base, controls: { reasoningLevel: 'high' } });
@@ -632,12 +748,14 @@ describe('planModelRequest', () => {
         ...base.controls,
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
       },
-      executionBindings: [{
-        id: 'fast:priority',
-        when: { fast: true },
-        actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
-        entitlement: 'granted',
-      }],
+      executionBindings: [
+        {
+          id: 'fast:priority',
+          when: { fast: true },
+          actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
+          entitlement: 'granted',
+        },
+      ],
     });
     const fast = getPlan(fastModel, {
       model: fastModel,
@@ -645,15 +763,16 @@ describe('planModelRequest', () => {
       controls: { fastModel: true },
     });
 
-    expect(new Set([
-      accountA.executionIdentity.fingerprint,
-      accountB.executionIdentity.fingerprint,
-      endpointPlan.executionIdentity.fingerprint,
-      high.executionIdentity.fingerprint,
-      fast.executionIdentity.fingerprint,
-    ]).size).toBe(5);
+    expect(
+      new Set([
+        accountA.executionIdentity.fingerprint,
+        accountB.executionIdentity.fingerprint,
+        endpointPlan.executionIdentity.fingerprint,
+        high.executionIdentity.fingerprint,
+        fast.executionIdentity.fingerprint,
+      ]).size,
+    ).toBe(5);
     expect(accountA.executionIdentity.variantKey).not.toBe(high.executionIdentity.variantKey);
     expect(accountA.executionIdentity.variantKey).not.toBe(fast.executionIdentity.variantKey);
   });
-
 });

@@ -57,4 +57,3 @@ export async function commitSessionRenameOp(
     ctx.setIsBusy(false);
   }
 }
-

@@ -14,12 +14,7 @@ import {
 } from './projectSelectionContext';
 import { loadProjectsOp, loadSessionsOp } from './projectSelectionProjectOps';
 import { selectSessionOp } from './projectSelectionSessionOps';
-import type {
-  LoadProjectsOptions,
-  LoadSessionsOptions,
-  SelectSessionOptions,
-  SelectionSnapshot,
-} from './types';
+import type { LoadProjectsOptions, LoadSessionsOptions, SelectSessionOptions, SelectionSnapshot } from './types';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
 export interface UseProjectSelectionLoadersOptions {
@@ -56,47 +51,51 @@ export function useProjectSelectionLoaders({
 
   const beginSelectionRequest = useCallback(() => selectionLane.begin('selection'), [selectionLane]);
 
-  const isLatestSelectionRequest = useCallback((requestId?: number) => (
-    requestId === undefined || selectionLane.isLatest('selection', requestId)
-  ), [selectionLane]);
+  const isLatestSelectionRequest = useCallback(
+    (requestId?: number) => requestId === undefined || selectionLane.isLatest('selection', requestId),
+    [selectionLane],
+  );
 
-  const loaderCtx = useMemo((): ProjectSelectionLoaderOpsContext => ({
-    t,
-    setSidebarError,
-    ensureProjectExpanded,
-    loadProjectSessionList,
-    pruneTreeForProjects,
-    resetTree,
-    isLatestSelectionRequest,
-    setProjects,
-    setSessions,
-    setCurrentProject,
-    setCurrentSessionId,
-    setProjectInputs,
-    updateProjectInputs,
-    setRightRailTarget,
-    setCurrentRun,
-    setCaptures,
-    getCurrentSession: getCurrentSessionView,
-    reloadSettings: (projectId) => useAppSettingsStore.getState().reloadSettings(projectId),
-  }), [
-    t,
-    setSidebarError,
-    ensureProjectExpanded,
-    loadProjectSessionList,
-    pruneTreeForProjects,
-    resetTree,
-    isLatestSelectionRequest,
-    setProjects,
-    setSessions,
-    setCurrentProject,
-    setCurrentSessionId,
-    setProjectInputs,
-    updateProjectInputs,
-    setRightRailTarget,
-    setCurrentRun,
-    setCaptures,
-  ]);
+  const loaderCtx = useMemo(
+    (): ProjectSelectionLoaderOpsContext => ({
+      t,
+      setSidebarError,
+      ensureProjectExpanded,
+      loadProjectSessionList,
+      pruneTreeForProjects,
+      resetTree,
+      isLatestSelectionRequest,
+      setProjects,
+      setSessions,
+      setCurrentProject,
+      setCurrentSessionId,
+      setProjectInputs,
+      updateProjectInputs,
+      setRightRailTarget,
+      setCurrentRun,
+      setCaptures,
+      getCurrentSession: getCurrentSessionView,
+      reloadSettings: (projectId) => useAppSettingsStore.getState().reloadSettings(projectId),
+    }),
+    [
+      t,
+      setSidebarError,
+      ensureProjectExpanded,
+      loadProjectSessionList,
+      pruneTreeForProjects,
+      resetTree,
+      isLatestSelectionRequest,
+      setProjects,
+      setSessions,
+      setCurrentProject,
+      setCurrentSessionId,
+      setProjectInputs,
+      updateProjectInputs,
+      setRightRailTarget,
+      setCurrentRun,
+      setCaptures,
+    ],
+  );
 
   const captureSelectionSnapshotFn = useCallback(() => captureSelectionSnapshot(), []);
   const restoreSelectionSnapshotFn = useCallback(
@@ -112,9 +111,8 @@ export function useProjectSelectionLoaders({
     [loaderCtx],
   );
   const loadProjects = useCallback(
-    (preferredProjectId?: string | null, preferredSessionId?: string | null, options: LoadProjectsOptions = {}) => (
-      loadProjectsOp(loaderCtx, preferredProjectId, preferredSessionId, options)
-    ),
+    (preferredProjectId?: string | null, preferredSessionId?: string | null, options: LoadProjectsOptions = {}) =>
+      loadProjectsOp(loaderCtx, preferredProjectId, preferredSessionId, options),
     [loaderCtx],
   );
 

@@ -16,7 +16,16 @@ import type { KnowledgeOperationProgress } from '@shared/types/knowledgeOperatio
  * Cancel; a cancelled rebuild keeps the dialog open and says the previous index is still in use. If it fails the
  * dialog stays open with the reason and a retry, and it closes only on success.
  */
-export function RebuildIndexDialog({ open, index, rebuilding, progress, cancelling, onRebuild, onCancel, onClose }: {
+export function RebuildIndexDialog({
+  open,
+  index,
+  rebuilding,
+  progress,
+  cancelling,
+  onRebuild,
+  onCancel,
+  onClose,
+}: {
   open: boolean;
   index: KnowledgeIndexOverview | null;
   rebuilding: boolean;
@@ -49,33 +58,58 @@ export function RebuildIndexDialog({ open, index, rebuilding, progress, cancelli
       busy={rebuilding}
       onClose={close}
       dataTestId="knowledge-center-rebuild-dialog"
-      footer={(
+      footer={
         <>
           {rebuilding ? <KnowledgeTaskProgress operation="rebuild" progress={progress} /> : null}
-          {!rebuilding && cancelled ? <KnowledgeTaskCancelled label={t('knowledgeCenter.indexRebuildCancelled')} /> : null}
+          {!rebuilding && cancelled ? (
+            <KnowledgeTaskCancelled label={t('knowledgeCenter.indexRebuildCancelled')} />
+          ) : null}
           {rebuilding ? (
-            <Button variant="secondary" loading={cancelling} data-testid="knowledge-center-rebuild-cancel" onClick={onCancel}>
+            <Button
+              variant="secondary"
+              loading={cancelling}
+              data-testid="knowledge-center-rebuild-cancel"
+              onClick={onCancel}
+            >
               {t('knowledgeCenter.cancelTask')}
             </Button>
           ) : (
-            <Button variant="ghost" onClick={close}>{t('dialog.cancel')}</Button>
+            <Button variant="ghost" onClick={close}>
+              {t('dialog.cancel')}
+            </Button>
           )}
-          <Button variant="primary" disabled={rebuilding} data-testid="knowledge-center-rebuild-confirm" onClick={rebuild}>
+          <Button
+            variant="primary"
+            disabled={rebuilding}
+            data-testid="knowledge-center-rebuild-confirm"
+            onClick={rebuild}
+          >
             {rebuilding ? t('knowledgeCenter.indexRebuilding') : t('knowledgeCenter.indexRebuild')}
           </Button>
         </>
-      )}
+      }
     >
       <dl className="knowledge-center-index-facts">
-        <div><dt>{t('knowledgeCenter.indexCardCount')}</dt><dd>{index?.cardCount ?? 0}</dd></div>
+        <div>
+          <dt>{t('knowledgeCenter.indexCardCount')}</dt>
+          <dd>{index?.cardCount ?? 0}</dd>
+        </div>
         <div>
           <dt>{t('knowledgeCenter.indexBuiltAt')}</dt>
-          <dd>{index?.builtAt ? formatDateTime(language, Date.parse(index.builtAt)) : t('knowledgeCenter.indexNeverBuilt')}</dd>
+          <dd>
+            {index?.builtAt
+              ? formatDateTime(language, Date.parse(index.builtAt))
+              : t('knowledgeCenter.indexNeverBuilt')}
+          </dd>
         </div>
       </dl>
       {failure ? (
-        <InlineError data-testid="knowledge-center-rebuild-error" detail={errorDetail(failure)} onRetry={rebuild}
-          retryDisabled={rebuilding}>
+        <InlineError
+          data-testid="knowledge-center-rebuild-error"
+          detail={errorDetail(failure)}
+          onRetry={rebuild}
+          retryDisabled={rebuilding}
+        >
           {humanizeError(failure, t, 'knowledgeCenter.indexRebuildFailed')}
         </InlineError>
       ) : null}

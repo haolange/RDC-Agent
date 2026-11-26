@@ -26,7 +26,12 @@ export const ComposerMarkdownModeTabs: React.FC<ComposerMarkdownModeTabsProps> =
         onChange={(next) => onModeChange(next === 'preview' ? 'preview' : 'write')}
         tabs={[
           { id: 'write', label: t('composer.markdownWrite'), description: t('composer.markdownWriteTip'), disabled },
-          { id: 'preview', label: t('composer.markdownPreview'), description: t('composer.markdownPreviewTip'), disabled },
+          {
+            id: 'preview',
+            label: t('composer.markdownPreview'),
+            description: t('composer.markdownPreviewTip'),
+            disabled,
+          },
         ]}
       />
     </div>

@@ -6,15 +6,23 @@ import { parseIpcArgs, ipcNonEmptyString } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
-const requestSchema = z.tuple([z.object({
-  providerIds: z.array(ipcNonEmptyString(200, 'providerId')).max(300).optional(),
-  retryRunId: ipcNonEmptyString(100, 'retryRunId').optional(),
-}).strict()]);
+const requestSchema = z.tuple([
+  z
+    .object({
+      providerIds: z.array(ipcNonEmptyString(200, 'providerId')).max(300).optional(),
+      retryRunId: ipcNonEmptyString(100, 'retryRunId').optional(),
+    })
+    .strict(),
+]);
 const idSchema = z.tuple([ipcNonEmptyString(100, 'runId')]);
 
 export function registerProviderProbeHandlers(context: WorkbenchIpcContext): void {
-  providerProbeBatchService.subscribe(batch => context.broadcastToRenderer('llm:probeBatchChanged', batch));
-  shutdownCoordinator.register({ id: 'provider-probes.dispose', phase: 'abort_all', dispose: () => providerProbeBatchService.dispose() });
+  providerProbeBatchService.subscribe((batch) => context.broadcastToRenderer('llm:probeBatchChanged', batch));
+  shutdownCoordinator.register({
+    id: 'provider-probes.dispose',
+    phase: 'abort_all',
+    dispose: () => providerProbeBatchService.dispose(),
+  });
   ipcMain.handle('llm:prepareProbeBatch', (_event, ...raw: unknown[]) => {
     const [request] = parseIpcArgs(requestSchema, raw, { label: 'llm:prepareProbeBatch', maxBytes: 64 * 1024 });
     return providerProbeBatchService.prepare(request);

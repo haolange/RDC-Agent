@@ -5,11 +5,7 @@
 
 /** Encode an identity segment for tool names: reversible base64url of utf8. */
 export function encodeMcpNameSegment(value: string): string {
-  return Buffer.from(value, 'utf8')
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '');
+  return Buffer.from(value, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
 /** Decode a name segment; null when encode(decode(x)) !== x (fail-closed). */

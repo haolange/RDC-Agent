@@ -10,18 +10,31 @@ import { markdownMediaRoute } from './useMarkdownMedia';
 vi.mock('./markdownHighlight', () => ({ MARKDOWN_LANGUAGES: {}, MARKDOWN_LANGUAGE_ALIASES: {} }));
 vi.mock('katex/dist/katex.min.css', () => ({}));
 
-const read = { url: 'https://renderdoc.org/docs/', domain: 'renderdoc.org', title: 'RenderDoc Docs', summary: 'Getting started.' };
+const read = {
+  url: 'https://renderdoc.org/docs/',
+  domain: 'renderdoc.org',
+  title: 'RenderDoc Docs',
+  summary: 'Getting started.',
+};
 
-const render = (content: string, deferHeavyPlugins = false) => renderToStaticMarkup(createElement(
-  MarkdownSourceProvider, { sources: [read], children: createElement(MessageMarkdown, { content, deferHeavyPlugins }) },
-));
+const render = (content: string, deferHeavyPlugins = false) =>
+  renderToStaticMarkup(
+    createElement(MarkdownSourceProvider, {
+      sources: [read],
+      children: createElement(MessageMarkdown, { content, deferHeavyPlugins }),
+    }),
+  );
 
 describe('rich answer Markdown', () => {
   it('cites a page the turn read as a pill and leaves other links as plain external links', () => {
     const html = render('见 [文档](https://www.renderdoc.org/docs) 与 [别处](https://example.com/a)。');
-    expect(html).toMatch(/<a class="markdown-citation" href="https:\/\/renderdoc.org\/docs\/"[^>]*data-tooltip="RenderDoc Docs\nGetting started."/);
+    expect(html).toMatch(
+      /<a class="markdown-citation" href="https:\/\/renderdoc.org\/docs\/"[^>]*data-tooltip="RenderDoc Docs\nGetting started."/,
+    );
     expect(html).toContain('<span class="ui-overflow-fade markdown-citation-label">renderdoc.org</span>');
-    expect(html).toMatch(/<a href="https:\/\/example.com\/a" target="_blank" rel="noreferrer noopener" data-tooltip="example.com">别处<\/a>/);
+    expect(html).toMatch(
+      /<a href="https:\/\/example.com\/a" target="_blank" rel="noreferrer noopener" data-tooltip="example.com">别处<\/a>/,
+    );
   });
 
   it('keeps footnote references in the page', () => {
@@ -64,7 +77,9 @@ describe('answer helpers', () => {
 
   it('lists cited reads once, in citation order', () => {
     const sources = new Map([[normalizeWebUrl(read.url), read]]);
-    expect(citedSources('[a](https://renderdoc.org/docs) [b](https://renderdoc.org/docs/#x) [c](https://x.dev)', sources)).toEqual([read]);
+    expect(
+      citedSources('[a](https://renderdoc.org/docs) [b](https://renderdoc.org/docs/#x) [c](https://x.dev)', sources),
+    ).toEqual([read]);
   });
 
   it('routes media references to one controlled channel or none', () => {

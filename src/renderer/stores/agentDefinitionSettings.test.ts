@@ -52,14 +52,17 @@ describe('agent definition settings overlays', () => {
     expect(c.settings.llm.agentRoutes).toEqual([{ agentId: 'ask', providerId: 'provider', modelId: 'a' }]);
   });
 
-  it('folds main\'s commit into the confirmed settings, and a failure only drops its own overlay', () => {
+  it("folds main's commit into the confirmed settings, and a failure only drops its own overlay", () => {
     const intents = new SettingsIntents(base());
     const b = intents.begin(agentDefinitionOverlay({ draft: draft('provider:b'), clientRevision: 201, scope: 'user' }));
     const c = intents.begin(agentDefinitionOverlay({ draft: draft('provider:c'), clientRevision: 202, scope: 'user' }));
-    const committed = intents.settle(b.id, agentDefinitionCommit('ask', {
-      definition: definition('provider:b'),
-      route: { agentId: 'ask', providerId: 'provider', modelId: 'b' },
-    }));
+    const committed = intents.settle(
+      b.id,
+      agentDefinitionCommit('ask', {
+        definition: definition('provider:b'),
+        route: { agentId: 'ask', providerId: 'provider', modelId: 'b' },
+      }),
+    );
     // C is still in flight, so it still shows; B's route is confirmed.
     expect(committed).toMatchObject({
       agents: { definitions: [{ instructions: 'provider:c' }] },
@@ -70,7 +73,9 @@ describe('agent definition settings overlays', () => {
 
   it('hides a deleted Agent and its route while the deletion is in flight', () => {
     const intents = new SettingsIntents(base());
-    const deletion = intents.begin(agentDefinitionOverlay({ draft: { ...draft('provider:a'), delete: true }, clientRevision: 1, scope: 'user' }));
+    const deletion = intents.begin(
+      agentDefinitionOverlay({ draft: { ...draft('provider:a'), delete: true }, clientRevision: 1, scope: 'user' }),
+    );
     expect(deletion.settings.agents.definitions).toEqual([]);
     expect(deletion.settings.llm.agentRoutes).toEqual([]);
     expect(intents.fail(deletion.id).agents.definitions).toHaveLength(1);
@@ -93,10 +98,17 @@ describe('agent definition settings overlays', () => {
       provenance: { scope: 'builtin', sourcePath: 'builtin/general.agent.md', sourceHash: 'builtin-hash' },
       compiledRoute: { agentId: 'general', providerId: '', modelId: '' },
     };
-    restoredBuiltin.compiledRoute = { agentId: 'general', providerId: 'openrouter', modelId: 'anthropic/claude-3-sonnet' };
+    restoredBuiltin.compiledRoute = {
+      agentId: 'general',
+      providerId: 'openrouter',
+      modelId: 'anthropic/claude-3-sonnet',
+    };
     const base = structuredClone(DEFAULT_SETTINGS);
     base.agents.definitions = [projectOverride];
-    const settled = agentDefinitionCommit('general', { definition: restoredBuiltin, route: restoredBuiltin.compiledRoute })(base);
+    const settled = agentDefinitionCommit('general', {
+      definition: restoredBuiltin,
+      route: restoredBuiltin.compiledRoute,
+    })(base);
     const general = settled.agents.definitions.find((entry) => entry.id === 'general');
     expect(general).toMatchObject({
       builtin: true,

@@ -7,7 +7,14 @@ import { parseSettingsFile } from './settingsFileSchema';
 import { sanitizeRdcCliInvokerSettings } from './settingsSanitize';
 
 it('loads old invalid settings visibly but rejects saving them', () => {
-  const saved = { enabled: true, command: 'C:/Tools/rdc.bat', argsPrefix: ['--non-interactive'], env: {}, workingDirectory: '', timeoutMs: 30000 };
+  const saved = {
+    enabled: true,
+    command: 'C:/Tools/rdc.bat',
+    argsPrefix: ['--non-interactive'],
+    env: {},
+    workingDirectory: '',
+    timeoutMs: 30000,
+  };
   const stored = parseSettingsFile({ ...createDefaultSettingsFile(), tooling: { ...DEFAULT_TOOLING, rdcCli: saved } });
   expect(stored.tooling.rdcCli).toEqual(saved);
   expect(() => sanitizeRdcCliInvokerSettings(saved, saved, true)).toThrow('RDC_BAT_REJECTED');

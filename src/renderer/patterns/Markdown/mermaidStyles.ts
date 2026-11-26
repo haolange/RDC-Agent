@@ -21,7 +21,9 @@ export function extractMermaidStyles(svg: string, scopeId: string): { svg: strin
     element.removeAttribute('style');
     index += 1;
     element.setAttribute('data-mermaid-style', String(index));
-    rules.push(`#${CSS.escape(scopeId)}[data-mermaid-style="${index}"], #${CSS.escape(scopeId)} [data-mermaid-style="${index}"] { ${declarations} }`);
+    rules.push(
+      `#${CSS.escape(scopeId)}[data-mermaid-style="${index}"], #${CSS.escape(scopeId)} [data-mermaid-style="${index}"] { ${declarations} }`,
+    );
   }
   return { svg: new XMLSerializer().serializeToString(root), css: rules.join('\n') };
 }

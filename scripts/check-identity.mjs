@@ -5,11 +5,15 @@ const failures = [];
 const visit = (dir) => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const file = path.join(dir, entry.name);
-    if (entry.isDirectory()) { visit(file); continue; }
+    if (entry.isDirectory()) {
+      visit(file);
+      continue;
+    }
     if (!entry.name.endsWith('.md') || entry.name === 'acceptance-ledger.md') continue;
     const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/u);
     lines.forEach((line, i) => {
-      if (!line.includes('Breaking:') && /rdx-tools|`rdx`|bin\/rdx|RDX CLI/u.test(line)) failures.push(`${path.relative(root, file)}:${i + 1}`);
+      if (!line.includes('Breaking:') && /rdx-tools|`rdx`|bin\/rdx|RDX CLI/u.test(line))
+        failures.push(`${path.relative(root, file)}:${i + 1}`);
     });
   }
 };

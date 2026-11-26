@@ -68,9 +68,8 @@
   }
 
   .settings-manifest-page:not(.is-detail-open) .settings-manifest-detail,
-  .settings-manifest-page.is-detail-open :is(
-    .settings-manifest-list-column, .settings-agent-defaults, .settings-manifest-page-toolbar
-  ) {
+  .settings-manifest-page.is-detail-open
+    :is(.settings-manifest-list-column, .settings-agent-defaults, .settings-manifest-page-toolbar) {
     display: none;
   }
 

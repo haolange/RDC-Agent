@@ -1,11 +1,7 @@
 import { useCallback, useState } from 'react';
 import { getRenamePopoverPosition } from './renamePopoverPosition';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
-import type {
-  ProjectMenuPopoverState,
-  ProjectRenamePopoverState,
-  SessionRenamePopoverState,
-} from './types';
+import type { ProjectMenuPopoverState, ProjectRenamePopoverState, SessionRenamePopoverState } from './types';
 
 export function useSidebarPopovers() {
   const [renamePopover, setRenamePopover] = useState<SessionRenamePopoverState | null>(null);
@@ -26,26 +22,35 @@ export function useSidebarPopovers() {
     setProjectMenuPopover({ project, x: position.x, y: position.y });
   }, []);
 
-  const handleSessionContextMenu = useCallback((event: React.MouseEvent, session: SessionRecord) => {
-    event.preventDefault();
-    openRenamePopover(session, event.clientX, event.clientY);
-  }, [openRenamePopover]);
+  const handleSessionContextMenu = useCallback(
+    (event: React.MouseEvent, session: SessionRecord) => {
+      event.preventDefault();
+      openRenamePopover(session, event.clientX, event.clientY);
+    },
+    [openRenamePopover],
+  );
 
-  const handleRenameButtonClick = useCallback((event: React.MouseEvent, session: SessionRecord) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const rect = event.currentTarget.getBoundingClientRect();
-    openRenamePopover(session, rect.right - 24, rect.bottom + 8);
-  }, [openRenamePopover]);
-
-  const handleRenameKeyDown = useCallback((event: React.KeyboardEvent, session: SessionRecord) => {
-    if (event.key === 'Enter' || event.key === ' ') {
+  const handleRenameButtonClick = useCallback(
+    (event: React.MouseEvent, session: SessionRecord) => {
       event.preventDefault();
       event.stopPropagation();
       const rect = event.currentTarget.getBoundingClientRect();
       openRenamePopover(session, rect.right - 24, rect.bottom + 8);
-    }
-  }, [openRenamePopover]);
+    },
+    [openRenamePopover],
+  );
+
+  const handleRenameKeyDown = useCallback(
+    (event: React.KeyboardEvent, session: SessionRecord) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        event.stopPropagation();
+        const rect = event.currentTarget.getBoundingClientRect();
+        openRenamePopover(session, rect.right - 24, rect.bottom + 8);
+      }
+    },
+    [openRenamePopover],
+  );
 
   const startProjectRename = useCallback(() => {
     if (!projectMenuPopover) return;

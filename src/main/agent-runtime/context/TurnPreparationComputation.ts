@@ -33,8 +33,7 @@ export async function computeTurnPreparation(
     contextTokenLimit: input.messageBudget,
     tokenizer: tokenizerService,
   });
-  const beforeConversationTokens = contextManager.estimateTokens(input.messages)
-    + input.imageTokenAdjustment;
+  const beforeConversationTokens = contextManager.estimateTokens(input.messages) + input.imageTokenAdjustment;
   input.signal?.throwIfAborted();
   // No model call or window installation in the preparation worker.
   const compactedMessages = contextManager.convertToLlm(input.messages);

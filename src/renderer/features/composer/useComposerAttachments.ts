@@ -15,9 +15,7 @@ type Translate = ReturnType<typeof useI18n>['t'];
 const EMPTY_PENDING_ATTACHMENTS: PendingAttachmentDraft[] = [];
 
 function stagingIdsOf(drafts: readonly PendingAttachmentDraft[]): string[] {
-  return drafts
-    .map((entry) => entry.stagingId)
-    .filter((stagingId): stagingId is string => Boolean(stagingId));
+  return drafts.map((entry) => entry.stagingId).filter((stagingId): stagingId is string => Boolean(stagingId));
 }
 
 export function useComposerAttachments(options: {
@@ -28,18 +26,13 @@ export function useComposerAttachments(options: {
   leftToggleDisabled: boolean;
   toggleLeftSidebar: () => void | Promise<void>;
 }) {
-  const {
-    t,
-    currentProject,
-    currentSession,
-    effectiveLeftCollapsed,
-    leftToggleDisabled,
-    toggleLeftSidebar,
-  } = options;
+  const { t, currentProject, currentSession, effectiveLeftCollapsed, leftToggleDisabled, toggleLeftSidebar } = options;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDropActive, setIsDropActive] = useState(false);
-  const [pendingAttachmentsByScope, setPendingAttachmentsByScope] = useState<Record<string, PendingAttachmentDraft[]>>({});
+  const [pendingAttachmentsByScope, setPendingAttachmentsByScope] = useState<Record<string, PendingAttachmentDraft[]>>(
+    {},
+  );
   const attachmentScopeKey = useMemo(
     () => buildComposerSessionScopeKey(currentProject?.projectId, currentSession?.sessionId),
     [currentProject?.projectId, currentSession?.sessionId],
@@ -49,19 +42,23 @@ export function useComposerAttachments(options: {
     () => pendingAttachmentsByScope[attachmentScopeKey] ?? EMPTY_PENDING_ATTACHMENTS,
     [attachmentScopeKey, pendingAttachmentsByScope],
   );
-  const setPendingAttachments: Dispatch<SetStateAction<PendingAttachmentDraft[]>> = useCallback((next) => {
-    setPendingAttachmentsByScope((current) => {
-      const previous = current[attachmentScopeKey] ?? [];
-      const value = typeof next === 'function'
-        ? (next as (prev: PendingAttachmentDraft[]) => PendingAttachmentDraft[])(previous)
-        : next;
-      if (value.length === 0) {
-        const { [attachmentScopeKey]: _removed, ...rest } = current;
-        return rest;
-      }
-      return { ...current, [attachmentScopeKey]: value };
-    });
-  }, [attachmentScopeKey]);
+  const setPendingAttachments: Dispatch<SetStateAction<PendingAttachmentDraft[]>> = useCallback(
+    (next) => {
+      setPendingAttachmentsByScope((current) => {
+        const previous = current[attachmentScopeKey] ?? [];
+        const value =
+          typeof next === 'function'
+            ? (next as (prev: PendingAttachmentDraft[]) => PendingAttachmentDraft[])(previous)
+            : next;
+        if (value.length === 0) {
+          const { [attachmentScopeKey]: _removed, ...rest } = current;
+          return rest;
+        }
+        return { ...current, [attachmentScopeKey]: value };
+      });
+    },
+    [attachmentScopeKey],
+  );
 
   useEffect(() => {
     if (previousScopeRef.current === attachmentScopeKey) return;
@@ -88,60 +85,66 @@ export function useComposerAttachments(options: {
     return false;
   }, [currentProject, effectiveLeftCollapsed, leftToggleDisabled, t, toggleLeftSidebar]);
 
-  const stageItems = useCallback(async (items: ConversationAttachmentStageItem[]) => {
-    const electronAPI = window.electronAPI;
-    if (items.length === 0) return;
-    try {
-      if (items.length > COMPOSER_MAX_ATTACHMENT_COUNT) {
-        throw new AppError('ATTACHMENT_LIMIT_EXCEEDED', `at most ${COMPOSER_MAX_ATTACHMENT_COUNT} attachments are allowed.`);
+  const stageItems = useCallback(
+    async (items: ConversationAttachmentStageItem[]) => {
+      const electronAPI = window.electronAPI;
+      if (items.length === 0) return;
+      try {
+        if (items.length > COMPOSER_MAX_ATTACHMENT_COUNT) {
+          throw new AppError(
+            'ATTACHMENT_LIMIT_EXCEEDED',
+            `at most ${COMPOSER_MAX_ATTACHMENT_COUNT} attachments are allowed.`,
+          );
+        }
+        const result = await electronAPI.conversation.stageAttachments({
+          items,
+          composerScopeKey: attachmentScopeKey,
+        });
+        const discardedIds: string[] = [];
+        setPendingAttachments((current) => {
+          const existing = new Set(current.map((entry) => entry.stagingId).filter(Boolean));
+          const next = result.attachments
+            .filter((descriptor) => {
+              if (existing.has(descriptor.stagingId) && !descriptor.error) {
+                discardedIds.push(descriptor.stagingId);
+                return false;
+              }
+              return true;
+            })
+            .map(descriptorToDraft);
+          return current.concat(next);
+        });
+        if (discardedIds.length > 0) {
+          void electronAPI.conversation.releaseAttachments({ stagingIds: discardedIds });
+        }
+        const accepted = result.attachments.filter((item) => !item.error);
+        if (accepted.length > 0) {
+          notify.success(t('app.stageFilesSuccess', { count: accepted.length }));
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const code = errorCodeOf(error);
+        const overflow = code === 'ATTACHMENT_LIMIT_EXCEEDED' || code === 'PAYLOAD_TOO_LARGE';
+        const drafts: PendingAttachmentDraft[] = items.map((item, index) => ({
+          id: `error-${Date.now()}-${index}`,
+          stagingId: '',
+          sourcePath: '',
+          fileName: 'fileName' in item && item.fileName ? item.fileName : 'attachment',
+          mimeType: 'application/octet-stream',
+          size: 0,
+          kind: 'file',
+          layer: 'binary',
+          error: {
+            code: overflow ? 'ATTACHMENT_LIMIT_EXCEEDED' : 'ATTACHMENT_INVALID',
+            message,
+          },
+        }));
+        setPendingAttachments((current) => current.concat(drafts));
+        notify.error(t(overflow ? 'app.attachReject.ATTACHMENT_LIMIT_EXCEEDED' : 'app.attachRejected'));
       }
-      const result = await electronAPI.conversation.stageAttachments({
-        items,
-        composerScopeKey: attachmentScopeKey,
-      });
-      const discardedIds: string[] = [];
-      setPendingAttachments((current) => {
-        const existing = new Set(current.map((entry) => entry.stagingId).filter(Boolean));
-        const next = result.attachments.filter((descriptor) => {
-          if (existing.has(descriptor.stagingId) && !descriptor.error) {
-            discardedIds.push(descriptor.stagingId);
-            return false;
-          }
-          return true;
-        }).map(descriptorToDraft);
-        return current.concat(next);
-      });
-      if (discardedIds.length > 0) {
-        void electronAPI.conversation.releaseAttachments({ stagingIds: discardedIds });
-      }
-      const accepted = result.attachments.filter((item) => !item.error);
-      if (accepted.length > 0) {
-        notify.success(t('app.stageFilesSuccess', { count: accepted.length }));
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const code = errorCodeOf(error);
-      const overflow = code === 'ATTACHMENT_LIMIT_EXCEEDED' || code === 'PAYLOAD_TOO_LARGE';
-      const drafts: PendingAttachmentDraft[] = items.map((item, index) => ({
-        id: `error-${Date.now()}-${index}`,
-        stagingId: '',
-        sourcePath: '',
-        fileName: 'fileName' in item && item.fileName ? item.fileName : 'attachment',
-        mimeType: 'application/octet-stream',
-        size: 0,
-        kind: 'file',
-        layer: 'binary',
-        error: {
-          code: overflow ? 'ATTACHMENT_LIMIT_EXCEEDED' : 'ATTACHMENT_INVALID',
-          message,
-        },
-      }));
-      setPendingAttachments((current) => current.concat(drafts));
-      notify.error(t(overflow
-        ? 'app.attachReject.ATTACHMENT_LIMIT_EXCEEDED'
-        : 'app.attachRejected'));
-    }
-  }, [attachmentScopeKey, setPendingAttachments, t]);
+    },
+    [attachmentScopeKey, setPendingAttachments, t],
+  );
 
   const handleAttachmentSelect = useCallback(async () => {
     const electronAPI = window.electronAPI;
@@ -152,24 +155,32 @@ export function useComposerAttachments(options: {
     }
     const filePaths = await electronAPI.selectFiles();
     if (!filePaths?.length) return;
-    await stageItems(filePaths.map((sourcePath) => ({
-      sourcePath,
-      fileName: sourcePath.split(/[\\/]/).pop() || sourcePath,
-    })));
+    await stageItems(
+      filePaths.map((sourcePath) => ({
+        sourcePath,
+        fileName: sourcePath.split(/[\\/]/).pop() || sourcePath,
+      })),
+    );
   }, [requireProject, stageItems]);
 
-  const handleFilesIngest = useCallback(async (files: readonly File[]) => {
-    if (!requireProject() || files.length === 0) return;
-    await stageItems(await filesToStageItems(files));
-  }, [requireProject, stageItems]);
+  const handleFilesIngest = useCallback(
+    async (files: readonly File[]) => {
+      if (!requireProject() || files.length === 0) return;
+      await stageItems(await filesToStageItems(files));
+    },
+    [requireProject, stageItems],
+  );
 
-  const handlePendingAttachmentRemove = useCallback((attachmentId: string) => {
-    const target = pendingAttachments.find((entry) => entry.id === attachmentId);
-    setPendingAttachments((current) => current.filter((entry) => entry.id !== attachmentId));
-    if (target?.stagingId && !target.error) {
-      void window.electronAPI.conversation.releaseAttachments({ stagingIds: [target.stagingId] });
-    }
-  }, [pendingAttachments, setPendingAttachments]);
+  const handlePendingAttachmentRemove = useCallback(
+    (attachmentId: string) => {
+      const target = pendingAttachments.find((entry) => entry.id === attachmentId);
+      setPendingAttachments((current) => current.filter((entry) => entry.id !== attachmentId));
+      if (target?.stagingId && !target.error) {
+        void window.electronAPI.conversation.releaseAttachments({ stagingIds: [target.stagingId] });
+      }
+    },
+    [pendingAttachments, setPendingAttachments],
+  );
 
   return {
     pendingAttachments,

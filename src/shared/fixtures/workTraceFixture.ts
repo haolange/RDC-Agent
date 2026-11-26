@@ -15,14 +15,24 @@ export interface WorkTraceFixtureOptions {
 }
 
 const TOOLS = [
-  { toolName: 'read_file', args: (step: number) => ({ path: `src/shaders/pass_${step % 12}.hlsl`, offset: 0, limit: 200 }) },
-  { toolName: 'grep', args: (step: number) => ({ pattern: `TEXCOORD${step % 4}`, path: 'src/shaders', output_mode: 'content' }) },
-  { toolName: 'shell', args: (step: number) => ({ command: `rdc call rd.event.get_drawcall --args-json '{"eventId":${2000 + step}}'` }) },
+  {
+    toolName: 'read_file',
+    args: (step: number) => ({ path: `src/shaders/pass_${step % 12}.hlsl`, offset: 0, limit: 200 }),
+  },
+  {
+    toolName: 'grep',
+    args: (step: number) => ({ pattern: `TEXCOORD${step % 4}`, path: 'src/shaders', output_mode: 'content' }),
+  },
+  {
+    toolName: 'shell',
+    args: (step: number) => ({ command: `rdc call rd.event.get_drawcall --args-json '{"eventId":${2000 + step}}'` }),
+  },
 ] as const;
 
 function toolCall(step: number, startedAt: number, running: boolean, resultPreviewChars: number): ConversationToolCall {
   const tool = TOOLS[step % TOOLS.length]!;
-  const result = `step ${step}: ` + 'resource 0x1f2e binding t3 format R8G8B8A8_UNORM; '.repeat(Math.ceil(resultPreviewChars / 52));
+  const result =
+    `step ${step}: ` + 'resource 0x1f2e binding t3 format R8G8B8A8_UNORM; '.repeat(Math.ceil(resultPreviewChars / 52));
   return {
     id: `call-${step}`,
     toolName: tool.toolName,
@@ -48,7 +58,9 @@ function llmStep(step: number, startedAt: number, running: boolean, resultPrevie
         providerOutputRef: { protocol: 'fixture', providerBlockKey: `thinking-${step}`, sourceIndex: 0 },
         thinking: {
           text: `The pass ${step % 12} output looks darker than its input; check what binds t3 before draw ${2000 + step}.`,
-          kind: 'summary', source: 'anthropic-thinking', visibility: 'summary',
+          kind: 'summary',
+          source: 'anthropic-thinking',
+          visibility: 'summary',
         },
         status: 'complete',
         displayOrder: 0,
@@ -73,8 +85,8 @@ export function createWorkTraceFixture(options: WorkTraceFixtureOptions): Conver
   const startedAt = options.startedAt ?? Date.parse('2026-11-25T00:00:00.000Z');
   const running = options.running ?? true;
   const resultPreviewChars = options.resultPreviewChars ?? 2_000;
-  const blocks = Array.from({ length: options.steps }, (_, step) => llmStep(
-    step, startedAt + step * 1_000, running && step === options.steps - 1, resultPreviewChars,
-  ));
+  const blocks = Array.from({ length: options.steps }, (_, step) =>
+    llmStep(step, startedAt + step * 1_000, running && step === options.steps - 1, resultPreviewChars),
+  );
   return { status: running ? 'running' : 'complete', blocks, updatedAt: startedAt + options.steps * 1_000 };
 }

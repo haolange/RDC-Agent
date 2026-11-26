@@ -13,7 +13,10 @@ import {
   resolveEffectiveModelSelection,
 } from './EffectiveModelResolver';
 import { planModelRequest } from './RequestPlanner';
-import { parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface, parseOllamaInstalledModels } from './LiveProviderCatalogParsers';
+import {
+  parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface,
+  parseOllamaInstalledModels,
+} from './LiveProviderCatalogParsers';
 import type { LlmProviderEntry } from '@shared/types/settings';
 
 vi.mock('electron', () => ({
@@ -28,10 +31,8 @@ vi.mock('electron', () => ({
   },
 }));
 
-const parseKimiCodeCatalog = (payload: unknown) => parseKimiCodeCatalogWithSurface(
-  payload,
-  getLoadedProviderSurface('kimi-coding-plan')!,
-);
+const parseKimiCodeCatalog = (payload: unknown) =>
+  parseKimiCodeCatalogWithSurface(payload, getLoadedProviderSurface('kimi-coding-plan')!);
 
 function provider(id: string, protocol: LlmProviderEntry['protocol']): LlmProviderEntry {
   return {
@@ -41,7 +42,6 @@ function provider(id: string, protocol: LlmProviderEntry['protocol']): LlmProvid
     models: [],
   } as unknown as LlmProviderEntry;
 }
-
 
 /** A provider lookup holding exactly the given providers. */
 function providersOf(...providers: LlmProviderEntry[]) {
@@ -68,25 +68,36 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     const grok = provider('grok-account', 'OpenAIResponses');
     const request = buildEffectiveCatalogRequest(grok);
     request.discovery = {
-      source: 'discovery', observedAt: '2026-11-02T00:00:00.000Z',
+      source: 'discovery',
+      observedAt: '2026-11-02T00:00:00.000Z',
       models: applyDiscoveryAuthority(grok, [{ modelId: 'grok-4.7', availability: 'available' }]),
     };
     const models = mergeEffectiveCatalog(request);
-    expect(models.find(model => model.modelId === 'grok-4.3')).toMatchObject({
+    expect(models.find((model) => model.modelId === 'grok-4.3')).toMatchObject({
       availability: 'unavailable',
       unavailableReason: 'The last successful Grok Subscription catalog did not list this model.',
     });
-    expect(mergeEffectiveCatalog({ ...request, discovery: undefined }).find(model => model.modelId === 'grok-4.3'))
-      .toMatchObject({ availability: 'unknown' });
+    expect(
+      mergeEffectiveCatalog({ ...request, discovery: undefined }).find((model) => model.modelId === 'grok-4.3'),
+    ).toMatchObject({ availability: 'unknown' });
     const base = models.find((model) => model.modelId === 'grok-4.7')!;
-    expect(planModelRequest({
-      model: base, catalogModels: models, controls: { fastModel: false, maxContextMode: true },
-    })).toMatchObject({
-      ok: true, plan: { effectiveModelId: 'grok-4.7', activeTierId: 'max', contextWindowTokens: 500_000 },
+    expect(
+      planModelRequest({
+        model: base,
+        catalogModels: models,
+        controls: { fastModel: false, maxContextMode: true },
+      }),
+    ).toMatchObject({
+      ok: true,
+      plan: { effectiveModelId: 'grok-4.7', activeTierId: 'max', contextWindowTokens: 500_000 },
     });
-    expect(planModelRequest({
-      model: base, catalogModels: models, controls: { fastModel: true, maxContextMode: true },
-    }).ok).toBe(false);
+    expect(
+      planModelRequest({
+        model: base,
+        catalogModels: models,
+        controls: { fastModel: true, maxContextMode: true },
+      }).ok,
+    ).toBe(false);
   });
 
   it.each([
@@ -94,34 +105,40 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     [false, true, 'grok-4.7', 500_000, ['context:max']],
     [true, false, 'grok-4.7-build-fast', 256_000, ['fast:build']],
     [true, true, 'grok-4.7-build-fast', 500_000, ['fast:build+max']],
-  ] as const)('plans Grok Fast=%s Max=%s from the compiled and discovered catalog', (
-    fastModel, maxContextMode, effectiveModelId, contextWindowTokens, appliedBindingIds,
-  ) => {
-    const grok = provider('grok-account', 'OpenAIResponses');
-    const request = buildEffectiveCatalogRequest(grok);
-    request.discovery = {
-      source: 'discovery', observedAt: '2026-11-02T00:00:00.000Z',
-      models: applyDiscoveryAuthority(grok, [
-        { modelId: 'grok-4.7', availability: 'available' },
-        { modelId: 'grok-4.7-build-fast', availability: 'available' },
-      ]),
-    };
-    const models = mergeEffectiveCatalog(request);
-    const base = models.find((model) => model.modelId === 'grok-4.7')!;
-    const result = planModelRequest({
-      model: base, catalogModels: models,
-      controls: { fastModel, maxContextMode, reasoningLevel: 'low' },
-    });
-    expect(result).toMatchObject({
-      ok: true,
-      controls: { fastModel, maxContextMode, reasoningLevel: 'low' },
-      plan: {
-        selectedModelId: 'grok-4.7', effectiveModelId, contextWindowTokens,
-        appliedBindingIds: [...appliedBindingIds], fastMode: fastModel,
-        activeTierId: maxContextMode ? 'max' : 'default',
-      },
-    });
-  });
+  ] as const)(
+    'plans Grok Fast=%s Max=%s from the compiled and discovered catalog',
+    (fastModel, maxContextMode, effectiveModelId, contextWindowTokens, appliedBindingIds) => {
+      const grok = provider('grok-account', 'OpenAIResponses');
+      const request = buildEffectiveCatalogRequest(grok);
+      request.discovery = {
+        source: 'discovery',
+        observedAt: '2026-11-02T00:00:00.000Z',
+        models: applyDiscoveryAuthority(grok, [
+          { modelId: 'grok-4.7', availability: 'available' },
+          { modelId: 'grok-4.7-build-fast', availability: 'available' },
+        ]),
+      };
+      const models = mergeEffectiveCatalog(request);
+      const base = models.find((model) => model.modelId === 'grok-4.7')!;
+      const result = planModelRequest({
+        model: base,
+        catalogModels: models,
+        controls: { fastModel, maxContextMode, reasoningLevel: 'low' },
+      });
+      expect(result).toMatchObject({
+        ok: true,
+        controls: { fastModel, maxContextMode, reasoningLevel: 'low' },
+        plan: {
+          selectedModelId: 'grok-4.7',
+          effectiveModelId,
+          contextWindowTokens,
+          appliedBindingIds: [...appliedBindingIds],
+          fastMode: fastModel,
+          activeTierId: maxContextMode ? 'max' : 'default',
+        },
+      });
+    },
+  );
 
   it('projects the dedicated tools fact source onto Cline Pass kimi-k2.7-code', () => {
     const contribution = buildCatalogModelContribution(
@@ -142,10 +159,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
   });
 
   it('loads ChatGPT controls and execution binding from the manifest', () => {
-    const contribution = buildCatalogModelContribution(
-      provider('chatgpt-account', 'OpenAIResponses'),
-      'gpt-6.1-terra',
-    );
+    const contribution = buildCatalogModelContribution(provider('chatgpt-account', 'OpenAIResponses'), 'gpt-6.1-terra');
     expect(contribution).toMatchObject({
       modelId: 'gpt-6.1-terra',
       presencePolicy: 'maintained',
@@ -154,10 +168,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
         maxContext: { state: 'selectable', entitlement: 'unknown', tierId: 'max' },
         reasoning: { levels: ['low', 'medium', 'high', 'xhigh', 'max'], defaultSelection: 'low' },
       },
-      executionBindings: [
-        { id: 'route:chatgpt-codex-parameter-policy' },
-        { id: 'fast:activation' },
-      ],
+      executionBindings: [{ id: 'route:chatgpt-codex-parameter-policy' }, { id: 'fast:activation' }],
     });
   });
 
@@ -167,13 +178,16 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     const request = buildEffectiveCatalogRequest(provider('chatgpt-account', 'OpenAIResponses'), retired.modelId);
     const discovery = { source: 'discovery' as const, observedAt: '2026-11-02T00:00:00.000Z', models: [retired] };
     const models = mergeEffectiveCatalog({
-      ...request, discovery,
+      ...request,
+      discovery,
       observed: { ...discovery, source: 'observed' },
       userOverride: { ...discovery, source: 'user', models: [{ ...retired, custom: true }] },
     });
-    expect(models.some(model => model.modelId === retired.modelId || model.aliases.includes(retired.modelId))).toBe(false);
+    expect(models.some((model) => model.modelId === retired.modelId || model.aliases.includes(retired.modelId))).toBe(
+      false,
+    );
     const api = buildEffectiveCatalogRequest(provider('openai', 'OpenAIResponses'), retired.modelId);
-    expect(mergeEffectiveCatalog({ ...api, discovery }).some(model => model.modelId === retired.modelId)).toBe(true);
+    expect(mergeEffectiveCatalog({ ...api, discovery }).some((model) => model.modelId === retired.modelId)).toBe(true);
   });
 
   it('projects account-scoped structure before entitlement refresh while planning stays fail-closed', () => {
@@ -193,12 +207,14 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
         },
       },
     });
-    expect(planEffectiveModelRequest({
-      providerId: 'chatgpt-account',
-      modelId: 'gpt-5.6-sol',
-      providers: settings,
-      controls: { fastModel: true },
-    })).toMatchObject({
+    expect(
+      planEffectiveModelRequest({
+        providerId: 'chatgpt-account',
+        modelId: 'gpt-5.6-sol',
+        providers: settings,
+        controls: { fastModel: true },
+      }),
+    ).toMatchObject({
       ok: false,
       code: 'MODEL_UNAVAILABLE',
       message: expect.stringContaining('not yet verified'),
@@ -206,9 +222,9 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
   });
 
   it('keeps Kimi for Coding reasoning levels on the selected OpenAI-compatible route', () => {
-    const openAiKimi = mergeEffectiveCatalog(buildEffectiveCatalogRequest(
-      provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions'),
-    )).find((model) => model.modelId === 'kimi-for-coding');
+    const openAiKimi = mergeEffectiveCatalog(
+      buildEffectiveCatalogRequest(provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions')),
+    ).find((model) => model.modelId === 'kimi-for-coding');
     expect(openAiKimi).toMatchObject({
       route: { protocol: 'OpenAICompatibleChatCompletions' },
       controls: {
@@ -217,7 +233,12 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
           supportsOff: true,
           levels: ['low', 'high', 'max'],
           defaultSelection: 'max',
-          wireProfile: { kind: 'openai-compatible', on: 'max', onMode: 'thinking-enabled', offMode: 'thinking-disabled' },
+          wireProfile: {
+            kind: 'openai-compatible',
+            on: 'max',
+            onMode: 'thinking-enabled',
+            offMode: 'thinking-disabled',
+          },
         },
       },
       routeOptions: [
@@ -229,10 +250,16 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
 
   it('preserves Kimi K3 Max as a client-side budget tier without inventing a model id', () => {
     const kimi = provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions');
-    const parsed = parseKimiCodeCatalog({ data: [{
-      id: 'k3', context_length: 256_000, supports_reasoning: true,
-      think_efforts: { valid_efforts: ['low', 'high', 'max'], default_effort: 'max' },
-    }] });
+    const parsed = parseKimiCodeCatalog({
+      data: [
+        {
+          id: 'k3',
+          context_length: 256_000,
+          supports_reasoning: true,
+          think_efforts: { valid_efforts: ['low', 'high', 'max'], default_effort: 'max' },
+        },
+      ],
+    });
     const request = buildEffectiveCatalogRequest(kimi);
     request.discovery = {
       source: 'discovery',
@@ -246,32 +273,48 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
         { id: 'max', maxPromptTokens: 1_000_000 },
       ],
       controls: { maxContext: { state: 'selectable', tierId: 'max' } },
-      executionBindings: [{
-        id: 'context:max',
-        actions: [{ kind: 'client-tier', tierId: 'max' }],
-      }],
+      executionBindings: [
+        {
+          id: 'context:max',
+          actions: [{ kind: 'client-tier', tierId: 'max' }],
+        },
+      ],
       resolvedControls: { maxContext: { state: 'selectable', disabled: false, entitlement: 'unknown' } },
     });
   });
   it('keeps normal K3 Max planning selectable while an explicit probe may verify the same model tier', async () => {
     const kimi = provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions');
     const settings = providersOf(kimi);
-    const parsed = parseKimiCodeCatalog({ data: [{
-      id: 'k3', context_length: 256_000, supports_reasoning: true,
-    }] });
+    const parsed = parseKimiCodeCatalog({
+      data: [
+        {
+          id: 'k3',
+          context_length: 256_000,
+          supports_reasoning: true,
+        },
+      ],
+    });
     await refreshEffectiveCatalogDiscovery(kimi, [], parsed.contributions);
 
-    expect(planEffectiveModelRequest({
-      providerId: 'kimi-coding-plan', modelId: 'k3', providers: settings,
-      controls: { maxContextMode: false },
-    })).toMatchObject({
+    expect(
+      planEffectiveModelRequest({
+        providerId: 'kimi-coding-plan',
+        modelId: 'k3',
+        providers: settings,
+        controls: { maxContextMode: false },
+      }),
+    ).toMatchObject({
       ok: true,
       plan: { selectedModelId: 'k3', effectiveModelId: 'k3', contextBudgetTokens: 256_000 },
     });
-    expect(planEffectiveModelRequest({
-      providerId: 'kimi-coding-plan', modelId: 'k3', providers: settings,
-      controls: { maxContextMode: true },
-    })).toMatchObject({
+    expect(
+      planEffectiveModelRequest({
+        providerId: 'kimi-coding-plan',
+        modelId: 'k3',
+        providers: settings,
+        controls: { maxContextMode: true },
+      }),
+    ).toMatchObject({
       ok: true,
       plan: {
         selectedModelId: 'k3',
@@ -280,10 +323,15 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
         contextMode: 'one-million',
       },
     });
-    expect(planEffectiveModelCapabilityProbe({
-      providerId: 'kimi-coding-plan', modelId: 'k3', mode: 'max-context', providers: settings,
-      controls: { maxContextMode: true },
-    })).toMatchObject({
+    expect(
+      planEffectiveModelCapabilityProbe({
+        providerId: 'kimi-coding-plan',
+        modelId: 'k3',
+        mode: 'max-context',
+        providers: settings,
+        controls: { maxContextMode: true },
+      }),
+    ).toMatchObject({
       ok: true,
       plan: {
         selectedModelId: 'k3',
@@ -297,20 +345,24 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
 
   it('tombstones absent Kimi account models and keeps Fast selectable but denied without HighSpeed', () => {
     const kimi = provider('kimi-coding-plan', 'AnthropicMessages');
-    const discovery = applyDiscoveryAuthority(kimi, [{
-      modelId: 'kimi-for-coding',
-      availability: 'available',
-      controls: {
-        fast: { state: 'selectable', defaultValue: false, entitlement: 'denied' },
+    const discovery = applyDiscoveryAuthority(kimi, [
+      {
+        modelId: 'kimi-for-coding',
+        availability: 'available',
+        controls: {
+          fast: { state: 'selectable', defaultValue: false, entitlement: 'denied' },
+        },
+        executionBindings: [
+          {
+            id: 'fast:kimi-for-coding-highspeed',
+            when: { fast: true },
+            actions: [{ kind: 'model-switch', targetModelId: 'kimi-for-coding-highspeed' }],
+            entitlement: 'denied',
+            unavailableReason: 'Execution target kimi-for-coding-highspeed is unavailable.',
+          },
+        ],
       },
-      executionBindings: [{
-        id: 'fast:kimi-for-coding-highspeed',
-        when: { fast: true },
-        actions: [{ kind: 'model-switch', targetModelId: 'kimi-for-coding-highspeed' }],
-        entitlement: 'denied',
-        unavailableReason: 'Execution target kimi-for-coding-highspeed is unavailable.',
-      }],
-    }]);
+    ]);
     expect(discovery).toEqual([
       expect.objectContaining({ modelId: 'kimi-for-coding', availability: 'available' }),
       expect.objectContaining({ modelId: 'k3.1-pro', availability: 'unavailable' }),
@@ -322,22 +374,29 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     const request = buildEffectiveCatalogRequest(kimi);
     request.discovery = { source: 'discovery', observedAt: '2026-07-17T00:00:00.000Z', models: discovery };
     const models = mergeEffectiveCatalog(request);
-    expect(models.filter((model) => (
-      model.selection?.pickerVisibility !== 'internal' && model.availability === 'available'
-    )).map((model) => model.modelId)).toEqual(['kimi-for-coding']);
+    expect(
+      models
+        .filter((model) => model.selection?.pickerVisibility !== 'internal' && model.availability === 'available')
+        .map((model) => model.modelId),
+    ).toEqual(['kimi-for-coding']);
     expect(models.find((model) => model.modelId === 'kimi-for-coding-highspeed')).toMatchObject({
       selection: { pickerVisibility: 'internal' },
       availability: 'unavailable',
     });
-    expect(models.find((model) => model.modelId === 'kimi-for-coding')?.controls.fast)
-      .toEqual({ state: 'selectable', defaultValue: false, entitlement: 'denied' });
+    expect(models.find((model) => model.modelId === 'kimi-for-coding')?.controls.fast).toEqual({
+      state: 'selectable',
+      defaultValue: false,
+      entitlement: 'denied',
+    });
   });
   it('keeps the maintained MiniMax highspeed target when discovery validates only the base', () => {
     const minimax = provider('minimax-global', 'AnthropicMessages');
-    const discovery = applyDiscoveryAuthority(minimax, [{
-      modelId: 'MiniMax-M2.7',
-      availability: 'available',
-    }]);
+    const discovery = applyDiscoveryAuthority(minimax, [
+      {
+        modelId: 'MiniMax-M2.7',
+        availability: 'available',
+      },
+    ]);
     const request = buildEffectiveCatalogRequest(minimax);
     request.discovery = { source: 'discovery', observedAt: '2026-07-15T00:00:00.000Z', models: discovery };
     const models = mergeEffectiveCatalog(request);
@@ -347,11 +406,13 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       availability: 'available',
       selection: { pickerVisibility: 'internal' },
     });
-    expect(planModelRequest({
-      model: base!,
-      catalogModels: models,
-      controls: { fastModel: true, reasoningLevel: 'on', maxContextMode: false },
-    })).toMatchObject({
+    expect(
+      planModelRequest({
+        model: base!,
+        catalogModels: models,
+        controls: { fastModel: true, reasoningLevel: 'on', maxContextMode: false },
+      }),
+    ).toMatchObject({
       ok: true,
       plan: {
         selectedModelId: 'MiniMax-M2.7',
@@ -363,9 +424,13 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
 
   it('tombstones only account-entitled models absent from an authoritative list', () => {
     const chatgpt = provider('chatgpt-account', 'OpenAIResponses');
-    const completed = applyDiscoveryAuthority(chatgpt, [{
-      modelId: 'gpt-5.4', aliases: ['gpt-5.4-current'], availability: 'available',
-    }]);
+    const completed = applyDiscoveryAuthority(chatgpt, [
+      {
+        modelId: 'gpt-5.4',
+        aliases: ['gpt-5.4-current'],
+        availability: 'available',
+      },
+    ]);
     expect(completed).toContainEqual(expect.objectContaining({ modelId: 'gpt-5.4', availability: 'available' }));
     expect(completed).toContainEqual({
       modelId: 'gpt-5.6-sol',
@@ -377,10 +442,12 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
   it('keeps maintained GPT-6.1 Sol, GPT-6 Sol and Luna executable when ChatGPT discovery omits them', () => {
     const chatgpt = provider('chatgpt-account', 'OpenAIResponses');
     const request = buildEffectiveCatalogRequest(chatgpt);
-    const discoveryModels = applyDiscoveryAuthority(chatgpt, [{
-      modelId: 'gpt-6-astra',
-      availability: 'available',
-    }]);
+    const discoveryModels = applyDiscoveryAuthority(chatgpt, [
+      {
+        modelId: 'gpt-6-astra',
+        availability: 'available',
+      },
+    ]);
     const models = mergeEffectiveCatalog({
       ...request,
       discovery: {
@@ -424,7 +491,10 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     };
     const request = buildEffectiveCatalogRequest(configured);
     expect(request.user?.models[0]?.routeOptions).toMatchObject([
-      { id: 'OpenAICompatibleChatCompletions', route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'http://localhost:4312/v1' } },
+      {
+        id: 'OpenAICompatibleChatCompletions',
+        route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'http://localhost:4312/v1' },
+      },
       { id: 'OpenAIResponses', route: { protocol: 'OpenAIResponses', baseUrl: 'http://localhost:4312/v1' } },
     ]);
   });
@@ -438,15 +508,23 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     };
     const request = buildEffectiveCatalogRequest(configured);
     request.discovery = {
-      source: 'discovery', observedAt: '2026-11-06T00:00:00.000Z',
-      models: parseOllamaInstalledModels({ models: [{ name: 'local-model' }] },
-        new Map([['local-model', { capabilities: ['tools'] }]]), getLoadedProviderSurface('ollama')!).contributions,
+      source: 'discovery',
+      observedAt: '2026-11-06T00:00:00.000Z',
+      models: parseOllamaInstalledModels(
+        { models: [{ name: 'local-model' }] },
+        new Map([['local-model', { capabilities: ['tools'] }]]),
+        getLoadedProviderSurface('ollama')!,
+      ).contributions,
     };
     const models = mergeEffectiveCatalog(request);
     const model = models.find((candidate) => candidate.modelId === 'local-model')!;
-    expect(planModelRequest({
-      model, catalogModels: models, controls: { fastModel: false, maxContextMode: false },
-    })).toMatchObject({ ok: true, plan: { route: { baseUrl: 'http://127.0.0.1:56606/v1', source: 'user' } } });
+    expect(
+      planModelRequest({
+        model,
+        catalogModels: models,
+        controls: { fastModel: false, maxContextMode: false },
+      }),
+    ).toMatchObject({ ok: true, plan: { route: { baseUrl: 'http://127.0.0.1:56606/v1', source: 'user' } } });
   });
 
   it('does not use an arbitrary saved endpoint for a non-editable provider', () => {
@@ -454,8 +532,9 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       ...provider('chatgpt-account', 'OpenAIResponses'),
       baseUrl: 'http://127.0.0.1:56606/v1',
     };
-    expect(buildEffectiveCatalogRequest(configured).fallbackRoute.baseUrl)
-      .toBe('https://chatgpt.com/backend-api/codex');
+    expect(buildEffectiveCatalogRequest(configured).fallbackRoute.baseUrl).toBe(
+      'https://chatgpt.com/backend-api/codex',
+    );
   });
 
   it('preserves protocol-specific routes for provider-managed cloud services', () => {
@@ -464,8 +543,9 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       catalogOwnership: 'provider-managed' as const,
       baseUrl: 'https://bedrock-mantle.us-east-1.api.aws/v1',
     };
-    expect(buildEffectiveCatalogRequest(configured).fallbackRoute.baseUrl)
-      .toBe('https://bedrock-mantle.${AWS_REGION}.api.aws/openai/v1');
+    expect(buildEffectiveCatalogRequest(configured).fallbackRoute.baseUrl).toBe(
+      'https://bedrock-mantle.${AWS_REGION}.api.aws/openai/v1',
+    );
   });
 
   it('preserves templated routes for non-local user-managed providers', () => {
@@ -483,31 +563,41 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       catalogOwnership: 'provider-managed' as const,
       baseUrl: 'https://api.cortecs.ai/v1',
     };
-    const snapshot = await refreshEffectiveCatalogDiscovery(cortecs, [{ id: 'live-model', label: 'Live model', enabled: true }], [{
-      modelId: 'live-model',
-      label: 'Live model',
-      availability: 'available',
-      contextTiers: [{
-        id: 'default',
-        label: 'Default',
-        maxTotalTokens: 128_000,
-        maxOutputTokens: 8_000,
-        activation: { kind: 'implicit' },
-        entitlement: 'granted',
-      }],
-      defaultBudgetTokens: 120_000,
-    }]);
+    const snapshot = await refreshEffectiveCatalogDiscovery(
+      cortecs,
+      [{ id: 'live-model', label: 'Live model', enabled: true }],
+      [
+        {
+          modelId: 'live-model',
+          label: 'Live model',
+          availability: 'available',
+          contextTiers: [
+            {
+              id: 'default',
+              label: 'Default',
+              maxTotalTokens: 128_000,
+              maxOutputTokens: 8_000,
+              activation: { kind: 'implicit' },
+              entitlement: 'granted',
+            },
+          ],
+          defaultBudgetTokens: 120_000,
+        },
+      ],
+    );
     const model = snapshot.models.find((entry) => entry.modelId === 'live-model');
     expect(model).toMatchObject({
       controls: { fast: { state: 'selectable', defaultValue: false } },
       executionBindings: [{ id: 'fast:cortecs-speed' }],
     });
-    expect(planModelRequest({
-      model: model!,
-      catalogModels: snapshot.models,
-      controls: { fastModel: true, reasoningLevel: 'off', maxContextMode: false },
-      requireAgentToolEligibility: false,
-    })).toMatchObject({
+    expect(
+      planModelRequest({
+        model: model!,
+        catalogModels: snapshot.models,
+        controls: { fastModel: true, reasoningLevel: 'off', maxContextMode: false },
+        requireAgentToolEligibility: false,
+      }),
+    ).toMatchObject({
       ok: true,
       plan: {
         selectedModelId: 'live-model',
@@ -541,31 +631,63 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       ...provider('custom-provider-alias-test', 'OpenAICompatibleChatCompletions'),
       catalogOwnership: 'user-managed' as const,
       models: [
-        { id: 'model-current', label: 'Current', aliases: ['model-old'], enabled: true, availability: 'available' as const },
+        {
+          id: 'model-current',
+          label: 'Current',
+          aliases: ['model-old'],
+          enabled: true,
+          availability: 'available' as const,
+        },
         { id: 'model-next', label: 'Next', enabled: true, availability: 'available' as const },
       ],
     };
     const settings = providersOf(customProvider);
     await refreshEffectiveCatalogDiscovery(customProvider, customProvider.models, [
       {
-        modelId: 'model-current', label: 'Current', aliases: ['model-old'], availability: 'available',
-        contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 128_000, activation: { kind: 'implicit' }, entitlement: 'granted' }],
+        modelId: 'model-current',
+        label: 'Current',
+        aliases: ['model-old'],
+        availability: 'available',
+        contextTiers: [
+          {
+            id: 'default',
+            label: 'Default',
+            maxPromptTokens: 128_000,
+            activation: { kind: 'implicit' },
+            entitlement: 'granted',
+          },
+        ],
         defaultBudgetTokens: 128_000,
         toolCalling: { state: 'supported' },
       },
       {
-        modelId: 'model-next', label: 'Next', availability: 'available',
-        contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 128_000, activation: { kind: 'implicit' }, entitlement: 'granted' }],
+        modelId: 'model-next',
+        label: 'Next',
+        availability: 'available',
+        contextTiers: [
+          {
+            id: 'default',
+            label: 'Default',
+            maxPromptTokens: 128_000,
+            activation: { kind: 'implicit' },
+            entitlement: 'granted',
+          },
+        ],
         defaultBudgetTokens: 128_000,
         toolCalling: { state: 'supported' },
       },
     ]);
     expect(resolveEffectiveModelSelection('custom-provider-alias-test', 'model-old', settings)).toMatchObject({
-      remappedFrom: 'model-old', model: { modelId: 'model-current' },
+      remappedFrom: 'model-old',
+      model: { modelId: 'model-current' },
     });
-    expect(planEffectiveModelRequest({
-      providerId: 'custom-provider-alias-test', modelId: 'model-old', providers: settings,
-    })).toMatchObject({
+    expect(
+      planEffectiveModelRequest({
+        providerId: 'custom-provider-alias-test',
+        modelId: 'model-old',
+        providers: settings,
+      }),
+    ).toMatchObject({
       ok: true,
       plan: { selectedModelId: 'model-current', effectiveModelId: 'model-current' },
     });

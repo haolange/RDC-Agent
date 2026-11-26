@@ -18,7 +18,7 @@ import type { WorkbenchIpcContext } from './workbenchContext';
 
 function readWorkflowState(sessionId: string, runId: string | null): WorkflowState | null {
   const run = runId
-    ? sessionRecordStore.listRuns(sessionId).find((entry) => entry.runId === runId) ?? null
+    ? (sessionRecordStore.listRuns(sessionId).find((entry) => entry.runId === runId) ?? null)
     : sessionRecordStore.getLatestRun(sessionId);
   if (!run) return null;
   return {

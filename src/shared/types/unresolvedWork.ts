@@ -1,5 +1,12 @@
 /** Why a remaining item cannot proceed now. `not_required` marks work outside what the goal needs. */
-export const UNRESOLVED_BLOCKERS = ['capability', 'permission', 'budget', 'strategy', 'external', 'not_required'] as const;
+export const UNRESOLVED_BLOCKERS = [
+  'capability',
+  'permission',
+  'budget',
+  'strategy',
+  'external',
+  'not_required',
+] as const;
 export type UnresolvedBlocker = (typeof UNRESOLVED_BLOCKERS)[number];
 
 /** One remaining item of a turn or Task result. */

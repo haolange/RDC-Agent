@@ -64,7 +64,8 @@ for (const component of [
   'src/renderer/features/right-rail/RightRailContext.tsx',
   'src/renderer/features/right-rail/CapturePanel.tsx',
 ]) {
-  const limit = component.endsWith('RightRailArtifactList.tsx') || component.endsWith('RightRailArtifactGlyphs.tsx') ? 200 : 300;
+  const limit =
+    component.endsWith('RightRailArtifactList.tsx') || component.endsWith('RightRailArtifactGlyphs.tsx') ? 200 : 300;
   if (lineCount(component) > limit) fail(`component must stay under ${limit} lines: ${component}`);
 }
 if (lineCount('src/main/agent-trace/rightRailInvestigationArtifacts.ts') > 150) {
@@ -72,7 +73,18 @@ if (lineCount('src/main/agent-trace/rightRailInvestigationArtifacts.ts') > 150) 
 }
 
 const tracePanel = read('src/renderer/features/right-rail/SessionRightRail.tsx');
-for (const requiredSection of ['id="tasks"', 'id="artifacts"', 'id="outputs"', 'id="context"', 'id="capture"', 'Tasks', 'Artifacts', 'Outputs', 'Context', 'Capture']) {
+for (const requiredSection of [
+  'id="tasks"',
+  'id="artifacts"',
+  'id="outputs"',
+  'id="context"',
+  'id="capture"',
+  'Tasks',
+  'Artifacts',
+  'Outputs',
+  'Context',
+  'Capture',
+]) {
   requireText(tracePanel, requiredSection, `SessionRightRail must render ${requiredSection}`);
 }
 if (!/id="tasks"[\s\S]*id="artifacts"[\s\S]*id="outputs"[\s\S]*id="context"[\s\S]*id="capture"/.test(tracePanel)) {
@@ -97,7 +109,14 @@ for (const required of [
 ]) {
   requireText(tracePanel, required, `SessionRightRail must retain ${required}`);
 }
-for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail', 'harnessTasks', 'RequestInspector', 'No tasks', 'aria-expanded']) {
+for (const forbidden of [
+  'ClassicSessionControlPanel',
+  'shouldShowTraceRightRail',
+  'harnessTasks',
+  'RequestInspector',
+  'No tasks',
+  'aria-expanded',
+]) {
   forbidText(tracePanel, forbidden, `SessionRightRail must not retain ${forbidden}`);
 }
 forbidText(tracePanel, 'is-empty', 'SessionRightRail sections must keep one card shell regardless of content');
@@ -106,10 +125,24 @@ const projectCaptureImport = [
   read('src/renderer/features/right-rail/ProjectCaptureImportPanel.tsx'),
   read('src/renderer/features/right-rail/projectCaptureActions.ts'),
 ].join('\n');
-for (const required of ['project.inputs.import', 'project.inputs.refresh', "'projectCapture.import'", "'projectCapture.empty'", 'right-rail-section project-capture-import-section', 'project-capture-input-list']) {
+for (const required of [
+  'project.inputs.import',
+  'project.inputs.refresh',
+  "'projectCapture.import'",
+  "'projectCapture.empty'",
+  'right-rail-section project-capture-import-section',
+  'project-capture-input-list',
+]) {
   requireText(projectCaptureImport, required, `ProjectCaptureImportPanel must retain ${required}`);
 }
-for (const forbidden of ['useCaptureStore', 'openedCapture', 'SessionRightRail', 'project-capture-inputs-section', '<h3>Captures</h3>', 'input.filePath}</small>']) {
+for (const forbidden of [
+  'useCaptureStore',
+  'openedCapture',
+  'SessionRightRail',
+  'project-capture-inputs-section',
+  '<h3>Captures</h3>',
+  'input.filePath}</small>',
+]) {
   forbidText(projectCaptureImport, forbidden, `ProjectCaptureImportPanel must not retain ${forbidden}`);
 }
 
@@ -117,7 +150,13 @@ const artifactList = [
   read('src/renderer/features/right-rail/RightRailArtifactList.tsx'),
   read('src/renderer/hooks/appShellBridge.ts'),
 ].join('\n');
-for (const required of ['RightRailArtifactGlyph', 'RightRailInvestigationPreview', 'TaskDialog', 'totalCount', 'listInvestigationArtifacts']) {
+for (const required of [
+  'RightRailArtifactGlyph',
+  'RightRailInvestigationPreview',
+  'TaskDialog',
+  'totalCount',
+  'listInvestigationArtifacts',
+]) {
   requireText(artifactList, required, `RightRailArtifactList must retain ${required}`);
 }
 for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:', 'Open', 'Delete', 'Refresh']) {
@@ -131,7 +170,16 @@ const artifactPreview = [
 for (const required of ['investigation.read', 'expectedHash', 'TaskDialog', 'CopyDiagnosticsButton', 'hash-mismatch']) {
   requireText(artifactPreview, required, `RightRailInvestigationPreview must retain ${required}`);
 }
-for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:', 'ArtifactViewer', 'title={hash}', 'title={row.contentHash}', 'investigation-preview-id', 'browse.copy.']) {
+for (const forbidden of [
+  'artifactStore',
+  'readdirSync',
+  'session:investigation:',
+  'ArtifactViewer',
+  'title={hash}',
+  'title={row.contentHash}',
+  'investigation-preview-id',
+  'browse.copy.',
+]) {
   forbidText(artifactPreview, forbidden, `RightRailInvestigationPreview must not retain ${forbidden}`);
 }
 
@@ -141,18 +189,61 @@ for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:
 }
 
 const outputList = read('src/renderer/features/right-rail/RightRailOutputList.tsx');
-for (const required of ['<Icon name="file"', "artifact.status === 'failed'", 'control.rightRail.outputs.missing', 'control.rightRail.outputs.open', 'control.rightRail.outputs.copyPath', '<Menu']) {
+for (const required of [
+  '<Icon name="file"',
+  "artifact.status === 'failed'",
+  'control.rightRail.outputs.missing',
+  'control.rightRail.outputs.open',
+  'control.rightRail.outputs.copyPath',
+  '<Menu',
+]) {
   requireText(outputList, required, `RightRailOutputList must retain ${required}`);
 }
-for (const forbidden of ['PlanArtifactPreview', 'isPlanArtifact', "artifact.type === 'plan'", 'previewMarkdown', 'plan.md', 'session_plan', 'artifact_store', 'run_report', 'action_output']) {
+for (const forbidden of [
+  'PlanArtifactPreview',
+  'isPlanArtifact',
+  "artifact.type === 'plan'",
+  'previewMarkdown',
+  'plan.md',
+  'session_plan',
+  'artifact_store',
+  'run_report',
+  'action_output',
+]) {
   forbidText(outputList, forbidden, `RightRailOutputList must not retain ${forbidden}`);
 }
 
 const context = read('src/renderer/features/right-rail/RightRailContext.tsx');
-for (const requiredArea of ['TaskContextPanelViewModel', 'TaskContextResource', "t('control.rightRail.context.resources')", "TaskDialog", "slice(0, 5)"]) {
+for (const requiredArea of [
+  'TaskContextPanelViewModel',
+  'TaskContextResource',
+  "t('control.rightRail.context.resources')",
+  'TaskDialog',
+  'slice(0, 5)',
+]) {
   requireText(context, requiredArea, `RightRailContext must retain ${requiredArea}`);
 }
-for (const forbidden of ['context?: ContextPanelViewModel', 'Rdc', 'Capture', 'Preview', 'Refresh', 'Copy', 'Clear', '<details', 'Session details', 'Replay options', 'Runtime details', 'Context ID', 'Replay session', 'Capture file', 'Remote ID', 'cliSummary', '<Fact label="CLI"', 'toolCount', 'namespace inventory']) {
+for (const forbidden of [
+  'context?: ContextPanelViewModel',
+  'Rdc',
+  'Capture',
+  'Preview',
+  'Refresh',
+  'Copy',
+  'Clear',
+  '<details',
+  'Session details',
+  'Replay options',
+  'Runtime details',
+  'Context ID',
+  'Replay session',
+  'Capture file',
+  'Remote ID',
+  'cliSummary',
+  '<Fact label="CLI"',
+  'toolCount',
+  'namespace inventory',
+]) {
   forbidText(context, forbidden, `RightRailContext must not retain ${forbidden}`);
 }
 
@@ -165,23 +256,62 @@ const capturePanel = [
   read('src/renderer/features/right-rail/CaptureReplayControls.tsx'),
   read('src/renderer/features/right-rail/CaptureWorkspace.tsx'),
 ].join('\n');
-for (const required of ['RdcContextPanelViewModel', 'control.captureOpen', 'capture.openProjectInput', 'capture.clearOpenedState', 'capture.applyReplayEvent', 'capture.refreshFrame', 'capture.readLivePreview', 'capture-replay-device-row', 'CaptureWorkspace', 'CaptureReplayControls', 'interactionLock', 'controlAgent', 'controlHuman']) {
+for (const required of [
+  'RdcContextPanelViewModel',
+  'control.captureOpen',
+  'capture.openProjectInput',
+  'capture.clearOpenedState',
+  'capture.applyReplayEvent',
+  'capture.refreshFrame',
+  'capture.readLivePreview',
+  'capture-replay-device-row',
+  'CaptureWorkspace',
+  'CaptureReplayControls',
+  'interactionLock',
+  'controlAgent',
+  'controlHuman',
+]) {
   requireText(capturePanel, required, `CapturePanel must retain ${required}`);
 }
-for (const retired of ['openHumanPreview', 'closeHumanPreview', 'humanPreviewStatus', 'role="tablist"', 'role="tabpanel"', 'capture-replay-tabs', 'CaptureHistoryControls', 'agentObservation', 'returnCurrent']) forbidText(capturePanel, retired, `Capture must retire ${retired}`);
+for (const retired of [
+  'openHumanPreview',
+  'closeHumanPreview',
+  'humanPreviewStatus',
+  'role="tablist"',
+  'role="tabpanel"',
+  'capture-replay-tabs',
+  'CaptureHistoryControls',
+  'agentObservation',
+  'returnCurrent',
+])
+  forbidText(capturePanel, retired, `Capture must retire ${retired}`);
 const workspace = read('src/renderer/features/right-rail/CaptureWorkspace.tsx');
-if ((workspace.match(/className="capture-replay-image"/g) ?? []).length !== 1) fail('CaptureWorkspace must own exactly one image viewport');
-for (const retired of ['EID ', 'control.replay.more', '<h2 className="right-rail-section-heading">']) forbidText(capturePanel, retired, `Capture must retire ${retired}`);
+if ((workspace.match(/className="capture-replay-image"/g) ?? []).length !== 1)
+  fail('CaptureWorkspace must own exactly one image viewport');
+for (const retired of ['EID ', 'control.replay.more', '<h2 className="right-rail-section-heading">'])
+  forbidText(capturePanel, retired, `Capture must retire ${retired}`);
 requireText(capturePanel, 'CopyDiagnosticsButton', 'Capture hands context and device ids to the clipboard');
 forbidText(capturePanel, 'capture-replay-diagnostics', 'Capture must not restore a diagnostics disclosure');
 const reportView = read('src/renderer/features/right-rail/RightRailReportView.tsx');
-for (const retired of ['investigation-report-note', 'investigation-report-meta', 'claim.claimKind}', 'claim.epistemic}']) forbidText(reportView, retired, `Report view must retire ${retired}`);
+for (const retired of [
+  'investigation-report-note',
+  'investigation-report-meta',
+  'claim.claimKind}',
+  'claim.epistemic}',
+])
+  forbidText(reportView, retired, `Report view must retire ${retired}`);
 requireText(reportView, 'CopyDiagnosticsButton', 'Report view hands record ids to the clipboard');
 forbidText(reportView, 'labels.diagnostics', 'Report view must not restore a diagnostics disclosure');
 const taskList = read('src/renderer/features/right-rail/RightRailTaskList.tsx');
-for (const retired of ['right-rail-task-order', 'right-rail-task-facts', 'right-rail-task-progress-label']) forbidText(taskList, retired, `Tasks must retire ${retired}`);
-for (const retired of ['stopLabel', 'useSessionWorkStop', 'stopBackgroundWork']) forbidText(taskList + tracePanel, retired, `Tasks must retire ${retired}`);
-forbidText(capturePanel, 'right-rail-capture-summary', 'CapturePanel must not duplicate the selected capture above its picker');
+for (const retired of ['right-rail-task-order', 'right-rail-task-facts', 'right-rail-task-progress-label'])
+  forbidText(taskList, retired, `Tasks must retire ${retired}`);
+for (const retired of ['stopLabel', 'useSessionWorkStop', 'stopBackgroundWork'])
+  forbidText(taskList + tracePanel, retired, `Tasks must retire ${retired}`);
+forbidText(
+  capturePanel,
+  'right-rail-capture-summary',
+  'CapturePanel must not duplicate the selected capture above its picker',
+);
 
 const emptyState = read('src/renderer/features/right-rail/RightRailEmptyState.tsx');
 for (const required of ['RightRailEmptyVisual', 'EmptyState', 'visual=']) {
@@ -193,10 +323,31 @@ const rightRailCss = [
   read('src/renderer/features/right-rail/CaptureReplay.css'),
   read('src/renderer/features/right-rail/RightRailEmptyVisuals.css'),
 ].join('\n');
-for (const required of ['.right-rail-empty-state', '.ui-empty-state-title', '.right-rail-empty-visual', '.capture-replay-device-row', '.project-capture-import-section', '.project-capture-input-list', '.right-rail-investigation-list']) {
+for (const required of [
+  '.right-rail-empty-state',
+  '.ui-empty-state-title',
+  '.right-rail-empty-visual',
+  '.capture-replay-device-row',
+  '.project-capture-import-section',
+  '.project-capture-input-list',
+  '.right-rail-investigation-list',
+]) {
   requireText(rightRailCss, required, `Right rail CSS must retain ${required}`);
 }
-for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.panel-action-btn', 'trace-plan-preview', 'is-plan', '.right-rail-details', '.right-rail-context-area-heading', '.right-rail-rdc-context', '.right-rail-section:not(.is-empty)', '.right-rail-section.is-empty', '.right-rail-capture-summary']) {
+for (const forbidden of [
+  '.control-panel',
+  '.cp-section',
+  '.capture-library',
+  '.panel-action-btn',
+  'trace-plan-preview',
+  'is-plan',
+  '.right-rail-details',
+  '.right-rail-context-area-heading',
+  '.right-rail-rdc-context',
+  '.right-rail-section:not(.is-empty)',
+  '.right-rail-section.is-empty',
+  '.right-rail-capture-summary',
+]) {
   forbidText(rightRailCss, forbidden, `RightRail.css must not retain ${forbidden}`);
 }
 
@@ -205,18 +356,35 @@ if (!railShell) fail('RightRail.css must keep a .right-rail shell rule');
 requireText(railShell[0], 'padding: var(--space-3)', '.right-rail shell must use space-3 padding on all sides');
 requireText(railShell[0], 'gap: var(--space-3)', '.right-rail shell must keep space-3 session card gap');
 forbidText(railShell[0], 'padding: var(--space-2)', '.right-rail shell must not use space-2 padding');
-requireText(read('src/renderer/features/right-rail/RightRail.css').replace(/\s+/g, ' '), '.project-capture-rail { gap: 0; }', 'Project rail must keep single-card gap: 0');
+requireText(
+  read('src/renderer/features/right-rail/RightRail.css').replace(/\s+/g, ' '),
+  '.project-capture-rail { gap: 0; }',
+  'Project rail must keep single-card gap: 0',
+);
 
 // Escape, the Tab trap and focus return come from the shared modal layer, the same as every other modal surface.
 const drawer = read('src/renderer/app/WorkbenchPanelDrawer.tsx');
-for (const requiredDrawerContract of ['role="dialog"', 'aria-modal="true"', 'useOverlayLayer(open', 'useModalFocus({']) {
+for (const requiredDrawerContract of [
+  'role="dialog"',
+  'aria-modal="true"',
+  'useOverlayLayer(open',
+  'useModalFocus({',
+]) {
   requireText(drawer, requiredDrawerContract, `WorkbenchPanelDrawer must retain ${requiredDrawerContract}`);
 }
 
 const workbenchLayout = read('src/renderer/app/useWorkbenchLayout.ts');
 const layoutConstants = read('src/shared/constants/layout.ts');
-requireText(layoutConstants, 'RIGHT_RAIL_DRAWER_BREAKPOINT = 920', 'right rail drawer must enter only once the work surface is genuinely narrow');
-requireText(workbenchLayout, 'useNarrowViewport(RIGHT_RAIL_DRAWER_BREAKPOINT)', 'workbench layout must use the shared right rail drawer breakpoint');
+requireText(
+  layoutConstants,
+  'RIGHT_RAIL_DRAWER_BREAKPOINT = 920',
+  'right rail drawer must enter only once the work surface is genuinely narrow',
+);
+requireText(
+  workbenchLayout,
+  'useNarrowViewport(RIGHT_RAIL_DRAWER_BREAKPOINT)',
+  'workbench layout must use the shared right rail drawer breakpoint',
+);
 
 const traceTypes = read('src/shared/types/trace.ts');
 for (const requiredContract of [
@@ -235,41 +403,93 @@ for (const requiredContract of [
 ]) {
   requireText(traceTypes, requiredContract, `trace contract must retain ${requiredContract}`);
 }
-for (const forbidden of ['groups:', 'session:outputs:list', 'previewMarkdown', 'session_plan', 'artifact_store', 'run_report', 'action_output', 'cliSummary', 'toolCount']) {
+for (const forbidden of [
+  'groups:',
+  'session:outputs:list',
+  'previewMarkdown',
+  'session_plan',
+  'artifact_store',
+  'run_report',
+  'action_output',
+  'cliSummary',
+  'toolCount',
+]) {
   forbidText(traceTypes, forbidden, `trace contract must not retain ${forbidden}`);
 }
 
 const taskContextResources = read('src/main/agent-trace/rightRailTaskContextResources.ts');
-for (const required of ['promptSegments', 'resourceRefs', "tool.status === 'complete'", "segment.kind === 'preloaded-skill'", "segment.kind === 'scoped-instruction'"]) {
+for (const required of [
+  'promptSegments',
+  'resourceRefs',
+  "tool.status === 'complete'",
+  "segment.kind === 'preloaded-skill'",
+  "segment.kind === 'scoped-instruction'",
+]) {
   requireText(taskContextResources, required, 'task Context resources must retain ' + required);
 }
-for (const forbidden of ['argsPreview', 'resultPreview', 'configuredTools', 'settings.agents.definitions', 'collectSessionUsedToolNames']) {
+for (const forbidden of [
+  'argsPreview',
+  'resultPreview',
+  'configuredTools',
+  'settings.agents.definitions',
+  'collectSessionUsedToolNames',
+]) {
   forbidText(taskContextResources, forbidden, 'task Context resources must not infer from ' + forbidden);
 }
 const projection = read('src/main/agent-trace/rightRailProjectionMappers.ts');
-for (const forbidden of ['ToolRuntimeSummary', 'cliSummary', 'toolCount', 'session_plan', 'run_report', 'action_output', 'previewMarkdown']) {
+for (const forbidden of [
+  'ToolRuntimeSummary',
+  'cliSummary',
+  'toolCount',
+  'session_plan',
+  'run_report',
+  'action_output',
+  'previewMarkdown',
+]) {
   forbidText(projection, forbidden, `right rail projection must not retain ${forbidden}`);
 }
 requireText(projection, 'export function mapRightRailOutputs', 'outputs mapper must be named mapRightRailOutputs');
 forbidText(projection, 'mapRightRailArtifacts', 'outputs mapper must not keep the artifacts name');
 
 const investigationProjection = read('src/main/agent-trace/rightRailInvestigationArtifacts.ts');
-for (const required of ['mapRightRailInvestigationArtifacts', 'investigationArtifactService', 'listForProjection', 'listManifests', "mission === 'unknown'", 'contentHash']) {
+for (const required of [
+  'mapRightRailInvestigationArtifacts',
+  'investigationArtifactService',
+  'listForProjection',
+  'listManifests',
+  "mission === 'unknown'",
+  'contentHash',
+]) {
   requireText(investigationProjection, required, `investigation rail mapper must retain ${required}`);
 }
-for (const forbidden of ['artifactStore', 'readdirSync', 'SessionArtifactSource', 'listSessionArtifactSources', 'FALLBACK_MISSION', "?? 'debugger'"]) {
+for (const forbidden of [
+  'artifactStore',
+  'readdirSync',
+  'SessionArtifactSource',
+  'listSessionArtifactSources',
+  'FALLBACK_MISSION',
+  "?? 'debugger'",
+]) {
   forbidText(investigationProjection, forbidden, `investigation rail mapper must not retain ${forbidden}`);
 }
 
 const projectionService = read('src/main/agent-trace/RightRailProjectionService.ts');
-forbidText(projectionService, "agentProfile: 'Ask'", 'RightRailProjectionService must not use Ask as a profile fallback');
+forbidText(
+  projectionService,
+  "agentProfile: 'Ask'",
+  'RightRailProjectionService must not use Ask as a profile fallback',
+);
 requireText(projectionService, "agentProfile: ''", 'empty right-rail panel must leave agentProfile empty');
 
 for (const forbidden of ['usedToolNames', "kind: 'tool'", 'settings.agents.definitions']) {
   forbidText(projection, forbidden, 'right rail projection must not retain generic resource path ' + forbidden);
 }
 const artifactSource = read('src/main/reports/SessionArtifactSource.ts');
-for (const required of ['export type SessionArtifactSourceKind = \'attachment\' | \'output\'', 'categorizeOutput', 'artifactStore.list']) {
+for (const required of [
+  "export type SessionArtifactSourceKind = 'attachment' | 'output'",
+  'categorizeOutput',
+  'artifactStore.list',
+]) {
   requireText(artifactSource, required, `SessionArtifactSource must retain ${required}`);
 }
 for (const forbidden of ['session_plan', 'run_report', 'action_output', 'reportPaths', 'plan.md', 'payload']) {
@@ -277,7 +497,13 @@ for (const forbidden of ['session_plan', 'run_report', 'action_output', 'reportP
 }
 
 const outputRegistrationTool = read('src/main/reports/OutputRegistrationTool.ts');
-for (const required of ['createOutputRegistrationTool', "name: 'output_register'", "'.rdc-agent', 'inputs'", 'runScopedStore.getRunRoot', 'artifactStore.register']) {
+for (const required of [
+  'createOutputRegistrationTool',
+  "name: 'output_register'",
+  "'.rdc-agent', 'inputs'",
+  'runScopedStore.getRunRoot',
+  'artifactStore.register',
+]) {
   requireText(outputRegistrationTool, required, `OutputRegistrationTool must retain ${required}`);
 }
 for (const forbidden of ['readdirSync', 'globSync', 'payload paths']) {
@@ -294,7 +520,11 @@ for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail
 }
 forbidText(channels, 'session:outputs:list', 'IPC channel registry must not retain session:outputs:list');
 forbidText(channels, 'session:investigation:', 'IPC channel registry must not add session:investigation channels');
-requireText(channels, "'investigation:read': 'read'", 'IPC channel registry must expose investigation:read classified as read');
+requireText(
+  channels,
+  "'investigation:read': 'read'",
+  'IPC channel registry must expose investigation:read classified as read',
+);
 
 const docs = {
   design: read('ARCHITECTURE.md'),
@@ -316,7 +546,11 @@ for (const [source, requiredTextValue, label] of [
   requireText(source, requiredTextValue, `missing ${label}`);
 }
 for (const [name, source] of Object.entries(docs)) {
-  requireText(source, 'Tasks / Artifacts / Outputs / Context / Capture', `${name} must describe the five-card Session rail`);
+  requireText(
+    source,
+    'Tasks / Artifacts / Outputs / Context / Capture',
+    `${name} must describe the five-card Session rail`,
+  );
 }
 for (const forbiddenDocText of [
   'keeps `plan.md` first',
@@ -329,7 +563,8 @@ for (const forbiddenDocText of [
   'Progress / Artifacts / Outputs / Context / Capture',
   '当前四卡',
 ]) {
-  for (const [name, source] of Object.entries(docs)) forbidText(source, forbiddenDocText, `${name} must not retain ${forbiddenDocText}`);
+  for (const [name, source] of Object.entries(docs))
+    forbidText(source, forbiddenDocText, `${name} must not retain ${forbiddenDocText}`);
 }
 
 console.log('[right-rail] OK');

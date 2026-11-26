@@ -18,9 +18,14 @@ import type {
 type Translate = ReturnType<typeof useI18n>['t'];
 
 const REASONING_LABEL_KEYS = {
-  off: 'composer.effort.levelOff', on: 'composer.effort.levelOn', minimal: 'composer.effort.levelMinimal',
-  low: 'composer.effort.levelLow', medium: 'composer.effort.levelMedium', high: 'composer.effort.levelHigh',
-  xhigh: 'composer.effort.levelExtra', max: 'composer.effort.levelMax',
+  off: 'composer.effort.levelOff',
+  on: 'composer.effort.levelOn',
+  minimal: 'composer.effort.levelMinimal',
+  low: 'composer.effort.levelLow',
+  medium: 'composer.effort.levelMedium',
+  high: 'composer.effort.levelHigh',
+  xhigh: 'composer.effort.levelExtra',
+  max: 'composer.effort.levelMax',
 } as const satisfies Record<ReasoningSelection, Parameters<Translate>[0]>;
 
 export interface CapabilityChip {
@@ -53,15 +58,23 @@ export function buildPricingRows(model: EffectiveModel | null, t: Translate): Mo
     { id: 'output', label: t('settings.providers.capability.pricingOutput'), value: price(model.cost.output) },
   ];
   if (typeof model.cost.cacheRead === 'number') {
-    rows.push({ id: 'cacheRead', label: t('settings.providers.capability.pricingCacheRead'), value: price(model.cost.cacheRead) });
+    rows.push({
+      id: 'cacheRead',
+      label: t('settings.providers.capability.pricingCacheRead'),
+      value: price(model.cost.cacheRead),
+    });
   }
   if (typeof model.cost.cacheWrite === 'number') {
-    rows.push({ id: 'cacheWrite', label: t('settings.providers.capability.pricingCacheWrite'), value: price(model.cost.cacheWrite) });
+    rows.push({
+      id: 'cacheWrite',
+      label: t('settings.providers.capability.pricingCacheWrite'),
+      value: price(model.cost.cacheWrite),
+    });
   }
   return rows;
 }
 
-export function getReasoningLabelKey(level: ReasoningSelection): typeof REASONING_LABEL_KEYS[ReasoningSelection] {
+export function getReasoningLabelKey(level: ReasoningSelection): (typeof REASONING_LABEL_KEYS)[ReasoningSelection] {
   return REASONING_LABEL_KEYS[level];
 }
 
@@ -104,14 +117,16 @@ export function buildContextTierRows(model: EffectiveModel | null, t: Translate)
   const choices = resolveContextTierChoices(model);
   return model.contextTiers.map((tier) => ({
     id: tier.id,
-    label: tier.id === choices.maxTier?.id
-      ? t('settings.providers.capability.maxTierLabel', { label: tier.label })
-      : tier.label,
+    label:
+      tier.id === choices.maxTier?.id
+        ? t('settings.providers.capability.maxTierLabel', { label: tier.label })
+        : tier.label,
     limit: formatTierLimit(tier, t),
     entitlement: formatEntitlement(tier.entitlement, t),
-    cost: typeof tier.costMultiplier === 'number'
-      ? t('settings.providers.capability.costMultiplier', { multiplier: tier.costMultiplier })
-      : null,
+    cost:
+      typeof tier.costMultiplier === 'number'
+        ? t('settings.providers.capability.costMultiplier', { multiplier: tier.costMultiplier })
+        : null,
     tone: tier.entitlement === 'granted' ? 'positive' : tier.entitlement === 'denied' ? 'negative' : 'warning',
   }));
 }
@@ -148,9 +163,7 @@ export function formatFastControl(model: EffectiveModel | null, t: Translate): s
   if (model.controls.fast.state === 'provider-managed') return t('composer.effort.providerManaged');
   if (model.controls.fast.state === 'fixed') return t('settings.providers.capability.alwaysOn');
   const entitlement = model.controls.fast.entitlement;
-  return entitlement === 'granted'
-    ? t('settings.providers.capability.supported')
-    : formatEntitlement(entitlement, t);
+  return entitlement === 'granted' ? t('settings.providers.capability.supported') : formatEntitlement(entitlement, t);
 }
 
 export function formatCapabilityState(state: CapabilityState | undefined, t: Translate): string {
@@ -178,11 +191,12 @@ function toolCallingTone(state: CapabilityState | undefined): CapabilityChip['to
 export function buildCapabilityChips(model: EffectiveModel | null, t: Translate): CapabilityChip[] {
   const fast = formatFastControl(model, t);
   const fastState = model?.resolvedControls?.fast.state ?? model?.controls.fast.state;
-  const fastTone = !model || fastState === 'unknown' || fastState === 'provider-managed'
-    ? 'warning'
-    : fastState === 'unsupported' || fastState === 'blocked'
-      ? 'negative'
-      : model.controls.fast.state === 'selectable' && model.controls.fast.entitlement === 'denied'
+  const fastTone =
+    !model || fastState === 'unknown' || fastState === 'provider-managed'
+      ? 'warning'
+      : fastState === 'unsupported' || fastState === 'blocked'
+        ? 'negative'
+        : model.controls.fast.state === 'selectable' && model.controls.fast.entitlement === 'denied'
           ? 'negative'
           : model.controls.fast.state === 'selectable' && model.controls.fast.entitlement === 'unknown'
             ? 'warning'
@@ -191,15 +205,30 @@ export function buildCapabilityChips(model: EffectiveModel | null, t: Translate)
     {
       label: t('settings.providers.capability.reasoning'),
       value: formatReasoningCapability(model, t),
-      tone: model?.controls.reasoning.kind === 'unknown'
-        ? 'default'
-        : model?.controls.reasoning.kind === 'none'
-          ? 'negative'
-          : model ? 'positive' : 'warning',
+      tone:
+        model?.controls.reasoning.kind === 'unknown'
+          ? 'default'
+          : model?.controls.reasoning.kind === 'none'
+            ? 'negative'
+            : model
+              ? 'positive'
+              : 'warning',
     },
     { label: t('settings.providers.capability.fastMode'), value: fast, tone: fastTone },
-    { label: t('settings.providers.capability.toolCalling'), value: formatToolCallingState(model?.toolCalling, t), tone: toolCallingTone(model?.toolCalling) },
-    { label: t('settings.providers.capability.visionInput'), value: formatCapabilityState(model?.visionInput, t), tone: stateTone(model?.visionInput) },
-    { label: t('settings.providers.capability.structuredOutput'), value: formatCapabilityState(model?.structuredOutput, t), tone: stateTone(model?.structuredOutput) },
+    {
+      label: t('settings.providers.capability.toolCalling'),
+      value: formatToolCallingState(model?.toolCalling, t),
+      tone: toolCallingTone(model?.toolCalling),
+    },
+    {
+      label: t('settings.providers.capability.visionInput'),
+      value: formatCapabilityState(model?.visionInput, t),
+      tone: stateTone(model?.visionInput),
+    },
+    {
+      label: t('settings.providers.capability.structuredOutput'),
+      value: formatCapabilityState(model?.structuredOutput, t),
+      tone: stateTone(model?.structuredOutput),
+    },
   ];
 }

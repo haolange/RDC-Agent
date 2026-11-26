@@ -14,9 +14,11 @@ const entry = (sessionId: string): RuntimeLogEntry => ({
   projectId: 'project-a',
 });
 
-const deferred = <T,>() => {
+const deferred = <T>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => { resolve = next; });
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
   return { promise, resolve };
 };
 
@@ -115,8 +117,13 @@ describe('terminalStore refresh', () => {
     });
     const stale = { ...entry('session-a'), id: 'stale' };
     useTerminalStore.setState({
-      scopeFilter: 'current-session', sessionId: 'session-a', projectId: 'project-a', runId: null,
-      entries: [stale], expandedEntryIds: [], isLoading: false,
+      scopeFilter: 'current-session',
+      sessionId: 'session-a',
+      projectId: 'project-a',
+      runId: null,
+      entries: [stale],
+      expandedEntryIds: [],
+      isLoading: false,
     });
 
     const refresh = useTerminalStore.getState().refreshEntries();

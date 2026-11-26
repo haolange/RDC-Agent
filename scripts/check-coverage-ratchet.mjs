@@ -18,7 +18,10 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const summaryPath = path.resolve(repoRoot, process.argv[2] ?? path.join('coverage', 'coverage-summary.json'));
-const ratchetPath = path.resolve(repoRoot, process.argv[3] ?? path.join('scripts', 'fidelity', 'coverage-ratchet.json'));
+const ratchetPath = path.resolve(
+  repoRoot,
+  process.argv[3] ?? path.join('scripts', 'fidelity', 'coverage-ratchet.json'),
+);
 const METRICS = ['lines', 'functions', 'branches', 'statements'];
 
 function fail(message) {

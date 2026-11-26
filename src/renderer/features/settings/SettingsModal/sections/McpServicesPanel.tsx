@@ -94,7 +94,10 @@ export const McpServicesPanel: React.FC<{
       ...(form.url ? [{ label: t('settings.resourceFieldUrl'), value: form.url }] : []),
       ...(form.command ? [{ label: t('settings.resourceFieldCommand'), value: form.command }] : []),
       ...(args ? [{ label: t('settings.resourceFieldArgs'), value: args }] : []),
-      { label: t('settings.resourceScope'), value: resource.scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser') },
+      {
+        label: t('settings.resourceScope'),
+        value: resource.scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser'),
+      },
       { label: t('settings.scopeResourceLocation'), value: resource.sourcePath },
       ...(server?.descriptorHash ? [{ label: t('settings.mcpDescriptorHash'), value: server.descriptorHash }] : []),
     ];
@@ -114,7 +117,10 @@ export const McpServicesPanel: React.FC<{
         </header>
         {live?.connectionStatus === 'connected' ? (
           <dl className="settings-runtime-detail-grid">
-            <div><dt>{t('settings.mcpToolsLabel')}</dt><dd>{t('settings.mcpStatusToolCount', { count: live.toolCount })}</dd></div>
+            <div>
+              <dt>{t('settings.mcpToolsLabel')}</dt>
+              <dd>{t('settings.mcpStatusToolCount', { count: live.toolCount })}</dd>
+            </div>
           </dl>
         ) : null}
         {live?.lastError ? <InlineError detail={live.lastError}>{t('settings.mcpConnectFailed')}</InlineError> : null}
@@ -137,7 +143,7 @@ export const McpServicesPanel: React.FC<{
         kinds={['mcp']}
         onChanged={onChanged}
         editorPresentation="dialog"
-        toolbarExtra={(
+        toolbarExtra={
           <Button
             variant="ghost"
             disabled={status.loading}
@@ -147,7 +153,7 @@ export const McpServicesPanel: React.FC<{
             <Icon name="refresh" size={14} />
             {status.loading ? t('settings.mcpStatusRefreshing') : t('settings.mcpStatusRefresh')}
           </Button>
-        )}
+        }
         renderList={({ resources, selectedId, select }) => (
           <McpResourceList
             resources={resources}
@@ -160,10 +166,16 @@ export const McpServicesPanel: React.FC<{
         )}
         renderDetail={renderDetail}
       />
-      {toggleError !== null ? <InlineError detail={toggleError || undefined}>{t('settings.mcpToggleFailed')}</InlineError> : null}
+      {toggleError !== null ? (
+        <InlineError detail={toggleError || undefined}>{t('settings.mcpToggleFailed')}</InlineError>
+      ) : null}
       {status.error !== null || status.unavailable ? (
-        <InlineError detail={status.error ?? undefined} onRetry={() => void status.refresh()} retryLabel={labels.retry}
-          retryDisabled={status.loading}>
+        <InlineError
+          detail={status.error ?? undefined}
+          onRetry={() => void status.refresh()}
+          retryLabel={labels.retry}
+          retryDisabled={status.loading}
+        >
           {t('settings.mcpStatusUnavailable')}
         </InlineError>
       ) : null}

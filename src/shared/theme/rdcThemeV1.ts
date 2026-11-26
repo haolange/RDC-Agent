@@ -60,9 +60,7 @@ export function parseRdcThemeV1(raw: string, expectedVariant?: ThemeVariant): Rd
     return { ok: false, reason: 'payload', error: 'Theme payload must be an object' };
   }
   const record = parsed as Record<string, unknown>;
-  const variant = record.variant === 'light' || record.variant === 'dark'
-    ? record.variant
-    : null;
+  const variant = record.variant === 'light' || record.variant === 'dark' ? record.variant : null;
   if (!variant) {
     return { ok: false, reason: 'variant', error: 'variant must be "light" or "dark"' };
   }
@@ -73,9 +71,7 @@ export function parseRdcThemeV1(raw: string, expectedVariant?: ThemeVariant): Rd
       error: `Theme variant is ${variant}, but this Import targets ${expectedVariant}`,
     };
   }
-  const theme = record.theme && typeof record.theme === 'object'
-    ? record.theme as Record<string, unknown>
-    : null;
+  const theme = record.theme && typeof record.theme === 'object' ? (record.theme as Record<string, unknown>) : null;
   if (!theme) {
     return { ok: false, reason: 'payload', error: 'theme object is required' };
   }

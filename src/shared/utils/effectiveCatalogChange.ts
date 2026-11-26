@@ -9,9 +9,8 @@ import type {
 
 type Json = unknown;
 
-const isRecord = (value: Json): value is Record<string, Json> => (
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-);
+const isRecord = (value: Json): value is Record<string, Json> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export const catalogBaseOf = (snapshot: EffectiveCatalogSnapshot): EffectiveCatalogBase => ({
   scopeGeneration: snapshot.scopeGeneration,
@@ -56,7 +55,10 @@ function modelUpdate(before: EffectiveModel, next: EffectiveModel): EffectiveMod
 function withValue(root: Json, path: ReadonlyArray<string | number>, change: EffectiveModelValueChange): Json {
   if (path.length === 0) return change.value;
   const [key, ...rest] = path;
-  const container = (Array.isArray(root) ? [...root] : { ...(isRecord(root) ? root : {}) }) as Record<string | number, Json>;
+  const container = (Array.isArray(root) ? [...root] : { ...(isRecord(root) ? root : {}) }) as Record<
+    string | number,
+    Json
+  >;
   if (rest.length === 0 && !('value' in change)) {
     delete container[key!];
   } else {
@@ -98,11 +100,10 @@ export function diffEffectiveCatalog(
   };
 }
 
-const sameBase = (snapshot: EffectiveCatalogSnapshot, base: EffectiveCatalogBase): boolean => (
-  snapshot.scopeGeneration === base.scopeGeneration
-  && snapshot.projectionVersion === base.projectionVersion
-  && snapshot.catalogRevision === base.catalogRevision
-);
+const sameBase = (snapshot: EffectiveCatalogSnapshot, base: EffectiveCatalogBase): boolean =>
+  snapshot.scopeGeneration === base.scopeGeneration &&
+  snapshot.projectionVersion === base.projectionVersion &&
+  snapshot.catalogRevision === base.catalogRevision;
 
 function applyModelUpdate(model: EffectiveModel, update: EffectiveModelUpdate): EffectiveModel {
   return update.changes.reduce<Json>((value, change) => withValue(value, change.path, change), model) as EffectiveModel;

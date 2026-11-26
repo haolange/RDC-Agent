@@ -8,11 +8,7 @@ import {
 
 describe('ShellCommandRiskAnalyzer structural helpers', () => {
   it('splits pipelines and chains', () => {
-    expect(splitShellSegments('echo a; rm -rf /tmp && ls')).toEqual([
-      'echo a',
-      'rm -rf /tmp',
-      'ls',
-    ]);
+    expect(splitShellSegments('echo a; rm -rf /tmp && ls')).toEqual(['echo a', 'rm -rf /tmp', 'ls']);
   });
 
   it('extracts basenames from path-prefixed binaries', () => {

@@ -8,8 +8,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { version } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 let failed = false;
 for (const name of ['README.md', 'README.en.md']) {
-  const stated = [...readFileSync(path.join(root, name), 'utf8').matchAll(/\*\*(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?) /gu)]
-    .map((match) => match[1]);
+  const stated = [
+    ...readFileSync(path.join(root, name), 'utf8').matchAll(/\*\*(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?) /gu),
+  ].map((match) => match[1]);
   if (stated.length === 0) {
     console.error(`[readme-version] ${name} states no source version.`);
     failed = true;

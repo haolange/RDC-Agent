@@ -8,13 +8,22 @@ import { readApprovedPlanTasks } from './ApprovedPlanTasks';
 import type { PlanTaskRequirement } from './planTaskRequirements';
 
 it('reads only the owning execution offer plan with its exact URI and hash', () => {
-  const task: PlanTaskRequirement = { taskId: 'task', revision: 1, subject: 'Work', description: '', blockedBy: [], completionRequirements: ['result'] };
+  const task: PlanTaskRequirement = {
+    taskId: 'task',
+    revision: 1,
+    subject: 'Work',
+    description: '',
+    blockedBy: [],
+    completionRequirements: ['result'],
+  };
   mocks.readOffer.mockReturnValue({ plan: { uri: 'session://plans/frozen.md', hash: 'a'.repeat(64) } });
   mocks.readMarkdown.mockReturnValue({ markdown: renderPlanTaskRequirements([task]) });
   expect(readApprovedPlanTasks('owner')).toEqual([task]);
   expect(mocks.readOffer).toHaveBeenCalledWith('owner');
   expect(mocks.readMarkdown).toHaveBeenCalledWith('owner', 'session://plans/frozen.md', 'a'.repeat(64));
-  mocks.readMarkdown.mockImplementation(() => { throw new Error('PLAN_HASH_MISMATCH'); });
+  mocks.readMarkdown.mockImplementation(() => {
+    throw new Error('PLAN_HASH_MISMATCH');
+  });
   expect(() => readApprovedPlanTasks('owner')).toThrow('PLAN_HASH_MISMATCH');
   mocks.readOffer.mockReturnValue(null);
   expect(readApprovedPlanTasks('ordinary-session')).toEqual([]);

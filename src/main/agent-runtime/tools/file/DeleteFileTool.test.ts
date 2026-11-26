@@ -22,7 +22,10 @@ afterEach(() => {
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
 });
 
-function workspace(): { root: string; context: { workspaceRoot: string; projectRootPath: string; projectId: null; sessionId: null } } {
+function workspace(): {
+  root: string;
+  context: { workspaceRoot: string; projectRootPath: string; projectId: null; sessionId: null };
+} {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-delete-'));
   roots.push(root);
   return { root, context: { workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null } };
@@ -40,7 +43,9 @@ describe('deleteFileTool', () => {
     expect(missing.details).toMatchObject({ existed: false });
 
     fs.writeFileSync(path.join(root, lockedName), 'x');
-    await expect(deleteFileTool.execute('tc-3', { path: lockedName }, undefined, undefined, context)).rejects.toThrow('permission denied');
+    await expect(deleteFileTool.execute('tc-3', { path: lockedName }, undefined, undefined, context)).rejects.toThrow(
+      'permission denied',
+    );
     expect(fs.existsSync(path.join(root, lockedName))).toBe(true);
   });
 });

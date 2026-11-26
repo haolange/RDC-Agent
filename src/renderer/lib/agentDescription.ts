@@ -2,7 +2,10 @@ import { resolveManifestText } from '@shared/utils/handoffLabels';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AppLanguage } from '@shared/types/settings';
 
-type AgentCopy = Pick<AgentManifestDefinition, 'description' | 'descriptionTranslations' | 'argumentHint' | 'argumentHintTranslations'>;
+type AgentCopy = Pick<
+  AgentManifestDefinition,
+  'description' | 'descriptionTranslations' | 'argumentHint' | 'argumentHintTranslations'
+>;
 
 /** A shipped Agent's description in the interface language; user and project copies keep their own text. */
 export function agentDescription(agent: AgentCopy | undefined, language: AppLanguage): string {

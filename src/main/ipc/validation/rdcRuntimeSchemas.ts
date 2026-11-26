@@ -4,38 +4,32 @@ import { ipcId, ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 
 const ResourceScopeMutableSchema = z.enum(['user', 'project']);
 
-const ScopedResourceKindSchema = z.enum([
-  'agent',
-  'skill',
-  'mcp',
-  'hook',
-  'policy',
-  'knowledge',
-  'memory',
-]);
+const ScopedResourceKindSchema = z.enum(['agent', 'skill', 'mcp', 'hook', 'policy', 'knowledge', 'memory']);
 
 const HookEventSchema = z.enum(CANONICAL_HOOK_EVENTS);
 
-export const RdcRuntimeOverviewArgsSchema = z.tuple([
-  ipcString(4096, 'projectRoot').optional(),
-]);
+export const RdcRuntimeOverviewArgsSchema = z.tuple([ipcString(4096, 'projectRoot').optional()]);
 
 export const ScopedResourceWriteArgsSchema = z.tuple([
-  z.object({
-    kind: ScopedResourceKindSchema,
-    scope: ResourceScopeMutableSchema,
-    id: ipcNonEmptyString(200, 'id'),
-    content: ipcString(2_000_000, 'content'),
-    projectRoot: ipcString(4096, 'projectRoot').optional(),
-  }).strict(),
+  z
+    .object({
+      kind: ScopedResourceKindSchema,
+      scope: ResourceScopeMutableSchema,
+      id: ipcNonEmptyString(200, 'id'),
+      content: ipcString(2_000_000, 'content'),
+      projectRoot: ipcString(4096, 'projectRoot').optional(),
+    })
+    .strict(),
 ]);
 
 export const ScopedResourceImportArgsSchema = z.tuple([
-  z.object({
-    kind: ScopedResourceKindSchema,
-    scope: ResourceScopeMutableSchema,
-    projectRoot: ipcString(4096, 'projectRoot').optional(),
-  }).strict(),
+  z
+    .object({
+      kind: ScopedResourceKindSchema,
+      scope: ResourceScopeMutableSchema,
+      projectRoot: ipcString(4096, 'projectRoot').optional(),
+    })
+    .strict(),
 ]);
 
 export const RdcRuntimeDeleteArgsSchema = z.tuple([
@@ -45,9 +39,7 @@ export const RdcRuntimeDeleteArgsSchema = z.tuple([
   ipcString(4096, 'projectRoot').optional(),
 ]);
 
-export const RdcRuntimeRevealArgsSchema = z.tuple([
-  ipcNonEmptyString(4096, 'sourcePath'),
-]);
+export const RdcRuntimeRevealArgsSchema = z.tuple([ipcNonEmptyString(4096, 'sourcePath')]);
 
 export const RdcRuntimeTrustHookArgsSchema = z.tuple([
   // Omitted / null projectRoot is user-scope; a path is project-scope only.
@@ -70,10 +62,7 @@ export const RdcRuntimeTestHookArgsSchema = z.tuple([
   ipcString(200, 'hookId').optional(),
 ]);
 
-export const RdcRuntimeListSnapshotsArgsSchema = z.tuple([
-  ipcId(128, 'sessionId'),
-  ipcId(128, 'turnId').optional(),
-]);
+export const RdcRuntimeListSnapshotsArgsSchema = z.tuple([ipcId(128, 'sessionId'), ipcId(128, 'turnId').optional()]);
 
 export const RdcRuntimeGetSnapshotArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),

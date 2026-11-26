@@ -76,20 +76,20 @@ export const useComposerSessionContextStore = create<ComposerSessionContextState
     set({ handoffSuggestionRequest });
   },
   clearHandoffSuggestion: () => set({ handoffSuggestionRequest: null }),
-  resetForSessionSwitch: () => set({
-    activeTurn: null,
-    isPromptSending: false,
-    handoffSuggestionRequest: null,
-  }),
+  resetForSessionSwitch: () =>
+    set({
+      activeTurn: null,
+      isPromptSending: false,
+      handoffSuggestionRequest: null,
+    }),
 }));
 
-export function ownsActiveTurn(
-  activeTurn: ActiveTurnContext,
-  ownership: ActiveTurnOwnership,
-): boolean {
-  return activeTurn.sessionId === ownership.sessionId
-    && activeTurn.requestId === ownership.requestId
-    && activeTurn.agentId === ownership.agentId;
+export function ownsActiveTurn(activeTurn: ActiveTurnContext, ownership: ActiveTurnOwnership): boolean {
+  return (
+    activeTurn.sessionId === ownership.sessionId &&
+    activeTurn.requestId === ownership.requestId &&
+    activeTurn.agentId === ownership.agentId
+  );
 }
 
 function normalizeComposerSessionOwner(sessionId: string | null | undefined): string {

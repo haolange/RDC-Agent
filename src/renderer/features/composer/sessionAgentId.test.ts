@@ -13,8 +13,15 @@ import { persistSessionAgentId } from './sessionAgentId';
 import type { SessionRecord } from '@shared/types/session';
 
 const record = (agentId?: string): SessionRecord => ({
-  schemaVersion: '1', sessionId: 'sess_1', projectId: 'proj_1', title: 't', goal: '', sessionPath: 'D:/sess',
-  createdAt: 1, updatedAt: 1, ...(agentId ? { agentId } : {}),
+  schemaVersion: '1',
+  sessionId: 'sess_1',
+  projectId: 'proj_1',
+  title: 't',
+  goal: '',
+  sessionPath: 'D:/sess',
+  createdAt: 1,
+  updatedAt: 1,
+  ...(agentId ? { agentId } : {}),
 });
 
 describe('Composer Agent pill', () => {
@@ -42,7 +49,11 @@ describe('Composer Agent pill', () => {
   it('shows a switch while main confirms it, then the record main wrote', async () => {
     useSessionRecordStore.getState().accept({ record: record('general'), revision: { epoch: 'e', n: 1 } });
     let answer!: (value: unknown) => void;
-    setAgentId.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    setAgentId.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
     const switching = persistSessionAgentId('sess_1', 'debugger');
     expect(readComposerAgentId()).toBe('debugger');
     answer({ success: true, session: { record: record('debugger'), revision: { epoch: 'e', n: 2 } } });

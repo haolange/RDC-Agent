@@ -12,12 +12,12 @@ export default function setup(): () => void {
   // not the platform alias that production code must reject.
   const canonicalTempRoot = fs.realpathSync(os.tmpdir());
   const root = fs.mkdtempSync(path.join(canonicalTempRoot, 'rdc-agent-vitest-'));
-  const temporaryEnvironment = Object.fromEntries(['TMP', 'TEMP', 'TMPDIR'].map(key => [key, process.env[key]]));
+  const temporaryEnvironment = Object.fromEntries(['TMP', 'TEMP', 'TMPDIR'].map((key) => [key, process.env[key]]));
   const temporaryRoot = path.join(root, 'temp');
   fs.mkdirSync(temporaryRoot);
   for (const key of Object.keys(temporaryEnvironment)) process.env[key] = temporaryRoot;
   // os.homedir() reads HOME (POSIX) or USERPROFILE (Windows): the user resource root is <root>/user/.rdc-agent.
-  const homeEnvironment = Object.fromEntries(['HOME', 'USERPROFILE'].map(key => [key, process.env[key]]));
+  const homeEnvironment = Object.fromEntries(['HOME', 'USERPROFILE'].map((key) => [key, process.env[key]]));
   for (const key of Object.keys(homeEnvironment)) process.env[key] = path.join(root, 'user');
   process.env.RDC_AGENT_USER_DATA = path.join(root, 'app-data');
   process.env.RDC_AGENT_QA_INSTANCE_ID = `vitest-${process.pid}`;

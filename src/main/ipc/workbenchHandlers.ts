@@ -107,11 +107,7 @@ async function appendActionEvent(event: ActionEvent): Promise<void> {
   broadcastToRenderer('evidence:eventAdded', event);
 }
 
-async function setRunLifecycleState(
-  sessionId: string,
-  runId: string,
-  patch: RunLifecyclePatch,
-): Promise<void> {
+async function setRunLifecycleState(sessionId: string, runId: string, patch: RunLifecyclePatch): Promise<void> {
   const updatePayload: Record<string, unknown> = {
     status: patch.status,
   };
@@ -172,9 +168,7 @@ async function selectCurrentProject(projectId: string | null): Promise<ProjectSe
 
   return {
     project,
-    currentSession: selectedSession?.projectId === projectId
-      ? sessionRevisions.snapshot(selectedSession)
-      : null,
+    currentSession: selectedSession?.projectId === projectId ? sessionRevisions.snapshot(selectedSession) : null,
     currentRun: state.currentSessionId ? sessionRecordStore.getLatestRun(state.currentSessionId) : null,
   };
 }
@@ -197,30 +191,30 @@ function registerToolTraceBridge(): void {
   rdcCliInvokerService.onInvocationTrace((trace) => {
     broadcastToRenderer('tool:executionComplete', trace);
     if (state.currentSessionId && state.currentRunId) {
-      void appendActionEvent(sessionRecordStore.createActionEvent({
-        runId: state.currentRunId,
-        sessionId: state.currentSessionId,
-        agentId: trace.runtimeOwner || 'debugger',
-        eventType: 'tool_execution',
-        status: trace.result.ok ? 'ok' : 'error',
-        turnId: trace.turnId,
-        payload: {
-          tool_name: trace.toolName,
-          args: trace.args,
-          result: trace.result.ok ? 'success' : 'failed',
-          error: trace.result.error,
-          trace_id: trace.traceId,
-        },
-      }));
+      void appendActionEvent(
+        sessionRecordStore.createActionEvent({
+          runId: state.currentRunId,
+          sessionId: state.currentSessionId,
+          agentId: trace.runtimeOwner || 'debugger',
+          eventType: 'tool_execution',
+          status: trace.result.ok ? 'ok' : 'error',
+          turnId: trace.turnId,
+          payload: {
+            tool_name: trace.toolName,
+            args: trace.args,
+            result: trace.result.ok ? 'success' : 'failed',
+            error: trace.result.error,
+            trace_id: trace.traceId,
+          },
+        }),
+      );
     }
     runtimeLogService.log({
       scope: state.currentSessionId ? 'session' : 'app',
       namespace: 'tool',
       severity: trace.result.ok ? 'success' : 'error',
       title: trace.toolName,
-      summary: trace.result.ok
-        ? '工具调用已完成。'
-        : trace.result.error?.message ?? '工具调用失败。',
+      summary: trace.result.ok ? '工具调用已完成。' : (trace.result.error?.message ?? '工具调用失败。'),
       detail: trace.result.duration_ms ? `${trace.result.duration_ms}ms` : undefined,
       sessionId: state.currentSessionId,
       projectId: state.currentProjectId,

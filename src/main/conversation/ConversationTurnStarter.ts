@@ -7,24 +7,42 @@ import { resolveAgentWriteTarget } from '@shared/types/agentManifest';
 import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRoot';
-import { awaitFirstCatalogLoad, planEffectiveModelRequest, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
+import {
+  awaitFirstCatalogLoad,
+  planEffectiveModelRequest,
+  resolveEffectiveModel,
+} from '../settings/provider-catalog/EffectiveModelResolver';
 import { resolveCompactionPercentForProject } from '../agent-runtime/context/compactionPercent';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
 import { conversationHistoryStore, projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { traceService } from '../agent-trace/TraceService';
-import { createDefaultBranchState, resolveVisibleConversationMessages } from '../sessions/store/ConversationBranchResolver';
-import { createDraftWorkTrace, finalizeTrace } from '../agent-runtime/workTrace/ConversationWorkTrace';
-import { materializeAgentUserInput, resolvePendingAttachmentDescriptors } from '../agent-runtime/attachments/ConversationAttachmentMaterializer';
-import { resolveEnabledAgentDefinition } from '../settings/agent-manifests/effectiveAgentSnapshot';
-import { createConversationMessage, isActiveRun, recordOverlayProfileDiagnostics, redactTechnicalMessage, resolveAgentRoutePreflight, resolveConversationAgentId } from './ConversationRoutePreflight';
-import { assertAgentReasoningHonored, conversationTurnControlInput } from './ConversationTurnControls';
 import {
-  createContinuationDropNotice,
-  shouldAnnounceContinuationDrop,
-} from './ConversationContinuationNotice';
+  createDefaultBranchState,
+  resolveVisibleConversationMessages,
+} from '../sessions/store/ConversationBranchResolver';
+import { createDraftWorkTrace, finalizeTrace } from '../agent-runtime/workTrace/ConversationWorkTrace';
+import {
+  materializeAgentUserInput,
+  resolvePendingAttachmentDescriptors,
+} from '../agent-runtime/attachments/ConversationAttachmentMaterializer';
+import { resolveEnabledAgentDefinition } from '../settings/agent-manifests/effectiveAgentSnapshot';
+import {
+  createConversationMessage,
+  isActiveRun,
+  recordOverlayProfileDiagnostics,
+  redactTechnicalMessage,
+  resolveAgentRoutePreflight,
+  resolveConversationAgentId,
+} from './ConversationRoutePreflight';
+import { assertAgentReasoningHonored, conversationTurnControlInput } from './ConversationTurnControls';
+import { createContinuationDropNotice, shouldAnnounceContinuationDrop } from './ConversationContinuationNotice';
 import { prepareConversationPrompt } from './ConversationPromptPreparer';
-import { completeProfileTurn, type ActiveConversationTurns, type ConversationTurnOutput } from './ConversationTurnRunner';
+import {
+  completeProfileTurn,
+  type ActiveConversationTurns,
+  type ConversationTurnOutput,
+} from './ConversationTurnRunner';
 import type { PolicyBudgetState } from '../agent-runtime/orchestration/TurnCoordinator';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
@@ -48,15 +66,17 @@ import type {
 
 /** The conversation's requests still preparing (ConversationService). */
 export interface PreparingConversationRequests {
-  getPreparingRequestByRequestId(requestId: string): {
-    requestId: string;
-    controller: AbortController;
-    phase: 'preparing' | 'committing';
-    scopeKey: string;
-    cancelAfterCommit: boolean;
-    credentialHandle?: string;
-    credentialLeaseTransferred: boolean;
-  } | undefined;
+  getPreparingRequestByRequestId(requestId: string):
+    | {
+        requestId: string;
+        controller: AbortController;
+        phase: 'preparing' | 'committing';
+        scopeKey: string;
+        cancelAfterCommit: boolean;
+        credentialHandle?: string;
+        credentialLeaseTransferred: boolean;
+      }
+    | undefined;
 }
 
 /** One user message to prepare, commit as a turn and start: who runs it, on which context, with which inputs. */
@@ -148,21 +168,23 @@ async function resolveTurnAgent(start: ProfileTurnStart): Promise<TurnStart> {
   // Turn preparation is where edits made outside the app (secrets, Agent files, trust) are picked up.
   settingsService.revalidateExternalInputs();
   const pendingProjectRootPath = context.projectId
-    ? projectWorkspaceStore.getProjectById(context.projectId)?.rootPath ?? null
+    ? (projectWorkspaceStore.getProjectById(context.projectId)?.rootPath ?? null)
     : null;
-  const conversationAgentId = resolveConversationAgentId(start.requestedAgentId, start.requestedProfileId, pendingProjectRootPath);
+  const conversationAgentId = resolveConversationAgentId(
+    start.requestedAgentId,
+    start.requestedProfileId,
+    pendingProjectRootPath,
+  );
   const turnIds = conversationTurnIds(requestId);
   throwIfPreparationCancelled({ preparationController });
-  if (
-    configurationCommit?.agentId
-    && configurationCommit.agentId !== conversationAgentId
-  ) {
+  if (configurationCommit?.agentId && configurationCommit.agentId !== conversationAgentId) {
     throw new AppError('AGENT_COMMIT_NOT_FOUND', 'the committed Agent does not match the selected route.');
   }
   const effectiveSnapshot = resolveEnabledAgentDefinition(conversationAgentId, pendingProjectRootPath);
   if (!effectiveSnapshot) {
     throw new AppError(
-      'CONVERSATION_AGENT_UNAVAILABLE', `requested profile \`${conversationAgentId}\` is not enabled.`,
+      'CONVERSATION_AGENT_UNAVAILABLE',
+      `requested profile \`${conversationAgentId}\` is not enabled.`,
     );
   }
   if (configurationCommit?.agentCommitHash) {
@@ -189,14 +211,23 @@ async function resolveTurnAgent(start: ProfileTurnStart): Promise<TurnStart> {
 }
 
 /** The Agent route preflight, failing with the provider or model diagnostic and the overlay diagnostics. */
-function requireRoutePreflight(turn: TurnStart, modelOverride: { providerId: string; modelId: string } | null): AgentRoutePreflightOk {
-  const routePreflight = resolveAgentRoutePreflight(turn.conversationAgentId, undefined, modelOverride, turn.pendingProjectRootPath);
+function requireRoutePreflight(
+  turn: TurnStart,
+  modelOverride: { providerId: string; modelId: string } | null,
+): AgentRoutePreflightOk {
+  const routePreflight = resolveAgentRoutePreflight(
+    turn.conversationAgentId,
+    undefined,
+    modelOverride,
+    turn.pendingProjectRootPath,
+  );
   if (!routePreflight.ok) {
     recordOverlayProfileDiagnostics(turn.context, turn.conversationAgentId, routePreflight.overlayDiagnostics, false);
     const overlay = routePreflight.overlayDiagnostics?.map(formatAgentManifestDiagnostic).join(' ') ?? '';
-    const code = routePreflight.diagnostic.code === 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
-      ? 'PROVIDER_UNAVAILABLE'
-      : 'MODEL_UNAVAILABLE';
+    const code =
+      routePreflight.diagnostic.code === 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
+        ? 'PROVIDER_UNAVAILABLE'
+        : 'MODEL_UNAVAILABLE';
     throw new Error(`${code}: ${routePreflight.diagnostic.userMessage}${overlay ? ` ${overlay}` : ''}`);
   }
   return routePreflight;
@@ -208,8 +239,9 @@ function requireRoutePreflight(turn: TurnStart, modelOverride: { providerId: str
  */
 async function resolveTurnRoute(turn: TurnStart): Promise<TurnRoute> {
   const { context, configurationCommit, effectiveSnapshot, preparationController } = turn;
-  const modelOverride = context.session?.modelOverride
-    ?? (configurationCommit?.providerId && configurationCommit.modelId
+  const modelOverride =
+    context.session?.modelOverride ??
+    (configurationCommit?.providerId && configurationCommit.modelId
       ? { providerId: configurationCommit.providerId, modelId: configurationCommit.modelId }
       : null);
   const configuredRoute = effectiveSnapshot.compiledRoute;
@@ -238,24 +270,24 @@ async function resolveTurnRoute(turn: TurnStart): Promise<TurnRoute> {
   routePreflight = requireRoutePreflight(turn, modelOverride);
 
   const providers = settingsService.providerConnections;
-  const effectiveModel = resolveEffectiveModel(
-    routePreflight.providerId,
-    routePreflight.modelId,
-    providers,
-  );
+  const effectiveModel = resolveEffectiveModel(routePreflight.providerId, routePreflight.modelId, providers);
   if (!effectiveModel) {
     throw new AppError('MODEL_UNAVAILABLE', `${routePreflight.providerId}/${routePreflight.modelId}`);
   }
   if (
-    configurationCommit?.providerCatalogRevision
-    && effectiveModel.catalogRevision !== configurationCommit.providerCatalogRevision
+    configurationCommit?.providerCatalogRevision &&
+    effectiveModel.catalogRevision !== configurationCommit.providerCatalogRevision
   ) {
     throw new AppError('MODEL_UNAVAILABLE', 'the effective Provider catalog changed before preflight.');
   }
   if (configurationCommit?.routeRevision && effectiveModel.routeRevision !== configurationCommit.routeRevision) {
     throw new AppError('MODEL_UNAVAILABLE', 'the selected model route changed before preflight.');
   }
-  const requestedControls = conversationTurnControlInput(effectiveSnapshot.reasoningLevel, context.session?.turnControls, turn.requestTurnControls);
+  const requestedControls = conversationTurnControlInput(
+    effectiveSnapshot.reasoningLevel,
+    context.session?.turnControls,
+    turn.requestTurnControls,
+  );
   const planning = planEffectiveModelRequest({
     providerId: routePreflight.providerId,
     modelId: routePreflight.modelId,
@@ -264,7 +296,11 @@ async function resolveTurnRoute(turn: TurnStart): Promise<TurnRoute> {
     compactionThresholdPercent: resolveCompactionPercentForProject(turn.pendingProjectRootPath),
   });
   if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
-  assertAgentReasoningHonored(effectiveSnapshot.reasoningLevel, requestedControls, planning.plan.reasoningWire.selection);
+  assertAgentReasoningHonored(
+    effectiveSnapshot.reasoningLevel,
+    requestedControls,
+    planning.plan.reasoningWire.selection,
+  );
   const plannedRouteCapability = resolveAgentRouteCapability(
     providers.get(routePreflight.providerId),
     routePreflight.modelId,
@@ -272,10 +308,13 @@ async function resolveTurnRoute(turn: TurnStart): Promise<TurnRoute> {
     planning.plan,
   );
   if (
-    configurationCommit?.providerCatalogRevision
-    && planning.plan.catalogRevision !== configurationCommit.providerCatalogRevision
+    configurationCommit?.providerCatalogRevision &&
+    planning.plan.catalogRevision !== configurationCommit.providerCatalogRevision
   ) {
-    throw new AppError('MODEL_UNAVAILABLE', 'the frozen RequestPlan catalog revision does not match the committed selection.');
+    throw new AppError(
+      'MODEL_UNAVAILABLE',
+      'the frozen RequestPlan catalog revision does not match the committed selection.',
+    );
   }
   // configurationCommit.routeRevision identifies the renderer-selected model and
   // was verified against effectiveModel above. A model-switch binding (for
@@ -290,46 +329,50 @@ async function planTurnInput(turn: TurnStart, route: TurnRoute): Promise<TurnInp
   const { context, requestId, turnIds } = turn;
   const pendingAttachmentDescriptors = await resolvePendingAttachmentDescriptors(turn.pendingAttachments);
   throwIfPreparationCancelled(turn);
-  const reservedSession = !context.session && context.projectId && pendingAttachmentDescriptors.length > 0
-    ? sessionRecordStore.allocateStagedConversationSession(
-      context.projectId,
-      turn.rawMessage.slice(0, 80),
-      requestId,
-      turnIds.turnId,
-    )
-    : null;
+  const reservedSession =
+    !context.session && context.projectId && pendingAttachmentDescriptors.length > 0
+      ? sessionRecordStore.allocateStagedConversationSession(
+          context.projectId,
+          turn.rawMessage.slice(0, 80),
+          requestId,
+          turnIds.turnId,
+        )
+      : null;
   const classifications = pendingAttachmentDescriptors.map((attachment) => ({
-    material: attachment.material, sourceHash: attachment.sourceHash,
+    material: attachment.material,
+    sourceHash: attachment.sourceHash,
     layer: attachment.layer,
     mimeType: attachment.mimeType,
     kind: attachment.kind,
     fileName: attachment.fileName,
     size: attachment.size,
   }));
-  const plannedAttachmentRecords: SessionAttachmentRecord[] = pendingAttachmentDescriptors.length === 0
-    ? []
-    : context.session
-      ? conversationHistoryStore.planAttachmentsForTurn(
-        context.session,
-        pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
-        sessionRecordStore.getSessionAttachmentsDir(context.session.sessionId),
-        classifications,
-      )
-      : reservedSession
+  const plannedAttachmentRecords: SessionAttachmentRecord[] =
+    pendingAttachmentDescriptors.length === 0
+      ? []
+      : context.session
         ? conversationHistoryStore.planAttachmentsForTurn(
-          reservedSession.session,
-          pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
-          path.join(reservedSession.finalPath, 'attachments'),
-          classifications,
-        )
-        : [];
+            context.session,
+            pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
+            sessionRecordStore.getSessionAttachmentsDir(context.session.sessionId),
+            classifications,
+          )
+        : reservedSession
+          ? conversationHistoryStore.planAttachmentsForTurn(
+              reservedSession.session,
+              pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
+              path.join(reservedSession.finalPath, 'attachments'),
+              classifications,
+            )
+          : [];
   if (pendingAttachmentDescriptors.length > 0 && plannedAttachmentRecords.length === 0) {
     throw new AppError('ATTACHMENT_SESSION_REQUIRED', 'select or create a project session before attaching files.');
   }
   const plannedInputAttachments = pendingAttachmentDescriptors.map((attachment, index) => {
     const planned = plannedAttachmentRecords[index]!;
     return {
-      material: planned.material, sourceHash: planned.sourceHash,
+      material: planned.material,
+      sourceHash: planned.sourceHash,
       attachmentId: planned.attachmentId,
       kind: planned.kind,
       layer: planned.layer ?? attachment.layer,
@@ -364,12 +407,10 @@ async function prepareTurnRuntime(turn: TurnStart, route: TurnRoute, input: Turn
     preloadSkillIds: turn.preloadSkillIds,
     excludeTurnId: turn.excludeTurnId,
   });
-  const preparedBranchState = branchContext?.branchState ?? (context.session
-    ? conversationHistoryStore.readConversationBranchState(context.session.sessionId)
-    : null);
-  const preparedBranchId = branchContext?.branchId
-    ?? preparedBranchState?.activeLeafBranchId
-    ?? ROOT_BRANCH_ID;
+  const preparedBranchState =
+    branchContext?.branchState ??
+    (context.session ? conversationHistoryStore.readConversationBranchState(context.session.sessionId) : null);
+  const preparedBranchId = branchContext?.branchId ?? preparedBranchState?.activeLeafBranchId ?? ROOT_BRANCH_ID;
   const preparedTurn = await agentOrchestrator.prepareTurnContext({
     requestId: turn.requestId,
     credentialHandle: route.credentialHandle,
@@ -430,7 +471,12 @@ interface TurnMessages {
  * The turn's durable commit: the staged or existing session takes the user message, the continuation notice, the
  * assistant draft and the branch state, then a run that owns the turn's outputs. A failure rolls the commit back.
  */
-async function commitTurn(turn: TurnStart, route: TurnRoute, input: TurnInput, runtime: PreparedTurnRuntime): Promise<CommittedTurn> {
+async function commitTurn(
+  turn: TurnStart,
+  route: TurnRoute,
+  input: TurnInput,
+  runtime: PreparedTurnRuntime,
+): Promise<CommittedTurn> {
   const commit: TurnCommit = {
     workingSession: turn.context.session,
     stagedSessionCommit: null,
@@ -457,7 +503,8 @@ async function commitTurn(turn: TurnStart, route: TurnRoute, input: TurnInput, r
   } catch (error) {
     try {
       if (commit.stagedSessionCommit) sessionRecordStore.rollbackStagedConversationSession(commit.stagedSessionCommit);
-      if (commit.existingTurnCommit) conversationHistoryStore.rollbackExistingConversationTurn(commit.existingTurnCommit);
+      if (commit.existingTurnCommit)
+        conversationHistoryStore.rollbackExistingConversationTurn(commit.existingTurnCommit);
     } catch (rollbackError) {
       console.error(`[ConversationService] Failed to roll back turn ${turn.turnIds.turnId}:`, rollbackError);
     }
@@ -501,19 +548,20 @@ function beginTurnCommit(turn: TurnStart, input: TurnInput, commit: TurnCommit):
 }
 
 /** The user message, the assistant draft, a continuation-drop notice when the route changed, and the branch. */
-function composeTurnMessages(turn: TurnStart, route: TurnRoute, runtime: PreparedTurnRuntime, commit: TurnCommit): TurnMessages {
+function composeTurnMessages(
+  turn: TurnStart,
+  route: TurnRoute,
+  runtime: PreparedTurnRuntime,
+  commit: TurnCommit,
+): TurnMessages {
   const { context, branchContext, requestId, turnIds, conversationAgentId, rawMessage } = turn;
   const { turnId } = turnIds;
   const { preparedTurn } = runtime;
   const { persistedHistoryBeforeCommit } = commit;
   const sessionIdForBranch = commit.workingSession?.sessionId ?? null;
-  let branchState = branchContext?.branchState ?? (sessionIdForBranch
-    ? commit.persistedBranchBeforeCommit
-    : null);
+  let branchState = branchContext?.branchState ?? (sessionIdForBranch ? commit.persistedBranchBeforeCommit : null);
   if (sessionIdForBranch && !branchState) branchState = createDefaultBranchState(sessionIdForBranch);
-  const branchId = branchContext?.branchId
-    ?? branchState?.activeLeafBranchId
-    ?? ROOT_BRANCH_ID;
+  const branchId = branchContext?.branchId ?? branchState?.activeLeafBranchId ?? ROOT_BRANCH_ID;
   const userMessage = createConversationMessage('user', rawMessage, {
     id: turnIds.userMessageId,
     requestId,
@@ -548,26 +596,28 @@ function composeTurnMessages(turn: TurnStart, route: TurnRoute, runtime: Prepare
   const previousPrepared = !sessionIdForBranch
     ? undefined
     : turn.excludeTurnId
-      ? persistedHistoryBeforeCommit.find((entry) => (
-        entry.turnId === turn.excludeTurnId && entry.role === 'assistant' && entry.preparedContext
-      ))?.preparedContext
-      : [...persistedHistoryBeforeCommit].reverse().find((entry) => (
-        entry.role === 'assistant' && entry.preparedContext && entry.status === 'complete'
-      ))?.preparedContext;
-  const continuationNotice = previousPrepared && shouldAnnounceContinuationDrop(previousPrepared, route.planning.plan)
-    ? createContinuationDropNotice({
-        requestId,
-        turnId,
-        sessionId: sessionIdForBranch,
-        projectId: context.projectId,
-        profileId: conversationAgentId,
-        branchId,
-        forkId: branchContext?.forkId,
-        variantIndex: branchContext?.variantIndex,
-        previous: previousPrepared.route,
-        next: route.planning.plan,
-      })
-    : null;
+      ? persistedHistoryBeforeCommit.find(
+          (entry) => entry.turnId === turn.excludeTurnId && entry.role === 'assistant' && entry.preparedContext,
+        )?.preparedContext
+      : [...persistedHistoryBeforeCommit]
+          .reverse()
+          .find((entry) => entry.role === 'assistant' && entry.preparedContext && entry.status === 'complete')
+          ?.preparedContext;
+  const continuationNotice =
+    previousPrepared && shouldAnnounceContinuationDrop(previousPrepared, route.planning.plan)
+      ? createContinuationDropNotice({
+          requestId,
+          turnId,
+          sessionId: sessionIdForBranch,
+          projectId: context.projectId,
+          profileId: conversationAgentId,
+          branchId,
+          forkId: branchContext?.forkId,
+          variantIndex: branchContext?.variantIndex,
+          previous: previousPrepared.route,
+          next: route.planning.plan,
+        })
+      : null;
   if (sessionIdForBranch && branchState && branchContext) {
     branchState = withRewriteVariant(branchState, branchContext, branchId, userMessage.id, turnId);
   }
@@ -590,7 +640,11 @@ function writeTurnHistory(commit: TurnCommit, messages: TurnMessages): void {
       messages.branchState,
     );
   } else if (commit.existingTurnCommit) {
-    conversationHistoryStore.commitExistingConversationTurn(commit.existingTurnCommit, committedHistory, messages.branchState);
+    conversationHistoryStore.commitExistingConversationTurn(
+      commit.existingTurnCommit,
+      committedHistory,
+      messages.branchState,
+    );
   }
 }
 
@@ -670,9 +724,10 @@ async function startCommittedTurn(
   const cancelAfterCommit = turn.requests.getPreparingRequestByRequestId(requestId)?.cancelAfterCommit === true;
   const projected = await projectCommittedTurn(turn, committed, cancelAfterCommit);
   const { workingSession } = projected;
-  const committedTurnRun: RunSummary | null = workingSession && committed.turnRunId
-    ? sessionRecordStore.listRuns(workingSession.sessionId).find(run => run.runId === committed.turnRunId) ?? null
-    : null;
+  const committedTurnRun: RunSummary | null =
+    workingSession && committed.turnRunId
+      ? (sessionRecordStore.listRuns(workingSession.sessionId).find((run) => run.runId === committed.turnRunId) ?? null)
+      : null;
   if (cancelAfterCommit) {
     await preparedTurn.runtime.mcpLease?.release({ discardIfIdle: true });
   } else {
@@ -695,7 +750,11 @@ async function startCommittedTurn(
 }
 
 /** The session takes the turn's Agent; the visible messages and trace projection are published (stopped if cancelled). */
-async function projectCommittedTurn(turn: TurnStart, committed: CommittedTurn, cancelAfterCommit: boolean): Promise<{
+async function projectCommittedTurn(
+  turn: TurnStart,
+  committed: CommittedTurn,
+  cancelAfterCommit: boolean,
+): Promise<{
   workingSession: SessionRecord | null;
   visibleMessages: ConversationMessage[];
   tracePresentation: ConversationTurnResult['tracePresentation'];
@@ -708,17 +767,18 @@ async function projectCommittedTurn(turn: TurnStart, committed: CommittedTurn, c
     sessionRecordStore.updateSession(workingSession.sessionId, { agentId: conversationAgentId });
     workingSession = sessionRecordStore.readSession(workingSession.sessionId) ?? workingSession;
   }
-  let visibleMessages = workingSession?.sessionId && branchState
-    ? resolveVisibleConversationMessages(
-        conversationHistoryStore.readConversationHistory(workingSession.sessionId),
-        branchState,
-      )
-    : [userMessage, ...(continuationNotice ? [continuationNotice] : []), assistantDraftMessage];
+  let visibleMessages =
+    workingSession?.sessionId && branchState
+      ? resolveVisibleConversationMessages(
+          conversationHistoryStore.readConversationHistory(workingSession.sessionId),
+          branchState,
+        )
+      : [userMessage, ...(continuationNotice ? [continuationNotice] : []), assistantDraftMessage];
   const traceSessionId = workingSession?.sessionId ?? output.ephemeralTraceSessionId(turnId);
-  let tracePresentation = await traceService.buildConversationPresentation(
-    traceSessionId,
-    [userMessage, assistantDraftMessage],
-  );
+  let tracePresentation = await traceService.buildConversationPresentation(traceSessionId, [
+    userMessage,
+    assistantDraftMessage,
+  ]);
   if (cancelAfterCommit) {
     assistantDraftMessage.status = 'stopped';
     assistantDraftMessage.updatedAt = nowMs();
@@ -729,23 +789,28 @@ async function projectCommittedTurn(turn: TurnStart, committed: CommittedTurn, c
     );
     const persistError = output.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
     if (persistError) console.error(`[ConversationService] Failed to persist cancelled turn ${turnId}:`, persistError);
-    visibleMessages = workingSession?.sessionId && branchState
-      ? resolveVisibleConversationMessages(
-          conversationHistoryStore.readConversationHistory(workingSession.sessionId),
-          branchState,
-        )
-      : [userMessage, assistantDraftMessage];
-    tracePresentation = await traceService.buildConversationPresentation(
-      traceSessionId,
-      [userMessage, assistantDraftMessage],
-    );
+    visibleMessages =
+      workingSession?.sessionId && branchState
+        ? resolveVisibleConversationMessages(
+            conversationHistoryStore.readConversationHistory(workingSession.sessionId),
+            branchState,
+          )
+        : [userMessage, assistantDraftMessage];
+    tracePresentation = await traceService.buildConversationPresentation(traceSessionId, [
+      userMessage,
+      assistantDraftMessage,
+    ]);
   }
   // The turn-start projection is published by output.publishConversationTrace below: for a
   // persisted session it resolves the full traceService.getSession projection (including the
   // buildRightPanel progress/artifacts/context payload). Publishing the lightweight
   // conversation-only presentation here first would overwrite the previous turn's full
   // projection and blank the right-rail sections until the full projection arrives.
-  output.publishConversationTrace(traceSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
+  output.publishConversationTrace(
+    traceSessionId,
+    [userMessage, assistantDraftMessage],
+    workingSession?.sessionId ?? null,
+  );
   return { workingSession, visibleMessages, tracePresentation };
 }
 
@@ -763,25 +828,28 @@ function runCommittedTurn(
   const { preparedTurn } = runtime;
   const runningRequestState = turn.requests.getPreparingRequestByRequestId(requestId);
   if (runningRequestState) runningRequestState.credentialLeaseTransferred = true;
-  void completeProfileTurn({ output: turn.output, turns: turn.turns }, {
-    context: {
-      ...context,
-      session: workingSession,
-      currentRun: committedTurnRun ?? context.currentRun,
+  void completeProfileTurn(
+    { output: turn.output, turns: turn.turns },
+    {
+      context: {
+        ...context,
+        session: workingSession,
+        currentRun: committedTurnRun ?? context.currentRun,
+      },
+      requestedProfileId: turn.requestedProfileId ?? conversationAgentId,
+      requestedAgentId: conversationAgentId,
+      rawMessage: turn.rawMessage,
+      importedAttachments: committed.importedAttachments,
+      userMessage: committed.userMessage,
+      assistantDraftMessage: committed.assistantDraftMessage,
+      requestId,
+      routePreflight: route.routePreflight,
+      planning: route.planning,
+      preparedPrompt: runtime.preparedPrompt,
+      preparedTurn,
+      policyBudget: turn.policyBudget,
     },
-    requestedProfileId: turn.requestedProfileId ?? conversationAgentId,
-    requestedAgentId: conversationAgentId,
-    rawMessage: turn.rawMessage,
-    importedAttachments: committed.importedAttachments,
-    userMessage: committed.userMessage,
-    assistantDraftMessage: committed.assistantDraftMessage,
-    requestId,
-    routePreflight: route.routePreflight,
-    planning: route.planning,
-    preparedPrompt: runtime.preparedPrompt,
-    preparedTurn,
-    policyBudget: turn.policyBudget,
-  }).catch((error) => {
+  ).catch((error) => {
     agentOrchestrator.releaseProviderRuntimeCredentials(preparedTurn.runtime.credentialHandle);
     console.error(`[ConversationService] Background turn ${turnId} failed before terminal cleanup:`, error);
   });

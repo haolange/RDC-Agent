@@ -11,15 +11,29 @@ import { createWorkProcessRowRenderer } from './workProcessRowRenderer';
 import { WorkProcessContent } from './WorkProcessContent';
 import type { WorkProcessRow } from './workProcessTypes';
 
-vi.mock('../../i18n', () => ({ useI18n: () => ({
-  t: (key: string, values?: { completed: number; total: number }) => values
-    ? `${values.completed} / ${values.total} completed` : key,
-}) }));
+vi.mock('../../i18n', () => ({
+  useI18n: () => ({
+    t: (key: string, values?: { completed: number; total: number }) =>
+      values ? `${values.completed} / ${values.total} completed` : key,
+  }),
+}));
 
 const snapshot = (id: string, change?: 'created' | 'updated'): Extract<WorkProcessRow, { type: 'taskSnapshot' }> => ({
-  type: 'taskSnapshot', id, change, status: 'complete', completed: 1, total: 5, duration: '0ms',
+  type: 'taskSnapshot',
+  id,
+  change,
+  status: 'complete',
+  completed: 1,
+  total: 5,
+  duration: '0ms',
   items: [
-    { taskId: 'pending', title: 'Long pending task with enough text to wrap on a narrow card', status: 'pending', order: 0, waitingOn: [{ taskId: 'upstream', title: 'Upstream', reason: 'unfinished' }] },
+    {
+      taskId: 'pending',
+      title: 'Long pending task with enough text to wrap on a narrow card',
+      status: 'pending',
+      order: 0,
+      waitingOn: [{ taskId: 'upstream', title: 'Upstream', reason: 'unfinished' }],
+    },
     { taskId: 'current', title: 'Current', status: 'in_progress', order: 1 },
     { taskId: 'done', title: 'Done', status: 'completed', order: 2 },
     { taskId: 'blocked', title: 'Blocked', status: 'blocked', statusReason: 'Waiting for input', order: 3 },
@@ -33,18 +47,27 @@ it('shows event type, completion count and distinct state icons without a fake d
   expect(document.body.textContent).toContain('chat.workProcessTaskSnapshotCreated');
   expect(document.body.textContent).toContain('1 / 5 completed');
   expect(document.body.textContent).not.toContain('0ms');
-  expect(document.querySelector('.work-process-task-snapshot[data-locate] .work-card-trigger .work-row-title')
-    ?.getAttribute('data-text')).toBe('chat.workProcessTaskSnapshotCreated');
+  expect(
+    document
+      .querySelector('.work-process-task-snapshot[data-locate] .work-card-trigger .work-row-title')
+      ?.getAttribute('data-text'),
+  ).toBe('chat.workProcessTaskSnapshotCreated');
   expect(document.querySelectorAll('.task-status-marker svg')).toHaveLength(5);
   expect(document.querySelector('.task-pending .task-status-marker circle')).not.toBeNull();
-  expect(document.querySelector('.task-pending .task-status-marker')?.getAttribute('aria-label')).toBe('chat.taskWaitingDependencies');
+  expect(document.querySelector('.task-pending .task-status-marker')?.getAttribute('aria-label')).toBe(
+    'chat.taskWaitingDependencies',
+  );
   expect(document.querySelector('.task-pending details')?.hasAttribute('open')).toBe(false);
   expect(document.querySelectorAll('.task-blocked')).toHaveLength(1);
   expect(document.querySelector('.task-blocked details')?.hasAttribute('open')).toBe(false);
   expect(document.querySelector('.task-blocked summary')?.textContent).toBe('Blocked');
-  expect(document.querySelector('.task-blocked details[data-locate] > summary .work-row-title')?.textContent).toBe('Blocked');
+  expect(document.querySelector('.task-blocked details[data-locate] > summary .work-row-title')?.textContent).toBe(
+    'Blocked',
+  );
   expect(document.querySelector('.task-completed [data-locate]')).toBeNull();
-  expect(document.querySelector('.task-blocked .work-process-task-snapshot-reason')?.textContent).toBe('Waiting for input');
+  expect(document.querySelector('.task-blocked .work-process-task-snapshot-reason')?.textContent).toBe(
+    'Waiting for input',
+  );
   expect(document.querySelector('[data-work-process-task-id="current"]')?.getAttribute('tabindex')).toBe('-1');
   const older = renderToStaticMarkup(createElement(TaskSnapshotCard, { row: snapshot('old') }));
   expect(older).toContain('chat.workProcessTaskSnapshotList');
@@ -55,23 +78,33 @@ it('keeps all snapshots open until the user collapses one and remembers that ges
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
-  const render = () => createElement(ScopedWorkDisclosure, {
-    scope: 'task-card-test',
-    children: createElement('ol', null,
-      createElement(TaskSnapshotCard, { row: snapshot('created', 'created') }),
-      createElement(TaskSnapshotCard, { row: snapshot('updated', 'updated') })),
-  });
+  const render = () =>
+    createElement(ScopedWorkDisclosure, {
+      scope: 'task-card-test',
+      children: createElement(
+        'ol',
+        null,
+        createElement(TaskSnapshotCard, { row: snapshot('created', 'created') }),
+        createElement(TaskSnapshotCard, { row: snapshot('updated', 'updated') }),
+      ),
+    });
   let root = createRoot(host);
   try {
     await act(async () => root.render(render()));
-    expect([...host.querySelectorAll('.work-card-trigger')].map((button) => button.getAttribute('aria-expanded'))).toEqual(['true', 'true']);
+    expect(
+      [...host.querySelectorAll('.work-card-trigger')].map((button) => button.getAttribute('aria-expanded')),
+    ).toEqual(['true', 'true']);
     await act(async () => root.render(render()));
-    expect([...host.querySelectorAll('.work-card-trigger')].map((button) => button.getAttribute('aria-expanded'))).toEqual(['true', 'true']);
+    expect(
+      [...host.querySelectorAll('.work-card-trigger')].map((button) => button.getAttribute('aria-expanded')),
+    ).toEqual(['true', 'true']);
     await act(async () => (host.querySelectorAll('.work-card-trigger')[0] as HTMLButtonElement).click());
     await act(async () => root.unmount());
     root = createRoot(host);
     await act(async () => root.render(render()));
-    expect([...host.querySelectorAll('.work-card-trigger')].map((button) => button.getAttribute('aria-expanded'))).toEqual(['false', 'true']);
+    expect(
+      [...host.querySelectorAll('.work-card-trigger')].map((button) => button.getAttribute('aria-expanded')),
+    ).toEqual(['false', 'true']);
   } finally {
     await act(async () => root.unmount());
     host.remove();
@@ -80,20 +113,40 @@ it('keeps all snapshots open until the user collapses one and remembers that ges
 });
 
 it('defaults historical cards to open even when they belong to separate turns', () => {
-  const section = (id: string, step: Extract<WorkProcessRow, { type: 'taskSnapshot' }>): Extract<WorkProcessRow, { type: 'section' }> => ({
-    type: 'section', id, status: 'complete',
-    stepCount: 1, duration: '',
-    steps: [step], visibleSteps: [step], loopId: id,
+  const section = (
+    id: string,
+    step: Extract<WorkProcessRow, { type: 'taskSnapshot' }>,
+  ): Extract<WorkProcessRow, { type: 'section' }> => ({
+    type: 'section',
+    id,
+    status: 'complete',
+    stepCount: 1,
+    duration: '',
+    steps: [step],
+    visibleSteps: [step],
+    loopId: id,
   });
-  const html = renderToStaticMarkup(createElement(WorkProcessContent, {
-    presentation: { rows: [section('turn-1', snapshot('first', 'created')),
-      section('turn-2', snapshot('second', 'updated'))], stepCount: 2, toolCount: 0,
-    summary: '', actionCount: 2, failureCount: 0, important: false },
-    disclosureScope: 'nested-task-test', active: false,
-  }));
+  const html = renderToStaticMarkup(
+    createElement(WorkProcessContent, {
+      presentation: {
+        rows: [section('turn-1', snapshot('first', 'created')), section('turn-2', snapshot('second', 'updated'))],
+        stepCount: 2,
+        toolCount: 0,
+        summary: '',
+        actionCount: 2,
+        failureCount: 0,
+        important: false,
+      },
+      disclosureScope: 'nested-task-test',
+      active: false,
+    }),
+  );
   const parsed = new DOMParser().parseFromString(html, 'text/html');
-  expect([...parsed.querySelectorAll('.kind-task-snapshot .work-card-trigger')]
-    .map((button) => button.getAttribute('aria-expanded'))).toEqual(['true', 'true']);
+  expect(
+    [...parsed.querySelectorAll('.kind-task-snapshot .work-card-trigger')].map((button) =>
+      button.getAttribute('aria-expanded'),
+    ),
+  ).toEqual(['true', 'true']);
 });
 
 it('locates the latest matching history card after windowing has unmounted it', async () => {
@@ -116,23 +169,36 @@ it('locates the latest matching history card after windowing has unmounted it', 
   const rows = Array.from({ length: 30 }, (_, index) => snapshot(`history-${index}`, index ? 'updated' : 'created'));
   const root = createRoot(host);
   try {
-    await act(async () => root.render(createElement(ScopedWorkDisclosure, { scope: 'task-locator-test',
-      children: createElement(MeasuredWorkRows, { rows, className: 'work-process-steps',
-        renderRow: createWorkProcessRowRenderer(undefined, undefined, 'normal') }),
-    })));
+    await act(async () =>
+      root.render(
+        createElement(ScopedWorkDisclosure, {
+          scope: 'task-locator-test',
+          children: createElement(MeasuredWorkRows, {
+            rows,
+            className: 'work-process-steps',
+            renderRow: createWorkProcessRowRenderer(undefined, undefined, 'normal'),
+          }),
+        }),
+      ),
+    );
     expect(host.querySelector('[data-work-process-block-id="history-29"]')).toBeNull();
     const candidates: WorkProcessTaskLocationRequest['candidates'] = [];
     await act(async () => {
-      document.dispatchEvent(new CustomEvent<WorkProcessTaskLocationRequest>(WORK_PROCESS_LOCATE_TASK_EVENT, {
-        detail: { taskId: 'pending', candidates },
-      }));
+      document.dispatchEvent(
+        new CustomEvent<WorkProcessTaskLocationRequest>(WORK_PROCESS_LOCATE_TASK_EVENT, {
+          detail: { taskId: 'pending', candidates },
+        }),
+      );
       candidates.at(-1)?.reveal();
     });
-    await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, 30)); });
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 30));
+    });
     expect(candidates).toHaveLength(1);
     expect(host.scrollTop).toBeGreaterThan(0);
-    expect(host.querySelector('[data-work-process-block-id="history-29"] [data-work-process-task-id="pending"]'))
-      .not.toBeNull();
+    expect(
+      host.querySelector('[data-work-process-block-id="history-29"] [data-work-process-task-id="pending"]'),
+    ).not.toBeNull();
     expect(scrollIntoView).toHaveBeenCalledOnce();
     expect(focus).toHaveBeenCalledWith({ preventScroll: true });
   } finally {

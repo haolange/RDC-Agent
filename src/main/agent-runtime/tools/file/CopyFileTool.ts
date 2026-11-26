@@ -1,6 +1,11 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { assertFileSizeCap, isPathExisting, requireMutationWorkspaceRoot, safeResolvePath } from '../../../runtime/toolFiles';
+import {
+  assertFileSizeCap,
+  isPathExisting,
+  requireMutationWorkspaceRoot,
+  safeResolvePath,
+} from '../../../runtime/toolFiles';
 import { COPY_MOVE_MAX_BYTES } from '../../../runtime/toolLimits';
 import type { AgentTool } from '../../agent/AgentTool';
 
@@ -34,7 +39,14 @@ export const copyFileTool: AgentTool<CopyFileParams, CopyFileDetails> = {
     },
     required: ['source', 'destination'],
   },
-  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: {
+    isReadOnly: false,
+    concurrency: 'exclusive',
+    isDestructive: true,
+    sideEffect: 'filesystem',
+    category: 'file',
+    requiresApproval: true,
+  },
   permissionHint: 'mutation',
   effects: { reads: ['source'], writes: ['destination'] },
 
@@ -53,10 +65,12 @@ export const copyFileTool: AgentTool<CopyFileParams, CopyFileDetails> = {
     await fs.copyFile(src, dest);
     const stat = await fs.stat(src);
     return {
-      content: [{
-        type: 'text',
-        text: `Copied ${src} → ${dest}${destExists ? ' (overwrote existing)' : ''} (${stat.size} bytes)`,
-      }],
+      content: [
+        {
+          type: 'text',
+          text: `Copied ${src} → ${dest}${destExists ? ' (overwrote existing)' : ''} (${stat.size} bytes)`,
+        },
+      ],
       details: { source: src, destination: dest, overwritten: destExists, bytes: stat.size },
     };
   },

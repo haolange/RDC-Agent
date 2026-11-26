@@ -55,12 +55,7 @@ const EmptyToolCard: React.FC<{
       {...dynStyle}
     >
       <span className="empty-workbench-tool-core" aria-hidden="true">
-        <ModeGlyph
-          mode={toolMode}
-          className="empty-workbench-tool-icon"
-          size={22}
-          strokeWidth={1.75}
-        />
+        <ModeGlyph mode={toolMode} className="empty-workbench-tool-icon" size={22} strokeWidth={1.75} />
       </span>
       <span className="empty-workbench-tool-copy">
         <span className="empty-workbench-tool-title">{t(`mode.${toolMode}`)}</span>
@@ -94,14 +89,12 @@ export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode
           <p className="empty-workbench-subtitle">{subtitle}</p>
         </div>
 
-        {setupPending ? <SetupChecklist steps={setup} /> : (
+        {setupPending ? (
+          <SetupChecklist steps={setup} />
+        ) : (
           <div className="empty-workbench-tool-grid" aria-label={t('emptyWorkbench.toolsLabel')}>
             {FOCUS_MODES.map((toolMode: FocusMode) => (
-              <EmptyToolCard
-                key={toolMode}
-                toolMode={toolMode}
-                agentDefinitions={agentDefinitions}
-              />
+              <EmptyToolCard key={toolMode} toolMode={toolMode} agentDefinitions={agentDefinitions} />
             ))}
           </div>
         )}

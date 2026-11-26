@@ -17,7 +17,9 @@
   line-height: var(--chip-height);
   text-decoration: none;
   vertical-align: middle;
-  transition: border-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 :is(.markdown-body, .markdown-sources) a.markdown-citation:hover,
@@ -149,10 +151,18 @@
   background: color-mix(in srgb, var(--callout-tone) 6%, transparent);
 }
 
-.markdown-callout.is-tip { --callout-tone: var(--token-status-success); }
-.markdown-callout.is-important { --callout-tone: var(--token-accent-primary); }
-.markdown-callout.is-warning { --callout-tone: var(--token-status-warning); }
-.markdown-callout.is-caution { --callout-tone: var(--token-status-error); }
+.markdown-callout.is-tip {
+  --callout-tone: var(--token-status-success);
+}
+.markdown-callout.is-important {
+  --callout-tone: var(--token-accent-primary);
+}
+.markdown-callout.is-warning {
+  --callout-tone: var(--token-status-warning);
+}
+.markdown-callout.is-caution {
+  --callout-tone: var(--token-status-error);
+}
 
 .markdown-callout-title {
   display: flex;

@@ -10,7 +10,9 @@ describe('Appearance persistence', () => {
   it('commits each edit as its own op computed from the settings shown, without waiting for the previous save', async () => {
     let settings = structuredClone(DEFAULT_SETTINGS);
     const patchSettings = vi.fn(async (ops: SettingsPatchOp[]) => {
-      for (const op of ops) if (op.op === 'appearance') settings = { ...settings, appearance: mergeUiPreferences(settings.appearance, op.value) };
+      for (const op of ops)
+        if (op.op === 'appearance')
+          settings = { ...settings, appearance: mergeUiPreferences(settings.appearance, op.value) };
       return settings;
     });
     const actions = createAppSettingsAppearanceActions(() => ({ settings, patchSettings }), vi.fn());
@@ -33,9 +35,14 @@ describe('Appearance persistence', () => {
 
   it('keeps disclosure intent immediate when a stale save fails and reports only the latest failure', async () => {
     let rejectFirst!: (error: Error) => void;
-    const first = new Promise<void>((_resolve, reject) => { rejectFirst = reject; });
+    const first = new Promise<void>((_resolve, reject) => {
+      rejectFirst = reject;
+    });
     const display = vi.fn();
-    const patchSettings = vi.fn().mockReturnValueOnce(first).mockResolvedValueOnce(DEFAULT_SETTINGS)
+    const patchSettings = vi
+      .fn()
+      .mockReturnValueOnce(first)
+      .mockResolvedValueOnce(DEFAULT_SETTINGS)
       .mockRejectedValueOnce(new Error('disk full'));
     const actions = createAppSettingsAppearanceActions(() => ({ settings: DEFAULT_SETTINGS, patchSettings }), display);
     const expanding = actions.setContextBreakdownExpanded(true);

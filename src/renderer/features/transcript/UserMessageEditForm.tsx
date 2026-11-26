@@ -44,7 +44,9 @@ export const UserMessageEditForm: React.FC<UserMessageEditFormProps> = ({
 
   return (
     <form className="conversation-edit-form" onSubmit={submit}>
-      <p className="conversation-edit-preview" data-testid="conversation-edit-preview">{executionPreview}</p>
+      <p className="conversation-edit-preview" data-testid="conversation-edit-preview">
+        {executionPreview}
+      </p>
       <Textarea
         ref={textareaRef}
         className="conversation-edit-textarea"

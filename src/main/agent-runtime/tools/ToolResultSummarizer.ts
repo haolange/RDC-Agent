@@ -1,9 +1,7 @@
 import type { AgentToolResult } from '../agent/AgentTool';
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
 function nativeShellSummary(result: AgentToolResult): string | null {
@@ -47,20 +45,33 @@ function nativeShellSummary(result: AgentToolResult): string | null {
     const validShader = eventHistory.filter((item) => asRecord(item.shader_out)?.valid === true);
     if (Number.isSafeInteger(event)) parts.push(`event=${event}`);
     if (typeof target?.texture_id === 'string') parts.push(`target=${target.texture_id}`);
-    if (target && Number.isSafeInteger(target.x) && Number.isSafeInteger(target.y)) parts.push(`pixel=(${target.x},${target.y})`);
-    parts.push(`history=${history.length}`, `eventFragments=${eventHistory.length}`, `passed=${passed.length}`, `shaderValid=${validShader.length}`);
+    if (target && Number.isSafeInteger(target.x) && Number.isSafeInteger(target.y))
+      parts.push(`pixel=(${target.x},${target.y})`);
+    parts.push(
+      `history=${history.length}`,
+      `eventFragments=${eventHistory.length}`,
+      `passed=${passed.length}`,
+      `shaderValid=${validShader.length}`,
+    );
     const primitives = passed.map((item) => item.primitive_id).filter((value) => Number.isSafeInteger(value));
-    if (primitives.length > 0) parts.push(`passedPrimitiveIds=${primitives.slice(0, 8).join(',')}${primitives.length > 8 ? ',…' : ''}`);
+    if (primitives.length > 0)
+      parts.push(`passedPrimitiveIds=${primitives.slice(0, 8).join(',')}${primitives.length > 8 ? ',…' : ''}`);
     const writers = [...new Set(history.map((item) => item.event_id).filter((value) => Number.isSafeInteger(value)))];
-    if (writers.length > 0) parts.push(`writerEvents=${writers.slice(0, 8).join(',')}${writers.length > 8 ? ',…' : ''}`);
-    if (typeof data.history_bindings_status === 'string') parts.push(`writerBindingsStatus=${data.history_bindings_status}`);
+    if (writers.length > 0)
+      parts.push(`writerEvents=${writers.slice(0, 8).join(',')}${writers.length > 8 ? ',…' : ''}`);
+    if (typeof data.history_bindings_status === 'string')
+      parts.push(`writerBindingsStatus=${data.history_bindings_status}`);
     if (Array.isArray(data.history_bindings)) {
-      const bindings = data.history_bindings.map(asRecord).filter(
-        (item): item is Record<string, unknown> => item !== null && Number.isSafeInteger(item.event_id),
-      );
+      const bindings = data.history_bindings
+        .map(asRecord)
+        .filter((item): item is Record<string, unknown> => item !== null && Number.isSafeInteger(item.event_id));
       const summary = bindings.slice(0, 8).map((item) => {
-        const level = item.binding_truth_level === 'binding_verified' ? 'verified'
-          : item.binding_truth_level === 'binding_degraded' ? 'degraded' : 'unknown';
+        const level =
+          item.binding_truth_level === 'binding_verified'
+            ? 'verified'
+            : item.binding_truth_level === 'binding_degraded'
+              ? 'degraded'
+              : 'unknown';
         return `${item.event_id}:${level}`;
       });
       if (summary.length > 0) parts.push(`writerBindings=${summary.join(',')}${bindings.length > 8 ? ',…' : ''}`);
@@ -75,32 +86,36 @@ function nativeShellSummary(result: AgentToolResult): string | null {
     const boundedText = (value: unknown, maxLength: number): string =>
       typeof value === 'string' && value.length <= maxLength ? value : 'unverified';
     const boundedList = (value: unknown): string[] | 'unverified' =>
-      Array.isArray(value) && value.length <= 8
-      && value.every((item) => typeof item === 'string' && item.length <= 64)
-        ? value as string[] : 'unverified';
+      Array.isArray(value) && value.length <= 8 && value.every((item) => typeof item === 'string' && item.length <= 64)
+        ? (value as string[])
+        : 'unverified';
     if (Number.isSafeInteger(data.resolved_event_id)) parts.push(`event=${data.resolved_event_id}`);
     parts.push(`shader=${boundedText(data.shader_id, 80)}`);
     parts.push(`target=${JSON.stringify(boundedText(data.target, 80))}`);
     parts.push(`encoding=${boundedText(data.source_encoding, 40)}`);
     parts.push(`sourceHash=${boundedText(data.source_hash, 128)}`);
-    parts.push(`availableTargets=${JSON.stringify({
-      status: boundedText(data.available_targets_status, 24),
-      targets: boundedList(data.available_targets),
-      error: data.available_targets_error === null ? null : boundedText(data.available_targets_error, 160),
-    })}`);
+    parts.push(
+      `availableTargets=${JSON.stringify({
+        status: boundedText(data.available_targets_status, 24),
+        targets: boundedList(data.available_targets),
+        error: data.available_targets_error === null ? null : boundedText(data.available_targets_error, 160),
+      })}`,
+    );
     const plan = asRecord(data.edit_plan);
     if (plan) {
       const knownBoolean = (value: unknown): boolean | 'unverified' =>
         typeof value === 'boolean' ? value : 'unverified';
-      parts.push(`editPlan=${JSON.stringify({
-        inputKind: boundedText(plan.input_kind, 64),
-        canEditText: knownBoolean(plan.can_edit_text),
-        canBuild: knownBoolean(plan.can_build),
-        canReplace: knownBoolean(plan.can_replace),
-        allowedEditInputs: boundedList(plan.allowed_edit_inputs),
-        allowedOps: boundedList(plan.allowed_ops),
-        blockedReason: boundedText(plan.blocked_reason, 160),
-      })}`);
+      parts.push(
+        `editPlan=${JSON.stringify({
+          inputKind: boundedText(plan.input_kind, 64),
+          canEditText: knownBoolean(plan.can_edit_text),
+          canBuild: knownBoolean(plan.can_build),
+          canReplace: knownBoolean(plan.can_replace),
+          allowedEditInputs: boundedList(plan.allowed_edit_inputs),
+          allowedOps: boundedList(plan.allowed_ops),
+          blockedReason: boundedText(plan.blocked_reason, 160),
+        })}`,
+      );
     } else {
       parts.push('editPlan=unverified');
     }
@@ -171,9 +186,7 @@ export class ToolResultSummarizer {
       match: (name, r) => name === 'web_search' && !!firstText(r),
       summarize: (_name, r) => {
         const lines = (firstText(r) ?? '').split('\n');
-        const header = lines
-          .filter((line) => /^(Search query|Provider|Results):/.test(line))
-          .join(' | ');
+        const header = lines.filter((line) => /^(Search query|Provider|Results):/.test(line)).join(' | ');
         const entries: string[] = [];
         for (let i = 0; i < lines.length && entries.length < 6; i++) {
           if (/^\d+\.\s/.test(lines[i])) {

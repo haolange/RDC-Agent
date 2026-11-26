@@ -17,7 +17,14 @@ export function subscribeAppThemeChanged(electronAPI: ElectronAPI, setSystemThem
   });
 }
 
-export function subscribeShellCommands(electronAPI: ElectronAPI, { t, setSettingsModalOpen, setWindowMaximized }: Pick<EventBridgeOptions, 't' | 'setSettingsModalOpen' | 'setWindowMaximized'>) {
+export function subscribeShellCommands(
+  electronAPI: ElectronAPI,
+  {
+    t,
+    setSettingsModalOpen,
+    setWindowMaximized,
+  }: Pick<EventBridgeOptions, 't' | 'setSettingsModalOpen' | 'setWindowMaximized'>,
+) {
   const handleFileOpen = (paths: unknown) => {
     if (!Array.isArray(paths) || paths.length === 0) return;
     notify.info(t('app.notice.filesReceived', { count: paths.length }));

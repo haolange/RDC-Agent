@@ -53,22 +53,31 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
     }
   };
 
-  const statusText = status === 'saving'
-    ? t('settings.saving')
-    : status === 'error'
-      ? ''
-      : dirty
-        ? t('settings.unsaved')
-        : status === 'saved'
-          ? t('settings.toolsSaved')
-          : '';
+  const statusText =
+    status === 'saving'
+      ? t('settings.saving')
+      : status === 'error'
+        ? ''
+        : dirty
+          ? t('settings.unsaved')
+          : status === 'saved'
+            ? t('settings.toolsSaved')
+            : '';
 
   return (
     <form
       className="settings-tools-card-stack"
       data-testid="settings-local-tools"
-      onChange={() => { if (!saving) { setStatus('idle'); setError(''); } }}
-      onSubmit={(event) => { event.preventDefault(); void save(); }}
+      onChange={() => {
+        if (!saving) {
+          setStatus('idle');
+          setError('');
+        }
+      }}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void save();
+      }}
     >
       <header className="settings-section-header">
         <div className="settings-section-title">{t('settings.localToolsTitle')}</div>
@@ -83,7 +92,11 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
           status={t(rdcCliDraft.enabled ? 'settings.localToolEnabled' : 'settings.disabled')}
           testId="settings-rdc-block"
         >
-          <RdcCliInvokerSettingsFields rdcCliDraft={rdcCliDraft} onRdcCliDraftChange={onRdcCliDraftChange} installation={installation} />
+          <RdcCliInvokerSettingsFields
+            rdcCliDraft={rdcCliDraft}
+            onRdcCliDraftChange={onRdcCliDraftChange}
+            installation={installation}
+          />
         </LocalToolDisclosure>
 
         <LocalToolDisclosure
@@ -108,19 +121,28 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
       </fieldset>
 
       {error ? <InlineError detail={error}>{t('settings.localToolsSaveFailed')}</InlineError> : null}
-      {statusText || error ? <div className="settings-actions settings-actions-split settings-tools-save-bar">
-        <span
-          className="settings-save-status"
-          role="status"
-          data-status={status === 'idle' && dirty ? 'dirty' : status}
-          data-testid="settings-tools-save-status"
-        >
-          {statusText}
-        </span>
-        {dirty || saving ? <Button type="submit" variant="primary" disabled={saving || installation.busy} data-testid="settings-tools-save">
-          {t('settings.save')}
-        </Button> : null}
-      </div> : null}
+      {statusText || error ? (
+        <div className="settings-actions settings-actions-split settings-tools-save-bar">
+          <span
+            className="settings-save-status"
+            role="status"
+            data-status={status === 'idle' && dirty ? 'dirty' : status}
+            data-testid="settings-tools-save-status"
+          >
+            {statusText}
+          </span>
+          {dirty || saving ? (
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={saving || installation.busy}
+              data-testid="settings-tools-save"
+            >
+              {t('settings.save')}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </form>
   );
 };

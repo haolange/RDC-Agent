@@ -41,39 +41,49 @@ describe('resolveCompactionThresholdTokens', () => {
 
 describe('resolveTurnOutputTokens', () => {
   it('caps by model max output when the window still has room', () => {
-    expect(resolveTurnOutputTokens({
-      contextWindowTokens: 1_000_000,
-      maxOutputTokens: 384_000,
-      promptTokens: 0,
-    })).toBe(384_000);
+    expect(
+      resolveTurnOutputTokens({
+        contextWindowTokens: 1_000_000,
+        maxOutputTokens: 384_000,
+        promptTokens: 0,
+      }),
+    ).toBe(384_000);
   });
 
   it('uses remaining window minus safety when prompt is near the compaction line', () => {
-    expect(resolveTurnOutputTokens({
-      contextWindowTokens: 1_000_000,
-      maxOutputTokens: 384_000,
-      promptTokens: 800_000,
-    })).toBe(184_000);
+    expect(
+      resolveTurnOutputTokens({
+        contextWindowTokens: 1_000_000,
+        maxOutputTokens: 384_000,
+        promptTokens: 800_000,
+      }),
+    ).toBe(184_000);
   });
 
   it('returns null when no output can fit', () => {
-    expect(resolveTurnOutputTokens({
-      contextWindowTokens: 200_000,
-      maxOutputTokens: 64_000,
-      promptTokens: 199_500,
-    })).toBeNull();
-    expect(resolveTurnOutputTokens({
-      contextWindowTokens: 200_000,
-      maxOutputTokens: 0,
-      promptTokens: 199_500,
-    })).toBeNull();
+    expect(
+      resolveTurnOutputTokens({
+        contextWindowTokens: 200_000,
+        maxOutputTokens: 64_000,
+        promptTokens: 199_500,
+      }),
+    ).toBeNull();
+    expect(
+      resolveTurnOutputTokens({
+        contextWindowTokens: 200_000,
+        maxOutputTokens: 0,
+        promptTokens: 199_500,
+      }),
+    ).toBeNull();
   });
 
   it('treats a missing output cap as the remaining window', () => {
-    expect(resolveTurnOutputTokens({
-      contextWindowTokens: 200_000,
-      maxOutputTokens: 0,
-      promptTokens: 1_000,
-    })).toBe(197_976);
+    expect(
+      resolveTurnOutputTokens({
+        contextWindowTokens: 200_000,
+        maxOutputTokens: 0,
+        promptTokens: 1_000,
+      }),
+    ).toBe(197_976);
   });
 });

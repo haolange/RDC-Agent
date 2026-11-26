@@ -16,7 +16,10 @@ export function toRunSummary(run: PersistedRunRecord): RunSummary {
 export function writeRunFiles(io: StorageIo, runPath: string, run: PersistedRunRecord): void {
   const parsed = PersistedRunRecordV3Schema.safeParse(run);
   if (!parsed.success) {
-    throw new AppError('STORAGE_SCHEMA', `refused to write invalid Run v3: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
+    throw new AppError(
+      'STORAGE_SCHEMA',
+      `refused to write invalid Run v3: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`,
+    );
   }
   io.ensureDir(runPath);
   io.writeUtf8Atomic(path.join(runPath, 'run.json'), `${JSON.stringify(parsed.data, null, 2)}\n`);

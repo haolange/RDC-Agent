@@ -14,17 +14,24 @@ export function normalizeTaskSnapshotItems(payload: {
       status: item.status,
       ...(item.displayState ? { displayState: item.displayState } : {}),
       statusReason: item.statusReason,
-      waitingOn: item.waitingOn?.map(wait => ({ ...wait })),
+      waitingOn: item.waitingOn?.map((wait) => ({ ...wait })),
       order: typeof item.order === 'number' ? item.order : index,
     }));
   }
   const taskId = payload.taskId?.trim() || 'runtime-tasks';
-  return [{
-    taskId,
-    title: payload.title?.trim() || taskId,
-    status: payload.status === 'in_progress' || payload.status === 'blocked'
-      || payload.status === 'completed' || payload.status === 'cancelled' ? payload.status : 'pending',
-    statusReason: payload.statusReason,
-    order: 0,
-  }];
+  return [
+    {
+      taskId,
+      title: payload.title?.trim() || taskId,
+      status:
+        payload.status === 'in_progress' ||
+        payload.status === 'blocked' ||
+        payload.status === 'completed' ||
+        payload.status === 'cancelled'
+          ? payload.status
+          : 'pending',
+      statusReason: payload.statusReason,
+      order: 0,
+    },
+  ];
 }

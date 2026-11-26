@@ -23,7 +23,15 @@ export interface DisclosureProps {
  * bodies are not rendered, so long work traces only pay for what is open.
  */
 export function Disclosure({
-  open, onOpenChange, summary, triggerLabel, trailing, children, className, triggerClassName, bodyClassName,
+  open,
+  onOpenChange,
+  summary,
+  triggerLabel,
+  trailing,
+  children,
+  className,
+  triggerClassName,
+  bodyClassName,
 }: DisclosureProps) {
   const bodyId = useId();
   return (
@@ -42,7 +50,11 @@ export function Disclosure({
         </button>
         {trailing ? <div className="ui-disclosure-trailing">{trailing}</div> : null}
       </div>
-      {open ? <div id={bodyId} className={cn('ui-disclosure-body', bodyClassName)}>{children}</div> : null}
+      {open ? (
+        <div id={bodyId} className={cn('ui-disclosure-body', bodyClassName)}>
+          {children}
+        </div>
+      ) : null}
     </div>
   );
 }

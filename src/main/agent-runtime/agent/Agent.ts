@@ -232,10 +232,7 @@ export class Agent {
     this.abort();
     const loopPromise = this._activeLoopPromise;
     const producerCompletion = this._activeProducerCompletion;
-    await Promise.allSettled([
-      loopPromise ?? Promise.resolve(),
-      producerCompletion ?? Promise.resolve(),
-    ]);
+    await Promise.allSettled([loopPromise ?? Promise.resolve(), producerCompletion ?? Promise.resolve()]);
   }
 
   /** The current loop promise, when a provider/tool producer is still active. */
@@ -264,11 +261,7 @@ export class Agent {
    * 不再原地 splice 共享数组；bump revision，下一轮 LLM 调用经 runtime ref 读取新 activeTools。
    */
   setTools(tools: ToolDefinition[]): void {
-    this._runtime = createLoopRuntimeState(
-      tools,
-      this._runtime.activatedDeferredTools,
-      this._runtime.revision + 1,
-    );
+    this._runtime = createLoopRuntimeState(tools, this._runtime.activatedDeferredTools, this._runtime.revision + 1);
     this._runtimeRef.current = this._runtime;
     this._state.tools = this._runtime.activeTools;
   }
@@ -277,11 +270,7 @@ export class Agent {
    * Deferred 激活：同步更新 activatedDeferredTools + activeTools，并 bump revision。
    */
   activateDeferredTools(activated: ReadonlySet<string>, activeTools: ToolDefinition[]): void {
-    this._runtime = createLoopRuntimeState(
-      activeTools,
-      activated,
-      this._runtime.revision + 1,
-    );
+    this._runtime = createLoopRuntimeState(activeTools, activated, this._runtime.revision + 1);
     this._runtimeRef.current = this._runtime;
     this._state.tools = this._runtime.activeTools;
   }

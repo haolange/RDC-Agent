@@ -1,5 +1,10 @@
 import { useCallback, useState } from 'react';
-import type { KnowledgeCardDetail, KnowledgeLaneHit, KnowledgePack, KnowledgePackConflict } from '@shared/types/knowledge';
+import type {
+  KnowledgeCardDetail,
+  KnowledgeLaneHit,
+  KnowledgePack,
+  KnowledgePackConflict,
+} from '@shared/types/knowledge';
 
 interface UseKnowledgeConflictsOptions {
   hits: KnowledgeLaneHit[];
@@ -20,37 +25,46 @@ export interface ConflictCardPair {
  * Conflicts view selection: resolves both ids of a contradicts pair through the compiled
  * pack (fallback: current hits) and loads the cards via the existing card IPC.
  */
-export function useKnowledgeConflicts({ hits, pack, detailSeq, onBeginSelect, onEndSelect, loadCard }: UseKnowledgeConflictsOptions) {
+export function useKnowledgeConflicts({
+  hits,
+  pack,
+  detailSeq,
+  onBeginSelect,
+  onEndSelect,
+  loadCard,
+}: UseKnowledgeConflictsOptions) {
   const [selectedConflict, setSelectedConflict] = useState<KnowledgePackConflict | null>(null);
   const [conflictCards, setConflictCards] = useState<ConflictCardPair>({ left: null, right: null });
 
-  const selectConflict = useCallback(async (conflict: KnowledgePackConflict) => {
-    const seq = detailSeq.next();
-    setSelectedConflict(conflict);
-    setConflictCards({ left: null, right: null });
-    onBeginSelect();
-    const locate = (cardId: string) => pack?.hits.find((hit) => hit.cardId === cardId)
-      ?? hits.find((hit) => hit.cardId === cardId)
-      ?? null;
-    const load = async (cardId: string): Promise<KnowledgeCardDetail | null> => {
-      const hit = locate(cardId);
-      if (!hit) return null;
+  const selectConflict = useCallback(
+    async (conflict: KnowledgePackConflict) => {
+      const seq = detailSeq.next();
+      setSelectedConflict(conflict);
+      setConflictCards({ left: null, right: null });
+      onBeginSelect();
+      const locate = (cardId: string) =>
+        pack?.hits.find((hit) => hit.cardId === cardId) ?? hits.find((hit) => hit.cardId === cardId) ?? null;
+      const load = async (cardId: string): Promise<KnowledgeCardDetail | null> => {
+        const hit = locate(cardId);
+        if (!hit) return null;
+        try {
+          return await loadCard(hit.spaceId, hit.relativePath);
+        } catch (error) {
+          // The pair still opens; the card that could not be read shows as missing.
+          console.warn('[knowledge] could not load a conflicting card', error);
+          return null;
+        }
+      };
       try {
-        return await loadCard(hit.spaceId, hit.relativePath);
-      } catch (error) {
-        // The pair still opens; the card that could not be read shows as missing.
-        console.warn('[knowledge] could not load a conflicting card', error);
-        return null;
+        const [left, right] = await Promise.all([load(conflict.leftCardId), load(conflict.rightCardId)]);
+        if (!detailSeq.isCurrent(seq)) return;
+        setConflictCards({ left, right });
+      } finally {
+        onEndSelect(seq);
       }
-    };
-    try {
-      const [left, right] = await Promise.all([load(conflict.leftCardId), load(conflict.rightCardId)]);
-      if (!detailSeq.isCurrent(seq)) return;
-      setConflictCards({ left, right });
-    } finally {
-      onEndSelect(seq);
-    }
-  }, [detailSeq, hits, loadCard, onBeginSelect, onEndSelect, pack]);
+    },
+    [detailSeq, hits, loadCard, onBeginSelect, onEndSelect, pack],
+  );
 
   const clearConflict = useCallback(() => {
     setSelectedConflict(null);

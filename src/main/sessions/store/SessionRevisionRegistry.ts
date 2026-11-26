@@ -21,7 +21,11 @@ export class SessionRevisionRegistry {
     const snapshot = { record, revision: { epoch: this.epoch, n: this.n } };
     for (const listener of this.listeners) {
       // A subscriber cannot undo a durable write; a failing one is reported.
-      try { listener(snapshot); } catch (error) { reportProcessFault('Session record listener failed', error); }
+      try {
+        listener(snapshot);
+      } catch (error) {
+        reportProcessFault('Session record listener failed', error);
+      }
     }
     return snapshot;
   }

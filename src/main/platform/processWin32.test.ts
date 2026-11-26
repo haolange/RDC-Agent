@@ -4,7 +4,10 @@ import type { spawnSync } from 'node:child_process';
 
 type SpawnResult = { status: number | null; stdout?: string; error?: Error };
 
-function backendWith(results: SpawnResult[], kill: (pid: number, signal: number | NodeJS.Signals) => boolean = () => true) {
+function backendWith(
+  results: SpawnResult[],
+  kill: (pid: number, signal: number | NodeJS.Signals) => boolean = () => true,
+) {
   const spawn = vi.fn((..._args: unknown[]) => results.shift() ?? { status: 1, stdout: '' });
   const backend = createWin32ProcessBackend({
     spawnSync: spawn as unknown as typeof spawnSync,
@@ -26,13 +29,19 @@ describe('Windows process primitives', () => {
   });
 
   it('reports a missing pid as exited without spawning and fails closed on query errors', () => {
-    const missing = backendWith([], () => { throw Object.assign(new Error('absent'), { code: 'ESRCH' }); });
+    const missing = backendWith([], () => {
+      throw Object.assign(new Error('absent'), { code: 'ESRCH' });
+    });
     expect(missing.backend.readBirth(212)).toBeNull();
     expect(missing.spawn).not.toHaveBeenCalled();
     expect(backendWith([{ status: 0, stdout: 'absent' }]).backend.readBirth(212)).toBeNull();
     expect(() => backendWith([{ status: 1, stdout: '' }]).backend.readBirth(212)).toThrow(/PROCESS_QUERY_FAILED/);
-    expect(() => backendWith([{ status: 0, stdout: 'invalid' }]).backend.readBirth(212)).toThrow(/PROCESS_QUERY_FAILED/);
-    expect(() => backendWith([{ status: null, error: new Error('timeout') }]).backend.readBirth(212)).toThrow('timeout');
+    expect(() => backendWith([{ status: 0, stdout: 'invalid' }]).backend.readBirth(212)).toThrow(
+      /PROCESS_QUERY_FAILED/,
+    );
+    expect(() => backendWith([{ status: null, error: new Error('timeout') }]).backend.readBirth(212)).toThrow(
+      'timeout',
+    );
     expect(() => windowsPowerShellPath('relative')).toThrow(/PROCESS_QUERY_UNAVAILABLE/);
   });
 

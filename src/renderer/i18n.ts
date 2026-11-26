@@ -7,8 +7,11 @@ export { translate, type LocalizedTranslator, type TranslationKey, type Translat
 export const useI18n = () => {
   const language = useAppSettingsStore((state) => state.settings.appearance.language);
 
-  return useMemo((): { language: AppLanguage; t: Translator } => ({
-    language,
-    t: localizedTranslator(language),
-  }), [language]);
+  return useMemo(
+    (): { language: AppLanguage; t: Translator } => ({
+      language,
+      t: localizedTranslator(language),
+    }),
+    [language],
+  );
 };

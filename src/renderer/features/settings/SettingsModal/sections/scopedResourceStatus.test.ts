@@ -13,11 +13,25 @@ const overview: RdcRuntimeOverview = {
     { ...source, kind: 'mcp', content: '{"name":"Review service"}', effectiveStatus: 'effective', diagnostics: [] },
     { ...source, kind: 'hook', content: 'id: review\ncommand: verify', effectiveStatus: 'effective', diagnostics: [] },
   ],
-  hooks: [{ ...source, event: 'tool.before-call', failurePolicy: 'warn', enabled: true, trusted: true,
-    needsRetrust: false, trustFingerprint: 'trusted revision' }],
+  hooks: [
+    {
+      ...source,
+      event: 'tool.before-call',
+      failurePolicy: 'warn',
+      enabled: true,
+      trusted: true,
+      needsRetrust: false,
+      trustFingerprint: 'trusted revision',
+    },
+  ],
   mcpServers: [{ ...source, name: 'Review service', trusted: true, needsRetrust: false, transport: 'stdio' }],
-  projectRoot: '/project', userRoot: '/user', userPaths: {}, diagnostics: [], skillSelection: { status: 'ready', options: [] },
-  knowledge: { userPath: '/user' }, memory: { userPath: '/user' },
+  projectRoot: '/project',
+  userRoot: '/user',
+  userPaths: {},
+  diagnostics: [],
+  skillSelection: { status: 'ready', options: [] },
+  knowledge: { userPath: '/user' },
+  memory: { userPath: '/user' },
 };
 const props = { overview, scope: 'project', onScopeChange: vi.fn(), onChanged: vi.fn() } as const;
 const initialSettings = useAppSettingsStore.getState().settings;
@@ -31,7 +45,9 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  useAppSettingsStore.setState({ settings: { ...initialSettings, appearance: { ...initialSettings.appearance, language: 'en' } } });
+  useAppSettingsStore.setState({
+    settings: { ...initialSettings, appearance: { ...initialSettings.appearance, language: 'en' } },
+  });
 });
 afterEach(async () => {
   await act(async () => root.unmount());
@@ -41,9 +57,10 @@ afterEach(async () => {
 });
 
 it('shows a live MCP state only when received and places trust once beside its actions', async () => {
-  const getStatusSummary = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([
-    { id: source.id, name: 'Review service', connectionStatus: 'unknown', toolCount: 0 },
-  ]);
+  const getStatusSummary = vi
+    .fn()
+    .mockResolvedValueOnce([])
+    .mockResolvedValueOnce([{ id: source.id, name: 'Review service', connectionStatus: 'unknown', toolCount: 0 }]);
   vi.stubGlobal('electronAPI', { mcp: { getStatusSummary } });
   await act(async () => root.render(createElement(McpServicesPanel, props)));
   expect(testId('settings-mcp-connection-badge')).toBeNull();
@@ -62,13 +79,19 @@ it('keeps Hook receipts copyable while the result shows the actual outcome', asy
   const testHook = vi.fn().mockResolvedValueOnce(receipt).mockResolvedValueOnce(failed);
   vi.stubGlobal('electronAPI', { rdcRuntime: { testHook } });
   const copy = vi.fn(async () => true);
-  await act(async () => root.render(createElement(ClipboardContext.Provider, { value: copy }, createElement(HooksSettings, props))));
+  await act(async () =>
+    root.render(createElement(ClipboardContext.Provider, { value: copy }, createElement(HooksSettings, props))),
+  );
   await click(host.querySelector<HTMLButtonElement>('button.ui-list-row')!);
   const run = testId('settings-hook-detail-test')!;
   await click(run);
   expect(testId('settings-hook-test-result')?.textContent).toBe('Hook test passed.');
   expect(host.textContent).not.toContain(receipt.stdout);
-  await click(testId('settings-hook-detail')!.querySelector<HTMLElement>('header [data-testid="settings-hook-diagnostics-menu"]')!);
+  await click(
+    testId('settings-hook-detail')!.querySelector<HTMLElement>(
+      'header [data-testid="settings-hook-diagnostics-menu"]',
+    )!,
+  );
   await click(document.querySelector<HTMLElement>('[data-testid="settings-hook-diagnostics"]')!);
   expect(copy).toHaveBeenLastCalledWith(expect.stringContaining(JSON.stringify(receipt, null, 2)));
   await click(run);

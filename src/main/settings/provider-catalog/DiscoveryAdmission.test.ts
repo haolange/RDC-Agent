@@ -11,27 +11,50 @@ describe('discovery admission', () => {
     ['video generation', { id: 'grok-imagine-video-1.5', output_modalities: ['video'] }, false, 'deny-pattern'],
     ['video modality without name match', { id: 'vendor-media-v2', modality: 'video' }, false, 'modality'],
     ['multimodal chat with video in id', { id: 'llava-video-7b', modality: 'text' }, true, undefined],
-    ['vision chat', { id: 'vision-image-chat', input_modalities: ['text', 'image'], output_modalities: ['text'] }, true, undefined],
-    ['image generation', { id: 'gpt-image-1', input_modalities: ['text', 'image'], output_modalities: ['image'] }, false, 'deny-pattern'],
-    ['vision chat input', { id: 'vision-chat', input_modalities: ['text', 'image'], output_modalities: ['text'] }, true, undefined],
+    [
+      'vision chat',
+      { id: 'vision-image-chat', input_modalities: ['text', 'image'], output_modalities: ['text'] },
+      true,
+      undefined,
+    ],
+    [
+      'image generation',
+      { id: 'gpt-image-1', input_modalities: ['text', 'image'], output_modalities: ['image'] },
+      false,
+      'deny-pattern',
+    ],
+    [
+      'vision chat input',
+      { id: 'vision-chat', input_modalities: ['text', 'image'], output_modalities: ['text'] },
+      true,
+      undefined,
+    ],
     ['allowlist miss', { id: 'other-model' }, false, 'allowlist'],
     ['unproven alias', { id: 'vendor-latest', type: 'alias' }, false, 'unproven-alias'],
     ['proven alias', { id: 'vendor-latest', type: 'alias', canonical_id: 'vendor-2026-07' }, true, undefined],
   ] as const)('%s', (_label, candidate, accepted, reason) => {
-    expect(evaluateDiscoveryAdmission(candidate, {
-      allowPatterns: candidate.id === 'other-model' ? ['gpt-*'] : undefined,
-      allowedModalities: ['text'],
-    })).toEqual({ accepted, ...(reason ? { reason } : {}) });
+    expect(
+      evaluateDiscoveryAdmission(candidate, {
+        allowPatterns: candidate.id === 'other-model' ? ['gpt-*'] : undefined,
+        allowedModalities: ['text'],
+      }),
+    ).toEqual({ accepted, ...(reason ? { reason } : {}) });
   });
 
   it('supports declarative deny patterns', () => {
-    expect(evaluateDiscoveryAdmission({ id: 'vendor-preview' }, { denyPatterns: ['*-preview'] }))
-      .toEqual({ accepted: false, reason: 'deny-pattern' });
+    expect(evaluateDiscoveryAdmission({ id: 'vendor-preview' }, { denyPatterns: ['*-preview'] })).toEqual({
+      accepted: false,
+      reason: 'deny-pattern',
+    });
   });
 
   it('normalizes a proven alias to its canonical id without treating it as another model', () => {
-    expect(extractDiscoveredModelIdentity({
-      id: 'vendor-latest', type: 'alias', canonical_id: 'vendor-2026-07',
-    })).toEqual({ id: 'vendor-2026-07', aliases: ['vendor-latest'] });
+    expect(
+      extractDiscoveredModelIdentity({
+        id: 'vendor-latest',
+        type: 'alias',
+        canonical_id: 'vendor-2026-07',
+      }),
+    ).toEqual({ id: 'vendor-2026-07', aliases: ['vendor-latest'] });
   });
 });

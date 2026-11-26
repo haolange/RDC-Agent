@@ -5,10 +5,7 @@ import { motionScrollBehavior } from '../../../lib/motion';
 import { SearchField } from '../../../ui/SearchField';
 import { useI18n } from '../../../i18n';
 import { SettingsNavIcon } from './SettingsNavIcon';
-import {
-  matchSettingsSearchEntries,
-  type SettingsSearchEntry,
-} from './settingsSearchIndex';
+import { matchSettingsSearchEntries, type SettingsSearchEntry } from './settingsSearchIndex';
 import type { TranslationKey } from '../../../i18n';
 import type { SettingsSection } from './types';
 
@@ -57,12 +54,25 @@ export const SettingsCenterNav: React.FC<{
   // Cheap to compute; the index and the provider list are both small.
   const results = (() => {
     const normalized = query.trim().toLowerCase();
-    const providerHits = normalized ? providers.filter((provider) => provider.label.toLowerCase().includes(normalized)).slice(0, 6) : [];
+    const providerHits = normalized
+      ? providers.filter((provider) => provider.label.toLowerCase().includes(normalized)).slice(0, 6)
+      : [];
     return [
-      ...matchSettingsSearchEntries(query, t).map((entry) => ({ key: entry.id, title: t(entry.titleKey), section: entry.section,
-        select: () => selectEntry(entry) })),
-      ...providerHits.map((provider) => ({ key: `provider-${provider.id}`, title: provider.label, section: 'models' as SettingsSection,
-        select: () => { setQuery(''); provider.open(); } })),
+      ...matchSettingsSearchEntries(query, t).map((entry) => ({
+        key: entry.id,
+        title: t(entry.titleKey),
+        section: entry.section,
+        select: () => selectEntry(entry),
+      })),
+      ...providerHits.map((provider) => ({
+        key: `provider-${provider.id}`,
+        title: provider.label,
+        section: 'models' as SettingsSection,
+        select: () => {
+          setQuery('');
+          provider.open();
+        },
+      })),
     ];
   })();
   useEffect(() => setActiveResult(0), [query]);
@@ -87,7 +97,12 @@ export const SettingsCenterNav: React.FC<{
   // The field keeps focus; arrows move the active result, Enter opens it, Escape clears the search.
   const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (isImeComposing(event)) return;
-    if (event.key === 'Escape' && query) { event.preventDefault(); event.stopPropagation(); setQuery(''); return; }
+    if (event.key === 'Escape' && query) {
+      event.preventDefault();
+      event.stopPropagation();
+      setQuery('');
+      return;
+    }
     if (results.length === 0) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
@@ -135,7 +150,9 @@ export const SettingsCenterNav: React.FC<{
         role="combobox"
         aria-expanded={results.length > 0}
         aria-controls={resultsId}
-        aria-activedescendant={results.length > 0 ? `${resultsId}-${Math.min(activeResult, results.length - 1)}` : undefined}
+        aria-activedescendant={
+          results.length > 0 ? `${resultsId}-${Math.min(activeResult, results.length - 1)}` : undefined
+        }
       />
       {results.length > 0 ? (
         <div id={resultsId} className="settings-search-results" role="listbox" data-testid="settings-search-results">
@@ -171,7 +188,11 @@ export const SettingsCenterNav: React.FC<{
           const group = GROUP_LABELS[section.id];
           return (
             <React.Fragment key={section.id}>
-              {group ? <span className="settings-center-nav-group" role="presentation">{t(group)}</span> : null}
+              {group ? (
+                <span className="settings-center-nav-group" role="presentation">
+                  {t(group)}
+                </span>
+              ) : null}
               <button
                 type="button"
                 className={cn('settings-center-nav-item', activeSection === section.id && 'is-active')}

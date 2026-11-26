@@ -9,13 +9,20 @@ vi.mock('../../../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key }
 
 it('saves a deliberate future limit through the manifest draft and rejects invalid limits', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const host = document.createElement('div'); document.body.append(host);
+  const host = document.createElement('div');
+  document.body.append(host);
   const root = createRoot(host);
   const update = vi.fn();
   const agent = { id: 'general', maxTurns: 50 } as AgentManifestDraft;
-  const render = () => act(() => root.render(createElement(AgentExecutionLimitField, {
-    agent, onUpdateAgent: update,
-  })));
+  const render = () =>
+    act(() =>
+      root.render(
+        createElement(AgentExecutionLimitField, {
+          agent,
+          onUpdateAgent: update,
+        }),
+      ),
+    );
   const commit = (value: string) => {
     const input = host.querySelector('input')!;
     input.value = value;
@@ -25,15 +32,23 @@ it('saves a deliberate future limit through the manifest draft and rejects inval
   try {
     render();
     expect(host.querySelector('input')!.value).toBe('50');
-    commit('100'); expect(update).toHaveBeenLastCalledWith({ maxTurns: 100 });
+    commit('100');
+    expect(update).toHaveBeenLastCalledWith({ maxTurns: 100 });
     expect(getChangedAgentManifestDrafts([{ ...agent, maxTurns: 100 }], [agent])).toHaveLength(1);
     update.mockClear();
     for (const invalid of ['0', '-1', '1.5', '9007199254740992']) {
       expect(commit(invalid).value).toBe('50');
     }
     expect(update).not.toHaveBeenCalled();
-    commit(''); expect(update).toHaveBeenLastCalledWith({ maxTurns: undefined });
-    agent.id = 'debugger'; agent.maxTurns = 12; render();
+    commit('');
+    expect(update).toHaveBeenLastCalledWith({ maxTurns: undefined });
+    agent.id = 'debugger';
+    agent.maxTurns = 12;
+    render();
     expect(host.querySelector('input')!.value).toBe('12');
-  } finally { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
 });

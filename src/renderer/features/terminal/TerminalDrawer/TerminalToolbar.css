@@ -6,8 +6,11 @@
   min-height: 42px;
   padding: var(--space-2) var(--runtime-terminal-inline-padding) var(--space-1);
   border-bottom: 1px solid var(--token-border-card);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--token-bg-shell) 96%, transparent), color-mix(in srgb, var(--token-bg-shell) 72%, transparent));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--token-bg-shell) 96%, transparent),
+    color-mix(in srgb, var(--token-bg-shell) 72%, transparent)
+  );
 }
 
 .runtime-terminal-title-group {
@@ -84,7 +87,9 @@
   background: transparent;
   color: var(--token-text-secondary);
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .runtime-terminal-close-workspace:hover,

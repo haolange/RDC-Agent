@@ -17,7 +17,9 @@ afterEach(() => {
 });
 
 it('names the settings file in the system language', () => {
-  expect(settingsStartupFailureText('zh-CN', FILE).detail).toContain(`请删除下面这个文件，然后重新启动 RDC-Agent：\n${FILE}`);
+  expect(settingsStartupFailureText('zh-CN', FILE).detail).toContain(
+    `请删除下面这个文件，然后重新启动 RDC-Agent：\n${FILE}`,
+  );
   expect(settingsStartupFailureText('zh-TW', FILE).title).toBe('RDC-Agent 无法启动');
   const english = settingsStartupFailureText('fr-FR', FILE);
   expect(english.title).toBe('RDC-Agent cannot start');
@@ -28,9 +30,13 @@ it('shows a native error box on the desktop', () => {
   electron.locale = 'zh-CN';
   const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
   reportSettingsStartupFailure(FILE, false);
-  expect(electron.showMessageBoxSync).toHaveBeenCalledWith(expect.objectContaining({
-    type: 'error', title: 'RDC-Agent 无法启动', detail: expect.stringContaining(FILE),
-  }));
+  expect(electron.showMessageBoxSync).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: 'error',
+      title: 'RDC-Agent 无法启动',
+      detail: expect.stringContaining(FILE),
+    }),
+  );
   expect(stderr).not.toHaveBeenCalled();
 });
 

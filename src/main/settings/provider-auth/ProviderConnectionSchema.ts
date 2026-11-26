@@ -10,9 +10,11 @@ export function resolvePrimaryConnectionSecretFieldId(
   if (explicit && secretFields.some((field) => field.id === explicit)) {
     return explicit;
   }
-  return secretFields.find((field) => field.id === 'apiKey')?.id
-    ?? secretFields.find((field) => /(?:BEARER_TOKEN|API_TOKEN|API_KEY|_PAT)$/u.test(field.id))?.id
-    ?? secretFields[0]?.id;
+  return (
+    secretFields.find((field) => field.id === 'apiKey')?.id ??
+    secretFields.find((field) => /(?:BEARER_TOKEN|API_TOKEN|API_KEY|_PAT)$/u.test(field.id))?.id ??
+    secretFields[0]?.id
+  );
 }
 
 export function isProviderConnectionSchemaSatisfied(
@@ -24,16 +26,20 @@ export function isProviderConnectionSchemaSatisfied(
   const alternativeFieldIds = new Set(
     schema.credentialAlternatives?.flatMap((alternative) => alternative.fieldIds) ?? [],
   );
-  if (!schema.fields
-    .filter((field) => field.required && !alternativeFieldIds.has(field.id))
-    .every((field) => isPresent(field.id))) {
+  if (
+    !schema.fields
+      .filter((field) => field.required && !alternativeFieldIds.has(field.id))
+      .every((field) => isPresent(field.id))
+  ) {
     return false;
   }
-  return !schema.credentialAlternatives?.length
-    || schema.credentialAlternatives.some((alternative) => (
-      alternative.ambient === true
-      || (alternative.fieldIds.length > 0 && alternative.fieldIds.every(isPresent))
-    ));
+  return (
+    !schema.credentialAlternatives?.length ||
+    schema.credentialAlternatives.some(
+      (alternative) =>
+        alternative.ambient === true || (alternative.fieldIds.length > 0 && alternative.fieldIds.every(isPresent)),
+    )
+  );
 }
 
 export function resolveProviderEndpointTemplate(
@@ -78,8 +84,10 @@ export function resolveProviderConnectionHeaders(
   schema: LlmProviderConnectionSchema | undefined,
   values: Readonly<Record<string, string>>,
 ): Record<string, string> {
-  return Object.fromEntries((schema?.headerMappings ?? []).flatMap((mapping) => {
-    const value = values[mapping.fieldId]?.trim();
-    return value ? [[mapping.header, `${mapping.prefix ?? ''}${value}`]] : [];
-  }));
+  return Object.fromEntries(
+    (schema?.headerMappings ?? []).flatMap((mapping) => {
+      const value = values[mapping.fieldId]?.trim();
+      return value ? [[mapping.header, `${mapping.prefix ?? ''}${value}`]] : [];
+    }),
+  );
 }

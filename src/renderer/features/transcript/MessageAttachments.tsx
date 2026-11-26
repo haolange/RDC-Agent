@@ -7,7 +7,10 @@ import type { SessionAttachmentRecord } from '@shared/types/session';
 
 const NO_RELATED_MESSAGES: readonly ConversationMessage[] = [];
 
-function notesFor(attachment: SessionAttachmentRecord, messages: readonly ConversationMessage[]): AttachmentNotes | undefined {
+function notesFor(
+  attachment: SessionAttachmentRecord,
+  messages: readonly ConversationMessage[],
+): AttachmentNotes | undefined {
   const { material, sourceHash, sessionId } = attachment;
   if (!material || !Object.values(material).some(Boolean)) return undefined;
   const group = material.comparison?.group;
@@ -15,8 +18,11 @@ function notesFor(attachment: SessionAttachmentRecord, messages: readonly Conver
   if (group) {
     for (const message of messages) {
       for (const candidate of message.attachments ?? []) {
-        if (candidate.sessionId === sessionId && candidate.attachmentId !== attachment.attachmentId
-          && candidate.material?.comparison?.group === group) {
+        if (
+          candidate.sessionId === sessionId &&
+          candidate.attachmentId !== attachment.attachmentId &&
+          candidate.material?.comparison?.group === group
+        ) {
           related.set(candidate.attachmentId, candidate.fileName);
         }
       }
@@ -27,14 +33,27 @@ function notesFor(attachment: SessionAttachmentRecord, messages: readonly Conver
 
 export function MessageAttachments({ attachments }: { attachments: readonly SessionAttachmentRecord[] }) {
   const hasComparison = attachments.some((item) => item.material?.comparison);
-  const messages = useConversationStore((state) => hasComparison ? state.conversationMessages : NO_RELATED_MESSAGES);
-  const items = useMemo(() => attachments.map((attachment): AttachmentItem => ({
-    id: attachment.attachmentId,
-    owner: attachment.sessionId && !attachment.attachmentId.startsWith('optimistic-')
-      ? { scope: 'session', attachmentId: attachment.attachmentId, sessionId: attachment.sessionId } : null,
-    fileName: attachment.fileName,
-    mode: attachmentMode(attachment.fileName, attachment.layer, attachment.mimeType),
-    notes: notesFor(attachment, messages),
-  })), [attachments, messages]);
-  return <AttachmentShelf key={attachments[0]?.sessionId} items={items} className="message-attachments" testId="message-attachments" />;
+  const messages = useConversationStore((state) => (hasComparison ? state.conversationMessages : NO_RELATED_MESSAGES));
+  const items = useMemo(
+    () =>
+      attachments.map((attachment): AttachmentItem => ({
+        id: attachment.attachmentId,
+        owner:
+          attachment.sessionId && !attachment.attachmentId.startsWith('optimistic-')
+            ? { scope: 'session', attachmentId: attachment.attachmentId, sessionId: attachment.sessionId }
+            : null,
+        fileName: attachment.fileName,
+        mode: attachmentMode(attachment.fileName, attachment.layer, attachment.mimeType),
+        notes: notesFor(attachment, messages),
+      })),
+    [attachments, messages],
+  );
+  return (
+    <AttachmentShelf
+      key={attachments[0]?.sessionId}
+      items={items}
+      className="message-attachments"
+      testId="message-attachments"
+    />
+  );
 }

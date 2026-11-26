@@ -4,14 +4,29 @@ import { createWorkTraceFixture } from '@shared/fixtures/workTraceFixture';
 import { createConversationMessageAssembler } from './conversationMessageAssembler';
 import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
 
-const message = (steps: number): ConversationMessage => ({
-  id: 'assistant-a', turnId: 'turn-a', sessionId: 'session-a', projectId: null, role: 'assistant',
-  content: '', status: 'streaming', createdAt: 1, updatedAt: steps, workTrace: createWorkTraceFixture({ steps }),
-} as ConversationMessage);
+const message = (steps: number): ConversationMessage =>
+  ({
+    id: 'assistant-a',
+    turnId: 'turn-a',
+    sessionId: 'session-a',
+    projectId: null,
+    role: 'assistant',
+    content: '',
+    status: 'streaming',
+    createdAt: 1,
+    updatedAt: steps,
+    workTrace: createWorkTraceFixture({ steps }),
+  }) as ConversationMessage;
 
-const deltaEvent = (encoder: ReturnType<typeof createConversationMessageDeltaEncoder>, steps: number): ConversationStreamEvent => (
-  { type: 'message_delta', sessionId: 'session-a', turnId: 'turn-a', delta: encoder.encode(message(steps))! }
-);
+const deltaEvent = (
+  encoder: ReturnType<typeof createConversationMessageDeltaEncoder>,
+  steps: number,
+): ConversationStreamEvent => ({
+  type: 'message_delta',
+  sessionId: 'session-a',
+  turnId: 'turn-a',
+  delta: encoder.encode(message(steps))!,
+});
 
 describe('conversation message assembler', () => {
   it('rebuilds whole messages from a delta sequence', () => {
@@ -19,7 +34,10 @@ describe('conversation message assembler', () => {
     const assembler = createConversationMessageAssembler({ requestSnapshot: vi.fn(), deliver: vi.fn() });
     for (const steps of [1, 2, 5]) {
       expect(assembler.accept(deltaEvent(encoder, steps))).toEqual({
-        type: 'message_patched', sessionId: 'session-a', turnId: 'turn-a', message: message(steps),
+        type: 'message_patched',
+        sessionId: 'session-a',
+        turnId: 'turn-a',
+        message: message(steps),
       });
     }
   });
@@ -49,7 +67,12 @@ describe('conversation message assembler', () => {
     const requestSnapshot = vi.fn(async () => null);
     const assembler = createConversationMessageAssembler({ requestSnapshot, deliver: vi.fn() });
     assembler.accept(deltaEvent(encoder, 1));
-    const completed: ConversationStreamEvent = { type: 'message_completed', sessionId: 'session-a', turnId: 'turn-a', message: message(2) };
+    const completed: ConversationStreamEvent = {
+      type: 'message_completed',
+      sessionId: 'session-a',
+      turnId: 'turn-a',
+      message: message(2),
+    };
     expect(assembler.accept(completed)).toBe(completed);
     expect(assembler.accept(deltaEvent(encoder, 3))).toBeNull();
     expect(requestSnapshot).toHaveBeenCalledOnce();

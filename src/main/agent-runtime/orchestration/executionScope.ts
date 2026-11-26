@@ -11,10 +11,7 @@ export function createEphemeralScopeId(): string {
   return ephemeralScopeId(randomUUID());
 }
 
-export function resolveExecutionScopeId(
-  sessionId?: string | null,
-  ephemeralScopeId?: string | null,
-): string {
+export function resolveExecutionScopeId(sessionId?: string | null, ephemeralScopeId?: string | null): string {
   const sid = sessionId?.trim();
   if (sid) return sid;
   const epi = ephemeralScopeId?.trim();

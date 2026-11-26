@@ -9,9 +9,15 @@ let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
 });
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
+afterEach(async () => {
+  await act(async () => root.unmount());
+  host.remove();
+  vi.unstubAllGlobals();
+});
 
 /**
  * Two Agents edited before the first save returns: each control commits only the field it changed, so neither
@@ -22,7 +28,9 @@ it('keeps both Agents when their models are changed before the first save return
   let controls!: ReturnType<typeof useAgentModelControls>;
   const Probe = () => {
     controls = useAgentModelControls({
-      onAgentModelOps: async (ops: SettingsPatchOp[]) => { writes.push(ops); },
+      onAgentModelOps: async (ops: SettingsPatchOp[]) => {
+        writes.push(ops);
+      },
     } as never);
     return null;
   };
@@ -33,7 +41,9 @@ it('keeps both Agents when their models are changed before the first save return
     controls.setAgentField('analyzer', { field: 'model', value: 'ollama:other-model' });
   });
 
-  const committed = writes.flat().filter(isAgentModelPatchOp)
+  const committed = writes
+    .flat()
+    .filter(isAgentModelPatchOp)
     .reduce<AgentModelSettings>(applyAgentModelOp, { default: {}, byAgent: {} });
   expect(committed.byAgent).toEqual({
     debugger: { model: 'ollama:local-model' },
@@ -45,7 +55,11 @@ it('clears an Agent field and the default field instead of writing whole binding
   const writes: SettingsPatchOp[][] = [];
   let controls!: ReturnType<typeof useAgentModelControls>;
   const Probe = () => {
-    controls = useAgentModelControls({ onAgentModelOps: async (ops: SettingsPatchOp[]) => { writes.push(ops); } } as never);
+    controls = useAgentModelControls({
+      onAgentModelOps: async (ops: SettingsPatchOp[]) => {
+        writes.push(ops);
+      },
+    } as never);
     return null;
   };
   await act(async () => root.render(createElement(Probe)));

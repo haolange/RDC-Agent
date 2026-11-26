@@ -26,9 +26,20 @@ function assert(condition, message) {
 }
 
 const expectedPresets = [
-  'rdc', 'absolutely', 'ayu', 'catppuccin', 'dracula', 'everforest', 'github', 'gruvbox', 'linear',
+  'rdc',
+  'absolutely',
+  'ayu',
+  'catppuccin',
+  'dracula',
+  'everforest',
+  'github',
+  'gruvbox',
+  'linear',
 ];
-assert(JSON.stringify([...THEME_PRESET_IDS]) === JSON.stringify(expectedPresets), 'Preset catalog must match Codex-aligned + RDC list');
+assert(
+  JSON.stringify([...THEME_PRESET_IDS]) === JSON.stringify(expectedPresets),
+  'Preset catalog must match Codex-aligned + RDC list',
+);
 assert(
   THEME_PRESET_CATALOG.every((preset) => preset.light.presetId === preset.id && preset.dark.presetId === preset.id),
   'Preset chrome must self-identify',
@@ -38,7 +49,10 @@ const defaults = createDefaultUiPreferences();
 assert(defaults.chromeThemes.light.presetId === 'rdc', 'Default light chrome is RDC');
 assert(defaults.chromeThemes.dark.presetId === 'rdc', 'Default dark chrome is RDC');
 assert(!('reduceMotion' in defaults), 'Removed motion preference must not persist in defaults');
-assert(!('usePointerCursors' in defaults), 'Interactive controls always use the pointer cursor; there is no preference for it');
+assert(
+  !('usePointerCursors' in defaults),
+  'Interactive controls always use the pointer cursor; there is no preference for it',
+);
 
 const sanitized = sanitizeUiPreferences({
   theme: 'light',
@@ -57,7 +71,10 @@ assert(vars['--color-accent-500'], 'compiler emits accent-500');
 assert(vars['--color-bg-1'], 'compiler emits surface bg-1');
 assert(vars['--color-text-primary'], 'compiler emits ink');
 assert(vars['--font-sans'] === undefined, 'default chrome leaves the bundled font stack to design-tokens.css');
-assert(compileThemeChrome({ ...chrome, fonts: { ui: 'Custom UI', code: null } }, 'dark')['--font-sans'] === 'Custom UI', 'a chosen UI font overrides the default stack');
+assert(
+  compileThemeChrome({ ...chrome, fonts: { ui: 'Custom UI', code: null } }, 'dark')['--font-sans'] === 'Custom UI',
+  'a chosen UI font overrides the default stack',
+);
 assert(vars['--color-surface-overlay'], 'compiler emits surface-overlay for popover chrome');
 const lightVars = compileThemeChrome(createDefaultChromeThemes().light, 'light');
 assert(lightVars['--color-surface-overlay'], 'light compiler emits surface-overlay');
@@ -109,7 +126,11 @@ assert(
 const effortPopupSource = scriptRead('src/renderer/features/composer/ComposerModelEffortPanel.tsx');
 {
   // The last row must clear the popup radius: the list's bottom padding is at least --space-2.
-  const listPadding = composerChromeSource.match(/\.composer-model-list \{[^}]*?\bpadding:\s*([^;]+);/u)?.[1].trim().split(/\s+/u) ?? [];
+  const listPadding =
+    composerChromeSource
+      .match(/\.composer-model-list \{[^}]*?\bpadding:\s*([^;]+);/u)?.[1]
+      .trim()
+      .split(/\s+/u) ?? [];
   const bottom = listPadding[listPadding.length === 4 || listPadding.length === 3 ? 2 : 0];
   assert(
     /^var\(--space-(?:[2-9]|1[0-9])\)$/u.test(bottom ?? ''),
@@ -127,15 +148,32 @@ const mainTsx = scriptRead('src/renderer/main.tsx');
 assert(!mainTsx.includes('styles/tokens'), 'main.tsx must not import styles/tokens');
 
 const applyChromeThemeSource = scriptRead('src/renderer/app/theme/applyChromeTheme.ts');
-assert(!applyChromeThemeSource.includes("createElement('style')"), 'applyChromeTheme must not inject <style> textContent under CSP');
-assert(!applyChromeThemeSource.includes('.style.colorScheme'), 'applyChromeTheme must not set inline style attributes under style-src-attr none');
+assert(
+  !applyChromeThemeSource.includes("createElement('style')"),
+  'applyChromeTheme must not inject <style> textContent under CSP',
+);
+assert(
+  !applyChromeThemeSource.includes('.style.colorScheme'),
+  'applyChromeTheme must not set inline style attributes under style-src-attr none',
+);
 
 const appearanceSource = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearanceSettings.tsx');
-const appearanceChromeParts = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearanceChromeParts.tsx');
-assert(!appearanceSource.includes('appearance-preset-swatch'), 'Appearance must not keep a side-mounted preset Aa sibling');
-assert(!appearanceChromeParts.includes('appearance-preset-swatch'), 'Chrome parts must not keep a side-mounted preset Aa sibling');
+const appearanceChromeParts = scriptRead(
+  'src/renderer/features/settings/SettingsModal/sections/AppearanceChromeParts.tsx',
+);
+assert(
+  !appearanceSource.includes('appearance-preset-swatch'),
+  'Appearance must not keep a side-mounted preset Aa sibling',
+);
+assert(
+  !appearanceChromeParts.includes('appearance-preset-swatch'),
+  'Chrome parts must not keep a side-mounted preset Aa sibling',
+);
 // Both theme previews select one editor independently of the application display mode.
-assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AppearancePresetRow.tsx')), 'The preset-tile row that folded the editors away is retired');
+assert(
+  !fs.existsSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AppearancePresetRow.tsx')),
+  'The preset-tile row that folded the editors away is retired',
+);
 assert(!appearanceSource.includes('usePointerCursors'), 'The pointer cursor preference is retired');
 assert(!appearanceChromeParts.includes('function ColorField'), 'Appearance must not inline a private ColorField');
 assert(scriptExists('src/renderer/ui/ColorField.tsx'), 'shared ColorField component must exist');
@@ -148,10 +186,7 @@ assert(
   /\.color-field-hex\s*\{[^}]*width:\s*9\.5ch/.test(colorFieldCss),
   'ColorField hex input must stay compact (#RRGGBB width), not stretch full rail',
 );
-assert(
-  !/\.color-field-hex\s*\{[^}]*width:\s*100%/.test(colorFieldCss),
-  'ColorField hex must not use width: 100%',
-);
+assert(!/\.color-field-hex\s*\{[^}]*width:\s*100%/.test(colorFieldCss), 'ColorField hex must not use width: 100%');
 
 const dropdownCss = scriptRead('src/renderer/ui/Select/Select.css');
 const dropdownPrimitives = scriptRead('src/renderer/ui/Select/SelectPrimitives.tsx');
@@ -180,12 +215,21 @@ for (const file of [
   'src/renderer/features/settings/SettingsModal/sections/HooksSettings.tsx',
 ]) {
   const source = scriptRead(file);
-  assert(/<CopyDiagnosticsMenu\b|\buseCopyDiagnostics\(/.test(source) && !/SettingsDiagnostics|summary=\{labels\.diagnostics\}/.test(source),
-    `${file} must expose object diagnostics from its actions menu`);
+  assert(
+    /<CopyDiagnosticsMenu\b|\buseCopyDiagnostics\(/.test(source) &&
+      !/SettingsDiagnostics|summary=\{labels\.diagnostics\}/.test(source),
+    `${file} must expose object diagnostics from its actions menu`,
+  );
   assert(!/<details\b|<select\b/.test(source), `${file} must not restore native unstyled controls`);
 }
-assert(!scriptExists('designs/rdc-agent-design-system/Design System Preview.html'), 'Duplicated HTML preview must remain retired');
+assert(
+  !scriptExists('designs/rdc-agent-design-system/Design System Preview.html'),
+  'Duplicated HTML preview must remain retired',
+);
 const settingsShell = scriptRead('src/renderer/features/settings/SettingsModal/sections/settings-shell.css');
-assert(!settingsShell.includes('aspect-ratio') && !/height:[^;]*100vw/.test(settingsShell), 'Settings height must be independent of width');
+assert(
+  !settingsShell.includes('aspect-ratio') && !/height:[^;]*100vw/.test(settingsShell),
+  'Settings height must be independent of width',
+);
 
 console.log('check:appearance passed');

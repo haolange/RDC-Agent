@@ -24,13 +24,7 @@ function tempRoot(prefix: string): string {
 }
 
 function caseYaml(caseId: string, title: string, extra = 'darker than reference'): string {
-  return [
-    `case_id: ${caseId}`,
-    `title: ${title}`,
-    'meta:',
-    '  status: fixed',
-    `symptoms: ${extra}`,
-  ].join('\n');
+  return [`case_id: ${caseId}`, `title: ${title}`, 'meta:', '  status: fixed', `symptoms: ${extra}`].join('\n');
 }
 
 function packageYaml(titles: string[]): string {
@@ -132,13 +126,20 @@ describe('KnowledgeImportService', () => {
     const importer = createDisposableImportService({ spaceRoot });
     await importer.importToSpace({ spaceId: 'user', source: caseYaml('kept-case', 'Kept', 'first symptoms') });
     const before = readdirSync(path.join(spaceRoot, 'cases')).sort();
-    const changed = await importer.previewImport({ spaceId: 'user', source: caseYaml('kept-case', 'Kept, edited', 'second symptoms') });
+    const changed = await importer.previewImport({
+      spaceId: 'user',
+      source: caseYaml('kept-case', 'Kept, edited', 'second symptoms'),
+    });
     expect(changed.items.map((item) => [item.status, item.reason])).toEqual([['conflict', 'duplicate-case-id']]);
     const fresh = await importer.previewImport({ spaceId: 'user', source: caseYaml('new-case', 'New card') });
-    expect(fresh.items.map((item) => [item.status, item.reason, item.record?.title])).toEqual([['draft', undefined, 'New card']]);
+    expect(fresh.items.map((item) => [item.status, item.reason, item.record?.title])).toEqual([
+      ['draft', undefined, 'New card'],
+    ]);
     expect(readdirSync(path.join(spaceRoot, 'cases')).sort()).toEqual(before);
     const imported = await importer.importToSpace({ spaceId: 'user', source: caseYaml('new-case', 'New card') });
-    expect(imported.items.map((item) => [item.status, item.reason])).toEqual(fresh.items.map((item) => [item.status, item.reason]));
+    expect(imported.items.map((item) => [item.status, item.reason])).toEqual(
+      fresh.items.map((item) => [item.status, item.reason]),
+    );
   });
 
   it('cancelled between cards, removes the cards it already wrote and leaves the space as it was', async () => {
@@ -150,13 +151,18 @@ describe('KnowledgeImportService', () => {
     const events: Array<{ phase: 'reading' | 'writing' | 'indexing'; done: number; total: number }> = [];
     const source = packageYaml(['One', 'Two', 'Three']);
 
-    await expect(importer.importToSpace({ spaceId: 'user', source }, {
-      signal: controller.signal,
-      onProgress: (phase, done, total) => {
-        events.push({ phase, done, total });
-        if (phase === 'writing' && done === 2) controller.abort(new AppError('KNOWLEDGE_OPERATION_CANCELLED'));
-      },
-    })).rejects.toMatchObject({ code: 'KNOWLEDGE_OPERATION_CANCELLED' });
+    await expect(
+      importer.importToSpace(
+        { spaceId: 'user', source },
+        {
+          signal: controller.signal,
+          onProgress: (phase, done, total) => {
+            events.push({ phase, done, total });
+            if (phase === 'writing' && done === 2) controller.abort(new AppError('KNOWLEDGE_OPERATION_CANCELLED'));
+          },
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_OPERATION_CANCELLED' });
 
     expect(cardFiles(spaceRoot)).toEqual(before);
     expectMonotonicProgress(events);
@@ -164,7 +170,11 @@ describe('KnowledgeImportService', () => {
     expect(events.at(-1)).toEqual({ phase: 'writing', done: 2, total: 3 });
     // Nothing was left half-imported: the same package imports whole afterwards.
     const again = await importer.importToSpace({ spaceId: 'user', source });
-    expect(again.items.map((item) => [item.status, item.reason])).toEqual([['draft', undefined], ['draft', undefined], ['draft', undefined]]);
+    expect(again.items.map((item) => [item.status, item.reason])).toEqual([
+      ['draft', undefined],
+      ['draft', undefined],
+      ['draft', undefined],
+    ]);
     expect(Object.keys(cardFiles(spaceRoot)).sort()).toEqual([
       path.join('cases', 'kept-case.md'),
       ...[0, 1, 2].map((index) => path.join('facts', `package-${index}.md`)),
@@ -197,17 +207,27 @@ describe('KnowledgeImportService', () => {
     const card = leftoverCard('mig-case', sourceHash);
     const sessionDir = path.join(sessionRoot, 'sess-mig');
     mkdirSync(sessionDir, { recursive: true });
-    writeFileSync(path.join(sessionDir, KNOWLEDGE_STATE_FILE), `${JSON.stringify({
-      schemaVersion: '1',
-      drafts: [{
-        revision: 1,
-        contentHash: hashKnowledgeContent(card),
-        card,
-        sourceHash,
-      }],
-      candidates: [],
-      reviews: [],
-    }, null, 2)}\n`, 'utf8');
+    writeFileSync(
+      path.join(sessionDir, KNOWLEDGE_STATE_FILE),
+      `${JSON.stringify(
+        {
+          schemaVersion: '1',
+          drafts: [
+            {
+              revision: 1,
+              contentHash: hashKnowledgeContent(card),
+              card,
+              sourceHash,
+            },
+          ],
+          candidates: [],
+          reviews: [],
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
     await importer.migrateSessionDrafts('sess-mig');
     expect(existsSync(path.join(spaceRoot, 'cases', 'mig-case.md'))).toBe(true);
     const persisted = JSON.parse(readFileSync(path.join(sessionDir, KNOWLEDGE_STATE_FILE), 'utf8')) as {
@@ -230,18 +250,30 @@ describe('KnowledgeImportService', () => {
     const card = leftoverCard('clash-case', leftoverHash);
     const sessionDir = path.join(sessionRoot, 'sess-clash');
     mkdirSync(sessionDir, { recursive: true });
-    writeFileSync(path.join(sessionDir, KNOWLEDGE_STATE_FILE), `${JSON.stringify({
-      schemaVersion: '1',
-      drafts: [{
-        revision: 1,
-        contentHash: hashKnowledgeContent(card),
-        card,
-        sourceHash: leftoverHash,
-      }],
-      candidates: [],
-      reviews: [],
-    }, null, 2)}\n`, 'utf8');
-    await expect(importer.migrateSessionDrafts('sess-clash')).rejects.toBeInstanceOf(KnowledgeDraftMigrationConflictError);
+    writeFileSync(
+      path.join(sessionDir, KNOWLEDGE_STATE_FILE),
+      `${JSON.stringify(
+        {
+          schemaVersion: '1',
+          drafts: [
+            {
+              revision: 1,
+              contentHash: hashKnowledgeContent(card),
+              card,
+              sourceHash: leftoverHash,
+            },
+          ],
+          candidates: [],
+          reviews: [],
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+    await expect(importer.migrateSessionDrafts('sess-clash')).rejects.toBeInstanceOf(
+      KnowledgeDraftMigrationConflictError,
+    );
     const persisted = JSON.parse(readFileSync(path.join(sessionDir, KNOWLEDGE_STATE_FILE), 'utf8')) as {
       schemaVersion: string;
       drafts: unknown[];

@@ -23,9 +23,10 @@ interface DefinitionActionsHost {
   show: (settings: AppSettings, confirmed?: boolean) => void;
 }
 
-const agentSaveOutcome = (save: Promise<AgentDefinitionSaveResult>): Promise<AgentDefinitionSaveResult> => save.then((result) => (
-  result.status === 'failed' ? Promise.reject(new Error(result.error ?? 'Agent definition save failed.')) : result
-));
+const agentSaveOutcome = (save: Promise<AgentDefinitionSaveResult>): Promise<AgentDefinitionSaveResult> =>
+  save.then((result) =>
+    result.status === 'failed' ? Promise.reject(new Error(result.error ?? 'Agent definition save failed.')) : result,
+  );
 
 /**
  * Agent definitions and provider model choices. Each Agent file (scope, project, id) and each provider's model
@@ -33,7 +34,12 @@ const agentSaveOutcome = (save: Promise<AgentDefinitionSaveResult>): Promise<Age
  * by it, the intent shows as a settings overlay until main answers, and main's commit folds into the confirmed
  * settings only when it is newer than the last one folded for that lane.
  */
-export function createSettingsDefinitionActions({ intents, viewSync, settings, show }: DefinitionActionsHost): Pick<
+export function createSettingsDefinitionActions({
+  intents,
+  viewSync,
+  settings,
+  show,
+}: DefinitionActionsHost): Pick<
   AppSettingsState,
   'saveAgentDefinition' | 'flushAgentDefinitionSaves' | 'saveProvider' | 'flushProviderSaves'
 > {
@@ -56,7 +62,8 @@ export function createSettingsDefinitionActions({ intents, viewSync, settings, s
         throw error;
       }
       const commit = result.status === 'committed' ? result : result.lastSuccessful;
-      const fold = commit && agentLanes.applyIfNewer(lane, commit.clientRevision) ? agentDefinitionCommit(agentId, commit) : null;
+      const fold =
+        commit && agentLanes.applyIfNewer(lane, commit.clientRevision) ? agentDefinitionCommit(agentId, commit) : null;
       show(intents.settle(intent.id, fold), true);
       if (result.status === 'failed' && agentLanes.isLatest(lane, request.clientRevision)) {
         throw new Error(result.error ?? 'Agent definition save failed.');
@@ -79,12 +86,17 @@ export function createSettingsDefinitionActions({ intents, viewSync, settings, s
       void providerLanes.track(lane, request.clientRevision, providerSaveOutcome(write));
       const result = await write.catch((error: unknown) => failedProviderSave(request, error));
       const commit = result.status === 'committed' ? result : result.lastSuccessful;
-      const fold = commit?.provider && providerLanes.applyIfNewer(lane, commit.clientRevision)
-        ? providerCommit(commit.provider) : null;
+      const fold =
+        commit?.provider && providerLanes.applyIfNewer(lane, commit.clientRevision)
+          ? providerCommit(commit.provider)
+          : null;
       show(intents.settle(intent.id, fold, result.revision), true);
       const current = settings().llm.providers.find((entry) => entry.id === provider.id);
-      if (!providerLanes.isLatest(lane, request.clientRevision)
-        || !current || providerConnectionIdentity(current) !== request.connectionIdentity) {
+      if (
+        !providerLanes.isLatest(lane, request.clientRevision) ||
+        !current ||
+        providerConnectionIdentity(current) !== request.connectionIdentity
+      ) {
         return { ...result, status: 'superseded' };
       }
       return result;

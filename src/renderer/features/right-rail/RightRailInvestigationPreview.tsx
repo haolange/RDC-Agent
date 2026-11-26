@@ -1,5 +1,9 @@
 import React from 'react';
-import { bareInvestigationHash, type InvestigationReadIpcResult, type InvestigationReport } from '@shared/types/renderdocInvestigation';
+import {
+  bareInvestigationHash,
+  type InvestigationReadIpcResult,
+  type InvestigationReport,
+} from '@shared/types/renderdocInvestigation';
 import { TaskDialog } from '../../ui/TaskDialog';
 import { Badge } from '../../ui/Badge';
 import { Skeleton } from '../../ui/Skeleton';
@@ -14,7 +18,6 @@ import type { InvestigationArtifactRow } from '@shared/types/trace';
 import './RightRailInvestigationPreview.css';
 
 type PreviewStatus = 'empty' | 'loading' | 'ready' | 'degraded' | 'error' | 'hash-mismatch';
-
 
 /** The sentence a non-report record is about: its statement or summary, whichever it carries. */
 const recordText = (record: unknown): string => {
@@ -38,13 +41,29 @@ export const RightRailInvestigationPreview: React.FC<{
   const read = useAsyncValue(
     row.contentHash ? JSON.stringify([sessionId, row.artifactId, row.contentHash]) : null,
     async (): Promise<InvestigationReadIpcResult> => {
-      const payload = await readInvestigationArtifact({ sessionId, artifactId: row.artifactId, expectedHash: row.contentHash! });
-      return payload ?? { ok: false, status: 'error', errorCode: 'INVESTIGATION_SESSION_DENIED', error: 'investigation:read is unavailable' };
+      const payload = await readInvestigationArtifact({
+        sessionId,
+        artifactId: row.artifactId,
+        expectedHash: row.contentHash!,
+      });
+      return (
+        payload ?? {
+          ok: false,
+          status: 'error',
+          errorCode: 'INVESTIGATION_SESSION_DENIED',
+          error: 'investigation:read is unavailable',
+        }
+      );
     },
   );
-  const result: InvestigationReadIpcResult | null = read.status === 'ready' ? read.value
-    : read.status === 'error' ? { ok: false, status: 'error', error: errorDetail(read.error) } : null;
-  const status: PreviewStatus = read.status === 'idle' ? 'empty' : read.status === 'loading' ? 'loading' : result!.status;
+  const result: InvestigationReadIpcResult | null =
+    read.status === 'ready'
+      ? read.value
+      : read.status === 'error'
+        ? { ok: false, status: 'error', error: errorDetail(read.error) }
+        : null;
+  const status: PreviewStatus =
+    read.status === 'idle' ? 'empty' : read.status === 'loading' ? 'loading' : result!.status;
 
   const hash = result?.contentHash || row.contentHash;
   const manifest = result?.manifest;
@@ -54,29 +73,49 @@ export const RightRailInvestigationPreview: React.FC<{
   const statement = manifest?.kind === 'report' ? '' : recordText(result?.record);
   const bareHash = bareInvestigationHash(hash);
 
-  return <TaskDialog open title={heading} onClose={onClose} closeLabel={t('control.rightRail.artifacts.preview.close')}
-    size={row.kind === 'report' ? 'lg' : 'md'} dataTestId="investigation-preview" className="investigation-preview-content">
-    <div className="investigation-preview-status">
-      <Badge variant="outline">{t(`control.rightRail.artifacts.status.${recordStatus}` as TranslationKey)}</Badge>
-    </div>
-    {integrityFailed ? (
-      <InlineError data-testid="investigation-preview-integrity" detail={result?.error}>
-        {t(status === 'hash-mismatch' ? 'control.rightRail.artifacts.preview.integrity.hashMismatch' : 'control.rightRail.artifacts.preview.integrity.degraded')}
-      </InlineError>
-    ) : null}
-    {status === 'error' ? <InlineError detail={result?.error}>{t('app.error.loadFailed')}</InlineError> : null}
-    {status === 'loading' ? <Skeleton count={4} /> : null}
-    {status === 'empty' ? <p className="investigation-preview-message">{t('control.rightRail.artifacts.preview.empty')}</p> : null}
-    {result?.record && manifest?.kind === 'report' ? <RightRailReportView report={result.record as InvestigationReport} /> : null}
-    {statement ? <p className="investigation-preview-statement">{statement}</p> : null}
-    <CopyDiagnosticsButton className="investigation-preview-copy-diagnostics" facts={[
-      { label: 'ID', value: row.artifactId },
-      { label: t('control.rightRail.artifacts.preview.hash'), value: bareHash ? `sha256:${bareHash}` : null },
-      { label: t('control.rightRail.artifacts.preview.version'), value: manifest?.createdAt ?? row.createdAt },
-      { label: t('control.rightRail.artifacts.preview.stateLabel'), value: status },
-      { label: t('control.rightRail.artifacts.preview.supersedes'), value: manifest?.supersedes },
-    ]} />
-  </TaskDialog>;
+  return (
+    <TaskDialog
+      open
+      title={heading}
+      onClose={onClose}
+      closeLabel={t('control.rightRail.artifacts.preview.close')}
+      size={row.kind === 'report' ? 'lg' : 'md'}
+      dataTestId="investigation-preview"
+      className="investigation-preview-content"
+    >
+      <div className="investigation-preview-status">
+        <Badge variant="outline">{t(`control.rightRail.artifacts.status.${recordStatus}` as TranslationKey)}</Badge>
+      </div>
+      {integrityFailed ? (
+        <InlineError data-testid="investigation-preview-integrity" detail={result?.error}>
+          {t(
+            status === 'hash-mismatch'
+              ? 'control.rightRail.artifacts.preview.integrity.hashMismatch'
+              : 'control.rightRail.artifacts.preview.integrity.degraded',
+          )}
+        </InlineError>
+      ) : null}
+      {status === 'error' ? <InlineError detail={result?.error}>{t('app.error.loadFailed')}</InlineError> : null}
+      {status === 'loading' ? <Skeleton count={4} /> : null}
+      {status === 'empty' ? (
+        <p className="investigation-preview-message">{t('control.rightRail.artifacts.preview.empty')}</p>
+      ) : null}
+      {result?.record && manifest?.kind === 'report' ? (
+        <RightRailReportView report={result.record as InvestigationReport} />
+      ) : null}
+      {statement ? <p className="investigation-preview-statement">{statement}</p> : null}
+      <CopyDiagnosticsButton
+        className="investigation-preview-copy-diagnostics"
+        facts={[
+          { label: 'ID', value: row.artifactId },
+          { label: t('control.rightRail.artifacts.preview.hash'), value: bareHash ? `sha256:${bareHash}` : null },
+          { label: t('control.rightRail.artifacts.preview.version'), value: manifest?.createdAt ?? row.createdAt },
+          { label: t('control.rightRail.artifacts.preview.stateLabel'), value: status },
+          { label: t('control.rightRail.artifacts.preview.supersedes'), value: manifest?.supersedes },
+        ]}
+      />
+    </TaskDialog>
+  );
 };
 
 export default RightRailInvestigationPreview;

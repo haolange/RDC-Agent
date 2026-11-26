@@ -29,14 +29,10 @@ export function useComposerEffectiveModel(agentId: string, currentSession: Sessi
   const projectId = useProjectStore((state) => state.currentProject?.projectId ?? null);
   const agentRoute = useAppSettingsStore((state) => readCompiledComposerRoute(state.settings, agentId));
   const draftScope = composerNoSessionScopeKey(projectId);
-  const draftModel = useComposerModelDraftStore((state) => (
-    currentSession ? null : (state.draftByScope[draftScope] ?? null)
-  ));
-  const effective = resolveComposerEffectiveModel(
-    currentSession?.modelOverride,
-    draftModel,
-    agentRoute,
+  const draftModel = useComposerModelDraftStore((state) =>
+    currentSession ? null : (state.draftByScope[draftScope] ?? null),
   );
+  const effective = resolveComposerEffectiveModel(currentSession?.modelOverride, draftModel, agentRoute);
   return {
     effective,
     hasChoice: hasComposerModelChoice(currentSession?.modelOverride, draftModel),

@@ -1,21 +1,22 @@
 import type { ReasoningControl, ResolvedReasoningSelection } from './modelCapability';
 import type { ProviderAdapterId } from '../provider-catalog/implementationRegistry';
 import type { JsonObject, JsonValue } from '../utils/jsonValue';
-import type { BooleanControlDefinition, ExecutionBinding, ModelCost, ModelPresencePolicy, ProviderContractBundle } from '../provider-catalog/modelManifestSchema';
+import type {
+  BooleanControlDefinition,
+  ExecutionBinding,
+  ModelCost,
+  ModelPresencePolicy,
+  ProviderContractBundle,
+} from '../provider-catalog/modelManifestSchema';
 import type { LlmProviderProtocol } from './settings';
 
 export type EntitlementState = 'granted' | 'denied' | 'unknown';
 export type EffectiveAvailability = 'available' | 'unavailable' | 'unknown';
 
-export type CapabilityState =
-  | { state: 'supported' }
-  | { state: 'unsupported'; reason?: string }
-  | { state: 'unknown' };
+export type CapabilityState = { state: 'supported' } | { state: 'unsupported'; reason?: string } | { state: 'unknown' };
 
 type TierActivation =
-  | { kind: 'implicit' }
-  | { kind: 'header'; headers: Record<string, string> }
-  | { kind: 'body'; patch: JsonObject };
+  { kind: 'implicit' } | { kind: 'header'; headers: Record<string, string> } | { kind: 'body'; patch: JsonObject };
 
 export interface ContextTier {
   id: string;
@@ -59,13 +60,7 @@ export interface ModelSelection {
 export type ControlDefinition = BooleanControlDefinition;
 export type ExecutionBindingDefinition = ExecutionBinding;
 
-type ResolvedControlState =
-  | 'selectable'
-  | 'fixed'
-  | 'blocked'
-  | 'unsupported'
-  | 'unknown'
-  | 'provider-managed';
+type ResolvedControlState = 'selectable' | 'fixed' | 'blocked' | 'unsupported' | 'unknown' | 'provider-managed';
 
 export interface ResolvedBooleanControlCapability {
   state: ResolvedControlState;
@@ -94,13 +89,7 @@ export interface ExecutionBindingResolution {
 }
 
 export type CapabilityEvidenceSource =
-  | 'catalog'
-  | 'discovery'
-  | 'overlay'
-  | 'entitlement'
-  | 'observed'
-  | 'maintained-surface'
-  | 'user';
+  'catalog' | 'discovery' | 'overlay' | 'entitlement' | 'observed' | 'maintained-surface' | 'user';
 
 export interface CapabilityEvidence {
   field: string;
@@ -257,11 +246,7 @@ interface StreamingPlan {
 }
 
 export type ContextTransitionStrategy =
-  | 'exact-continuation'
-  | 'provider-managed'
-  | 'semantic-replay'
-  | 'structured-handoff'
-  | 'fresh-chain';
+  'exact-continuation' | 'provider-managed' | 'semantic-replay' | 'structured-handoff' | 'fresh-chain';
 
 export interface ContextTransitionPlan {
   strategy: ContextTransitionStrategy;
@@ -330,7 +315,4 @@ export interface RequestPlan {
 }
 
 export type RequestPlanningErrorCode =
-  | 'MODEL_UNAVAILABLE'
-  | 'NO_USABLE_CONTEXT_TIER'
-  | 'PLAN_CONFLICT'
-  | 'CONSTRAINT_REJECTED';
+  'MODEL_UNAVAILABLE' | 'NO_USABLE_CONTEXT_TIER' | 'PLAN_CONFLICT' | 'CONSTRAINT_REJECTED';

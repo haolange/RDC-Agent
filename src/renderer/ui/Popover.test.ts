@@ -8,30 +8,51 @@ let host: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([new DOMRect(0, 0, 40, 20)] as unknown as DOMRectList);
-  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([
+    new DOMRect(0, 0, 40, 20),
+  ] as unknown as DOMRectList);
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
 });
-afterEach(() => { act(() => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  act(() => root.unmount());
+  host.remove();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 function Sample({ label }: { label?: string }) {
   const [open, setOpen] = useState(false);
-  return createElement('div', {},
+  return createElement(
+    'div',
+    {},
     createElement(Popover, {
-      open, onOpenChange: setOpen, label,
+      open,
+      onOpenChange: setOpen,
+      label,
       trigger: createElement('button', { type: 'button' }, 'Filters'),
-      children: [createElement('button', { key: 'one', id: 'one' }, 'One'), createElement('button', { key: 'two', id: 'two' }, 'Two')],
+      children: [
+        createElement('button', { key: 'one', id: 'one' }, 'One'),
+        createElement('button', { key: 'two', id: 'two' }, 'Two'),
+      ],
     }),
-    createElement('button', { id: 'after' }, 'After'));
+    createElement('button', { id: 'after' }, 'After'),
+  );
 }
 
-const tab = (target: Element, shiftKey = false) => act(() => {
-  target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true }));
-});
+const tab = (target: Element, shiftKey = false) =>
+  act(() => {
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true }));
+  });
 
 it('is a named dialog that takes focus on open and joins the Tab order right after its trigger', () => {
   act(() => root.render(createElement(Sample)));
   const trigger = host.querySelector('button')!;
-  act(() => { trigger.focus(); trigger.click(); });
+  act(() => {
+    trigger.focus();
+    trigger.click();
+  });
   const dialog = document.querySelector<HTMLElement>('.ui-popover')!;
   expect(dialog.getAttribute('role')).toBe('dialog');
   expect(dialog.getAttribute('aria-labelledby')).toBe(trigger.id);

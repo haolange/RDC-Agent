@@ -126,8 +126,11 @@ export function translateCoreToSharedAgentEvent(
           'assistant.completed',
           {
             text,
-            textItems: event.message.content.flatMap((block) => block.type === 'text' && block.providerOutputRef
-              ? [{ text: block.text, phase: block.phase, providerOutputRef: { ...block.providerOutputRef } }] : []),
+            textItems: event.message.content.flatMap((block) =>
+              block.type === 'text' && block.providerOutputRef
+                ? [{ text: block.text, phase: block.phase, providerOutputRef: { ...block.providerOutputRef } }]
+                : [],
+            ),
             thinking: thinking.length > 0 ? thinking : undefined,
             providerOutputRefs: extractAssistantTextOutputRefs(event.message.content),
             stopReason: mapCoreStopReasonToShared(event.message.stopReason),
@@ -244,11 +247,7 @@ export function translateCoreToSharedAgentEvent(
     }
     case 'compaction': {
       const { type: _type, ...progress } = event;
-      return buildSharedAgentEvent(
-        'context.compacted',
-        progress,
-        context,
-      );
+      return buildSharedAgentEvent('context.compacted', progress, context);
     }
     case 'diagnostic': {
       return buildSharedAgentEvent(
@@ -286,19 +285,33 @@ function translateAssistantMessageEvent(
         context,
       );
     case 'text_end':
-      return buildSharedAgentEvent('assistant.text_end', {
-        text: ev.content, phase: ev.phase, providerOutputRef: { ...ev.providerOutputRef },
-      }, context);
+      return buildSharedAgentEvent(
+        'assistant.text_end',
+        {
+          text: ev.content,
+          phase: ev.phase,
+          providerOutputRef: { ...ev.providerOutputRef },
+        },
+        context,
+      );
     case 'thinking_delta':
       return buildSharedAgentEvent(
         'assistant.thinking_delta',
-        { text: ev.delta, thinking: toSharedThinkingArtifact(ev.thinking), providerOutputRef: { ...ev.providerOutputRef } },
+        {
+          text: ev.delta,
+          thinking: toSharedThinkingArtifact(ev.thinking),
+          providerOutputRef: { ...ev.providerOutputRef },
+        },
         context,
       );
     case 'thinking_end':
       return buildSharedAgentEvent(
         'assistant.thinking_end',
-        { text: ev.content, thinking: toSharedThinkingArtifact(ev.thinking), providerOutputRef: { ...ev.providerOutputRef } },
+        {
+          text: ev.content,
+          thinking: toSharedThinkingArtifact(ev.thinking),
+          providerOutputRef: { ...ev.providerOutputRef },
+        },
         context,
       );
     case 'toolcall_end': {
@@ -388,9 +401,7 @@ function extractAssistantTextOutputRefs(
 }
 
 function extractAssistantThinkingFromContent(content: AssistantMessage['content']): ThinkingArtifact[] {
-  return content
-    .filter(isThinkingContent)
-    .map((block) => toSharedThinkingArtifact(block));
+  return content.filter(isThinkingContent).map((block) => toSharedThinkingArtifact(block));
 }
 
 function isThinkingContent(block: AssistantMessage['content'][number]): block is ThinkingContent {
@@ -399,11 +410,14 @@ function isThinkingContent(block: AssistantMessage['content'][number]): block is
 
 function toRecordDetails(details: unknown): Record<string, unknown> | undefined {
   return details && typeof details === 'object' && !Array.isArray(details)
-    ? details as Record<string, unknown>
+    ? (details as Record<string, unknown>)
     : undefined;
 }
 
-export function toolResultToSharedResult(result: ToolResultMessage, durationMs: number): import('@shared/types/tool').ToolCallResult {
+export function toolResultToSharedResult(
+  result: ToolResultMessage,
+  durationMs: number,
+): import('@shared/types/tool').ToolCallResult {
   if (result.isError) {
     return {
       ok: false,

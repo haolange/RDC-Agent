@@ -25,9 +25,8 @@ export const skillsCommand: CommandDefinition = {
       };
     }
     const action = args[0];
-    const resolveSkill = (rawId: string) => skills.find((entry) => (
-      entry.id === rawId || entry.name === rawId || entry.label === rawId
-    ));
+    const resolveSkill = (rawId: string) =>
+      skills.find((entry) => entry.id === rawId || entry.name === rawId || entry.label === rawId);
     if (action === 'run') {
       const skillId = args[1] ?? '';
       const skill = resolveSkill(skillId);

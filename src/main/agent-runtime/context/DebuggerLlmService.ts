@@ -56,10 +56,7 @@ export interface RunLlmExecutionSummary {
   }>;
 }
 
-const NON_OCCUPYING_BREAKDOWN_IDS = new Set<ContextUsageBreakdownId>([
-  'mcp_tools_deferred',
-  'builtin_tools_deferred',
-]);
+const NON_OCCUPYING_BREAKDOWN_IDS = new Set<ContextUsageBreakdownId>(['mcp_tools_deferred', 'builtin_tools_deferred']);
 
 function buildScaledBreakdown(
   raw: ContextUsageBreakdownEntry[] | null,
@@ -76,11 +73,13 @@ function buildScaledBreakdown(
     tokens: Math.max(0, Math.round(entry.tokens * scaleFactor)),
     ...(entry.count !== undefined ? { count: entry.count } : {}),
   }));
-  scaled.push(...passthrough.map((entry) => ({
-    id: entry.id,
-    tokens: Math.max(0, entry.tokens),
-    ...(entry.count !== undefined ? { count: entry.count } : {}),
-  })));
+  scaled.push(
+    ...passthrough.map((entry) => ({
+      id: entry.id,
+      tokens: Math.max(0, entry.tokens),
+      ...(entry.count !== undefined ? { count: entry.count } : {}),
+    })),
+  );
   if (promptBudgetTokens) {
     scaled.push({ id: 'free', tokens: Math.max(0, promptBudgetTokens - occupiedTokens) });
   }
@@ -108,7 +107,6 @@ function hasMaterialProviderUsageTelemetry(usage: {
     usage.cost?.total,
   ].some((value) => typeof value === 'number' && value > 0);
 }
-
 
 function isSubagentSessionId(sessionId: string | null | undefined): boolean {
   return Boolean(sessionId && isSubagentScopeId(sessionId));
@@ -179,7 +177,8 @@ export class DebuggerLlmService {
     cost?: LlmUsageCost;
     precomputedBreakdown: ContextUsageBreakdownEntry[];
   }): void {
-    if (!params.sessionId || isSubagentSessionId(params.sessionId) || !hasMaterialProviderUsageTelemetry(params)) return;
+    if (!params.sessionId || isSubagentSessionId(params.sessionId) || !hasMaterialProviderUsageTelemetry(params))
+      return;
     const key = params.runId ?? params.turnId;
     const existing = this.runSummaries.get(key) ?? {
       providerId: params.providerId,
@@ -203,8 +202,7 @@ export class DebuggerLlmService {
     if (typeof params.cacheWriteTokens === 'number') {
       existing.totalCacheWriteTokens = (existing.totalCacheWriteTokens ?? 0) + params.cacheWriteTokens;
     }
-    const hasCacheStats = typeof params.cacheHitTokens === 'number'
-      || typeof params.cacheMissTokens === 'number';
+    const hasCacheStats = typeof params.cacheHitTokens === 'number' || typeof params.cacheMissTokens === 'number';
     if (hasCacheStats) {
       const hit = params.cacheHitTokens ?? 0;
       const miss = params.cacheMissTokens ?? 0;
@@ -256,8 +254,8 @@ export class DebuggerLlmService {
     const maxOutputTokens = planning.ok ? planning.plan.maxOutputTokens : null;
     const compactionThresholdTokens = planning.ok ? planning.plan.compactionThresholdTokens : null;
     const occupiedTokens = summary.lastOccupiedTokens ?? 0;
-    const hasCacheStats = typeof summary.totalCacheHitTokens === 'number'
-      || typeof summary.totalCacheMissTokens === 'number';
+    const hasCacheStats =
+      typeof summary.totalCacheHitTokens === 'number' || typeof summary.totalCacheMissTokens === 'number';
     const cacheHitTokens = hasCacheStats ? (summary.totalCacheHitTokens ?? 0) : undefined;
     const cacheMissTokens = hasCacheStats ? (summary.totalCacheMissTokens ?? 0) : undefined;
     const lastHit = summary.lastTurnCacheHitTokens;
@@ -265,12 +263,8 @@ export class DebuggerLlmService {
     const hasLastTurnCache = typeof lastHit === 'number' || typeof lastMiss === 'number';
     const lastTurnHit = hasLastTurnCache ? (lastHit ?? 0) : undefined;
     const lastTurnMiss = hasLastTurnCache ? (lastMiss ?? 0) : undefined;
-    const lastTurnRate = hasLastTurnCache
-      ? cacheHitRatePercent(lastTurnHit ?? 0, lastTurnMiss ?? 0)
-      : undefined;
-    const cumulativeRate = hasCacheStats
-      ? cacheHitRatePercent(cacheHitTokens ?? 0, cacheMissTokens ?? 0)
-      : undefined;
+    const lastTurnRate = hasLastTurnCache ? cacheHitRatePercent(lastTurnHit ?? 0, lastTurnMiss ?? 0) : undefined;
+    const cumulativeRate = hasCacheStats ? cacheHitRatePercent(cacheHitTokens ?? 0, cacheMissTokens ?? 0) : undefined;
     return {
       runId: key,
       providerId: summary.providerId,
@@ -282,9 +276,10 @@ export class DebuggerLlmService {
       contextWindowTokens,
       maxOutputTokens,
       compactionThresholdTokens,
-      usagePercent: promptBudgetTokens > 0
-        ? Math.min(100, Math.max(0, Math.round((occupiedTokens / promptBudgetTokens) * 100)))
-        : 0,
+      usagePercent:
+        promptBudgetTokens > 0
+          ? Math.min(100, Math.max(0, Math.round((occupiedTokens / promptBudgetTokens) * 100)))
+          : 0,
       occupiedTokens,
       breakdown: buildScaledBreakdown(summary.lastPromptBreakdown ?? null, occupiedTokens, promptBudgetTokens || null),
       snapshotAt: summary.lastSnapshotAt ?? null,
@@ -304,17 +299,20 @@ export class DebuggerLlmService {
   }
 
   private resolveSessionTurnControls(summary: RunLlmExecutionSummary): ConversationTurnControls | null {
-    return summary.sessionId ? sessionRecordStore.readSession(summary.sessionId)?.turnControls ?? null : null;
+    return summary.sessionId ? (sessionRecordStore.readSession(summary.sessionId)?.turnControls ?? null) : null;
   }
 
   private broadcastRunUsage(summary: RunLlmExecutionSummary, usage: RunContextUsageSummary): void {
     if (!summary.sessionId) return;
     const session = sessionRecordStore.readSession(summary.sessionId);
     if (!session) return;
-    workflowProjectionPublisher.publishRunUsage({
-      projectId: session.projectId,
-      sessionId: session.sessionId,
-    }, usage);
+    workflowProjectionPublisher.publishRunUsage(
+      {
+        projectId: session.projectId,
+        sessionId: session.sessionId,
+      },
+      usage,
+    );
   }
 }
 

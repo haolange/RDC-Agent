@@ -10,8 +10,14 @@ describe('fetchRemoteImage', () => {
   });
 
   it('refuses private and local hosts', async () => {
-    await expect(fetchRemoteImage('https://127.0.0.1/a.png')).resolves.toEqual({ dataUrl: null, error: 'REMOTE_IMAGE_URL_DENIED' });
-    await expect(fetchRemoteImage('https://localhost/a.png')).resolves.toEqual({ dataUrl: null, error: 'REMOTE_IMAGE_URL_DENIED' });
+    await expect(fetchRemoteImage('https://127.0.0.1/a.png')).resolves.toEqual({
+      dataUrl: null,
+      error: 'REMOTE_IMAGE_URL_DENIED',
+    });
+    await expect(fetchRemoteImage('https://localhost/a.png')).resolves.toEqual({
+      dataUrl: null,
+      error: 'REMOTE_IMAGE_URL_DENIED',
+    });
   });
 });
 

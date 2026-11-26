@@ -25,7 +25,9 @@ export async function createExternalCaptureReference(filePath: string): Promise<
     const header = Buffer.alloc(4);
     const { bytesRead } = await handle.read(header, 0, 4, 0);
     if (bytesRead !== 4 || header.toString('ascii') !== 'RDOC') throw new AppError('CAPTURE_REFERENCE_INVALID_RDC');
-  } finally { await handle.close(); }
+  } finally {
+    await handle.close();
+  }
   const hashed = await hashCaptureFile(canonical);
   const after = await openedFileIdentity(canonical);
   if (before.dev !== after.dev || before.ino !== after.ino || before.ctimeNs !== after.ctimeNs) {
@@ -33,10 +35,18 @@ export async function createExternalCaptureReference(filePath: string): Promise<
   }
   return {
     inputId: `reference_${createHash('sha256').update(canonical).digest('hex').slice(0, 24)}`,
-    source: 'external_reference', filePath: canonical, fileName: path.basename(canonical),
-    discoveredAt: Date.now(), lastModifiedAt: hashed.mtimeMs, size: hashed.size,
+    source: 'external_reference',
+    filePath: canonical,
+    fileName: path.basename(canonical),
+    discoveredAt: Date.now(),
+    lastModifiedAt: hashed.mtimeMs,
+    size: hashed.size,
     contentSha256: hashed.sha256,
-    referenceIdentity: { device: after.dev.toString(), inode: after.ino.toString(), birthtimeNs: after.birthtimeNs.toString() },
+    referenceIdentity: {
+      device: after.dev.toString(),
+      inode: after.ino.toString(),
+      birthtimeNs: after.birthtimeNs.toString(),
+    },
   };
 }
 
@@ -45,10 +55,13 @@ export async function verifyExternalCaptureReference(input: ProjectInputRecord):
     throw new AppError('CAPTURE_REFERENCE_INVALID_RECORD');
   }
   const current = await createExternalCaptureReference(input.filePath);
-  if (current.filePath !== input.filePath || current.contentSha256 !== input.contentSha256
-    || current.referenceIdentity?.device !== input.referenceIdentity.device
-    || current.referenceIdentity.inode !== input.referenceIdentity.inode
-    || current.referenceIdentity.birthtimeNs !== input.referenceIdentity.birthtimeNs) {
+  if (
+    current.filePath !== input.filePath ||
+    current.contentSha256 !== input.contentSha256 ||
+    current.referenceIdentity?.device !== input.referenceIdentity.device ||
+    current.referenceIdentity.inode !== input.referenceIdentity.inode ||
+    current.referenceIdentity.birthtimeNs !== input.referenceIdentity.birthtimeNs
+  ) {
     throw new AppError('CAPTURE_REFERENCE_CHANGED', 'explicitly register the current file again.');
   }
   return { ...current, inputId: input.inputId, discoveredAt: input.discoveredAt };

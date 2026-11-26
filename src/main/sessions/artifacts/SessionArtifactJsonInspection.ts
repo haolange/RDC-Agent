@@ -3,7 +3,12 @@ import { SessionArtifactError } from './sessionArtifactContract';
 import { isSessionArtifactizedEnvelope } from './sessionArtifactContract';
 
 export interface ArtifactJsonInspection {
-  layers: Array<{ kind: 'file' | 'json-chunks' | 'json-text' | 'json-string'; pointer?: string; bytes: number; sha256: string }>;
+  layers: Array<{
+    kind: 'file' | 'json-chunks' | 'json-text' | 'json-string';
+    pointer?: string;
+    bytes: number;
+    sha256: string;
+  }>;
   rootType: string;
   nodeCount: number;
   numberCount: number;
@@ -14,24 +19,42 @@ export interface ArtifactJsonInspection {
 }
 
 function parse(text: string, layer: string): unknown {
-  try { return JSON.parse(text); } catch {
+  try {
+    return JSON.parse(text);
+  } catch {
     throw new SessionArtifactError('ARTIFACT_JSON_INVALID', `JSON layer ${layer} is not valid JSON.`);
   }
 }
 
 function digest(kind: ArtifactJsonInspection['layers'][number]['kind'], bytes: Buffer, pointer?: string) {
-  return { kind, ...(pointer === undefined ? {} : { pointer }), bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
+  return {
+    kind,
+    ...(pointer === undefined ? {} : { pointer }),
+    bytes: bytes.length,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+  };
 }
 
 function selectText(value: unknown, pointer: string): string {
-  if (typeof pointer !== 'string' || pointer.length > 256 || (pointer !== '' && !pointer.startsWith('/')) || /~(?:[^01]|$)/.test(pointer)) {
-    throw new SessionArtifactError('ARTIFACT_JSON_POINTER_INVALID', 'Use an RFC 6901 pointer of at most 256 characters.');
+  if (
+    typeof pointer !== 'string' ||
+    pointer.length > 256 ||
+    (pointer !== '' && !pointer.startsWith('/')) ||
+    /~(?:[^01]|$)/.test(pointer)
+  ) {
+    throw new SessionArtifactError(
+      'ARTIFACT_JSON_POINTER_INVALID',
+      'Use an RFC 6901 pointer of at most 256 characters.',
+    );
   }
   let current = value;
   for (const segment of pointer === '' ? [] : pointer.slice(1).split('/')) {
     const key = segment.replace(/~1/g, '/').replace(/~0/g, '~');
     if (!current || typeof current !== 'object' || !Object.hasOwn(current, key)) {
-      throw new SessionArtifactError('ARTIFACT_JSON_POINTER_INVALID', 'The pointer does not select an own JSON property.');
+      throw new SessionArtifactError(
+        'ARTIFACT_JSON_POINTER_INVALID',
+        'The pointer does not select an own JSON property.',
+      );
     }
     current = (current as Record<string, unknown>)[key];
   }
@@ -52,7 +75,12 @@ function decodeArtifactJson(bytes: Buffer, textPointers: string[]) {
   }
   let value = parse(text, 'file');
   const layers = [digest('file', bytes)];
-  if (value && typeof value === 'object' && !Array.isArray(value) && (value as Record<string, unknown>).encoding === 'json-chunks') {
+  if (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (value as Record<string, unknown>).encoding === 'json-chunks'
+  ) {
     const chunks = (value as Record<string, unknown>).chunks;
     if (!Array.isArray(chunks) || !chunks.every((chunk) => typeof chunk === 'string')) {
       throw new SessionArtifactError('ARTIFACT_JSON_INVALID', 'The json-chunks envelope contains invalid chunks.');
@@ -62,8 +90,10 @@ function decodeArtifactJson(bytes: Buffer, textPointers: string[]) {
     layers.push(digest('json-chunks', Buffer.from(joined, 'utf8')));
   }
   const details = isSessionArtifactizedEnvelope(value) ? value.details : null;
-  const sourceResultTruncated = details && typeof details === 'object' && 'truncated' in details && typeof details.truncated === 'boolean'
-    ? details.truncated : undefined;
+  const sourceResultTruncated =
+    details && typeof details === 'object' && 'truncated' in details && typeof details.truncated === 'boolean'
+      ? details.truncated
+      : undefined;
   for (const [index, pointer] of textPointers.entries()) {
     const selected = selectText(value, pointer);
     value = parse(selected, `text pointer ${index + 1}`);
@@ -81,33 +111,59 @@ export interface ArtifactJsonTextView {
 }
 
 /** Select plain string data after the same bounded JSON decoding used by inspection. */
-export function readArtifactJsonText(bytes: Buffer, textPointers: string[], pointer: string): { text: string; view: ArtifactJsonTextView } {
+export function readArtifactJsonText(
+  bytes: Buffer,
+  textPointers: string[],
+  pointer: string,
+): { text: string; view: ArtifactJsonTextView } {
   const decoded = decodeArtifactJson(bytes, textPointers);
   const text = selectText(decoded.value, pointer);
   const selected = Buffer.from(text, 'utf8');
-  if (selected.toString('utf8') !== text) throw new SessionArtifactError('ARTIFACT_JSON_INVALID', 'Selected text contains invalid Unicode.');
+  if (selected.toString('utf8') !== text)
+    throw new SessionArtifactError('ARTIFACT_JSON_INVALID', 'Selected text contains invalid Unicode.');
   const layer = digest('json-string', selected, pointer);
-  return { text, view: { pointer, sha256: layer.sha256, bytes: layer.bytes,
-    layers: [...decoded.layers, layer],
-    ...(decoded.sourceResultTruncated === undefined ? {} : { sourceResultTruncated: decoded.sourceResultTruncated }),
-  } };
+  return {
+    text,
+    view: {
+      pointer,
+      sha256: layer.sha256,
+      bytes: layer.bytes,
+      layers: [...decoded.layers, layer],
+      ...(decoded.sourceResultTruncated === undefined ? {} : { sourceResultTruncated: decoded.sourceResultTruncated }),
+    },
+  };
 }
 
 /** Select the sole text block of a recognized tool result for ordinary search. */
 export function readDefaultToolResultText(bytes: Buffer): { text: string; view: ArtifactJsonTextView } | undefined {
   let outer: unknown;
-  try { outer = JSON.parse(bytes.toString('utf8')); } catch { return undefined; }
-  const chunked = outer && typeof outer === 'object' && !Array.isArray(outer)
-    && (outer as Record<string, unknown>).encoding === 'json-chunks';
+  try {
+    outer = JSON.parse(bytes.toString('utf8'));
+  } catch {
+    return undefined;
+  }
+  const chunked =
+    outer &&
+    typeof outer === 'object' &&
+    !Array.isArray(outer) &&
+    (outer as Record<string, unknown>).encoding === 'json-chunks';
   if (!chunked && !isSessionArtifactizedEnvelope(outer)) return undefined;
   const { value } = decodeArtifactJson(bytes, []);
   if (!isSessionArtifactizedEnvelope(value)) return undefined;
   const blocks = Array.isArray(value.content) ? value.content : [];
-  const indexes = blocks.flatMap((block, index) => block && typeof block === 'object'
-    && (block as Record<string, unknown>).type === 'text'
-    && typeof (block as Record<string, unknown>).text === 'string' ? [index] : []);
+  const indexes = blocks.flatMap((block, index) =>
+    block &&
+    typeof block === 'object' &&
+    (block as Record<string, unknown>).type === 'text' &&
+    typeof (block as Record<string, unknown>).text === 'string'
+      ? [index]
+      : [],
+  );
   if (indexes.length !== 1) {
-    throw new SessionArtifactError('ARTIFACT_JSON_POINTER_INVALID', 'Tool result has no unique text block; select one with textPointer.');
+    throw new SessionArtifactError(
+      'ARTIFACT_JSON_POINTER_INVALID',
+      'Tool result has no unique text block; select one with textPointer.',
+    );
   }
   return readArtifactJsonText(bytes, [], `/content/${indexes[0]}/text`);
 }
@@ -115,14 +171,20 @@ export function readDefaultToolResultText(bytes: Buffer): { text: string; view: 
 export function inspectArtifactJson(bytes: Buffer, textPointers: string[]): ArtifactJsonInspection {
   const { value, layers, sourceResultTruncated } = decodeArtifactJson(bytes, textPointers);
   const result: ArtifactJsonInspection = {
-    layers, rootType: value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value,
-    nodeCount: 0, numberCount: 0, nonFiniteNumberCount: 0, arrayCount: 0, arrayLengths: {},
+    layers,
+    rootType: value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value,
+    nodeCount: 0,
+    numberCount: 0,
+    nonFiniteNumberCount: 0,
+    arrayCount: 0,
+    arrayLengths: {},
     ...(sourceResultTruncated === undefined ? {} : { sourceResultTruncated }),
   };
   const pending = [value];
   while (pending.length) {
     const node = pending.pop();
-    if (++result.nodeCount > 100_000) throw new SessionArtifactError('ARTIFACT_JSON_INSPECTION_LIMIT', 'JSON exceeds 100000 inspected nodes.');
+    if (++result.nodeCount > 100_000)
+      throw new SessionArtifactError('ARTIFACT_JSON_INSPECTION_LIMIT', 'JSON exceeds 100000 inspected nodes.');
     if (typeof node === 'number') {
       result.numberCount += 1;
       if (!Number.isFinite(node)) result.nonFiniteNumberCount += 1;

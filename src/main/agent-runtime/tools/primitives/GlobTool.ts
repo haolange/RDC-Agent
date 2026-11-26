@@ -48,25 +48,30 @@ const DEFAULT_IGNORED_DIRS = new Set<string>([
 export const globTool: AgentTool<GlobParams, GlobDetails> = {
   name: 'glob',
   label: '文件搜索',
-  description:
-    'Search for files matching a glob pattern in the workspace. Supports *, **, ?, {a,b}, and [abc].',
+  description: 'Search for files matching a glob pattern in the workspace. Supports *, **, ?, {a,b}, and [abc].',
   parameters: {
     type: 'object',
     properties: {
       pattern: {
         type: 'string',
-        description:
-          'Glob pattern, e.g. "src/**/*.ts" or "**/*.{json,md}".',
+        description: 'Glob pattern, e.g. "src/**/*.ts" or "**/*.{json,md}".',
       },
       cwd: {
         type: 'string',
-        description:
-          'Optional sub-directory inside the workspace to search from (default: workspace root).',
+        description: 'Optional sub-directory inside the workspace to search from (default: workspace root).',
       },
     },
     required: ['pattern'],
   },
-  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false, knowledgeRoots: 'read-access' },
+  spec: {
+    isReadOnly: true,
+    concurrency: 'shared',
+    isDestructive: false,
+    sideEffect: 'none',
+    category: 'search',
+    requiresApproval: false,
+    knowledgeRoots: 'read-access',
+  },
   permissionHint: 'readonly',
   effects: { reads: ['cwd', 'path'], readPattern: 'pattern' },
 

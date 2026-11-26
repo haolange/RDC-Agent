@@ -14,7 +14,10 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
-const option = (name, fallback) => { const index = args.indexOf(name); return index >= 0 ? args[index + 1] : fallback; };
+const option = (name, fallback) => {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : fallback;
+};
 const taskFile = option('--tasks', path.join(here, 'evals', 'vkcube-lavapipe.json'));
 const suite = JSON.parse(fs.readFileSync(taskFile, 'utf8'));
 
@@ -43,8 +46,10 @@ function latestCompletedAssistant(records) {
       messages.set(record.id, record);
     }
   }
-  return [...messages.values()].sort((left, right) => left.createdAt - right.createdAt)
-    .filter((message) => message.role === 'assistant' && message.status === 'complete').at(-1);
+  return [...messages.values()]
+    .sort((left, right) => left.createdAt - right.createdAt)
+    .filter((message) => message.role === 'assistant' && message.status === 'complete')
+    .at(-1);
 }
 
 export function grade(text, tasks = suite.tasks) {
@@ -95,7 +100,9 @@ function readSessionRecords(directory) {
         try {
           const record = JSON.parse(fs.readFileSync(full, 'utf8'));
           if (record && typeof record === 'object' && !Array.isArray(record)) records.push(record);
-        } catch { /* not a JSON record */ }
+        } catch {
+          /* not a JSON record */
+        }
       }
     }
   };
@@ -106,7 +113,11 @@ function readSessionRecords(directory) {
 function readSessionText(directory) {
   const history = path.join(directory, 'conversation.jsonl');
   if (!fs.existsSync(history)) throw new Error(`no conversation.jsonl in ${directory}`);
-  const records = fs.readFileSync(history, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  const records = fs
+    .readFileSync(history, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
   const finalMessage = latestCompletedAssistant(records);
   if (!finalMessage) throw new Error(`no completed assistant message in ${history}`);
   const finalAnswer = finalMessage.content;
@@ -118,8 +129,11 @@ function readSessionText(directory) {
       else if (entry.name.endsWith('.json')) {
         try {
           const record = JSON.parse(fs.readFileSync(full, 'utf8'));
-          if (record?.recordType === 'InvestigationReport' || record?.reportContract) reports.push(JSON.stringify(record));
-        } catch { /* not a JSON record */ }
+          if (record?.recordType === 'InvestigationReport' || record?.reportContract)
+            reports.push(JSON.stringify(record));
+        } catch {
+          /* not a JSON record */
+        }
       }
     }
   };
@@ -129,15 +143,20 @@ function readSessionText(directory) {
 
 function report(result) {
   for (const item of result.results) {
-    console.log(`${item.passed ? 'PASS' : 'FAIL'}  ${item.id} ${item.name}: ${item.answer}${item.passed ? '' : `  (expected ${item.expected})`}`);
+    console.log(
+      `${item.passed ? 'PASS' : 'FAIL'}  ${item.id} ${item.name}: ${item.answer}${item.passed ? '' : `  (expected ${item.expected})`}`,
+    );
   }
-  console.log(`[eval:${suite.id}] score ${(result.score * 100).toFixed(0)}% (${result.results.filter((item) => item.passed).length}/${result.results.length})`);
+  console.log(
+    `[eval:${suite.id}] score ${(result.score * 100).toFixed(0)}% (${result.results.filter((item) => item.passed).length}/${result.results.length})`,
+  );
 }
 
 if (args.includes('--print-prompt')) {
   console.log(suite.prompt[option('--lang', 'zh-CN')] ?? suite.prompt.en);
 } else if (args.includes('--self-test')) {
-  const answer = '分析过程……\nQ1: EID 11\nQ2: 36 个顶点\nQ3: B8G8R8A8_UNORM，500×500\nQ4: 6\nQ5: 事件 14（vkQueuePresentKHR）\nQ6: 顶点着色器与像素着色器（VS、PS）';
+  const answer =
+    '分析过程……\nQ1: EID 11\nQ2: 36 个顶点\nQ3: B8G8R8A8_UNORM，500×500\nQ4: 6\nQ5: 事件 14（vkQueuePresentKHR）\nQ6: 顶点着色器与像素着色器（VS、PS）';
   const right = grade(answer);
   const wrong = grade('Q1: 12\nQ2: 24\nQ3: R8G8B8A8_UNORM 1920x1080\nQ4: 7\nQ5: 13\nQ6: compute');
   const rebuilt = latestCompletedAssistant([
@@ -146,22 +165,33 @@ if (args.includes('--print-prompt')) {
     { op: 'delta', id: 'assistant', patch: { content: answer, status: 'complete' }, updatedAt: 3 },
   ]);
   if (right.score !== 1 || wrong.score !== 0 || grade(rebuilt?.content ?? '').score !== 1) {
-    report(right); report(wrong); process.exit(1);
+    report(right);
+    report(wrong);
+    process.exit(1);
   }
   const observed = (claimId, evidenceIds) => ({ claimId, epistemic: 'observed', evidenceIds });
   const conclusion = (sourceClaimId) => ({ reportContract: {}, claims: [{ compactProvenance: [{ sourceClaimId }] }] });
   const cited = gradeEvidence([{ evidenceId: 'ev-1' }, observed('c-1', ['ev-1']), conclusion('c-1')]);
-  const dangling = gradeEvidence([{ items: [{ evidenceId: 'ev-2' }] }, observed('c-2', ['ev-missing']), conclusion('c-2')]);
+  const dangling = gradeEvidence([
+    { items: [{ evidenceId: 'ev-2' }] },
+    observed('c-2', ['ev-missing']),
+    conclusion('c-2'),
+  ]);
   if (cited.uncited.length !== 0 || cited.reports !== 1 || dangling.uncited.join() !== 'c-2') {
-    console.error('[eval] evidence grading self-test failed', { cited, dangling }); process.exit(1);
+    console.error('[eval] evidence grading self-test failed', { cited, dangling });
+    process.exit(1);
   }
   console.log('[eval] self-test OK');
 } else {
-  const directory = args.find((arg) => !arg.startsWith('--') && arg !== option('--tasks') && arg !== option('--min-score'));
+  const directory = args.find(
+    (arg) => !arg.startsWith('--') && arg !== option('--tasks') && arg !== option('--min-score'),
+  );
   if (!directory) throw new Error('usage: eval-investigation.mjs <session-directory> | --print-prompt | --self-test');
   const result = grade(readSessionText(directory));
   report(result);
   const evidence = gradeEvidence(readSessionRecords(directory));
-  console.log(`[eval:${suite.id}] evidence: ${evidence.reports} report(s), ${evidence.uncited.length} observed source claim(s) without recorded evidence${evidence.uncited.length ? ` (${evidence.uncited.join(', ')})` : ''}`);
+  console.log(
+    `[eval:${suite.id}] evidence: ${evidence.reports} report(s), ${evidence.uncited.length} observed source claim(s) without recorded evidence${evidence.uncited.length ? ` (${evidence.uncited.join(', ')})` : ''}`,
+  );
   process.exit(result.score >= Number(option('--min-score', '0')) && evidence.uncited.length === 0 ? 0 : 1);
 }

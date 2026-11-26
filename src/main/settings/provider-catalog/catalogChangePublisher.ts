@@ -1,9 +1,8 @@
 import { diffEffectiveCatalog } from '@shared/utils/effectiveCatalogChange';
 import type { EffectiveCatalogChange, EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
 
-const scopeKey = (snapshot: EffectiveCatalogSnapshot): string => (
-  `${snapshot.providerId}\u0000${snapshot.accountId}\u0000${snapshot.protocol ?? 'default'}`
-);
+const scopeKey = (snapshot: EffectiveCatalogSnapshot): string =>
+  `${snapshot.providerId}\u0000${snapshot.accountId}\u0000${snapshot.protocol ?? 'default'}`;
 
 /**
  * Sends catalog snapshots to the renderer as changes: each against the snapshot last handed out for its scope,

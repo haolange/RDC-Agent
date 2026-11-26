@@ -1,14 +1,22 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { z } from 'zod';
-import { assertFileSizeCap, assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from '../../../runtime/toolFiles';
+import {
+  assertFileSizeCap,
+  assertTextReadable,
+  requireMutationWorkspaceRoot,
+  safeResolvePath,
+  writeTextFileNoFollow,
+} from '../../../runtime/toolFiles';
 import { NOTEBOOK_MAX_BYTES } from '../../../runtime/toolLimits';
 import type { AgentTool } from '../../agent/AgentTool';
 
 /** The nbformat fields this tool edits; every other notebook field is written back unchanged. */
-const NotebookSchema = z.object({
-  cells: z.array(z.object({ source: z.union([z.string(), z.array(z.string())]) }).passthrough()),
-}).passthrough();
+const NotebookSchema = z
+  .object({
+    cells: z.array(z.object({ source: z.union([z.string(), z.array(z.string())]) }).passthrough()),
+  })
+  .passthrough();
 
 interface NotebookEditParams {
   notebook_path: string;
@@ -36,7 +44,14 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
     },
     required: ['notebook_path', 'cell_index', 'new_source'],
   },
-  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: {
+    isReadOnly: false,
+    concurrency: 'exclusive',
+    isDestructive: false,
+    sideEffect: 'filesystem',
+    category: 'file',
+    requiresApproval: true,
+  },
   permissionHint: 'mutation',
   effects: { writes: ['notebook_path'] },
 
@@ -69,9 +84,7 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
     const cell = notebook.cells[idx];
     const oldSource = Array.isArray(cell.source) ? cell.source.join('') : cell.source;
     // Preserve Jupyter array source shape when the cell originally used string[].
-    cell.source = Array.isArray(cell.source)
-      ? params.new_source.split(/(?<=\n)/)
-      : params.new_source;
+    cell.source = Array.isArray(cell.source) ? params.new_source.split(/(?<=\n)/) : params.new_source;
     await writeTextFileNoFollow(absolute, JSON.stringify(notebook, null, 2));
     return {
       content: [{ type: 'text', text: `Edited cell ${idx} in ${absolute}` }],

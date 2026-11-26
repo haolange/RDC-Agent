@@ -29,7 +29,11 @@ export interface AtomicWriteOptions {
 
 const temporaryPathFor = (filePath: string): string => `${filePath}.${process.pid}.${generateShortId()}.tmp`;
 
-export function writeFileAtomicSync(filePath: string, content: string | Uint8Array, options: AtomicWriteOptions = {}): void {
+export function writeFileAtomicSync(
+  filePath: string,
+  content: string | Uint8Array,
+  options: AtomicWriteOptions = {},
+): void {
   const directory = path.dirname(filePath);
   fs.mkdirSync(directory, { recursive: true });
   const temporaryPath = temporaryPathFor(filePath);
@@ -50,7 +54,11 @@ export function writeFileAtomicSync(filePath: string, content: string | Uint8Arr
   syncDirectorySync(directory);
 }
 
-export async function writeFileAtomic(filePath: string, content: string | Uint8Array, options: AtomicWriteOptions = {}): Promise<void> {
+export async function writeFileAtomic(
+  filePath: string,
+  content: string | Uint8Array,
+  options: AtomicWriteOptions = {},
+): Promise<void> {
   const directory = path.dirname(filePath);
   await fs.promises.mkdir(directory, { recursive: true });
   const temporaryPath = temporaryPathFor(filePath);

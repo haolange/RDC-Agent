@@ -31,12 +31,7 @@ const FIVE_DEFERRED = [
   'knowledge_candidate_create',
 ] as const;
 
-const FORBIDDEN_WRITE = [
-  'knowledge_write',
-  'knowledge_promote',
-  'knowledge_update',
-  'knowledge_deprecate',
-] as const;
+const FORBIDDEN_WRITE = ['knowledge_write', 'knowledge_promote', 'knowledge_update', 'knowledge_deprecate'] as const;
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const fixturePath = path.join(
@@ -49,10 +44,13 @@ function readRepo(relative: string): string {
 }
 
 function skillAllowedTools(skillId: string): string[] {
-  const match = /allowed-tools:\s*\[([^\]]*)\]/.exec(
-    readRepo(`resources/agent-runtime/skills/${skillId}/SKILL.md`),
+  const match = /allowed-tools:\s*\[([^\]]*)\]/.exec(readRepo(`resources/agent-runtime/skills/${skillId}/SKILL.md`));
+  return (
+    match?.[1]
+      ?.split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean) ?? []
   );
-  return match?.[1]?.split(',').map((entry) => entry.trim()).filter(Boolean) ?? [];
 }
 
 function space(rootPath: string): KnowledgeSpace {
@@ -92,7 +90,10 @@ describe('knowledge system contract', () => {
     const workbenchIds = new Set(AGENT_WORKBENCH_TOOL_CATALOG.map((tool) => tool.id));
     const tools = createKnowledgeTools('session-contract');
     expect(tools.map((tool) => tool.name)).toEqual([...FIVE_DEFERRED]);
-    const deferred = partitionDeferredTools(FIVE_DEFERRED.map((name) => ({ name })), new Set());
+    const deferred = partitionDeferredTools(
+      FIVE_DEFERRED.map((name) => ({ name })),
+      new Set(),
+    );
     expect(deferred.injected).toEqual([]);
     expect(deferred.deferredBuiltin.map((tool) => tool.name)).toEqual([...FIVE_DEFERRED]);
     for (const id of FIVE_DEFERRED) {
@@ -124,12 +125,14 @@ describe('knowledge system contract', () => {
       },
       now: () => new Date('2026-09-01T00:00:00.000Z'),
     });
-    await expect(write.write({
-      spaceId: 'user',
-      card: draftCard(),
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: false } as never,
-    })).rejects.toMatchObject({ code: 'KNOWLEDGE_HUMAN_CONFIRMATION_REQUIRED' });
+    await expect(
+      write.write({
+        spaceId: 'user',
+        card: draftCard(),
+        permissionMode: 'full-access',
+        confirmation: { explicitHumanConfirmation: false } as never,
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_HUMAN_CONFIRMATION_REQUIRED' });
     const saved = await write.write({
       spaceId: 'user',
       card: draftCard(),
@@ -200,18 +203,24 @@ describe('knowledge system contract', () => {
       'read_image',
     ]);
     expect(candidateTools).toEqual(['knowledge_candidate_create']);
-    expect(readRepo('resources/agent-runtime/skills/knowledge-scout/SKILL.md')).not.toMatch(/knowledge_write|knowledge_promote/);
-    expect(readRepo('resources/agent-runtime/skills/knowledge-candidate/SKILL.md')).not.toMatch(/knowledge_write|knowledge_promote/);
+    expect(readRepo('resources/agent-runtime/skills/knowledge-scout/SKILL.md')).not.toMatch(
+      /knowledge_write|knowledge_promote/,
+    );
+    expect(readRepo('resources/agent-runtime/skills/knowledge-candidate/SKILL.md')).not.toMatch(
+      /knowledge_write|knowledge_promote/,
+    );
 
     const runtime = [...FIVE_DEFERRED, 'skills', 'skill_read', 'ask_user', 'tool_search', 'read_file', 'read_image'];
     const scoutNarrow = intersectSkillAllowedTools(runtime, scoutTools);
-    expect(scoutNarrow).toEqual(expect.arrayContaining([
-      'knowledge_browse',
-      'knowledge_search',
-      'knowledge_read',
-      'knowledge_compile',
-      'read_image',
-    ]));
+    expect(scoutNarrow).toEqual(
+      expect.arrayContaining([
+        'knowledge_browse',
+        'knowledge_search',
+        'knowledge_read',
+        'knowledge_compile',
+        'read_image',
+      ]),
+    );
     expect(scoutNarrow).toEqual(expect.arrayContaining(['skills', 'skill_read', 'ask_user', 'tool_search']));
     expect(scoutNarrow).not.toContain('knowledge_candidate_create');
     expect(scoutNarrow).not.toContain('read_file');
@@ -264,18 +273,22 @@ describe('knowledge system contract', () => {
     });
     expect(saved.lifecycle).toBe('draft');
     expect(saved.sourceStatus).toBe('fixed');
-    await expect(write.write({
-      spaceId: 'user',
-      card: { ...fixed, lifecycle: 'verified' },
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toMatchObject({ code: 'KNOWLEDGE_LIFECYCLE_INVALID' });
-    await expect(write.promote({
-      spaceId: 'user',
-      card: { ...fixed, lifecycle: 'candidate' },
-      to: 'verified',
-      permissionMode: 'full-access',
-      confirmation: { explicitHumanConfirmation: true },
-    })).rejects.toMatchObject({ code: 'KNOWLEDGE_LIFECYCLE_INVALID' });
+    await expect(
+      write.write({
+        spaceId: 'user',
+        card: { ...fixed, lifecycle: 'verified' },
+        permissionMode: 'full-access',
+        confirmation: { explicitHumanConfirmation: true },
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_LIFECYCLE_INVALID' });
+    await expect(
+      write.promote({
+        spaceId: 'user',
+        card: { ...fixed, lifecycle: 'candidate' },
+        to: 'verified',
+        permissionMode: 'full-access',
+        confirmation: { explicitHumanConfirmation: true },
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_LIFECYCLE_INVALID' });
   });
 });

@@ -19,7 +19,11 @@ export function reportProcessFault(title: string, fault: unknown): void {
   console.error(`[main] ${title}:`, fault);
   try {
     runtimeLogService.log({
-      scope: 'app', namespace: 'system', severity: 'error', title, summary,
+      scope: 'app',
+      namespace: 'system',
+      severity: 'error',
+      title,
+      summary,
       raw: { stack: fault instanceof Error ? fault.stack : undefined },
     });
   } catch (logError) {

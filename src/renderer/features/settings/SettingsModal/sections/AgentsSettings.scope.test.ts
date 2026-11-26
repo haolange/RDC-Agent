@@ -9,7 +9,12 @@ describe('new agent scope', () => {
   it('keeps a new project agent in the selected project even if the active project changes before save', () => {
     const draft = createNewAgent({ name: 'Frame Checker', id: 'frame-checker' }, t, 'project', 'project-b');
 
-    expect(draft).toMatchObject({ id: 'frame-checker', name: 'Frame Checker', writeScope: 'project', writeProjectId: 'project-b' });
+    expect(draft).toMatchObject({
+      id: 'frame-checker',
+      name: 'Frame Checker',
+      writeScope: 'project',
+      writeProjectId: 'project-b',
+    });
     expect(resolveAgentWriteTargetFromDraft(draft, 'project-a')).toEqual({ scope: 'project', projectId: 'project-b' });
   });
 

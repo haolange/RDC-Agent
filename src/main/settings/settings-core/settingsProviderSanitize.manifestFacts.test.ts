@@ -32,13 +32,22 @@ describe('provider facts read from manifests', () => {
 
   it('maps account bundles through the declared credential fields and route base URL', () => {
     const bundles: Record<string, string> = {
-      'github-copilot': JSON.stringify({ providerId: 'github-copilot', accessToken: 'gh-fixture', copilotToken: 'cp-fixture' }),
-      nous: JSON.stringify({ providerId: 'nous', accessToken: 'nous-fixture', resourceUrl: 'https://nous.example/v1', accountId: 'n1' }),
+      'github-copilot': JSON.stringify({
+        providerId: 'github-copilot',
+        accessToken: 'gh-fixture',
+        copilotToken: 'cp-fixture',
+      }),
+      nous: JSON.stringify({
+        providerId: 'nous',
+        accessToken: 'nous-fixture',
+        resourceUrl: 'https://nous.example/v1',
+        accountId: 'n1',
+      }),
       openrouter: JSON.stringify({ providerId: 'openrouter', apiKey: 'sk-or-fixture', accessToken: 'unused' }),
     };
-    vi.spyOn(secretStorageService, 'getSecret').mockImplementation((ref) => (
-      Object.entries(bundles).find(([providerId]) => String(ref).includes(providerId))?.[1] ?? ''
-    ));
+    vi.spyOn(secretStorageService, 'getSecret').mockImplementation(
+      (ref) => Object.entries(bundles).find(([providerId]) => String(ref).includes(providerId))?.[1] ?? '',
+    );
     expect(resolveAccountRuntimeCredential({ id: 'github-copilot', activeAccountId: 'a1' }, '/fixture')).toEqual({
       apiKey: 'cp-fixture',
       baseUrl: 'https://api.githubcopilot.com',
@@ -53,6 +62,8 @@ describe('provider facts read from manifests', () => {
       apiKey: 'sk-or-fixture',
       baseUrl: 'https://openrouter.ai/api/v1',
     });
-    expect(resolveAccountRuntimeCredential({ id: 'deepseek', activeAccountId: 'a1' }, '/fixture')).toEqual({ apiKey: '' });
+    expect(resolveAccountRuntimeCredential({ id: 'deepseek', activeAccountId: 'a1' }, '/fixture')).toEqual({
+      apiKey: '',
+    });
   });
 });

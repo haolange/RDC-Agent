@@ -10,7 +10,11 @@ import {
   type InvestigationIndexDocument,
   type InvestigationIndexEntry,
 } from './investigationRecordKeys';
-import { parseInvestigationRecord, parseInvestigationRecordOf, type InvestigationRecordByType } from './investigationRecordSchemas';
+import {
+  parseInvestigationRecord,
+  parseInvestigationRecordOf,
+  type InvestigationRecordByType,
+} from './investigationRecordSchemas';
 import type {
   ArtifactSourceRef,
   InvestigationArtifactManifest,
@@ -34,7 +38,10 @@ export interface VerifiedIndexArtifact {
 }
 
 /** A record body that matches its index hash and the schema of the record type its entry names. */
-export function parseVerifiedRecordBody(entry: InvestigationIndexEntry, read: InvestigationContentRead): InvestigationRecord {
+export function parseVerifiedRecordBody(
+  entry: InvestigationIndexEntry,
+  read: InvestigationContentRead,
+): InvestigationRecord {
   return parseRecordText(entry, verifiedRecordBody(entry, read));
 }
 
@@ -62,7 +69,10 @@ export function parseRecordTextOf<Type extends InvestigationRecordType>(
   recordType: Type,
 ): InvestigationRecordByType[Type] {
   if (entry.recordType !== recordType) {
-    throw new InvestigationError('INVESTIGATION_INDEX_CORRUPT', `index entry ${entry.artifactId} is not a ${recordType}`);
+    throw new InvestigationError(
+      'INVESTIGATION_INDEX_CORRUPT',
+      `index entry ${entry.artifactId} is not a ${recordType}`,
+    );
   }
   try {
     return parseInvestigationRecordOf(recordType, JSON.parse(text));
@@ -87,31 +97,30 @@ export function assertTripleContentHash(
 ): string {
   const bodyHash = sha256Prefixed(contentText);
   if (resolverHash && !hashesEqual(bodyHash, resolverHash)) {
-    throw new InvestigationError(
-      'INVESTIGATION_HASH_MISMATCH',
-      'contentRef body hash does not match stored bytes',
-    );
+    throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', 'contentRef body hash does not match stored bytes');
   }
   if (
-    !hashesEqual(bodyHash, indexHash)
-    || !hashesEqual(bodyHash, manifestHash)
-    || !hashesEqual(indexHash, manifestHash)
+    !hashesEqual(bodyHash, indexHash) ||
+    !hashesEqual(bodyHash, manifestHash) ||
+    !hashesEqual(indexHash, manifestHash)
   ) {
-    throw new InvestigationError(
-      'INVESTIGATION_HASH_MISMATCH',
-      'index, manifest, and contentRef hashes must match',
-    );
+    throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', 'index, manifest, and contentRef hashes must match');
   }
   return bodyHash;
 }
 
 export function isReadySourceDriftError(error: unknown): boolean {
-  return error instanceof InvestigationError
-    && (error.code === 'INVESTIGATION_HASH_MISMATCH' || error.code === 'INVESTIGATION_REF_UNRESOLVED');
+  return (
+    error instanceof InvestigationError &&
+    (error.code === 'INVESTIGATION_HASH_MISMATCH' || error.code === 'INVESTIGATION_REF_UNRESOLVED')
+  );
 }
 
 /** Propagation may change a source after the initial ready check but before commit. */
-export function assertReadySourcesUnchanged(sources: readonly ArtifactSourceRef[], staged: InvestigationIndexDocument): void {
+export function assertReadySourcesUnchanged(
+  sources: readonly ArtifactSourceRef[],
+  staged: InvestigationIndexDocument,
+): void {
   for (const source of sources) {
     const entry = staged.artifacts.find((item) => item.artifactId === source.artifactId);
     if (!entry || !hashesEqual(source.expectedHash, entry.contentHash)) {
@@ -187,10 +196,7 @@ export function assertReadyAgainstVerifiedIndex(
   try {
     parseInvestigationRecord(kindEntry.recordType, JSON.parse(contentText));
   } catch (error) {
-    throw new InvestigationError(
-      'INVESTIGATION_READY_DENIED',
-      error instanceof Error ? error.message : String(error),
-    );
+    throw new InvestigationError('INVESTIGATION_READY_DENIED', error instanceof Error ? error.message : String(error));
   }
   assertReadyWorldStateBinding(manifest, record, verified);
 }
@@ -218,14 +224,14 @@ function verifyIndexEntry(
   }
   const manifest = io.parseManifest(io.readManifest(entry.manifestUri));
   if (
-    manifest.artifactId !== entry.artifactId
-    || manifest.kind !== entry.kind
-    || manifest.recordType !== entry.recordType
-    || manifest.contentRef !== entry.contentUri
-    || manifest.status !== entry.status
-    || !hashesEqual(manifest.contentHash, entry.contentHash)
-    || manifest.createdAt !== entry.createdAt
-    || (manifest.supersedes ?? undefined) !== (entry.supersedes ?? undefined)
+    manifest.artifactId !== entry.artifactId ||
+    manifest.kind !== entry.kind ||
+    manifest.recordType !== entry.recordType ||
+    manifest.contentRef !== entry.contentUri ||
+    manifest.status !== entry.status ||
+    !hashesEqual(manifest.contentHash, entry.contentHash) ||
+    manifest.createdAt !== entry.createdAt ||
+    (manifest.supersedes ?? undefined) !== (entry.supersedes ?? undefined)
   ) {
     throw new InvestigationError(
       'INVESTIGATION_INDEX_CORRUPT',
@@ -271,11 +277,10 @@ function assertReadyWorldStateBinding(
     }
     return;
   }
-  const live = [...verified.values()].some((item) => (
-    item.entry.kind === 'world_state'
-    && item.entry.status !== 'superseded'
-    && item.entry.recordKey === worldStateId
-  ));
+  const live = [...verified.values()].some(
+    (item) =>
+      item.entry.kind === 'world_state' && item.entry.status !== 'superseded' && item.entry.recordKey === worldStateId,
+  );
   if (!live) {
     throw new InvestigationError('INVESTIGATION_READY_DENIED', `worldState ${worldStateId} is not resolvable`);
   }
@@ -283,13 +288,11 @@ function assertReadyWorldStateBinding(
 
 function reraiseIndexIntegrity(error: unknown, artifactId: string): InvestigationError {
   if (
-    error instanceof InvestigationError
-    && (
-      error.code === 'INVESTIGATION_INDEX_CORRUPT'
-      || error.code === 'INVESTIGATION_HASH_MISMATCH'
-      || error.code === 'INVESTIGATION_READY_DENIED'
-      || error.code === 'INVESTIGATION_REF_UNRESOLVED'
-    )
+    error instanceof InvestigationError &&
+    (error.code === 'INVESTIGATION_INDEX_CORRUPT' ||
+      error.code === 'INVESTIGATION_HASH_MISMATCH' ||
+      error.code === 'INVESTIGATION_READY_DENIED' ||
+      error.code === 'INVESTIGATION_REF_UNRESOLVED')
   ) {
     return error;
   }

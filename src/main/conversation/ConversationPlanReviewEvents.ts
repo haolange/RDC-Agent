@@ -23,9 +23,16 @@ export function applyPlanReviewRequested(input: {
   const pausedTrace = input.workTrace
     ? {
         ...input.workTrace,
-        blocks: input.workTrace.blocks.map((block) => block.items?.some((item) => item.kind === 'thinking' && item.status === 'streaming')
-          ? { ...block, items: block.items.map((item) => item.kind === 'thinking' ? { ...item, status: 'complete' as const } : item) }
-          : block),
+        blocks: input.workTrace.blocks.map((block) =>
+          block.items?.some((item) => item.kind === 'thinking' && item.status === 'streaming')
+            ? {
+                ...block,
+                items: block.items.map((item) =>
+                  item.kind === 'thinking' ? { ...item, status: 'complete' as const } : item,
+                ),
+              }
+            : block,
+        ),
       }
     : input.workTrace;
   return upsertRuntimeToolCall(
@@ -68,7 +75,11 @@ export function applyPlanReviewAnswered(input: {
           ...planReview,
           status: cancelled
             ? 'cancelled'
-            : (input.payload.decision?.kind === 'approve' ? 'approved' : input.payload.decision?.kind === 'reject' ? 'rejected' : planReview.status),
+            : input.payload.decision?.kind === 'approve'
+              ? 'approved'
+              : input.payload.decision?.kind === 'reject'
+                ? 'rejected'
+                : planReview.status,
           decision: input.payload.decision ?? planReview.decision,
         }
       : undefined,

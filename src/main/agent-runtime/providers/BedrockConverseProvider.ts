@@ -102,34 +102,57 @@ interface BedrockConverseRequest {
 
 /** One Converse stream event; event kinds and fields this adapter does not read pass through. */
 const optionalIndex = z.number().optional();
-const BedrockStreamEventSchema = z.object({
-  messageStart: z.object({ role: z.string().optional() }).passthrough().optional(),
-  contentBlockStart: z.object({
-    contentBlockIndex: optionalIndex,
-    start: z.object({
-      toolUse: z.object({ toolUseId: z.string().optional(), name: z.string().optional() }).passthrough().optional(),
-    }).passthrough().optional(),
-  }).passthrough().optional(),
-  contentBlockDelta: z.object({
-    contentBlockIndex: optionalIndex,
-    delta: z.object({
-      text: z.string().optional(),
-      toolUse: z.object({ input: z.string().optional() }).passthrough().optional(),
-      reasoningContent: z.object({ text: z.string().optional() }).passthrough().optional(),
-    }).passthrough().optional(),
-  }).passthrough().optional(),
-  contentBlockStop: z.object({ contentBlockIndex: optionalIndex }).passthrough().optional(),
-  messageStop: z.object({ stopReason: z.string().optional() }).passthrough().optional(),
-  metadata: z.object({
-    usage: z.object({
-      inputTokens: z.number().optional(),
-      outputTokens: z.number().optional(),
-      totalTokens: z.number().optional(),
-      cacheReadInputTokens: z.number().optional(),
-      cacheWriteInputTokens: z.number().optional(),
-    }).passthrough().optional(),
-  }).passthrough().optional(),
-}).passthrough();
+const BedrockStreamEventSchema = z
+  .object({
+    messageStart: z.object({ role: z.string().optional() }).passthrough().optional(),
+    contentBlockStart: z
+      .object({
+        contentBlockIndex: optionalIndex,
+        start: z
+          .object({
+            toolUse: z
+              .object({ toolUseId: z.string().optional(), name: z.string().optional() })
+              .passthrough()
+              .optional(),
+          })
+          .passthrough()
+          .optional(),
+      })
+      .passthrough()
+      .optional(),
+    contentBlockDelta: z
+      .object({
+        contentBlockIndex: optionalIndex,
+        delta: z
+          .object({
+            text: z.string().optional(),
+            toolUse: z.object({ input: z.string().optional() }).passthrough().optional(),
+            reasoningContent: z.object({ text: z.string().optional() }).passthrough().optional(),
+          })
+          .passthrough()
+          .optional(),
+      })
+      .passthrough()
+      .optional(),
+    contentBlockStop: z.object({ contentBlockIndex: optionalIndex }).passthrough().optional(),
+    messageStop: z.object({ stopReason: z.string().optional() }).passthrough().optional(),
+    metadata: z
+      .object({
+        usage: z
+          .object({
+            inputTokens: z.number().optional(),
+            outputTokens: z.number().optional(),
+            totalTokens: z.number().optional(),
+            cacheReadInputTokens: z.number().optional(),
+            cacheWriteInputTokens: z.number().optional(),
+          })
+          .passthrough()
+          .optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
 type BedrockStreamEvent = z.infer<typeof BedrockStreamEventSchema>;
 type BedrockUsage = NonNullable<NonNullable<BedrockStreamEvent['metadata']>['usage']>;
 
@@ -161,11 +184,7 @@ export class BedrockConverseProvider implements ProviderStrategy {
     this.defaultHeaders = { ...(options.headers ?? {}) };
   }
 
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage> {
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
       const response = await this.send(model, context, options, run.signal);
       return consumeBedrockStream(response, run, options);
@@ -177,7 +196,10 @@ export class BedrockConverseProvider implements ProviderStrategy {
       throw new ProviderHttpError(PROVIDER_API, 401, 'missing requestAuthorizer for Bedrock Converse provider');
     }
     const url = this.buildEndpointUrl(model.id, options.baseUrl);
-    const body = applyRequestPlanBody(this.buildRequestBody(model, context, options) as unknown as Record<string, unknown>, options.requestPlan);
+    const body = applyRequestPlanBody(
+      this.buildRequestBody(model, context, options) as unknown as Record<string, unknown>,
+      options.requestPlan,
+    );
     return sendProviderRequest(PROVIDER_API, options.requestPlan, signal, {
       url,
       headers: {
@@ -195,11 +217,7 @@ export class BedrockConverseProvider implements ProviderStrategy {
     return buildBedrockConverseStreamUrl(modelId, baseUrlOverride || this.baseUrl, this.region);
   }
 
-  private buildRequestBody(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): BedrockConverseRequest {
+  private buildRequestBody(model: Model, context: Context, options: StreamOptions): BedrockConverseRequest {
     const prompt = partitionSystemPrompt(context);
     const system: BedrockSystemBlock[] = [];
     if (prompt.stableText) {
@@ -259,7 +277,8 @@ async function consumeBedrockStream(
   const textRefs = new Map<number, ProviderOutputRef>();
   const thinkingRefs = new Map<number, ProviderOutputRef>();
   const toolCalls = new ToolCallAccumulator<number>(builder);
-  const toolRef = (blockIndex: number) => channels.ref({ providerBlockKey: `virtual:tool:${blockIndex}`, sourceIndex: blockIndex });
+  const toolRef = (blockIndex: number) =>
+    channels.ref({ providerBlockKey: `virtual:tool:${blockIndex}`, sourceIndex: blockIndex });
   let sawOutput = false;
   const thinkingMeta = {
     kind: 'raw' as const,
@@ -425,13 +444,15 @@ function convertMessage(message: Message): BedrockMessage | null {
   }
   return {
     role: 'user',
-    content: [{
-      toolResult: {
-        toolUseId: message.toolCallId,
-        content: toolResultContent.length > 0 ? toolResultContent : [{ text: '' }],
-        status: message.isError ? 'error' : 'success',
+    content: [
+      {
+        toolResult: {
+          toolUseId: message.toolCallId,
+          content: toolResultContent.length > 0 ? toolResultContent : [{ text: '' }],
+          status: message.isError ? 'error' : 'success',
+        },
       },
-    }],
+    ],
   };
 }
 

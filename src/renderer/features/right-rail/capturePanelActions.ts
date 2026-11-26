@@ -19,4 +19,6 @@ export const readLivePreview = (scope: CaptureScope) => api().capture.readLivePr
 export const clearOpenedCapture = (scope: CaptureReplayBindingRequest) => api().capture.clearOpenedState(scope);
 export const refreshProjectCaptureInputs = (projectId: string) => api().project.inputs.refresh(projectId);
 export const refreshReplayDevices = () => api().device.refresh();
-export const openProjectCaptureInput = (request: CaptureReplayBindingRequest & { inputId: string; filePath: string; replayDeviceId: string }) => api().capture.openProjectInput(request);
+export const openProjectCaptureInput = (
+  request: CaptureReplayBindingRequest & { inputId: string; filePath: string; replayDeviceId: string },
+) => api().capture.openProjectInput(request);

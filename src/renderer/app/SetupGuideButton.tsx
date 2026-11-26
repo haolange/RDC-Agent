@@ -27,7 +27,7 @@ export function SetupGuideButton() {
       onOpenChange={setOpen}
       align="end"
       className="setup-guide-popover"
-      trigger={(
+      trigger={
         <button
           type="button"
           className={`main-utility-toggle${open ? ' is-active' : ''}`}
@@ -37,7 +37,7 @@ export function SetupGuideButton() {
         >
           <Icon name="help" />
         </button>
-      )}
+      }
     >
       <SetupChecklist steps={steps} />
     </Popover>

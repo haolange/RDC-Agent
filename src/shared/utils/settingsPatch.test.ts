@@ -27,12 +27,26 @@ describe('settings patch ops', () => {
     let models: AgentModelSettings = { default: { model: 'a:one', reasoningLevel: 'high' }, byAgent: {} };
     models = applyAgentModelOp(models, { op: 'agentModels.setDefault', field: 'reasoningLevel', value: null });
     expect(models.default).toEqual({ model: 'a:one' });
-    models = applyAgentModelOp(models, { op: 'agentModels.setAgentField', agentId: 'debugger', field: 'model', value: 'a:two' });
-    models = applyAgentModelOp(models, { op: 'agentModels.setAgentField', agentId: 'debugger', field: 'reasoningLevel', value: 'low' });
+    models = applyAgentModelOp(models, {
+      op: 'agentModels.setAgentField',
+      agentId: 'debugger',
+      field: 'model',
+      value: 'a:two',
+    });
+    models = applyAgentModelOp(models, {
+      op: 'agentModels.setAgentField',
+      agentId: 'debugger',
+      field: 'reasoningLevel',
+      value: 'low',
+    });
     expect(models.byAgent).toEqual({ debugger: { model: 'a:two', reasoningLevel: 'low' } });
     models = applyAgentModelOp(models, { op: 'agentModels.clearAgentField', agentId: 'debugger', field: 'model' });
     expect(models.byAgent).toEqual({ debugger: { reasoningLevel: 'low' } });
-    models = applyAgentModelOp(models, { op: 'agentModels.clearAgentField', agentId: 'debugger', field: 'reasoningLevel' });
+    models = applyAgentModelOp(models, {
+      op: 'agentModels.clearAgentField',
+      agentId: 'debugger',
+      field: 'reasoningLevel',
+    });
     expect(models.byAgent).toEqual({});
   });
 
@@ -44,14 +58,20 @@ describe('settings patch ops', () => {
       { op: 'layout', value: { leftSidebar: { width: 300 } } },
       { op: 'layout', value: { terminal: { height: 280 } } },
     ]);
-    expect(next.agentModels.byAgent).toEqual({ debugger: { model: 'ollama:local-model' }, analyzer: { model: 'ollama:other-model' } });
+    expect(next.agentModels.byAgent).toEqual({
+      debugger: { model: 'ollama:local-model' },
+      analyzer: { model: 'ollama:other-model' },
+    });
     expect(next.layout.leftSidebar).toEqual({ ...start.layout.leftSidebar, width: 300 });
     expect(next.layout.terminal.height).toBe(280);
     expect(next.layout.rightPanel).toBe(start.layout.rightPanel);
   });
 
   it('describes changed bindings only and applies them back', () => {
-    const before: AgentModelSettings = { default: { model: 'a:one' }, byAgent: { debugger: { model: 'a:two' }, analyzer: { model: 'a:three' } } };
+    const before: AgentModelSettings = {
+      default: { model: 'a:one' },
+      byAgent: { debugger: { model: 'a:two' }, analyzer: { model: 'a:three' } },
+    };
     const after: AgentModelSettings = { default: { model: 'a:one' }, byAgent: { analyzer: { model: 'a:four' } } };
     const changes = diffAgentModels(before, after);
     expect(changes).toEqual({ byAgent: { debugger: null, analyzer: { model: 'a:four' } } });

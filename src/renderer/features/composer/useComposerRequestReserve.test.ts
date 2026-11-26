@@ -8,11 +8,38 @@ import type { ComposerPendingRequestState } from './pendingRequestSelection';
 import type { ConversationMessage } from '@shared/types/conversation';
 
 const assistant = (status: ConversationMessage['status']): ConversationMessage => ({
-  id: 'assistant', turnId: 'turn-plan', sessionId: 's', projectId: 'p', role: 'assistant', content: '', status, createdAt: 1, updatedAt: 1,
+  id: 'assistant',
+  turnId: 'turn-plan',
+  sessionId: 's',
+  projectId: 'p',
+  role: 'assistant',
+  content: '',
+  status,
+  createdAt: 1,
+  updatedAt: 1,
 });
-const review = { kind: 'plan-review', request: { sessionId: 's', reviewId: 'review', agentId: 'mission', recovered: false,
-  turnId: 'turn-plan', toolCallId: 'plan', planReview: { planId: 'plan', revision: 1, uri: 'session://plans/p.md', hash: 'h',
-    title: 'Plan', summary: [], sections: [], status: 'awaiting', handoffOptions: [] } } } as ComposerPendingRequestState;
+const review = {
+  kind: 'plan-review',
+  request: {
+    sessionId: 's',
+    reviewId: 'review',
+    agentId: 'mission',
+    recovered: false,
+    turnId: 'turn-plan',
+    toolCallId: 'plan',
+    planReview: {
+      planId: 'plan',
+      revision: 1,
+      uri: 'session://plans/p.md',
+      hash: 'h',
+      title: 'Plan',
+      summary: [],
+      sections: [],
+      status: 'awaiting',
+      handoffOptions: [],
+    },
+  },
+} as ComposerPendingRequestState;
 
 let reserved: number[] = [];
 const Probe = ({ pending }: { pending: ComposerPendingRequestState | null }) => {
@@ -27,13 +54,17 @@ beforeEach(() => {
   useConversationStore.getState().reset();
   reserved = [];
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
-it('keeps an answered request\'s height until its turn ends, and releases it when the turn stops instead', async () => {
+it("keeps an answered request's height until its turn ends, and releases it when the turn stops instead", async () => {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
-  const render = (pending: ComposerPendingRequestState | null) => act(async () => root.render(createElement(Probe, { pending })));
+  const render = (pending: ComposerPendingRequestState | null) =>
+    act(async () => root.render(createElement(Probe, { pending })));
   try {
     useConversationStore.getState().upsertConversationMessages([assistant('streaming')]);
     await render(review);
@@ -44,7 +75,9 @@ it('keeps an answered request\'s height until its turn ends, and releases it whe
     await render(review);
     expect(reserved.at(-1)).toBe(0);
     await render(null);
-    await act(async () => useConversationStore.getState().upsertConversationMessages([{ ...assistant('complete'), updatedAt: 2 }]));
+    await act(async () =>
+      useConversationStore.getState().upsertConversationMessages([{ ...assistant('complete'), updatedAt: 2 }]),
+    );
     expect(reserved.at(-1)).toBe(0);
     // A turn that stops after its request was answered releases the reserve the same way.
     useConversationStore.getState().reset();
@@ -52,7 +85,9 @@ it('keeps an answered request\'s height until its turn ends, and releases it whe
     await render(review);
     await render(null);
     expect(reserved.at(-1)).toBe(202);
-    await act(async () => useConversationStore.getState().upsertConversationMessages([{ ...assistant('stopped'), updatedAt: 2 }]));
+    await act(async () =>
+      useConversationStore.getState().upsertConversationMessages([{ ...assistant('stopped'), updatedAt: 2 }]),
+    );
     expect(reserved.at(-1)).toBe(0);
   } finally {
     await act(async () => root.unmount());

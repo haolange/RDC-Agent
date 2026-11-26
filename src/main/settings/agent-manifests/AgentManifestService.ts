@@ -2,7 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import { createHash } from 'crypto';
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
-import { AGENT_PROJECT_CEILING_NARROWED, AGENT_PROJECT_UNTRUSTED, agentAccessCeiling, type AgentAccessCeiling } from '@shared/types/agentManifest';
+import {
+  AGENT_PROJECT_CEILING_NARROWED,
+  AGENT_PROJECT_UNTRUSTED,
+  agentAccessCeiling,
+  type AgentAccessCeiling,
+} from '@shared/types/agentManifest';
 import { AGENT_ROLES } from '@shared/constants/agents';
 import { resolveAgentModel } from '@shared/utils/agentModelRoute';
 import { AppError } from '@shared/errors/appError';
@@ -15,7 +20,12 @@ import { StampedValue, directoryStamp, fileStamp } from '../../runtime/externalI
 import { writeFileAtomic } from '../../runtime/atomicFile';
 import { narrowerAccessCeiling } from './accessCeiling';
 import { isSafeAgentProfileId } from './agentProfileId';
-import { AGENT_MANIFEST_FIELD_MOVED, parseAgentMarkdownStrict, readAgentFrontmatterId, serializeAgentMarkdown } from './agentManifestParse';
+import {
+  AGENT_MANIFEST_FIELD_MOVED,
+  parseAgentMarkdownStrict,
+  readAgentFrontmatterId,
+  serializeAgentMarkdown,
+} from './agentManifestParse';
 import { projectAgentTrust } from './ProjectAgentTrust';
 import type { EffectiveAgentProfile } from './agentRuntimeTypes';
 import type { ScopedResourceCandidate } from '../../runtime/scopedResourceTypes';
@@ -58,16 +68,11 @@ const safeFileNameForDraft = (draft: Pick<AgentManifestDraft, 'id' | 'name' | 'f
   return expected;
 };
 
-const hashManifestContent = (content: string): string => (
-  createHash('sha256').update(content, 'utf8').digest('hex')
-);
+const hashManifestContent = (content: string): string => createHash('sha256').update(content, 'utf8').digest('hex');
 
-const hashManifestFile = (filePath: string): string =>
-  hashManifestContent(fs.readFileSync(filePath, 'utf8'));
+const hashManifestFile = (filePath: string): string => hashManifestContent(fs.readFileSync(filePath, 'utf8'));
 
-const reservedAgentIdsForCandidate = (
-  candidate: ScopedResourceCandidate<AgentManifestDefinition>,
-): string[] => {
+const reservedAgentIdsForCandidate = (candidate: ScopedResourceCandidate<AgentManifestDefinition>): string[] => {
   const filenameId = idFromFileName(path.basename(candidate.sourcePath));
   const ids = [filenameId, candidate.id];
   try {
@@ -99,9 +104,9 @@ const isAgentManifestFileName = (entry: string): boolean => entry.endsWith('.age
 
 const listAgentManifestFiles = (directory: string): string[] => {
   if (!fs.existsSync(directory)) return [];
-  return fs.readdirSync(directory).filter((entry) => (
-    isAgentManifestFileName(entry) && isSafeAgentProfileId(idFromFileName(entry))
-  ));
+  return fs
+    .readdirSync(directory)
+    .filter((entry) => isAgentManifestFileName(entry) && isSafeAgentProfileId(idFromFileName(entry)));
 };
 
 /** A project profile without a user or builtin profile of the same id never gets process execution. */
@@ -220,7 +225,10 @@ interface EffectiveSnapshot {
 export class AgentManifestService {
   private readAgentModels: () => AgentModelSettings = () => ({ default: {}, byAgent: {} });
   private readonly manifestFiles = new Map<string, StampedValue<ManifestFiles>>();
-  private readonly effective = new WeakMap<ManifestFiles, { agentModels: AgentModelSettings; snapshot: EffectiveSnapshot }>();
+  private readonly effective = new WeakMap<
+    ManifestFiles,
+    { agentModels: AgentModelSettings; snapshot: EffectiveSnapshot }
+  >();
   private readonly globalInstructions = new Map<string, StampedValue<string>>();
   private readonly sortedDefinitions = new WeakMap<EffectiveSnapshot, readonly AgentManifestDefinition[]>();
 
@@ -256,7 +264,11 @@ export class AgentManifestService {
         ...(projectRoot ? [appPathService.getProjectRdcPaths(projectRoot).agentsPath] : []),
       ];
       value = new StampedValue(
-        () => [...directories.map((directory) => directoryStamp(directory, isAgentManifestFileName)), projectAgentTrust.stamp()].join('#'),
+        () =>
+          [
+            ...directories.map((directory) => directoryStamp(directory, isAgentManifestFileName)),
+            projectAgentTrust.stamp(),
+          ].join('#'),
         () => this.readManifestFiles(paths, projectRoot),
       );
       this.manifestFiles.set(key, value);
@@ -285,7 +297,8 @@ export class AgentManifestService {
     if (cached?.agentModels === agentModels) return cached.snapshot;
     const profiles = files.resolved.resources.map((resource) => {
       const model = resolveAgentModel(resource.value.id, agentModels);
-      const builtinSourceHash = resource.provenance.scope === 'builtin' ? undefined : files.builtinHashes.get(resource.value.id);
+      const builtinSourceHash =
+        resource.provenance.scope === 'builtin' ? undefined : files.builtinHashes.get(resource.value.id);
       return {
         ...resource.value,
         builtin: resource.provenance.scope === 'builtin',
@@ -294,13 +307,25 @@ export class AgentManifestService {
           ...resource.provenance,
           sourceHash: files.sourceHashes.get(resource.provenance.sourcePath)!,
         },
-        compiledRoute: { agentId: resource.value.id, providerId: model.route?.providerId ?? '', modelId: model.route?.modelId ?? '' },
+        compiledRoute: {
+          agentId: resource.value.id,
+          providerId: model.route?.providerId ?? '',
+          modelId: model.route?.modelId ?? '',
+        },
         ...(model.reasoningLevel ? { reasoningLevel: model.reasoningLevel } : {}),
         modelSource: model.source,
-        ...(builtinSourceHash ? { builtinUpdate: {
-          builtinSourceHash,
-          status: !resource.value.basedOn ? 'unknown-base' as const : resource.value.basedOn === builtinSourceHash ? 'current' as const : 'updated' as const,
-        } } : {}),
+        ...(builtinSourceHash
+          ? {
+              builtinUpdate: {
+                builtinSourceHash,
+                status: !resource.value.basedOn
+                  ? ('unknown-base' as const)
+                  : resource.value.basedOn === builtinSourceHash
+                    ? ('current' as const)
+                    : ('updated' as const),
+              },
+            }
+          : {}),
       };
     });
     const snapshot = deepFreeze({ profiles, diagnostics: files.diagnostics });
@@ -327,9 +352,14 @@ export class AgentManifestService {
     for (const loaded of loadManifestCandidates(this.getAgentsDirectory(paths), 'user', false)) {
       const reserved = reservedAgentIdsForCandidate(loaded.candidate);
       if (reserved.length > 0) {
-        diagnostics.push(
-          { code: 'AGENT_ID_RESERVED_HISTORICAL', severity: 'error', scope: 'user', agentId: reserved[0], sourcePath: loaded.candidate.sourcePath, message: `Agent id '${reserved[0]}' is reserved.` },
-        );
+        diagnostics.push({
+          code: 'AGENT_ID_RESERVED_HISTORICAL',
+          severity: 'error',
+          scope: 'user',
+          agentId: reserved[0],
+          sourcePath: loaded.candidate.sourcePath,
+          message: `Agent id '${reserved[0]}' is reserved.`,
+        });
         continue;
       }
       candidates.push(loaded.candidate);
@@ -340,22 +370,37 @@ export class AgentManifestService {
       for (const loaded of loadManifestCandidates(projectAgentsPath, 'project', false)) {
         const reserved = reservedAgentIdsForCandidate(loaded.candidate);
         if (reserved.length > 0) {
-          diagnostics.push(
-            { code: 'AGENT_ID_RESERVED_HISTORICAL', severity: 'error', scope: 'project', agentId: reserved[0], sourcePath: loaded.candidate.sourcePath, message: `Agent id '${reserved[0]}' is reserved.` },
-          );
+          diagnostics.push({
+            code: 'AGENT_ID_RESERVED_HISTORICAL',
+            severity: 'error',
+            scope: 'project',
+            agentId: reserved[0],
+            sourcePath: loaded.candidate.sourcePath,
+            message: `Agent id '${reserved[0]}' is reserved.`,
+          });
           continue;
         }
-        if (!loaded.candidate.invalid && !projectAgentTrust.isTrusted(projectRoot, loaded.candidate.id, loaded.candidate.sourcePath)) {
+        if (
+          !loaded.candidate.invalid &&
+          !projectAgentTrust.isTrusted(projectRoot, loaded.candidate.id, loaded.candidate.sourcePath)
+        ) {
           diagnostics.push({
-            code: AGENT_PROJECT_UNTRUSTED, severity: 'warning', scope: 'project', agentId: loaded.candidate.id,
-            sourcePath: loaded.candidate.sourcePath, message: 'This project brings its own Agent profile; it loads only after you trust it.',
+            code: AGENT_PROJECT_UNTRUSTED,
+            severity: 'warning',
+            scope: 'project',
+            agentId: loaded.candidate.id,
+            sourcePath: loaded.candidate.sourcePath,
+            message: 'This project brings its own Agent profile; it loads only after you trust it.',
           });
           continue;
         }
         const clamped = clampProjectAccessCeiling(loaded.candidate, candidates);
         if (clamped.narrowedFrom) {
           diagnostics.push({
-            code: AGENT_PROJECT_CEILING_NARROWED, severity: 'warning', scope: 'project', agentId: loaded.candidate.id,
+            code: AGENT_PROJECT_CEILING_NARROWED,
+            severity: 'warning',
+            scope: 'project',
+            agentId: loaded.candidate.id,
             sourcePath: loaded.candidate.sourcePath,
             message: `Access ceiling ${clamped.narrowedFrom} narrowed to ${agentAccessCeiling(clamped.candidate.value)}: a project profile cannot exceed the profile it overrides.`,
           });
@@ -366,7 +411,7 @@ export class AgentManifestService {
 
     const resolved = scopedResourceResolver.resolve(candidates);
     for (const entry of resolved.diagnostics) {
-      const candidate = candidates.find(value => value.sourcePath === entry.sourcePath);
+      const candidate = candidates.find((value) => value.sourcePath === entry.sourcePath);
       if (!candidate) throw new AppError('AGENT_DIAGNOSTIC_SOURCE_MISSING');
       const movedPrefix = `${AGENT_MANIFEST_FIELD_MOVED}: `;
       const moved = entry.code === 'resource.invalid' && entry.message.startsWith(movedPrefix);
@@ -378,14 +423,26 @@ export class AgentManifestService {
         sourcePath: candidate.sourcePath,
       });
     }
-    const uniqueDiagnostics = [...new Map(diagnostics.map(issue => {
-      return [JSON.stringify([resolvedPathKey(issue.sourcePath), issue.code, issue.message]), issue] as const;
-    })).values()].sort((a, b) => a.scope.localeCompare(b.scope) || a.sourcePath.localeCompare(b.sourcePath) || a.code.localeCompare(b.code));
-    const builtinHashes = new Map(candidates.filter((candidate) => candidate.scope === 'builtin')
-      .map((candidate) => [candidate.id, hashManifestFile(candidate.sourcePath)] as const));
-    const sourceHashes = new Map(resolved.resources.map((resource) => (
-      [resource.provenance.sourcePath, hashManifestFile(resource.provenance.sourcePath)] as const
-    )));
+    const uniqueDiagnostics = [
+      ...new Map(
+        diagnostics.map((issue) => {
+          return [JSON.stringify([resolvedPathKey(issue.sourcePath), issue.code, issue.message]), issue] as const;
+        }),
+      ).values(),
+    ].sort(
+      (a, b) =>
+        a.scope.localeCompare(b.scope) || a.sourcePath.localeCompare(b.sourcePath) || a.code.localeCompare(b.code),
+    );
+    const builtinHashes = new Map(
+      candidates
+        .filter((candidate) => candidate.scope === 'builtin')
+        .map((candidate) => [candidate.id, hashManifestFile(candidate.sourcePath)] as const),
+    );
+    const sourceHashes = new Map(
+      resolved.resources.map(
+        (resource) => [resource.provenance.sourcePath, hashManifestFile(resource.provenance.sourcePath)] as const,
+      ),
+    );
     return { resolved, diagnostics: uniqueDiagnostics, builtinHashes, sourceHashes, trustRevision };
   }
 
@@ -397,9 +454,14 @@ export class AgentManifestService {
     const snapshot = this.resolveEffectiveSnapshot(paths, projectRoot);
     let sorted = this.sortedDefinitions.get(snapshot);
     if (!sorted) {
-      sorted = Object.freeze(snapshot.profiles
-        .slice()
-        .sort((left, right) => Number(right.userInvocable) - Number(left.userInvocable) || left.name.localeCompare(right.name)));
+      sorted = Object.freeze(
+        snapshot.profiles
+          .slice()
+          .sort(
+            (left, right) =>
+              Number(right.userInvocable) - Number(left.userInvocable) || left.name.localeCompare(right.name),
+          ),
+      );
       this.sortedDefinitions.set(snapshot, sorted);
     }
     return sorted;
@@ -424,10 +486,7 @@ export class AgentManifestService {
     return this.resolveEffectiveSnapshot(paths, projectRoot).profiles;
   }
 
-  saveGlobalInstructions(
-    paths: Pick<AppRuntimePaths, 'instructionsPath'>,
-    globalInstructions: string,
-  ): void {
+  saveGlobalInstructions(paths: Pick<AppRuntimePaths, 'instructionsPath'>, globalInstructions: string): void {
     fs.writeFileSync(this.getGlobalInstructionsPath(paths), globalInstructions.trim(), 'utf8');
     this.globalInstructions.get(this.getGlobalInstructionsPath(paths))?.invalidate();
   }
@@ -447,9 +506,8 @@ export class AgentManifestService {
     if (agentId === GENERAL_AGENT_ID && !draft.delete && draft.enabled === false) {
       throw new AppError('AGENT_DEFAULT_REQUIRED', 'General is the default Agent and cannot be switched off.');
     }
-    const directory = options.scope === 'project'
-      ? this.resolveProjectAgentsPath(options.projectRoot)
-      : this.getAgentsDirectory(paths);
+    const directory =
+      options.scope === 'project' ? this.resolveProjectAgentsPath(options.projectRoot) : this.getAgentsDirectory(paths);
     if (options.scope === 'user' && path.resolve(directory) === path.resolve(appPathService.getBuiltinAgentsPath())) {
       throw new AppError('BUILTIN_AGENT_MANIFEST_READONLY', 'edit requires an explicit user copy-on-write.');
     }
@@ -463,10 +521,14 @@ export class AgentManifestService {
       options.scope === 'project' ? options.projectRoot : undefined,
     ).profiles.find((profile) => profile.id === agentId);
     if (options.sourceHash && current && current.provenance.sourceHash !== options.sourceHash) {
-      throw new AppError('AGENT_MANIFEST_SOURCE_HASH_CONFLICT', 'the effective profile changed since the editor loaded.');
+      throw new AppError(
+        'AGENT_MANIFEST_SOURCE_HASH_CONFLICT',
+        'the effective profile changed since the editor loaded.',
+      );
     }
     // A copy of the current builtin records which builtin version it was taken from.
-    const basedOn = draft.basedOn ?? (current?.provenance.scope === 'builtin' ? current.provenance.sourceHash : undefined);
+    const basedOn =
+      draft.basedOn ?? (current?.provenance.scope === 'builtin' ? current.provenance.sourceHash : undefined);
     const resolutionRoot = options.scope === 'project' ? options.projectRoot : undefined;
     if (draft.delete) {
       if (current?.provenance.scope === 'builtin' && options.scope === 'user') {
@@ -537,19 +599,15 @@ export class AgentManifestService {
     options?: { scope?: 'user' | 'project'; projectRoot?: string },
   ): Promise<AgentManifestDefinition | null> {
     if (isReservedAgentId(agentId)) return null;
-    const directory = options?.scope === 'project'
-      ? this.resolveProjectAgentsPath(options.projectRoot)
-      : this.getAgentsDirectory(paths);
+    const directory =
+      options?.scope === 'project'
+        ? this.resolveProjectAgentsPath(options.projectRoot)
+        : this.getAgentsDirectory(paths);
     const entries = await fs.promises.readdir(directory).catch(() => [] as string[]);
-    const fileName = entries.find((entry) => (
-      entry.endsWith('.agent.md') && idFromFileName(entry) === agentId
-    ));
+    const fileName = entries.find((entry) => entry.endsWith('.agent.md') && idFromFileName(entry) === agentId);
     if (!fileName) return null;
     const filePath = path.join(directory, fileName);
-    const [content, stat] = await Promise.all([
-      fs.promises.readFile(filePath, 'utf8'),
-      fs.promises.stat(filePath),
-    ]);
+    const [content, stat] = await Promise.all([fs.promises.readFile(filePath, 'utf8'), fs.promises.stat(filePath)]);
     const parsed = parseAgentMarkdownStrict(content, filePath, agentId, stat.mtime.toISOString(), false);
     return parsed.ok ? parsed.definition : null;
   }
@@ -565,13 +623,18 @@ export class AgentManifestService {
     projectRoot?: string,
   ): { agentId: string; scope: AgentManifestWriteScope; sourcePath: string; sourceHash: string } {
     this.revalidate();
-    const diagnostic = this.resolveEffectiveSnapshot(paths, projectRoot).diagnostics.find((issue) => (
-      issue.code === code && issue.scope !== 'builtin' && samePath(issue.sourcePath, sourcePath)
-    ));
+    const diagnostic = this.resolveEffectiveSnapshot(paths, projectRoot).diagnostics.find(
+      (issue) => issue.code === code && issue.scope !== 'builtin' && samePath(issue.sourcePath, sourcePath),
+    );
     if (!diagnostic || diagnostic.scope === 'builtin') {
       throw new AppError('AGENT_OVERRIDE_NOT_DIAGNOSED', `${sourcePath} has no current ${code} diagnostic.`);
     }
-    return { agentId: diagnostic.agentId, scope: diagnostic.scope, sourcePath: diagnostic.sourcePath, sourceHash: hashManifestFile(diagnostic.sourcePath) };
+    return {
+      agentId: diagnostic.agentId,
+      scope: diagnostic.scope,
+      sourcePath: diagnostic.sourcePath,
+      sourceHash: hashManifestFile(diagnostic.sourcePath),
+    };
   }
 
   /** The current builtin and the effective user/project override of one Agent. */
@@ -625,18 +688,19 @@ export class AgentManifestService {
       throw new Error(`Invalid agent profile id: ${imported.definition.id}`);
     }
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = imported.definition;
-    const commit = await this.saveDefinition(paths, {
-      ...draft,
-      fileName: fileNameForId(imported.definition.id || imported.definition.name),
-    }, { scope: 'user' });
+    const commit = await this.saveDefinition(
+      paths,
+      {
+        ...draft,
+        fileName: fileNameForId(imported.definition.id || imported.definition.name),
+      },
+      { scope: 'user' },
+    );
     if (!commit.definition) throw new Error('Imported agent manifest was not committed.');
     return commit.definition;
   }
 
-  routesFromDefinitions(
-    currentRoutes: LlmAgentRoute[],
-    definitions: AgentManifestDraft[],
-  ): LlmAgentRoute[] {
+  routesFromDefinitions(currentRoutes: LlmAgentRoute[], definitions: AgentManifestDraft[]): LlmAgentRoute[] {
     const routeMap = new Map(currentRoutes.map((route) => [route.agentId, route]));
     const routeAgentIds = new Set<string>(AGENT_ROLES);
     for (const definition of definitions) {
@@ -648,18 +712,24 @@ export class AgentManifestService {
       // authority that may accept or reject the model at execution time.
       routeMap.set(definition.id, this.routeForAgent(definition.id));
     }
-    return Array.from(routeAgentIds).map((agentId) => routeMap.get(agentId) ?? {
-      agentId,
-      providerId: '',
-      modelId: '',
-    });
+    return Array.from(routeAgentIds).map(
+      (agentId) =>
+        routeMap.get(agentId) ?? {
+          agentId,
+          providerId: '',
+          modelId: '',
+        },
+    );
   }
 
   private readGlobalInstructions(paths: Pick<AppRuntimePaths, 'instructionsPath'>): string {
     const filePath = this.getGlobalInstructionsPath(paths);
     let value = this.globalInstructions.get(filePath);
     if (!value) {
-      value = new StampedValue(() => fileStamp(filePath), () => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : ''));
+      value = new StampedValue(
+        () => fileStamp(filePath),
+        () => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : ''),
+      );
       this.globalInstructions.set(filePath, value);
     }
     return value.get();

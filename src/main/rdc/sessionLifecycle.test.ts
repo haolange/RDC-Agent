@@ -82,7 +82,8 @@ describe('sessionLifecycle hooks', () => {
     closeReplay.mockRejectedValueOnce(new Error('RDC_DEVICE_ACTION_UNCONFIRMED'));
     await expect(removeSessionWithHooks('sess-1')).rejects.toThrow('RDC_DEVICE_ACTION_UNCONFIRMED');
     expect(closeReplay).toHaveBeenCalledWith({ projectId: 'proj-1', sessionId: 'sess-1' });
-    expect(clearReplayHistory).not.toHaveBeenCalled(); expect(removeSession).not.toHaveBeenCalled();
+    expect(clearReplayHistory).not.toHaveBeenCalled();
+    expect(removeSession).not.toHaveBeenCalled();
     expect(dispatchRuntimeHooks).not.toHaveBeenCalled();
   });
   it('keeps the session when history cleanup fails so deletion can be retried', async () => {

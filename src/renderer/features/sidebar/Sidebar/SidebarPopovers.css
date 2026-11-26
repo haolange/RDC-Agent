@@ -62,7 +62,7 @@
   background: var(--token-bg-overlay);
   border: 1px solid var(--token-border-card);
   box-shadow: var(--token-shadow-popover);
-  }
+}
 
 .sidebar-context-menu-item {
   display: flex;

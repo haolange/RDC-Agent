@@ -1,4 +1,14 @@
-import { type ChallengeRecord, type ClaimRecord, type ClaimSet, type CompactProvenanceEntry, type EvidenceRecord, type ExperimentRecord, type InvestigationMission, type InvestigationReport, type WorldState } from '@shared/types/renderdocInvestigation';
+import {
+  type ChallengeRecord,
+  type ClaimRecord,
+  type ClaimSet,
+  type CompactProvenanceEntry,
+  type EvidenceRecord,
+  type ExperimentRecord,
+  type InvestigationMission,
+  type InvestigationReport,
+  type WorldState,
+} from '@shared/types/renderdocInvestigation';
 import { InvestigationError } from './investigationErrors';
 import type { ClaimKind, EpistemicStatus, ExperimentStatus } from '@shared/types/renderdocInvestigation';
 
@@ -8,10 +18,7 @@ const ANALYZER_LAYER_RANK: Record<AnalyzerExplanationLayer, number> = {
   observed: 2,
 };
 
-export function isOptimizerExperimentRecord(
-  experiment: ExperimentRecord,
-  mission?: InvestigationMission,
-): boolean {
+export function isOptimizerExperimentRecord(experiment: ExperimentRecord, mission?: InvestigationMission): boolean {
   if (mission === 'optimizer') return true;
   if (experiment.actionClass != null) return true;
   if (experiment.protocol.kind === 'ABABAB') return true;
@@ -67,9 +74,9 @@ export function assertSClaim01(
 
 export function assertProvenanceMatchesSource(entry: CompactProvenanceEntry, source: ClaimRecord): void {
   if (
-    entry.sourceClaimId !== source.claimId
-    || entry.sourceEpistemicStatus !== source.epistemic
-    || entry.sourceVerificationLevel !== source.verification
+    entry.sourceClaimId !== source.claimId ||
+    entry.sourceEpistemicStatus !== source.epistemic ||
+    entry.sourceVerificationLevel !== source.verification
   ) {
     throw new InvestigationError(
       'INVESTIGATION_INVARIANT_VIOLATION',
@@ -129,21 +136,19 @@ export function assertSCausal01(claim: ClaimRecord, lookup: InvestigationLookup)
   }
 }
 
-export function worldStateMarksEvidenceStale(
-  worldState: WorldState,
-  verdict: { staleEvidence: boolean },
-): boolean {
+export function worldStateMarksEvidenceStale(worldState: WorldState, verdict: { staleEvidence: boolean }): boolean {
   return verdict.staleEvidence || worldState.validity === 'polluted' || worldState.validity === 'stale';
 }
 
 export function assertAnalyzerClaimLayer(claim: ClaimRecord, lookup?: InvestigationLookup): void {
   const layer = analyzerExplanationLayer(claim.claimKind);
   if (!layer) return;
-  const crossed = layer === 'observed'
-    ? claim.epistemic !== 'observed' || claim.verification !== 'observed'
-    : layer === 'reconstructed'
-      ? claim.epistemic !== 'derived' || claim.verification !== 'reconstructed'
-      : claim.epistemic === 'observed' || claim.epistemic === 'derived' || claim.verification === 'observed';
+  const crossed =
+    layer === 'observed'
+      ? claim.epistemic !== 'observed' || claim.verification !== 'observed'
+      : layer === 'reconstructed'
+        ? claim.epistemic !== 'derived' || claim.verification !== 'reconstructed'
+        : claim.epistemic === 'observed' || claim.epistemic === 'derived' || claim.verification === 'observed';
   if (crossed) {
     throw new InvestigationError(
       'INVESTIGATION_INVARIANT_VIOLATION',
@@ -187,10 +192,7 @@ export function assertAnalyzerClaimLayer(claim: ClaimRecord, lookup?: Investigat
   }
 }
 
-export function assertOptimizerExperimentClose(
-  experiment: ExperimentRecord,
-  mission?: InvestigationMission,
-): void {
+export function assertOptimizerExperimentClose(experiment: ExperimentRecord, mission?: InvestigationMission): void {
   if (!isClosedExperimentStatus(experiment.status)) return;
   if (experiment.intervention.type === 'none') {
     throw new InvestigationError(
@@ -219,11 +221,9 @@ export function assertReportContractPresent(
 ): void {
   const contract = report.reportContract;
   if (!contract) {
-    throw new InvestigationError(
-      'INVESTIGATION_INVARIANT_VIOLATION',
-      'ready report requires reportContract',
-      { invariantId: 'S-CLAIM-01' },
-    );
+    throw new InvestigationError('INVESTIGATION_INVARIANT_VIOLATION', 'ready report requires reportContract', {
+      invariantId: 'S-CLAIM-01',
+    });
   }
   const missing = [
     contract.conclusion,
@@ -298,16 +298,21 @@ export function assertObservedClaimEvidence(
   const projected = options?.treatAsProjected === true || claim.projectionKind != null;
   const cited = projected
     ? (claim.compactProvenance ?? []).flatMap((entry) => {
-      const source = lookup.getClaim(entry.sourceClaimId);
-      return source && source.projectionKind == null && source.epistemic === 'observed' ? [source] : [];
-    })
-    : claim.epistemic === 'observed' ? [claim] : [];
+        const source = lookup.getClaim(entry.sourceClaimId);
+        return source && source.projectionKind == null && source.epistemic === 'observed' ? [source] : [];
+      })
+    : claim.epistemic === 'observed'
+      ? [claim]
+      : [];
   for (const observed of cited) {
     if (!verifyEvidenceIdsResolvable(observed.evidenceIds ?? [], lookup)) {
       throw new InvestigationError(
         'INVESTIGATION_INVARIANT_VIOLATION',
         `observed claim ${observed.claimId} must cite at least one resolvable evidenceId (EvidenceRecord.evidenceId or an EvidencePack item, not an artifactId)`,
-        { invariantId: 'S-EVIDENCE-01', details: { claimId: observed.claimId, evidenceIds: observed.evidenceIds ?? [] } },
+        {
+          invariantId: 'S-EVIDENCE-01',
+          details: { claimId: observed.claimId, evidenceIds: observed.evidenceIds ?? [] },
+        },
       );
     }
   }
@@ -321,7 +326,10 @@ export function assertReportRecordRefs(
   const mission = options?.mission ?? report.mission;
   for (const evidenceId of report.evidenceIds) {
     if (!lookup.getEvidence(evidenceId)) {
-      throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `report evidence ${evidenceId} is not resolvable; evidenceIds use EvidenceRecord.evidenceId (or an EvidencePack item), not artifactId. Read the evidence artifact to inspect its record key.`);
+      throw new InvestigationError(
+        'INVESTIGATION_REF_UNRESOLVED',
+        `report evidence ${evidenceId} is not resolvable; evidenceIds use EvidenceRecord.evidenceId (or an EvidencePack item), not artifactId. Read the evidence artifact to inspect its record key.`,
+      );
     }
   }
   for (const experimentId of report.experimentIds) {
@@ -347,11 +355,8 @@ export function assertReportRecordRefs(
 
 export function assertChallengeRecordRefs(challenge: ChallengeRecord, lookup: InvestigationLookup): void {
   const { type, id } = challenge.targetRef;
-  const resolved = type === 'claim'
-    ? lookup.getClaim(id)
-    : type === 'evidence'
-      ? lookup.getEvidence(id)
-      : lookup.getExperiment(id);
+  const resolved =
+    type === 'claim' ? lookup.getClaim(id) : type === 'evidence' ? lookup.getEvidence(id) : lookup.getExperiment(id);
   if (!resolved) {
     throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `challenge target ${type}:${id}`);
   }
@@ -407,8 +412,13 @@ export function assertSState01(evidence: EvidenceRecord, lookup: InvestigationLo
 }
 
 export function assertObservedToolEvidenceHasArtifact(evidence: EvidenceRecord): void {
-  if (evidence.source.kind === 'tool' && evidence.epistemicStatus === 'observed'
-    && evidence.strength === 'strong' && !evidence.stale && evidence.artifactRefs.length === 0) {
+  if (
+    evidence.source.kind === 'tool' &&
+    evidence.epistemicStatus === 'observed' &&
+    evidence.strength === 'strong' &&
+    !evidence.stale &&
+    evidence.artifactRefs.length === 0
+  ) {
     throw new InvestigationError(
       'INVESTIGATION_REF_UNRESOLVED',
       'strong observed tool evidence requires a resolvable artifactRef and content hash',
@@ -432,10 +442,7 @@ export function assertEvidenceLinks(evidence: EvidenceRecord, lookup: Investigat
   }
 }
 
-export function verifyEvidenceIdsResolvable(
-  evidenceIds: string[],
-  lookup: InvestigationLookup,
-): boolean {
+export function verifyEvidenceIdsResolvable(evidenceIds: string[], lookup: InvestigationLookup): boolean {
   return evidenceIds.length >= 1 && evidenceIds.every((evidenceId) => Boolean(lookup.getEvidence(evidenceId)));
 }
 
@@ -446,9 +453,11 @@ export function experimentSatisfiesRdcIsolation(
   if (!experiment) return false;
   if (experiment.intervention.type === 'none') return false;
   const rollback = experiment.rollback;
-  return rollback.executed === true
-    && rollback.baselineRestored === true
-    && verifyEvidenceIdsResolvable(rollback.verifyEvidenceIds, lookup);
+  return (
+    rollback.executed === true &&
+    rollback.baselineRestored === true &&
+    verifyEvidenceIdsResolvable(rollback.verifyEvidenceIds, lookup)
+  );
 }
 
 export function evaluateSRdc01(input: {
@@ -459,8 +468,8 @@ export function evaluateSRdc01(input: {
   if (!isWorldStateMutated(input.worldState)) {
     return { polluted: false, staleEvidence: false };
   }
-  const isolated = input.worldState.replay.exclusiveLock === true
-    && experimentSatisfiesRdcIsolation(input.experiment, input.lookup);
+  const isolated =
+    input.worldState.replay.exclusiveLock === true && experimentSatisfiesRdcIsolation(input.experiment, input.lookup);
   if (isolated) return { polluted: false, staleEvidence: false };
   return { polluted: true, staleEvidence: true };
 }
@@ -478,7 +487,9 @@ export function collectProjectedClaims(record: unknown): ClaimRecord[] {
 }
 
 function isClaimRecord(value: unknown): value is ClaimRecord {
-  return Boolean(value && typeof value === 'object' && 'claimId' in value && 'claimKind' in value && 'epistemic' in value);
+  return Boolean(
+    value && typeof value === 'object' && 'claimId' in value && 'claimKind' in value && 'epistemic' in value,
+  );
 }
 
 /**
@@ -490,7 +501,8 @@ export function assertReadyObservedEvidence(kind: string, record: unknown, looku
   if (kind === 'claim') assertObservedClaimEvidence(record as ClaimRecord, lookup);
   if (kind === 'claim_set') for (const claim of (record as ClaimSet).items) assertObservedClaimEvidence(claim, lookup);
   if (kind === 'report') {
-    for (const claim of (record as InvestigationReport).claims) assertObservedClaimEvidence(claim, lookup, { treatAsProjected: true });
+    for (const claim of (record as InvestigationReport).claims)
+      assertObservedClaimEvidence(claim, lookup, { treatAsProjected: true });
   }
 }
 
@@ -506,7 +518,9 @@ export function epistemicRank(status: EpistemicStatus): number {
   return EPISTEMIC_RANK[status];
 }
 
-export function isCausalOrCounterfactualClaim(claim: Pick<ClaimRecord, 'claimKind' | 'declaresCounterfactual'>): boolean {
+export function isCausalOrCounterfactualClaim(
+  claim: Pick<ClaimRecord, 'claimKind' | 'declaresCounterfactual'>,
+): boolean {
   return claim.claimKind === 'causal_conclusion' || claim.declaresCounterfactual === true;
 }
 

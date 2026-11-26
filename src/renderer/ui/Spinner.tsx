@@ -6,10 +6,6 @@ export interface SpinnerProps {
 
 export function Spinner({ size = 'md' }: SpinnerProps) {
   return (
-    <span
-      className={`ui-spinner animate-spin${size !== 'md' ? ` is-size-${size}` : ''}`}
-      role="status"
-      aria-hidden
-    />
+    <span className={`ui-spinner animate-spin${size !== 'md' ? ` is-size-${size}` : ''}`} role="status" aria-hidden />
   );
 }

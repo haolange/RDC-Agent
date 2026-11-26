@@ -10,11 +10,7 @@ import {
   queryAdbDevicesLinesWithServerBootstrap,
   type AdbStartServerState,
 } from './adbServerClient';
-import {
-  devicesSemanticallyEqual,
-  nextPollIntervalMs,
-  POLL_BASE_MS,
-} from './replayDeviceDiff';
+import { devicesSemanticallyEqual, nextPollIntervalMs, POLL_BASE_MS } from './replayDeviceDiff';
 import { parseAdbDeviceLine } from './replayDeviceParse';
 import type { ReplayDeviceEntry, ReplayDeviceSnapshot } from '@shared/types/device';
 
@@ -61,7 +57,10 @@ export class ReplayDeviceService {
     this.initialized = true;
   }
   subscribe(listener: (snapshot: ReplayDeviceSnapshot) => void): () => void {
-    this.listeners.add(listener); return () => { this.listeners.delete(listener); };
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
   startWatch(): void {
@@ -240,24 +239,26 @@ export class ReplayDeviceService {
     this.pollIntervalMs = nextPollIntervalMs(this.pollIntervalMs, adbAvailable);
 
     const previousLocal = this.devices.get(LOCAL_DEVICE.id) ?? LOCAL_DEVICE;
-    const nextDevices = new Map<string, ReplayDeviceEntry>([[
-      LOCAL_DEVICE.id,
-      { ...LOCAL_DEVICE, lastSeen: previousLocal.lastSeen },
-    ]]);
+    const nextDevices = new Map<string, ReplayDeviceEntry>([
+      [LOCAL_DEVICE.id, { ...LOCAL_DEVICE, lastSeen: previousLocal.lastSeen }],
+    ]);
     const detectedIds = new Set<string>(['local']);
 
     for (const detected of detectedDevices) {
       detectedIds.add(detected.id);
       const previous = this.devices.get(detected.id);
-      nextDevices.set(detected.id, previous && devicesSemanticallyEqual([previous], [{ ...detected, lastSeen: previous.lastSeen }])
-        ? { ...detected, lastSeen: previous.lastSeen } : detected);
+      nextDevices.set(
+        detected.id,
+        previous && devicesSemanticallyEqual([previous], [{ ...detected, lastSeen: previous.lastSeen }])
+          ? { ...detected, lastSeen: previous.lastSeen }
+          : detected,
+      );
     }
 
     for (const [deviceId, device] of this.devices.entries()) {
       if (detectedIds.has(deviceId) || deviceId === 'local') {
         continue;
       }
-
 
       nextDevices.set(deviceId, {
         ...device,

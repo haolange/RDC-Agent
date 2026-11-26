@@ -5,7 +5,10 @@ export { PublicUrlDeniedError } from './publicAddress';
 
 /** The request to a validated public address did not complete: network failure, timeout, abort or a broken redirect. */
 export class PublicRequestFailedError extends Error {
-  constructor(readonly url: string, cause: unknown) {
+  constructor(
+    readonly url: string,
+    cause: unknown,
+  ) {
     super(`Public request to ${url} failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
   }
 }
@@ -36,7 +39,10 @@ export async function fetchPublic(rawUrl: string, options: PublicFetchOptions): 
   options.signal?.throwIfAborted();
   let current = await pinPublicUrl(rawUrl, { httpsOnly: options.httpsOnly });
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new Error(`Timed out after ${options.timeoutMs}ms`)), options.timeoutMs);
+  const timer = setTimeout(
+    () => controller.abort(new Error(`Timed out after ${options.timeoutMs}ms`)),
+    options.timeoutMs,
+  );
   const abort = (): void => controller.abort(options.signal?.reason ?? new Error('Request aborted'));
   options.signal?.addEventListener('abort', abort, { once: true });
   try {

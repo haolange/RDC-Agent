@@ -1,26 +1,20 @@
 import { create } from 'zustand';
-import type {
-  ProjectInputRecord,
-  ProjectRecord,
-  SessionRecord,
-} from '@shared/types/session';
+import type { ProjectInputRecord, ProjectRecord, SessionRecord } from '@shared/types/session';
 
 export type RightRailTarget = 'project' | 'session';
 
-const areProjectInputsEqual = (
-  leftInputs: ProjectInputRecord[],
-  rightInputs: ProjectInputRecord[],
-): boolean => (
-  leftInputs.length === rightInputs.length
-  && leftInputs.every((leftInput, index) => {
+const areProjectInputsEqual = (leftInputs: ProjectInputRecord[], rightInputs: ProjectInputRecord[]): boolean =>
+  leftInputs.length === rightInputs.length &&
+  leftInputs.every((leftInput, index) => {
     const rightInput = rightInputs[index];
-    return Boolean(rightInput)
-      && leftInput.inputId === rightInput.inputId
-      && leftInput.filePath === rightInput.filePath
-      && leftInput.lastModifiedAt === rightInput.lastModifiedAt
-      && leftInput.size === rightInput.size;
-  })
-);
+    return (
+      Boolean(rightInput) &&
+      leftInput.inputId === rightInput.inputId &&
+      leftInput.filePath === rightInput.filePath &&
+      leftInput.lastModifiedAt === rightInput.lastModifiedAt &&
+      leftInput.size === rightInput.size
+    );
+  });
 
 interface ProjectState {
   projects: ProjectRecord[];
@@ -60,44 +54,44 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setCurrentSessionId: (currentSessionId) => set({ currentSessionId }),
   setRightRailTarget: (rightRailTarget) => set({ rightRailTarget }),
   setProjectInputs: (inputs) => set({ projectInputs: inputs }),
-  updateProjectInputs: (projectId, inputs) => set((state) => {
-    const inputsUpdatedAt = Date.now();
-    const shouldUpdateProjectInputs = state.currentProject?.projectId === projectId
-      && !areProjectInputsEqual(state.projectInputs, inputs);
-    const shouldUpdateCurrentProject = state.currentProject?.projectId === projectId
-      && !areProjectInputsEqual(state.currentProject.inputs, inputs);
-    const projects = state.projects.map((project) => {
-      if (project.projectId !== projectId) {
-        return project;
+  updateProjectInputs: (projectId, inputs) =>
+    set((state) => {
+      const inputsUpdatedAt = Date.now();
+      const shouldUpdateProjectInputs =
+        state.currentProject?.projectId === projectId && !areProjectInputsEqual(state.projectInputs, inputs);
+      const shouldUpdateCurrentProject =
+        state.currentProject?.projectId === projectId && !areProjectInputsEqual(state.currentProject.inputs, inputs);
+      const projects = state.projects.map((project) => {
+        if (project.projectId !== projectId) {
+          return project;
+        }
+        if (areProjectInputsEqual(project.inputs, inputs)) {
+          return project;
+        }
+        return {
+          ...project,
+          inputs,
+          inputsUpdatedAt,
+        };
+      });
+      const didUpdateProjectList = projects.some((project, index) => project !== state.projects[index]);
+
+      if (!shouldUpdateProjectInputs && !shouldUpdateCurrentProject && !didUpdateProjectList) {
+        return state;
       }
-      if (areProjectInputsEqual(project.inputs, inputs)) {
-        return project;
-      }
+
       return {
-        ...project,
-        inputs,
-        inputsUpdatedAt,
+        ...state,
+        projectInputs: shouldUpdateProjectInputs ? inputs : state.projectInputs,
+        currentProject:
+          shouldUpdateCurrentProject && state.currentProject
+            ? {
+                ...state.currentProject,
+                inputs,
+                inputsUpdatedAt,
+              }
+            : state.currentProject,
+        projects,
       };
-    });
-    const didUpdateProjectList = projects.some((project, index) => project !== state.projects[index]);
-
-    if (!shouldUpdateProjectInputs && !shouldUpdateCurrentProject && !didUpdateProjectList) {
-      return state;
-    }
-
-    return {
-      ...state,
-      projectInputs: shouldUpdateProjectInputs
-        ? inputs
-        : state.projectInputs,
-      currentProject: shouldUpdateCurrentProject && state.currentProject
-        ? {
-            ...state.currentProject,
-            inputs,
-            inputsUpdatedAt,
-          }
-        : state.currentProject,
-      projects,
-    };
-  }, true),
+    }, true),
 }));

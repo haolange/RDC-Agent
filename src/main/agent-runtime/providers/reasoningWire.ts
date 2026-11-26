@@ -1,13 +1,8 @@
 import type { ReasoningVisibilityRequest } from '@shared/provider-catalog/modelManifestSchema';
-import type {
-  NamedReasoningLevel,
-  ResolvedReasoningSelection,
-} from '@shared/types/modelCapability';
+import type { NamedReasoningLevel, ResolvedReasoningSelection } from '@shared/types/modelCapability';
 import type { RequestPlan } from '@shared/types/providerCapability';
 
-function resolveWireLevel(
-  reasoning: ResolvedReasoningSelection,
-): NamedReasoningLevel | null {
+function resolveWireLevel(reasoning: ResolvedReasoningSelection): NamedReasoningLevel | null {
   if (reasoning.selection === 'off' || reasoning.selection === 'unknown') {
     return null;
   }
@@ -154,9 +149,8 @@ export function applyGeminiReasoning(
   if (!reasoning) {
     return;
   }
-  const withThoughts = (thinkingConfig: Record<string, unknown>) => (
-    visibilityRequest === 'gemini-include-thoughts' ? { ...thinkingConfig, includeThoughts: true } : thinkingConfig
-  );
+  const withThoughts = (thinkingConfig: Record<string, unknown>) =>
+    visibilityRequest === 'gemini-include-thoughts' ? { ...thinkingConfig, includeThoughts: true } : thinkingConfig;
 
   const wireLevel = resolveWireLevel(reasoning);
   if (reasoning.control.wireProfile.kind === 'gemini-thinking-level') {

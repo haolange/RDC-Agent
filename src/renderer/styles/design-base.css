@@ -53,7 +53,13 @@
     outline: 2px solid Highlight !important;
   }
 
-  :is([aria-selected='true'], [aria-current='page'], [aria-current='true'], [role='menuitemradio'][aria-checked='true'], .is-selected) {
+  :is(
+    [aria-selected='true'],
+    [aria-current='page'],
+    [aria-current='true'],
+    [role='menuitemradio'][aria-checked='true'],
+    .is-selected
+  ) {
     background-color: Highlight !important;
     color: HighlightText !important;
   }

@@ -99,8 +99,10 @@ export class AppPathService {
       path.join(process.cwd(), 'resources', 'agent-runtime'),
       path.join(process.resourcesPath ?? '', 'agent-runtime'),
     ];
-    return candidates.map((candidate) => path.resolve(candidate)).find((candidate) => fs.existsSync(candidate))
-      ?? path.resolve(appResources);
+    return (
+      candidates.map((candidate) => path.resolve(candidate)).find((candidate) => fs.existsSync(candidate)) ??
+      path.resolve(appResources)
+    );
   }
 
   getBuiltinAgentsPath(): string {
@@ -254,7 +256,11 @@ export class AppPathService {
   }
 
   getLiveReplayPreviewPath(sessionId: string): string {
-    return path.join(this.getAppStatePaths().capturePreviewsPath, 'live', `${sanitizePathSegment(sessionId || 'session')}.png`);
+    return path.join(
+      this.getAppStatePaths().capturePreviewsPath,
+      'live',
+      `${sanitizePathSegment(sessionId || 'session')}.png`,
+    );
   }
 }
 

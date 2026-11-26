@@ -27,17 +27,31 @@ const traceStatusFromAction = (event: ActionEvent): TraceStatus => {
 };
 
 /** The packet fields this emitter reads; a model may add others. */
-const VisibleReasoningPacketSchema = z.object({
-  mode: z.enum(['task_understanding', 'planning', 'intent', 'hypothesis', 'evidence_need', 'observation_summary',
-    'decision_update', 'next_action', 'risk_note', 'summary']),
-  content: z.string().min(1),
-  hypothesis: z.string().optional(),
-  nextAction: z.string().optional(),
-  confidence: z.enum(['low', 'medium', 'high']).optional(),
-}).passthrough();
+const VisibleReasoningPacketSchema = z
+  .object({
+    mode: z.enum([
+      'task_understanding',
+      'planning',
+      'intent',
+      'hypothesis',
+      'evidence_need',
+      'observation_summary',
+      'decision_update',
+      'next_action',
+      'risk_note',
+      'summary',
+    ]),
+    content: z.string().min(1),
+    hypothesis: z.string().optional(),
+    nextAction: z.string().optional(),
+    confidence: z.enum(['low', 'medium', 'high']).optional(),
+  })
+  .passthrough();
 
 /** Model thinking text that is a structured packet; any other text is shown as written. */
-const parseReasoningPacket = (text: string): Pick<VisibleReasoningPacket, 'mode' | 'content' | 'hypothesis' | 'nextAction' | 'confidence'> | null => {
+const parseReasoningPacket = (
+  text: string,
+): Pick<VisibleReasoningPacket, 'mode' | 'content' | 'hypothesis' | 'nextAction' | 'confidence'> | null => {
   const trimmed = text.trim();
   if (!trimmed.startsWith('{')) return null;
   let value: unknown;
@@ -178,7 +192,6 @@ export class TraceEventEmitter {
     };
     return this.store.append(runId, 'node.created', node);
   }
-
 }
 
 export interface VisibleReasoningPacket {

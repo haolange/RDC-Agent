@@ -1,7 +1,4 @@
-import type {
-  PreparedTurnContextSummary,
-  RunContextUsageSummary,
-} from '@shared/types/session';
+import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 
 export type ConversationPreparationPhase = 'idle' | 'preparing' | 'current' | 'actual';
 
@@ -43,11 +40,11 @@ function usageMatchesPreparedContext(
   usage: RunContextUsageSummary,
 ): boolean {
   return Boolean(
-    prepared
-    && usage.snapshotAt !== null
-    && usage.snapshotAt >= prepared.preparedAt
-    && usage.providerId === prepared.route.providerId
-    && [prepared.route.selectedModelId, prepared.route.effectiveModelId].includes(usage.modelId),
+    prepared &&
+    usage.snapshotAt !== null &&
+    usage.snapshotAt >= prepared.preparedAt &&
+    usage.providerId === prepared.route.providerId &&
+    [prepared.route.selectedModelId, prepared.route.effectiveModelId].includes(usage.modelId),
   );
 }
 
@@ -60,9 +57,9 @@ export function acceptsContextUsage(
   if (state.preparedTurnContext) return usageMatchesPreparedContext(state.preparedTurnContext, usage);
   if (state.conversationTerminalTurnId) return usage.runId === state.conversationTerminalTurnId;
   if (
-    state.currentRunUsage?.runId === usage.runId
-    && state.currentRunUsage.snapshotAt !== null
-    && usage.snapshotAt !== null
+    state.currentRunUsage?.runId === usage.runId &&
+    state.currentRunUsage.snapshotAt !== null &&
+    usage.snapshotAt !== null
   ) {
     return usage.snapshotAt >= state.currentRunUsage.snapshotAt;
   }
@@ -84,8 +81,8 @@ export function applyContextUsage(
   }
 
   const providerActualIsNewer = usageMatchesPreparedContext(state.preparedTurnContext, usage);
-  const terminalAlreadyObserved = providerActualIsNewer
-    && state.conversationTerminalTurnId === state.preparedTurnContext?.turnId;
+  const terminalAlreadyObserved =
+    providerActualIsNewer && state.conversationTerminalTurnId === state.preparedTurnContext?.turnId;
 
   return {
     ...state,

@@ -71,11 +71,14 @@ export interface InvestigationTxnIo {
 }
 
 export interface InvestigationTxnHooks {
-  onPersistBoundary?: (boundary: InvestigationPersistBoundary, info: {
-    txnId: string;
-    uri?: string;
-    role?: InvestigationTxnRole;
-  }) => void;
+  onPersistBoundary?: (
+    boundary: InvestigationPersistBoundary,
+    info: {
+      txnId: string;
+      uri?: string;
+      role?: InvestigationTxnRole;
+    },
+  ) => void;
 }
 
 export type InvestigationTxnRecovery = 'none' | 'rolled-back' | 'rolled-forward';
@@ -102,11 +105,15 @@ export function withInvestigationTxnLock<T>(
   options?: { maxAttempts?: number },
 ): T {
   try {
-    return withDirectoryFileLockSync(investigationTxnRoot(sessionPath), {
-      lockFileName: INVESTIGATION_TXN_LOCK,
-      timeoutCode: INVESTIGATION_TXN_LOCK_TIMEOUT,
-      ...(options?.maxAttempts != null ? { maxAttempts: options.maxAttempts } : {}),
-    }, operation);
+    return withDirectoryFileLockSync(
+      investigationTxnRoot(sessionPath),
+      {
+        lockFileName: INVESTIGATION_TXN_LOCK,
+        timeoutCode: INVESTIGATION_TXN_LOCK_TIMEOUT,
+        ...(options?.maxAttempts != null ? { maxAttempts: options.maxAttempts } : {}),
+      },
+      operation,
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.startsWith(INVESTIGATION_TXN_LOCK_TIMEOUT)) {
@@ -159,10 +166,7 @@ export function commitInvestigationTxn(
   emitBoundary(hooks, 'cleanup', { txnId });
 }
 
-export function recoverInvestigationTxn(
-  sessionId: string,
-  io: InvestigationTxnIo,
-): InvestigationTxnRecovery {
+export function recoverInvestigationTxn(sessionId: string, io: InvestigationTxnIo): InvestigationTxnRecovery {
   let sessionPath: string;
   try {
     sessionPath = io.resolve(sessionId, 'session://investigation/index.json').sessionPath;
@@ -206,25 +210,16 @@ export function recoverInvestigationTxn(
   return 'rolled-back';
 }
 
-function readStagingTexts(
-  sessionPath: string,
-  plan: InvestigationTxnPlanEntry[],
-): InvestigationTxnMutation[] {
+function readStagingTexts(sessionPath: string, plan: InvestigationTxnPlanEntry[]): InvestigationTxnMutation[] {
   const stagingDir = path.join(investigationTxnRoot(sessionPath), INVESTIGATION_TXN_STAGING);
   return plan.map((entry) => {
     const stagedPath = path.join(stagingDir, entry.stagingName);
     if (!fs.existsSync(stagedPath)) {
-      throw new InvestigationError(
-        'INVESTIGATION_DEGRADED',
-        `missing staging file for ${entry.uri}`,
-      );
+      throw new InvestigationError('INVESTIGATION_DEGRADED', `missing staging file for ${entry.uri}`);
     }
     const text = fs.readFileSync(stagedPath, 'utf8');
     if (sha256Prefixed(text) !== entry.contentHash) {
-      throw new InvestigationError(
-        'INVESTIGATION_DEGRADED',
-        `staging hash drifted for ${entry.uri}`,
-      );
+      throw new InvestigationError('INVESTIGATION_DEGRADED', `staging hash drifted for ${entry.uri}`);
     }
     return { uri: entry.uri, text, role: entry.role };
   });

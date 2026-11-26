@@ -10,7 +10,12 @@ export interface ProjectInputLifecycleHost {
   getProject(projectId: string): ProjectRecord | null;
   refresh(projectId: string): Promise<ProjectInputRecord[]>;
   detachReference(projectId: string, inputId: string): Promise<ProjectInputRecord[]>;
-  bindings(projectId: string): Array<{ scope: { projectId: string; sessionId: string }; inputId: string | null; captureHash: string | null; interactionLock: string | null }>;
+  bindings(projectId: string): Array<{
+    scope: { projectId: string; sessionId: string };
+    inputId: string | null;
+    captureHash: string | null;
+    interactionLock: string | null;
+  }>;
   close(projectId: string, inputId: string): Promise<void>;
   rebind(projectId: string, inputId: string, input: ProjectInputRecord): Promise<void>;
   block<T>(projectId: string, inputId: string, operation: () => Promise<T>): Promise<T>;
@@ -18,9 +23,20 @@ export interface ProjectInputLifecycleHost {
 }
 
 export class ProjectInputLifecycle {
-  constructor(private readonly host: ProjectInputLifecycleHost, private readonly history: ReplayHistoryStore) {}
+  constructor(
+    private readonly host: ProjectInputLifecycleHost,
+    private readonly history: ReplayHistoryStore,
+  ) {}
 
-  async prepare(projectId: string, inputId: string): Promise<{ project: ProjectRecord; input: ProjectInputRecord; affectedSessionIds: string[]; approvalIdentity: string }> {
+  async prepare(
+    projectId: string,
+    inputId: string,
+  ): Promise<{
+    project: ProjectRecord;
+    input: ProjectInputRecord;
+    affectedSessionIds: string[];
+    approvalIdentity: string;
+  }> {
     const project = this.host.getProject(projectId);
     if (!project) throw new AppError('PROJECT_NOT_FOUND');
     const input = project.inputs.find((item) => item.inputId === inputId);
@@ -31,7 +47,12 @@ export class ProjectInputLifecycle {
       if (!input.referenceIdentity || !input.contentSha256) throw new AppError('CAPTURE_REFERENCE_INVALID_RECORD');
     } else {
       const relative = path.relative(project.inputsPath, input.filePath);
-      if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || path.extname(input.filePath).toLowerCase() !== '.rdc') {
+      if (
+        !relative ||
+        relative.startsWith('..') ||
+        path.isAbsolute(relative) ||
+        path.extname(input.filePath).toLowerCase() !== '.rdc'
+      ) {
         throw new AppError('PROJECT_INPUT_PATH_ESCAPE');
       }
       await safePath(project.rootPath, input.filePath);
@@ -41,8 +62,19 @@ export class ProjectInputLifecycle {
     const bindings = this.host.bindings(projectId).filter((binding) => binding.inputId === inputId);
     const busy = bindings.filter((binding) => binding.interactionLock);
     if (busy.length) throw new AppError('PROJECT_INPUT_BUSY', busy.map((item) => item.scope.sessionId).join(', '));
-    return { project, input: verified, affectedSessionIds: bindings.map((item) => item.scope.sessionId),
-      approvalIdentity: JSON.stringify([projectId, inputId, input.source, input.filePath, verified.contentSha256, input.referenceIdentity]) };
+    return {
+      project,
+      input: verified,
+      affectedSessionIds: bindings.map((item) => item.scope.sessionId),
+      approvalIdentity: JSON.stringify([
+        projectId,
+        inputId,
+        input.source,
+        input.filePath,
+        verified.contentSha256,
+        input.referenceIdentity,
+      ]),
+    };
   }
 
   async remove(projectId: string, inputId: string, approvedIdentity: string): Promise<ProjectInputRemoveResult> {
@@ -67,9 +99,13 @@ export class ProjectInputLifecycle {
       });
     } catch (error) {
       const inputs = this.host.getProject(projectId)?.inputs ?? [];
-      return { success: false, inputs: fileDeleted ? inputs.filter((input) => input.inputId !== inputId) : inputs,
-        fileDeleted, cleanupPending: fileDeleted || !!this.host.getProject(projectId)?.replayCleanupPending,
-        error: error instanceof Error ? error.message : String(error) };
+      return {
+        success: false,
+        inputs: fileDeleted ? inputs.filter((input) => input.inputId !== inputId) : inputs,
+        fileDeleted,
+        cleanupPending: fileDeleted || !!this.host.getProject(projectId)?.replayCleanupPending,
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   }
 
@@ -81,8 +117,11 @@ export class ProjectInputLifecycle {
       if (!binding.inputId) continue;
       const current = byId.get(binding.inputId);
       if (current && current.contentSha256 === binding.captureHash) continue;
-      const moved = !current ? inputs.filter(input => input.contentSha256 === binding.captureHash)
-        .sort((a, b) => a.filePath.localeCompare(b.filePath))[0] : undefined;
+      const moved = !current
+        ? inputs
+            .filter((input) => input.contentSha256 === binding.captureHash)
+            .sort((a, b) => a.filePath.localeCompare(b.filePath))[0]
+        : undefined;
       if (moved) {
         await this.host.rebind(project.projectId, binding.inputId, moved);
         continue;
@@ -91,7 +130,10 @@ export class ProjectInputLifecycle {
       await this.host.close(project.projectId, binding.inputId);
     }
     // A same-content input anywhere in the project protects all session history for that hash.
-    await this.history.reconcileCaptureReferences(project.rootPath, new Set(inputs.map((input) => input.contentSha256!)));
+    await this.history.reconcileCaptureReferences(
+      project.rootPath,
+      new Set(inputs.map((input) => input.contentSha256!)),
+    );
     await this.history.reconcileInputSelections(project.rootPath, inputs);
   }
 }

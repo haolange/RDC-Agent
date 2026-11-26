@@ -11,7 +11,10 @@ import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/pro
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 
 interface ProviderConnectModelRowProps {
-  provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured' | 'serviceOperator' | 'authMode'>;
+  provider: Pick<
+    LlmProviderEntry,
+    'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured' | 'serviceOperator' | 'authMode'
+  >;
   model: LlmProviderModel;
   effectiveModel: EffectiveModel | null;
   snapshot: EffectiveCatalogSnapshot | null;
@@ -37,7 +40,8 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
 }) => {
   const { t } = useI18n();
   const availability = effectiveModel?.availability ?? model.availability ?? 'unknown';
-  const refreshError = snapshot?.lastRefreshError ?? (loadFailed ? t('settings.providers.modelRefreshFailedReason') : undefined);
+  const refreshError =
+    snapshot?.lastRefreshError ?? (loadFailed ? t('settings.providers.modelRefreshFailedReason') : undefined);
   const badge = resolveProviderModelAvailabilityBadge({
     availability,
     enabled: model.enabled,
@@ -46,17 +50,18 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
     refreshError,
   });
   const isUnavailable = badge === 'unavailable';
-  const statusLabel = badge === 'unavailable'
-    ? t('settings.providers.modelUnavailable')
-    : badge === 'disabled'
-      ? t('settings.providers.modelDisabled')
-      : badge === 'loading'
-        ? t('settings.providers.modelLoading')
-        : badge === 'refresh-failed'
-          ? t('settings.providers.modelRefreshFailed')
-          : badge === 'unverified'
-            ? t('settings.providers.modelUnverified')
-            : t('settings.providers.modelAvailable');
+  const statusLabel =
+    badge === 'unavailable'
+      ? t('settings.providers.modelUnavailable')
+      : badge === 'disabled'
+        ? t('settings.providers.modelDisabled')
+        : badge === 'loading'
+          ? t('settings.providers.modelLoading')
+          : badge === 'refresh-failed'
+            ? t('settings.providers.modelRefreshFailed')
+            : badge === 'unverified'
+              ? t('settings.providers.modelUnverified')
+              : t('settings.providers.modelAvailable');
   const statusTitle = isUnavailable
     ? t('settings.providers.modelUnavailableReason')
     : badge === 'refresh-failed'
@@ -74,10 +79,20 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
       <div className="settings-model-row-main">
         <span className="settings-model-row-identity">
           <span className="settings-model-row-label">{model.label}</span>
-          {effectiveModel ? <span className="settings-model-row-context">{formatContextCapability(effectiveModel, t)}</span> : null}
+          {effectiveModel ? (
+            <span className="settings-model-row-context">{formatContextCapability(effectiveModel, t)}</span>
+          ) : null}
         </span>
-        <span className={`settings-model-row-check is-${badge}`} tabIndex={statusTitle ? 0 : undefined} data-tooltip={statusTitle}>{statusLabel}</span>
-        <span className="settings-model-row-capabilities"><ProviderModelCapabilityIcons model={effectiveModel} /></span>
+        <span
+          className={`settings-model-row-check is-${badge}`}
+          tabIndex={statusTitle ? 0 : undefined}
+          data-tooltip={statusTitle}
+        >
+          {statusLabel}
+        </span>
+        <span className="settings-model-row-capabilities">
+          <ProviderModelCapabilityIcons model={effectiveModel} />
+        </span>
         <Switch
           checked={model.enabled}
           disabled={disabled || isUnavailable}
@@ -85,7 +100,9 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
           aria-label={t('settings.providers.capability.modelEnabled', { model: model.label })}
         />
         <Button
-          variant="ghost" size="sm" className="settings-model-capability-toggle"
+          variant="ghost"
+          size="sm"
+          className="settings-model-capability-toggle"
           aria-expanded={expanded}
           aria-label={`${t('settings.providers.capability.toggle')} · ${model.label}`}
           data-tooltip={t('settings.providers.capability.toggle')}

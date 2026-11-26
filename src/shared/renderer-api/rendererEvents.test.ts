@@ -12,8 +12,12 @@ function pushTransport() {
       return () => transport.removeListener(channel, callback);
     },
     addListener: (channel, callback) => listeners.set(channel, (listeners.get(channel) ?? new Set()).add(callback)),
-    removeListener: (channel, callback) => { listeners.get(channel)?.delete(callback); },
-    removeAllListeners: (channel) => { listeners.delete(channel); },
+    removeListener: (channel, callback) => {
+      listeners.get(channel)?.delete(callback);
+    },
+    removeAllListeners: (channel) => {
+      listeners.delete(channel);
+    },
   };
   const push = (channel: RendererEventChannel, payload: unknown) => {
     for (const callback of listeners.get(channel) ?? []) callback(payload);
@@ -36,8 +40,12 @@ describe('renderer events', () => {
     const status = { runId: 'run', sessionId: 'session', status: 'completed' };
     push('workflow:runStatusChanged', status);
     push('workflow:runStatusChanged', { runId: 'run', sessionId: 'session', status: 'exploded' });
-    const delta = { type: 'message_delta', sessionId: 'session', turnId: 'turn',
-      delta: { messageId: 'message', seq: 2, baseSeq: 1, fields: { content: 'Hi' } } };
+    const delta = {
+      type: 'message_delta',
+      sessionId: 'session',
+      turnId: 'turn',
+      delta: { messageId: 'message', seq: 2, baseSeq: 1, fields: { content: 'Hi' } },
+    };
     push('conversation:event', delta);
     push('conversation:event', { ...delta, delta: { ...delta.delta, seq: '3' } });
 

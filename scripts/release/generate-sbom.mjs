@@ -82,11 +82,13 @@ const bom = {
       version: packageJson.version ?? '0.0.0',
       'bom-ref': 'pkg:npm/' + packageJson.name + '@' + packageJson.version,
     },
-    tools: [{
-      vendor: 'RDC-Agent',
-      name: 'generate-sbom.mjs',
-      version: '0.2.0',
-    }],
+    tools: [
+      {
+        vendor: 'RDC-Agent',
+        name: 'generate-sbom.mjs',
+        version: '0.2.0',
+      },
+    ],
     properties: [
       { name: 'rdc:gitSha', value: gitSha() },
       { name: 'rdc:lockfile', value: 'pnpm-lock.yaml' },
@@ -104,4 +106,12 @@ const serialized = JSON.stringify(bom, null, 2) + '\n';
 writeFileSync(outPath, serialized, 'utf8');
 const digest = createHash('sha256').update(serialized).digest('hex');
 writeFileSync(outPath + '.sha256', digest + '  sbom.cdx.json\n', 'utf8');
-console.log('[release:sbom] Wrote ' + path.relative(repoRoot, outPath) + ' (' + components.length + ' components, sha256=' + digest.slice(0, 12) + ')');
+console.log(
+  '[release:sbom] Wrote ' +
+    path.relative(repoRoot, outPath) +
+    ' (' +
+    components.length +
+    ' components, sha256=' +
+    digest.slice(0, 12) +
+    ')',
+);

@@ -95,7 +95,10 @@ function helpMenu(): Electron.MenuItemConstructorOptions {
 function openLink(url: string): void {
   shell.openExternal(url).catch((error: unknown) => {
     runtimeLogService.log({
-      scope: 'app', namespace: 'system', severity: 'error', title: 'Could not open link',
+      scope: 'app',
+      namespace: 'system',
+      severity: 'error',
+      title: 'Could not open link',
       summary: `${url}: ${error instanceof Error ? error.message : String(error)}`,
     });
   });

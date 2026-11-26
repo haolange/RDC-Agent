@@ -6,7 +6,11 @@ import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } f
 export const templateResourceId = (kind: ScopedResourceKind): string => `new-${kind}`;
 
 export const normalizeResourceId = (value: string): string =>
-  value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || value;
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || value;
 
 export type SaveScopedResourceOutcome =
   | { ok: true; overview: RdcRuntimeOverview; id: string }
@@ -74,8 +78,9 @@ export async function importScopedResourceFromPicker(input: {
     ...(input.projectRoot ? { projectRoot: input.projectRoot } : {}),
   });
   if (!result) return null;
-  const imported = result.overview.resources.find(
-    (entry) => entry.scope === input.scope && entry.kind === input.kind && entry.id === result.id,
-  ) ?? null;
+  const imported =
+    result.overview.resources.find(
+      (entry) => entry.scope === input.scope && entry.kind === input.kind && entry.id === result.id,
+    ) ?? null;
   return { overview: result.overview, imported };
 }

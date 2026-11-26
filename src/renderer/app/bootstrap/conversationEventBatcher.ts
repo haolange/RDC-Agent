@@ -16,10 +16,8 @@ export interface ConversationEventBatcherOptions {
  * Terminal events flush immediately so stop/complete never wait on RAF.
  */
 export function createConversationEventBatcher(options: ConversationEventBatcherOptions) {
-  const schedule = options.schedule
-    ?? ((callback: () => void) => window.requestAnimationFrame(callback));
-  const cancel = options.cancel
-    ?? ((handle: number) => window.cancelAnimationFrame(handle));
+  const schedule = options.schedule ?? ((callback: () => void) => window.requestAnimationFrame(callback));
+  const cancel = options.cancel ?? ((handle: number) => window.cancelAnimationFrame(handle));
 
   const pendingByMessageId = new Map<string, MessageEvent>();
   let frameHandle: number | null = null;

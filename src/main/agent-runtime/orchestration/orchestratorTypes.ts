@@ -4,10 +4,7 @@
 
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentRouteCapability, AgentEvent } from '@shared/types/agentRuntime';
-import type {
-  ConversationTurnControls,
-  ResolvedReasoningSelection,
-} from '@shared/types/modelCapability';
+import type { ConversationTurnControls, ResolvedReasoningSelection } from '@shared/types/modelCapability';
 import type { EffectiveModel, ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 import type { PreparedTurnContextSummary } from '@shared/types/session';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
@@ -19,11 +16,7 @@ import type { McpConnectionLease } from './McpConnectionCoordinator';
 import type { AgentEventBridgeContext } from '../AgentEventBridge';
 import type { AttachmentLayer } from '@shared/types/conversation';
 import type { SessionAttachmentKind } from '@shared/types/session';
-import type {
-  Message,
-  ToolDefinition,
-  UserMessage,
-} from '../core/types';
+import type { Message, ToolDefinition, UserMessage } from '../core/types';
 import type { AgentTool } from '../agent/AgentTool';
 
 export interface FrozenAttachmentManifestEntry {

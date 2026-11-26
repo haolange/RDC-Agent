@@ -1,12 +1,7 @@
-import type {
-  ProviderContractBundle,
-  ProviderReasoningContract,
-} from './modelManifestSchema';
+import type { ProviderContractBundle, ProviderReasoningContract } from './modelManifestSchema';
 import type { LlmProviderProtocol } from '../types/settings';
 
-export function createFailClosedProviderContracts(
-  protocol: LlmProviderProtocol,
-): ProviderContractBundle {
+export function createFailClosedProviderContracts(protocol: LlmProviderProtocol): ProviderContractBundle {
   return {
     protocolDialect: protocol,
     protocolVersion: 'unspecified',

@@ -21,7 +21,11 @@ export const ComposerAttachIngest: React.FC<{
       }}
     />
     {/* The one drop feedback: always mounted so it fades both in and out. */}
-    <div className={`composer-drop-overlay${isDropActive ? ' is-visible' : ''}`} data-testid="composer-drop-overlay" aria-hidden={!isDropActive}>
+    <div
+      className={`composer-drop-overlay${isDropActive ? ' is-visible' : ''}`}
+      data-testid="composer-drop-overlay"
+      aria-hidden={!isDropActive}
+    >
       <Icon name="upload" size={20} />
       <span>{dropHint}</span>
     </div>

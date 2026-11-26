@@ -8,10 +8,7 @@ import { agentPlanReviewRequestService } from '../agent-runtime/interactions/Age
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { attachmentStagingService } from '../conversation/AttachmentStagingService';
-import {
-  assertAttachmentPreviewPath,
-  readAttachmentFilePreviewDataUrl,
-} from '../runtime/attachmentPreview';
+import { assertAttachmentPreviewPath, readAttachmentFilePreviewDataUrl } from '../runtime/attachmentPreview';
 import { NATIVE_IMAGE_MIME_TYPES } from '../runtime/attachmentClassify';
 import { delegationTraceStore } from '../agent-runtime/workTrace/DelegationTraceStore';
 import { toRejectedSendResult } from '../conversation/conversationSendRejection';
@@ -133,22 +130,36 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
 
   ipcMain.handle('conversation:getDelegationTrace', async (_event, ...rawArgs: unknown[]) => {
     const [request] = parseIpcArgs(ConversationGetDelegationTraceArgsSchema, rawArgs, {
-      label: 'conversation:getDelegationTrace', maxBytes: 4 * 1024,
+      label: 'conversation:getDelegationTrace',
+      maxBytes: 4 * 1024,
     });
     if (!state.currentSessionId || request.sessionId !== state.currentSessionId) {
       return { header: null, steps: [], nextCursor: null, total: 0, error: 'DELEGATION_TRACE_SESSION_DENIED' };
     }
-    return delegationTraceStore.read(request.sessionId, request.parentToolCallId, request.cursor, request.pageSize, request.sinceRevision);
+    return delegationTraceStore.read(
+      request.sessionId,
+      request.parentToolCallId,
+      request.cursor,
+      request.pageSize,
+      request.sinceRevision,
+    );
   });
 
   ipcMain.handle('conversation:getDelegationContent', async (_event, ...rawArgs: unknown[]) => {
     const [request] = parseIpcArgs(ConversationGetDelegationContentArgsSchema, rawArgs, {
-      label: 'conversation:getDelegationContent', maxBytes: 4 * 1024,
+      label: 'conversation:getDelegationContent',
+      maxBytes: 4 * 1024,
     });
-    if (!state.currentSessionId || request.sessionId !== state.currentSessionId) throw new AppError('DELEGATION_CONTENT_SESSION_DENIED');
-    return delegationTraceStore.readContent(request.sessionId, request.parentToolCallId,
+    if (!state.currentSessionId || request.sessionId !== state.currentSessionId)
+      throw new AppError('DELEGATION_CONTENT_SESSION_DENIED');
+    return delegationTraceStore.readContent(
+      request.sessionId,
+      request.parentToolCallId,
       { childSessionId: request.childSessionId, executionId: request.executionId, generation: request.generation },
-      request.kind, request.offset, request.stepId);
+      request.kind,
+      request.offset,
+      request.stepId,
+    );
   });
 
   ipcMain.handle('conversation:switchBranch', async (_event, ...rawArgs: unknown[]) => {
@@ -271,7 +282,8 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
         if (!state.currentSessionId || request.sessionId !== state.currentSessionId) {
           return { dataUrl: null, error: 'IMAGE_PREVIEW_SESSION_DENIED' };
         }
-        const attachment = conversationHistoryStore.listSessionAttachments(request.sessionId)
+        const attachment = conversationHistoryStore
+          .listSessionAttachments(request.sessionId)
           .find((item) => item.attachmentId === request.previewId);
         if (!attachment || !NATIVE_IMAGE_MIME_TYPES.has(attachment.mimeType)) {
           return { dataUrl: null, error: 'IMAGE_PREVIEW_NOT_FOUND' };

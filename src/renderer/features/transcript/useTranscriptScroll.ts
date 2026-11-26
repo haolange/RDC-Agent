@@ -2,7 +2,10 @@ import { useCallback, useLayoutEffect, useRef, type MutableRefObject } from 'rea
 
 const STICKY_SCROLL_THRESHOLD = 96;
 
-interface LaidOut { scrollHeight: number; clientHeight: number }
+interface LaidOut {
+  scrollHeight: number;
+  clientHeight: number;
+}
 
 /** Reads the container's heights and keeps them as the geometry the reader last saw. */
 const readLayout = (container: HTMLDivElement, laidOut: MutableRefObject<LaidOut>): number => {
@@ -27,8 +30,8 @@ export function useTranscriptScroll(messageCount: number, activityAt: number | u
   const settleScroll = useCallback((container: HTMLDivElement) => {
     if (!scrolledSinceSettled.current) return;
     scrolledSinceSettled.current = false;
-    shouldStickToBottom.current = laidOut.current.scrollHeight - container.scrollTop
-      - laidOut.current.clientHeight < STICKY_SCROLL_THRESHOLD;
+    shouldStickToBottom.current =
+      laidOut.current.scrollHeight - container.scrollTop - laidOut.current.clientHeight < STICKY_SCROLL_THRESHOLD;
   }, []);
   const followContent = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -63,16 +66,26 @@ export function useTranscriptScroll(messageCount: number, activityAt: number | u
       // independently when an image loads or a tool disclosure opens.
       container.querySelectorAll('.conversation-thread-item').forEach((row) => targets.add(row));
       for (const target of observed) {
-        if (!targets.has(target)) { observer.unobserve(target); observed.delete(target); }
+        if (!targets.has(target)) {
+          observer.unobserve(target);
+          observed.delete(target);
+        }
       }
       for (const target of targets) {
-        if (!observed.has(target)) { observer.observe(target); observed.add(target); }
+        if (!observed.has(target)) {
+          observer.observe(target);
+          observed.add(target);
+        }
       }
     };
     refreshTargets();
     const mutations = new MutationObserver(refreshTargets);
     mutations.observe(container, { childList: true, subtree: true });
-    return () => { mutations.disconnect(); observer.disconnect(); observed.clear(); };
+    return () => {
+      mutations.disconnect();
+      observer.disconnect();
+      observed.clear();
+    };
   }, [followResize, isEmpty]);
 
   return { scrollContainerRef, handleScroll };

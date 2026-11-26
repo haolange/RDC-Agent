@@ -4,11 +4,7 @@ import { isImeComposing } from '../../../lib/ime';
 import { useDynStyle } from '../../../lib/useDynStyle';
 import { Button } from '../../../ui/Button';
 import { Icon } from '../../../ui/Icon';
-import type {
-  ProjectMenuPopoverState,
-  ProjectRenamePopoverState,
-  SessionRenamePopoverState,
-} from './types';
+import type { ProjectMenuPopoverState, ProjectRenamePopoverState, SessionRenamePopoverState } from './types';
 
 interface RenamePopoverPanelsProps {
   isBusy: boolean;

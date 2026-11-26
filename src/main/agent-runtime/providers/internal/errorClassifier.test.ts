@@ -210,19 +210,13 @@ describe('classifyProviderError', () => {
 
   describe('auth_scope_denied', () => {
     it('classifies scope error with HTTP 403 as auth_scope_denied', () => {
-      const result = classifyProviderError(
-        new Error('OAuth scope "chat:write" not granted'),
-        403,
-      );
+      const result = classifyProviderError(new Error('OAuth scope "chat:write" not granted'), 403);
       expect(result.code).toBe('auth_scope_denied');
       expect(result.retryable).toBe(false);
     });
 
     it('classifies permission error with HTTP 401 as auth_scope_denied', () => {
-      const result = classifyProviderError(
-        new Error('Insufficient permission for this operation'),
-        401,
-      );
+      const result = classifyProviderError(new Error('Insufficient permission for this operation'), 401);
       expect(result.code).toBe('auth_scope_denied');
       expect(result.retryable).toBe(false);
     });

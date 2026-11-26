@@ -54,10 +54,17 @@ export class WorkflowProjectionPublisher {
   publishConversationEvent(event: ConversationStreamEvent): void {
     if (event.type === 'message_patched') {
       const delta = this.messageDeltas.encode(event.message);
-      if (delta) this.publish('conversation:event', { type: 'message_delta', sessionId: event.sessionId, turnId: event.turnId, delta });
+      if (delta)
+        this.publish('conversation:event', {
+          type: 'message_delta',
+          sessionId: event.sessionId,
+          turnId: event.turnId,
+          delta,
+        });
       return;
     }
-    if (event.type === 'message_completed' || event.type === 'message_errored') this.messageDeltas.forget(event.message.id);
+    if (event.type === 'message_completed' || event.type === 'message_errored')
+      this.messageDeltas.forget(event.message.id);
     this.publish('conversation:event', event);
   }
 
@@ -65,7 +72,6 @@ export class WorkflowProjectionPublisher {
   conversationMessageSnapshot(messageId: string): { seq: number; message: ConversationMessage } | null {
     return this.messageDeltas.snapshot(messageId);
   }
-
 }
 
 export const workflowProjectionPublisher = new WorkflowProjectionPublisher();

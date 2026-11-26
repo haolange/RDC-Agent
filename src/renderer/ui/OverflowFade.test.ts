@@ -7,16 +7,22 @@ import { OverflowFade } from './OverflowFade';
 let resizeCallback: ResizeObserverCallback | null = null;
 let disconnected = false;
 
-const deferred = <T,>() => {
+const deferred = <T>() => {
   let resolve!: (value: T | PromiseLike<T>) => void;
-  const promise = new Promise<T>((next) => { resolve = next; });
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
   return { promise, resolve };
 };
 
 const installFontSet = (ready: Promise<FontFaceSet>) => {
   const listeners = new Set<EventListenerOrEventListenerObject>();
-  const addEventListener = vi.fn((_type: string, listener: EventListenerOrEventListenerObject) => listeners.add(listener));
-  const removeEventListener = vi.fn((_type: string, listener: EventListenerOrEventListenerObject) => listeners.delete(listener));
+  const addEventListener = vi.fn((_type: string, listener: EventListenerOrEventListenerObject) =>
+    listeners.add(listener),
+  );
+  const removeEventListener = vi.fn((_type: string, listener: EventListenerOrEventListenerObject) =>
+    listeners.delete(listener),
+  );
   const fontSet = { ready, addEventListener, removeEventListener } as unknown as FontFaceSet;
   Object.defineProperty(document, 'fonts', { configurable: true, value: fontSet });
   return {
@@ -37,12 +43,19 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   resizeCallback = null;
   disconnected = false;
-  vi.stubGlobal('ResizeObserver', class {
-    constructor(callback: ResizeObserverCallback) { resizeCallback = callback; }
-    observe() {}
-    disconnect() { disconnected = true; }
-    unobserve() {}
-  });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback;
+      }
+      observe() {}
+      disconnect() {
+        disconnected = true;
+      }
+      unobserve() {}
+    },
+  );
 });
 
 afterEach(() => {
@@ -64,18 +77,24 @@ describe('OverflowFade', () => {
       clientWidth: { configurable: true, value: 80 },
       scrollWidth: { configurable: true, value: 160 },
     });
-    await act(async () => { resizeCallback?.([], {} as ResizeObserver); });
+    await act(async () => {
+      resizeCallback?.([], {} as ResizeObserver);
+    });
     expect(text.classList.contains('is-overflowing')).toBe(true);
     expect(text.textContent).toBe('Complete model name');
     expect(text.dataset.tooltip).toBe('Complete model name');
 
     Object.defineProperty(text, 'scrollWidth', { configurable: true, value: 60 });
-    await act(async () => { resizeCallback?.([], {} as ResizeObserver); });
+    await act(async () => {
+      resizeCallback?.([], {} as ResizeObserver);
+    });
     expect(text.classList.contains('is-overflowing')).toBe(false);
     expect(text.dataset.tooltip).toBeUndefined();
 
     Object.defineProperty(text, 'scrollWidth', { configurable: true, value: 140 });
-    await act(async () => { resizeCallback?.([], {} as ResizeObserver); });
+    await act(async () => {
+      resizeCallback?.([], {} as ResizeObserver);
+    });
     expect(text.classList.contains('is-overflowing')).toBe(true);
 
     Object.defineProperty(text, 'scrollWidth', { configurable: true, value: 60 });
@@ -129,7 +148,13 @@ describe('OverflowFade', () => {
     let measurementCount = 0;
     Object.defineProperties(text, {
       clientWidth: { configurable: true, value: 100 },
-      scrollWidth: { configurable: true, get: () => { measurementCount += 1; return 140; } },
+      scrollWidth: {
+        configurable: true,
+        get: () => {
+          measurementCount += 1;
+          return 140;
+        },
+      },
     });
     await act(async () => fonts.dispatchLoadingDone());
     expect(measurementCount).toBe(1);

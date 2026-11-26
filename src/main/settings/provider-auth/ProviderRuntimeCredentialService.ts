@@ -40,7 +40,10 @@ const defaultDependencies: ProviderRuntimeCredentialDependencies = {
   getProvider: (providerId) => settingsService.runtimeProviderConfig(providerId),
   getConnectionValues: (providerId) => settingsService.getProviderConnectionValues(providerId),
   getConnectionHeaders: (providerId, values) => {
-    return resolveProviderConnectionHeaders(settingsService.providerConnections.get(providerId)?.connectionSchema, values);
+    return resolveProviderConnectionHeaders(
+      settingsService.providerConnections.get(providerId)?.connectionSchema,
+      values,
+    );
   },
   resolveGoogleVertex: resolveGoogleVertexAccessToken,
   resolveAwsBedrock: resolveAwsBedrockCredentials,
@@ -51,14 +54,9 @@ const defaultDependencies: ProviderRuntimeCredentialDependencies = {
 export class ProviderRuntimeCredentialService {
   private readonly leases = new Map<string, FrozenProviderRuntimeCredential>();
 
-  constructor(
-    private readonly dependencies: ProviderRuntimeCredentialDependencies = defaultDependencies,
-  ) {}
+  constructor(private readonly dependencies: ProviderRuntimeCredentialDependencies = defaultDependencies) {}
 
-  async freeze(
-    providerId: LlmProviderId,
-    operation: ProviderRuntimeCredentialOperation = 'chat',
-  ): Promise<string> {
+  async freeze(providerId: LlmProviderId, operation: ProviderRuntimeCredentialOperation = 'chat'): Promise<string> {
     this.purgeExpired();
     const handle = this.dependencies.createHandle();
     this.leases.set(handle, await this.materializeLease(providerId, handle, operation));

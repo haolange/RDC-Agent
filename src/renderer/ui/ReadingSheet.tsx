@@ -34,8 +34,18 @@ export interface ReadingSheetProps {
  * up to that area, and keeps header and status fixed while the body is the only scroller.
  */
 export function ReadingSheet({
-  open, title, meta, actions, status, children, onClose, onExited, closeLabel, className,
-  dataTestId, animateHeight = false,
+  open,
+  title,
+  meta,
+  actions,
+  status,
+  children,
+  onClose,
+  onExited,
+  closeLabel,
+  className,
+  dataTestId,
+  animateHeight = false,
 }: ReadingSheetProps) {
   const titleId = useId();
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -71,7 +81,9 @@ export function ReadingSheet({
       >
         <header className="ui-reading-sheet-header">
           <div className="ui-reading-sheet-heading">
-            <h2 id={titleId} className="ui-reading-sheet-title">{title}</h2>
+            <h2 id={titleId} className="ui-reading-sheet-title">
+              {title}
+            </h2>
             {meta ? <div className="ui-reading-sheet-meta">{meta}</div> : null}
           </div>
           <div className="ui-reading-sheet-actions">
@@ -83,7 +95,13 @@ export function ReadingSheet({
         </header>
         {status ? <div className="ui-reading-sheet-status">{status}</div> : null}
         <div className="ui-reading-sheet-body">
-          {animated ? <div className="ui-reading-sheet-content" ref={contentRef}>{children}</div> : children}
+          {animated ? (
+            <div className="ui-reading-sheet-content" ref={contentRef}>
+              {children}
+            </div>
+          ) : (
+            children
+          )}
         </div>
       </div>
     </div>,

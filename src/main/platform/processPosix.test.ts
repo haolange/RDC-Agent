@@ -9,7 +9,10 @@ function stat(pid: number, state: string, processGroup: number, startTicks: numb
   return `${pid} (worker (py) x) ${tail.join(' ')}`;
 }
 
-function fakeProc(files: Record<string, string>, kill = vi.fn((_pid: number, _signal: number | NodeJS.Signals): boolean => true)) {
+function fakeProc(
+  files: Record<string, string>,
+  kill = vi.fn((_pid: number, _signal: number | NodeJS.Signals): boolean => true),
+) {
   const readFile = (filePath: string): string => {
     if (filePath in files) return files[filePath]!;
     throw Object.assign(new Error('missing'), { code: 'ENOENT' });
@@ -25,7 +28,11 @@ const base = {
 
 describe('POSIX process primitives', () => {
   it('reads the RDC-Tool Linux birth token and treats zombies and missing pids as exited', () => {
-    const { backend } = fakeProc({ ...base, '/proc/42/stat': stat(42, 'S', 42, 987654), '/proc/43/stat': stat(43, 'Z', 43, 5) });
+    const { backend } = fakeProc({
+      ...base,
+      '/proc/42/stat': stat(42, 'S', 42, 987654),
+      '/proc/43/stat': stat(43, 'Z', 43, 5),
+    });
     expect(backend.readBirth(42)).toBe(`linux-start-ticks:${BOOT_ID}:987654`);
     expect(backend.readBirth(43)).toBeNull();
     expect(backend.readBirth(44)).toBeNull();
@@ -34,7 +41,9 @@ describe('POSIX process primitives', () => {
   });
 
   it('fails instead of guessing when stat is malformed or /proc is absent', () => {
-    expect(() => fakeProc({ ...base, '/proc/42/stat': '42 (x) S 1' }).backend.readBirth(42)).toThrow(/PROCESS_QUERY_FAILED/);
+    expect(() => fakeProc({ ...base, '/proc/42/stat': '42 (x) S 1' }).backend.readBirth(42)).toThrow(
+      /PROCESS_QUERY_FAILED/,
+    );
     const kill = vi.fn((_pid: number, _signal: number | NodeJS.Signals): boolean => {
       throw Object.assign(new Error('denied'), { code: 'EPERM' });
     });
@@ -44,10 +53,17 @@ describe('POSIX process primitives', () => {
   });
 
   it('kills a daemon group it leads, but only the pid when it shares the caller group', () => {
-    const { backend, kill } = fakeProc({ ...base, '/proc/42/stat': stat(42, 'S', 42, 1), '/proc/43/stat': stat(43, 'S', 10, 1) });
+    const { backend, kill } = fakeProc({
+      ...base,
+      '/proc/42/stat': stat(42, 'S', 42, 1),
+      '/proc/43/stat': stat(43, 'S', 10, 1),
+    });
     expect(backend.killTree(42, 1000)).toBe(true);
     expect(backend.killTree(43, 1000)).toBe(true);
-    expect(kill.mock.calls).toEqual([[-42, 'SIGKILL'], [43, 'SIGKILL']]);
+    expect(kill.mock.calls).toEqual([
+      [-42, 'SIGKILL'],
+      [43, 'SIGKILL'],
+    ]);
   });
 
   it('reads the NUL-separated command line', () => {

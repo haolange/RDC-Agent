@@ -24,22 +24,32 @@ describe.skipIf(!root || !capture || !phase || !output)('native event rejection 
     const originalCaptureHash = captureHash();
     const results: unknown[] = [];
     const operations = ['rd.event.set_active', 'rd.pipeline.get_state'] as const;
-    const groups = phase === 'before' ? operations.map(operation => [operation]) : [operations];
+    const groups = phase === 'before' ? operations.map((operation) => [operation]) : [operations];
     for (const group of groups) {
       const directory = mkdtempSync(path.join(parent, 'rejection-owned-'));
       const contextId = 'rejection-' + randomUUID();
       const ownerId = 'rejection-session-' + randomUUID();
-      const settings = { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, timeoutMs: 30000, workingDirectory: root!,
+      const settings = {
+        ...DEFAULT_RDC_CLI_INVOKER,
+        enabled: true,
+        timeoutMs: 30000,
+        workingDirectory: root!,
         command: rdcInstallationFiles(root!).python,
         argsPrefix: [rdcInstallationFiles(root!).entry],
-        env: { RDC_TOOL_INTERMEDIATE_ROOT: directory, PYTHONDONTWRITEBYTECODE: '1' } };
-      const native = async (command: string, args: string[]) => parseRdcNativeResult(await rdcCliInvokerService.executeCLI(command,
-        [...args, '--daemon-context', contextId], { settings, contextId }));
+        env: { RDC_TOOL_INTERMEDIATE_ROOT: directory, PYTHONDONTWRITEBYTECODE: '1' },
+      };
+      const native = async (command: string, args: string[]) =>
+        parseRdcNativeResult(
+          await rdcCliInvokerService.executeCLI(command, [...args, '--daemon-context', contextId], {
+            settings,
+            contextId,
+          }),
+        );
       const originalExecute = rdcCliInvokerService.executeCLI.bind(rdcCliInvokerService);
       const captured: Array<{ operation: string; exitCode: number; stdout: string }> = [];
       const spy = vi.spyOn(rdcCliInvokerService, 'executeCLI').mockImplementation(async (...args) => {
         const result = await originalExecute(...args);
-        if (args[0] === 'call' && group.includes(args[1]?.[0] as typeof operations[number])) {
+        if (args[0] === 'call' && group.includes(args[1]?.[0] as (typeof operations)[number])) {
           captured.push({ operation: args[1]![0], exitCode: result.exitCode, stdout: result.stdout });
         }
         return result;
@@ -48,8 +58,12 @@ describe.skipIf(!root || !capture || !phase || !output)('native event rejection 
       let cleaned = false;
       try {
         const catalog = await rdcCliInvokerService.loadCatalog(settings, true);
-        const guide = JSON.parse(readFileSync(path.join(process.cwd(), 'scripts/fidelity/rdc-tool-guide-catalog.json'), 'utf8')) as {
-          fingerprint: string; tool_count: number };
+        const guide = JSON.parse(
+          readFileSync(path.join(process.cwd(), 'scripts/fidelity/rdc-tool-guide-catalog.json'), 'utf8'),
+        ) as {
+          fingerprint: string;
+          tool_count: number;
+        };
         expect(catalog.fingerprint).toBe(guide.fingerprint);
         expect(catalog.tools).toHaveLength(guide.tool_count);
         const opened = await native('capture', ['open', '--file', capture!]);
@@ -60,52 +74,99 @@ describe.skipIf(!root || !capture || !phase || !output)('native event rejection 
         const captureFileId = opened.data.capture_file_id as string;
         expect(runtime.session_id).toBe(replaySessionId);
         expect(runtime.capture_file_id).toBe(captureFileId);
-        setRdcRuntimeContextForSession(ownerId, { contextId, runtimeOwner: ownerId, ownerLeaseId: contextId,
-          replaySessionId, captureFileId, backend: 'local', updatedAt: Date.now() }, { projectId: 'qa-project' });
+        setRdcRuntimeContextForSession(
+          ownerId,
+          {
+            contextId,
+            runtimeOwner: ownerId,
+            ownerLeaseId: contextId,
+            replaySessionId,
+            captureFileId,
+            backend: 'local',
+            updatedAt: Date.now(),
+          },
+          { projectId: 'qa-project' },
+        );
         const lease = getRdcContextLease(ownerId);
-        const context = { agentId: 'general', accessCeiling: 'full' as const, sessionId: ownerId, projectId: 'qa-project',
-          turnId: 'rejection-turn', projectRootPath: directory, workspaceRoot: directory,
-          rdcBinding: freezeRdcTurnBinding(settings, catalog.tools, lease) };
+        const context = {
+          agentId: 'general',
+          accessCeiling: 'full' as const,
+          sessionId: ownerId,
+          projectId: 'qa-project',
+          turnId: 'rejection-turn',
+          projectRootPath: directory,
+          workspaceRoot: directory,
+          rdcBinding: freezeRdcTurnBinding(settings, catalog.tools, lease),
+        };
         const entries = [];
         for (const operation of group) {
-          const error = await executeRdcShell({ operation, args: { event_id: 2147483647 } },
-            operation, undefined, context).catch((caught: unknown) => caught);
+          const error = await executeRdcShell(
+            { operation, args: { event_id: 2147483647 } },
+            operation,
+            undefined,
+            context,
+          ).catch((caught: unknown) => caught);
           expect(error).toBeInstanceOf(RdcNativeFailure);
           const failure = error as RdcNativeFailure;
           expect(failure.nativeError.code).toBe('event_not_found');
-          const expected = phase === 'before'
-            ? { preservationVerified: false, leaseState: 'quarantined' }
-            : { preservationVerified: true, leaseState: 'retained' };
-          expect((failure.deliveryResult?.details as Record<string, unknown> | undefined)?.mainValidation).toMatchObject(expected);
+          const expected =
+            phase === 'before'
+              ? { preservationVerified: false, leaseState: 'quarantined' }
+              : { preservationVerified: true, leaseState: 'retained' };
+          expect(
+            (failure.deliveryResult?.details as Record<string, unknown> | undefined)?.mainValidation,
+          ).toMatchObject(expected);
           expect(Boolean(getRdcContextLease(ownerId)?.quarantineReason)).toBe(phase === 'before');
           entries.push({ operation, delivery: failure.deliveryResult });
         }
         expect(captured).toHaveLength(group.length);
         if (phase !== 'before') {
           const after = await native('call', ['rd.session.get_context', '--args-json', '{}']);
-          expect(after.data.runtime).toMatchObject({ session_id: replaySessionId, capture_file_id: captureFileId,
-            active_event_id: runtime.active_event_id });
+          expect(after.data.runtime).toMatchObject({
+            session_id: replaySessionId,
+            capture_file_id: captureFileId,
+            active_event_id: runtime.active_event_id,
+          });
           expect(parseRdcProcessIdentity((after.meta as Record<string, unknown>).process_identity)).toEqual(identity);
-          const valid = await executeRdcShell({ operation: 'rd.event.get_action_details',
-            args: { event_id: runtime.active_event_id as number } }, 'valid-event', undefined, context);
+          const valid = await executeRdcShell(
+            { operation: 'rd.event.get_action_details', args: { event_id: runtime.active_event_id as number } },
+            'valid-event',
+            undefined,
+            context,
+          );
           expect(valid.isError).not.toBe(true);
           expect(getRdcContextLease(ownerId)).toEqual(lease);
         }
         expect(captureHash()).toBe(originalCaptureHash);
-        results.push({ phase, entries, captured, fingerprint: catalog.fingerprint, captureSha256: originalCaptureHash,
-          originalEvent: runtime.active_event_id, processIdentity: identity });
+        results.push({
+          phase,
+          entries,
+          captured,
+          fingerprint: catalog.fingerprint,
+          captureSha256: originalCaptureHash,
+          originalEvent: runtime.active_event_id,
+          processIdentity: identity,
+        });
       } finally {
         try {
           await native('context', ['clear']);
           const stopped = await native('daemon', ['stop']);
           expect(stopped.data.stopped).toBe(true);
-          if (identity) for (const processIdentity of [identity.daemon, identity.worker]) {
-            await vi.waitFor(() => {
-              let code: string | undefined;
-              try { process.kill(processIdentity.pid, 0); } catch (error) { code = (error as NodeJS.ErrnoException).code; }
-              expect(code).toBe('ESRCH');
-            }, { timeout: 10000, interval: 50 });
-          }
+          if (identity)
+            for (const processIdentity of [identity.daemon, identity.worker]) {
+              await vi.waitFor(
+                () => {
+                  let code: string | undefined;
+                  try {
+                    process.kill(processIdentity.pid, 0);
+                  } catch (error) {
+                    code = (error as NodeJS.ErrnoException).code;
+                  }
+                  expect(code).toBe('ESRCH');
+                },
+                { timeout: 10000, interval: 50 },
+              );
+            }
           cleaned = true;
         } finally {
           spy.mockRestore();

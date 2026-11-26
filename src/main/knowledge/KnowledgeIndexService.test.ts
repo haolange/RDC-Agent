@@ -40,13 +40,15 @@ describe('KnowledgeIndexService rebuild', () => {
 
     const controller = new AbortController();
     const events: Array<{ phase: KnowledgeOperationPhase; done: number; total: number }> = [];
-    await expect(index.rebuild({
-      signal: controller.signal,
-      onProgress: (phase, done, total) => {
-        events.push({ phase, done, total });
-        if (done === 2) controller.abort(new AppError('KNOWLEDGE_OPERATION_CANCELLED'));
-      },
-    })).rejects.toMatchObject({ code: 'KNOWLEDGE_OPERATION_CANCELLED' });
+    await expect(
+      index.rebuild({
+        signal: controller.signal,
+        onProgress: (phase, done, total) => {
+          events.push({ phase, done, total });
+          if (done === 2) controller.abort(new AppError('KNOWLEDGE_OPERATION_CANCELLED'));
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'KNOWLEDGE_OPERATION_CANCELLED' });
 
     expect(events).toEqual([0, 1, 2].map((done) => ({ phase: 'indexing', done, total: 3 })));
     expectMonotonicProgress(events);

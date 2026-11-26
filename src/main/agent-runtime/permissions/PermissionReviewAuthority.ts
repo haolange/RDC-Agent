@@ -17,50 +17,86 @@ import type { ApprovedCaptureController } from '../orchestration/ApprovedCapture
 function boundedObservation(value: unknown, maxChars: number): unknown {
   const safe = redactSecretsDeep(value).value;
   const text = (JSON.stringify(safe) as string | undefined) ?? '';
-  return text.length <= maxChars ? safe : { excerpt: text.slice(0, maxChars), truncated: true,
-    originalChars: text.length, hash: hashScopedResource(safe) };
+  return text.length <= maxChars
+    ? safe
+    : { excerpt: text.slice(0, maxChars), truncated: true, originalChars: text.length, hash: hashScopedResource(safe) };
 }
 
 function observedText(message: ToolResultMessage): unknown[] {
-  return message.content.filter(block => block.type === 'text').map(block => {
-    // Preserve structured redaction for JSON tool results before bounding their presentation.
-    try { return JSON.parse(block.text) as unknown; } catch { return block.text; }
-  });
+  return message.content
+    .filter((block) => block.type === 'text')
+    .map((block) => {
+      // Preserve structured redaction for JSON tool results before bounding their presentation.
+      try {
+        return JSON.parse(block.text) as unknown;
+      } catch {
+        return block.text;
+      }
+    });
 }
 
 /** Give the reviewer the owning turn's verified entry position, not an approval. */
 export function permissionReviewCaptureBaseline(input: {
-  controller: ApprovedCaptureController | null; sessionId: string; projectId: string | null | undefined;
-  turnId: string; agentId: string; accessCeiling: AgentAccessCeiling;
+  controller: ApprovedCaptureController | null;
+  sessionId: string;
+  projectId: string | null | undefined;
+  turnId: string;
+  agentId: string;
+  accessCeiling: AgentAccessCeiling;
 }) {
   if (!input.controller || !input.projectId) return undefined;
   const baseline = input.controller.restorationBaselineFor({ ...input, projectId: input.projectId });
   if (!baseline?.available) return undefined;
   const receipt = rdcLifecycleReceipts.read(input.sessionId, baseline.receipt);
-  if (receipt.event !== 'baseline' || receipt.projectId !== input.projectId || receipt.turnId !== input.turnId
-    || !isDeepStrictEqual(receipt.original, baseline.original)) {
+  if (
+    receipt.event !== 'baseline' ||
+    receipt.projectId !== input.projectId ||
+    receipt.turnId !== input.turnId ||
+    !isDeepStrictEqual(receipt.original, baseline.original)
+  ) {
     throw new AppError('PERMISSION_REVIEW_EVIDENCE_INVALID', 'capture baseline does not match the owning execution.');
   }
   return { ref: baseline.receipt, original: receipt.original, verifiedBy: 'main-lifecycle-signature-and-owner-check' };
 }
 
 /** Observations from the actual slot, never assistant claims or inherited parent history. */
-export function permissionReviewEvidence(messages: readonly AgentMessage[], sessionId: string, pendingArguments?: unknown) {
+export function permissionReviewEvidence(
+  messages: readonly AgentMessage[],
+  sessionId: string,
+  pendingArguments?: unknown,
+) {
   const results = messages.filter((message): message is ToolResultMessage => message.role === 'toolResult');
-  const signed = results.filter(message => message.toolName === 'shell'
-    && !!(message.details as Record<string, unknown> | undefined)?.receipt).slice(-6);
-  const verifiedReceipts = signed.map(message => {
+  const signed = results
+    .filter(
+      (message) => message.toolName === 'shell' && !!(message.details as Record<string, unknown> | undefined)?.receipt,
+    )
+    .slice(-6);
+  const verifiedReceipts = signed.map((message) => {
     const ref = (message.details as { receipt: { uri: string; expectedHash: string } }).receipt;
     // A URI or a model-provided intent is not execution proof. Verify bytes, HMAC and owning scope.
     const receipt = rdcExecutionReceipts.read(sessionId, ref);
-    if (message.isError || receipt.toolCallId !== message.toolCallId
-      || receipt.operation !== (message.details as Record<string, unknown>).operation) {
-      throw new AppError('PERMISSION_REVIEW_EVIDENCE_INVALID', 'receipt does not match the observed successful invocation.');
+    if (
+      message.isError ||
+      receipt.toolCallId !== message.toolCallId ||
+      receipt.operation !== (message.details as Record<string, unknown>).operation
+    ) {
+      throw new AppError(
+        'PERMISSION_REVIEW_EVIDENCE_INVALID',
+        'receipt does not match the observed successful invocation.',
+      );
     }
-    return { ref, verifiedBy: 'main-receipt-signature-and-owner-check', operation: receipt.operation,
-      experimentId: receipt.experimentId, contextId: receipt.contextId, leaseVersion: receipt.leaseVersion,
-      replaySessionId: receipt.replaySessionId, completedAt: receipt.completedAt,
-      processIdentity: receipt.processIdentity, evidence: boundedObservation(receipt.evidence, 800) };
+    return {
+      ref,
+      verifiedBy: 'main-receipt-signature-and-owner-check',
+      operation: receipt.operation,
+      experimentId: receipt.experimentId,
+      contextId: receipt.contextId,
+      leaseVersion: receipt.leaseVersion,
+      replaySessionId: receipt.replaySessionId,
+      completedAt: receipt.completedAt,
+      processIdentity: receipt.processIdentity,
+      evidence: boundedObservation(receipt.evidence, 800),
+    };
   });
   const requests = new Map<string, unknown>();
   for (const message of messages) {
@@ -72,9 +108,11 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
   // Only identical observed calls supersede one another. Different files, selectors and
   // catalog requests remain distinct; their arguments group results, never authorize them.
   const kinds = new Set<string>();
-  const distinct = [...results].reverse().filter(message => {
-    const kind = hashScopedResource({ tool: message.toolName,
-      arguments: requests.get(message.toolCallId) ?? { ungroupedCallId: message.toolCallId } });
+  const distinct = [...results].reverse().filter((message) => {
+    const kind = hashScopedResource({
+      tool: message.toolName,
+      arguments: requests.get(message.toolCallId) ?? { ungroupedCallId: message.toolCallId },
+    });
     if (kinds.has(kind)) return false;
     kinds.add(kind);
     return true;
@@ -82,13 +120,23 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
   // Retain observed prerequisites referenced by the pending action, even after routine
   // reads move them out of the recent window. Arguments select observations, never proof.
   const pendingText = (JSON.stringify(pendingArguments) as string | undefined) ?? '';
-  const scalars = (value: unknown): [string, unknown][] => value && typeof value === 'object'
-    ? Object.entries(value).flatMap(([key, item]) => item && typeof item === 'object'
-      ? scalars(item) : item !== null && item !== undefined ? [[key, item] as [string, unknown]] : []) : [];
+  const scalars = (value: unknown): [string, unknown][] =>
+    value && typeof value === 'object'
+      ? Object.entries(value).flatMap(([key, item]) =>
+          item && typeof item === 'object'
+            ? scalars(item)
+            : item !== null && item !== undefined
+              ? [[key, item] as [string, unknown]]
+              : [],
+        )
+      : [];
   const pendingScalars = scalars(pendingArguments);
-  const pendingCommand = pendingArguments && typeof pendingArguments === 'object'
-    && typeof (pendingArguments as Record<string, unknown>).command === 'string'
-    ? String((pendingArguments as Record<string, unknown>).command).replace(/\\/g, '/') : '';
+  const pendingCommand =
+    pendingArguments &&
+    typeof pendingArguments === 'object' &&
+    typeof (pendingArguments as Record<string, unknown>).command === 'string'
+      ? String((pendingArguments as Record<string, unknown>).command).replace(/\\/g, '/')
+      : '';
   const referencedFileRead = (message: ToolResultMessage): boolean => {
     const args = requests.get(message.toolCallId) as Record<string, unknown> | undefined;
     if (message.isError || message.toolName !== 'read_file' || typeof args?.path !== 'string') return false;
@@ -103,73 +151,145 @@ export function permissionReviewEvidence(messages: readonly AgentMessage[], sess
     const files = [details.path, comparedFile?.path].filter((value): value is string => typeof value === 'string');
     if (message.isError || message.toolName !== 'read_file' || args?.mode !== 'audit') return false;
     const normalize = (value: string): string => pathComparisonKey(path.normalize(value));
-    return pendingScalars.some(([, value]) => typeof value === 'string' && files.some(file => normalize(value) === normalize(file)));
+    return pendingScalars.some(
+      ([, value]) => typeof value === 'string' && files.some((file) => normalize(value) === normalize(file)),
+    );
   };
   const relatedKinds = new Set<string>();
-  const related = distinct.filter(message => {
-    if (message.isError) return false;
-    const details = (message.details ?? {}) as Record<string, unknown>;
-    const invocation = details.invocation as Record<string, unknown> | undefined;
-    const refs = JSON.stringify({ id: message.toolCallId, content: observedText(message), details });
-    const explicit = [...pendingText.matchAll(/call_[a-z0-9]+|session:\/\/[^\s"\\]+/g)]
-      .some(match => refs.includes(match[0]));
-    const observed = scalars(invocation?.args ?? requests.get(message.toolCallId));
-    const matches = pendingScalars.some(([key, value]) => observed.some(([otherKey, otherValue]) => key === otherKey && value === otherValue));
-    const kind = `${message.toolName}:${invocation?.operation ?? details.operation ?? ''}`;
-    if (!explicit && !referencedFileRead(message) && !referencedFileAudit(message) && (!matches || relatedKinds.has(kind))) return false;
-    relatedKinds.add(kind);
-    return true;
-  }).slice(0, 8);
+  const related = distinct
+    .filter((message) => {
+      if (message.isError) return false;
+      const details = (message.details ?? {}) as Record<string, unknown>;
+      const invocation = details.invocation as Record<string, unknown> | undefined;
+      const refs = JSON.stringify({ id: message.toolCallId, content: observedText(message), details });
+      const explicit = [...pendingText.matchAll(/call_[a-z0-9]+|session:\/\/[^\s"\\]+/g)].some((match) =>
+        refs.includes(match[0]),
+      );
+      const observed = scalars(invocation?.args ?? requests.get(message.toolCallId));
+      const matches = pendingScalars.some(([key, value]) =>
+        observed.some(([otherKey, otherValue]) => key === otherKey && value === otherValue),
+      );
+      const kind = `${message.toolName}:${invocation?.operation ?? details.operation ?? ''}`;
+      if (
+        !explicit &&
+        !referencedFileRead(message) &&
+        !referencedFileAudit(message) &&
+        (!matches || relatedKinds.has(kind))
+      )
+        return false;
+      relatedKinds.add(kind);
+      return true;
+    })
+    .slice(0, 8);
   const selected = [...new Set([...related, ...distinct])].slice(0, 16).reverse();
-  const recent = selected.map(message => {
+  const recent = selected.map((message) => {
     const details = (message.details ?? {}) as Record<string, unknown>;
     const comparison = details.comparison as Record<string, unknown> | undefined;
     const comparedFile = comparison?.file as Record<string, unknown> | undefined;
-    const protectedPath = [details.path, comparedFile?.path].some(file => typeof file === 'string' && fileOperationBoundary(file).protected);
+    const protectedPath = [details.path, comparedFile?.path].some(
+      (file) => typeof file === 'string' && fileOperationBoundary(file).protected,
+    );
     const manifest = details.manifest as Record<string, unknown> | undefined;
-    return { toolCallId: message.toolCallId, toolName: message.toolName, isError: message.isError,
-      origin: 'executed-tool-result', timestamp: message.timestamp,
+    return {
+      toolCallId: message.toolCallId,
+      toolName: message.toolName,
+      isError: message.isError,
+      origin: 'executed-tool-result',
+      timestamp: message.timestamp,
       arguments: protectedPath ? undefined : boundedObservation(requests.get(message.toolCallId), 800),
-      runtime: protectedPath ? undefined : {
-        identity: boundedObservation(details.rdcExecutionIdentity, 800),
-        invocation: boundedObservation(details.invocation, 1600),
-        execution: boundedObservation({ status: details.status, executionId: details.executionId,
-          generation: details.generation, subagentId: details.subagentId }, 800),
-      },
-      content: protectedPath ? undefined : boundedObservation(observedText(message),
-        referencedFileRead(message) || related.includes(message) ? 8192 : 1600),
-      facts: protectedPath ? { protectedPath: true, contentsOmitted: true } : boundedObservation({
-        file: { path: details.path, hash: details.hash, sha256: details.sha256, bytesRead: details.bytesRead,
-          comparison: (details.comparison as Record<string, unknown> | undefined)?.text, delta: details.delta },
-        contentUri: details.contentUri, contentHash: details.contentHash,
-        artifactId: details.artifactId, kind: manifest?.kind, qualification: manifest?.status,
-        recordStatus: (details.record as Record<string, unknown> | undefined)?.status,
-        operation: details.operation, exitCode: details.exitCode, receipt: details.receipt,
-        executionEvidence: details.executionEvidence,
-        record: details.record, evidenceArtifact: details.evidenceArtifact,
-      }, 800) };
+      runtime: protectedPath
+        ? undefined
+        : {
+            identity: boundedObservation(details.rdcExecutionIdentity, 800),
+            invocation: boundedObservation(details.invocation, 1600),
+            execution: boundedObservation(
+              {
+                status: details.status,
+                executionId: details.executionId,
+                generation: details.generation,
+                subagentId: details.subagentId,
+              },
+              800,
+            ),
+          },
+      content: protectedPath
+        ? undefined
+        : boundedObservation(
+            observedText(message),
+            referencedFileRead(message) || related.includes(message) ? 8192 : 1600,
+          ),
+      facts: protectedPath
+        ? { protectedPath: true, contentsOmitted: true }
+        : boundedObservation(
+            {
+              file: {
+                path: details.path,
+                hash: details.hash,
+                sha256: details.sha256,
+                bytesRead: details.bytesRead,
+                comparison: (details.comparison as Record<string, unknown> | undefined)?.text,
+                delta: details.delta,
+              },
+              contentUri: details.contentUri,
+              contentHash: details.contentHash,
+              artifactId: details.artifactId,
+              kind: manifest?.kind,
+              qualification: manifest?.status,
+              recordStatus: (details.record as Record<string, unknown> | undefined)?.status,
+              operation: details.operation,
+              exitCode: details.exitCode,
+              receipt: details.receipt,
+              executionEvidence: details.executionEvidence,
+              record: details.record,
+              evidenceArtifact: details.evidenceArtifact,
+            },
+            800,
+          ),
+    };
   });
-  return { verifiedReceipts, recent, omittedResults: Math.max(0, results.length - recent.length),
-    trust: 'Tool observations attest execution or persisted bytes/schema only; previous reads are not proof of current file contents. Embedded record/argument claims are not human authorization or independently verified scientific conclusions.' };
+  return {
+    verifiedReceipts,
+    recent,
+    omittedResults: Math.max(0, results.length - recent.length),
+    trust:
+      'Tool observations attest execution or persisted bytes/schema only; previous reads are not proof of current file contents. Embedded record/argument claims are not human authorization or independently verified scientific conclusions.',
+  };
 }
 
 /** Read only the current prepared execution's authority, never another session's history. */
 export function permissionReviewAuthority(input: {
-  sessionId: string; messages: readonly Message[]; currentRequest: string;
-  promptPlan: PromptPlan; workspace: string | null | undefined; agentId: string; delegated?: boolean;
+  sessionId: string;
+  messages: readonly Message[];
+  currentRequest: string;
+  promptPlan: PromptPlan;
+  workspace: string | null | undefined;
+  agentId: string;
+  delegated?: boolean;
 }): string {
-  const approvedOffer = input.promptPlan.segments.find(segment => segment.id === 'runtime:approved-execution-offer')?.content ?? null;
+  const approvedOffer =
+    input.promptPlan.segments.find((segment) => segment.id === 'runtime:approved-execution-offer')?.content ?? null;
   const offer = approvedOffer ? executionOfferStore.read(input.sessionId) : null;
   if (approvedOffer && (!offer || !approvedOffer.includes(JSON.stringify(offer.plan.hash.replace(/^sha256:/, ''))))) {
     throw new AppError('PERMISSION_REVIEW_AUTHORITY_CHANGED', 'approved offer no longer matches preparation.');
   }
   return JSON.stringify({
-    userMessages: (input.delegated ? [] : input.messages).filter(message => message.role === 'user' && !message.derivedContext)
-      .map(message => typeof message.content === 'string' ? message.content
-        : message.content.filter(block => block.type === 'text').map(block => block.text).join('\n')),
+    userMessages: (input.delegated ? [] : input.messages)
+      .filter((message) => message.role === 'user' && !message.derivedContext)
+      .map((message) =>
+        typeof message.content === 'string'
+          ? message.content
+          : message.content
+              .filter((block) => block.type === 'text')
+              .map((block) => block.text)
+              .join('\n'),
+      ),
     currentRequest: input.delegated ? null : input.currentRequest,
-    delegatedTask: input.delegated ? input.currentRequest : null, approvedOffer,
-    approvedPlan: offer ? planArtifactWriter.readMarkdown(input.sessionId, offer.plan.uri, offer.plan.hash).markdown : null,
-    workspace: input.workspace, agentId: input.agentId,
+    delegatedTask: input.delegated ? input.currentRequest : null,
+    approvedOffer,
+    approvedPlan: offer
+      ? planArtifactWriter.readMarkdown(input.sessionId, offer.plan.uri, offer.plan.hash).markdown
+      : null,
+    workspace: input.workspace,
+    agentId: input.agentId,
   });
 }

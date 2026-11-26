@@ -32,34 +32,57 @@ const envelope = <T>(scope: SessionScope, payload: T): SessionScopedPayload<T> =
 interface CaptureChannelContext {
   context: WorkbenchIpcContext;
   authorizeReplayScope: (scope: SessionScope) => void;
-  broadcastContext: (scope: SessionScope, payload: ReturnType<typeof rdcSessionService.snapshotContextForSession>) => void;
-  broadcastOpenedCapture: (scope: SessionScope, payload: ReturnType<typeof rdcSessionService.snapshotOpenedCaptureForSession>) => void;
+  broadcastContext: (
+    scope: SessionScope,
+    payload: ReturnType<typeof rdcSessionService.snapshotContextForSession>,
+  ) => void;
+  broadcastOpenedCapture: (
+    scope: SessionScope,
+    payload: ReturnType<typeof rdcSessionService.snapshotOpenedCaptureForSession>,
+  ) => void;
 }
 
 export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): void {
   registerCaptureReplayReadHandlers();
   const authorizeReplayScope = (scope: SessionScope) => {
-    if (sessionRecordStore.readSession(scope.sessionId)?.projectId !== scope.projectId) throw new AppError('REPLAY_SCOPE_DENIED');
+    if (sessionRecordStore.readSession(scope.sessionId)?.projectId !== scope.projectId)
+      throw new AppError('REPLAY_SCOPE_DENIED');
   };
   const lastReplayHint = new Map<string, { phase: string; contextId: string | null; imageEventId: number | null }>();
-  rdcSessionService.subscribe(state => {
+  rdcSessionService.subscribe((state) => {
     context.broadcastToRenderer('capture:replayChanged', state);
     const previous = lastReplayHint.get(state.sessionId);
-    lastReplayHint.set(state.sessionId, { phase: state.phase, contextId: state.contextId, imageEventId: state.imageEventId });
+    lastReplayHint.set(state.sessionId, {
+      phase: state.phase,
+      contextId: state.contextId,
+      imageEventId: state.imageEventId,
+    });
     const terminal = state.phase === 'ready' || state.phase === 'error' || state.phase === 'closed';
-    const identityChanged = !previous || previous.contextId !== state.contextId || previous.imageEventId !== state.imageEventId;
+    const identityChanged =
+      !previous || previous.contextId !== state.contextId || previous.imageEventId !== state.imageEventId;
     if ((terminal && previous?.phase !== state.phase) || (identityChanged && previous)) {
       traceProjectionRefreshService.schedule(state.sessionId);
     }
   });
-  const broadcastContext = (scope: SessionScope, payload: ReturnType<typeof rdcSessionService.snapshotContextForSession>) => {
+  const broadcastContext = (
+    scope: SessionScope,
+    payload: ReturnType<typeof rdcSessionService.snapshotContextForSession>,
+  ) => {
     context.broadcastToRenderer('context:changed', envelope(scope, payload));
     traceProjectionRefreshService.schedule(scope.sessionId);
   };
-  const broadcastOpenedCapture = (scope: SessionScope, payload: ReturnType<typeof rdcSessionService.snapshotOpenedCaptureForSession>) => {
+  const broadcastOpenedCapture = (
+    scope: SessionScope,
+    payload: ReturnType<typeof rdcSessionService.snapshotOpenedCaptureForSession>,
+  ) => {
     context.broadcastToRenderer('capture:openedStateChanged', envelope(scope, payload));
   };
-  const channelContext: CaptureChannelContext = { context, authorizeReplayScope, broadcastContext, broadcastOpenedCapture };
+  const channelContext: CaptureChannelContext = {
+    context,
+    authorizeReplayScope,
+    broadcastContext,
+    broadcastOpenedCapture,
+  };
   const channels: IpcChannelTable = {
     ...replayChannels(channelContext),
     ...captureChannels(channelContext),
@@ -72,17 +95,26 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
 function replayChannels({ authorizeReplayScope }: CaptureChannelContext): IpcChannelTable {
   return {
     'capture:getReplayState': (_event, ...rawArgs: unknown[]) => {
-      const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, { label: 'capture:getReplayState', maxBytes: 1024 });
+      const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, {
+        label: 'capture:getReplayState',
+        maxBytes: 1024,
+      });
       authorizeReplayScope(scope);
       return rdcSessionService.snapshotReplayForSession(scope);
     },
     'capture:refreshFrame': (_event, ...rawArgs: unknown[]) => {
-      const [scope] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, { label: 'capture:refreshFrame', maxBytes: 1024 });
+      const [scope] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, {
+        label: 'capture:refreshFrame',
+        maxBytes: 1024,
+      });
       authorizeReplayScope(scope);
       return rdcSessionService.refreshFrameForSession(scope);
     },
     'capture:applyReplayEvent': (_event, ...rawArgs: unknown[]) => {
-      const [request] = parseIpcArgs(CaptureReplayApplyArgsSchema, rawArgs, { label: 'capture:applyReplayEvent', maxBytes: 4096 });
+      const [request] = parseIpcArgs(CaptureReplayApplyArgsSchema, rawArgs, {
+        label: 'capture:applyReplayEvent',
+        maxBytes: 4096,
+      });
       authorizeReplayScope(request);
       return rdcSessionService.applyEventForSession(request);
     },
@@ -90,7 +122,12 @@ function replayChannels({ authorizeReplayScope }: CaptureChannelContext): IpcCha
 }
 
 /** Capture recovery, opening, selection and clearing, with the context and opened-state broadcasts they cause. */
-function captureChannels({ context, authorizeReplayScope, broadcastContext, broadcastOpenedCapture }: CaptureChannelContext): IpcChannelTable {
+function captureChannels({
+  context,
+  authorizeReplayScope,
+  broadcastContext,
+  broadcastOpenedCapture,
+}: CaptureChannelContext): IpcChannelTable {
   return {
     'capture:getRecovery': (_event, ...rawArgs: unknown[]) => {
       const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, { label: 'capture:getRecovery', maxBytes: 1024 });
@@ -98,7 +135,10 @@ function captureChannels({ context, authorizeReplayScope, broadcastContext, broa
       return captureRecoveryStatus(scope);
     },
     'capture:restorePrevious': async (_event, ...rawArgs: unknown[]) => {
-      const [scope] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, { label: 'capture:restorePrevious', maxBytes: 1024 });
+      const [scope] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, {
+        label: 'capture:restorePrevious',
+        maxBytes: 1024,
+      });
       authorizeReplayScope(scope);
       try {
         const state = await restorePreviousCapture(scope);
@@ -121,7 +161,9 @@ function captureChannels({ context, authorizeReplayScope, broadcastContext, broa
       return { captures: rdcSessionService.snapshotContextForSession(scope)?.captureDescriptors ?? [] };
     },
     'capture:openProjectInput': async (_event, ...rawArgs: unknown[]) => {
-      let request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string; bindingGeneration: number } | undefined;
+      let request:
+        | (Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string; bindingGeneration: number })
+        | undefined;
       try {
         [request] = parseIpcArgs(CaptureOpenProjectInputArgsSchema, rawArgs, {
           label: 'capture:openProjectInput',
@@ -131,8 +173,9 @@ function captureChannels({ context, authorizeReplayScope, broadcastContext, broa
         if (!session || session.projectId !== request.projectId) {
           return { success: false, error: 'Session does not belong to the requested project.' };
         }
-        const input = (await projectWorkspaceStore.listProjectInputs(request.projectId))
-          .find((entry) => entry.inputId === request!.inputId && entry.filePath === request!.filePath);
+        const input = (await projectWorkspaceStore.listProjectInputs(request.projectId)).find(
+          (entry) => entry.inputId === request!.inputId && entry.filePath === request!.filePath,
+        );
         if (!input) return { success: false, error: `Project input not found: ${request.inputId}` };
 
         const replayDevice = replayDeviceService.getDeviceById(request.replayDeviceId);
@@ -149,13 +192,16 @@ function captureChannels({ context, authorizeReplayScope, broadcastContext, broa
           projectId: request.projectId,
           raw: { inputId: request.inputId, replayDeviceId: request.replayDeviceId },
         });
-        const openedCapture = await rdcSessionService.openProjectInput({
-          projectId: request.projectId,
-          sessionId: request.sessionId,
-          inputId: input.inputId,
-          filePath: input.filePath,
-          replayDevice,
-        }, { expectedGeneration: request.bindingGeneration });
+        const openedCapture = await rdcSessionService.openProjectInput(
+          {
+            projectId: request.projectId,
+            sessionId: request.sessionId,
+            inputId: input.inputId,
+            filePath: input.filePath,
+            replayDevice,
+          },
+          { expectedGeneration: request.bindingGeneration },
+        );
         const scope: SessionScope = { projectId: request.projectId, sessionId: request.sessionId };
         const contextSnapshot = rdcSessionService.snapshotContextForSession(scope);
         broadcastOpenedCapture(scope, openedCapture);
@@ -192,16 +238,28 @@ function captureChannels({ context, authorizeReplayScope, broadcastContext, broa
           projectId: request?.projectId,
           raw: request ? { inputId: request.inputId, replayDeviceId: request.replayDeviceId } : undefined,
         });
-        return { success: false, error: error instanceof Error ? error.message : String(error), issue: replayDeviceIssue(error) };
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+          issue: replayDeviceIssue(error),
+        };
       }
     },
     'capture:getOpenedState': async (_event, ...rawArgs: unknown[]) => {
-      const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, { label: 'capture:getOpenedState', maxBytes: 1024 });
+      const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, {
+        label: 'capture:getOpenedState',
+        maxBytes: 1024,
+      });
       return rdcSessionService.snapshotOpenedCaptureForSession(scope);
     },
     'capture:clearOpenedState': async (_event, ...rawArgs: unknown[]) => {
-      const [scope] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, { label: 'capture:clearOpenedState', maxBytes: 1024 });
-      const cleared = await rdcSessionService.clearOpenedCaptureForSession(scope, { expectedGeneration: scope.bindingGeneration });
+      const [scope] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, {
+        label: 'capture:clearOpenedState',
+        maxBytes: 1024,
+      });
+      const cleared = await rdcSessionService.clearOpenedCaptureForSession(scope, {
+        expectedGeneration: scope.bindingGeneration,
+      });
       if (!cleared) return { success: false, error: 'No RDC context is owned by this session.' };
       broadcastOpenedCapture(scope, null);
       broadcastContext(scope, null);
@@ -218,14 +276,20 @@ function captureChannels({ context, authorizeReplayScope, broadcastContext, broa
     },
     'capture:select': async (_event, ...rawArgs: unknown[]) => {
       try {
-        const [request] = parseIpcArgs(CaptureSelectArgsSchema, rawArgs, { label: 'capture:select', maxBytes: 4 * 1024 });
+        const [request] = parseIpcArgs(CaptureSelectArgsSchema, rawArgs, {
+          label: 'capture:select',
+          maxBytes: 4 * 1024,
+        });
         const scope: SessionScope = { projectId: request.projectId, sessionId: request.sessionId };
         const snapshot = rdcSessionService.snapshotContextForSession(scope);
         if (!snapshot?.captureDescriptors.some((capture) => capture.id === request.captureId)) {
           return { success: false, error: 'Capture is not owned by this session.' };
         }
         await rdcSessionService.switchActiveCapture(request, request.captureId);
-        context.broadcastToRenderer('capture:statusChanged', envelope(scope, { captureId: request.captureId, status: 'selected' }));
+        context.broadcastToRenderer(
+          'capture:statusChanged',
+          envelope(scope, { captureId: request.captureId, status: 'selected' }),
+        );
         broadcastContext(scope, rdcSessionService.snapshotContextForSession(scope));
         return { success: true };
       } catch (error) {
@@ -245,14 +309,31 @@ function deviceChannels({ authorizeReplayScope }: CaptureChannelContext): IpcCha
     'device:prepare': async (_event, ...rawArgs: unknown[]) => {
       const [request] = parseIpcArgs(DevicePreparationArgsSchema, rawArgs, { label: 'device:prepare', maxBytes: 4096 });
       authorizeReplayScope(request);
-      try { return await rdcSessionService.prepareDevice(request); }
-      catch (error) { return { success: false, state: rdcSessionService.snapshotReplayForSession(request), error: replayDeviceIssue(error) }; }
+      try {
+        return await rdcSessionService.prepareDevice(request);
+      } catch (error) {
+        return {
+          success: false,
+          state: rdcSessionService.snapshotReplayForSession(request),
+          error: replayDeviceIssue(error),
+        };
+      }
     },
     'device:cancelPreparation': async (_event, ...rawArgs: unknown[]) => {
-      const [request] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, { label: 'device:cancelPreparation', maxBytes: 1024 });
+      const [request] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, {
+        label: 'device:cancelPreparation',
+        maxBytes: 1024,
+      });
       authorizeReplayScope(request);
-      try { return await rdcSessionService.cancelDevicePreparation(request); }
-      catch (error) { return { success: false, state: rdcSessionService.snapshotReplayForSession(request), error: replayDeviceIssue(error) }; }
+      try {
+        return await rdcSessionService.cancelDevicePreparation(request);
+      } catch (error) {
+        return {
+          success: false,
+          state: rdcSessionService.snapshotReplayForSession(request),
+          error: replayDeviceIssue(error),
+        };
+      }
     },
     'device:refresh': async (_event, ...rawArgs: unknown[]) => {
       parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'device:refresh', maxBytes: 1024 });

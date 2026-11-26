@@ -17,26 +17,29 @@ export type TrustScope = 'user' | 'project';
 
 const TRUST_SCHEMA_VERSION = 3;
 
-const TrustRecordSchema = z.object({
-  scope: z.enum(['user', 'project']),
-  ownerRealpath: z.string().min(1),
-  resourceId: z.string().min(1),
-  trustFingerprint: z.string().min(1),
-  trustedAt: z.string().min(1),
-}).strict();
+const TrustRecordSchema = z
+  .object({
+    scope: z.enum(['user', 'project']),
+    ownerRealpath: z.string().min(1),
+    resourceId: z.string().min(1),
+    trustFingerprint: z.string().min(1),
+    trustedAt: z.string().min(1),
+  })
+  .strict();
 
 export type TrustRecord = z.infer<typeof TrustRecordSchema>;
 
-const TrustFileSchema = z.object({
-  schemaVersion: z.literal(TRUST_SCHEMA_VERSION),
-  records: z.record(z.string(), TrustRecordSchema),
-}).strict();
+const TrustFileSchema = z
+  .object({
+    schemaVersion: z.literal(TRUST_SCHEMA_VERSION),
+    records: z.record(z.string(), TrustRecordSchema),
+  })
+  .strict();
 
 type TrustRecords = Record<string, TrustRecord>;
 
-const keyOf = (scope: TrustScope, ownerRealpath: string, resourceId: string): string => (
-  `${scope}::${ownerRealpath.toLowerCase()}::${resourceId}`
-);
+const keyOf = (scope: TrustScope, ownerRealpath: string, resourceId: string): string =>
+  `${scope}::${ownerRealpath.toLowerCase()}::${resourceId}`;
 
 export class TrustStore {
   constructor(private readonly filePath: () => string) {}
@@ -51,7 +54,13 @@ export class TrustStore {
 
   trust(scope: TrustScope, ownerRealpath: string, resourceId: string, trustFingerprint: string): TrustRecord {
     const records = this.readForUpdate();
-    const record: TrustRecord = { scope, ownerRealpath, resourceId, trustFingerprint, trustedAt: new Date().toISOString() };
+    const record: TrustRecord = {
+      scope,
+      ownerRealpath,
+      resourceId,
+      trustFingerprint,
+      trustedAt: new Date().toISOString(),
+    };
     records[keyOf(scope, ownerRealpath, resourceId)] = record;
     this.write(records);
     return record;
@@ -68,14 +77,22 @@ export class TrustStore {
 
   private read(): TrustRecords {
     const path = this.filePath();
-    return readValidatedSync(path, (raw) => {
-      const document = JSON.parse(raw) as unknown;
-      const version = typeof document === 'object' && document !== null ? (document as { schemaVersion?: unknown }).schemaVersion : undefined;
-      if (typeof version === 'number' && version > TRUST_SCHEMA_VERSION) {
-        throw new AppError('STORAGE_SCHEMA_UNSUPPORTED', `${path} has schemaVersion ${version}; supported up to ${TRUST_SCHEMA_VERSION}`);
-      }
-      return version === TRUST_SCHEMA_VERSION ? TrustFileSchema.parse(document).records : {};
-    }) ?? {};
+    return (
+      readValidatedSync(path, (raw) => {
+        const document = JSON.parse(raw) as unknown;
+        const version =
+          typeof document === 'object' && document !== null
+            ? (document as { schemaVersion?: unknown }).schemaVersion
+            : undefined;
+        if (typeof version === 'number' && version > TRUST_SCHEMA_VERSION) {
+          throw new AppError(
+            'STORAGE_SCHEMA_UNSUPPORTED',
+            `${path} has schemaVersion ${version}; supported up to ${TRUST_SCHEMA_VERSION}`,
+          );
+        }
+        return version === TRUST_SCHEMA_VERSION ? TrustFileSchema.parse(document).records : {};
+      }) ?? {}
+    );
   }
 
   /** A trust decision the user repeats replaces a damaged file; reads keep reporting the damage until then. */
@@ -89,6 +106,9 @@ export class TrustStore {
   }
 
   private write(records: TrustRecords): void {
-    writeFileAtomicSync(this.filePath(), `${JSON.stringify({ schemaVersion: TRUST_SCHEMA_VERSION, records }, null, 2)}\n`);
+    writeFileAtomicSync(
+      this.filePath(),
+      `${JSON.stringify({ schemaVersion: TRUST_SCHEMA_VERSION, records }, null, 2)}\n`,
+    );
   }
 }

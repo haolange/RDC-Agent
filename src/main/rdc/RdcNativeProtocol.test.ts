@@ -4,45 +4,113 @@ import type { CLIResult } from '../tools/ShellInvocationService';
 
 describe('native failure projection', () => {
   it('distinguishes truncated stdout from malformed native output without disclosing its content', () => {
-    const truncated = { exitCode: 0, stdout: 'private tail', stdoutByteLength: 9000000, stdoutTruncated: true, stderr: '' } as CLIResult;
+    const truncated = {
+      exitCode: 0,
+      stdout: 'private tail',
+      stdoutByteLength: 9000000,
+      stdoutTruncated: true,
+      stderr: '',
+    } as CLIResult;
     expect(() => parseRdcNativeResult(truncated)).toThrow('RDC_CLI_OUTPUT_TRUNCATED');
     expect(() => parseRdcNativeResult(truncated)).not.toThrow('private tail');
-    const malformed = { exitCode: 0, stdout: 'private prefix', stdoutByteLength: 14, stdoutTruncated: false, stderr: '' } as CLIResult;
+    const malformed = {
+      exitCode: 0,
+      stdout: 'private prefix',
+      stdoutByteLength: 14,
+      stdoutTruncated: false,
+      stderr: '',
+    } as CLIResult;
     expect(() => parseRdcNativeResult(malformed)).toThrow('stdoutBytes=14, prefix=other');
     expect(() => parseRdcNativeResult(malformed)).not.toThrow('private prefix');
   });
-  it.each(['android_remote_socket_missing', 'android_remote_socket_ambiguous', 'renderdoc_error'])('preserves %s on nonzero CLI exit', (code) => {
-    const result = { exitCode: 1, stdout: JSON.stringify({ ok: false, error: { code, message: 'Device connection failed' } }), stderr: '' } as CLIResult;
-    expect(() => parseRdcNativeResult(result)).toThrow(`${code}: Device connection failed`);
-  });
+  it.each(['android_remote_socket_missing', 'android_remote_socket_ambiguous', 'renderdoc_error'])(
+    'preserves %s on nonzero CLI exit',
+    (code) => {
+      const result = {
+        exitCode: 1,
+        stdout: JSON.stringify({ ok: false, error: { code, message: 'Device connection failed' } }),
+        stderr: '',
+      } as CLIResult;
+      expect(() => parseRdcNativeResult(result)).toThrow(`${code}: Device connection failed`);
+    },
+  );
   it('preserves a global owner startup failure without live process metadata and exposes only recovery guidance', () => {
-    const details = { context_id: 'owned-context', state_path: '/private/state.json', reason: 'owner_identity_unavailable',
-      recovery_hint: 'Keep the existing owner state and inspect the owning process.', token: 'PRIVATE_TOKEN' };
-    const result = { exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0', result_kind: 'rdc_tool.cli',
-      ok: false, error: { code: 'daemon_owner_unavailable', category: 'runtime', message: 'Daemon ownership is unavailable', details } }), stderr: '' } as CLIResult;
+    const details = {
+      context_id: 'owned-context',
+      state_path: '/private/state.json',
+      reason: 'owner_identity_unavailable',
+      recovery_hint: 'Keep the existing owner state and inspect the owning process.',
+      token: 'PRIVATE_TOKEN',
+    };
+    const result = {
+      exitCode: 1,
+      stdout: JSON.stringify({
+        schema_version: '3.0.0',
+        result_kind: 'rdc_tool.cli',
+        ok: false,
+        error: {
+          code: 'daemon_owner_unavailable',
+          category: 'runtime',
+          message: 'Daemon ownership is unavailable',
+          details,
+        },
+      }),
+      stderr: '',
+    } as CLIResult;
     let failure: unknown;
-    try { parseRdcNativeResult(result, 'owned-context', 'rd.remote.connect'); } catch (error) { failure = error; }
+    try {
+      parseRdcNativeResult(result, 'owned-context', 'rd.remote.connect');
+    } catch (error) {
+      failure = error;
+    }
     expect(failure).toBeInstanceOf(RdcNativeFailure);
-    expect(failure).toMatchObject({ resultKind: 'rdc_tool.cli', effectsNotAttempted: false,
-      nativeError: { code: 'daemon_owner_unavailable', category: 'runtime', exitCode: 1, details } });
+    expect(failure).toMatchObject({
+      resultKind: 'rdc_tool.cli',
+      effectsNotAttempted: false,
+      nativeError: { code: 'daemon_owner_unavailable', category: 'runtime', exitCode: 1, details },
+    });
     expect((failure as Error).message).toContain('Daemon ownership is unavailable');
     expect((failure as Error).message).toContain('reason: owner_identity_unavailable');
     expect((failure as Error).message).toContain(details.recovery_hint);
-    expect((failure as Error).message).not.toMatch(/PRIVATE_TOKEN|private\/state|unexpected result_kind|PROCESS_IDENTITY/);
+    expect((failure as Error).message).not.toMatch(
+      /PRIVATE_TOKEN|private\/state|unexpected result_kind|PROCESS_IDENTITY/,
+    );
   });
   it('does not project owner guidance from other errors or unbounded control-bearing fields', () => {
     for (const change of [
-      { code: 'other_runtime_error', category: 'runtime', details: { reason: 'PRIVATE_REASON', recovery_hint: 'PRIVATE_HINT' } },
-      { code: 'daemon_owner_unavailable', category: 'validation', details: { reason: 'PRIVATE_REASON', recovery_hint: 'PRIVATE_HINT' } },
-      { code: 'daemon_owner_unavailable', category: 'runtime', details: { reason: 'PRIVATE_REASON\ncontrol', recovery_hint: 'PRIVATE_HINT' + 'x'.repeat(512) } },
+      {
+        code: 'other_runtime_error',
+        category: 'runtime',
+        details: { reason: 'PRIVATE_REASON', recovery_hint: 'PRIVATE_HINT' },
+      },
+      {
+        code: 'daemon_owner_unavailable',
+        category: 'validation',
+        details: { reason: 'PRIVATE_REASON', recovery_hint: 'PRIVATE_HINT' },
+      },
+      {
+        code: 'daemon_owner_unavailable',
+        category: 'runtime',
+        details: { reason: 'PRIVATE_REASON\ncontrol', recovery_hint: 'PRIVATE_HINT' + 'x'.repeat(512) },
+      },
     ]) {
-      const result = { exitCode: 1, stdout: JSON.stringify({ ok: false, error: { message: 'Original failure', ...change } }), stderr: '' } as CLIResult;
+      const result = {
+        exitCode: 1,
+        stdout: JSON.stringify({ ok: false, error: { message: 'Original failure', ...change } }),
+        stderr: '',
+      } as CLIResult;
       expect(() => parseRdcNativeResult(result)).toThrow('Original failure');
       expect(() => parseRdcNativeResult(result)).not.toThrow(/PRIVATE_REASON|PRIVATE_HINT/);
     }
   });
   it('does not accept an ok envelope from a failed process', () => {
-    expect(() => parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify({ ok: true, result_kind: 'rd.remote.connect', data: {} }), stderr: '' } as CLIResult)).toThrow('RDC_CLI_FAILED');
+    expect(() =>
+      parseRdcNativeResult({
+        exitCode: 1,
+        stdout: JSON.stringify({ ok: true, result_kind: 'rd.remote.connect', data: {} }),
+        stderr: '',
+      } as CLIResult),
+    ).toThrow('RDC_CLI_FAILED');
   });
   it('classifies a process failure without stdout without exposing stderr', () => {
     const result = { exitCode: 1, stdout: '', stderr: 'private process details' } as CLIResult;
@@ -50,78 +118,173 @@ describe('native failure projection', () => {
     expect(() => parseRdcNativeResult(result)).not.toThrow('private process details');
   });
   it('rejects a success envelope whose data is not an object', () => {
-    const result = { exitCode: 0, stdout: JSON.stringify({ ok: true, result_kind: 'rd.event.list', data: ['event'] }), stderr: '' } as CLIResult;
+    const result = {
+      exitCode: 0,
+      stdout: JSON.stringify({ ok: true, result_kind: 'rd.event.list', data: ['event'] }),
+      stderr: '',
+    } as CLIResult;
     expect(() => parseRdcNativeResult(result)).toThrow(expect.objectContaining({ code: 'RDC_CLI_PROTOCOL' }));
   });
   it('does not display arbitrary binary stdout', () => {
-    expect(() => parseRdcNativeResult({ exitCode: 1, stdout: 'binary', stderr: '' } as CLIResult)).toThrow('RDC_CLI_PROTOCOL');
+    expect(() => parseRdcNativeResult({ exitCode: 1, stdout: 'binary', stderr: '' } as CLIResult)).toThrow(
+      'RDC_CLI_PROTOCOL',
+    );
   });
   it('shows only a bounded recovery code for failed shader rollback', () => {
-    const result = { exitCode: 1, stdout: JSON.stringify({ ok: false, error: {
-      code: 'replacement_revert_recovery_failed', message: 'Replay recovery failed',
-      details: { recovery_error_code: 'adb_forward_failed', error: 'private device details' },
-    } }), stderr: '' } as CLIResult;
+    const result = {
+      exitCode: 1,
+      stdout: JSON.stringify({
+        ok: false,
+        error: {
+          code: 'replacement_revert_recovery_failed',
+          message: 'Replay recovery failed',
+          details: { recovery_error_code: 'adb_forward_failed', error: 'private device details' },
+        },
+      }),
+      stderr: '',
+    } as CLIResult;
     expect(() => parseRdcNativeResult(result)).toThrow('Replay recovery failed (recovery: adb_forward_failed)');
     expect(() => parseRdcNativeResult(result)).not.toThrow('private device details');
   });
   it('preserves a bounded context cleanup reason without exposing native details', () => {
-    const result = { exitCode: 1, stdout: JSON.stringify({ ok: false, error: {
-      code: 'context_cleanup_failed', message: 'Context cleanup failed',
-      details: { cleanup_reason_code: 'expired_remote_cleanup_failed', cleanup_errors: ['private device details'] },
-    } }), stderr: '' } as CLIResult;
-    expect(() => parseRdcNativeResult(result)).toThrow('Context cleanup failed (cleanup: expired_remote_cleanup_failed)');
+    const result = {
+      exitCode: 1,
+      stdout: JSON.stringify({
+        ok: false,
+        error: {
+          code: 'context_cleanup_failed',
+          message: 'Context cleanup failed',
+          details: { cleanup_reason_code: 'expired_remote_cleanup_failed', cleanup_errors: ['private device details'] },
+        },
+      }),
+      stderr: '',
+    } as CLIResult;
+    expect(() => parseRdcNativeResult(result)).toThrow(
+      'Context cleanup failed (cleanup: expired_remote_cleanup_failed)',
+    );
     expect(() => parseRdcNativeResult(result)).not.toThrow('private device details');
   });
   it('does not treat a no-replacement claim as proof of an unchanged replay', () => {
-    const result = { exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
-      result_kind: 'rd.shader.edit_and_replace', ok: false, error: {
-        code: 'shader_patch_op_unsupported_for_encoding', category: 'validation', message: 'Source cannot be edited',
-        details: { replacement_attempted: false, context_preserved: true, private_path: 'do not expose' },
-      } }), stderr: '' } as CLIResult;
+    const result = {
+      exitCode: 1,
+      stdout: JSON.stringify({
+        schema_version: '3.0.0',
+        result_kind: 'rd.shader.edit_and_replace',
+        ok: false,
+        error: {
+          code: 'shader_patch_op_unsupported_for_encoding',
+          category: 'validation',
+          message: 'Source cannot be edited',
+          details: { replacement_attempted: false, context_preserved: true, private_path: 'do not expose' },
+        },
+      }),
+      stderr: '',
+    } as CLIResult;
     let failure: unknown;
-    try { parseRdcNativeResult(result, undefined, 'rd.shader.edit_and_replace'); } catch (error) { failure = error; }
+    try {
+      parseRdcNativeResult(result, undefined, 'rd.shader.edit_and_replace');
+    } catch (error) {
+      failure = error;
+    }
     expect(failure).toBeInstanceOf(RdcNativeFailure);
     expect(failure).toMatchObject({ resultKind: 'rd.shader.edit_and_replace', effectsNotAttempted: false });
     expect((failure as Error).message).not.toContain('private_path');
   });
   it('retains only canonical proof that no native effect was attempted', () => {
-    const envelope = { schema_version: '3.0.0', result_kind: 'rd.pipeline.get_state', ok: false,
-      error: { code: 'unsupported_target', category: 'validation', message: 'Target unavailable',
-        details: { effects_attempted: false, context_preserved: true, private_path: 'do not expose' } } };
+    const envelope = {
+      schema_version: '3.0.0',
+      result_kind: 'rd.pipeline.get_state',
+      ok: false,
+      error: {
+        code: 'unsupported_target',
+        category: 'validation',
+        message: 'Target unavailable',
+        details: { effects_attempted: false, context_preserved: true, private_path: 'do not expose' },
+      },
+    };
     let failure: unknown;
-    try { parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify(envelope), stderr: '' } as CLIResult,
-      undefined, 'rd.pipeline.get_state'); } catch (error) { failure = error; }
+    try {
+      parseRdcNativeResult(
+        { exitCode: 1, stdout: JSON.stringify(envelope), stderr: '' } as CLIResult,
+        undefined,
+        'rd.pipeline.get_state',
+      );
+    } catch (error) {
+      failure = error;
+    }
     expect(failure).toMatchObject({ resultKind: 'rd.pipeline.get_state', effectsNotAttempted: true });
     expect((failure as Error).message).not.toContain('private_path');
     for (const change of [
-      { schema_version: '2.0.0' }, { result_kind: 'rd.pipeline.other' },
+      { schema_version: '2.0.0' },
+      { result_kind: 'rd.pipeline.other' },
       { error: { ...envelope.error, details: { effects_attempted: true, context_preserved: true } } },
       { error: { ...envelope.error, details: { effects_attempted: false, context_preserved: false } } },
     ]) {
       let rejected: unknown;
-      try { parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify({ ...envelope, ...change }), stderr: '' } as CLIResult,
-        undefined, 'rd.pipeline.get_state'); } catch (error) { rejected = error; }
+      try {
+        parseRdcNativeResult(
+          { exitCode: 1, stdout: JSON.stringify({ ...envelope, ...change }), stderr: '' } as CLIResult,
+          undefined,
+          'rd.pipeline.get_state',
+        );
+      } catch (error) {
+        rejected = error;
+      }
       expect(rejected).toMatchObject({ effectsNotAttempted: false });
     }
   });
-  it.each(['validation', 'capability', 'runtime', 'not_found'])('does not use category %s to decide preservation', category => {
-    const envelope = { schema_version: '3.0.0', result_kind: 'rd.pipeline.get_state', ok: false,
-      error: { code: 'arbitrary_code', category, message: 'Rejected',
-        details: { effects_attempted: false, context_preserved: true } } };
-    let failure: unknown;
-    try { parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify(envelope), stderr: '' } as CLIResult,
-      undefined, envelope.result_kind); } catch (error) { failure = error; }
-    expect(failure).toMatchObject({ effectsNotAttempted: true });
-  });
-  it.each(['get_shader', 'get_stage_state', 'get_constant_buffers', 'get_resource_bindings'])(
-    'retains exact pre-effect capability rejection for pipeline %s', action => {
-      const operation = `rd.pipeline.${action}`;
-      const result = { exitCode: 1, stdout: JSON.stringify({ schema_version: '3.0.0',
-        result_kind: operation, ok: false, error: { code: 'shader_stage_unsupported', category: 'capability',
-          message: 'RT stage is unsupported', details: { failure_stage: 'validate_stage',
-            effects_attempted: false, context_preserved: true } } }), stderr: '' } as CLIResult;
+  it.each(['validation', 'capability', 'runtime', 'not_found'])(
+    'does not use category %s to decide preservation',
+    (category) => {
+      const envelope = {
+        schema_version: '3.0.0',
+        result_kind: 'rd.pipeline.get_state',
+        ok: false,
+        error: {
+          code: 'arbitrary_code',
+          category,
+          message: 'Rejected',
+          details: { effects_attempted: false, context_preserved: true },
+        },
+      };
       let failure: unknown;
-      try { parseRdcNativeResult(result, undefined, operation); } catch (error) { failure = error; }
+      try {
+        parseRdcNativeResult(
+          { exitCode: 1, stdout: JSON.stringify(envelope), stderr: '' } as CLIResult,
+          undefined,
+          envelope.result_kind,
+        );
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toMatchObject({ effectsNotAttempted: true });
+    },
+  );
+  it.each(['get_shader', 'get_stage_state', 'get_constant_buffers', 'get_resource_bindings'])(
+    'retains exact pre-effect capability rejection for pipeline %s',
+    (action) => {
+      const operation = `rd.pipeline.${action}`;
+      const result = {
+        exitCode: 1,
+        stdout: JSON.stringify({
+          schema_version: '3.0.0',
+          result_kind: operation,
+          ok: false,
+          error: {
+            code: 'shader_stage_unsupported',
+            category: 'capability',
+            message: 'RT stage is unsupported',
+            details: { failure_stage: 'validate_stage', effects_attempted: false, context_preserved: true },
+          },
+        }),
+        stderr: '',
+      } as CLIResult;
+      let failure: unknown;
+      try {
+        parseRdcNativeResult(result, undefined, operation);
+      } catch (error) {
+        failure = error;
+      }
       expect(failure).toMatchObject({ effectsNotAttempted: true });
     },
   );
@@ -131,35 +294,76 @@ describe('native failure projection', () => {
     const error = { code: 'shader_stage_unsupported', category: 'capability', message: 'Unsupported stage', details };
     const envelope = { schema_version: '3.0.0', result_kind: operation, ok: false, error };
     for (const change of [
-      { schema_version: '2.0.0' }, { result_kind: 'rd.pipeline.get_state' },
+      { schema_version: '2.0.0' },
+      { result_kind: 'rd.pipeline.get_state' },
       { error: { ...error, details: { failure_stage: 'validate_stage', context_preserved: true } } },
       { error: { ...error, details: { failure_stage: 'validate_stage', effects_attempted: false } } },
     ]) {
       let failure: unknown;
-      try { parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify({ ...envelope, ...change }), stderr: '' } as CLIResult,
-        undefined, operation); } catch (caught) { failure = caught; }
+      try {
+        parseRdcNativeResult(
+          { exitCode: 1, stdout: JSON.stringify({ ...envelope, ...change }), stderr: '' } as CLIResult,
+          undefined,
+          operation,
+        );
+      } catch (caught) {
+        failure = caught;
+      }
       expect(failure).toMatchObject({ effectsNotAttempted: false });
     }
     for (const [kind, expectedKind, exitCode] of [
-      [operation, undefined, 1], [operation, operation, 0],
+      [operation, undefined, 1],
+      [operation, operation, 0],
     ] as const) {
       let failure: unknown;
-      try { parseRdcNativeResult({ exitCode, stdout: JSON.stringify({ ...envelope, result_kind: kind }), stderr: '' } as CLIResult,
-        undefined, expectedKind); } catch (caught) { failure = caught; }
+      try {
+        parseRdcNativeResult(
+          { exitCode, stdout: JSON.stringify({ ...envelope, result_kind: kind }), stderr: '' } as CLIResult,
+          undefined,
+          expectedKind,
+        );
+      } catch (caught) {
+        failure = caught;
+      }
       expect(failure).toMatchObject({ effectsNotAttempted: false });
     }
   });
   it('retains only exact failed screenshot target restoration proof', () => {
-    const envelope = { schema_version: '3.0.0', result_kind: 'rd.export.screenshot', ok: false,
-      error: { code: 'preview_event_output_unavailable', category: 'runtime', message: 'No target',
-        details: { context_id: 'owned-context', session_id: 'native-replay', failure_stage: 'resolve_visual_target',
-          replay_state_restored: true, restored_event_id: 11, artifact_write_attempted: false } } };
+    const envelope = {
+      schema_version: '3.0.0',
+      result_kind: 'rd.export.screenshot',
+      ok: false,
+      error: {
+        code: 'preview_event_output_unavailable',
+        category: 'runtime',
+        message: 'No target',
+        details: {
+          context_id: 'owned-context',
+          session_id: 'native-replay',
+          failure_stage: 'resolve_visual_target',
+          replay_state_restored: true,
+          restored_event_id: 11,
+          artifact_write_attempted: false,
+        },
+      },
+    };
     const parse = (value: object, exitCode = 1) => {
-      try { parseRdcNativeResult({ exitCode, stdout: JSON.stringify(value), stderr: '' } as CLIResult,
-        undefined, 'rd.export.screenshot'); } catch (error) { return error as RdcNativeFailure; }
+      try {
+        parseRdcNativeResult(
+          { exitCode, stdout: JSON.stringify(value), stderr: '' } as CLIResult,
+          undefined,
+          'rd.export.screenshot',
+        );
+      } catch (error) {
+        return error as RdcNativeFailure;
+      }
       throw new Error('Expected native failure');
     };
-    expect(parse(envelope).screenshotTargetRestoration).toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 11 });
+    expect(parse(envelope).screenshotTargetRestoration).toEqual({
+      contextId: 'owned-context',
+      sessionId: 'native-replay',
+      eventId: 11,
+    });
     for (const details of [
       { ...envelope.error.details, replay_state_restored: false },
       { ...envelope.error.details, artifact_write_attempted: true },
@@ -170,22 +374,48 @@ describe('native failure projection', () => {
     }
     expect(parse({ ...envelope, schema_version: '2.0.0' }).screenshotTargetRestoration).toBeNull();
     expect(parse({ ...envelope, result_kind: 'rd.export.texture' }).screenshotTargetRestoration).toBeNull();
-    expect(parse({ ...envelope, error: { ...envelope.error, category: 'validation' } }).screenshotTargetRestoration)
-      .toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 11 });
+    expect(
+      parse({ ...envelope, error: { ...envelope.error, category: 'validation' } }).screenshotTargetRestoration,
+    ).toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 11 });
     expect(parse(envelope, 0).screenshotTargetRestoration).toBeNull();
   });
   it('retains only exact shader-source binding restoration proof', () => {
-    const envelope = { schema_version: '3.0.0', result_kind: 'rd.shader.get_source', ok: false,
-      error: { code: 'shader_binding_lookup_failed', category: 'runtime', message: 'No PS bound',
-        details: { context_id: 'owned-context', session_id: 'native-replay', resolved_event_id: 3029,
-          failure_stage: 'resolve_binding', failure_reason: 'stage_unbound',
-          replay_state_restored: true, restored_event_id: 1248 } } };
+    const envelope = {
+      schema_version: '3.0.0',
+      result_kind: 'rd.shader.get_source',
+      ok: false,
+      error: {
+        code: 'shader_binding_lookup_failed',
+        category: 'runtime',
+        message: 'No PS bound',
+        details: {
+          context_id: 'owned-context',
+          session_id: 'native-replay',
+          resolved_event_id: 3029,
+          failure_stage: 'resolve_binding',
+          failure_reason: 'stage_unbound',
+          replay_state_restored: true,
+          restored_event_id: 1248,
+        },
+      },
+    };
     const parse = (value: object, exitCode = 1) => {
-      try { parseRdcNativeResult({ exitCode, stdout: JSON.stringify(value), stderr: '' } as CLIResult,
-        undefined, 'rd.shader.get_source'); } catch (error) { return error as RdcNativeFailure; }
+      try {
+        parseRdcNativeResult(
+          { exitCode, stdout: JSON.stringify(value), stderr: '' } as CLIResult,
+          undefined,
+          'rd.shader.get_source',
+        );
+      } catch (error) {
+        return error as RdcNativeFailure;
+      }
       throw new Error('Expected native failure');
     };
-    expect(parse(envelope).inspectionRestoration).toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 1248 });
+    expect(parse(envelope).inspectionRestoration).toEqual({
+      contextId: 'owned-context',
+      sessionId: 'native-replay',
+      eventId: 1248,
+    });
     for (const details of [
       { ...envelope.error.details, replay_state_restored: false },
       { ...envelope.error.details, failure_stage: 'compile' },
@@ -195,44 +425,88 @@ describe('native failure projection', () => {
       expect(parse({ ...envelope, error: { ...envelope.error, details } }).inspectionRestoration).toBeNull();
     }
     expect(parse({ ...envelope, result_kind: 'rd.shader.get_disassembly' }).inspectionRestoration).toBeNull();
-    expect(parse({ ...envelope, error: { ...envelope.error, code: 'other_code' } }).inspectionRestoration)
-      .toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 1248 });
+    expect(parse({ ...envelope, error: { ...envelope.error, code: 'other_code' } }).inspectionRestoration).toEqual({
+      contextId: 'owned-context',
+      sessionId: 'native-replay',
+      eventId: 1248,
+    });
     expect(parse(envelope, 0).inspectionRestoration).toBeNull();
   });
   it('accepts only exact constant-buffer failure restoration proof', () => {
-    const details = { context_id: 'owned-context', session_id: 'native-replay',
-      failure_stage: 'decode_constant_buffer', failure_reason: 'slot_unavailable',
-      replay_state_restored: true, restored_event_id: 11 };
-    const envelope = { schema_version: '3.0.0', result_kind: 'rd.shader.get_constant_buffer_contents', ok: false,
-      error: { code: 'constant_buffer_data_unavailable', category: 'runtime', message: 'No buffer', details } };
+    const details = {
+      context_id: 'owned-context',
+      session_id: 'native-replay',
+      failure_stage: 'decode_constant_buffer',
+      failure_reason: 'slot_unavailable',
+      replay_state_restored: true,
+      restored_event_id: 11,
+    };
+    const envelope = {
+      schema_version: '3.0.0',
+      result_kind: 'rd.shader.get_constant_buffer_contents',
+      ok: false,
+      error: { code: 'constant_buffer_data_unavailable', category: 'runtime', message: 'No buffer', details },
+    };
     const parse = (value: object, exitCode = 1) => {
-      try { parseRdcNativeResult({ exitCode, stdout: JSON.stringify(value), stderr: '' } as CLIResult,
-        undefined, envelope.result_kind); } catch (error) { return error as RdcNativeFailure; }
+      try {
+        parseRdcNativeResult(
+          { exitCode, stdout: JSON.stringify(value), stderr: '' } as CLIResult,
+          undefined,
+          envelope.result_kind,
+        );
+      } catch (error) {
+        return error as RdcNativeFailure;
+      }
       throw new Error('Expected native failure');
     };
-    expect(parse(envelope).inspectionRestoration).toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 11 });
+    expect(parse(envelope).inspectionRestoration).toEqual({
+      contextId: 'owned-context',
+      sessionId: 'native-replay',
+      eventId: 11,
+    });
     for (const change of [
-      { replay_state_restored: false }, { failure_stage: 'compile' }, { failure_reason: 'unknown' },
-      { restored_event_id: 0 }, { restored_event_id: 1.5 }, { context_id: null }, { session_id: null },
+      { replay_state_restored: false },
+      { failure_stage: 'compile' },
+      { failure_reason: 'unknown' },
+      { restored_event_id: 0 },
+      { restored_event_id: 1.5 },
+      { context_id: null },
+      { session_id: null },
     ]) {
-      expect(parse({ ...envelope, error: { ...envelope.error, details: { ...details, ...change } } })
-        .inspectionRestoration).toBeNull();
+      expect(
+        parse({ ...envelope, error: { ...envelope.error, details: { ...details, ...change } } }).inspectionRestoration,
+      ).toBeNull();
     }
     for (const change of [{ code: 'other_code' }, { category: 'validation' }]) {
-      expect(parse({ ...envelope, error: { ...envelope.error, ...change } }).inspectionRestoration)
-        .toEqual({ contextId: 'owned-context', sessionId: 'native-replay', eventId: 11 });
+      expect(parse({ ...envelope, error: { ...envelope.error, ...change } }).inspectionRestoration).toEqual({
+        contextId: 'owned-context',
+        sessionId: 'native-replay',
+        eventId: 11,
+      });
     }
     expect(parse({ ...envelope, schema_version: '2.0.0' }).inspectionRestoration).toBeNull();
     expect(parse({ ...envelope, result_kind: 'rd.shader.get_source' }).inspectionRestoration).toBeNull();
     expect(parse(envelope, 0).inspectionRestoration).toBeNull();
   });
   it.each([
-    { schema_version: '2.0.0' }, { result_kind: 'rd.shader.other' }, { exitCode: 0 },
-    { category: 'runtime' }, { replacement_attempted: true }, { context_preserved: false },
+    { schema_version: '2.0.0' },
+    { result_kind: 'rd.shader.other' },
+    { exitCode: 0 },
+    { category: 'runtime' },
+    { replacement_attempted: true },
+    { context_preserved: false },
   ])('does not accept incomplete or conflicting no-replacement proof: %j', (change) => {
-    const envelope = { schema_version: '3.0.0', result_kind: 'rd.shader.edit_and_replace', ok: false,
-      error: { code: 'shader_replace_failed', category: 'validation', message: 'Failed',
-        details: { replacement_attempted: false, context_preserved: true } } };
+    const envelope = {
+      schema_version: '3.0.0',
+      result_kind: 'rd.shader.edit_and_replace',
+      ok: false,
+      error: {
+        code: 'shader_replace_failed',
+        category: 'validation',
+        message: 'Failed',
+        details: { replacement_attempted: false, context_preserved: true },
+      },
+    };
     const { exitCode = 1, ...fields } = change;
     const { category, replacement_attempted, context_preserved, ...top } = fields;
     Object.assign(envelope, top);
@@ -240,17 +514,58 @@ describe('native failure projection', () => {
     if (replacement_attempted !== undefined) envelope.error.details.replacement_attempted = replacement_attempted;
     if (context_preserved !== undefined) envelope.error.details.context_preserved = context_preserved;
     let failure: unknown;
-    try { parseRdcNativeResult({ exitCode, stdout: JSON.stringify(envelope), stderr: '' } as CLIResult,
-      undefined, 'rd.shader.edit_and_replace'); } catch (error) { failure = error; }
+    try {
+      parseRdcNativeResult(
+        { exitCode, stdout: JSON.stringify(envelope), stderr: '' } as CLIResult,
+        undefined,
+        'rd.shader.edit_and_replace',
+      );
+    } catch (error) {
+      failure = error;
+    }
     expect(failure).toBeInstanceOf(RdcNativeFailure);
     expect(failure).toMatchObject({ effectsNotAttempted: false });
   });
 });
 
 it('retains structured remote repair facts without replacing its native error classification', () => {
-  const details = { remote: { code: 'remote_version_mismatch', stage: 'verifying', device_serial: 'SERIAL', expected_version: '1.45', actual_version: '1.36' } };
-  let error: unknown; try { parseRdcNativeResult({ exitCode: 1, stdout: JSON.stringify({ ok: false, result_kind: 'rd.remote.connect', error: {
-    code: 'remote_version_mismatch', category: 'runtime', message: 'Version mismatch', details } }), stderr: '' } as CLIResult, 'owned', 'rd.remote.connect'); } catch (caught) { error = caught; }
+  const details = {
+    remote: {
+      code: 'remote_version_mismatch',
+      stage: 'verifying',
+      device_serial: 'SERIAL',
+      expected_version: '1.45',
+      actual_version: '1.36',
+    },
+  };
+  let error: unknown;
+  try {
+    parseRdcNativeResult(
+      {
+        exitCode: 1,
+        stdout: JSON.stringify({
+          ok: false,
+          result_kind: 'rd.remote.connect',
+          error: {
+            code: 'remote_version_mismatch',
+            category: 'runtime',
+            message: 'Version mismatch',
+            details,
+          },
+        }),
+        stderr: '',
+      } as CLIResult,
+      'owned',
+      'rd.remote.connect',
+    );
+  } catch (caught) {
+    error = caught;
+  }
   expect(error).toBeInstanceOf(RdcNativeFailure);
-  expect((error as RdcNativeFailure).nativeError).toEqual({ code: 'remote_version_mismatch', category: 'runtime', exitCode: 1, details });
+  expect((error as RdcNativeFailure).nativeError).toEqual({
+    code: 'remote_version_mismatch',
+    category: 'runtime',
+    exitCode: 1,
+    details,
+  });
 });

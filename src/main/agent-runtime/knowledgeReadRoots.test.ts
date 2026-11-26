@@ -18,16 +18,20 @@ async function makeDir(prefix: string): Promise<string> {
 describe('knowledge read-access tools', () => {
   it('only the four read-only file tools declare read access to the knowledge roots', () => {
     const tools = getPrimitiveTools();
-    const readAccess = tools.filter((tool) => tool.spec.knowledgeRoots === 'read-access').map((tool) => tool.name).sort();
+    const readAccess = tools
+      .filter((tool) => tool.spec.knowledgeRoots === 'read-access')
+      .map((tool) => tool.name)
+      .sort();
     expect(readAccess).toEqual(['glob', 'grep', 'read_file', 'read_image']);
-    expect(tools.filter((tool) => [
-      'write_file',
-      'edit_file',
-      'delete_file',
-      'shell',
-      'code_interpreter',
-      'knowledge_search',
-    ].includes(tool.name)).some((tool) => tool.spec.knowledgeRoots === 'read-access')).toBe(false);
+    expect(
+      tools
+        .filter((tool) =>
+          ['write_file', 'edit_file', 'delete_file', 'shell', 'code_interpreter', 'knowledge_search'].includes(
+            tool.name,
+          ),
+        )
+        .some((tool) => tool.spec.knowledgeRoots === 'read-access'),
+    ).toBe(false);
   });
 });
 

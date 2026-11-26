@@ -3,7 +3,9 @@ import { refreshEffectiveCatalog } from './effectiveCatalogService';
 import type { ElectronAPI } from '@shared/types/electron';
 
 it('uses the provider refresh action and preserves its failure', async () => {
-  const refreshProviderModels = vi.fn().mockResolvedValueOnce({ success: false, error: 'Account is not connected.' })
+  const refreshProviderModels = vi
+    .fn()
+    .mockResolvedValueOnce({ success: false, error: 'Account is not connected.' })
     .mockResolvedValueOnce({ success: true });
   const api = { llm: { refreshProviderModels } } as unknown as ElectronAPI;
   const scope = { accountId: 'a', protocol: 'OpenAIResponses' as const };

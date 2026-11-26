@@ -14,19 +14,23 @@ interface WorkflowStoreState {
 }
 
 function sameRightPanel(current: RightPanelViewModel, next: RightPanelViewModel): boolean {
-  return current === next
-    || (current.tasks === next.tasks
-      && current.artifacts === next.artifacts
-      && current.outputs === next.outputs
-      && current.context === next.context);
+  return (
+    current === next ||
+    (current.tasks === next.tasks &&
+      current.artifacts === next.artifacts &&
+      current.outputs === next.outputs &&
+      current.context === next.context)
+  );
 }
 
 function sameTracePresentation(current: AgentRunPresentation | null, next: AgentRunPresentation | null): boolean {
   if (current === next) return true;
   if (!current || !next) return false;
-  return current.sessionId === next.sessionId
-    && current.updatedAt === next.updatedAt
-    && sameRightPanel(current.rightPanel, next.rightPanel);
+  return (
+    current.sessionId === next.sessionId &&
+    current.updatedAt === next.updatedAt &&
+    sameRightPanel(current.rightPanel, next.rightPanel)
+  );
 }
 
 export const useWorkflowStore = create<WorkflowStoreState>((set) => ({
@@ -34,16 +38,27 @@ export const useWorkflowStore = create<WorkflowStoreState>((set) => ({
   tracePresentation: null,
 
   setWorkflowState: (workflowState) => set({ workflowState }),
-  setTracePresentation: (presentation) => set((state) => {
-    const mode = useRuntimePermissionStore.getState().snapshot?.mode;
-    const tracePresentation = presentation && mode && presentation.rightPanel.context.task.permission !== mode
-      ? { ...presentation, rightPanel: { ...presentation.rightPanel, context: {
-        ...presentation.rightPanel.context, task: { ...presentation.rightPanel.context.task, permission: mode },
-      } } } : presentation;
-    return sameTracePresentation(state.tracePresentation, tracePresentation) ? state : { tracePresentation };
-  }),
-  reset: () => set({
-    workflowState: null,
-    tracePresentation: null,
-  }),
+  setTracePresentation: (presentation) =>
+    set((state) => {
+      const mode = useRuntimePermissionStore.getState().snapshot?.mode;
+      const tracePresentation =
+        presentation && mode && presentation.rightPanel.context.task.permission !== mode
+          ? {
+              ...presentation,
+              rightPanel: {
+                ...presentation.rightPanel,
+                context: {
+                  ...presentation.rightPanel.context,
+                  task: { ...presentation.rightPanel.context.task, permission: mode },
+                },
+              },
+            }
+          : presentation;
+      return sameTracePresentation(state.tracePresentation, tracePresentation) ? state : { tracePresentation };
+    }),
+  reset: () =>
+    set({
+      workflowState: null,
+      tracePresentation: null,
+    }),
 }));

@@ -37,7 +37,10 @@ describe('case chapter values', () => {
       { text: 'I-NORM-02', code: true },
       { text: '。', code: false },
     ]);
-    expect(splitIdentifiers('ids %20-%24')).toEqual([{ text: 'ids ', code: false }, { text: '%20-%24', code: true }]);
+    expect(splitIdentifiers('ids %20-%24')).toEqual([
+      { text: 'ids ', code: false },
+      { text: '%20-%24', code: true },
+    ]);
     expect(looksLikeIdentifier('Mesh_Body')).toBe(true);
     expect(looksLikeIdentifier(':EvaluateLight -> Light.Radiance')).toBe(true);
     expect(looksLikeIdentifier('颜色错误')).toBe(false);
@@ -45,7 +48,9 @@ describe('case chapter values', () => {
   });
 
   it('drops internal references and the containers they leave empty', () => {
-    const evidence = parseChapterValue('{"tool":"manual.spirv_edit","params":{"file":"asset-1f2e3d4c"},"link":"session://tool-outputs/x"}');
+    const evidence = parseChapterValue(
+      '{"tool":"manual.spirv_edit","params":{"file":"asset-1f2e3d4c"},"link":"session://tool-outputs/x"}',
+    );
     expect(withoutInternalReferences(evidence!)).toEqual({ tool: 'manual.spirv_edit' });
     expect(parseChapterValue('plain prose')).toBeUndefined();
     expect(parseChapterValue('{broken')).toBeUndefined();

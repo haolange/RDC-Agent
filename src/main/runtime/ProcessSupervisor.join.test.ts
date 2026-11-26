@@ -85,7 +85,9 @@ describe('ProcessSupervisor bounded join', () => {
 
   it('returns unconfirmed_orphan when forced termination has no close event', async () => {
     const supervisor = new ProcessSupervisor();
-    const supervised = await withProcessExecutionOwner('parent::subagent::child', async () => supervisor.spawn('other', 'fake-command', [], { isolateProcessGroup: false }));
+    const supervised = await withProcessExecutionOwner('parent::subagent::child', async () =>
+      supervisor.spawn('other', 'fake-command', [], { isolateProcessGroup: false }),
+    );
 
     const arbiter = new ToolResourceArbiter();
     const info = await arbiter.runExclusive('project', undefined, () => supervised.join(1));
@@ -96,7 +98,9 @@ describe('ProcessSupervisor bounded join', () => {
     expect(supervisor.hasUnconfirmedProcesses('parent::subagent::child')).toBe(true);
     expect(supervisor.hasUnconfirmedProcesses('other-child')).toBe(false);
     let joined = false;
-    const join = supervisor.joinExecutionProcesses('parent::subagent::child').then(() => { joined = true; });
+    const join = supervisor.joinExecutionProcesses('parent::subagent::child').then(() => {
+      joined = true;
+    });
     await Promise.resolve();
     expect(joined).toBe(false);
 

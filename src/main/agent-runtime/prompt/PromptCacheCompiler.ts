@@ -13,14 +13,13 @@ export interface PromptCacheCompileInput {
 
 /** A stable, opaque UUID-shaped key: the same scope always routes to the same cache. */
 function scopeAffinityKey(scopeId: string): string {
-  const hex = hashScopedResource({ cacheAffinityScope: scopeId }).replace(/^sha256:/u, '').slice(0, 32);
+  const hex = hashScopedResource({ cacheAffinityScope: scopeId })
+    .replace(/^sha256:/u, '')
+    .slice(0, 32);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-const disabledCache = (
-  input: PromptCacheCompileInput,
-  reason: string,
-): CompiledPromptCache => ({
+const disabledCache = (input: PromptCacheCompileInput, reason: string): CompiledPromptCache => ({
   enabled: false,
   mode: input.requestPlan.cachePlan.mode,
   keyCarrier: input.requestPlan.cachePlan.keyCarrier,
@@ -55,35 +54,29 @@ export class PromptCacheCompiler {
     if (plan.keyCarrier === 'session-id-and-prompt-cache-key' && !input.affinityScopeId) {
       return disabledCache(input, 'Session-affine cache requires the execution scope.');
     }
-    const requestKey = plan.keyCarrier === 'prompt-cache-key'
-      ? `rdc:${prefixFingerprint.slice(0, 48)}`
-      : plan.keyCarrier === 'session-id-and-prompt-cache-key' ? scopeAffinityKey(input.affinityScopeId!) : undefined;
+    const requestKey =
+      plan.keyCarrier === 'prompt-cache-key'
+        ? `rdc:${prefixFingerprint.slice(0, 48)}`
+        : plan.keyCarrier === 'session-id-and-prompt-cache-key'
+          ? scopeAffinityKey(input.affinityScopeId!)
+          : undefined;
 
     let breakpoint: CompiledPromptCache['breakpoint'];
     if (plan.mode === 'implicit-prefix' || plan.mode === 'provider-managed') {
       breakpoint = 'implicit';
     } else if (plan.mode === 'automatic-breakpoint') {
-      if (
-        plan.breakpointCarrier !== 'anthropic-cache-control'
-        && plan.breakpointCarrier !== 'provider-managed'
-      ) {
+      if (plan.breakpointCarrier !== 'anthropic-cache-control' && plan.breakpointCarrier !== 'provider-managed') {
         return disabledCache(input, 'Automatic cache mode has no compatible breakpoint carrier.');
       }
       breakpoint = 'automatic';
     } else if (plan.mode === 'explicit-breakpoints') {
-      if (
-        plan.breakpointCarrier !== 'openai-prompt-cache'
-        && plan.breakpointCarrier !== 'anthropic-cache-control'
-      ) {
+      if (plan.breakpointCarrier !== 'openai-prompt-cache' && plan.breakpointCarrier !== 'anthropic-cache-control') {
         return disabledCache(input, 'Explicit cache mode has no compatible breakpoint carrier.');
       }
       breakpoint = 'explicit';
     } else {
       // automatic-and-explicit-breakpoints
-      if (
-        plan.breakpointCarrier !== 'openai-prompt-cache'
-        && plan.breakpointCarrier !== 'anthropic-cache-control'
-      ) {
+      if (plan.breakpointCarrier !== 'openai-prompt-cache' && plan.breakpointCarrier !== 'anthropic-cache-control') {
         return disabledCache(input, 'Combined cache mode has no compatible breakpoint carrier.');
       }
       breakpoint = 'automatic-and-explicit';
@@ -91,14 +84,18 @@ export class PromptCacheCompiler {
 
     const reason = [
       plan.keyCarrier === 'prompt-cache-key' ? 'Stable prompt and tool prefix compiled to prompt_cache_key.' : '',
-      plan.keyCarrier === 'session-id-and-prompt-cache-key' ? 'Execution scope compiled to prompt_cache_key and the session-id header.' : '',
+      plan.keyCarrier === 'session-id-and-prompt-cache-key'
+        ? 'Execution scope compiled to prompt_cache_key and the session-id header.'
+        : '',
       breakpoint === 'implicit' ? 'Provider performs implicit prefix caching.' : '',
       breakpoint === 'automatic' ? 'Provider automatic breakpoint enabled.' : '',
       breakpoint === 'explicit' ? 'Stable prefix compiled to an explicit cache breakpoint.' : '',
       breakpoint === 'automatic-and-explicit'
         ? 'Provider automatic caching and an explicit stable-prefix breakpoint enabled.'
         : '',
-    ].filter(Boolean).join(' ');
+    ]
+      .filter(Boolean)
+      .join(' ');
 
     return {
       enabled: true,

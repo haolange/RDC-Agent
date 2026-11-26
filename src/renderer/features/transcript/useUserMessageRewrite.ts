@@ -26,117 +26,119 @@ export function useUserMessageRewrite(message: ConversationMessage) {
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
 
-  return useCallback(async (nextContent: string) => {
-    const electronAPI = getElectronApi();
-    if (!electronAPI) {
-      throw new Error('App bridge is not available.');
-    }
+  return useCallback(
+    async (nextContent: string) => {
+      const electronAPI = getElectronApi();
+      if (!electronAPI) {
+        throw new Error('App bridge is not available.');
+      }
 
-    const previousMessages = useConversationStore.getState().allConversationMessages;
-    const previousBranchState = useConversationStore.getState().branchState;
-    const requestId = createConversationRequestId();
-    const rewriteAgentId = readComposerAgentId();
-    const turnOwnership = {
-      sessionId: message.sessionId ?? 'no-session',
-      requestId,
-      agentId: rewriteAgentId,
-    };
-    const optimistic = buildOptimisticRewriteSnapshot({
-      requestId,
-      sourceMessage: message,
-      nextContent,
-      allMessages: previousMessages,
-      branchState: previousBranchState,
-      agentId: rewriteAgentId,
-    });
-
-    setConversationSnapshot(optimistic.messages, optimistic.branchState);
-    useSessionStore.getState().setConversationPreparationPhase('preparing');
-    useComposerSessionContextStore.getState().beginTurn({
-      ...turnOwnership,
-      projectId: message.projectId ?? currentProject?.projectId ?? null,
-    });
-
-    try {
-      const configuration = await buildConversationConfigurationCommit({
-        selectedAgentId: rewriteAgentId,
-        currentProjectId: currentProject?.projectId,
-        getEffectiveCatalog: (providerId) => electronAPI.settings.getEffectiveCatalog(providerId),
-        modelOverride: readComposerEffectiveModel(
-          rewriteAgentId,
-          getCurrentSessionView(),
-          currentProject?.projectId,
-        ),
-      });
-      const result = await electronAPI.conversation.rewriteFromMessage({
+      const previousMessages = useConversationStore.getState().allConversationMessages;
+      const previousBranchState = useConversationStore.getState().branchState;
+      const requestId = createConversationRequestId();
+      const rewriteAgentId = readComposerAgentId();
+      const turnOwnership = {
+        sessionId: message.sessionId ?? 'no-session',
         requestId,
-        messageId: message.id,
-        projectId: message.projectId ?? currentProject?.projectId ?? null,
-        sessionId: message.sessionId,
-        currentRunId: message.runId ?? null,
-        replayDeviceId: null,
         agentId: rewriteAgentId,
-        profileId: resolveComposerProfileId(rewriteAgentId),
-        message: nextContent,
-        attachments: message.attachments?.map((attachment) => ({
-          sourcePath: attachment.filePath,
-          material: attachment.material,
-          fileName: attachment.fileName,
-          mimeType: attachment.mimeType,
-          size: attachment.size,
-        })) ?? [],
-        turnControls: { ...useTurnControlsStore.getState().turnControls },
-        configurationCommit: configuration.configurationCommit,
+      };
+      const optimistic = buildOptimisticRewriteSnapshot({
+        requestId,
+        sourceMessage: message,
+        nextContent,
+        allMessages: previousMessages,
+        branchState: previousBranchState,
+        agentId: rewriteAgentId,
       });
 
-      if (useConversationStore.getState().consumeRevokedRequest(requestId)) {
+      setConversationSnapshot(optimistic.messages, optimistic.branchState);
+      useSessionStore.getState().setConversationPreparationPhase('preparing');
+      useComposerSessionContextStore.getState().beginTurn({
+        ...turnOwnership,
+        projectId: message.projectId ?? currentProject?.projectId ?? null,
+      });
+
+      try {
+        const configuration = await buildConversationConfigurationCommit({
+          selectedAgentId: rewriteAgentId,
+          currentProjectId: currentProject?.projectId,
+          getEffectiveCatalog: (providerId) => electronAPI.settings.getEffectiveCatalog(providerId),
+          modelOverride: readComposerEffectiveModel(rewriteAgentId, getCurrentSessionView(), currentProject?.projectId),
+        });
+        const result = await electronAPI.conversation.rewriteFromMessage({
+          requestId,
+          messageId: message.id,
+          projectId: message.projectId ?? currentProject?.projectId ?? null,
+          sessionId: message.sessionId,
+          currentRunId: message.runId ?? null,
+          replayDeviceId: null,
+          agentId: rewriteAgentId,
+          profileId: resolveComposerProfileId(rewriteAgentId),
+          message: nextContent,
+          attachments:
+            message.attachments?.map((attachment) => ({
+              sourcePath: attachment.filePath,
+              material: attachment.material,
+              fileName: attachment.fileName,
+              mimeType: attachment.mimeType,
+              size: attachment.size,
+            })) ?? [],
+          turnControls: { ...useTurnControlsStore.getState().turnControls },
+          configurationCommit: configuration.configurationCommit,
+        });
+
+        if (useConversationStore.getState().consumeRevokedRequest(requestId)) {
+          useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
+          useSessionStore.getState().setPreparedTurnContext(null);
+          useSessionStore.getState().setConversationPreparationPhase('idle');
+          return;
+        }
+
+        // Main's messages and branch carry the ids the snapshot used, so they update it in place.
+        const committedSessionId =
+          result.session?.record.sessionId ?? result.userMessage.sessionId ?? result.assistantDraftMessage.sessionId;
+        if (committedSessionId)
+          useComposerSessionContextStore.getState().bindCommittedSession(turnOwnership, committedSessionId);
+
+        await applyConversationTurnResult({
+          electronAPI,
+          result,
+          currentProject,
+          setSessions,
+          setCurrentRun,
+          setTracePresentation,
+          setConversationMessages,
+          setBranchState,
+          setConversationSnapshot,
+          upsertConversationMessages,
+        });
+
+        if (useConversationStore.getState().monotonicStoppedRequestIds.includes(requestId)) {
+          useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
+          useSessionStore.getState().setConversationPreparationPhase('idle');
+          return;
+        }
+
+        useSessionStore.getState().setPreparedTurnContext(result.preparedContext);
+        useSessionStore.getState().setConversationPreparationPhase('current');
+      } catch (error) {
+        setConversationSnapshot(previousMessages, previousBranchState);
         useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
         useSessionStore.getState().setPreparedTurnContext(null);
         useSessionStore.getState().setConversationPreparationPhase('idle');
-        return;
+        throw error;
       }
-
-      // Main's messages and branch carry the ids the snapshot used, so they update it in place.
-      const committedSessionId = result.session?.record.sessionId ?? result.userMessage.sessionId ?? result.assistantDraftMessage.sessionId;
-      if (committedSessionId) useComposerSessionContextStore.getState().bindCommittedSession(turnOwnership, committedSessionId);
-
-      await applyConversationTurnResult({
-        electronAPI,
-        result,
-        currentProject,
-        setSessions,
-        setCurrentRun,
-        setTracePresentation,
-        setConversationMessages,
-        setBranchState,
-        setConversationSnapshot,
-        upsertConversationMessages,
-      });
-
-      if (useConversationStore.getState().monotonicStoppedRequestIds.includes(requestId)) {
-        useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
-        useSessionStore.getState().setConversationPreparationPhase('idle');
-        return;
-      }
-
-      useSessionStore.getState().setPreparedTurnContext(result.preparedContext);
-      useSessionStore.getState().setConversationPreparationPhase('current');
-    } catch (error) {
-      setConversationSnapshot(previousMessages, previousBranchState);
-      useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
-      useSessionStore.getState().setPreparedTurnContext(null);
-      useSessionStore.getState().setConversationPreparationPhase('idle');
-      throw error;
-    }
-  }, [
-    currentProject,
-    message,
-    setBranchState,
-    setConversationMessages,
-    setConversationSnapshot,
-    setCurrentRun,
-    setSessions,
-    setTracePresentation,
-    upsertConversationMessages,
-  ]);
+    },
+    [
+      currentProject,
+      message,
+      setBranchState,
+      setConversationMessages,
+      setConversationSnapshot,
+      setCurrentRun,
+      setSessions,
+      setTracePresentation,
+      upsertConversationMessages,
+    ],
+  );
 }

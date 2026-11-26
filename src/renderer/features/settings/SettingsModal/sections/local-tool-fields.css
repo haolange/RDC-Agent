@@ -39,8 +39,8 @@
   padding: var(--space-3) var(--space-2);
 }
 
-.settings-local-tool-grid input[type="number"],
-.settings-runtime-form-grid input[type="number"] {
+.settings-local-tool-grid input[type='number'],
+.settings-runtime-form-grid input[type='number'] {
   inline-size: min(100%, 7rem);
 }
 

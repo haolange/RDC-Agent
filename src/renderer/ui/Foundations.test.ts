@@ -7,7 +7,9 @@ import { Button } from './Button';
 
 describe('shared foundation semantics', () => {
   it('defaults to a single row and leaves native editing attributes intact', () => {
-    const html = renderToStaticMarkup(React.createElement(Textarea, { defaultValue: '中文', 'aria-label': 'Prompt', readOnly: true }));
+    const html = renderToStaticMarkup(
+      React.createElement(Textarea, { defaultValue: '中文', 'aria-label': 'Prompt', readOnly: true }),
+    );
     expect(html).toContain('rows="1"');
     expect(html).toContain('is-sizing-content');
     expect(html).toContain('中文');
@@ -20,7 +22,9 @@ describe('shared foundation semantics', () => {
     expect(html).not.toContain('style=');
   });
   it('preserves empty-state visuals and marks loading buttons disabled and busy', () => {
-    const html = renderToStaticMarkup(React.createElement(EmptyState, { title: 'Empty', variant: 'page', visual: 'Scene' }));
+    const html = renderToStaticMarkup(
+      React.createElement(EmptyState, { title: 'Empty', variant: 'page', visual: 'Scene' }),
+    );
     expect(html).toContain('ui-empty-state is-page');
     expect(html).toContain('ui-empty-state-visual');
     const button = renderToStaticMarkup(React.createElement(Button, { loading: true, children: 'Save' }));

@@ -17,7 +17,9 @@ const root = process.env.RDC_NATIVE_TOOLS_ROOT;
 const capture = process.env.RDC_NATIVE_CAPTURE;
 describe.skipIf(!root || !capture)('explicit native read-only host acceptance', () => {
   it('runs frozen reads and retains the owning replay after an unsupported stage', { timeout: 120000 }, async () => {
-    const outputRoot = process.env.RDC_NATIVE_READ_OUTPUT ? path.dirname(process.env.RDC_NATIVE_READ_OUTPUT) : path.join(root!, 'intermediate', 'native-read-acceptance');
+    const outputRoot = process.env.RDC_NATIVE_READ_OUTPUT
+      ? path.dirname(process.env.RDC_NATIVE_READ_OUTPUT)
+      : path.join(root!, 'intermediate', 'native-read-acceptance');
     mkdirSync(outputRoot, { recursive: true });
     const directory = mkdtempSync(path.join(outputRoot, 'rdc-host-read-'));
     const contextSnapshots: unknown[] = [];
@@ -25,10 +27,15 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
     const sessionId = 'host-session-' + randomUUID();
     const captureHash = () => createHash('sha256').update(readFileSync(capture!)).digest('hex');
     const inputHash = captureHash();
-    const settings = { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, timeoutMs: 30000, workingDirectory: root!,
+    const settings = {
+      ...DEFAULT_RDC_CLI_INVOKER,
+      enabled: true,
+      timeoutMs: 30000,
+      workingDirectory: root!,
       command: rdcInstallationFiles(root!).python,
       argsPrefix: [rdcInstallationFiles(root!).entry],
-      env: { RDC_TOOL_INTERMEDIATE_ROOT: directory, PYTHONDONTWRITEBYTECODE: '1' } };
+      env: { RDC_TOOL_INTERMEDIATE_ROOT: directory, PYTHONDONTWRITEBYTECODE: '1' },
+    };
     const processes: Array<Record<string, unknown>> = [];
     const stageResults: Array<{ exitCode: number; envelope: Record<string, unknown> }> = [];
     const receipt: Record<string, unknown> = { toolsRoot: root, capture, inputSha256: inputHash, contextId, sessionId };
@@ -44,23 +51,36 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
     const invokeSpy = vi.spyOn(rdcCliInvokerService, 'executeCLI').mockImplementation(async (...args) => {
       const result = await execute(...args);
       if (args[0] === 'call' && args[1]?.[0] === 'rd.pipeline.get_stage_state') {
-        stageResults.push({ exitCode: result.exitCode, envelope: JSON.parse(result.stdout) as Record<string, unknown> });
+        stageResults.push({
+          exitCode: result.exitCode,
+          envelope: JSON.parse(result.stdout) as Record<string, unknown>,
+        });
       }
       return result;
     });
-    const native = async (command: string, args: string[]) => parseRdcNativeResult(await rdcCliInvokerService.executeCLI(command,
-      [...args, '--daemon-context', contextId], { settings, contextId }));
+    const native = async (command: string, args: string[]) =>
+      parseRdcNativeResult(
+        await rdcCliInvokerService.executeCLI(command, [...args, '--daemon-context', contextId], {
+          settings,
+          contextId,
+        }),
+      );
     const snapshot = async () => {
       const result = await native('call', ['rd.session.get_context', '--args-json', '{}']);
       contextSnapshots.push(result);
       const runtime = result.data.runtime as Record<string, unknown>;
       const sessions = result.data.sessions as Array<Record<string, unknown>>;
-      const session = sessions.find(item => item.session_id === result.data.current_session_id)!;
+      const session = sessions.find((item) => item.session_id === result.data.current_session_id)!;
       expect(result.data.context_id).toBe(contextId);
       expect(session).toBeDefined();
-      const identity = { contextId: result.data.context_id, replaySessionId: runtime.session_id,
-        captureFileId: runtime.capture_file_id, eventId: runtime.active_event_id, replacements: session.shader_replacements,
-        processIdentity: parseRdcProcessIdentity((result.meta as Record<string, unknown>).process_identity) };
+      const identity = {
+        contextId: result.data.context_id,
+        replaySessionId: runtime.session_id,
+        captureFileId: runtime.capture_file_id,
+        eventId: runtime.active_event_id,
+        replacements: session.shader_replacements,
+        processIdentity: parseRdcProcessIdentity((result.meta as Record<string, unknown>).process_identity),
+      };
       expect(identity.replaySessionId).toBe(result.data.current_session_id);
       expect(identity.captureFileId).toBe(session.capture_file_id);
       return identity;
@@ -87,7 +107,10 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
       expect(worker.pid).toBe(original.processIdentity.worker.pid);
       expect(loaded).toMatchObject({ status: 'observed', configured_paths_match: true });
       const installed = rdcInstallationFiles(root!);
-      for (const [key, expectedPath] of [['native', installed.nativeLibrary], ['binding', installed.bindingModule]] as const) {
+      for (const [key, expectedPath] of [
+        ['native', installed.nativeLibrary],
+        ['binding', installed.bindingModule],
+      ] as const) {
         const component = loaded[key] as { path: string; on_disk: { sha256: string } };
         expect(samePath(component.path, expectedPath)).toBe(true);
         expect(component.on_disk.sha256).toBe(createHash('sha256').update(readFileSync(expectedPath)).digest('hex'));
@@ -97,59 +120,136 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
       expect(original.replacements).toEqual([]);
       expect(typeof original.replaySessionId).toBe('string');
       expect(typeof original.captureFileId).toBe('string');
-      setRdcRuntimeContextForSession(sessionId, { contextId, runtimeOwner: sessionId, ownerLeaseId: contextId,
-        replaySessionId: original.replaySessionId as string, captureFileId: original.captureFileId as string,
-        backend: 'local', updatedAt: Date.now() }, { projectId: 'qa-project' });
+      setRdcRuntimeContextForSession(
+        sessionId,
+        {
+          contextId,
+          runtimeOwner: sessionId,
+          ownerLeaseId: contextId,
+          replaySessionId: original.replaySessionId as string,
+          captureFileId: original.captureFileId as string,
+          backend: 'local',
+          updatedAt: Date.now(),
+        },
+        { projectId: 'qa-project' },
+      );
       const frozenLease = getRdcContextLease(sessionId);
-      const context = { agentId: 'general', accessCeiling: 'full' as const, sessionId, projectId: 'qa-project',
-        turnId: 'read-turn', projectRootPath: directory, workspaceRoot: directory,
-        rdcBinding: freezeRdcTurnBinding(settings, catalog.tools, frozenLease) };
+      const context = {
+        agentId: 'general',
+        accessCeiling: 'full' as const,
+        sessionId,
+        projectId: 'qa-project',
+        turnId: 'read-turn',
+        projectRootPath: directory,
+        workspaceRoot: directory,
+        rdcBinding: freezeRdcTurnBinding(settings, catalog.tools, frozenLease),
+      };
       const before = processes.length;
-      const guideSnapshot = JSON.parse(readFileSync(path.join(process.cwd(), 'scripts/fidelity/rdc-tool-guide-catalog.json'), 'utf8')) as { fingerprint: string; tool_count: number };
+      const guideSnapshot = JSON.parse(
+        readFileSync(path.join(process.cwd(), 'scripts/fidelity/rdc-tool-guide-catalog.json'), 'utf8'),
+      ) as { fingerprint: string; tool_count: number };
       expect(catalog.fingerprint).toBe(guideSnapshot.fingerprint);
       expect(catalog.tools).toHaveLength(guideSnapshot.tool_count);
-      const listed = await executeRdcShell({ discovery: { kind: 'list', limit: 10 } }, 'discovery-list', undefined, context);
-      const described = await executeRdcShell({ discovery: { kind: 'describe', operation: 'rd.resource.list_all' } }, 'discovery-describe', undefined, context);
-      const discoveryPayload = (result: typeof listed) => JSON.parse((result.content[0] as { text: string }).text) as { fingerprint: string; data: Record<string, unknown> };
-      expect(discoveryPayload(listed)).toMatchObject({ fingerprint: guideSnapshot.fingerprint, data: { total: guideSnapshot.tool_count } });
-      expect(discoveryPayload(described)).toMatchObject({ fingerprint: guideSnapshot.fingerprint, data: { name: 'rd.resource.list_all' } });
+      const listed = await executeRdcShell(
+        { discovery: { kind: 'list', limit: 10 } },
+        'discovery-list',
+        undefined,
+        context,
+      );
+      const described = await executeRdcShell(
+        { discovery: { kind: 'describe', operation: 'rd.resource.list_all' } },
+        'discovery-describe',
+        undefined,
+        context,
+      );
+      const discoveryPayload = (result: typeof listed) =>
+        JSON.parse((result.content[0] as { text: string }).text) as {
+          fingerprint: string;
+          data: Record<string, unknown>;
+        };
+      expect(discoveryPayload(listed)).toMatchObject({
+        fingerprint: guideSnapshot.fingerprint,
+        data: { total: guideSnapshot.tool_count },
+      });
+      expect(discoveryPayload(described)).toMatchObject({
+        fingerprint: guideSnapshot.fingerprint,
+        data: { name: 'rd.resource.list_all' },
+      });
       expect(processes).toHaveLength(before);
       const results = [];
       for (const kind of ['texture', 'buffer']) {
-        const result = await executeRdcShell({ operation: 'rd.resource.list_all', args: { kind } }, kind, undefined, context);
+        const result = await executeRdcShell(
+          { operation: 'rd.resource.list_all', args: { kind } },
+          kind,
+          undefined,
+          context,
+        );
         expect(result.isError).not.toBe(true);
         expect(result.details?.exitCode).toBe(0);
         results.push(result);
       }
       expect(processes).toHaveLength(before + 2);
       const beforeRt = processes.length;
-      const rejected = await executeRdcShell({ operation: 'rd.pipeline.get_stage_state', args: { stage: 'RT' } },
-        'unsupported-stage', undefined, context).catch((error: unknown) => error);
+      const rejected = await executeRdcShell(
+        { operation: 'rd.pipeline.get_stage_state', args: { stage: 'RT' } },
+        'unsupported-stage',
+        undefined,
+        context,
+      ).catch((error: unknown) => error);
       expect(rejected).toBeInstanceOf(RdcNativeFailure);
-      expect((rejected as RdcNativeFailure).deliveryResult).toMatchObject({ isError: true, details: {
-        nativeFailure: { code: 'shader_stage_unsupported', category: 'validation',
-          proof: { effects_attempted: false, context_preserved: true } },
-        mainValidation: { preservationVerified: true, leaseState: 'retained' },
-      } });
+      expect((rejected as RdcNativeFailure).deliveryResult).toMatchObject({
+        isError: true,
+        details: {
+          nativeFailure: {
+            code: 'shader_stage_unsupported',
+            category: 'validation',
+            proof: { effects_attempted: false, context_preserved: true },
+          },
+          mainValidation: { preservationVerified: true, leaseState: 'retained' },
+        },
+      });
       expect((rejected as RdcNativeFailure).deliveryResult?.details).not.toHaveProperty('receipt');
       expect(processes).toHaveLength(beforeRt + 1);
       expect(getRdcContextLease(sessionId)).toEqual(frozenLease);
       const afterRt = await snapshot();
       expect(afterRt).toEqual(original);
-      const ps = await executeRdcShell({ operation: 'rd.pipeline.get_stage_state', args: { stage: 'PS' } },
-        'explicit-valid-stage', undefined, context);
+      const ps = await executeRdcShell(
+        { operation: 'rd.pipeline.get_stage_state', args: { stage: 'PS' } },
+        'explicit-valid-stage',
+        undefined,
+        context,
+      );
       expect(ps.isError).not.toBe(true);
       expect(ps.details?.exitCode).toBe(0);
-      const psText = ps.content.find(item => item.type === 'text');
+      const psText = ps.content.find((item) => item.type === 'text');
       expect(psText?.type).toBe('text');
-      expect(JSON.parse(psText?.type === 'text' ? psText.text : '')).toMatchObject({ result: { ok: true,
-        result_kind: 'rd.pipeline.get_stage_state', data: { stage_state: { stage: 'PS' }, resolved_event_id: original.eventId } } });
+      expect(JSON.parse(psText?.type === 'text' ? psText.text : '')).toMatchObject({
+        result: {
+          ok: true,
+          result_kind: 'rd.pipeline.get_stage_state',
+          data: { stage_state: { stage: 'PS' }, resolved_event_id: original.eventId },
+        },
+      });
       expect(stageResults).toHaveLength(2);
-      expect(stageResults[0]).toMatchObject({ exitCode: 1, envelope: { ok: false, error: {
-        code: 'shader_stage_unsupported', category: 'validation', details: {
-          failure_stage: 'validate_stage', effects_attempted: false, context_preserved: true } } } });
-      for (const stage of stageResults) expect(parseRdcProcessIdentity(
-        (stage.envelope.meta as Record<string, unknown>).process_identity)).toEqual(original.processIdentity);
+      expect(stageResults[0]).toMatchObject({
+        exitCode: 1,
+        envelope: {
+          ok: false,
+          error: {
+            code: 'shader_stage_unsupported',
+            category: 'validation',
+            details: {
+              failure_stage: 'validate_stage',
+              effects_attempted: false,
+              context_preserved: true,
+            },
+          },
+        },
+      });
+      for (const stage of stageResults)
+        expect(parseRdcProcessIdentity((stage.envelope.meta as Record<string, unknown>).process_identity)).toEqual(
+          original.processIdentity,
+        );
       const afterPs = await snapshot();
       expect(afterPs).toEqual(original);
       expect(getRdcContextLease(sessionId)).toEqual(frozenLease);
@@ -160,12 +260,21 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
         expect(process.pid).toBeGreaterThan(0);
         expect((process.args as string[])[0]).toBe(settings.argsPrefix[0]);
       }
-      Object.assign(receipt, { verified: true, fingerprint: catalog.fingerprint, results, stageResults, afterRt, afterPs,
-        rejection: (rejected as RdcNativeFailure).deliveryResult, finalLease: getRdcContextLease(sessionId) });
+      Object.assign(receipt, {
+        verified: true,
+        fingerprint: catalog.fingerprint,
+        results,
+        stageResults,
+        afterRt,
+        afterPs,
+        rejection: (rejected as RdcNativeFailure).deliveryResult,
+        finalLease: getRdcContextLease(sessionId),
+      });
     } finally {
       try {
-        try { receipt.clear = await native('context', ['clear']); }
-        finally {
+        try {
+          receipt.clear = await native('context', ['clear']);
+        } finally {
           const stop = await native('daemon', ['stop']);
           receipt.stop = stop;
           expect(stop.data.stopped).toBe(true);
@@ -173,16 +282,23 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
           expect(original).toBeDefined();
           const exitedIdentities = [];
           for (const identity of [original!.processIdentity.daemon, original!.processIdentity.worker]) {
-            await vi.waitFor(() => {
-              let exitCode: string | undefined;
-              try { process.kill(identity.pid, 0); } catch (error) { exitCode = (error as NodeJS.ErrnoException).code; }
-              expect(exitCode).toBe('ESRCH');
-            }, { timeout: 10000, interval: 50 });
+            await vi.waitFor(
+              () => {
+                let exitCode: string | undefined;
+                try {
+                  process.kill(identity.pid, 0);
+                } catch (error) {
+                  exitCode = (error as NodeJS.ErrnoException).code;
+                }
+                expect(exitCode).toBe('ESRCH');
+              },
+              { timeout: 10000, interval: 50 },
+            );
             exitedIdentities.push({ ...identity, observed: 'ESRCH' });
           }
           receipt.exitedIdentities = exitedIdentities;
-          const childExits = await Promise.all(children.map(child => child.join(1000)));
-          expect(childExits.every(exit => exit.reason !== 'unconfirmed_orphan')).toBe(true);
+          const childExits = await Promise.all(children.map((child) => child.join(1000)));
+          expect(childExits.every((exit) => exit.reason !== 'unconfirmed_orphan')).toBe(true);
           receipt.childExits = childExits;
           stopped = true;
         }
@@ -191,10 +307,19 @@ describe.skipIf(!root || !capture)('explicit native read-only host acceptance', 
         spy.mockRestore();
         setRdcRuntimeContextForSession(sessionId, null);
         if (stopped) rmSync(directory, { recursive: true, force: true });
-        Object.assign(receipt, { processes, contextSnapshots, inputSha256After: captureHash(), stateDirectory: directory, cleanup: { daemonWorkerExited: stopped, temporaryDirectoryRemoved: stopped } });
+        Object.assign(receipt, {
+          processes,
+          contextSnapshots,
+          inputSha256After: captureHash(),
+          stateDirectory: directory,
+          cleanup: { daemonWorkerExited: stopped, temporaryDirectoryRemoved: stopped },
+        });
         if (process.env.RDC_NATIVE_READ_OUTPUT) {
           mkdirSync(path.dirname(process.env.RDC_NATIVE_READ_OUTPUT), { recursive: true });
-          writeFileSync(process.env.RDC_NATIVE_READ_OUTPUT, JSON.stringify(receipt, (key, value: unknown) => key === 'token' ? undefined : value, 2));
+          writeFileSync(
+            process.env.RDC_NATIVE_READ_OUTPUT,
+            JSON.stringify(receipt, (key, value: unknown) => (key === 'token' ? undefined : value), 2),
+          );
         }
         expect(receipt.inputSha256After).toBe(inputHash);
       }

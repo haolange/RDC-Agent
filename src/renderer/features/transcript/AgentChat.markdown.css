@@ -30,12 +30,31 @@
 }
 
 /* Six levels on the four type roles: size steps down, then weight and colour carry the last levels. */
-.markdown-body h1 { margin-top: var(--space-6); font-size: var(--type-title-size); }
-.markdown-body h2 { font-size: var(--type-reading-size); }
-.markdown-body h3 { font-size: var(--type-body-size); }
-.markdown-body h4 { margin-top: var(--space-4); font-size: var(--type-body-size); }
-.markdown-body h5 { margin-top: var(--space-4); color: var(--token-text-secondary); font-size: var(--type-body-size); }
-.markdown-body h6 { margin-top: var(--space-4); color: var(--token-text-secondary); font-size: var(--type-body-size); font-weight: var(--font-normal); }
+.markdown-body h1 {
+  margin-top: var(--space-6);
+  font-size: var(--type-title-size);
+}
+.markdown-body h2 {
+  font-size: var(--type-reading-size);
+}
+.markdown-body h3 {
+  font-size: var(--type-body-size);
+}
+.markdown-body h4 {
+  margin-top: var(--space-4);
+  font-size: var(--type-body-size);
+}
+.markdown-body h5 {
+  margin-top: var(--space-4);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+}
+.markdown-body h6 {
+  margin-top: var(--space-4);
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-normal);
+}
 
 .markdown-body ul,
 .markdown-body ol {

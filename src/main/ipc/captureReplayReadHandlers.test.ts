@@ -10,7 +10,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('electron', () => ({
   ipcMain: {
-    handle: (channel: string, handler: (...args: unknown[]) => unknown) => { handlers.set(channel, handler); },
+    handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
+      handlers.set(channel, handler);
+    },
   },
 }));
 vi.mock('../rdc/captures/replay/ReplayHistoryStore', () => ({
@@ -49,8 +51,12 @@ describe('captureReplayReadHandlers', () => {
     mocks.readSession.mockReturnValue({ projectId: 'other' });
     mocks.getProjectById.mockReturnValue({ rootPath: '/project' });
     registerCaptureReplayReadHandlers();
-    await expect(handlers.get('capture:readLivePreview')!({}, { projectId: 'p', sessionId: 's1' })).rejects.toThrow('REPLAY_SCOPE_DENIED');
-    expect(() => handlers.get('capture:getReplaySelection')!({}, { projectId: 'p', sessionId: 's1' })).toThrow('REPLAY_SCOPE_DENIED');
+    await expect(handlers.get('capture:readLivePreview')!({}, { projectId: 'p', sessionId: 's1' })).rejects.toThrow(
+      'REPLAY_SCOPE_DENIED',
+    );
+    expect(() => handlers.get('capture:getReplaySelection')!({}, { projectId: 'p', sessionId: 's1' })).toThrow(
+      'REPLAY_SCOPE_DENIED',
+    );
     expect(mocks.readLive).not.toHaveBeenCalled();
     expect(mocks.readSelection).not.toHaveBeenCalled();
   });

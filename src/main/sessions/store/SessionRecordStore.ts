@@ -1,18 +1,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  generateEventId,
-  generateRunId,
-  generateShortId,
-  nowMs,
-  sanitizeToken,
-} from '@shared/utils/id';
+import { generateEventId, generateRunId, generateShortId, nowMs, sanitizeToken } from '@shared/utils/id';
 import { AppError } from '@shared/errors/appError';
 import { ActionEventSchema } from '@shared/types/evidence';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/jsonl';
 import { assertNoRunV3StageFields, toPersistedRunV3 } from '../run/runV3/runRecordSchema';
 import { appPathService } from '../../runtime/AppPathService';
-import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from '../run/sessionRunPersistence';
+import {
+  readPersistedRun as loadPersistedRun,
+  toRunSummary,
+  writeRunFiles as persistRunFiles,
+} from '../run/sessionRunPersistence';
 import { renameWithRetrySync } from '../../platform/fileRename';
 import { SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
 import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
@@ -40,8 +38,15 @@ export interface SessionRecordHost {
   io: StorageIo;
   projects: Pick<
     ProjectWorkspaceStore,
-    | 'getProjectById' | 'listProjects' | 'ensureProjectSessionsRoot' | 'touchProject' | 'readSelection'
-    | 'writeSelection' | 'getCurrentProjectId' | 'setCurrentProjectId' | 'setCurrentSessionId'
+    | 'getProjectById'
+    | 'listProjects'
+    | 'ensureProjectSessionsRoot'
+    | 'touchProject'
+    | 'readSelection'
+    | 'writeSelection'
+    | 'getCurrentProjectId'
+    | 'setCurrentProjectId'
+    | 'setCurrentSessionId'
   >;
 }
 
@@ -56,7 +61,6 @@ export interface SessionRecordLinks {
   /** Reading a session discards the state file of the removed handoff flow. */
   removedHandoffState: Pick<ExecutionOfferStore, 'discardRemovedHandoffState'>;
 }
-
 
 const SAFE_RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
@@ -143,10 +147,12 @@ export class SessionRecordStore {
   listSessions(projectId: string): SessionRecord[] {
     const project = this.host.projects.getProjectById(projectId);
     if (!project) return [];
-    return reconcileProjectSessionTitles(this.host, project, (session, sessionPath) => (
-      this.normalizeSessionRecord(session, sessionPath)
-    ), (rewritten) => sessionRevisions.written(rewritten))
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return reconcileProjectSessionTitles(
+      this.host,
+      project,
+      (session, sessionPath) => this.normalizeSessionRecord(session, sessionPath),
+      (rewritten) => sessionRevisions.written(rewritten),
+    ).sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
   createSession(projectId: string, title?: string, goal: string = ''): SessionRecord {
@@ -236,12 +242,7 @@ export class SessionRecordStore {
       plannedAttachments?: import('@shared/types/session').SessionAttachmentRecord[];
     },
   ): StagedConversationSessionCommit {
-    const reserved = options?.reserved ?? this.allocateStagedConversationSession(
-      projectId,
-      title,
-      requestId,
-      turnId,
-    );
+    const reserved = options?.reserved ?? this.allocateStagedConversationSession(projectId, title, requestId, turnId);
     const { session, stagingPath, finalPath } = reserved;
     if (fs.existsSync(stagingPath)) fs.rmSync(stagingPath, { recursive: true, force: true });
     this.host.io.ensureDir(path.join(stagingPath, 'attachments'));
@@ -250,16 +251,16 @@ export class SessionRecordStore {
     try {
       const attachments = options?.plannedAttachments
         ? this.copyPlannedAttachments(
-          sourceAttachmentPaths,
-          options.plannedAttachments,
-          path.join(stagingPath, 'attachments'),
-        )
+            sourceAttachmentPaths,
+            options.plannedAttachments,
+            path.join(stagingPath, 'attachments'),
+          )
         : this.links.attachments.copyAttachmentsForTurn(
-          session,
-          sourceAttachmentPaths,
-          path.join(stagingPath, 'attachments'),
-          path.join(finalPath, 'attachments'),
-        );
+            session,
+            sourceAttachmentPaths,
+            path.join(stagingPath, 'attachments'),
+            path.join(finalPath, 'attachments'),
+          );
       return { session, requestId, turnId, stagingPath, finalPath, attachments };
     } catch (error) {
       fs.rmSync(stagingPath, { recursive: true, force: true });
@@ -326,9 +327,12 @@ export class SessionRecordStore {
   readSessionRecord(sessionId: string): SessionRecord | null {
     const location = this.findSessionLocation(sessionId);
     if (!location) return null;
-    const sessions = reconcileProjectSessionTitles(this.host, location.project, (session, sessionPath) => (
-      this.normalizeSessionRecord(session, sessionPath)
-    ), (rewritten) => sessionRevisions.written(rewritten));
+    const sessions = reconcileProjectSessionTitles(
+      this.host,
+      location.project,
+      (session, sessionPath) => this.normalizeSessionRecord(session, sessionPath),
+      (rewritten) => sessionRevisions.written(rewritten),
+    );
     return sessions.find((session) => session.sessionId === sessionId) ?? null;
   }
 
@@ -363,7 +367,8 @@ export class SessionRecordStore {
       return [];
     }
 
-    return fs.readdirSync(runsRoot, { withFileTypes: true })
+    return fs
+      .readdirSync(runsRoot, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => this.readPersistedRun(sessionId, entry.name))
       .filter((run): run is PersistedRunRecord => run !== null)
@@ -442,11 +447,12 @@ export class SessionRecordStore {
   }
 
   async updateCase(caseId: string, data: Record<string, unknown>): Promise<void> {
-    const title = typeof data.title === 'string'
-      ? data.title
-      : typeof data.symptom_summary === 'string'
-        ? data.symptom_summary
-        : undefined;
+    const title =
+      typeof data.title === 'string'
+        ? data.title
+        : typeof data.symptom_summary === 'string'
+          ? data.symptom_summary
+          : undefined;
     const goal = typeof data.user_goal === 'string' ? data.user_goal : undefined;
     const lastRunId = typeof data.current_run === 'string' ? data.current_run : undefined;
 
@@ -497,8 +503,8 @@ export class SessionRecordStore {
           status: 'pending' as const,
         }));
 
-    const backend = input.backend
-      || (captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local');
+    const backend =
+      input.backend || (captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local');
     const startedAt = nowMs();
     const persistedRun = toPersistedRunV3({
       runId,
@@ -540,7 +546,7 @@ export class SessionRecordStore {
 
   async readRun(caseId: string, runId: string): Promise<Record<string, unknown> | null> {
     const run = this.readPersistedRun(caseId, runId);
-    return run ? run as unknown as Record<string, unknown> : null;
+    return run ? (run as unknown as Record<string, unknown>) : null;
   }
 
   async updateRun(caseId: string, runId: string, data: Record<string, unknown>): Promise<void> {
@@ -586,16 +592,15 @@ export class SessionRecordStore {
     ) as unknown as PersistedRunRecord;
     // deepMerge applies the patch unchecked, so the merged runtime is not known to be an object.
     const mergedRuntime: unknown = merged.runtime;
-    const runtimePatch = mergedRuntime && typeof mergedRuntime === 'object'
-      ? { ...mergedRuntime }
-      : {};
+    const runtimePatch = mergedRuntime && typeof mergedRuntime === 'object' ? { ...mergedRuntime } : {};
     merged.runtime = {
       ...existing.runtime,
       ...runtimePatch,
     };
-    const identity = existing.kind === 'mission'
-      ? { kind: existing.kind, profileId: existing.profileId, mission: existing.mission }
-      : { kind: existing.kind, profileId: existing.profileId };
+    const identity =
+      existing.kind === 'mission'
+        ? { kind: existing.kind, profileId: existing.profileId, mission: existing.mission }
+        : { kind: existing.kind, profileId: existing.profileId };
     Object.assign(merged, identity);
     if (existing.kind !== 'mission') {
       delete (merged as { mission?: unknown }).mission;
@@ -708,7 +713,8 @@ export class SessionRecordStore {
   }
 
   normalizeSessionRecord(session: SessionRecord, sessionPath?: string): SessionRecord {
-    const resolvedSessionPath = sessionPath || this.findSessionLocation(session.sessionId)?.sessionPath || session.sessionPath;
+    const resolvedSessionPath =
+      sessionPath || this.findSessionLocation(session.sessionId)?.sessionPath || session.sessionPath;
     return {
       ...session,
       sessionPath: resolvedSessionPath || '',
@@ -747,5 +753,4 @@ export class SessionRecordStore {
 
     return Math.max(...usedIndexes) + 1;
   }
-
 }

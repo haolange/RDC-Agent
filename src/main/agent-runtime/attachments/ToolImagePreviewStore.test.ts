@@ -50,13 +50,15 @@ describe('ToolImagePreviewStore', () => {
     roots.push(sessionPath);
     readSession.mockReturnValue({ sessionPath });
 
-    await expect(recordToolImagePreview({
-      sessionId: 'session-1',
-      toolCallId: 'tool-1',
-      fileName: 'frame.png',
-      bytes: Buffer.from('not-an-image'),
-      mimeType: 'image/png',
-    })).rejects.toThrow(/IMAGE_PREVIEW_INVALID|magic bytes/i);
+    await expect(
+      recordToolImagePreview({
+        sessionId: 'session-1',
+        toolCallId: 'tool-1',
+        fileName: 'frame.png',
+        bytes: Buffer.from('not-an-image'),
+        mimeType: 'image/png',
+      }),
+    ).rejects.toThrow(/IMAGE_PREVIEW_INVALID|magic bytes/i);
   });
 
   it('rejects path-escaping preview ids', () => {
@@ -78,12 +80,14 @@ describe('ToolImagePreviewStore', () => {
     await writeFile(sourcePath, Buffer.from('GIF89a-not-png'));
     readSession.mockReturnValue({ sessionPath });
 
-    await expect(recordToolImagePreview({
-      sessionId: 'session-1',
-      toolCallId: 'tool-1',
-      fileName: 'spoof.png',
-      sourcePath,
-      mimeType: 'image/png',
-    })).rejects.toThrow(/ATTACHMENT_INVALID|magic bytes/i);
+    await expect(
+      recordToolImagePreview({
+        sessionId: 'session-1',
+        toolCallId: 'tool-1',
+        fileName: 'spoof.png',
+        sourcePath,
+        mimeType: 'image/png',
+      }),
+    ).rejects.toThrow(/ATTACHMENT_INVALID|magic bytes/i);
   });
 });

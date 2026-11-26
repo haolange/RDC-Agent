@@ -4,14 +4,7 @@ import { sanitizePastedText } from './contextMenuSanitize';
 import { resolveReadonlySurface } from './contextMenuTarget';
 import type { ContextMenuTarget } from './contextMenuTarget';
 
-export type ContextMenuCommandId =
-  | 'undo'
-  | 'redo'
-  | 'cut'
-  | 'copy'
-  | 'paste'
-  | 'pasteSanitized'
-  | 'selectAll';
+export type ContextMenuCommandId = 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'pasteSanitized' | 'selectAll';
 
 export interface ContextMenuCommandHost {
   copyText: (text: string) => Promise<boolean>;
@@ -28,9 +21,7 @@ function queryEnabled(command: string): boolean {
 
 function runExec(command: string, value?: string): boolean {
   try {
-    return value === undefined
-      ? document.execCommand(command)
-      : document.execCommand(command, false, value);
+    return value === undefined ? document.execCommand(command) : document.execCommand(command, false, value);
   } catch {
     return false;
   }
@@ -48,9 +39,7 @@ export function registerCodeMirrorView(host: HTMLElement, view: EditorView | nul
 }
 
 function findCodeMirrorView(element: HTMLElement): EditorView | null {
-  return registeredViews.get(element)
-    ?? EditorView.findFromDOM(element)
-    ?? null;
+  return registeredViews.get(element) ?? EditorView.findFromDOM(element) ?? null;
 }
 
 function focusTarget(element: HTMLElement): void {

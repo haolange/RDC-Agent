@@ -1,8 +1,5 @@
 import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
-import {
-  resolveCompactionThresholdTokens,
-  resolveTurnOutputTokens,
-} from '@shared/utils/contextBudget';
+import { resolveCompactionThresholdTokens, resolveTurnOutputTokens } from '@shared/utils/contextBudget';
 import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 
 export interface ContextUsageSelectedProfile {
@@ -13,9 +10,9 @@ export interface ContextUsageSelectedProfile {
 }
 
 export function awaitsExecutionContextWindow(prepared: PreparedTurnContextSummary | null): boolean {
-  return Boolean(prepared
-    && !prepared.compactionApplied
-    && prepared.preparedInputTokens > prepared.compactionThresholdTokens);
+  return Boolean(
+    prepared && !prepared.compactionApplied && prepared.preparedInputTokens > prepared.compactionThresholdTokens,
+  );
 }
 
 function positiveOrNull(value: number | null | undefined): number | null {
@@ -77,9 +74,7 @@ export function resolveDisplayedGeneratable(
 ): number | null {
   const windowTokens = resolveDisplayedContextWindow(showPrepared, prepared, usage, profile);
   const maxOutput = resolveDisplayedMaxOutput(showPrepared, prepared, usage, profile);
-  const occupied = showPrepared && prepared
-    ? prepared.preparedInputTokens
-    : usage?.occupiedTokens ?? 0;
+  const occupied = showPrepared && prepared ? prepared.preparedInputTokens : (usage?.occupiedTokens ?? 0);
   if (windowTokens == null || maxOutput == null) return null;
   return resolveTurnOutputTokens({
     contextWindowTokens: windowTokens,

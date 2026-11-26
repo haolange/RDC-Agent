@@ -14,32 +14,40 @@ describe('MCP RPC transport bounds', () => {
   });
 
   it('rejects oversized outbound JSON-RPC requests for stdio payload serialization', async () => {
-    await expect(new MCPManager().connect({
-      name: 'oversized-stdio-payload',
-      type: 'http',
-      url: 'http://127.0.0.1:1',
-    })).rejects.toThrow();
+    await expect(
+      new MCPManager().connect({
+        name: 'oversized-stdio-payload',
+        type: 'http',
+        url: 'http://127.0.0.1:1',
+      }),
+    ).rejects.toThrow();
   });
 
   it('bounds cumulative streamable HTTP responses before parsing', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-      new Response('x'.repeat(MAX_MCP_BUFFER_BYTES + 1), { status: 200 }),
-    ));
-    await expect(new MCPManager().connect({
-      name: 'oversized-streamable-http',
-      type: 'streamable-http',
-      url: 'http://127.0.0.1:1',
-    })).rejects.toThrow(/exceeded/);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('x'.repeat(MAX_MCP_BUFFER_BYTES + 1), { status: 200 })),
+    );
+    await expect(
+      new MCPManager().connect({
+        name: 'oversized-streamable-http',
+        type: 'streamable-http',
+        url: 'http://127.0.0.1:1',
+      }),
+    ).rejects.toThrow(/exceeded/);
   });
 
   it('bounds MCPManager HTTP responses before parsing', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-      new Response('x'.repeat(MAX_MCP_BUFFER_BYTES + 1), { status: 200 }),
-    ));
-    await expect(new MCPManager().connect({
-      name: 'oversized-http',
-      type: 'http',
-      url: 'http://127.0.0.1:1',
-    })).rejects.toThrow(/exceeded/);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('x'.repeat(MAX_MCP_BUFFER_BYTES + 1), { status: 200 })),
+    );
+    await expect(
+      new MCPManager().connect({
+        name: 'oversized-http',
+        type: 'http',
+        url: 'http://127.0.0.1:1',
+      }),
+    ).rejects.toThrow(/exceeded/);
   });
 });

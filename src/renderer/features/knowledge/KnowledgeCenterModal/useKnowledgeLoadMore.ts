@@ -23,10 +23,13 @@ export function useKnowledgeLoadMore(input: {
     setError(null);
     try {
       const result = await window.electronAPI.knowledge.query({
-        ...queryRequest, offset: page.nextOffset, limit: 50, expectedRevision: page.revision,
+        ...queryRequest,
+        offset: page.nextOffset,
+        limit: 50,
+        expectedRevision: page.revision,
       });
       if (!querySeq.current.isCurrent(seq)) return;
-      setHits(current => [...current, ...result.hits]);
+      setHits((current) => [...current, ...result.hits]);
       setPage({ revision: result.revision, total: result.total, nextOffset: result.nextOffset });
     } catch (error) {
       if (querySeq.current.isCurrent(seq)) setError(errorDetail(error));

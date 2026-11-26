@@ -101,7 +101,11 @@ describe('jsonl fault handling', () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-jsonl-'));
     const filePath = path.join(root, 'chunked.jsonl');
     const large = `${'x'.repeat(65529)}😀汉字`;
-    fs.writeFileSync(filePath, `${JSON.stringify({ id: 1, value: large })}\r\n{broken}\n${JSON.stringify({ id: 3, value: '终😀' })}`, 'utf8');
+    fs.writeFileSync(
+      filePath,
+      `${JSON.stringify({ id: 1, value: large })}\r\n{broken}\n${JSON.stringify({ id: 3, value: '终😀' })}`,
+      'utf8',
+    );
     const seen: number[] = [];
     const result = readJsonl(filePath, ValueRecord.parse, (record) => {
       seen.push(record.id);
@@ -118,7 +122,15 @@ describe('jsonl fault handling', () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-jsonl-'));
     const filePath = path.join(root, 'invalid-schema.jsonl');
     fs.writeFileSync(filePath, '{"schemaVersion":1}\n');
-    expect(() => readJsonl(filePath, (value) => value, () => { throw new Error('invalid context entry'); })).toThrow('invalid context entry');
+    expect(() =>
+      readJsonl(
+        filePath,
+        (value) => value,
+        () => {
+          throw new Error('invalid context entry');
+        },
+      ),
+    ).toThrow('invalid context entry');
   });
 
   it('reports a JSON line that is not a valid record as corruption, never as a record', () => {
@@ -128,6 +140,8 @@ describe('jsonl fault handling', () => {
     const result = readJsonl(filePath, IdRecord.parse);
     expect(result.records).toEqual([{ id: 1 }, { id: 3 }]);
     expect(result.diagnostics).toMatchObject([{ line: 2 }]);
-    expect(() => assertNoJsonlDiagnostics(filePath, result.diagnostics)).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+    expect(() => assertNoJsonlDiagnostics(filePath, result.diagnostics)).toThrow(
+      expect.objectContaining({ code: 'STORAGE_CORRUPT' }),
+    );
   });
 });

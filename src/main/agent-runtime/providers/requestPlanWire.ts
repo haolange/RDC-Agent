@@ -1,7 +1,8 @@
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { JsonObject, JsonValue } from '@shared/utils/jsonValue';
 
-const SECRET_HEADER = /^(?:authorization|proxy-authorization|cookie|set-cookie|.*(?:api[-_]?key|access[-_]?token|refresh[-_]?token|bearer[-_]?token|security[-_]?token|client[-_]?secret|credential|password))$/i;
+const SECRET_HEADER =
+  /^(?:authorization|proxy-authorization|cookie|set-cookie|.*(?:api[-_]?key|access[-_]?token|refresh[-_]?token|bearer[-_]?token|security[-_]?token|client[-_]?secret|credential|password))$/i;
 
 function cloneJson(value: JsonValue): JsonValue {
   if (Array.isArray(value)) return value.map(cloneJson);
@@ -17,9 +18,8 @@ function mergeJson(target: Record<string, unknown>, patch: JsonObject): void {
       delete target[key];
     } else if (value && typeof value === 'object' && !Array.isArray(value)) {
       const current = target[key];
-      const nested = current && typeof current === 'object' && !Array.isArray(current)
-        ? current as Record<string, unknown>
-        : {};
+      const nested =
+        current && typeof current === 'object' && !Array.isArray(current) ? (current as Record<string, unknown>) : {};
       target[key] = nested;
       mergeJson(nested, value);
     } else {
@@ -28,10 +28,7 @@ function mergeJson(target: Record<string, unknown>, patch: JsonObject): void {
   }
 }
 
-export function applyRequestPlanBody(
-  body: Record<string, unknown>,
-  requestPlan: RequestPlan,
-): Record<string, unknown> {
+export function applyRequestPlanBody(body: Record<string, unknown>, requestPlan: RequestPlan): Record<string, unknown> {
   mergeJson(body, requestPlan.bodyPatch);
   return body;
 }

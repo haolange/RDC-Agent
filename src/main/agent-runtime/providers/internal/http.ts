@@ -79,8 +79,7 @@ export function parseRetryAfterMs(headers: { get(name: string): string | null },
   return Number.isFinite(date) ? Math.max(0, date - now) : undefined;
 }
 
-export const PROVIDER_EMPTY_STREAM_MESSAGE =
-  'Provider stream ended without assistant output or structured tool call.';
+export const PROVIDER_EMPTY_STREAM_MESSAGE = 'Provider stream ended without assistant output or structured tool call.';
 
 export class ProviderEmptyStreamError extends Error {
   readonly code = 'PROVIDER_STREAM_EMPTY' as const;
@@ -98,11 +97,7 @@ export class ProviderWireFailureError extends Error {
   readonly wireCode?: string;
   readonly bodyText?: string;
 
-  constructor(
-    providerApi: string,
-    message: string,
-    options?: { code?: string; bodyText?: string },
-  ) {
+  constructor(providerApi: string, message: string, options?: { code?: string; bodyText?: string }) {
     super(`[${providerApi}] ${message}`);
     this.name = 'ProviderWireFailureError';
     this.providerApi = providerApi;
@@ -119,9 +114,11 @@ export function isProviderEmptyStreamError(error: unknown): error is ProviderEmp
   if (error instanceof ProviderEmptyStreamError) {
     return true;
   }
-  return error instanceof Error
-    && error.name === 'ProviderEmptyStreamError'
-    && (error as { code?: unknown }).code === 'PROVIDER_STREAM_EMPTY';
+  return (
+    error instanceof Error &&
+    error.name === 'ProviderEmptyStreamError' &&
+    (error as { code?: unknown }).code === 'PROVIDER_STREAM_EMPTY'
+  );
 }
 
 export interface ComposedSignal {
@@ -294,10 +291,15 @@ export async function ensureOk(response: Response, providerApi: string): Promise
   const looksLikeHtml = Boolean(bodyText && /(?:<!doctype\s+html|<html\b)/i.test(bodyText));
   const htmlTitle = looksLikeHtml ? bodyText?.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] : undefined;
   const snippet = looksLikeHtml
-    ? (htmlTitle?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-      || response.statusText
-      || 'HTML error response')
-    : bodyText ? bodyText.slice(0, 500) : response.statusText || 'request failed';
+    ? htmlTitle
+        ?.replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim() ||
+      response.statusText ||
+      'HTML error response'
+    : bodyText
+      ? bodyText.slice(0, 500)
+      : response.statusText || 'request failed';
   throw new ProviderHttpError(providerApi, response.status, snippet, bodyText, parseRetryAfterMs(response.headers));
 }
 
@@ -336,9 +338,10 @@ export function composeAbortSignals(
     }
   }
 
-  const timeoutId = Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0
-    ? setTimeout(() => onAbort(new ProviderTimeoutError(providerApi, 'total', requestTimeoutMs)), requestTimeoutMs)
-    : null;
+  const timeoutId =
+    Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0
+      ? setTimeout(() => onAbort(new ProviderTimeoutError(providerApi, 'total', requestTimeoutMs)), requestTimeoutMs)
+      : null;
 
   return {
     signal: controller.signal,
@@ -358,9 +361,7 @@ export function normalizeError(err: unknown): Error {
 }
 
 function readWireRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
 function readWireString(value: unknown): string {
@@ -460,7 +461,8 @@ async function readWithTimeout(
       finish(() => reject(error));
     }, timeoutMs);
 
-    reader.read()
+    reader
+      .read()
       .then((result) => finish(() => resolve(result)))
       .catch((error) => finish(() => reject(error)));
   });

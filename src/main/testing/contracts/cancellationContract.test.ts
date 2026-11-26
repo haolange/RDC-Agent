@@ -8,12 +8,9 @@ import { TurnCoordinator } from '../../agent-runtime/orchestration/TurnCoordinat
 import type { AgentEvent } from '@shared/types/agentRuntime';
 
 function spawnLongRunning(supervisor: ProcessSupervisor) {
-  return supervisor.spawn(
-    'shell',
-    process.execPath,
-    ['-e', 'setInterval(() => undefined, 1000);'],
-    { isolateProcessGroup: false },
-  );
+  return supervisor.spawn('shell', process.execPath, ['-e', 'setInterval(() => undefined, 1000);'], {
+    isolateProcessGroup: false,
+  });
 }
 
 function makeEvent(id: string): AgentEvent {
@@ -88,7 +85,6 @@ describe('cancellationContract: late events', () => {
     expect(received).toEqual(['early']);
   });
 });
-
 
 describe('cancellationContract: dynamic producer join', () => {
   it('abortAndJoin waits for late-registered producer', async () => {

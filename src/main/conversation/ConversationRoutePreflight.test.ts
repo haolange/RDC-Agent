@@ -65,7 +65,9 @@ function settingsWith(): AppSettings {
 
 /** Serves the narrow settings reads the preflight uses from one settings fixture. */
 function useSettings(settings: AppSettings): void {
-  vi.mocked(settingsService.providerConnections.get).mockImplementation((id) => settings.llm.providers.find((entry) => entry.id === id));
+  vi.mocked(settingsService.providerConnections.get).mockImplementation((id) =>
+    settings.llm.providers.find((entry) => entry.id === id),
+  );
   vi.mocked(settingsService.providerConnections.list).mockReturnValue(settings.llm.providers);
   vi.mocked(settingsService.snapshot).mockReturnValue({ revision: 1, user: settings } as never);
 }
@@ -90,7 +92,13 @@ function model(state: 'supported' | 'unknown' | 'unsupported'): EffectiveModel {
     controls: {
       fast: { state: 'unsupported', fixedValue: false },
       maxContext: { state: 'unsupported', fixedValue: false },
-      reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+      reasoning: {
+        kind: 'none',
+        supportsOff: true,
+        levels: [],
+        defaultSelection: 'off',
+        wireProfile: { kind: 'none' },
+      },
     },
     route: { protocol: 'OpenAICompatibleChatCompletions', source: 'catalog' },
     toolCalling: { state },
@@ -185,7 +193,14 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockReturnValue({
       profiles: [editProfile],
       diagnostics: [
-        { code: 'resource.invalid', severity: 'error', scope: 'project', agentId: 'edit', sourcePath: 'D:/Project/.rdc-agent/agents/edit.agent.md', message: 'tools/skills/mcp-servers/agents/model must be string arrays when present.' },
+        {
+          code: 'resource.invalid',
+          severity: 'error',
+          scope: 'project',
+          agentId: 'edit',
+          sourcePath: 'D:/Project/.rdc-agent/agents/edit.agent.md',
+          message: 'tools/skills/mcp-servers/agents/model must be string arrays when present.',
+        },
       ],
     } as never);
     vi.mocked(resolveEffectiveModelSelection).mockReturnValue({
@@ -197,7 +212,14 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.overlayDiagnostics).toEqual([
-      { code: 'resource.invalid', severity: 'error', scope: 'project', agentId: 'edit', sourcePath: 'D:/Project/.rdc-agent/agents/edit.agent.md', message: 'tools/skills/mcp-servers/agents/model must be string arrays when present.' },
+      {
+        code: 'resource.invalid',
+        severity: 'error',
+        scope: 'project',
+        agentId: 'edit',
+        sourcePath: 'D:/Project/.rdc-agent/agents/edit.agent.md',
+        message: 'tools/skills/mcp-servers/agents/model must be string arrays when present.',
+      },
     ]);
   });
 
@@ -207,14 +229,23 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
       llm: { providers: [provider], agentRoutes: [] },
     } as unknown as AppSettings);
     vi.mocked(agentManifestService.resolveEffectiveSnapshot).mockReturnValue({
-      profiles: [{
-        id: 'edit',
-        name: 'Edit',
-        enabled: true,
-        compiledRoute: { agentId: 'edit', providerId: '', modelId: '' },
-      }],
+      profiles: [
+        {
+          id: 'edit',
+          name: 'Edit',
+          enabled: true,
+          compiledRoute: { agentId: 'edit', providerId: '', modelId: '' },
+        },
+      ],
       diagnostics: [
-        { code: 'resource.invalid', severity: 'error', scope: 'project', agentId: 'edit', sourcePath: 'D:/Project/.rdc-agent/agents/edit.agent.md', message: 'tools/skills/mcp-servers/agents/model must be string arrays when present.' },
+        {
+          code: 'resource.invalid',
+          severity: 'error',
+          scope: 'project',
+          agentId: 'edit',
+          sourcePath: 'D:/Project/.rdc-agent/agents/edit.agent.md',
+          message: 'tools/skills/mcp-servers/agents/model must be string arrays when present.',
+        },
       ],
     } as never);
     const result = resolveAgentRoutePreflight('edit', undefined, null, 'D:/Project');
@@ -222,7 +253,14 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
     if (result.ok) return;
     expect(result.diagnostic.code).toBe('CONVERSATION_LLM_ROUTE_MISSING');
     expect(result.overlayDiagnostics).toEqual([
-      { code: 'resource.invalid', severity: 'error', scope: 'project', agentId: 'edit', sourcePath: 'D:/Project/.rdc-agent/agents/edit.agent.md', message: 'tools/skills/mcp-servers/agents/model must be string arrays when present.' },
+      {
+        code: 'resource.invalid',
+        severity: 'error',
+        scope: 'project',
+        agentId: 'edit',
+        sourcePath: 'D:/Project/.rdc-agent/agents/edit.agent.md',
+        message: 'tools/skills/mcp-servers/agents/model must be string arrays when present.',
+      },
     ]);
   });
 
@@ -232,13 +270,24 @@ describe('resolveAgentRoutePreflight tool eligibility', () => {
     recordOverlayProfileDiagnostics(
       { projectId: 'proj', session: null, currentRun: null } as never,
       'edit',
-      [{ code: 'resource.invalid', severity: 'error', scope: 'project', agentId: 'edit', sourcePath: 'D:/Project/.rdc-agent/agents/edit.agent.md', message: 'malformed' }],
+      [
+        {
+          code: 'resource.invalid',
+          severity: 'error',
+          scope: 'project',
+          agentId: 'edit',
+          sourcePath: 'D:/Project/.rdc-agent/agents/edit.agent.md',
+          message: 'malformed',
+        },
+      ],
       false,
     );
-    expect(vi.mocked(runtimeLogService.log)).toHaveBeenCalledWith(expect.objectContaining({
-      raw: expect.objectContaining({ code: 'CONVERSATION_PROFILE_OVERLAY_INVALID' }),
-      summary: expect.stringContaining('resource.invalid'),
-    }));
+    expect(vi.mocked(runtimeLogService.log)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        raw: expect.objectContaining({ code: 'CONVERSATION_PROFILE_OVERLAY_INVALID' }),
+        summary: expect.stringContaining('resource.invalid'),
+      }),
+    );
   });
 
   it('reports disabled custom profiles without rewriting their id', () => {

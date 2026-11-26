@@ -35,26 +35,32 @@ describe('normalizeUsage', () => {
   });
 
   it('keeps the wire total and every reported figure, deriving cache hit and miss from the cache read', () => {
-    expect(normalizeUsage({ prompt: 100, completion: 20, total: 125, cached: 60, written: 10, thinking: 5, speed: 'fast' }, FULL_FIELDS))
-      .toEqual({
-        inputTokens: 100,
-        outputTokens: 20,
-        totalTokens: 125,
-        cacheReadTokens: 60,
-        cacheWriteTokens: 10,
-        reasoningTokens: 5,
-        speed: 'fast',
-        cacheHitTokens: 60,
-        cacheMissTokens: 40,
-      });
+    expect(
+      normalizeUsage(
+        { prompt: 100, completion: 20, total: 125, cached: 60, written: 10, thinking: 5, speed: 'fast' },
+        FULL_FIELDS,
+      ),
+    ).toEqual({
+      inputTokens: 100,
+      outputTokens: 20,
+      totalTokens: 125,
+      cacheReadTokens: 60,
+      cacheWriteTokens: 10,
+      reasoningTokens: 5,
+      speed: 'fast',
+      cacheHitTokens: 60,
+      cacheMissTokens: 40,
+    });
   });
 
   it('prefers native prompt-cache hit and miss counts over the cache read', () => {
-    expect(normalizeUsage({ prompt: 100, completion: 1, cached: 60, hits: 30, misses: 70 }, FULL_FIELDS)).toMatchObject({
-      cacheReadTokens: 60,
-      cacheHitTokens: 30,
-      cacheMissTokens: 70,
-    });
+    expect(normalizeUsage({ prompt: 100, completion: 1, cached: 60, hits: 30, misses: 70 }, FULL_FIELDS)).toMatchObject(
+      {
+        cacheReadTokens: 60,
+        cacheHitTokens: 30,
+        cacheMissTokens: 70,
+      },
+    );
   });
 
   it('reads only the figures a wire maps, even when its usage object carries more', () => {

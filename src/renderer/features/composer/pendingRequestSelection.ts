@@ -18,7 +18,10 @@ export function composerPendingRequestKey(pending: ComposerPendingRequestState):
     : `user-input:${createRequestFingerprint(pending.request)}`;
 }
 
-export function resolveComposerPendingRequest(messages: ConversationMessage[], plan?: PendingPlanReviewRequest | null): ComposerPendingRequestState | null {
+export function resolveComposerPendingRequest(
+  messages: ConversationMessage[],
+  plan?: PendingPlanReviewRequest | null,
+): ComposerPendingRequestState | null {
   const approval = findPendingToolApproval(messages);
   if (approval) return { kind: 'tool-approval', request: approval };
   if (plan) return { kind: 'plan-review', request: plan };

@@ -11,11 +11,15 @@ export const useRdcRuntimeOverview = (open: boolean) => {
   const read = useAsyncValue(open ? key : null, () => window.electronAPI.rdcRuntime.getOverview(projectRoot));
   // What the sections show: the read for the current key, which their own confirmed changes then update.
   const [overview, setOverview] = useState<RdcRuntimeOverview | null>(null);
-  useEffect(() => { setOverview(read.status === 'ready' ? read.value : null); }, [read]);
+  useEffect(() => {
+    setOverview(read.status === 'ready' ? read.value : null);
+  }, [read]);
   const lifetime = useMemo(() => ({ key, active: false }), [key]);
   useLayoutEffect(() => {
     lifetime.active = open;
-    return () => { lifetime.active = false; };
+    return () => {
+      lifetime.active = false;
+    };
   }, [lifetime, open]);
   const setCurrentOverview = useMemo(() => fenceOverviewSetter(lifetime, setOverview), [lifetime]);
   const refresh = useCallback(() => setRevision((value) => value + 1), []);

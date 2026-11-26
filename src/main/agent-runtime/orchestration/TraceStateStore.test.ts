@@ -4,10 +4,14 @@ import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ sessionPath: '' }));
-vi.mock('../../sessions/store/sessionStores', () => ({ sessionRecordStore: { readSession: () => ({ sessionPath: fixture.sessionPath }) } }));
+vi.mock('../../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { readSession: () => ({ sessionPath: fixture.sessionPath }) },
+}));
 import { traceStateStore } from './TraceStateStore';
 
-afterEach(() => { if (fixture.sessionPath) fs.rmSync(fixture.sessionPath, { recursive: true, force: true }); });
+afterEach(() => {
+  if (fixture.sessionPath) fs.rmSync(fixture.sessionPath, { recursive: true, force: true });
+});
 
 it('reports a damaged request tree instead of replacing it with an empty one', () => {
   fixture.sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-trace-state-'));

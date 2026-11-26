@@ -91,9 +91,18 @@
 }
 
 /* Risk reads at a glance: low green, medium amber, high red. */
-.composer-tool-approval-meta .composer-tool-approval-risk.is-low { border-color: color-mix(in srgb, var(--token-status-success) 45%, transparent); color: var(--token-status-success); }
-.composer-tool-approval-meta .composer-tool-approval-risk.is-medium { border-color: color-mix(in srgb, var(--token-status-warning) 45%, transparent); color: var(--token-status-warning); }
-.composer-tool-approval-meta .composer-tool-approval-risk.is-high { border-color: color-mix(in srgb, var(--token-status-error) 45%, transparent); color: var(--token-status-error); }
+.composer-tool-approval-meta .composer-tool-approval-risk.is-low {
+  border-color: color-mix(in srgb, var(--token-status-success) 45%, transparent);
+  color: var(--token-status-success);
+}
+.composer-tool-approval-meta .composer-tool-approval-risk.is-medium {
+  border-color: color-mix(in srgb, var(--token-status-warning) 45%, transparent);
+  color: var(--token-status-warning);
+}
+.composer-tool-approval-meta .composer-tool-approval-risk.is-high {
+  border-color: color-mix(in srgb, var(--token-status-error) 45%, transparent);
+  color: var(--token-status-error);
+}
 
 .composer-tool-approval-meta span {
   min-height: var(--space-6);
@@ -130,5 +139,7 @@
 @media (prefers-reduced-motion: reduce) {
   .composer-shell-tool-approval,
   .composer-shell-plan-review,
-  .composer-shell-user-input { animation: none; }
+  .composer-shell-user-input {
+    animation: none;
+  }
 }

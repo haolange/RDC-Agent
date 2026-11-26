@@ -7,10 +7,7 @@ import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEve
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from './DelegatedInteractionOwner';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentApprovalEventPayload, AgentEvent } from '@shared/types/agentRuntime';
-import type {
-  ConversationAskUserAnswer,
-  ConversationAskUserQuestion,
-} from '@shared/types/conversation';
+import type { ConversationAskUserAnswer, ConversationAskUserQuestion } from '@shared/types/conversation';
 import type { ConversationAnswerUserInputResult } from '@shared/types/conversation';
 
 interface PendingUserInputRequest {
@@ -142,20 +139,34 @@ export class AgentUserInputRequestService {
       const answer = answerByQuestionId.get(question.questionId);
       if (!answer) continue;
       if (answer.responseKind === 'skipped' && question.required !== false) {
-        return { success: false, questionId: question.questionId, error: `Question ${question.questionId} is required; answer or choose unknown.` };
+        return {
+          success: false,
+          questionId: question.questionId,
+          error: `Question ${question.questionId} is required; answer or choose unknown.`,
+        };
       }
       if (answer.responseKind === 'unknown' || answer.responseKind === 'skipped') {
-        if (answer.selectedOptionId) return { success: false, questionId: question.questionId, error: 'An unknown or skipped answer cannot select a proposed explanation.' };
+        if (answer.selectedOptionId)
+          return {
+            success: false,
+            questionId: question.questionId,
+            error: 'An unknown or skipped answer cannot select a proposed explanation.',
+          };
         continue;
       }
       if (!question.allowFreeform && !answer.selectedOptionId) {
-        return { success: false, questionId: question.questionId, error: `Question ${question.questionId} requires one of the provided options.` };
+        return {
+          success: false,
+          questionId: question.questionId,
+          error: `Question ${question.questionId} requires one of the provided options.`,
+        };
       }
-      if (
-        answer.selectedOptionId
-        && !question.options.some((option) => option.optionId === answer.selectedOptionId)
-      ) {
-        return { success: false, questionId: question.questionId, error: `Unknown option selected for question ${question.questionId}.` };
+      if (answer.selectedOptionId && !question.options.some((option) => option.optionId === answer.selectedOptionId)) {
+        return {
+          success: false,
+          questionId: question.questionId,
+          error: `Unknown option selected for question ${question.questionId}.`,
+        };
       }
     }
 
@@ -215,7 +226,22 @@ export class AgentUserInputRequestService {
     payload: AgentApprovalEventPayload,
   ): void {
     const owner = pending.delegatedOwner;
-    pending.onEvent?.(buildSharedAgentEvent(type, owner ? { ...payload, delegatedRequest: { executionId: owner.executionId, childSessionId: owner.childSessionId, turnId: pending.turnId } } : payload, owner ? { ...pending.context, sessionId: owner.ownerSessionId } : pending.context));
+    pending.onEvent?.(
+      buildSharedAgentEvent(
+        type,
+        owner
+          ? {
+              ...payload,
+              delegatedRequest: {
+                executionId: owner.executionId,
+                childSessionId: owner.childSessionId,
+                turnId: pending.turnId,
+              },
+            }
+          : payload,
+        owner ? { ...pending.context, sessionId: owner.ownerSessionId } : pending.context,
+      ),
+    );
   }
 }
 

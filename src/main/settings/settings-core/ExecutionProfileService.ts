@@ -10,11 +10,13 @@ export class ExecutionProfileService {
   getDiagnostics(providers: readonly LlmProviderEntry[]): SettingsDiagnostic[] {
     return providers.some(isProviderExecutable)
       ? []
-      : [{
-          code: 'missing_configured_provider',
-          severity: 'warning',
-          message: 'No configured provider is available for agent execution.',
-        }];
+      : [
+          {
+            code: 'missing_configured_provider',
+            severity: 'warning',
+            message: 'No configured provider is available for agent execution.',
+          },
+        ];
   }
 }
 

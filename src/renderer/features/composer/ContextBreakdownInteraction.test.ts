@@ -14,19 +14,41 @@ it('lets the portal own dismissal and preserves disclosure across reopenings', (
     const [expanded, setExpanded] = useState(false);
     const menu = useComposerMenu('usage');
     const agent = useComposerMenu('agent');
-    return [createElement('button', {
-      key: 'agent', onClick: agent.toggle, 'aria-expanded': agent.open, 'data-testid': 'agent-trigger',
-    }), createElement(ContextUsageIndicator, {
-      key: 'usage', menu,
-      usage: null, prepared: null, phase: 'idle', selectedProfile: null,
-      detailsExpanded: expanded,
-      onDetailsExpandedChange: (next: boolean) => { changes(next); setExpanded(next); },
-    })];
+    return [
+      createElement('button', {
+        key: 'agent',
+        onClick: agent.toggle,
+        'aria-expanded': agent.open,
+        'data-testid': 'agent-trigger',
+      }),
+      createElement(ContextUsageIndicator, {
+        key: 'usage',
+        menu,
+        usage: null,
+        prepared: null,
+        phase: 'idle',
+        selectedProfile: null,
+        detailsExpanded: expanded,
+        onDetailsExpandedChange: (next: boolean) => {
+          changes(next);
+          setExpanded(next);
+        },
+      }),
+    ];
   }
-  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
   try {
-    act(() => root.render(createElement(StrictMode, null,
-      createElement(ComposerMenuRegistryProvider, { scope: 'composer', children: createElement(Owner) }))));
+    act(() =>
+      root.render(
+        createElement(
+          StrictMode,
+          null,
+          createElement(ComposerMenuRegistryProvider, { scope: 'composer', children: createElement(Owner) }),
+        ),
+      ),
+    );
     const trigger = host.querySelector<HTMLButtonElement>('[data-testid="composer-usage-indicator"]')!;
     const agent = host.querySelector<HTMLButtonElement>('[data-testid="agent-trigger"]')!;
     act(() => agent.click());
@@ -46,11 +68,15 @@ it('lets the portal own dismissal and preserves disclosure across reopenings', (
     expect(document.activeElement).toBe(trigger);
     act(() => trigger.click());
     expect(document.querySelector('.context-breakdown-details-toggle')?.getAttribute('aria-expanded')).toBe('true');
-    act(() => document.querySelector('.ui-reading-sheet-overlay')!
-      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    act(() =>
+      document
+        .querySelector('.ui-reading-sheet-overlay')!
+        .dispatchEvent(new MouseEvent('mousedown', { bubbles: true })),
+    );
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   } finally {
-    act(() => root.unmount()); host.remove();
+    act(() => root.unmount());
+    host.remove();
     vi.unstubAllGlobals();
   }
 });

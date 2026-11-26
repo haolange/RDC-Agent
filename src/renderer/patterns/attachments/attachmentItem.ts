@@ -20,7 +20,11 @@ export interface AttachmentItem {
 
 export type AttachmentError = Extract<ConversationAccessAttachmentResult, { kind: 'error' }>['code'];
 
-export function attachmentMode(fileName: string, layer: AttachmentLayer | undefined, mimeType?: string): AttachmentItem['mode'] {
+export function attachmentMode(
+  fileName: string,
+  layer: AttachmentLayer | undefined,
+  mimeType?: string,
+): AttachmentItem['mode'] {
   if (layer === 'image' || (!layer && /^image\/(png|jpeg|gif|webp)$/i.test(mimeType ?? ''))) return 'image';
   const extension = attachmentExtension(fileName);
   if (isMarkdownAttachment(extension) && (layer === 'text' || !layer)) return 'markdown';

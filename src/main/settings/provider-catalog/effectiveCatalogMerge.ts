@@ -13,18 +13,16 @@ import type {
 import type { JsonValue } from '@shared/utils/jsonValue';
 import type { LlmProviderCatalogOwnership, LlmProviderEntry } from '@shared/types/settings';
 import type { ReasoningControl } from '@shared/types/modelCapability';
-import type {
-  CatalogLayerContribution,
-  EffectiveCatalogRequest,
-  PartialContextTier,
-} from './effectiveCatalogTypes';
+import type { CatalogLayerContribution, EffectiveCatalogRequest, PartialContextTier } from './effectiveCatalogTypes';
 
 function cloneJsonValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map((item) => (item === undefined ? null : cloneJsonValue(item)));
   if (value === null || typeof value !== 'object') return value;
-  return Object.fromEntries(Object.entries(value)
-    .filter(([, child]) => child !== undefined)
-    .map(([key, child]) => [key, cloneJsonValue(child)]));
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, child]) => child !== undefined)
+      .map(([key, child]) => [key, cloneJsonValue(child)]),
+  );
 }
 
 /**
@@ -93,21 +91,25 @@ function createConservativeModel(
     enabled: true,
     route: cloneJson(fallbackRoute),
     routeRevision: routeRevision(fallbackRoute),
-    routeOptions: [{
-      id: fallbackRoute.protocol,
-      route: cloneJson(fallbackRoute),
-      routeRevision: routeRevision(fallbackRoute, fallbackRoute.protocol),
-      availability: 'available',
-    }],
+    routeOptions: [
+      {
+        id: fallbackRoute.protocol,
+        route: cloneJson(fallbackRoute),
+        routeRevision: routeRevision(fallbackRoute, fallbackRoute.protocol),
+        availability: 'available',
+      },
+    ],
     selection: { pickerVisibility: 'primary' },
     presencePolicy: 'discovered',
     availability: 'unknown',
-    contextTiers: [{
-      id: 'default',
-      label: 'Default',
-      activation: { kind: 'implicit' },
-      entitlement: 'unknown',
-    }],
+    contextTiers: [
+      {
+        id: 'default',
+        label: 'Default',
+        activation: { kind: 'implicit' },
+        entitlement: 'unknown',
+      },
+    ],
     defaultBudgetTokens: 0,
     controls: {
       fast: { state: 'unknown', defaultValue: false },
@@ -186,7 +188,7 @@ function layerForField(
   const matchedPath = Object.keys(fieldLayers ?? {})
     .filter((candidate) => field === candidate || field.startsWith(`${candidate}.`))
     .sort((left, right) => right.length - left.length)[0];
-  return matchedPath ? fieldLayers?.[matchedPath] ?? defaultLayer : defaultLayer;
+  return matchedPath ? (fieldLayers?.[matchedPath] ?? defaultLayer) : defaultLayer;
 }
 
 function mergeObjectLeaves(
@@ -217,19 +219,15 @@ function mergeObjectLeaves(
         );
         continue;
       }
-      const nextTarget = isObject(target[key]) ? target[key] as Record<string, unknown> : {};
+      const nextTarget = isObject(target[key]) ? (target[key] as Record<string, unknown>) : {};
       target[key] = nextTarget;
       mergeObjectLeaves(nextTarget, value, field, layer, provenance, fieldLayers);
       continue;
     }
     target[key] = cloneJson(value);
-    provenance.push(evidenceFor(
-      evidenceLayer,
-      field,
-      value,
-      previous,
-      provenance.filter((entry) => entry.field === field).at(-1),
-    ));
+    provenance.push(
+      evidenceFor(evidenceLayer, field, value, previous, provenance.filter((entry) => entry.field === field).at(-1)),
+    );
   }
 }
 
@@ -247,20 +245,22 @@ function recordObjectLeafEvidence(
     if (isObject(child)) {
       recordObjectLeafEvidence(
         child,
-        isObject(previous?.[key]) ? previous[key] as Record<string, unknown> : undefined,
+        isObject(previous?.[key]) ? (previous[key] as Record<string, unknown>) : undefined,
         field,
         layer,
         provenance,
         fieldLayers,
       );
     } else {
-      provenance.push(evidenceFor(
-        layerForField(layer, fieldLayers, field),
-        field,
-        child,
-        previous?.[key],
-        provenance.filter((entry) => entry.field === field).at(-1),
-      ));
+      provenance.push(
+        evidenceFor(
+          layerForField(layer, fieldLayers, field),
+          field,
+          child,
+          previous?.[key],
+          provenance.filter((entry) => entry.field === field).at(-1),
+        ),
+      );
     }
   }
 }
@@ -280,9 +280,10 @@ function mergeContextTiers(
       entitlement: 'unknown' as const,
     };
     const contextControl = target.controls.maxContext;
-    const protectsCatalogMaxTier = layer.source === 'entitlement'
-      && (contextControl.state === 'fixed' || contextControl.state === 'selectable')
-      && contextControl.tierId === patch.id;
+    const protectsCatalogMaxTier =
+      layer.source === 'entitlement' &&
+      (contextControl.state === 'fixed' || contextControl.state === 'selectable') &&
+      contextControl.tierId === patch.id;
     const effectivePatch: PartialContextTier = protectsCatalogMaxTier
       ? {
           id: patch.id,
@@ -338,14 +339,15 @@ function applyLayer(
   for (const patch of layer.models) {
     if (isRetiredProviderModel(request.providerId, patch.modelId)) continue;
     const direct = models.get(patch.modelId);
-    const matched = direct ? [patch.modelId, direct] as const : [...models.entries()].find(([, candidate]) => (
-      candidate.aliases.includes(patch.modelId)
-      || (patch.aliases ?? []).includes(candidate.modelId)
-      || (
-        layer.source === 'discovery'
-        && normalizeDiscoveredModelMatchKey(candidate.modelId) === normalizeDiscoveredModelMatchKey(patch.modelId)
-      )
-    ));
+    const matched = direct
+      ? ([patch.modelId, direct] as const)
+      : [...models.entries()].find(
+          ([, candidate]) =>
+            candidate.aliases.includes(patch.modelId) ||
+            (patch.aliases ?? []).includes(candidate.modelId) ||
+            (layer.source === 'discovery' &&
+              normalizeDiscoveredModelMatchKey(candidate.modelId) === normalizeDiscoveredModelMatchKey(patch.modelId)),
+        );
     const matchedKey = matched?.[0];
     if (!matched && layer.source === 'user' && request.catalogOwnership !== 'user-managed' && !patch.custom) {
       // Persisted app-managed rows are preferences only. They may update a model
@@ -353,18 +355,13 @@ function applyLayer(
       // Custom models from models.json user overrides are exempt.
       continue;
     }
-    if (
-      protocolDiffersFromCatalog
-      && layer.protocol
-      && matched?.[1].route.protocol !== layer.protocol
-    ) {
+    if (protocolDiffersFromCatalog && layer.protocol && matched?.[1].route.protocol !== layer.protocol) {
       continue;
     }
-    const model = matched?.[1]
-      ?? createConservativeModel(request.providerId, patch.modelId, request.fallbackRoute, layer.observedAt);
-    const rekeyFromDiscovery = layer.source === 'discovery'
-      && matchedKey !== undefined
-      && matchedKey !== patch.modelId;
+    const model =
+      matched?.[1] ??
+      createConservativeModel(request.providerId, patch.modelId, request.fallbackRoute, layer.observedAt);
+    const rekeyFromDiscovery = layer.source === 'discovery' && matchedKey !== undefined && matchedKey !== patch.modelId;
     const {
       aliases: rawAliases,
       contextTiers,
@@ -376,7 +373,7 @@ function applyLayer(
       custom: _custom,
       ...ordinaryFields
     } = patch;
-    const aliases = rawAliases?.filter(alias => !isRetiredProviderModel(request.providerId, alias));
+    const aliases = rawAliases?.filter((alias) => !isRetiredProviderModel(request.providerId, alias));
     const patchLayer: CatalogLayerContribution = factSource
       ? {
           ...layer,
@@ -385,58 +382,62 @@ function applyLayer(
         }
       : layer;
     const patchFieldLayers = fieldFactSources
-      ? Object.fromEntries(Object.entries(fieldFactSources).map(([fieldPath, metadata]) => [
-          fieldPath,
-          {
-            ...patchLayer,
-            ...metadata,
-            observedAt: metadata.observedAt ?? patchLayer.observedAt,
-          },
-        ]))
+      ? Object.fromEntries(
+          Object.entries(fieldFactSources).map(([fieldPath, metadata]) => [
+            fieldPath,
+            {
+              ...patchLayer,
+              ...metadata,
+              observedAt: metadata.observedAt ?? patchLayer.observedAt,
+            },
+          ]),
+        )
       : undefined;
-    const catalogExplicitlyUnavailable = layer.source !== 'catalog'
-      && request.catalog.models.some((catalogModel) => (
-        catalogModel.availability === 'unavailable'
-        && [catalogModel.modelId, ...(catalogModel.aliases ?? [])]
-          .some((id) => normalizeDiscoveredModelMatchKey(id) === normalizeDiscoveredModelMatchKey(model.modelId))
-      ));
-    const availabilityPatch = catalogExplicitlyUnavailable && availability !== 'unavailable'
-      ? {}
-      : {
-          ...(availability !== undefined ? { availability } : {}),
-          ...(unavailableReason !== undefined ? { unavailableReason } : {}),
-        };
+    const catalogExplicitlyUnavailable =
+      layer.source !== 'catalog' &&
+      request.catalog.models.some(
+        (catalogModel) =>
+          catalogModel.availability === 'unavailable' &&
+          [catalogModel.modelId, ...(catalogModel.aliases ?? [])].some(
+            (id) => normalizeDiscoveredModelMatchKey(id) === normalizeDiscoveredModelMatchKey(model.modelId),
+          ),
+      );
+    const availabilityPatch =
+      catalogExplicitlyUnavailable && availability !== 'unavailable'
+        ? {}
+        : {
+            ...(availability !== undefined ? { availability } : {}),
+            ...(unavailableReason !== undefined ? { unavailableReason } : {}),
+          };
     const ordinaryPatch: Record<string, unknown> = rekeyFromDiscovery
       ? { ...ordinaryFields, ...availabilityPatch }
       : { ...ordinaryFields, ...availabilityPatch, ...(aliases !== undefined ? { aliases } : {}) };
     // Discovery may repeat the catalog default along with a model's availability.
     // Keep the admitted model's route or the user's configured endpoint in that case.
     if (
-      layer.source === 'discovery'
-      && (matched || model.route.source === 'user')
-      && isObject(ordinaryPatch.route)
-      && ordinaryPatch.route.source === 'catalog'
+      layer.source === 'discovery' &&
+      (matched || model.route.source === 'user') &&
+      isObject(ordinaryPatch.route) &&
+      ordinaryPatch.route.source === 'catalog'
     ) {
       delete ordinaryPatch.route;
     }
     // Live rows without a measured window must not clobber compiled/manifest budgets (Agents picker
     // requires defaultBudgetTokens > 0; OpenCode Go /models returns ids only).
     if (
-      layer.source === 'discovery'
-      && typeof ordinaryPatch.defaultBudgetTokens === 'number'
-      && ordinaryPatch.defaultBudgetTokens <= 0
-      && model.defaultBudgetTokens > 0
+      layer.source === 'discovery' &&
+      typeof ordinaryPatch.defaultBudgetTokens === 'number' &&
+      ordinaryPatch.defaultBudgetTokens <= 0 &&
+      model.defaultBudgetTokens > 0
     ) {
       delete ordinaryPatch.defaultBudgetTokens;
     }
     if (rekeyFromDiscovery) {
       const previousId = model.modelId;
       model.modelId = patch.modelId;
-      model.aliases = [...new Set([
-        previousId,
-        ...model.aliases,
-        ...(aliases ?? []),
-      ])].filter((alias) => alias !== patch.modelId);
+      model.aliases = [...new Set([previousId, ...model.aliases, ...(aliases ?? [])])].filter(
+        (alias) => alias !== patch.modelId,
+      );
       model.provenance.push(
         evidenceFor(layerForField(patchLayer, patchFieldLayers, 'modelId'), 'modelId', patch.modelId, previousId),
         evidenceFor(layerForField(patchLayer, patchFieldLayers, 'aliases'), 'aliases', model.aliases),
@@ -477,9 +478,9 @@ function gateOverlayToExactAdmittedModels(
   catalog: CatalogLayerContribution,
 ): CatalogLayerContribution | undefined {
   if (!overlay) return undefined;
-  const admittedModelIds = new Set(discovery?.models
-    .filter((model) => model.availability !== 'unavailable')
-    .map((model) => model.modelId) ?? []);
+  const admittedModelIds = new Set(
+    discovery?.models.filter((model) => model.availability !== 'unavailable').map((model) => model.modelId) ?? [],
+  );
   for (const model of catalog.models) {
     admittedModelIds.add(model.modelId);
   }
@@ -491,11 +492,7 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
   const models = new Map<string, EffectiveModel>();
   const user = sanitizeUserContribution(request.user, request.catalogOwnership);
   const discovery = enforceDiscoveryAdmission(request.discovery);
-  const overlay = gateOverlayToExactAdmittedModels(
-    request.overlay,
-    discovery,
-    request.catalog,
-  );
+  const overlay = gateOverlayToExactAdmittedModels(request.overlay, discovery, request.catalog);
   const observedLayers = Array.isArray(request.observed)
     ? request.observed
     : request.observed
@@ -514,44 +511,48 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
     applyLayer(models, request, layer);
   }
   const projectedModels = [...models.values()].map((model): EffectiveModel => {
-    const hasExplicitRouteOptions = model.provenance.some((evidence) => (
-      evidence.field === 'routeOptions' || evidence.field.startsWith('routeOptions.')
-    ));
-    const routeOptions = hasExplicitRouteOptions && model.routeOptions
-      ? model.routeOptions.map((option) => ({
-          ...cloneJson(option),
-          routeRevision: option.routeRevision || routeRevision(option.route, option.id),
-        }))
-      : [{
-          id: model.route.protocol,
-          route: cloneJson(model.route),
-          routeRevision: routeRevision(model.route, model.route.protocol),
-          availability: model.availability,
-          ...(model.unavailableReason ? { unavailableReason: model.unavailableReason } : {}),
-        }];
+    const hasExplicitRouteOptions = model.provenance.some(
+      (evidence) => evidence.field === 'routeOptions' || evidence.field.startsWith('routeOptions.'),
+    );
+    const routeOptions =
+      hasExplicitRouteOptions && model.routeOptions
+        ? model.routeOptions.map((option) => ({
+            ...cloneJson(option),
+            routeRevision: option.routeRevision || routeRevision(option.route, option.id),
+          }))
+        : [
+            {
+              id: model.route.protocol,
+              route: cloneJson(model.route),
+              routeRevision: routeRevision(model.route, model.route.protocol),
+              availability: model.availability,
+              ...(model.unavailableReason ? { unavailableReason: model.unavailableReason } : {}),
+            },
+          ];
     const preferredRouteOption = model.preferredRouteOptionId
-      ? routeOptions.find((option) => option.id === model.preferredRouteOptionId
-        && option.availability !== 'unavailable')
+      ? routeOptions.find(
+          (option) => option.id === model.preferredRouteOptionId && option.availability !== 'unavailable',
+        )
       : undefined;
     const preferredRouteOptionId = preferredRouteOption ? model.preferredRouteOptionId : undefined;
     const projectedRoute = preferredRouteOption?.route ?? model.route;
     const defaultTier = resolveContextTierChoices(model).normalTier;
-    const derivedDefaultBudgetTokens = model.defaultBudgetTokens > 0
-      ? model.defaultBudgetTokens
-      : defaultTier ? contextTierPromptCap(defaultTier) ?? 0 : 0;
+    const derivedDefaultBudgetTokens =
+      model.defaultBudgetTokens > 0
+        ? model.defaultBudgetTokens
+        : defaultTier
+          ? (contextTierPromptCap(defaultTier) ?? 0)
+          : 0;
     const projected = {
       ...model,
       aliases: [...model.aliases],
       selection: model.selection ? cloneJson(model.selection) : { pickerVisibility: 'primary' as const },
       presencePolicy: model.presencePolicy,
       route: cloneJson(projectedRoute),
-      routeRevision: preferredRouteOption?.routeRevision
-        ?? routeRevision(model.route),
+      routeRevision: preferredRouteOption?.routeRevision ?? routeRevision(model.route),
       routeOptions,
       defaultBudgetTokens: derivedDefaultBudgetTokens,
-      ...(preferredRouteOptionId
-        ? { preferredRouteOptionId }
-        : { preferredRouteOptionId: undefined }),
+      ...(preferredRouteOptionId ? { preferredRouteOptionId } : { preferredRouteOptionId: undefined }),
       contextTiers: model.contextTiers.map((tier) => cloneJson(tier)),
       controls: cloneJson(model.controls),
       executionBindings: model.executionBindings?.map((binding) => cloneJson(binding)),
@@ -568,46 +569,58 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
     if (projected.availability === 'available' && projected.defaultBudgetTokens <= 0) {
       projected.availability = 'unavailable';
       projected.unavailableReason = 'Provider discovery did not supply a positive executable context budget.';
-      projected.provenance.push({
-        field: 'availability',
-        source: 'catalog',
-        observedAt: new Date().toISOString(),
-        detail: 'Executable context budget fail-closed gate',
-      }, {
-        field: 'unavailableReason',
-        source: 'catalog',
-        observedAt: new Date().toISOString(),
-        detail: 'Executable context budget fail-closed gate',
-      });
+      projected.provenance.push(
+        {
+          field: 'availability',
+          source: 'catalog',
+          observedAt: new Date().toISOString(),
+          detail: 'Executable context budget fail-closed gate',
+        },
+        {
+          field: 'unavailableReason',
+          source: 'catalog',
+          observedAt: new Date().toISOString(),
+          detail: 'Executable context budget fail-closed gate',
+        },
+      );
     }
     if (request.providerAvailability?.state === 'unavailable') {
       projected.availability = 'unavailable';
       projected.unavailableReason = request.providerAvailability.reason ?? 'Provider runtime is unavailable.';
-      projected.provenance.push({
-        field: 'availability',
-        source: 'catalog',
-        observedAt: request.providerAvailability.observedAt,
-        detail: 'Provider runtime availability gate',
-      }, {
-        field: 'unavailableReason',
-        source: 'catalog',
-        observedAt: request.providerAvailability.observedAt,
-        detail: 'Provider runtime availability gate',
-      });
+      projected.provenance.push(
+        {
+          field: 'availability',
+          source: 'catalog',
+          observedAt: request.providerAvailability.observedAt,
+          detail: 'Provider runtime availability gate',
+        },
+        {
+          field: 'unavailableReason',
+          source: 'catalog',
+          observedAt: request.providerAvailability.observedAt,
+          detail: 'Provider runtime availability gate',
+        },
+      );
     }
     return projected;
   });
   return projectedModels.map((model) => {
-    const bindingResolutions = Object.fromEntries((model.executionBindings ?? []).map((binding) => [
-      binding.id,
-      resolveExecutionBinding(model, binding, projectedModels),
-    ]));
+    const bindingResolutions = Object.fromEntries(
+      (model.executionBindings ?? []).map((binding) => [
+        binding.id,
+        resolveExecutionBinding(model, binding, projectedModels),
+      ]),
+    );
     const revisioned = { ...model, bindingResolutions };
     return {
       ...revisioned,
-      resolvedControls: resolveModelControls(revisioned, {
-        reasoningLevel: revisioned.controls.reasoning.defaultSelection,
-      }, projectedModels).resolved,
+      resolvedControls: resolveModelControls(
+        revisioned,
+        {
+          reasoningLevel: revisioned.controls.reasoning.defaultSelection,
+        },
+        projectedModels,
+      ).resolved,
     };
   });
 }

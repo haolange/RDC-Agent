@@ -1,9 +1,37 @@
-import { type ArtifactSourceRef, type ChallengeRecord, type ClaimRecord, type ClaimSet, type EvidencePack, type EvidenceRecord, type ExperimentRecord, type InvestigationArtifactKind, type InvestigationMission, type InvestigationRecord, type InvestigationReport, type WorldState } from '@shared/types/renderdocInvestigation';
+import {
+  type ArtifactSourceRef,
+  type ChallengeRecord,
+  type ClaimRecord,
+  type ClaimSet,
+  type EvidencePack,
+  type EvidenceRecord,
+  type ExperimentRecord,
+  type InvestigationArtifactKind,
+  type InvestigationMission,
+  type InvestigationRecord,
+  type InvestigationReport,
+  type WorldState,
+} from '@shared/types/renderdocInvestigation';
 import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
 import { isCausalOrCounterfactualClaim } from './investigationInvariants';
 import { InvestigationError } from './investigationErrors';
 import { hashesEqual } from './investigationHash';
-import { assertChallengeRecordRefs, assertCheckpointRecordRefs, assertClaimRecordRefs, assertEvidenceLinks, assertObservedToolEvidenceHasArtifact, assertOptimizerExperimentClose, assertReportRecordRefs, assertSCausal01, assertSClaim01, assertSState01, collectProjectedClaims, evaluateSRdc01, worldStateMarksEvidenceStale, type InvestigationLookup } from './investigationInvariants';
+import {
+  assertChallengeRecordRefs,
+  assertCheckpointRecordRefs,
+  assertClaimRecordRefs,
+  assertEvidenceLinks,
+  assertObservedToolEvidenceHasArtifact,
+  assertOptimizerExperimentClose,
+  assertReportRecordRefs,
+  assertSCausal01,
+  assertSClaim01,
+  assertSState01,
+  collectProjectedClaims,
+  evaluateSRdc01,
+  worldStateMarksEvidenceStale,
+  type InvestigationLookup,
+} from './investigationInvariants';
 import { inferWorldStateId, isWorldStateBoundKind } from './investigationRecordKeys';
 import { worldStateBindError, worldStateResolvable } from './investigationArtifactWrite';
 import type { InvestigationMutationReader } from './investigationArtifactMutations';
@@ -36,11 +64,18 @@ export class InvestigationRecordChecks {
     mission?: InvestigationMission,
   ): void {
     const claimSetItems = kind === 'claim_set' ? (record as ClaimSet).items : [];
-    const recordLookup: InvestigationLookup = claimSetItems.length > 0
-      ? { ...lookup, getClaim: (claimId) => claimSetItems.find((item) => item.claimId === claimId) ?? lookup.getClaim(claimId) }
-      : lookup;
+    const recordLookup: InvestigationLookup =
+      claimSetItems.length > 0
+        ? {
+            ...lookup,
+            getClaim: (claimId) => claimSetItems.find((item) => item.claimId === claimId) ?? lookup.getClaim(claimId),
+          }
+        : lookup;
     if (kind === 'world_state' && mission === 'optimizer' && 'status' in (record as WorldState).benchmark) {
-      throw new InvestigationError('INVESTIGATION_SCHEMA_INVALID', 'Optimizer WorldState requires measured benchmark settings');
+      throw new InvestigationError(
+        'INVESTIGATION_SCHEMA_INVALID',
+        'Optimizer WorldState requires measured benchmark settings',
+      );
     }
     if (kind === 'evidence') {
       this.assertEvidenceInvariants(sessionId, record as EvidenceRecord, lookup);
@@ -85,14 +120,17 @@ export class InvestigationRecordChecks {
       assertChallengeRecordRefs(record as ChallengeRecord, lookup);
     }
     if (kind === 'checkpoint') {
-      assertCheckpointRecordRefs(record as {
-        currentWorldStateId: string;
-        completedExperiments: string[];
-        openChallenges: string[];
-        criticalArtifactRefs: string[];
-        established: string[];
-        rejected: string[];
-      }, lookup);
+      assertCheckpointRecordRefs(
+        record as {
+          currentWorldStateId: string;
+          completedExperiments: string[];
+          openChallenges: string[];
+          criticalArtifactRefs: string[];
+          established: string[];
+          rejected: string[];
+        },
+        lookup,
+      );
     }
     if (kind === 'report') {
       assertReportRecordRefs(record as InvestigationReport, lookup, { mission });
@@ -120,9 +158,7 @@ export class InvestigationRecordChecks {
       }
       return {
         record: worldState,
-        markEvidenceStaleFor: worldStateMarksEvidenceStale(worldState, verdict)
-          ? worldState.worldStateId
-          : undefined,
+        markEvidenceStaleFor: worldStateMarksEvidenceStale(worldState, verdict) ? worldState.worldStateId : undefined,
       };
     }
     if (kind === 'evidence') {
@@ -168,20 +204,20 @@ export class InvestigationRecordChecks {
     } catch (error) {
       if (error instanceof InvestigationError) throw error;
       if (error instanceof SessionArtifactError && error.code === 'ARTIFACT_HASH_MISMATCH') {
-        throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', `content ${uri} hash mismatch. A SHA-256 has 64 hexadecimal digits. In the owning session, use artifact_read with the URI only (omit expectedHash and selectors) to inspect the current hash; compare it with the original source before correcting the reference. Do not silently substitute changed content.`, {
-          invariantId: 'S-CTX-01',
-        });
+        throw new InvestigationError(
+          'INVESTIGATION_HASH_MISMATCH',
+          `content ${uri} hash mismatch. A SHA-256 has 64 hexadecimal digits. In the owning session, use artifact_read with the URI only (omit expectedHash and selectors) to inspect the current hash; compare it with the original source before correcting the reference. Do not silently substitute changed content.`,
+          {
+            invariantId: 'S-CTX-01',
+          },
+        );
       }
       const message = error instanceof SessionArtifactError || error instanceof Error ? error.message : String(error);
       throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', message, { invariantId: 'S-CTX-01' });
     }
   }
 
-  private assertEvidenceInvariants(
-    sessionId: string,
-    evidence: EvidenceRecord,
-    lookup: InvestigationLookup,
-  ): void {
+  private assertEvidenceInvariants(sessionId: string, evidence: EvidenceRecord, lookup: InvestigationLookup): void {
     assertSState01(evidence, lookup);
     assertObservedToolEvidenceHasArtifact(evidence);
     if (evidence.contentHashes.length !== evidence.artifactRefs.length) {
@@ -202,11 +238,7 @@ export class InvestigationRecordChecks {
     assertEvidenceLinks(evidence, lookup);
   }
 
-  private applyEvidenceStale(
-    sessionId: string,
-    evidence: EvidenceRecord,
-    lookup: InvestigationLookup,
-  ): EvidenceRecord {
+  private applyEvidenceStale(sessionId: string, evidence: EvidenceRecord, lookup: InvestigationLookup): EvidenceRecord {
     const next = { ...evidence };
     const worldState = lookup.getWorldState(next.worldStateId);
     if (worldState) {
@@ -248,13 +280,15 @@ export class InvestigationRecordChecks {
   }
 
   private findExperimentForWorldState(sessionId: string, worldStateId: string): ExperimentRecord | null {
-    const entries = this.host.readIndex(sessionId).artifacts.filter((entry) => entry.kind === 'experiment' && entry.status !== 'superseded');
+    const entries = this.host
+      .readIndex(sessionId)
+      .artifacts.filter((entry) => entry.kind === 'experiment' && entry.status !== 'superseded');
     for (const entry of entries) {
       const experiment = this.host.recordReader(sessionId).readRecordBodyOf(entry, 'ExperimentRecord');
       if (
-        experiment.baselineWorldStateId === worldStateId
-        || experiment.variantWorldStateId === worldStateId
-        || experiment.restoredWorldStateId === worldStateId
+        experiment.baselineWorldStateId === worldStateId ||
+        experiment.variantWorldStateId === worldStateId ||
+        experiment.restoredWorldStateId === worldStateId
       ) {
         return experiment;
       }

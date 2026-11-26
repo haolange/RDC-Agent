@@ -20,8 +20,8 @@ interface WorkProcessProps {
 }
 
 /** A plan revision is waiting for the person's decision; replaced revisions carry their own status. */
-const awaitsPlanReview = (trace: ConversationWorkTrace): boolean => trace.blocks
-  .some((block) => block.toolCalls.some((call) => call.planReview?.status === 'awaiting'));
+const awaitsPlanReview = (trace: ConversationWorkTrace): boolean =>
+  trace.blocks.some((block) => block.toolCalls.some((call) => call.planReview?.status === 'awaiting'));
 
 /**
  * Working stays open while the turn runs, including while its plan card waits for review, when it ends in an error or
@@ -31,28 +31,38 @@ const awaitsPlanReview = (trace: ConversationWorkTrace): boolean => trace.blocks
 const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer }) => {
   const { t, language } = useI18n();
   const localized = useMemo(() => withLanguage(t, language), [t, language]);
-  const presentation = useMemo(() => buildWorkProcessPresentation(trace, localized, { reply: answer ?? '' }), [trace, localized, answer]);
+  const presentation = useMemo(
+    () => buildWorkProcessPresentation(trace, localized, { reply: answer ?? '' }),
+    [trace, localized, answer],
+  );
   const inProgress = trace.status === 'running';
   // Waiting on the person is not work: the header stops its signal, but the window keeps following the plan card.
   const running = inProgress && !awaitsPlanReview(trace);
   const showAll = useAppSettingsStore((state) => state.settings.appearance.workProcessExpansion) === 'all';
-  const [expanded, toggle] = useScopedWorkDisclosure('root',
-    inProgress || showAll || trace.status === 'error' || trace.status === 'stopped' || presentation.failureCount > 0);
+  const [expanded, toggle] = useScopedWorkDisclosure(
+    'root',
+    inProgress || showAll || trace.status === 'error' || trace.status === 'stopped' || presentation.failureCount > 0,
+  );
 
-  const headlineCopy = trace.status === 'stopped'
-    ? t('chat.workProcessHeadlineStopped')
-    : running
-      ? t('chat.workProcessHeadlineRunning')
-      : t('chat.workProcessTitle');
-  const actionMeta = presentation.actionCount > 0
-    ? t(presentation.actionCount === 1 ? 'chat.workProcessActionOne' : 'chat.workProcessActions', { count: presentation.actionCount })
-    : '';
+  const headlineCopy =
+    trace.status === 'stopped'
+      ? t('chat.workProcessHeadlineStopped')
+      : running
+        ? t('chat.workProcessHeadlineRunning')
+        : t('chat.workProcessTitle');
+  const actionMeta =
+    presentation.actionCount > 0
+      ? t(presentation.actionCount === 1 ? 'chat.workProcessActionOne' : 'chat.workProcessActions', {
+          count: presentation.actionCount,
+        })
+      : '';
   // While working the clock is the whole label and advances on the shared second; a settled turn says how long it took.
   const now = useWorkClock(running);
   const duration = formatTraceDuration(trace.blocks, language, now);
-  const durationMeta = duration ? running ? duration : t('chat.workProcessDuration', { duration }) : '';
+  const durationMeta = duration ? (running ? duration : t('chat.workProcessDuration', { duration })) : '';
   const metaParts = [durationMeta, actionMeta].filter(Boolean);
-  const failureMeta = presentation.failureCount > 0 ? t('chat.workProcessFailures', { count: presentation.failureCount }) : '';
+  const failureMeta =
+    presentation.failureCount > 0 ? t('chat.workProcessFailures', { count: presentation.failureCount }) : '';
   const hasBody = Boolean(presentation.summary) || presentation.rows.length > 0;
   // Blocks with nothing to show yet (runtime bookkeeping) do not open an empty Working while the turn runs.
   if (inProgress && !hasBody) return null;
@@ -76,7 +86,12 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer 
           {metaParts.length > 0 || failureMeta ? (
             <span className="work-process-meta">
               {metaParts.join(' · ')}
-              {failureMeta ? <>{metaParts.length > 0 ? ' · ' : ''}<span className="work-process-meta-failures">{failureMeta}</span></> : null}
+              {failureMeta ? (
+                <>
+                  {metaParts.length > 0 ? ' · ' : ''}
+                  <span className="work-process-meta-failures">{failureMeta}</span>
+                </>
+              ) : null}
             </span>
           ) : null}
         </span>

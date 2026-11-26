@@ -31,7 +31,12 @@ export class ProjectAgentTrust {
   }
 
   isTrusted(projectRoot: string, agentId: string, sourcePath: string): boolean {
-    return this.store.isTrusted('project', canonicalRealpath(projectRoot), agentId, projectAgentFingerprint(sourcePath));
+    return this.store.isTrusted(
+      'project',
+      canonicalRealpath(projectRoot),
+      agentId,
+      projectAgentFingerprint(sourcePath),
+    );
   }
 
   trust(projectRoot: string, agentId: string, sourcePath: string): void {

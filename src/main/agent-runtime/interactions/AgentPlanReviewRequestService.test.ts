@@ -33,29 +33,47 @@ const committed = {
 
 function approval(service: AgentPlanReviewRequestService, sessionId = 'sess'): PlanApprovalRequest {
   return {
-    sessionId, reviewId: service.projection('sess').review?.reviewId ?? 'expired',
-    decision: { kind: 'approve', handoff: planReview.handoffOptions[0] }, expectedPlanHash: planReview.hash,
-    model: { providerId: 'p', modelId: 'm' }, controls: { reasoningLevel: 'high', fastModel: false, maxContextMode: false },
+    sessionId,
+    reviewId: service.projection('sess').review?.reviewId ?? 'expired',
+    decision: { kind: 'approve', handoff: planReview.handoffOptions[0] },
+    expectedPlanHash: planReview.hash,
+    model: { providerId: 'p', modelId: 'm' },
+    controls: { reasoningLevel: 'high', fastModel: false, maxContextMode: false },
     baseRevision: { epoch: 'run-1', n: 3 },
   };
 }
 
 function open(service: AgentPlanReviewRequestService, turnHandle?: TurnHandle, onEvent?: (event: AgentEvent) => void) {
-  return service.request({ agentId: 'debugger', sessionId: 'sess', turnId: 'turn', toolCallId: 'call', planReview, turnHandle, onEvent,
-    context: { runId: 'run', turnId: 'turn', sessionId: 'sess', agentId: 'debugger' } });
+  return service.request({
+    agentId: 'debugger',
+    sessionId: 'sess',
+    turnId: 'turn',
+    toolCallId: 'call',
+    planReview,
+    turnHandle,
+    onEvent,
+    context: { runId: 'run', turnId: 'turn', sessionId: 'sess', agentId: 'debugger' },
+  });
 }
 
 describe('AgentPlanReviewRequestService', () => {
-  it.each([false, true])('persists exact review cancellation including already-aborted=%s', async alreadyAborted => {
+  it.each([false, true])('persists exact review cancellation including already-aborted=%s', async (alreadyAborted) => {
     const cancelReview = vi.fn(() => true);
     const store = { cancelReview } as unknown as PlanReviewStateStore;
     const service = new AgentPlanReviewRequestService(undefined, store);
     const controller = new AbortController();
     const events: AgentEvent[] = [];
     if (alreadyAborted) controller.abort();
-    const pending = service.request({ agentId: 'custom-planner', sessionId: 'sess', turnId: 'turn-c',
-      toolCallId: 'call-c', planReview, signal: controller.signal,
-      context: { sessionId: 'sess', turnId: 'turn-c', agentId: 'custom-planner' }, onEvent: event => events.push(event) });
+    const pending = service.request({
+      agentId: 'custom-planner',
+      sessionId: 'sess',
+      turnId: 'turn-c',
+      toolCallId: 'call-c',
+      planReview,
+      signal: controller.signal,
+      context: { sessionId: 'sess', turnId: 'turn-c', agentId: 'custom-planner' },
+      onEvent: (event) => events.push(event),
+    });
     const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
     if (!alreadyAborted) controller.abort();
     await rejected;
@@ -67,14 +85,23 @@ describe('AgentPlanReviewRequestService', () => {
 
   it('rejects with feedback into the same loop and refuses to approve the answered review', async () => {
     const markRejected = vi.fn();
-    const service = new AgentPlanReviewRequestService(undefined, { cancelReview: () => false, markRejected } as unknown as PlanReviewStateStore);
+    const service = new AgentPlanReviewRequestService(undefined, {
+      cancelReview: () => false,
+      markRejected,
+    } as unknown as PlanReviewStateStore);
     const pending = open(service);
     const reviewId = service.projection('sess').review!.reviewId;
-    const result = await service.answer({ sessionId: 'sess', reviewId, decision: { kind: 'reject', feedback: ' Narrow it. ' } });
+    const result = await service.answer({
+      sessionId: 'sess',
+      reviewId,
+      decision: { kind: 'reject', feedback: ' Narrow it. ' },
+    });
     expect(result).toMatchObject({ decision: 'reject', planReview: { decision: { reviewId, kind: 'reject' } } });
     expect(markRejected).toHaveBeenCalledExactlyOnceWith('sess', { turnId: 'turn', planId: 'plan-1', revision: 1 });
     await expect(pending).resolves.toBe('rejected\nfeedback: Narrow it.');
-    await expect(service.answer({ ...approval(service), reviewId })).rejects.toMatchObject({ code: 'PLAN_REVIEW_SCOPE_CHANGED' });
+    await expect(service.answer({ ...approval(service), reviewId })).rejects.toMatchObject({
+      code: 'PLAN_REVIEW_SCOPE_CHANGED',
+    });
     expect(transaction).not.toHaveBeenCalled();
   });
 
@@ -84,30 +111,53 @@ describe('AgentPlanReviewRequestService', () => {
     const turnHandle = { approvedPlan: null } as TurnHandle;
     const service = new AgentPlanReviewRequestService();
     const pending = open(service, turnHandle, (event) => events.push(event));
-    await expect(service.answer(approval(service, 'other-owner'))).rejects.toMatchObject({ code: 'PLAN_SESSION_DENIED' });
+    await expect(service.answer(approval(service, 'other-owner'))).rejects.toMatchObject({
+      code: 'PLAN_SESSION_DENIED',
+    });
     const request = approval(service);
     const result = await service.answer(request);
 
-    expect(transaction).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
-      sessionId: 'sess', turnId: 'turn', sourceAgentId: 'debugger', handoff: request.decision.handoff,
-      expectedPlanHash: request.expectedPlanHash, model: request.model, controls: request.controls, baseRevision: request.baseRevision,
-    }), expect.any(Object));
-    expect(result).toEqual({ decision: 'approve', session: committed.session,
+    expect(transaction).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        sessionId: 'sess',
+        turnId: 'turn',
+        sourceAgentId: 'debugger',
+        handoff: request.decision.handoff,
+        expectedPlanHash: request.expectedPlanHash,
+        model: request.model,
+        controls: request.controls,
+        baseRevision: request.baseRevision,
+      }),
+      expect.any(Object),
+    );
+    expect(result).toEqual({
+      decision: 'approve',
+      session: committed.session,
       planReview: expect.objectContaining({ decision: { reviewId: request.reviewId, kind: 'approve' } }),
-      handoff: { prompt: 'Execute the frozen plan.', send: true } });
+      handoff: { prompt: 'Execute the frozen plan.', send: true },
+    });
     await expect(pending).resolves.toContain('已冻结计划并确认声明交接。');
-    expect(turnHandle.approvedPlan).toEqual({ toolCallId: 'call', hash: committed.frozen.hash, target: 'general',
-      frozenUri: committed.frozen.uri, planId: 'plan-1' });
+    expect(turnHandle.approvedPlan).toEqual({
+      toolCallId: 'call',
+      hash: committed.frozen.hash,
+      target: 'general',
+      frozenUri: committed.frozen.uri,
+      planId: 'plan-1',
+    });
     expect(events[1]?.payload).toMatchObject({ kind: 'plan_review', status: 'approved' });
     await expect(service.answer(request)).rejects.toMatchObject({ code: 'PLAN_REVIEW_SCOPE_CHANGED' });
     expect(events).toHaveLength(2);
   });
 
   it('keeps a failed approval pending without publishing anything', async () => {
-    transaction.mockReset().mockRejectedValue(Object.assign(new Error('HOOK_DENIED: agent.before-handoff'), { code: 'HOOK_DENIED' }));
+    transaction
+      .mockReset()
+      .mockRejectedValue(Object.assign(new Error('HOOK_DENIED: agent.before-handoff'), { code: 'HOOK_DENIED' }));
     const turnHandle = { approvedPlan: null } as TurnHandle;
     const onEvent = vi.fn();
-    const service = new AgentPlanReviewRequestService(undefined, { cancelReview: () => false } as unknown as PlanReviewStateStore);
+    const service = new AgentPlanReviewRequestService(undefined, {
+      cancelReview: () => false,
+    } as unknown as PlanReviewStateStore);
     const pending = open(service, turnHandle, onEvent);
     await expect(service.answer(approval(service))).rejects.toMatchObject({ code: 'HOOK_DENIED' });
     expect(turnHandle.approvedPlan).toBeNull();
@@ -122,11 +172,16 @@ describe('AgentPlanReviewRequestService', () => {
     let deps!: PlanApprovalDeps;
     transaction.mockReset().mockImplementation(async (_input, received: PlanApprovalDeps) => {
       deps = received;
-      await new Promise<void>((resolve) => { finish = resolve; });
-      if (!received.isCurrent()) throw Object.assign(new Error('PLAN_REVIEW_SCOPE_CHANGED'), { code: 'PLAN_REVIEW_SCOPE_CHANGED' });
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      if (!received.isCurrent())
+        throw Object.assign(new Error('PLAN_REVIEW_SCOPE_CHANGED'), { code: 'PLAN_REVIEW_SCOPE_CHANGED' });
       return committed;
     });
-    const service = new AgentPlanReviewRequestService(undefined, { cancelReview: () => true } as unknown as PlanReviewStateStore);
+    const service = new AgentPlanReviewRequestService(undefined, {
+      cancelReview: () => true,
+    } as unknown as PlanReviewStateStore);
     const pending = open(service);
     const request = approval(service);
     const first = service.answer(request);

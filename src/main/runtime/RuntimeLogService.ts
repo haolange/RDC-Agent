@@ -37,18 +37,11 @@ function truncateUtf8(text: string, maxBytes: number): string {
   return `${buf.subarray(0, end).toString('utf8')}…[truncated]`;
 }
 
-function clampEntryFields(input: RuntimeLogInput): Pick<
-  RuntimeLogEntry,
-  'title' | 'summary' | 'detail' | 'raw'
-> {
+function clampEntryFields(input: RuntimeLogInput): Pick<RuntimeLogEntry, 'title' | 'summary' | 'detail' | 'raw'> {
   const redactedTitle = redactCredentialLikeText(input.title);
   const redactedSummary = redactCredentialLikeText(input.summary);
-  const redactedDetail = input.detail !== undefined
-    ? redactCredentialLikeText(input.detail)
-    : undefined;
-  const redactedRaw = input.raw === undefined || input.raw === null
-    ? null
-    : redactSecretsDeep(input.raw, 'raw').value;
+  const redactedDetail = input.detail !== undefined ? redactCredentialLikeText(input.detail) : undefined;
+  const redactedRaw = input.raw === undefined || input.raw === null ? null : redactSecretsDeep(input.raw, 'raw').value;
 
   let title = truncateUtf8(redactedTitle, 4 * 1024);
   let summary = truncateUtf8(redactedSummary, 8 * 1024);
@@ -61,9 +54,8 @@ function clampEntryFields(input: RuntimeLogInput): Pick<
     raw = { truncated: true, reason: 'unserializable' };
     rawJson = JSON.stringify(raw);
   }
-  const fixed = Buffer.byteLength(title, 'utf8')
-    + Buffer.byteLength(summary, 'utf8')
-    + Buffer.byteLength(detail ?? '', 'utf8');
+  const fixed =
+    Buffer.byteLength(title, 'utf8') + Buffer.byteLength(summary, 'utf8') + Buffer.byteLength(detail ?? '', 'utf8');
   const rawBudget = Math.max(0, MAX_ENTRY_BYTES - fixed - 64);
   if (Buffer.byteLength(rawJson, 'utf8') > rawBudget) {
     raw = {

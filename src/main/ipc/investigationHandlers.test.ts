@@ -19,15 +19,14 @@ vi.mock('../investigation/InvestigationArtifactService', () => ({
 vi.mock('../sessions/store/sessionStores', () => ({
   sessionRecordStore: { readSession },
 }));
-vi.mock('../agent-trace/rightRailInvestigationArtifacts', () => ({ listInvestigationArtifacts: vi.fn(() => ({ rows: [], totalCount: 0, storeDegraded: false })) }));
+vi.mock('../agent-trace/rightRailInvestigationArtifacts', () => ({
+  listInvestigationArtifacts: vi.fn(() => ({ rows: [], totalCount: 0, storeDegraded: false })),
+}));
 
 const HASH = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const OTHER_HASH = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
-function invoke(
-  state: { currentSessionId: string | null; currentProjectId: string | null },
-  args: unknown[],
-) {
+function invoke(state: { currentSessionId: string | null; currentProjectId: string | null }, args: unknown[]) {
   registerInvestigationHandlers({
     state: { currentSessionId: state.currentSessionId, currentProjectId: state.currentProjectId, currentRunId: null },
   } as never);
@@ -45,10 +44,9 @@ describe('investigation:read', () => {
   });
 
   it('denies a session that is not current and does not read', async () => {
-    const result = await invoke(
-      { currentSessionId: 'session-current', currentProjectId: 'project-current' },
-      [{ sessionId: 'session-other', artifactId: 'invart-1', expectedHash: HASH }],
-    );
+    const result = await invoke({ currentSessionId: 'session-current', currentProjectId: 'project-current' }, [
+      { sessionId: 'session-other', artifactId: 'invart-1', expectedHash: HASH },
+    ]);
     expect(result).toMatchObject({
       ok: false,
       status: 'error',
@@ -59,10 +57,9 @@ describe('investigation:read', () => {
 
   it('denies a session that is not owned by the active project', async () => {
     readSession.mockReturnValue({ sessionId: 'session-current', projectId: 'project-other' });
-    const result = await invoke(
-      { currentSessionId: 'session-current', currentProjectId: 'project-current' },
-      [{ sessionId: 'session-current', artifactId: 'invart-1', expectedHash: HASH }],
-    );
+    const result = await invoke({ currentSessionId: 'session-current', currentProjectId: 'project-current' }, [
+      { sessionId: 'session-current', artifactId: 'invart-1', expectedHash: HASH },
+    ]);
     expect(result).toMatchObject({
       ok: false,
       status: 'error',
@@ -75,10 +72,9 @@ describe('investigation:read', () => {
     readRecord.mockImplementation(() => {
       throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', 'expectedHash does not match content');
     });
-    const result = await invoke(
-      { currentSessionId: 'session-current', currentProjectId: 'project-current' },
-      [{ sessionId: 'session-current', artifactId: 'invart-1', expectedHash: OTHER_HASH }],
-    );
+    const result = await invoke({ currentSessionId: 'session-current', currentProjectId: 'project-current' }, [
+      { sessionId: 'session-current', artifactId: 'invart-1', expectedHash: OTHER_HASH },
+    ]);
     expect(result).toMatchObject({
       ok: false,
       status: 'hash-mismatch',
@@ -91,10 +87,9 @@ describe('investigation:read', () => {
     readRecord.mockImplementation(() => {
       throw new InvestigationError('INVESTIGATION_INDEX_CORRUPT', 'index is not JSON');
     });
-    const result = await invoke(
-      { currentSessionId: 'session-current', currentProjectId: 'project-current' },
-      [{ sessionId: 'session-current', artifactId: 'invart-1', expectedHash: HASH }],
-    );
+    const result = await invoke({ currentSessionId: 'session-current', currentProjectId: 'project-current' }, [
+      { sessionId: 'session-current', artifactId: 'invart-1', expectedHash: HASH },
+    ]);
     expect(result).toMatchObject({
       ok: false,
       status: 'degraded',
@@ -106,10 +101,9 @@ describe('investigation:read', () => {
     readRecord.mockImplementation(() => {
       throw new SessionArtifactError('ARTIFACT_TOO_LARGE', '2097153 bytes exceeds 2097152 bytes.');
     });
-    const result = await invoke(
-      { currentSessionId: 'session-current', currentProjectId: 'project-current' },
-      [{ sessionId: 'session-current', artifactId: 'invart-1', expectedHash: HASH }],
-    );
+    const result = await invoke({ currentSessionId: 'session-current', currentProjectId: 'project-current' }, [
+      { sessionId: 'session-current', artifactId: 'invart-1', expectedHash: HASH },
+    ]);
     expect(result).toMatchObject({
       ok: false,
       status: 'error',
@@ -131,10 +125,7 @@ describe('investigation:read', () => {
     ];
     for (const payload of cases) {
       await expect(
-        invoke(
-          { currentSessionId: 'session-current', currentProjectId: 'project-current' },
-          [payload],
-        ),
+        invoke({ currentSessionId: 'session-current', currentProjectId: 'project-current' }, [payload]),
       ).rejects.toBeInstanceOf(IpcValidationError);
     }
     expect(readRecord).not.toHaveBeenCalled();
@@ -147,10 +138,9 @@ describe('investigation:read', () => {
       contentHash: HASH,
       contentUri: 'session://investigation/records/invart-1.json',
     });
-    const result = await invoke(
-      { currentSessionId: 'session-current', currentProjectId: 'project-current' },
-      [{ sessionId: 'session-current', artifactId: 'invart-1', expectedHash: HASH }],
-    );
+    const result = await invoke({ currentSessionId: 'session-current', currentProjectId: 'project-current' }, [
+      { sessionId: 'session-current', artifactId: 'invart-1', expectedHash: HASH },
+    ]);
     expect(result).toEqual({
       ok: true,
       status: 'ready',
@@ -168,20 +158,28 @@ describe('investigation:list ownership and payload', () => {
   const run = (request: unknown) => {
     handle.mockReset();
     readSession.mockReturnValue({ projectId: scope.projectId });
-    registerInvestigationHandlers({ state: { currentSessionId: scope.sessionId, currentProjectId: scope.projectId } } as never);
-    return handle.mock.calls.find(call => call[0] === 'investigation:list')![1]({}, request);
+    registerInvestigationHandlers({
+      state: { currentSessionId: scope.sessionId, currentProjectId: scope.projectId },
+    } as never);
+    return handle.mock.calls.find((call) => call[0] === 'investigation:list')![1]({}, request);
   };
   it('passes only an authorized fixed-size cursor request to main selection', () => {
     const cursor = { createdAt: '2026-01-01T00:00:00.000Z', artifactId: 'invart-1' };
     expect(run({ ...scope, cursor })).toEqual({ rows: [], totalCount: 0, storeDegraded: false });
     expect(listInvestigationArtifacts).toHaveBeenLastCalledWith(scope.sessionId, cursor);
   });
-  it.each([{ ...scope, sessionId: 'other' }, { ...scope, projectId: 'other' }])('rejects foreign scope before listing', request => {
+  it.each([
+    { ...scope, sessionId: 'other' },
+    { ...scope, projectId: 'other' },
+  ])('rejects foreign scope before listing', (request) => {
     vi.mocked(listInvestigationArtifacts).mockClear();
     expect(() => run(request)).toThrow('INVESTIGATION_SESSION_DENIED');
     expect(listInvestigationArtifacts).not.toHaveBeenCalled();
   });
-  it.each([{ ...scope, limit: 999 }, { ...scope, cursor: { createdAt: 'bad', artifactId: '../x' } }])('rejects malformed or adjustable paging', request => {
+  it.each([
+    { ...scope, limit: 999 },
+    { ...scope, cursor: { createdAt: 'bad', artifactId: '../x' } },
+  ])('rejects malformed or adjustable paging', (request) => {
     expect(() => run(request)).toThrow(IpcValidationError);
   });
 });

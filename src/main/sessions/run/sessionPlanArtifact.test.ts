@@ -5,12 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { StorageIo } from '../../runtime/StorageIo';
 import { SessionArtifactResolver } from '../artifacts/SessionArtifactResolver';
 import { parsePlanTaskRequirements, renderPlanTaskRequirements } from './planTaskRequirements';
-import {
-  LIVE_PLAN_URI,
-  PlanArtifactWriter,
-  composePlanMarkdown,
-  sectionsFromMarkdown,
-} from './sessionPlanArtifact';
+import { LIVE_PLAN_URI, PlanArtifactWriter, composePlanMarkdown, sectionsFromMarkdown } from './sessionPlanArtifact';
 import type { PlanTaskRequirement } from './planTaskRequirements';
 
 describe('PlanArtifactWriter', () => {
@@ -25,15 +20,19 @@ describe('PlanArtifactWriter', () => {
     roots.push(projectsRoot);
     const sessionPath = path.join(projectsRoot, 'sess');
     await mkdir(sessionPath, { recursive: true });
-    await writeFile(path.join(sessionPath, 'session.json'), JSON.stringify({
-      sessionId: 'sess',
-      projectId: 'p',
-      title: 't',
-      goal: '',
-      sessionPath,
-      createdAt: 1,
-      updatedAt: 1,
-    }), 'utf8');
+    await writeFile(
+      path.join(sessionPath, 'session.json'),
+      JSON.stringify({
+        sessionId: 'sess',
+        projectId: 'p',
+        title: 't',
+        goal: '',
+        sessionPath,
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+      'utf8',
+    );
 
     const resolver = new SessionArtifactResolver({ resolveSessionPath: () => sessionPath, io: new StorageIo() });
     const writer = new PlanArtifactWriter(resolver);
@@ -56,9 +55,17 @@ describe('PlanArtifactWriter', () => {
 
 describe('plan markdown helpers', () => {
   const task: PlanTaskRequirement = {
-    taskId: 'task-review', revision: 3, subject: 'Independent review', description: 'Review current material only.',
-    blockedBy: ['task-generation'], completionRequirements: ['review'],
-    executionRequirements: { mode: 'subagent', requiredSkillIds: ['review-method'], independentOfTaskIds: ['task-generation'] },
+    taskId: 'task-review',
+    revision: 3,
+    subject: 'Independent review',
+    description: 'Review current material only.',
+    blockedBy: ['task-generation'],
+    completionRequirements: ['review'],
+    executionRequirements: {
+      mode: 'subagent',
+      requiredSkillIds: ['review-method'],
+      independentOfTaskIds: ['task-generation'],
+    },
   };
 
   it('includes the exact main-owned Task obligations in the reviewed and hashed Markdown', () => {
@@ -66,7 +73,12 @@ describe('plan markdown helpers', () => {
     const markdown = composePlanMarkdown({ ...input, taskRequirements: [task] });
     expect(parsePlanTaskRequirements(markdown)).toEqual([task]);
     expect(sectionsFromMarkdown(markdown).map((section) => section.heading)).toEqual(['Work']);
-    expect(composePlanMarkdown({ ...input, taskRequirements: [{ ...task, completionRequirements: ['review', 'limitations'] }] })).not.toBe(markdown);
+    expect(
+      composePlanMarkdown({
+        ...input,
+        taskRequirements: [{ ...task, completionRequirements: ['review', 'limitations'] }],
+      }),
+    ).not.toBe(markdown);
     expect(() => composePlanMarkdown({ ...input, content: markdown })).toThrow('generated from requiredTaskIds');
   });
 
@@ -76,7 +88,11 @@ describe('plan markdown helpers', () => {
     const section = renderPlanTaskRequirements([task]);
     expect(() => parsePlanTaskRequirements(section + section)).toThrow('duplicate');
     expect(() => parsePlanTaskRequirements(section + '\nUnbound trailing instructions.')).toThrow('terminate');
-    expect(() => renderPlanTaskRequirements([{ ...task, executionRequirements: { ...task.executionRequirements!, mode: 'direct' } }])).toThrow();
+    expect(() =>
+      renderPlanTaskRequirements([
+        { ...task, executionRequirements: { ...task.executionRequirements!, mode: 'direct' } },
+      ]),
+    ).toThrow();
   });
 
   it('composes title, summary and content then splits ## sections', () => {

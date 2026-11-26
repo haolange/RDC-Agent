@@ -4,9 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const contract = JSON.parse(
-  fs.readFileSync(path.join(root, 'scripts/fidelity/renderer-contract.json'), 'utf8'),
-);
+const contract = JSON.parse(fs.readFileSync(path.join(root, 'scripts/fidelity/renderer-contract.json'), 'utf8'));
 
 export const CONTRACT_ROOT = root;
 export const CONTRACT_FILES = contract.files;
@@ -15,9 +13,7 @@ export const CONTRACT_GROUPS = contract.groups ?? {};
 
 const normalize = (relativePath) => relativePath.replace(/\\/g, '/');
 
-const filesByPath = new Map(
-  Object.entries(CONTRACT_FILES).map(([key, relative]) => [normalize(relative), key]),
-);
+const filesByPath = new Map(Object.entries(CONTRACT_FILES).map(([key, relative]) => [normalize(relative), key]));
 
 const retiredSet = new Set(CONTRACT_RETIRED.map(normalize));
 

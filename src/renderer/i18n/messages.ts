@@ -105,17 +105,16 @@ const translations: Record<AppLanguage, Readonly<Partial<Record<string, string>>
 
 const HAN = /[\u3400-\u9fff\uf900-\ufaff]/u;
 const LATIN = /[A-Za-z0-9]/u;
-const meetsAcrossScripts = (left: string | undefined, right: string | undefined): boolean => Boolean(left && right)
-  && ((HAN.test(left!) && LATIN.test(right!)) || (LATIN.test(left!) && HAN.test(right!)));
+const meetsAcrossScripts = (left: string | undefined, right: string | undefined): boolean =>
+  Boolean(left && right) && ((HAN.test(left!) && LATIN.test(right!)) || (LATIN.test(left!) && HAN.test(right!)));
 
 /**
  * Chinese copy puts a space between Han characters and Latin letters or digits. Templates are written that way; a value
  * dropped into a template gets the same space where it meets the surrounding text, so「编辑{kind}」reads「编辑钩子」and
  * 「编辑 MCP」alike.
  */
-const spaceAtSeams = (value: string, before: string | undefined, after: string | undefined): string => (
-  `${meetsAcrossScripts(before, value[0]) ? ' ' : ''}${value}${meetsAcrossScripts(value.at(-1), after) ? ' ' : ''}`
-);
+const spaceAtSeams = (value: string, before: string | undefined, after: string | undefined): string =>
+  `${meetsAcrossScripts(before, value[0]) ? ' ' : ''}${value}${meetsAcrossScripts(value.at(-1), after) ? ' ' : ''}`;
 
 export const translate = (
   language: AppLanguage,
@@ -138,10 +137,8 @@ export type Translator = (key: TranslationKey, params?: Record<string, string | 
 export type LocalizedTranslator = Translator & { readonly language: AppLanguage };
 
 /** Gives an existing translator its language; components pair `useI18n`'s `t` and `language` this way. */
-export const withLanguage = (t: Translator, language: AppLanguage): LocalizedTranslator => Object.assign(
-  (key: TranslationKey, params?: Record<string, string | number>) => t(key, params),
-  { language },
-);
+export const withLanguage = (t: Translator, language: AppLanguage): LocalizedTranslator =>
+  Object.assign((key: TranslationKey, params?: Record<string, string | number>) => t(key, params), { language });
 
 const localizedTranslators = new Map<AppLanguage, LocalizedTranslator>();
 

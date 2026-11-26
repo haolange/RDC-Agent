@@ -5,7 +5,8 @@ import type { AppLanguage } from '@shared/types/settings';
 type ToolRow = Extract<WorkProcessRow, { type: 'tool' }>;
 type WebGroupRow = Extract<WorkProcessRow, { type: 'webGroup' }>;
 
-const isRead = (row: WorkProcessRow): row is ToolRow => row.type === 'tool' && row.toolName === 'web_fetch' && !row.approval;
+const isRead = (row: WorkProcessRow): row is ToolRow =>
+  row.type === 'tool' && row.toolName === 'web_fetch' && !row.approval;
 
 function groupStatus(members: ToolRow[]): WorkProcessRowStatus {
   if (members.some((member) => member.status === 'running' || member.status === 'pending')) return 'running';
@@ -47,7 +48,10 @@ export function groupWebRows(rows: WorkProcessRow[], language: AppLanguage): Wor
   };
   for (const row of rows) {
     if (isRead(row)) reads.push(row);
-    else { flush(); output.push(row); }
+    else {
+      flush();
+      output.push(row);
+    }
   }
   flush();
   return output;

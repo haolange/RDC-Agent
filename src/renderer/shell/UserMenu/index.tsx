@@ -105,9 +105,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
       updatePosition();
     };
 
-    const resizeObserver = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(() => updatePosition())
-      : null;
+    const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => updatePosition()) : null;
 
     if (menuRef.current && resizeObserver) {
       resizeObserver.observe(menuRef.current);
@@ -120,12 +118,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
     };
-  }, [
-    open,
-    updatePosition,
-    settings.appearance.fontScale,
-    settings.profile.nickname,
-  ]);
+  }, [open, updatePosition, settings.appearance.fontScale, settings.profile.nickname]);
 
   const menuDynStyle = useDynStyle({
     left: `${position.left}px`,

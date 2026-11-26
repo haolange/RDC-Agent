@@ -18,10 +18,7 @@ export type PinnedFetchInit = {
  * Connects to the already-verified pinned address while sending the original Host (and TLS servername), so DNS
  * rebinding cannot retarget the TCP connection. The body is buffered under `maxResponseBytes` before resolving.
  */
-export async function requestPinned(
-  pinned: PinnedPublicHttpUrl,
-  init: PinnedFetchInit,
-): Promise<Response> {
+export async function requestPinned(pinned: PinnedPublicHttpUrl, init: PinnedFetchInit): Promise<Response> {
   if (!Number.isSafeInteger(init.maxResponseBytes) || init.maxResponseBytes <= 0) {
     throw new Error('Pinned HTTP response byte limit must be a positive safe integer.');
   }
@@ -96,11 +93,13 @@ export async function requestPinned(
             if (value === undefined) continue;
             headerEntries.push([key, Array.isArray(value) ? value.join(', ') : value]);
           }
-          resolve(new Response(body, {
-            status: incoming.statusCode ?? 0,
-            statusText: incoming.statusMessage ?? '',
-            headers: headerEntries,
-          }));
+          resolve(
+            new Response(body, {
+              status: incoming.statusCode ?? 0,
+              statusText: incoming.statusMessage ?? '',
+              headers: headerEntries,
+            }),
+          );
         });
         incoming.on('error', reject);
       },

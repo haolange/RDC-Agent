@@ -13,20 +13,42 @@ import type { ConversationCancelActiveTurnResult, ConversationMessage } from '@s
 
 const session: SessionRecord = {
   schemaVersion: '1',
-  sessionId: 'session-a', projectId: 'project-a', title: 'A', goal: '', sessionPath: '/a', createdAt: 1, updatedAt: 1,
+  sessionId: 'session-a',
+  projectId: 'project-a',
+  title: 'A',
+  goal: '',
+  sessionPath: '/a',
+  createdAt: 1,
+  updatedAt: 1,
 };
 const ownership = {
-  sessionId: session.sessionId, projectId: session.projectId, requestId: 'request-a', agentId: 'general',
+  sessionId: session.sessionId,
+  projectId: session.projectId,
+  requestId: 'request-a',
+  agentId: 'general',
 };
 const assistant = (patch: Partial<ConversationMessage> = {}): ConversationMessage => ({
-  id: 'assistant-a', turnId: 'turn-a', requestId: 'request-a', role: 'assistant', agentId: 'general',
-  sessionId: session.sessionId, projectId: session.projectId, content: 'partial', status: 'streaming',
-  createdAt: 1, updatedAt: 2, workTrace: { status: 'running', updatedAt: 2, blocks: [] }, ...patch,
+  id: 'assistant-a',
+  turnId: 'turn-a',
+  requestId: 'request-a',
+  role: 'assistant',
+  agentId: 'general',
+  sessionId: session.sessionId,
+  projectId: session.projectId,
+  content: 'partial',
+  status: 'streaming',
+  createdAt: 1,
+  updatedAt: 2,
+  workTrace: { status: 'running', updatedAt: 2, blocks: [] },
+  ...patch,
 });
-const completed = () => assistant({
-  status: 'complete', content: 'Authoritative final answer', updatedAt: 10,
-  workTrace: { status: 'complete', updatedAt: 10, blocks: [] },
-});
+const completed = () =>
+  assistant({
+    status: 'complete',
+    content: 'Authoritative final answer',
+    updatedAt: 10,
+    workTrace: { status: 'complete', updatedAt: 10, blocks: [] },
+  });
 const cancel = vi.fn<() => Promise<ConversationCancelActiveTurnResult>>();
 const getHistory = vi.fn();
 let root: Root;
@@ -44,31 +66,48 @@ beforeEach(() => {
   cancel.mockReset().mockResolvedValue({ success: true, phase: 'running' });
   getHistory.mockReset().mockResolvedValue({ messages: [completed()], branchState: null });
   useNotificationStore.setState({ notifications: [] });
-  Object.defineProperty(window, 'electronAPI', { configurable: true, value: { conversation: { cancelActiveTurn: cancel, getHistory } } });
+  Object.defineProperty(window, 'electronAPI', {
+    configurable: true,
+    value: { conversation: { cancelActiveTurn: cancel, getHistory } },
+  });
   useConversationStore.getState().reset();
   useConversationStore.getState().upsertConversationMessage(assistant());
   useComposerSessionContextStore.getState().resetForSessionSwitch();
   useComposerSessionContextStore.getState().beginTurn(ownership);
   useProjectStore.getState().setCurrentSessionId(session.sessionId);
   useSessionProjectionStore.getState().reset();
-  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
   act(() => root.render(createElement(Harness)));
 });
 afterEach(async () => {
-  await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals();
+  await act(async () => root.unmount());
+  host.remove();
+  vi.unstubAllGlobals();
   Object.defineProperty(window, 'electronAPI', { configurable: true, value: undefined });
 });
 
 it('reports Stop as pending from the click until main answers, including when the request fails', async () => {
   let answer!: (result: ConversationCancelActiveTurnResult) => void;
-  cancel.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+  cancel.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+  );
   stopPending = [];
   let settled!: Promise<void>;
-  await act(async () => { settled = stop(); });
+  await act(async () => {
+    settled = stop();
+  });
   // The optimistic stop already ended the reply; the button must not fall back to an empty Send meanwhile.
   expect(useConversationStore.getState().conversationMessages[0].status).toBe('stopped');
   expect(stopPending.at(-1)).toBe(true);
-  await act(async () => { answer({ success: true, phase: 'running' }); await settled; });
+  await act(async () => {
+    answer({ success: true, phase: 'running' });
+    await settled;
+  });
   expect(stopPending.at(-1)).toBe(false);
   cancel.mockRejectedValue(new Error('bridge lost'));
   await act(async () => stop());
@@ -94,9 +133,18 @@ it('preserves a terminal event delivered while cancellation is waiting', async (
 });
 
 it('keeps a real main-owned stopped result and its complete tool receipts', async () => {
-  cancel.mockResolvedValue({ success: true, phase: 'running', cancelledRequestId: 'request-a', cancelledTurnId: 'turn-a' });
-  const stopped = assistant({ status: 'stopped', content: 'Saved partial answer', updatedAt: 10,
-    workTrace: { status: 'stopped', updatedAt: 10, blocks: [] } });
+  cancel.mockResolvedValue({
+    success: true,
+    phase: 'running',
+    cancelledRequestId: 'request-a',
+    cancelledTurnId: 'turn-a',
+  });
+  const stopped = assistant({
+    status: 'stopped',
+    content: 'Saved partial answer',
+    updatedAt: 10,
+    workTrace: { status: 'stopped', updatedAt: 10, blocks: [] },
+  });
   getHistory.mockResolvedValue({ messages: [stopped], branchState: null });
   await act(async () => stop());
   expect(useConversationStore.getState().conversationMessages[0]).toEqual(stopped);
@@ -107,7 +155,9 @@ it('routes a delayed terminal read to its owning cache after switching sessions'
   getHistory.mockImplementation(async () => {
     useProjectStore.getState().setCurrentSessionId('session-b');
     useConversationStore.getState().setConversationMessages([other]);
-    useComposerSessionContextStore.getState().beginTurn({ ...ownership, sessionId: 'session-b', requestId: 'request-b' });
+    useComposerSessionContextStore
+      .getState()
+      .beginTurn({ ...ownership, sessionId: 'session-b', requestId: 'request-b' });
     return { messages: [completed()], branchState: null };
   });
   await act(async () => stop());
@@ -117,7 +167,13 @@ it('routes a delayed terminal read to its owning cache after switching sessions'
 });
 
 it('merges only the stopped turn without replacing a newer request in the same session', async () => {
-  const newer = assistant({ id: 'assistant-new', turnId: 'turn-new', requestId: 'request-new', createdAt: 20, updatedAt: 20 });
+  const newer = assistant({
+    id: 'assistant-new',
+    turnId: 'turn-new',
+    requestId: 'request-new',
+    createdAt: 20,
+    updatedAt: 20,
+  });
   getHistory.mockImplementation(async () => {
     useConversationStore.getState().upsertConversationMessage(newer);
     useComposerSessionContextStore.getState().beginTurn({ ...ownership, requestId: 'request-new' });
@@ -129,7 +185,10 @@ it('merges only the stopped turn without replacing a newer request in the same s
 });
 
 it.each([
-  { requestId: 'other' }, { turnId: 'other' }, { sessionId: 'other' }, { agentId: 'other' },
+  { requestId: 'other' },
+  { turnId: 'other' },
+  { sessionId: 'other' },
+  { agentId: 'other' },
   { status: 'streaming' as const },
 ])('does not accept an unmatched or nonterminal result %j', async (patch) => {
   getHistory.mockResolvedValue({ messages: [assistant({ ...completed(), ...patch })], branchState: null });
@@ -151,7 +210,9 @@ it('reports a failed authoritative read without fabricating completion', async (
   getHistory.mockRejectedValue(new Error('History unavailable'));
   await act(async () => stop());
   expect(useNotificationStore.getState().notifications[0]).toMatchObject({
-    tone: 'error', title: 'app.stopRunFailed', details: [{ label: 'Detail', value: 'History unavailable' }],
+    tone: 'error',
+    title: 'app.stopRunFailed',
+    details: [{ label: 'Detail', value: 'History unavailable' }],
   });
   expect(useConversationStore.getState().conversationMessages[0].status).toBe('stopped');
 });

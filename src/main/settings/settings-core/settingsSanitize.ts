@@ -17,11 +17,7 @@ import {
 } from '@shared/constants/appSettingsDefaults';
 import { expandHomePath } from '../../platform/paths';
 import { assertRdcCliBinding } from '../../runtime/rdcCliBinding';
-import {
-  LEFT_DEFAULTS,
-  RIGHT_DEFAULTS,
-  VALID_PERMISSION_MODES,
-} from './settingsDefaults';
+import { LEFT_DEFAULTS, RIGHT_DEFAULTS, VALID_PERMISSION_MODES } from './settingsDefaults';
 import type {
   AgentPermissionSettings,
   AgentRuntimeContextSettings,
@@ -47,12 +43,15 @@ function dedupeStrings(values: string[]): string[] {
 
 export function sanitizeStringArray(value: unknown): string[] {
   return Array.isArray(value)
-    ? value.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim()).filter(Boolean)
+    ? value
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
     : [];
 }
 
 export function sanitizeStringRecord(value: unknown): Record<string, string> {
-  const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const record = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   const sanitized: Record<string, string> = {};
   for (const [key, entry] of Object.entries(record)) {
     const cleanKey = key.trim();
@@ -69,16 +68,18 @@ export function sanitizeRdcCliInvokerSettings(
   fallback: RdcCliInvokerSettings = DEFAULT_RDC_CLI_INVOKER,
   validate = false,
 ): RdcCliInvokerSettings {
-  const candidate = value && typeof value === 'object' ? value as Partial<RdcCliInvokerSettings> : {};
-  const timeoutMs = typeof candidate.timeoutMs === 'number' && Number.isFinite(candidate.timeoutMs)
-    ? clamp(Math.trunc(candidate.timeoutMs), 1000, 600000)
-    : fallback.timeoutMs;
+  const candidate = value && typeof value === 'object' ? (value as Partial<RdcCliInvokerSettings>) : {};
+  const timeoutMs =
+    typeof candidate.timeoutMs === 'number' && Number.isFinite(candidate.timeoutMs)
+      ? clamp(Math.trunc(candidate.timeoutMs), 1000, 600000)
+      : fallback.timeoutMs;
 
   const settings: RdcCliInvokerSettings = {
     enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : fallback.enabled,
     command: typeof candidate.command === 'string' ? candidate.command.trim() : fallback.command,
     argsPrefix: sanitizeStringArray(candidate.argsPrefix ?? fallback.argsPrefix),
-    workingDirectory: typeof candidate.workingDirectory === 'string' ? candidate.workingDirectory.trim() : fallback.workingDirectory,
+    workingDirectory:
+      typeof candidate.workingDirectory === 'string' ? candidate.workingDirectory.trim() : fallback.workingDirectory,
     env: sanitizeStringRecord(candidate.env ?? fallback.env),
     timeoutMs,
   };
@@ -90,19 +91,19 @@ export function sanitizeCodeInterpreterSettings(
   value: unknown,
   fallback: CodeInterpreterSettings = DEFAULT_CODE_INTERPRETER,
 ): CodeInterpreterSettings {
-  const candidate = value && typeof value === 'object' ? value as Partial<CodeInterpreterSettings> : {};
-  const timeoutMs = typeof candidate.timeoutMs === 'number' && Number.isFinite(candidate.timeoutMs)
-    ? clamp(Math.trunc(candidate.timeoutMs), 1000, 600000)
-    : fallback.timeoutMs;
+  const candidate = value && typeof value === 'object' ? (value as Partial<CodeInterpreterSettings>) : {};
+  const timeoutMs =
+    typeof candidate.timeoutMs === 'number' && Number.isFinite(candidate.timeoutMs)
+      ? clamp(Math.trunc(candidate.timeoutMs), 1000, 600000)
+      : fallback.timeoutMs;
   return {
     enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : fallback.enabled,
     command: typeof candidate.command === 'string' ? candidate.command.trim() : fallback.command,
     argsPrefix: sanitizeStringArray(candidate.argsPrefix ?? fallback.argsPrefix),
     timeoutMs,
     env: sanitizeStringRecord(candidate.env ?? fallback.env),
-    artifactsEnabled: typeof candidate.artifactsEnabled === 'boolean'
-      ? candidate.artifactsEnabled
-      : fallback.artifactsEnabled,
+    artifactsEnabled:
+      typeof candidate.artifactsEnabled === 'boolean' ? candidate.artifactsEnabled : fallback.artifactsEnabled,
   };
 }
 
@@ -110,23 +111,21 @@ export function sanitizeAgentShellSettings(
   value: unknown,
   fallback: AgentShellSettings = DEFAULT_SHELL_TOOLING,
 ): AgentShellSettings {
-  const candidate = value && typeof value === 'object' ? value as Partial<AgentShellSettings> : {};
+  const candidate = value && typeof value === 'object' ? (value as Partial<AgentShellSettings>) : {};
   return {
     executable: typeof candidate.executable === 'string' ? candidate.executable.trim() : fallback.executable,
   };
 }
 
 function sanitizePathList(value: unknown): string[] {
-  return dedupeStrings(
-    sanitizeStringArray(value).map((entry) => path.resolve(expandHomePath(entry))),
-  );
+  return dedupeStrings(sanitizeStringArray(value).map((entry) => path.resolve(expandHomePath(entry))));
 }
 
 export function sanitizeAgentPermissionSettings(
   value: unknown,
   fallback: AgentPermissionSettings = DEFAULT_AGENT_RUNTIME.permissions,
 ): AgentPermissionSettings {
-  const candidate = value && typeof value === 'object' ? value as Partial<AgentPermissionSettings> : {};
+  const candidate = value && typeof value === 'object' ? (value as Partial<AgentPermissionSettings>) : {};
   return {
     mode: pickEnum(candidate.mode, VALID_PERMISSION_MODES, fallback.mode),
     readableRoots: sanitizePathList(candidate.readableRoots ?? fallback.readableRoots),
@@ -140,7 +139,7 @@ export function sanitizeAgentRuntimeContextSettings(
   value: unknown,
   fallback: AgentRuntimeContextSettings = DEFAULT_AGENT_RUNTIME.context,
 ): AgentRuntimeContextSettings {
-  const candidate = value && typeof value === 'object' ? value as Partial<AgentRuntimeContextSettings> : {};
+  const candidate = value && typeof value === 'object' ? (value as Partial<AgentRuntimeContextSettings>) : {};
   return {
     compactionThresholdPercent: sanitizeCompactionThresholdPercent(
       candidate.compactionThresholdPercent,
@@ -189,18 +188,16 @@ export function sanitizeTerminal(input: unknown, fallback = DEFAULT_LAYOUT.termi
 
 export function sanitizeWindow(input: unknown, fallback = DEFAULT_LAYOUT.window): WindowLayoutPreference {
   const candidate = (input ?? {}) as Partial<WindowLayoutPreference>;
-  const width = typeof candidate.width === 'number' && Number.isFinite(candidate.width)
-    ? Math.trunc(candidate.width)
-    : fallback.width;
-  const height = typeof candidate.height === 'number' && Number.isFinite(candidate.height)
-    ? Math.trunc(candidate.height)
-    : fallback.height;
-  const x = typeof candidate.x === 'number' && Number.isFinite(candidate.x)
-    ? Math.trunc(candidate.x)
-    : fallback.x;
-  const y = typeof candidate.y === 'number' && Number.isFinite(candidate.y)
-    ? Math.trunc(candidate.y)
-    : fallback.y;
+  const width =
+    typeof candidate.width === 'number' && Number.isFinite(candidate.width)
+      ? Math.trunc(candidate.width)
+      : fallback.width;
+  const height =
+    typeof candidate.height === 'number' && Number.isFinite(candidate.height)
+      ? Math.trunc(candidate.height)
+      : fallback.height;
+  const x = typeof candidate.x === 'number' && Number.isFinite(candidate.x) ? Math.trunc(candidate.x) : fallback.x;
+  const y = typeof candidate.y === 'number' && Number.isFinite(candidate.y) ? Math.trunc(candidate.y) : fallback.y;
   return {
     width: clamp(width, APP_MIN_WINDOW_WIDTH, Math.max(APP_MIN_WINDOW_WIDTH, APP_DEFAULT_WINDOW_WIDTH * 4)),
     height: clamp(height, APP_MIN_WINDOW_HEIGHT, Math.max(APP_MIN_WINDOW_HEIGHT, APP_DEFAULT_WINDOW_HEIGHT * 4)),

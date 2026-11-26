@@ -89,8 +89,15 @@ export function Popover({
     if (!triggerRect || !content) return;
     const width = content.offsetWidth;
     const height = content.offsetHeight;
-    const { left, top } = placeAnchoredSurface(triggerRect, { width, height },
-      { width: window.innerWidth, height: window.innerHeight }, align, side, VIEWPORT_MARGIN, ANCHOR_GAP);
+    const { left, top } = placeAnchoredSurface(
+      triggerRect,
+      { width, height },
+      { width: window.innerWidth, height: window.innerHeight },
+      align,
+      side,
+      VIEWPORT_MARGIN,
+      ANCHOR_GAP,
+    );
     setCoords({ left, top, ready: true });
   }, [align, side]);
 
@@ -113,7 +120,8 @@ export function Popover({
     if (!isDialog || !coords.ready || focusedOpen.current) return;
     focusedOpen.current = true;
     const content = contentRef.current;
-    if (content && !content.contains(document.activeElement)) (getModalFocusableElements(content)[0] ?? content).focus();
+    if (content && !content.contains(document.activeElement))
+      (getModalFocusableElements(content)[0] ?? content).focus();
   }, [coords.ready, isDialog, open]);
 
   useDismissable({
@@ -175,7 +183,11 @@ export function Popover({
   // The trigger's own name is the dialog's name unless a label is given; a trigger named by another element lends
   // that element (a swatch named by its field label).
   const triggerLabelledBy = trigger.props['aria-labelledby'] as string | undefined;
-  const nameProps = !isDialog ? {} : label ? { 'aria-label': label } : { 'aria-labelledby': triggerLabelledBy ?? triggerId };
+  const nameProps = !isDialog
+    ? {}
+    : label
+      ? { 'aria-label': label }
+      : { 'aria-labelledby': triggerLabelledBy ?? triggerId };
 
   /** Tab past either end of a dialog leaves through its trigger, as if the surface sat right after it. */
   const leaveByTab = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -199,36 +211,36 @@ export function Popover({
       {triggerNode}
       {presence.mounted && typeof document !== 'undefined'
         ? createPortal(
-          <div
-            ref={contentRef}
-            id={contentId}
-            className={cn('ui-popover', className)}
-            role={role}
-            tabIndex={isDialog ? -1 : undefined}
-            {...nameProps}
-            onKeyDownCapture={(event) => {
-              if (!open || !isTopOverlayLayer(layerId) || !event.currentTarget.contains(event.target as Node)) return;
-              if (event.key === 'Tab' && isDialog && !dismissOnTab) {
-                leaveByTab(event);
-                return;
-              }
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                event.stopPropagation();
-              } else if (event.key !== 'Tab' || !dismissOnTab) return;
-              // Release this surface before its dialog handles the key. Tab continues natively from the trigger.
-              flushSync(() => onOpenChange(false));
-              triggerRef.current?.focus();
-            }}
-            data-side={side}
-            data-state={presence.state}
-            data-ready={coords.ready ? 'true' : 'false'}
-            {...positionStyle}
-          >
-            {children}
-          </div>,
-          document.body,
-        )
+            <div
+              ref={contentRef}
+              id={contentId}
+              className={cn('ui-popover', className)}
+              role={role}
+              tabIndex={isDialog ? -1 : undefined}
+              {...nameProps}
+              onKeyDownCapture={(event) => {
+                if (!open || !isTopOverlayLayer(layerId) || !event.currentTarget.contains(event.target as Node)) return;
+                if (event.key === 'Tab' && isDialog && !dismissOnTab) {
+                  leaveByTab(event);
+                  return;
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                } else if (event.key !== 'Tab' || !dismissOnTab) return;
+                // Release this surface before its dialog handles the key. Tab continues natively from the trigger.
+                flushSync(() => onOpenChange(false));
+                triggerRef.current?.focus();
+              }}
+              data-side={side}
+              data-state={presence.state}
+              data-ready={coords.ready ? 'true' : 'false'}
+              {...positionStyle}
+            >
+              {children}
+            </div>,
+            document.body,
+          )
         : null}
     </>
   );

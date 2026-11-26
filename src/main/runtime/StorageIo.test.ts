@@ -45,7 +45,9 @@ describe('StorageIo integrity', () => {
 
   it('deepMerge skips __proto__, prototype, and constructor keys', () => {
     const base = { safe: 1, nested: { keep: true } } as Record<string, unknown>;
-    const patch = JSON.parse('{"safe":2,"__proto__":{"polluted":true},"nested":{"constructor":{"x":1},"ok":3}}') as Record<string, unknown>;
+    const patch = JSON.parse(
+      '{"safe":2,"__proto__":{"polluted":true},"nested":{"constructor":{"x":1},"ok":3}}',
+    ) as Record<string, unknown>;
     const merged = io.deepMerge(base, patch);
     expect(merged.safe).toBe(2);
     expect((merged.nested as { ok: number }).ok).toBe(3);

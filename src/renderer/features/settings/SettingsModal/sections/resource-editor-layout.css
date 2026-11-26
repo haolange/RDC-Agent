@@ -11,7 +11,8 @@
   overflow: auto;
 }
 
-.settings-runtime-editor:is([data-resource-kind='skill'], [data-resource-kind='policy'], [data-resource-kind='agent']) .settings-runtime-form-grid {
+.settings-runtime-editor:is([data-resource-kind='skill'], [data-resource-kind='policy'], [data-resource-kind='agent'])
+  .settings-runtime-form-grid {
   display: flex;
   flex-direction: column;
   flex: 1;

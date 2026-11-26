@@ -22,8 +22,12 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
   if (options.length < 2) return null;
   const selectedAvailability = provider.authModeAvailability?.[value] ?? provider.providerAvailability;
   // The manifest's reason is English provider data: it may explain in a tooltip, the visible line is product copy.
-  const selectedState = selectedAvailability.state === 'unknown' ? t('settings.providerAuthUnverified')
-    : selectedAvailability.state === 'unavailable' ? t('settings.providerAuthUnavailable') : '';
+  const selectedState =
+    selectedAvailability.state === 'unknown'
+      ? t('settings.providerAuthUnverified')
+      : selectedAvailability.state === 'unavailable'
+        ? t('settings.providerAuthUnavailable')
+        : '';
 
   return (
     <div className="settings-field settings-provider-auth-field">
@@ -31,10 +35,8 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
       <div className="settings-provider-auth-options" role="radiogroup" aria-label={t('settings.providerAuthMode')}>
         {options.map((mode) => {
           const availability = provider.authModeAvailability?.[mode] ?? provider.providerAvailability;
-          const unavailable = availability.state === 'unavailable'
-            || (mode === 'account' && !provider.accountLogin);
-          const reason = availability.reason
-            ?? (unavailable ? t('settings.providerAuthUnavailable') : undefined);
+          const unavailable = availability.state === 'unavailable' || (mode === 'account' && !provider.accountLogin);
+          const reason = availability.reason ?? (unavailable ? t('settings.providerAuthUnavailable') : undefined);
           return (
             <Button
               key={mode}

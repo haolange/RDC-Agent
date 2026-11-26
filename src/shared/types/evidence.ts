@@ -9,16 +9,7 @@ type EventType = string;
 
 // 事件状态
 type EventStatus =
-  | 'ok'
-  | 'error'
-  | 'sent'
-  | 'pass'
-  | 'fail'
-  | 'blocked'
-  | 'entered'
-  | 'warning'
-  | 'timeout'
-  | 'completed';
+  'ok' | 'error' | 'sent' | 'pass' | 'fail' | 'blocked' | 'entered' | 'warning' | 'timeout' | 'completed';
 
 // Action事件
 export interface ActionEvent {

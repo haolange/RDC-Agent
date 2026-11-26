@@ -9,7 +9,10 @@ import { sessionArtifactResolver } from '../sessions/artifacts/SessionArtifactRe
 import { conversationHistoryStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { appPathService } from '../runtime/AppPathService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
-import { ConversationAccessAttachmentArgsSchema, ConversationResolveMediaArgsSchema } from './validation/conversationSchemas';
+import {
+  ConversationAccessAttachmentArgsSchema,
+  ConversationResolveMediaArgsSchema,
+} from './validation/conversationSchemas';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 function isMissingFileError(error: unknown): boolean {
@@ -23,25 +26,30 @@ export function registerConversationMediaHandlers({ state }: WorkbenchIpcContext
   void pruneAttachmentDocumentCopies(documentCopyRoot);
   ipcMain.handle('conversation:accessAttachment', async (_event, ...rawArgs: unknown[]) => {
     const [{ owner, action }] = parseIpcArgs(ConversationAccessAttachmentArgsSchema, rawArgs, {
-      label: 'conversation:accessAttachment', maxBytes: 4 * 1024,
+      label: 'conversation:accessAttachment',
+      maxBytes: 4 * 1024,
     });
     let attachment: OwnedAttachment | undefined;
     try {
       if (owner.scope === 'session') {
         if (owner.sessionId !== state.currentSessionId) return { kind: 'error', code: 'denied' };
-        const record = conversationHistoryStore.listSessionAttachments(owner.sessionId)
+        const record = conversationHistoryStore
+          .listSessionAttachments(owner.sessionId)
           .find((item) => item.attachmentId === owner.attachmentId && item.sessionId === owner.sessionId);
-        if (record) attachment = {
-          ...record,
-          layer: record.layer ?? layerFromPersistedKind(record.kind, record.mimeType, record.fileName),
-          root: sessionRecordStore.getSessionAttachmentsDir(owner.sessionId),
-        };
+        if (record)
+          attachment = {
+            ...record,
+            layer: record.layer ?? layerFromPersistedKind(record.kind, record.mimeType, record.fileName),
+            root: sessionRecordStore.getSessionAttachmentsDir(owner.sessionId),
+          };
       } else {
         attachment = attachmentStagingService.getOwnedAttachment(owner.stagingId, owner.composerScopeKey);
       }
       if (!attachment) return { kind: 'error', code: 'unavailable' };
-      const stillOwned = () => owner.scope === 'session' ? state.currentSessionId === owner.sessionId
-        : Boolean(attachmentStagingService.getOwnedAttachment(owner.stagingId, owner.composerScopeKey));
+      const stillOwned = () =>
+        owner.scope === 'session'
+          ? state.currentSessionId === owner.sessionId
+          : Boolean(attachmentStagingService.getOwnedAttachment(owner.stagingId, owner.composerScopeKey));
       return await accessOwnedAttachment(attachment, action, shell, stillOwned, documentCopyRoot);
     } catch (error) {
       // A file that vanished between listing and reading is an ordinary outcome; anything else is a real fault.

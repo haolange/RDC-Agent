@@ -8,7 +8,10 @@ import {
 } from './LiveProviderOAuthContracts';
 
 function fixture(name: string): Record<string, unknown> {
-  return JSON.parse(readFileSync(resolve(__dirname, '../fixtures/provider-catalogs', name), 'utf8')) as Record<string, unknown>;
+  return JSON.parse(readFileSync(resolve(__dirname, '../fixtures/provider-catalogs', name), 'utf8')) as Record<
+    string,
+    unknown
+  >;
 }
 
 describe('live-verification OAuth contracts', () => {

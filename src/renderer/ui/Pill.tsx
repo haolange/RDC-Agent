@@ -9,15 +9,7 @@ export interface PillProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Pill = forwardRef<HTMLButtonElement, PillProps>(function Pill(
-  {
-    selected = false,
-    running = false,
-    className,
-    disabled,
-    type = 'button',
-    children,
-    ...rest
-  },
+  { selected = false, running = false, className, disabled, type = 'button', children, ...rest },
   ref,
 ) {
   return (

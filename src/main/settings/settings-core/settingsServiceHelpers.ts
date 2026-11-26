@@ -18,7 +18,9 @@ export function stableSerialize(value: unknown): string {
 }
 
 export function hashProviderDefinition(provider: LlmProviderEntry): string {
-  return createHash('sha256').update(stableSerialize({ ...provider, apiKey: '' }), 'utf8').digest('hex');
+  return createHash('sha256')
+    .update(stableSerialize({ ...provider, apiKey: '' }), 'utf8')
+    .digest('hex');
 }
 
 export function nowIso(): string {

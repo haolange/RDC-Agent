@@ -26,7 +26,12 @@ import {
   ScopedResourceWriteArgsSchema,
 } from './validation/rdcRuntimeSchemas';
 import type { AgentRuntimeMcpDescriptor } from '../settings/agent-manifests/agentRuntimeTypes';
-import type { HookEvent, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdcRuntime';
+import type {
+  HookEvent,
+  ScopedResourceImportRequest,
+  ScopedResourceKind,
+  ScopedResourceWriteRequest,
+} from '@shared/types/rdcRuntime';
 import type { IpcChannelTable } from './invokeRegistry';
 
 /**
@@ -47,10 +52,14 @@ function mcpTrustDetail(server: AgentRuntimeMcpDescriptor): string {
   return [
     server.sourcePath ? nativeMessage('mcpSource', { value: server.sourcePath }) : null,
     nativeMessage('mcpTransport', { value: server.transport }),
-    server.command ? nativeMessage('mcpCommand', { value: [server.command, ...(server.args ?? [])].map(quoteArgument).join(' ') }) : null,
+    server.command
+      ? nativeMessage('mcpCommand', { value: [server.command, ...(server.args ?? [])].map(quoteArgument).join(' ') })
+      : null,
     server.url ? nativeMessage('mcpUrl', { value: server.url }) : null,
     envKeys.length ? nativeMessage('mcpEnvKeys', { value: envKeys.join(', ') }) : null,
-  ].filter((line): line is string => line !== null).join('\n');
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
 }
 
 const quoteArgument = (value: string): string => (/^[\w./:=@+-]+$/u.test(value) ? value : JSON.stringify(value));
@@ -64,7 +73,7 @@ async function mutateHookTrust(
   const overviewRoot = ownedProjectRoot(projectRoot);
   hookEngine.load(appPathService.getUserRdcPaths().hooksPath, overviewRoot);
   const hook = hookEngine.list().find((entry) => entry.definition.id === hookId);
-  if (confirm && hook && !await confirm(hook)) return scopedRuntimeService.overview(overviewRoot);
+  if (confirm && hook && !(await confirm(hook))) return scopedRuntimeService.overview(overviewRoot);
   // Same rule as renderer resolveHookTrustProjectRoot: only project-scope mutations receive a root.
   const trustRoot = hook?.scope === 'project' ? overviewRoot : undefined;
   mutate(hookId, trustRoot);
@@ -96,7 +105,10 @@ function scopedResourceChannels(): IpcChannelTable {
         label: 'rdc-runtime:validate',
         maxBytes: 2 * 1024 * 1024,
       }) as [ScopedResourceWriteRequest];
-      const diagnostics = scopedRuntimeService.validate({ ...request, projectRoot: ownedProjectRoot(request.projectRoot) });
+      const diagnostics = scopedRuntimeService.validate({
+        ...request,
+        projectRoot: ownedProjectRoot(request.projectRoot),
+      });
       return { valid: diagnostics.length === 0, diagnostics };
     },
     'rdc-runtime:upsert': (_event, ...rawArgs: unknown[]) => {
@@ -116,7 +128,8 @@ function scopedResourceChannels(): IpcChannelTable {
       }) as [ScopedResourceImportRequest];
       const projectRoot = ownedProjectRoot(request.projectRoot);
       const extensions = SCOPED_IMPORT_EXTENSIONS[request.kind];
-      if (!extensions) throw new AppError('SCOPED_IMPORT_UNSUPPORTED', `${request.kind} resources are not imported from files.`);
+      if (!extensions)
+        throw new AppError('SCOPED_IMPORT_UNSUPPORTED', `${request.kind} resources are not imported from files.`);
       const picked = await dialog.showOpenDialog({
         title: nativeMessage('importResource'),
         filters: [{ name: request.kind, extensions: [...extensions] }],
@@ -161,10 +174,19 @@ function resourceTrustChannels(): IpcChannelTable {
         maxBytes: 8 * 1024,
         padTo: 2,
       });
-      return mutateHookTrust(projectRoot, hookId, (id, trustRoot) => {
-        hookEngine.trustHook(id, trustRoot);
-      }, (hook) => confirmResourceTrust('hook', hook.definition.id,
-        `${hook.sourcePath}\n${[hook.definition.command, ...hook.definition.args].join(' ')}`));
+      return mutateHookTrust(
+        projectRoot,
+        hookId,
+        (id, trustRoot) => {
+          hookEngine.trustHook(id, trustRoot);
+        },
+        (hook) =>
+          confirmResourceTrust(
+            'hook',
+            hook.definition.id,
+            `${hook.sourcePath}\n${[hook.definition.command, ...hook.definition.args].join(' ')}`,
+          ),
+      );
     },
     'rdc-runtime:revokeHook': (_event, ...rawArgs: unknown[]) => {
       const [projectRoot, hookId] = parseIpcArgs(RdcRuntimeRevokeHookArgsSchema, rawArgs, {
@@ -182,10 +204,12 @@ function resourceTrustChannels(): IpcChannelTable {
         maxBytes: 8 * 1024,
       });
       const projectRoot = ownedProjectRoot(rawRoot)!;
-      const server = agentRuntimeConfigService.listMcpServers(projectRoot)
+      const server = agentRuntimeConfigService
+        .listMcpServers(projectRoot)
         .find((entry) => entry.id === descriptorId && entry.scope === 'project');
       if (!server) throw new AppError('MCP_DESCRIPTOR_UNKNOWN', `${descriptorId} is not a project MCP server here.`);
-      if (!await confirmResourceTrust('mcp', server.id, mcpTrustDetail(server))) return scopedRuntimeService.overview(projectRoot);
+      if (!(await confirmResourceTrust('mcp', server.id, mcpTrustDetail(server))))
+        return scopedRuntimeService.overview(projectRoot);
       return scopedRuntimeService.trustProjectMcp(projectRoot, descriptorId);
     },
     'rdc-runtime:revokeMcp': (_event, ...rawArgs: unknown[]) => {

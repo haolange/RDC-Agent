@@ -78,7 +78,11 @@ function expandToken(toolName: string): string[] {
   return [normalizeToolName(toolName)];
 }
 
-function finalizeAllowlist(agentId: AgentRole, profileTools: readonly string[], ceiling: AgentAccessCeiling = DEFAULT_AGENT_ACCESS_CEILING): string[] {
+function finalizeAllowlist(
+  agentId: AgentRole,
+  profileTools: readonly string[],
+  ceiling: AgentAccessCeiling = DEFAULT_AGENT_ACCESS_CEILING,
+): string[] {
   const unique = filterToolsWithinCeiling(Array.from(new Set(profileTools.flatMap(expandToken))), ceiling);
   if (unique.length === 0) {
     throw new AppError('AGENT_TOOLS_EMPTY', `profile ${agentId} has an empty tools list and cannot execute.`);
@@ -95,7 +99,9 @@ export function resolveAgentToolAllowlistFromDefinition(
 }
 
 export function resolveAgentToolAllowlist(agentId: AgentRole): string[] {
-  const manifest = settingsService.agentDefinitions().find((definition) => definition.id === agentId && definition.enabled);
+  const manifest = settingsService
+    .agentDefinitions()
+    .find((definition) => definition.id === agentId && definition.enabled);
   return finalizeAllowlist(agentId, manifest?.tools ?? [], agentAccessCeiling(manifest));
 }
 

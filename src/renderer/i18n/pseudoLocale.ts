@@ -8,8 +8,22 @@ export function enablePseudoLocale(): void {
 export const pseudoLocaleEnabled = (): boolean => enabled;
 
 const ACCENTED: Record<string, string> = {
-  a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú', c: 'ç', n: 'ñ', y: 'ý',
-  A: 'Á', E: 'É', I: 'Í', O: 'Ó', U: 'Ú', C: 'Ç', N: 'Ñ', Y: 'Ý',
+  a: 'á',
+  e: 'é',
+  i: 'í',
+  o: 'ó',
+  u: 'ú',
+  c: 'ç',
+  n: 'ñ',
+  y: 'ý',
+  A: 'Á',
+  E: 'É',
+  I: 'Í',
+  O: 'Ó',
+  U: 'Ú',
+  C: 'Ç',
+  N: 'Ñ',
+  Y: 'Ý',
 };
 
 /**
@@ -17,7 +31,8 @@ const ACCENTED: Record<string, string> = {
  * English shows it. Placeholders are kept intact for interpolation.
  */
 export function pseudoLocalize(template: string): string {
-  const body = template.split(/(\{\w+\})/u)
+  const body = template
+    .split(/(\{\w+\})/u)
     .map((part) => (/^\{\w+\}$/u.test(part) ? part : [...part].map((char) => ACCENTED[char] ?? char).join('')))
     .join('');
   return `[${body}${'~'.repeat(Math.ceil(template.length * 0.4))}]`;

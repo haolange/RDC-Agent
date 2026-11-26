@@ -4,7 +4,11 @@ import { ProjectAgentTrustDialog } from './ProjectAgentTrustDialog';
 import type { useAgentModelControls } from './useAgentModelControls';
 import type { AgentModelOption } from '@shared/types/agentManifest';
 
-export function AgentReviewDialogs({ models, options, onRestore }: {
+export function AgentReviewDialogs({
+  models,
+  options,
+  onRestore,
+}: {
   models: ReturnType<typeof useAgentModelControls>;
   options: AgentModelOption[];
   onRestore: () => void;
@@ -15,7 +19,10 @@ export function AgentReviewDialogs({ models, options, onRestore }: {
         <AgentBuiltinDiffDialog
           state={models.builtinDiff}
           onClose={models.closeBuiltinDiff}
-          onRestore={() => { models.closeBuiltinDiff(); onRestore(); }}
+          onRestore={() => {
+            models.closeBuiltinDiff();
+            onRestore();
+          }}
         />
       ) : null}
       {models.overrideAction ? (

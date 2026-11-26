@@ -11,12 +11,12 @@ export const MODAL_FOCUSABLE_SELECTOR = [
 ].join(',');
 
 export function getModalFocusableElements(container: HTMLElement): HTMLElement[] {
-  return Array.from(container.querySelectorAll<HTMLElement>(MODAL_FOCUSABLE_SELECTOR))
-    .filter((element) => (
-      !element.hasAttribute('disabled')
-      && element.getAttribute('aria-hidden') !== 'true'
-      && element.getClientRects().length > 0
-    ));
+  return Array.from(container.querySelectorAll<HTMLElement>(MODAL_FOCUSABLE_SELECTOR)).filter(
+    (element) =>
+      !element.hasAttribute('disabled') &&
+      element.getAttribute('aria-hidden') !== 'true' &&
+      element.getClientRects().length > 0,
+  );
 }
 
 export function shouldCaptureEscapedFocus(trap: boolean): boolean {
@@ -47,9 +47,7 @@ export function useModalFocus(options: {
 
   useEffect(() => {
     if (!open) return undefined;
-    const previouslyFocused = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frameId = window.requestAnimationFrame(() => {
       const container = containerRef.current;
       if (!container) return;

@@ -3,10 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AppError } from '@shared/errors/appError';
 import { sessionRecordStore } from '../../sessions/store/sessionStores';
-import {
-  assertSafeImageAttachment,
-  detectImageMagicMime,
-} from './ConversationAttachmentMaterializer';
+import { assertSafeImageAttachment, detectImageMagicMime } from './ConversationAttachmentMaterializer';
 
 const ACCEPTED_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
@@ -44,7 +41,10 @@ function loadNativeImage(): typeof import('electron').nativeImage | null {
   }
 }
 
-function resizeThumbnail(bytes: Buffer, mimeType: string): { data: Buffer; mimeType: string; width?: number; height?: number } {
+function resizeThumbnail(
+  bytes: Buffer,
+  mimeType: string,
+): { data: Buffer; mimeType: string; width?: number; height?: number } {
   try {
     const nativeImage = loadNativeImage();
     if (!nativeImage) throw new Error('no-electron');
@@ -54,9 +54,7 @@ function resizeThumbnail(bytes: Buffer, mimeType: string): { data: Buffer; mimeT
     }
     const size = image.getSize();
     const scale = Math.min(1, MAX_EDGE / Math.max(size.width, size.height, 1));
-    const resized = scale < 1
-      ? image.resize({ width: Math.max(1, Math.round(size.width * scale)) })
-      : image;
+    const resized = scale < 1 ? image.resize({ width: Math.max(1, Math.round(size.width * scale)) }) : image;
     const nextSize = resized.getSize();
     return { data: resized.toPNG(), mimeType: 'image/png', width: nextSize.width, height: nextSize.height };
   } catch {
@@ -89,7 +87,8 @@ export async function recordToolImagePreview(input: {
     }
     if (magicMime !== input.mimeType) {
       throw new AppError(
-        'IMAGE_PREVIEW_INVALID', `${input.fileName} declared ${input.mimeType} but content is ${magicMime}`,
+        'IMAGE_PREVIEW_INVALID',
+        `${input.fileName} declared ${input.mimeType} but content is ${magicMime}`,
       );
     }
   }

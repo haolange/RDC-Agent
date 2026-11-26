@@ -1,5 +1,10 @@
 #!/usr/bin/env node
-import { defaultRepoRoot, isDirectInvocation, printForbiddenCheck, runForbiddenCheck } from './lib/forbiddenSourceRules.mjs';
+import {
+  defaultRepoRoot,
+  isDirectInvocation,
+  printForbiddenCheck,
+  runForbiddenCheck,
+} from './lib/forbiddenSourceRules.mjs';
 import { assertBuiltinProfileContracts } from './builtin-profile-contracts.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,7 +13,8 @@ const FORBIDDEN_RULES = [
   {
     id: 'investigation.forbidden.ask-plan-edit.seed',
     file: 'src/main/settings/agent-manifests/AgentManifestService.ts',
-    pattern: "const createSeedDefinition[\\s\\S]*agentId === 'ask'[\\s\\S]*agentId === 'plan'[\\s\\S]*agentId === 'edit'",
+    pattern:
+      "const createSeedDefinition[\\s\\S]*agentId === 'ask'[\\s\\S]*agentId === 'plan'[\\s\\S]*agentId === 'edit'",
     probe: 'source-pattern',
     note: 'Ask/Plan/Edit user seed writer is current debt',
   },
@@ -22,7 +28,7 @@ const FORBIDDEN_RULES = [
   {
     id: 'investigation.forbidden.ask-plan-edit.default',
     file: 'src/shared/types/agent.ts',
-    pattern: "DEFAULT_MODEL_ROUTING: Record<AgentId[\\s\\S]*ask:",
+    pattern: 'DEFAULT_MODEL_ROUTING: Record<AgentId[\\s\\S]*ask:',
     probe: 'source-pattern',
     note: 'Ask/Plan/Edit default model routing is current debt',
   },
@@ -50,7 +56,7 @@ const FORBIDDEN_RULES = [
   {
     id: 'investigation.forbidden.ask-plan-edit.write-scopes',
     file: 'src/shared/constants/agents.ts',
-    pattern: "AGENT_WRITE_SCOPES[\\s\\S]*ask: \\[\\][\\s\\S]*plan:",
+    pattern: 'AGENT_WRITE_SCOPES[\\s\\S]*ask: \\[\\][\\s\\S]*plan:',
     probe: 'source-pattern',
     note: 'Ask/Plan/Edit writeScopes map is current debt',
   },

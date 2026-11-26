@@ -1,8 +1,5 @@
 import { createProviderStateRef } from '../reasoning/ProviderStateRefs';
-import {
-  AssistantStreamBuilder,
-  ProviderStreamProtocolError,
-} from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
 import { ProviderHttpError } from './internal/http';
 import { normalizeUsage, type UsageFieldMap } from './internal/usageNormalizer';
@@ -42,11 +39,7 @@ export class GoogleInteractionsStreamState {
     private readonly builder: AssistantStreamBuilder,
     private readonly requestPlan: RequestPlan,
   ) {
-    this.steps = new GoogleInteractionsStepState(
-      builder,
-      requestPlan,
-      () => this.interactionId,
-    );
+    this.steps = new GoogleInteractionsStepState(builder, requestPlan, () => this.interactionId);
   }
 
   handle(event: Record<string, unknown>): void {
@@ -92,10 +85,7 @@ export class GoogleInteractionsStreamState {
     };
   }
 
-  private finishInteraction(
-    interaction: Record<string, unknown> | null,
-    forcedReason?: StopReason,
-  ): void {
+  private finishInteraction(interaction: Record<string, unknown> | null, forcedReason?: StopReason): void {
     if (this.steps.hasOpenSteps()) {
       throw new ProviderHttpError(PROVIDER_API, 502, 'Google Interactions ended with open steps.');
     }
@@ -107,8 +97,8 @@ export class GoogleInteractionsStreamState {
     this.applyUsage(recordValue(interaction?.usage));
     const state = createProviderStateRef(this.requestPlan, this.interactionId);
     if (state) this.builder.setProviderState(state);
-    this.finishReason = forcedReason
-      ?? (status === 'incomplete' ? 'length' : this.steps.toolCallSeen() ? 'toolUse' : 'stop');
+    this.finishReason =
+      forcedReason ?? (status === 'incomplete' ? 'length' : this.steps.toolCallSeen() ? 'toolUse' : 'stop');
     this.terminalSeen = true;
   }
 
@@ -127,9 +117,7 @@ export class GoogleInteractionsStreamState {
 }
 
 function recordValue(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 function stringValue(value: unknown): string {
   return typeof value === 'string' ? value : '';

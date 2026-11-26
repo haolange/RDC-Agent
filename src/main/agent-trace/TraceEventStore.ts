@@ -7,28 +7,42 @@ import { parseJsonWith, readValidatedSync } from '../runtime/atomicFile';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '../runtime/jsonl';
 import type { AgentRun } from '@shared/types/agenticTrace';
 
-const AgentRunSchema: ZodType<AgentRun> = z.object({
-  runId: z.string(),
-  agentType: z.string(),
-  title: z.string().optional(),
-  userRequest: z.string(),
-  status: z.enum(['pending', 'running', 'succeeded', 'failed', 'cancelled', 'skipped', 'waiting_approval']),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  context: z.record(z.string(), z.unknown()).optional(),
-  profileVersion: z.string().optional(),
-}).strict();
+const AgentRunSchema: ZodType<AgentRun> = z
+  .object({
+    runId: z.string(),
+    agentType: z.string(),
+    title: z.string().optional(),
+    userRequest: z.string(),
+    status: z.enum(['pending', 'running', 'succeeded', 'failed', 'cancelled', 'skipped', 'waiting_approval']),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    context: z.record(z.string(), z.unknown()).optional(),
+    profileVersion: z.string().optional(),
+  })
+  .strict();
 
-const TraceEventSchema: ZodType<TraceEvent> = z.object({
-  eventId: z.string(),
-  runId: z.string(),
-  seq: z.number(),
-  timestamp: z.string(),
-  type: z.enum(['node.created', 'node.updated', 'tool.started', 'tool.completed', 'tool.failed', 'phase.started',
-    'phase.completed', 'run.completed', 'run.failed', 'run.cancelled']),
-  payload: z.unknown(),
-  visibility: z.enum(['user', 'debug', 'internal']),
-}).strict();
+const TraceEventSchema: ZodType<TraceEvent> = z
+  .object({
+    eventId: z.string(),
+    runId: z.string(),
+    seq: z.number(),
+    timestamp: z.string(),
+    type: z.enum([
+      'node.created',
+      'node.updated',
+      'tool.started',
+      'tool.completed',
+      'tool.failed',
+      'phase.started',
+      'phase.completed',
+      'run.completed',
+      'run.failed',
+      'run.cancelled',
+    ]),
+    payload: z.unknown(),
+    visibility: z.enum(['user', 'debug', 'internal']),
+  })
+  .strict();
 
 const readRun = (file: string): AgentRun | null => readValidatedSync(file, parseJsonWith(AgentRunSchema.parse));
 
@@ -54,7 +68,8 @@ export class TraceRunStore {
 
   list(): AgentRun[] {
     if (!fs.existsSync(this.runsDir)) return [];
-    return fs.readdirSync(this.runsDir)
+    return fs
+      .readdirSync(this.runsDir)
       .filter((name) => name.endsWith('.json'))
       .flatMap((name) => readRun(path.join(this.runsDir, name)) ?? [])
       .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
@@ -94,7 +109,9 @@ export class TraceEventStore {
       // Detect collision: if disk already has this seq, bump until free.
       let seq = next;
       const existing = new Set(
-        this.getEventsRaw(runId).map((event) => event.seq).filter((value) => Number.isFinite(value)),
+        this.getEventsRaw(runId)
+          .map((event) => event.seq)
+          .filter((value) => Number.isFinite(value)),
       );
       while (existing.has(seq)) {
         seq += 1;
@@ -120,11 +137,7 @@ export class TraceEventStore {
     return result.records;
   }
 
-  append(
-    runId: string,
-    type: TraceEvent['type'],
-    payload: unknown,
-  ): TraceEvent {
+  append(runId: string, type: TraceEvent['type'], payload: unknown): TraceEvent {
     const seq = this.nextSeq(runId);
     const event: TraceEvent = {
       eventId: generateEventId('trace'),

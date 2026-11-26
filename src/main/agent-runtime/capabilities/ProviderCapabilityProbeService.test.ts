@@ -28,16 +28,25 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
     route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test/v1', source: 'catalog' },
     availability: 'available',
     presencePolicy: 'maintained',
-    contextTiers: [{
-      id: 'default', label: 'Default', maxPromptTokens: 272_000,
-      activation: { kind: 'implicit' }, entitlement: 'granted',
-    }],
+    contextTiers: [
+      {
+        id: 'default',
+        label: 'Default',
+        maxPromptTokens: 272_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      },
+    ],
     defaultBudgetTokens: 272_000,
     controls: {
       fast: { state: 'unsupported', fixedValue: false },
       maxContext: { state: 'unsupported', fixedValue: false },
       reasoning: {
-        kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', lockedSelection: 'off',
+        kind: 'none',
+        supportsOff: true,
+        levels: [],
+        defaultSelection: 'off',
+        lockedSelection: 'off',
         wireProfile: { kind: 'none' },
       },
     },
@@ -73,21 +82,22 @@ function plan(
     routeRevision: effectiveModel.routeRevision ?? 'test-route',
     selectedModelId: request.modelId,
     effectiveModelId: request.modelId,
-    appliedBindingIds: request.mode === 'fast' && effectiveModel.executionBindings?.[0]
-      ? [effectiveModel.executionBindings[0].id]
-      : [],
+    appliedBindingIds:
+      request.mode === 'fast' && effectiveModel.executionBindings?.[0] ? [effectiveModel.executionBindings[0].id] : [],
     route: effectiveModel.route,
-    headers: request.mode === 'max-context' && maxTier.activation.kind === 'header'
-      ? maxTier.activation.headers
-      : {},
-    bodyPatch: request.mode === 'fast' && effectiveModel.executionBindings?.[0]?.actions[0]?.kind === 'request-patch'
-      ? effectiveModel.executionBindings[0].actions[0].patch : {},
-    contextBudgetTokens: request.mode === 'max-context'
-      ? Math.min(1_000_000, maxTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens)
-      : effectiveModel.defaultBudgetTokens,
+    headers: request.mode === 'max-context' && maxTier.activation.kind === 'header' ? maxTier.activation.headers : {},
+    bodyPatch:
+      request.mode === 'fast' && effectiveModel.executionBindings?.[0]?.actions[0]?.kind === 'request-patch'
+        ? effectiveModel.executionBindings[0].actions[0].patch
+        : {},
+    contextBudgetTokens:
+      request.mode === 'max-context'
+        ? Math.min(1_000_000, maxTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens)
+        : effectiveModel.defaultBudgetTokens,
     contextMode: request.mode === 'max-context' ? 'one-million' : 'normal',
-    contextWindowTokens: maxTier.maxTotalTokens
-      ?? (maxTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens) + (maxTier.maxOutputTokens ?? 0),
+    contextWindowTokens:
+      maxTier.maxTotalTokens ??
+      (maxTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens) + (maxTier.maxOutputTokens ?? 0),
     activeTierId: request.mode === 'max-context' ? maxTier.id : effectiveModel.contextTiers[0].id,
     fastMode: request.mode === 'fast',
     reasoningWire: { selection: 'off', control: effectiveModel.controls.reasoning },
@@ -104,12 +114,25 @@ function plan(
   };
 }
 
-function reply(content: AssistantMessage['content'], stopReason: AssistantMessage['stopReason'] = 'stop'): AssistantMessage {
-  return { role: 'assistant', content, model: 'model-a', provider: 'provider-a',
-    usage: { inputTokens: 3, outputTokens: 1, totalTokens: 4 }, stopReason, timestamp: 1 };
+function reply(
+  content: AssistantMessage['content'],
+  stopReason: AssistantMessage['stopReason'] = 'stop',
+): AssistantMessage {
+  return {
+    role: 'assistant',
+    content,
+    model: 'model-a',
+    provider: 'provider-a',
+    usage: { inputTokens: 3, outputTokens: 1, totalTokens: 4 },
+    stopReason,
+    timestamp: 1,
+  };
 }
 const TEXT_REPLY = reply([{ type: 'text', text: 'ok' }]);
-const TOOL_REPLY = reply([{ type: 'toolCall', id: 'call-1', name: 'capability_check', arguments: { ok: true } }], 'toolUse');
+const TOOL_REPLY = reply(
+  [{ type: 'toolCall', id: 'call-1', name: 'capability_check', arguments: { ok: true } }],
+  'toolUse',
+);
 
 function dependencies(effectiveModel: EffectiveModel) {
   const resolved = target(effectiveModel);
@@ -166,12 +189,14 @@ describe('ProviderCapabilityProbeService', () => {
         ...model().controls,
         fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' },
       },
-      executionBindings: [{
-        id: 'fast:priority',
-        when: { fast: true },
-        actions: [{ kind: 'request-patch', patch: { speed: 'fast' } }],
-        entitlement: 'unknown',
-      }],
+      executionBindings: [
+        {
+          id: 'fast:priority',
+          when: { fast: true },
+          actions: [{ kind: 'request-patch', patch: { speed: 'fast' } }],
+          entitlement: 'unknown',
+        },
+      ],
     });
     const fixture = dependencies(effectiveModel);
     const service = new ProviderCapabilityProbeService(fixture.value);
@@ -207,61 +232,90 @@ describe('ProviderCapabilityProbeService', () => {
     fixture.freezeCredentials.mockRejectedValue(new Error('Credential lease unavailable'));
     const service = new ProviderCapabilityProbeService(fixture.value);
 
-    await expect(service.test({
-      providerId: 'provider-a', modelId: 'model-a', mode: 'default',
-    })).resolves.toMatchObject({
-      success: false, status: 'failed', requestSent: false,
+    await expect(
+      service.test({
+        providerId: 'provider-a',
+        modelId: 'model-a',
+        mode: 'default',
+      }),
+    ).resolves.toMatchObject({
+      success: false,
+      status: 'failed',
+      requestSent: false,
     });
     expect(fixture.execute).not.toHaveBeenCalled();
     expect(fixture.releaseCredentials).not.toHaveBeenCalled();
   });
 
   it('sends a real request for an implicit unknown Max tier instead of short-circuiting', async () => {
-    const fixture = dependencies(model({
-      contextTiers: [
-        ...model().contextTiers,
-        { id: 'long', label: 'Max', maxPromptTokens: 872_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
-      ],
-      controls: {
-        ...model().controls,
-        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'long' },
-      },
-    }));
+    const fixture = dependencies(
+      model({
+        contextTiers: [
+          ...model().contextTiers,
+          {
+            id: 'long',
+            label: 'Max',
+            maxPromptTokens: 872_000,
+            activation: { kind: 'implicit' },
+            entitlement: 'unknown',
+          },
+        ],
+        controls: {
+          ...model().controls,
+          maxContext: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'long' },
+        },
+      }),
+    );
     const service = new ProviderCapabilityProbeService(fixture.value);
 
-    await expect(service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' })).resolves.toMatchObject({
-      success: false, status: 'inconclusive', requestSent: true,
+    await expect(
+      service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' }),
+    ).resolves.toMatchObject({
+      success: false,
+      status: 'inconclusive',
+      requestSent: true,
     });
     expect(fixture.execute).toHaveBeenCalledOnce();
   });
 
   it('sends and records an explicit header-activated unknown 1M tier probe', async () => {
-    const fixture = dependencies(model({
-      contextTiers: [
-        ...model().contextTiers,
-        {
-          id: 'long', label: '1M', maxPromptTokens: 1_000_000,
-          activation: { kind: 'header', headers: { 'anthropic-beta': 'context-1m' } }, entitlement: 'unknown',
+    const fixture = dependencies(
+      model({
+        contextTiers: [
+          ...model().contextTiers,
+          {
+            id: 'long',
+            label: '1M',
+            maxPromptTokens: 1_000_000,
+            activation: { kind: 'header', headers: { 'anthropic-beta': 'context-1m' } },
+            entitlement: 'unknown',
+          },
+        ],
+        controls: {
+          ...model().controls,
+          maxContext: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'long' },
         },
-      ],
-      controls: {
-        ...model().controls,
-        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'long' },
-      },
-    }));
+      }),
+    );
     const service = new ProviderCapabilityProbeService(fixture.value);
 
-    await expect(service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' })).resolves.toMatchObject({
-      success: true, status: 'verified', requestSent: true,
+    await expect(
+      service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' }),
+    ).resolves.toMatchObject({
+      success: true,
+      status: 'verified',
+      requestSent: true,
     });
     expect(fixture.execute).toHaveBeenCalledOnce();
     expect(fixture.recordSuccess).toHaveBeenCalledOnce();
-    expect(buildProbeSuccessPatch(
-      { providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' },
-      fixture.resolved,
-      plan({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' }, fixture.resolved.model).plan,
-      TEXT_REPLY,
-    )).toMatchObject({
+    expect(
+      buildProbeSuccessPatch(
+        { providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' },
+        fixture.resolved,
+        plan({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' }, fixture.resolved.model).plan,
+        TEXT_REPLY,
+      ),
+    ).toMatchObject({
       modelId: 'model-a',
       controls: { maxContext: expect.objectContaining({ entitlement: 'granted' }) },
       contextTiers: expect.arrayContaining([expect.objectContaining({ id: 'long', entitlement: 'granted' })]),
@@ -274,10 +328,14 @@ describe('ProviderCapabilityProbeService', () => {
         ...model().controls,
         fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' },
       },
-      executionBindings: [{
-        id: 'fast:priority', when: { fast: true },
-        actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }], entitlement: 'unknown',
-      }],
+      executionBindings: [
+        {
+          id: 'fast:priority',
+          when: { fast: true },
+          actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
+          entitlement: 'unknown',
+        },
+      ],
     });
     const fixture = dependencies(effectiveModel);
     fixture.execute.mockRejectedValue(Object.assign(new Error('HTTP 403'), { status: 403 }));
@@ -286,13 +344,20 @@ describe('ProviderCapabilityProbeService', () => {
     const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'fast' } as const;
 
     await expect(service.test(request)).resolves.toMatchObject({
-      success: false, status: 'denied', requestSent: true,
+      success: false,
+      status: 'denied',
+      requestSent: true,
     });
     expect(fixture.recordFailure).toHaveBeenCalledWith(request, fixture.resolved, expect.any(Object), 403, 'HTTP 403');
-    expect(buildProbeFailurePatch(request, fixture.resolved, plan(request, effectiveModel).plan, 403, true)).toMatchObject({
-      modelId: 'model-a', controls: { fast: { entitlement: 'denied' } },
+    expect(
+      buildProbeFailurePatch(request, fixture.resolved, plan(request, effectiveModel).plan, 403, true),
+    ).toMatchObject({
+      modelId: 'model-a',
+      controls: { fast: { entitlement: 'denied' } },
     });
-    expect(buildProbeSuccessPatch(request, fixture.resolved, plan(request, effectiveModel).plan, TEXT_REPLY)).toMatchObject({
+    expect(
+      buildProbeSuccessPatch(request, fixture.resolved, plan(request, effectiveModel).plan, TEXT_REPLY),
+    ).toMatchObject({
       modelId: 'model-a',
       controls: { fast: { entitlement: 'granted' } },
       executionBindings: [expect.objectContaining({ id: 'fast:priority', entitlement: 'granted' })],
@@ -327,10 +392,14 @@ describe('ProviderCapabilityProbeService', () => {
         ...model().controls,
         fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' },
       },
-      executionBindings: [{
-        id: 'fast:model-a-highspeed', when: { fast: true },
-        actions: [{ kind: 'model-switch', targetModelId: 'model-a-highspeed' }], entitlement: 'unknown',
-      }],
+      executionBindings: [
+        {
+          id: 'fast:model-a-highspeed',
+          when: { fast: true },
+          actions: [{ kind: 'model-switch', targetModelId: 'model-a-highspeed' }],
+          entitlement: 'unknown',
+        },
+      ],
     });
     const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'fast' } as const;
     const basePlan = plan(request, effectiveModel).plan;
@@ -349,10 +418,14 @@ describe('ProviderCapabilityProbeService', () => {
         ...model().controls,
         fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' },
       },
-      executionBindings: [{
-        id: 'fast:priority', when: { fast: true },
-        actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }], entitlement: 'unknown',
-      }],
+      executionBindings: [
+        {
+          id: 'fast:priority',
+          when: { fast: true },
+          actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
+          entitlement: 'unknown',
+        },
+      ],
     });
     const fixture = dependencies(effectiveModel);
     fixture.execute.mockRejectedValue(Object.assign(new Error('HTTP 429'), { status: 429 }));
@@ -360,7 +433,9 @@ describe('ProviderCapabilityProbeService', () => {
     const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'fast' } as const;
 
     await expect(service.test(request)).resolves.toMatchObject({
-      success: false, status: 'failed', requestSent: true,
+      success: false,
+      status: 'failed',
+      requestSent: true,
     });
     expect(fixture.recordFailure).toHaveBeenCalledWith(request, fixture.resolved, expect.any(Object), 429, 'HTTP 429');
     expect(buildProbeFailurePatch(request, fixture.resolved, plan(request, effectiveModel).plan, 429)).toBeNull();
@@ -375,53 +450,95 @@ describe('capability evidence and lifecycle', () => {
   ] as const)('keeps requested priority distinct from the returned tier %s', async (serviceTier, detailCode) => {
     const m = model();
     m.controls.fast = { state: 'selectable', defaultValue: false, entitlement: 'granted' };
-    m.executionBindings = [{
-      id: 'fast', when: { fast: true }, entitlement: 'granted',
-      actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
-    }];
+    m.executionBindings = [
+      {
+        id: 'fast',
+        when: { fast: true },
+        entitlement: 'granted',
+        actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
+      },
+    ];
     const f = dependencies(m);
     const response = await f.execute();
     f.execute.mockResolvedValue({ ...response, execution: { serviceTier } });
-    await expect(new ProviderCapabilityProbeService(f.value).test({ providerId: 'provider-a', modelId: 'model-a', mode: 'fast' }))
-      .resolves.toMatchObject({
-        status: 'inconclusive', detailCode, requestSent: true,
-        evidence: { requestedServiceTier: 'priority', serviceTier },
-      });
+    await expect(
+      new ProviderCapabilityProbeService(f.value).test({ providerId: 'provider-a', modelId: 'model-a', mode: 'fast' }),
+    ).resolves.toMatchObject({
+      status: 'inconclusive',
+      detailCode,
+      requestSent: true,
+      evidence: { requestedServiceTier: 'priority', serviceTier },
+    });
     expect(f.recordSuccess).not.toHaveBeenCalled();
     expect(f.recordFailure).not.toHaveBeenCalled();
   });
 
-  it.each(['priority', 'target'] as const)('uses the %s binding response instead of Anthropic-only speed', async kind => {
-    const m = model();
-    m.controls.fast = { state: 'selectable', defaultValue: false, entitlement: 'unknown' };
-    m.executionBindings = [{ id: 'fast', when: { fast: true }, entitlement: 'unknown', actions: kind === 'priority'
-      ? [{ kind: 'request-patch', patch: { service_tier: 'priority' } }]
-      : [{ kind: 'model-switch', targetModelId: 'fast-target' }] }];
-    const f = dependencies(m);
-    const response = await f.execute();
-    f.execute.mockResolvedValue({ ...response, execution: kind === 'priority' ? { serviceTier: 'priority' } : { modelId: 'fast-target' } });
-    f.execute.mockClear();
-    await expect(new ProviderCapabilityProbeService(f.value).test({ providerId: 'provider-a', modelId: 'model-a', mode: 'fast' }))
-      .resolves.toMatchObject({ success: true, status: 'verified' });
-    expect(f.execute).toHaveBeenCalledOnce();
-  });
+  it.each(['priority', 'target'] as const)(
+    'uses the %s binding response instead of Anthropic-only speed',
+    async (kind) => {
+      const m = model();
+      m.controls.fast = { state: 'selectable', defaultValue: false, entitlement: 'unknown' };
+      m.executionBindings = [
+        {
+          id: 'fast',
+          when: { fast: true },
+          entitlement: 'unknown',
+          actions:
+            kind === 'priority'
+              ? [{ kind: 'request-patch', patch: { service_tier: 'priority' } }]
+              : [{ kind: 'model-switch', targetModelId: 'fast-target' }],
+        },
+      ];
+      const f = dependencies(m);
+      const response = await f.execute();
+      f.execute.mockResolvedValue({
+        ...response,
+        execution: kind === 'priority' ? { serviceTier: 'priority' } : { modelId: 'fast-target' },
+      });
+      f.execute.mockClear();
+      await expect(
+        new ProviderCapabilityProbeService(f.value).test({
+          providerId: 'provider-a',
+          modelId: 'model-a',
+          mode: 'fast',
+        }),
+      ).resolves.toMatchObject({ success: true, status: 'verified' });
+      expect(f.execute).toHaveBeenCalledOnce();
+    },
+  );
 
-  it.each(['length', 'refusal', 'toolUse'] as const)('never grants a capability on %s termination', async stopReason => {
-    const f = dependencies(model());
-    const response = await f.execute();
-    f.execute.mockResolvedValue({ ...response, stopReason });
-    await expect(new ProviderCapabilityProbeService(f.value).test({ providerId: 'provider-a', modelId: 'model-a', mode: 'default' }))
-      .resolves.toMatchObject({ success: false, status: 'inconclusive' });
-    expect(f.recordSuccess).not.toHaveBeenCalled();
-  });
+  it.each(['length', 'refusal', 'toolUse'] as const)(
+    'never grants a capability on %s termination',
+    async (stopReason) => {
+      const f = dependencies(model());
+      const response = await f.execute();
+      f.execute.mockResolvedValue({ ...response, stopReason });
+      await expect(
+        new ProviderCapabilityProbeService(f.value).test({
+          providerId: 'provider-a',
+          modelId: 'model-a',
+          mode: 'default',
+        }),
+      ).resolves.toMatchObject({ success: false, status: 'inconclusive' });
+      expect(f.recordSuccess).not.toHaveBeenCalled();
+    },
+  );
 
   it('discards late success and releases the lease after cancellation settles', async () => {
     const f = dependencies(model());
     const response = await f.execute();
     let finish!: (value: AssistantMessage) => void;
-    f.execute.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    f.execute.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
     const controller = new AbortController();
-    const pending = new ProviderCapabilityProbeService(f.value).test({ providerId: 'provider-a', modelId: 'model-a', mode: 'default' }, controller.signal);
+    const pending = new ProviderCapabilityProbeService(f.value).test(
+      { providerId: 'provider-a', modelId: 'model-a', mode: 'default' },
+      controller.signal,
+    );
     await Promise.resolve();
     controller.abort();
     expect(f.releaseCredentials).not.toHaveBeenCalled();
@@ -438,14 +555,21 @@ describe('capability evidence and lifecycle', () => {
       f.resolved.provider = { ...f.resolved.provider, activeAccountId: 'new-account' };
       return response;
     });
-    await expect(new ProviderCapabilityProbeService(f.value).test({ providerId: 'provider-a', modelId: 'model-a', mode: 'default' }))
-      .resolves.toMatchObject({ status: 'inconclusive', detail: expect.stringContaining('configuration changed') });
+    await expect(
+      new ProviderCapabilityProbeService(f.value).test({
+        providerId: 'provider-a',
+        modelId: 'model-a',
+        mode: 'default',
+      }),
+    ).resolves.toMatchObject({ status: 'inconclusive', detail: expect.stringContaining('configuration changed') });
     expect(f.recordSuccess).not.toHaveBeenCalled();
   });
 });
 
 it('classifies explicit insufficient balance as quota without inventing subscription denial', () => {
-  expect(classifyCapabilityProbeFailure(402, false, 'Insufficient Balance (insufficient_balance_error)')).toBe('quota-exhausted');
+  expect(classifyCapabilityProbeFailure(402, false, 'Insufficient Balance (insufficient_balance_error)')).toBe(
+    'quota-exhausted',
+  );
   expect(classifyCapabilityProbeFailure(402, false, 'payment required')).toBe('unknown');
 });
 
@@ -453,40 +577,80 @@ it('records an explicit model subscription denial without downgrading structural
   const t = target(model());
   const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'default' } as const;
   expect(buildProbeFailurePatch(request, t, plan(request, t.model).plan, 403, true)).toMatchObject({
-    availability: 'unavailable', factSource: { sourceRevision: 'capability-probe:availability-denied' },
+    availability: 'unavailable',
+    factSource: { sourceRevision: 'capability-probe:availability-denied' },
   });
   expect(buildProbeFailurePatch(request, t, plan(request, t.model).plan, 403, false)).toBeNull();
 });
 
 it('allows an explicit retry of an account-scoped probe denial while keeping ordinary unavailable models closed', async () => {
-  const denied = model({ availability: 'unavailable', provenance: [{ field: 'availability', source: 'observed',
-    observedAt: '2026-11-05', sourceRevision: 'capability-probe:availability-denied' }] });
+  const denied = model({
+    availability: 'unavailable',
+    provenance: [
+      {
+        field: 'availability',
+        source: 'observed',
+        observedAt: '2026-11-05',
+        sourceRevision: 'capability-probe:availability-denied',
+      },
+    ],
+  });
   const f = dependencies(denied);
   const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'default' } as const;
   await expect(new ProviderCapabilityProbeService(f.value).test(request)).resolves.toMatchObject({ success: true });
-  expect(buildProbeSuccessPatch(request, f.resolved, plan(request, denied).plan, TEXT_REPLY)).toMatchObject({ availability: 'available' });
+  expect(buildProbeSuccessPatch(request, f.resolved, plan(request, denied).plan, TEXT_REPLY)).toMatchObject({
+    availability: 'available',
+  });
   const ordinary = dependencies(model({ availability: 'unavailable' }));
-  await expect(new ProviderCapabilityProbeService(ordinary.value).test(request)).resolves.toMatchObject({ requestSent: false });
+  await expect(new ProviderCapabilityProbeService(ordinary.value).test(request)).resolves.toMatchObject({
+    requestSent: false,
+  });
   expect(ordinary.execute).not.toHaveBeenCalled();
 });
 
 describe('response receipt evidence', () => {
   const fastModel = model({
     controls: { ...model().controls, fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' } },
-    executionBindings: [{
-      id: 'fast:priority', when: { fast: true }, entitlement: 'unknown',
-      actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
-    }],
+    executionBindings: [
+      {
+        id: 'fast:priority',
+        when: { fast: true },
+        entitlement: 'unknown',
+        actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
+      },
+    ],
     contextTiers: [
-      { id: 'default', label: 'Default', maxPromptTokens: 272_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
-      { id: 'long', label: 'Long', maxPromptTokens: 1_000_000, activation: { kind: 'explicit' } as never, entitlement: 'unknown' },
+      {
+        id: 'default',
+        label: 'Default',
+        maxPromptTokens: 272_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      },
+      {
+        id: 'long',
+        label: 'Long',
+        maxPromptTokens: 1_000_000,
+        activation: { kind: 'explicit' } as never,
+        entitlement: 'unknown',
+      },
     ],
   } as Partial<EffectiveModel>);
-  const fastPlan = { appliedBindingIds: ['fast:priority'], bodyPatch: { service_tier: 'priority' } } as unknown as RequestPlan;
-  const reply = (overrides: Partial<AssistantMessage>) => ({
-    role: 'assistant', content: [], model: 'model-a', provider: 'provider-a', stopReason: 'stop', timestamp: 0,
-    usage: { inputTokens: 1_000, outputTokens: 10, totalTokens: 1_010 }, ...overrides,
-  }) as AssistantMessage;
+  const fastPlan = {
+    appliedBindingIds: ['fast:priority'],
+    bodyPatch: { service_tier: 'priority' },
+  } as unknown as RequestPlan;
+  const reply = (overrides: Partial<AssistantMessage>) =>
+    ({
+      role: 'assistant',
+      content: [],
+      model: 'model-a',
+      provider: 'provider-a',
+      stopReason: 'stop',
+      timestamp: 0,
+      usage: { inputTokens: 1_000, outputTokens: 10, totalTokens: 1_010 },
+      ...overrides,
+    }) as AssistantMessage;
 
   it('proves Fast only when the provider echoes the priority tier, not because the request succeeded', () => {
     expect(receiptConfirmsFast(fastModel, fastPlan, reply({}))).toBe(false);
@@ -496,8 +660,20 @@ describe('response receipt evidence', () => {
 
   it('proves a larger context tier only with a prompt that no smaller tier could hold', () => {
     expect(receiptExceedsSmallerTiers(fastModel, 'long', reply({}))).toBe(false);
-    expect(receiptExceedsSmallerTiers(fastModel, 'long', reply({ usage: { inputTokens: 300_000, outputTokens: 1, totalTokens: 300_001 } }))).toBe(true);
-    expect(receiptExceedsSmallerTiers(fastModel, 'default', reply({ usage: { inputTokens: 300_000, outputTokens: 1, totalTokens: 300_001 } }))).toBe(false);
+    expect(
+      receiptExceedsSmallerTiers(
+        fastModel,
+        'long',
+        reply({ usage: { inputTokens: 300_000, outputTokens: 1, totalTokens: 300_001 } }),
+      ),
+    ).toBe(true);
+    expect(
+      receiptExceedsSmallerTiers(
+        fastModel,
+        'default',
+        reply({ usage: { inputTokens: 300_000, outputTokens: 1, totalTokens: 300_001 } }),
+      ),
+    ).toBe(false);
   });
 });
 
@@ -508,10 +684,15 @@ describe('tool-calling evidence', () => {
   it('records tool calling only from a structured call to the probe tool', async () => {
     const f = dependencies(unproven);
     f.execute.mockResolvedValue(TOOL_REPLY);
-    await expect(new ProviderCapabilityProbeService(f.value).test(request)).resolves.toMatchObject({ success: true, status: 'verified' });
+    await expect(new ProviderCapabilityProbeService(f.value).test(request)).resolves.toMatchObject({
+      success: true,
+      status: 'verified',
+    });
     expect(f.recordSuccess).toHaveBeenCalledWith(request, f.resolved, expect.any(Object), TOOL_REPLY);
-    expect(buildProbeSuccessPatch(request, f.resolved, plan(request, unproven).plan, TOOL_REPLY))
-      .toEqual({ modelId: 'model-a', toolCalling: { state: 'supported' } });
+    expect(buildProbeSuccessPatch(request, f.resolved, plan(request, unproven).plan, TOOL_REPLY)).toEqual({
+      modelId: 'model-a',
+      toolCalling: { state: 'supported' },
+    });
     expect(buildProbeSuccessPatch(request, f.resolved, plan(request, unproven).plan, TEXT_REPLY)).toBeNull();
   });
 
@@ -521,9 +702,14 @@ describe('tool-calling evidence', () => {
     f.execute.mockRejectedValue(Object.assign(new Error(detail), { status: 400 }));
     f.recordFailure.mockReturnValue(true);
     await expect(new ProviderCapabilityProbeService(f.value).test(request)).resolves.toMatchObject({
-      success: false, status: 'denied', failureKind: 'tools-unsupported', detail,
+      success: false,
+      status: 'denied',
+      failureKind: 'tools-unsupported',
+      detail,
     });
-    expect(buildProbeFailurePatch(request, f.resolved, plan(request, unproven).plan, 400, false, detail))
-      .toEqual({ modelId: 'model-a', toolCalling: { state: 'unsupported', reason: detail } });
+    expect(buildProbeFailurePatch(request, f.resolved, plan(request, unproven).plan, 400, false, detail)).toEqual({
+      modelId: 'model-a',
+      toolCalling: { state: 'unsupported', reason: detail },
+    });
   });
 });

@@ -45,19 +45,22 @@ export function toInvestigationError(error: unknown): InvestigationError {
     return new InvestigationError('INVESTIGATION_SCHEMA_INVALID', error.message);
   }
   if (error instanceof SessionArtifactError) {
-    return new InvestigationError(error.code === 'ARTIFACT_SESSION_DENIED' ? 'INVESTIGATION_SESSION_DENIED' : 'INVESTIGATION_STORAGE_FAILED', error.message, {
-      details: { artifactCode: error.code },
-    });
+    return new InvestigationError(
+      error.code === 'ARTIFACT_SESSION_DENIED' ? 'INVESTIGATION_SESSION_DENIED' : 'INVESTIGATION_STORAGE_FAILED',
+      error.message,
+      {
+        details: { artifactCode: error.code },
+      },
+    );
   }
-  return new InvestigationError(
-    'INVESTIGATION_STORAGE_FAILED',
-    error instanceof Error ? error.message : String(error),
-  );
+  return new InvestigationError('INVESTIGATION_STORAGE_FAILED', error instanceof Error ? error.message : String(error));
 }
 
 export function isInvestigationStoreDegraded(error: unknown): boolean {
   if (!(error instanceof InvestigationError)) return false;
-  return error.code === 'INVESTIGATION_DEGRADED'
-    || error.code === 'INVESTIGATION_INDEX_CORRUPT'
-    || error.code === 'INVESTIGATION_INDEX_MISSING';
+  return (
+    error.code === 'INVESTIGATION_DEGRADED' ||
+    error.code === 'INVESTIGATION_INDEX_CORRUPT' ||
+    error.code === 'INVESTIGATION_INDEX_MISSING'
+  );
 }

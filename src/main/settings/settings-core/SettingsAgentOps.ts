@@ -24,7 +24,9 @@ export class SettingsAgentOps {
   private async withAgentDefinitionWriteLock<T>(laneKey: string, task: () => Promise<T>): Promise<T> {
     const previous = this.agentDefinitionWriteTails.get(laneKey) ?? Promise.resolve();
     let release: () => void = () => {};
-    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const tail = previous.catch(() => undefined).then(() => gate);
     this.agentDefinitionWriteTails.set(laneKey, tail);
     await previous.catch(() => undefined);
@@ -94,11 +96,15 @@ export class SettingsAgentOps {
     snapshot: AgentDefinitionCommitSnapshot | null,
   ): Promise<void> {
     if (!snapshot?.definition) {
-      await agentManifestService.saveDefinition(paths, { ...request.draft, delete: true }, {
-        scope: request.scope,
-        projectRoot: request.scope === 'project' ? resolveRegisteredProjectRoot(request.projectId) : undefined,
-        sourceHash: request.sourceHash,
-      });
+      await agentManifestService.saveDefinition(
+        paths,
+        { ...request.draft, delete: true },
+        {
+          scope: request.scope,
+          projectRoot: request.scope === 'project' ? resolveRegisteredProjectRoot(request.projectId) : undefined,
+          sourceHash: request.sourceHash,
+        },
+      );
       return;
     }
     const {
@@ -132,21 +138,30 @@ export class SettingsAgentOps {
       return this.saveResult(request, 'failed', null, `Invalid agent profile id: ${agentId || '<empty>'}`);
     }
     if (!Number.isSafeInteger(request.clientRevision) || request.clientRevision < 1) {
-      return this.saveResult(request, 'failed', await this.readAgentDefinitionCommit({
-        agentId,
-        scope: request.scope,
-        projectId: request.projectId,
-      }), 'clientRevision must be a positive safe integer.');
+      return this.saveResult(
+        request,
+        'failed',
+        await this.readAgentDefinitionCommit({
+          agentId,
+          scope: request.scope,
+          projectId: request.projectId,
+        }),
+        'clientRevision must be a positive safe integer.',
+      );
     }
 
     const laneKey = this.laneKey({ agentId, scope: request.scope, projectId: request.projectId });
     const latestRevision = this.agentDefinitionRevisions.get(laneKey) ?? 0;
     if (request.clientRevision <= latestRevision) {
-      return this.saveResult(request, 'superseded', await this.readAgentDefinitionCommit({
-        agentId,
-        scope: request.scope,
-        projectId: request.projectId,
-      }));
+      return this.saveResult(
+        request,
+        'superseded',
+        await this.readAgentDefinitionCommit({
+          agentId,
+          scope: request.scope,
+          projectId: request.projectId,
+        }),
+      );
     }
     this.agentDefinitionRevisions.set(laneKey, request.clientRevision);
     await Promise.resolve();
@@ -175,7 +190,9 @@ export class SettingsAgentOps {
           clientRevision: request.clientRevision,
           commitHash: commit.commitHash,
           definition: commit.definition,
-          route: commit.definition?.compiledRoute ?? (commit.definition ? agentManifestService.routeForAgent(commit.definition.id) : null),
+          route:
+            commit.definition?.compiledRoute ??
+            (commit.definition ? agentManifestService.routeForAgent(commit.definition.id) : null),
         };
         this.agentDefinitionCommits.set(laneKey, snapshot);
         return this.saveResult(request, 'committed', snapshot);

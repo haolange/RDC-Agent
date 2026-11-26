@@ -13,11 +13,18 @@ export function createReplayApplyQueue<T>(apply: (value: T) => Promise<unknown>,
     const value = pending;
     pending = undefined;
     running = true;
-    try { await apply(value); } catch (error) { reportFailure(error); }
-    finally { settle(); }
+    try {
+      await apply(value);
+    } catch (error) {
+      reportFailure(error);
+    } finally {
+      settle();
+    }
   };
   // These run once apply() settles: dispose() and enqueue() may have run while it was awaited.
-  const reportFailure = (error: unknown) => { if (!disposed) onError(error); };
+  const reportFailure = (error: unknown) => {
+    if (!disposed) onError(error);
+  };
   const settle = () => {
     running = false;
     if (!disposed && pending !== undefined) void drain();
@@ -26,16 +33,26 @@ export function createReplayApplyQueue<T>(apply: (value: T) => Promise<unknown>,
     enqueue(value: T, flush = false) {
       if (disposed) return;
       pending = value;
-      if (flush && timer) { clearTimeout(timer); timer = undefined; }
+      if (flush && timer) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
       if (!running && !timer) {
         if (flush) void drain();
         else timer = setTimeout(() => void drain(), COALESCE_MS);
       }
     },
     flush() {
-      if (timer) { clearTimeout(timer); timer = undefined; }
+      if (timer) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
       if (!running) void drain();
     },
-    dispose() { disposed = true; pending = undefined; if (timer) clearTimeout(timer); },
+    dispose() {
+      disposed = true;
+      pending = undefined;
+      if (timer) clearTimeout(timer);
+    },
   };
 }

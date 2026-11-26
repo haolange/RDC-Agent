@@ -36,12 +36,17 @@ function HookTrustBadge({ state }: { state: HookTrustState }) {
   const { t } = useI18n();
   if (state === 'builtin') return null;
   const tone = state === 'trusted' ? 'success' : 'warning';
-  const label = state === 'trusted'
-    ? t('settings.hookTrusted')
-    : state === 'needs-retrust'
-      ? t('settings.hookNeedsRetrust')
-      : t('settings.hookUntrusted');
-  return <Badge tone={tone} data-testid="settings-hook-trust-badge" data-state={state}>{label}</Badge>;
+  const label =
+    state === 'trusted'
+      ? t('settings.hookTrusted')
+      : state === 'needs-retrust'
+        ? t('settings.hookNeedsRetrust')
+        : t('settings.hookUntrusted');
+  return (
+    <Badge tone={tone} data-testid="settings-hook-trust-badge" data-state={state}>
+      {label}
+    </Badge>
+  );
 }
 
 /**
@@ -58,14 +63,15 @@ export const HooksSettings: React.FC<{
   const { t } = useI18n();
   const [busyId, setBusyId] = useState('');
   const [message, setMessage] = useState('');
-  const [testResult, setTestResult] = useState<(HookTest & { id: string; scope: HookOverview['scope']; fingerprint: string }) | null>(null);
+  const [testResult, setTestResult] = useState<
+    (HookTest & { id: string; scope: HookOverview['scope']; fingerprint: string }) | null
+  >(null);
 
   const hookFor = (resource: ScopedResourceDocument): HookOverview | undefined =>
     overview?.hooks.find((hook) => hook.id === resource.id && hook.scope === resource.scope);
 
-  const failurePolicyLabel = (policy: 'block' | 'warn') => (
-    policy === 'block' ? t('settings.hookFailureBlock') : t('settings.hookFailureWarn')
-  );
+  const failurePolicyLabel = (policy: 'block' | 'warn') =>
+    policy === 'block' ? t('settings.hookFailureBlock') : t('settings.hookFailureWarn');
 
   const run = async (hook: HookOverview, action: 'trust' | 'revoke' | 'test') => {
     setBusyId(hook.id);
@@ -78,13 +84,12 @@ export const HooksSettings: React.FC<{
         setTestResult({ ...result, id: hook.id, scope: hook.scope, fingerprint: hook.trustFingerprint });
         return;
       }
-      const next = action === 'trust'
-        ? await trustHook(trustProjectRoot, hook.id)
-        : await revokeHook(trustProjectRoot, hook.id);
+      const next =
+        action === 'trust' ? await trustHook(trustProjectRoot, hook.id) : await revokeHook(trustProjectRoot, hook.id);
       if (!next) return;
       onChanged(
         trustProjectRoot == null && overview?.projectRoot
-          ? (await getRdcOverview(overview.projectRoot)) ?? next
+          ? ((await getRdcOverview(overview.projectRoot)) ?? next)
           : next,
       );
     } catch (error) {
@@ -101,16 +106,26 @@ export const HooksSettings: React.FC<{
     const busy = busyId === resource.id;
     const canTest = Boolean(hook) && (trust === 'builtin' || trust === 'trusted');
     const seconds = timeoutSeconds(form.timeoutMs);
-    const result = testResult?.id === resource.id && testResult.scope === resource.scope &&
-      testResult.fingerprint === hook?.trustFingerprint && canTest ? testResult : null;
+    const result =
+      testResult?.id === resource.id &&
+      testResult.scope === resource.scope &&
+      testResult.fingerprint === hook?.trustFingerprint &&
+      canTest
+        ? testResult
+        : null;
     const diagnostics: DiagnosticFact[] = [
       ...(result ? [{ label: t('settings.hookTestResult'), value: result.details }] : []),
-      { label: t('settings.resourceScope'), value: resource.scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser') },
+      {
+        label: t('settings.resourceScope'),
+        value: resource.scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser'),
+      },
       { label: t('settings.scopeResourceLocation'), value: resource.sourcePath },
-      ...(hook ? [
-        { label: t('settings.hookFingerprint'), value: hook.trustFingerprint },
-        { label: t('settings.contentFingerprint'), value: hook.sourceHash },
-      ] : []),
+      ...(hook
+        ? [
+            { label: t('settings.hookFingerprint'), value: hook.trustFingerprint },
+            { label: t('settings.contentFingerprint'), value: hook.sourceHash },
+          ]
+        : []),
     ];
     return (
       <div className="settings-runtime-detail" data-testid="settings-hook-detail">
@@ -140,10 +155,24 @@ export const HooksSettings: React.FC<{
         </header>
 
         <dl className="settings-runtime-detail-grid">
-          <div><dt>{t('settings.resourceFieldEvent')}</dt><dd>{hookEventLabel(form.event, t)}</dd></div>
-          <div><dt>{t('settings.resourceFieldCommand')}</dt><dd><code>{commandLine(form.command, form.argsText) || '—'}</code></dd></div>
-          <div><dt>{t('settings.resourceTimeout')}</dt><dd>{seconds ? t('settings.resourceTimeoutValue', { count: seconds }) : '—'}</dd></div>
-          <div><dt>{t('settings.resourceFieldFailurePolicy')}</dt><dd>{failurePolicyLabel(form.failurePolicy)}</dd></div>
+          <div>
+            <dt>{t('settings.resourceFieldEvent')}</dt>
+            <dd>{hookEventLabel(form.event, t)}</dd>
+          </div>
+          <div>
+            <dt>{t('settings.resourceFieldCommand')}</dt>
+            <dd>
+              <code>{commandLine(form.command, form.argsText) || '—'}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>{t('settings.resourceTimeout')}</dt>
+            <dd>{seconds ? t('settings.resourceTimeoutValue', { count: seconds }) : '—'}</dd>
+          </div>
+          <div>
+            <dt>{t('settings.resourceFieldFailurePolicy')}</dt>
+            <dd>{failurePolicyLabel(form.failurePolicy)}</dd>
+          </div>
         </dl>
 
         {hook && trust !== 'builtin' ? (
@@ -153,8 +182,12 @@ export const HooksSettings: React.FC<{
             title={t('settings.hookTrustTitle')}
             hint={t('settings.hookTrustHint')}
             badge={<HookTrustBadge state={trust} />}
-            changed={trust === 'needs-retrust' ? { message: t('settings.hookTrustChanged'), testId: 'settings-hook-trust-change' } : undefined}
-            actions={(
+            changed={
+              trust === 'needs-retrust'
+                ? { message: t('settings.hookTrustChanged'), testId: 'settings-hook-trust-change' }
+                : undefined
+            }
+            actions={
               <>
                 {trust === 'trusted' || trust === 'needs-retrust' ? (
                   <Button variant="secondary" size="sm" disabled={busy} onClick={() => void run(hook, 'revoke')}>
@@ -167,17 +200,22 @@ export const HooksSettings: React.FC<{
                   </Button>
                 ) : null}
               </>
-            )}
+            }
           />
         ) : null}
 
         {message && busyId === '' ? <InlineError detail={message}>{t('app.error.actionFailed')}</InlineError> : null}
-        {result && (result.status === 'completed' || result.status === 'skipped'
-          ? <p className="settings-runtime-editor-status" role="status" data-testid="settings-hook-test-result">
-            {result.status === 'completed' && <Icon name="check" size={14} />}
-            {t(testStatusLabel[result.status])}
-          </p>
-          : <InlineError detail={result.details} data-testid="settings-hook-test-result">{t(testStatusLabel[result.status])}</InlineError>)}
+        {result &&
+          (result.status === 'completed' || result.status === 'skipped' ? (
+            <p className="settings-runtime-editor-status" role="status" data-testid="settings-hook-test-result">
+              {result.status === 'completed' && <Icon name="check" size={14} />}
+              {t(testStatusLabel[result.status])}
+            </p>
+          ) : (
+            <InlineError detail={result.details} data-testid="settings-hook-test-result">
+              {t(testStatusLabel[result.status])}
+            </InlineError>
+          ))}
       </div>
     );
   };

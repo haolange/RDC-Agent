@@ -1,9 +1,4 @@
-export type {
-  AppMetaApi,
-  AppShellApi,
-  DialogApi,
-  WindowControlsApi,
-} from './platform';
+export type { AppMetaApi, AppShellApi, DialogApi, WindowControlsApi } from './platform';
 export type { ConversationApi } from './conversation';
 export type { CommandApi } from './command';
 export type { WorkflowApi } from './workflow';

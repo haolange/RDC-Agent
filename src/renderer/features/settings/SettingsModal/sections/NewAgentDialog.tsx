@@ -24,18 +24,43 @@ export const NewAgentDialog: React.FC<{
   }, []);
   const trimmed = name.trim();
   const id = uniqueResourceId(toSlug(trimmed || t('settings.agentDefaultName')), existingIds);
-  const create = () => { if (trimmed) onCreate({ name: trimmed, id }); };
+  const create = () => {
+    if (trimmed) onCreate({ name: trimmed, id });
+  };
   return (
-    <TaskDialog open size="sm" title={t('settings.newAgentTitle')} description={t('settings.newAgentScope', { scope: scopeLabel })}
-      closeLabel={t('dialog.cancel')} onClose={onClose} dataTestId="settings-new-agent-dialog"
-      footer={<>
-        <Button variant="ghost" onClick={onClose}>{t('dialog.cancel')}</Button>
-        <Button variant="primary" disabled={!trimmed} onClick={create}>{t('settings.newAgentCreate')}</Button>
-      </>}>
+    <TaskDialog
+      open
+      size="sm"
+      title={t('settings.newAgentTitle')}
+      description={t('settings.newAgentScope', { scope: scopeLabel })}
+      closeLabel={t('dialog.cancel')}
+      onClose={onClose}
+      dataTestId="settings-new-agent-dialog"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            {t('dialog.cancel')}
+          </Button>
+          <Button variant="primary" disabled={!trimmed} onClick={create}>
+            {t('settings.newAgentCreate')}
+          </Button>
+        </>
+      }
+    >
       <SettingsField label={t('settings.agentName')}>
-        <Input ref={nameRef} aria-label={t('settings.agentName')} value={name} placeholder={t('settings.agentDefaultName')}
+        <Input
+          ref={nameRef}
+          aria-label={t('settings.agentName')}
+          value={name}
+          placeholder={t('settings.agentDefaultName')}
           onChange={(event) => setName(event.currentTarget.value)}
-          onKeyDown={(event) => { if (event.key === 'Enter' && !isImeComposing(event)) { event.preventDefault(); create(); } }} />
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !isImeComposing(event)) {
+              event.preventDefault();
+              create();
+            }
+          }}
+        />
       </SettingsField>
     </TaskDialog>
   );

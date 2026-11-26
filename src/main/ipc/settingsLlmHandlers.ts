@@ -8,7 +8,11 @@ import { resolveCompiledRouteForAgent } from '../settings/provider-catalog/compi
 import { tryCurrentProjectRoot } from '../settings/settings-core/resolveRegisteredProjectRoot';
 import { providerConnectionService } from '../settings/provider-auth/ProviderConnectionService';
 import { settingsService } from '../settings/settings-core/SettingsService';
-import { buildEffectiveCatalogRequest, resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/provider-catalog/EffectiveModelResolver';
+import {
+  buildEffectiveCatalogRequest,
+  resolveEffectiveCatalog,
+  resolveEffectiveModel,
+} from '../settings/provider-catalog/EffectiveModelResolver';
 import { effectiveCatalogService } from '../settings/provider-catalog/EffectiveCatalogService';
 import { CatalogChangePublisher } from '../settings/provider-catalog/catalogChangePublisher';
 import { providerCapabilityProbeService } from '../agent-runtime/capabilities/ProviderCapabilityProbeService';
@@ -61,12 +65,18 @@ import type { IpcChannelTable } from './invokeRegistry';
 
 /** Observers of committed settings may fail; the saved file stays authoritative. */
 async function notifyCommitted(notify: () => unknown): Promise<void> {
-  try { await notify(); } catch (error) {
-    runtimeLogService.log({ scope: 'app', namespace: 'system', severity: 'error',
+  try {
+    await notify();
+  } catch (error) {
+    runtimeLogService.log({
+      scope: 'app',
+      namespace: 'system',
+      severity: 'error',
       title: 'Settings committed; observer update failed',
       summary: 'The saved settings remain authoritative.',
       detail: error instanceof Error ? error.message : String(error),
-      raw: { code: 'SETTINGS_COMMITTED_NOTIFICATION_FAILED' } });
+      raw: { code: 'SETTINGS_COMMITTED_NOTIFICATION_FAILED' },
+    });
   }
 }
 
@@ -77,10 +87,12 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const provider = settingsService.providerConnections.get(request.providerId);
     return !!provider && buildEffectiveCatalogRequest(provider).configurationRevision === request.configurationRevision;
   });
-  effectiveCatalogService.setDiscoveryLoaderResolver((request) => (
-    providerConnectionService.createEffectiveCatalogDiscoveryLoader(request)
-  ));
-  const catalogChanges = new CatalogChangePublisher((change) => context.broadcastToRenderer('llm:effectiveCatalogChanged', change));
+  effectiveCatalogService.setDiscoveryLoaderResolver((request) =>
+    providerConnectionService.createEffectiveCatalogDiscoveryLoader(request),
+  );
+  const catalogChanges = new CatalogChangePublisher((change) =>
+    context.broadcastToRenderer('llm:effectiveCatalogChanged', change),
+  );
   effectiveCatalogService.subscribe((snapshot) => catalogChanges.publish(snapshot));
   const broadcastCatalog = async (providerId: string): Promise<void> => {
     await loadProviderSurface(providerId);
@@ -98,7 +110,10 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
 }
 
 /** Provider drafts, connections, model refresh and account login; a change re-announces the provider catalog. */
-function providerConnectionChannels(context: WorkbenchIpcContext, broadcastCatalog: (providerId: string) => Promise<void>): IpcChannelTable {
+function providerConnectionChannels(
+  context: WorkbenchIpcContext,
+  broadcastCatalog: (providerId: string) => Promise<void>,
+): IpcChannelTable {
   return {
     'llm:testProviderDraft': async (_event, ...rawArgs: unknown[]) => {
       const [request] = parseIpcArgs(LlmProviderDraftArgsSchema, rawArgs, {
@@ -185,7 +200,8 @@ function providerConnectionChannels(context: WorkbenchIpcContext, broadcastCatal
     },
     'llm:cancelProviderAccountLogin': (_event, ...rawArgs: unknown[]) => {
       const [providerId] = parseIpcArgs(LlmProviderIdArgsSchema, rawArgs, {
-        label: 'llm:cancelProviderAccountLogin', maxBytes: 1024,
+        label: 'llm:cancelProviderAccountLogin',
+        maxBytes: 1024,
       });
       providerAccountAuthService.cancelLogin(providerId);
     },
@@ -327,7 +343,7 @@ function agentDefinitionChannels(context: WorkbenchIpcContext): IpcChannelTable 
         maxBytes: 8 * 1024,
       });
       const preview = settingsService.previewProjectAgentTrust(request.sourcePath);
-      if (!await confirmResourceTrust('agent', preview.agentId, preview.sourcePath)) {
+      if (!(await confirmResourceTrust('agent', preview.agentId, preview.sourcePath))) {
         return settingsService.settingsView();
       }
       settingsService.trustProjectAgent(request);
@@ -360,9 +376,7 @@ function providerDefinitionChannels(context: WorkbenchIpcContext): IpcChannelTab
       const catalogRevision = snapshot?.catalogRevision ?? null;
       settingsService.setProviderDefinitionCatalogRevision(result.provider.id, catalogRevision);
       if (snapshot) effectiveCatalogService.announce(snapshot);
-      const lastSuccessful = result.lastSuccessful
-        ? { ...result.lastSuccessful, catalogRevision }
-        : null;
+      const lastSuccessful = result.lastSuccessful ? { ...result.lastSuccessful, catalogRevision } : null;
       return { ...result, catalogRevision, lastSuccessful, revision: settingsService.snapshot().revision };
     },
     'settings:getProviderDefinitionCommit': async (_event, ...rawArgs: unknown[]) => {
@@ -382,7 +396,10 @@ function providerDefinitionChannels(context: WorkbenchIpcContext): IpcChannelTab
 }
 
 /** Settings patches, the resolved shell and the user's model overrides. */
-function preferenceChannels(context: WorkbenchIpcContext, broadcastCatalog: (providerId: string) => Promise<void>): IpcChannelTable {
+function preferenceChannels(
+  context: WorkbenchIpcContext,
+  broadcastCatalog: (providerId: string) => Promise<void>,
+): IpcChannelTable {
   return {
     'settings:patch': async (_event, ...rawArgs: unknown[]) => {
       const [ops] = parseIpcArgs(SettingsPatchArgsSchema, rawArgs, {
@@ -392,7 +409,12 @@ function preferenceChannels(context: WorkbenchIpcContext, broadcastCatalog: (pro
       const previousLanguage = settingsService.snapshot().user.appearance.language;
       const result = settingsService.update(ops);
       const { appearance, agentModels } = result.changed;
-      if (appearance && ops.some((op) => op.op === 'appearance' && (op.value.theme !== undefined || op.value.chromeThemes !== undefined))) {
+      if (
+        appearance &&
+        ops.some(
+          (op) => op.op === 'appearance' && (op.value.theme !== undefined || op.value.chromeThemes !== undefined),
+        )
+      ) {
         await notifyCommitted(applyProductIcon);
         await notifyCommitted(applyWindowBackgrounds);
       }

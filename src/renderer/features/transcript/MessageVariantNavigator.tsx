@@ -17,10 +17,7 @@ interface MessageVariantNavigatorProps {
   branchState: ConversationBranchState | null;
 }
 
-export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = ({
-  message,
-  branchState,
-}) => {
+export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = ({ message, branchState }) => {
   const { t } = useI18n();
 
   const fork = useMemo(() => {
@@ -46,31 +43,34 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
     };
   }, [fork]);
 
-  const switchVariant = useCallback(async (direction: -1 | 1) => {
-    if (!fork || !navigator || !message.sessionId) return;
-    const nextIndex = navigator.variantIndex + direction;
-    if (nextIndex < 0 || nextIndex >= navigator.variantCount) return;
-    const nextBranch = navigator.branches[nextIndex];
-    if (!nextBranch) return;
+  const switchVariant = useCallback(
+    async (direction: -1 | 1) => {
+      if (!fork || !navigator || !message.sessionId) return;
+      const nextIndex = navigator.variantIndex + direction;
+      if (nextIndex < 0 || nextIndex >= navigator.variantCount) return;
+      const nextBranch = navigator.branches[nextIndex];
+      if (!nextBranch) return;
 
-    const result = await switchConversationBranch({
-      sessionId: message.sessionId,
-      forkId: fork.forkId,
-      branchId: nextBranch.branchId,
-    });
-    // A switch that did not happen says so; silently staying on the old branch reads as a broken control.
-    if (!result?.success) {
-      notify.error(t('chat.messageVariantSwitchFailed'));
-      return;
-    }
-    hydrateLoadedSessionSurface({
-      sessionId: message.sessionId,
-      messages: result.messages,
-      branchState: result.branchState ?? null,
-      tracePresentation: result.tracePresentation ?? null,
-      applyTrace: Boolean(result.tracePresentation),
-    });
-  }, [fork, message.sessionId, navigator, t]);
+      const result = await switchConversationBranch({
+        sessionId: message.sessionId,
+        forkId: fork.forkId,
+        branchId: nextBranch.branchId,
+      });
+      // A switch that did not happen says so; silently staying on the old branch reads as a broken control.
+      if (!result?.success) {
+        notify.error(t('chat.messageVariantSwitchFailed'));
+        return;
+      }
+      hydrateLoadedSessionSurface({
+        sessionId: message.sessionId,
+        messages: result.messages,
+        branchState: result.branchState ?? null,
+        tracePresentation: result.tracePresentation ?? null,
+        applyTrace: Boolean(result.tracePresentation),
+      });
+    },
+    [fork, message.sessionId, navigator, t],
+  );
 
   if (!navigator) return null;
 

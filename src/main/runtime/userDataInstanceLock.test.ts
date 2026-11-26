@@ -56,7 +56,11 @@ describe('userData instance lock', () => {
   });
 
   it('does not treat a lock that records no pid as a live owner', () => {
-    fs.writeFileSync(lockFile(), JSON.stringify({ pid: '212', birth: 'birth', mode: 'desktop', startTs: 'start' }), 'utf8');
+    fs.writeFileSync(
+      lockFile(),
+      JSON.stringify({ pid: '212', birth: 'birth', mode: 'desktop', startTs: 'start' }),
+      'utf8',
+    );
     const probe = vi.fn((): ProcessLiveness => 'alive');
 
     const lock = acquireUserDataInstanceLock(tempRoot, owner(313), probe);
@@ -86,15 +90,18 @@ describe('userData instance lock', () => {
     if (lock.acquired) lock.release();
   });
 
-  it.skipIf(!currentProcessIdentity().birth)('reclaims a lock whose live PID now belongs to a process with another birth', () => {
-    const self = currentProcessIdentity();
-    fs.writeFileSync(lockFile(), JSON.stringify({ ...owner(self.pid), birth: `${self.birth}0` }), 'utf8');
+  it.skipIf(!currentProcessIdentity().birth)(
+    'reclaims a lock whose live PID now belongs to a process with another birth',
+    () => {
+      const self = currentProcessIdentity();
+      fs.writeFileSync(lockFile(), JSON.stringify({ ...owner(self.pid), birth: `${self.birth}0` }), 'utf8');
 
-    const lock = acquireUserDataInstanceLock(tempRoot, owner(313));
+      const lock = acquireUserDataInstanceLock(tempRoot, owner(313));
 
-    expect(lock.acquired).toBe(true);
-    if (lock.acquired) lock.release();
-  });
+      expect(lock.acquired).toBe(true);
+      if (lock.acquired) lock.release();
+    },
+  );
 
   it('does not let an old owner release a replacement lock', () => {
     const first = acquireUserDataInstanceLock(tempRoot, owner(606), exited);

@@ -50,10 +50,12 @@ describe('data-only provider discovery fixtures', () => {
     const payload = JSON.parse(fs.readFileSync(path.join(fixtureRoot, `${providerId}.json`), 'utf8')) as unknown;
     const parsed = parseDeclarativeCatalog(discovery, payload);
     expect(parsed.map((model) => model.id)).toEqual(expectedIds);
-    expect(toDeclarativeCatalogContributions(parsed, {
-      protocol: surface.routes[0].protocol,
-      baseUrl: surface.routes[0].baseUrl,
-    })).toHaveLength(expectedIds.length);
+    expect(
+      toDeclarativeCatalogContributions(parsed, {
+        protocol: surface.routes[0].protocol,
+        baseUrl: surface.routes[0].baseUrl,
+      }),
+    ).toHaveLength(expectedIds.length);
     expect(resolveDeclarativeDiscoveryUrl(discovery, surface.routes[0].baseUrl)).toMatch(/^https?:\/\//u);
   });
 
@@ -62,17 +64,27 @@ describe('data-only provider discovery fixtures', () => {
       status: 'stable',
       availability: { state: 'unknown' },
       discovery: { strategy: { kind: 'custom-parser', parserId: 'openai-compatible' } },
-      routes: [expect.objectContaining({
-        protocol: 'OpenAICompatibleChatCompletions',
-        baseUrl: 'https://apis.iflow.cn/v1',
-      })],
+      routes: [
+        expect.objectContaining({
+          protocol: 'OpenAICompatibleChatCompletions',
+          baseUrl: 'https://apis.iflow.cn/v1',
+        }),
+      ],
     });
   });
 
   it('projects both LongCat chat routes and keeps Zen protocols model-scoped', () => {
     const longcat = createProviderEntryFromCatalog('longcat');
-    const anthropic = buildEffectiveCatalogRequest({ ...longcat, protocol: 'AnthropicMessages', baseUrl: 'https://api.longcat.chat/anthropic/v1' });
-    const chat = buildEffectiveCatalogRequest({ ...longcat, protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.longcat.chat/openai/v1' });
+    const anthropic = buildEffectiveCatalogRequest({
+      ...longcat,
+      protocol: 'AnthropicMessages',
+      baseUrl: 'https://api.longcat.chat/anthropic/v1',
+    });
+    const chat = buildEffectiveCatalogRequest({
+      ...longcat,
+      protocol: 'OpenAICompatibleChatCompletions',
+      baseUrl: 'https://api.longcat.chat/openai/v1',
+    });
     expect(anthropic.fallbackRoute.protocol).toBe('AnthropicMessages');
     expect(chat.fallbackRoute.protocol).toBe('OpenAICompatibleChatCompletions');
     expect(anthropic.catalog.models.find((model) => model.modelId === 'LongCat-2.5')).toMatchObject({
@@ -91,15 +103,21 @@ describe('data-only provider discovery fixtures', () => {
     const discovery = surface?.discovery.strategy;
     if (!surface || discovery?.kind !== 'json-catalog') throw new Error('Missing OpenCode Zen discovery');
     const payload = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'opencode-zen.json'), 'utf8')) as unknown;
-    const contributions = toDeclarativeCatalogContributions(
-      parseDeclarativeCatalog(discovery, payload),
-      { protocol: surface.routes[0].protocol, baseUrl: surface.routes[0].baseUrl },
-    );
+    const contributions = toDeclarativeCatalogContributions(parseDeclarativeCatalog(discovery, payload), {
+      protocol: surface.routes[0].protocol,
+      baseUrl: surface.routes[0].baseUrl,
+    });
     expect(contributions.find((model) => model.modelId === 'gpt-5.5')?.route?.protocol).toBe('OpenAIResponses');
-    expect(contributions.find((model) => model.modelId === 'claude-opus-4-8')?.route?.protocol).toBe('AnthropicMessages');
+    expect(contributions.find((model) => model.modelId === 'claude-opus-4-8')?.route?.protocol).toBe(
+      'AnthropicMessages',
+    );
     expect(contributions.find((model) => model.modelId === 'qwen3.6-plus')?.route?.protocol).toBe('AnthropicMessages');
-    expect(contributions.find((model) => model.modelId === 'minimax-m3')?.route?.protocol).toBe('OpenAICompatibleChatCompletions');
-    expect(contributions.find((model) => model.modelId === 'gemini-3.5-flash')?.route?.protocol).toBe('OpenAICompatibleChatCompletions');
+    expect(contributions.find((model) => model.modelId === 'minimax-m3')?.route?.protocol).toBe(
+      'OpenAICompatibleChatCompletions',
+    );
+    expect(contributions.find((model) => model.modelId === 'gemini-3.5-flash')?.route?.protocol).toBe(
+      'OpenAICompatibleChatCompletions',
+    );
   });
 
   it('treats a protocol-less candidate list as availability evidence without replacing model-owned routes', () => {
@@ -113,10 +131,7 @@ describe('data-only provider discovery fixtures', () => {
     const discovery = surface?.discovery.strategy;
     if (!surface || discovery?.kind !== 'json-catalog') throw new Error('Missing DeepSeek discovery');
     const parsed = parseDeclarativeCatalog(discovery, {
-      data: [
-        { id: 'deepseek-flash' },
-        { id: 'deepseek-v4-flash' },
-      ],
+      data: [{ id: 'deepseek-flash' }, { id: 'deepseek-v4-flash' }],
     });
     const contributions = toDeclarativeCatalogContributions(parsed, {
       protocol: 'OpenAIResponses',
@@ -140,30 +155,34 @@ describe('data-only provider discovery fixtures', () => {
         models: staleFallbackContributions,
       },
     });
-    expect(models.find((model) => model.modelId === 'deepseek-flash')?.route.protocol)
-      .toBe('OpenAIResponses');
+    expect(models.find((model) => model.modelId === 'deepseek-flash')?.route.protocol).toBe('OpenAIResponses');
     expect(models.some((model) => model.modelId === 'deepseek-v4-flash')).toBe(false);
   });
 
   it('only enables grandfathered Moonshot API models for eligible accounts', () => {
     const provider = createProviderEntryFromCatalog('moonshot');
     const request = buildEffectiveCatalogRequest(provider);
-    const availability = (allowedIds: string[]) => mergeEffectiveCatalog({
-      ...request,
-      discovery: {
-        source: 'discovery',
-        observedAt: '2026-11-24T00:00:00.000Z',
-        models: applyDiscoveryAuthority(provider, allowedIds.map((modelId) => ({
-          modelId, availability: 'available',
-        }))),
-      },
-    });
+    const availability = (allowedIds: string[]) =>
+      mergeEffectiveCatalog({
+        ...request,
+        discovery: {
+          source: 'discovery',
+          observedAt: '2026-11-24T00:00:00.000Z',
+          models: applyDiscoveryAuthority(
+            provider,
+            allowedIds.map((modelId) => ({
+              modelId,
+              availability: 'available',
+            })),
+          ),
+        },
+      });
 
-    expect(availability(['kimi-k3']).find((model) => model.modelId === 'kimi-k2.7-code')?.availability)
-      .toBe('unavailable');
+    expect(availability(['kimi-k3']).find((model) => model.modelId === 'kimi-k2.7-code')?.availability).toBe(
+      'unavailable',
+    );
     const grandfathered = availability(['kimi-k3', 'kimi-k2.7-code', 'kimi-k2.5']);
-    expect(grandfathered.find((model) => model.modelId === 'kimi-k2.7-code')?.availability)
-      .toBe('available');
+    expect(grandfathered.find((model) => model.modelId === 'kimi-k2.7-code')?.availability).toBe('available');
     expect(grandfathered.some((model) => model.modelId === 'kimi-k2.5')).toBe(false);
   });
 
@@ -185,19 +204,20 @@ describe('data-only provider discovery fixtures', () => {
     const chutesSurface = getLoadedProviderSurface('chutes');
     const fireworksSurface = getLoadedProviderSurface('fireworks-ai');
     if (
-      githubSurface?.discovery.strategy?.kind !== 'json-catalog'
-      || chutesSurface?.discovery.strategy?.kind !== 'json-catalog'
-      || fireworksSurface?.discovery.strategy?.kind !== 'json-catalog'
-    ) throw new Error('Missing declarative discovery');
+      githubSurface?.discovery.strategy?.kind !== 'json-catalog' ||
+      chutesSurface?.discovery.strategy?.kind !== 'json-catalog' ||
+      fireworksSurface?.discovery.strategy?.kind !== 'json-catalog'
+    )
+      throw new Error('Missing declarative discovery');
 
     const project = (providerId: string, surface: typeof githubSurface) => {
       const discovery = surface?.discovery.strategy;
       if (!surface || discovery?.kind !== 'json-catalog') throw new Error(`Missing ${providerId}`);
       const payload = JSON.parse(fs.readFileSync(path.join(fixtureRoot, `${providerId}.json`), 'utf8')) as unknown;
-      return toDeclarativeCatalogContributions(
-        parseDeclarativeCatalog(discovery, payload),
-        { protocol: surface.routes[0].protocol, baseUrl: surface.routes[0].baseUrl },
-      )[0];
+      return toDeclarativeCatalogContributions(parseDeclarativeCatalog(discovery, payload), {
+        protocol: surface.routes[0].protocol,
+        baseUrl: surface.routes[0].baseUrl,
+      })[0];
     };
 
     expect(project('github-models', githubSurface)).toMatchObject({

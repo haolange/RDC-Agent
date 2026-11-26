@@ -4,7 +4,10 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { directoryLinkType } from '../platform/paths';
 import { classifyAttachmentBytes } from '../runtime/attachmentClassify';
-import { hydrateFrozenUserContent, materializeAgentUserInput } from '../agent-runtime/attachments/ConversationAttachmentMaterializer';
+import {
+  hydrateFrozenUserContent,
+  materializeAgentUserInput,
+} from '../agent-runtime/attachments/ConversationAttachmentMaterializer';
 import { assertAttachmentPreviewPath } from '../runtime/attachmentPreview';
 import { materializedText, attachmentTempRoot } from '../testing/attachmentTestSupport';
 import { AttachmentStagingService } from './AttachmentStagingService';
@@ -32,20 +35,25 @@ describe('attachment pipeline hardening', () => {
       mimeType: 'text/markdown',
       size: bytes.byteLength,
     };
-    const prepared = await materializeAgentUserInput('inspect', [{
-      ...planned,
-      readPath: stagingPath,
-    }], 'disabled', { includeImageData: false, contextBudgetTokens: 80_000 });
-    const hydrated = await hydrateFrozenUserContent(
-      prepared.content,
-      prepared.attachmentManifest,
-      [{
+    const prepared = await materializeAgentUserInput(
+      'inspect',
+      [
+        {
+          ...planned,
+          readPath: stagingPath,
+        },
+      ],
+      'disabled',
+      { includeImageData: false, contextBudgetTokens: 80_000 },
+    );
+    const hydrated = await hydrateFrozenUserContent(prepared.content, prepared.attachmentManifest, [
+      {
         ...planned,
         sessionId: 'sess',
         projectId: 'proj',
         createdAt: Date.now(),
-      }],
-    );
+      },
+    ]);
     const preparedText = materializedText(prepared.content);
     const runningText = materializedText(hydrated);
     expect(preparedText).toContain(sessionPath);
@@ -54,15 +62,23 @@ describe('attachment pipeline hardening', () => {
   });
 
   it('fails closed when the frozen manifest does not match committed attachments', async () => {
-    await expect(hydrateFrozenUserContent('inspect', [{
-      attachmentId: 'att_1',
-      fileName: 'notes.md',
-      filePath: path.join(tempRoot, 'missing.md'),
-      mimeType: 'text/markdown',
-      size: 12,
-      layer: 'text',
-      kind: 'file',
-    }], [])).rejects.toThrow('ATTACHMENT_INVALID');
+    await expect(
+      hydrateFrozenUserContent(
+        'inspect',
+        [
+          {
+            attachmentId: 'att_1',
+            fileName: 'notes.md',
+            filePath: path.join(tempRoot, 'missing.md'),
+            mimeType: 'text/markdown',
+            size: 12,
+            layer: 'text',
+            kind: 'file',
+          },
+        ],
+        [],
+      ),
+    ).rejects.toThrow('ATTACHMENT_INVALID');
   });
 
   it('rejects a PE executable even when the file is renamed to .txt', () => {
@@ -71,10 +87,7 @@ describe('attachment pipeline hardening', () => {
   });
 
   it('rejects attachment errors as non-retryable preflight failures', () => {
-    const rejected = toRejectedSendResult(
-      'req-1',
-      new Error('ATTACHMENT_LIMIT_EXCEEDED: too many attachments'),
-    );
+    const rejected = toRejectedSendResult('req-1', new Error('ATTACHMENT_LIMIT_EXCEEDED: too many attachments'));
     expect(rejected.status).toBe('rejected');
     if (rejected.status !== 'rejected') return;
     expect(rejected.error.code).toBe('ATTACHMENT_LIMIT_EXCEEDED');
@@ -111,23 +124,42 @@ describe('staging quota and preview realpath', () => {
     } catch {
       return;
     }
-    expect(() => assertAttachmentPreviewPath(
-      path.join(root, 'attachments'),
-      path.join(link, 'secret.png'),
-    )).toThrow(/IMAGE_PREVIEW_PATH_ESCAPE|symlink/i);
+    expect(() => assertAttachmentPreviewPath(path.join(root, 'attachments'), path.join(link, 'secret.png'))).toThrow(
+      /IMAGE_PREVIEW_PATH_ESCAPE|symlink/i,
+    );
   });
 });
 
 it('carries material context into the actual input and rejects changed committed bytes', async () => {
-  const filePath = path.join(tempRoot, 'constraint.md'); const text = 'No reference image; preserve normal highlights.';
+  const filePath = path.join(tempRoot, 'constraint.md');
+  const text = 'No reference image; preserve normal highlights.';
   fs.writeFileSync(filePath, text);
-  const material = { intent: 'Only tear duct bright dots', documentLocation: 'Section 2, paragraph 3', comparison: { group: 'eye', role: 'baseline' as const, conditions: 'same camera and exposure' } };
-  const record = { attachmentId: 'material', fileName: 'constraint.md', filePath, sourceHash: createHash('sha256').update(text).digest('hex'), material, kind: 'file' as const, layer: 'text' as const, mimeType: 'text/markdown', size: Buffer.byteLength(text), sessionId: 'session', projectId: 'project', createdAt: 1 };
+  const material = {
+    intent: 'Only tear duct bright dots',
+    documentLocation: 'Section 2, paragraph 3',
+    comparison: { group: 'eye', role: 'baseline' as const, conditions: 'same camera and exposure' },
+  };
+  const record = {
+    attachmentId: 'material',
+    fileName: 'constraint.md',
+    filePath,
+    sourceHash: createHash('sha256').update(text).digest('hex'),
+    material,
+    kind: 'file' as const,
+    layer: 'text' as const,
+    mimeType: 'text/markdown',
+    size: Buffer.byteLength(text),
+    sessionId: 'session',
+    projectId: 'project',
+    createdAt: 1,
+  };
   const input = await materializeAgentUserInput('help', [record], 'disabled');
   expect(JSON.stringify(input.content)).toContain('Only tear duct bright dots');
   expect(JSON.stringify(input.content)).toContain('not verified observations or authorization');
   expect(input.attachmentManifest[0]).toMatchObject({ material, sourceHash: record.sourceHash });
   expect(await hydrateFrozenUserContent(input.content, input.attachmentManifest, [record])).toEqual(input.content);
   fs.writeFileSync(filePath, 'Changed after prepare');
-  await expect(hydrateFrozenUserContent(input.content, input.attachmentManifest, [record])).rejects.toThrow('ATTACHMENT_SOURCE_CHANGED');
+  await expect(hydrateFrozenUserContent(input.content, input.attachmentManifest, [record])).rejects.toThrow(
+    'ATTACHMENT_SOURCE_CHANGED',
+  );
 });

@@ -109,7 +109,5 @@ export function isOriginAllowed(
 
 /** Cookie-authenticated product surfaces that must be same-origin to the bridge. */
 export function cookieOriginRequiredForPath(pathname: string): boolean {
-  return pathname === '/invoke'
-    || pathname === '/events'
-    || pathname.startsWith('/api/');
+  return pathname === '/invoke' || pathname === '/events' || pathname.startsWith('/api/');
 }

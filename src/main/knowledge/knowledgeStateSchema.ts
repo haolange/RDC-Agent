@@ -9,47 +9,59 @@ export const KNOWLEDGE_STATE_LOCK_TIMEOUT = 'KNOWLEDGE_STATE_LOCK_TIMEOUT';
 
 const hex64 = z.string().regex(/^[a-f0-9]{64}$/);
 
-export const KnowledgeDurableDraftSchema = z.object({
-  revision: z.number().int().positive(),
-  contentHash: hex64,
-  card: KnowledgeCardRecordSchema,
-  sourceHash: hex64.optional(),
-  sourceMtimeMs: z.number().int().nonnegative().optional(),
-  sourceSize: z.number().int().nonnegative().optional(),
-}).strict();
-
-export const KnowledgeDurableCandidateSchema = z.object({
-  revision: z.number().int().positive(),
-  contentHash: hex64,
-  candidate: z.object({
-    candidateId: z.string().trim().min(1),
-    sessionId: z.string().trim().min(1),
-    card: KnowledgeCardRecordSchema,
-    createdAt: z.string().trim().min(1),
-    source: z.literal('explicit-user-intent'),
-  }).strict(),
-}).strict();
-
-export const KnowledgeDurableReviewSchema = z.object({
-  revision: z.number().int().positive(),
-  contentHash: hex64,
-  review: z.object({
-    reviewId: z.string().trim().min(1),
-    sessionId: z.string().trim().min(1),
-    kind: z.enum(['write', 'promote']),
-    cardId: z.string().trim().min(1),
-    createdAt: z.string().trim().min(1),
+export const KnowledgeDurableDraftSchema = z
+  .object({
     revision: z.number().int().positive(),
     contentHash: hex64,
-  }).strict(),
-}).strict();
+    card: KnowledgeCardRecordSchema,
+    sourceHash: hex64.optional(),
+    sourceMtimeMs: z.number().int().nonnegative().optional(),
+    sourceSize: z.number().int().nonnegative().optional(),
+  })
+  .strict();
 
-export const KnowledgeStateDocumentSchema = z.object({
-  schemaVersion: z.literal(KNOWLEDGE_STATE_SCHEMA_VERSION),
-  candidates: z.array(KnowledgeDurableCandidateSchema),
-  reviews: z.array(KnowledgeDurableReviewSchema),
-  drafts: z.array(KnowledgeDurableDraftSchema).optional(),
-}).strict();
+export const KnowledgeDurableCandidateSchema = z
+  .object({
+    revision: z.number().int().positive(),
+    contentHash: hex64,
+    candidate: z
+      .object({
+        candidateId: z.string().trim().min(1),
+        sessionId: z.string().trim().min(1),
+        card: KnowledgeCardRecordSchema,
+        createdAt: z.string().trim().min(1),
+        source: z.literal('explicit-user-intent'),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const KnowledgeDurableReviewSchema = z
+  .object({
+    revision: z.number().int().positive(),
+    contentHash: hex64,
+    review: z
+      .object({
+        reviewId: z.string().trim().min(1),
+        sessionId: z.string().trim().min(1),
+        kind: z.enum(['write', 'promote']),
+        cardId: z.string().trim().min(1),
+        createdAt: z.string().trim().min(1),
+        revision: z.number().int().positive(),
+        contentHash: hex64,
+      })
+      .strict(),
+  })
+  .strict();
+
+export const KnowledgeStateDocumentSchema = z
+  .object({
+    schemaVersion: z.literal(KNOWLEDGE_STATE_SCHEMA_VERSION),
+    candidates: z.array(KnowledgeDurableCandidateSchema),
+    reviews: z.array(KnowledgeDurableReviewSchema),
+    drafts: z.array(KnowledgeDurableDraftSchema).optional(),
+  })
+  .strict();
 
 export interface KnowledgeDurableDraft {
   revision: number;
@@ -108,18 +120,19 @@ export function serializeKnowledgeStateDocument(
   document: KnowledgeStateDocument,
   leftoverDrafts: readonly KnowledgeDurableDraft[],
 ): string {
-  const payload = leftoverDrafts.length > 0
-    ? {
-      schemaVersion: KNOWLEDGE_STATE_SCHEMA_VERSION,
-      candidates: document.candidates,
-      reviews: document.reviews,
-      drafts: [...leftoverDrafts],
-    }
-    : {
-      schemaVersion: KNOWLEDGE_STATE_SCHEMA_VERSION,
-      candidates: document.candidates,
-      reviews: document.reviews,
-    };
+  const payload =
+    leftoverDrafts.length > 0
+      ? {
+          schemaVersion: KNOWLEDGE_STATE_SCHEMA_VERSION,
+          candidates: document.candidates,
+          reviews: document.reviews,
+          drafts: [...leftoverDrafts],
+        }
+      : {
+          schemaVersion: KNOWLEDGE_STATE_SCHEMA_VERSION,
+          candidates: document.candidates,
+          reviews: document.reviews,
+        };
   return `${JSON.stringify(payload, null, 2)}\n`;
 }
 

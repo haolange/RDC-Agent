@@ -113,27 +113,20 @@ export const PROVIDER_ADAPTER_IMPLEMENTATIONS = {
 
 export type ProviderAdapterId = keyof typeof PROVIDER_ADAPTER_IMPLEMENTATIONS;
 
-export const PROVIDER_ADAPTER_IDS = Object.freeze(
-  Object.keys(PROVIDER_ADAPTER_IMPLEMENTATIONS) as ProviderAdapterId[],
-);
+export const PROVIDER_ADAPTER_IDS = Object.freeze(Object.keys(PROVIDER_ADAPTER_IMPLEMENTATIONS) as ProviderAdapterId[]);
 
-export function getProviderAdapterImplementation(
-  adapterId: string,
-): ProviderAdapterImplementation | undefined {
+export function getProviderAdapterImplementation(adapterId: string): ProviderAdapterImplementation | undefined {
   return PROVIDER_ADAPTER_IMPLEMENTATIONS[adapterId as ProviderAdapterId];
 }
 
-export function providerAdapterSupportsProtocol(
-  adapterId: string,
-  protocol: LlmProviderProtocol,
-): boolean {
+export function providerAdapterSupportsProtocol(adapterId: string, protocol: LlmProviderProtocol): boolean {
   return getProviderAdapterImplementation(adapterId)?.protocols.includes(protocol) === true;
 }
 
 export function providerAdapterIdForProtocol(protocol: LlmProviderProtocol): ProviderAdapterId {
-  const matches = PROVIDER_ADAPTER_IDS.filter((adapterId) => (
-    (PROVIDER_ADAPTER_IMPLEMENTATIONS[adapterId].protocols as readonly LlmProviderProtocol[]).includes(protocol)
-  ));
+  const matches = PROVIDER_ADAPTER_IDS.filter((adapterId) =>
+    (PROVIDER_ADAPTER_IMPLEMENTATIONS[adapterId].protocols as readonly LlmProviderProtocol[]).includes(protocol),
+  );
   if (matches.length !== 1) {
     throw new Error(`Protocol ${protocol} must resolve to exactly one runtime adapter; received ${matches.length}.`);
   }
@@ -188,11 +181,11 @@ export const PROVIDER_DISCOVERY_POLICY_IDS = [
   'volcengine-coding-plan-models',
 ] as const;
 
-export type ProviderAuthSchemaId = typeof PROVIDER_AUTH_SCHEMA_IDS[number];
+export type ProviderAuthSchemaId = (typeof PROVIDER_AUTH_SCHEMA_IDS)[number];
 /** Auth schemas that resolve credentials from the environment when no key was entered. */
 export function authSchemaResolvesAmbientCredentials(id: ProviderAuthSchemaId | undefined): boolean {
   return id === 'google-vertex' || id === 'aws-bedrock';
 }
 
-export type ProviderAccountFlowId = typeof PROVIDER_ACCOUNT_FLOW_IDS[number];
-export type ProviderDiscoveryPolicyId = typeof PROVIDER_DISCOVERY_POLICY_IDS[number];
+export type ProviderAccountFlowId = (typeof PROVIDER_ACCOUNT_FLOW_IDS)[number];
+export type ProviderDiscoveryPolicyId = (typeof PROVIDER_DISCOVERY_POLICY_IDS)[number];

@@ -52,7 +52,8 @@ export const contracts = {
   },
   'SearchMultiSelect / Menu / ListRow / Feedback': {
     avoid: '多选不静默丢弃不可用引用；Toast 不取代字段错误；菜单不伪装导航。',
-    states: '多选：加载/失败/重试/空/无匹配/禁用/不可用；菜单：禁用/焦点；列表：selected 与 disabled；反馈：成功/失败。',
+    states:
+      '多选：加载/失败/重试/空/无匹配/禁用/不可用；菜单：禁用/焦点；列表：selected 与 disabled；反馈：成功/失败。',
     layout: 'Panel/SectionHeader 组织容器；ListRow 仅负责一行；菜单共享锚定边界。',
     motion: 'Spinner 只表示等待；Badge 为静态内容；CheckPill 切换不发起业务调用。',
     consumers: 'Settings Agent 工具选择、Knowledge 列表、左栏菜单、app/NotificationLayer；精确路径见消费者索引。',
@@ -94,8 +95,10 @@ export const contracts = {
   },
   'ReadingSheet / Disclosure': {
     avoid: 'ReadingSheet 只用于读一份长内容（计划、上下文用量），不承载表单编辑；Disclosure 不隐藏错误与权限约束。',
-    states: 'Sheet：内容短时按内容高度、长时到可用高度后正文滚动；状态条保持可见；Escape 只关闭顶层。Disclosure：受控开合、trailing 操作、关闭时不渲染正文。',
-    layout: 'Sheet 占据 Composer 上方的阅读区，头部、状态、底部固定，正文是唯一滚动区；工作台外居中。Disclosure 头部一行，箭头由组件绘制。',
+    states:
+      'Sheet：内容短时按内容高度、长时到可用高度后正文滚动；状态条保持可见；Escape 只关闭顶层。Disclosure：受控开合、trailing 操作、关闭时不渲染正文。',
+    layout:
+      'Sheet 占据 Composer 上方的阅读区，头部、状态、底部固定，正文是唯一滚动区；工作台外居中。Disclosure 头部一行，箭头由组件绘制。',
     motion: 'Sheet 进入用 --motion-overlay；Disclosure 箭头旋转与正文进入用 --motion-disclosure。',
     consumers: 'PlanReviewPanel、ContextBreakdownSheet；精确路径见消费者索引。',
   },
@@ -109,13 +112,15 @@ export const contracts = {
   'OverflowFade / EmptyState': {
     avoid: '不按字数截断；错误和正文不渐隐；空态不能伪装读取失败或不支持。',
     states: '未溢出/真实溢出/宽度改变；EmptyState inline/panel/page 与可选动作、visual。',
-    layout: '单行名称 min-width:0，ResizeObserver 观察宽度；inline 是列表内一行说明，panel 是带创建动作的有界表面，page 填满所在栏位。消费方不再包边框盒子。',
+    layout:
+      '单行名称 min-width:0，ResizeObserver 观察宽度；inline 是列表内一行说明，panel 是带创建动作的有界表面，page 填满所在栏位。消费方不再包边框盒子。',
     motion: '渐隐为静态遮罩，不是工作扫光。',
     consumers: 'Composer 附件、右栏任务、Settings 资源页、Knowledge 空态。',
   },
   'ActiveSignalText / TaskStatusMarker': {
     avoid: '不用于普通 selected、高亮或历史已完成项；不根据动画生成业务状态。',
-    states: 'active/inactive、工作/思考 tone；pending/in_progress/blocked/completed/cancelled/failed（failed 由 main 从当前执行派生）。',
+    states:
+      'active/inactive、工作/思考 tone；pending/in_progress/blocked/completed/cancelled/failed（failed 由 main 从当前执行派生）。',
     layout: '由轨道放置；禁止父样式覆盖 active 文字遮罩、变量或伪元素层级。',
     motion: '冻结现有从左到右 active-signal-shimmer；进行中标记只旋转一段弧线，系统减少动效时静止。',
     consumers: 'Transcript 工作过程、TaskSnapshotCard、RightRailTaskList。',
@@ -136,8 +141,10 @@ export const contracts = {
   },
   'Tabs / Pill / IconButton': {
     avoid: 'Tabs 不代替执行按钮；Pill 的 selected 不表示 running；装饰 Icon/ModeGlyph 不承担点击职责。',
-    states: 'Tabs underline/segmented、图标、计数、collapsible 图标模式、禁用、单一 Tab 焦点；Pill selected/running/disabled；IconButton disabled。',
-    layout: 'Tabs 可 fullWidth；collapsible 在带标签的一行放不下时整体降为图标加提示，容器变宽后恢复，永不重叠或换行；图标按钮保持控件高度和 label。',
+    states:
+      'Tabs underline/segmented、图标、计数、collapsible 图标模式、禁用、单一 Tab 焦点；Pill selected/running/disabled；IconButton disabled。',
+    layout:
+      'Tabs 可 fullWidth；collapsible 在带标签的一行放不下时整体降为图标加提示，容器变宽后恢复，永不重叠或换行；图标按钮保持控件高度和 label。',
     motion: '一个指示器在选项间滑动（--motion-indicator）；ModeGlyph 只表示模式身份。',
     consumers: 'Settings 页签、Composer 模式/权限选择、左右栏工具动作。',
   },

@@ -94,26 +94,41 @@ vi.mock('../../runtime/AppPathService', () => {
 describe('session stores: session locations', () => {
   it('finds a session again without the registry, and follows moves, removals and project changes', async () => {
     const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore } = await import('./sessionStores');
-    const root = (name: string) => { const dir = path.join(tempRoot, name); fs.mkdirSync(dir, { recursive: true }); return dir; };
+    const root = (name: string) => {
+      const dir = path.join(tempRoot, name);
+      fs.mkdirSync(dir, { recursive: true });
+      return dir;
+    };
     const first = await projectWorkspaceStore.createProject(root('location-first'));
     const second = await projectWorkspaceStore.createProject(root('location-second'));
     const session = sessionRecordStore.createSession(first.projectId, 'Located');
     const locate = (sessionId: string) => sessionRecordStore.findSessionLocation(sessionId);
 
-    expect(locate(session.sessionId)).toMatchObject({ project: { projectId: first.projectId }, sessionPath: session.sessionPath });
+    expect(locate(session.sessionId)).toMatchObject({
+      project: { projectId: first.projectId },
+      sessionPath: session.sessionPath,
+    });
     const registryReads = vi.spyOn(projectWorkspaceStore, 'readRegistry');
     try {
       expect(locate(session.sessionId)?.sessionPath).toBe(session.sessionPath);
       conversationHistoryStore.appendConversationMessage(session.sessionId, {
-        id: 'located-user', turnId: 'located-turn', role: 'user', content: 'hi',
-        sessionId: session.sessionId, projectId: first.projectId, createdAt: 1,
+        id: 'located-user',
+        turnId: 'located-turn',
+        role: 'user',
+        content: 'hi',
+        sessionId: session.sessionId,
+        projectId: first.projectId,
+        createdAt: 1,
       });
       expect(registryReads).not.toHaveBeenCalled();
 
       // Moved on disk into the other project's sessions directory.
       const movedPath = path.join(projectWorkspaceStore.getProjectSessionsRoot(second), session.sessionId);
       fs.renameSync(session.sessionPath, movedPath);
-      expect(locate(session.sessionId)).toMatchObject({ project: { projectId: second.projectId }, sessionPath: movedPath });
+      expect(locate(session.sessionId)).toMatchObject({
+        project: { projectId: second.projectId },
+        sessionPath: movedPath,
+      });
 
       projectWorkspaceStore.renameProject(second.projectId, 'Renamed second');
       expect(locate(session.sessionId)?.project.name).toBe('Renamed second');
@@ -153,10 +168,15 @@ describe('sessionRecordStore.removeSession side-channel cleanup', () => {
     fs.writeFileSync(file, original);
     fs.writeFileSync(journal, 'Unsupported session journal must remain untouched');
     await expect(projectWorkspaceStore.initializeWorkspace()).resolves.toBeUndefined();
-    expect(sessionRecordStore.listSessions(project.projectId)).toContainEqual(expect.objectContaining({
-      sessionId: session.sessionId, storageDiagnostic: 'unsupported-schema',
-    }));
-    expect(() => sessionRecordStore.updateSession(session.sessionId, { title: 'Changed' })).toThrow('STORAGE_SCHEMA_UNSUPPORTED');
+    expect(sessionRecordStore.listSessions(project.projectId)).toContainEqual(
+      expect.objectContaining({
+        sessionId: session.sessionId,
+        storageDiagnostic: 'unsupported-schema',
+      }),
+    );
+    expect(() => sessionRecordStore.updateSession(session.sessionId, { title: 'Changed' })).toThrow(
+      'STORAGE_SCHEMA_UNSUPPORTED',
+    );
     expect(fs.readFileSync(file, 'utf8')).toBe(original);
     expect(fs.readFileSync(journal, 'utf8')).toBe('Unsupported session journal must remain untouched');
     fs.rmSync(session.sessionPath, { recursive: true, force: true });
@@ -319,14 +339,28 @@ describe('sessionRecordStore.removeSession side-channel cleanup', () => {
       preparedAt: 1,
     };
     const user: ConversationMessage = {
-      id: 'user-staged', requestId: 'request-staged', turnId: 'turn-staged',
-      sessionId: staged.session.sessionId, projectId: project.projectId, role: 'user',
-      content: 'hello', createdAt: 1, preparedContext, attachments: staged.attachments,
+      id: 'user-staged',
+      requestId: 'request-staged',
+      turnId: 'turn-staged',
+      sessionId: staged.session.sessionId,
+      projectId: project.projectId,
+      role: 'user',
+      content: 'hello',
+      createdAt: 1,
+      preparedContext,
+      attachments: staged.attachments,
     };
     const assistant: ConversationMessage = {
-      id: 'assistant-staged', requestId: 'request-staged', turnId: 'turn-staged',
-      sessionId: staged.session.sessionId, projectId: project.projectId, role: 'assistant',
-      content: '', status: 'streaming', createdAt: 2, preparedContext,
+      id: 'assistant-staged',
+      requestId: 'request-staged',
+      turnId: 'turn-staged',
+      sessionId: staged.session.sessionId,
+      projectId: project.projectId,
+      role: 'assistant',
+      content: '',
+      status: 'streaming',
+      createdAt: 2,
+      preparedContext,
     };
     sessionRecordStore.commitStagedConversationSession(staged, [user, assistant], null);
 
@@ -404,9 +438,11 @@ describe('sessionRecordStore.removeSession side-channel cleanup', () => {
       capturePaths: [],
       profileId: 'general',
     });
-    await expect(sessionRecordStore.updateRun(session.sessionId, run.runId, {
-      captures: [{ id: 'cap', filePath: 'a.rdc', role: 'primary', backendHint: 'local', status: 'pending' }],
-    })).rejects.toThrow(/CONVERSATION_RUN_CAPTURES_FORBIDDEN/);
+    await expect(
+      sessionRecordStore.updateRun(session.sessionId, run.runId, {
+        captures: [{ id: 'cap', filePath: 'a.rdc', role: 'primary', backendHint: 'local', status: 'pending' }],
+      }),
+    ).rejects.toThrow(/CONVERSATION_RUN_CAPTURES_FORBIDDEN/);
     const persisted = await sessionRecordStore.readRun(session.sessionId, run.runId);
     expect(persisted?.captures).toEqual([]);
   });
@@ -466,60 +502,121 @@ function makeTerminalContextEntry(): SessionContextTurnEntry {
 
 describe('conversationHistoryStore terminal transaction', () => {
   it('keeps compaction progress across short turns after append-only terminal commits', async () => {
-    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } = await import('./sessionStores');
+    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } =
+      await import('./sessionStores');
     const projectRoot = path.join(tempRoot, 'terminal-compaction-progress');
     fs.mkdirSync(projectRoot, { recursive: true });
     const project = await projectWorkspaceStore.createProject(projectRoot);
     const session = sessionRecordStore.createSession(project.projectId, 'Short terminal turns');
     for (let turn = 0; turn < 6; turn += 1) {
-      const base = { sessionId: session.sessionId, projectId: project.projectId, turnId: `turn-${turn}`, requestId: `request-${turn}`, createdAt: turn * 100 };
-      conversationHistoryStore.appendConversationMessage(session.sessionId, { ...base, id: `user-${turn}`, role: 'user', content: 'question' });
-      const assistant: ConversationMessage = { ...base, id: `assistant-${turn}`, role: 'assistant', content: '', status: 'streaming' };
+      const base = {
+        sessionId: session.sessionId,
+        projectId: project.projectId,
+        turnId: `turn-${turn}`,
+        requestId: `request-${turn}`,
+        createdAt: turn * 100,
+      };
+      conversationHistoryStore.appendConversationMessage(session.sessionId, {
+        ...base,
+        id: `user-${turn}`,
+        role: 'user',
+        content: 'question',
+      });
+      const assistant: ConversationMessage = {
+        ...base,
+        id: `assistant-${turn}`,
+        role: 'assistant',
+        content: '',
+        status: 'streaming',
+      };
       conversationHistoryStore.appendConversationMessage(session.sessionId, assistant);
       for (let delta = 1; delta <= 20; delta += 1) {
-        conversationHistoryStore.appendConversationMessage(session.sessionId, { ...assistant, content: `part-${delta}`, updatedAt: base.createdAt + delta });
+        conversationHistoryStore.appendConversationMessage(session.sessionId, {
+          ...assistant,
+          content: `part-${delta}`,
+          updatedAt: base.createdAt + delta,
+        });
       }
-      conversationHistoryStore.commitConversationTerminal(session.sessionId, base.requestId, base.turnId,
+      conversationHistoryStore.commitConversationTerminal(
+        session.sessionId,
+        base.requestId,
+        base.turnId,
         { ...assistant, content: 'final', status: 'complete', updatedAt: base.createdAt + 21 },
-        { ...makeTerminalContextEntry(), turnId: base.turnId, userMessageId: `user-${turn}`, assistantMessageId: assistant.id });
+        {
+          ...makeTerminalContextEntry(),
+          turnId: base.turnId,
+          userMessageId: `user-${turn}`,
+          assistantMessageId: assistant.id,
+        },
+      );
       // Compaction runs after the event that crossed the threshold, as it does between real streaming events.
       await new Promise((resolve) => setImmediate(resolve));
     }
     const history = conversationHistoryStore.readConversationHistory(session.sessionId);
     const raw = fs.readFileSync(path.join(session.sessionPath, 'conversation.jsonl'), 'utf8').trim().split('\n');
     expect(history).toHaveLength(12);
-    expect(history.filter((message) => message.role === 'assistant').every((message) => message.content === 'final')).toBe(true);
+    expect(
+      history.filter((message) => message.role === 'assistant').every((message) => message.content === 'final'),
+    ).toBe(true);
     expect(raw.length).toBeLessThan(history.length + 24);
     expect(sessionContextStore.readSessionContextJournal(session.sessionId)).toHaveLength(6);
   });
 
-  it.each(['prepared', 'committing', 'committed'] as const)('recovers bounded %s WAL without replay duplicates', async (phase) => {
-    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } = await import('./sessionStores');
-    const projectRoot = path.join(tempRoot, `bounded-terminal-${phase}`);
-    fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await projectWorkspaceStore.createProject(projectRoot);
-    const session = sessionRecordStore.createSession(project.projectId, phase);
-    const assistant: ConversationMessage = {
-      id: 'assistant-terminal', requestId: 'request-terminal', turnId: 'turn-terminal',
-      sessionId: session.sessionId, projectId: project.projectId, role: 'assistant',
-      content: 'partial', status: 'streaming', createdAt: 1, updatedAt: 2,
-    };
-    conversationHistoryStore.writeConversationHistory(session.sessionId, [assistant]);
-    const terminal: ConversationMessage = { ...assistant, content: 'final', status: 'complete', updatedAt: 1 };
-    const wal = prepareTerminalAppend(session.sessionPath, 'request-terminal', 'turn-terminal', terminal, makeTerminalContextEntry(), true, true);
-    fs.appendFileSync(path.join(session.sessionPath, 'conversation.jsonl'), Buffer.from(wal.history.append).subarray(0, 17));
-    fs.writeFileSync(path.join(session.sessionPath, 'terminal-commit.json'), JSON.stringify({ ...wal, phase }));
-    await projectWorkspaceStore.initializeWorkspace();
-    await projectWorkspaceStore.initializeWorkspace();
-    const history = conversationHistoryStore.readConversationHistory(session.sessionId);
-    expect(history).toHaveLength(1);
-    expect(history[0]).toMatchObject({ content: phase === 'prepared' ? 'partial' : 'final', status: phase === 'prepared' ? 'streaming' : 'complete' });
-    expect(sessionContextStore.readSessionContextJournal(session.sessionId)).toHaveLength(phase === 'prepared' ? 0 : 1);
-    expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
-  });
+  it.each(['prepared', 'committing', 'committed'] as const)(
+    'recovers bounded %s WAL without replay duplicates',
+    async (phase) => {
+      const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } =
+        await import('./sessionStores');
+      const projectRoot = path.join(tempRoot, `bounded-terminal-${phase}`);
+      fs.mkdirSync(projectRoot, { recursive: true });
+      const project = await projectWorkspaceStore.createProject(projectRoot);
+      const session = sessionRecordStore.createSession(project.projectId, phase);
+      const assistant: ConversationMessage = {
+        id: 'assistant-terminal',
+        requestId: 'request-terminal',
+        turnId: 'turn-terminal',
+        sessionId: session.sessionId,
+        projectId: project.projectId,
+        role: 'assistant',
+        content: 'partial',
+        status: 'streaming',
+        createdAt: 1,
+        updatedAt: 2,
+      };
+      conversationHistoryStore.writeConversationHistory(session.sessionId, [assistant]);
+      const terminal: ConversationMessage = { ...assistant, content: 'final', status: 'complete', updatedAt: 1 };
+      const wal = prepareTerminalAppend(
+        session.sessionPath,
+        'request-terminal',
+        'turn-terminal',
+        terminal,
+        makeTerminalContextEntry(),
+        true,
+        true,
+      );
+      fs.appendFileSync(
+        path.join(session.sessionPath, 'conversation.jsonl'),
+        Buffer.from(wal.history.append).subarray(0, 17),
+      );
+      fs.writeFileSync(path.join(session.sessionPath, 'terminal-commit.json'), JSON.stringify({ ...wal, phase }));
+      await projectWorkspaceStore.initializeWorkspace();
+      await projectWorkspaceStore.initializeWorkspace();
+      const history = conversationHistoryStore.readConversationHistory(session.sessionId);
+      expect(history).toHaveLength(1);
+      expect(history[0]).toMatchObject({
+        content: phase === 'prepared' ? 'partial' : 'final',
+        status: phase === 'prepared' ? 'streaming' : 'complete',
+      });
+      expect(sessionContextStore.readSessionContextJournal(session.sessionId)).toHaveLength(
+        phase === 'prepared' ? 0 : 1,
+      );
+      expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
+    },
+  );
 
   it('commits the terminal message and context journal as one durable snapshot', async () => {
-    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } = await import('./sessionStores');
+    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } =
+      await import('./sessionStores');
     const projectRoot = path.join(tempRoot, 'terminal-commit-project');
     fs.mkdirSync(projectRoot, { recursive: true });
     const project = await projectWorkspaceStore.createProject(projectRoot);
@@ -570,8 +667,9 @@ describe('conversationHistoryStore terminal transaction', () => {
       { id: 'user-terminal', content: 'question' },
       { id: 'assistant-terminal', content: 'final answer', status: 'complete' },
     ]);
-    expect(sessionContextStore.readSessionContextJournal(session.sessionId))
-      .toMatchObject([{ turnId: 'turn-terminal', schemaVersion: 2 }]);
+    expect(sessionContextStore.readSessionContextJournal(session.sessionId)).toMatchObject([
+      { turnId: 'turn-terminal', schemaVersion: 2 },
+    ]);
     expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
   });
 
@@ -579,45 +677,54 @@ describe('conversationHistoryStore terminal transaction', () => {
     { phase: 'prepared' as const, rollForward: false },
     { phase: 'committing' as const, rollForward: true },
   ])('recovers a $phase terminal transaction without a split state', async ({ phase, rollForward }) => {
-    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } = await import('./sessionStores');
+    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } =
+      await import('./sessionStores');
     const projectRoot = path.join(tempRoot, `terminal-recovery-${phase}`);
     fs.mkdirSync(projectRoot, { recursive: true });
     const project = await projectWorkspaceStore.createProject(projectRoot);
     const session = sessionRecordStore.createSession(project.projectId, `Terminal recovery ${phase}`);
-    const beforeHistory: ConversationMessage[] = [{
-      id: 'assistant-terminal',
-      requestId: 'request-terminal',
-      turnId: 'turn-terminal',
-      sessionId: session.sessionId,
-      projectId: project.projectId,
-      branchId: 'branch-root',
-      role: 'assistant',
-      content: 'partial',
-      status: 'streaming',
-      createdAt: 2,
-      updatedAt: 2,
-    }];
-    const afterHistory: ConversationMessage[] = [{
-      ...beforeHistory[0]!,
-      content: 'final answer',
-      status: 'complete',
-      updatedAt: 3,
-    }];
+    const beforeHistory: ConversationMessage[] = [
+      {
+        id: 'assistant-terminal',
+        requestId: 'request-terminal',
+        turnId: 'turn-terminal',
+        sessionId: session.sessionId,
+        projectId: project.projectId,
+        branchId: 'branch-root',
+        role: 'assistant',
+        content: 'partial',
+        status: 'streaming',
+        createdAt: 2,
+        updatedAt: 2,
+      },
+    ];
+    const afterHistory: ConversationMessage[] = [
+      {
+        ...beforeHistory[0]!,
+        content: 'final answer',
+        status: 'complete',
+        updatedAt: 3,
+      },
+    ];
     const afterContext = [makeTerminalContextEntry()];
     fs.writeFileSync(
       path.join(session.sessionPath, 'terminal-commit.json'),
-      JSON.stringify({
-        schemaVersion: '1',
-        requestId: 'request-terminal',
-        turnId: 'turn-terminal',
-        phase,
-        beforeHistory,
-        beforeBranch: null,
-        beforeContext: [],
-        afterHistory,
-        afterBranch: null,
-        afterContext,
-      }, null, 2),
+      JSON.stringify(
+        {
+          schemaVersion: '1',
+          requestId: 'request-terminal',
+          turnId: 'turn-terminal',
+          phase,
+          beforeHistory,
+          beforeBranch: null,
+          beforeContext: [],
+          afterHistory,
+          afterBranch: null,
+          afterContext,
+        },
+        null,
+        2,
+      ),
       'utf8',
     );
 
@@ -629,8 +736,7 @@ describe('conversationHistoryStore terminal transaction', () => {
       content: rollForward ? 'final answer' : 'partial',
       status: rollForward ? 'complete' : 'streaming',
     });
-    expect(sessionContextStore.readSessionContextJournal(session.sessionId))
-      .toHaveLength(rollForward ? 1 : 0);
+    expect(sessionContextStore.readSessionContextJournal(session.sessionId)).toHaveLength(rollForward ? 1 : 0);
     expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
   });
 });
@@ -655,7 +761,8 @@ describe('session revisions', () => {
     expect(own[1]!.revision.n).toBeGreaterThan(own[0]!.revision.n);
     expect(own[2]!.revision.n).toBeGreaterThan(own[1]!.revision.n);
     expect(sessionRecordStore.readSessionSnapshot(session.sessionId)).toMatchObject({
-      record: { agentId: 'analyzer' }, revision: own[2]!.revision,
+      record: { agentId: 'analyzer' },
+      revision: own[2]!.revision,
     });
   });
 });

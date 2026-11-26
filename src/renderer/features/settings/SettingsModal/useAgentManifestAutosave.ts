@@ -7,7 +7,11 @@ import {
   serializeAgentManifestDraft,
   shouldRollbackFailedAgentManifestSave,
 } from './agentManifestAutosaveState';
-import type { AgentDefinitionSaveResult, AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
+import type {
+  AgentDefinitionSaveResult,
+  AgentManifestDefinition,
+  AgentManifestDraft,
+} from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import type { AgentManifestSaveBatch } from './settingsModalActions';
 
@@ -62,20 +66,31 @@ export function useAgentManifestAutosave(options: UseAgentManifestAutosaveOption
     if (!open) rebase(settings.agents.definitions);
   }, [open, settings.agents.definitions]);
 
-  const selectDrafts = (pending = getChangedAgentManifestDrafts(latest.current.agentManifestDrafts, savedDraftsRef.current)) => (
+  const selectDrafts = (
+    pending = getChangedAgentManifestDrafts(latest.current.agentManifestDrafts, savedDraftsRef.current),
+  ) =>
     selectSubmittableAgentManifestDrafts(
-      pending, latest.current.blockSubmit, latest.current.blockProjectedSubmit, latest.current.agentManifestDrafts,
-    )
-  );
+      pending,
+      latest.current.blockSubmit,
+      latest.current.blockProjectedSubmit,
+      latest.current.agentManifestDrafts,
+    );
 
-  const executeRef = useRef<(drafts: AgentManifestDraft[], revision: number, visibleDrafts?: AgentManifestDraft[]) => Promise<void>>(async () => {});
+  const executeRef = useRef<
+    (drafts: AgentManifestDraft[], revision: number, visibleDrafts?: AgentManifestDraft[]) => Promise<void>
+  >(async () => {});
   executeRef.current = async (drafts, revision, visibleDrafts = drafts) => {
     report('saving', '', false);
     try {
       const results = await latest.current.onSave({ drafts });
       if (!results) throw new Error(failedMessage);
       lanes.applyIfNewer('drafts', revision, () => {
-        savedDraftsRef.current = applyAgentDefinitionSaveResults(savedDraftsRef.current, drafts, results, currentProjectId);
+        savedDraftsRef.current = applyAgentDefinitionSaveResults(
+          savedDraftsRef.current,
+          drafts,
+          results,
+          currentProjectId,
+        );
       });
       if (!lanes.isLatest('drafts', revision)) return;
       const remaining = selectDrafts();
@@ -89,7 +104,14 @@ export function useAgentManifestAutosave(options: UseAgentManifestAutosaveOption
         report('saved', savedMessage);
       }
     } catch (error) {
-      if (!shouldRollbackFailedAgentManifestSave(lanes.isLatest('drafts', revision), visibleDrafts, latest.current.agentManifestDrafts)) return;
+      if (
+        !shouldRollbackFailedAgentManifestSave(
+          lanes.isLatest('drafts', revision),
+          visibleDrafts,
+          latest.current.agentManifestDrafts,
+        )
+      )
+        return;
       // Keep the attempted values and compare hashes even when the visible draft
       // rolls back. Retrying must not save unrelated profiles or rebase a conflict.
       failedDraftsRef.current = drafts;
@@ -116,7 +138,6 @@ export function useAgentManifestAutosave(options: UseAgentManifestAutosaveOption
       window.clearTimeout(timer);
       if (debounceTimerRef.current === timer) debounceTimerRef.current = null;
     };
-
   }, [draftSnapshot, lanes, open]);
 
   useEffect(() => {
@@ -125,7 +146,6 @@ export function useAgentManifestAutosave(options: UseAgentManifestAutosaveOption
       if (changed.length > 0) void executeRef.current(changed, lanes.begin('drafts'));
     }
     wasOpenRef.current = open;
-
   }, [draftSnapshot, lanes, open]);
 
   const retry = async () => {
@@ -143,7 +163,11 @@ export function useAgentManifestAutosave(options: UseAgentManifestAutosaveOption
       window.clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
     }
-    await executeRef.current(drafts, lanes.begin('drafts'), current.filter(entry => drafts.some(draft => draft.id === entry.id)));
+    await executeRef.current(
+      drafts,
+      lanes.begin('drafts'),
+      current.filter((entry) => drafts.some((draft) => draft.id === entry.id)),
+    );
   };
 
   return { retry, rebase };

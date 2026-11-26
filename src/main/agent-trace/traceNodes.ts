@@ -15,14 +15,7 @@ export interface BaseTraceNode {
   metadata?: Record<string, unknown>;
 }
 
-export type EvidenceRefKind =
-  | 'trace_node'
-  | 'tool_call'
-  | 'artifact'
-  | 'file_range'
-  | 'url'
-  | 'log'
-  | 'domain_object';
+export type EvidenceRefKind = 'trace_node' | 'tool_call' | 'artifact' | 'file_range' | 'url' | 'log' | 'domain_object';
 
 export interface EvidenceRef {
   kind: EvidenceRefKind;
@@ -31,14 +24,7 @@ export interface EvidenceRef {
   metadata?: Record<string, unknown>;
 }
 
-export type AttachmentKind =
-  | 'file'
-  | 'image'
-  | 'audio'
-  | 'video'
-  | 'url'
-  | 'text'
-  | 'binary';
+export type AttachmentKind = 'file' | 'image' | 'audio' | 'video' | 'url' | 'text' | 'binary';
 
 export interface AttachmentRef {
   attachmentId: string;
@@ -50,17 +36,7 @@ export interface AttachmentRef {
 }
 
 export type ArtifactRefKind =
-  | 'file'
-  | 'code'
-  | 'diff'
-  | 'image'
-  | 'table'
-  | 'chart'
-  | 'json'
-  | 'log'
-  | 'link'
-  | 'binary'
-  | 'domain_object';
+  'file' | 'code' | 'diff' | 'image' | 'table' | 'chart' | 'json' | 'log' | 'link' | 'binary' | 'domain_object';
 
 export interface ArtifactRef {
   artifactId: string;
@@ -122,14 +98,7 @@ export interface ArtifactPreview {
 }
 
 export type ToolResultPreview =
-  | TextPreview
-  | CodePreview
-  | LogPreview
-  | DiffPreview
-  | ImagePreview
-  | TablePreview
-  | JsonPreview
-  | ArtifactPreview;
+  TextPreview | CodePreview | LogPreview | DiffPreview | ImagePreview | TablePreview | JsonPreview | ArtifactPreview;
 
 export type ReasoningConfidence = 'low' | 'medium' | 'high';
 
@@ -146,15 +115,7 @@ export type VisibleReasoningMode =
   | 'summary';
 
 export type PhaseKind =
-  | 'understand'
-  | 'plan'
-  | 'search'
-  | 'inspect'
-  | 'modify'
-  | 'execute'
-  | 'verify'
-  | 'summarize'
-  | 'custom';
+  'understand' | 'plan' | 'search' | 'inspect' | 'modify' | 'execute' | 'verify' | 'summarize' | 'custom';
 
 export interface TaskFrameNode extends BaseTraceNode {
   kind: 'task_frame';
@@ -230,17 +191,7 @@ export interface ToolActionNode extends BaseTraceNode {
 }
 
 export type ArtifactNodeKind =
-  | 'file'
-  | 'code'
-  | 'diff'
-  | 'image'
-  | 'table'
-  | 'chart'
-  | 'json'
-  | 'log'
-  | 'link'
-  | 'binary'
-  | 'domain_object';
+  'file' | 'code' | 'diff' | 'image' | 'table' | 'chart' | 'json' | 'log' | 'link' | 'binary' | 'domain_object';
 
 export interface ArtifactNode extends BaseTraceNode {
   kind: 'artifact';
@@ -318,16 +269,7 @@ export type TraceNode =
   | FinalResponseNode;
 
 export type ToolCategory =
-  | 'file'
-  | 'shell'
-  | 'code'
-  | 'browser'
-  | 'image'
-  | 'data'
-  | 'artifact'
-  | 'sub_agent'
-  | 'domain'
-  | 'unknown';
+  'file' | 'shell' | 'code' | 'browser' | 'image' | 'data' | 'artifact' | 'sub_agent' | 'domain' | 'unknown';
 
 export interface ObservationFact {
   label: string;

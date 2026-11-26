@@ -1,5 +1,9 @@
 import { useEffect } from 'react';
-import { reconcileCatalogProviders, startCatalogProjection, useEffectiveCatalogStore } from '../../stores/effectiveCatalogStore';
+import {
+  reconcileCatalogProviders,
+  startCatalogProjection,
+  useEffectiveCatalogStore,
+} from '../../stores/effectiveCatalogStore';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -11,18 +15,27 @@ export function useCatalogBootstrap(): void {
   // Model choices follow the effective catalog in the renderer; a catalog change needs no settings read.
   useEffect(() => startCatalogProjection(), []);
 
-  useEffect(() => window.electronAPI.events.onSettingsChanged(
-    (change) => useAppSettingsStore.getState().adoptSettingsChange(change),
-  ), []);
+  useEffect(
+    () =>
+      window.electronAPI.events.onSettingsChanged((change) =>
+        useAppSettingsStore.getState().adoptSettingsChange(change),
+      ),
+    [],
+  );
 
   useEffect(() => {
     if (!currentSessionId) return;
     for (const provider of useAppSettingsStore.getState().settings.llm.providers) {
-      if (provider.enabled !== false && provider.isConfigured) void useEffectiveCatalogStore.getState().load(provider, false, true);
+      if (provider.enabled !== false && provider.isConfigured)
+        void useEffectiveCatalogStore.getState().load(provider, false, true);
     }
   }, [currentSessionId]);
 
-  useEffect(() => window.electronAPI.events.onPlanReviewChanged(projection => usePlanReviewStore.getState().accept(projection)), []);
+  useEffect(
+    () =>
+      window.electronAPI.events.onPlanReviewChanged((projection) => usePlanReviewStore.getState().accept(projection)),
+    [],
+  );
 
   useEffect(() => {
     if (useAppSettingsStore.getState().hydrated) {

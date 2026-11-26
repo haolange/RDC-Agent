@@ -27,12 +27,22 @@ describe('desktop renderer API', () => {
 
   it('throws a failed call as RendererIpcError with its code, params and class', async () => {
     const { api } = fakeIpc({
-      [IPC_ERROR_KEY]: { code: 'CONVERSATION_BUSY', params: { sessions: 1 }, category: 'availability', technical: 'CONVERSATION_BUSY: a turn is running' },
+      [IPC_ERROR_KEY]: {
+        code: 'CONVERSATION_BUSY',
+        params: { sessions: 1 },
+        category: 'availability',
+        technical: 'CONVERSATION_BUSY: a turn is running',
+      },
     });
 
     const failure = await api.session.list().catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(RendererIpcError);
-    expect(failure).toMatchObject({ code: 'CONVERSATION_BUSY', params: { sessions: 1 }, category: 'availability', channel: 'session:list' });
+    expect(failure).toMatchObject({
+      code: 'CONVERSATION_BUSY',
+      params: { sessions: 1 },
+      category: 'availability',
+      channel: 'session:list',
+    });
   });
 
   it('routes settings mutations through the canonical settings:patch channel', async () => {

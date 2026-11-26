@@ -12,17 +12,17 @@ export type AuditOrigin = 'desktop' | 'browser-qa' | 'runtime';
 export type AuditEvent =
   | { kind: 'ipc'; channel: string; argumentsSha256: string; outcome: 'requested' | 'ok' | 'error'; errorCode?: string }
   | {
-    kind: 'tool-decision';
-    decidedBy: 'user' | 'auto-review' | 'policy';
-    approved: boolean;
-    tool: string;
-    toolCallId: string;
-    argumentsSha256: string;
-    risk?: 'low' | 'medium' | 'high';
-    sessionId?: string | null;
-    turnId?: string;
-    reason?: string;
-  }
+      kind: 'tool-decision';
+      decidedBy: 'user' | 'auto-review' | 'policy';
+      approved: boolean;
+      tool: string;
+      toolCallId: string;
+      argumentsSha256: string;
+      risk?: 'low' | 'medium' | 'high';
+      sessionId?: string | null;
+      turnId?: string;
+      reason?: string;
+    }
   | { kind: 'permission-settings'; from: AgentPermissionSettings; to: AgentPermissionSettings }
   /** An outbound request the person asked for: an image the model linked whose URL no non-model source supplied. */
   | { kind: 'network'; purpose: 'remote-image'; host: string; urlSha256: string; sessionId: string };
@@ -47,7 +47,11 @@ export function auditArgumentsHash(value: unknown): string {
 /** The decision was not recorded, so the action it describes must not happen. */
 export class AuditWriteFailedError extends AppError {
   constructor(cause: unknown) {
-    super('AUDIT_WRITE_FAILED', `the security audit log could not be written (${cause instanceof Error ? cause.message : String(cause)}); the action was not performed.`, { cause });
+    super(
+      'AUDIT_WRITE_FAILED',
+      `the security audit log could not be written (${cause instanceof Error ? cause.message : String(cause)}); the action was not performed.`,
+      { cause },
+    );
   }
 }
 

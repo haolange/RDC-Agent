@@ -19,8 +19,11 @@ export function announcementText(markdown: string): string {
   return `${(wordEnd > ANNOUNCE_LIMIT * 0.6 ? cut.slice(0, wordEnd) : cut).trimEnd()}…`;
 }
 
-const isSettledReply = (message: ConversationMessage) => message.role === 'assistant'
-  && message.status !== 'streaming' && message.status !== 'draft' && message.content.trim() !== '';
+const isSettledReply = (message: ConversationMessage) =>
+  message.role === 'assistant' &&
+  message.status !== 'streaming' &&
+  message.status !== 'draft' &&
+  message.content.trim() !== '';
 
 /**
  * The transcript's polite live region. Each assistant reply is read once, when it settles, so streaming text is not
@@ -52,7 +55,13 @@ export function ReplyAnnouncer() {
   }, [messages, t]);
 
   return (
-    <div className="visually-hidden" role="status" aria-live="polite" aria-atomic="true" data-testid="transcript-reply-announcer">
+    <div
+      className="visually-hidden"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      data-testid="transcript-reply-announcer"
+    >
       {announcement}
     </div>
   );

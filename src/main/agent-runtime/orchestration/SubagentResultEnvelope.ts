@@ -1,47 +1,137 @@
 import { AppError } from '@shared/errors/appError';
 import { formatSessionArtifactUri } from '../../sessions/artifacts/sessionArtifactContract';
-import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
+import {
+  sessionArtifactResolver,
+  type SessionArtifactResolver,
+} from '../../sessions/artifacts/SessionArtifactResolver';
 import type { TaskCompletionResult, TaskExecutionRecord } from '../tasks';
 import type { TurnCompletionDeclaration } from './TurnCoordinator';
 
-export interface PersistedSubagentResult { uri: string; hash: string }
-export interface DelegationSourceFailure { code: 'ARTIFACT_NOT_FOUND'; message: string }
-export function persistSubagentResult(sessionId: string, executionId: string, value: unknown, resolver: Pick<SessionArtifactResolver, 'write' | 'read'> = sessionArtifactResolver): PersistedSubagentResult {
+export interface PersistedSubagentResult {
+  uri: string;
+  hash: string;
+}
+export interface DelegationSourceFailure {
+  code: 'ARTIFACT_NOT_FOUND';
+  message: string;
+}
+export function persistSubagentResult(
+  sessionId: string,
+  executionId: string,
+  value: unknown,
+  resolver: Pick<SessionArtifactResolver, 'write' | 'read'> = sessionArtifactResolver,
+): PersistedSubagentResult {
   const serialized = JSON.stringify(value);
-  const chunks = Array.from({ length: Math.ceil(serialized.length / 4_000) }, (_, index) => serialized.slice(index * 4_000, (index + 1) * 4_000));
-  const saved = resolver.write(sessionId, formatSessionArtifactUri('tool-outputs', `subagent-${executionId}.json`), JSON.stringify({ encoding: 'json-chunks', reconstruction: 'Join chunks without separators, then parse JSON.', chunks }, null, 2), { mimeType: 'application/json' });
+  const chunks = Array.from({ length: Math.ceil(serialized.length / 4_000) }, (_, index) =>
+    serialized.slice(index * 4_000, (index + 1) * 4_000),
+  );
+  const saved = resolver.write(
+    sessionId,
+    formatSessionArtifactUri('tool-outputs', `subagent-${executionId}.json`),
+    JSON.stringify(
+      { encoding: 'json-chunks', reconstruction: 'Join chunks without separators, then parse JSON.', chunks },
+      null,
+      2,
+    ),
+    { mimeType: 'application/json' },
+  );
   const verified = resolver.read(sessionId, saved.uri, { expectedHash: saved.hash, limit: 1 });
-  if (verified.hash !== saved.hash) throw new AppError('SUBAGENT_RESULT_VERIFY_FAILED', 'persisted result hash differs on readback.');
+  if (verified.hash !== saved.hash)
+    throw new AppError('SUBAGENT_RESULT_VERIFY_FAILED', 'persisted result hash differs on readback.');
   return { uri: saved.uri, hash: saved.hash };
 }
-export function normalizeSubagentResult(text: string, status: 'complete' | 'failed' | 'cancelled', declaration: TurnCompletionDeclaration | null | undefined, artifact?: PersistedSubagentResult, sourceFailure?: DelegationSourceFailure): TaskCompletionResult {
-  const resultRef = artifact?.uri; const resultHash = artifact?.hash;
+export function normalizeSubagentResult(
+  text: string,
+  status: 'complete' | 'failed' | 'cancelled',
+  declaration: TurnCompletionDeclaration | null | undefined,
+  artifact?: PersistedSubagentResult,
+  sourceFailure?: DelegationSourceFailure,
+): TaskCompletionResult {
+  const resultRef = artifact?.uri;
+  const resultHash = artifact?.hash;
   if (status === 'cancelled') {
-    if (text.startsWith('POLICY_LIMIT_EXCEEDED: maxWallTimeMs')) return {
-      disposition: 'blocked', summary: 'Subagent execution exceeded its wall-time budget.',
-      outputs: {}, error: 'POLICY_LIMIT_EXCEEDED: maxWallTimeMs', resultRef, resultHash,
-    };
+    if (text.startsWith('POLICY_LIMIT_EXCEEDED: maxWallTimeMs'))
+      return {
+        disposition: 'blocked',
+        summary: 'Subagent execution exceeded its wall-time budget.',
+        outputs: {},
+        error: 'POLICY_LIMIT_EXCEEDED: maxWallTimeMs',
+        resultRef,
+        resultHash,
+      };
     return { disposition: 'cancelled', summary: 'Subagent execution cancelled.', outputs: {}, resultRef, resultHash };
   }
   if (status === 'failed') {
-    if (sourceFailure) return {
-      disposition: 'blocked', summary: sourceFailure.message, outputs: {}, error: sourceFailure.code, resultRef, resultHash,
+    if (sourceFailure)
+      return {
+        disposition: 'blocked',
+        summary: sourceFailure.message,
+        outputs: {},
+        error: sourceFailure.code,
+        resultRef,
+        resultHash,
+      };
+    if (text.startsWith('DELEGATION_PREPARATION_CONFLICT:'))
+      return {
+        disposition: 'blocked',
+        summary: text,
+        outputs: {},
+        error: 'DELEGATION_PREPARATION_CONFLICT',
+        resultRef,
+        resultHash,
+      };
+    return {
+      disposition: 'blocked',
+      summary: 'Subagent execution failed; inspect the durable result artifact.',
+      outputs: {},
+      error: 'SUBAGENT_EXECUTION_FAILED',
+      resultRef,
+      resultHash,
     };
-    if (text.startsWith('DELEGATION_PREPARATION_CONFLICT:')) return {
-      disposition: 'blocked', summary: text, outputs: {}, error: 'DELEGATION_PREPARATION_CONFLICT', resultRef, resultHash,
-    };
-    return { disposition: 'blocked', summary: 'Subagent execution failed; inspect the durable result artifact.', outputs: {}, error: 'SUBAGENT_EXECUTION_FAILED', resultRef, resultHash };
   }
-  if (declaration?.result) { const result = declaration.result; return { disposition: declaration.disposition === 'budget_paused' ? 'blocked' : declaration.disposition, summary: result.summary, outputs: { ...result.outputs }, resultRef, resultHash, evidenceRefs: [...declaration.evidenceRefs], counterevidence: [...result.counterevidence], unresolved: [...result.unresolved], scope: result.scope, sideEffects: [...result.sideEffects], recoveryState: [...result.recoveryState] }; }
+  if (declaration?.result) {
+    const result = declaration.result;
+    return {
+      disposition: declaration.disposition === 'budget_paused' ? 'blocked' : declaration.disposition,
+      summary: result.summary,
+      outputs: { ...result.outputs },
+      resultRef,
+      resultHash,
+      evidenceRefs: [...declaration.evidenceRefs],
+      counterevidence: [...result.counterevidence],
+      unresolved: [...result.unresolved],
+      scope: result.scope,
+      sideEffects: [...result.sideEffects],
+      recoveryState: [...result.recoveryState],
+    };
+  }
   void text; // Unstructured transcript is preserved in the result artifact, never promoted into parent input.
-  return { disposition: 'partial', summary: 'No structured result was returned; inspect the durable result artifact.', outputs: {}, error: 'SUBAGENT_STRUCTURED_RESULT_MISSING', resultRef, resultHash, unresolved: [{ gap: 'The child returned no structured result.', attempted: 'Read the delegated turn outcome.', blocker: 'external', resumeWhen: 'The durable result artifact is inspected or the delegation is repeated with a structured turn_complete.' }], missingRequirements: ['Structured result envelope'] };
+  return {
+    disposition: 'partial',
+    summary: 'No structured result was returned; inspect the durable result artifact.',
+    outputs: {},
+    error: 'SUBAGENT_STRUCTURED_RESULT_MISSING',
+    resultRef,
+    resultHash,
+    unresolved: [
+      {
+        gap: 'The child returned no structured result.',
+        attempted: 'Read the delegated turn outcome.',
+        blocker: 'external',
+        resumeWhen:
+          'The durable result artifact is inspected or the delegation is repeated with a structured turn_complete.',
+      },
+    ],
+    missingRequirements: ['Structured result envelope'],
+  };
 }
 /** Bounded parent data: omitted fields are explicit and remain recoverable in resultRef. */
 export function projectSubagentResult(result: TaskCompletionResult) {
   const externalizedFields: string[] = [];
   function keep<T>(field: string, value: T, maxBytes: number, empty: T): T {
     if (Buffer.byteLength((JSON.stringify(value) as string | undefined) ?? '', 'utf8') <= maxBytes) return value;
-    externalizedFields.push(field); return empty;
+    externalizedFields.push(field);
+    return empty;
   }
   const projection = {
     disposition: result.disposition,
@@ -52,18 +142,37 @@ export function projectSubagentResult(result: TaskCompletionResult) {
     evidenceRefs: keep('evidenceRefs', result.evidenceRefs ?? [], 2_000, []),
     counterevidence: keep('counterevidence', result.counterevidence ?? [], 1_000, []),
     unresolved: keep('unresolved', result.unresolved ?? [], 1_000, []),
-    scope: keep('scope', result.scope ?? '', 1_000, 'Scope externalized; do not generalize without reading the result artifact.'),
+    scope: keep(
+      'scope',
+      result.scope ?? '',
+      1_000,
+      'Scope externalized; do not generalize without reading the result artifact.',
+    ),
     sideEffects: keep('sideEffects', result.sideEffects ?? [], 1_000, []),
     recoveryState: keep('recoveryState', result.recoveryState ?? [], 1_000, []),
     missingRequirements: keep('missingRequirements', result.missingRequirements ?? [], 1_000, []),
     error: result.error ? keep('error', result.error, 500, 'Error details externalized.') : undefined,
     externalizedFields,
   };
-  if (externalizedFields.length && (!result.resultRef || !result.resultHash)) throw new AppError('SUBAGENT_RESULT_REFERENCE_REQUIRED', 'cannot omit structured fields without a durable result reference.');
+  if (externalizedFields.length && (!result.resultRef || !result.resultHash))
+    throw new AppError(
+      'SUBAGENT_RESULT_REFERENCE_REQUIRED',
+      'cannot omit structured fields without a durable result reference.',
+    );
   return projection;
 }
 export function projectSubagentExecution(execution: TaskExecutionRecord | null | undefined) {
   if (!execution) return undefined;
-  return { id: execution.id, taskId: execution.taskId, generation: execution.generation, status: execution.status, budget: execution.budget, frozenPlanRef: execution.frozenPlanRef, result: execution.result ? projectSubagentResult(execution.result) : undefined };
+  return {
+    id: execution.id,
+    taskId: execution.taskId,
+    generation: execution.generation,
+    status: execution.status,
+    budget: execution.budget,
+    frozenPlanRef: execution.frozenPlanRef,
+    result: execution.result ? projectSubagentResult(execution.result) : undefined,
+  };
 }
-export function bounded(value: string, max: number): string { return value.length <= max ? value : `${value.slice(0, max - 20)}\n...[truncated]`; }
+export function bounded(value: string, max: number): string {
+  return value.length <= max ? value : `${value.slice(0, max - 20)}\n...[truncated]`;
+}

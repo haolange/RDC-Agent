@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  isActiveThinkingStatus,
-  isActiveWorkProcessStatus,
-} from './workProcessActiveSignal';
+import { isActiveThinkingStatus, isActiveWorkProcessStatus } from './workProcessActiveSignal';
 
 describe('workProcessActiveSignal', () => {
   it('activates only live Work Process statuses', () => {

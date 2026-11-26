@@ -15,7 +15,12 @@ const unsubscribe = vi.fn();
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('electronAPI', {
-    events: { onKnowledgeProgress: (callback: typeof report) => { report = callback; return unsubscribe; } },
+    events: {
+      onKnowledgeProgress: (callback: typeof report) => {
+        report = callback;
+        return unsubscribe;
+      },
+    },
     knowledge: { cancel },
   });
   cancel.mockClear();
@@ -39,7 +44,7 @@ async function mountOperation(): Promise<{ current: () => KnowledgeOperationCont
   return { current: () => latest };
 }
 
-it('follows only its own run\'s progress, cancels that run by id and settles a cancel as a neutral outcome', async () => {
+it("follows only its own run's progress, cancels that run by id and settles a cancel as a neutral outcome", async () => {
   const operation = await mountOperation();
   let operationId = '';
   let fail!: (error: unknown) => void;
@@ -47,7 +52,9 @@ it('follows only its own run\'s progress, cancels that run by id and settles a c
   await act(async () => {
     outcome = operation.current().run((id) => {
       operationId = id;
-      return new Promise((_, reject) => { fail = reject; });
+      return new Promise((_, reject) => {
+        fail = reject;
+      });
     });
   });
   expect(operation.current().running).toBe(true);
@@ -62,9 +69,15 @@ it('follows only its own run\'s progress, cancels that run by id and settles a c
   expect(cancel).toHaveBeenCalledWith({ operationId });
   expect(operation.current().cancelling).toBe(true);
 
-  await act(async () => fail(new RendererIpcError('knowledge:import', {
-    code: 'KNOWLEDGE_OPERATION_CANCELLED', params: {}, category: 'availability',
-  })));
+  await act(async () =>
+    fail(
+      new RendererIpcError('knowledge:import', {
+        code: 'KNOWLEDGE_OPERATION_CANCELLED',
+        params: {},
+        category: 'availability',
+      }),
+    ),
+  );
   await expect(outcome).resolves.toEqual({ cancelled: true });
   expect(operation.current().running).toBe(false);
   expect(operation.current().cancelling).toBe(false);

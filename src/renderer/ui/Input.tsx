@@ -10,13 +10,7 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  {
-    inputSize = 'md',
-    error = false,
-    className,
-    disabled,
-    ...rest
-  },
+  { inputSize = 'md', error = false, className, disabled, ...rest },
   ref,
 ) {
   return (

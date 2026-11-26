@@ -8,10 +8,7 @@ import { useComposerEffectiveModel } from '../../hooks/useComposerEffectiveModel
 import { Button } from '../../ui/Button';
 import { InlineError } from '../../ui/InlineError';
 import { filterComposerPickerOptions } from './composerModelPicker';
-import {
-  resolveComposerAgentDefaultState,
-  type ComposerAgentDefaultState,
-} from './composerAgentDefaultModel';
+import { resolveComposerAgentDefaultState, type ComposerAgentDefaultState } from './composerAgentDefaultModel';
 import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
 import { ComposerModelList } from './ComposerModelPickerList';
@@ -46,24 +43,30 @@ export const ComposerModelPickerPanel: React.FC<{
   const [saving, setSaving] = useState(false);
   const mounted = useRef(true);
   const savingRef = useRef(false);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const providers = useAppSettingsStore((state) => state.settings.llm.providers);
   useEffect(() => {
-    for (const provider of providers.filter(entry => entry.enabled && entry.isConfigured)) {
+    for (const provider of providers.filter((entry) => entry.enabled && entry.isConfigured)) {
       void useEffectiveCatalogStore.getState().load(provider, false, true);
     }
   }, [providers]);
   const agentRoute = useAppSettingsStore((state) => readCompiledComposerRoute(state.settings, agentId));
-  const agentName = useAppSettingsStore((state) => (
-    state.settings.agents.definitions.find((entry) => entry.id === agentId)?.name || agentId
-  ));
+  const agentName = useAppSettingsStore(
+    (state) => state.settings.agents.definitions.find((entry) => entry.id === agentId)?.name || agentId,
+  );
   const { options, providerStates, loading, retry } = useComposerModelPickerOptions(providers);
   const { effective, hasChoice, projectId } = useComposerEffectiveModel(agentId, currentSession);
   const agentDefault = resolveComposerAgentDefaultState(agentRoute, options, !loading);
   const agentDefaultMeta = formatAgentDefaultMeta(agentDefault, agentName, t);
-  const agentDefaultTitle = agentDefault.kind === 'unavailable' && agentDefault.providerId && agentDefault.modelId
-    ? `${agentDefault.providerId} / ${agentDefault.modelId}`
-    : t('composer.model.agentDefaultTitle', { name: agentName });
+  const agentDefaultTitle =
+    agentDefault.kind === 'unavailable' && agentDefault.providerId && agentDefault.modelId
+      ? `${agentDefault.providerId} / ${agentDefault.modelId}`
+      : t('composer.model.agentDefaultTitle', { name: agentName });
   // One section per connected provider, in settings order: its matching models plus, when it has one,
   // the provider's own loading / refresh-failed / empty notice, so a failure sits next to what it affects.
   const sections = useMemo(() => {
@@ -101,11 +104,8 @@ export const ComposerModelPickerPanel: React.FC<{
     }
     onChosen();
   };
-  const selectModel = (next: { providerId: string; modelId: string }) => save(() => commitComposerModelChoice(
-    next,
-    currentSession?.sessionId,
-    projectId,
-  ));
+  const selectModel = (next: { providerId: string; modelId: string }) =>
+    save(() => commitComposerModelChoice(next, currentSession?.sessionId, projectId));
   const selectAgentDefault = async () => {
     if (!agentDefault.selectable) return;
     await save(() => clearComposerModelChoice(currentSession?.sessionId, projectId));
@@ -161,7 +161,9 @@ export const ComposerModelPickerPanel: React.FC<{
           aria-label={t('composer.model.searchPlaceholder')}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <Button variant="ghost" size="sm"
+        <Button
+          variant="ghost"
+          size="sm"
           type="button"
           className={`composer-model-item composer-model-default${hasChoice ? '' : ' is-selected'}`}
           data-testid="composer-model-agent-default"
@@ -174,11 +176,21 @@ export const ComposerModelPickerPanel: React.FC<{
           <span className="composer-model-item-label">{t('composer.model.agentDefault')}</span>
           <span className="composer-model-item-meta">{agentDefaultMeta}</span>
         </Button>
-        {saving ? <p className="composer-model-empty" role="status">{t('settings.saving')}</p> : null}
+        {saving ? (
+          <p className="composer-model-empty" role="status">
+            {t('settings.saving')}
+          </p>
+        ) : null}
         {saveError ? <InlineError>{saveError}</InlineError> : null}
       </div>
-      <ComposerModelList sections={sections} loading={loading} effective={effective} saving={saving}
-        onSelect={(choice) => void selectModel(choice)} onRetry={retry} />
+      <ComposerModelList
+        sections={sections}
+        loading={loading}
+        effective={effective}
+        saving={saving}
+        onSelect={(choice) => void selectModel(choice)}
+        onRetry={retry}
+      />
     </div>
   );
 };

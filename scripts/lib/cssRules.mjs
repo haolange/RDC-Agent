@@ -2,7 +2,8 @@
 // It understands nesting through braces only, which is all renderer CSS uses (no CSS nesting syntax).
 
 /** Comments blanked to spaces so offsets and line numbers stay true. */
-export const stripCssComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ' '));
+export const stripCssComments = (text) =>
+  text.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ' '));
 
 /** Splits on commas outside parentheses: `a:is(:hover, :focus), b` yields two selectors. */
 export function splitTopLevel(value, separator = ',') {

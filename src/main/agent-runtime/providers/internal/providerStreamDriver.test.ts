@@ -30,12 +30,23 @@ const requestPlan = createTestRequestPlan({
   fastMode: false,
   reasoningWire: { selection: 'unknown', control: { kind: 'none' } },
 } as never);
-const model = { id: 'm', name: 'm', provider: 'fixture', api: 'fixture', contextWindow: 128_000, maxTokens: 1024 } as Model;
+const model = {
+  id: 'm',
+  name: 'm',
+  provider: 'fixture',
+  api: 'fixture',
+  contextWindow: 128_000,
+  maxTokens: 1024,
+} as Model;
 const options: StreamOptions = { requestPlan, firstChunkTimeoutMs: 2_000, streamIdleTimeoutMs: 2_000 };
 const textRef = createProviderOutputRef({ protocol: 'fixture', providerBlockKey: 'text:0', contentIndex: 0 });
 
 const FrameSchema = z.object({ text: z.string() });
-const sseFrames: ProviderFrameStream<z.infer<typeof FrameSchema>> = { providerApi: 'fixture', framing: 'sse', frameSchema: FrameSchema };
+const sseFrames: ProviderFrameStream<z.infer<typeof FrameSchema>> = {
+  providerApi: 'fixture',
+  framing: 'sse',
+  frameSchema: FrameSchema,
+};
 const lineFrames: ProviderFrameStream<z.infer<typeof FrameSchema>> = { ...sseFrames, framing: 'json-lines' };
 
 async function collect<T>(frames: AsyncIterable<T>): Promise<T[]> {
@@ -44,7 +55,9 @@ async function collect<T>(frames: AsyncIterable<T>): Promise<T[]> {
   return out;
 }
 
-async function errorEvent(stream: AsyncIterable<AssistantMessageEvent>): Promise<Extract<AssistantMessageEvent, { type: 'error' }> | undefined> {
+async function errorEvent(
+  stream: AsyncIterable<AssistantMessageEvent>,
+): Promise<Extract<AssistantMessageEvent, { type: 'error' }> | undefined> {
   let failure: Extract<AssistantMessageEvent, { type: 'error' }> | undefined;
   try {
     for await (const event of stream) if (event.type === 'error') failure = event;
@@ -97,7 +110,10 @@ describe('httpStreamFailure', () => {
     const timeout = new ProviderTimeoutError('fixture', 'total', 10);
     controller.abort(timeout);
 
-    expect(httpStreamFailure(new DOMException('aborted', 'AbortError'), controller.signal)).toEqual({ error: timeout, reason: 'error' });
+    expect(httpStreamFailure(new DOMException('aborted', 'AbortError'), controller.signal)).toEqual({
+      error: timeout,
+      reason: 'error',
+    });
   });
 
   it('reports a user abort as aborted and any other error as thrown', () => {
@@ -116,7 +132,10 @@ describe('sendProviderRequest', () => {
   it('signs the exact body text it sends and returns an OK response', async () => {
     const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response('', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
-    const authorizer = vi.fn(async (input: { headers: Record<string, string> }) => ({ ...input.headers, authorization: 'signed' }));
+    const authorizer = vi.fn(async (input: { headers: Record<string, string> }) => ({
+      ...input.headers,
+      authorization: 'signed',
+    }));
     const signal = new AbortController().signal;
 
     const response = await sendProviderRequest('fixture', requestPlan, signal, {
@@ -142,13 +161,18 @@ describe('sendProviderRequest', () => {
   });
 
   it('turns a failed status into a provider HTTP error', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('upstream down', { status: 503 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('upstream down', { status: 503 })),
+    );
 
-    await expect(sendProviderRequest('fixture', requestPlan, new AbortController().signal, {
-      url: 'https://provider.fixture/chat',
-      headers: {},
-      body: {},
-    })).rejects.toMatchObject({ name: 'ProviderHttpError', status: 503 });
+    await expect(
+      sendProviderRequest('fixture', requestPlan, new AbortController().signal, {
+        url: 'https://provider.fixture/chat',
+        headers: {},
+        body: {},
+      }),
+    ).rejects.toMatchObject({ name: 'ProviderHttpError', status: 503 });
   });
 });
 
@@ -159,20 +183,35 @@ describe('readProviderFrames', () => {
     const lines = new Response('{"text":"a"}\n{"text":"b"}\n');
     const events = new Response('data: {"text":"a"}\n\ndata: [DONE]\n\ndata: {"text":"after"}\n\n');
 
-    expect(await collect(readProviderFrames(lines, signal, options, lineFrames))).toEqual([{ text: 'a' }, { text: 'b' }]);
-    expect(await collect(readProviderFrames(events, signal, options, sseFrames, onDoneSentinel))).toEqual([{ text: 'a' }]);
+    expect(await collect(readProviderFrames(lines, signal, options, lineFrames))).toEqual([
+      { text: 'a' },
+      { text: 'b' },
+    ]);
+    expect(await collect(readProviderFrames(events, signal, options, sseFrames, onDoneSentinel))).toEqual([
+      { text: 'a' },
+    ]);
     expect(onDoneSentinel).toHaveBeenCalledOnce();
   });
 
   it('fails on a frame of another shape instead of skipping it', async () => {
-    const frames = readProviderFrames(new Response('data: {"text":1}\n\n'), new AbortController().signal, options, sseFrames);
+    const frames = readProviderFrames(
+      new Response('data: {"text":1}\n\n'),
+      new AbortController().signal,
+      options,
+      sseFrames,
+    );
 
     await expect(collect(frames)).rejects.toMatchObject({ code: 'PROVIDER_STREAM_MALFORMED_FRAME' });
   });
 
   it('stops yielding once the signal aborted and leaves reporting the abort to the driver', async () => {
     const controller = new AbortController();
-    const frames = readProviderFrames(new Response('{"text":"a"}\n{"text":"b"}\n'), controller.signal, options, lineFrames);
+    const frames = readProviderFrames(
+      new Response('{"text":"a"}\n{"text":"b"}\n'),
+      controller.signal,
+      options,
+      lineFrames,
+    );
     const seen: string[] = [];
     for await (const frame of frames) {
       seen.push(frame.text);

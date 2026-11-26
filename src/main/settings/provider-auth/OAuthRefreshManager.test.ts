@@ -6,9 +6,12 @@ describe('OAuthRefreshManager', () => {
 
   it('deduplicates concurrent refresh and commits a rotated token once', async () => {
     let resolveRefresh: ((value: { access: string; refresh: string }) => void) | undefined;
-    const refresh = vi.fn(() => new Promise<{ access: string; refresh: string }>((resolve) => {
-      resolveRefresh = resolve;
-    }));
+    const refresh = vi.fn(
+      () =>
+        new Promise<{ access: string; refresh: string }>((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
     const commit = vi.fn();
     const manager = new OAuthRefreshManager(() => 1_000);
     const request = {
@@ -33,27 +36,33 @@ describe('OAuthRefreshManager', () => {
     const manager = new OAuthRefreshManager(() => 1_000);
     const refresh = vi.fn(async () => ({ access: 'new' }));
     const current = { access: 'old' };
-    await expect(manager.refresh({
-      key,
-      current,
-      expiresAt: new Date(120_000).toISOString(),
-      refresh,
-      commit: vi.fn(),
-    })).resolves.toBe(current);
+    await expect(
+      manager.refresh({
+        key,
+        current,
+        expiresAt: new Date(120_000).toISOString(),
+        refresh,
+        commit: vi.fn(),
+      }),
+    ).resolves.toBe(current);
     expect(refresh).not.toHaveBeenCalled();
   });
 
   it('normalizes invalid_grant and invokes the account failure hook', async () => {
     const manager = new OAuthRefreshManager();
     const onInvalidGrant = vi.fn();
-    await expect(manager.refresh({
-      key,
-      current: { access: 'old' },
-      force: true,
-      refresh: async () => { throw new Error('invalid_grant'); },
-      commit: vi.fn(),
-      onInvalidGrant,
-    })).rejects.toBeInstanceOf(OAuthRefreshError);
+    await expect(
+      manager.refresh({
+        key,
+        current: { access: 'old' },
+        force: true,
+        refresh: async () => {
+          throw new Error('invalid_grant');
+        },
+        commit: vi.fn(),
+        onInvalidGrant,
+      }),
+    ).rejects.toBeInstanceOf(OAuthRefreshError);
     expect(onInvalidGrant).toHaveBeenCalledOnce();
   });
 });

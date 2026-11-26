@@ -29,13 +29,17 @@ vi.mock('../../sessions/store/sessionStores', async () => {
         if (disk.failOfferWrite) throw new Error('disk full');
         disk.offer = structuredClone(offer);
       },
-      clear: () => { disk.offer = null; },
+      clear: () => {
+        disk.offer = null;
+      },
     },
   };
 });
 vi.mock('../../hooks/runtimeHookDispatch', () => ({ dispatchRuntimeHooks: disk.hooks }));
 vi.mock('./sessionModelGate', () => ({ assertSessionModelAndControls: disk.model }));
-vi.mock('../../settings/agent-manifests/effectiveAgentSnapshot', () => ({ resolveEnabledAgentDefinition: disk.profiles }));
+vi.mock('../../settings/agent-manifests/effectiveAgentSnapshot', () => ({
+  resolveEnabledAgentDefinition: disk.profiles,
+}));
 vi.mock('./handoffSkillCompatibility', () => ({ assertDeclaredHandoffSkillCompatibility: vi.fn() }));
 
 import { sessionRevisions } from '../../sessions/store/SessionRevisionRegistry';
@@ -47,32 +51,69 @@ import type { SessionRecord } from '@shared/types/session';
 
 const hash = 'a'.repeat(64);
 const planReview: ConversationPlanReview = {
-  planId: 'plan-1', revision: 2, uri: 'session://plans/plan.md', hash, title: 'Find the drop', summary: [], sections: [],
-  status: 'awaiting', handoffOptions: [{ agent: 'general', label: 'Execute with General' }],
+  planId: 'plan-1',
+  revision: 2,
+  uri: 'session://plans/plan.md',
+  hash,
+  title: 'Find the drop',
+  summary: [],
+  sections: [],
+  status: 'awaiting',
+  handoffOptions: [{ agent: 'general', label: 'Execute with General' }],
 };
-const declared = { agent: 'general', label: 'Execute with General', prompt: 'Execute the frozen plan.', send: true,
-  requiredSkillIds: ['renderdoc-execution'] };
-const awaiting: PlanReviewStateDocument = { schemaVersion: '1', planId: 'plan-1', ownerTurnId: 'turn-1', revision: 2,
-  status: 'awaiting', updatedAt: 100 };
-const priorOffer: ExecutionOffer = { schemaVersion: '1', sourceAgentId: 'debugger', targetAgentId: 'general',
-  plan: { uri: 'session://plans/plan-old.md', hash: 'b'.repeat(64) }, requiredSkillIds: [], label: 'Execute with General',
-  prompt: 'Earlier plan.', approvedAt: 50 };
+const declared = {
+  agent: 'general',
+  label: 'Execute with General',
+  prompt: 'Execute the frozen plan.',
+  send: true,
+  requiredSkillIds: ['renderdoc-execution'],
+};
+const awaiting: PlanReviewStateDocument = {
+  schemaVersion: '1',
+  planId: 'plan-1',
+  ownerTurnId: 'turn-1',
+  revision: 2,
+  status: 'awaiting',
+  updatedAt: 100,
+};
+const priorOffer: ExecutionOffer = {
+  schemaVersion: '1',
+  sourceAgentId: 'debugger',
+  targetAgentId: 'general',
+  plan: { uri: 'session://plans/plan-old.md', hash: 'b'.repeat(64) },
+  requiredSkillIds: [],
+  label: 'Execute with General',
+  prompt: 'Earlier plan.',
+  approvedAt: 50,
+};
 
 function deps(overrides: Partial<PlanApprovalDeps> = {}): PlanApprovalDeps & { diagnostics: string[] } {
   const diagnostics: string[] = [];
   return {
     diagnostics,
     writer: {
-      stageFrozenPlan: (_id, expected) => ({ uri: 'session://plans/plan-frozen.md', markdown: '# Find the drop', hash: expected, taskRequirements: [] }),
-      writeFrozenPlan: (_id, staged) => { disk.frozen.set(staged.uri, staged.markdown); },
-      discardFrozenPlan: (_id, uri) => { disk.frozen.delete(uri); },
+      stageFrozenPlan: (_id, expected) => ({
+        uri: 'session://plans/plan-frozen.md',
+        markdown: '# Find the drop',
+        hash: expected,
+        taskRequirements: [],
+      }),
+      writeFrozenPlan: (_id, staged) => {
+        disk.frozen.set(staged.uri, staged.markdown);
+      },
+      discardFrozenPlan: (_id, uri) => {
+        disk.frozen.delete(uri);
+      },
     },
     store: {
       assertAwaiting: () => {
-        if (disk.state?.status !== 'awaiting') throw new Error('PLAN_REVIEW_SCOPE_CHANGED: this review no longer owns the current plan.');
+        if (disk.state?.status !== 'awaiting')
+          throw new Error('PLAN_REVIEW_SCOPE_CHANGED: this review no longer owns the current plan.');
         return disk.state;
       },
-      replace: (_id, document) => { disk.state = structuredClone(document); },
+      replace: (_id, document) => {
+        disk.state = structuredClone(document);
+      },
     },
     installTaskRevisions: vi.fn(async () => undefined),
     isCurrent: () => true,
@@ -83,9 +124,14 @@ function deps(overrides: Partial<PlanApprovalDeps> = {}): PlanApprovalDeps & { d
 
 function input(patch: Partial<PlanApprovalInput> = {}): PlanApprovalInput {
   return {
-    sessionId: 'sess', turnId: 'turn-1', sourceAgentId: 'debugger', planReview,
-    handoff: { agent: 'general', label: 'Execute with General' }, expectedPlanHash: hash,
-    model: { providerId: 'p', modelId: 'm' }, controls: { reasoningLevel: 'high', fastModel: false, maxContextMode: false },
+    sessionId: 'sess',
+    turnId: 'turn-1',
+    sourceAgentId: 'debugger',
+    planReview,
+    handoff: { agent: 'general', label: 'Execute with General' },
+    expectedPlanHash: hash,
+    model: { providerId: 'p', modelId: 'm' },
+    controls: { reasoningLevel: 'high', fastModel: false, maxContextMode: false },
     baseRevision: sessionRevisions.revisionOf('sess'),
     ...patch,
   };
@@ -101,8 +147,17 @@ function expectNothingCommitted() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  disk.session = { schemaVersion: '1', sessionId: 'sess', projectId: 'proj', title: 'S', goal: '', sessionPath: '/s',
-    createdAt: 1, updatedAt: 1, agentId: 'debugger' };
+  disk.session = {
+    schemaVersion: '1',
+    sessionId: 'sess',
+    projectId: 'proj',
+    title: 'S',
+    goal: '',
+    sessionPath: '/s',
+    createdAt: 1,
+    updatedAt: 1,
+    agentId: 'debugger',
+  };
   sessionRevisions.written(disk.session);
   disk.offer = structuredClone(priorOffer);
   disk.state = structuredClone(awaiting);
@@ -110,19 +165,33 @@ beforeEach(() => {
   disk.failOfferWrite = false;
   disk.hooks.mockResolvedValue(true);
   disk.model.mockResolvedValue(undefined);
-  disk.profiles.mockImplementation((agentId: string) => (agentId === 'debugger' ? { id: 'debugger', handoffs: [declared] } : { id: agentId, skills: [] }));
+  disk.profiles.mockImplementation((agentId: string) =>
+    agentId === 'debugger' ? { id: 'debugger', handoffs: [declared] } : { id: agentId, skills: [] },
+  );
 });
 
 it('commits the frozen plan, plan state, offer and the session Agent, model and controls together', async () => {
   const result = await runPlanApprovalTransaction(input(), deps());
 
   expect(disk.frozen.get('session://plans/plan-frozen.md')).toBe('# Find the drop');
-  expect(disk.state).toMatchObject({ status: 'approved', approvedHash: hash, frozenUri: 'session://plans/plan-frozen.md',
-    approvedHandoff: { agent: 'general', label: 'Execute with General' } });
-  expect(disk.offer).toMatchObject({ sourceAgentId: 'debugger', targetAgentId: 'general', requiredSkillIds: ['renderdoc-execution'],
-    plan: { uri: 'session://plans/plan-frozen.md', hash }, approvedAt: disk.state!.updatedAt });
-  expect(disk.session).toMatchObject({ agentId: 'general', modelOverride: { providerId: 'p', modelId: 'm' },
-    turnControls: { reasoningLevel: 'high', fastModel: false, maxContextMode: false } });
+  expect(disk.state).toMatchObject({
+    status: 'approved',
+    approvedHash: hash,
+    frozenUri: 'session://plans/plan-frozen.md',
+    approvedHandoff: { agent: 'general', label: 'Execute with General' },
+  });
+  expect(disk.offer).toMatchObject({
+    sourceAgentId: 'debugger',
+    targetAgentId: 'general',
+    requiredSkillIds: ['renderdoc-execution'],
+    plan: { uri: 'session://plans/plan-frozen.md', hash },
+    approvedAt: disk.state!.updatedAt,
+  });
+  expect(disk.session).toMatchObject({
+    agentId: 'general',
+    modelOverride: { providerId: 'p', modelId: 'm' },
+    turnControls: { reasoningLevel: 'high', fastModel: false, maxContextMode: false },
+  });
   expect(result.session).toEqual({ record: disk.session, revision: sessionRevisions.revisionOf('sess') });
   expect(result.handoff).toMatchObject({ prompt: 'Execute the frozen plan.', send: true });
   expect(disk.hooks.mock.calls.map(([event]) => event)).toEqual(['agent.before-handoff', 'agent.after-handoff']);
@@ -157,8 +226,16 @@ it('keeps a committed approval and reports a diagnostic when agent.after-handoff
 
 it.each([
   ['a stale plan hash', () => input({ expectedPlanHash: 'c'.repeat(64) }), 'PLAN_HASH_MISMATCH'],
-  ['a stale session revision', () => input({ baseRevision: { ...sessionRevisions.revisionOf('sess'), n: 0 } }), 'SESSION_REVISION_STALE'],
-  ['a revision from an earlier main process', () => input({ baseRevision: { epoch: 'earlier-run', n: sessionRevisions.revisionOf('sess').n } }), 'SESSION_REVISION_STALE'],
+  [
+    'a stale session revision',
+    () => input({ baseRevision: { ...sessionRevisions.revisionOf('sess'), n: 0 } }),
+    'SESSION_REVISION_STALE',
+  ],
+  [
+    'a revision from an earlier main process',
+    () => input({ baseRevision: { epoch: 'earlier-run', n: sessionRevisions.revisionOf('sess').n } }),
+    'SESSION_REVISION_STALE',
+  ],
 ])('rejects %s before any effect', async (_name, build, code) => {
   await expect(runPlanApprovalTransaction(build(), deps())).rejects.toMatchObject({ code });
   expectNothingCommitted();
@@ -166,6 +243,8 @@ it.each([
 });
 
 it('does not commit an approval whose review was cancelled while the hooks ran', async () => {
-  await expect(runPlanApprovalTransaction(input(), deps({ isCurrent: () => false }))).rejects.toMatchObject({ code: 'PLAN_REVIEW_SCOPE_CHANGED' });
+  await expect(runPlanApprovalTransaction(input(), deps({ isCurrent: () => false }))).rejects.toMatchObject({
+    code: 'PLAN_REVIEW_SCOPE_CHANGED',
+  });
   expectNothingCommitted();
 });

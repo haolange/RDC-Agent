@@ -3,18 +3,20 @@ import { AppError } from '@shared/errors/appError';
 import type { MissionKind, RunRecord } from '@shared/types/session';
 import type { PersistedRunRecord } from '../../store/storageTypes';
 
-const CaptureDescriptorSchema = z.object({
-  id: z.string().min(1),
-  filePath: z.string().min(1),
-  captureFileId: z.string().optional(),
-  role: z.enum(['primary', 'baseline', 'reference', 'fix']),
-  backendHint: z.enum(['local', 'remote']),
-  status: z.enum(['pending', 'opening', 'open', 'error', 'closed']),
-  ownerSessionId: z.string().nullable().optional(),
-  sessionId: z.string().optional(),
-  replaySessionId: z.string().optional(),
-  contextId: z.string().optional(),
-}).passthrough();
+const CaptureDescriptorSchema = z
+  .object({
+    id: z.string().min(1),
+    filePath: z.string().min(1),
+    captureFileId: z.string().optional(),
+    role: z.enum(['primary', 'baseline', 'reference', 'fix']),
+    backendHint: z.enum(['local', 'remote']),
+    status: z.enum(['pending', 'opening', 'open', 'error', 'closed']),
+    ownerSessionId: z.string().nullable().optional(),
+    sessionId: z.string().optional(),
+    replaySessionId: z.string().optional(),
+    contextId: z.string().optional(),
+  })
+  .passthrough();
 
 const RunStatusSchema = z.enum([
   'queued',
@@ -29,13 +31,15 @@ const RunStatusSchema = z.enum([
   'interrupted',
 ]);
 
-const RuntimeSchema = z.object({
-  backend: z.enum(['local', 'remote']),
-  entry_mode: z.enum(['cli', 'mcp']),
-  context_id: z.string().nullable(),
-  runtime_owner: z.string().nullable(),
-  session_id: z.string().min(1),
-}).strict();
+const RuntimeSchema = z
+  .object({
+    backend: z.enum(['local', 'remote']),
+    entry_mode: z.enum(['cli', 'mcp']),
+    context_id: z.string().nullable(),
+    runtime_owner: z.string().nullable(),
+    session_id: z.string().min(1),
+  })
+  .strict();
 
 const RunRecordBaseFields = {
   schemaVersion: z.literal('3'),
@@ -91,17 +95,21 @@ export function assertNoRunV3StageFields(record: Record<string, unknown>, source
   throw new AppError('STORAGE_SCHEMA', `RUN_V3_STAGE_FIELD: ${source} must not carry ${leftovers.join(', ')}`);
 }
 
-export const ConversationPersistedRunSchema = z.object({
-  ...RunRecordBaseFields,
-  kind: z.literal('conversation'),
-  captures: z.array(CaptureDescriptorSchema).max(0),
-}).strict();
+export const ConversationPersistedRunSchema = z
+  .object({
+    ...RunRecordBaseFields,
+    kind: z.literal('conversation'),
+    captures: z.array(CaptureDescriptorSchema).max(0),
+  })
+  .strict();
 
-export const MissionPersistedRunSchema = z.object({
-  ...RunRecordBaseFields,
-  kind: z.literal('mission'),
-  mission: z.enum(['debugger', 'analyzer', 'optimizer']),
-}).strict();
+export const MissionPersistedRunSchema = z
+  .object({
+    ...RunRecordBaseFields,
+    kind: z.literal('mission'),
+    mission: z.enum(['debugger', 'analyzer', 'optimizer']),
+  })
+  .strict();
 
 export const PersistedRunRecordV3Schema: ZodType<PersistedRunRecord> = z.discriminatedUnion('kind', [
   ConversationPersistedRunSchema,
@@ -110,7 +118,10 @@ export const PersistedRunRecordV3Schema: ZodType<PersistedRunRecord> = z.discrim
 
 export function classifyRunKind(
   _profileId: string,
-  declared?: { completionContract?: 'final-answer' | 'investigation-report'; investigationMission?: MissionKind | null },
+  declared?: {
+    completionContract?: 'final-answer' | 'investigation-report';
+    investigationMission?: MissionKind | null;
+  },
 ): { kind: RunRecord['kind']; mission?: MissionKind } {
   if (declared?.completionContract === 'investigation-report') {
     if (!declared.investigationMission) {

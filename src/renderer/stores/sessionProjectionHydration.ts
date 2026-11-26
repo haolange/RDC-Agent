@@ -32,10 +32,7 @@ export function hydrateSessionProjection(projection: SessionProjection): boolean
     monotonicStoppedRequestIds: projection.monotonicStoppedRequestIds,
     revokedRequestIds: projection.revokedRequestIds,
   });
-  useConversationStore.getState().setConversationSnapshot(
-    projection.allMessages,
-    projection.branchState,
-  );
+  useConversationStore.getState().setConversationSnapshot(projection.allMessages, projection.branchState);
   useWorkflowStore.getState().setWorkflowState(projection.workflowState);
   useWorkflowStore.getState().setTracePresentation(projection.tracePresentation);
   const capture = useCaptureStore.getState();

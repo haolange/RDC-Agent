@@ -17,13 +17,30 @@ const fixture = vi.hoisted(() => ({
   refresh: vi.fn(),
   setMode: vi.fn(() => Promise.resolve()),
 }));
-vi.mock('../../stores/runtimePermissionStore', () => ({ useRuntimePermissionStore: (select: (state: typeof fixture) => unknown) => select(fixture) }));
-vi.mock('../../stores/appSettingsStore', () => ({ useAppSettingsStore: (select: (state: object) => unknown) => select({ setAgentPermissionMode: fixture.setMode }) }));
-vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: Parameters<typeof translate>[1], params?: Record<string, string>) => translate(fixture.language, key, params) }) }));
-vi.mock('./useComposerMenuRegistry', () => ({ useComposerMenu: () => ({ open: true, close: vi.fn(), toggle: vi.fn(), setRoot: vi.fn(), setTrigger: vi.fn() }) }));
+vi.mock('../../stores/runtimePermissionStore', () => ({
+  useRuntimePermissionStore: (select: (state: typeof fixture) => unknown) => select(fixture),
+}));
+vi.mock('../../stores/appSettingsStore', () => ({
+  useAppSettingsStore: (select: (state: object) => unknown) => select({ setAgentPermissionMode: fixture.setMode }),
+}));
+vi.mock('../../i18n', () => ({
+  useI18n: () => ({
+    t: (key: Parameters<typeof translate>[1], params?: Record<string, string>) =>
+      translate(fixture.language, key, params),
+  }),
+}));
+vi.mock('./useComposerMenuRegistry', () => ({
+  useComposerMenu: () => ({ open: true, close: vi.fn(), toggle: vi.fn(), setRoot: vi.fn(), setTrigger: vi.fn() }),
+}));
 
 afterEach(() => {
-  Object.assign(fixture, { snapshot: { mode: 'default', revision: 1 }, pendingMode: null, error: false, failedSwitch: null, language: 'en' });
+  Object.assign(fixture, {
+    snapshot: { mode: 'default', revision: 1 },
+    pendingMode: null,
+    error: false,
+    failedSwitch: null,
+    language: 'en',
+  });
   fixture.setMode.mockClear();
   vi.unstubAllGlobals();
 });
@@ -65,8 +82,9 @@ it('keeps every mode name in one label cell, shows the requested mode while it a
   try {
     fixture.pendingMode = 'full-access';
     await act(async () => root.render(React.createElement(PermissionModeSelector)));
-    expect([...host.querySelectorAll('.composer-permission-pill-label-option')].map((option) => option.textContent))
-      .toEqual(['Default', 'Auto-review', 'Full access', 'Custom']);
+    expect(
+      [...host.querySelectorAll('.composer-permission-pill-label-option')].map((option) => option.textContent),
+    ).toEqual(['Default', 'Auto-review', 'Full access', 'Custom']);
     expect(shownLabel()).toBe('Full access');
     expect(host.querySelector('[data-testid="composer-permission-pill"]')?.getAttribute('data-mode')).toBe('default');
     // Main answers: the confirmed mode takes the same cell.
@@ -78,9 +96,10 @@ it('keeps every mode name in one label cell, shows the requested mode while it a
     await act(async () => root.render(null));
     await act(async () => root.render(React.createElement(PermissionModeSelector)));
     expect(document.activeElement?.getAttribute('data-mode')).toBe('full-access');
-    const press = (key: string) => act(async () => {
-      document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
-    });
+    const press = (key: string) =>
+      act(async () => {
+        document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      });
     await press('ArrowDown');
     expect(document.activeElement?.getAttribute('data-mode')).toBe('custom');
     await press('ArrowDown');
@@ -107,10 +126,13 @@ it('says in the footer which switch failed, keeps its detail for copying, and re
     expect(host.innerHTML).toBe('');
     fixture.failedSwitch = { mode: 'full-access', detail: 'SETTINGS_WRITE_FAILED: disk full' };
     await act(async () => root.render(React.createElement(PermissionSwitchNotice)));
-    expect(host.querySelector('[data-testid="composer-permission-notice"]')?.textContent)
-      .toContain(translate('en', 'composer.permission.switchFailed', { mode: 'Full access' }));
+    expect(host.querySelector('[data-testid="composer-permission-notice"]')?.textContent).toContain(
+      translate('en', 'composer.permission.switchFailed', { mode: 'Full access' }),
+    );
     expect(host.textContent).not.toContain('disk full');
-    await act(async () => host.querySelector<HTMLButtonElement>('[data-testid="composer-permission-notice"] button')!.click());
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('[data-testid="composer-permission-notice"] button')!.click(),
+    );
     expect(fixture.setMode).toHaveBeenCalledWith('full-access');
   } finally {
     await act(async () => root.unmount());

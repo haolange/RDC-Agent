@@ -2,6 +2,7 @@ import { redactSecretsDeep, redactCredentialLikeText } from '../../runtime/secre
 
 /** Keep persisted delegation bodies and their visible projection on one redaction path. */
 export function safeDelegationText(value: unknown): string {
-  const raw = typeof value === 'string' ? value : JSON.stringify(redactSecretsDeep(value).value) as string | undefined;
+  const raw =
+    typeof value === 'string' ? value : (JSON.stringify(redactSecretsDeep(value).value) as string | undefined);
   return redactCredentialLikeText(raw ?? '');
 }

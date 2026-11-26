@@ -17,8 +17,13 @@ export function useScopedSkillSelection(scope: SkillSelectionScope) {
     async () => (await window.electronAPI.rdcRuntime.getOverview(projectRoot)).skillSelection,
   );
   const catalog = read.status === 'ready' ? read.value : null;
-  const error = read.status === 'error'
-    ? (read.error instanceof Error ? read.error.message : String(read.error))
-    : catalog?.status === 'error' ? catalog.error.message : '';
+  const error =
+    read.status === 'error'
+      ? read.error instanceof Error
+        ? read.error.message
+        : String(read.error)
+      : catalog?.status === 'error'
+        ? catalog.error.message
+        : '';
   return { catalog, loading: enabled && read.status === 'loading', error, enabled, refresh };
 }

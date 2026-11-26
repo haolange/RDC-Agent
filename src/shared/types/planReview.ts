@@ -32,8 +32,7 @@ export interface RecoverableApprovedHandoff extends PlanReviewHandoffSuggestion 
 }
 
 export type PlanReviewDecision =
-  | { kind: 'approve'; handoff: PlanReviewHandoffIdentity }
-  | { kind: 'reject'; feedback: string };
+  { kind: 'approve'; handoff: PlanReviewHandoffIdentity } | { kind: 'reject'; feedback: string };
 
 export interface ConversationPlanReview {
   planId: string;
@@ -151,15 +150,22 @@ export interface PlanReviewProjection {
   decision?: { reviewId: string; kind: 'approve' | 'reject' | 'cancel' };
 }
 
-export interface PlanCancelReviewRequest { sessionId: string; reviewId: string }
+export interface PlanCancelReviewRequest {
+  sessionId: string;
+  reviewId: string;
+}
 
 /** A failed answer throws a registered error through the IPC error exit; a returned result is a committed decision. */
 export type ConversationAnswerPlanReviewResult =
   | {
-    decision: 'approve';
-    session: SessionRecordSnapshot;
-    planReview: PlanReviewProjection;
-    /** The declared continuation: send it as one execute turn, or prefill it when `send` is false. */
-    handoff: { prompt: string; send: boolean };
-  }
-  | { decision: 'reject'; planReview: PlanReviewProjection; replan?: { agentId: string; source: PlanReadRequest; feedback: string } };
+      decision: 'approve';
+      session: SessionRecordSnapshot;
+      planReview: PlanReviewProjection;
+      /** The declared continuation: send it as one execute turn, or prefill it when `send` is false. */
+      handoff: { prompt: string; send: boolean };
+    }
+  | {
+      decision: 'reject';
+      planReview: PlanReviewProjection;
+      replan?: { agentId: string; source: PlanReadRequest; feedback: string };
+    };

@@ -9,7 +9,9 @@ import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { WebFetchImageArgsSchema, WebResolveFaviconArgsSchema } from './validation/webSchemas';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
-const remoteImageProvenance = new RemoteImageProvenance((sessionId) => conversationHistoryStore.readConversationHistory(sessionId));
+const remoteImageProvenance = new RemoteImageProvenance((sessionId) =>
+  conversationHistoryStore.readConversationHistory(sessionId),
+);
 
 export function registerWebHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
@@ -37,7 +39,13 @@ export function registerWebHandlers(context: WorkbenchIpcContext): void {
     }
     if (request.intent === 'click') {
       const host = URL.canParse(request.url) ? new URL(request.url).host : '';
-      auditLog.record({ kind: 'network', purpose: 'remote-image', host, urlSha256: auditArgumentsHash(request.url), sessionId: request.sessionId });
+      auditLog.record({
+        kind: 'network',
+        purpose: 'remote-image',
+        host,
+        urlSha256: auditArgumentsHash(request.url),
+        sessionId: request.sessionId,
+      });
     }
     return fetchRemoteImage(request.url);
   });

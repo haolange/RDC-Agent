@@ -1,12 +1,7 @@
 import type { LlmProviderModel } from '@shared/types/settings';
 
 export type ProviderModelAvailabilityBadge =
-  | 'unavailable'
-  | 'disabled'
-  | 'loading'
-  | 'refresh-failed'
-  | 'unverified'
-  | 'available';
+  'unavailable' | 'disabled' | 'loading' | 'refresh-failed' | 'unverified' | 'available';
 
 /**
  * Single badge state machine for Provider Connect model rows. Loading never flashes "not confirmed",

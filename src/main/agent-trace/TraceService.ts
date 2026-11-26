@@ -10,16 +10,8 @@ import { traceTreeBuilder } from './TraceTreeBuilder';
 import { projectionBuilder } from './ProjectionBuilder';
 import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
 import { rightRailProjectionService } from './RightRailProjectionService';
-import type {
-  RawAuditRef,
-  TraceSessionResult,
-} from '@shared/types/trace';
-import type {
-  AgentRun,
-  AgentRunPresentation,
-  AgentRunViewModel,
-  TraceStatus,
-} from '@shared/types/agenticTrace';
+import type { RawAuditRef, TraceSessionResult } from '@shared/types/trace';
+import type { AgentRun, AgentRunPresentation, AgentRunViewModel, TraceStatus } from '@shared/types/agenticTrace';
 import type { RunSummary } from '@shared/types/session';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
@@ -33,18 +25,21 @@ const toIso = (value: number | string | undefined): string => {
 
 const collectExplicitThinking = (
   blocks: ConversationWorkBlock[] | undefined,
-): Array<{ blockId: string; thinking: ThinkingArtifact }> => (blocks ?? []).flatMap((block) => (
-  loopThinkingItems(block).map((item) => ({ blockId: block.id, thinking: item.thinking }))
-));
+): Array<{ blockId: string; thinking: ThinkingArtifact }> =>
+  (blocks ?? []).flatMap((block) =>
+    loopThinkingItems(block).map((item) => ({ blockId: block.id, thinking: item.thinking })),
+  );
 
-export function findCanonicalFinalAnswer(
-  conversations: ConversationMessage[],
-  runId: string,
-): string | null {
+export function findCanonicalFinalAnswer(conversations: ConversationMessage[], runId: string): string | null {
   let finalAnswer: string | null = null;
   for (const message of conversations) {
-    if (message.runId !== runId || message.role !== 'assistant' || message.diagnostic
-      || (message.status ?? message.workTrace?.status) !== 'complete') continue;
+    if (
+      message.runId !== runId ||
+      message.role !== 'assistant' ||
+      message.diagnostic ||
+      (message.status ?? message.workTrace?.status) !== 'complete'
+    )
+      continue;
     const reply = message.content.trim();
     if (reply && message.workTrace?.blocks.some((block) => loopFinalAnswerText(block) === reply)) finalAnswer = reply;
   }
@@ -71,10 +66,11 @@ export function resolveHistoryTurnProfileId(turn: {
   userMessage?: Pick<ConversationMessage, 'profileId' | 'agentId'>;
   assistantMessages: Array<Pick<ConversationMessage, 'profileId' | 'agentId'>>;
 }): string {
-  const raw = turn.userMessage?.profileId
-    ?? turn.assistantMessages.at(-1)?.profileId
-    ?? turn.assistantMessages.at(-1)?.agentId
-    ?? '';
+  const raw =
+    turn.userMessage?.profileId ??
+    turn.assistantMessages.at(-1)?.profileId ??
+    turn.assistantMessages.at(-1)?.agentId ??
+    '';
   const id = typeof raw === 'string' ? raw.trim() : '';
   return id || DEFAULT_AGENT_ID;
 }
@@ -94,9 +90,15 @@ export class TraceService {
     return this.stores;
   }
 
-  private get runStore() { return this.getStores().run; }
-  private get eventStore() { return this.getStores().events; }
-  private get emitter() { return this.getStores().emitter; }
+  private get runStore() {
+    return this.getStores().run;
+  }
+  private get eventStore() {
+    return this.getStores().events;
+  }
+  private get emitter() {
+    return this.getStores().emitter;
+  }
 
   getRun(runId: string): AgentRun | null {
     return this.runStore.get(runId);
@@ -161,9 +163,10 @@ export class TraceService {
       profileId = agentType;
       const profile = agentProfileRegistry.getForMode(agentType);
 
-      const userPrompt = this.userPromptForRun(conversations, run.runId)
-        || runEvents.find((e) => e.event_type === 'user_message')?.payload.content as string
-        || '调试任务';
+      const userPrompt =
+        this.userPromptForRun(conversations, run.runId) ||
+        (runEvents.find((e) => e.event_type === 'user_message')?.payload.content as string) ||
+        '调试任务';
 
       const runId = run.runId;
       let agentRun = this.runStore.get(runId);
@@ -205,9 +208,8 @@ export class TraceService {
           .map((traceEvent) => (traceEvent.payload as { phaseId?: string }).phaseId)
           .filter((phaseId): phaseId is string => Boolean(phaseId)),
       );
-      const phaseTitle = (phaseId: string) => (
-        profile.phases.find((phase) => phase.phaseId === phaseId)?.displayName ?? phaseId
-      );
+      const phaseTitle = (phaseId: string) =>
+        profile.phases.find((phase) => phase.phaseId === phaseId)?.displayName ?? phaseId;
       const startPhase = (phaseId: string) => {
         if (existingPhaseStarts.has(phaseId)) return;
         this.emitter.emitPhaseStarted(runId, phaseId, phaseTitle(phaseId));
@@ -265,7 +267,6 @@ export class TraceService {
       const timeline = projectionBuilder.build(agentRun, nodes, profile);
 
       runViewModels.push({ run: agentRun, timeline });
-
     }
 
     for (const turn of this.groupHistoryTurns(conversations)) {
@@ -273,13 +274,14 @@ export class TraceService {
       const runId = `history-${turn.turnId}`;
       const userPrompt = turn.userMessage?.content.trim() || 'Conversation';
       const assistant = turn.assistantMessages.slice(-1)[0];
-      const status: TraceStatus = assistant?.status === 'error'
-        ? 'failed'
-        : assistant?.status === 'stopped'
-          ? 'cancelled'
-          : !assistant || assistant.status === 'streaming' || assistant.status === 'draft'
-            ? 'running'
-            : 'succeeded';
+      const status: TraceStatus =
+        assistant?.status === 'error'
+          ? 'failed'
+          : assistant?.status === 'stopped'
+            ? 'cancelled'
+            : !assistant || assistant.status === 'streaming' || assistant.status === 'draft'
+              ? 'running'
+              : 'succeeded';
 
       const profileId = resolveHistoryTurnProfileId(turn);
       let agentRun = this.runStore.get(runId) ?? {
@@ -317,11 +319,7 @@ export class TraceService {
           existingHistoryNodeIds.add(thoughtId);
         }
       }
-      if (
-        assistant?.content.trim()
-        && !existingHistoryNodeIds.has(`__final__:${runId}`)
-        && status !== 'running'
-      ) {
+      if (assistant?.content.trim() && !existingHistoryNodeIds.has(`__final__:${runId}`) && status !== 'running') {
         this.emitter.emitFinalResponse(runId, assistant.content);
       }
 
@@ -392,7 +390,6 @@ export class TraceService {
   ): string | null {
     if (run.status !== 'completed') return null;
     return findCanonicalFinalAnswer(conversations, runId);
-
   }
 
   private groupHistoryTurns(messages: ConversationMessage[]): HistoryTurn[] {

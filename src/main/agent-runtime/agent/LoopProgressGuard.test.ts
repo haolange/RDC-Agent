@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createToolRoundFingerprint,
-  LoopProgressGuard,
-} from './LoopProgressGuard';
+import { createToolRoundFingerprint, LoopProgressGuard } from './LoopProgressGuard';
 import type { AssistantMessage, ToolDefinition, ToolResultMessage } from '../core/types';
 
 function toolRound(args: Record<string, unknown> = {}): AssistantMessage {
@@ -64,18 +61,22 @@ describe('LoopProgressGuard', () => {
   it('ignores call ids and volatile timing metadata while retaining semantic details', () => {
     const first = createToolRoundFingerprint(
       toolRound({ filter: 'all' }),
-      [result('No   tasks.\n', {
-        timestamp: 1,
-        details: { count: 0, durationMs: 12, updatedAt: 100 },
-      })],
+      [
+        result('No   tasks.\n', {
+          timestamp: 1,
+          details: { count: 0, durationMs: 12, updatedAt: 100 },
+        }),
+      ],
       2,
     );
     const second = createToolRoundFingerprint(
       toolRound({ filter: 'all' }),
-      [result('No tasks.', {
-        timestamp: 999,
-        details: { count: 0, durationMs: 88, updatedAt: 900 },
-      })],
+      [
+        result('No tasks.', {
+          timestamp: 999,
+          details: { count: 0, durationMs: 88, updatedAt: 900 },
+        }),
+      ],
       2,
     );
     expect(second).toBe(first);

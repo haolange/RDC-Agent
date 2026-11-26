@@ -7,7 +7,10 @@ import { useI18n } from '../../../../i18n';
 import { humanizeError } from '../../../../i18n/humanizeError';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 
-interface SpacesColumnProps { state: ReturnType<typeof useKnowledgeCenter>; candidateCount?: number }
+interface SpacesColumnProps {
+  state: ReturnType<typeof useKnowledgeCenter>;
+  candidateCount?: number;
+}
 
 export function SpacesColumn({ state, candidateCount }: SpacesColumnProps) {
   const { t } = useI18n();
@@ -53,7 +56,9 @@ export function SpacesColumn({ state, candidateCount }: SpacesColumnProps) {
                 onCheckedChange={() => state.toggleSpace(space.spaceId)}
                 data-testid={'knowledge-space-' + space.spaceId}
                 label={space.kind === 'user' ? t('knowledgeCenter.userSpace') : space.label}
-                trailing={<span className="knowledge-center-space-meta">{state.index?.cardsBySpace[space.spaceId] ?? 0}</span>}
+                trailing={
+                  <span className="knowledge-center-space-meta">{state.index?.cardsBySpace[space.spaceId] ?? 0}</span>
+                }
               />
             ))}
           </div>

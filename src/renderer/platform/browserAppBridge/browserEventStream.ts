@@ -54,7 +54,8 @@ export function createEventStreamParser(): EventStreamParser {
 }
 
 function parseFrame(frame: string): BrowserBridgeEvent | null {
-  const data = frame.split('\n')
+  const data = frame
+    .split('\n')
     .filter((line) => line.startsWith('data:'))
     .map((line) => line.slice(5).trimStart())
     .join('\n');
@@ -62,7 +63,10 @@ function parseFrame(frame: string): BrowserBridgeEvent | null {
   try {
     const parsed = BrowserBridgeEventSchema.safeParse(JSON.parse(data));
     if (parsed.success) return parsed.data;
-    console.warn('[BrowserAppBridge] Dropped an event frame that is not a bridge event:', parsed.error.issues.map((issue) => issue.path.join('.')));
+    console.warn(
+      '[BrowserAppBridge] Dropped an event frame that is not a bridge event:',
+      parsed.error.issues.map((issue) => issue.path.join('.')),
+    );
   } catch (error) {
     // A malformed frame is isolated; later valid frames on the same stream remain deliverable.
     console.warn('[BrowserAppBridge] Dropped a malformed event frame:', error);
@@ -72,10 +76,19 @@ function parseFrame(frame: string): BrowserBridgeEvent | null {
 
 function abortableDelay(milliseconds: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
-    if (signal.aborted) { resolve(); return; }
-    const finish = () => { signal.removeEventListener('abort', onAbort); resolve(); };
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+    const finish = () => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    };
     const timer = globalThis.setTimeout(finish, milliseconds);
-    const onAbort = () => { globalThis.clearTimeout(timer); finish(); };
+    const onAbort = () => {
+      globalThis.clearTimeout(timer);
+      finish();
+    };
     signal.addEventListener('abort', onAbort, { once: true });
   });
 }
@@ -114,7 +127,9 @@ export function connectBrowserEventStream(
           if (chunk.done) break;
           for (const event of parser.push(decoder.decode(chunk.value, { stream: true }))) {
             if (stopped()) break;
-            try { onEvent(event); } catch (error) {
+            try {
+              onEvent(event);
+            } catch (error) {
               console.error('[BrowserAppBridge] Event listener failed:', error);
             }
           }

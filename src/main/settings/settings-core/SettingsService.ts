@@ -222,9 +222,10 @@ export class SettingsService {
       if (field.kind !== 'secret') {
         continue;
       }
-      const value = field.id === resolvePrimaryConnectionSecretFieldId(provider.connectionSchema)
-        ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot)
-        : secretStorageService.getSecret(provider.secretRefs?.[field.id], workspaceRoot).trim();
+      const value =
+        field.id === resolvePrimaryConnectionSecretFieldId(provider.connectionSchema)
+          ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot)
+          : secretStorageService.getSecret(provider.secretRefs?.[field.id], workspaceRoot).trim();
       if (value) {
         values[field.id] = value;
       }
@@ -245,17 +246,19 @@ export class SettingsService {
     const provider = this.providerConnections.get(providerId);
     if (!provider?.enabled || !provider.isConfigured || provider.status !== 'verified') return undefined;
     const workspaceRoot = appPathService.getUserRdcRoot();
-    const accountCredential = provider.authMode === 'account'
-      ? resolveAccountRuntimeCredential(provider, workspaceRoot)
-      : { apiKey: '', baseUrl: undefined, accountId: undefined };
+    const accountCredential =
+      provider.authMode === 'account'
+        ? resolveAccountRuntimeCredential(provider, workspaceRoot)
+        : { apiKey: '', baseUrl: undefined, accountId: undefined };
     return {
       id: provider.id,
       protocol: provider.protocol,
       label: provider.label,
       enabled: provider.enabled,
-      apiKey: provider.authMode === 'api-key'
-        ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot)
-        : accountCredential.apiKey,
+      apiKey:
+        provider.authMode === 'api-key'
+          ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot)
+          : accountCredential.apiKey,
       baseUrl: accountCredential.baseUrl ?? provider.baseUrl,
       accountId: accountCredential.accountId,
       authMode: provider.authMode,
@@ -320,9 +323,7 @@ export class SettingsService {
     return { revision: change.revision, changed };
   }
 
-  async getAgentDefinitionCommit(
-    query: AgentDefinitionCommitQuery,
-  ): Promise<AgentDefinitionCommitSnapshot | null> {
+  async getAgentDefinitionCommit(query: AgentDefinitionCommitQuery): Promise<AgentDefinitionCommitSnapshot | null> {
     return this.agentOps.getAgentDefinitionCommit(query);
   }
 
@@ -392,7 +393,10 @@ export class SettingsService {
     providerId: LlmProviderId,
     secretPayload: string,
     models: LlmProviderModel[],
-    accountSummary: Pick<LlmProviderEntry, 'accountLabel' | 'planLabel' | 'oauthExpiresAt' | 'oauthRefreshAvailable'> = {},
+    accountSummary: Pick<
+      LlmProviderEntry,
+      'accountLabel' | 'planLabel' | 'oauthExpiresAt' | 'oauthRefreshAvailable'
+    > = {},
   ): LlmProviderEntry {
     return this.providerOps.saveProviderAccountConnection(providerId, secretPayload, models, accountSummary);
   }
@@ -400,7 +404,10 @@ export class SettingsService {
   rotateProviderAccountCredential(
     providerId: LlmProviderId,
     secretPayload: string,
-    accountSummary: Pick<LlmProviderEntry, 'accountLabel' | 'planLabel' | 'oauthExpiresAt' | 'oauthRefreshAvailable'> = {},
+    accountSummary: Pick<
+      LlmProviderEntry,
+      'accountLabel' | 'planLabel' | 'oauthExpiresAt' | 'oauthRefreshAvailable'
+    > = {},
   ): LlmProviderEntry {
     return this.providerOps.rotateProviderAccountCredential(providerId, secretPayload, accountSummary);
   }

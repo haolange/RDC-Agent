@@ -26,9 +26,12 @@ describe('OutputRegistrationTool', () => {
 
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  const tool = () => createOutputRegistrationTool({
-    sessionId: 'session-a', runId: 'run-a', projectRootPath: root,
-  });
+  const tool = () =>
+    createOutputRegistrationTool({
+      sessionId: 'session-a',
+      runId: 'run-a',
+      projectRootPath: root,
+    });
 
   it('copies an explicit project file into the owning run and registers it', async () => {
     fs.writeFileSync(path.join(root, 'report.md'), '# report');
@@ -38,14 +41,20 @@ describe('OutputRegistrationTool', () => {
     expect(result.isError).not.toBe(true);
     expect(result.details?.path).toContain(path.join('.state', 'run', 'artifacts'));
     expect(fs.readFileSync(result.details!.path, 'utf8')).toBe('# report');
-    expect(mocks.register).toHaveBeenCalledWith('session-a', 'run-a', expect.objectContaining({ title: 'Capture report', kind: 'report' }));
+    expect(mocks.register).toHaveBeenCalledWith(
+      'session-a',
+      'run-a',
+      expect.objectContaining({ title: 'Capture report', kind: 'report' }),
+    );
   });
 
   it('rejects inputs and paths outside the active project', async () => {
     fs.mkdirSync(path.join(root, '.rdc-agent', 'inputs'), { recursive: true });
     fs.writeFileSync(path.join(root, '.rdc-agent', 'inputs', 'capture.rdc'), 'capture');
 
-    await expect(tool().execute('input', { path: '.rdc-agent/inputs/capture.rdc' })).resolves.toMatchObject({ isError: true });
+    await expect(tool().execute('input', { path: '.rdc-agent/inputs/capture.rdc' })).resolves.toMatchObject({
+      isError: true,
+    });
     await expect(tool().execute('escape', { path: '../outside.md' })).resolves.toMatchObject({ isError: true });
     expect(mocks.register).not.toHaveBeenCalled();
   });

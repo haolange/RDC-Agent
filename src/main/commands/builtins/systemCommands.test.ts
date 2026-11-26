@@ -5,7 +5,9 @@ vi.mock('../../runtime/RuntimePermissionStateService', () => ({
   runtimePermissionStateService: { getSnapshot: () => ({ mode: status.mode, revision: 3 }) },
 }));
 vi.mock('../../agent-runtime/orchestration/agentRuntimeRoot', () => ({
-  agentOrchestrator: { getMcpServerStatusSummary: vi.fn((root: string | null) => (root === '/work/project' ? status.servers : [])) },
+  agentOrchestrator: {
+    getMcpServerStatusSummary: vi.fn((root: string | null) => (root === '/work/project' ? status.servers : [])),
+  },
 }));
 vi.mock('../../sessions/store/sessionStores', () => ({
   projectWorkspaceStore: { getProjectById: (id: string) => (id === 'proj' ? { rootPath: '/work/project' } : null) },

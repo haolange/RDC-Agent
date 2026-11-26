@@ -59,7 +59,8 @@ export interface ValidatedToolCall {
 }
 
 export type DenyTool = (reason?: string) => Promise<ToolResultMessage>;
-export type AdmissionGate<T> = { ok: true; value: T } | { ok: false; result: ToolResultMessage | Promise<ToolResultMessage> };
+export type AdmissionGate<T> =
+  { ok: true; value: T } | { ok: false; result: ToolResultMessage | Promise<ToolResultMessage> };
 
 export function errorToolResult(toolCall: ToolCall, text: string): ToolResultMessage {
   return {
@@ -82,16 +83,24 @@ export function admitToolCall(
   const { agentId, plan, runtimeContext } = scope;
   const normalizedName = normalizeToolName(toolCall.name);
   if (
-    !deps.toolPolicy.isAllowedForRuntime(agentId, toolCall.name, scope.effectiveToolAllowlist, plan?.excludeRdcLeaseTools === true)
-    || !scope.tools.has(normalizedName)
+    !deps.toolPolicy.isAllowedForRuntime(
+      agentId,
+      toolCall.name,
+      scope.effectiveToolAllowlist,
+      plan?.excludeRdcLeaseTools === true,
+    ) ||
+    !scope.tools.has(normalizedName)
   ) {
     return { ok: false, result: denyTool() };
   }
   if (
-    scope.activeSkillAllowlist !== null
-    && !deps.toolPolicy.matchesToolAllowlist(normalizedName, Array.from(scope.activeSkillAllowlist))
+    scope.activeSkillAllowlist !== null &&
+    !deps.toolPolicy.matchesToolAllowlist(normalizedName, Array.from(scope.activeSkillAllowlist))
   ) {
-    return { ok: false, result: denyTool(`Tool "${toolCall.name}" is outside the allowed-tools set declared by the active skill.`) };
+    return {
+      ok: false,
+      result: denyTool(`Tool "${toolCall.name}" is outside the allowed-tools set declared by the active skill.`),
+    };
   }
   if (plan?.policy && isToolDeniedByPolicy(plan.policy, normalizedName)) {
     return { ok: false, result: denyTool(`POLICY_DENIED: tool "${toolCall.name}" is in deniedTools.`) };
@@ -123,19 +132,26 @@ export function reserveCallBudget(scope: ToolExecutorScope, toolCall: ToolCall):
   return null;
 }
 
-export function validateToolArguments(tool: AgentTool, toolCall: ToolCallContent): AdmissionGate<Record<string, unknown>> {
+export function validateToolArguments(
+  tool: AgentTool,
+  toolCall: ToolCallContent,
+): AdmissionGate<Record<string, unknown>> {
   if (toolCall.invalidArguments !== undefined) {
-    return { ok: false, result: errorToolResult(toolCall,
-      `TOOL_ARGUMENTS_INVALID: the arguments were not a JSON object. Received: ${toolCall.invalidArguments.slice(0, 200)}`) };
+    return {
+      ok: false,
+      result: errorToolResult(
+        toolCall,
+        `TOOL_ARGUMENTS_INVALID: the arguments were not a JSON object. Received: ${toolCall.invalidArguments.slice(0, 200)}`,
+      ),
+    };
   }
   try {
     const validatedArgs = toolValidator.validate(toolToDefinition(tool), toolCall.arguments);
     tool.validateArgs?.(validatedArgs);
     return { ok: true, value: validatedArgs };
   } catch (error) {
-    const message = error instanceof ToolValidationError
-      ? error.message
-      : error instanceof Error ? error.message : String(error);
+    const message =
+      error instanceof ToolValidationError ? error.message : error instanceof Error ? error.message : String(error);
     return { ok: false, result: errorToolResult(toolCall, `TOOL_SCHEMA_VIOLATION: ${message}`) };
   }
 }
@@ -149,8 +165,11 @@ export function captureAccessDenial(call: ValidatedToolCall, activeTurn: TurnHan
   }
   const captureControl = activeTurn?.captureControl;
   if (captureControl && capture.live(call.args)) {
-    try { captureControl.assertLiveAccess(); }
-    catch (error) { return error instanceof Error ? error.message : String(error); }
+    try {
+      captureControl.assertLiveAccess();
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
   }
   return null;
 }

@@ -40,17 +40,16 @@ export function KnowledgeCardImage({
   }, [url, relativePath, onReady]);
 
   return (
-    <figure
-      className="knowledge-card-image"
-      data-testid="knowledge-card-image"
-      data-role={role}
-      data-path={path}
-    >
+    <figure className="knowledge-card-image" data-testid="knowledge-card-image" data-role={role} data-path={path}>
       {heading ? <figcaption className="knowledge-card-image-label">{heading}</figcaption> : null}
       <div className="knowledge-card-image-frame">
         {ready ? (
-          <button type="button" className="knowledge-card-image-open" aria-label={t('knowledgeCenter.imageOpen', { name: heading || imageLabel })}
-            onClick={() => (onOpen ? onOpen(relativePath) : setViewing(true))}>
+          <button
+            type="button"
+            className="knowledge-card-image-open"
+            aria-label={t('knowledgeCenter.imageOpen', { name: heading || imageLabel })}
+            onClick={() => (onOpen ? onOpen(relativePath) : setViewing(true))}
+          >
             <img src={preview.dataUrl} alt={imageLabel} />
           </button>
         ) : preview.status === 'loading' || preview.status === 'idle' ? (
@@ -64,8 +63,13 @@ export function KnowledgeCardImage({
         )}
       </div>
       {!onOpen && url ? (
-        <ImageViewer open={viewing} items={[{ src: url, title: imageLabel }]} index={0}
-          onIndexChange={() => undefined} onClose={() => setViewing(false)} />
+        <ImageViewer
+          open={viewing}
+          items={[{ src: url, title: imageLabel }]}
+          index={0}
+          onIndexChange={() => undefined}
+          onClose={() => setViewing(false)}
+        />
       ) : null}
     </figure>
   );

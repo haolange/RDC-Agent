@@ -1,16 +1,24 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_THEME_PRESET_ID, getPresetChrome } from '@shared/theme/presets';
 
-const f = vi.hoisted(() => ({ theme: { shouldUseDarkColors: true }, windows: [] as Array<{ isDestroyed: () => boolean; setBackgroundColor: (color: string) => void }> }));
+const f = vi.hoisted(() => ({
+  theme: { shouldUseDarkColors: true },
+  windows: [] as Array<{ isDestroyed: () => boolean; setBackgroundColor: (color: string) => void }>,
+}));
 vi.mock('electron', () => ({ nativeTheme: f.theme, BrowserWindow: { getAllWindows: () => f.windows } }));
-vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { snapshot: () => ({ revision: 1, user: { appearance: appearance('light') } }) } }));
+vi.mock('../settings/settings-core/SettingsService', () => ({
+  settingsService: { snapshot: () => ({ revision: 1, user: { appearance: appearance('light') } }) },
+}));
 
 function appearance(theme: 'dark' | 'light' | 'system') {
   const chrome = (variant: 'dark' | 'light') => getPresetChrome(DEFAULT_THEME_PRESET_ID, variant);
   return { theme, chromeThemes: { dark: chrome('dark'), light: chrome('light') } } as never;
 }
 
-beforeEach(() => { f.theme.shouldUseDarkColors = true; f.windows = []; });
+beforeEach(() => {
+  f.theme.shouldUseDarkColors = true;
+  f.windows = [];
+});
 
 it('paints the window with the background of the theme the user will see', async () => {
   const { windowBackgroundColor } = await import('./appearanceChrome');

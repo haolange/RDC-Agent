@@ -4,12 +4,17 @@ import { RevisionLanes, nextClientRevision } from './revisionLanes';
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
   let reject!: (error: Error) => void;
-  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
   return { promise, resolve, reject };
 };
 
 describe('revision lanes', () => {
-  afterEach(() => { vi.useRealTimers(); });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('keeps revisions growing across lanes and after the clock moves back', () => {
     vi.useFakeTimers({ now: 2_000 });
@@ -55,7 +60,12 @@ describe('revision lanes', () => {
     lanes.track('a', lanes.begin('a'), first.promise);
     expect(lanes.busy('a')).toBe(true);
     let settled = false;
-    const waiting = lanes.settled('a').then(() => { settled = true; }, (error: Error) => error.message);
+    const waiting = lanes.settled('a').then(
+      () => {
+        settled = true;
+      },
+      (error: Error) => error.message,
+    );
     lanes.track('a', lanes.begin('a'), second.promise);
     first.resolve('one');
     await first.promise;

@@ -29,8 +29,9 @@ export const PlanReviewPanel: React.FC<{
   const { t } = useI18n();
   const api = useElectronApi();
   const sessionId = useProjectStore((state) => state.currentSessionId);
-  const projection = usePlanReviewStore(state => sessionId ? state.bySession[sessionId] : undefined);
-  const canReopen = projection?.recoverable?.planId === plan.planId && projection.recoverable.revision === plan.revision;
+  const projection = usePlanReviewStore((state) => (sessionId ? state.bySession[sessionId] : undefined));
+  const canReopen =
+    projection?.recoverable?.planId === plan.planId && projection.recoverable.revision === plan.revision;
   const { readPlan, copyPlan, saveToProject, exportPlan } = usePlanReviewActions();
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -38,16 +39,31 @@ export const PlanReviewPanel: React.FC<{
   const initialSession = useRef(sessionId);
   // The panel belongs to the session it opened in; switching away closes it.
   const ownSession = Boolean(sessionId) && initialSession.current === sessionId;
-  useEffect(() => { if (!ownSession) onClose(); }, [ownSession, onClose]);
+  useEffect(() => {
+    if (!ownSession) onClose();
+  }, [ownSession, onClose]);
   const planRead = useAsyncValue(
     ownSession ? JSON.stringify([sessionId, plan.planId, plan.revision, plan.uri, plan.hash]) : null,
-    () => readPlan({ sessionId: sessionId!, planId: plan.planId, revision: plan.revision, uri: plan.uri, expectedHash: plan.hash }),
+    () =>
+      readPlan({
+        sessionId: sessionId!,
+        planId: plan.planId,
+        revision: plan.revision,
+        uri: plan.uri,
+        expectedHash: plan.hash,
+      }),
   );
   const markdown = planRead.status === 'ready' ? planRead.value.markdown : '';
   const loading = planRead.status === 'loading';
   const error = actionError ?? (planRead.status === 'error' ? errorDetail(planRead.error) : null);
   const parts = useMemo(() => splitPlanAppendix(markdown), [markdown]);
-  const reference = { sessionId: sessionId!, planId: plan.planId, revision: plan.revision, uri: plan.uri, expectedHash: plan.hash };
+  const reference = {
+    sessionId: sessionId!,
+    planId: plan.planId,
+    revision: plan.revision,
+    uri: plan.uri,
+    expectedHash: plan.hash,
+  };
 
   const runAction = async (action: () => Promise<boolean>, message: string) => {
     if (!sessionId || busy) return;
@@ -73,37 +89,86 @@ export const PlanReviewPanel: React.FC<{
       open={open}
       onClose={onClose}
       onExited={onExited}
-      actions={<>
-        {canReopen ? <Button variant="secondary" size="sm" disabled={busy || loading} onClick={() => void runAction(async () => {
-          const restored = await reopenPlanReview(api, reference);
-          usePlanReviewStore.getState().accept(restored); onClose(); return true;
-        }, t('chat.planReviewReopened'))}>{t('chat.planReviewReopen')}</Button> : null}
-        <IconButton label={t('chat.planReviewExport')} size="sm" disabled={disabled}
-          onClick={() => void runAction(() => exportPlan(reference), t('chat.planReviewExported'))}>
-          <Icon name="upload" size={14} />
-        </IconButton>
-        <IconButton label={t('chat.planReviewSave')} size="sm" disabled={disabled}
-          onClick={() => void runAction(() => saveToProject(reference), t('chat.planReviewSaved'))}>
-          <Icon name="folder" size={14} />
-        </IconButton>
-        <IconButton label={t('chat.planReviewCopy')} size="sm" disabled={busy || !markdown}
-          onClick={() => void runAction(() => copyPlan(markdown), t('chat.planReviewCopied'))}>
-          <Icon name="copy" size={14} />
-        </IconButton>
-      </>}
-      status={notice || error || projection?.error ? <>
-        {notice ? <p className="plan-review-panel__notice" role="status">{notice}</p> : null}
-        {error || projection?.error ? <InlineError detail={error || projection?.error}>{t('app.error.actionFailed')}</InlineError> : null}
-      </> : undefined}
+      actions={
+        <>
+          {canReopen ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={busy || loading}
+              onClick={() =>
+                void runAction(async () => {
+                  const restored = await reopenPlanReview(api, reference);
+                  usePlanReviewStore.getState().accept(restored);
+                  onClose();
+                  return true;
+                }, t('chat.planReviewReopened'))
+              }
+            >
+              {t('chat.planReviewReopen')}
+            </Button>
+          ) : null}
+          <IconButton
+            label={t('chat.planReviewExport')}
+            size="sm"
+            disabled={disabled}
+            onClick={() => void runAction(() => exportPlan(reference), t('chat.planReviewExported'))}
+          >
+            <Icon name="upload" size={14} />
+          </IconButton>
+          <IconButton
+            label={t('chat.planReviewSave')}
+            size="sm"
+            disabled={disabled}
+            onClick={() => void runAction(() => saveToProject(reference), t('chat.planReviewSaved'))}
+          >
+            <Icon name="folder" size={14} />
+          </IconButton>
+          <IconButton
+            label={t('chat.planReviewCopy')}
+            size="sm"
+            disabled={busy || !markdown}
+            onClick={() => void runAction(() => copyPlan(markdown), t('chat.planReviewCopied'))}
+          >
+            <Icon name="copy" size={14} />
+          </IconButton>
+        </>
+      }
+      status={
+        notice || error || projection?.error ? (
+          <>
+            {notice ? (
+              <p className="plan-review-panel__notice" role="status">
+                {notice}
+              </p>
+            ) : null}
+            {error || projection?.error ? (
+              <InlineError detail={error || projection?.error}>{t('app.error.actionFailed')}</InlineError>
+            ) : null}
+          </>
+        ) : undefined
+      }
     >
       <div className="plan-review-panel__body" aria-busy={loading}>
-        {loading ? <div role="status" aria-label={t('chat.planReviewLoading')}><Skeleton shape="line" count={5} /></div> : markdown ? <>
-          <MessageMarkdown content={parts.body} />
-          {parts.appendix ? <Details variant="panel" className="plan-review-panel__appendix" data-testid="plan-review-appendix"
-            summary={t('chat.planReviewExecutionReferences')}>
-            <MessageMarkdown content={planAppendixMarkdown(parts.appendix)} />
-          </Details> : null}
-        </> : null}
+        {loading ? (
+          <div role="status" aria-label={t('chat.planReviewLoading')}>
+            <Skeleton shape="line" count={5} />
+          </div>
+        ) : markdown ? (
+          <>
+            <MessageMarkdown content={parts.body} />
+            {parts.appendix ? (
+              <Details
+                variant="panel"
+                className="plan-review-panel__appendix"
+                data-testid="plan-review-appendix"
+                summary={t('chat.planReviewExecutionReferences')}
+              >
+                <MessageMarkdown content={planAppendixMarkdown(parts.appendix)} />
+              </Details>
+            ) : null}
+          </>
+        ) : null}
       </div>
     </ReadingSheet>
   );

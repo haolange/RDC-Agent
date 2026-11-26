@@ -5,10 +5,19 @@ import { expect, it } from 'vitest';
 it('preserves narrow approval and question layouts inside the original viewport breakpoint', () => {
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(readFileSync('src/renderer/features/composer/composer-viewport.css', 'utf8'));
-  const media = [...sheet.cssRules].find(rule => rule instanceof CSSMediaRule && rule.conditionText === '(max-width: 920px)') as CSSMediaRule;
+  const media = [...sheet.cssRules].find(
+    (rule) => rule instanceof CSSMediaRule && rule.conditionText === '(max-width: 920px)',
+  ) as CSSMediaRule;
   expect(media).toBeDefined();
   const property = (selector: string, name: string) => {
-    const rule = [...media.cssRules].find(item => item instanceof CSSStyleRule && item.selectorText.split(',').map(part => part.trim()).includes(selector)) as CSSStyleRule;
+    const rule = [...media.cssRules].find(
+      (item) =>
+        item instanceof CSSStyleRule &&
+        item.selectorText
+          .split(',')
+          .map((part) => part.trim())
+          .includes(selector),
+    ) as CSSStyleRule;
     return rule?.style.getPropertyValue(name);
   };
   expect(property('.composer-user-input-question-bar', 'flex-direction')).toBe('column');

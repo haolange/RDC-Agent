@@ -19,9 +19,13 @@ import type { WorkflowState } from '@shared/types/workflow';
 const reads = new RevisionLanes();
 
 function applyEvidence(events: ActionEvent[], messagesFrom: () => ConversationMessage[]): ConversationMessage[] {
-  useConversationStore.getState().setTimeline(events
-    .map((event) => mapActionEventToTimelineEntry(event))
-    .filter((entry): entry is AgentTimelineEntry => entry !== null));
+  useConversationStore
+    .getState()
+    .setTimeline(
+      events
+        .map((event) => mapActionEventToTimelineEntry(event))
+        .filter((entry): entry is AgentTimelineEntry => entry !== null),
+    );
   return hydrateMessagesWithActionEvents(messagesFrom(), events);
 }
 
@@ -56,13 +60,17 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
 
     const read = reads.begin('surface');
     const live = () => reads.isLatest('surface', read) && useProjectStore.getState().currentSessionId === sessionId;
-    void electronAPI.workflow.getState().then((state) => {
-      if (!live()) return;
-      const workflow = state as WorkflowState | null;
-      useWorkflowStore.getState().setWorkflowState(workflow);
-      useConversationStore.getState().setReasoningSummaries(workflow?.reasoningSummaries ?? []);
-    }).catch(() => undefined);
-    const evidence = electronAPI.evidence.getChain()
+    void electronAPI.workflow
+      .getState()
+      .then((state) => {
+        if (!live()) return;
+        const workflow = state as WorkflowState | null;
+        useWorkflowStore.getState().setWorkflowState(workflow);
+        useConversationStore.getState().setReasoningSummaries(workflow?.reasoningSummaries ?? []);
+      })
+      .catch(() => undefined);
+    const evidence = electronAPI.evidence
+      .getChain()
       .then((result) => result.events as ActionEvent[])
       .catch(() => [] as ActionEvent[]);
 
@@ -70,15 +78,19 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
     if (conversation.surfaceSessionId === sessionId || conversation.historyLoadingSessionId === sessionId) {
       void evidence.then((events) => {
         if (!live()) return;
-        useConversationStore.getState().setConversationMessages(
-          applyEvidence(events, () => useConversationStore.getState().allConversationMessages),
-        );
+        useConversationStore
+          .getState()
+          .setConversationMessages(
+            applyEvidence(events, () => useConversationStore.getState().allConversationMessages),
+          );
       });
     } else {
       conversation.setHistoryLoadingSessionId(sessionId);
       void (async () => {
         const [historyResult, events, traceResult] = await Promise.all([
-          electronAPI.conversation.getHistory(sessionId).catch(() => ({ messages: [], branchState: null, planReview: null })),
+          electronAPI.conversation
+            .getHistory(sessionId)
+            .catch(() => ({ messages: [], branchState: null, planReview: null })),
           evidence,
           electronAPI.trace.getProjection(sessionId).catch(() => ({ success: false, presentation: null })),
         ]);
@@ -110,13 +122,18 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
       return undefined;
     }
     const read = reads.begin('usage');
-    void electronAPI.workflow.getRunUsage({
-      sessionId,
-      ...(currentRunId ? { runId: currentRunId } : {}),
-    }).then((result) => {
-      if (!reads.isLatest('usage', read) || useProjectStore.getState().currentSessionId !== sessionId) return;
-      useSessionStore.getState().setCurrentRunUsage(result.usage, result.stale);
-    }).catch(() => undefined);
-    return () => { reads.forget('usage'); };
+    void electronAPI.workflow
+      .getRunUsage({
+        sessionId,
+        ...(currentRunId ? { runId: currentRunId } : {}),
+      })
+      .then((result) => {
+        if (!reads.isLatest('usage', read) || useProjectStore.getState().currentSessionId !== sessionId) return;
+        useSessionStore.getState().setCurrentRunUsage(result.usage, result.stale);
+      })
+      .catch(() => undefined);
+    return () => {
+      reads.forget('usage');
+    };
   }, [clearUsageSnapshot, currentRunId, sessionId]);
 }

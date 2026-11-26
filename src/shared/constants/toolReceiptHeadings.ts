@@ -5,5 +5,6 @@
  */
 export const TOOL_RECEIPT_IMAGE_EVIDENCE_HEADING =
   'Image evidence (grant each exact URI explicitly to a reviewer; the result wrapper does not grant pixels):';
-export const TOOL_RECEIPT_DECODED_TEXT_HEADING = 'Decoded tool text: call artifact_read with one of the following exact selections, '
-  + 'then follow its next cursor. These select returned text blocks, not omitted source-file ranges or domain validation.';
+export const TOOL_RECEIPT_DECODED_TEXT_HEADING =
+  'Decoded tool text: call artifact_read with one of the following exact selections, ' +
+  'then follow its next cursor. These select returned text blocks, not omitted source-file ranges or domain validation.';

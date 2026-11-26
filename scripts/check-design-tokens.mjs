@@ -51,9 +51,8 @@ const EXEMPT_PREFIXES = [
   'src/renderer/styles/design-reduced-motion.css',
 ];
 
-const isExempt = (rel) => EXEMPT_PREFIXES.some((prefix) => (
-  prefix.endsWith('/') ? rel.startsWith(prefix) : rel === prefix
-));
+const isExempt = (rel) =>
+  EXEMPT_PREFIXES.some((prefix) => (prefix.endsWith('/') ? rel.startsWith(prefix) : rel === prefix));
 
 const STOP_COLOR_EXEMPT = new Set();
 
@@ -76,8 +75,10 @@ const RULES = [
   },
   {
     id: 'font-size-role',
-    pattern: /font-size:(?!\s*(?:var\(--type-(?:title|reading|body|meta)-size\)|var\(--[a-z-]+-font-size\)|inherit\b|100%))/,
-    message: 'font-size must use one of the four typography roles var(--type-title|reading|body|meta-size); no em, rem or px',
+    pattern:
+      /font-size:(?!\s*(?:var\(--type-(?:title|reading|body|meta)-size\)|var\(--[a-z-]+-font-size\)|inherit\b|100%))/,
+    message:
+      'font-size must use one of the four typography roles var(--type-title|reading|body|meta-size); no em, rem or px',
   },
   {
     id: 'raw-type-scale',
@@ -86,7 +87,8 @@ const RULES = [
   },
   {
     id: 'spacing-px',
-    pattern: /(?:^|[\s{;])(?:gap|row-gap|column-gap|padding|padding-top|padding-right|padding-bottom|padding-left|padding-inline|padding-inline-start|padding-inline-end|padding-block|margin|margin-top|margin-right|margin-bottom|margin-left|margin-inline|margin-inline-start|margin-inline-end|margin-block):\s*[^;]*\d+(?:\.\d+)?px/,
+    pattern:
+      /(?:^|[\s{;])(?:gap|row-gap|column-gap|padding|padding-top|padding-right|padding-bottom|padding-left|padding-inline|padding-inline-start|padding-inline-end|padding-block|margin|margin-top|margin-right|margin-bottom|margin-left|margin-inline|margin-inline-start|margin-inline-end|margin-block):\s*[^;]*\d+(?:\.\d+)?px/,
     message: 'spacing must use var(--space-*)',
   },
   {
@@ -105,7 +107,11 @@ const BACKDROP_FILTER_DECL = /(?:-webkit-)?backdrop-filter:\s*([^;]+)/g;
 
 /** line-height and letter-spacing: a literal number or length outside var() is off the scale. */
 const SCALED_PROPERTIES = [
-  { id: 'line-height-literal', property: 'line-height', message: 'line-height must use var(--type-*-line) or var(--leading-*)' },
+  {
+    id: 'line-height-literal',
+    property: 'line-height',
+    message: 'line-height must use var(--type-*-line) or var(--leading-*)',
+  },
   { id: 'letter-spacing-literal', property: 'letter-spacing', message: 'letter-spacing must use var(--tracking-*)' },
 ];
 const isOffScale = (value) => {
@@ -134,7 +140,10 @@ function definedCustomProperties(cssFiles) {
     for (const match of text.matchAll(/(--[\w-]+)\s*:/g)) names.add(match[1]);
     for (const match of text.matchAll(/@property\s+(--[\w-]+)/g)) names.add(match[1]);
   }
-  for (const file of [...rendererScripts(path.join(root, 'src/renderer')), ...rendererScripts(path.join(root, 'src/shared/theme'))]) {
+  for (const file of [
+    ...rendererScripts(path.join(root, 'src/renderer')),
+    ...rendererScripts(path.join(root, 'src/shared/theme')),
+  ]) {
     for (const match of fs.readFileSync(file, 'utf8').matchAll(/['"`](--[\w-]+)/g)) names.add(match[1]);
   }
   return names;
@@ -164,7 +173,10 @@ for (const filePath of files) {
     if (/^\s*@media\b/.test(line)) {
       for (const match of line.matchAll(MEDIA_WIDTH)) {
         const px = Number(match[1]) * (match[2] === 'px' ? 1 : 16);
-        if (!BREAKPOINTS.has(px)) hits.push(`${rel}:${index + 1}: breakpoint — media width ${match[1]}${match[2]} is not in the breakpoint table (${[...BREAKPOINTS].join(' / ')}px) :: ${line.trim()}`);
+        if (!BREAKPOINTS.has(px))
+          hits.push(
+            `${rel}:${index + 1}: breakpoint — media width ${match[1]}${match[2]} is not in the breakpoint table (${[...BREAKPOINTS].join(' / ')}px) :: ${line.trim()}`,
+          );
       }
     }
     BACKDROP_FILTER_DECL.lastIndex = 0;
@@ -172,7 +184,9 @@ for (const filePath of files) {
     while ((backdropMatch = BACKDROP_FILTER_DECL.exec(line))) {
       const value = backdropMatch[1].trim();
       if (value === 'var(--modal-backdrop-filter)') continue;
-      hits.push(`${rel}:${index + 1}: backdrop-blur — backdrop-filter must be var(--modal-backdrop-filter) :: ${line.trim()}`);
+      hits.push(
+        `${rel}:${index + 1}: backdrop-blur — backdrop-filter must be var(--modal-backdrop-filter) :: ${line.trim()}`,
+      );
     }
   });
 }
@@ -184,7 +198,9 @@ for (const filePath of files) {
   for (const match of text.matchAll(/var\(\s*(--[\w-]+)\s*\)/g)) {
     if (defined.has(match[1])) continue;
     const line = text.slice(0, match.index).split('\n').length;
-    hits.push(`${rel}:${line}: undefined-var — ${match[1]} is defined nowhere, so the declaration is invalid and inherits :: ${match[0]}`);
+    hits.push(
+      `${rel}:${line}: undefined-var — ${match[1]} is defined nowhere, so the declaration is invalid and inherits :: ${match[0]}`,
+    );
   }
 }
 
@@ -200,10 +216,14 @@ const failing = hits.filter((hit) => {
 });
 for (const [file, allowed] of Object.entries(PENDING_OWNER_FIXES)) {
   const count = pendingCounts.get(file) ?? 0;
-  if (count < allowed) console.log(`[design-tokens] pending ${file}: ${count} hit(s); lower its PENDING_OWNER_FIXES entry to ${count}`);
+  if (count < allowed)
+    console.log(`[design-tokens] pending ${file}: ${count} hit(s); lower its PENDING_OWNER_FIXES entry to ${count}`);
 }
 const pendingTotal = [...pendingCounts.values()].reduce((sum, count) => sum + count, 0);
-if (pendingTotal > 0) console.log(`[design-tokens] ${pendingTotal} pending hit(s) in ${pendingCounts.size} file(s) owned by another change`);
+if (pendingTotal > 0)
+  console.log(
+    `[design-tokens] ${pendingTotal} pending hit(s) in ${pendingCounts.size} file(s) owned by another change`,
+  );
 
 const verbose = process.argv.includes('--verbose');
 const shown = verbose ? hits : failing;

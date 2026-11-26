@@ -4,31 +4,58 @@ import { useRdcInstallation } from './useRdcInstallation';
 
 const DEFAULT_SETTINGS = createDefaultAppSettings();
 
-const mock = vi.hoisted(() => ({ values: [] as unknown[], cleanup: [] as (() => void)[],
-  verify: vi.fn(), save: vi.fn(), select: vi.fn(), resolve: vi.fn(), detect: vi.fn() }));
+const mock = vi.hoisted(() => ({
+  values: [] as unknown[],
+  cleanup: [] as (() => void)[],
+  verify: vi.fn(),
+  save: vi.fn(),
+  select: vi.fn(),
+  resolve: vi.fn(),
+  detect: vi.fn(),
+}));
 vi.mock('react', () => ({
   useRef: (current: unknown) => ({ current }),
   useState: (initial: unknown) => {
     const index = mock.values.length;
     mock.values.push(initial);
-    return [initial, (value: unknown) => { mock.values[index] = value; }];
+    return [
+      initial,
+      (value: unknown) => {
+        mock.values[index] = value;
+      },
+    ];
   },
-  useEffect: (effect: () => () => void) => { mock.cleanup.push(effect()); },
+  useEffect: (effect: () => () => void) => {
+    mock.cleanup.push(effect());
+  },
 }));
 vi.mock('../../../../platform/rdcInstallation', () => ({
-  validateRdcInstallation: mock.verify, selectRdcInstallation: mock.select,
-  resolveRdcInstallation: mock.resolve, detectRdcInstallations: mock.detect,
+  validateRdcInstallation: mock.verify,
+  selectRdcInstallation: mock.select,
+  resolveRdcInstallation: mock.resolve,
+  detectRdcInstallations: mock.detect,
 }));
-vi.mock('../../../../stores/appSettingsStore', () => ({ useAppSettingsStore: { getState: () => ({ patchSettings: mock.save }) } }));
+vi.mock('../../../../stores/appSettingsStore', () => ({
+  useAppSettingsStore: { getState: () => ({ patchSettings: mock.save }) },
+}));
 const draft = { ...DEFAULT_SETTINGS.tooling.rdcCli, workingDirectory: 'D:\\工具 folder' };
 const verified = { settings: { ...draft, enabled: true }, summary: { cli: { available: true } } };
-beforeEach(() => { vi.clearAllMocks(); mock.values = []; mock.cleanup = []; mock.verify.mockResolvedValue(verified); });
+beforeEach(() => {
+  vi.clearAllMocks();
+  mock.values = [];
+  mock.cleanup = [];
+  mock.verify.mockResolvedValue(verified);
+});
 
 it('validates the selected draft before saving and reports success only after persistence', async () => {
   mock.save.mockResolvedValue({ tooling: { rdcCli: verified.settings } });
   const applied = vi.fn();
   await useRdcInstallation(draft, applied).apply();
-  expect(mock.verify).toHaveBeenCalledWith({ root: draft.workingDirectory, timeoutMs: draft.timeoutMs, env: draft.env });
+  expect(mock.verify).toHaveBeenCalledWith({
+    root: draft.workingDirectory,
+    timeoutMs: draft.timeoutMs,
+    env: draft.env,
+  });
   expect(mock.verify.mock.invocationCallOrder[0]).toBeLessThan(mock.save.mock.invocationCallOrder[0]);
   expect(applied).toHaveBeenCalledWith(verified.settings);
   expect(mock.values[3]).toEqual(verified.summary);
@@ -45,7 +72,11 @@ it.each(['catalog mismatch', 'save failed'])('does not claim applied on %s', asy
 });
 it.each(['close', 'replace'])('discards verification after %s before any save', async (action) => {
   let finish!: (value: typeof verified) => void;
-  mock.verify.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  mock.verify.mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
   const applied = vi.fn();
   const state = useRdcInstallation(draft, applied);
   const pending = state.apply();

@@ -1,13 +1,9 @@
 import { mergeToolExecutionActionEvent } from './conversationActionEventMerge';
-import type {
-  ConversationMessage,
-  ConversationWorkBlock,
-  ConversationWorkTrace,
-} from '@shared/types/conversation';
+import type { ConversationMessage, ConversationWorkBlock, ConversationWorkTrace } from '@shared/types/conversation';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ToolTraceEntry } from '@shared/types/tool';
 
-const cloneWorkTrace = (trace: ConversationWorkTrace | null | undefined): ConversationWorkTrace => (
+const cloneWorkTrace = (trace: ConversationWorkTrace | null | undefined): ConversationWorkTrace =>
   trace
     ? {
         ...trace,
@@ -20,8 +16,7 @@ const cloneWorkTrace = (trace: ConversationWorkTrace | null | undefined): Conver
         status: 'idle',
         blocks: [],
         updatedAt: Date.now(),
-      }
-);
+      };
 
 const upsertWorkBlock = (
   trace: ConversationWorkTrace | null | undefined,
@@ -74,7 +69,7 @@ export const applyToolTraceToMessage = (message: ConversationMessage, trace: Too
     const nextToolCall = {
       id: trace.traceId,
       toolName: trace.toolName,
-      status: trace.result.ok ? 'complete' as const : 'error' as const,
+      status: trace.result.ok ? ('complete' as const) : ('error' as const),
       argsPreview: JSON.stringify(trace.args, null, 2),
       resultPreview: trace.result.ok
         ? JSON.stringify(trace.result.data ?? trace.result.artifacts ?? {}, null, 2)
@@ -119,36 +114,32 @@ export const applyActionEventToMessage = (message: ConversationMessage, event: A
     return toolMerged;
   }
 
-  const stage = typeof event.payload.toStage === 'string'
-    ? event.payload.toStage
-    : typeof event.payload.stage === 'string'
-      ? event.payload.stage
-      : undefined;
+  const stage =
+    typeof event.payload.toStage === 'string'
+      ? event.payload.toStage
+      : typeof event.payload.stage === 'string'
+        ? event.payload.stage
+        : undefined;
   const blockId = `${event.event_type}:${stage || event.event_id}`;
   const summary = String(
-    event.payload.summary
-    || event.payload.reason
-    || event.payload.objective
-    || event.payload.content
-    || event.payload.verdict
-    || event.payload.toStage
-    || event.event_type,
+    event.payload.summary ||
+      event.payload.reason ||
+      event.payload.objective ||
+      event.payload.content ||
+      event.payload.verdict ||
+      event.payload.toStage ||
+      event.event_type,
   );
   const nextBlockTrace = upsertWorkBlock(nextTrace, blockId, {
-    kind: event.status === 'error' || event.status === 'blocked' || event.status === 'fail'
-      ? 'diagnostic'
-      : 'output',
+    kind: event.status === 'error' || event.status === 'blocked' || event.status === 'fail' ? 'diagnostic' : 'output',
     title: stage ? `Stage: ${stage}` : event.event_type,
     stage,
-    status: event.status === 'error' || event.status === 'blocked' || event.status === 'fail'
-      ? 'error'
-      : 'complete',
+    status: event.status === 'error' || event.status === 'blocked' || event.status === 'fail' ? 'error' : 'complete',
     summary,
     completedAt: eventTime + event.duration_ms,
   });
-  nextBlockTrace.status = event.status === 'error' || event.status === 'blocked' || event.status === 'fail'
-    ? 'error'
-    : 'running';
+  nextBlockTrace.status =
+    event.status === 'error' || event.status === 'blocked' || event.status === 'fail' ? 'error' : 'running';
 
   return {
     ...message,
@@ -161,12 +152,9 @@ export const hydrateMessagesWithActionEvents = (
   messages: ConversationMessage[],
   events: ActionEvent[],
 ): ConversationMessage[] => {
-  const sortedEvents = events
-    .slice()
-    .sort((left, right) => left.ts_ms - right.ts_ms);
+  const sortedEvents = events.slice().sort((left, right) => left.ts_ms - right.ts_ms);
 
-  return messages.map((message) => sortedEvents.reduce(
-    (currentMessage, event) => applyActionEventToMessage(currentMessage, event),
-    message,
-  ));
+  return messages.map((message) =>
+    sortedEvents.reduce((currentMessage, event) => applyActionEventToMessage(currentMessage, event), message),
+  );
 };

@@ -33,7 +33,9 @@
   line-height: var(--type-body-line);
   white-space: nowrap;
   cursor: pointer;
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .ui-tabs-tab:hover:not(:disabled) {
@@ -88,7 +90,9 @@
   left: 0;
   width: var(--ui-tabs-indicator-width, 0);
   transform: translateX(var(--ui-tabs-indicator-x, 0));
-  transition: transform var(--motion-indicator), width var(--motion-indicator);
+  transition:
+    transform var(--motion-indicator),
+    width var(--motion-indicator);
   pointer-events: none;
 }
 
@@ -143,7 +147,9 @@
 .ui-tabs.is-segmented .ui-tabs-list:not(.is-measured) .ui-tabs-tab.is-selected {
   border-radius: var(--radius-sm);
   background: var(--token-bg-raised);
-  box-shadow: var(--token-elevation-1), inset 0 0 0 1px var(--ui-tabs-accent, var(--token-border-default));
+  box-shadow:
+    var(--token-elevation-1),
+    inset 0 0 0 1px var(--ui-tabs-accent, var(--token-border-default));
 }
 
 .ui-tabs.is-segmented .ui-tabs-indicator {

@@ -29,18 +29,33 @@ describe('MCP input schema compilation', () => {
     const compiled = compileMcpInputSchema(SDK_SCHEMA, 'search');
     if (!compiled.ok) throw new Error(compiled.reason);
     const definition = { name: 'search', description: '', parameters: compiled.schema };
-    expect(toolValidator.validate(definition, {
-      query: 'shadow', options: { limit: 5 }, since: null, tags: ['a', 'b'], extra: { any: 1 },
-    })).toEqual({ query: 'shadow', options: { limit: 5 }, since: null, tags: ['a', 'b'], extra: { any: 1 } });
+    expect(
+      toolValidator.validate(definition, {
+        query: 'shadow',
+        options: { limit: 5 },
+        since: null,
+        tags: ['a', 'b'],
+        extra: { any: 1 },
+      }),
+    ).toEqual({ query: 'shadow', options: { limit: 5 }, since: null, tags: ['a', 'b'], extra: { any: 1 } });
     expect(() => toolValidator.validate(definition, { query: 'shadow', options: { limit: 0 } })).toThrow(/大于 0/);
     expect(() => toolValidator.validate(definition, { query: 'shadow', options: {} })).toThrow(/allOf/);
-    expect(() => toolValidator.validate(definition, { query: 'shadow', options: { limit: 1 }, since: { day: 1 } })).toThrow(/anyOf/);
-    expect(() => toolValidator.validate(definition, { query: 'shadow', options: { limit: 1 }, tags: ['a', 'a'] })).toThrow(/互不相同/);
-    expect(() => toolValidator.validate(definition, { query: 'shadow', options: { limit: 1 }, unknown: true })).toThrow(/未声明字段/);
+    expect(() =>
+      toolValidator.validate(definition, { query: 'shadow', options: { limit: 1 }, since: { day: 1 } }),
+    ).toThrow(/anyOf/);
+    expect(() =>
+      toolValidator.validate(definition, { query: 'shadow', options: { limit: 1 }, tags: ['a', 'a'] }),
+    ).toThrow(/互不相同/);
+    expect(() => toolValidator.validate(definition, { query: 'shadow', options: { limit: 1 }, unknown: true })).toThrow(
+      /未声明字段/,
+    );
   });
 
   it('checks every member of a union type instead of letting any value through', () => {
-    const compiled = compileMcpInputSchema({ type: 'object', properties: { note: { type: ['string', 'null'] } } }, 'note');
+    const compiled = compileMcpInputSchema(
+      { type: 'object', properties: { note: { type: ['string', 'null'] } } },
+      'note',
+    );
     if (!compiled.ok) throw new Error(compiled.reason);
     const definition = { name: 'note', description: '', parameters: compiled.schema };
     expect(toolValidator.validate(definition, { note: null })).toEqual({ note: null });
@@ -48,9 +63,14 @@ describe('MCP input schema compilation', () => {
   });
 
   it('reports a schema the validator cannot enforce at connect time', () => {
-    expect(compileMcpInputSchema({ type: 'object', properties: { pair: { type: 'array', prefixItems: [{ type: 'string' }] } } }, 'pair'))
-      .toMatchObject({ ok: false, reason: expect.stringContaining('prefixItems') });
-    expect(compileMcpInputSchema({ type: 'object', properties: { item: { $ref: '#/$defs/Missing' } } }, 'item'))
-      .toMatchObject({ ok: false, reason: expect.stringContaining('unresolvable $ref') });
+    expect(
+      compileMcpInputSchema(
+        { type: 'object', properties: { pair: { type: 'array', prefixItems: [{ type: 'string' }] } } },
+        'pair',
+      ),
+    ).toMatchObject({ ok: false, reason: expect.stringContaining('prefixItems') });
+    expect(
+      compileMcpInputSchema({ type: 'object', properties: { item: { $ref: '#/$defs/Missing' } } }, 'item'),
+    ).toMatchObject({ ok: false, reason: expect.stringContaining('unresolvable $ref') });
   });
 });

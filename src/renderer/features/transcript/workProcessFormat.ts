@@ -14,9 +14,8 @@ export const normalizeWorkProcessText = (value: string): string => {
 };
 
 /** Time from `start` to `end` (or to now, for something still running) in the interface language; empty without a start. */
-export const formatDurationMs = (language: AppLanguage, start?: number, end?: number): string => (
-  start ? formatDuration(language, (end ?? Date.now()) - start) : ''
-);
+export const formatDurationMs = (language: AppLanguage, start?: number, end?: number): string =>
+  start ? formatDuration(language, (end ?? Date.now()) - start) : '';
 
 export const compactText = (value: string, maxLength: number): string => {
   const text = value.trim().replace(/\s+/g, ' ');

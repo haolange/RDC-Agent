@@ -2,10 +2,7 @@ import * as fs from 'fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { TokenizerService } from '../core/TokenizerService';
-import {
-  ATTACHMENT_INLINE_BUDGET_RATIO,
-  ATTACHMENT_INLINE_TOKEN_BUDGET,
-} from '../../runtime/attachmentClassify';
+import { ATTACHMENT_INLINE_BUDGET_RATIO, ATTACHMENT_INLINE_TOKEN_BUDGET } from '../../runtime/attachmentClassify';
 
 const tokenizer = new TokenizerService();
 const TOKEN_MODEL = 'gpt-4';
@@ -26,21 +23,16 @@ export function countAttachmentTokens(text: string): number {
   return tokenizer.countTokens(text, TOKEN_MODEL);
 }
 
-export function resolveInlineTokenBudget(
-  extractableCount: number,
-  contextBudgetTokens?: number,
-): number {
-  const fromContext = typeof contextBudgetTokens === 'number' && contextBudgetTokens > 0
-    ? Math.floor(contextBudgetTokens * ATTACHMENT_INLINE_BUDGET_RATIO)
-    : ATTACHMENT_INLINE_TOKEN_BUDGET;
+export function resolveInlineTokenBudget(extractableCount: number, contextBudgetTokens?: number): number {
+  const fromContext =
+    typeof contextBudgetTokens === 'number' && contextBudgetTokens > 0
+      ? Math.floor(contextBudgetTokens * ATTACHMENT_INLINE_BUDGET_RATIO)
+      : ATTACHMENT_INLINE_TOKEN_BUDGET;
   const total = Math.min(ATTACHMENT_INLINE_TOKEN_BUDGET, Math.max(256, fromContext));
   return Math.max(256, Math.floor(total / Math.max(1, extractableCount)));
 }
 
-export function truncateTextToTokenBudget(
-  text: string,
-  budgetTokens: number,
-): { text: string; truncated: boolean } {
+export function truncateTextToTokenBudget(text: string, budgetTokens: number): { text: string; truncated: boolean } {
   if (countAttachmentTokens(text) <= budgetTokens) {
     return { text, truncated: false };
   }
@@ -75,7 +67,10 @@ function windowBytesForBudget(budgetTokens: number): number {
   return Math.max(4096, Math.ceil(budgetTokens * BYTES_PER_TOKEN * BYTE_WINDOW_SLACK));
 }
 
-async function readUtf8Window(filePath: string, budgetTokens: number): Promise<{
+async function readUtf8Window(
+  filePath: string,
+  budgetTokens: number,
+): Promise<{
   decoded: string;
   totalBytes: number;
   pretrimmed: boolean;
@@ -145,9 +140,7 @@ export async function extractPdfText(filePath: string, budgetTokens: number): Pr
       emptyReason: 'PDF has no extractable text layer (likely a scanned document).',
     };
   }
-  const decoded = pages
-    .map((page, index) => `--- page ${index + 1} ---\n${page}`)
-    .join('\n\n');
+  const decoded = pages.map((page, index) => `--- page ${index + 1} ---\n${page}`).join('\n\n');
   const { text, truncated } = truncateTextToTokenBudget(decoded, budgetTokens);
   return {
     body: text,
@@ -173,9 +166,7 @@ let pdfWorkerConfigured = false;
 function configurePdfWorker(pdfjs: { GlobalWorkerOptions: { workerSrc: string } }): void {
   if (pdfWorkerConfigured) return;
   const require = createRequire(__filename);
-  pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(
-    require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs'),
-  ).href;
+  pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href;
   pdfWorkerConfigured = true;
 }
 

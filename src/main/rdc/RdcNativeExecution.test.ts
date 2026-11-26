@@ -18,7 +18,7 @@ import type { InvestigationContentRef, ExperimentRecord } from '@shared/types/re
 
 const state = vi.hoisted(() => ({ receipts: null as RdcExecutionReceipts | null }));
 vi.mock('./RdcExecutionReceipts', async (original) => ({
-  ...await original<typeof import('./RdcExecutionReceipts')>(),
+  ...(await original<typeof import('./RdcExecutionReceipts')>()),
   rdcExecutionReceipts: {
     prepare: () => state.receipts!.prepare(),
     write: (...args: Parameters<RdcExecutionReceipts['write']>) => state.receipts!.write(...args),
@@ -30,8 +30,9 @@ const enabled = Boolean(root && fixture && process.env.RDC_NATIVE_ALLOW_MUTATION
 const hash = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex');
 
 function cleanupNativeTestDirectory(directory: string, testRoot: string): void {
-if (path.dirname(path.resolve(directory)) !== testRoot) throw new Error('Refusing cleanup outside the owned test root');
-rmSync(directory, { recursive: true, force: true });
+  if (path.dirname(path.resolve(directory)) !== testRoot)
+    throw new Error('Refusing cleanup outside the owned test root');
+  rmSync(directory, { recursive: true, force: true });
 }
 
 describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit disposable capture)', () => {
@@ -47,25 +48,53 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
     const before = hash(fixture!);
     const contextId = 'qa-receipt-' + randomUUID().slice(0, 12);
     const sessionId = 'qa-session-' + randomUUID();
-    const settings = { ...DEFAULT_RDC_CLI_INVOKER, enabled: true, command: files.python,
-      argsPrefix: [files.entry], env: nativeEnv, timeoutMs: 60_000 };
-    const resolver = new SessionArtifactResolver({ resolveSessionPath: (id) => id === sessionId ? directory : null });
+    const settings = {
+      ...DEFAULT_RDC_CLI_INVOKER,
+      enabled: true,
+      command: files.python,
+      argsPrefix: [files.entry],
+      env: nativeEnv,
+      timeoutMs: 60_000,
+    };
+    const resolver = new SessionArtifactResolver({ resolveSessionPath: (id) => (id === sessionId ? directory : null) });
     const receipts = new RdcExecutionReceipts(resolver, () => 'isolated-integration-signing-key');
     state.receipts = receipts;
-    const native = async (command: string, args: string[] = []) => parseRdcNativeResult(
-      await rdcCliInvokerService.executeCLI(command, [...args, '--daemon-context', contextId], { settings }));
+    const native = async (command: string, args: string[] = []) =>
+      parseRdcNativeResult(
+        await rdcCliInvokerService.executeCLI(command, [...args, '--daemon-context', contextId], { settings }),
+      );
     let replaySessionId = '';
     let evidence: NonNullable<ExperimentRecord['executionEvidence']> | undefined;
     try {
       const opened = await native('capture', ['open', '--file', capture]);
       replaySessionId = String(opened.data.session_id);
       const eventId = Number(opened.data.active_event_id);
-      setRdcRuntimeContextForSession(sessionId, {
-        contextId, runtimeOwner: 'qa-native', ownerLeaseId: 'qa-native-lease', replaySessionId,
-        captureFileId: String(opened.data.capture_file_id), backend: 'local', updatedAt: Date.now(),
-      }, { projectId: 'qa-project' });
-      const context = { workspaceRoot: directory, projectRootPath: directory, projectId: 'qa-project',
-        sessionId, turnId: 'qa-turn', agentId: 'general', rdcBinding: freezeRdcTurnBinding(settings, (await rdcCliInvokerService.loadCatalog(settings, true)).tools, getRdcContextLease(sessionId)) };
+      setRdcRuntimeContextForSession(
+        sessionId,
+        {
+          contextId,
+          runtimeOwner: 'qa-native',
+          ownerLeaseId: 'qa-native-lease',
+          replaySessionId,
+          captureFileId: String(opened.data.capture_file_id),
+          backend: 'local',
+          updatedAt: Date.now(),
+        },
+        { projectId: 'qa-project' },
+      );
+      const context = {
+        workspaceRoot: directory,
+        projectRootPath: directory,
+        projectId: 'qa-project',
+        sessionId,
+        turnId: 'qa-turn',
+        agentId: 'general',
+        rdcBinding: freezeRdcTurnBinding(
+          settings,
+          (await rdcCliInvokerService.loadCatalog(settings, true)).tools,
+          getRdcContextLease(sessionId),
+        ),
+      };
       const invoke = async (phase: string, operation: string, args: Record<string, unknown>) => {
         const result = await executeRdcShell({ operation, args, experimentId: 'qa-aba' }, phase, undefined, context);
         expect(result.isError).not.toBe(true);
@@ -81,8 +110,13 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
       const baselineHash = hash(outputPath);
       copyFileSync(outputPath, path.join(directory, 'baseline.png'));
       const intervention = await invoke('intervention', 'rd.shader.edit_and_replace', {
-        event_id: eventId, stage: 'ps', source_encoding: 'glsl', entry: 'main', preserve_outputs: false,
-        source_text: '#version 450\nlayout(location=0) out vec4 outColor;\nvoid main(){outColor=vec4(1.0,0.0,1.0,1.0);}',
+        event_id: eventId,
+        stage: 'ps',
+        source_encoding: 'glsl',
+        entry: 'main',
+        preserve_outputs: false,
+        source_text:
+          '#version 450\nlayout(location=0) out vec4 outColor;\nvoid main(){outColor=vec4(1.0,0.0,1.0,1.0);}',
       });
       const replacementId = receipts.read(sessionId, intervention).result.replacement_id;
       const variant = await invoke('variant', 'rd.export.texture', measurement);
@@ -93,30 +127,56 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
       const restoredHash = hash(outputPath);
       copyFileSync(outputPath, path.join(directory, 'restored.png'));
       evidence = { baseline, intervention, variant, rollback, restored };
-      assertExecutionEvidence(sessionId, { ...recordedExperiment({
-        experimentId: 'qa-aba', hypothesisClaimId: 'qa-hypothesis', baselineWorldStateId: 'qa-baseline',
-        variantWorldStateId: 'qa-variant', restoredWorldStateId: 'qa-restored', verifyEvidenceIds: ['qa-visual-restored'],
-      }), executionEvidence: evidence }, receipts);
+      assertExecutionEvidence(
+        sessionId,
+        {
+          ...recordedExperiment({
+            experimentId: 'qa-aba',
+            hypothesisClaimId: 'qa-hypothesis',
+            baselineWorldStateId: 'qa-baseline',
+            variantWorldStateId: 'qa-variant',
+            restoredWorldStateId: 'qa-restored',
+            verifyEvidenceIds: ['qa-visual-restored'],
+          }),
+          executionEvidence: evidence,
+        },
+        receipts,
+      );
       expect(variantHash).not.toBe(baselineHash);
       expect(restoredHash).toBe(baselineHash);
-      writeFileSync(path.join(directory, 'validation.json'), JSON.stringify({ contextId, sessionId, evidence,
-        baselineHash, variantHash, restoredHash, sourceHash: before }, null, 2));
+      writeFileSync(
+        path.join(directory, 'validation.json'),
+        JSON.stringify(
+          { contextId, sessionId, evidence, baselineHash, variantHash, restoredHash, sourceHash: before },
+          null,
+          2,
+        ),
+      );
       if (process.env.RDC_NATIVE_EXECUTION_OUTPUT) {
         const output = path.resolve(process.env.RDC_NATIVE_EXECUTION_OUTPUT);
         mkdirSync(output, { recursive: true });
         for (const name of ['validation.json', 'baseline.png', 'variant.png', 'restored.png']) {
           copyFileSync(path.join(directory, name), path.join(output, name));
         }
-        cpSync(path.join(directory, 'session-artifacts', 'tool-outputs'), path.join(output, 'tool-outputs'), { recursive: true });
+        cpSync(path.join(directory, 'session-artifacts', 'tool-outputs'), path.join(output, 'tool-outputs'), {
+          recursive: true,
+        });
       }
       console.info('Native signed execution verified:', directory);
     } finally {
       try {
         if (replaySessionId) {
-          const list = await native('call', ['rd.shader.list_replacements', '--args-json', JSON.stringify({ session_id: replaySessionId })]);
+          const list = await native('call', [
+            'rd.shader.list_replacements',
+            '--args-json',
+            JSON.stringify({ session_id: replaySessionId }),
+          ]);
           for (const replacement of (list.data.replacements ?? []) as Array<{ replacement_id: string }>) {
-            await native('call', ['rd.shader.revert_replacement', '--args-json',
-              JSON.stringify({ session_id: replaySessionId, replacement_id: replacement.replacement_id })]);
+            await native('call', [
+              'rd.shader.revert_replacement',
+              '--args-json',
+              JSON.stringify({ session_id: replaySessionId, replacement_id: replacement.replacement_id }),
+            ]);
           }
         }
       } finally {

@@ -4,10 +4,7 @@ import { dispatchRuntimeHooks } from '../hooks/runtimeHookDispatch';
 import { rdcSessionService } from './RdcSessionService';
 import { replayHistoryStore } from './captures/replay/ReplayHistoryStore';
 
-export async function createSessionWithHooks(
-  projectId: string,
-  title?: string,
-) {
+export async function createSessionWithHooks(projectId: string, title?: string) {
   const project = projectWorkspaceStore.getProjectById(projectId);
   if (!project) {
     throw new Error(`Project not found: ${projectId}`);

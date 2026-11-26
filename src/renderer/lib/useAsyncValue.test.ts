@@ -14,13 +14,21 @@ describe('useAsyncValue', () => {
   const disposed: string[] = [];
 
   function Probe({ valueKey }: { valueKey: string | null }) {
-    shown = useAsyncValue(valueKey, (signal) => new Promise<string>((resolve, reject) => {
-      reads.push({ key: valueKey ?? '', resolve, reject, signal });
-    }), { dispose: (value) => disposed.push(value) });
+    shown = useAsyncValue(
+      valueKey,
+      (signal) =>
+        new Promise<string>((resolve, reject) => {
+          reads.push({ key: valueKey ?? '', resolve, reject, signal });
+        }),
+      { dispose: (value) => disposed.push(value) },
+    );
     return null;
   }
   const render = (valueKey: string | null) => act(() => root.render(createElement(Probe, { valueKey })));
-  const answer = (index: number, value: string) => act(async () => { reads[index]!.resolve(value); });
+  const answer = (index: number, value: string) =>
+    act(async () => {
+      reads[index]!.resolve(value);
+    });
 
   beforeEach(() => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -48,7 +56,7 @@ describe('useAsyncValue', () => {
     expect(disposed).toEqual(['value-a']);
   });
 
-  it('never shows a previous key\'s value while the new key loads, and releases it', async () => {
+  it("never shows a previous key's value while the new key loads, and releases it", async () => {
     render('a');
     await answer(0, 'value-a');
     render('b');
@@ -61,7 +69,9 @@ describe('useAsyncValue', () => {
 
   it('reports a failed read of the current key and reads nothing for a null key', async () => {
     render('a');
-    await act(async () => { reads[0]!.reject(new Error('offline')); });
+    await act(async () => {
+      reads[0]!.reject(new Error('offline'));
+    });
     expect(shown).toMatchObject({ status: 'error', error: new Error('offline') });
     render(null);
     expect(shown).toEqual({ status: 'idle' });

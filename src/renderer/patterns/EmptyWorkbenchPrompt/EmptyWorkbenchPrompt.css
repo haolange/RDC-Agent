@@ -71,11 +71,7 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-lg);
   background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--empty-card-accent) 5%, transparent),
-      transparent 48%
-    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--empty-card-accent) 5%, transparent), transparent 48%),
     var(--token-bg-raised);
   text-align: left;
   transition:
@@ -96,11 +92,7 @@
 .empty-workbench-tool-card:focus-visible {
   border-color: color-mix(in srgb, var(--empty-card-accent) 40%, var(--token-border-muted));
   background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--empty-card-accent) 8%, transparent),
-      transparent 48%
-    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--empty-card-accent) 8%, transparent), transparent 48%),
     var(--token-bg-raised);
 }
 

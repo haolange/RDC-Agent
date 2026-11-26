@@ -27,11 +27,7 @@ export const findFirstEnabledIndex = (options: SelectOption[]): number =>
 export const findSelectedEnabledIndex = (options: SelectOption[], value: string): number =>
   options.findIndex((option) => option.value === value && !option.disabled);
 
-export const findNextEnabledIndex = (
-  options: SelectOption[],
-  startIndex: number,
-  direction: 1 | -1,
-): number => {
+export const findNextEnabledIndex = (options: SelectOption[], startIndex: number, direction: 1 | -1): number => {
   if (options.length === 0) {
     return -1;
   }

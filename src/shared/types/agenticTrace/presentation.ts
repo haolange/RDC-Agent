@@ -1,11 +1,7 @@
 import type { AgentRun } from './base';
 import type { SessionScope } from '../session';
 import type { TimelineProjection } from './projection';
-import type {
-  BranchNavigatorViewModel,
-  RawAuditRef,
-  RightPanelViewModel,
-} from '../trace';
+import type { BranchNavigatorViewModel, RawAuditRef, RightPanelViewModel } from '../trace';
 
 export interface AgentRunPresentation {
   projectId: string;
@@ -28,4 +24,3 @@ export interface AgentRunViewModel {
 export interface TraceProjectionChangedPayload extends SessionScope {
   presentation: AgentRunPresentation;
 }
-

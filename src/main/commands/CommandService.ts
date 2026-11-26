@@ -8,10 +8,7 @@
  */
 
 import { CommandRegistry } from './CommandRegistry';
-import type {
-  CommandExecuteRequest,
-  CommandResult,
-} from '@shared/types/command';
+import type { CommandExecuteRequest, CommandResult } from '@shared/types/command';
 import type { ConversationMessage } from '@shared/types/conversation';
 
 export class CommandService {
@@ -31,10 +28,7 @@ export class CommandService {
     return { result, systemMessage };
   }
 
-  private buildSystemMessage(
-    result: CommandResult,
-    request: CommandExecuteRequest,
-  ): ConversationMessage {
+  private buildSystemMessage(result: CommandResult, request: CommandExecuteRequest): ConversationMessage {
     const ctx = request.context;
     const commandName = request.input.trim().slice(1).split(/\s+/)[0];
     const now = Date.now();
@@ -58,9 +52,7 @@ export class CommandService {
             kind: 'command',
             title: `/${commandName}`,
             status: result.success ? 'complete' : 'error',
-            summary: result.data
-              ? `${result.message}\n${JSON.stringify(result.data, null, 2)}`
-              : result.message,
+            summary: result.data ? `${result.message}\n${JSON.stringify(result.data, null, 2)}` : result.message,
             toolCalls: [],
             startedAt: now,
             completedAt: now,

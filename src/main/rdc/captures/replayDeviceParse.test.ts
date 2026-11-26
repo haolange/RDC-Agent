@@ -3,8 +3,18 @@ import { parseAdbDeviceLine, parseAndroidBootstrapMetadata } from './replayDevic
 
 describe('Android service ownership projection', () => {
   it('reports a borrowed connection without claiming APK verification or startup', () => {
-    const metadata = parseAndroidBootstrapMetadata({ package_name: 'helper', started_activity: false, installed_apk: false, created_forward: true });
-    expect(metadata).toMatchObject({ packageName: 'helper', startedActivity: false, installedApk: false, createdForward: true });
+    const metadata = parseAndroidBootstrapMetadata({
+      package_name: 'helper',
+      started_activity: false,
+      installed_apk: false,
+      created_forward: true,
+    });
+    expect(metadata).toMatchObject({
+      packageName: 'helper',
+      startedActivity: false,
+      installedApk: false,
+      createdForward: true,
+    });
   });
   it('reports startup only when the current native result confirms it', () => {
     expect(parseAndroidBootstrapMetadata({ installed_apk: true })?.startedActivity).toBeUndefined();

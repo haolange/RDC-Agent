@@ -3,11 +3,23 @@ import { MemoryTaskStore, TaskRegistry } from '../tasks';
 import { deriveChildPolicyBudget } from './DelegationBudget';
 import { bindTaskRootBudget, getBoundTaskRootBudgetId, taskRootBudgetId } from './TaskRootBudget';
 import { readLiveTaskBudget } from './TaskRuntimeBudgetView';
-import { createPolicyBudgetState, createSubagentBudgetState, finishSubagentBudgetChild,
-  reserveDispatchBudget, startSubagentBudgetChild, TurnHandle } from './TurnCoordinator';
+import {
+  createPolicyBudgetState,
+  createSubagentBudgetState,
+  finishSubagentBudgetChild,
+  reserveDispatchBudget,
+  startSubagentBudgetChild,
+  TurnHandle,
+} from './TurnCoordinator';
 
-beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-20T00:00:00Z')); });
-afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-10-20T00:00:00Z'));
+});
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
+});
 
 async function fixture(maxWallTimeMs = 60_000) {
   const registry = new TaskRegistry(new MemoryTaskStore());
@@ -23,9 +35,13 @@ describe('active Task budget observation', () => {
     const { registry, policy, turn } = await fixture();
     const before = await registry.getRootBudget('root-a');
     const snapshot = readLiveTaskBudget(turn, 'root-a');
-    expect(snapshot).toMatchObject({ turnId: 'current-turn', generation: 3,
-      remainingPolicy: { toolCalls: 19, subagents: 4, wallTimeMs: 60_000 }, reservedSubagentSlots: 0,
-      subagentTreeAdmission: { allowed: true, childrenSpawned: 0, activeChildren: 0 } });
+    expect(snapshot).toMatchObject({
+      turnId: 'current-turn',
+      generation: 3,
+      remainingPolicy: { toolCalls: 19, subagents: 4, wallTimeMs: 60_000 },
+      reservedSubagentSlots: 0,
+      subagentTreeAdmission: { allowed: true, childrenSpawned: 0, activeChildren: 0 },
+    });
     expect(policy.toolCalls).toBe(11);
     expect(policy.subagents).toBe(0);
     expect(await registry.getRootBudget('root-a')).toEqual(before);
@@ -37,11 +53,16 @@ describe('active Task budget observation', () => {
     const { policy, turn } = await fixture();
     const child = deriveChildPolicyBudget(policy, { maxToolCalls: 4, maxSubagents: 0, maxWallTimeMs: 4_000 });
     expect(reserveDispatchBudget(child, { toolCalls: 1, subagents: 0 })).toEqual({ ok: true });
-    const childTurn = new TurnHandle({ sessionKey: 'owner::subagent::child', turnId: 'child-turn', generation: 1,
-      policyBudget: child, subagentBudget: createSubagentBudgetState(undefined, 1) });
+    const childTurn = new TurnHandle({
+      sessionKey: 'owner::subagent::child',
+      turnId: 'child-turn',
+      generation: 1,
+      policyBudget: child,
+      subagentBudget: createSubagentBudgetState(undefined, 1),
+    });
     const snapshot = readLiveTaskBudget(childTurn, 'root-a');
     expect(snapshot?.remainingPolicy).toEqual({ toolCalls: 3, subagents: 0, wallTimeMs: 4_000 });
-    expect(snapshot?.policyChain.map(item => item.toolCalls)).toEqual([1, 12]);
+    expect(snapshot?.policyChain.map((item) => item.toolCalls)).toEqual([1, 12]);
     expect(turn.policyBudget.toolCalls).toBe(12);
     expect(child.toolCalls).toBe(1);
   });
@@ -62,7 +83,10 @@ describe('active Task budget observation', () => {
     turn.subagentBudget.budget = { ...turn.subagentBudget.budget, maxChildren: 5 };
     turn.subagentBudget.childrenSpawned = turn.subagentBudget.budget.maxChildren;
     const snapshot = readLiveTaskBudget(turn, 'root-a');
-    expect(snapshot?.subagentTreeAdmission).toMatchObject({ allowed: false, reason: expect.stringContaining('maxChildren') });
+    expect(snapshot?.subagentTreeAdmission).toMatchObject({
+      allowed: false,
+      reason: expect.stringContaining('maxChildren'),
+    });
     expect(snapshot?.remainingPolicy.toolCalls).toBe(19);
     expect(policy.toolCalls).toBe(11);
     expect(turn.subagentBudget.childrenSpawned).toBe(5);
@@ -76,6 +100,10 @@ describe('active Task budget observation', () => {
     vi.setSystemTime(started + 1_000);
     finishSubagentBudgetChild(turn.subagentBudget);
     vi.setSystemTime(started + 100_000);
-    expect(readLiveTaskBudget(turn, 'root-a')?.subagentTreeAdmission).toMatchObject({ allowed: true, childrenSpawned: 1, activeChildren: 0 });
+    expect(readLiveTaskBudget(turn, 'root-a')?.subagentTreeAdmission).toMatchObject({
+      allowed: true,
+      childrenSpawned: 1,
+      activeChildren: 0,
+    });
   });
 });

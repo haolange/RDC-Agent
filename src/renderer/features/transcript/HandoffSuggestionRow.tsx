@@ -10,7 +10,9 @@ export const HandoffSuggestionRow: React.FC<{
 }> = ({ suggestions }) => {
   const { t } = useI18n();
   const onSelect = useHandoffSuggestionActions();
-  const disabled = useComposerSessionContextStore(state => !!state.activeTurn || state.isPromptSending || !!state.handoffSuggestionRequest);
+  const disabled = useComposerSessionContextStore(
+    (state) => !!state.activeTurn || state.isPromptSending || !!state.handoffSuggestionRequest,
+  );
   if (suggestions.length === 0) return null;
   return (
     <div className="handoff-suggestion-row" data-testid="handoff-suggestion-row">
@@ -19,7 +21,9 @@ export const HandoffSuggestionRow: React.FC<{
         disabled={disabled}
         options={suggestions}
         onSelect={(option) => {
-          const match = suggestions.find((suggestion) => suggestion.agent === option.agent && suggestion.label === option.label);
+          const match = suggestions.find(
+            (suggestion) => suggestion.agent === option.agent && suggestion.label === option.label,
+          );
           if (match) onSelect(match);
         }}
       />

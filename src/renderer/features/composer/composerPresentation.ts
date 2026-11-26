@@ -19,7 +19,10 @@ export function buildComposerPresentation(input: {
     // The Agent pill already names who receives the message; the placeholder only says what to tell it.
     promptPlaceholder: hint ? t('composer.placeholderHint', { hint }) : t('composer.placeholder', { agent }),
     attachButtonLabel: t(input.hasProject ? 'composer.attach' : 'composer.attachNeedsProject'),
-    primaryButtonDescription: input.stopPending ? t('composer.stopping')
-      : input.isComposerBusy ? stopLabel : t('composer.sendTo', { agent }),
+    primaryButtonDescription: input.stopPending
+      ? t('composer.stopping')
+      : input.isComposerBusy
+        ? stopLabel
+        : t('composer.sendTo', { agent }),
   };
 }

@@ -9,28 +9,44 @@ describe('replay apply queue', () => {
     const queue = createReplayApplyQueue<number>(apply, vi.fn());
     queue.flush();
     expect(apply).not.toHaveBeenCalled();
-    queue.enqueue(3); queue.flush();
+    queue.enqueue(3);
+    queue.flush();
     await vi.runAllTimersAsync();
     expect(apply.mock.calls).toEqual([[3]]);
-    queue.flush(); await vi.runAllTimersAsync();
+    queue.flush();
+    await vi.runAllTimersAsync();
     expect(apply.mock.calls).toEqual([[3]]);
-    queue.enqueue(4); queue.dispose(); queue.flush();
+    queue.enqueue(4);
+    queue.dispose();
+    queue.flush();
     await vi.runAllTimersAsync();
     expect(apply.mock.calls).toEqual([[3]]);
   });
   it('coalesces dragging and flushes the final value after an in-flight operation', async () => {
     vi.useFakeTimers();
     let finish!: () => void;
-    const apply = vi.fn().mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; })).mockResolvedValue(undefined);
+    const apply = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockResolvedValue(undefined);
     const queue = createReplayApplyQueue<number>(apply, vi.fn());
-    queue.enqueue(1); queue.enqueue(2);
+    queue.enqueue(1);
+    queue.enqueue(2);
     await vi.advanceTimersByTimeAsync(99);
     expect(apply).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(apply.mock.calls).toEqual([[2]]);
-    queue.enqueue(3); queue.enqueue(4, true); queue.enqueue(5, true);
+    queue.enqueue(3);
+    queue.enqueue(4, true);
+    queue.enqueue(5, true);
     expect(apply).toHaveBeenCalledTimes(1);
-    finish(); await vi.runAllTimersAsync();
+    finish();
+    await vi.runAllTimersAsync();
     expect(apply.mock.calls).toEqual([[2], [5]]);
     queue.dispose();
   });
@@ -38,7 +54,8 @@ describe('replay apply queue', () => {
     vi.useFakeTimers();
     const apply = vi.fn();
     const queue = createReplayApplyQueue<number>(apply, vi.fn());
-    queue.enqueue(20); queue.dispose();
+    queue.enqueue(20);
+    queue.dispose();
     await vi.runAllTimersAsync();
     queue.enqueue(21, true);
     expect(apply).not.toHaveBeenCalled();
@@ -49,9 +66,11 @@ describe('replay apply queue', () => {
     const apply = vi.fn().mockRejectedValueOnce(error).mockResolvedValue(undefined);
     const onError = vi.fn();
     const queue = createReplayApplyQueue<number>(apply, onError);
-    queue.enqueue(1, true); await vi.runAllTimersAsync();
+    queue.enqueue(1, true);
+    await vi.runAllTimersAsync();
     expect(onError).toHaveBeenCalledWith(error);
-    queue.enqueue(2, true); await vi.runAllTimersAsync();
+    queue.enqueue(2, true);
+    await vi.runAllTimersAsync();
     expect(apply.mock.calls).toEqual([[1], [2]]);
     queue.dispose();
   });

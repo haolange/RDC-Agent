@@ -1,12 +1,5 @@
 import type { ElectronAPI } from '../types/electron';
-import type {
-  CaptureApi,
-  ContextApi,
-  DeviceApi,
-  ProjectApi,
-  RuntimeLogApi,
-  SessionApi,
-} from '../types/electron-api';
+import type { CaptureApi, ContextApi, DeviceApi, ProjectApi, RuntimeLogApi, SessionApi } from '../types/electron-api';
 import type { RendererApiTransport } from './transport';
 
 export function createProjectApi(transport: RendererApiTransport): ProjectApi {
@@ -20,12 +13,11 @@ export function createProjectApi(transport: RendererApiTransport): ProjectApi {
       list: (projectId) => transport.invoke('project:inputs:list', projectId),
       refresh: (projectId) => transport.invoke('project:inputs:refresh', projectId),
       prepareRemove: (projectId, inputId) => transport.invoke('project:inputs:prepareRemove', projectId, inputId),
-      remove: (projectId, inputId, approvalToken) => transport.invoke('project:inputs:remove', projectId, inputId, approvalToken),
+      remove: (projectId, inputId, approvalToken) =>
+        transport.invoke('project:inputs:remove', projectId, inputId, approvalToken),
       import: (projectId) => transport.invoke('project:inputs:import', projectId),
       referencePath: (projectId, filePath) => transport.invoke('project:inputs:reference', projectId, filePath),
-      importPaths: (projectId, filePaths) => (
-        transport.invoke('project:inputs:importPaths', projectId, filePaths)
-      ),
+      importPaths: (projectId, filePaths) => transport.invoke('project:inputs:importPaths', projectId, filePaths),
     },
   };
 }
@@ -51,9 +43,10 @@ export function createSessionApi(transport: RendererApiTransport): SessionApi {
     open: (id) => transport.invoke('session:open', id),
     setModelOverride: (id, request) => transport.invoke('session:setModelOverride', id, request),
     setAgentId: (id, agentId) => transport.invoke('session:setAgentId', id, agentId),
-    applyDeclaredHandoff: (id, agent, label, expectedPlanHash) => expectedPlanHash
-      ? transport.invoke('session:applyDeclaredHandoff', id, agent, label, expectedPlanHash)
-      : transport.invoke('session:applyDeclaredHandoff', id, agent, label),
+    applyDeclaredHandoff: (id, agent, label, expectedPlanHash) =>
+      expectedPlanHash
+        ? transport.invoke('session:applyDeclaredHandoff', id, agent, label, expectedPlanHash)
+        : transport.invoke('session:applyDeclaredHandoff', id, agent, label),
   };
 }
 

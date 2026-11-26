@@ -44,9 +44,7 @@ function isResolvableCommit(cwd, sha) {
 }
 
 export function resolveDiffCheckArgs({ cwd = process.cwd(), env = process.env } = {}) {
-  const candidate = String(
-    env.RDC_DIFF_BASE || env.GITHUB_BASE_SHA || env.GITHUB_EVENT_BEFORE || '',
-  ).trim();
+  const candidate = String(env.RDC_DIFF_BASE || env.GITHUB_BASE_SHA || env.GITHUB_EVENT_BEFORE || '').trim();
 
   if (isResolvableCommit(cwd, candidate)) {
     return {

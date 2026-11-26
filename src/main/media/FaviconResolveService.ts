@@ -48,7 +48,12 @@ export interface FaviconResolveResult {
 const memoryCache = new Map<string, { dataUrl: string | null; expiresAt: number }>();
 
 function normalizeDomain(raw: string): string {
-  const cleaned = raw.replace(/^https?:\/\//i, '').split('/')[0]?.trim().toLowerCase() ?? '';
+  const cleaned =
+    raw
+      .replace(/^https?:\/\//i, '')
+      .split('/')[0]
+      ?.trim()
+      .toLowerCase() ?? '';
   return cleaned.replace(/:\d+$/, '');
 }
 
@@ -80,7 +85,8 @@ function sniffMime(bytes: Uint8Array, contentType: string | null): string | null
   if (header && ALLOWED_MIME.has(header)) return header;
   const raster = sniffRasterImageMime(bytes);
   if (raster) return raster;
-  if (bytes.length >= 4 && bytes[0] === 0x00 && bytes[1] === 0x00 && bytes[2] === 0x01 && bytes[3] === 0x00) return 'image/x-icon';
+  if (bytes.length >= 4 && bytes[0] === 0x00 && bytes[1] === 0x00 && bytes[2] === 0x01 && bytes[3] === 0x00)
+    return 'image/x-icon';
   const asText = new TextDecoder('utf-8', { fatal: false }).decode(bytes.slice(0, 64)).trimStart();
   if (asText.startsWith('<svg') || asText.startsWith('<?xml')) return 'image/svg+xml';
   return header && header.startsWith('image/') ? header : null;
@@ -89,8 +95,11 @@ function sniffMime(bytes: Uint8Array, contentType: string | null): string | null
 async function fetchPublicBytes(rawUrl: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
   try {
     const { response } = await fetchPublic(rawUrl, {
-      accept: 'image/*,*/*;q=0.8', userAgent: 'RDC-Agent/FaviconResolve', maxResponseBytes: MAX_FAVICON_BYTES,
-      maxRedirects: MAX_REDIRECTS, timeoutMs: REQUEST_TIMEOUT_MS,
+      accept: 'image/*,*/*;q=0.8',
+      userAgent: 'RDC-Agent/FaviconResolve',
+      maxResponseBytes: MAX_FAVICON_BYTES,
+      maxRedirects: MAX_REDIRECTS,
+      timeoutMs: REQUEST_TIMEOUT_MS,
     });
     if (!response.ok) return null;
     const bytes = await readLimitedBytes(response, MAX_FAVICON_BYTES);
@@ -153,8 +162,11 @@ async function discoverIconUrls(domain: string): Promise<string[]> {
 
   try {
     const { response, finalUrl } = await fetchPublic(`${httpsOrigin}/`, {
-      accept: 'text/html,application/xhtml+xml', userAgent: 'RDC-Agent/FaviconResolve', maxResponseBytes: MAX_ICON_PAGE_BYTES,
-      maxRedirects: MAX_REDIRECTS, timeoutMs: REQUEST_TIMEOUT_MS,
+      accept: 'text/html,application/xhtml+xml',
+      userAgent: 'RDC-Agent/FaviconResolve',
+      maxResponseBytes: MAX_ICON_PAGE_BYTES,
+      maxRedirects: MAX_REDIRECTS,
+      timeoutMs: REQUEST_TIMEOUT_MS,
     });
     if (response.ok) candidates.unshift(...parseIconHrefFromHtml((await response.text()).slice(0, 80_000), finalUrl));
   } catch {
@@ -214,11 +226,9 @@ export async function resolveFaviconDataUrl(rawDomain: string): Promise<FaviconR
   const candidates = await discoverIconUrls(domain);
   for (const candidate of candidates) {
     const embedded = parseDataImageUrl(candidate);
-    const fetched = embedded ?? (
-      candidate.startsWith('http://') || candidate.startsWith('https://')
-        ? await fetchPublicBytes(candidate)
-        : null
-    );
+    const fetched =
+      embedded ??
+      (candidate.startsWith('http://') || candidate.startsWith('https://') ? await fetchPublicBytes(candidate) : null);
     if (!fetched) continue;
     const dataUrl = writeDiskCache(domain, fetched.mime, fetched.bytes);
     memoryCache.set(domain, { dataUrl, expiresAt: Date.now() + CACHE_TTL_MS });

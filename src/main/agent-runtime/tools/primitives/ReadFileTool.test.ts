@@ -17,11 +17,18 @@ describe('ReadFileTool', () => {
     const bytes = Buffer.alloc(READ_FILE_MAX_OUTPUT_BYTES + 1024, 'x');
     await writeFile(path.join(root, 'long.txt'), bytes);
     const result = await readFileTool.execute('hash-budget', { path: 'long.txt' }, undefined, undefined, {
-      workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null,
+      workspaceRoot: root,
+      projectRootPath: root,
+      projectId: null,
+      sessionId: null,
     });
     const text = result.content[0]?.type === 'text' ? result.content[0].text : '';
     expect(Buffer.byteLength(text)).toBeLessThanOrEqual(READ_FILE_MAX_OUTPUT_BYTES);
-    expect(result.details).toMatchObject({ truncated: true, bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') });
+    expect(result.details).toMatchObject({
+      truncated: true,
+      bytes: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    });
     expect(text).toContain(`sha256=${result.details?.sha256}`);
   });
 
@@ -30,9 +37,18 @@ describe('ReadFileTool', () => {
     roots.push(root);
     const bytes = Buffer.from(`\uFEFF${'甲'.repeat(32768)}\r\n尾\r\n`, 'utf8');
     await writeFile(path.join(root, 'unicode.txt'), bytes);
-    const result = await readFileTool.execute('hash-window', { path: 'unicode.txt', offset: 2, limit: 1 }, undefined, undefined, {
-      workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null,
-    });
+    const result = await readFileTool.execute(
+      'hash-window',
+      { path: 'unicode.txt', offset: 2, limit: 1 },
+      undefined,
+      undefined,
+      {
+        workspaceRoot: root,
+        projectRootPath: root,
+        projectId: null,
+        sessionId: null,
+      },
+    );
     const sha256 = createHash('sha256').update(bytes).digest('hex');
     expect(result.details).toMatchObject({ bytes: bytes.length, sha256, totalLines: 2, offset: 2, truncated: false });
     const text = result.content[0]?.type === 'text' ? result.content[0].text : '';
@@ -74,8 +90,9 @@ describe('ReadFileTool', () => {
       sessionId: null,
     };
 
-    await expect(readFileTool.execute('r2', { path: '../outside.txt' }, undefined, undefined, context))
-      .rejects.toThrow(/超出 workspace/);
+    await expect(readFileTool.execute('r2', { path: '../outside.txt' }, undefined, undefined, context)).rejects.toThrow(
+      /超出 workspace/,
+    );
   });
 
   it('rejects RenderDoc .rdc captures', async () => {
@@ -90,8 +107,9 @@ describe('ReadFileTool', () => {
       sessionId: null,
     };
 
-    await expect(readFileTool.execute('r3', { path: 'WhiteHair.rdc' }, undefined, undefined, context))
-      .rejects.toThrow(/RenderDoc|\.rdc|binary/i);
+    await expect(readFileTool.execute('r3', { path: 'WhiteHair.rdc' }, undefined, undefined, context)).rejects.toThrow(
+      /RenderDoc|\.rdc|binary/i,
+    );
   });
 
   it('reads native diagnostic text without mistaking its prefix for a capture', async () => {
@@ -100,7 +118,10 @@ describe('ReadFileTool', () => {
     const text = 'RDOC 001234: [12:34:56] runtime.cpp - Log - connected\n';
     await writeFile(path.join(root, 'diagnostic.log'), text, 'utf8');
     const context: ToolExecutionContext = {
-      workspaceRoot: root, projectRootPath: root, projectId: null, sessionId: null,
+      workspaceRoot: root,
+      projectRootPath: root,
+      projectId: null,
+      sessionId: null,
     };
     const result = await readFileTool.execute('read-log', { path: 'diagnostic.log' }, undefined, undefined, context);
     expect(JSON.stringify(result.content)).toContain('RDOC 001234:');
@@ -121,7 +142,8 @@ describe('ReadFileTool', () => {
       sessionId: 'sess-1',
     };
 
-    await expect(readFileTool.execute('r4', { path: artifact }, undefined, undefined, context))
-      .rejects.toThrow(/超出 workspace|workspace/);
+    await expect(readFileTool.execute('r4', { path: artifact }, undefined, undefined, context)).rejects.toThrow(
+      /超出 workspace|workspace/,
+    );
   });
 });

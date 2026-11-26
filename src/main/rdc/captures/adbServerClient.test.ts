@@ -1,10 +1,6 @@
 import * as net from 'net';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  AdbServerProtocolError,
-  AdbServerUnreachableError,
-  queryAdbDevicesLines,
-} from './adbServerClient';
+import { AdbServerProtocolError, AdbServerUnreachableError, queryAdbDevicesLines } from './adbServerClient';
 
 async function listenEphemeral(
   handler: (socket: net.Socket) => void,
@@ -27,13 +23,14 @@ async function listenEphemeral(
   }
   return {
     port: address.port,
-    close: () => new Promise((resolve, reject) => {
-      for (const socket of sockets) {
-        socket.destroy();
-      }
-      sockets.clear();
-      server.close((error) => (error ? reject(error) : resolve()));
-    }),
+    close: () =>
+      new Promise((resolve, reject) => {
+        for (const socket of sockets) {
+          socket.destroy();
+        }
+        sockets.clear();
+        server.close((error) => (error ? reject(error) : resolve()));
+      }),
   };
 }
 
@@ -67,7 +64,8 @@ describe('queryAdbDevicesLines', () => {
   const closers: Array<() => Promise<void>> = [];
 
   it('aborts a pending query and releases its socket', async () => {
-    const server = await listenEphemeral(() => {}); closers.push(server.close);
+    const server = await listenEphemeral(() => {});
+    closers.push(server.close);
     const controller = new AbortController();
     const query = queryAdbDevicesLines({ port: server.port, signal: controller.signal });
     controller.abort();
@@ -96,11 +94,7 @@ describe('queryAdbDevicesLines', () => {
 
     const lines = await queryAdbDevicesLines({ host: '127.0.0.1', port: mock.port, timeoutMs: 1000 });
     expect(request).toBe('000ehost:devices-l');
-    expect(lines).toEqual([
-      'SERIAL1\tdevice product:foo model:Pixel device:bar',
-      'SERIAL2\toffline',
-      '',
-    ]);
+    expect(lines).toEqual(['SERIAL1\tdevice product:foo model:Pixel device:bar', 'SERIAL2\toffline', '']);
   });
 
   it('maps FAIL responses to protocol-failure', async () => {
@@ -148,7 +142,8 @@ describe('queryAdbDevicesLines', () => {
     });
     closers.push(mock.close);
 
-    await expect(queryAdbDevicesLines({ host: '127.0.0.1', port: mock.port, timeoutMs: 200 }))
-      .rejects.toBeInstanceOf(AdbServerUnreachableError);
+    await expect(queryAdbDevicesLines({ host: '127.0.0.1', port: mock.port, timeoutMs: 200 })).rejects.toBeInstanceOf(
+      AdbServerUnreachableError,
+    );
   });
 });

@@ -20,15 +20,21 @@ const listeners = new Set<() => void>();
 
 export function loadMarkdownEnhancers(): Promise<void> {
   loading ??= Promise.all([import('rehype-highlight'), import('rehype-katex'), import('./markdownHighlight')])
-    .then(([{ default: rehypeHighlight }, { default: rehypeKatex }, { hljs, MARKDOWN_LANGUAGES, MARKDOWN_LANGUAGE_ALIASES }]) => {
-      const highlightOptions = { languages: MARKDOWN_LANGUAGES, aliases: MARKDOWN_LANGUAGE_ALIASES };
-      enhancers = {
-        streamingRehypePlugins: [[rehypeHighlight, { ...highlightOptions, detect: false }]],
-        fullRehypePlugins: [rehypeKatex, [rehypeHighlight, { ...highlightOptions, detect: true }]],
-        hljs,
-      };
-      for (const listener of listeners) listener();
-    })
+    .then(
+      ([
+        { default: rehypeHighlight },
+        { default: rehypeKatex },
+        { hljs, MARKDOWN_LANGUAGES, MARKDOWN_LANGUAGE_ALIASES },
+      ]) => {
+        const highlightOptions = { languages: MARKDOWN_LANGUAGES, aliases: MARKDOWN_LANGUAGE_ALIASES };
+        enhancers = {
+          streamingRehypePlugins: [[rehypeHighlight, { ...highlightOptions, detect: false }]],
+          fullRehypePlugins: [rehypeKatex, [rehypeHighlight, { ...highlightOptions, detect: true }]],
+          hljs,
+        };
+        for (const listener of listeners) listener();
+      },
+    )
     .catch((error: unknown) => {
       // The next render that needs them asks again; meanwhile Markdown stays readable, only unhighlighted.
       loading = null;
@@ -39,7 +45,9 @@ export function loadMarkdownEnhancers(): Promise<void> {
 
 const subscribe = (listener: () => void) => {
   listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  return () => {
+    listeners.delete(listener);
+  };
 };
 
 const currentEnhancers = () => enhancers;
@@ -53,7 +61,9 @@ export function useMarkdownEnhancers(): MarkdownEnhancers | null {
 }
 
 export function prefetchMarkdownEnhancers(): void {
-  const start = () => { void loadMarkdownEnhancers(); };
+  const start = () => {
+    void loadMarkdownEnhancers();
+  };
   if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(start, { timeout: 2000 });
   else window.setTimeout(start, 200);
 }

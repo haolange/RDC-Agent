@@ -12,7 +12,11 @@ let cached: { accent: string; image: NativeImage } | undefined;
 export function bindProductIcon(window: BrowserWindow): void {
   target = window;
   window.once('closed', () => {
-    if (target === window) { target = null; source = undefined; cached = undefined; }
+    if (target === window) {
+      target = null;
+      source = undefined;
+      cached = undefined;
+    }
   });
   applyProductIcon();
 }
@@ -39,7 +43,7 @@ export function applyProductIcon(): void {
       maskLogoCircleRgba(rgba, width, height);
       // Native bitmaps store premultiplied channels; canvas ImageData uses straight RGBA.
       for (let i = 0; i < rgba.length; i += 4) {
-        for (let c = 0; c < 3; c += 1) rgba[i + c] = Math.round(rgba[i + c] * rgba[i + 3] / 255);
+        for (let c = 0; c < 3; c += 1) rgba[i + c] = Math.round((rgba[i + c] * rgba[i + 3]) / 255);
       }
       for (let i = 0; i < rgba.length; i += 4) [rgba[i], rgba[i + 2]] = [rgba[i + 2], rgba[i]];
       const image = nativeImage.createFromBitmap(Buffer.from(rgba), { width, height });
@@ -48,7 +52,12 @@ export function applyProductIcon(): void {
     }
     target.setIcon(cached.image);
   } catch (error) {
-    runtimeLogService.log({ scope: 'app', namespace: 'system', severity: 'warning',
-      title: 'Product icon update failed', summary: error instanceof Error ? error.message : String(error) });
+    runtimeLogService.log({
+      scope: 'app',
+      namespace: 'system',
+      severity: 'warning',
+      title: 'Product icon update failed',
+      summary: error instanceof Error ? error.message : String(error),
+    });
   }
 }

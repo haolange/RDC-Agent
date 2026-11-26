@@ -4,7 +4,15 @@ import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/c
 import type { PromptSegment } from '@shared/types/rdcRuntime';
 
 const message = (blocks: ConversationWorkBlock[]): ConversationMessage => ({
-  id: 'assistant-1', turnId: 'turn-1', sessionId: 'session-1', projectId: 'project-1', role: 'assistant', content: '', status: 'streaming', createdAt: 1, updatedAt: 1,
+  id: 'assistant-1',
+  turnId: 'turn-1',
+  sessionId: 'session-1',
+  projectId: 'project-1',
+  role: 'assistant',
+  content: '',
+  status: 'streaming',
+  createdAt: 1,
+  updatedAt: 1,
   workTrace: { status: 'running', blocks, updatedAt: 1 },
 });
 
@@ -21,38 +29,71 @@ const segment = (input: Partial<PromptSegment> & Pick<PromptSegment, 'id' | 'kin
 describe('right rail task context resources', () => {
   it('keeps live and frozen plan references in the transcript while retaining other session resources', () => {
     const resources = collectSessionTaskContextResources({
-      messages: [message([{
-        id: 'plans', kind: 'llm_turn', title: 'Plan', status: 'complete', startedAt: 1,
-        toolCalls: [{ id: 'plan', toolName: 'plan_artifact', status: 'complete', startedAt: 1,
-          resourceRefs: [
-            { id: 'live', kind: 'file', label: 'plan.md', path: 'session://plans/plan.md' },
-            { id: 'frozen', kind: 'file', label: 'plan-frozen.md', path: 'session://plans/plan-frozen.md' },
-            { id: 'output', kind: 'file', label: 'result.md', path: 'session://tool-outputs/result.md' },
-          ],
-        }],
-      }])], promptSegments: [],
+      messages: [
+        message([
+          {
+            id: 'plans',
+            kind: 'llm_turn',
+            title: 'Plan',
+            status: 'complete',
+            startedAt: 1,
+            toolCalls: [
+              {
+                id: 'plan',
+                toolName: 'plan_artifact',
+                status: 'complete',
+                startedAt: 1,
+                resourceRefs: [
+                  { id: 'live', kind: 'file', label: 'plan.md', path: 'session://plans/plan.md' },
+                  { id: 'frozen', kind: 'file', label: 'plan-frozen.md', path: 'session://plans/plan-frozen.md' },
+                  { id: 'output', kind: 'file', label: 'result.md', path: 'session://tool-outputs/result.md' },
+                ],
+              },
+            ],
+          },
+        ]),
+      ],
+      promptSegments: [],
     });
     expect(resources.map((resource) => resource.id)).toEqual(['output']);
   });
 
   it('uses only durable resources from successfully completed tool calls', () => {
     const resources = collectSessionTaskContextResources({
-      messages: [message([{
-        id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'complete', toolCalls: [
+      messages: [
+        message([
           {
-            id: 'one', toolName: 'read_file', status: 'complete', startedAt: 1,
-            resourceRefs: [{ id: 'file:a', kind: 'file', label: 'a.md', path: 'D:/project/a.md' }],
+            id: 'loop',
+            kind: 'llm_turn',
+            title: 'Loop',
+            status: 'complete',
+            toolCalls: [
+              {
+                id: 'one',
+                toolName: 'read_file',
+                status: 'complete',
+                startedAt: 1,
+                resourceRefs: [{ id: 'file:a', kind: 'file', label: 'a.md', path: 'D:/project/a.md' }],
+              },
+              {
+                id: 'two',
+                toolName: 'read_file',
+                status: 'error',
+                startedAt: 2,
+                resourceRefs: [{ id: 'file:error', kind: 'file', label: 'error.md' }],
+              },
+              {
+                id: 'three',
+                toolName: 'mcp__server__inspect',
+                status: 'complete',
+                startedAt: 3,
+                resourceRefs: [{ id: 'mcp:server:inspect', kind: 'mcp', label: 'inspect', summary: 'server' }],
+              },
+            ],
+            startedAt: 1,
           },
-          {
-            id: 'two', toolName: 'read_file', status: 'error', startedAt: 2,
-            resourceRefs: [{ id: 'file:error', kind: 'file', label: 'error.md' }],
-          },
-          {
-            id: 'three', toolName: 'mcp__server__inspect', status: 'complete', startedAt: 3,
-            resourceRefs: [{ id: 'mcp:server:inspect', kind: 'mcp', label: 'inspect', summary: 'server' }],
-          },
-        ], startedAt: 1,
-      }])],
+        ]),
+      ],
       promptSegments: [],
       projectRoot: 'D:/project',
     });
@@ -63,7 +104,11 @@ describe('right rail task context resources', () => {
     const resources = collectSessionTaskContextResources({
       messages: [],
       promptSegments: [
-        segment({ id: 'skill:browser', kind: 'preloaded-skill', sourcePath: 'D:/project/.rdc-agent/skills/browser/SKILL.md' }),
+        segment({
+          id: 'skill:browser',
+          kind: 'preloaded-skill',
+          sourcePath: 'D:/project/.rdc-agent/skills/browser/SKILL.md',
+        }),
         segment({ id: 'instruction:project', kind: 'scoped-instruction', sourcePath: 'D:/project/AGENTS.md' }),
         segment({ id: 'profile:ask', kind: 'agent-profile', sourcePath: 'D:/agents/ask.agent.md' }),
         segment({ id: 'catalog', kind: 'skill-catalog', sourcePath: 'runtime://skills/catalog' }),
@@ -78,13 +123,40 @@ describe('right rail task context resources', () => {
 
   it('deduplicates the same path but keeps same-named resources from different paths', () => {
     const resources = collectSessionTaskContextResources({
-      messages: [message([{
-        id: 'loop', kind: 'llm_turn', title: 'Loop', status: 'complete', startedAt: 1, toolCalls: [
-          { id: 'one', toolName: 'read_file', status: 'complete', startedAt: 1, resourceRefs: [{ id: 'one', kind: 'file', label: 'README.md', path: 'D:/one/README.md' }] },
-          { id: 'two', toolName: 'read_file', status: 'complete', startedAt: 2, resourceRefs: [{ id: 'two', kind: 'file', label: 'README.md', path: 'D:/two/README.md' }] },
-          { id: 'three', toolName: 'read_file', status: 'complete', startedAt: 3, resourceRefs: [{ id: 'three', kind: 'file', label: 'README.md', path: 'D:/one/README.md' }] },
-        ],
-      }])],
+      messages: [
+        message([
+          {
+            id: 'loop',
+            kind: 'llm_turn',
+            title: 'Loop',
+            status: 'complete',
+            startedAt: 1,
+            toolCalls: [
+              {
+                id: 'one',
+                toolName: 'read_file',
+                status: 'complete',
+                startedAt: 1,
+                resourceRefs: [{ id: 'one', kind: 'file', label: 'README.md', path: 'D:/one/README.md' }],
+              },
+              {
+                id: 'two',
+                toolName: 'read_file',
+                status: 'complete',
+                startedAt: 2,
+                resourceRefs: [{ id: 'two', kind: 'file', label: 'README.md', path: 'D:/two/README.md' }],
+              },
+              {
+                id: 'three',
+                toolName: 'read_file',
+                status: 'complete',
+                startedAt: 3,
+                resourceRefs: [{ id: 'three', kind: 'file', label: 'README.md', path: 'D:/one/README.md' }],
+              },
+            ],
+          },
+        ]),
+      ],
       promptSegments: [],
     });
     expect(resources).toHaveLength(2);

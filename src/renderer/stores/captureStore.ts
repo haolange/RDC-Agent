@@ -1,9 +1,5 @@
 import { create } from 'zustand';
-import type {
-  CaptureDescriptor,
-  ContextSnapshot,
-  OpenedCaptureState,
-} from '@shared/types/session';
+import type { CaptureDescriptor, ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
 
 interface CaptureState {
   captures: CaptureDescriptor[];
@@ -26,21 +22,25 @@ export const useCaptureStore = create<CaptureState>((set) => ({
 
   setContextSnapshot: (snapshot) => set({ contextSnapshot: snapshot }),
   setCaptures: (captures) => set({ captures }),
-  addCapture: (capture) => set((state) => ({
-    captures: state.captures.some((entry) => entry.id === capture.id)
-      ? state.captures.map((entry) => entry.id === capture.id ? { ...entry, ...capture } : entry)
-      : [...state.captures, capture],
-  })),
-  updateCapture: (captureId, patch) => set((state) => ({
-    captures: state.captures.map((entry) => entry.id === captureId ? { ...entry, ...patch } : entry),
-  })),
-  removeCapture: (captureId) => set((state) => ({
-    captures: state.captures.filter((entry) => entry.id !== captureId),
-  })),
+  addCapture: (capture) =>
+    set((state) => ({
+      captures: state.captures.some((entry) => entry.id === capture.id)
+        ? state.captures.map((entry) => (entry.id === capture.id ? { ...entry, ...capture } : entry))
+        : [...state.captures, capture],
+    })),
+  updateCapture: (captureId, patch) =>
+    set((state) => ({
+      captures: state.captures.map((entry) => (entry.id === captureId ? { ...entry, ...patch } : entry)),
+    })),
+  removeCapture: (captureId) =>
+    set((state) => ({
+      captures: state.captures.filter((entry) => entry.id !== captureId),
+    })),
   setOpenedCapture: (openedCapture) => set({ openedCapture }),
-  reset: () => set({
-    contextSnapshot: null,
-    captures: [],
-    openedCapture: null,
-  }),
+  reset: () =>
+    set({
+      contextSnapshot: null,
+      captures: [],
+      openedCapture: null,
+    }),
 }));

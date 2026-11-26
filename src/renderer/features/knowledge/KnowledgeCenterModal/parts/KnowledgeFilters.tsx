@@ -48,7 +48,7 @@ export function KnowledgeFilters({ state }: { state: ReturnType<typeof useKnowle
       onOpenChange={setOpen}
       align="start"
       className="knowledge-filter-popover"
-      trigger={(
+      trigger={
         <Button
           variant="secondary"
           size="sm"
@@ -57,11 +57,9 @@ export function KnowledgeFilters({ state }: { state: ReturnType<typeof useKnowle
         >
           <Icon name="filter" size={14} />
           {t('knowledgeCenter.filters')}
-          {narrowed.length > 0 ? (
-            <span className="knowledge-filter-count">{narrowed.length}</span>
-          ) : null}
+          {narrowed.length > 0 ? <span className="knowledge-filter-count">{narrowed.length}</span> : null}
         </Button>
-      )}
+      }
     >
       <div className="knowledge-filter-header">
         <span className="knowledge-filter-title">{t('knowledgeCenter.filters')}</span>
@@ -70,9 +68,11 @@ export function KnowledgeFilters({ state }: { state: ReturnType<typeof useKnowle
           size="sm"
           disabled={narrowed.length === 0}
           data-testid="knowledge-center-filters-reset"
-          onClick={() => groups.forEach((group) => group.options
-            .filter((option) => !option.selected)
-            .forEach((option) => option.toggle()))}
+          onClick={() =>
+            groups.forEach((group) =>
+              group.options.filter((option) => !option.selected).forEach((option) => option.toggle()),
+            )
+          }
         >
           {t('knowledgeCenter.resetFilters')}
         </Button>

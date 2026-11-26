@@ -15,9 +15,14 @@ import type { AppLanguage } from '@shared/types/settings';
 
 const translator = localizedTranslator;
 const call = (toolName: string, status: ConversationToolCall['status'] = 'complete'): ConversationToolCall => ({
-  id: toolName, toolName, status, startedAt: 1, executionStartedAt: status === 'pending' ? undefined : 1,
+  id: toolName,
+  toolName,
+  status,
+  startedAt: 1,
+  executionStartedAt: status === 'pending' ? undefined : 1,
   completedAt: status === 'running' || status === 'pending' ? undefined : 100,
-  argsPreview: '{"path":"中文文件.txt"}', resultPreview: '原始中文 output',
+  argsPreview: '{"path":"中文文件.txt"}',
+  resultPreview: '原始中文 output',
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -51,18 +56,37 @@ it('translates approvals, unknown risks and fallback messages while retaining ho
     for (const status of ['pending', 'approved', 'rejected', 'cancelled'] as const) {
       for (const reviewMethod of ['rule', 'model', undefined] as const) {
         const t = translator(language);
-        const row = createToolRowForPresentation({ ...call('shell', 'pending'),
-          approval: { approvalId: 'approval', status, reviewMethod, reviewer: reviewMethod ? 'auto_review' : 'user', risk: 'high', reason: '原始审核 reason' },
-        }, t);
+        const row = createToolRowForPresentation(
+          {
+            ...call('shell', 'pending'),
+            approval: {
+              approvalId: 'approval',
+              status,
+              reviewMethod,
+              reviewer: reviewMethod ? 'auto_review' : 'user',
+              risk: 'high',
+              reason: '原始审核 reason',
+            },
+          },
+          t,
+        );
         if (row.type !== 'tool' || !row.approval) throw new Error('expected approval');
         expect(row.approval.metaLines).toContain(t('chat.workProcessRiskHigh'));
         if (language === 'en') expect(row.approval.verb).not.toMatch(/\p{Script=Han}/u);
         if (status !== 'approved') expect(row.approval.message).toBe('原始审核 reason');
       }
     }
-    const row = createToolRowForPresentation({ ...call('shell'), approval: {
-      approvalId: 'unknown-risk', status: 'rejected', risk: 'custom-risk',
-    } }, translator(language));
+    const row = createToolRowForPresentation(
+      {
+        ...call('shell'),
+        approval: {
+          approvalId: 'unknown-risk',
+          status: 'rejected',
+          risk: 'custom-risk',
+        },
+      },
+      translator(language),
+    );
     if (row.type !== 'tool' || !row.approval) throw new Error('expected approval');
     expect(row.approval.metaLines[0]).toContain('custom-risk');
     expect(row.approval.message).toBe(translate(language, 'chat.approvalRejectedMessage'));
@@ -70,10 +94,28 @@ it('translates approvals, unknown risks and fallback messages while retaining ho
 });
 
 it('formats compaction details directly for the selected language', () => {
-  const trace: ConversationWorkTrace = { status: 'complete', updatedAt: 2, blocks: [{
-    id: 'compact', kind: 'compaction', startedAt: 1, title: '原始标题', summary: '原始压缩内容', status: 'complete', toolCalls: [],
-    compactionStats: { provenance: 'auto', messagesBefore: 8, messagesAfter: 2, tokensBefore: 100, tokensAfter: 20 },
-  }] };
+  const trace: ConversationWorkTrace = {
+    status: 'complete',
+    updatedAt: 2,
+    blocks: [
+      {
+        id: 'compact',
+        kind: 'compaction',
+        startedAt: 1,
+        title: '原始标题',
+        summary: '原始压缩内容',
+        status: 'complete',
+        toolCalls: [],
+        compactionStats: {
+          provenance: 'auto',
+          messagesBefore: 8,
+          messagesAfter: 2,
+          tokensBefore: 100,
+          tokensAfter: 20,
+        },
+      },
+    ],
+  };
   const row = buildWorkProcessPresentation(trace, translator('zh-CN')).rows[0];
   if (row.type !== 'summary') throw new Error('expected compaction');
   expect(row.detailLines).toEqual(['原始压缩内容', '8 → 2 条消息', '预估 tokens：100 → 20']);
@@ -81,29 +123,58 @@ it('formats compaction details directly for the selected language', () => {
 
 it('updates an already mounted historical tool without losing disclosure or focus or executing IPC', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
   const ipc = vi.fn();
   vi.stubGlobal('electronAPI', ipc);
   const initial = useAppSettingsStore.getState().settings;
-  const trace: ConversationWorkTrace = { status: 'complete', updatedAt: 100, blocks: [{
-    id: 'loop', kind: 'llm_turn', title: 'LLM turn', status: 'complete', toolCalls: [call('artifact_read')],
-    startedAt: 1, completedAt: 100,
-  }] };
+  const trace: ConversationWorkTrace = {
+    status: 'complete',
+    updatedAt: 100,
+    blocks: [
+      {
+        id: 'loop',
+        kind: 'llm_turn',
+        title: 'LLM turn',
+        status: 'complete',
+        toolCalls: [call('artifact_read')],
+        startedAt: 1,
+        completedAt: 100,
+      },
+    ],
+  };
   const before = JSON.stringify(trace);
-  const host = document.createElement('div'); document.body.append(host);
+  const host = document.createElement('div');
+  document.body.append(host);
   const root = createRoot(host);
-  const switchTo = (language: AppLanguage) => act(async () => {
-    useAppSettingsStore.setState({ settings: { ...initial, appearance: { ...initial.appearance, language } } });
-  });
+  const switchTo = (language: AppLanguage) =>
+    act(async () => {
+      useAppSettingsStore.setState({ settings: { ...initial, appearance: { ...initial.appearance, language } } });
+    });
   try {
     await switchTo('zh-CN');
-    await act(async () => root.render(createElement(WorkProcess, { trace, sessionId: 'language-test', rowKey: 'history' })));
+    await act(async () =>
+      root.render(createElement(WorkProcess, { trace, sessionId: 'language-test', rowKey: 'history' })),
+    );
     // A settled Working is folded: open it to reach the historical tool card; its steps are laid out flat.
-    await act(async () => { host.querySelector<HTMLButtonElement>('.work-process-header')!.click(); });
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.work-process-header')!.click();
+    });
     const trigger = host.querySelector<HTMLButtonElement>('.work-card-trigger')!;
     expect(trigger.textContent).toContain('已读取产物');
-    await act(async () => { trigger.focus(); trigger.click(); });
-    for (const [language, title] of [['en', 'Read artifact'], ['zh-CN', '已读取产物']] as const) {
+    await act(async () => {
+      trigger.focus();
+      trigger.click();
+    });
+    for (const [language, title] of [
+      ['en', 'Read artifact'],
+      ['zh-CN', '已读取产物'],
+    ] as const) {
       await switchTo(language);
       expect(host.querySelector('.work-card-trigger')).toBe(trigger);
       expect(trigger.textContent).toContain(title);
@@ -114,14 +185,17 @@ it('updates an already mounted historical tool without losing disclosure or focu
     expect(JSON.stringify(trace)).toBe(before);
     expect(ipc).not.toHaveBeenCalled();
   } finally {
-    await act(async () => root.unmount()); host.remove();
+    await act(async () => root.unmount());
+    host.remove();
     useAppSettingsStore.setState({ settings: initial });
   }
 });
 
 it('localizes builtin command descriptions without replacing custom descriptions or command identities', () => {
-  const commands = [{ id: 'help', name: 'help', description: 'original', category: 'system', aliases: ['?'] },
-    { id: 'custom', name: 'custom', description: '用户说明', category: 'custom', aliases: [] }];
+  const commands = [
+    { id: 'help', name: 'help', description: 'original', category: 'system', aliases: ['?'] },
+    { id: 'custom', name: 'custom', description: '用户说明', category: 'custom', aliases: [] },
+  ];
   const localized = localizeCommands(commands, translator('zh-CN'));
   expect(localized[0].description).toBe('列出可用命令或查看命令详情');
   expect(localized[0].name).toBe('help');

@@ -8,14 +8,28 @@ import { hashScopedResource, scopedResourceResolver } from '../../runtime/Scoped
 import { appPathService } from '../../runtime/AppPathService';
 import { projectAgentTrust } from './ProjectAgentTrust';
 import { agentRuntimeConfigService } from './AgentRuntimeConfigService';
-import type { RdcRuntimeOverview, ScopedResourceDocument, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdcRuntime';
+import type {
+  RdcRuntimeOverview,
+  ScopedResourceDocument,
+  ScopedResourceKind,
+  ScopedResourceWriteRequest,
+} from '@shared/types/rdcRuntime';
 import type { RestrictivePolicy } from '../../runtime/scopedResourceTypes';
 
 const EXTENSIONS: Partial<Record<ScopedResourceKind, string>> = {
-  agent: '.agent.md', mcp: '.mcp.json', hook: '.hook.yml', policy: '.policy.yml', memory: '.md', knowledge: '.md',
+  agent: '.agent.md',
+  mcp: '.mcp.json',
+  hook: '.hook.yml',
+  policy: '.policy.yml',
+  memory: '.md',
+  knowledge: '.md',
 };
 const safeId = (value: string): string => {
-  const id = value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+  const id = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
   if (!id) throw new Error('Resource id is required.');
   return id;
 };
@@ -43,7 +57,11 @@ function declaredResourceId(parse: () => unknown): string | undefined {
 
 /** File types each resource kind can be imported from; knowledge and memory are not file-imported. */
 export const SCOPED_IMPORT_EXTENSIONS: Partial<Record<ScopedResourceKind, readonly string[]>> = {
-  agent: ['md'], skill: ['md'], mcp: ['json'], hook: ['yml', 'yaml'], policy: ['yml', 'yaml'],
+  agent: ['md'],
+  skill: ['md'],
+  mcp: ['json'],
+  hook: ['yml', 'yaml'],
+  policy: ['yml', 'yaml'],
 };
 
 export class ScopedRuntimeService {
@@ -51,11 +69,17 @@ export class ScopedRuntimeService {
 
   private rootFor(kind: ScopedResourceKind, scope: 'user' | 'project', projectRoot?: string): string {
     const user = appPathService.getUserRdcPaths();
-    const project = scope === 'project' ? appPathService.getProjectRdcPaths(this.requireProject(projectRoot)) : undefined;
+    const project =
+      scope === 'project' ? appPathService.getProjectRdcPaths(this.requireProject(projectRoot)) : undefined;
     const paths = scope === 'user' ? user : project!;
     const map: Partial<Record<ScopedResourceKind, string>> = {
-      agent: paths.agentsPath, skill: paths.skillsPath, mcp: paths.mcpPath, hook: paths.hooksPath,
-      policy: paths.policiesPath, knowledge: paths.knowledgePath, memory: paths.memoryPath,
+      agent: paths.agentsPath,
+      skill: paths.skillsPath,
+      mcp: paths.mcpPath,
+      hook: paths.hooksPath,
+      policy: paths.policiesPath,
+      knowledge: paths.knowledgePath,
+      memory: paths.memoryPath,
     };
     const root = map[kind];
     if (!root) throw new Error(`Unsupported scoped resource kind: ${kind}`);
@@ -78,13 +102,13 @@ export class ScopedRuntimeService {
             continue;
           }
           const extension = EXTENSIONS[kind]!;
-          for (const entry of fs.readdirSync(root).filter((entry) => entry.endsWith(extension)).sort()) {
-            documents.push(this.readDocumentSafe(
-              kind,
-              scope,
-              entry.slice(0, -extension.length),
-              path.join(root, entry),
-            ));
+          for (const entry of fs
+            .readdirSync(root)
+            .filter((entry) => entry.endsWith(extension))
+            .sort()) {
+            documents.push(
+              this.readDocumentSafe(kind, scope, entry.slice(0, -extension.length), path.join(root, entry)),
+            );
           }
         } catch (error) {
           documents.push({
@@ -95,9 +119,7 @@ export class ScopedRuntimeService {
             sourceHash: hashScopedResource(root),
             effectiveStatus: 'invalid',
             content: '',
-            diagnostics: [
-              `Failed to list ${kind} root: ${error instanceof Error ? error.message : String(error)}`,
-            ],
+            diagnostics: [`Failed to list ${kind} root: ${error instanceof Error ? error.message : String(error)}`],
           });
         }
       }
@@ -109,7 +131,12 @@ export class ScopedRuntimeService {
     }
     for (const variants of byKey.values()) {
       const project = variants.find((entry) => entry.scope === 'project');
-      if (project) variants.filter((entry) => entry.scope === 'user').forEach((entry) => { entry.effectiveStatus = 'overridden'; });
+      if (project)
+        variants
+          .filter((entry) => entry.scope === 'user')
+          .forEach((entry) => {
+            entry.effectiveStatus = 'overridden';
+          });
     }
     return documents;
   }
@@ -134,7 +161,7 @@ export class ScopedRuntimeService {
     const mcpServers = agentRuntimeConfigService.listMcpServers(projectRoot).map((server) => ({
       id: server.id,
       name: server.name,
-      scope: server.scope === 'project' ? 'project' as const : 'user' as const,
+      scope: server.scope === 'project' ? ('project' as const) : ('user' as const),
       ...(server.sourcePath ? { sourcePath: server.sourcePath } : {}),
       ...(server.descriptorHash ? { descriptorHash: server.descriptorHash } : {}),
       trusted: server.scope === 'project' ? !server.needsRetrust : true,
@@ -175,7 +202,10 @@ export class ScopedRuntimeService {
       ...(projectRoot ? { projectRoot } : {}),
       userPaths: { ...user },
       ...(project ? { projectPaths: { ...project } } : {}),
-      resources, hooks, mcpServers, skillSelection,
+      resources,
+      hooks,
+      mcpServers,
+      skillSelection,
       knowledge: { userPath: user.knowledgePath, ...(project ? { projectPath: project.knowledgePath } : {}) },
       memory: { userPath: user.memoryPath, ...(project ? { projectPath: project.memoryPath } : {}) },
       diagnostics,
@@ -188,7 +218,9 @@ export class ScopedRuntimeService {
       throw new Error(`MCP descriptor not found: ${descriptorId}`);
     }
     if (descriptor.executableOverrideRejected) {
-      throw new Error(descriptor.blockedReason || `Project MCP "${descriptorId}" cannot override user executable fields.`);
+      throw new Error(
+        descriptor.blockedReason || `Project MCP "${descriptorId}" cannot override user executable fields.`,
+      );
     }
     if (descriptor.scope !== 'project') {
       throw new Error(`MCP "${descriptorId}" is not a project-scoped descriptor requiring trust.`);
@@ -214,13 +246,18 @@ export class ScopedRuntimeService {
       }
       if (request.kind === 'hook' || request.kind === 'policy') YAML.parse(request.content);
       if (request.kind === 'policy' && request.scope === 'project' && request.projectRoot) {
-        const userPolicyPath = path.join(appPathService.getUserRdcPaths().policiesPath, `${safeId(request.id)}.policy.yml`);
+        const userPolicyPath = path.join(
+          appPathService.getUserRdcPaths().policiesPath,
+          `${safeId(request.id)}.policy.yml`,
+        );
         if (fs.existsSync(userPolicyPath)) {
           const base = YAML.parse(fs.readFileSync(userPolicyPath, 'utf8')) as RestrictivePolicy;
           scopedResourceResolver.tightenPolicy(base, YAML.parse(request.content) as RestrictivePolicy);
         }
       }
-    } catch (error) { diagnostics.push(error instanceof Error ? error.message : String(error)); }
+    } catch (error) {
+      diagnostics.push(error instanceof Error ? error.message : String(error));
+    }
     return diagnostics;
   }
 
@@ -229,7 +266,8 @@ export class ScopedRuntimeService {
     if (diagnostics.length) throw new Error(diagnostics.join('\n'));
     const id = safeId(request.id);
     const root = this.rootFor(request.kind, request.scope, request.projectRoot);
-    const sourcePath = request.kind === 'skill' ? path.join(root, id, 'SKILL.md') : path.join(root, `${id}${EXTENSIONS[request.kind]}`);
+    const sourcePath =
+      request.kind === 'skill' ? path.join(root, id, 'SKILL.md') : path.join(root, `${id}${EXTENSIONS[request.kind]}`);
     assertInside(root, sourcePath);
     fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
     fs.writeFileSync(sourcePath, `${request.content.trim()}\n`, 'utf8');
@@ -240,21 +278,31 @@ export class ScopedRuntimeService {
     return this.readDocument(request.kind, request.scope, id, sourcePath);
   }
 
-  importFromFile(request: { kind: ScopedResourceKind; scope: 'user' | 'project'; filePath: string; projectRoot?: string }): ScopedResourceDocument {
+  importFromFile(request: {
+    kind: ScopedResourceKind;
+    scope: 'user' | 'project';
+    filePath: string;
+    projectRoot?: string;
+  }): ScopedResourceDocument {
     const filePath = path.resolve(request.filePath);
     if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
       throw new Error('Import source file was not found.');
     }
     const basename = path.basename(filePath);
     const lower = basename.toLowerCase();
-    const allowed = SCOPED_IMPORT_EXTENSIONS[request.kind]?.some((extension) => lower.endsWith(`.${extension}`)) ?? false;
+    const allowed =
+      SCOPED_IMPORT_EXTENSIONS[request.kind]?.some((extension) => lower.endsWith(`.${extension}`)) ?? false;
     if (!allowed) throw new Error(`Unsupported file type for ${request.kind} import.`);
     const content = fs.readFileSync(filePath, 'utf8');
     let id = path.basename(filePath, path.extname(filePath));
     if (request.kind === 'skill' && lower === 'skill.md') id = path.basename(path.dirname(filePath));
     if (request.kind === 'agent' && lower.endsWith('.agent.md')) id = basename.slice(0, -'.agent.md'.length);
-    const declaredId = request.kind === 'mcp' ? declaredResourceId(() => JSON.parse(content))
-      : request.kind === 'hook' || request.kind === 'policy' ? declaredResourceId(() => YAML.parse(content)) : undefined;
+    const declaredId =
+      request.kind === 'mcp'
+        ? declaredResourceId(() => JSON.parse(content))
+        : request.kind === 'hook' || request.kind === 'policy'
+          ? declaredResourceId(() => YAML.parse(content))
+          : undefined;
     if (declaredId) id = declaredId;
     return this.upsert({
       kind: request.kind,
@@ -294,23 +342,38 @@ export class ScopedRuntimeService {
         sourceHash: hashScopedResource(`unreadable:${sourcePath}`),
         effectiveStatus: 'invalid',
         content: '',
-        diagnostics: [
-          `Failed to read ${kind}/${id}: ${error instanceof Error ? error.message : String(error)}`,
-        ],
+        diagnostics: [`Failed to read ${kind}/${id}: ${error instanceof Error ? error.message : String(error)}`],
       };
     }
   }
 
-  private readDocument(kind: ScopedResourceKind, scope: 'user' | 'project', id: string, sourcePath: string): ScopedResourceDocument {
+  private readDocument(
+    kind: ScopedResourceKind,
+    scope: 'user' | 'project',
+    id: string,
+    sourcePath: string,
+  ): ScopedResourceDocument {
     const content = fs.readFileSync(sourcePath, 'utf8');
     const diagnostics = this.validate({ kind, scope, id, content });
     let enabled = true;
     try {
-      if (kind === 'agent') enabled = YAML.parse(content.match(/^---\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? '').enabled !== false;
+      if (kind === 'agent')
+        enabled = YAML.parse(content.match(/^---\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? '').enabled !== false;
       else if (kind === 'mcp') enabled = JSON.parse(content).enabledByDefault !== false;
       else if (kind === 'hook' || kind === 'policy') enabled = YAML.parse(content).enabled !== false;
-    } catch { enabled = false; }
-    return { id, kind, scope, sourcePath, sourceHash: hashScopedResource(content), effectiveStatus: diagnostics.length ? 'invalid' : enabled ? 'effective' : 'disabled', content, diagnostics };
+    } catch {
+      enabled = false;
+    }
+    return {
+      id,
+      kind,
+      scope,
+      sourcePath,
+      sourceHash: hashScopedResource(content),
+      effectiveStatus: diagnostics.length ? 'invalid' : enabled ? 'effective' : 'disabled',
+      content,
+      diagnostics,
+    };
   }
 
   private requireProject(projectRoot?: string): string {

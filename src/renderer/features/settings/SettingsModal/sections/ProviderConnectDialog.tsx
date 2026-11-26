@@ -63,11 +63,14 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   const [modelCount, setModelCount] = useState(0);
   const authMode = provider.authMode;
   const busy = connectionDraft.busy !== 'idle';
-  const savedConnected = provider.isConfigured && provider.status === 'verified'
-    && !hasProviderConnectionDefinitionChanged(provider, connectionDraft);
+  const savedConnected =
+    provider.isConfigured &&
+    provider.status === 'verified' &&
+    !hasProviderConnectionDefinitionChanged(provider, connectionDraft);
   const phase = connectionPhase(connectionDraft, connectionHasFreshTest, savedConnected);
   const unavailableCount = connectionDraft.models.filter((model) => model.availability === 'unavailable').length;
-  const showDiscoveryEmpty = (authMode === 'environment' || authMode === 'local') && connectionDraft.models.length === 0;
+  const showDiscoveryEmpty =
+    (authMode === 'environment' || authMode === 'local') && connectionDraft.models.length === 0;
   const title = getResolvedProviderLabel(provider);
   const protocolLabel = getProviderProtocolLabel(provider.protocol);
   const routeCount = provider.routeCount ?? 1;
@@ -80,31 +83,51 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
       className="settings-provider-connect-dialog"
       title={title}
       titleIcon={<ProviderMark id={provider.id} category={provider.category} />}
-      headerActions={<>
-        {provider.isConfigured ? <ProviderProbeBatchPanel providerIds={[provider.id]} disabled={busy} /> : null}
-        <CopyDiagnosticsMenu testId="settings-provider-diagnostics" label={t('settings.directory.more', { name: title })} facts={[
-          { label: t('settings.providers.serviceId'), value: provider.id },
-          { label: t('settings.providerProtocol'), value: routeCount > 1 ? t('settings.providerProtocolMulti', { protocol: protocolLabel, count: routeCount }) : protocolLabel },
-          { label: t('settings.providerBaseUrl'), value: connectionDraft.baseUrl || provider.baseUrl },
-          { label: t('settings.oauthRedirectUri'), value: account?.redirectUri },
-          { label: t('settings.oauthRequestedScopes'), value: account?.requestedScopes ?? account?.diagnostic?.requestedScopes },
-          { label: t('settings.oauthProviderErrorLabel'), value: account?.diagnostic?.providerError },
-          { label: t('settings.oauthDiagnosticDetail'), value: account?.diagnostic?.detail },
-        ]} />
-      </>}
-      description={provider.accountLabel || provider.planLabel || provider.category === 'coding-token-plan'
-        ? providerIdentityDetail(provider, title, t) : undefined}
+      headerActions={
+        <>
+          {provider.isConfigured ? <ProviderProbeBatchPanel providerIds={[provider.id]} disabled={busy} /> : null}
+          <CopyDiagnosticsMenu
+            testId="settings-provider-diagnostics"
+            label={t('settings.directory.more', { name: title })}
+            facts={[
+              { label: t('settings.providers.serviceId'), value: provider.id },
+              {
+                label: t('settings.providerProtocol'),
+                value:
+                  routeCount > 1
+                    ? t('settings.providerProtocolMulti', { protocol: protocolLabel, count: routeCount })
+                    : protocolLabel,
+              },
+              { label: t('settings.providerBaseUrl'), value: connectionDraft.baseUrl || provider.baseUrl },
+              { label: t('settings.oauthRedirectUri'), value: account?.redirectUri },
+              {
+                label: t('settings.oauthRequestedScopes'),
+                value: account?.requestedScopes ?? account?.diagnostic?.requestedScopes,
+              },
+              { label: t('settings.oauthProviderErrorLabel'), value: account?.diagnostic?.providerError },
+              { label: t('settings.oauthDiagnosticDetail'), value: account?.diagnostic?.detail },
+            ]}
+          />
+        </>
+      }
+      description={
+        provider.accountLabel || provider.planLabel || provider.category === 'coding-token-plan'
+          ? providerIdentityDetail(provider, title, t)
+          : undefined
+      }
       onClose={onClose}
       closeLabel={t('settings.cancel')}
       busy={busy}
       dataTestId="settings-provider-connect-dialog"
-      footer={(
+      footer={
         <>
           {connectionDraft.modelSaveError ? (
             <InlineError className="settings-provider-connection-status" detail={connectionDraft.modelSaveError}>
               {t('settings.providerSaveFailed')}
             </InlineError>
-          ) : <ProviderConnectionStatusLine phase={phase} />}
+          ) : (
+            <ProviderConnectionStatusLine phase={phase} />
+          )}
           <ProviderConnectActions
             draft={connectionDraft}
             provider={provider}
@@ -118,27 +141,33 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             onSave={onSave}
           />
         </>
-      )}
+      }
     >
-      <div className="settings-provider-connect-body" data-model-count={modelCount} data-testid="settings-provider-connect-body">
+      <div
+        className="settings-provider-connect-body"
+        data-model-count={modelCount}
+        data-testid="settings-provider-connect-body"
+      >
         <ProviderAuthModeField
           provider={provider}
           value={connectionDraft.authMode}
           disabled={busy || connectionDevicePending}
-          onChange={(nextAuthMode) => onUpdateConnectionDraft({
-            authMode: nextAuthMode,
-            usingStoredSecret: nextAuthMode === 'api-key' && provider.hasStoredSecretByAuthMode?.['api-key'] === true,
-            accountStatus: undefined,
-            authCode: '',
-            error: '',
-            discoveryDiagnostic: null,
-            testedApiKey: '',
-            testedBaseUrl: '',
-            testedProtocol: connectionDraft.protocol,
-            testedAuthMode: nextAuthMode,
-            testedConnectionSignature: '',
-            models: [],
-          })}
+          onChange={(nextAuthMode) =>
+            onUpdateConnectionDraft({
+              authMode: nextAuthMode,
+              usingStoredSecret: nextAuthMode === 'api-key' && provider.hasStoredSecretByAuthMode?.['api-key'] === true,
+              accountStatus: undefined,
+              authCode: '',
+              error: '',
+              discoveryDiagnostic: null,
+              testedApiKey: '',
+              testedBaseUrl: '',
+              testedProtocol: connectionDraft.protocol,
+              testedAuthMode: nextAuthMode,
+              testedConnectionSignature: '',
+              models: [],
+            })
+          }
         />
 
         {authMode === 'api-key' && (
@@ -156,20 +185,25 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
               value={connectionDraft.baseUrl}
               placeholder="http://localhost:11434"
               spellCheck={false}
-              onChange={(event) => onUpdateConnectionDraft({
-                baseUrl: event.target.value,
-                error: '',
-                discoveryDiagnostic: null,
-                testedApiKey: '',
-                testedBaseUrl: '',
-                models: [],
-              })}
+              onChange={(event) =>
+                onUpdateConnectionDraft({
+                  baseUrl: event.target.value,
+                  error: '',
+                  discoveryDiagnostic: null,
+                  testedApiKey: '',
+                  testedBaseUrl: '',
+                  models: [],
+                })
+              }
             />
           </SettingsField>
         )}
 
         {authMode === 'environment' && (
-          <SettingsField label={t('settings.providers.authSource')} description={t('settings.environmentProviderConnectHint')}>
+          <SettingsField
+            label={t('settings.providers.authSource')}
+            description={t('settings.environmentProviderConnectHint')}
+          >
             <div className="settings-provider-readonly" data-testid="settings-provider-environment-notice">
               <Icon name="lock" size={14} />
               {t('settings.providers.authSourceEnvironment')}
@@ -195,7 +229,9 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         )}
 
         {connectionDraft.error && (
-          <InlineError data-testid="settings-provider-connect-error" detail={connectionDraft.error}>{t('settings.providerTestFailed')}</InlineError>
+          <InlineError data-testid="settings-provider-connect-error" detail={connectionDraft.error}>
+            {t('settings.providerTestFailed')}
+          </InlineError>
         )}
         {!connectionDraft.error && connectionDraft.discoveryDiagnostic && (
           <p className="settings-provider-notice" data-testid="settings-provider-connect-discovery-diagnostic">
@@ -211,7 +247,9 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         {showDiscoveryEmpty ? (
           <section className="settings-provider-discovery" data-testid="settings-provider-discovery">
             <div className="settings-provider-discovery-head">
-              <strong>{authMode === 'local' ? t('settings.localProviderModelsTitle') : t('settings.providers.discoveryTitle')}</strong>
+              <strong>
+                {authMode === 'local' ? t('settings.localProviderModelsTitle') : t('settings.providers.discoveryTitle')}
+              </strong>
               <p className="settings-section-description">{t('settings.localProviderModelsHint')}</p>
             </div>
             <ProviderDiscoveryEmpty />
@@ -219,7 +257,10 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         ) : null}
 
         {authMode === 'local' && unavailableCount > 0 ? (
-          <p className="settings-provider-notice settings-provider-notice--warning" data-testid="settings-provider-unavailable-summary">
+          <p
+            className="settings-provider-notice settings-provider-notice--warning"
+            data-testid="settings-provider-unavailable-summary"
+          >
             <Icon name="warning" size={14} />
             {t('settings.localProviderUnavailableSummary', { count: unavailableCount })}
           </p>
@@ -237,7 +278,6 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             onModelCountChange={setModelCount}
           />
         )}
-
       </div>
     </TaskDialog>
   );

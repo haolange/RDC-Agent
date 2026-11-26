@@ -58,12 +58,17 @@ function forbiddenMatches(rule, repoRoot) {
         .map((file) => relativePosix(repoRoot, file));
     case 'walk-path-and-content': {
       const pathPattern = new RegExp(rule.pattern);
-      return (rule.roots ?? [rule.file]).flatMap((root) => walkFiles(resolveRulePath(repoRoot, root), { includeTests: Boolean(rule.includeTests) }))
-        .filter((file) => pathPattern.test(relativePosix(repoRoot, file)) || sourceMatches(readFileSync(file, 'utf8'), rule))
+      return (rule.roots ?? [rule.file])
+        .flatMap((root) => walkFiles(resolveRulePath(repoRoot, root), { includeTests: Boolean(rule.includeTests) }))
+        .filter(
+          (file) => pathPattern.test(relativePosix(repoRoot, file)) || sourceMatches(readFileSync(file, 'utf8'), rule),
+        )
         .map((file) => relativePosix(repoRoot, file));
     }
     case 'source-pattern':
-      return existsSync(target) && statSync(target).isFile() && sourceMatches(readFileSync(target, 'utf8'), rule) ? [rule.file] : [];
+      return existsSync(target) && statSync(target).isFile() && sourceMatches(readFileSync(target, 'utf8'), rule)
+        ? [rule.file]
+        : [];
     default:
       throw new Error(`rule ${rule.id} has unknown probe ${rule.probe}`);
   }
@@ -79,9 +84,12 @@ const GRAPH_CLASS_RE = /export\s+(?:class|function|const)\s+InvestigationGraph(?
 const TASK_STORE_IMPLEMENTS_RE = /implements\s+TaskStore\b/;
 const TASK_STORE_EXTENDS_RE = /extends\s+[A-Za-z0-9_]*TaskStore\b/;
 const TASK_STORE_CLASS_RE = /(?:export\s+)?class\s+[A-Za-z0-9_]*TaskStore\b/;
-const TASK_STORE_IMPORT_RE = /import\s+(?:type\s+)?(?:\{[^}]*\b(?:TaskStore|FileTaskStore|MemoryTaskStore)\b[^}]*\}|\*\s+as\s+\w+)\s+from\s+['"][^'"]*TaskStore['"]/;
-const LIFECYCLE_RE = /\b(?:SessionEnd|session\.after|turn\.after|AfterTurn|AfterSession|onSessionEnd|onTurnEnd|afterSession|afterTurn)\b/;
-const KNOWLEDGE_WRITE_CALL_RE = /\b(?:knowledgeWriteService|[A-Za-z0-9_]*[Kk]nowledgeWriteService)\s*\.\s*[A-Za-z0-9_]+\s*\(|\bnew\s+KnowledgeWriteService\b|\bknowledge:(?:write|promote|update|deprecate)\b|\bthis\.write\s*\(/;
+const TASK_STORE_IMPORT_RE =
+  /import\s+(?:type\s+)?(?:\{[^}]*\b(?:TaskStore|FileTaskStore|MemoryTaskStore)\b[^}]*\}|\*\s+as\s+\w+)\s+from\s+['"][^'"]*TaskStore['"]/;
+const LIFECYCLE_RE =
+  /\b(?:SessionEnd|session\.after|turn\.after|AfterTurn|AfterSession|onSessionEnd|onTurnEnd|afterSession|afterTurn)\b/;
+const KNOWLEDGE_WRITE_CALL_RE =
+  /\b(?:knowledgeWriteService|[A-Za-z0-9_]*[Kk]nowledgeWriteService)\s*\.\s*[A-Za-z0-9_]+\s*\(|\bnew\s+KnowledgeWriteService\b|\bknowledge:(?:write|promote|update|deprecate)\b|\bthis\.write\s*\(/;
 const HUMAN_APPROVED_IPC_RE = /ipcMain\.handle\(\s*['"]knowledge:(?:write|promote|update|deprecate)['"]/;
 const APPROVAL_TOKEN_RE = /\bapprovalToken\b/;
 const HUMAN_CONFIRM_RE = /\b(?:explicitHumanConfirmation|humanConfirmation|requireHuman(?:Approval|Confirmation))\b/;
@@ -100,16 +108,17 @@ function isCanonicalTaskStorePath(posixPath) {
 function isExtraTaskStoreImplementation(source, posixPath) {
   if (isCanonicalTaskStorePath(posixPath)) return false;
   if (TASK_STORE_IMPLEMENTS_RE.test(source) || TASK_STORE_EXTENDS_RE.test(source)) return true;
-  if (TASK_STORE_CLASS_RE.test(source) && (TASK_STORE_IMPORT_RE.test(source) || /\binterface\s+TaskStore\b/.test(source))) {
+  if (
+    TASK_STORE_CLASS_RE.test(source) &&
+    (TASK_STORE_IMPORT_RE.test(source) || /\binterface\s+TaskStore\b/.test(source))
+  ) {
     return true;
   }
   return false;
 }
 
 function knowledgeWriteTokenPattern(token) {
-  return new RegExp(
-    `(?:^|[^A-Za-z0-9_])(?:['"]${token}['"]|${token}\\s*:)`,
-  );
+  return new RegExp(`(?:^|[^A-Za-z0-9_])(?:['"]${token}['"]|${token}\\s*:)`);
 }
 
 function hasForbiddenKnowledgeWriteToken(source) {
@@ -132,28 +141,33 @@ function isLegitimateRdcCliSurface(posixPath) {
 
 function hasRdcMcpRegistration(source) {
   return (
-    /mcpServers?\s*[:=][\s\S]{0,500}(?:name|id|command|descriptorId)\s*:\s*['"][^'"]*rdc/i.test(source)
-    || /(?:name|id|descriptorId)\s*:\s*['"]rdc(?:-mcp)?['"][\s\S]{0,240}(?:command|transport|mcpServers?|url)/i.test(source)
-    || /AgentRuntimeMcpDescriptor[\s\S]{0,240}['"]rdc/i.test(source)
-    || /createMcpServer\([^)]*rdc/i.test(source)
-    || /mcp__rdc__/i.test(source)
+    /mcpServers?\s*[:=][\s\S]{0,500}(?:name|id|command|descriptorId)\s*:\s*['"][^'"]*rdc/i.test(source) ||
+    /(?:name|id|descriptorId)\s*:\s*['"]rdc(?:-mcp)?['"][\s\S]{0,240}(?:command|transport|mcpServers?|url)/i.test(
+      source,
+    ) ||
+    /AgentRuntimeMcpDescriptor[\s\S]{0,240}['"]rdc/i.test(source) ||
+    /createMcpServer\([^)]*rdc/i.test(source) ||
+    /mcp__rdc__/i.test(source)
   );
 }
 
 function hasRdAgentToolRegistration(source, posixPath) {
-  const inCatalog = (
-    posixPath.endsWith('agentToolTokens.ts')
-    || posixPath.endsWith('agentWorkbenchCatalog.ts')
-    || posixPath.endsWith('workProcessToolCatalog.ts')
-    || posixPath.endsWith('RuntimeToolAssembly.ts')
-    || posixPath.startsWith('src/main/agent-runtime/tools/')
-  );
+  const inCatalog =
+    posixPath.endsWith('agentToolTokens.ts') ||
+    posixPath.endsWith('agentWorkbenchCatalog.ts') ||
+    posixPath.endsWith('workProcessToolCatalog.ts') ||
+    posixPath.endsWith('RuntimeToolAssembly.ts') ||
+    posixPath.startsWith('src/main/agent-runtime/tools/');
   if (inCatalog && /['"]rd\.[A-Za-z0-9_.]+['"]/.test(source)) {
     return /BUILTIN_AGENT_TOOL_IDS|AGENT_WORKBENCH_TOOL_CATALOG|id:\s*['"]rd\.|name:\s*['"]rd\./.test(source);
   }
   return (
-    /(?:new\s+AgentTool|create(?:Builtin)?(?:Agent)?Tool|register(?:ed)?Tool)\s*\([\s\S]{0,400}(?:name|id)\s*:\s*['"]rd\./.test(source)
-    || /(?:name|id)\s*:\s*['"]rd\.[A-Za-z0-9_.]+['"][\s\S]{0,200}(?:inputSchema|permission|execute\s*\(|spec\s*:|approvalRequired|resultSummary)/.test(source)
+    /(?:new\s+AgentTool|create(?:Builtin)?(?:Agent)?Tool|register(?:ed)?Tool)\s*\([\s\S]{0,400}(?:name|id)\s*:\s*['"]rd\./.test(
+      source,
+    ) ||
+    /(?:name|id)\s*:\s*['"]rd\.[A-Za-z0-9_.]+['"][\s\S]{0,200}(?:inputSchema|permission|execute\s*\(|spec\s*:|approvalRequired|resultSummary)/.test(
+      source,
+    )
   );
 }
 
@@ -223,7 +237,11 @@ function collectHardForbidViolations(repoRoot) {
     }
   }
 
-  const graphDirs = ['src/main/InvestigationGraph', 'src/main/investigation/InvestigationGraph', 'src/shared/InvestigationGraph'];
+  const graphDirs = [
+    'src/main/InvestigationGraph',
+    'src/main/investigation/InvestigationGraph',
+    'src/shared/InvestigationGraph',
+  ];
   for (const relative of graphDirs) {
     const absolute = resolveRulePath(repoRoot, relative);
     if (existsSync(absolute) && statSync(absolute).isDirectory()) {

@@ -58,9 +58,10 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
     queryRequest: state.queryRequest,
     queryRevision: state.page.revision,
     filteredCount: state.page.total,
-    selected: state.viewMode === 'cards' && state.selectedCard
-      ? { spaceId: state.selectedCard.spaceId, relativePath: state.selectedCard.relativePath }
-      : null,
+    selected:
+      state.viewMode === 'cards' && state.selectedCard
+        ? { spaceId: state.selectedCard.spaceId, relativePath: state.selectedCard.relativePath }
+        : null,
   });
   const write = useKnowledgeWriteConfirm({
     active: open,
@@ -86,7 +87,14 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
   const bodyRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const presence = usePresence(open, backdropRef);
-  const busy = state.loadingOverview || state.loadingQuery || importer.busy || candidates.busy || write.busy || exporter.busy || topics.busy;
+  const busy =
+    state.loadingOverview ||
+    state.loadingQuery ||
+    importer.busy ||
+    candidates.busy ||
+    write.busy ||
+    exporter.busy ||
+    topics.busy;
   // Sub-dialogs register their own overlay layers, so Escape here only ever
   // closes the Knowledge Center itself.
   const { layerId } = useOverlayLayer(open);
@@ -114,7 +122,13 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
     // bubble through the React tree, so nesting them would route every click
     // inside a dialog into the backdrop's close handler.
     <>
-      <div ref={backdropRef} className="knowledge-center-backdrop" data-state={presence.state} onClick={onClose} data-testid="knowledge-center-backdrop">
+      <div
+        ref={backdropRef}
+        className="knowledge-center-backdrop"
+        data-state={presence.state}
+        onClick={onClose}
+        data-testid="knowledge-center-backdrop"
+      >
         <div
           ref={dialogRef}
           className={`knowledge-center ${state.narrow ? 'is-narrow' : ''}`}
@@ -161,14 +175,24 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
                   { id: 'topics', label: t('knowledgeCenter.topicsTitle'), onSelect: () => void topics.openPanel() },
                   { id: 'rebuild', label: t('knowledgeCenter.indexRebuild'), onSelect: () => setRebuildOpen(true) },
                 ]}
-                trigger={(
-                  <IconButton label={t('knowledgeCenter.moreActions')} size="sm" aria-haspopup="menu" data-testid="knowledge-center-more">
+                trigger={
+                  <IconButton
+                    label={t('knowledgeCenter.moreActions')}
+                    size="sm"
+                    aria-haspopup="menu"
+                    data-testid="knowledge-center-more"
+                  >
                     <Icon name="more" size={16} />
                   </IconButton>
-                )}
+                }
               />
               {!state.narrow ? (
-                <IconButton label={t('knowledgeCenter.close')} size="sm" onClick={onClose} data-testid="knowledge-center-close">
+                <IconButton
+                  label={t('knowledgeCenter.close')}
+                  size="sm"
+                  onClick={onClose}
+                  data-testid="knowledge-center-close"
+                >
                   <Icon name="close" size={16} />
                 </IconButton>
               ) : null}
@@ -200,32 +224,49 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
           )}
           <div className="knowledge-center-grid" ref={bodyRef}>
             {showSpaces && <SpacesColumn state={state} candidateCount={candidates.inbox?.candidates.length} />}
-            {showList && <ListColumn state={state} inbox={candidates.inbox} inboxError={candidates.error} onImport={importer.openPanel}
-              onRebuildIndex={() => setRebuildOpen(true)} />}
+            {showList && (
+              <ListColumn
+                state={state}
+                inbox={candidates.inbox}
+                inboxError={candidates.error}
+                onImport={importer.openPanel}
+                onRebuildIndex={() => setRebuildOpen(true)}
+              />
+            )}
             {showDetail && (
               <DetailColumn
                 state={state}
                 write={write}
                 candidateHasSession={candidates.hasSession}
                 candidateBusy={candidates.busy}
-                candidateError={candidates.candidateError?.cardId === state.selectedCard?.cardId
-                  ? candidates.candidateError?.message ?? null : null}
+                candidateError={
+                  candidates.candidateError?.cardId === state.selectedCard?.cardId
+                    ? (candidates.candidateError?.message ?? null)
+                    : null
+                }
                 onCreateCandidate={() => {
                   if (state.selectedCard) void candidates.createCandidate(detailToRecord(state.selectedCard));
                 }}
               />
             )}
-            </div>
           </div>
         </div>
+      </div>
 
       <ImportKnowledgeDialog importer={importer} candidates={candidates} spaces={state.spaces} />
       <ExportKnowledgeDialog exporter={exporter} spaces={state.spaces} />
       <WriteConfirmDialog write={write} spaces={state.spaces} />
       <KnowledgeTopicsDialog topics={topics} />
-      <RebuildIndexDialog open={rebuildOpen} index={state.index} rebuilding={state.rebuilding}
-        progress={state.rebuildProgress} cancelling={state.rebuildCancelling}
-        onRebuild={state.rebuildIndex} onCancel={state.cancelRebuild} onClose={() => setRebuildOpen(false)} />
+      <RebuildIndexDialog
+        open={rebuildOpen}
+        index={state.index}
+        rebuilding={state.rebuilding}
+        progress={state.rebuildProgress}
+        cancelling={state.rebuildCancelling}
+        onRebuild={state.rebuildIndex}
+        onCancel={state.cancelRebuild}
+        onClose={() => setRebuildOpen(false)}
+      />
     </>,
     document.body,
   );

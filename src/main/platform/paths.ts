@@ -65,7 +65,10 @@ export function commandFileNames(
   pathExt: string = process.env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD;.VBS;.JS',
 ): string[] {
   if (!host.isWindows || pathApi(host).extname(command)) return [command];
-  const extensions = pathExt.split(';').map((entry) => entry.trim()).filter(Boolean);
+  const extensions = pathExt
+    .split(';')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
   return [command, ...extensions.map((extension) => `${command}${extension}`)];
 }
 

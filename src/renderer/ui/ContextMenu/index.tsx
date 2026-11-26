@@ -22,9 +22,7 @@ export interface ContextMenuProps {
 }
 
 function enabledCommandIndexes(items: ContextMenuItem[]): number[] {
-  return items.flatMap((item, index) => (
-    item.type === 'command' && !item.disabled ? [index] : []
-  ));
+  return items.flatMap((item, index) => (item.type === 'command' && !item.disabled ? [index] : []));
 }
 
 function nextEnabledIndex(items: ContextMenuItem[], current: number, delta: number): number {
@@ -43,16 +41,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ open, ...props }) => {
   return <ContextMenuSurface {...props} open={open} state={presence.state} menuRef={menuRef} />;
 };
 
-const ContextMenuSurface: React.FC<Omit<ContextMenuProps, 'open'> & { open: boolean; state: PresenceState; menuRef: RefObject<HTMLDivElement> }> = ({
-  open,
-  state,
-  menuRef,
-  x,
-  y,
-  items,
-  onSelect,
-  onClose,
-}) => {
+const ContextMenuSurface: React.FC<
+  Omit<ContextMenuProps, 'open'> & { open: boolean; state: PresenceState; menuRef: RefObject<HTMLDivElement> }
+> = ({ open, state, menuRef, x, y, items, onSelect, onClose }) => {
   const { layerId } = useOverlayLayer(open);
   const [coords, setCoords] = useState({ left: x, top: y });
   const [activeIndex, setActiveIndex] = useState(() => enabledCommandIndexes(items)[0] ?? -1);
@@ -65,9 +56,15 @@ const ContextMenuSurface: React.FC<Omit<ContextMenuProps, 'open'> & { open: bool
     const menu = menuRef.current;
     if (!menu) return;
     const position = () => {
-      const next = placeAnchoredSurface({ left: x, right: x, top: y, bottom: y },
+      const next = placeAnchoredSurface(
+        { left: x, right: x, top: y, bottom: y },
         { width: menu.offsetWidth, height: menu.offsetHeight },
-        { width: window.innerWidth, height: window.innerHeight }, 'start', 'bottom', VIEWPORT_MARGIN, 0);
+        { width: window.innerWidth, height: window.innerHeight },
+        'start',
+        'bottom',
+        VIEWPORT_MARGIN,
+        0,
+      );
       setCoords({ left: next.left, top: next.top });
     };
     position();
@@ -87,7 +84,10 @@ const ContextMenuSurface: React.FC<Omit<ContextMenuProps, 'open'> & { open: bool
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!isTopOverlayLayer(layerId)) return;
-      if (event.key === 'Tab') { onClose(); return; }
+      if (event.key === 'Tab') {
+        onClose();
+        return;
+      }
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
         setActiveIndex((current) => nextEnabledIndex(items, current, event.key === 'ArrowDown' ? 1 : -1));
@@ -113,17 +113,16 @@ const ContextMenuSurface: React.FC<Omit<ContextMenuProps, 'open'> & { open: bool
 
   useEffect(() => {
     const origin = document.activeElement;
-    return () => { if (origin instanceof HTMLElement && origin.isConnected) origin.focus({ preventScroll: true }); };
+    return () => {
+      if (origin instanceof HTMLElement && origin.isConnected) origin.focus({ preventScroll: true });
+    };
   }, []);
 
   useEffect(() => {
     menuRef.current?.querySelector<HTMLElement>('[tabindex="0"]')?.focus({ preventScroll: true });
   }, [activeIndex, menuRef]);
 
-  const labelledBy = useMemo(
-    () => items.find((item) => item.type === 'command')?.id ?? 'copy',
-    [items],
-  );
+  const labelledBy = useMemo(() => items.find((item) => item.type === 'command')?.id ?? 'copy', [items]);
 
   return createPortal(
     <div

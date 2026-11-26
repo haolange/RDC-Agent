@@ -7,11 +7,11 @@ export const KNOWLEDGE_PACKAGE_ZIP_MAX_UNCOMPRESSED = 32 * 1024 * 1024;
 export function normalizeZipEntryName(name: string): string {
   const posix = name.replace(/\\/g, '/');
   if (
-    !posix
-    || posix.includes('\0')
-    || posix.includes(':')
-    || posix.split('/').includes('..')
-    || posix.split('/').includes('')
+    !posix ||
+    posix.includes('\0') ||
+    posix.includes(':') ||
+    posix.split('/').includes('..') ||
+    posix.split('/').includes('')
   ) {
     throw new AppError('KNOWLEDGE_ZIP_PATH_INVALID');
   }
@@ -72,9 +72,11 @@ export function utf8ToZip(text: string): Uint8Array {
 }
 
 export function isZipBuffer(bytes: Uint8Array): boolean {
-  return bytes.byteLength >= 4
-    && bytes[0] === 0x50
-    && bytes[1] === 0x4b
-    && (bytes[2] === 0x03 || bytes[2] === 0x05 || bytes[2] === 0x07)
-    && (bytes[3] === 0x04 || bytes[3] === 0x06 || bytes[3] === 0x08);
+  return (
+    bytes.byteLength >= 4 &&
+    bytes[0] === 0x50 &&
+    bytes[1] === 0x4b &&
+    (bytes[2] === 0x03 || bytes[2] === 0x05 || bytes[2] === 0x07) &&
+    (bytes[3] === 0x04 || bytes[3] === 0x06 || bytes[3] === 0x08)
+  );
 }

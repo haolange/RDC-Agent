@@ -32,7 +32,11 @@ export interface AppErrorOptions {
 export class AppError extends Error {
   readonly params: ErrorParams;
 
-  constructor(readonly code: ErrorCode, detail?: string, options: AppErrorOptions = {}) {
+  constructor(
+    readonly code: ErrorCode,
+    detail?: string,
+    options: AppErrorOptions = {},
+  ) {
     super(detail ? `${code}: ${detail}` : code, options.cause === undefined ? undefined : { cause: options.cause });
     this.name = 'AppError';
     this.params = options.params ?? {};
@@ -74,7 +78,10 @@ export class RendererIpcError extends Error {
   readonly category: ErrorCategory;
   readonly technical?: string;
 
-  constructor(readonly channel: string, payload: IpcErrorPayload) {
+  constructor(
+    readonly channel: string,
+    payload: IpcErrorPayload,
+  ) {
     super(payload.technical ?? payload.code);
     this.name = 'RendererIpcError';
     this.code = payload.code;

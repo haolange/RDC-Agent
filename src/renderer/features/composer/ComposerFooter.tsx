@@ -13,29 +13,50 @@ import { useComposerMenu } from './useComposerMenuRegistry';
 import { useComposerView } from './ComposerControllerContext';
 
 function RegisteredContextUsageIndicator(
-  props: Omit<React.ComponentProps<typeof ContextUsageIndicator>, 'menu' | 'detailsExpanded' |
-    'detailsSaveError' | 'onDetailsExpandedChange'>,
+  props: Omit<
+    React.ComponentProps<typeof ContextUsageIndicator>,
+    'menu' | 'detailsExpanded' | 'detailsSaveError' | 'onDetailsExpandedChange'
+  >,
 ): React.ReactElement {
   const menu = useComposerMenu('usage');
-  const detailsExpanded = useAppSettingsStore((state) => (
-    state.contextBreakdownPreference?.expanded ?? state.settings.appearance.contextBreakdownExpanded
-  ));
+  const detailsExpanded = useAppSettingsStore(
+    (state) => state.contextBreakdownPreference?.expanded ?? state.settings.appearance.contextBreakdownExpanded,
+  );
   const detailsSaveError = useAppSettingsStore((state) => state.contextBreakdownPreference?.error);
   const setDetailsExpanded = useAppSettingsStore((state) => state.setContextBreakdownExpanded);
   return (
-    <ContextUsageIndicator {...props} menu={menu} detailsExpanded={detailsExpanded} detailsSaveError={detailsSaveError}
-      onDetailsExpandedChange={(expanded) => { void setDetailsExpanded(expanded); }} />
+    <ContextUsageIndicator
+      {...props}
+      menu={menu}
+      detailsExpanded={detailsExpanded}
+      detailsSaveError={detailsSaveError}
+      onDetailsExpandedChange={(expanded) => {
+        void setDetailsExpanded(expanded);
+      }}
+    />
   );
 }
 
 export function ComposerFooter() {
   const { composer, currentSession, transitionLabel } = useComposerView();
   const {
-    selectedAgentId, lastKnownUsage, usageEstimated, usageStale, preparedTurnContext, conversationPreparationPhase,
-    selectedContextProfile, isComposerBusy, stopPending, attachButtonLabel, primaryButtonDisabled,
-    primaryButtonDescription, handlePrimaryStop, handleAttachmentSelect, handlePromptSend,
+    selectedAgentId,
+    lastKnownUsage,
+    usageEstimated,
+    usageStale,
+    preparedTurnContext,
+    conversationPreparationPhase,
+    selectedContextProfile,
+    isComposerBusy,
+    stopPending,
+    attachButtonLabel,
+    primaryButtonDisabled,
+    primaryButtonDescription,
+    handlePrimaryStop,
+    handleAttachmentSelect,
+    handlePromptSend,
   } = composer;
-  const handingOff = useComposerSessionContextStore(state => !!state.handoffSuggestionRequest);
+  const handingOff = useComposerSessionContextStore((state) => !!state.handoffSuggestionRequest);
   // From the Stop click until main answers, the button stays Stop and shows that it is stopping.
   const stopSlot = isComposerBusy || stopPending;
   return (
@@ -73,7 +94,9 @@ export function ComposerFooter() {
             stale={usageStale}
             estimated={usageEstimated}
           />
-          <span role="status" className="composer-transition-announcement">{transitionLabel}</span>
+          <span role="status" className="composer-transition-announcement">
+            {transitionLabel}
+          </span>
           <Button
             variant={stopSlot ? 'danger' : 'primary'}
             size="sm"
@@ -85,7 +108,9 @@ export function ComposerFooter() {
             aria-label={primaryButtonDescription}
             data-tooltip={[transitionLabel, primaryButtonDescription].filter(Boolean).join(' · ')}
           >
-            {stopPending ? <Spinner size="sm" /> : isComposerBusy ? (
+            {stopPending ? (
+              <Spinner size="sm" />
+            ) : isComposerBusy ? (
               <Icon name="stop" filled />
             ) : (
               <Icon name="arrow-up" />

@@ -14,10 +14,7 @@ function cardStagingDir(cardId: string): string {
   return path.join(knowledgeIngestStagingRoot(), digest);
 }
 
-export async function putStagedKnowledgeImages(
-  cardId: string,
-  images: readonly KnowledgeStagedImage[],
-): Promise<void> {
+export async function putStagedKnowledgeImages(cardId: string, images: readonly KnowledgeStagedImage[]): Promise<void> {
   const root = cardStagingDir(cardId);
   await fs.rm(root, { recursive: true, force: true });
   if (images.length === 0) return;

@@ -3,7 +3,10 @@ import { SettingsField } from '../parts';
 import { useI18n } from '../../../../i18n';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 
-export function AgentExecutionLimitField({ agent, onUpdateAgent }: {
+export function AgentExecutionLimitField({
+  agent,
+  onUpdateAgent,
+}: {
   agent: AgentManifestDraft;
   onUpdateAgent: (patch: Partial<AgentManifestDraft>) => void;
 }) {

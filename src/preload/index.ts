@@ -15,14 +15,17 @@ import type { DesktopIpc } from '@shared/renderer-api/transport';
 const rdcIpc: DesktopIpc = {
   platform: process.platform,
   invoke(channel, ...args) {
-    if (!isRendererInvokeChannel(channel)) return Promise.reject(new Error(`Undeclared IPC channel: ${String(channel)}`));
+    if (!isRendererInvokeChannel(channel))
+      return Promise.reject(new Error(`Undeclared IPC channel: ${String(channel)}`));
     return ipcRenderer.invoke(channel, ...args) as Promise<unknown>;
   },
   subscribe(channel, callback) {
     if (!isRendererEventChannel(channel)) throw new Error(`Undeclared IPC event channel: ${String(channel)}`);
     const listener = (_event: unknown, ...args: unknown[]): void => callback(...args);
     ipcRenderer.on(channel, listener);
-    return () => { ipcRenderer.removeListener(channel, listener); };
+    return () => {
+      ipcRenderer.removeListener(channel, listener);
+    };
   },
 };
 

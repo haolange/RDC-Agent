@@ -3,10 +3,7 @@
  */
 
 import { isTopLevelAgentId } from '@shared/types/agent';
-import {
-  AGENT_DESCRIPTIONS,
-  AGENT_DISPLAY_NAMES,
-} from '@shared/constants/agents';
+import { AGENT_DESCRIPTIONS, AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
 import { appPathService } from '../../runtime/AppPathService';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
@@ -57,14 +54,16 @@ export class PromptPlanForTurn {
     >;
   }): PromptPlan | null {
     const plan = input.effectivePlan;
-    const profiles = input.effectiveProfiles ?? (input.effectiveProfile ? [input.effectiveProfile]
-      : agentManifestService.getEffectiveProfiles(
-        appPathService.getRuntimePaths(),
-        (plan?.projectRootPath ?? input.projectRootPath) ?? undefined,
-      ));
-    const definition = input.effectiveProfile
-      ?? profiles.find((profile) => profile.id === input.agentId && profile.enabled)
-      ?? null;
+    const profiles =
+      input.effectiveProfiles ??
+      (input.effectiveProfile
+        ? [input.effectiveProfile]
+        : agentManifestService.getEffectiveProfiles(
+            appPathService.getRuntimePaths(),
+            plan?.projectRootPath ?? input.projectRootPath ?? undefined,
+          ));
+    const definition =
+      input.effectiveProfile ?? profiles.find((profile) => profile.id === input.agentId && profile.enabled) ?? null;
     if (!definition || !definition.enabled) {
       return null;
     }

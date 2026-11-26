@@ -14,9 +14,7 @@ export function useProjectTree() {
   const [projectSessionsByProject, setProjectSessionsByProject] = useState<Record<string, SessionRecord[]>>({});
 
   const ensureProjectExpanded = useCallback((projectId: string) => {
-    setExpandedProjectIds((current) => (
-      current.includes(projectId) ? current : [...current, projectId]
-    ));
+    setExpandedProjectIds((current) => (current.includes(projectId) ? current : [...current, projectId]));
   }, []);
 
   const loadProjectSessionList = useCallback(async (projectId: string) => {
@@ -31,12 +29,12 @@ export function useProjectTree() {
 
   const pruneTreeForProjects = useCallback((visibleProjectIds: Set<string>) => {
     setExpandedProjectIds((current) => current.filter((projectId) => visibleProjectIds.has(projectId)));
-    setShowAllSessionsByProject((current) => Object.fromEntries(
-      Object.entries(current).filter(([projectId]) => visibleProjectIds.has(projectId)),
-    ));
-    setProjectSessionsByProject((current) => Object.fromEntries(
-      Object.entries(current).filter(([projectId]) => visibleProjectIds.has(projectId)),
-    ));
+    setShowAllSessionsByProject((current) =>
+      Object.fromEntries(Object.entries(current).filter(([projectId]) => visibleProjectIds.has(projectId))),
+    );
+    setProjectSessionsByProject((current) =>
+      Object.fromEntries(Object.entries(current).filter(([projectId]) => visibleProjectIds.has(projectId))),
+    );
   }, []);
 
   const resetTree = useCallback(() => {
@@ -44,18 +42,21 @@ export function useProjectTree() {
     setProjectSessionsByProject({});
   }, []);
 
-  const toggleProjectExpanded = useCallback(async (project: ProjectRecord) => {
-    const isExpanded = expandedProjectIds.includes(project.projectId);
-    if (isExpanded) {
-      setExpandedProjectIds((current) => current.filter((projectId) => projectId !== project.projectId));
-      return;
-    }
+  const toggleProjectExpanded = useCallback(
+    async (project: ProjectRecord) => {
+      const isExpanded = expandedProjectIds.includes(project.projectId);
+      if (isExpanded) {
+        setExpandedProjectIds((current) => current.filter((projectId) => projectId !== project.projectId));
+        return;
+      }
 
-    ensureProjectExpanded(project.projectId);
-    if (!projectSessionsByProject[project.projectId]) {
-      await loadProjectSessionList(project.projectId);
-    }
-  }, [ensureProjectExpanded, expandedProjectIds, loadProjectSessionList, projectSessionsByProject]);
+      ensureProjectExpanded(project.projectId);
+      if (!projectSessionsByProject[project.projectId]) {
+        await loadProjectSessionList(project.projectId);
+      }
+    },
+    [ensureProjectExpanded, expandedProjectIds, loadProjectSessionList, projectSessionsByProject],
+  );
 
   const toggleShowAllSessions = useCallback((event: MouseEvent, projectId: string) => {
     event.preventDefault();

@@ -3,7 +3,10 @@ import { observeTextareaSizing, textareaHeight } from './textareaSizing';
 import { assignDynStyle, clearDynStyle } from './useDynStyle';
 
 vi.mock('./useDynStyle', () => ({ assignDynStyle: vi.fn(), clearDynStyle: vi.fn() }));
-afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+});
 
 describe('textarea content sizing', () => {
   it('grows, caps at eight rows, and shrinks after deletion', () => {
@@ -38,57 +41,94 @@ describe('textarea content sizing', () => {
     let pending: (() => void) | undefined;
     const disconnect = vi.fn();
     const observeMutation = vi.fn();
-    vi.stubGlobal('ResizeObserver', class {
-      constructor(callback: typeof resize) { resize = callback; }
-      observe = vi.fn(); disconnect = disconnect;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: typeof resize) {
+          resize = callback;
+        }
+        observe = vi.fn();
+        disconnect = disconnect;
+      },
+    );
+    vi.stubGlobal(
+      'MutationObserver',
+      class {
+        constructor(callback: () => void) {
+          mutation = callback;
+        }
+        observe = observeMutation;
+        disconnect = disconnect;
+      },
+    );
+    vi.stubGlobal('requestAnimationFrame', (callback: () => void) => {
+      pending = callback;
+      return 1;
     });
-    vi.stubGlobal('MutationObserver', class {
-      constructor(callback: () => void) { mutation = callback; }
-      observe = observeMutation; disconnect = disconnect;
+    vi.stubGlobal('cancelAnimationFrame', () => {
+      pending = undefined;
     });
-    vi.stubGlobal('requestAnimationFrame', (callback: () => void) => { pending = callback; return 1; });
-    vi.stubGlobal('cancelAnimationFrame', () => { pending = undefined; });
     vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn() });
-    vi.stubGlobal('document', { fonts: {
-      ready: Promise.resolve(),
-      addEventListener: (name: string, callback: () => void) => fonts.set(name, callback),
-      removeEventListener: (name: string) => fonts.delete(name),
-    } });
+    vi.stubGlobal('document', {
+      fonts: {
+        ready: Promise.resolve(),
+        addEventListener: (name: string, callback: () => void) => fonts.set(name, callback),
+        removeEventListener: (name: string) => fonts.delete(name),
+      },
+    });
     let lineHeight = '20px';
     let maxHeight = 'none';
-    vi.stubGlobal('getComputedStyle', () => ({ lineHeight, fontSize: '14px', paddingTop: '4px',
-      paddingBottom: '4px', borderTopWidth: '1px', borderBottomWidth: '1px', minHeight: '32px', maxHeight }));
+    vi.stubGlobal('getComputedStyle', () => ({
+      lineHeight,
+      fontSize: '14px',
+      paddingTop: '4px',
+      paddingBottom: '4px',
+      borderTopWidth: '1px',
+      borderBottomWidth: '1px',
+      minHeight: '32px',
+      maxHeight,
+    }));
     let visible = true;
     const root = { parentElement: null };
-    const element = { scrollHeight: 30, parentElement: root,
-      getClientRects: () => visible ? [{}] : [],
+    const element = {
+      scrollHeight: 30,
+      parentElement: root,
+      getClientRects: () => (visible ? [{}] : []),
       addEventListener: (name: string, callback: () => void) => handlers.set(name, callback),
       removeEventListener: (name: string) => handlers.delete(name),
     } as unknown as HTMLTextAreaElement;
     const cleanup = observeTextareaSizing(element, 1, 8);
     expect(assignDynStyle).toHaveBeenLastCalledWith(element, { height: '32px', 'overflow-y': 'hidden' });
-    expect(observeMutation).toHaveBeenCalledWith(root, expect.objectContaining({
-      attributeFilter: expect.arrayContaining(['data-font-scale']),
-    }));
+    expect(observeMutation).toHaveBeenCalledWith(
+      root,
+      expect.objectContaining({
+        attributeFilter: expect.arrayContaining(['data-font-scale']),
+      }),
+    );
     Object.defineProperty(element, 'scrollHeight', { value: 300, configurable: true });
     handlers.get('input')!();
     expect(assignDynStyle).toHaveBeenLastCalledWith(element, { height: '170px', 'overflow-y': 'auto' });
     visible = false;
     vi.mocked(assignDynStyle).mockClear();
-    mutation(); pending?.();
+    mutation();
+    pending?.();
     expect(assignDynStyle).not.toHaveBeenCalled();
     visible = true;
-    resize([{ contentRect: { width: 160 } }]); pending?.();
+    resize([{ contentRect: { width: 160 } }]);
+    pending?.();
     expect(assignDynStyle).toHaveBeenCalled();
     vi.mocked(assignDynStyle).mockClear();
-    fonts.get('loadingdone')!(); pending?.();
+    fonts.get('loadingdone')!();
+    pending?.();
     expect(assignDynStyle).toHaveBeenCalled();
     // App font-scale uses a root data attribute, not inline style or a width change.
     lineHeight = '30px';
-    mutation(); pending?.();
+    mutation();
+    pending?.();
     expect(assignDynStyle).toHaveBeenLastCalledWith(element, { height: '250px', 'overflow-y': 'auto' });
     maxHeight = '180px';
-    mutation(); pending?.();
+    mutation();
+    pending?.();
     expect(assignDynStyle).toHaveBeenLastCalledWith(element, { height: '180px', 'overflow-y': 'auto' });
     Object.defineProperty(element, 'scrollHeight', { value: 50, configurable: true });
     handlers.get('input')!();

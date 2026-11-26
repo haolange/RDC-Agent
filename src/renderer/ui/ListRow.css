@@ -15,7 +15,9 @@
   line-height: var(--type-body-line);
   text-align: left;
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .ui-list-row:hover:not(:disabled) {

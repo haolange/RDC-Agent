@@ -109,9 +109,8 @@ export async function loadProjectsOp(
   ctx.pruneTreeForProjects(visibleProjectIds);
   options.onProjectsListed?.();
 
-  const targetProject = nextProjects.find((project) => project.projectId === preferredProjectId)
-    || nextProjects[0]
-    || null;
+  const targetProject =
+    nextProjects.find((project) => project.projectId === preferredProjectId) || nextProjects[0] || null;
 
   if (!targetProject) {
     const currentSession = ctx.getCurrentSession();
@@ -161,10 +160,7 @@ export async function handleAddProjectOp(ctx: ProjectSelectionHandlerOpsContext,
   }
 }
 
-export async function handleRemoveProjectOp(
-  ctx: ProjectSelectionHandlerOpsContext,
-  project?: ProjectRecord,
-) {
+export async function handleRemoveProjectOp(ctx: ProjectSelectionHandlerOpsContext, project?: ProjectRecord) {
   ctx.setSidebarError(null);
   const targetProject = project || ctx.getCurrentProject();
   if (!targetProject) return;
@@ -182,10 +178,7 @@ export async function handleRemoveProjectOp(
   }
 }
 
-export async function handleProjectSelectOp(
-  ctx: ProjectSelectionHandlerOpsContext,
-  project: ProjectRecord,
-) {
+export async function handleProjectSelectOp(ctx: ProjectSelectionHandlerOpsContext, project: ProjectRecord) {
   ctx.setSidebarError(null);
   const requestId = ctx.beginSelectionRequest();
   const rollbackState = captureSelectionSnapshot();
@@ -214,13 +207,9 @@ export async function handleProjectSelectOp(
   }
 }
 
-export async function handleOpenExplorerOp(
-  ctx: ProjectSelectionHandlerOpsContext,
-  project: ProjectRecord,
-) {
+export async function handleOpenExplorerOp(ctx: ProjectSelectionHandlerOpsContext, project: ProjectRecord) {
   if (ctx.projectMenuOpen) {
     ctx.onCloseProjectMenu();
   }
   await window.electronAPI.appShell.openPath(project.rootPath);
 }
-

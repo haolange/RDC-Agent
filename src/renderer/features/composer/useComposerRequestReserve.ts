@@ -7,14 +7,19 @@ import type { ComposerPendingRequestState } from './pendingRequestSelection';
  * review) is still running, the next request of that turn takes the same place, so answering does not drop the
  * Composer and raise it again. The reserve ends with that turn: the Composer settles back once, when the turn is done.
  */
-export function useComposerRequestReserve(pending: ComposerPendingRequestState | null, requestShell: HTMLElement | null): number {
+export function useComposerRequestReserve(
+  pending: ComposerPendingRequestState | null,
+  requestShell: HTMLElement | null,
+): number {
   const [reserve, setReserve] = useState<{ turnId: string; height: number } | null>(null);
   const pendingTurnId = pending?.request.turnId ?? null;
   useLayoutEffect(() => {
     if (!pendingTurnId || !requestShell) return undefined;
     const measure = () => {
       const height = Math.round(requestShell.getBoundingClientRect().height);
-      setReserve((current) => (current?.turnId === pendingTurnId && current.height === height ? current : { turnId: pendingTurnId, height }));
+      setReserve((current) =>
+        current?.turnId === pendingTurnId && current.height === height ? current : { turnId: pendingTurnId, height },
+      );
     };
     measure();
     if (typeof ResizeObserver === 'undefined') return undefined;
@@ -23,7 +28,15 @@ export function useComposerRequestReserve(pending: ComposerPendingRequestState |
     return () => observer.disconnect();
   }, [pendingTurnId, requestShell]);
   const reservedTurnId = reserve?.turnId ?? null;
-  const turnRunning = useConversationStore((state) => reservedTurnId !== null && state.conversationMessages.some((message) => (
-    message.turnId === reservedTurnId && message.role === 'assistant' && (message.status === 'streaming' || message.status === 'draft'))));
+  const turnRunning = useConversationStore(
+    (state) =>
+      reservedTurnId !== null &&
+      state.conversationMessages.some(
+        (message) =>
+          message.turnId === reservedTurnId &&
+          message.role === 'assistant' &&
+          (message.status === 'streaming' || message.status === 'draft'),
+      ),
+  );
   return pending || !reserve || !turnRunning ? 0 : reserve.height;
 }

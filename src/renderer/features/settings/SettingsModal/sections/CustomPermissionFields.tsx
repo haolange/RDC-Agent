@@ -13,7 +13,10 @@ const ruleFields = [
 ] as const;
 
 function lines(value: string): string[] {
-  return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 export const CustomPermissionFields: React.FC = () => {
@@ -27,13 +30,14 @@ export const CustomPermissionFields: React.FC = () => {
     deniedCommandPrefixes: saved.deniedCommandPrefixes.join('\n'),
   }));
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const statusText = status === 'saving'
-    ? t('settings.customPermissionSaving')
-    : status === 'saved'
-      ? t('settings.customPermissionSaved')
-      : status === 'error'
-        ? t('settings.customPermissionError')
-        : '';
+  const statusText =
+    status === 'saving'
+      ? t('settings.customPermissionSaving')
+      : status === 'saved'
+        ? t('settings.customPermissionSaved')
+        : status === 'error'
+          ? t('settings.customPermissionError')
+          : '';
   const dirty = ruleFields.some(([field]) => lines(draft[field]).join('\n') !== saved[field].join('\n'));
 
   return (
@@ -46,33 +50,46 @@ export const CustomPermissionFields: React.FC = () => {
     >
       {ruleFields.map(([field, label]) => (
         <SettingsField key={field} label={t(label)} htmlFor={`settings-permission-${field}`}>
-          <Textarea id={`settings-permission-${field}`} sizing="content" value={draft[field]} disabled={status === 'saving'}
+          <Textarea
+            id={`settings-permission-${field}`}
+            sizing="content"
+            value={draft[field]}
+            disabled={status === 'saving'}
             onChange={(event) => {
               const value = event.currentTarget.value;
               setStatus('idle');
-              setDraft(current => ({ ...current, [field]: value }));
-            }} />
+              setDraft((current) => ({ ...current, [field]: value }));
+            }}
+          />
         </SettingsField>
       ))}
-      {dirty || status !== 'idle' ? <div className="settings-actions settings-actions-split">
-        <span className="settings-save-status" role="status" data-status={status}>{statusText}</span>
-        {dirty || status === 'saving' ? <Button
-          variant="primary"
-          size="sm"
-          disabled={status === 'saving'}
-          onClick={() => {
-            setStatus('saving');
-            void save({
-              readableRoots: lines(draft.readableRoots),
-              writableRoots: lines(draft.writableRoots),
-              allowedCommandPrefixes: lines(draft.allowedCommandPrefixes),
-              deniedCommandPrefixes: lines(draft.deniedCommandPrefixes),
-            }).then(() => setStatus('saved')).catch(() => setStatus('error'));
-          }}
-        >
-          {t('settings.customPermissionSave')}
-        </Button> : null}
-      </div> : null}
+      {dirty || status !== 'idle' ? (
+        <div className="settings-actions settings-actions-split">
+          <span className="settings-save-status" role="status" data-status={status}>
+            {statusText}
+          </span>
+          {dirty || status === 'saving' ? (
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={status === 'saving'}
+              onClick={() => {
+                setStatus('saving');
+                void save({
+                  readableRoots: lines(draft.readableRoots),
+                  writableRoots: lines(draft.writableRoots),
+                  allowedCommandPrefixes: lines(draft.allowedCommandPrefixes),
+                  deniedCommandPrefixes: lines(draft.deniedCommandPrefixes),
+                })
+                  .then(() => setStatus('saved'))
+                  .catch(() => setStatus('error'));
+              }}
+            >
+              {t('settings.customPermissionSave')}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </SettingsSection>
   );
 };

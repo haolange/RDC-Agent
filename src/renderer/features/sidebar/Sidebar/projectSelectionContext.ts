@@ -45,14 +45,8 @@ export interface ProjectSelectionHandlerOpsContext extends ProjectSelectionLoade
     preferredSessionId?: string | null,
     options?: import('./types').LoadProjectsOptions,
   ) => Promise<void>;
-  loadSessions: (
-    project: ProjectRecord,
-    options?: import('./types').LoadSessionsOptions,
-  ) => Promise<void>;
-  selectSession: (
-    sessionId: string,
-    options?: import('./types').SelectSessionOptions,
-  ) => Promise<boolean>;
+  loadSessions: (project: ProjectRecord, options?: import('./types').LoadSessionsOptions) => Promise<void>;
+  selectSession: (sessionId: string, options?: import('./types').SelectSessionOptions) => Promise<boolean>;
   getCurrentProject: () => ProjectRecord | null;
   getCurrentSession: () => SessionRecord | null;
   getRightRailTarget: () => RightRailTarget;
@@ -73,10 +67,7 @@ export function captureSelectionSnapshot(): SelectionSnapshot {
   };
 }
 
-export function restoreSelectionSnapshot(
-  ctx: ProjectSelectionLoaderOpsContext,
-  snapshot: SelectionSnapshot,
-) {
+export function restoreSelectionSnapshot(ctx: ProjectSelectionLoaderOpsContext, snapshot: SelectionSnapshot) {
   ctx.setCurrentProject(snapshot.currentProject);
   ctx.setCurrentSessionId(snapshot.currentSessionId);
   ctx.setRightRailTarget(snapshot.rightRailTarget);
@@ -86,4 +77,3 @@ export function restoreSelectionSnapshot(
     useSessionProjectionStore.getState().activateSession(snapshot.currentSessionId);
   }
 }
-

@@ -22,13 +22,14 @@ export function ChromeThemeCard(props: {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   const presetOptions = useMemo(
-    () => THEME_PRESET_CATALOG.map((preset) => ({
-      value: preset.id,
-      label: preset.label,
-      // The selected preset previews the live accent; the others show their own.
-      swatchColor: preset.id === props.chrome.presetId ? props.chrome.accent : preset[props.variant].accent,
-      testId: `appearance-preset-option-${props.variant}-${preset.id}`,
-    })),
+    () =>
+      THEME_PRESET_CATALOG.map((preset) => ({
+        value: preset.id,
+        label: preset.label,
+        // The selected preset previews the live accent; the others show their own.
+        swatchColor: preset.id === props.chrome.presetId ? props.chrome.accent : preset[props.variant].accent,
+        testId: `appearance-preset-option-${props.variant}-${preset.id}`,
+      })),
     [props.chrome.accent, props.chrome.presetId, props.variant],
   );
 
@@ -47,9 +48,7 @@ export function ChromeThemeCard(props: {
     }
   };
 
-  const title = props.variant === 'light'
-    ? t('settings.appearanceLightTheme')
-    : t('settings.appearanceDarkTheme');
+  const title = props.variant === 'light' ? t('settings.appearanceLightTheme') : t('settings.appearanceDarkTheme');
 
   return (
     <div className="appearance-chrome-card" data-testid={`appearance-chrome-${props.variant}`}>

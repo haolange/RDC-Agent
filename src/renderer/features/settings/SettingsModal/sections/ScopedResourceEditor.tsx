@@ -47,7 +47,11 @@ export const ScopedResourceEditor: React.FC<{
   const fieldId = useId();
   const kindLabel = t(kindLabelKey(kind));
   return (
-    <div className="settings-runtime-editor settings-manifest-editor" data-testid="settings-runtime-editor" data-resource-kind={kind}>
+    <div
+      className="settings-runtime-editor settings-manifest-editor"
+      data-testid="settings-runtime-editor"
+      data-resource-kind={kind}
+    >
       {showHeader ? (
         <div className="settings-manifest-editor-head">
           <div className="settings-section-title">
@@ -59,9 +63,17 @@ export const ScopedResourceEditor: React.FC<{
             ) : null}
           </div>
           <div className="settings-manifest-editor-actions">
-            {onDelete ? <Button variant="danger" disabled={busy} onClick={onDelete}>{t('settings.delete')}</Button> : null}
-            <Button variant="ghost" disabled={busy} onClick={onCancel}>{t('settings.cancel')}</Button>
-            <Button variant="primary" disabled={busy} onClick={onSave}>{t('settings.scopeSave')}</Button>
+            {onDelete ? (
+              <Button variant="danger" disabled={busy} onClick={onDelete}>
+                {t('settings.delete')}
+              </Button>
+            ) : null}
+            <Button variant="ghost" disabled={busy} onClick={onCancel}>
+              {t('settings.cancel')}
+            </Button>
+            <Button variant="primary" disabled={busy} onClick={onSave}>
+              {t('settings.scopeSave')}
+            </Button>
           </div>
         </div>
       ) : null}
@@ -81,8 +93,13 @@ export const ScopedResourceEditor: React.FC<{
 
         <SettingsField label={t('settings.resourceFieldId')} htmlFor={`${fieldId}-id`}>
           <div className="settings-runtime-id-control">
-            <Input id={`${fieldId}-id`} value={form.id} disabled={idLocked || busy} placeholder={templateResourceId(kind)}
-              onChange={(event) => onChange({ id: event.target.value })} />
+            <Input
+              id={`${fieldId}-id`}
+              value={form.id}
+              disabled={idLocked || busy}
+              placeholder={templateResourceId(kind)}
+              onChange={(event) => onChange({ id: event.target.value })}
+            />
             {idLocked ? (
               <span className="settings-runtime-readonly-tag" data-testid="settings-resource-id-locked">
                 <Icon name="lock" size={12} />
@@ -98,7 +115,8 @@ export const ScopedResourceEditor: React.FC<{
             label={kind === 'skill' ? t('settings.resourceFieldSkillMd') : t('settings.resourceFieldContent')}
           >
             <Textarea
-              sizing="fill" className="settings-resource-document-input"
+              sizing="fill"
+              className="settings-resource-document-input"
               aria-label={kind === 'skill' ? t('settings.resourceFieldSkillMd') : t('settings.resourceFieldContent')}
               value={form.body}
               disabled={busy}
@@ -124,9 +142,16 @@ export const ScopedResourceEditor: React.FC<{
         </p>
       ) : null}
       {notice ? (
-        notice.tone === 'error'
-          ? <InlineError data-testid="settings-runtime-editor-error" detail={notice.detail}>{notice.message}</InlineError>
-          : <p className="settings-runtime-editor-status" role="status"><Icon name="check" size={14} />{notice.message}</p>
+        notice.tone === 'error' ? (
+          <InlineError data-testid="settings-runtime-editor-error" detail={notice.detail}>
+            {notice.message}
+          </InlineError>
+        ) : (
+          <p className="settings-runtime-editor-status" role="status">
+            <Icon name="check" size={14} />
+            {notice.message}
+          </p>
+        )
       ) : null}
     </div>
   );

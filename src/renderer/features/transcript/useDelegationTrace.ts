@@ -7,20 +7,37 @@ const empty: DelegationTracePage = { header: null, steps: [], nextCursor: null, 
 const PAGE_SIZE = 40;
 
 function sameIdentity(a: DelegationTraceHeader | null, b: DelegationTraceHeader | null): boolean {
-  return !!a && !!b && a.childSessionId === b.childSessionId
-    && a.executionId === b.executionId && a.generation === b.generation;
+  return (
+    !!a &&
+    !!b &&
+    a.childSessionId === b.childSessionId &&
+    a.executionId === b.executionId &&
+    a.generation === b.generation
+  );
 }
 
-function mergeSteps(previous: DelegationTraceStep[], incoming: DelegationTraceStep[], prepend: boolean): DelegationTraceStep[] {
+function mergeSteps(
+  previous: DelegationTraceStep[],
+  incoming: DelegationTraceStep[],
+  prepend: boolean,
+): DelegationTraceStep[] {
   const byId = new Map(previous.map((step) => [step.id, step]));
   for (const step of incoming) byId.set(step.id, step);
-  const ids = [...new Set(prepend
-    ? [...incoming.map((step) => step.id), ...previous.map((step) => step.id)]
-    : [...previous.map((step) => step.id), ...incoming.map((step) => step.id)])];
+  const ids = [
+    ...new Set(
+      prepend
+        ? [...incoming.map((step) => step.id), ...previous.map((step) => step.id)]
+        : [...previous.map((step) => step.id), ...incoming.map((step) => step.id)],
+    ),
+  ];
   return ids.map((id) => byId.get(id)!);
 }
 
-export function useDelegationTrace(sessionId: string | null | undefined, parentToolCallId: string, historyOpen: boolean) {
+export function useDelegationTrace(
+  sessionId: string | null | undefined,
+  parentToolCallId: string,
+  historyOpen: boolean,
+) {
   const api = useElectronApi();
   const [page, setPage] = React.useState<DelegationTracePage>(empty);
   const [headerLoading, setHeaderLoading] = React.useState(Boolean(sessionId));
@@ -66,19 +83,31 @@ export function useDelegationTrace(sessionId: string | null | undefined, parentT
       const identityChanged = previous.header && head.header && !sameIdentity(previous.header, head.header);
       if (identityChanged) setEarliest(null);
       setPage((current) => ({ ...head, steps: identityChanged ? [] : current.steps }));
-      if (!historyOpen || !head.header) { setLoading(false); return; }
+      if (!historyOpen || !head.header) {
+        setLoading(false);
+        return;
+      }
       const loaded = state.current.earliest !== null && !identityChanged;
       const start = loaded ? 0 : Math.max(0, head.total - PAGE_SIZE);
-      const next = await api.conversation.getDelegationTrace({ sessionId, parentToolCallId,
-        cursor: start, pageSize: loaded ? 120 : PAGE_SIZE,
-        ...(loaded ? { sinceRevision: previous.revision } : {}) });
+      const next = await api.conversation.getDelegationTrace({
+        sessionId,
+        parentToolCallId,
+        cursor: start,
+        pageSize: loaded ? 120 : PAGE_SIZE,
+        ...(loaded ? { sinceRevision: previous.revision } : {}),
+      });
       if (superseded() || !sameIdentity(head.header, next.header)) return;
       if (loaded) {
         const updates = [...next.steps];
         let cursor = next.nextCursor;
         while (cursor !== null && !superseded()) {
-          const remaining = await api.conversation.getDelegationTrace({ sessionId, parentToolCallId,
-            cursor, pageSize: 120, sinceRevision: previous.revision });
+          const remaining = await api.conversation.getDelegationTrace({
+            sessionId,
+            parentToolCallId,
+            cursor,
+            pageSize: 120,
+            sinceRevision: previous.revision,
+          });
           updates.push(...remaining.steps);
           cursor = remaining.nextCursor;
         }
@@ -88,12 +117,16 @@ export function useDelegationTrace(sessionId: string | null | undefined, parentT
         setEarliest(start);
       }
       if (!superseded()) setLoading(false);
-    })().catch(() => { if (!superseded()) {
-      setHeaderLoading(false);
-      setLoading(false);
-      setPage((current) => ({ ...current, error: 'DELEGATION_TRACE_READ_FAILED' }));
-    } });
-    return () => { reads.forget('trace'); };
+    })().catch(() => {
+      if (!superseded()) {
+        setHeaderLoading(false);
+        setLoading(false);
+        setPage((current) => ({ ...current, error: 'DELEGATION_TRACE_READ_FAILED' }));
+      }
+    });
+    return () => {
+      reads.forget('trace');
+    };
   }, [reads, api, sessionId, parentToolCallId, historyOpen, revision]);
 
   const loadEarlier = React.useCallback(async () => {
@@ -101,15 +134,28 @@ export function useDelegationTrace(sessionId: string | null | undefined, parentT
     setLoading(true);
     try {
       const start = Math.max(0, earliest - PAGE_SIZE);
-      const earlier = await api.conversation.getDelegationTrace({ sessionId, parentToolCallId,
-        cursor: start, pageSize: earliest - start });
+      const earlier = await api.conversation.getDelegationTrace({
+        sessionId,
+        parentToolCallId,
+        cursor: start,
+        pageSize: earliest - start,
+      });
       if (!sameIdentity(state.current.page.header, earlier.header)) return;
       setPage((current) => ({ ...current, steps: mergeSteps(current.steps, earlier.steps, true) }));
       setEarliest(start);
-    } catch { setPage((current) => ({ ...current, error: 'DELEGATION_TRACE_READ_FAILED' })); }
-    finally { setLoading(false); }
+    } catch {
+      setPage((current) => ({ ...current, error: 'DELEGATION_TRACE_READ_FAILED' }));
+    } finally {
+      setLoading(false);
+    }
   }, [api, sessionId, parentToolCallId, earliest, loading]);
 
-  return { page, loading, headerLoading, hasEarlier: earliest !== null && earliest > 0, loadEarlier,
-    retry: () => setRevision((current) => current + 1) };
+  return {
+    page,
+    loading,
+    headerLoading,
+    hasEarlier: earliest !== null && earliest > 0,
+    loadEarlier,
+    retry: () => setRevision((current) => current + 1),
+  };
 }

@@ -1,5 +1,3 @@
-
-
 /** A tool call the model requested: the one call shape main's loop and the shared runtime events use. */
 export interface ToolCall {
   id: string;

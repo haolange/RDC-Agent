@@ -1,5 +1,16 @@
 import * as fs from 'fs';
-import { type ChallengeRecord, type ClaimRecord, type ClaimSet, type EvidencePack, type EvidenceRecord, type ExperimentRecord, type InvestigationArtifactKind, type InvestigationArtifactStatus, type InvestigationRecord, type WorldState } from '@shared/types/renderdocInvestigation';
+import {
+  type ChallengeRecord,
+  type ClaimRecord,
+  type ClaimSet,
+  type EvidencePack,
+  type EvidenceRecord,
+  type ExperimentRecord,
+  type InvestigationArtifactKind,
+  type InvestigationArtifactStatus,
+  type InvestigationRecord,
+  type WorldState,
+} from '@shared/types/renderdocInvestigation';
 import { formatSessionArtifactUri } from '../sessions/artifacts/sessionArtifactContract';
 import { INVESTIGATION_SCHEMA_NAMESPACE } from './investigationKindRegistry';
 
@@ -23,13 +34,7 @@ export interface InvestigationIndexDocument {
   artifacts: InvestigationIndexEntry[];
 }
 
-type RecordKeySpace =
-  | 'world_state'
-  | 'evidence'
-  | 'claim'
-  | 'experiment'
-  | 'challenge'
-  | 'checkpoint';
+type RecordKeySpace = 'world_state' | 'evidence' | 'claim' | 'experiment' | 'challenge' | 'checkpoint';
 
 export function emptyIndex(): InvestigationIndexDocument {
   return { schemaVersion: INVESTIGATION_SCHEMA_NAMESPACE, artifacts: [] };
@@ -85,7 +90,11 @@ export function recordKeyToken(key: { space: RecordKeySpace; id: string }): stri
 
 export function collectSupersedeChain(artifacts: InvestigationIndexEntry[], startId?: string): Set<string> {
   const chain = new Set<string>();
-  for (let current = startId; current && !chain.has(current); current = artifacts.find((entry) => entry.artifactId === current)?.supersedes) {
+  for (
+    let current = startId;
+    current && !chain.has(current);
+    current = artifacts.find((entry) => entry.artifactId === current)?.supersedes
+  ) {
     chain.add(current);
   }
   return chain;

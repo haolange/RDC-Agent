@@ -20,7 +20,9 @@ const check = async (name) => {
   const report = await page.evaluate(inspectPage);
   const problems = report.small.length + report.lowContrast.length + (report.overflow ? 1 : 0);
   failures += problems;
-  console.log(`[readability] ${name}: small=${report.small.length} contrast=${report.lowContrast.length} overflow=${report.overflow}`);
+  console.log(
+    `[readability] ${name}: small=${report.small.length} contrast=${report.lowContrast.length} overflow=${report.overflow}`,
+  );
   for (const line of [...report.small, ...report.lowContrast].slice(0, 12)) console.log(`  - ${line}`);
 };
 

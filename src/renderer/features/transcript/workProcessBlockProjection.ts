@@ -36,7 +36,10 @@ export interface ThinkingItemPresentation {
 export interface LoopProjectionDeps {
   resolveOutputPhase: (block: ConversationWorkBlock) => ConversationLoopOutputPhase;
   resolveReasoningState: (block: ConversationWorkBlock) => ConversationReasoningState;
-  resolveThinkingItem: (block: ConversationWorkBlock, item: ConversationThinkingItem) => ThinkingItemPresentation | null;
+  resolveThinkingItem: (
+    block: ConversationWorkBlock,
+    item: ConversationThinkingItem,
+  ) => ThinkingItemPresentation | null;
   isNonFinalStopReason: (stopReason?: ConversationLoopStopReason) => boolean;
   normalizeThinkingDedupKey: (value: string) => string;
   createApprovalRow: (block: ConversationWorkBlock) => WorkProcessRow;
@@ -83,12 +86,20 @@ export function buildPresentationUnits(
     const block = blocks[blockIndex];
 
     if (block.kind === 'llm_turn') {
-      const unit = projectLlmTurn(block, deps, ctx, snapshotsByLoop.get(block.id), interactionsByLoop.get(block.id), superseded.has(block.id));
+      const unit = projectLlmTurn(
+        block,
+        deps,
+        ctx,
+        snapshotsByLoop.get(block.id),
+        interactionsByLoop.get(block.id),
+        superseded.has(block.id),
+      );
       if (unit) units.push(unit);
       continue;
     }
 
-    if (!groupedSnapshots.has(block.id) && !groupedInteractions.has(block.id)) pushStandaloneBlock(block, units, deps, ctx);
+    if (!groupedSnapshots.has(block.id) && !groupedInteractions.has(block.id))
+      pushStandaloneBlock(block, units, deps, ctx);
   }
 
   return units;

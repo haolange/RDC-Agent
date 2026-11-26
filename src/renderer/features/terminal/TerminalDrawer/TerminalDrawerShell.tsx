@@ -9,11 +9,7 @@ interface TerminalDrawerShellProps {
   body: React.ReactNode;
 }
 
-export const TerminalDrawerShell: React.FC<TerminalDrawerShellProps> = ({
-  vm,
-  toolbar,
-  body,
-}) => {
+export const TerminalDrawerShell: React.FC<TerminalDrawerShellProps> = ({ vm, toolbar, body }) => {
   const {
     t,
     terminalHeight,
@@ -89,9 +85,7 @@ export const TerminalDrawerShell: React.FC<TerminalDrawerShellProps> = ({
 
       {toolbar}
 
-      <div className="runtime-terminal-workspace-body">
-        {body}
-      </div>
+      <div className="runtime-terminal-workspace-body">{body}</div>
     </section>
   );
 };

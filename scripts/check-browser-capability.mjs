@@ -6,7 +6,7 @@ require('./register-ts-source.cjs');
 function fail(message) {
   console.error(`[browser-capability] ${message}`);
   throw new Error(message);
-};
+}
 
 function main() {
   const { RENDERER_INVOKE_CHANNEL_TABLE } = require('../src/shared/renderer-api/channels.ts');

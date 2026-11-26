@@ -6,10 +6,7 @@ import {
   isRendererEventChannel,
   isRendererInvokeChannel,
 } from './index';
-import type {
-  RendererApiTransport,
-  RendererEventCallback,
-} from './transport';
+import type { RendererApiTransport, RendererEventCallback } from './transport';
 import type { RendererEventChannel, RendererInvokeChannel } from './channels';
 
 class RecordingTransport implements RendererApiTransport {
@@ -143,9 +140,7 @@ describe('canonical renderer API', () => {
     api.on('internal:event' as RendererEventChannel, callback);
     api.off('internal:event' as RendererEventChannel, callback);
 
-    expect(transport.invocations.map(({ channel }) => channel).sort()).toEqual(
-      [...RENDERER_INVOKE_CHANNELS].sort(),
-    );
+    expect(transport.invocations.map(({ channel }) => channel).sort()).toEqual([...RENDERER_INVOKE_CHANNELS].sort());
     expect(new Set(transport.addedListeners)).toEqual(new Set(RENDERER_EVENT_CHANNELS));
     expect(new Set(transport.removedListeners)).toEqual(new Set(RENDERER_EVENT_CHANNELS));
     expect(transport.addedListeners).toHaveLength(addedBeforeUnknown);
@@ -155,7 +150,13 @@ describe('canonical renderer API', () => {
   it('scopes device preparation and carries only main-issued confirmation tokens', async () => {
     const transport = new RecordingTransport();
     const api = createRendererApi('win32', transport);
-    const request = { projectId: 'p', sessionId: 's', bindingGeneration: 4, deviceId: 'android', confirmationToken: 'once' };
+    const request = {
+      projectId: 'p',
+      sessionId: 's',
+      bindingGeneration: 4,
+      deviceId: 'android',
+      confirmationToken: 'once',
+    };
     await api.device.prepare(request);
     await api.device.cancelPreparation({ projectId: 'p', sessionId: 's', bindingGeneration: 4 });
     expect(transport.invocations).toEqual([

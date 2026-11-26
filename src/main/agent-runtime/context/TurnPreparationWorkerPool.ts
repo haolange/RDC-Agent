@@ -29,10 +29,7 @@ export class TurnPreparationWorkerPool {
 
   constructor(private readonly maxWorkers = 2) {}
 
-  async run(
-    input: TurnPreparationComputationInput,
-    signal?: AbortSignal,
-  ): Promise<TurnPreparationComputationResult> {
+  async run(input: TurnPreparationComputationInput, signal?: AbortSignal): Promise<TurnPreparationComputationResult> {
     if (signal?.aborted) throw new AppError('REQUEST_CANCELLED', 'request preparation was cancelled.');
     const workerPath = path.join(__dirname, 'turnPreparationWorker.js');
     // Only the bundle ships the compiled worker; running from source computes on this thread.
@@ -43,7 +40,11 @@ export class TurnPreparationWorkerPool {
     }
     return new Promise<TurnPreparationComputationResult>((resolve, reject) => {
       const task: PendingTask = {
-        id: this.nextTaskId++, input, signal, resolve, reject,
+        id: this.nextTaskId++,
+        input,
+        signal,
+        resolve,
+        reject,
         abort: () => this.abortTask(task),
       };
       signal?.addEventListener('abort', task.abort, { once: true });

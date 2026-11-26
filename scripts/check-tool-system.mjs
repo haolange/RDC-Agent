@@ -22,7 +22,11 @@ function walkSourceFiles(dir, out = []) {
       walkSourceFiles(full, out);
       continue;
     }
-    if (/\.(ts|tsx|js|mjs|cjs)$/.test(entry.name) && !entry.name.endsWith('.test.ts') && !entry.name.endsWith('.test.tsx')) {
+    if (
+      /\.(ts|tsx|js|mjs|cjs)$/.test(entry.name) &&
+      !entry.name.endsWith('.test.ts') &&
+      !entry.name.endsWith('.test.tsx')
+    ) {
       out.push(full);
     }
   }
@@ -37,7 +41,9 @@ function main() {
     REJECTED_TOOL_TOKENS,
   } = require('../src/shared/constants/agentToolTokens.ts');
   const { AGENT_WORKBENCH_TOOL_CATALOG } = require('../src/shared/constants/agentWorkbenchCatalog.ts');
-  const { WORK_PROCESS_TOOL_DISPLAY_CATALOG } = require('../src/renderer/features/transcript/workProcessToolCatalog.ts');
+  const {
+    WORK_PROCESS_TOOL_DISPLAY_CATALOG,
+  } = require('../src/renderer/features/transcript/workProcessToolCatalog.ts');
   const { parseAgentMarkdownStrict } = require('../src/main/settings/agent-manifests/agentManifestParse.ts');
 
   assert(
@@ -50,23 +56,17 @@ function main() {
   const workbenchSet = new Set(workbenchIds);
   assert(workbenchSet.size === workbenchIds.length, 'AGENT_WORKBENCH_TOOL_CATALOG has duplicate ids');
   assert(
-    builtinSet.size === workbenchSet.size
-      && [...builtinSet].every((id) => workbenchSet.has(id))
-      && [...workbenchSet].every((id) => builtinSet.has(id)),
+    builtinSet.size === workbenchSet.size &&
+      [...builtinSet].every((id) => workbenchSet.has(id)) &&
+      [...workbenchSet].every((id) => builtinSet.has(id)),
     `AGENT_WORKBENCH_TOOL_CATALOG ids must equal BUILTIN_AGENT_TOOL_IDS. missing=${[...builtinSet].filter((id) => !workbenchSet.has(id)).join(',')} extra=${[...workbenchSet].filter((id) => !builtinSet.has(id)).join(',')}`,
   );
 
   for (const id of BUILTIN_AGENT_TOOL_IDS) {
-    assert(
-      WORK_PROCESS_TOOL_DISPLAY_CATALOG[id],
-      `WORK_PROCESS_TOOL_DISPLAY_CATALOG must cover ${id}`,
-    );
+    assert(WORK_PROCESS_TOOL_DISPLAY_CATALOG[id], `WORK_PROCESS_TOOL_DISPLAY_CATALOG must cover ${id}`);
   }
 
-  const scanRoots = [
-    path.join(repoRoot, 'src'),
-    path.join(repoRoot, 'scripts'),
-  ];
+  const scanRoots = [path.join(repoRoot, 'src'), path.join(repoRoot, 'scripts')];
   const registrationResidues = [];
   for (const root of scanRoots) {
     for (const file of walkSourceFiles(root)) {
@@ -74,10 +74,10 @@ function main() {
       if (relative === 'src/shared/constants/agentToolTokens.ts') continue;
       const source = fs.readFileSync(file, 'utf8');
       if (
-        /name:\s*['"]search_codebase['"]/.test(source)
-        || /['"]search_codebase['"]\s*:\s*\{/.test(source)
-        || /register(?:Tool|ed)?\([^)]*search_codebase/.test(source)
-        || /tools?\.push\([^)]*search_codebase/.test(source)
+        /name:\s*['"]search_codebase['"]/.test(source) ||
+        /['"]search_codebase['"]\s*:\s*\{/.test(source) ||
+        /register(?:Tool|ed)?\([^)]*search_codebase/.test(source) ||
+        /tools?\.push\([^)]*search_codebase/.test(source)
       ) {
         registrationResidues.push(relative);
       }
@@ -106,8 +106,7 @@ function main() {
   );
 
   assert(
-    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.task)
-      && CANONICAL_TOOL_TOKEN_EXPANSIONS.task.includes('task_stop'),
+    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.task) && CANONICAL_TOOL_TOKEN_EXPANSIONS.task.includes('task_stop'),
     'CANONICAL_TOOL_TOKEN_EXPANSIONS.task must include task_stop',
   );
   assert(REJECTED_TOOL_TOKENS.todo, 'REJECTED_TOOL_TOKENS must include todo');
@@ -133,28 +132,25 @@ function main() {
   assert(BUILTIN_AGENT_TOOL_TIERS.read_file === 'core', 'read_file must stay core');
   assert(BUILTIN_AGENT_TOOL_TIERS.artifact_read === 'core', 'artifact_read must stay core');
   assert(
-    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.read)
-      && CANONICAL_TOOL_TOKEN_EXPANSIONS.read.includes('artifact_read')
-      && CANONICAL_TOOL_TOKEN_EXPANSIONS.read.includes('read_file')
-      && CANONICAL_TOOL_TOKEN_EXPANSIONS.read.includes('read_image'),
+    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.read) &&
+      CANONICAL_TOOL_TOKEN_EXPANSIONS.read.includes('artifact_read') &&
+      CANONICAL_TOOL_TOKEN_EXPANSIONS.read.includes('read_file') &&
+      CANONICAL_TOOL_TOKEN_EXPANSIONS.read.includes('read_image'),
     'CANONICAL_TOOL_TOKEN_EXPANSIONS.read must include read_file, read_image, artifact_read',
   );
   for (const orphan of ['delete_file', 'move_file', 'copy_file', 'notebook_edit', 'memory_write', 'memory_delete']) {
-    assert(
-      BUILTIN_AGENT_TOOL_TIERS[orphan] === 'extended',
-      `${orphan} must be extended (discovered via tool_search)`,
-    );
+    assert(BUILTIN_AGENT_TOOL_TIERS[orphan] === 'extended', `${orphan} must be extended (discovered via tool_search)`);
   }
   assert(
-    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS['file-manage'])
-      && ['delete_file', 'move_file', 'copy_file', 'notebook_edit']
-        .every((id) => CANONICAL_TOOL_TOKEN_EXPANSIONS['file-manage'].includes(id)),
+    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS['file-manage']) &&
+      ['delete_file', 'move_file', 'copy_file', 'notebook_edit'].every((id) =>
+        CANONICAL_TOOL_TOKEN_EXPANSIONS['file-manage'].includes(id),
+      ),
     'CANONICAL_TOOL_TOKEN_EXPANSIONS.file-manage must cover delete/move/copy/notebook_edit',
   );
   assert(
-    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS['memory-write'])
-      && ['memory_write', 'memory_delete']
-        .every((id) => CANONICAL_TOOL_TOKEN_EXPANSIONS['memory-write'].includes(id)),
+    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS['memory-write']) &&
+      ['memory_write', 'memory_delete'].every((id) => CANONICAL_TOOL_TOKEN_EXPANSIONS['memory-write'].includes(id)),
     'CANONICAL_TOOL_TOKEN_EXPANSIONS.memory-write must cover memory_write/memory_delete',
   );
   const knowledgeTools = [
@@ -165,8 +161,8 @@ function main() {
     'knowledge_candidate_create',
   ];
   assert(
-    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.knowledge)
-      && knowledgeTools.every((id) => CANONICAL_TOOL_TOKEN_EXPANSIONS.knowledge.includes(id)),
+    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.knowledge) &&
+      knowledgeTools.every((id) => CANONICAL_TOOL_TOKEN_EXPANSIONS.knowledge.includes(id)),
     'CANONICAL_TOOL_TOKEN_EXPANSIONS.knowledge must expand to the five Knowledge tools',
   );
   for (const id of knowledgeTools) {
@@ -175,8 +171,8 @@ function main() {
   }
   const investigationTools = ['investigation_read', 'investigation_write', 'investigation_list'];
   assert(
-    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.investigation)
-      && investigationTools.every((id) => CANONICAL_TOOL_TOKEN_EXPANSIONS.investigation.includes(id)),
+    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.investigation) &&
+      investigationTools.every((id) => CANONICAL_TOOL_TOKEN_EXPANSIONS.investigation.includes(id)),
     'CANONICAL_TOOL_TOKEN_EXPANSIONS.investigation must expand to the Investigation tools',
   );
   for (const id of investigationTools) {
@@ -184,16 +180,14 @@ function main() {
     assert(BUILTIN_AGENT_TOOL_TIERS[id] === 'extended', `${id} must be extended/deferred`);
   }
   assert(
-    !['knowledge_write', 'knowledge_promote', 'knowledge_update', 'knowledge_deprecate']
-      .some((id) => BUILTIN_AGENT_TOOL_IDS.includes(id)),
+    !['knowledge_write', 'knowledge_promote', 'knowledge_update', 'knowledge_deprecate'].some((id) =>
+      BUILTIN_AGENT_TOOL_IDS.includes(id),
+    ),
     'persistent Knowledge write tools must not be registered as agent tools',
   );
 
   // Context Window Phase 2：MCP deferred loading 计量 id 与前缀规则。
-  const sessionTypes = fs.readFileSync(
-    path.join(repoRoot, 'src/shared/types/session.ts'),
-    'utf8',
-  );
+  const sessionTypes = fs.readFileSync(path.join(repoRoot, 'src/shared/types/session.ts'), 'utf8');
   assert(
     /ContextUsageBreakdownId\s*=[\s\S]*?'mcp_tools_deferred'/.test(sessionTypes),
     'ContextUsageBreakdownId must include mcp_tools_deferred',
@@ -211,13 +205,9 @@ function main() {
     /export const MCP_TOOL_NAME_PREFIX\s*=\s*['"]mcp__['"]/.test(deferredTools),
     'deferredTools MCP_TOOL_NAME_PREFIX must be mcp__',
   );
-  const mcpManager = fs.readFileSync(
-    path.join(repoRoot, 'src/main/agent-runtime/agent/MCPManager.ts'),
-    'utf8',
-  );
+  const mcpManager = fs.readFileSync(path.join(repoRoot, 'src/main/agent-runtime/agent/MCPManager.ts'), 'utf8');
   assert(
-    /return toolName\.startsWith\(['"]mcp__['"]\)/.test(mcpManager)
-      || /startsWith\(['"]mcp__['"]\)/.test(mcpManager),
+    /return toolName\.startsWith\(['"]mcp__['"]\)/.test(mcpManager) || /startsWith\(['"]mcp__['"]\)/.test(mcpManager),
     'MCPManager isMCPTool must use mcp__ prefix',
   );
   assert(
@@ -230,7 +220,9 @@ function main() {
   );
   // tool_search must only discover the allowlist/runtime-policy filtered tool set.
   assert(
-    /createToolSearchTool\(\(\)\s*=>\s*\n?\s*Array\.from\(availableTools\.values\(\)\)\.filter/.test(runtimeToolAssembly),
+    /createToolSearchTool\(\(\)\s*=>\s*\n?\s*Array\.from\(availableTools\.values\(\)\)\.filter/.test(
+      runtimeToolAssembly,
+    ),
     'RuntimeToolAssembly tool_search closure must filter available tools by allowlist and runtime policy',
   );
 
@@ -240,10 +232,7 @@ function main() {
   );
   assert(!readFileTool.includes('session-artifacts'), 'read_file must not gain a session-artifacts allow path');
 
-  const contextManager = fs.readFileSync(
-    path.join(repoRoot, 'src/main/agent-runtime/agent/ContextManager.ts'),
-    'utf8',
-  );
+  const contextManager = fs.readFileSync(path.join(repoRoot, 'src/main/agent-runtime/agent/ContextManager.ts'), 'utf8');
   assert(
     !contextManager.includes('ToolResultSummarizer') && contextManager.includes('CONTEXT_CANNOT_FIT'),
     'ContextManager must preserve original evidence and reject an unsafe window instead of truncating tool results',
@@ -266,10 +255,7 @@ function main() {
     path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/ShellTool.ts'),
     'utf8',
   );
-  assert(
-    !shellTool.includes('run_in_background'),
-    'shell must not declare a disabled run_in_background parameter',
-  );
+  assert(!shellTool.includes('run_in_background'), 'shell must not declare a disabled run_in_background parameter');
 
   console.log('[tool-system] OK');
 }

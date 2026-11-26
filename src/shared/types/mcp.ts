@@ -9,12 +9,7 @@ export const MCP_TRANSPORTS = ['stdio', 'streamable-http'] as const;
  * MCP 连接状态。
  * `unknown`：已配置但运行时尚未尝试连接（仪表盘 / mcp 目录工具用）。
  */
-export type MCPConnectionStatus =
-  | 'disconnected'
-  | 'connecting'
-  | 'connected'
-  | 'error'
-  | 'unknown';
+export type MCPConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error' | 'unknown';
 
 /**
  * MCP 服务器运行时状态摘要。

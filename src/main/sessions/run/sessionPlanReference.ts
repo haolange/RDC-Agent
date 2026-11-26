@@ -5,34 +5,55 @@ import { planReviewStateStore } from './PlanReviewStateStore';
 import type { PlanReadRequest } from '@shared/types/planReview';
 import type { ConversationMessage, ConversationWorkBlock, ConversationToolCall } from '@shared/types/conversation';
 
-const collectCalls = (blocks: ConversationWorkBlock[]): ConversationToolCall[] => blocks.flatMap(block => block.toolCalls);
+const collectCalls = (blocks: ConversationWorkBlock[]): ConversationToolCall[] =>
+  blocks.flatMap((block) => block.toolCalls);
 
 function matchesPlanUri(request: PlanReadRequest, call: ConversationToolCall): boolean {
   if (call.planReview?.uri === request.uri) return true;
   const owner = call.delegatedRequest?.childSessionId ?? request.sessionId;
   const approved = planReviewStateStore.read(owner);
-  return approved?.status === 'approved' && approved.planId === request.planId && approved.revision === request.revision
-    && approved.frozenUri === request.uri && approved.approvedHash === request.expectedHash;
+  return (
+    approved?.status === 'approved' &&
+    approved.planId === request.planId &&
+    approved.revision === request.revision &&
+    approved.frozenUri === request.uri &&
+    approved.approvedHash === request.expectedHash
+  );
 }
 
 /** Resolve provenance from persisted history, never from mutable session settings. */
-export function resolvePlanReference(request: PlanReadRequest, history: (sessionId: string) => ConversationMessage[] =
-  (sessionId) => conversationHistoryStore.readConversationHistory(sessionId)) {
-  const matches = history(request.sessionId).flatMap(message =>
+export function resolvePlanReference(
+  request: PlanReadRequest,
+  history: (sessionId: string) => ConversationMessage[] = (sessionId) =>
+    conversationHistoryStore.readConversationHistory(sessionId),
+) {
+  const matches = history(request.sessionId).flatMap((message) =>
     collectCalls(message.workTrace?.blocks ?? [])
-      .filter(call => call.toolName === 'plan_artifact' && call.planReview?.planId === request.planId
-        && call.planReview.revision === request.revision && matchesPlanUri(request, call)
-        && call.planReview.hash === request.expectedHash)
-      .map(call => ({ message, call })));
+      .filter(
+        (call) =>
+          call.toolName === 'plan_artifact' &&
+          call.planReview?.planId === request.planId &&
+          call.planReview.revision === request.revision &&
+          matchesPlanUri(request, call) &&
+          call.planReview.hash === request.expectedHash,
+      )
+      .map((call) => ({ message, call })),
+  );
   if (matches.length !== 1) throw new AppError('PLAN_REFERENCE_DENIED', 'expected one persisted plan revision.');
   const { message, call } = matches[0];
   const ownerSessionId = call.delegatedRequest?.childSessionId ?? request.sessionId;
   const source = call.delegatedRequest
-    ? history(ownerSessionId).find(entry => entry.turnId === call.delegatedRequest!.turnId && entry.role === 'assistant')
+    ? history(ownerSessionId).find(
+        (entry) => entry.turnId === call.delegatedRequest!.turnId && entry.role === 'assistant',
+      )
     : message;
   if (!source?.agentId) throw new AppError('PLAN_PROVENANCE_MISSING', 'creating agent is unavailable.');
-  return { plan: call.planReview!, ownerSessionId, agentId: source.agentId,
-    turnId: call.delegatedRequest?.turnId ?? message.turnId };
+  return {
+    plan: call.planReview!,
+    ownerSessionId,
+    agentId: source.agentId,
+    turnId: call.delegatedRequest?.turnId ?? message.turnId,
+  };
 }
 
 export function readReferencedPlan(request: PlanReadRequest) {

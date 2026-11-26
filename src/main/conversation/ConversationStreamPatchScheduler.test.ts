@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConversationStreamPatchScheduler, type ConversationStreamPatchCommit } from './ConversationStreamPatchScheduler';
+import {
+  ConversationStreamPatchScheduler,
+  type ConversationStreamPatchCommit,
+} from './ConversationStreamPatchScheduler';
 
 describe('ConversationStreamPatchScheduler', () => {
   it('batches text patches and skips trace projection for token deltas', () => {
@@ -78,11 +81,7 @@ describe('ConversationStreamPatchScheduler', () => {
     scheduler.commitTerminal('message_completed', { status: 'complete', content: 'final' });
 
     expect(commits.map((commit) => commit.options.persist)).toEqual([true, true, true]);
-    expect(commits.map((commit) => commit.type)).toEqual([
-      'message_patched',
-      'message_patched',
-      'message_completed',
-    ]);
+    expect(commits.map((commit) => commit.type)).toEqual(['message_patched', 'message_patched', 'message_completed']);
     expect(commits[2].patch).toEqual({ status: 'complete', content: 'final' });
 
     vi.advanceTimersByTime(500);

@@ -36,7 +36,10 @@ export class StampedValue<T> {
   private entry: { stamp: string; value: T } | null = null;
   private revisionValue = 0;
 
-  constructor(private readonly stamp: () => string, private readonly load: () => T) {}
+  constructor(
+    private readonly stamp: () => string,
+    private readonly load: () => T,
+  ) {}
 
   get revision(): number {
     return this.revisionValue;

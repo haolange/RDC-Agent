@@ -64,9 +64,8 @@ export class AiSdkStreamingProvider implements ProviderStrategy {
   stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     const request = { providerApi: this.api, model, options, failure: sdkStreamFailure };
     return startProviderStream(request, async ({ builder, signal }) => {
-      if (options.requestPlan.effectiveModelId !== model.id) throw new Error(
-        `RequestPlan model ${options.requestPlan.effectiveModelId} does not match ${model.id}.`,
-      );
+      if (options.requestPlan.effectiveModelId !== model.id)
+        throw new Error(`RequestPlan model ${options.requestPlan.effectiveModelId} does not match ${model.id}.`);
       const languageModel = await this.createModel(model, context, options);
       const result = streamText({
         model: languageModel,
@@ -87,10 +86,15 @@ export class AiSdkStreamingProvider implements ProviderStrategy {
 
 function toAiSdkTools(context: Context): ToolSet | undefined {
   if (!context.tools?.length) return undefined;
-  return Object.fromEntries(context.tools.map((entry) => [entry.name, tool({
-    description: entry.description,
-    inputSchema: jsonSchema(entry.parameters as Parameters<typeof jsonSchema>[0]),
-  })]));
+  return Object.fromEntries(
+    context.tools.map((entry) => [
+      entry.name,
+      tool({
+        description: entry.description,
+        inputSchema: jsonSchema(entry.parameters as Parameters<typeof jsonSchema>[0]),
+      }),
+    ]),
+  );
 }
 
 function toModelMessages(messages: Message[]): ModelMessage[] {
@@ -98,17 +102,19 @@ function toModelMessages(messages: Message[]): ModelMessage[] {
     if (message.role === 'user') {
       return {
         role: 'user',
-        content: typeof message.content === 'string'
-          ? message.content
-          : message.content.map((block) => block.type === 'text'
-            ? { type: 'text' as const, text: block.text }
-            : { type: 'image' as const, image: block.data, mediaType: block.mimeType }),
+        content:
+          typeof message.content === 'string'
+            ? message.content
+            : message.content.map((block) =>
+                block.type === 'text'
+                  ? { type: 'text' as const, text: block.text }
+                  : { type: 'image' as const, image: block.data, mediaType: block.mimeType },
+              ),
       };
     }
     if (message.role === 'assistant') {
       const content: Array<
-        | { type: 'text'; text: string }
-        | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
+        { type: 'text'; text: string } | { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
       > = [];
       for (const block of message.content) {
         if (block.type === 'text') content.push({ type: 'text', text: block.text });
@@ -123,19 +129,29 @@ function toModelMessages(messages: Message[]): ModelMessage[] {
       }
       return { role: 'assistant', content };
     }
-    const content = message.content.map((block) => block.type === 'text'
-      ? { type: 'text' as const, text: block.text }
-      : { type: 'image-data' as const, data: block.data, mediaType: block.mimeType });
+    const content = message.content.map((block) =>
+      block.type === 'text'
+        ? { type: 'text' as const, text: block.text }
+        : { type: 'image-data' as const, data: block.data, mediaType: block.mimeType },
+    );
     return {
       role: 'tool',
-      content: [{
-        type: 'tool-result',
-        toolCallId: message.toolCallId,
-        toolName: message.toolName,
-        output: message.isError
-          ? { type: 'error-text', value: content.filter((part) => part.type === 'text').map((part) => part.text).join('\n') }
-          : { type: 'content', value: content },
-      }],
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: message.toolCallId,
+          toolName: message.toolName,
+          output: message.isError
+            ? {
+                type: 'error-text',
+                value: content
+                  .filter((part) => part.type === 'text')
+                  .map((part) => part.text)
+                  .join('\n'),
+              }
+            : { type: 'content', value: content },
+        },
+      ],
     };
   });
 }
@@ -148,10 +164,11 @@ async function consumeFullStream(
   const channels = new StreamChannelRefs(model.api);
   const toolCalls = new ToolCallAccumulator<string>(builder);
   let sawTextOrThinking = false;
-  const refFor = (id: string) => channels.ref({
-    providerBlockKey: `part:${id}`,
-    itemId: id,
-  });
+  const refFor = (id: string) =>
+    channels.ref({
+      providerBlockKey: `part:${id}`,
+      itemId: id,
+    });
   const thinkingInput = {
     kind: 'unknown' as const,
     source: 'unknown' as const,

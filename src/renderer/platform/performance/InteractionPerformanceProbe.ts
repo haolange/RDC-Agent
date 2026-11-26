@@ -36,9 +36,7 @@ export function summarizeInteractionPerformance(
   eventTimingSupported: boolean,
   longTaskSupported: boolean,
 ): InteractionPerformanceSnapshot {
-  const observedEventTimingSamples = eventTimingSupported
-    ? eventTimingSamples.slice(0, interactionCount)
-    : [];
+  const observedEventTimingSamples = eventTimingSupported ? eventTimingSamples.slice(0, interactionCount) : [];
   // Threshold-imputed estimate, not a measured latency for missing entries.
   // Missing entries can also be pending delivery or have an unavailable target.
   const unobservedInteractionCount = eventTimingSupported
@@ -48,9 +46,8 @@ export function summarizeInteractionPerformance(
     ...observedEventTimingSamples,
     ...Array.from({ length: unobservedInteractionCount }, () => EVENT_TIMING_THRESHOLD_MS),
   ].sort((left, right) => left - right);
-  const p95Index = sortedPointerSamples.length > 0
-    ? Math.max(0, Math.ceil(sortedPointerSamples.length * 0.95) - 1)
-    : -1;
+  const p95Index =
+    sortedPointerSamples.length > 0 ? Math.max(0, Math.ceil(sortedPointerSamples.length * 0.95) - 1) : -1;
   const pointerToPaintP95 = p95Index >= 0 ? sortedPointerSamples[p95Index] : undefined;
   const pointerToPaintMax = sortedPointerSamples.at(-1);
   const longTaskMax = longTaskSamples.length > 0 ? Math.max(...longTaskSamples) : undefined;
@@ -84,14 +81,15 @@ export function installInteractionPerformanceProbe(): () => void {
 
   const requestedScope = query.get('qaPerformanceScope');
   const scope = requestedScope === 'transcript' || requestedScope === 'devices' ? requestedScope : 'composer';
-  const selector = scope === 'transcript'
-    ? '[data-testid="conversation-thread"] button, [data-testid="conversation-thread"] summary'
-    : scope === 'devices'
-      ? '[data-testid="utility-device-selector-trigger"], [data-testid="utility-device-selector-dropdown"] button'
-      : COMPOSER_CONTROL_SELECTOR;
+  const selector =
+    scope === 'transcript'
+      ? '[data-testid="conversation-thread"] button, [data-testid="conversation-thread"] summary'
+      : scope === 'devices'
+        ? '[data-testid="utility-device-selector-trigger"], [data-testid="utility-device-selector-dropdown"] button'
+        : COMPOSER_CONTROL_SELECTOR;
   const requestedWindow = Number(query.get('qaPerformanceWindowMs'));
-  const windowMs = Number.isFinite(requestedWindow) && requestedWindow >= 1 && requestedWindow <= 300_000
-    ? requestedWindow : null;
+  const windowMs =
+    Number.isFinite(requestedWindow) && requestedWindow >= 1 && requestedWindow <= 300_000 ? requestedWindow : null;
   const installedAt = performance.now();
   const deadline = windowMs === null ? Infinity : installedAt + windowMs;
   document.documentElement.dataset.rdcQaPerformanceInstalled = 'true';
@@ -103,28 +101,36 @@ export function installInteractionPerformanceProbe(): () => void {
   let observationStartedAt: number | null = windowMs === null ? null : installedAt;
   let stoppedAt: number | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const eventTimingSupported = typeof PerformanceObserver !== 'undefined'
-    && PerformanceObserver.supportedEntryTypes.includes('event');
-  const longTaskSupported = typeof PerformanceObserver !== 'undefined'
-    && PerformanceObserver.supportedEntryTypes.includes('longtask');
+  const eventTimingSupported =
+    typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes.includes('event');
+  const longTaskSupported =
+    typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes.includes('longtask');
 
   const publish = () => {
-    document.documentElement.setAttribute(PERFORMANCE_ATTRIBUTE, JSON.stringify({
-      ...summarizeInteractionPerformance(
-        interactionCount, eventTimingSamples, longTaskSamples,
-        eventTimingSupported, longTaskSupported,
-      ),
-      scope,
-      longTaskScope: 'page',
-      eventTimingEstimation: 'missing-clicks-imputed-at-threshold',
-      eventTimingAttribution: 'connected-target-selector',
-      observationWindowMs: windowMs,
-      observationStartedAt,
-      observationEndedAt: stoppedAt,
-      observationDurationMs: observationStartedAt === null ? 0
-        : roundMilliseconds(Math.min(stoppedAt ?? performance.now(), deadline) - observationStartedAt),
-      status: stoppedAt === null ? 'recording' : 'stopped',
-    }));
+    document.documentElement.setAttribute(
+      PERFORMANCE_ATTRIBUTE,
+      JSON.stringify({
+        ...summarizeInteractionPerformance(
+          interactionCount,
+          eventTimingSamples,
+          longTaskSamples,
+          eventTimingSupported,
+          longTaskSupported,
+        ),
+        scope,
+        longTaskScope: 'page',
+        eventTimingEstimation: 'missing-clicks-imputed-at-threshold',
+        eventTimingAttribution: 'connected-target-selector',
+        observationWindowMs: windowMs,
+        observationStartedAt,
+        observationEndedAt: stoppedAt,
+        observationDurationMs:
+          observationStartedAt === null
+            ? 0
+            : roundMilliseconds(Math.min(stoppedAt ?? performance.now(), deadline) - observationStartedAt),
+        status: stoppedAt === null ? 'recording' : 'stopped',
+      }),
+    );
   };
   const consume = (entries: PerformanceEntry[]) => {
     for (const rawEntry of entries) {
@@ -152,9 +158,12 @@ export function installInteractionPerformanceProbe(): () => void {
     observer.observe(options);
     observers.push(observer);
   };
-  if (eventTimingSupported) observe({
-    type: 'event', buffered: true, durationThreshold: EVENT_TIMING_THRESHOLD_MS,
-  } as PerformanceObserverInit);
+  if (eventTimingSupported)
+    observe({
+      type: 'event',
+      buffered: true,
+      durationThreshold: EVENT_TIMING_THRESHOLD_MS,
+    } as PerformanceObserverInit);
   if (longTaskSupported) observe({ type: 'longtask', buffered: true });
 
   const onClick = (event: MouseEvent) => {

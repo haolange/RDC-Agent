@@ -14,7 +14,6 @@ import { appPathService } from './runtime/AppPathService';
  * Electron Main Process Entry
  */
 
-
 import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
 import { projectWorkspaceStore, sessionRecordStore } from './sessions/store/sessionStores';
 import { rdcSessionService } from './rdc/RdcSessionService';
@@ -46,10 +45,7 @@ import { conversationService } from './conversation/ConversationService';
 import { agentOrchestrator } from './agent-runtime/orchestration/agentRuntimeRoot';
 import { processSupervisor } from './runtime/ProcessSupervisor';
 import { turnCoordinator } from './agent-runtime/orchestration/TurnCoordinator';
-import {
-  bindWindowLayoutPersistence,
-  resolveWindowCreationOptions,
-} from './window/windowLayoutPersistence';
+import { bindWindowLayoutPersistence, resolveWindowCreationOptions } from './window/windowLayoutPersistence';
 import { bindProductIcon } from './window/productIcon';
 import { reportSettingsStartupFailure } from './window/settingsStartupFailure';
 import { resolvedAppearanceMode, windowBackgroundColor } from './window/appearanceChrome';
@@ -83,7 +79,11 @@ let shutdownExitCode = 0;
 let settingsInitialized = false;
 
 function registerShutdownDisposables(): void {
-  shutdownCoordinator.register({ id: 'oauth.dispose', phase: 'terminate_processes', dispose: () => providerAccountAuthService.dispose() });
+  shutdownCoordinator.register({
+    id: 'oauth.dispose',
+    phase: 'terminate_processes',
+    dispose: () => providerAccountAuthService.dispose(),
+  });
   shutdownCoordinator.register({
     id: 'conversation.stop-accepting',
     phase: 'stop_accepting_turns',
@@ -197,21 +197,22 @@ function createDisposableBrowserQaUserData(): string {
 function isValidatedDisposableBrowserQaUserData(targetPath: string): boolean {
   const resolved = path.resolve(targetPath);
   const relativePath = path.relative(qaUserDataRoot, resolved);
-  return relativePath !== ''
-    && !relativePath.startsWith('..')
-    && !path.isAbsolute(relativePath)
-    && qaDisposableUserDataPattern.test(path.basename(resolved));
+  return (
+    relativePath !== '' &&
+    !relativePath.startsWith('..') &&
+    !path.isAbsolute(relativePath) &&
+    qaDisposableUserDataPattern.test(path.basename(resolved))
+  );
 }
 
 const explicitUserDataPath = process.env.RDC_AGENT_USER_DATA?.trim();
-const useDisposableBrowserQaUserData = isBrowserQa
-  && !explicitUserDataPath
-  && process.env.RDC_AGENT_USE_CANONICAL_USERDATA !== '1';
+const useDisposableBrowserQaUserData =
+  isBrowserQa && !explicitUserDataPath && process.env.RDC_AGENT_USE_CANONICAL_USERDATA !== '1';
 const userDataPath = useDisposableBrowserQaUserData
   ? createDisposableBrowserQaUserData()
   : resolveCanonicalUserDataPath(explicitUserDataPath, app.getPath('appData'));
-const cleanupDisposableBrowserQaUserData = useDisposableBrowserQaUserData
-  && isValidatedDisposableBrowserQaUserData(userDataPath);
+const cleanupDisposableBrowserQaUserData =
+  useDisposableBrowserQaUserData && isValidatedDisposableBrowserQaUserData(userDataPath);
 process.env.RDC_AGENT_USER_DATA = userDataPath;
 fs.mkdirSync(userDataPath, { recursive: true });
 if (useDisposableBrowserQaUserData) {
@@ -224,13 +225,16 @@ app.commandLine.appendSwitch('user-data-dir', userDataPath);
 app.setPath('userData', userDataPath);
 // Installed once userData is fixed, so the runtime log lands in this instance's log file.
 installProcessFaultHandlers();
-console.log('[RDC-Agent] Startup identity:', JSON.stringify({
-  version: app.getVersion(),
-  carrier: isHeadlessMode ? 'browser' : app.isPackaged ? 'packaged-desktop' : 'source-desktop',
-  application: app.getAppPath(),
-  userData: userDataPath,
-  userResources: appPathService.getUserRdcRoot(),
-}));
+console.log(
+  '[RDC-Agent] Startup identity:',
+  JSON.stringify({
+    version: app.getVersion(),
+    carrier: isHeadlessMode ? 'browser' : app.isPackaged ? 'packaged-desktop' : 'source-desktop',
+    application: app.getAppPath(),
+    userData: userDataPath,
+    userResources: appPathService.getUserRdcRoot(),
+  }),
+);
 
 const userDataLock = acquireUserDataInstanceLock(userDataPath, {
   ...currentProcessIdentity(),
@@ -240,8 +244,8 @@ const userDataLock = acquireUserDataInstanceLock(userDataPath, {
 if (!userDataLock.acquired) {
   const owner = userDataLock.owner;
   console.error(
-    `[RDC-Agent] userData is already in use${owner ? ` by pid ${owner.pid} (${owner.mode})` : ''}`
-    + `: ${userDataPath}`,
+    `[RDC-Agent] userData is already in use${owner ? ` by pid ${owner.pid} (${owner.mode})` : ''}` +
+      `: ${userDataPath}`,
   );
   app.exit(1);
 } else {
@@ -252,7 +256,9 @@ if (!userDataLock.acquired) {
       try {
         fs.rmSync(userDataPath, { recursive: true, force: true });
       } catch (error) {
-        console.warn(`[RDC-Agent] Failed to clean disposable Browser QA userData: ${error instanceof Error ? error.message : String(error)}`);
+        console.warn(
+          `[RDC-Agent] Failed to clean disposable Browser QA userData: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -300,7 +306,6 @@ app.on('second-instance', () => {
   mainWindow.focus();
 });
 
-
 function emitWindowMaximizedState(): void {
   if (!mainWindow) return;
   rendererEventHub.emit('window:maximized-changed', mainWindow.isMaximized());
@@ -319,9 +324,7 @@ function getDevRendererUrl(): string {
 async function openRdcFiles(): Promise<void> {
   const result = await dialog.showOpenDialog({
     title: nativeMessage('selectCaptures'),
-    filters: [
-      { name: nativeMessage('captureFilter'), extensions: ['rdc'] },
-    ],
+    filters: [{ name: nativeMessage('captureFilter'), extensions: ['rdc'] }],
     properties: ['openFile', 'multiSelections'],
   });
 
@@ -412,7 +415,8 @@ function createMainWindow(): void {
     // Production mode loads the bundled renderer.
     const rendererEntry = path.join(__dirname, '../renderer/index.html');
     trustRendererEntry(pathToFileURL(rendererEntry).href);
-    mainWindow.loadFile(rendererEntry, { query: { theme: bootTheme } })
+    mainWindow
+      .loadFile(rendererEntry, { query: { theme: bootTheme } })
       .catch((error: unknown) => reportProcessFault('Renderer failed to load', error));
   }
 
@@ -437,8 +441,12 @@ function createMainWindow(): void {
   });
 
   mainWindow.webContents.on('console-message', (details) => {
-    console.log('[RendererConsole]', { level: details.level, message: details.message,
-      line: details.lineNumber, sourceId: details.sourceId });
+    console.log('[RendererConsole]', {
+      level: details.level,
+      message: details.message,
+      line: details.lineNumber,
+      sourceId: details.sourceId,
+    });
   });
 
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
@@ -460,96 +468,107 @@ function createMainWindow(): void {
   setupKeyboardShortcuts(mainWindow);
   installApplicationMenu({
     openRdcFiles,
-    newCase: () => { rendererEventHub.emit('case:new'); mainWindow?.webContents.send('case:new'); },
-    openSettings: () => { rendererEventHub.emit('settings:open'); mainWindow?.webContents.send('settings:open'); },
+    newCase: () => {
+      rendererEventHub.emit('case:new');
+      mainWindow?.webContents.send('case:new');
+    },
+    openSettings: () => {
+      rendererEventHub.emit('settings:open');
+      mainWindow?.webContents.send('settings:open');
+    },
   });
 }
 
 // App lifecycle.
-app.whenReady().then(async () => {
-  installRendererSecurityPolicy();
-  try {
-    settingsService.initialize();
-  } catch (error) {
-    if (!(error instanceof SettingsFileError)) throw error;
-    // An unusable settings file is never converted or repaired: the user deletes it and reconfigures in Settings.
-    console.error('[Main] Settings file cannot be used:', error);
-    reportSettingsStartupFailure(error.filePath, isHeadlessMode);
-    shutdownExitCode = 1;
-    app.quit();
-    return;
-  }
-  settingsInitialized = true;
+app
+  .whenReady()
+  .then(async () => {
+    installRendererSecurityPolicy();
+    try {
+      settingsService.initialize();
+    } catch (error) {
+      if (!(error instanceof SettingsFileError)) throw error;
+      // An unusable settings file is never converted or repaired: the user deletes it and reconfigures in Settings.
+      console.error('[Main] Settings file cannot be used:', error);
+      reportSettingsStartupFailure(error.filePath, isHeadlessMode);
+      shutdownExitCode = 1;
+      app.quit();
+      return;
+    }
+    settingsInitialized = true;
 
-  await projectWorkspaceStore.initializeWorkspace();
-  onJsonlTailRepair((repair) => runtimeLogService.log({
-    scope: 'app',
-    namespace: 'system',
-    severity: 'warning',
-    title: 'Interrupted record set aside',
-    summary: `An incomplete final record (${repair.length} bytes) was moved out of ${repair.filePath}.`,
-    raw: { ...repair },
-  }));
-  runtimeLogService.log({
-    scope: 'app',
-    namespace: 'system',
-    severity: 'info',
-    title: 'App ready',
-    summary: 'RDC Agent 主进程已启动。',
-    raw: {
-      workspaceRoot: projectWorkspaceStore.getWorkspacePath(),
-    },
-  });
-
-  registerIPCHandlers();
-
-  // Initialize main process services.
-  await initializeServices();
-  if (isBrowserQa) {
-    const bridgeUrl = await startBrowserAppBridge({
-      devRendererUrl: isDev ? getDevRendererUrl() : null,
-      rendererRoot: path.join(__dirname, '../renderer'),
-      mainBundlePath: path.join(__dirname, 'index.js'),
-      appVersion: app.getVersion(),
-    });
+    await projectWorkspaceStore.initializeWorkspace();
+    onJsonlTailRepair((repair) =>
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'system',
+        severity: 'warning',
+        title: 'Interrupted record set aside',
+        summary: `An incomplete final record (${repair.length} bytes) was moved out of ${repair.filePath}.`,
+        raw: { ...repair },
+      }),
+    );
     runtimeLogService.log({
       scope: 'app',
       namespace: 'system',
-      severity: 'success',
-      title: 'Browser app session ready',
-      summary: `浏览器真实会话入口已启动：${bridgeUrl}/app`,
-      raw: { bridgeUrl, userDataPath },
+      severity: 'info',
+      title: 'App ready',
+      summary: 'RDC Agent 主进程已启动。',
+      raw: {
+        workspaceRoot: projectWorkspaceStore.getWorkspacePath(),
+      },
     });
-    if (isHeadlessMode) {
-      // Headless QA has no renderer window. The bridge plus this timer keep
-      // Electron alive without creating a GPU-backed hidden BrowserWindow.
-      headlessKeepAliveTimer = setInterval(() => {
-        // Keep Electron's main process alive while Browser QA is connected.
-      }, 60_000);
-      console.log(`[BrowserAppBridge] Headless mode enabled without a renderer window.`);
+
+    registerIPCHandlers();
+
+    // Initialize main process services.
+    await initializeServices();
+    if (isBrowserQa) {
+      const bridgeUrl = await startBrowserAppBridge({
+        devRendererUrl: isDev ? getDevRendererUrl() : null,
+        rendererRoot: path.join(__dirname, '../renderer'),
+        mainBundlePath: path.join(__dirname, 'index.js'),
+        appVersion: app.getVersion(),
+      });
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'system',
+        severity: 'success',
+        title: 'Browser app session ready',
+        summary: `浏览器真实会话入口已启动：${bridgeUrl}/app`,
+        raw: { bridgeUrl, userDataPath },
+      });
+      if (isHeadlessMode) {
+        // Headless QA has no renderer window. The bridge plus this timer keep
+        // Electron alive without creating a GPU-backed hidden BrowserWindow.
+        headlessKeepAliveTimer = setInterval(() => {
+          // Keep Electron's main process alive while Browser QA is connected.
+        }, 60_000);
+        console.log(`[BrowserAppBridge] Headless mode enabled without a renderer window.`);
+      }
+    } else if (isHeadlessMode) {
+      console.error('[RDC-Agent] Headless mode requires the browser app bridge.');
+      shutdownExitCode = 1;
+      app.quit();
+      return;
     }
-  } else if (isHeadlessMode) {
-    console.error('[RDC-Agent] Headless mode requires the browser app bridge.');
-    shutdownExitCode = 1;
-    app.quit();
-    return;
-  }
 
-  if (!isHeadlessMode) {
-    createMainWindow();
-  }
-
-  // macOS: recreate the window when the dock icon is clicked.
-  app.on('activate', () => {
-    if (!isHeadlessMode && BrowserWindow.getAllWindows().length === 0) {
+    if (!isHeadlessMode) {
       createMainWindow();
     }
+
+    // macOS: recreate the window when the dock icon is clicked.
+    app.on('activate', () => {
+      if (!isHeadlessMode && BrowserWindow.getAllWindows().length === 0) {
+        createMainWindow();
+      }
+    });
+  })
+  .catch((error: unknown) => {
+    console.error('[Main] Startup failed:', error);
+    shutdownExitCode = 1;
+    app.quit();
   });
-}).catch((error: unknown) => {
-  console.error('[Main] Startup failed:', error);
-  shutdownExitCode = 1;
-  app.quit();
-});
 
 // Quit after all windows close on Windows/Linux.
 app.on('window-all-closed', () => {
@@ -605,7 +624,7 @@ async function initializeServices(): Promise<void> {
     // SettingsService is initialized lazily by this access.
     const hasConfiguredProvider = settingsService.hasConfiguredProvider();
     console.log('[Main] SettingsService initialized, hasConfiguredProvider:', hasConfiguredProvider);
-    
+
     await rdcCliInvokerService.getRuntimeSummary();
     console.log('[Main] RDC-Tool CLI invoker initialized');
     // Harvest logs its own failures and unconfirmed state; a failure there never stops the rest of startup.
@@ -627,7 +646,7 @@ async function initializeServices(): Promise<void> {
       title: 'RDC-Tool CLI invoker ready',
       summary: 'RDC-Tool CLI invoker 诊断已加载。',
     });
-    
+
     await initializeIpcState();
     console.log('[Main] IPC state initialized');
 

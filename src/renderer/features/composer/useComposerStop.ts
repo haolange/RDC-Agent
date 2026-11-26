@@ -31,14 +31,7 @@ export function useComposerStop(options: {
   setPendingAttachments?: Dispatch<SetStateAction<PendingAttachmentDraft[]>>;
   setPendingSkillIds?: Dispatch<SetStateAction<string[]>>;
 }) {
-  const {
-    t,
-    currentSession,
-    currentRun,
-    setPromptValue,
-    setPendingAttachments,
-    setPendingSkillIds,
-  } = options;
+  const { t, currentSession, currentRun, setPromptValue, setPendingAttachments, setPendingSkillIds } = options;
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   // The session whose Stop main has not answered yet: its button shows the pending icon from the click on.
   const [stoppingSessionId, setStoppingSessionId] = useState<string | null>(null);
@@ -51,16 +44,14 @@ export function useComposerStop(options: {
     try {
       useComposerSessionContextStore.getState().setIsPromptSending(false);
       const activeTurn = useComposerSessionContextStore.getState().activeTurn;
-      const turnOwnership: ActiveTurnOwnership | null = (
-        activeTurn
-        && activeTurn.sessionId === (currentSession?.sessionId ?? 'no-session')
+      const turnOwnership: ActiveTurnOwnership | null =
+        activeTurn && activeTurn.sessionId === (currentSession?.sessionId ?? 'no-session')
           ? {
-            sessionId: activeTurn.sessionId,
-            requestId: activeTurn.requestId,
-            agentId: activeTurn.agentId,
-          }
-          : null
-      );
+              sessionId: activeTurn.sessionId,
+              requestId: activeTurn.requestId,
+              agentId: activeTurn.agentId,
+            }
+          : null;
       const requestId = turnOwnership?.requestId ?? null;
       const conversation = useConversationStore.getState();
       const activeAssistant = selectActiveAssistantForTurn(
@@ -83,23 +74,23 @@ export function useComposerStop(options: {
         turnId: turnId ?? undefined,
       });
 
-      const workflowStopPromise = currentRun
-        && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running'].includes(currentRun.status)
-        ? (setCurrentRun({ ...currentRun, status: 'stopping' }), electronAPI.workflow.stop(currentRun.runId))
-        : null;
+      const workflowStopPromise =
+        currentRun &&
+        ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running'].includes(currentRun.status)
+          ? (setCurrentRun({ ...currentRun, status: 'stopping' }), electronAPI.workflow.stop(currentRun.runId))
+          : null;
 
       const cancelResult = await cancelPromise;
 
       if (cancelResult.success && cancelResult.phase === 'preparing') {
-        const revokedRequestId = requestId
-          ?? cancelResult.cancelledRequestId
-          ?? activeAssistant?.requestId
-          ?? null;
+        const revokedRequestId = requestId ?? cancelResult.cancelledRequestId ?? activeAssistant?.requestId ?? null;
         if (revokedRequestId) {
           conversation.markRequestRevoked(revokedRequestId);
-          useConversationStore.getState().setConversationMessages(
-            removeRequestMessages(useConversationStore.getState().allConversationMessages, revokedRequestId),
-          );
+          useConversationStore
+            .getState()
+            .setConversationMessages(
+              removeRequestMessages(useConversationStore.getState().allConversationMessages, revokedRequestId),
+            );
         }
         if (setPromptValue && setPendingAttachments && setPendingSkillIds) {
           restoreLastSentIfCurrentSession(currentSession?.sessionId, (lastSent) => {
@@ -120,8 +111,14 @@ export function useComposerStop(options: {
         return;
       }
 
-      await reconcileConversationStop({ conversationAPI: electronAPI.conversation, cancelResult,
-        sessionId: currentSession?.sessionId, activeAssistant, activeTurn, turnOwnership });
+      await reconcileConversationStop({
+        conversationAPI: electronAPI.conversation,
+        cancelResult,
+        sessionId: currentSession?.sessionId,
+        activeAssistant,
+        activeTurn,
+        turnOwnership,
+      });
 
       // Do not block notice on workflow stop latency.
       if (workflowStopPromise) {

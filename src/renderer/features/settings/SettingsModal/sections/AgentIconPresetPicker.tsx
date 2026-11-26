@@ -13,10 +13,7 @@ interface AgentIconPresetPickerProps {
   onChange: (value: ModeIconKey) => void;
 }
 
-export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
-  value,
-  onChange,
-}) => {
+export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({ value, onChange }) => {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -30,11 +27,16 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
     const items = Array.from(gridRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? []);
     if (items.length === 0) return;
     const current = items.indexOf(document.activeElement as HTMLButtonElement);
-    const next = event.key === 'Home' ? 0
-      : event.key === 'End' ? items.length - 1
-        : ['ArrowDown', 'ArrowRight'].includes(event.key) ? (current + 1 + items.length) % items.length
-          : ['ArrowUp', 'ArrowLeft'].includes(event.key) ? (current - 1 + items.length) % items.length
-            : null;
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? items.length - 1
+          : ['ArrowDown', 'ArrowRight'].includes(event.key)
+            ? (current + 1 + items.length) % items.length
+            : ['ArrowUp', 'ArrowLeft'].includes(event.key)
+              ? (current - 1 + items.length) % items.length
+              : null;
     if (next === null) return;
     event.preventDefault();
     items[next]?.focus();
@@ -47,13 +49,13 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
       align="start"
       className="settings-agent-icon-popover"
       label={t('settings.chooseAgentIcon')}
-      trigger={(
+      trigger={
         <Button variant="secondary" className="settings-agent-icon-trigger" aria-haspopup="menu">
           <ModeGlyph mode="general" icon={value} size={16} strokeWidth={1.9} />
           <span>{t('settings.changeAgentIcon')}</span>
           <Chevron direction="down" />
         </Button>
-      )}
+      }
     >
       <div className="settings-agent-icon-popover-title">{t('settings.chooseAgentIcon')}</div>
       <div

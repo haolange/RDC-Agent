@@ -8,27 +8,52 @@ import { ApprovedPlanHandoff } from './ApprovedPlanHandoff';
 
 vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (key: string) => key, language: 'en' }) }));
 let root: Root;
-const offer = { agent: 'general', label: 'Execute', prompt: 'Execute plan', send: true, planHash: 'a'.repeat(64), planId: 'plan-a', revision: 2, planUri: 'session://plans/plan-a/2.md', planTitle: 'Plan A' };
+const offer = {
+  agent: 'general',
+  label: 'Execute',
+  prompt: 'Execute plan',
+  send: true,
+  planHash: 'a'.repeat(64),
+  planId: 'plan-a',
+  revision: 2,
+  planUri: 'session://plans/plan-a/2.md',
+  planTitle: 'Plan A',
+};
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  usePlanReviewStore.getState().reset(); useComposerSessionContextStore.getState().resetForSessionSwitch();
-  const host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  usePlanReviewStore.getState().reset();
+  useComposerSessionContextStore.getState().resetForSessionSwitch();
+  const host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
 });
-afterEach(async () => { await act(async () => root.unmount()); document.body.replaceChildren(); vi.unstubAllGlobals(); });
+afterEach(async () => {
+  await act(async () => root.unmount());
+  document.body.replaceChildren();
+  vi.unstubAllGlobals();
+});
 
 it('requires an explicit click and binds the queued handoff to the displayed approved plan', async () => {
-  usePlanReviewStore.getState().accept({ sessionId: 's', projectionVersion: 1, review: null, recoverable: null, approvedHandoff: offer });
+  usePlanReviewStore
+    .getState()
+    .accept({ sessionId: 's', projectionVersion: 1, review: null, recoverable: null, approvedHandoff: offer });
   await act(async () => root.render(createElement(ApprovedPlanHandoff, { sessionId: 's', disabled: false })));
   expect(useComposerSessionContextStore.getState().handoffSuggestionRequest).toBeNull();
   const button = document.querySelector<HTMLButtonElement>('button')!;
   expect(button.textContent).toContain('Execute');
   await act(async () => button.click());
-  expect(useComposerSessionContextStore.getState().handoffSuggestionRequest).toMatchObject({ sessionId: 's', agentId: 'general', approvedPlan: { planId: 'plan-a', revision: 2, hash: offer.planHash } });
+  expect(useComposerSessionContextStore.getState().handoffSuggestionRequest).toMatchObject({
+    sessionId: 's',
+    agentId: 'general',
+    approvedPlan: { planId: 'plan-a', revision: 2, hash: offer.planHash },
+  });
   expect(button.disabled).toBe(true);
 });
 
 it('hides another session’s action and disables continuation while the composer is busy', async () => {
-  usePlanReviewStore.getState().accept({ sessionId: 's', projectionVersion: 1, review: null, recoverable: null, approvedHandoff: offer });
+  usePlanReviewStore
+    .getState()
+    .accept({ sessionId: 's', projectionVersion: 1, review: null, recoverable: null, approvedHandoff: offer });
   await act(async () => root.render(createElement(ApprovedPlanHandoff, { sessionId: 'other', disabled: false })));
   expect(document.querySelector('button')).toBeNull();
   await act(async () => root.render(createElement(ApprovedPlanHandoff, { sessionId: 's', disabled: true })));

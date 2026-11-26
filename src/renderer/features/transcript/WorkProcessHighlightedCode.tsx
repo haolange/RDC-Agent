@@ -19,9 +19,11 @@ export const WorkProcessHighlightedCode: React.FC<{
 
   return (
     <pre className={`work-process-highlighted-code${collapsed ? ' is-collapsed' : ''}`}>
-      {html === null
-        ? <code className={`hljs language-${language}`}>{source}</code>
-        : <code className={`hljs language-${language}`} dangerouslySetInnerHTML={{ __html: html }} />}
+      {html === null ? (
+        <code className={`hljs language-${language}`}>{source}</code>
+      ) : (
+        <code className={`hljs language-${language}`} dangerouslySetInnerHTML={{ __html: html }} />
+      )}
     </pre>
   );
 };

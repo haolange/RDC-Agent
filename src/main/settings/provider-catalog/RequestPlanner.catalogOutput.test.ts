@@ -4,10 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveTurnOutputTokens } from '@shared/utils/contextBudget';
 import { compileProviderCatalog } from '../../provider-catalog/catalogCompiler';
 import { loadProviderCatalogManifestInput } from '../../provider-catalog/manifestLoader';
-import {
-  parseDeclarativeCatalog,
-  toDeclarativeCatalogContributions,
-} from './DeclarativeCatalogDiscovery';
+import { parseDeclarativeCatalog, toDeclarativeCatalogContributions } from './DeclarativeCatalogDiscovery';
 import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
 import { parseChatGptAccountCatalog } from './LiveProviderCatalogParsers';
 import { planModelRequest } from './RequestPlanner';
@@ -16,9 +13,9 @@ import type { LlmProviderProtocol } from '@shared/types/settings';
 import type { EffectiveModel, CatalogModelRoute } from '@shared/types/providerCapability';
 import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
 
-const compiledCatalog = compileProviderCatalog(loadProviderCatalogManifestInput(
-  resolve(__dirname, '../../../shared/provider-catalog/manifests'),
-));
+const compiledCatalog = compileProviderCatalog(
+  loadProviderCatalogManifestInput(resolve(__dirname, '../../../shared/provider-catalog/manifests')),
+);
 
 function fixture(name: string): unknown {
   return JSON.parse(readFileSync(resolve(__dirname, '../fixtures/provider-catalogs', name), 'utf8')) as unknown;
@@ -84,27 +81,33 @@ function mergeModels(input: {
       observedAt: '2026-08-22T00:00:00.000Z',
       models: input.catalog,
     },
-    ...(input.discovery ? {
-      discovery: {
-        source: 'discovery',
-        observedAt: '2026-08-22T00:00:00.000Z',
-        models: input.discovery,
-      },
-    } : {}),
-    ...(input.user ? {
-      user: {
-        source: 'user',
-        observedAt: '2026-08-22T00:00:00.000Z',
-        models: input.user,
-      },
-    } : {}),
-    ...(input.userOverride ? {
-      userOverride: {
-        source: 'user',
-        observedAt: '2026-08-22T00:00:00.000Z',
-        models: input.userOverride,
-      },
-    } : {}),
+    ...(input.discovery
+      ? {
+          discovery: {
+            source: 'discovery',
+            observedAt: '2026-08-22T00:00:00.000Z',
+            models: input.discovery,
+          },
+        }
+      : {}),
+    ...(input.user
+      ? {
+          user: {
+            source: 'user',
+            observedAt: '2026-08-22T00:00:00.000Z',
+            models: input.user,
+          },
+        }
+      : {}),
+    ...(input.userOverride
+      ? {
+          userOverride: {
+            source: 'user',
+            observedAt: '2026-08-22T00:00:00.000Z',
+            models: input.userOverride,
+          },
+        }
+      : {}),
   });
 }
 
@@ -112,20 +115,20 @@ function expectSendableOutput(model: EffectiveModel, catalogModels: EffectiveMod
   const sendable = { ...model, availability: 'available' as const, enabled: true };
   const result = planModelRequest({
     model: sendable,
-    catalogModels: catalogModels.map((entry) => (
-      entry.modelId === model.modelId ? sendable : entry
-    )),
+    catalogModels: catalogModels.map((entry) => (entry.modelId === model.modelId ? sendable : entry)),
     requireAgentToolEligibility: false,
   });
   expect(result.ok, `${model.providerId}/${model.modelId} ${result.ok ? '' : result.message}`).toBe(true);
   if (!result.ok) return;
   expect(result.plan.maxOutputTokens).toBeGreaterThan(0);
   expect(result.plan.contextWindowTokens).toBeGreaterThan(0);
-  expect(resolveTurnOutputTokens({
-    contextWindowTokens: result.plan.contextWindowTokens,
-    maxOutputTokens: result.plan.maxOutputTokens,
-    promptTokens: 256,
-  })).toBeGreaterThan(0);
+  expect(
+    resolveTurnOutputTokens({
+      contextWindowTokens: result.plan.contextWindowTokens,
+      maxOutputTokens: result.plan.maxOutputTokens,
+      promptTokens: 256,
+    }),
+  ).toBeGreaterThan(0);
 }
 
 describe('catalog output planning', () => {
@@ -161,15 +164,20 @@ describe('catalog output planning', () => {
   });
 
   it('plans ChatGPT Account live rows that only report an input window', () => {
-    const parsed = parseChatGptAccountCatalog({
-      models: [{
-        slug: 'gpt-5.6-sol',
-        visibility: 'list',
-        supported_in_api: true,
-        context_window: 272_000,
-        max_context_window: 272_000,
-      }],
-    }, { models: [] });
+    const parsed = parseChatGptAccountCatalog(
+      {
+        models: [
+          {
+            slug: 'gpt-5.6-sol',
+            visibility: 'list',
+            supported_in_api: true,
+            context_window: 272_000,
+            max_context_window: 272_000,
+          },
+        ],
+      },
+      { models: [] },
+    );
     const [model] = mergeModels({
       providerId: 'chatgpt-account',
       protocol: 'OpenAIResponses',
@@ -186,44 +194,64 @@ describe('catalog output planning', () => {
     expect(planned).toMatchObject({ ok: true, plan: { maxOutputTokens: 272_000, contextWindowTokens: 272_000 } });
   });
 
-  it.each([undefined, ['text'], ['text', 'image']])('preserves manifest vision through ChatGPT discovery %j', (input_modalities) => {
-    const definition = compiledCatalog.surfaces.get('chatgpt-account')!.surface.models.find((model) => model.modelId === 'gpt-5.6-sol')!;
-    const live = parseChatGptAccountCatalog({ models: [{ slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true, input_modalities }] }, { models: [] });
-    const [model] = mergeModels({
-      providerId: 'chatgpt-account', protocol: 'OpenAIResponses', baseUrl: definition.route.baseUrl!,
-      catalog: [definition], discovery: live.contributions,
-    });
-    expect(model.visionInput.state).toBe('supported');
-    expect(model.toolCalling.state).toBe('supported');
-    expect(model.structuredOutput.state).toBe('supported');
-  });
+  it.each([undefined, ['text'], ['text', 'image']])(
+    'preserves manifest vision through ChatGPT discovery %j',
+    (input_modalities) => {
+      const definition = compiledCatalog.surfaces
+        .get('chatgpt-account')!
+        .surface.models.find((model) => model.modelId === 'gpt-5.6-sol')!;
+      const live = parseChatGptAccountCatalog(
+        { models: [{ slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true, input_modalities }] },
+        { models: [] },
+      );
+      const [model] = mergeModels({
+        providerId: 'chatgpt-account',
+        protocol: 'OpenAIResponses',
+        baseUrl: definition.route.baseUrl!,
+        catalog: [definition],
+        discovery: live.contributions,
+      });
+      expect(model.visionInput.state).toBe('supported');
+      expect(model.toolCalling.state).toBe('supported');
+      expect(model.structuredOutput.state).toBe('supported');
+    },
+  );
 
   it('keeps a compiled output cap when live ChatGPT rows omit max_output_tokens', () => {
-    const live = parseChatGptAccountCatalog({
-      models: [{
-        slug: 'gpt-5.6-sol',
-        visibility: 'list',
-        supported_in_api: true,
-        context_window: 272_000,
-      }],
-    }, { models: [] });
+    const live = parseChatGptAccountCatalog(
+      {
+        models: [
+          {
+            slug: 'gpt-5.6-sol',
+            visibility: 'list',
+            supported_in_api: true,
+            context_window: 272_000,
+          },
+        ],
+      },
+      { models: [] },
+    );
     const [model] = mergeModels({
       providerId: 'chatgpt-account',
       protocol: 'OpenAIResponses',
       baseUrl: 'https://chatgpt.com/backend-api/codex',
-      catalog: [{
-        modelId: 'gpt-5.6-sol',
-        availability: 'available',
-        contextTiers: [{
-          id: 'default',
-          label: 'Compiled',
-          maxPromptTokens: 256_000,
-          maxOutputTokens: 64_000,
-          activation: { kind: 'implicit' },
-          entitlement: 'granted',
-        }],
-        defaultBudgetTokens: 256_000,
-      }],
+      catalog: [
+        {
+          modelId: 'gpt-5.6-sol',
+          availability: 'available',
+          contextTiers: [
+            {
+              id: 'default',
+              label: 'Compiled',
+              maxPromptTokens: 256_000,
+              maxOutputTokens: 64_000,
+              activation: { kind: 'implicit' },
+              entitlement: 'granted',
+            },
+          ],
+          defaultBudgetTokens: 256_000,
+        },
+      ],
       discovery: live.contributions,
     });
     expect(model.contextTiers.find((tier) => tier.id === 'default')).toMatchObject({
@@ -236,8 +264,10 @@ describe('catalog output planning', () => {
   it('plans declarative /models rows with or without live max_output_tokens', () => {
     const fireworksSurface = compiledCatalog.surfaces.get('fireworks-ai')?.surface;
     const githubSurface = compiledCatalog.surfaces.get('github-models')?.surface;
-    if (fireworksSurface?.discovery.strategy?.kind !== 'json-catalog'
-      || githubSurface?.discovery.strategy?.kind !== 'json-catalog') {
+    if (
+      fireworksSurface?.discovery.strategy?.kind !== 'json-catalog' ||
+      githubSurface?.discovery.strategy?.kind !== 'json-catalog'
+    ) {
       throw new Error('Missing declarative discovery fixtures');
     }
 
@@ -291,19 +321,23 @@ describe('catalog output planning', () => {
       baseUrl: 'http://localhost:4312/v1',
       catalogOwnership: 'user-managed',
       catalog: [],
-      user: [{
-        modelId: 'window-only-custom',
-        label: 'Window only',
-        availability: 'available',
-        contextTiers: [{
-          id: 'default',
-          label: 'Default',
-          maxPromptTokens: 128_000,
-          activation: { kind: 'implicit' },
-          entitlement: 'unknown',
-        }],
-        defaultBudgetTokens: 128_000,
-      }],
+      user: [
+        {
+          modelId: 'window-only-custom',
+          label: 'Window only',
+          availability: 'available',
+          contextTiers: [
+            {
+              id: 'default',
+              label: 'Default',
+              maxPromptTokens: 128_000,
+              activation: { kind: 'implicit' },
+              entitlement: 'unknown',
+            },
+          ],
+          defaultBudgetTokens: 128_000,
+        },
+      ],
     });
     expect(model.contextTiers[0]).not.toHaveProperty('maxOutputTokens');
     const planned = planModelRequest({

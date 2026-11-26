@@ -67,7 +67,9 @@ describe('SecretStorageService fail-closed', () => {
     fs.writeFileSync(filePath, '{not-json', 'utf8');
 
     for (let read = 0; read < 2; read += 1) {
-      expect(() => secretStorageService.hasSecretRecord('provider-test-api-key')).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+      expect(() => secretStorageService.hasSecretRecord('provider-test-api-key')).toThrow(
+        expect.objectContaining({ code: 'STORAGE_CORRUPT' }),
+      );
     }
     expect(fs.readFileSync(filePath, 'utf8')).toBe('{not-json');
     expect(fs.readdirSync(secretsPath).filter((entry) => entry.includes('.corrupt-'))).toHaveLength(1);
@@ -99,7 +101,8 @@ describe('SecretStorageService fail-closed', () => {
     secretStorageService.setSecret('provider-test-api-key', 'sk-first');
     const decrypt = vi.spyOn(safeStorage, 'decryptString');
     const reads = vi.spyOn(fs, 'readFileSync');
-    for (let read = 0; read < 3; read += 1) expect(secretStorageService.getSecret('provider-test-api-key')).toBe('sk-first');
+    for (let read = 0; read < 3; read += 1)
+      expect(secretStorageService.getSecret('provider-test-api-key')).toBe('sk-first');
     expect(decrypt).toHaveBeenCalledTimes(1);
     expect(reads).not.toHaveBeenCalled();
     const revision = secretStorageService.revision;

@@ -51,9 +51,6 @@ export function resolveSelectedContextProfile(
     contextWindowTokens,
     contextBudgetTokens,
     maxOutputTokens,
-    compactionThresholdTokens: resolveCompactionThresholdTokens(
-      contextBudgetTokens,
-      compactionThresholdPercent,
-    ),
+    compactionThresholdTokens: resolveCompactionThresholdTokens(contextBudgetTokens, compactionThresholdPercent),
   };
 }

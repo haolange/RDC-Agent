@@ -72,9 +72,13 @@ function mapInvestigationReadError(error: unknown): InvestigationReadIpcResult {
 
 export function registerInvestigationHandlers(context: WorkbenchIpcContext): void {
   ipcMain.handle('investigation:list', (_event, ...rawArgs: unknown[]) => {
-    const [request] = parseIpcArgs(InvestigationListArgsSchema, rawArgs, { label: 'investigation:list', maxBytes: 4096 });
+    const [request] = parseIpcArgs(InvestigationListArgsSchema, rawArgs, {
+      label: 'investigation:list',
+      maxBytes: 4096,
+    });
     const denied = assertActiveInvestigationOwner(context.state, request.sessionId);
-    if (denied || request.projectId !== context.state.currentProjectId) throw new AppError('INVESTIGATION_SESSION_DENIED');
+    if (denied || request.projectId !== context.state.currentProjectId)
+      throw new AppError('INVESTIGATION_SESSION_DENIED');
     return listInvestigationArtifacts(request.sessionId, request.cursor);
   });
   ipcMain.handle('investigation:read', async (_event, ...rawArgs: unknown[]) => {

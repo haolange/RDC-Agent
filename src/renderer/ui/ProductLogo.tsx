@@ -8,12 +8,15 @@ const LOGO_SIZE = 128;
 let source: Promise<HTMLImageElement> | undefined;
 
 function loadLogo(): Promise<HTMLImageElement> {
-  return source ??= new Promise((resolve, reject) => {
+  return (source ??= new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => { source = undefined; reject(new Error('Product logo could not be loaded.')); };
+    image.onerror = () => {
+      source = undefined;
+      reject(new Error('Product logo could not be loaded.'));
+    };
     image.src = logoUrl;
-  });
+  }));
 }
 
 export function ProductLogo({ accent, className = '' }: { accent: string; className?: string }) {

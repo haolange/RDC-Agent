@@ -10,10 +10,7 @@ export async function runRuntimeHooks(
   return hookEngine.trigger(event, { ...context, event });
 }
 
-export async function dispatchRuntimeHooks(
-  event: HookEvent,
-  context: Omit<HookContext, 'event'>,
-): Promise<boolean> {
+export async function dispatchRuntimeHooks(event: HookEvent, context: Omit<HookContext, 'event'>): Promise<boolean> {
   const results = await runRuntimeHooks(event, context);
   return results.every((result) => result.allowed);
 }

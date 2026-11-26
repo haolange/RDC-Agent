@@ -19,8 +19,9 @@ const removedPaths = [
 ];
 for (const relativePath of removedPaths) {
   const absolutePath = path.join(repoRoot, relativePath);
-  const existsWithContent = fs.existsSync(absolutePath)
-    && (!fs.statSync(absolutePath).isDirectory() || fs.readdirSync(absolutePath).length > 0);
+  const existsWithContent =
+    fs.existsSync(absolutePath) &&
+    (!fs.statSync(absolutePath).isDirectory() || fs.readdirSync(absolutePath).length > 0);
   if (existsWithContent) {
     fail(`removed Catalog path returned: ${relativePath}`);
   }
@@ -46,7 +47,10 @@ if (settingsTypes.includes("'image-generation'") || settingsTypes.includes("'vid
 if (/export type LlmProviderCategory\s*=[\s\S]*?\|\s*'image'/.test(settingsTypes)) {
   fail('settings.ts must not include LlmProviderCategory image');
 }
-const catalogSchema = fs.readFileSync(path.join(repoRoot, 'src/shared/provider-catalog/catalogManifestSchema.ts'), 'utf8');
+const catalogSchema = fs.readFileSync(
+  path.join(repoRoot, 'src/shared/provider-catalog/catalogManifestSchema.ts'),
+  'utf8',
+);
 if (catalogSchema.includes("'image-generation'") || catalogSchema.includes("'video-generation'")) {
   fail('catalogManifestSchema must not declare image/video generation capabilities');
 }
@@ -92,12 +96,16 @@ for (const directory of ['identities', 'profiles', 'surfaces']) {
   }
 }
 
-const registrySource = fs.readFileSync(path.join(repoRoot, 'src/main/provider-catalog/ProviderCatalogRegistry.ts'), 'utf8');
+const registrySource = fs.readFileSync(
+  path.join(repoRoot, 'src/main/provider-catalog/ProviderCatalogRegistry.ts'),
+  'utf8',
+);
 if (!registrySource.includes("from 'virtual:rdc-provider-catalog-index'")) {
   fail('ProviderCatalogRegistry must consume the compiled virtual index and lazy surface chunks');
 }
 for (const forbidden of ['manifestLoader', 'compileProviderCatalog(', 'src/shared/provider-catalog/manifests']) {
-  if (registrySource.includes(forbidden)) fail(`ProviderCatalogRegistry contains a source-manifest runtime fallback: ${forbidden}`);
+  if (registrySource.includes(forbidden))
+    fail(`ProviderCatalogRegistry contains a source-manifest runtime fallback: ${forbidden}`);
 }
 
 const liveParserSource = fs.readFileSync(
@@ -118,11 +126,17 @@ for (const forbidden of [
   }
 }
 
-const settingsSource = fs.readFileSync(path.join(repoRoot, 'src/main/settings/settings-core/SettingsService.ts'), 'utf8');
+const settingsSource = fs.readFileSync(
+  path.join(repoRoot, 'src/main/settings/settings-core/SettingsService.ts'),
+  'utf8',
+);
 if (settingsSource.includes('discoveryPolicyId ===')) {
   fail('SettingsService must derive persistence from the authority matrix, not parser policy ids');
 }
-const connectionSource = fs.readFileSync(path.join(repoRoot, 'src/main/settings/provider-auth/ProviderConnectionService.ts'), 'utf8');
+const connectionSource = fs.readFileSync(
+  path.join(repoRoot, 'src/main/settings/provider-auth/ProviderConnectionService.ts'),
+  'utf8',
+);
 if (connectionSource.includes("provider.id === 'moonshot'")) {
   fail('Moonshot discovery must use its declarative manifest instead of a Provider id branch');
 }

@@ -81,7 +81,8 @@ const SEARCH_PROVIDERS: SearchProvider[] = [
 export const webFetchTool: AgentTool<WebFetchParams, WebFetchDetails> = {
   name: 'web_fetch',
   label: 'Fetch Web Page',
-  description: 'Fetch a public UTF-8 HTTP(S) source (at most 2 MiB) in 160 KiB text pages. Results have a metadata block followed by the exact source-text block (stored artifact textPointer /content/1/text). Each call re-fetches the complete bounded source. Use page.nextOffset and the complete sourceHash as expectedSourceHash for continuation; changed bytes fail closed. offset counts UTF-16 code units, not bytes. A page is not complete source coverage. Localhost/private networks are blocked on every redirect.',
+  description:
+    'Fetch a public UTF-8 HTTP(S) source (at most 2 MiB) in 160 KiB text pages. Results have a metadata block followed by the exact source-text block (stored artifact textPointer /content/1/text). Each call re-fetches the complete bounded source. Use page.nextOffset and the complete sourceHash as expectedSourceHash for continuation; changed bytes fail closed. offset counts UTF-16 code units, not bytes. A page is not complete source coverage. Localhost/private networks are blocked on every redirect.',
   parameters: {
     type: 'object',
     properties: {
@@ -89,19 +90,38 @@ export const webFetchTool: AgentTool<WebFetchParams, WebFetchDetails> = {
         type: 'string',
         description: 'Public http or https URL to fetch.',
       },
-      offset: { type: 'integer', minimum: 0, description: 'UTF-16 offset from page.nextOffset; omit for the first page.' },
-      expectedSourceHash: { type: 'string', pattern: '^[a-fA-F0-9]{64}$', description: 'SHA-256 of the complete fetched UTF-8 source, required for a nonzero offset. This is not the tool-output artifact hash.' },
+      offset: {
+        type: 'integer',
+        minimum: 0,
+        description: 'UTF-16 offset from page.nextOffset; omit for the first page.',
+      },
+      expectedSourceHash: {
+        type: 'string',
+        pattern: '^[a-fA-F0-9]{64}$',
+        description:
+          'SHA-256 of the complete fetched UTF-8 source, required for a nonzero offset. This is not the tool-output artifact hash.',
+      },
     },
     required: ['url'],
   },
-  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
+  spec: {
+    isReadOnly: true,
+    concurrency: 'shared',
+    isDestructive: false,
+    sideEffect: 'network',
+    category: 'web',
+    requiresApproval: false,
+  },
   permissionHint: 'readonly',
   effects: { network: true },
 
   async execute(_toolCallId, params, signal) {
     const result = await fetchPublicText(params, signal);
     return {
-      content: [{ type: 'text', text: result.contentText }, { type: 'text', text: result.sourceText }],
+      content: [
+        { type: 'text', text: result.contentText },
+        { type: 'text', text: result.sourceText },
+      ],
       details: result.details,
     };
   },
@@ -110,7 +130,8 @@ export const webFetchTool: AgentTool<WebFetchParams, WebFetchDetails> = {
 export const webSearchTool: AgentTool<WebSearchParams, WebSearchDetails> = {
   name: 'web_search',
   label: 'Search Web',
-  description: 'Search the public web with a zero-configuration read-only provider and return discovery results. Use web_fetch on selected source pages before factual summaries, especially latest/current/today requests.',
+  description:
+    'Search the public web with a zero-configuration read-only provider and return discovery results. Use web_fetch on selected source pages before factual summaries, especially latest/current/today requests.',
   parameters: {
     type: 'object',
     properties: {
@@ -121,7 +142,14 @@ export const webSearchTool: AgentTool<WebSearchParams, WebSearchDetails> = {
     },
     required: ['query'],
   },
-  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
+  spec: {
+    isReadOnly: true,
+    concurrency: 'shared',
+    isDestructive: false,
+    sideEffect: 'network',
+    category: 'web',
+    requiresApproval: false,
+  },
   permissionHint: 'readonly',
   effects: { network: true },
 
@@ -141,13 +169,21 @@ function extractHtmlTitle(text: string): string | undefined {
   return title ? title.slice(0, 160) : undefined;
 }
 
-async function fetchPublicText(params: WebFetchParams, signal?: AbortSignal): Promise<{
+async function fetchPublicText(
+  params: WebFetchParams,
+  signal?: AbortSignal,
+): Promise<{
   contentText: string;
   sourceText: string;
   details: WebFetchDetails;
 }> {
   const cursor = validateWebTextCursor(params);
-  const response = await requestPublicText(params.url, signal, 'text/plain,text/markdown,text/html,application/json;q=0.9,*/*;q=0.5', WEB_MAX_SOURCE_BYTES);
+  const response = await requestPublicText(
+    params.url,
+    signal,
+    'text/plain,text/markdown,text/html,application/json;q=0.9,*/*;q=0.5',
+    WEB_MAX_SOURCE_BYTES,
+  );
   if (response.truncated) throw new Error(`Web source exceeds the ${WEB_MAX_SOURCE_BYTES} byte source limit.`);
   if (createHash('sha256').update(response.text, 'utf8').digest('hex') !== response.bodyHash) {
     throw new Error('Web source is not valid UTF-8; replacement text is not original source evidence.');
@@ -161,9 +197,13 @@ async function fetchPublicText(params: WebFetchParams, signal?: AbortSignal): Pr
       `Status: ${response.status} ${response.statusText}`,
       `Source: ${response.bytes} bytes; sha256:${response.bodyHash}`,
       `Page: UTF-16 offset ${selected.page.offset}; ${selected.page.bytes} UTF-8 bytes`,
-      selected.truncated ? `Continue: offset=${selected.page.nextOffset}; expectedSourceHash=${response.bodyHash}` : 'End of source.',
+      selected.truncated
+        ? `Continue: offset=${selected.page.nextOffset}; expectedSourceHash=${response.bodyHash}`
+        : 'End of source.',
       'Exact source page follows in the second text block; artifact textPointer: /content/1/text.',
-    ].filter(Boolean).join('\n'),
+    ]
+      .filter(Boolean)
+      .join('\n'),
     sourceText: selected.text,
     details: {
       kind: 'fetch',
@@ -179,7 +219,10 @@ async function fetchPublicText(params: WebFetchParams, signal?: AbortSignal): Pr
   };
 }
 
-async function searchPublicWeb(query: string, signal?: AbortSignal): Promise<{
+async function searchPublicWeb(
+  query: string,
+  signal?: AbortSignal,
+): Promise<{
   content: Array<{ type: 'text'; text: string }>;
   details: WebSearchDetails;
 }> {
@@ -188,7 +231,11 @@ async function searchPublicWeb(query: string, signal?: AbortSignal): Promise<{
   for (const provider of SEARCH_PROVIDERS) {
     const searchUrl = provider.buildUrl(query);
     try {
-      const response = await requestPublicText(searchUrl, signal, 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5');
+      const response = await requestPublicText(
+        searchUrl,
+        signal,
+        'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5',
+      );
       const results = provider.parse(response.text).slice(0, SEARCH_RESULT_LIMIT);
       if (results.length === 0) {
         failures.push(`${provider.name}: no parseable results`);
@@ -204,7 +251,9 @@ async function searchPublicWeb(query: string, signal?: AbortSignal): Promise<{
           const meta = [
             result.source ? `Source: ${result.source}` : '',
             result.publishedAt ? `Date: ${result.publishedAt}` : '',
-          ].filter(Boolean).join(' | ');
+          ]
+            .filter(Boolean)
+            .join(' | ');
           return [
             `${index + 1}. ${result.title}`,
             `   ${result.url}`,
@@ -237,12 +286,21 @@ async function searchPublicWeb(query: string, signal?: AbortSignal): Promise<{
   throw new Error(`Web search failed for "${query}". ${failures.join(' | ')}`);
 }
 
-async function requestPublicText(rawUrl: string, signal?: AbortSignal, accept = '*/*', responseLimit = MAX_RESPONSE_BYTES): Promise<PublicTextResponse> {
+async function requestPublicText(
+  rawUrl: string,
+  signal?: AbortSignal,
+  accept = '*/*',
+  responseLimit = MAX_RESPONSE_BYTES,
+): Promise<PublicTextResponse> {
   let fetched;
   try {
     fetched = await fetchPublic(rawUrl, {
-      accept, userAgent: 'RDC-Agent/AskReadonlyWebTool', maxResponseBytes: WEB_MAX_SOURCE_BYTES,
-      maxRedirects: WEB_MAX_REDIRECTS, timeoutMs: REQUEST_TIMEOUT_MS, signal,
+      accept,
+      userAgent: 'RDC-Agent/AskReadonlyWebTool',
+      maxResponseBytes: WEB_MAX_SOURCE_BYTES,
+      maxRedirects: WEB_MAX_REDIRECTS,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      signal,
     });
   } catch (error) {
     if (error instanceof PublicRequestFailedError) throw createNetworkError(error.url, error.cause);
@@ -303,8 +361,8 @@ async function readResponseBodyLimited(
 
 function createNetworkError(url: string, error: unknown): Error {
   const host = safeHost(url);
-  const record = error && typeof error === 'object' ? error as Record<string, unknown> : {};
-  const cause = record.cause && typeof record.cause === 'object' ? record.cause as Record<string, unknown> : {};
+  const record = error && typeof error === 'object' ? (error as Record<string, unknown>) : {};
+  const cause = record.cause && typeof record.cause === 'object' ? (record.cause as Record<string, unknown>) : {};
   const causeCode = typeof cause.code === 'string' ? cause.code : '';
   const causeMessage = typeof cause.message === 'string' ? cause.message : '';
   const errorName = typeof record.name === 'string' ? record.name : '';
@@ -336,9 +394,9 @@ export function parseDuckDuckGoResults(html: string): WebSearchResult[] {
     if (!url || !title) continue;
     const nearby = html.slice(match.index + match[0].length, match.index + match[0].length + 1600);
     const snippet = cleanHtmlText(
-      nearby.match(/<a\b[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/i)?.[1]
-      ?? nearby.match(/<div\b[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/div>/i)?.[1]
-      ?? '',
+      nearby.match(/<a\b[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/i)?.[1] ??
+        nearby.match(/<div\b[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/div>/i)?.[1] ??
+        '',
     );
     const source = getSourceDomain(url);
     const publishedAt = extractPublishedDate(`${title} ${snippet} ${cleanHtmlText(nearby)}`);
@@ -366,18 +424,30 @@ export function parseBingResults(html: string): WebSearchResult[] {
 }
 
 const MONTHS: Record<string, string> = {
-  jan: '01', january: '01',
-  feb: '02', february: '02',
-  mar: '03', march: '03',
-  apr: '04', april: '04',
+  jan: '01',
+  january: '01',
+  feb: '02',
+  february: '02',
+  mar: '03',
+  march: '03',
+  apr: '04',
+  april: '04',
   may: '05',
-  jun: '06', june: '06',
-  jul: '07', july: '07',
-  aug: '08', august: '08',
-  sep: '09', sept: '09', september: '09',
-  oct: '10', october: '10',
-  nov: '11', november: '11',
-  dec: '12', december: '12',
+  jun: '06',
+  june: '06',
+  jul: '07',
+  july: '07',
+  aug: '08',
+  august: '08',
+  sep: '09',
+  sept: '09',
+  september: '09',
+  oct: '10',
+  october: '10',
+  nov: '11',
+  november: '11',
+  dec: '12',
+  december: '12',
 };
 
 function getSourceDomain(rawUrl: string): string | undefined {
@@ -394,13 +464,17 @@ export function extractPublishedDate(text: string): string | undefined {
   const iso = source.match(/\b((?:19|20)\d{2})[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])\b/);
   if (iso) return formatDateParts(iso[1], iso[2], iso[3]);
 
-  const monthDayYear = source.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(0?[1-9]|[12]\d|3[01]),?\s+((?:19|20)\d{2})\b/i);
+  const monthDayYear = source.match(
+    /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(0?[1-9]|[12]\d|3[01]),?\s+((?:19|20)\d{2})\b/i,
+  );
   if (monthDayYear) {
     const month = MONTHS[monthDayYear[1].replace('.', '').toLowerCase()];
     if (month) return formatDateParts(monthDayYear[3], month, monthDayYear[2]);
   }
 
-  const dayMonthYear = source.match(/\b(0?[1-9]|[12]\d|3[01])\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+((?:19|20)\d{2})\b/i);
+  const dayMonthYear = source.match(
+    /\b(0?[1-9]|[12]\d|3[01])\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+((?:19|20)\d{2})\b/i,
+  );
   if (dayMonthYear) {
     const month = MONTHS[dayMonthYear[2].replace('.', '').toLowerCase()];
     if (month) return formatDateParts(dayMonthYear[3], month, dayMonthYear[1]);
@@ -413,7 +487,8 @@ function formatDateParts(year: string, month: string, day: string): string | und
   const numericYear = Number(year);
   const numericMonth = Number(month);
   const numericDay = Number(day);
-  if (!Number.isInteger(numericYear) || !Number.isInteger(numericMonth) || !Number.isInteger(numericDay)) return undefined;
+  if (!Number.isInteger(numericYear) || !Number.isInteger(numericMonth) || !Number.isInteger(numericDay))
+    return undefined;
   if (numericMonth < 1 || numericMonth > 12 || numericDay < 1 || numericDay > 31) return undefined;
   return `${String(numericYear).padStart(4, '0')}-${String(numericMonth).padStart(2, '0')}-${String(numericDay).padStart(2, '0')}`;
 }
@@ -439,7 +514,9 @@ function dedupeResults(results: WebSearchResult[]): WebSearchResult[] {
 }
 
 function cleanHtmlText(value: string): string {
-  return decodeHtml(value.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+  return decodeHtml(value.replace(/<[^>]+>/g, ' '))
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function decodeHtml(value: string): string {

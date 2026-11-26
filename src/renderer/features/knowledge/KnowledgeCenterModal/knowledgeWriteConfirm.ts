@@ -123,7 +123,8 @@ export async function issueKnowledgeWrite(input: {
   if (isWriteVersionStale(latest.card, input.openedUpdatedAt)) {
     return { ok: false, stale: true };
   }
-  const isPromote = input.action === 'promote-verified' || input.action === 'promote-promoted' || input.action === 'retire';
+  const isPromote =
+    input.action === 'promote-verified' || input.action === 'promote-promoted' || input.action === 'retire';
   const issued = await input.api.issueApprovalToken({
     action: isPromote ? 'knowledge.promote' : 'knowledge.write',
     spaceId: input.after.spaceId,

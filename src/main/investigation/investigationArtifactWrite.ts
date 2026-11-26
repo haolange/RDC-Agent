@@ -43,14 +43,17 @@ export interface InvestigationReadResult {
 }
 
 export interface InvestigationArtifactServiceDeps {
-  receiptStore?: import("../rdc/RdcExecutionReceipts").RdcExecutionReceipts;
+  receiptStore?: import('../rdc/RdcExecutionReceipts').RdcExecutionReceipts;
   resolver?: SessionArtifactResolver;
   now?: () => Date;
-  onPersistBoundary?: (boundary: InvestigationPersistBoundary, info: {
-    txnId: string;
-    uri?: string;
-    role?: InvestigationTxnRole;
-  }) => void;
+  onPersistBoundary?: (
+    boundary: InvestigationPersistBoundary,
+    info: {
+      txnId: string;
+      uri?: string;
+      role?: InvestigationTxnRole;
+    },
+  ) => void;
   lockMaxAttempts?: number;
 }
 

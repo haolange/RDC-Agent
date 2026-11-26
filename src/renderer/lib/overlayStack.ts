@@ -37,7 +37,11 @@ export function isTopOverlayLayer(id: number | null): boolean {
  * Registers an overlay layer while `open` is true and reports whether it is
  * currently the topmost one.
  */
-function bindOverlay(open: boolean, setLayerId: (id: number | null) => void, setIsTop: (top: boolean) => void): (() => void) | undefined {
+function bindOverlay(
+  open: boolean,
+  setLayerId: (id: number | null) => void,
+  setIsTop: (top: boolean) => void,
+): (() => void) | undefined {
   if (!open) {
     setLayerId(null);
     setIsTop(false);

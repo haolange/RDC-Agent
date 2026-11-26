@@ -29,6 +29,8 @@ export function groupKnowledgeImages(images: readonly KnowledgeImageRef[]): {
   return { pairs, singles: leftover };
 }
 
-export function knowledgeImageRoleLabelKey(role: KnowledgeImageRole): `knowledgeCenter.imageRole.${KnowledgeImageRole}` {
+export function knowledgeImageRoleLabelKey(
+  role: KnowledgeImageRole,
+): `knowledgeCenter.imageRole.${KnowledgeImageRole}` {
   return `knowledgeCenter.imageRole.${role}`;
 }

@@ -5,7 +5,12 @@ import type {
   InvestigationRecordType,
 } from './renderdocInvestigation';
 import type { ConversationTaskStatus, TaskDisplayState } from './conversation';
-import type { TaskDependencyWait, TaskExecutionDispatch, TaskExecutionPreparation, TaskExecutionStatus } from './taskExecution';
+import type {
+  TaskDependencyWait,
+  TaskExecutionDispatch,
+  TaskExecutionPreparation,
+  TaskExecutionStatus,
+} from './taskExecution';
 
 export interface RawAuditRef {
   id: string;
@@ -46,13 +51,7 @@ export interface TaskRailItem {
 }
 
 type TraceArtifactType =
-  | 'report'
-  | 'generative_ui'
-  | 'visual_report'
-  | 'evidence_bundle'
-  | 'failure_summary'
-  | 'cancelled_summary'
-  | 'other';
+  'report' | 'generative_ui' | 'visual_report' | 'evidence_bundle' | 'failure_summary' | 'cancelled_summary' | 'other';
 
 export type TraceArtifactSource = 'report' | 'evidence' | 'image' | 'document' | 'data' | 'other';
 
@@ -117,14 +116,7 @@ export interface InvestigationArtifactsPanelViewModel {
   storeDegraded: boolean;
 }
 
-type TaskContextResourceKind =
-  | 'attachment'
-  | 'reference'
-  | 'file'
-  | 'directory'
-  | 'skill'
-  | 'mcp'
-  | 'web';
+type TaskContextResourceKind = 'attachment' | 'reference' | 'file' | 'directory' | 'skill' | 'mcp' | 'web';
 
 export interface TaskContextResource {
   id: string;
@@ -220,6 +212,15 @@ export interface TraceSessionResult {
 }
 
 /** Read-only pages of the same current Investigation selection used by the rail. */
-export interface InvestigationListCursor { createdAt: string; artifactId: string }
-export interface InvestigationListRequest { projectId: string; sessionId: string; cursor?: InvestigationListCursor }
-export interface InvestigationListPage extends InvestigationArtifactsPanelViewModel { nextCursor?: InvestigationListCursor }
+export interface InvestigationListCursor {
+  createdAt: string;
+  artifactId: string;
+}
+export interface InvestigationListRequest {
+  projectId: string;
+  sessionId: string;
+  cursor?: InvestigationListCursor;
+}
+export interface InvestigationListPage extends InvestigationArtifactsPanelViewModel {
+  nextCursor?: InvestigationListCursor;
+}

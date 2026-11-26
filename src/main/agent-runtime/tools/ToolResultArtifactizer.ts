@@ -1,11 +1,20 @@
 import * as fs from 'fs';
 import { z } from 'zod';
 import { toolResultDisplay } from '@shared/utils/toolResultDisplay';
-import { TOOL_RECEIPT_DECODED_TEXT_HEADING, TOOL_RECEIPT_IMAGE_EVIDENCE_HEADING } from '@shared/constants/toolReceiptHeadings';
+import {
+  TOOL_RECEIPT_DECODED_TEXT_HEADING,
+  TOOL_RECEIPT_IMAGE_EVIDENCE_HEADING,
+} from '@shared/constants/toolReceiptHeadings';
 import { SessionArtifactError } from '../../sessions/artifacts/sessionArtifactContract';
-import { TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES, formatSessionArtifactUri } from '../../sessions/artifacts/sessionArtifactContract';
+import {
+  TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES,
+  formatSessionArtifactUri,
+} from '../../sessions/artifacts/sessionArtifactContract';
 import { sha256Hex } from '../../runtime/contentHash';
-import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
+import {
+  sessionArtifactResolver,
+  type SessionArtifactResolver,
+} from '../../sessions/artifacts/SessionArtifactResolver';
 import { delegatedArtifactOwner, grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { ToolResultSummarizer } from './ToolResultSummarizer';
 import { storeToolImage } from './ToolImageArtifact';
@@ -58,8 +67,17 @@ function serializeEnvelope(
     details: parsed.details,
   };
   const serialized = JSON.stringify(record);
-  const chunks = Array.from({ length: Math.ceil(serialized.length / 4000) }, (_, index) => serialized.slice(index * 4000, (index + 1) * 4000));
-  return { envelope: JSON.stringify({ encoding: 'json-chunks', reconstruction: 'Join chunks without separators, then parse JSON.', chunks }, null, 2), record };
+  const chunks = Array.from({ length: Math.ceil(serialized.length / 4000) }, (_, index) =>
+    serialized.slice(index * 4000, (index + 1) * 4000),
+  );
+  return {
+    envelope: JSON.stringify(
+      { encoding: 'json-chunks', reconstruction: 'Join chunks without separators, then parse JSON.', chunks },
+      null,
+      2,
+    ),
+    record,
+  };
 }
 
 function failClosed(code: string, message: string): AgentToolResult {
@@ -70,7 +88,12 @@ function failClosed(code: string, message: string): AgentToolResult {
   };
 }
 
-function persistenceFailure(input: ArtifactizeToolResultInput, code: string, message: string, serialized: string): AgentToolResult {
+function persistenceFailure(
+  input: ArtifactizeToolResultInput,
+  code: string,
+  message: string,
+  serialized: string,
+): AgentToolResult {
   // The effect has already returned. A delivery failure must not erase that fact
   // or invite a second mutation/cleanup. This remains an error, never evidence.
   const inline = Buffer.byteLength(serialized, 'utf8') <= TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES;
@@ -81,10 +104,18 @@ function persistenceFailure(input: ArtifactizeToolResultInput, code: string, mes
     isError: true,
     content: [
       { type: 'text', text: diagnostic },
-      ...(inline ? input.result.content : [{ type: 'text' as const, text: (summary ?? 'Full execution result unavailable: artifact persistence failed.').slice(0, 1024) }]),
+      ...(inline
+        ? input.result.content
+        : [
+            {
+              type: 'text' as const,
+              text: (summary ?? 'Full execution result unavailable: artifact persistence failed.').slice(0, 1024),
+            },
+          ]),
     ],
     details: {
-      code, artifactized: false,
+      code,
+      artifactized: false,
       executionResult: { isError: input.result.isError === true, inline, detailsInline },
       ...(detailsInline ? { originalDetails: input.result.details ?? null } : {}),
     },
@@ -128,10 +159,7 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
   try {
     serialized = serializeResult(result);
   } catch (error) {
-    return failClosed(
-      'ARTIFACT_WRITE_FAILED',
-      error instanceof Error ? error.message : String(error),
-    );
+    return failClosed('ARTIFACT_WRITE_FAILED', error instanceof Error ? error.message : String(error));
   }
   const threshold = input.thresholdBytes ?? TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES;
   const belowThreshold = Buffer.byteLength(serialized, 'utf8') <= threshold;
@@ -162,38 +190,65 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
     const storedContent = result.content.map((block) => {
       if (block.type !== 'image' || !block.data) return block;
       const extension = IMAGE_EXTENSION[block.mimeType];
-      if (!extension) throw new SessionArtifactError('ARTIFACT_MIME_DENIED', `unsupported image MIME: ${block.mimeType}`);
+      if (!extension)
+        throw new SessionArtifactError('ARTIFACT_MIME_DENIED', `unsupported image MIME: ${block.mimeType}`);
       const bytes = Buffer.from(block.data, 'base64');
       const written = storeToolImage(resolver, ownerSessionId, childPrefix, extension, block.mimeType, bytes);
       if (written.created) createdImages.push({ uri: written.uri, hash: written.hash });
       imageReferences.push({ uri: written.uri, hash: written.hash });
-      return { type: 'image' as const, ref: written.uri, hash: written.hash, mimeType: block.mimeType, bytes: bytes.length };
+      return {
+        type: 'image' as const,
+        ref: written.uri,
+        hash: written.hash,
+        mimeType: block.mimeType,
+        bytes: bytes.length,
+      };
     });
-    const { envelope, record } = serializeEnvelope(ownerSessionId, input.toolName, input.toolCallId || toolCallId, result, storedContent);
+    const { envelope, record } = serializeEnvelope(
+      ownerSessionId,
+      input.toolName,
+      input.toolCallId || toolCallId,
+      result,
+      storedContent,
+    );
     const written = resolver.write(ownerSessionId, uri, Buffer.from(envelope, 'utf8'), { mimeType });
     manifestWritten = true;
     for (const image of imageReferences) grantDelegatedOutput(sessionId, image.uri, image.hash);
     grantDelegatedOutput(sessionId, written.uri, written.hash);
     const imageEvidenceText = imageReferences.length
-      ? `\n${TOOL_RECEIPT_IMAGE_EVIDENCE_HEADING}\n`
-        + imageReferences.map(image => `${image.uri}\nsha256:${image.hash}`).join('\n')
+      ? `\n${TOOL_RECEIPT_IMAGE_EVIDENCE_HEADING}\n` +
+        imageReferences.map((image) => `${image.uri}\nsha256:${image.hash}`).join('\n')
       : '';
     if (belowThreshold) {
       return {
         ...result,
-        content: [...result.content, { type: 'text', text: `Evidence ref: ${written.uri}\nhash: ${written.hash}${imageEvidenceText}` }],
-        details: { ...(typeof result.details === 'object' && result.details !== null ? result.details : {}),
-          evidenceArtifact: { ref: written.uri, hash: written.hash, owner: record.owner, ownerScope: record.ownerScope, source: record.source } },
+        content: [
+          ...result.content,
+          { type: 'text', text: `Evidence ref: ${written.uri}\nhash: ${written.hash}${imageEvidenceText}` },
+        ],
+        details: {
+          ...(typeof result.details === 'object' && result.details !== null ? result.details : {}),
+          evidenceArtifact: {
+            ref: written.uri,
+            hash: written.hash,
+            owner: record.owner,
+            ownerScope: record.ownerScope,
+            source: record.source,
+          },
+        },
       };
     }
-    const summary = summarizer.trySummarize(input.toolName, result, 400)
-      ?? `[${input.toolName}] ${record.size} bytes stored`;
-    const textReads = storedContent.flatMap((block, index) => block.type === 'text' && block.text
-      ? [{ uri: written.uri, expectedHash: written.hash, textPointer: `/content/${index}/text` }]
-      : []).slice(0, 8);
+    const summary =
+      summarizer.trySummarize(input.toolName, result, 400) ?? `[${input.toolName}] ${record.size} bytes stored`;
+    const textReads = storedContent
+      .flatMap((block, index) =>
+        block.type === 'text' && block.text
+          ? [{ uri: written.uri, expectedHash: written.hash, textPointer: `/content/${index}/text` }]
+          : [],
+      )
+      .slice(0, 8);
     const textReadHint = textReads.length
-      ? `\n${TOOL_RECEIPT_DECODED_TEXT_HEADING}\n`
-        + textReads.map(selection => JSON.stringify(selection)).join('\n')
+      ? `\n${TOOL_RECEIPT_DECODED_TEXT_HEADING}\n` + textReads.map((selection) => JSON.stringify(selection)).join('\n')
       : '';
     // Offload large text and evidence payloads, but keep native image blocks in
     // the model result. ContextManager bridges them into the next vision input;
@@ -204,13 +259,20 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
     return {
       isError: result.isError,
       content: [
-        { type: 'text', text: `${summary}\nref: ${written.uri}\nhash: ${written.hash}${textReadHint}${imageEvidenceText}` },
+        {
+          type: 'text',
+          text: `${summary}\nref: ${written.uri}\nhash: ${written.hash}${textReadHint}${imageEvidenceText}`,
+        },
         ...imageBlocks,
       ],
       details: {
         artifactized: true,
-        ...(result.details && typeof result.details === 'object' && 'imagePreviews' in result.details
-          && Array.isArray(result.details.imagePreviews) ? { imagePreviews: result.details.imagePreviews } : {}),
+        ...(result.details &&
+        typeof result.details === 'object' &&
+        'imagePreviews' in result.details &&
+        Array.isArray(result.details.imagePreviews)
+          ? { imagePreviews: result.details.imagePreviews }
+          : {}),
         ref: written.uri,
         hash: written.hash,
         summary,
@@ -227,7 +289,8 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
     if (error instanceof SessionArtifactError) {
       return persistenceFailure(input, error.code, error.message, serialized);
     }
-    return persistenceFailure(input,
+    return persistenceFailure(
+      input,
       'ARTIFACT_WRITE_FAILED',
       error instanceof Error ? error.message : String(error),
       serialized,

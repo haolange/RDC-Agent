@@ -2,10 +2,7 @@ import React from 'react';
 import { Button } from '../../../../ui/Button';
 import { englishTranslations, type TranslationKey } from '../../../../i18n/messages';
 import { SettingsField } from '../parts';
-import {
-  projectEndpointTemplate,
-  resolvePrimarySecretField,
-} from '../providerConnectionState';
+import { projectEndpointTemplate, resolvePrimarySecretField } from '../providerConnectionState';
 import { STORED_SECRET_MASK } from '../utils';
 import { useI18n } from '../../../../i18n';
 import type { LlmProviderConnectionField, LlmProviderEntry } from '@shared/types/settings';
@@ -28,9 +25,8 @@ const resetTest = {
   models: [],
 };
 
-const inputTypeFor = (field: LlmProviderConnectionField): React.HTMLInputTypeAttribute => (
-  field.kind === 'url' ? 'url' : 'text'
-);
+const inputTypeFor = (field: LlmProviderConnectionField): React.HTMLInputTypeAttribute =>
+  field.kind === 'url' ? 'url' : 'text';
 
 function connectionLabel(kind: 'field' | 'method', id: string, label: string, t: Translate) {
   const key = `settings.connection.${kind}.${id}`;
@@ -57,9 +53,7 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
     onUpdateConnectionDraft({
       connectionValues,
       usingStoredConnectionSecrets,
-      ...(field.id === primarySecret?.id
-        ? { apiKey: value, usingStoredSecret: false }
-        : {}),
+      ...(field.id === primarySecret?.id ? { apiKey: value, usingStoredSecret: false } : {}),
       ...(field.id === 'baseUrl' ? { baseUrl: value } : {}),
       ...resetTest,
     });
@@ -95,8 +89,13 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
             />
           </SettingsField>
         )}
-        <SettingsField label={t('settings.apiKey')} htmlFor="settings-provider-api-key-input"
-          description={t(connectionDraft.usingStoredSecret ? 'settings.apiKeyStoredHint' : 'settings.apiKeyConnectHint')}>
+        <SettingsField
+          label={t('settings.apiKey')}
+          htmlFor="settings-provider-api-key-input"
+          description={t(
+            connectionDraft.usingStoredSecret ? 'settings.apiKeyStoredHint' : 'settings.apiKeyConnectHint',
+          )}
+        >
           <div className="settings-secret-field">
             <input
               className="input settings-secret-input"
@@ -105,11 +104,13 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
               type={connectionDraft.showApiKey && !connectionDraft.usingStoredSecret ? 'text' : 'password'}
               value={connectionDraft.usingStoredSecret ? STORED_SECRET_MASK : connectionDraft.apiKey}
               readOnly={connectionDraft.usingStoredSecret || connectionDraft.busy !== 'idle'}
-              onChange={(event) => onUpdateConnectionDraft({
-                apiKey: event.target.value,
-                usingStoredSecret: false,
-                ...resetTest,
-              })}
+              onChange={(event) =>
+                onUpdateConnectionDraft({
+                  apiKey: event.target.value,
+                  usingStoredSecret: false,
+                  ...resetTest,
+                })
+              }
             />
             <Button
               size="sm"
@@ -121,14 +122,22 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
                 }
                 onUpdateConnectionDraft({ showApiKey: !connectionDraft.showApiKey });
               }}
-              aria-label={connectionDraft.usingStoredSecret
-                ? t('settings.replaceSecret')
-                : connectionDraft.showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
-              disabled={connectionDraft.busy !== 'idle' || (!connectionDraft.usingStoredSecret && !connectionDraft.apiKey)}
+              aria-label={
+                connectionDraft.usingStoredSecret
+                  ? t('settings.replaceSecret')
+                  : connectionDraft.showApiKey
+                    ? t('settings.hideSecret')
+                    : t('settings.showSecret')
+              }
+              disabled={
+                connectionDraft.busy !== 'idle' || (!connectionDraft.usingStoredSecret && !connectionDraft.apiKey)
+              }
             >
               {connectionDraft.usingStoredSecret
                 ? t('settings.replaceSecret')
-                : connectionDraft.showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
+                : connectionDraft.showApiKey
+                  ? t('settings.hideSecret')
+                  : t('settings.showSecret')}
             </Button>
           </div>
         </SettingsField>
@@ -137,25 +146,39 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
   }
 
   const endpointTemplate = connectionDraft.baseUrl || schema.endpointTemplate;
-  const publicFields = schema.fields.filter(field => field.kind !== 'secret');
-  const publicValues = Object.fromEntries(publicFields.map(field => [field.id, connectionDraft.connectionValues[field.id] ?? '']));
+  const publicFields = schema.fields.filter((field) => field.kind !== 'secret');
+  const publicValues = Object.fromEntries(
+    publicFields.map((field) => [field.id, connectionDraft.connectionValues[field.id] ?? '']),
+  );
   const endpoint = projectEndpointTemplate(endpointTemplate, publicValues);
-  const showEndpoint = endpoint !== endpointTemplate && !endpoint.includes('${') && /^https?:\/\//iu.test(endpoint)
-    && URL.canParse(endpoint) && !Object.values(publicValues).some(value => value.trim().replace(/\/+$/u, '') === endpoint.replace(/\/+$/u, ''));
+  const showEndpoint =
+    endpoint !== endpointTemplate &&
+    !endpoint.includes('${') &&
+    /^https?:\/\//iu.test(endpoint) &&
+    URL.canParse(endpoint) &&
+    !Object.values(publicValues).some((value) => value.trim().replace(/\/+$/u, '') === endpoint.replace(/\/+$/u, ''));
 
   return (
     <div className="settings-provider-connection-fields" data-testid="settings-provider-connection-fields">
       {schema.fields.map((field) => {
-        const usingStoredSecret = field.kind === 'secret'
-          && connectionDraft.usingStoredConnectionSecrets[field.id] === true;
+        const usingStoredSecret =
+          field.kind === 'secret' && connectionDraft.usingStoredConnectionSecrets[field.id] === true;
         const visible = connectionDraft.visibleConnectionSecrets[field.id] === true;
         return (
-          <SettingsField key={field.id} htmlFor={`settings-provider-input-${field.id}`} label={
-            <span className="settings-connection-field-label">
-              {connectionLabel('field', field.id, field.label, t)}
-              {field.required ? <span className="settings-required-field" aria-hidden="true">{t('settings.connectionRequired')}</span> : null}
-            </span>
-          }>
+          <SettingsField
+            key={field.id}
+            htmlFor={`settings-provider-input-${field.id}`}
+            label={
+              <span className="settings-connection-field-label">
+                {connectionLabel('field', field.id, field.label, t)}
+                {field.required ? (
+                  <span className="settings-required-field" aria-hidden="true">
+                    {t('settings.connectionRequired')}
+                  </span>
+                ) : null}
+              </span>
+            }
+          >
             {field.kind === 'secret' ? (
               <div className="settings-secret-field">
                 <input
@@ -164,7 +187,7 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
                   aria-required={field.required}
                   data-testid={`settings-provider-connect-field-${field.id}`}
                   type={visible && !usingStoredSecret ? 'text' : 'password'}
-                  value={usingStoredSecret ? STORED_SECRET_MASK : connectionDraft.connectionValues[field.id] ?? ''}
+                  value={usingStoredSecret ? STORED_SECRET_MASK : (connectionDraft.connectionValues[field.id] ?? '')}
                   placeholder={field.placeholder ?? ''}
                   readOnly={usingStoredSecret || connectionDraft.busy !== 'idle'}
                   onChange={(event) => updateField(field, event.target.value)}
@@ -184,14 +207,23 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
                       },
                     });
                   }}
-                  aria-label={usingStoredSecret
-                    ? t('settings.replaceSecret')
-                    : visible ? t('settings.hideSecret') : t('settings.showSecret')}
-                  disabled={connectionDraft.busy !== 'idle' || (!usingStoredSecret && !connectionDraft.connectionValues[field.id])}
+                  aria-label={
+                    usingStoredSecret
+                      ? t('settings.replaceSecret')
+                      : visible
+                        ? t('settings.hideSecret')
+                        : t('settings.showSecret')
+                  }
+                  disabled={
+                    connectionDraft.busy !== 'idle' ||
+                    (!usingStoredSecret && !connectionDraft.connectionValues[field.id])
+                  }
                 >
                   {usingStoredSecret
                     ? t('settings.replaceSecret')
-                    : visible ? t('settings.hideSecret') : t('settings.showSecret')}
+                    : visible
+                      ? t('settings.hideSecret')
+                      : t('settings.showSecret')}
                 </Button>
               </div>
             ) : (
@@ -215,7 +247,9 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
         <div className="settings-provider-credential-options" data-testid="settings-provider-credential-options">
           <span className="settings-field-label">{t('settings.connectionCredentialOptions')}</span>
           <span className="settings-provider-credential-options-value">
-            {schema.credentialAlternatives.map(option => connectionLabel('method', option.id, option.label ?? option.id, t)).join(' / ')}
+            {schema.credentialAlternatives
+              .map((option) => connectionLabel('method', option.id, option.label ?? option.id, t))
+              .join(' / ')}
           </span>
         </div>
       ) : null}
@@ -223,7 +257,9 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
       {showEndpoint ? (
         <div className="settings-field settings-provider-endpoint-preview">
           <span className="settings-field-label">{t('settings.connectionEndpointPreview')}</span>
-          <span className="settings-provider-endpoint-value" data-testid="settings-provider-connect-endpoint-preview">{endpoint}</span>
+          <span className="settings-provider-endpoint-value" data-testid="settings-provider-connect-endpoint-preview">
+            {endpoint}
+          </span>
         </div>
       ) : null}
     </div>

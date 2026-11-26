@@ -1,7 +1,13 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { AppError, IPC_ERROR_KEY, toIpcErrorPayload, type IpcErrorResult } from '@shared/errors/appError';
 import { isHighImpactChannel, RENDERER_INVOKE_CHANNELS, type RendererInvokeChannel } from '@shared/renderer-api';
-import { auditArgumentsHash, auditLog, runWithAuditOrigin, type AuditEvent, type AuditOrigin } from '../runtime/AuditLog';
+import {
+  auditArgumentsHash,
+  auditLog,
+  runWithAuditOrigin,
+  type AuditEvent,
+  type AuditOrigin,
+} from '../runtime/AuditLog';
 import { redactCredentialLikeText } from '../runtime/secretRedaction';
 import { isTrustedRendererUrl } from '../runtime/rendererTrust';
 
@@ -23,7 +29,13 @@ let registryInstalled = false;
  * when the outcome is appended, so a failure there is reported instead of being turned into an error for a call that
  * succeeded.
  */
-async function dispatch(origin: AuditOrigin, channel: string, listener: InvokeHandler, event: IpcMainInvokeEvent, args: unknown[]): Promise<unknown> {
+async function dispatch(
+  origin: AuditOrigin,
+  channel: string,
+  listener: InvokeHandler,
+  event: IpcMainInvokeEvent,
+  args: unknown[],
+): Promise<unknown> {
   return runWithAuditOrigin(origin, async () => {
     const highImpact = isHighImpactChannel(channel);
     const argumentsSha256 = highImpact ? auditArgumentsHash(args) : '';
@@ -34,8 +46,10 @@ async function dispatch(origin: AuditOrigin, channel: string, listener: InvokeHa
       return result;
     } catch (error) {
       const payload = toIpcErrorPayload(error, redactCredentialLikeText);
-      if (highImpact) recordOutcome({ kind: 'ipc', channel, argumentsSha256, outcome: 'error', errorCode: payload.code });
-      if (payload.code === 'INTERNAL_ERROR') process.stderr.write(`[ipc] ${channel} failed: ${payload.technical ?? ''}\n`);
+      if (highImpact)
+        recordOutcome({ kind: 'ipc', channel, argumentsSha256, outcome: 'error', errorCode: payload.code });
+      if (payload.code === 'INTERNAL_ERROR')
+        process.stderr.write(`[ipc] ${channel} failed: ${payload.technical ?? ''}\n`);
       return { [IPC_ERROR_KEY]: payload } satisfies IpcErrorResult;
     }
   });
@@ -70,8 +84,9 @@ export function installIpcInvokeRegistry(): void {
 }
 
 function createBrowserInvokeEvent(): IpcMainInvokeEvent {
-  const sender = BrowserWindow.getFocusedWindow()?.webContents
-    ?? BrowserWindow.getAllWindows().find((window) => !window.isDestroyed())?.webContents;
+  const sender =
+    BrowserWindow.getFocusedWindow()?.webContents ??
+    BrowserWindow.getAllWindows().find((window) => !window.isDestroyed())?.webContents;
 
   return {
     sender,

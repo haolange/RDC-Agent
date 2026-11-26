@@ -52,8 +52,8 @@ export function Tabs({
   const tabId = (index: number) => `${instanceId}-tab-${index}`;
   const panelId = `${instanceId}-panel`;
   const hasPanel = children !== undefined && children !== null && children !== false;
-  const focusIndex = selectedIndex >= 0 && !tabs[selectedIndex].disabled
-    ? selectedIndex : tabs.findIndex((tab) => !tab.disabled);
+  const focusIndex =
+    selectedIndex >= 0 && !tabs[selectedIndex].disabled ? selectedIndex : tabs.findIndex((tab) => !tab.disabled);
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const next = resolveTabNavigation(tabs, index, event.key);
@@ -64,8 +64,16 @@ export function Tabs({
   };
 
   return (
-    <div ref={rootRef} className={cn('ui-tabs', variant === 'segmented' && 'is-segmented', fullWidth && 'is-full-width',
-      collapsed && 'is-icon-only', className)}>
+    <div
+      ref={rootRef}
+      className={cn(
+        'ui-tabs',
+        variant === 'segmented' && 'is-segmented',
+        fullWidth && 'is-full-width',
+        collapsed && 'is-icon-only',
+        className,
+      )}
+    >
       <div ref={listRef} className={cn('ui-tabs-list', measured && 'is-measured')} role="tablist" aria-label={label}>
         {selectedIndex >= 0 ? <span className="ui-tabs-indicator" aria-hidden="true" {...indicatorStyle} /> : null}
         {tabs.map((tab, index) => {
@@ -90,7 +98,11 @@ export function Tabs({
               onClick={() => onChange(tab.id)}
               onKeyDown={(event) => onKeyDown(event, index)}
             >
-              {tab.icon ? <span className="ui-tabs-icon" aria-hidden="true">{tab.icon}</span> : null}
+              {tab.icon ? (
+                <span className="ui-tabs-icon" aria-hidden="true">
+                  {tab.icon}
+                </span>
+              ) : null}
               <span className="ui-tabs-label">{tab.label}</span>
               {tab.count ? <span className="ui-tabs-count">{tab.count}</span> : null}
             </button>

@@ -80,7 +80,10 @@ function defaultDeps(): ShellResolverDeps {
 
 function basenameWithoutExt(executable: string, host: HostDescriptor): string {
   const pathApi = host.isWindows ? path.win32 : path.posix;
-  return pathApi.basename(executable).replace(/\.exe$/i, '').toLowerCase();
+  return pathApi
+    .basename(executable)
+    .replace(/\.exe$/i, '')
+    .toLowerCase();
 }
 
 export class ShellResolver {
@@ -185,11 +188,7 @@ export class ShellResolver {
     }
     const powershellVersion = this.probePowerShell(executable);
     if (powershellVersion) {
-      return this.toResolved(
-        executable,
-        this.inferPowerShellKind(executable, powershellVersion),
-        powershellVersion,
-      );
+      return this.toResolved(executable, this.inferPowerShellKind(executable, powershellVersion), powershellVersion);
     }
     const zshVersion = this.probePosix(executable, 'zsh');
     if (zshVersion) return this.toResolved(executable, 'zsh', zshVersion);
@@ -247,11 +246,12 @@ export class ShellResolver {
   }
 
   private probePosix(executable: string, kind: 'zsh' | 'bash' | 'sh'): string | null {
-    const versionArg = kind === 'zsh'
-      ? ['-c', 'printf %s "$ZSH_VERSION"']
-      : kind === 'bash'
-        ? ['-c', 'printf %s "$BASH_VERSION"']
-        : ['-c', 'echo ok'];
+    const versionArg =
+      kind === 'zsh'
+        ? ['-c', 'printf %s "$ZSH_VERSION"']
+        : kind === 'bash'
+          ? ['-c', 'printf %s "$BASH_VERSION"']
+          : ['-c', 'echo ok'];
     const result = this.deps.spawnSync(executable, versionArg, this.spawnOptions());
     if (result.status !== 0) return null;
     const version = String(result.stdout).trim().split(/\r?\n/)[0]?.trim() ?? '';

@@ -2,10 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { RevisionLanes } from './revisionLanes';
 
 export type AsyncValue<T> =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'ready'; value: T }
-  | { status: 'error'; error: unknown };
+  { status: 'idle' } | { status: 'loading' } | { status: 'ready'; value: T } | { status: 'error'; error: unknown };
 
 const IDLE: AsyncValue<never> = { status: 'idle' };
 const LOADING: AsyncValue<never> = { status: 'loading' };
@@ -43,16 +40,19 @@ export function useAsyncValue<T>(
     revisionRef.current = revision;
     const controller = new AbortController();
     let shown: { value: T } | null = null;
-    readRef.current(controller.signal).then((value) => {
-      if (!lane.isLatest('read', revision)) {
-        disposeRef.current?.(value);
-        return;
-      }
-      shown = { value };
-      setState({ key, revision, value: { status: 'ready', value } });
-    }, (error: unknown) => {
-      if (lane.isLatest('read', revision)) setState({ key, revision, value: { status: 'error', error } });
-    });
+    readRef.current(controller.signal).then(
+      (value) => {
+        if (!lane.isLatest('read', revision)) {
+          disposeRef.current?.(value);
+          return;
+        }
+        shown = { value };
+        setState({ key, revision, value: { status: 'ready', value } });
+      },
+      (error: unknown) => {
+        if (lane.isLatest('read', revision)) setState({ key, revision, value: { status: 'error', error } });
+      },
+    );
     return () => {
       lane.forget('read');
       revisionRef.current = 0;
@@ -68,9 +68,13 @@ export function useAsyncValue<T>(
 export function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, ms);
-    signal.addEventListener('abort', () => {
-      clearTimeout(timer);
-      reject(signal.reason);
-    }, { once: true });
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      },
+      { once: true },
+    );
   });
 }

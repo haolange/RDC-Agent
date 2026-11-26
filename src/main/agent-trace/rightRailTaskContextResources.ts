@@ -1,6 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import type { ConversationMessage, ConversationToolResourceRef, ConversationWorkBlock } from '@shared/types/conversation';
+import type {
+  ConversationMessage,
+  ConversationToolResourceRef,
+  ConversationWorkBlock,
+} from '@shared/types/conversation';
 import type { PromptSegment } from '@shared/types/rdcRuntime';
 import type { TaskContextResource } from '@shared/types/trace';
 
@@ -17,7 +21,11 @@ const collectToolRefs = (
 
 const safeOpenPath = (value: string | undefined): string | undefined => {
   if (!value) return undefined;
-  try { return fs.existsSync(value) ? value : undefined; } catch { return undefined; }
+  try {
+    return fs.existsSync(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 const pathSummary = (targetPath: string | undefined, projectRoot: string | undefined): string | undefined => {
@@ -32,23 +40,17 @@ const pathSummary = (targetPath: string | undefined, projectRoot: string | undef
   return parent && parent !== '.' ? path.basename(parent) : undefined;
 };
 
-const fromToolRef = (
-  ref: ConversationToolResourceRef,
-  projectRoot: string | undefined,
-): TaskContextResource => ({
+const fromToolRef = (ref: ConversationToolResourceRef, projectRoot: string | undefined): TaskContextResource => ({
   id: ref.id,
   kind: ref.kind,
   label: ref.label,
-  summary: ref.path ? pathSummary(ref.path, projectRoot) ?? ref.summary : ref.summary,
+  summary: ref.path ? (pathSummary(ref.path, projectRoot) ?? ref.summary) : ref.summary,
   state: 'used',
   path: safeOpenPath(ref.path),
   url: ref.url,
 });
 
-const fromPromptSegment = (
-  segment: PromptSegment,
-  projectRoot: string | undefined,
-): TaskContextResource | null => {
+const fromPromptSegment = (segment: PromptSegment, projectRoot: string | undefined): TaskContextResource | null => {
   if (segment.kind === 'preloaded-skill') {
     const skillId = segment.id.startsWith('skill:') ? segment.id.slice('skill:'.length) : segment.id;
     return {
@@ -76,9 +78,7 @@ const fromPromptSegment = (
 const dedupeToolRefs = (refs: ConversationToolResourceRef[]): ConversationToolResourceRef[] => {
   const seen = new Set<string>();
   return refs.filter((ref) => {
-    const identity = ref.path
-      ? 'path:' + path.normalize(ref.path).replaceAll('\\', '/').toLocaleLowerCase()
-      : ref.id;
+    const identity = ref.path ? 'path:' + path.normalize(ref.path).replaceAll('\\', '/').toLocaleLowerCase() : ref.id;
     if (seen.has(identity)) return false;
     seen.add(identity);
     return true;

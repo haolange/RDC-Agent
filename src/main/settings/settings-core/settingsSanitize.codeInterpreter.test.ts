@@ -15,10 +15,12 @@ describe('sanitizeCodeInterpreterSettings', () => {
   });
 
   it('keeps only the executable field for tooling.shell', () => {
-    expect(sanitizeAgentShellSettings({
-      executable: '  C:\\\\pwsh.exe  ',
-      env: { TOKEN: 'secret' },
-    })).toEqual({ executable: 'C:\\\\pwsh.exe' });
+    expect(
+      sanitizeAgentShellSettings({
+        executable: '  C:\\\\pwsh.exe  ',
+        env: { TOKEN: 'secret' },
+      }),
+    ).toEqual({ executable: 'C:\\\\pwsh.exe' });
   });
 
   it('does not accept a project-shaped extra shell payload beyond executable', () => {
@@ -29,14 +31,16 @@ describe('sanitizeCodeInterpreterSettings', () => {
   });
 
   it('clamps timeout and keeps explicit enablement', () => {
-    expect(sanitizeCodeInterpreterSettings({
-      enabled: true,
-      command: '  py  ',
-      argsPrefix: ['-X', 'utf8'],
-      timeoutMs: 12,
-      env: { PYTHONUNBUFFERED: '1' },
-      artifactsEnabled: false,
-    })).toEqual({
+    expect(
+      sanitizeCodeInterpreterSettings({
+        enabled: true,
+        command: '  py  ',
+        argsPrefix: ['-X', 'utf8'],
+        timeoutMs: 12,
+        env: { PYTHONUNBUFFERED: '1' },
+        artifactsEnabled: false,
+      }),
+    ).toEqual({
       enabled: true,
       command: 'py',
       argsPrefix: ['-X', 'utf8'],

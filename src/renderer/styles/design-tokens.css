@@ -113,7 +113,9 @@
 
   /* Typography */
   /* Inter and JetBrains Mono ship with the app (@fontsource-variable); CJK falls through to the system face. */
-  --font-sans-default: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+  --font-sans-default:
+    'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei UI', sans-serif;
   --font-mono-default: 'JetBrains Mono Variable', 'JetBrains Mono', 'SF Mono', Consolas, monospace;
   --font-sans: var(--font-sans-default);
   --font-mono: var(--font-mono-default);
@@ -133,7 +135,6 @@
   --font-normal: 400;
   --font-semibold: 600;
 
-
   /* Focus ring: one outside offset for free-standing controls, one inside offset for rows clipped by a scroller. */
   --focus-ring-offset: 2px;
   --focus-ring-offset-inset: -2px;
@@ -146,11 +147,11 @@
   --leading-relaxed: 1.625;
 
   /* Shadows — macOS-style layered soft elevation (ambient + key light) */
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.10), 0 1px 1px rgb(0 0 0 / 0.06);
-  --shadow-md: 0 2px 4px rgb(0 0 0 / 0.10), 0 8px 20px rgb(0 0 0 / 0.16);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.1), 0 1px 1px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 2px 4px rgb(0 0 0 / 0.1), 0 8px 20px rgb(0 0 0 / 0.16);
   --shadow-lg: 0 4px 8px rgb(0 0 0 / 0.12), 0 18px 38px rgb(0 0 0 / 0.22);
-  --shadow-xl: 0 8px 16px rgb(0 0 0 / 0.16), 0 32px 64px rgb(0 0 0 / 0.30);
-  --shadow-panel: 0 2px 6px rgb(0 0 0 / 0.10), 0 14px 30px rgb(0 0 0 / 0.18);
+  --shadow-xl: 0 8px 16px rgb(0 0 0 / 0.16), 0 32px 64px rgb(0 0 0 / 0.3);
+  --shadow-panel: 0 2px 6px rgb(0 0 0 / 0.1), 0 14px 30px rgb(0 0 0 / 0.18);
   --shadow-panel-hover: 0 4px 10px rgb(0 0 0 / 0.14), 0 18px 36px rgb(0 0 0 / 0.22);
   --shadow-glow: 0 0 0 1px rgb(var(--color-accent-500) / 0.12);
   --shadow-glow-strong: 0 0 0 1px rgb(var(--color-accent-500) / 0.2);
@@ -221,10 +222,10 @@
   --animation-shake: 0.5s;
 
   /* Semantic Border Radius */
-  --radius-card: var(--radius-lg);        /* 10px - card */
-  --radius-button: var(--radius-md);      /* 8px - button */
-  --radius-input: var(--radius-md);       /* 8px - input */
-  --radius-sheet: var(--radius-2xl);      /* 18px - sheets and dialogs */
+  --radius-card: var(--radius-lg); /* 10px - card */
+  --radius-button: var(--radius-md); /* 8px - button */
+  --radius-input: var(--radius-md); /* 8px - input */
+  --radius-sheet: var(--radius-2xl); /* 18px - sheets and dialogs */
   --radius-bubble: var(--radius-xl);
   --radius-bubble-tail: var(--radius-md);
 
@@ -302,11 +303,11 @@
 
   /* Light elevation: cooler, softer shadows + a crisp white top edge */
   --shadow-sm: 0 1px 2px rgb(20 30 44 / 0.08), 0 1px 1px rgb(20 30 44 / 0.04);
-  --shadow-md: 0 2px 4px rgb(20 30 44 / 0.06), 0 8px 20px rgb(20 30 44 / 0.10);
+  --shadow-md: 0 2px 4px rgb(20 30 44 / 0.06), 0 8px 20px rgb(20 30 44 / 0.1);
   --shadow-lg: 0 4px 8px rgb(20 30 44 / 0.08), 0 18px 38px rgb(20 30 44 / 0.12);
-  --shadow-xl: 0 8px 16px rgb(20 30 44 / 0.10), 0 32px 64px rgb(20 30 44 / 0.16);
-  --shadow-panel: 0 2px 6px rgb(20 30 44 / 0.06), 0 14px 30px rgb(20 30 44 / 0.10);
-  --shadow-panel-hover: 0 4px 10px rgb(20 30 44 / 0.10), 0 18px 36px rgb(20 30 44 / 0.14);
+  --shadow-xl: 0 8px 16px rgb(20 30 44 / 0.1), 0 32px 64px rgb(20 30 44 / 0.16);
+  --shadow-panel: 0 2px 6px rgb(20 30 44 / 0.06), 0 14px 30px rgb(20 30 44 / 0.1);
+  --shadow-panel-hover: 0 4px 10px rgb(20 30 44 / 0.1), 0 18px 36px rgb(20 30 44 / 0.14);
   --highlight-edge: inset 0 1px 0 rgb(255 255 255 / 0.85);
   --highlight-faint: inset 0 1px 0 rgb(255 255 255 / 0.6);
   --shadow-drawer: 0 -18px 34px rgb(20 30 44 / 0.08);
@@ -318,35 +319,39 @@
   --token-surface-raised: rgb(var(--color-bg-1));
 
   /* Effort 强度渐进指示专用，不得挪作装饰。普通档：低浅 → 高深（不含 Max）。 */
-  --token-effort-fill-1:       hsl(265 40% 86%);
-  --token-effort-fill-2:       hsl(265 44% 78%);
-  --token-effort-fill-3:       hsl(265 48% 70%);
-  --token-effort-fill-4:       hsl(265 52% 60%);
-  --token-effort-fill-5:       hsl(265 56% 50%);
-  --token-effort-thumb:        hsl(265 52% 50%);
-  --token-effort-track:        color-mix(in srgb, var(--token-border-muted) 80%, transparent);
+  --token-effort-fill-1: hsl(265 40% 86%);
+  --token-effort-fill-2: hsl(265 44% 78%);
+  --token-effort-fill-3: hsl(265 48% 70%);
+  --token-effort-fill-4: hsl(265 52% 60%);
+  --token-effort-fill-5: hsl(265 56% 50%);
+  --token-effort-thumb: hsl(265 52% 50%);
+  --token-effort-track: color-mix(in srgb, var(--token-border-muted) 80%, transparent);
   /* Max-tier pixel field palette (dark rail + growing cells); not a track fill gradient */
   /* Max: translucent dark-gray rail + soft lavender pixel cloud (reference grow frames).
      Pixel hues stay near effort purple family so High→Max brightness does not jump. */
   /* Light Max rail: soft graphite, translucent so the pixel field stays readable */
-  --token-effort-max-track:    color-mix(in srgb, transparent 58%, color-mix(in srgb, var(--token-bg-overlay) 40%, #d8dbe2));
-  --token-effort-max-from:     color-mix(in srgb, var(--token-effort-fill-5) 28%, #9a93a8);
-  --token-effort-max-mid:      color-mix(in srgb, var(--token-effort-fill-4) 32%, #b4abc4);
-  --token-effort-max-to:       color-mix(in srgb, var(--token-effort-fill-4) 24%, #d2cadc);
-  --token-effort-max-sparkle:  rgb(255 255 255 / 0.92);
-  --token-effort-max-thumb:    color-mix(in srgb, var(--token-effort-max-sparkle) 70%, var(--token-effort-max-to));
+  --token-effort-max-track: color-mix(
+    in srgb,
+    transparent 58%,
+    color-mix(in srgb, var(--token-bg-overlay) 40%, #d8dbe2)
+  );
+  --token-effort-max-from: color-mix(in srgb, var(--token-effort-fill-5) 28%, #9a93a8);
+  --token-effort-max-mid: color-mix(in srgb, var(--token-effort-fill-4) 32%, #b4abc4);
+  --token-effort-max-to: color-mix(in srgb, var(--token-effort-fill-4) 24%, #d2cadc);
+  --token-effort-max-sparkle: rgb(255 255 255 / 0.92);
+  --token-effort-max-thumb: color-mix(in srgb, var(--token-effort-max-sparkle) 70%, var(--token-effort-max-to));
 
   /* Context breakdown 分段专用（light），不得挪作它用 — 略加深以保证浅色底对比 */
   --token-context-system-prompt: rgb(var(--color-purple));
-  --token-context-memory-files:  rgb(var(--color-warning));
-  --token-context-skills:        rgb(var(--color-info));
-  --token-context-system-tools:  rgb(var(--color-success));
-  --token-context-mcp-tools:     rgb(var(--color-orange));
-  --token-context-subagents:     rgb(var(--color-pink));
-  --token-context-summarized:    rgb(var(--color-primary-400));
-  --token-context-conversation:  rgb(var(--color-primary-500));
-  --token-context-deferred:      rgb(var(--color-text-muted));
-  --token-context-free:          rgb(var(--color-bg-4));
+  --token-context-memory-files: rgb(var(--color-warning));
+  --token-context-skills: rgb(var(--color-info));
+  --token-context-system-tools: rgb(var(--color-success));
+  --token-context-mcp-tools: rgb(var(--color-orange));
+  --token-context-subagents: rgb(var(--color-pink));
+  --token-context-summarized: rgb(var(--color-primary-400));
+  --token-context-conversation: rgb(var(--color-primary-500));
+  --token-context-deferred: rgb(var(--color-text-muted));
+  --token-context-free: rgb(var(--color-bg-4));
 }
 
 :root[data-font-scale='small'] {
@@ -386,206 +391,210 @@
 
 :root {
   /* ── Interactive surfaces ── */
-  --token-bg-app:              rgb(var(--color-bg-0));
-  --token-bg-shell:            rgb(var(--color-bg-1));
-  --token-bg-panel:            rgb(var(--color-bg-2));
-  --token-bg-raised:           rgb(var(--color-bg-3));
-  --token-bg-overlay:          rgb(var(--color-surface-overlay));
+  --token-bg-app: rgb(var(--color-bg-0));
+  --token-bg-shell: rgb(var(--color-bg-1));
+  --token-bg-panel: rgb(var(--color-bg-2));
+  --token-bg-raised: rgb(var(--color-bg-3));
+  --token-bg-overlay: rgb(var(--color-surface-overlay));
 
   /* ── Interactive element states ── */
-  --token-interactive-rest:    transparent;
-  --token-interactive-hover:   rgb(var(--color-bg-3));
-  --token-interactive-active:  rgb(var(--color-accent-500) / 0.12);
-  --token-interactive-focus:   rgb(var(--color-accent-500) / 0.16);
+  --token-interactive-rest: transparent;
+  --token-interactive-hover: rgb(var(--color-bg-3));
+  --token-interactive-active: rgb(var(--color-accent-500) / 0.12);
+  --token-interactive-focus: rgb(var(--color-accent-500) / 0.16);
 
   /* ── Borders ── */
-  --token-border-muted:        rgb(var(--color-border-subtle));
-  --token-border-default:      rgb(var(--color-border-default));
-  --token-border-strong:       rgb(var(--color-border-strong));
-  --token-border-focus:        rgb(var(--color-focus-ring));
-  --token-border-card:         rgb(var(--color-border-secondary));
-  --token-border-input:        rgb(var(--color-border-default));
-  --token-border-control:      rgb(var(--color-control-boundary));
+  --token-border-muted: rgb(var(--color-border-subtle));
+  --token-border-default: rgb(var(--color-border-default));
+  --token-border-strong: rgb(var(--color-border-strong));
+  --token-border-focus: rgb(var(--color-focus-ring));
+  --token-border-card: rgb(var(--color-border-secondary));
+  --token-border-input: rgb(var(--color-border-default));
+  --token-border-control: rgb(var(--color-control-boundary));
 
   /* ── Typography ── */
   /* Three text levels: primary, secondary, disabled (placeholders share disabled). */
-  --token-text-primary:        rgb(var(--color-text-primary));
-  --token-text-secondary:      rgb(var(--color-text-secondary));
-  --token-text-disabled:       rgb(var(--color-text-muted));
-  --token-text-link:           rgb(var(--color-accent-ink));
+  --token-text-primary: rgb(var(--color-text-primary));
+  --token-text-secondary: rgb(var(--color-text-secondary));
+  --token-text-disabled: rgb(var(--color-text-muted));
+  --token-text-link: rgb(var(--color-accent-ink));
   /* Text and glyphs on a filled accent surface (primary buttons, filled markers). */
-  --token-text-on-accent:      rgb(var(--color-text-on-accent));
-  --token-text-on-danger:      rgb(var(--color-on-danger));
+  --token-text-on-accent: rgb(var(--color-text-on-accent));
+  --token-text-on-danger: rgb(var(--color-on-danger));
   /* Slider thumbs, switch knobs and stop dots: a constant light control face in both themes, never the ink. */
-  --token-control-knob:        rgb(255 255 255);
+  --token-control-knob: rgb(255 255 255);
   --token-control-knob-border: rgb(0 0 0 / 0.14);
   --token-control-knob-shadow: 0 1px 2px rgb(0 0 0 / 0.24), 0 2px 6px rgb(0 0 0 / 0.16);
 
   /* ── Selection ── */
-  --token-selection-bg:        rgb(var(--color-accent-500) / 0.12);
-  --token-selection-bg-hover:  rgb(var(--color-accent-500) / 0.16);
+  --token-selection-bg: rgb(var(--color-accent-500) / 0.12);
+  --token-selection-bg-hover: rgb(var(--color-accent-500) / 0.16);
   --token-selection-indicator: var(--token-accent-primary);
 
   /* ── Accent ── */
-  --token-accent-primary:      rgb(var(--color-accent-ink));
+  --token-accent-primary: rgb(var(--color-accent-ink));
   /* Right-rail empty-visual illustration accent; not a chrome/UI surface color. */
   --token-illustration-purple: rgb(var(--color-purple));
 
   /* ── Muted/dim surfaces ── */
-  --token-bg-muted:            var(--token-bg-raised);
-  --token-border-subtle:       color-mix(in srgb, var(--token-border-muted) 50%, transparent);
+  --token-bg-muted: var(--token-bg-raised);
+  --token-border-subtle: color-mix(in srgb, var(--token-border-muted) 50%, transparent);
 
   /* ── Status ── */
-  --token-status-success:      rgb(var(--color-success));
-  --token-status-warning:      rgb(var(--color-warning));
-  --token-status-error:        rgb(var(--color-error));
-  --token-status-info:         rgb(var(--color-info));
+  --token-status-success: rgb(var(--color-success));
+  --token-status-warning: rgb(var(--color-warning));
+  --token-status-error: rgb(var(--color-error));
+  --token-status-info: rgb(var(--color-info));
 
   /* ── Task states ── grey only means "not happening": pending (hollow) and cancelled (slashed). */
-  --token-task-pending:        rgb(var(--color-text-tertiary));
-  --token-task-active:         var(--token-accent-primary);
-  --token-task-done:           rgb(var(--color-success));
-  --token-task-blocked:        rgb(var(--color-warning));
-  --token-task-failed:         rgb(var(--color-error));
-  --token-task-cancelled:      rgb(var(--color-text-muted));
+  --token-task-pending: rgb(var(--color-text-tertiary));
+  --token-task-active: var(--token-accent-primary);
+  --token-task-done: rgb(var(--color-success));
+  --token-task-blocked: rgb(var(--color-warning));
+  --token-task-failed: rgb(var(--color-error));
+  --token-task-cancelled: rgb(var(--color-text-muted));
 
   /* Effort 强度渐进指示专用，不得挪作装饰。普通档：低浅 → 高深（不含 Max）。 */
-  --token-effort-fill-1:       hsl(265 46% 72%);
-  --token-effort-fill-2:       hsl(265 50% 64%);
-  --token-effort-fill-3:       hsl(265 54% 56%);
-  --token-effort-fill-4:       hsl(265 58% 48%);
-  --token-effort-fill-5:       hsl(265 62% 40%);
-  --token-effort-thumb:        hsl(265 58% 48%);
-  --token-effort-track:        color-mix(in srgb, var(--token-border-muted) 72%, transparent);
-  --token-effort-max-track:    color-mix(in srgb, transparent 62%, color-mix(in srgb, var(--token-bg-overlay) 60%, #292930));
-  --token-effort-max-from:     color-mix(in srgb, var(--token-effort-fill-5) 18%, #6a6474);
-  --token-effort-max-mid:      color-mix(in srgb, var(--token-effort-fill-4) 22%, #958aa8);
-  --token-effort-max-to:       color-mix(in srgb, var(--token-effort-fill-4) 16%, #c0b6cf);
-  --token-effort-max-sparkle:  rgb(236 230 245 / 0.84);
-  --token-effort-max-thumb:    color-mix(in srgb, var(--token-effort-max-sparkle) 88%, var(--token-effort-max-to));
+  --token-effort-fill-1: hsl(265 46% 72%);
+  --token-effort-fill-2: hsl(265 50% 64%);
+  --token-effort-fill-3: hsl(265 54% 56%);
+  --token-effort-fill-4: hsl(265 58% 48%);
+  --token-effort-fill-5: hsl(265 62% 40%);
+  --token-effort-thumb: hsl(265 58% 48%);
+  --token-effort-track: color-mix(in srgb, var(--token-border-muted) 72%, transparent);
+  --token-effort-max-track: color-mix(
+    in srgb,
+    transparent 62%,
+    color-mix(in srgb, var(--token-bg-overlay) 60%, #292930)
+  );
+  --token-effort-max-from: color-mix(in srgb, var(--token-effort-fill-5) 18%, #6a6474);
+  --token-effort-max-mid: color-mix(in srgb, var(--token-effort-fill-4) 22%, #958aa8);
+  --token-effort-max-to: color-mix(in srgb, var(--token-effort-fill-4) 16%, #c0b6cf);
+  --token-effort-max-sparkle: rgb(236 230 245 / 0.84);
+  --token-effort-max-thumb: color-mix(in srgb, var(--token-effort-max-sparkle) 88%, var(--token-effort-max-to));
 
   /* Context breakdown 分段专用，不得挪作它用。
    * 多彩但克制的彩虹序：紫/金/青/绿/橙/粉 + 主蓝对话段；deferred/free 用中性灰。
    * 不占用 --token-accent-* / --token-status-* 语义位。 */
   --token-context-system-prompt: rgb(var(--color-purple));
-  --token-context-memory-files:  rgb(var(--color-warning));
-  --token-context-skills:        rgb(var(--color-info));
-  --token-context-system-tools:  rgb(var(--color-success));
-  --token-context-mcp-tools:     rgb(var(--color-orange));
-  --token-context-subagents:     rgb(var(--color-pink));
-  --token-context-summarized:    rgb(var(--color-primary-300));
-  --token-context-conversation:  rgb(var(--color-primary-400));
-  --token-context-deferred:      rgb(var(--color-text-muted));
-  --token-context-free:          rgb(var(--color-bg-5));
+  --token-context-memory-files: rgb(var(--color-warning));
+  --token-context-skills: rgb(var(--color-info));
+  --token-context-system-tools: rgb(var(--color-success));
+  --token-context-mcp-tools: rgb(var(--color-orange));
+  --token-context-subagents: rgb(var(--color-pink));
+  --token-context-summarized: rgb(var(--color-primary-300));
+  --token-context-conversation: rgb(var(--color-primary-400));
+  --token-context-deferred: rgb(var(--color-text-muted));
+  --token-context-free: rgb(var(--color-bg-5));
 
   /* ── Elevation (macOS-style depth) ──
    *  Components express depth through these tokens instead of hard 1px borders.
    *  `*-edge` appends a glassy top highlight; pair it after the shadow. */
-  --transcript-card-radius:    var(--radius-lg);
-  --transcript-card-padding:   var(--space-2) var(--space-3);
-  --transcript-card-border:    1px solid var(--token-border-muted);
-  --transcript-card-surface:   var(--token-surface-sunken);
-  --transcript-card-shadow:    var(--shadow-panel-hover);
+  --transcript-card-radius: var(--radius-lg);
+  --transcript-card-padding: var(--space-2) var(--space-3);
+  --transcript-card-border: 1px solid var(--token-border-muted);
+  --transcript-card-surface: var(--token-surface-sunken);
+  --transcript-card-shadow: var(--shadow-panel-hover);
   --transcript-card-icon-size: 14px;
 
   /* Elevation: cards rest at 1, floating panels at 2, sheets and dialogs at 3. */
-  --token-elevation-1:         var(--shadow-sm);
-  --token-elevation-2:         var(--shadow-lg);
-  --token-elevation-3:         var(--shadow-xl);
-  --token-shadow-raised:       var(--shadow-sm);
-  --token-shadow-card:         var(--shadow-md);
-  --token-shadow-popover:      var(--shadow-lg);
-  --token-shadow-modal:        var(--shadow-xl);
-  --token-elevation-edge:      var(--highlight-edge);
-  --token-edge-faint:          var(--highlight-faint);
-  --token-shadow-drawer:       var(--shadow-drawer);
-  --token-shadow-well:         var(--shadow-well);
-  --token-hairline-swatch:     var(--hairline-swatch);
-  --token-sheen-drawer:        var(--sheen-drawer);
+  --token-elevation-1: var(--shadow-sm);
+  --token-elevation-2: var(--shadow-lg);
+  --token-elevation-3: var(--shadow-xl);
+  --token-shadow-raised: var(--shadow-sm);
+  --token-shadow-card: var(--shadow-md);
+  --token-shadow-popover: var(--shadow-lg);
+  --token-shadow-modal: var(--shadow-xl);
+  --token-elevation-edge: var(--highlight-edge);
+  --token-edge-faint: var(--highlight-faint);
+  --token-shadow-drawer: var(--shadow-drawer);
+  --token-shadow-well: var(--shadow-well);
+  --token-hairline-swatch: var(--hairline-swatch);
+  --token-sheen-drawer: var(--sheen-drawer);
   /* Raised surface fill: on dark, depth reads as a surface clearly lighter than
    * the canvas (elevation overlay) plus the highlight edge — shadows barely show. */
-  --token-surface-raised:      linear-gradient(180deg, rgb(var(--color-bg-4)), rgb(var(--color-bg-3)));
-  --token-surface-sunken:      rgb(var(--color-bg-1) / 0.6);
+  --token-surface-raised: linear-gradient(180deg, rgb(var(--color-bg-4)), rgb(var(--color-bg-3)));
+  --token-surface-sunken: rgb(var(--color-bg-1) / 0.6);
 
   /* ── Control sizing scale ──
    *  sm / md / lg = 28 / 32 / 36. Default interactive control = md. */
-  --control-height-sm:         28px;
-  --control-height-md:         32px;
-  --control-height-lg:         36px;
-  --control-radius:            var(--radius-lg);
-  --control-radius-pill:       var(--radius-full);
-  --control-padding-x:         var(--space-3);
+  --control-height-sm: 28px;
+  --control-height-md: 32px;
+  --control-height-lg: 36px;
+  --control-radius: var(--radius-lg);
+  --control-radius-pill: var(--radius-full);
+  --control-padding-x: var(--space-3);
   /* Display chips (page pills, source pills): not controls, so one step below sm. */
-  --chip-height:               24px;
-  --chip-icon-size:            14px;
+  --chip-height: 24px;
+  --chip-icon-size: 14px;
 
   /* ── Component: Button ── */
-  --btn-height-sm:             var(--control-height-sm);
-  --btn-height-md:             var(--control-height-md);
-  --btn-height-lg:             var(--control-height-lg);
-  --btn-padding-sm:            0 var(--space-2);
-  --btn-padding-md:            0 var(--space-3);
-  --btn-padding-lg:            0 var(--space-5);
-  --btn-radius:                var(--control-radius);
-  --btn-font-size:             var(--type-body-size);
-  --btn-font-weight:           var(--font-semibold);
-  --btn-primary-bg:            var(--token-accent-primary);
-  --btn-primary-bg-hover:      color-mix(in srgb, var(--token-accent-primary) 88%, var(--token-text-primary));
-  --btn-primary-text:          var(--token-text-on-accent);
-  --btn-secondary-bg:          var(--token-bg-muted);
-  --btn-secondary-bg-hover:    var(--token-interactive-hover);
-  --btn-secondary-border:      var(--token-border-default);
-  --btn-ghost-bg:              transparent;
-  --btn-ghost-bg-hover:        var(--token-interactive-hover);
+  --btn-height-sm: var(--control-height-sm);
+  --btn-height-md: var(--control-height-md);
+  --btn-height-lg: var(--control-height-lg);
+  --btn-padding-sm: 0 var(--space-2);
+  --btn-padding-md: 0 var(--space-3);
+  --btn-padding-lg: 0 var(--space-5);
+  --btn-radius: var(--control-radius);
+  --btn-font-size: var(--type-body-size);
+  --btn-font-weight: var(--font-semibold);
+  --btn-primary-bg: var(--token-accent-primary);
+  --btn-primary-bg-hover: color-mix(in srgb, var(--token-accent-primary) 88%, var(--token-text-primary));
+  --btn-primary-text: var(--token-text-on-accent);
+  --btn-secondary-bg: var(--token-bg-muted);
+  --btn-secondary-bg-hover: var(--token-interactive-hover);
+  --btn-secondary-border: var(--token-border-default);
+  --btn-ghost-bg: transparent;
+  --btn-ghost-bg-hover: var(--token-interactive-hover);
 
   /* ── Component: Input ── */
-  --input-height-sm:           var(--control-height-sm);
-  --input-height-md:           var(--control-height-md);
-  --input-height-lg:           var(--control-height-lg);
-  --input-bg:                  var(--token-bg-muted);
-  --input-bg-hover:            var(--token-bg-raised);
-  --input-border:              var(--token-border-input);
-  --input-border-hover:        var(--token-border-strong);
-  --input-border-focus:        var(--token-border-focus);
-  --input-radius:              var(--radius-input);
-  --input-text:                var(--token-text-primary);
-  --input-placeholder:         var(--token-text-disabled);
+  --input-height-sm: var(--control-height-sm);
+  --input-height-md: var(--control-height-md);
+  --input-height-lg: var(--control-height-lg);
+  --input-bg: var(--token-bg-muted);
+  --input-bg-hover: var(--token-bg-raised);
+  --input-border: var(--token-border-input);
+  --input-border-hover: var(--token-border-strong);
+  --input-border-focus: var(--token-border-focus);
+  --input-radius: var(--radius-input);
+  --input-text: var(--token-text-primary);
+  --input-placeholder: var(--token-text-disabled);
 
   /* ── Component: Checkbox / CheckPill box ──
    *  Multi-select stays an outline box + ink tick. Accent fill is Switch-only. */
-  --checkbox-bg:               var(--token-bg-panel);
-  --checkbox-border:           var(--token-border-control);
-  --checkbox-checked-bg:       transparent;
-  --checkbox-checked-border:   var(--token-border-strong);
-  --checkbox-check-color:      var(--token-text-primary);
+  --checkbox-bg: var(--token-bg-panel);
+  --checkbox-border: var(--token-border-control);
+  --checkbox-checked-bg: transparent;
+  --checkbox-checked-border: var(--token-border-strong);
+  --checkbox-check-color: var(--token-text-primary);
 
   /* ── Component: Card ── */
-  --card-bg:                   var(--token-bg-panel);
-  --card-bg-hover:             var(--token-interactive-hover);
-  --card-border:               var(--token-border-card);
-  --card-radius:               var(--radius-card);
-  --card-shadow:               var(--token-shadow-card);
+  --card-bg: var(--token-bg-panel);
+  --card-bg-hover: var(--token-interactive-hover);
+  --card-border: var(--token-border-card);
+  --card-radius: var(--radius-card);
+  --card-shadow: var(--token-shadow-card);
 
   /* ── Component: Modal / Dialog ── */
-  --modal-bg:                  var(--token-bg-shell);
-  --modal-border:              var(--token-border-default);
-  --modal-radius:              var(--radius-sheet);
-  --modal-shadow:              var(--token-shadow-popover);
-  --modal-backdrop:            color-mix(in srgb, var(--token-bg-app) 40%, transparent);
-  --modal-backdrop-filter:     blur(16px);
-  --modal-workbench-inset:     var(--space-4);
+  --modal-bg: var(--token-bg-shell);
+  --modal-border: var(--token-border-default);
+  --modal-radius: var(--radius-sheet);
+  --modal-shadow: var(--token-shadow-popover);
+  --modal-backdrop: color-mix(in srgb, var(--token-bg-app) 40%, transparent);
+  --modal-backdrop-filter: blur(16px);
+  --modal-workbench-inset: var(--space-4);
 
   /* ── Component: Badge ── */
-  --badge-height:              20px;
-  --badge-radius:              var(--radius-full);
-  --badge-font-size:           var(--type-meta-size);
-  --badge-font-weight:         var(--font-semibold);
+  --badge-height: 20px;
+  --badge-radius: var(--radius-full);
+  --badge-font-size: var(--type-meta-size);
+  --badge-font-weight: var(--font-semibold);
 
   /* ── Layout constants ── */
-  --layout-sidebar-left:       256px;
-  --layout-sidebar-right:      312px;
-  --layout-header:             52px;
-  --layout-composer-max:       760px;
+  --layout-sidebar-left: 256px;
+  --layout-sidebar-right: 312px;
+  --layout-header: 52px;
+  --layout-composer-max: 760px;
 }
 
 @media (max-width: 640px) {

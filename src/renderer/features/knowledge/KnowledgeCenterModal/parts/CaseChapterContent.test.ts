@@ -7,22 +7,28 @@ import type { KnowledgeCaseChapter } from '@shared/types/knowledge';
 vi.mock('../../../../i18n', () => ({
   useI18n: () => ({
     language: 'en',
-    t: (key: string) => ({
-      'knowledgeCenter.case.sourceDetails': 'Source and parameters',
-      'knowledgeCenter.field.expected': 'Expected',
-      'knowledgeCenter.field.observed': 'Observed',
-      'knowledgeCenter.field.category_primary': 'Category',
-      'knowledgeCenter.field.location': 'Location',
-      'knowledgeCenter.evidenceKind.image_compare': 'Image comparison',
-      'knowledgeCenter.valueUnknown': 'Unknown',
-      'knowledgeCenter.listSeparator': ', ',
-    }[key] ?? key),
+    t: (key: string) =>
+      ({
+        'knowledgeCenter.case.sourceDetails': 'Source and parameters',
+        'knowledgeCenter.field.expected': 'Expected',
+        'knowledgeCenter.field.observed': 'Observed',
+        'knowledgeCenter.field.category_primary': 'Category',
+        'knowledgeCenter.field.location': 'Location',
+        'knowledgeCenter.evidenceKind.image_compare': 'Image comparison',
+        'knowledgeCenter.valueUnknown': 'Unknown',
+        'knowledgeCenter.listSeparator': ', ',
+      })[key] ?? key,
   }),
 }));
 
-const render = (chapter: KnowledgeCaseChapter | undefined, value: unknown) => renderToStaticMarkup(createElement(CaseChapterContent, {
-  spaceId: 'user', chapter, content: typeof value === 'string' ? value : JSON.stringify(value),
-}));
+const render = (chapter: KnowledgeCaseChapter | undefined, value: unknown) =>
+  renderToStaticMarkup(
+    createElement(CaseChapterContent, {
+      spaceId: 'user',
+      chapter,
+      content: typeof value === 'string' ? value : JSON.stringify(value),
+    }),
+  );
 
 describe('case chapters as an authored document', () => {
   it('leaves prose and invalid JSON on the Markdown path', () => {
@@ -32,8 +38,13 @@ describe('case chapters as an authored document', () => {
 
   it('compares expected with observed and reads the visual facts in words', () => {
     const markup = render('symptoms', {
-      expected: 'Hair keeps its dark detail', observed: 'Hair washes out to white',
-      visual: { phenomenon: ['wrong colour', 'too bright'], spatial_pattern: 'view_space', affected_objects: ['Mesh_Body', 'Props/Crate'] },
+      expected: 'Hair keeps its dark detail',
+      observed: 'Hair washes out to white',
+      visual: {
+        phenomenon: ['wrong colour', 'too bright'],
+        spatial_pattern: 'view_space',
+        affected_objects: ['Mesh_Body', 'Props/Crate'],
+      },
     });
     expect(markup).toContain('knowledge-symptom-comparison');
     expect(markup).toContain('Hair washes out to white');
@@ -44,11 +55,14 @@ describe('case chapters as an authored document', () => {
   });
 
   it('lists evidence as findings, keeps ids off the page and puts sources one click away', () => {
-    const markup = render('evidence', [{
-      evidence_id: 'e_spirv', type: 'image_compare',
-      source: { tool: 'manual.spirv_edit', params: { file: 'asset-1f2e3d4c' } },
-      summary: 'Removing the decoration on %17 restores the frame. <script>alert(1)</script>',
-    }]);
+    const markup = render('evidence', [
+      {
+        evidence_id: 'e_spirv',
+        type: 'image_compare',
+        source: { tool: 'manual.spirv_edit', params: { file: 'asset-1f2e3d4c' } },
+        summary: 'Removing the decoration on %17 restores the frame. <script>alert(1)</script>',
+      },
+    ]);
     expect(markup).toContain('Image comparison');
     expect(markup).toContain('<code>%17</code>');
     expect(markup).toContain('aria-expanded="false"');
@@ -72,10 +86,13 @@ describe('case chapters as an authored document', () => {
   });
 
   it('numbers verification steps and localizes unknown scope values', () => {
-    expect(render('experimentVerification', ['Replay with the patch.', 'Check the other GPU.'])).toMatch(/<ol class="knowledge-case-steps"><li><span class="knowledge-case-step-text">Replay with the patch\.<\/span><\/li>/u);
+    expect(render('experimentVerification', ['Replay with the patch.', 'Check the other GPU.'])).toMatch(
+      /<ol class="knowledge-case-steps"><li><span class="knowledge-case-step-text">Replay with the patch\.<\/span><\/li>/u,
+    );
     // A step mixing prose and identifiers stays one line of text, not one grid cell per run.
-    expect(render('experimentVerification', ['Control: removing the decoration on %21 also restores it.']))
-      .toContain('<li><span class="knowledge-case-step-text">Control: removing the decoration on <code>%21</code> also restores it.</span></li>');
+    expect(render('experimentVerification', ['Control: removing the decoration on %21 also restores it.'])).toContain(
+      '<li><span class="knowledge-case-step-text">Control: removing the decoration on <code>%21</code> also restores it.</span></li>',
+    );
     const scope = render('scopeExclusions', { platform: 'Android', driver: 'unknown' });
     expect(scope).toContain('knowledgeCenter.scope.platform');
     expect(scope).toContain('Unknown');

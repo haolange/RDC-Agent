@@ -10,20 +10,34 @@ export function useCaptureRecovery(scope: CaptureScope, revision: number | undef
     const current = ++sequence.current;
     try {
       const next = await getCaptureRecovery(scope);
-      if (current === sequence.current) { setStatus(next); setError(null); }
+      if (current === sequence.current) {
+        setStatus(next);
+        setError(null);
+      }
     } catch (reason) {
       if (current === sequence.current) setError(reason instanceof Error ? reason.message : String(reason));
     }
   }, [scope]);
-  useEffect(() => { void refresh(); return () => { sequence.current += 1; }; }, [refresh, revision]);
-  const restore = useCallback(async (bindingGeneration: number): Promise<CaptureReplayState | null> => {
-    setError(null);
-    try {
-      const result = await restorePreviousCapture({ ...scope, bindingGeneration });
-      if (!result.success || !result.state) throw new Error(result.error ?? 'Capture recovery failed.');
-      await refresh();
-      return result.state;
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); return null; }
-  }, [refresh, scope]);
+  useEffect(() => {
+    void refresh();
+    return () => {
+      sequence.current += 1;
+    };
+  }, [refresh, revision]);
+  const restore = useCallback(
+    async (bindingGeneration: number): Promise<CaptureReplayState | null> => {
+      setError(null);
+      try {
+        const result = await restorePreviousCapture({ ...scope, bindingGeneration });
+        if (!result.success || !result.state) throw new Error(result.error ?? 'Capture recovery failed.');
+        await refresh();
+        return result.state;
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : String(reason));
+        return null;
+      }
+    },
+    [refresh, scope],
+  );
   return { status, error, restore };
 }

@@ -1,22 +1,34 @@
 import { z } from 'zod';
 import { ipcId, ipcNonEmptyString } from './IpcPayloadGuard';
 
-export const SessionScopeSchema = z.object({
-  projectId: ipcId(128, 'projectId'),
-  sessionId: ipcId(128, 'sessionId'),
-}).strict();
+export const SessionScopeSchema = z
+  .object({
+    projectId: ipcId(128, 'projectId'),
+    sessionId: ipcId(128, 'sessionId'),
+  })
+  .strict();
 
 export const SessionScopeArgsSchema = z.tuple([SessionScopeSchema]);
 
-export const CaptureReplayBindingSchema = SessionScopeSchema.extend({ bindingGeneration: z.number().int().nonnegative() }).strict();
+export const CaptureReplayBindingSchema = SessionScopeSchema.extend({
+  bindingGeneration: z.number().int().nonnegative(),
+}).strict();
 export const CaptureReplayBindingArgsSchema = z.tuple([CaptureReplayBindingSchema]);
-export const DevicePreparationArgsSchema = z.tuple([CaptureReplayBindingSchema.extend({
-  deviceId: ipcId(128, 'deviceId'), confirmationToken: ipcNonEmptyString(256, 'confirmationToken').optional(),
-}).strict()]);
-export const CaptureReplayApplyArgsSchema = z.tuple([CaptureReplayBindingSchema.extend({
-  eventId: z.number().int().nonnegative(),
-  target: z.object({ textureId: z.string().max(256).optional(), outputSlot: z.number().int().nonnegative().optional() }).strict().optional(),
-}).strict()]);
+export const DevicePreparationArgsSchema = z.tuple([
+  CaptureReplayBindingSchema.extend({
+    deviceId: ipcId(128, 'deviceId'),
+    confirmationToken: ipcNonEmptyString(256, 'confirmationToken').optional(),
+  }).strict(),
+]);
+export const CaptureReplayApplyArgsSchema = z.tuple([
+  CaptureReplayBindingSchema.extend({
+    eventId: z.number().int().nonnegative(),
+    target: z
+      .object({ textureId: z.string().max(256).optional(), outputSlot: z.number().int().nonnegative().optional() })
+      .strict()
+      .optional(),
+  }).strict(),
+]);
 
 export const CaptureOpenProjectInputArgsSchema = z.tuple([
   CaptureReplayBindingSchema.extend({

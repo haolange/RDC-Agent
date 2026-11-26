@@ -6,19 +6,41 @@ import { useConversationStore } from '../../stores/conversationStore';
 import { ReplyAnnouncer, announcementText } from './ReplyAnnouncer';
 import type { ConversationMessage, ConversationMessageStatus } from '@shared/types/conversation';
 
-vi.mock('../../i18n', () => ({ useI18n: () => ({ t: (_key: string, params: { text: string }) => `Reply: ${params.text}` }) }));
+vi.mock('../../i18n', () => ({
+  useI18n: () => ({ t: (_key: string, params: { text: string }) => `Reply: ${params.text}` }),
+}));
 let host: HTMLDivElement;
 let root: Root;
 const initial = useConversationStore.getState();
-const reply = (id: string, content: string, status: ConversationMessageStatus, sessionId = 'a'): ConversationMessage => ({
-  id, turnId: id, sessionId, projectId: 'p', role: 'assistant', content, status, createdAt: 1,
+const reply = (
+  id: string,
+  content: string,
+  status: ConversationMessageStatus,
+  sessionId = 'a',
+): ConversationMessage => ({
+  id,
+  turnId: id,
+  sessionId,
+  projectId: 'p',
+  role: 'assistant',
+  content,
+  status,
+  createdAt: 1,
 });
-const show = (messages: ConversationMessage[]) => act(() => useConversationStore.setState({ conversationMessages: messages }));
+const show = (messages: ConversationMessage[]) =>
+  act(() => useConversationStore.setState({ conversationMessages: messages }));
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
 });
-afterEach(() => { act(() => root.unmount()); useConversationStore.setState(initial, true); host.remove(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  act(() => root.unmount());
+  useConversationStore.setState(initial, true);
+  host.remove();
+  vi.unstubAllGlobals();
+});
 
 it('reads each reply once it settles and keeps opened history silent', () => {
   show([reply('old', 'Earlier answer', 'complete')]);

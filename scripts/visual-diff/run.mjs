@@ -19,9 +19,13 @@ const definitionsPath = path.join(here, 'scenarios.json');
 const sharedPath = path.join(scenarioDir, 'shared.json');
 const SHARED_MIN_BYTES = 4096;
 
-const fail = (message) => { console.error(`[visual-diff] ${message}`); process.exit(1); };
-const electronBinary = () => process.env.VISUAL_DIFF_ELECTRON
-  || path.join(repoRoot, 'node_modules', 'electron', 'dist', process.platform === 'win32' ? 'electron.exe' : 'electron');
+const fail = (message) => {
+  console.error(`[visual-diff] ${message}`);
+  process.exit(1);
+};
+const electronBinary = () =>
+  process.env.VISUAL_DIFF_ELECTRON ||
+  path.join(repoRoot, 'node_modules', 'electron', 'dist', process.platform === 'win32' ? 'electron.exe' : 'electron');
 
 function spawnHost(args) {
   const xvfb = process.platform === 'linux' && !process.env.DISPLAY;
@@ -33,14 +37,21 @@ function spawnHost(args) {
 
 function runHost(args, capture = false) {
   const result = spawnHost(args);
-  if (result.status !== 0) fail(`host failed (${args.join(' ')}):\n${(result.stderr || result.stdout || '').slice(-2000)}`);
+  if (result.status !== 0)
+    fail(`host failed (${args.join(' ')}):\n${(result.stderr || result.stdout || '').slice(-2000)}`);
   return capture ? result.stdout : undefined;
 }
 
 /** Pixels that changed beyond antialiasing noise; bitmaps with equal hashes are identical. */
 function changedPixels(basePng, headPng) {
   const output = runHost(['--mode', 'diff', '--a', basePng, '--b', headPng], true);
-  return JSON.parse(output.trim().split('\n').filter((line) => line.startsWith('{')).at(-1)).pixels;
+  return JSON.parse(
+    output
+      .trim()
+      .split('\n')
+      .filter((line) => line.startsWith('{'))
+      .at(-1),
+  ).pixels;
 }
 
 const readJson = (file, fallback) => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : fallback);
@@ -48,18 +59,27 @@ const writeJson = (file, value) => fs.writeFileSync(file, `${JSON.stringify(valu
 
 /** Large answers (the settings DTO, histories) are kept once and referenced by content hash. */
 function externalize(responses, shared) {
-  return Object.fromEntries(Object.entries(responses).map(([channel, entries]) => [channel, entries.map((entry) => {
-    const text = JSON.stringify(entry);
-    if (text.length < SHARED_MIN_BYTES) return entry;
-    const ref = createHash('sha256').update(text).digest('hex').slice(0, 24);
-    shared[ref] = entry;
-    return { ref };
-  })]));
+  return Object.fromEntries(
+    Object.entries(responses).map(([channel, entries]) => [
+      channel,
+      entries.map((entry) => {
+        const text = JSON.stringify(entry);
+        if (text.length < SHARED_MIN_BYTES) return entry;
+        const ref = createHash('sha256').update(text).digest('hex').slice(0, 24);
+        shared[ref] = entry;
+        return { ref };
+      }),
+    ]),
+  );
 }
 
 function internalize(responses, shared) {
-  return Object.fromEntries(Object.entries(responses).map(([channel, entries]) => [channel, entries.map((entry) => (
-    entry.ref ? shared[entry.ref] : entry))]));
+  return Object.fromEntries(
+    Object.entries(responses).map(([channel, entries]) => [
+      channel,
+      entries.map((entry) => (entry.ref ? shared[entry.ref] : entry)),
+    ]),
+  );
 }
 
 /** Stops the instance's whole process group and waits until it is gone, so the next instance can take the port. */
@@ -74,7 +94,8 @@ async function stopQaInstance(child) {
     }
   };
   if (alive()) process.kill(-child.pid);
-  for (let attempt = 0; attempt < 100 && alive(); attempt += 1) await new Promise((resolve) => setTimeout(resolve, 100));
+  for (let attempt = 0; attempt < 100 && alive(); attempt += 1)
+    await new Promise((resolve) => setTimeout(resolve, 100));
 }
 
 async function startQaInstance(workDir) {
@@ -84,9 +105,13 @@ async function startQaInstance(workDir) {
   const env = { ...process.env, RDC_AGENT_BROWSER_QA_FULL_ACCESS: '1' };
   delete env.RDC_AGENT_USER_DATA;
   const xvfb = process.platform === 'linux' && !process.env.DISPLAY;
-  const child = spawn(xvfb ? 'xvfb-run' : process.execPath,
-    xvfb ? ['-a', process.execPath, 'scripts/launch-rdc-agent.mjs', '--mode', 'browser'] : ['scripts/launch-rdc-agent.mjs', '--mode', 'browser'],
-    { cwd: repoRoot, env, stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')], detached: true });
+  const child = spawn(
+    xvfb ? 'xvfb-run' : process.execPath,
+    xvfb
+      ? ['-a', process.execPath, 'scripts/launch-rdc-agent.mjs', '--mode', 'browser']
+      : ['scripts/launch-rdc-agent.mjs', '--mode', 'browser'],
+    { cwd: repoRoot, env, stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')], detached: true },
+  );
   for (let attempt = 0; attempt < 120; attempt += 1) {
     const text = fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '';
     const url = text.match(/https?:\/\/\S+qaBootstrap=\S+/g)?.at(-1);
@@ -112,14 +137,34 @@ async function record(ids) {
       const definitionPath = path.join(workDir, 'definition.json');
       const recordedPath = path.join(workDir, 'recorded.json');
       writeJson(definitionPath, definition);
-      runHost(['--mode', 'record', '--scenario', definitionPath, '--bridge', url, '--out', recordedPath, '--build', repoRoot,
-        '--userdata', userData]);
+      runHost([
+        '--mode',
+        'record',
+        '--scenario',
+        definitionPath,
+        '--bridge',
+        url,
+        '--out',
+        recordedPath,
+        '--build',
+        repoRoot,
+        '--userdata',
+        userData,
+      ]);
       // The disposable instance's directories and the checkout's location differ per run and machine; fixed
       // placeholders keep machine paths out of the recordings and let identical answers dedupe.
-      const recorded = JSON.parse(fs.readFileSync(recordedPath, 'utf8')
-        .split(JSON.stringify(userData).slice(1, -1)).join('/visual-diff')
-        .split(JSON.stringify(repoRoot).slice(1, -1)).join('/visual-diff-repo'));
-      writeJson(path.join(scenarioDir, `${definition.id}.json`), { ...recorded, responses: externalize(recorded.responses, shared) });
+      const recorded = JSON.parse(
+        fs
+          .readFileSync(recordedPath, 'utf8')
+          .split(JSON.stringify(userData).slice(1, -1))
+          .join('/visual-diff')
+          .split(JSON.stringify(repoRoot).slice(1, -1))
+          .join('/visual-diff-repo'),
+      );
+      writeJson(path.join(scenarioDir, `${definition.id}.json`), {
+        ...recorded,
+        responses: externalize(recorded.responses, shared),
+      });
       console.log(`[visual-diff] recorded ${definition.id}`);
     } finally {
       await stopQaInstance(child);
@@ -130,14 +175,33 @@ async function record(ids) {
     }
   }
   // Drop shared answers no scenario references any more.
-  const referenced = new Set(fs.readdirSync(scenarioDir).filter((name) => name !== 'shared.json' && name.endsWith('.json'))
-    .flatMap((name) => Object.values(readJson(path.join(scenarioDir, name), {}).responses ?? {}).flat().map((entry) => entry.ref).filter(Boolean)));
-  writeJson(sharedPath, Object.fromEntries(Object.entries(shared).filter(([ref]) => referenced.has(ref)).sort(([a], [b]) => a.localeCompare(b))));
+  const referenced = new Set(
+    fs
+      .readdirSync(scenarioDir)
+      .filter((name) => name !== 'shared.json' && name.endsWith('.json'))
+      .flatMap((name) =>
+        Object.values(readJson(path.join(scenarioDir, name), {}).responses ?? {})
+          .flat()
+          .map((entry) => entry.ref)
+          .filter(Boolean),
+      ),
+  );
+  writeJson(
+    sharedPath,
+    Object.fromEntries(
+      Object.entries(shared)
+        .filter(([ref]) => referenced.has(ref))
+        .sort(([a], [b]) => a.localeCompare(b)),
+    ),
+  );
 }
 
 function capture(outDir, buildRoot) {
   const shared = readJson(sharedPath, {});
-  const scenarios = fs.readdirSync(scenarioDir).filter((name) => name !== 'shared.json' && name.endsWith('.json')).sort();
+  const scenarios = fs
+    .readdirSync(scenarioDir)
+    .filter((name) => name !== 'shared.json' && name.endsWith('.json'))
+    .sort();
   if (!scenarios.length) fail('no recorded scenarios');
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-visual-diff-'));
   const otherBuild = path.resolve(buildRoot) !== repoRoot;
@@ -147,8 +211,20 @@ function capture(outDir, buildRoot) {
       const scenario = readJson(path.join(scenarioDir, name));
       const resolved = path.join(workDir, name);
       writeJson(resolved, { ...scenario, responses: internalize(scenario.responses, shared) });
-      const args = ['--mode', 'replay', '--scenario', resolved, '--out', path.resolve(outDir), '--build', path.resolve(buildRoot)];
-      if (!otherBuild) { runHost(args); continue; }
+      const args = [
+        '--mode',
+        'replay',
+        '--scenario',
+        resolved,
+        '--out',
+        path.resolve(outDir),
+        '--build',
+        path.resolve(buildRoot),
+      ];
+      if (!otherBuild) {
+        runHost(args);
+        continue;
+      }
       // Another build (the comparison base) may predate the UI a newer scenario reaches; it then has no result and
       // compare reports the scenario as new. The checkout's own build must render every scenario.
       const result = spawnHost(args);
@@ -165,9 +241,17 @@ function capture(outDir, buildRoot) {
 /** Scenario ids declared by `Visual-Diff-Allow:` trailers on the commits under comparison. */
 function allowedScenarios() {
   const range = process.env.VISUAL_DIFF_RANGE;
-  if (!range) return new Set((process.env.VISUAL_DIFF_ALLOW ?? '').split(',').map((id) => id.trim()).filter(Boolean));
+  if (!range)
+    return new Set(
+      (process.env.VISUAL_DIFF_ALLOW ?? '')
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean),
+    );
   const log = spawnSync('git', ['log', '--format=%B', range], { cwd: repoRoot, encoding: 'utf8' }).stdout ?? '';
-  return new Set([...log.matchAll(/^Visual-Diff-Allow:\s*(.+)$/gm)].flatMap((match) => match[1].split(',').map((id) => id.trim())));
+  return new Set(
+    [...log.matchAll(/^Visual-Diff-Allow:\s*(.+)$/gm)].flatMap((match) => match[1].split(',').map((id) => id.trim())),
+  );
 }
 
 function compare(baseDir, headDir) {
@@ -177,26 +261,41 @@ function compare(baseDir, headDir) {
   for (const name of results) {
     const head = readJson(path.join(headDir, name));
     const base = readJson(path.join(baseDir, name), null);
-    if (!base) { console.log(`[visual-diff] ${head.id}: new scenario`); continue; }
-    const pixels = base.l2 === head.l2 ? 0 : changedPixels(path.join(baseDir, `${head.id}.png`), path.join(headDir, `${head.id}.png`));
+    if (!base) {
+      console.log(`[visual-diff] ${head.id}: new scenario`);
+      continue;
+    }
+    const pixels =
+      base.l2 === head.l2
+        ? 0
+        : changedPixels(path.join(baseDir, `${head.id}.png`), path.join(headDir, `${head.id}.png`));
     const changed = [base.l1 !== head.l1 && 'L1', pixels > 0 && `L2 (${pixels} px)`].filter(Boolean);
     if (!changed.length) continue;
     const declared = allowed.has(head.id) || allowed.has('*');
     console.log(`[visual-diff] ${head.id}: ${changed.join('+')} changed${declared ? ' (declared)' : ''}`);
     if (base.l1 !== head.l1) {
-      const before = new Set(base.nodes); const after = new Set(head.nodes);
+      const before = new Set(base.nodes);
+      const after = new Set(head.nodes);
       for (const node of head.nodes.filter((entry) => !before.has(entry)).slice(0, 8)) console.log(`    + ${node}`);
       for (const node of base.nodes.filter((entry) => !after.has(entry)).slice(0, 8)) console.log(`    - ${node}`);
     }
     if (!declared) unexpected.push(head.id);
   }
-  if (unexpected.length) fail(`undeclared differences: ${unexpected.join(', ')} (add "Visual-Diff-Allow: <ids>" to the commit that intends them)`);
+  if (unexpected.length)
+    fail(
+      `undeclared differences: ${unexpected.join(', ')} (add "Visual-Diff-Allow: <ids>" to the commit that intends them)`,
+    );
   console.log('[visual-diff] OK');
 }
 
 const [command, ...rest] = process.argv.slice(2);
-const option = (name, fallback) => { const index = rest.indexOf(name); return index >= 0 ? rest[index + 1] : fallback; };
+const option = (name, fallback) => {
+  const index = rest.indexOf(name);
+  return index >= 0 ? rest[index + 1] : fallback;
+};
 if (command === 'record') await record(rest);
-else if (command === 'capture') capture(rest[0] ?? fail('capture needs an output directory'), option('--build', repoRoot));
-else if (command === 'compare') compare(rest[0] ?? fail('compare needs a base directory'), rest[1] ?? fail('compare needs a head directory'));
+else if (command === 'capture')
+  capture(rest[0] ?? fail('capture needs an output directory'), option('--build', repoRoot));
+else if (command === 'compare')
+  compare(rest[0] ?? fail('compare needs a base directory'), rest[1] ?? fail('compare needs a head directory'));
 else fail('usage: run.mjs record [id...] | capture <dir> [--build <root>] | compare <base-dir> <head-dir>');

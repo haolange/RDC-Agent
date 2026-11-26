@@ -6,7 +6,11 @@ const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_REDIRECTS = 3;
 
 export type RemoteImageResult = { dataUrl: string } | { dataUrl: null; error: RemoteImageError };
-export type RemoteImageError = 'REMOTE_IMAGE_URL_DENIED' | 'REMOTE_IMAGE_UNAVAILABLE' | 'REMOTE_IMAGE_TOO_LARGE' | 'REMOTE_IMAGE_TYPE_DENIED'
+export type RemoteImageError =
+  | 'REMOTE_IMAGE_URL_DENIED'
+  | 'REMOTE_IMAGE_UNAVAILABLE'
+  | 'REMOTE_IMAGE_TOO_LARGE'
+  | 'REMOTE_IMAGE_TYPE_DENIED'
   | 'REMOTE_IMAGE_UNVERIFIED';
 
 /**
@@ -17,11 +21,18 @@ export async function fetchRemoteImage(url: string): Promise<RemoteImageResult> 
   let fetched;
   try {
     fetched = await fetchPublic(url, {
-      accept: 'image/png,image/jpeg,image/gif,image/webp,image/*;q=0.8', userAgent: 'RDC-Agent/RemoteImage',
-      maxResponseBytes: REMOTE_IMAGE_MAX_BYTES, maxRedirects: MAX_REDIRECTS, timeoutMs: REQUEST_TIMEOUT_MS, httpsOnly: true,
+      accept: 'image/png,image/jpeg,image/gif,image/webp,image/*;q=0.8',
+      userAgent: 'RDC-Agent/RemoteImage',
+      maxResponseBytes: REMOTE_IMAGE_MAX_BYTES,
+      maxRedirects: MAX_REDIRECTS,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      httpsOnly: true,
     });
   } catch (error) {
-    return { dataUrl: null, error: error instanceof PublicUrlDeniedError ? 'REMOTE_IMAGE_URL_DENIED' : 'REMOTE_IMAGE_UNAVAILABLE' };
+    return {
+      dataUrl: null,
+      error: error instanceof PublicUrlDeniedError ? 'REMOTE_IMAGE_URL_DENIED' : 'REMOTE_IMAGE_UNAVAILABLE',
+    };
   }
   const { response } = fetched;
   if (!response.ok) return { dataUrl: null, error: 'REMOTE_IMAGE_UNAVAILABLE' };

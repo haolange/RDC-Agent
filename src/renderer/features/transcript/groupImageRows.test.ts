@@ -2,17 +2,23 @@ import { expect, it } from 'vitest';
 import { groupImageRows } from './groupImageRows';
 import type { WorkProcessRow } from './workProcessTypes';
 
-const image = (id: string, status = 'complete', toolName = 'read_image') => ({
-  type: 'tool', id, status, toolName, target: id, duration: '1ms',
-} as Extract<WorkProcessRow, { type: 'tool' }>);
+const image = (id: string, status = 'complete', toolName = 'read_image') =>
+  ({
+    type: 'tool',
+    id,
+    status,
+    toolName,
+    target: id,
+    duration: '1ms',
+  }) as Extract<WorkProcessRow, { type: 'tool' }>;
 it('groups successful adjacent reads without losing or deduplicating receipts', () => {
   const rows = [image('a'), image('b')];
   const grouped = groupImageRows(rows);
   expect(grouped).toHaveLength(1);
-  expect((grouped[0] as typeof rows[0]).imageCalls).toEqual(rows);
+  expect((grouped[0] as (typeof rows)[0]).imageCalls).toEqual(rows);
   expect(groupImageRows(grouped)).toEqual(grouped);
 });
-it.each(['running', 'error', 'cancelled', 'pending'])('never groups across %s', status => {
+it.each(['running', 'error', 'cancelled', 'pending'])('never groups across %s', (status) => {
   expect(groupImageRows([image('a'), image('b', status), image('c')])).toHaveLength(3);
 });
 it('keeps adjacent images together and splits groups at file reads', () => {
@@ -20,6 +26,6 @@ it('keeps adjacent images together and splits groups at file reads', () => {
   const grouped = groupImageRows(images);
   expect(grouped).toHaveLength(1);
   expect(grouped[0].type).toBe('tool');
-  expect((grouped[0] as typeof images[0]).imageCalls).toHaveLength(25);
+  expect((grouped[0] as (typeof images)[0]).imageCalls).toHaveLength(25);
   expect(groupImageRows([image('a'), image('file', 'complete', 'read_file'), image('b')])).toHaveLength(3);
 });

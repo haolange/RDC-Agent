@@ -10,7 +10,8 @@ export function useProjectInputsBootstrap(shellReady: boolean): void {
       return;
     }
     if (!shellReady) return;
-    void window.electronAPI.project.inputs.list(currentProject.projectId)
+    void window.electronAPI.project.inputs
+      .list(currentProject.projectId)
       .then((result) => {
         useProjectStore.getState().updateProjectInputs(currentProject.projectId, result.inputs);
       })

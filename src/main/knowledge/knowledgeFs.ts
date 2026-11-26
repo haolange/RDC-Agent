@@ -29,12 +29,17 @@ export function extractPreview(body: string): string | undefined {
   const title = /^#\s+(.+)$/m.exec(body)?.[1]?.trim();
   // Structured chapters (scope, root cause) are rendered by the reader, not shown raw in a one-line preview,
   // and a chapter that only repeats the title adds nothing.
-  const prose = body.replace(/```[\s\S]*?```/g, '').split(/\n\s*\n/)
+  const prose = body
+    .replace(/```[\s\S]*?```/g, '')
+    .split(/\n\s*\n/)
     .map((paragraph) => paragraph.replace(/^#+\s+.+$/gm, '').trim())
     .filter((paragraph) => paragraph && paragraph !== title && !/^[[{]/.test(paragraph))
     .join(' ');
   const plain = prose
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[*_`>#-]/g, ' ').replace(/\s+/g, ' ').trim();
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_`>#-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!plain) return undefined;
   return plain.length > PREVIEW_MAX_CHARS ? `${plain.slice(0, PREVIEW_MAX_CHARS - 1)}…` : plain;
 }
@@ -52,28 +57,48 @@ export async function resolveWithinRoot(rootPath: string, relativePath: string):
     if (!isPathInside(realRoot, realTarget)) throw new Error('Knowledge card path escaped its space root.');
     return realTarget;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error('Knowledge card not found.', { cause: error });
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+      throw new Error('Knowledge card not found.', { cause: error });
     throw error;
   }
 }
 
 export async function walkMarkdownFiles(rootPath: string): Promise<{ realRoot: string; files: string[] }> {
-  try { await fs.mkdir(rootPath, { recursive: true }); } catch { return { realRoot: rootPath, files: [] }; }
+  try {
+    await fs.mkdir(rootPath, { recursive: true });
+  } catch {
+    return { realRoot: rootPath, files: [] };
+  }
   let realRoot: string;
-  try { realRoot = await fs.realpath(rootPath); } catch { return { realRoot: rootPath, files: [] }; }
+  try {
+    realRoot = await fs.realpath(rootPath);
+  } catch {
+    return { realRoot: rootPath, files: [] };
+  }
   const files: string[] = [];
   const walk = async (absoluteDir: string, depth: number): Promise<void> => {
     if (depth > MAX_WALK_DEPTH) return;
     let entries: import('node:fs').Dirent[];
-    try { entries = await fs.readdir(absoluteDir, { withFileTypes: true }); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error; }
+    try {
+      entries = await fs.readdir(absoluteDir, { withFileTypes: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw error;
+    }
     for (const entry of entries) {
       if (entry.name.startsWith('.')) continue;
       const absolute = path.join(absoluteDir, entry.name);
       let realAbsolute: string;
-      try { realAbsolute = await fs.realpath(absolute); } catch { continue; }
+      try {
+        realAbsolute = await fs.realpath(absolute);
+      } catch {
+        continue;
+      }
       if (!isPathInside(realRoot, realAbsolute)) continue;
-      if (entry.isDirectory()) { await walk(absolute, depth + 1); continue; }
+      if (entry.isDirectory()) {
+        await walk(absolute, depth + 1);
+        continue;
+      }
       if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) files.push(absolute);
     }
   };
@@ -114,7 +139,10 @@ function assertNotLink(stat: import('node:fs').Stats, target: string): void {
     throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', `refusing symlink/junction write path ${target}.`);
   }
   if (stat.isFile() && stat.nlink > 1) {
-    throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', `refusing hardlinked write path ${target} (nlink=${stat.nlink}).`);
+    throw new AppError(
+      'KNOWLEDGE_WRITE_PATH_REJECTED',
+      `refusing hardlinked write path ${target} (nlink=${stat.nlink}).`,
+    );
   }
 }
 
@@ -143,10 +171,7 @@ async function assertLexicalAncestorsAreLinkFree(absolute: string): Promise<void
   }
 }
 
-export async function assertSafeKnowledgeWriteTarget(
-  rootPath: string,
-  relativePath: string,
-): Promise<string> {
+export async function assertSafeKnowledgeWriteTarget(rootPath: string, relativePath: string): Promise<string> {
   const normalizedRelative = toPosixRelative(relativePath).replace(/^\/+/, '');
   if (!normalizedRelative || normalizedRelative.includes('\0') || normalizedRelative.split('/').includes('..')) {
     throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', 'relative path contains .., NUL, or is empty.');
@@ -156,7 +181,10 @@ export async function assertSafeKnowledgeWriteTarget(
   await fs.mkdir(lexicalRoot, { recursive: true });
   const realRoot = await fs.realpath(lexicalRoot);
   if (!samePath(realRoot, lexicalRoot)) {
-    throw new AppError('KNOWLEDGE_WRITE_PATH_REJECTED', `space root realpath diverged from lexical path ${lexicalRoot}.`);
+    throw new AppError(
+      'KNOWLEDGE_WRITE_PATH_REJECTED',
+      `space root realpath diverged from lexical path ${lexicalRoot}.`,
+    );
   }
   const lexical = path.resolve(lexicalRoot, ...normalizedRelative.split('/'));
   if (!isPathInside(lexicalRoot, lexical)) {

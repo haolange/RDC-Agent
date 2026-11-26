@@ -16,14 +16,15 @@ import { buildModelEffortCapsulePresentation } from './effortControlParts';
 import { useComposerEffortControl } from './useComposerEffortControl';
 import { ComposerModelEffortPanel } from './ComposerModelEffortPanel';
 import { ComposerModelPickerPanel } from './ComposerModelPickerPanel';
-import {
-  nextComposerModelEffortView,
-  type ComposerModelEffortView,
-} from './composerModelEffortView';
+import { nextComposerModelEffortView, type ComposerModelEffortView } from './composerModelEffortView';
 import type { PreparedTurnContextSummary } from '@shared/types/session';
 import type { SessionRecord } from '@shared/types/session';
 
-export interface ComposerModelSaveState { saving: boolean; error?: string; retry?: () => void }
+export interface ComposerModelSaveState {
+  saving: boolean;
+  error?: string;
+  retry?: () => void;
+}
 
 export const ComposerModelEffortControl: React.FC<{
   agentId: string;
@@ -43,7 +44,12 @@ export const ComposerModelEffortControl: React.FC<{
   const previousViewRef = useRef(view);
   const [saveState, setSaveState] = useState<ComposerModelSaveState>({ saving: false });
   const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const handleSaveState = useCallback((state: ComposerModelSaveState) => {
     if (!mounted.current) return;
     setSaveState(state);
@@ -56,9 +62,11 @@ export const ComposerModelEffortControl: React.FC<{
   });
   const controlSaveError = controlsState.saveState.error ? t('composer.model.saveFailed') : undefined;
   useEffect(() => {
-    onSaveStateChange?.({ saving: saveState.saving || controlsState.saveState.saving,
+    onSaveStateChange?.({
+      saving: saveState.saving || controlsState.saveState.saving,
       error: saveState.error || controlSaveError,
-      retry: controlsState.saveState.error ? controlsState.retrySave : undefined });
+      retry: controlsState.saveState.error ? controlsState.retrySave : undefined,
+    });
   }, [saveState, controlsState.saveState, controlsState.retrySave, controlSaveError, onSaveStateChange]);
   const { options, loading } = useComposerModelPickerOptions(
     useAppSettingsStore((state) => state.settings.llm.providers),
@@ -68,13 +76,17 @@ export const ComposerModelEffortControl: React.FC<{
   const selected = frozen ? { providerId: frozen.route.providerId, modelId: frozen.route.effectiveModelId } : effective;
   const unavailable = !frozen && controlsState.capabilityState.status === 'unavailable';
   const waiting = disabled && preparing && !frozen;
-  const currentOption = options.find((option) => (
-    option.providerId === selected?.providerId && option.modelId === selected.modelId
-  ));
+  const currentOption = options.find(
+    (option) => option.providerId === selected?.providerId && option.modelId === selected.modelId,
+  );
   // The same model name offered by two providers is ambiguous on the pill; name the provider only then.
-  const sharedName = currentOption && options.some((option) => option.providerId !== currentOption.providerId && option.label === currentOption.label);
+  const sharedName =
+    currentOption &&
+    options.some((option) => option.providerId !== currentOption.providerId && option.label === currentOption.label);
   const modelLabel = currentOption
-    ? sharedName ? `${currentOption.providerLabel} · ${currentOption.label}` : currentOption.label
+    ? sharedName
+      ? `${currentOption.providerLabel} · ${currentOption.label}`
+      : currentOption.label
     : selected?.modelId || t('settings.selectModelPlaceholder');
   const displayedControls = frozen?.controls ?? effort.turnControls;
   const displayedEffort = frozen ? t(EFFORT_LABEL_KEYS[displayedControls.reasoningLevel]) : effort.effortLabel;
@@ -88,16 +100,26 @@ export const ComposerModelEffortControl: React.FC<{
   });
   // No level beside a model that cannot reason, or beside the "choose a model" placeholder.
   const showReasoningLevel = !unavailable && Boolean(selected) && (Boolean(frozen) || !effort.reasoningLockedDisabled);
-  const title = unavailable ? `${modelLabel} · ${t('composer.model.unavailable')}` : waiting ? `${capsule.title} · ${t('composer.model.preparing')}` : capsule.title;
+  const title = unavailable
+    ? `${modelLabel} · ${t('composer.model.unavailable')}`
+    : waiting
+      ? `${capsule.title} · ${t('composer.model.preparing')}`
+      : capsule.title;
   const activeView = view;
 
-  const assignMenuRoot = useCallback((node: HTMLDivElement | null) => {
-    menuRef.current = node;
-    menu.setRoot(node);
-  }, [menu]);
-  const assignMenuTrigger = useCallback((node: HTMLButtonElement | null) => {
-    menu.setTrigger(node);
-  }, [menu]);
+  const assignMenuRoot = useCallback(
+    (node: HTMLDivElement | null) => {
+      menuRef.current = node;
+      menu.setRoot(node);
+    },
+    [menu],
+  );
+  const assignMenuTrigger = useCallback(
+    (node: HTMLButtonElement | null) => {
+      menu.setTrigger(node);
+    },
+    [menu],
+  );
 
   useEffect(() => {
     if (!open) setView(nextComposerModelEffortView('menu-closed'));
@@ -107,7 +129,9 @@ export const ComposerModelEffortControl: React.FC<{
     const previous = previousViewRef.current;
     previousViewRef.current = view;
     if (open && previous === 'models' && view === 'effort') {
-      popupRef.current?.querySelector<HTMLButtonElement>('[data-testid="composer-model-effort-open-picker"]')?.focus({ preventScroll: true });
+      popupRef.current
+        ?.querySelector<HTMLButtonElement>('[data-testid="composer-model-effort-open-picker"]')
+        ?.focus({ preventScroll: true });
     }
   }, [open, view]);
 
@@ -149,8 +173,14 @@ export const ComposerModelEffortControl: React.FC<{
           </span>
         ) : null}
         <OverflowFade className="composer-model-effort-pill-model" text={capsule.modelLabel} />
-        {showReasoningLevel ? <span className="composer-model-effort-pill-level" data-tooltip={capsule.reasoningLabel}>{displayedEffort}</span> : null}
-        <span className="composer-model-effort-pill-caret" aria-hidden="true"><Chevron direction="down" size={12} /></span>
+        {showReasoningLevel ? (
+          <span className="composer-model-effort-pill-level" data-tooltip={capsule.reasoningLabel}>
+            {displayedEffort}
+          </span>
+        ) : null}
+        <span className="composer-model-effort-pill-caret" aria-hidden="true">
+          <Chevron direction="down" size={12} />
+        </span>
       </Pill>
 
       {open && activeView === 'effort' ? (
@@ -160,9 +190,13 @@ export const ComposerModelEffortControl: React.FC<{
           trackRef={effort.trackRef}
           modelLabel={loading && !currentOption && !effective ? t('composer.model.loading') : modelLabel}
           onOpenModels={() => setView(nextComposerModelEffortView('open-models'))}
-          capabilityStateDetail={controlsState.saveState.error ? t('composer.model.saveFailed') : effort.capabilityStateDetail}
+          capabilityStateDetail={
+            controlsState.saveState.error ? t('composer.model.saveFailed') : effort.capabilityStateDetail
+          }
           capabilityRefreshing={effort.capabilityRefreshing}
-          capabilityRetryLabel={controlsState.saveState.error ? t('composer.model.retrySave') : effort.capabilityRetryLabel}
+          capabilityRetryLabel={
+            controlsState.saveState.error ? t('composer.model.retrySave') : effort.capabilityRetryLabel
+          }
           onRetryCapability={controlsState.saveState.error ? controlsState.retrySave : effort.retryCapability}
           hasAdjustableReasoning={effort.hasAdjustableReasoning}
           reasoningLabel={displayedEffort}

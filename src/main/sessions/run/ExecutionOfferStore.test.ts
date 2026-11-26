@@ -65,7 +65,9 @@ describe('ExecutionOfferStore', () => {
 
   it('matches only the same target and frozen plan', () => {
     const current = offer();
-    expect(executionOfferMatches(current, { agentId: 'general', planHash: 'a'.repeat(64), planUri: current.plan.uri })).toBe(true);
+    expect(
+      executionOfferMatches(current, { agentId: 'general', planHash: 'a'.repeat(64), planUri: current.plan.uri }),
+    ).toBe(true);
     expect(executionOfferMatches(current, { agentId: 'analyzer', planHash: 'a'.repeat(64) })).toBe(false);
     expect(executionOfferMatches(current, { agentId: 'general', planHash: 'b'.repeat(64) })).toBe(false);
   });

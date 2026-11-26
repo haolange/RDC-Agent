@@ -40,7 +40,9 @@ const CLASS_FORWARD_SHARE = 0.6;
 
 const toRelative = (file) => path.relative(repoRoot, file).split(path.sep).join('/');
 const isOutsideProduction = (relative) =>
-  /\.test\.tsx?$/.test(relative) || relative.endsWith('.d.ts') || /(^|\/)(testing|fixtures|__fixtures__)\//.test(relative);
+  /\.test\.tsx?$/.test(relative) ||
+  relative.endsWith('.d.ts') ||
+  /(^|\/)(testing|fixtures|__fixtures__)\//.test(relative);
 
 function walk(directory, out = []) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -62,7 +64,10 @@ const sourceFiles = new Map();
 function parse(relative) {
   if (!sourceFiles.has(relative)) {
     const absolute = path.join(repoRoot, relative);
-    sourceFiles.set(relative, ts.createSourceFile(absolute, fs.readFileSync(absolute, 'utf8'), ts.ScriptTarget.Latest, true));
+    sourceFiles.set(
+      relative,
+      ts.createSourceFile(absolute, fs.readFileSync(absolute, 'utf8'), ts.ScriptTarget.Latest, true),
+    );
   }
   return sourceFiles.get(relative);
 }
@@ -70,16 +75,25 @@ function parse(relative) {
 function moduleSpecifiers(sourceFile) {
   const specifiers = [];
   const visit = (node) => {
-    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
       specifiers.push(node.moduleSpecifier.text);
     } else if (
-      ts.isCallExpression(node)
-      && node.arguments.length > 0
-      && ts.isStringLiteralLike(node.arguments[0])
-      && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require'))
+      ts.isCallExpression(node) &&
+      node.arguments.length > 0 &&
+      ts.isStringLiteralLike(node.arguments[0]) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) && node.expression.text === 'require'))
     ) {
       specifiers.push(node.arguments[0].text);
-    } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal)) {
+    } else if (
+      ts.isImportTypeNode(node) &&
+      ts.isLiteralTypeNode(node.argument) &&
+      ts.isStringLiteral(node.argument.literal)
+    ) {
       specifiers.push(node.argument.literal.text);
     }
     ts.forEachChild(node, visit);
@@ -94,7 +108,12 @@ function importsOf(relative) {
     const containing = path.join(repoRoot, relative);
     const targets = [];
     for (const specifier of moduleSpecifiers(parse(relative))) {
-      const resolved = ts.resolveModuleName(specifier.replace(/\?.*$/, ''), containing, compilerOptions, ts.sys).resolvedModule;
+      const resolved = ts.resolveModuleName(
+        specifier.replace(/\?.*$/, ''),
+        containing,
+        compilerOptions,
+        ts.sys,
+      ).resolvedModule;
       if (!resolved || resolved.isExternalLibraryImport) continue;
       const target = toRelative(resolved.resolvedFileName);
       if (!target.startsWith('..') && !target.includes('node_modules/')) targets.push(target);
@@ -122,12 +141,15 @@ const productionModules = walk(path.join(repoRoot, 'src'))
   .sort();
 const toolingRoots = [
   ...TOOLING_CONFIGS,
-  ...TOOLING_DIRECTORIES.flatMap((directory) => walk(path.join(repoRoot, directory)).map(toRelative))
-    .filter((relative) => /\.(mjs|cjs|js|ts|tsx)$/.test(relative)),
+  ...TOOLING_DIRECTORIES.flatMap((directory) => walk(path.join(repoRoot, directory)).map(toRelative)).filter(
+    (relative) => /\.(mjs|cjs|js|ts|tsx)$/.test(relative),
+  ),
 ];
 const reachable = reachableFrom([...SHIPPED_ENTRIES, ...toolingRoots]);
 const importedBy = new Map();
-for (const relative of walk(path.join(repoRoot, 'src')).map(toRelative).filter((file) => /\.tsx?$/.test(file))) {
+for (const relative of walk(path.join(repoRoot, 'src'))
+  .map(toRelative)
+  .filter((file) => /\.tsx?$/.test(file))) {
   for (const target of importsOf(relative)) {
     if (!importedBy.has(target)) importedBy.set(target, []);
     importedBy.get(target).push(relative);
@@ -141,9 +163,13 @@ for (const relative of productionModules) {
   const productionImporters = importers.filter((importer) => !isOutsideProduction(importer));
   if (importers.length === 0) problems.push(`${relative} is imported by nothing; delete it`);
   else if (productionImporters.length === 0) {
-    problems.push(`${relative} is imported only by tests (${importers.slice(0, 2).join(', ')}); move it under a testing/ directory or delete it`);
+    problems.push(
+      `${relative} is imported only by tests (${importers.slice(0, 2).join(', ')}); move it under a testing/ directory or delete it`,
+    );
   } else {
-    problems.push(`${relative} is imported only by unreachable modules (${productionImporters.slice(0, 2).join(', ')})`);
+    problems.push(
+      `${relative} is imported only by unreachable modules (${productionImporters.slice(0, 2).join(', ')})`,
+    );
   }
 }
 
@@ -170,18 +196,26 @@ function forwardedCallee(fn) {
   return passedThrough ? expression.expression.getText() : null;
 }
 
-const hasModifier = (node, kind) => (ts.getModifiers?.(node) ?? node.modifiers ?? []).some((modifier) => modifier.kind === kind);
+const hasModifier = (node, kind) =>
+  (ts.getModifiers?.(node) ?? node.modifiers ?? []).some((modifier) => modifier.kind === kind);
 
 for (const relative of productionModules) {
   if (FACADES.has(relative)) continue;
   const sourceFile = parse(relative);
   const visitClasses = (node) => {
     if (ts.isClassDeclaration(node)) {
-      const methods = node.members.filter((member) => ts.isMethodDeclaration(member) && member.body
-        && !hasModifier(member, ts.SyntaxKind.PrivateKeyword) && !hasModifier(member, ts.SyntaxKind.StaticKeyword));
+      const methods = node.members.filter(
+        (member) =>
+          ts.isMethodDeclaration(member) &&
+          member.body &&
+          !hasModifier(member, ts.SyntaxKind.PrivateKeyword) &&
+          !hasModifier(member, ts.SyntaxKind.StaticKeyword),
+      );
       const forwarding = methods.filter((method) => /^this\.\w+\.\w+$/.test(forwardedCallee(method) ?? ''));
       if (methods.length >= CLASS_MIN_METHODS && forwarding.length / methods.length >= CLASS_FORWARD_SHARE) {
-        problems.push(`${relative}: class ${node.name?.text ?? '(anonymous)'} forwards ${forwarding.length} of ${methods.length} public methods to members; callers use the owner directly`);
+        problems.push(
+          `${relative}: class ${node.name?.text ?? '(anonymous)'} forwards ${forwarding.length} of ${methods.length} public methods to members; callers use the owner directly`,
+        );
       }
     }
     ts.forEachChild(node, visitClasses);
@@ -204,7 +238,8 @@ for (const relative of productionModules) {
     if (ts.isVariableStatement(statement)) {
       for (const declaration of statement.declarationList.declarations) {
         const initializer = declaration.initializer;
-        if (initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))) exportedFunctions.push(initializer);
+        if (initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)))
+          exportedFunctions.push(initializer);
       }
     }
   }

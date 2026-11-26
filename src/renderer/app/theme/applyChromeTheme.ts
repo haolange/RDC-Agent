@@ -12,13 +12,8 @@ function ensureChromeSheet(): CSSStyleSheet | null {
   return chromeSheet;
 }
 
-export function resolveActiveChrome(
-  appearance: UiPreferences,
-  resolvedTheme: ResolvedTheme,
-): ThemeChromeConfig {
-  return resolvedTheme === 'light'
-    ? appearance.chromeThemes.light
-    : appearance.chromeThemes.dark;
+export function resolveActiveChrome(appearance: UiPreferences, resolvedTheme: ResolvedTheme): ThemeChromeConfig {
+  return resolvedTheme === 'light' ? appearance.chromeThemes.light : appearance.chromeThemes.dark;
 }
 
 /**
@@ -26,10 +21,7 @@ export function resolveActiveChrome(
  * Uses a constructable stylesheet so CSP may keep `style-src 'self'` /
  * `style-src-attr 'none'` (no `<style>` textContent or inline style attributes).
  */
-export function applyChromeTheme(
-  appearance: UiPreferences,
-  resolvedTheme: ResolvedTheme,
-): void {
+export function applyChromeTheme(appearance: UiPreferences, resolvedTheme: ResolvedTheme): void {
   const chrome = resolveActiveChrome(appearance, resolvedTheme);
   const vars = compileThemeChrome(chrome, resolvedTheme);
   const declarations = Object.entries(vars)
@@ -38,9 +30,7 @@ export function applyChromeTheme(
 
   const sheet = ensureChromeSheet();
   if (sheet) {
-    sheet.replaceSync(
-      `:root {\n  color-scheme: ${resolvedTheme};\n  ${declarations}\n}`,
-    );
+    sheet.replaceSync(`:root {\n  color-scheme: ${resolvedTheme};\n  ${declarations}\n}`);
   }
 
   document.documentElement.dataset.chromePreset = chrome.presetId;

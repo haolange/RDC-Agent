@@ -34,9 +34,7 @@ export class SessionResumeService {
 
       // 检查是否有未完成的 run（状态非 success/failed/stopped 等终态）
       const runningStatuses = ['running', 'awaiting_input', 'awaiting_approval'] as string[];
-      const unfinishedRuns = sessionRecordStore.listRuns(sessionId).filter(
-        (r) => runningStatuses.includes(r.status),
-      );
+      const unfinishedRuns = sessionRecordStore.listRuns(sessionId).filter((r) => runningStatuses.includes(r.status));
       const runResumable = unfinishedRuns.length > 0;
 
       return {

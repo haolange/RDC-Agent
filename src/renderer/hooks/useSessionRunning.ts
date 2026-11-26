@@ -4,8 +4,8 @@ import { useProjectStore } from '../stores/projectStore';
 import { useSessionProjectionStore } from '../stores/sessionProjectionStore';
 import type { ConversationMessage } from '@shared/types/conversation';
 
-const hasReplyInFlight = (messages: readonly ConversationMessage[]): boolean => messages
-  .some((message) => message.role === 'assistant' && ACTIVE_ASSISTANT_STATUSES.has(message.status));
+const hasReplyInFlight = (messages: readonly ConversationMessage[]): boolean =>
+  messages.some((message) => message.role === 'assistant' && ACTIVE_ASSISTANT_STATUSES.has(message.status));
 
 /**
  * Whether a session has a reply in flight: the open session reads the live conversation, every other session reads
@@ -13,8 +13,11 @@ const hasReplyInFlight = (messages: readonly ConversationMessage[]): boolean => 
  */
 export function useSessionRunning(sessionId: string): boolean {
   const openSessionId = useProjectStore((state) => state.currentSessionId);
-  const live = useConversationStore((state) => openSessionId === sessionId && hasReplyInFlight(state.allConversationMessages));
-  const background = useSessionProjectionStore((state) => openSessionId !== sessionId
-    && hasReplyInFlight(state.bySessionId[sessionId]?.allMessages ?? []));
+  const live = useConversationStore(
+    (state) => openSessionId === sessionId && hasReplyInFlight(state.allConversationMessages),
+  );
+  const background = useSessionProjectionStore(
+    (state) => openSessionId !== sessionId && hasReplyInFlight(state.bySessionId[sessionId]?.allMessages ?? []),
+  );
   return live || background;
 }

@@ -23,14 +23,18 @@ describe('composerSessionContext', () => {
     });
 
     let restored = '';
-    expect(restoreLastSentIfCurrentSession('session-b', (last) => {
-      restored = last.prompt;
-    })).toBe(false);
+    expect(
+      restoreLastSentIfCurrentSession('session-b', (last) => {
+        restored = last.prompt;
+      }),
+    ).toBe(false);
     expect(restored).toBe('');
 
-    expect(restoreLastSentIfCurrentSession('session-a', (last) => {
-      restored = last.prompt;
-    })).toBe(true);
+    expect(
+      restoreLastSentIfCurrentSession('session-a', (last) => {
+        restored = last.prompt;
+      }),
+    ).toBe(true);
     expect(restored).toBe('hello from a');
   });
 
@@ -43,9 +47,11 @@ describe('composerSessionContext', () => {
       skillIds: [],
     });
     let restored = '';
-    expect(restoreLastSentIfCurrentSession(null, (last) => {
-      restored = last.prompt;
-    })).toBe(true);
+    expect(
+      restoreLastSentIfCurrentSession(null, (last) => {
+        restored = last.prompt;
+      }),
+    ).toBe(true);
     expect(restored).toBe('before session');
   });
 
@@ -79,7 +85,9 @@ describe('composerSessionContext', () => {
     };
     useComposerSessionContextStore.getState().beginTurn({ ...ownership, projectId: 'project-1' });
 
-    useComposerSessionContextStore.getState().bindCommittedSession({ ...ownership, agentId: 'plan' }, 'wrong-agent-session');
+    useComposerSessionContextStore
+      .getState()
+      .bindCommittedSession({ ...ownership, agentId: 'plan' }, 'wrong-agent-session');
     useComposerSessionContextStore.getState().clearActiveTurnIfOwned({
       ...ownership,
       requestId: 'stale-request',

@@ -6,7 +6,10 @@ import { RebuildIndexDialog } from './RebuildIndexDialog';
 import type { KnowledgeOperationProgress } from '@shared/types/knowledgeOperation';
 
 vi.mock('../../../../i18n', () => ({
-  useI18n: () => ({ language: 'en', t: (key: string, params?: Record<string, unknown>) => (params ? `${key} ${JSON.stringify(params)}` : key) }),
+  useI18n: () => ({
+    language: 'en',
+    t: (key: string, params?: Record<string, unknown>) => (params ? `${key} ${JSON.stringify(params)}` : key),
+  }),
 }));
 
 let host: HTMLDivElement;
@@ -32,10 +35,27 @@ function setup() {
   const onClose = vi.fn();
   const onCancel = vi.fn();
   let settle!: { resolve: (outcome: Outcome) => void; reject: (reason: Error) => void };
-  const onRebuild = vi.fn(() => new Promise<Outcome>((resolve, reject) => { settle = { resolve, reject }; }));
-  const render = (rebuilding: boolean, progress: KnowledgeOperationProgress | null = null, cancelling = false) => act(async () => root.render(
-    createElement(RebuildIndexDialog, { open: true, index, rebuilding, progress, cancelling, onRebuild, onCancel, onClose }),
-  ));
+  const onRebuild = vi.fn(
+    () =>
+      new Promise<Outcome>((resolve, reject) => {
+        settle = { resolve, reject };
+      }),
+  );
+  const render = (rebuilding: boolean, progress: KnowledgeOperationProgress | null = null, cancelling = false) =>
+    act(async () =>
+      root.render(
+        createElement(RebuildIndexDialog, {
+          open: true,
+          index,
+          rebuilding,
+          progress,
+          cancelling,
+          onRebuild,
+          onCancel,
+          onClose,
+        }),
+      ),
+    );
   return { onClose, onCancel, onRebuild, render, settle: () => settle };
 }
 
@@ -58,7 +78,7 @@ it('keeps the dialog open with the reason when the rebuild fails, and closes aft
   expect(onClose).toHaveBeenCalledTimes(1);
 });
 
-it('draws main\'s counts as a determinate bar, offers Cancel while it runs and treats a cancel as a neutral outcome', async () => {
+it("draws main's counts as a determinate bar, offers Cancel while it runs and treats a cancel as a neutral outcome", async () => {
   const { onClose, onCancel, render, settle } = setup();
   await render(false);
   await act(async () => query('knowledge-center-rebuild-confirm')!.click());
@@ -67,7 +87,9 @@ it('draws main\'s counts as a determinate bar, offers Cancel while it runs and t
   const bar = document.querySelector('[data-testid="knowledge-task-progress"] [role="progressbar"]');
   expect(bar?.getAttribute('aria-valuenow')).toBe('4');
   expect(bar?.getAttribute('aria-valuemax')).toBe('10');
-  expect(query('knowledge-task-progress')?.textContent).toContain('knowledgeCenter.progressRebuildIndexing {"done":4,"total":10}');
+  expect(query('knowledge-task-progress')?.textContent).toContain(
+    'knowledgeCenter.progressRebuildIndexing {"done":4,"total":10}',
+  );
   const cancel = query('knowledge-center-rebuild-cancel') as HTMLButtonElement;
   expect(cancel.disabled).toBe(false);
   await act(async () => cancel.click());

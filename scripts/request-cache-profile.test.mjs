@@ -8,18 +8,49 @@ import { loadSnapshots, profileRequests, renderMarkdown } from './request-cache-
 const SECRET_TEXT = 'USER-CONTENT-SENTINEL';
 const core = { id: 'core:agent-loop.md', kind: 'core-contract', content: `core ${SECRET_TEXT}` };
 const skill = { id: 'skill:rdc-tool-shell', kind: 'preloaded-skill', content: 'method text' };
-const permission = (revision) => ({ id: 'runtime:permission', kind: 'runtime-fact', content: `Mode: auto\nRevision: ${revision}` });
+const permission = (revision) => ({
+  id: 'runtime:permission',
+  kind: 'runtime-fact',
+  content: `Mode: auto\nRevision: ${revision}`,
+});
 const user = { role: 'user', content: `find the cause ${SECRET_TEXT}`, timestamp: 1 };
-const call = (id) => ({ role: 'assistant', content: [{ type: 'thinking', redacted: true }, { type: 'toolCall', id, name: 'shell', arguments: { rdc: { operation: 'rd.texture.get_pixel' } } }], model: 'm', provider: 'p', usage: {}, stopReason: 'toolUse', timestamp: 2 });
-const result = (id, text) => ({ role: 'toolResult', toolCallId: id, toolName: 'shell', isError: false, content: [{ type: 'text', text }], timestamp: 3 });
+const call = (id) => ({
+  role: 'assistant',
+  content: [
+    { type: 'thinking', redacted: true },
+    { type: 'toolCall', id, name: 'shell', arguments: { rdc: { operation: 'rd.texture.get_pixel' } } },
+  ],
+  model: 'm',
+  provider: 'p',
+  usage: {},
+  stopReason: 'toolUse',
+  timestamp: 2,
+});
+const result = (id, text) => ({
+  role: 'toolResult',
+  toolCallId: id,
+  toolName: 'shell',
+  isError: false,
+  content: [{ type: 'text', text }],
+  timestamp: 3,
+});
 const tail = { role: 'user', content: 'ephemeral hint', timestamp: 4 };
 
 function snapshot(callIndex, { segments, messages, tools = [{ name: 'shell' }], usage, redactions = [] }) {
   return {
-    id: `llm-call-${callIndex}`, createdAt: `2026-11-18T00:00:0${callIndex}.000Z`, completedAt: `2026-11-18T00:00:0${callIndex}.500Z`,
-    sessionId: 'sess_a', turnId: 'turn_1', callIndex, route: { providerId: 'chatgpt-account', modelId: 'gpt', protocol: 'OpenAIResponses' },
+    id: `llm-call-${callIndex}`,
+    createdAt: `2026-11-18T00:00:0${callIndex}.000Z`,
+    completedAt: `2026-11-18T00:00:0${callIndex}.500Z`,
+    sessionId: 'sess_a',
+    turnId: 'turn_1',
+    callIndex,
+    route: { providerId: 'chatgpt-account', modelId: 'gpt', protocol: 'OpenAIResponses' },
     promptPlan: { segments, systemPrompt: segments.map((segment) => segment.content).join('\n\n') },
-    messages, tools, cache: { enabled: false }, usage, redactions,
+    messages,
+    tools,
+    cache: { enabled: false },
+    usage,
+    redactions,
   };
 }
 
@@ -27,16 +58,52 @@ function writeFixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-request-profile-'));
   const dir = path.join(root, 'sess_a', 'turn_1');
   fs.mkdirSync(dir, { recursive: true });
-  const hash = (index) => [{ path: `messages[${index}].content[0]`, reason: 'protected opaque reasoning', hash: `h${index}` }];
-  const requests = [
-    snapshot(0, { segments: [core, skill, permission(1)], messages: [user], usage: { inputTokens: 1000, cacheReadTokens: 0 } }),
-    snapshot(1, { segments: [core, skill, permission(1)], messages: [user, call('a'), result('a', 'x'.repeat(4000))], usage: { inputTokens: 2000, cacheReadTokens: 1000 }, redactions: hash(1) }),
-    snapshot(2, { segments: [core, skill, permission(1)], messages: [user, call('a'), result('a', 'x'.repeat(4000)), tail], usage: { inputTokens: 2100, cacheReadTokens: 0 }, redactions: hash(1) }),
-    snapshot(3, { segments: [core, skill, permission(1)], messages: [user, call('a'), result('a', 'x'.repeat(4000)), call('b'), result('b', 'y')], usage: { inputTokens: 2200, cacheReadTokens: 2000 }, redactions: [...hash(1), ...hash(3)] }),
-    snapshot(4, { segments: [core, skill, permission(2)], messages: [user, call('a'), result('a', 'x'.repeat(4000)), call('b'), result('b', 'y')], usage: { inputTokens: 2200, cacheReadTokens: 100 }, redactions: [...hash(1), ...hash(3)] }),
-    snapshot(5, { segments: [core, skill, permission(2)], tools: [{ name: 'shell' }, { name: 'subagent' }], messages: [user], usage: { inputTokens: 900, cacheReadTokens: 0 } }),
+  const hash = (index) => [
+    { path: `messages[${index}].content[0]`, reason: 'protected opaque reasoning', hash: `h${index}` },
   ];
-  requests.forEach((value) => fs.writeFileSync(path.join(dir, `${String(value.callIndex).padStart(3, '0')}-${value.id}.json`), JSON.stringify(value)));
+  const requests = [
+    snapshot(0, {
+      segments: [core, skill, permission(1)],
+      messages: [user],
+      usage: { inputTokens: 1000, cacheReadTokens: 0 },
+    }),
+    snapshot(1, {
+      segments: [core, skill, permission(1)],
+      messages: [user, call('a'), result('a', 'x'.repeat(4000))],
+      usage: { inputTokens: 2000, cacheReadTokens: 1000 },
+      redactions: hash(1),
+    }),
+    snapshot(2, {
+      segments: [core, skill, permission(1)],
+      messages: [user, call('a'), result('a', 'x'.repeat(4000)), tail],
+      usage: { inputTokens: 2100, cacheReadTokens: 0 },
+      redactions: hash(1),
+    }),
+    snapshot(3, {
+      segments: [core, skill, permission(1)],
+      messages: [user, call('a'), result('a', 'x'.repeat(4000)), call('b'), result('b', 'y')],
+      usage: { inputTokens: 2200, cacheReadTokens: 2000 },
+      redactions: [...hash(1), ...hash(3)],
+    }),
+    snapshot(4, {
+      segments: [core, skill, permission(2)],
+      messages: [user, call('a'), result('a', 'x'.repeat(4000)), call('b'), result('b', 'y')],
+      usage: { inputTokens: 2200, cacheReadTokens: 100 },
+      redactions: [...hash(1), ...hash(3)],
+    }),
+    snapshot(5, {
+      segments: [core, skill, permission(2)],
+      tools: [{ name: 'shell' }, { name: 'subagent' }],
+      messages: [user],
+      usage: { inputTokens: 900, cacheReadTokens: 0 },
+    }),
+  ];
+  requests.forEach((value) =>
+    fs.writeFileSync(
+      path.join(dir, `${String(value.callIndex).padStart(3, '0')}-${value.id}.json`),
+      JSON.stringify(value),
+    ),
+  );
   fs.writeFileSync(path.join(dir, 'session.json'), JSON.stringify({ unrelated: true }));
   return root;
 }
@@ -47,7 +114,11 @@ test('locates the first canonical difference between adjacent requests and keeps
     const { snapshots, ignoredFiles } = loadSnapshots([root]);
     assert.equal(ignoredFiles, 1);
     const { requests, summary } = profileRequests(snapshots);
-    const regions = requests.map((row) => row.difference && (row.difference.region === 'input' ? `input:${row.difference.fromEnd}` : row.difference.region));
+    const regions = requests.map(
+      (row) =>
+        row.difference &&
+        (row.difference.region === 'input' ? `input:${row.difference.fromEnd}` : row.difference.region),
+    );
     assert.deepEqual(regions, [null, 'none', 'none', 'input:1', 'instructions', 'tools']);
     assert.equal(requests[4].difference.label, 'runtime:permission');
     assert.ok(requests[1].difference.coveredOfPrevious === 1);

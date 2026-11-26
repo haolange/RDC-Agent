@@ -1,6 +1,7 @@
 export const enProjectCapture = {
   'projectCapture.reference': 'Reference external capture (read only)',
-  'projectCapture.referenceHint': 'Register one external RDC without copying it. Only this file is authorized for reading; removing its reference keeps the original.',
+  'projectCapture.referenceHint':
+    'Register one external RDC without copying it. Only this file is authorized for reading; removing its reference keeps the original.',
   'projectCapture.referencePath': 'Absolute path to the original RDC',
   'projectCapture.registerReference': 'Register reference',
   'projectCapture.referenceFailed': 'External capture registration failed',

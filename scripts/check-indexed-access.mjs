@@ -63,10 +63,11 @@ const PENDING_DIRECTORIES = new Set([
 ]);
 
 const toRelative = (fileName) => path.relative(repoRoot, fileName).split(path.sep).join('/');
-const isProductionSource = (relativePath) => relativePath.startsWith('src/')
-  && /\.tsx?$/u.test(relativePath)
-  && !/\.(test|d)\.tsx?$/u.test(relativePath)
-  && !relativePath.startsWith('src/main/testing/');
+const isProductionSource = (relativePath) =>
+  relativePath.startsWith('src/') &&
+  /\.tsx?$/u.test(relativePath) &&
+  !/\.(test|d)\.tsx?$/u.test(relativePath) &&
+  !relativePath.startsWith('src/main/testing/');
 
 const configPath = path.join(repoRoot, 'tsconfig.json');
 const configFile = ts.readConfigFile(configPath, ts.sys.readFile);

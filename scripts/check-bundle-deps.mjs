@@ -26,7 +26,8 @@ const devDependencies = new Set(Object.keys(packageJson.devDependencies ?? {}));
 function sourceFiles(directory) {
   const absolute = path.join(root, directory);
   if (!fs.existsSync(absolute)) return [];
-  return fs.readdirSync(absolute, { recursive: true, withFileTypes: true })
+  return fs
+    .readdirSync(absolute, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile() && /\.(?:ts|tsx|mjs|js)$/u.test(entry.name) && !/\.test\.tsx?$/u.test(entry.name))
     .map((entry) => path.join(entry.parentPath, entry.name))
     .filter((file) => !path.relative(root, file).split(path.sep).includes('testing'));
@@ -77,12 +78,15 @@ for (const [name, file] of runtime) {
 }
 for (const name of dependencies) {
   if (runtime.has(name) || peersOfRuntime.has(name)) continue;
-  problems.push(renderer.has(name)
-    ? `${name} is used only by the renderer bundle; move it to devDependencies`
-    : `${name} is in dependencies but nothing imports it; remove it`);
+  problems.push(
+    renderer.has(name)
+      ? `${name} is used only by the renderer bundle; move it to devDependencies`
+      : `${name} is in dependencies but nothing imports it; remove it`,
+  );
 }
 for (const [name, file] of renderer) {
-  if (!runtime.has(name) && !devDependencies.has(name)) problems.push(`${name} is imported by ${file} but is not in devDependencies`);
+  if (!runtime.has(name) && !devDependencies.has(name))
+    problems.push(`${name} is imported by ${file} but is not in devDependencies`);
 }
 
 if (process.argv.includes('--entry-chunk')) {
@@ -96,7 +100,8 @@ if (process.argv.includes('--entry-chunk')) {
       problems.push('the renderer entry chunk named by out/renderer/index.html does not exist');
     } else {
       const size = fs.statSync(entryPath).size;
-      if (size > ENTRY_CHUNK_BUDGET) problems.push(`renderer entry chunk is ${size} bytes; the budget is ${ENTRY_CHUNK_BUDGET}`);
+      if (size > ENTRY_CHUNK_BUDGET)
+        problems.push(`renderer entry chunk is ${size} bytes; the budget is ${ENTRY_CHUNK_BUDGET}`);
       else console.log(`[bundle-deps] renderer entry chunk ${size} / ${ENTRY_CHUNK_BUDGET} bytes`);
     }
   }

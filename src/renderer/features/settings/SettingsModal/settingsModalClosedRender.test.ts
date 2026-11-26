@@ -9,12 +9,20 @@ it('a closed Settings modal copies the providers once, not on every render', asy
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   let reads = 0;
   const provider = {
-    id: 'provider-a', providerAvailability: {}, catalogProvenance: [], models: [], recommendedModels: [],
+    id: 'provider-a',
+    providerAvailability: {},
+    catalogProvenance: [],
+    models: [],
+    recommendedModels: [],
     // Every copy of the provider (cloneProvider) reads this field.
-    get authModeOptions() { reads += 1; return undefined; },
+    get authModeOptions() {
+      reads += 1;
+      return undefined;
+    },
   } as unknown as LlmProviderEntry;
   const settings = {
-    profile: {}, llm: { providers: [provider], agentRoutes: [] },
+    profile: {},
+    llm: { providers: [provider], agentRoutes: [] },
     tooling: { rdcCli: {}, codeInterpreter: {}, shell: {} },
     agents: { definitions: [], globalInstructions: '' },
   } as unknown as AppSettings;

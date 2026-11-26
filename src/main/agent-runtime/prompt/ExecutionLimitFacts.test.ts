@@ -4,24 +4,35 @@ import { applyExecutionLimitFacts } from './ExecutionLimitFacts';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 
 const base: PromptPlan = {
-  id: 'plan', segments: [], systemPrompt: '', totalTokenEstimate: 0,
+  id: 'plan',
+  segments: [],
+  systemPrompt: '',
+  totalTokenEstimate: 0,
   stablePrefix: { fingerprint: 'stable', segmentIds: [], sourceHashes: [], tokenEstimate: 0, volatileSegmentIds: [] },
-  metrics: { systemPrompt: 0, scopedInstructions: 0, skills: 0 }, diagnostics: [],
+  metrics: { systemPrompt: 0, scopedInstructions: 0, skills: 0 },
+  diagnostics: [],
 };
 
 describe('frozen execution limit facts', () => {
   it.each([
-    [undefined, undefined, undefined], [undefined, 50, 50], [900, 50, 50], [8, 50, 8],
-    [Number.MAX_SAFE_INTEGER, 12, 12], [Infinity, 12, 12],
-  ] as const)('uses the executable resolver for policy %s and profile %s', (policyMaxTurns, profileMaxTurns, expected) => {
-    const plan = applyExecutionLimitFacts(base, { policyMaxTurns, profileMaxTurns });
-    expect(resolveAgentMaxTurns(policyMaxTurns, profileMaxTurns)).toBe(expected);
-    expect(plan.systemPrompt).toContain(`prepared turn: ${expected ?? 'not configured'}`);
-    expect(plan.systemPrompt).toContain('not a remaining balance or a tool-call budget');
-    expect(plan.systemPrompt).toContain('compaction must be accounted for separately');
-    expect(plan.systemPrompt).toContain('safety stop, not a planning budget');
-    expect(plan.systemPrompt).toContain('through task_get');
-  });
+    [undefined, undefined, undefined],
+    [undefined, 50, 50],
+    [900, 50, 50],
+    [8, 50, 8],
+    [Number.MAX_SAFE_INTEGER, 12, 12],
+    [Infinity, 12, 12],
+  ] as const)(
+    'uses the executable resolver for policy %s and profile %s',
+    (policyMaxTurns, profileMaxTurns, expected) => {
+      const plan = applyExecutionLimitFacts(base, { policyMaxTurns, profileMaxTurns });
+      expect(resolveAgentMaxTurns(policyMaxTurns, profileMaxTurns)).toBe(expected);
+      expect(plan.systemPrompt).toContain(`prepared turn: ${expected ?? 'not configured'}`);
+      expect(plan.systemPrompt).toContain('not a remaining balance or a tool-call budget');
+      expect(plan.systemPrompt).toContain('compaction must be accounted for separately');
+      expect(plan.systemPrompt).toContain('safety stop, not a planning budget');
+      expect(plan.systemPrompt).toContain('through task_get');
+    },
+  );
 
   it('projects the builtin General ceiling of 200 under an unconstrained policy', () => {
     const plan = applyExecutionLimitFacts(base, { policyMaxTurns: Number.MAX_SAFE_INTEGER, profileMaxTurns: 200 });
@@ -29,7 +40,9 @@ describe('frozen execution limit facts', () => {
   });
 
   it('rejects zero policy before preparing executable facts', () => {
-    expect(() => applyExecutionLimitFacts(base, { policyMaxTurns: 0, profileMaxTurns: 50 })).toThrow('POLICY_MAX_TURNS_ZERO');
+    expect(() => applyExecutionLimitFacts(base, { policyMaxTurns: 0, profileMaxTurns: 50 })).toThrow(
+      'POLICY_MAX_TURNS_ZERO',
+    );
   });
 
   it('replaces facts without mutating the supplied plan or changing its stable prefix', () => {

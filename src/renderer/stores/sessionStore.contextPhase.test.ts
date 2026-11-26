@@ -162,14 +162,15 @@ describe('session context display phases', () => {
   it('drops a telemetry-free zero snapshot from a late session projection', () => {
     const store = useSessionStore.getState();
     store.setCurrentRunUsage(usage());
-    store.setCurrentRunUsage(usage({
-      inputTokens: 0,
-      outputTokens: 0,
-      totalTokens: 0,
-      occupiedTokens: 0,
-    }));
+    store.setCurrentRunUsage(
+      usage({
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        occupiedTokens: 0,
+      }),
+    );
 
     expect(useSessionStore.getState().lastKnownUsage).toBeNull();
   });
-
 });

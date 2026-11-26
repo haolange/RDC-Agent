@@ -18,7 +18,12 @@ function retryable(error: unknown, attempt: number, host: HostDescriptor): boole
   return host.isWindows && code !== undefined && TRANSIENT_WINDOWS_RENAME.has(code) && attempt < RENAME_ATTEMPTS - 1;
 }
 
-export function renameWithRetrySync(source: string, target: string, host: HostDescriptor = currentHost(), rename = fs.renameSync): void {
+export function renameWithRetrySync(
+  source: string,
+  target: string,
+  host: HostDescriptor = currentHost(),
+  rename = fs.renameSync,
+): void {
   for (let attempt = 0; ; attempt += 1) {
     try {
       rename(source, target);

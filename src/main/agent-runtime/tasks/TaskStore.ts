@@ -1,7 +1,11 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { z } from 'zod';
-import { TASK_EXECUTION_STATUSES, TaskExecutionPreparationSchema, type TaskExecutionPreparation } from '@shared/types/taskExecution';
+import {
+  TASK_EXECUTION_STATUSES,
+  TaskExecutionPreparationSchema,
+  type TaskExecutionPreparation,
+} from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
 import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
 import { writeFileAtomic } from '../../runtime/atomicFile';
@@ -29,13 +33,15 @@ interface TaskStateDocument {
   rootBudgets: Record<string, TaskRootBudgetRecord>;
 }
 
-const TaskStateDocumentSchema = z.object({
-  schemaVersion: z.literal(TASK_SCHEMA_VERSION),
-  tasks: z.record(z.string(), TaskRecordSchema),
-  executions: z.record(z.string(), TaskExecutionRecordSchema),
-  messages: z.record(z.string(), z.array(TaskExecutionMessageSchema)),
-  rootBudgets: z.record(z.string(), TaskRootBudgetRecordSchema),
-}).strict();
+const TaskStateDocumentSchema = z
+  .object({
+    schemaVersion: z.literal(TASK_SCHEMA_VERSION),
+    tasks: z.record(z.string(), TaskRecordSchema),
+    executions: z.record(z.string(), TaskExecutionRecordSchema),
+    messages: z.record(z.string(), z.array(TaskExecutionMessageSchema)),
+    rootBudgets: z.record(z.string(), TaskRootBudgetRecordSchema),
+  })
+  .strict();
 
 const TaskStateVersionSchema = z.object({ schemaVersion: z.unknown().optional() });
 
@@ -49,10 +55,17 @@ function parseTaskState(raw: string, statePath: string): TaskStateDocument {
   }
   const versioned = TaskStateVersionSchema.safeParse(value);
   if (versioned.success && versioned.data.schemaVersion !== TASK_SCHEMA_VERSION) {
-    throw new AppError('STORAGE_SCHEMA_UNSUPPORTED', `Unsupported task state schema version: ${String(versioned.data.schemaVersion)}.`);
+    throw new AppError(
+      'STORAGE_SCHEMA_UNSUPPORTED',
+      `Unsupported task state schema version: ${String(versioned.data.schemaVersion)}.`,
+    );
   }
   const state = TaskStateDocumentSchema.safeParse(value);
-  if (!state.success) throw new AppError('STORAGE_CORRUPT', `Malformed canonical task state in ${statePath}: ${z.prettifyError(state.error)}`);
+  if (!state.success)
+    throw new AppError(
+      'STORAGE_CORRUPT',
+      `Malformed canonical task state in ${statePath}: ${z.prettifyError(state.error)}`,
+    );
   validateState(state.data);
   return state.data;
 }
@@ -105,7 +118,9 @@ export class FileTaskStore implements TaskStore {
     const name = `${this.root}:${key}`;
     const previous = processLocks.get(name) ?? Promise.resolve();
     let release!: () => void;
-    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const tail = previous.then(() => gate);
     processLocks.set(name, tail);
     await previous;
@@ -158,8 +173,12 @@ export class FileTaskStore implements TaskStore {
       .map(clone)
       .sort((left, right) => left.sequence - right.sequence);
   }
-  async loadRootBudget(id: string): Promise<TaskRootBudgetRecord | null> { return clone((await this.readState()).rootBudgets[id] ?? null); }
-  async saveRootBudget(budget: TaskRootBudgetRecord): Promise<void> { await this.commit({ rootBudgets: [budget] }); }
+  async loadRootBudget(id: string): Promise<TaskRootBudgetRecord | null> {
+    return clone((await this.readState()).rootBudgets[id] ?? null);
+  }
+  async saveRootBudget(budget: TaskRootBudgetRecord): Promise<void> {
+    await this.commit({ rootBudgets: [budget] });
+  }
 
   async commit(changes: TaskStoreCommit): Promise<void> {
     await this.ensureInitialized();
@@ -198,7 +217,10 @@ export class FileTaskStore implements TaskStore {
       return this.readStateFile();
     }
     if (entries.length) {
-      throw new AppError('TASK_STORAGE_REQUIRES_CONVERSION', 'nonempty task storage has no current task-state.json; original files were preserved.');
+      throw new AppError(
+        'TASK_STORAGE_REQUIRES_CONVERSION',
+        'nonempty task storage has no current task-state.json; original files were preserved.',
+      );
     }
     return emptyState();
   }
@@ -209,7 +231,9 @@ export class FileTaskStore implements TaskStore {
       pending = this.initialize();
       initializations.set(this.root, pending);
     }
-    try { await pending; } catch (error) {
+    try {
+      await pending;
+    } catch (error) {
       if (initializations.get(this.root) === pending) initializations.delete(this.root);
       throw error;
     }
@@ -224,7 +248,10 @@ export class FileTaskStore implements TaskStore {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
     if ((await fs.readdir(this.root)).length) {
-      throw new AppError('TASK_STORAGE_REQUIRES_CONVERSION', 'nonempty task storage has no current task-state.json; original files were preserved.');
+      throw new AppError(
+        'TASK_STORAGE_REQUIRES_CONVERSION',
+        'nonempty task storage has no current task-state.json; original files were preserved.',
+      );
     }
     await this.writeState(emptyState());
   }
@@ -247,32 +274,61 @@ export class MemoryTaskStore implements TaskStore {
   async withLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
     const previous = this.locks.get(key) ?? Promise.resolve();
     let release!: () => void;
-    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const tail = previous.then(() => gate);
     this.locks.set(key, tail);
     await previous;
-    try { return await operation(); } finally {
+    try {
+      return await operation();
+    } finally {
       release();
       if (this.locks.get(key) === tail) this.locks.delete(key);
     }
   }
 
-  async loadTask(id: string): Promise<TaskRecord | null> { return clone(this.state.tasks[id] ?? null); }
-  async saveTask(task: TaskRecord): Promise<void> { await this.commit({ tasks: [task] }); }
-  async listTasks(): Promise<TaskRecord[]> { return orderTasks(Object.values(this.state.tasks).map(clone)); }
-  async deleteTask(id: string): Promise<void> { await this.commit({ deletedTaskIds: [id] }); }
-  async loadExecution(id: string): Promise<TaskExecutionRecord | null> { return clone(this.state.executions[id] ?? null); }
-  async saveExecution(execution: TaskExecutionRecord): Promise<void> { await this.commit({ executions: [execution] }); }
-  async listExecutions(taskId?: string): Promise<TaskExecutionRecord[]> { return Object.values(this.state.executions).filter((entry) => !taskId || entry.taskId === taskId).map(clone); }
-  async appendMessage(message: TaskExecutionMessage): Promise<void> { await this.commit({ messages: [message] }); }
-  async listMessages(id: string, after = 0): Promise<TaskExecutionMessage[]> { return (this.state.messages[id] ?? []).filter((entry) => entry.sequence > after).map(clone); }
-  async loadRootBudget(id: string): Promise<TaskRootBudgetRecord | null> { return clone(this.state.rootBudgets[id] ?? null); }
-  async saveRootBudget(budget: TaskRootBudgetRecord): Promise<void> { await this.commit({ rootBudgets: [budget] }); }
+  async loadTask(id: string): Promise<TaskRecord | null> {
+    return clone(this.state.tasks[id] ?? null);
+  }
+  async saveTask(task: TaskRecord): Promise<void> {
+    await this.commit({ tasks: [task] });
+  }
+  async listTasks(): Promise<TaskRecord[]> {
+    return orderTasks(Object.values(this.state.tasks).map(clone));
+  }
+  async deleteTask(id: string): Promise<void> {
+    await this.commit({ deletedTaskIds: [id] });
+  }
+  async loadExecution(id: string): Promise<TaskExecutionRecord | null> {
+    return clone(this.state.executions[id] ?? null);
+  }
+  async saveExecution(execution: TaskExecutionRecord): Promise<void> {
+    await this.commit({ executions: [execution] });
+  }
+  async listExecutions(taskId?: string): Promise<TaskExecutionRecord[]> {
+    return Object.values(this.state.executions)
+      .filter((entry) => !taskId || entry.taskId === taskId)
+      .map(clone);
+  }
+  async appendMessage(message: TaskExecutionMessage): Promise<void> {
+    await this.commit({ messages: [message] });
+  }
+  async listMessages(id: string, after = 0): Promise<TaskExecutionMessage[]> {
+    return (this.state.messages[id] ?? []).filter((entry) => entry.sequence > after).map(clone);
+  }
+  async loadRootBudget(id: string): Promise<TaskRootBudgetRecord | null> {
+    return clone(this.state.rootBudgets[id] ?? null);
+  }
+  async saveRootBudget(budget: TaskRootBudgetRecord): Promise<void> {
+    await this.commit({ rootBudgets: [budget] });
+  }
   async commit(changes: TaskStoreCommit): Promise<void> {
     const next = clone(this.state);
     for (const task of changes.tasks ?? []) next.tasks[task.id] = clone(task);
     for (const execution of changes.executions ?? []) next.executions[execution.id] = clone(execution);
-    for (const message of changes.messages ?? []) next.messages[message.executionId] = [...(next.messages[message.executionId] ?? []), clone(message)];
+    for (const message of changes.messages ?? [])
+      next.messages[message.executionId] = [...(next.messages[message.executionId] ?? []), clone(message)];
     for (const budget of changes.rootBudgets ?? []) next.rootBudgets[budget.id] = clone(budget);
     for (const id of changes.deletedTaskIds ?? []) delete next.tasks[id];
     this.state = next;
@@ -289,9 +345,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function validateState(state: TaskStateDocument): void {
   for (const [id, budget] of Object.entries(state.rootBudgets)) {
-    if (budget.id !== id || [budget.toolCalls, budget.subagents, budget.maxToolCalls, budget.maxSubagents,
-      budget.maxChildDepth, budget.deadlineAt, budget.startedAt, budget.updatedAt].some((value) => !Number.isFinite(value) || value < 0)
-      || budget.toolCalls > budget.maxToolCalls || budget.subagents > budget.maxSubagents) {
+    if (
+      budget.id !== id ||
+      [
+        budget.toolCalls,
+        budget.subagents,
+        budget.maxToolCalls,
+        budget.maxSubagents,
+        budget.maxChildDepth,
+        budget.deadlineAt,
+        budget.startedAt,
+        budget.updatedAt,
+      ].some((value) => !Number.isFinite(value) || value < 0) ||
+      budget.toolCalls > budget.maxToolCalls ||
+      budget.subagents > budget.maxSubagents
+    ) {
       throw new Error(`Malformed root Task budget: ${id}.`);
     }
   }
@@ -299,79 +367,127 @@ function validateState(state: TaskStateDocument): void {
     if (task.executionRequirements !== undefined) {
       TaskExecutionRequirementsSchema.parse(task.executionRequirements);
       if (task.executionRequired !== true) throw new Error(`Malformed constrained task without execution: ${id}.`);
-      if (!Array.isArray(task.executionRequirements.requiredSkillIds) || !Array.isArray(task.executionRequirements.independentOfTaskIds)) throw new Error(`Malformed canonical task requirements: ${id}.`);
+      if (
+        !Array.isArray(task.executionRequirements.requiredSkillIds) ||
+        !Array.isArray(task.executionRequirements.independentOfTaskIds)
+      )
+        throw new Error(`Malformed canonical task requirements: ${id}.`);
     }
-    if (task.id !== id || typeof task.subject !== 'string'
-      || !Array.isArray(task.blockedBy) || !Array.isArray(task.blocks) || !Array.isArray(task.executionIds)
-      || !Array.isArray(task.completionRequirements) || typeof task.revision !== 'number'
-      || typeof task.description !== 'string' || typeof task.createdAt !== 'number' || typeof task.updatedAt !== 'number'
-      || (task.creationTurnRef !== undefined && (typeof task.creationTurnRef !== 'string' || !task.creationTurnRef.trim()))
-      || !['pending', 'in_progress', 'blocked', 'completed', 'cancelled'].includes(task.status)) {
+    if (
+      task.id !== id ||
+      typeof task.subject !== 'string' ||
+      !Array.isArray(task.blockedBy) ||
+      !Array.isArray(task.blocks) ||
+      !Array.isArray(task.executionIds) ||
+      !Array.isArray(task.completionRequirements) ||
+      typeof task.revision !== 'number' ||
+      typeof task.description !== 'string' ||
+      typeof task.createdAt !== 'number' ||
+      typeof task.updatedAt !== 'number' ||
+      (task.creationTurnRef !== undefined &&
+        (typeof task.creationTurnRef !== 'string' || !task.creationTurnRef.trim())) ||
+      !['pending', 'in_progress', 'blocked', 'completed', 'cancelled'].includes(task.status)
+    ) {
       throw new Error(`Malformed canonical task record: ${id}.`);
     }
-    if (task.parentTaskId && !state.tasks[task.parentTaskId]) throw new Error(`Task ${id} references missing parent ${task.parentTaskId}.`);
+    if (task.parentTaskId && !state.tasks[task.parentTaskId])
+      throw new Error(`Task ${id} references missing parent ${task.parentTaskId}.`);
     for (const dependency of task.blockedBy) {
       if (!state.tasks[dependency]) throw new Error(`Task ${id} references missing dependency ${dependency}.`);
-      if (!state.tasks[dependency]!.blocks.includes(id)) throw new Error(`Task dependency links are not reciprocal: ${dependency} -> ${id}.`);
+      if (!state.tasks[dependency]!.blocks.includes(id))
+        throw new Error(`Task dependency links are not reciprocal: ${dependency} -> ${id}.`);
     }
     for (const blocked of task.blocks) {
-      if (!state.tasks[blocked]?.blockedBy.includes(id)) throw new Error(`Task dependency links are not reciprocal: ${id} -> ${blocked}.`);
+      if (!state.tasks[blocked]?.blockedBy.includes(id))
+        throw new Error(`Task dependency links are not reciprocal: ${id} -> ${blocked}.`);
     }
-    for (const executionId of task.executionIds) if (!state.executions[executionId]) throw new Error(`Task ${id} references missing execution ${executionId}.`);
-    if (task.currentExecutionId && state.executions[task.currentExecutionId]?.taskId !== id) throw new Error(`Task ${id} references an invalid current execution.`);
+    for (const executionId of task.executionIds)
+      if (!state.executions[executionId]) throw new Error(`Task ${id} references missing execution ${executionId}.`);
+    if (task.currentExecutionId && state.executions[task.currentExecutionId]?.taskId !== id)
+      throw new Error(`Task ${id} references an invalid current execution.`);
   }
   for (const [id, execution] of Object.entries(state.executions)) {
     if (execution.preparation !== undefined) TaskExecutionPreparationSchema.parse(execution.preparation);
     if (execution.runtimeEpochs !== undefined) {
-      if (!Array.isArray(execution.runtimeEpochs) || !execution.preparation) throw new Error(`Malformed runtime epochs: ${id}.`);
+      if (!Array.isArray(execution.runtimeEpochs) || !execution.preparation)
+        throw new Error(`Malformed runtime epochs: ${id}.`);
       let previous = execution.preparation.runtimeFingerprint;
       for (const epoch of execution.runtimeEpochs) {
         TaskRuntimeEpochSchema.parse(epoch);
-        if (epoch.previousFingerprint !== previous || epoch.runtimeFingerprint === previous) throw new Error(`Broken runtime epoch chain: ${id}.`);
+        if (epoch.previousFingerprint !== previous || epoch.runtimeFingerprint === previous)
+          throw new Error(`Broken runtime epoch chain: ${id}.`);
         previous = epoch.runtimeFingerprint;
       }
     }
     if (execution.independentSources !== undefined) {
       if (!Array.isArray(execution.independentSources)) throw new Error(`Malformed independent source binding: ${id}.`);
-      execution.independentSources.forEach(source => TaskIndependentSourceSchema.parse(source));
+      execution.independentSources.forEach((source) => TaskIndependentSourceSchema.parse(source));
     }
     const owner = state.tasks[execution.taskId];
-    if (execution.id !== id || !owner
-      || !owner.executionIds.includes(id) || !Number.isInteger(execution.generation) || execution.generation < 1
-      || !Number.isInteger(execution.taskRevision) || execution.taskRevision < 1 || !isRecord(execution.budget)
-      || typeof execution.runtimeInstanceId !== 'string' || !execution.runtimeInstanceId.trim()
-      || !Number.isInteger(execution.childMessageAckSequence) || execution.childMessageAckSequence < 0
-      || !Number.isInteger(execution.parentMessageAckSequence) || execution.parentMessageAckSequence < 0
-      || !['direct', 'subagent', 'handoff'].includes(execution.mode)
-      || (execution.dispatch !== undefined && !['wait', 'background'].includes(execution.dispatch))
-      || !(TASK_EXECUTION_STATUSES as readonly string[]).includes(execution.status)
-      || !validBudget(execution.budget)) {
+    if (
+      execution.id !== id ||
+      !owner ||
+      !owner.executionIds.includes(id) ||
+      !Number.isInteger(execution.generation) ||
+      execution.generation < 1 ||
+      !Number.isInteger(execution.taskRevision) ||
+      execution.taskRevision < 1 ||
+      !isRecord(execution.budget) ||
+      typeof execution.runtimeInstanceId !== 'string' ||
+      !execution.runtimeInstanceId.trim() ||
+      !Number.isInteger(execution.childMessageAckSequence) ||
+      execution.childMessageAckSequence < 0 ||
+      !Number.isInteger(execution.parentMessageAckSequence) ||
+      execution.parentMessageAckSequence < 0 ||
+      !['direct', 'subagent', 'handoff'].includes(execution.mode) ||
+      (execution.dispatch !== undefined && !['wait', 'background'].includes(execution.dispatch)) ||
+      !(TASK_EXECUTION_STATUSES as readonly string[]).includes(execution.status) ||
+      !validBudget(execution.budget)
+    ) {
       throw new Error(`Malformed canonical task execution: ${id}.`);
     }
     if (execution.rootBudgetId && !state.rootBudgets[execution.rootBudgetId]) {
       throw new Error(`Execution references missing root budget: ${id}.`);
     }
-    const expectedDisposition = execution.status === 'completed' ? 'completed'
-      : execution.status === 'partial' ? 'partial'
-        : execution.status === 'cancelled' ? 'cancelled'
-          : ['blocked', 'failed', 'interrupted'].includes(execution.status) ? 'blocked' : undefined;
-    if ((expectedDisposition && execution.result?.disposition !== expectedDisposition)
-      || (!expectedDisposition && execution.result !== undefined)) throw new Error(`Execution status/result contradiction: ${id}.`);
+    const expectedDisposition =
+      execution.status === 'completed'
+        ? 'completed'
+        : execution.status === 'partial'
+          ? 'partial'
+          : execution.status === 'cancelled'
+            ? 'cancelled'
+            : ['blocked', 'failed', 'interrupted'].includes(execution.status)
+              ? 'blocked'
+              : undefined;
+    if (
+      (expectedDisposition && execution.result?.disposition !== expectedDisposition) ||
+      (!expectedDisposition && execution.result !== undefined)
+    )
+      throw new Error(`Execution status/result contradiction: ${id}.`);
     if (execution.result && Boolean(execution.result.resultRef) !== Boolean(execution.result.resultHash)) {
       throw new Error(`Execution result reference/hash contradiction: ${id}.`);
     }
   }
   for (const [executionId, messages] of Object.entries(state.messages)) {
     const execution = state.executions[executionId];
-    if (!execution || !Array.isArray(messages)) throw new Error(`Messages reference missing execution: ${executionId}.`);
+    if (!execution || !Array.isArray(messages))
+      throw new Error(`Messages reference missing execution: ${executionId}.`);
     const sequences = new Set<number>();
     for (const message of messages) {
-      if (message.executionId !== executionId
-        || message.taskId !== execution.taskId || message.generation !== execution.generation
-        || message.id !== `${executionId}:${message.sequence}` || !Number.isInteger(message.sequence) || message.sequence < 1
-        || !['progress', 'blocked', 'decision_required', 'result'].includes(message.kind)
-        || !['to_parent', 'to_child'].includes(message.direction)
-        || typeof message.body !== 'string' || !message.body.trim() || sequences.has(message.sequence)) throw new Error(`Malformed task execution message: ${message.id}.`);
+      if (
+        message.executionId !== executionId ||
+        message.taskId !== execution.taskId ||
+        message.generation !== execution.generation ||
+        message.id !== `${executionId}:${message.sequence}` ||
+        !Number.isInteger(message.sequence) ||
+        message.sequence < 1 ||
+        !['progress', 'blocked', 'decision_required', 'result'].includes(message.kind) ||
+        !['to_parent', 'to_child'].includes(message.direction) ||
+        typeof message.body !== 'string' ||
+        !message.body.trim() ||
+        sequences.has(message.sequence)
+      )
+        throw new Error(`Malformed task execution message: ${message.id}.`);
       sequences.add(message.sequence);
     }
   }
@@ -379,12 +495,15 @@ function validateState(state: TaskStateDocument): void {
 
 function validBudget(value: TaskExecutionRecord['budget']): boolean {
   const counters = [value.toolCalls, value.subagents, value.childDepth, value.startedAt];
-  const limits = [value.maxToolCalls, value.maxSubagents, value.maxChildDepth, value.deadlineAt]
-    .filter((entry): entry is number => entry !== undefined);
+  const limits = [value.maxToolCalls, value.maxSubagents, value.maxChildDepth, value.deadlineAt].filter(
+    (entry): entry is number => entry !== undefined,
+  );
   if ([...counters, ...limits].some((entry) => !Number.isFinite(entry) || entry < 0)) return false;
-  return (value.maxToolCalls === undefined || value.toolCalls <= value.maxToolCalls)
-    && (value.maxSubagents === undefined || value.subagents <= value.maxSubagents)
-    && (value.maxChildDepth === undefined || value.childDepth <= value.maxChildDepth);
+  return (
+    (value.maxToolCalls === undefined || value.toolCalls <= value.maxToolCalls) &&
+    (value.maxSubagents === undefined || value.subagents <= value.maxSubagents) &&
+    (value.maxChildDepth === undefined || value.childDepth <= value.maxChildDepth)
+  );
 }
 
 function clone<T>(value: T): T {

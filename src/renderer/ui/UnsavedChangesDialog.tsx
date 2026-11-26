@@ -32,21 +32,25 @@ export const UnsavedChangesDialog: React.FC<UnsavedChangesDialogProps> = ({
   }, []);
 
   return (
-  <TaskDialog
-    open
-    variant="alert"
-    size="sm"
-    title={title}
-    onClose={onKeepEditing}
-    closeLabel={keepEditingLabel}
-    footer={(
-      <>
-        <Button variant="ghost" size="md" onClick={onDiscard}>{discardLabel}</Button>
-        <Button ref={keepEditingRef} variant="primary" size="md" onClick={onKeepEditing}>{keepEditingLabel}</Button>
-      </>
-    )}
-  >
-    <p className="confirmation-message">{message}</p>
-  </TaskDialog>
+    <TaskDialog
+      open
+      variant="alert"
+      size="sm"
+      title={title}
+      onClose={onKeepEditing}
+      closeLabel={keepEditingLabel}
+      footer={
+        <>
+          <Button variant="ghost" size="md" onClick={onDiscard}>
+            {discardLabel}
+          </Button>
+          <Button ref={keepEditingRef} variant="primary" size="md" onClick={onKeepEditing}>
+            {keepEditingLabel}
+          </Button>
+        </>
+      }
+    >
+      <p className="confirmation-message">{message}</p>
+    </TaskDialog>
   );
 };

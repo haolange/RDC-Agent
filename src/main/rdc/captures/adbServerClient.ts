@@ -45,11 +45,13 @@ function isConnectUnreachable(error: unknown): boolean {
     return false;
   }
   const code = (error as NodeJS.ErrnoException).code;
-  return code === 'ECONNREFUSED'
-    || code === 'ENOTFOUND'
-    || code === 'EHOSTUNREACH'
-    || code === 'ENETUNREACH'
-    || code === 'ETIMEDOUT';
+  return (
+    code === 'ECONNREFUSED' ||
+    code === 'ENOTFOUND' ||
+    code === 'EHOSTUNREACH' ||
+    code === 'ENETUNREACH' ||
+    code === 'ETIMEDOUT'
+  );
 }
 
 function destroySocket(socket: net.Socket): void {
@@ -118,9 +120,7 @@ export async function queryAdbDevicesLines(options?: QueryAdbDevicesOptions): Pr
     options?.signal?.addEventListener('abort', abort, { once: true });
     const timer = setTimeout(() => {
       timedOut = true;
-      settle(new AdbServerUnreachableError(
-        `ADB server timed out after ${timeoutMs}ms (${host}:${port}).`,
-      ));
+      settle(new AdbServerUnreachableError(`ADB server timed out after ${timeoutMs}ms (${host}:${port}).`));
     }, timeoutMs);
 
     const tryParse = () => {
@@ -136,10 +136,7 @@ export async function queryAdbDevicesLines(options?: QueryAdbDevicesOptions): Pr
           settle(error);
           return;
         }
-        settle(new AdbServerProtocolError(
-          error instanceof Error ? error.message : String(error),
-          { cause: error },
-        ));
+        settle(new AdbServerProtocolError(error instanceof Error ? error.message : String(error), { cause: error }));
       }
     };
 
@@ -148,16 +145,10 @@ export async function queryAdbDevicesLines(options?: QueryAdbDevicesOptions): Pr
         return;
       }
       if (isConnectUnreachable(error)) {
-        settle(new AdbServerUnreachableError(
-          `ADB server unreachable at ${host}:${port}.`,
-          { cause: error },
-        ));
+        settle(new AdbServerUnreachableError(`ADB server unreachable at ${host}:${port}.`, { cause: error }));
         return;
       }
-      settle(new AdbServerProtocolError(
-        error.message || 'ADB server socket error.',
-        { cause: error },
-      ));
+      settle(new AdbServerProtocolError(error.message || 'ADB server socket error.', { cause: error }));
     });
 
     socket.on('data', (chunk) => {
@@ -191,15 +182,11 @@ export async function queryAdbDevicesLines(options?: QueryAdbDevicesOptions): Pr
         if (!writeError) {
           return;
         }
-        settle(isConnectUnreachable(writeError)
-          ? new AdbServerUnreachableError(
-            `ADB server unreachable at ${host}:${port}.`,
-            { cause: writeError },
-          )
-          : new AdbServerProtocolError(
-            writeError.message || 'Failed to write ADB request.',
-            { cause: writeError },
-          ));
+        settle(
+          isConnectUnreachable(writeError)
+            ? new AdbServerUnreachableError(`ADB server unreachable at ${host}:${port}.`, { cause: writeError })
+            : new AdbServerProtocolError(writeError.message || 'Failed to write ADB request.', { cause: writeError }),
+        );
       });
     });
   });

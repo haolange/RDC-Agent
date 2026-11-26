@@ -6,13 +6,22 @@ import { missingCaseChapters, serializeKnowledgeCard } from './knowledgeCardSche
 import { assertKnowledgeImagesAvailable } from './knowledgeAssetAvailability';
 import { knowledgeHumanConfirmationRequired, knowledgeAssetsMissing } from './knowledgeErrors';
 import { assertSafeKnowledgeWriteTarget, writeKnowledgeCardAtomic } from './knowledgeFs';
-import { clearStagedKnowledgeImages, putStagedKnowledgeImages, takeStagedKnowledgeImages } from './knowledgeImageStaging';
+import {
+  clearStagedKnowledgeImages,
+  putStagedKnowledgeImages,
+  takeStagedKnowledgeImages,
+} from './knowledgeImageStaging';
 import { isKnowledgeImagePathAllowed } from './knowledgeImages';
 import { knowledgeIndexService, KnowledgeIndexService } from './KnowledgeIndexService';
 import { knowledgeQueryService } from './KnowledgeQueryService';
 import type { KnowledgeStagedImage } from './knowledgeIngest';
 import type { AgentPermissionMode } from '@shared/types/settings';
-import type { KnowledgeCardRecord, KnowledgeHumanConfirmation, KnowledgeLifecycle, KnowledgeSpace } from '@shared/types/knowledge';
+import type {
+  KnowledgeCardRecord,
+  KnowledgeHumanConfirmation,
+  KnowledgeLifecycle,
+  KnowledgeSpace,
+} from '@shared/types/knowledge';
 
 export interface KnowledgeWriteInput {
   spaceId: string;
@@ -69,13 +78,19 @@ export class KnowledgeWriteService {
       throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', 'persist Candidate via KnowledgeCandidateService, not Write.');
     }
     assertFixedIsNotVerified(input.card);
-    if ((input.card.lifecycle === 'verified' || input.card.lifecycle === 'promoted') && input.card.missingAssets?.length) {
+    if (
+      (input.card.lifecycle === 'verified' || input.card.lifecycle === 'promoted') &&
+      input.card.missingAssets?.length
+    ) {
       throw knowledgeAssetsMissing();
     }
     if (input.card.lifecycle === 'verified' && input.card.type === 'case') {
       const missing = missingCaseChapters(input.card.chapters);
       if (missing.length > 0) {
-        throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', `case cannot be verified; missing chapters: ${missing.join(',')}`);
+        throw new AppError(
+          'KNOWLEDGE_LIFECYCLE_INVALID',
+          `case cannot be verified; missing chapters: ${missing.join(',')}`,
+        );
       }
     }
     if ((input.card.lifecycle === 'verified' || input.card.lifecycle === 'promoted') && input.card.images?.length) {
@@ -120,7 +135,10 @@ export class KnowledgeWriteService {
     const declared = record.images ?? [];
     if (declared.length === 0) return;
     if (incoming?.length) await putStagedKnowledgeImages(record.cardId, incoming);
-    const staged = await takeStagedKnowledgeImages(record.cardId, declared.map((image) => image.relativePath));
+    const staged = await takeStagedKnowledgeImages(
+      record.cardId,
+      declared.map((image) => image.relativePath),
+    );
     for (const image of staged) {
       if (!isKnowledgeImagePathAllowed(record.relativePath, image.relativePath, record.caseId)) continue;
       const dest = await assertSafeKnowledgeWriteTarget(rootPath, image.relativePath);
@@ -146,7 +164,10 @@ export class KnowledgeWriteService {
     if (input.to === 'verified' && input.card.type === 'case') {
       const missing = missingCaseChapters(input.card.chapters);
       if (missing.length > 0) {
-        throw new AppError('KNOWLEDGE_LIFECYCLE_INVALID', `case cannot be verified; missing chapters: ${missing.join(',')}`);
+        throw new AppError(
+          'KNOWLEDGE_LIFECYCLE_INVALID',
+          `case cannot be verified; missing chapters: ${missing.join(',')}`,
+        );
       }
     }
     return this.write({

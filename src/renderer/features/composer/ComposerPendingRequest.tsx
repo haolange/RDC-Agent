@@ -5,7 +5,14 @@ import { composerPendingRequestKey, type ComposerPendingRequestState } from './p
 import type { SessionRecord } from '@shared/types/session';
 import type { Ref } from 'react';
 
-export function ComposerPendingRequest({ pending, composeAccentStyle, agentId, currentSession, onReplan, shellRef }: {
+export function ComposerPendingRequest({
+  pending,
+  composeAccentStyle,
+  agentId,
+  currentSession,
+  onReplan,
+  shellRef,
+}: {
   pending: ComposerPendingRequestState;
   composeAccentStyle: { 'data-dyn-style': string };
   agentId: string;
@@ -14,17 +21,28 @@ export function ComposerPendingRequest({ pending, composeAccentStyle, agentId, c
   shellRef?: Ref<HTMLDivElement>;
 }) {
   if (pending.kind === 'tool-approval') {
-    return <div ref={shellRef} className="composer-shell composer-shell-tool-approval" {...composeAccentStyle}>
-      <ToolApprovalRequestPanel key={composerPendingRequestKey(pending)} request={pending.request} />
-    </div>;
+    return (
+      <div ref={shellRef} className="composer-shell composer-shell-tool-approval" {...composeAccentStyle}>
+        <ToolApprovalRequestPanel key={composerPendingRequestKey(pending)} request={pending.request} />
+      </div>
+    );
   }
   if (pending.kind === 'plan-review') {
-    return <div ref={shellRef} className="composer-shell composer-shell-plan-review" {...composeAccentStyle}>
-      <PlanReviewRequestPanel key={composerPendingRequestKey(pending)} request={pending.request}
-        agentId={agentId} currentSession={currentSession} onReplan={onReplan} />
-    </div>;
+    return (
+      <div ref={shellRef} className="composer-shell composer-shell-plan-review" {...composeAccentStyle}>
+        <PlanReviewRequestPanel
+          key={composerPendingRequestKey(pending)}
+          request={pending.request}
+          agentId={agentId}
+          currentSession={currentSession}
+          onReplan={onReplan}
+        />
+      </div>
+    );
   }
-  return <div ref={shellRef} className="composer-shell composer-shell-user-input" {...composeAccentStyle}>
-    <UserInputRequestPanel key={composerPendingRequestKey(pending)} request={pending.request} />
-  </div>;
+  return (
+    <div ref={shellRef} className="composer-shell composer-shell-user-input" {...composeAccentStyle}>
+      <UserInputRequestPanel key={composerPendingRequestKey(pending)} request={pending.request} />
+    </div>
+  );
 }

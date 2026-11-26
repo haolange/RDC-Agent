@@ -6,7 +6,13 @@ import { useKnowledgeQueryRunner } from './useKnowledgeQueryRunner';
 import type { KnowledgeLaneHit, KnowledgePack } from '@shared/types/knowledge';
 
 /** The list's query: debounced search text with the selected spaces and filters, its pages of hits and its pack. */
-export function useKnowledgeQuery({ viewMode, selectedSpaceIds, types, lifecycles, setError }: {
+export function useKnowledgeQuery({
+  viewMode,
+  selectedSpaceIds,
+  types,
+  lifecycles,
+  setError,
+}: {
   viewMode: KnowledgeViewMode;
   selectedSpaceIds: string[];
   types: Parameters<typeof buildKnowledgeCenterQueryRequest>[0]['type'];
@@ -27,30 +33,64 @@ export function useKnowledgeQuery({ viewMode, selectedSpaceIds, types, lifecycle
     return () => window.clearTimeout(timer);
   }, [searchQuery]);
 
-  const queryRequest = useMemo(() => buildKnowledgeCenterQueryRequest({
-    spaceIds: selectedSpaceIds,
-    text: debouncedSearch,
-    type: types,
-    lifecycle: lifecycles,
-  }), [debouncedSearch, lifecycles, selectedSpaceIds, types]);
-  const runQuery = useKnowledgeQueryRunner({ querySeq, setLoadingQuery, setPage, setHits, setPack, setPackQueryKey, setError });
-  const refreshQuery = useCallback(async () => { await runQuery(viewMode, queryRequest); }, [queryRequest, runQuery, viewMode]);
+  const queryRequest = useMemo(
+    () =>
+      buildKnowledgeCenterQueryRequest({
+        spaceIds: selectedSpaceIds,
+        text: debouncedSearch,
+        type: types,
+        lifecycle: lifecycles,
+      }),
+    [debouncedSearch, lifecycles, selectedSpaceIds, types],
+  );
+  const runQuery = useKnowledgeQueryRunner({
+    querySeq,
+    setLoadingQuery,
+    setPage,
+    setHits,
+    setPack,
+    setPackQueryKey,
+    setError,
+  });
+  const refreshQuery = useCallback(async () => {
+    await runQuery(viewMode, queryRequest);
+  }, [queryRequest, runQuery, viewMode]);
   const { loadingMore, loadMore, resetLoadingMore } = useKnowledgeLoadMore({
-    querySeq, queryRequest, page, setHits, setPage, setError,
+    querySeq,
+    queryRequest,
+    page,
+    setHits,
+    setPage,
+    setError,
   });
   /** Drops the query in flight and its results, as closing the Knowledge Center does. */
   const resetQuery = useCallback(() => {
     querySeq.current.next();
     setLoadingQuery(false);
     setHits([]);
-    setPage({}); resetLoadingMore();
+    setPage({});
+    resetLoadingMore();
     setPack(null);
     setPackQueryKey(null);
     setSearchQuery('');
   }, [resetLoadingMore]);
 
   return {
-    querySeq, runQuery, resetQuery,
-    view: { searchQuery, setSearchQuery, queryRequest, hits, page, pack, packQueryKey, loadingQuery, loadingMore, loadMore, refreshQuery },
+    querySeq,
+    runQuery,
+    resetQuery,
+    view: {
+      searchQuery,
+      setSearchQuery,
+      queryRequest,
+      hits,
+      page,
+      pack,
+      packQueryKey,
+      loadingQuery,
+      loadingMore,
+      loadMore,
+      refreshQuery,
+    },
   };
 }

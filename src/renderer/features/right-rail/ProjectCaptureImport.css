@@ -1,5 +1,7 @@
 /* Project imports share the rail shell and UI kit control scale. */
-.project-capture-rail { gap: 0; }
+.project-capture-rail {
+  gap: 0;
+}
 
 .project-capture-import-section .right-rail-section-content {
   gap: var(--space-3);
@@ -9,7 +11,9 @@
   align-items: center;
 }
 
-.project-capture-header .ui-section-header-actions { gap: var(--space-1); }
+.project-capture-header .ui-section-header-actions {
+  gap: var(--space-1);
+}
 
 .project-capture-input-copy strong {
   color: var(--token-text-secondary);

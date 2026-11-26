@@ -30,10 +30,19 @@ const renderedPatterns = [
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** A template id such as `plan-card-${id}` matches any value in place of each interpolation. */
-const idMatcher = (id) => new RegExp(`^${id.split(/\$\{[^}]*\}/).map(escapeRegExp).join('.+')}$`);
+const idMatcher = (id) =>
+  new RegExp(
+    `^${id
+      .split(/\$\{[^}]*\}/)
+      .map(escapeRegExp)
+      .join('.+')}$`,
+  );
 
 const rendered = new Set();
-for (const filePath of walk(path.join(repoRoot, 'src/renderer'), (name) => /\.tsx?$/.test(name) && !name.includes('.test.'))) {
+for (const filePath of walk(
+  path.join(repoRoot, 'src/renderer'),
+  (name) => /\.tsx?$/.test(name) && !name.includes('.test.'),
+)) {
   const content = fs.readFileSync(filePath, 'utf8');
   for (const pattern of renderedPatterns) {
     for (const match of content.matchAll(pattern)) {

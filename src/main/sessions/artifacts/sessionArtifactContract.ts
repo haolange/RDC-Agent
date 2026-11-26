@@ -112,8 +112,14 @@ export function parseSessionArtifactUri(uri: string): ParsedSessionArtifactUri {
     } catch {
       throw new SessionArtifactError('ARTIFACT_URI_INVALID', 'malformed percent-encoding.');
     }
-    if (decoded === '.' || decoded === '..' || decoded.includes('\\') || decoded.includes('\0') || decoded.includes('/')
-      || /^[a-zA-Z]:/.test(decoded)) {
+    if (
+      decoded === '.' ||
+      decoded === '..' ||
+      decoded.includes('\\') ||
+      decoded.includes('\0') ||
+      decoded.includes('/') ||
+      /^[a-zA-Z]:/.test(decoded)
+    ) {
       throw new SessionArtifactError('ARTIFACT_PATH_ESCAPE', 'path traversal is not allowed.');
     }
   }
@@ -164,20 +170,31 @@ export interface SessionArtifactizedEnvelope {
 export function isSessionArtifactSourceRef(value: unknown): value is SessionArtifactSourceRef {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
-  return typeof record.toolName === 'string' && record.toolName.length > 0
-    && typeof record.toolCallId === 'string' && record.toolCallId.length > 0;
+  return (
+    typeof record.toolName === 'string' &&
+    record.toolName.length > 0 &&
+    typeof record.toolCallId === 'string' &&
+    record.toolCallId.length > 0
+  );
 }
 
 export function isSessionArtifactizedEnvelope(value: unknown): value is SessionArtifactizedEnvelope {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
-  return typeof record.owner === 'string' && record.owner.length > 0
-    && isSessionArtifactSourceRef(record.source)
-    && typeof record.hash === 'string' && /^[a-f0-9]{64}$/i.test(record.hash)
-    && typeof record.size === 'number' && Number.isFinite(record.size) && record.size >= 0
-    && typeof record.mime === 'string' && record.mime.length > 0
-    && 'content' in record
-    && 'details' in record;
+  return (
+    typeof record.owner === 'string' &&
+    record.owner.length > 0 &&
+    isSessionArtifactSourceRef(record.source) &&
+    typeof record.hash === 'string' &&
+    /^[a-f0-9]{64}$/i.test(record.hash) &&
+    typeof record.size === 'number' &&
+    Number.isFinite(record.size) &&
+    record.size >= 0 &&
+    typeof record.mime === 'string' &&
+    record.mime.length > 0 &&
+    'content' in record &&
+    'details' in record
+  );
 }
 
 export function formatSessionArtifactUri(category: SessionArtifactCategory, relativePath: string): string {

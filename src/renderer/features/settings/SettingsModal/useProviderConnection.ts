@@ -46,12 +46,7 @@ export const useProviderConnection = (options: UseProviderConnectionOptions) => 
     const currentDraft = connectionDraftRef.current;
     const provider = options.providerDrafts.find((entry) => entry.id === currentDraft?.providerId);
     if (!currentDraft || !provider) return;
-    const models = updateProviderModelPreference(
-      provider.catalogOwnership,
-      currentDraft.models,
-      modelId,
-      patch,
-    );
+    const models = updateProviderModelPreference(provider.catalogOwnership, currentDraft.models, modelId, patch);
     const nextDraft = { ...currentDraft, models, modelSaveError: undefined };
     connectionDraftRef.current = nextDraft;
     options.setConnectionDraft(nextDraft);
@@ -61,16 +56,19 @@ export const useProviderConnection = (options: UseProviderConnectionOptions) => 
     void options.saveProvider({ ...provider, models }).then((result) => {
       if (result.status === 'superseded') return;
       const confirmed = result.lastSuccessful?.provider;
-      if (confirmed) options.setProviderDrafts((providers) => providers.map(
-        (entry) => entry.id === provider.id ? confirmed : entry,
-      ));
+      if (confirmed)
+        options.setProviderDrafts((providers) =>
+          providers.map((entry) => (entry.id === provider.id ? confirmed : entry)),
+        );
       options.setConnectionDraft((current) => {
-        if (current?.providerId !== provider.id || hasProviderConnectionDefinitionChanged(connectionOwner, current)) return current;
+        if (current?.providerId !== provider.id || hasProviderConnectionDefinitionChanged(connectionOwner, current))
+          return current;
         // The dialog can be reopened before the write returns. Only reconcile
         // a fresh draft still showing the original saved model selection.
         const submittedHere = current.models === models;
         if (!submittedHere && JSON.stringify(current.models) !== JSON.stringify(provider.models)) return current;
-        if (result.status === 'committed') return submittedHere || !confirmed ? current : { ...current, models: confirmed.models };
+        if (result.status === 'committed')
+          return submittedHere || !confirmed ? current : { ...current, models: confirmed.models };
         return {
           ...current,
           models: (confirmed ?? provider).models,

@@ -27,9 +27,10 @@ export interface AgentModelCommands {
   onTrustProjectAgent: (request: AgentOverrideFileRequest) => Promise<void>;
 }
 
-const defaultFieldOp = (change: AgentModelFieldChange): SettingsPatchOp => (change.field === 'model'
-  ? { op: 'agentModels.setDefault', field: 'model', value: change.value ?? null }
-  : { op: 'agentModels.setDefault', field: 'reasoningLevel', value: change.value ?? null });
+const defaultFieldOp = (change: AgentModelFieldChange): SettingsPatchOp =>
+  change.field === 'model'
+    ? { op: 'agentModels.setDefault', field: 'model', value: change.value ?? null }
+    : { op: 'agentModels.setDefault', field: 'reasoningLevel', value: change.value ?? null };
 
 const agentFieldOp = (agentId: string, change: AgentModelFieldChange): SettingsPatchOp => {
   if (change.value === undefined) return { op: 'agentModels.clearAgentField', agentId, field: change.field };
@@ -57,31 +58,42 @@ export function useAgentModelControls(commands: AgentModelCommands) {
 
   const setDefaultField = (change: AgentModelFieldChange) => commit(defaultFieldOp(change), DEFAULT_MODEL_TARGET);
 
-  const setAgentField = (agentId: string, change: AgentModelFieldChange) => commit(agentFieldOp(agentId, change), agentId);
+  const setAgentField = (agentId: string, change: AgentModelFieldChange) =>
+    commit(agentFieldOp(agentId, change), agentId);
 
   const showBuiltinDiff = (draft: AgentManifestDraft, updated: boolean) => {
     setBuiltinDiff({ agentId: draft.id, agentName: draft.name || draft.id, updated });
     void commands.onLoadAgentBuiltinComparison(draft).then(
-      (comparison) => setBuiltinDiff((current) => (current?.agentId === draft.id
-        ? { ...current, lines: diffLines(comparison.builtinContent, comparison.overrideContent) } : current)),
-      (error: unknown) => setBuiltinDiff((current) => (current?.agentId === draft.id
-        ? { ...current, error: errorDetail(error) } : current)),
+      (comparison) =>
+        setBuiltinDiff((current) =>
+          current?.agentId === draft.id
+            ? { ...current, lines: diffLines(comparison.builtinContent, comparison.overrideContent) }
+            : current,
+        ),
+      (error: unknown) =>
+        setBuiltinDiff((current) =>
+          current?.agentId === draft.id ? { ...current, error: errorDetail(error) } : current,
+        ),
     );
   };
 
   const openOverrideAction = (action: AgentOverrideFileAction['action'], issue: AgentManifestDiagnostic) => {
-    const same = (current: AgentOverrideFileAction | null) => current?.sourcePath === issue.sourcePath && current.action === action;
+    const same = (current: AgentOverrideFileAction | null) =>
+      current?.sourcePath === issue.sourcePath && current.action === action;
     setOverrideAction({ action, agentId: issue.agentId, sourcePath: issue.sourcePath });
     void commands.onPreviewAgentModelMigration(issue.sourcePath).then(
       (preview) => setOverrideAction((current) => (same(current) ? { ...current!, preview } : current)),
-      (error: unknown) => setOverrideAction((current) => (same(current)
-        ? { ...current!, error: errorDetail(error) } : current)),
+      (error: unknown) =>
+        setOverrideAction((current) => (same(current) ? { ...current!, error: errorDetail(error) } : current)),
     );
   };
 
   const confirmOverrideAction = async (preview: AgentModelMigrationPreview) => {
     if (!overrideAction) return;
-    await commands.onCommitAgentOverrideFile(overrideAction.action, { sourcePath: preview.sourcePath, sourceHash: preview.sourceHash });
+    await commands.onCommitAgentOverrideFile(overrideAction.action, {
+      sourcePath: preview.sourcePath,
+      sourceHash: preview.sourceHash,
+    });
     setOverrideAction(null);
   };
 
@@ -90,8 +102,8 @@ export function useAgentModelControls(commands: AgentModelCommands) {
     setTrustReview({ agentId: issue.agentId, sourcePath: issue.sourcePath });
     void commands.onPreviewProjectAgentTrust(issue.sourcePath).then(
       (preview) => setTrustReview((current) => (same(current) ? { ...current!, preview } : current)),
-      (error: unknown) => setTrustReview((current) => (same(current)
-        ? { ...current!, error: errorDetail(error) } : current)),
+      (error: unknown) =>
+        setTrustReview((current) => (same(current) ? { ...current!, error: errorDetail(error) } : current)),
     );
   };
 

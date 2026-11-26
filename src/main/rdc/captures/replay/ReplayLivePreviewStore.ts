@@ -17,7 +17,12 @@ export class ReplayLivePreviewStore {
     return appPathService.getLiveReplayPreviewPath(sessionId);
   }
 
-  async write(sessionId: string, generation: number, imageEventId: number, encoded: EncodedReplayPng): Promise<OpenedCapturePreview> {
+  async write(
+    sessionId: string,
+    generation: number,
+    imageEventId: number,
+    encoded: EncodedReplayPng,
+  ): Promise<OpenedCapturePreview> {
     const target = this.pathFor(sessionId);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, encoded.png);

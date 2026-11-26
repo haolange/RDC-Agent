@@ -3,7 +3,15 @@ import { useI18n } from '../../../../i18n';
 import type { AgentScope } from './agentDraftFactory';
 
 /** The Agents page's scope switch and its one autosave mark. */
-export function AgentsPageToolbar({ scope, canProject, onScopeChange, saveState, saveMessage, saveBlocked, onRetrySave }: {
+export function AgentsPageToolbar({
+  scope,
+  canProject,
+  onScopeChange,
+  saveState,
+  saveMessage,
+  saveBlocked,
+  onRetrySave,
+}: {
   scope: AgentScope;
   canProject: boolean;
   onScopeChange: (scope: AgentScope) => void;

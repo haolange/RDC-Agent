@@ -4,8 +4,9 @@ import { resolveCanonicalUserDataPath } from './userDataPath';
 
 describe('canonical userData path', () => {
   it('uses the same appData location regardless of renderer carrier', () => {
-    expect(resolveCanonicalUserDataPath(undefined, path.join('C:', 'Users', 'Vip', 'AppData', 'Roaming')))
-      .toBe(path.join('C:', 'Users', 'Vip', 'AppData', 'Roaming', 'rdc-agent'));
+    expect(resolveCanonicalUserDataPath(undefined, path.join('C:', 'Users', 'Vip', 'AppData', 'Roaming'))).toBe(
+      path.join('C:', 'Users', 'Vip', 'AppData', 'Roaming', 'rdc-agent'),
+    );
   });
 
   it('honors an explicit automation override', () => {

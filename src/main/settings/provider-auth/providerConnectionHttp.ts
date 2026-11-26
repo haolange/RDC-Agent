@@ -27,13 +27,28 @@ export const getJson = async (url: string, init: RequestInit): Promise<unknown> 
 
 const httpConnectionError = (status: number) => {
   if (status === 401 || status === 403) {
-    return providerConnectionError('credentials-rejected', `The API key was rejected (HTTP ${status}).`, { status }, status);
+    return providerConnectionError(
+      'credentials-rejected',
+      `The API key was rejected (HTTP ${status}).`,
+      { status },
+      status,
+    );
   }
   if (status === 404) {
-    return providerConnectionError('discovery-unavailable', 'The model discovery endpoint was not found (HTTP 404).', { status }, status);
+    return providerConnectionError(
+      'discovery-unavailable',
+      'The model discovery endpoint was not found (HTTP 404).',
+      { status },
+      status,
+    );
   }
   if (status >= 500) {
-    return providerConnectionError('service-unavailable', `The provider service is unavailable (HTTP ${status}).`, { status }, status);
+    return providerConnectionError(
+      'service-unavailable',
+      `The provider service is unavailable (HTTP ${status}).`,
+      { status },
+      status,
+    );
   }
   return providerConnectionError('http-failed', `The connection test failed (HTTP ${status}).`, { status }, status);
 };
@@ -69,9 +84,10 @@ export const parseModelsPayload = (strategy: DiscoveryStrategy | string, payload
     return normalizeDiscoveredModels(
       googleModels
         .filter((value) => {
-          const methods = value && typeof value === 'object'
-            ? (value as { supportedGenerationMethods?: unknown }).supportedGenerationMethods
-            : null;
+          const methods =
+            value && typeof value === 'object'
+              ? (value as { supportedGenerationMethods?: unknown }).supportedGenerationMethods
+              : null;
           return !Array.isArray(methods) || methods.includes('generateContent');
         })
         .map((value) => {
@@ -86,19 +102,19 @@ export const parseModelsPayload = (strategy: DiscoveryStrategy | string, payload
       isAgentRoutableOpenAiModel,
     );
   }
-  return Array.isArray(record.data)
-    ? normalizeDiscoveredModels(record.data, isAgentRoutableOpenAiModel)
-    : [];
+  return Array.isArray(record.data) ? normalizeDiscoveredModels(record.data, isAgentRoutableOpenAiModel) : [];
 };
 
-export const createTinyAnthropicProbeBody = (modelId: string): string => JSON.stringify({
-  model: modelId,
-  max_tokens: 1,
-  messages: [{ role: 'user', content: 'ping' }],
-});
+export const createTinyAnthropicProbeBody = (modelId: string): string =>
+  JSON.stringify({
+    model: modelId,
+    max_tokens: 1,
+    messages: [{ role: 'user', content: 'ping' }],
+  });
 
-export const createTinyOpenAiProbeBody = (modelId: string): string => JSON.stringify({
-  model: modelId,
-  max_tokens: 1,
-  messages: [{ role: 'user', content: 'ping' }],
-});
+export const createTinyOpenAiProbeBody = (modelId: string): string =>
+  JSON.stringify({
+    model: modelId,
+    max_tokens: 1,
+    messages: [{ role: 'user', content: 'ping' }],
+  });

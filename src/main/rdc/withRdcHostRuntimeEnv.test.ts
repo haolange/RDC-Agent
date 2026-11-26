@@ -35,8 +35,9 @@ describe('withRdcHostRuntimeEnv', () => {
     vi.stubEnv('RDC_TOOL_DXC_TOOLS_PATH', 'host-dxc');
     try {
       expect(withRdcHostRuntimeEnv(cli).env.RDC_TOOL_DXC_TOOLS_PATH).toBe('host-dxc');
-      expect(withRdcHostRuntimeEnv({ ...cli, env: { RDC_TOOL_DXC_TOOLS_PATH: 'settings-dxc' } })
-        .env.RDC_TOOL_DXC_TOOLS_PATH).toBe('settings-dxc');
+      expect(
+        withRdcHostRuntimeEnv({ ...cli, env: { RDC_TOOL_DXC_TOOLS_PATH: 'settings-dxc' } }).env.RDC_TOOL_DXC_TOOLS_PATH,
+      ).toBe('settings-dxc');
     } finally {
       vi.unstubAllEnvs();
     }

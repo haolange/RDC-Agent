@@ -46,7 +46,6 @@ describe('AssistantStreamBuilder channel invariant', () => {
       kind: 'raw',
       source: 'openai-compatible-raw',
       visibility: 'raw-collapsed',
-
     });
     builder.appendThinking(thinkingRef, 'same bytes');
     builder.endThinking(thinkingRef);
@@ -78,30 +77,37 @@ describe('AssistantStreamBuilder channel invariant', () => {
   it('fails closed when one source ref changes semantic channel', () => {
     const { builder } = makeBuilder();
     builder.startText(textRef);
-    expect(() => builder.startThinking(textRef, {
-      kind: 'raw',
-      source: 'unknown',
-      visibility: 'raw-collapsed',
-
-    })).toThrowError(expect.objectContaining({
-      code: 'PROVIDER_STREAM_CHANNEL_COLLISION',
-    }) as ProviderStreamProtocolError);
+    expect(() =>
+      builder.startThinking(textRef, {
+        kind: 'raw',
+        source: 'unknown',
+        visibility: 'raw-collapsed',
+      }),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'PROVIDER_STREAM_CHANNEL_COLLISION',
+      }) as ProviderStreamProtocolError,
+    );
   });
 
   it('rejects a delta before block start', () => {
     const { builder } = makeBuilder();
-    expect(() => builder.appendText(textRef, 'late')).toThrowError(expect.objectContaining({
-      code: 'PROVIDER_STREAM_DELTA_BEFORE_START',
-    }) as ProviderStreamProtocolError);
+    expect(() => builder.appendText(textRef, 'late')).toThrowError(
+      expect.objectContaining({
+        code: 'PROVIDER_STREAM_DELTA_BEFORE_START',
+      }) as ProviderStreamProtocolError,
+    );
   });
 
   it('rejects writes after block close', () => {
     const { builder } = makeBuilder();
     builder.startText(textRef);
     builder.endText(textRef);
-    expect(() => builder.appendText(textRef, 'late')).toThrowError(expect.objectContaining({
-      code: 'PROVIDER_STREAM_BLOCK_CLOSED',
-    }) as ProviderStreamProtocolError);
+    expect(() => builder.appendText(textRef, 'late')).toThrowError(
+      expect.objectContaining({
+        code: 'PROVIDER_STREAM_BLOCK_CLOSED',
+      }) as ProviderStreamProtocolError,
+    );
   });
 
   it('rejects semantic events after terminal', () => {
@@ -110,9 +116,11 @@ describe('AssistantStreamBuilder channel invariant', () => {
     builder.appendText(textRef, 'done');
     builder.markTerminal('stop');
     builder.finish({ signal: new AbortController().signal, sawOutput: true, providerApi: 'fixture' });
-    expect(() => builder.appendText(textRef, 'late')).toThrowError(expect.objectContaining({
-      code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
-    }) as ProviderStreamProtocolError);
+    expect(() => builder.appendText(textRef, 'late')).toThrowError(
+      expect.objectContaining({
+        code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
+      }) as ProviderStreamProtocolError,
+    );
   });
 
   it('rejects two source refs claiming the same emitted content index', () => {
@@ -124,14 +132,17 @@ describe('AssistantStreamBuilder channel invariant', () => {
       sourceIndex: 99,
       contentIndex: textRef.contentIndex,
     });
-    expect(() => builder.startThinking(collidingRef, {
-      kind: 'raw',
-      source: 'unknown',
-      visibility: 'raw-collapsed',
-
-    })).toThrowError(expect.objectContaining({
-      code: 'PROVIDER_STREAM_CHANNEL_COLLISION',
-    }) as ProviderStreamProtocolError);
+    expect(() =>
+      builder.startThinking(collidingRef, {
+        kind: 'raw',
+        source: 'unknown',
+        visibility: 'raw-collapsed',
+      }),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'PROVIDER_STREAM_CHANNEL_COLLISION',
+      }) as ProviderStreamProtocolError,
+    );
   });
 });
 
@@ -152,21 +163,26 @@ describe('AssistantStreamBuilder terminal contract', () => {
   it('reports an aborted read as an abort, a silent stream as empty and a terminal-less stream as truncated', () => {
     const aborted = new AbortController();
     aborted.abort();
-    expect(() => makeBuilder().builder.finish({ signal: aborted.signal, sawOutput: true, providerApi: 'test' }))
-      .toThrowError(expect.objectContaining({ name: 'AbortError' }));
-    expect(() => makeBuilder().builder.finish({ signal: live(), sawOutput: false, providerApi: 'test' }))
-      .toThrowError(expect.objectContaining({ code: 'PROVIDER_STREAM_EMPTY' }));
-    expect(() => makeBuilder().builder.finish({ signal: live(), sawOutput: true, providerApi: 'test' }))
-      .toThrowError(expect.objectContaining({ code: 'PROVIDER_STREAM_TRUNCATED' }) as ProviderStreamProtocolError);
+    expect(() =>
+      makeBuilder().builder.finish({ signal: aborted.signal, sawOutput: true, providerApi: 'test' }),
+    ).toThrowError(expect.objectContaining({ name: 'AbortError' }));
+    expect(() => makeBuilder().builder.finish({ signal: live(), sawOutput: false, providerApi: 'test' })).toThrowError(
+      expect.objectContaining({ code: 'PROVIDER_STREAM_EMPTY' }),
+    );
+    expect(() => makeBuilder().builder.finish({ signal: live(), sawOutput: true, providerApi: 'test' })).toThrowError(
+      expect.objectContaining({ code: 'PROVIDER_STREAM_TRUNCATED' }) as ProviderStreamProtocolError,
+    );
   });
 
   it('treats a frame that is not JSON as a protocol violation', () => {
-    expect(() => parseProviderFrame('{"type":', 'test', z.object({ type: z.string() })))
-      .toThrowError(expect.objectContaining({ code: 'PROVIDER_STREAM_MALFORMED_FRAME' }) as ProviderStreamProtocolError);
+    expect(() => parseProviderFrame('{"type":', 'test', z.object({ type: z.string() }))).toThrowError(
+      expect.objectContaining({ code: 'PROVIDER_STREAM_MALFORMED_FRAME' }) as ProviderStreamProtocolError,
+    );
   });
 
   it('treats a JSON frame that is not a frame of the protocol as a protocol violation', () => {
-    expect(() => parseProviderFrame('{"type":7}', 'test', z.object({ type: z.string() })))
-      .toThrowError(expect.objectContaining({ code: 'PROVIDER_STREAM_MALFORMED_FRAME' }) as ProviderStreamProtocolError);
+    expect(() => parseProviderFrame('{"type":7}', 'test', z.object({ type: z.string() }))).toThrowError(
+      expect.objectContaining({ code: 'PROVIDER_STREAM_MALFORMED_FRAME' }) as ProviderStreamProtocolError,
+    );
   });
 });

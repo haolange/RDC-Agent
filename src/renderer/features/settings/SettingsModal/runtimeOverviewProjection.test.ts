@@ -5,7 +5,9 @@ import type { SetStateAction } from 'react';
 describe('runtime overview mutation projection fence', () => {
   it('lets a submitted write finish but discards its stale onChanged result', async () => {
     let finish!: (value: string) => void;
-    const write = new Promise<string>((resolve) => { finish = resolve; });
+    const write = new Promise<string>((resolve) => {
+      finish = resolve;
+    });
     const lifetime = { active: true };
     const setState = vi.fn();
     const onChanged = fenceOverviewSetter<string>(lifetime, setState);
@@ -33,7 +35,9 @@ describe('runtime overview mutation projection fence', () => {
     const lifetime = { active: true };
     let queued!: SetStateAction<string>;
     const update = vi.fn((value: string) => `${value}!`);
-    const setter = fenceOverviewSetter<string>(lifetime, (value) => { queued = value; });
+    const setter = fenceOverviewSetter<string>(lifetime, (value) => {
+      queued = value;
+    });
     setter(update);
     expect(typeof queued).toBe('function');
     const apply = queued as (value: string) => string;

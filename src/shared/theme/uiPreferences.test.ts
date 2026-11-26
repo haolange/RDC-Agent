@@ -47,7 +47,9 @@ describe('Context breakdown expansion preference', () => {
 describe('Appearance patch', () => {
   it('patches one chrome variant field by field and leaves the other variant as it was', () => {
     const current = createDefaultUiPreferences();
-    const merged = mergeUiPreferences(current, { chromeThemes: { light: { accent: '#bf4c22', fonts: { code: 'Iosevka' } } } });
+    const merged = mergeUiPreferences(current, {
+      chromeThemes: { light: { accent: '#bf4c22', fonts: { code: 'Iosevka' } } },
+    });
     expect(merged.chromeThemes.light).toMatchObject({ accent: '#bf4c22', surface: current.chromeThemes.light.surface });
     expect(merged.chromeThemes.light.fonts).toEqual({ ...current.chromeThemes.light.fonts, code: 'Iosevka' });
     expect(merged.chromeThemes.dark).toEqual(current.chromeThemes.dark);

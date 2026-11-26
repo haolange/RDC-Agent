@@ -119,86 +119,112 @@ afterEach(() => {
 });
 
 describe('OpenAIResponsesProvider DeepSeek dialect', () => {
-  it.each(['OpenAIResponses', 'DeepSeekResponses'])('keeps optional tool arguments optional on the %s wire', (dialect) => {
-    const parameters = {
-      type: 'object',
-      properties: {
-        uri: { type: 'string' },
-        jsonTextPointers: { type: 'array', items: { type: 'string' } },
-      },
-      required: ['uri'],
-    };
-    const base = deepSeekPlan();
-    const contracts = dialect === 'DeepSeekResponses' ? base.contracts : createFailClosedProviderContracts('OpenAIResponses');
-    const requestPlan = { ...base, contracts, route: { ...base.route, contracts } };
-    const body = buildRequestBody(model, {
-      messages: [],
-      tools: [{ name: 'artifact_read', description: 'Read a hash-bound artifact.', parameters }],
-    }, { requestPlan });
-    expect(body.tools).toEqual([{ type: 'function', name: 'artifact_read', description: 'Read a hash-bound artifact.', parameters, strict: false }]);
-    expect(parameters.required).toEqual(['uri']);
-    expect(parameters).not.toHaveProperty('additionalProperties');
-  });
+  it.each(['OpenAIResponses', 'DeepSeekResponses'])(
+    'keeps optional tool arguments optional on the %s wire',
+    (dialect) => {
+      const parameters = {
+        type: 'object',
+        properties: {
+          uri: { type: 'string' },
+          jsonTextPointers: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['uri'],
+      };
+      const base = deepSeekPlan();
+      const contracts =
+        dialect === 'DeepSeekResponses' ? base.contracts : createFailClosedProviderContracts('OpenAIResponses');
+      const requestPlan = { ...base, contracts, route: { ...base.route, contracts } };
+      const body = buildRequestBody(
+        model,
+        {
+          messages: [],
+          tools: [{ name: 'artifact_read', description: 'Read a hash-bound artifact.', parameters }],
+        },
+        { requestPlan },
+      );
+      expect(body.tools).toEqual([
+        {
+          type: 'function',
+          name: 'artifact_read',
+          description: 'Read a hash-bound artifact.',
+          parameters,
+          strict: false,
+        },
+      ]);
+      expect(parameters.required).toEqual(['uri']);
+      expect(parameters).not.toHaveProperty('additionalProperties');
+    },
+  );
 
   it('streams raw reasoning, preserves the exact item for tool continuation, and omits unsupported state fields', async () => {
     let request: RequestInit | undefined;
     const reasoningItem = { type: 'reasoning', id: 'rs_1', content: 'Need the tool.' };
     vi.stubGlobal('fetch', async (_url: string | URL | Request, init?: RequestInit) => {
       request = init;
-      return new Response([
-        'data: {"type":"response.output_item.added","output_index":0,"item":{"type":"reasoning","id":"rs_1","content":[]}}',
-        '',
-        'data: {"type":"response.reasoning_text.delta","item_id":"rs_1","output_index":0,"delta":"Need the "}',
-        '',
-        'data: {"type":"response.reasoning_text.delta","item_id":"rs_1","output_index":0,"delta":"tool."}',
-        '',
-        'data: {"type":"response.reasoning_text.done","item_id":"rs_1","output_index":0,"text":"Need the tool."}',
-        '',
-        `data: ${JSON.stringify({ type: 'response.output_item.done', output_index: 0, item: reasoningItem })}`,
-        '',
-        'data: {"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"call_1","name":"lookup"}}',
-        '',
-        'data: {"type":"response.function_call_arguments.delta","item_id":"fc_1","output_index":1,"delta":"{\\"id\\":1}"}',
-        '',
-        'data: {"type":"response.function_call_arguments.done","item_id":"fc_1","output_index":1,"arguments":"{\\"id\\":1}"}',
-        '',
-        'data: {"type":"response.output_item.done","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"call_1","name":"lookup","arguments":"{\\"id\\":1}"}}',
-        '',
-        `data: ${JSON.stringify({
-          type: 'response.completed',
-          response: {
-            id: 'resp_1',
-            status: 'completed',
-            output: [reasoningItem, { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'lookup', arguments: '{"id":1}' }],
-            usage: {
-              input_tokens: 20,
-              output_tokens: 8,
-              total_tokens: 28,
-              input_tokens_details: { cached_tokens: 5 },
-              output_tokens_details: { reasoning_tokens: 4 },
+      return new Response(
+        [
+          'data: {"type":"response.output_item.added","output_index":0,"item":{"type":"reasoning","id":"rs_1","content":[]}}',
+          '',
+          'data: {"type":"response.reasoning_text.delta","item_id":"rs_1","output_index":0,"delta":"Need the "}',
+          '',
+          'data: {"type":"response.reasoning_text.delta","item_id":"rs_1","output_index":0,"delta":"tool."}',
+          '',
+          'data: {"type":"response.reasoning_text.done","item_id":"rs_1","output_index":0,"text":"Need the tool."}',
+          '',
+          `data: ${JSON.stringify({ type: 'response.output_item.done', output_index: 0, item: reasoningItem })}`,
+          '',
+          'data: {"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"call_1","name":"lookup"}}',
+          '',
+          'data: {"type":"response.function_call_arguments.delta","item_id":"fc_1","output_index":1,"delta":"{\\"id\\":1}"}',
+          '',
+          'data: {"type":"response.function_call_arguments.done","item_id":"fc_1","output_index":1,"arguments":"{\\"id\\":1}"}',
+          '',
+          'data: {"type":"response.output_item.done","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"call_1","name":"lookup","arguments":"{\\"id\\":1}"}}',
+          '',
+          `data: ${JSON.stringify({
+            type: 'response.completed',
+            response: {
+              id: 'resp_1',
+              status: 'completed',
+              output: [
+                reasoningItem,
+                { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'lookup', arguments: '{"id":1}' },
+              ],
+              usage: {
+                input_tokens: 20,
+                output_tokens: 8,
+                total_tokens: 28,
+                input_tokens_details: { cached_tokens: 5 },
+                output_tokens_details: { reasoning_tokens: 4 },
+              },
             },
-          },
-        })}`,
-        '',
-      ].join('\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+          })}`,
+          '',
+        ].join('\n'),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+      );
     });
 
     const context: Context = {
       systemPrompt: 'Use tools precisely.',
       messages: [{ role: 'user', content: 'Look it up.', timestamp: 1 }],
-      tools: [{
-        name: 'lookup',
-        description: 'Lookup an id',
-        parameters: { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] },
-      }],
+      tools: [
+        {
+          name: 'lookup',
+          description: 'Lookup an id',
+          parameters: { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] },
+        },
+      ],
     };
     const requestPlan = deepSeekPlan();
-    const message = await new OpenAIResponsesProvider({ apiKey: 'secret' }).stream(model, context, {
-      requestPlan,
-      reasoning: { selection: 'high', control: reasoningControl },
-      temperature: 1,
-      topP: 0.95,
-    }).result();
+    const message = await new OpenAIResponsesProvider({ apiKey: 'secret' })
+      .stream(model, context, {
+        requestPlan,
+        reasoning: { selection: 'high', control: reasoningControl },
+        temperature: 1,
+        topP: 0.95,
+      })
+      .result();
 
     const body = JSON.parse(String(request?.body)) as Record<string, unknown>;
     expect(body).toMatchObject({
@@ -208,8 +234,14 @@ describe('OpenAIResponsesProvider DeepSeek dialect', () => {
       tools: [expect.objectContaining({ type: 'function', name: 'lookup', strict: false })],
     });
     for (const unsupported of [
-      'store', 'parallel_tool_calls', 'previous_response_id', 'include',
-      'prompt_cache_key', 'prompt_cache_options', 'temperature', 'top_p',
+      'store',
+      'parallel_tool_calls',
+      'previous_response_id',
+      'include',
+      'prompt_cache_key',
+      'prompt_cache_options',
+      'temperature',
+      'top_p',
     ]) {
       expect(body).not.toHaveProperty(unsupported);
     }
@@ -237,20 +269,23 @@ describe('OpenAIResponsesProvider DeepSeek dialect', () => {
       }),
     ]);
 
-    const replay = toResponsesInput({
-      messages: [
-        { role: 'user', content: 'Look it up.', timestamp: 1 },
-        message,
-        {
-          role: 'toolResult',
-          toolCallId: 'call_1',
-          toolName: 'lookup',
-          content: [{ type: 'text', text: 'result' }],
-          isError: false,
-          timestamp: 2,
-        },
-      ],
-    }, requestPlan);
+    const replay = toResponsesInput(
+      {
+        messages: [
+          { role: 'user', content: 'Look it up.', timestamp: 1 },
+          message,
+          {
+            role: 'toolResult',
+            toolCallId: 'call_1',
+            toolName: 'lookup',
+            content: [{ type: 'text', text: 'result' }],
+            isError: false,
+            timestamp: 2,
+          },
+        ],
+      },
+      requestPlan,
+    );
     expect(replay).toEqual([
       expect.objectContaining({ role: 'user' }),
       reasoningItem,
@@ -262,23 +297,33 @@ describe('OpenAIResponsesProvider DeepSeek dialect', () => {
 
 describe('OpenAIResponsesProvider empty stream', () => {
   it('throws ProviderEmptyStreamError instead of a synthetic HTTP 502', async () => {
-    vi.stubGlobal('fetch', async () => new Response([
-      'data: {"type":"response.completed","response":{"id":"resp_empty","status":"completed","output":[]}}',
-      '',
-    ].join('\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+    vi.stubGlobal(
+      'fetch',
+      async () =>
+        new Response(
+          [
+            'data: {"type":"response.completed","response":{"id":"resp_empty","status":"completed","output":[]}}',
+            '',
+          ].join('\n'),
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+        ),
+    );
 
     const context: Context = {
       systemPrompt: 'Answer.',
       messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
     };
-    const error = await new OpenAIResponsesProvider({ apiKey: 'secret' }).stream(model, context, {
-      requestPlan: deepSeekPlan(),
-    }).result().then(
-      () => {
-        throw new Error('expected empty stream to reject');
-      },
-      (caught: unknown) => caught,
-    );
+    const error = await new OpenAIResponsesProvider({ apiKey: 'secret' })
+      .stream(model, context, {
+        requestPlan: deepSeekPlan(),
+      })
+      .result()
+      .then(
+        () => {
+          throw new Error('expected empty stream to reject');
+        },
+        (caught: unknown) => caught,
+      );
     expect(error).toBeInstanceOf(ProviderEmptyStreamError);
     expect(error).toMatchObject({
       name: 'ProviderEmptyStreamError',
@@ -291,23 +336,30 @@ describe('OpenAIResponsesProvider empty stream', () => {
 
 describe('OpenAIResponsesProvider SSE stream failures', () => {
   it('throws ProviderWireFailureError for error events without HTTP status', async () => {
-    vi.stubGlobal('fetch', async () => new Response([
-      'data: {"type":"error","message":"Account suspended by provider"}',
-      '',
-    ].join('\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+    vi.stubGlobal(
+      'fetch',
+      async () =>
+        new Response(['data: {"type":"error","message":"Account suspended by provider"}', ''].join('\n'), {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        }),
+    );
 
     const context: Context = {
       systemPrompt: 'Answer.',
       messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
     };
-    const error = await new OpenAIResponsesProvider({ apiKey: 'secret' }).stream(model, context, {
-      requestPlan: deepSeekPlan(),
-    }).result().then(
-      () => {
-        throw new Error('expected stream error to reject');
-      },
-      (caught: unknown) => caught,
-    );
+    const error = await new OpenAIResponsesProvider({ apiKey: 'secret' })
+      .stream(model, context, {
+        requestPlan: deepSeekPlan(),
+      })
+      .result()
+      .then(
+        () => {
+          throw new Error('expected stream error to reject');
+        },
+        (caught: unknown) => caught,
+      );
     expect(error).toBeInstanceOf(ProviderWireFailureError);
     expect(error).not.toBeInstanceOf(ProviderHttpError);
     expect((error as ProviderWireFailureError).message).toContain('Account suspended by provider');
@@ -315,23 +367,32 @@ describe('OpenAIResponsesProvider SSE stream failures', () => {
   });
 
   it('throws ProviderHttpError 401 for response.failed with explicit status', async () => {
-    vi.stubGlobal('fetch', async () => new Response([
-      'data: {"type":"response.failed","response":{"error":{"message":"invalid api key","status":401}}}',
-      '',
-    ].join('\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+    vi.stubGlobal(
+      'fetch',
+      async () =>
+        new Response(
+          ['data: {"type":"response.failed","response":{"error":{"message":"invalid api key","status":401}}}', ''].join(
+            '\n',
+          ),
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+        ),
+    );
 
     const context: Context = {
       systemPrompt: 'Answer.',
       messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
     };
-    const error = await new OpenAIResponsesProvider({ apiKey: 'secret' }).stream(model, context, {
-      requestPlan: deepSeekPlan(),
-    }).result().then(
-      () => {
-        throw new Error('expected auth failure to reject');
-      },
-      (caught: unknown) => caught,
-    );
+    const error = await new OpenAIResponsesProvider({ apiKey: 'secret' })
+      .stream(model, context, {
+        requestPlan: deepSeekPlan(),
+      })
+      .result()
+      .then(
+        () => {
+          throw new Error('expected auth failure to reject');
+        },
+        (caught: unknown) => caught,
+      );
     expect(error).toBeInstanceOf(ProviderHttpError);
     expect((error as ProviderHttpError).status).toBe(401);
     expect((error as ProviderHttpError).message).toContain('invalid api key');

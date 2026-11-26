@@ -29,13 +29,15 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
     route: { protocol: 'AnthropicMessages', source: 'catalog' },
     availability: 'available',
     presencePolicy: 'maintained',
-    contextTiers: [{
-      id: 'default',
-      label: 'Default',
-      maxTotalTokens: 256_000,
-      activation: { kind: 'implicit' },
-      entitlement: 'granted',
-    }],
+    contextTiers: [
+      {
+        id: 'default',
+        label: 'Default',
+        maxTotalTokens: 256_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      },
+    ],
     defaultBudgetTokens: 256_000,
     controls: {
       fast: { state: 'unsupported', fixedValue: false },

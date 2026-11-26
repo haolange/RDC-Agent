@@ -23,10 +23,11 @@ export async function selectSessionOp(
   const previousSessionId = ctx.getCurrentSession()?.sessionId ?? null;
 
   if (options.optimisticSession) {
-    if (previousSessionId !== options.optimisticSession.sessionId) applySessionSwitchHygiene({
-      previousSessionId,
-      nextSessionId: options.optimisticSession.sessionId,
-    });
+    if (previousSessionId !== options.optimisticSession.sessionId)
+      applySessionSwitchHygiene({
+        previousSessionId,
+        nextSessionId: options.optimisticSession.sessionId,
+      });
     ctx.setCurrentSessionId(options.optimisticSession.sessionId);
     ctx.setRightRailTarget('session');
     ctx.setCurrentRun(null);
@@ -49,7 +50,8 @@ export async function selectSessionOp(
     restoreSelectionSnapshot(ctx, rollbackState);
     ctx.setSidebarError({ contextKey: 'sidebar.selectSessionFailed', detail: result.error });
     if (options.optimisticSession?.projectId) {
-      await ctx.loadProjectSessionList(options.optimisticSession.projectId)
+      await ctx
+        .loadProjectSessionList(options.optimisticSession.projectId)
         .catch((error: unknown) => console.warn('[sidebar] could not reload the session list', error));
     }
     return false;
@@ -78,10 +80,7 @@ export async function selectSessionOp(
   return true;
 }
 
-export async function handleSessionCreateOp(
-  ctx: ProjectSelectionHandlerOpsContext,
-  project?: ProjectRecord,
-) {
+export async function handleSessionCreateOp(ctx: ProjectSelectionHandlerOpsContext, project?: ProjectRecord) {
   ctx.setSidebarError(null);
   const targetProject = project || ctx.getCurrentProject();
   if (!targetProject) return;
@@ -240,4 +239,3 @@ export async function handleSessionActivateOp(
     ctx.setIsBusy(false);
   }
 }
-

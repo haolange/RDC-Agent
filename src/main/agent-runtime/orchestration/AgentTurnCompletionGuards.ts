@@ -27,12 +27,15 @@ export function createCaptureRestorationFeedback(run: AgentTurnRun): CaptureRest
     const control = turnHandle.captureControl;
     if (!control) return undefined;
     run.captureRestoreFailure = control.lastRestoreError ?? run.captureRestoreFailure;
-    const acknowledged = run.captureRestoreFailure && declaration?.disposition !== 'completed'
-      && declaration?.result?.recoveryState.some(value => value.includes(run.captureRestoreFailure!));
+    const acknowledged =
+      run.captureRestoreFailure &&
+      declaration?.disposition !== 'completed' &&
+      declaration?.result?.recoveryState.some((value) => value.includes(run.captureRestoreFailure!));
     if (acknowledged) return undefined;
     try {
       const status = await control.restorationStatus(turnHandle.signal);
-      if (!status.restored) return `# Capture Restoration Required\nFrozen signed entry baseline: ${JSON.stringify({ receipt: status.receipt, original: status.original })}\nHost-observed current position: ${JSON.stringify(status.current)}\nUse rdc_probe capture_restore under the current permission mode to restore the signed entry position. If restore fails, record the actual failure and remaining recovery in turn_complete.result.recoveryState and unresolved.`;
+      if (!status.restored)
+        return `# Capture Restoration Required\nFrozen signed entry baseline: ${JSON.stringify({ receipt: status.receipt, original: status.original })}\nHost-observed current position: ${JSON.stringify(status.current)}\nUse rdc_probe capture_restore under the current permission mode to restore the signed entry position. If restore fails, record the actual failure and remaining recovery in turn_complete.result.recoveryState and unresolved.`;
       run.captureRestoreFailure = null;
       return undefined;
     } catch (error) {
@@ -54,10 +57,16 @@ export function installCompletionReadinessValidator(
   turnHandle.validateCompletionReadiness = async (declaration) => {
     await validateCompletionReadiness({
       profileId: input.agentId,
-      completionContract: preparedRuntime.approvedExecution?.investigation ? 'investigation-report' : preparedRuntime.effectivePlan.completionContract,
-      investigationMission: preparedRuntime.approvedExecution?.investigation?.mission ?? preparedRuntime.effectivePlan.investigationMission ?? undefined,
+      completionContract: preparedRuntime.approvedExecution?.investigation
+        ? 'investigation-report'
+        : preparedRuntime.effectivePlan.completionContract,
+      investigationMission:
+        preparedRuntime.approvedExecution?.investigation?.mission ??
+        preparedRuntime.effectivePlan.investigationMission ??
+        undefined,
       sessionId: executionScopeId,
-      disposition: declaration.disposition, evidenceRefs: declaration.evidenceRefs,
+      disposition: declaration.disposition,
+      evidenceRefs: declaration.evidenceRefs,
       budgetEvidence: completionBudgetEvidence(turnHandle),
     });
     const feedback = await captureRestorationFeedback(declaration);
@@ -70,18 +79,29 @@ export function installCompletionReadinessValidator(
     if (run.captureRestorationNeededForPartial && turnHandle.captureControl && !run.captureRestoreFailure) {
       run.captureRestorationNeededForPartial = false;
       // The declaration is recorded; its review states what the restored position makes possible again.
-      approvedGoalContinuation.noteConditionsChanged('The host now verifies the signed entry position, so work that needed it may be possible again; continue it with the existing Task, preserving its consumption and deadline.');
+      approvedGoalContinuation.noteConditionsChanged(
+        'The host now verifies the signed entry position, so work that needed it may be possible again; continue it with the existing Task, preserving its consumption and deadline.',
+      );
     }
   };
 }
 
 /** A Mission planning turn must end with a reviewed plan (or a completed declaration). */
-export function createMissionPlanningFeedback(run: AgentTurnRun, effectivePlan: EffectiveRuntimePlan): () => string | undefined {
+export function createMissionPlanningFeedback(
+  run: AgentTurnRun,
+  effectivePlan: EffectiveRuntimePlan,
+): () => string | undefined {
   const { turnHandle, preparedRuntime } = run;
   return () => {
     const plan = turnHandle.runtimePlan ?? effectivePlan;
-    if (!plan.investigationMission || !plan.profileHandoffs.some(handoff => handoff.surface === 'plan-gate')
-      || preparedRuntime.approvedExecution || turnHandle.approvedPlan || turnHandle.completionDeclaration?.disposition === 'completed') return undefined;
+    if (
+      !plan.investigationMission ||
+      !plan.profileHandoffs.some((handoff) => handoff.surface === 'plan-gate') ||
+      preparedRuntime.approvedExecution ||
+      turnHandle.approvedPlan ||
+      turnHandle.completionDeclaration?.disposition === 'completed'
+    )
+      return undefined;
     return '# Mission Plan Required\nSubmit a plan with plan_artifact for user review, or use ask_user when clarification is needed before planning.';
   };
 }
@@ -108,13 +128,16 @@ export function createTerminalResponseGuard(
   return async (message) => {
     if (turnHandle.isAborted) return undefined;
     const unfinished = await listUnfinishedDirectTasks({
-      sessionId, turnId: turnHandle.turnId, generation: turnHandle.generation,
+      sessionId,
+      turnId: turnHandle.turnId,
+      generation: turnHandle.generation,
     });
     if (unfinished.length) {
       const redeclare = turnHandle.completionDeclaration
-        ? '\nThe previous completion declaration is no longer active; declare completion again after settling the Tasks.' : '';
+        ? '\nThe previous completion declaration is no longer active; declare completion again after settling the Tasks.'
+        : '';
       turnHandle.completionDeclaration = null;
-      return `# Unsettled Direct Tasks\nThe current turn still owns unfinished direct Tasks: ${unfinished.map(item => item.taskId).join(', ')}. Continue useful work within the authorized scope, or use task_update to record a concrete blocker. Settle the Tasks before ending the turn; do not reset consumption or alter the deadline.${redeclare}`;
+      return `# Unsettled Direct Tasks\nThe current turn still owns unfinished direct Tasks: ${unfinished.map((item) => item.taskId).join(', ')}. Continue useful work within the authorized scope, or use task_update to record a concrete blocker. Settle the Tasks before ending the turn; do not reset consumption or alter the deadline.${redeclare}`;
     }
     if (capsule && !turnHandle.completionDeclaration?.result) {
       return '# Delegated Result Required\nThe delegated execution has not declared a structured result. Use turn_complete with result.summary, result.outputs (including the Task completion keys), counterevidence, unresolved, scope, sideEffects and recoveryState. Preserve the actual evidence and choose an honest partial or blocked disposition when work cannot be completed. Do not invent results, reset consumption or alter the deadline.';
@@ -122,8 +145,12 @@ export function createTerminalResponseGuard(
     const planningFeedback = missionPlanningFeedback();
     if (planningFeedback) return planningFeedback;
     if (!turnHandle.requiresApprovedGoalClosure) return undefined;
-    if (input.options?.allowInformationalReply && !turnHandle.completionDeclaration
-      && turnHandle.policyBudget.toolCalls === toolCallsAtEntry) return undefined;
+    if (
+      input.options?.allowInformationalReply &&
+      !turnHandle.completionDeclaration &&
+      turnHandle.policyBudget.toolCalls === toolCallsAtEntry
+    )
+      return undefined;
     const incomplete = await approvedGoalContinuation.closingCheck();
     if (incomplete) return incomplete;
     const restorationFeedback = await captureRestorationFeedback(turnHandle.completionDeclaration);
@@ -132,13 +159,25 @@ export function createTerminalResponseGuard(
       return `${restorationFeedback}\nThe previous completion declaration is no longer active; call turn_complete again.`;
     }
     return approvedGoalContinuation.closingCheck(() => {
-      if (preparedRuntime.approvedExecution) assertApprovedExecutionCurrent(executionScopeId, input.agentId, preparedRuntime.approvedExecution.offer);
+      if (preparedRuntime.approvedExecution)
+        assertApprovedExecutionCurrent(executionScopeId, input.agentId, preparedRuntime.approvedExecution.offer);
       const mission = preparedRuntime.approvedExecution?.investigation?.mission;
-      if (!mission || !['completed', 'budget_paused'].includes(turnHandle.completionDeclaration?.disposition ?? '')) return;
-      guards.validateCompletion({ profileId: input.agentId, completionContract: 'investigation-report', investigationMission: mission,
-        sessionId: executionScopeId, disposition: turnHandle.completionDeclaration!.disposition,
-        evidenceRefs: turnHandle.completionDeclaration!.evidenceRefs, budgetEvidence: completionBudgetEvidence(turnHandle),
-        finalAnswerText: message.content.filter(block => block.type === 'text').map(block => block.text).join('').trim() });
+      if (!mission || !['completed', 'budget_paused'].includes(turnHandle.completionDeclaration?.disposition ?? ''))
+        return;
+      guards.validateCompletion({
+        profileId: input.agentId,
+        completionContract: 'investigation-report',
+        investigationMission: mission,
+        sessionId: executionScopeId,
+        disposition: turnHandle.completionDeclaration!.disposition,
+        evidenceRefs: turnHandle.completionDeclaration!.evidenceRefs,
+        budgetEvidence: completionBudgetEvidence(turnHandle),
+        finalAnswerText: message.content
+          .filter((block) => block.type === 'text')
+          .map((block) => block.text)
+          .join('')
+          .trim(),
+      });
     });
   };
 }

@@ -23,7 +23,13 @@ const PANELS: Array<{ id: AgentPanel; icon: IconName }> = [
 ];
 
 /** The Agent's identity, permissions, handoffs and instructions: one opens at a time, the others show a summary. */
-export function AgentEditorPanels({ skills, settings, selectedAgent, onUpdateAgent, agentManifestSaveBlocked }: {
+export function AgentEditorPanels({
+  skills,
+  settings,
+  selectedAgent,
+  onUpdateAgent,
+  agentManifestSaveBlocked,
+}: {
   skills: AgentSkillCatalog;
   settings: AppSettings;
   selectedAgent: AgentManifestDraft;
@@ -35,18 +41,22 @@ export function AgentEditorPanels({ skills, settings, selectedAgent, onUpdateAge
   const capabilityGroups = buildAgentCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
   const toolDiagnostics = diagnoseManifestToolTokens(selectedAgent.tools);
 
-  const panelLabel = (panel: AgentPanel): string => (
-    panel === 'identity' ? t('settings.agentAdvancedIdentity')
-      : panel === 'permissions' ? t('settings.agentAdvancedCapabilities')
-        : panel === 'handoffs' ? t('settings.handoffs')
-          : t('settings.agentAdvancedInstructions')
-  );
-  const panelHint = (panel: AgentPanel): string => (
-    panel === 'identity' ? t('settings.agentAdvancedIdentityHint')
-      : panel === 'permissions' ? t('settings.agentAdvancedCapabilitiesHint')
-        : panel === 'handoffs' ? t('settings.agentHandoffsHint')
-          : t('settings.agentInstructionsHint')
-  );
+  const panelLabel = (panel: AgentPanel): string =>
+    panel === 'identity'
+      ? t('settings.agentAdvancedIdentity')
+      : panel === 'permissions'
+        ? t('settings.agentAdvancedCapabilities')
+        : panel === 'handoffs'
+          ? t('settings.handoffs')
+          : t('settings.agentAdvancedInstructions');
+  const panelHint = (panel: AgentPanel): string =>
+    panel === 'identity'
+      ? t('settings.agentAdvancedIdentityHint')
+      : panel === 'permissions'
+        ? t('settings.agentAdvancedCapabilitiesHint')
+        : panel === 'handoffs'
+          ? t('settings.agentHandoffsHint')
+          : t('settings.agentInstructionsHint');
 
   const renderPanelBody = (panel: AgentPanel) => {
     if (panel === 'identity') {
@@ -58,8 +68,10 @@ export function AgentEditorPanels({ skills, settings, selectedAgent, onUpdateAge
           <AgentCapabilityPicker groups={capabilityGroups} skills={skills} targetAgentId={selectedAgent.id} />
           <AgentExecutionLimitField agent={selectedAgent} onUpdateAgent={onUpdateAgent} />
           {toolDiagnostics.length > 0 ? (
-            <InlineError data-testid="settings-agent-tool-diagnostics"
-              detail={toolDiagnostics.map(item => `${item.token} · ${item.message}`).join('\n')}>
+            <InlineError
+              data-testid="settings-agent-tool-diagnostics"
+              detail={toolDiagnostics.map((item) => `${item.token} · ${item.message}`).join('\n')}
+            >
               {t('settings.agentToolDiagnosticsTitle')}
             </InlineError>
           ) : null}
@@ -100,7 +112,8 @@ export function AgentEditorPanels({ skills, settings, selectedAgent, onUpdateAge
         const summary = !open && agentPanelSummary(id, selectedAgent, settings, t);
         return (
           <section key={id} className={`settings-agent-panel${open ? ' is-open' : ''}`} data-panel={id}>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               className="settings-agent-panel-toggle"
               data-tooltip={open ? undefined : panelHint(id)}
               aria-expanded={open}

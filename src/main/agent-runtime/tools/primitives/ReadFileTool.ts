@@ -46,20 +46,37 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails | FileAudit
   parameters: {
     type: 'object',
     properties: {
-      pinEvidence: { type: 'boolean', description: 'Opt in to a durable URI/hash for the returned text window, including small diffs. Default false avoids extra artifacts. Whole-file hash and totalLines do not mean the displayed window is complete; inspect truncated and page all required content. Explicit child grants remain required.' },
+      pinEvidence: {
+        type: 'boolean',
+        description:
+          'Opt in to a durable URI/hash for the returned text window, including small diffs. Default false avoids extra artifacts. Whole-file hash and totalLines do not mean the displayed window is complete; inspect truncated and page all required content. Explicit child grants remain required.',
+      },
       path: {
         type: 'string',
         description: 'Relative or absolute path inside the workspace.',
       },
-      mode: { type: 'string', enum: ['text', 'audit'], description: 'Default text; audit performs a bounded hash-bound whole-file computation without reading full content into model context.' },
-      expectedHash: { type: 'string', description: 'Audit only: exact input SHA-256, optional sha256: prefix; mismatch fails closed.' },
+      mode: {
+        type: 'string',
+        enum: ['text', 'audit'],
+        description:
+          'Default text; audit performs a bounded hash-bound whole-file computation without reading full content into model context.',
+      },
+      expectedHash: {
+        type: 'string',
+        description: 'Audit only: exact input SHA-256, optional sha256: prefix; mismatch fails closed.',
+      },
       compareWith: {
-        type: 'object', additionalProperties: false,
+        type: 'object',
+        additionalProperties: false,
         properties: { path: { type: 'string' }, expectedHash: { type: 'string' } },
         required: ['path', 'expectedHash'],
         description: 'Audit only: second independently authorized, hash-bound input. Reports actual byte equality.',
       },
-      textComparison: { type: 'boolean', description: 'Audit only: require valid NUL-free UTF-8, preserve BOM/bare CR, normalize only CRLF to LF. Return normalized hashes and common prefix/suffix line counts plus bounded middle spans. A truncated middle is not a full diff; hashes/equality still cover complete inputs.' },
+      textComparison: {
+        type: 'boolean',
+        description:
+          'Audit only: require valid NUL-free UTF-8, preserve BOM/bare CR, normalize only CRLF to LF. Return normalized hashes and common prefix/suffix line counts plus bounded middle spans. A truncated middle is not a full diff; hashes/equality still cover complete inputs.',
+      },
       offset: {
         type: 'integer',
         description: 'Start line number (1-based, default: 1).',
@@ -72,7 +89,12 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails | FileAudit
     required: ['path'],
   },
   spec: {
-    isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'file', requiresApproval: false,
+    isReadOnly: true,
+    concurrency: 'shared',
+    isDestructive: false,
+    sideEffect: 'none',
+    category: 'file',
+    requiresApproval: false,
     knowledgeRoots: 'read-access',
     presentation: { pinEvidence: (args) => args.mode === 'audit' || args.pinEvidence === true },
   },
@@ -89,8 +111,7 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails | FileAudit
       const details = await auditFiles(params, context, signal);
       return { content: [{ type: 'text', text: JSON.stringify(details) }], details };
     }
-    if (params.expectedHash !== undefined
-      || params.compareWith !== undefined || params.textComparison !== undefined) {
+    if (params.expectedHash !== undefined || params.compareWith !== undefined || params.textComparison !== undefined) {
       throw new AppError('FILE_READ_MODE_INVALID', 'audit options require explicit mode=audit.');
     }
 
@@ -98,10 +119,7 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails | FileAudit
     assertTextReadable(absolute, { maxBytes: TEXT_FILE_MAX_BYTES });
 
     const offset = Math.max(1, Math.floor(params.offset ?? 1));
-    const limit = Math.max(
-      1,
-      Math.min(READ_FILE_MAX_LIMIT, Math.floor(params.limit ?? READ_FILE_DEFAULT_LIMIT)),
-    );
+    const limit = Math.max(1, Math.min(READ_FILE_MAX_LIMIT, Math.floor(params.limit ?? READ_FILE_DEFAULT_LIMIT)));
 
     const { lines, totalLines, hitEof, bytes, sha256 } = await readLineWindow(absolute, offset, limit, signal);
     if (signal?.aborted) {
@@ -109,16 +127,14 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails | FileAudit
     }
 
     const startIdx = offset - 1;
-    const numbered = lines
-      .map((line, i) => `${String(startIdx + i + 1).padStart(6, ' ')}→${line}`)
-      .join('\n');
+    const numbered = lines.map((line, i) => `${String(startIdx + i + 1).padStart(6, ' ')}→${line}`).join('\n');
 
     const display = `Whole file: ${bytes} bytes · sha256=${sha256}\nDisplayed ${lines.length} lines starting at ${offset} (line numbers are not file bytes).\n\n${numbered}`;
     const text = truncateOutput(display, READ_FILE_MAX_OUTPUT_BYTES);
     const truncated =
-      Buffer.byteLength(display, 'utf8') > READ_FILE_MAX_OUTPUT_BYTES
-      || !hitEof
-      || lines.length < Math.min(limit, Math.max(0, totalLines - startIdx));
+      Buffer.byteLength(display, 'utf8') > READ_FILE_MAX_OUTPUT_BYTES ||
+      !hitEof ||
+      lines.length < Math.min(limit, Math.max(0, totalLines - startIdx));
 
     recordSuccessfulFileRead(absolute, context);
     return {

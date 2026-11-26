@@ -4,7 +4,15 @@
  */
 import { randomBytes } from 'crypto';
 
-export type IpcApprovalAction = 'memory.write' | 'memory.delete' | 'knowledge.write' | 'knowledge.promote' | 'project.input.delete' | 'plan.saveToProject' | 'plan.export' | 'device.prepare';
+export type IpcApprovalAction =
+  | 'memory.write'
+  | 'memory.delete'
+  | 'knowledge.write'
+  | 'knowledge.promote'
+  | 'project.input.delete'
+  | 'plan.saveToProject'
+  | 'plan.export'
+  | 'device.prepare';
 
 export interface IpcApprovalTokenIssueRequest {
   action: IpcApprovalAction;
@@ -74,7 +82,9 @@ export class IpcApprovalTokenService {
     return this.tokens.size;
   }
 
-  revoke(token: string): void { this.tokens.delete(token); }
+  revoke(token: string): void {
+    this.tokens.delete(token);
+  }
 
   private pruneExpired(): void {
     const now = Date.now();

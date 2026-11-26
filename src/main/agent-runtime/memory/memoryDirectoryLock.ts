@@ -24,12 +24,13 @@ export async function releaseMemoryDirectoryLock(lockPath: string): Promise<void
   await releaseDirectoryFileLock(lockPath);
 }
 
-export async function withMemoryDirectoryLock<T>(
-  memoryDir: string,
-  operation: () => Promise<T>,
-): Promise<T> {
-  return withDirectoryFileLock(memoryDir, {
-    lockFileName: LOCK_FILE_NAME,
-    timeoutCode: 'MEMORY_LOCK_TIMEOUT',
-  }, operation);
+export async function withMemoryDirectoryLock<T>(memoryDir: string, operation: () => Promise<T>): Promise<T> {
+  return withDirectoryFileLock(
+    memoryDir,
+    {
+      lockFileName: LOCK_FILE_NAME,
+      timeoutCode: 'MEMORY_LOCK_TIMEOUT',
+    },
+    operation,
+  );
 }

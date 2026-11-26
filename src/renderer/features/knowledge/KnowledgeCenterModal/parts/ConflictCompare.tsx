@@ -39,7 +39,9 @@ function ConflictCardPane({
         ) : null}
       </header>
       {loading && !card ? (
-        <div role="status" aria-label={t('knowledgeCenter.loading')}><Skeleton shape="line" count={4} /></div>
+        <div role="status" aria-label={t('knowledgeCenter.loading')}>
+          <Skeleton shape="line" count={4} />
+        </div>
       ) : card ? (
         <dl className="knowledge-conflict-pane-grid">
           <div>

@@ -20,7 +20,6 @@ import type { RequestPlan } from '@shared/types/providerCapability';
 import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 import type { SessionContextHost } from '../../sessions/store/SessionContextStore';
 
-
 afterEach(() => vi.restoreAllMocks());
 
 type PlanOptions = {
@@ -182,16 +181,18 @@ function assistant(content: AssistantMessage['content']): AssistantMessage {
 }
 
 function encryptedAssistant(plan = responsesPlan): AssistantMessage {
-  return assistant([{
-    type: 'thinking',
-    kind: 'opaque',
-    source: 'openai-responses-encrypted',
-    visibility: 'hidden',
-    continuation: createContinuationArtifact(plan, {
-      type: 'reasoning',
-      encryptedContent: 'protected',
-    }),
-  }]);
+  return assistant([
+    {
+      type: 'thinking',
+      kind: 'opaque',
+      source: 'openai-responses-encrypted',
+      visibility: 'hidden',
+      continuation: createContinuationArtifact(plan, {
+        type: 'reasoning',
+        encryptedContent: 'protected',
+      }),
+    },
+  ]);
 }
 
 function entry(overrides: Partial<SessionContextTurnEntry> = {}): SessionContextTurnEntry {
@@ -314,7 +315,9 @@ describe('SessionContextJournal v2', () => {
     });
     // 落盘的 opaque 制品必须能通过完整性回放校验（verbatim，未被裁剪）。
     const persisted = filterSessionContextMessageArtifacts(canonical[0], responsesPlan);
-    expect(persisted.decisions.some((decision) => decision.action === 'replay' && decision.reason === 'exact-execution')).toBe(true);
+    expect(
+      persisted.decisions.some((decision) => decision.action === 'replay' && decision.reason === 'exact-execution'),
+    ).toBe(true);
     // tool-call-turn scope 的制品不落盘；thinking 展示文案不落盘。
     expect(JSON.stringify(canonical)).not.toContain('anthropic-signature');
     expect(JSON.stringify(canonical)).not.toContain('display copy');
@@ -429,25 +432,29 @@ describe('SessionContextJournal v2', () => {
           timestamp: 2,
         },
       ]);
-      expect(terminal.some((message) => (
-        message.role === 'assistant'
-        && message.content.some((block) => block.type === 'thinking' && block.continuation)
-      ))).toBe(true);
+      expect(
+        terminal.some(
+          (message) =>
+            message.role === 'assistant' &&
+            message.content.some((block) => block.type === 'thinking' && block.continuation),
+        ),
+      ).toBe(true);
 
-      vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([entry({
-        executionIdentity: plan.executionIdentity,
-        messages: [
-          { role: 'user', content: 'inspect', timestamp: 1 },
-          ...terminal,
-        ],
-      })]);
+      vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([
+        entry({
+          executionIdentity: plan.executionIdentity,
+          messages: [{ role: 'user', content: 'inspect', timestamp: 1 }, ...terminal],
+        }),
+      ]);
       const sameRoute = journal.materialize('session-1', ['turn-1'], plan);
       expect(sameRoute.replayedArtifactCount).toBe(1);
       expect(sameRoute.filteredArtifactCount).toBe(0);
-      const thinking = (sameRoute.messages.find((message) => message.role === 'assistant') as AssistantMessage)
-        .content.find((block) => block.type === 'thinking');
-      expect(thinking?.continuation?.reasoningContent ?? thinking?.continuation?.raw ?? thinking?.continuation?.signature)
-        .toBeTruthy();
+      const thinking = (
+        sameRoute.messages.find((message) => message.role === 'assistant') as AssistantMessage
+      ).content.find((block) => block.type === 'thinking');
+      expect(
+        thinking?.continuation?.reasoningContent ?? thinking?.continuation?.raw ?? thinking?.continuation?.signature,
+      ).toBeTruthy();
 
       const dropped = journal.materialize('session-1', ['turn-1'], responsesPlan);
       expect(dropped.replayedArtifactCount).toBe(0);
@@ -472,25 +479,29 @@ describe('SessionContextJournal v2', () => {
   it('keeps required artifacts beyond the optional retention window', () => {
     const journal = new SessionContextJournal();
     const totalTurns = 10;
-    const entries = Array.from({ length: totalTurns }, (_, index) => entry({
-      turnId: `turn-${index + 1}`,
-      userMessageId: `user-${index + 1}`,
-      assistantMessageId: `assistant-${index + 1}`,
-      executionIdentity: reasoningContentPlan.executionIdentity,
-      messages: [
-        { role: 'user', content: `question ${index + 1}`, timestamp: index + 1 },
-        assistant([{
-          type: 'thinking',
-          kind: 'raw',
-          source: 'deepseek-raw',
-          visibility: 'raw-collapsed',
-          continuation: createContinuationArtifact(reasoningContentPlan, {
-            type: 'reasoning_content',
-            reasoningContent: `required-${index + 1}`,
-          }),
-        }]),
-      ],
-    }));
+    const entries = Array.from({ length: totalTurns }, (_, index) =>
+      entry({
+        turnId: `turn-${index + 1}`,
+        userMessageId: `user-${index + 1}`,
+        assistantMessageId: `assistant-${index + 1}`,
+        executionIdentity: reasoningContentPlan.executionIdentity,
+        messages: [
+          { role: 'user', content: `question ${index + 1}`, timestamp: index + 1 },
+          assistant([
+            {
+              type: 'thinking',
+              kind: 'raw',
+              source: 'deepseek-raw',
+              visibility: 'raw-collapsed',
+              continuation: createContinuationArtifact(reasoningContentPlan, {
+                type: 'reasoning_content',
+                reasoningContent: `required-${index + 1}`,
+              }),
+            },
+          ]),
+        ],
+      }),
+    );
     vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue(entries);
 
     const result = journal.materialize(
@@ -534,17 +545,25 @@ describe('SessionContextJournal v2', () => {
 
     expect(() => journal.append('session-1', existing)).not.toThrow();
     expect(append).not.toHaveBeenCalled();
-    expect(() => journal.append('session-1', entry({ status: 'error' })))
-      .toThrow('Conflicting session context entry');
+    expect(() => journal.append('session-1', entry({ status: 'error' }))).toThrow('Conflicting session context entry');
   });
 
   it('fails closed on legacy v1 entries instead of performing a hot migration', () => {
     const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-session-context-'));
     try {
-      fs.writeFileSync(path.join(sessionPath, 'session-context.jsonl'), `${JSON.stringify({ schemaVersion: 1, turnId: 'turn-1' })}\n`);
-      const store = new SessionContextStore({ sessions: { findSessionLocation: () => ({ sessionPath }) } } as unknown as SessionContextHost);
-      expect(() => store.readSessionContextJournal('session-1')).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
-      expect(() => store.readSessionContextJournal('session-1', () => false)).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+      fs.writeFileSync(
+        path.join(sessionPath, 'session-context.jsonl'),
+        `${JSON.stringify({ schemaVersion: 1, turnId: 'turn-1' })}\n`,
+      );
+      const store = new SessionContextStore({
+        sessions: { findSessionLocation: () => ({ sessionPath }) },
+      } as unknown as SessionContextHost);
+      expect(() => store.readSessionContextJournal('session-1')).toThrow(
+        expect.objectContaining({ code: 'STORAGE_CORRUPT' }),
+      );
+      expect(() => store.readSessionContextJournal('session-1', () => false)).toThrow(
+        expect.objectContaining({ code: 'STORAGE_CORRUPT' }),
+      );
     } finally {
       fs.rmSync(sessionPath, { recursive: true, force: true });
     }
@@ -554,16 +573,36 @@ describe('SessionContextJournal v2', () => {
     const journal = new SessionContextJournal();
     vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([]);
     vi.spyOn(conversationHistoryStore, 'readConversationHistory').mockReturnValue([]);
-    expect(() => journal.materialize('session-1', ['missing-turn'], responsesPlan))
-      .toThrow('Session context journal is incomplete');
+    expect(() => journal.materialize('session-1', ['missing-turn'], responsesPlan)).toThrow(
+      'Session context journal is incomplete',
+    );
   });
 
   it('continues after a process-interrupted turn without promoting partial tool output into context', () => {
     const journal = new SessionContextJournal();
     vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([]);
     const history = [
-      { id: 'user-1', turnId: 'interrupted-turn', sessionId: 'session-1', projectId: 'project-1', role: 'user', content: 'Inspect event 42', createdAt: 1 },
-      { id: 'assistant-1', turnId: 'interrupted-turn', sessionId: 'session-1', projectId: 'project-1', role: 'assistant', content: 'Unverified partial answer', status: 'error', createdAt: 2, updatedAt: 3, diagnostic: { code: 'CONVERSATION_INTERRUPTED', severity: 'error', userMessage: 'Interrupted' } },
+      {
+        id: 'user-1',
+        turnId: 'interrupted-turn',
+        sessionId: 'session-1',
+        projectId: 'project-1',
+        role: 'user',
+        content: 'Inspect event 42',
+        createdAt: 1,
+      },
+      {
+        id: 'assistant-1',
+        turnId: 'interrupted-turn',
+        sessionId: 'session-1',
+        projectId: 'project-1',
+        role: 'assistant',
+        content: 'Unverified partial answer',
+        status: 'error',
+        createdAt: 2,
+        updatedAt: 3,
+        diagnostic: { code: 'CONVERSATION_INTERRUPTED', severity: 'error', userMessage: 'Interrupted' },
+      },
     ] as ConversationMessage[];
     vi.spyOn(conversationHistoryStore, 'readConversationHistory').mockReturnValue(history);
 
@@ -578,34 +617,54 @@ describe('SessionContextJournal v2', () => {
     const journal = new SessionContextJournal();
     vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([]);
     vi.spyOn(conversationHistoryStore, 'readConversationHistory').mockReturnValue([
-      { id: 'user-1', turnId: 'missing-turn', sessionId: 'session-1', projectId: 'project-1', role: 'user', content: 'Inspect', createdAt: 1 },
-      { id: 'assistant-1', turnId: 'missing-turn', sessionId: 'session-1', projectId: 'project-1', role: 'assistant', content: 'Answer', status: 'error', createdAt: 2 },
+      {
+        id: 'user-1',
+        turnId: 'missing-turn',
+        sessionId: 'session-1',
+        projectId: 'project-1',
+        role: 'user',
+        content: 'Inspect',
+        createdAt: 1,
+      },
+      {
+        id: 'assistant-1',
+        turnId: 'missing-turn',
+        sessionId: 'session-1',
+        projectId: 'project-1',
+        role: 'assistant',
+        content: 'Answer',
+        status: 'error',
+        createdAt: 2,
+      },
     ] as ConversationMessage[]);
 
-    expect(() => journal.materialize('session-1', ['missing-turn'], responsesPlan))
-      .toThrow('Session context journal is incomplete');
+    expect(() => journal.materialize('session-1', ['missing-turn'], responsesPlan)).toThrow(
+      'Session context journal is incomplete',
+    );
   });
 
   it('keeps semantic messages and paired tool facts while dropping incompatible native state', () => {
     const journal = new SessionContextJournal();
-    vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([entry({
-      messages: [
-        { role: 'user', content: 'inspect the capture', timestamp: 1 },
-        assistant([
-          ...encryptedAssistant().content,
-          { type: 'text', text: 'Found one suspicious event.' },
-          { type: 'toolCall', id: 'tool-1', name: 'read_file', arguments: { path: 'capture.rdc' } },
-        ]),
-        {
-          role: 'toolResult',
-          toolCallId: 'tool-1',
-          toolName: 'read_file',
-          content: [{ type: 'text', text: 'event facts' }],
-          isError: false,
-          timestamp: 2,
-        },
-      ],
-    })]);
+    vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([
+      entry({
+        messages: [
+          { role: 'user', content: 'inspect the capture', timestamp: 1 },
+          assistant([
+            ...encryptedAssistant().content,
+            { type: 'text', text: 'Found one suspicious event.' },
+            { type: 'toolCall', id: 'tool-1', name: 'read_file', arguments: { path: 'capture.rdc' } },
+          ]),
+          {
+            role: 'toolResult',
+            toolCallId: 'tool-1',
+            toolName: 'read_file',
+            content: [{ type: 'text', text: 'event facts' }],
+            isError: false,
+            timestamp: 2,
+          },
+        ],
+      }),
+    ]);
 
     const result = journal.materialize('session-1', ['turn-1'], anthropicPlan);
     expect(result.filteredArtifactCount).toBe(1);
@@ -615,5 +674,4 @@ describe('SessionContextJournal v2', () => {
       { type: 'toolCall', id: 'tool-1', name: 'read_file', arguments: { path: 'capture.rdc' } },
     ]);
   });
-
 });

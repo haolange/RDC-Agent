@@ -13,17 +13,24 @@ import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 export const ComposerAgentMenu: React.FC = () => {
   const { t, language } = useI18n();
   const { composer, activeAgentId } = useComposerView();
-  const { currentMode, currentModeConfig, currentModeLabel, selectedAgentId, userInvocableAgents, setSelectedAgentId } = composer;
+  const { currentMode, currentModeConfig, currentModeLabel, selectedAgentId, userInvocableAgents, setSelectedAgentId } =
+    composer;
   const selectedAgentDefinition = userInvocableAgents.find((agent) => agent.id === selectedAgentId);
   const selectedAgentCapability = agentDescription(selectedAgentDefinition, language);
   const menu = useComposerMenu('agent');
   const popupRef = useRef<HTMLDivElement>(null);
-  const setRootRef = useCallback((node: HTMLDivElement | null) => {
-    menu.setRoot(node);
-  }, [menu]);
-  const setTriggerRef = useCallback((node: HTMLButtonElement | null) => {
-    menu.setTrigger(node);
-  }, [menu]);
+  const setRootRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      menu.setRoot(node);
+    },
+    [menu],
+  );
+  const setTriggerRef = useCallback(
+    (node: HTMLButtonElement | null) => {
+      menu.setTrigger(node);
+    },
+    [menu],
+  );
 
   useEffect(() => {
     if (!menu.open) return;
@@ -78,7 +85,12 @@ export const ComposerAgentMenu: React.FC = () => {
         data-tooltip={selectedAgentCapability || currentModeLabel}
       >
         <span className="composer-agent-pill-icon" aria-hidden="true">
-          <ModeGlyph mode={currentMode} icon={selectedAgentDefinition?.icon ?? currentModeConfig.icon} size={16} strokeWidth={2} />
+          <ModeGlyph
+            mode={currentMode}
+            icon={selectedAgentDefinition?.icon ?? currentModeConfig.icon}
+            size={16}
+            strokeWidth={2}
+          />
         </span>
         <span className="composer-agent-pill-label">{currentModeLabel}</span>
         <span className="composer-agent-pill-caret" aria-hidden="true">
@@ -86,12 +98,7 @@ export const ComposerAgentMenu: React.FC = () => {
         </span>
       </Pill>
       {menu.open ? (
-        <div
-          ref={popupRef}
-          className="composer-agent-menu-popup"
-          role="menu"
-          onKeyDown={handleMenuKeyDown}
-        >
+        <div ref={popupRef} className="composer-agent-menu-popup" role="menu" onKeyDown={handleMenuKeyDown}>
           {userInvocableAgents.map((agent) => {
             const agentMode: AgentMode = agent.id;
             const description = agentDescription(agent, language);

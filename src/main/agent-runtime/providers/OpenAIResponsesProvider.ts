@@ -12,13 +12,7 @@ import {
 } from './internal/responsesShared';
 import { isReasoningEnabled } from './reasoningWire';
 import type { EventStream } from '../core/EventStream';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Model,
-  StreamOptions,
-} from '../core/types';
+import type { AssistantMessage, AssistantMessageEvent, Context, Model, StreamOptions } from '../core/types';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type { ProviderRequestAuthorizer } from '../../settings/provider-auth/AwsBedrockCredentials';
 
@@ -62,11 +56,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
     this.requestAuthorizer = options.requestAuthorizer;
   }
 
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage> {
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
       const response = await this.send(model, context, options, run.signal);
       return consumeResponsesEventStream(response, run, options, OPENAI_RESPONSES_SURFACE);
@@ -111,4 +101,10 @@ export function buildOpenAIResponsesUrl(baseUrl: string): string {
   return trimmed.endsWith('/responses') ? trimmed : `${trimmed}/responses`;
 }
 
-export { buildResponsesRequestBody as buildRequestBody, isDeepSeekResponsesPlan, isReasoningEnabled, readDeepSeekReasoningText, toResponsesInput };
+export {
+  buildResponsesRequestBody as buildRequestBody,
+  isDeepSeekResponsesPlan,
+  isReasoningEnabled,
+  readDeepSeekReasoningText,
+  toResponsesInput,
+};

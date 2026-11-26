@@ -14,22 +14,55 @@ export const FadingPreview: React.FC<{ text: string }> = ({ text }) => {
     observer.observe(element);
     return () => observer.disconnect();
   }, [text]);
-  return <span ref={ref} className={`work-disclosure-preview${clipped ? ' is-clipped' : ''}`}>{text}</span>;
+  return (
+    <span ref={ref} className={`work-disclosure-preview${clipped ? ' is-clipped' : ''}`}>
+      {text}
+    </span>
+  );
 };
 
 export const WorkDisclosure: React.FC<{
-  title: string; preview?: string; open: boolean; onToggle: () => void;
-  children: React.ReactNode; meta?: string; disabled?: boolean; variant?: 'section' | 'secondary-card' | 'inline';
+  title: string;
+  preview?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  meta?: string;
+  disabled?: boolean;
+  variant?: 'section' | 'secondary-card' | 'inline';
   bodyClassName?: string;
 }> = ({ title, preview = '', open, onToggle, children, meta, disabled, variant = 'section', bodyClassName }) => {
   const contentId = React.useId();
-  const heading = <>{disabled ? <span className="work-disclosure-label">{title}</span> : <WorkRowTitle text={title} wrap />}
-    {!open || disabled ? <FadingPreview text={preview} /> : <span className="work-disclosure-meta">{meta}</span>}
-    {!disabled ? <Chevron open={open} size={12} className="work-process-row-caret" /> : null}</>;
-  return <section className={`work-disclosure variant-${variant}${open ? ' is-open' : ''}`} data-locate={!disabled || undefined}>
-    {disabled ? <div className="work-disclosure-header is-disabled">{heading}</div>
-      : <button type="button" className="work-disclosure-header" aria-expanded={open}
-        aria-controls={contentId} onClick={onToggle}>{heading}</button>}
-    {open && !disabled ? <div id={contentId} className={`work-disclosure-body${bodyClassName ? ` ${bodyClassName}` : ''}`}>{children}</div> : null}
-  </section>;
+  const heading = (
+    <>
+      {disabled ? <span className="work-disclosure-label">{title}</span> : <WorkRowTitle text={title} wrap />}
+      {!open || disabled ? <FadingPreview text={preview} /> : <span className="work-disclosure-meta">{meta}</span>}
+      {!disabled ? <Chevron open={open} size={12} className="work-process-row-caret" /> : null}
+    </>
+  );
+  return (
+    <section
+      className={`work-disclosure variant-${variant}${open ? ' is-open' : ''}`}
+      data-locate={!disabled || undefined}
+    >
+      {disabled ? (
+        <div className="work-disclosure-header is-disabled">{heading}</div>
+      ) : (
+        <button
+          type="button"
+          className="work-disclosure-header"
+          aria-expanded={open}
+          aria-controls={contentId}
+          onClick={onToggle}
+        >
+          {heading}
+        </button>
+      )}
+      {open && !disabled ? (
+        <div id={contentId} className={`work-disclosure-body${bodyClassName ? ` ${bodyClassName}` : ''}`}>
+          {children}
+        </div>
+      ) : null}
+    </section>
+  );
 };

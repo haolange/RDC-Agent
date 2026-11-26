@@ -23,17 +23,19 @@ function buildProbePromptPlan(): PromptPlan {
   const content = `This is a user-requested provider capability check. Call the ${CAPABILITY_CHECK_TOOL.name} tool once with {"ok": true}. Do not reply with text.`;
   return {
     id: generateEventId('prompt-plan'),
-    segments: [{
-      id: 'runtime:provider-capability-probe',
-      kind: 'runtime-fact',
-      scope: 'runtime',
-      sourcePath: 'runtime://provider-capability-probe',
-      sourceHash: hashScopedResource(content),
-      precedence: 0,
-      content,
-      stability: 'stable',
-      tokenEstimate: charsToTokens(content.length),
-    }],
+    segments: [
+      {
+        id: 'runtime:provider-capability-probe',
+        kind: 'runtime-fact',
+        scope: 'runtime',
+        sourcePath: 'runtime://provider-capability-probe',
+        sourceHash: hashScopedResource(content),
+        precedence: 0,
+        content,
+        stability: 'stable',
+        tokenEstimate: charsToTokens(content.length),
+      },
+    ],
     systemPrompt: content,
     totalTokenEstimate: charsToTokens(content.length),
     stablePrefix: {
@@ -59,7 +61,8 @@ export async function executeCapabilityProbe(input: CapabilityProbeExecution): P
     userContent: 'Run the capability check.',
     tools: [CAPABILITY_CHECK_TOOL],
     maxTokens: PROBE_MAX_OUTPUT_TOKENS,
-    reasoning: resolveAgentRouteCapability(input.provider, input.model.modelId, input.model, input.plan).reasoningContract,
+    reasoning: resolveAgentRouteCapability(input.provider, input.model.modelId, input.model, input.plan)
+      .reasoningContract,
     // The probe checks the route as a real turn would use it, cache behaviour included.
     writesPromptCache: true,
     controls: { capabilityProbeMode: input.request.mode },

@@ -12,17 +12,7 @@ export interface ListRowProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const ListRow = forwardRef<HTMLButtonElement, ListRowProps>(function ListRow(
-  {
-    leading,
-    trailing,
-    description,
-    selected = false,
-    className,
-    disabled,
-    type = 'button',
-    children,
-    ...rest
-  },
+  { leading, trailing, description, selected = false, className, disabled, type = 'button', children, ...rest },
   ref,
 ) {
   return (
@@ -43,8 +33,9 @@ export const ListRow = forwardRef<HTMLButtonElement, ListRowProps>(function List
       {leading ? <span className="ui-list-row-leading">{leading}</span> : null}
       <span className="ui-list-row-body">
         <span className="ui-list-row-title">{children}</span>
-        {description !== undefined && description !== null
-          ? <span className="ui-list-row-description">{description}</span> : null}
+        {description !== undefined && description !== null ? (
+          <span className="ui-list-row-description">{description}</span>
+        ) : null}
       </span>
       {trailing ? <span className="ui-list-row-trailing">{trailing}</span> : null}
     </button>

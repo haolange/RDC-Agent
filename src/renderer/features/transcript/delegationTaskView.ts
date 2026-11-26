@@ -19,12 +19,16 @@ const DelegationTaskViewSchema = z.object({
     inputArtifactRefs: shownTexts,
     requiredSkillIds: shownTexts,
     acceptedFacts: z.array(z.object({ statement: shownText, qualification: shownText, sourceRefs: shownTexts })),
-    negativePaths: z.array(z.object({ path: shownText, reason: shownText, applicableWhen: shownText, recheckWhen: shownText })),
-    budget: z.object({
-      maxToolCalls: z.number().optional(),
-      maxWallTimeMs: z.number().optional(),
-      maxSubagents: z.number().optional(),
-    }).default({}),
+    negativePaths: z.array(
+      z.object({ path: shownText, reason: shownText, applicableWhen: shownText, recheckWhen: shownText }),
+    ),
+    budget: z
+      .object({
+        maxToolCalls: z.number().optional(),
+        maxWallTimeMs: z.number().optional(),
+        maxSubagents: z.number().optional(),
+      })
+      .default({}),
     profile: shownText.optional(),
     domainExtensions: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
   }),

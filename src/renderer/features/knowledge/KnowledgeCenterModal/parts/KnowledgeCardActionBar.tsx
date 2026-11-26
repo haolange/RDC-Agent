@@ -23,7 +23,15 @@ const ACTION_LABEL_KEYS: Record<KnowledgeCardAction, TranslationKey> = {
 };
 
 /** The selected card's footer: its primary lifecycle action, the rest and the diagnostics copy in a menu. */
-export function KnowledgeCardActionBar({ card, reviewing, write, onCreateCandidate, candidateHasSession, candidateBusy, candidateError }: {
+export function KnowledgeCardActionBar({
+  card,
+  reviewing,
+  write,
+  onCreateCandidate,
+  candidateHasSession,
+  candidateBusy,
+  candidateError,
+}: {
   card: KnowledgeCardDetail;
   reviewing: boolean;
   write: ReturnType<typeof useKnowledgeWriteConfirm>;
@@ -35,17 +43,25 @@ export function KnowledgeCardActionBar({ card, reviewing, write, onCreateCandida
   const { t } = useI18n();
   const [moreOpen, setMoreOpen] = useState(false);
   const actions = knowledgeCardActions(card.lifecycle, reviewing);
-  const { copied, copy } = useCopyFeedback(useCopyDiagnostics([
-    { label: 'cardId', value: card.cardId },
-    { label: 'caseId', value: card.caseId },
-    { label: 'relations', value: card.relations.map((relation) => relation.targetCardId).join(', ') },
-    { label: 'sourceStatus', value: card.sourceStatus },
-    { label: t('knowledgeCenter.metaSourceHash'), value: card.sourceHash },
-    { label: t('knowledgeCenter.metaSourceMtime'), value: card.sourceMtimeMs != null ? new Date(card.sourceMtimeMs).toISOString() : null },
-    { label: t('knowledgeCenter.metaSourceSize'), value: card.sourceSize },
-  ]));
-  const candidateBlocked = !candidateHasSession ? t('knowledgeCenter.sessionRequired')
-    : card.missingAssets?.length ? t('knowledgeCenter.candidateAssetsMissing') : undefined;
+  const { copied, copy } = useCopyFeedback(
+    useCopyDiagnostics([
+      { label: 'cardId', value: card.cardId },
+      { label: 'caseId', value: card.caseId },
+      { label: 'relations', value: card.relations.map((relation) => relation.targetCardId).join(', ') },
+      { label: 'sourceStatus', value: card.sourceStatus },
+      { label: t('knowledgeCenter.metaSourceHash'), value: card.sourceHash },
+      {
+        label: t('knowledgeCenter.metaSourceMtime'),
+        value: card.sourceMtimeMs != null ? new Date(card.sourceMtimeMs).toISOString() : null,
+      },
+      { label: t('knowledgeCenter.metaSourceSize'), value: card.sourceSize },
+    ]),
+  );
+  const candidateBlocked = !candidateHasSession
+    ? t('knowledgeCenter.sessionRequired')
+    : card.missingAssets?.length
+      ? t('knowledgeCenter.candidateAssetsMissing')
+      : undefined;
   const cardActionsLabel = t('knowledgeCenter.cardActions', { title: card.title });
   const run = (action: KnowledgeCardAction) => {
     if (action === 'create-candidate') {
@@ -57,7 +73,11 @@ export function KnowledgeCardActionBar({ card, reviewing, write, onCreateCandida
 
   return (
     <div className="knowledge-center-actions" data-testid="knowledge-center-actions">
-      {candidateError ? <InlineError detail={candidateError}>{humanizeError(candidateError, t, 'knowledgeCenter.candidateFailed')}</InlineError> : null}
+      {candidateError ? (
+        <InlineError detail={candidateError}>
+          {humanizeError(candidateError, t, 'knowledgeCenter.candidateFailed')}
+        </InlineError>
+      ) : null}
       <Menu
         open={moreOpen}
         onOpenChange={setMoreOpen}
@@ -65,15 +85,29 @@ export function KnowledgeCardActionBar({ card, reviewing, write, onCreateCandida
         side="top"
         label={cardActionsLabel}
         items={[
-          ...actions.more.map((action) => ({ id: action, label: t(ACTION_LABEL_KEYS[action]), onSelect: () => run(action) })),
-          { id: 'diagnostics', testId: 'knowledge-center-provenance', label: t('app.copyDiagnostics'), onSelect: () => void copy() },
+          ...actions.more.map((action) => ({
+            id: action,
+            label: t(ACTION_LABEL_KEYS[action]),
+            onSelect: () => run(action),
+          })),
+          {
+            id: 'diagnostics',
+            testId: 'knowledge-center-provenance',
+            label: t('app.copyDiagnostics'),
+            onSelect: () => void copy(),
+          },
         ]}
-        trigger={(
-          <IconButton label={cardActionsLabel} size="sm" aria-haspopup="menu" data-testid="knowledge-center-more-actions"
-            data-tooltip={t(copied ? 'app.copied' : 'knowledgeCenter.moreActions')}>
+        trigger={
+          <IconButton
+            label={cardActionsLabel}
+            size="sm"
+            aria-haspopup="menu"
+            data-testid="knowledge-center-more-actions"
+            data-tooltip={t(copied ? 'app.copied' : 'knowledgeCenter.moreActions')}
+          >
             <Icon name={copied ? 'check' : 'more'} size={16} />
           </IconButton>
-        )}
+        }
       />
       {actions.primary ? (
         <Button

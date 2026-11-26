@@ -48,7 +48,13 @@ export function fieldLabel(key: string, t: Translate): string {
 
 /** Sentences stay sentences; the identifiers inside them (`%17`, `I-NORM-02`) read as code. */
 export function Prose({ text }: { text: string }) {
-  return <>{splitIdentifiers(text).map((segment, index) => (segment.code ? <code key={index}>{segment.text}</code> : segment.text))}</>;
+  return (
+    <>
+      {splitIdentifiers(text).map((segment, index) =>
+        segment.code ? <code key={index}>{segment.text}</code> : segment.text,
+      )}
+    </>
+  );
 }
 
 function ValueText({ value }: { value: string }) {
@@ -64,17 +70,38 @@ function ValueList({ items }: { items: CaseValue[] }) {
   const { t } = useI18n();
   const strings = items.every((item) => typeof item === 'string' && item.length < 80);
   if (strings && items.every((item) => looksLikeIdentifier(item as string))) {
-    return <span className="knowledge-case-codes">{items.map((item, index) => <code key={index}>{item as string}</code>)}</span>;
+    return (
+      <span className="knowledge-case-codes">
+        {items.map((item, index) => (
+          <code key={index}>{item as string}</code>
+        ))}
+      </span>
+    );
   }
   if (strings && items.every((item) => !isTermLike(item as string) && !looksLikeIdentifier(item as string))) {
     return <Prose text={(items as string[]).join(t('knowledgeCenter.listSeparator'))} />;
   }
   if (strings) {
-    return <>{items.map((item, index) => (
-      <span key={index}>{index > 0 ? t('knowledgeCenter.listSeparator') : null}<ValueText value={item as string} /></span>
-    ))}</>;
+    return (
+      <>
+        {items.map((item, index) => (
+          <span key={index}>
+            {index > 0 ? t('knowledgeCenter.listSeparator') : null}
+            <ValueText value={item as string} />
+          </span>
+        ))}
+      </>
+    );
   }
-  return <ul className="knowledge-case-list">{items.map((item, index) => <li key={index}><Value value={item} /></li>)}</ul>;
+  return (
+    <ul className="knowledge-case-list">
+      {items.map((item, index) => (
+        <li key={index}>
+          <Value value={item} />
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export function Value({ value }: { value: CaseValue }) {
@@ -87,9 +114,9 @@ export function Value({ value }: { value: CaseValue }) {
 
 /** Nested objects (a source with its parameters, a blame with its location) contribute their rows to one list. */
 function factRows(record: CaseRecord, path = ''): Array<{ path: string; key: string; value: CaseValue }> {
-  return Object.entries(record).flatMap(([key, value]) => (isCaseRecord(value)
-    ? factRows(value, `${path}${key}.`)
-    : [{ path: `${path}${key}`, key, value }]));
+  return Object.entries(record).flatMap(([key, value]) =>
+    isCaseRecord(value) ? factRows(value, `${path}${key}.`) : [{ path: `${path}${key}`, key, value }],
+  );
 }
 
 /** Facts as label–value rows. */
@@ -102,7 +129,9 @@ export function Facts({ record }: { record: CaseRecord }) {
       {rows.map(({ path, key, value }) => (
         <div key={path}>
           <dt>{fieldLabel(key, t)}</dt>
-          <dd><Value value={value} /></dd>
+          <dd>
+            <Value value={value} />
+          </dd>
         </div>
       ))}
     </dl>

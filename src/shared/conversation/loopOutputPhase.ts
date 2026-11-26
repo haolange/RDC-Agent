@@ -27,11 +27,7 @@ export function resolveConversationLoopOutputPhase(
     pending?.approval || pending?.userInput || pending?.planReview || pending?.handoff,
   );
 
-  if (
-    input.stopReason === 'end_turn'
-    && !input.loopHasTools
-    && !hasPendingContinuation
-  ) {
+  if (input.stopReason === 'end_turn' && !input.loopHasTools && !hasPendingContinuation) {
     return 'final_answer';
   }
 

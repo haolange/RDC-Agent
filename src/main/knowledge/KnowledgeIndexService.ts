@@ -28,12 +28,14 @@ export interface KnowledgeIndexDependencies {
 const defaultDependencies = (): KnowledgeIndexDependencies => {
   return {
     listSpaces: () => {
-      const spaces: KnowledgeSpace[] = [{
-        spaceId: 'user',
-        kind: 'user',
-        label: 'User',
-        rootPath: appPathService.getUserRdcPaths().knowledgePath,
-      }];
+      const spaces: KnowledgeSpace[] = [
+        {
+          spaceId: 'user',
+          kind: 'user',
+          label: 'User',
+          rootPath: appPathService.getUserRdcPaths().knowledgePath,
+        },
+      ];
       for (const project of projectWorkspaceStore.listProjects()) {
         spaces.push({
           spaceId: `project:${project.projectId}`,
@@ -57,12 +59,7 @@ export function contentHashOf(source: string): string {
   return createHash('sha256').update(source, 'utf8').digest('hex');
 }
 
-function toEntry(
-  space: KnowledgeSpace,
-  relativePath: string,
-  source: string,
-  updatedAt: number,
-): KnowledgeIndexEntry {
+function toEntry(space: KnowledgeSpace, relativePath: string, source: string, updatedAt: number): KnowledgeIndexEntry {
   const parsed = parseKnowledgeFrontmatter(source, { spaceId: space.spaceId, relativePath });
   const headings = [...source.matchAll(/^#{1,3}\s+(.+)$/gm)].map((match) => match[1].trim());
   const lexical = [parsed.record.title, parsed.body, relativePath].join('\n').toLocaleLowerCase();
@@ -87,7 +84,14 @@ function toEntry(
 }
 
 function resolveDeps(overrides: Partial<KnowledgeIndexDependencies>): KnowledgeIndexDependencies {
-  if (overrides.listSpaces && overrides.snapshotPath && overrides.storage && overrides.now && overrides.readFile && overrides.statMtime) {
+  if (
+    overrides.listSpaces &&
+    overrides.snapshotPath &&
+    overrides.storage &&
+    overrides.now &&
+    overrides.readFile &&
+    overrides.statMtime
+  ) {
     return overrides as KnowledgeIndexDependencies;
   }
   return { ...defaultDependencies(), ...overrides };
@@ -123,10 +127,7 @@ export class KnowledgeIndexService {
   }
 
   getSnapshot(): KnowledgeIndexSnapshot | null {
-    return this.dependencies.storage.readJson(
-      this.dependencies.snapshotPath(),
-      KNOWLEDGE_INDEX_MIGRATIONS,
-    );
+    return this.dependencies.storage.readJson(this.dependencies.snapshotPath(), KNOWLEDGE_INDEX_MIGRATIONS);
   }
 
   async computeLiveRevision(): Promise<string> {
@@ -163,7 +164,7 @@ export class KnowledgeIndexService {
 
   async isSnapshotStale(snapshot: KnowledgeIndexSnapshot | null = this.getSnapshot()): Promise<boolean> {
     if (!snapshot) return true;
-    return snapshot.revision !== await this.computeLiveRevision();
+    return snapshot.revision !== (await this.computeLiveRevision());
   }
 
   async getOrRebuild(): Promise<KnowledgeIndexSnapshot> {

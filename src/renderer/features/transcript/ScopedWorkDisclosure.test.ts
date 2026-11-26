@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ScopedWorkDisclosure, useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 
-it('changes open state once per scope or default change and never paints the previous row\'s state first', async () => {
+it("changes open state once per scope or default change and never paints the previous row's state first", async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -14,8 +14,10 @@ it('changes open state once per scope or default change and never paints the pre
     painted.push(open);
     return createElement('button', { type: 'button', 'aria-expanded': open, onClick: toggle }, 'Working');
   };
-  const render = (scope: string, defaultOpen: boolean) => act(async () => root.render(createElement(ScopedWorkDisclosure,
-    { scope, children: createElement(Probe, { defaultOpen }) })));
+  const render = (scope: string, defaultOpen: boolean) =>
+    act(async () =>
+      root.render(createElement(ScopedWorkDisclosure, { scope, children: createElement(Probe, { defaultOpen }) })),
+    );
   const root = createRoot(host);
   try {
     await render('request:folded:assistant', false);
@@ -44,8 +46,8 @@ it('preserves a delegated tool disclosure through windowed unmounts and scopes e
     const [open, toggle] = useScopedWorkDisclosure('tool-read', defaultOpen);
     return createElement('button', { type: 'button', 'aria-expanded': open, onClick: toggle }, 'Tool');
   };
-  const render = (scope: string, defaultOpen = false) => createElement(ScopedWorkDisclosure,
-    { scope, children: createElement(Probe, { defaultOpen }) });
+  const render = (scope: string, defaultOpen = false) =>
+    createElement(ScopedWorkDisclosure, { scope, children: createElement(Probe, { defaultOpen }) });
   let root = createRoot(host);
   try {
     await act(async () => root.render(render('session-a\u0000call-a')));

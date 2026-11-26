@@ -20,9 +20,9 @@ function fixture(name: string): unknown {
   return JSON.parse(readFileSync(resolve(__dirname, '../fixtures/provider-catalogs', name), 'utf8')) as unknown;
 }
 
-const compiledCatalog = compileProviderCatalog(loadProviderCatalogManifestInput(
-  resolve(__dirname, '../../../shared/provider-catalog/manifests'),
-));
+const compiledCatalog = compileProviderCatalog(
+  loadProviderCatalogManifestInput(resolve(__dirname, '../../../shared/provider-catalog/manifests')),
+);
 
 function surface(name: string) {
   const entry = compiledCatalog.surfaces.get(name)?.surface;
@@ -39,28 +39,41 @@ const OPENCODE_GO_SURFACE = surface('opencode-go');
 const OPENROUTER_SURFACE = surface('openrouter');
 const parseKimiCodeCatalog = (payload: unknown) => parseKimiCodeCatalogWithSurface(payload, KIMI_SURFACE);
 const parseOpenCodeGoCatalog = (payload: unknown) => parseOpenCodeGoCatalogWithSurface(payload, OPENCODE_GO_SURFACE);
-const parseOpenRouterAccountCatalog = (payload: unknown) => parseOpenRouterAccountCatalogWithSurface(payload, OPENROUTER_SURFACE);
+const parseOpenRouterAccountCatalog = (payload: unknown) =>
+  parseOpenRouterAccountCatalogWithSurface(payload, OPENROUTER_SURFACE);
 
 describe('live Provider Catalog parsers', () => {
   it('admits only exact Kimi Coding Plan product ids and keeps labels manifest-owned', () => {
-    const parsed = parseKimiCodeCatalog({ data: [
-      {
-        id: 'kimi-for-coding', display_name: 'Kimi K2.7 Code', context_length: 256_000,
-        supports_reasoning: true, supports_thinking_type: 'only', protocol: 'anthropic',
-        supports_tool_call: true,
-      },
-      {
-        id: 'k3', display_name: 'backend-version-name', context_length: 256_000,
-        supports_reasoning: true, supports_thinking_type: 'only', protocol: 'openai',
-        think_efforts: { valid_efforts: ['low', 'high', 'max'], default_effort: 'max' },
-      },
-      {
-        id: 'k3-256k', context_length: 256_000, supports_reasoning: true,
-        think_efforts: { valid_efforts: ['low', 'high', 'max'], default_effort: 'high' },
-      },
-      { id: 'kimi-for-coding-highspeed', context_length: 256_000, supports_reasoning: true },
-      { id: 'kimi-k2.7-code', display_name: 'must-not-enter' },
-    ] });
+    const parsed = parseKimiCodeCatalog({
+      data: [
+        {
+          id: 'kimi-for-coding',
+          display_name: 'Kimi K2.7 Code',
+          context_length: 256_000,
+          supports_reasoning: true,
+          supports_thinking_type: 'only',
+          protocol: 'anthropic',
+          supports_tool_call: true,
+        },
+        {
+          id: 'k3',
+          display_name: 'backend-version-name',
+          context_length: 256_000,
+          supports_reasoning: true,
+          supports_thinking_type: 'only',
+          protocol: 'openai',
+          think_efforts: { valid_efforts: ['low', 'high', 'max'], default_effort: 'max' },
+        },
+        {
+          id: 'k3-256k',
+          context_length: 256_000,
+          supports_reasoning: true,
+          think_efforts: { valid_efforts: ['low', 'high', 'max'], default_effort: 'high' },
+        },
+        { id: 'kimi-for-coding-highspeed', context_length: 256_000, supports_reasoning: true },
+        { id: 'kimi-k2.7-code', display_name: 'must-not-enter' },
+      ],
+    });
 
     expect(parsed.models.map((model) => [model.id, model.label])).toEqual([
       ['k3', 'Kimi K3'],
@@ -73,13 +86,18 @@ describe('live Provider Catalog parsers', () => {
         fast: { state: 'unsupported', fixedValue: false },
         maxContext: { state: 'selectable', tierId: 'max' },
         reasoning: {
-          kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'], defaultSelection: 'max',
+          kind: 'levels',
+          supportsOff: false,
+          levels: ['low', 'high', 'max'],
+          defaultSelection: 'max',
         },
       },
-      executionBindings: [{
-        id: 'context:max',
-        actions: [{ kind: 'client-tier', tierId: 'max' }],
-      }],
+      executionBindings: [
+        {
+          id: 'context:max',
+          actions: [{ kind: 'client-tier', tierId: 'max' }],
+        },
+      ],
     });
     expect(parsed.contributions.find((model) => model.modelId === 'kimi-for-coding')).toMatchObject({
       controls: { fast: { state: 'selectable', entitlement: 'unknown' } },
@@ -89,15 +107,23 @@ describe('live Provider Catalog parsers', () => {
         }),
       ]),
     });
-    expect(parsed.contributions.find((model) => model.modelId === 'kimi-for-coding-highspeed'))
-      .toMatchObject({ selection: { pickerVisibility: 'internal' }, controls: { fast: { state: 'unsupported' } } });
+    expect(parsed.contributions.find((model) => model.modelId === 'kimi-for-coding-highspeed')).toMatchObject({
+      selection: { pickerVisibility: 'internal' },
+      controls: { fast: { state: 'unsupported' } },
+    });
   });
 
   it('narrows Kimi K3 live effort metadata without erasing the official baseline', () => {
-    const maxOnly = parseKimiCodeCatalog({ models: [{
-      id: 'k3', context_length: 256_000, supports_reasoning: true,
-      think_efforts: { valid_efforts: ['max'], default_effort: 'max' },
-    }] }).contributions[0];
+    const maxOnly = parseKimiCodeCatalog({
+      models: [
+        {
+          id: 'k3',
+          context_length: 256_000,
+          supports_reasoning: true,
+          think_efforts: { valid_efforts: ['max'], default_effort: 'max' },
+        },
+      ],
+    }).contributions[0];
     expect(maxOnly).toMatchObject({
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
@@ -106,11 +132,13 @@ describe('live Provider Catalog parsers', () => {
       },
     });
 
-    const unknown = parseKimiCodeCatalog({ data: [{ id: 'k3', context_length: 256_000 }] })
-      .contributions[0];
+    const unknown = parseKimiCodeCatalog({ data: [{ id: 'k3', context_length: 256_000 }] }).contributions[0];
     expect(unknown?.controls?.reasoning).toMatchObject({
-      kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'],
-      defaultState: 'known', defaultSelection: 'high',
+      kind: 'levels',
+      supportsOff: false,
+      levels: ['low', 'high', 'max'],
+      defaultState: 'known',
+      defaultSelection: 'high',
     });
     expect(() => parseKimiCodeCatalog({ unexpected: [] })).toThrow(/missing a data or models array/u);
   });
@@ -121,12 +149,19 @@ describe('live Provider Catalog parsers', () => {
     k3.liveProjection.context.observedTierId = 'max';
     k3.liveProjection.context.entitlementAuthority = 'manifest';
 
-    const contribution = parseKimiCodeCatalogWithSurface({ data: [{
-      id: 'k3',
-      protocol: 'unrecognized-wire',
-      context_length: 1_000_000,
-      supports_reasoning: true,
-    }] }, modelCatalogSurface).contributions[0];
+    const contribution = parseKimiCodeCatalogWithSurface(
+      {
+        data: [
+          {
+            id: 'k3',
+            protocol: 'unrecognized-wire',
+            context_length: 1_000_000,
+            supports_reasoning: true,
+          },
+        ],
+      },
+      modelCatalogSurface,
+    ).contributions[0];
 
     expect(contribution.route).toMatchObject(k3.route);
     expect(contribution.route?.contracts?.reasoning).toMatchObject({ semantic: 'raw', displayLabel: 'Raw reasoning' });
@@ -138,13 +173,15 @@ describe('live Provider Catalog parsers', () => {
     expect(contribution.controls?.reasoning).toMatchObject({ kind: 'unknown', supportsOff: false });
   });
   it('drops retired DeepSeek Flash/Pro ids from OpenCode Go live admission', () => {
-    const parsed = parseOpenCodeGoCatalog({ data: [
-      { id: 'deepseek-v4.1-flash' },
-      { id: 'deepseek-v4-flash' },
-      { id: 'deepseek-v4-pro' },
-      { id: 'deepseek-v4-flash-vision-exp' },
-      { id: 'glm-5.2' },
-    ] });
+    const parsed = parseOpenCodeGoCatalog({
+      data: [
+        { id: 'deepseek-v4.1-flash' },
+        { id: 'deepseek-v4-flash' },
+        { id: 'deepseek-v4-pro' },
+        { id: 'deepseek-v4-flash-vision-exp' },
+        { id: 'glm-5.2' },
+      ],
+    });
     expect(parsed.models.map((model) => model.id)).toEqual(['deepseek-v4.1-flash', 'glm-5.2']);
   });
 
@@ -159,24 +196,28 @@ describe('live Provider Catalog parsers', () => {
   });
 
   it('projects compiled OpenCode Go budgets for live ids even when upstream omits context_window', () => {
-    const parsed = parseOpenCodeGoCatalog({ data: [
-      { id: 'minimax-m3' },
-      { id: 'glm-5.2' },
-      { id: 'kimi-k3', context_length: 1_000_000 },
-    ] });
-    expect(parsed.contributions).toEqual(expect.arrayContaining([
-      expect.objectContaining({ modelId: 'minimax-m3', defaultBudgetTokens: 256_000, availability: 'available' }),
-      expect.objectContaining({ modelId: 'glm-5.2', defaultBudgetTokens: 200_000, availability: 'available' }),
-      expect.objectContaining({ modelId: 'kimi-k3', defaultBudgetTokens: 256_000, availability: 'available' }),
-    ]));
+    const parsed = parseOpenCodeGoCatalog({
+      data: [{ id: 'minimax-m3' }, { id: 'glm-5.2' }, { id: 'kimi-k3', context_length: 1_000_000 }],
+    });
+    expect(parsed.contributions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ modelId: 'minimax-m3', defaultBudgetTokens: 256_000, availability: 'available' }),
+        expect.objectContaining({ modelId: 'glm-5.2', defaultBudgetTokens: 200_000, availability: 'available' }),
+        expect.objectContaining({ modelId: 'kimi-k3', defaultBudgetTokens: 256_000, availability: 'available' }),
+      ]),
+    );
   });
 
   it('projects Kimi K3 only from exact OpenCode Go and OpenRouter live rows', () => {
-    const openCode = parseOpenCodeGoCatalog({ data: [{
-      id: 'kimi-k3',
-      endpoint: '/chat/completions',
-      context_length: 1_000_000,
-    }] });
+    const openCode = parseOpenCodeGoCatalog({
+      data: [
+        {
+          id: 'kimi-k3',
+          endpoint: '/chat/completions',
+          context_length: 1_000_000,
+        },
+      ],
+    });
     expect(openCode.contributions[0]).toMatchObject({
       modelId: 'kimi-k3',
       label: 'Kimi K3',
@@ -185,17 +226,24 @@ describe('live Provider Catalog parsers', () => {
         fast: { state: 'unsupported', fixedValue: false },
         maxContext: { state: 'selectable', tierId: 'max' },
         reasoning: {
-          kind: 'always-on', supportsOff: false, defaultSelection: 'max', lockedSelection: 'max',
+          kind: 'always-on',
+          supportsOff: false,
+          defaultSelection: 'max',
+          lockedSelection: 'max',
         },
       },
     });
 
-    const openRouter = parseOpenRouterAccountCatalog({ data: [{
-      id: 'moonshotai/kimi-k3',
-      name: 'Moonshot backend display',
-      context_length: 1_000_000,
-      supported_parameters: ['tools'],
-    }] });
+    const openRouter = parseOpenRouterAccountCatalog({
+      data: [
+        {
+          id: 'moonshotai/kimi-k3',
+          name: 'Moonshot backend display',
+          context_length: 1_000_000,
+          supported_parameters: ['tools'],
+        },
+      ],
+    });
     expect(openRouter.contributions[0]).toMatchObject({
       modelId: 'moonshotai/kimi-k3',
       label: 'Kimi K3',
@@ -204,75 +252,85 @@ describe('live Provider Catalog parsers', () => {
         fast: { state: 'unsupported', fixedValue: false },
         maxContext: { state: 'selectable', tierId: 'max' },
         reasoning: {
-          kind: 'always-on', supportsOff: false, defaultSelection: 'max', lockedSelection: 'max',
+          kind: 'always-on',
+          supportsOff: false,
+          defaultSelection: 'max',
+          lockedSelection: 'max',
         },
       },
     });
-    expect(parseOpenRouterAccountCatalog({ data: [{
-      id: 'moonshotai/kimi-k2.7-code', context_length: 256_000,
-    }] }).contributions[0]?.controls).toBeUndefined();
+    expect(
+      parseOpenRouterAccountCatalog({
+        data: [
+          {
+            id: 'moonshotai/kimi-k2.7-code',
+            context_length: 256_000,
+          },
+        ],
+      }).contributions[0]?.controls,
+    ).toBeUndefined();
   });
   it('excludes ClinePass models from the Cline usage catalog', () => {
     const parsed = parseClineCatalog(fixture('cline.json'), surface('cline'));
-    expect(parsed.models.map((model) => model.id).sort()).toEqual([
-      'anthropic/claude-sonnet-4.6',
-      'openai/gpt-5.4',
-    ]);
+    expect(parsed.models.map((model) => model.id).sort()).toEqual(['anthropic/claude-sonnet-4.6', 'openai/gpt-5.4']);
     expect(parsed.entitlementContributions).toBeUndefined();
     expect(parsed.contributions.every((model) => !model.modelId.startsWith('cline-pass/'))).toBe(true);
   });
 
   it('projects live recommended-models vendor ids onto ClinePass catalog ids', () => {
-    const parsed = parseClinePassCatalog({
-      recommended: [
-        { id: 'moonshotai/kimi-k3', name: 'moonshotai/kimi-k3' },
-        { id: 'anthropic/claude-opus-5', name: 'anthropic/claude-opus-5' },
-        { id: 'z-ai/glm-5.3', name: 'GLM-5.3 live' },
-      ],
-    }, surface('cline-pass'));
-    expect(parsed.models.map((model) => model.id).sort()).toEqual([
-      'cline-pass/glm-5.3',
-      'cline-pass/kimi-k3',
-    ]);
-    expect(parsed.contributions).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        modelId: 'cline-pass/kimi-k3',
-        label: 'Kimi K3',
-      }),
-    ]));
+    const parsed = parseClinePassCatalog(
+      {
+        recommended: [
+          { id: 'moonshotai/kimi-k3', name: 'moonshotai/kimi-k3' },
+          { id: 'anthropic/claude-opus-5', name: 'anthropic/claude-opus-5' },
+          { id: 'z-ai/glm-5.3', name: 'GLM-5.3 live' },
+        ],
+      },
+      surface('cline-pass'),
+    );
+    expect(parsed.models.map((model) => model.id).sort()).toEqual(['cline-pass/glm-5.3', 'cline-pass/kimi-k3']);
+    expect(parsed.contributions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          modelId: 'cline-pass/kimi-k3',
+          label: 'Kimi K3',
+        }),
+      ]),
+    );
   });
 
   it('projects only ClinePass models onto the ClinePass plan surface', () => {
     const parsed = parseClinePassCatalog(fixture('cline-pass.json'), surface('cline-pass'));
-    expect(parsed.models.map((model) => model.id).sort()).toEqual([
-      'cline-pass/glm-5.2',
-      'cline-pass/qwen3.7-max',
-    ]);
+    expect(parsed.models.map((model) => model.id).sort()).toEqual(['cline-pass/glm-5.2', 'cline-pass/qwen3.7-max']);
     expect(parsed.models.every((model) => model.id.startsWith('cline-pass/'))).toBe(true);
-    expect(parsed.contributions).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        modelId: 'cline-pass/qwen3.7-max',
-        label: 'Qwen3.7 Max',
-        availability: 'available',
-        route: expect.objectContaining({
-          protocol: 'OpenAICompatibleChatCompletions',
-          baseUrl: 'https://api.cline.bot/api/v1',
-        }),
-        // Live description advertises 1M; keep catalog-observation entitlement unknown until granted.
-        contextTiers: [expect.objectContaining({
-          id: 'default',
-          maxPromptTokens: 1_000_000,
-          entitlement: 'unknown',
-        })],
-        controls: expect.objectContaining({
-          maxContext: expect.objectContaining({
-            state: 'fixed',
-            fixedValue: true,
-            entitlement: 'unknown',
+    expect(parsed.contributions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          modelId: 'cline-pass/qwen3.7-max',
+          label: 'Qwen3.7 Max',
+          availability: 'available',
+          route: expect.objectContaining({
+            protocol: 'OpenAICompatibleChatCompletions',
+            baseUrl: 'https://api.cline.bot/api/v1',
+          }),
+          // Live description advertises 1M; keep catalog-observation entitlement unknown until granted.
+          contextTiers: [
+            expect.objectContaining({
+              id: 'default',
+              maxPromptTokens: 1_000_000,
+              entitlement: 'unknown',
+            }),
+          ],
+          controls: expect.objectContaining({
+            maxContext: expect.objectContaining({
+              state: 'fixed',
+              fixedValue: true,
+              entitlement: 'unknown',
+            }),
           }),
         }),
-      }),
-    ]));
+      ]),
+    );
   });
 
   it('projects OpenRouter live metadata on the OpenRouter route', () => {
@@ -280,7 +338,11 @@ describe('live Provider Catalog parsers', () => {
     expect(parseOpenRouterAccountCatalog(source.models).contributions).toEqual([
       expect.objectContaining({
         modelId: 'anthropic/claude-sonnet-4.6',
-        route: expect.objectContaining({ protocol: 'OpenRouterChatCompletions', baseUrl: 'https://openrouter.ai/api/v1', source: 'catalog' }),
+        route: expect.objectContaining({
+          protocol: 'OpenRouterChatCompletions',
+          baseUrl: 'https://openrouter.ai/api/v1',
+          source: 'catalog',
+        }),
         contextTiers: [expect.objectContaining({ maxPromptTokens: 1_000_000 })],
         toolCalling: { state: 'supported' },
         visionInput: { state: 'supported' },
@@ -291,11 +353,7 @@ describe('live Provider Catalog parsers', () => {
 
   it('parses account-visible ChatGPT ids without duplicating manifest controls', () => {
     const parsed = parseChatGptAccountCatalog(fixture('chatgpt-account.json'), CHATGPT_RETIREMENTS);
-    expect(parsed.models.map((model) => model.id)).toEqual([
-      'gpt-5.6-luna',
-      'gpt-5.6-sol',
-      'gpt-5.6-terra',
-    ]);
+    expect(parsed.models.map((model) => model.id)).toEqual(['gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra']);
     const sol = parsed.contributions.find((model) => model.modelId === 'gpt-5.6-sol');
     expect(sol?.visionInput).toBeUndefined();
     expect(sol).toMatchObject({
@@ -310,29 +368,48 @@ describe('live Provider Catalog parsers', () => {
     expect(sol?.executionBindings).toBeUndefined();
   });
 
-  it.each([undefined, ['text'], ['text', 'image']])('keeps ChatGPT structure manifest-owned for modalities %j', (input_modalities) => {
-    const parsed = parseChatGptAccountCatalog({ models: [
-      { slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true, input_modalities },
-    ] }, CHATGPT_RETIREMENTS);
-    expect(parsed.contributions[0].visionInput).toBeUndefined();
-    expect(parsed.contributions[0].toolCalling).toBeUndefined();
-    expect(parsed.contributions[0].structuredOutput).toBeUndefined();
-  });
+  it.each([undefined, ['text'], ['text', 'image']])(
+    'keeps ChatGPT structure manifest-owned for modalities %j',
+    (input_modalities) => {
+      const parsed = parseChatGptAccountCatalog(
+        { models: [{ slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true, input_modalities }] },
+        CHATGPT_RETIREMENTS,
+      );
+      expect(parsed.contributions[0].visionInput).toBeUndefined();
+      expect(parsed.contributions[0].toolCalling).toBeUndefined();
+      expect(parsed.contributions[0].structuredOutput).toBeUndefined();
+    },
+  );
 
   it('excludes retired, hidden and API-unavailable ChatGPT rows', () => {
-    const parsed = parseChatGptAccountCatalog({ models: [
-      { slug: 'hidden-model', visibility: 'hide', supported_in_api: true },
-      { slug: 'unavailable-model', visibility: 'list', supported_in_api: false },
-      { slug: 'gpt-5.5', visibility: 'list', supported_in_api: true },
-    ] }, CHATGPT_RETIREMENTS);
+    const parsed = parseChatGptAccountCatalog(
+      {
+        models: [
+          { slug: 'hidden-model', visibility: 'hide', supported_in_api: true },
+          { slug: 'unavailable-model', visibility: 'list', supported_in_api: false },
+          { slug: 'gpt-5.5', visibility: 'list', supported_in_api: true },
+        ],
+      },
+      CHATGPT_RETIREMENTS,
+    );
     expect(parsed.models).toEqual([]);
   });
 
   it('accepts a Codex Max window below one million when it is larger than the default', () => {
-    const parsed = parseChatGptAccountCatalog({ models: [{
-      slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true,
-      context_window: 272_000, max_context_window: 872_000,
-    }] }, CHATGPT_RETIREMENTS);
+    const parsed = parseChatGptAccountCatalog(
+      {
+        models: [
+          {
+            slug: 'gpt-5.6-sol',
+            visibility: 'list',
+            supported_in_api: true,
+            context_window: 272_000,
+            max_context_window: 872_000,
+          },
+        ],
+      },
+      CHATGPT_RETIREMENTS,
+    );
     expect(parsed.contributions[0].contextTiers).toEqual([
       expect.objectContaining({ id: 'default', maxPromptTokens: 272_000 }),
       expect.objectContaining({ id: 'max', maxPromptTokens: 872_000, entitlement: 'granted' }),
@@ -340,15 +417,30 @@ describe('live Provider Catalog parsers', () => {
   });
 
   it('keeps future account models structurally unknown while accepting explicit live windows', () => {
-    const parsed = parseChatGptAccountCatalog({ models: [{
-      slug: 'future-live-model', visibility: 'list', supported_in_api: true,
-      context_window: 256_000, max_context_window: 1_000_000,
-    }] }, CHATGPT_RETIREMENTS);
+    const parsed = parseChatGptAccountCatalog(
+      {
+        models: [
+          {
+            slug: 'future-live-model',
+            visibility: 'list',
+            supported_in_api: true,
+            context_window: 256_000,
+            max_context_window: 1_000_000,
+          },
+        ],
+      },
+      CHATGPT_RETIREMENTS,
+    );
     expect(parsed.contributions[0]).toMatchObject({
       modelId: 'future-live-model',
       contextTiers: [
         expect.objectContaining({ id: 'default', maxPromptTokens: 256_000, maxTotalTokens: 256_000 }),
-        expect.objectContaining({ id: 'max', maxPromptTokens: 1_000_000, maxTotalTokens: 1_000_000, entitlement: 'granted' }),
+        expect.objectContaining({
+          id: 'max',
+          maxPromptTokens: 1_000_000,
+          maxTotalTokens: 1_000_000,
+          entitlement: 'granted',
+        }),
       ],
     });
     expect(parsed.contributions[0].controls).toBeUndefined();
@@ -362,17 +454,35 @@ describe('live Provider Catalog parsers', () => {
   });
 
   it('uses only subscription observations and grants Max/Fast only from the same live catalog', () => {
-    const parsed = parseGrokBuilderCatalog({ models: {
-      'grok-4.7': { info: { id: 'grok-4.7', api_backend: 'responses', context_window: 256000, context_windows: [256000, 500000] } },
-      'grok-4.7-build-fast': { info: { id: 'grok-4.7-build-fast', api_backend: 'responses', context_window: 256000, context_windows: [256000, 500000] } },
-    } });
+    const parsed = parseGrokBuilderCatalog({
+      models: {
+        'grok-4.7': {
+          info: { id: 'grok-4.7', api_backend: 'responses', context_window: 256000, context_windows: [256000, 500000] },
+        },
+        'grok-4.7-build-fast': {
+          info: {
+            id: 'grok-4.7-build-fast',
+            api_backend: 'responses',
+            context_window: 256000,
+            context_windows: [256000, 500000],
+          },
+        },
+      },
+    });
     expect(parsed.models.map((model) => model.id)).toEqual(['grok-4.7', 'grok-4.7-build-fast']);
     expect(parsed.contributions.find((model) => model.modelId === 'grok-4.7')).toMatchObject({
       controls: { maxContext: { entitlement: 'granted' }, fast: { entitlement: 'granted' } },
-      contextTiers: [expect.objectContaining({ maxPromptTokens: 256000 }), expect.objectContaining({ maxPromptTokens: 500000 })],
+      contextTiers: [
+        expect.objectContaining({ maxPromptTokens: 256000 }),
+        expect.objectContaining({ maxPromptTokens: 500000 }),
+      ],
     });
-    const restricted = parseGrokBuilderCatalog({ models: [{ id: 'grok-4.7', api_backend: 'responses', context_window: 256000, context_windows: [256000] }] });
-    expect(restricted.contributions[0]).toMatchObject({ controls: { maxContext: { entitlement: 'denied' }, fast: { entitlement: 'denied' } } });
+    const restricted = parseGrokBuilderCatalog({
+      models: [{ id: 'grok-4.7', api_backend: 'responses', context_window: 256000, context_windows: [256000] }],
+    });
+    expect(restricted.contributions[0]).toMatchObject({
+      controls: { maxContext: { entitlement: 'denied' }, fast: { entitlement: 'denied' } },
+    });
   });
 
   it('admits Composer 2.5 from every supported Builder envelope without inventing Fast mode', () => {
@@ -399,17 +509,18 @@ describe('live Provider Catalog parsers', () => {
         admittedCount: 1,
         filtered: { invalidIdentity: 0, hidden: 0, unsupportedInApi: 0 },
       });
-      expect(parsed.contributions).toEqual([expect.objectContaining({
-        modelId: 'grok-composer-2.5-fast',
-        label: 'Composer 2.5',
-        selection: { pickerVisibility: 'primary' },
-        defaultBudgetTokens: 200_000,
-        controls: expect.objectContaining({
-          fast: { state: 'unsupported', fixedValue: false },
-          maxContext: { state: 'unsupported', fixedValue: false },
+      expect(parsed.contributions).toEqual([
+        expect.objectContaining({
+          modelId: 'grok-composer-2.5-fast',
+          label: 'Composer 2.5',
+          selection: { pickerVisibility: 'primary' },
+          defaultBudgetTokens: 200_000,
+          controls: expect.objectContaining({
+            fast: { state: 'unsupported', fixedValue: false },
+            maxContext: { state: 'unsupported', fixedValue: false },
+          }),
         }),
-      })]);
-
+      ]);
     }
   });
   it('keeps compiled Kimi output caps unless live reports a positive max output', () => {
@@ -419,17 +530,34 @@ describe('live Provider Catalog parsers', () => {
     if (!k3 || !defaultTier) throw new Error('Missing Kimi K3 compiled default tier');
     defaultTier.maxOutputTokens = 32_000;
 
-    const without = parseKimiCodeCatalogWithSurface({ data: [{
-      id: 'k3', context_length: 256_000,
-    }] }, surface).contributions[0];
+    const without = parseKimiCodeCatalogWithSurface(
+      {
+        data: [
+          {
+            id: 'k3',
+            context_length: 256_000,
+          },
+        ],
+      },
+      surface,
+    ).contributions[0];
     expect(without.contextTiers?.find((tier) => tier.id === 'default')).toMatchObject({
       maxPromptTokens: 256_000,
       maxOutputTokens: 32_000,
     });
 
-    const withOutput = parseKimiCodeCatalogWithSurface({ data: [{
-      id: 'k3', context_length: 256_000, max_output_tokens: 8_000,
-    }] }, surface).contributions[0];
+    const withOutput = parseKimiCodeCatalogWithSurface(
+      {
+        data: [
+          {
+            id: 'k3',
+            context_length: 256_000,
+            max_output_tokens: 8_000,
+          },
+        ],
+      },
+      surface,
+    ).contributions[0];
     expect(withOutput.contextTiers?.find((tier) => tier.id === 'default')).toMatchObject({
       maxPromptTokens: 256_000,
       maxOutputTokens: 8_000,
@@ -437,75 +565,110 @@ describe('live Provider Catalog parsers', () => {
   });
 
   it('writes ChatGPT output caps only when the live row reports them', () => {
-    const parsed = parseChatGptAccountCatalog({ models: [{
-      slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true,
-      context_window: 272_000,
-    }] }, CHATGPT_RETIREMENTS);
-    expect(parsed.contributions[0].contextTiers?.[0]).toEqual(expect.objectContaining({
-      maxPromptTokens: 272_000,
-    }));
+    const parsed = parseChatGptAccountCatalog(
+      {
+        models: [
+          {
+            slug: 'gpt-5.6-sol',
+            visibility: 'list',
+            supported_in_api: true,
+            context_window: 272_000,
+          },
+        ],
+      },
+      CHATGPT_RETIREMENTS,
+    );
+    expect(parsed.contributions[0].contextTiers?.[0]).toEqual(
+      expect.objectContaining({
+        maxPromptTokens: 272_000,
+      }),
+    );
     expect(parsed.contributions[0].contextTiers?.[0]).not.toHaveProperty('maxOutputTokens');
 
-    const withOutput = parseChatGptAccountCatalog({ models: [{
-      slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true,
-      context_window: 272_000, max_output_tokens: 16_384,
-    }] }, CHATGPT_RETIREMENTS);
+    const withOutput = parseChatGptAccountCatalog(
+      {
+        models: [
+          {
+            slug: 'gpt-5.6-sol',
+            visibility: 'list',
+            supported_in_api: true,
+            context_window: 272_000,
+            max_output_tokens: 16_384,
+          },
+        ],
+      },
+      CHATGPT_RETIREMENTS,
+    );
     expect(withOutput.contributions[0].contextTiers).toEqual([
       expect.objectContaining({ id: 'default', maxPromptTokens: 272_000, maxOutputTokens: 16_384 }),
     ]);
   });
 
   it('filters generated media and hidden subscription models', () => {
-    const parsed = parseGrokBuilderCatalog({ models: [
-      { id: 'grok-4.7', api_backend: 'responses', context_window: 256000 },
-      { id: 'grok-4.6', hidden: true },
-      { id: 'grok-image-1', modality: 'image' },
-      { id: 'grok-imagine-video-1.5', output_modalities: ['video'] },
-    ] });
+    const parsed = parseGrokBuilderCatalog({
+      models: [
+        { id: 'grok-4.7', api_backend: 'responses', context_window: 256000 },
+        { id: 'grok-4.6', hidden: true },
+        { id: 'grok-image-1', modality: 'image' },
+        { id: 'grok-imagine-video-1.5', output_modalities: ['video'] },
+      ],
+    });
     expect(parsed.models.map((model) => model.id)).toEqual(['grok-4.7']);
     expect(parsed.diagnostic?.complete).toBe(true);
   });
 
-  it.each([
-    { models: [{ id: 'grok-4.7' }], next_cursor: 'next' },
-    { models: [{ id: 'grok-4.7' }, {}] },
-  ])('does not treat an incomplete Grok payload as authority for absent models', payload => {
-    expect(parseGrokBuilderCatalog(payload).diagnostic?.complete).toBe(false);
-  });
+  it.each([{ models: [{ id: 'grok-4.7' }], next_cursor: 'next' }, { models: [{ id: 'grok-4.7' }, {}] }])(
+    'does not treat an incomplete Grok payload as authority for absent models',
+    (payload) => {
+      expect(parseGrokBuilderCatalog(payload).diagnostic?.complete).toBe(false);
+    },
+  );
 });
-
 
 it('grants only manifest-declared ChatGPT Max controls from explicit current-account windows', async () => {
   const surface = await loadProviderSurface('chatgpt-account');
-  const parsed = parseChatGptAccountCatalog({ models: [{ slug: 'gpt-6.1-terra', context_window: 500000, max_context_window: 872000 }] }, surface!);
+  const parsed = parseChatGptAccountCatalog(
+    { models: [{ slug: 'gpt-6.1-terra', context_window: 500000, max_context_window: 872000 }] },
+    surface!,
+  );
   expect(parsed.contributions[0]).toMatchObject({
     controls: { maxContext: { state: 'selectable', tierId: 'max', entitlement: 'granted' } },
-    contextTiers: [ { id: 'default', maxTotalTokens: 500000 }, { id: 'max', maxTotalTokens: 872000, entitlement: 'granted' } ],
+    contextTiers: [
+      { id: 'default', maxTotalTokens: 500000 },
+      { id: 'max', maxTotalTokens: 872000, entitlement: 'granted' },
+    ],
   });
 });
-
 
 it('aligns fixed Max entitlement with the explicitly observed default window', async () => {
   await loadProviderSurface('kimi-coding-plan');
   const parsed = parseKimiCodeCatalog({ data: [{ id: 'kimi-for-coding', context_length: 1048576 }] });
-  expect(parsed.contributions.find(m => m.modelId === 'kimi-for-coding')).toMatchObject({
+  expect(parsed.contributions.find((m) => m.modelId === 'kimi-for-coding')).toMatchObject({
     controls: { maxContext: { state: 'fixed', entitlement: 'granted' } },
     contextTiers: [{ id: 'default', entitlement: 'granted' }],
   });
 });
 
 describe('local Ollama installed models', () => {
-  const tags = { models: [
-    { name: 'qwen3:4b', model: 'qwen3:4b', details: { family: 'qwen3' } },
-    { name: 'llava:7b', model: 'llava:7b' },
-    { name: 'mystery:1b', model: 'mystery:1b' },
-  ] };
+  const tags = {
+    models: [
+      { name: 'qwen3:4b', model: 'qwen3:4b', details: { family: 'qwen3' } },
+      { name: 'llava:7b', model: 'llava:7b' },
+      { name: 'mystery:1b', model: 'mystery:1b' },
+    ],
+  };
   const shows = new Map<string, unknown>([
-    ['qwen3:4b', { capabilities: ['completion', 'tools', 'thinking'], model_info: { 'general.architecture': 'qwen3', 'qwen3.context_length': 40960 } }],
+    [
+      'qwen3:4b',
+      {
+        capabilities: ['completion', 'tools', 'thinking'],
+        model_info: { 'general.architecture': 'qwen3', 'qwen3.context_length': 40960 },
+      },
+    ],
     ['llava:7b', { capabilities: ['completion', 'vision'], model_info: { 'llama.context_length': 4096 } }],
   ]);
 
-  it('takes availability, tool calling, image input and context window from the runtime\'s own facts', () => {
+  it("takes availability, tool calling, image input and context window from the runtime's own facts", () => {
     const parsed = parseOllamaInstalledModels(tags, shows, surface('ollama'));
     const byId = new Map(parsed.contributions.map((model) => [model.modelId, model]));
     expect(parsed.models.map((model) => model.id)).toEqual(['llava:7b', 'mystery:1b', 'qwen3:4b']);
@@ -517,13 +680,17 @@ describe('local Ollama installed models', () => {
       contextTiers: [{ maxPromptTokens: 40960 }],
       controls: { reasoning: { kind: 'toggle', supportsOff: true, defaultSelection: 'on' } },
     });
-    expect(byId.get('llava:7b')).toMatchObject({ toolCalling: { state: 'unsupported' }, visionInput: { state: 'supported' } });
+    expect(byId.get('llava:7b')).toMatchObject({
+      toolCalling: { state: 'unsupported' },
+      visionInput: { state: 'supported' },
+    });
     expect(byId.get('llava:7b')).not.toHaveProperty('controls');
   });
 
   it('keeps a model whose facts could not be read listed with unknown capabilities', () => {
-    const mystery = parseOllamaInstalledModels(tags, shows, surface('ollama')).contributions
-      .find((model) => model.modelId === 'mystery:1b');
+    const mystery = parseOllamaInstalledModels(tags, shows, surface('ollama')).contributions.find(
+      (model) => model.modelId === 'mystery:1b',
+    );
     expect(mystery).toMatchObject({ availability: 'available' });
     expect(mystery).not.toHaveProperty('toolCalling');
     expect(mystery).not.toHaveProperty('defaultBudgetTokens');

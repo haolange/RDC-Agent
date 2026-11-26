@@ -50,30 +50,27 @@ export const collectReadableText = (value: unknown, maxLines = 6): string[] => {
 
 const collectContentArray = (value: unknown, maxLines = 6): string[] => {
   if (!value || typeof value !== 'object') return [];
-  const content = Array.isArray(value)
-    ? value
-    : (value as Record<string, unknown>).content;
+  const content = Array.isArray(value) ? value : (value as Record<string, unknown>).content;
   if (!Array.isArray(content)) return [];
 
-  return content.flatMap((item) => {
-    if (item && typeof item === 'object') {
-      return createDetailLines(stringifyPreview((item as Record<string, unknown>).text), maxLines);
-    }
-    return createDetailLines(stringifyPreview(item), maxLines);
-  }).slice(0, maxLines);
+  return content
+    .flatMap((item) => {
+      if (item && typeof item === 'object') {
+        return createDetailLines(stringifyPreview((item as Record<string, unknown>).text), maxLines);
+      }
+      return createDetailLines(stringifyPreview(item), maxLines);
+    })
+    .slice(0, maxLines);
 };
 
-export const toRecord = (value: unknown): Record<string, unknown> | null => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null
-);
+export const toRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 
-export const readNestedValue = (record: Record<string, unknown>, path: string[]): unknown => (
-  path.reduce<unknown>((current, key) => (
-    current && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined
-  ), record)
-);
+export const readNestedValue = (record: Record<string, unknown>, path: string[]): unknown =>
+  path.reduce<unknown>(
+    (current, key) => (current && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined),
+    record,
+  );
 
 export const readNestedString = (record: Record<string, unknown>, path: string[]): string => {
   const value = readNestedValue(record, path);
@@ -188,7 +185,7 @@ const decodeJsonStringFragment = (value: string): string => {
   }
 };
 
-const decodeEscapedText = (value: string): string => (
+const decodeEscapedText = (value: string): string =>
   value
     .replace(/\\\\n/g, '\n')
     .replace(/\\\\r/g, '\r')
@@ -197,8 +194,7 @@ const decodeEscapedText = (value: string): string => (
     .replace(/\\r/g, '\r')
     .replace(/\\t/g, '\t')
     .replace(/\\+"/g, '"')
-    .replace(/\\\\/g, '\\')
-);
+    .replace(/\\\\/g, '\\');
 
 /** A session file address is the runtime's receipt, never something a person reads on a card or in its details. */
 export const isInternalAddress = (value: string): boolean => /^session:\/\//i.test(value.trim());

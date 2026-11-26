@@ -5,20 +5,28 @@ const require = createRequire(import.meta.url);
 const entry = require.resolve('style-mod', { paths: [require.resolve('@codemirror/view')] });
 const { StyleModule } = require(entry) as {
   StyleModule: {
-    new(spec: Record<string, Record<string, string>>): unknown;
+    new (spec: Record<string, Record<string, string>>): unknown;
     mount(root: unknown, modules: unknown[]): void;
   };
 };
 
 class ConstructedSheet {
   rules: string[] = [];
-  insertRule(rule: string, index: number) { this.rules.splice(index, 0, rule); }
+  insertRule(rule: string, index: number) {
+    this.rules.splice(index, 0, rule);
+  }
 }
 
 function documentRoot() {
   return {
-    head: { insertBefore: vi.fn(() => { throw new Error('CSP forbids inline style'); }) },
-    createElement: vi.fn(() => { throw new Error('Must not create inline style'); }),
+    head: {
+      insertBefore: vi.fn(() => {
+        throw new Error('CSP forbids inline style');
+      }),
+    },
+    createElement: vi.fn(() => {
+      throw new Error('Must not create inline style');
+    }),
     defaultView: { CSSStyleSheet: ConstructedSheet },
     adoptedStyleSheets: [] as ConstructedSheet[],
   };
@@ -44,7 +52,8 @@ describe('CodeMirror style module under strict desktop CSP', () => {
     StyleModule.mount(shadow, [first, second]);
     expect(shadow.adoptedStyleSheets[0]).toBe(root.adoptedStyleSheets[0]);
     expect(shadow.adoptedStyleSheets[0].rules).toEqual([
-      '.editor {color: inherit;}', '.editor {color: var(--token-text-secondary);}',
+      '.editor {color: inherit;}',
+      '.editor {color: var(--token-text-secondary);}',
     ]);
     expect(root.createElement).not.toHaveBeenCalled();
   });

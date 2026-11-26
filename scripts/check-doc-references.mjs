@@ -23,12 +23,16 @@ function walk(directory, out = []) {
 }
 
 const documents = [
-  'AGENTS.md', 'ARCHITECTURE.md', 'DESIGN.md',
+  'AGENTS.md',
+  'ARCHITECTURE.md',
+  'DESIGN.md',
   ...walk('docs').filter((file) => file.endsWith('.md') && !file.endsWith('acceptance-ledger.md')),
   ...walk('src').filter((file) => file.endsWith('README.md')),
 ];
 const channelSource = fs.readFileSync(path.join(root, 'src/shared/renderer-api/channels.ts'), 'utf8');
-const channels = new Set([...channelSource.matchAll(/['"]([a-z][A-Za-z]+:[A-Za-z:.-]+)['"]/g)].map((match) => match[1]));
+const channels = new Set(
+  [...channelSource.matchAll(/['"]([a-z][A-Za-z]+:[A-Za-z:.-]+)['"]/g)].map((match) => match[1]),
+);
 const channelNamespaces = new Set([...channels].map((channel) => channel.split(':')[0]));
 
 const problems = [];
@@ -37,7 +41,9 @@ for (const document of documents) {
   lines.forEach((line, index) => {
     if (NEGATED.test(line)) return;
     const where = `${document}:${index + 1}`;
-    for (const match of line.matchAll(/`((?:src|scripts|docs|resources|designs|\.github)\/[A-Za-z0-9_./\-[\]]+?)(?::(\d+)(?:-(\d+))?)?`/g)) {
+    for (const match of line.matchAll(
+      /`((?:src|scripts|docs|resources|designs|\.github)\/[A-Za-z0-9_./\-[\]]+?)(?::(\d+)(?:-(\d+))?)?`/g,
+    )) {
       const target = match[1].replace(/[.,]$/, '');
       if (/[*{}<>]/.test(target)) continue;
       if (!fs.existsSync(path.join(root, target))) problems.push(`${where} missing path ${target}`);
@@ -48,12 +54,14 @@ for (const document of documents) {
     }
     for (const match of line.matchAll(/\]\((?!https?:|#|mailto:)([^)#\s]+)(?:#[^)]*)?\)/g)) {
       const target = path.posix.normalize(path.posix.join(path.posix.dirname(document), match[1]));
-      if (!target.startsWith('..') && !fs.existsSync(path.join(root, target))) problems.push(`${where} broken link ${match[1]}`);
+      if (!target.startsWith('..') && !fs.existsSync(path.join(root, target)))
+        problems.push(`${where} broken link ${match[1]}`);
     }
     if (IPC_CONTEXT.test(line)) {
       for (const match of line.matchAll(/`([a-z][A-Za-z]+:[a-z][A-Za-z]+(?::[A-Za-z]+)?)`/g)) {
         const channel = match[1];
-        if (channelNamespaces.has(channel.split(':')[0]) && !channels.has(channel)) problems.push(`${where} unknown IPC channel ${channel}`);
+        if (channelNamespaces.has(channel.split(':')[0]) && !channels.has(channel))
+          problems.push(`${where} unknown IPC channel ${channel}`);
       }
     }
   });

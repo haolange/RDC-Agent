@@ -25,7 +25,9 @@ export const MarkdownCodeBlock: React.FC<MarkdownCodeBlockProps> = ({ language, 
   const [folded, setFolded] = useState(foldable);
   const [wrapped, setWrapped] = useState(false);
   const label = language.trim() || t('chat.markdownCodePlain');
-  const className = ['markdown-code-block', wrapped ? 'is-wrapped' : '', foldable && folded ? 'is-folded' : ''].filter(Boolean).join(' ');
+  const className = ['markdown-code-block', wrapped ? 'is-wrapped' : '', foldable && folded ? 'is-folded' : '']
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div className={className} data-testid="markdown-code-block">
@@ -33,17 +35,32 @@ export const MarkdownCodeBlock: React.FC<MarkdownCodeBlockProps> = ({ language, 
         <span className="markdown-code-block-lang">{label}</span>
         {fileName ? <OverflowFade className="markdown-code-block-file" text={fileName} /> : null}
         <span className="markdown-code-block-actions">
-          <IconButton size="sm" label={t('chat.markdownCodeWrap')} aria-pressed={wrapped} data-tooltip={t('chat.markdownCodeWrap')}
-            className="markdown-code-block-wrap" onClick={() => setWrapped((value) => !value)}>
+          <IconButton
+            size="sm"
+            label={t('chat.markdownCodeWrap')}
+            aria-pressed={wrapped}
+            data-tooltip={t('chat.markdownCodeWrap')}
+            className="markdown-code-block-wrap"
+            onClick={() => setWrapped((value) => !value)}
+          >
             <Icon name="wrap" size={14} />
           </IconButton>
-          <CopyButton className="markdown-code-block-copy" onCopy={() => copyText(code)}
-            label={t('chat.markdownCopyCode')} copiedLabel={t('chat.markdownCopied')} />
+          <CopyButton
+            className="markdown-code-block-copy"
+            onCopy={() => copyText(code)}
+            label={t('chat.markdownCopyCode')}
+            copiedLabel={t('chat.markdownCopied')}
+          />
         </span>
       </div>
       <pre className="markdown-code-block-pre">{children}</pre>
       {foldable ? (
-        <button type="button" className="markdown-code-block-fold" aria-expanded={!folded} onClick={() => setFolded((value) => !value)}>
+        <button
+          type="button"
+          className="markdown-code-block-fold"
+          aria-expanded={!folded}
+          onClick={() => setFolded((value) => !value)}
+        >
           {folded ? t('chat.markdownCodeExpand', { count: lineCount }) : t('chat.markdownCodeCollapse')}
         </button>
       ) : null}

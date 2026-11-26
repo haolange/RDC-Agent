@@ -13,8 +13,9 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const releaseDir = path.join(repoRoot, 'release');
 const outputName = 'SHA256SUMS.txt';
-const hasDistribution = existsSync(releaseDir)
-  && readdirSync(releaseDir).some(name => /\.(exe|zip|dmg|AppImage|deb|rpm|msi|pkg)$/i.test(name));
+const hasDistribution =
+  existsSync(releaseDir) &&
+  readdirSync(releaseDir).some((name) => /\.(exe|zip|dmg|AppImage|deb|rpm|msi|pkg)$/i.test(name));
 
 function hashFile(absolute, relative) {
   const digest = createHash('sha256').update(readFileSync(absolute)).digest('hex');
@@ -25,17 +26,18 @@ function listArtifactFiles(dir, prefix = '') {
   if (!existsSync(dir)) return [];
   const entries = [];
   for (const name of readdirSync(dir).sort()) {
-    if (name === outputName || name.endsWith('.sha256') || name === 'sbom.cdx.json' || name === 'builder-debug.yml') continue;
+    if (name === outputName || name.endsWith('.sha256') || name === 'sbom.cdx.json' || name === 'builder-debug.yml')
+      continue;
     const absolute = path.join(dir, name);
     const relative = prefix ? `${prefix}/${name}` : name;
     const stats = statSync(absolute);
     if (stats.isDirectory()) {
       if (
-        name.endsWith('-unpacked')
-        || name === 'mac'
-        || name === 'mac-arm64'
-        || name === 'win-unpacked'
-        || name === 'linux-unpacked'
+        name.endsWith('-unpacked') ||
+        name === 'mac' ||
+        name === 'mac-arm64' ||
+        name === 'win-unpacked' ||
+        name === 'linux-unpacked'
       ) {
         if (hasDistribution) continue; // Public checksum list must not reference local-only unpacked files.
         // --dir packs: hash the primary executable inside unpacked trees.
@@ -56,10 +58,10 @@ function listArtifactFiles(dir, prefix = '') {
     }
     if (!stats.isFile()) continue;
     if (
-      /\.(exe|dmg|AppImage|zip|blockmap|yml|yaml|deb|rpm|msi|pkg|7z|tar\.gz)$/i.test(name)
-      || name === 'latest.yml'
-      || name === 'latest-mac.yml'
-      || name === 'latest-linux.yml'
+      /\.(exe|dmg|AppImage|zip|blockmap|yml|yaml|deb|rpm|msi|pkg|7z|tar\.gz)$/i.test(name) ||
+      name === 'latest.yml' ||
+      name === 'latest-mac.yml' ||
+      name === 'latest-linux.yml'
     ) {
       entries.push(hashFile(absolute, relative));
     }

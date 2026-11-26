@@ -25,9 +25,12 @@ vi.mock('../../settings/provider-catalog/EffectiveModelResolver', () => ({
 
 vi.mock('../../settings/settings-core/SettingsService', () => ({
   settingsService: {
-    snapshot: vi.fn(() => ({ revision: 1, user: {
-      agentRuntime: { context: { compactionThresholdPercent: 80 } },
-    } })),
+    snapshot: vi.fn(() => ({
+      revision: 1,
+      user: {
+        agentRuntime: { context: { compactionThresholdPercent: 80 } },
+      },
+    })),
     providerConnections: { get: () => undefined, list: () => [] },
   },
 }));
@@ -118,10 +121,21 @@ describe('DebuggerLlmService cache aggregation', () => {
   });
 
   it('retains reported zero values and leaves unreported telemetry absent', () => {
-    const turn = { turnId: 'turn_free', sessionId: 'sess_free', providerId: 'provider', modelId: 'model',
-      inputTokens: 12, outputTokens: 1, precomputedBreakdown: [] };
-    service.recordAgentTurnUsage({ ...turn, reasoningTokens: 0, cacheReadTokens: 0,
-      cost: { input: 0, output: 0, total: 0 } });
+    const turn = {
+      turnId: 'turn_free',
+      sessionId: 'sess_free',
+      providerId: 'provider',
+      modelId: 'model',
+      inputTokens: 12,
+      outputTokens: 1,
+      precomputedBreakdown: [],
+    };
+    service.recordAgentTurnUsage({
+      ...turn,
+      reasoningTokens: 0,
+      cacheReadTokens: 0,
+      cost: { input: 0, output: 0, total: 0 },
+    });
     service.recordAgentTurnUsage(turn);
     const { usage } = service.getSessionContextUsage({ sessionId: turn.sessionId });
     expect(usage).toMatchObject({ cumulativeCost: 0, reasoningTokens: 0, cacheReadTokens: 0 });
@@ -268,5 +282,4 @@ describe('DebuggerLlmService cache aggregation', () => {
       usagePercent: 0,
     });
   });
-
 });

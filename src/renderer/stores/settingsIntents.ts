@@ -25,7 +25,11 @@ const withPatchView = (settings: AppSettings, view: SettingsPatchView): AppSetti
   agents: { ...settings.agents, globalInstructions: view.globalInstructions },
 });
 
-function applyChanges(view: SettingsPatchView, changed: SettingsPatchChanges, ops: readonly SettingsPatchOp[]): SettingsPatchView {
+function applyChanges(
+  view: SettingsPatchView,
+  changed: SettingsPatchChanges,
+  ops: readonly SettingsPatchOp[],
+): SettingsPatchView {
   const instructions = [...ops].reverse().find((op) => op.op === 'globalInstructions');
   return {
     appearance: changed.appearance ?? view.appearance,
@@ -35,21 +39,24 @@ function applyChanges(view: SettingsPatchView, changed: SettingsPatchChanges, op
     agentRuntime: changed.agentRuntime ?? view.agentRuntime,
     agentModels: changed.agentModels ? applyAgentModelChanges(view.agentModels, changed.agentModels) : view.agentModels,
     // Main stores the instructions as sent (normalized); the committed text is the one the op carried.
-    globalInstructions: changed.globalInstructions && instructions
-      ? applySettingsPatchOps(view, [instructions]).globalInstructions
-      : view.globalInstructions,
+    globalInstructions:
+      changed.globalInstructions && instructions
+        ? applySettingsPatchOps(view, [instructions]).globalInstructions
+        : view.globalInstructions,
   };
 }
 
 /** A `settings:patch` shown before main answers: its ops replayed on the settings, in order. */
-export const patchOverlay = (ops: readonly SettingsPatchOp[]): SettingsOverlay => (settings) => (
-  withPatchView(settings, applySettingsPatchOps(patchViewOf(settings), ops))
-);
+export const patchOverlay =
+  (ops: readonly SettingsPatchOp[]): SettingsOverlay =>
+  (settings) =>
+    withPatchView(settings, applySettingsPatchOps(patchViewOf(settings), ops));
 
 /** What main committed for a `settings:patch`: the sections it reported changed. */
-export const patchCommit = (ops: readonly SettingsPatchOp[], result: SettingsPatchResult): SettingsOverlay => (settings) => (
-  withPatchView(settings, applyChanges(patchViewOf(settings), result.changed, ops))
-);
+export const patchCommit =
+  (ops: readonly SettingsPatchOp[], result: SettingsPatchResult): SettingsOverlay =>
+  (settings) =>
+    withPatchView(settings, applyChanges(patchViewOf(settings), result.changed, ops));
 
 /**
  * The renderer's settings: what main confirmed, at the settings revision it confirmed it, with every intent still in

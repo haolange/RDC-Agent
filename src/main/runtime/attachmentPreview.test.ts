@@ -11,7 +11,8 @@ describe('assertAttachmentPreviewPath', () => {
   });
 
   it('rejects path escape attempts', () => {
-    expect(() => assertAttachmentPreviewPath(root, path.join(root, '..', 'secret.png')))
-      .toThrow('IMAGE_PREVIEW_PATH_ESCAPE');
+    expect(() => assertAttachmentPreviewPath(root, path.join(root, '..', 'secret.png'))).toThrow(
+      'IMAGE_PREVIEW_PATH_ESCAPE',
+    );
   });
 });

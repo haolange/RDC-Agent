@@ -16,10 +16,7 @@ export function deviceIdentityKey(device: ReplayDeviceEntry): string {
   });
 }
 
-export function devicesSemanticallyEqual(
-  previous: ReplayDeviceEntry[],
-  next: ReplayDeviceEntry[],
-): boolean {
+export function devicesSemanticallyEqual(previous: ReplayDeviceEntry[], next: ReplayDeviceEntry[]): boolean {
   if (previous.length !== next.length) {
     return false;
   }

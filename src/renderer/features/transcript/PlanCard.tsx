@@ -23,7 +23,10 @@ export const PlanCard: React.FC<{
   const readButton = useRef<HTMLElement>(null);
   const preview = planPreview(plan);
   const { previewRef, overflowing } = usePlanPreviewOverflow(preview);
-  const showPlan = () => { readButton.current?.focus(); onOpen(plan); };
+  const showPlan = () => {
+    readButton.current?.focus();
+    onOpen(plan);
+  };
 
   return (
     <>
@@ -50,7 +53,9 @@ export const PlanCard: React.FC<{
           <span>{t('chat.planReviewProcessKind')}</span>
           <span>{t(STATUS_KEY[plan.status])}</span>
         </div>
-        <h3 className="plan-card__title" data-tooltip={plan.title} data-work-node-prose>{plan.title}</h3>
+        <h3 className="plan-card__title" data-tooltip={plan.title} data-work-node-prose>
+          {plan.title}
+        </h3>
         <div ref={previewRef} className={`plan-card__preview${overflowing ? ' is-overflowing' : ''}`}>
           <MessageMarkdown content={preview} deferHeavyPlugins interactive={false} />
         </div>

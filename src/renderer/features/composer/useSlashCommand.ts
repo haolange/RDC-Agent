@@ -34,11 +34,14 @@ export function useSlashCommand(
     setVisible(promptValue.trim().startsWith('/') && promptValue.trim().length <= 40);
   }, [promptValue]);
 
-  const onSelect = useCallback((commandName: string) => {
-    setVisible(false);
-    setPromptValue('');
-    void onSendCommand(commandName);
-  }, [setPromptValue, onSendCommand]);
+  const onSelect = useCallback(
+    (commandName: string) => {
+      setVisible(false);
+      setPromptValue('');
+      void onSendCommand(commandName);
+    },
+    [setPromptValue, onSendCommand],
+  );
 
   const onDismiss = useCallback(() => {
     setVisible(false);

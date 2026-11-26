@@ -49,9 +49,8 @@ const traceMetaOf = (trace: ConversationWorkTrace): Omit<ConversationWorkTrace, 
   return meta;
 };
 
-const sameBlockOrder = (ids: readonly string[], blocks: readonly ConversationWorkBlock[]): boolean => (
-  ids.length === blocks.length && blocks.every((block, index) => block.id === ids[index])
-);
+const sameBlockOrder = (ids: readonly string[], blocks: readonly ConversationWorkBlock[]): boolean =>
+  ids.length === blocks.length && blocks.every((block, index) => block.id === ids[index]);
 
 /**
  * The fields of `message` as sent now, and which of them changed. A value that is the same object (or the same
@@ -183,7 +182,7 @@ export function applyConversationMessageDelta(
     if (delta.baseSeq !== 0) next.workTrace = base?.workTrace;
     return next;
   }
-  const previousTrace = delta.baseSeq === 0 ? undefined : base?.workTrace ?? undefined;
+  const previousTrace = delta.baseSeq === 0 ? undefined : (base?.workTrace ?? undefined);
   const changed = new Map(delta.trace.blocks.map((block) => [block.id, block]));
   const previousBlocks = new Map((previousTrace?.blocks ?? []).map((block) => [block.id, block]));
   const order = delta.trace.blockIds ?? (previousTrace?.blocks ?? []).map((block) => block.id);

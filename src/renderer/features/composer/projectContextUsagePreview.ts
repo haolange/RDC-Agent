@@ -13,10 +13,12 @@ export function shouldProjectContextUsagePreview(
   usage: RunContextUsageSummary,
   profile: SelectedContextProfile,
 ): boolean {
-  return usage.providerId !== profile.providerId
-    || usage.modelId !== profile.modelId
-    || usage.promptBudgetTokens !== profile.contextBudgetTokens
-    || usage.compactionThresholdTokens !== profile.compactionThresholdTokens;
+  return (
+    usage.providerId !== profile.providerId ||
+    usage.modelId !== profile.modelId ||
+    usage.promptBudgetTokens !== profile.contextBudgetTokens ||
+    usage.compactionThresholdTokens !== profile.compactionThresholdTokens
+  );
 }
 
 function rescaleBreakdown(
@@ -26,9 +28,7 @@ function rescaleBreakdown(
 ): RunContextUsageSummary['breakdown'] {
   if (breakdown === null) return null;
   const freeTokens = Math.max(0, denom - occupiedTokens);
-  const next = breakdown.map((entry) => (
-    entry.id === 'free' ? { ...entry, tokens: freeTokens } : entry
-  ));
+  const next = breakdown.map((entry) => (entry.id === 'free' ? { ...entry, tokens: freeTokens } : entry));
   if (!next.some((entry) => entry.id === 'free')) {
     next.push({ id: 'free', tokens: freeTokens });
   }
@@ -49,9 +49,7 @@ export function projectContextUsagePreview(
 
   const denom = profile.contextBudgetTokens;
   const occupiedTokens = usage.occupiedTokens;
-  const usagePercent = denom > 0
-    ? Math.min(100, Math.max(0, Math.round((occupiedTokens / denom) * 100)))
-    : 0;
+  const usagePercent = denom > 0 ? Math.min(100, Math.max(0, Math.round((occupiedTokens / denom) * 100))) : 0;
 
   return {
     estimated: true,

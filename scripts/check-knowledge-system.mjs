@@ -1,5 +1,10 @@
 #!/usr/bin/env node
-import { defaultRepoRoot, isDirectInvocation, printForbiddenCheck, runForbiddenCheck } from './lib/forbiddenSourceRules.mjs';
+import {
+  defaultRepoRoot,
+  isDirectInvocation,
+  printForbiddenCheck,
+  runForbiddenCheck,
+} from './lib/forbiddenSourceRules.mjs';
 
 const EMBEDDING_RUNTIME_FORBIDDEN = [
   ['Embedd', 'ingExecutionService'].join(''),
@@ -30,7 +35,7 @@ const FORBIDDEN_RULES = [
   {
     id: 'knowledge.forbidden.browse.channels',
     file: 'src/shared/renderer-api/channels.ts',
-    pattern: "knowledge:listSpaces",
+    pattern: 'knowledge:listSpaces',
     probe: 'source-pattern',
     note: 'browse-only renderer channels are forbidden',
   },
@@ -51,7 +56,7 @@ const FORBIDDEN_RULES = [
   {
     id: 'knowledge.forbidden.browse.coverage-exclusion',
     file: 'vitest.config.ts',
-    pattern: "src/main/runtime/KnowledgeBrowseService.ts",
+    pattern: 'src/main/runtime/KnowledgeBrowseService.ts',
     probe: 'source-pattern',
     note: 'coverage exclusion for browse-only service is forbidden',
   },
@@ -97,13 +102,18 @@ const FORBIDDEN_RULES = [
     includeTests: true,
     pattern: EMBEDDING_RUNTIME_FORBIDDEN,
     probe: 'walk-path-and-content',
-    unlessPattern: "NON_AGENT_MODALITIES[\\s\\S]{0,120}'embedding'[\\s\\S]{0,40}'embeddings'|\\*embedding\\*|semanticContext|Semantic Token|图形学 Semantics",
+    unlessPattern:
+      "NON_AGENT_MODALITIES[\\s\\S]{0,120}'embedding'[\\s\\S]{0,40}'embeddings'|\\*embedding\\*|semanticContext|Semantic Token|图形学 Semantics",
     note: 'Embedding capability and Semantic lane runtime must be absent from source, tests, scripts, file paths, and export lists',
   },
 ];
 
 export function runKnowledgeSystemCheck(overrides = {}) {
-  return runForbiddenCheck({ name: 'knowledge-system', repoRoot: overrides.repoRoot || defaultRepoRoot(), rules: FORBIDDEN_RULES });
+  return runForbiddenCheck({
+    name: 'knowledge-system',
+    repoRoot: overrides.repoRoot || defaultRepoRoot(),
+    rules: FORBIDDEN_RULES,
+  });
 }
 
 if (isDirectInvocation(import.meta.url)) {

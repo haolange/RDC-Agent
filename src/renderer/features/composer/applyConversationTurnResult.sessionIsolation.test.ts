@@ -8,39 +8,15 @@ import { useWorkflowStore } from '../../stores/workflowStore';
 import { applyConversationTurnResult } from '../../stores/conversationSendHelpers';
 import type { ConversationTurnResult } from '@shared/types/conversation';
 
-const baseTurn = (): ConversationTurnResult => ({
-  requestId: 'req-stop',
-  mode: 'talk',
-  executionTransition: {
-    kind: 'continue',
-  },
-  preparedContext: {} as ConversationTurnResult['preparedContext'],
-  userMessage: {
-    id: 'user-1',
+const baseTurn = (): ConversationTurnResult =>
+  ({
     requestId: 'req-stop',
-    turnId: 'turn-real',
-    sessionId: 'session-a',
-    projectId: 'project-1',
-    role: 'user',
-    content: 'hi',
-    status: 'complete',
-    createdAt: 1,
-    updatedAt: 1,
-  },
-  assistantDraftMessage: {
-    id: 'assistant-1',
-    requestId: 'req-stop',
-    turnId: 'turn-real',
-    sessionId: 'session-a',
-    projectId: 'project-1',
-    role: 'assistant',
-    content: 'streaming again',
-    status: 'streaming',
-    createdAt: 2,
-    updatedAt: 2,
-  },
-  messages: [
-    {
+    mode: 'talk',
+    executionTransition: {
+      kind: 'continue',
+    },
+    preparedContext: {} as ConversationTurnResult['preparedContext'],
+    userMessage: {
       id: 'user-1',
       requestId: 'req-stop',
       turnId: 'turn-real',
@@ -52,7 +28,7 @@ const baseTurn = (): ConversationTurnResult => ({
       createdAt: 1,
       updatedAt: 1,
     },
-    {
+    assistantDraftMessage: {
       id: 'assistant-1',
       requestId: 'req-stop',
       turnId: 'turn-real',
@@ -64,21 +40,46 @@ const baseTurn = (): ConversationTurnResult => ({
       createdAt: 2,
       updatedAt: 2,
     },
-  ],
-  session: {
-    record: {
-      schemaVersion: '1',
-      sessionId: 'session-a',
-      projectId: 'project-1',
-      title: 'A',
-      goal: '',
-      sessionPath: '/tmp/a',
-      createdAt: 1,
-      updatedAt: 1,
+    messages: [
+      {
+        id: 'user-1',
+        requestId: 'req-stop',
+        turnId: 'turn-real',
+        sessionId: 'session-a',
+        projectId: 'project-1',
+        role: 'user',
+        content: 'hi',
+        status: 'complete',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        id: 'assistant-1',
+        requestId: 'req-stop',
+        turnId: 'turn-real',
+        sessionId: 'session-a',
+        projectId: 'project-1',
+        role: 'assistant',
+        content: 'streaming again',
+        status: 'streaming',
+        createdAt: 2,
+        updatedAt: 2,
+      },
+    ],
+    session: {
+      record: {
+        schemaVersion: '1',
+        sessionId: 'session-a',
+        projectId: 'project-1',
+        title: 'A',
+        goal: '',
+        sessionPath: '/tmp/a',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      revision: { epoch: 'run-1', n: 4 },
     },
-    revision: { epoch: 'run-1', n: 4 },
-  },
-} as unknown as ConversationTurnResult);
+  }) as unknown as ConversationTurnResult;
 
 describe('applyConversationTurnResult session isolation', () => {
   beforeEach(() => {

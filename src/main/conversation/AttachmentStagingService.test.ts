@@ -45,11 +45,16 @@ describe('AttachmentStagingService', () => {
   });
 
   it('stages bytes as a native image and exposes a preview id', async () => {
-    const [descriptor] = await service.stage([{
-      fileName: 'dot.png',
-      mimeType: 'image/png',
-      bytesBase64: PNG_1X1.toString('base64'),
-    }], 'project:session');
+    const [descriptor] = await service.stage(
+      [
+        {
+          fileName: 'dot.png',
+          mimeType: 'image/png',
+          bytesBase64: PNG_1X1.toString('base64'),
+        },
+      ],
+      'project:session',
+    );
     expect(descriptor.layer).toBe('image');
     expect(descriptor.kind).toBe('image');
     expect(descriptor.previewId).toBe(descriptor.stagingId);
@@ -59,10 +64,13 @@ describe('AttachmentStagingService', () => {
   it('rejects .rdc captures and executables without writing files', async () => {
     const rdcPath = path.join(tempRoot, 'frame.rdc');
     fs.writeFileSync(rdcPath, 'rdc');
-    const [capture, executable] = await service.stage([
-      { sourcePath: rdcPath, fileName: 'frame.rdc' },
-      { fileName: 'setup.exe', bytesBase64: Buffer.from('MZ').toString('base64') },
-    ], 'project:session');
+    const [capture, executable] = await service.stage(
+      [
+        { sourcePath: rdcPath, fileName: 'frame.rdc' },
+        { fileName: 'setup.exe', bytesBase64: Buffer.from('MZ').toString('base64') },
+      ],
+      'project:session',
+    );
     expect(capture.error?.code).toBe('ATTACHMENT_CAPTURE_USE_PROJECT_IMPORT');
     expect(executable.error?.code).toBe('ATTACHMENT_EXECUTABLE_DENIED');
     expect(capture.sourcePath).toBe('');

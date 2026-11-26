@@ -157,10 +157,19 @@ const TaskCompletionResultSchema: ZodType<TaskCompletionResult> = z.object({
   resultHash: z.string().optional(),
   evidenceRefs: z.array(z.object({ uri: z.string(), hash: z.string() })).optional(),
   counterevidence: z.array(z.string()).optional(),
-  unresolved: z.array(z.union([
-    z.string(),
-    z.object({ gap: z.string(), attempted: z.string(), blocker: z.enum(UNRESOLVED_BLOCKERS), resumeWhen: z.string() }),
-  ])).optional(),
+  unresolved: z
+    .array(
+      z.union([
+        z.string(),
+        z.object({
+          gap: z.string(),
+          attempted: z.string(),
+          blocker: z.enum(UNRESOLVED_BLOCKERS),
+          resumeWhen: z.string(),
+        }),
+      ]),
+    )
+    .optional(),
   scope: z.string().optional(),
   sideEffects: z.array(z.string()).optional(),
   recoveryState: z.array(z.string()).optional(),

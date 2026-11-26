@@ -1,9 +1,6 @@
 import path from 'node:path';
 import { compileProviderCatalog, type CompiledProviderCatalog } from './catalogCompiler';
-import {
-  listProviderCatalogManifestFiles,
-  loadProviderCatalogManifestInput,
-} from './manifestLoader';
+import { listProviderCatalogManifestFiles, loadProviderCatalogManifestInput } from './manifestLoader';
 import type { Plugin } from 'vite';
 
 export const PROVIDER_CATALOG_INDEX_MODULE_ID = 'virtual:rdc-provider-catalog-index';
@@ -27,9 +24,12 @@ export function providerCatalogVitePlugin(repoRoot: string): Plugin {
     load(id) {
       const catalog = compiled ?? compile();
       if (id === RESOLVED_PROVIDER_CATALOG_INDEX_MODULE_ID) {
-        const loaders = [...catalog.surfaces.keys()].map((surfaceId) => (
-          `${JSON.stringify(surfaceId)}:()=>import(${JSON.stringify(`${PROVIDER_CATALOG_SURFACE_MODULE_PREFIX}${encodeURIComponent(surfaceId)}`)}).then((module)=>module.default)`
-        )).join(',');
+        const loaders = [...catalog.surfaces.keys()]
+          .map(
+            (surfaceId) =>
+              `${JSON.stringify(surfaceId)}:()=>import(${JSON.stringify(`${PROVIDER_CATALOG_SURFACE_MODULE_PREFIX}${encodeURIComponent(surfaceId)}`)}).then((module)=>module.default)`,
+          )
+          .join(',');
         return [
           `const surfaceLoaders={${loaders}};`,
           'export async function loadProviderSurface(id){const loader=surfaceLoaders[id];return loader?loader():null;}',

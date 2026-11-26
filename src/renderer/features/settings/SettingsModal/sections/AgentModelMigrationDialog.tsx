@@ -61,57 +61,94 @@ export function AgentModelMigrationDialog({ target, options, onConfirm, onClose 
       size="md"
       busy={busy}
       variant={migrate ? 'task' : 'alert'}
-      title={t(migrate ? 'settings.agentModelMigrationTitle' : 'settings.agentOverrideDeleteTitle', { id: target.agentId })}
+      title={t(migrate ? 'settings.agentModelMigrationTitle' : 'settings.agentOverrideDeleteTitle', {
+        id: target.agentId,
+      })}
       description={t(migrate ? 'settings.agentModelMigrationDescription' : 'settings.agentOverrideDeleteDescription')}
       closeLabel={t('dialog.close')}
       onClose={onClose}
       dataTestId="settings-agent-model-migration-dialog"
-      footer={<>
-        <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>{t('dialog.cancel')}</Button>
-        <Button variant={migrate ? 'primary' : 'danger'} size="sm" loading={busy} disabled={!preview}
-          onClick={() => void confirm()} data-testid="settings-agent-model-migration-confirm">
-          {t(migrate ? 'settings.agentModelMigrationConfirm' : 'settings.agentOverrideDeleteConfirm')}
-        </Button>
-      </>}
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={busy}>
+            {t('dialog.cancel')}
+          </Button>
+          <Button
+            variant={migrate ? 'primary' : 'danger'}
+            size="sm"
+            loading={busy}
+            disabled={!preview}
+            onClick={() => void confirm()}
+            data-testid="settings-agent-model-migration-confirm"
+          >
+            {t(migrate ? 'settings.agentModelMigrationConfirm' : 'settings.agentOverrideDeleteConfirm')}
+          </Button>
+        </>
+      }
     >
       {!preview && !target.error ? <Spinner size="sm" /> : null}
-      {target.error ? <InlineError detail={target.error}>{humanizeError(target.error, t, 'app.error.loadFailed')}</InlineError> : null}
+      {target.error ? (
+        <InlineError detail={target.error}>{humanizeError(target.error, t, 'app.error.loadFailed')}</InlineError>
+      ) : null}
       {preview ? (
         <dl className="settings-agent-migration-facts">
           <dt>{t('settings.agentModelMigrationFile')}</dt>
-          <dd><code>{preview.sourcePath}</code></dd>
-          {migrate ? <>
-            <dt>{t('settings.agentModelMigrationSettings')}</dt>
-            <dd data-testid="settings-agent-model-migration-binding">
-              {bindingText(preview.currentBinding, options, t)} → <strong>{bindingText(preview.binding, options, t)}</strong>
-            </dd>
-            <dt>{t('settings.agentModelMigrationBackup')}</dt>
-            <dd><code>{preview.backupPath}</code></dd>
-          </> : (
+          <dd>
+            <code>{preview.sourcePath}</code>
+          </dd>
+          {migrate ? (
+            <>
+              <dt>{t('settings.agentModelMigrationSettings')}</dt>
+              <dd data-testid="settings-agent-model-migration-binding">
+                {bindingText(preview.currentBinding, options, t)} →{' '}
+                <strong>{bindingText(preview.binding, options, t)}</strong>
+              </dd>
+              <dt>{t('settings.agentModelMigrationBackup')}</dt>
+              <dd>
+                <code>{preview.backupPath}</code>
+              </dd>
+            </>
+          ) : (
             <>
               <dt>{t('settings.agentOverrideDeleteDeclared')}</dt>
               <dd>{t('settings.agentOverrideDeleteDeclaredHint')}</dd>
             </>
           )}
-          {preview.droppedHandoffModels.length > 0 ? <>
-            <dt>{t('settings.agentModelMigrationHandoffs')}</dt>
-            <dd>
-              <ul>
-                {preview.droppedHandoffModels.map((entry) => (
-                  <li key={`${entry.label}:${entry.agent}:${entry.model}`}>
-                    {t('settings.agentModelMigrationHandoffDropped', { label: entry.label, agent: entry.agent, model: entry.model })}
-                  </li>
+          {preview.droppedHandoffModels.length > 0 ? (
+            <>
+              <dt>{t('settings.agentModelMigrationHandoffs')}</dt>
+              <dd>
+                <ul>
+                  {preview.droppedHandoffModels.map((entry) => (
+                    <li key={`${entry.label}:${entry.agent}:${entry.model}`}>
+                      {t('settings.agentModelMigrationHandoffDropped', {
+                        label: entry.label,
+                        agent: entry.agent,
+                        model: entry.model,
+                      })}
+                    </li>
+                  ))}
+                </ul>
+              </dd>
+            </>
+          ) : null}
+          {preview.ignoredValues.length > 0 ? (
+            <>
+              <dt>{t('settings.agentModelMigrationIgnored')}</dt>
+              <dd>
+                {preview.ignoredValues.map((value) => (
+                  <code key={value}>{value}</code>
                 ))}
-              </ul>
-            </dd>
-          </> : null}
-          {preview.ignoredValues.length > 0 ? <>
-            <dt>{t('settings.agentModelMigrationIgnored')}</dt>
-            <dd>{preview.ignoredValues.map((value) => <code key={value}>{value}</code>)}</dd>
-          </> : null}
+              </dd>
+            </>
+          ) : null}
         </dl>
       ) : null}
-      {error ? <InlineError detail={error}>{humanizeError(error, t, migrate ? 'settings.agentModelMigrationFailed' : 'app.error.actionFailed')}</InlineError> : null}
+      {error ? (
+        <InlineError detail={error}>
+          {humanizeError(error, t, migrate ? 'settings.agentModelMigrationFailed' : 'app.error.actionFailed')}
+        </InlineError>
+      ) : null}
     </TaskDialog>
   );
 }

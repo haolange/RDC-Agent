@@ -100,14 +100,16 @@ const effectiveModel: EffectiveModel = {
   route: requestPlan.route,
   availability: 'available',
   presencePolicy: 'maintained',
-  contextTiers: [{
-    id: 'normal',
-    label: 'Normal',
-    maxPromptTokens: 256_000,
-    maxOutputTokens: 244_000,
-    activation: { kind: 'implicit' },
-    entitlement: 'granted',
-  }],
+  contextTiers: [
+    {
+      id: 'normal',
+      label: 'Normal',
+      maxPromptTokens: 256_000,
+      maxOutputTokens: 244_000,
+      activation: { kind: 'implicit' },
+      entitlement: 'granted',
+    },
+  ],
   defaultBudgetTokens: 256_000,
   controls: {
     fast: { state: 'unsupported', fixedValue: false },
@@ -207,8 +209,12 @@ describe('AgentOrchestrator prepared turn context', () => {
     expect(result.runtime.promptPlan.systemPrompt).toContain('prepared turn: not configured');
     expect(result.runtime.promptPlan.segments.at(-1)?.id).toBe('runtime:execution-limits');
     expect(baseInput.promptPlan.segments).toEqual([]);
-    expect(result.runtime.effectivePlan.promptPlanFingerprint).toBe(createHash('sha256')
-      .update(JSON.stringify([result.runtime.promptPlan.systemPrompt])).digest('hex').slice(0, 24));
+    expect(result.runtime.effectivePlan.promptPlanFingerprint).toBe(
+      createHash('sha256')
+        .update(JSON.stringify([result.runtime.promptPlan.systemPrompt]))
+        .digest('hex')
+        .slice(0, 24),
+    );
     expect(Array.isArray(result.runtime.effectivePlan.knowledgeReadRoots)).toBe(true);
     for (const root of result.runtime.effectivePlan.knowledgeReadRoots) {
       expect(result.runtime.effectivePlan.permissionConstraints.readableRoots).not.toContain(root);
@@ -218,24 +224,28 @@ describe('AgentOrchestrator prepared turn context', () => {
   });
 
   it('fails before persistence when fixed prompt overhead leaves no message budget', async () => {
-    await expect(createAgentOrchestrator().prepareTurnContext({
-      ...baseInput,
-      requestPlan: { ...requestPlan, contextBudgetTokens: 100 },
-      promptPlan: {
-        ...baseInput.promptPlan,
-        totalTokenEstimate: 100,
-        metrics: { systemPrompt: 400, scopedInstructions: 0, skills: 0 },
-      },
-    })).rejects.toThrow(/^PROMPT_OVERHEAD_EXCEEDS_BUDGET:/u);
+    await expect(
+      createAgentOrchestrator().prepareTurnContext({
+        ...baseInput,
+        requestPlan: { ...requestPlan, contextBudgetTokens: 100 },
+        promptPlan: {
+          ...baseInput.promptPlan,
+          totalTokenEstimate: 100,
+          metrics: { systemPrompt: 400, scopedInstructions: 0, skills: 0 },
+        },
+      }),
+    ).rejects.toThrow(/^PROMPT_OVERHEAD_EXCEEDS_BUDGET:/u);
   });
 
   it('honors cancellation before any runtime preparation work begins', async () => {
     const controller = new AbortController();
     controller.abort();
-    await expect(createAgentOrchestrator().prepareTurnContext({
-      ...baseInput,
-      signal: controller.signal,
-    })).rejects.toThrow(/^REQUEST_CANCELLED:/u);
+    await expect(
+      createAgentOrchestrator().prepareTurnContext({
+        ...baseInput,
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow(/^REQUEST_CANCELLED:/u);
   });
 
   it('freezes existing user and project knowledge directories onto the plan', async () => {

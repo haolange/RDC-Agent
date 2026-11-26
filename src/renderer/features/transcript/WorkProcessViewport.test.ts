@@ -9,31 +9,64 @@ it('reads the scroll position once per frame, not in the scroll event, and keeps
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('matchMedia', () => ({ matches: true }));
   let resize!: ResizeObserverCallback;
-  vi.stubGlobal('ResizeObserver', class {
-    constructor(callback: ResizeObserverCallback) { resize = callback; }
-    observe = vi.fn();
-    disconnect = vi.fn();
-  });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: ResizeObserverCallback) {
+        resize = callback;
+      }
+      observe = vi.fn();
+      disconnect = vi.fn();
+    },
+  );
   const frames = new Map<number, FrameRequestCallback>();
   let nextFrame = 0;
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frames.set(++nextFrame, callback); return nextFrame; });
-  vi.stubGlobal('cancelAnimationFrame', (id: number) => { frames.delete(id); });
-  const runFrame = () => act(async () => {
-    const due = [...frames.values()];
-    frames.clear();
-    due.forEach((callback) => callback(performance.now()));
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++nextFrame, callback);
+    return nextFrame;
   });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+    frames.delete(id);
+  });
+  const runFrame = () =>
+    act(async () => {
+      const due = [...frames.values()];
+      frames.clear();
+      due.forEach((callback) => callback(performance.now()));
+    });
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
   let reads = 0;
   let scrollHeight = 1000;
   let scrollTop = 0;
-  const geometry = (scroller: HTMLElement) => Object.defineProperties(scroller, {
-    scrollHeight: { configurable: true, get: () => { reads += 1; return scrollHeight; } },
-    clientHeight: { configurable: true, get: () => { reads += 1; return 200; } },
-    scrollTop: { configurable: true, get: () => { reads += 1; return scrollTop; }, set: (value: number) => { scrollTop = value; } },
-  });
+  const geometry = (scroller: HTMLElement) =>
+    Object.defineProperties(scroller, {
+      scrollHeight: {
+        configurable: true,
+        get: () => {
+          reads += 1;
+          return scrollHeight;
+        },
+      },
+      clientHeight: {
+        configurable: true,
+        get: () => {
+          reads += 1;
+          return 200;
+        },
+      },
+      scrollTop: {
+        configurable: true,
+        get: () => {
+          reads += 1;
+          return scrollTop;
+        },
+        set: (value: number) => {
+          scrollTop = value;
+        },
+      },
+    });
   try {
     await act(async () => root.render(createElement(WorkProcessViewport, { following: true, children: 'rows' })));
     const scroller = host.querySelector<HTMLElement>('.work-process-viewport-scroller')!;
@@ -61,6 +94,7 @@ it('reads the scroll position once per frame, not in the scroll event, and keeps
   } finally {
     await act(async () => root.unmount());
     host.remove();
-    vi.restoreAllMocks(); vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   }
 });

@@ -15,11 +15,9 @@ export { shouldRejectActivePatchForMonotonicStop } from './conversationStoreMode
 export const selectOrderedConversationMessages = (state: ConversationState): ConversationMessage[] =>
   state.conversationMessages;
 
-export const selectConversationMessageCount = (state: ConversationState): number =>
-  state.conversationMessages.length;
+export const selectConversationMessageCount = (state: ConversationState): number => state.conversationMessages.length;
 
-export const selectLatestMessageActivityAt = (state: ConversationState): number =>
-  state.latestMessageActivityAt;
+export const selectLatestMessageActivityAt = (state: ConversationState): number => state.latestMessageActivityAt;
 
 const messageActivityAt = (message: ConversationMessage): number => message.updatedAt ?? message.createdAt;
 
@@ -48,94 +46,104 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   ...initialConversationState,
   setHistoryLoadingSessionId: (historyLoadingSessionId) => set({ historyLoadingSessionId }),
 
-  setConversationMessages: (messages) => set((state) => {
-    const allConversationMessages = sortConversationMessages(messages);
-    return projectMessages(allConversationMessages, state.branchState);
-  }),
-  setBranchState: (branchState) => set((state) => {
-    const conversationMessages = projectVisibleMessages(state.allConversationMessages, branchState);
-    return {
-      branchState,
-      conversationMessages,
-      latestMessageActivityAt: latestActivityAt(conversationMessages),
-    };
-  }),
-  setConversationSnapshot: (messages, branchState) => set((state) => {
-    const nextBranchState = branchState === undefined ? state.branchState : branchState;
-    const allConversationMessages = sortConversationMessages(messages);
-    return { ...projectMessages(allConversationMessages, nextBranchState), branchState: nextBranchState };
-  }),
-  addConversationMessage: (message) => set((state) => {
-    const allConversationMessages = mergeConversationMessages(
-      state.allConversationMessages,
-      [message],
-      new Set(state.monotonicStoppedTurnIds),
-      new Set(state.monotonicStoppedRequestIds),
-    );
-    return projectMessages(allConversationMessages, state.branchState);
-  }),
-  upsertConversationMessage: (message) => set((state) => {
-    const allConversationMessages = mergeConversationMessages(
-      state.allConversationMessages,
-      [message],
-      new Set(state.monotonicStoppedTurnIds),
-      new Set(state.monotonicStoppedRequestIds),
-    );
-    return projectMessages(allConversationMessages, state.branchState);
-  }),
-  upsertConversationMessages: (messages) => set((state) => {
-    const allConversationMessages = mergeConversationMessages(
-      state.allConversationMessages,
-      messages,
-      new Set(state.monotonicStoppedTurnIds),
-      new Set(state.monotonicStoppedRequestIds),
-    );
-    return projectMessages(allConversationMessages, state.branchState);
-  }),
-  patchAssistantMessageByTurnId: (turnId, patch) => set((state) => {
-    const assistant = state.allConversationMessages.find(
-      (message) => message.turnId === turnId && message.role === 'assistant',
-    );
-    const requestStopped = Boolean(
-      assistant?.requestId && state.monotonicStoppedRequestIds.includes(assistant.requestId),
-    );
-    if (
-      (state.monotonicStoppedTurnIds.includes(turnId) || requestStopped)
-      && patch.status
-      && ACTIVE_ASSISTANT_STATUSES.has(patch.status)
-    ) return {};
-    const allConversationMessages = sortConversationMessages(
-      state.allConversationMessages.map((message) => (
-        message.turnId === turnId && message.role === 'assistant'
-          ? { ...message, ...patch, updatedAt: Date.now() }
-          : message
-      )),
-    );
-    return projectMessages(allConversationMessages, state.branchState);
-  }),
-  updateAssistantMessageByTurnId: (turnId, updater) => set((state) => {
-    const allConversationMessages = sortConversationMessages(
-      state.allConversationMessages.map((message) => (
-        message.turnId === turnId && message.role === 'assistant' ? updater(message) : message
-      )),
-    );
-    return projectMessages(allConversationMessages, state.branchState);
-  }),
-  markTurnMonotonicallyStopped: (turnId) => set((state) => (
-    state.monotonicStoppedTurnIds.includes(turnId)
-      ? {}
-      : { monotonicStoppedTurnIds: [...state.monotonicStoppedTurnIds, turnId] }
-  )),
-  markRequestMonotonicallyStopped: (requestId) => set((state) => (
-    state.monotonicStoppedRequestIds.includes(requestId)
-      ? {}
-      : { monotonicStoppedRequestIds: [...state.monotonicStoppedRequestIds, requestId] }
-  )),
-  markRequestRevoked: (requestId) => set((state) => (
-    state.revokedRequestIds.includes(requestId)
-      ? {}
-      : { revokedRequestIds: [...state.revokedRequestIds, requestId] }
-  )),
+  setConversationMessages: (messages) =>
+    set((state) => {
+      const allConversationMessages = sortConversationMessages(messages);
+      return projectMessages(allConversationMessages, state.branchState);
+    }),
+  setBranchState: (branchState) =>
+    set((state) => {
+      const conversationMessages = projectVisibleMessages(state.allConversationMessages, branchState);
+      return {
+        branchState,
+        conversationMessages,
+        latestMessageActivityAt: latestActivityAt(conversationMessages),
+      };
+    }),
+  setConversationSnapshot: (messages, branchState) =>
+    set((state) => {
+      const nextBranchState = branchState === undefined ? state.branchState : branchState;
+      const allConversationMessages = sortConversationMessages(messages);
+      return { ...projectMessages(allConversationMessages, nextBranchState), branchState: nextBranchState };
+    }),
+  addConversationMessage: (message) =>
+    set((state) => {
+      const allConversationMessages = mergeConversationMessages(
+        state.allConversationMessages,
+        [message],
+        new Set(state.monotonicStoppedTurnIds),
+        new Set(state.monotonicStoppedRequestIds),
+      );
+      return projectMessages(allConversationMessages, state.branchState);
+    }),
+  upsertConversationMessage: (message) =>
+    set((state) => {
+      const allConversationMessages = mergeConversationMessages(
+        state.allConversationMessages,
+        [message],
+        new Set(state.monotonicStoppedTurnIds),
+        new Set(state.monotonicStoppedRequestIds),
+      );
+      return projectMessages(allConversationMessages, state.branchState);
+    }),
+  upsertConversationMessages: (messages) =>
+    set((state) => {
+      const allConversationMessages = mergeConversationMessages(
+        state.allConversationMessages,
+        messages,
+        new Set(state.monotonicStoppedTurnIds),
+        new Set(state.monotonicStoppedRequestIds),
+      );
+      return projectMessages(allConversationMessages, state.branchState);
+    }),
+  patchAssistantMessageByTurnId: (turnId, patch) =>
+    set((state) => {
+      const assistant = state.allConversationMessages.find(
+        (message) => message.turnId === turnId && message.role === 'assistant',
+      );
+      const requestStopped = Boolean(
+        assistant?.requestId && state.monotonicStoppedRequestIds.includes(assistant.requestId),
+      );
+      if (
+        (state.monotonicStoppedTurnIds.includes(turnId) || requestStopped) &&
+        patch.status &&
+        ACTIVE_ASSISTANT_STATUSES.has(patch.status)
+      )
+        return {};
+      const allConversationMessages = sortConversationMessages(
+        state.allConversationMessages.map((message) =>
+          message.turnId === turnId && message.role === 'assistant'
+            ? { ...message, ...patch, updatedAt: Date.now() }
+            : message,
+        ),
+      );
+      return projectMessages(allConversationMessages, state.branchState);
+    }),
+  updateAssistantMessageByTurnId: (turnId, updater) =>
+    set((state) => {
+      const allConversationMessages = sortConversationMessages(
+        state.allConversationMessages.map((message) =>
+          message.turnId === turnId && message.role === 'assistant' ? updater(message) : message,
+        ),
+      );
+      return projectMessages(allConversationMessages, state.branchState);
+    }),
+  markTurnMonotonicallyStopped: (turnId) =>
+    set((state) =>
+      state.monotonicStoppedTurnIds.includes(turnId)
+        ? {}
+        : { monotonicStoppedTurnIds: [...state.monotonicStoppedTurnIds, turnId] },
+    ),
+  markRequestMonotonicallyStopped: (requestId) =>
+    set((state) =>
+      state.monotonicStoppedRequestIds.includes(requestId)
+        ? {}
+        : { monotonicStoppedRequestIds: [...state.monotonicStoppedRequestIds, requestId] },
+    ),
+  markRequestRevoked: (requestId) =>
+    set((state) =>
+      state.revokedRequestIds.includes(requestId) ? {} : { revokedRequestIds: [...state.revokedRequestIds, requestId] },
+    ),
   consumeRevokedRequest: (requestId) => {
     const state = get();
     if (!state.revokedRequestIds.includes(requestId)) return false;

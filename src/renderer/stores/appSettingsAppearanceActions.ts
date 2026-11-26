@@ -38,10 +38,16 @@ export function createAppSettingsAppearanceActions(
     setComposerMarkdown: (composerMarkdown: boolean) => save({ composerMarkdown }),
     setChromeTheme: (variant: ThemeVariant, chrome: Partial<ThemeChromeConfig>) => {
       const current = get().settings.appearance.chromeThemes;
-      return save({ chromeThemes: { ...current, [variant]: {
-        ...current[variant], ...chrome,
-        fonts: { ...current[variant].fonts, ...chrome.fonts },
-      } } });
+      return save({
+        chromeThemes: {
+          ...current,
+          [variant]: {
+            ...current[variant],
+            ...chrome,
+            fonts: { ...current[variant].fonts, ...chrome.fonts },
+          },
+        },
+      });
     },
     setContextBreakdownExpanded: async (expanded: boolean) => {
       const revision = preferenceLanes.begin('contextBreakdown');

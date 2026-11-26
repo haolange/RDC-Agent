@@ -17,13 +17,29 @@ describe('error contract', () => {
   });
 
   it('maps failures to the IPC payload, redacting the technical text and defaulting to INTERNAL_ERROR', () => {
-    expect(toIpcErrorPayload(new AppError('FILE_WRITE_PROTECTED', 'secret-abc is protected', { params: { path: 'config.json' } }), redact))
-      .toEqual({ code: 'FILE_WRITE_PROTECTED', params: { path: 'config.json' }, category: 'security', technical: 'FILE_WRITE_PROTECTED: [REDACTED] is protected' });
-    expect(toIpcErrorPayload(new TypeError('x is undefined'), redact)).toMatchObject({ code: 'INTERNAL_ERROR', category: 'integrity' });
+    expect(
+      toIpcErrorPayload(
+        new AppError('FILE_WRITE_PROTECTED', 'secret-abc is protected', { params: { path: 'config.json' } }),
+        redact,
+      ),
+    ).toEqual({
+      code: 'FILE_WRITE_PROTECTED',
+      params: { path: 'config.json' },
+      category: 'security',
+      technical: 'FILE_WRITE_PROTECTED: [REDACTED] is protected',
+    });
+    expect(toIpcErrorPayload(new TypeError('x is undefined'), redact)).toMatchObject({
+      code: 'INTERNAL_ERROR',
+      category: 'integrity',
+    });
   });
 
   it('rebuilds the payload on the renderer side as RendererIpcError', () => {
-    const error = new RendererIpcError('session:list', { code: 'CONVERSATION_BUSY', params: {}, category: 'availability' });
+    const error = new RendererIpcError('session:list', {
+      code: 'CONVERSATION_BUSY',
+      params: {},
+      category: 'availability',
+    });
     expect(errorCodeOf(error)).toBe('CONVERSATION_BUSY');
     expect(error.message).toBe('CONVERSATION_BUSY');
   });

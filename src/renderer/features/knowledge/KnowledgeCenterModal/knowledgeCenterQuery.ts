@@ -47,10 +47,16 @@ export function includeSelectedSpaceId(current: string[], spaceId: string): stri
 export async function runKnowledgeCenterQuery(input: {
   viewMode: KnowledgeViewMode;
   queryRequest: KnowledgeQueryRequest;
-  query: (request: KnowledgeQueryRequest) => Promise<Pick<KnowledgeQueryResult, 'hits' | 'revision' | 'total' | 'nextOffset'>>;
+  query: (
+    request: KnowledgeQueryRequest,
+  ) => Promise<Pick<KnowledgeQueryResult, 'hits' | 'revision' | 'total' | 'nextOffset'>>;
   compile: (request: KnowledgeQueryRequest & { limit?: number }) => Promise<KnowledgePack>;
   isCurrent?: () => boolean;
-}): Promise<{ hits: KnowledgeLaneHit[]; pack: KnowledgePack; page?: Pick<KnowledgeQueryResult, 'revision' | 'total' | 'nextOffset'> } | null> {
+}): Promise<{
+  hits: KnowledgeLaneHit[];
+  pack: KnowledgePack;
+  page?: Pick<KnowledgeQueryResult, 'revision' | 'total' | 'nextOffset'>;
+} | null> {
   const stale = () => input.isCurrent != null && !input.isCurrent();
   if (input.viewMode === 'conflicts') {
     const compiled = await input.compile({ ...input.queryRequest, limit: 50 });
@@ -61,6 +67,8 @@ export async function runKnowledgeCenterQuery(input: {
   if (stale()) return null;
   const compiled = await input.compile({ ...input.queryRequest, limit: 50 });
   if (stale()) return null;
-  return { ...assignKnowledgeCenterList(input.viewMode, result.hits, compiled),
-    page: { revision: result.revision, total: result.total, nextOffset: result.nextOffset } };
+  return {
+    ...assignKnowledgeCenterList(input.viewMode, result.hits, compiled),
+    page: { revision: result.revision, total: result.total, nextOffset: result.nextOffset },
+  };
 }

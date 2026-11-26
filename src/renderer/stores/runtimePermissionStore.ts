@@ -22,11 +22,10 @@ export const useRuntimePermissionStore = create<RuntimePermissionStore>((set, ge
   pendingMode: null,
   error: false,
   failedSwitch: null,
-  applySnapshot: (snapshot) => set((state) => (
-    state.snapshot && state.snapshot.revision >= snapshot.revision
-      ? state
-      : { snapshot, error: false }
-  )),
+  applySnapshot: (snapshot) =>
+    set((state) =>
+      state.snapshot && state.snapshot.revision >= snapshot.revision ? state : { snapshot, error: false },
+    ),
   setSyncError: () => set({ error: true }),
   refresh: async () => {
     try {
@@ -54,10 +53,15 @@ export const useRuntimePermissionStore = create<RuntimePermissionStore>((set, ge
       try {
         confirmed = await window.electronAPI.runtime.getPermissionState();
         get().applySnapshot(confirmed);
-      } catch { /* Keep the last confirmed snapshot; never infer an effective mode. */ }
+      } catch {
+        /* Keep the last confirmed snapshot; never infer an effective mode. */
+      }
       if (request === requestRevision) {
-        set(confirmed?.mode === mode ? { pendingMode: null, error: false }
-          : { pendingMode: null, error: true, failedSwitch: { mode, detail: errorDetail(error) } });
+        set(
+          confirmed?.mode === mode
+            ? { pendingMode: null, error: false }
+            : { pendingMode: null, error: true, failedSwitch: { mode, detail: errorDetail(error) } },
+        );
       }
       if (confirmed?.mode === mode) return get().snapshot!;
       throw error;

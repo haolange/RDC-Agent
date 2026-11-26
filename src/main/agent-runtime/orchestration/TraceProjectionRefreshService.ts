@@ -59,7 +59,8 @@ export class TraceProjectionRefreshService {
 
 export const traceProjectionRefreshService = new TraceProjectionRefreshService({
   getProjection: async (sessionId) => {
-    if (!projectionSource) throw new Error('The trace projection source is not bound; src/main/index.ts binds it at startup.');
+    if (!projectionSource)
+      throw new Error('The trace projection source is not bound; src/main/index.ts binds it at startup.');
     return projectionSource.getSession(sessionId);
   },
   publish: (scope, presentation) => workflowProjectionPublisher.publishTraceProjectionChanged(scope, presentation),

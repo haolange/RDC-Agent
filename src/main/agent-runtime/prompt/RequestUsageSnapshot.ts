@@ -30,14 +30,23 @@ export function readRequestUsage(rootPath: string, scopeId: string): RequestUsag
         if (turn.isSymbolicLink()) throw new AppError('REQUEST_USAGE_TURN_LINK_DENIED');
         continue;
       }
-      const requests = fs.readdirSync(path.join(rootPath, scope.name, turn.name), { withFileTypes: true })
-        .filter(entry => /^\d+-.+\.json$/.test(entry.name));
-      if (requests.some(entry => !entry.isFile())) throw new AppError('REQUEST_USAGE_COMMIT_NOT_FILE');
+      const requests = fs
+        .readdirSync(path.join(rootPath, scope.name, turn.name), { withFileTypes: true })
+        .filter((entry) => /^\d+-.+\.json$/.test(entry.name));
+      if (requests.some((entry) => !entry.isFile())) throw new AppError('REQUEST_USAGE_COMMIT_NOT_FILE');
       turns.push({ turnId: turn.name, committedRequests: requests.length });
     }
     scopes.push({ scopeKey: scope.name, turns: turns.sort((a, b) => a.turnId.localeCompare(b.turnId)) });
   }
-  return { observedAt: Date.now(), isReservation: false, source: 'committed-request-snapshots', scopeId,
-    committedRequests: scopes.reduce((sum, scope) => sum + scope.turns.reduce((n, turn) => n + turn.committedRequests, 0), 0),
-    scopes: scopes.sort((a, b) => a.scopeKey.localeCompare(b.scopeKey)) };
+  return {
+    observedAt: Date.now(),
+    isReservation: false,
+    source: 'committed-request-snapshots',
+    scopeId,
+    committedRequests: scopes.reduce(
+      (sum, scope) => sum + scope.turns.reduce((n, turn) => n + turn.committedRequests, 0),
+      0,
+    ),
+    scopes: scopes.sort((a, b) => a.scopeKey.localeCompare(b.scopeKey)),
+  };
 }

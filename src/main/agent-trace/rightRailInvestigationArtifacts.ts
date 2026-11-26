@@ -1,17 +1,25 @@
-import { INVESTIGATION_MISSIONS, bareInvestigationHash, type InvestigationArtifactManifest, type InvestigationMission, type InvestigationRecordType } from '@shared/types/renderdocInvestigation';
+import {
+  INVESTIGATION_MISSIONS,
+  bareInvestigationHash,
+  type InvestigationArtifactManifest,
+  type InvestigationMission,
+  type InvestigationRecordType,
+} from '@shared/types/renderdocInvestigation';
 import { formatInvestigationContentHash } from '../investigation/investigationHash';
 import { hashesEqual } from '../investigation/investigationHash';
 import { investigationArtifactService } from '../investigation/InvestigationArtifactService';
 import { collectSupersedeChain, type InvestigationIndexEntry } from '../investigation/investigationRecordKeys';
-import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel, InvestigationListCursor, InvestigationListPage } from '@shared/types/trace';
+import type {
+  InvestigationArtifactRow,
+  InvestigationArtifactsPanelViewModel,
+  InvestigationListCursor,
+  InvestigationListPage,
+} from '@shared/types/trace';
 
 const PAGE_SIZE = 50;
 
-const knownMission = (value: string | undefined): InvestigationMission | 'unknown' => (
-  value && (INVESTIGATION_MISSIONS as readonly string[]).includes(value)
-    ? value as InvestigationMission
-    : 'unknown'
-);
+const knownMission = (value: string | undefined): InvestigationMission | 'unknown' =>
+  value && (INVESTIGATION_MISSIONS as readonly string[]).includes(value) ? (value as InvestigationMission) : 'unknown';
 
 export interface InvestigationListSnapshot {
   artifacts: InvestigationIndexEntry[];
@@ -69,7 +77,8 @@ const toRow = (
 };
 
 export function listInvestigationArtifacts(
-  sessionId: string, cursor?: InvestigationListCursor,
+  sessionId: string,
+  cursor?: InvestigationListCursor,
   source: InvestigationArtifactsSource = investigationArtifactService,
 ): InvestigationListPage {
   try {
@@ -84,14 +93,21 @@ export function listInvestigationArtifacts(
     const manifests = source.listManifests(sessionId);
     const superseded = collectSuperseded(entries);
     const visible = entries.filter((entry) => !superseded.has(entry.artifactId));
-    const remaining = cursor ? visible.filter(entry => entry.createdAt < cursor.createdAt
-      || (entry.createdAt === cursor.createdAt && entry.artifactId.localeCompare(cursor.artifactId) < 0)) : visible;
+    const remaining = cursor
+      ? visible.filter(
+          (entry) =>
+            entry.createdAt < cursor.createdAt ||
+            (entry.createdAt === cursor.createdAt && entry.artifactId.localeCompare(cursor.artifactId) < 0),
+        )
+      : visible;
     const page = remaining.slice(0, PAGE_SIZE);
     const last = page.at(-1);
     return {
       rows: page.map((entry) => toRow(entry, manifests.get(entry.artifactId) ?? null)),
       totalCount: visible.length,
-      ...(last && remaining.length > PAGE_SIZE ? { nextCursor: { createdAt: last.createdAt, artifactId: last.artifactId } } : {}),
+      ...(last && remaining.length > PAGE_SIZE
+        ? { nextCursor: { createdAt: last.createdAt, artifactId: last.artifactId } }
+        : {}),
       storeDegraded: false,
     };
   } catch {
@@ -99,8 +115,10 @@ export function listInvestigationArtifacts(
   }
 }
 
-export function mapRightRailInvestigationArtifacts(sessionId: string,
-  source: InvestigationArtifactsSource = investigationArtifactService): InvestigationArtifactsPanelViewModel {
+export function mapRightRailInvestigationArtifacts(
+  sessionId: string,
+  source: InvestigationArtifactsSource = investigationArtifactService,
+): InvestigationArtifactsPanelViewModel {
   const page = listInvestigationArtifacts(sessionId, undefined, source);
   return { rows: page.rows.slice(0, 5), totalCount: page.totalCount, storeDegraded: page.storeDegraded };
 }

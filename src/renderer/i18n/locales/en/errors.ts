@@ -13,7 +13,8 @@ export const enErrors = {
   'errors.MODEL_UNAVAILABLE': "The selected model isn't available. Choose another model.",
   'errors.MODEL_SELECTION_CHANGED': 'The model changed while this was being prepared. Try again.',
   'errors.PROVIDER_UNAVAILABLE': "The model provider isn't connected. Check it in Settings.",
-  'errors.VISION_INPUT_UNSUPPORTED': "The selected model can't read images. Choose a model with vision or remove the images.",
+  'errors.VISION_INPUT_UNSUPPORTED':
+    "The selected model can't read images. Choose a model with vision or remove the images.",
   'errors.TURN_CANCELLED': 'The request was stopped.',
   'errors.REQUEST_CANCELLED': 'The request was stopped.',
   'errors.SHUTTING_DOWN': "RDC-Agent is closing, so the request wasn't started.",
@@ -24,7 +25,8 @@ export const enErrors = {
   'errors.PLAN_REVIEW_BUSY': 'Another plan review is being processed. Try again in a moment.',
   'errors.PLAN_REVIEW_SCOPE_CHANGED': 'The plan changed after it was shown. Review the latest version.',
   'errors.PLAN_HASH_MISMATCH': 'The plan no longer matches the version you reviewed. Review it again.',
-  'errors.SESSION_REVISION_STALE': 'This conversation changed while you were choosing. Check the Agent, model and settings, then try again.',
+  'errors.SESSION_REVISION_STALE':
+    'This conversation changed while you were choosing. Check the Agent, model and settings, then try again.',
   'errors.APPROVED_PLAN_CHANGED': 'The approved plan has changed. Approve the current plan again.',
   'errors.PLAN_NOT_FOUND': "This plan can't be found.",
   'errors.PROJECT_NOT_FOUND': 'This project is no longer available.',
@@ -34,7 +36,8 @@ export const enErrors = {
   'errors.CAPTURE_REFERENCE_NOT_FOUND': "The capture file can't be found where it was.",
   'errors.CAPTURE_REFERENCE_CHANGED': 'The capture file changed on disk. Add it again.',
   'errors.RDC_INSTALLATION_INVALID': "RenderDoc tooling isn't set up correctly. Check it in Settings.",
-  'errors.RDC_CATALOG_MISMATCH': 'The installed RDC-Tool does not match this RDC-Agent. Install the matching RDC-Tool release.',
+  'errors.RDC_CATALOG_MISMATCH':
+    'The installed RDC-Tool does not match this RDC-Agent. Install the matching RDC-Tool release.',
   'errors.RDC_UPGRADE_REQUIRED': 'RDC-Tool needs to be updated.',
   'errors.RDC_HOST_UNSUPPORTED': "This isn't supported on this computer.",
   'errors.RDC_DEVICE_IN_USE': 'The device is in use by another session.',
@@ -50,7 +53,8 @@ export const enErrors = {
   'errors.KNOWLEDGE_TOPICS_BUSY': 'Topics are being reorganized. Try again in a moment.',
   'errors.KNOWLEDGE_OPERATION_CANCELLED': 'The knowledge task was cancelled.',
   'errors.KNOWLEDGE_ASSETS_MISSING': 'Some attachments this card declares are missing. Provide them and try again.',
-  'errors.KNOWLEDGE_EXPORT_EMPTY_RESULT': 'No cards in this selection can be exported. Provide missing attachments or remove sensitive content and invalid paths.',
+  'errors.KNOWLEDGE_EXPORT_EMPTY_RESULT':
+    'No cards in this selection can be exported. Provide missing attachments or remove sensitive content and invalid paths.',
   'errors.AGENT_MANIFEST_INVALID': 'The agent definition has errors. Fix them and save again.',
   'errors.BUILTIN_AGENT_MANIFEST_READONLY': "Built-in agents can't be edited.",
   'errors.AGENT_SLOT_BUSY': 'This agent is busy in another session.',
@@ -58,7 +62,8 @@ export const enErrors = {
   'errors.PERMISSION_MODE_CHANGED': 'The permission mode changed, so the pending action was cancelled.',
   'errors.AUDIT_WRITE_FAILED': "The security log couldn't be written, so the action wasn't performed.",
   'errors.SECRET_STORAGE_UNAVAILABLE': "Secure credential storage isn't available on this system.",
-  'errors.STORAGE_CORRUPT': "A data file is damaged, so this couldn't be completed. A copy was kept and your other data is unaffected.",
+  'errors.STORAGE_CORRUPT':
+    "A data file is damaged, so this couldn't be completed. A copy was kept and your other data is unaffected.",
   'errors.STORAGE_UNREADABLE': "A data file couldn't be read. Check that RDC-Agent can access it, then try again.",
   'errors.MCP_TRUST_REQUIRED': 'This project MCP server needs your trust before it can connect.',
   'errors.IPC_VALIDATION_ERROR': 'The request was rejected because its contents were invalid.',

@@ -33,7 +33,8 @@ export function useKnowledgeRebuild(refreshOverview: () => Promise<void>, refres
   }, []);
 
   return {
-    rebuildSeq, stopRebuild,
+    rebuildSeq,
+    stopRebuild,
     view: { rebuilding, rebuildIndex, rebuildProgress: progress, rebuildCancelling: cancelling, cancelRebuild: cancel },
   };
 }

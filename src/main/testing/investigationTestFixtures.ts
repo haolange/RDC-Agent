@@ -1,7 +1,19 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { type ArtifactSourceRef, type ChallengeRecord, type ClaimRecord, type EvidenceRecord, type ExperimentRecord, type InvestigationArtifactKind, type InvestigationMission, type InvestigationReport, type InvestigationReportContract, type MissionCheckpoint, type WorldState } from '@shared/types/renderdocInvestigation';
+import {
+  type ArtifactSourceRef,
+  type ChallengeRecord,
+  type ClaimRecord,
+  type EvidenceRecord,
+  type ExperimentRecord,
+  type InvestigationArtifactKind,
+  type InvestigationMission,
+  type InvestigationReport,
+  type InvestigationReportContract,
+  type MissionCheckpoint,
+  type WorldState,
+} from '@shared/types/renderdocInvestigation';
 import { INVESTIGATION_SCHEMA_NAMESPACE } from '../investigation/investigationKindRegistry';
 import { formatSessionArtifactUri } from '../sessions/artifacts/sessionArtifactContract';
 import { formatInvestigationContentHash } from '../investigation/investigationHash';
@@ -27,7 +39,8 @@ export function createInvestigationHarness(
   });
   const receiptStore = new RdcExecutionReceipts(resolver, () => 'test-receipt-key');
   const service = new InvestigationArtifactService({
-    resolver, receiptStore,
+    resolver,
+    receiptStore,
     now: () => new Date('2026-09-01T00:00:00.000Z'),
     ...extras,
   });
@@ -45,7 +58,8 @@ export function reopenInvestigationHarness(
   });
   const receiptStore = new RdcExecutionReceipts(resolver, () => 'test-receipt-key');
   const service = new InvestigationArtifactService({
-    resolver, receiptStore,
+    resolver,
+    receiptStore,
     now: () => new Date('2026-09-01T00:00:00.000Z'),
     ...extras,
   });
@@ -60,7 +74,8 @@ export function createMultiSessionInvestigationHarness(ids: string[] = [SESSION_
   });
   const receiptStore = new RdcExecutionReceipts(resolver, () => 'test-receipt-key');
   const service = new InvestigationArtifactService({
-    resolver, receiptStore,
+    resolver,
+    receiptStore,
     now: () => new Date('2026-09-01T00:00:00.000Z'),
   });
   receiptStores.set(service, receiptStore);
@@ -126,7 +141,11 @@ export function derivedStructureClaim(worldStateId: string, claimId = 'claim-der
 }
 
 /** An observation cites the Evidence it rests on; `evidenceOf()` writes `ev-1` by default. */
-export function observedClaim(worldStateId: string, claimId = 'claim-obs', evidenceIds: string[] = ['ev-1']): ClaimRecord {
+export function observedClaim(
+  worldStateId: string,
+  claimId = 'claim-obs',
+  evidenceIds: string[] = ['ev-1'],
+): ClaimRecord {
   return {
     ...hypothesisClaim(worldStateId, claimId),
     claimKind: 'observed_fact',
@@ -293,7 +312,11 @@ export function writeDraft(
 ) {
   if (kind === 'experiment' && receiptStores.has(service)) {
     const experiment = record as ExperimentRecord;
-    if (!experiment.executionEvidence) record = { ...experiment, executionEvidence: seedExecutionEvidence(receiptStores.get(service)!, SESSION_ID, experiment.experimentId) };
+    if (!experiment.executionEvidence)
+      record = {
+        ...experiment,
+        executionEvidence: seedExecutionEvidence(receiptStores.get(service)!, SESSION_ID, experiment.experimentId),
+      };
   }
   return service.writeRecord(SESSION_ID, {
     kind,
@@ -326,19 +349,24 @@ export function plantInvestigationRecord(
     mimeType: 'application/json',
   });
   const contentHash = formatInvestigationContentHash(written.hash);
-  resolver.write(SESSION_ID, manifestUri, serializeInvestigationJson({
-    artifactId: input.artifactId,
-    mission: 'debugger',
-    kind: input.kind,
-    status: 'draft',
-    title: input.kind,
-    summary: input.kind,
-    contentRef: contentUri,
-    sourceRefs: [],
-    contentHash,
-    recordType: input.recordType,
-    createdAt: '2026-09-01T00:00:00.000Z',
-  }), { mimeType: 'application/json' });
+  resolver.write(
+    SESSION_ID,
+    manifestUri,
+    serializeInvestigationJson({
+      artifactId: input.artifactId,
+      mission: 'debugger',
+      kind: input.kind,
+      status: 'draft',
+      title: input.kind,
+      summary: input.kind,
+      contentRef: contentUri,
+      sourceRefs: [],
+      contentHash,
+      recordType: input.recordType,
+      createdAt: '2026-09-01T00:00:00.000Z',
+    }),
+    { mimeType: 'application/json' },
+  );
   let artifacts: Array<Record<string, unknown>> = [];
   try {
     const existing = resolver.read(SESSION_ID, indexUri);
@@ -358,10 +386,15 @@ export function plantInvestigationRecord(
     createdAt: '2026-09-01T00:00:00.000Z',
     recordKey: input.recordKey,
   });
-  resolver.write(SESSION_ID, indexUri, serializeInvestigationJson({
-    schemaVersion: INVESTIGATION_SCHEMA_NAMESPACE,
-    artifacts,
-  }), { mimeType: 'application/json' });
+  resolver.write(
+    SESSION_ID,
+    indexUri,
+    serializeInvestigationJson({
+      schemaVersion: INVESTIGATION_SCHEMA_NAMESPACE,
+      artifacts,
+    }),
+    { mimeType: 'application/json' },
+  );
 }
 
 export function overwriteInvestigationRecordBody(
@@ -380,34 +413,46 @@ export function overwriteInvestigationManifest(
 ): void {
   const manifestUri = formatSessionArtifactUri('investigation', `manifests/${artifactId}.json`);
   const manifest = JSON.parse(resolver.read(SESSION_ID, manifestUri).text ?? '{}') as Record<string, unknown>;
-  resolver.write(SESSION_ID, manifestUri, serializeInvestigationJson({
-    ...manifest,
-    ...patch,
-  }), { mimeType: 'application/json' });
+  resolver.write(
+    SESSION_ID,
+    manifestUri,
+    serializeInvestigationJson({
+      ...manifest,
+      ...patch,
+    }),
+    { mimeType: 'application/json' },
+  );
 }
 
-export function forceReadyEmptySourceRefs(
-  resolver: SessionArtifactResolver,
-  artifactId: string,
-): void {
+export function forceReadyEmptySourceRefs(resolver: SessionArtifactResolver, artifactId: string): void {
   const manifestUri = formatSessionArtifactUri('investigation', `manifests/${artifactId}.json`);
   const indexUri = formatSessionArtifactUri('investigation', 'index.json');
   const manifest = JSON.parse(resolver.read(SESSION_ID, manifestUri).text ?? '{}') as Record<string, unknown>;
-  resolver.write(SESSION_ID, manifestUri, serializeInvestigationJson({
-    ...manifest,
-    status: 'ready',
-    sourceRefs: [],
-  }), { mimeType: 'application/json' });
+  resolver.write(
+    SESSION_ID,
+    manifestUri,
+    serializeInvestigationJson({
+      ...manifest,
+      status: 'ready',
+      sourceRefs: [],
+    }),
+    { mimeType: 'application/json' },
+  );
   const index = JSON.parse(resolver.read(SESSION_ID, indexUri).text ?? '{}') as {
     schemaVersion: string;
     artifacts: Array<Record<string, unknown>>;
   };
-  resolver.write(SESSION_ID, indexUri, serializeInvestigationJson({
-    ...index,
-    artifacts: index.artifacts.map((entry) => (
-      entry.artifactId === artifactId ? { ...entry, status: 'ready' } : entry
-    )),
-  }), { mimeType: 'application/json' });
+  resolver.write(
+    SESSION_ID,
+    indexUri,
+    serializeInvestigationJson({
+      ...index,
+      artifacts: index.artifacts.map((entry) =>
+        entry.artifactId === artifactId ? { ...entry, status: 'ready' } : entry,
+      ),
+    }),
+    { mimeType: 'application/json' },
+  );
 }
 
 export function projectClaim(source: ClaimRecord, claimId: string): ClaimRecord {
@@ -415,11 +460,13 @@ export function projectClaim(source: ClaimRecord, claimId: string): ClaimRecord 
     ...source,
     claimId,
     projectionKind: 'report',
-    compactProvenance: [{
-      sourceClaimId: source.claimId,
-      sourceEpistemicStatus: source.epistemic,
-      sourceVerificationLevel: source.verification,
-    }],
+    compactProvenance: [
+      {
+        sourceClaimId: source.claimId,
+        sourceEpistemicStatus: source.epistemic,
+        sourceVerificationLevel: source.verification,
+      },
+    ],
   };
 }
 

@@ -15,18 +15,24 @@ import { settingsService } from '../../settings/settings-core/SettingsService';
 import type { AgentTurnRun } from './AgentTurnRunner';
 
 /** MCP connection failures and the route capability diagnostic, before the first request. */
-export function reportRouteDiagnostics(run: AgentTurnRun, sharedEventContext: AgentEventBridgeContext, toolDefinitionCount: number): void {
+export function reportRouteDiagnostics(
+  run: AgentTurnRun,
+  sharedEventContext: AgentEventBridgeContext,
+  toolDefinitionCount: number,
+): void {
   const { input, preparedRuntime, requestPlan, effectiveModel, executionScopeId } = run;
   const { routeCapability } = preparedRuntime;
   const { mcpConnectionErrors } = preparedRuntime;
   const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, toolDefinitionCount);
   if (mcpConnectionErrors.length > 0) {
-    input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
-      code: 'mcp_connection_failed',
-      severity: 'warning',
-      message: 'One or more configured MCP servers could not be connected. MCP tools are unavailable for this turn.',
-      technicalMessage: mcpConnectionErrors.join('\n'),
-    }));
+    input.options?.onEvent?.(
+      buildDiagnosticAgentEvent(sharedEventContext, {
+        code: 'mcp_connection_failed',
+        severity: 'warning',
+        message: 'One or more configured MCP servers could not be connected. MCP tools are unavailable for this turn.',
+        technicalMessage: mcpConnectionErrors.join('\n'),
+      }),
+    );
   }
   if (!routeDiagnostic) return;
   if (routeDiagnostic.surface === 'runtime-log') {
@@ -48,12 +54,14 @@ export function reportRouteDiagnostics(run: AgentTurnRun, sharedEventContext: Ag
       },
     });
   } else {
-    input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
-      code: routeDiagnostic.code,
-      severity: routeDiagnostic.severity,
-      message: routeDiagnostic.message,
-      technicalMessage: JSON.stringify(routeCapability),
-    }));
+    input.options?.onEvent?.(
+      buildDiagnosticAgentEvent(sharedEventContext, {
+        code: routeDiagnostic.code,
+        severity: routeDiagnostic.severity,
+        message: routeDiagnostic.message,
+        technicalMessage: JSON.stringify(routeCapability),
+      }),
+    );
   }
 }
 

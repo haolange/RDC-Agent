@@ -10,10 +10,7 @@ import { knowledgeCandidateService } from '../knowledge/KnowledgeCandidateServic
 import { knowledgeImportService } from '../knowledge/KnowledgeImportService';
 import { KnowledgeDraftMigrationConflictError } from '../knowledge/knowledgeErrors';
 import { knowledgeCompileService } from '../knowledge/KnowledgeCompileService';
-import {
-  createDefaultExportDependencies,
-  KnowledgeExportService,
-} from '../knowledge/KnowledgeExportService';
+import { createDefaultExportDependencies, KnowledgeExportService } from '../knowledge/KnowledgeExportService';
 import { knowledgeIndexService } from '../knowledge/KnowledgeIndexService';
 import { knowledgeQueryService } from '../knowledge/KnowledgeQueryService';
 import { knowledgeWriteService } from '../knowledge/KnowledgeWriteService';
@@ -45,15 +42,22 @@ import {
   KnowledgeTopicPreviewArgsSchema,
   KnowledgeTopicApplyArgsSchema,
 } from './validation/knowledgeSchemas';
-import type { KnowledgeCardRecord, KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
+import type {
+  KnowledgeCardRecord,
+  KnowledgeIndexOverview,
+  KnowledgeQueryRequest,
+  KnowledgeSpace,
+} from '@shared/types/knowledge';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import type { IpcChannelTable } from './invokeRegistry';
 
-const knowledgeExportService = new KnowledgeExportService(createDefaultExportDependencies({
-  getCard: (spaceId, relativePath) => knowledgeQueryService.getCard(spaceId, relativePath),
-  listCards: (spaceId) => knowledgeQueryService.listCards(spaceId),
-  listSpaces: () => knowledgeQueryService.listSpaces(),
-}));
+const knowledgeExportService = new KnowledgeExportService(
+  createDefaultExportDependencies({
+    getCard: (spaceId, relativePath) => knowledgeQueryService.getCard(spaceId, relativePath),
+    listCards: (spaceId) => knowledgeQueryService.listCards(spaceId),
+    listSpaces: () => knowledgeQueryService.listSpaces(),
+  }),
+);
 
 function assertKnownSpaces(spaceIds: string[] | undefined): void {
   if (!spaceIds?.length) return;
@@ -75,7 +79,10 @@ function requireHumanConfirmation(confirmation: { explicitHumanConfirmation?: bo
   }
 }
 
-function knowledgeTokenBinding(spaceId: string, relativePath: string): {
+function knowledgeTokenBinding(
+  spaceId: string,
+  relativePath: string,
+): {
   scope: 'user' | 'project';
   name: string;
   projectRoot?: string;
@@ -198,8 +205,14 @@ function rethrowKnowledgeError(error: unknown): never {
 export function registerKnowledgeHandlers(context: WorkbenchIpcContext): void {
   // Import, export and rebuild run under a renderer-chosen id: progress goes out on `knowledge:progress`, and
   // `knowledge:cancel` stops the run between items. Quitting stops every run and waits for it to settle.
-  const operations = new KnowledgeOperationRegistry((progress) => context.broadcastToRenderer('knowledge:progress', progress));
-  shutdownCoordinator.register({ id: 'knowledge-operations.abort', phase: 'abort_all', dispose: () => operations.abortAll() });
+  const operations = new KnowledgeOperationRegistry((progress) =>
+    context.broadcastToRenderer('knowledge:progress', progress),
+  );
+  shutdownCoordinator.register({
+    id: 'knowledge-operations.abort',
+    phase: 'abort_all',
+    dispose: () => operations.abortAll(),
+  });
   const channels: IpcChannelTable = {
     ...knowledgeQueryChannels(operations),
     ...knowledgeIntakeChannels(operations),
@@ -220,15 +233,22 @@ function knowledgeQueryChannels(operations: KnowledgeOperationRegistry): IpcChan
       return knowledgeTopicService.suggest();
     },
     'knowledge:topics:preview': async (_event, ...rawArgs: unknown[]) => {
-      const [changes] = parseIpcArgs(KnowledgeTopicPreviewArgsSchema, rawArgs, { label: 'knowledge:topics:preview', maxBytes: 2 * 1024 * 1024 });
+      const [changes] = parseIpcArgs(KnowledgeTopicPreviewArgsSchema, rawArgs, {
+        label: 'knowledge:topics:preview',
+        maxBytes: 2 * 1024 * 1024,
+      });
       return knowledgeTopicService.preview(changes);
     },
     'knowledge:topics:apply': async (_event, ...rawArgs: unknown[]) => {
-      const [input] = parseIpcArgs(KnowledgeTopicApplyArgsSchema, rawArgs, { label: 'knowledge:topics:apply', maxBytes: 2 * 1024 * 1024 });
+      const [input] = parseIpcArgs(KnowledgeTopicApplyArgsSchema, rawArgs, {
+        label: 'knowledge:topics:apply',
+        maxBytes: 2 * 1024 * 1024,
+      });
       const preview = await knowledgeTopicService.preview(input.changes);
-      if (preview.changeHash !== input.changeHash) throw new AppError('KNOWLEDGE_TOPICS_PREVIEW_CHANGED', 'review the changes again.');
-      const detail = `topics: ${preview.topics.map(topic => topic.label).join(', ')}; cards: ${preview.cards.length}`;
-      if (!await confirmKnowledgeMutation('knowledge.write', 'user', detail)) return { cancelled: true as const };
+      if (preview.changeHash !== input.changeHash)
+        throw new AppError('KNOWLEDGE_TOPICS_PREVIEW_CHANGED', 'review the changes again.');
+      const detail = `topics: ${preview.topics.map((topic) => topic.label).join(', ')}; cards: ${preview.cards.length}`;
+      if (!(await confirmKnowledgeMutation('knowledge.write', 'user', detail))) return { cancelled: true as const };
       return knowledgeTopicService.apply(input.changes, input.changeHash);
     },
     'knowledge:overview': async (_event, ...rawArgs: unknown[]) => {
@@ -315,7 +335,8 @@ function knowledgeIntakeChannels(operations: KnowledgeOperationRegistry): IpcCha
           namespace: 'context',
           severity: 'warning',
           title: 'Knowledge session draft migration conflict',
-          summary: 'Unreviewed session drafts were not written because the target space already has a different card at the same identity.',
+          summary:
+            'Unreviewed session drafts were not written because the target space already has a different card at the same identity.',
           raw: { sessionId, cardIds: error.cardIds },
         });
       }
@@ -363,8 +384,11 @@ function knowledgeIntakeChannels(operations: KnowledgeOperationRegistry): IpcCha
         assertKnownSpaces([input.spaceId]);
         return await operations.run(input.operationId, async (options) => {
           // Imported cards become context the Agent trusts, so the person confirms in main, not the renderer.
-          const importedFrom = input.filePath ? path.basename(input.filePath) : nativeMessage('pastedText', { count: (input.source ?? '').length });
-          if (!await confirmKnowledgeMutation('knowledge.write', input.spaceId, importedFrom)) return { cancelled: true as const };
+          const importedFrom = input.filePath
+            ? path.basename(input.filePath)
+            : nativeMessage('pastedText', { count: (input.source ?? '').length });
+          if (!(await confirmKnowledgeMutation('knowledge.write', input.spaceId, importedFrom)))
+            return { cancelled: true as const };
           options.signal.throwIfAborted();
           if (input.sessionId) {
             try {
@@ -376,15 +400,19 @@ function knowledgeIntakeChannels(operations: KnowledgeOperationRegistry): IpcCha
                 namespace: 'context',
                 severity: 'warning',
                 title: 'Knowledge session draft migration conflict',
-                summary: 'Unreviewed session drafts were not written because the target space already has a different card at the same identity.',
+                summary:
+                  'Unreviewed session drafts were not written because the target space already has a different card at the same identity.',
                 raw: { sessionId: input.sessionId, cardIds: error.cardIds },
               });
             }
           }
-          return await knowledgeImportService.importToSpace({
-            spaceId: input.spaceId,
-            ...(input.filePath ? { filePath: input.filePath } : { source: input.source ?? '' }),
-          }, options);
+          return await knowledgeImportService.importToSpace(
+            {
+              spaceId: input.spaceId,
+              ...(input.filePath ? { filePath: input.filePath } : { source: input.source ?? '' }),
+            },
+            options,
+          );
         });
       } catch (error) {
         rethrowKnowledgeError(error);
@@ -461,9 +489,10 @@ function knowledgeMutationChannels(operations: KnowledgeOperationRegistry): IpcC
       });
       const { operationId, ...request } = input;
       try {
-        const spaceIds = request.scope === 'space'
-          ? [request.spaceId].filter((value): value is string => Boolean(value))
-          : (request.cardRefs ?? []).map((ref) => ref.spaceId);
+        const spaceIds =
+          request.scope === 'space'
+            ? [request.spaceId].filter((value): value is string => Boolean(value))
+            : (request.cardRefs ?? []).map((ref) => ref.spaceId);
         assertKnownSpaces([...new Set(spaceIds)]);
         return await operations.run(operationId, async (options) => {
           // Main owns the destination: the renderer asks to export, the person picks where in a native dialog.

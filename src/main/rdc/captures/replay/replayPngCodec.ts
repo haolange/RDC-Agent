@@ -12,11 +12,14 @@ export const replayPngCodec: ReplayPngCodec = {
     const original = image.getSize();
     if (original.width < 1 || original.height < 1) throw new AppError('REPLAY_INVALID_PNG');
     const scale = Math.min(1, 960 / Math.max(original.width, original.height));
-    const result = scale < 1 ? image.resize({
-      width: Math.max(1, Math.round(original.width * scale)),
-      height: Math.max(1, Math.round(original.height * scale)),
-      quality: 'best',
-    }) : image;
+    const result =
+      scale < 1
+        ? image.resize({
+            width: Math.max(1, Math.round(original.width * scale)),
+            height: Math.max(1, Math.round(original.height * scale)),
+            quality: 'best',
+          })
+        : image;
     return { png: result.toPNG(), ...result.getSize() };
   },
 };

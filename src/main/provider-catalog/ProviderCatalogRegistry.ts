@@ -36,12 +36,14 @@ function frozen<T>(value: T): T {
 function isCompiledIndex(value: unknown): value is CompiledProviderCatalogIndex {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<CompiledProviderCatalogIndex>;
-  return candidate.schemaVersion === PROVIDER_CATALOG_SCHEMA_VERSION
-    && typeof candidate.catalogRevision === 'string'
-    && Array.isArray(candidate.surfaces)
-    && typeof candidate.identityCount === 'number'
-    && typeof candidate.surfaceCount === 'number'
-    && typeof candidate.modelCount === 'number';
+  return (
+    candidate.schemaVersion === PROVIDER_CATALOG_SCHEMA_VERSION &&
+    typeof candidate.catalogRevision === 'string' &&
+    Array.isArray(candidate.surfaces) &&
+    typeof candidate.identityCount === 'number' &&
+    typeof candidate.surfaceCount === 'number' &&
+    typeof candidate.modelCount === 'number'
+  );
 }
 
 if (!isCompiledIndex(bundledCatalogIndex)) {
@@ -85,11 +87,7 @@ function combineAvailability(
   mode: ProviderSurfaceManifest['availability'],
 ): LlmProviderAvailability {
   const states = [provider.state, mode.state];
-  const state = states.includes('unavailable')
-    ? 'unavailable'
-    : states.includes('unknown')
-      ? 'unknown'
-      : 'available';
+  const state = states.includes('unavailable') ? 'unavailable' : states.includes('unknown') ? 'unknown' : 'available';
   const reason = [provider.reason, mode.reason]
     .filter((value): value is string => Boolean(value?.trim()))
     .filter((value, index, values) => values.indexOf(value) === index)
@@ -98,9 +96,8 @@ function combineAvailability(
 }
 
 function toProviderModel(model: ProviderSurfaceSummary['models'][number] | ModelManifest): LlmProviderModel {
-  const availability = model.presencePolicy === 'account-entitled' && model.availability === 'available'
-    ? 'unknown'
-    : model.availability;
+  const availability =
+    model.presencePolicy === 'account-entitled' && model.availability === 'available' ? 'unknown' : model.availability;
   return {
     id: model.modelId,
     label: model.label,
@@ -158,9 +155,7 @@ export function getProviderCatalogOwnership(id: string): LlmProviderCatalogOwner
   return summaryById(id)?.catalogOwnership ?? 'user-managed';
 }
 
-export function getProviderDiscoveryAuthority(
-  id: string,
-): ProviderSurfaceSummary['discoveryAuthority'] | undefined {
+export function getProviderDiscoveryAuthority(id: string): ProviderSurfaceSummary['discoveryAuthority'] | undefined {
   return summaryById(id)?.discoveryAuthority;
 }
 export function getProviderAuthModeAvailability(
@@ -173,28 +168,35 @@ export function getProviderAuthModeAvailability(
     const mode = mapAuthMode(rawMode);
     grouped.set(mode, [...(grouped.get(mode) ?? []), rawMode]);
   }
-  return Object.fromEntries([...grouped.entries()].map(([mode, rawModes]) => {
-    const rawAvailability = rawModes.map((rawMode) => surface.authModeAvailability?.[rawMode] ?? surface.availability);
-    const modeAvailability = rawAvailability.some((entry) => entry.state === 'available')
-      ? { state: 'available' as const }
-      : rawAvailability.some((entry) => entry.state === 'unknown')
-        ? { state: 'unknown' as const, reason: rawAvailability.find((entry) => entry.state === 'unknown')?.reason }
-        : { state: 'unavailable' as const, reason: rawAvailability.map((entry) => entry.reason).filter(Boolean).join(' ') };
-    return [mode, combineAvailability(surface.availability, modeAvailability)];
-  }));
+  return Object.fromEntries(
+    [...grouped.entries()].map(([mode, rawModes]) => {
+      const rawAvailability = rawModes.map(
+        (rawMode) => surface.authModeAvailability?.[rawMode] ?? surface.availability,
+      );
+      const modeAvailability = rawAvailability.some((entry) => entry.state === 'available')
+        ? { state: 'available' as const }
+        : rawAvailability.some((entry) => entry.state === 'unknown')
+          ? { state: 'unknown' as const, reason: rawAvailability.find((entry) => entry.state === 'unknown')?.reason }
+          : {
+              state: 'unavailable' as const,
+              reason: rawAvailability
+                .map((entry) => entry.reason)
+                .filter(Boolean)
+                .join(' '),
+            };
+      return [mode, combineAvailability(surface.availability, modeAvailability)];
+    }),
+  );
 }
 
 export function getProviderModelSummaries(id: string): LlmProviderModel[] {
   const summary = summaryById(id);
-  return summary?.models
-    .filter((model) => model.selection.pickerVisibility !== 'internal')
-    .map(toProviderModel) ?? [];
+  return summary?.models.filter((model) => model.selection.pickerVisibility !== 'internal').map(toProviderModel) ?? [];
 }
 
 export function getProviderCatalogModelSummaries(id: string): ProviderSurfaceSummary['models'] {
   return frozen(summaryById(id)?.models ?? []);
 }
-
 
 export function getProviderModelDefinitions(id: string): ModelManifest[] {
   return frozen(loadedSurfaces.get(id)?.models ?? []);
@@ -202,10 +204,13 @@ export function getProviderModelDefinitions(id: string): ModelManifest[] {
 
 export function lookupProviderModelDefinition(id: string, modelId: string): ModelManifest | null {
   const normalized = modelId.trim().toLowerCase();
-  const model = loadedSurfaces.get(id)?.models.find((entry) => (
-    entry.modelId.trim().toLowerCase() === normalized
-    || entry.aliases.some((alias) => alias.trim().toLowerCase() === normalized)
-  ));
+  const model = loadedSurfaces
+    .get(id)
+    ?.models.find(
+      (entry) =>
+        entry.modelId.trim().toLowerCase() === normalized ||
+        entry.aliases.some((alias) => alias.trim().toLowerCase() === normalized),
+    );
   return model ? frozen(model) : null;
 }
 
@@ -240,10 +245,16 @@ export function createProviderEntryFromCatalog(id: string): LlmProviderEntry {
   const surface = summaryById(id);
   const route = surface ? defaultRoute(surface) : undefined;
   if (!surface || !route) throw new Error(`Unknown builtin provider: ${id}`);
-  const models = surface.catalogOwnership !== 'user-managed'
-    ? surface.models.filter((model) => model.selection.pickerVisibility !== 'internal'
-      && (model.presencePolicy !== 'account-entitled' || model.availability === 'available')).map(toProviderModel)
-    : [];
+  const models =
+    surface.catalogOwnership !== 'user-managed'
+      ? surface.models
+          .filter(
+            (model) =>
+              model.selection.pickerVisibility !== 'internal' &&
+              (model.presencePolicy !== 'account-entitled' || model.availability === 'available'),
+          )
+          .map(toProviderModel)
+      : [];
   const authMode = mapAuthMode(surface.authModes[0]);
   const authModeAvailability = getProviderAuthModeAvailability(id);
   const selectedAvailability = authModeAvailability[authMode] ?? surface.availability;

@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 const transport = vi.hoisted(() => ({ requestPinned: vi.fn() }));
 vi.mock('./pinnedTransport', () => transport);
 vi.mock('dns/promises', () => ({
-  lookup: vi.fn(async (host: string) => [{ address: host === 'internal.example' ? '10.0.0.7' : '93.184.216.34', family: 4 }]),
+  lookup: vi.fn(async (host: string) => [
+    { address: host === 'internal.example' ? '10.0.0.7' : '93.184.216.34', family: 4 },
+  ]),
 }));
 
 import { fetchPublic, PublicRequestFailedError, PublicUrlDeniedError } from './publicEgress';
@@ -20,18 +22,25 @@ describe('fetchPublic', () => {
 
   it('keeps https on every hop when asked', async () => {
     transport.requestPinned.mockReset().mockResolvedValueOnce(redirect('http://example.com/plain'));
-    await expect(fetchPublic('https://example.com/', { ...options, httpsOnly: true })).rejects.toThrow(/Blocked non-HTTPS/);
+    await expect(fetchPublic('https://example.com/', { ...options, httpsOnly: true })).rejects.toThrow(
+      /Blocked non-HTTPS/,
+    );
   });
 
   it('follows public redirects and reports the final URL', async () => {
-    transport.requestPinned.mockReset().mockResolvedValueOnce(redirect('/next')).mockResolvedValueOnce(new Response('ok'));
+    transport.requestPinned
+      .mockReset()
+      .mockResolvedValueOnce(redirect('/next'))
+      .mockResolvedValueOnce(new Response('ok'));
     const { response, finalUrl } = await fetchPublic('https://example.com/start', options);
     expect([await response.text(), finalUrl]).toEqual(['ok', 'https://example.com/next']);
   });
 
   it('reports redirect loops and transport failures with the hop that failed', async () => {
     transport.requestPinned.mockReset().mockResolvedValue(redirect('/again'));
-    await expect(fetchPublic('https://example.com/', options)).rejects.toMatchObject({ url: 'https://example.com/again' });
+    await expect(fetchPublic('https://example.com/', options)).rejects.toMatchObject({
+      url: 'https://example.com/again',
+    });
     transport.requestPinned.mockReset().mockRejectedValueOnce(new Error('ECONNRESET'));
     const failure = fetchPublic('https://example.com/', options);
     await expect(failure).rejects.toBeInstanceOf(PublicRequestFailedError);

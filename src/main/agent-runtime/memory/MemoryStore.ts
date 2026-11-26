@@ -7,8 +7,25 @@ import { appPathService } from '../../runtime/AppPathService';
 import { withMemoryDirectoryLock } from './memoryDirectoryLock';
 
 export type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
-export interface MemoryRecord { id: string; name: string; displayName: string; normalizedName: string; description: string; type: MemoryType; content: string; tags?: string[]; createdAt: number; updatedAt: number; }
-export interface WriteMemoryInput { name: string; description: string; type: MemoryType; content: string; tags?: string[]; }
+export interface MemoryRecord {
+  id: string;
+  name: string;
+  displayName: string;
+  normalizedName: string;
+  description: string;
+  type: MemoryType;
+  content: string;
+  tags?: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+export interface WriteMemoryInput {
+  name: string;
+  description: string;
+  type: MemoryType;
+  content: string;
+  tags?: string[];
+}
 
 const hashSlug = (value: string): string => createHash('sha256').update(value).digest('hex');
 
@@ -18,17 +35,16 @@ const LIST_MAX_FILES = 500;
 const LIST_MAX_FILE_BYTES = 512 * 1024;
 const LIST_CONCURRENCY = 8;
 
-async function withDirectoryMutex<T>(
-  memoryDir: string,
-  operation: () => Promise<T>,
-): Promise<T> {
+async function withDirectoryMutex<T>(memoryDir: string, operation: () => Promise<T>): Promise<T> {
   // Resolve the lock key after creating the directory so two MemoryStore
   // instances (including symlinked aliases) share one physical mutex.
   await fs.mkdir(memoryDir, { recursive: true });
   const realMemoryDir = await fs.realpath(memoryDir);
   const previous = directoryWriteQueues.get(realMemoryDir) ?? Promise.resolve();
   let release!: () => void;
-  const current = new Promise<void>((resolve) => { release = resolve; });
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   const tail = previous.then(() => current);
   directoryWriteQueues.set(realMemoryDir, tail);
   await previous;
@@ -81,11 +97,31 @@ const parseFrontmatter = (source: string): { meta: Record<string, unknown>; body
     if (separator < 1) continue;
     const key = line.slice(0, separator).trim();
     const raw = line.slice(separator + 1).trim();
-    try { meta[key] = JSON.parse(raw); } catch { meta[key] = raw; }
+    try {
+      meta[key] = JSON.parse(raw);
+    } catch {
+      meta[key] = raw;
+    }
   }
   return { meta, body: match[2].trim() };
 };
-const serialize = (record: MemoryRecord): string => ['---', `id: ${JSON.stringify(record.id)}`, `name: ${JSON.stringify(record.name)}`, `displayName: ${JSON.stringify(record.displayName)}`, `normalizedName: ${JSON.stringify(record.normalizedName)}`, `description: ${JSON.stringify(record.description)}`, `type: ${JSON.stringify(record.type)}`, `tags: ${JSON.stringify(record.tags ?? [])}`, `createdAt: ${record.createdAt}`, `updatedAt: ${record.updatedAt}`, '---', '', record.content.trim(), ''].join('\n');
+const serialize = (record: MemoryRecord): string =>
+  [
+    '---',
+    `id: ${JSON.stringify(record.id)}`,
+    `name: ${JSON.stringify(record.name)}`,
+    `displayName: ${JSON.stringify(record.displayName)}`,
+    `normalizedName: ${JSON.stringify(record.normalizedName)}`,
+    `description: ${JSON.stringify(record.description)}`,
+    `type: ${JSON.stringify(record.type)}`,
+    `tags: ${JSON.stringify(record.tags ?? [])}`,
+    `createdAt: ${record.createdAt}`,
+    `updatedAt: ${record.updatedAt}`,
+    '---',
+    '',
+    record.content.trim(),
+    '',
+  ].join('\n');
 
 function assertMemoryPathContained(memoryDir: string, targetPath: string): void {
   const root = path.resolve(memoryDir);
@@ -108,7 +144,9 @@ async function replaceFileAtomic(target: string, temporary: string): Promise<voi
 /** Explicit file-backed memory store. It never builds or injects a global index. */
 export class MemoryStore {
   constructor(private readonly memoryDir: string) {}
-  getMemoryDir(): string { return this.memoryDir; }
+  getMemoryDir(): string {
+    return this.memoryDir;
+  }
 
   private resolveMemoryFilePath(slug: string): string {
     if (!slug || slug.includes('/') || slug.includes('\\') || slug.includes('\0') || slug === '.' || slug === '..') {
@@ -208,7 +246,7 @@ export class MemoryStore {
       const { meta, body } = parseFrontmatter(await fs.readFile(filePath, 'utf8'));
       const candidateType = String(meta.type ?? 'reference');
       const type: MemoryType = ['user', 'feedback', 'project', 'reference'].includes(candidateType)
-        ? candidateType as MemoryType
+        ? (candidateType as MemoryType)
         : 'reference';
       // Disk filename slug is the sole path authority; frontmatter name is display-only when it differs.
       const displayName = String(meta.displayName ?? meta.name ?? slug);
@@ -250,10 +288,7 @@ export class MemoryStore {
       for (const entry of entries) {
         if (!entry.endsWith('.md')) continue;
         const candidate = await this.readMemoryFile(entry.slice(0, -3));
-        if (candidate && (
-          candidate.displayName === requested
-          || candidate.normalizedName === normalized
-        )) {
+        if (candidate && (candidate.displayName === requested || candidate.normalizedName === normalized)) {
           return candidate;
         }
       }
@@ -270,8 +305,12 @@ export class MemoryStore {
 
   async listMemories(): Promise<MemoryRecord[]> {
     let entries: string[];
-    try { entries = await fs.readdir(this.memoryDir); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw error; }
+    try {
+      entries = await fs.readdir(this.memoryDir);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw error;
+    }
 
     const mdEntries = entries.filter((entry) => entry.endsWith('.md')).slice(0, LIST_MAX_FILES);
     if (entries.filter((entry) => entry.endsWith('.md')).length > LIST_MAX_FILES) {
@@ -296,7 +335,20 @@ export class MemoryStore {
 
   async searchMemories(query: string, limit = 20): Promise<MemoryRecord[]> {
     const needle = query.trim().toLocaleLowerCase();
-    return (await this.listMemories()).filter((record) => !needle || [record.name, record.displayName, record.normalizedName, record.description, record.content, ...(record.tags ?? [])].some((value) => value.toLocaleLowerCase().includes(needle))).slice(0, Math.max(1, Math.min(limit, 100)));
+    return (await this.listMemories())
+      .filter(
+        (record) =>
+          !needle ||
+          [
+            record.name,
+            record.displayName,
+            record.normalizedName,
+            record.description,
+            record.content,
+            ...(record.tags ?? []),
+          ].some((value) => value.toLocaleLowerCase().includes(needle)),
+      )
+      .slice(0, Math.max(1, Math.min(limit, 100)));
   }
 }
 

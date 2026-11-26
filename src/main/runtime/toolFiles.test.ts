@@ -40,8 +40,12 @@ describe('abortPromise', () => {
     // Promise must not reject after dispose (listener removed).
     return Promise.race([
       handle.promise.then(
-        () => { throw new Error('should not resolve'); },
-        () => { throw new Error('should not reject after dispose'); },
+        () => {
+          throw new Error('should not resolve');
+        },
+        () => {
+          throw new Error('should not reject after dispose');
+        },
       ),
       new Promise<void>((resolve) => setTimeout(resolve, 20)),
     ]);
@@ -97,12 +101,14 @@ describe('assertTextReadable', () => {
 describe('mutation workspace ownership', () => {
   it('rejects implicit process cwd writes when no project is selected', () => {
     expect(() => requireMutationWorkspaceRoot(undefined)).toThrow(/MUTATION_REQUIRES_PROJECT/);
-    expect(() => requireMutationWorkspaceRoot({
-      workspaceRoot: process.cwd(),
-      projectRootPath: null,
-      projectId: null,
-      sessionId: null,
-    })).toThrow(/MUTATION_REQUIRES_PROJECT/);
+    expect(() =>
+      requireMutationWorkspaceRoot({
+        workspaceRoot: process.cwd(),
+        projectRootPath: null,
+        projectId: null,
+        sessionId: null,
+      }),
+    ).toThrow(/MUTATION_REQUIRES_PROJECT/);
   });
 });
 
@@ -151,13 +157,15 @@ describe('safeResolvePath', () => {
     expect(allowed).toBe(path.resolve(externalFile));
 
     // Concurrent call without the temporary root must still fail (no global leak).
-    expect(() => safeResolvePath(externalFile, workspace, {
-      workspaceRoot: workspace,
-      projectRootPath: workspace,
-      projectId: null,
-      sessionId: null,
-      temporaryAllowedPathRoots: [],
-    })).toThrow(/超出 workspace/);
+    expect(() =>
+      safeResolvePath(externalFile, workspace, {
+        workspaceRoot: workspace,
+        projectRootPath: workspace,
+        projectId: null,
+        sessionId: null,
+        temporaryAllowedPathRoots: [],
+      }),
+    ).toThrow(/超出 workspace/);
   });
 
   it('rejects sibling ~/.rdc-agent/memory and ~/.rdc-agent/agents even when knowledge is a temporary root', async () => {
@@ -203,13 +211,15 @@ describe('safeResolvePath', () => {
     }
     const escaped = path.join(planted, 'secret.md');
     expect(isWithinRootAllowingAliases(escaped, knowledge)).toBe(false);
-    expect(() => safeResolvePath(escaped, workspace, {
-      workspaceRoot: workspace,
-      projectRootPath: workspace,
-      projectId: null,
-      sessionId: null,
-      temporaryAllowedPathRoots: [knowledge],
-    })).toThrow(/SYMLINK_PATH_REJECTED/);
+    expect(() =>
+      safeResolvePath(escaped, workspace, {
+        workspaceRoot: workspace,
+        projectRootPath: workspace,
+        projectId: null,
+        sessionId: null,
+        temporaryAllowedPathRoots: [knowledge],
+      }),
+    ).toThrow(/SYMLINK_PATH_REJECTED/);
   });
 
   it('read_file rejects a knowledge-root junction that escapes to a sibling', async () => {
@@ -227,13 +237,15 @@ describe('safeResolvePath', () => {
     } catch {
       return;
     }
-    await expect(readFileTool.execute('r-kn-junc', { path: path.join(planted, 'secret.md') }, undefined, undefined, {
-      workspaceRoot: workspace,
-      projectRootPath: workspace,
-      projectId: null,
-      sessionId: null,
-      temporaryAllowedPathRoots: [knowledge],
-    })).rejects.toThrow(/SYMLINK_PATH_REJECTED/);
+    await expect(
+      readFileTool.execute('r-kn-junc', { path: path.join(planted, 'secret.md') }, undefined, undefined, {
+        workspaceRoot: workspace,
+        projectRootPath: workspace,
+        projectId: null,
+        sessionId: null,
+        temporaryAllowedPathRoots: [knowledge],
+      }),
+    ).rejects.toThrow(/SYMLINK_PATH_REJECTED/);
   });
 
   it('write_file rejects a path inside a knowledge root at the execution layer', async () => {
@@ -244,12 +256,14 @@ describe('safeResolvePath', () => {
     await mkdir(knowledge, { recursive: true });
     const card = path.join(knowledge, 'card.md');
     await writeFile(card, 'keep', 'utf8');
-    await expect(writeFileTool.execute('w-kn', { path: card, content: 'overwrite' }, undefined, undefined, {
-      workspaceRoot: workspace,
-      projectRootPath: workspace,
-      projectId: 'proj',
-      sessionId: null,
-    })).rejects.toThrow(/超出 workspace/);
+    await expect(
+      writeFileTool.execute('w-kn', { path: card, content: 'overwrite' }, undefined, undefined, {
+        workspaceRoot: workspace,
+        projectRootPath: workspace,
+        projectId: 'proj',
+        sessionId: null,
+      }),
+    ).rejects.toThrow(/超出 workspace/);
   });
 
   it('resolves a missing target through the existing ancestor and refuses to escape the root', async () => {
@@ -267,8 +281,9 @@ describe('safeResolvePath', () => {
     };
     const missing = path.join(knowledge, 'ghost', 'card.md');
     expect(safeResolvePath(missing, workspace, context)).toBe(path.resolve(missing));
-    expect(() => safeResolvePath(path.join(knowledge, '..', 'memory', 'x.md'), workspace, context))
-      .toThrow(/超出 workspace|SYMLINK/);
+    expect(() => safeResolvePath(path.join(knowledge, '..', 'memory', 'x.md'), workspace, context)).toThrow(
+      /超出 workspace|SYMLINK/,
+    );
   });
 
   it('recognizes project-root case aliases as the same knowledge root', async () => {
@@ -287,13 +302,15 @@ describe('safeResolvePath', () => {
       return;
     }
     expect(isWithinRootAllowingAliases(file, aliasRoot)).toBe(true);
-    expect(safeResolvePath(file, project, {
-      workspaceRoot: project,
-      projectRootPath: project,
-      projectId: null,
-      sessionId: null,
-      temporaryAllowedPathRoots: [aliasRoot],
-    })).toBe(path.resolve(file));
+    expect(
+      safeResolvePath(file, project, {
+        workspaceRoot: project,
+        projectRootPath: project,
+        projectId: null,
+        sessionId: null,
+        temporaryAllowedPathRoots: [aliasRoot],
+      }),
+    ).toBe(path.resolve(file));
   });
 
   it('recognizes a Windows 8.3 project alias as the same knowledge root when available', async () => {
@@ -311,9 +328,15 @@ describe('safeResolvePath', () => {
       const escaped = project.replace(/'/g, "''");
       shortProject = execFileSync(
         windowsPowerShellPath(),
-        ['-NoProfile', '-Command', `(New-Object -ComObject Scripting.FileSystemObject).GetFolder('${escaped}').ShortPath`],
+        [
+          '-NoProfile',
+          '-Command',
+          `(New-Object -ComObject Scripting.FileSystemObject).GetFolder('${escaped}').ShortPath`,
+        ],
         { encoding: 'utf8' },
-      ).trim().replace(/^["']|["']$/g, '');
+      )
+        .trim()
+        .replace(/^["']|["']$/g, '');
     } catch {
       return;
     }
@@ -329,13 +352,15 @@ describe('safeResolvePath', () => {
     }
     if (realShort.toLowerCase() !== realLong.toLowerCase()) return;
     expect(isWithinRootAllowingAliases(file, shortKnowledge)).toBe(true);
-    expect(safeResolvePath(path.join(shortKnowledge, 'card.md'), project, {
-      workspaceRoot: project,
-      projectRootPath: project,
-      projectId: null,
-      sessionId: null,
-      temporaryAllowedPathRoots: [knowledge],
-    })).toBe(path.resolve(file));
+    expect(
+      safeResolvePath(path.join(shortKnowledge, 'card.md'), project, {
+        workspaceRoot: project,
+        projectRootPath: project,
+        projectId: null,
+        sessionId: null,
+        temporaryAllowedPathRoots: [knowledge],
+      }),
+    ).toBe(path.resolve(file));
   });
 
   it('withTemporaryPathAccess treats missing roots as empty and scopes only the callback', async () => {

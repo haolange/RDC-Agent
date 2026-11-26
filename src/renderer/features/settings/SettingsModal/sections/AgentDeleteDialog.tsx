@@ -3,7 +3,12 @@ import { useI18n } from '../../../../i18n';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 
 /** Confirms deleting an Agent; for an override of a builtin it restores the builtin instead. */
-export function AgentDeleteDialog({ agent, restoresBuiltin, onCancel, onConfirm }: {
+export function AgentDeleteDialog({
+  agent,
+  restoresBuiltin,
+  onCancel,
+  onConfirm,
+}: {
   agent: AgentManifestDraft;
   restoresBuiltin: boolean;
   onCancel: () => void;

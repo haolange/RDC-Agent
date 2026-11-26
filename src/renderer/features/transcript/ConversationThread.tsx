@@ -1,8 +1,5 @@
 import React, { useCallback } from 'react';
-import {
-  selectOrderedConversationMessages,
-  useConversationStore,
-} from '../../stores/conversationStore';
+import { selectOrderedConversationMessages, useConversationStore } from '../../stores/conversationStore';
 import { EmptyWorkbenchPrompt } from '../../patterns/EmptyWorkbenchPrompt';
 import { useWorkbenchSetup } from '../../hooks/useWorkbenchSetup';
 import { useI18n } from '../../i18n';
@@ -23,16 +20,17 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({ mode }) 
   const setup = useWorkbenchSetup();
   const { t } = useI18n();
 
-  const renderMessage = useCallback(
-    (message: ConversationMessage) => <MessageBubble message={message} />,
-    [],
-  );
+  const renderMessage = useCallback((message: ConversationMessage) => <MessageBubble message={message} />, []);
 
   // While a session's saved history is read, the transcript holds its place instead of flashing the empty home.
   if (orderedMessages.length === 0 && historyLoading) {
     return (
-      <div className="conversation-thread conversation-thread-loading" data-testid="conversation-thread"
-        role="status" aria-label={t('chat.historyLoading')}>
+      <div
+        className="conversation-thread conversation-thread-loading"
+        data-testid="conversation-thread"
+        role="status"
+        aria-label={t('chat.historyLoading')}
+      >
         <Skeleton shape="card" count={3} />
       </div>
     );
@@ -40,10 +38,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({ mode }) 
 
   if (orderedMessages.length === 0) {
     return (
-      <div
-        className="conversation-thread conversation-thread-empty"
-        data-testid="conversation-thread"
-      >
+      <div className="conversation-thread conversation-thread-empty" data-testid="conversation-thread">
         <EmptyWorkbenchPrompt mode={mode} setup={setup} />
       </div>
     );

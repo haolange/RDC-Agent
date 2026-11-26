@@ -22,13 +22,19 @@ import type {
   SessionRecordSnapshot,
   SessionScopedPayload,
 } from '../types/session';
-import type { AgentPermissionMode, ResolvedTheme, SettingsChangedPayload, SettingsFileSection } from '../types/settings';
+import type {
+  AgentPermissionMode,
+  ResolvedTheme,
+  SettingsChangedPayload,
+  SettingsFileSection,
+} from '../types/settings';
 import type { ToolCallResult, ToolTraceEntry } from '../types/tool';
 
 /** A zod enum of exactly the members of the string union `T`: a missing or unknown member fails to compile. */
-const enumOf = <T extends string>() => <const L extends readonly [T, ...T[]]>(
-  values: L & ([T] extends [L[number]] ? unknown : never),
-) => z.enum(values);
+const enumOf =
+  <T extends string>() =>
+  <const L extends readonly [T, ...T[]]>(values: L & ([T] extends [L[number]] ? unknown : never)) =>
+    z.enum(values);
 
 const isRecord = (value: unknown): boolean => typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -43,17 +49,36 @@ const envelope = <T>(fields: z.ZodRawShape) => {
   const schema = z.object(fields);
   return z.custom<T>().superRefine((value, ctx) => {
     const parsed = schema.safeParse(value);
-    if (!parsed.success) for (const issue of parsed.error.issues) ctx.addIssue({ code: 'custom', path: issue.path, message: issue.message });
+    if (!parsed.success)
+      for (const issue of parsed.error.issues)
+        ctx.addIssue({ code: 'custom', path: issue.path, message: issue.message });
   });
 };
 
 const sessionScope = { projectId: z.string(), sessionId: z.string() };
-const sessionScoped = <T>(payload: z.ZodType<T>): z.ZodType<SessionScopedPayload<T>> => z.object({ ...sessionScope, payload });
+const sessionScoped = <T>(payload: z.ZodType<T>): z.ZodType<SessionScopedPayload<T>> =>
+  z.object({ ...sessionScope, payload });
 
 const AGENT_EVENT_TYPES = enumOf<AgentEventType>()([
-  'run.started', 'assistant.delta', 'assistant.text_end', 'assistant.thinking_delta', 'assistant.thinking_end',
-  'assistant.completed', 'tool.requested', 'tool.started', 'tool.completed', 'tool.denied', 'task.created', 'task.updated',
-  'approval.requested', 'approval.answered', 'diagnostic', 'run.completed', 'run.failed', 'run.cancelled', 'context.compacted',
+  'run.started',
+  'assistant.delta',
+  'assistant.text_end',
+  'assistant.thinking_delta',
+  'assistant.thinking_end',
+  'assistant.completed',
+  'tool.requested',
+  'tool.started',
+  'tool.completed',
+  'tool.denied',
+  'task.created',
+  'task.updated',
+  'approval.requested',
+  'approval.answered',
+  'diagnostic',
+  'run.completed',
+  'run.failed',
+  'run.cancelled',
+  'context.compacted',
 ]);
 
 const messageEnvelope = envelope<ConversationMessage>({ id: z.string(), turnId: z.string(), role: z.string() });
@@ -94,7 +119,9 @@ const PlanReviewProjectionSchema: z.ZodType<PlanReviewProjection> = z.object({
   recoverable: record<NonNullable<PlanReviewProjection['recoverable']>>().nullable(),
   approvedHandoff: record<NonNullable<PlanReviewProjection['approvedHandoff']>>().optional(),
   error: z.string().optional(),
-  decision: z.object({ reviewId: z.string(), kind: enumOf<'approve' | 'reject' | 'cancel'>()(['approve', 'reject', 'cancel']) }).optional(),
+  decision: z
+    .object({ reviewId: z.string(), kind: enumOf<'approve' | 'reject' | 'cancel'>()(['approve', 'reject', 'cancel']) })
+    .optional(),
 });
 
 const SessionRecordSnapshotSchema: z.ZodType<SessionRecordSnapshot> = z.object({
@@ -106,14 +133,24 @@ const RunStatusChangedSchema = z.object({
   runId: z.string(),
   sessionId: z.string(),
   status: enumOf<RunStatus>()([
-    'queued', 'planning', 'awaiting_input', 'awaiting_approval', 'running', 'stopping', 'completed', 'failed', 'cancelled',
+    'queued',
+    'planning',
+    'awaiting_input',
+    'awaiting_approval',
+    'running',
+    'stopping',
+    'completed',
+    'failed',
+    'cancelled',
     'interrupted',
   ]),
   stopReason: z.string().optional(),
 });
 
 const EffectiveCatalogChangeSchema: z.ZodType<EffectiveCatalogChange> = z.object({
-  base: z.object({ scopeGeneration: z.string(), projectionVersion: z.number(), catalogRevision: z.string() }).nullable(),
+  base: z
+    .object({ scopeGeneration: z.string(), projectionVersion: z.number(), catalogRevision: z.string() })
+    .nullable(),
   snapshot: z.object({
     scopeGeneration: z.string(),
     projectionVersion: z.number(),
@@ -165,7 +202,16 @@ const ReplayDeviceStatusSchema: z.ZodType<ReplayDeviceStatusChangedPayload> = z.
 });
 
 const CAPTURE_REPLAY_PHASES = enumOf<CaptureReplayPhase>()([
-  'closed', 'validating', 'connecting', 'transferring', 'opening', 'loading_image', 'ready', 'applying', 'closing', 'error',
+  'closed',
+  'validating',
+  'connecting',
+  'transferring',
+  'opening',
+  'loading_image',
+  'ready',
+  'applying',
+  'closing',
+  'error',
 ]);
 
 const RuntimeLogEntrySchema: z.ZodType<RuntimeLogEntry> = z.object({
@@ -195,7 +241,11 @@ export const RENDERER_EVENT_PAYLOAD = {
   'window:maximized-changed': z.boolean(),
   'conversation:event': ConversationStreamEventSchema,
   'plan:reviewChanged': PlanReviewProjectionSchema,
-  'conversation:delegationChanged': z.object({ sessionId: z.string(), parentToolCallId: z.string(), revision: z.number() }),
+  'conversation:delegationChanged': z.object({
+    sessionId: z.string(),
+    parentToolCallId: z.string(),
+    revision: z.number(),
+  }),
   'session:recordChanged': SessionRecordSnapshotSchema,
   'workflow:runStatusChanged': RunStatusChangedSchema,
   'workflow:runUsageChanged': sessionScoped(RunContextUsageSummarySchema),
@@ -215,15 +265,19 @@ export const RENDERER_EVENT_PAYLOAD = {
   'evidence:eventAdded': ActionEventSchema,
   'device:statusChanged': ReplayDeviceStatusSchema,
   'capture:statusChanged': sessionScoped(z.unknown()),
-  'context:changed': sessionScoped(envelope<ContextSnapshot>({ contextId: z.string(), sessionId: z.string() }).nullable()),
+  'context:changed': sessionScoped(
+    envelope<ContextSnapshot>({ contextId: z.string(), sessionId: z.string() }).nullable(),
+  ),
   'project:inputsChanged': z.object({ projectId: z.string(), inputs: z.array(ProjectInputRecordSchema) }),
   'project:inputsError': z.object({ projectId: z.string(), error: z.string() }),
-  'capture:openedStateChanged': sessionScoped(envelope<OpenedCaptureState>({
-    ...sessionScope,
-    inputId: z.string(),
-    captureId: z.string(),
-    status: enumOf<OpenedCaptureState['status']>()(['opening', 'open', 'error', 'closed']),
-  }).nullable()),
+  'capture:openedStateChanged': sessionScoped(
+    envelope<OpenedCaptureState>({
+      ...sessionScope,
+      inputId: z.string(),
+      captureId: z.string(),
+      status: enumOf<OpenedCaptureState['status']>()(['opening', 'open', 'error', 'closed']),
+    }).nullable(),
+  ),
   'capture:replayChanged': envelope<CaptureReplayState>({
     ...sessionScope,
     generation: z.number(),
@@ -237,13 +291,24 @@ export const RENDERER_EVENT_PAYLOAD = {
   }) satisfies z.ZodType<RuntimePermissionState>,
   'settings:changed': z.object({
     revision: z.number(),
-    sections: z.array(enumOf<SettingsFileSection>()([
-      'appearance', 'layout', 'profile', 'tooling', 'agentRuntime', 'agentModels', 'providers', 'globalInstructions',
-    ])),
+    sections: z.array(
+      enumOf<SettingsFileSection>()([
+        'appearance',
+        'layout',
+        'profile',
+        'tooling',
+        'agentRuntime',
+        'agentModels',
+        'providers',
+        'globalInstructions',
+      ]),
+    ),
   }) satisfies z.ZodType<SettingsChangedPayload>,
 } satisfies { [Channel in RendererEventChannel]: z.ZodType };
 
-export type RendererEventPayload<Channel extends RendererEventChannel> = z.output<(typeof RENDERER_EVENT_PAYLOAD)[Channel]>;
+export type RendererEventPayload<Channel extends RendererEventChannel> = z.output<
+  (typeof RENDERER_EVENT_PAYLOAD)[Channel]
+>;
 
 /**
  * Checks one pushed payload against its channel. A payload that fails is reported as a renderer console warning
@@ -256,7 +321,9 @@ export function acceptsEventPayload<Channel extends RendererEventChannel>(
   const schema: z.ZodType = RENDERER_EVENT_PAYLOAD[channel];
   const parsed = schema.safeParse(payload);
   if (parsed.success) return true;
-  const issues = parsed.error.issues.map((issue) => `${issue.path.map(String).join('.') || '(payload)'}: ${issue.message}`);
+  const issues = parsed.error.issues.map(
+    (issue) => `${issue.path.map(String).join('.') || '(payload)'}: ${issue.message}`,
+  );
   console.warn(`[ipc-event] dropped an invalid ${channel} payload`, issues);
   return false;
 }

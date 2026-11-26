@@ -23,9 +23,7 @@ export function OverflowFade({ text, className }: OverflowFadeProps) {
     };
     measure();
 
-    const resizeObserver = typeof ResizeObserver === 'undefined'
-      ? null
-      : new ResizeObserver(measure);
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     resizeObserver?.observe(element);
 
     const fonts = documentFonts();

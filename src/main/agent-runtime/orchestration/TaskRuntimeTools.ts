@@ -1,7 +1,13 @@
 import { isSubagentScopeId } from '@shared/utils/executionScope';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { AppError } from '@shared/errors/appError';
-import { createTaskTools, TaskRegistry, createSessionTaskStore, taskStoreForExecutionScope, getDelegatedTaskScope } from '../tasks';
+import {
+  createTaskTools,
+  TaskRegistry,
+  createSessionTaskStore,
+  taskStoreForExecutionScope,
+  getDelegatedTaskScope,
+} from '../tasks';
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import { requestSnapshotStore } from '../prompt/RequestSnapshotStore';
 import { traceProjectionRefreshService } from './TraceProjectionRefreshService';
@@ -26,7 +32,10 @@ export function createTaskRuntimeTools(input: {
       if (!result.resultRef) return true;
       if (!ownerSessionId || !result.resultHash) return false;
       try {
-        const verified = sessionArtifactResolver.read(ownerSessionId, result.resultRef, { expectedHash: result.resultHash, limit: 1 });
+        const verified = sessionArtifactResolver.read(ownerSessionId, result.resultRef, {
+          expectedHash: result.resultHash,
+          limit: 1,
+        });
         return verified.hash === result.resultHash;
       } catch {
         return false;
@@ -49,7 +58,8 @@ export function createTaskRuntimeTools(input: {
   const recovery = registry.reconcileInterruptedExecutions();
   const tools = createTaskTools(registry, {
     scopeRootTaskId: delegatedScope?.rootTaskId,
-    readLiveBudget: (rootBudgetId) => readLiveTaskBudget(input.turnHandle ?? input.activeTurns.getActiveTurn(resolvedSessionId), rootBudgetId),
+    readLiveBudget: (rootBudgetId) =>
+      readLiveTaskBudget(input.turnHandle ?? input.activeTurns.getActiveTurn(resolvedSessionId), rootBudgetId),
     readRequestUsage: resolvedSessionId ? () => requestSnapshotStore.readUsage(resolvedSessionId) : undefined,
     requestCurrentTurnStop: () => false,
     getCreationTurnRef: () => {
@@ -62,43 +72,75 @@ export function createTaskRuntimeTools(input: {
       const priorRootBudgetId = delegatedScope?.executionId
         ? (await registry.getExecution(delegatedScope.executionId))?.rootBudgetId
         : scopedExecutions.at(-1)?.rootBudgetId;
-      const rootBudgetId = turn?.policyBudget && ownerSessionId
-        ? await bindTaskRootBudget(registry, ownerSessionId, turn.policyBudget, priorRootBudgetId)
-        : undefined;
+      const rootBudgetId =
+        turn?.policyBudget && ownerSessionId
+          ? await bindTaskRootBudget(registry, ownerSessionId, turn.policyBudget, priorRootBudgetId)
+          : undefined;
       return {
         parentExecutionId: delegatedScope?.executionId,
         preparation: turn?.taskPreparation ?? undefined,
         rootBudgetId,
         frozenPlanRef: turn?.turnId ? `turn:${turn.turnId}:generation:${turn.generation}` : undefined,
-        budget: turn?.policyBudget ? {
-          maxToolCalls: turn.policyBudget.maxToolCalls,
-          toolCalls: turn.policyBudget.toolCalls,
-          maxSubagents: turn.policyBudget.maxSubagents,
-          subagents: turn.policyBudget.subagents,
-          maxChildDepth: turn.policyBudget.maxChildDepth,
-          childDepth: turn.subagentBudget.depth,
-          deadlineAt: turn.policyBudget.wallStartedAt + turn.policyBudget.maxWallTimeMs,
-        } : undefined,
+        budget: turn?.policyBudget
+          ? {
+              maxToolCalls: turn.policyBudget.maxToolCalls,
+              toolCalls: turn.policyBudget.toolCalls,
+              maxSubagents: turn.policyBudget.maxSubagents,
+              subagents: turn.policyBudget.subagents,
+              maxChildDepth: turn.policyBudget.maxChildDepth,
+              childDepth: turn.subagentBudget.depth,
+              deadlineAt: turn.policyBudget.wallStartedAt + turn.policyBudget.maxWallTimeMs,
+            }
+          : undefined,
       };
     },
   }).map((tool) => {
     const execute = tool.execute.bind(tool);
-    return { ...tool, execute: async (...args: Parameters<typeof execute>) => { await recovery; return execute(...args); } };
+    return {
+      ...tool,
+      execute: async (...args: Parameters<typeof execute>) => {
+        await recovery;
+        return execute(...args);
+      },
+    };
   });
   if (delegatedScope?.executionId && delegatedScope.generation) {
     tools.push({
       name: 'subagent_report',
       label: 'Report Subagent Progress',
       description: 'Report meaningful progress, a blocker, or a decision request to the owning Task execution.',
-      parameters: { type: 'object', required: ['kind', 'body'], properties: { kind: { type: 'string', enum: ['progress', 'blocked', 'decision_required'] }, body: { type: 'string', maxLength: 8000 } } },
+      parameters: {
+        type: 'object',
+        required: ['kind', 'body'],
+        properties: {
+          kind: { type: 'string', enum: ['progress', 'blocked', 'decision_required'] },
+          body: { type: 'string', maxLength: 8000 },
+        },
+      },
       permissionHint: 'readonly',
-      spec: { isReadOnly: false, concurrency: 'orchestration-parallel', isDestructive: false, sideEffect: 'session', category: 'task', requiresApproval: false },
+      spec: {
+        isReadOnly: false,
+        concurrency: 'orchestration-parallel',
+        isDestructive: false,
+        sideEffect: 'session',
+        category: 'task',
+        requiresApproval: false,
+      },
       execute: async (_id, args) => {
         const kind = String(args.kind ?? '');
         const body = String(args.body ?? '').trim();
-        if (!['progress', 'blocked', 'decision_required'].includes(kind) || !body || body.length > 8_000) throw new AppError('SUBAGENT_REPORT_INVALID');
-        const message = await registry.appendExecutionMessage(delegatedScope.executionId!, { expectedGeneration: delegatedScope.generation!, kind: kind as 'progress' | 'blocked' | 'decision_required', direction: 'to_parent', body });
-        return { content: [{ type: 'text', text: `Report queued: ${message.id}` }], details: { messageId: message.id, sequence: message.sequence } };
+        if (!['progress', 'blocked', 'decision_required'].includes(kind) || !body || body.length > 8_000)
+          throw new AppError('SUBAGENT_REPORT_INVALID');
+        const message = await registry.appendExecutionMessage(delegatedScope.executionId!, {
+          expectedGeneration: delegatedScope.generation!,
+          kind: kind as 'progress' | 'blocked' | 'decision_required',
+          direction: 'to_parent',
+          body,
+        });
+        return {
+          content: [{ type: 'text', text: `Report queued: ${message.id}` }],
+          details: { messageId: message.id, sequence: message.sequence },
+        };
       },
     });
   }

@@ -12,11 +12,18 @@
   color: var(--token-text-secondary);
 }
 
-.is-trace-flash { animation: trace-flash 1.6s ease-out; }
+.is-trace-flash {
+  animation: trace-flash 1.6s ease-out;
+}
 
 @keyframes trace-flash {
-  0%, 100% { outline: 0 solid transparent; }
-  35% { outline: var(--space-1) solid color-mix(in srgb, var(--token-border-focus) 35%, transparent); }
+  0%,
+  100% {
+    outline: 0 solid transparent;
+  }
+  35% {
+    outline: var(--space-1) solid color-mix(in srgb, var(--token-border-focus) 35%, transparent);
+  }
 }
 
 .right-rail-output-actions {

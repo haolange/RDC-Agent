@@ -15,7 +15,10 @@ export interface AgentModelOptionInputs {
 }
 
 /** The providers whose effective catalogs feed the choices: every routed provider and every usable one. */
-export function modelOptionCatalogProviderIds(providers: readonly LlmProviderEntry[], routes: readonly LlmAgentRoute[]): Set<string> {
+export function modelOptionCatalogProviderIds(
+  providers: readonly LlmProviderEntry[],
+  routes: readonly LlmAgentRoute[],
+): Set<string> {
   return new Set([
     ...routes.map((route) => route.providerId).filter(Boolean),
     ...providers.filter((provider) => provider.enabled && provider.isConfigured).map((provider) => provider.id),
@@ -27,25 +30,36 @@ export function modelOptionCatalogProviderIds(providers: readonly LlmProviderEnt
  * setting or route references (marked with why it cannot run). Computed where the catalogs are, so a catalog change
  * updates the choices without reading the settings again.
  */
-export function buildAgentModelOptions({ providers, routes, agentModels, catalogs }: AgentModelOptionInputs): AgentModelOption[] {
+export function buildAgentModelOptions({
+  providers,
+  routes,
+  agentModels,
+  catalogs,
+}: AgentModelOptionInputs): AgentModelOption[] {
   const referenced = new Set([
-    ...[agentModels.default, ...Object.values(agentModels.byAgent)].map((binding) => binding.model ?? '').filter(Boolean),
+    ...[agentModels.default, ...Object.values(agentModels.byAgent)]
+      .map((binding) => binding.model ?? '')
+      .filter(Boolean),
     ...routes.map((route) => canonicalAgentModelId(route.providerId, route.modelId)).filter(Boolean),
   ]);
   const options: AgentModelOption[] = [];
   const seen = new Set<string>();
-  const internalTargets = new Set(catalogs.flatMap((catalog) => catalog.models
-    .filter((model) => model.selection?.pickerVisibility === 'internal')
-    .map((model) => canonicalAgentModelId(catalog.providerId, model.modelId))));
+  const internalTargets = new Set(
+    catalogs.flatMap((catalog) =>
+      catalog.models
+        .filter((model) => model.selection?.pickerVisibility === 'internal')
+        .map((model) => canonicalAgentModelId(catalog.providerId, model.modelId)),
+    ),
+  );
   const addOption = (option: AgentModelOption): void => {
     if (!option.canonicalId || seen.has(option.canonicalId)) return;
     seen.add(option.canonicalId);
     options.push(option);
   };
   const providerIssue = (provider: LlmProviderEntry): Pick<AgentModelOption, 'providerIssue' | 'disabledReason'> => {
-    const state = provider.status === 'unconfigured' || provider.status === 'failed'
-      ? provider.status : 'unavailable';
-    const detail = state === 'failed' ? provider.lastError : state === 'unavailable' ? provider.unavailableReason : undefined;
+    const state = provider.status === 'unconfigured' || provider.status === 'failed' ? provider.status : 'unavailable';
+    const detail =
+      state === 'failed' ? provider.lastError : state === 'unavailable' ? provider.unavailableReason : undefined;
     return { providerIssue: state, ...(detail ? { disabledReason: detail } : {}) };
   };
   const fromEffectiveModel = (provider: LlmProviderEntry, model: EffectiveModel): AgentModelOption => {
@@ -63,27 +77,28 @@ export function buildAgentModelOptions({ providers, routes, agentModels, catalog
           : model.availability === 'available' && toolExecutable
             ? 'ready'
             : 'model-unverified';
-    const disabledReason = status === 'provider-unavailable'
-      ? undefined
-      : status === 'model-disabled'
-        ? 'Model is disabled.'
-        : status === 'model-unavailable'
-          ? eligibility === 'unsupported'
-            ? 'This provider route explicitly does not support native structured agent tools.'
-            : eligibility === 'no-adapter'
-              ? 'This provider route has no implemented native structured-tool adapter.'
-              : model.unavailableReason ?? 'Model is unavailable for this account and route.'
-          : status === 'model-unverified'
-            ? eligibility === 'budget-unknown'
-              ? 'Model has no verified positive context budget and cannot be executed safely.'
-              : eligibility === 'tools-unknown'
-                ? 'Native tool calling is not confirmed for this provider route, so the model is not an Agent-executable choice.'
-                : 'Model availability has not been verified for this account and route.'
-            : undefined;
+    const disabledReason =
+      status === 'provider-unavailable'
+        ? undefined
+        : status === 'model-disabled'
+          ? 'Model is disabled.'
+          : status === 'model-unavailable'
+            ? eligibility === 'unsupported'
+              ? 'This provider route explicitly does not support native structured agent tools.'
+              : eligibility === 'no-adapter'
+                ? 'This provider route has no implemented native structured-tool adapter.'
+                : (model.unavailableReason ?? 'Model is unavailable for this account and route.')
+            : status === 'model-unverified'
+              ? eligibility === 'budget-unknown'
+                ? 'Model has no verified positive context budget and cannot be executed safely.'
+                : eligibility === 'tools-unknown'
+                  ? 'Native tool calling is not confirmed for this provider route, so the model is not an Agent-executable choice.'
+                  : 'Model availability has not been verified for this account and route.'
+              : undefined;
     // models.json user overrides are the only layer that carries sourceKind 'user'.
-    const isUserOverride = model.provenance.some((evidence) => (
-      evidence.source === 'user' && evidence.sourceKind === 'user'
-    ));
+    const isUserOverride = model.provenance.some(
+      (evidence) => evidence.source === 'user' && evidence.sourceKind === 'user',
+    );
     return {
       canonicalId,
       providerId: provider.id,
@@ -92,8 +107,8 @@ export function buildAgentModelOptions({ providers, routes, agentModels, catalog
       modelLabel: model.label || model.modelId,
       configured: status === 'ready',
       status,
-      reasoningSelections: model.controls.reasoning.kind === 'unknown'
-        ? null : getReasoningSelectionOrder(model.controls.reasoning),
+      reasoningSelections:
+        model.controls.reasoning.kind === 'unknown' ? null : getReasoningSelectionOrder(model.controls.reasoning),
       ...(status === 'provider-unavailable' ? providerIssue(provider) : disabledReason ? { disabledReason } : {}),
       ...(model.cost ? { cost: model.cost } : {}),
       ...(isUserOverride ? { custom: true } : {}),
@@ -102,11 +117,12 @@ export function buildAgentModelOptions({ providers, routes, agentModels, catalog
 
   for (const provider of providers) {
     if (provider.catalogOwnership !== 'user-managed') {
-      const snapshot = catalogs.find((catalog) => (
-        catalog.providerId === provider.id
-        && catalog.accountId === (provider.activeAccountId ?? `anonymous:${provider.id}`)
-        && catalog.protocol === provider.protocol
-      ));
+      const snapshot = catalogs.find(
+        (catalog) =>
+          catalog.providerId === provider.id &&
+          catalog.accountId === (provider.activeAccountId ?? `anonymous:${provider.id}`) &&
+          catalog.protocol === provider.protocol,
+      );
       for (const model of snapshot?.models ?? []) {
         if (model.selection?.pickerVisibility === 'internal') continue;
         const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
@@ -117,16 +133,17 @@ export function buildAgentModelOptions({ providers, routes, agentModels, catalog
       }
       continue;
     }
-    const snapshot = catalogs.find((catalog) => (
-      catalog.providerId === provider.id
-      && catalog.accountId === (provider.activeAccountId ?? `anonymous:${provider.id}`)
-      && catalog.protocol === provider.protocol
-    ));
+    const snapshot = catalogs.find(
+      (catalog) =>
+        catalog.providerId === provider.id &&
+        catalog.accountId === (provider.activeAccountId ?? `anonymous:${provider.id}`) &&
+        catalog.protocol === provider.protocol,
+    );
     for (const model of provider.models) {
       const canonicalId = canonicalAgentModelId(provider.id, model.id);
-      const effective = snapshot?.models.find((entry) => (
-        entry.modelId === model.id || entry.aliases.includes(model.id)
-      ));
+      const effective = snapshot?.models.find(
+        (entry) => entry.modelId === model.id || entry.aliases.includes(model.id),
+      );
       if (effective) {
         const executable = isAgentToolExecutableModel(effective);
         if (executable || referenced.has(canonicalId)) {
@@ -139,7 +156,9 @@ export function buildAgentModelOptions({ providers, routes, agentModels, catalog
       const disabled = model.enabled === false;
       const status: AgentModelOption['status'] = providerUnavailable
         ? 'provider-unavailable'
-        : disabled ? 'model-disabled' : 'model-unverified';
+        : disabled
+          ? 'model-disabled'
+          : 'model-unverified';
       addOption({
         canonicalId,
         providerId: provider.id,
@@ -152,7 +171,10 @@ export function buildAgentModelOptions({ providers, routes, agentModels, catalog
           ? providerIssue(provider)
           : status === 'model-disabled'
             ? { disabledReason: 'Model is disabled.' }
-            : { disabledReason: 'Native tool calling is not confirmed for this provider route, so the model is not an Agent-executable choice.' }),
+            : {
+                disabledReason:
+                  'Native tool calling is not confirmed for this provider route, so the model is not an Agent-executable choice.',
+              }),
       });
     }
   }
@@ -175,9 +197,10 @@ export function buildAgentModelOptions({ providers, routes, agentModels, catalog
     });
   }
 
-  return options.sort((left, right) => (
-    left.providerLabel.localeCompare(right.providerLabel)
-    || Number(right.configured) - Number(left.configured)
-    || left.modelLabel.localeCompare(right.modelLabel)
-  ));
+  return options.sort(
+    (left, right) =>
+      left.providerLabel.localeCompare(right.providerLabel) ||
+      Number(right.configured) - Number(left.configured) ||
+      left.modelLabel.localeCompare(right.modelLabel),
+  );
 }

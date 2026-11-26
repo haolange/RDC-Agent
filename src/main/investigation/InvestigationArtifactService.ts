@@ -1,6 +1,16 @@
 import * as path from 'path';
 import { generateEventId } from '@shared/utils/id';
-import { type ChallengeRecord, type ClaimRecord, type EvidenceRecord, type ExperimentRecord, type InvestigationArtifactKind, type InvestigationArtifactManifest, type InvestigationRecord, type InvestigationReport, type WorldState } from '@shared/types/renderdocInvestigation';
+import {
+  type ChallengeRecord,
+  type ClaimRecord,
+  type EvidenceRecord,
+  type ExperimentRecord,
+  type InvestigationArtifactKind,
+  type InvestigationArtifactManifest,
+  type InvestigationRecord,
+  type InvestigationReport,
+  type WorldState,
+} from '@shared/types/renderdocInvestigation';
 import { SessionArtifactError } from '../sessions/artifacts/sessionArtifactContract';
 import { RdcExecutionReceipts } from '../rdc/RdcExecutionReceipts';
 import { SessionArtifactResolver, sessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
@@ -14,7 +24,8 @@ import {
   collectSupersede,
   retiredRecordKeysForReplacement,
   upsertIndexEntry,
-  withPendingInvestigationMutations, type InvestigationMutationReader,
+  withPendingInvestigationMutations,
+  type InvestigationMutationReader,
 } from './investigationArtifactMutations';
 import {
   commitInvestigationTxn,
@@ -25,24 +36,48 @@ import {
   type InvestigationTxnMutation,
 } from './investigationTxn';
 import { hashesEqual, serializeInvestigationJson, sha256Prefixed } from './investigationHash';
-import { assertReadyObservedEvidence, assertReportContractPresent, type InvestigationLookup } from './investigationInvariants';
+import {
+  assertReadyObservedEvidence,
+  assertReportContractPresent,
+  type InvestigationLookup,
+} from './investigationInvariants';
 import { requireInvestigationKind } from './investigationKindRegistry';
 import {
   assertInvestigationIndexIntegrity,
   assertReadySourcesUnchanged,
   assertTripleContentHash,
-  parseVerifiedRecordBody, parseVerifiedRecordBodyOf,
+  parseVerifiedRecordBody,
+  parseVerifiedRecordBodyOf,
 } from './investigationReadIntegrity';
 import { InvestigationReadRepair } from './investigationReadRepair';
 import { InvestigationRecordChecks } from './investigationRecordChecks';
-import { collectRecordKeys, collectSupersedeChain, contentUriFor, directoryHasJson, emptyIndex, INDEX_URI, manifestUriFor, recordKeyOf, recordKeyToken, type InvestigationIndexDocument, type InvestigationIndexEntry } from './investigationRecordKeys';
+import {
+  collectRecordKeys,
+  collectSupersedeChain,
+  contentUriFor,
+  directoryHasJson,
+  emptyIndex,
+  INDEX_URI,
+  manifestUriFor,
+  recordKeyOf,
+  recordKeyToken,
+  type InvestigationIndexDocument,
+  type InvestigationIndexEntry,
+} from './investigationRecordKeys';
 import {
   InvestigationArtifactManifestSchema,
   InvestigationIndexDocumentSchema,
   parseInvestigationRecord,
   parseInvestigationWriteRecord,
 } from './investigationRecordSchemas';
-import { rejectOpaqueWriteInput, requireCanonicalWriteMission, type InvestigationArtifactServiceDeps, type InvestigationReadResult, type InvestigationWriteInput, type InvestigationWriteResult } from './investigationArtifactWrite';
+import {
+  rejectOpaqueWriteInput,
+  requireCanonicalWriteMission,
+  type InvestigationArtifactServiceDeps,
+  type InvestigationReadResult,
+  type InvestigationWriteInput,
+  type InvestigationWriteResult,
+} from './investigationArtifactWrite';
 
 export type { InvestigationIndexDocument, InvestigationIndexEntry } from './investigationRecordKeys';
 export type {
@@ -80,7 +115,8 @@ export class InvestigationArtifactService {
       readIndex: (sessionId) => this.readIndex(sessionId),
       readIndexSnapshot: (sessionId) => this.readIndexSnapshot(sessionId),
       readRecordBody: (sessionId, entry) => this.recordReader(sessionId).readRecordBody(entry),
-      readRecordBodyOf: (sessionId, entry, recordType) => this.recordReader(sessionId).readRecordBodyOf(entry, recordType),
+      readRecordBodyOf: (sessionId, entry, recordType) =>
+        this.recordReader(sessionId).readRecordBodyOf(entry, recordType),
       readJson: (sessionId: string, uri: string) => this.readJson(sessionId, uri),
       parseManifest: (value) => this.parseManifest(value),
       assertReady: (sessionId, manifest, contentText) => this.assertReady(sessionId, manifest, contentText),
@@ -100,7 +136,10 @@ export class InvestigationArtifactService {
     try {
       parsed = parseInvestigationWriteRecord(kindEntry.recordType, input.record);
     } catch (error) {
-      throw new InvestigationError('INVESTIGATION_SCHEMA_INVALID', error instanceof Error ? error.message : String(error));
+      throw new InvestigationError(
+        'INVESTIGATION_SCHEMA_INVALID',
+        error instanceof Error ? error.message : String(error),
+      );
     }
     const lookup = this.createRawLookup(sessionId);
     const mission = requireCanonicalWriteMission(kindEntry.kind, input.mission, parsed);
@@ -174,8 +213,11 @@ export class InvestigationArtifactService {
       mutations.push(...superseded.mutations);
       workingIndex = superseded.index;
       supersededArtifactId = superseded.artifactId;
-      if (kindEntry.kind === 'world_state' && replaced?.kind === 'world_state'
-        && replaced.recordKey !== (parsed as WorldState).worldStateId) {
+      if (
+        kindEntry.kind === 'world_state' &&
+        replaced?.kind === 'world_state' &&
+        replaced.recordKey !== (parsed as WorldState).worldStateId
+      ) {
         const stale = collectSupersededWorldStateDependents(mutationReader, replaced.recordKey, workingIndex);
         mutations.push(...stale.mutations);
         workingIndex = stale.index;
@@ -260,22 +302,29 @@ export class InvestigationArtifactService {
   list(sessionId: string | null | undefined, filter?: { kind?: string; status?: string }): InvestigationIndexEntry[] {
     this.assertSession(sessionId);
     return this.withSessionLock(sessionId, () => {
-    this.readRepair.reconcileSupersededRecordDependents(sessionId);
-    const entries = this.readIndex(sessionId).artifacts.filter((entry) => (
-      (!filter?.kind || entry.kind === filter.kind) && (!filter?.status || entry.status === filter.status)
-    ));
-    const lookup = this.createLookup(sessionId);
-    for (const entry of entries) {
-      if (entry.status !== 'ready' && entry.status !== 'draft') continue;
-      this.recordChecks.assertRecordInvariants(sessionId, entry.kind, this.recordReader(sessionId).readRecordBody(entry), lookup);
-    }
-    return entries;
+      this.readRepair.reconcileSupersededRecordDependents(sessionId);
+      const entries = this.readIndex(sessionId).artifacts.filter(
+        (entry) => (!filter?.kind || entry.kind === filter.kind) && (!filter?.status || entry.status === filter.status),
+      );
+      const lookup = this.createLookup(sessionId);
+      for (const entry of entries) {
+        if (entry.status !== 'ready' && entry.status !== 'draft') continue;
+        this.recordChecks.assertRecordInvariants(
+          sessionId,
+          entry.kind,
+          this.recordReader(sessionId).readRecordBody(entry),
+          lookup,
+        );
+      }
+      return entries;
     });
   }
   /** Reconcile the graph once per locked archive; each body still receives full integrity checks. */
   readAllRecords(sessionId: string | null | undefined): InvestigationReadResult[] {
-    this.assertSession(sessionId); return this.withSessionLock(sessionId, () =>
-      this.list(sessionId).map(entry => this.readReconciledRecord(sessionId, entry.artifactId)));
+    this.assertSession(sessionId);
+    return this.withSessionLock(sessionId, () =>
+      this.list(sessionId).map((entry) => this.readReconciledRecord(sessionId, entry.artifactId)),
+    );
   }
   listForProjection(sessionId: string | null | undefined): {
     artifacts: InvestigationIndexEntry[];
@@ -298,12 +347,15 @@ export class InvestigationArtifactService {
   listManifests(sessionId: string | null | undefined): Map<string, InvestigationArtifactManifest | null> {
     this.assertSession(sessionId);
     return this.withSessionLock(sessionId, () => {
-    const manifests = new Map<string, InvestigationArtifactManifest | null>();
-    for (const entry of this.readIndexSnapshot(sessionId).artifacts) {
-      try { manifests.set(entry.artifactId, this.parseManifest(this.readJson(sessionId, entry.manifestUri))); }
-      catch { manifests.set(entry.artifactId, null); }
-    }
-    return manifests;
+      const manifests = new Map<string, InvestigationArtifactManifest | null>();
+      for (const entry of this.readIndexSnapshot(sessionId).artifacts) {
+        try {
+          manifests.set(entry.artifactId, this.parseManifest(this.readJson(sessionId, entry.manifestUri)));
+        } catch {
+          manifests.set(entry.artifactId, null);
+        }
+      }
+      return manifests;
     });
   }
 
@@ -412,7 +464,11 @@ export class InvestigationArtifactService {
     };
   }
 
-  private findRecord<T extends InvestigationRecord>(sessionId: string, kind: InvestigationArtifactKind, recordKey: string): T | null {
+  private findRecord<T extends InvestigationRecord>(
+    sessionId: string,
+    kind: InvestigationArtifactKind,
+    recordKey: string,
+  ): T | null {
     const live = this.readIndex(sessionId).artifacts.filter((entry) => entry.status !== 'superseded');
     const standalone = live.filter((entry) => entry.kind === kind && entry.recordKey === recordKey).at(-1);
     // Historical lifecycle records stay readable by artifact ID, not as current semantic refs.
@@ -420,9 +476,13 @@ export class InvestigationArtifactService {
     const reader = this.recordReader(sessionId);
     if (standalone) return reader.readRecordBody(standalone) as T;
     if (kind !== 'claim' && kind !== 'evidence') return null;
-    for (const entry of live.filter((item) => item.kind === (kind === 'claim' ? 'claim_set' : 'evidence_pack')).reverse()) {
-      const match = kind === 'claim' ? reader.readRecordBodyOf(entry, 'ClaimSet').items.find((item) => item.claimId === recordKey)
-        : reader.readRecordBodyOf(entry, 'EvidencePack').items.find((item) => item.evidenceId === recordKey);
+    for (const entry of live
+      .filter((item) => item.kind === (kind === 'claim' ? 'claim_set' : 'evidence_pack'))
+      .reverse()) {
+      const match =
+        kind === 'claim'
+          ? reader.readRecordBodyOf(entry, 'ClaimSet').items.find((item) => item.claimId === recordKey)
+          : reader.readRecordBodyOf(entry, 'EvidencePack').items.find((item) => item.evidenceId === recordKey);
       if (match) return match as T;
     }
     return null;
@@ -534,9 +594,10 @@ export class InvestigationArtifactService {
       const existing = collectRecordKeys(entry.kind, this.recordReader(sessionId).readRecordBody(entry));
       const clash = existing.find((key) => incomingSet.has(recordKeyToken(key)));
       if (clash) {
-        const claimSetHint = input.kind === 'claim_set' && clash.space === 'claim'
-          ? '; ClaimSet.items define new Claims and cannot repeat IDs from previously written Claims; cite existing Claims in supports/contradicts or use new item IDs'
-          : '';
+        const claimSetHint =
+          input.kind === 'claim_set' && clash.space === 'claim'
+            ? '; ClaimSet.items define new Claims and cannot repeat IDs from previously written Claims; cite existing Claims in supports/contradicts or use new item IDs'
+            : '';
         throw new InvestigationError(
           'INVESTIGATION_DUPLICATE_ID',
           `record id ${clash.id} already exists; version updates must use supersedes${claimSetHint}`,
@@ -567,16 +628,20 @@ export class InvestigationArtifactService {
   private withSessionLock<T>(sessionId: string, operation: () => T): T {
     if (this.lockedSessions.has(sessionId)) return operation();
     const sessionPath = this.resolver.resolve(sessionId, INDEX_URI).sessionPath;
-    return withInvestigationTxnLock(sessionPath, () => {
-      this.lockedSessions.add(sessionId);
-      try {
-        this.recoverStore(sessionId);
-        return operation();
-      } finally {
-        this.verifiedIndexes.delete(sessionId);
-        this.lockedSessions.delete(sessionId);
-      }
-    }, { maxAttempts: this.lockMaxAttempts });
+    return withInvestigationTxnLock(
+      sessionPath,
+      () => {
+        this.lockedSessions.add(sessionId);
+        try {
+          this.recoverStore(sessionId);
+          return operation();
+        } finally {
+          this.verifiedIndexes.delete(sessionId);
+          this.lockedSessions.delete(sessionId);
+        }
+      },
+      { maxAttempts: this.lockMaxAttempts },
+    );
   }
 
   private parseManifest(value: unknown): InvestigationArtifactManifest {
@@ -596,11 +661,7 @@ export class InvestigationArtifactService {
     }
   }
 
-  private readArtifact(
-    sessionId: string,
-    uri: string,
-    options?: { expectedHash?: string },
-  ) {
+  private readArtifact(sessionId: string, uri: string, options?: { expectedHash?: string }) {
     try {
       return readCompleteInvestigationArtifact(this.resolver, sessionId, uri, options);
     } catch (error) {

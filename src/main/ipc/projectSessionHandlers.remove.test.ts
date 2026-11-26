@@ -44,9 +44,15 @@ vi.mock('../sessions/store/sessionStores', () => ({
   executionOfferStore: storage.executionOffers,
 }));
 vi.mock('./projectInputLifecycleHandlers', () => ({ registerProjectInputLifecycleHandlers: vi.fn() }));
-vi.mock('../rdc/RdcSessionService', () => ({ rdcSessionService: { clearOpenedCaptureForSession: vi.fn(async () => true) } }));
+vi.mock('../rdc/RdcSessionService', () => ({
+  rdcSessionService: { clearOpenedCaptureForSession: vi.fn(async () => true) },
+}));
 vi.mock('../agent-runtime/orchestration/agentRuntimeRoot', () => ({
-  agentOrchestrator: { syncSessionSlots, releaseSessionToolState: vi.fn(), backgroundSubagents: { abortSession: abortBackgroundSession } },
+  agentOrchestrator: {
+    syncSessionSlots,
+    releaseSessionToolState: vi.fn(),
+    backgroundSubagents: { abortSession: abortBackgroundSession },
+  },
 }));
 vi.mock('../conversation/ConversationService', () => ({
   conversationService: conversation,
@@ -109,13 +115,16 @@ describe('session:remove slot sync', () => {
     storage.projects.referenceProjectInput.mockResolvedValue(inputs);
     const broadcast = vi.fn();
     registerProjectSessionHandlers({ state: {}, broadcastToRenderer: broadcast } as unknown as WorkbenchIpcContext);
-    expect(await handlers.get('project:inputs:reference')!({}, 'proj_1', 'D:/source/original.rdc'))
-      .toEqual({ success: true, inputs });
+    expect(await handlers.get('project:inputs:reference')!({}, 'proj_1', 'D:/source/original.rdc')).toEqual({
+      success: true,
+      inputs,
+    });
     expect(storage.projects.referenceProjectInput).toHaveBeenCalledWith('proj_1', 'D:/source/original.rdc');
     expect(broadcast).toHaveBeenCalledWith('project:inputsChanged', { projectId: 'proj_1', inputs });
     storage.projects.referenceProjectInput.mockClear();
-    expect(await handlers.get('project:inputs:reference')!({}, 'proj_1', ['D:/source/original.rdc']))
-      .toMatchObject({ success: false });
+    expect(await handlers.get('project:inputs:reference')!({}, 'proj_1', ['D:/source/original.rdc'])).toMatchObject({
+      success: false,
+    });
     expect(storage.projects.referenceProjectInput).not.toHaveBeenCalled();
   });
 
@@ -124,7 +133,9 @@ describe('session:remove slot sync', () => {
     conversation.cancelActiveTurn.mockRejectedValueOnce(new Error('join not confirmed'));
     registerProjectSessionHandlers({
       state: { currentSessionId: null, currentProjectId: 'proj_1', currentRunId: null },
-      broadcastToRenderer: vi.fn(), broadcastRunStatusChanged: vi.fn(), applyCurrentLlmConfig: vi.fn(),
+      broadcastToRenderer: vi.fn(),
+      broadcastRunStatusChanged: vi.fn(),
+      applyCurrentLlmConfig: vi.fn(),
       setRunLifecycleState: vi.fn(async () => undefined),
       selectCurrentProject: vi.fn(async () => ({ project: null, currentSession: null, currentRun: null })),
       initializeIpcState: vi.fn(async () => undefined),
@@ -135,11 +146,17 @@ describe('session:remove slot sync', () => {
   });
   it('keeps the project and its visible owner when device installation remains unconfirmed after native cleanup', async () => {
     storage.listSessions.mockReturnValue([{ sessionId: 'sess_1' }]);
-    vi.mocked(rdcSessionService.clearOpenedCaptureForSession).mockRejectedValueOnce(new Error('RDC_DEVICE_ACTION_UNCONFIRMED'));
+    vi.mocked(rdcSessionService.clearOpenedCaptureForSession).mockRejectedValueOnce(
+      new Error('RDC_DEVICE_ACTION_UNCONFIRMED'),
+    );
     const state = { currentSessionId: 'sess_1', currentProjectId: 'proj_1', currentRunId: 'run_1' };
     registerProjectSessionHandlers({ state, broadcastToRenderer: vi.fn() } as unknown as WorkbenchIpcContext);
-    expect(await handlers.get('project:remove')!({}, 'proj_1')).toEqual({ success: false, error: 'RDC_DEVICE_ACTION_UNCONFIRMED' });
-    expect(storage.removeProject).not.toHaveBeenCalled(); expect(storage.removeSession).not.toHaveBeenCalled();
+    expect(await handlers.get('project:remove')!({}, 'proj_1')).toEqual({
+      success: false,
+      error: 'RDC_DEVICE_ACTION_UNCONFIRMED',
+    });
+    expect(storage.removeProject).not.toHaveBeenCalled();
+    expect(storage.removeSession).not.toHaveBeenCalled();
     expect(state).toEqual({ currentSessionId: 'sess_1', currentProjectId: 'proj_1', currentRunId: 'run_1' });
   });
 
@@ -221,7 +238,9 @@ describe('session:remove slot sync', () => {
     conversation.isTurnActive.mockReturnValue(true);
     registerProjectSessionHandlers({
       state: { currentSessionId: null, currentProjectId: 'proj_1', currentRunId: null },
-      broadcastToRenderer: vi.fn(), broadcastRunStatusChanged: vi.fn(), applyCurrentLlmConfig: vi.fn(),
+      broadcastToRenderer: vi.fn(),
+      broadcastRunStatusChanged: vi.fn(),
+      applyCurrentLlmConfig: vi.fn(),
       setRunLifecycleState: vi.fn(async () => undefined),
       selectCurrentProject: vi.fn(async () => ({ project: null, currentSession: null, currentRun: null })),
       initializeIpcState: vi.fn(async () => undefined),
@@ -236,20 +255,30 @@ describe('session:remove slot sync', () => {
   it('interrupts a stale run when neither execution owner is active', async () => {
     storage.readSession.mockReturnValue({ sessionId: 'sess_1', projectId: 'proj_1', title: 't' });
     storage.getLatestRun.mockReturnValue({
-      runId: 'run_1', turnId: 'turn_1', sessionId: 'sess_1', status: 'running',
+      runId: 'run_1',
+      turnId: 'turn_1',
+      sessionId: 'sess_1',
+      status: 'running',
     } as RunSummary);
     registerProjectSessionHandlers({
       state: { currentSessionId: null, currentProjectId: 'proj_1', currentRunId: null },
-      broadcastToRenderer: vi.fn(), broadcastRunStatusChanged: vi.fn(), applyCurrentLlmConfig: vi.fn(),
+      broadcastToRenderer: vi.fn(),
+      broadcastRunStatusChanged: vi.fn(),
+      applyCurrentLlmConfig: vi.fn(),
       setRunLifecycleState: vi.fn(async () => undefined),
       selectCurrentProject: vi.fn(async () => ({ project: null, currentSession: null, currentRun: null })),
       initializeIpcState: vi.fn(async () => undefined),
     } as unknown as WorkbenchIpcContext);
 
     await handlers.get('session:open')!({}, 'sess_1');
-    expect(storage.updateRun).toHaveBeenCalledWith('sess_1', 'run_1', expect.objectContaining({
-      status: 'interrupted', stopReason: 'Recovered after app restart',
-    }));
+    expect(storage.updateRun).toHaveBeenCalledWith(
+      'sess_1',
+      'run_1',
+      expect.objectContaining({
+        status: 'interrupted',
+        stopReason: 'Recovered after app restart',
+      }),
+    );
   });
 
   it('cancels an active run without writing lastStage', async () => {
@@ -262,14 +291,10 @@ describe('session:remove slot sync', () => {
       createdAt: 1,
       updatedAt: 1,
     });
-    storage.listRuns.mockReturnValue([
-      { runId: 'run_1', status: 'running' },
-    ]);
-    const setRunLifecycleState = vi.fn(async (
-      _sessionId: string,
-      _runId: string,
-      _patch: Record<string, unknown>,
-    ) => undefined);
+    storage.listRuns.mockReturnValue([{ runId: 'run_1', status: 'running' }]);
+    const setRunLifecycleState = vi.fn(
+      async (_sessionId: string, _runId: string, _patch: Record<string, unknown>) => undefined,
+    );
     registerProjectSessionHandlers({
       state: { currentSessionId: 'sess_1', currentProjectId: 'proj_1', currentRunId: 'run_1' },
       broadcastToRenderer: vi.fn(),

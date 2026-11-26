@@ -9,21 +9,25 @@ import type { StorageIo } from '../../runtime/StorageIo';
 export const EXECUTION_OFFER_FILE = 'execution-offer.json';
 export const REMOVED_HANDOFF_STATE_FILE = 'handoff-state.json';
 
-const ExecutionOfferSchema = z.object({
-  schemaVersion: z.literal(EXECUTION_OFFER_SCHEMA),
-  offerId: z.string().uuid().optional(),
-  sourceAgentId: z.string().trim().min(1),
-  targetAgentId: z.string().trim().min(1),
-  plan: z.object({
-    uri: z.string().trim().min(1),
-    hash: z.string().trim().min(1),
-  }).strict(),
-  requiredSkillIds: z.array(z.string().trim().min(1)),
-  requiredToolIds: z.array(z.string().trim().min(1)).optional(),
-  label: z.string().trim().min(1),
-  prompt: z.string().trim().min(1),
-  approvedAt: z.number(),
-}).strict();
+const ExecutionOfferSchema = z
+  .object({
+    schemaVersion: z.literal(EXECUTION_OFFER_SCHEMA),
+    offerId: z.string().uuid().optional(),
+    sourceAgentId: z.string().trim().min(1),
+    targetAgentId: z.string().trim().min(1),
+    plan: z
+      .object({
+        uri: z.string().trim().min(1),
+        hash: z.string().trim().min(1),
+      })
+      .strict(),
+    requiredSkillIds: z.array(z.string().trim().min(1)),
+    requiredToolIds: z.array(z.string().trim().min(1)).optional(),
+    label: z.string().trim().min(1),
+    prompt: z.string().trim().min(1),
+    approvedAt: z.number(),
+  })
+  .strict();
 
 export interface ExecutionOfferHost {
   io: StorageIo;

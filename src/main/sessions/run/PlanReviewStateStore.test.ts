@@ -34,8 +34,14 @@ describe('PlanReviewStateStore', () => {
     expect(third.planId).toBe(first.planId);
     expect(third.revision).toBe(3);
     const awaiting = store.assertAwaiting('sess', { turnId: 'turn-a', planId: first.planId, revision: 3 });
-    store.replace('sess', { ...awaiting, status: 'approved', approvedHash: 'a'.repeat(64), frozenUri: 'session://plans/plan-x.md',
-      approvedHandoff: { agent: 'general', label: 'Execute' }, updatedAt: awaiting.updatedAt + 1 });
+    store.replace('sess', {
+      ...awaiting,
+      status: 'approved',
+      approvedHash: 'a'.repeat(64),
+      frozenUri: 'session://plans/plan-x.md',
+      approvedHandoff: { agent: 'general', label: 'Execute' },
+      updatedAt: awaiting.updatedAt + 1,
+    });
     const nextCycle = store.beginRevision('sess', 'turn-a');
     expect(nextCycle.newCycle).toBe(true);
     expect(nextCycle.planId).not.toBe(first.planId);
@@ -46,7 +52,10 @@ describe('PlanReviewStateStore', () => {
     const store = createStore();
     const file = store.getStatePath('sess')!;
     for (const patch of [{ revision: -2 }, { status: 'nonsense' }, { approvedHandoff: 42 }, { updatedAt: undefined }]) {
-      await writeFile(file, JSON.stringify({ schemaVersion: '1', planId: 'p', revision: 1, status: 'awaiting', updatedAt: 1, ...patch }));
+      await writeFile(
+        file,
+        JSON.stringify({ schemaVersion: '1', planId: 'p', revision: 1, status: 'awaiting', updatedAt: 1, ...patch }),
+      );
       expect(() => store.read('sess')).toThrow(/STORAGE_CORRUPT/);
     }
     const future = JSON.stringify({ schemaVersion: '99', planId: 'p' });
@@ -74,14 +83,21 @@ describe('PlanReviewStateStore', () => {
     expect(store.read('sess')?.status).toBe('cancelled');
     const next = store.beginRevision('sess', 'turn-b');
     expect(store.cancelReview('sess', 'turn-a', first.planId, 1)).toBe(false);
-    expect(() => store.markRejected('sess', { turnId: 'turn-a', planId: first.planId, revision: 1 })).toThrow('SCOPE_CHANGED');
+    expect(() => store.markRejected('sess', { turnId: 'turn-a', planId: first.planId, revision: 1 })).toThrow(
+      'SCOPE_CHANGED',
+    );
     expect(store.read('sess')).toMatchObject({ planId: next.planId, status: 'awaiting' });
     const file = store.getStatePath('sess')!;
-    const original = JSON.stringify({ schemaVersion: '1', planId: 'unowned', revision: 4, status: 'rejected', updatedAt: 1 });
+    const original = JSON.stringify({
+      schemaVersion: '1',
+      planId: 'unowned',
+      revision: 4,
+      status: 'rejected',
+      updatedAt: 1,
+    });
     await writeFile(file, original);
     expect(store.read('sess')?.ownerTurnId).toBeUndefined();
     expect(await readFile(file, 'utf8')).toBe(original);
     expect(store.beginRevision('sess', 'turn-b')).toMatchObject({ newCycle: true, revision: 1 });
   });
-
 });

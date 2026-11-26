@@ -62,7 +62,9 @@
   font: inherit;
   font-size: var(--type-reading-size);
   font-weight: var(--font-semibold);
-  transition: border-color var(--transition-fast), background var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .settings-profile-nickname:hover {
@@ -136,8 +138,18 @@
   background: currentColor;
 }
 
-.work-process-choice-preview > span::before { inline-size: var(--space-1); }
-.work-process-choice-preview > span::after { inline-size: 68%; }
-.work-process-choice-preview > span:nth-child(even)::after { inline-size: 48%; }
-.work-process-choice-preview > span:last-child { color: var(--token-accent-primary); }
-.work-process-choice-preview.is-following { mask-image: linear-gradient(to bottom, transparent 20%, black 75%); }
+.work-process-choice-preview > span::before {
+  inline-size: var(--space-1);
+}
+.work-process-choice-preview > span::after {
+  inline-size: 68%;
+}
+.work-process-choice-preview > span:nth-child(even)::after {
+  inline-size: 48%;
+}
+.work-process-choice-preview > span:last-child {
+  color: var(--token-accent-primary);
+}
+.work-process-choice-preview.is-following {
+  mask-image: linear-gradient(to bottom, transparent 20%, black 75%);
+}

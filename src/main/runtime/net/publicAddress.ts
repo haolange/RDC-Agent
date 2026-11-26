@@ -50,9 +50,21 @@ const ipv6 = (cidr: string): AddressRange => {
 
 /** IPv4 space that is not globally routable unicast (RFC 6890 special-purpose registry, plus multicast and reserved). */
 const NON_PUBLIC_IPV4: readonly AddressRange[] = [
-  '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8', '169.254.0.0/16', '172.16.0.0/12', '192.0.0.0/24',
-  '192.0.2.0/24', '192.88.99.0/24', '192.168.0.0/16', '198.18.0.0/15', '198.51.100.0/24', '203.0.113.0/24',
-  '224.0.0.0/4', '240.0.0.0/4',
+  '0.0.0.0/8',
+  '10.0.0.0/8',
+  '100.64.0.0/10',
+  '127.0.0.0/8',
+  '169.254.0.0/16',
+  '172.16.0.0/12',
+  '192.0.0.0/24',
+  '192.0.2.0/24',
+  '192.88.99.0/24',
+  '192.168.0.0/16',
+  '198.18.0.0/15',
+  '198.51.100.0/24',
+  '203.0.113.0/24',
+  '224.0.0.0/4',
+  '240.0.0.0/4',
 ].map(ipv4);
 
 /** IPv6 forms that carry an IPv4 address; the embedded address decides. */
@@ -84,9 +96,10 @@ function ipv6ToBigInt(address: string): bigint {
   const [head, tail] = text.split('::');
   const headGroups = head ? head.split(':') : [];
   const tailGroups = tail ? tail.split(':') : [];
-  const groups = tail === undefined
-    ? headGroups
-    : [...headGroups, ...Array<string>(8 - headGroups.length - tailGroups.length).fill('0'), ...tailGroups];
+  const groups =
+    tail === undefined
+      ? headGroups
+      : [...headGroups, ...Array<string>(8 - headGroups.length - tailGroups.length).fill('0'), ...tailGroups];
   return groups.reduce((value, group) => (value << 16n) | BigInt(Number.parseInt(group, 16)), 0n);
 }
 
@@ -110,7 +123,9 @@ export function isPublicAddress(address: string): boolean {
     const embeddedValue = (value >> BigInt(128 - embedded.ipv4Offset - 32)) & 0xffffffffn;
     return !NON_PUBLIC_IPV4.some((range) => inRange(embeddedValue, 32, range));
   }
-  return inRange(value, 128, GLOBAL_UNICAST_IPV6) && !NON_PUBLIC_GLOBAL_IPV6.some((range) => inRange(value, 128, range));
+  return (
+    inRange(value, 128, GLOBAL_UNICAST_IPV6) && !NON_PUBLIC_GLOBAL_IPV6.some((range) => inRange(value, 128, range))
+  );
 }
 
 /**
@@ -118,7 +133,10 @@ export function isPublicAddress(address: string): boolean {
  * address must be public, so a mixed dual-stack answer cannot slip a private address in. Connect only through
  * `requestPinned` so the TCP connection goes to the verified address, closing the DNS rebinding window.
  */
-export async function pinPublicUrl(rawUrl: string, options: { httpsOnly?: boolean } = {}): Promise<PinnedPublicHttpUrl> {
+export async function pinPublicUrl(
+  rawUrl: string,
+  options: { httpsOnly?: boolean } = {},
+): Promise<PinnedPublicHttpUrl> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -141,7 +159,9 @@ export async function pinPublicUrl(rawUrl: string, options: { httpsOnly?: boolea
   try {
     addresses = await lookup(literal, { all: true });
   } catch (error) {
-    throw new PublicUrlDeniedError(`DNS lookup failed for ${hostname}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new PublicUrlDeniedError(
+      `DNS lookup failed for ${hostname}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
   const [primary] = addresses;
   if (!primary) throw new PublicUrlDeniedError(`DNS lookup returned no addresses for ${hostname}`);

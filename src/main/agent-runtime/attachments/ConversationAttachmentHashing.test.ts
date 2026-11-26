@@ -34,8 +34,7 @@ describe('conversation attachment hashing', () => {
       size: 64 * 1024 * 1024,
     } as import('fs').Stats);
 
-    await expect(hashAttachmentContents([0, 1, 2, 3, 4].map(attachment)))
-      .rejects.toThrow('ATTACHMENT_LIMIT_EXCEEDED');
+    await expect(hashAttachmentContents([0, 1, 2, 3, 4].map(attachment))).rejects.toThrow('ATTACHMENT_LIMIT_EXCEEDED');
     expect(statSync).toHaveBeenCalledTimes(5);
     expect(createReadStream).not.toHaveBeenCalled();
   });
@@ -104,5 +103,4 @@ describe('conversation attachment hashing', () => {
     const reversed = await hashAttachmentContents([attachment(2), attachment(1), attachment(0)]);
     expect(reversed).toEqual([hashes[2], hashes[1], hashes[0]]);
   });
-
 });

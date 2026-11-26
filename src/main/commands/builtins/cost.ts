@@ -26,7 +26,9 @@ export const costCommand: CommandDefinition = {
 
     const completed = runs.filter((run) => run.status === 'completed').length;
     const failed = runs.filter((run) => run.status === 'failed').length;
-    const active = runs.filter((run) => ['queued', 'planning', 'awaiting_input', 'awaiting_approval', 'running', 'stopping'].includes(run.status)).length;
+    const active = runs.filter((run) =>
+      ['queued', 'planning', 'awaiting_input', 'awaiting_approval', 'running', 'stopping'].includes(run.status),
+    ).length;
     const lastRun = runs[0];
     const lines = [
       `Session: ${sessionId}`,

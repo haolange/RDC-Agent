@@ -20,18 +20,26 @@ export function DiffBlock({ lines, beforeLabel, afterLabel, dataTestId, fold }: 
   return (
     <div className="ui-diff-block">
       <div className="ui-diff-legend" aria-hidden="true">
-        <span className="is-remove">− {beforeLabel} ({removed})</span>
-        <span className="is-add">+ {afterLabel} ({added})</span>
+        <span className="is-remove">
+          − {beforeLabel} ({removed})
+        </span>
+        <span className="is-add">
+          + {afterLabel} ({added})
+        </span>
       </div>
       <pre className="ui-diff scrollbar-thin" data-testid={dataTestId} tabIndex={0}>
-        {rows.map((line, index) => (line.kind === 'gap' ? (
-          <div key={`gap:${index}`} className="ui-diff-line is-gap">{fold?.label(line.count)}</div>
-        ) : (
-          <div key={`${line.kind}:${index}`} className={`ui-diff-line is-${line.kind}`}>
-            {line.kind === 'add' ? '+' : line.kind === 'remove' ? '-' : ' '}
-            {line.text}
-          </div>
-        )))}
+        {rows.map((line, index) =>
+          line.kind === 'gap' ? (
+            <div key={`gap:${index}`} className="ui-diff-line is-gap">
+              {fold?.label(line.count)}
+            </div>
+          ) : (
+            <div key={`${line.kind}:${index}`} className={`ui-diff-line is-${line.kind}`}>
+              {line.kind === 'add' ? '+' : line.kind === 'remove' ? '-' : ' '}
+              {line.text}
+            </div>
+          ),
+        )}
       </pre>
     </div>
   );

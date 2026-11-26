@@ -7,7 +7,7 @@
 }
 
 .composer-shell.is-running:focus-within,
-.composer-shell.is-running:has([aria-expanded="true"]) {
+.composer-shell.is-running:has([aria-expanded='true']) {
   border-color: color-mix(in srgb, var(--composer-mode-accent) 52%, var(--token-border-strong));
   box-shadow:
     var(--token-edge-faint),

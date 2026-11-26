@@ -20,35 +20,41 @@ export function useKnowledgeOperation() {
   const current = useRef<string | null>(null);
   const [running, setRunning] = useState<RunningKnowledgeOperation | null>(null);
 
-  useEffect(() => window.electronAPI.events.onKnowledgeProgress((progress) => {
-    if (progress.operationId !== current.current) return;
-    setRunning((state) => (state?.operationId === progress.operationId ? { ...state, progress } : state));
-  }), []);
+  useEffect(
+    () =>
+      window.electronAPI.events.onKnowledgeProgress((progress) => {
+        if (progress.operationId !== current.current) return;
+        setRunning((state) => (state?.operationId === progress.operationId ? { ...state, progress } : state));
+      }),
+    [],
+  );
 
-  const run = useCallback(async <T>(start: (operationId: string) => Promise<T>): Promise<KnowledgeOperationOutcome<T>> => {
-    const operationId = crypto.randomUUID();
-    current.current = operationId;
-    setRunning({ operationId, progress: null, cancelling: false });
-    try {
-      return { cancelled: false, value: await start(operationId) };
-    } catch (error) {
-      if (errorCodeOf(error) === 'KNOWLEDGE_OPERATION_CANCELLED') return { cancelled: true };
-      throw error;
-    } finally {
-      if (current.current === operationId) {
-        current.current = null;
-        setRunning(null);
+  const run = useCallback(
+    async <T>(start: (operationId: string) => Promise<T>): Promise<KnowledgeOperationOutcome<T>> => {
+      const operationId = crypto.randomUUID();
+      current.current = operationId;
+      setRunning({ operationId, progress: null, cancelling: false });
+      try {
+        return { cancelled: false, value: await start(operationId) };
+      } catch (error) {
+        if (errorCodeOf(error) === 'KNOWLEDGE_OPERATION_CANCELLED') return { cancelled: true };
+        throw error;
+      } finally {
+        if (current.current === operationId) {
+          current.current = null;
+          setRunning(null);
+        }
       }
-    }
-  }, []);
+    },
+    [],
+  );
 
   /** Stays pending until main answers; a request that could not be delivered lets the person ask again. */
   const cancel = useCallback(() => {
     const operationId = current.current;
     if (!operationId) return;
-    const settle = (cancelling: boolean) => setRunning((state) => (
-      state?.operationId === operationId ? { ...state, cancelling } : state
-    ));
+    const settle = (cancelling: boolean) =>
+      setRunning((state) => (state?.operationId === operationId ? { ...state, cancelling } : state));
     settle(true);
     void window.electronAPI.knowledge.cancel({ operationId }).catch((error: unknown) => {
       console.warn('[knowledge] could not cancel the operation', error);

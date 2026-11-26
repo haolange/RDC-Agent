@@ -4,10 +4,7 @@ import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { createProviderStateRef } from '../reasoning/ProviderStateRefs';
 import { GoogleInteractionsProvider } from './GoogleInteractionsProvider';
-import {
-  buildGoogleInteractionsRequest,
-  toGoogleInteractionSteps,
-} from './GoogleInteractionsWire';
+import { buildGoogleInteractionsRequest, toGoogleInteractionSteps } from './GoogleInteractionsWire';
 import type { AssistantMessage, Context, Model } from '../core/types';
 import type { ReasoningControl } from '@shared/types/modelCapability';
 import type { RequestPlan } from '@shared/types/providerCapability';
@@ -129,63 +126,70 @@ describe('GoogleInteractionsProvider', () => {
     let request: { url: string; init?: RequestInit } | undefined;
     vi.stubGlobal('fetch', async (url: string | URL | Request, init?: RequestInit) => {
       request = { url: String(url), init };
-      return new Response([
-        'event: interaction.created',
-        'data: {"event_type":"interaction.created","interaction":{"id":"int_1","status":"in_progress"}}',
-        '',
-        'event: step.start',
-        'data: {"event_type":"step.start","index":0,"step":{"type":"thought","signature":"","summary":[]}}',
-        '',
-        'event: step.delta',
-        'data: {"event_type":"step.delta","index":0,"delta":{"type":"thought_summary","content":{"type":"text","text":"Check weather."}}}',
-        '',
-        'event: step.delta',
-        'data: {"event_type":"step.delta","index":0,"delta":{"type":"thought_signature","signature":"sig_1"}}',
-        '',
-        'event: step.stop',
-        'data: {"event_type":"step.stop","index":0}',
-        '',
-        'event: step.start',
-        'data: {"event_type":"step.start","index":1,"step":{"type":"function_call","id":"call_1","name":"weather"}}',
-        '',
-        'event: step.delta',
-        'data: {"event_type":"step.delta","index":1,"delta":{"type":"arguments_delta","arguments":"{\\"city\\":\\""}}',
-        '',
-        'event: step.delta',
-        'data: {"event_type":"step.delta","index":1,"delta":{"type":"arguments_delta","arguments":"Paris\\"}"}}',
-        '',
-        'event: step.stop',
-        'data: {"event_type":"step.stop","index":1}',
-        '',
-        'event: interaction.requires_action',
-        'data: {"event_type":"interaction.requires_action","interaction":{"id":"int_1","status":"requires_action","usage":{"total_input_tokens":11,"total_output_tokens":7,"total_thought_tokens":3,"total_cached_tokens":5,"total_tokens":21}}}',
-        '',
-        'event: done',
-        'data: [DONE]',
-        '',
-      ].join('\n'), {
-        status: 200,
-        headers: { 'Content-Type': 'text/event-stream' },
-      });
+      return new Response(
+        [
+          'event: interaction.created',
+          'data: {"event_type":"interaction.created","interaction":{"id":"int_1","status":"in_progress"}}',
+          '',
+          'event: step.start',
+          'data: {"event_type":"step.start","index":0,"step":{"type":"thought","signature":"","summary":[]}}',
+          '',
+          'event: step.delta',
+          'data: {"event_type":"step.delta","index":0,"delta":{"type":"thought_summary","content":{"type":"text","text":"Check weather."}}}',
+          '',
+          'event: step.delta',
+          'data: {"event_type":"step.delta","index":0,"delta":{"type":"thought_signature","signature":"sig_1"}}',
+          '',
+          'event: step.stop',
+          'data: {"event_type":"step.stop","index":0}',
+          '',
+          'event: step.start',
+          'data: {"event_type":"step.start","index":1,"step":{"type":"function_call","id":"call_1","name":"weather"}}',
+          '',
+          'event: step.delta',
+          'data: {"event_type":"step.delta","index":1,"delta":{"type":"arguments_delta","arguments":"{\\"city\\":\\""}}',
+          '',
+          'event: step.delta',
+          'data: {"event_type":"step.delta","index":1,"delta":{"type":"arguments_delta","arguments":"Paris\\"}"}}',
+          '',
+          'event: step.stop',
+          'data: {"event_type":"step.stop","index":1}',
+          '',
+          'event: interaction.requires_action',
+          'data: {"event_type":"interaction.requires_action","interaction":{"id":"int_1","status":"requires_action","usage":{"total_input_tokens":11,"total_output_tokens":7,"total_thought_tokens":3,"total_cached_tokens":5,"total_tokens":21}}}',
+          '',
+          'event: done',
+          'data: [DONE]',
+          '',
+        ].join('\n'),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        },
+      );
     });
 
     const context: Context = {
       systemPrompt: 'Stay precise.',
       messages: [{ role: 'user', content: 'Weather?', timestamp: 1 }],
-      tools: [{
-        name: 'weather',
-        description: 'Read weather',
-        parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] },
-      }],
+      tools: [
+        {
+          name: 'weather',
+          description: 'Read weather',
+          parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] },
+        },
+      ],
     };
     const message = await new GoogleInteractionsProvider({
       apiKey: 'secret',
       baseUrl: 'https://generativelanguage.googleapis.com/v1',
-    }).stream(model, context, {
-      requestPlan: plan(),
-      reasoning: { selection: 'high', control: reasoningControl },
-      reasoningVisibility: 'summary-events',
-    }).result();
+    })
+      .stream(model, context, {
+        requestPlan: plan(),
+        reasoning: { selection: 'high', control: reasoningControl },
+        reasoningVisibility: 'summary-events',
+      })
+      .result();
 
     expect(request?.url).toBe('https://generativelanguage.googleapis.com/v1/interactions');
     expect(new Headers(request?.init?.headers).get('x-goog-api-key')).toBe('secret');
@@ -235,19 +239,33 @@ describe('GoogleInteractionsProvider', () => {
   });
 
   it('fails closed when a thought step stops before its required signature', async () => {
-    vi.stubGlobal('fetch', async () => new Response([
-      'data: {"event_type":"interaction.created","interaction":{"id":"int_1"}}',
-      '',
-      'data: {"event_type":"step.start","index":0,"step":{"type":"thought","summary":[]}}',
-      '',
-      'data: {"event_type":"step.stop","index":0}',
-      '',
-    ].join('\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+    vi.stubGlobal(
+      'fetch',
+      async () =>
+        new Response(
+          [
+            'data: {"event_type":"interaction.created","interaction":{"id":"int_1"}}',
+            '',
+            'data: {"event_type":"step.start","index":0,"step":{"type":"thought","summary":[]}}',
+            '',
+            'data: {"event_type":"step.stop","index":0}',
+            '',
+          ].join('\n'),
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+        ),
+    );
 
-    await expect(new GoogleInteractionsProvider({ apiKey: 'secret' })
-      .stream(model, { messages: [{ role: 'user', content: 'x', timestamp: 1 }] }, {
-        requestPlan: plan(),
-      }).result()).rejects.toThrow('thought step ended without its required signature');
+    await expect(
+      new GoogleInteractionsProvider({ apiKey: 'secret' })
+        .stream(
+          model,
+          { messages: [{ role: 'user', content: 'x', timestamp: 1 }] },
+          {
+            requestPlan: plan(),
+          },
+        )
+        .result(),
+    ).rejects.toThrow('thought step ended without its required signature');
   });
 });
 
@@ -265,19 +283,23 @@ describe('Google Interactions context compilation', () => {
       providerState,
       timestamp: 2,
     };
-    const body = buildGoogleInteractionsRequest(model, {
-      systemPrompt: 'System remains request-scoped.',
-      messages: [
-        { role: 'user', content: 'old', timestamp: 1 },
-        priorAssistant,
-        { role: 'user', content: 'new', timestamp: 3 },
-      ],
-      tools: [{ name: 'lookup', description: 'Lookup', parameters: { type: 'object' } }],
-    }, {
-      requestPlan,
-      reasoning: { selection: 'high', control: reasoningControl },
-      reasoningVisibility: 'summary-events',
-    });
+    const body = buildGoogleInteractionsRequest(
+      model,
+      {
+        systemPrompt: 'System remains request-scoped.',
+        messages: [
+          { role: 'user', content: 'old', timestamp: 1 },
+          priorAssistant,
+          { role: 'user', content: 'new', timestamp: 3 },
+        ],
+        tools: [{ name: 'lookup', description: 'Lookup', parameters: { type: 'object' } }],
+      },
+      {
+        requestPlan,
+        reasoning: { selection: 'high', control: reasoningControl },
+        reasoningVisibility: 'summary-events',
+      },
+    );
 
     expect(body).toMatchObject({
       previous_interaction_id: 'int_anchor',
@@ -302,22 +324,29 @@ describe('Google Interactions context compilation', () => {
       signature: 'sig_cross_model',
       raw,
     });
-    const steps = toGoogleInteractionSteps([{
-      role: 'assistant',
-      content: [{
-        type: 'thinking',
-        text: 'Preserve me.',
-        kind: 'summary',
-        source: 'gemini-interactions-summary',
-        visibility: 'summary',
-        continuation,
-      }],
-      model: 'gemini-3.5-flash',
-      provider: 'google-ai-studio',
-      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-      stopReason: 'stop',
-      timestamp: 1,
-    }], targetPlan);
+    const steps = toGoogleInteractionSteps(
+      [
+        {
+          role: 'assistant',
+          content: [
+            {
+              type: 'thinking',
+              text: 'Preserve me.',
+              kind: 'summary',
+              source: 'gemini-interactions-summary',
+              visibility: 'summary',
+              continuation,
+            },
+          ],
+          model: 'gemini-3.5-flash',
+          provider: 'google-ai-studio',
+          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          stopReason: 'stop',
+          timestamp: 1,
+        },
+      ],
+      targetPlan,
+    );
 
     expect(steps).toEqual([raw]);
   });

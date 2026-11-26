@@ -8,11 +8,7 @@ import { KNOWLEDGE_PACKAGE_SCHEMA } from './knowledgePackage';
 import { resolveWithinRoot } from './knowledgeFs';
 import { containsAbsolutePath, hasKnowledgeSecret } from './knowledgeSensitiveText';
 import { isSafeKnowledgeImageRelative, KNOWLEDGE_IMAGE_MAX_BYTES } from './knowledgeImages';
-import {
-  KNOWLEDGE_PACKAGE_MANIFEST,
-  utf8ToZip,
-  zipKnowledgeFiles,
-} from './knowledgeZip';
+import { KNOWLEDGE_PACKAGE_MANIFEST, utf8ToZip, zipKnowledgeFiles } from './knowledgeZip';
 import type { KnowledgePackage, KnowledgePackageCard } from './knowledgePackage';
 import type { KnowledgeOperationOptions } from './knowledgeOperations';
 import type { KnowledgeCardDetail, KnowledgeImageRef, KnowledgeSpace } from '@shared/types/knowledge';
@@ -70,9 +66,7 @@ export function serializeMarkdown(cards: KnowledgePackageCard[]): string {
   return cards
     .map((card) => {
       const meta = [card.type, card.lifecycle, card.caseId].filter(Boolean).join(' · ');
-      return [`# ${card.title}`, meta ? `> ${meta}` : '', card.body.trim()]
-        .filter(Boolean)
-        .join('\n\n');
+      return [`# ${card.title}`, meta ? `> ${meta}` : '', card.body.trim()].filter(Boolean).join('\n\n');
     })
     .join('\n\n---\n\n')
     .concat('\n');
@@ -93,9 +87,10 @@ export class KnowledgeExportService {
   }
 
   /** One card as the package carries it, with its images; `excluded` when it may not leave this machine. */
-  private async collectCard(ref: { spaceId: string; relativePath: string }): Promise<
-    { card: KnowledgePackageCard; images: Map<string, Uint8Array> } | 'excluded' | null
-  > {
+  private async collectCard(ref: {
+    spaceId: string;
+    relativePath: string;
+  }): Promise<{ card: KnowledgePackageCard; images: Map<string, Uint8Array> } | 'excluded' | null> {
     const card = await this.deps.getCard(ref.spaceId, ref.relativePath);
     if (!card) return null;
     if (!isExportable(card)) return 'excluded';
@@ -145,12 +140,13 @@ export class KnowledgeExportService {
     if (cards.length === 0) throw new AppError('KNOWLEDGE_EXPORT_EMPTY_RESULT');
 
     onProgress?.('writing', 0, 1);
-    const payload = request.format === 'package'
-      ? zipKnowledgeFiles([
-        { name: KNOWLEDGE_PACKAGE_MANIFEST, data: utf8ToZip(serializePackage(cards, new Date().toISOString())) },
-        ...[...imageFiles.entries()].map(([name, data]) => ({ name, data })),
-      ])
-      : new TextEncoder().encode(serializeMarkdown(cards));
+    const payload =
+      request.format === 'package'
+        ? zipKnowledgeFiles([
+            { name: KNOWLEDGE_PACKAGE_MANIFEST, data: utf8ToZip(serializePackage(cards, new Date().toISOString())) },
+            ...[...imageFiles.entries()].map(([name, data]) => ({ name, data })),
+          ])
+        : new TextEncoder().encode(serializeMarkdown(cards));
     await this.deps.writeBytes(targetPath, payload, signal);
     onProgress?.('writing', 1, 1);
     return {
@@ -169,8 +165,8 @@ export function createDefaultExportDependencies(services: {
 }): KnowledgeExportDependencies {
   return {
     getCard: services.getCard,
-    listCards: async (spaceId) => (await services.listCards(spaceId))
-      .map((card) => ({ spaceId, relativePath: card.relativePath })),
+    listCards: async (spaceId) =>
+      (await services.listCards(spaceId)).map((card) => ({ spaceId, relativePath: card.relativePath })),
     readImage: async (spaceId, relativePath) => {
       const space = services.listSpaces().find((entry) => entry.spaceId === spaceId);
       if (!space) return null;

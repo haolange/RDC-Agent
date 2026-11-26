@@ -34,27 +34,29 @@ describe('conversationStore branch projection', () => {
       sessionId: 'sess-1',
       rootBranchId: ROOT_BRANCH_ID,
       activeLeafBranchId: 'branch-v2',
-      forks: [{
-        forkId: 'msg-user-1',
-        anchorMessageId: 'msg-user-1',
-        activeBranchId: 'branch-v2',
-        branches: [
-          {
-            branchId: ROOT_BRANCH_ID,
-            parentBranchId: null,
-            variantIndex: 0,
-            anchorUserMessageId: 'msg-user-1',
-            rootTurnId: 'turn-1',
-          },
-          {
-            branchId: 'branch-v2',
-            parentBranchId: ROOT_BRANCH_ID,
-            variantIndex: 1,
-            anchorUserMessageId: 'msg-user-1b',
-            rootTurnId: 'turn-2',
-          },
-        ],
-      }],
+      forks: [
+        {
+          forkId: 'msg-user-1',
+          anchorMessageId: 'msg-user-1',
+          activeBranchId: 'branch-v2',
+          branches: [
+            {
+              branchId: ROOT_BRANCH_ID,
+              parentBranchId: null,
+              variantIndex: 0,
+              anchorUserMessageId: 'msg-user-1',
+              rootTurnId: 'turn-1',
+            },
+            {
+              branchId: 'branch-v2',
+              parentBranchId: ROOT_BRANCH_ID,
+              variantIndex: 1,
+              anchorUserMessageId: 'msg-user-1b',
+              rootTurnId: 'turn-2',
+            },
+          ],
+        },
+      ],
     };
 
     useConversationStore.getState().setConversationMessages([
@@ -93,10 +95,9 @@ describe('conversationStore branch projection', () => {
     ]);
     expect(useConversationStore.getState().allConversationMessages).toHaveLength(5);
     expect(
-      resolveVisibleConversationMessages(
-        useConversationStore.getState().allConversationMessages,
-        branchState,
-      ).map((entry) => entry.id),
+      resolveVisibleConversationMessages(useConversationStore.getState().allConversationMessages, branchState).map(
+        (entry) => entry.id,
+      ),
     ).toEqual(['msg-user-1b', 'msg-assistant-1b']);
   });
 
@@ -105,32 +106,39 @@ describe('conversationStore branch projection', () => {
       sessionId: 'sess-1',
       rootBranchId: ROOT_BRANCH_ID,
       activeLeafBranchId: 'branch-v2',
-      forks: [{
-        forkId: 'fork-a',
-        anchorMessageId: 'u1',
-        activeBranchId: 'branch-v2',
-        branches: [
-          {
-            branchId: ROOT_BRANCH_ID,
-            parentBranchId: null,
-            variantIndex: 0,
-            anchorUserMessageId: 'u1',
-            rootTurnId: 't1',
-          },
-          {
-            branchId: 'branch-v2',
-            parentBranchId: ROOT_BRANCH_ID,
-            variantIndex: 1,
-            anchorUserMessageId: 'u1b',
-            rootTurnId: 't2',
-          },
-        ],
-      }],
+      forks: [
+        {
+          forkId: 'fork-a',
+          anchorMessageId: 'u1',
+          activeBranchId: 'branch-v2',
+          branches: [
+            {
+              branchId: ROOT_BRANCH_ID,
+              parentBranchId: null,
+              variantIndex: 0,
+              anchorUserMessageId: 'u1',
+              rootTurnId: 't1',
+            },
+            {
+              branchId: 'branch-v2',
+              parentBranchId: ROOT_BRANCH_ID,
+              variantIndex: 1,
+              anchorUserMessageId: 'u1b',
+              rootTurnId: 't2',
+            },
+          ],
+        },
+      ],
     };
-    useConversationStore.getState().setConversationSnapshot([
-      msg('u1', 't1', 'user', 'old', { branchId: ROOT_BRANCH_ID, forkId: 'fork-a', createdAt: now }),
-      msg('u1b', 't2', 'user', 'new', { branchId: 'branch-v2', forkId: 'fork-a', createdAt: now + 1 }),
-    ], branchState);
+    useConversationStore
+      .getState()
+      .setConversationSnapshot(
+        [
+          msg('u1', 't1', 'user', 'old', { branchId: ROOT_BRANCH_ID, forkId: 'fork-a', createdAt: now }),
+          msg('u1b', 't2', 'user', 'new', { branchId: 'branch-v2', forkId: 'fork-a', createdAt: now + 1 }),
+        ],
+        branchState,
+      );
 
     expect(useConversationStore.getState().conversationMessages.map((entry) => entry.id)).toEqual(['u1b']);
   });

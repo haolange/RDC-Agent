@@ -65,7 +65,10 @@ export function persistSessionModelOverride(
   return saveSessionModelField(sessionId, 'modelOverride', { modelOverride });
 }
 
-export function persistSessionTurnControls(sessionId: string, turnControls: ConversationTurnControls): Promise<SessionModelSaveResult> {
+export function persistSessionTurnControls(
+  sessionId: string,
+  turnControls: ConversationTurnControls,
+): Promise<SessionModelSaveResult> {
   return saveSessionModelField(sessionId, 'turnControls', { turnControls });
 }
 

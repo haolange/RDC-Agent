@@ -1,10 +1,19 @@
 import { LLM_PROVIDER_CATALOG_FIELDS } from '../types/settings';
-import type { LlmProviderCatalogEntry, LlmProviderConnectionState, LlmProviderEntry, LlmProviderModel } from '../types/settings';
+import type {
+  LlmProviderCatalogEntry,
+  LlmProviderConnectionState,
+  LlmProviderEntry,
+  LlmProviderModel,
+} from '../types/settings';
 
 /** The catalog's recommended models that an enabled, available row still offers. */
-export const offeredRecommendedModels = (recommended: readonly string[], models: readonly LlmProviderModel[]): string[] => (
-  recommended.filter((id) => models.some((model) => model.id === id && model.enabled !== false && model.availability !== 'unavailable'))
-);
+export const offeredRecommendedModels = (
+  recommended: readonly string[],
+  models: readonly LlmProviderModel[],
+): string[] =>
+  recommended.filter((id) =>
+    models.some((model) => model.id === id && model.enabled !== false && model.availability !== 'unavailable'),
+  );
 
 /** A provider entry without its catalog facts: what `settings:get` sends for it. */
 export function providerConnectionState(entry: LlmProviderEntry): LlmProviderConnectionState {
@@ -17,7 +26,10 @@ export function providerConnectionState(entry: LlmProviderEntry): LlmProviderCon
  * The provider entry main composes, rebuilt from the catalog entry and the connection state: the catalog facts, the
  * recommended models the enabled rows still offer, and everything else from the state.
  */
-export function joinProviderEntry(catalog: LlmProviderCatalogEntry, state: LlmProviderConnectionState): LlmProviderEntry {
+export function joinProviderEntry(
+  catalog: LlmProviderCatalogEntry,
+  state: LlmProviderConnectionState,
+): LlmProviderEntry {
   return {
     ...state,
     protocol: catalog.protocol,

@@ -18,16 +18,22 @@ export async function pruneAttachmentDocumentCopies(root: string): Promise<void>
       try {
         if ((await lstat(directory)).mtimeMs >= cutoff) continue;
         const children = await readdir(directory, { withFileTypes: true });
-        if (children.some((child) => !child.isFile())
-          || (children.length > 1 && children.some((child) => child.name.startsWith('~$')))) continue;
-        const timestamps = await Promise.all(children.map(async (child) => (await lstat(join(directory, child.name))).mtimeMs));
+        if (
+          children.some((child) => !child.isFile()) ||
+          (children.length > 1 && children.some((child) => child.name.startsWith('~$')))
+        )
+          continue;
+        const timestamps = await Promise.all(
+          children.map(async (child) => (await lstat(join(directory, child.name))).mtimeMs),
+        );
         if (timestamps.every((mtime) => mtime < cutoff)) await rm(directory, { recursive: true, force: true });
       } catch (error) {
         if (!['EBUSY', 'EPERM', 'EACCES', 'ENOENT'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
       }
     }
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.warn('[attachments] Could not clean document copies', error);
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+      console.warn('[attachments] Could not clean document copies', error);
   }
 }
 

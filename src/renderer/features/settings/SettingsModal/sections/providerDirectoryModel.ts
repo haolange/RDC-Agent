@@ -26,7 +26,8 @@ export function isSuggestedProvider(id: string): boolean {
 
 export function directoryCategory(provider: Pick<DirectoryEntry, 'category' | 'endpointClass'>) {
   return provider.category === 'compatible-access' && provider.endpointClass === 'first-party'
-    ? 'official-direct' : provider.category;
+    ? 'official-direct'
+    : provider.category;
 }
 
 interface DirectoryGroup<T> {
@@ -37,7 +38,12 @@ interface DirectoryGroup<T> {
 }
 
 /** Groups only for presentation. Every action still receives the exact configured surface. */
-export function directoryGroups<T extends DirectoryEntry>(entries: T[], filter: string, search: string, t: Translate): DirectoryGroup<T>[] {
+export function directoryGroups<T extends DirectoryEntry>(
+  entries: T[],
+  filter: string,
+  search: string,
+  t: Translate,
+): DirectoryGroup<T>[] {
   const terms = search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const groups = new Map<string, DirectoryGroup<T>>();
   for (const entry of entries) {
@@ -49,12 +55,26 @@ export function directoryGroups<T extends DirectoryEntry>(entries: T[], filter: 
     if (categoryFilter && (filter !== category || (!terms.length && priority === 1))) continue;
     const custom = entry.endpointClass === 'user-endpoint';
     const familyLabel = custom ? t('settings.directory.custom') : family?.label;
-    const keywords = [entry.label, entry.id, familyLabel, family?.aliases, aliases.get(entry.id), category,
+    const keywords = [
+      entry.label,
+      entry.id,
+      familyLabel,
+      family?.aliases,
+      aliases.get(entry.id),
+      category,
       t(getProviderCategoryTranslation(category)),
-      ...entry.models.flatMap((model) => [model.id, model.label, ...(model.aliases ?? [])])].join(' ').toLocaleLowerCase();
+      ...entry.models.flatMap((model) => [model.id, model.label, ...(model.aliases ?? [])]),
+    ]
+      .join(' ')
+      .toLocaleLowerCase();
     if (!terms.every((term) => keywords.includes(term))) continue;
     const key = family?.label ?? entry.id;
-    const group: DirectoryGroup<T> = groups.get(key) ?? { key, label: familyLabel ?? entry.label, entries: [], priority };
+    const group: DirectoryGroup<T> = groups.get(key) ?? {
+      key,
+      label: familyLabel ?? entry.label,
+      entries: [],
+      priority,
+    };
     group.entries.push(entry);
     group.priority = Math.max(group.priority, priority);
     groups.set(key, group);

@@ -40,12 +40,14 @@ interface ResponsesCompletedPayload {
   };
 }
 
-type InputMessageContent = string | Array<{
-  type: string;
-  text?: string;
-  data?: string;
-  mimeType?: string;
-}>;
+type InputMessageContent =
+  | string
+  | Array<{
+      type: string;
+      text?: string;
+      data?: string;
+      mimeType?: string;
+    }>;
 
 type ResponsesInputContentPart =
   | { type: 'input_text'; text: string; prompt_cache_breakpoint?: { mode: 'explicit' } }
@@ -103,7 +105,8 @@ export async function consumeResponsesEventStream(
   const frames = { providerApi: protocol, framing: 'sse', frameSchema: ResponsesFrameSchema } as const;
   for await (const event of readProviderFrames(response, signal, options, frames)) {
     const eventType = readString(event.type);
-    if (eventType.startsWith('response.reasoning')) reasoningEventCounts[eventType] = (reasoningEventCounts[eventType] ?? 0) + 1;
+    if (eventType.startsWith('response.reasoning'))
+      reasoningEventCounts[eventType] = (reasoningEventCounts[eventType] ?? 0) + 1;
     if (providerTerminalSeen) {
       throw new ProviderStreamProtocolError(
         'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
@@ -139,7 +142,10 @@ export async function consumeResponsesEventStream(
       case 'response.reasoning_summary_text.done':
       case 'response.reasoning_summary_part.done': {
         const identity = items.identityFromEvent(event);
-        const text = eventType === 'response.reasoning_summary_text.done' ? readString(event.text) : readString(readRecord(event.part)?.text);
+        const text =
+          eventType === 'response.reasoning_summary_text.done'
+            ? readString(event.text)
+            : readString(readRecord(event.part)?.text);
         if (text) {
           sawOutput = true;
           items.completeSummaryPart(identity, readNumber(event.summary_index) ?? 0, text);
@@ -199,7 +205,8 @@ export async function consumeResponsesEventStream(
       case 'response.function_call_arguments.delta': {
         const identity = items.identityFromEvent(event);
         const delta = readString(event.delta);
-        if (delta) toolCalls.appendArguments(toolKey(identity.outputIndex, identity.itemId), items.toolRef(identity), delta);
+        if (delta)
+          toolCalls.appendArguments(toolKey(identity.outputIndex, identity.itemId), items.toolRef(identity), delta);
         break;
       }
       case 'response.function_call_arguments.done': {
@@ -234,7 +241,12 @@ export async function consumeResponsesEventStream(
           sawOutput = true;
           const toolRef = items.toolRef(identity);
           const key = toolKey(identity.outputIndex, identity.itemId);
-          toolCalls.open(key, toolRef, readString(item?.call_id) || readString(item?.id) || '', readString(item?.name) || '');
+          toolCalls.open(
+            key,
+            toolRef,
+            readString(item?.call_id) || readString(item?.id) || '',
+            readString(item?.name) || '',
+          );
           const args = readString(item?.arguments);
           if (args && !toolCalls.hasArguments(key)) toolCalls.appendArguments(key, toolRef, args);
           toolCalls.close(key, toolRef);
@@ -250,9 +262,9 @@ export async function consumeResponsesEventStream(
           applyCompletedUsage(builder, completed);
           const providerState = createProviderStateRef(options.requestPlan, completed.id);
           if (providerState) builder.setProviderState(providerState);
-          items.applyCompletedReasoning(completed.output, (item) => (
-            createResponsesReasoningArtifact(options.requestPlan, item)
-          ));
+          items.applyCompletedReasoning(completed.output, (item) =>
+            createResponsesReasoningArtifact(options.requestPlan, item),
+          );
           items.closeRemaining();
           finishReason = completed.status === 'incomplete' ? 'length' : sawToolCall ? 'toolUse' : 'stop';
         }
@@ -264,9 +276,9 @@ export async function consumeResponsesEventStream(
         const incomplete = readRecord(event.response) as ResponsesCompletedPayload | null;
         if (incomplete) {
           applyCompletedUsage(builder, incomplete);
-          items.applyCompletedReasoning(incomplete.output, (item) => (
-            createResponsesReasoningArtifact(options.requestPlan, item)
-          ));
+          items.applyCompletedReasoning(incomplete.output, (item) =>
+            createResponsesReasoningArtifact(options.requestPlan, item),
+          );
         }
         items.closeRemaining();
         builder.markTerminal('length');
@@ -319,24 +331,26 @@ export function buildResponsesRequestBody(
     ? { ...context, messages: context.messages.slice(providerState.assistantMessageIndex + 1) }
     : context;
   const prompt = partitionSystemPrompt(context);
-  const explicitBreakpoint = !deepSeekResponses && options.promptCache?.enabled === true
-    && options.promptCache.breakpointCarrier === 'openai-prompt-cache'
-    && (
-      options.promptCache.breakpoint === 'explicit'
-      || options.promptCache.breakpoint === 'automatic-and-explicit'
-    );
+  const explicitBreakpoint =
+    !deepSeekResponses &&
+    options.promptCache?.enabled === true &&
+    options.promptCache.breakpointCarrier === 'openai-prompt-cache' &&
+    (options.promptCache.breakpoint === 'explicit' || options.promptCache.breakpoint === 'automatic-and-explicit');
   const input = toResponsesInput(inputContext, options.requestPlan);
   if (explicitBreakpoint) {
     if (!prompt.stableText) {
       throw new AppError(
-        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE', 'explicit OpenAI cache mode requires PromptPlan-owned stable segments.',
+        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE',
+        'explicit OpenAI cache mode requires PromptPlan-owned stable segments.',
       );
     }
-    const content: ResponsesInputContentPart[] = [{
-      type: 'input_text',
-      text: prompt.stableText,
-      prompt_cache_breakpoint: { mode: 'explicit' },
-    }];
+    const content: ResponsesInputContentPart[] = [
+      {
+        type: 'input_text',
+        text: prompt.stableText,
+        prompt_cache_breakpoint: { mode: 'explicit' },
+      },
+    ];
     if (prompt.volatileText) {
       content.push({ type: 'input_text', text: prompt.volatileText });
     }
@@ -346,14 +360,20 @@ export function buildResponsesRequestBody(
     model: model.id,
     input,
     stream: true,
-    ...(!deepSeekResponses ? {
-      store: options.requestPlan.statePlan.store,
-      parallel_tool_calls: true,
-    } : {}),
+    ...(!deepSeekResponses
+      ? {
+          store: options.requestPlan.statePlan.store,
+          parallel_tool_calls: true,
+        }
+      : {}),
   };
-  if (!deepSeekResponses && options.promptCache?.enabled
-    && (options.promptCache.keyCarrier === 'prompt-cache-key' || options.promptCache.keyCarrier === 'session-id-and-prompt-cache-key')
-    && options.promptCache.requestKey) {
+  if (
+    !deepSeekResponses &&
+    options.promptCache?.enabled &&
+    (options.promptCache.keyCarrier === 'prompt-cache-key' ||
+      options.promptCache.keyCarrier === 'session-id-and-prompt-cache-key') &&
+    options.promptCache.requestKey
+  ) {
     body.prompt_cache_key = options.promptCache.requestKey;
   }
   if (explicitBreakpoint) {
@@ -402,11 +422,13 @@ export function readDeepSeekReasoningText(item: Record<string, unknown> | null |
   if (!item) return '';
   if (typeof item.content === 'string') return item.content;
   if (!Array.isArray(item.content)) return '';
-  return item.content.flatMap((part): string[] => {
-    const value = readRecord(part);
-    const text = readString(value?.text) || readString(value?.content);
-    return text ? [text] : [];
-  }).join('');
+  return item.content
+    .flatMap((part): string[] => {
+      const value = readRecord(part);
+      const text = readString(value?.text) || readString(value?.content);
+      return text ? [text] : [];
+    })
+    .join('');
 }
 
 function convertMessage(message: Message, requestPlan: RequestPlan): unknown[] {
@@ -425,7 +447,12 @@ function convertMessage(message: Message, requestPlan: RequestPlan): unknown[] {
         );
         if (replayItem) items.push(replayItem);
       } else if (block.type === 'text' && block.text) {
-        items.push({ role: 'assistant', content: block.text, type: 'message', ...(block.phase ? { phase: block.phase } : {}) });
+        items.push({
+          role: 'assistant',
+          content: block.text,
+          type: 'message',
+          ...(block.phase ? { phase: block.phase } : {}),
+        });
       } else if (block.type === 'toolCall') {
         items.push({
           type: 'function_call',
@@ -443,11 +470,13 @@ function convertMessage(message: Message, requestPlan: RequestPlan): unknown[] {
     .filter((block) => block.type === 'text')
     .map((block) => block.text)
     .join('\n');
-  return [{
-    type: 'function_call_output',
-    call_id: message.toolCallId,
-    output,
-  }];
+  return [
+    {
+      type: 'function_call_output',
+      call_id: message.toolCallId,
+      output,
+    },
+  ];
 }
 
 function readOutputPhase(value: unknown): 'commentary' | 'final_answer' | undefined {
@@ -517,9 +546,7 @@ function createResponsesReasoningArtifact(
 }
 
 function readRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
 function readString(value: unknown): string {

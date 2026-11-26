@@ -5,13 +5,8 @@ import {
   PROVIDER_ADAPTER_IMPLEMENTATIONS,
   providerAdapterIdForProtocol,
 } from '@shared/provider-catalog/implementationRegistry';
-import {
-  hasImplementedStructuredToolAdapter,
-  isAgentToolExecutableModel,
-} from '@shared/utils/agentToolCapability';
-import {
-  PROTOCOL_WIRE_FIXTURE_COVERAGE,
-} from '../testing/contracts/protocolWireFixtureCoverage';
+import { hasImplementedStructuredToolAdapter, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
+import { PROTOCOL_WIRE_FIXTURE_COVERAGE } from '../testing/contracts/protocolWireFixtureCoverage';
 import { compileProviderCatalog, dedicatedToolCallingFactSourceIds } from './catalogCompiler';
 import { loadProviderCatalogManifestInput } from './manifestLoader';
 import type { LlmProviderProtocol } from '@shared/types/settings';
@@ -108,13 +103,15 @@ describe('Agent tool-calling catalog audit', () => {
     expect(catalog).not.toHaveProperty('embeddings');
     for (const compiled of catalog.surfaces.values()) {
       for (const model of compiled.surface.models) {
-        expect(isAgentToolExecutableModel({
-          enabled: model.enabled !== false,
-          availability: model.availability === 'unavailable' ? 'unavailable' : 'available',
-          selection: model.selection,
-          toolCalling: model.toolCalling,
-          route: model.route,
-        }) && model.modelId.includes('embedding')).toBe(false);
+        expect(
+          isAgentToolExecutableModel({
+            enabled: model.enabled !== false,
+            availability: model.availability === 'unavailable' ? 'unavailable' : 'available',
+            selection: model.selection,
+            toolCalling: model.toolCalling,
+            route: model.route,
+          }) && model.modelId.includes('embedding'),
+        ).toBe(false);
       }
     }
   });

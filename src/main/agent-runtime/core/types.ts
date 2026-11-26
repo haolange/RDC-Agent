@@ -78,7 +78,11 @@ export interface AssistantMessage {
   /** Provider id（与 `Model.provider` 对应）。 */
   provider: string;
   /** Actual server response metadata; never inferred from the requested model/tier. */
-  execution?: { modelId?: string; serviceTier?: string; reasoningEvents?: import('@shared/types/reasoning').ReasoningEventSummary };
+  execution?: {
+    modelId?: string;
+    serviceTier?: string;
+    reasoningEvents?: import('@shared/types/reasoning').ReasoningEventSummary;
+  };
   /** Token 使用统计。 */
   usage: Usage;
   /** 助手消息结束的原因。 */
@@ -268,14 +272,60 @@ export interface Model {
 export type AssistantMessageEvent =
   | { type: 'start'; partial: AssistantMessage }
   | { type: 'text_start'; contentIndex: number; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'text_delta'; contentIndex: number; delta: string; phase?: TextContent['phase']; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'text_end'; contentIndex: number; content: string; phase?: TextContent['phase']; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'thinking_start'; contentIndex: number; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'thinking_delta'; contentIndex: number; delta: string; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'thinking_end'; contentIndex: number; content: string; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | {
+      type: 'text_delta';
+      contentIndex: number;
+      delta: string;
+      phase?: TextContent['phase'];
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'text_end';
+      contentIndex: number;
+      content: string;
+      phase?: TextContent['phase'];
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'thinking_start';
+      contentIndex: number;
+      thinking: ThinkingContent;
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'thinking_delta';
+      contentIndex: number;
+      delta: string;
+      thinking: ThinkingContent;
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'thinking_end';
+      contentIndex: number;
+      content: string;
+      thinking: ThinkingContent;
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
   | { type: 'toolcall_start'; contentIndex: number; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'toolcall_delta'; contentIndex: number; delta: string; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
-  | { type: 'toolcall_end'; contentIndex: number; toolCall: ToolCallContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | {
+      type: 'toolcall_delta';
+      contentIndex: number;
+      delta: string;
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'toolcall_end';
+      contentIndex: number;
+      toolCall: ToolCallContent;
+      providerOutputRef: ProviderOutputRef;
+      partial: AssistantMessage;
+    }
   | { type: 'done'; reason: StopReason; message: AssistantMessage }
   | { type: 'error'; error: Error; message: AssistantMessage };
 

@@ -6,21 +6,44 @@ const text = z.string().trim().min(1).max(4_000);
 
 const texts = z.array(text).max(32);
 
-const ref = text.refine(value => { try { parseSessionArtifactUri(value); return true; } catch { return false; } }, 'invalid session artifact URI');
+const ref = text.refine((value) => {
+  try {
+    parseSessionArtifactUri(value);
+    return true;
+  } catch {
+    return false;
+  }
+}, 'invalid session artifact URI');
 
 const refs = z.array(ref).max(32);
 
-export const DelegationCapsuleSchema = z.object({
-  goal: text, task: text, scope: text,
-  acceptedFacts: z.array(z.object({ statement: text, sourceRefs: refs, qualification: text }).strict()).max(32),
-  hypotheses: texts, challengeRefs: refs,
-  negativePaths: z.array(z.object({ path: text, reason: text, applicableWhen: text, recheckWhen: text }).strict()).max(32),
-  inputArtifactRefs: refs, outputRequirements: text, stopConditions: texts,
-  requiredSkillIds: texts,
-  budget: z.object({ maxToolCalls: z.number().int().positive().optional(), maxWallTimeMs: z.number().int().positive().optional(), maxSubagents: z.number().int().nonnegative().optional() }).strict().default({}),
-  domainExtensions: z.record(z.string(), z.record(z.string(), z.boolean())).optional(),
-  profile: text.optional(),
-}).strict();
+export const DelegationCapsuleSchema = z
+  .object({
+    goal: text,
+    task: text,
+    scope: text,
+    acceptedFacts: z.array(z.object({ statement: text, sourceRefs: refs, qualification: text }).strict()).max(32),
+    hypotheses: texts,
+    challengeRefs: refs,
+    negativePaths: z
+      .array(z.object({ path: text, reason: text, applicableWhen: text, recheckWhen: text }).strict())
+      .max(32),
+    inputArtifactRefs: refs,
+    outputRequirements: text,
+    stopConditions: texts,
+    requiredSkillIds: texts,
+    budget: z
+      .object({
+        maxToolCalls: z.number().int().positive().optional(),
+        maxWallTimeMs: z.number().int().positive().optional(),
+        maxSubagents: z.number().int().nonnegative().optional(),
+      })
+      .strict()
+      .default({}),
+    domainExtensions: z.record(z.string(), z.record(z.string(), z.boolean())).optional(),
+    profile: text.optional(),
+  })
+  .strict();
 
 export type DelegationCapsule = z.infer<typeof DelegationCapsuleSchema>;
 
@@ -34,7 +57,9 @@ export function parseDelegationCapsule(input: unknown): DelegationCapsule {
   const parsed = DelegationCapsuleSchema.safeParse(input);
   if (!parsed.success) throw new Error(`${DELEGATION_CAPSULE_ERROR}: ${parsed.error.message}`);
   if (JSON.stringify(parsed.data).length > DELEGATION_CAPSULE_MAX_CHARS) {
-    throw new Error(`${DELEGATION_CAPSULE_ERROR}: capsule exceeds ${DELEGATION_CAPSULE_MAX_CHARS} characters; externalize raw material and pass artifact refs.`);
+    throw new Error(
+      `${DELEGATION_CAPSULE_ERROR}: capsule exceeds ${DELEGATION_CAPSULE_MAX_CHARS} characters; externalize raw material and pass artifact refs.`,
+    );
   }
   return freezeDelegationCapsule(parsed.data);
 }

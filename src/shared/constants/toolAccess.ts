@@ -94,7 +94,7 @@ export function isToolWithinCeiling(toolName: string, ceiling: AgentAccessCeilin
 }
 
 export function filterToolsWithinCeiling(toolNames: readonly string[], ceiling: AgentAccessCeiling): string[] {
-  return toolNames.filter((name) => name.endsWith('*') ? ceiling === 'full' : isToolWithinCeiling(name, ceiling));
+  return toolNames.filter((name) => (name.endsWith('*') ? ceiling === 'full' : isToolWithinCeiling(name, ceiling)));
 }
 
 /** Native RDC execution. Omitted ceiling is the profile default (`full`); a missing context is denied. */

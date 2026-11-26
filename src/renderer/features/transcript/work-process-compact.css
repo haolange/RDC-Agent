@@ -50,5 +50,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .work-process-body.is-compact .work-process-step.is-appear { animation: none; }
+  .work-process-body.is-compact .work-process-step.is-appear {
+    animation: none;
+  }
 }

@@ -23,15 +23,25 @@ function viewOf(settings: AppSettings, revision = 1): [SettingsView, LlmProvider
     llm: { connections: settings.llm.providers.map(providerConnectionState), agentRoutes: settings.llm.agentRoutes },
     agents: { ...settings.agents, projectId: null },
   };
-  const providers = settings.llm.providers.map((provider) => ({ ...provider, recommendedModels: provider.recommendedModels ?? [] }));
+  const providers = settings.llm.providers.map((provider) => ({
+    ...provider,
+    recommendedModels: provider.recommendedModels ?? [],
+  }));
   return [view, { categories: [], protocols: [], providers }];
 }
 
 function deferredPatches() {
-  const calls: Array<{ ops: SettingsPatchOp[]; resolve: (result: SettingsPatchResult) => void; reject: (error: Error) => void }> = [];
-  const patch = vi.fn((ops: SettingsPatchOp[]) => new Promise<SettingsPatchResult>((resolve, reject) => {
-    calls.push({ ops, resolve, reject });
-  }));
+  const calls: Array<{
+    ops: SettingsPatchOp[];
+    resolve: (result: SettingsPatchResult) => void;
+    reject: (error: Error) => void;
+  }> = [];
+  const patch = vi.fn(
+    (ops: SettingsPatchOp[]) =>
+      new Promise<SettingsPatchResult>((resolve, reject) => {
+        calls.push({ ops, resolve, reject });
+      }),
+  );
   vi.stubGlobal('window', { electronAPI: { settings: { patch } } });
   return calls;
 }
@@ -52,29 +62,51 @@ describe('optimistic settings patches', () => {
 
     calls[0]!.reject(new Error('disk full'));
     await expect(theme).rejects.toThrow('disk full');
-    expect(store.getState().settings.appearance).toMatchObject({ theme: DEFAULT_SETTINGS.appearance.theme, language: 'en' });
+    expect(store.getState().settings.appearance).toMatchObject({
+      theme: DEFAULT_SETTINGS.appearance.theme,
+      language: 'en',
+    });
 
     calls[1]!.resolve({ revision: 2, changed: { appearance: { ...DEFAULT_SETTINGS.appearance, language: 'en' } } });
     await language;
-    expect(store.getState().settings.appearance).toMatchObject({ theme: DEFAULT_SETTINGS.appearance.theme, language: 'en' });
+    expect(store.getState().settings.appearance).toMatchObject({
+      theme: DEFAULT_SETTINGS.appearance.theme,
+      language: 'en',
+    });
   });
 
   it('keeps two Agents edited before the first save returns', async () => {
     const calls = deferredPatches();
     const store = useAppSettingsStore;
     store.getState().hydrate(...viewOf(DEFAULT_SETTINGS), 'dark');
-    const first = store.getState().patchSettings([{ op: 'agentModels.setAgentField', agentId: 'debugger', field: 'model', value: 'ollama:local-model' }]);
-    const second = store.getState().patchSettings([{ op: 'agentModels.setAgentField', agentId: 'analyzer', field: 'model', value: 'ollama:other-model' }]);
+    const first = store
+      .getState()
+      .patchSettings([
+        { op: 'agentModels.setAgentField', agentId: 'debugger', field: 'model', value: 'ollama:local-model' },
+      ]);
+    const second = store
+      .getState()
+      .patchSettings([
+        { op: 'agentModels.setAgentField', agentId: 'analyzer', field: 'model', value: 'ollama:other-model' },
+      ]);
 
-    calls[0]!.resolve({ revision: 2, changed: { agentModels: { byAgent: { debugger: { model: 'ollama:local-model' } } } } });
+    calls[0]!.resolve({
+      revision: 2,
+      changed: { agentModels: { byAgent: { debugger: { model: 'ollama:local-model' } } } },
+    });
     await first;
     expect(store.getState().settings.agentModels.byAgent).toEqual({
-      debugger: { model: 'ollama:local-model' }, analyzer: { model: 'ollama:other-model' },
+      debugger: { model: 'ollama:local-model' },
+      analyzer: { model: 'ollama:other-model' },
     });
-    calls[1]!.resolve({ revision: 3, changed: { agentModels: { byAgent: { analyzer: { model: 'ollama:other-model' } } } } });
+    calls[1]!.resolve({
+      revision: 3,
+      changed: { agentModels: { byAgent: { analyzer: { model: 'ollama:other-model' } } } },
+    });
     await second;
     expect(store.getState().settings.agentModels.byAgent).toEqual({
-      debugger: { model: 'ollama:local-model' }, analyzer: { model: 'ollama:other-model' },
+      debugger: { model: 'ollama:local-model' },
+      analyzer: { model: 'ollama:other-model' },
     });
   });
 
@@ -97,25 +129,51 @@ describe('provider model choices on their revision lane', () => {
   });
 
   const provider = {
-    id: 'lane-provider', activeAccountId: 'account', enabled: true, isConfigured: true,
-    models: [{ id: 'a', label: 'A', enabled: true }, { id: 'b', label: 'B', enabled: true }],
+    id: 'lane-provider',
+    activeAccountId: 'account',
+    enabled: true,
+    isConfigured: true,
+    models: [
+      { id: 'a', label: 'A', enabled: true },
+      { id: 'b', label: 'B', enabled: true },
+    ],
   } as LlmProviderEntry;
   const withChoices = (enabled: [boolean, boolean]): LlmProviderEntry => ({
-    ...provider, models: provider.models.map((model, index) => ({ ...model, enabled: enabled[index]! })),
+    ...provider,
+    models: provider.models.map((model, index) => ({ ...model, enabled: enabled[index]! })),
   });
-  const enabledShown = () => useAppSettingsStore.getState().settings.llm.providers[0]!.models.map((model) => model.enabled);
+  const enabledShown = () =>
+    useAppSettingsStore.getState().settings.llm.providers[0]!.models.map((model) => model.enabled);
 
   function deferredSaves() {
-    const calls: Array<{ request: ProviderDefinitionSaveRequest; resolve: (result: ProviderDefinitionSaveResult) => void }> = [];
-    const saveProviderDefinition = vi.fn((request: ProviderDefinitionSaveRequest) => new Promise<ProviderDefinitionSaveResult>((resolve) => {
-      calls.push({ request, resolve });
-    }));
+    const calls: Array<{
+      request: ProviderDefinitionSaveRequest;
+      resolve: (result: ProviderDefinitionSaveResult) => void;
+    }> = [];
+    const saveProviderDefinition = vi.fn(
+      (request: ProviderDefinitionSaveRequest) =>
+        new Promise<ProviderDefinitionSaveResult>((resolve) => {
+          calls.push({ request, resolve });
+        }),
+    );
     vi.stubGlobal('window', { electronAPI: { settings: { saveProviderDefinition } } });
-    useAppSettingsStore.getState().hydrate(...viewOf({ ...DEFAULT_SETTINGS, llm: { ...DEFAULT_SETTINGS.llm, providers: [provider] } }), 'dark');
+    useAppSettingsStore
+      .getState()
+      .hydrate(...viewOf({ ...DEFAULT_SETTINGS, llm: { ...DEFAULT_SETTINGS.llm, providers: [provider] } }), 'dark');
     return calls;
   }
-  const answer = (call: { request: ProviderDefinitionSaveRequest }, entry: LlmProviderEntry, status: 'committed' | 'failed'): ProviderDefinitionSaveResult => {
-    const snapshot = { clientRevision: call.request.clientRevision, providerId: entry.id, commitHash: 'hash', provider: entry, catalogRevision: null };
+  const answer = (
+    call: { request: ProviderDefinitionSaveRequest },
+    entry: LlmProviderEntry,
+    status: 'committed' | 'failed',
+  ): ProviderDefinitionSaveResult => {
+    const snapshot = {
+      clientRevision: call.request.clientRevision,
+      providerId: entry.id,
+      commitHash: 'hash',
+      provider: entry,
+      catalogRevision: null,
+    };
     return status === 'committed'
       ? { ...snapshot, status, lastSuccessful: snapshot }
       : { ...snapshot, status, provider: null, lastSuccessful: null, error: 'disk full' };

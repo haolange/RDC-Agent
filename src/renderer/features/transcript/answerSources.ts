@@ -14,8 +14,14 @@ export function answerSources(trace: ConversationWorkTrace | null | undefined): 
   const snippets = new Map<string, string>();
   for (const call of calls) {
     if (call.toolName !== 'web_search' || call.status !== 'complete') continue;
-    const { webPages } = extractWebToolPresentation(call.toolName, parsePreview(call.resultPreview), call.argsPreview, 'complete');
-    for (const page of webPages ?? []) if (page.url && page.snippet) snippets.set(normalizeWebUrl(page.url), page.snippet);
+    const { webPages } = extractWebToolPresentation(
+      call.toolName,
+      parsePreview(call.resultPreview),
+      call.argsPreview,
+      'complete',
+    );
+    for (const page of webPages ?? [])
+      if (page.url && page.snippet) snippets.set(normalizeWebUrl(page.url), page.snippet);
   }
   const sources = new Map<string, MarkdownSource>();
   for (const call of calls) {
@@ -24,8 +30,15 @@ export function answerSources(trace: ConversationWorkTrace | null | undefined): 
       if (ref.kind !== 'web' || !ref.url) continue;
       const key = normalizeWebUrl(ref.url);
       const domain = webHostname(ref.url);
-      const title = ref.label && ref.label !== ref.url && ref.label.replace(/^www\./, '') !== domain ? ref.label : undefined;
-      if (!sources.has(key)) sources.set(key, { url: ref.url, domain, ...(title ? { title } : {}), ...(snippets.has(key) ? { summary: snippets.get(key) } : {}) });
+      const title =
+        ref.label && ref.label !== ref.url && ref.label.replace(/^www\./, '') !== domain ? ref.label : undefined;
+      if (!sources.has(key))
+        sources.set(key, {
+          url: ref.url,
+          domain,
+          ...(title ? { title } : {}),
+          ...(snippets.has(key) ? { summary: snippets.get(key) } : {}),
+        });
     }
   }
   return [...sources.values()];

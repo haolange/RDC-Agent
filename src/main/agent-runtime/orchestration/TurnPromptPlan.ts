@@ -51,8 +51,9 @@ export interface TurnPromptPlan {
  */
 export function buildTurnPromptPlan(input: TurnPromptPlanInput): TurnPromptPlan {
   const projectRoot = input.projectRootPath ?? undefined;
-  const activePaths = [input.projectRootPath, ...(input.activePaths ?? [])]
-    .filter((value): value is string => Boolean(value));
+  const activePaths = [input.projectRootPath, ...(input.activePaths ?? [])].filter((value): value is string =>
+    Boolean(value),
+  );
   const scopedInstructions = input.projectRootPath
     ? scopedInstructionResolver.resolveForPaths({
         userInstructionsPath: appPathService.getUserRdcPaths().instructionsPath,
@@ -72,7 +73,11 @@ export function buildTurnPromptPlan(input: TurnPromptPlanInput): TurnPromptPlan 
     return skill;
   });
   const baseTools = input.baseTools.map((toolName) => normalizeToolName(toolName));
-  const tools = combineActiveSkillAllowlists(baseTools, preloadedSkills.map((skill) => skill.allowedTools)) ?? baseTools;
+  const tools =
+    combineActiveSkillAllowlists(
+      baseTools,
+      preloadedSkills.map((skill) => skill.allowedTools),
+    ) ?? baseTools;
   const promptClock = resolvePromptClock();
   const promptPlan = promptPlanBuilder.build({
     profile: {

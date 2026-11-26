@@ -79,4 +79,6 @@
   stroke-linejoin: round;
 }
 
-.right-rail-artifact-row.status-failed .right-rail-artifact-icon { color: var(--token-status-error); }
+.right-rail-artifact-row.status-failed .right-rail-artifact-icon {
+  color: var(--token-status-error);
+}

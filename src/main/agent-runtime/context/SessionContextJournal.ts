@@ -69,9 +69,10 @@ export const filterSessionContextMessageArtifacts = (
       blocks.push(block);
       return blocks;
     }
-    const decision = withinRetention || block.continuation?.requirement === 'required'
-      ? decideContinuationReplay(block.continuation, requestPlan, { sameToolLoop: false })
-      : { action: 'drop' as const, reason: 'retention-expired' as const };
+    const decision =
+      withinRetention || block.continuation?.requirement === 'required'
+        ? decideContinuationReplay(block.continuation, requestPlan, { sameToolLoop: false })
+        : { action: 'drop' as const, reason: 'retention-expired' as const };
     decisions.push({
       messageIndex,
       contentIndex,
@@ -85,16 +86,15 @@ export const filterSessionContextMessageArtifacts = (
     return blocks;
   }, []);
   const nextMessage: AssistantMessage = { ...message, content };
-  if (
-    nextMessage.providerState
-    && providerStateReuseReason(nextMessage.providerState, requestPlan) !== 'reusable'
-  ) delete nextMessage.providerState;
+  if (nextMessage.providerState && providerStateReuseReason(nextMessage.providerState, requestPlan) !== 'reusable')
+    delete nextMessage.providerState;
   return { message: nextMessage, filtered, replayed, decisions };
 };
 
 export const canonicalizeTerminalContextMessages = (messages: Message[]): Message[] => {
   const completedToolCalls = new Set(
-    messages.filter((message): message is ToolResultMessage => message.role === 'toolResult')
+    messages
+      .filter((message): message is ToolResultMessage => message.role === 'toolResult')
       .map((message) => message.toolCallId),
   );
   const result: Message[] = [];
@@ -117,9 +117,7 @@ export const canonicalizeTerminalContextMessages = (messages: Message[]): Messag
   return result;
 };
 
-export const canonicalizeSessionContextTurnEntry = (
-  entry: SessionContextTurnEntry,
-): SessionContextTurnEntry => ({
+export const canonicalizeSessionContextTurnEntry = (entry: SessionContextTurnEntry): SessionContextTurnEntry => ({
   ...entry,
   messages: canonicalizeTerminalContextMessages(entry.messages),
 });
@@ -134,9 +132,10 @@ export class SessionContextJournal {
     const entries = this.readEntries(sessionId, visibleTurnIds);
     const entryByTurn = new Map(entries.map((entry) => [entry.turnId, entry]));
     const missingTurnIds = visibleTurnIds.filter((turnId) => !entryByTurn.has(turnId));
-    const interrupted = missingTurnIds.length > 0
-      ? this.recoverInterruptedMessages(sessionId, missingTurnIds)
-      : new Map<string, Message[]>();
+    const interrupted =
+      missingTurnIds.length > 0
+        ? this.recoverInterruptedMessages(sessionId, missingTurnIds)
+        : new Map<string, Message[]>();
     if (interrupted.size !== missingTurnIds.length) {
       throw new Error('Session context journal is incomplete for ' + missingTurnIds.length + ' visible turn(s).');
     }
@@ -173,27 +172,38 @@ export class SessionContextJournal {
     const history = conversationHistoryStore.readConversationHistory(sessionId);
     const recovered = new Map<string, Message[]>();
     for (const turnId of missingTurnIds) {
-      const pair = history.filter(message => message.turnId === turnId && message.sessionId === sessionId);
+      const pair = history.filter((message) => message.turnId === turnId && message.sessionId === sessionId);
       if (pair.length !== 2) continue;
-      const user = pair.find(message => message.role === 'user');
-      const assistant = pair.find(message => message.role === 'assistant');
+      const user = pair.find((message) => message.role === 'user');
+      const assistant = pair.find((message) => message.role === 'assistant');
       if (!user || !assistant || normalizeBranchId(user.branchId) !== normalizeBranchId(assistant.branchId)) continue;
       // A process crash can persist a visible, interrupted turn before its
       // terminal context transaction. Replay only the user's actual text and
       // an explicit gap marker. Tool calls and partial model output remain in
       // the visible trace, but are not silently promoted into prompt facts.
-      if (assistant.status !== 'error' || !(
-        assistant.diagnostic?.code === 'CONVERSATION_INTERRUPTED'
-        || assistant.workTrace?.summary === INTERRUPTED_CONVERSATION_SUMMARY
-      )) continue;
+      if (
+        assistant.status !== 'error' ||
+        !(
+          assistant.diagnostic?.code === 'CONVERSATION_INTERRUPTED' ||
+          assistant.workTrace?.summary === INTERRUPTED_CONVERSATION_SUMMARY
+        )
+      )
+        continue;
       recovered.set(turnId, [
         { role: 'user', content: user.content, timestamp: user.createdAt },
         {
           role: 'assistant',
-          content: [{ type: 'text', text: '[Previous turn interrupted before its context journal committed. Its partial tool outputs and attachments are not replayed; inspect their preserved sources before using them as evidence.]' }],
-          model: 'interrupted-turn', provider: 'rdc-agent',
+          content: [
+            {
+              type: 'text',
+              text: '[Previous turn interrupted before its context journal committed. Its partial tool outputs and attachments are not replayed; inspect their preserved sources before using them as evidence.]',
+            },
+          ],
+          model: 'interrupted-turn',
+          provider: 'rdc-agent',
           usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-          stopReason: 'error', timestamp: assistant.updatedAt ?? assistant.createdAt,
+          stopReason: 'error',
+          timestamp: assistant.updatedAt ?? assistant.createdAt,
         },
       ]);
     }
@@ -202,7 +212,9 @@ export class SessionContextJournal {
 
   append(sessionId: string, entry: SessionContextTurnEntry): void {
     const canonicalEntry = canonicalizeSessionContextTurnEntry(entry);
-    const duplicate = this.readEntries(sessionId, [entry.turnId]).find((candidate) => candidate.turnId === entry.turnId);
+    const duplicate = this.readEntries(sessionId, [entry.turnId]).find(
+      (candidate) => candidate.turnId === entry.turnId,
+    );
     if (duplicate) {
       if (JSON.stringify(duplicate) !== JSON.stringify(canonicalEntry)) {
         throw new Error('Conflicting session context entry for turn ' + entry.turnId + '.');

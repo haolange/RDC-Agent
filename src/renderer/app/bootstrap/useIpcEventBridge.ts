@@ -7,7 +7,11 @@ import { useCurrentSessionView } from '../../stores/sessionRecordStore';
 import { useSessionStore } from '../../stores/sessionStore';
 
 import { notify } from '../../stores/notificationStore';
-import { createCaptureProjection, subscribeCaptureStatusChanged, subscribeDeviceStatusChanged } from './captureSubscriptions';
+import {
+  createCaptureProjection,
+  subscribeCaptureStatusChanged,
+  subscribeDeviceStatusChanged,
+} from './captureSubscriptions';
 import { subscribeConversation, subscribeToolExecutionComplete } from './conversationSubscriptions';
 import {
   subscribeEvidenceEventAdded,
@@ -36,9 +40,7 @@ export function useSyncCapturesFromSnapshot() {
       return;
     }
 
-    captureStore.setCaptures(
-      mergeCapturesWithSnapshot(captureStore.captures, snapshot),
-    );
+    captureStore.setCaptures(mergeCapturesWithSnapshot(captureStore.captures, snapshot));
   }, []);
 }
 
@@ -60,12 +62,10 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
   useEffect(() => {
     const electronAPI = window.electronAPI;
 
-
     const unsubscribePermissionState = subscribePermissionState(electronAPI);
     const unsubscribeSessionRecordChanged = subscribeSessionRecordChanged(electronAPI);
     const unsubscribeRunUsageChanged = subscribeRunUsageChanged(electronAPI);
     const unsubscribeTraceProjectionChanged = subscribeTraceProjectionChanged(electronAPI);
-
 
     const captureProjection = createCaptureProjection(electronAPI, syncCapturesFromSnapshot);
     const { projectScopedContext, projectScopedOpenedCapture } = captureProjection;
@@ -86,7 +86,11 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
     const unsubscribeAppThemeChanged = subscribeAppThemeChanged(electronAPI, setSystemTheme);
 
     captureProjection.hydrate();
-    const unsubscribeShellCommands = subscribeShellCommands(electronAPI, { t, setSettingsModalOpen, setWindowMaximized });
+    const unsubscribeShellCommands = subscribeShellCommands(electronAPI, {
+      t,
+      setSettingsModalOpen,
+      setWindowMaximized,
+    });
 
     return () => {
       unsubscribePermissionState();
@@ -108,12 +112,5 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
       conversation.unsubscribe();
       unsubscribeShellCommands();
     };
-  }, [
-    activeSessionId,
-    setSettingsModalOpen,
-    setSystemTheme,
-    setWindowMaximized,
-    syncCapturesFromSnapshot,
-    t,
-  ]);
+  }, [activeSessionId, setSettingsModalOpen, setSystemTheme, setWindowMaximized, syncCapturesFromSnapshot, t]);
 }

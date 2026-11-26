@@ -4,7 +4,10 @@ import type { AgentPermissionMode } from '@shared/types/settings';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 
 export class PermissionModeChangedError extends AppError {
-  constructor() { super('PERMISSION_MODE_CHANGED'); this.name = 'PermissionModeChangedError'; }
+  constructor() {
+    super('PERMISSION_MODE_CHANGED');
+    this.name = 'PermissionModeChangedError';
+  }
 }
 
 /** Main-owned live mode. Other execution constraints remain frozen on the plan. */
@@ -28,7 +31,11 @@ export class RuntimePermissionStateService {
     this.snapshot = Object.freeze({ mode, revision: previous.revision + 1 });
     for (const listener of [...this.listeners]) {
       // Committed state cannot be rolled back by observers; a failing one is reported.
-      try { listener(this.snapshot); } catch (error) { reportProcessFault('Permission mode listener failed', error); }
+      try {
+        listener(this.snapshot);
+      } catch (error) {
+        reportProcessFault('Permission mode listener failed', error);
+      }
     }
     return this.snapshot;
   }

@@ -20,7 +20,11 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
   const [timeoutText, setTimeoutText] = useState(() => String(draft.timeoutMs / 1000));
 
   return (
-    <section className="settings-local-tool-form" data-testid="settings-code-interpreter" data-settings-search="code-interpreter">
+    <section
+      className="settings-local-tool-form"
+      data-testid="settings-code-interpreter"
+      data-settings-search="code-interpreter"
+    >
       <div className="settings-local-tool-grid">
         <SettingsField layout="row" label={t('settings.codeInterpreterEnabled')} htmlFor="settings-interpreter-enabled">
           <Switch
@@ -56,7 +60,11 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
             }}
           />
         </SettingsField>
-        <SettingsField label={t('settings.codeInterpreterArgs')} htmlFor="settings-interpreter-args" description={t('settings.rdcCliArgsPrefixHint')}>
+        <SettingsField
+          label={t('settings.codeInterpreterArgs')}
+          htmlFor="settings-interpreter-args"
+          description={t('settings.rdcCliArgsPrefixHint')}
+        >
           <Input
             id="settings-interpreter-args"
             type="text"
@@ -68,7 +76,11 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
             }}
           />
         </SettingsField>
-        <SettingsField label={t('settings.codeInterpreterEnv')} htmlFor="settings-interpreter-env" description={t('settings.envLineHint')}>
+        <SettingsField
+          label={t('settings.codeInterpreterEnv')}
+          htmlFor="settings-interpreter-env"
+          description={t('settings.envLineHint')}
+        >
           <Textarea
             id="settings-interpreter-env"
             data-testid="settings-code-interpreter-env"
@@ -79,12 +91,18 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
               const value = event.target.value;
               setEnvText(value);
               onChange({ ...draft, env: textToEnv(value) });
-              const invalid = value.split(/\r?\n/u).some((line) => line.trim() && (line.indexOf('=') <= 0 || !line.slice(0, line.indexOf('=')).trim()));
+              const invalid = value
+                .split(/\r?\n/u)
+                .some((line) => line.trim() && (line.indexOf('=') <= 0 || !line.slice(0, line.indexOf('=')).trim()));
               event.target.setCustomValidity(invalid ? t('settings.environmentFormatHint') : '');
             }}
           />
         </SettingsField>
-        <SettingsField layout="row" label={t('settings.codeInterpreterArtifacts')} description={t('settings.codeInterpreterArtifactsHint')}>
+        <SettingsField
+          layout="row"
+          label={t('settings.codeInterpreterArtifacts')}
+          description={t('settings.codeInterpreterArtifactsHint')}
+        >
           <Checkbox
             checked={draft.artifactsEnabled}
             onCheckedChange={(checked) => onChange({ ...draft, artifactsEnabled: checked })}

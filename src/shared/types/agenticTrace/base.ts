@@ -1,11 +1,4 @@
-export type TraceStatus =
-  | 'pending'
-  | 'running'
-  | 'succeeded'
-  | 'failed'
-  | 'cancelled'
-  | 'skipped'
-  | 'waiting_approval';
+export type TraceStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'skipped' | 'waiting_approval';
 
 export interface AgentRun {
   runId: string;

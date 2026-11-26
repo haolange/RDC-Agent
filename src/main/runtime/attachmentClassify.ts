@@ -12,12 +12,7 @@ export const ATTACHMENT_INLINE_BUDGET_RATIO = 0.1;
 export const MAX_IMAGE_PIXELS = 40_000_000;
 export const MAX_IMAGE_EDGE = 16_384;
 
-export const NATIVE_IMAGE_MIME_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-]);
+export const NATIVE_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
 const TEXT_EXTENSIONS = new Set([
   '.txt',
@@ -125,34 +120,27 @@ function looksLikeUtf8(bytes: Buffer): boolean {
 }
 
 function isPng(bytes: Buffer): boolean {
-  return bytes.length >= 8
-    && bytes[0] === 0x89
-    && bytes[1] === 0x50
-    && bytes[2] === 0x4e
-    && bytes[3] === 0x47;
+  return bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
 }
 
 function isJpeg(bytes: Buffer): boolean {
-  return bytes.length >= 3
-    && bytes[0] === 0xff
-    && bytes[1] === 0xd8
-    && bytes[2] === 0xff;
+  return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
 }
 
 function isGif(bytes: Buffer): boolean {
-  return bytes.length >= 6
-    && bytes[0] === 0x47
-    && bytes[1] === 0x49
-    && bytes[2] === 0x46
-    && bytes[3] === 0x38
-    && (bytes[4] === 0x37 || bytes[4] === 0x39)
-    && bytes[5] === 0x61;
+  return (
+    bytes.length >= 6 &&
+    bytes[0] === 0x47 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x38 &&
+    (bytes[4] === 0x37 || bytes[4] === 0x39) &&
+    bytes[5] === 0x61
+  );
 }
 
 function isWebp(bytes: Buffer): boolean {
-  return bytes.length >= 12
-    && bytes.toString('ascii', 0, 4) === 'RIFF'
-    && bytes.toString('ascii', 8, 12) === 'WEBP';
+  return bytes.length >= 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
 }
 
 function isPdf(bytes: Buffer): boolean {
@@ -160,9 +148,13 @@ function isPdf(bytes: Buffer): boolean {
 }
 
 function isZip(bytes: Buffer): boolean {
-  return bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b
-    && (bytes[2] === 0x03 || bytes[2] === 0x05 || bytes[2] === 0x07)
-    && (bytes[3] === 0x04 || bytes[3] === 0x06 || bytes[3] === 0x08);
+  return (
+    bytes.length >= 4 &&
+    bytes[0] === 0x50 &&
+    bytes[1] === 0x4b &&
+    (bytes[2] === 0x03 || bytes[2] === 0x05 || bytes[2] === 0x07) &&
+    (bytes[3] === 0x04 || bytes[3] === 0x06 || bytes[3] === 0x08)
+  );
 }
 
 function isSvg(bytes: Buffer, declaredMime: string | null | undefined): boolean {
@@ -176,22 +168,20 @@ function isPe(bytes: Buffer): boolean {
 }
 
 function isElf(bytes: Buffer): boolean {
-  return bytes.length >= 4
-    && bytes[0] === 0x7f
-    && bytes[1] === 0x45
-    && bytes[2] === 0x4c
-    && bytes[3] === 0x46;
+  return bytes.length >= 4 && bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46;
 }
 
 function isMachO(bytes: Buffer): boolean {
   if (bytes.length < 4) return false;
   const magic = bytes.readUInt32BE(0);
-  return magic === 0xFEEDFACE
-    || magic === 0xFEEDFACF
-    || magic === 0xCEFAEDFE
-    || magic === 0xCFFAEDFE
-    || magic === 0xCAFEBABE
-    || magic === 0xBEBAFECA;
+  return (
+    magic === 0xfeedface ||
+    magic === 0xfeedfacf ||
+    magic === 0xcefaedfe ||
+    magic === 0xcffaedfe ||
+    magic === 0xcafebabe ||
+    magic === 0xbebafeca
+  );
 }
 
 function isExecutableMagic(bytes: Buffer): boolean {
@@ -224,10 +214,7 @@ export function detectImageMagicMime(bytes: Buffer): string | null {
   return null;
 }
 
-export function inferAttachmentMimeType(
-  fileName: string,
-  declaredMime?: string | null,
-): string | null {
+export function inferAttachmentMimeType(fileName: string, declaredMime?: string | null): string | null {
   const declared = (declaredMime ?? '').trim().toLowerCase();
   if (declared) return declared;
   return MIME_BY_EXTENSION[fileExtension(fileName)] ?? null;
@@ -283,11 +270,7 @@ export function readImageDimensions(mimeType: string, bytes: Buffer): { width: n
   return null;
 }
 
-export function assertSafeImageBytes(
-  fileName: string,
-  mimeType: string,
-  bytes: Buffer,
-): void {
+export function assertSafeImageBytes(fileName: string, mimeType: string, bytes: Buffer): void {
   if (mimeType === 'image/svg+xml' || fileExtension(fileName) === '.svg') {
     throw new AppError('ATTACHMENT_MEDIA_UNSUPPORTED', `${fileName} (image/svg+xml)`);
   }
@@ -308,7 +291,10 @@ export function assertSafeImageBytes(
     throw new AppError('ATTACHMENT_INVALID', `${fileName} edge ${dims.width}x${dims.height} exceeds ${MAX_IMAGE_EDGE}`);
   }
   if (dims.width * dims.height > MAX_IMAGE_PIXELS) {
-    throw new AppError('ATTACHMENT_INVALID', `${fileName} pixels ${dims.width * dims.height} exceed ${MAX_IMAGE_PIXELS}`);
+    throw new AppError(
+      'ATTACHMENT_INVALID',
+      `${fileName} pixels ${dims.width * dims.height} exceed ${MAX_IMAGE_PIXELS}`,
+    );
   }
 }
 

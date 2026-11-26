@@ -5,7 +5,10 @@ import {
   isAgentToolExecutableModel,
 } from '@shared/utils/agentToolCapability';
 import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
-import { planEffectiveModelRequest, resolveEffectiveModel } from '../../settings/provider-catalog/EffectiveModelResolver';
+import {
+  planEffectiveModelRequest,
+  resolveEffectiveModel,
+} from '../../settings/provider-catalog/EffectiveModelResolver';
 import { resolveCompactionPercentForProject } from '../context/compactionPercent';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
@@ -17,9 +20,12 @@ export async function assertSessionModelExecutable(model: SessionModelOverride):
   const effective = resolveEffectiveModel(model.providerId, model.modelId, settingsService.providerConnections);
   if (effective && isAgentToolExecutableModel(effective)) return;
   const eligibility = effective ? classifyAgentToolEligibility(effective) : 'unavailable';
-  throw new AppError('MODEL_UNAVAILABLE', eligibility === 'executable'
-    ? `${model.providerId}:${model.modelId}`
-    : describeAgentToolIneligibility(eligibility, model.providerId, model.modelId).technicalMessage);
+  throw new AppError(
+    'MODEL_UNAVAILABLE',
+    eligibility === 'executable'
+      ? `${model.providerId}:${model.modelId}`
+      : describeAgentToolIneligibility(eligibility, model.providerId, model.modelId).technicalMessage,
+  );
 }
 
 /** The model is executable and the controls plan into a request for it, as the next turn's preparation will check. */
@@ -37,6 +43,9 @@ export async function assertSessionModelAndControls(
     compactionThresholdPercent: resolveCompactionPercentForProject(projectRoot),
   });
   if (!planning.ok) {
-    throw new AppError(planning.code === 'CONSTRAINT_REJECTED' ? 'CONSTRAINT_REJECTED' : 'MODEL_UNAVAILABLE', planning.message);
+    throw new AppError(
+      planning.code === 'CONSTRAINT_REJECTED' ? 'CONSTRAINT_REJECTED' : 'MODEL_UNAVAILABLE',
+      planning.message,
+    );
   }
 }

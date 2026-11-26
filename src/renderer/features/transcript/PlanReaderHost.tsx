@@ -22,7 +22,8 @@ export function PlanReaderHost({ children }: { children: ReactNode }) {
       if (!target || useProjectStore.getState().currentSessionId !== target.sessionId) return;
       // The original trigger may have remounted while the reader stayed open.
       Array.from(document.querySelectorAll<HTMLElement>('[data-plan-id]'))
-        .find((button) => button.dataset.planId === target.planId)?.focus({ preventScroll: true });
+        .find((button) => button.dataset.planId === target.planId)
+        ?.focus({ preventScroll: true });
     });
   }, []);
   const dropPlan = useCallback(() => setPlan(null), []);

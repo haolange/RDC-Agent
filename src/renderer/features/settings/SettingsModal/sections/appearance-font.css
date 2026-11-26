@@ -81,7 +81,9 @@
 
 .appearance-font-option.is-selected .appearance-font-option-mark {
   border-color: var(--token-accent-primary);
-  box-shadow: inset 0 0 0 3px var(--token-bg-panel), inset 0 0 0 var(--space-2) var(--token-accent-primary);
+  box-shadow:
+    inset 0 0 0 3px var(--token-bg-panel),
+    inset 0 0 0 var(--space-2) var(--token-accent-primary);
 }
 
 .appearance-font-option-copy {

@@ -27,7 +27,13 @@ const plan = createTestRequestPlan({
   fastMode: false,
   reasoningWire: {
     selection: 'high',
-    control: { kind: 'levels', supportsOff: true, levels: ['high'], defaultSelection: 'high', wireProfile: { kind: 'none' } },
+    control: {
+      kind: 'levels',
+      supportsOff: true,
+      levels: ['high'],
+      defaultSelection: 'high',
+      wireProfile: { kind: 'none' },
+    },
   },
 });
 
@@ -44,12 +50,17 @@ describe('requestPlanWire', () => {
       ...plan,
       bodyPatch: { temperature: null, top_p: null, max_output_tokens: null },
     };
-    expect(applyRequestPlanBody({
-      model: 'gpt-5.4',
-      temperature: 0.35,
-      top_p: 0.9,
-      max_output_tokens: 1200,
-    }, suppressionPlan)).toEqual({ model: 'gpt-5.4' });
+    expect(
+      applyRequestPlanBody(
+        {
+          model: 'gpt-5.4',
+          temperature: 0.35,
+          top_p: 0.9,
+          max_output_tokens: 1200,
+        },
+        suppressionPlan,
+      ),
+    ).toEqual({ model: 'gpt-5.4' });
   });
   it('passes activation headers but rejects credential injection', () => {
     expect(requestPlanHeaders(plan)).toEqual({ 'anthropic-beta': 'context-1m' });

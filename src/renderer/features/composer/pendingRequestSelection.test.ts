@@ -9,17 +9,61 @@ vi.mock('./ToolApprovalRequestPanel', () => ({ ToolApprovalRequestPanel: () => '
 vi.mock('./PlanReviewRequestPanel', () => ({ PlanReviewRequestPanel: () => 'plan panel' }));
 vi.mock('./UserInputRequestPanel', () => ({ UserInputRequestPanel: () => 'question panel' }));
 
-const approval: ConversationToolCall = { id: 'approve', toolName: 'shell', status: 'pending', startedAt: 1,
-  approval: { approvalId: 'approval', status: 'pending', risk: 'high' } };
-const plan: ConversationToolCall = { id: 'plan', toolName: 'plan_artifact', status: 'running', startedAt: 1,
-  planReview: { planId: 'p', revision: 1, uri: 'session://plans/p.md', hash: 'a'.repeat(64), title: 'Plan', summary: [], sections: [], status: 'awaiting', handoffOptions: [] } };
-const review = { sessionId: 's', reviewId: 'review', agentId: 'debugger', recovered: false, turnId: 't', toolCallId: 'plan', planReview: plan.planReview! };
-const input: ConversationToolCall = { id: 'ask', toolName: 'ask_user', status: 'running', startedAt: 1,
-  userInputQuestions: [{ questionId: 'q', prompt: 'Where?', options: [], allowFreeform: true }] };
+const approval: ConversationToolCall = {
+  id: 'approve',
+  toolName: 'shell',
+  status: 'pending',
+  startedAt: 1,
+  approval: { approvalId: 'approval', status: 'pending', risk: 'high' },
+};
+const plan: ConversationToolCall = {
+  id: 'plan',
+  toolName: 'plan_artifact',
+  status: 'running',
+  startedAt: 1,
+  planReview: {
+    planId: 'p',
+    revision: 1,
+    uri: 'session://plans/p.md',
+    hash: 'a'.repeat(64),
+    title: 'Plan',
+    summary: [],
+    sections: [],
+    status: 'awaiting',
+    handoffOptions: [],
+  },
+};
+const review = {
+  sessionId: 's',
+  reviewId: 'review',
+  agentId: 'debugger',
+  recovered: false,
+  turnId: 't',
+  toolCallId: 'plan',
+  planReview: plan.planReview!,
+};
+const input: ConversationToolCall = {
+  id: 'ask',
+  toolName: 'ask_user',
+  status: 'running',
+  startedAt: 1,
+  userInputQuestions: [{ questionId: 'q', prompt: 'Where?', options: [], allowFreeform: true }],
+};
 const message = (calls: ConversationToolCall[], sessionId = 's'): ConversationMessage => ({
-  id: 'm', turnId: 't', sessionId, projectId: 'p', role: 'assistant', status: 'streaming', content: '', createdAt: 1,
-  workTrace: { summary: '', status: 'running', updatedAt: 1,
-    blocks: [{ id: 'b', kind: 'llm_turn', title: '', status: 'running', startedAt: 1, toolCalls: calls }] },
+  id: 'm',
+  turnId: 't',
+  sessionId,
+  projectId: 'p',
+  role: 'assistant',
+  status: 'streaming',
+  content: '',
+  createdAt: 1,
+  workTrace: {
+    summary: '',
+    status: 'running',
+    updatedAt: 1,
+    blocks: [{ id: 'b', kind: 'llm_turn', title: '', status: 'running', startedAt: 1, toolCalls: calls }],
+  },
 });
 
 describe('pending Composer request precedence', () => {
@@ -40,19 +84,39 @@ describe('pending Composer request precedence', () => {
   ] as const)('preserves each pending shell and accent identity', (call, kind, content) => {
     const pending = resolveComposerPendingRequest([message([call])], kind === 'plan-review' ? review : null);
     if (!pending) throw new Error('Expected pending request');
-    const html = renderToStaticMarkup(createElement(ComposerPendingRequest, {
-      pending, composeAccentStyle: { 'data-dyn-style': 'accent-request' },
-      agentId: 'general', currentSession: null,
-    }));
-    expect(html).toBe(`<div class="composer-shell composer-shell-${kind}" data-dyn-style="accent-request">${content}</div>`);
+    const html = renderToStaticMarkup(
+      createElement(ComposerPendingRequest, {
+        pending,
+        composeAccentStyle: { 'data-dyn-style': 'accent-request' },
+        agentId: 'general',
+        currentSession: null,
+      }),
+    );
+    expect(html).toBe(
+      `<div class="composer-shell composer-shell-${kind}" data-dyn-style="accent-request">${content}</div>`,
+    );
   });
 });
 
-it.each(['rule', 'model'] as const)('keeps %s review out of Composer, including delegated and mixed approvals', method => {
-  const automated = { ...approval, id: 'auto', delegatedRequest: { executionId: 'e', childSessionId: 'child', turnId: 'ct', toolCallId: 'auto' },
-    approval: { ...approval.approval!, approvalId: 'auto-review-auto', reviewer: 'auto_review', reviewMethod: method } };
-  expect(resolveComposerPendingRequest([message([automated])])).toBeNull();
-  expect(resolveComposerPendingRequest([message([automated, plan])], review)?.kind).toBe('plan-review');
-  expect(resolveComposerPendingRequest([message([automated, approval])])?.request).toMatchObject({ approvalId: 'approval' });
-  expect(resolveComposerPendingRequest([{ ...message([automated]), status: 'complete' }])).toBeNull();
-});
+it.each(['rule', 'model'] as const)(
+  'keeps %s review out of Composer, including delegated and mixed approvals',
+  (method) => {
+    const automated = {
+      ...approval,
+      id: 'auto',
+      delegatedRequest: { executionId: 'e', childSessionId: 'child', turnId: 'ct', toolCallId: 'auto' },
+      approval: {
+        ...approval.approval!,
+        approvalId: 'auto-review-auto',
+        reviewer: 'auto_review',
+        reviewMethod: method,
+      },
+    };
+    expect(resolveComposerPendingRequest([message([automated])])).toBeNull();
+    expect(resolveComposerPendingRequest([message([automated, plan])], review)?.kind).toBe('plan-review');
+    expect(resolveComposerPendingRequest([message([automated, approval])])?.request).toMatchObject({
+      approvalId: 'approval',
+    });
+    expect(resolveComposerPendingRequest([{ ...message([automated]), status: 'complete' }])).toBeNull();
+  },
+);

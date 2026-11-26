@@ -16,6 +16,9 @@ export function serializeInvestigationJson(value: unknown): string {
 }
 
 export function formatInvestigationContentHash(hex: string): string {
-  const bare = hex.trim().toLowerCase().replace(/^sha256:/, '');
+  const bare = hex
+    .trim()
+    .toLowerCase()
+    .replace(/^sha256:/, '');
   return `sha256:${bare}`;
 }

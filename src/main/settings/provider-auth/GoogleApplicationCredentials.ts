@@ -33,9 +33,18 @@ type GoogleCredentialDocument = GoogleServiceAccountCredential | GoogleAuthorize
 
 /** The fields of a gcloud credential file this module uses; gcloud writes others, which are ignored. */
 const GoogleCredentialDocumentSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('service_account'), client_email: z.string(), private_key: z.string(), token_uri: z.string().optional() }),
   z.object({
-    type: z.literal('authorized_user'), client_id: z.string(), client_secret: z.string(), refresh_token: z.string(), token_uri: z.string().optional(),
+    type: z.literal('service_account'),
+    client_email: z.string(),
+    private_key: z.string(),
+    token_uri: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal('authorized_user'),
+    client_id: z.string(),
+    client_secret: z.string(),
+    refresh_token: z.string(),
+    token_uri: z.string().optional(),
   }),
 ]);
 
@@ -51,24 +60,19 @@ const encodeJson = (value: unknown): string => Buffer.from(JSON.stringify(value)
 function requireToken(payload: GoogleTokenResponse, source: string): CachedToken {
   const accessToken = typeof payload.access_token === 'string' ? payload.access_token.trim() : '';
   if (!accessToken) throw new Error(`${source} did not return a Google access token.`);
-  const expiresIn = typeof payload.expires_in === 'number' && Number.isFinite(payload.expires_in)
-    ? payload.expires_in
-    : 3600;
+  const expiresIn =
+    typeof payload.expires_in === 'number' && Number.isFinite(payload.expires_in) ? payload.expires_in : 3600;
   return { accessToken, expiresAt: Date.now() + Math.max(60, expiresIn) * 1000 };
 }
 
-async function postTokenForm(
-  url: string,
-  body: URLSearchParams,
-  fetchImpl: typeof fetch,
-): Promise<CachedToken> {
+async function postTokenForm(url: string, body: URLSearchParams, fetchImpl: typeof fetch): Promise<CachedToken> {
   const response = await fetchImpl(url, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body,
   });
   if (!response.ok) throw new Error(`Google OAuth token exchange failed with HTTP ${response.status}.`);
-  return requireToken(await response.json() as GoogleTokenResponse, 'Google OAuth');
+  return requireToken((await response.json()) as GoogleTokenResponse, 'Google OAuth');
 }
 
 export async function exchangeGoogleCredentialDocument(
@@ -77,12 +81,16 @@ export async function exchangeGoogleCredentialDocument(
 ): Promise<CachedToken> {
   const tokenUri = credential.token_uri?.trim() || DEFAULT_TOKEN_URI;
   if (credential.type === 'authorized_user') {
-    return postTokenForm(tokenUri, new URLSearchParams({
-      client_id: credential.client_id,
-      client_secret: credential.client_secret,
-      refresh_token: credential.refresh_token,
-      grant_type: 'refresh_token',
-    }), fetchImpl);
+    return postTokenForm(
+      tokenUri,
+      new URLSearchParams({
+        client_id: credential.client_id,
+        client_secret: credential.client_secret,
+        refresh_token: credential.refresh_token,
+        grant_type: 'refresh_token',
+      }),
+      fetchImpl,
+    );
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -97,10 +105,14 @@ export async function exchangeGoogleCredentialDocument(
   signer.update(unsigned);
   signer.end();
   const assertion = `${unsigned}.${signer.sign(credential.private_key, 'base64url')}`;
-  return postTokenForm(tokenUri, new URLSearchParams({
-    grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-    assertion,
-  }), fetchImpl);
+  return postTokenForm(
+    tokenUri,
+    new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion,
+    }),
+    fetchImpl,
+  );
 }
 
 function defaultCredentialPaths(): string[] {
@@ -135,7 +147,7 @@ async function metadataAccessToken(fetchImpl: typeof fetch): Promise<CachedToken
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`Google metadata credential lookup failed with HTTP ${response.status}.`);
-    return requireToken(await response.json() as GoogleTokenResponse, 'Google metadata server');
+    return requireToken((await response.json()) as GoogleTokenResponse, 'Google metadata server');
   } finally {
     clearTimeout(timer);
   }
@@ -145,9 +157,7 @@ export async function resolveGoogleVertexAccessToken(
   explicitCredentialPath?: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
-  const candidates = explicitCredentialPath?.trim()
-    ? [explicitCredentialPath.trim()]
-    : defaultCredentialPaths();
+  const candidates = explicitCredentialPath?.trim() ? [explicitCredentialPath.trim()] : defaultCredentialPaths();
   for (const pathname of candidates) {
     const cacheKey = `file:${path.resolve(pathname)}`;
     const cached = tokenCache.get(cacheKey);

@@ -61,12 +61,14 @@ describe('delegatedRdcLeaseContract: dual owner', () => {
       projectId: 'p1',
       ownerTurnId: 'turn-1',
     });
-    expect(() => grantDelegatedLease({
-      parentSessionId: 'parent',
-      childSessionId: 'child-b',
-      projectId: 'p1',
-      ownerTurnId: 'turn-1',
-    })).toThrow(/RDC_LEASE_DUAL_OWNER/);
+    expect(() =>
+      grantDelegatedLease({
+        parentSessionId: 'parent',
+        childSessionId: 'child-b',
+        projectId: 'p1',
+        ownerTurnId: 'turn-1',
+      }),
+    ).toThrow(/RDC_LEASE_DUAL_OWNER/);
     expect(getDelegatedChildSessionId('parent')).toBe('child-a');
     expect(assertRdcContextLeaseOwnership({ sessionId: 'child-b', projectId: 'p1' })).toBeNull();
   });
@@ -74,11 +76,13 @@ describe('delegatedRdcLeaseContract: dual owner', () => {
 
 describe('delegatedRdcLeaseContract: grant without parent', () => {
   it('fail-closes when the parent has no lease', () => {
-    expect(() => grantDelegatedLease({
-      parentSessionId: 'parent',
-      childSessionId: 'child',
-      ownerTurnId: 'turn-1',
-    })).toThrow(/RDC_LEASE_DELEGATE_DENIED/);
+    expect(() =>
+      grantDelegatedLease({
+        parentSessionId: 'parent',
+        childSessionId: 'child',
+        ownerTurnId: 'turn-1',
+      }),
+    ).toThrow(/RDC_LEASE_DELEGATE_DENIED/);
     expect(getRdcContextLease('child')).toBeNull();
   });
 });
@@ -179,11 +183,13 @@ describe('delegatedRdcLeaseContract: stable order', () => {
       createNotStarted: (call, _index, reason) => ({ id: call.id, text: reason, isError: true }),
     });
     expect(results.map((entry) => entry.id)).toEqual(['second', 'first']);
-    expect(partitionConsecutiveSafeGroups([
-      isConcurrencySafeSpec(readFileTool.spec),
-      isConcurrencySafeSpec(RUNTIME_CONTEXT_TOOL_SPEC),
-      isConcurrencySafeSpec(RDC_PROBE_TOOL_SPEC),
-    ])).toEqual([
+    expect(
+      partitionConsecutiveSafeGroups([
+        isConcurrencySafeSpec(readFileTool.spec),
+        isConcurrencySafeSpec(RUNTIME_CONTEXT_TOOL_SPEC),
+        isConcurrencySafeSpec(RDC_PROBE_TOOL_SPEC),
+      ]),
+    ).toEqual([
       { callIndexes: [0], parallel: true },
       { callIndexes: [1], parallel: false },
       { callIndexes: [2], parallel: false },
@@ -208,7 +214,6 @@ describe('delegatedRdcLeaseContract: offline child allowlist', () => {
       profile: { skills: [] },
       toolAllowlist: ['read_file', 'runtime_context', 'rdc_probe', 'shell'],
       permissionConstraints: {
-
         readableRoots: [],
         writableRoots: [],
         allowedCommandPrefixes: [],

@@ -80,13 +80,7 @@ const normalizeSpacing = (lines: MarkdownLine[]): MarkdownLine[] => {
 
     const previous = previousNonBlank(output);
     const next = nextNonBlank(lines, index + 1);
-    if (
-      previous
-      && next
-      && !previous.fenced
-      && !next.fenced
-      && isListContinuation(previous.text, next.text)
-    ) {
+    if (previous && next && !previous.fenced && !next.fenced && isListContinuation(previous.text, next.text)) {
       continue;
     }
 

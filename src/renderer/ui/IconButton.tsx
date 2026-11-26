@@ -11,15 +11,7 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  {
-    label,
-    size = 'md',
-    className,
-    type = 'button',
-    disabled,
-    children,
-    ...rest
-  },
+  { label, size = 'md', className, type = 'button', disabled, children, ...rest },
   ref,
 ) {
   return (
@@ -28,12 +20,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       type={type}
       aria-label={label}
       disabled={disabled}
-      className={cn(
-        'icon-button',
-        size !== 'md' && `is-size-${size}`,
-        disabled && 'is-disabled',
-        className,
-      )}
+      className={cn('icon-button', size !== 'md' && `is-size-${size}`, disabled && 'is-disabled', className)}
       {...rest}
     >
       {children}

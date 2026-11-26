@@ -13,13 +13,7 @@ import {
   type ResponsesStreamSurface,
 } from './internal/responsesShared';
 import type { EventStream } from '../core/EventStream';
-import type {
-  AssistantMessage,
-  AssistantMessageEvent,
-  Context,
-  Model,
-  StreamOptions,
-} from '../core/types';
+import type { AssistantMessage, AssistantMessageEvent, Context, Model, StreamOptions } from '../core/types';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 
 const DEFAULT_API_VERSION = '2024-10-21';
@@ -55,11 +49,7 @@ export class AzureOpenAIResponsesProvider implements ProviderStrategy {
     this.defaultHeaders = { ...(options.headers ?? {}) };
   }
 
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage> {
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
       const response = await this.send(model, context, options, run.signal);
       return consumeResponsesEventStream(response, run, options, AZURE_RESPONSES_SURFACE);

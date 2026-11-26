@@ -84,7 +84,9 @@ async function assertQaSurface(baseUrl, qaUrl) {
     body: JSON.stringify({ channel: 'app:getMeta', args: [] }),
   });
   if (invokeNoOrigin.response.status !== 401) {
-    fail(`POST /invoke without Origin expected 401, got ${invokeNoOrigin.response.status}: ${invokeNoOrigin.text.slice(0, 200)}`);
+    fail(
+      `POST /invoke without Origin expected 401, got ${invokeNoOrigin.response.status}: ${invokeNoOrigin.text.slice(0, 200)}`,
+    );
     return null;
   }
   ok('POST /invoke cookie without Origin → 401');
@@ -94,7 +96,9 @@ async function assertQaSurface(baseUrl, qaUrl) {
     headers: { Cookie: cookie },
   });
   if (eventsNoOrigin.response.status !== 401) {
-    fail(`POST /events without Origin expected 401, got ${eventsNoOrigin.response.status}: ${eventsNoOrigin.text.slice(0, 200)}`);
+    fail(
+      `POST /events without Origin expected 401, got ${eventsNoOrigin.response.status}: ${eventsNoOrigin.text.slice(0, 200)}`,
+    );
     return null;
   }
   ok('POST /events cookie without Origin → 401');
@@ -107,7 +111,9 @@ async function assertQaSurface(baseUrl, qaUrl) {
     },
   });
   if (eventsEvilOrigin.response.status !== 401 && eventsEvilOrigin.response.status !== 403) {
-    fail(`POST /events foreign Origin expected 401/403, got ${eventsEvilOrigin.response.status}: ${eventsEvilOrigin.text.slice(0, 200)}`);
+    fail(
+      `POST /events foreign Origin expected 401/403, got ${eventsEvilOrigin.response.status}: ${eventsEvilOrigin.text.slice(0, 200)}`,
+    );
     return null;
   }
   ok('POST /events cookie + foreign Origin → denied');
@@ -153,17 +159,13 @@ async function waitForBridgeFromChild() {
   const env = { ...process.env };
   delete env.RDC_AGENT_USER_DATA;
   delete env.RDC_AGENT_USE_CANONICAL_USERDATA;
-  const child = spawn(
-    process.execPath,
-    [path.join(repoRoot, 'scripts/launch-rdc-agent.mjs'), '--mode', 'browser'],
-    {
-      cwd: repoRoot,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      // On POSIX the launcher leads its own process group, so stopping it also reaps Electron.
-      detached: process.platform !== 'win32',
-    },
-  );
+  const child = spawn(process.execPath, [path.join(repoRoot, 'scripts/launch-rdc-agent.mjs'), '--mode', 'browser'], {
+    cwd: repoRoot,
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    // On POSIX the launcher leads its own process group, so stopping it also reaps Electron.
+    detached: process.platform !== 'win32',
+  });
 
   let qaUrl = null;
   let identity = null;
@@ -253,7 +255,9 @@ async function removeSmokeUserData(smokeUserData) {
       return;
     } catch (error) {
       if (attempt === 19) {
-        fail(`Could not clean smoke userData ${resolvedSmokeRoot}: ${error instanceof Error ? error.message : String(error)}`);
+        fail(
+          `Could not clean smoke userData ${resolvedSmokeRoot}: ${error instanceof Error ? error.message : String(error)}`,
+        );
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -295,11 +299,15 @@ async function main() {
       try {
         const probe = await fetch(qaUrl, { redirect: 'manual' });
         if (probe.status !== 302 && probe.status !== 401 && probe.status !== 200) {
-          fail(`Bridge not reachable at ${qaUrl} (status ${probe.status}). Start with pnpm run start:agent-browser and use its bootstrap URL, or set RDC_AGENT_SMOKE_START=1.`);
+          fail(
+            `Bridge not reachable at ${qaUrl} (status ${probe.status}). Start with pnpm run start:agent-browser and use its bootstrap URL, or set RDC_AGENT_SMOKE_START=1.`,
+          );
           return;
         }
       } catch (error) {
-        fail(`Bridge not reachable at ${baseUrl}: ${error instanceof Error ? error.message : String(error)}. Start with pnpm run start:agent-browser, or set RDC_AGENT_SMOKE_START=1.`);
+        fail(
+          `Bridge not reachable at ${baseUrl}: ${error instanceof Error ? error.message : String(error)}. Start with pnpm run start:agent-browser, or set RDC_AGENT_SMOKE_START=1.`,
+        );
         return;
       }
     }

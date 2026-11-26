@@ -3,12 +3,22 @@ import { createWorkTraceFixture } from '../fixtures/workTraceFixture';
 import { applyConversationMessageDelta, createConversationMessageDeltaEncoder } from './messageDelta';
 import type { ConversationMessage, ConversationWorkBlock } from '../types/conversation';
 
-const message = (steps: number, overrides: Partial<ConversationMessage> = {}): ConversationMessage => ({
-  id: 'assistant-a', turnId: 'turn-a', requestId: 'request-a', role: 'assistant', agentId: 'general',
-  sessionId: 'session-a', projectId: 'project-a', content: '', status: 'streaming', createdAt: 1, updatedAt: 2,
-  workTrace: createWorkTraceFixture({ steps }),
-  ...overrides,
-} as ConversationMessage);
+const message = (steps: number, overrides: Partial<ConversationMessage> = {}): ConversationMessage =>
+  ({
+    id: 'assistant-a',
+    turnId: 'turn-a',
+    requestId: 'request-a',
+    role: 'assistant',
+    agentId: 'general',
+    sessionId: 'session-a',
+    projectId: 'project-a',
+    content: '',
+    status: 'streaming',
+    createdAt: 1,
+    updatedAt: 2,
+    workTrace: createWorkTraceFixture({ steps }),
+    ...overrides,
+  }) as ConversationMessage;
 
 describe('conversation message deltas', () => {
   it('rebuilds every sent state, starting from a first send that is complete on its own', () => {
@@ -39,7 +49,9 @@ describe('conversation message deltas', () => {
 
   it('carries removed fields and a removed trace', () => {
     const encoder = createConversationMessageDeltaEncoder();
-    const first = message(2, { diagnostic: { code: 'CONVERSATION_LLM_REQUEST_FAILED', severity: 'error', userMessage: 'u' } } as Partial<ConversationMessage>);
+    const first = message(2, {
+      diagnostic: { code: 'CONVERSATION_LLM_REQUEST_FAILED', severity: 'error', userMessage: 'u' },
+    } as Partial<ConversationMessage>);
     const rebuiltFirst = applyConversationMessageDelta(undefined, encoder.encode(first)!);
     const second = { ...message(0), workTrace: null } as ConversationMessage;
     const delta = encoder.encode(second)!;
@@ -49,7 +61,10 @@ describe('conversation message deltas', () => {
   });
 
   /** The next commit the way main makes it: the edited block is a copy, every other block is shared. */
-  const nextCommit = (sent: ConversationMessage, edit: (blocks: ConversationWorkBlock[]) => ConversationWorkBlock[]) => ({
+  const nextCommit = (
+    sent: ConversationMessage,
+    edit: (blocks: ConversationWorkBlock[]) => ConversationWorkBlock[],
+  ) => ({
     ...sent,
     updatedAt: (sent.updatedAt ?? 0) + 1,
     workTrace: { ...sent.workTrace!, blocks: edit(sent.workTrace!.blocks.slice()) },
@@ -81,9 +96,9 @@ describe('conversation message deltas', () => {
       const encoder = createConversationMessageDeltaEncoder();
       const sent = message(steps);
       encoder.encode(sent);
-      const next = nextCommit(sent, (blocks) => blocks.map((block, index) => (
-        index === blocks.length - 1 ? { ...block, status: 'complete' as const } : block
-      )));
+      const next = nextCommit(sent, (blocks) =>
+        blocks.map((block, index) => (index === blocks.length - 1 ? { ...block, status: 'complete' as const } : block)),
+      );
       const stringify = vi.spyOn(JSON, 'stringify');
       try {
         expect(encoder.encode(next)?.trace?.blocks.map((block) => block.id)).toEqual([`loop-${steps - 1}`]);

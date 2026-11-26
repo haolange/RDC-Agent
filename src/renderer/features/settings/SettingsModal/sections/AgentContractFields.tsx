@@ -18,37 +18,41 @@ export const AgentContractFields: React.FC<{
 }> = ({ agent, onChange }) => {
   const { t } = useI18n();
   return (
-  <div className="settings-agent-route-grid">
-    <SettingsField label={t('settings.agentAccessCeiling')}>
-      <Select
-        ariaLabel={t('settings.agentAccessCeiling')}
-        dataTestId="settings-agent-access-ceiling"
-        value={agentAccessCeiling(agent)}
-        onChange={(value) => onChange({ accessCeiling: value as AgentAccessCeiling })}
-        options={AGENT_ACCESS_CEILINGS.map((value) => ({
-          value,
-          label: t(value === 'read-only'
-            ? 'settings.agentAccessCeilingReadOnly'
-            : value === 'workspace-write'
-              ? 'settings.agentAccessCeilingWorkspaceWrite'
-              : 'settings.agentAccessCeilingFull'),
-        }))}
-      />
-    </SettingsField>
-    <SettingsField label={t('settings.agentCompletionContract')}>
-      <Select
-        ariaLabel={t('settings.agentCompletionContract')}
-        dataTestId="settings-agent-completion-contract"
-        value={agentCompletionContract(agent)}
-        onChange={(value) => onChange({ completionContract: value as AgentCompletionContract })}
-        options={AGENT_COMPLETION_CONTRACTS.map((value) => ({
-          value,
-          label: t(value === 'investigation-report'
-            ? 'settings.agentCompletionContractInvestigationReport'
-            : 'settings.agentCompletionContractFinalAnswer'),
-        }))}
-      />
-    </SettingsField>
-  </div>
-);
+    <div className="settings-agent-route-grid">
+      <SettingsField label={t('settings.agentAccessCeiling')}>
+        <Select
+          ariaLabel={t('settings.agentAccessCeiling')}
+          dataTestId="settings-agent-access-ceiling"
+          value={agentAccessCeiling(agent)}
+          onChange={(value) => onChange({ accessCeiling: value as AgentAccessCeiling })}
+          options={AGENT_ACCESS_CEILINGS.map((value) => ({
+            value,
+            label: t(
+              value === 'read-only'
+                ? 'settings.agentAccessCeilingReadOnly'
+                : value === 'workspace-write'
+                  ? 'settings.agentAccessCeilingWorkspaceWrite'
+                  : 'settings.agentAccessCeilingFull',
+            ),
+          }))}
+        />
+      </SettingsField>
+      <SettingsField label={t('settings.agentCompletionContract')}>
+        <Select
+          ariaLabel={t('settings.agentCompletionContract')}
+          dataTestId="settings-agent-completion-contract"
+          value={agentCompletionContract(agent)}
+          onChange={(value) => onChange({ completionContract: value as AgentCompletionContract })}
+          options={AGENT_COMPLETION_CONTRACTS.map((value) => ({
+            value,
+            label: t(
+              value === 'investigation-report'
+                ? 'settings.agentCompletionContractInvestigationReport'
+                : 'settings.agentCompletionContractFinalAnswer',
+            ),
+          }))}
+        />
+      </SettingsField>
+    </div>
+  );
 };

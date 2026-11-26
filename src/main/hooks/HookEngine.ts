@@ -55,8 +55,10 @@ const parseHookFile = (sourcePath: string): HookDefinition => {
   const parsed: unknown = YAML.parse(fs.readFileSync(sourcePath, 'utf8'));
   if (!parsed || typeof parsed !== 'object') throw new Error(`Invalid hook file: ${sourcePath}`);
   const value = parsed as Partial<HookDefinition>;
-  if (!value.id?.trim() || !value.event || !value.command?.trim()) throw new Error(`Hook requires id, event, and command: ${sourcePath}`);
-  if (!['block', 'warn'].includes(value.failurePolicy ?? '')) throw new Error(`Hook failurePolicy must be block or warn: ${sourcePath}`);
+  if (!value.id?.trim() || !value.event || !value.command?.trim())
+    throw new Error(`Hook requires id, event, and command: ${sourcePath}`);
+  if (!['block', 'warn'].includes(value.failurePolicy ?? ''))
+    throw new Error(`Hook failurePolicy must be block or warn: ${sourcePath}`);
   return {
     id: value.id.trim(),
     enabled: value.enabled !== false,
@@ -65,7 +67,8 @@ const parseHookFile = (sourcePath: string): HookDefinition => {
     args: Array.isArray(value.args) ? value.args.map(String) : [],
     ...(value.cwd?.trim() ? { cwd: value.cwd.trim() } : {}),
     ...(value.env && typeof value.env === 'object' ? { env: value.env } : {}),
-    timeoutMs: Number.isFinite(value.timeoutMs) && Number(value.timeoutMs) > 0 ? Number(value.timeoutMs) : DEFAULT_TIMEOUT_MS,
+    timeoutMs:
+      Number.isFinite(value.timeoutMs) && Number(value.timeoutMs) > 0 ? Number(value.timeoutMs) : DEFAULT_TIMEOUT_MS,
     failurePolicy: value.failurePolicy as 'block' | 'warn',
     ...(value.matcher ? { matcher: value.matcher } : {}),
   };
@@ -100,9 +103,8 @@ function readHookFiles(directories: ReadonlyArray<readonly [string, HookScope]>,
   return { stamp, candidates, invalid };
 }
 
-const untrustedReason = (scope: 'user' | 'project'): string => (
-  `${scope === 'project' ? 'Project' : 'User'} hook requires explicit trust for its current trust fingerprint.`
-);
+const untrustedReason = (scope: 'user' | 'project'): string =>
+  `${scope === 'project' ? 'Project' : 'User'} hook requires explicit trust for its current trust fingerprint.`;
 
 export class HookEngine {
   constructor(private readonly explicitTrustStorePath?: string) {}
@@ -133,9 +135,14 @@ export class HookEngine {
     projectRoot?: string,
     builtinHooksPath = appPathService.getBuiltinHooksPath(),
   ): LoadedHook[] {
-    const directories: Array<readonly [string, HookScope]> = [[builtinHooksPath, 'builtin'], [userHooksPath, 'user']];
+    const directories: Array<readonly [string, HookScope]> = [
+      [builtinHooksPath, 'builtin'],
+      [userHooksPath, 'user'],
+    ];
     if (projectRoot) directories.push([appPathService.getProjectRdcPaths(projectRoot).hooksPath, 'project']);
-    const stamp = directories.map(([root, scope]) => `${scope}\u0000${root}\u0000${directoryStamp(root, isHookFile)}`).join('\n');
+    const stamp = directories
+      .map(([root, scope]) => `${scope}\u0000${root}\u0000${directoryStamp(root, isHookFile)}`)
+      .join('\n');
     if (this.files?.stamp !== stamp) this.files = readHookFiles(directories, stamp);
     const { candidates } = this.files;
     this.invalid = [...this.files.invalid];
@@ -157,17 +164,19 @@ export class HookEngine {
       const scope = resource.provenance.scope;
       // Built-in hooks ship with the app and are trusted by scope, so their identity is their shipped bytes. Computing
       // the full fingerprint would hash the runtime they launch (the app's own Electron binary, ~200 MB) for nothing.
-      const trustFingerprint = scope === 'builtin'
-        ? `builtin:${resource.provenance.sourceHash}`
-        : computeHookTrustFingerprint({
-          definition: resource.value,
-          scope,
-          sourcePath: resource.provenance.sourcePath,
-          projectRoot,
-        });
-      const ownerRoot = scope === 'project' && projectRoot
-        ? canonicalRealpath(projectRoot)
-        : canonicalRealpath(path.dirname(resource.provenance.sourcePath));
+      const trustFingerprint =
+        scope === 'builtin'
+          ? `builtin:${resource.provenance.sourceHash}`
+          : computeHookTrustFingerprint({
+              definition: resource.value,
+              scope,
+              sourcePath: resource.provenance.sourcePath,
+              projectRoot,
+            });
+      const ownerRoot =
+        scope === 'project' && projectRoot
+          ? canonicalRealpath(projectRoot)
+          : canonicalRealpath(path.dirname(resource.provenance.sourcePath));
       const record = scope === 'builtin' ? undefined : trustRecord(scope, ownerRoot, resource.id);
       const trusted = scope === 'builtin' || record?.trustFingerprint === trustFingerprint;
       return {
@@ -216,9 +225,10 @@ export class HookEngine {
     if (hook.scope === 'builtin') {
       throw new Error('Builtin hooks are trusted by default and cannot be stored in the trust store.');
     }
-    const ownerRoot = hook.scope === 'project'
-      ? canonicalRealpath(projectRoot ?? hook.trust.projectRoot ?? '')
-      : canonicalRealpath(path.dirname(hook.sourcePath));
+    const ownerRoot =
+      hook.scope === 'project'
+        ? canonicalRealpath(projectRoot ?? hook.trust.projectRoot ?? '')
+        : canonicalRealpath(path.dirname(hook.sourcePath));
     const { trustedAt } = this.trustStore.trust(hook.scope, ownerRoot, hookId, hook.trustFingerprint);
     hook.trust = {
       trusted: true,
@@ -241,16 +251,21 @@ export class HookEngine {
 
   revokeHook(hookId: string, projectRoot?: string): void {
     const requestedOwnerRoot = projectRoot ? canonicalRealpath(projectRoot) : undefined;
-    this.trustStore.revoke((record) => record.resourceId === hookId && (requestedOwnerRoot
-      ? record.scope === 'project' && record.ownerRealpath.toLowerCase() === requestedOwnerRoot.toLowerCase()
-      : record.scope === 'user'));
-    const hook = this.loaded.find((entry) => (
-      entry.definition.id === hookId
-      && (requestedOwnerRoot
-        ? entry.scope === 'project'
-          && canonicalRealpath(entry.trust.projectRoot ?? '').toLowerCase() === requestedOwnerRoot.toLowerCase()
-        : entry.scope === 'user')
-    ));
+    this.trustStore.revoke(
+      (record) =>
+        record.resourceId === hookId &&
+        (requestedOwnerRoot
+          ? record.scope === 'project' && record.ownerRealpath.toLowerCase() === requestedOwnerRoot.toLowerCase()
+          : record.scope === 'user'),
+    );
+    const hook = this.loaded.find(
+      (entry) =>
+        entry.definition.id === hookId &&
+        (requestedOwnerRoot
+          ? entry.scope === 'project' &&
+            canonicalRealpath(entry.trust.projectRoot ?? '').toLowerCase() === requestedOwnerRoot.toLowerCase()
+          : entry.scope === 'user'),
+    );
     if (hook && hook.scope !== 'builtin') {
       hook.trust = {
         trusted: false,
@@ -264,7 +279,10 @@ export class HookEngine {
 
   async trigger(event: HookEvent, context: HookContext): Promise<HookExecutionResult[]> {
     const results: HookExecutionResult[] = [];
-    for (const hook of this.loaded.filter((entry) => entry.definition.enabled && entry.definition.event === event && this.matches(entry.definition, context))) {
+    for (const hook of this.loaded.filter(
+      (entry) =>
+        entry.definition.enabled && entry.definition.event === event && this.matches(entry.definition, context),
+    )) {
       if (hook.scope !== 'builtin' && !hook.trust.trusted) {
         results.push({
           hookId: hook.definition.id,
@@ -336,15 +354,18 @@ export class HookEngine {
   }
 
   private matches(hook: HookDefinition, context: HookContext): boolean {
-    const agentMatch = !hook.matcher?.agents?.length || (context.agentId ? hook.matcher.agents.includes(context.agentId) : false);
-    const toolMatch = !hook.matcher?.tools?.length || (context.toolName ? hook.matcher.tools.includes(context.toolName) : false);
+    const agentMatch =
+      !hook.matcher?.agents?.length || (context.agentId ? hook.matcher.agents.includes(context.agentId) : false);
+    const toolMatch =
+      !hook.matcher?.tools?.length || (context.toolName ? hook.matcher.tools.includes(context.toolName) : false);
     return agentMatch && toolMatch;
   }
 
   private async run(hook: LoadedHook, context: HookContext): Promise<HookExecutionResult> {
     const definition = hook.definition;
     const env = { ...process.env } as Record<string, string | undefined>;
-    for (const [targetName, sourceName] of Object.entries(definition.env ?? {})) env[targetName] = process.env[sourceName];
+    for (const [targetName, sourceName] of Object.entries(definition.env ?? {}))
+      env[targetName] = process.env[sourceName];
     const cwd = resolveHookCwd(definition, context.projectRoot);
     const spawnSpec = resolveHookSpawn(definition, hook.scope, hook.sourcePath, cwd);
     if ('unresolvedArg' in spawnSpec) {
@@ -408,12 +429,11 @@ export class HookEngine {
     }
     const code = info.code;
     const succeeded = code === 0;
-    const builtinFailure = hook.scope === 'builtin'
-      ? stderr.trim().split(/\r?\n/, 1)[0]
-      : undefined;
-    const failureReason = builtinFailure?.startsWith(`${definition.id}:`) && builtinFailure.length <= 512
-      ? builtinFailure
-      : `Hook exited with code ${code}.`;
+    const builtinFailure = hook.scope === 'builtin' ? stderr.trim().split(/\r?\n/, 1)[0] : undefined;
+    const failureReason =
+      builtinFailure?.startsWith(`${definition.id}:`) && builtinFailure.length <= 512
+        ? builtinFailure
+        : `Hook exited with code ${code}.`;
     return {
       hookId: definition.id,
       allowed: succeeded || definition.failurePolicy === 'warn',
@@ -424,7 +444,6 @@ export class HookEngine {
       ...(!succeeded ? { reason: failureReason } : {}),
     };
   }
-
 }
 
 export const hookEngine = new HookEngine();

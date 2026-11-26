@@ -31,9 +31,7 @@ export interface ConcurrentToolGroup {
 }
 
 /** Partition a same-turn call list into consecutive safe groups and exclusive unsafe singles. */
-export function partitionConsecutiveSafeGroups(
-  safeFlags: readonly boolean[],
-): ConcurrentToolGroup[] {
+export function partitionConsecutiveSafeGroups(safeFlags: readonly boolean[]): ConcurrentToolGroup[] {
   const groups: ConcurrentToolGroup[] = [];
   let current: ConcurrentToolGroup | null = null;
   for (let index = 0; index < safeFlags.length; index += 1) {

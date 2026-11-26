@@ -1,4 +1,11 @@
-import { type ToolContentInput, type UnwrappedToolContent, asFiniteNumber, filterEnvelopeLines, extractReadableResultLines, enhanceToolPreviewLines } from './workProcessToolContentShared';
+import {
+  type ToolContentInput,
+  type UnwrappedToolContent,
+  asFiniteNumber,
+  filterEnvelopeLines,
+  extractReadableResultLines,
+  enhanceToolPreviewLines,
+} from './workProcessToolContentShared';
 import { createDetailLines, isLikelyBinaryText } from './workProcessContentText';
 import { compactText } from './workProcessFormat';
 
@@ -15,19 +22,12 @@ export function presentGenericContent(input: ToolContentInput): UnwrappedToolCon
     ? [t('chat.binaryPreviewOmitted')]
     : filterEnvelopeLines(baseLines);
 
-  const previewLines = filterEnvelopeLines(enhanceToolPreviewLines(
-    toolName,
-    parsed,
-    contentText || undefined,
-    binarySafe,
-  ));
+  const previewLines = filterEnvelopeLines(
+    enhanceToolPreviewLines(toolName, parsed, contentText || undefined, binarySafe),
+  );
 
   const total = asFiniteNumber(
-    details?.total
-    ?? details?.matched
-    ?? details?.count
-    ?? record?.total
-    ?? record?.matched,
+    details?.total ?? details?.matched ?? details?.count ?? record?.total ?? record?.matched,
   );
 
   const bodyLines = previewLines.slice(0, 3);

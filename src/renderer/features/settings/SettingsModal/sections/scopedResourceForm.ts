@@ -2,15 +2,17 @@ import { z } from 'zod';
 import type { ScopedResourceKind } from '@shared/types/rdcRuntime';
 
 /** The MCP server fields the form edits; the body keeps every other field as written. */
-const McpServerFormSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().optional(),
-  transport: z.string().optional(),
-  url: z.string().optional(),
-  command: z.string().optional(),
-  args: z.array(z.unknown()).optional(),
-  enabledByDefault: z.boolean().optional(),
-}).passthrough();
+const McpServerFormSchema = z
+  .object({
+    id: z.string().optional(),
+    name: z.string().optional(),
+    transport: z.string().optional(),
+    url: z.string().optional(),
+    command: z.string().optional(),
+    args: z.array(z.unknown()).optional(),
+    enabledByDefault: z.boolean().optional(),
+  })
+  .passthrough();
 
 export type ResourceFormState = {
   id: string;
@@ -28,11 +30,12 @@ export type ResourceFormState = {
 
 export const emptyForm = (kind: ScopedResourceKind, id: string): ResourceFormState => ({
   id,
-  body: kind === 'skill'
-    ? `---\nname: ${id}\ndescription: Reusable scoped instructions\nallowed-tools: []\n---\n\nDescribe the skill workflow here.`
-    : kind === 'policy'
-      ? 'deniedTools: []\napproval: mutation\nlimits:\n  contextCompactionPercent: 100'
-      : '',
+  body:
+    kind === 'skill'
+      ? `---\nname: ${id}\ndescription: Reusable scoped instructions\nallowed-tools: []\n---\n\nDescribe the skill workflow here.`
+      : kind === 'policy'
+        ? 'deniedTools: []\napproval: mutation\nlimits:\n  contextCompactionPercent: 100'
+        : '',
   name: id,
   transport: 'stdio',
   url: '',
@@ -98,7 +101,7 @@ export const formFromContent = (kind: ScopedResourceKind, id: string, content: s
 const parseDescriptor = (body: string): Record<string, unknown> => {
   try {
     const parsed: unknown = JSON.parse(body);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
   } catch {
     return {};
   }
@@ -113,16 +116,20 @@ export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormStat
     }
     // The form edits a few fields of the descriptor; everything else it carries (env, description, …) stays as written.
     const { url: _url, ...original } = parseDescriptor(form.body);
-    return JSON.stringify({
-      ...original,
-      id: form.id,
-      name: form.name || form.id,
-      transport: form.transport || 'stdio',
-      ...(form.transport === 'streamable-http' && form.url.trim() ? { url: form.url.trim() } : {}),
-      command: form.command,
-      args,
-      enabledByDefault: form.enabled,
-    }, null, 2);
+    return JSON.stringify(
+      {
+        ...original,
+        id: form.id,
+        name: form.name || form.id,
+        transport: form.transport || 'stdio',
+        ...(form.transport === 'streamable-http' && form.url.trim() ? { url: form.url.trim() } : {}),
+        command: form.command,
+        args,
+        enabledByDefault: form.enabled,
+      },
+      null,
+      2,
+    );
   }
   if (kind === 'hook') {
     return [
@@ -142,7 +149,11 @@ export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormStat
 export const resourceDisplayName = (kind: ScopedResourceKind, id: string, content: string): string => {
   if (kind === 'skill') {
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content)?.[1] ?? '';
-    const name = frontmatter.split(/\r?\n/).find((line) => line.startsWith('name:'))?.slice('name:'.length).trim();
+    const name = frontmatter
+      .split(/\r?\n/)
+      .find((line) => line.startsWith('name:'))
+      ?.slice('name:'.length)
+      .trim();
     return name ? name.replace(/^['"]|['"]$/g, '') : id;
   }
   if (kind === 'mcp') return formFromContent('mcp', id, content).name || id;

@@ -1,17 +1,30 @@
 import { describe, expect, it, vi } from 'vitest';
-import { finalizeTrace, upsertLoopResult, upsertLoopTextItem, upsertLoopThinkingItem, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import {
+  finalizeTrace,
+  upsertLoopResult,
+  upsertLoopTextItem,
+  upsertLoopThinkingItem,
+  upsertRuntimeToolCall,
+} from './ConversationWorkTrace';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 
-const finish = (trace: ConversationWorkTrace | undefined, id: string) => upsertLoopResult(trace, id, { status: 'complete', stopReason: 'tool_use', outputPhase: 'commentary' });
+const finish = (trace: ConversationWorkTrace | undefined, id: string) =>
+  upsertLoopResult(trace, id, { status: 'complete', stopReason: 'tool_use', outputPhase: 'commentary' });
 
 describe('work trace loop settlement and interaction ownership', () => {
   it('settles the screenshot sequence without ending the active turn', () => {
     let trace = finish(undefined, 'runtime-loop-15');
     trace = upsertRuntimeToolCall(trace, { id: 'plan-first', toolName: 'plan_artifact', status: 'complete' });
     trace = finish(trace, 'runtime-loop-16');
-    trace = upsertRuntimeToolCall(trace, { id: 'read', toolName: 'artifact_read', status: 'complete' }, { loopId: 'runtime-loop-16' });
-    expect(trace.blocks.filter((block) => block.kind === 'llm_turn').map((block) => block.status))
-      .toEqual(['complete', 'complete']);
+    trace = upsertRuntimeToolCall(
+      trace,
+      { id: 'read', toolName: 'artifact_read', status: 'complete' },
+      { loopId: 'runtime-loop-16' },
+    );
+    expect(trace.blocks.filter((block) => block.kind === 'llm_turn').map((block) => block.status)).toEqual([
+      'complete',
+      'complete',
+    ]);
     expect(trace.status).toBe('running');
   });
 
@@ -23,7 +36,12 @@ describe('work trace loop settlement and interaction ownership', () => {
     const interactions = trace.blocks.filter((block) => block.kind !== 'llm_turn');
     expect(interactions).toHaveLength(2);
     expect(interactions.map((block) => block.toolCalls.map((call) => call.id))).toEqual([['first'], ['second']]);
-    expect(trace.blocks.map((block) => block.kind)).toEqual(['llm_turn', interactions[0].kind, 'llm_turn', interactions[1].kind]);
+    expect(trace.blocks.map((block) => block.kind)).toEqual([
+      'llm_turn',
+      interactions[0].kind,
+      'llm_turn',
+      interactions[1].kind,
+    ]);
     const ids = trace.blocks.map((block) => block.id);
     trace = upsertRuntimeToolCall(trace, { id: 'second', toolName, status: 'complete' });
     expect(trace.blocks.map((block) => block.id)).toEqual(ids);
@@ -36,12 +54,20 @@ describe('work trace loop settlement and interaction ownership', () => {
     trace = finish(trace, 'loop');
     expect(trace.blocks[0].status).toBe('running');
     expect(trace.blocks[0].completedAt).toBeUndefined();
-    trace = upsertRuntimeToolCall(trace, { id: 'read', toolName: 'artifact_read', status: 'complete' }, { loopId: 'loop' });
+    trace = upsertRuntimeToolCall(
+      trace,
+      { id: 'read', toolName: 'artifact_read', status: 'complete' },
+      { loopId: 'loop' },
+    );
     expect(trace.blocks[0].status).toBe('complete');
   });
 
   it('preserves tool errors when model output settles', () => {
-    let trace = upsertRuntimeToolCall(undefined, { id: 'read', toolName: 'artifact_read', status: 'error', error: 'Missing artifact' }, { loopId: 'loop' });
+    let trace = upsertRuntimeToolCall(
+      undefined,
+      { id: 'read', toolName: 'artifact_read', status: 'error', error: 'Missing artifact' },
+      { loopId: 'loop' },
+    );
     trace = finish(trace, 'loop');
     expect(trace.blocks[0].status).toBe('error');
     expect(trace.blocks[0].toolCalls[0].error).toBe('Missing artifact');
@@ -60,12 +86,22 @@ describe('work trace loop settlement and interaction ownership', () => {
       expect(trace.blocks[0].status).toBe('running');
       expect(trace.blocks[0].completedAt).toBeUndefined();
       expect(trace.blocks[0].result?.outputPhase).toBeUndefined();
-    } finally { clock.mockRestore(); }
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it('does not reopen a completed parent because a background child remains active', () => {
-    let trace = upsertRuntimeToolCall(undefined, { id: 'delegate', toolName: 'subagent', status: 'complete',
-      delegation: { task: 'Background analysis', profile: 'general', mode: 'background', executionId: 'child' } }, { loopId: 'loop' });
+    let trace = upsertRuntimeToolCall(
+      undefined,
+      {
+        id: 'delegate',
+        toolName: 'subagent',
+        status: 'complete',
+        delegation: { task: 'Background analysis', profile: 'general', mode: 'background', executionId: 'child' },
+      },
+      { loopId: 'loop' },
+    );
     trace = finish(trace, 'loop');
     expect(trace.blocks[0].status).toBe('complete');
     expect(trace.status).toBe('running');
@@ -89,7 +125,12 @@ describe('structural sharing', () => {
     vi.useFakeTimers();
     try {
       const ref = { protocol: 'fixture', providerBlockKey: 'output:reasoning:0', contentIndex: 0 };
-      const thinking = (text: string) => ({ text, kind: 'summary' as const, source: 'openai-responses-summary' as const, visibility: 'summary' as const });
+      const thinking = (text: string) => ({
+        text,
+        kind: 'summary' as const,
+        source: 'openai-responses-summary' as const,
+        visibility: 'summary' as const,
+      });
       vi.setSystemTime(1_000);
       let trace = upsertLoopThinkingItem(undefined, 'loop', ref, thinking(''), 'streaming');
       vi.setSystemTime(1_200);
@@ -108,7 +149,12 @@ describe('structural sharing', () => {
     vi.useFakeTimers();
     try {
       const ref = { protocol: 'fixture', providerBlockKey: 'output:reasoning:0', contentIndex: 0 };
-      const thinking = (text: string) => ({ text, kind: 'summary' as const, source: 'openai-responses-summary' as const, visibility: 'summary' as const });
+      const thinking = (text: string) => ({
+        text,
+        kind: 'summary' as const,
+        source: 'openai-responses-summary' as const,
+        visibility: 'summary' as const,
+      });
       vi.setSystemTime(1_000);
       let trace = upsertLoopResult(undefined, 'loop', { status: 'streaming' });
       vi.setSystemTime(4_200);
@@ -122,9 +168,17 @@ describe('structural sharing', () => {
   it('preserves the original provider phase when the host starts the next response', () => {
     const ref = { protocol: 'fixture', providerBlockKey: 'output:text:0', contentIndex: 0 };
     let trace = upsertLoopTextItem(undefined, 'loop-1', ref, 'Interim report', 'final_answer', 'complete');
-    trace = upsertLoopResult(trace, 'loop-1', { status: 'complete', stopReason: 'end_turn', outputPhase: 'final_answer' });
+    trace = upsertLoopResult(trace, 'loop-1', {
+      status: 'complete',
+      stopReason: 'end_turn',
+      outputPhase: 'final_answer',
+    });
     trace = upsertLoopTextItem(trace, 'loop-2', ref, 'Final report', 'final_answer', 'complete');
-    trace = upsertLoopResult(trace, 'loop-2', { status: 'complete', stopReason: 'end_turn', outputPhase: 'final_answer' });
+    trace = upsertLoopResult(trace, 'loop-2', {
+      status: 'complete',
+      stopReason: 'end_turn',
+      outputPhase: 'final_answer',
+    });
     const [first, second] = trace.blocks;
     expect(first!.result?.outputPhase).toBe('final_answer');
     expect(first!.items?.[0]).toMatchObject({ kind: 'text', phase: 'final_answer' });

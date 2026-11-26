@@ -30,11 +30,14 @@ const nodeInline = (code: string) => ({
 
 const writeHook = (dir: string, id: string, extra: Record<string, unknown>) => {
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, `${id}.hook.yml`), YAML.stringify({
-    id,
-    enabled: true,
-    ...extra,
-  }));
+  fs.writeFileSync(
+    path.join(dir, `${id}.hook.yml`),
+    YAML.stringify({
+      id,
+      enabled: true,
+      ...extra,
+    }),
+  );
 };
 
 describe('HookEngine trust fingerprint', () => {
@@ -49,7 +52,9 @@ describe('HookEngine trust fingerprint', () => {
       'src/main/agent-runtime/orchestration/ToolExecutorFactory.ts',
       'src/main/agent-runtime/orchestration/RuntimeToolAssembly.ts',
       'src/main/agent-runtime/context/ExecutionContextWindow.ts',
-    ].map((relative) => fs.readFileSync(path.join(repoRoot, relative), 'utf8')).join('\n');
+    ]
+      .map((relative) => fs.readFileSync(path.join(repoRoot, relative), 'utf8'))
+      .join('\n');
     for (const event of CANONICAL_HOOK_EVENTS) {
       expect(dispatchSources).toContain(`'${event}'`);
     }
@@ -133,12 +138,15 @@ describe('HookEngine trust fingerprint', () => {
     const trustPath = path.join(root, 'trust.json');
     const engine = new HookEngine(trustPath);
     const loaded = engine.load(path.join(root, 'user'), project, emptyBuiltin());
-    fs.writeFileSync(trustPath, JSON.stringify({
-      [`${path.resolve(project).toLowerCase()}::check`]: {
-        sourceHash: loaded[0].sourceHash,
-        trustedAt: '2026-01-01T00:00:00.000Z',
-      },
-    }));
+    fs.writeFileSync(
+      trustPath,
+      JSON.stringify({
+        [`${path.resolve(project).toLowerCase()}::check`]: {
+          sourceHash: loaded[0].sourceHash,
+          trustedAt: '2026-01-01T00:00:00.000Z',
+        },
+      }),
+    );
     const reloaded = engine.load(path.join(root, 'user'), project, emptyBuiltin());
     expect(reloaded[0].trust.trusted).toBe(false);
     expect(reloaded[0].trust.needsRetrust).toBe(true);

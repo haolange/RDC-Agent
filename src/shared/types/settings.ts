@@ -8,15 +8,7 @@ export type ThemeVariant = ResolvedTheme;
 export type AppLanguage = 'zh-CN' | 'en';
 export type FontScale = 'small' | 'medium' | 'large';
 export type ThemePresetId =
-  | 'rdc'
-  | 'absolutely'
-  | 'ayu'
-  | 'catppuccin'
-  | 'dracula'
-  | 'everforest'
-  | 'github'
-  | 'gruvbox'
-  | 'linear';
+  'rdc' | 'absolutely' | 'ayu' | 'catppuccin' | 'dracula' | 'everforest' | 'github' | 'gruvbox' | 'linear';
 
 export interface ThemeChromeFonts {
   ui: string | null;
@@ -150,12 +142,7 @@ export interface LlmProviderAvailability {
  * commercial shape; they must not be used to infer runtime protocol.
  */
 export type LlmProviderCategory =
-  | 'login-authorization'
-  | 'official-direct'
-  | 'cloud-platform'
-  | 'coding-token-plan'
-  | 'compatible-access'
-  | 'local';
+  'login-authorization' | 'official-direct' | 'cloud-platform' | 'coding-token-plan' | 'compatible-access' | 'local';
 
 export type LlmProviderCatalogOwnership = 'app-managed' | 'provider-managed' | 'user-managed';
 
@@ -229,13 +216,7 @@ interface LlmProviderCatalogProvenance {
  * Image/video generation is out of product scope and must not appear here.
  */
 type LlmProviderCapability =
-  | 'chat'
-  | 'tool-calling'
-  | 'structured-output'
-  | 'reasoning'
-  | 'prompt-cache'
-  | 'vision-input'
-  | 'model-discovery';
+  'chat' | 'tool-calling' | 'structured-output' | 'reasoning' | 'prompt-cache' | 'vision-input' | 'model-discovery';
 export type LlmProviderConnectionStatus = 'unconfigured' | 'verified' | 'failed' | 'unavailable';
 type LlmProviderModelAvailability = 'available' | 'unavailable' | 'unknown';
 export interface SidebarLayoutPreference {
@@ -340,11 +321,7 @@ export interface ToolingSettings {
   shell: AgentShellSettings;
 }
 
-export type AgentPermissionMode =
-  | 'default'
-  | 'auto-review'
-  | 'full-access'
-  | 'custom';
+export type AgentPermissionMode = 'default' | 'auto-review' | 'full-access' | 'custom';
 
 export interface AgentPermissionSettings {
   mode: AgentPermissionMode;
@@ -548,9 +525,25 @@ interface LlmSettings {
 
 /** The fields of a provider entry that are catalog facts; `settings:getProviderCatalog` sends them once. */
 export const LLM_PROVIDER_CATALOG_FIELDS = [
-  'protocol', 'routeCount', 'authModeOptions', 'authModeAvailability', 'lifecycleStatus', 'providerAvailability',
-  'category', 'catalogOwnership', 'serviceOperator', 'endpointClass', 'catalogProvenance', 'label', 'connectionSchema',
-  'baseUrlEditable', 'recommendedModels', 'docsUrl', 'accountLogin', 'capabilities', 'apiKey',
+  'protocol',
+  'routeCount',
+  'authModeOptions',
+  'authModeAvailability',
+  'lifecycleStatus',
+  'providerAvailability',
+  'category',
+  'catalogOwnership',
+  'serviceOperator',
+  'endpointClass',
+  'catalogProvenance',
+  'label',
+  'connectionSchema',
+  'baseUrlEditable',
+  'recommendedModels',
+  'docsUrl',
+  'accountLogin',
+  'capabilities',
+  'apiKey',
 ] as const satisfies ReadonlyArray<keyof LlmProviderEntry>;
 
 /** A provider as `settings:get` sends it: its connection and the user's state, without the catalog facts. */
@@ -577,14 +570,7 @@ export interface SettingsView {
 
 /** A section of the user's settings file, or the global instructions Settings also writes. */
 export type SettingsFileSection =
-  | 'appearance'
-  | 'layout'
-  | 'profile'
-  | 'tooling'
-  | 'agentRuntime'
-  | 'agentModels'
-  | 'providers'
-  | 'globalInstructions';
+  'appearance' | 'layout' | 'profile' | 'tooling' | 'agentRuntime' | 'agentModels' | 'providers' | 'globalInstructions';
 
 /** Broadcast on `settings:changed` after every committed settings write. */
 export interface SettingsChangedPayload {
@@ -631,8 +617,7 @@ export interface AppSettings {
 
 /** The fields of one Agent model binding, each set and cleared on its own. */
 type AgentModelBindingField =
-  | { field: 'model'; value: string }
-  | { field: 'reasoningLevel'; value: ReasoningSelection };
+  { field: 'model'; value: string } | { field: 'reasoningLevel'; value: ReasoningSelection };
 
 /**
  * One change `settings:patch` applies. A section op merges its partial value into that section (nested objects one
@@ -641,27 +626,36 @@ type AgentModelBindingField =
  */
 export type SettingsPatchOp =
   | { op: 'appearance'; value: AppearancePatch }
-  | { op: 'layout'; value: Partial<{
-    leftSidebar: Partial<SidebarLayoutPreference>;
-    rightPanel: Partial<SidebarLayoutPreference>;
-    terminal: Partial<TerminalLayoutPreference>;
-    window: Partial<WindowLayoutPreference>;
-  }> }
+  | {
+      op: 'layout';
+      value: Partial<{
+        leftSidebar: Partial<SidebarLayoutPreference>;
+        rightPanel: Partial<SidebarLayoutPreference>;
+        terminal: Partial<TerminalLayoutPreference>;
+        window: Partial<WindowLayoutPreference>;
+      }>;
+    }
   | { op: 'profile'; value: Partial<ProfileSettings> }
-  | { op: 'tooling'; value: Partial<{
-    rdcCli: Partial<RdcCliInvokerSettings>;
-    codeInterpreter: Partial<CodeInterpreterSettings>;
-    shell: Partial<AgentShellSettings>;
-  }> }
-  | { op: 'agentRuntime'; value: Partial<{
-    permissions: Partial<AgentPermissionSettings>;
-    context: Partial<AgentRuntimeContextSettings>;
-  }> }
+  | {
+      op: 'tooling';
+      value: Partial<{
+        rdcCli: Partial<RdcCliInvokerSettings>;
+        codeInterpreter: Partial<CodeInterpreterSettings>;
+        shell: Partial<AgentShellSettings>;
+      }>;
+    }
+  | {
+      op: 'agentRuntime';
+      value: Partial<{
+        permissions: Partial<AgentPermissionSettings>;
+        context: Partial<AgentRuntimeContextSettings>;
+      }>;
+    }
   | { op: 'globalInstructions'; value: string }
   /** Sets one field of the default binding; null clears it. */
   | ({ op: 'agentModels.setDefault' } & (
-    | { field: 'model'; value: string | null }
-    | { field: 'reasoningLevel'; value: ReasoningSelection | null }))
+      { field: 'model'; value: string | null } | { field: 'reasoningLevel'; value: ReasoningSelection | null }
+    ))
   | ({ op: 'agentModels.setAgentField'; agentId: string } & AgentModelBindingField)
   | { op: 'agentModels.clearAgentField'; agentId: string; field: AgentModelBindingField['field'] };
 
@@ -769,7 +763,13 @@ export interface LlmModelCapabilityProbeRequest {
 export interface LlmModelCapabilityProbeResult {
   success: boolean;
   status: 'verified' | 'inconclusive' | 'denied' | 'failed' | 'cancelled';
-  failureKind?: 'entitlement-denied' | 'authentication-failed' | 'quota-exhausted' | 'route-unavailable' | 'tools-unsupported' | 'unknown';
+  failureKind?:
+    | 'entitlement-denied'
+    | 'authentication-failed'
+    | 'quota-exhausted'
+    | 'route-unavailable'
+    | 'tools-unsupported'
+    | 'unknown';
   requestSent: boolean;
   detail?: string;
   detailCode?: 'fast-tier-default' | 'fast-tier-missing' | 'fast-tier-other';

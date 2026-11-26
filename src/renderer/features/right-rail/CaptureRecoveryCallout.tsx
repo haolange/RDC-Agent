@@ -4,7 +4,16 @@ import { useI18n } from '../../i18n';
 import type { CaptureRecoveryStatus } from '@shared/types/captureReplay';
 
 /** Offers to reopen the capture this session had before; names it only when it differs from the current choice. */
-export function CaptureRecoveryCallout({ status, error, locked, disabled, restoring, showTarget, deviceLabel, onRestore }: {
+export function CaptureRecoveryCallout({
+  status,
+  error,
+  locked,
+  disabled,
+  restoring,
+  showTarget,
+  deviceLabel,
+  onRestore,
+}: {
   status: CaptureRecoveryStatus | null;
   error: string | null;
   locked: boolean;
@@ -16,14 +25,33 @@ export function CaptureRecoveryCallout({ status, error, locked, disabled, restor
 }) {
   const { t } = useI18n();
   const original = status?.original;
-  return <>
-    {status && <div className="capture-replay-callout is-warning" aria-live="polite">
-      <div className="capture-replay-callout-copy"><strong>{t(locked ? 'control.replay.recoveryOwned' : 'control.replay.recoveryPending')}</strong>
-        {showTarget && original ? <small>{original.fileName} · {deviceLabel(original.deviceId)}</small>
-          : !original ? <small>{t('control.replay.recoveryNoCapture')}</small> : null}</div>
-      <Button variant="secondary" size="sm" disabled={disabled} aria-busy={restoring} data-tooltip={t('control.replay.recoveryDescription')}
-        onClick={onRestore}>{t('control.replay.recoveryAction')}</Button>
-    </div>}
-    {error && <InlineError detail={error}>{t('control.replay.recoveryFailed')}</InlineError>}
-  </>;
+  return (
+    <>
+      {status && (
+        <div className="capture-replay-callout is-warning" aria-live="polite">
+          <div className="capture-replay-callout-copy">
+            <strong>{t(locked ? 'control.replay.recoveryOwned' : 'control.replay.recoveryPending')}</strong>
+            {showTarget && original ? (
+              <small>
+                {original.fileName} · {deviceLabel(original.deviceId)}
+              </small>
+            ) : !original ? (
+              <small>{t('control.replay.recoveryNoCapture')}</small>
+            ) : null}
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={disabled}
+            aria-busy={restoring}
+            data-tooltip={t('control.replay.recoveryDescription')}
+            onClick={onRestore}
+          >
+            {t('control.replay.recoveryAction')}
+          </Button>
+        </div>
+      )}
+      {error && <InlineError detail={error}>{t('control.replay.recoveryFailed')}</InlineError>}
+    </>
+  );
 }

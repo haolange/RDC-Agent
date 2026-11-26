@@ -71,7 +71,10 @@ export function matchesDeniedCommandPrefix(command: string, prefix: string): boo
   for (const segment of splitShellSegments(command)) {
     const basename = extractCommandBasename(segment);
     if (!basename) continue;
-    const rewritten = segment.trim().replace(/^[^\s]+/, basename).toLowerCase();
+    const rewritten = segment
+      .trim()
+      .replace(/^[^\s]+/, basename)
+      .toLowerCase();
     if (new RegExp(`^${escaped}(?=$|[\\s;&|)])`, 'i').test(rewritten)) return true;
     if (basename === prefixFirst && needle === prefixFirst) return true;
   }

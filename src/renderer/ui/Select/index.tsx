@@ -54,10 +54,7 @@ export const Select: React.FC<SelectProps> = ({
     ready: false,
   });
 
-  const selectedOption = useMemo(
-    () => options.find((option) => option.value === value) ?? null,
-    [options, value],
-  );
+  const selectedOption = useMemo(() => options.find((option) => option.value === value) ?? null, [options, value]);
 
   const resolveInitialIndex = useCallback(() => {
     const selectedIndex = findSelectedEnabledIndex(options, value);
@@ -85,17 +82,18 @@ export const Select: React.FC<SelectProps> = ({
       return;
     }
 
-    const measuredWidth = Math.max(
-      triggerRect.width,
-      menuElement?.offsetWidth ?? 0,
-      minMenuWidth,
-    );
-    const { width, left, top, placement } = placeAnchoredSurface(triggerRect,
+    const measuredWidth = Math.max(triggerRect.width, menuElement?.offsetWidth ?? 0, minMenuWidth);
+    const { width, left, top, placement } = placeAnchoredSurface(
+      triggerRect,
       { width: measuredWidth, height: menuElement?.offsetHeight ?? 320 },
-      { width: viewportWidth, height: viewportHeight }, menuAlign, 'bottom', VIEWPORT_MARGIN, ANCHOR_GAP);
-    const tipAnchorX = menuAlign === 'end'
-      ? triggerRect.right - 16
-      : triggerRect.left + Math.min(20, triggerRect.width / 2);
+      { width: viewportWidth, height: viewportHeight },
+      menuAlign,
+      'bottom',
+      VIEWPORT_MARGIN,
+      ANCHOR_GAP,
+    );
+    const tipAnchorX =
+      menuAlign === 'end' ? triggerRect.right - 16 : triggerRect.left + Math.min(20, triggerRect.width / 2);
 
     setMenuPosition({
       left,
@@ -123,11 +121,14 @@ export const Select: React.FC<SelectProps> = ({
     if (!presence.mounted) setMenuPosition((current) => (current.ready ? { ...current, ready: false } : current));
   }, [presence.mounted]);
 
-  const commitSelection = useCallback((nextValue: string) => {
-    onChange(nextValue);
-    setOpen(false);
-    triggerRef.current?.focus();
-  }, [onChange]);
+  const commitSelection = useCallback(
+    (nextValue: string) => {
+      onChange(nextValue);
+      setOpen(false);
+      triggerRef.current?.focus();
+    },
+    [onChange],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -191,9 +192,8 @@ export const Select: React.FC<SelectProps> = ({
       updateMenuPosition();
     };
 
-    const resizeObserver = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(() => updateMenuPosition())
-      : null;
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => updateMenuPosition()) : null;
 
     if (menuRef.current && resizeObserver) {
       resizeObserver.observe(menuRef.current);
@@ -235,7 +235,9 @@ export const Select: React.FC<SelectProps> = ({
     open ? 'is-open' : '',
     disabled ? 'is-disabled' : '',
     className,
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const triggerLabel = selectedOption?.label ?? placeholder;
   const triggerAriaLabel = ariaLabel ?? triggerLabel;

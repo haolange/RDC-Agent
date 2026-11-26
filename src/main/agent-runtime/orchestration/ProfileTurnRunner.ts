@@ -20,7 +20,10 @@ import { appPathService } from '../../runtime/AppPathService';
 import { sessionRecordStore } from '../../sessions/store/sessionStores';
 import { settingsService } from '../../settings/settings-core/SettingsService';
 import { agentManifestService } from '../../settings/agent-manifests/AgentManifestService';
-import { planEffectiveModelRequest, resolveEffectiveModel } from '../../settings/provider-catalog/EffectiveModelResolver';
+import {
+  planEffectiveModelRequest,
+  resolveEffectiveModel,
+} from '../../settings/provider-catalog/EffectiveModelResolver';
 import { resolveAgentRouteCapability } from '../capabilities/RouteCapabilityResolver';
 import { imageTokenAdjustmentForContent } from '../attachments/ConversationAttachmentMaterializer';
 import { applyDelegationCapsuleToPromptPlan } from '../prompt/DelegationCapsuleCompiler';
@@ -102,11 +105,15 @@ export function resolveProfileToolAllowlist(
   prepared?: PreparedAgentTurnContext | null,
 ): string[] {
   const leaseFiltered = options?.excludeRdcLeaseTools ? stripRdcLeaseToolsFromAllowlist(allowlist) : allowlist;
-  const maxDepth = Math.min(prepared?.runtime.effectivePlan.policy.maxChildDepth
-    ?? compileEffectivePolicy(options?.projectRootPath ?? null).maxChildDepth, options?.policyBudget?.maxChildDepth ?? Infinity);
-  return (options?.subagentBudget?.depth ?? options?.policyBudget?.childDepth ?? 0) >= maxDepth
-    || newDelegationBudgetExhausted(options?.policyBudget, options?.subagentBudget)
-    ? leaseFiltered.filter((name) => name.trim().toLowerCase() !== 'subagent') : leaseFiltered;
+  const maxDepth = Math.min(
+    prepared?.runtime.effectivePlan.policy.maxChildDepth ??
+      compileEffectivePolicy(options?.projectRootPath ?? null).maxChildDepth,
+    options?.policyBudget?.maxChildDepth ?? Infinity,
+  );
+  return (options?.subagentBudget?.depth ?? options?.policyBudget?.childDepth ?? 0) >= maxDepth ||
+    newDelegationBudgetExhausted(options?.policyBudget, options?.subagentBudget)
+    ? leaseFiltered.filter((name) => name.trim().toLowerCase() !== 'subagent')
+    : leaseFiltered;
 }
 
 export class ProfileTurnRunner {
@@ -136,7 +143,9 @@ export class ProfileTurnRunner {
   private async runProfileTurn(
     request: ProfileTurnRequest,
     prepare: (scope: ProfileTurnScope) => Promise<{
-      route: ProfileRoute; requestPlan: ProfileRequestPlan; preparedTurn: PreparedAgentTurnContext;
+      route: ProfileRoute;
+      requestPlan: ProfileRequestPlan;
+      preparedTurn: PreparedAgentTurnContext;
     }>,
   ): Promise<string> {
     const scope = this.beginProfileTurn(request);
@@ -166,7 +175,8 @@ export class ProfileTurnRunner {
   private async resolveChildRoute(request: ProfileTurnRequest, scope: ProfileTurnScope): Promise<ProfileRoute> {
     const snapshot = this.resolveProfileSnapshot(request);
     let route = this.configuredRoute(request, snapshot);
-    const credentialProviderId = request.requestPlan?.providerId ?? request.modelOverride?.providerId ?? route?.providerId;
+    const credentialProviderId =
+      request.requestPlan?.providerId ?? request.modelOverride?.providerId ?? route?.providerId;
     if (credentialProviderId) {
       scope.ownedCredentialHandle = await this.deps.credentials.refresh(credentialProviderId);
       const refreshed = this.enabledProfile(request.agentId, this.effectiveProfiles(request.projectRootPath));
@@ -194,9 +204,10 @@ export class ProfileTurnRunner {
     snapshot: ProfileSnapshot,
   ): EffectiveAgentProfile['compiledRoute'] | undefined {
     const routeAgentId = request.routeAgentId ?? request.agentId;
-    const compiledRoute = routeAgentId === request.agentId
-      ? snapshot.effectiveProfile?.compiledRoute
-      : this.enabledProfile(routeAgentId, snapshot.effectiveProfiles)?.compiledRoute;
+    const compiledRoute =
+      routeAgentId === request.agentId
+        ? snapshot.effectiveProfile?.compiledRoute
+        : this.enabledProfile(routeAgentId, snapshot.effectiveProfiles)?.compiledRoute;
     return compiledRoute?.providerId && compiledRoute.modelId ? compiledRoute : undefined;
   }
 
@@ -223,12 +234,14 @@ export class ProfileTurnRunner {
     const modelOverride = request.modelOverride ?? null;
     return {
       ...fallbackConfig,
-      modelProvider: request.requestPlan?.providerId
-        ?? (modelOverride ? modelOverride.providerId : route?.providerId)
-        ?? fallbackConfig.modelProvider,
-      modelName: request.requestPlan?.effectiveModelId
-        ?? (modelOverride ? modelOverride.modelId : route?.modelId)
-        ?? fallbackConfig.modelName,
+      modelProvider:
+        request.requestPlan?.providerId ??
+        (modelOverride ? modelOverride.providerId : route?.providerId) ??
+        fallbackConfig.modelProvider,
+      modelName:
+        request.requestPlan?.effectiveModelId ??
+        (modelOverride ? modelOverride.modelId : route?.modelId) ??
+        fallbackConfig.modelName,
       systemPrompt: request.systemPrompt || effectiveProfile?.instructions || fallbackConfig.systemPrompt,
       temperature: request.temperature ?? fallbackConfig.temperature,
     };
@@ -243,34 +256,42 @@ export class ProfileTurnRunner {
     const providerId = config.modelProvider;
     const modelId = config.modelName;
     const toolAllowlist = resolveProfileToolAllowlist(
-      preparedTurn?.toolAllowlist
-        ?? resolveAgentToolAllowlistFromDefinition(request.agentId, effectiveProfile.tools, agentAccessCeiling(effectiveProfile)),
+      preparedTurn?.toolAllowlist ??
+        resolveAgentToolAllowlistFromDefinition(
+          request.agentId,
+          effectiveProfile.tools,
+          agentAccessCeiling(effectiveProfile),
+        ),
       request,
       preparedTurn,
     );
     const { plan, controls } = this.planRequest(request, effectiveProfile, config);
-    const capability = preparedTurn?.effectiveModel ?? resolveEffectiveModel(providerId, modelId, settingsService.providerConnections);
+    const capability =
+      preparedTurn?.effectiveModel ?? resolveEffectiveModel(providerId, modelId, settingsService.providerConnections);
     if (!capability) {
       const message = `MODEL_UNAVAILABLE: ${providerId}/${modelId}`;
       if (request.frozenDelegationCapsule) throw new DelegationConfigurationError('MODEL_UNAVAILABLE', message);
       throw new Error(message);
     }
-    let promptPlan = request.promptPlan ?? this.deps.promptPlan.buildPromptPlanForAgentTurn({
-      agentId: request.agentId,
-      sessionId: request.sessionId ?? null,
-      projectRootPath: request.projectRootPath ?? null,
-      providerId,
-      modelId,
-      toolAllowlist,
-      contextWindowTokens: plan.contextWindowTokens,
-      capability, requestPlan: plan,
-      systemPrompt: config.systemPrompt,
-      messageText: typeof request.content === 'string' ? request.content : '',
-      preloadSkillIds: request.preloadSkillIds,
-      effectiveProfile,
-      extraSegments: request.extraPromptSegments,
-      effectiveProfiles: route.effectiveProfiles,
-    });
+    let promptPlan =
+      request.promptPlan ??
+      this.deps.promptPlan.buildPromptPlanForAgentTurn({
+        agentId: request.agentId,
+        sessionId: request.sessionId ?? null,
+        projectRootPath: request.projectRootPath ?? null,
+        providerId,
+        modelId,
+        toolAllowlist,
+        contextWindowTokens: plan.contextWindowTokens,
+        capability,
+        requestPlan: plan,
+        systemPrompt: config.systemPrompt,
+        messageText: typeof request.content === 'string' ? request.content : '',
+        preloadSkillIds: request.preloadSkillIds,
+        effectiveProfile,
+        extraSegments: request.extraPromptSegments,
+        effectiveProfiles: route.effectiveProfiles,
+      });
     if (!promptPlan) throw new AppError('PROMPT_PLAN_UNAVAILABLE', request.agentId);
     if (request.promptPlan && request.extraPromptSegments?.length) {
       promptPlan = applyDelegationCapsuleToPromptPlan(promptPlan, request.extraPromptSegments);
@@ -285,9 +306,15 @@ export class ProfileTurnRunner {
     config: AgentConfig,
   ): { plan: RequestPlan; controls: ConversationTurnControls } {
     const planned = this.frozenOrPlannedRequest(request, effectiveProfile, config);
-    if (request.frozenDelegationCapsule && effectiveProfile.reasoningLevel
-      && planned.plan.reasoningWire.selection !== effectiveProfile.reasoningLevel) {
-      throw new DelegationConfigurationError('DELEGATION_REASONING_UNSUPPORTED', 'DELEGATION_REASONING_UNSUPPORTED: selected route cannot honor the Agent reasoning level.');
+    if (
+      request.frozenDelegationCapsule &&
+      effectiveProfile.reasoningLevel &&
+      planned.plan.reasoningWire.selection !== effectiveProfile.reasoningLevel
+    ) {
+      throw new DelegationConfigurationError(
+        'DELEGATION_REASONING_UNSUPPORTED',
+        'DELEGATION_REASONING_UNSUPPORTED: selected route cannot honor the Agent reasoning level.',
+      );
     }
     return planned;
   }
@@ -302,13 +329,16 @@ export class ProfileTurnRunner {
       return {
         plan: frozen,
         controls: request.turnControls ?? {
-          reasoningLevel: frozen.reasoningWire.selection === 'unknown' ? 'off' as const : frozen.reasoningWire.selection,
+          reasoningLevel:
+            frozen.reasoningWire.selection === 'unknown' ? ('off' as const) : frozen.reasoningWire.selection,
           maxContextMode: frozen.contextMode === 'one-million',
           fastModel: frozen.fastMode,
         },
       };
     }
-    const sessionControls = request.sessionId ? sessionRecordStore.readSession(request.sessionId)?.turnControls : undefined;
+    const sessionControls = request.sessionId
+      ? sessionRecordStore.readSession(request.sessionId)?.turnControls
+      : undefined;
     const planning = planEffectiveModelRequest({
       providerId: config.modelProvider,
       modelId: config.modelName,
@@ -348,7 +378,12 @@ export class ProfileTurnRunner {
     }
     const excludeSubagent = resolveProfileToolAllowlist(['subagent'], request, null).length === 0;
     const providers = settingsService.providerConnections;
-    const routeCapability = resolveAgentRouteCapability(providers.get(config.modelProvider), config.modelName, requestPlan.capability, requestPlan.plan);
+    const routeCapability = resolveAgentRouteCapability(
+      providers.get(config.modelProvider),
+      config.modelName,
+      requestPlan.capability,
+      requestPlan.plan,
+    );
     const preparedTurn = await this.deps.turnPrep.prepareTurnContext({
       requestId: generateEventId('profile-prep'),
       credentialHandle: scope.ownedCredentialHandle,
@@ -414,17 +449,18 @@ export class ProfileTurnRunner {
       contextDiagnostic: preparedTurn.contextDiagnostic,
       preparedRuntime: preparedTurn.runtime,
       terminalContext: options.onTerminalContext
-        ? (messages, status, pendingHandoff, completionDeclaration, approvedPlan, completionReceipt) => options.onTerminalContext?.({
-            messages,
-            executionIdentity: plan.executionIdentity,
-            status,
-            selectedTurnCount: preparedTurn.contextDiagnostic.selectedTurnCount,
-            filteredArtifactCount: preparedTurn.contextDiagnostic.filteredArtifactCount,
-            pendingHandoff,
-            completionDeclaration,
-            completionReceipt,
-            approvedPlan,
-          })
+        ? (messages, status, pendingHandoff, completionDeclaration, approvedPlan, completionReceipt) =>
+            options.onTerminalContext?.({
+              messages,
+              executionIdentity: plan.executionIdentity,
+              status,
+              selectedTurnCount: preparedTurn.contextDiagnostic.selectedTurnCount,
+              filteredArtifactCount: preparedTurn.contextDiagnostic.filteredArtifactCount,
+              pendingHandoff,
+              completionDeclaration,
+              completionReceipt,
+              approvedPlan,
+            })
         : undefined,
     });
   }
@@ -451,7 +487,8 @@ export class ProfileTurnRunner {
       this.deps.slots.purgeAgentStatesForScope(scope.executionScopeId);
     }
     if (scope.preparedLeaseRelease) {
-      await scope.preparedLeaseRelease()
+      await scope
+        .preparedLeaseRelease()
         .catch((error: unknown) => reportProcessFault('Prepared RDC lease was not released at turn end', error));
     }
     this.deps.credentials.release(scope.ownedCredentialHandle);

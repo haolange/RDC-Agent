@@ -47,14 +47,28 @@ const preparedUsageContext = (turnId: string): PreparedTurnContextSummary => ({
   compactionApplied: false,
   filteredArtifactCount: 0,
   preparedAt: 10,
-  continuation: { executionFingerprint: 'test', strategy: 'semantic-replay', replayedArtifactCount: 0, droppedArtifactCount: 0, decisionCounts: [] },
-  cache: { enabled: false, mode: 'none', keyCarrier: 'none', breakpointCarrier: 'none', ttl: 'none', breakpoint: 'none', stableTokenEstimate: 0, stableSegmentCount: 0, providerReported: false, reason: 'test' },
+  continuation: {
+    executionFingerprint: 'test',
+    strategy: 'semantic-replay',
+    replayedArtifactCount: 0,
+    droppedArtifactCount: 0,
+    decisionCounts: [],
+  },
+  cache: {
+    enabled: false,
+    mode: 'none',
+    keyCarrier: 'none',
+    breakpointCarrier: 'none',
+    ttl: 'none',
+    breakpoint: 'none',
+    stableTokenEstimate: 0,
+    stableSegmentCount: 0,
+    providerReported: false,
+    reason: 'test',
+  },
 });
 
-const usageSnapshot = (
-  runId: string,
-  overrides: Partial<RunContextUsageSummary> = {},
-): RunContextUsageSummary => ({
+const usageSnapshot = (runId: string, overrides: Partial<RunContextUsageSummary> = {}): RunContextUsageSummary => ({
   runId,
   providerId: 'provider-a',
   modelId: 'model-a',
@@ -82,10 +96,9 @@ describe('sessionProjectionStore', () => {
   });
 
   it('caches background conversation patches and hydrates on activate', () => {
-    useSessionProjectionStore.getState().projectConversationMessage(
-      'session-a',
-      message({ content: 'cached stream', updatedAt: 2 }),
-    );
+    useSessionProjectionStore
+      .getState()
+      .projectConversationMessage('session-a', message({ content: 'cached stream', updatedAt: 2 }));
     expect(useConversationStore.getState().conversationMessages).toHaveLength(0);
 
     const hydrated = useSessionProjectionStore.getState().activateSession('session-a');
@@ -111,7 +124,9 @@ describe('sessionProjectionStore', () => {
       ownerLeaseId: 'lease-a',
       activeCapture: 'capture-a',
       deviceLabel: 'Local',
-      captureDescriptors: [{ id: 'capture-a', filePath: 'D:/a.rdc', role: 'primary', backendHint: 'local', status: 'open' }],
+      captureDescriptors: [
+        { id: 'capture-a', filePath: 'D:/a.rdc', role: 'primary', backendHint: 'local', status: 'open' },
+      ],
     } as never;
     const openedCapture = {
       projectId: 'project-a',

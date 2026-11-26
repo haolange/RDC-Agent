@@ -9,46 +9,66 @@ import type { KnowledgeTopicDocument } from '@shared/types/knowledge';
 
 const topicId = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/u);
 const name = z.string().trim().min(1).max(120);
-export const KnowledgeTopicSchema = z.object({
-  id: topicId, label: name, synonyms: z.array(name).max(32),
-}).strict();
-export const KnowledgeTopicAssignmentSchema = z.object({
-  cardId: z.string().trim().min(1).max(512),
-  contentHash: z.string().regex(/^[a-f0-9]{64}$/u),
-  topicIds: z.array(topicId).max(64),
-}).strict();
-export const KnowledgeTopicChangesSchema = z.object({
-  expectedRevision: z.string().regex(/^[a-f0-9]{64}$/u),
-  expectedCorpusRevision: z.string().regex(/^[a-f0-9]{64}$/u),
-  topics: z.array(KnowledgeTopicSchema).max(128),
-  assignments: z.array(KnowledgeTopicAssignmentSchema).max(10000),
-  merges: z.array(z.object({ sourceId: topicId, targetId: topicId }).strict()).max(128).default([]),
-}).strict();
-const documentSchema = z.object({
-  schemaVersion: z.literal(1), topics: z.array(KnowledgeTopicSchema).max(128),
-  assignments: z.array(KnowledgeTopicAssignmentSchema).max(10000),
-}).strict().superRefine((document, context) => {
-  const ids = new Set<string>();
-  const terms = new Map<string, string>();
-  for (const topic of document.topics) {
-    if (ids.has(topic.id)) context.addIssue({ code: 'custom', message: `Duplicate topic id: ${topic.id}` });
-    ids.add(topic.id);
-    for (const term of [topic.label, ...topic.synonyms]) {
-      const key = term.normalize('NFKC').toLocaleLowerCase();
-      const owner = terms.get(key);
-      if (owner && owner !== topic.id) context.addIssue({ code: 'custom', message: `Ambiguous topic synonym: ${term}` });
-      terms.set(key, topic.id);
+export const KnowledgeTopicSchema = z
+  .object({
+    id: topicId,
+    label: name,
+    synonyms: z.array(name).max(32),
+  })
+  .strict();
+export const KnowledgeTopicAssignmentSchema = z
+  .object({
+    cardId: z.string().trim().min(1).max(512),
+    contentHash: z.string().regex(/^[a-f0-9]{64}$/u),
+    topicIds: z.array(topicId).max(64),
+  })
+  .strict();
+export const KnowledgeTopicChangesSchema = z
+  .object({
+    expectedRevision: z.string().regex(/^[a-f0-9]{64}$/u),
+    expectedCorpusRevision: z.string().regex(/^[a-f0-9]{64}$/u),
+    topics: z.array(KnowledgeTopicSchema).max(128),
+    assignments: z.array(KnowledgeTopicAssignmentSchema).max(10000),
+    merges: z
+      .array(z.object({ sourceId: topicId, targetId: topicId }).strict())
+      .max(128)
+      .default([]),
+  })
+  .strict();
+const documentSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    topics: z.array(KnowledgeTopicSchema).max(128),
+    assignments: z.array(KnowledgeTopicAssignmentSchema).max(10000),
+  })
+  .strict()
+  .superRefine((document, context) => {
+    const ids = new Set<string>();
+    const terms = new Map<string, string>();
+    for (const topic of document.topics) {
+      if (ids.has(topic.id)) context.addIssue({ code: 'custom', message: `Duplicate topic id: ${topic.id}` });
+      ids.add(topic.id);
+      for (const term of [topic.label, ...topic.synonyms]) {
+        const key = term.normalize('NFKC').toLocaleLowerCase();
+        const owner = terms.get(key);
+        if (owner && owner !== topic.id)
+          context.addIssue({ code: 'custom', message: `Ambiguous topic synonym: ${term}` });
+        terms.set(key, topic.id);
+      }
     }
-  }
-  const cards = new Set<string>();
-  for (const assignment of document.assignments) {
-    if (cards.has(assignment.cardId)) context.addIssue({ code: 'custom', message: `Duplicate card assignment: ${assignment.cardId}` });
-    cards.add(assignment.cardId);
-    if (new Set(assignment.topicIds).size !== assignment.topicIds.length || assignment.topicIds.some(id => !ids.has(id))) {
-      context.addIssue({ code: 'custom', message: `Invalid topic assignment: ${assignment.cardId}` });
+    const cards = new Set<string>();
+    for (const assignment of document.assignments) {
+      if (cards.has(assignment.cardId))
+        context.addIssue({ code: 'custom', message: `Duplicate card assignment: ${assignment.cardId}` });
+      cards.add(assignment.cardId);
+      if (
+        new Set(assignment.topicIds).size !== assignment.topicIds.length ||
+        assignment.topicIds.some((id) => !ids.has(id))
+      ) {
+        context.addIssue({ code: 'custom', message: `Invalid topic assignment: ${assignment.cardId}` });
+      }
     }
-  }
-});
+  });
 
 const fileName = '.topics.json';
 const lockName = '.topics.lock';
@@ -58,7 +78,9 @@ const digest = (source: string): string => createHash('sha256').update(source, '
 export class KnowledgeTopicStore {
   constructor(private readonly root: () => string) {}
 
-  validate(value: KnowledgeTopicDocument): void { documentSchema.parse(value); }
+  validate(value: KnowledgeTopicDocument): void {
+    documentSchema.parse(value);
+  }
 
   async read(): Promise<{ document: KnowledgeTopicDocument; revision: string; source: string | null }> {
     const target = path.join(this.root(), fileName);
@@ -81,9 +103,11 @@ export class KnowledgeTopicStore {
     const lockPath = await assertSafeKnowledgeWriteTarget(root, lockName);
     const token = `${process.pid}:${randomUUID()}`;
     let handle: Awaited<ReturnType<typeof fs.open>>;
-    try { handle = await fs.open(lockPath, 'wx'); }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new AppError('KNOWLEDGE_TOPICS_BUSY', 'a topic update is already in progress.', { cause: error });
+    try {
+      handle = await fs.open(lockPath, 'wx');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST')
+        throw new AppError('KNOWLEDGE_TOPICS_BUSY', 'a topic update is already in progress.', { cause: error });
       throw error;
     }
     let initialized = false;
@@ -98,7 +122,8 @@ export class KnowledgeTopicStore {
       const owner = await fs.readFile(lockPath, 'utf8').catch(() => null);
       // Handle stats on both sides: a path stat is not comparable with a handle stat on every host.
       const current = await openedFileIdentity(lockPath).catch(() => null);
-      if (owner === token || (!initialized && current?.dev === identity.dev && current.ino === identity.ino)) await fs.unlink(lockPath);
+      if (owner === token || (!initialized && current?.dev === identity.dev && current.ino === identity.ino))
+        await fs.unlink(lockPath);
     }
   }
 

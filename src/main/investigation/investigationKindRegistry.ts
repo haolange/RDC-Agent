@@ -22,7 +22,9 @@ export const INVESTIGATION_KIND_REGISTRY: readonly InvestigationKindRegistryEntr
   { kind: 'report', recordType: 'InvestigationReport', schema: 'rdc.investigation.v1.InvestigationReport' },
 ] as const;
 
-const KIND_BY_ID = new Map<string, InvestigationKindRegistryEntry>(INVESTIGATION_KIND_REGISTRY.map((entry) => [entry.kind, entry]));
+const KIND_BY_ID = new Map<string, InvestigationKindRegistryEntry>(
+  INVESTIGATION_KIND_REGISTRY.map((entry) => [entry.kind, entry]),
+);
 
 export function requireInvestigationKind(kind: string): InvestigationKindRegistryEntry {
   const resolved = resolveInvestigationKind(kind);

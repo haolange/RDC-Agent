@@ -13,11 +13,7 @@ interface MessageActionsProps {
   onEditResend?: (content: string) => void;
 }
 
-export const MessageActions: React.FC<MessageActionsProps> = ({
-  message,
-  branchState = null,
-  onEditResend,
-}) => {
+export const MessageActions: React.FC<MessageActionsProps> = ({ message, branchState = null, onEditResend }) => {
   const { t } = useI18n();
   const { copyText } = useClipboardBridge();
   const editResendLabel = t('chat.editResend');
@@ -35,7 +31,12 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
 
   return (
     <div className="message-actions" data-testid="message-actions">
-      <CopyButton className="message-action-btn" onCopy={handleCopy} label={t('chat.copyMessage')} copiedLabel={t('chat.markdownCopied')} />
+      <CopyButton
+        className="message-action-btn"
+        onCopy={handleCopy}
+        label={t('chat.copyMessage')}
+        copiedLabel={t('chat.markdownCopied')}
+      />
       {message.role === 'user' && onEditResend && (
         <button
           type="button"
@@ -47,9 +48,7 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
           <Icon name="edit" size={14} />
         </button>
       )}
-      {message.role === 'user' ? (
-        <MessageVariantNavigator message={message} branchState={branchState} />
-      ) : null}
+      {message.role === 'user' ? <MessageVariantNavigator message={message} branchState={branchState} /> : null}
     </div>
   );
 };

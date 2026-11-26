@@ -83,15 +83,14 @@ export class AgentRecoveryAbortError extends Error {
     this.attempts = fields.attempts;
     this.maxAttempts = fields.maxAttempts;
     this.lastStatus = fields.lastStatus;
-    this.bodySnippet = fields.bodySnippet !== undefined
-      ? redactRecoverySnippet(fields.bodySnippet)
-      : undefined;
+    this.bodySnippet = fields.bodySnippet !== undefined ? redactRecoverySnippet(fields.bodySnippet) : undefined;
     this.streamCode = fields.streamCode;
-    this.code = fields.category === 'stream_protocol'
-      ? 'PROVIDER_STREAM_PROTOCOL_VIOLATION'
-      : fields.category === 'empty_stream'
-        ? 'PROVIDER_STREAM_EMPTY'
-        : 'AGENT_RECOVERY_ABORTED';
+    this.code =
+      fields.category === 'stream_protocol'
+        ? 'PROVIDER_STREAM_PROTOCOL_VIOLATION'
+        : fields.category === 'empty_stream'
+          ? 'PROVIDER_STREAM_EMPTY'
+          : 'AGENT_RECOVERY_ABORTED';
   }
 }
 
@@ -151,8 +150,7 @@ export class ErrorRecovery {
     maxRecoveryRetries?: number;
   }) {
     this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
-    this.maxRecoveryRetries =
-      options.maxRecoveryRetries ?? DEFAULT_MAX_RECOVERY_RETRIES;
+    this.maxRecoveryRetries = options.maxRecoveryRetries ?? DEFAULT_MAX_RECOVERY_RETRIES;
     this.fallbackModel = options.fallbackModel;
     this.state = {
       recoveryCount: 0,
@@ -198,9 +196,9 @@ export class ErrorRecovery {
       status === 529 ||
       status === 503 ||
       raw.includes('overloaded') ||
-      raw.includes('service unavailable')
-      || raw.includes('at capacity')
-      || raw.includes('high demand')
+      raw.includes('service unavailable') ||
+      raw.includes('at capacity') ||
+      raw.includes('high demand')
     ) {
       return 'overloaded';
     }
@@ -339,9 +337,10 @@ export class ErrorRecovery {
       }
 
       case 'stream_protocol': {
-        const streamCode = readProviderStreamCode(error)
-          ?? (error instanceof AgentRecoveryAbortError ? error.streamCode : undefined)
-          ?? 'PROVIDER_STREAM_PROTOCOL_VIOLATION';
+        const streamCode =
+          readProviderStreamCode(error) ??
+          (error instanceof AgentRecoveryAbortError ? error.streamCode : undefined) ??
+          'PROVIDER_STREAM_PROTOCOL_VIOLATION';
         return {
           type: 'abort',
           reason: `${streamCode}: ${error.message}`,
@@ -427,10 +426,11 @@ export class ErrorRecovery {
       maxAttempts: this.getMaxAttempts(category),
       lastStatus: http?.status,
       bodySnippet: http?.bodyText ?? wire?.bodyText ?? wire?.message ?? original.message,
-      streamCode: category === 'stream_protocol'
-        ? readProviderStreamCode(original)
-          ?? (original instanceof AgentRecoveryAbortError ? original.streamCode : undefined)
-        : undefined,
+      streamCode:
+        category === 'stream_protocol'
+          ? (readProviderStreamCode(original) ??
+            (original instanceof AgentRecoveryAbortError ? original.streamCode : undefined))
+          : undefined,
     });
   }
 

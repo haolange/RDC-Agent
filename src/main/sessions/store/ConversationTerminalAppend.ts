@@ -20,7 +20,11 @@ function parseJournaledRecord<T>(schema: z.ZodType<T>, line: string, file: strin
     throw new AppError('STORAGE_CORRUPT', `Terminal append ${file} record is not JSON.`, { cause: error });
   }
   const record = schema.safeParse(value);
-  if (!record.success) throw new AppError('STORAGE_CORRUPT', `Terminal append ${file} record is malformed: ${z.prettifyError(record.error)}`);
+  if (!record.success)
+    throw new AppError(
+      'STORAGE_CORRUPT',
+      `Terminal append ${file} record is malformed: ${z.prettifyError(record.error)}`,
+    );
   return record.data;
 }
 
@@ -62,9 +66,15 @@ export function prepareTerminalAppend(
     ? { op: 'delta', id: assistant.id, patch: assistant, updatedAt: assistant.updatedAt ?? assistant.createdAt }
     : assistant;
   return {
-    schemaVersion: '2', requestId, turnId, phase: 'prepared',
+    schemaVersion: '2',
+    requestId,
+    turnId,
+    phase: 'prepared',
     history: fingerprint(path.join(sessionPath, 'conversation.jsonl'), `${JSON.stringify(historyRecord)}\n`),
-    context: fingerprint(path.join(sessionPath, 'session-context.jsonl'), appendContext ? `${JSON.stringify(context)}\n` : ''),
+    context: fingerprint(
+      path.join(sessionPath, 'session-context.jsonl'),
+      appendContext ? `${JSON.stringify(context)}\n` : '',
+    ),
   };
 }
 
@@ -95,7 +105,10 @@ function validateFile(filePath: string, expected: TerminalAppendFile): void {
     if (hash.digest('hex') !== expected.sha256) throw new Error('Terminal append prefix hash mismatch.');
     while (position < size) {
       const count = fs.readSync(fd, buffer, 0, Math.min(buffer.length, size - position), position);
-      if (!count || !buffer.subarray(0, count).equals(append.subarray(position - expected.bytes, position - expected.bytes + count))) {
+      if (
+        !count ||
+        !buffer.subarray(0, count).equals(append.subarray(position - expected.bytes, position - expected.bytes + count))
+      ) {
         throw new Error('Terminal append contains an unrelated tail.');
       }
       position += count;
@@ -128,11 +141,19 @@ function applyFile(filePath: string, expected: TerminalAppendFile, forward: bool
   }
 }
 
-export function applyTerminalAppend(sessionPath: string, journal: ConversationTerminalAppendJournal, forward: boolean): ConversationMessage {
+export function applyTerminalAppend(
+  sessionPath: string,
+  journal: ConversationTerminalAppendJournal,
+  forward: boolean,
+): ConversationMessage {
   const record = parseJournaledRecord(ConversationHistoryRecordSchema, journal.history.append, 'history');
   const assistant = 'op' in record ? record.patch : record;
   if ('op' in record && record.id !== assistant.id) throw new Error('Terminal append delta ownership mismatch.');
-  if (assistant.role !== 'assistant' || assistant.turnId !== journal.turnId || assistant.requestId !== journal.requestId) {
+  if (
+    assistant.role !== 'assistant' ||
+    assistant.turnId !== journal.turnId ||
+    assistant.requestId !== journal.requestId
+  ) {
     throw new Error('Terminal append message ownership mismatch.');
   }
   if (journal.context.append) {

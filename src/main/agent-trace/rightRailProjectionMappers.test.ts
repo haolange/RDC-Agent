@@ -1,14 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { TASK_SCHEMA_VERSION } from '../agent-runtime/tasks/TaskContracts';
 import { dedupeSessionArtifactSources, type SessionArtifactSource } from '../reports/SessionArtifactSource';
-import { buildRdcContext, buildTaskContext, mapRightRailOutputs, mapRightRailTasks } from './rightRailProjectionMappers';
+import {
+  buildRdcContext,
+  buildTaskContext,
+  mapRightRailOutputs,
+  mapRightRailTasks,
+} from './rightRailProjectionMappers';
 import type { ContextSnapshot, OpenedCaptureState, RunSummary } from '@shared/types/session';
 import type { TraceArtifactRecord } from '@shared/types/trace';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 
 const task = (id: string, status: TaskRecord['status'], createdAt: number, statusReason?: string): TaskRecord => ({
-  schemaVersion: TASK_SCHEMA_VERSION, id, subject: id, description: '', status, statusReason, blockedBy: [], blocks: [],
-  completionRequirements: [], executionRequired: true, executionIds: [], revision: 1, createdAt, updatedAt: createdAt,
+  schemaVersion: TASK_SCHEMA_VERSION,
+  id,
+  subject: id,
+  description: '',
+  status,
+  statusReason,
+  blockedBy: [],
+  blocks: [],
+  completionRequirements: [],
+  executionRequired: true,
+  executionIds: [],
+  revision: 1,
+  createdAt,
+  updatedAt: createdAt,
 });
 
 const source = (
@@ -18,29 +35,71 @@ const source = (
   exists = true,
   category: TraceArtifactRecord['source'] = 'document',
 ): SessionArtifactSource => ({
-  id, kind, runId, title: `${id}.txt`, fileName: `${id}.txt`, filePath: `D:/rail/${id}.txt`, source: category,
-  mimeType: 'text/plain', sizeBytes: 12, createdAt: 1, updatedAt: 1, exists,
+  id,
+  kind,
+  runId,
+  title: `${id}.txt`,
+  fileName: `${id}.txt`,
+  filePath: `D:/rail/${id}.txt`,
+  source: category,
+  mimeType: 'text/plain',
+  sizeBytes: 12,
+  createdAt: 1,
+  updatedAt: 1,
+  exists,
 });
 
-const run = (runId: string, startedAt: number): RunSummary => ({ runId, startedAt } as RunSummary);
+const run = (runId: string, startedAt: number): RunSummary => ({ runId, startedAt }) as RunSummary;
 
 const openedCapture = {
-  projectId: 'project-a', ownerSessionId: 'session-a', inputId: 'input-a', filePath: 'D:/captures/WhiteHair.rdc',
-  captureId: 'capture-a', captureFileId: 'capture-file-a', sessionId: 'rdc-session-a', contextId: 'context-a',
-  replaySessionId: 'rdc-session-a', backend: 'remote', deviceId: 'android-a', deviceLabel: 'Android GPU', status: 'open', openedAt: 10,
-  runtimeContext: { contextId: 'context-a', replaySessionId: 'rdc-session-a', runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-a', backend: 'remote', deviceLabel: 'Android GPU', remoteId: 'remote-a', remoteStatus: 'connected', updatedAt: 11 },
+  projectId: 'project-a',
+  ownerSessionId: 'session-a',
+  inputId: 'input-a',
+  filePath: 'D:/captures/WhiteHair.rdc',
+  captureId: 'capture-a',
+  captureFileId: 'capture-file-a',
+  sessionId: 'rdc-session-a',
+  contextId: 'context-a',
+  replaySessionId: 'rdc-session-a',
+  backend: 'remote',
+  deviceId: 'android-a',
+  deviceLabel: 'Android GPU',
+  status: 'open',
+  openedAt: 10,
+  runtimeContext: {
+    contextId: 'context-a',
+    replaySessionId: 'rdc-session-a',
+    runtimeOwner: 'rdc-agent',
+    ownerLeaseId: 'lease-a',
+    backend: 'remote',
+    deviceLabel: 'Android GPU',
+    remoteId: 'remote-a',
+    remoteStatus: 'connected',
+    updatedAt: 11,
+  },
 } satisfies OpenedCaptureState;
 
 const contextSnapshot = {
-  contextId: 'context-a', sessionId: 'rdc-session-a', ownerSessionId: 'session-a', backend: 'remote', remoteStatus: 'connected',
-  runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-a', captureDescriptors: [], activeCapture: 'capture-a', deviceLabel: 'Android GPU',
+  contextId: 'context-a',
+  sessionId: 'rdc-session-a',
+  ownerSessionId: 'session-a',
+  backend: 'remote',
+  remoteStatus: 'connected',
+  runtimeOwner: 'rdc-agent',
+  ownerLeaseId: 'lease-a',
+  captureDescriptors: [],
+  activeCapture: 'capture-a',
+  deviceLabel: 'Android GPU',
   runtimeContext: openedCapture.runtimeContext,
 } satisfies ContextSnapshot;
 
 describe('right rail projection mappers', () => {
   it('projects only real task records and preserves lifecycle status', () => {
     const rows = mapRightRailTasks('session-a', 'branch-a', [
-      task('done', 'completed', 1), task('active', 'in_progress', 2), task('blocked', 'blocked', 3, 'Waiting for device'), task('cancel', 'cancelled', 4),
+      task('done', 'completed', 1),
+      task('active', 'in_progress', 2),
+      task('blocked', 'blocked', 3, 'Waiting for device'),
+      task('cancel', 'cancelled', 4),
     ]);
     expect(rows.map((entry) => entry.status)).toEqual(['completed', 'in_progress', 'blocked', 'cancelled']);
     expect(rows.map((entry) => entry.order)).toEqual([0, 1, 2, 3]);
@@ -49,7 +108,9 @@ describe('right rail projection mappers', () => {
 
   it('projects explicit user-facing outputs without pinning plans or exposing internal producers', () => {
     const result = mapRightRailOutputs({
-      sessionId: 'session-a', branchId: 'branch-a', runs: [run('run-old', 1), run('run-current', 2)],
+      sessionId: 'session-a',
+      branchId: 'branch-a',
+      runs: [run('run-old', 1), run('run-current', 2)],
       sources: [
         source('current', 'output', 'run-current', true, 'report'),
         source('old', 'output', 'run-old', false, 'evidence'),
@@ -66,7 +127,10 @@ describe('right rail projection mappers', () => {
     const input = { ...source('input', 'attachment'), filePath: 'D:/rail/report.md' };
     const first = { ...source('first', 'output'), filePath: 'D:/rail/reports/../report.md' };
     const duplicate = { ...source('duplicate', 'output'), filePath: 'D:/rail/report.md' };
-    expect(dedupeSessionArtifactSources([input, first, duplicate]).map((entry) => entry.id)).toEqual(['input', 'first']);
+    expect(dedupeSessionArtifactSources([input, first, duplicate]).map((entry) => entry.id)).toEqual([
+      'input',
+      'first',
+    ]);
   });
 
   it('fails closed without an owned capture and does not invent CLI diagnostics', () => {
@@ -78,8 +142,20 @@ describe('right rail projection mappers', () => {
 
   it('projects the owner session RDC runtime identifiers for agent consumption', () => {
     const result = buildRdcContext({ openedCapture, contextSnapshot, availableCaptures: [] });
-    expect(result.capture).toMatchObject({ inputId: 'input-a', captureId: 'capture-a', captureFileId: 'capture-file-a', replaySessionId: 'rdc-session-a' });
-    expect(result.runtime).toMatchObject({ contextId: 'context-a', replaySessionId: 'rdc-session-a', runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-a', remoteId: 'remote-a', remoteStatus: 'connected' });
+    expect(result.capture).toMatchObject({
+      inputId: 'input-a',
+      captureId: 'capture-a',
+      captureFileId: 'capture-file-a',
+      replaySessionId: 'rdc-session-a',
+    });
+    expect(result.runtime).toMatchObject({
+      contextId: 'context-a',
+      replaySessionId: 'rdc-session-a',
+      runtimeOwner: 'rdc-agent',
+      ownerLeaseId: 'lease-a',
+      remoteId: 'remote-a',
+      remoteStatus: 'connected',
+    });
   });
 
   it('projects concrete resources and deduplicates attachments by canonical path', () => {

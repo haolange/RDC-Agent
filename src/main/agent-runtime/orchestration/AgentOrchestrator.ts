@@ -73,7 +73,9 @@ export class AgentOrchestrator {
     this.credentials.release(credentialHandle);
   }
 
-  async prepareTurnContext(input: Parameters<TurnPreparationService['prepareTurnContext']>[0]): Promise<PreparedAgentTurnContext> {
+  async prepareTurnContext(
+    input: Parameters<TurnPreparationService['prepareTurnContext']>[0],
+  ): Promise<PreparedAgentTurnContext> {
     return this.turnPrep.prepareTurnContext(input);
   }
 
@@ -82,7 +84,10 @@ export class AgentOrchestrator {
     return this.profileTurns.sendPrepared(turn);
   }
 
-  async abortAndJoin(sessionId: string | null | undefined, options?: { graceMs?: number; forceAfterMs?: number; reason?: AbortReason }): Promise<void> {
+  async abortAndJoin(
+    sessionId: string | null | undefined,
+    options?: { graceMs?: number; forceAfterMs?: number; reason?: AbortReason },
+  ): Promise<void> {
     const key = sessionId?.trim();
     if (!key) return;
     // use resolved key without generating a new ephemeral scope

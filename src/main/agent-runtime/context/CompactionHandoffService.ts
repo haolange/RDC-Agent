@@ -8,7 +8,10 @@ import { parseModelHandoffSections } from './StructuredHandoffBuilder';
 export async function generateCompactionSections(input: CompactionHandoffExecution) {
   input.signal?.throwIfAborted();
   const estimator = new ContextManager({ contextTokenLimit: input.plan.contextWindowTokens });
-  if (estimator.estimateTokens([{ role: 'user', content: input.transcript, timestamp: 0 }]) + 8192 > input.plan.contextWindowTokens) {
+  if (
+    estimator.estimateTokens([{ role: 'user', content: input.transcript, timestamp: 0 }]) + 8192 >
+    input.plan.contextWindowTokens
+  ) {
     throw new AppError('COMPACTION_SOURCE_TOO_LARGE', 'original evidence exceeds the safe compaction budget.');
   }
   const message = await executeCompactionHandoff(input);

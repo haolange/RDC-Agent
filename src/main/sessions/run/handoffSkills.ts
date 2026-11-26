@@ -5,10 +5,13 @@ import { planReviewStateStore } from './PlanReviewStateStore';
 import { executionOfferMatches } from './ExecutionOfferStore';
 import type { ExecutionOffer } from './executionOffer';
 
-const completionReceiptSchema = z.object({
-  offerId: z.string().uuid().optional(), planUri: z.string().min(1),
-  planHash: z.string().regex(/^(?:sha256:)?[a-f0-9]{64}$/),
-}).strict();
+const completionReceiptSchema = z
+  .object({
+    offerId: z.string().uuid().optional(),
+    planUri: z.string().min(1),
+    planHash: z.string().regex(/^(?:sha256:)?[a-f0-9]{64}$/),
+  })
+  .strict();
 
 /** Return only an offer bound to this recipient and the currently approved frozen plan. */
 export function approvedExecutionOfferForAgent(
@@ -18,21 +21,36 @@ export function approvedExecutionOfferForAgent(
   if (!sessionId) return null;
   const offer = executionOfferStore.read(sessionId);
   const approved = planReviewStateStore.read(sessionId);
-  if (!approved || approved.status !== 'approved'
-    || !approved.approvedHash || !approved.frozenUri
-    || approved.approvedHandoff?.agent !== agentId) return null;
-  if (!executionOfferMatches(offer, {
-    agentId,
-    planHash: approved.approvedHash,
-    planUri: approved.frozenUri,
-  })) {
+  if (
+    !approved ||
+    approved.status !== 'approved' ||
+    !approved.approvedHash ||
+    !approved.frozenUri ||
+    approved.approvedHandoff?.agent !== agentId
+  )
+    return null;
+  if (
+    !executionOfferMatches(offer, {
+      agentId,
+      planHash: approved.approvedHash,
+      planUri: approved.frozenUri,
+    })
+  ) {
     return null;
   }
-  const completions = sessionContextStore.readSessionContextJournal(sessionId, entry => entry.approvedExecutionCompletion !== undefined);
+  const completions = sessionContextStore.readSessionContextJournal(
+    sessionId,
+    (entry) => entry.approvedExecutionCompletion !== undefined,
+  );
   for (const entry of completions) {
     const receipt = completionReceiptSchema.parse(entry.approvedExecutionCompletion);
-    if (entry.status === 'complete' && receipt.offerId === offer.offerId
-      && receipt.planUri === offer.plan.uri && receipt.planHash === offer.plan.hash) return null;
+    if (
+      entry.status === 'complete' &&
+      receipt.offerId === offer.offerId &&
+      receipt.planUri === offer.plan.uri &&
+      receipt.planHash === offer.plan.hash
+    )
+      return null;
   }
   // The approved decision owns this timestamp. Declaring a handoff must not
   // replace it, including when reading an offer written before that fix.

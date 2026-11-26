@@ -48,27 +48,50 @@ const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com';
 const PROVIDER_API = 'google-gemini';
 
 /** One streamGenerateContent chunk; part kinds this adapter does not read (inline data, ...) pass through. */
-const GeminiStreamChunkSchema = z.object({
-  candidates: z.array(z.object({
-    content: z.object({
-      parts: z.array(z.object({
-        text: z.string().optional(),
-        thought: z.boolean().optional(),
-        thoughtSignature: z.string().optional(),
-        functionCall: z.object({ name: z.string(), args: z.record(z.string(), z.unknown()).optional() }).passthrough().optional(),
-      }).passthrough()).optional(),
-      role: z.string().optional(),
-    }).passthrough().optional(),
-    finishReason: z.string().optional(),
-    index: z.number().optional(),
-  }).passthrough()).optional(),
-  usageMetadata: z.object({
-    promptTokenCount: z.number().optional(),
-    candidatesTokenCount: z.number().optional(),
-    totalTokenCount: z.number().optional(),
-    thoughtsTokenCount: z.number().optional(),
-  }).passthrough().optional(),
-}).passthrough();
+const GeminiStreamChunkSchema = z
+  .object({
+    candidates: z
+      .array(
+        z
+          .object({
+            content: z
+              .object({
+                parts: z
+                  .array(
+                    z
+                      .object({
+                        text: z.string().optional(),
+                        thought: z.boolean().optional(),
+                        thoughtSignature: z.string().optional(),
+                        functionCall: z
+                          .object({ name: z.string(), args: z.record(z.string(), z.unknown()).optional() })
+                          .passthrough()
+                          .optional(),
+                      })
+                      .passthrough(),
+                  )
+                  .optional(),
+                role: z.string().optional(),
+              })
+              .passthrough()
+              .optional(),
+            finishReason: z.string().optional(),
+            index: z.number().optional(),
+          })
+          .passthrough(),
+      )
+      .optional(),
+    usageMetadata: z
+      .object({
+        promptTokenCount: z.number().optional(),
+        candidatesTokenCount: z.number().optional(),
+        totalTokenCount: z.number().optional(),
+        thoughtsTokenCount: z.number().optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
 type GeminiStreamChunk = z.infer<typeof GeminiStreamChunkSchema>;
 type GeminiCandidate = NonNullable<GeminiStreamChunk['candidates']>[number];
 type GeminiPart = NonNullable<NonNullable<GeminiCandidate['content']>['parts']>[number];
@@ -106,11 +129,7 @@ export class GeminiProvider implements ProviderStrategy {
     this.surface = options.surface ?? 'ai-studio';
   }
 
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage> {
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
       const response = await this.send(model, context, options, run.signal);
       return consumeGeminiStream(response, run, options);
@@ -136,10 +155,7 @@ export class GeminiProvider implements ProviderStrategy {
     });
   }
 
-  private buildRequestBody(
-    context: Context,
-    options: StreamOptions,
-  ): Record<string, unknown> {
+  private buildRequestBody(context: Context, options: StreamOptions): Record<string, unknown> {
     const { systemInstruction, contents } = toGeminiContents(context, options.requestPlan);
     const body: Record<string, unknown> = { contents };
     if (systemInstruction) {
@@ -171,11 +187,12 @@ export function buildGeminiStreamUrl(
   surface: 'ai-studio' | 'vertex' = 'ai-studio',
 ): string {
   const trimmed = baseUrl.replace(/\/+$/u, '');
-  const versionedBase = surface === 'vertex'
-    ? trimmed
-    : trimmed.includes('/v1beta') || trimmed.includes('/v1')
+  const versionedBase =
+    surface === 'vertex'
       ? trimmed
-      : `${trimmed}/v1beta`;
+      : trimmed.includes('/v1beta') || trimmed.includes('/v1')
+        ? trimmed
+        : `${trimmed}/v1beta`;
   const endpoint = `${versionedBase}/models/${encodeURIComponent(modelId)}:streamGenerateContent?alt=sse`;
   return surface === 'vertex' ? endpoint : `${endpoint}&key=${encodeURIComponent(apiKey)}`;
 }
@@ -269,7 +286,13 @@ class GeminiStreamState {
         this.builder.endThinking(signatureRef);
       }
       const toolRef = this.channels.ref({ providerBlockKey: `function:${callIndex}`, sourceIndex: callIndex });
-      this.toolCalls.addComplete(callIndex, toolRef, callId, part.functionCall.name, JSON.stringify(part.functionCall.args ?? {}));
+      this.toolCalls.addComplete(
+        callIndex,
+        toolRef,
+        callId,
+        part.functionCall.name,
+        JSON.stringify(part.functionCall.args ?? {}),
+      );
     }
     // inlineData / 其它 part 暂不处理。
   }
@@ -284,7 +307,10 @@ interface GeminiContent {
   parts: Array<Record<string, unknown>>;
 }
 
-function toGeminiContents(context: Context, requestPlan: RequestPlan): {
+function toGeminiContents(
+  context: Context,
+  requestPlan: RequestPlan,
+): {
   systemInstruction?: string;
   contents: GeminiContent[];
 } {
@@ -293,8 +319,7 @@ function toGeminiContents(context: Context, requestPlan: RequestPlan): {
     contents.push(...convertMessage(message, requestPlan));
   }
   return {
-    systemInstruction:
-      context.systemPrompt && context.systemPrompt.trim() ? context.systemPrompt : undefined,
+    systemInstruction: context.systemPrompt && context.systemPrompt.trim() ? context.systemPrompt : undefined,
     contents,
   };
 }
@@ -320,9 +345,7 @@ function convertMessage(message: Message, requestPlan: RequestPlan): GeminiConte
   if (message.role === 'assistant') {
     const parts: Array<Record<string, unknown>> = [];
     const pendingSignatures = new Map<string, string>();
-    const toolCallIds = message.content
-      .filter((block) => block.type === 'toolCall')
-      .map((block) => block.id);
+    const toolCallIds = message.content.filter((block) => block.type === 'toolCall').map((block) => block.id);
     for (const block of message.content) {
       if (block.type === 'text') {
         parts.push({ text: block.text });
@@ -337,7 +360,8 @@ function convertMessage(message: Message, requestPlan: RequestPlan): GeminiConte
         if (decision.action !== 'replay' || !block.continuation?.thoughtSignature) continue;
         if (binding?.toolCallIds?.length) {
           for (const toolCallId of binding.toolCallIds) {
-            if (toolCallIds.includes(toolCallId)) pendingSignatures.set(toolCallId, block.continuation.thoughtSignature);
+            if (toolCallIds.includes(toolCallId))
+              pendingSignatures.set(toolCallId, block.continuation.thoughtSignature);
           }
         } else if (block.text) {
           parts.push({ text: block.text, thought: true, thoughtSignature: block.continuation.thoughtSignature });

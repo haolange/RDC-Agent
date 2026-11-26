@@ -1,18 +1,9 @@
 import { diffLines, type DiffLine } from '@shared/utils/lineDiff';
 import type { KnowledgeCardRecord } from '@shared/types/knowledge';
 
-const COMPARE_FIELDS: Array<keyof KnowledgeCardRecord> = [
-  'title',
-  'type',
-  'lifecycle',
-  'sourceStatus',
-  'caseId',
-];
+const COMPARE_FIELDS: Array<keyof KnowledgeCardRecord> = ['title', 'type', 'lifecycle', 'sourceStatus', 'caseId'];
 
-export function diffKnowledgeCard(
-  before: KnowledgeCardRecord | null,
-  after: KnowledgeCardRecord,
-): DiffLine[] {
+export function diffKnowledgeCard(before: KnowledgeCardRecord | null, after: KnowledgeCardRecord): DiffLine[] {
   const lines: DiffLine[] = [];
   for (const field of COMPARE_FIELDS) {
     const prev = before ? String(before[field] ?? '') : '';

@@ -2,7 +2,11 @@ import { create } from 'zustand';
 import { applyEffectiveCatalogChange } from '@shared/utils/effectiveCatalogChange';
 import { providerConnectionIdentity } from '@shared/utils/providerConnectionIdentity';
 import { getElectronApi } from '../platform/getElectronApi';
-import { observeEffectiveCatalog, readEffectiveCatalog, refreshEffectiveCatalog } from '../services/effectiveCatalogService';
+import {
+  observeEffectiveCatalog,
+  readEffectiveCatalog,
+  refreshEffectiveCatalog,
+} from '../services/effectiveCatalogService';
 import { latestCatalogProjection } from '../lib/catalogProjection';
 import { errorDetail } from '../lib/errorDetail';
 import { RevisionLanes } from '../lib/revisionLanes';
@@ -21,7 +25,8 @@ export interface CatalogProjection {
   error?: string;
 }
 const accountOf = (scope: CatalogScope): string => scope.activeAccountId || `anonymous:${scope.id}`;
-export const catalogScopeKey = (scope: CatalogScope): string => JSON.stringify([scope.id, accountOf(scope), scope.protocol]);
+export const catalogScopeKey = (scope: CatalogScope): string =>
+  JSON.stringify([scope.id, accountOf(scope), scope.protocol]);
 /**
  * One revision lane per catalog scope. A read takes the lane's next revision and its answer applies only while it is
  * still the newest read of a scope the store holds (an invalidated scope or a reset forgets the lane); a menu that
@@ -31,14 +36,14 @@ const reads = new RevisionLanes();
 const scopes = new Map<string, CatalogScope>();
 const connections = new Map<string, string>();
 
-const changeMatches = (scope: CatalogScope, change: EffectiveCatalogChange): boolean => (
-  scope.id === change.snapshot.providerId && accountOf(scope) === change.snapshot.accountId
-  && (!change.snapshot.protocol || scope.protocol === change.snapshot.protocol)
-);
+const changeMatches = (scope: CatalogScope, change: EffectiveCatalogChange): boolean =>
+  scope.id === change.snapshot.providerId &&
+  accountOf(scope) === change.snapshot.accountId &&
+  (!change.snapshot.protocol || scope.protocol === change.snapshot.protocol);
 /** A change for the held configuration that is not newer than the held snapshot tells nothing new. */
-const isStale = (current: EffectiveCatalogSnapshot | null, change: EffectiveCatalogChange): boolean => (
-  current?.scopeGeneration === change.snapshot.scopeGeneration && current.projectionVersion >= change.snapshot.projectionVersion
-);
+const isStale = (current: EffectiveCatalogSnapshot | null, change: EffectiveCatalogChange): boolean =>
+  current?.scopeGeneration === change.snapshot.scopeGeneration &&
+  current.projectionVersion >= change.snapshot.projectionVersion;
 
 interface CatalogState {
   entries: Record<string, CatalogProjection>;
@@ -49,16 +54,27 @@ interface CatalogState {
 }
 
 export const useEffectiveCatalogStore = create<CatalogState>((set, get) => {
-  const setEntry = (key: string, entry: CatalogProjection) => set((state) => ({ entries: { ...state.entries, [key]: entry } }));
-  const readSnapshot = async (scope: CatalogScope, retry: boolean, isCurrent: () => boolean): Promise<EffectiveCatalogSnapshot | null> => {
+  const setEntry = (key: string, entry: CatalogProjection) =>
+    set((state) => ({ entries: { ...state.entries, [key]: entry } }));
+  const readSnapshot = async (
+    scope: CatalogScope,
+    retry: boolean,
+    isCurrent: () => boolean,
+  ): Promise<EffectiveCatalogSnapshot | null> => {
     if (retry) {
-      await refreshEffectiveCatalog(getElectronApi(), scope.id, { accountId: accountOf(scope), protocol: scope.protocol });
+      await refreshEffectiveCatalog(getElectronApi(), scope.id, {
+        accountId: accountOf(scope),
+        protocol: scope.protocol,
+      });
       if (!isCurrent()) return null;
     }
     const snapshot = await readEffectiveCatalog(getElectronApi(), scope.id, accountOf(scope));
     if (!snapshot) throw new Error('The model catalog is unavailable.');
-    if (snapshot.providerId !== scope.id || snapshot.accountId !== accountOf(scope)
-      || (snapshot.protocol && snapshot.protocol !== scope.protocol)) {
+    if (
+      snapshot.providerId !== scope.id ||
+      snapshot.accountId !== accountOf(scope) ||
+      (snapshot.protocol && snapshot.protocol !== scope.protocol)
+    ) {
       throw new Error('The model catalog belongs to a different account or protocol.');
     }
     return snapshot;
@@ -75,16 +91,27 @@ export const useEffectiveCatalogStore = create<CatalogState>((set, get) => {
       const revision = reads.begin(key);
       const isCurrent = () => reads.isLatest(key, revision);
       setEntry(key, { ...previous, snapshot: previous?.snapshot ?? null, loading: true, error: undefined });
-      const request = readSnapshot(scope, retry, isCurrent).then((snapshot) => {
-        if (!snapshot || !isCurrent()) return null;
-        const current = get().entries[key]?.snapshot;
-        const next = latestCatalogProjection(current?.scopeGeneration === snapshot.scopeGeneration ? current : null, snapshot);
-        setEntry(key, { snapshot: next, loading: false, error: next.lastRefreshError });
-        return next;
-      }, (error: unknown) => {
-        if (isCurrent()) setEntry(key, { snapshot: get().entries[key]?.snapshot ?? null, loading: false, error: errorDetail(error) });
-        return null;
-      });
+      const request = readSnapshot(scope, retry, isCurrent).then(
+        (snapshot) => {
+          if (!snapshot || !isCurrent()) return null;
+          const current = get().entries[key]?.snapshot;
+          const next = latestCatalogProjection(
+            current?.scopeGeneration === snapshot.scopeGeneration ? current : null,
+            snapshot,
+          );
+          setEntry(key, { snapshot: next, loading: false, error: next.lastRefreshError });
+          return next;
+        },
+        (error: unknown) => {
+          if (isCurrent())
+            setEntry(key, {
+              snapshot: get().entries[key]?.snapshot ?? null,
+              loading: false,
+              error: errorDetail(error),
+            });
+          return null;
+        },
+      );
       return reads.track(key, revision, request);
     },
     accept: (change) => {
@@ -107,7 +134,11 @@ export const useEffectiveCatalogStore = create<CatalogState>((set, get) => {
     invalidate: (scope) => {
       const key = catalogScopeKey(scope);
       reads.forget(key);
-      set((state) => { const entries = { ...state.entries }; delete entries[key]; return { entries }; });
+      set((state) => {
+        const entries = { ...state.entries };
+        delete entries[key];
+        return { entries };
+      });
     },
   };
 });
@@ -132,7 +163,11 @@ export function reconcileCatalogProviders(
     if (!keys.has(key)) {
       reads.forget(key);
       scopes.delete(key);
-      useEffectiveCatalogStore.setState((state) => { const entries = { ...state.entries }; delete entries[key]; return { entries }; });
+      useEffectiveCatalogStore.setState((state) => {
+        const entries = { ...state.entries };
+        delete entries[key];
+        return { entries };
+      });
     }
   }
   for (const provider of providers) {

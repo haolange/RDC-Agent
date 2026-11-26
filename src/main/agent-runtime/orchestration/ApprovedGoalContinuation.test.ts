@@ -16,7 +16,7 @@ vi.mock('./DirectTaskTurnLifecycle', () => ({ listActiveDelegations: vi.fn(async
 const roots: string[] = [];
 afterEach(async () => {
   vi.mocked(listActiveDelegations).mockReset().mockResolvedValue([]);
-  await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })));
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
 async function fixture() {
@@ -26,23 +26,45 @@ async function fixture() {
   const registry = new TaskRegistry(new FileTaskStore(root, async () => approved));
   const turn = new TurnHandle({ sessionKey: randomUUID(), turnId: randomUUID(), generation: 1 });
   turn.requiresApprovedGoalClosure = true;
-  return { registry, turn, approve: (tasks: PlanTaskRequirement[]) => { approved = tasks; } };
+  return {
+    registry,
+    turn,
+    approve: (tasks: PlanTaskRequirement[]) => {
+      approved = tasks;
+    },
+  };
 }
 
-const unresolvedPartial = (gap = 'Revise the claim.', hash = 'a') => ({ disposition: 'partial' as const,
+const unresolvedPartial = (gap = 'Revise the claim.', hash = 'a') => ({
+  disposition: 'partial' as const,
   evidenceRefs: [{ uri: 'session://tool-outputs/result.json', hash: hash.repeat(64) }],
-  result: { summary: 'One claim still needs revision.', outputs: {}, counterevidence: [],
-    unresolved: [{ gap, attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }],
-    scope: 'approved goal', sideEffects: [], recoveryState: [] } });
+  result: {
+    summary: 'One claim still needs revision.',
+    outputs: {},
+    counterevidence: [],
+    unresolved: [
+      { gap, attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' },
+    ],
+    scope: 'approved goal',
+    sideEffects: [],
+    recoveryState: [],
+  },
+});
 
 it('reviews an incomplete approved Task once per Task state without changing consumption', async () => {
   const { registry, turn, approve } = await fixture();
   const task = await registry.createTask('Resolve the approved question');
   approve([snapshotTaskRequirement(task)]);
   const deadlineAt = Date.now() + 60_000;
-  const first = await registry.startExecution(task.id, { mode: 'direct', budget: { toolCalls: 3, maxToolCalls: 9, deadlineAt } });
-  await registry.settleExecution(first.id, { expectedGeneration: 1, status: 'blocked',
-    result: { disposition: 'blocked', summary: 'One branch is unverified.', outputs: {} } });
+  const first = await registry.startExecution(task.id, {
+    mode: 'direct',
+    budget: { toolCalls: 3, maxToolCalls: 9, deadlineAt },
+  });
+  await registry.settleExecution(first.id, {
+    expectedGeneration: 1,
+    status: 'blocked',
+    result: { disposition: 'blocked', summary: 'One branch is unverified.', outputs: {} },
+  });
   const goal = createApprovedGoalContinuation(turn, 'session', registry);
   const declaration = { disposition: 'partial' as const, evidenceRefs: [] };
   turn.completionDeclaration = declaration;
@@ -58,9 +80,14 @@ it('reviews an incomplete approved Task once per Task state without changing con
 
   const second = await registry.startExecution(task.id, { mode: 'direct' });
   expect(second.budget).toMatchObject({ toolCalls: 3, maxToolCalls: 9, deadlineAt });
-  await registry.settleExecution(second.id, { expectedGeneration: 2, status: 'blocked',
-    result: { disposition: 'blocked', summary: 'A different condition is unavailable.', outputs: {} } });
-  expect(await goal.reviewDeclaration({ disposition: 'blocked', evidenceRefs: [] })).toContain('A different condition is unavailable.');
+  await registry.settleExecution(second.id, {
+    expectedGeneration: 2,
+    status: 'blocked',
+    result: { disposition: 'blocked', summary: 'A different condition is unavailable.', outputs: {} },
+  });
+  expect(await goal.reviewDeclaration({ disposition: 'blocked', evidenceRefs: [] })).toContain(
+    'A different condition is unavailable.',
+  );
 });
 
 it('reviews an unresolved partial once however often its evidence is rewritten', async () => {
@@ -68,13 +95,20 @@ it('reviews an unresolved partial once however often its evidence is rewritten',
   const task = await registry.createTask('Review the approved result');
   approve([snapshotTaskRequirement(task)]);
   const execution = await registry.startExecution(task.id, { mode: 'direct' });
-  await registry.settleExecution(execution.id, { expectedGeneration: 1, status: 'completed',
-    result: { disposition: 'completed', summary: 'Review done.', outputs: {} } });
+  await registry.settleExecution(execution.id, {
+    expectedGeneration: 1,
+    status: 'completed',
+    result: { disposition: 'completed', summary: 'Review done.', outputs: {} },
+  });
   const goal = createApprovedGoalContinuation(turn, 'session', registry);
   expect(await goal.reviewDeclaration(unresolvedPartial())).toContain('approved Tasks are settled');
   expect(await goal.reviewDeclaration(unresolvedPartial('Revise the claim.', 'b'))).toBeUndefined();
-  expect(await goal.reviewDeclaration(unresolvedPartial('Revise the second claim.', 'b'))).toContain('approved Tasks are settled');
-  expect(await goal.reviewDeclaration({ ...unresolvedPartial('Another claim.'), disposition: 'blocked' })).toBeUndefined();
+  expect(await goal.reviewDeclaration(unresolvedPartial('Revise the second claim.', 'b'))).toContain(
+    'approved Tasks are settled',
+  );
+  expect(
+    await goal.reviewDeclaration({ ...unresolvedPartial('Another claim.'), disposition: 'blocked' }),
+  ).toBeUndefined();
   // The terminal check never sends a reviewed partial back for another round.
   turn.completionDeclaration = unresolvedPartial();
   expect(await goal.closingCheck()).toBeUndefined();
@@ -114,13 +148,19 @@ it('invalidates a declaration when its report reference or other completion cond
   const { registry, turn } = await fixture();
   const goal = createApprovedGoalContinuation(turn, 'session', registry);
   turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
-  expect(await goal.closingCheck(() => { throw new MissionCompletionError('report_not_bound', 'Missing reference.'); }))
-    .toContain('call turn_complete again');
+  expect(
+    await goal.closingCheck(() => {
+      throw new MissionCompletionError('report_not_bound', 'Missing reference.');
+    }),
+  ).toContain('call turn_complete again');
   expect(turn.completionDeclaration).toBeNull();
 
   turn.completionDeclaration = { disposition: 'completed', evidenceRefs: [] };
-  expect(await goal.closingCheck(() => { throw new MissionCompletionError('open_challenge', 'Challenge remains open.'); }))
-    .toContain('call turn_complete again');
+  expect(
+    await goal.closingCheck(() => {
+      throw new MissionCompletionError('open_challenge', 'Challenge remains open.');
+    }),
+  ).toContain('call turn_complete again');
   expect(turn.completionDeclaration).toBeNull();
 });
 
@@ -169,12 +209,16 @@ it('does not hide errors reading the approved Task state', async () => {
   const { registry, turn } = await fixture();
   vi.spyOn(registry, 'assertApprovedTasksCompleted').mockRejectedValue(new Error('storage unavailable'));
   const goal = createApprovedGoalContinuation(turn, 'session', registry);
-  await expect(goal.reviewDeclaration({ disposition: 'partial', evidenceRefs: [] })).rejects.toThrow('storage unavailable');
+  await expect(goal.reviewDeclaration({ disposition: 'partial', evidenceRefs: [] })).rejects.toThrow(
+    'storage unavailable',
+  );
 });
 
 it('reports a changed approved requirement once while still allowing an honest partial', async () => {
   const { registry, turn } = await fixture();
-  vi.spyOn(registry, 'assertApprovedTasksCompleted').mockRejectedValue(new Error('TASK_EXECUTION_REQUIREMENTS: approved Task changed'));
+  vi.spyOn(registry, 'assertApprovedTasksCompleted').mockRejectedValue(
+    new Error('TASK_EXECUTION_REQUIREMENTS: approved Task changed'),
+  );
   const goal = createApprovedGoalContinuation(turn, 'session', registry);
   expect(await goal.reviewDeclaration({ disposition: 'partial', evidenceRefs: [] })).toContain('approved Task changed');
   expect(await goal.reviewDeclaration({ disposition: 'partial', evidenceRefs: [] })).toBeUndefined();
@@ -185,28 +229,67 @@ it('restates the recorded frontier and open Challenge follow-ups in a single rea
   const task = await registry.createTask('Investigate the approved symptom');
   approve([snapshotTaskRequirement(task)]);
   const execution = await registry.startExecution(task.id, { mode: 'direct' });
-  await registry.settleExecution(execution.id, { expectedGeneration: 1, status: 'completed',
-    result: { disposition: 'completed', summary: 'Partial evidence.', outputs: {} } });
-  const entry = (artifactId: string, kind: string, status: string, createdAt = '2026-11-11T00:00:00Z') =>
-    ({ artifactId, kind, status, createdAt });
+  await registry.settleExecution(execution.id, {
+    expectedGeneration: 1,
+    status: 'completed',
+    result: { disposition: 'completed', summary: 'Partial evidence.', outputs: {} },
+  });
+  const entry = (artifactId: string, kind: string, status: string, createdAt = '2026-11-11T00:00:00Z') => ({
+    artifactId,
+    kind,
+    status,
+    createdAt,
+  });
   const records: Record<string, unknown> = {
     old: { checkpointId: 'cp-old', unresolvedFrontier: 'stale frontier' },
     cp1: { checkpointId: 'cp-1', unresolvedFrontier: 'Read native values around the candidate region.' },
     cp2: { checkpointId: 'cp-2', unresolvedFrontier: 'Confirm which draw covers the candidate region.' },
-    ch1: { challengeId: 'ch-1', targetRef: { type: 'claim', id: 'claim-anchor' }, statement: 'Anchor unproven.',
-      requiredFollowUp: 'Compare the draw-call overlay with the candidate rectangle.', status: 'open' },
-    ch2: { challengeId: 'ch-2', targetRef: { type: 'evidence', id: 'ev-1' }, statement: 'Settled.', status: 'resolved' },
+    ch1: {
+      challengeId: 'ch-1',
+      targetRef: { type: 'claim', id: 'claim-anchor' },
+      statement: 'Anchor unproven.',
+      requiredFollowUp: 'Compare the draw-call overlay with the candidate rectangle.',
+      status: 'open',
+    },
+    ch2: {
+      challengeId: 'ch-2',
+      targetRef: { type: 'evidence', id: 'ev-1' },
+      statement: 'Settled.',
+      status: 'resolved',
+    },
   };
-  const index = [entry('old', 'checkpoint', 'superseded', '2026-11-12T00:00:00Z'), entry('cp1', 'checkpoint', 'ready'),
-    entry('cp2', 'checkpoint', 'draft', '2026-11-11T01:00:00Z'), entry('ch1', 'challenge', 'ready'), entry('ch2', 'challenge', 'ready')];
+  const index = [
+    entry('old', 'checkpoint', 'superseded', '2026-11-12T00:00:00Z'),
+    entry('cp1', 'checkpoint', 'ready'),
+    entry('cp2', 'checkpoint', 'draft', '2026-11-11T01:00:00Z'),
+    entry('ch1', 'challenge', 'ready'),
+    entry('ch2', 'challenge', 'ready'),
+  ];
   const investigation = {
-    list: (_session: string, filter: { kind: string }) => index.filter(item => item.kind === filter.kind),
+    list: (_session: string, filter: { kind: string }) => index.filter((item) => item.kind === filter.kind),
     readRecord: (_session: string, artifactId: string) => ({ record: records[artifactId] }),
   } as never;
   const goal = createApprovedGoalContinuation(turn, 'session', registry, investigation);
-  const declaration = { disposition: 'partial' as const, evidenceRefs: [],
-    result: { summary: 'Anchor not established.', outputs: {}, counterevidence: [], unresolved: [{ gap: 'Anchor the symptom.', attempted: 'Fixture attempt.', blocker: 'external' as const, resumeWhen: 'Fixture condition.' }],
-      scope: 'approved goal', sideEffects: [], recoveryState: [] } };
+  const declaration = {
+    disposition: 'partial' as const,
+    evidenceRefs: [],
+    result: {
+      summary: 'Anchor not established.',
+      outputs: {},
+      counterevidence: [],
+      unresolved: [
+        {
+          gap: 'Anchor the symptom.',
+          attempted: 'Fixture attempt.',
+          blocker: 'external' as const,
+          resumeWhen: 'Fixture condition.',
+        },
+      ],
+      scope: 'approved goal',
+      sideEffects: [],
+      recoveryState: [],
+    },
+  };
   const feedback = await goal.reviewDeclaration(declaration);
   expect(feedback).toContain('cp-2');
   expect(feedback).toContain('Confirm which draw covers the candidate region.');
@@ -214,7 +297,12 @@ it('restates the recorded frontier and open Challenge follow-ups in a single rea
   expect(feedback).not.toMatch(/stale frontier|cp-1|ch-2/u);
   expect(await goal.reviewDeclaration(declaration)).toBeUndefined();
 
-  const unreadable = createApprovedGoalContinuation(turn, 'session', registry,
-    { list: () => { throw new Error('INVESTIGATION_STORE_CORRUPT: index unreadable'); } } as never);
-  expect(await unreadable.reviewDeclaration(declaration)).toContain('Recorded investigation work could not be read: INVESTIGATION_STORE_CORRUPT');
+  const unreadable = createApprovedGoalContinuation(turn, 'session', registry, {
+    list: () => {
+      throw new Error('INVESTIGATION_STORE_CORRUPT: index unreadable');
+    },
+  } as never);
+  expect(await unreadable.reviewDeclaration(declaration)).toContain(
+    'Recorded investigation work could not be read: INVESTIGATION_STORE_CORRUPT',
+  );
 });

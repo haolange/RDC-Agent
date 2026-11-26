@@ -7,7 +7,9 @@
   min-height: 0;
   line-height: var(--leading-normal);
 }
-.right-rail-section.is-populated > .right-rail-section-content { margin-top: var(--space-2); }
+.right-rail-section.is-populated > .right-rail-section-content {
+  margin-top: var(--space-2);
+}
 
 .right-rail-task-progress {
   display: flex;
@@ -31,10 +33,18 @@
   cursor: pointer;
 }
 
-.right-rail-task-fold:hover { color: var(--token-text-primary); background: var(--token-interactive-hover); }
-.right-rail-task-fold:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset-inset); }
+.right-rail-task-fold:hover {
+  color: var(--token-text-primary);
+  background: var(--token-interactive-hover);
+}
+.right-rail-task-fold:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset-inset);
+}
 
-.right-rail-section .right-rail-tasks { gap: var(--space-0-5); }
+.right-rail-section .right-rail-tasks {
+  gap: var(--space-0-5);
+}
 
 .right-rail-task-row > button {
   display: grid;
@@ -55,8 +65,13 @@
   transition: background var(--transition-fast);
 }
 
-.right-rail-task-row > button:hover { background: var(--token-interactive-hover); }
-.right-rail-task-row > button:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset-inset); }
+.right-rail-task-row > button:hover {
+  background: var(--token-interactive-hover);
+}
+.right-rail-task-row > button:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset-inset);
+}
 
 .right-rail-task-row .task-status-marker {
   margin-top: calc((var(--type-body-line) - var(--space-3) - var(--space-0-5)) / 2);
@@ -75,7 +90,10 @@
 }
 
 .right-rail-task-row.status-in_progress .right-rail-task-title,
-.right-rail-task-row.status-failed .right-rail-task-title { color: var(--token-text-primary); font-weight: var(--font-normal); }
+.right-rail-task-row.status-failed .right-rail-task-title {
+  color: var(--token-text-primary);
+  font-weight: var(--font-normal);
+}
 /* Finished work stays readable; only cancelled work recedes and is struck through. */
 .right-rail-task-row.status-cancelled .right-rail-task-title {
   color: var(--token-text-secondary);

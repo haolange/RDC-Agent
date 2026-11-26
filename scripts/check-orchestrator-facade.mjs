@@ -34,8 +34,11 @@ const sourceFile = ts.createSourceFile(
 
 const importedModules = new Set();
 for (const statement of sourceFile.statements) {
-  if ((ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement))
-    && statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+  if (
+    (ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) &&
+    statement.moduleSpecifier &&
+    ts.isStringLiteral(statement.moduleSpecifier)
+  ) {
     importedModules.add(statement.moduleSpecifier.text);
   }
 }
@@ -43,24 +46,45 @@ for (const statement of sourceFile.statements) {
 const lineOf = (position) => sourceFile.getLineAndCharacterOfPosition(position).line;
 const functionLengths = [];
 const visit = (node) => {
-  if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) || ts.isConstructorDeclaration(node)
-    || ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node) || ts.isFunctionExpression(node)
-    || ts.isArrowFunction(node)) && node.body) {
-    const name = node.name && ts.isIdentifier(node.name) ? node.name.text : ts.isConstructorDeclaration(node) ? 'constructor' : '(anonymous)';
+  if (
+    (ts.isFunctionDeclaration(node) ||
+      ts.isMethodDeclaration(node) ||
+      ts.isConstructorDeclaration(node) ||
+      ts.isGetAccessorDeclaration(node) ||
+      ts.isSetAccessorDeclaration(node) ||
+      ts.isFunctionExpression(node) ||
+      ts.isArrowFunction(node)) &&
+    node.body
+  ) {
+    const name =
+      node.name && ts.isIdentifier(node.name)
+        ? node.name.text
+        : ts.isConstructorDeclaration(node)
+          ? 'constructor'
+          : '(anonymous)';
     functionLengths.push({ name, lines: lineOf(node.body.getEnd()) - lineOf(node.body.getStart(sourceFile)) + 1 });
   }
   ts.forEachChild(node, visit);
 };
 visit(sourceFile);
-const longest = functionLengths.reduce((max, entry) => (entry.lines > max.lines ? entry : max), { name: '(none)', lines: 0 });
+const longest = functionLengths.reduce((max, entry) => (entry.lines > max.lines ? entry : max), {
+  name: '(none)',
+  lines: 0,
+});
 
 if (importedModules.size > FAN_OUT_MAX) {
-  fail(`${ORCHESTRATOR_REL} imports ${importedModules.size} modules (budget ${FAN_OUT_MAX}). Move the work into a collaborator built by agentRuntimeRoot.ts.`);
+  fail(
+    `${ORCHESTRATOR_REL} imports ${importedModules.size} modules (budget ${FAN_OUT_MAX}). Move the work into a collaborator built by agentRuntimeRoot.ts.`,
+  );
 }
 if (longest.lines > FUNCTION_LINES_MAX) {
-  fail(`${ORCHESTRATOR_REL}: ${longest.name} is ${longest.lines} lines (budget ${FUNCTION_LINES_MAX}). Split it into named phases.`);
+  fail(
+    `${ORCHESTRATOR_REL}: ${longest.name} is ${longest.lines} lines (budget ${FUNCTION_LINES_MAX}). Split it into named phases.`,
+  );
 }
 if (process.exitCode) process.exit(process.exitCode);
 
-console.log(`[orchestrator-facade] fan-out ${importedModules.size} <= ${FAN_OUT_MAX}; longest function ${longest.name} ${longest.lines} <= ${FUNCTION_LINES_MAX} lines`);
+console.log(
+  `[orchestrator-facade] fan-out ${importedModules.size} <= ${FAN_OUT_MAX}; longest function ${longest.name} ${longest.lines} <= ${FUNCTION_LINES_MAX} lines`,
+);
 console.log('[orchestrator-facade] OK');

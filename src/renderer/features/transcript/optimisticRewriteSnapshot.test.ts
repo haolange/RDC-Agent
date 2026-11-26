@@ -45,12 +45,12 @@ describe('buildOptimisticRewriteSnapshot', () => {
     // The branch and messages carry the ids main gives the rewrite, so its answer updates them in place.
     const ids = conversationTurnIds('req-rewrite');
     expect(snapshot.branchState.activeLeafBranchId).toBe(ids.branchId);
-    expect(snapshot.messages.slice(-2).map((message) => [message.id, message.turnId]))
-      .toEqual([[ids.userMessageId, ids.turnId], [ids.assistantMessageId, ids.turnId]]);
+    expect(snapshot.messages.slice(-2).map((message) => [message.id, message.turnId])).toEqual([
+      [ids.userMessageId, ids.turnId],
+      [ids.assistantMessageId, ids.turnId],
+    ]);
     const visible = resolveVisibleConversationMessages(snapshot.messages, snapshot.branchState);
     expect(visible.some((message) => message.content === 'edited prompt')).toBe(true);
-    expect(visible.some((message) => (
-      message.role === 'assistant' && message.status === 'streaming'
-    ))).toBe(true);
+    expect(visible.some((message) => message.role === 'assistant' && message.status === 'streaming')).toBe(true);
   });
 });

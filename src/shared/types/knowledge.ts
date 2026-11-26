@@ -5,23 +5,10 @@
  * Candidate / Write through thin IPC; list order comes from the service.
  */
 
-export const KNOWLEDGE_CARD_TYPES = [
-  'fact',
-  'constraint',
-  'pattern',
-  'procedure',
-  'case',
-  'model',
-] as const;
+export const KNOWLEDGE_CARD_TYPES = ['fact', 'constraint', 'pattern', 'procedure', 'case', 'model'] as const;
 export type KnowledgeCardType = (typeof KNOWLEDGE_CARD_TYPES)[number];
 
-export const KNOWLEDGE_LIFECYCLES = [
-  'draft',
-  'candidate',
-  'verified',
-  'promoted',
-  'retired',
-] as const;
+export const KNOWLEDGE_LIFECYCLES = ['draft', 'candidate', 'verified', 'promoted', 'retired'] as const;
 export type KnowledgeLifecycle = (typeof KNOWLEDGE_LIFECYCLES)[number];
 
 export const KNOWLEDGE_RELATION_KINDS = [
@@ -302,7 +289,14 @@ export interface KnowledgeTopicPreview {
   changeHash: string;
   topics: KnowledgeTopic[];
   merges: Array<{ source: KnowledgeTopic; target: KnowledgeTopic }>;
-  cards: Array<{ cardId: string; title: string; relativePath: string; before: string[]; after: string[]; stale: boolean }>;
+  cards: Array<{
+    cardId: string;
+    title: string;
+    relativePath: string;
+    before: string[];
+    after: string[];
+    stale: boolean;
+  }>;
 }
 
 export interface KnowledgeCompiledHit extends KnowledgeLaneHit {

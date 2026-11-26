@@ -3,7 +3,14 @@ import * as path from 'path';
 import { isSubagentScopeId } from '@shared/utils/executionScope';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/jsonl';
 import { readCurrentStoredJson } from '../../runtime/storedDocument';
-import { SESSION_SHELL_STATE_MIGRATIONS, CURRENT_USAGE_SCHEMA_VERSION, SessionContextTurnEntrySchema, SessionUsageV2Schema, toSessionShellStateManifest, toSessionUsageManifest } from './storageSchema';
+import {
+  SESSION_SHELL_STATE_MIGRATIONS,
+  CURRENT_USAGE_SCHEMA_VERSION,
+  SessionContextTurnEntrySchema,
+  SessionUsageV2Schema,
+  toSessionShellStateManifest,
+  toSessionUsageManifest,
+} from './storageSchema';
 import type { RunContextUsageSummary } from '@shared/types/session';
 import type { SessionContextTurnEntry } from '../../agent-runtime/context/SessionContextJournal';
 import type { StorageIo } from '../../runtime/StorageIo';
@@ -13,7 +20,6 @@ export interface SessionContextHost {
   io: StorageIo;
   sessions: { findSessionLocation(sessionId: string): { sessionPath: string } | null };
 }
-
 
 export class SessionContextStore {
   constructor(private readonly host: SessionContextHost) {}
@@ -30,7 +36,9 @@ export class SessionContextStore {
     }
     const usagePath = this.getSessionUsagePath(sessionId);
     if (!usagePath) return null;
-    return readCurrentStoredJson(this.host.io, usagePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageV2Schema)?.usage ?? null;
+    return (
+      readCurrentStoredJson(this.host.io, usagePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageV2Schema)?.usage ?? null
+    );
   }
 
   getSessionShellStatePath(sessionId: string): string | null {
@@ -84,7 +92,10 @@ export class SessionContextStore {
     return path.join(location.sessionPath, 'session-context.jsonl');
   }
 
-  readSessionContextJournal(sessionId: string, select?: (entry: SessionContextTurnEntry) => boolean): SessionContextTurnEntry[] {
+  readSessionContextJournal(
+    sessionId: string,
+    select?: (entry: SessionContextTurnEntry) => boolean,
+  ): SessionContextTurnEntry[] {
     const journalPath = this.getSessionContextJournalPath(sessionId);
     if (!fs.existsSync(journalPath)) return [];
     const result = readJsonl(journalPath, SessionContextTurnEntrySchema.parse, select);

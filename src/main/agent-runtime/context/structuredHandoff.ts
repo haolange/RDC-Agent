@@ -1,7 +1,4 @@
-export type StructuredHandoffKind =
-  | 'derived-compaction'
-  | 'model-transition'
-  | 'agent-handoff';
+export type StructuredHandoffKind = 'derived-compaction' | 'model-transition' | 'agent-handoff';
 
 export interface StructuredHandoffFact {
   text: string;

@@ -17,13 +17,23 @@ const descKey = (id: AgentPermissionMode): TranslationKey => `composer.permissio
 
 /** Arrow keys move through the modes, Home and End jump to the ends; Escape belongs to the menu registry. */
 const moveFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
-  const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]:not(:disabled)'));
+  const items = Array.from(
+    event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]:not(:disabled)'),
+  );
   if (items.length === 0) return;
   const index = items.indexOf(document.activeElement as HTMLButtonElement);
-  const target = event.key === 'ArrowDown' ? (index + 1) % items.length
-    : event.key === 'ArrowUp' ? (index <= 0 ? items.length - 1 : index - 1)
-      : event.key === 'Home' ? 0
-        : event.key === 'End' ? items.length - 1 : null;
+  const target =
+    event.key === 'ArrowDown'
+      ? (index + 1) % items.length
+      : event.key === 'ArrowUp'
+        ? index <= 0
+          ? items.length - 1
+          : index - 1
+        : event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? items.length - 1
+            : null;
   if (target === null) return;
   event.preventDefault();
   items[target].focus({ preventScroll: true });
@@ -42,12 +52,18 @@ export const PermissionModeSelector: React.FC = () => {
   const current = mode ?? 'default';
   // The label names the mode being applied while main confirms it; the pill's tone stays the confirmed mode's.
   const shown = pendingMode ?? current;
-  const setRootRef = useCallback((node: HTMLDivElement | null) => {
-    menu.setRoot(node);
-  }, [menu]);
-  const setTriggerRef = useCallback((node: HTMLButtonElement | null) => {
-    menu.setTrigger(node);
-  }, [menu]);
+  const setRootRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      menu.setRoot(node);
+    },
+    [menu],
+  );
+  const setTriggerRef = useCallback(
+    (node: HTMLButtonElement | null) => {
+      menu.setTrigger(node);
+    },
+    [menu],
+  );
 
   useEffect(() => {
     if (!menu.open) return;
@@ -73,8 +89,13 @@ export const PermissionModeSelector: React.FC = () => {
         aria-busy={pendingMode !== null}
         aria-haspopup="menu"
         aria-expanded={menu.open}
-        data-tooltip={pendingMode ? `${t('composer.permission.saving')} · ${t(labelKey(pendingMode))}`
-          : snapshot ? `${t(labelKey(current))} · ${t(descKey(current))}` : t('composer.permission.loading')}
+        data-tooltip={
+          pendingMode
+            ? `${t('composer.permission.saving')} · ${t(labelKey(pendingMode))}`
+            : snapshot
+              ? `${t(labelKey(current))} · ${t(descKey(current))}`
+              : t('composer.permission.loading')
+        }
         onClick={() => menu.toggle()}
       >
         <span className="composer-permission-pill-icon" aria-hidden="true">
@@ -82,10 +103,19 @@ export const PermissionModeSelector: React.FC = () => {
         </span>
         {/* Every mode's name shares one cell sized to the widest, so switching never changes the pill's width. */}
         <span className="composer-permission-pill-label">
-          {snapshot ? PERMISSION_MODES.map((entry) => (
-            <span key={entry} className={`composer-permission-pill-label-option${entry === shown ? ' is-shown' : ''}`}
-              aria-hidden={entry === shown ? undefined : true}>{t(labelKey(entry))}</span>
-          )) : <span className="composer-permission-pill-label-option is-shown">{t('composer.permission.loading')}</span>}
+          {snapshot ? (
+            PERMISSION_MODES.map((entry) => (
+              <span
+                key={entry}
+                className={`composer-permission-pill-label-option${entry === shown ? ' is-shown' : ''}`}
+                aria-hidden={entry === shown ? undefined : true}
+              >
+                {t(labelKey(entry))}
+              </span>
+            ))
+          ) : (
+            <span className="composer-permission-pill-label-option is-shown">{t('composer.permission.loading')}</span>
+          )}
         </span>
         <span className="composer-permission-pill-caret" aria-hidden="true">
           <Chevron direction="down" size={12} />
@@ -110,7 +140,12 @@ export const PermissionModeSelector: React.FC = () => {
             </button>
           ))}
           {error && !snapshot ? (
-            <InlineError onRetry={() => { void refresh().catch(() => undefined); }} retryLabel={t('composer.permission.retry')}>
+            <InlineError
+              onRetry={() => {
+                void refresh().catch(() => undefined);
+              }}
+              retryLabel={t('composer.permission.retry')}
+            >
               {t('composer.permission.saveFailed')}
             </InlineError>
           ) : null}
@@ -128,8 +163,14 @@ export const PermissionSwitchNotice: React.FC = () => {
   const setMode = useAppSettingsStore((state) => state.setAgentPermissionMode);
   if (!failedSwitch) return null;
   return (
-    <InlineError data-testid="composer-permission-notice" detail={failedSwitch.detail}
-      retryDisabled={pending} onRetry={() => { void setMode(failedSwitch.mode).catch(() => undefined); }}>
+    <InlineError
+      data-testid="composer-permission-notice"
+      detail={failedSwitch.detail}
+      retryDisabled={pending}
+      onRetry={() => {
+        void setMode(failedSwitch.mode).catch(() => undefined);
+      }}
+    >
       {t('composer.permission.switchFailed', { mode: t(labelKey(failedSwitch.mode)) })}
     </InlineError>
   );

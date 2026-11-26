@@ -50,7 +50,11 @@ export function ResourceListDetail({
           <div className="settings-resource-detail-column">{detail}</div>
         </div>
       )}
-      {status ? <div className="settings-resource-status" role="status">{status}</div> : null}
+      {status ? (
+        <div className="settings-resource-status" role="status">
+          {status}
+        </div>
+      ) : null}
     </div>
   );
 }

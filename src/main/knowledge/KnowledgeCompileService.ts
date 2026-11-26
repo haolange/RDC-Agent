@@ -23,7 +23,9 @@ export class KnowledgeCompileService {
     const hits: KnowledgeCompiledHit[] = ranked.map((hit) => ({
       ...hit,
       reasons: hit.lanes.map((lane) => {
-        const score = query.lanes.find(result => result.lane === lane)?.hits.find(item => item.cardId === hit.cardId)?.score;
+        const score = query.lanes
+          .find((result) => result.lane === lane)
+          ?.hits.find((item) => item.cardId === hit.cardId)?.score;
         return score === undefined ? lane : `${lane}:${score}`;
       }),
     }));
@@ -31,15 +33,24 @@ export class KnowledgeCompileService {
     for (const left of hits) {
       for (const right of hits) {
         if (left.cardId >= right.cardId) continue;
-        const contradicts = left.relations?.some(relation => relation.kind === 'contradicts' && relation.targetCardId === right.cardId)
-          || right.relations?.some(relation => relation.kind === 'contradicts' && relation.targetCardId === left.cardId);
+        const contradicts =
+          left.relations?.some(
+            (relation) => relation.kind === 'contradicts' && relation.targetCardId === right.cardId,
+          ) ||
+          right.relations?.some((relation) => relation.kind === 'contradicts' && relation.targetCardId === left.cardId);
         if (contradicts) {
           conflicts.push({ leftCardId: left.cardId, rightCardId: right.cardId, kind: 'contradicts' });
         }
       }
     }
     const digest = createHash('sha256')
-      .update(JSON.stringify({ query: query.queryFingerprint ?? null, hits: hits.map(hit => [hit.cardId, hit.contentHash]) }), 'utf8')
+      .update(
+        JSON.stringify({
+          query: query.queryFingerprint ?? null,
+          hits: hits.map((hit) => [hit.cardId, hit.contentHash]),
+        }),
+        'utf8',
+      )
       .digest('hex')
       .slice(0, 16);
     return {

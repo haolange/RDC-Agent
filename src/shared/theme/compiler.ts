@@ -47,10 +47,7 @@ const STATUS_SEEDS: Record<ResolvedTheme, Record<'success' | 'warning' | 'error'
  * Compile Appearance chrome into CSS custom-property patches applied on :root.
  * Does not touch compose/agent effort variables.
  */
-export function compileThemeChrome(
-  chrome: ThemeChromeConfig,
-  variant: ResolvedTheme,
-): CompiledChromeCssVars {
+export function compileThemeChrome(chrome: ThemeChromeConfig, variant: ResolvedTheme): CompiledChromeCssVars {
   const accent = hexToRgb(normalizeHexColor(chrome.accent, '#33d1ff'));
   const surface = hexToRgb(normalizeHexColor(chrome.surface, variant === 'dark' ? '#0f1115' : '#fafbfd'));
   const ink = hexToRgb(normalizeHexColor(chrome.ink, variant === 'dark' ? '#f4f6f8' : '#151d27'));
@@ -86,10 +83,13 @@ export function compileThemeChrome(
   vars['--color-focus-ring'] = rgbToCssTriplet(readableOn(accents['500'], chromeSurfaces, BOUNDARY_CONTRAST));
   // An unchecked checkbox is recognisable only by its outline, so the outline reads at 3:1 (WCAG 1.4.11). It starts
   // from the strong border as painted over the panel and moves only as far as that floor requires.
-  const strongBorderOverPanel = variant === 'light'
-    ? mixRgb(surfaces['2'], LIGHT_BORDER_INK, LIGHT_STRONG_BORDER_ALPHA)
-    : mixRgb(surfaces['2'], DARK_BORDER_INK, DARK_STRONG_BORDER_ALPHA);
-  vars['--color-control-boundary'] = rgbToCssTriplet(readableOn(roundRgb(strongBorderOverPanel), chromeSurfaces, BOUNDARY_CONTRAST));
+  const strongBorderOverPanel =
+    variant === 'light'
+      ? mixRgb(surfaces['2'], LIGHT_BORDER_INK, LIGHT_STRONG_BORDER_ALPHA)
+      : mixRgb(surfaces['2'], DARK_BORDER_INK, DARK_STRONG_BORDER_ALPHA);
+  vars['--color-control-boundary'] = rgbToCssTriplet(
+    readableOn(roundRgb(strongBorderOverPanel), chromeSurfaces, BOUNDARY_CONTRAST),
+  );
 
   // Only a chosen font overrides the bundled default stacks owned by design-tokens.css.
   if (chrome.fonts.ui?.trim()) vars['--font-sans'] = chrome.fonts.ui.trim();

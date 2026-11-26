@@ -1,5 +1,11 @@
 import { createHash } from 'crypto';
-import type { ResolvedResource, ResourceProvenance, RestrictivePolicy, ScopedResourceCandidate, ScopedResourceCatalog } from './scopedResourceTypes';
+import type {
+  ResolvedResource,
+  ResourceProvenance,
+  RestrictivePolicy,
+  ScopedResourceCandidate,
+  ScopedResourceCatalog,
+} from './scopedResourceTypes';
 
 const SCOPE_PRECEDENCE = { builtin: 0, user: 1, project: 2 } as const;
 const APPROVAL_STRENGTH = { none: 0, destructive: 1, mutation: 2, all: 3 } as const;
@@ -10,7 +16,10 @@ export const hashScopedResource = (value: unknown): string => {
   let pending = '';
   const emit = (text: string) => {
     pending += text;
-    if (pending.length >= 16_384) { hash.update(pending); pending = ''; }
+    if (pending.length >= 16_384) {
+      hash.update(pending);
+      pending = '';
+    }
   };
   const string = (text: string) => {
     emit('"');
@@ -25,9 +34,18 @@ export const hashScopedResource = (value: unknown): string => {
     emit('"');
   };
   const visit = (entry: unknown): void => {
-    if (entry === undefined) { emit('undefined'); return; }
-    if (typeof entry === 'bigint') { emit(`${entry.toString()}n`); return; }
-    if (typeof entry === 'string') { string(entry); return; }
+    if (entry === undefined) {
+      emit('undefined');
+      return;
+    }
+    if (typeof entry === 'bigint') {
+      emit(`${entry.toString()}n`);
+      return;
+    }
+    if (typeof entry === 'string') {
+      string(entry);
+      return;
+    }
     if (Array.isArray(entry)) {
       emit('[');
       for (let i = 0; i < entry.length; i++) {
@@ -35,17 +53,22 @@ export const hashScopedResource = (value: unknown): string => {
         // Array.map historically leaves holes empty, unlike explicit undefined.
         if (i in entry) visit(entry[i]);
       }
-      emit(']'); return;
+      emit(']');
+      return;
     }
     if (entry && typeof entry === 'object') {
       emit('{');
-      const entries = Object.entries(entry as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right));
+      const entries = Object.entries(entry as Record<string, unknown>).sort(([left], [right]) =>
+        left.localeCompare(right),
+      );
       entries.forEach(([key, item], index) => {
         if (index) emit(',');
-        string(key); emit(':'); visit(item);
+        string(key);
+        emit(':');
+        visit(item);
       });
-      emit('}'); return;
+      emit('}');
+      return;
     }
     emit((JSON.stringify(entry) as string | undefined) ?? String(entry));
   };
@@ -77,8 +100,9 @@ export class ScopedResourceResolver {
         diagnostics.push({
           code: 'resource.invalid',
           severity: 'error',
-          message: candidate.invalidReason
-            ?? `Resource ${id} at ${candidate.sourcePath} is invalid and will not override a lower-scope resource.`,
+          message:
+            candidate.invalidReason ??
+            `Resource ${id} at ${candidate.sourcePath} is invalid and will not override a lower-scope resource.`,
           sourcePath: candidate.sourcePath,
         });
         continue;
@@ -101,13 +125,15 @@ export class ScopedResourceResolver {
         scope: winner.scope,
         sourcePath: winner.sourcePath,
         sourceHash: hashScopedResource(winner.value),
-        ...(previous ? {
-          overriddenSource: {
-            scope: previous.scope,
-            sourcePath: previous.sourcePath,
-            sourceHash: hashScopedResource(previous.value),
-          },
-        } : {}),
+        ...(previous
+          ? {
+              overriddenSource: {
+                scope: previous.scope,
+                sourcePath: previous.sourcePath,
+                sourceHash: hashScopedResource(previous.value),
+              },
+            }
+          : {}),
       };
       const enabled = winner.enabled !== false;
       return {
@@ -115,13 +141,21 @@ export class ScopedResourceResolver {
         kind: winner.kind,
         value: winner.value,
         enabled,
-        effectiveStatus: enabled ? (previous ? 'overridden' : winner.scope === 'builtin' ? 'effective' : 'inherited') : 'disabled',
+        effectiveStatus: enabled
+          ? previous
+            ? 'overridden'
+            : winner.scope === 'builtin'
+              ? 'effective'
+              : 'inherited'
+          : 'disabled',
         provenance,
       };
     });
 
     return {
-      resources: resources.sort((left, right) => left.kind.localeCompare(right.kind) || left.id.localeCompare(right.id)),
+      resources: resources.sort(
+        (left, right) => left.kind.localeCompare(right.kind) || left.id.localeCompare(right.id),
+      ),
       diagnostics,
     };
   }

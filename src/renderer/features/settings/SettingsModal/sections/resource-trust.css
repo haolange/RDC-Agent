@@ -13,9 +13,15 @@
   border-radius: var(--radius-full);
   background: var(--token-text-disabled);
 }
-.settings-mcp-status[data-status='connected']::before { background: var(--token-status-success); }
-.settings-mcp-status[data-status='error']::before { background: var(--token-status-error); }
-.settings-mcp-status[data-status='connecting']::before { background: var(--token-status-warning); }
+.settings-mcp-status[data-status='connected']::before {
+  background: var(--token-status-success);
+}
+.settings-mcp-status[data-status='error']::before {
+  background: var(--token-status-error);
+}
+.settings-mcp-status[data-status='connecting']::before {
+  background: var(--token-status-warning);
+}
 .settings-runtime-detail-head {
   display: flex;
   flex-wrap: wrap;

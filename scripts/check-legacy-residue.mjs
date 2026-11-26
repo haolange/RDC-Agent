@@ -101,19 +101,19 @@ const isExactSymbolAllowlist = (rel, line, symbol) => {
   }
 
   if (
-    symbol === FORBIDDEN.stagedHandoff
-    || symbol === FORBIDDEN.leakFile
-    || symbol === FORBIDDEN.planPhases
-    || symbol === FORBIDDEN.modeCapabilities
-    || symbol === FORBIDDEN.intakeContext
-    || symbol === FORBIDDEN.gateResult
-    || symbol === FORBIDDEN.writeScope
-    || symbol === FORBIDDEN.harnessStatus
-    || symbol === FORBIDDEN.contextPacket
-    || symbol === FORBIDDEN.askAgentMd
-    || symbol === FORBIDDEN.groupAskTurns
-    || symbol === FORBIDDEN.askTurn
-    || symbol === FORBIDDEN.legacyFallback
+    symbol === FORBIDDEN.stagedHandoff ||
+    symbol === FORBIDDEN.leakFile ||
+    symbol === FORBIDDEN.planPhases ||
+    symbol === FORBIDDEN.modeCapabilities ||
+    symbol === FORBIDDEN.intakeContext ||
+    symbol === FORBIDDEN.gateResult ||
+    symbol === FORBIDDEN.writeScope ||
+    symbol === FORBIDDEN.harnessStatus ||
+    symbol === FORBIDDEN.contextPacket ||
+    symbol === FORBIDDEN.askAgentMd ||
+    symbol === FORBIDDEN.groupAskTurns ||
+    symbol === FORBIDDEN.askTurn ||
+    symbol === FORBIDDEN.legacyFallback
   ) {
     if (rel === 'ARCHITECTURE.md' && /\|\s*`/.test(line)) return true;
     if (rel === 'docs/product/acceptance-ledger.md' && /U03-/.test(line)) return true;
@@ -145,9 +145,7 @@ const reportHits = (id, hits) => {
 const collectPatternHits = (needle, { wordBoundary = false } = {}) => {
   const hits = [];
   const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = wordBoundary
-    ? new RegExp(`(?<![A-Za-z])${escaped}(?![A-Za-z])`)
-    : new RegExp(escaped);
+  const re = wordBoundary ? new RegExp(`(?<![A-Za-z])${escaped}(?![A-Za-z])`) : new RegExp(escaped);
   for (const rel of files) {
     const content = readFileSync(path.join(repoRoot, rel), 'utf8');
     const lines = content.split(/\r?\n/);
@@ -161,14 +159,10 @@ const collectPatternHits = (needle, { wordBoundary = false } = {}) => {
   return hits;
 };
 
-const collectPathHits = (relativePath) => (
-  existsSync(path.join(repoRoot, relativePath)) ? [relativePath] : []
-);
+const collectPathHits = (relativePath) => (existsSync(path.join(repoRoot, relativePath)) ? [relativePath] : []);
 
 const collectExportHits = (symbol) => {
-  const exportFiles = [
-    'src/shared/constants/index.ts',
-  ];
+  const exportFiles = ['src/shared/constants/index.ts'];
   const hits = [];
   for (const rel of exportFiles) {
     const full = path.join(repoRoot, rel);
@@ -176,7 +170,12 @@ const collectExportHits = (symbol) => {
     const lines = readFileSync(full, 'utf8').split(/\r?\n/);
     lines.forEach((line, index) => {
       const trimmed = line.trim();
-      if (trimmed === symbol || trimmed.endsWith(` ${symbol}`) || trimmed.endsWith(`, ${symbol}`) || trimmed.startsWith(`${symbol},`)) {
+      if (
+        trimmed === symbol ||
+        trimmed.endsWith(` ${symbol}`) ||
+        trimmed.endsWith(`, ${symbol}`) ||
+        trimmed.startsWith(`${symbol},`)
+      ) {
         if (symbol === FORBIDDEN.writeScope && trimmed.includes(token('AgentManifest', 'WriteScope'))) return;
         hits.push(`${rel}:${index + 1}:${trimmed}`);
       }
@@ -187,7 +186,9 @@ const collectExportHits = (symbol) => {
 
 const collectDynamicImportHits = (needle) => {
   const hits = [];
-  const importRe = new RegExp(`import\\s*\\(\\s*['"\`][^'"\`]*${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^'"\`]*['"\`]`);
+  const importRe = new RegExp(
+    `import\\s*\\(\\s*['"\`][^'"\`]*${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^'"\`]*['"\`]`,
+  );
   const mockRe = new RegExp(`vi\\.mock\\(\\s*['"\`][^'"\`]*${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
   for (const rel of files) {
     if (!rel.startsWith('src/') && !rel.startsWith('scripts/')) continue;
@@ -216,38 +217,41 @@ if (!existsSync(harnessPath)) {
 
 const rules = [
   { id: 'staged_handoff', hits: collectPatternHits(FORBIDDEN.stagedHandoff) },
-  { id: 'rdc-runtime-leak.json', hits: [
-    ...collectPatternHits(FORBIDDEN.leakFile),
-    ...collectPathHits(FORBIDDEN.leakFile),
-  ] },
+  {
+    id: 'rdc-runtime-leak.json',
+    hits: [...collectPatternHits(FORBIDDEN.leakFile), ...collectPathHits(FORBIDDEN.leakFile)],
+  },
   { id: 'PLAN_PHASES', hits: collectPatternHits(FORBIDDEN.planPhases) },
-  { id: 'WriteScope', hits: [
-    ...collectPatternHits(FORBIDDEN.writeScope, { wordBoundary: true }),
-    ...collectExportHits(FORBIDDEN.writeScope),
-  ] },
-  { id: 'IntakeContext', hits: [
-    ...collectPatternHits(FORBIDDEN.intakeContext),
-    ...collectExportHits(FORBIDDEN.intakeContext),
-  ] },
-  { id: 'GateResult', hits: [
-    ...collectPatternHits(FORBIDDEN.gateResult),
-    ...collectExportHits(FORBIDDEN.gateResult),
-  ] },
-  { id: 'MODE_CAPABILITIES', hits: [
-    ...collectPatternHits(FORBIDDEN.modeCapabilities),
-    ...collectExportHits(FORBIDDEN.modeCapabilities),
-  ] },
-  { id: 'EmbeddingExecutionService', hits: [
-    ...collectPatternHits(FORBIDDEN.embeddingService),
-    ...collectPathHits(`${FORBIDDEN.embeddingRuntimeDir}.ts`),
-    ...collectPathHits(`${FORBIDDEN.embeddingRuntimeDir}.test.ts`),
-    ...collectDynamicImportHits(FORBIDDEN.embeddingService),
-    ...collectExportHits(FORBIDDEN.embeddingService),
-  ] },
-  { id: 'Ask.agent.md', hits: [
-    ...collectPatternHits(FORBIDDEN.askAgentMd),
-    ...collectPathHits(`.github/agents/${FORBIDDEN.askAgentMd}`),
-  ] },
+  {
+    id: 'WriteScope',
+    hits: [
+      ...collectPatternHits(FORBIDDEN.writeScope, { wordBoundary: true }),
+      ...collectExportHits(FORBIDDEN.writeScope),
+    ],
+  },
+  {
+    id: 'IntakeContext',
+    hits: [...collectPatternHits(FORBIDDEN.intakeContext), ...collectExportHits(FORBIDDEN.intakeContext)],
+  },
+  { id: 'GateResult', hits: [...collectPatternHits(FORBIDDEN.gateResult), ...collectExportHits(FORBIDDEN.gateResult)] },
+  {
+    id: 'MODE_CAPABILITIES',
+    hits: [...collectPatternHits(FORBIDDEN.modeCapabilities), ...collectExportHits(FORBIDDEN.modeCapabilities)],
+  },
+  {
+    id: 'EmbeddingExecutionService',
+    hits: [
+      ...collectPatternHits(FORBIDDEN.embeddingService),
+      ...collectPathHits(`${FORBIDDEN.embeddingRuntimeDir}.ts`),
+      ...collectPathHits(`${FORBIDDEN.embeddingRuntimeDir}.test.ts`),
+      ...collectDynamicImportHits(FORBIDDEN.embeddingService),
+      ...collectExportHits(FORBIDDEN.embeddingService),
+    ],
+  },
+  {
+    id: 'Ask.agent.md',
+    hits: [...collectPatternHits(FORBIDDEN.askAgentMd), ...collectPathHits(`.github/agents/${FORBIDDEN.askAgentMd}`)],
+  },
   { id: 'groupAskTurns', hits: collectPatternHits(FORBIDDEN.groupAskTurns) },
   { id: 'AskTurn', hits: collectPatternHits(FORBIDDEN.askTurn, { wordBoundary: true }) },
   { id: 'HarnessStatus', hits: collectPatternHits(FORBIDDEN.harnessStatus) },

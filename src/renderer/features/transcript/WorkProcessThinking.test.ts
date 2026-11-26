@@ -8,24 +8,38 @@ import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import type { WorkProcessRow } from './workProcessTypes';
 
 vi.mock('../../i18n', () => ({
-  useI18n: () => ({ t: (key: TranslationKey, params?: Record<string, string | number>) => translate('en', key, params) }),
+  useI18n: () => ({
+    t: (key: TranslationKey, params?: Record<string, string | number>) => translate('en', key, params),
+  }),
 }));
 
 type ThinkingRow = Extract<WorkProcessRow, { type: 'thinking' }>;
 
 const summary: ThinkingRow = {
-  type: 'thinking', id: 'thinking', status: 'complete', thinkingStatus: 'complete', duration: '',
-  label: 'Thought for 20ms', kind: 'summary', visibility: 'summary', preview: '', openByDefault: false,
+  type: 'thinking',
+  id: 'thinking',
+  status: 'complete',
+  thinkingStatus: 'complete',
+  duration: '',
+  label: 'Thought for 20ms',
+  kind: 'summary',
+  visibility: 'summary',
+  preview: '',
+  openByDefault: false,
 };
 
 describe('public thinking Markdown', () => {
   let host: HTMLUListElement;
   let root: ReturnType<typeof createRoot>;
-  const render = (preview: string, overrides?: Partial<ThinkingRow>, scope = 'thinking-test') => act(async () => {
-    root.render(React.createElement(ScopedWorkDisclosure, { scope, children:
-      React.createElement(WorkProcessThinkingRow, { row: { ...summary, ...overrides, preview } }),
-    }));
-  });
+  const render = (preview: string, overrides?: Partial<ThinkingRow>, scope = 'thinking-test') =>
+    act(async () => {
+      root.render(
+        React.createElement(ScopedWorkDisclosure, {
+          scope,
+          children: React.createElement(WorkProcessThinkingRow, { row: { ...summary, ...overrides, preview } }),
+        }),
+      );
+    });
   const toggle = () => act(async () => host.querySelector('summary')!.click());
 
   beforeEach(() => {
@@ -53,17 +67,27 @@ describe('public thinking Markdown', () => {
     expect(host.querySelector('summary')?.textContent).toBe('Thought for 20ms');
     await toggle();
     expect(host.querySelector('details')?.open).toBe(true);
-    expect([...host.querySelectorAll('.markdown-body strong')].map((node) => node.textContent)).toEqual(['Compare passes', 'Read targets', 'Check output']);
+    expect([...host.querySelectorAll('.markdown-body strong')].map((node) => node.textContent)).toEqual([
+      'Compare passes',
+      'Read targets',
+      'Check output',
+    ]);
   });
 
   it('retains the row and manual disclosure choice as a title gains streamed Markdown body and settles', async () => {
-    const streaming = { status: 'running', thinkingStatus: 'streaming', label: 'Thinking…', openByDefault: true } as const;
+    const streaming = {
+      status: 'running',
+      thinkingStatus: 'streaming',
+      label: 'Thinking…',
+      openByDefault: true,
+    } as const;
     await render('# Read capture', streaming, 'thinking-stream');
     const row = host.firstElementChild;
     expect(host.querySelector('details')).not.toBeNull();
     expect(host.querySelector('[data-active-signal="info"]')?.textContent).toBe('Thinking…');
 
-    const preview = '# Read capture\n\nInspect [visible events](https://example.com/events).\n\n- Depth output\n\n```md\n# literal heading\n```';
+    const preview =
+      '# Read capture\n\nInspect [visible events](https://example.com/events).\n\n- Depth output\n\n```md\n# literal heading\n```';
     await render(preview, streaming, 'thinking-stream');
     expect(host.firstElementChild).toBe(row);
     expect(host.querySelector('details')?.open).toBe(true);
@@ -81,7 +105,11 @@ describe('public thinking Markdown', () => {
   });
 
   it('keeps a rich title and its interactive reference link in the disclosure', async () => {
-    await render('## **Read** [the capture][capture]\n\n[capture]: https://example.com/capture', {}, 'thinking-rich-heading');
+    await render(
+      '## **Read** [the capture][capture]\n\n[capture]: https://example.com/capture',
+      {},
+      'thinking-rich-heading',
+    );
     expect(host.querySelector('details')).not.toBeNull();
     expect(host.querySelector('.markdown-body strong')?.textContent).toBe('Read');
     expect(host.querySelector('.markdown-body a')?.getAttribute('href')).toBe('https://example.com/capture');

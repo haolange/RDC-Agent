@@ -62,15 +62,32 @@ export class SettingsAgentOverrideOps {
     const target = this.resolveMovedFieldOverride(request);
     const raw = await fs.promises.readFile(target.sourcePath, 'utf8');
     const plan = planAgentModelFieldMigration(raw);
-    const migrated = parseAgentMarkdownStrict(plan.content, target.sourcePath, target.agentId, new Date().toISOString(), false);
+    const migrated = parseAgentMarkdownStrict(
+      plan.content,
+      target.sourcePath,
+      target.agentId,
+      new Date().toISOString(),
+      false,
+    );
     if (!migrated.ok) {
       throw new AppError('AGENT_MODEL_MIGRATION_STILL_INVALID', migrated.reason);
     }
     await writeFileAtomic(`${target.sourcePath}.bak`, raw);
     const fields: SettingsPatchOp[] = [];
-    if (plan.binding.model) fields.push({ op: 'agentModels.setAgentField', agentId: target.agentId, field: 'model', value: plan.binding.model });
+    if (plan.binding.model)
+      fields.push({
+        op: 'agentModels.setAgentField',
+        agentId: target.agentId,
+        field: 'model',
+        value: plan.binding.model,
+      });
     if (plan.binding.reasoningLevel) {
-      fields.push({ op: 'agentModels.setAgentField', agentId: target.agentId, field: 'reasoningLevel', value: plan.binding.reasoningLevel });
+      fields.push({
+        op: 'agentModels.setAgentField',
+        agentId: target.agentId,
+        field: 'reasoningLevel',
+        value: plan.binding.reasoningLevel,
+      });
     }
     if (fields.length > 0) this.settings.update(fields);
     await writeFileAtomic(target.sourcePath, plan.content);
@@ -99,9 +116,12 @@ export class SettingsAgentOverrideOps {
     projectAgentTrust.trust(projectRoot, target.agentId, target.sourcePath);
   }
 
-  private resolveUntrustedProjectAgent(request: Pick<AgentOverrideFileRequest, 'sourcePath'> & { sourceHash?: string }) {
+  private resolveUntrustedProjectAgent(
+    request: Pick<AgentOverrideFileRequest, 'sourcePath'> & { sourceHash?: string },
+  ) {
     const projectRoot = tryCurrentProjectRoot();
-    if (!projectRoot) throw new AppError('AGENT_PROJECT_ROOT_REQUIRED', 'open the project that owns this Agent profile.');
+    if (!projectRoot)
+      throw new AppError('AGENT_PROJECT_ROOT_REQUIRED', 'open the project that owns this Agent profile.');
     const target = agentManifestService.resolveDiagnosedOverride(
       appPathService.getRuntimePaths(),
       request.sourcePath,

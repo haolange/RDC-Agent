@@ -121,9 +121,8 @@ export async function* readProviderFrames<Frame>(
   onDoneSentinel?: () => void,
 ): AsyncGenerator<Frame> {
   const readOptions = { providerApi: wire.providerApi, ...options, ...(onDoneSentinel ? { onDoneSentinel } : {}) };
-  const frames = wire.framing === 'sse'
-    ? parseSSE(response, signal, readOptions)
-    : parseJsonLines(response, signal, readOptions);
+  const frames =
+    wire.framing === 'sse' ? parseSSE(response, signal, readOptions) : parseJsonLines(response, signal, readOptions);
   for await (const data of frames) {
     if (signal.aborted) return;
     yield parseProviderFrame(data, wire.providerApi, wire.frameSchema);

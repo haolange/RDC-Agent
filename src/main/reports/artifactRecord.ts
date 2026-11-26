@@ -1,12 +1,4 @@
-export type ArtifactKind =
-  | 'capture'
-  | 'screenshot'
-  | 'shader'
-  | 'trace'
-  | 'report'
-  | 'log'
-  | 'data'
-  | 'note';
+export type ArtifactKind = 'capture' | 'screenshot' | 'shader' | 'trace' | 'report' | 'log' | 'data' | 'note';
 
 export interface ArtifactRecord {
   artifactId: string;

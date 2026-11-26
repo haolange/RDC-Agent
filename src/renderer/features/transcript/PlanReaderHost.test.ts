@@ -9,24 +9,33 @@ vi.mock('../../stores/projectStore', () => ({ useProjectStore: { getState: () =>
 // The reader stays mounted while it closes and reports when it has left, as ReadingSheet does.
 vi.mock('./PlanReviewPanel', async () => {
   const { useEffect } = await vi.importActual<typeof import('react')>('react');
-  return { PlanReviewPanel: ({ open, onClose, onExited }: { open: boolean; onClose: () => void; onExited: () => void }) => {
-    useEffect(() => { if (!open) onExited(); }, [open, onExited]);
-    return open ? createElement('button', { onClick: onClose, 'data-reader': true }, 'Close') : null;
-  } };
+  return {
+    PlanReviewPanel: ({ open, onClose, onExited }: { open: boolean; onClose: () => void; onExited: () => void }) => {
+      useEffect(() => {
+        if (!open) onExited();
+      }, [open, onExited]);
+      return open ? createElement('button', { onClick: onClose, 'data-reader': true }, 'Close') : null;
+    },
+  };
 });
 
 it('keeps the reader open across transcript remounts and restores the new trigger', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   let frame!: FrameRequestCallback;
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frame = callback; return 1; });
-  const host = document.createElement('div'); document.body.append(host);
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frame = callback;
+    return 1;
+  });
+  const host = document.createElement('div');
+  document.body.append(host);
   const root = createRoot(host);
   const plan = { planId: 'p' } as ConversationPlanReview;
   function Trigger() {
     const open = usePlanReader();
     return createElement('button', { 'data-plan-id': 'p', onClick: () => open(plan) }, 'Read');
   }
-  const render = (key: string) => act(async () => root.render(createElement(PlanReaderHost, null, createElement(Trigger, { key }))));
+  const render = (key: string) =>
+    act(async () => root.render(createElement(PlanReaderHost, null, createElement(Trigger, { key }))));
   try {
     await render('desktop');
     const original = host.querySelector<HTMLButtonElement>('[data-plan-id]')!;
@@ -39,6 +48,8 @@ it('keeps the reader open across transcript remounts and restores the new trigge
     expect(document.activeElement).toBe(host.querySelector('[data-plan-id]'));
     expect(host.querySelector('[data-reader]')).toBeNull();
   } finally {
-    await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals();
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
   }
 });

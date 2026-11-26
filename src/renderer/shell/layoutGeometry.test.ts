@@ -15,9 +15,7 @@ describe('layoutGeometry', () => {
   });
 
   it('keeps window floor large enough for left rail plus one-row composer', () => {
-    expect(APP_MIN_WINDOW_WIDTH).toBe(
-      LEFT_SIDEBAR_MIN_WIDTH + APP_MIN_MAIN_WIDTH + APP_RESIZE_HANDLE_WIDTH,
-    );
+    expect(APP_MIN_WINDOW_WIDTH).toBe(LEFT_SIDEBAR_MIN_WIDTH + APP_MIN_MAIN_WIDTH + APP_RESIZE_HANDLE_WIDTH);
     expect(APP_MIN_WINDOW_WIDTH).toBeGreaterThanOrEqual(700);
   });
 });

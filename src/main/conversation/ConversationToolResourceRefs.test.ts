@@ -14,10 +14,15 @@ describe('ConversationToolResourceRefs', () => {
     expect(extractConversationToolResourceRefs('read_file', success({ path: 'D:/project/docs/DESIGN.md' }))).toEqual([
       expect.objectContaining({ kind: 'file', label: 'DESIGN.md', path: 'D:/project/docs/DESIGN.md' }),
     ]);
-    expect(extractConversationToolResourceRefs('copy_file', success({
-      source: 'D:/project/a.md',
-      destination: 'D:/project/docs/a.md',
-    }))).toEqual([
+    expect(
+      extractConversationToolResourceRefs(
+        'copy_file',
+        success({
+          source: 'D:/project/a.md',
+          destination: 'D:/project/docs/a.md',
+        }),
+      ),
+    ).toEqual([
       expect.objectContaining({ kind: 'file', label: 'a.md', path: 'D:/project/a.md' }),
       expect.objectContaining({ kind: 'file', label: 'a.md', path: 'D:/project/docs/a.md' }),
     ]);
@@ -27,34 +32,50 @@ describe('ConversationToolResourceRefs', () => {
   });
 
   it('extracts skill, MCP, and web identities without arbitrary payload data', () => {
-    expect(extractConversationToolResourceRefs('skill_read', success({
-      skillId: 'browser',
-      name: 'Browser',
-      sourcePath: 'D:/skills/browser/SKILL.md',
-      instructions: 'must not be persisted',
-    }))).toEqual([{
-      id: 'skill:browser',
-      kind: 'skill',
-      label: 'Browser',
-      summary: 'SKILL.md',
-      path: 'D:/skills/browser/SKILL.md',
-    }]);
-    expect(extractConversationToolResourceRefs('mcp__render_doc__inspect_capture', success({ secret: 'no' }))).toEqual([{
-      id: 'mcp:render_doc:inspect_capture',
-      kind: 'mcp',
-      label: 'inspect capture',
-      summary: 'render_doc',
-    }]);
-    expect(extractConversationToolResourceRefs('web_fetch', success({
-      url: 'https://example.com/docs',
-      title: 'Example docs',
-    }))).toEqual([{
-      id: 'web:https://example.com/docs',
-      kind: 'web',
-      label: 'Example docs',
-      summary: 'example.com',
-      url: 'https://example.com/docs',
-    }]);
+    expect(
+      extractConversationToolResourceRefs(
+        'skill_read',
+        success({
+          skillId: 'browser',
+          name: 'Browser',
+          sourcePath: 'D:/skills/browser/SKILL.md',
+          instructions: 'must not be persisted',
+        }),
+      ),
+    ).toEqual([
+      {
+        id: 'skill:browser',
+        kind: 'skill',
+        label: 'Browser',
+        summary: 'SKILL.md',
+        path: 'D:/skills/browser/SKILL.md',
+      },
+    ]);
+    expect(extractConversationToolResourceRefs('mcp__render_doc__inspect_capture', success({ secret: 'no' }))).toEqual([
+      {
+        id: 'mcp:render_doc:inspect_capture',
+        kind: 'mcp',
+        label: 'inspect capture',
+        summary: 'render_doc',
+      },
+    ]);
+    expect(
+      extractConversationToolResourceRefs(
+        'web_fetch',
+        success({
+          url: 'https://example.com/docs',
+          title: 'Example docs',
+        }),
+      ),
+    ).toEqual([
+      {
+        id: 'web:https://example.com/docs',
+        kind: 'web',
+        label: 'Example docs',
+        summary: 'example.com',
+        url: 'https://example.com/docs',
+      },
+    ]);
   });
 
   it('fails closed for unsuccessful and generic non-resource tools', () => {
@@ -71,9 +92,14 @@ describe('ConversationToolResourceRefs', () => {
   it('collects a successful knowledge-root file read as an ordinary file resource', () => {
     // Contract: grep/glob/read of canonical knowledge paths reuse the file-tool
     // resource path. Do not add a knowledge-specific Right Rail projection.
-    expect(extractConversationToolResourceRefs('read_file', success({
-      path: 'C:/Users/me/.rdc-agent/knowledge/cards/note.md',
-    }))).toEqual([
+    expect(
+      extractConversationToolResourceRefs(
+        'read_file',
+        success({
+          path: 'C:/Users/me/.rdc-agent/knowledge/cards/note.md',
+        }),
+      ),
+    ).toEqual([
       expect.objectContaining({
         kind: 'file',
         label: 'note.md',
@@ -83,12 +109,17 @@ describe('ConversationToolResourceRefs', () => {
   });
 
   it('extracts session:// refs as file kind with the URI as path', () => {
-    expect(extractConversationToolResourceRefs('grep', success({
-      artifactized: true,
-      ref: 'session://tool-outputs/call-9.json',
-      hash: 'aabbccdd',
-      summary: 'offloaded',
-    }))).toEqual([
+    expect(
+      extractConversationToolResourceRefs(
+        'grep',
+        success({
+          artifactized: true,
+          ref: 'session://tool-outputs/call-9.json',
+          hash: 'aabbccdd',
+          summary: 'offloaded',
+        }),
+      ),
+    ).toEqual([
       expect.objectContaining({
         kind: 'file',
         path: 'session://tool-outputs/call-9.json',

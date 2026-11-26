@@ -99,10 +99,12 @@ export interface BuildEffectiveRuntimePlanInput {
   projectRootPath: string | null;
   projectId?: string | null;
   profileProvenance?: ResourceProvenance | null;
-  profile?: Pick<AgentManifestDefinition, 'skills' | 'maxTurns' | 'accessCeiling' | 'completionContract'> & {
-    agents?: AgentManifestDefinition['agents'];
-    handoffs?: AgentManifestDefinition['handoffs'];
-  } | null;
+  profile?:
+    | (Pick<AgentManifestDefinition, 'skills' | 'maxTurns' | 'accessCeiling' | 'completionContract'> & {
+        agents?: AgentManifestDefinition['agents'];
+        handoffs?: AgentManifestDefinition['handoffs'];
+      })
+    | null;
   enabledProfileIds?: readonly string[];
   /** Profiles other agents may hand work to; declared delegates outside this set are dropped. */
   delegableProfileIds?: readonly string[];
@@ -159,9 +161,7 @@ function freezeStringList(values: readonly string[] | undefined): readonly strin
   return Object.freeze([...(values ?? [])]);
 }
 
-function serializeActivatedDeferred(
-  value: ReadonlySet<string> | readonly string[] | undefined,
-): readonly string[] {
+function serializeActivatedDeferred(value: ReadonlySet<string> | readonly string[] | undefined): readonly string[] {
   if (!value) return Object.freeze([]);
   const list = Array.isArray(value) ? [...value] : [...value];
   list.sort();
@@ -182,55 +182,69 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
   };
   const knowledgeReadRoots = freezeStringList(input.knowledgeReadRoots);
   const profileSkills = freezeStringList(input.profile?.skills ?? []);
-  const profileMaxTurns = typeof input.profile?.maxTurns === 'number' && input.profile.maxTurns > 0
-    ? input.profile.maxTurns
-    : null;
-  const profileHandoffs = Object.freeze((input.profile?.handoffs ?? []).map((handoff) => Object.freeze({
-    agent: handoff.agent,
-    label: handoff.label,
-    ...(handoff.labelTranslations ? { labelTranslations: Object.freeze({ ...handoff.labelTranslations }) } : {}),
-    prompt: handoff.prompt,
-    ...(handoff.send !== undefined ? { send: handoff.send } : {}),
-    ...(handoff.surface !== undefined ? { surface: handoff.surface } : {}),
-    ...(handoff.requiredSkillIds && handoff.requiredSkillIds.length > 0
-      ? { requiredSkillIds: Object.freeze([...handoff.requiredSkillIds]) }
-      : {}),
-    ...(handoff.requiredToolIds && handoff.requiredToolIds.length > 0
-      ? { requiredToolIds: Object.freeze([...handoff.requiredToolIds]) }
-      : {}),
-  })));
+  const profileMaxTurns =
+    typeof input.profile?.maxTurns === 'number' && input.profile.maxTurns > 0 ? input.profile.maxTurns : null;
+  const profileHandoffs = Object.freeze(
+    (input.profile?.handoffs ?? []).map((handoff) =>
+      Object.freeze({
+        agent: handoff.agent,
+        label: handoff.label,
+        ...(handoff.labelTranslations ? { labelTranslations: Object.freeze({ ...handoff.labelTranslations }) } : {}),
+        prompt: handoff.prompt,
+        ...(handoff.send !== undefined ? { send: handoff.send } : {}),
+        ...(handoff.surface !== undefined ? { surface: handoff.surface } : {}),
+        ...(handoff.requiredSkillIds && handoff.requiredSkillIds.length > 0
+          ? { requiredSkillIds: Object.freeze([...handoff.requiredSkillIds]) }
+          : {}),
+        ...(handoff.requiredToolIds && handoff.requiredToolIds.length > 0
+          ? { requiredToolIds: Object.freeze([...handoff.requiredToolIds]) }
+          : {}),
+      }),
+    ),
+  );
   const enabledProfileIds = freezeStringList(input.enabledProfileIds);
   const declaredDelegates = input.profileDelegates ?? input.profile?.agents ?? [];
   const delegable = input.delegableProfileIds ? new Set(input.delegableProfileIds) : null;
-  const profileDelegates = freezeStringList(delegable ? declaredDelegates.filter((id) => delegable.has(id)) : declaredDelegates);
+  const profileDelegates = freezeStringList(
+    delegable ? declaredDelegates.filter((id) => delegable.has(id)) : declaredDelegates,
+  );
   const excludeRdcLeaseTools = input.excludeRdcLeaseTools === true;
   const excludeSubagent = input.excludeSubagent === true;
-  const withoutSubagent = (values: readonly string[]): string[] => excludeSubagent
-    ? values.filter((name) => name.trim().toLowerCase() !== 'subagent')
-    : [...values];
+  const withoutSubagent = (values: readonly string[]): string[] =>
+    excludeSubagent ? values.filter((name) => name.trim().toLowerCase() !== 'subagent') : [...values];
   const ceiling = agentAccessCeiling(input.profile);
   const completionContract = agentCompletionContract(input.profile);
-  const investigationMission = completionContract === 'investigation-report' ? input.investigationMission ?? null : null;
+  const investigationMission =
+    completionContract === 'investigation-report' ? (input.investigationMission ?? null) : null;
   if (completionContract === 'investigation-report' && !investigationMission) {
-    throw new Error('mission_method: investigation-report requires a preloaded skill that declares investigation-mission');
+    throw new Error(
+      'mission_method: investigation-report requires a preloaded skill that declares investigation-mission',
+    );
   }
   const applyCeiling = (values: readonly string[]): readonly string[] => filterToolsWithinCeiling(values, ceiling);
   const rawAllowlist = excludeRdcLeaseTools
     ? stripRdcLeaseToolsFromAllowlist(input.toolAllowlist)
     : input.toolAllowlist;
   const toolAllowlist = freezeStringList(withoutSubagent(applyCeiling(rawAllowlist)));
-  const skillIntersection = input.skillIntersection === undefined || input.skillIntersection === null
-    ? null
-    : freezeStringList(withoutSubagent(applyCeiling(
-      excludeRdcLeaseTools
-        ? stripRdcLeaseToolsFromAllowlist(input.skillIntersection)
-        : input.skillIntersection,
-    )));
-  const visibleToolNames = freezeStringList(withoutSubagent(applyCeiling(
-      excludeRdcLeaseTools
-        ? stripRdcLeaseToolsFromAllowlist(input.visibleToolNames ?? [])
-        : input.visibleToolNames ?? [],
-  )));
+  const skillIntersection =
+    input.skillIntersection === undefined || input.skillIntersection === null
+      ? null
+      : freezeStringList(
+          withoutSubagent(
+            applyCeiling(
+              excludeRdcLeaseTools ? stripRdcLeaseToolsFromAllowlist(input.skillIntersection) : input.skillIntersection,
+            ),
+          ),
+        );
+  const visibleToolNames = freezeStringList(
+    withoutSubagent(
+      applyCeiling(
+        excludeRdcLeaseTools
+          ? stripRdcLeaseToolsFromAllowlist(input.visibleToolNames ?? [])
+          : (input.visibleToolNames ?? []),
+      ),
+    ),
+  );
   const delegationCapsule = input.delegationCapsule
     ? freezeDelegationCapsule(structuredClone(input.delegationCapsule))
     : null;
@@ -320,33 +334,49 @@ export function rebuildEffectiveRuntimePlan(
   input: { rdcBindingFingerprint: string; systemPrompt: string },
 ): EffectiveRuntimePlan {
   return buildEffectiveRuntimePlan({
-    agentId: previous.agentId, projectRootPath: previous.projectRootPath, projectId: previous.projectId,
+    agentId: previous.agentId,
+    projectRootPath: previous.projectRootPath,
+    projectId: previous.projectId,
     profileProvenance: previous.profileProvenance,
-    profile: { skills: [...previous.profileSkills], ...(previous.profileMaxTurns !== null ? { maxTurns: previous.profileMaxTurns } : {}),
-      accessCeiling: previous.accessCeiling, completionContract: previous.completionContract,
-      agents: [...previous.profileDelegates], handoffs: previous.profileHandoffs.map(handoff => {
+    profile: {
+      skills: [...previous.profileSkills],
+      ...(previous.profileMaxTurns !== null ? { maxTurns: previous.profileMaxTurns } : {}),
+      accessCeiling: previous.accessCeiling,
+      completionContract: previous.completionContract,
+      agents: [...previous.profileDelegates],
+      handoffs: previous.profileHandoffs.map((handoff) => {
         const { requiredSkillIds, requiredToolIds, ...rest } = handoff;
-        return { ...rest, ...(requiredSkillIds ? { requiredSkillIds: [...requiredSkillIds] } : {}),
-          ...(requiredToolIds ? { requiredToolIds: [...requiredToolIds] } : {}) };
-      }) },
-    enabledProfileIds: previous.enabledProfileIds, profileDelegates: previous.profileDelegates,
-    toolAllowlist: previous.toolAllowlist, permissionConstraints: previous.permissionConstraints,
-    knowledgeReadRoots: previous.knowledgeReadRoots, policy: previous.policy,
-    routeCapability: previous.routeCapability, requestPlan: { executionIdentity: { fingerprint: previous.requestPlanFingerprint } },
-    promptPlan: { systemPrompt: input.systemPrompt }, investigationMission: previous.investigationMission,
-    skillIntersection: previous.skillIntersection, visibleToolNames: previous.visibleToolNames,
-    activatedDeferredTools: previous.activatedDeferredTools, mcpDescriptorHash: previous.mcpDescriptorHash,
+        return {
+          ...rest,
+          ...(requiredSkillIds ? { requiredSkillIds: [...requiredSkillIds] } : {}),
+          ...(requiredToolIds ? { requiredToolIds: [...requiredToolIds] } : {}),
+        };
+      }),
+    },
+    enabledProfileIds: previous.enabledProfileIds,
+    profileDelegates: previous.profileDelegates,
+    toolAllowlist: previous.toolAllowlist,
+    permissionConstraints: previous.permissionConstraints,
+    knowledgeReadRoots: previous.knowledgeReadRoots,
+    policy: previous.policy,
+    routeCapability: previous.routeCapability,
+    requestPlan: { executionIdentity: { fingerprint: previous.requestPlanFingerprint } },
+    promptPlan: { systemPrompt: input.systemPrompt },
+    investigationMission: previous.investigationMission,
+    skillIntersection: previous.skillIntersection,
+    visibleToolNames: previous.visibleToolNames,
+    activatedDeferredTools: previous.activatedDeferredTools,
+    mcpDescriptorHash: previous.mcpDescriptorHash,
     compactionThresholdPercent: previous.contextCompactionPercent,
     attachmentManifestFingerprint: previous.attachmentManifestFingerprint,
-    excludeRdcLeaseTools: previous.excludeRdcLeaseTools, excludeSubagent: previous.excludeSubagent,
-    delegationCapsule: previous.delegationCapsule, rdcBindingFingerprint: input.rdcBindingFingerprint,
+    excludeRdcLeaseTools: previous.excludeRdcLeaseTools,
+    excludeSubagent: previous.excludeSubagent,
+    delegationCapsule: previous.delegationCapsule,
+    rdcBindingFingerprint: input.rdcBindingFingerprint,
   });
 }
 
-export function activeToolNamesForPlan(
-  definitions: readonly ToolDefinition[],
-  plan: EffectiveRuntimePlan,
-): string[] {
+export function activeToolNamesForPlan(definitions: readonly ToolDefinition[], plan: EffectiveRuntimePlan): string[] {
   const allow = new Set(plan.toolAllowlist.map((name) => name.trim().toLowerCase()));
   return definitions
     .map((definition) => definition.name)

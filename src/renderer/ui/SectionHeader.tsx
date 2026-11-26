@@ -9,13 +9,7 @@ export interface SectionHeaderProps extends Omit<HTMLAttributes<HTMLDivElement>,
   actions?: ReactNode;
 }
 
-export function SectionHeader({
-  title,
-  description,
-  actions,
-  className,
-  ...rest
-}: SectionHeaderProps) {
+export function SectionHeader({ title, description, actions, className, ...rest }: SectionHeaderProps) {
   return (
     <div className={cn('ui-section-header', className)} {...rest}>
       <div className="ui-section-header-copy">

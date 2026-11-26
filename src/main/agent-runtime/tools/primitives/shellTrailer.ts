@@ -112,7 +112,7 @@ export function wrapPosixCommand(scriptPath: string, marker: string, spawnCwd: s
     '  printf \'\\n%s\\ncwd=%s\\nprovider=FileSystem\\nexit=%s\\n\' "$__m" "$__cwd" "$__exit"',
     `  rm -f -- ${quotedScript}`,
     '}',
-    'trap \'__exit=$?; __emit\' EXIT',
+    "trap '__exit=$?; __emit' EXIT",
     'set +e',
     `. ${quotedScript}`,
     '__exit=$?',

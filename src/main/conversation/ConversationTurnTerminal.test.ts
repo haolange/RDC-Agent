@@ -4,7 +4,6 @@ import { assertTerminalContextOwnership } from './ConversationTurnTerminal';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 
-
 const storage = vi.hoisted(() => ({
   readConversationHistory: vi.fn(),
   readConversationBranchState: vi.fn(),
@@ -30,19 +29,34 @@ describe('terminal context branch ownership', () => {
       message('assistant', 'assistant', 'followup', 21),
     ];
     branches = {
-      sessionId: 'session', rootBranchId: ROOT_BRANCH_ID, activeLeafBranchId: 'branch-edit',
-      forks: [{
-        forkId: 'fork', anchorMessageId: 'original-user', activeBranchId: 'branch-edit',
-        branches: [{ branchId: 'branch-edit', parentBranchId: ROOT_BRANCH_ID, variantIndex: 1,
-          anchorUserMessageId: 'anchor', rootTurnId: 'rewrite' }],
-      }],
+      sessionId: 'session',
+      rootBranchId: ROOT_BRANCH_ID,
+      activeLeafBranchId: 'branch-edit',
+      forks: [
+        {
+          forkId: 'fork',
+          anchorMessageId: 'original-user',
+          activeBranchId: 'branch-edit',
+          branches: [
+            {
+              branchId: 'branch-edit',
+              parentBranchId: ROOT_BRANCH_ID,
+              variantIndex: 1,
+              anchorUserMessageId: 'anchor',
+              rootTurnId: 'rewrite',
+            },
+          ],
+        },
+      ],
     };
     storage.readConversationHistory.mockImplementation(() => history);
     storage.readConversationBranchState.mockImplementation(() => branches);
   });
 
   it('accepts the first rewritten turn and subsequent turns on the same branch', () => {
-    expect(() => assertTerminalContextOwnership('session', 'rewrite', 'anchor', 'anchor-answer', 'branch-edit')).not.toThrow();
+    expect(() =>
+      assertTerminalContextOwnership('session', 'rewrite', 'anchor', 'anchor-answer', 'branch-edit'),
+    ).not.toThrow();
     expect(validate).not.toThrow();
   });
 
@@ -83,6 +97,8 @@ describe('terminal context branch ownership', () => {
   it('keeps root branch turns independent of fork metadata', () => {
     history[2].branchId = ROOT_BRANCH_ID;
     history[3].branchId = ROOT_BRANCH_ID;
-    expect(() => assertTerminalContextOwnership('session', 'followup', 'user', 'assistant', ROOT_BRANCH_ID)).not.toThrow();
+    expect(() =>
+      assertTerminalContextOwnership('session', 'followup', 'user', 'assistant', ROOT_BRANCH_ID),
+    ).not.toThrow();
   });
 });

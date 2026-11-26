@@ -1,9 +1,9 @@
-import { resolve } from 'path'
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
-import { providerCatalogVitePlugin } from './src/main/provider-catalog/providerCatalogVitePlugin'
-import rendererConfig from './vite.renderer.config'
+import { resolve } from 'path';
+import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
+import { providerCatalogVitePlugin } from './src/main/provider-catalog/providerCatalogVitePlugin';
+import rendererConfig from './vite.renderer.config';
 
-const repoRoot = __dirname
+const repoRoot = __dirname;
 
 export default defineConfig({
   main: {
@@ -50,4 +50,4 @@ export default defineConfig({
       },
     },
   },
-})
+});

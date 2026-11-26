@@ -3,12 +3,7 @@
  * Keeps the browser on the bridge origin so HttpOnly cookies never cross ports.
  */
 
-import {
-  request as httpRequest,
-  type IncomingMessage,
-  type Server,
-  type ServerResponse,
-} from 'http';
+import { request as httpRequest, type IncomingMessage, type Server, type ServerResponse } from 'http';
 import { request as httpsRequest } from 'https';
 import { URL } from 'url';
 
@@ -25,17 +20,11 @@ const HOP_BY_HOP = new Set([
   'content-length',
 ]);
 
-const STRIP_FROM_UPSTREAM = new Set([
-  'cookie',
-  'authorization',
-  'proxy-authorization',
-]);
+const STRIP_FROM_UPSTREAM = new Set(['cookie', 'authorization', 'proxy-authorization']);
 
 function shouldStripUpstreamHeader(name: string): boolean {
   const key = name.toLowerCase();
-  return HOP_BY_HOP.has(key)
-    || STRIP_FROM_UPSTREAM.has(key)
-    || key.startsWith('x-rdc-');
+  return HOP_BY_HOP.has(key) || STRIP_FROM_UPSTREAM.has(key) || key.startsWith('x-rdc-');
 }
 
 /** Copy request headers to Vite without leaking bridge auth. */
@@ -65,21 +54,23 @@ export function mapDevRendererProxyPath(pathname: string, search = ''): string {
 
 /** True when the path is a bridge-owned API surface (never proxied). */
 export function isBridgeOwnedPath(pathname: string): boolean {
-  return pathname === '/qa'
-    || pathname === '/invoke'
-    || pathname === '/events'
-    || pathname === '/health'
-    || pathname.startsWith('/api/');
+  return (
+    pathname === '/qa' ||
+    pathname === '/invoke' ||
+    pathname === '/events' ||
+    pathname === '/health' ||
+    pathname.startsWith('/api/')
+  );
 }
 
-export function shouldProxyToDevRenderer(
-  pathname: string,
-  devRendererUrl: string | null | undefined,
-): boolean {
+export function shouldProxyToDevRenderer(pathname: string, devRendererUrl: string | null | undefined): boolean {
   return Boolean(devRendererUrl) && !isBridgeOwnedPath(pathname);
 }
 
-function copyRequestHeaders(source: IncomingMessage, targetHost: string): Record<string, string | string[] | undefined> {
+function copyRequestHeaders(
+  source: IncomingMessage,
+  targetHost: string,
+): Record<string, string | string[] | undefined> {
   return copyDevRendererUpstreamHeaders(source, targetHost);
 }
 
@@ -128,21 +119,20 @@ export function proxyHttpToDevRenderer(
       return;
     }
     response.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
-    response.end(JSON.stringify({
-      success: false,
-      error: `Dev renderer proxy failed: ${error.message}`,
-      bridgeOrigin: input.bridgeOrigin,
-      devRendererUrl: input.devRendererUrl,
-    }));
+    response.end(
+      JSON.stringify({
+        success: false,
+        error: `Dev renderer proxy failed: ${error.message}`,
+        bridgeOrigin: input.bridgeOrigin,
+        devRendererUrl: input.devRendererUrl,
+      }),
+    );
   });
 
   request.pipe(upstream);
 }
 
-export function attachDevRendererWebSocketProxy(
-  server: Server,
-  resolveDevRendererUrl: () => string | null,
-): void {
+export function attachDevRendererWebSocketProxy(server: Server, resolveDevRendererUrl: () => string | null): void {
   server.on('upgrade', (request, socket, head) => {
     const devRendererUrl = resolveDevRendererUrl();
     if (!devRendererUrl || !request.url) {
@@ -181,9 +171,7 @@ export function attachDevRendererWebSocketProxy(
     });
 
     upstream.on('upgrade', (upstreamResponse, upstreamSocket, upstreamHead) => {
-      const lines = [
-        `HTTP/1.1 ${upstreamResponse.statusCode ?? 101} Switching Protocols`,
-      ];
+      const lines = [`HTTP/1.1 ${upstreamResponse.statusCode ?? 101} Switching Protocols`];
       for (const [key, value] of Object.entries(upstreamResponse.headers)) {
         if (value == null) continue;
         if (Array.isArray(value)) {

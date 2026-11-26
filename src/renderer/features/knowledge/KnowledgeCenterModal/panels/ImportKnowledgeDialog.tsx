@@ -36,40 +36,62 @@ export function ImportKnowledgeDialog({ importer, candidates, spaces }: ImportKn
   // Reading the source happens on the first step and reports no counts; the import itself runs from the preview step,
   // follows main's counts and can be cancelled, after which the preview stays as it was.
   const importing = importer.operation.running;
-  const progress = importing ? <KnowledgeTaskProgress operation="import" progress={importer.operation.progress} />
-    : importer.busy && step !== 'result' ? <KnowledgeTaskProgress label={t('knowledgeCenter.progressReading')} />
-      : importer.cancelled ? <KnowledgeTaskCancelled label={t('knowledgeCenter.importCancelled')} />
-        : null;
-  const footer = step === 'result' ? (
-    <Button variant="primary" disabled={importer.busy} onClick={importer.close}>{t('knowledgeCenter.importDone')}</Button>
-  ) : step === 'preview' ? (
-    <>
-      {progress}
-      {importing ? (
-        <Button variant="secondary" loading={importer.operation.cancelling} data-testid="knowledge-center-import-cancel"
-          onClick={importer.cancelImport}>
-          {t('knowledgeCenter.cancelTask')}
-        </Button>
-      ) : (
-        <Button variant="ghost" disabled={importer.busy} onClick={importer.back}>{t('knowledgeCenter.importBack')}</Button>
-      )}
-      <Button variant="primary" disabled={importer.busy || newCount === 0} data-testid="knowledge-center-import-run"
-        onClick={() => void importer.importSource()}>
-        {t('knowledgeCenter.importRunCount', { count: newCount })}
+  const progress = importing ? (
+    <KnowledgeTaskProgress operation="import" progress={importer.operation.progress} />
+  ) : importer.busy && step !== 'result' ? (
+    <KnowledgeTaskProgress label={t('knowledgeCenter.progressReading')} />
+  ) : importer.cancelled ? (
+    <KnowledgeTaskCancelled label={t('knowledgeCenter.importCancelled')} />
+  ) : null;
+  const footer =
+    step === 'result' ? (
+      <Button variant="primary" disabled={importer.busy} onClick={importer.close}>
+        {t('knowledgeCenter.importDone')}
       </Button>
-    </>
-  ) : (
-    <>
-      {progress}
-      <Button variant="ghost" disabled={importer.busy} onClick={importer.close}>{t('knowledgeCenter.confirmCancel')}</Button>
-      {importer.mode === 'paste' ? (
-        <Button variant="primary" disabled={importer.busy || !importer.source.trim()} data-testid="knowledge-center-import-preview"
-          onClick={() => void importer.previewPasted()}>
-          {t('knowledgeCenter.importPreview')}
+    ) : step === 'preview' ? (
+      <>
+        {progress}
+        {importing ? (
+          <Button
+            variant="secondary"
+            loading={importer.operation.cancelling}
+            data-testid="knowledge-center-import-cancel"
+            onClick={importer.cancelImport}
+          >
+            {t('knowledgeCenter.cancelTask')}
+          </Button>
+        ) : (
+          <Button variant="ghost" disabled={importer.busy} onClick={importer.back}>
+            {t('knowledgeCenter.importBack')}
+          </Button>
+        )}
+        <Button
+          variant="primary"
+          disabled={importer.busy || newCount === 0}
+          data-testid="knowledge-center-import-run"
+          onClick={() => void importer.importSource()}
+        >
+          {t('knowledgeCenter.importRunCount', { count: newCount })}
         </Button>
-      ) : null}
-    </>
-  );
+      </>
+    ) : (
+      <>
+        {progress}
+        <Button variant="ghost" disabled={importer.busy} onClick={importer.close}>
+          {t('knowledgeCenter.confirmCancel')}
+        </Button>
+        {importer.mode === 'paste' ? (
+          <Button
+            variant="primary"
+            disabled={importer.busy || !importer.source.trim()}
+            data-testid="knowledge-center-import-preview"
+            onClick={() => void importer.previewPasted()}
+          >
+            {t('knowledgeCenter.importPreview')}
+          </Button>
+        ) : null}
+      </>
+    );
 
   return (
     <TaskDialog
@@ -94,7 +116,10 @@ export function ImportKnowledgeDialog({ importer, candidates, spaces }: ImportKn
                 value={importer.spaceId}
                 disabled={importer.busy}
                 onChange={(value) => importer.setSpaceId(value)}
-                options={spaces.map((space) => ({ value: space.spaceId, label: space.kind === 'user' ? t('knowledgeCenter.userSpace') : space.label }))}
+                options={spaces.map((space) => ({
+                  value: space.spaceId,
+                  label: space.kind === 'user' ? t('knowledgeCenter.userSpace') : space.label,
+                }))}
               />
             </label>
           ) : null}
@@ -113,7 +138,10 @@ export function ImportKnowledgeDialog({ importer, candidates, spaces }: ImportKn
             <div
               className={`knowledge-import-drop${dragging ? ' is-dragging' : ''}`}
               data-testid="knowledge-center-import-file"
-              onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragging(true);
+              }}
               onDragLeave={() => setDragging(false)}
               onDrop={(event) => {
                 event.preventDefault();
@@ -162,7 +190,11 @@ export function ImportKnowledgeDialog({ importer, candidates, spaces }: ImportKn
         </>
       ) : null}
 
-      {importer.error ? <InlineError data-testid="knowledge-center-import-error" detail={importer.error.detail}>{importer.error.message}</InlineError> : null}
+      {importer.error ? (
+        <InlineError data-testid="knowledge-center-import-error" detail={importer.error.detail}>
+          {importer.error.message}
+        </InlineError>
+      ) : null}
     </TaskDialog>
   );
 }

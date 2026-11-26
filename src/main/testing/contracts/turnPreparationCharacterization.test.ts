@@ -15,14 +15,18 @@ const offer = vi.hoisted(() => ({ current: null as unknown }));
 
 vi.mock('electron', () => ({
   app: { getPath: () => roots.base, getAppPath: () => process.cwd(), getVersion: () => '0.0.0-test' },
-  safeStorage: { isEncryptionAvailable: () => false, decryptString: () => '', encryptString: (value: string) => Buffer.from(value) },
+  safeStorage: {
+    isEncryptionAvailable: () => false,
+    decryptString: () => '',
+    encryptString: (value: string) => Buffer.from(value),
+  },
 }));
 vi.mock('../../runtime/AuditLog', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../../runtime/AuditLog')>(),
+  ...(await importOriginal<typeof import('../../runtime/AuditLog')>()),
   auditLog: { record: vi.fn() },
 }));
 vi.mock('../../sessions/run/handoffSkills', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../../sessions/run/handoffSkills')>(),
+  ...(await importOriginal<typeof import('../../sessions/run/handoffSkills')>()),
   approvedExecutionOfferForAgent: () => offer.current,
 }));
 
@@ -57,9 +61,14 @@ import type { PreparedAgentTurnContext } from '../../agent-runtime/orchestration
 const AGENTS = ['general', 'debugger', 'analyzer', 'optimizer'] as const;
 const MODEL_ID = 'local-model';
 const provider = {
-  id: 'ollama', protocol: 'OllamaOpenAICompatibleChatCompletions', catalogOwnership: 'user-managed',
-  enabled: true, isConfigured: true, status: 'verified',
-  baseUrl: 'http://127.0.0.1:11434/v1', models: [{ id: MODEL_ID, label: 'Local model', enabled: true, defaultBudgetTokens: 65_536 }],
+  id: 'ollama',
+  protocol: 'OllamaOpenAICompatibleChatCompletions',
+  catalogOwnership: 'user-managed',
+  enabled: true,
+  isConfigured: true,
+  status: 'verified',
+  baseUrl: 'http://127.0.0.1:11434/v1',
+  models: [{ id: MODEL_ID, label: 'Local model', enabled: true, defaultBudgetTokens: 65_536 }],
 } as unknown as LlmProviderEntry;
 const providers = { get: (providerId: string) => (providerId === provider.id ? provider : undefined) };
 
@@ -74,15 +83,23 @@ beforeAll(async () => {
   vi.useFakeTimers({ now: new Date('2026-11-25T00:00:00.000Z'), toFake: ['Date'] });
   fs.mkdirSync(roots.project, { recursive: true });
   await loadProviderSurface('ollama');
-  await refreshEffectiveCatalogDiscovery(provider, [], parseOllamaInstalledModels(
-    { models: [{ name: MODEL_ID }] }, new Map([[MODEL_ID, { capabilities: ['tools', 'vision'] }]]), getLoadedProviderSurface('ollama')!,
-  ).contributions);
+  await refreshEffectiveCatalogDiscovery(
+    provider,
+    [],
+    parseOllamaInstalledModels(
+      { models: [{ name: MODEL_ID }] },
+      new Map([[MODEL_ID, { capabilities: ['tools', 'vision'] }]]),
+      getLoadedProviderSurface('ollama')!,
+    ).contributions,
+  );
   await projectWorkspaceStore.initializeWorkspace();
   const project = await projectWorkspaceStore.createProject(roots.project);
   projectId = project.projectId;
   sessionId = sessionRecordStore.createSession(projectId, 'Characterization').sessionId;
-  const written = planArtifactWriter.writeLivePlan(sessionId,
-    `# Plan\n\n1. Read the hair pass.\n\n${renderInvestigationPlanContract({ schemaVersion: 1, mission: 'debugger' })}`);
+  const written = planArtifactWriter.writeLivePlan(
+    sessionId,
+    `# Plan\n\n1. Read the hair pass.\n\n${renderInvestigationPlanContract({ schemaVersion: 1, mission: 'debugger' })}`,
+  );
   approvedPlan = { uri: written.uri, hash: written.hash };
 });
 
@@ -93,10 +110,19 @@ afterAll(() => {
 
 async function prepare(agentId: (typeof AGENTS)[number], scenario: Scenario): Promise<PreparedAgentTurnContext> {
   // A Debugger plan approved for General: only General receives the offer, as approvedExecutionOfferForAgent decides.
-  offer.current = scenario === 'approved-plan' && agentId === 'general' ? {
-    schemaVersion: EXECUTION_OFFER_SCHEMA, sourceAgentId: 'debugger', targetAgentId: 'general', plan: approvedPlan,
-    requiredSkillIds: [], label: 'Execute', prompt: 'Execute the approved plan.', approvedAt: Date.parse('2026-11-25T00:00:00.000Z'),
-  } : null;
+  offer.current =
+    scenario === 'approved-plan' && agentId === 'general'
+      ? {
+          schemaVersion: EXECUTION_OFFER_SCHEMA,
+          sourceAgentId: 'debugger',
+          targetAgentId: 'general',
+          plan: approvedPlan,
+          requiredSkillIds: [],
+          label: 'Execute',
+          prompt: 'Execute the approved plan.',
+          approvedAt: Date.parse('2026-11-25T00:00:00.000Z'),
+        }
+      : null;
   const profiles = agentManifestService.getEffectiveProfiles(appPathService.getUserRdcPaths(), roots.project);
   const profile = profiles.find((entry) => entry.id === agentId)!;
   const planning = planEffectiveModelRequest({ providerId: 'ollama', modelId: MODEL_ID, providers, controls: {} });
@@ -105,47 +131,86 @@ async function prepare(agentId: (typeof AGENTS)[number], scenario: Scenario): Pr
   const toolAllowlist = resolveAgentToolAllowlistFromDefinition(agentId, profile.tools, agentAccessCeiling(profile));
   const scoped = scenario === 'session' || scenario === 'attachment' || scenario === 'approved-plan';
   const promptPlan = new PromptPlanForTurn().buildPromptPlanForAgentTurn({
-    agentId, sessionId: scoped ? sessionId : null, projectRootPath: roots.project, providerId: 'ollama', modelId: MODEL_ID,
-    toolAllowlist, contextWindowTokens: planning.plan.contextWindowTokens, capability: effectiveModel, requestPlan: planning.plan,
-    systemPrompt: profile.instructions, messageText: 'Why is the hair black?', effectiveProfile: profile, effectiveProfiles: profiles,
+    agentId,
+    sessionId: scoped ? sessionId : null,
+    projectRootPath: roots.project,
+    providerId: 'ollama',
+    modelId: MODEL_ID,
+    toolAllowlist,
+    contextWindowTokens: planning.plan.contextWindowTokens,
+    capability: effectiveModel,
+    requestPlan: planning.plan,
+    systemPrompt: profile.instructions,
+    messageText: 'Why is the hair black?',
+    effectiveProfile: profile,
+    effectiveProfiles: profiles,
   })!;
-  const content = scenario === 'attachment'
-    ? [{ type: 'text' as const, text: 'Why is the hair black?' }, { type: 'image' as const, data: 'iVBORw0KGgo=', mimeType: 'image/png' }]
-    : 'Why is the hair black?';
+  const content =
+    scenario === 'attachment'
+      ? [
+          { type: 'text' as const, text: 'Why is the hair black?' },
+          { type: 'image' as const, data: 'iVBORw0KGgo=', mimeType: 'image/png' },
+        ]
+      : 'Why is the hair black?';
   return createAgentOrchestrator().prepareTurnContext({
-    requestId: `request-${agentId}-${scenario}`, credentialHandle: 'credential', turnId: `turn-${agentId}-${scenario}`, agentId,
-    content: content as never, imageTokenAdjustment: scenario === 'attachment' ? 85 : 0,
-    providerId: 'ollama', selectedModelId: MODEL_ID, effectiveModel,
+    requestId: `request-${agentId}-${scenario}`,
+    credentialHandle: 'credential',
+    turnId: `turn-${agentId}-${scenario}`,
+    agentId,
+    content: content as never,
+    imageTokenAdjustment: scenario === 'attachment' ? 85 : 0,
+    providerId: 'ollama',
+    selectedModelId: MODEL_ID,
+    effectiveModel,
     routeCapability: resolveAgentRouteCapability(provider, MODEL_ID, effectiveModel, planning.plan),
-    requestPlan: planning.plan, turnControls: planning.controls, promptPlan, effectiveProfile: profile,
-    effectiveProfileIds: profiles.filter((entry) => entry.enabled).map((entry) => entry.id), toolAllowlist,
-    projectRootPath: roots.project, projectId: scoped ? projectId : null, sessionId: scoped ? sessionId : null,
-    visibleTurnIds: [], activeBranchId: 'root',
-    ...(scenario === 'subagent' ? {
-      subagentDepth: 1,
-      frozenDelegationCapsule: { inputArtifactRefs: [], challengeRefs: [], acceptedFacts: [] } as never,
-    } : {}),
+    requestPlan: planning.plan,
+    turnControls: planning.controls,
+    promptPlan,
+    effectiveProfile: profile,
+    effectiveProfileIds: profiles.filter((entry) => entry.enabled).map((entry) => entry.id),
+    toolAllowlist,
+    projectRootPath: roots.project,
+    projectId: scoped ? projectId : null,
+    sessionId: scoped ? sessionId : null,
+    visibleTurnIds: [],
+    activeBranchId: 'root',
+    ...(scenario === 'subagent'
+      ? {
+          subagentDepth: 1,
+          frozenDelegationCapsule: { inputArtifactRefs: [], challengeRefs: [], acceptedFacts: [] } as never,
+        }
+      : {}),
   });
 }
 
 /** Every spelling a host may use for a directory: as given, resolved, with forward slashes, and case-folded (Windows). */
 function pathForms(raw: string): string[] {
   const forms = [raw, fs.realpathSync.native(raw)].flatMap((form) => [form, form.replace(/\\/g, '/')]);
-  return [...new Set([...forms, ...forms.map((form) => form.toLowerCase())])].sort((left, right) => right.length - left.length);
+  return [...new Set([...forms, ...forms.map((form) => form.toLowerCase())])].sort(
+    (left, right) => right.length - left.length,
+  );
 }
 
 /** Machine-specific values (fixture root, checkout path, generated ids) are replaced so the result is the same on every host. */
 function normalize(value: unknown): unknown {
   if (typeof value === 'string') {
     let text = value;
-    for (const [raw, token] of [[roots.base, '<root>'], [process.cwd(), '<repo>']] as const) {
+    for (const [raw, token] of [
+      [roots.base, '<root>'],
+      [process.cwd(), '<repo>'],
+    ] as const) {
       for (const form of pathForms(raw)) text = text.split(form).join(token);
     }
-    for (const [id, token] of [[projectId, '<project>'], [sessionId, '<session>']] as const) text = text.split(id).join(token);
+    for (const [id, token] of [
+      [projectId, '<project>'],
+      [sessionId, '<session>'],
+    ] as const)
+      text = text.split(id).join(token);
     return text.includes('<root>') || text.includes('<repo>') ? text.replace(/\\/g, '/') : text;
   }
   if (Array.isArray(value)) return value.map(normalize);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, normalize(entry)]));
+  if (value && typeof value === 'object')
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, normalize(entry)]));
   return value;
 }
 
@@ -157,24 +222,38 @@ function normalize(value: unknown): unknown {
 const HOST_DEPENDENT_HASHES = new Set(['promptPlanFingerprint', 'rdcBindingFingerprint']);
 
 function characterize(prepared: PreparedAgentTurnContext) {
-  const { planId: _planId, fingerprint: _fingerprint, policyFingerprint: _policyFingerprint, routeCapability, profileProvenance, policy, ...plan } =
-    prepared.runtime.effectivePlan as unknown as Record<string, unknown> & {
-      routeCapability: { toolCallingMode: string }; profileProvenance: { scope: string; sourceHash: string } | null;
-      policy: Record<string, unknown>;
-    };
+  const {
+    planId: _planId,
+    fingerprint: _fingerprint,
+    policyFingerprint: _policyFingerprint,
+    routeCapability,
+    profileProvenance,
+    policy,
+    ...plan
+  } = prepared.runtime.effectivePlan as unknown as Record<string, unknown> & {
+    routeCapability: { toolCallingMode: string };
+    profileProvenance: { scope: string; sourceHash: string } | null;
+    policy: Record<string, unknown>;
+  };
   const { sourceFingerprint: _sourceFingerprint, ...policyFields } = policy;
   const { summary } = prepared;
   return normalize({
     plan: {
       ...Object.fromEntries(Object.entries(plan).filter(([key]) => !HOST_DEPENDENT_HASHES.has(key))),
-      profileProvenance: profileProvenance && { scope: profileProvenance.scope, sourceHash: profileProvenance.sourceHash },
+      profileProvenance: profileProvenance && {
+        scope: profileProvenance.scope,
+        sourceHash: profileProvenance.sourceHash,
+      },
       policy: policyFields,
       toolCallingMode: routeCapability.toolCallingMode,
     },
     promptSegments: prepared.runtime.promptPlan.segments.map((segment) => `${segment.kind}:${segment.id}`),
     summary: {
-      promptBudgetTokens: summary.promptBudgetTokens, contextWindowTokens: summary.contextWindowTokens,
-      contextMode: summary.contextMode, compactionApplied: summary.compactionApplied, route: summary.route,
+      promptBudgetTokens: summary.promptBudgetTokens,
+      contextWindowTokens: summary.contextWindowTokens,
+      contextMode: summary.contextMode,
+      compactionApplied: summary.compactionApplied,
+      route: summary.route,
     },
   });
 }
@@ -198,7 +277,9 @@ describe('turn preparation budget', () => {
     const read = vi.spyOn(fs, 'readFileSync');
     try {
       await prepare('general', 'session');
-      const settingsReads = read.mock.calls.filter(([file]) => typeof file === 'string' && file === settingsPath).length;
+      const settingsReads = read.mock.calls.filter(
+        ([file]) => typeof file === 'string' && file === settingsPath,
+      ).length;
       expect(settingsReads).toBeLessThanOrEqual(1);
     } finally {
       read.mockRestore();

@@ -9,7 +9,11 @@ export type ScopeNotice = { tone: 'success'; message: string } | { tone: 'error'
  * The resource editor's form: which resource it shows or creates, the draft against its saved baseline, the unsaved
  * guard in front of anything that would drop the draft, and the outcome notice.
  */
-export function useScopedResourceForm(kind: ScopedResourceKind, scope: 'user' | 'project', resources: ScopedResourceDocument[]) {
+export function useScopedResourceForm(
+  kind: ScopedResourceKind,
+  scope: 'user' | 'project',
+  resources: ScopedResourceDocument[],
+) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<ResourceFormState>(() => emptyForm(kind, ''));
@@ -47,15 +51,17 @@ export function useScopedResourceForm(kind: ScopedResourceKind, scope: 'user' | 
     setPendingDiscard(() => action);
   };
 
-  const openResource = (resource: ScopedResourceDocument) => guard(() => {
-    showForm(formFromContent(resource.kind, resource.id, resource.content), resource.id);
-    setNotice(null);
-  });
+  const openResource = (resource: ScopedResourceDocument) =>
+    guard(() => {
+      showForm(formFromContent(resource.kind, resource.id, resource.content), resource.id);
+      setNotice(null);
+    });
 
-  const startNew = () => guard(() => {
-    showForm(emptyForm(kind, ''), null, true);
-    setNotice(null);
-  });
+  const startNew = () =>
+    guard(() => {
+      showForm(emptyForm(kind, ''), null, true);
+      setNotice(null);
+    });
 
   const closeEditor = () => guard(reset);
 
@@ -65,13 +71,14 @@ export function useScopedResourceForm(kind: ScopedResourceKind, scope: 'user' | 
   };
 
   /** Closes the dialog but keeps the selection so the read-only detail stays put. */
-  const closeDialogEditor = () => guard(() => {
-    setForm(baseline);
-    setCreating(false);
-    setDialogEditing(false);
-    setNotice(null);
-    if (creating) setSelectedId(null);
-  });
+  const closeDialogEditor = () =>
+    guard(() => {
+      setForm(baseline);
+      setCreating(false);
+      setDialogEditing(false);
+      setNotice(null);
+      if (creating) setSelectedId(null);
+    });
 
   const patchForm = (patch: Partial<ResourceFormState>) => {
     setForm((current) => ({ ...current, ...patch }));
@@ -79,8 +86,30 @@ export function useScopedResourceForm(kind: ScopedResourceKind, scope: 'user' | 
   };
 
   return {
-    selectedId, selected, creating, editing, dirty, form, notice, setNotice, pendingDiscard, dialogEditing, setDialogEditing,
-    showForm, reset, guard, openResource, startNew, closeEditor, openDialogEditor, closeDialogEditor, patchForm,
-    resolveDiscard: (accept: boolean) => { const action = pendingDiscard; setPendingDiscard(null); if (accept) action?.(); },
+    selectedId,
+    selected,
+    creating,
+    editing,
+    dirty,
+    form,
+    notice,
+    setNotice,
+    pendingDiscard,
+    dialogEditing,
+    setDialogEditing,
+    showForm,
+    reset,
+    guard,
+    openResource,
+    startNew,
+    closeEditor,
+    openDialogEditor,
+    closeDialogEditor,
+    patchForm,
+    resolveDiscard: (accept: boolean) => {
+      const action = pendingDiscard;
+      setPendingDiscard(null);
+      if (accept) action?.();
+    },
   };
 }

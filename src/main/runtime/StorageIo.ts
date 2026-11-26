@@ -7,7 +7,14 @@
 import * as fs from 'fs';
 import { parse as parseYamlDocument } from 'yaml';
 import { readValidatedSync, writeFileAtomicSync } from './atomicFile';
-import { assertNoUnsupportedSchemaVersion, CURRENT_STORE_SCHEMA_VERSION, parseStoredDocument, schemaValidationError, StorageSchemaError, type StorageMigration } from './storedDocument';
+import {
+  assertNoUnsupportedSchemaVersion,
+  CURRENT_STORE_SCHEMA_VERSION,
+  parseStoredDocument,
+  schemaValidationError,
+  StorageSchemaError,
+  type StorageMigration,
+} from './storedDocument';
 import type { ZodType } from 'zod';
 
 const DEEP_MERGE_FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
@@ -32,7 +39,7 @@ export class StorageIo {
   readJson<T>(filePath: string, validator?: StoredDocumentValidator<T>): T | null {
     return readValidatedSync(filePath, (raw) => {
       const parsed: unknown = JSON.parse(raw);
-      return validator ? validateDocument(parsed, filePath, validator) : parsed as T;
+      return validator ? validateDocument(parsed, filePath, validator) : (parsed as T);
     });
   }
 
@@ -59,9 +66,7 @@ export class StorageIo {
   }
 
   writeJsonlAtomic(filePath: string, items: unknown[]): void {
-    const content = items.length > 0
-      ? `${items.map((item) => JSON.stringify(item)).join('\n')}\n`
-      : '';
+    const content = items.length > 0 ? `${items.map((item) => JSON.stringify(item)).join('\n')}\n` : '';
     this.writeUtf8Atomic(filePath, content);
   }
 

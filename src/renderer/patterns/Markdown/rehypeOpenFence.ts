@@ -21,7 +21,9 @@ export function isFenceClosed(source: string): boolean {
 
 const languageClasses = (properties: Record<string, unknown> | undefined): string[] => {
   const className = properties?.className;
-  return Array.isArray(className) ? className.filter((name): name is string => typeof name === 'string' && name.startsWith('language-')) : [];
+  return Array.isArray(className)
+    ? className.filter((name): name is string => typeof name === 'string' && name.startsWith('language-'))
+    : [];
 };
 
 /**

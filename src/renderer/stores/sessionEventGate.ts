@@ -8,11 +8,7 @@ export function isActiveSessionEvent(sessionId: string | null | undefined): bool
 
 export function isActiveSessionScope(scope: SessionScope | null | undefined): boolean {
   const { currentProject, currentSessionId } = useProjectStore.getState();
-  return Boolean(
-    scope
-    && currentProject?.projectId === scope.projectId
-    && currentSessionId === scope.sessionId,
-  );
+  return Boolean(scope && currentProject?.projectId === scope.projectId && currentSessionId === scope.sessionId);
 }
 
 export function getActiveSessionId(): string | null {

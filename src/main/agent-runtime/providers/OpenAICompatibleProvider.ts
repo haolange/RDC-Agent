@@ -46,10 +46,10 @@ const PROVIDER_API = 'openai-compatible';
 function hasSemanticChoice(choice: ChatCompletionsChoice): boolean {
   const delta = choice.delta;
   return Boolean(
-    (typeof delta?.content === 'string' && delta.content.length > 0)
-    || (typeof delta?.reasoning === 'string' && delta.reasoning.length > 0)
-    || (typeof delta?.reasoning_content === 'string' && delta.reasoning_content.length > 0)
-    || (Array.isArray(delta?.tool_calls) && delta.tool_calls.length > 0),
+    (typeof delta?.content === 'string' && delta.content.length > 0) ||
+    (typeof delta?.reasoning === 'string' && delta.reasoning.length > 0) ||
+    (typeof delta?.reasoning_content === 'string' && delta.reasoning_content.length > 0) ||
+    (Array.isArray(delta?.tool_calls) && delta.tool_calls.length > 0),
   );
 }
 
@@ -126,11 +126,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
     this.requestAuthorizer = options.requestAuthorizer;
   }
 
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage> {
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
       const response = await this.send(model, context, options, run.signal);
       return consumeChatCompletionsStream(response, run, options, OPENAI_COMPATIBLE_DIALECT);
@@ -157,28 +153,25 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
     });
   }
 
-  private buildRequestBody(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): Record<string, unknown> {
+  private buildRequestBody(model: Model, context: Context, options: StreamOptions): Record<string, unknown> {
     const messages = toOpenAIMessages(context, options.requestPlan, options.promptCache);
     const body: Record<string, unknown> = {
       model: model.id,
       messages,
       stream: true,
     };
-    if (options.promptCache?.enabled
-      && options.promptCache.keyCarrier === 'prompt-cache-key'
-      && options.promptCache.requestKey) {
+    if (
+      options.promptCache?.enabled &&
+      options.promptCache.keyCarrier === 'prompt-cache-key' &&
+      options.promptCache.requestKey
+    ) {
       body.prompt_cache_key = options.promptCache.requestKey;
     }
-    if (options.promptCache?.enabled
-      && options.promptCache.breakpointCarrier === 'openai-prompt-cache'
-      && (
-        options.promptCache.breakpoint === 'explicit'
-        || options.promptCache.breakpoint === 'automatic-and-explicit'
-      )) {
+    if (
+      options.promptCache?.enabled &&
+      options.promptCache.breakpointCarrier === 'openai-prompt-cache' &&
+      (options.promptCache.breakpoint === 'explicit' || options.promptCache.breakpoint === 'automatic-and-explicit')
+    ) {
       body.prompt_cache_options = {
         mode: options.promptCache.breakpoint === 'explicit' ? 'explicit' : 'implicit',
         ...(options.promptCache.ttl === 'thirty-minutes' ? { ttl: '30m' } : {}),
@@ -220,23 +213,24 @@ function toOpenAIMessages(
 ): ChatCompletionsMessage[] {
   const out: ChatCompletionsMessage[] = [];
   const prompt = partitionSystemPrompt(context);
-  const explicitBreakpoint = promptCache?.enabled === true
-    && promptCache.breakpointCarrier === 'openai-prompt-cache'
-    && (
-      promptCache.breakpoint === 'explicit'
-      || promptCache.breakpoint === 'automatic-and-explicit'
-    );
+  const explicitBreakpoint =
+    promptCache?.enabled === true &&
+    promptCache.breakpointCarrier === 'openai-prompt-cache' &&
+    (promptCache.breakpoint === 'explicit' || promptCache.breakpoint === 'automatic-and-explicit');
   if (explicitBreakpoint) {
     if (!prompt.stableText) {
       throw new AppError(
-        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE', 'explicit OpenAI cache mode requires PromptPlan-owned stable segments.',
+        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE',
+        'explicit OpenAI cache mode requires PromptPlan-owned stable segments.',
       );
     }
-    const content: Array<Record<string, unknown>> = [{
-      type: 'text',
-      text: prompt.stableText,
-      prompt_cache_breakpoint: { mode: 'explicit' },
-    }];
+    const content: Array<Record<string, unknown>> = [
+      {
+        type: 'text',
+        text: prompt.stableText,
+        prompt_cache_breakpoint: { mode: 'explicit' },
+      },
+    ];
     if (prompt.volatileText) content.push({ type: 'text', text: prompt.volatileText });
     out.push({ role: 'system', content });
   } else if (prompt.combinedText) {

@@ -26,7 +26,11 @@ function ownerHasExited(owner: DirectoryFileLockOwner): boolean {
 }
 
 /** A birth the owner did not record is the type's empty "not recorded" marker; such an owner is judged by pid. */
-const DirectoryFileLockOwnerSchema: ZodType<DirectoryFileLockOwner> = z.object({ pid: z.number(), birth: z.string().catch(''), createdAt: z.number() });
+const DirectoryFileLockOwnerSchema: ZodType<DirectoryFileLockOwner> = z.object({
+  pid: z.number(),
+  birth: z.string().catch(''),
+  createdAt: z.number(),
+});
 
 /** The recorded owner, or null while the lock is not (yet) a complete owner record; such a lock stays held. */
 function parseLockOwner(raw: string): DirectoryFileLockOwner | null {
@@ -84,21 +88,28 @@ async function recoverStaleLock(lockPath: string): Promise<boolean> {
   // delayed contender can unlink the new owner's lock after another recovers it.
   const recoveryPath = `${lockPath}.recovery`;
   let recovery: FileHandle;
-  try { recovery = await fs.open(recoveryPath, 'wx'); }
-  catch (error) {
+  try {
+    recovery = await fs.open(recoveryPath, 'wx');
+  } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
     throw error;
   }
   try {
     const current = await readLockOwner(lockPath);
     if (!current || !ownerHasExited(current)) return false;
-    try { await fs.unlink(lockPath); return true; }
-    catch (error) {
+    try {
+      await fs.unlink(lockPath);
+      return true;
+    } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
       return false;
     }
   } finally {
-    try { await recovery.close(); } finally { await fs.unlink(recoveryPath); }
+    try {
+      await recovery.close();
+    } finally {
+      await fs.unlink(recoveryPath);
+    }
   }
 }
 
@@ -109,21 +120,28 @@ function recoverStaleLockSync(lockPath: string): boolean {
   }
   const recoveryPath = `${lockPath}.recovery`;
   let recovery: number;
-  try { recovery = openSync(recoveryPath, 'wx'); }
-  catch (error) {
+  try {
+    recovery = openSync(recoveryPath, 'wx');
+  } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
     throw error;
   }
   try {
     const current = readLockOwnerSync(lockPath);
     if (!current || !ownerHasExited(current)) return false;
-    try { unlinkSync(lockPath); return true; }
-    catch (error) {
+    try {
+      unlinkSync(lockPath);
+      return true;
+    } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
       return false;
     }
   } finally {
-    try { closeSync(recovery); } finally { unlinkSync(recoveryPath); }
+    try {
+      closeSync(recovery);
+    } finally {
+      unlinkSync(recoveryPath);
+    }
   }
 }
 

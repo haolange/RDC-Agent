@@ -43,19 +43,25 @@ const DEFAULT_BASE_URL = 'https://api.anthropic.com/v1';
 const DEFAULT_ANTHROPIC_VERSION = '2023-06-01';
 const PROVIDER_API = 'anthropic-messages';
 
-const AnthropicUsageSchema = z.object({
-  input_tokens: z.number().nullish(),
-  output_tokens: z.number().nullish(),
-  cache_read_input_tokens: z.number().nullish(),
-  cache_creation_input_tokens: z.number().nullish(),
-  speed: z.string().nullish(),
-}).passthrough();
+const AnthropicUsageSchema = z
+  .object({
+    input_tokens: z.number().nullish(),
+    output_tokens: z.number().nullish(),
+    cache_read_input_tokens: z.number().nullish(),
+    cache_creation_input_tokens: z.number().nullish(),
+    speed: z.string().nullish(),
+  })
+  .passthrough();
 
 const AnthropicContentBlockSchema = z.union([
   z.object({ type: z.literal('text'), text: z.string().optional() }).passthrough(),
-  z.object({ type: z.literal('thinking'), thinking: z.string().optional(), signature: z.string().optional() }).passthrough(),
+  z
+    .object({ type: z.literal('thinking'), thinking: z.string().optional(), signature: z.string().optional() })
+    .passthrough(),
   z.object({ type: z.literal('redacted_thinking'), data: z.string() }).passthrough(),
-  z.object({ type: z.literal('tool_use'), id: z.string(), name: z.string(), input: z.unknown().optional() }).passthrough(),
+  z
+    .object({ type: z.literal('tool_use'), id: z.string(), name: z.string(), input: z.unknown().optional() })
+    .passthrough(),
   unhandledProviderEvent(['text', 'thinking', 'redacted_thinking', 'tool_use']),
 ]);
 
@@ -69,21 +75,39 @@ const AnthropicDeltaSchema = z.union([
 
 /** One Messages stream event; event types this adapter does not handle (ping, ...) are ignored. */
 const AnthropicEventSchema = z.union([
-  z.object({
-    type: z.literal('message_start'),
-    message: z.object({ model: z.string().nullish(), id: z.string().nullish(), usage: AnthropicUsageSchema.nullish() }).passthrough(),
-  }).passthrough(),
-  z.object({ type: z.literal('content_block_start'), index: z.number(), content_block: AnthropicContentBlockSchema }).passthrough(),
+  z
+    .object({
+      type: z.literal('message_start'),
+      message: z
+        .object({ model: z.string().nullish(), id: z.string().nullish(), usage: AnthropicUsageSchema.nullish() })
+        .passthrough(),
+    })
+    .passthrough(),
+  z
+    .object({ type: z.literal('content_block_start'), index: z.number(), content_block: AnthropicContentBlockSchema })
+    .passthrough(),
   z.object({ type: z.literal('content_block_delta'), index: z.number(), delta: AnthropicDeltaSchema }).passthrough(),
   z.object({ type: z.literal('content_block_stop'), index: z.number() }).passthrough(),
-  z.object({
-    type: z.literal('message_delta'),
-    delta: z.object({ stop_reason: z.string().nullish() }).passthrough(),
-    usage: AnthropicUsageSchema.nullish(),
-  }).passthrough(),
+  z
+    .object({
+      type: z.literal('message_delta'),
+      delta: z.object({ stop_reason: z.string().nullish() }).passthrough(),
+      usage: AnthropicUsageSchema.nullish(),
+    })
+    .passthrough(),
   z.object({ type: z.literal('message_stop') }).passthrough(),
-  z.object({ type: z.literal('error'), error: z.object({ type: z.string(), message: z.string() }).passthrough() }).passthrough(),
-  unhandledProviderEvent(['message_start', 'content_block_start', 'content_block_delta', 'content_block_stop', 'message_delta', 'message_stop', 'error']),
+  z
+    .object({ type: z.literal('error'), error: z.object({ type: z.string(), message: z.string() }).passthrough() })
+    .passthrough(),
+  unhandledProviderEvent([
+    'message_start',
+    'content_block_start',
+    'content_block_delta',
+    'content_block_stop',
+    'message_delta',
+    'message_stop',
+    'error',
+  ]),
 ]);
 type AnthropicEvent = z.infer<typeof AnthropicEventSchema>;
 type AnthropicUsage = z.infer<typeof AnthropicUsageSchema>;
@@ -106,7 +130,8 @@ interface AnthropicUsageTotals {
 const ANTHROPIC_USAGE_FIELDS: UsageFieldMap<AnthropicUsageTotals> = {
   // Anthropic 的 input_tokens 不含 prompt cache 命中/写入部分；
   // agent-runtime Usage.inputTokens 归一为完整 prompt 占用（与 OpenAI prompt_tokens 口径一致）。
-  inputTokens: (usage) => (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+  inputTokens: (usage) =>
+    (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
   outputTokens: (usage) => usage.output_tokens,
   cacheReadTokens: (usage) => usage.cache_read_input_tokens,
   cacheWriteTokens: (usage) => usage.cache_creation_input_tokens,
@@ -120,7 +145,7 @@ function mergeAnthropicUsage(
   source: 'message_start' | 'message_delta',
 ): AnthropicUsageTotals {
   return {
-    input_tokens: source === 'message_start' ? reported?.input_tokens ?? totals.input_tokens : totals.input_tokens,
+    input_tokens: source === 'message_start' ? (reported?.input_tokens ?? totals.input_tokens) : totals.input_tokens,
     output_tokens: reported?.output_tokens ?? totals.output_tokens,
     cache_read_input_tokens: reported?.cache_read_input_tokens ?? totals.cache_read_input_tokens,
     cache_creation_input_tokens: reported?.cache_creation_input_tokens ?? totals.cache_creation_input_tokens,
@@ -152,11 +177,7 @@ export class AnthropicProvider implements ProviderStrategy {
     this.surface = options.surface ?? 'anthropic';
   }
 
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage> {
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
       const response = await this.send(model, context, options, run.signal);
       return consumeAnthropicStream(response, run, options);
@@ -175,10 +196,7 @@ export class AnthropicProvider implements ProviderStrategy {
       body.anthropic_version = 'vertex-2023-10-16';
     }
     const url = buildAnthropicMessagesUrl(baseUrl, model.id, this.surface);
-    const plannedHeaders = mergeAnthropicRequestHeaders(
-      this.defaultHeaders,
-      requestPlanHeaders(options.requestPlan),
-    );
+    const plannedHeaders = mergeAnthropicRequestHeaders(this.defaultHeaders, requestPlanHeaders(options.requestPlan));
     return sendProviderRequest(PROVIDER_API, options.requestPlan, signal, {
       url,
       headers: {
@@ -192,17 +210,8 @@ export class AnthropicProvider implements ProviderStrategy {
     });
   }
 
-  private buildRequestBody(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): Record<string, unknown> {
-    const { system, messages } = toAnthropicMessages(
-      context,
-      options.requestPlan,
-      options.promptCache,
-      this.surface,
-    );
+  private buildRequestBody(model: Model, context: Context, options: StreamOptions): Record<string, unknown> {
+    const { system, messages } = toAnthropicMessages(context, options.requestPlan, options.promptCache, this.surface);
     const body: Record<string, unknown> = {
       model: model.id,
       messages,
@@ -210,13 +219,12 @@ export class AnthropicProvider implements ProviderStrategy {
       max_tokens: options.maxTokens ?? model.maxTokens,
     };
     if (system) body.system = system;
-    if (this.surface === 'anthropic'
-      && options.promptCache?.enabled
-      && options.promptCache.breakpointCarrier === 'anthropic-cache-control'
-      && (
-        options.promptCache.breakpoint === 'automatic'
-        || options.promptCache.breakpoint === 'automatic-and-explicit'
-      )) {
+    if (
+      this.surface === 'anthropic' &&
+      options.promptCache?.enabled &&
+      options.promptCache.breakpointCarrier === 'anthropic-cache-control' &&
+      (options.promptCache.breakpoint === 'automatic' || options.promptCache.breakpoint === 'automatic-and-explicit')
+    ) {
       body.cache_control = anthropicCacheControl(options.promptCache.ttl);
     }
     if (typeof options.temperature === 'number') body.temperature = options.temperature;
@@ -239,9 +247,7 @@ export function buildAnthropicMessagesUrl(
     return `${trimmed}/models/${encodeURIComponent(modelId)}:streamRawPredict`;
   }
   if (trimmed.endsWith('/messages')) return trimmed;
-  return /\/v\d+(?:\/|$)/u.test(new URL(trimmed).pathname)
-    ? `${trimmed}/messages`
-    : `${trimmed}/v1/messages`;
+  return /\/v\d+(?:\/|$)/u.test(new URL(trimmed).pathname) ? `${trimmed}/messages` : `${trimmed}/v1/messages`;
 }
 
 /** Reads a Messages stream: content blocks are addressed by index, and message_stop is the terminal signal. */
@@ -271,7 +277,10 @@ class AnthropicStreamState {
   private readonly thinkingSource: ThinkingArtifactSource;
   private readonly redactedThinkingSource: ThinkingArtifactSource;
 
-  constructor(private readonly builder: AssistantStreamBuilder, options: StreamOptions) {
+  constructor(
+    private readonly builder: AssistantStreamBuilder,
+    options: StreamOptions,
+  ) {
     this.requestPlan = options.requestPlan;
     this.thinkingKind = resolveAnthropicThinkingKind(options.reasoningVisibility);
     this.thinkingVisibility = resolveAnthropicThinkingVisibility(options.reasoningVisibility);
@@ -331,7 +340,10 @@ class AnthropicStreamState {
     };
   }
 
-  private startBlock(index: number, block: Extract<AnthropicEvent, { type: 'content_block_start' }>['content_block']): void {
+  private startBlock(
+    index: number,
+    block: Extract<AnthropicEvent, { type: 'content_block_start' }>['content_block'],
+  ): void {
     const blockRef = this.refFor(index);
     if (block.type === 'text') {
       this.builder.startText(blockRef);
@@ -364,7 +376,11 @@ class AnthropicStreamState {
       this.sawOutput = true;
       this.builder.startToolCall(blockRef, block.id, block.name);
       this.blockKinds.set(index, 'tool_call');
-      if (block.input && typeof block.input === 'object' && Object.keys(block.input as Record<string, unknown>).length > 0) {
+      if (
+        block.input &&
+        typeof block.input === 'object' &&
+        Object.keys(block.input as Record<string, unknown>).length > 0
+      ) {
         this.builder.appendToolCallArgs(blockRef, JSON.stringify(block.input));
       }
     }
@@ -376,9 +392,13 @@ class AnthropicStreamState {
       this.builder.appendText(this.refFor(index), delta.text);
     } else if (delta.type === 'thinking_delta') {
       this.sawOutput = true;
-      this.builder.appendThinking(this.refFor(index), delta.thinking, this.thinkingInput(
-        this.thinkingArtifactsByIndex.get(index) ?? createAnthropicThinkingArtifact(this.requestPlan),
-      ));
+      this.builder.appendThinking(
+        this.refFor(index),
+        delta.thinking,
+        this.thinkingInput(
+          this.thinkingArtifactsByIndex.get(index) ?? createAnthropicThinkingArtifact(this.requestPlan),
+        ),
+      );
     } else if (delta.type === 'signature_delta') {
       const artifact = mergeAnthropicSignature(
         this.requestPlan,
@@ -467,28 +487,30 @@ function toAnthropicMessages(
   }
 
   const prompt = partitionSystemPrompt(context);
-  const explicitBreakpoint = promptCache?.enabled === true
-    && promptCache.breakpointCarrier === 'anthropic-cache-control'
-    && (
-      promptCache.breakpoint === 'explicit'
-      || promptCache.breakpoint === 'automatic-and-explicit'
-    );
+  const explicitBreakpoint =
+    promptCache?.enabled === true &&
+    promptCache.breakpointCarrier === 'anthropic-cache-control' &&
+    (promptCache.breakpoint === 'explicit' || promptCache.breakpoint === 'automatic-and-explicit');
   if (explicitBreakpoint && surface !== 'anthropic') {
     throw new AppError(
-      'PROMPT_CACHE_SURFACE_UNSUPPORTED', 'explicit Anthropic cache blocks are not enabled for this surface manifest.',
+      'PROMPT_CACHE_SURFACE_UNSUPPORTED',
+      'explicit Anthropic cache blocks are not enabled for this surface manifest.',
     );
   }
   if (explicitBreakpoint) {
     if (!prompt.stableText) {
       throw new AppError(
-        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE', 'explicit Anthropic cache mode requires PromptPlan-owned stable segments.',
+        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE',
+        'explicit Anthropic cache mode requires PromptPlan-owned stable segments.',
       );
     }
-    const system: AnthropicSystemBlock[] = [{
-      type: 'text',
-      text: prompt.stableText,
-      cache_control: anthropicCacheControl(promptCache.ttl),
-    }];
+    const system: AnthropicSystemBlock[] = [
+      {
+        type: 'text',
+        text: prompt.stableText,
+        cache_control: anthropicCacheControl(promptCache.ttl),
+      },
+    ];
     if (prompt.volatileText) system.push({ type: 'text', text: prompt.volatileText });
     return { system, messages };
   }
@@ -610,9 +632,10 @@ function toAnthropicThinkingReplayBlock(
   return { type: 'thinking', thinking: text, signature: artifact.signature };
 }
 
-function anthropicCacheControl(
-  ttl: NonNullable<StreamOptions['promptCache']>['ttl'],
-): { type: 'ephemeral'; ttl: '5m' | '1h' } {
+function anthropicCacheControl(ttl: NonNullable<StreamOptions['promptCache']>['ttl']): {
+  type: 'ephemeral';
+  ttl: '5m' | '1h';
+} {
   return { type: 'ephemeral', ttl: ttl === 'one-hour' ? '1h' : '5m' };
 }
 
@@ -650,7 +673,10 @@ function mergeAnthropicRequestHeaders(
   for (const headers of [defaultHeaders, planHeaders]) {
     for (const [name, value] of Object.entries(headers)) {
       if (name.toLowerCase() !== 'anthropic-beta') continue;
-      for (const beta of value.split(',').map((entry) => entry.trim()).filter(Boolean)) {
+      for (const beta of value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)) {
         if (!betaValues.includes(beta)) betaValues.push(beta);
       }
     }

@@ -4,11 +4,7 @@ import { useDynStyle } from '../../../lib/useDynStyle';
 import { Button } from '../../../ui/Button';
 import { EmptyState } from '../../../ui/EmptyState';
 import { Skeleton } from '../../../ui/Skeleton';
-import {
-  formatRaw,
-  formatTimestamp,
-  formatShortId,
-} from './terminalFormatters';
+import { formatRaw, formatTimestamp, formatShortId } from './terminalFormatters';
 import {
   TERMINAL_ENTRY_ESTIMATE,
   TERMINAL_WINDOW_OVERSCAN,
@@ -98,18 +94,15 @@ export const TerminalActivityPane: React.FC<TerminalActivityPaneProps> = ({ vm }
   const windowed = filteredEntries.length > TERMINAL_WINDOW_THRESHOLD;
   const visible = windowed ? filteredEntries.slice(range.start, range.end) : filteredEntries;
   const leading = windowed ? range.start * TERMINAL_ENTRY_ESTIMATE : 0;
-  const trailing = windowed
-    ? Math.max(0, (filteredEntries.length - range.end) * TERMINAL_ENTRY_ESTIMATE)
-    : 0;
+  const trailing = windowed ? Math.max(0, (filteredEntries.length - range.end) * TERMINAL_ENTRY_ESTIMATE) : 0;
 
   return (
-    <div
-      className="runtime-terminal-activity-pane"
-      data-testid="runtime-terminal-activity-pane"
-    >
+    <div className="runtime-terminal-activity-pane" data-testid="runtime-terminal-activity-pane">
       <div ref={activityBodyRef} className="runtime-terminal-activity-body scrollbar-thin">
         {isLoading ? (
-          <div role="status" aria-label={t('terminal.loading')}><Skeleton shape="row" count={6} /></div>
+          <div role="status" aria-label={t('terminal.loading')}>
+            <Skeleton shape="row" count={6} />
+          </div>
         ) : filteredEntries.length === 0 ? (
           <EmptyState variant="page" title={emptyCopy} />
         ) : (
@@ -141,51 +134,50 @@ interface TerminalLogEntryProps {
   copyLabel: string;
 }
 
-const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({
-  entry,
-  isExpanded,
-  onToggle,
-  onCopy,
-  copyLabel,
-}) => {
+const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({ entry, isExpanded, onToggle, onCopy, copyLabel }) => {
   const { t } = useI18n();
   return (
-  <article
-    className={`runtime-terminal-entry severity-${entry.severity} ${isExpanded ? 'expanded' : ''}`}
-    data-testid={`runtime-log-entry-${entry.id}`}
-  >
-    <button
-      type="button"
-      className="runtime-terminal-entry-main"
-      onClick={onToggle}
-      aria-expanded={isExpanded}
+    <article
+      className={`runtime-terminal-entry severity-${entry.severity} ${isExpanded ? 'expanded' : ''}`}
+      data-testid={`runtime-log-entry-${entry.id}`}
     >
-      <span className={`runtime-terminal-severity-dot severity-${entry.severity}`} role="img"
-        aria-label={t(SEVERITY_LABEL_KEYS[entry.severity])} data-tooltip={t(SEVERITY_LABEL_KEYS[entry.severity])} />
-      <span className="runtime-terminal-entry-time">{formatTimestamp(entry.timestamp)}</span>
-      <span className="runtime-terminal-entry-title">{entry.title}</span>
-      <span className="runtime-terminal-entry-summary">{entry.summary}</span>
-    </button>
+      <button type="button" className="runtime-terminal-entry-main" onClick={onToggle} aria-expanded={isExpanded}>
+        <span
+          className={`runtime-terminal-severity-dot severity-${entry.severity}`}
+          role="img"
+          aria-label={t(SEVERITY_LABEL_KEYS[entry.severity])}
+          data-tooltip={t(SEVERITY_LABEL_KEYS[entry.severity])}
+        />
+        <span className="runtime-terminal-entry-time">{formatTimestamp(entry.timestamp)}</span>
+        <span className="runtime-terminal-entry-title">{entry.title}</span>
+        <span className="runtime-terminal-entry-summary">{entry.summary}</span>
+      </button>
 
-    {isExpanded && (
-      <div className="runtime-terminal-entry-details">
-        {entry.detail && (
-          <div className="runtime-terminal-entry-detail">{entry.detail}</div>
-        )}
-        <div className="runtime-terminal-entry-meta">
-          <span>{t('terminal.namespace')} {t(NAMESPACE_LABEL_KEYS[entry.namespace])}</span>
-          <span>{t('terminal.metaSession')} {formatShortId(entry.sessionId)}</span>
-          <span>{t('terminal.metaRun')} {formatShortId(entry.runId)}</span>
-          <span>{t('terminal.metaProject')} {formatShortId(entry.projectId)}</span>
+      {isExpanded && (
+        <div className="runtime-terminal-entry-details">
+          {entry.detail && <div className="runtime-terminal-entry-detail">{entry.detail}</div>}
+          <div className="runtime-terminal-entry-meta">
+            <span>
+              {t('terminal.namespace')} {t(NAMESPACE_LABEL_KEYS[entry.namespace])}
+            </span>
+            <span>
+              {t('terminal.metaSession')} {formatShortId(entry.sessionId)}
+            </span>
+            <span>
+              {t('terminal.metaRun')} {formatShortId(entry.runId)}
+            </span>
+            <span>
+              {t('terminal.metaProject')} {formatShortId(entry.projectId)}
+            </span>
+          </div>
+          {entry.raw != null && <pre className="runtime-terminal-entry-raw">{formatRaw(entry.raw)}</pre>}
+          <div className="runtime-terminal-entry-actions">
+            <Button variant="ghost" size="sm" onClick={onCopy}>
+              {copyLabel}
+            </Button>
+          </div>
         </div>
-        {entry.raw != null && (
-          <pre className="runtime-terminal-entry-raw">{formatRaw(entry.raw)}</pre>
-        )}
-        <div className="runtime-terminal-entry-actions">
-          <Button variant="ghost" size="sm" onClick={onCopy}>{copyLabel}</Button>
-        </div>
-      </div>
-    )}
-  </article>
+      )}
+    </article>
   );
 };

@@ -35,7 +35,11 @@ export function isVendorSecretUsable(providerId: string, secret: string): boolea
   return !primaryField?.valuePrefix || normalized.startsWith(primaryField.valuePrefix.toLowerCase());
 }
 
-export function getResolvedProviderSecret(providerId: string, secretRef: string | undefined, workspaceRoot: string): string {
+export function getResolvedProviderSecret(
+  providerId: string,
+  secretRef: string | undefined,
+  workspaceRoot: string,
+): string {
   const secret = secretStorageService.getSecret(secretRef, workspaceRoot).trim();
   return isVendorSecretUsable(providerId, secret) ? secret : '';
 }
@@ -59,9 +63,8 @@ function readOAuthBundle(raw: string): Record<string, unknown> | null {
   return parsed.success ? parsed.data : null;
 }
 
-const bundleText = (value: unknown): string | undefined => (
-  typeof value === 'string' && value.trim() ? value.trim() : undefined
-);
+const bundleText = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() ? value.trim() : undefined;
 
 /** The upstream account id an OAuth bundle names; undefined when the payload is not a bundle or names none. */
 export function extractOAuthBundleAccountId(raw: string): string | undefined {
@@ -73,9 +76,7 @@ export function getProviderAccountSecretRef(
   accountId: string | undefined,
   kind: 'api-key' | 'oauth',
 ): string | undefined {
-  return accountId
-    ? secretStorageService.createProviderAccountSecretRef(providerId, accountId, kind)
-    : undefined;
+  return accountId ? secretStorageService.createProviderAccountSecretRef(providerId, accountId, kind) : undefined;
 }
 
 export function sanitizeAuthAccountIds(
@@ -100,9 +101,11 @@ export function resolveSelectedAuthAvailability(
   mode: LlmProviderAuthMode,
   fallback: LlmProviderEntry,
 ): LlmProviderAvailability {
-  return getProviderAuthModeAvailability(providerId)[mode]
-    ?? fallback.authModeAvailability?.[mode]
-    ?? fallback.providerAvailability;
+  return (
+    getProviderAuthModeAvailability(providerId)[mode] ??
+    fallback.authModeAvailability?.[mode] ??
+    fallback.providerAvailability
+  );
 }
 
 export function resolveAccountRuntimeCredential(
@@ -145,16 +148,24 @@ export function sanitizeModels(models: unknown): LlmProviderModel[] {
     if (!modelId || modelMap.has(modelId)) {
       continue;
     }
-    const availability = candidate.availability === 'available'
-      || candidate.availability === 'unavailable'
-      || candidate.availability === 'unknown'
-      ? candidate.availability
-      : undefined;
+    const availability =
+      candidate.availability === 'available' ||
+      candidate.availability === 'unavailable' ||
+      candidate.availability === 'unknown'
+        ? candidate.availability
+        : undefined;
 
     const aliases = Array.isArray(candidate.aliases)
-      ? [...new Set(candidate.aliases.filter((value): value is string => (
-          typeof value === 'string' && Boolean(value.trim()) && value.trim() !== modelId
-        )).map((value) => value.trim()))]
+      ? [
+          ...new Set(
+            candidate.aliases
+              .filter(
+                (value): value is string =>
+                  typeof value === 'string' && Boolean(value.trim()) && value.trim() !== modelId,
+              )
+              .map((value) => value.trim()),
+          ),
+        ]
       : [];
     modelMap.set(modelId, {
       id: modelId,
@@ -163,20 +174,22 @@ export function sanitizeModels(models: unknown): LlmProviderModel[] {
       defaultReasoningSelection: isReasoningSelection(candidate.defaultReasoningSelection)
         ? candidate.defaultReasoningSelection
         : undefined,
-      defaultBudgetTokens: typeof candidate.defaultBudgetTokens === 'number'
-        && Number.isSafeInteger(candidate.defaultBudgetTokens)
-        && candidate.defaultBudgetTokens > 0
-        ? candidate.defaultBudgetTokens
-        : undefined,
-      preferredRouteOptionId: typeof candidate.preferredRouteOptionId === 'string'
-        && candidate.preferredRouteOptionId.trim()
-        ? candidate.preferredRouteOptionId.trim()
-        : undefined,
+      defaultBudgetTokens:
+        typeof candidate.defaultBudgetTokens === 'number' &&
+        Number.isSafeInteger(candidate.defaultBudgetTokens) &&
+        candidate.defaultBudgetTokens > 0
+          ? candidate.defaultBudgetTokens
+          : undefined,
+      preferredRouteOptionId:
+        typeof candidate.preferredRouteOptionId === 'string' && candidate.preferredRouteOptionId.trim()
+          ? candidate.preferredRouteOptionId.trim()
+          : undefined,
       ...(aliases.length > 0 ? { aliases } : {}),
       availability,
-      availabilityReason: typeof candidate.availabilityReason === 'string' && candidate.availabilityReason.trim()
-        ? candidate.availabilityReason.trim()
-        : undefined,
+      availabilityReason:
+        typeof candidate.availabilityReason === 'string' && candidate.availabilityReason.trim()
+          ? candidate.availabilityReason.trim()
+          : undefined,
     });
   }
 
@@ -197,7 +210,7 @@ export function applyModelEnabledState(
       defaultReasoningSelection: persisted?.defaultReasoningSelection,
       defaultBudgetTokens: persisted?.defaultBudgetTokens,
       preferredRouteOptionId: persisted?.preferredRouteOptionId,
-      availability: manifestDenied ? 'unavailable' : persisted?.availability ?? model.availability,
+      availability: manifestDenied ? 'unavailable' : (persisted?.availability ?? model.availability),
       availabilityReason: manifestDenied ? model.availabilityReason : persisted?.availabilityReason,
     };
   });
@@ -218,15 +231,16 @@ export function applyModelPreferences(
       defaultReasoningSelection: isReasoningSelection(preference.defaultReasoningSelection)
         ? preference.defaultReasoningSelection
         : undefined,
-      defaultBudgetTokens: typeof preference.defaultBudgetTokens === 'number'
-        && Number.isSafeInteger(preference.defaultBudgetTokens)
-        && preference.defaultBudgetTokens > 0
-        ? preference.defaultBudgetTokens
-        : undefined,
-      preferredRouteOptionId: typeof preference.preferredRouteOptionId === 'string'
-        && preference.preferredRouteOptionId.trim()
-        ? preference.preferredRouteOptionId.trim()
-        : undefined,
+      defaultBudgetTokens:
+        typeof preference.defaultBudgetTokens === 'number' &&
+        Number.isSafeInteger(preference.defaultBudgetTokens) &&
+        preference.defaultBudgetTokens > 0
+          ? preference.defaultBudgetTokens
+          : undefined,
+      preferredRouteOptionId:
+        typeof preference.preferredRouteOptionId === 'string' && preference.preferredRouteOptionId.trim()
+          ? preference.preferredRouteOptionId.trim()
+          : undefined,
     };
   });
 }
@@ -238,12 +252,16 @@ export function resolveProviderModels(providerId: string, persistedModels: unkno
   const catalogMetadata = getProviderCatalogModelSummaries(providerId);
   const metadataById = new Map(catalogMetadata.map((metadata) => [metadata.modelId, metadata]));
   const catalogModels = getProviderModelSummaries(providerId);
-  const catalogKeys = new Set(catalogMetadata.flatMap((metadata) => (
-    [metadata.modelId, ...metadata.aliases].map(normalizeDiscoveredModelMatchKey).filter(Boolean)
-  )));
-  const observedKeys = new Set(sanitized.flatMap((model) => (
-    [model.id, ...(model.aliases ?? [])].map(normalizeDiscoveredModelMatchKey).filter(Boolean)
-  )));
+  const catalogKeys = new Set(
+    catalogMetadata.flatMap((metadata) =>
+      [metadata.modelId, ...metadata.aliases].map(normalizeDiscoveredModelMatchKey).filter(Boolean),
+    ),
+  );
+  const observedKeys = new Set(
+    sanitized.flatMap((model) =>
+      [model.id, ...(model.aliases ?? [])].map(normalizeDiscoveredModelMatchKey).filter(Boolean),
+    ),
+  );
   const visibleCatalogModels = catalogModels.filter((model) => {
     const metadata = metadataById.get(model.id);
     if (!metadata || metadata.presencePolicy === 'maintained') return true;
@@ -251,9 +269,8 @@ export function resolveProviderModels(providerId: string, persistedModels: unkno
       .map(normalizeDiscoveredModelMatchKey)
       .some((key) => observedKeys.has(key));
   });
-  const dynamicAllowed = ownership !== 'app-managed'
-    && authority !== 'candidate-validation'
-    && authority !== 'entitlement-overlay';
+  const dynamicAllowed =
+    ownership !== 'app-managed' && authority !== 'candidate-validation' && authority !== 'entitlement-overlay';
   const dynamicModels = dynamicAllowed
     ? sanitized.filter((model) => {
         if (!isAdmittedDiscoveredModel({ id: model.id })) return false;
@@ -262,10 +279,7 @@ export function resolveProviderModels(providerId: string, persistedModels: unkno
           .some((key) => catalogKeys.has(key));
       })
     : [];
-  return [
-    ...applyModelEnabledState(visibleCatalogModels, sanitized),
-    ...dynamicModels,
-  ];
+  return [...applyModelEnabledState(visibleCatalogModels, sanitized), ...dynamicModels];
 }
 
 export function createEmptyAgentRoutes(): LlmAgentRoute[] {
@@ -300,8 +314,10 @@ export function cloneConnectionSchema(
     ? {
         ...schema,
         fields: schema.fields.map((field) => ({ ...field })),
-        credentialAlternatives: schema.credentialAlternatives
-          ?.map((alternative) => ({ ...alternative, fieldIds: [...alternative.fieldIds] })),
+        credentialAlternatives: schema.credentialAlternatives?.map((alternative) => ({
+          ...alternative,
+          fieldIds: [...alternative.fieldIds],
+        })),
         headerMappings: schema.headerMappings?.map((mapping) => ({ ...mapping })),
       }
     : undefined;
@@ -334,9 +350,7 @@ export function isConnectionSchemaSatisfied(
   }
   const isPresent = (fieldId: string): boolean => {
     const field = schema.fields.find((candidate) => candidate.id === fieldId);
-    return field?.kind === 'secret'
-      ? secretPresence[fieldId] === true
-      : Boolean(connectionValues[fieldId]?.trim());
+    return field?.kind === 'secret' ? secretPresence[fieldId] === true : Boolean(connectionValues[fieldId]?.trim());
   };
   const alternativeFieldIds = new Set(
     schema.credentialAlternatives?.flatMap((alternative) => alternative.fieldIds) ?? [],
@@ -347,19 +361,17 @@ export function isConnectionSchemaSatisfied(
   if (!requiredFieldsPresent) {
     return false;
   }
-  return !schema.credentialAlternatives?.length
-    || schema.credentialAlternatives.some((alternative) => (
-      alternative.ambient === true
-      || (alternative.fieldIds.length > 0 && alternative.fieldIds.every(isPresent))
-    ));
+  return (
+    !schema.credentialAlternatives?.length ||
+    schema.credentialAlternatives.some(
+      (alternative) =>
+        alternative.ambient === true || (alternative.fieldIds.length > 0 && alternative.fieldIds.every(isPresent)),
+    )
+  );
 }
 
-export function normalizeManifestRoutes(
-  routes: unknown,
-): LlmAgentRoute[] {
-  const routeMap = new Map<string, LlmAgentRoute>(
-    createEmptyAgentRoutes().map((route) => [route.agentId, route]),
-  );
+export function normalizeManifestRoutes(routes: unknown): LlmAgentRoute[] {
+  const routeMap = new Map<string, LlmAgentRoute>(createEmptyAgentRoutes().map((route) => [route.agentId, route]));
   for (const route of Array.isArray(routes) ? routes.map(sanitizeRoute) : []) {
     if (!route) {
       continue;

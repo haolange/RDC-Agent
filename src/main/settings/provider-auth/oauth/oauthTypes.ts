@@ -1,9 +1,5 @@
 import { z, type ZodType } from 'zod';
-import type {
-  LlmProviderAccountDiagnostic,
-  LlmProviderAccountLoginMode,
-  LlmProviderId,
-} from '@shared/types/settings';
+import type { LlmProviderAccountDiagnostic, LlmProviderAccountLoginMode, LlmProviderId } from '@shared/types/settings';
 
 export interface OAuthFlowState {
   providerId: LlmProviderId;

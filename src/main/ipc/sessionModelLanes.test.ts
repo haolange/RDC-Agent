@@ -24,8 +24,12 @@ describe('session model lanes', () => {
   });
 
   it('accepts only requests that set a field, with a positive safe-integer revision', () => {
-    expect(SessionSetModelOverrideArgsSchema.safeParse(['s', { turnControls: controls, clientRevision: 1 }]).success).toBe(true);
+    expect(
+      SessionSetModelOverrideArgsSchema.safeParse(['s', { turnControls: controls, clientRevision: 1 }]).success,
+    ).toBe(true);
     expect(SessionSetModelOverrideArgsSchema.safeParse(['s', { clientRevision: 1 }]).success).toBe(false);
-    expect(SessionSetModelOverrideArgsSchema.safeParse(['s', { modelOverride: null, clientRevision: 0 }]).success).toBe(false);
+    expect(SessionSetModelOverrideArgsSchema.safeParse(['s', { modelOverride: null, clientRevision: 0 }]).success).toBe(
+      false,
+    );
   });
 });

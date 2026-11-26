@@ -2,14 +2,7 @@ import type { CompiledPromptCache, PromptStablePrefix } from './semanticContext'
 
 export type ResourceScope = 'builtin' | 'user' | 'project';
 
-export type ScopedResourceKind =
-  | 'agent'
-  | 'skill'
-  | 'mcp'
-  | 'hook'
-  | 'policy'
-  | 'knowledge'
-  | 'memory';
+export type ScopedResourceKind = 'agent' | 'skill' | 'mcp' | 'hook' | 'policy' | 'knowledge' | 'memory';
 
 export type EffectiveResourceStatus = 'effective' | 'inherited' | 'overridden' | 'disabled' | 'invalid';
 
@@ -53,7 +46,7 @@ export const CANONICAL_HOOK_EVENTS = [
   'permission.denied',
 ] as const;
 
-export type HookEvent = typeof CANONICAL_HOOK_EVENTS[number];
+export type HookEvent = (typeof CANONICAL_HOOK_EVENTS)[number];
 
 type PromptSegmentKind =
   | 'core-contract'

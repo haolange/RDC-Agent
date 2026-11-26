@@ -124,9 +124,7 @@ export function matchSettingsSearchEntries(
   const normalized = query.trim().toLowerCase();
   if (!normalized) return [];
   return SETTINGS_SEARCH_INDEX.filter((entry) => {
-    const haystack = [titleOf(entry.titleKey), entry.section, ...entry.keywords]
-      .join(' ')
-      .toLowerCase();
+    const haystack = [titleOf(entry.titleKey), entry.section, ...entry.keywords].join(' ').toLowerCase();
     return haystack.includes(normalized);
   });
 }

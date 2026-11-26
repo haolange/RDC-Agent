@@ -5,7 +5,8 @@ export function countWorkActions(rows: readonly WorkProcessRow[]): number {
   return rows.reduce((total, row) => {
     if (row.type === 'section') return total + countWorkActions(row.visibleSteps);
     if (row.type === 'tool') return total + (row.imageCalls?.length ?? 1);
-    if (row.type === 'thinking' || row.type === 'output' || row.type === 'summary' || row.type === 'diagnostic') return total;
+    if (row.type === 'thinking' || row.type === 'output' || row.type === 'summary' || row.type === 'diagnostic')
+      return total;
     return total + 1;
   }, 0);
 }
@@ -19,7 +20,8 @@ export function countFailedActions(rows: readonly WorkProcessRow[]): number {
     if (row.type === 'section') return total + countFailedActions(row.visibleSteps);
     if (row.type === 'tool') return total + (row.imageCalls ?? [row]).filter((call) => call.status === 'error').length;
     if (row.type === 'webGroup') return total + row.members.filter((member) => member.status === 'error').length;
-    if (row.type === 'subagent' || row.type === 'userInput' || row.type === 'planReview') return total + (row.status === 'error' ? 1 : 0);
+    if (row.type === 'subagent' || row.type === 'userInput' || row.type === 'planReview')
+      return total + (row.status === 'error' ? 1 : 0);
     return total;
   }, 0);
 }

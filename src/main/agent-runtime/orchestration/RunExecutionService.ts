@@ -16,10 +16,7 @@ interface ActiveRunController extends ActiveRunSnapshot {
 export class RunExecutionService {
   private activeRuns = new Map<string, ActiveRunController>();
 
-  startRun(
-    context: RunExecutionContext,
-    executor: (signal: AbortSignal) => Promise<unknown>,
-  ): ActiveRunSnapshot {
+  startRun(context: RunExecutionContext, executor: (signal: AbortSignal) => Promise<unknown>): ActiveRunSnapshot {
     const existing = this.activeRuns.get(context.runId);
     if (existing) {
       return existing;
@@ -72,9 +69,7 @@ export class RunExecutionService {
   async stopAll(): Promise<void> {
     const runIds = Array.from(this.activeRuns.keys());
     runIds.forEach((runId) => this.stopRun(runId));
-    await Promise.allSettled(
-      runIds.map((runId) => this.activeRuns.get(runId)?.promise),
-    );
+    await Promise.allSettled(runIds.map((runId) => this.activeRuns.get(runId)?.promise));
   }
 }
 

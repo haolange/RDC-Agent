@@ -73,10 +73,7 @@ export class TokenizerService {
    * 计算多条消息的总 token 数（含消息格式开销）。
    * 覆盖 text / image / toolCall / thinking(continuation) 四类内容块。
    */
-  countMessagesTokens(
-    messages: Array<{ role: string; content?: unknown }>,
-    modelId?: string,
-  ): number {
+  countMessagesTokens(messages: Array<{ role: string; content?: unknown }>, modelId?: string): number {
     let total = 0;
     for (const msg of messages) {
       // 每条消息约 4 token 的格式开销

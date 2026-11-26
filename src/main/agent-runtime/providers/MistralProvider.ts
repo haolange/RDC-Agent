@@ -95,11 +95,7 @@ export class MistralProvider implements ProviderStrategy {
     this.defaultHeaders = { ...(options.headers ?? {}) };
   }
 
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage> {
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
       const response = await this.send(model, context, options, run.signal);
       return consumeChatCompletionsStream(response, run, options, MISTRAL_DIALECT);
@@ -126,11 +122,7 @@ export class MistralProvider implements ProviderStrategy {
     });
   }
 
-  private buildRequestBody(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): Record<string, unknown> {
+  private buildRequestBody(model: Model, context: Context, options: StreamOptions): Record<string, unknown> {
     const messages = toMistralMessages(context, options.requestPlan);
     const body: Record<string, unknown> = {
       model: model.id,
@@ -160,10 +152,7 @@ export function buildMistralChatCompletionsUrl(baseUrl: string): string {
 // 转换辅助
 // =====================================================================
 
-function toMistralMessages(
-  context: Context,
-  requestPlan: RequestPlan,
-): ChatCompletionsMessage[] {
+function toMistralMessages(context: Context, requestPlan: RequestPlan): ChatCompletionsMessage[] {
   const out: ChatCompletionsMessage[] = [];
   const prompt = partitionSystemPrompt(context);
   if (prompt.combinedText) {

@@ -2,7 +2,12 @@ import { randomUUID } from 'crypto';
 import { createServer } from 'http';
 import { getLoadedProviderSurface } from '../../../provider-catalog/ProviderCatalogRegistry';
 import { parseOpenRouterAccountCatalog } from '../../provider-catalog/LiveProviderCatalogParsers';
-import { buildOpenRouterAuthorizationUrl, buildOpenRouterExchange, createPkcePair, parseOpenRouterExchange } from '../../provider-catalog/LiveProviderOAuthContracts';
+import {
+  buildOpenRouterAuthorizationUrl,
+  buildOpenRouterExchange,
+  createPkcePair,
+  parseOpenRouterExchange,
+} from '../../provider-catalog/LiveProviderOAuthContracts';
 import { fetchJson } from './oauthHttp';
 import type { CatalogModelContribution } from '../../provider-catalog/effectiveCatalogTypes';
 import type { OAuthFlowState, OAuthSecretBundle } from './oauthTypes';
@@ -47,7 +52,9 @@ export async function exchangeOpenRouterCode(flow: OAuthFlowState, code: string)
   };
 }
 
-export async function discoverOpenRouterCatalog(bundle: OAuthSecretBundle): Promise<{ models: LlmProviderModel[]; contributions?: CatalogModelContribution[] }> {
+export async function discoverOpenRouterCatalog(
+  bundle: OAuthSecretBundle,
+): Promise<{ models: LlmProviderModel[]; contributions?: CatalogModelContribution[] }> {
   if (!bundle.apiKey) throw new Error('OpenRouter OAuth API key is missing.');
   const payload = await fetchJson('https://openrouter.ai/api/v1/models', {
     method: 'GET',
@@ -111,7 +118,10 @@ export function startOpenRouterCallbackServer(
       flow.error = error instanceof Error ? error.message : String(error);
       closeFlowServer(flow);
       clearFlow(flow.flowId);
-      if (!settled) { settled = true; reject(error); }
+      if (!settled) {
+        settled = true;
+        reject(error);
+      }
     });
     server.listen(0, '127.0.0.1', () => {
       const address = server.address();

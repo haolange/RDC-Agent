@@ -10,9 +10,7 @@
   display: flex;
   flex-direction: column;
   border-top: 1px solid color-mix(in srgb, var(--token-border-default) 0%, transparent);
-  background:
-    linear-gradient(180deg, var(--token-sheen-drawer), transparent 42%),
-    var(--token-bg-app);
+  background: linear-gradient(180deg, var(--token-sheen-drawer), transparent 42%), var(--token-bg-app);
   transition:
     height var(--transition-slow),
     max-height var(--transition-slow),
@@ -76,7 +74,9 @@
   background: var(--token-border-default);
   transform: translateX(-50%);
   opacity: 0;
-  transition: opacity var(--transition-fast), background var(--transition-fast);
+  transition:
+    opacity var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .runtime-terminal-resize-handle:hover::before,

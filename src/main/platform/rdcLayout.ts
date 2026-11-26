@@ -48,7 +48,10 @@ export const RDC_CLI_ENTRY = 'cli/run_cli.py';
 export function rdcHostLayout(host: HostDescriptor = currentHost()): RdcHostLayout {
   const layout = (RDC_HOST_LAYOUTS as Readonly<Record<string, RdcHostLayout | undefined>>)[host.target];
   if (!layout) {
-    throw new AppError('RDC_HOST_UNSUPPORTED', `RDC-Tool has no runtime layout for host ${host.target}; supported: ${Object.keys(RDC_HOST_LAYOUTS).join(', ')}.`);
+    throw new AppError(
+      'RDC_HOST_UNSUPPORTED',
+      `RDC-Tool has no runtime layout for host ${host.target}; supported: ${Object.keys(RDC_HOST_LAYOUTS).join(', ')}.`,
+    );
   }
   return layout;
 }

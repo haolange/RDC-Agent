@@ -59,50 +59,171 @@
   transition: color var(--transition-fast);
 }
 .knowledge-center-outline-link:hover,
-.knowledge-center-outline-link:focus-visible { color: var(--token-text-primary); }
-.knowledge-center-outline-link:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: var(--focus-ring-offset); border-radius: var(--radius-sm); }
+.knowledge-center-outline-link:focus-visible {
+  color: var(--token-text-primary);
+}
+.knowledge-center-outline-link:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
 
 .knowledge-case-tabs .ui-tabs-list {
   overflow-x: auto;
   overscroll-behavior-inline: contain;
 }
 
-.knowledge-case-tabs .ui-tabs-tab { flex: 0 0 auto; }
-.knowledge-case-section { scroll-margin-top: var(--space-5); color: var(--token-text-primary); font-size: var(--type-reading-size); line-height: var(--type-reading-line); }
-.knowledge-case-section > h2 { margin: 0 0 var(--space-3); color: var(--token-text-primary); font-size: var(--type-reading-size); font-weight: var(--font-semibold); line-height: var(--leading-tight); }
-.knowledge-case-section p { margin: 0; }
+.knowledge-case-tabs .ui-tabs-tab {
+  flex: 0 0 auto;
+}
+.knowledge-case-section {
+  scroll-margin-top: var(--space-5);
+  color: var(--token-text-primary);
+  font-size: var(--type-reading-size);
+  line-height: var(--type-reading-line);
+}
+.knowledge-case-section > h2 {
+  margin: 0 0 var(--space-3);
+  color: var(--token-text-primary);
+  font-size: var(--type-reading-size);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+}
+.knowledge-case-section p {
+  margin: 0;
+}
 
 /* Facts: label in the secondary tone, value in the reading tone, aligned in two columns. */
-.knowledge-case-facts { display: grid; grid-template-columns: minmax(6rem, max-content) minmax(0, 1fr); gap: var(--space-2) var(--space-5); margin: 0; font-size: var(--type-body-size); line-height: var(--type-body-line); }
-.knowledge-case-facts > div { display: contents; }
-.knowledge-case-facts dt { color: var(--token-text-secondary); }
-.knowledge-case-facts dd { margin: 0; min-width: 0; color: var(--token-text-primary); overflow-wrap: anywhere; }
-.knowledge-case-codes { display: inline-flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); }
-.knowledge-case-list { margin: 0; padding-left: var(--space-5); display: grid; gap: var(--space-2); }
+.knowledge-case-facts {
+  display: grid;
+  grid-template-columns: minmax(6rem, max-content) minmax(0, 1fr);
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
+.knowledge-case-facts > div {
+  display: contents;
+}
+.knowledge-case-facts dt {
+  color: var(--token-text-secondary);
+}
+.knowledge-case-facts dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--token-text-primary);
+  overflow-wrap: anywhere;
+}
+.knowledge-case-codes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+.knowledge-case-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+}
 
-.knowledge-symptoms { display: grid; gap: var(--space-4); }
-.knowledge-symptom-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
-.knowledge-symptom { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); border-radius: var(--radius-lg); background: var(--token-bg-muted); }
-.knowledge-symptom.is-observed { box-shadow: inset 0 0 0 1px var(--token-border-default); }
-.knowledge-symptom-label { color: var(--token-text-secondary); font-size: var(--type-body-size); font-weight: var(--font-semibold); }
-.knowledge-symptom-text { margin: 0; color: var(--token-text-primary); }
+.knowledge-symptoms {
+  display: grid;
+  gap: var(--space-4);
+}
+.knowledge-symptom-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.knowledge-symptom {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-muted);
+}
+.knowledge-symptom.is-observed {
+  box-shadow: inset 0 0 0 1px var(--token-border-default);
+}
+.knowledge-symptom-label {
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-semibold);
+}
+.knowledge-symptom-text {
+  margin: 0;
+  color: var(--token-text-primary);
+}
 
-.knowledge-root-cause { display: grid; gap: var(--space-4); }
-.knowledge-case-lead { margin: 0; color: var(--token-text-primary); }
+.knowledge-root-cause {
+  display: grid;
+  gap: var(--space-4);
+}
+.knowledge-case-lead {
+  margin: 0;
+  color: var(--token-text-primary);
+}
 
-.knowledge-evidence-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
-.knowledge-evidence { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) 0; border-top: 1px solid var(--token-border-subtle); }
-.knowledge-evidence:first-child { border-top: 0; padding-top: 0; }
-.knowledge-evidence-kind { color: var(--token-text-secondary); font-size: var(--type-body-size); }
-.knowledge-evidence-summary { margin: 0; color: var(--token-text-primary); }
-.knowledge-evidence-toggle.button { align-self: flex-start; padding: 0; gap: var(--space-1); color: var(--token-text-secondary); }
+.knowledge-evidence-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.knowledge-evidence {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--token-border-subtle);
+}
+.knowledge-evidence:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.knowledge-evidence-kind {
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+}
+.knowledge-evidence-summary {
+  margin: 0;
+  color: var(--token-text-primary);
+}
+.knowledge-evidence-toggle.button {
+  align-self: flex-start;
+  padding: 0;
+  gap: var(--space-1);
+  color: var(--token-text-secondary);
+}
 .knowledge-evidence-toggle.button:hover,
-.knowledge-evidence-toggle.button:focus-visible { color: var(--token-text-primary); }
-.knowledge-evidence-details { margin-top: var(--space-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--token-bg-muted); }
+.knowledge-evidence-toggle.button:focus-visible {
+  color: var(--token-text-primary);
+}
+.knowledge-evidence-details {
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-muted);
+}
 
 /* Verification reads as a numbered procedure. */
-.knowledge-case-steps { counter-reset: knowledge-step; display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
-.knowledge-case-steps > li { counter-increment: knowledge-step; display: grid; grid-template-columns: var(--space-6) minmax(0, 1fr); gap: var(--space-3); align-items: baseline; }
+.knowledge-case-steps {
+  counter-reset: knowledge-step;
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.knowledge-case-steps > li {
+  counter-increment: knowledge-step;
+  display: grid;
+  grid-template-columns: var(--space-6) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: baseline;
+}
 .knowledge-case-steps > li::before {
   content: counter(knowledge-step);
   display: inline-grid;
@@ -117,15 +238,35 @@
 }
 
 /* Before and after are the hero of a case: large, side by side, captioned underneath. */
-.knowledge-card-images { display: grid; gap: var(--space-4); margin-bottom: var(--space-4); }
-.knowledge-card-images-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-3); }
+.knowledge-card-images {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.knowledge-card-images-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+}
 .knowledge-card-images-pair > figure {
   display: grid;
   grid-row: span 2;
   grid-template-rows: subgrid;
 }
-.knowledge-card-image { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; min-width: 0; }
-.knowledge-card-image-label { order: 2; margin: 0; color: var(--token-text-secondary); font-size: var(--type-body-size); line-height: var(--type-body-line); }
+.knowledge-card-image {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  min-width: 0;
+}
+.knowledge-card-image-label {
+  order: 2;
+  margin: 0;
+  color: var(--token-text-secondary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
 .knowledge-card-image-frame {
   display: grid;
   place-items: center;
@@ -169,12 +310,20 @@
   text-align: center;
 }
 @container knowledge-detail (max-width: 28rem) {
-  .knowledge-case-facts, .knowledge-symptom-comparison, .knowledge-card-images-pair { grid-template-columns: 1fr; }
-  .knowledge-card-images-pair { row-gap: var(--space-3); }
+  .knowledge-case-facts,
+  .knowledge-symptom-comparison,
+  .knowledge-card-images-pair {
+    grid-template-columns: 1fr;
+  }
+  .knowledge-card-images-pair {
+    row-gap: var(--space-3);
+  }
 }
 
 /* Headings the outline jumps to land below the sticky header edge, not under it. */
-.knowledge-center-markdown :is(h1, h2, h3) { scroll-margin-top: var(--space-5); }
+.knowledge-center-markdown :is(h1, h2, h3) {
+  scroll-margin-top: var(--space-5);
+}
 
 .knowledge-center-index-facts {
   display: grid;
@@ -184,6 +333,15 @@
   padding-inline-start: var(--space-5);
   font-size: var(--type-body-size);
 }
-.knowledge-center-index-facts > div { display: contents; }
-.knowledge-center-index-facts dt { color: var(--token-text-secondary); }
-.knowledge-center-index-facts dd { margin: 0; min-width: 0; color: var(--token-text-secondary); overflow-wrap: anywhere; }
+.knowledge-center-index-facts > div {
+  display: contents;
+}
+.knowledge-center-index-facts dt {
+  color: var(--token-text-secondary);
+}
+.knowledge-center-index-facts dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--token-text-secondary);
+  overflow-wrap: anywhere;
+}

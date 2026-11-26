@@ -30,9 +30,14 @@ export function errorDetails(error: unknown): ErrorDetail[] {
   const code = errorCodeOf(error);
   if (code) details.push({ label: 'Code', value: code });
   if (error instanceof RendererIpcError) details.push({ label: 'Channel', value: error.channel });
-  const technical = error instanceof RendererIpcError ? error.technical
-    : error instanceof Error ? error.message
-      : error === null || error === undefined ? undefined : String(error);
+  const technical =
+    error instanceof RendererIpcError
+      ? error.technical
+      : error instanceof Error
+        ? error.message
+        : error === null || error === undefined
+          ? undefined
+          : String(error);
   if (technical) details.push({ label: 'Detail', value: technical });
   return details;
 }

@@ -20,9 +20,10 @@ export function parseSapAiCoreServiceKey(raw: string): SapAiCoreServiceKey {
   }
   const record = value as Record<string, unknown>;
   const serviceUrls = record.serviceurls;
-  const apiUrl = serviceUrls && typeof serviceUrls === 'object' && !Array.isArray(serviceUrls)
-    ? readString(serviceUrls as Record<string, unknown>, 'AI_API_URL')
-    : '';
+  const apiUrl =
+    serviceUrls && typeof serviceUrls === 'object' && !Array.isArray(serviceUrls)
+      ? readString(serviceUrls as Record<string, unknown>, 'AI_API_URL')
+      : '';
   const clientId = readString(record, 'clientid');
   const clientSecret = readString(record, 'clientsecret');
   const authUrl = readString(record, 'url');
@@ -69,12 +70,15 @@ export async function listSapAiCoreDeployments(input: {
 }): Promise<AiDeployment[]> {
   const key = parseSapAiCoreServiceKey(input.serviceKeyJson);
   assertSapAiCoreApiUrl(key, input.configuredApiUrl);
-  const result = await DeploymentApi.deploymentQuery({
-    scenarioId: input.scenarioId,
-    status: 'RUNNING',
-  }, {
-    'AI-Resource-Group': input.resourceGroup?.trim() || 'default',
-  }).execute(createSapAiCoreDestination(key));
+  const result = await DeploymentApi.deploymentQuery(
+    {
+      scenarioId: input.scenarioId,
+      status: 'RUNNING',
+    },
+    {
+      'AI-Resource-Group': input.resourceGroup?.trim() || 'default',
+    },
+  ).execute(createSapAiCoreDestination(key));
   return result.resources;
 }
 

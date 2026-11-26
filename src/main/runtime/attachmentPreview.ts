@@ -34,11 +34,7 @@ function assertNoSymlinkPath(target: string): void {
   }
 }
 
-export function resizeAttachmentThumbnail(
-  bytes: Buffer,
-  mimeType: string,
-  maxEdge = MAX_EDGE,
-): AttachmentThumbnail {
+export function resizeAttachmentThumbnail(bytes: Buffer, mimeType: string, maxEdge = MAX_EDGE): AttachmentThumbnail {
   try {
     const nativeImage = loadNativeImage();
     if (!nativeImage) throw new Error('no-electron');
@@ -48,9 +44,7 @@ export function resizeAttachmentThumbnail(
     }
     const size = image.getSize();
     const scale = Math.min(1, maxEdge / Math.max(size.width, size.height, 1));
-    const resized = scale < 1
-      ? image.resize({ width: Math.max(1, Math.round(size.width * scale)) })
-      : image;
+    const resized = scale < 1 ? image.resize({ width: Math.max(1, Math.round(size.width * scale)) }) : image;
     const nextSize = resized.getSize();
     return { data: resized.toPNG(), mimeType: 'image/png', width: nextSize.width, height: nextSize.height };
   } catch {

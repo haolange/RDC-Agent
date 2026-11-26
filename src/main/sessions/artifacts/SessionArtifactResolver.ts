@@ -12,8 +12,25 @@ import { sessionRecordStore } from '../store/sessionStores';
 import { renameWithRetrySync } from '../../platform/fileRename';
 import { parseSessionArtifactUri, SessionArtifactError } from './sessionArtifactContract';
 import { SESSION_ARTIFACT_CATEGORIES } from './sessionArtifactContract';
-import { ARTIFACT_READ_MAX_OUTPUT_BYTES, ARTIFACT_READ_MAX_OUTPUT_LINES, formatSessionArtifactUri, isSessionArtifactizedEnvelope, SESSION_ARTIFACT_ALLOWED_MIME_SET, SESSION_ARTIFACT_MAX_FILE_BYTES, SESSION_ARTIFACT_MAX_IMAGE_BYTES, SESSION_ARTIFACT_MAX_SESSION_BYTES, SESSION_ARTIFACT_MAX_TOOL_OUTPUT_FILES, SESSION_ARTIFACT_ROOT_DIR } from './sessionArtifactContract';
-import { inspectArtifactJson, readArtifactJsonText, readDefaultToolResultText, type ArtifactJsonInspection, type ArtifactJsonTextView } from './SessionArtifactJsonInspection';
+import {
+  ARTIFACT_READ_MAX_OUTPUT_BYTES,
+  ARTIFACT_READ_MAX_OUTPUT_LINES,
+  formatSessionArtifactUri,
+  isSessionArtifactizedEnvelope,
+  SESSION_ARTIFACT_ALLOWED_MIME_SET,
+  SESSION_ARTIFACT_MAX_FILE_BYTES,
+  SESSION_ARTIFACT_MAX_IMAGE_BYTES,
+  SESSION_ARTIFACT_MAX_SESSION_BYTES,
+  SESSION_ARTIFACT_MAX_TOOL_OUTPUT_FILES,
+  SESSION_ARTIFACT_ROOT_DIR,
+} from './sessionArtifactContract';
+import {
+  inspectArtifactJson,
+  readArtifactJsonText,
+  readDefaultToolResultText,
+  type ArtifactJsonInspection,
+  type ArtifactJsonTextView,
+} from './SessionArtifactJsonInspection';
 import { searchArtifactText, type ArtifactTextSearch } from './SessionArtifactTextSearch';
 import {
   commitSessionArtifactReservation,
@@ -29,8 +46,24 @@ import type { ParsedSessionArtifactUri, SessionArtifactCategory } from './sessio
 import type { SessionArtifactSourceRef } from './sessionArtifactContract';
 
 const EXECUTABLE_EXTENSIONS = new Set([
-  '.exe', '.dll', '.so', '.dylib', '.bin', '.com', '.msi', '.bat', '.cmd',
-  '.ps1', '.sh', '.bash', '.zsh', '.fish', '.app', '.scr', '.pif', '.cpl',
+  '.exe',
+  '.dll',
+  '.so',
+  '.dylib',
+  '.bin',
+  '.com',
+  '.msi',
+  '.bat',
+  '.cmd',
+  '.ps1',
+  '.sh',
+  '.bash',
+  '.zsh',
+  '.fish',
+  '.app',
+  '.scr',
+  '.pif',
+  '.cpl',
 ]);
 
 const MIME_BY_EXTENSION: Record<string, string> = {
@@ -140,10 +173,7 @@ function assertNoSymlinkPath(target: string): void {
 function assertNoHardlinkFile(target: string, stat?: fs.Stats): void {
   const fileStat = stat ?? fs.lstatSync(target);
   if (fileStat.isSymbolicLink()) {
-    throw new SessionArtifactError(
-      'ARTIFACT_SYMLINK_REJECTED',
-      `refusing to follow symlink/reparse path ${target}.`,
-    );
+    throw new SessionArtifactError('ARTIFACT_SYMLINK_REJECTED', `refusing to follow symlink/reparse path ${target}.`);
   }
   if (fileStat.isFile() && fileStat.nlink > 1) {
     throw new SessionArtifactError(
@@ -173,8 +203,7 @@ function realpathExistingAncestor(target: string): string {
 }
 
 function isPng(bytes: Buffer): boolean {
-  return bytes.length >= 8
-    && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  return bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
 }
 
 function isJpeg(bytes: Buffer): boolean {
@@ -182,15 +211,19 @@ function isJpeg(bytes: Buffer): boolean {
 }
 
 function isGif(bytes: Buffer): boolean {
-  return bytes.length >= 6
-    && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38
-    && (bytes[4] === 0x37 || bytes[4] === 0x39) && bytes[5] === 0x61;
+  return (
+    bytes.length >= 6 &&
+    bytes[0] === 0x47 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x38 &&
+    (bytes[4] === 0x37 || bytes[4] === 0x39) &&
+    bytes[5] === 0x61
+  );
 }
 
 function isWebp(bytes: Buffer): boolean {
-  return bytes.length >= 12
-    && bytes.toString('ascii', 0, 4) === 'RIFF'
-    && bytes.toString('ascii', 8, 12) === 'WEBP';
+  return bytes.length >= 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
 }
 
 function isSvg(bytes: Buffer): boolean {
@@ -203,13 +236,11 @@ function isPe(bytes: Buffer): boolean {
 }
 
 function isElf(bytes: Buffer): boolean {
-  return bytes.length >= 4
-    && bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46;
+  return bytes.length >= 4 && bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46;
 }
 
 function isRdoc(bytes: Buffer): boolean {
-  return bytes.length >= 4
-    && bytes[0] === 0x52 && bytes[1] === 0x44 && bytes[2] === 0x4f && bytes[3] === 0x43;
+  return bytes.length >= 4 && bytes[0] === 0x52 && bytes[1] === 0x44 && bytes[2] === 0x4f && bytes[3] === 0x43;
 }
 
 function detectImageMagicMime(bytes: Buffer): string | null {
@@ -373,11 +404,29 @@ export class SessionArtifactResolver {
   read(
     sessionId: string | null | undefined,
     uri: string,
-    options?: { offset?: number; column?: number; limit?: number; maxBytes?: number; expectedHash?: string; includeImageData?: boolean; jsonTextPointers?: string[]; textPointer?: string; search?: string },
+    options?: {
+      offset?: number;
+      column?: number;
+      limit?: number;
+      maxBytes?: number;
+      expectedHash?: string;
+      includeImageData?: boolean;
+      jsonTextPointers?: string[];
+      textPointer?: string;
+      search?: string;
+    },
   ): SessionArtifactReadResult {
     const resolved = this.resolve(sessionId, uri);
-    if ((options?.jsonTextPointers !== undefined || options?.textPointer !== undefined || options?.search !== undefined) && !options.expectedHash) {
-      throw new SessionArtifactError('ARTIFACT_HASH_REQUIRED', 'JSON inspection, text selection and search require expectedHash.');
+    if (
+      (options?.jsonTextPointers !== undefined ||
+        options?.textPointer !== undefined ||
+        options?.search !== undefined) &&
+      !options.expectedHash
+    ) {
+      throw new SessionArtifactError(
+        'ARTIFACT_HASH_REQUIRED',
+        'JSON inspection, text selection and search require expectedHash.',
+      );
     }
     if (!fs.existsSync(resolved.absolutePath)) {
       throw new SessionArtifactError('ARTIFACT_NOT_FOUND', resolved.uri);
@@ -390,12 +439,11 @@ export class SessionArtifactResolver {
       throw new SessionArtifactError('ARTIFACT_NOT_FOUND', 'target is not a regular file.');
     }
     assertNoHardlinkFile(resolved.absolutePath, stat);
-    const fileLimit = MIME_BY_EXTENSION[path.extname(resolved.relativePath).toLowerCase()]?.startsWith('image/') ? this.maxImageBytes : this.maxFileBytes;
+    const fileLimit = MIME_BY_EXTENSION[path.extname(resolved.relativePath).toLowerCase()]?.startsWith('image/')
+      ? this.maxImageBytes
+      : this.maxFileBytes;
     if (stat.size > fileLimit) {
-      throw new SessionArtifactError(
-        'ARTIFACT_TOO_LARGE',
-        `${stat.size} bytes exceeds ${fileLimit} bytes.`,
-      );
+      throw new SessionArtifactError('ARTIFACT_TOO_LARGE', `${stat.size} bytes exceeds ${fileLimit} bytes.`);
     }
     const bytes = fs.readFileSync(resolved.absolutePath);
     const fileMimeType = this.assertAllowedBytes(resolved.relativePath, bytes);
@@ -410,19 +458,33 @@ export class SessionArtifactResolver {
         throw new SessionArtifactError('ARTIFACT_HASH_MISMATCH', 'sha256 does not match expectedHash.');
       }
     }
-    if ((options?.jsonTextPointers !== undefined || options?.textPointer !== undefined) && fileMimeType !== 'application/json') {
-      throw new SessionArtifactError('ARTIFACT_MIME_DENIED', options.textPointer !== undefined
-        ? 'Text selection requires a JSON artifact. Omit textPointer for images or plain text.'
-        : 'JSON inspection requires a JSON artifact. Omit jsonTextPointers entirely for image or plain-text reads; [] explicitly requests JSON inspection. Do not repeat the same rejected arguments.');
+    if (
+      (options?.jsonTextPointers !== undefined || options?.textPointer !== undefined) &&
+      fileMimeType !== 'application/json'
+    ) {
+      throw new SessionArtifactError(
+        'ARTIFACT_MIME_DENIED',
+        options.textPointer !== undefined
+          ? 'Text selection requires a JSON artifact. Omit textPointer for images or plain text.'
+          : 'JSON inspection requires a JSON artifact. Omit jsonTextPointers entirely for image or plain-text reads; [] explicitly requests JSON inspection. Do not repeat the same rejected arguments.',
+      );
     }
     if ((options?.search !== undefined || options?.textPointer !== undefined) && mimeType.startsWith('image/')) {
       throw new SessionArtifactError('ARTIFACT_MIME_DENIED', 'Text selection and search do not read image pixels.');
     }
-    const view = options?.textPointer !== undefined
-      ? readArtifactJsonText(bytes, options.jsonTextPointers ?? [], options.textPointer)
-      : options?.search !== undefined && options.jsonTextPointers === undefined && resolved.category === 'tool-outputs' && fileMimeType === 'application/json'
-        ? readDefaultToolResultText(bytes) : undefined;
-    const jsonInspection = options?.jsonTextPointers === undefined || view ? undefined : inspectArtifactJson(bytes, options.jsonTextPointers);
+    const view =
+      options?.textPointer !== undefined
+        ? readArtifactJsonText(bytes, options.jsonTextPointers ?? [], options.textPointer)
+        : options?.search !== undefined &&
+            options.jsonTextPointers === undefined &&
+            resolved.category === 'tool-outputs' &&
+            fileMimeType === 'application/json'
+          ? readDefaultToolResultText(bytes)
+          : undefined;
+    const jsonInspection =
+      options?.jsonTextPointers === undefined || view
+        ? undefined
+        : inspectArtifactJson(bytes, options.jsonTextPointers);
     const offset = Math.max(1, Math.floor(options?.offset ?? 1));
     const limit = Math.max(
       1,
@@ -451,12 +513,31 @@ export class SessionArtifactResolver {
     if (column > firstLine.length || (column > 0 && /[\uDC00-\uDFFF]/.test(firstLine[column] ?? ''))) {
       throw new SessionArtifactError('ARTIFACT_URI_INVALID', 'Invalid paging column; use the exact returned cursor.');
     }
-    const maxBytes = Math.max(4, Math.min(ARTIFACT_READ_MAX_OUTPUT_BYTES, options?.maxBytes ?? ARTIFACT_READ_MAX_OUTPUT_BYTES));
+    const maxBytes = Math.max(
+      4,
+      Math.min(ARTIFACT_READ_MAX_OUTPUT_BYTES, options?.maxBytes ?? ARTIFACT_READ_MAX_OUTPUT_BYTES),
+    );
     if (options?.search !== undefined) {
       const found = searchArtifactText(text, options.search, { offset, column }, limit, maxBytes);
-      return { uri: resolved.uri, category: resolved.category, relativePath: resolved.relativePath, mimeType, hash, bytes: byteLength,
-        text: found.text, search: found.search, ...(view ? { textView: view.view } : {}), ...(jsonInspection ? { jsonInspection } : {}),
-        truncated: found.next !== undefined, offset, limit, totalLines: lines.length, ...(found.next ? { next: found.next } : {}), owner: record.owner, source: record.source };
+      return {
+        uri: resolved.uri,
+        category: resolved.category,
+        relativePath: resolved.relativePath,
+        mimeType,
+        hash,
+        bytes: byteLength,
+        text: found.text,
+        search: found.search,
+        ...(view ? { textView: view.view } : {}),
+        ...(jsonInspection ? { jsonInspection } : {}),
+        truncated: found.next !== undefined,
+        offset,
+        limit,
+        totalLines: lines.length,
+        ...(found.next ? { next: found.next } : {}),
+        owner: record.owner,
+        source: record.source,
+      };
     }
     const window = lines.slice(offset - 1, offset - 1 + limit);
     if (window.length) window[0] = window[0].slice(column);
@@ -465,7 +546,12 @@ export class SessionArtifactResolver {
     const rendered = this.sliceUtf8(selected, maxBytes);
     const truncated = hasLaterLines || rendered.length < selected.length;
     const consumed = rendered.split('\n');
-    const next = truncated ? { offset: offset + consumed.length - 1, column: consumed.length === 1 ? column + rendered.length : consumed[consumed.length - 1].length } : undefined;
+    const next = truncated
+      ? {
+          offset: offset + consumed.length - 1,
+          column: consumed.length === 1 ? column + rendered.length : consumed[consumed.length - 1].length,
+        }
+      : undefined;
     return {
       uri: resolved.uri,
       category: resolved.category,
@@ -503,10 +589,7 @@ export class SessionArtifactResolver {
       resolved = this.resolve(sessionId, uri);
       const fileLimit = detectImageMagicMime(bytes) ? this.maxImageBytes : this.maxFileBytes;
       if (bytes.length > fileLimit) {
-        throw new SessionArtifactError(
-          'ARTIFACT_TOO_LARGE',
-          `${bytes.length} bytes exceeds ${fileLimit} bytes.`,
-        );
+        throw new SessionArtifactError('ARTIFACT_TOO_LARGE', `${bytes.length} bytes exceeds ${fileLimit} bytes.`);
       }
       const mimeType = this.assertAllowedBytes(resolved.relativePath, bytes, options?.mimeType);
       this.io.ensureDir(path.dirname(resolved.absolutePath));
@@ -546,7 +629,10 @@ export class SessionArtifactResolver {
       assertNoSymlinkPath(resolved.absolutePath);
       assertNoHardlinkFile(resolved.absolutePath);
       const written = fs.readFileSync(resolved.absolutePath);
-      commitSessionArtifactReservation(reservation, this.measureDiskUsage(resolved.artifactsRoot, resolved.categoryRoot));
+      commitSessionArtifactReservation(
+        reservation,
+        this.measureDiskUsage(resolved.artifactsRoot, resolved.categoryRoot),
+      );
       reservation = null;
       return {
         uri: resolved.uri,
@@ -558,7 +644,11 @@ export class SessionArtifactResolver {
       };
     } catch (error) {
       if (tempPath && fs.existsSync(tempPath)) {
-        try { fs.rmSync(tempPath, { force: true }); } catch { /* best-effort temp cleanup */ }
+        try {
+          fs.rmSync(tempPath, { force: true });
+        } catch {
+          /* best-effort temp cleanup */
+        }
       }
       if (reservation && resolved) {
         try {
@@ -566,13 +656,12 @@ export class SessionArtifactResolver {
             reservation,
             this.measureDiskUsage(resolved.artifactsRoot, resolved.categoryRoot),
           );
-        } catch { /* rollback must not hide the original failure */ }
+        } catch {
+          /* rollback must not hide the original failure */
+        }
       }
       if (error instanceof SessionArtifactError) throw error;
-      throw new SessionArtifactError(
-        'ARTIFACT_WRITE_FAILED',
-        error instanceof Error ? error.message : String(error),
-      );
+      throw new SessionArtifactError('ARTIFACT_WRITE_FAILED', error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -592,10 +681,7 @@ export class SessionArtifactResolver {
     this.ensureReconciled(sessionId);
     const artifactsRoot = this.artifactsRootFor(sessionId);
     const categoryRoot = path.join(artifactsRoot, 'tool-outputs');
-    return getSessionArtifactQuotaSnapshot(
-      artifactsRoot,
-      this.measureDiskUsage(artifactsRoot, categoryRoot),
-    );
+    return getSessionArtifactQuotaSnapshot(artifactsRoot, this.measureDiskUsage(artifactsRoot, categoryRoot));
   }
 
   /** Point-in-time logical quota only; writes still reserve and validate atomically. */
@@ -603,10 +689,16 @@ export class SessionArtifactResolver {
     const usage = this.getQuotaUsage(sessionId);
     return {
       usage,
-      limits: { maxFileBytes: this.maxFileBytes, maxImageBytes: this.maxImageBytes,
-        maxSessionBytes: this.maxSessionBytes, maxToolOutputFiles: this.maxToolOutputFiles },
-      remaining: { bytes: Math.max(0, this.maxSessionBytes - usage.liveBytes),
-        toolOutputFiles: Math.max(0, this.maxToolOutputFiles - usage.liveToolOutputFiles) },
+      limits: {
+        maxFileBytes: this.maxFileBytes,
+        maxImageBytes: this.maxImageBytes,
+        maxSessionBytes: this.maxSessionBytes,
+        maxToolOutputFiles: this.maxToolOutputFiles,
+      },
+      remaining: {
+        bytes: Math.max(0, this.maxSessionBytes - usage.liveBytes),
+        toolOutputFiles: Math.max(0, this.maxToolOutputFiles - usage.liveToolOutputFiles),
+      },
       isReservation: false,
     };
   }
@@ -615,9 +707,7 @@ export class SessionArtifactResolver {
     this.ensureReconciled(sessionId);
     const artifactsRoot = this.artifactsRootFor(sessionId);
     if (!fs.existsSync(artifactsRoot)) return [];
-    const categories: SessionArtifactCategory[] = category
-      ? [category]
-      : [...SESSION_ARTIFACT_CATEGORIES];
+    const categories: SessionArtifactCategory[] = category ? [category] : [...SESSION_ARTIFACT_CATEGORIES];
     const uris: string[] = [];
     for (const current of categories) {
       const categoryRoot = path.join(artifactsRoot, current);

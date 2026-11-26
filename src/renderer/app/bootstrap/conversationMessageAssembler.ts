@@ -4,7 +4,10 @@ import type { ConversationMessage, ConversationStreamEvent } from '@shared/types
 type MessagePatchedEvent = Extract<ConversationStreamEvent, { type: 'message_patched' }>;
 
 export interface ConversationMessageAssemblerOptions {
-  requestSnapshot: (sessionId: string, messageId: string) => Promise<{ seq: number; message: ConversationMessage } | null>;
+  requestSnapshot: (
+    sessionId: string,
+    messageId: string,
+  ) => Promise<{ seq: number; message: ConversationMessage } | null>;
   /** Receives a message rebuilt from a snapshot after the stream was resumed. */
   deliver: (event: MessagePatchedEvent) => void;
 }
@@ -21,11 +24,17 @@ export function createConversationMessageAssembler(options: ConversationMessageA
   const resume = (sessionId: string, messageId: string) => {
     if (resuming.has(messageId)) return;
     resuming.add(messageId);
-    void options.requestSnapshot(sessionId, messageId)
+    void options
+      .requestSnapshot(sessionId, messageId)
       .then((snapshot) => {
         if (!snapshot || (streams.get(messageId)?.seq ?? 0) >= snapshot.seq) return;
         streams.set(messageId, snapshot);
-        options.deliver({ type: 'message_patched', sessionId, turnId: snapshot.message.turnId, message: snapshot.message });
+        options.deliver({
+          type: 'message_patched',
+          sessionId,
+          turnId: snapshot.message.turnId,
+          message: snapshot.message,
+        });
       })
       // A failed request is retried by the next delta of the same message; the terminal event is always whole.
       .catch((error: unknown) => console.warn('[conversation] could not resume a streamed message', error))

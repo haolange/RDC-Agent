@@ -19,15 +19,17 @@ export const useTurnControlsStore = create<TurnControlsState>((set) => ({
   turnControls: buildInitialTurnControls(null),
   capabilityState: { status: 'loading' },
   controlsByCapabilityKey: {},
-  setTurnControls: (next) => set((state) => ({
-    turnControls: typeof next === 'function' ? next(state.turnControls) : next,
-  })),
+  setTurnControls: (next) =>
+    set((state) => ({
+      turnControls: typeof next === 'function' ? next(state.turnControls) : next,
+    })),
   setCapabilityState: (capabilityState) => set({ capabilityState }),
-  rememberControls: (capabilityKey, controls) => set((state) => ({
-    controlsByCapabilityKey: {
-      ...state.controlsByCapabilityKey,
-      [capabilityKey]: controls,
-    },
-  })),
+  rememberControls: (capabilityKey, controls) =>
+    set((state) => ({
+      controlsByCapabilityKey: {
+        ...state.controlsByCapabilityKey,
+        [capabilityKey]: controls,
+      },
+    })),
   clearRememberedControls: () => set({ controlsByCapabilityKey: {} }),
 }));

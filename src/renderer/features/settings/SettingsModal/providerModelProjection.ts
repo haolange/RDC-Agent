@@ -26,11 +26,16 @@ export function mergeTestedProviderModels(
       preferredRouteOptionId: previous.preferredRouteOptionId,
     };
   });
-  return [...refreshed, ...current.filter((model) => !matched.has(model)).map((model) => ({
-    ...model,
-    availability: 'unknown' as const,
-    availabilityReason: undefined,
-  }))];
+  return [
+    ...refreshed,
+    ...current
+      .filter((model) => !matched.has(model))
+      .map((model) => ({
+        ...model,
+        availability: 'unknown' as const,
+        availabilityReason: undefined,
+      })),
+  ];
 }
 
 export function updateProviderModelPreference(
@@ -40,10 +45,8 @@ export function updateProviderModelPreference(
   patch: Partial<LlmProviderModel>,
 ): LlmProviderModel[] {
   const incomingKeys = new Set([modelId, ...(patch.aliases ?? [])]);
-  const matches = (model: LlmProviderModel): boolean => (
-    incomingKeys.has(model.id)
-    || (model.aliases ?? []).some((alias) => incomingKeys.has(alias))
-  );
+  const matches = (model: LlmProviderModel): boolean =>
+    incomingKeys.has(model.id) || (model.aliases ?? []).some((alias) => incomingKeys.has(alias));
   let updated = false;
   const next: LlmProviderModel[] = [];
   for (const model of models) {
@@ -63,12 +66,15 @@ export function updateProviderModelPreference(
     });
   }
   if (updated) return next;
-  return [...next, {
-    ...patch,
-    id: modelId,
-    label: patch.label ?? modelId,
-    enabled: patch.enabled ?? true,
-  }];
+  return [
+    ...next,
+    {
+      ...patch,
+      id: modelId,
+      label: patch.label ?? modelId,
+      enabled: patch.enabled ?? true,
+    },
+  ];
 }
 
 export function projectProviderModels(
@@ -87,35 +93,37 @@ export function projectProviderModels(
     storedById.set(stored.id, stored);
     for (const alias of stored.aliases ?? []) storedById.set(alias, stored);
   }
-  const internalVariantIds = new Set(snapshot.models
-    .filter((model) => model.selection?.pickerVisibility === 'internal')
-    .flatMap((model) => [model.modelId, ...model.aliases]));
+  const internalVariantIds = new Set(
+    snapshot.models
+      .filter((model) => model.selection?.pickerVisibility === 'internal')
+      .flatMap((model) => [model.modelId, ...model.aliases]),
+  );
   const projected = snapshot.models
     .filter((effectiveModel) => effectiveModel.selection?.pickerVisibility !== 'internal')
     .filter((effectiveModel) => {
       if (effectiveModel.presencePolicy !== 'account-entitled' || effectiveModel.availability === 'available') {
         return true;
       }
-      return storedById.has(effectiveModel.modelId)
-        || effectiveModel.aliases.some((alias) => storedById.has(alias));
+      return storedById.has(effectiveModel.modelId) || effectiveModel.aliases.some((alias) => storedById.has(alias));
     })
     .map((effectiveModel) => {
-    const stored = storedById.get(effectiveModel.modelId)
-      ?? effectiveModel.aliases.map((alias) => storedById.get(alias)).find(Boolean);
-    return {
-      effectiveModel,
-      model: {
-        id: effectiveModel.modelId,
-        label: effectiveModel.label,
-        enabled: stored?.enabled ?? effectiveModel.enabled,
-        aliases: [...effectiveModel.aliases],
-        availability: effectiveModel.availability,
-        availabilityReason: effectiveModel.unavailableReason,
-        defaultReasoningSelection: stored?.defaultReasoningSelection,
-        defaultBudgetTokens: stored?.defaultBudgetTokens,
-        preferredRouteOptionId: stored?.preferredRouteOptionId,
-      },
-    };
+      const stored =
+        storedById.get(effectiveModel.modelId) ??
+        effectiveModel.aliases.map((alias) => storedById.get(alias)).find(Boolean);
+      return {
+        effectiveModel,
+        model: {
+          id: effectiveModel.modelId,
+          label: effectiveModel.label,
+          enabled: stored?.enabled ?? effectiveModel.enabled,
+          aliases: [...effectiveModel.aliases],
+          availability: effectiveModel.availability,
+          availabilityReason: effectiveModel.unavailableReason,
+          defaultReasoningSelection: stored?.defaultReasoningSelection,
+          defaultBudgetTokens: stored?.defaultBudgetTokens,
+          preferredRouteOptionId: stored?.preferredRouteOptionId,
+        },
+      };
     });
   const projectedIds = new Set(projected.flatMap(({ model }) => [model.id, ...model.aliases]));
   return [

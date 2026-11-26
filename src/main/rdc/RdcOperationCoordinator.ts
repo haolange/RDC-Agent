@@ -8,7 +8,8 @@ export function beginRdcLifecycle(sessionId: string): () => void {
   lifecycles.set(sessionId, (lifecycles.get(sessionId) ?? 0) + 1);
   return () => {
     const remaining = (lifecycles.get(sessionId) ?? 1) - 1;
-    if (remaining) lifecycles.set(sessionId, remaining); else lifecycles.delete(sessionId);
+    if (remaining) lifecycles.set(sessionId, remaining);
+    else lifecycles.delete(sessionId);
   };
 }
 export function acquireRdcPreparationLock(sessionId: string, owner: string): void {
@@ -19,13 +20,19 @@ export function runRdcOperation<T>(contextId: string, operation: () => Promise<T
   const previous = queues.get(contextId) ?? Promise.resolve();
   const pending = previous.catch(() => undefined).then(operation);
   queues.set(contextId, pending);
-  void pending.finally(() => { if (queues.get(contextId) === pending) queues.delete(contextId); }).catch(() => undefined);
+  void pending
+    .finally(() => {
+      if (queues.get(contextId) === pending) queues.delete(contextId);
+    })
+    .catch(() => undefined);
   return pending;
 }
 export function setRdcInteractionLock(sessionId: string, owner: string, locked: boolean): void {
   const entries = locks.get(sessionId) ?? new Set<string>();
-  if (locked) entries.add(owner); else entries.delete(owner);
-  if (entries.size) locks.set(sessionId, entries); else locks.delete(sessionId);
+  if (locked) entries.add(owner);
+  else entries.delete(owner);
+  if (entries.size) locks.set(sessionId, entries);
+  else locks.delete(sessionId);
   for (const listener of listeners) listener(sessionId);
 }
 export function getRdcInteractionLock(sessionId: string): string | null {
@@ -35,5 +42,8 @@ export function ownsRdcInteractionLock(sessionId: string, turnId: string): boole
   return locks.get(sessionId)?.has(turnId) === true;
 }
 export function subscribeRdcInteractionLock(listener: (sessionId: string) => void): () => void {
-  listeners.add(listener); return () => { listeners.delete(listener); };
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }

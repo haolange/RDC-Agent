@@ -5,7 +5,16 @@ import type { ReactNode } from 'react';
  * Trust for one project resource (a hook script or an MCP server): what state it is in, a warning when it changed
  * since it was trusted, and trust / revoke.
  */
-export function ResourceTrustBlock({ testId, state, title, hint, badge, changed, actions, children }: {
+export function ResourceTrustBlock({
+  testId,
+  state,
+  title,
+  hint,
+  badge,
+  changed,
+  actions,
+  children,
+}: {
   testId: string;
   state: string;
   title: string;

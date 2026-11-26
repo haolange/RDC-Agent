@@ -6,7 +6,12 @@ import { Toast, ToastStack } from '../ui/Toast';
 import { useNotificationStore, type Notification, type NotificationTone } from '../stores/notificationStore';
 
 /** Errors wait for the user; everything else leaves on its own. */
-const AUTO_DISMISS_MS: Record<NotificationTone, number | null> = { info: 4000, success: 4000, warning: 6000, error: null };
+const AUTO_DISMISS_MS: Record<NotificationTone, number | null> = {
+  info: 4000,
+  success: 4000,
+  warning: 6000,
+  error: null,
+};
 const VISIBLE_LIMIT = 3;
 
 function CopyErrorDetails({ details }: { details: NonNullable<Notification['details']> }) {
@@ -36,13 +41,20 @@ export const NotificationToast: React.FC = () => {
         active.delete(notification.id);
         continue;
       }
-      if (!running) active.set(notification.id, window.setTimeout(() => dismiss(notification.id), delay));
+      if (!running)
+        active.set(
+          notification.id,
+          window.setTimeout(() => dismiss(notification.id), delay),
+        );
     }
   }, [visible, closing, held, dismiss]);
 
-  useEffect(() => () => {
-    for (const timer of timers.current.values()) window.clearTimeout(timer);
-  }, []);
+  useEffect(
+    () => () => {
+      for (const timer of timers.current.values()) window.clearTimeout(timer);
+    },
+    [],
+  );
 
   return (
     <ToastStack>

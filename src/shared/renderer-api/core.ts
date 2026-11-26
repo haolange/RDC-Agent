@@ -65,7 +65,8 @@ export function createConversationApi(transport: RendererApiTransport, events: R
     answerToolApproval: (request) => transport.invoke('conversation:answerToolApproval', request),
     answerPlanReview: (request) => transport.invoke('conversation:answerPlanReview', request),
     getHistory: (sessionId) => transport.invoke('conversation:getHistory', sessionId),
-    getMessageSnapshot: (sessionId, messageId) => transport.invoke('conversation:getMessageSnapshot', sessionId, messageId),
+    getMessageSnapshot: (sessionId, messageId) =>
+      transport.invoke('conversation:getMessageSnapshot', sessionId, messageId),
     getDelegationTrace: (request) => transport.invoke('conversation:getDelegationTrace', request),
     getDelegationContent: (request) => transport.invoke('conversation:getDelegationContent', request),
     switchBranch: (request) => transport.invoke('conversation:switchBranch', request),
@@ -134,9 +135,8 @@ export function createKnowledgeApi(transport: RendererApiTransport): KnowledgeAp
 
 export function createCommandApi(transport: RendererApiTransport): CommandApi {
   return {
-    list: (category) => category === undefined
-      ? transport.invoke('command:list')
-      : transport.invoke('command:list', category),
+    list: (category) =>
+      category === undefined ? transport.invoke('command:list') : transport.invoke('command:list', category),
     execute: (request) => transport.invoke('command:execute', request),
   };
 }

@@ -1,4 +1,11 @@
-import { type ConversationWorkBlock, type ConversationReasoningState, type ConversationLoopStopReason, type ConversationLoopOutputPhase, type ConversationThinkingItem, type ConversationWorkTrace } from '@shared/types/conversation';
+import {
+  type ConversationWorkBlock,
+  type ConversationReasoningState,
+  type ConversationLoopStopReason,
+  type ConversationLoopOutputPhase,
+  type ConversationThinkingItem,
+  type ConversationWorkTrace,
+} from '@shared/types/conversation';
 import { lastLoopThinking } from '@shared/conversation/loopItems';
 import { normalizeWorkProcessText, formatDurationMs } from './workProcessFormat';
 import { groupImageRows } from './groupImageRows';
@@ -7,7 +14,11 @@ import { createApprovalRow } from './workProcessDecisionRows';
 import { createToolRowForPresentation } from './workProcessToolRows';
 import { countFailedActions, countWorkActions } from './workProcessSectionModel';
 import { type WorkProcessRow, type WorkProcessPresentation } from './workProcessTypes';
-import { buildPresentationUnits, presentationUnitsToDetailRows, type ThinkingItemPresentation } from './workProcessBlockProjection';
+import {
+  buildPresentationUnits,
+  presentationUnitsToDetailRows,
+  type ThinkingItemPresentation,
+} from './workProcessBlockProjection';
 import { markReadSearchResults, mergeWebReadsAcrossSteps } from './workProcessWebFlow';
 import { hasVisibleThinkingMarkdown } from './workProcessThinkingContent';
 import type { LocalizedTranslator } from '../../i18n/messages';
@@ -15,9 +26,8 @@ import type { AppLanguage } from '@shared/types/settings';
 
 const INTERNAL_BLOCK_IDS = new Set(['runtime-run', 'assistant-output', 'runtime-reasoning']);
 
-const normalizeThinkingDedupKey = (value: string): string => (
-  normalizeWorkProcessText(value).replace(/\s+/g, ' ').toLowerCase()
-);
+const normalizeThinkingDedupKey = (value: string): string =>
+  normalizeWorkProcessText(value).replace(/\s+/g, ' ').toLowerCase();
 
 const resolveReasoningState = (block: ConversationWorkBlock): ConversationReasoningState => {
   if (block.reasoningState) return block.reasoningState;
@@ -25,9 +35,8 @@ const resolveReasoningState = (block: ConversationWorkBlock): ConversationReason
   return thinking ? thinking.kind : 'none';
 };
 
-const isNonFinalStopReason = (stopReason?: ConversationLoopStopReason): boolean => (
-  stopReason === 'max_tokens' || stopReason === 'refusal' || stopReason === 'aborted'
-);
+const isNonFinalStopReason = (stopReason?: ConversationLoopStopReason): boolean =>
+  stopReason === 'max_tokens' || stopReason === 'refusal' || stopReason === 'aborted';
 
 const resolveOutputPhase = (block: ConversationWorkBlock): ConversationLoopOutputPhase => {
   // Runtime phase is authoritative. Before it settles, a loop without tools reads as the
@@ -77,7 +86,8 @@ const resolveThinkingItem = (
 const getLoopProjectionDeps = (t: LocalizedTranslator) => ({
   resolveOutputPhase,
   resolveReasoningState,
-  resolveThinkingItem: (block: ConversationWorkBlock, item: ConversationThinkingItem) => resolveThinkingItem(block, item, t),
+  resolveThinkingItem: (block: ConversationWorkBlock, item: ConversationThinkingItem) =>
+    resolveThinkingItem(block, item, t),
   isNonFinalStopReason,
   normalizeThinkingDedupKey,
   createApprovalRow: (block: ConversationWorkBlock) => createApprovalRow(block, t),
@@ -87,7 +97,9 @@ const getLoopProjectionDeps = (t: LocalizedTranslator) => ({
   countToolSteps,
 });
 
-const buildProjectionContext = (t: LocalizedTranslator): {
+const buildProjectionContext = (
+  t: LocalizedTranslator,
+): {
   visibleThinkingKeys: Set<string>;
   createToolRow: (call: import('@shared/types/conversation').ConversationToolCall) => WorkProcessRow;
   groupProcessRows: typeof groupProcessRows;
@@ -114,12 +126,19 @@ export const buildWorkProcessPresentation = (
 ): WorkProcessPresentation => {
   const blocks = Array.isArray(trace.blocks) ? trace.blocks : [];
   const reply = owner?.reply.trim();
-  const processBlocks = owner ? blocks.map((block) => block.items?.length ? {
-    ...block,
-    items: block.items.filter((item) => item.kind !== 'text' || (
-      item.phase !== 'final_answer' && (!reply || item.text.trim() !== reply)
-    )),
-  } : block) : blocks;
+  const processBlocks = owner
+    ? blocks.map((block) =>
+        block.items?.length
+          ? {
+              ...block,
+              items: block.items.filter(
+                (item) =>
+                  item.kind !== 'text' || (item.phase !== 'final_answer' && (!reply || item.text.trim() !== reply)),
+              ),
+            }
+          : block,
+      )
+    : blocks;
   const rows = markReadSearchResults(mergeWebReadsAcrossSteps(blocksToDetailRows(processBlocks, t), t.language));
   const toolCount = countToolSteps(rows);
   const stepCount = countSteps(rows);
@@ -140,28 +159,38 @@ export const buildWorkProcessPresentation = (
 
 const groupProcessRows = groupImageRows;
 
-const countToolSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) => {
-  if (row.type === 'section') return total + countToolSteps(row.steps);
-  if (row.type === 'tool') return total + (row.imageCalls?.length ?? 1);
-  if (row.type === 'userInput' || row.type === 'planReview') return total + 1;
-  return total;
-}, 0);
+const countToolSteps = (rows: WorkProcessRow[]): number =>
+  rows.reduce((total, row) => {
+    if (row.type === 'section') return total + countToolSteps(row.steps);
+    if (row.type === 'tool') return total + (row.imageCalls?.length ?? 1);
+    if (row.type === 'userInput' || row.type === 'planReview') return total + 1;
+    return total;
+  }, 0);
 
-const countSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) => {
-  if (row.type === 'section') return total + 1 + countSteps(row.steps);
-  return total + 1;
-}, 0);
+const countSteps = (rows: WorkProcessRow[]): number =>
+  rows.reduce((total, row) => {
+    if (row.type === 'section') return total + 1 + countSteps(row.steps);
+    return total + 1;
+  }, 0);
 
-const rowsHaveAttention = (rows: WorkProcessRow[]): boolean => rows.some((row) => {
-  if (row.type === 'section') return row.status === 'running' || row.status === 'error' || row.status === 'skipped' || rowsHaveAttention(row.steps);
-  return row.status === 'error' || row.status === 'running' || row.status === 'skipped';
-});
+const rowsHaveAttention = (rows: WorkProcessRow[]): boolean =>
+  rows.some((row) => {
+    if (row.type === 'section')
+      return (
+        row.status === 'running' || row.status === 'error' || row.status === 'skipped' || rowsHaveAttention(row.steps)
+      );
+    return row.status === 'error' || row.status === 'running' || row.status === 'skipped';
+  });
 
 /** How long the turn has worked: from its first block to its last settled one, or to `now` while a block still runs. */
 export const formatTraceDuration = (blocks: ConversationWorkBlock[], language: AppLanguage, now?: number): string => {
   const timestamps = blocks.flatMap((block) => [block.startedAt, block.completedAt].filter(isNumber));
   if (timestamps.length === 0) return '';
-  return formatDurationMs(language, Math.min(...timestamps), blocks.some((block) => !block.completedAt) ? now : Math.max(...timestamps));
+  return formatDurationMs(
+    language,
+    Math.min(...timestamps),
+    blocks.some((block) => !block.completedAt) ? now : Math.max(...timestamps),
+  );
 };
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);

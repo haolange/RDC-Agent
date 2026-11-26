@@ -16,9 +16,7 @@ export interface ConcurrentDispatchReservationFailure {
   limit: string;
 }
 
-export type ConcurrentDispatchReserveResult =
-  | ConcurrentDispatchReservation
-  | ConcurrentDispatchReservationFailure;
+export type ConcurrentDispatchReserveResult = ConcurrentDispatchReservation | ConcurrentDispatchReservationFailure;
 
 export interface ConcurrentToolSchedulerInput<TCall, TResult> {
   calls: readonly TCall[];
@@ -36,16 +34,11 @@ export async function executeConcurrentToolGroups<TCall, TResult>(
   input: ConcurrentToolSchedulerInput<TCall, TResult>,
 ): Promise<TResult[]> {
   const results: Array<TResult | undefined> = new Array(input.calls.length);
-  const groups = partitionConsecutiveSafeGroups(
-    input.calls.map((call, index) => input.isSafe(call, index)),
-  );
+  const groups = partitionConsecutiveSafeGroups(input.calls.map((call, index) => input.isSafe(call, index)));
   let stopNewGroups = false;
   let terminalResult = false;
 
-  const fillRange = (
-    indexes: readonly number[],
-    factory: (call: TCall, index: number) => TResult,
-  ) => {
+  const fillRange = (indexes: readonly number[], factory: (call: TCall, index: number) => TResult) => {
     for (const index of indexes) {
       if (results[index] === undefined) {
         results[index] = factory(input.calls[index], index);
@@ -66,23 +59,21 @@ export async function executeConcurrentToolGroups<TCall, TResult>(
     const groupCalls = group.callIndexes.map((index) => input.calls[index]);
 
     if (input.signal?.aborted) {
-      fillRange(remainingIndexesFrom(groupIndex), (call, index) => (
-        input.createNotStarted(call, index, 'aborted before dispatch')
-      ));
+      fillRange(remainingIndexesFrom(groupIndex), (call, index) =>
+        input.createNotStarted(call, index, 'aborted before dispatch'),
+      );
       break;
     }
     if (stopNewGroups) {
-      fillRange(group.callIndexes, (call, index) => (
-        input.createNotStarted(call, index, terminalResult ? 'turn completed after tool' : 'prior group failed')
-      ));
+      fillRange(group.callIndexes, (call, index) =>
+        input.createNotStarted(call, index, terminalResult ? 'turn completed after tool' : 'prior group failed'),
+      );
       continue;
     }
 
     const reservation = input.reserve(groupCalls);
     if (!reservation.ok) {
-      fillRange(group.callIndexes, (call, index) => (
-        input.createBudgetFailure(call, index, reservation.limit)
-      ));
+      fillRange(group.callIndexes, (call, index) => input.createBudgetFailure(call, index, reservation.limit));
       stopNewGroups = true;
       continue;
     }
@@ -109,7 +100,5 @@ export async function executeConcurrentToolGroups<TCall, TResult>(
     }
   }
 
-  return results.map((result, index) => (
-    result ?? input.createNotStarted(input.calls[index], index, 'missing result')
-  ));
+  return results.map((result, index) => result ?? input.createNotStarted(input.calls[index], index, 'missing result'));
 }

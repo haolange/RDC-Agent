@@ -9,11 +9,7 @@ import { rollbackAgentManifestDrafts } from './agentManifestAutosaveState';
 import { useProviderConnection } from './useProviderConnection';
 import { useSettingsModalState } from './useSettingsModalState';
 import { useSettingsDirty } from './settingsDirtyState';
-import {
-  getEnabledModels,
-  getProviderDisplayLabel,
-  sortProvidersByLabel,
-} from './utils';
+import { getEnabledModels, getProviderDisplayLabel, sortProvidersByLabel } from './utils';
 import type { AppSettings, LlmProviderCatalogResponse, LlmProviderEntry } from '@shared/types/settings';
 import type { AgentManifestDefinition, AgentManifestDraft } from '@shared/types/agentManifest';
 
@@ -42,7 +38,8 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const refreshSettings = useAppSettingsStore((state) => state.refreshSettings);
   // Opening Settings is where edits made outside the app (secrets, Agent files, trust) are picked up.
   useEffect(() => {
-    if (open) void refreshSettings().catch((error: unknown) => console.warn('[settings] could not refresh settings', error));
+    if (open)
+      void refreshSettings().catch((error: unknown) => console.warn('[settings] could not refresh settings', error));
   }, [open, refreshSettings]);
 
   const providerConnection = useProviderConnection({
@@ -60,34 +57,49 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   });
 
   const routableProviders = useMemo(
-    () => sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.enabled && provider.isConfigured && getEnabledModels(provider).length > 0)),
+    () =>
+      sortProvidersByLabel(
+        modalState.providerDrafts.filter(
+          (provider) => provider.enabled && provider.isConfigured && getEnabledModels(provider).length > 0,
+        ),
+      ),
     [modalState.providerDrafts],
   );
   const accountProviders = useMemo(
-    () => sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.category === 'login-authorization')),
+    () =>
+      sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.category === 'login-authorization')),
     [modalState.providerDrafts],
   );
   const providerCatalog = useMemo(
-    () => sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.category !== 'login-authorization')),
+    () =>
+      sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.category !== 'login-authorization')),
     [modalState.providerDrafts],
   );
   const configuredProvidersWithoutEnabledModels = useMemo(
-    () => sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.isConfigured && getEnabledModels(provider).length === 0)),
+    () =>
+      sortProvidersByLabel(
+        modalState.providerDrafts.filter(
+          (provider) => provider.isConfigured && getEnabledModels(provider).length === 0,
+        ),
+      ),
     [modalState.providerDrafts],
   );
   const getResolvedProviderLabel = (provider: Pick<LlmProviderEntry, 'label'>) =>
     getProviderDisplayLabel(provider, t('settings.unnamedProvider'));
 
-  const sections: Array<{ id: typeof modalState.activeSection; label: string; subtitle: string }> = useMemo(() => [
-    { id: 'general', label: t('settings.general'), subtitle: t('settings.generalSubtitle') },
-    { id: 'appearance', label: t('settings.appearance'), subtitle: t('settings.appearanceSubtitle') },
-    { id: 'models', label: t('settings.models'), subtitle: t('settings.modelsSubtitle') },
-    { id: 'agents', label: t('settings.agentManifestTitle'), subtitle: t('settings.agentsSubtitle') },
-    { id: 'skills', label: t('settings.skills'), subtitle: t('settings.skillsSubtitle') },
-    { id: 'tools', label: t('settings.toolsAndExtensions'), subtitle: t('settings.toolsSubtitle') },
-    { id: 'hooks', label: t('settings.hooks'), subtitle: t('settings.hooksSubtitle') },
-    { id: 'policy', label: t('settings.policy'), subtitle: t('settings.policySubtitle') },
-  ], [t]);
+  const sections: Array<{ id: typeof modalState.activeSection; label: string; subtitle: string }> = useMemo(
+    () => [
+      { id: 'general', label: t('settings.general'), subtitle: t('settings.generalSubtitle') },
+      { id: 'appearance', label: t('settings.appearance'), subtitle: t('settings.appearanceSubtitle') },
+      { id: 'models', label: t('settings.models'), subtitle: t('settings.modelsSubtitle') },
+      { id: 'agents', label: t('settings.agentManifestTitle'), subtitle: t('settings.agentsSubtitle') },
+      { id: 'skills', label: t('settings.skills'), subtitle: t('settings.skillsSubtitle') },
+      { id: 'tools', label: t('settings.toolsAndExtensions'), subtitle: t('settings.toolsSubtitle') },
+      { id: 'hooks', label: t('settings.hooks'), subtitle: t('settings.hooksSubtitle') },
+      { id: 'policy', label: t('settings.policy'), subtitle: t('settings.policySubtitle') },
+    ],
+    [t],
+  );
 
   const blockSubmit = (draft: AgentManifestDraft) => {
     const issues = validateAgentHandoffs(draft.handoffs, {
@@ -122,11 +134,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     currentProjectId,
     onSave: actions.handleSaveAgentManifests,
     onRollback: (failedDrafts, savedDrafts) => {
-      modalState.setAgentManifestDrafts((current) => rollbackAgentManifestDrafts(
-        current,
-        failedDrafts,
-        savedDrafts,
-      ));
+      modalState.setAgentManifestDrafts((current) => rollbackAgentManifestDrafts(current, failedDrafts, savedDrafts));
     },
     onSaveStateChange: modalState.setAgentManifestSaveState,
     onSaveMessageChange: modalState.setAgentManifestSaveMessage,
@@ -137,7 +145,9 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     failedMessage: t('settings.agentManifestSaveFailed'),
   });
 
-  useEffect(() => { rebaseAgentDraftsRef.current = agentManifestAutosave.rebase; });
+  useEffect(() => {
+    rebaseAgentDraftsRef.current = agentManifestAutosave.rebase;
+  });
 
   const dirty = useSettingsDirty(settings, {
     tools: {

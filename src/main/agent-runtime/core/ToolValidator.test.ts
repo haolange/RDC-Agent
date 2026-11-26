@@ -10,8 +10,14 @@ function def(parameters: ToolDefinition['parameters'], name = 'demo'): ToolDefin
 
 describe('ToolValidator', () => {
   it('enforces command/rdc exclusive schema modes before dispatch', () => {
-    const tool = def({ type: 'object', properties: { command: { type: 'string' }, rdc: { type: 'object' } },
-      oneOf: [{ required: ['command'], not: { required: ['rdc'] } }, { required: ['rdc'], not: { required: ['command'] } }] });
+    const tool = def({
+      type: 'object',
+      properties: { command: { type: 'string' }, rdc: { type: 'object' } },
+      oneOf: [
+        { required: ['command'], not: { required: ['rdc'] } },
+        { required: ['rdc'], not: { required: ['command'] } },
+      ],
+    });
     expect(validator.validate(tool, { command: 'echo ok' })).toEqual({ command: 'echo ok' });
     expect(validator.validate(tool, { rdc: {} })).toEqual({ rdc: {} });
     for (const args of [{}, { command: 'echo ok', rdc: {} }, { command: true }]) {
@@ -37,10 +43,9 @@ describe('ToolValidator', () => {
   });
 
   it('rejects missing required fields', () => {
-    expect(() => validator.validate(
-      def({ type: 'object', required: ['path'], properties: { path: { type: 'string' } } }),
-      {},
-    )).toThrow(ToolValidationError);
+    expect(() =>
+      validator.validate(def({ type: 'object', required: ['path'], properties: { path: { type: 'string' } } }), {}),
+    ).toThrow(ToolValidationError);
   });
 
   it('enforces minLength/maxLength/pattern', () => {
@@ -69,39 +74,45 @@ describe('ToolValidator', () => {
   });
 
   it('does not coerce safe path/command/url parameters', () => {
-    expect(() => validator.validate(
-      def({
-        type: 'object',
-        properties: {
-          path: { type: 'string' },
-          command: { type: 'string' },
-          url: { type: 'string' },
-        },
-      }),
-      { path: 12, command: true, url: 1 },
-    )).toThrow(/期望 string/);
+    expect(() =>
+      validator.validate(
+        def({
+          type: 'object',
+          properties: {
+            path: { type: 'string' },
+            command: { type: 'string' },
+            url: { type: 'string' },
+          },
+        }),
+        { path: 12, command: true, url: 1 },
+      ),
+    ).toThrow(/期望 string/);
 
-    expect(validator.validate(
-      def({
-        type: 'object',
-        properties: {
-          path: { type: 'string' },
-          command: { type: 'string' },
-          url: { type: 'string' },
-        },
-      }),
-      { path: '/tmp/a', command: 'ls', url: 'https://example.test' },
-    )).toEqual({ path: '/tmp/a', command: 'ls', url: 'https://example.test' });
+    expect(
+      validator.validate(
+        def({
+          type: 'object',
+          properties: {
+            path: { type: 'string' },
+            command: { type: 'string' },
+            url: { type: 'string' },
+          },
+        }),
+        { path: '/tmp/a', command: 'ls', url: 'https://example.test' },
+      ),
+    ).toEqual({ path: '/tmp/a', command: 'ls', url: 'https://example.test' });
   });
 
   it('rejects undeclared fields by default', () => {
-    expect(() => validator.validate(
-      def({
-        type: 'object',
-        properties: { name: { type: 'string' } },
-      }),
-      { name: 'ok', extra: true },
-    )).toThrow(/未声明字段/);
+    expect(() =>
+      validator.validate(
+        def({
+          type: 'object',
+          properties: { name: { type: 'string' } },
+        }),
+        { name: 'ok', extra: true },
+      ),
+    ).toThrow(/未声明字段/);
   });
 
   it('passes through opaque objects when properties is omitted', () => {
@@ -123,15 +134,17 @@ describe('ToolValidator', () => {
   });
 
   it('still rejects every key when properties is an empty object', () => {
-    expect(() => validator.validate(
-      def({
-        type: 'object',
-        properties: {
-          record: { type: 'object', properties: {} },
-        },
-      }),
-      { record: { evidenceId: 'ev-1' } },
-    )).toThrow(/未声明字段/);
+    expect(() =>
+      validator.validate(
+        def({
+          type: 'object',
+          properties: {
+            record: { type: 'object', properties: {} },
+          },
+        }),
+        { record: { evidenceId: 'ev-1' } },
+      ),
+    ).toThrow(/未声明字段/);
   });
 
   it('enforces anyOf and union types instead of rejecting them', () => {
@@ -149,15 +162,19 @@ describe('ToolValidator', () => {
   it('rejects keywords outside the supported set', () => {
     const unsupported = ['prefixItems', 'patternProperties', 'if', 'contains', 'dependentRequired', '$id'];
     for (const key of unsupported) {
-      expect(() => validator.validate(
-        def({
-          type: 'object',
-          properties: {
-            n: { type: 'number', [key]: 1 } as never,
-          },
-        }),
-        { n: 1 },
-      ), key).toThrow(/不支持的 schema 关键字/);
+      expect(
+        () =>
+          validator.validate(
+            def({
+              type: 'object',
+              properties: {
+                n: { type: 'number', [key]: 1 } as never,
+              },
+            }),
+            { n: 1 },
+          ),
+        key,
+      ).toThrow(/不支持的 schema 关键字/);
     }
   });
 
@@ -180,6 +197,15 @@ it('validates actual shell discovery and execution modes without mixed fields', 
   const { shellTool } = await import('../tools/primitives/ShellTool');
   const tool = { name: shellTool.name, description: shellTool.description, parameters: shellTool.parameters };
   const validator = new ToolValidator();
-  for (const rdc of [{ discovery: { kind: 'search', query: 'pixel', limit: 8 } }, { discovery: { kind: 'describe', operation: 'rd.texture.get_pixel_history' } }, { operation: 'rd.texture.get_pixel_history', args: { x: 0 } }]) expect(() => validator.validate(tool, { rdc })).not.toThrow();
-  for (const rdc of [{ discovery: { kind: 'search', query: 'pixel' }, operation: 'rd.core.init' }, { discovery: { kind: 'describe', operation: 'rd.texture.get_pixel_history', query: 'pixel' } }]) expect(() => validator.validate(tool, { rdc })).toThrow();
+  for (const rdc of [
+    { discovery: { kind: 'search', query: 'pixel', limit: 8 } },
+    { discovery: { kind: 'describe', operation: 'rd.texture.get_pixel_history' } },
+    { operation: 'rd.texture.get_pixel_history', args: { x: 0 } },
+  ])
+    expect(() => validator.validate(tool, { rdc })).not.toThrow();
+  for (const rdc of [
+    { discovery: { kind: 'search', query: 'pixel' }, operation: 'rd.core.init' },
+    { discovery: { kind: 'describe', operation: 'rd.texture.get_pixel_history', query: 'pixel' } },
+  ])
+    expect(() => validator.validate(tool, { rdc })).toThrow();
 });

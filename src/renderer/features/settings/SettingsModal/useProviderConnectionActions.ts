@@ -57,7 +57,10 @@ export const useProviderConnectionActions = (
       if (connectionDraft.authMode === 'account') {
         const result = await window.electronAPI.llm.refreshProviderModels(connectionDraft.providerId);
         if (!result.success) {
-          updateConnectionDraft({ busy: 'idle', error: connectionFailureText(result, t, 'settings.providerTestFailed') });
+          updateConnectionDraft({
+            busy: 'idle',
+            error: connectionFailureText(result, t, 'settings.providerTestFailed'),
+          });
           return;
         }
         updateConnectionDraft({
@@ -67,8 +70,9 @@ export const useProviderConnectionActions = (
         await refreshLocalSettings(connectionDraft.providerId);
         return;
       }
-      const request = providerConnectionRequest(connectionDraft) as Parameters<typeof window.electronAPI.llm.testProviderDraft>[0]
-        & { protocol?: typeof connectionDraft.protocol };
+      const request = providerConnectionRequest(connectionDraft) as Parameters<
+        typeof window.electronAPI.llm.testProviderDraft
+      >[0] & { protocol?: typeof connectionDraft.protocol };
       const result = await window.electronAPI.llm.testProviderDraft(request);
       if (!result.success) {
         updateConnectionDraft({ busy: 'idle', error: connectionFailureText(result, t, 'settings.providerTestFailed') });
@@ -94,13 +98,13 @@ export const useProviderConnectionActions = (
         }
         const status = connectionDraft.accountStatus?.requiresCodeInput
           ? await window.electronAPI.llm.finishProviderAccountLogin({
-            providerId: connectionDraft.providerId,
-            code: connectionDraft.authCode,
-          })
+              providerId: connectionDraft.providerId,
+              code: connectionDraft.authCode,
+            })
           : await window.electronAPI.llm.startProviderAccountLogin({
-            providerId: connectionDraft.providerId,
-            authMode: connectionDraft.authMode,
-          });
+              providerId: connectionDraft.providerId,
+              authMode: connectionDraft.authMode,
+            });
         if (!status.connected && status.state !== 'pending') {
           updateConnectionDraft({ busy: 'idle', error: '', accountStatus: status });
           return;
@@ -121,10 +125,16 @@ export const useProviderConnectionActions = (
       const request = {
         ...providerConnectionRequest(connectionDraft),
         modelPreferences: modelPreferences(),
-      } as Parameters<typeof window.electronAPI.llm.connectProvider>[0] & { protocol?: typeof connectionDraft.protocol };
+      } as Parameters<typeof window.electronAPI.llm.connectProvider>[0] & {
+        protocol?: typeof connectionDraft.protocol;
+      };
       const result = await window.electronAPI.llm.connectProvider(request);
       if (!result.success) {
-        updateConnectionDraft({ busy: 'idle', error: connectionFailureText(result, t, 'settings.providerSaveFailed'), models: [] });
+        updateConnectionDraft({
+          busy: 'idle',
+          error: connectionFailureText(result, t, 'settings.providerSaveFailed'),
+          models: [],
+        });
         return;
       }
       await reopenSaved(connectionDraft.providerId);

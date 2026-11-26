@@ -5,12 +5,12 @@ import type { ContextMenuTarget } from './contextMenuTarget';
 export type ContextMenuItem =
   | { type: 'separator' }
   | {
-    type: 'command';
-    id: ContextMenuCommandId;
-    label: string;
-    shortcut: string;
-    disabled: boolean;
-  };
+      type: 'command';
+      id: ContextMenuCommandId;
+      label: string;
+      shortcut: string;
+      disabled: boolean;
+    };
 
 export interface ContextMenuLabels {
   undo: string;
@@ -74,10 +74,7 @@ export function buildContextMenuItems(
   if (target.kind === 'none') return [];
   const clipboardEmpty = clipboardText.length === 0;
   if (!target.writable) {
-    return [
-      command('copy', labels, shortcuts, !target.hasSelection),
-      command('selectAll', labels, shortcuts, false),
-    ];
+    return [command('copy', labels, shortcuts, !target.hasSelection), command('selectAll', labels, shortcuts, false)];
   }
   return [
     command('undo', labels, shortcuts, !canUndo(target)),

@@ -20,9 +20,9 @@ export interface SkillCatalogBudgetInput {
 
 export function resolveSkillCatalogBudget(input: SkillCatalogBudgetInput): SkillCatalogBudget {
   const includeSkillCatalog = input.skillCatalogCount > 0;
-  const catalogCharBudget = Number.isFinite(input.contextWindowTokens)
-    && (input.contextWindowTokens as number) > 0
-    ? Math.max(1000, Math.floor((input.contextWindowTokens as number) * 0.02 * 4))
-    : 8000;
+  const catalogCharBudget =
+    Number.isFinite(input.contextWindowTokens) && (input.contextWindowTokens as number) > 0
+      ? Math.max(1000, Math.floor((input.contextWindowTokens as number) * 0.02 * 4))
+      : 8000;
   return { includeSkillCatalog, catalogCharBudget };
 }

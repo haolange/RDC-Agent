@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  groupKnowledgeImages,
-  isSafeKnowledgePreviewPath,
-  normalizeKnowledgePreviewPath,
-} from './knowledgeCardImages';
+import { groupKnowledgeImages, isSafeKnowledgePreviewPath, normalizeKnowledgePreviewPath } from './knowledgeCardImages';
 
 describe('knowledge card image grouping', () => {
   it('pairs observed and reference in order', () => {
@@ -12,10 +8,12 @@ describe('knowledge card image grouping', () => {
       { relativePath: 'cases/a/extra.png', role: 'illustration' },
       { relativePath: 'cases/a/reference.png', role: 'reference' },
     ]);
-    expect(grouped.pairs).toEqual([{
-      observed: { relativePath: 'cases/a/observed.png', role: 'observed' },
-      reference: { relativePath: 'cases/a/reference.png', role: 'reference' },
-    }]);
+    expect(grouped.pairs).toEqual([
+      {
+        observed: { relativePath: 'cases/a/observed.png', role: 'observed' },
+        reference: { relativePath: 'cases/a/reference.png', role: 'reference' },
+      },
+    ]);
     expect(grouped.singles).toEqual([{ relativePath: 'cases/a/extra.png', role: 'illustration' }]);
   });
 

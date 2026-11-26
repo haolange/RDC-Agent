@@ -75,9 +75,14 @@ export function readJsonl<T>(
     if (value.ok) accept(value.value);
     else diagnostics.push({ line: lineNumber, error: value.error });
   };
-  const ioError = (error: unknown) => new Error(`Failed to read JSONL file: ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+  const ioError = (error: unknown) =>
+    new Error(`Failed to read JSONL file: ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
   let fd: number;
-  try { fd = fs.openSync(filePath, 'r'); } catch (error) { throw ioError(error); }
+  try {
+    fd = fs.openSync(filePath, 'r');
+  } catch (error) {
+    throw ioError(error);
+  }
   let tornTail: JsonlTornTail | undefined;
   try {
     const buffer = Buffer.allocUnsafe(64 * 1024);
@@ -86,7 +91,11 @@ export function readJsonl<T>(
     let total = 0;
     let bytes: number;
     const read = () => {
-      try { return fs.readSync(fd, buffer, 0, buffer.length, null); } catch (error) { throw ioError(error); }
+      try {
+        return fs.readSync(fd, buffer, 0, buffer.length, null);
+      } catch (error) {
+        throw ioError(error);
+      }
     };
     while ((bytes = read()) > 0) {
       total += bytes;
@@ -206,9 +215,7 @@ export function writeJsonl(filePath: string, items: unknown[]): void {
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  const content = items.length > 0
-    ? `${items.map((item) => JSON.stringify(item, null, 0)).join('\n')}\n`
-    : '';
+  const content = items.length > 0 ? `${items.map((item) => JSON.stringify(item, null, 0)).join('\n')}\n` : '';
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
@@ -218,5 +225,7 @@ export function assertNoJsonlDiagnostics(filePath: string, diagnostics: JsonlDia
     .slice(0, 3)
     .map((entry) => `line ${entry.line}: ${entry.error}`)
     .join('; ');
-  throw new AppError('STORAGE_CORRUPT', `JSONL corruption in ${filePath}: ${preview}`, { params: { file: path.basename(filePath) } });
+  throw new AppError('STORAGE_CORRUPT', `JSONL corruption in ${filePath}: ${preview}`, {
+    params: { file: path.basename(filePath) },
+  });
 }

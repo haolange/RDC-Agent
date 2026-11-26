@@ -23,7 +23,9 @@ export function remarkCodeFenceTitle() {
 /** The language a fenced block declares (its `language-*` class) and the file named in its meta string. */
 export function parseCodeFence(className: unknown, meta: unknown): { language: string; fileName?: string } {
   const classes = Array.isArray(className) ? className : typeof className === 'string' ? className.split(/\s+/) : [];
-  const languageClass = classes.find((name): name is string => typeof name === 'string' && name.startsWith('language-'));
+  const languageClass = classes.find(
+    (name): name is string => typeof name === 'string' && name.startsWith('language-'),
+  );
   const language = languageClass?.slice('language-'.length) ?? '';
   const titled = typeof meta === 'string' ? /(?:title|file|filename)=(?:"([^"]+)"|'([^']+)'|(\S+))/.exec(meta) : null;
   const fileName = titled?.[1] || titled?.[2] || titled?.[3] || undefined;

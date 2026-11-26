@@ -1,10 +1,6 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 
-export type ActiveSignalTone =
-  | 'neutral'
-  | 'info'
-  | 'interaction'
-  | 'response';
+export type ActiveSignalTone = 'neutral' | 'info' | 'interaction' | 'response';
 
 interface ActiveSignalTextProps extends HTMLAttributes<HTMLSpanElement> {
   active?: boolean;
@@ -19,19 +15,12 @@ export function ActiveSignalText({
   children,
   ...rest
 }: ActiveSignalTextProps) {
-  const classes = [
-    'active-signal-text',
-    active ? 'is-active' : '',
-    `tone-${tone}`,
-    className,
-  ].filter(Boolean).join(' ');
+  const classes = ['active-signal-text', active ? 'is-active' : '', `tone-${tone}`, className]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <span
-      {...rest}
-      className={classes}
-      data-active-signal={active ? tone : undefined}
-    >
+    <span {...rest} className={classes} data-active-signal={active ? tone : undefined}>
       {children}
     </span>
   );

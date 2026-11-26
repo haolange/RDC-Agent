@@ -1,4 +1,6 @@
-vi.mock('../settings/settings-core/SettingsService', () => ({ settingsService: { snapshot: () => ({ revision: 1, user: { appearance: { language: mocks.language } } }) } }));
+vi.mock('../settings/settings-core/SettingsService', () => ({
+  settingsService: { snapshot: () => ({ revision: 1, user: { appearance: { language: mocks.language } } }) },
+}));
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -13,23 +15,49 @@ import type { WorkbenchIpcContext } from './workbenchContext';
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => Promise<any>>(),
   language: 'zh-CN',
-  read: vi.fn(), saveDialog: vi.fn(), confirm: vi.fn(),
-  location: vi.fn(), paths: vi.fn(),
+  read: vi.fn(),
+  saveDialog: vi.fn(),
+  confirm: vi.fn(),
+  location: vi.fn(),
+  paths: vi.fn(),
 }));
-vi.mock('electron', () => ({ ipcMain: { handle: (id: string, fn: (...args: unknown[]) => Promise<any>) => mocks.handlers.set(id, fn) },
-  BrowserWindow: { getFocusedWindow: () => ({}) }, dialog: { showSaveDialog: mocks.saveDialog, showMessageBox: mocks.confirm } }));
+vi.mock('electron', () => ({
+  ipcMain: { handle: (id: string, fn: (...args: unknown[]) => Promise<any>) => mocks.handlers.set(id, fn) },
+  BrowserWindow: { getFocusedWindow: () => ({}) },
+  dialog: { showSaveDialog: mocks.saveDialog, showMessageBox: mocks.confirm },
+}));
 vi.mock('../sessions/run/sessionPlanReference', () => ({ readReferencedPlan: mocks.read }));
-vi.mock('../sessions/store/sessionStores', () => ({ sessionRecordStore: { findSessionLocation: mocks.location }, get storageIo() { return new StorageIo(); } }));
+vi.mock('../sessions/store/sessionStores', () => ({
+  sessionRecordStore: { findSessionLocation: mocks.location },
+  get storageIo() {
+    return new StorageIo();
+  },
+}));
 vi.mock('../runtime/AppPathService', () => ({ appPathService: { getProjectRdcPaths: mocks.paths } }));
 vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn() } }));
-vi.mock('../conversation/ConversationService', () => ({ conversationService: {
-  isSessionBusy: () => false, isTurnActive: () => false, cancelActiveTurn: vi.fn(),
-} }));
-vi.mock('../agent-runtime/interactions/AgentPlanReviewRequestService', () => ({ agentPlanReviewRequestService: {
-  setBusyChecker: vi.fn(), subscribe: vi.fn(), reopen: vi.fn(), cancel: vi.fn(),
-} }));
+vi.mock('../conversation/ConversationService', () => ({
+  conversationService: {
+    isSessionBusy: () => false,
+    isTurnActive: () => false,
+    cancelActiveTurn: vi.fn(),
+  },
+}));
+vi.mock('../agent-runtime/interactions/AgentPlanReviewRequestService', () => ({
+  agentPlanReviewRequestService: {
+    setBusyChecker: vi.fn(),
+    subscribe: vi.fn(),
+    reopen: vi.fn(),
+    cancel: vi.fn(),
+  },
+}));
 
-const request = { sessionId: 's', planId: 'old-plan', revision: 2, uri: 'session://plans/plan-frozen.md', expectedHash: 'a'.repeat(64) };
+const request = {
+  sessionId: 's',
+  planId: 'old-plan',
+  revision: 2,
+  uri: 'session://plans/plan-frozen.md',
+  expectedHash: 'a'.repeat(64),
+};
 const context = { state: { currentSessionId: 's' } } as WorkbenchIpcContext;
 let root: string;
 const invoke = (channel: string, args: unknown) => mocks.handlers.get(channel)!(null, args);
@@ -39,8 +67,14 @@ beforeEach(() => {
   context.state.currentSessionId = 's';
   mocks.location.mockReturnValue({ project: { rootPath: root } });
   mocks.paths.mockReturnValue({ plansPath: path.join(root, '.rdc-agent', 'plans') });
-  mocks.read.mockReturnValue({ markdown: '# Old body\n', hash: request.expectedHash, uri: request.uri,
-    ownerSessionId: 's', agentId: 'debugger', plan: { planId: request.planId, revision: 2, title: 'Old plan' } });
+  mocks.read.mockReturnValue({
+    markdown: '# Old body\n',
+    hash: request.expectedHash,
+    uri: request.uri,
+    ownerSessionId: 's',
+    agentId: 'debugger',
+    plan: { planId: request.planId, revision: 2, title: 'Old plan' },
+  });
   mocks.saveDialog.mockResolvedValue({ canceled: false, filePath: path.join(root, 'export.md') });
   mocks.confirm.mockResolvedValue({ response: 0 });
   registerPlanHandlers(context);
@@ -58,15 +92,24 @@ describe('plan IPC file authority', () => {
     const result = await invoke('plan:saveToProject', { ...request, approvalToken: grant.token });
     expect(result.success).toBe(true);
     const content = fs.readFileSync(result.path, 'utf8');
-    expect(parse(content.split('---')[1])).toMatchObject({ planId: 'old-plan', revision: 2, agent: 'debugger', sha256: request.expectedHash });
+    expect(parse(content.split('---')[1])).toMatchObject({
+      planId: 'old-plan',
+      revision: 2,
+      agent: 'debugger',
+      sha256: request.expectedHash,
+    });
     expect(content).toContain('# Old body');
     expect((await invoke('plan:saveToProject', { ...request, approvalToken: grant.token })).success).toBe(false);
   });
-  it.each(['path', 'hash', 'revision'])('rejects substituted %s and consumes the grant', async field => {
+  it.each(['path', 'hash', 'revision'])('rejects substituted %s and consumes the grant', async (field) => {
     const grant = await invoke('plan:issueApprovalToken', { ...request, action: 'plan.export' });
     const args = { ...request, approvalToken: grant.token, targetPath: grant.targetPath };
-    const altered = field === 'path' ? { ...args, targetPath: path.join(root, 'victim.md') }
-      : field === 'hash' ? { ...args, expectedHash: 'b'.repeat(64) } : { ...args, revision: 3 };
+    const altered =
+      field === 'path'
+        ? { ...args, targetPath: path.join(root, 'victim.md') }
+        : field === 'hash'
+          ? { ...args, expectedHash: 'b'.repeat(64) }
+          : { ...args, revision: 3 };
     expect((await invoke('plan:export', altered)).error).toBe('PLAN_APPROVAL_TOKEN_INVALID');
     expect((await invoke('plan:export', args)).success).toBe(false);
     expect(fs.readdirSync(root)).toEqual([]);
@@ -82,16 +125,32 @@ describe('plan IPC file authority', () => {
   it('does not issue after dialog cancellation or a session switch during confirmation', async () => {
     mocks.saveDialog.mockResolvedValueOnce({ canceled: true });
     expect(await invoke('plan:issueApprovalToken', { ...request, action: 'plan.export' })).toEqual({ cancelled: true });
-    mocks.confirm.mockImplementationOnce(async () => { context.state.currentSessionId = 'other'; return { response: 0 }; });
-    await expect(invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' })).rejects.toThrow(/SESSION_DENIED/);
+    mocks.confirm.mockImplementationOnce(async () => {
+      context.state.currentSessionId = 'other';
+      return { response: 0 };
+    });
+    await expect(invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' })).rejects.toThrow(
+      /SESSION_DENIED/,
+    );
   });
 });
 
-it.each([['zh-CN', '确认写入计划文件', '取消'], ['en', 'Confirm plan file write', 'Cancel']])('localizes %s plan confirmation and does not issue after cancellation', async (language, title, cancel) => {
+it.each([
+  ['zh-CN', '确认写入计划文件', '取消'],
+  ['en', 'Confirm plan file write', 'Cancel'],
+])('localizes %s plan confirmation and does not issue after cancellation', async (language, title, cancel) => {
   mocks.language = language;
   mocks.confirm.mockResolvedValueOnce({ response: 1 });
-  expect(await invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' })).toEqual({ cancelled: true });
-  expect(mocks.confirm).toHaveBeenLastCalledWith(expect.any(Object), expect.objectContaining({
-    title, buttons: [expect.any(String), cancel], defaultId: 1, cancelId: 1,
-  }));
+  expect(await invoke('plan:issueApprovalToken', { ...request, action: 'plan.saveToProject' })).toEqual({
+    cancelled: true,
+  });
+  expect(mocks.confirm).toHaveBeenLastCalledWith(
+    expect.any(Object),
+    expect.objectContaining({
+      title,
+      buttons: [expect.any(String), cancel],
+      defaultId: 1,
+      cancelId: 1,
+    }),
+  );
 });

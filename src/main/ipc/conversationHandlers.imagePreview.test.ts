@@ -67,20 +67,24 @@ describe('conversation:getToolImagePreview', () => {
   }
 
   it('denies previews for a session that is not current', async () => {
-    const result = await invoke({ currentSessionId: 'session-current' }, [{
-      sessionId: 'session-other',
-      previewId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
-    }]);
+    const result = await invoke({ currentSessionId: 'session-current' }, [
+      {
+        sessionId: 'session-other',
+        previewId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+    ]);
     expect(result).toEqual({ dataUrl: null, error: 'IMAGE_PREVIEW_SESSION_DENIED' });
     expect(readToolImagePreviewDataUrl).not.toHaveBeenCalled();
   });
 
   it('returns the data URL for the active session', async () => {
     readToolImagePreviewDataUrl.mockReturnValue('data:image/png;base64,abc');
-    const result = await invoke({ currentSessionId: 'session-current' }, [{
-      sessionId: 'session-current',
-      previewId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
-    }]);
+    const result = await invoke({ currentSessionId: 'session-current' }, [
+      {
+        sessionId: 'session-current',
+        previewId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+    ]);
     expect(result).toEqual({ dataUrl: 'data:image/png;base64,abc' });
   });
 });
@@ -105,29 +109,35 @@ describe('conversation:getAttachmentPreview', () => {
   }
 
   it('denies session previews that are not the active session', async () => {
-    const result = await invoke({ currentSessionId: 'session-current' }, [{
-      previewId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      sessionId: 'session-other',
-    }]);
+    const result = await invoke({ currentSessionId: 'session-current' }, [
+      {
+        previewId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        sessionId: 'session-other',
+      },
+    ]);
     expect(result).toEqual({ dataUrl: null, error: 'IMAGE_PREVIEW_SESSION_DENIED' });
     expect(listSessionAttachments).not.toHaveBeenCalled();
   });
 
   it('rejects session attachment paths that escape the attachments directory', async () => {
-    listSessionAttachments.mockReturnValue([{
-      attachmentId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      sessionId: 'session-current',
-      mimeType: 'image/png',
-      filePath: 'C:\\escape\\secret.png',
-    }]);
+    listSessionAttachments.mockReturnValue([
+      {
+        attachmentId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        sessionId: 'session-current',
+        mimeType: 'image/png',
+        filePath: 'C:\\escape\\secret.png',
+      },
+    ]);
     getSessionAttachmentsDir.mockReturnValue('C:\\sessions\\session-current\\attachments');
     assertAttachmentPreviewPath.mockImplementation(() => {
       throw new Error('IMAGE_PREVIEW_PATH_ESCAPE');
     });
-    const result = await invoke({ currentSessionId: 'session-current' }, [{
-      previewId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      sessionId: 'session-current',
-    }]);
+    const result = await invoke({ currentSessionId: 'session-current' }, [
+      {
+        previewId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        sessionId: 'session-current',
+      },
+    ]);
     expect(result).toEqual({ dataUrl: null, error: 'IMAGE_PREVIEW_PATH_ESCAPE' });
     expect(readAttachmentFilePreviewDataUrl).not.toHaveBeenCalled();
   });

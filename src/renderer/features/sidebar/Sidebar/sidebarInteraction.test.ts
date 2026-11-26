@@ -12,46 +12,74 @@ const project = { projectId: 'project', name: 'Project', rootPath: 'D:\\project'
 const session = { sessionId: 'session', projectId: 'project', title: '会话 Long name' } as SessionRecord;
 let root: Root;
 let host: HTMLDivElement;
-beforeEach(() => { vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); host = document.createElement('div'); document.body.append(host); root = createRoot(host); });
-afterEach(() => { act(() => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+});
+afterEach(() => {
+  act(() => root.unmount());
+  host.remove();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 it('keeps selection separate from rename/remove actions and targets the exact session', () => {
-  const activate = vi.fn(); const rename = vi.fn(); const remove = vi.fn();
-  act(() => root.render(createElement(SessionListItem, {
-    project, session, isSessionRailActive: true, onActivate: activate,
-    onContextMenu: vi.fn(), onRenameClick: rename, onRemoveClick: remove,
-    onRenameKeyDown: vi.fn(), onRemoveKeyDown: vi.fn(),
-  })));
+  const activate = vi.fn();
+  const rename = vi.fn();
+  const remove = vi.fn();
+  act(() =>
+    root.render(
+      createElement(SessionListItem, {
+        project,
+        session,
+        isSessionRailActive: true,
+        onActivate: activate,
+        onContextMenu: vi.fn(),
+        onRenameClick: rename,
+        onRemoveClick: remove,
+        onRenameKeyDown: vi.fn(),
+        onRemoveKeyDown: vi.fn(),
+      }),
+    ),
+  );
   const buttons = host.querySelectorAll('button');
-  act(() => buttons[1].click()); expect(rename.mock.calls[0][1]).toBe(session); expect(activate).not.toHaveBeenCalled();
-  act(() => buttons[2].click()); expect(remove.mock.calls[0][1]).toBe(session); expect(activate).not.toHaveBeenCalled();
-  act(() => buttons[0].click()); expect(activate).toHaveBeenCalledExactlyOnceWith(project, session);
+  act(() => buttons[1].click());
+  expect(rename.mock.calls[0][1]).toBe(session);
+  expect(activate).not.toHaveBeenCalled();
+  act(() => buttons[2].click());
+  expect(remove.mock.calls[0][1]).toBe(session);
+  expect(activate).not.toHaveBeenCalled();
+  act(() => buttons[0].click());
+  expect(activate).toHaveBeenCalledExactlyOnceWith(project, session);
   expect(host.querySelector('.is-selected')).not.toBeNull();
 });
 
 it('never shows another project session beneath the selected project while its list is changing', () => {
   const otherProject = { projectId: 'other', name: 'Other', rootPath: 'D:\\other' } as ProjectRecord;
   const otherSession = { sessionId: 'other-session', projectId: 'other', title: 'Other session' } as SessionRecord;
-  const renderGroup = (selectedProject: ProjectRecord) => createElement(ProjectGroup, {
-    project: selectedProject,
-    isCurrentProject: true,
-    isProjectRailActive: true,
-    isExpanded: true,
-    projectSessions: [session, otherSession],
-    showAllSessions: false,
-    rightRailTarget: 'project',
-    onProjectSelect: vi.fn(),
-    onProjectChevronClick: vi.fn(),
-    onToggleProjectExpanded: vi.fn(),
-    onOpenProjectMenu: vi.fn(),
-    onSessionActivate: vi.fn(),
-    onSessionContextMenu: vi.fn(),
-    onRenameClick: vi.fn(),
-    onRemoveClick: vi.fn(),
-    onRenameKeyDown: vi.fn(),
-    onRemoveKeyDown: vi.fn(),
-    onToggleShowAll: vi.fn(),
-  });
+  const renderGroup = (selectedProject: ProjectRecord) =>
+    createElement(ProjectGroup, {
+      project: selectedProject,
+      isCurrentProject: true,
+      isProjectRailActive: true,
+      isExpanded: true,
+      projectSessions: [session, otherSession],
+      showAllSessions: false,
+      rightRailTarget: 'project',
+      onProjectSelect: vi.fn(),
+      onProjectChevronClick: vi.fn(),
+      onToggleProjectExpanded: vi.fn(),
+      onOpenProjectMenu: vi.fn(),
+      onSessionActivate: vi.fn(),
+      onSessionContextMenu: vi.fn(),
+      onRenameClick: vi.fn(),
+      onRemoveClick: vi.fn(),
+      onRenameKeyDown: vi.fn(),
+      onRemoveKeyDown: vi.fn(),
+      onToggleShowAll: vi.fn(),
+    });
 
   act(() => root.render(renderGroup(project)));
   expect(host.textContent).toContain(session.title);
@@ -63,21 +91,33 @@ it('never shows another project session beneath the selected project while its l
 });
 
 it('focuses/selects a new rename target, preserves editing focus, commits Enter and dismisses outside', () => {
-  const close = vi.fn(); const commit = vi.fn();
+  const close = vi.fn();
+  const commit = vi.fn();
   const props: RenamePopoverProps = {
-    isBusy: false, renamePopover: { session, x: 5, y: 10, titleDraft: session.title },
-    projectMenuPopover: null, projectRenamePopover: null,
-    onRenameDraftChange: vi.fn(), onProjectRenameDraftChange: vi.fn(),
-    onCloseRename: close, onCloseProjectMenu: vi.fn(), onCloseProjectRename: vi.fn(),
-    onCommitSessionRename: commit, onCommitProjectRename: vi.fn(), onOpenExplorer: vi.fn(),
-    onStartProjectRename: vi.fn(), onSessionCreate: vi.fn(), onRemoveProject: vi.fn(),
+    isBusy: false,
+    renamePopover: { session, x: 5, y: 10, titleDraft: session.title },
+    projectMenuPopover: null,
+    projectRenamePopover: null,
+    onRenameDraftChange: vi.fn(),
+    onProjectRenameDraftChange: vi.fn(),
+    onCloseRename: close,
+    onCloseProjectMenu: vi.fn(),
+    onCloseProjectRename: vi.fn(),
+    onCommitSessionRename: commit,
+    onCommitProjectRename: vi.fn(),
+    onOpenExplorer: vi.fn(),
+    onStartProjectRename: vi.fn(),
+    onSessionCreate: vi.fn(),
+    onRemoveProject: vi.fn(),
   };
   act(() => root.render(createElement(RenamePopover, props)));
   const input = host.querySelector('input')!;
-  expect(document.activeElement).toBe(input); expect(input.selectionEnd).toBe(session.title.length);
+  expect(document.activeElement).toBe(input);
+  expect(input.selectionEnd).toBe(session.title.length);
   input.setSelectionRange(2, 2);
   act(() => root.render(createElement(RenamePopover, { ...props, renamePopover: { ...props.renamePopover!, x: 20 } })));
-  expect(document.activeElement).toBe(input); expect(input.selectionStart).toBe(2);
+  expect(document.activeElement).toBe(input);
+  expect(input.selectionStart).toBe(2);
   act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })));
   expect(commit).toHaveBeenCalledOnce();
   act(() => input.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));

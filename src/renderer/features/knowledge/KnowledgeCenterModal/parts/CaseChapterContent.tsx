@@ -26,7 +26,12 @@ const EVIDENCE_KIND_LABELS: Record<string, TranslationKey> = {
 function Symptoms({ record }: { record: CaseRecord }) {
   const { t } = useI18n();
   const { expected, observed, ...rest } = record;
-  const sides = ([['expected', expected], ['observed', observed]] as const).filter(([, item]) => item !== undefined);
+  const sides = (
+    [
+      ['expected', expected],
+      ['observed', observed],
+    ] as const
+  ).filter(([, item]) => item !== undefined);
   return (
     <div className="knowledge-symptoms">
       {sides.length ? (
@@ -34,7 +39,9 @@ function Symptoms({ record }: { record: CaseRecord }) {
           {sides.map(([key, item]) => (
             <div className={`knowledge-symptom is-${key}`} key={key}>
               <div className="knowledge-symptom-label">{fieldLabel(key, t)}</div>
-              <p className="knowledge-symptom-text"><Value value={item!} /></p>
+              <p className="knowledge-symptom-text">
+                <Value value={item!} />
+              </p>
             </div>
           ))}
         </div>
@@ -50,19 +57,35 @@ function EvidenceItem({ record }: { record: CaseRecord }) {
   const detailsId = useId();
   // The evidence id names the record for its author; the reader gets the finding and, on request, how it was found.
   const { summary, evidence_id: _id, type, ...details } = record;
-  const kind = typeof type === 'string' ? (EVIDENCE_KIND_LABELS[type] ? t(EVIDENCE_KIND_LABELS[type]) : humanizeTerm(type)) : null;
+  const kind =
+    typeof type === 'string' ? (EVIDENCE_KIND_LABELS[type] ? t(EVIDENCE_KIND_LABELS[type]) : humanizeTerm(type)) : null;
   const source = withoutInternalReferences(details);
   return (
     <li className="knowledge-evidence">
       {kind ? <span className="knowledge-evidence-kind">{kind}</span> : null}
-      {summary !== undefined ? <p className="knowledge-evidence-summary"><Value value={summary} /></p> : null}
+      {summary !== undefined ? (
+        <p className="knowledge-evidence-summary">
+          <Value value={summary} />
+        </p>
+      ) : null}
       {isCaseRecord(source) ? (
         <>
-          <Button variant="ghost" size="sm" className="knowledge-evidence-toggle" aria-expanded={open} aria-controls={detailsId} onClick={() => setOpen(!open)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="knowledge-evidence-toggle"
+            aria-expanded={open}
+            aria-controls={detailsId}
+            onClick={() => setOpen(!open)}
+          >
             {t('knowledgeCenter.case.sourceDetails')}
             <Chevron direction="down" open={open} />
           </Button>
-          {open ? <div id={detailsId} className="knowledge-evidence-details"><Facts record={source} /></div> : null}
+          {open ? (
+            <div id={detailsId} className="knowledge-evidence-details">
+              <Facts record={source} />
+            </div>
+          ) : null}
         </>
       ) : null}
     </li>
@@ -73,7 +96,11 @@ function RootCause({ record }: { record: CaseRecord }) {
   const { mechanism, ...rest } = record;
   return (
     <div className="knowledge-root-cause">
-      {typeof mechanism === 'string' ? <p className="knowledge-case-lead"><Prose text={mechanism} /></p> : null}
+      {typeof mechanism === 'string' ? (
+        <p className="knowledge-case-lead">
+          <Prose text={mechanism} />
+        </p>
+      ) : null}
       {mechanism !== undefined && typeof mechanism !== 'string' ? <Value value={mechanism} /> : null}
       <Facts record={rest} />
     </div>
@@ -83,7 +110,13 @@ function RootCause({ record }: { record: CaseRecord }) {
 function Steps({ items }: { items: CaseValue[] }) {
   return (
     <ol className="knowledge-case-steps">
-      {items.map((item, index) => <li key={index}><span className="knowledge-case-step-text"><Value value={item} /></span></li>)}
+      {items.map((item, index) => (
+        <li key={index}>
+          <span className="knowledge-case-step-text">
+            <Value value={item} />
+          </span>
+        </li>
+      ))}
     </ol>
   );
 }
@@ -94,7 +127,15 @@ function Steps({ items }: { items: CaseValue[] }) {
  * verification is a numbered procedure — and any other structured value reads as label–value facts. Internal
  * references are left out; text that is not JSON is Markdown.
  */
-export function CaseChapterContent({ content, chapter, spaceId }: { content: string; chapter?: KnowledgeCaseChapter; spaceId: string }) {
+export function CaseChapterContent({
+  content,
+  chapter,
+  spaceId,
+}: {
+  content: string;
+  chapter?: KnowledgeCaseChapter;
+  spaceId: string;
+}) {
   const parsed = parseChapterValue(content);
   if (parsed === undefined) return <KnowledgeMarkdown content={content} spaceId={spaceId} />;
   const value = withoutInternalReferences(parsed);
@@ -104,14 +145,29 @@ export function CaseChapterContent({ content, chapter, spaceId }: { content: str
   if (chapter === 'evidence' && Array.isArray(value)) {
     return (
       <ol className="knowledge-evidence-list">
-        {value.map((item, index) => (isCaseRecord(item)
-          ? <EvidenceItem key={index} record={item} />
-          : <li key={index} className="knowledge-evidence"><p className="knowledge-evidence-summary"><Value value={item} /></p></li>))}
+        {value.map((item, index) =>
+          isCaseRecord(item) ? (
+            <EvidenceItem key={index} record={item} />
+          ) : (
+            <li key={index} className="knowledge-evidence">
+              <p className="knowledge-evidence-summary">
+                <Value value={item} />
+              </p>
+            </li>
+          ),
+        )}
       </ol>
     );
   }
-  if (Array.isArray(value) && (chapter === 'experimentVerification' || chapter === 'negative' || chapter === 'openChallenges')) {
+  if (
+    Array.isArray(value) &&
+    (chapter === 'experimentVerification' || chapter === 'negative' || chapter === 'openChallenges')
+  ) {
     return <Steps items={value} />;
   }
-  return <div className="knowledge-case-structured"><Value value={value} /></div>;
+  return (
+    <div className="knowledge-case-structured">
+      <Value value={value} />
+    </div>
+  );
 }

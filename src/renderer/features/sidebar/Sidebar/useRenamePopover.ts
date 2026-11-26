@@ -1,10 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useDismissable } from '../../../lib/useDismissable';
-import type {
-  ProjectMenuPopoverState,
-  ProjectRenamePopoverState,
-  SessionRenamePopoverState,
-} from './types';
+import type { ProjectMenuPopoverState, ProjectRenamePopoverState, SessionRenamePopoverState } from './types';
 
 interface UseRenamePopoverOptions {
   renamePopover: SessionRenamePopoverState | null;
@@ -33,8 +29,16 @@ export function useRenamePopover({
   const initializedProjectRenameTargetRef = useRef<string | null>(null);
 
   useDismissable({ open: Boolean(renamePopover), inside: () => [renamePopoverRef.current], onDismiss: onCloseRename });
-  useDismissable({ open: Boolean(projectMenuPopover), inside: () => [projectMenuRef.current], onDismiss: onCloseProjectMenu });
-  useDismissable({ open: Boolean(projectRenamePopover), inside: () => [projectRenameRef.current], onDismiss: onCloseProjectRename });
+  useDismissable({
+    open: Boolean(projectMenuPopover),
+    inside: () => [projectMenuRef.current],
+    onDismiss: onCloseProjectMenu,
+  });
+  useDismissable({
+    open: Boolean(projectRenamePopover),
+    inside: () => [projectRenameRef.current],
+    onDismiss: onCloseProjectRename,
+  });
 
   // The popovers are anchored to sidebar rows; a window resize moves the rows, so it closes them.
   useEffect(() => {
@@ -46,7 +50,14 @@ export function useRenamePopover({
     };
     window.addEventListener('resize', handleDismiss);
     return () => window.removeEventListener('resize', handleDismiss);
-  }, [renamePopover, projectMenuPopover, projectRenamePopover, onCloseRename, onCloseProjectMenu, onCloseProjectRename]);
+  }, [
+    renamePopover,
+    projectMenuPopover,
+    projectRenamePopover,
+    onCloseRename,
+    onCloseProjectMenu,
+    onCloseProjectRename,
+  ]);
 
   useEffect(() => {
     const targetSessionId = renamePopover?.session.sessionId ?? null;

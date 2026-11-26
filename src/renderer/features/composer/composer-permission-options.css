@@ -41,7 +41,7 @@
   width: 3px;
   border-radius: var(--radius-full);
   background: var(--permission-tone);
-  content: "";
+  content: '';
   opacity: 0.72;
 }
 

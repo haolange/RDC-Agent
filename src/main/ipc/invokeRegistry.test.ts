@@ -22,7 +22,9 @@ describe('IPC dispatch', () => {
     const handler = vi.fn(() => 'done');
     ipcMain.handle('conversation:answerToolApproval', handler);
 
-    audit.record.mockImplementationOnce(() => { throw new AuditWriteFailedError(new Error('disk full')); });
+    audit.record.mockImplementationOnce(() => {
+      throw new AuditWriteFailedError(new Error('disk full'));
+    });
     await expect(invokeRegisteredIpcChannel('conversation:answerToolApproval', [{}])).resolves.toMatchObject({
       [IPC_ERROR_KEY]: { code: 'AUDIT_WRITE_FAILED', category: 'security' },
     });
@@ -52,9 +54,14 @@ describe('IPC dispatch', () => {
 
   it('reports an uncoded failure as INTERNAL_ERROR with credential-like text redacted', async () => {
     const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
-    ipcMain.handle('session:list', () => { throw new TypeError('request failed with Authorization: Bearer fixture-bearer-value-0000'); });
+    ipcMain.handle('session:list', () => {
+      throw new TypeError('request failed with Authorization: Bearer fixture-bearer-value-0000');
+    });
 
-    const result = await invokeRegisteredIpcChannel('session:list', []) as Record<string, { code: string; technical: string }>;
+    const result = (await invokeRegisteredIpcChannel('session:list', [])) as Record<
+      string,
+      { code: string; technical: string }
+    >;
     expect(result[IPC_ERROR_KEY]?.code).toBe('INTERNAL_ERROR');
     expect(result[IPC_ERROR_KEY]?.technical).not.toContain('fixture-bearer-value-0000');
     stderr.mockRestore();

@@ -40,10 +40,17 @@ function listFiles(relativeRoot) {
   return result;
 }
 
-const tracked = git(['ls-files', '-z']).stdout.split('\0').filter(Boolean).map((file) => file.replaceAll('\\', '/'));
-const forbiddenTracked = tracked.filter((file) => existsSync(path.join(repoRoot, file)) && (/^(?:node_modules|out|dist|release|build|coverage|tmp|browser-session-tmp|logs|workspace)(?:\/|$)/.test(file)
-  || /(?:^|\/)(?:\.pnpm-store|\.cache)(?:\/|$)/.test(file)
-  || /\.(?:log|tmp|temp|tsbuildinfo)$/.test(file)));
+const tracked = git(['ls-files', '-z'])
+  .stdout.split('\0')
+  .filter(Boolean)
+  .map((file) => file.replaceAll('\\', '/'));
+const forbiddenTracked = tracked.filter(
+  (file) =>
+    existsSync(path.join(repoRoot, file)) &&
+    (/^(?:node_modules|out|dist|release|build|coverage|tmp|browser-session-tmp|logs|workspace)(?:\/|$)/.test(file) ||
+      /(?:^|\/)(?:\.pnpm-store|\.cache)(?:\/|$)/.test(file) ||
+      /\.(?:log|tmp|temp|tsbuildinfo)$/.test(file)),
+);
 if (forbiddenTracked.length > 0) fail(`Generated/runtime files are tracked:\n${forbiddenTracked.join('\n')}`);
 
 const allowedTrackedRootDirectories = new Set(['.github', 'designs', 'docs', 'patches', 'resources', 'scripts', 'src']);
@@ -60,7 +67,9 @@ const unexpectedTrackedRoots = [...new Set(tracked.map((file) => file.split('/')
   return !allowedTrackedRootDirectories.has(entry);
 });
 if (unexpectedTrackedRoots.length > 0) {
-  fail(`Unexpected tracked top-level entries (update the hygiene allowlist only for deliberate additions):\n${unexpectedTrackedRoots.join('\n')}`);
+  fail(
+    `Unexpected tracked top-level entries (update the hygiene allowlist only for deliberate additions):\n${unexpectedTrackedRoots.join('\n')}`,
+  );
 }
 
 const forbiddenPaths = ['cli', 'e2e', 'test', 'docs/handover'];
@@ -106,7 +115,9 @@ const unexpectedRootFiles = readdirSync(repoRoot).filter((entry) => {
   return statSync(absolute).isFile() && !allowedRootFiles.has(entry);
 });
 if (unexpectedRootFiles.length > 0) {
-  fail(`Unexpected root files (update the hygiene allowlist only for deliberate additions):\n${unexpectedRootFiles.join('\n')}`);
+  fail(
+    `Unexpected root files (update the hygiene allowlist only for deliberate additions):\n${unexpectedRootFiles.join('\n')}`,
+  );
 }
 
 const designsRoot = path.join(repoRoot, 'designs');
@@ -117,7 +128,9 @@ if (existsSync(designsRoot)) {
   });
   const unexpectedDesigns = designEntries.filter((entry) => entry !== 'rdc-agent-design-system');
   if (unexpectedDesigns.length > 0) {
-    fail(`designs/ may only contain rdc-agent-design-system; remove review prototypes:\n${unexpectedDesigns.join('\n')}`);
+    fail(
+      `designs/ may only contain rdc-agent-design-system; remove review prototypes:\n${unexpectedDesigns.join('\n')}`,
+    );
   }
 }
 
@@ -128,7 +141,8 @@ for (const required of ['pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
   if (!existsSync(path.join(repoRoot, required))) fail(`Required pnpm file is missing: ${required}`);
 }
 const workspaceConfig = read('pnpm-workspace.yaml');
-if (!/^storeDir: ~\/.cache\/rdc-agent\/pnpm-store$/m.test(workspaceConfig)) fail('pnpm-workspace.yaml must enforce the per-user pnpm store.');
+if (!/^storeDir: ~\/.cache\/rdc-agent\/pnpm-store$/m.test(workspaceConfig))
+  fail('pnpm-workspace.yaml must enforce the per-user pnpm store.');
 if (!/^preferOffline: true$/m.test(workspaceConfig)) fail('pnpm-workspace.yaml must prefer the local pnpm store.');
 if (!/^ {2}yauzl: 3\.3\.1$/m.test(workspaceConfig)) {
   fail('pnpm-workspace.yaml must override yauzl to 3.3.1 so Electron install works on Node >=24.16.');
@@ -158,7 +172,9 @@ if (!existsSync(path.join(repoRoot, 'scripts/smoke-agent-browser-qa.mjs'))) {
 
 const launcherSource = read('scripts/launch-rdc-agent.mjs');
 if (!/RDC_AGENT_BROWSER_QA:\s*headless\s*\?\s*'1'\s*:\s*'0'/.test(launcherSource)) {
-  fail('launch-rdc-agent.mjs must set RDC_AGENT_BROWSER_QA only for browser/headless modes (not desktop/release defaults).');
+  fail(
+    'launch-rdc-agent.mjs must set RDC_AGENT_BROWSER_QA only for browser/headless modes (not desktop/release defaults).',
+  );
 }
 if (/RDC_AGENT_BROWSER_QA:\s*'1'/.test(launcherSource) && !/headless\s*\?\s*'1'/.test(launcherSource)) {
   fail('launch-rdc-agent.mjs must not hard-code RDC_AGENT_BROWSER_QA=1 for all modes.');
@@ -183,12 +199,18 @@ for (const seedPath of ['resources/knowledge/seed/library/README.md', 'resources
 }
 
 const builder = JSON.parse(read('electron-builder.json'));
-if (!builder.files?.includes('out/**/*')) fail('electron-builder.json must package out/**/* only as the compiled application input.');
+if (!builder.files?.includes('out/**/*'))
+  fail('electron-builder.json must package out/**/* only as the compiled application input.');
 if (builder.files?.some((entry) => /^(?:scripts|node_modules|\.pnpm-store|pnpm-lock|\.npmrc)/.test(entry))) {
   fail('electron-builder files whitelist includes a development-only path.');
 }
 const builderText = JSON.stringify(builder);
-for (const forbidden of ['start:agent-browser', 'smoke:agent-browser', 'open-agent-browser-qa.html', 'RDC_AGENT_BROWSER_QA']) {
+for (const forbidden of [
+  'start:agent-browser',
+  'smoke:agent-browser',
+  'open-agent-browser-qa.html',
+  'RDC_AGENT_BROWSER_QA',
+]) {
   if (builderText.includes(forbidden)) {
     fail(`electron-builder.json must not treat Browser QA (${forbidden}) as a packaged user entry.`);
   }

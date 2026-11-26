@@ -29,11 +29,20 @@ interface DetailColumnProps {
 const HEADLINE_AXES: readonly KnowledgeScopeAxis[] = ['platform', 'api', 'gpuVendor', 'gpuArch', 'device', 'engine'];
 
 function headlineFacts(card: KnowledgeCardDetail, typeLabel: string | null): string[] {
-  const axes = HEADLINE_AXES.map((axis) => card.scope[axis]?.trim()).filter((value): value is string => Boolean(value) && value!.toLowerCase() !== 'unknown');
+  const axes = HEADLINE_AXES.map((axis) => card.scope[axis]?.trim()).filter(
+    (value): value is string => Boolean(value) && value!.toLowerCase() !== 'unknown',
+  );
   return [...(typeLabel ? [typeLabel] : []), ...axes];
 }
 
-export function DetailColumn({ state, write, onCreateCandidate, candidateHasSession, candidateBusy, candidateError }: DetailColumnProps) {
+export function DetailColumn({
+  state,
+  write,
+  onCreateCandidate,
+  candidateHasSession,
+  candidateBusy,
+  candidateError,
+}: DetailColumnProps) {
   const { t } = useI18n();
   const card = state.selectedCard;
   const conflict = state.viewMode === 'conflicts' ? state.selectedConflict : null;
@@ -59,7 +68,11 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                 <h1 className="knowledge-center-header-title">{card.title}</h1>
                 <div className="knowledge-center-meta-line" data-testid="knowledge-center-meta-line">
                   {facts.length ? <span className="knowledge-center-facts">{facts.join(' · ')}</span> : null}
-                  <KnowledgeStatusTag lifecycle={card.lifecycle} sourceStatus={card.sourceStatus} reviewing={reviewing} />
+                  <KnowledgeStatusTag
+                    lifecycle={card.lifecycle}
+                    sourceStatus={card.sourceStatus}
+                    reviewing={reviewing}
+                  />
                 </div>
               </>
             ) : null}
@@ -71,7 +84,7 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                 size="sm"
                 className="knowledge-detail-info-toggle"
                 aria-expanded={infoOpen}
-                aria-controls={infoOpen ? "knowledge-card-information" : undefined}
+                aria-controls={infoOpen ? 'knowledge-card-information' : undefined}
                 onClick={() => setInfoOpen(!infoOpen)}
                 data-testid="knowledge-center-metadata-toggle"
               >
@@ -84,7 +97,11 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
       ) : null}
 
       <div className="knowledge-center-body" data-testid="knowledge-center-body">
-        {state.loadingDetail && !conflict && <div role="status" aria-label={t('knowledgeCenter.loading')}><Skeleton shape="line" count={8} /></div>}
+        {state.loadingDetail && !conflict && (
+          <div role="status" aria-label={t('knowledgeCenter.loading')}>
+            <Skeleton shape="line" count={8} />
+          </div>
+        )}
         {conflict ? (
           <ConflictCompare
             left={state.conflictCards.left}
@@ -97,8 +114,16 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
           <div className="knowledge-center-empty" data-testid="knowledge-center-empty-detail">
             <EmptyState
               variant="page"
-              title={t(state.viewMode === 'conflicts' ? 'knowledgeCenter.selectConflictPrompt' : reviewing ? 'knowledgeCenter.selectCandidatePrompt' : 'knowledgeCenter.selectPrompt')}
-              description={state.viewMode === 'cards' && state.hits.length === 0 ? t('knowledgeCenter.emptyDetailHint') : undefined}
+              title={t(
+                state.viewMode === 'conflicts'
+                  ? 'knowledgeCenter.selectConflictPrompt'
+                  : reviewing
+                    ? 'knowledgeCenter.selectCandidatePrompt'
+                    : 'knowledgeCenter.selectPrompt',
+              )}
+              description={
+                state.viewMode === 'cards' && state.hits.length === 0 ? t('knowledgeCenter.emptyDetailHint') : undefined
+              }
             />
           </div>
         )}
@@ -109,8 +134,10 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
                 <CardMetaGrid
                   card={card}
                   spaceLabel={spaceLabel}
-                  resolveRelation={(targetCardId) => state.hits.find((entry) => entry.cardId === targetCardId)
-                    ?? state.pack?.hits.find((entry) => entry.cardId === targetCardId)}
+                  resolveRelation={(targetCardId) =>
+                    state.hits.find((entry) => entry.cardId === targetCardId) ??
+                    state.pack?.hits.find((entry) => entry.cardId === targetCardId)
+                  }
                   onOpenRelation={state.openRelatedCard}
                 />
               </div>
@@ -121,8 +148,15 @@ export function DetailColumn({ state, write, onCreateCandidate, candidateHasSess
       </div>
 
       {card ? (
-        <KnowledgeCardActionBar card={card} reviewing={reviewing} write={write} onCreateCandidate={onCreateCandidate}
-          candidateHasSession={candidateHasSession} candidateBusy={candidateBusy} candidateError={candidateError} />
+        <KnowledgeCardActionBar
+          card={card}
+          reviewing={reviewing}
+          write={write}
+          onCreateCandidate={onCreateCandidate}
+          candidateHasSession={candidateHasSession}
+          candidateBusy={candidateBusy}
+          candidateError={candidateError}
+        />
       ) : null}
     </Panel>
   );

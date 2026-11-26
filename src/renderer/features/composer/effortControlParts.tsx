@@ -5,10 +5,7 @@ import {
 } from '@shared/types/modelCapability';
 import { cn } from '../../lib/cn';
 import type { ReactNode } from 'react';
-import type {
-  ReasoningControl,
-  ReasoningSelection,
-} from '@shared/types/modelCapability';
+import type { ReasoningControl, ReasoningSelection } from '@shared/types/modelCapability';
 
 export function resolveSelectedLevel(
   reasoningLevel: ReasoningSelection,
@@ -18,8 +15,7 @@ export function resolveSelectedLevel(
   if (!reasoningControl) {
     return displayLevels[0] ?? 'off';
   }
-  const clamped = clampReasoningSelection(reasoningLevel, reasoningControl)
-    ?? reasoningControl.defaultSelection;
+  const clamped = clampReasoningSelection(reasoningLevel, reasoningControl) ?? reasoningControl.defaultSelection;
   if (displayLevels.includes(clamped)) {
     return clamped;
   }
@@ -66,19 +62,13 @@ interface EffortModeIconButtonProps {
 }
 
 export function EffortModeIconButton(props: EffortModeIconButtonProps) {
-  const accessibleName = props.statusLabel
-    ? `${props.label} · ${props.statusLabel}`
-    : props.label;
+  const accessibleName = props.statusLabel ? `${props.label} · ${props.statusLabel}` : props.label;
   const tipText = props.statusLabel ?? props.label;
   return (
     <button
       type="button"
       role="switch"
-      className={cn(
-        'composer-model-effort-mode',
-        props.active && 'is-active',
-        !props.available && 'is-disabled',
-      )}
+      className={cn('composer-model-effort-mode', props.active && 'is-active', !props.available && 'is-disabled')}
       data-mode={props.mode}
       data-testid={props['data-testid']}
       aria-checked={props.active}

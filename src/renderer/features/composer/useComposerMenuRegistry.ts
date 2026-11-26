@@ -1,19 +1,7 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useOverlayLayer } from '../../lib/overlayStack';
 import { useDismissable } from '../../lib/useDismissable';
-import {
-  reduceComposerMenu,
-  type ComposerMenuAction,
-  type ComposerMenuId,
-} from './composerMenuState';
+import { reduceComposerMenu, type ComposerMenuAction, type ComposerMenuId } from './composerMenuState';
 
 export interface ComposerMenuRegistryApi {
   activeId: ComposerMenuId | null;
@@ -31,7 +19,13 @@ const ComposerMenuRegistryContext = createContext<ComposerMenuRegistryApi | null
  * One open Composer menu at a time. A menu belongs to the scope it was opened in (the pending request the Composer
  * shows), so a request arriving or settling closes it without remounting the Composer underneath.
  */
-export function ComposerMenuRegistryProvider({ scope, children }: { scope: string; children: React.ReactNode }): React.ReactElement {
+export function ComposerMenuRegistryProvider({
+  scope,
+  children,
+}: {
+  scope: string;
+  children: React.ReactNode;
+}): React.ReactElement {
   const [opened, setOpened] = useState<ComposerMenuId | null>(null);
   const [openedScope, setOpenedScope] = useState(scope);
   // A new scope closes the menu while rendering, so no frame shows a menu of the previous request.
@@ -57,28 +51,45 @@ export function ComposerMenuRegistryProvider({ scope, children }: { scope: strin
   }, []);
 
   // Focus queued for a menu of the previous scope is not delivered into the next one.
-  useEffect(() => () => {
-    if (focusFrameRef.current !== null) window.cancelAnimationFrame(focusFrameRef.current);
-    focusFrameRef.current = null;
-  }, [scope]);
+  useEffect(
+    () => () => {
+      if (focusFrameRef.current !== null) window.cancelAnimationFrame(focusFrameRef.current);
+      focusFrameRef.current = null;
+    },
+    [scope],
+  );
 
-  const update = useCallback((action: ComposerMenuAction, afterwards?: (current: ComposerMenuId | null, next: ComposerMenuId | null) => void) => {
-    setOpened((current) => {
-      const next = reduceComposerMenu(current, action);
-      afterwards?.(current, next);
-      return next;
-    });
-  }, []);
+  const update = useCallback(
+    (
+      action: ComposerMenuAction,
+      afterwards?: (current: ComposerMenuId | null, next: ComposerMenuId | null) => void,
+    ) => {
+      setOpened((current) => {
+        const next = reduceComposerMenu(current, action);
+        afterwards?.(current, next);
+        return next;
+      });
+    },
+    [],
+  );
 
   const open = useCallback((id: ComposerMenuId) => update({ type: 'open', id }), [update]);
 
-  const close = useCallback((id?: ComposerMenuId) => update({ type: 'close', id }, (current, next) => {
-    if (next === null && current && current !== 'usage') restoreFocus(current);
-  }), [restoreFocus, update]);
+  const close = useCallback(
+    (id?: ComposerMenuId) =>
+      update({ type: 'close', id }, (current, next) => {
+        if (next === null && current && current !== 'usage') restoreFocus(current);
+      }),
+    [restoreFocus, update],
+  );
 
-  const toggle = useCallback((id: ComposerMenuId) => update({ type: 'toggle', id }, (current, next) => {
-    if (next === null && current === id && id !== 'usage') restoreFocus(id);
-  }), [restoreFocus, update]);
+  const toggle = useCallback(
+    (id: ComposerMenuId) =>
+      update({ type: 'toggle', id }, (current, next) => {
+        if (next === null && current === id && id !== 'usage') restoreFocus(id);
+      }),
+    [restoreFocus, update],
+  );
 
   const isOpen = useCallback((id: ComposerMenuId) => activeId === id, [activeId]);
 
@@ -108,15 +119,18 @@ export function ComposerMenuRegistryProvider({ scope, children }: { scope: strin
     onDismiss: () => close(activeIdRef.current ?? undefined),
   });
 
-  const value = useMemo<ComposerMenuRegistryApi>(() => ({
-    activeId,
-    open,
-    close,
-    toggle,
-    isOpen,
-    setRoot,
-    setTrigger,
-  }), [activeId, close, isOpen, open, setRoot, setTrigger, toggle]);
+  const value = useMemo<ComposerMenuRegistryApi>(
+    () => ({
+      activeId,
+      open,
+      close,
+      toggle,
+      isOpen,
+      setRoot,
+      setTrigger,
+    }),
+    [activeId, close, isOpen, open, setRoot, setTrigger, toggle],
+  );
 
   return React.createElement(ComposerMenuRegistryContext.Provider, { value }, children);
 }

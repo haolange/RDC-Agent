@@ -44,25 +44,39 @@ const DEFAULT_BASE_URL = 'http://localhost:11434';
 const PROVIDER_API = 'ollama';
 
 /** One Ollama /api/chat stream line; fields this adapter does not read pass through. */
-const OllamaChunkSchema = z.object({
-  model: z.string().nullish(),
-  message: z.object({
-    role: z.string().nullish(),
-    content: z.string().nullish(),
-    thinking: z.string().nullish(),
-    tool_calls: z.array(z.object({
-      function: z.object({
-        name: z.string().nullish(),
-        arguments: z.union([z.record(z.string(), z.unknown()), z.string()]).nullish(),
-      }).passthrough().nullish(),
-    }).passthrough()).nullish(),
-  }).passthrough().nullish(),
-  done: z.boolean().nullish(),
-  done_reason: z.string().nullish(),
-  prompt_eval_count: z.number().nullish(),
-  eval_count: z.number().nullish(),
-  total_duration: z.number().nullish(),
-}).passthrough();
+const OllamaChunkSchema = z
+  .object({
+    model: z.string().nullish(),
+    message: z
+      .object({
+        role: z.string().nullish(),
+        content: z.string().nullish(),
+        thinking: z.string().nullish(),
+        tool_calls: z
+          .array(
+            z
+              .object({
+                function: z
+                  .object({
+                    name: z.string().nullish(),
+                    arguments: z.union([z.record(z.string(), z.unknown()), z.string()]).nullish(),
+                  })
+                  .passthrough()
+                  .nullish(),
+              })
+              .passthrough(),
+          )
+          .nullish(),
+      })
+      .passthrough()
+      .nullish(),
+    done: z.boolean().nullish(),
+    done_reason: z.string().nullish(),
+    prompt_eval_count: z.number().nullish(),
+    eval_count: z.number().nullish(),
+    total_duration: z.number().nullish(),
+  })
+  .passthrough();
 type OllamaChunk = z.infer<typeof OllamaChunkSchema>;
 
 const OLLAMA_FRAMES: ProviderFrameStream<OllamaChunk> = {
@@ -96,11 +110,7 @@ export class OllamaProvider implements ProviderStrategy {
     this.defaultHeaders = { ...(options.headers ?? {}) };
   }
 
-  stream(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): EventStream<AssistantMessageEvent, AssistantMessage> {
+  stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     return startProviderStream({ providerApi: PROVIDER_API, model, options }, async (run) => {
       const response = await this.send(model, context, options, run.signal);
       return consumeOllamaStream(response, run, options);
@@ -117,14 +127,14 @@ export class OllamaProvider implements ProviderStrategy {
       ...requestPlanHeaders(options.requestPlan),
     };
     if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-    return sendProviderRequest(PROVIDER_API, options.requestPlan, signal, { url: `${baseUrl}/api/chat`, headers, body });
+    return sendProviderRequest(PROVIDER_API, options.requestPlan, signal, {
+      url: `${baseUrl}/api/chat`,
+      headers,
+      body,
+    });
   }
 
-  private buildRequestBody(
-    model: Model,
-    context: Context,
-    options: StreamOptions,
-  ): Record<string, unknown> {
+  private buildRequestBody(model: Model, context: Context, options: StreamOptions): Record<string, unknown> {
     const messages = toOllamaMessages(context, options.requestPlan);
     const body: Record<string, unknown> = {
       model: model.id,
@@ -256,10 +266,8 @@ function convertMessage(message: Message, requestPlan?: RequestPlan): OllamaMess
       else if (block.type === 'thinking' && requestPlan) {
         const sameToolLoop = message.content.some((candidate) => candidate.type === 'toolCall');
         const decision = decideContinuationReplay(block.continuation, requestPlan, { sameToolLoop });
-        if (
-          decision.action === 'replay'
-          && block.continuation?.reasoningContent
-        ) thinking.push(block.continuation.reasoningContent);
+        if (decision.action === 'replay' && block.continuation?.reasoningContent)
+          thinking.push(block.continuation.reasoningContent);
       } else if (block.type === 'toolCall') {
         toolCalls.push({
           function: { name: block.name, arguments: block.arguments },

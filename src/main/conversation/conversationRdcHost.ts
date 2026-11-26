@@ -11,8 +11,12 @@ export interface ConversationRdcHost {
 const idleHost: ConversationRdcHost = {
   acquirePreparationLock() {},
   setInteractionLock() {},
-  snapshotOpenedCapture() { return null; },
-  replayDevice() { return null; },
+  snapshotOpenedCapture() {
+    return null;
+  },
+  replayDevice() {
+    return null;
+  },
 };
 
 let host: ConversationRdcHost = idleHost;

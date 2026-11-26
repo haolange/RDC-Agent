@@ -23,20 +23,32 @@ const rawThinking = { kind: 'raw', source: 'openai-compatible-raw', visibility: 
 function thinkingItem(
   text: string,
   displayOrder: number,
-  options: Partial<Pick<ThinkingArtifact, 'kind' | 'source' | 'visibility'>> & { status?: ConversationThinkingStatus } = {},
+  options: Partial<Pick<ThinkingArtifact, 'kind' | 'source' | 'visibility'>> & {
+    status?: ConversationThinkingStatus;
+  } = {},
 ): ConversationThinkingItem {
   const { status = 'complete', ...artifact } = options;
   return {
-    kind: 'thinking', status, displayOrder,
+    kind: 'thinking',
+    status,
+    displayOrder,
     providerOutputRef: { protocol: 'test', providerBlockKey: `thinking-${displayOrder}`, contentIndex: displayOrder },
     thinking: { text, kind: 'summary', source: 'anthropic-thinking', visibility: 'summary', ...artifact },
   };
 }
 
 /** One provider text block; defaults to settled commentary. */
-function textItem(text: string, displayOrder: number, overrides: Partial<ConversationTextItem> = {}): ConversationTextItem {
+function textItem(
+  text: string,
+  displayOrder: number,
+  overrides: Partial<ConversationTextItem> = {},
+): ConversationTextItem {
   return {
-    kind: 'text', text, phase: 'commentary', status: 'complete', displayOrder,
+    kind: 'text',
+    text,
+    phase: 'commentary',
+    status: 'complete',
+    displayOrder,
     providerOutputRef: { protocol: 'test', providerBlockKey: `text-${displayOrder}`, contentIndex: displayOrder },
     ...overrides,
   };
@@ -49,32 +61,77 @@ it.each([
   ['model', 'rejected', 'PERMISSION_REVIEW_TIMEOUT', '审核未完成'],
   ['model', 'cancelled', 'PERMISSION_REVIEW_CANCELLED', '已取消'],
   [undefined, 'rejected', undefined, '自动审查未通过'],
-] as const)('projects host review route %s, status %s and error %s independently', (reviewMethod, status, errorCode, verb) => {
-  const row = createToolRowForPresentation({ id: 'review', toolName: 'shell', status: 'error', startedAt: now,
-    approval: { approvalId: 'auto-review-call', status, reviewer: 'auto_review', reviewMethod, errorCode,
-      risk: 'high', reason: 'PERMISSION_REVIEW_TIMEOUT: model text alone does not classify failures', requestedAt: now },
-  }, t);
-  expect(row).toMatchObject({ type: 'tool', approval: { verb } });
-  if (row.type !== 'tool') throw new Error('Expected tool row');
-  expect(row.approval?.metaLines.includes('操作未执行')).toBe(status === 'rejected');
-  if (!reviewMethod) expect(row.approval?.metaLines).toContain('自动审查');
-});
+] as const)(
+  'projects host review route %s, status %s and error %s independently',
+  (reviewMethod, status, errorCode, verb) => {
+    const row = createToolRowForPresentation(
+      {
+        id: 'review',
+        toolName: 'shell',
+        status: 'error',
+        startedAt: now,
+        approval: {
+          approvalId: 'auto-review-call',
+          status,
+          reviewer: 'auto_review',
+          reviewMethod,
+          errorCode,
+          risk: 'high',
+          reason: 'PERMISSION_REVIEW_TIMEOUT: model text alone does not classify failures',
+          requestedAt: now,
+        },
+      },
+      t,
+    );
+    expect(row).toMatchObject({ type: 'tool', approval: { verb } });
+    if (row.type !== 'tool') throw new Error('Expected tool row');
+    expect(row.approval?.metaLines.includes('操作未执行')).toBe(status === 'rejected');
+    if (!reviewMethod) expect(row.approval?.metaLines).toContain('自动审查');
+  },
+);
 
 it('keeps a post-approval native error separate from an operation-preflight rejection', () => {
-  const row = createToolRowForPresentation({ id: 'native', toolName: 'shell', status: 'error', startedAt: now,
-    error: 'Native process exited with code 1',
-    approval: { approvalId: 'auto-review-native', status: 'approved', reviewer: 'auto_review', reviewMethod: 'model', requestedAt: now },
-  }, t);
+  const row = createToolRowForPresentation(
+    {
+      id: 'native',
+      toolName: 'shell',
+      status: 'error',
+      startedAt: now,
+      error: 'Native process exited with code 1',
+      approval: {
+        approvalId: 'auto-review-native',
+        status: 'approved',
+        reviewer: 'auto_review',
+        reviewMethod: 'model',
+        requestedAt: now,
+      },
+    },
+    t,
+  );
   expect(row).toMatchObject({ type: 'tool', status: 'error', approval: { verb: '独立审核通过' } });
   if (row.type !== 'tool') throw new Error('Expected tool row');
   expect(row.approval?.metaLines).not.toContain('操作未执行');
   expect(row.verb).not.toBe('已阻断');
 });
 
-it.each(['tool-approval', 'auto-review-approval'])('does not label cancelled %s as approved', id => {
-  expect(createApprovalRow({ id, kind: 'approval', title: 'Approval', status: 'cancelled',
-    toolCalls: [], startedAt: now, completedAt: now + 10 }, t)).toMatchObject({
-    type: 'approval', status: 'cancelled', verb: '已取消',
+it.each(['tool-approval', 'auto-review-approval'])('does not label cancelled %s as approved', (id) => {
+  expect(
+    createApprovalRow(
+      {
+        id,
+        kind: 'approval',
+        title: 'Approval',
+        status: 'cancelled',
+        toolCalls: [],
+        startedAt: now,
+        completedAt: now + 10,
+      },
+      t,
+    ),
+  ).toMatchObject({
+    type: 'approval',
+    status: 'cancelled',
+    verb: '已取消',
   });
 });
 
@@ -87,25 +144,48 @@ function flattenWorkRows(rows: WorkRow[]): WorkRow[] {
   });
 }
 
-function rowsOfType<Type extends WorkRow['type']>(rows: WorkRow[], type: Type): Array<Extract<WorkRow, { type: Type }>> {
+function rowsOfType<Type extends WorkRow['type']>(
+  rows: WorkRow[],
+  type: Type,
+): Array<Extract<WorkRow, { type: Type }>> {
   return flattenWorkRows(rows).filter((row): row is Extract<WorkRow, { type: Type }> => row.type === type);
 }
 
 describe('buildWorkProcessPresentation', () => {
   it('projects one card per parent subagent tool call without a duplicate tool row', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'running', updatedAt: now + 20,
-      blocks: [{
-        id: 'loop', kind: 'llm_turn', title: 'LLM turn', status: 'running', startedAt: now,
-        result: { status: 'streaming', outputPhase: 'commentary', toolCallIds: ['delegate-1', 'delegate-2'] },
-        toolCalls: [
-          { id: 'delegate-1', toolName: 'subagent', status: 'complete', startedAt: now,
-            delegation: { task: 'Read inputs', profile: 'general', mode: 'wait' } },
-          { id: 'delegate-2', toolName: 'subagent', status: 'running', startedAt: now + 1,
-            delegation: { task: 'Read config', profile: 'general', mode: 'background', executionId: 'exec-2' } },
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'running',
+        updatedAt: now + 20,
+        blocks: [
+          {
+            id: 'loop',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'running',
+            startedAt: now,
+            result: { status: 'streaming', outputPhase: 'commentary', toolCallIds: ['delegate-1', 'delegate-2'] },
+            toolCalls: [
+              {
+                id: 'delegate-1',
+                toolName: 'subagent',
+                status: 'complete',
+                startedAt: now,
+                delegation: { task: 'Read inputs', profile: 'general', mode: 'wait' },
+              },
+              {
+                id: 'delegate-2',
+                toolName: 'subagent',
+                status: 'running',
+                startedAt: now + 1,
+                delegation: { task: 'Read config', profile: 'general', mode: 'background', executionId: 'exec-2' },
+              },
+            ],
+          },
         ],
-      }],
-    }, t);
+      },
+      t,
+    );
     const rows = flattenWorkRows(presentation.rows);
     expect(rows.filter((row) => row.type === 'subagent')).toMatchObject([
       { id: 'delegate-1', task: 'Read inputs', status: 'complete' },
@@ -114,44 +194,85 @@ describe('buildWorkProcessPresentation', () => {
     expect(rows.filter((row) => row.type === 'tool' && row.toolName === 'subagent')).toHaveLength(0);
   });
   it('keeps both completed checkpoints in the visible history', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 20,
-      blocks: [
-        { id: 'compact-1', kind: 'compaction', title: 'Context compacted', summary: 'old counts', status: 'complete', toolCalls: [], startedAt: now, completedAt: now + 5 },
-        { id: 'compact-2', kind: 'compaction', title: 'Context compacted', summary: 'new counts', status: 'complete', toolCalls: [], startedAt: now + 10, completedAt: now + 15 },
-      ],
-    }, t);
-    expect(presentation.rows).toEqual(['compact-1', 'compact-2'].map(id => expect.objectContaining({ id, type: 'summary', text: '上下文已自动压缩' })));
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 20,
+        blocks: [
+          {
+            id: 'compact-1',
+            kind: 'compaction',
+            title: 'Context compacted',
+            summary: 'old counts',
+            status: 'complete',
+            toolCalls: [],
+            startedAt: now,
+            completedAt: now + 5,
+          },
+          {
+            id: 'compact-2',
+            kind: 'compaction',
+            title: 'Context compacted',
+            summary: 'new counts',
+            status: 'complete',
+            toolCalls: [],
+            startedAt: now + 10,
+            completedAt: now + 15,
+          },
+        ],
+      },
+      t,
+    );
+    expect(presentation.rows).toEqual(
+      ['compact-1', 'compact-2'].map((id) =>
+        expect.objectContaining({ id, type: 'summary', text: '上下文已自动压缩' }),
+      ),
+    );
   });
 
   it('uses authoritative task event rows instead of duplicating task tool receipts', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'running',
-      updatedAt: now + 20,
-      blocks: [
-        {
-          id: 'task-create-loop', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
-          result: { status: 'complete', outputPhase: 'commentary', toolCallIds: ['task-create'] },
-          toolCalls: [{
-            id: 'task-create', toolName: 'task_create', status: 'complete',
-            argsPreview: JSON.stringify({ tasks: [{ subject: 'Inspect capture' }] }),
-            resultPreview: JSON.stringify({ ids: ['task-1'] }),
-            startedAt: now, completedAt: now + 10,
-          }],
-          startedAt: now, completedAt: now + 10,
-        },
-        {
-          id: 'task-snapshot-turn-1', kind: 'task_snapshot', title: '0 of 1 completed', status: 'running',
-          taskSnapshot: {
-            completed: 0,
-            total: 1,
-            items: [{ taskId: 'task-1', title: 'Inspect capture', status: 'pending', order: 0 }],
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'running',
+        updatedAt: now + 20,
+        blocks: [
+          {
+            id: 'task-create-loop',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', outputPhase: 'commentary', toolCallIds: ['task-create'] },
+            toolCalls: [
+              {
+                id: 'task-create',
+                toolName: 'task_create',
+                status: 'complete',
+                argsPreview: JSON.stringify({ tasks: [{ subject: 'Inspect capture' }] }),
+                resultPreview: JSON.stringify({ ids: ['task-1'] }),
+                startedAt: now,
+                completedAt: now + 10,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 10,
           },
-          toolCalls: [], startedAt: now + 10,
-        },
-      ],
-    }, t);
+          {
+            id: 'task-snapshot-turn-1',
+            kind: 'task_snapshot',
+            title: '0 of 1 completed',
+            status: 'running',
+            taskSnapshot: {
+              completed: 0,
+              total: 1,
+              items: [{ taskId: 'task-1', title: 'Inspect capture', status: 'pending', order: 0 }],
+            },
+            toolCalls: [],
+            startedAt: now + 10,
+          },
+        ],
+      },
+      t,
+    );
     const rows = flattenWorkRows(presentation.rows);
     expect(rows.filter((row) => row.type === 'tool' && row.toolName === 'task_create')).toHaveLength(0);
     expect(rows.filter((row) => row.type === 'taskSnapshot')).toEqual([
@@ -160,105 +281,128 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('preserves the TaskRegistry lifecycle state and blocked reason in Work Process', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 20,
-      blocks: [{
-        id: 'task-snapshot-1',
-        kind: 'task_snapshot',
-        title: '0 of 1 completed',
+    const presentation = buildWorkProcessPresentation(
+      {
         status: 'complete',
-        taskSnapshot: {
-          completed: 0,
-          total: 1,
-          items: [{ taskId: 'task-1', title: 'Wait for QA', status: 'blocked', statusReason: 'QA waiting', order: 0 }],
-        },
-        toolCalls: [],
-        startedAt: now,
-      }],
-    }, t);
+        updatedAt: now + 20,
+        blocks: [
+          {
+            id: 'task-snapshot-1',
+            kind: 'task_snapshot',
+            title: '0 of 1 completed',
+            status: 'complete',
+            taskSnapshot: {
+              completed: 0,
+              total: 1,
+              items: [
+                { taskId: 'task-1', title: 'Wait for QA', status: 'blocked', statusReason: 'QA waiting', order: 0 },
+              ],
+            },
+            toolCalls: [],
+            startedAt: now,
+          },
+        ],
+      },
+      t,
+    );
     const row = flattenWorkRows(presentation.rows).find((entry) => entry.type === 'taskSnapshot');
     expect(row).toEqual(expect.objectContaining({ type: 'taskSnapshot', completed: 0, total: 1 }));
     if (!row || row.type !== 'taskSnapshot') throw new Error('expected task snapshot');
-    expect(row.items).toEqual([expect.objectContaining({
-      taskId: 'task-1', title: 'Wait for QA', status: 'blocked', statusReason: 'QA waiting', order: 0,
-    })]);
+    expect(row.items).toEqual([
+      expect.objectContaining({
+        taskId: 'task-1',
+        title: 'Wait for QA',
+        status: 'blocked',
+        statusReason: 'QA waiting',
+        order: 0,
+      }),
+    ]);
   });
 
   it('projects streaming commentary as an output row without promoting it into thinking', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'running',
-      updatedAt: now,
-      blocks: [
-        {
-          id: 'runtime-loop-prose',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'running',
-          result: { status: 'streaming', toolCallIds: [], outputPhase: 'commentary' },
-          items: [textItem('Inspecting capture metadata', 1, { status: 'streaming' })],
-          toolCalls: [],
-          startedAt: now,
-        },
-      ],
-    }, t);
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'running',
+        updatedAt: now,
+        blocks: [
+          {
+            id: 'runtime-loop-prose',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'running',
+            result: { status: 'streaming', toolCallIds: [], outputPhase: 'commentary' },
+            items: [textItem('Inspecting capture metadata', 1, { status: 'streaming' })],
+            toolCalls: [],
+            startedAt: now,
+          },
+        ],
+      },
+      t,
+    );
 
-    expect(rowsOfType(presentation.rows, 'output')).toEqual([expect.objectContaining({
-      text: 'Inspecting capture metadata', phase: 'commentary', status: 'running',
-    })]);
+    expect(rowsOfType(presentation.rows, 'output')).toEqual([
+      expect.objectContaining({
+        text: 'Inspecting capture metadata',
+        phase: 'commentary',
+        status: 'running',
+      }),
+    ]);
     expect(rowsOfType(presentation.rows, 'thinking')).toHaveLength(0);
   });
 
   it('keeps settled commentary text even when the loop has no tool calls', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'running',
-      updatedAt: now + 2000,
-      blocks: [
-        {
-          id: 'runtime-loop-ask',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: {
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'running',
+        updatedAt: now + 2000,
+        blocks: [
+          {
+            id: 'runtime-loop-ask',
+            kind: 'llm_turn',
+            title: 'LLM turn',
             status: 'complete',
-            toolCallIds: ['ask-1'],
-            stopReason: 'tool_use',
-            outputPhase: 'commentary',
-          },
-          items: [textItem('Need a few answers first.', 1)],
-          toolCalls: [
-            {
-              id: 'ask-1',
-              toolName: 'ask_user',
+            result: {
               status: 'complete',
-              argsPreview: JSON.stringify({ questions: [{ prompt: 'Drink?' }] }),
-              resultPreview: JSON.stringify({ answers: [{ answer: '茶' }] }),
-              displayOrder: 2,
-              startedAt: now,
-              completedAt: now + 500,
+              toolCallIds: ['ask-1'],
+              stopReason: 'tool_use',
+              outputPhase: 'commentary',
             },
-          ],
-          startedAt: now,
-          completedAt: now + 500,
-        },
-        {
-          id: 'runtime-loop-commentary',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: {
-            status: 'complete',
-            toolCallIds: [],
-            stopReason: 'end_turn',
-            outputPhase: 'commentary',
+            items: [textItem('Need a few answers first.', 1)],
+            toolCalls: [
+              {
+                id: 'ask-1',
+                toolName: 'ask_user',
+                status: 'complete',
+                argsPreview: JSON.stringify({ questions: [{ prompt: 'Drink?' }] }),
+                resultPreview: JSON.stringify({ answers: [{ answer: '茶' }] }),
+                displayOrder: 2,
+                startedAt: now,
+                completedAt: now + 500,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 500,
           },
-          items: [textItem('Thanks — summarizing the parameter combinations next.', 3)],
-          toolCalls: [],
-          startedAt: now + 600,
-          completedAt: now + 900,
-        },
-      ],
-    }, t);
+          {
+            id: 'runtime-loop-commentary',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: {
+              status: 'complete',
+              toolCallIds: [],
+              stopReason: 'end_turn',
+              outputPhase: 'commentary',
+            },
+            items: [textItem('Thanks — summarizing the parameter combinations next.', 3)],
+            toolCalls: [],
+            startedAt: now + 600,
+            completedAt: now + 900,
+          },
+        ],
+      },
+      t,
+    );
 
     const sections = presentation.rows.filter((row) => row.type === 'section');
     expect(sections.map((section) => rowsOfType(section.steps, 'output').map((row) => row.text))).toEqual([
@@ -268,55 +412,58 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('tags settled final_answer text as the answer instead of commentary', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 3000,
-      blocks: [
-        {
-          id: 'runtime-loop-process',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: {
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 3000,
+        blocks: [
+          {
+            id: 'runtime-loop-process',
+            kind: 'llm_turn',
+            title: 'LLM turn',
             status: 'complete',
-            toolCallIds: ['tool-read'],
-            stopReason: 'tool_use',
-            outputPhase: 'commentary',
-          },
-          items: [textItem('Checking files.', 1)],
-          toolCalls: [
-            {
-              id: 'tool-read',
-              toolName: 'read_file',
+            result: {
               status: 'complete',
-              argsPreview: JSON.stringify({ path: 'a.ts' }),
-              resultPreview: JSON.stringify({ ok: true }),
-              displayOrder: 2,
-              startedAt: now + 100,
-              completedAt: now + 200,
+              toolCallIds: ['tool-read'],
+              stopReason: 'tool_use',
+              outputPhase: 'commentary',
             },
-          ],
-          startedAt: now,
-          completedAt: now + 200,
-        },
-        {
-          id: 'runtime-loop-final',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: {
-            status: 'complete',
-            toolCallIds: [],
-            stopReason: 'end_turn',
-            outputPhase: 'final_answer',
+            items: [textItem('Checking files.', 1)],
+            toolCalls: [
+              {
+                id: 'tool-read',
+                toolName: 'read_file',
+                status: 'complete',
+                argsPreview: JSON.stringify({ path: 'a.ts' }),
+                resultPreview: JSON.stringify({ ok: true }),
+                displayOrder: 2,
+                startedAt: now + 100,
+                completedAt: now + 200,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 200,
           },
-          items: [textItem('Final answer body only', 3, { phase: 'final_answer' })],
-          toolCalls: [],
-          startedAt: now + 300,
-          completedAt: now + 400,
-        },
-      ],
-    }, t);
+          {
+            id: 'runtime-loop-final',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: {
+              status: 'complete',
+              toolCallIds: [],
+              stopReason: 'end_turn',
+              outputPhase: 'final_answer',
+            },
+            items: [textItem('Final answer body only', 3, { phase: 'final_answer' })],
+            toolCalls: [],
+            startedAt: now + 300,
+            completedAt: now + 400,
+          },
+        ],
+      },
+      t,
+    );
 
     expect(rowsOfType(presentation.rows, 'output').map(({ text, phase }) => ({ text, phase }))).toEqual([
       { text: 'Checking files.', phase: 'commentary' },
@@ -325,137 +472,173 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('keeps streaming final_answer text tagged as the answer', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'running',
-      updatedAt: now + 3100,
-      blocks: [
-        {
-          id: 'runtime-loop-ask',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: {
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'running',
+        updatedAt: now + 3100,
+        blocks: [
+          {
+            id: 'runtime-loop-ask',
+            kind: 'llm_turn',
+            title: 'LLM turn',
             status: 'complete',
-            toolCallIds: [],
-            stopReason: 'end_turn',
-            outputPhase: 'commentary',
-          },
-          items: [textItem('Need a few answers first.', 1)],
-          toolCalls: [],
-          startedAt: now,
-          completedAt: now + 200,
-        },
-        {
-          id: 'runtime-user-input',
-          kind: 'user_input',
-          title: 'User input requested',
-          status: 'complete',
-          result: {
-            status: 'complete',
-            toolCallIds: ['ask-batch'],
-          },
-          toolCalls: [
-            {
-              id: 'ask-batch',
-              toolName: 'ask_user',
+            result: {
               status: 'complete',
-              argsPreview: JSON.stringify({
-                questions: [
-                  { prompt: 'Drink?' },
-                  { prompt: 'Quality?' },
-                ],
-              }),
-              resultPreview: JSON.stringify({
-                answers: [{ answer: '茶' }, { answer: '还行' }],
-              }),
-              startedAt: now + 200,
-              completedAt: now + 400,
+              toolCallIds: [],
+              stopReason: 'end_turn',
+              outputPhase: 'commentary',
             },
-          ],
-          startedAt: now + 200,
-          completedAt: now + 400,
-        },
-        {
-          id: 'runtime-loop-final-stream',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'running',
-          result: {
-            status: 'streaming',
-            toolCallIds: [],
-            outputPhase: 'final_answer',
+            items: [textItem('Need a few answers first.', 1)],
+            toolCalls: [],
+            startedAt: now,
+            completedAt: now + 200,
           },
-          items: [textItem('Streaming final answer tokens after ask_user.', 2, { phase: 'final_answer', status: 'streaming' })],
-          toolCalls: [],
-          startedAt: now + 500,
-        },
-      ],
-    }, t);
+          {
+            id: 'runtime-user-input',
+            kind: 'user_input',
+            title: 'User input requested',
+            status: 'complete',
+            result: {
+              status: 'complete',
+              toolCallIds: ['ask-batch'],
+            },
+            toolCalls: [
+              {
+                id: 'ask-batch',
+                toolName: 'ask_user',
+                status: 'complete',
+                argsPreview: JSON.stringify({
+                  questions: [{ prompt: 'Drink?' }, { prompt: 'Quality?' }],
+                }),
+                resultPreview: JSON.stringify({
+                  answers: [{ answer: '茶' }, { answer: '还行' }],
+                }),
+                startedAt: now + 200,
+                completedAt: now + 400,
+              },
+            ],
+            startedAt: now + 200,
+            completedAt: now + 400,
+          },
+          {
+            id: 'runtime-loop-final-stream',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'running',
+            result: {
+              status: 'streaming',
+              toolCallIds: [],
+              outputPhase: 'final_answer',
+            },
+            items: [
+              textItem('Streaming final answer tokens after ask_user.', 2, {
+                phase: 'final_answer',
+                status: 'streaming',
+              }),
+            ],
+            toolCalls: [],
+            startedAt: now + 500,
+          },
+        ],
+      },
+      t,
+    );
 
-    expect(rowsOfType(presentation.rows, 'output').map(({ text, phase, status }) => ({ text, phase, status }))).toEqual([
-      { text: 'Need a few answers first.', phase: 'commentary', status: 'complete' },
-      { text: 'Streaming final answer tokens after ask_user.', phase: 'final_answer', status: 'running' },
-    ]);
+    expect(rowsOfType(presentation.rows, 'output').map(({ text, phase, status }) => ({ text, phase, status }))).toEqual(
+      [
+        { text: 'Need a few answers first.', phase: 'commentary', status: 'complete' },
+        { text: 'Streaming final answer tokens after ask_user.', phase: 'final_answer', status: 'running' },
+      ],
+    );
   });
 
-  it('uses Thought-for settled labels with the thinking block\'s own streaming time', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 1000,
-      blocks: [
-        {
-          id: 'runtime-loop-thought',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds: ['tool-read'] },
-          items: [
-            { ...thinkingItem('raw chain-of-thought that must not be result text', 1, rawThinking), startedAt: now, completedAt: now + 1500 },
-            textItem('Read files before answering.', 2),
-          ],
-          toolCalls: [
-            {
-              id: 'tool-read',
-              toolName: 'read_file',
-              status: 'complete',
-              argsPreview: JSON.stringify({ path: 'README.md' }),
-              resultPreview: JSON.stringify({ content: 'hello' }),
-              displayOrder: 3,
-              startedAt: now + 1500,
-              completedAt: now + 1600,
-            },
-          ],
-          startedAt: now,
-          completedAt: now + 1600,
-        },
-      ],
-    }, t);
+  it("uses Thought-for settled labels with the thinking block's own streaming time", () => {
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 1000,
+        blocks: [
+          {
+            id: 'runtime-loop-thought',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: ['tool-read'] },
+            items: [
+              {
+                ...thinkingItem('raw chain-of-thought that must not be result text', 1, rawThinking),
+                startedAt: now,
+                completedAt: now + 1500,
+              },
+              textItem('Read files before answering.', 2),
+            ],
+            toolCalls: [
+              {
+                id: 'tool-read',
+                toolName: 'read_file',
+                status: 'complete',
+                argsPreview: JSON.stringify({ path: 'README.md' }),
+                resultPreview: JSON.stringify({ content: 'hello' }),
+                displayOrder: 3,
+                startedAt: now + 1500,
+                completedAt: now + 1600,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 1600,
+          },
+        ],
+      },
+      t,
+    );
 
-    expect(rowsOfType(presentation.rows, 'thinking')).toEqual([expect.objectContaining({
-      label: '已思考 · 1.5秒',
-      preview: 'raw chain-of-thought that must not be result text',
-      openByDefault: false,
-    })]);
+    expect(rowsOfType(presentation.rows, 'thinking')).toEqual([
+      expect.objectContaining({
+        label: '已思考 · 1.5秒',
+        preview: 'raw chain-of-thought that must not be result text',
+        openByDefault: false,
+      }),
+    ]);
     expect(rowsOfType(presentation.rows, 'output').map((row) => row.text)).toEqual(['Read files before answering.']);
   });
 
   it('keeps each thinking block of one loop as its own row around the tool between them', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 300,
-      blocks: [{
-        id: 'runtime-loop-interleaved', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
-        result: { status: 'complete', stopReason: 'tool_use', outputPhase: 'commentary', toolCallIds: ['tool-read'] },
-        items: [thinkingItem('Locate the config first.', 1), thinkingItem('The config confirms the cause.', 3)],
-        toolCalls: [{
-          id: 'tool-read', toolName: 'read_file', status: 'complete', displayOrder: 2,
-          argsPreview: JSON.stringify({ path: 'config.json' }), resultPreview: '{}',
-          startedAt: now + 100, completedAt: now + 200,
-        }],
-        startedAt: now,
-        completedAt: now + 300,
-      }],
-    }, t);
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 300,
+        blocks: [
+          {
+            id: 'runtime-loop-interleaved',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: {
+              status: 'complete',
+              stopReason: 'tool_use',
+              outputPhase: 'commentary',
+              toolCallIds: ['tool-read'],
+            },
+            items: [thinkingItem('Locate the config first.', 1), thinkingItem('The config confirms the cause.', 3)],
+            toolCalls: [
+              {
+                id: 'tool-read',
+                toolName: 'read_file',
+                status: 'complete',
+                displayOrder: 2,
+                argsPreview: JSON.stringify({ path: 'config.json' }),
+                resultPreview: '{}',
+                startedAt: now + 100,
+                completedAt: now + 200,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 300,
+          },
+        ],
+      },
+      t,
+    );
 
     const section = presentation.rows.find((row) => row.type === 'section');
     if (section?.type !== 'section') throw new Error('expected section');
@@ -467,237 +650,301 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('uses streaming Thinking label while the loop is active', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'running',
-      updatedAt: now,
-      blocks: [
-        {
-          id: 'runtime-loop-stream',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'running',
-          result: { status: 'streaming', toolCallIds: ['tool-glob'] },
-          items: [thinkingItem('planning next step', 1, { status: 'streaming' })],
-          toolCalls: [
-            {
-              id: 'tool-glob',
-              toolName: 'glob',
-              status: 'running',
-              argsPreview: JSON.stringify({ pattern: '**/*' }),
-              displayOrder: 2,
-              startedAt: now + 100,
-            },
-          ],
-          startedAt: now,
-        },
-      ],
-    }, t);
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'running',
+        updatedAt: now,
+        blocks: [
+          {
+            id: 'runtime-loop-stream',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'running',
+            result: { status: 'streaming', toolCallIds: ['tool-glob'] },
+            items: [thinkingItem('planning next step', 1, { status: 'streaming' })],
+            toolCalls: [
+              {
+                id: 'tool-glob',
+                toolName: 'glob',
+                status: 'running',
+                argsPreview: JSON.stringify({ pattern: '**/*' }),
+                displayOrder: 2,
+                startedAt: now + 100,
+              },
+            ],
+            startedAt: now,
+          },
+        ],
+      },
+      t,
+    );
 
-    expect(rowsOfType(presentation.rows, 'thinking')).toEqual([expect.objectContaining({
-      label: '正在思考…',
-      thinkingStatus: 'streaming',
-      openByDefault: true,
-    })]);
+    expect(rowsOfType(presentation.rows, 'thinking')).toEqual([
+      expect.objectContaining({
+        label: '正在思考…',
+        thinkingStatus: 'streaming',
+        openByDefault: true,
+      }),
+    ]);
   });
 
   it('expands active final-answer thinking by the same lifecycle policy', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'running',
-      updatedAt: now,
-      blocks: [
-        {
-          id: 'runtime-loop-final-active',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'running',
-          result: {
-            status: 'streaming',
-            toolCallIds: [],
-            stopReason: 'end_turn',
-            outputPhase: 'final_answer',
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'running',
+        updatedAt: now,
+        blocks: [
+          {
+            id: 'runtime-loop-final-active',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'running',
+            result: {
+              status: 'streaming',
+              toolCallIds: [],
+              stopReason: 'end_turn',
+              outputPhase: 'final_answer',
+            },
+            items: [thinkingItem('compose a short identity answer', 1, { ...rawThinking, status: 'streaming' })],
+            toolCalls: [],
+            startedAt: now,
           },
-          items: [thinkingItem('compose a short identity answer', 1, { ...rawThinking, status: 'streaming' })],
-          toolCalls: [],
-          startedAt: now,
-        },
-      ],
-    }, t);
-    expect(rowsOfType(presentation.rows, 'thinking')).toEqual([expect.objectContaining({
-      openByDefault: true,
-      label: '正在思考…',
-    })]);
+        ],
+      },
+      t,
+    );
+    expect(rowsOfType(presentation.rows, 'thinking')).toEqual([
+      expect.objectContaining({
+        openByDefault: true,
+        label: '正在思考…',
+      }),
+    ]);
   });
 
   it('shows settled thinking while the turn awaits plan review', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'running', updatedAt: now + 100,
-      blocks: [{
-        id: 'runtime-loop-plan-review', kind: 'llm_turn', title: 'LLM turn', status: 'running',
-        result: { status: 'streaming', toolCallIds: ['plan-call'] },
-        items: [thinkingItem('Plan is ready', 1, { source: 'openai-responses-summary' })],
-        startedAt: now, completedAt: now + 100,
-        toolCalls: [{ id: 'plan-call', toolName: 'plan_artifact', status: 'running', displayOrder: 2, startedAt: now + 100,
-          planReview: { planId: 'plan-1', revision: 1, uri: 'session://plans/plan.md',
-            hash: 'a'.repeat(64), title: 'Plan', summary: [], sections: [], status: 'awaiting',
-            handoffOptions: [{ label: 'Execute with General', agent: 'general' }] } }],
-      }],
-    }, t);
-    expect(rowsOfType(presentation.rows, 'thinking')).toEqual([expect.objectContaining({
-      label: expect.stringMatching(/^已思考/),
-      openByDefault: false,
-    })]);
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'running',
+        updatedAt: now + 100,
+        blocks: [
+          {
+            id: 'runtime-loop-plan-review',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'running',
+            result: { status: 'streaming', toolCallIds: ['plan-call'] },
+            items: [thinkingItem('Plan is ready', 1, { source: 'openai-responses-summary' })],
+            startedAt: now,
+            completedAt: now + 100,
+            toolCalls: [
+              {
+                id: 'plan-call',
+                toolName: 'plan_artifact',
+                status: 'running',
+                displayOrder: 2,
+                startedAt: now + 100,
+                planReview: {
+                  planId: 'plan-1',
+                  revision: 1,
+                  uri: 'session://plans/plan.md',
+                  hash: 'a'.repeat(64),
+                  title: 'Plan',
+                  summary: [],
+                  sections: [],
+                  status: 'awaiting',
+                  handoffOptions: [{ label: 'Execute with General', agent: 'general' }],
+                },
+              },
+            ],
+          },
+        ],
+      },
+      t,
+    );
+    expect(rowsOfType(presentation.rows, 'thinking')).toEqual([
+      expect.objectContaining({
+        label: expect.stringMatching(/^已思考/),
+        openByDefault: false,
+      }),
+    ]);
   });
 
   it('expands active raw thinking and folds settled process-loop thinking by policy', () => {
-    const active = buildWorkProcessPresentation({
-      status: 'running',
-      updatedAt: now,
-      blocks: [
-        {
-          id: 'runtime-loop-raw-open',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'running',
-          result: { status: 'streaming', toolCallIds: ['tool-glob-raw'] },
-          items: [thinkingItem('live raw thinking', 1, { ...rawThinking, status: 'streaming' })],
-          toolCalls: [
-            {
-              id: 'tool-glob-raw',
-              toolName: 'glob',
-              status: 'running',
-              argsPreview: JSON.stringify({ pattern: '**/*' }),
-              displayOrder: 2,
-              startedAt: now + 100,
-            },
-          ],
-          startedAt: now,
-        },
-      ],
-    }, t);
-    expect(rowsOfType(active.rows, 'thinking')).toEqual([expect.objectContaining({
-      openByDefault: true,
-      label: '正在思考…',
-    })]);
+    const active = buildWorkProcessPresentation(
+      {
+        status: 'running',
+        updatedAt: now,
+        blocks: [
+          {
+            id: 'runtime-loop-raw-open',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'running',
+            result: { status: 'streaming', toolCallIds: ['tool-glob-raw'] },
+            items: [thinkingItem('live raw thinking', 1, { ...rawThinking, status: 'streaming' })],
+            toolCalls: [
+              {
+                id: 'tool-glob-raw',
+                toolName: 'glob',
+                status: 'running',
+                argsPreview: JSON.stringify({ pattern: '**/*' }),
+                displayOrder: 2,
+                startedAt: now + 100,
+              },
+            ],
+            startedAt: now,
+          },
+        ],
+      },
+      t,
+    );
+    expect(rowsOfType(active.rows, 'thinking')).toEqual([
+      expect.objectContaining({
+        openByDefault: true,
+        label: '正在思考…',
+      }),
+    ]);
 
-    const settled = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 1000,
-      blocks: [
-        {
-          id: 'runtime-loop-raw-closed',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds: ['tool-glob-raw-done'] },
-          items: [{ ...thinkingItem('settled raw thinking', 1, rawThinking), startedAt: now, completedAt: now + 100 }],
-          toolCalls: [
-            {
-              id: 'tool-glob-raw-done',
-              toolName: 'glob',
-              status: 'complete',
-              argsPreview: JSON.stringify({ pattern: '**/*' }),
-              resultPreview: JSON.stringify({ files: ['a.ts'] }),
-              displayOrder: 2,
-              startedAt: now + 100,
-              completedAt: now + 200,
-            },
-          ],
-          startedAt: now,
-          completedAt: now + 200,
-        },
-      ],
-    }, t);
-    expect(rowsOfType(settled.rows, 'thinking')).toEqual([expect.objectContaining({
-      openByDefault: false,
-      label: '已思考 · 100ms',
-    })]);
+    const settled = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 1000,
+        blocks: [
+          {
+            id: 'runtime-loop-raw-closed',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: ['tool-glob-raw-done'] },
+            items: [
+              { ...thinkingItem('settled raw thinking', 1, rawThinking), startedAt: now, completedAt: now + 100 },
+            ],
+            toolCalls: [
+              {
+                id: 'tool-glob-raw-done',
+                toolName: 'glob',
+                status: 'complete',
+                argsPreview: JSON.stringify({ pattern: '**/*' }),
+                resultPreview: JSON.stringify({ files: ['a.ts'] }),
+                displayOrder: 2,
+                startedAt: now + 100,
+                completedAt: now + 200,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 200,
+          },
+        ],
+      },
+      t,
+    );
+    expect(rowsOfType(settled.rows, 'thinking')).toEqual([
+      expect.objectContaining({
+        openByDefault: false,
+        label: '已思考 · 100ms',
+      }),
+    ]);
   });
 
   it('falls back to durationless 已思考 when timestamps are missing', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now,
-      blocks: [
-        {
-          id: 'runtime-loop-no-time',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds: [] },
-          items: [thinkingItem('summary only', 1)],
-          toolCalls: [],
-          startedAt: undefined as unknown as number,
-          completedAt: undefined,
-        },
-      ],
-    }, t);
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now,
+        blocks: [
+          {
+            id: 'runtime-loop-no-time',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: [] },
+            items: [thinkingItem('summary only', 1)],
+            toolCalls: [],
+            startedAt: undefined as unknown as number,
+            completedAt: undefined,
+          },
+        ],
+      },
+      t,
+    );
 
     expect(rowsOfType(presentation.rows, 'thinking').map((row) => row.label)).toEqual(['已思考']);
   });
 
   it('keeps adjacent tool calls in individual cards with their own identities', () => {
     const toolCallIds = ['lookup', 'first-result', 'second-result'];
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now,
-      blocks: [
-        {
-          id: 'runtime-loop-explore',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds },
-          toolCalls: toolCallIds.map((id, index) => ({
-            id,
-            toolName: index === 0 ? 'tool_search' : 'artifact_read',
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now,
+        blocks: [
+          {
+            id: 'runtime-loop-explore',
+            kind: 'llm_turn',
+            title: 'LLM turn',
             status: 'complete',
-            argsPreview: JSON.stringify(index === 0 ? { query: 'files' } : { uri: `session://tool-outputs/${id}` }),
-            resultPreview: JSON.stringify({ content: `document ${index}` }),
-            startedAt: now + index * 10,
-            executionStartedAt: now + index * 10,
-            completedAt: now + index * 10 + index + 1,
-          })),
-          startedAt: now,
-          completedAt: now + 30,
-        },
-      ],
-    }, t);
+            result: { status: 'complete', toolCallIds },
+            toolCalls: toolCallIds.map((id, index) => ({
+              id,
+              toolName: index === 0 ? 'tool_search' : 'artifact_read',
+              status: 'complete',
+              argsPreview: JSON.stringify(index === 0 ? { query: 'files' } : { uri: `session://tool-outputs/${id}` }),
+              resultPreview: JSON.stringify({ content: `document ${index}` }),
+              startedAt: now + index * 10,
+              executionStartedAt: now + index * 10,
+              completedAt: now + index * 10 + index + 1,
+            })),
+            startedAt: now,
+            completedAt: now + 30,
+          },
+        ],
+      },
+      t,
+    );
 
     const section = presentation.rows.find((row) => row.type === 'section');
     const visibleSteps = section?.type === 'section' ? section.visibleSteps : [];
     expect(visibleSteps.map((row) => row.id)).toEqual(toolCallIds);
-    expect(visibleSteps).toMatchObject(toolCallIds.map((id, index) => ({
-      type: 'tool', id, duration: `${index + 1}ms`, rawLines: expect.arrayContaining([expect.stringContaining(`document ${index}`)]),
-    })));
+    expect(visibleSteps).toMatchObject(
+      toolCallIds.map((id, index) => ({
+        type: 'tool',
+        id,
+        duration: `${index + 1}ms`,
+        rawLines: expect.arrayContaining([expect.stringContaining(`document ${index}`)]),
+      })),
+    );
     expect(section?.type === 'section' ? section.steps : []).toHaveLength(3);
   });
 
   it('keeps a single tool flat without aggregation', () => {
     const toolCallIds = ['tool-flat'];
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now,
-      blocks: [
-        {
-          id: 'runtime-loop-two',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds },
-          toolCalls: toolCallIds.map((id, index) => ({
-            id,
-            toolName: 'read_file',
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now,
+        blocks: [
+          {
+            id: 'runtime-loop-two',
+            kind: 'llm_turn',
+            title: 'LLM turn',
             status: 'complete',
-            argsPreview: JSON.stringify({ path: `${index}.md` }),
-            resultPreview: '{}',
-            startedAt: now + index * 10,
-            completedAt: now + index * 10 + 5,
-          })),
-          startedAt: now,
-          completedAt: now + 10,
-        },
-      ],
-    }, t);
+            result: { status: 'complete', toolCallIds },
+            toolCalls: toolCallIds.map((id, index) => ({
+              id,
+              toolName: 'read_file',
+              status: 'complete',
+              argsPreview: JSON.stringify({ path: `${index}.md` }),
+              resultPreview: '{}',
+              startedAt: now + index * 10,
+              completedAt: now + index * 10 + 5,
+            })),
+            startedAt: now,
+            completedAt: now + 10,
+          },
+        ],
+      },
+      t,
+    );
 
     const section = presentation.rows.find((row) => row.type === 'section');
     const visibleSteps = section?.type === 'section' ? section.visibleSteps : [];
@@ -705,30 +952,42 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('retains skipped audit counts without projecting calls that never executed', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      toolEvidence: { total: 3, succeeded: 1, failed: 1, skipped: 1 },
-      updatedAt: now + 20,
-      blocks: [{
-        id: 'runtime-loop-evidence',
-        kind: 'llm_turn',
-        title: 'LLM turn',
+    const presentation = buildWorkProcessPresentation(
+      {
         status: 'complete',
-        result: { status: 'complete', outputPhase: 'commentary', toolCallIds: ['ok', 'failed', 'skipped'] },
-        toolCalls: [
-          { id: 'ok', toolName: 'read_file', status: 'complete', startedAt: now, completedAt: now + 1 },
-          { id: 'failed', toolName: 'shell', status: 'error', error: 'exit 1', startedAt: now + 2, completedAt: now + 3 },
-          { id: 'skipped', toolName: 'web_search', status: 'skipped', startedAt: now + 4, completedAt: now + 5 },
+        toolEvidence: { total: 3, succeeded: 1, failed: 1, skipped: 1 },
+        updatedAt: now + 20,
+        blocks: [
+          {
+            id: 'runtime-loop-evidence',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', outputPhase: 'commentary', toolCallIds: ['ok', 'failed', 'skipped'] },
+            toolCalls: [
+              { id: 'ok', toolName: 'read_file', status: 'complete', startedAt: now, completedAt: now + 1 },
+              {
+                id: 'failed',
+                toolName: 'shell',
+                status: 'error',
+                error: 'exit 1',
+                startedAt: now + 2,
+                completedAt: now + 3,
+              },
+              { id: 'skipped', toolName: 'web_search', status: 'skipped', startedAt: now + 4, completedAt: now + 5 },
+            ],
+            startedAt: now,
+            completedAt: now + 5,
+          },
         ],
-        startedAt: now,
-        completedAt: now + 5,
-      }],
-    }, t);
+      },
+      t,
+    );
 
     expect(presentation.toolEvidence).toEqual({ total: 3, succeeded: 1, failed: 1, skipped: 1 });
-    expect(flattenWorkRows(presentation.rows)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'tool', id: 'failed', status: 'error' }),
-    ]));
+    expect(flattenWorkRows(presentation.rows)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: 'tool', id: 'failed', status: 'error' })]),
+    );
     expect(flattenWorkRows(presentation.rows).some((row) => row.id === 'skipped')).toBe(false);
   });
 
@@ -738,12 +997,17 @@ describe('buildWorkProcessPresentation', () => {
     const image = `session://tool-outputs/image-${hash}.png`;
     const receipt = `Evidence ref: ${ref}\nhash: ${hash}\nImage evidence (grant each exact URI explicitly to a reviewer; the result wrapper does not grant pixels):\n${image}\nsha256:${hash}`;
     const resultPreview = buildToolResultPreview({
-      content: [{ type: 'text', text: 'Files inspected' }, { type: 'text', text: receipt },
-        { type: 'text', text: 'Output after receipt' }],
+      content: [
+        { type: 'text', text: 'Files inspected' },
+        { type: 'text', text: receipt },
+        { type: 'text', text: 'Output after receipt' },
+      ],
       details: { evidenceArtifact: { ref, hash }, matched: 12 },
     });
-    const row = createToolRowForPresentation({ id: 'inline-evidence', toolName: 'shell', status: 'complete',
-      startedAt: now, resultPreview }, t);
+    const row = createToolRowForPresentation(
+      { id: 'inline-evidence', toolName: 'shell', status: 'complete', startedAt: now, resultPreview },
+      t,
+    );
     expect(row).toMatchObject({ type: 'tool', previewLines: ['Files inspected', 'Output after receipt'] });
     if (row.type !== 'tool') throw new Error('expected tool row');
     expect(row.rawLines.join('\n')).toContain(ref);
@@ -754,67 +1018,90 @@ describe('buildWorkProcessPresentation', () => {
   it('preserves receipt-like lines printed by a tool and the complete failure reason', () => {
     const printed = `Evidence ref: session://tool-outputs/printed.json\nhash: ${'cd'.repeat(32)}\nUnable to read the capture`;
     const resultPreview = buildToolResultPreview({ content: [{ type: 'text', text: printed }] });
-    const row = createToolRowForPresentation({ id: 'printed', toolName: 'shell', status: 'complete', startedAt: now, resultPreview }, t);
+    const row = createToolRowForPresentation(
+      { id: 'printed', toolName: 'shell', status: 'complete', startedAt: now, resultPreview },
+      t,
+    );
     expect(row).toMatchObject({ type: 'tool', previewLines: printed.split('\n') });
-    const error = createToolRowForPresentation({ id: 'error', toolName: 'shell', status: 'error', startedAt: now,
-      resultPreview: buildToolResultPreview({ ok: false, error: { message: printed } }) }, t);
-    expect(error).toMatchObject({ type: 'tool', diagnosticCaption: expect.stringContaining('Unable to read the capture') });
+    const error = createToolRowForPresentation(
+      {
+        id: 'error',
+        toolName: 'shell',
+        status: 'error',
+        startedAt: now,
+        resultPreview: buildToolResultPreview({ ok: false, error: { message: printed } }),
+      },
+      t,
+    );
+    expect(error).toMatchObject({
+      type: 'tool',
+      diagnosticCaption: expect.stringContaining('Unable to read the capture'),
+    });
   });
 
   it('keeps offloaded output around the generated read hint and stores the full hint in Raw', () => {
     const ref = 'session://tool-outputs/read.json';
     const hash = 'ef'.repeat(32);
     const summary = 'hash check returned a mismatch';
-    const hint = 'Decoded tool text: call artifact_read with one of the following exact selections, then follow its next cursor. '
-      + 'These select returned text blocks, not omitted source-file ranges or domain validation.';
+    const hint =
+      'Decoded tool text: call artifact_read with one of the following exact selections, then follow its next cursor. ' +
+      'These select returned text blocks, not omitted source-file ranges or domain validation.';
     const pointer = JSON.stringify({ uri: ref, expectedHash: hash, textPointer: '/content/0/text' });
-    const resultPreview = buildToolResultPreview({ content: [{ type: 'text',
-      text: `${summary}\nref: ${ref}\nhash: ${hash}\n${hint}\n${pointer}\nCheck the original file` }],
+    const resultPreview = buildToolResultPreview({
+      content: [
+        { type: 'text', text: `${summary}\nref: ${ref}\nhash: ${hash}\n${hint}\n${pointer}\nCheck the original file` },
+      ],
       details: { artifactized: true, ref, hash, summary },
     });
-    const row = createToolRowForPresentation({ id: 'offload', toolName: 'shell', status: 'complete', startedAt: now, resultPreview }, t);
+    const row = createToolRowForPresentation(
+      { id: 'offload', toolName: 'shell', status: 'complete', startedAt: now, resultPreview },
+      t,
+    );
     expect(row).toMatchObject({ type: 'tool', previewLines: [summary, 'Check the original file'] });
     if (row.type !== 'tool') throw new Error('expected tool row');
     expect(row.rawLines.join('\n')).toContain('textPointer');
   });
 
   it('preserves info, warning, and error diagnostic severity in Work Process rows', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'error',
-      updatedAt: now,
-      blocks: [
-        {
-          id: 'diagnostic-info',
-          kind: 'diagnostic',
-          title: 'Catalog evidence refreshed',
-          status: 'complete',
-          diagnosticSeverity: 'info',
-          toolCalls: [],
-          startedAt: now,
-          completedAt: now + 1,
-        },
-        {
-          id: 'diagnostic-warning',
-          kind: 'diagnostic',
-          title: 'Structured tools are unsupported',
-          status: 'complete',
-          diagnosticSeverity: 'warning',
-          toolCalls: [],
-          startedAt: now + 2,
-          completedAt: now + 3,
-        },
-        {
-          id: 'diagnostic-error',
-          kind: 'diagnostic',
-          title: 'Route is unavailable',
-          status: 'error',
-          diagnosticSeverity: 'error',
-          toolCalls: [],
-          startedAt: now + 4,
-          completedAt: now + 5,
-        },
-      ],
-    }, t);
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'error',
+        updatedAt: now,
+        blocks: [
+          {
+            id: 'diagnostic-info',
+            kind: 'diagnostic',
+            title: 'Catalog evidence refreshed',
+            status: 'complete',
+            diagnosticSeverity: 'info',
+            toolCalls: [],
+            startedAt: now,
+            completedAt: now + 1,
+          },
+          {
+            id: 'diagnostic-warning',
+            kind: 'diagnostic',
+            title: 'Structured tools are unsupported',
+            status: 'complete',
+            diagnosticSeverity: 'warning',
+            toolCalls: [],
+            startedAt: now + 2,
+            completedAt: now + 3,
+          },
+          {
+            id: 'diagnostic-error',
+            kind: 'diagnostic',
+            title: 'Route is unavailable',
+            status: 'error',
+            diagnosticSeverity: 'error',
+            toolCalls: [],
+            startedAt: now + 4,
+            completedAt: now + 5,
+          },
+        ],
+      },
+      t,
+    );
 
     expect(presentation.rows.filter((row) => row.type === 'diagnostic')).toEqual([
       expect.objectContaining({ id: 'diagnostic-info', severity: 'info' }),
@@ -824,39 +1111,42 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('exposes a human-readable diagnosticCaption for failed tools without JSON envelope', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'error',
-      updatedAt: now,
-      blocks: [
-        {
-          id: 'runtime-loop-git-fail',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'error',
-          result: { status: 'complete', toolCallIds: ['tool-git'] },
-          toolCalls: [
-            {
-              id: 'tool-git',
-              toolName: 'shell',
-              status: 'error',
-              argsPreview: JSON.stringify({ command: 'git rev-parse --show-toplevel' }),
-              resultPreview: JSON.stringify({
-                ok: false,
-                data: {},
-                error: {
-                  code: 'AGENT_TOOL_FAILED',
-                  message: 'fatal: not a git repository (or any of the parent directories): .git',
-                },
-              }),
-              startedAt: now,
-              completedAt: now + 20,
-            },
-          ],
-          startedAt: now,
-          completedAt: now + 20,
-        },
-      ],
-    }, t);
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'error',
+        updatedAt: now,
+        blocks: [
+          {
+            id: 'runtime-loop-git-fail',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'error',
+            result: { status: 'complete', toolCallIds: ['tool-git'] },
+            toolCalls: [
+              {
+                id: 'tool-git',
+                toolName: 'shell',
+                status: 'error',
+                argsPreview: JSON.stringify({ command: 'git rev-parse --show-toplevel' }),
+                resultPreview: JSON.stringify({
+                  ok: false,
+                  data: {},
+                  error: {
+                    code: 'AGENT_TOOL_FAILED',
+                    message: 'fatal: not a git repository (or any of the parent directories): .git',
+                  },
+                }),
+                startedAt: now,
+                completedAt: now + 20,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 20,
+          },
+        ],
+      },
+      t,
+    );
 
     const tool = flattenWorkRows(presentation.rows).find((row) => row.type === 'tool');
     expect(tool).toMatchObject({
@@ -870,16 +1160,35 @@ describe('buildWorkProcessPresentation', () => {
 
   it('says a runtime rejection once, as its reason, and keeps the coded text in the raw receipt', () => {
     const error = 'TOOL_SCHEMA_VIOLATION: [plan_artifact] args.summary: 数组元素数不得大于 4（实际: 5）';
-    const presentation = buildWorkProcessPresentation({
-      status: 'error',
-      updatedAt: now,
-      blocks: [{
-        id: 'runtime-loop-schema', kind: 'llm_turn', title: 'LLM turn', status: 'error',
-        result: { status: 'complete', toolCallIds: ['tool-plan'] },
-        toolCalls: [{ id: 'tool-plan', toolName: 'plan_artifact', status: 'error', argsPreview: '{}', error, startedAt: now, completedAt: now + 5 }],
-        startedAt: now, completedAt: now + 5,
-      }],
-    }, t);
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'error',
+        updatedAt: now,
+        blocks: [
+          {
+            id: 'runtime-loop-schema',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'error',
+            result: { status: 'complete', toolCallIds: ['tool-plan'] },
+            toolCalls: [
+              {
+                id: 'tool-plan',
+                toolName: 'plan_artifact',
+                status: 'error',
+                argsPreview: '{}',
+                error,
+                startedAt: now,
+                completedAt: now + 5,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 5,
+          },
+        ],
+      },
+      t,
+    );
 
     const tool = flattenWorkRows(presentation.rows).find((row) => row.type === 'tool');
     if (tool?.type !== 'tool') throw new Error('expected a tool row');
@@ -890,45 +1199,48 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('folds answer-only follow-up thinking into a quiet section and omits Reply boundaries', () => {
-    const withThinking = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 100,
-      blocks: [
-        {
-          id: 'runtime-loop-tools',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds: ['tool-1'] },
-          toolCalls: [
-            {
-              id: 'tool-1',
-              toolName: 'glob',
-              status: 'complete',
-              argsPreview: JSON.stringify({ pattern: '*' }),
-              resultPreview: '{}',
-              startedAt: now,
-              completedAt: now + 10,
-            },
-          ],
-          startedAt: now,
-          completedAt: now + 10,
-        },
-        {
-          id: 'runtime-loop-answer',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
-          items: [thinkingItem('Closing thoughts before the reply.', 1)],
-          toolCalls: [],
-          startedAt: now + 20,
-          completedAt: now + 40,
-        },
-      ],
-    }, t);
+    const withThinking = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 100,
+        blocks: [
+          {
+            id: 'runtime-loop-tools',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: ['tool-1'] },
+            toolCalls: [
+              {
+                id: 'tool-1',
+                toolName: 'glob',
+                status: 'complete',
+                argsPreview: JSON.stringify({ pattern: '*' }),
+                resultPreview: '{}',
+                startedAt: now,
+                completedAt: now + 10,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 10,
+          },
+          {
+            id: 'runtime-loop-answer',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
+            items: [thinkingItem('Closing thoughts before the reply.', 1)],
+            toolCalls: [],
+            startedAt: now + 20,
+            completedAt: now + 40,
+          },
+        ],
+      },
+      t,
+    );
 
-    expect(withThinking.rows.every((row) => row.type !== 'response' as string)).toBe(true);
+    expect(withThinking.rows.every((row) => row.type !== ('response' as string))).toBe(true);
     const closing = withThinking.rows.filter((row) => row.type === 'section').at(-1);
     expect(closing).toMatchObject({
       type: 'section',
@@ -937,43 +1249,46 @@ describe('buildWorkProcessPresentation', () => {
       steps: [expect.objectContaining({ type: 'thinking', preview: 'Closing thoughts before the reply.' })],
     });
 
-    const withoutThinking = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 100,
-      blocks: [
-        {
-          id: 'runtime-loop-tools-2',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds: ['tool-2'] },
-          toolCalls: [
-            {
-              id: 'tool-2',
-              toolName: 'glob',
-              status: 'complete',
-              argsPreview: JSON.stringify({ pattern: '*' }),
-              resultPreview: '{}',
-              startedAt: now,
-              completedAt: now + 10,
-            },
-          ],
-          startedAt: now,
-          completedAt: now + 10,
-        },
-        {
-          id: 'runtime-loop-answer-silent',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
-          toolCalls: [],
-          startedAt: now + 20,
-          completedAt: now + 40,
-        },
-      ],
-    }, t);
-    expect(withoutThinking.rows.every((row) => row.type !== 'response' as string)).toBe(true);
+    const withoutThinking = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 100,
+        blocks: [
+          {
+            id: 'runtime-loop-tools-2',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: ['tool-2'] },
+            toolCalls: [
+              {
+                id: 'tool-2',
+                toolName: 'glob',
+                status: 'complete',
+                argsPreview: JSON.stringify({ pattern: '*' }),
+                resultPreview: '{}',
+                startedAt: now,
+                completedAt: now + 10,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 10,
+          },
+          {
+            id: 'runtime-loop-answer-silent',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
+            toolCalls: [],
+            startedAt: now + 20,
+            completedAt: now + 40,
+          },
+        ],
+      },
+      t,
+    );
+    expect(withoutThinking.rows.every((row) => row.type !== ('response' as string))).toBe(true);
     expect(withoutThinking.rows.filter((row) => row.type === 'section')).toHaveLength(1);
   });
 
@@ -1011,44 +1326,45 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('unwraps shell envelope into shell content-layer preview without ok/trace_id', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 500,
-      blocks: [
-        {
-          id: 'runtime-loop-shell',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds: ['tool-shell'] },
-          toolCalls: [
-            {
-              id: 'tool-shell',
-              toolName: 'shell',
-              status: 'complete',
-              argsPreview: JSON.stringify({ command: 'npm run typecheck' }),
-              resultPreview: JSON.stringify({
-                ok: true,
-                data: {
-                  content: [{ type: 'text', text: '> tsc\nFound 0 errors.' }],
-                  details: { command: 'npm run typecheck', exitCode: 0, durationMs: 120 },
-                },
-                duration_ms: 120,
-                trace_id: 'tool-shell',
-              }),
-              startedAt: now,
-              completedAt: now + 120,
-            },
-          ],
-          startedAt: now,
-          completedAt: now + 120,
-        },
-      ],
-    }, t);
-
-    const shellRow = flattenWorkRows(presentation.rows).find(
-      (row) => row.type === 'tool' && row.toolName === 'shell',
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 500,
+        blocks: [
+          {
+            id: 'runtime-loop-shell',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: ['tool-shell'] },
+            toolCalls: [
+              {
+                id: 'tool-shell',
+                toolName: 'shell',
+                status: 'complete',
+                argsPreview: JSON.stringify({ command: 'npm run typecheck' }),
+                resultPreview: JSON.stringify({
+                  ok: true,
+                  data: {
+                    content: [{ type: 'text', text: '> tsc\nFound 0 errors.' }],
+                    details: { command: 'npm run typecheck', exitCode: 0, durationMs: 120 },
+                  },
+                  duration_ms: 120,
+                  trace_id: 'tool-shell',
+                }),
+                startedAt: now,
+                completedAt: now + 120,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 120,
+          },
+        ],
+      },
+      t,
     );
+
+    const shellRow = flattenWorkRows(presentation.rows).find((row) => row.type === 'tool' && row.toolName === 'shell');
     expect(shellRow).toMatchObject({
       type: 'tool',
       family: 'shell',
@@ -1079,44 +1395,47 @@ describe('buildWorkProcessPresentation', () => {
       '',
       `${'x'.repeat(400)}`,
     ].join('\n');
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 500,
-      blocks: [
-        {
-          id: 'runtime-loop-skill',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds: ['tool-skill'] },
-          toolCalls: [
-            {
-              id: 'tool-skill',
-              toolName: 'skill_read',
-              status: 'complete',
-              argsPreview: JSON.stringify({ skill_id: 'arming-thought' }),
-              resultPreview: JSON.stringify({
-                ok: true,
-                data: {
-                  content: [{ type: 'text', text: skillMarkdown }],
-                  details: {
-                    skillId: 'arming-thought',
-                    description: 'Establish qiushi principles at conversation start.',
-                    sourcePath: 'C:/Users/Vip/.codex/skills/arming-thought/SKILL.md',
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 500,
+        blocks: [
+          {
+            id: 'runtime-loop-skill',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: ['tool-skill'] },
+            toolCalls: [
+              {
+                id: 'tool-skill',
+                toolName: 'skill_read',
+                status: 'complete',
+                argsPreview: JSON.stringify({ skill_id: 'arming-thought' }),
+                resultPreview: JSON.stringify({
+                  ok: true,
+                  data: {
+                    content: [{ type: 'text', text: skillMarkdown }],
+                    details: {
+                      skillId: 'arming-thought',
+                      description: 'Establish qiushi principles at conversation start.',
+                      sourcePath: 'C:/Users/Vip/.codex/skills/arming-thought/SKILL.md',
+                    },
                   },
-                },
-                duration_ms: 40,
-                trace_id: 'tool-skill',
-              }),
-              startedAt: now,
-              completedAt: now + 40,
-            },
-          ],
-          startedAt: now,
-          completedAt: now + 40,
-        },
-      ],
-    }, t);
+                  duration_ms: 40,
+                  trace_id: 'tool-skill',
+                }),
+                startedAt: now,
+                completedAt: now + 40,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 40,
+          },
+        ],
+      },
+      t,
+    );
 
     const skillRow = flattenWorkRows(presentation.rows).find(
       (row) => row.type === 'tool' && row.toolName === 'skill_read',
@@ -1137,35 +1456,38 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('strips Unicode line gutters and projects file preview kind', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 600,
-      blocks: [
-        {
-          id: 'runtime-loop-file',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds: ['tool-read'] },
-          toolCalls: [
-            {
-              id: 'tool-read',
-              toolName: 'read_file',
-              status: 'complete',
-              argsPreview: JSON.stringify({ path: '.rdc-agent/project.yaml' }),
-              resultPreview: JSON.stringify({
-                ok: true,
-                data: { content: [{ type: 'text', text: '1→schema_version: "1"\n2→name: "rdc"' }] },
-              }),
-              startedAt: now,
-              completedAt: now + 20,
-            },
-          ],
-          startedAt: now,
-          completedAt: now + 20,
-        },
-      ],
-    }, t);
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 600,
+        blocks: [
+          {
+            id: 'runtime-loop-file',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: ['tool-read'] },
+            toolCalls: [
+              {
+                id: 'tool-read',
+                toolName: 'read_file',
+                status: 'complete',
+                argsPreview: JSON.stringify({ path: '.rdc-agent/project.yaml' }),
+                resultPreview: JSON.stringify({
+                  ok: true,
+                  data: { content: [{ type: 'text', text: '1→schema_version: "1"\n2→name: "rdc"' }] },
+                }),
+                startedAt: now,
+                completedAt: now + 20,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 20,
+          },
+        ],
+      },
+      t,
+    );
 
     const readRow = flattenWorkRows(presentation.rows).find(
       (row) => row.type === 'tool' && row.toolName === 'read_file',
@@ -1182,43 +1504,44 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('projects glob outcome-first body from production envelope details', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 16,
-      blocks: [
-        {
-          id: 'runtime-loop-glob',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds: ['tool-glob'] },
-          toolCalls: [
-            {
-              id: 'tool-glob',
-              toolName: 'glob',
-              status: 'complete',
-              argsPreview: JSON.stringify({ pattern: '**/*' }),
-              resultPreview: JSON.stringify({
-                ok: true,
-                data: {
-                  content: [{ type: 'text', text: 'src/a.ts\nsrc/b.ts\nREADME.md' }],
-                  details: { pattern: '**/*', cwd: '.', matched: 3, truncated: false },
-                },
-                duration_ms: 16,
-              }),
-              startedAt: now,
-              completedAt: now + 16,
-            },
-          ],
-          startedAt: now,
-          completedAt: now + 16,
-        },
-      ],
-    }, t);
-
-    const globRow = flattenWorkRows(presentation.rows).find(
-      (row) => row.type === 'tool' && row.toolName === 'glob',
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 16,
+        blocks: [
+          {
+            id: 'runtime-loop-glob',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: ['tool-glob'] },
+            toolCalls: [
+              {
+                id: 'tool-glob',
+                toolName: 'glob',
+                status: 'complete',
+                argsPreview: JSON.stringify({ pattern: '**/*' }),
+                resultPreview: JSON.stringify({
+                  ok: true,
+                  data: {
+                    content: [{ type: 'text', text: 'src/a.ts\nsrc/b.ts\nREADME.md' }],
+                    details: { pattern: '**/*', cwd: '.', matched: 3, truncated: false },
+                  },
+                  duration_ms: 16,
+                }),
+                startedAt: now,
+                completedAt: now + 16,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 16,
+          },
+        ],
+      },
+      t,
     );
+
+    const globRow = flattenWorkRows(presentation.rows).find((row) => row.type === 'tool' && row.toolName === 'glob');
     if (!globRow || globRow.type !== 'tool') throw new Error('expected glob tool row');
     expect(globRow.family).toBe('search');
     expect(globRow.bodyText).toBe('3 个文件');
@@ -1229,38 +1552,41 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('projects read_file totalLines into collapsed bodyText', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 10,
-      blocks: [
-        {
-          id: 'runtime-loop-read-lines',
-          kind: 'llm_turn',
-          title: 'LLM turn',
-          status: 'complete',
-          result: { status: 'complete', toolCallIds: ['tool-read-lines'] },
-          toolCalls: [
-            {
-              id: 'tool-read-lines',
-              toolName: 'read_file',
-              status: 'complete',
-              argsPreview: JSON.stringify({ path: 'DESIGN.md' }),
-              resultPreview: JSON.stringify({
-                ok: true,
-                data: {
-                  content: [{ type: 'text', text: '     1→# Design\n     2→body' }],
-                  details: { path: 'DESIGN.md', totalLines: 240, offset: 1, limit: 2000, truncated: false },
-                },
-              }),
-              startedAt: now,
-              completedAt: now + 10,
-            },
-          ],
-          startedAt: now,
-          completedAt: now + 10,
-        },
-      ],
-    }, t);
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 10,
+        blocks: [
+          {
+            id: 'runtime-loop-read-lines',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: ['tool-read-lines'] },
+            toolCalls: [
+              {
+                id: 'tool-read-lines',
+                toolName: 'read_file',
+                status: 'complete',
+                argsPreview: JSON.stringify({ path: 'DESIGN.md' }),
+                resultPreview: JSON.stringify({
+                  ok: true,
+                  data: {
+                    content: [{ type: 'text', text: '     1→# Design\n     2→body' }],
+                    details: { path: 'DESIGN.md', totalLines: 240, offset: 1, limit: 2000, truncated: false },
+                  },
+                }),
+                startedAt: now,
+                completedAt: now + 10,
+              },
+            ],
+            startedAt: now,
+            completedAt: now + 10,
+          },
+        ],
+      },
+      t,
+    );
 
     const readRow = flattenWorkRows(presentation.rows).find(
       (row) => row.type === 'tool' && row.toolName === 'read_file',
@@ -1271,41 +1597,46 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('keeps the session address and hash of an offloaded result out of the card', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now,
-      blocks: [{
-        id: 'loop-artifact',
-        kind: 'llm_turn',
-        title: 'LLM turn',
+    const presentation = buildWorkProcessPresentation(
+      {
         status: 'complete',
-        toolCalls: [{
-          id: 'tool-artifact',
-          toolName: 'grep',
-          status: 'complete',
-          argsPreview: JSON.stringify({ pattern: 'foo' }),
-          resultPreview: JSON.stringify({
-            ok: true,
-            data: {
-              content: [{ type: 'text', text: 'Offloaded grep matches' }],
-              details: {
-                artifactized: true,
-                ref: 'session://tool-outputs/call-9.json',
-                hash: 'abcdef0123456789ffff',
-                summary: 'Offloaded grep matches',
+        updatedAt: now,
+        blocks: [
+          {
+            id: 'loop-artifact',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            toolCalls: [
+              {
+                id: 'tool-artifact',
+                toolName: 'grep',
+                status: 'complete',
+                argsPreview: JSON.stringify({ pattern: 'foo' }),
+                resultPreview: JSON.stringify({
+                  ok: true,
+                  data: {
+                    content: [{ type: 'text', text: 'Offloaded grep matches' }],
+                    details: {
+                      artifactized: true,
+                      ref: 'session://tool-outputs/call-9.json',
+                      hash: 'abcdef0123456789ffff',
+                      summary: 'Offloaded grep matches',
+                    },
+                  },
+                }),
+                startedAt: now,
+                completedAt: now + 8,
               },
-            },
-          }),
-          startedAt: now,
-          completedAt: now + 8,
-        }],
-        startedAt: now,
-        completedAt: now + 8,
-      }],
-    }, t);
-    const row = flattenWorkRows(presentation.rows).find(
-      (entry) => entry.type === 'tool' && entry.toolName === 'grep',
+            ],
+            startedAt: now,
+            completedAt: now + 8,
+          },
+        ],
+      },
+      t,
     );
+    const row = flattenWorkRows(presentation.rows).find((entry) => entry.type === 'tool' && entry.toolName === 'grep');
     if (!row || row.type !== 'tool') throw new Error('expected artifactized tool row');
     expect(row.pathChip).toBeUndefined();
     expect(row.chips).toBeUndefined();
@@ -1314,66 +1645,105 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('projects adjacent task snapshots with N of M counts and task anchors', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 40,
-      blocks: [{
-        id: 'task-snapshot-1',
-        kind: 'task_snapshot',
-        title: '2 of 3 completed',
+    const presentation = buildWorkProcessPresentation(
+      {
         status: 'complete',
-        taskSnapshot: {
-          completed: 2,
-          total: 3,
-          items: [
-            { taskId: 'task-a', title: 'Inspect capture', status: 'completed', order: 0 },
-            { taskId: 'task-b', title: 'Write notes', status: 'completed', order: 1 },
-            { taskId: 'task-c', title: 'Publish output', status: 'pending', order: 2 },
-          ],
-        },
-        toolCalls: [],
-        startedAt: now,
-        completedAt: now + 20,
-      }],
-    }, t);
+        updatedAt: now + 40,
+        blocks: [
+          {
+            id: 'task-snapshot-1',
+            kind: 'task_snapshot',
+            title: '2 of 3 completed',
+            status: 'complete',
+            taskSnapshot: {
+              completed: 2,
+              total: 3,
+              items: [
+                { taskId: 'task-a', title: 'Inspect capture', status: 'completed', order: 0 },
+                { taskId: 'task-b', title: 'Write notes', status: 'completed', order: 1 },
+                { taskId: 'task-c', title: 'Publish output', status: 'pending', order: 2 },
+              ],
+            },
+            toolCalls: [],
+            startedAt: now,
+            completedAt: now + 20,
+          },
+        ],
+      },
+      t,
+    );
     const row = flattenWorkRows(presentation.rows).find((entry) => entry.type === 'taskSnapshot');
-    expect(row).toEqual(expect.objectContaining({
-      type: 'taskSnapshot',
-      completed: 2,
-      total: 3,
-    }));
+    expect(row).toEqual(
+      expect.objectContaining({
+        type: 'taskSnapshot',
+        completed: 2,
+        total: 3,
+      }),
+    );
     if (!row || row.type !== 'taskSnapshot') throw new Error('expected task snapshot');
     expect(row.items.map((item) => item.taskId)).toEqual(['task-a', 'task-b', 'task-c']);
   });
 
   it('projects separate historical task snapshots around later work', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 80,
-      blocks: [
-        {
-          id: 'task-snapshot-created', kind: 'task_snapshot', title: 'Tasks added', status: 'complete',
-          taskSnapshot: { change: 'created', completed: 0, total: 1, items: [{ taskId: 'task-a', title: 'One', status: 'pending', order: 0 }] },
-          toolCalls: [], startedAt: now, completedAt: now + 35,
-        },
-        {
-          id: 'loop-shell', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
-          result: { status: 'complete', toolCallIds: ['shell-1'] },
-          toolCalls: [{
-            id: 'shell-1', toolName: 'shell', status: 'complete',
-            argsPreview: JSON.stringify({ command: 'dir' }),
-            resultPreview: JSON.stringify({ ok: true, data: { content: [{ type: 'text', text: 'ok' }] } }),
-            startedAt: now + 10, completedAt: now + 20,
-          }],
-          startedAt: now + 10, completedAt: now + 20,
-        },
-        {
-          id: 'task-snapshot-updated', kind: 'task_snapshot', title: 'Tasks updated', status: 'complete',
-          taskSnapshot: { change: 'updated', completed: 1, total: 1, items: [{ taskId: 'task-a', title: 'One', status: 'completed', order: 0 }] },
-          toolCalls: [], startedAt: now + 30, completedAt: now + 30,
-        },
-      ],
-    }, t);
+    const presentation = buildWorkProcessPresentation(
+      {
+        status: 'complete',
+        updatedAt: now + 80,
+        blocks: [
+          {
+            id: 'task-snapshot-created',
+            kind: 'task_snapshot',
+            title: 'Tasks added',
+            status: 'complete',
+            taskSnapshot: {
+              change: 'created',
+              completed: 0,
+              total: 1,
+              items: [{ taskId: 'task-a', title: 'One', status: 'pending', order: 0 }],
+            },
+            toolCalls: [],
+            startedAt: now,
+            completedAt: now + 35,
+          },
+          {
+            id: 'loop-shell',
+            kind: 'llm_turn',
+            title: 'LLM turn',
+            status: 'complete',
+            result: { status: 'complete', toolCallIds: ['shell-1'] },
+            toolCalls: [
+              {
+                id: 'shell-1',
+                toolName: 'shell',
+                status: 'complete',
+                argsPreview: JSON.stringify({ command: 'dir' }),
+                resultPreview: JSON.stringify({ ok: true, data: { content: [{ type: 'text', text: 'ok' }] } }),
+                startedAt: now + 10,
+                completedAt: now + 20,
+              },
+            ],
+            startedAt: now + 10,
+            completedAt: now + 20,
+          },
+          {
+            id: 'task-snapshot-updated',
+            kind: 'task_snapshot',
+            title: 'Tasks updated',
+            status: 'complete',
+            taskSnapshot: {
+              change: 'updated',
+              completed: 1,
+              total: 1,
+              items: [{ taskId: 'task-a', title: 'One', status: 'completed', order: 0 }],
+            },
+            toolCalls: [],
+            startedAt: now + 30,
+            completedAt: now + 30,
+          },
+        ],
+      },
+      t,
+    );
     const snapshots = flattenWorkRows(presentation.rows).filter((entry) => entry.type === 'taskSnapshot');
     expect(snapshots).toHaveLength(2);
     expect(snapshots).toEqual([
@@ -1383,127 +1753,141 @@ describe('buildWorkProcessPresentation', () => {
   });
 
   it('projects memory and interpreter families with chips and code body', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 20,
-      blocks: [{
-        id: 'runtime-loop-families',
-        kind: 'llm_turn',
-        title: 'LLM turn',
+    const presentation = buildWorkProcessPresentation(
+      {
         status: 'complete',
-        result: { status: 'complete', toolCallIds: ['mem-1', 'py-1'] },
-        toolCalls: [
+        updatedAt: now + 20,
+        blocks: [
           {
-            id: 'mem-1',
-            toolName: 'memory_search',
+            id: 'runtime-loop-families',
+            kind: 'llm_turn',
+            title: 'LLM turn',
             status: 'complete',
-            argsPreview: JSON.stringify({ query: 'compositor', scope: 'project' }),
-            resultPreview: JSON.stringify({
-              ok: true,
-              data: { content: [{ type: 'text', text: 'Last model override lived on the session.' }] },
-            }),
+            result: { status: 'complete', toolCallIds: ['mem-1', 'py-1'] },
+            toolCalls: [
+              {
+                id: 'mem-1',
+                toolName: 'memory_search',
+                status: 'complete',
+                argsPreview: JSON.stringify({ query: 'compositor', scope: 'project' }),
+                resultPreview: JSON.stringify({
+                  ok: true,
+                  data: { content: [{ type: 'text', text: 'Last model override lived on the session.' }] },
+                }),
+                startedAt: now,
+                completedAt: now + 5,
+              },
+              {
+                id: 'py-1',
+                toolName: 'code_interpreter',
+                status: 'complete',
+                argsPreview: JSON.stringify({ code: 'print(1)' }),
+                resultPreview: JSON.stringify({
+                  ok: true,
+                  data: { content: [{ type: 'text', text: '1' }], details: { command: 'python', exitCode: 0 } },
+                }),
+                startedAt: now + 6,
+                completedAt: now + 10,
+              },
+            ],
             startedAt: now,
-            completedAt: now + 5,
-          },
-          {
-            id: 'py-1',
-            toolName: 'code_interpreter',
-            status: 'complete',
-            argsPreview: JSON.stringify({ code: 'print(1)' }),
-            resultPreview: JSON.stringify({
-              ok: true,
-              data: { content: [{ type: 'text', text: '1' }], details: { command: 'python', exitCode: 0 } },
-            }),
-            startedAt: now + 6,
             completedAt: now + 10,
           },
         ],
-        startedAt: now,
-        completedAt: now + 10,
-      }],
-    }, t);
+      },
+      t,
+    );
     const rows = flattenWorkRows(presentation.rows);
     const memory = rows.find((row) => row.type === 'tool' && row.toolName === 'memory_search');
     const interpreter = rows.find((row) => row.type === 'tool' && row.toolName === 'code_interpreter');
-    expect(memory).toEqual(expect.objectContaining({
-      type: 'tool',
-      family: 'memory',
-      chips: ['compositor', 'project'],
-      bodyText: 'Last model override lived on the session.',
-    }));
-    expect(interpreter).toEqual(expect.objectContaining({
-      type: 'tool',
-      family: 'interpreter',
-      commandText: 'print(1)',
-    }));
+    expect(memory).toEqual(
+      expect.objectContaining({
+        type: 'tool',
+        family: 'memory',
+        chips: ['compositor', 'project'],
+        bodyText: 'Last model override lived on the session.',
+      }),
+    );
+    expect(interpreter).toEqual(
+      expect.objectContaining({
+        type: 'tool',
+        family: 'interpreter',
+        commandText: 'print(1)',
+      }),
+    );
   });
 
   it('projects skill, mcp, and runtime families with structured body fields', () => {
-    const presentation = buildWorkProcessPresentation({
-      status: 'complete',
-      updatedAt: now + 20,
-      blocks: [{
-        id: 'runtime-loop-structured',
-        kind: 'llm_turn',
-        title: 'LLM turn',
+    const presentation = buildWorkProcessPresentation(
+      {
         status: 'complete',
-        result: { status: 'complete', toolCallIds: ['sk-1', 'mcp-1', 'ts-1', 'out-1'] },
-        toolCalls: [
+        updatedAt: now + 20,
+        blocks: [
           {
-            id: 'sk-1',
-            toolName: 'skill_read',
+            id: 'runtime-loop-structured',
+            kind: 'llm_turn',
+            title: 'LLM turn',
             status: 'complete',
-            argsPreview: JSON.stringify({ skill_id: 'arming-thought' }),
-            resultPreview: JSON.stringify({
-              ok: true,
-              data: {
-                content: [{ type: 'text', text: 'Establish principles.' }],
-                details: { skillId: 'arming-thought', sourcePath: '/skills/arming-thought/SKILL.md' },
+            result: { status: 'complete', toolCallIds: ['sk-1', 'mcp-1', 'ts-1', 'out-1'] },
+            toolCalls: [
+              {
+                id: 'sk-1',
+                toolName: 'skill_read',
+                status: 'complete',
+                argsPreview: JSON.stringify({ skill_id: 'arming-thought' }),
+                resultPreview: JSON.stringify({
+                  ok: true,
+                  data: {
+                    content: [{ type: 'text', text: 'Establish principles.' }],
+                    details: { skillId: 'arming-thought', sourcePath: '/skills/arming-thought/SKILL.md' },
+                  },
+                }),
+                startedAt: now,
+                completedAt: now + 4,
               },
-            }),
+              {
+                id: 'mcp-1',
+                toolName: 'mcp__browser__navigate',
+                status: 'complete',
+                argsPreview: JSON.stringify({ url: 'https://example.com' }),
+                resultPreview: JSON.stringify({
+                  ok: true,
+                  data: { content: [{ type: 'text', text: 'Opened example.com' }] },
+                }),
+                startedAt: now + 5,
+                completedAt: now + 8,
+              },
+              {
+                id: 'ts-1',
+                toolName: 'tool_search',
+                status: 'complete',
+                argsPreview: JSON.stringify({ query: 'image' }),
+                resultPreview: JSON.stringify({
+                  matches: ['read_image', 'code_interpreter'],
+                }),
+                startedAt: now + 9,
+                completedAt: now + 12,
+              },
+              {
+                id: 'out-1',
+                toolName: 'output_register',
+                status: 'complete',
+                argsPreview: JSON.stringify({ path: 'out/report.md' }),
+                resultPreview: JSON.stringify({
+                  ok: true,
+                  data: { details: { path: 'out/report.md' } },
+                }),
+                startedAt: now + 13,
+                completedAt: now + 16,
+              },
+            ],
             startedAt: now,
-            completedAt: now + 4,
-          },
-          {
-            id: 'mcp-1',
-            toolName: 'mcp__browser__navigate',
-            status: 'complete',
-            argsPreview: JSON.stringify({ url: 'https://example.com' }),
-            resultPreview: JSON.stringify({
-              ok: true,
-              data: { content: [{ type: 'text', text: 'Opened example.com' }] },
-            }),
-            startedAt: now + 5,
-            completedAt: now + 8,
-          },
-          {
-            id: 'ts-1',
-            toolName: 'tool_search',
-            status: 'complete',
-            argsPreview: JSON.stringify({ query: 'image' }),
-            resultPreview: JSON.stringify({
-              matches: ['read_image', 'code_interpreter'],
-            }),
-            startedAt: now + 9,
-            completedAt: now + 12,
-          },
-          {
-            id: 'out-1',
-            toolName: 'output_register',
-            status: 'complete',
-            argsPreview: JSON.stringify({ path: 'out/report.md' }),
-            resultPreview: JSON.stringify({
-              ok: true,
-              data: { details: { path: 'out/report.md' } },
-            }),
-            startedAt: now + 13,
             completedAt: now + 16,
           },
         ],
-        startedAt: now,
-        completedAt: now + 16,
-      }],
-    }, t);
+      },
+      t,
+    );
     const rows = flattenWorkRows(presentation.rows);
     expect(rows.find((row) => row.type === 'tool' && row.toolName === 'skill_read')).toEqual(
       expect.objectContaining({
@@ -1549,30 +1933,36 @@ describe('buildWorkProcessPresentation', () => {
       status: 'awaiting',
       handoffOptions: [{ label: 'Execute with General', agent: 'general' }],
     };
-    const card = createToolRowForPresentation({
-      id: 'plan-live',
-      toolName: 'plan_artifact',
-      status: 'running',
-      planReview: awaiting,
-      argsPreview: JSON.stringify({ title: awaiting.title }),
-      startedAt: now,
-    }, t);
+    const card = createToolRowForPresentation(
+      {
+        id: 'plan-live',
+        toolName: 'plan_artifact',
+        status: 'running',
+        planReview: awaiting,
+        argsPreview: JSON.stringify({ title: awaiting.title }),
+        startedAt: now,
+      },
+      t,
+    );
     expect(card).toMatchObject({ type: 'planReview', plan: awaiting, status: 'running' });
 
-    const shell = createToolRowForPresentation({
-      id: 'plan-rejected',
-      toolName: 'plan_artifact',
-      status: 'complete',
-      planReview: {
-        ...awaiting,
-        revision: 1,
-        status: 'rejected',
-        decision: { kind: 'reject', feedback: '请补上复现条件。' },
+    const shell = createToolRowForPresentation(
+      {
+        id: 'plan-rejected',
+        toolName: 'plan_artifact',
+        status: 'complete',
+        planReview: {
+          ...awaiting,
+          revision: 1,
+          status: 'rejected',
+          decision: { kind: 'reject', feedback: '请补上复现条件。' },
+        },
+        resultPreview: '请补上复现条件。',
+        startedAt: now,
+        completedAt: now + 10,
       },
-      resultPreview: '请补上复现条件。',
-      startedAt: now,
-      completedAt: now + 10,
-    }, t);
+      t,
+    );
     expect(shell).toMatchObject({
       type: 'tool',
       verb: '计划 · 已提出修改',

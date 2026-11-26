@@ -12,16 +12,20 @@ export function useProviderProbeBatch(providerIds?: string[]) {
     mounted.current = true;
     const api = getElectronApi();
     const accept = (next: ProviderProbeBatch | null) => {
-      if (mounted.current) setBatch(previous => previous && next && previous.revision > next.revision ? previous : next);
+      if (mounted.current)
+        setBatch((previous) => (previous && next && previous.revision > next.revision ? previous : next));
     };
     const unsubscribe = api?.events.onProbeBatchChanged(accept);
-    void api?.llm.getProbeBatch().then(accept)
+    void api?.llm
+      .getProbeBatch()
+      .then(accept)
       .catch((cause: unknown) => console.warn('[settings] could not read the provider probe batch', cause));
     return () => {
       mounted.current = false;
       unsubscribe?.();
       if (owned.current) {
-        void api?.llm.cancelProbeBatch(owned.current)
+        void api?.llm
+          .cancelProbeBatch(owned.current)
           .catch((cause: unknown) => console.warn('[settings] could not cancel the provider probe batch', cause));
       }
     };
@@ -32,20 +36,35 @@ export function useProviderProbeBatch(providerIds?: string[]) {
     setBusy(true);
     setError('');
     try {
-      const next = kind === 'prepare' || kind === 'retry'
-        ? await api.llm.prepareProbeBatch({ providerIds, ...(kind === 'retry' && batch ? { retryRunId: batch.id } : {}) })
-        : kind === 'start' && batch ? await api.llm.startProbeBatch(batch.id)
-        : batch ? await api.llm.cancelProbeBatch(batch.id) : null;
+      const next =
+        kind === 'prepare' || kind === 'retry'
+          ? await api.llm.prepareProbeBatch({
+              providerIds,
+              ...(kind === 'retry' && batch ? { retryRunId: batch.id } : {}),
+            })
+          : kind === 'start' && batch
+            ? await api.llm.startProbeBatch(batch.id)
+            : batch
+              ? await api.llm.cancelProbeBatch(batch.id)
+              : null;
       if (kind === 'prepare' || kind === 'retry') owned.current = next?.id ?? null;
       if (!mounted.current) {
         if (next && owned.current === next.id) await api.llm.cancelProbeBatch(next.id);
         return;
       }
-      setBatch(previous => previous && next && previous.revision > next.revision ? previous : next);
-    } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { if (mounted.current) setBusy(false); }
+      setBatch((previous) => (previous && next && previous.revision > next.revision ? previous : next));
+    } catch (cause) {
+      if (mounted.current) setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
   };
-  const inScope = !providerIds || batch?.items.every(item => providerIds.includes(item.providerId));
-  return { batch: inScope ? batch : null, busy, error, action,
-    occupied: batch?.state === 'running' || batch?.state === 'cancelling' };
+  const inScope = !providerIds || batch?.items.every((item) => providerIds.includes(item.providerId));
+  return {
+    batch: inScope ? batch : null,
+    busy,
+    error,
+    action,
+    occupied: batch?.state === 'running' || batch?.state === 'cancelling',
+  };
 }

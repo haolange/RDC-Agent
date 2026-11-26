@@ -1,8 +1,4 @@
-import type {
-  RunSummary,
-  SessionRecordSnapshot,
-  ProjectRecord,
-} from '@shared/types/session';
+import type { RunSummary, SessionRecordSnapshot, ProjectRecord } from '@shared/types/session';
 
 export interface WorkbenchIpcState {
   currentSessionId: string | null;
@@ -26,12 +22,7 @@ export interface ProjectSelectionResult {
 export interface WorkbenchIpcContext {
   state: WorkbenchIpcState;
   broadcastToRenderer(channel: string, ...args: unknown[]): void;
-  broadcastRunStatusChanged(payload: {
-    runId: string;
-    sessionId: string;
-    status: string;
-    stopReason?: string;
-  }): void;
+  broadcastRunStatusChanged(payload: { runId: string; sessionId: string; status: string; stopReason?: string }): void;
   applyCurrentLlmConfig(): void;
   setRunLifecycleState(sessionId: string, runId: string, patch: RunLifecyclePatch): Promise<void>;
   selectCurrentProject(projectId: string | null): Promise<ProjectSelectionResult>;

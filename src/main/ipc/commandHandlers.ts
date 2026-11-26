@@ -2,10 +2,7 @@ import { ipcMain } from 'electron';
 import { getRegistry } from '../commands';
 import { CommandService } from '../commands/CommandService';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
-import {
-  CommandExecuteArgsSchema,
-  CommandListArgsSchema,
-} from './validation/commandSchemas';
+import { CommandExecuteArgsSchema, CommandListArgsSchema } from './validation/commandSchemas';
 import type { CommandExecuteRequest, CommandListResult } from '@shared/types/command';
 
 let commandService: CommandService | null = null;

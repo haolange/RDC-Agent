@@ -1,5 +1,10 @@
-.plan-review-panel__body .markdown-body { min-width: 0; }
-.plan-review-panel__body pre { max-width: 100%; overflow-x: auto; }
+.plan-review-panel__body .markdown-body {
+  min-width: 0;
+}
+.plan-review-panel__body pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
 
 .plan-review-panel__notice {
   margin: 0;
@@ -8,5 +13,9 @@
   line-height: var(--type-body-line);
 }
 
-.plan-review-panel__appendix { margin-top: var(--space-5); }
-.plan-review-panel__appendix > summary { color: var(--token-text-secondary); }
+.plan-review-panel__appendix {
+  margin-top: var(--space-5);
+}
+.plan-review-panel__appendix > summary {
+  color: var(--token-text-secondary);
+}

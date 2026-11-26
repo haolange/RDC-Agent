@@ -6,15 +6,18 @@ import { afterEach, expect, it } from 'vitest';
 import { acquireDirectoryFileLock, withDirectoryFileLockSync } from './directoryFileLock';
 
 const roots: string[] = [];
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
 
 it('does not remove a lock whose owner is still being written', async () => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'rdc-lock-initializing-'));
   roots.push(root);
   const lockPath = path.join(root, '.lock');
   writeFileSync(lockPath, '');
-  await expect(acquireDirectoryFileLock(root, { lockFileName: '.lock', maxAttempts: 2 }))
-    .rejects.toThrow('DIRECTORY_LOCK_TIMEOUT');
+  await expect(acquireDirectoryFileLock(root, { lockFileName: '.lock', maxAttempts: 2 })).rejects.toThrow(
+    'DIRECTORY_LOCK_TIMEOUT',
+  );
   expect(existsSync(lockPath)).toBe(true);
 });
 
@@ -23,8 +26,9 @@ it('does not remove a lock whose owner record names no pid', async () => {
   roots.push(root);
   const lockPath = path.join(root, '.lock');
   writeFileSync(lockPath, JSON.stringify({ pid: 'dead', birth: '', createdAt: 1 }));
-  await expect(acquireDirectoryFileLock(root, { lockFileName: '.lock', maxAttempts: 2 }))
-    .rejects.toThrow('DIRECTORY_LOCK_TIMEOUT');
+  await expect(acquireDirectoryFileLock(root, { lockFileName: '.lock', maxAttempts: 2 })).rejects.toThrow(
+    'DIRECTORY_LOCK_TIMEOUT',
+  );
   expect(existsSync(lockPath)).toBe(true);
 });
 
@@ -33,8 +37,9 @@ it('does not remove an initializing lock in the synchronous path', () => {
   roots.push(root);
   const lockPath = path.join(root, '.lock');
   writeFileSync(lockPath, '');
-  expect(() => withDirectoryFileLockSync(root, { lockFileName: '.lock', maxAttempts: 2 }, () => {}))
-    .toThrow('DIRECTORY_LOCK_TIMEOUT');
+  expect(() => withDirectoryFileLockSync(root, { lockFileName: '.lock', maxAttempts: 2 }, () => {})).toThrow(
+    'DIRECTORY_LOCK_TIMEOUT',
+  );
   expect(existsSync(lockPath)).toBe(true);
 });
 
@@ -45,10 +50,12 @@ it('does not steal an existing recovery marker', async () => {
   expect(dead.status).toBe(0);
   writeFileSync(path.join(root, '.lock'), JSON.stringify({ pid: dead.pid, createdAt: Date.now() }));
   writeFileSync(path.join(root, '.lock.recovery'), '');
-  await expect(acquireDirectoryFileLock(root, { lockFileName: '.lock', maxAttempts: 2 }))
-    .rejects.toThrow('DIRECTORY_LOCK_TIMEOUT');
-  expect(() => withDirectoryFileLockSync(root, { lockFileName: '.lock', maxAttempts: 2 }, () => {}))
-    .toThrow('DIRECTORY_LOCK_TIMEOUT');
+  await expect(acquireDirectoryFileLock(root, { lockFileName: '.lock', maxAttempts: 2 })).rejects.toThrow(
+    'DIRECTORY_LOCK_TIMEOUT',
+  );
+  expect(() => withDirectoryFileLockSync(root, { lockFileName: '.lock', maxAttempts: 2 }, () => {})).toThrow(
+    'DIRECTORY_LOCK_TIMEOUT',
+  );
   expect(existsSync(path.join(root, '.lock.recovery'))).toBe(true);
 });
 
@@ -61,7 +68,9 @@ it('serializes asynchronous and synchronous dead-owner recovery across processes
   expect(dead.status).toBe(0);
   writeFileSync(path.join(root, '.lock'), JSON.stringify({ pid: dead.pid, createdAt: Date.now() - 1000 }));
   const worker = path.join(root, 'worker.cjs');
-  writeFileSync(worker, `
+  writeFileSync(
+    worker,
+    `
 const fs = require('node:fs');
 const path = require('node:path');
 const dir = process.env.LOCK_TEST_ROOT;
@@ -91,19 +100,29 @@ const { acquireDirectoryFileLock, releaseDirectoryFileLock, withDirectoryFileLoc
     withDirectoryFileLockSync(dir,{lockFileName:'.lock',maxAttempts:30},()=>{ checkOwner(); fs.writeFileSync(marker('b-acquired'),''); });
   }
 })().catch(e=>{console.error(e);process.exitCode=1;});
-`);
-  const start = (role: string) => spawn(process.execPath, [worker], { windowsHide: true, env: {
-    ...process.env, LOCK_TEST_ROOT: root, LOCK_TEST_ROLE: role,
-    LOCK_TEST_REGISTER: path.resolve('scripts/register-ts-source.cjs'), LOCK_TEST_MODULE: path.resolve('src/main/sessions/store/directoryFileLock.ts'),
-  }, stdio: 'pipe' });
+`,
+  );
+  const start = (role: string) =>
+    spawn(process.execPath, [worker], {
+      windowsHide: true,
+      env: {
+        ...process.env,
+        LOCK_TEST_ROOT: root,
+        LOCK_TEST_ROLE: role,
+        LOCK_TEST_REGISTER: path.resolve('scripts/register-ts-source.cjs'),
+        LOCK_TEST_MODULE: path.resolve('src/main/sessions/store/directoryFileLock.ts'),
+      },
+      stdio: 'pipe',
+    });
   const waitFor = async (name: string) => {
     for (let i = 0; i < 500; i++) {
       if (existsSync(path.join(root, name))) return;
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     }
     throw new Error(`Timed out waiting for ${name}`);
   };
-  const exitCode = (child: ReturnType<typeof start>) => new Promise<number | null>(resolve => child.once('close', code => resolve(code)));
+  const exitCode = (child: ReturnType<typeof start>) =>
+    new Promise<number | null>((resolve) => child.once('close', (code) => resolve(code)));
   const a = start('A');
   const aDone = exitCode(a);
   let b: ReturnType<typeof start> | undefined;
@@ -113,12 +132,12 @@ const { acquireDirectoryFileLock, releaseDirectoryFileLock, withDirectoryFileLoc
     b = start('B');
     bDone = exitCode(b);
     await waitFor('b-started');
-    await new Promise(resolve => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 250));
     expect(existsSync(path.join(root, 'b-acquired'))).toBe(false);
     writeFileSync(path.join(root, 'allow-a'), '');
     await waitFor('a-acquired');
     // Hold long enough for B to retry several times against A's live lock before A checks and releases it.
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise((resolve) => setTimeout(resolve, 400));
     writeFileSync(path.join(root, 'release-a'), '');
     expect(await Promise.all([aDone, bDone])).toEqual([0, 0]);
     expect(existsSync(path.join(root, 'b-acquired'))).toBe(true);

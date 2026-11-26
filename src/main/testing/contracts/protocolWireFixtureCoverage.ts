@@ -94,6 +94,6 @@ export const PROTOCOL_WIRE_FIXTURE_COVERAGE = {
   },
 } as const satisfies Record<LlmProviderProtocol, ProtocolWireFixtureCoverage>;
 
-export const PROTOCOL_WIRE_FIXTURE_DIRS = Object.freeze(
-  [...new Set(Object.values(PROTOCOL_WIRE_FIXTURE_COVERAGE).map((entry) => entry.dir))],
-);
+export const PROTOCOL_WIRE_FIXTURE_DIRS = Object.freeze([
+  ...new Set(Object.values(PROTOCOL_WIRE_FIXTURE_COVERAGE).map((entry) => entry.dir)),
+]);

@@ -34,12 +34,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   setCurrentRun: (currentRun) => set({ currentRun }),
   setCurrentRunUsage: (usage, stale = false) => set((state) => applyContextUsage(state, usage, stale)),
   setPreparedTurnContext: (preparedTurnContext) => set((state) => setPreparedContext(state, preparedTurnContext)),
-  setConversationPreparationPhase: (conversationPreparationPhase) => set((state) => (
-    setContextPreparationPhase(state, conversationPreparationPhase)
-  )),
-  markConversationTurnTerminal: (turnId, awaitLateUsage = true) => set((state) => (
-    markContextTurnTerminal(state, turnId, awaitLateUsage)
-  )),
+  setConversationPreparationPhase: (conversationPreparationPhase) =>
+    set((state) => setContextPreparationPhase(state, conversationPreparationPhase)),
+  markConversationTurnTerminal: (turnId, awaitLateUsage = true) =>
+    set((state) => markContextTurnTerminal(state, turnId, awaitLateUsage)),
   clearUsageSnapshot: () => set(createEmptyContextUsageProjection()),
   hydrateContextUsage: (contextUsage) => set(contextUsage),
   reset: () => {

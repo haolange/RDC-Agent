@@ -17,11 +17,14 @@ export function useKnowledgeViewport() {
   }, []);
 
   // Moving from a row or Back replaces the source pane. Tabs keep their own focus.
-  const navigateToPane = useCallback((pane: 'list' | 'detail') => {
-    if (!narrow || narrowPane === pane) return;
-    focusPane.current = pane;
-    setNarrowPane(pane);
-  }, [narrow, narrowPane]);
+  const navigateToPane = useCallback(
+    (pane: 'list' | 'detail') => {
+      if (!narrow || narrowPane === pane) return;
+      focusPane.current = pane;
+      setNarrowPane(pane);
+    },
+    [narrow, narrowPane],
+  );
 
   useLayoutEffect(() => {
     if (focusPane.current !== narrowPane) return;

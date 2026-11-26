@@ -31,14 +31,26 @@ export function findInternalReferences(text: string): Array<{ kind: string; valu
  */
 export function assertReaderFacingPlan(input: { title: string; summary: string[]; content: string }): void {
   const content = input.content.replace(/\r\n/g, '\n');
-  const appendixHeadings = content.split('\n').filter((line) => line.trim() === PLAN_EXECUTION_REFERENCES_HEADING).length;
-  if (appendixHeadings > 1) throw new AppError('PLAN_BODY_INVALID', `write a single "${PLAN_EXECUTION_REFERENCES_HEADING}" section.`);
+  const appendixHeadings = content
+    .split('\n')
+    .filter((line) => line.trim() === PLAN_EXECUTION_REFERENCES_HEADING).length;
+  if (appendixHeadings > 1)
+    throw new AppError('PLAN_BODY_INVALID', `write a single "${PLAN_EXECUTION_REFERENCES_HEADING}" section.`);
   const { body, appendix } = splitPlanAppendix(content);
   if (appendix && /^##[ \t]+/m.test(appendix.split('\n').slice(1).join('\n'))) {
-    throw new AppError('PLAN_BODY_INVALID', `"${PLAN_EXECUTION_REFERENCES_HEADING}" must be the last section; move the sections after it above it.`);
+    throw new AppError(
+      'PLAN_BODY_INVALID',
+      `"${PLAN_EXECUTION_REFERENCES_HEADING}" must be the last section; move the sections after it above it.`,
+    );
   }
   const references = findInternalReferences([input.title, ...input.summary, body].join('\n'));
   if (!references.length) return;
-  const listed = references.slice(0, 5).map((entry) => `${entry.kind} "${entry.value}"`).join('; ');
-  throw new AppError('PLAN_BODY_INTERNAL_REFERENCE', `the title, summary and body are read by the user, so name objects instead of citing internal references. Move ${references.length} reference(s) to plan_artifact fields (requiredTaskIds, captureScope) or to a final "${PLAN_EXECUTION_REFERENCES_HEADING}" section: ${listed}.`);
+  const listed = references
+    .slice(0, 5)
+    .map((entry) => `${entry.kind} "${entry.value}"`)
+    .join('; ');
+  throw new AppError(
+    'PLAN_BODY_INTERNAL_REFERENCE',
+    `the title, summary and body are read by the user, so name objects instead of citing internal references. Move ${references.length} reference(s) to plan_artifact fields (requiredTaskIds, captureScope) or to a final "${PLAN_EXECUTION_REFERENCES_HEADING}" section: ${listed}.`,
+  );
 }

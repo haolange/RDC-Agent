@@ -14,7 +14,12 @@ import {
 import type { KnowledgeImportItem } from '@shared/types/knowledge';
 import type { useKnowledgeCandidateInbox } from '../useKnowledgeCandidateInbox';
 
-const OUTCOME_TONE: Record<KnowledgeImportOutcome, BadgeTone> = { new: 'success', present: 'neutral', conflict: 'warning', quarantine: 'error' };
+const OUTCOME_TONE: Record<KnowledgeImportOutcome, BadgeTone> = {
+  new: 'success',
+  present: 'neutral',
+  conflict: 'warning',
+  quarantine: 'error',
+};
 
 const OUTCOME_LABEL_KEYS: Record<KnowledgeImportOutcome, TranslationKey> = {
   new: 'knowledgeCenter.importOutcome.new',
@@ -36,16 +41,30 @@ function ItemNote({ item }: { item: KnowledgeImportItem }) {
   const outcome = knowledgeImportOutcome(item);
   if (outcome === 'quarantine') {
     const reason = knowledgeQuarantineReason(item.reason);
-    return <p className="knowledge-import-item-note">{t(reason ? `knowledgeCenter.importReason.${reason}` : 'knowledgeCenter.importStatusQuarantineHint')}</p>;
+    return (
+      <p className="knowledge-import-item-note">
+        {t(reason ? `knowledgeCenter.importReason.${reason}` : 'knowledgeCenter.importStatusQuarantineHint')}
+      </p>
+    );
   }
-  if (outcome === 'conflict') return <p className="knowledge-import-item-note">{t('knowledgeCenter.importConflictNote')}</p>;
+  if (outcome === 'conflict')
+    return <p className="knowledge-import-item-note">{t('knowledgeCenter.importConflictNote')}</p>;
   if (item.missingAssets.length > 0) {
-    return <p className="knowledge-import-item-note">{t('knowledgeCenter.importMissingAssets', { count: item.missingAssets.length })}</p>;
+    return (
+      <p className="knowledge-import-item-note">
+        {t('knowledgeCenter.importMissingAssets', { count: item.missingAssets.length })}
+      </p>
+    );
   }
   return null;
 }
 
-export function ImportItems({ items, written, candidates, onProposed }: {
+export function ImportItems({
+  items,
+  written,
+  candidates,
+  onProposed,
+}: {
   items: readonly KnowledgeImportItem[];
   written: boolean;
   candidates?: ReturnType<typeof useKnowledgeCandidateInbox>;
@@ -58,23 +77,45 @@ export function ImportItems({ items, written, candidates, onProposed }: {
         const outcome = knowledgeImportOutcome(item);
         const type = item.record?.type;
         const images = item.record?.images?.length ?? 0;
-        const meta = [type ? t(TYPE_LABEL_KEYS[type]) : null, images ? t('knowledgeCenter.importImageCount', { count: images }) : null].filter(Boolean);
+        const meta = [
+          type ? t(TYPE_LABEL_KEYS[type]) : null,
+          images ? t('knowledgeCenter.importImageCount', { count: images }) : null,
+        ].filter(Boolean);
         return (
-          <li key={`${item.record?.cardId ?? item.status}:${index}`} className="knowledge-import-item" data-outcome={outcome}>
+          <li
+            key={`${item.record?.cardId ?? item.status}:${index}`}
+            className="knowledge-import-item"
+            data-outcome={outcome}
+          >
             <Icon name={type ? TYPE_ICONS[type] : 'warning'} size={16} className="knowledge-import-item-icon" />
             <div className="knowledge-import-item-copy">
-              <span className="knowledge-import-item-title">{item.record?.title ?? t('knowledgeCenter.importUnreadable')}</span>
+              <span className="knowledge-import-item-title">
+                {item.record?.title ?? t('knowledgeCenter.importUnreadable')}
+              </span>
               {meta.length ? <span className="knowledge-import-item-meta">{meta.join(' · ')}</span> : null}
               <ItemNote item={item} />
               {candidates?.candidateError && candidates.candidateError.cardId === item.record?.cardId ? (
-                <InlineError detail={candidates.candidateError.message}>{humanizeError(candidates.candidateError.message, t, 'knowledgeCenter.candidateFailed')}</InlineError>
+                <InlineError detail={candidates.candidateError.message}>
+                  {humanizeError(candidates.candidateError.message, t, 'knowledgeCenter.candidateFailed')}
+                </InlineError>
               ) : null}
             </div>
             <div className="knowledge-import-item-side">
-              <Badge tone={OUTCOME_TONE[outcome]} data-status={outcome}>{t((written ? WRITTEN_LABEL_KEYS : OUTCOME_LABEL_KEYS)[outcome])}</Badge>
-              {candidates && outcome === 'new' && item.record && candidates.hasSession && item.missingAssets.length === 0 ? (
-                <Button variant="ghost" size="sm" disabled={candidates.busy} data-testid="knowledge-center-import-create-candidate"
-                  onClick={() => void candidates.createCandidate(item.record!, onProposed)}>
+              <Badge tone={OUTCOME_TONE[outcome]} data-status={outcome}>
+                {t((written ? WRITTEN_LABEL_KEYS : OUTCOME_LABEL_KEYS)[outcome])}
+              </Badge>
+              {candidates &&
+              outcome === 'new' &&
+              item.record &&
+              candidates.hasSession &&
+              item.missingAssets.length === 0 ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={candidates.busy}
+                  data-testid="knowledge-center-import-create-candidate"
+                  onClick={() => void candidates.createCandidate(item.record!, onProposed)}
+                >
                   {t('knowledgeCenter.importCreateCandidate')}
                 </Button>
               ) : null}
@@ -89,11 +130,16 @@ export function ImportItems({ items, written, candidates, onProposed }: {
 export function OutcomeSummary({ items, written }: { items: readonly KnowledgeImportItem[]; written: boolean }) {
   const { t } = useI18n();
   const counts = countKnowledgeImportOutcomes(items);
-  const rest = (['present', 'conflict', 'quarantine'] as const).filter((outcome) => counts[outcome] > 0)
+  const rest = (['present', 'conflict', 'quarantine'] as const)
+    .filter((outcome) => counts[outcome] > 0)
     .map((outcome) => t(`knowledgeCenter.importSummary.${outcome}`, { count: counts[outcome] }));
   return (
     <div className="knowledge-import-summary" data-testid="knowledge-center-import-summary">
-      <h3>{t(written ? 'knowledgeCenter.importSummary.written' : 'knowledgeCenter.importSummary.planned', { count: counts.new })}</h3>
+      <h3>
+        {t(written ? 'knowledgeCenter.importSummary.written' : 'knowledgeCenter.importSummary.planned', {
+          count: counts.new,
+        })}
+      </h3>
       {rest.length ? <p>{rest.join(t('knowledgeCenter.listSeparator'))}</p> : null}
     </div>
   );

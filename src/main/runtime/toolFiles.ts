@@ -105,8 +105,7 @@ export function isWithinRootAllowingAliases(target: string, root: string): boole
       return false;
     }
     const identRoot = realpathExistingAncestor(resolvedRoot);
-    const contained = isWithinRoot(target, root)
-      || isWithinRoot(realpathExistingAncestor(target), identRoot);
+    const contained = isWithinRoot(target, root) || isWithinRoot(realpathExistingAncestor(target), identRoot);
     if (!contained) return false;
     return !hasSymlinkInsideRoot(target, identRoot);
   } catch {
@@ -306,8 +305,8 @@ export function formatBinaryRejectMessage(absolutePath: string, reason: string):
   const ext = path.extname(absolutePath).toLowerCase();
   if (ext === '.rdc') {
     return (
-      `Cannot read binary RenderDoc capture as text: ${absolutePath}. `
-      + 'Open the .rdc via the session Capture panel / RDC runtime instead of read_file.'
+      `Cannot read binary RenderDoc capture as text: ${absolutePath}. ` +
+      'Open the .rdc via the session Capture panel / RDC runtime instead of read_file.'
     );
   }
   return `Cannot read binary file as text: ${absolutePath} (${reason}). Use an appropriate binary or domain tool.`;
@@ -319,9 +318,7 @@ export function assertFileSizeCap(absolutePath: string, maxBytes: number, label 
     throw new Error(`${label} is not a regular file: ${absolutePath}`);
   }
   if (stat.size > maxBytes) {
-    throw new Error(
-      `${label} exceeds size limit (${stat.size} bytes > ${maxBytes} bytes): ${absolutePath}`,
-    );
+    throw new Error(`${label} exceeds size limit (${stat.size} bytes > ${maxBytes} bytes): ${absolutePath}`);
   }
 }
 
@@ -351,10 +348,7 @@ function sampleLooksBinary(sample: Buffer): string | null {
  * Fail-closed gate for text-oriented tools.
  * Rejects .rdc, RenderDoc magic, NUL samples, and oversized files (default 8MB).
  */
-export function assertTextReadable(
-  absolutePath: string,
-  options?: { maxBytes?: number },
-): void {
+export function assertTextReadable(absolutePath: string, options?: { maxBytes?: number }): void {
   const ext = path.extname(absolutePath).toLowerCase();
   if (ext === '.rdc') {
     throw new Error(formatBinaryRejectMessage(absolutePath, 'RenderDoc capture extension'));
@@ -407,10 +401,7 @@ export async function withTemporaryPathAccess<T>(
   }
   const scopedContext: ToolExecutionContext = {
     ...context,
-    temporaryAllowedPathRoots: [
-      ...(context.temporaryAllowedPathRoots ?? []),
-      ...(allowedRoots ?? []),
-    ],
+    temporaryAllowedPathRoots: [...(context.temporaryAllowedPathRoots ?? []), ...(allowedRoots ?? [])],
   };
   return callback(scopedContext);
 }

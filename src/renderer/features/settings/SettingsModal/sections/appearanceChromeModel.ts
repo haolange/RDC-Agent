@@ -16,7 +16,9 @@ export type ThemeImportPreview =
 export function previewThemeImport(text: string, variant: ThemeVariant): ThemeImportPreview {
   if (!text.trim()) return { state: 'empty' };
   const result = parseRdcThemeV1(text, variant);
-  return result.ok ? { state: 'valid', chrome: result.chrome } : { state: 'invalid', reason: result.reason, error: result.error };
+  return result.ok
+    ? { state: 'valid', chrome: result.chrome }
+    : { state: 'invalid', reason: result.reason, error: result.error };
 }
 
 const THEME_IMPORT_ERROR_COPY = {

@@ -8,112 +8,120 @@ import type { RunSummary } from '@shared/types/session';
 import type { ConversationTurnOutput } from './ConversationTurnRunner';
 
 export function persistConversationSnapshot(
-    sessionId: string | null | undefined,
-    message: ConversationMessage,
-  ): Error | null {
-    if (!sessionId) {
-      return null;
-    }
-    try {
-      conversationHistoryStore.appendConversationMessage(sessionId, message);
-      return null;
-    } catch (error) {
-      const normalized = error instanceof Error ? error : new Error(String(error));
-      if (/^Session not found for conversation history:/i.test(normalized.message)) {
-        console.info(`[ConversationService] Ignored conversation write after session teardown for ${sessionId}.`);
-        return null;
-      }
-      console.error(`[ConversationService] Failed to persist conversation snapshot for ${sessionId}:`, normalized);
-      return normalized;
-    }
+  sessionId: string | null | undefined,
+  message: ConversationMessage,
+): Error | null {
+  if (!sessionId) {
+    return null;
   }
+  try {
+    conversationHistoryStore.appendConversationMessage(sessionId, message);
+    return null;
+  } catch (error) {
+    const normalized = error instanceof Error ? error : new Error(String(error));
+    if (/^Session not found for conversation history:/i.test(normalized.message)) {
+      console.info(`[ConversationService] Ignored conversation write after session teardown for ${sessionId}.`);
+      return null;
+    }
+    console.error(`[ConversationService] Failed to persist conversation snapshot for ${sessionId}:`, normalized);
+    return normalized;
+  }
+}
 
 export function assertTerminalContextOwnership(
-    sessionId: string,
-    turnId: string,
-    userMessageId: string,
-    assistantMessageId: string,
-    branchId: string,
-  ): void {
-    const history = conversationHistoryStore.readConversationHistory(sessionId);
-    const user = history.find((message) => message.id === userMessageId);
-    const assistant = history.find((message) => message.id === assistantMessageId);
-    const normalizedBranchId = normalizeBranchId(branchId);
-    if (
-      !user
-      || user.role !== 'user'
-      || user.turnId !== turnId
-      || normalizeBranchId(user.branchId) !== normalizedBranchId
-      || !assistant
-      || assistant.role !== 'assistant'
-      || assistant.turnId !== turnId
-      || normalizeBranchId(assistant.branchId) !== normalizedBranchId
-    ) {
-      throw new Error(`Conversation message ownership changed before context journal append for turn ${turnId}.`);
-    }
-    if (normalizedBranchId === ROOT_BRANCH_ID) return;
-    const branchState = conversationHistoryStore.readConversationBranchState(sessionId);
-    const concreteBranch = branchState?.forks
-      .flatMap((fork) => fork.branches)
-      .find((branch) => branch.branchId === normalizedBranchId);
-    const anchor = history.find((message) => message.id === concreteBranch?.anchorUserMessageId);
-    // The anchor owns the fork's first turn. Later turns keep that branch ID,
-    // but have their own user message and turn IDs.
-    if (
-      !concreteBranch
-      || !anchor
-      || anchor.role !== 'user'
-      || anchor.turnId !== concreteBranch.rootTurnId
-      || normalizeBranchId(anchor.branchId) !== normalizedBranchId
-      || user.createdAt < anchor.createdAt
-    ) {
-      throw new Error(`Conversation branch ownership changed before context journal append for turn ${turnId}.`);
-    }
+  sessionId: string,
+  turnId: string,
+  userMessageId: string,
+  assistantMessageId: string,
+  branchId: string,
+): void {
+  const history = conversationHistoryStore.readConversationHistory(sessionId);
+  const user = history.find((message) => message.id === userMessageId);
+  const assistant = history.find((message) => message.id === assistantMessageId);
+  const normalizedBranchId = normalizeBranchId(branchId);
+  if (
+    !user ||
+    user.role !== 'user' ||
+    user.turnId !== turnId ||
+    normalizeBranchId(user.branchId) !== normalizedBranchId ||
+    !assistant ||
+    assistant.role !== 'assistant' ||
+    assistant.turnId !== turnId ||
+    normalizeBranchId(assistant.branchId) !== normalizedBranchId
+  ) {
+    throw new Error(`Conversation message ownership changed before context journal append for turn ${turnId}.`);
   }
+  if (normalizedBranchId === ROOT_BRANCH_ID) return;
+  const branchState = conversationHistoryStore.readConversationBranchState(sessionId);
+  const concreteBranch = branchState?.forks
+    .flatMap((fork) => fork.branches)
+    .find((branch) => branch.branchId === normalizedBranchId);
+  const anchor = history.find((message) => message.id === concreteBranch?.anchorUserMessageId);
+  // The anchor owns the fork's first turn. Later turns keep that branch ID,
+  // but have their own user message and turn IDs.
+  if (
+    !concreteBranch ||
+    !anchor ||
+    anchor.role !== 'user' ||
+    anchor.turnId !== concreteBranch.rootTurnId ||
+    normalizeBranchId(anchor.branchId) !== normalizedBranchId ||
+    user.createdAt < anchor.createdAt
+  ) {
+    throw new Error(`Conversation branch ownership changed before context journal append for turn ${turnId}.`);
+  }
+}
 
 export function emitConversationEvent(event: ConversationStreamEvent) {
-    workflowProjectionPublisher.publishConversationEvent(event);
-  }
+  workflowProjectionPublisher.publishConversationEvent(event);
+}
 
 export function publishTraceProjection(sessionId: string | null | undefined): void {
-    if (!sessionId) {
-      return;
-    }
-
-    void traceService.getSession(sessionId)
-      .then((result) => {
-        if (result.success && result.presentation) {
-          workflowProjectionPublisher.publishTraceProjectionChanged({ projectId: result.presentation.projectId, sessionId: result.presentation.sessionId }, result.presentation);
-        }
-      })
-      .catch((error) => {
-        console.error('[ConversationService] Failed to publish trace projection:', error);
-      });
+  if (!sessionId) {
+    return;
   }
+
+  void traceService
+    .getSession(sessionId)
+    .then((result) => {
+      if (result.success && result.presentation) {
+        workflowProjectionPublisher.publishTraceProjectionChanged(
+          { projectId: result.presentation.projectId, sessionId: result.presentation.sessionId },
+          result.presentation,
+        );
+      }
+    })
+    .catch((error) => {
+      console.error('[ConversationService] Failed to publish trace projection:', error);
+    });
+}
 
 export function publishConversationTrace(
-    traceSessionId: string,
-    messages: ConversationMessage[],
-    persistedSessionId?: string | null,
-    publishProjection: typeof publishTraceProjection = publishTraceProjection,
-  ): void {
-    if (persistedSessionId) {
-      publishProjection(persistedSessionId);
-      return;
-    }
-
-    void traceService.buildConversationPresentation(traceSessionId, messages)
-      .then((presentation) => {
-        workflowProjectionPublisher.publishTraceProjectionChanged({ projectId: presentation.projectId, sessionId: presentation.sessionId }, presentation);
-      })
-      .catch((error) => {
-        console.error('[ConversationService] Failed to publish ephemeral trace projection:', error);
-      });
+  traceSessionId: string,
+  messages: ConversationMessage[],
+  persistedSessionId?: string | null,
+  publishProjection: typeof publishTraceProjection = publishTraceProjection,
+): void {
+  if (persistedSessionId) {
+    publishProjection(persistedSessionId);
+    return;
   }
+
+  void traceService
+    .buildConversationPresentation(traceSessionId, messages)
+    .then((presentation) => {
+      workflowProjectionPublisher.publishTraceProjectionChanged(
+        { projectId: presentation.projectId, sessionId: presentation.sessionId },
+        presentation,
+      );
+    })
+    .catch((error) => {
+      console.error('[ConversationService] Failed to publish ephemeral trace projection:', error);
+    });
+}
 
 export function ephemeralTraceSessionId(turnId: string): string {
-    return `conversation-${turnId}`;
-  }
+  return `conversation-${turnId}`;
+}
 
 export function publishRunStatus(sessionId: string, runId: string, status: RunSummary['status']): void {
   workflowProjectionPublisher.publishRunStatus({ sessionId, runId, status });

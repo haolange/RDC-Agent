@@ -37,15 +37,26 @@ export function fileOperationBoundary(target: string): { readOnly: boolean; prot
   const parts = normalized.split('/');
   const name = parts.at(-1) ?? '';
   const scope = parts.lastIndexOf('.rdc-agent');
-  const category = scope >= 0 ? parts[scope + 1] ?? '' : '';
+  const category = scope >= 0 ? (parts[scope + 1] ?? '') : '';
   const applicationOwned = applicationOwnedReason(normalized, name);
   if (applicationOwned) return { readOnly: true, protected: true, reason: applicationOwned };
   const readOnly = name.endsWith('.rdc') || parts.includes('.git') || ['knowledge', 'inputs'].includes(category);
-  const protectedPath = readOnly || ['agents', 'skills', 'hooks', 'policies', 'mcp', 'memory', 'secrets'].includes(category)
-    || parts.some(part => ['.agents', '.codex', '.aws', '.ssh'].includes(part))
-    || name === '.env' || name.startsWith('.env.') || name === 'config.json' && scope >= 0;
-  return { readOnly, protected: protectedPath, reason: readOnly ? 'Capture inputs, Git metadata and canonical knowledge are not generic write targets.'
-    : protectedPath ? 'Writing runtime configuration or credential-related paths requires specific authorization.' : 'Ordinary workspace text target.' };
+  const protectedPath =
+    readOnly ||
+    ['agents', 'skills', 'hooks', 'policies', 'mcp', 'memory', 'secrets'].includes(category) ||
+    parts.some((part) => ['.agents', '.codex', '.aws', '.ssh'].includes(part)) ||
+    name === '.env' ||
+    name.startsWith('.env.') ||
+    (name === 'config.json' && scope >= 0);
+  return {
+    readOnly,
+    protected: protectedPath,
+    reason: readOnly
+      ? 'Capture inputs, Git metadata and canonical knowledge are not generic write targets.'
+      : protectedPath
+        ? 'Writing runtime configuration or credential-related paths requires specific authorization.'
+        : 'Ordinary workspace text target.',
+  };
 }
 
 export function assertFileWriteBoundary(target: string): void {

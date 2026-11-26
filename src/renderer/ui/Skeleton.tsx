@@ -17,7 +17,9 @@ export function Skeleton({ shape = 'line', count = 1, className, inline = false 
   const Stack = inline ? 'span' : 'div';
   return (
     <Stack className={cn('ui-skeleton-stack', `is-shape-${shape}`, className)} aria-hidden="true">
-      {Array.from({ length: count }, (_, index) => <span key={index} className="ui-skeleton" />)}
+      {Array.from({ length: count }, (_, index) => (
+        <span key={index} className="ui-skeleton" />
+      ))}
     </Stack>
   );
 }

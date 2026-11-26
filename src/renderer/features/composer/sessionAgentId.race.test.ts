@@ -10,9 +10,10 @@ const pending = vi.hoisted(() => [] as Array<{ agentId: string; n: number; resol
 vi.mock('../../platform/getElectronApi', () => ({
   getElectronApi: () => ({
     session: {
-      setAgentId: (_sessionId: string, agentId: string) => new Promise((resolve) => {
-        pending.push({ agentId, n: pending.length + 2, resolve });
-      }),
+      setAgentId: (_sessionId: string, agentId: string) =>
+        new Promise((resolve) => {
+          pending.push({ agentId, n: pending.length + 2, resolve });
+        }),
     },
   }),
 }));
@@ -21,8 +22,15 @@ import { persistSessionAgentId } from './sessionAgentId';
 import type { SessionRecord } from '@shared/types/session';
 
 const session = (agentId: string): SessionRecord => ({
-  schemaVersion: '1', sessionId: 'session-a', projectId: 'project-a', title: 'A', goal: '', sessionPath: '/a',
-  createdAt: 1, updatedAt: 1, agentId,
+  schemaVersion: '1',
+  sessionId: 'session-a',
+  projectId: 'project-a',
+  title: 'A',
+  goal: '',
+  sessionPath: '/a',
+  createdAt: 1,
+  updatedAt: 1,
+  agentId,
 });
 const request = (agentId: string) => pending.find((entry) => entry.agentId === agentId)!;
 const respond = (agentId: string) => {

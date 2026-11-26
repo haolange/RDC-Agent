@@ -8,7 +8,12 @@
 
 import * as fs from 'fs/promises';
 import { assertFileWriteBoundary } from '../../../runtime/FileOperationBoundary';
-import { assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from '../../../runtime/toolFiles';
+import {
+  assertTextReadable,
+  requireMutationWorkspaceRoot,
+  safeResolvePath,
+  writeTextFileNoFollow,
+} from '../../../runtime/toolFiles';
 import { TEXT_FILE_MAX_BYTES } from '../../../runtime/toolLimits';
 import { requireSuccessfulFileRead } from './fileReadAccess';
 import type { AgentTool } from '../../agent/AgentTool';
@@ -51,7 +56,14 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
     },
     required: ['path', 'old_text', 'new_text'],
   },
-  spec: { isReadOnly: false, concurrency: 'exclusive', isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: {
+    isReadOnly: false,
+    concurrency: 'exclusive',
+    isDestructive: false,
+    sideEffect: 'filesystem',
+    category: 'file',
+    requiresApproval: true,
+  },
   permissionHint: 'mutation',
   effects: { writes: ['path'] },
 
@@ -82,18 +94,12 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
     if (firstIdx < 0) {
       throw new Error('old_text 未在文件中找到');
     }
-    const secondIdx = original.indexOf(
-      params.old_text,
-      firstIdx + params.old_text.length,
-    );
+    const secondIdx = original.indexOf(params.old_text, firstIdx + params.old_text.length);
     if (secondIdx >= 0) {
       throw new Error('old_text 在文件中出现多次，请提供更精确的上下文');
     }
 
-    const updated =
-      original.slice(0, firstIdx) +
-      params.new_text +
-      original.slice(firstIdx + params.old_text.length);
+    const updated = original.slice(0, firstIdx) + params.new_text + original.slice(firstIdx + params.old_text.length);
 
     await writeTextFileNoFollow(absolute, updated);
 

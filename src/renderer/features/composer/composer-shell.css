@@ -21,11 +21,13 @@
   border-radius: var(--composer-shell-radius);
   overflow: visible;
   background: var(--token-bg-panel);
-  transition: border-color var(--transition-fast), background var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .composer-shell:focus-within,
-.composer-shell:has([aria-expanded="true"]) {
+.composer-shell:has([aria-expanded='true']) {
   border-color: var(--composer-mode-accent);
 }
 

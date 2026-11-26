@@ -1,8 +1,4 @@
-import type {
-  AttachmentLayer,
-  ComposerAttachmentError,
-  ConversationAttachmentInput,
-} from '@shared/types/conversation';
+import type { AttachmentLayer, ComposerAttachmentError, ConversationAttachmentInput } from '@shared/types/conversation';
 import type { SessionAttachmentRecord } from '@shared/types/session';
 
 export interface PendingAttachmentDraft extends ConversationAttachmentInput {

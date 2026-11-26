@@ -105,13 +105,15 @@ describe('CommandRegistry', () => {
 
   describe('execute', () => {
     it('应执行命令并返回结果', async () => {
-      registry.register(makeCommand({
-        name: 'greet',
-        execute: async (args) => ({
-          success: true,
-          message: `Hello, ${args[0] ?? 'world'}!`,
+      registry.register(
+        makeCommand({
+          name: 'greet',
+          execute: async (args) => ({
+            success: true,
+            message: `Hello, ${args[0] ?? 'world'}!`,
+          }),
         }),
-      }));
+      );
 
       const result = await registry.execute({
         input: '/greet Claude',
@@ -132,10 +134,14 @@ describe('CommandRegistry', () => {
     });
 
     it('命令执行异常应被捕获', async () => {
-      registry.register(makeCommand({
-        name: 'fail',
-        execute: async () => { throw new Error('boom'); },
-      }));
+      registry.register(
+        makeCommand({
+          name: 'fail',
+          execute: async () => {
+            throw new Error('boom');
+          },
+        }),
+      );
 
       const result = await registry.execute({ input: '/fail' });
       expect(result.success).toBe(false);
@@ -144,13 +150,15 @@ describe('CommandRegistry', () => {
 
     it('应传递执行上下文', async () => {
       let receivedCtx: unknown;
-      registry.register(makeCommand({
-        name: 'ctx',
-        execute: async (_args, ctx) => {
-          receivedCtx = ctx;
-          return { success: true, message: 'ok' };
-        },
-      }));
+      registry.register(
+        makeCommand({
+          name: 'ctx',
+          execute: async (_args, ctx) => {
+            receivedCtx = ctx;
+            return { success: true, message: 'ok' };
+          },
+        }),
+      );
 
       await registry.execute({
         input: '/ctx',

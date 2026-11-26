@@ -1,4 +1,8 @@
-import { PermissionModeChangedError, runtimePermissionStateService, type RuntimePermissionStateService } from '../../runtime/RuntimePermissionStateService';
+import {
+  PermissionModeChangedError,
+  runtimePermissionStateService,
+  type RuntimePermissionStateService,
+} from '../../runtime/RuntimePermissionStateService';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { AgentPermissionDecision } from './AgentPermissionPolicy';
 
@@ -8,7 +12,10 @@ const stale = Symbol('permission-revision-stale');
 export interface PermissionAdmissionInput<T> {
   authorize: (state: RuntimePermissionState, signal: AbortSignal) => Promise<AgentPermissionDecision>;
   beforeExecute: () => Promise<void>;
-  withResource: (operation: () => Promise<T | typeof stale>, state: RuntimePermissionState) => Promise<T | typeof stale>;
+  withResource: (
+    operation: () => Promise<T | typeof stale>,
+    state: RuntimePermissionState,
+  ) => Promise<T | typeof stale>;
   execute: (decision: AgentPermissionDecision, state: RuntimePermissionState) => Promise<T>;
   assertLive: () => void;
   signal?: AbortSignal;

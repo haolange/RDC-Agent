@@ -60,11 +60,13 @@ describe('knowledge import/export model', () => {
   });
 
   it('counts export space from the space listing, not the filtered hits', () => {
-    expect(knowledgeExportScopeCounts({
-      picked: 1,
-      hits: [hit('one')],
-      spaceCount: 7,
-    })).toEqual({
+    expect(
+      knowledgeExportScopeCounts({
+        picked: 1,
+        hits: [hit('one')],
+        spaceCount: 7,
+      }),
+    ).toEqual({
       selected: 1,
       filtered: 1,
       space: 7,

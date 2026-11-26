@@ -102,9 +102,11 @@ describe('faultInjectionContract: provider/stream abort late discard', () => {
     abortErr.name = 'AbortError';
     builder.fail(abortErr, 'aborted');
     expect(stream.isDone).toBe(true);
-    expect(() => builder.appendText(ref, 'late')).toThrowError(expect.objectContaining({
-      code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
-    }) as ProviderStreamProtocolError);
+    expect(() => builder.appendText(ref, 'late')).toThrowError(
+      expect.objectContaining({
+        code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
+      }) as ProviderStreamProtocolError,
+    );
   });
 });
 
@@ -250,17 +252,21 @@ describe('faultInjectionContract: attachment source replaced after staging', () 
         io: new StorageIo(),
       } as ConstructorParameters<typeof ConversationHistoryStore>[0]);
       const [stagedPath] = store.stageAttachmentInputs([sourcePath], stagingDir);
-      const [stagedHash] = await hashAttachmentContents([{
-        sourcePath: stagedPath!,
-        fileName: 'source.txt',
-        mimeType: 'text/plain',
-      }]);
+      const [stagedHash] = await hashAttachmentContents([
+        {
+          sourcePath: stagedPath!,
+          fileName: 'source.txt',
+          mimeType: 'text/plain',
+        },
+      ]);
       fs.writeFileSync(sourcePath, 'replaced');
-      const [sourceHash] = await hashAttachmentContents([{
-        sourcePath,
-        fileName: 'source.txt',
-        mimeType: 'text/plain',
-      }]);
+      const [sourceHash] = await hashAttachmentContents([
+        {
+          sourcePath,
+          fileName: 'source.txt',
+          mimeType: 'text/plain',
+        },
+      ]);
       expect(fs.readFileSync(stagedPath!, 'utf8')).toBe('staged-bytes');
       expect(stagedHash).not.toBe(sourceHash);
     } finally {

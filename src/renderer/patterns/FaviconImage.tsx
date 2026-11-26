@@ -13,40 +13,26 @@ const monogramForDomain = (domain: string): string => {
 };
 
 export const FaviconImage: React.FC<FaviconImageProps> = ({ domain }) => {
-  const cleaned = domain.replace(/^https?:\/\//i, '').split('/')[0]?.trim() ?? '';
+  const cleaned =
+    domain
+      .replace(/^https?:\/\//i, '')
+      .split('/')[0]
+      ?.trim() ?? '';
   const favicon = useAsyncValue(cleaned || null, () => resolveFaviconDataUrl(cleaned));
   const dataUrl = favicon.status === 'ready' ? favicon.value : null;
   // A failed lookup shows the monogram, like a domain without an icon.
   const resolved = favicon.status !== 'loading';
 
   if (dataUrl) {
-    return (
-      <img
-        className="favicon-image"
-        src={dataUrl}
-        alt=""
-        width={14}
-        height={14}
-        loading="lazy"
-      />
-    );
+    return <img className="favicon-image" src={dataUrl} alt="" width={14} height={14} loading="lazy" />;
   }
 
   if (!resolved) {
-    return (
-      <span
-        className="favicon-image is-pending"
-        aria-hidden="true"
-      />
-    );
+    return <span className="favicon-image is-pending" aria-hidden="true" />;
   }
 
   return (
-    <span
-      className="favicon-image is-monogram"
-      aria-hidden="true"
-      data-letter={monogramForDomain(cleaned)}
-    >
+    <span className="favicon-image is-monogram" aria-hidden="true" data-letter={monogramForDomain(cleaned)}>
       {monogramForDomain(cleaned)}
     </span>
   );

@@ -1,10 +1,5 @@
 import type { RdcTurnBinding } from '../../rdc/RdcTurnBindings';
-import type {
-  ImageContent,
-  JsonSchema,
-  TextContent,
-  ToolDefinition,
-} from '../core/types';
+import type { ImageContent, JsonSchema, TextContent, ToolDefinition } from '../core/types';
 
 export type AgentToolPermissionHint = 'readonly' | 'session_mutation' | 'mutation' | 'destructive';
 
@@ -136,10 +131,7 @@ export interface AgentToolResult<TDetails = unknown> {
   details?: TDetails;
 }
 
-export interface AgentTool<
-  TParams extends object = Record<string, unknown>,
-  TDetails = unknown,
-> {
+export interface AgentTool<TParams extends object = Record<string, unknown>, TDetails = unknown> {
   readonly name: string;
   readonly label?: string;
   readonly description: string;
@@ -161,7 +153,9 @@ export interface AgentTool<
   ): Promise<AgentToolResult<TDetails>>;
 }
 
-export function toolToDefinition(tool: Pick<AgentTool, 'name' | 'description' | 'parameters' | 'pollable'>): ToolDefinition {
+export function toolToDefinition(
+  tool: Pick<AgentTool, 'name' | 'description' | 'parameters' | 'pollable'>,
+): ToolDefinition {
   return {
     name: tool.name,
     description: tool.description,

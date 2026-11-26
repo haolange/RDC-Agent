@@ -76,11 +76,15 @@ const REQUIRED_FUSES = {
   onlyLoadAppFromAsar: true,
 };
 for (const [fuse, expected] of Object.entries(REQUIRED_FUSES)) {
-  if (builder.electronFuses?.[fuse] !== expected) fail(`electron-builder.json electronFuses.${fuse} must be ${expected}.`);
+  if (builder.electronFuses?.[fuse] !== expected)
+    fail(`electron-builder.json electronFuses.${fuse} must be ${expected}.`);
 }
 
-const windowsTargets = (builder.win?.target ?? []).map(target => typeof target === 'string' ? target : target.target);
-if (!windowsTargets.includes('zip') || !windowsTargets.includes('nsis')) fail('Windows distribution must include zip and nsis.');
+const windowsTargets = (builder.win?.target ?? []).map((target) =>
+  typeof target === 'string' ? target : target.target,
+);
+if (!windowsTargets.includes('zip') || !windowsTargets.includes('nsis'))
+  fail('Windows distribution must include zip and nsis.');
 if (builder.win?.artifactName?.includes('-setup') || !builder.nsis?.artifactName?.includes('-setup')) {
   fail('Only the NSIS installer artifact name may contain -setup.');
 }
@@ -90,15 +94,13 @@ for (const pattern of secretPatterns) {
   }
 }
 
-for (const forbiddenKey of [
-  'certificatePassword',
-  'cscKeyPassword',
-  'publisherName',
-]) {
-  if (Object.prototype.hasOwnProperty.call(builder.win ?? {}, forbiddenKey)
-    && typeof builder.win[forbiddenKey] === 'string'
-    && builder.win[forbiddenKey].length > 0
-    && !String(builder.win[forbiddenKey]).includes('${env.')) {
+for (const forbiddenKey of ['certificatePassword', 'cscKeyPassword', 'publisherName']) {
+  if (
+    Object.prototype.hasOwnProperty.call(builder.win ?? {}, forbiddenKey) &&
+    typeof builder.win[forbiddenKey] === 'string' &&
+    builder.win[forbiddenKey].length > 0 &&
+    !String(builder.win[forbiddenKey]).includes('${env.')
+  ) {
     fail(`win.${forbiddenKey} must not be a committed plaintext secret.`);
   }
 }
@@ -111,8 +113,8 @@ const packageJson = JSON.parse(read('package.json'));
 const channel = process.env.RDC_AGENT_RELEASE_CHANNEL;
 const tagRef = process.env.GITHUB_REF?.startsWith('refs/tags/') ? process.env.GITHUB_REF : undefined;
 const prereleaseVersion = /^\d+\.\d+\.\d+-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*$/.test(packageJson.version);
-const unsignedPrerelease = channel === 'prerelease' && prereleaseVersion
-  && (!tagRef || tagRef === `refs/tags/v${packageJson.version}`);
+const unsignedPrerelease =
+  channel === 'prerelease' && prereleaseVersion && (!tagRef || tagRef === `refs/tags/v${packageJson.version}`);
 if (channel === 'prerelease' && !unsignedPrerelease) {
   fail('Unsigned prerelease requires a prerelease package version and an exactly matching tag (when set).');
 }
@@ -127,9 +129,11 @@ if (requireWinSign) {
     fail('Release channel requires WIN_CSC_KEY_PASSWORD (or CSC_KEY_PASSWORD).');
   }
 } else {
-  console.log(unsignedPrerelease
-    ? '[release-config] Explicit prerelease may stay unsigned; publish as a disclosed GitHub prerelease only.'
-    : '[release-config] local/CI pack may stay unsigned (RDC_AGENT_RELEASE_CHANNEL is not release).');
+  console.log(
+    unsignedPrerelease
+      ? '[release-config] Explicit prerelease may stay unsigned; publish as a disclosed GitHub prerelease only.'
+      : '[release-config] local/CI pack may stay unsigned (RDC_AGENT_RELEASE_CHANNEL is not release).',
+  );
 }
 
 const requiredScripts = [

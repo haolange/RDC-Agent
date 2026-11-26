@@ -2,8 +2,10 @@ export const enKnowledgeCenter = {
   'knowledgeCenter.title': 'Knowledge Center',
   'knowledgeCenter.topicsTitle': 'Topics and synonyms',
   'knowledgeCenter.metaTopics': 'Topics',
-  'knowledgeCenter.topicsDescription': 'Review suggestions from user-space sources. Select cards and check synonyms before previewing changes.',
-  'knowledgeCenter.topicsPreviewDescription': 'Review topics, synonyms and affected cards. Changes apply only after confirmation; source Markdown is not rewritten.',
+  'knowledgeCenter.topicsDescription':
+    'Review suggestions from user-space sources. Select cards and check synonyms before previewing changes.',
+  'knowledgeCenter.topicsPreviewDescription':
+    'Review topics, synonyms and affected cards. Changes apply only after confirmation; source Markdown is not rewritten.',
   'knowledgeCenter.topicsNoSuggestions': 'No topic suggestions yet. Add a topic to begin.',
   'knowledgeCenter.topicsSynonyms': 'Synonyms (comma-separated)',
   'knowledgeCenter.topicsMergeInto': 'Merge into',
@@ -52,7 +54,8 @@ export const enKnowledgeCenter = {
   'knowledgeCenter.indexRebuild': 'Rebuild Index',
   'knowledgeCenter.indexNeverBuilt': 'Not built yet',
   'knowledgeCenter.indexRebuilding': 'Rebuilding…',
-  'knowledgeCenter.indexRebuildHint': 'Scan every space again and rebuild the index. The index normally keeps up on its own; rebuild only when search results look wrong.',
+  'knowledgeCenter.indexRebuildHint':
+    'Scan every space again and rebuild the index. The index normally keeps up on its own; rebuild only when search results look wrong.',
   'knowledgeCenter.indexRebuildFailed': 'The index could not be rebuilt. Search keeps using the previous index.',
   'knowledgeCenter.progressReading': 'Reading the source…',
   'knowledgeCenter.progressImporting': 'Importing cards…',
@@ -77,18 +80,22 @@ export const enKnowledgeCenter = {
   'knowledgeCenter.exportFormat': 'Format',
   'knowledgeCenter.exportFormatPackage': 'Knowledge package (zip, re-importable, includes images)',
   'knowledgeCenter.exportFormatMarkdown': 'Markdown (for reading)',
-  'knowledgeCenter.exportLocationHint': 'A re-importable package is one zip with the cards and their images. Credentials, provider settings and session data are never exported.',
+  'knowledgeCenter.exportLocationHint':
+    'A re-importable package is one zip with the cards and their images. Credentials, provider settings and session data are never exported.',
   'knowledgeCenter.exportRun': 'Export',
   'knowledgeCenter.exportDone': 'Exported {count} cards.',
-  'knowledgeCenter.exportExcluded': '{count} cards were skipped because of missing attachments, secrets, or absolute paths.',
+  'knowledgeCenter.exportExcluded':
+    '{count} cards were skipped because of missing attachments, secrets, or absolute paths.',
   'knowledgeCenter.importTitle': 'Import knowledge',
-  'knowledgeCenter.importDescription': 'Imported cards become drafts in the chosen space. They are not verified and do not become candidates.',
+  'knowledgeCenter.importDescription':
+    'Imported cards become drafts in the chosen space. They are not verified and do not become candidates.',
   'knowledgeCenter.importInputMode': 'Input',
   'knowledgeCenter.importModeFile': 'File',
   'knowledgeCenter.importModePaste': 'Paste',
   'knowledgeCenter.importSelectFile': 'Choose file',
   'knowledgeCenter.importReplaceFile': 'Replace file',
-  'knowledgeCenter.importFormatHint': 'An exported knowledge package (.zip), or a case YAML in the same folder as its images.',
+  'knowledgeCenter.importFormatHint':
+    'An exported knowledge package (.zip), or a case YAML in the same folder as its images.',
   'knowledgeCenter.importPasteHint': 'Pasted YAML does not include comparison images.',
   'knowledgeCenter.importMissingAssets': '{count} declared attachments were not included with the file.',
   'knowledgeCenter.importTargetSpace': 'Target space',
@@ -140,7 +147,8 @@ export const enKnowledgeCenter = {
   'knowledgeCenter.createCandidate': 'Submit as candidate',
   'knowledgeCenter.back': 'Back',
   'knowledgeCenter.confirmTitle': 'Confirm knowledge write',
-  'knowledgeCenter.confirmDescription': 'Review the change below. It is written to the knowledge base only after you confirm.',
+  'knowledgeCenter.confirmDescription':
+    'Review the change below. It is written to the knowledge base only after you confirm.',
   'knowledgeCenter.confirmTarget': 'Target',
   'knowledgeCenter.confirmDiff': 'Diff',
   'knowledgeCenter.confirmCurrentStatus': 'Current status',
@@ -163,7 +171,8 @@ export const enKnowledgeCenter = {
   'knowledgeCenter.paneDetail': 'Detail',
   'knowledgeCenter.emptyDetailHint': 'Imported cards can be read here.',
   'knowledgeCenter.candidatesTitle': 'Candidates',
-  'knowledgeCenter.candidatesHint': 'Cards waiting for review after you create a Candidate. Saving still goes through write confirmation.',
+  'knowledgeCenter.candidatesHint':
+    'Cards waiting for review after you create a Candidate. Saving still goes through write confirmation.',
   'knowledgeCenter.pendingReview': 'Pending review',
   'knowledgeCenter.saveAsDraft': 'Save as draft',
   'knowledgeCenter.conflictsTitle': 'Conflicts',
@@ -183,7 +192,8 @@ export const enKnowledgeCenter = {
   'knowledgeCenter.metaSourceSize': 'Source size',
   'knowledgeCenter.metaProvenanceNone': 'This card has no import provenance.',
   'knowledgeCenter.importContentYaml': 'Knowledge content (YAML)',
-  'knowledgeCenter.importStatusQuarantineHint': 'Quarantined: validation failed or sensitive content was found; nothing was written.',
+  'knowledgeCenter.importStatusQuarantineHint':
+    'Quarantined: validation failed or sensitive content was found; nothing was written.',
   'knowledgeCenter.diffBefore': 'Before',
   'knowledgeCenter.diffAfter': 'After',
   'knowledgeCenter.imageBefore': 'Before fix',
@@ -223,7 +233,8 @@ export const enKnowledgeCenter = {
   'knowledgeCenter.cardActions': 'Actions for {title}',
   'knowledgeCenter.indexMissing': 'The index has not been built, so search is unavailable.',
   'knowledgeCenter.statusFixedUnverified': 'Fixed · not verified',
-  'knowledgeCenter.statusFixedUnverifiedHint': 'The problem is fixed, but the fix itself has not been verified. Fixing is not verifying.',
+  'knowledgeCenter.statusFixedUnverifiedHint':
+    'The problem is fixed, but the fix itself has not been verified. Fixing is not verifying.',
   'knowledgeCenter.lifecycleHint.draft': 'Only in your space; not submitted for review.',
   'knowledgeCenter.lifecycleHint.candidate': 'Submitted; it counts once you confirm it.',
   'knowledgeCenter.lifecycleHint.verified': 'Confirmed by evidence; safe to rely on.',

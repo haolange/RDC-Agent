@@ -6,7 +6,11 @@ import fs from 'node:fs';
 
 const base = process.env.RDC_DIFF_BASE || 'HEAD~1';
 const KINDS = [
-  ['test', (file) => /\.test\.tsx?$/u.test(file) || /(^|\/)testing\//u.test(file) || file.startsWith('scripts/visual-diff/scenarios/')],
+  [
+    'test',
+    (file) =>
+      /\.test\.tsx?$/u.test(file) || /(^|\/)testing\//u.test(file) || file.startsWith('scripts/visual-diff/scenarios/'),
+  ],
   ['production', (file) => /^src\//u.test(file)],
   ['docs', (file) => file.startsWith('docs/') || file.endsWith('.md')],
   ['scripts', (file) => file.startsWith('scripts/') || file.startsWith('.github/')],
@@ -25,8 +29,19 @@ for (const line of numstat.split('\n').filter(Boolean)) {
   entry.removed += Number(removed);
 }
 
-const rows = [...totals].filter(([, { added, removed }]) => added || removed)
-  .map(([kind, { added, removed }]) => `| ${kind} | +${added} | -${removed} | ${added - removed >= 0 ? '+' : ''}${added - removed} |`);
-const report = [`### Growth since ${base.slice(0, 12)}`, '', '| kind | added | removed | net |', '|---|---:|---:|---:|', ...rows, ''].join('\n');
+const rows = [...totals]
+  .filter(([, { added, removed }]) => added || removed)
+  .map(
+    ([kind, { added, removed }]) =>
+      `| ${kind} | +${added} | -${removed} | ${added - removed >= 0 ? '+' : ''}${added - removed} |`,
+  );
+const report = [
+  `### Growth since ${base.slice(0, 12)}`,
+  '',
+  '| kind | added | removed | net |',
+  '|---|---:|---:|---:|',
+  ...rows,
+  '',
+].join('\n');
 if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${report}\n`);
 console.log(report);

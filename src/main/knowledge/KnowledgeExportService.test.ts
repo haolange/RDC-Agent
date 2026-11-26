@@ -8,12 +8,13 @@ import { AppError } from '@shared/errors/appError';
 import { expectMonotonicProgress } from '../testing/knowledgeProgress';
 import { KNOWLEDGE_PACKAGE_SCHEMA } from './knowledgePackage';
 import { ingestKnowledge, ingestKnowledgeFromPath } from './knowledgeIngest';
-import { createDefaultExportDependencies, KnowledgeExportService, isExportable, toPackageCard } from './KnowledgeExportService';
 import {
-  KNOWLEDGE_PACKAGE_MANIFEST,
-  unzipKnowledgeFiles,
-  utf8FromZip,
-} from './knowledgeZip';
+  createDefaultExportDependencies,
+  KnowledgeExportService,
+  isExportable,
+  toPackageCard,
+} from './KnowledgeExportService';
+import { KNOWLEDGE_PACKAGE_MANIFEST, unzipKnowledgeFiles, utf8FromZip } from './knowledgeZip';
 import type { KnowledgeCardDetail } from '@shared/types/knowledge';
 
 const PNG_1X1 = Buffer.from(
@@ -56,18 +57,15 @@ function detail(overrides: Partial<KnowledgeCardDetail> = {}): KnowledgeCardDeta
   };
 }
 
-function createService(
-  cards: KnowledgeCardDetail[],
-  images: Map<string, Uint8Array> = new Map(),
-) {
+function createService(cards: KnowledgeCardDetail[], images: Map<string, Uint8Array> = new Map()) {
   const written = new Map<string, Uint8Array>();
   const service = new KnowledgeExportService({
-    getCard: async (spaceId, relativePath) => (
-      cards.find((card) => card.spaceId === spaceId && card.relativePath === relativePath) ?? null
-    ),
-    listCards: async (spaceId) => cards
-      .filter((card) => card.spaceId === spaceId)
-      .map((card) => ({ spaceId: card.spaceId, relativePath: card.relativePath })),
+    getCard: async (spaceId, relativePath) =>
+      cards.find((card) => card.spaceId === spaceId && card.relativePath === relativePath) ?? null,
+    listCards: async (spaceId) =>
+      cards
+        .filter((card) => card.spaceId === spaceId)
+        .map((card) => ({ spaceId: card.spaceId, relativePath: card.relativePath })),
     readImage: async (_spaceId, relativePath) => images.get(relativePath) ?? null,
     writeBytes: async (targetPath, contents) => {
       written.set(targetPath, contents);
@@ -107,11 +105,14 @@ describe('KnowledgeExportService', () => {
       [detail({ images: [{ relativePath: imagePath, role: 'observed' }] })],
       new Map([[imagePath, PNG_1X1]]),
     );
-    const result = await service.export({
-      format: 'package',
-      scope: 'space',
-      spaceId: 'user',
-    }, targetPath);
+    const result = await service.export(
+      {
+        format: 'package',
+        scope: 'space',
+        spaceId: 'user',
+      },
+      targetPath,
+    );
 
     expect(result.cardCount).toBe(1);
     expect(result.excludedCount).toBe(0);
@@ -148,14 +149,23 @@ describe('KnowledgeExportService', () => {
     const targetPath = absoluteTarget('knowledge.zip');
     const { service, written } = createService([
       detail({ images: [{ relativePath: 'cases/aird-1/observed.png', role: 'observed' }] }),
-      detail({ cardId: 'user:facts/complete.md', relativePath: 'facts/complete.md', type: 'fact', lifecycle: 'draft', images: [] }),
+      detail({
+        cardId: 'user:facts/complete.md',
+        relativePath: 'facts/complete.md',
+        type: 'fact',
+        lifecycle: 'draft',
+        images: [],
+      }),
       detail({ cardId: 'user:facts/missing.md', relativePath: 'facts/missing.md', missingAssets: ['asset-12345678'] }),
     ]);
-    const result = await service.export({
-      format: 'package',
-      scope: 'space',
-      spaceId: 'user',
-    }, targetPath);
+    const result = await service.export(
+      {
+        format: 'package',
+        scope: 'space',
+        spaceId: 'user',
+      },
+      targetPath,
+    );
     const parsed = parseYaml(packageYaml(written.get(targetPath)!)) as {
       cards: Array<{ images?: unknown }>;
     };
@@ -167,23 +177,31 @@ describe('KnowledgeExportService', () => {
 
   it('does not create an export when every selected card has missing assets', async () => {
     const targetPath = absoluteTarget('knowledge.zip');
-    const { service, written } = createService([
-      detail({ missingAssets: ['asset-12345678'] }),
-    ]);
-    await expect(service.export({
-      format: 'package', scope: 'space', spaceId: 'user',
-    }, targetPath)).rejects.toThrow('KNOWLEDGE_EXPORT_EMPTY_RESULT');
+    const { service, written } = createService([detail({ missingAssets: ['asset-12345678'] })]);
+    await expect(
+      service.export(
+        {
+          format: 'package',
+          scope: 'space',
+          spaceId: 'user',
+        },
+        targetPath,
+      ),
+    ).rejects.toThrow('KNOWLEDGE_EXPORT_EMPTY_RESULT');
     expect(written.has(targetPath)).toBe(false);
   });
 
   it('reports a duplicate cardId through the existing conflict path', async () => {
     const targetPath = absoluteTarget('knowledge.zip');
     const { service, written } = createService([detail()]);
-    await service.export({
-      format: 'package',
-      scope: 'space',
-      spaceId: 'user',
-    }, targetPath);
+    await service.export(
+      {
+        format: 'package',
+        scope: 'space',
+        spaceId: 'user',
+      },
+      targetPath,
+    );
     const conflict = ingestKnowledge(packageYaml(written.get(targetPath)!), {
       spaceId: 'user',
       existingCaseIds: ['user:cases/aird-1.md'],
@@ -197,11 +215,14 @@ describe('KnowledgeExportService', () => {
       detail(),
       detail({ cardId: 'user:cases/aird-2.md', relativePath: 'cases/aird-2.md', body: 'password: hunter2' }),
     ]);
-    const result = await service.export({
-      format: 'package',
-      scope: 'space',
-      spaceId: 'user',
-    }, absoluteTarget('knowledge.zip'));
+    const result = await service.export(
+      {
+        format: 'package',
+        scope: 'space',
+        spaceId: 'user',
+      },
+      absoluteTarget('knowledge.zip'),
+    );
     expect(result.cardCount).toBe(1);
     expect(result.excludedCount).toBe(1);
   });
@@ -209,11 +230,14 @@ describe('KnowledgeExportService', () => {
   it('writes readable markdown that is not a package and cannot be re-imported', async () => {
     const targetPath = absoluteTarget('knowledge.md');
     const { service, written } = createService([detail()]);
-    await service.export({
-      format: 'markdown',
-      scope: 'selected',
-      cardRefs: [{ spaceId: 'user', relativePath: 'cases/aird-1.md' }],
-    }, targetPath);
+    await service.export(
+      {
+        format: 'markdown',
+        scope: 'selected',
+        cardRefs: [{ spaceId: 'user', relativePath: 'cases/aird-1.md' }],
+      },
+      targetPath,
+    );
     const contents = new TextDecoder().decode(written.get(targetPath));
     expect(contents).toContain('# Material sampling triage');
     expect(contents).not.toContain(KNOWLEDGE_PACKAGE_SCHEMA);
@@ -223,9 +247,13 @@ describe('KnowledgeExportService', () => {
   });
 
   it('cancelled while reading cards or before the file replaces the target, leaves no file and no temp file', async () => {
-    const cards = [detail(), detail({ cardId: 'user:cases/aird-2.md', relativePath: 'cases/aird-2.md', caseId: 'aird-2' })];
+    const cards = [
+      detail(),
+      detail({ cardId: 'user:cases/aird-2.md', relativePath: 'cases/aird-2.md', caseId: 'aird-2' }),
+    ];
     const deps = createDefaultExportDependencies({
-      getCard: async (spaceId, relativePath) => cards.find((card) => card.spaceId === spaceId && card.relativePath === relativePath) ?? null,
+      getCard: async (spaceId, relativePath) =>
+        cards.find((card) => card.spaceId === spaceId && card.relativePath === relativePath) ?? null,
       listCards: async () => cards,
       listSpaces: () => [],
     });
@@ -234,27 +262,36 @@ describe('KnowledgeExportService', () => {
     const exportUntil = async (targetPath: string, stopAt: (phase: string, done: number) => boolean) => {
       const controller = new AbortController();
       const events: Array<{ phase: 'reading' | 'writing' | 'indexing'; done: number; total: number }> = [];
-      await expect(service.export({ format: 'package', scope: 'space', spaceId: 'user' }, targetPath, {
-        signal: controller.signal,
-        onProgress: (phase, done, total) => {
-          events.push({ phase, done, total });
-          if (stopAt(phase, done)) controller.abort(new AppError('KNOWLEDGE_OPERATION_CANCELLED'));
-        },
-      })).rejects.toMatchObject({ code: 'KNOWLEDGE_OPERATION_CANCELLED' });
+      await expect(
+        service.export({ format: 'package', scope: 'space', spaceId: 'user' }, targetPath, {
+          signal: controller.signal,
+          onProgress: (phase, done, total) => {
+            events.push({ phase, done, total });
+            if (stopAt(phase, done)) controller.abort(new AppError('KNOWLEDGE_OPERATION_CANCELLED'));
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'KNOWLEDGE_OPERATION_CANCELLED' });
       expectMonotonicProgress(events);
       return events;
     };
 
     const fresh = absoluteTarget('knowledge.zip');
-    expect((await exportUntil(fresh, (phase, done) => phase === 'reading' && done === 1)).at(-1))
-      .toEqual({ phase: 'reading', done: 1, total: 2 });
+    expect((await exportUntil(fresh, (phase, done) => phase === 'reading' && done === 1)).at(-1)).toEqual({
+      phase: 'reading',
+      done: 1,
+      total: 2,
+    });
     expect(writeBytes).not.toHaveBeenCalled();
     expect(readdirSync(path.dirname(fresh))).toEqual([]);
 
     // The person chose to replace an existing file: the temp file is written, then removed, and the old file stays.
     const existing = absoluteTarget('knowledge.zip');
     writeFileSync(existing, 'previous export');
-    expect((await exportUntil(existing, (phase) => phase === 'writing')).at(-1)).toEqual({ phase: 'writing', done: 0, total: 1 });
+    expect((await exportUntil(existing, (phase) => phase === 'writing')).at(-1)).toEqual({
+      phase: 'writing',
+      done: 0,
+      total: 1,
+    });
     expect(writeBytes).toHaveBeenCalledOnce();
     expect(readdirSync(path.dirname(existing))).toEqual(['knowledge.zip']);
     expect(readFileSync(existing, 'utf8')).toBe('previous export');
@@ -262,16 +299,26 @@ describe('KnowledgeExportService', () => {
 
   it('fails closed on a relative target path and on an empty selection', async () => {
     const { service } = createService([detail()]);
-    await expect(service.export({
-      format: 'package',
-      scope: 'selected',
-      cardRefs: [{ spaceId: 'user', relativePath: 'cases/aird-1.md' }],
-    }, 'relative/knowledge.zip')).rejects.toThrow('KNOWLEDGE_EXPORT_TARGET_INVALID');
+    await expect(
+      service.export(
+        {
+          format: 'package',
+          scope: 'selected',
+          cardRefs: [{ spaceId: 'user', relativePath: 'cases/aird-1.md' }],
+        },
+        'relative/knowledge.zip',
+      ),
+    ).rejects.toThrow('KNOWLEDGE_EXPORT_TARGET_INVALID');
 
-    await expect(service.export({
-      format: 'package',
-      scope: 'selected',
-      cardRefs: [],
-    }, absoluteTarget('knowledge.zip'))).rejects.toThrow('KNOWLEDGE_EXPORT_EMPTY_SELECTION');
+    await expect(
+      service.export(
+        {
+          format: 'package',
+          scope: 'selected',
+          cardRefs: [],
+        },
+        absoluteTarget('knowledge.zip'),
+      ),
+    ).rejects.toThrow('KNOWLEDGE_EXPORT_EMPTY_SELECTION');
   });
 });

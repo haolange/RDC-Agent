@@ -13,6 +13,9 @@ export function recordSuccessfulFileRead(absolute: string, context?: ToolExecuti
 
 export function requireSuccessfulFileRead(absolute: string, context?: ToolExecutionContext): void {
   if (!context?.successfulFileReads?.has(readKey(absolute))) {
-    throw new AppError('READ_BEFORE_EDIT_REQUIRED', 'successfully read_file this path in the current session before editing or overwriting it.');
+    throw new AppError(
+      'READ_BEFORE_EDIT_REQUIRED',
+      'successfully read_file this path in the current session before editing or overwriting it.',
+    );
   }
 }

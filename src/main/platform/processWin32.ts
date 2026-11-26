@@ -33,12 +33,17 @@ export function windowsPowerShellPath(systemRoot: string | undefined = process.e
 
 export function createWin32ProcessBackend(deps: Win32ProcessDeps = defaultDeps): ProcessBackend {
   const query = (script: string): { status: number | null; stdout: string } => {
-    const result = deps.spawnSync(windowsPowerShellPath(deps.systemRoot()), [
-      '-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; ${script}`,
-    ], {
-      encoding: 'utf8', windowsHide: true, timeout: WINDOWS_QUERY_TIMEOUT_MS, maxBuffer: 64 * 1024,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
+    const result = deps.spawnSync(
+      windowsPowerShellPath(deps.systemRoot()),
+      ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; ${script}`],
+      {
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: WINDOWS_QUERY_TIMEOUT_MS,
+        maxBuffer: 64 * 1024,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    );
     if (result.error) throw result.error;
     return { status: result.status, stdout: result.stdout.trim() };
   };
@@ -59,28 +64,39 @@ export function createWin32ProcessBackend(deps: Win32ProcessDeps = defaultDeps):
     isRunning,
     readBirth(pid) {
       if (!isRunning(pid)) return null;
-      const result = query(`$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; `
-        + "if ($null -eq $p -or $p.HasExited) { 'absent' } else { $p.StartTime.ToFileTimeUtc() }");
+      const result = query(
+        `$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; ` +
+          "if ($null -eq $p -or $p.HasExited) { 'absent' } else { $p.StartTime.ToFileTimeUtc() }",
+      );
       if (result.status !== 0) throw new AppError('PROCESS_QUERY_FAILED', `birth of pid ${pid} is unreadable.`);
       if (result.stdout === 'absent') return null;
-      if (!/^[1-9]\d*$/.test(result.stdout)) throw new AppError('PROCESS_QUERY_FAILED', `invalid birth for pid ${pid}.`);
+      if (!/^[1-9]\d*$/.test(result.stdout))
+        throw new AppError('PROCESS_QUERY_FAILED', `invalid birth for pid ${pid}.`);
       return `windows-filetime:${result.stdout}`;
     },
     readCommandLine(pid) {
-      const result = query(`$p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; `
-        + 'if ($null -ne $p) { [string]$p.CommandLine }');
+      const result = query(
+        `$p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; ` +
+          'if ($null -ne $p) { [string]$p.CommandLine }',
+      );
       return result.status === 0 && result.stdout ? result.stdout : null;
     },
     killTree(pid, timeoutMs) {
       const result = deps.spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
-        windowsHide: true, stdio: 'ignore', timeout: timeoutMs, killSignal: 'SIGKILL',
+        windowsHide: true,
+        stdio: 'ignore',
+        timeout: timeoutMs,
+        killSignal: 'SIGKILL',
       });
       return result.status === 0;
     },
     signalChildTree(pid, _signal, timeoutMs) {
       // taskkill has no graceful process-tree signal; /F is the only bounded abort.
       deps.spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
-        windowsHide: true, stdio: 'ignore', timeout: timeoutMs, killSignal: 'SIGKILL',
+        windowsHide: true,
+        stdio: 'ignore',
+        timeout: timeoutMs,
+        killSignal: 'SIGKILL',
       });
     },
     childGroupOptions: {},

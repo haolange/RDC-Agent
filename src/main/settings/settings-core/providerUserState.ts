@@ -65,9 +65,11 @@ function visibleModels(
 ): LlmProviderModel[] {
   const resolved = resolveProviderModels(providerId, observed);
   if (authMode !== 'account' || hasAccountCredential) return resolved;
-  const maintainedIds = new Set(getProviderCatalogModelSummaries(providerId)
-    .filter((metadata) => metadata.presencePolicy === 'maintained')
-    .map((metadata) => metadata.modelId));
+  const maintainedIds = new Set(
+    getProviderCatalogModelSummaries(providerId)
+      .filter((metadata) => metadata.presencePolicy === 'maintained')
+      .map((metadata) => metadata.modelId),
+  );
   const structural = getProviderModelSummaries(providerId).filter((model) => maintainedIds.has(model.id));
   const structuralById = new Map(structural.map((model) => [model.id, model]));
   return applyModelEnabledState(structural, resolved).map((model) => ({
@@ -113,10 +115,16 @@ export function composeProviderEntry(
   const apiKeyCredentialPresent = connectionSchema?.fields.length
     ? isConnectionSchemaSatisfied(connectionSchema, connectionValues, hasStoredConnectionSecrets)
     : Boolean(apiKeySecret);
-  const hasStoredSecretByAuthMode = Object.fromEntries(authModeOptions.map((mode) => [
-    mode,
-    mode === 'local' || mode === 'environment' ? true : mode === 'api-key' ? apiKeyCredentialPresent : Boolean(oauthSecret),
-  ])) as Partial<Record<LlmProviderAuthMode, boolean>>;
+  const hasStoredSecretByAuthMode = Object.fromEntries(
+    authModeOptions.map((mode) => [
+      mode,
+      mode === 'local' || mode === 'environment'
+        ? true
+        : mode === 'api-key'
+          ? apiKeyCredentialPresent
+          : Boolean(oauthSecret),
+    ]),
+  ) as Partial<Record<LlmProviderAuthMode, boolean>>;
   const hasStoredSecret = hasStoredSecretByAuthMode[authMode] === true;
   const models = visibleModels(
     providerId,
@@ -125,14 +133,18 @@ export function composeProviderEntry(
     hasStoredSecretByAuthMode.account === true,
   );
   const selectedAvailability = resolveSelectedAuthAvailability(providerId, authMode, catalog);
-  const configuredAuthMode = state?.configuredAuthMode && authModeOptions.includes(state.configuredAuthMode)
-    ? state.configuredAuthMode
-    : undefined;
-  const status: LlmProviderConnectionStatus = selectedAvailability.state === 'unavailable'
-    ? 'unavailable'
-    : state?.status === 'failed' && (!configuredAuthMode || configuredAuthMode === authMode)
-      ? 'failed'
-      : configuredAuthMode === authMode && hasStoredSecret ? 'verified' : 'unconfigured';
+  const configuredAuthMode =
+    state?.configuredAuthMode && authModeOptions.includes(state.configuredAuthMode)
+      ? state.configuredAuthMode
+      : undefined;
+  const status: LlmProviderConnectionStatus =
+    selectedAvailability.state === 'unavailable'
+      ? 'unavailable'
+      : state?.status === 'failed' && (!configuredAuthMode || configuredAuthMode === authMode)
+        ? 'failed'
+        : configuredAuthMode === authMode && hasStoredSecret
+          ? 'verified'
+          : 'unconfigured';
   return {
     id: providerId,
     activeAccountId: authAccountIds[authMode],
@@ -160,7 +172,7 @@ export function composeProviderEntry(
     hasStoredConnectionSecrets,
     connectionSchema,
     hasStoredSecret,
-    baseUrl: catalog.baseUrlEditable ? state?.baseUrl ?? catalog.baseUrl : catalog.baseUrl,
+    baseUrl: catalog.baseUrlEditable ? (state?.baseUrl ?? catalog.baseUrl) : catalog.baseUrl,
     baseUrlEditable: catalog.baseUrlEditable,
     models,
     recommendedModels: offeredRecommendedModels(catalog.recommendedModels, models),
@@ -189,30 +201,34 @@ export function composeProviders(
   workspaceRoot: string,
 ): { providers: LlmProviderEntry[]; orphanProviderIds: string[] } {
   return {
-    providers: listProviderSummaries().map((surface) => composeProviderEntry(surface.id, states[surface.id], workspaceRoot)),
+    providers: listProviderSummaries().map((surface) =>
+      composeProviderEntry(surface.id, states[surface.id], workspaceRoot),
+    ),
     orphanProviderIds: Object.keys(states).filter((providerId) => !isBuiltinProviderId(providerId)),
   };
 }
 
 function toUserModelStates(providerId: string, models: readonly LlmProviderModel[]): Record<string, UserModelState> {
   const catalogById = new Map(getProviderModelSummaries(providerId).map((model) => [model.id, model]));
-  return Object.fromEntries(models.map((model) => {
-    const catalogModel = catalogById.get(model.id);
-    const manifestDenied = catalogModel?.availability === 'unavailable';
-    const state: UserModelState = {
-      ...(model.enabled === false ? { enabled: false } : {}),
-      ...(model.defaultReasoningSelection ? { defaultReasoningSelection: model.defaultReasoningSelection } : {}),
-      ...(model.defaultBudgetTokens ? { defaultBudgetTokens: model.defaultBudgetTokens } : {}),
-      ...(model.preferredRouteOptionId ? { preferredRouteOptionId: model.preferredRouteOptionId } : {}),
-      ...(!manifestDenied && model.availability && model.availability !== catalogModel?.availability
-        ? { availability: model.availability }
-        : {}),
-      ...(!manifestDenied && model.availabilityReason ? { availabilityReason: model.availabilityReason } : {}),
-      ...(!catalogModel && model.label && model.label !== model.id ? { label: model.label } : {}),
-      ...(!catalogModel && model.aliases?.length ? { aliases: [...model.aliases] } : {}),
-    };
-    return [model.id, state];
-  }));
+  return Object.fromEntries(
+    models.map((model) => {
+      const catalogModel = catalogById.get(model.id);
+      const manifestDenied = catalogModel?.availability === 'unavailable';
+      const state: UserModelState = {
+        ...(model.enabled === false ? { enabled: false } : {}),
+        ...(model.defaultReasoningSelection ? { defaultReasoningSelection: model.defaultReasoningSelection } : {}),
+        ...(model.defaultBudgetTokens ? { defaultBudgetTokens: model.defaultBudgetTokens } : {}),
+        ...(model.preferredRouteOptionId ? { preferredRouteOptionId: model.preferredRouteOptionId } : {}),
+        ...(!manifestDenied && model.availability && model.availability !== catalogModel?.availability
+          ? { availability: model.availability }
+          : {}),
+        ...(!manifestDenied && model.availabilityReason ? { availabilityReason: model.availabilityReason } : {}),
+        ...(!catalogModel && model.label && model.label !== model.id ? { label: model.label } : {}),
+        ...(!catalogModel && model.aliases?.length ? { aliases: [...model.aliases] } : {}),
+      };
+      return [model.id, state];
+    }),
+  );
 }
 
 function userStateOf(entry: LlmProviderEntry): UserProviderState {
@@ -220,9 +236,12 @@ function userStateOf(entry: LlmProviderEntry): UserProviderState {
   const authModeOptions = catalog.authModeOptions ?? [catalog.authMode];
   const authMode = authModeOptions.includes(entry.authMode) ? entry.authMode : catalog.authMode;
   const authAccountIds = sanitizeAuthAccountIds(entry, authMode);
-  const configuredAuthMode = entry.configuredAuthMode && authModeOptions.includes(entry.configuredAuthMode)
-    ? entry.configuredAuthMode
-    : entry.status === 'verified' || entry.isConfigured ? authMode : undefined;
+  const configuredAuthMode =
+    entry.configuredAuthMode && authModeOptions.includes(entry.configuredAuthMode)
+      ? entry.configuredAuthMode
+      : entry.status === 'verified' || entry.isConfigured
+        ? authMode
+        : undefined;
   const failed = entry.status === 'failed';
   const connectionValues = sanitizeConnectionValues(catalog.connectionSchema, entry.connectionValues);
   const baseUrl = entry.baseUrl?.trim();

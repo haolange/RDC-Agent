@@ -120,11 +120,13 @@ describe('settingsModalActions project scope save', () => {
 
     await actions.handleSaveAgentManifests({ drafts: [deleted] });
 
-    expect(drafts).toEqual([expect.objectContaining({
-      id: 'general',
-      writeScope: 'user',
-      sourceHash: 'builtin-hash',
-    })]);
+    expect(drafts).toEqual([
+      expect.objectContaining({
+        id: 'general',
+        writeScope: 'user',
+        sourceHash: 'builtin-hash',
+      }),
+    ]);
     expect(drafts[0]?.delete).toBeUndefined();
     expect(saveAgentDefinition).toHaveBeenCalledTimes(1);
   });
@@ -171,14 +173,28 @@ describe('settingsModalActions personalization autosave', () => {
       draft = typeof next === 'function' ? next(draft) : next;
     });
     let release: () => void = () => undefined;
-    const patchSettings = vi.fn((ops: Array<{ op: string; value: string }>) => new Promise((resolve) => {
-      release = () => resolve({ agents: { globalInstructions: ops.find((op) => op.op === 'globalInstructions')?.value.trim() } });
-    }));
-    const modalState = { get globalInstructionsDraft() { return draft; }, setGlobalInstructionsDraft };
+    const patchSettings = vi.fn(
+      (ops: Array<{ op: string; value: string }>) =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({ agents: { globalInstructions: ops.find((op) => op.op === 'globalInstructions')?.value.trim() } });
+        }),
+    );
+    const modalState = {
+      get globalInstructionsDraft() {
+        return draft;
+      },
+      setGlobalInstructionsDraft,
+    };
     const actions = createSettingsModalActions({
-      modalState: modalState as never, providerConnection: {} as never, updateProfile: vi.fn(async () => undefined),
-      patchSettings: patchSettings as never, saveAgentDefinition: vi.fn() as never, t: (key: string) => key,
-      adoptView: vi.fn(), rebaseAgentDrafts: vi.fn(),
+      modalState: modalState as never,
+      providerConnection: {} as never,
+      updateProfile: vi.fn(async () => undefined),
+      patchSettings: patchSettings as never,
+      saveAgentDefinition: vi.fn() as never,
+      t: (key: string) => key,
+      adoptView: vi.fn(),
+      rebaseAgentDrafts: vi.fn(),
     });
 
     const saving = actions.handleSavePersonalization();

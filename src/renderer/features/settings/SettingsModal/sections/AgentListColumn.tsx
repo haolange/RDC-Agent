@@ -10,8 +10,20 @@ import type { AgentScope } from './agentDraftFactory';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 
 /** The scope's Agents with their count and the create action, then the manifest problems when there are any. */
-export function AgentListColumn({ listRef, scope, drafts, selectedId, describe, canCreate, diagnosticsCount, diagnosticsOpen,
-  onSelect, onCreate, onImport, onOpenDiagnostics }: {
+export function AgentListColumn({
+  listRef,
+  scope,
+  drafts,
+  selectedId,
+  describe,
+  canCreate,
+  diagnosticsCount,
+  diagnosticsOpen,
+  onSelect,
+  onCreate,
+  onImport,
+  onOpenDiagnostics,
+}: {
   listRef: Ref<HTMLDivElement>;
   scope: AgentScope;
   drafts: AgentManifestDraft[];
@@ -29,37 +41,49 @@ export function AgentListColumn({ listRef, scope, drafts, selectedId, describe, 
   return (
     <div className="settings-manifest-list-column">
       <div className="settings-manifest-list-toolbar">
-        <span className="settings-manifest-count">
-          {t('settings.agentListCount', { count: drafts.length })}
-        </span>
-        <SplitButton dataTestId="settings-agent-create" label={t('settings.newAgent')} onClick={onCreate}
-          disabled={!canCreate} menuLabel={t('settings.newAgentMore')}
-          items={[{ id: 'import', label: t('settings.importAgentManifest'), onSelect: onImport }]} />
+        <span className="settings-manifest-count">{t('settings.agentListCount', { count: drafts.length })}</span>
+        <SplitButton
+          dataTestId="settings-agent-create"
+          label={t('settings.newAgent')}
+          onClick={onCreate}
+          disabled={!canCreate}
+          menuLabel={t('settings.newAgentMore')}
+          items={[{ id: 'import', label: t('settings.importAgentManifest'), onSelect: onImport }]}
+        />
       </div>
 
       <div ref={listRef} className="settings-manifest-list" aria-label={t('settings.agentManifestTitle')}>
         {drafts.length === 0 ? (
           <EmptyState
             className="settings-manifest-list-empty"
-            title={t('settings.agentScopeEmpty', { scope: scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser') })}
+            title={t('settings.agentScopeEmpty', {
+              scope: scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser'),
+            })}
           />
-        ) : drafts.map((agent) => (
-          <AgentListItem
-            key={agent.id}
-            id={agent.id}
-            name={agent.name}
-            description={describe(agent)}
-            icon={agent.icon}
-            selected={agent.id === selectedId}
-            onSelect={() => onSelect(agent.id)}
-          />
-        ))}
+        ) : (
+          drafts.map((agent) => (
+            <AgentListItem
+              key={agent.id}
+              id={agent.id}
+              name={agent.name}
+              description={describe(agent)}
+              icon={agent.icon}
+              selected={agent.id === selectedId}
+              onSelect={() => onSelect(agent.id)}
+            />
+          ))
+        )}
       </div>
 
       {diagnosticsCount > 0 ? (
-        <div className="settings-agent-tool-diagnostics settings-agent-diagnostics-row" data-testid="settings-agent-manifest-diagnostics">
+        <div
+          className="settings-agent-tool-diagnostics settings-agent-diagnostics-row"
+          data-testid="settings-agent-manifest-diagnostics"
+        >
           <Button
-            variant="secondary" size="sm" aria-haspopup="dialog"
+            variant="secondary"
+            size="sm"
+            aria-haspopup="dialog"
             className="settings-agent-diagnostics-toggle"
             aria-expanded={diagnosticsOpen}
             onClick={onOpenDiagnostics}

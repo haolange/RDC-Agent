@@ -69,10 +69,13 @@ export class ShutdownCoordinator {
     let forceExitTimer: ReturnType<typeof setTimeout> | null = null;
 
     if (forceExit) {
-      forceExitTimer = setTimeout(() => {
-        this.phase = 'exited';
-        forceExit();
-      }, Math.max(0, timeoutMs));
+      forceExitTimer = setTimeout(
+        () => {
+          this.phase = 'exited';
+          forceExit();
+        },
+        Math.max(0, timeoutMs),
+      );
       forceExitTimer.unref();
     }
 

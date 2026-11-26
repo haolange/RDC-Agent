@@ -114,7 +114,7 @@ async function removeTemporaryRoot(root) {
       lastError = error;
       const code = error?.code;
       if (code !== 'EBUSY' && code !== 'EPERM') throw error;
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
     }
   }
   throw lastError;
@@ -164,17 +164,21 @@ async function main() {
     child.stderr?.on('data', collect);
     let timer;
     const outcome = await Promise.race([
-      new Promise(resolve => {
-        child.once('error', error => resolve({ type: 'error', error }));
+      new Promise((resolve) => {
+        child.once('error', (error) => resolve({ type: 'error', error }));
         child.once('exit', (code, signal) => resolve({ type: 'exit', code, signal }));
       }),
-      new Promise(resolve => { timer = setTimeout(() => resolve({ type: 'hold' }), HOLD_MS); }),
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve({ type: 'hold' }), HOLD_MS);
+      }),
     ]);
     clearTimeout(timer);
     if (outcome.type !== 'hold') {
-      fail(outcome.type === 'error'
-        ? `Electron failed to start: ${String(outcome.error)}`
-        : `Electron exited before readiness (code=${outcome.code}, signal=${outcome.signal})`);
+      fail(
+        outcome.type === 'error'
+          ? `Electron failed to start: ${String(outcome.error)}`
+          : `Electron exited before readiness (code=${outcome.code}, signal=${outcome.signal})`,
+      );
       return;
     }
     // A missing packaged dependency may leave a live process showing an error

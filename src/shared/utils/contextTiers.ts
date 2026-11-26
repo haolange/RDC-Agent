@@ -1,8 +1,4 @@
-import type {
-  ControlDefinition,
-  ContextTier,
-  EffectiveModel,
-} from '../types/providerCapability';
+import type { ControlDefinition, ContextTier, EffectiveModel } from '../types/providerCapability';
 
 export interface ContextTierChoices {
   normalTier?: ContextTier;
@@ -53,9 +49,7 @@ export function contextTierWindowTokens(tier: ContextTier): number | undefined {
   if (typeof tier.maxPromptTokens !== 'number' || tier.maxPromptTokens <= 0) {
     return undefined;
   }
-  const outputReserve = typeof tier.maxOutputTokens === 'number' && tier.maxOutputTokens > 0
-    ? tier.maxOutputTokens
-    : 0;
+  const outputReserve = typeof tier.maxOutputTokens === 'number' && tier.maxOutputTokens > 0 ? tier.maxOutputTokens : 0;
   return tier.maxPromptTokens + outputReserve;
 }
 
@@ -83,8 +77,10 @@ export function isEligibleMaxContextTier(
   const normalWindow = contextTierWindowTokens(normalTier);
   if (maxWindow === undefined || normalWindow === undefined) return false;
   if (maxTier.id === normalTier.id) return true;
-  const normalBudget = normalBudgetTokens && normalBudgetTokens > 0
-    ? Math.min(normalBudgetTokens, contextTierPromptCap(normalTier) ?? normalWindow) : normalWindow;
+  const normalBudget =
+    normalBudgetTokens && normalBudgetTokens > 0
+      ? Math.min(normalBudgetTokens, contextTierPromptCap(normalTier) ?? normalWindow)
+      : normalWindow;
   return maxWindow > normalWindow || (contextTierPromptCap(maxTier) ?? maxWindow) > normalBudget;
 }
 
@@ -106,38 +102,32 @@ function highestTier(tiers: ContextTier[], sourceOrder: Map<string, number>): Co
  * window/input budget larger than the normal tier budget. A control may also point at the
  * sole/normal tier for always-on Max.
  */
-export function resolveContextTierChoices(
-  model: {
-    contextTiers: readonly ContextTier[];
-    defaultBudgetTokens?: number;
-    controls: Pick<EffectiveModel['controls'], 'maxContext'>;
-  },
-): ContextTierChoices {
+export function resolveContextTierChoices(model: {
+  contextTiers: readonly ContextTier[];
+  defaultBudgetTokens?: number;
+  controls: Pick<EffectiveModel['controls'], 'maxContext'>;
+}): ContextTierChoices {
   const usable = model.contextTiers.filter((tier) => tier.entitlement !== 'denied');
   const sourceOrder = new Map(model.contextTiers.map((tier, index) => [tier.id, index]));
   const granted = usable.filter((tier) => tier.entitlement === 'granted');
   const unknown = usable.filter((tier) => tier.entitlement === 'unknown');
-  const normalTier = granted.find((tier) => tier.id === 'default')
-    ?? granted[0]
-    ?? unknown.find((tier) => tier.id === 'default')
-    ?? unknown[0];
+  const normalTier =
+    granted.find((tier) => tier.id === 'default') ??
+    granted[0] ??
+    unknown.find((tier) => tier.id === 'default') ??
+    unknown[0];
 
   if (!normalTier) return { maxTierUnverified: false };
 
   const contextControl = model.controls.maxContext;
-  const explicitTierId = contextControl.state === 'fixed' || contextControl.state === 'selectable'
-    ? contextControl.tierId
-    : undefined;
-  const explicitTier = explicitTierId
-    ? usable.find((tier) => tier.id === explicitTierId)
-    : undefined;
-  const eligible = explicitTier && isEligibleMaxContextTier(explicitTier, normalTier, model.defaultBudgetTokens)
-    ? [explicitTier]
-    : [];
+  const explicitTierId =
+    contextControl.state === 'fixed' || contextControl.state === 'selectable' ? contextControl.tierId : undefined;
+  const explicitTier = explicitTierId ? usable.find((tier) => tier.id === explicitTierId) : undefined;
+  const eligible =
+    explicitTier && isEligibleMaxContextTier(explicitTier, normalTier, model.defaultBudgetTokens) ? [explicitTier] : [];
   const grantedEligible = eligible.filter((tier) => tier.entitlement === 'granted');
   const unknownEligible = eligible.filter((tier) => tier.entitlement === 'unknown');
-  const maxTier = highestTier(grantedEligible, sourceOrder)
-    ?? highestTier(unknownEligible, sourceOrder);
+  const maxTier = highestTier(grantedEligible, sourceOrder) ?? highestTier(unknownEligible, sourceOrder);
 
   return {
     normalTier,
@@ -146,8 +136,6 @@ export function resolveContextTierChoices(
   };
 }
 
-export function getMaxContextControl(
-  model: Pick<EffectiveModel, 'controls'>,
-): ControlDefinition {
+export function getMaxContextControl(model: Pick<EffectiveModel, 'controls'>): ControlDefinition {
   return model.controls.maxContext;
 }

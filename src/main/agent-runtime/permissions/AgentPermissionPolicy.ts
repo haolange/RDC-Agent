@@ -9,14 +9,8 @@ import { isWithinRootAllowingAliases } from '../../runtime/toolFiles';
 import { safeResolvePath } from '../../runtime/toolFiles';
 import { fileOperationBoundary } from '../../runtime/FileOperationBoundary';
 import { matchShellFileToolBypass } from './shellFileToolBypass';
-import {
-  matchesDeniedCommandPrefix,
-  shellCommandRiskAnalyzer,
-} from './ShellCommandRiskAnalyzer';
-import {
-  isToolDeniedByPolicy,
-  resolvePolicyApprovalFloor,
-} from './PolicyCompiler';
+import { matchesDeniedCommandPrefix, shellCommandRiskAnalyzer } from './ShellCommandRiskAnalyzer';
+import { isToolDeniedByPolicy, resolvePolicyApprovalFloor } from './PolicyCompiler';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
 import type { CompiledPolicy } from './PolicyCompiler';
 import type { AgentTool, ReplayLifecycleStep, ToolExecutionContext } from '../agent/AgentTool';
@@ -36,8 +30,10 @@ export type AgentPermissionDecisionAction = 'allow' | 'ask_user' | 'auto_review'
 /** The operation contract the reviewer receives for each replay lifecycle step a tool declares (`spec.capture`). */
 const REPLAY_LIFECYCLE_CONTRACT: Record<ReplayLifecycleStep, string> = {
   capture_select: 'Select the registered input named by inputId on the device frozen in the approved plan.',
-  capture_restore: 'Verify the signed entry position and, if needed, restore only its owning replay, event and output target. Reopening can use only the recorded entry input and device. An empty entry position means closing the owning replay.',
-  capture_recover: 'Release the faulted lease only after checking its owner and process identity, then reopen the same approved capture and device under a new replay context. The call supplies no replacement target.',
+  capture_restore:
+    'Verify the signed entry position and, if needed, restore only its owning replay, event and output target. Reopening can use only the recorded entry input and device. An empty entry position means closing the owning replay.',
+  capture_recover:
+    'Release the faulted lease only after checking its owner and process identity, then reopen the same approved capture and device under a new replay context. The call supplies no replacement target.',
 };
 
 export interface AgentPermissionDecision {
@@ -86,23 +82,9 @@ export interface AgentPermissionDecisionInput {
   knowledgeReadRoots?: readonly string[];
 }
 
-const WINDOWS_ROUTINE_COMMAND_PREFIXES = [
-  'dir',
-  'ls',
-  'get-childitem',
-  'get-location',
-  'pwd',
-  'echo',
-  'write-output',
-];
+const WINDOWS_ROUTINE_COMMAND_PREFIXES = ['dir', 'ls', 'get-childitem', 'get-location', 'pwd', 'echo', 'write-output'];
 
-const POSIX_ROUTINE_COMMAND_PREFIXES = [
-  'ls',
-  'pwd',
-  'echo',
-  'which',
-  'where',
-];
+const POSIX_ROUTINE_COMMAND_PREFIXES = ['ls', 'pwd', 'echo', 'which', 'where'];
 const DANGEROUS_COMMAND_PATTERNS = [
   /\brm\b/i,
   /\brmdir\b/i,
@@ -138,9 +120,7 @@ function resolveConfiguredRoot(value: string): string {
 /** Without an open project there is no workspace: relative paths resolve where the tool would, and count as external. */
 function resolveToolTarget(value: string, workspaceRoot: string | null): string {
   const expanded = expandHomePath(value);
-  return path.isAbsolute(expanded)
-    ? path.resolve(expanded)
-    : path.resolve(workspaceRoot ?? process.cwd(), expanded);
+  return path.isAbsolute(expanded) ? path.resolve(expanded) : path.resolve(workspaceRoot ?? process.cwd(), expanded);
 }
 
 function isWithinRoot(target: string, root: string): boolean {
@@ -170,7 +150,10 @@ function inferPathTargetFromGlobPattern(pattern: string): string {
 function argumentAt(toolCall: ToolCall, key: string): string {
   let value: unknown = toolCall.arguments;
   for (const segment of key.split('.')) {
-    value = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>)[segment] : undefined;
+    value =
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)[segment]
+        : undefined;
   }
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -228,14 +211,18 @@ const DRIVE_PATH = /^[a-z]:/iu;
  */
 function commandUsesExternalPath(command: string, workspaceRoot: string): boolean {
   const workspace = workspaceRoot.replace(/\\/g, '/').replace(/\/+$/u, '').toLowerCase();
-  return command.split(/[\s;|&]+/u).flatMap((token) => token.split('=')).some((raw) => {
-    const token = raw.replace(/\\/g, '/');
-    if (!token) return false;
-    if (token.startsWith('~') || token.split('/').includes('..') || POWERSHELL_PROVIDER_DRIVE.test(token)) return true;
-    if (!token.startsWith('/') && !DRIVE_PATH.test(token)) return false;
-    const target = token.replace(/\/+$/u, '').toLowerCase();
-    return target !== workspace && !target.startsWith(`${workspace}/`);
-  });
+  return command
+    .split(/[\s;|&]+/u)
+    .flatMap((token) => token.split('='))
+    .some((raw) => {
+      const token = raw.replace(/\\/g, '/');
+      if (!token) return false;
+      if (token.startsWith('~') || token.split('/').includes('..') || POWERSHELL_PROVIDER_DRIVE.test(token))
+        return true;
+      if (!token.startsWith('/') && !DRIVE_PATH.test(token)) return false;
+      const target = token.replace(/\/+$/u, '').toLowerCase();
+      return target !== workspace && !target.startsWith(`${workspace}/`);
+    });
 }
 
 function isCommandDeniedByRule(command: string, permissions: AgentPermissionSettings): boolean {
@@ -244,7 +231,11 @@ function isCommandDeniedByRule(command: string, permissions: AgentPermissionSett
 }
 
 function isCommandAllowedByRule(command: string, permissions: AgentPermissionSettings): boolean {
-  return simpleCommandSegments(command)?.every(segment => permissions.allowedCommandPrefixes.some(prefix => matchesDeniedCommandPrefix(segment, prefix))) ?? false;
+  return (
+    simpleCommandSegments(command)?.every((segment) =>
+      permissions.allowedCommandPrefixes.some((prefix) => matchesDeniedCommandPrefix(segment, prefix)),
+    ) ?? false
+  );
 }
 
 function routineCommandPrefixes(): string[] {
@@ -256,13 +247,21 @@ function routineCommandPrefixes(): string[] {
 
 function isRoutineCommand(command: string, permissions: AgentPermissionSettings): boolean {
   if (isCommandAllowedByRule(command, permissions)) return true;
-  return simpleCommandSegments(command)?.every(segment => routineCommandPrefixes().some(prefix => matchesDeniedCommandPrefix(segment, prefix))) ?? false;
+  return (
+    simpleCommandSegments(command)?.every((segment) =>
+      routineCommandPrefixes().some((prefix) => matchesDeniedCommandPrefix(segment, prefix)),
+    ) ?? false
+  );
 }
 
 /** Only statically simple chains qualify for rule-based allow. Opaque syntax is reviewed. */
 function simpleCommandSegments(command: string): string[] | null {
-  if (/["'`$(){}<>\\]/.test(command) || /\r|\|&|(^|[^&])&([^&]|$)|--(?:output|ext-diff|textconv|exec-path)/i.test(command)) return null;
-  const segments = command.split(/&&|\|\||[;|\n]/).map(segment => segment.trim());
+  if (
+    /["'`$(){}<>\\]/.test(command) ||
+    /\r|\|&|(^|[^&])&([^&]|$)|--(?:output|ext-diff|textconv|exec-path)/i.test(command)
+  )
+    return null;
+  const segments = command.split(/&&|\|\||[;|\n]/).map((segment) => segment.trim());
   return segments.length && segments.every(Boolean) ? segments : null;
 }
 
@@ -290,10 +289,7 @@ const DECISION_STRENGTH: Record<AgentPermissionDecisionAction, number> = {
   deny: 3,
 };
 
-function floorAction(
-  floor: 'none' | 'auto_review' | 'user',
-  toolName: string,
-): AgentPermissionDecision | null {
+function floorAction(floor: 'none' | 'auto_review' | 'user', toolName: string): AgentPermissionDecision | null {
   if (floor === 'none') return null;
   if (floor === 'auto_review') {
     return {
@@ -320,9 +316,8 @@ function maxDecision(
     ? {
         ...floor,
         operationFacts: baseline.operationFacts,
-        temporaryPathRoots: floor.temporaryPathRoots.length > 0
-          ? floor.temporaryPathRoots
-          : baseline.temporaryPathRoots,
+        temporaryPathRoots:
+          floor.temporaryPathRoots.length > 0 ? floor.temporaryPathRoots : baseline.temporaryPathRoots,
       }
     : baseline;
 }
@@ -368,19 +363,33 @@ export class AgentPermissionPolicyService {
     const replayAction = spec.capture?.replayLifecycle?.(input.toolCall.arguments) ?? null;
     if (replayAction) {
       if (ceiling !== 'full') return denied('RDC_EXECUTION_DENIED: replay lifecycle requires a full access ceiling.');
-      const baseline = mode === 'full-access'
-        ? { action: 'allow' as const, risk: 'low' as const, temporaryPathRoots: [] }
-        : request(mode, 'Changing the owning replay requires authorization under the current permission mode.', 'medium');
-      const floor = input.compiledPolicy ? resolvePolicyApprovalFloor(input.compiledPolicy, toolName, 'mutation') : 'none';
-      return maxDecision({ ...baseline, operationFacts: {
-        operation: replayAction,
-        scope: 'owning approved replay',
-        operationContract: { description: REPLAY_LIFECYCLE_CONTRACT[replayAction] },
-      } }, floorAction(floor, input.toolCall.name));
+      const baseline =
+        mode === 'full-access'
+          ? { action: 'allow' as const, risk: 'low' as const, temporaryPathRoots: [] }
+          : request(
+              mode,
+              'Changing the owning replay requires authorization under the current permission mode.',
+              'medium',
+            );
+      const floor = input.compiledPolicy
+        ? resolvePolicyApprovalFloor(input.compiledPolicy, toolName, 'mutation')
+        : 'none';
+      return maxDecision(
+        {
+          ...baseline,
+          operationFacts: {
+            operation: replayAction,
+            scope: 'owning approved replay',
+            operationContract: { description: REPLAY_LIFECYCLE_CONTRACT[replayAction] },
+          },
+        },
+        floorAction(floor, input.toolCall.name),
+      );
     }
 
     if (spec.capture?.nativeOperation?.(input.toolCall.arguments)) {
-      if (!rdcShellBaseline) return denied('RDC_PERMISSION_UNREGISTERED: shell.rdc has no registered operation policy.', 'high');
+      if (!rdcShellBaseline)
+        return denied('RDC_PERMISSION_UNREGISTERED: shell.rdc has no registered operation policy.', 'high');
       const rdcBaseline = rdcShellBaseline(input, mode, ceiling);
       if (!input.compiledPolicy) return rdcBaseline;
       const floor = resolvePolicyApprovalFloor(input.compiledPolicy, toolName, input.tool.permissionHint);
@@ -400,11 +409,7 @@ export class AgentPermissionPolicyService {
 
     const baseline = this.evaluateBaseline(input, permissions, mode, toolName, workspaceRoot);
     if (!input.compiledPolicy) return baseline;
-    const floor = resolvePolicyApprovalFloor(
-      input.compiledPolicy,
-      toolName,
-      input.tool.permissionHint,
-    );
+    const floor = resolvePolicyApprovalFloor(input.compiledPolicy, toolName, input.tool.permissionHint);
     return maxDecision(baseline, floorAction(floor, input.toolCall.name));
   }
 
@@ -420,17 +425,26 @@ export class AgentPermissionPolicyService {
     if ('denied' in writeClass) return denied(writeClass.denied);
     if (mode === 'full-access') {
       return writeClass.protectedTarget
-        ? { action: 'ask_user', reason: 'Protected configuration or credential-related write requires specific authorization, including under full access.', risk: 'high', temporaryPathRoots: ['*'] }
+        ? {
+            action: 'ask_user',
+            reason:
+              'Protected configuration or credential-related write requires specific authorization, including under full access.',
+            risk: 'high',
+            temporaryPathRoots: ['*'],
+          }
         : { action: 'allow', risk: 'low', temporaryPathRoots: ['*'] };
     }
 
-    const customRules = mode === 'custom' ? permissions : {
-      ...permissions,
-      readableRoots: [],
-      writableRoots: [],
-      allowedCommandPrefixes: [],
-      deniedCommandPrefixes: [],
-    };
+    const customRules =
+      mode === 'custom'
+        ? permissions
+        : {
+            ...permissions,
+            readableRoots: [],
+            writableRoots: [],
+            allowedCommandPrefixes: [],
+            deniedCommandPrefixes: [],
+          };
     const commandArgument = input.tool.spec.shellCommand;
     if (commandArgument && isCommandDeniedByRule(extractStringArg(input.toolCall, commandArgument), customRules)) {
       return denied('Custom policy denied this command prefix (word-boundary match).');
@@ -438,34 +452,35 @@ export class AgentPermissionPolicyService {
 
     const configuredReadableRoots = customRules.readableRoots.map(resolveConfiguredRoot);
     const configuredWritableRoots = customRules.writableRoots.map(resolveConfiguredRoot);
-    const sessionAttachmentsRoot = input.sessionAttachmentsRoot
-      ? path.resolve(input.sessionAttachmentsRoot)
-      : null;
-    const knowledgeReadRoots = input.tool.spec.knowledgeRoots === 'read-access'
-      ? (input.knowledgeReadRoots ?? []).map((root) => path.resolve(root))
-      : [];
-    const readRoots = [
-      ...configuredReadableRoots,
-      ...(sessionAttachmentsRoot ? [sessionAttachmentsRoot] : []),
-    ];
+    const sessionAttachmentsRoot = input.sessionAttachmentsRoot ? path.resolve(input.sessionAttachmentsRoot) : null;
+    const knowledgeReadRoots =
+      input.tool.spec.knowledgeRoots === 'read-access'
+        ? (input.knowledgeReadRoots ?? []).map((root) => path.resolve(root))
+        : [];
+    const readRoots = [...configuredReadableRoots, ...(sessionAttachmentsRoot ? [sessionAttachmentsRoot] : [])];
 
     if (declaresReads(input.tool) && writes.length === 0 && !input.tool.effects?.writes?.length) {
       if (!workspaceRoot && reads.length === 0) {
-        return request(mode, `No project is open, so "${input.toolCall.name}" has no workspace to read within.`, 'medium');
+        return request(
+          mode,
+          `No project is open, so "${input.toolCall.name}" has no workspace to read within.`,
+          'medium',
+        );
       }
       const targets = reads.map((target) => resolveToolTarget(target, workspaceRoot));
       const externalTargets = targets.filter((target) => !isInsideWorkspace(target, workspaceRoot));
       if (externalTargets.length === 0) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: [] };
       }
-      const allowedTargets = externalTargets.filter((target) => (
-        readRoots.some((root) => isWithinRoot(target, root))
-        || knowledgeReadRoots.some((root) => isWithinRootAllowingAliases(target, root))
-      ));
+      const allowedTargets = externalTargets.filter(
+        (target) =>
+          readRoots.some((root) => isWithinRoot(target, root)) ||
+          knowledgeReadRoots.some((root) => isWithinRootAllowingAliases(target, root)),
+      );
       if (allowedTargets.length === externalTargets.length) {
-        const matchingKnowledgeRoots = knowledgeReadRoots.filter((root) => (
-          externalTargets.some((target) => isWithinRootAllowingAliases(target, root))
-        ));
+        const matchingKnowledgeRoots = knowledgeReadRoots.filter((root) =>
+          externalTargets.some((target) => isWithinRootAllowingAliases(target, root)),
+        );
         return {
           action: 'allow',
           risk: 'low',
@@ -504,16 +519,30 @@ export class AgentPermissionPolicyService {
       return request(mode, `Shell command is not in the routine command set: ${command}`, 'medium');
     }
 
-    if (input.tool.effects?.writes?.length || input.tool.permissionHint === 'mutation' || input.tool.permissionHint === 'destructive') {
+    if (
+      input.tool.effects?.writes?.length ||
+      input.tool.permissionHint === 'mutation' ||
+      input.tool.permissionHint === 'destructive'
+    ) {
       const targets = [...reads, ...writes].map((target) => resolveToolTarget(target, workspaceRoot));
       const externalTargets = targets.filter((target) => !isInsideWorkspace(target, workspaceRoot));
       if (input.tool.effects?.writes?.length && externalTargets.length === 0 && targets.length > 0) {
         return writeClass.protectedTarget
-          ? request(mode, `Tool "${input.toolCall.name}" writes protected configuration or credential-related paths and requires specific authorization.`, 'high')
-          : request(mode, `Tool "${input.toolCall.name}" changes workspace files; runtime read-before-edit and path checks remain enforced.`, 'low');
+          ? request(
+              mode,
+              `Tool "${input.toolCall.name}" writes protected configuration or credential-related paths and requires specific authorization.`,
+              'high',
+            )
+          : request(
+              mode,
+              `Tool "${input.toolCall.name}" changes workspace files; runtime read-before-edit and path checks remain enforced.`,
+              'low',
+            );
       }
       if (mode === 'custom' && externalTargets.length > 0) {
-        const allowedTargets = externalTargets.filter((target) => configuredWritableRoots.some((root) => isWithinRoot(target, root)));
+        const allowedTargets = externalTargets.filter((target) =>
+          configuredWritableRoots.some((root) => isWithinRoot(target, root)),
+        );
         if (allowedTargets.length === externalTargets.length && !writeClass.protectedTarget) {
           return { action: 'allow', risk: 'medium', temporaryPathRoots: allowedTargets };
         }
@@ -529,12 +558,20 @@ export class AgentPermissionPolicyService {
     }
 
     if (input.tool.effects?.network) {
-      return request(mode, `Network tool "${input.toolCall.name}" requires approval: fetched content and requested URLs leave this machine.`, 'medium');
+      return request(
+        mode,
+        `Network tool "${input.toolCall.name}" requires approval: fetched content and requested URLs leave this machine.`,
+        'medium',
+      );
     }
 
     const access = toolAccessOf(toolName);
     if (access === 'mutate' || access === 'execute') {
-      return request(mode, `Tool "${input.toolCall.name}" ${access === 'execute' ? 'runs a process or external integration' : 'changes workspace or user resources'}.`, 'medium');
+      return request(
+        mode,
+        `Tool "${input.toolCall.name}" ${access === 'execute' ? 'runs a process or external integration' : 'changes workspace or user resources'}.`,
+        'medium',
+      );
     }
 
     return { action: 'allow', risk: 'low', temporaryPathRoots: [] };

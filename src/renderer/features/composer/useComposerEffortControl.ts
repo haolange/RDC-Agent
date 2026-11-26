@@ -31,7 +31,8 @@ export function useComposerEffortControl(options: {
 }) {
   const { open, disabled, menuRef, popupRef } = options;
   const { t } = useI18n();
-  const { turnControls, agentReasoning, capability, capabilityState, retryCapability, updateTurnControls } = useComposerTurnControls();
+  const { turnControls, agentReasoning, capability, capabilityState, retryCapability, updateTurnControls } =
+    useComposerTurnControls();
   const [dragRatio, setDragRatio] = useState<number | null>(null);
   const [snapLevel, setSnapLevel] = useState<ReasoningSelection | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -45,8 +46,10 @@ export function useComposerEffortControl(options: {
   const capabilityKey = capability ? `${capability.providerId}:${capability.modelId}` : 'pending';
   const displayLevels = useMemo(() => buildDisplaySelections(reasoningControl), [reasoningControl]);
   const displayLevelsKey = displayLevels.join('|');
-  const reasoningLockedDisabled = !reasoningControl || reasoningControl.kind === 'unknown' || reasoningControl.kind === 'none';
-  const hasAdjustableReasoning = !disabled && !reasoningLockedDisabled && displayLevels.length > 1 && reasoningControl.kind !== 'always-on';
+  const reasoningLockedDisabled =
+    !reasoningControl || reasoningControl.kind === 'unknown' || reasoningControl.kind === 'none';
+  const hasAdjustableReasoning =
+    !disabled && !reasoningLockedDisabled && displayLevels.length > 1 && reasoningControl.kind !== 'always-on';
   const selectedLevel = resolveSelectedLevel(turnControls.reasoningLevel, reasoningControl, displayLevels);
 
   useEffect(() => {
@@ -54,17 +57,13 @@ export function useComposerEffortControl(options: {
   }, [selectedLevel, snapLevel]);
 
   const validSnapLevel = snapLevel && displayLevels.includes(snapLevel) ? snapLevel : null;
-  const displayLevel = isDragging ? resolveNearestSnapLevel(dragRatio, displayLevels) : (validSnapLevel ?? selectedLevel);
+  const displayLevel = isDragging
+    ? resolveNearestSnapLevel(dragRatio, displayLevels)
+    : (validSnapLevel ?? selectedLevel);
   const displayIndex = Math.max(0, displayLevels.indexOf(displayLevel));
   const thumbRatio = isDragging ? clampSliderRatio(dragRatio) : getStopPosition(displayIndex, displayLevels.length);
-  const {
-    showMaxTrack,
-    exitingMaxPhase,
-    maxTimeline,
-    resetMaxVisual,
-    applyCommittedLevelVisual,
-    completeMaxTimeline,
-  } = useMaxVisualController({ open, isDragging, displayLevel, selectedLevel });
+  const { showMaxTrack, exitingMaxPhase, maxTimeline, resetMaxVisual, applyCommittedLevelVisual, completeMaxTimeline } =
+    useMaxVisualController({ open, isDragging, displayLevel, selectedLevel });
 
   useEffect(() => {
     setSnapLevel(null);
@@ -78,20 +77,30 @@ export function useComposerEffortControl(options: {
     resetMaxVisual();
   }, [capabilityKey, displayLevelsKey, resetMaxVisual]);
 
-  useEffect(() => () => {
-    if (pointerFrameRef.current) window.cancelAnimationFrame(pointerFrameRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (pointerFrameRef.current) window.cancelAnimationFrame(pointerFrameRef.current);
+    },
+    [],
+  );
 
-  const reasoningUnavailable = Boolean(capability && capabilityReady && (selectedLevel !== turnControls.reasoningLevel
-    || (reasoningControl?.kind === 'unknown' && agentReasoning === turnControls.reasoningLevel)));
+  const reasoningUnavailable = Boolean(
+    capability &&
+    capabilityReady &&
+    (selectedLevel !== turnControls.reasoningLevel ||
+      (reasoningControl?.kind === 'unknown' && agentReasoning === turnControls.reasoningLevel)),
+  );
   const effortLabel = reasoningUnavailable
     ? t('composer.effort.reasoningUnavailable', { level: t(EFFORT_LABEL_KEYS[turnControls.reasoningLevel]) })
     : t(reasoningLockedDisabled ? 'composer.effort.levelOff' : EFFORT_LABEL_KEYS[selectedLevel]);
   const tooltipLabel = t(reasoningLockedDisabled ? 'composer.effort.levelOff' : EFFORT_LABEL_KEYS[displayLevel]);
   const statusPresentation = capabilityStatusPresentation(capabilityState);
   const capabilityStateLabel = statusPresentation.labelKey ? t(statusPresentation.labelKey) : undefined;
-  const capabilityStateDetail = reasoningUnavailable ? t('composer.effort.reasoningUnavailableHint')
-    : statusPresentation.detailKey ? t(statusPresentation.detailKey) : undefined;
+  const capabilityStateDetail = reasoningUnavailable
+    ? t('composer.effort.reasoningUnavailableHint')
+    : statusPresentation.detailKey
+      ? t(statusPresentation.detailKey)
+      : undefined;
   const { maxContextStatusLabel, fastModelStatusLabel } = buildEffortCapabilityStatusLabels({
     capability,
     capabilityReady,
@@ -114,12 +123,15 @@ export function useComposerEffortControl(options: {
     Math.max(96, Math.ceil(tooltipLabel.length * 8 + 24)),
   );
 
-  const commitEffort = useCallback((level: ReasoningSelection) => {
-    if (!displayLevels.includes(level)) return;
-    setSnapLevel(level);
-    updateTurnControls({ reasoningLevel: level });
-    applyCommittedLevelVisual(level);
-  }, [applyCommittedLevelVisual, displayLevels, updateTurnControls]);
+  const commitEffort = useCallback(
+    (level: ReasoningSelection) => {
+      if (!displayLevels.includes(level)) return;
+      setSnapLevel(level);
+      updateTurnControls({ reasoningLevel: level });
+      applyCommittedLevelVisual(level);
+    },
+    [applyCommittedLevelVisual, displayLevels, updateTurnControls],
+  );
 
   return {
     turnControls,

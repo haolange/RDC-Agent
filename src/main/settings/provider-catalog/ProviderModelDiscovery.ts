@@ -6,9 +6,7 @@ import {
   getProviderRouteHeaders,
   loadProviderSurface,
 } from '../../provider-catalog/ProviderCatalogRegistry';
-import {
-  resolveProviderConnectionHeaders,
-} from '../provider-auth/ProviderConnectionSchema';
+import { resolveProviderConnectionHeaders } from '../provider-auth/ProviderConnectionSchema';
 import { resolveGoogleVertexAccessToken } from '../provider-auth/GoogleApplicationCredentials';
 import { createAwsBedrockRequestAuthorizer } from '../provider-auth/AwsBedrockCredentials';
 import { listSapAiCoreDeployments } from '../provider-auth/SapAiCoreCredentials';
@@ -61,10 +59,7 @@ import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type { ProviderSurfaceDefinition } from './providerCatalogTypes';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 
-type ManifestProjectedCatalogParser = (
-  payload: unknown,
-  surface: ProviderSurfaceDefinition,
-) => ParsedLiveCatalog;
+type ManifestProjectedCatalogParser = (payload: unknown, surface: ProviderSurfaceDefinition) => ParsedLiveCatalog;
 
 const MANIFEST_PROJECTED_CATALOG_PARSERS: Readonly<Record<string, ManifestProjectedCatalogParser>> = {
   'kimi-code-catalog': parseKimiCodeCatalog,
@@ -87,14 +82,28 @@ function resolveDiscoveryStrategy(
 ): string | null {
   if (!discovery) return null;
   const parserId = discovery.kind === 'custom-parser' ? discovery.parserId : undefined;
-  if (parserId === 'kimi-code-catalog' || parserId === 'openrouter-catalog' || parserId === 'opencode-go-catalog' || parserId === 'cline-catalog' || parserId === 'cline-pass-catalog' || parserId === 'google-vertex-models'
-    || parserId === 'gitlab-duo-direct-access' || parserId === 'sap-ai-core-deployments'
-    || parserId === 'volcengine-coding-plan-models') return parserId;
+  if (
+    parserId === 'kimi-code-catalog' ||
+    parserId === 'openrouter-catalog' ||
+    parserId === 'opencode-go-catalog' ||
+    parserId === 'cline-catalog' ||
+    parserId === 'cline-pass-catalog' ||
+    parserId === 'google-vertex-models' ||
+    parserId === 'gitlab-duo-direct-access' ||
+    parserId === 'sap-ai-core-deployments' ||
+    parserId === 'volcengine-coding-plan-models'
+  )
+    return parserId;
   if (parserId === 'freemodel-catalog') return parserId;
   if (parserId === 'google-ai-studio' || parserId === 'azure-deployment' || parserId === 'ollama-tags') return parserId;
-  if (parserId === 'anthropic' || parserId === 'anthropic-candidate-validation') return 'anthropic-candidate-validation';
+  if (parserId === 'anthropic' || parserId === 'anthropic-candidate-validation')
+    return 'anthropic-candidate-validation';
   if (parserId === 'openai-compatible') return 'openai-compatible';
-  if (protocol === 'OpenAICompatibleChatCompletions' || protocol === 'OpenAIResponses' || protocol === 'OpenRouterChatCompletions') {
+  if (
+    protocol === 'OpenAICompatibleChatCompletions' ||
+    protocol === 'OpenAIResponses' ||
+    protocol === 'OpenRouterChatCompletions'
+  ) {
     return 'openai-compatible';
   }
   if (protocol === 'AnthropicMessages') {
@@ -164,8 +173,8 @@ async function validateAnthropicCandidateModels(
   const validatedModels = toStaticModels(validModels);
   return managedModels.length > 0
     ? mergeManagedModelAvailability(managedModels, validatedModels, {
-      aliasesByModelId: buildManagedAliasIndex(provider.id),
-    })
+        aliasesByModelId: buildManagedAliasIndex(provider.id),
+      })
     : validatedModels;
 }
 
@@ -186,31 +195,27 @@ async function validateCodingPlanModels(
   });
   const discoveredModels = parseModelsPayload({ kind: 'custom-parser', parserId: 'openai-compatible' }, payload);
   const availableKeys = new Set(
-    discoveredModels.flatMap((model) => [
-      model.id.toLowerCase(),
-      normalizeCodingPlanModelMatchKey(model.id),
-    ]),
+    discoveredModels.flatMap((model) => [model.id.toLowerCase(), normalizeCodingPlanModelMatchKey(model.id)]),
   );
   const aliasesByModelId = buildManagedAliasIndex(providerId);
   const matchedIds = modelIds.filter((modelId) => {
     const aliases = aliasesByModelId.get(modelId) ?? [];
-    return [modelId, ...aliases].some((candidate) => (
-      availableKeys.has(candidate.toLowerCase())
-      || availableKeys.has(normalizeCodingPlanModelMatchKey(candidate))
-    ));
+    return [modelId, ...aliases].some(
+      (candidate) =>
+        availableKeys.has(candidate.toLowerCase()) || availableKeys.has(normalizeCodingPlanModelMatchKey(candidate)),
+    );
   });
   // Prefer full discovered payload for merge so alias/meta reasons stay accurate.
-  const validatedModels = matchedIds.length > 0
-    ? toStaticModels(matchedIds)
-    : discoveredModels;
+  const validatedModels = matchedIds.length > 0 ? toStaticModels(matchedIds) : discoveredModels;
   if (validatedModels.length === 0) {
     throw providerConnectionError('no-routable-models', 'The provider returned no models the agent can route to.');
   }
-  const mergedModels = managedModels.length > 0
-    ? mergeManagedModelAvailability(managedModels, discoveredModels.length > 0 ? discoveredModels : validatedModels, {
-      aliasesByModelId,
-    })
-    : validatedModels;
+  const mergedModels =
+    managedModels.length > 0
+      ? mergeManagedModelAvailability(managedModels, discoveredModels.length > 0 ? discoveredModels : validatedModels, {
+          aliasesByModelId,
+        })
+      : validatedModels;
   const models = selectAvailableCodingPlanModels(mergedModels);
   const filteredModelCount = mergedModels.length - models.length;
   return {
@@ -272,9 +277,7 @@ export async function discoverProviderModels(
   }
   const definition = await loadProviderSurface(provider.id);
   const catalogOwnership = getProviderCatalogOwnership(provider.id);
-  const managedModels = catalogOwnership !== 'user-managed'
-    ? requireManagedModels(provider.id)
-    : [];
+  const managedModels = catalogOwnership !== 'user-managed' ? requireManagedModels(provider.id) : [];
   if (provider.unavailableReason) {
     throw new ProviderConnectionError(provider.unavailableReason);
   }
@@ -283,11 +286,12 @@ export async function discoverProviderModels(
   }
   const authSchemaId = getProviderAuthSchemaId(provider.id);
   const hasCredentialResolver = authSchemaResolvesAmbientCredentials(authSchemaId);
-  const apiKey = provider.authMode === 'api-key'
-    ? authSchemaId === 'google-vertex' && !apiKeyDraft
-      ? await resolveGoogleVertexAccessToken(connectionValues.GOOGLE_APPLICATION_CREDENTIALS)
-      : apiKeyDraft
-    : '';
+  const apiKey =
+    provider.authMode === 'api-key'
+      ? authSchemaId === 'google-vertex' && !apiKeyDraft
+        ? await resolveGoogleVertexAccessToken(connectionValues.GOOGLE_APPLICATION_CREDENTIALS)
+        : apiKeyDraft
+      : '';
   if (provider.authMode === 'api-key' && !apiKey && !hasCredentialResolver) {
     throw providerConnectionError('api-key-required', 'An API key is required.');
   }
@@ -299,12 +303,9 @@ export async function discoverProviderModels(
     }
     throw providerConnectionError('discovery-missing', 'The provider has no model discovery configuration.');
   }
-  const baseUrl = (
-    baseUrlDraft
-    || provider.baseUrl
-    || getProviderDefaultBaseUrl(provider.id)
-    || ''
-  ).trim().replace(/\/+$/, '');
+  const baseUrl = (baseUrlDraft || provider.baseUrl || getProviderDefaultBaseUrl(provider.id) || '')
+    .trim()
+    .replace(/\/+$/, '');
   if (!baseUrl) {
     throw providerConnectionError('base-url-required', 'A base URL is required.');
   }
@@ -352,39 +353,39 @@ export async function discoverProviderModels(
       ? deployments.some((deployment) => deployment.id === requestedDeploymentId)
       : deployments.length > 0;
     if (!admitted) {
-      throw new ProviderConnectionError(requestedDeploymentId
-        ? `SAP AI Core deployment ${requestedDeploymentId} is not RUNNING for this route.`
-        : 'SAP AI Core returned no RUNNING deployment for this route.');
+      throw new ProviderConnectionError(
+        requestedDeploymentId
+          ? `SAP AI Core deployment ${requestedDeploymentId} is not RUNNING for this route.`
+          : 'SAP AI Core returned no RUNNING deployment for this route.',
+      );
     }
     return { models: managedModels };
   }
-  const candidateModelIds = catalogOwnership !== 'user-managed'
-    ? managedModels.map((model) => model.id)
-    : provider.recommendedModels;
+  const candidateModelIds =
+    catalogOwnership !== 'user-managed' ? managedModels.map((model) => model.id) : provider.recommendedModels;
   const manifestProjectedParser = MANIFEST_PROJECTED_CATALOG_PARSERS[strategy];
   if (manifestProjectedParser) {
-    const headers = strategy === 'kimi-code-catalog'
-      ? {
-          Authorization: 'Bearer ' + apiKey,
-          'User-Agent': 'RDC-Agent',
-          ...resolveProviderConnectionHeaders(provider.connectionSchema, connectionValues),
-        }
-      : createDiscoveryHeaders(provider, apiKey, connectionValues);
+    const headers =
+      strategy === 'kimi-code-catalog'
+        ? {
+            Authorization: 'Bearer ' + apiKey,
+            'User-Agent': 'RDC-Agent',
+            ...resolveProviderConnectionHeaders(provider.connectionSchema, connectionValues),
+          }
+        : createDiscoveryHeaders(provider, apiKey, connectionValues);
     // Cline catalog list endpoints are public; probe /users/me so fake keys fail closed.
     if (strategy === 'cline-catalog' || strategy === 'cline-pass-catalog') {
       await getJson(resolveClineCredentialProbeUrl(baseUrl), { method: 'GET', headers });
     }
-    const url = strategy === 'kimi-code-catalog'
-      ? resolveCodingPlanModelsUrl(baseUrl)
-      : strategy === 'cline-catalog'
-        ? resolveClineCatalogUrl(baseUrl, 'usage')
-        : strategy === 'cline-pass-catalog'
-          ? resolveClineCatalogUrl(baseUrl, 'pass')
-          : appendPath(baseUrl, '/models');
-    const parsed = manifestProjectedParser(
-      await getJson(url, { method: 'GET', headers }),
-      definition,
-    );
+    const url =
+      strategy === 'kimi-code-catalog'
+        ? resolveCodingPlanModelsUrl(baseUrl)
+        : strategy === 'cline-catalog'
+          ? resolveClineCatalogUrl(baseUrl, 'usage')
+          : strategy === 'cline-pass-catalog'
+            ? resolveClineCatalogUrl(baseUrl, 'pass')
+            : appendPath(baseUrl, '/models');
+    const parsed = manifestProjectedParser(await getJson(url, { method: 'GET', headers }), definition);
     return {
       models: requireModels(parsed.models),
       contributions: parsed.contributions,
@@ -417,12 +418,7 @@ export async function discoverProviderModels(
       const admitted = requireModels(parseGoogleVertexPublisherModels(payload, 'anthropic'));
       return {
         models: admitted,
-        contributions: projectGoogleVertexModelRoutes(
-          admitted,
-          baseUrl,
-          '',
-          'GoogleVertexAnthropic',
-        ),
+        contributions: projectGoogleVertexModelRoutes(admitted, baseUrl, '', 'GoogleVertexAnthropic'),
       };
     }
     const modelsBaseUrl = resolveGoogleVertexOpenAiBaseUrl(baseUrl);
@@ -431,24 +427,18 @@ export async function discoverProviderModels(
       headers: createDiscoveryHeaders(provider, apiKey, connectionValues),
     });
     const discovered = parseModelsPayload({ kind: 'custom-parser', parserId: 'openai-compatible' }, payload);
-    const models = provider.protocol === 'GoogleVertexGemini'
-      ? discovered.filter((model) => model.id.toLowerCase().includes('gemini'))
-      : discovered;
+    const models =
+      provider.protocol === 'GoogleVertexGemini'
+        ? discovered.filter((model) => model.id.toLowerCase().includes('gemini'))
+        : discovered;
     const admitted = requireModels(models);
     return {
       models: admitted,
-      contributions: projectGoogleVertexModelRoutes(
-        admitted,
-        baseUrl,
-        modelsBaseUrl,
-        'GoogleVertexGemini',
-      ),
+      contributions: projectGoogleVertexModelRoutes(admitted, baseUrl, modelsBaseUrl, 'GoogleVertexGemini'),
     };
   }
   const surfaceDiscoveryStrategy = definition.discovery.strategy;
-  const declarativeDiscovery = surfaceDiscoveryStrategy?.kind === 'json-catalog'
-    ? surfaceDiscoveryStrategy
-    : null;
+  const declarativeDiscovery = surfaceDiscoveryStrategy?.kind === 'json-catalog' ? surfaceDiscoveryStrategy : null;
   if (declarativeDiscovery) {
     const url = resolveDeclarativeDiscoveryUrl(declarativeDiscovery, baseUrl);
     const payload = await getJson(url, {
@@ -459,12 +449,14 @@ export async function discoverProviderModels(
       },
     });
     const parsedModels = parseDeclarativeCatalog(declarativeDiscovery, payload);
-    const discoveredModels = requireModels(parsedModels.map((model) => ({
-      id: model.id,
-      label: model.label,
-      enabled: true,
-      aliases: model.aliases,
-    })));
+    const discoveredModels = requireModels(
+      parsedModels.map((model) => ({
+        id: model.id,
+        label: model.label,
+        enabled: true,
+        aliases: model.aliases,
+      })),
+    );
     const fallbackRoute = {
       protocol: provider.protocol,
       baseUrl,
@@ -472,11 +464,12 @@ export async function discoverProviderModels(
     const contributions = toDeclarativeCatalogContributions(parsedModels, fallbackRoute);
     const authoritative = definition.discovery.authority === 'authoritative-list';
     return {
-      models: catalogOwnership !== 'user-managed' && !authoritative
-        ? mergeManagedModelAvailability(managedModels, discoveredModels, {
-          aliasesByModelId: buildManagedAliasIndex(provider.id),
-        })
-        : discoveredModels,
+      models:
+        catalogOwnership !== 'user-managed' && !authoritative
+          ? mergeManagedModelAvailability(managedModels, discoveredModels, {
+              aliasesByModelId: buildManagedAliasIndex(provider.id),
+            })
+          : discoveredModels,
       contributions,
     };
   }
@@ -487,7 +480,16 @@ export async function discoverProviderModels(
     return validateCodingPlanModels(provider.id, apiKey, baseUrl, candidateModelIds, managedModels);
   }
   if (strategy === 'anthropic-candidate-validation') {
-    return { models: await validateAnthropicCandidateModels(provider, apiKey, baseUrl, candidateModelIds, managedModels, connectionValues) };
+    return {
+      models: await validateAnthropicCandidateModels(
+        provider,
+        apiKey,
+        baseUrl,
+        candidateModelIds,
+        managedModels,
+        connectionValues,
+      ),
+    };
   }
   if (strategy === 'azure-deployment') {
     return { models: await validateAzureCandidateModels(apiKey, baseUrl, candidateModelIds, managedModels) };
@@ -498,11 +500,12 @@ export async function discoverProviderModels(
     });
     const discoveredModels = requireModels(parseModelsPayload(strategy, payload));
     return {
-      models: catalogOwnership !== 'user-managed'
-        ? mergeManagedModelAvailability(managedModels, discoveredModels, {
-        aliasesByModelId: buildManagedAliasIndex(provider.id),
-        })
-        : discoveredModels,
+      models:
+        catalogOwnership !== 'user-managed'
+          ? mergeManagedModelAvailability(managedModels, discoveredModels, {
+              aliasesByModelId: buildManagedAliasIndex(provider.id),
+            })
+          : discoveredModels,
     };
   }
   const headers = createDiscoveryHeaders(provider, apiKey, connectionValues);
@@ -516,11 +519,12 @@ export async function discoverProviderModels(
   });
   const discoveredModels = requireModels(parseModelsPayload(strategy, payload));
   return {
-    models: catalogOwnership !== 'user-managed'
-      ? mergeManagedModelAvailability(managedModels, discoveredModels, {
-      aliasesByModelId: buildManagedAliasIndex(provider.id),
-      })
-      : discoveredModels,
+    models:
+      catalogOwnership !== 'user-managed'
+        ? mergeManagedModelAvailability(managedModels, discoveredModels, {
+            aliasesByModelId: buildManagedAliasIndex(provider.id),
+          })
+        : discoveredModels,
   };
 }
 
@@ -536,11 +540,19 @@ async function discoverOllamaInstalledModels(
 ): Promise<ModelDiscoveryResult> {
   const tags = await getJson(appendPath(origin, '/api/tags'), { method: 'GET', headers });
   const names = parseModelsPayload('ollama-tags', tags).map((model) => model.id);
-  const shows = await Promise.allSettled(names.map(async (name) => [name, await getJson(appendPath(origin, '/api/show'), {
-    method: 'POST',
-    headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: name }),
-  })] as const));
+  const shows = await Promise.allSettled(
+    names.map(
+      async (name) =>
+        [
+          name,
+          await getJson(appendPath(origin, '/api/show'), {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: name }),
+          }),
+        ] as const,
+    ),
+  );
   const parsed = parseOllamaInstalledModels(
     tags,
     new Map(shows.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))),

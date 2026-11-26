@@ -53,7 +53,8 @@ export const enContextBreakdown = {
   'contextBreakdown.preparing': 'Preparing',
   'contextBreakdown.windowPending': 'Building request window',
   'contextBreakdown.windowPendingAria': 'Request window is pending while the full history is processed',
-  'contextBreakdown.windowPendingNote': 'This is the full history estimate. The actual request updates after the window is built.',
+  'contextBreakdown.windowPendingNote':
+    'This is the full history estimate. The actual request updates after the window is built.',
   'contextBreakdown.currentRequestAria': 'Current request prepared context usage {percent}%',
   'contextBreakdown.actualAria': 'Actual provider context usage {percent}%',
   'contextBreakdown.lastActualAria': 'Last actual context usage {percent}%',

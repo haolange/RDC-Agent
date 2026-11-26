@@ -65,34 +65,45 @@ export function ExportKnowledgeDialog({ exporter, spaces }: ExportKnowledgeDialo
       closeLabel={t('knowledgeCenter.confirmCancel')}
       busy={exporter.busy}
       dataTestId="knowledge-center-export"
-      footer={exporter.result ? (
-        <Button variant="primary" onClick={exporter.close}>{t('knowledgeCenter.importDone')}</Button>
-      ) : (
-        <>
-          {exporter.operation.running ? <KnowledgeTaskProgress operation="export" progress={exporter.operation.progress} />
-            : exporter.busy ? <KnowledgeTaskProgress label={t('knowledgeCenter.progressExporting')} />
-              : exporter.cancelled ? <KnowledgeTaskCancelled label={t('knowledgeCenter.exportCancelled')} />
-                : null}
-          {exporter.operation.running ? (
-            <Button variant="secondary" loading={exporter.operation.cancelling} data-testid="knowledge-center-export-cancel"
-              onClick={exporter.cancelExport}>
-              {t('knowledgeCenter.cancelTask')}
-            </Button>
-          ) : (
-            <Button variant="ghost" disabled={exporter.busy} onClick={exporter.close}>
-              {t('knowledgeCenter.confirmCancel')}
-            </Button>
-          )}
-          <Button
-            variant="primary"
-            disabled={exporter.busy || exporter.pendingCount === 0}
-            data-testid="knowledge-center-export-run"
-            onClick={() => void exporter.run()}
-          >
-            {t('knowledgeCenter.exportRun')}
+      footer={
+        exporter.result ? (
+          <Button variant="primary" onClick={exporter.close}>
+            {t('knowledgeCenter.importDone')}
           </Button>
-        </>
-      )}
+        ) : (
+          <>
+            {exporter.operation.running ? (
+              <KnowledgeTaskProgress operation="export" progress={exporter.operation.progress} />
+            ) : exporter.busy ? (
+              <KnowledgeTaskProgress label={t('knowledgeCenter.progressExporting')} />
+            ) : exporter.cancelled ? (
+              <KnowledgeTaskCancelled label={t('knowledgeCenter.exportCancelled')} />
+            ) : null}
+            {exporter.operation.running ? (
+              <Button
+                variant="secondary"
+                loading={exporter.operation.cancelling}
+                data-testid="knowledge-center-export-cancel"
+                onClick={exporter.cancelExport}
+              >
+                {t('knowledgeCenter.cancelTask')}
+              </Button>
+            ) : (
+              <Button variant="ghost" disabled={exporter.busy} onClick={exporter.close}>
+                {t('knowledgeCenter.confirmCancel')}
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              disabled={exporter.busy || exporter.pendingCount === 0}
+              data-testid="knowledge-center-export-run"
+              onClick={() => void exporter.run()}
+            >
+              {t('knowledgeCenter.exportRun')}
+            </Button>
+          </>
+        )
+      }
     >
       {exporter.result ? (
         <div className="knowledge-export-result" data-testid="knowledge-center-export-result">
@@ -106,13 +117,7 @@ export function ExportKnowledgeDialog({ exporter, spaces }: ExportKnowledgeDialo
         </div>
       ) : (
         <>
-          {radioGroup(
-            'scope',
-            scopeOptions,
-            exporter.scope,
-            exporter.setScope,
-            t('knowledgeCenter.exportScope'),
-          )}
+          {radioGroup('scope', scopeOptions, exporter.scope, exporter.setScope, t('knowledgeCenter.exportScope'))}
 
           {exporter.scope === 'selected' ? (
             <div className="knowledge-export-picker" data-testid="knowledge-center-export-picker">
@@ -124,10 +129,20 @@ export function ExportKnowledgeDialog({ exporter, spaces }: ExportKnowledgeDialo
                   aria-label={t('knowledgeCenter.exportPickerSearch')}
                   disabled={exporter.busy}
                 />
-                <Button variant="ghost" size="sm" disabled={exporter.busy || exporter.pickable.length === 0} onClick={exporter.pickAll}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={exporter.busy || exporter.pickable.length === 0}
+                  onClick={exporter.pickAll}
+                >
                   {t('knowledgeCenter.exportPickAll')}
                 </Button>
-                <Button variant="ghost" size="sm" disabled={exporter.busy || exporter.picked.size === 0} onClick={exporter.clearPicked}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={exporter.busy || exporter.picked.size === 0}
+                  onClick={exporter.clearPicked}
+                >
                   {t('knowledgeCenter.exportPickNone')}
                 </Button>
               </div>
@@ -142,7 +157,9 @@ export function ExportKnowledgeDialog({ exporter, spaces }: ExportKnowledgeDialo
                     />
                   </li>
                 ))}
-                {exporter.pickable.length === 0 ? <li className="knowledge-export-picker-empty">{t('knowledgeCenter.exportPickerEmpty')}</li> : null}
+                {exporter.pickable.length === 0 ? (
+                  <li className="knowledge-export-picker-empty">{t('knowledgeCenter.exportPickerEmpty')}</li>
+                ) : null}
               </ul>
             </div>
           ) : null}
@@ -156,21 +173,22 @@ export function ExportKnowledgeDialog({ exporter, spaces }: ExportKnowledgeDialo
                 value={exporter.spaceId}
                 disabled={exporter.busy}
                 onChange={exporter.setSpaceId}
-                options={spaces.map((space) => ({ value: space.spaceId, label: space.kind === 'user' ? t('knowledgeCenter.userSpace') : space.label }))}
+                options={spaces.map((space) => ({
+                  value: space.spaceId,
+                  label: space.kind === 'user' ? t('knowledgeCenter.userSpace') : space.label,
+                }))}
               />
             </label>
           ) : null}
 
-          {radioGroup(
-            'format',
-            formatOptions,
-            exporter.format,
-            exporter.setFormat,
-            t('knowledgeCenter.exportFormat'),
-          )}
+          {radioGroup('format', formatOptions, exporter.format, exporter.setFormat, t('knowledgeCenter.exportFormat'))}
 
           <p className="knowledge-write-hint">{t('knowledgeCenter.exportLocationHint')}</p>
-          {exporter.error ? <InlineError detail={exporter.error}>{humanizeError(exporter.error, t, 'app.error.actionFailed')}</InlineError> : null}
+          {exporter.error ? (
+            <InlineError detail={exporter.error}>
+              {humanizeError(exporter.error, t, 'app.error.actionFailed')}
+            </InlineError>
+          ) : null}
         </>
       )}
     </TaskDialog>

@@ -18,7 +18,15 @@ const OUTLINE_MIN_ENTRIES = 3;
  * where it applies. The claim is the lead sentence under the title, not a section of its own.
  */
 const CASE_READING_ORDER: readonly KnowledgeCaseChapter[] = [
-  'symptoms', 'evidence', 'rootCause', 'fix', 'experimentVerification', 'derived', 'negative', 'openChallenges', 'scopeExclusions',
+  'symptoms',
+  'evidence',
+  'rootCause',
+  'fix',
+  'experimentVerification',
+  'derived',
+  'negative',
+  'openChallenges',
+  'scopeExclusions',
 ];
 
 const sameText = (left: string, right: string) => left.replace(/\s+/gu, '') === right.replace(/\s+/gu, '');
@@ -36,10 +44,16 @@ function CaseChapters({ card, chapters }: { card: KnowledgeCardDetail; chapters:
     </section>
   );
 
-  return chapters.length === 1 ? section : (
-    <Tabs className="knowledge-case-tabs" label={t('knowledgeCenter.outline')}
+  return chapters.length === 1 ? (
+    section
+  ) : (
+    <Tabs
+      className="knowledge-case-tabs"
+      label={t('knowledgeCenter.outline')}
       tabs={chapters.map((entry) => ({ id: entry, label: t(CHAPTER_LABEL_KEYS[entry]) }))}
-      value={chapter} onChange={setSelected}>
+      value={chapter}
+      onChange={setSelected}
+    >
       {section}
     </Tabs>
   );
@@ -49,27 +63,45 @@ function CaseChapters({ card, chapters }: { card: KnowledgeCardDetail; chapters:
 export function KnowledgeCardDocument({ card }: { card: KnowledgeCardDetail }) {
   const { t } = useI18n();
   const textRef = useRef<HTMLDivElement>(null);
-  const chapters = card.type === 'case' && card.chapters
-    ? CASE_READING_ORDER.filter((chapter) => hasReadableCaseChapter(card.chapters?.[chapter]))
-    : null;
+  const chapters =
+    card.type === 'case' && card.chapters
+      ? CASE_READING_ORDER.filter((chapter) => hasReadableCaseChapter(card.chapters?.[chapter]))
+      : null;
   const claim = card.chapters?.claim?.trim();
   const lead = claim && !sameText(claim, card.title) ? claim : null;
   const body = !chapters?.length ? bodyWithoutTitle(card.body, card.title) : '';
-  const outline = markdownOutline(body).filter((heading) => heading.level <= 3).map((heading) => heading.title);
+  const outline = markdownOutline(body)
+    .filter((heading) => heading.level <= 3)
+    .map((heading) => heading.title);
   const jumpTo = (index: number) => {
-    textRef.current?.querySelectorAll('h1, h2, h3')[index]
-      ?.scrollIntoView({ block: 'start', behavior: motionScrollBehavior() });
+    textRef.current
+      ?.querySelectorAll('h1, h2, h3')
+      [index]?.scrollIntoView({ block: 'start', behavior: motionScrollBehavior() });
   };
 
   return (
     <div className="knowledge-center-document">
       {lead ? <p className="knowledge-case-claim">{lead}</p> : null}
-      {card.images?.length ? <KnowledgeCardImages key={JSON.stringify(['images', card.spaceId, card.cardId])}
-        spaceId={card.spaceId} images={card.images} /> : null}
+      {card.images?.length ? (
+        <KnowledgeCardImages
+          key={JSON.stringify(['images', card.spaceId, card.cardId])}
+          spaceId={card.spaceId}
+          images={card.images}
+        />
+      ) : null}
       {outline.length >= OUTLINE_MIN_ENTRIES ? (
-        <nav className="knowledge-center-chapters" aria-label={t('knowledgeCenter.outline')} data-testid="knowledge-center-chapters">
+        <nav
+          className="knowledge-center-chapters"
+          aria-label={t('knowledgeCenter.outline')}
+          data-testid="knowledge-center-chapters"
+        >
           {outline.map((label, index) => (
-            <button key={`${label}:${index}`} type="button" className="knowledge-center-outline-link" onClick={() => jumpTo(index)}>
+            <button
+              key={`${label}:${index}`}
+              type="button"
+              className="knowledge-center-outline-link"
+              onClick={() => jumpTo(index)}
+            >
               {label}
             </button>
           ))}

@@ -35,5 +35,10 @@ export function useKnowledgeOverview(setError: (error: string | null) => void) {
     setLoadingOverview(false);
   }, []);
 
-  return { overviewSeq, setSelectedSpaceIds, stopOverview, view: { spaces, index, selectedSpaceIds, loadingOverview, refreshOverview, toggleSpace } };
+  return {
+    overviewSeq,
+    setSelectedSpaceIds,
+    stopOverview,
+    view: { spaces, index, selectedSpaceIds, loadingOverview, refreshOverview, toggleSpace },
+  };
 }

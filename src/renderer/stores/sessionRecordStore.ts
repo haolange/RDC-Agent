@@ -27,7 +27,10 @@ export function isNewerSessionRevision(next: SessionRevision, current: SessionRe
   return !current || next.epoch !== current.epoch || next.n > current.n;
 }
 
-function composeView(snapshot: SessionRecordSnapshot | undefined, pending: PendingFields | undefined): SessionRecord | undefined {
+function composeView(
+  snapshot: SessionRecordSnapshot | undefined,
+  pending: PendingFields | undefined,
+): SessionRecord | undefined {
   if (!snapshot) return undefined;
   const fields = pending ? Object.entries(pending) : [];
   if (fields.length === 0) return snapshot.record;
@@ -77,15 +80,18 @@ export const useSessionRecordStore = create<SessionRecordState>((set) => ({
     });
     return intentId;
   },
-  settleIntent: (sessionId, intentId) => set((state) => {
-    const current = state.pending[sessionId];
-    if (!current || !Object.values(current).some((entry) => entry.intentId === intentId)) return state;
-    const fields = Object.fromEntries(Object.entries(current).filter(([, entry]) => entry.intentId !== intentId)) as PendingFields;
-    const pending = { ...state.pending };
-    if (Object.keys(fields).length > 0) pending[sessionId] = fields;
-    else delete pending[sessionId];
-    return { pending, views: withView({ ...state, pending }, sessionId) };
-  }),
+  settleIntent: (sessionId, intentId) =>
+    set((state) => {
+      const current = state.pending[sessionId];
+      if (!current || !Object.values(current).some((entry) => entry.intentId === intentId)) return state;
+      const fields = Object.fromEntries(
+        Object.entries(current).filter(([, entry]) => entry.intentId !== intentId),
+      ) as PendingFields;
+      const pending = { ...state.pending };
+      if (Object.keys(fields).length > 0) pending[sessionId] = fields;
+      else delete pending[sessionId];
+      return { pending, views: withView({ ...state, pending }, sessionId) };
+    }),
   reset: () => set({ records: {}, pending: {}, views: {} }),
 }));
 
@@ -100,7 +106,7 @@ export function receiveSessionList(snapshots: readonly SessionRecordSnapshot[]):
 }
 
 export function getSessionView(sessionId: string | null | undefined): SessionRecord | null {
-  return sessionId ? useSessionRecordStore.getState().views[sessionId] ?? null : null;
+  return sessionId ? (useSessionRecordStore.getState().views[sessionId] ?? null) : null;
 }
 
 export function getCurrentSessionView(): SessionRecord | null {
@@ -109,7 +115,7 @@ export function getCurrentSessionView(): SessionRecord | null {
 
 /** The session as main last wrote it, with the person's in-flight intents on top. */
 export function useSessionView(sessionId: string | null | undefined): SessionRecord | null {
-  return useSessionRecordStore((state) => (sessionId ? state.views[sessionId] ?? null : null));
+  return useSessionRecordStore((state) => (sessionId ? (state.views[sessionId] ?? null) : null));
 }
 
 export function useCurrentSessionView(): SessionRecord | null {

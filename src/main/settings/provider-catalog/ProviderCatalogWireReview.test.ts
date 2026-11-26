@@ -2,15 +2,19 @@ import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import { compileProviderCatalog } from '../../provider-catalog/catalogCompiler';
 import { loadProviderCatalogManifestInput } from '../../provider-catalog/manifestLoader';
-import { applyAnthropicReasoning, applyOpenAiCompatibleReasoning, buildOpenAiResponsesReasoning } from '../../agent-runtime/providers/reasoningWire';
+import {
+  applyAnthropicReasoning,
+  applyOpenAiCompatibleReasoning,
+  buildOpenAiResponsesReasoning,
+} from '../../agent-runtime/providers/reasoningWire';
 import { applyRequestPlanBody } from '../../agent-runtime/providers/requestPlanWire';
 import { planModelRequest } from './RequestPlanner';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 
-const catalog = compileProviderCatalog(loadProviderCatalogManifestInput(
-  resolve(__dirname, '../../../shared/provider-catalog/manifests'),
-));
+const catalog = compileProviderCatalog(
+  loadProviderCatalogManifestInput(resolve(__dirname, '../../../shared/provider-catalog/manifests')),
+);
 
 function effective(providerId: string, modelId: string, protocol?: LlmProviderProtocol): EffectiveModel {
   const surface = catalog.surfaces.get(providerId)!.surface;
@@ -20,7 +24,10 @@ function effective(providerId: string, modelId: string, protocol?: LlmProviderPr
   const reasoning = overlay?.patch.controls?.reasoning ?? definition.controls.reasoning;
   return {
     ...definition,
-    providerId, enabled: true, availability: 'available', provenance: [],
+    providerId,
+    enabled: true,
+    availability: 'available',
+    provenance: [],
     route: { ...route, source: 'catalog' },
     routeOptions: undefined,
     controls: {
@@ -75,7 +82,11 @@ describe('reviewed provider catalog request paths', () => {
     expect(planModelRequest({ model: subscription, controls: { fastModel: true } }).ok).toBe(false);
     subscription.controls.fast = { state: 'selectable', defaultValue: false, entitlement: 'granted' };
     const target = effective('grok-account', 'grok-4.7-build-fast');
-    const account = planModelRequest({ model: subscription, catalogModels: [subscription, target], controls: { fastModel: true } });
+    const account = planModelRequest({
+      model: subscription,
+      catalogModels: [subscription, target],
+      controls: { fastModel: true },
+    });
     expect(account.ok).toBe(true);
     if (!account.ok) throw new Error(account.message);
     expect(account.plan.fastMode).toBe(true);
@@ -133,12 +144,18 @@ describe('reviewed provider catalog request paths', () => {
     const model = effective(surfaceId, 'gpt-6.2-astra');
     expect(model.route.protocol).toBe('OpenAIResponses');
     expect(model.contextTiers[0]).toMatchObject({
-      maxPromptTokens: 922_000, maxOutputTokens: 128_000, maxTotalTokens: 1_050_000,
+      maxPromptTokens: 922_000,
+      maxOutputTokens: 128_000,
+      maxTotalTokens: 1_050_000,
     });
     const result = planModelRequest({ model, controls: { reasoningLevel: 'xhigh', fastModel: true } });
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.message);
-    expect(wire(result.plan)).toMatchObject({ model: 'gpt-6.2-astra', reasoning: { effort: 'xhigh' }, service_tier: 'fast' });
+    expect(wire(result.plan)).toMatchObject({
+      model: 'gpt-6.2-astra',
+      reasoning: { effort: 'xhigh' },
+      service_tier: 'fast',
+    });
     expect(wire(result.plan)).not.toHaveProperty('temperature');
     expect(wire(result.plan)).not.toHaveProperty('top_p');
   });
@@ -164,11 +181,17 @@ describe('reviewed provider catalog request paths', () => {
   });
 
   it('uses Claude Fable 5.2 adaptive thinking and GA Fast without the legacy beta header', () => {
-    const result = planModelRequest({ model: effective('anthropic', 'claude-fable-5-2'), controls: { fastModel: true } });
+    const result = planModelRequest({
+      model: effective('anthropic', 'claude-fable-5-2'),
+      controls: { fastModel: true },
+    });
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.message);
     expect(wire(result.plan)).toMatchObject({
-      model: 'claude-fable-5-2', thinking: { type: 'adaptive' }, output_config: { effort: 'high' }, speed: 'fast',
+      model: 'claude-fable-5-2',
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'high' },
+      speed: 'fast',
     });
     expect(wire(result.plan)).not.toHaveProperty('temperature');
     expect(wire(result.plan)).not.toHaveProperty('top_p');

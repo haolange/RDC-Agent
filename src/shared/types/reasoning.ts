@@ -21,10 +21,7 @@ export type ThinkingArtifactSource = ProviderThinkingProjectionSource;
 type ContinuationArtifactRequirement = 'optional' | 'required';
 type ContinuationArtifactScope = ProviderContractBundle['toolLoop']['artifactScope'];
 export type ContinuationArtifactMutationPolicy =
-  | 'verbatim'
-  | 'verbatim-ordered'
-  | 'container-bound'
-  | 'provider-managed';
+  'verbatim' | 'verbatim-ordered' | 'container-bound' | 'provider-managed';
 
 export interface ContinuationArtifactMetadata {
   type: string;
@@ -55,5 +52,11 @@ export interface ThinkingArtifact {
  */
 export interface ReasoningEventSummary {
   events: Record<string, number>;
-  summaryParts: Array<{ itemKey: string; index: number; streamedChars: number; completedChars?: number; recovered: boolean }>;
+  summaryParts: Array<{
+    itemKey: string;
+    index: number;
+    streamedChars: number;
+    completedChars?: number;
+    recovered: boolean;
+  }>;
 }

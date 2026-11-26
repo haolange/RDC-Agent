@@ -64,7 +64,15 @@ export const grepTool: AgentTool<GrepParams, GrepDetails> = {
     },
     required: ['pattern'],
   },
-  spec: { isReadOnly: true, concurrency: 'shared', isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false, knowledgeRoots: 'read-access' },
+  spec: {
+    isReadOnly: true,
+    concurrency: 'shared',
+    isDestructive: false,
+    sideEffect: 'none',
+    category: 'search',
+    requiresApproval: false,
+    knowledgeRoots: 'read-access',
+  },
   permissionHint: 'readonly',
   effects: { reads: ['cwd', 'path'] },
 
@@ -87,12 +95,10 @@ export const grepTool: AgentTool<GrepParams, GrepDetails> = {
       throw new Error(`Unsupported path type: ${root}`);
     }
 
-    const rawText = matches.length > 0
-      ? matches.join('\n')
-      : `(no matches for pattern "${params.pattern}")`;
+    const rawText = matches.length > 0 ? matches.join('\n') : `(no matches for pattern "${params.pattern}")`;
     const text = truncateOutput(rawText, GREP_MAX_OUTPUT_BYTES);
-    const truncated = output.clippedLine || matches.length >= maxMatches
-      || Buffer.byteLength(rawText, 'utf8') > GREP_MAX_OUTPUT_BYTES;
+    const truncated =
+      output.clippedLine || matches.length >= maxMatches || Buffer.byteLength(rawText, 'utf8') > GREP_MAX_OUTPUT_BYTES;
 
     return {
       content: [{ type: 'text', text }],
@@ -138,7 +144,8 @@ async function walkAndSearch(
     if (matches.length >= maxMatches) return;
     const absolute = path.join(current, entry.name);
     if (entry.isDirectory()) {
-      if (!DEFAULT_IGNORED_DIRS.has(entry.name)) await walkAndSearch(absolute, workspaceRoot, regex, matches, matchedFiles, maxMatches, output, signal);
+      if (!DEFAULT_IGNORED_DIRS.has(entry.name))
+        await walkAndSearch(absolute, workspaceRoot, regex, matches, matchedFiles, maxMatches, output, signal);
     } else if (entry.isFile()) {
       await searchFile(absolute, workspaceRoot, regex, matches, matchedFiles, maxMatches, output, signal);
     }

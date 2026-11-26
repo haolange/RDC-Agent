@@ -8,12 +8,27 @@ import type { StorageIo } from '../../runtime/StorageIo';
 
 vi.mock('electron', () => ({ app: {} }));
 const roots: string[] = [];
-afterEach(async () => { await Promise.all(roots.splice(0).map(root => fs.rm(root, { recursive: true, force: true }))); });
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })));
+});
 async function setup() {
-  const rootPath = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-input-scan-')); roots.push(rootPath);
-  const inputsPath = path.join(rootPath, '.rdc-agent', 'inputs'); await fs.mkdir(inputsPath, { recursive: true });
-  const project: ProjectRecord = { projectId: 'project', name: 'project', rootPath, inputsPath, resourcePath: path.dirname(inputsPath),
-    knowledgePath: '', slug: 'project', inputsUpdatedAt: 1, createdAt: 1, updatedAt: 1, inputs: [] };
+  const rootPath = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-input-scan-'));
+  roots.push(rootPath);
+  const inputsPath = path.join(rootPath, '.rdc-agent', 'inputs');
+  await fs.mkdir(inputsPath, { recursive: true });
+  const project: ProjectRecord = {
+    projectId: 'project',
+    name: 'project',
+    rootPath,
+    inputsPath,
+    resourcePath: path.dirname(inputsPath),
+    knowledgePath: '',
+    slug: 'project',
+    inputsUpdatedAt: 1,
+    createdAt: 1,
+    updatedAt: 1,
+    inputs: [],
+  };
   const store = new ProjectWorkspaceStore({} as StorageIo);
   vi.spyOn(store, 'getProjectById').mockReturnValue(project);
   const persist = vi.spyOn(store, 'persistProject').mockImplementation(() => undefined);
@@ -30,18 +45,27 @@ describe('Project input complete scans', () => {
   });
   it('persists and restores an exact external reference without copying it, then detaches it', async () => {
     const { store, project, persist } = await setup();
-    const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-reference-source-')); roots.push(sourceRoot);
-    const source = path.join(sourceRoot, 'original.rdc'); await fs.writeFile(source, 'RDOCsmall fixture');
+    const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'rdc-reference-source-'));
+    roots.push(sourceRoot);
+    const source = path.join(sourceRoot, 'original.rdc');
+    await fs.writeFile(source, 'RDOCsmall fixture');
     let durable = structuredClone(project);
-    vi.mocked(store.getProjectById).mockImplementation(id => id === project.projectId ? structuredClone(durable) : null);
-    persist.mockImplementation(next => { durable = structuredClone(next); });
+    vi.mocked(store.getProjectById).mockImplementation((id) =>
+      id === project.projectId ? structuredClone(durable) : null,
+    );
+    persist.mockImplementation((next) => {
+      durable = structuredClone(next);
+    });
     const first = await store.referenceProjectInput(project.projectId, source);
-    expect(first).toHaveLength(1); expect(first[0].source).toBe('external_reference');
+    expect(first).toHaveLength(1);
+    expect(first[0].source).toBe('external_reference');
     expect(await fs.readdir(project.inputsPath)).toEqual([]);
     expect(await store.referenceProjectInput(project.projectId, source)).toHaveLength(1);
     const restarted = new ProjectWorkspaceStore({} as StorageIo);
     vi.spyOn(restarted, 'getProjectById').mockImplementation(() => structuredClone(durable));
-    vi.spyOn(restarted, 'persistProject').mockImplementation(next => { durable = structuredClone(next); });
+    vi.spyOn(restarted, 'persistProject').mockImplementation((next) => {
+      durable = structuredClone(next);
+    });
     expect(await restarted.refreshProjectInputs(project.projectId)).toEqual(first);
     await fs.writeFile(source, 'RDOCchanged');
     await expect(restarted.refreshProjectInputs(project.projectId)).rejects.toThrow('CAPTURE_REFERENCE_CHANGED');
@@ -52,7 +76,8 @@ describe('Project input complete scans', () => {
   });
   it('verifies original content before publishing a complete input index', async () => {
     const { store, project, persist, reconcile } = await setup();
-    const file = path.join(project.inputsPath, 'capture.rdc'); await fs.writeFile(file, 'capture');
+    const file = path.join(project.inputsPath, 'capture.rdc');
+    await fs.writeFile(file, 'capture');
     const inputs = await store.refreshProjectInputs('project');
     expect(inputs[0].contentSha256).toMatch(/^[a-f0-9]{64}$/u);
     expect(persist).toHaveBeenCalledBefore(reconcile);
@@ -65,7 +90,8 @@ describe('Project input complete scans', () => {
     store.normalizeProjectRecord(project);
     await expect(fs.stat(project.rootPath)).rejects.toHaveProperty('code', 'ENOENT');
     await expect(store.refreshProjectInputs('project')).rejects.toHaveProperty('code', 'ENOENT');
-    expect(reconcile).not.toHaveBeenCalled(); expect(persist).not.toHaveBeenCalled();
+    expect(reconcile).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
   });
   it('recognizes a removed inputs directory only when its project root remains accessible', async () => {
     const { store, project, reconcile } = await setup();
@@ -77,26 +103,49 @@ describe('Project input complete scans', () => {
     const { store, project, reconcile, persist } = await setup();
     await fs.mkdir(path.join(project.inputsPath, ...Array.from({ length: 10 }, () => 'deep')), { recursive: true });
     await expect(store.refreshProjectInputs('project')).rejects.toThrow('PROJECT_INPUTS_BUDGET_EXCEEDED');
-    expect(reconcile).not.toHaveBeenCalled(); expect(persist).not.toHaveBeenCalled();
+    expect(reconcile).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
   });
-  it.each(['REPLAY_STORE_BUSY', 'REPLAY_MANIFEST_CORRUPT'])('persists and broadcasts confirmed final deletion despite %s, then retries after restart', async (failure) => {
-    const { store, project, persist, reconcile } = await setup();
-    project.inputs = [{ inputId: 'removed', fileName: 'removed.rdc', filePath: path.join(project.inputsPath, 'removed.rdc'),
-      source: 'project_resource', size: 1, discoveredAt: 1, lastModifiedAt: 1, contentSha256: 'a'.repeat(64) }];
-    let durable = structuredClone(project);
-    persist.mockImplementation(value => { durable = structuredClone(value); });
-    const publish = vi.fn(); store.setInputCommitListener(publish);
-    reconcile.mockRejectedValueOnce(new Error(failure));
-    await expect(store.refreshProjectInputs('project')).rejects.toThrow(failure);
-    expect(publish).toHaveBeenCalledWith('project', []);
-    expect(durable.inputs).toEqual([]);
-    expect(durable.replayCleanupPending).toMatchObject({ captureHashes: ['a'.repeat(64)], error: failure });
-    const restarted = new ProjectWorkspaceStore({} as StorageIo);
-    vi.spyOn(restarted, 'getProjectById').mockImplementation(() => structuredClone(durable));
-    vi.spyOn(restarted, 'persistProject').mockImplementation(value => { durable = structuredClone(value); });
-    const retry = vi.fn(async () => undefined); restarted.setInputReconciler(retry);
-    expect(await restarted.refreshProjectInputs('project')).toEqual([]);
-    expect(retry).toHaveBeenCalledWith(expect.objectContaining({ inputs: [], replayCleanupPending: expect.any(Object) }), []);
-    expect(durable.replayCleanupPending).toBeUndefined();
-  });
+  it.each(['REPLAY_STORE_BUSY', 'REPLAY_MANIFEST_CORRUPT'])(
+    'persists and broadcasts confirmed final deletion despite %s, then retries after restart',
+    async (failure) => {
+      const { store, project, persist, reconcile } = await setup();
+      project.inputs = [
+        {
+          inputId: 'removed',
+          fileName: 'removed.rdc',
+          filePath: path.join(project.inputsPath, 'removed.rdc'),
+          source: 'project_resource',
+          size: 1,
+          discoveredAt: 1,
+          lastModifiedAt: 1,
+          contentSha256: 'a'.repeat(64),
+        },
+      ];
+      let durable = structuredClone(project);
+      persist.mockImplementation((value) => {
+        durable = structuredClone(value);
+      });
+      const publish = vi.fn();
+      store.setInputCommitListener(publish);
+      reconcile.mockRejectedValueOnce(new Error(failure));
+      await expect(store.refreshProjectInputs('project')).rejects.toThrow(failure);
+      expect(publish).toHaveBeenCalledWith('project', []);
+      expect(durable.inputs).toEqual([]);
+      expect(durable.replayCleanupPending).toMatchObject({ captureHashes: ['a'.repeat(64)], error: failure });
+      const restarted = new ProjectWorkspaceStore({} as StorageIo);
+      vi.spyOn(restarted, 'getProjectById').mockImplementation(() => structuredClone(durable));
+      vi.spyOn(restarted, 'persistProject').mockImplementation((value) => {
+        durable = structuredClone(value);
+      });
+      const retry = vi.fn(async () => undefined);
+      restarted.setInputReconciler(retry);
+      expect(await restarted.refreshProjectInputs('project')).toEqual([]);
+      expect(retry).toHaveBeenCalledWith(
+        expect.objectContaining({ inputs: [], replayCleanupPending: expect.any(Object) }),
+        [],
+      );
+      expect(durable.replayCleanupPending).toBeUndefined();
+    },
+  );
 });

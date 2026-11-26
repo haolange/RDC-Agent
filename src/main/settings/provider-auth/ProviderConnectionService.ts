@@ -1,7 +1,4 @@
-import {
-  getProviderAuthModeAvailability,
-  isBuiltinProviderId,
-} from '../../provider-catalog/ProviderCatalogRegistry';
+import { getProviderAuthModeAvailability, isBuiltinProviderId } from '../../provider-catalog/ProviderCatalogRegistry';
 import { settingsService } from '../settings-core/SettingsService';
 import {
   buildEffectiveCatalogRequest,
@@ -12,15 +9,9 @@ import {
 import { effectiveCatalogService } from '../provider-catalog/EffectiveCatalogService';
 import { discoverProviderModels } from '../provider-catalog/ProviderModelDiscovery';
 import { describeProviderError, ProviderConnectionError, providerConnectionError } from './providerConnectionErrors';
-import {
-  resolveProviderConnectionDraft,
-  resolveTestDiscoveryAccountId,
-} from './ProviderConnectionDraft';
+import { resolveProviderConnectionDraft, resolveTestDiscoveryAccountId } from './ProviderConnectionDraft';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
-import type {
-  DiscoveryLoader,
-  EffectiveCatalogRequest,
-} from '../provider-catalog/effectiveCatalogTypes';
+import type { DiscoveryLoader, EffectiveCatalogRequest } from '../provider-catalog/effectiveCatalogTypes';
 import type {
   LlmProviderAccountLoginFinishRequest,
   LlmProviderAccountLoginStartRequest,
@@ -72,24 +63,27 @@ export class ProviderConnectionService {
     const provider = settingsService.providerConnections.get(request.providerId);
     const accountId = provider?.activeAccountId ?? (provider ? `anonymous:${provider.id}` : '');
     if (
-      !provider
-      || !provider.isConfigured
-      || provider.protocol !== request.protocol
-      || accountId !== request.accountId
+      !provider ||
+      !provider.isConfigured ||
+      provider.protocol !== request.protocol ||
+      accountId !== request.accountId
     ) {
       return undefined;
     }
     return async () => {
-      const connection = provider.authMode === 'account'
-        ? null
-        : resolveProviderConnectionDraft(
-            provider,
-            {},
-            settingsService.getProviderConnectionValues(provider.id),
-          );
-      const discovery = provider.authMode === 'account'
-        ? await providerAccountAuthService.loadEffectiveCatalog(provider.id)
-        : await discoverProviderModels(provider, connection?.apiKey ?? '', connection?.baseUrl ?? '', connection?.values ?? {});
+      const connection =
+        provider.authMode === 'account'
+          ? null
+          : resolveProviderConnectionDraft(provider, {}, settingsService.getProviderConnectionValues(provider.id));
+      const discovery =
+        provider.authMode === 'account'
+          ? await providerAccountAuthService.loadEffectiveCatalog(provider.id)
+          : await discoverProviderModels(
+              provider,
+              connection?.apiKey ?? '',
+              connection?.baseUrl ?? '',
+              connection?.values ?? {},
+            );
       return {
         protocol: provider.protocol,
         ...('detail' in discovery && discovery.detail ? { detail: discovery.detail } : {}),
@@ -197,7 +191,10 @@ export class ProviderConnectionService {
     }
   }
 
-  async refreshProviderModels(providerId: LlmProviderId, scope?: { accountId: string; protocol: LlmProviderEntry['protocol'] }): Promise<LlmProviderConnectionResult> {
+  async refreshProviderModels(
+    providerId: LlmProviderId,
+    scope?: { accountId: string; protocol: LlmProviderEntry['protocol'] },
+  ): Promise<LlmProviderConnectionResult> {
     try {
       const provider = this.getProvider(providerId);
       const request = buildEffectiveCatalogRequest(provider);
@@ -213,9 +210,16 @@ export class ProviderConnectionService {
       }
       if (snapshot.lastRefreshError) throw new ProviderConnectionError(snapshot.lastRefreshError);
       return {
-        success: true, provider: current, discoveryAccountId: snapshot.accountId,
-        models: snapshot.models.map(model => ({ id: model.modelId, label: model.label,
-          enabled: model.enabled, availability: model.availability, unavailableReason: model.unavailableReason })),
+        success: true,
+        provider: current,
+        discoveryAccountId: snapshot.accountId,
+        models: snapshot.models.map((model) => ({
+          id: model.modelId,
+          label: model.label,
+          enabled: model.enabled,
+          availability: model.availability,
+          unavailableReason: model.unavailableReason,
+        })),
       };
     } catch (error) {
       return {
@@ -305,9 +309,10 @@ export class ProviderConnectionService {
     if (!options.includes(authMode)) {
       throw new ProviderConnectionError(`Provider ${provider.id} does not support ${authMode} authentication.`);
     }
-    const availability = getProviderAuthModeAvailability(provider.id)[authMode]
-      ?? provider.authModeAvailability?.[authMode]
-      ?? provider.providerAvailability;
+    const availability =
+      getProviderAuthModeAvailability(provider.id)[authMode] ??
+      provider.authModeAvailability?.[authMode] ??
+      provider.providerAvailability;
     return {
       ...provider,
       authMode,

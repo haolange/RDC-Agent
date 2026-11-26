@@ -18,7 +18,9 @@ input[type='reset']:not(:disabled),
   cursor: pointer;
 }
 
-input:not([type='checkbox']):not([type='radio']):not([type='button']):not([type='submit']):not([type='reset']):not([type='file']),
+input:not([type='checkbox']):not([type='radio']):not([type='button']):not([type='submit']):not([type='reset']):not(
+    [type='file']
+  ),
 textarea {
   cursor: text;
 }

@@ -17,12 +17,19 @@ export const mcpCommand: CommandDefinition = {
   async execute(args, ctx) {
     const action = args[0] ?? 'list';
     if (action === 'settings') {
-      return { success: true, message: 'Opening MCP settings.', uiAction: { type: 'open-settings', payload: { section: 'tools' } } };
+      return {
+        success: true,
+        message: 'Opening MCP settings.',
+        uiAction: { type: 'open-settings', payload: { section: 'tools' } },
+      };
     }
     if (action !== 'list') {
-      return { success: false, message: 'Usage: /mcp [list | settings]. Servers connect when an agent turn needs them.' };
+      return {
+        success: false,
+        message: 'Usage: /mcp [list | settings]. Servers connect when an agent turn needs them.',
+      };
     }
-    const projectRoot = ctx.projectId ? projectWorkspaceStore.getProjectById(ctx.projectId)?.rootPath ?? null : null;
+    const projectRoot = ctx.projectId ? (projectWorkspaceStore.getProjectById(ctx.projectId)?.rootPath ?? null) : null;
     const servers = agentOrchestrator.getMcpServerStatusSummary(projectRoot);
     if (servers.length === 0) {
       return { success: true, message: 'No MCP servers are configured.', data: { servers } };

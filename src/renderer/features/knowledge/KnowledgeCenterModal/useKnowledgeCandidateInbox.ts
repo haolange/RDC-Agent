@@ -43,27 +43,34 @@ export function useKnowledgeCandidateInbox(options: { open: boolean; sessionId: 
   }, [options.open, refreshInbox]);
 
   /** Proposes a draft card for review; `onCreated` runs once the queue shows it. */
-  const createCandidate = useCallback(async (card: KnowledgeCardRecord, onCreated?: () => void) => {
-    if (!options.sessionId) {
-      setCandidateError({ cardId: card.cardId, message: t('knowledgeCenter.sessionRequired') });
-      return;
-    }
-    if (!beginSynchronousFlight(inFlight)) return;
-    const seq = createRequest.next();
-    setBusy(true);
-    setCandidateError(null);
-    try {
-      await window.electronAPI.knowledge.candidateCreate({ sessionId: options.sessionId, card, explicitUserIntent: true });
-      if (!createRequest.isCurrent(seq)) return;
-      await refreshInbox();
-      if (createRequest.isCurrent(seq)) onCreated?.();
-    } catch (err) {
-      if (createRequest.isCurrent(seq)) setCandidateError({ cardId: card.cardId, message: errorDetail(err) });
-    } finally {
-      inFlight.current = false;
-      if (createRequest.isCurrent(seq)) setBusy(false);
-    }
-  }, [createRequest, options.sessionId, refreshInbox, t]);
+  const createCandidate = useCallback(
+    async (card: KnowledgeCardRecord, onCreated?: () => void) => {
+      if (!options.sessionId) {
+        setCandidateError({ cardId: card.cardId, message: t('knowledgeCenter.sessionRequired') });
+        return;
+      }
+      if (!beginSynchronousFlight(inFlight)) return;
+      const seq = createRequest.next();
+      setBusy(true);
+      setCandidateError(null);
+      try {
+        await window.electronAPI.knowledge.candidateCreate({
+          sessionId: options.sessionId,
+          card,
+          explicitUserIntent: true,
+        });
+        if (!createRequest.isCurrent(seq)) return;
+        await refreshInbox();
+        if (createRequest.isCurrent(seq)) onCreated?.();
+      } catch (err) {
+        if (createRequest.isCurrent(seq)) setCandidateError({ cardId: card.cardId, message: errorDetail(err) });
+      } finally {
+        inFlight.current = false;
+        if (createRequest.isCurrent(seq)) setBusy(false);
+      }
+    },
+    [createRequest, options.sessionId, refreshInbox, t],
+  );
 
   return { hasSession: Boolean(options.sessionId), inbox, refreshInbox, busy, error, candidateError, createCandidate };
 }

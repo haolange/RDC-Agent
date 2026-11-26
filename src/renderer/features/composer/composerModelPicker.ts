@@ -62,24 +62,18 @@ export function toComposerPickerOption(
     contextWindowLabel: window.label,
     hasReasoning: hasPickerReasoning(model),
     hasVisionInput: model.visionInput.state === 'supported',
-    hasFastMode: model.controls.fast.state === 'selectable'
-      || (model.controls.fast.state === 'fixed' && model.controls.fast.fixedValue === true),
+    hasFastMode:
+      model.controls.fast.state === 'selectable' ||
+      (model.controls.fast.state === 'fixed' && model.controls.fast.fixedValue === true),
   };
 }
 
-export function matchesComposerPickerQuery(
-  option: ComposerModelPickerOption,
-  query: string,
-): boolean {
+export function matchesComposerPickerQuery(option: ComposerModelPickerOption, query: string): boolean {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return true;
-  return [
-    option.providerId,
-    option.providerLabel,
-    option.modelId,
-    option.label,
-    ...option.aliases,
-  ].some((value) => value.toLowerCase().includes(normalized));
+  return [option.providerId, option.providerLabel, option.modelId, option.label, ...option.aliases].some((value) =>
+    value.toLowerCase().includes(normalized),
+  );
 }
 
 export function filterComposerPickerOptions(

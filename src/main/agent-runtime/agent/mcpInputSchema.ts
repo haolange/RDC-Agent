@@ -3,15 +3,24 @@ import type { JsonSchema } from '../core/types';
 
 /** Keywords that describe a value without constraining it; they are dropped before validation. */
 const ANNOTATION_KEYS = new Set([
-  '$schema', '$id', '$comment', '$anchor', '$defs', 'definitions', 'examples', 'format', 'deprecated',
-  'readOnly', 'writeOnly', 'contentEncoding', 'contentMediaType',
+  '$schema',
+  '$id',
+  '$comment',
+  '$anchor',
+  '$defs',
+  'definitions',
+  'examples',
+  'format',
+  'deprecated',
+  'readOnly',
+  'writeOnly',
+  'contentEncoding',
+  'contentMediaType',
 ]);
 
 const MAX_REF_DEPTH = 8;
 
-export type McpInputSchemaResult =
-  | { ok: true; schema: JsonSchema }
-  | { ok: false; reason: string };
+export type McpInputSchemaResult = { ok: true; schema: JsonSchema } | { ok: false; reason: string };
 
 /**
  * Turns the JSON Schema an MCP server declares into the schema the tool validator enforces: annotation keywords are
@@ -49,9 +58,12 @@ function normalize(value: unknown, definitions: Record<string, unknown>, refDept
   const output: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value)) {
     if (ANNOTATION_KEYS.has(key)) continue;
-    output[key] = key === 'properties' && isRecord(child)
-      ? Object.fromEntries(Object.entries(child).map(([name, property]) => [name, normalize(property, definitions, refDepth)]))
-      : normalize(child, definitions, refDepth);
+    output[key] =
+      key === 'properties' && isRecord(child)
+        ? Object.fromEntries(
+            Object.entries(child).map(([name, property]) => [name, normalize(property, definitions, refDepth)]),
+          )
+        : normalize(child, definitions, refDepth);
   }
   return output;
 }

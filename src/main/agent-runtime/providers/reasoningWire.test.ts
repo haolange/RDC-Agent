@@ -22,23 +22,57 @@ const openAi56 = {
     levels: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' },
   },
 } satisfies ReasoningControl;
-const kimiToggle = { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'anthropic', on: 'high', onMode: 'enabled', onBudgetTokens: 4096, offMode: 'disabled' } } satisfies ReasoningControl;
-const glmToggle = { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'anthropic', on: 'high', onMode: 'enabled', offMode: 'disabled' } } satisfies ReasoningControl;
-const deepSeekLevels = { kind: 'levels', supportsOff: true, levels: ['high', 'max'], defaultSelection: 'high', wireProfile: { kind: 'anthropic', on: 'high', levels: { high: 'high', max: 'max' }, onMode: 'enabled', offMode: 'disabled' } } satisfies ReasoningControl;
+const kimiToggle = {
+  kind: 'toggle',
+  supportsOff: true,
+  levels: [],
+  defaultSelection: 'on',
+  wireProfile: { kind: 'anthropic', on: 'high', onMode: 'enabled', onBudgetTokens: 4096, offMode: 'disabled' },
+} satisfies ReasoningControl;
+const glmToggle = {
+  kind: 'toggle',
+  supportsOff: true,
+  levels: [],
+  defaultSelection: 'on',
+  wireProfile: { kind: 'anthropic', on: 'high', onMode: 'enabled', offMode: 'disabled' },
+} satisfies ReasoningControl;
+const deepSeekLevels = {
+  kind: 'levels',
+  supportsOff: true,
+  levels: ['high', 'max'],
+  defaultSelection: 'high',
+  wireProfile: {
+    kind: 'anthropic',
+    on: 'high',
+    levels: { high: 'high', max: 'max' },
+    onMode: 'enabled',
+    offMode: 'disabled',
+  },
+} satisfies ReasoningControl;
 
 describe('buildOpenAiResponsesReasoning', () => {
   it('maps GPT-5.6 xhigh/max to the same canonical wire values', () => {
     const reasoningControl = openAi56;
 
-    expect(buildOpenAiResponsesReasoning({
-      selection: 'xhigh',
-      control: reasoningControl,
-    }, null).reasoning).toMatchObject({ effort: 'xhigh' });
+    expect(
+      buildOpenAiResponsesReasoning(
+        {
+          selection: 'xhigh',
+          control: reasoningControl,
+        },
+        null,
+      ).reasoning,
+    ).toMatchObject({ effort: 'xhigh' });
 
-    expect(buildOpenAiResponsesReasoning({
-      selection: 'max',
-      control: reasoningControl,
-    }, null).reasoning).toMatchObject({ effort: 'max' });
+    expect(
+      buildOpenAiResponsesReasoning(
+        {
+          selection: 'max',
+          control: reasoningControl,
+        },
+        null,
+      ).reasoning,
+    ).toMatchObject({ effort: 'max' });
   });
 
   it('uses the documented DeepSeek Responses none wire when Off is selected', () => {
@@ -58,8 +92,7 @@ describe('buildOpenAiResponsesReasoning', () => {
     expect(buildOpenAiResponsesReasoning({ selection: 'off', control }, null)).toEqual({
       reasoning: { effort: 'none' },
     });
-    expect(buildOpenAiResponsesReasoning({ selection: 'xhigh', control }, null).reasoning)
-      .toEqual({ effort: 'high' });
+    expect(buildOpenAiResponsesReasoning({ selection: 'xhigh', control }, null).reasoning).toEqual({ effort: 'high' });
   });
 });
 
@@ -68,10 +101,14 @@ describe('applyAnthropicReasoning', () => {
     const reasoningControl = kimiToggle;
 
     const body: Record<string, unknown> = {};
-    applyAnthropicReasoning(body, {
-      selection: 'on',
-      control: reasoningControl,
-    }, 'anthropic-display');
+    applyAnthropicReasoning(
+      body,
+      {
+        selection: 'on',
+        control: reasoningControl,
+      },
+      'anthropic-display',
+    );
 
     expect(body.thinking).toMatchObject({
       type: 'enabled',
@@ -84,10 +121,14 @@ describe('applyAnthropicReasoning', () => {
     const reasoningControl = glmToggle;
 
     const body: Record<string, unknown> = {};
-    applyAnthropicReasoning(body, {
-      selection: 'on',
-      control: reasoningControl,
-    }, null);
+    applyAnthropicReasoning(
+      body,
+      {
+        selection: 'on',
+        control: reasoningControl,
+      },
+      null,
+    );
 
     expect(body.thinking).toMatchObject({ type: 'enabled' });
     expect((body.thinking as { budget_tokens?: number }).budget_tokens).toBeUndefined();
@@ -97,10 +138,14 @@ describe('applyAnthropicReasoning', () => {
     const reasoningControl = kimiToggle;
 
     const body: Record<string, unknown> = {};
-    applyAnthropicReasoning(body, {
-      selection: 'off',
-      control: reasoningControl,
-    }, null);
+    applyAnthropicReasoning(
+      body,
+      {
+        selection: 'off',
+        control: reasoningControl,
+      },
+      null,
+    );
 
     expect(body.thinking).toEqual({ type: 'disabled' });
   });
@@ -113,10 +158,14 @@ describe('applyAnthropicReasoning', () => {
     });
 
     const body: Record<string, unknown> = {};
-    applyAnthropicReasoning(body, {
-      selection: 'max',
-      control: reasoningControl,
-    }, null);
+    applyAnthropicReasoning(
+      body,
+      {
+        selection: 'max',
+        control: reasoningControl,
+      },
+      null,
+    );
 
     expect(body.thinking).toMatchObject({ type: 'enabled' });
     expect(body.output_config).toEqual({ effort: 'max' });
@@ -126,10 +175,16 @@ describe('applyAnthropicReasoning', () => {
 describe('remaining reasoning wire profiles', () => {
   it('compiles OpenAI-compatible on/off activations and effort', () => {
     const control = {
-      kind: 'levels', supportsOff: true, levels: ['high'], defaultSelection: 'high',
+      kind: 'levels',
+      supportsOff: true,
+      levels: ['high'],
+      defaultSelection: 'high',
       wireProfile: {
-        kind: 'openai-compatible', on: 'high', levels: { high: 'high' },
-        onMode: 'enable-thinking-true', offMode: 'enable-thinking-false',
+        kind: 'openai-compatible',
+        on: 'high',
+        levels: { high: 'high' },
+        onMode: 'enable-thinking-true',
+        offMode: 'enable-thinking-false',
       },
     } satisfies ReasoningControl;
     const enabled: Record<string, unknown> = {};
@@ -142,7 +197,10 @@ describe('remaining reasoning wire profiles', () => {
 
   it('compiles Gemini thinking-level and thinking-budget profiles', () => {
     const levelControl = {
-      kind: 'levels', supportsOff: false, levels: ['high'], defaultSelection: 'high',
+      kind: 'levels',
+      supportsOff: false,
+      levels: ['high'],
+      defaultSelection: 'high',
       wireProfile: { kind: 'gemini-thinking-level', on: 'high', levels: { high: 'high' } },
     } satisfies ReasoningControl;
     const levelConfig: Record<string, unknown> = {};
@@ -150,7 +208,10 @@ describe('remaining reasoning wire profiles', () => {
     expect(levelConfig).toEqual({ thinkingConfig: { thinkingLevel: 'HIGH' } });
 
     const budgetControl = {
-      kind: 'levels', supportsOff: true, levels: ['medium'], defaultSelection: 'medium',
+      kind: 'levels',
+      supportsOff: true,
+      levels: ['medium'],
+      defaultSelection: 'medium',
       wireProfile: { kind: 'gemini-thinking-budget', on: 'medium', levels: { medium: 8192 }, offBudget: 0 },
     } satisfies ReasoningControl;
     const enabledBudget: Record<string, unknown> = {};
@@ -163,7 +224,10 @@ describe('remaining reasoning wire profiles', () => {
 
   it('uses the GenerateContent and Interactions wire forms for Gemini 4 extra-high effort', () => {
     const control = {
-      kind: 'levels', supportsOff: false, levels: ['high', 'xhigh'], defaultSelection: 'high',
+      kind: 'levels',
+      supportsOff: false,
+      levels: ['high', 'xhigh'],
+      defaultSelection: 'high',
       wireProfile: { kind: 'gemini-thinking-level', on: 'high', levels: { high: 'high', xhigh: 'xhigh' } },
     } satisfies ReasoningControl;
     const reasoning = { selection: 'xhigh', control } as const;
@@ -179,7 +243,10 @@ describe('remaining reasoning wire profiles', () => {
 
   it('asks Gemini for thought summaries only when the route declares that request', () => {
     const control = {
-      kind: 'levels', supportsOff: true, levels: ['medium'], defaultSelection: 'medium',
+      kind: 'levels',
+      supportsOff: true,
+      levels: ['medium'],
+      defaultSelection: 'medium',
       wireProfile: { kind: 'gemini-thinking-budget', on: 'medium', levels: { medium: 8192 }, offBudget: 0 },
     } satisfies ReasoningControl;
     const visible: Record<string, unknown> = {};
@@ -192,10 +259,14 @@ describe('remaining reasoning wire profiles', () => {
 
   it('switches Ollama thinking with think only for a known control on a route that declares it', () => {
     const control = {
-      kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on',
+      kind: 'toggle',
+      supportsOff: true,
+      levels: [],
+      defaultSelection: 'on',
       wireProfile: { kind: 'openai-compatible', on: 'high', levels: {} },
     } as unknown as ReasoningControl;
-    const plan = (visibilityRequest?: string) => ({ contracts: { reasoning: { visibilityRequest } } }) as unknown as Pick<RequestPlan, 'contracts'>;
+    const plan = (visibilityRequest?: string) =>
+      ({ contracts: { reasoning: { visibilityRequest } } }) as unknown as Pick<RequestPlan, 'contracts'>;
     const on: Record<string, unknown> = {};
     applyOllamaThink(on, { selection: 'on', control }, plan('ollama-think'));
     expect(on).toEqual({ think: true });
@@ -212,7 +283,10 @@ describe('remaining reasoning wire profiles', () => {
 
   it('compiles Moonshot thinking on and off explicitly', () => {
     const control = {
-      kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on',
+      kind: 'toggle',
+      supportsOff: true,
+      levels: [],
+      defaultSelection: 'on',
       wireProfile: { kind: 'moonshot-thinking', onMode: 'enabled', offMode: 'disabled' },
     } satisfies ReasoningControl;
     const enabled: Record<string, unknown> = {};

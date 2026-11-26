@@ -10,7 +10,10 @@ import type { AppSettings } from '@shared/types/settings';
 function WorkProcessPreview({ latest }: { latest?: boolean }) {
   return (
     <span className={`work-process-choice-preview${latest ? ' is-following' : ''}`} aria-hidden="true">
-      <span /><span /><span /><span />
+      <span />
+      <span />
+      <span />
+      <span />
     </span>
   );
 }
@@ -51,33 +54,59 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
           onSave={onAccountSave}
         />
 
-        <SettingsSection variant="rows"
+        <SettingsSection
+          variant="rows"
           title={t('settings.appearancePreferences')}
           className="settings-language-section"
           data-settings-search="language"
         >
           <SettingsField layout="row" label={t('userMenu.language')} search="language">
-            <Tabs variant="segmented" label={t('userMenu.language')}
+            <Tabs
+              variant="segmented"
+              label={t('userMenu.language')}
               value={settings.appearance.language}
-              tabs={[{ id: 'zh-CN', label: t('language.zh') }, { id: 'en', label: t('language.en') }]}
+              tabs={[
+                { id: 'zh-CN', label: t('language.zh') },
+                { id: 'en', label: t('language.en') },
+              ]}
               onChange={(language) => {
                 if (language === 'zh-CN' || language === 'en') void onLanguageChange(language);
-              }} />
+              }}
+            />
           </SettingsField>
-          <SettingsField layout="row" label={t('settings.workProcessExpansion')} search="work-process-expansion"
-            description={t(settings.appearance.workProcessExpansion === 'latest'
-              ? 'settings.workProcessExpansionLatestHint' : 'settings.workProcessExpansionAllHint')}>
-            <Tabs className="work-process-choice" variant="segmented" label={t('settings.workProcessExpansion')}
+          <SettingsField
+            layout="row"
+            label={t('settings.workProcessExpansion')}
+            search="work-process-expansion"
+            description={t(
+              settings.appearance.workProcessExpansion === 'latest'
+                ? 'settings.workProcessExpansionLatestHint'
+                : 'settings.workProcessExpansionAllHint',
+            )}
+          >
+            <Tabs
+              className="work-process-choice"
+              variant="segmented"
+              label={t('settings.workProcessExpansion')}
               value={settings.appearance.workProcessExpansion}
               tabs={[
-                { id: 'latest', label: t('settings.workProcessExpansionLatest'), icon: <WorkProcessPreview latest />,
-                  description: t('settings.workProcessExpansionLatestHint') },
-                { id: 'all', label: t('settings.workProcessExpansionAll'), icon: <WorkProcessPreview />,
-                  description: t('settings.workProcessExpansionAllHint') },
+                {
+                  id: 'latest',
+                  label: t('settings.workProcessExpansionLatest'),
+                  icon: <WorkProcessPreview latest />,
+                  description: t('settings.workProcessExpansionLatestHint'),
+                },
+                {
+                  id: 'all',
+                  label: t('settings.workProcessExpansionAll'),
+                  icon: <WorkProcessPreview />,
+                  description: t('settings.workProcessExpansionAllHint'),
+                },
               ]}
               onChange={(expansion) => {
                 if (expansion === 'latest' || expansion === 'all') void onWorkProcessExpansionChange(expansion);
-              }} />
+              }}
+            />
           </SettingsField>
         </SettingsSection>
         <PersonalizationSettings

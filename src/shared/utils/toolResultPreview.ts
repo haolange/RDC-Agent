@@ -13,15 +13,13 @@ const CONTENT_TEXT_MAX_LINES = 30;
 const WEB_RESULTS_MAX = 8;
 const PREVIEW_JSON_MAX_CHARS = 12_000;
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 const truncateText = (text: string, maxChars = CONTENT_TEXT_MAX_CHARS, maxLines = CONTENT_TEXT_MAX_LINES): string => {
   const lines = text.replace(/\r\n/g, '\n').split('\n');
-  const clippedLines = lines.length > maxLines
-    ? [...lines.slice(0, maxLines), `… (${lines.length - maxLines} more lines)`]
-    : lines;
+  const clippedLines =
+    lines.length > maxLines ? [...lines.slice(0, maxLines), `… (${lines.length - maxLines} more lines)`] : lines;
   let clipped = clippedLines.join('\n');
   if (clipped.length > maxChars) {
     clipped = `${clipped.slice(0, maxChars)}…`;
@@ -61,17 +59,12 @@ const compactWebResults = (results: unknown): unknown[] | undefined => {
     return {
       title: typeof entry.title === 'string' ? entry.title : undefined,
       url: typeof entry.url === 'string' ? entry.url : undefined,
-      snippet: typeof entry.snippet === 'string'
-        ? truncateText(entry.snippet, 240, 3)
-        : undefined,
+      snippet: typeof entry.snippet === 'string' ? truncateText(entry.snippet, 240, 3) : undefined,
     };
   });
 };
 
-const compactDetails = (
-  details: unknown,
-  extras?: Record<string, unknown>,
-): Record<string, unknown> | null => {
+const compactDetails = (details: unknown, extras?: Record<string, unknown>): Record<string, unknown> | null => {
   const base = isRecord(details) ? { ...details } : {};
   if (extras) {
     for (const [key, value] of Object.entries(extras)) {
@@ -80,10 +73,11 @@ const compactDetails = (
   }
   if (Object.keys(base).length === 0) return details == null ? null : { value: details };
 
-  const artifactized = base.artifactized === true
-    || typeof base.ref === 'string'
-    || typeof base.hash === 'string'
-    || typeof base.summary === 'string';
+  const artifactized =
+    base.artifactized === true ||
+    typeof base.ref === 'string' ||
+    typeof base.hash === 'string' ||
+    typeof base.summary === 'string';
   if (artifactized) {
     return {
       ...base,
@@ -102,9 +96,9 @@ const compactDetails = (
   for (const key of Object.keys(base)) {
     const value = base[key];
     if (
-      typeof value === 'string'
-      && value.length > 800
-      && !['pattern', 'query', 'command', 'path', 'cwd', 'url'].includes(key)
+      typeof value === 'string' &&
+      value.length > 800 &&
+      !['pattern', 'query', 'command', 'path', 'cwd', 'url'].includes(key)
     ) {
       base[key] = truncateText(value, 800, 12);
     }
@@ -153,14 +147,14 @@ export const buildToolResultPreview = (result: unknown): string => {
   const dataSource = isRecord(record.data)
     ? record.data
     : {
-      content: record.content,
-      details: record.details,
-      matches: record.matches,
-      stdout: record.stdout,
-      text: record.text,
-      lineCount: record.lineCount,
-      totalLines: record.totalLines,
-    };
+        content: record.content,
+        details: record.details,
+        matches: record.matches,
+        stdout: record.stdout,
+        text: record.text,
+        lineCount: record.lineCount,
+        totalLines: record.totalLines,
+      };
 
   const preview: Record<string, unknown> = {
     ok: record.ok !== false,
@@ -171,7 +165,5 @@ export const buildToolResultPreview = (result: unknown): string => {
   if (record.trace_id != null) preview.trace_id = record.trace_id;
 
   const encoded = JSON.stringify(preview);
-  return encoded.length > PREVIEW_JSON_MAX_CHARS
-    ? encoded.slice(0, PREVIEW_JSON_MAX_CHARS)
-    : encoded;
+  return encoded.length > PREVIEW_JSON_MAX_CHARS ? encoded.slice(0, PREVIEW_JSON_MAX_CHARS) : encoded;
 };

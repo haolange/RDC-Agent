@@ -7,11 +7,18 @@ import { expect, it } from 'vitest';
 it('checks generated guides in an independent checkout and still rejects stale content', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'rdc-guide-checkout-'));
   const repo = path.resolve(import.meta.dirname, '../../..');
-  const inputs = ['scripts/generate-rdc-tool-guides.mjs', 'scripts/fidelity/rdc-tool-guide-catalog.json',
-    'resources/agent-runtime/rdc-tool-guide-members.json'];
-  const members = JSON.parse(readFileSync(path.join(repo, inputs[2]), 'utf8')) as { guides: Record<string, { skillId: string }> };
+  const inputs = [
+    'scripts/generate-rdc-tool-guides.mjs',
+    'scripts/fidelity/rdc-tool-guide-catalog.json',
+    'resources/agent-runtime/rdc-tool-guide-members.json',
+  ];
+  const members = JSON.parse(readFileSync(path.join(repo, inputs[2]), 'utf8')) as {
+    guides: Record<string, { skillId: string }>;
+  };
   // Generated outputs the check compares: every guide and the shipped catalog identity.
-  const references = Object.values(members.guides).map(({ skillId }) => `resources/agent-runtime/skills/${skillId}/references/tools.md`);
+  const references = Object.values(members.guides).map(
+    ({ skillId }) => `resources/agent-runtime/skills/${skillId}/references/tools.md`,
+  );
   references.push('resources/agent-runtime/rdc-tool-catalog-identity.json');
   try {
     for (const input of [...inputs, ...references]) {
@@ -19,7 +26,12 @@ it('checks generated guides in an independent checkout and still rejects stale c
       mkdirSync(path.dirname(target), { recursive: true });
       cpSync(path.join(repo, input), target);
     }
-    const check = () => spawnSync(process.execPath, [path.join(root, inputs[0]), '--check'], { cwd: root, encoding: 'utf8', windowsHide: true });
+    const check = () =>
+      spawnSync(process.execPath, [path.join(root, inputs[0]), '--check'], {
+        cwd: root,
+        encoding: 'utf8',
+        windowsHide: true,
+      });
     const fresh = check();
     expect(fresh.stderr).toBe('');
     expect(fresh.status).toBe(0);
