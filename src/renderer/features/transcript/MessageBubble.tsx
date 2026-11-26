@@ -21,6 +21,7 @@ import { MessageAttachments } from './MessageAttachments';
 import { HandoffSuggestionRow } from './HandoffSuggestionRow';
 import { SystemMessage } from './SystemMessage';
 import { answerSources } from './answerSources';
+import { resolveDiagnosticText } from './systemMessagePresentation';
 import type { ConversationMessage, ConversationMessageStatus } from '@shared/types/conversation';
 
 interface MessageBubbleProps {
@@ -228,7 +229,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
                 data-testid="conversation-message-diagnostic"
                 detail={[message.diagnostic.code, message.diagnostic.technicalMessage].filter(Boolean).join('\n')}
               >
-                {message.diagnostic.userMessage}
+                {resolveDiagnosticText(message.diagnostic, t)}
               </InlineError>
             ) : null}
             {!isInProgress && hasContent ? <MarkdownSourcesRow content={message.content} /> : null}

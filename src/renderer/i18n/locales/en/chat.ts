@@ -71,6 +71,18 @@ export const enChat = {
   'chat.messageError': 'Error',
   'chat.messageStopped': 'Stopped',
   'chat.messageStoppedAtShutdown': 'Stopped when RDC-Agent closed',
+  'chat.interruptedTurn.js-fatal':
+    'This request was interrupted when RDC-Agent stopped after an unexpected internal error. Send it again.',
+  'chat.interruptedTurn.native-crash-suspected': 'This request was interrupted when RDC-Agent crashed. Send it again.',
+  'chat.interruptedTurn.renderer-gone':
+    "This request was interrupted after RDC-Agent's window stopped working. Send it again.",
+  'chat.interruptedTurn.child-process-gone':
+    'This request was interrupted after a helper process of RDC-Agent stopped. Send it again.',
+  'chat.interruptedTurn.shutdown-interrupted':
+    'This request was interrupted when RDC-Agent did not finish closing. Send it again.',
+  'chat.interruptedTurn.killed-or-power-loss-suspected':
+    'This request was interrupted when RDC-Agent was ended by the system or lost power. Send it again.',
+  'chat.interruptedTurn.unknown': 'This request was interrupted when RDC-Agent stopped. Send it again.',
   'chat.messageWarning': 'Warning',
   'chat.rewriteWillUse': 'Will use: {agent} · {model}',
   'chat.rewriteModelUnknown': 'model not ready',

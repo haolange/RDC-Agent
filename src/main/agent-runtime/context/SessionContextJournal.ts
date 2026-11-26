@@ -12,9 +12,6 @@ import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapab
 import type { ProviderContinuationArtifact } from '../core/types';
 import type { AssistantMessage, Message, ToolResultMessage } from '../core/types';
 
-/** Work-trace summary of a turn the app's exit interrupted before its terminal context entry was written. */
-export const INTERRUPTED_CONVERSATION_SUMMARY = '请求在应用退出后中断，需重新发起。';
-
 export interface SessionContextTurnEntry {
   turnId: string;
   userMessageId: string;
@@ -183,14 +180,7 @@ export class SessionContextJournal {
       // terminal context transaction. Replay only the user's actual text and
       // an explicit gap marker. Tool calls and partial model output remain in
       // the visible trace, but are not silently promoted into prompt facts.
-      if (
-        assistant.status !== 'error' ||
-        !(
-          assistant.diagnostic?.code === 'CONVERSATION_INTERRUPTED' ||
-          assistant.workTrace?.summary === INTERRUPTED_CONVERSATION_SUMMARY
-        )
-      )
-        continue;
+      if (assistant.status !== 'error' || assistant.diagnostic?.code !== 'CONVERSATION_INTERRUPTED') continue;
       recovered.set(turnId, [
         { role: 'user', content: user.content, timestamp: user.createdAt },
         {

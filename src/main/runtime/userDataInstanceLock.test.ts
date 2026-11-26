@@ -25,6 +25,7 @@ describe('userData instance lock', () => {
     birth: `birth-${pid}`,
     mode,
     startTs: `start-${pid}`,
+    instanceId: `instance-${pid}`,
   });
   const lockFile = () => path.join(tempRoot, 'instance.lock');
   const exited = (): ProcessLiveness => 'exited';
@@ -80,13 +81,33 @@ describe('userData instance lock', () => {
     expect(probe).toHaveBeenCalledWith(expect.objectContaining({ pid: 212, birth: '' }));
   });
 
-  it('reclaims a stale lock without changing userData paths', () => {
-    fs.writeFileSync(lockFile(), `${JSON.stringify(owner(404))}\n`, 'utf8');
+  it('reclaims a stale lock and reports the owner that never released it', () => {
+    fs.writeFileSync(lockFile(), `${JSON.stringify(owner(404, 'desktop'))}\n`, 'utf8');
+    const probe = vi.fn((): ProcessLiveness => 'exited');
 
-    const lock = acquireUserDataInstanceLock(tempRoot, owner(505), exited);
+    const lock = acquireUserDataInstanceLock(tempRoot, owner(505), probe);
 
-    expect(lock.acquired).toBe(true);
+    expect(lock).toMatchObject({
+      acquired: true,
+      instanceId: 'instance-505',
+      staleOwner: { pid: 404, birth: 'birth-404', mode: 'desktop', startTs: 'start-404', instanceId: 'instance-404' },
+    });
+    expect(probe).toHaveBeenCalledWith(expect.objectContaining({ pid: 404, birth: 'birth-404' }));
     expect((JSON.parse(fs.readFileSync(lockFile(), 'utf8')) as { pid: number }).pid).toBe(505);
+    if (lock.acquired) lock.release();
+    // A launch after a released lock has no stale owner.
+    const next = acquireUserDataInstanceLock(tempRoot, owner(606), probe);
+    expect(next).toMatchObject({ acquired: true, staleOwner: null });
+    if (next.acquired) next.release();
+  });
+
+  it('reports an unreadable stale lock as an owner that recorded nothing', () => {
+    fs.writeFileSync(lockFile(), '{"pid":', 'utf8');
+    const lock = acquireUserDataInstanceLock(tempRoot, owner(505), exited);
+    expect(lock).toMatchObject({
+      acquired: true,
+      staleOwner: { pid: 0, birth: '', mode: 'unknown', startTs: 'unknown', instanceId: '' },
+    });
     if (lock.acquired) lock.release();
   });
 

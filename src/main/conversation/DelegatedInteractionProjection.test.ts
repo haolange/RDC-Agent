@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { resolveComposerPendingRequest } from '../../renderer/features/composer/pendingRequestSelection';
 import { findPendingUserInput } from '../../renderer/features/composer/userInputRequestModel';
+import { adoptPreviousInstanceDiagnosis } from '../runtime/previousInstanceDiagnosis';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 import {
   reconcileDelegatedInteractionRequests,
@@ -206,6 +207,45 @@ it('settles an orphaned parent turn and its thinking after a plan request is rej
     planReview: { status: 'cancelled' },
   });
   expect(reconcileInterruptedConversationTurn(recovered, false)).toBe(recovered);
+  expect(recovered.diagnostic).toMatchObject({ code: 'CONVERSATION_INTERRUPTED', interruption: { cause: 'unknown' } });
+});
+
+it('names how the previous launch ended on the turns it left running, and nothing for older ones', () => {
+  const streaming = (createdAt: number) =>
+    ({
+      id: `m-${createdAt}`,
+      projectId: 'project',
+      sessionId: 'session',
+      turnId: `turn-${createdAt}`,
+      role: 'assistant',
+      status: 'streaming',
+      content: 'partial',
+      createdAt,
+    }) as ConversationMessage;
+  adoptPreviousInstanceDiagnosis(
+    {
+      classification: 'renderer-gone',
+      instanceId: 'previous',
+      pid: 42,
+      startedAt: 1_000,
+      lastRecordAt: 2_000,
+      lastRecord: 'process_gone',
+      crashFiles: 0,
+      interruptedTurns: [],
+      damagedRecords: 0,
+    },
+    5_000,
+  );
+  try {
+    const previousLaunch = reconcileInterruptedConversationTurn(streaming(1_500), false);
+    expect(previousLaunch.diagnostic).toMatchObject({ interruption: { cause: 'renderer-gone' } });
+    expect(previousLaunch.workTrace).toBeUndefined();
+    expect(reconcileInterruptedConversationTurn(streaming(500), false).diagnostic).toMatchObject({
+      interruption: { cause: 'unknown' },
+    });
+  } finally {
+    adoptPreviousInstanceDiagnosis(null);
+  }
 });
 
 it('settles an awaiting plan on a stopped message without rewriting its terminal tool evidence', () => {

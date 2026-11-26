@@ -91,7 +91,7 @@ import type { MCPServerStatusSummary } from './mcp';
 import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
 import type { TraceProjectionChangedPayload } from './agenticTrace';
 import type { TraceSessionResult } from './trace';
-import type { CrashFilesSummary } from './lifecycle';
+import type { CrashFilesSummary, PreviousInstanceNotice } from './lifecycle';
 import type {
   HookEvent,
   RdcRuntimeOverview,
@@ -183,6 +183,8 @@ export interface ElectronAPI {
       version: string;
       productName: string;
       systemTheme: ResolvedTheme;
+      /** Set when the previous launch left its instance lock behind: how it most likely ended. */
+      previousInstance: PreviousInstanceNotice | null;
     }>;
   };
 

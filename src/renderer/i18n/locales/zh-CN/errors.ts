@@ -496,6 +496,15 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.USER_INPUT_REQUEST_NOT_FOUND': '该问题已不再等待回答。',
   'errors.TOOL_APPROVAL_REQUEST_NOT_FOUND': '该批准请求已不在等待中。',
   'errors.PUBLIC_REQUEST_FAILED': '无法访问该网站。',
+  'errors.PREVIOUS_INSTANCE_JS_FATAL': 'RDC-Agent 上次因意外的内部错误而停止。当时正在进行的请求已标记为中断。',
+  'errors.PREVIOUS_INSTANCE_NATIVE_CRASH': 'RDC-Agent 上次崩溃了。当时正在进行的请求已标记为中断。',
+  'errors.PREVIOUS_INSTANCE_RENDERER_GONE':
+    'RDC-Agent 上次窗口停止工作，应用没有正常关闭。当时正在进行的请求已标记为中断。',
+  'errors.PREVIOUS_INSTANCE_CHILD_PROCESS_GONE':
+    'RDC-Agent 上次有辅助进程意外退出，应用没有正常关闭。当时正在进行的请求已标记为中断。',
+  'errors.PREVIOUS_INSTANCE_SHUTDOWN_INTERRUPTED': 'RDC-Agent 上次没有完成关闭。当时正在进行的请求已标记为中断。',
+  'errors.PREVIOUS_INSTANCE_KILLED':
+    'RDC-Agent 上次没有正常关闭，可能被系统结束或断电。当时正在进行的请求已标记为中断。',
   'errors.PROVIDER_ACCOUNT_LOGIN_FAILED': '登录模型服务失败，请查看详情后重试。',
   'errors.PROVIDER_CONNECTION_FAILED': '无法连接模型服务，或请求被拒绝。',
   'errors.RDC_NATIVE_FAILURE': 'RenderDoc 工具报告了失败。',

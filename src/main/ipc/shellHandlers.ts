@@ -5,6 +5,7 @@ import { nativeMessage } from '../window/nativeI18n';
 
 import { appPathService } from '../runtime/AppPathService';
 import { clearCrashDumps, summarizeCrashFiles } from '../runtime/crashFiles';
+import { previousInstanceNotice } from '../runtime/previousInstanceDiagnosis';
 import { samePath } from '../platform/paths';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
@@ -150,6 +151,7 @@ function appChannels(): IpcChannelTable {
         version: app.getVersion(),
         productName: app.getName(),
         systemTheme: nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
+        previousInstance: previousInstanceNotice(),
       };
     },
     'app:selectAvatar': async (_event, ...rawArgs: unknown[]) => {

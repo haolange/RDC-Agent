@@ -1,6 +1,8 @@
 import { type TaskExecutionPreparation } from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
+import { TASK_INTERRUPTED_REASONS } from '@shared/constants/taskStatusReasons';
 import { lifecycleLedger } from '../../runtime/LifecycleLedger';
+import { interruptionCauseOf } from '../../runtime/previousInstanceDiagnosis';
 import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
 import { TaskRuntimeEpochSchema } from './taskExecutionSchemas';
 import {
@@ -485,7 +487,7 @@ export class TaskRegistry extends TaskExecutionLedger {
         execution.status = 'interrupted';
         execution.result = {
           disposition: 'blocked',
-          summary: 'Execution was interrupted by runtime restart and requires explicit recovery.',
+          summary: TASK_INTERRUPTED_REASONS[interruptionCauseOf(execution.runtimeInstanceId)],
           outputs: {},
         };
         execution.updatedAt = now;

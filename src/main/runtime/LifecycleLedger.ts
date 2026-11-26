@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
-import { SHUTDOWN_CAUSES, TURN_STOP_CAUSES } from '@shared/types/lifecycle';
+import { PREVIOUS_INSTANCE_CLASSIFICATIONS, SHUTDOWN_CAUSES, TURN_STOP_CAUSES } from '@shared/types/lifecycle';
 import { SHUTDOWN_PHASE_ORDER } from '../lifecycle/ShutdownCoordinator';
 import { renameWithRetrySync, syncDirectorySync } from '../platform/fileRename';
 import { appPathService } from './AppPathService';
@@ -165,6 +165,12 @@ export const LifecycleRecordSchema = z.union([
     decision: z.enum(['keep', 'rebuild', 'quarantined']),
     reason: z.string().optional(),
     errorCode: z.string().optional(),
+  }),
+  z.strictObject({
+    ...header,
+    kind: z.literal('previous_instance_diagnosed'),
+    diagnosedInstanceId: z.string(),
+    classification: z.enum(PREVIOUS_INSTANCE_CLASSIFICATIONS),
   }),
   z.strictObject({
     ...header,

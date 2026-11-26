@@ -14,3 +14,38 @@ export interface CrashFilesSummary {
   count: number;
   bytes: number;
 }
+
+/**
+ * How the previous launch most likely ended when it left its instance lock behind, judged at the next launch from the
+ * lock, its lifecycle ledger records and new minidumps. `killed-or-power-loss-suspected` is the honest "nothing was
+ * recorded": the process vanished without a fault, a crash file or a shutdown.
+ */
+export const PREVIOUS_INSTANCE_CLASSIFICATIONS = [
+  'js-fatal',
+  'native-crash-suspected',
+  'renderer-gone',
+  'child-process-gone',
+  'shutdown-interrupted',
+  'killed-or-power-loss-suspected',
+] as const;
+export type PreviousInstanceClassification = (typeof PREVIOUS_INSTANCE_CLASSIFICATIONS)[number];
+
+/** Why an interrupted record ended: the previous launch's classification, or `unknown` for an older launch. */
+export type InterruptionCause = PreviousInstanceClassification | 'unknown';
+
+/** What the startup notice and its "Copy details" say about a previous launch that did not end cleanly. */
+export interface PreviousInstanceNotice {
+  classification: PreviousInstanceClassification;
+  /** The previous launch's lifecycle instance id; empty when neither its lock nor the ledger named it. */
+  instanceId: string;
+  pid: number;
+  /** When its last ledger record was written (epoch ms), the closest known time to its end. */
+  lastRecordAt: number | null;
+  lastRecord: string | null;
+  process?: string;
+  reason?: string;
+  exitCode?: number;
+  crashFiles: number;
+  /** Turns it started and never finished. */
+  interruptedTurns: Array<{ sessionId: string | null; turnId: string }>;
+}

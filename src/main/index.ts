@@ -51,6 +51,7 @@ import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
 import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
 import { abnormalSupervisedExit, goneProcessKind, lifecycleLedger } from './runtime/LifecycleLedger';
 import { pruneCrashDumps, startLocalCrashReporter } from './runtime/crashFiles';
+import { adoptPreviousInstanceDiagnosis, diagnosePreviousInstanceFromDisk } from './runtime/previousInstanceDiagnosis';
 import { currentHost } from './platform/host';
 import { currentProcessIdentity } from './platform/process';
 import type { ShutdownCause } from '@shared/types/lifecycle';
@@ -256,6 +257,7 @@ const userDataLock = acquireUserDataInstanceLock(userDataPath, {
   ...processIdentity,
   mode: instanceMode,
   startTs: new Date().toISOString(),
+  instanceId: lifecycleLedger.instanceId,
 });
 if (!userDataLock.acquired) {
   const owner = userDataLock.owner;
@@ -276,6 +278,21 @@ if (!userDataLock.acquired) {
     const event = abnormalSupervisedExit(owner, info);
     if (event) lifecycleLedger.record(event);
   });
+  // A lock the previous launch never released: say how it most likely ended before anything reads a session, and
+  // before crash-file retention runs, so its minidumps still count.
+  if (userDataLock.staleOwner) {
+    const diagnosis = diagnosePreviousInstanceFromDisk(userDataLock.staleOwner);
+    adoptPreviousInstanceDiagnosis(diagnosis);
+    lifecycleLedger.record({
+      kind: 'previous_instance_diagnosed',
+      diagnosedInstanceId: diagnosis.instanceId,
+      classification: diagnosis.classification,
+    });
+    console.warn(
+      '[RDC-Agent] The previous launch did not end cleanly:',
+      JSON.stringify({ ...diagnosis, interruptedTurns: diagnosis.interruptedTurns.length }),
+    );
+  }
   // Local minidumps only, for the instance that owns this data directory; the disposable Browser QA instance has none.
   if (!useDisposableBrowserQaUserData) {
     try {

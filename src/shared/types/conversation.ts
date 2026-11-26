@@ -1,4 +1,4 @@
-import type { TurnStopCause } from './lifecycle';
+import type { InterruptionCause, TurnStopCause } from './lifecycle';
 import type { AgentRole } from './agent';
 import type { TaskDependencyWait } from './taskExecution';
 import type { ConversationTurnControls } from './modelCapability';
@@ -141,8 +141,11 @@ export interface ConversationContinuationDrop {
   reasons: Array<{ reason: string; count: number }>;
 }
 
+/** Codes whose diagnostic carries structured facts the renderer words itself. */
+type StructuredDiagnosticCode = 'MODEL_CONTINUATION_DROPPED' | 'CONVERSATION_INTERRUPTED';
+
 interface ConversationMessageDiagnosticBase {
-  code: Exclude<ConversationMessageDiagnosticCode, 'MODEL_CONTINUATION_DROPPED'>;
+  code: Exclude<ConversationMessageDiagnosticCode, StructuredDiagnosticCode>;
   severity: 'warning' | 'error';
   userMessage: string;
   agentId?: AgentRole;
@@ -159,7 +162,17 @@ export interface ConversationContinuationDropDiagnostic extends Omit<Conversatio
   continuationDrop: ConversationContinuationDrop;
 }
 
-export type ConversationMessageDiagnostic = ConversationMessageDiagnosticBase | ConversationContinuationDropDiagnostic;
+/**
+ * A turn that had no producer after a restart. Its cause is the previous launch's classification when that launch
+ * started the turn, else `unknown`; the renderer words it in the interface language.
+ */
+export interface ConversationInterruptedDiagnostic extends Omit<ConversationMessageDiagnosticBase, 'code'> {
+  code: 'CONVERSATION_INTERRUPTED';
+  interruption: { cause: InterruptionCause };
+}
+
+export type ConversationMessageDiagnostic =
+  ConversationMessageDiagnosticBase | ConversationContinuationDropDiagnostic | ConversationInterruptedDiagnostic;
 
 export interface ConversationToolCall {
   /** Runtime Hook events owned by this exact call, in arrival order. */

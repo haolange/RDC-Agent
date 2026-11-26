@@ -522,6 +522,18 @@ export const enErrors = {
   'errors.USER_INPUT_REQUEST_NOT_FOUND': 'This question is no longer waiting for an answer.',
   'errors.TOOL_APPROVAL_REQUEST_NOT_FOUND': 'This approval request is no longer pending.',
   'errors.PUBLIC_REQUEST_FAILED': "The website couldn't be reached.",
+  'errors.PREVIOUS_INSTANCE_JS_FATAL':
+    'RDC-Agent stopped last time after an unexpected internal error. Requests that were running are marked as interrupted.',
+  'errors.PREVIOUS_INSTANCE_NATIVE_CRASH':
+    'RDC-Agent crashed last time. Requests that were running are marked as interrupted.',
+  'errors.PREVIOUS_INSTANCE_RENDERER_GONE':
+    "RDC-Agent's window stopped working last time and the app did not close normally. Requests that were running are marked as interrupted.",
+  'errors.PREVIOUS_INSTANCE_CHILD_PROCESS_GONE':
+    'A helper process of RDC-Agent stopped last time and the app did not close normally. Requests that were running are marked as interrupted.',
+  'errors.PREVIOUS_INSTANCE_SHUTDOWN_INTERRUPTED':
+    'RDC-Agent did not finish closing last time. Requests that were running are marked as interrupted.',
+  'errors.PREVIOUS_INSTANCE_KILLED':
+    'RDC-Agent did not close normally last time; it may have been ended by the system or lost power. Requests that were running are marked as interrupted.',
   'errors.PROVIDER_ACCOUNT_LOGIN_FAILED': 'Signing in to the model provider failed. Check the details and try again.',
   'errors.PROVIDER_CONNECTION_FAILED': "The model provider couldn't be reached or refused the request.",
   'errors.RDC_NATIVE_FAILURE': 'RenderDoc tooling reported a failure.',
