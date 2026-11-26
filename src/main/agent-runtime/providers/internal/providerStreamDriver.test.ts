@@ -104,10 +104,67 @@ describe('startProviderStream', () => {
   });
 });
 
+describe('startProviderStream watchdog', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+  const watched: StreamOptions = { requestPlan, firstChunkTimeoutMs: 100, streamIdleTimeoutMs: 50 };
+
+  it('times out a request whose response headers never arrive, from dispatch', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+          }),
+      ),
+    );
+    const stream = startProviderStream({ providerApi: 'fixture', model, options: watched }, async ({ signal }) => {
+      await sendProviderRequest('fixture', requestPlan, signal, { url: 'https://x.test', headers: {}, body: {} });
+      return { sawOutput: true };
+    });
+    const failed = errorEvent(stream);
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    const event = await failed;
+    expect(event?.error).toMatchObject({ name: 'ProviderTimeoutError', phase: 'first-byte', afterContent: false });
+    expect(event?.message.stopReason).toBe('error');
+  });
+
+  it('keeps a stream alive for as long as chunks keep arriving and reports an idle timeout after content', async () => {
+    vi.useFakeTimers();
+    const stream = startProviderStream(
+      { providerApi: 'fixture', model, options: watched },
+      async ({ builder, signal, touch }) => {
+        builder.startText(textRef);
+        for (let i = 0; i < 20; i += 1) {
+          touch();
+          builder.appendText(textRef, 'x');
+          await new Promise((resolve) => setTimeout(resolve, 40));
+        }
+        await new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason)));
+        return { sawOutput: true };
+      },
+    );
+    const failed = errorEvent(stream);
+
+    await vi.advanceTimersByTimeAsync(40 * 20);
+    await vi.advanceTimersByTimeAsync(50);
+
+    const event = await failed;
+    expect(event?.error).toMatchObject({ phase: 'idle', timeoutMs: 50, afterContent: true });
+    expect(event?.message.content).toEqual([expect.objectContaining({ type: 'text', text: 'x'.repeat(20) })]);
+  });
+});
+
 describe('httpStreamFailure', () => {
   it('reports an abort with the reason the signal fired, so a timeout stays a timeout', () => {
     const controller = new AbortController();
-    const timeout = new ProviderTimeoutError('fixture', 'total', 10);
+    const timeout = new ProviderTimeoutError('fixture', 'idle', 10);
     controller.abort(timeout);
 
     expect(httpStreamFailure(new DOMException('aborted', 'AbortError'), controller.signal)).toEqual({

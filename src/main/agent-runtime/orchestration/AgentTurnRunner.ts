@@ -15,6 +15,7 @@ import {
 } from '../permissions/PermissionReviewAuthority';
 import { executePermissionReview } from '../permissions/PermissionReviewRuntime';
 import { delegatedArtifactReferences } from '../../sessions/artifacts/DelegatedArtifactAccess';
+import { providerFirstByteTimeoutMs } from '../providers/internal/streamWatchdog';
 import { TokenizerService } from '../core/TokenizerService';
 import { isExplicitStructuredToolCallingRejection } from '../capabilities/RouteCapabilityResolver';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
@@ -279,6 +280,7 @@ export class AgentTurnRunner {
       reasoning: requestPlan.reasoningWire,
       reasoningVisibility: requestPlan.reasoningWire.selection === 'off' ? 'none' : routeCapability.reasoningVisibility,
       signal: input.options?.signal,
+      firstChunkTimeoutMs: providerFirstByteTimeoutMs(requestPlan),
       requestPlan,
       promptCache,
       credentialHandle: preparedRuntime.credentialHandle,

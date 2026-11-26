@@ -1,7 +1,15 @@
 import { EventStream } from '../../core/EventStream';
 import { recordQuotaFromResponse } from '../../../settings/provider-catalog/ProviderQuota';
 import { AssistantStreamBuilder, parseProviderFrame } from './AssistantStreamBuilder';
-import { composeAbortSignals, ensureOk, normalizeError, parseJsonLines, parseSSE } from './http';
+import {
+  composeAbortSignals,
+  ensureOk,
+  normalizeError,
+  parseJsonLines,
+  parseSSE,
+  registerStreamActivity,
+} from './http';
+import { StreamWatchdog } from './streamWatchdog';
 import type { ZodType } from 'zod';
 import type { ProviderRequestAuthorizer } from '../../../settings/provider-auth/AwsBedrockCredentials';
 import type { RequestPlan } from '@shared/types/providerCapability';
@@ -11,6 +19,8 @@ import type { AssistantMessage, AssistantMessageEvent, Model, StopReason, Stream
 export interface ProviderStreamRun {
   builder: AssistantStreamBuilder;
   signal: AbortSignal;
+  /** Reports a received chunk or part to the stream watchdog; the shared frame readers do this themselves. */
+  touch: () => void;
 }
 
 /** How a failed request ends the message: the error the stream rejects with and the stop reason it records. */
@@ -62,15 +72,25 @@ async function driveProviderStream(
   run: (stream: ProviderStreamRun) => Promise<{ sawOutput: boolean }>,
 ): Promise<void> {
   const { providerApi, options } = request;
-  const composed = composeAbortSignals(options.signal, stream.signal, { providerApi, ...options });
+  const composed = composeAbortSignals(options.signal, stream.signal);
+  const watchdog = new StreamWatchdog({
+    providerApi,
+    firstChunkTimeoutMs: options.firstChunkTimeoutMs,
+    streamIdleTimeoutMs: options.streamIdleTimeoutMs,
+    abort: composed.abort,
+    hasOutput: () => builder.hasOutput,
+  });
+  registerStreamActivity(composed.signal, () => watchdog.touch());
   try {
     builder.start();
-    const { sawOutput } = await run({ builder, signal: composed.signal });
+    watchdog.start();
+    const { sawOutput } = await run({ builder, signal: composed.signal, touch: () => watchdog.touch() });
     builder.finish({ signal: composed.signal, sawOutput, providerApi });
   } catch (thrown) {
     const failure = (request.failure ?? httpStreamFailure)(thrown, composed.signal);
     builder.fail(failure.error, failure.reason);
   } finally {
+    watchdog.dispose();
     composed.dispose();
   }
 }

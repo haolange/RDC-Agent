@@ -120,6 +120,17 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 | `ProviderStreamProtocolError` | `PROVIDER_STREAM_TRUNCATED` | 已有输出、连接关闭，但没收到该协议的终止信号（`message_stop`、`finish_reason`、`[DONE]`、`done:true`、`response.completed` 等）；半截答案与半截工具调用不入库为完成 |
 | `ProviderStreamProtocolError` | `PROVIDER_STREAM_MALFORMED_FRAME` | 流中一帧不是 JSON；不跳过、不拼接后续帧 |
 
+### Provider 请求时限（`providers/internal/streamWatchdog.ts`）
+
+每条 provider 流只有一个看门狗，由 `startProviderStream` 持有；适配器与帧读取器不自带计时器，也没有总时长上限。
+
+| 阶段 | 起算 | 时限 | 超时 |
+| --- | --- | --- | --- |
+| `first-byte` | 请求发出时（覆盖建连、响应头与首个 chunk） | `providerFirstByteTimeoutMs(plan)`：`reasoningWire.control.kind` 为 `none`，或 `selection` 为 `off` 时 **20s**；否则 **180s**（推理模型可能长时间不出字） | `ProviderTimeoutError`（`PROVIDER_TIMEOUT`，`phase: 'first-byte'`） |
+| `idle` | 每收到一个 chunk / part（含 keepalive 字节；AI SDK 路径按 stream part，`start` 除外）后重置 | **60s** | `ProviderTimeoutError`（`phase: 'idle'`） |
+
+只要持续有进展，流就不会被总时长截断。AI SDK 路径的超时按超时错误报告（`stopReason: 'error'`），不再报成 `aborted`。
+
 ### ErrorRecovery 分类与重试
 
 | category | 行为 |

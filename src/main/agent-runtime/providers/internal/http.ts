@@ -1,13 +1,7 @@
 import { AppError } from '@shared/errors/appError';
-export type ProviderTimeoutPhase = 'first-byte' | 'idle' | 'total';
+export type ProviderTimeoutPhase = 'first-byte' | 'idle';
 
-export interface ProviderStreamTimeoutOptions {
-  firstChunkTimeoutMs?: number;
-  streamIdleTimeoutMs?: number;
-  requestTimeoutMs?: number;
-}
-
-export interface ProviderStreamReadOptions extends ProviderStreamTimeoutOptions {
+export interface ProviderStreamReadOptions {
   providerApi: string;
   /** Max incomplete-line buffer bytes before fail-closed. Default 8 MiB. */
   maxBufferBytes?: number;
@@ -15,9 +9,6 @@ export interface ProviderStreamReadOptions extends ProviderStreamTimeoutOptions 
   onDoneSentinel?: () => void;
 }
 
-export const DEFAULT_PROVIDER_FIRST_CHUNK_TIMEOUT_MS = 20_000;
-export const DEFAULT_PROVIDER_STREAM_IDLE_TIMEOUT_MS = 60_000;
-export const DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS = 300_000;
 export const DEFAULT_PROVIDER_MAX_BUFFER_BYTES = 8 * 1024 * 1024;
 
 export class ProviderStreamBufferError extends AppError {
@@ -35,23 +26,20 @@ export class ProviderStreamBufferError extends AppError {
   }
 }
 
-interface ResolvedProviderTimeouts {
-  firstChunkTimeoutMs: number;
-  streamIdleTimeoutMs: number;
-  requestTimeoutMs: number;
-}
-
 export class ProviderTimeoutError extends AppError {
   readonly phase: ProviderTimeoutPhase;
   readonly timeoutMs: number;
   readonly providerApi: string;
+  /** Whether the stream had already produced model output (text, thinking or a tool call) when the timer fired. */
+  readonly afterContent: boolean;
 
-  constructor(providerApi: string, phase: ProviderTimeoutPhase, timeoutMs: number) {
+  constructor(providerApi: string, phase: ProviderTimeoutPhase, timeoutMs: number, afterContent = false) {
     super('PROVIDER_TIMEOUT', `[${providerApi}] provider stream ${phase} timeout after ${timeoutMs}ms`);
     this.name = 'ProviderTimeoutError';
     this.providerApi = providerApi;
     this.phase = phase;
     this.timeoutMs = timeoutMs;
+    this.afterContent = afterContent;
   }
 }
 
@@ -127,15 +115,21 @@ export function isProviderEmptyStreamError(error: unknown): error is ProviderEmp
 
 export interface ComposedSignal {
   signal: AbortSignal;
+  /** Aborts the composed signal with `reason`; a no-op once it has aborted. */
+  abort: (reason: unknown) => void;
   dispose: () => void;
 }
 
-export function resolveProviderTimeouts(options: ProviderStreamTimeoutOptions = {}): ResolvedProviderTimeouts {
-  return {
-    firstChunkTimeoutMs: options.firstChunkTimeoutMs ?? DEFAULT_PROVIDER_FIRST_CHUNK_TIMEOUT_MS,
-    streamIdleTimeoutMs: options.streamIdleTimeoutMs ?? DEFAULT_PROVIDER_STREAM_IDLE_TIMEOUT_MS,
-    requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS,
-  };
+const streamActivity = new WeakMap<AbortSignal, () => void>();
+
+/** Lets the stream readers report received bytes on `signal` to the watchdog that bounds that stream. */
+export function registerStreamActivity(signal: AbortSignal, touch: () => void): void {
+  streamActivity.set(signal, touch);
+}
+
+/** Reports that a chunk arrived on the stream guarded through `signal`; a no-op for an unguarded signal. */
+export function touchStreamWatchdog(signal: AbortSignal | undefined): void {
+  if (signal) streamActivity.get(signal)?.();
 }
 
 export interface SseRecord {
@@ -161,23 +155,15 @@ export async function* parseSSERecords(
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  const timeouts = resolveProviderTimeouts(options);
   const maxBufferBytes = options.maxBufferBytes ?? DEFAULT_PROVIDER_MAX_BUFFER_BYTES;
   let buffer = '';
-  let hasReadChunk = false;
   let eventName: string | null = null;
 
   try {
     while (true) {
       throwIfAborted(signal);
-      const { done, value } = await readWithTimeout(
-        reader,
-        signal,
-        options.providerApi,
-        hasReadChunk ? 'idle' : 'first-byte',
-        hasReadChunk ? timeouts.streamIdleTimeoutMs : timeouts.firstChunkTimeoutMs,
-      );
-      hasReadChunk = true;
+      const { done, value } = await readAbortable(reader, signal);
+      touchStreamWatchdog(signal);
       if (done) {
         break;
       }
@@ -233,22 +219,14 @@ export async function* parseJsonLines(
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  const timeouts = resolveProviderTimeouts(options);
   const maxBufferBytes = options.maxBufferBytes ?? DEFAULT_PROVIDER_MAX_BUFFER_BYTES;
   let buffer = '';
-  let hasReadChunk = false;
 
   try {
     while (true) {
       throwIfAborted(signal);
-      const { done, value } = await readWithTimeout(
-        reader,
-        signal,
-        options.providerApi,
-        hasReadChunk ? 'idle' : 'first-byte',
-        hasReadChunk ? timeouts.streamIdleTimeoutMs : timeouts.firstChunkTimeoutMs,
-      );
-      hasReadChunk = true;
+      const { done, value } = await readAbortable(reader, signal);
+      touchStreamWatchdog(signal);
       if (done) {
         break;
       }
@@ -311,14 +289,8 @@ export function nowMs(): number {
   return Date.now();
 }
 
-export function composeAbortSignals(
-  external: AbortSignal | undefined,
-  internal: AbortSignal,
-  timeoutOptions: (ProviderStreamTimeoutOptions & { providerApi: string }) | undefined = undefined,
-): ComposedSignal {
+export function composeAbortSignals(external: AbortSignal | undefined, internal: AbortSignal): ComposedSignal {
   const controller = new AbortController();
-  const providerApi = timeoutOptions?.providerApi ?? 'provider';
-  const requestTimeoutMs = resolveProviderTimeouts(timeoutOptions).requestTimeoutMs;
   const onAbort = (reason: unknown): void => {
     if (!controller.signal.aborted) {
       controller.abort(reason);
@@ -342,19 +314,12 @@ export function composeAbortSignals(
     }
   }
 
-  const timeoutId =
-    Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0
-      ? setTimeout(() => onAbort(new ProviderTimeoutError(providerApi, 'total', requestTimeoutMs)), requestTimeoutMs)
-      : null;
-
   return {
     signal: controller.signal,
+    abort: onAbort,
     dispose: () => {
       internal.removeEventListener('abort', internalAbort);
       external?.removeEventListener('abort', externalAbort);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
     },
   };
 }
@@ -419,56 +384,32 @@ export function createResponsesStreamFailure(
   return new ProviderWireFailureError(providerApi, message, { code: wireCode, bodyText });
 }
 
-async function readWithTimeout(
+/** One read that rejects with the signal's reason as soon as it aborts; the stream watchdog is what bounds waiting. */
+function readAbortable(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   signal: AbortSignal | undefined,
-  providerApi: string,
-  phase: ProviderTimeoutPhase,
-  timeoutMs: number,
 ): Promise<ReadableStreamReadResult<Uint8Array>> {
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-    return reader.read();
-  }
-
+  if (!signal) return reader.read();
   return new Promise<ReadableStreamReadResult<Uint8Array>>((resolve, reject) => {
-    let settled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const cleanup = (): void => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-      signal?.removeEventListener('abort', onAbort);
-    };
-
-    const finish = (callback: () => void): void => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      callback();
-    };
-
     const onAbort = (): void => {
-      finish(() => reject(abortErrorFromSignal(signal)));
-    };
-
-    if (signal?.aborted) {
+      void reader.cancel(signal.reason).catch(() => undefined);
       reject(abortErrorFromSignal(signal));
+    };
+    if (signal.aborted) {
+      onAbort();
       return;
     }
-
-    signal?.addEventListener('abort', onAbort, { once: true });
-    timeoutId = setTimeout(() => {
-      const error = new ProviderTimeoutError(providerApi, phase, timeoutMs);
-      void reader.cancel(error).catch(() => undefined);
-      finish(() => reject(error));
-    }, timeoutMs);
-
-    reader
-      .read()
-      .then((result) => finish(() => resolve(result)))
-      .catch((error) => finish(() => reject(error)));
+    signal.addEventListener('abort', onAbort, { once: true });
+    reader.read().then(
+      (result) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(result);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
   });
 }
 

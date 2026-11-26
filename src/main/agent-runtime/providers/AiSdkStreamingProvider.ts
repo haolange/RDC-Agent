@@ -63,7 +63,7 @@ export class AiSdkStreamingProvider implements ProviderStrategy {
   }
   stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     const request = { providerApi: this.api, model, options, failure: sdkStreamFailure };
-    return startProviderStream(request, async ({ builder, signal }) => {
+    return startProviderStream(request, async ({ builder, signal, touch }) => {
       if (options.requestPlan.effectiveModelId !== model.id)
         throw new Error(`RequestPlan model ${options.requestPlan.effectiveModelId} does not match ${model.id}.`);
       const languageModel = await this.createModel(model, context, options);
@@ -79,7 +79,7 @@ export class AiSdkStreamingProvider implements ProviderStrategy {
         abortSignal: signal,
         maxRetries: 0,
       });
-      return { sawOutput: await consumeFullStream(result.fullStream, builder, model) };
+      return { sawOutput: await consumeFullStream(result.fullStream, builder, model, touch) };
     });
   }
 }
@@ -160,6 +160,7 @@ async function consumeFullStream(
   parts: AsyncIterable<TextStreamPart<ToolSet>>,
   builder: AssistantStreamBuilder,
   model: Model,
+  touch: () => void,
 ): Promise<boolean> {
   const channels = new StreamChannelRefs(model.api);
   const toolCalls = new ToolCallAccumulator<string>(builder);
@@ -176,6 +177,8 @@ async function consumeFullStream(
   };
 
   for await (const part of parts) {
+    // The SDK emits `start` before any request is sent, so it is not evidence that the provider answered.
+    if (part.type !== 'start') touch();
     const partWithId = part as TextStreamPart<ToolSet> & { id?: string };
     if (part.type === 'text-start') {
       builder.startText(refFor(part.id));
