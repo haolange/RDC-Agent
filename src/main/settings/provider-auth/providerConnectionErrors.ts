@@ -1,17 +1,19 @@
+import { AppError } from '@shared/errors/appError';
 import type { ProviderConnectionErrorCode, ProviderConnectionErrorParams } from '@shared/types/settings';
 
 /**
- * A connection failure the person can act on carries a code (and params) the renderer translates; the
- * message is the English technical fallback for logs and for failures without a code.
+ * A connection failure the person can act on carries a connection code (and params) the renderer translates into
+ * the provider settings copy; the message is the English technical fallback for logs and for failures without one.
  */
-export class ProviderConnectionError extends Error {
+export class ProviderConnectionError extends AppError {
   constructor(
     message: string,
     readonly httpStatus?: number,
-    readonly code?: ProviderConnectionErrorCode,
-    readonly params?: ProviderConnectionErrorParams,
+    readonly connectionCode?: ProviderConnectionErrorCode,
+    readonly connectionParams?: ProviderConnectionErrorParams,
   ) {
-    super(message);
+    super('PROVIDER_CONNECTION_FAILED', message);
+    this.name = 'ProviderConnectionError';
   }
 }
 
@@ -35,8 +37,8 @@ export function describeProviderError(error: unknown): ParsedProviderError {
   if (error instanceof ProviderConnectionError) {
     return {
       error: error.message,
-      ...(error.code ? { errorCode: error.code } : {}),
-      ...(error.params ? { errorParams: error.params } : {}),
+      ...(error.connectionCode ? { errorCode: error.connectionCode } : {}),
+      ...(error.connectionParams ? { errorParams: error.connectionParams } : {}),
     };
   }
   if (error instanceof DOMException && error.name === 'AbortError') {

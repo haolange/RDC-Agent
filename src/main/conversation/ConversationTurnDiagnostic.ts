@@ -166,7 +166,7 @@ function isStreamProtocolTurnFailure(error: unknown): boolean {
   if (isProviderStreamProtocolError(error)) {
     return true;
   }
-  return error instanceof AgentRecoveryAbortError && error.category === 'stream_protocol';
+  return error instanceof AgentRecoveryAbortError && error.recoveryCategory === 'stream_protocol';
 }
 
 type LlmFailureClass =
@@ -188,7 +188,7 @@ function classifyLlmRequestFailure(error: unknown): LlmRequestFailure {
   const maxAttempts = abort?.maxAttempts ?? 1;
   const snippetSource = abort?.bodySnippet ?? http?.bodyText ?? causeSnippet(error);
   const snippet = redactTechnicalMessage(snippetSource);
-  const category = abort?.category ?? inferLlmFailureCategory(error, status);
+  const category = abort?.recoveryCategory ?? inferLlmFailureCategory(error, status);
   const kind = llmFailureKind(category, status, error);
   return { kind, status, attempts, maxAttempts, snippet };
 }

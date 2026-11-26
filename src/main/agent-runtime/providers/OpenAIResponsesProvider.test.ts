@@ -328,7 +328,7 @@ describe('OpenAIResponsesProvider empty stream', () => {
     expect(error).toMatchObject({
       name: 'ProviderEmptyStreamError',
       code: 'PROVIDER_STREAM_EMPTY',
-      message: 'Provider stream ended without assistant output or structured tool call.',
+      message: 'PROVIDER_STREAM_EMPTY: Provider stream ended without assistant output or structured tool call.',
     });
     expect(error).not.toMatchObject({ status: 502 });
   });

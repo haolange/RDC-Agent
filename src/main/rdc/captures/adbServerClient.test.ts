@@ -97,7 +97,7 @@ describe('queryAdbDevicesLines', () => {
     expect(lines).toEqual(['SERIAL1\tdevice product:foo model:Pixel device:bar', 'SERIAL2\toffline', '']);
   });
 
-  it('maps FAIL responses to protocol-failure', async () => {
+  it('maps FAIL responses to ADB_SERVER_PROTOCOL', async () => {
     const message = 'cannot connect';
     const lengthHex = message.length.toString(16).padStart(4, '0');
     const mock = await listenEphemeral((socket) => {
@@ -111,8 +111,8 @@ describe('queryAdbDevicesLines', () => {
     await expect(rejection).rejects.toBeInstanceOf(AdbServerProtocolError);
     await expect(rejection).rejects.toMatchObject({
       name: 'AdbServerProtocolError',
-      code: 'protocol-failure',
-      message,
+      code: 'ADB_SERVER_PROTOCOL',
+      message: `ADB_SERVER_PROTOCOL: ${message}`,
     });
   });
 
@@ -133,7 +133,7 @@ describe('queryAdbDevicesLines', () => {
 
     const rejection = queryAdbDevicesLines({ host: '127.0.0.1', port, timeoutMs: 500 });
     await expect(rejection).rejects.toBeInstanceOf(AdbServerUnreachableError);
-    await expect(rejection).rejects.toMatchObject({ code: 'server-unreachable' });
+    await expect(rejection).rejects.toMatchObject({ code: 'ADB_SERVER_UNREACHABLE' });
   });
 
   it('times out hung responses as AdbServerUnreachableError', async () => {

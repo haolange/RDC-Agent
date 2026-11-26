@@ -350,7 +350,7 @@ describe('AgentLoop recovery diagnostics', () => {
     expect(attempts).toBe(4);
     expect(rejected).toBeInstanceOf(AgentRecoveryAbortError);
     expect(rejected).toMatchObject({
-      category: 'server_error',
+      recoveryCategory: 'server_error',
       lastStatus: 500,
       attempts: 4,
       maxAttempts: 4,
@@ -410,7 +410,7 @@ describe('AgentLoop recovery diagnostics', () => {
     expect(attempts).toBe(2);
     expect(rejected).toBeInstanceOf(AgentRecoveryAbortError);
     expect(rejected).toMatchObject({
-      category: 'empty_stream',
+      recoveryCategory: 'empty_stream',
       attempts: 2,
       maxAttempts: 2,
     });

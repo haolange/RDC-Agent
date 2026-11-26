@@ -30,7 +30,7 @@ describe('provider http stream helpers', () => {
     );
 
     await expect(ensureOk(response, 'openai-compatible')).rejects.toMatchObject({
-      message: '[openai-compatible] HTTP 502: opencode.ai | 502: Bad gateway',
+      message: 'PROVIDER_HTTP_ERROR: [openai-compatible] HTTP 502: opencode.ai | 502: Bad gateway',
       status: 502,
     });
   });

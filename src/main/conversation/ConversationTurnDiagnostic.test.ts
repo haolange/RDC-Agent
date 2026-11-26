@@ -116,7 +116,7 @@ describe('conversation turn failure classification', () => {
     expect(diagnostic.code).toBe('CONVERSATION_LLM_REQUEST_FAILED');
     expect(diagnostic.userMessage).toContain('服务没有返回答复或工具调用');
     expect(diagnostic.technicalMessage).toBe(
-      'provider HTTP n/a · attempts 2/2 · Provider stream ended without assistant output or structured tool call.',
+      'provider HTTP n/a · attempts 2/2 · PROVIDER_STREAM_EMPTY: Provider stream ended without assistant output or structured tool call.',
     );
   });
 

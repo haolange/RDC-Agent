@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import type { AssistantMessage, ToolCallContent, ToolDefinition, ToolResultMessage } from '../core/types';
 
 export type AgentLoopTerminationCode = 'AGENT_NO_PROGRESS' | 'AGENT_MAX_TURNS_EXCEEDED';
 
-export class AgentLoopTerminationError extends Error {
-  readonly code: AgentLoopTerminationCode;
+export class AgentLoopTerminationError extends AppError {
+  declare readonly code: AgentLoopTerminationCode;
   readonly turn: number;
   readonly maxTurns?: number;
   readonly noProgressReason?: 'runtime-obligation';
@@ -14,9 +15,8 @@ export class AgentLoopTerminationError extends Error {
     message: string,
     options: { turn: number; maxTurns?: number; noProgressReason?: 'runtime-obligation' },
   ) {
-    super(message);
+    super(code, message);
     this.name = 'AgentLoopTerminationError';
-    this.code = code;
     this.turn = options.turn;
     this.maxTurns = options.maxTurns;
     this.noProgressReason = options.noProgressReason;

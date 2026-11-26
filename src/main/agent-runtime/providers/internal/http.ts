@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 export type ProviderTimeoutPhase = 'first-byte' | 'idle' | 'total';
 
 export interface ProviderStreamTimeoutOptions {
@@ -19,12 +20,15 @@ export const DEFAULT_PROVIDER_STREAM_IDLE_TIMEOUT_MS = 60_000;
 export const DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS = 300_000;
 export const DEFAULT_PROVIDER_MAX_BUFFER_BYTES = 8 * 1024 * 1024;
 
-export class ProviderStreamBufferError extends Error {
+export class ProviderStreamBufferError extends AppError {
   readonly providerApi: string;
   readonly maxBufferBytes: number;
 
   constructor(providerApi: string, maxBufferBytes: number) {
-    super(`[${providerApi}] provider stream buffer exceeded ${maxBufferBytes} bytes`);
+    super(
+      'PROVIDER_STREAM_BUFFER_EXCEEDED',
+      `[${providerApi}] provider stream buffer exceeded ${maxBufferBytes} bytes`,
+    );
     this.name = 'ProviderStreamBufferError';
     this.providerApi = providerApi;
     this.maxBufferBytes = maxBufferBytes;
@@ -37,13 +41,13 @@ interface ResolvedProviderTimeouts {
   requestTimeoutMs: number;
 }
 
-export class ProviderTimeoutError extends Error {
+export class ProviderTimeoutError extends AppError {
   readonly phase: ProviderTimeoutPhase;
   readonly timeoutMs: number;
   readonly providerApi: string;
 
   constructor(providerApi: string, phase: ProviderTimeoutPhase, timeoutMs: number) {
-    super(`[${providerApi}] provider stream ${phase} timeout after ${timeoutMs}ms`);
+    super('PROVIDER_TIMEOUT', `[${providerApi}] provider stream ${phase} timeout after ${timeoutMs}ms`);
     this.name = 'ProviderTimeoutError';
     this.providerApi = providerApi;
     this.phase = phase;
@@ -51,7 +55,7 @@ export class ProviderTimeoutError extends Error {
   }
 }
 
-export class ProviderHttpError extends Error {
+export class ProviderHttpError extends AppError {
   readonly status: number;
   readonly providerApi: string;
   readonly bodyText?: string;
@@ -59,7 +63,7 @@ export class ProviderHttpError extends Error {
   readonly retryAfterMs?: number;
 
   constructor(providerApi: string, status: number, message: string, bodyText?: string, retryAfterMs?: number) {
-    super(`[${providerApi}] HTTP ${status}: ${message}`);
+    super('PROVIDER_HTTP_ERROR', `[${providerApi}] HTTP ${status}: ${message}`);
     this.name = 'ProviderHttpError';
     this.providerApi = providerApi;
     this.status = status;
@@ -81,24 +85,24 @@ export function parseRetryAfterMs(headers: { get(name: string): string | null },
 
 export const PROVIDER_EMPTY_STREAM_MESSAGE = 'Provider stream ended without assistant output or structured tool call.';
 
-export class ProviderEmptyStreamError extends Error {
-  readonly code = 'PROVIDER_STREAM_EMPTY' as const;
+export class ProviderEmptyStreamError extends AppError {
+  declare readonly code: 'PROVIDER_STREAM_EMPTY';
   readonly providerApi: string;
 
   constructor(providerApi: string, message = PROVIDER_EMPTY_STREAM_MESSAGE) {
-    super(message);
+    super('PROVIDER_STREAM_EMPTY', message);
     this.name = 'ProviderEmptyStreamError';
     this.providerApi = providerApi;
   }
 }
 
-export class ProviderWireFailureError extends Error {
+export class ProviderWireFailureError extends AppError {
   readonly providerApi: string;
   readonly wireCode?: string;
   readonly bodyText?: string;
 
   constructor(providerApi: string, message: string, options?: { code?: string; bodyText?: string }) {
-    super(`[${providerApi}] ${message}`);
+    super('PROVIDER_WIRE_FAILURE', `[${providerApi}] ${message}`);
     this.name = 'ProviderWireFailureError';
     this.providerApi = providerApi;
     this.wireCode = options?.code;

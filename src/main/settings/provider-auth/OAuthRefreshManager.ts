@@ -1,16 +1,18 @@
+import { AppError } from '@shared/errors/appError';
 import type { ProviderAccountKey } from '../provider-catalog/providerCatalogTypes';
 
 export const DEFAULT_OAUTH_REFRESH_SKEW_MS = 60_000;
 
-export class OAuthRefreshError extends Error {
-  readonly code: 'INVALID_GRANT';
+export class OAuthRefreshError extends AppError {
+  declare readonly code: 'INVALID_GRANT';
   readonly providerId: string;
   readonly accountId: string;
 
   constructor(key: ProviderAccountKey, cause: unknown) {
-    super(`OAuth refresh grant is invalid for ${key.providerId}/${key.accountId}; sign in again.`, { cause });
+    super('INVALID_GRANT', `OAuth refresh grant is invalid for ${key.providerId}/${key.accountId}; sign in again.`, {
+      cause,
+    });
     this.name = 'OAuthRefreshError';
-    this.code = 'INVALID_GRANT';
     this.providerId = key.providerId;
     this.accountId = key.accountId;
   }

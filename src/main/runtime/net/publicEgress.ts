@@ -1,15 +1,17 @@
+import { AppError } from '@shared/errors/appError';
 import { requestPinned } from './pinnedTransport';
 import { pinPublicUrl, PublicUrlDeniedError } from './publicAddress';
 
 export { PublicUrlDeniedError } from './publicAddress';
 
 /** The request to a validated public address did not complete: network failure, timeout, abort or a broken redirect. */
-export class PublicRequestFailedError extends Error {
+export class PublicRequestFailedError extends AppError {
   constructor(
     readonly url: string,
     cause: unknown,
   ) {
-    super(`Public request to ${url} failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    super('PUBLIC_REQUEST_FAILED', `${url}: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    this.name = 'PublicRequestFailedError';
   }
 }
 

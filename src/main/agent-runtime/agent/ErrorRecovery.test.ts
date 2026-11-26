@@ -302,7 +302,7 @@ describe('ErrorRecovery', () => {
       const abortError = recovery.createAbortError(original, action.reason);
       expect(abortError).toBeInstanceOf(AgentRecoveryAbortError);
       expect(abortError.cause).toBe(original);
-      expect(abortError.category).toBe('server_error');
+      expect(abortError.recoveryCategory).toBe('server_error');
       expect(abortError.lastStatus).toBe(500);
       expect(abortError.bodySnippet).toContain('boom');
       expect(abortError.attempts).toBe(4);
@@ -322,11 +322,11 @@ describe('ErrorRecovery', () => {
       expect(recovery.classifyError(original)).toBe('unknown');
       expect(recovery.decide(original)).toEqual({
         type: 'abort',
-        reason: 'unrecoverable error: [openai-responses] Account suspended by provider',
+        reason: 'unrecoverable error: PROVIDER_WIRE_FAILURE: [openai-responses] Account suspended by provider',
       });
       const abortError = recovery.createAbortError(original, 'unrecoverable error');
       expect(abortError.cause).toBe(original);
-      expect(abortError.category).toBe('unknown');
+      expect(abortError.recoveryCategory).toBe('unknown');
       expect(abortError.bodySnippet).toContain('account_suspended');
     });
 

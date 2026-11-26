@@ -9,6 +9,7 @@
  * 调用方（Agent 上层）负责按 RecoveryAction 调度具体行为。
  */
 
+import { AppError } from '@shared/errors/appError';
 import {
   isProviderEmptyStreamError,
   parseRetryAfterMs,
@@ -66,31 +67,33 @@ export interface AgentRecoveryAbortFields {
   streamCode?: string;
 }
 
-/** Recovery abort：保留 cause 链与结构化诊断字段。 */
-export class AgentRecoveryAbortError extends Error {
-  readonly code: string;
+/** Recovery abort：保留 cause 链与结构化诊断字段；`recoveryCategory` 是恢复分类，`category` 是 AppError 的失败类别。 */
+export class AgentRecoveryAbortError extends AppError {
+  declare readonly code: 'PROVIDER_STREAM_PROTOCOL_VIOLATION' | 'PROVIDER_STREAM_EMPTY' | 'AGENT_RECOVERY_ABORTED';
   readonly streamCode?: string;
-  readonly category: ErrorCategory;
+  readonly recoveryCategory: ErrorCategory;
   readonly attempts: number;
   readonly maxAttempts: number;
   readonly lastStatus?: number;
   readonly bodySnippet?: string;
 
   constructor(message: string, fields: AgentRecoveryAbortFields) {
-    super(message, { cause: fields.cause });
+    super(
+      fields.category === 'stream_protocol'
+        ? 'PROVIDER_STREAM_PROTOCOL_VIOLATION'
+        : fields.category === 'empty_stream'
+          ? 'PROVIDER_STREAM_EMPTY'
+          : 'AGENT_RECOVERY_ABORTED',
+      message,
+      { cause: fields.cause },
+    );
     this.name = 'AgentRecoveryAbortError';
-    this.category = fields.category;
+    this.recoveryCategory = fields.category;
     this.attempts = fields.attempts;
     this.maxAttempts = fields.maxAttempts;
     this.lastStatus = fields.lastStatus;
     this.bodySnippet = fields.bodySnippet !== undefined ? redactRecoverySnippet(fields.bodySnippet) : undefined;
     this.streamCode = fields.streamCode;
-    this.code =
-      fields.category === 'stream_protocol'
-        ? 'PROVIDER_STREAM_PROTOCOL_VIOLATION'
-        : fields.category === 'empty_stream'
-          ? 'PROVIDER_STREAM_EMPTY'
-          : 'AGENT_RECOVERY_ABORTED';
   }
 }
 
@@ -166,7 +169,7 @@ export class ErrorRecovery {
       return 'empty_stream';
     }
     if (error instanceof AgentRecoveryAbortError) {
-      return error.category;
+      return error.recoveryCategory;
     }
     if (isProviderStreamProtocolError(error)) {
       return 'stream_protocol';

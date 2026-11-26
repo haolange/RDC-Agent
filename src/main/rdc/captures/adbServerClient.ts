@@ -1,24 +1,21 @@
 import * as net from 'net';
+import { AppError } from '@shared/errors/appError';
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 5037;
 const DEFAULT_TIMEOUT_MS = 2000;
 const HOST_DEVICES_L = 'host:devices-l';
 
-export class AdbServerUnreachableError extends Error {
-  readonly code = 'server-unreachable' as const;
-
+export class AdbServerUnreachableError extends AppError {
   constructor(message: string, options?: { cause?: unknown }) {
-    super(message, options?.cause !== undefined ? { cause: options.cause } : undefined);
+    super('ADB_SERVER_UNREACHABLE', message, { cause: options?.cause });
     this.name = 'AdbServerUnreachableError';
   }
 }
 
-export class AdbServerProtocolError extends Error {
-  readonly code = 'protocol-failure' as const;
-
+export class AdbServerProtocolError extends AppError {
   constructor(message: string, options?: { cause?: unknown }) {
-    super(message, options?.cause !== undefined ? { cause: options.cause } : undefined);
+    super('ADB_SERVER_PROTOCOL', message, { cause: options?.cause });
     this.name = 'AdbServerProtocolError';
   }
 }

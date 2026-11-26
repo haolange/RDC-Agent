@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { z, type ZodType } from 'zod';
 import {
   appendThinkingText,
@@ -43,14 +44,13 @@ export type ProviderStreamDiagnosticCode =
   | 'PROVIDER_STREAM_TRUNCATED'
   | 'PROVIDER_STREAM_MALFORMED_FRAME';
 
-export class ProviderStreamProtocolError extends Error {
-  readonly code: ProviderStreamDiagnosticCode;
+export class ProviderStreamProtocolError extends AppError {
+  declare readonly code: ProviderStreamDiagnosticCode;
   readonly outputRef: ProviderOutputRef;
 
   constructor(code: ProviderStreamDiagnosticCode, ref: ProviderOutputRef, message: string) {
-    super(message);
+    super(code, message);
     this.name = 'ProviderStreamProtocolError';
-    this.code = code;
     this.outputRef = { ...ref };
   }
 }

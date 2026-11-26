@@ -1,15 +1,17 @@
+import { AppError } from '@shared/errors/appError';
 import { auditArgumentsHash, auditLog } from '../../runtime/AuditLog';
 import { agentPermissionPolicyService, type AgentPermissionDecisionInput } from './AgentPermissionPolicy';
 import { agentToolApprovalRequestService, type ToolApprovalRequestInput } from './AgentToolApprovalRequestService';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { PermissionReviewer } from './PermissionReviewRuntime';
 
-export class ToolPermissionDenied extends Error {
+export class ToolPermissionDenied extends AppError {
   constructor(
     message: string,
     readonly requiresApproval = false,
   ) {
-    super(message);
+    super('TOOL_PERMISSION_DENIED', message);
+    this.name = 'ToolPermissionDenied';
   }
 }
 

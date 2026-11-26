@@ -31,6 +31,7 @@
 跨边界的失败只有一种形状：`AppError(code, detail?, { params?, cause? })`（`src/shared/errors/appError.ts`）。
 
 - **登记表**：`src/shared/errors/errorCodes.ts` 是封闭登记表，每个码写明分类（security / integrity / availability）与 params 的 zod schema（strict object，值为字符串或数字）；`AppError` 只接受登记过的码，新增失败就是在这里加一行并补中英文案。分类决定调用方的反应（本文三类）；params 是文案可插值的全部字段。开发与测试运行（`NODE_ENV=development` 或 Vitest）构造 `AppError` 时按 schema 校验 params，形状不符当场抛错。
+- **错误子类**：需要携带结构化字段的失败（Provider HTTP / 超时 / 流协议、RDC native 失败、adb、OAuth、工具权限、Agent 循环终止等）是 `AppError` 的子类，用登记码构造并保留 `cause` 与各自字段，所以 `errorCodeOf`、IPC 出口与 `humanizeError` 对它们一视同仁；不另写 `extends Error` 的错误类。
 - **消息形状**：`message` 保持 `CODE: detail`，日志、工具结果与诊断照旧可读；分支只看 `code`，不解析消息文本。catch 内重抛必须带 `{ cause }`，保留原始失败（ESLint `preserve-caught-error` 与错误契约规则执行；`new Error('CODE: …')` 写法被禁止）。
 - **IPC 唯一出口**：`invokeRegistry.dispatch` 是桌面与 Browser QA 共同的出口。处理器失败时返回错误结果 `{ __rdcIpcError: { code, params, category, technical } }`：没有登记码的失败归 `INTERNAL_ERROR`，`technical` 经凭据脱敏；high-impact 通道的审计 outcome 记录同一个 `code`。成功值原样返回。处理器失败一律抛 `AppError(code, detail, { params })`，不 catch 后返回 `{ success: false, error }` 一类字符串结果（那样码会丢失）；成功时返回的就是数据本身。用户在主进程对话框里取消不是失败：返回 `null` 或 `{ cancelled: true }`。Browser QA 桥把错误结果作为 `{ success: false, error, appError }` 返回（`INTERNAL_ERROR` 为 500，其余 422）。
 - **renderer**：`createRendererApi` 在 renderer 自己的 realm 里把错误结果抛成 `RendererIpcError`（带 `code`、`params`、`category`、`channel`）。preload 只暴露按通道白名单检查的 `rdcIpc`，不在 preload 里抛错——context bridge 会剥掉自定义错误的属性。
@@ -114,8 +115,8 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 | 类型 | code / 形态 | 语义 |
 | --- | --- | --- |
 | `ProviderEmptyStreamError` | `PROVIDER_STREAM_EMPTY` | 流结束但无 assistant 正文或 structured tool call；**禁止**合成 HTTP 502 |
-| `ProviderWireFailureError` | wire failure | OpenAI/Azure Responses SSE `error` / `response.failed` 无 400–599 status 时；有 status 则 `ProviderHttpError` |
-| `ProviderHttpError` | HTTP status | 真实 4xx/5xx；`createResponsesStreamFailure` 仅在 wire 带明确 status 时使用；携带服务端 `retry-after-ms` / `Retry-After` 解析出的 `retryAfterMs` |
+| `ProviderWireFailureError` | `PROVIDER_WIRE_FAILURE` | OpenAI/Azure Responses SSE `error` / `response.failed` 无 400–599 status 时；有 status 则 `ProviderHttpError` |
+| `ProviderHttpError` | `PROVIDER_HTTP_ERROR` + HTTP status | 真实 4xx/5xx；`createResponsesStreamFailure` 仅在 wire 带明确 status 时使用；携带服务端 `retry-after-ms` / `Retry-After` 解析出的 `retryAfterMs` |
 | `ProviderStreamProtocolError` | `PROVIDER_STREAM_TRUNCATED` | 已有输出、连接关闭，但没收到该协议的终止信号（`message_stop`、`finish_reason`、`[DONE]`、`done:true`、`response.completed` 等）；半截答案与半截工具调用不入库为完成 |
 | `ProviderStreamProtocolError` | `PROVIDER_STREAM_MALFORMED_FRAME` | 流中一帧不是 JSON；不跳过、不拼接后续帧 |
 
@@ -132,7 +133,7 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 | `auth_error` | **401/403**；立即 abort |
 | `stream_protocol` | `PROVIDER_STREAM_*` 协议违规（含截断与坏帧）；不重试 |
 
-`AgentRecoveryAbortError` 必须经 `createAbortError` 构造，始终携带 `cause` + `category` / `attempts` / `maxAttempts` / `lastStatus?` / `bodySnippet`（脱敏 ≤300）；禁止裸 `new Error('[Recovery abort]')`。
+`AgentRecoveryAbortError` 必须经 `createAbortError` 构造，始终携带 `cause` + `recoveryCategory`（上表的恢复分类；`category` 是 `AppError` 的失败类别）/ `attempts` / `maxAttempts` / `lastStatus?` / `bodySnippet`（脱敏 ≤300）；禁止裸 `new Error('[Recovery abort]')`。
 
 ### Turn 失败诊断（`createTurnFailedDiagnostic`）
 

@@ -59,7 +59,7 @@ const RdcNativeFailureEnvelopeSchema = z
   .passthrough();
 const RdcNativeObjectSchema = z.record(z.string(), z.unknown());
 
-export class RdcNativeFailure extends Error {
+export class RdcNativeFailure extends AppError {
   /** Bound only after the owning execution path finishes its existing safety checks. */
   deliveryResult?: AgentToolResult;
   constructor(
@@ -75,7 +75,7 @@ export class RdcNativeFailure extends Error {
     readonly screenshotTargetRestoration: { contextId: string; sessionId: string; eventId: number } | null = null,
     readonly inspectionRestoration: { contextId: string; sessionId: string; eventId: number } | null = null,
   ) {
-    super(message);
+    super('RDC_NATIVE_FAILURE', message);
     this.name = 'RdcNativeFailure';
   }
 }

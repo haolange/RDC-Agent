@@ -159,7 +159,7 @@ describe('EffectiveCatalogService', () => {
       throw new ProviderConnectionError('Service unavailable', 503);
     });
     expect(snapshot.models[0].availability).toBe('available');
-    expect(snapshot.lastRefreshError).toBe('Service unavailable');
+    expect(snapshot.lastRefreshError).toBe('PROVIDER_CONNECTION_FAILED: Service unavailable');
   });
 
   it('marks a discovery-only model without a positive executable context budget unavailable', async () => {

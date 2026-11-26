@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import { GROK_OAUTH_REQUESTED_SCOPES, GROK_OPENID_CONFIGURATION_URL } from './oauthConstants';
 import {
   fetchJson,
@@ -58,9 +59,10 @@ export const createGrokOAuthFailureDiagnostic = (
   );
 };
 
-export class GrokOAuthDiagnosticError extends Error {
+export class GrokOAuthDiagnosticError extends AppError {
   constructor(readonly diagnostic: LlmProviderAccountDiagnostic) {
-    super(renderAccountDiagnosticMessage(diagnostic));
+    super('PROVIDER_ACCOUNT_LOGIN_FAILED', renderAccountDiagnosticMessage(diagnostic));
+    this.name = 'GrokOAuthDiagnosticError';
   }
 }
 
