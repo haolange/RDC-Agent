@@ -390,7 +390,7 @@ import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
 
 | Job | 内容 |
 | --- | --- |
-| `build`（Ubuntu） | `pnpm audit`、typecheck、lint、`test:coverage` 与 `test:coverage:renderer` 及各自的 `check:coverage-ratchet`、`check:gates`、增长报告、`check-agent-tool-capability`、调查评测自检、`check:request-cache-profile`、`check:git-diff`、build、renderer 入口 chunk 预算 |
+| `build`（Ubuntu） | `pnpm audit`、typecheck、lint、`test:coverage` 与 `test:coverage:renderer` 及各自的 `check:coverage-ratchet`、`check:gates`、增长报告、`check-agent-tool-capability`、调查评测（判分自检与 faux provider 回合）、`check:request-cache-profile`、`check:git-diff`、build、renderer 入口 chunk 预算 |
 | `macos-shell` | typecheck 与宿主相关的 runtime / primitive 工具测试 |
 | `windows-unit` | Windows 上的 node 单元测试 |
 | `linux-smoke` | Linux Browser QA smoke |

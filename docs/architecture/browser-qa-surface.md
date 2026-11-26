@@ -77,8 +77,12 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
   - 设 `QA_VIDEO_DIR` 时整段走查录成视频，截图日志带相对时间，便于剪出动效片段。
   - 截图目录放在仓库外，只留验收需要的一组。
 - 结果评测：`node scripts/eval-investigation.mjs --print-prompt` 给出 `scripts/evals/vkcube-lavapipe.json` 的问题（基于 RDC-Tool 的 `vkcube_lavapipe.rdc`，答案来自真实回放：唯一 draw 的事件、顶点数、渲染目标格式与尺寸、action 数、present 事件、着色器阶段）。
-  - 在应用里用任一模型完成这次调查后，`node scripts/eval-investigation.mjs <会话目录>` 按会话最后的答复与 InvestigationReport 记录逐题判分，并检查报告结论回指的每条 observed 源 Claim 都引用了会话里实际记录的 Evidence（与 `S-EVIDENCE-01` 一致），缺证据即判失败。
-  - 判分本身不依赖模型；CI 只跑 `--self-test` 校验两种判分，真实会话的评测需要模型与可回放的 capture。
+  - 在应用里用任一模型完成这次调查后，`node scripts/eval-investigation.mjs <会话目录>` 从三方面判分，任一项不过即失败：
+    - 答案：按会话最后的答复与 InvestigationReport 记录逐题判分。
+    - 工具调用：套件的 `requiredToolCalls`（工具名加必须包含的参数）都要在 `session-context.jsonl` 里出现，且结果不是错误。
+    - 证据：报告结论回指的每条 observed 源 Claim 都引用了会话里实际记录的 Evidence（与 `S-EVIDENCE-01` 一致），每条 Evidence 的 artifactRef 都能解析到会话制品且 hash 一致。
+  - `--faux` 用脚本化 provider 驱动一次真实的调查回合：agent loop、产品的 `rdc_probe`（原生结果来自套件 `faux.replay` 的录制回放，代替 RDC-Tool CLI）、工具结果制品化与证据固定、调查工具写 Evidence / Claim / Report，最后经终态追加写出会话，再用同一套判分。脚本化模型只从收到的工具结果推出答案。它是受控 fixture，不代替真实模型或真实回放的证据。
+  - CI `build` 运行 `--self-test`（判分自检）与 `--faux`；真实模型的评测手动运行，需要模型与可回放的 capture。
 - 可读性：`RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 启动一个 disposable 实例（切换外观需要写设置），把日志路径交给 `node scripts/qa-readability.mjs <日志> [截图目录]`。
   - 它用这次的一次性 URL 进入，在 Settings › Appearance 切换深色/浅色并断言主题确实生效（未开放写设置时直接失败，不把深色结果记成浅色），对首页、设置与 720px 窄屏逐一检查可见文字小于 12px、文字对比度低于 WCAG AA（正文 4.5:1、大字 3:1）与水平溢出，有问题即非零退出。
   - 两个脚本共用 `scripts/qa-browser-shared.mjs`。
