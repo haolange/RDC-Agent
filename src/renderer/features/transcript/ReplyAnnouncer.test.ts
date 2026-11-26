@@ -56,7 +56,11 @@ it('reads each reply once it settles and keeps opened history silent', () => {
 
   // Another session's saved replies are history too.
   show([reply('other', 'Saved answer', 'complete', 'b')]);
-  expect(region.textContent).toBe('Reply: The draw is culled by depth.');
+  expect(region.textContent).toBe('');
+  show([reply('other', 'Saved answer', 'complete', 'b'), reply('current', 'New answer', 'complete', 'b')]);
+  expect(region.textContent).toBe('Reply: New answer');
+  show([]);
+  expect(region.textContent).toBe('');
 });
 
 it('caps a long reply at a word boundary', () => {

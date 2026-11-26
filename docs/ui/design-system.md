@@ -146,7 +146,7 @@ Settings 页标题与正文共用面板内边距。
 - 焦点环统一 `--token-border-focus`；禁止 `outline: none` 而不提供等效焦点样式。
 - 在文本框里按 Enter 提交、选中或关闭之前，先用 `lib/ime` 的 `isImeComposing` 排除输入法组字（Chromium 报 `isComposing`，WebKit 报 keyCode 229）。组字时的 Enter 只用来上屏候选词，Escape 只用来取消组字。
 - **Windows 高对比度（forced colors）**：系统会重绘全部作者颜色、去掉阴影并压平底色。`design-base.css` 用系统色补回只靠阴影或底色表达的状态：键盘焦点是 `Highlight` 焦点环，选中项（`aria-selected`、`aria-current`、`is-selected`）是 `Highlight` 底与 `HighlightText` 字，禁用是 `GrayText`。这组规则只在 forced colors 下生效，并有意压过组件规则。
-- **读屏播报**：Transcript 有一个礼貌的 live region（`features/transcript/ReplyAnnouncer`）。每条助手回复在完成时读一次（去掉 Markdown 标点，约 300 字处按词截断），流式输出不逐字播报；打开会话时已有的历史回复不播报。
+- **读屏播报**：Transcript 有一个礼貌的 live region（`features/transcript/ReplyAnnouncer`）。每条助手回复在完成时读一次（去掉 Markdown 标点，约 300 字处按词截断），流式输出不逐字播报。切换会话或清空消息时清除上一次播报，打开会话时已有的历史回复保持静默。
 - 按压态：可点击控件都有 `:active` 反馈（轻微压暗或 0.98 缩放），时长 `--duration-fast`。
 - 动效由真实交互与运行生命周期驱动，规则见「动效」。
 

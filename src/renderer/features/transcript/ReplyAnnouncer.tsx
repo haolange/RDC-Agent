@@ -38,6 +38,7 @@ export function ReplyAnnouncer() {
   useEffect(() => {
     if (messages.length === 0) {
       heard.current = null;
+      setAnnouncement('');
       return;
     }
     const settled = messages.filter(isSettledReply);
@@ -45,6 +46,7 @@ export function ReplyAnnouncer() {
     const known = heard.current;
     if (!known || (known.sessionId !== null && sessionId !== null && known.sessionId !== sessionId)) {
       heard.current = { sessionId, ids: new Set(settled.map((message) => message.id)) };
+      setAnnouncement('');
       return;
     }
     known.sessionId ??= sessionId;
