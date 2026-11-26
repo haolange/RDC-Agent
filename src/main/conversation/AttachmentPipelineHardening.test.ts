@@ -1,19 +1,16 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { directoryLinkType } from '../platform/paths';
 import { classifyAttachmentBytes } from '../runtime/attachmentClassify';
 import { hydrateFrozenUserContent, materializeAgentUserInput } from '../agent-runtime/attachments/ConversationAttachmentMaterializer';
 import { assertAttachmentPreviewPath } from '../runtime/attachmentPreview';
+import { materializedText, attachmentTempRoot } from '../testing/attachmentTestSupport';
 import { AttachmentStagingService } from './AttachmentStagingService';
 import { toRejectedSendResult } from './conversationSendRejection';
 
-const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-att-hard-'));
-
-beforeEach(() => fs.mkdirSync(tempRoot, { recursive: true }));
-afterEach(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
+const tempRoot = attachmentTempRoot('rdc-att-hard-');
 
 describe('attachment pipeline hardening', () => {
   it('keeps prepare/run inline text identical when physical directories differ', async () => {
@@ -49,12 +46,8 @@ describe('attachment pipeline hardening', () => {
         createdAt: Date.now(),
       }],
     );
-    const preparedText = typeof prepared.content === 'string'
-      ? prepared.content
-      : prepared.content[0]?.type === 'text' ? prepared.content[0].text : '';
-    const runningText = typeof hydrated === 'string'
-      ? hydrated
-      : hydrated[0]?.type === 'text' ? hydrated[0].text : '';
+    const preparedText = materializedText(prepared.content);
+    const runningText = materializedText(hydrated);
     expect(preparedText).toContain(sessionPath);
     expect(preparedText).not.toContain(stagingPath);
     expect(runningText).toBe(preparedText);

@@ -1,50 +1,25 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { materializeAgentUserInput } from '../agent-runtime/attachments/ConversationAttachmentMaterializer';
+import { materializedText, attachmentTempRoot, writeFileAttachment } from '../testing/attachmentTestSupport';
 
-const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-att-mat-'));
+const tempRoot = attachmentTempRoot('rdc-att-mat-');
 
 const EMPTY_PDF = '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n';
 
 // The first PDF read imports pdf.js and its fake worker (both MB-sized ESM). On a busy cold runner that load
 // alone outlasts a test's 5 s budget, so it is paid once here through the same production path.
 beforeAll(async () => {
-  const warmPath = path.join(tempRoot, 'warm.pdf');
-  fs.writeFileSync(warmPath, EMPTY_PDF);
-  await materializeAgentUserInput('warm', [{
-    kind: 'file', layer: 'pdf', fileName: 'warm.pdf', filePath: warmPath, mimeType: 'application/pdf', size: fs.statSync(warmPath).size,
-  }], 'disabled', false);
+  await materializeAgentUserInput('warm', [writeFileAttachment(tempRoot, 'warm.pdf', EMPTY_PDF, 'pdf', 'application/pdf')], 'disabled', false);
 }, 60_000);
-beforeEach(() => fs.mkdirSync(tempRoot, { recursive: true }));
-afterEach(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
 
 describe('conversation attachment materialization', () => {
   it('inlines text files and keeps binary files as tool-visible paths', async () => {
-    const textPath = path.join(tempRoot, 'notes.md');
-    const binaryPath = path.join(tempRoot, 'sheet.xlsx');
-    fs.writeFileSync(textPath, '# title\nhello');
-    fs.writeFileSync(binaryPath, Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]));
     const result = await materializeAgentUserInput('inspect', [
-      {
-        kind: 'file',
-        layer: 'text',
-        fileName: 'notes.md',
-        filePath: textPath,
-        mimeType: 'text/markdown',
-        size: fs.statSync(textPath).size,
-      },
-      {
-        kind: 'file',
-        layer: 'binary',
-        fileName: 'sheet.xlsx',
-        filePath: binaryPath,
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        size: fs.statSync(binaryPath).size,
-      },
+      writeFileAttachment(tempRoot, 'notes.md', '# title\nhello', 'text', 'text/markdown'),
+      writeFileAttachment(tempRoot, 'sheet.xlsx', Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]), 'binary',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
     ], 'disabled', false);
-    const text = typeof result.content === 'string' ? result.content : result.content[0]?.type === 'text' ? result.content[0].text : '';
+    const text = materializedText(result.content);
     expect(text).toContain('# title');
     expect(text).toContain('sheet.xlsx');
     expect(text).toContain('binary');
@@ -72,36 +47,20 @@ describe('conversation attachment materialization', () => {
   });
 
   it('produces identical inline text for prepare and run materialization', async () => {
-    const textPath = path.join(tempRoot, 'repeat.md');
-    fs.writeFileSync(textPath, Array.from({ length: 80 }, (_, index) => `line-${index} content`).join('\n'));
-    const attachment = {
-      kind: 'file' as const,
-      layer: 'text' as const,
-      fileName: 'repeat.md',
-      filePath: textPath,
-      mimeType: 'text/markdown',
-      size: fs.statSync(textPath).size,
-    };
+    const attachment = writeFileAttachment(tempRoot, 'repeat.md',
+      Array.from({ length: 80 }, (_, index) => `line-${index} content`).join('\n'), 'text', 'text/markdown');
     const prepared = await materializeAgentUserInput('inspect', [attachment], 'disabled', false);
     const running = await materializeAgentUserInput('inspect', [attachment], 'disabled', true);
-    const preparedText = typeof prepared.content === 'string' ? prepared.content : prepared.content[0]?.type === 'text' ? prepared.content[0].text : '';
-    const runningText = typeof running.content === 'string' ? running.content : running.content[0]?.type === 'text' ? running.content[0].text : '';
+    const preparedText = materializedText(prepared.content);
+    const runningText = materializedText(running.content);
     expect(runningText).toBe(preparedText);
     expect(preparedText).toContain('line-0 content');
   });
 
   it('writes an explicit diagnostic when a PDF has no text layer', async () => {
-    const pdfPath = path.join(tempRoot, 'scan.pdf');
-    fs.writeFileSync(pdfPath, EMPTY_PDF);
-    const result = await materializeAgentUserInput('inspect', [{
-      kind: 'file',
-      layer: 'pdf',
-      fileName: 'scan.pdf',
-      filePath: pdfPath,
-      mimeType: 'application/pdf',
-      size: fs.statSync(pdfPath).size,
-    }], 'disabled', false);
-    const text = typeof result.content === 'string' ? result.content : result.content[0]?.type === 'text' ? result.content[0].text : '';
+    const result = await materializeAgentUserInput('inspect', [writeFileAttachment(tempRoot, 'scan.pdf', EMPTY_PDF, 'pdf', 'application/pdf')],
+      'disabled', false);
+    const text = materializedText(result.content);
     expect(text).toMatch(/could not be loaded|no extractable text layer/i);
     expect(text).toContain('scan.pdf');
   });

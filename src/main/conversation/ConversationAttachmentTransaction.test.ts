@@ -31,57 +31,27 @@ vi.mock('../runtime/AppPathService', () => {
       fs.mkdirSync(dir, { recursive: true });
     }
   }
+  const projectRdcPaths = (projectRoot: string) => {
+    const rdc = path.join(projectRoot, '.rdc-agent');
+    return {
+      projectRoot,
+      projectRdcRoot: rdc,
+      projectMetadataPath: path.join(rdc, 'project.yaml'),
+      gitignorePath: path.join(rdc, '.gitignore'),
+      ...Object.fromEntries(['agents', 'skills', 'mcp', 'hooks', 'policies', 'knowledge', 'memory', 'inputs', 'artifacts']
+        .map((name) => [`${name}Path`, path.join(rdc, name)])),
+    };
+  };
   return {
     appPathService: {
       getAppStatePaths: () => paths,
       getUserDataRoot: () => tempRoot,
       getRuntimePaths: () => ({ userDataRoot: tempRoot, ...paths }),
-      getProjectRdcPaths: (projectRoot: string) => ({
-        projectRoot,
-        projectRdcRoot: path.join(projectRoot, '.rdc-agent'),
-        projectMetadataPath: path.join(projectRoot, '.rdc-agent', 'project.yaml'),
-        gitignorePath: path.join(projectRoot, '.rdc-agent', '.gitignore'),
-        agentsPath: path.join(projectRoot, '.rdc-agent', 'agents'),
-        skillsPath: path.join(projectRoot, '.rdc-agent', 'skills'),
-        mcpPath: path.join(projectRoot, '.rdc-agent', 'mcp'),
-        hooksPath: path.join(projectRoot, '.rdc-agent', 'hooks'),
-        policiesPath: path.join(projectRoot, '.rdc-agent', 'policies'),
-        knowledgePath: path.join(projectRoot, '.rdc-agent', 'knowledge'),
-        memoryPath: path.join(projectRoot, '.rdc-agent', 'memory'),
-        inputsPath: path.join(projectRoot, '.rdc-agent', 'inputs'),
-        artifactsPath: path.join(projectRoot, '.rdc-agent', 'artifacts'),
-      }),
+      getProjectRdcPaths: projectRdcPaths,
       initializeProjectRdc: (projectRoot: string) => {
-        const projectPaths = {
-          projectRoot,
-          projectRdcRoot: path.join(projectRoot, '.rdc-agent'),
-          projectMetadataPath: path.join(projectRoot, '.rdc-agent', 'project.yaml'),
-          gitignorePath: path.join(projectRoot, '.rdc-agent', '.gitignore'),
-          agentsPath: path.join(projectRoot, '.rdc-agent', 'agents'),
-          skillsPath: path.join(projectRoot, '.rdc-agent', 'skills'),
-          mcpPath: path.join(projectRoot, '.rdc-agent', 'mcp'),
-          hooksPath: path.join(projectRoot, '.rdc-agent', 'hooks'),
-          policiesPath: path.join(projectRoot, '.rdc-agent', 'policies'),
-          knowledgePath: path.join(projectRoot, '.rdc-agent', 'knowledge'),
-          memoryPath: path.join(projectRoot, '.rdc-agent', 'memory'),
-          inputsPath: path.join(projectRoot, '.rdc-agent', 'inputs'),
-          artifactsPath: path.join(projectRoot, '.rdc-agent', 'artifacts'),
-        };
-        for (const dir of [
-          projectPaths.projectRdcRoot,
-          projectPaths.agentsPath,
-          projectPaths.skillsPath,
-          projectPaths.mcpPath,
-          projectPaths.hooksPath,
-          projectPaths.policiesPath,
-          projectPaths.knowledgePath,
-          projectPaths.memoryPath,
-          projectPaths.inputsPath,
-          projectPaths.artifactsPath,
-        ]) {
-          fs.mkdirSync(dir, { recursive: true });
-        }
-        return projectPaths;
+        const { projectMetadataPath: _metadata, gitignorePath: _gitignore, projectRoot: _root, ...directories } = projectRdcPaths(projectRoot);
+        for (const dir of Object.values(directories)) fs.mkdirSync(dir, { recursive: true });
+        return projectRdcPaths(projectRoot);
       },
     },
   };
