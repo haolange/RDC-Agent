@@ -12,7 +12,6 @@ import { fileURLToPath } from 'node:url';
 import { REQUIRED_PNPM, resolvePnpm as resolvePnpmCandidate } from './pnpm-resolver.mjs';
 
 const REQUIRED_NODE = [22, 13, 0];
-const STATE_SCHEMA_VERSION = 1;
 const VALID_MODES = new Set(['desktop', 'desktop-dev', 'browser', 'browser-dev', 'prepare-only']);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '..');
@@ -278,7 +277,6 @@ function dependencyFingerprint(storePath) {
   return createHash('sha256')
     .update(
       JSON.stringify({
-        schemaVersion: STATE_SCHEMA_VERSION,
         inputHash,
         pnpmVersion: REQUIRED_PNPM,
         platform: process.platform,
@@ -305,11 +303,7 @@ async function ensureDependencies(pnpm, storePath, forcePrepare) {
   const storeMatches = Boolean(installedStore && pathEquals(installedStore, storePath));
   const criticalDependenciesExist = criticalDependencyPaths().every(existsSync);
   const installRequired =
-    forcePrepare ||
-    state?.schemaVersion !== STATE_SCHEMA_VERSION ||
-    state?.fingerprint !== fingerprint ||
-    !storeMatches ||
-    !criticalDependenciesExist;
+    forcePrepare || state?.fingerprint !== fingerprint || !storeMatches || !criticalDependenciesExist;
 
   if (installRequired) {
     if (installedStore && !storeMatches) {
@@ -336,7 +330,6 @@ async function ensureDependencies(pnpm, storePath, forcePrepare) {
     );
   }
   writeJsonAtomic(dependencyStatePath, {
-    schemaVersion: STATE_SCHEMA_VERSION,
     fingerprint,
     storePath,
     platform: process.platform,
@@ -376,16 +369,12 @@ function ensureBuild(dependencyKey, env, forcePrepare) {
   ];
   const fingerprint = buildFingerprint(dependencyKey);
   const state = readJson(buildStatePath);
-  const buildRequired =
-    forcePrepare ||
-    state?.schemaVersion !== STATE_SCHEMA_VERSION ||
-    state?.fingerprint !== fingerprint ||
-    !outputs.every(existsSync);
+  const buildRequired = forcePrepare || state?.fingerprint !== fingerprint || !outputs.every(existsSync);
   if (buildRequired) {
     console.log('[RDC-Agent] Building current application sources...');
     runNodeCli(electronVite, ['build'], env);
     if (!outputs.every(existsSync)) fail(`Build completed without all required outputs: ${outputs.join(', ')}`);
-    writeJsonAtomic(buildStatePath, { schemaVersion: STATE_SCHEMA_VERSION, fingerprint });
+    writeJsonAtomic(buildStatePath, { fingerprint });
   } else {
     console.log('[RDC-Agent] Build outputs are current; skipping build.');
   }
