@@ -267,6 +267,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
   - 压缩触发为 `min(用户 compactionThresholdPercent, policy.contextCompactionPercent)`（policy ≥100 不约束；结果 clamp 50–90，步长 5）。
   - 规划上限走 `resolvePlanningOutputTokens`（声明值 / 拆窗差值 / 窗口本身）。每次 LLM call 的 `max_tokens` = `min(规划上限, window − promptTokens − safety)`；缺省输出上限 = 剩余窗口，不把缺省写成 0。
   - 装不下时先压缩，仍装不下再 `CONTEXT_CANNOT_FIT` fail-closed。
+  - 本地 token 估算（`TokenizerService`，gpt-tokenizer）按执行 scope 与模型用 Provider 上报的 `inputTokens` 校准（`TokenCountCalibration`）：首个上报设定「上报 / 估算」比例，之后每次上报向新比例移动一半，比例限制在 0.5–2。`promptTokens` 与执行途中的压缩阈值都按该比例换算。
 - **Orchestrator façade**：`AgentOrchestrator.ts` 保持 façade（少于 800 行，ESLint `max-lines`）；turn 准备、tool 装配、executor、turn/subagent runner、prompt-plan、memory UI 等职责外提到协作单元。`pnpm run check:orchestrator-facade` 度量它导入的不同模块数（fan-out）与最长函数体行数，预算取实测最大值，只降不升。
 
 ### 工作记录与 Tasks

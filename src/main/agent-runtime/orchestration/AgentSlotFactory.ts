@@ -52,6 +52,16 @@ export function reportedUsageFields(
   };
 }
 
+/** The usage a completed request stores beside its snapshot: the provider's own counts, never an estimate. */
+function completedRequestUsage(usage: Usage) {
+  return {
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    ...reportedUsageFields(usage),
+    estimated: false,
+  };
+}
+
 export interface AgentSlotFactoryDeps {
   slots: AgentSlotRegistry;
   deferredActivation: DeferredToolActivationTracker;
@@ -177,6 +187,14 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
 
   const errorRecovery = new ErrorRecovery({ primaryModel: agentModel });
   const toolSchemaTokens = (): number => charsToTokens(JSON.stringify(agent.state.tools).length);
+  // Local estimates are rescaled by the ratio this scope's provider reported for earlier requests on this model.
+  const calibration = deps.tokenizerService.calibration(executionScopeId, modelId);
+  const estimatePromptTokens = (messages: Array<{ role: string; content?: unknown }>): number =>
+    (resolvePromptPlan?.() ?? promptPlan).totalTokenEstimate +
+    RUNTIME_PERMISSION_TOKEN_RESERVE +
+    toolSchemaTokens() +
+    deps.tokenizerService.countMessagesTokens(messages, modelId);
+  let sentEstimate: { requestId: string; tokens: number } | undefined;
 
   const agent: Agent = new Agent({
     initialState: {
@@ -196,7 +214,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
     resolvePromptPlan,
     transformContext: (messages, signal, onProgress) => {
       contextManager.setRequestTokenLimit(
-        requestCompactionThreshold -
+        calibration.toEstimateTokens(requestCompactionThreshold) -
           (resolvePromptPlan?.() ?? promptPlan).totalTokenEstimate -
           RUNTIME_PERMISSION_TOKEN_RESERVE -
           toolSchemaTokens(),
@@ -208,11 +226,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
       resolveTurnOutputTokens({
         contextWindowTokens: streamOptions.requestPlan.contextWindowTokens,
         maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
-        promptTokens:
-          (resolvePromptPlan?.() ?? promptPlan).totalTokenEstimate +
-          RUNTIME_PERMISSION_TOKEN_RESERVE +
-          toolSchemaTokens() +
-          deps.tokenizerService.countMessagesTokens(messages, modelId),
+        promptTokens: calibration.toProviderTokens(estimatePromptTokens(messages)),
       }),
     onRequest: async ({ context: requestContext, streamOptions: requestOptions, mailboxDeliveries }) => {
       const callIndex = requestSnapshotStore.nextCallIndex(executionScopeId, turnSignature || undefined);
@@ -260,11 +274,13 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
           }),
       });
       requestSnapshotStore.write(snapshot);
+      sentEstimate = { requestId: snapshot.id, tokens: estimatePromptTokens(requestContext.messages) };
       await onProviderRequestCommitted?.(snapshot.id);
       return snapshot.id;
     },
     onResponse: (requestId, message) => {
       if (!requestId || !isSuccessfulProviderResponse(message)) return;
+      if (sentEstimate?.requestId === requestId) calibration.observe(sentEstimate.tokens, message.usage.inputTokens);
       recordResponseReceipt(
         providerId,
         modelId,
@@ -276,12 +292,7 @@ export function createOrReuseAgentSlot(deps: AgentSlotFactoryDeps, request: Agen
         requestId,
         executionScopeId,
         turnSignature || undefined,
-        {
-          inputTokens: message.usage.inputTokens,
-          outputTokens: message.usage.outputTokens,
-          ...reportedUsageFields(message.usage),
-          estimated: false,
-        },
+        completedRequestUsage(message.usage),
         message.execution?.reasoningEvents,
       );
     },

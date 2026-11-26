@@ -6,6 +6,10 @@
  * countMessagesTokens 覆盖全部计费内容块：text、image（尺寸估算）、
  * toolCall（名称 + JSON 参数）、thinking（可读文本或 opaque continuation payload）。
  * Opaque continuation 只按字节计量，绝不解读或升格为可读 thinking。
+ *
+ * gpt-tokenizer is one encoding; providers count with their own. `calibration(scopeId, modelId)` keeps, per execution
+ * scope and model, the ratio between the prompt tokens a provider reported and the local estimate of that request, so
+ * later estimates for the same scope and model are expressed in that provider's tokens.
  */
 
 import { encode } from 'gpt-tokenizer';
@@ -25,6 +29,48 @@ const CACHE_MIN_CHARS = 256;
 const CACHE_MAX_CHARS = 16_000_000;
 const CACHE_MAX_TEXT_CHARS = CACHE_MAX_CHARS / 8;
 
+/** A provider count may rescale local estimates by at most this factor either way; beyond it the ratio is clamped. */
+const CALIBRATION_MIN_RATIO = 0.5;
+const CALIBRATION_MAX_RATIO = 2;
+/** Calibrations kept, least recently used first; each is a few numbers, the bound only caps idle scopes. */
+const CALIBRATION_SCOPES_MAX = 256;
+
+/**
+ * The ratio between a provider's reported prompt tokens and the local estimate of the same request. The first report
+ * sets it; each later report moves it halfway, so one request with an unusual content mix does not swing it. Until a
+ * report arrives the ratio is 1.
+ */
+export class TokenCountCalibration {
+  private factor = 1;
+  private observed = false;
+
+  /** The current provider-tokens-per-estimated-token ratio. */
+  get ratio(): number {
+    return this.factor;
+  }
+
+  /** Records the prompt tokens a provider reported for a request whose local estimate was `estimatedTokens`. */
+  observe(estimatedTokens: number, reportedInputTokens: number): void {
+    if (!(estimatedTokens > 0) || !(reportedInputTokens > 0)) return;
+    const ratio = Math.min(
+      CALIBRATION_MAX_RATIO,
+      Math.max(CALIBRATION_MIN_RATIO, reportedInputTokens / estimatedTokens),
+    );
+    this.factor = this.observed ? (this.factor + ratio) / 2 : ratio;
+    this.observed = true;
+  }
+
+  /** A local estimate expressed in the provider's tokens. */
+  toProviderTokens(estimatedTokens: number): number {
+    return Math.ceil(estimatedTokens * this.factor);
+  }
+
+  /** A provider-token budget expressed in local-estimate units. */
+  toEstimateTokens(providerTokens: number): number {
+    return Math.floor(providerTokens / this.factor);
+  }
+}
+
 export class TokenizerService {
   /**
    * Token counts by text, least recently used first. A turn counts its whole history before every request; the
@@ -33,6 +79,25 @@ export class TokenizerService {
    */
   private readonly counts = new Map<string, number>();
   private cachedChars = 0;
+  private readonly calibrations = new Map<string, TokenCountCalibration>();
+
+  /** The calibration for one execution scope and model, created on first use. */
+  calibration(scopeId: string, modelId: string): TokenCountCalibration {
+    const key = `${scopeId}\u0000${modelId}`;
+    const existing = this.calibrations.get(key);
+    if (existing) {
+      this.calibrations.delete(key);
+      this.calibrations.set(key, existing);
+      return existing;
+    }
+    const created = new TokenCountCalibration();
+    this.calibrations.set(key, created);
+    for (const oldest of this.calibrations.keys()) {
+      if (this.calibrations.size <= CALIBRATION_SCOPES_MAX) break;
+      this.calibrations.delete(oldest);
+    }
+    return created;
+  }
 
   /**
    * 计算文本的 token 数。
