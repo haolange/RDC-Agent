@@ -2,6 +2,7 @@ import React from 'react';
 import { useI18n } from '../../i18n';
 import { Chevron } from '../../ui/Chevron';
 import { assignDynStyles, clearDynStyles } from '../../lib/useDynStyle';
+import { PlainButton } from '../../ui/PlainButton';
 
 /** A gap this small at the bottom still counts as "at the latest". */
 const BOTTOM_SLACK = 24;
@@ -140,8 +141,7 @@ export const WorkProcessViewport: React.FC<{ following: boolean; children: React
         <div ref={contentRef}>{children}</div>
       </div>
       {following && paused ? (
-        <button
-          type="button"
+        <PlainButton
           className="work-process-viewport-latest"
           onClick={() => {
             stick.current = true;
@@ -151,7 +151,7 @@ export const WorkProcessViewport: React.FC<{ following: boolean; children: React
         >
           <Chevron direction="down" size={12} />
           {t('chat.workProcessBackToLatest')}
-        </button>
+        </PlainButton>
       ) : null}
     </div>
   );

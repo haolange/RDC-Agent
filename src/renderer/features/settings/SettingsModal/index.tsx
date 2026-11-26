@@ -1,13 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { useModalFocus } from '../../../lib/useModalFocus';
-import { isTopOverlayLayer, useOverlayLayer } from '../../../lib/overlayStack';
 import { Icon } from '../../../ui/Icon';
 import { ProductLogo } from '../../../ui/ProductLogo';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { IconButton } from '../../../ui/IconButton';
 import { UnsavedChangesDialog } from '../../../ui/UnsavedChangesDialog';
-import { usePresence } from '../../../ui/usePresence';
+import { ModalLayer } from '../../../ui/ModalLayer';
 import { useSettingsNavigationStore } from '../../../stores/settingsNavigationStore';
 import { useSettingsModal } from './useSettingsModal';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
@@ -29,10 +26,7 @@ export const SettingsModal = React.memo<SettingsModalProps>(({ open, settings, o
   const modal = useSettingsModal(open, settings);
   const systemTheme = useAppSettingsStore((state) => state.systemTheme);
   const theme = settings.appearance.theme === 'system' ? systemTheme : settings.appearance.theme;
-  const dialogRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const backdropRef = useRef<HTMLDivElement>(null);
-  const presence = usePresence(open, backdropRef);
   const runtime = useRdcRuntimeOverview(open);
   const [resourceScope, setResourceScope] = useState<'user' | 'project'>('user');
   const agentRequest = useSettingsNavigationStore((state) => state.agentRequest);
@@ -70,14 +64,6 @@ export const SettingsModal = React.memo<SettingsModalProps>(({ open, settings, o
     }
     requestClose();
   }, [connectionDraft, requestClose, setConnectionDraft]);
-  const { layerId } = useOverlayLayer(open);
-  useModalFocus({
-    open,
-    containerRef: dialogRef,
-    onClose: closeSurface,
-    trap: true,
-    layerId,
-  });
 
   // A service's panel opens over the card grid; closing it returns to the grid.
   const providerDialog =
@@ -114,101 +100,89 @@ export const SettingsModal = React.memo<SettingsModalProps>(({ open, settings, o
     clearSectionRequest(sectionRequest.sequence);
   }, [open, sectionRequest, setActiveSection, clearSectionRequest]);
 
-  if (!presence.mounted) return null;
-
   const activeSectionMeta = sections.find((section) => section.id === activeSection);
 
-  return createPortal(
-    <>
-      <div
-        ref={backdropRef}
-        className="settings-modal-backdrop"
-        data-state={presence.state}
-        onMouseDown={(event) => {
-          if (event.target === event.currentTarget && isTopOverlayLayer(layerId)) requestClose();
-        }}
-      >
-        <div
-          ref={dialogRef}
-          className="settings-modal settings-center"
-          data-testid="settings-modal"
-          role="dialog"
-          tabIndex={-1}
-          aria-modal="true"
-          aria-labelledby="settings-modal-title"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="settings-center-sidebar">
-            <div className="settings-center-brand">
-              <ProductLogo accent={settings.appearance.chromeThemes[theme].accent} />
-              <div className="settings-center-brand-copy">
-                <div className="settings-center-brand-title">RDC-Agent</div>
-                <div className="settings-center-brand-subtitle">{t('settings.title')}</div>
-              </div>
-            </div>
-
-            <SettingsCenterNav
-              sections={sections}
-              activeSection={activeSection}
-              onSelectSection={(section) =>
-                guardLeave(() => {
-                  if (section !== 'agents') clearAgentRequest();
-                  setActiveSection(section);
-                })
-              }
-              providers={[...modal.accountProviders, ...modal.providerCatalog].map((provider) => ({
-                id: provider.id,
-                label: modal.getResolvedProviderLabel(provider),
-                open: () =>
-                  guardLeave(() => {
-                    setActiveSection('models');
-                    modal.openProviderConnection(provider);
-                  }),
-              }))}
+  return (
+    <ModalLayer
+      open={open}
+      onClose={closeSurface}
+      onDismiss={requestClose}
+      overlayClassName="settings-modal-backdrop"
+      className="settings-modal settings-center"
+      data-testid="settings-modal"
+      aria-labelledby="settings-modal-title"
+      onClick={(event) => event.stopPropagation()}
+      after={
+        <>
+          {pendingLeave ? (
+            <UnsavedChangesDialog
+              title={t('settings.unsavedExitTitle')}
+              message={t('settings.unsavedExitMessage')}
+              keepEditingLabel={t('settings.keepEditing')}
+              discardLabel={t('settings.discardChanges')}
+              onKeepEditing={keepEditing}
+              onDiscard={discardAndLeave}
             />
-          </div>
-
-          <div className="settings-center-content">
-            <div className="settings-modal-header">
-              <div className="settings-modal-heading">
-                <div className="settings-modal-title" id="settings-modal-title">
-                  {activeSectionMeta?.label}
-                </div>
-                {activeSectionMeta ? <p className="settings-modal-subtitle">{activeSectionMeta.subtitle}</p> : null}
-              </div>
-              <IconButton className="settings-modal-close" label={t('settings.close')} onClick={requestClose}>
-                <Icon name="close" size={16} />
-              </IconButton>
-            </div>
-
-            <div ref={panelRef} className="settings-center-panel scrollbar-thin" data-testid="settings-center-panel">
-              <SettingsPageContent
-                modal={modal}
-                settings={settings}
-                runtime={runtime}
-                resourceScope={resourceScope}
-                setResourceScope={setResourceScope}
-                setResourceDraftDirty={setResourceDraftDirty}
-              />
-            </div>
+          ) : null}
+          {providerDialog}
+        </>
+      }
+    >
+      <div className="settings-center-sidebar">
+        <div className="settings-center-brand">
+          <ProductLogo accent={settings.appearance.chromeThemes[theme].accent} />
+          <div className="settings-center-brand-copy">
+            <div className="settings-center-brand-title">RDC-Agent</div>
+            <div className="settings-center-brand-subtitle">{t('settings.title')}</div>
           </div>
         </div>
+
+        <SettingsCenterNav
+          sections={sections}
+          activeSection={activeSection}
+          onSelectSection={(section) =>
+            guardLeave(() => {
+              if (section !== 'agents') clearAgentRequest();
+              setActiveSection(section);
+            })
+          }
+          providers={[...modal.accountProviders, ...modal.providerCatalog].map((provider) => ({
+            id: provider.id,
+            label: modal.getResolvedProviderLabel(provider),
+            open: () =>
+              guardLeave(() => {
+                setActiveSection('models');
+                modal.openProviderConnection(provider);
+              }),
+          }))}
+        />
       </div>
 
-      {pendingLeave ? (
-        <UnsavedChangesDialog
-          title={t('settings.unsavedExitTitle')}
-          message={t('settings.unsavedExitMessage')}
-          keepEditingLabel={t('settings.keepEditing')}
-          discardLabel={t('settings.discardChanges')}
-          onKeepEditing={keepEditing}
-          onDiscard={discardAndLeave}
-        />
-      ) : null}
+      <div className="settings-center-content">
+        <div className="settings-modal-header">
+          <div className="settings-modal-heading">
+            <div className="settings-modal-title" id="settings-modal-title">
+              {activeSectionMeta?.label}
+            </div>
+            {activeSectionMeta ? <p className="settings-modal-subtitle">{activeSectionMeta.subtitle}</p> : null}
+          </div>
+          <IconButton className="settings-modal-close" label={t('settings.close')} onClick={requestClose}>
+            <Icon name="close" size={16} />
+          </IconButton>
+        </div>
 
-      {providerDialog}
-    </>,
-    document.body,
+        <div ref={panelRef} className="settings-center-panel scrollbar-thin" data-testid="settings-center-panel">
+          <SettingsPageContent
+            modal={modal}
+            settings={settings}
+            runtime={runtime}
+            resourceScope={resourceScope}
+            setResourceScope={setResourceScope}
+            setResourceDraftDirty={setResourceDraftDirty}
+          />
+        </div>
+      </div>
+    </ModalLayer>
   );
 });
 SettingsModal.displayName = 'SettingsModal';

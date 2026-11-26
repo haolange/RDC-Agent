@@ -1,6 +1,7 @@
 import { cn } from '../../../../lib/cn';
 import { useI18n } from '../../../../i18n';
 import { Switch } from '../../../../ui/Switch';
+import { PlainButton } from '../../../../ui/PlainButton';
 import { formFromContent } from './scopedResourceForm';
 import type { ScopedResourceDocument } from '@shared/types/rdcRuntime';
 import type { ReactNode } from 'react';
@@ -31,15 +32,10 @@ export function McpResourceList({
         const selected = resource.id === selectedId;
         return (
           <li key={`${resource.scope}:${resource.id}`} className={cn('settings-mcp-row', selected && 'is-selected')}>
-            <button
-              type="button"
-              className="settings-mcp-row-main"
-              aria-pressed={selected}
-              onClick={() => onSelect(resource)}
-            >
+            <PlainButton className="settings-mcp-row-main" aria-pressed={selected} onClick={() => onSelect(resource)}>
               <span className="settings-mcp-row-name">{name}</span>
               {renderStatus(resource)}
-            </button>
+            </PlainButton>
             <Switch
               checked={form.enabled}
               disabled={busyId === resource.id}

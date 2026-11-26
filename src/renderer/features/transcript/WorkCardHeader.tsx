@@ -1,5 +1,6 @@
 import React from 'react';
 import { Chevron } from '../../ui/Chevron';
+import { PlainButton } from '../../ui/PlainButton';
 import { WorkRowTitle } from './WorkRowTitle';
 
 /** Shared tool-card geometry; callers own identity, state and disclosure. */
@@ -30,8 +31,7 @@ export const WorkCardHeader: React.FC<{
   preview,
   trailingPreview,
 }) => (
-  <button
-    type="button"
+  <PlainButton
     className={`work-card-trigger${preview ? ' has-preview' : ''}`}
     onClick={onClick}
     aria-expanded={expanded}
@@ -56,5 +56,5 @@ export const WorkCardHeader: React.FC<{
         {trailingPreview ? <span className="work-card-preview-trailing">{trailingPreview}</span> : null}
       </span>
     ) : null}
-  </button>
+  </PlainButton>
 );

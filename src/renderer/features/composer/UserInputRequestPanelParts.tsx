@@ -1,6 +1,7 @@
 import { Textarea } from '../../ui/Textarea';
 import { useI18n } from '../../i18n';
 import { Icon } from '../../ui/Icon';
+import { PlainButton } from '../../ui/PlainButton';
 import type { FC, RefObject } from 'react';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 
@@ -16,9 +17,8 @@ export const UserInputOptionList: FC<{
       {question.options.map((option, index) => {
         const isSelected = selectedOptionId === option.optionId;
         return (
-          <button
+          <PlainButton
             key={option.optionId}
-            type="button"
             role="radio"
             aria-checked={isSelected}
             className={`composer-user-input-option${isSelected ? ' is-selected' : ''}`}
@@ -41,7 +41,7 @@ export const UserInputOptionList: FC<{
                 <Icon name="check" />
               </span>
             ) : null}
-          </button>
+          </PlainButton>
         );
       })}
     </div>
@@ -60,8 +60,7 @@ export const UserInputCustomAnswer: FC<{
   return (
     <div className={`composer-user-input-custom${!selectedOptionId && customAnswer.trim() ? ' is-selected' : ''}`}>
       {question.options.length > 0 ? (
-        <button
-          type="button"
+        <PlainButton
           className="composer-user-input-custom-select"
           disabled={isSubmitting}
           onClick={() => {
@@ -78,7 +77,7 @@ export const UserInputCustomAnswer: FC<{
               <Icon name="check" />
             </span>
           ) : null}
-        </button>
+        </PlainButton>
       ) : null}
       <Textarea
         ref={textareaRef}

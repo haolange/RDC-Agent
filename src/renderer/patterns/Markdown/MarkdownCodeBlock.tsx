@@ -5,6 +5,7 @@ import { CopyButton } from '../../ui/CopyButton';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { OverflowFade } from '../../ui/OverflowFade';
+import { PlainButton } from '../../ui/PlainButton';
 
 /** Blocks longer than this open folded, fading at the fold, with one control to show the rest. */
 export const CODE_BLOCK_FOLD_LINES = 30;
@@ -55,14 +56,13 @@ export const MarkdownCodeBlock: React.FC<MarkdownCodeBlockProps> = ({ language, 
       </div>
       <pre className="markdown-code-block-pre">{children}</pre>
       {foldable ? (
-        <button
-          type="button"
+        <PlainButton
           className="markdown-code-block-fold"
           aria-expanded={!folded}
           onClick={() => setFolded((value) => !value)}
         >
           {folded ? t('chat.markdownCodeExpand', { count: lineCount }) : t('chat.markdownCodeCollapse')}
-        </button>
+        </PlainButton>
       ) : null}
     </div>
   );

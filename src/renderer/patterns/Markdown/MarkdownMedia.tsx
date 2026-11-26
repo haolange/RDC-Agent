@@ -4,6 +4,7 @@ import { Button } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
 import { ImageViewer, type ImageViewerItem } from '../../ui/ImageViewer';
 import { Skeleton } from '../../ui/Skeleton';
+import { PlainButton } from '../../ui/PlainButton';
 import { useMarkdownSourceScope } from './markdownSources';
 import { useMarkdownMedia } from './useMarkdownMedia';
 
@@ -98,14 +99,14 @@ export const MarkdownMedia: React.FC<{ src?: string; alt?: string }> = ({ src, a
   }
   return (
     <span className="markdown-media" role="figure" aria-label={alt || undefined}>
-      <button type="button" className="markdown-media-open" onClick={(event) => gallery?.open(event.currentTarget)}>
+      <PlainButton className="markdown-media-open" onClick={(event) => gallery?.open(event.currentTarget)}>
         <img
           className="markdown-media-image"
           src={media.url}
           alt={alt}
           data-original={src?.startsWith('https://') ? src : undefined}
         />
-      </button>
+      </PlainButton>
       {alt ? <span className="markdown-media-caption">{alt}</span> : null}
     </span>
   );

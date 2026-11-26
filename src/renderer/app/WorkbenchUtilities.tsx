@@ -1,6 +1,7 @@
 import { DeviceSelector } from '../features/captures/DeviceSelector';
 import { useI18n } from '../i18n';
 import { Icon } from '../ui/Icon';
+import { PlainButton } from '../ui/PlainButton';
 import { SetupGuideButton } from './SetupGuideButton';
 
 interface WorkbenchUtilitiesProps {
@@ -21,8 +22,7 @@ export function WorkbenchUtilities({
     <div className="titlebar-utilities">
       <SetupGuideButton />
       <DeviceSelector />
-      <button
-        type="button"
+      <PlainButton
         className={`main-utility-toggle terminal-pill${isTerminalOpen ? ' is-active' : ''}${activityAlertSeverity ? ` terminal-${activityAlertSeverity}` : ''}`}
         onClick={onToggleTerminal}
         data-testid="terminal-toggle"
@@ -34,7 +34,7 @@ export function WorkbenchUtilities({
         {activityAlertSeverity && (
           <span className={`terminal-status-badge ${activityAlertSeverity}`} aria-hidden="true" />
         )}
-      </button>
+      </PlainButton>
     </div>
   );
 }

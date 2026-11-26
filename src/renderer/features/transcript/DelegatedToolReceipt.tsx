@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
 import { Skeleton } from '../../ui/Skeleton';
+import { PlainButton } from '../../ui/PlainButton';
 import { WorkDisclosure } from './WorkDisclosure';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { useDelegationContent } from './useDelegationContent';
@@ -36,14 +37,14 @@ export const DelegatedToolReceipt: React.FC<{
           </span>
         ) : null}
         {content.error ? (
-          <button type="button" className="work-process-subagent-more" onClick={content.retry}>
+          <PlainButton className="work-process-subagent-more" onClick={content.retry}>
             {t('chat.subagentRetry')}
-          </button>
+          </PlainButton>
         ) : null}
         {content.hasMore ? (
-          <button type="button" className="work-process-subagent-more" onClick={() => void content.loadMore()}>
+          <PlainButton className="work-process-subagent-more" onClick={() => void content.loadMore()}>
             {t('chat.subagentShowMore')}
-          </button>
+          </PlainButton>
         ) : null}
       </div>
     </WorkDisclosure>

@@ -24,6 +24,8 @@ const renderedPatterns = [
   /dataTestId\s*=\s*["']([^"']+)["']/g,
   // Shared parts take the id as a prop or a default parameter (SettingsField, HandoffActionRow).
   /\btestId\s*=\s*["']([^"']+)["']/g,
+  // ModalLayer names its overlay separately from the dialog.
+  /\boverlayTestId\s*=\s*["']([^"']+)["']/g,
   /\btestId:\s*'([^']+)'/g,
   /\btestId:\s*`([^`]+)`/g,
 ];

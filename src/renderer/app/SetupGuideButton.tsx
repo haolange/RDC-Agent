@@ -5,6 +5,7 @@ import { SetupChecklist } from '../patterns/SetupChecklist';
 import { Icon } from '../ui/Icon';
 import { Popover } from '../ui/Popover';
 import './SetupGuideButton.css';
+import { PlainButton } from '../ui/PlainButton';
 
 /**
  * The title-bar「?」reopens the first-run checklist at any time. It reads the same live configuration as the empty
@@ -28,15 +29,14 @@ export function SetupGuideButton() {
       align="end"
       className="setup-guide-popover"
       trigger={
-        <button
-          type="button"
+        <PlainButton
           className={`main-utility-toggle${open ? ' is-active' : ''}`}
           data-testid="titlebar-setup-guide"
           aria-label={label}
           data-tooltip={label}
         >
           <Icon name="help" />
-        </button>
+        </PlainButton>
       }
     >
       <SetupChecklist steps={steps} />

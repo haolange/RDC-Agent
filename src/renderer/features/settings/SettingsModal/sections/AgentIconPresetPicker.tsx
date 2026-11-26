@@ -6,6 +6,7 @@ import { Chevron } from '../../../../ui/Chevron';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { Popover } from '../../../../ui/Popover';
 import { useI18n } from '../../../../i18n';
+import { PlainButton } from '../../../../ui/PlainButton';
 import type { ModeIconKey } from '@shared/types/layout';
 
 interface AgentIconPresetPickerProps {
@@ -66,9 +67,8 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({ va
         onKeyDown={onGridKeyDown}
       >
         {AGENT_ICON_PRESETS.map((preset) => (
-          <button
+          <PlainButton
             key={preset.id}
-            type="button"
             className={`settings-agent-icon-option${value === preset.id ? ' is-selected' : ''}`}
             role="menuitemradio"
             aria-checked={value === preset.id}
@@ -81,7 +81,7 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({ va
                 <Icon name="check" size={12} />
               </span>
             ) : null}
-          </button>
+          </PlainButton>
         ))}
       </div>
     </Popover>

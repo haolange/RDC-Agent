@@ -2,6 +2,7 @@ import React from 'react';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
 import { useI18n } from '../../i18n';
 import { Skeleton } from '../../ui/Skeleton';
+import { PlainButton } from '../../ui/PlainButton';
 import { DelegationTaskDocument } from './DelegationTaskDocument';
 import { useDelegationContent } from './useDelegationContent';
 
@@ -58,14 +59,14 @@ export function DelegationBody({
         </span>
       ) : null}
       {content.error ? (
-        <button type="button" className="work-process-subagent-more" onClick={content.retry}>
+        <PlainButton className="work-process-subagent-more" onClick={content.retry}>
           {t('chat.subagentRetry')}
-        </button>
+        </PlainButton>
       ) : null}
       {content.hasMore ? (
-        <button type="button" className="work-process-subagent-more" onClick={() => void content.loadMore()}>
+        <PlainButton className="work-process-subagent-more" onClick={() => void content.loadMore()}>
           {t('chat.subagentShowMore')}
-        </button>
+        </PlainButton>
       ) : null}
     </>
   );

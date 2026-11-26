@@ -3,6 +3,7 @@ import { useClipboardBridge } from '../../hooks/useClipboardBridge';
 import { useI18n } from '../../i18n';
 import { CopyButton } from '../../ui/CopyButton';
 import { Icon } from '../../ui/Icon';
+import { PlainButton } from '../../ui/PlainButton';
 import { MessageVariantNavigator } from './MessageVariantNavigator';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ConversationMessage } from '@shared/types/conversation';
@@ -38,15 +39,14 @@ export const MessageActions: React.FC<MessageActionsProps> = ({ message, branchS
         copiedLabel={t('chat.markdownCopied')}
       />
       {message.role === 'user' && onEditResend && (
-        <button
-          type="button"
+        <PlainButton
           className="message-action-btn"
           data-tooltip={editResendLabel}
           aria-label={editResendLabel}
           onClick={handleEditResend}
         >
           <Icon name="edit" size={14} />
-        </button>
+        </PlainButton>
       )}
       {message.role === 'user' ? <MessageVariantNavigator message={message} branchState={branchState} /> : null}
     </div>

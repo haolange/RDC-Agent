@@ -5,6 +5,7 @@ import { Button } from '../../../ui/Button';
 import { EmptyState } from '../../../ui/EmptyState';
 import { Skeleton } from '../../../ui/Skeleton';
 import { formatLogTime } from '../../../lib/formatTime';
+import { PlainButton } from '../../../ui/PlainButton';
 import { formatRaw, formatShortId } from './terminalFormatters';
 import {
   TERMINAL_ENTRY_ESTIMATE,
@@ -142,7 +143,7 @@ const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({ entry, isExpanded, 
       className={`runtime-terminal-entry severity-${entry.severity} ${isExpanded ? 'expanded' : ''}`}
       data-testid={`runtime-log-entry-${entry.id}`}
     >
-      <button type="button" className="runtime-terminal-entry-main" onClick={onToggle} aria-expanded={isExpanded}>
+      <PlainButton className="runtime-terminal-entry-main" onClick={onToggle} aria-expanded={isExpanded}>
         <span
           className={`runtime-terminal-severity-dot severity-${entry.severity}`}
           role="img"
@@ -152,7 +153,7 @@ const TerminalLogEntry: React.FC<TerminalLogEntryProps> = ({ entry, isExpanded, 
         <span className="runtime-terminal-entry-time">{formatLogTime(language, entry.timestamp)}</span>
         <span className="runtime-terminal-entry-title">{entry.title}</span>
         <span className="runtime-terminal-entry-summary">{entry.summary}</span>
-      </button>
+      </PlainButton>
 
       {isExpanded && (
         <div className="runtime-terminal-entry-details">

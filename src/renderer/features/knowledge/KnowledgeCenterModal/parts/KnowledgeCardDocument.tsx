@@ -5,6 +5,7 @@ import { useI18n } from '../../../../i18n';
 import { CHAPTER_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { hasReadableCaseChapter } from '../knowledgeCaseValues';
 import { bodyWithoutTitle, markdownOutline } from '../knowledgeOutline';
+import { PlainButton } from '../../../../ui/PlainButton';
 import { CaseChapterContent } from './CaseChapterContent';
 import { KnowledgeCardImages } from './KnowledgeCardImages';
 import { KnowledgeMarkdown } from './KnowledgeMarkdown';
@@ -96,14 +97,13 @@ export function KnowledgeCardDocument({ card }: { card: KnowledgeCardDetail }) {
           data-testid="knowledge-center-chapters"
         >
           {outline.map((label, index) => (
-            <button
+            <PlainButton
               key={`${label}:${index}`}
-              type="button"
               className="knowledge-center-outline-link"
               onClick={() => jumpTo(index)}
             >
               {label}
-            </button>
+            </PlainButton>
           ))}
         </nav>
       ) : null}

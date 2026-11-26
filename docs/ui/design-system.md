@@ -189,6 +189,7 @@ Settings 页标题与正文共用面板内边距。
 - React 层用 `<Button variant="primary|secondary|ghost|danger|reset" size="sm|md|lg">`（`src/renderer/ui/Button.tsx`）。`reset` 去掉按钮铬，只在不会被 `.button` 特异性盖过现有菜单内边距时使用。
 - 普通按钮为中性实色表面与细边框，主要动作使用强调色文字及描边，不铺大面积 accent；单选分段使用低饱和实色选中面。输入和按钮统一小圆角，默认控件高度 md，紧凑工具栏 sm。Composer Send 保留 Agent accent 实色的领域契约。
 - **禁止**新增第三套按钮类名，禁止在 feature CSS 中重复定义按钮样式。
+- 原生 `<button>` 只出现在 `src/renderer/ui/`：外观属于领域的控件（会话与项目行、导航项、窗口按钮、披露头、卡片触发器）用 `ui/PlainButton`，它没有自己的样式，只固定 `type="button"` 并转发 ref。门禁：`check:ui-contract` 的 `bare-button`（上限 0）。
 
 ### 多行输入与全文编辑
 
@@ -326,6 +327,8 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 - 说明文案仅保留操作条件、作用域和必要风险，内部实现细节留在文档。
 
 ## 任务子弹窗（TaskDialog）
+
+模态层统一由 `ui/ModalLayer` 承担：portal、带进退场的遮罩、overlay stack 中的一层（Escape 与 Tab 陷阱只归最上层）、开启时移入焦点并在关闭时归还、按下遮罩本身才关闭（忙碌或不在最上层时不关闭）。`TaskDialog`、Settings、知识中心与命令面板都站在它上面，各自只拥有对话框内部的布局；子弹窗经 `after` 渲染为遮罩的兄弟节点。右栏抽屉 `WorkbenchPanelDrawer` 是保持挂载的树内抽屉，直接用同一组 `useOverlayLayer` / `useModalFocus`；用户菜单与 Composer 的模型/思考面板是锚定的非模态面板，不属于模态层。
 
 导入、导出、资源编辑、连接配置、写入确认等「离开当前阅读面会丢上下文」的任务，一律用 `src/renderer/ui/TaskDialog.tsx`，叠在 Settings / Knowledge 之上，不替换背后的列表、筛选、选择或滚动位置。
 

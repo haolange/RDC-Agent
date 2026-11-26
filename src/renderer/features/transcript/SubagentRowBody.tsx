@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n';
 import { InlineError } from '../../ui/InlineError';
 import { Skeleton } from '../../ui/Skeleton';
 import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
+import { PlainButton } from '../../ui/PlainButton';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkProcessContent } from './WorkProcessContent';
 import { SubagentCallDetails } from './SubagentCallDetails';
@@ -121,9 +122,9 @@ export function SubagentRowBody({
       >
         {loading || headerLoading ? loadingLines : null}
         {page.error ? (
-          <button type="button" className="work-process-subagent-more" onClick={retry}>
+          <PlainButton className="work-process-subagent-more" onClick={retry}>
             {t('chat.subagentRetry')}
-          </button>
+          </PlainButton>
         ) : null}
         {!loading && !headerLoading && !page.error && page.steps.length === 0 ? (
           <span className="work-process-subagent-note">{t('chat.subagentNoActions')}</span>
@@ -137,9 +138,9 @@ export function SubagentRowBody({
           active={row.status === 'running'}
           leadingContent={
             hasEarlier ? (
-              <button type="button" className="work-process-subagent-more" onClick={() => void loadEarlierWithAnchor()}>
+              <PlainButton className="work-process-subagent-more" onClick={() => void loadEarlierWithAnchor()}>
                 {t('chat.subagentShowEarlier')}
-              </button>
+              </PlainButton>
             ) : null
           }
           disclosureScope={`${sessionId ?? ''}\u0000${row.id}`}

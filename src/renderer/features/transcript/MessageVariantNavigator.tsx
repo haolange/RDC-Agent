@@ -9,6 +9,7 @@ import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydra
 import { useI18n } from '../../i18n';
 import { notify } from '../../stores/notificationStore';
 import { Chevron } from '../../ui/Chevron';
+import { PlainButton } from '../../ui/PlainButton';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ConversationMessage } from '@shared/types/conversation';
 
@@ -76,30 +77,28 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
 
   return (
     <div className="message-variant-navigator" data-testid="message-variant-navigator">
-      <button
-        type="button"
+      <PlainButton
         className="message-variant-nav-btn"
         aria-label={t('chat.messageVariantPrev')}
         disabled={navigator.variantIndex <= 0}
         onClick={() => void switchVariant(-1)}
       >
         <Chevron direction="left" size={12} />
-      </button>
+      </PlainButton>
       <span className="message-variant-nav-label" aria-live="polite">
         {t('chat.messageVariantLabel', {
           current: navigator.variantIndex + 1,
           total: navigator.variantCount,
         })}
       </span>
-      <button
-        type="button"
+      <PlainButton
         className="message-variant-nav-btn"
         aria-label={t('chat.messageVariantNext')}
         disabled={navigator.variantIndex >= navigator.variantCount - 1}
         onClick={() => void switchVariant(1)}
       >
         <Chevron size={12} />
-      </button>
+      </PlainButton>
     </div>
   );
 };

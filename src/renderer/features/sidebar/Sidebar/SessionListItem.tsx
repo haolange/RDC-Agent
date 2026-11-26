@@ -2,6 +2,7 @@ import React from 'react';
 import { useI18n } from '../../../i18n';
 import { useSessionRunning } from '../../../hooks/useSessionRunning';
 import { Icon } from '../../../ui/Icon';
+import { PlainButton } from '../../../ui/PlainButton';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
 export interface SessionListItemProps {
@@ -48,7 +49,7 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
       onContextMenu={(event) => onContextMenu(event, session)}
     >
       <div className="session-item-header">
-        <button type="button" className="session-item-select" onClick={() => void onActivate(project, session)}>
+        <PlainButton className="session-item-select" onClick={() => void onActivate(project, session)}>
           {/* Rows carry no icon of their own; the gutter only marks a session with a reply in flight. */}
           <span className="session-item-gutter">
             {running ? (
@@ -61,26 +62,24 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
             ) : null}
           </span>
           <span className="session-item-title">{session.title}</span>
-        </button>
+        </PlainButton>
         <span className="session-item-actions">
-          <button
-            type="button"
+          <PlainButton
             className="session-item-icon-button"
             data-tooltip={t('sidebar.renameSession')}
             onClick={(event) => onRenameClick(event, session)}
             onKeyDown={(event) => onRenameKeyDown(event, session)}
           >
             <Icon name="edit" size={14} />
-          </button>
-          <button
-            type="button"
+          </PlainButton>
+          <PlainButton
             className="session-item-icon-button danger"
             data-tooltip={t('sidebar.removeSession')}
             onClick={(event) => onRemoveClick(event, session)}
             onKeyDown={(event) => onRemoveKeyDown(event, session)}
           >
             <Icon name="trash" size={14} />
-          </button>
+          </PlainButton>
         </span>
       </div>
     </div>

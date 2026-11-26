@@ -5,6 +5,7 @@ import { Button } from '../../ui/Button';
 import { InlineError } from '../../ui/InlineError';
 import { useClipboardBridge } from '../../hooks/useClipboardBridge';
 import { Skeleton } from '../../ui/Skeleton';
+import { PlainButton } from '../../ui/PlainButton';
 import { useDelegationContent } from './useDelegationContent';
 import { useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { WorkDisclosure } from './WorkDisclosure';
@@ -63,14 +64,14 @@ function Detail({
           </span>
         ) : null}
         {content.error ? (
-          <button type="button" className="work-process-subagent-more" onClick={content.retry}>
+          <PlainButton className="work-process-subagent-more" onClick={content.retry}>
             {t('chat.subagentRetry')}
-          </button>
+          </PlainButton>
         ) : null}
         {content.hasMore ? (
-          <button type="button" className="work-process-subagent-more" onClick={() => void content.loadMore()}>
+          <PlainButton className="work-process-subagent-more" onClick={() => void content.loadMore()}>
             {t('chat.subagentShowMore')}
-          </button>
+          </PlainButton>
         ) : null}
       </div>
     </WorkDisclosure>

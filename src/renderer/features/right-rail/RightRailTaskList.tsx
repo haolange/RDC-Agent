@@ -6,6 +6,7 @@ import { useModelDisplayLabel } from '../../hooks/useModelDisplayLabel';
 import { Chevron } from '../../ui/Chevron';
 import { ProgressBar } from '../../ui/ProgressBar';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
+import { PlainButton } from '../../ui/PlainButton';
 import type { TaskRailItem } from '@shared/types/trace';
 import './RightRailTasks.css';
 
@@ -67,15 +68,14 @@ const TaskRow: React.FC<{ task: TaskRailItem; locateLabel: string }> = ({ task, 
   const stateLabel = waiting ? t('chat.taskWaitingDependencies') : t(`chat.workProcessTaskStatus.${task.displayState}`);
   return (
     <li className={`right-rail-task-row status-${task.displayState}`}>
-      <button
-        type="button"
+      <PlainButton
         onClick={() => focusWorkProcessTask(task.id)}
         aria-label={`${task.title} · ${locateLabel}`}
         data-tooltip={[task.title, stateLabel, ...facts].join(' · ')}
       >
         <TaskStatusMarker size="sm" status={task.displayState} label={stateLabel} />
         <span className="right-rail-task-title">{task.title}</span>
-      </button>
+      </PlainButton>
     </li>
   );
 };
@@ -91,8 +91,7 @@ export const RightRailTaskList: React.FC<{ tasks: TaskRailItem[]; locateLabel: s
       <>
         <TaskProgress done={done} total={tasks.length} />
         {foldable ? (
-          <button
-            type="button"
+          <PlainButton
             className="right-rail-task-fold"
             aria-expanded={showCompleted}
             onClick={() => setShowCompleted(!showCompleted)}
@@ -103,7 +102,7 @@ export const RightRailTaskList: React.FC<{ tasks: TaskRailItem[]; locateLabel: s
                 count: done,
               })}
             </span>
-          </button>
+          </PlainButton>
         ) : null}
         <ol className="right-rail-tasks">
           {visible.map((task) => (

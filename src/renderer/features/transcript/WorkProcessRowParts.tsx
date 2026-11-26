@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n';
 import { Button } from '../../ui/Button';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Icon } from '../../ui/Icon';
+import { PlainButton } from '../../ui/PlainButton';
 import { WorkCardHeader } from './WorkCardHeader';
 import { getRowStatusLabel } from './workProcessStatus';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
@@ -127,8 +128,7 @@ export const ToolRow: React.FC<{
           {(!isBackgroundWait || expanded) && !grouped ? <CardBody row={row} /> : null}
 
           {hasDiagnostic ? (
-            <button
-              type="button"
+            <PlainButton
               className={`work-process-tool-diagnostic${expanded ? ' is-open' : ''}`}
               data-testid="work-process-tool-diagnostic"
               aria-expanded={expanded}
@@ -141,7 +141,7 @@ export const ToolRow: React.FC<{
                   {expanded ? t('chat.workProcessHideDiagnostic') : t('chat.workProcessShowDiagnostic')}
                 </span>
               ) : null}
-            </button>
+            </PlainButton>
           ) : null}
 
           {hookAttention && !expanded ? (

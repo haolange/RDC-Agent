@@ -5,6 +5,7 @@ import { ModeGlyph } from '../../ui/ModeGlyph';
 import { Pill } from '../../ui/Pill';
 import { useI18n } from '../../i18n';
 import { Chevron } from '../../ui/Chevron';
+import { PlainButton } from '../../ui/PlainButton';
 import { useComposerMenu } from './useComposerMenuRegistry';
 import { useComposerView } from './ComposerControllerContext';
 import type { AgentMode } from '@shared/types/layout';
@@ -105,9 +106,8 @@ export const ComposerAgentMenu: React.FC = () => {
             const isSelected = selectedAgentId === agent.id;
             const isRunning = activeAgentId === agent.id;
             return (
-              <button
+              <PlainButton
                 key={agent.id}
-                type="button"
                 className={`composer-agent-menu-item${isSelected ? ' is-selected' : ''}${isRunning ? ' is-running' : ''}`}
                 data-testid={`mode-menu-item-${agent.id}`}
                 data-selected={isSelected}
@@ -136,7 +136,7 @@ export const ComposerAgentMenu: React.FC = () => {
                     {description}
                   </span>
                 ) : null}
-              </button>
+              </PlainButton>
             );
           })}
         </div>

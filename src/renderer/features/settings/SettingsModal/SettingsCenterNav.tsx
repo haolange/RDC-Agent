@@ -4,6 +4,7 @@ import { isImeComposing } from '../../../lib/ime';
 import { motionScrollBehavior } from '../../../lib/motion';
 import { SearchField } from '../../../ui/SearchField';
 import { useI18n } from '../../../i18n';
+import { PlainButton } from '../../../ui/PlainButton';
 import { SettingsNavIcon } from './SettingsNavIcon';
 import { matchSettingsSearchEntries, type SettingsSearchEntry } from './settingsSearchIndex';
 import type { TranslationKey } from '../../../i18n';
@@ -157,10 +158,9 @@ export const SettingsCenterNav: React.FC<{
       {results.length > 0 ? (
         <div id={resultsId} className="settings-search-results" role="listbox" data-testid="settings-search-results">
           {results.map((entry, index) => (
-            <button
+            <PlainButton
               key={entry.key}
               id={`${resultsId}-${index}`}
-              type="button"
               role="option"
               tabIndex={-1}
               aria-selected={index === activeResult}
@@ -173,7 +173,7 @@ export const SettingsCenterNav: React.FC<{
               <span className="settings-search-result-section">
                 {sections.find((section) => section.id === entry.section)?.label}
               </span>
-            </button>
+            </PlainButton>
           ))}
         </div>
       ) : null}
@@ -193,8 +193,7 @@ export const SettingsCenterNav: React.FC<{
                   {t(group)}
                 </span>
               ) : null}
-              <button
-                type="button"
+              <PlainButton
                 className={cn('settings-center-nav-item', activeSection === section.id && 'is-active')}
                 data-testid={`settings-nav-${section.id}`}
                 data-settings-nav-item="true"
@@ -205,7 +204,7 @@ export const SettingsCenterNav: React.FC<{
               >
                 <SettingsNavIcon section={section.id} />
                 <span>{section.label}</span>
-              </button>
+              </PlainButton>
             </React.Fragment>
           );
         })}

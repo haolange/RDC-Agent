@@ -240,7 +240,7 @@ Session 右栏是 Tasks / Artifacts / Outputs / Context / Capture 单轨，投�
   - 需要解释的用次级正文写在标签下；悬停提示（`data-tooltip`，`ui/TooltipHost`）只补充信息或显示被截断的全文，不用原生 `title`。
   - 视觉原则见 `DESIGN.md`，审美契约见 `docs/ui/design-system.md`。
 - **图标与动效**：图标只来自 `ui/Icon`（展开箭头用 `ui/Chevron`），不内联 SVG、不用文字当图标；一条 transition 只写一条缓动，进场必有退场。门禁：`pnpm run check:ui-contract`。
-- **按钮**：动作按钮用 `<Button>`（`.button` + variant）。
+- **按钮**：动作按钮用 `<Button>`（`.button` + variant）；外观属于领域的行、导航项与窗口按钮用 `ui/PlainButton`，`src/renderer/ui/` 之外不写原生 `<button>`（`check:ui-contract` 的 `bare-button`）。
 - **状态类**：一律 `is-*` 并配对应 `aria-*`。
 - **焦点**：`:hover` 配 `:focus-visible`；去掉 outline 时提供等效焦点样式。
 - **新组件**：覆盖所有交互状态，variant 经 CSS 变量控制，不用内联 style。

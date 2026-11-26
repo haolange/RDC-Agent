@@ -5,6 +5,7 @@ import { Chevron } from '../../ui/Chevron';
 import { Pill } from '../../ui/Pill';
 import { useRuntimePermissionStore } from '../../stores/runtimePermissionStore';
 import { InlineError } from '../../ui/InlineError';
+import { PlainButton } from '../../ui/PlainButton';
 import { useComposerMenu } from './useComposerMenuRegistry';
 import type { TranslationKey } from '../../i18n';
 import type { AgentPermissionMode } from '@shared/types/settings';
@@ -123,9 +124,8 @@ export const PermissionModeSelector: React.FC = () => {
       {menu.open ? (
         <div ref={popupRef} className="composer-permission-popup" role="menu" onKeyDown={moveFocus}>
           {PERMISSION_MODES.map((entry) => (
-            <button
+            <PlainButton
               key={entry}
-              type="button"
               className={`composer-permission-menu-item ${entry === mode ? 'is-selected' : ''}`}
               data-mode={entry}
               data-tooltip={t(descKey(entry))}
@@ -136,7 +136,7 @@ export const PermissionModeSelector: React.FC = () => {
             >
               <span className="composer-permission-menu-label">{t(labelKey(entry))}</span>
               {entry === mode ? <Icon name="check" size={16} className="composer-permission-menu-check" /> : null}
-            </button>
+            </PlainButton>
           ))}
           {error && !snapshot ? (
             <InlineError

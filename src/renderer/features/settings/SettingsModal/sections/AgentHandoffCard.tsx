@@ -8,6 +8,7 @@ import { Select } from '../../../../ui/Select';
 import { Textarea } from '../../../../ui/Textarea';
 import { SettingsField } from '../parts';
 import { useI18n } from '../../../../i18n';
+import { PlainButton } from '../../../../ui/PlainButton';
 import { AgentSkillPicker, type AgentSkillCatalog } from './AgentSkillPicker';
 import {
   AGENT_HANDOFF_ISSUE_KEYS,
@@ -95,8 +96,7 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
       data-invalid={shown ? 'true' : undefined}
     >
       <div className="settings-handoff-card-head">
-        <button
-          type="button"
+        <PlainButton
           className="settings-handoff-card-toggle"
           aria-expanded={expanded}
           aria-controls={bodyId}
@@ -109,7 +109,7 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
           </strong>
           {!expanded && targetName ? <small className="settings-handoff-card-target">→ {targetName}</small> : null}
           {shown ? <Icon name="warning" size={14} className="settings-handoff-card-warning" /> : null}
-        </button>
+        </PlainButton>
         <div className="settings-handoff-card-actions">
           <IconButton label={t('settings.agentHandoffMoveUp')} size="sm" disabled={isFirst} onClick={onMoveUp}>
             <Icon name="arrow-up" size={14} />

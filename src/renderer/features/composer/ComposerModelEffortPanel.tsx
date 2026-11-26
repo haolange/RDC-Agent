@@ -6,6 +6,7 @@ import { Icon } from '../../ui/Icon';
 import { Chevron } from '../../ui/Chevron';
 import { Switch } from '../../ui/Switch';
 import { useI18n } from '../../i18n';
+import { PlainButton } from '../../ui/PlainButton';
 import { EffortModeIconButton, getStopPosition } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, thumbInsetPercent } from './effortSliderGeometry';
 import { EffortMaxField } from './EffortMaxField';
@@ -148,8 +149,7 @@ export const ComposerModelEffortPanel: React.FC<{
           <span className="composer-model-effort-level">
             {t('composer.effort.reasoningValue', { level: reasoningLabel })}
           </span>
-          <button
-            type="button"
+          <PlainButton
             className="composer-model-effort-model"
             data-testid="composer-model-effort-open-picker"
             aria-label={t('composer.model.openPicker')}
@@ -158,7 +158,7 @@ export const ComposerModelEffortPanel: React.FC<{
           >
             <span>{modelLabel}</span>
             <Chevron size={12} />
-          </button>
+          </PlainButton>
           {capabilityStateDetail ? (
             <Button variant="ghost" size="sm" onClick={onRetryCapability}>
               {capabilityRetryLabel}

@@ -6,6 +6,7 @@ import { InlineError } from '../../../ui/InlineError';
 import { useProjectStore } from '../../../stores/projectStore';
 import { Icon } from '../../../ui/Icon';
 import { Skeleton } from '../../../ui/Skeleton';
+import { PlainButton } from '../../../ui/PlainButton';
 import { ProjectGroup } from './ProjectGroup';
 import { RenamePopover, useSidebarPopovers } from './RenamePopover';
 import { useProjectSelection } from './useProjectSelection';
@@ -88,25 +89,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
             </div>
             <div className="session-section-actions">
               {selection.currentProject && (
-                <button
-                  type="button"
+                <PlainButton
                   className="session-section-action"
                   data-tooltip={t('sidebar.removeProject')}
                   onClick={() => setPendingRemoval({ kind: 'project', project: selection.currentProject! })}
                   disabled={selection.isBusy}
                 >
                   <Icon name="trash" size={14} />
-                </button>
+                </PlainButton>
               )}
-              <button
-                type="button"
+              <PlainButton
                 className="session-section-action"
                 data-tooltip={t('sidebar.addProject')}
                 onClick={() => setAddingProject(true)}
                 disabled={selection.isBusy}
               >
                 <Icon name="plus" size={14} />
-              </button>
+              </PlainButton>
             </div>
           </div>
 

@@ -10,6 +10,7 @@ import { Badge } from '../../../../ui/Badge';
 import { InlineError } from '../../../../ui/InlineError';
 import { humanizeError } from '../../../../i18n/humanizeError';
 import { useI18n } from '../../../../i18n';
+import { PlainButton } from '../../../../ui/PlainButton';
 import { AgentContractFields } from './AgentContractFields';
 import { AgentModelBindingFields, type AgentModelFieldChange } from './AgentModelBindingFields';
 import { configStatus, provenanceLabel } from './agentConfigStatus';
@@ -98,8 +99,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                 data-tone={builtinUpdate.status === 'updated' ? 'warning' : undefined}
               >
                 {/* The change itself is one click away: the comparison, which can also restore. */}
-                <button
-                  type="button"
+                <PlainButton
                   className="settings-agent-editor-link"
                   onClick={onShowBuiltinDiff}
                   data-testid="settings-agent-builtin-diff-open"
@@ -110,15 +110,14 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                       ? 'settings.agentBuiltinUpdated'
                       : 'settings.agentOverridesBuiltin',
                   )}
-                </button>
-                <button
-                  type="button"
+                </PlainButton>
+                <PlainButton
                   className="settings-agent-editor-link"
                   onClick={onDeleteAgent}
                   data-testid="settings-agent-restore"
                 >
                   {t('settings.agentRestore')}
-                </button>
+                </PlainButton>
               </div>
             ) : null}
           </div>

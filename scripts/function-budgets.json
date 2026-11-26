@@ -218,7 +218,7 @@
       "complexity": 43
     },
     "src/renderer/features/composer/ComposerModelEffortPanel.tsx": {
-      "lines": 184
+      "lines": 183
     },
     "src/renderer/features/composer/ComposerModelPickerPanel.tsx": {
       "lines": 152
@@ -249,7 +249,7 @@
       "lines": 152
     },
     "src/renderer/features/knowledge/KnowledgeCenterModal/index.tsx": {
-      "lines": 228
+      "lines": 206
     },
     "src/renderer/features/knowledge/KnowledgeCenterModal/panels/ExportKnowledgeDialog.tsx": {
       "lines": 169
@@ -278,16 +278,16 @@
       "complexity": 45
     },
     "src/renderer/features/settings/SettingsModal/index.tsx": {
-      "lines": 172
+      "lines": 152
     },
     "src/renderer/features/settings/SettingsModal/sections/AgentHandoffCard.tsx": {
-      "lines": 205
+      "lines": 204
     },
     "src/renderer/features/settings/SettingsModal/sections/AgentManifestEditor.tsx": {
-      "lines": 165
+      "lines": 163
     },
     "src/renderer/features/settings/SettingsModal/sections/AgentModelCascadeSelect.tsx": {
-      "lines": 182
+      "lines": 179
     },
     "src/renderer/features/settings/SettingsModal/sections/AgentsSettings.tsx": {
       "lines": 212
@@ -315,7 +315,7 @@
       "complexity": 53
     },
     "src/renderer/features/settings/SettingsModal/SettingsCenterNav.tsx": {
-      "lines": 167
+      "lines": 165
     },
     "src/renderer/features/settings/SettingsModal/settingsModalActions.ts": {
       "lines": 176
@@ -330,10 +330,10 @@
       "lines": 156
     },
     "src/renderer/features/sidebar/Sidebar/index.tsx": {
-      "lines": 181
+      "lines": 179
     },
     "src/renderer/features/sidebar/Sidebar/RenamePopoverPanels.tsx": {
-      "lines": 175
+      "lines": 171
     },
     "src/renderer/features/transcript/SubagentRowBody.tsx": {
       "lines": 155

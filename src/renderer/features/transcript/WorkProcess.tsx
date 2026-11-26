@@ -4,6 +4,7 @@ import { withLanguage } from '../../i18n/messages';
 import { ActiveSignalText } from '../../ui/ActiveSignalText';
 import { Chevron } from '../../ui/Chevron';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
+import { PlainButton } from '../../ui/PlainButton';
 import { ScopedWorkDisclosure, useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { buildWorkProcessPresentation, formatTraceDuration } from './workProcessTracePresentation';
 import { useThinkingMarkdownParser } from './workProcessThinkingContent';
@@ -77,7 +78,7 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer 
       data-testid="work-process"
       aria-label={headlineCopy}
     >
-      <button type="button" className="work-process-header" onClick={toggle} aria-expanded={expanded}>
+      <PlainButton className="work-process-header" onClick={toggle} aria-expanded={expanded}>
         <span className={`work-process-status-dot status-${trace.status}`} aria-hidden="true" />
         <span className="work-process-heading-copy">
           {running ? (
@@ -100,7 +101,7 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer 
           ) : null}
         </span>
         <Chevron open={expanded} size={12} className="work-process-caret" />
-      </button>
+      </PlainButton>
 
       {hasBody ? (
         <WorkProcessFoldProvider value={!expanded}>

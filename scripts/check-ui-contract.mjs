@@ -23,6 +23,7 @@ const CEILINGS = {
   'reduced-motion': 0,
   'smooth-scroll': 0,
   'tooltip-target': 0,
+  'bare-button': 0,
 };
 
 /** Token and motion definition layers may hold literal values; components may not. */
@@ -110,6 +111,19 @@ function inlineSvg() {
     const text = read(file);
     for (const match of text.matchAll(/['"]chevron-(?:right|left|up|down)['"]/g))
       findings.push(`${file}:${lineOf(text, match.index)} ${match[0]}`);
+  }
+  return findings;
+}
+
+/**
+ * Native buttons live in ui/: actions use Button or IconButton, controls with a domain look (rows, navigation items,
+ * window controls) use PlainButton, so the button contract (type, ref, states) has one owner.
+ */
+function bareButtons() {
+  const findings = [];
+  for (const file of files.filter((name) => name.endsWith('.tsx') && !name.startsWith('src/renderer/ui/'))) {
+    const text = read(file);
+    for (const match of text.matchAll(/<button\b/g)) findings.push(`${file}:${lineOf(text, match.index)}`);
   }
   return findings;
 }
@@ -337,6 +351,7 @@ const INTERACTIVE_COMPONENTS = new Set([
   'SearchField',
   'CopyButton',
   'ListRow',
+  'PlainButton',
   'Badge',
 ]);
 
@@ -470,6 +485,7 @@ const results = {
   'reduced-motion': reducedMotion(),
   'smooth-scroll': smoothScrolls(),
   'tooltip-target': tooltipTargets(),
+  'bare-button': bareButtons(),
 };
 
 const verbose = process.argv.includes('--verbose');

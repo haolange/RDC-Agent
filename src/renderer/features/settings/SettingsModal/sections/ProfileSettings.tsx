@@ -2,6 +2,7 @@ import React from 'react';
 import { ProfileAvatar } from '../../../../patterns/ProfileAvatar';
 import { SettingsSaveMark, SettingsSection, useSettingsAutosave } from '../parts';
 import { useI18n } from '../../../../i18n';
+import { PlainButton } from '../../../../ui/PlainButton';
 import type { AppSettings } from '@shared/types/settings';
 
 interface ProfileSettingsProps {
@@ -38,8 +39,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
       data-settings-search="profile"
     >
       <div className="settings-profile-row">
-        <button
-          type="button"
+        <PlainButton
           className="settings-profile-avatar-button"
           aria-label={t('settings.changeAvatar')}
           data-tooltip={t('settings.changeAvatar')}
@@ -51,7 +51,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
             avatarPath={accountDraft.avatarPath}
             nickname={accountDraft.nickname}
           />
-        </button>
+        </PlainButton>
         <input
           className="settings-profile-nickname"
           aria-label={t('settings.nickname')}

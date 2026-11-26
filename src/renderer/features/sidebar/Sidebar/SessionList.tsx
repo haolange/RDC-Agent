@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
 import { EmptyState } from '../../../ui/EmptyState';
+import { PlainButton } from '../../../ui/PlainButton';
 import { SessionListItem } from './SessionListItem';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 
@@ -58,13 +59,9 @@ export const SessionList: React.FC<SessionListProps> = ({
         />
       ))}
       {hasOverflowSessions && (
-        <button
-          type="button"
-          className="session-list-toggle"
-          onClick={(event) => onToggleShowAll(event, project.projectId)}
-        >
+        <PlainButton className="session-list-toggle" onClick={(event) => onToggleShowAll(event, project.projectId)}>
           {showAllSessions ? t('sidebar.showLess') : t('sidebar.showMore')}
-        </button>
+        </PlainButton>
       )}
     </div>
   );

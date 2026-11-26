@@ -1,4 +1,5 @@
 import { Icon } from '../../ui/Icon';
+import { PlainButton } from '../../ui/PlainButton';
 
 export interface WindowControlsProps {
   maximized: boolean;
@@ -13,33 +14,30 @@ export function WindowControls({ maximized, labels, onMinimize, onToggleMaximize
   const maximizeLabel = maximized ? labels.restore : labels.maximize;
   return (
     <div className="window-controls" role="group" aria-label={labels.group}>
-      <button
-        type="button"
+      <PlainButton
         className="window-control window-control-minimize"
         data-tooltip={labels.minimize}
         aria-label={labels.minimize}
         onClick={onMinimize}
       >
         <Icon name="window-minimize" />
-      </button>
-      <button
-        type="button"
+      </PlainButton>
+      <PlainButton
         className="window-control window-control-maximize"
         data-tooltip={maximizeLabel}
         aria-label={maximizeLabel}
         onClick={onToggleMaximize}
       >
         <Icon name={maximized ? 'window-restore' : 'window-maximize'} />
-      </button>
-      <button
-        type="button"
+      </PlainButton>
+      <PlainButton
         className="window-control close"
         data-tooltip={labels.close}
         aria-label={labels.close}
         onClick={onClose}
       >
         <Icon name="close" />
-      </button>
+      </PlainButton>
     </div>
   );
 }

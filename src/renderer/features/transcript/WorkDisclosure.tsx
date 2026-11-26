@@ -1,5 +1,6 @@
 import React from 'react';
 import { Chevron } from '../../ui/Chevron';
+import { PlainButton } from '../../ui/PlainButton';
 import { WorkRowTitle } from './WorkRowTitle';
 
 export const FadingPreview: React.FC<{ text: string }> = ({ text }) => {
@@ -48,15 +49,14 @@ export const WorkDisclosure: React.FC<{
       {disabled ? (
         <div className="work-disclosure-header is-disabled">{heading}</div>
       ) : (
-        <button
-          type="button"
+        <PlainButton
           className="work-disclosure-header"
           aria-expanded={open}
           aria-controls={contentId}
           onClick={onToggle}
         >
           {heading}
-        </button>
+        </PlainButton>
       )}
       {open && !disabled ? (
         <div id={contentId} className={`work-disclosure-body${bodyClassName ? ` ${bodyClassName}` : ''}`}>

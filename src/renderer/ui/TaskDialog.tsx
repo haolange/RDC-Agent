@@ -1,11 +1,8 @@
-import { useId, useRef, type ReactNode, type RefObject } from 'react';
-import { createPortal } from 'react-dom';
+import { useId, type ReactNode, type RefObject } from 'react';
 import { cn } from '../lib/cn';
-import { useOverlayLayer } from '../lib/overlayStack';
-import { useModalFocus } from '../lib/useModalFocus';
 import { IconButton } from './IconButton';
 import { Icon } from './Icon';
-import { usePresence } from './usePresence';
+import { ModalLayer } from './ModalLayer';
 import './TaskDialog.css';
 
 export type TaskDialogSize = 'sm' | 'md' | 'lg';
@@ -53,65 +50,49 @@ export function TaskDialog({
 }: TaskDialogProps) {
   const titleId = useId();
   const descriptionId = useId();
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const { layerId } = useOverlayLayer(open);
-  const presence = usePresence(open, overlayRef);
 
-  useModalFocus({ open, containerRef: dialogRef, onClose, busy, layerId, fallbackFocusRef });
-
-  if (!presence.mounted || typeof document === 'undefined') return null;
-
-  return createPortal(
-    <div
-      ref={overlayRef}
-      className="task-dialog-overlay"
-      data-state={presence.state}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy) onClose();
-      }}
+  return (
+    <ModalLayer
+      open={open}
+      onClose={onClose}
+      busy={busy}
+      fallbackFocusRef={fallbackFocusRef}
+      overlayClassName="task-dialog-overlay"
+      className={cn('task-dialog', `is-size-${size}`, className)}
+      role={variant === 'alert' ? 'alertdialog' : 'dialog'}
+      aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
+      aria-busy={busy}
+      data-task-dialog
+      data-testid={dataTestId}
     >
-      <div
-        ref={dialogRef}
-        className={cn('task-dialog', `is-size-${size}`, className)}
-        role={variant === 'alert' ? 'alertdialog' : 'dialog'}
-        tabIndex={-1}
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={description ? descriptionId : undefined}
-        aria-busy={busy}
-        data-task-dialog
-        data-testid={dataTestId}
-      >
-        <header className="task-dialog-header">
-          <div className="task-dialog-heading">
-            <h2 id={titleId} className="task-dialog-title">
-              {titleIcon ? (
-                <span className="task-dialog-title-with-icon">
-                  {titleIcon}
-                  {title}
-                </span>
-              ) : (
-                title
-              )}
-            </h2>
-            {description ? (
-              <p id={descriptionId} className="task-dialog-description">
-                {description}
-              </p>
-            ) : null}
-          </div>
-          {headerActions}
-          {variant === 'task' ? (
-            <IconButton label={closeLabel} size="sm" disabled={busy} onClick={onClose}>
-              <Icon name="close" size={16} />
-            </IconButton>
+      <header className="task-dialog-header">
+        <div className="task-dialog-heading">
+          <h2 id={titleId} className="task-dialog-title">
+            {titleIcon ? (
+              <span className="task-dialog-title-with-icon">
+                {titleIcon}
+                {title}
+              </span>
+            ) : (
+              title
+            )}
+          </h2>
+          {description ? (
+            <p id={descriptionId} className="task-dialog-description">
+              {description}
+            </p>
           ) : null}
-        </header>
-        <div className="task-dialog-body">{children}</div>
-        {footer ? <footer className="task-dialog-footer">{footer}</footer> : null}
-      </div>
-    </div>,
-    document.body,
+        </div>
+        {headerActions}
+        {variant === 'task' ? (
+          <IconButton label={closeLabel} size="sm" disabled={busy} onClick={onClose}>
+            <Icon name="close" size={16} />
+          </IconButton>
+        ) : null}
+      </header>
+      <div className="task-dialog-body">{children}</div>
+      {footer ? <footer className="task-dialog-footer">{footer}</footer> : null}
+    </ModalLayer>
   );
 }

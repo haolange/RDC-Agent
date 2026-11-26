@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { useI18n } from '../i18n';
+import { PlainButton } from '../ui/PlainButton';
 import { awaitsExecutionContextWindow, type ContextUsageSelectedProfile } from './contextUsageDisplay';
 import { ContextBreakdownSheet } from './ContextBreakdownSheet';
 import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
@@ -85,8 +86,7 @@ export const ContextUsageIndicator: React.FC<{
 
   return (
     <div className="composer-usage">
-      <button
-        type="button"
+      <PlainButton
         className={`composer-usage-indicator${stale && !showPrepared ? ' is-stale' : ''}${phase === 'preparing' || awaitingWindow ? ' is-pending' : ''}${showEstimatedRing ? ' is-estimated' : ''}`}
         data-testid="composer-usage-indicator"
         data-estimated={showEstimatedRing ? 'true' : undefined}
@@ -111,7 +111,7 @@ export const ContextUsageIndicator: React.FC<{
         <span className="composer-usage-value">
           <span className="composer-usage-value-number">{valueText}</span>
         </span>
-      </button>
+      </PlainButton>
       <ContextBreakdownSheet
         open={open}
         prepared={showPrepared ? prepared : null}

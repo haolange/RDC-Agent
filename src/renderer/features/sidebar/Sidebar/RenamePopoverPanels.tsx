@@ -4,6 +4,7 @@ import { isImeComposing } from '../../../lib/ime';
 import { useDynStyle } from '../../../lib/useDynStyle';
 import { Button } from '../../../ui/Button';
 import { Icon } from '../../../ui/Icon';
+import { PlainButton } from '../../../ui/PlainButton';
 import type { ProjectMenuPopoverState, ProjectRenamePopoverState, SessionRenamePopoverState } from './types';
 
 interface RenamePopoverPanelsProps {
@@ -129,26 +130,23 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
           x={projectMenuPopover.x}
           y={projectMenuPopover.y}
         >
-          <button
-            type="button"
+          <PlainButton
             className="sidebar-context-menu-item"
             onClick={() => void onOpenExplorer()}
             data-tooltip={t('sidebar.menuExplorer')}
           >
             <Icon name="folder" size={14} />
             <span>{t('sidebar.openInExplorer')}</span>
-          </button>
-          <button
-            type="button"
+          </PlainButton>
+          <PlainButton
             className="sidebar-context-menu-item"
             onClick={onStartProjectRename}
             data-tooltip={t('sidebar.menuRename')}
           >
             <Icon name="edit" size={14} />
             <span>{t('sidebar.renameProject')}</span>
-          </button>
-          <button
-            type="button"
+          </PlainButton>
+          <PlainButton
             className="sidebar-context-menu-item"
             onClick={() => void onSessionCreate()}
             data-tooltip={t('sidebar.menuNewSession')}
@@ -156,10 +154,9 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
           >
             <Icon name="plus" size={14} />
             <span>{t('sidebar.addSession')}</span>
-          </button>
+          </PlainButton>
           <div className="sidebar-context-menu-divider" role="separator" />
-          <button
-            type="button"
+          <PlainButton
             className="sidebar-context-menu-item is-destructive"
             onClick={() => void onRemoveProject()}
             data-tooltip={t('sidebar.menuDelete')}
@@ -167,7 +164,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
           >
             <Icon name="trash" size={14} />
             <span>{t('sidebar.removeProject')}</span>
-          </button>
+          </PlainButton>
         </PositionedSurface>
       )}
 

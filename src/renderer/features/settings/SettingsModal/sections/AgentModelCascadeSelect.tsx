@@ -5,6 +5,7 @@ import { Chevron } from '../../../../ui/Chevron';
 import { Popover } from '../../../../ui/Popover';
 import { SearchField } from '../../../../ui/SearchField';
 import { useI18n } from '../../../../i18n';
+import { PlainButton } from '../../../../ui/PlainButton';
 import { ProviderMark } from './ProviderMark';
 import {
   agentModelOptionAccessibleLabel,
@@ -80,8 +81,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
         align="start"
         className="settings-model-cascade-menu"
         trigger={
-          <button
-            type="button"
+          <PlainButton
             className="settings-model-cascade-trigger"
             data-testid="settings-model-cascade-trigger"
             aria-haspopup="listbox"
@@ -98,7 +98,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
               ) : null}
             </span>
             <Chevron direction="down" />
-          </button>
+          </PlainButton>
         }
       >
         <div className="settings-model-cascade-search">
@@ -119,8 +119,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
             aria-label={t('settings.modelFieldLabel')}
             onKeyDown={onMenuKeyDown}
           >
-            <button
-              type="button"
+            <PlainButton
               className={`settings-model-option settings-model-option--default${followsDefault ? ' is-selected' : ''}`}
               role="option"
               aria-selected={followsDefault}
@@ -131,7 +130,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
                 <span className="settings-model-option-label">{followDefaultLabel}</span>
               </span>
               {followsDefault ? <Icon name="check" size={14} className="settings-model-option-check" /> : null}
-            </button>
+            </PlainButton>
           </div>
         ) : null}
         {groups.length === 0 ? (
@@ -165,9 +164,8 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
                   const accessibleLabel = agentModelOptionAccessibleLabel(option, t('settings.modelUnavailable'));
                   const selectedRow = option.canonicalId === value;
                   return (
-                    <button
+                    <PlainButton
                       key={option.canonicalId}
-                      type="button"
                       className={`settings-model-option${selectedRow ? ' is-selected' : ''}`}
                       data-provider-id={option.providerId}
                       data-model-id={option.modelId}
@@ -197,7 +195,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
                         </span>
                       ) : null}
                       {selectedRow ? <Icon name="check" size={14} className="settings-model-option-check" /> : null}
-                    </button>
+                    </PlainButton>
                   );
                 })}
               </div>
