@@ -33,6 +33,7 @@ import { replayDeviceService } from './rdc/captures/ReplayDeviceService';
 import { runtimeLogService } from './runtime/RuntimeLogService';
 import { installProcessFaultHandlers, reportProcessFault } from './runtime/processFaultHandlers';
 import { isDevelopmentRun } from './runtime/developmentRun';
+import { StoredFileError } from './runtime/atomicFile';
 import { onJsonlTailRepair } from './runtime/jsonl';
 import { rendererEventHub } from './runtime/rendererEventHub';
 import { startBrowserAppBridge, stopBrowserAppBridge } from './browserAppBridge/BrowserAppBridgeServer';
@@ -44,7 +45,7 @@ import { processSupervisor } from './runtime/ProcessSupervisor';
 import { turnCoordinator } from './agent-runtime/orchestration/TurnCoordinator';
 import { bindWindowLayoutPersistence, resolveWindowCreationOptions } from './window/windowLayoutPersistence';
 import { bindProductIcon } from './window/productIcon';
-import { reportSettingsStartupFailure } from './window/settingsStartupFailure';
+import { reportSettingsStartupFailure, reportStoredDataStartupFailure } from './window/startupFailure';
 import { bindRendererRecovery, RENDERER_CRASH_PARAM, type RendererCrash } from './window/rendererRecovery';
 import { resolvedAppearanceMode, windowBackgroundColor } from './window/appearanceChrome';
 import { isTrustedRendererUrl, openExternalHttps, trustRendererEntry } from './runtime/rendererTrust';
@@ -78,7 +79,7 @@ bindCrossDomainHosts();
 const SHUTDOWN_TIMEOUT_MS = 45_000;
 let shutdownStarted = false;
 let shutdownExitCode = 0;
-let settingsInitialized = false;
+let workspaceInitialized = false;
 /**
  * What asked the app to quit; a quit without a more specific cause (the menu, the dock, a process signal, which
  * Electron turns into a quit itself) is `before-quit`.
@@ -130,7 +131,7 @@ function registerShutdownDisposables(): void {
     id: 'rdc.close-runtime',
     phase: 'release_owned_runtimes',
     dispose: async () => {
-      if (settingsInitialized) {
+      if (workspaceInitialized) {
         await rdcSessionService.closeAll();
       }
     },
@@ -572,9 +573,8 @@ app
       app.quit();
       return;
     }
-    settingsInitialized = true;
-
     await projectWorkspaceStore.initializeWorkspace();
+    workspaceInitialized = true;
     onJsonlTailRepair((repair) =>
       runtimeLogService.log({
         scope: 'app',
@@ -643,6 +643,7 @@ app
   })
   .catch((error: unknown) => {
     console.error('[Main] Startup failed:', error);
+    if (error instanceof StoredFileError) reportStoredDataStartupFailure(error.filePath, isHeadlessMode);
     shutdownExitCode = 1;
     app.quit();
   });

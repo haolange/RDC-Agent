@@ -27,6 +27,17 @@ export interface AtomicWriteOptions {
   signal?: AbortSignal;
 }
 
+export class StoredFileError extends AppError {
+  constructor(
+    code: 'STORAGE_CORRUPT' | 'STORAGE_UNREADABLE',
+    readonly filePath: string,
+    detail: string,
+    cause: unknown,
+  ) {
+    super(code, `${filePath} ${detail}`, { cause, params: { file: path.basename(filePath) } });
+  }
+}
+
 const temporaryPathFor = (filePath: string): string => `${filePath}.${process.pid}.${generateShortId()}.tmp`;
 
 export function writeFileAtomicSync(
@@ -107,19 +118,17 @@ export function readValidatedSync<T>(filePath: string, parse: (raw: string) => T
     raw = fs.readFileSync(filePath, 'utf8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw new AppError('STORAGE_UNREADABLE', `${filePath}: ${error instanceof Error ? error.message : String(error)}`, {
-      cause: error,
-      params: { file: path.basename(filePath) },
-    });
+    throw new StoredFileError('STORAGE_UNREADABLE', filePath, `could not be read: ${String(error)}`, error);
   }
   try {
     return parse(raw);
   } catch (error) {
     const keptAt = keepDamagedCopy(filePath, raw);
-    throw new AppError(
+    throw new StoredFileError(
       'STORAGE_CORRUPT',
-      `${filePath} is damaged (copy kept at ${keptAt}): ${error instanceof Error ? error.message : String(error)}`,
-      { cause: error, params: { file: path.basename(filePath) } },
+      filePath,
+      `is damaged (copy kept at ${keptAt}): ${error instanceof Error ? error.message : String(error)}`,
+      error,
     );
   }
 }

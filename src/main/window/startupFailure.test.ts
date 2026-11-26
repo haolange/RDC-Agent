@@ -6,7 +6,11 @@ vi.mock('electron', () => ({
   dialog: { showMessageBoxSync: electron.showMessageBoxSync },
 }));
 
-import { reportSettingsStartupFailure, settingsStartupFailureText } from './settingsStartupFailure';
+import {
+  reportSettingsStartupFailure,
+  reportStoredDataStartupFailure,
+  settingsStartupFailureText,
+} from './startupFailure';
 
 const FILE = '/home/user/.rdc-agent/config.json';
 const DATA = '/home/user/.config/RDC-Agent';
@@ -50,4 +54,17 @@ it('prints the same text to stderr without a dialog when headless', () => {
   const text = settingsStartupFailureText('en-US', FILE, DATA);
   expect(stderr).toHaveBeenCalledWith(`${text.title}\n${text.message}\n${text.detail}\n`);
   expect(electron.showMessageBoxSync).not.toHaveBeenCalled();
+});
+
+it('names the unreadable application record and data directory in the desktop error box', () => {
+  electron.locale = 'zh-CN';
+  const registry = `${DATA}/state/projects/registry.json`;
+  reportStoredDataStartupFailure(registry, false);
+  expect(electron.showMessageBoxSync).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: 'error',
+      message: 'RDC-Agent 无法读取本地数据文件。',
+      detail: expect.stringContaining(`${registry}\n${DATA}`),
+    }),
+  );
 });

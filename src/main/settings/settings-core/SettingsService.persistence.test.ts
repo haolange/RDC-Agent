@@ -349,7 +349,7 @@ describe('SettingsService provider persistence', () => {
     fs.writeFileSync(settingsPath, raw, 'utf8');
     const { SettingsService } = await import('./SettingsService');
     const { SettingsFileError } = await import('./settingsFileSchema');
-    const { settingsStartupFailureText } = await import('../../window/settingsStartupFailure');
+    const { settingsStartupFailureText } = await import('../../window/startupFailure');
 
     const failure = (() => {
       try {

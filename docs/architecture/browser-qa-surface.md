@@ -55,7 +55,7 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
 - 只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才落真实 `~/.rdc-agent`。
 - 两种载体不得同时占用同一目录；`instance.lock` 冲突应明确失败。
 - 涉及真实本机数据的验收必须显式指定 userData。
-- 设置文件不可用（损坏或不是当前 schema 版本）时，headless 实例不弹窗，把与桌面错误框相同的提示（含要删除的 `config.json` 路径）写到 stderr，并以非零状态退出。
+- 设置文件损坏、不可读或不符合当前 schema 时，启动提示点名 `config.json` 和应用数据目录。启动期间读取本地数据文件失败也提示具体文件和数据目录。Desktop 显示原生错误框，headless 把同样的内容写到 stderr。二者都以非零状态退出。
 
 `instance.lock` 回收不能只凭 PID 存活判断 owner：锁记录 owner 的进程身份（pid 与 birth，见 [`host-platform.md`](host-platform.md)），只有身份证明已退出（pid 不存在或 birth 不同，即 PID 被复用）才回收；身份不可读或未记录 birth 的活 pid 保持拒绝，也不向该进程发送终止信号。
 

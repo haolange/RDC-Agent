@@ -46,7 +46,9 @@ describe('validated reads', () => {
     const target = path.join(root, 'state.json');
     fs.writeFileSync(target, '{"count":');
     for (let read = 0; read < 2; read += 1) {
-      expect(() => readValidatedSync(target, parseCount)).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+      expect(() => readValidatedSync(target, parseCount)).toThrow(
+        expect.objectContaining({ code: 'STORAGE_CORRUPT', filePath: target }),
+      );
     }
     const copies = fs.readdirSync(root).filter((name) => name.startsWith('state.json.corrupt-'));
     expect(copies).toHaveLength(1);
