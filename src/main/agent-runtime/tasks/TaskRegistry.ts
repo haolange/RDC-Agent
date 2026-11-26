@@ -1,6 +1,6 @@
-import * as crypto from 'crypto';
 import { type TaskExecutionPreparation } from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
+import { lifecycleLedger } from '../../runtime/LifecycleLedger';
 import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
 import { TaskRuntimeEpochSchema } from './taskExecutionSchemas';
 import {
@@ -38,7 +38,6 @@ import {
 import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
 import type { TaskExecutionRequirements, TaskRuntimeEpoch } from './taskExecutionSchemas';
 
-const TASK_RUNTIME_INSTANCE_ID = crypto.randomUUID();
 export const INVALIDATED_REVIEW_GUIDANCE =
   'To revise a reviewed result, reexecute the source Task with its unchanged definition (for direct work use task_update status=in_progress), settle it with the new resultRef and resultHash, then dispatch the same review Task with that current source; preserve consumption and deadlines.';
 
@@ -272,7 +271,7 @@ export class TaskRegistry extends TaskExecutionLedger {
         taskId,
         taskRevision: task.revision,
         generation,
-        runtimeInstanceId: TASK_RUNTIME_INSTANCE_ID,
+        runtimeInstanceId: lifecycleLedger.instanceId,
         parentExecutionId: options.parentExecutionId,
         rootBudgetId,
         mode: options.mode,
@@ -478,7 +477,7 @@ export class TaskRegistry extends TaskExecutionLedger {
     return this.store.withLock('state', async () => {
       const active = (await this.store.listExecutions()).filter(
         (execution) =>
-          !isTerminalExecutionStatus(execution.status) && execution.runtimeInstanceId !== TASK_RUNTIME_INSTANCE_ID,
+          !isTerminalExecutionStatus(execution.status) && execution.runtimeInstanceId !== lifecycleLedger.instanceId,
       );
       const now = Date.now();
       const changedTasks: TaskRecord[] = [];

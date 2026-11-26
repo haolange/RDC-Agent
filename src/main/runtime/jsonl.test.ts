@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   appendJsonl,
+  appendJsonlDurable,
   assertNoJsonlDiagnostics,
   onJsonlTailRepair,
   readJsonl,
@@ -76,6 +77,21 @@ describe('jsonl fault handling', () => {
     expect(repairs).toHaveLength(1);
     expect(repairs[0]).toMatchObject({ code: 'JSONL_TORN_TAIL', filePath, length: 22 });
     expect(fs.readFileSync(repairs[0]!.quarantinePath, 'utf8')).toBe('{"n":2,"text":"interru');
+  });
+
+  it('appends durably through its own descriptor and repairs a torn tail first', () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-jsonl-'));
+    const filePath = path.join(root, 'nested', 'durable.jsonl');
+    appendJsonlDurable(filePath, { n: 1 });
+    fs.appendFileSync(filePath, '{"n":2,"cut', 'utf8');
+    const unsubscribe = onJsonlTailRepair(() => undefined);
+    try {
+      appendJsonlDurable(filePath, { n: 3 });
+    } finally {
+      unsubscribe();
+    }
+    expect(fs.readFileSync(filePath, 'utf8')).toBe('{"n":1}\n{"n":3}\n');
+    expect(fs.readdirSync(path.dirname(filePath)).filter((name) => name.includes('.torn-'))).toHaveLength(1);
   });
 
   it('keeps a complete last record that only lacks its newline', () => {

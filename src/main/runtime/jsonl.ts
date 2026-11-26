@@ -207,6 +207,24 @@ export function appendJsonl(filePath: string, data: unknown): void {
 }
 
 /**
+ * Append one JSON record and make it durable before returning: open, write the whole line, fsync, close. A record the
+ * caller saw appended survives a crash or power loss right after, which is what a log read at the next launch needs.
+ * Like `appendJsonl`, a file left without its final newline by an interrupted append is brought back to a record
+ * boundary first.
+ */
+export function appendJsonlDurable(filePath: string, data: unknown): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  ensureJsonlRecordBoundary(filePath);
+  const fd = fs.openSync(filePath, 'a');
+  try {
+    fs.writeSync(fd, `${JSON.stringify(data, null, 0)}\n`);
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
  * Overwrite a JSONL file with the provided records.
  */
 export function writeJsonl(filePath: string, items: unknown[]): void {
