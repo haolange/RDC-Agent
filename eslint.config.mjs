@@ -256,21 +256,7 @@ export const importCycleLint = {
   },
   rules: { 'import/no-cycle': 'error' },
 };
-export const IMPORT_CYCLE_PENDING = {
-  ...Object.fromEntries(
-    [
-      'src/renderer/features/transcript/SubagentRow.tsx',
-      'src/renderer/features/transcript/SubagentRowBody.tsx',
-      'src/renderer/features/transcript/WorkProcessContent.tsx',
-      'src/renderer/features/transcript/workProcessRowRenderer.tsx',
-    ].map((file) => [
-      file,
-      'A subagent row nests the work process rows of its delegated run, and that row renderer renders subagent ' +
-        'rows again; breaking the loop means handing the nested renderer down instead of importing it, in the ' +
-        'transcript restructuring (plan 6.5)',
-    ]),
-  ),
-};
+export const IMPORT_CYCLE_PENDING = {};
 
 // One typed program for all of src (src/tsconfig.lint.json, read only by ESLint): the repository settings plus
 // noUncheckedIndexedAccess, so a lookup that can miss stays guarded. Every typed rule below uses it, so no file is

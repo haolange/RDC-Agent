@@ -5,6 +5,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
 import { SubagentRow } from './SubagentRow';
+import { WorkProcessContent } from './WorkProcessContent';
+import { WorkProcessContentContext } from './workProcessContentContext';
+
+/** A subagent row as the transcript renders it: inside the work process body that nests its delegation. */
+const inWorkProcess = (props: Parameters<typeof SubagentRow>[0]) =>
+  createElement(WorkProcessContentContext.Provider, { value: WorkProcessContent }, createElement(SubagentRow, props));
 
 const state = vi.hoisted(() => ({
   expanded: false,
@@ -147,7 +153,7 @@ const row = {
 it('presents the frozen task once in each card state and unmounts the preview on expansion', () => {
   state.expanded = false;
   const collapsed = new DOMParser().parseFromString(
-    renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })),
+    renderToStaticMarkup(inWorkProcess({ row, sessionId: 's1' })),
     'text/html',
   );
   expect(collapsed.querySelector('.work-card-preview')?.textContent).toBe(task);
@@ -160,7 +166,7 @@ it('presents the frozen task once in each card state and unmounts the preview on
 
   state.expanded = true;
   const opened = new DOMParser().parseFromString(
-    renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })),
+    renderToStaticMarkup(inWorkProcess({ row, sessionId: 's1' })),
     'text/html',
   );
   expect(opened.querySelector('.work-card-preview')).toBeNull();
@@ -171,7 +177,7 @@ it('presents the frozen task once in each card state and unmounts the preview on
 
   state.taskLoading = true;
   const loading = new DOMParser().parseFromString(
-    renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })),
+    renderToStaticMarkup(inWorkProcess({ row, sessionId: 's1' })),
     'text/html',
   );
   expect(loading.querySelector('.work-card-preview')).toBeNull();
@@ -183,7 +189,7 @@ it('presents the frozen task once in each card state and unmounts the preview on
   state.taskLoading = false;
   state.taskError = true;
   const failed = new DOMParser().parseFromString(
-    renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })),
+    renderToStaticMarkup(inWorkProcess({ row, sessionId: 's1' })),
     'text/html',
   );
   expect(failed.querySelector('.work-card-preview')).toBeNull();
@@ -193,7 +199,7 @@ it('presents the frozen task once in each card state and unmounts the preview on
 
   state.headerLoading = true;
   const pending = new DOMParser().parseFromString(
-    renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })),
+    renderToStaticMarkup(inWorkProcess({ row, sessionId: 's1' })),
     'text/html',
   );
   expect(pending.querySelector('.work-card-preview')).toBeNull();
@@ -213,14 +219,14 @@ it('shows a child final once while preserving both disclosure controls', () => {
   state.projectedFinal = true;
   try {
     const open = new DOMParser().parseFromString(
-      renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })),
+      renderToStaticMarkup(inWorkProcess({ row, sessionId: 's1' })),
       'text/html',
     );
     expect(open.body.textContent?.split('Final child reply')).toHaveLength(2);
     expect(open.body.textContent).toContain('chat.subagentFinalShownAbove');
     state.workOpen = false;
     const folded = new DOMParser().parseFromString(
-      renderToStaticMarkup(createElement(SubagentRow, { row, sessionId: 's1' })),
+      renderToStaticMarkup(inWorkProcess({ row, sessionId: 's1' })),
       'text/html',
     );
     expect(folded.body.textContent?.split('Final child reply')).toHaveLength(2);
@@ -241,7 +247,7 @@ it('offers the exact Agent settings for trusted configuration failures', async (
   document.body.append(host);
   const root = createRoot(host);
   try {
-    await act(async () => root.render(createElement(SubagentRow, { row, sessionId: 'config' })));
+    await act(async () => root.render(inWorkProcess({ row, sessionId: 'config' })));
     expect(host.querySelector('[role="alert"]')?.textContent).not.toContain('Model unavailable');
     expect(host.querySelector('[role="alert"] button[aria-label="app.copyDetails"]')).not.toBeNull();
     const button = [...host.querySelectorAll('button')].find(
@@ -251,7 +257,7 @@ it('offers the exact Agent settings for trusted configuration failures', async (
     await act(async () => button!.click());
     expect(useSettingsNavigationStore.getState().agentRequest?.agentId).toBe('general');
     state.configurationError = false;
-    await act(async () => root.render(createElement(SubagentRow, { row, sessionId: 'config' })));
+    await act(async () => root.render(inWorkProcess({ row, sessionId: 'config' })));
     expect(
       [...host.querySelectorAll('button')].some((element) => element.textContent === 'chat.subagentOpenAgentSettings'),
     ).toBe(false);
@@ -271,7 +277,7 @@ it('shows the parent receipt and task when admission fails before a child trace 
   const failedRow = { ...row, status: 'error' as const, resultPreview: 'SUBAGENT_BUDGET: child wall time exceeded' };
   try {
     const opened = new DOMParser().parseFromString(
-      renderToStaticMarkup(createElement(SubagentRow, { row: failedRow, sessionId: 's1' })),
+      renderToStaticMarkup(inWorkProcess({ row: failedRow, sessionId: 's1' })),
       'text/html',
     );
     const failure = opened.querySelector('.ui-inline-error[role="alert"]');

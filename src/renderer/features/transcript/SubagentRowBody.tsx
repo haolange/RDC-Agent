@@ -5,7 +5,7 @@ import { Skeleton } from '../../ui/Skeleton';
 import { useSettingsNavigationStore } from '../../stores/settingsNavigationStore';
 import { PlainButton } from '../../ui/PlainButton';
 import { ScopedWorkDisclosure } from './ScopedWorkDisclosure';
-import { WorkProcessContent } from './WorkProcessContent';
+import { useNestedWorkProcessContent, type WorkProcessContentProps } from './workProcessContentContext';
 import { SubagentCallDetails } from './SubagentCallDetails';
 import { DelegatedToolReceipt } from './DelegatedToolReceipt';
 import { DelegationBody } from './DelegationBody';
@@ -16,6 +16,12 @@ import type { SubagentWorkRow } from './subagentRowModel';
 import type { WorkProcessRow } from './workProcessTypes';
 
 /** An opened delegation: its task, then its work process, final reply and call details as separate disclosures. */
+/** The delegation's own process, rendered by the enclosing work process body. */
+function NestedWorkProcess(props: WorkProcessContentProps) {
+  const WorkProcessContent = useNestedWorkProcessContent();
+  return <WorkProcessContent {...props} />;
+}
+
 export function SubagentRowBody({
   id,
   row,
@@ -129,7 +135,7 @@ export function SubagentRowBody({
         {!loading && !headerLoading && !page.error && page.steps.length === 0 ? (
           <span className="work-process-subagent-note">{t('chat.subagentNoActions')}</span>
         ) : null}
-        <WorkProcessContent
+        <NestedWorkProcess
           embedded
           density="compact"
           presentation={state.presentation}
