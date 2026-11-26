@@ -52,10 +52,7 @@ describe('PlanReviewStateStore', () => {
     const store = createStore();
     const file = store.getStatePath('sess')!;
     for (const patch of [{ revision: -2 }, { status: 'nonsense' }, { approvedHandoff: 42 }, { updatedAt: undefined }]) {
-      await writeFile(
-        file,
-        JSON.stringify({ schemaVersion: '1', planId: 'p', revision: 1, status: 'awaiting', updatedAt: 1, ...patch }),
-      );
+      await writeFile(file, JSON.stringify({ planId: 'p', revision: 1, status: 'awaiting', updatedAt: 1, ...patch }));
       expect(() => store.read('sess')).toThrow(/STORAGE_CORRUPT/);
     }
   });
@@ -85,7 +82,6 @@ describe('PlanReviewStateStore', () => {
     expect(store.read('sess')).toMatchObject({ planId: next.planId, status: 'awaiting' });
     const file = store.getStatePath('sess')!;
     const original = JSON.stringify({
-      schemaVersion: '1',
       planId: 'unowned',
       revision: 4,
       status: 'rejected',

@@ -422,7 +422,6 @@ describe('sessionRecordStore.removeSession side-channel cleanup', () => {
 });
 function makeTerminalContextEntry(): SessionContextTurnEntry {
   return {
-    schemaVersion: 2,
     turnId: 'turn-terminal',
     userMessageId: 'user-terminal',
     assistantMessageId: 'assistant-terminal',
@@ -640,75 +639,8 @@ describe('conversationHistoryStore terminal transaction', () => {
       { id: 'assistant-terminal', content: 'final answer', status: 'complete' },
     ]);
     expect(sessionContextStore.readSessionContextJournal(session.sessionId)).toMatchObject([
-      { turnId: 'turn-terminal', schemaVersion: 2 },
+      { turnId: 'turn-terminal' },
     ]);
-    expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
-  });
-
-  it.each([
-    { phase: 'prepared' as const, rollForward: false },
-    { phase: 'committing' as const, rollForward: true },
-  ])('recovers a $phase terminal transaction without a split state', async ({ phase, rollForward }) => {
-    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } =
-      await import('./sessionStores');
-    const projectRoot = path.join(tempRoot, `terminal-recovery-${phase}`);
-    fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await projectWorkspaceStore.createProject(projectRoot);
-    const session = sessionRecordStore.createSession(project.projectId, `Terminal recovery ${phase}`);
-    const beforeHistory: ConversationMessage[] = [
-      {
-        id: 'assistant-terminal',
-        requestId: 'request-terminal',
-        turnId: 'turn-terminal',
-        sessionId: session.sessionId,
-        projectId: project.projectId,
-        branchId: 'branch-root',
-        role: 'assistant',
-        content: 'partial',
-        status: 'streaming',
-        createdAt: 2,
-        updatedAt: 2,
-      },
-    ];
-    const afterHistory: ConversationMessage[] = [
-      {
-        ...beforeHistory[0]!,
-        content: 'final answer',
-        status: 'complete',
-        updatedAt: 3,
-      },
-    ];
-    const afterContext = [makeTerminalContextEntry()];
-    fs.writeFileSync(
-      path.join(session.sessionPath, 'terminal-commit.json'),
-      JSON.stringify(
-        {
-          schemaVersion: '1',
-          requestId: 'request-terminal',
-          turnId: 'turn-terminal',
-          phase,
-          beforeHistory,
-          beforeBranch: null,
-          beforeContext: [],
-          afterHistory,
-          afterBranch: null,
-          afterContext,
-        },
-        null,
-        2,
-      ),
-      'utf8',
-    );
-
-    conversationHistoryStore.writeConversationHistory(session.sessionId, afterHistory);
-    sessionContextStore.appendSessionContextTurn(session.sessionId, afterContext[0]!);
-    await projectWorkspaceStore.initializeWorkspace();
-
-    expect(conversationHistoryStore.readConversationHistory(session.sessionId)[0]).toMatchObject({
-      content: rollForward ? 'final answer' : 'partial',
-      status: rollForward ? 'complete' : 'streaming',
-    });
-    expect(sessionContextStore.readSessionContextJournal(session.sessionId)).toHaveLength(rollForward ? 1 : 0);
     expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
   });
 });

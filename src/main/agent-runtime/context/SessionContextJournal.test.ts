@@ -197,7 +197,6 @@ function encryptedAssistant(plan = responsesPlan): AssistantMessage {
 
 function entry(overrides: Partial<SessionContextTurnEntry> = {}): SessionContextTurnEntry {
   return {
-    schemaVersion: 2,
     turnId: 'turn-1',
     userMessageId: 'user-1',
     assistantMessageId: 'assistant-1',

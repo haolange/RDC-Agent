@@ -94,7 +94,6 @@ beforeEach(() => {
   fixture.failWrite = false;
   fixture.content = 'A verified plan';
   fixture.state = {
-    schemaVersion: '1',
     planId: 'plan',
     ownerTurnId: 'turn',
     revision: 1,

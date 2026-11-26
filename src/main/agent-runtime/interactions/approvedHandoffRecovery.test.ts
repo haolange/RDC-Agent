@@ -27,7 +27,6 @@ vi.mock('../../sessions/run/sessionPlanReference', () => ({ readReferencedPlan: 
 vi.mock('./applyDeclaredHandoff', () => ({ assertDeclaredHandoffForPlan: () => f.declaration }));
 
 const approval: PlanReviewStateDocument = {
-  schemaVersion: '1',
   planId: 'plan',
   revision: 1,
   ownerTurnId: 'turn',
@@ -39,7 +38,6 @@ const approval: PlanReviewStateDocument = {
 };
 beforeEach(() => {
   f.offer = {
-    schemaVersion: '1',
     sourceAgentId: 'debugger',
     targetAgentId: 'general',
     label: 'Execute',

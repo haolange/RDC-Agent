@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 import { mergeCapturesWithSnapshot } from '../../services/conversationTimeline';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useCaptureStore } from '../../stores/captureStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useCurrentSessionView } from '../../stores/sessionRecordStore';
 import { useSessionStore } from '../../stores/sessionStore';
 
-import { notify } from '../../stores/notificationStore';
 import {
   createCaptureProjection,
   subscribeCaptureStatusChanged,
@@ -49,15 +47,6 @@ export function useIpcEventBridge(options: EventBridgeOptions): void {
 
   const setSystemTheme = useAppSettingsStore((state) => state.setSystemTheme);
   const activeSessionId = useProjectStore((state) => state.currentSessionId);
-  const handoffNotice = useCurrentSessionView()?.handoffNotice;
-  const shownHandoffNotices = useRef(new Set<string>());
-  useEffect(() => {
-    if (!activeSessionId || !handoffNotice) return;
-    const key = activeSessionId + ':' + handoffNotice;
-    if (shownHandoffNotices.current.has(key)) return;
-    shownHandoffNotices.current.add(key);
-    notify.info(handoffNotice);
-  }, [activeSessionId, handoffNotice]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;

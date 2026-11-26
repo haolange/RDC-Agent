@@ -66,7 +66,6 @@ export function prepareTerminalAppend(
     ? { op: 'delta', id: assistant.id, patch: assistant, updatedAt: assistant.updatedAt ?? assistant.createdAt }
     : assistant;
   return {
-    schemaVersion: '2',
     requestId,
     turnId,
     phase: 'prepared',

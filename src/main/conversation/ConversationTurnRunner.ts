@@ -510,7 +510,6 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
     const { input } = this;
     const approvedExecution = input.preparedTurn.runtime.approvedExecution;
     return canonicalizeSessionContextTurnEntry({
-      schemaVersion: 2,
       turnId: this.assistantMessage.turnId,
       userMessageId: input.userMessage.id,
       assistantMessageId: this.assistantMessage.id,

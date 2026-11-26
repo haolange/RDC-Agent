@@ -39,7 +39,6 @@ export type PlanTaskRequirement = z.infer<typeof PlanTaskRequirementSchema>;
 
 export const PlanTaskRequirementsSchema = z
   .object({
-    schemaVersion: z.literal(1),
     tasks: z.array(PlanTaskRequirementSchema).min(1).max(128),
   })
   .strict()
@@ -58,7 +57,7 @@ export const PlanTaskRequirementsSchema = z
   });
 
 export function renderPlanTaskRequirements(tasks: PlanTaskRequirement[]): string {
-  const snapshot = PlanTaskRequirementsSchema.parse({ schemaVersion: 1, tasks });
+  const snapshot = PlanTaskRequirementsSchema.parse({ tasks });
   return `${PLAN_TASK_REQUIREMENTS_HEADING}\n\n\`\`\`json\n${JSON.stringify(snapshot, null, 2)}\n\`\`\`\n`;
 }
 

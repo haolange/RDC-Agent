@@ -2308,7 +2308,7 @@ describe('ToolExecutorFactory plan_artifact gate', () => {
         runtimeContext: context,
       });
       expect(result.isError, JSON.stringify(result.content)).toBe(false);
-      expect(parseInvestigationPlanContract(write.mock.calls[0][1])).toEqual({ schemaVersion: 1, mission: 'analyzer' });
+      expect(parseInvestigationPlanContract(write.mock.calls[0][1])).toEqual({ mission: 'analyzer' });
       expect(vi.mocked(agentPlanReviewRequestService.request).mock.calls.at(-1)?.[0].planReview.sections).not.toEqual(
         expect.arrayContaining([expect.objectContaining({ heading: 'Investigation execution contract' })]),
       );

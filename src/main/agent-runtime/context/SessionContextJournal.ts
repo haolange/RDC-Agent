@@ -16,7 +16,6 @@ import type { AssistantMessage, Message, ToolResultMessage } from '../core/types
 export const INTERRUPTED_CONVERSATION_SUMMARY = '请求在应用退出后中断，需重新发起。';
 
 export interface SessionContextTurnEntry {
-  schemaVersion: 2;
   turnId: string;
   userMessageId: string;
   assistantMessageId: string;

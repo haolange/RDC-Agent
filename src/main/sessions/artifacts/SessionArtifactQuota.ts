@@ -36,7 +36,6 @@ interface LedgerState {
 }
 
 interface PersistedQuotaDocument {
-  schemaVersion: '1';
   committedBytes: number;
   committedToolOutputFiles: number;
   reservations: Array<{
@@ -75,7 +74,6 @@ function persistLedger(artifactsRoot: string, disk: { bytes: number; toolOutputF
     fs.mkdirSync(root, { recursive: true });
   }
   const document: PersistedQuotaDocument = {
-    schemaVersion: '1',
     committedBytes: disk.bytes,
     committedToolOutputFiles: disk.toolOutputFiles,
     reservations: [...state.reservations.values()].map((reservation) => ({

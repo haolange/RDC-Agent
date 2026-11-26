@@ -258,7 +258,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 - **存储 fail-closed**：持久化文件只经 `atomicFile` 原语读写（见 `docs/contracts/failure-model.md`「存储原语」）。
   - 写入走原子持久写（temp + fsync + rename）；deepMerge 拒绝危险原型键。
   - 读取区分不存在、损坏和不支持的版本：损坏每次读都报 `STORAGE_CORRUPT` 且不读成空；不支持的版本报 `STORAGE_SCHEMA_UNSUPPORTED` 并保留原件。
-  - Run 只读 run.json v3，run.yaml 是写入投影；attachments.json 只读 schemaVersion 1 的对象；usage.json 只读 schemaVersion 2 的对象。缺版本、旧版本和仅有 YAML 的 Run 明确报 `STORAGE_SCHEMA_UNSUPPORTED`，不自动迁移、改写或隔离原件；当前版本结构不合法报 `STORAGE_SCHEMA`。
+  - Run 只读 run.json，run.yaml 是写入投影；attachments.json 与 usage.json 都是不带格式版本的严格对象。仅有 YAML 的 Run 报 `STORAGE_SCHEMA`，不自动迁移、改写或隔离原件。
   - Settings 只接受当前格式的严格文档（见「Settings 持久化」）：不符合的文件（包括其他格式写下的）报 `STORAGE_CORRUPT` 并保留原文件，启动时提示删除整个数据目录与设置文件后重启。
   - 目录锁对活 pid 永不回收。owner 无法读取时可能仍在初始化，等待并在超时后报错；只自动回收可识别的死 pid 锁。跨进程回收以独占标记串行化，取得标记后重新读取 owner；标记本身不能安全确认失主时等待并超时，不抢占。
 - **结构化压缩**：仅自动压缩；产品不提供按钮、菜单、`/compact` 或 `/summary`。
@@ -601,11 +601,11 @@ Knowledge 位于 `src/main/knowledge/`。Knowledge Center 为三列 UI（Spaces 
 
 ### I. Run 记录
 
-唯一活跃 schema 为 `schemaVersion: '3'`（`src/main/sessions/run/runRecord/`）。
+Run 记录的严格 schema 在 `src/main/sessions/run/runRecord/`，不带格式版本。
 
 - Run 无 `lastStage`、`runtime.workflow_stage`、`WorkflowStage` / `WorkflowPhase`、stage constants / event / IPC / update API 与 `recommendedSpecialists`。
 - 职责划分：权限 = effective `profileId` + frozen allowlist；Mission 身份 = `run.kind + mission + profileId`；生命周期 = `RunStatus` + turn transaction；用户进度 = `TaskRegistry` / `taskProjection`；方法进度 = Investigation records / checkpoints；输出阶段 = canonical `outputPhase`。
-- 运行时只读 v3 JSON；旧格式、缺版本、未知版本及仅有 YAML 的目录明确报错并保留原件，不含转换器与双读。
+- 运行时只读当前格式的 JSON；其他格式写下的文件与仅有 YAML 的目录明确报错并保留原件，不含转换器与双读。
 
 ### J. Mission 工具面
 

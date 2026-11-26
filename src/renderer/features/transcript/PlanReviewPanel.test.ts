@@ -16,7 +16,7 @@ const markdown = [
   '## Task execution requirements',
   '',
   '```json',
-  '{"schemaVersion":1}',
+  '{"tasks":[]}',
   '```',
 ].join('\n');
 

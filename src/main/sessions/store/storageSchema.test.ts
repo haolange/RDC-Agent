@@ -19,7 +19,7 @@ import {
   toSessionUsageManifest,
   toSessionShellStateManifest,
   ConversationTurnCommitSchema,
-  ConversationTerminalJournalSchema,
+  ConversationTerminalAppendSchema,
 } from './storageSchema';
 
 describe('session usage schema', () => {
@@ -40,14 +40,13 @@ describe('session usage schema', () => {
     snapshotAt: 1,
   };
 
-  it('accepts a current { schemaVersion, usage } document', () => {
-    expect(SessionUsageSchema.parse(toSessionUsageManifest(usage))).toEqual({ schemaVersion: '2', usage });
+  it('accepts a current { usage } document', () => {
+    expect(SessionUsageSchema.parse(toSessionUsageManifest(usage))).toEqual({ usage });
   });
 
   it('rejects retired usage fields', () => {
     expect(
       SessionUsageSchema.safeParse({
-        schemaVersion: '2',
         usage: { ...usage, outputReserveTokens: 384_000 },
       }).success,
     ).toBe(false);
@@ -55,9 +54,8 @@ describe('session usage schema', () => {
 });
 
 describe('session shell-state schema', () => {
-  it('accepts a current { schemaVersion, state } document', () => {
+  it('accepts a current { state } document', () => {
     expect(SessionShellStateSchema.parse(toSessionShellStateManifest({ cwd: 'D:/Projects/app' }))).toEqual({
-      schemaVersion: '1',
       state: { cwd: 'D:/Projects/app' },
     });
   });
@@ -66,7 +64,7 @@ describe('session shell-state schema', () => {
     const io = new StorageIo();
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-shell-state-'));
     const filePath = path.join(root, 'shell-state.json');
-    fs.writeFileSync(filePath, JSON.stringify({ schemaVersion: '1', state: { cwd: 12 } }), 'utf8');
+    fs.writeFileSync(filePath, JSON.stringify({ state: { cwd: 12 } }), 'utf8');
     expect(() => io.readJson(filePath, SessionShellStateSchema)).toThrow(/STORAGE_CORRUPT|STORAGE_SCHEMA/);
     expect(fs.existsSync(filePath)).toBe(true);
     expect(
@@ -96,7 +94,6 @@ describe('StorageIo schema-backed readJson', () => {
     const root = tempRoot();
     const filePath = path.join(root, 'session.json');
     const record = {
-      schemaVersion: '1',
       sessionId: 'sess_1',
       projectId: 'proj_1',
       title: 't',
@@ -122,7 +119,6 @@ describe('StorageIo schema-backed readJson', () => {
 });
 
 const legalSession = {
-  schemaVersion: '1' as const,
   sessionId: 'sess_1',
   projectId: 'proj_1',
   title: 't',
@@ -145,7 +141,6 @@ const legalAttachment = {
 };
 
 const legalRun = {
-  schemaVersion: '3' as const,
   kind: 'mission' as const,
   mission: 'debugger' as const,
   profileId: 'debugger',
@@ -170,7 +165,6 @@ const legalRun = {
 };
 
 const legalTurnCommit = {
-  schemaVersion: '1',
   requestId: 'req_1',
   turnId: 'turn_1',
   phase: 'prepared' as const,
@@ -181,17 +175,13 @@ const legalTurnCommit = {
   importedPaths: [],
 };
 
+const appendFile = { existed: true, bytes: 0, sha256: 'a'.repeat(64), append: '' };
 const legalTerminalCommit = {
-  schemaVersion: '1',
   requestId: 'req_1',
   turnId: 'turn_1',
   phase: 'prepared' as const,
-  beforeHistory: [],
-  beforeBranch: null,
-  beforeContext: [],
-  afterHistory: [],
-  afterBranch: null,
-  afterContext: [],
+  history: appendFile,
+  context: appendFile,
 };
 
 const legalUsage = {
@@ -296,22 +286,22 @@ describe('storage schema store quartet', () => {
       name: 'session usage',
       file: 'usage.json',
       legal: toSessionUsageManifest(legalUsage),
-      corrupt: { schemaVersion: '1', usage: { runId: 1 } },
+      corrupt: { usage: { runId: 1 } },
       read: (filePath: string) => io.readJson(filePath, SessionUsageSchema),
     },
     {
       name: 'turn-commit',
       file: 'conversation-turn-commit.json',
       legal: legalTurnCommit,
-      corrupt: { schemaVersion: '1', requestId: 1 },
+      corrupt: { requestId: 1 },
       read: (filePath: string) => io.readJson(filePath, ConversationTurnCommitSchema),
     },
     {
       name: 'terminal-commit',
       file: 'conversation-terminal-commit.json',
       legal: legalTerminalCommit,
-      corrupt: { schemaVersion: '1', requestId: 1 },
-      read: (filePath: string) => io.readJson(filePath, ConversationTerminalJournalSchema),
+      corrupt: { requestId: 1 },
+      read: (filePath: string) => io.readJson(filePath, ConversationTerminalAppendSchema),
     },
     {
       name: 'run',
@@ -349,16 +339,9 @@ describe('storage schema store quartet', () => {
         io.writeJsonAtomic(filePath, store.legal);
         const parsed = store.read(filePath);
         expect(parsed).toBeTruthy();
-        if (store.name === 'attachments') {
-          expect(Array.isArray(parsed)).toBe(true);
-          expect((JSON.parse(fs.readFileSync(filePath, 'utf8')) as { schemaVersion?: string }).schemaVersion).toBe('1');
-        }
-        if (store.name === 'session usage') {
-          expect((parsed as { schemaVersion?: string; usage?: { promptBudgetTokens?: number } }).schemaVersion).toBe(
-            '2',
-          );
+        if (store.name === 'attachments') expect(Array.isArray(parsed)).toBe(true);
+        if (store.name === 'session usage')
           expect((parsed as { usage?: { promptBudgetTokens?: number } }).usage?.promptBudgetTokens).toBe(100);
-        }
       });
 
       it('fail-closes a structurally damaged document', () => {
@@ -366,6 +349,15 @@ describe('storage schema store quartet', () => {
         fs.mkdirSync(path.dirname(filePath), { recursive: true });
         fs.writeFileSync(filePath, JSON.stringify(store.corrupt), 'utf8');
         expect(() => store.read(filePath)).toThrow(/STORAGE_CORRUPT|STORAGE_SCHEMA/);
+      });
+
+      it('refuses a document that still carries a format version, leaving its bytes in place', () => {
+        const filePath = path.join(tempRoot(), store.file);
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        const raw = JSON.stringify({ schemaVersion: '1', ...store.legal });
+        fs.writeFileSync(filePath, raw, 'utf8');
+        expect(() => store.read(filePath)).toThrow(/STORAGE_CORRUPT|STORAGE_SCHEMA/);
+        expect(fs.readFileSync(filePath, 'utf8')).toBe(raw);
       });
     });
   }

@@ -13,7 +13,6 @@ const saved = (patch: Record<string, unknown> = {}) => ({
   success: true,
   session: {
     record: {
-      schemaVersion: '1' as const,
       sessionId: 'session-a',
       projectId: 'project-a',
       title: 'A',

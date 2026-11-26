@@ -6,9 +6,9 @@
 
 会话终态提交沿同一存储事务路径执行。
 
-- 当前内部 terminal WAL v2 只保存本回合追加、原文件字节边界及 SHA256；固定 owning session 的 history/context 路径不从日志输入。
+- terminal WAL 只保存本回合追加、原文件字节边界及 SHA256；固定 owning session 的 history/context 路径不从日志输入。
 - 恢复先验证两份前缀与可识别的部分追加，再按 prepared 回滚、committing/committed 前滚，数据 fsync 后才移除日志；未知尾部或前缀变化 fail-closed，不截断无关数据。
-- 仍有效的 v1 快照事务保留恢复解释，正常提交只写 v2；conversation/context JSONL 数据格式与既有记录不迁移、不删减。
+- WAL 与 conversation/context JSONL 都不带格式版本；其他格式写下的日志或记录按严格 schema 失败，不迁移、不删减。
 - Context journal 逐行校验，物化与重复检查只保留所需 turn，未选记录的语法/结构错误不得隐去；终态不得把所有历史 context 重复序列化为 before/after 大对象。
 
 唯一运行时路径：
@@ -68,8 +68,7 @@ Scoped Runtime Resolution
 - 压缩与权限审核不提供工具；探测提供一个无副作用的 `capability_check`，由调用方判读回执。
 - 稳定前缀指纹锚定 prompt-cache。
 - Session 重建路径：`conversation.jsonl` + `conversation-branches.json` + `session-context.jsonl`。
-- `context-view.json` 写入 `{ schemaVersion: '1', view }`；缺版本裸 view 走 `SESSION_CONTEXT_VIEW_MIGRATIONS`。
-- `shell-state.json` 写入 `{ schemaVersion: '1', state: { cwd } }`，只存 cwd；缺版本或损坏 fail-closed / quarantine，未知更高版本 `STORAGE_SCHEMA_UNSUPPORTED`。
+- `shell-state.json` 写入 `{ state: { cwd } }`，只存 cwd；损坏或其他格式写下的文件报 `STORAGE_CORRUPT` 并旁存副本。
 
 切模型不自动 compact、不写迁移事务。`ContinuationReplayPolicy` 按 compiled execution identity 决定同绑定回放 / 跨绑定 drop；普通 Send 与 rewrite 在将丢弃 continuation 制品时插入同一条系统通知。optional 制品保留最近 8 个可见 turn；`requirement: required` 制品不受该窗口过期，只随 compaction 边界终止。
 
@@ -304,13 +303,12 @@ Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（当前 57 ids，含 `shell` 
 
 `investigation_list` 的 `kind` / `status` 可选；传 `any` 或省略即包含全部对应值，其他允许值作精确过滤。工具目录列出允许值，未知值须明确拒绝，不能把错误输入解释成“本会话无调查产物”。
 
-Run 的 `schemaVersion` 为 `'3'`（`src/main/sessions/run/runRecord/`）：discriminated union `kind: conversation|mission` + `profileId`，新写无 `mode` / `lastStage` / `runtime.workflow_stage`。
+Run 记录（`src/main/sessions/run/runRecord/`）是 discriminated union `kind: conversation|mission` + `profileId`，不带格式版本，没有 `mode` / `lastStage` / `runtime.workflow_stage`。
 
-- 产品只读 `run.json` v3；仅有 `run.yaml`、缺版本、旧版本或未知版本时明确报 `STORAGE_SCHEMA_UNSUPPORTED`，保留源文件，不在读取时迁移。
+- 产品只读 `run.json`，严格 schema 拒绝其他格式写下的文件（`STORAGE_CORRUPT`，保留源文件）；只有 `run.yaml` 的目录报 `STORAGE_SCHEMA`，不在读取时迁移。
 - `kind: mission` 来自冻结的 `completion-contract: investigation-report`，`mission` 来自预载 Skill 的 `investigation-mission`，不必等于 `profileId`。
 - 没有该合同时新写为 conversation，不按 profile id 推断。
 - conversation 的 `captures=[]` 且不消费 investigation sidecar。
-- 既有一次性本机转换备份仅供核验，不参与 Run 枚举、IPC、UI 或 Right Rail。
 - 见 `ARCHITECTURE.md` 裁决 I。
 
 Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only route 的有效工具集为空，不得列出或模仿工具调用。`tool_search` 无结果时返回 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 与工具集 fingerprint；fingerprint 未变化时重复同一搜索属于无进展。

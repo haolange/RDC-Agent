@@ -26,7 +26,6 @@ import { persistSessionAgentId } from './sessionAgentId';
 import type { SessionRecord } from '@shared/types/session';
 
 const session = (agentId: string): SessionRecord => ({
-  schemaVersion: '1',
   sessionId: 'session-a',
   projectId: 'project-a',
   title: 'A',

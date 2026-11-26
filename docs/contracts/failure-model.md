@@ -92,8 +92,8 @@
 | Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，原件保留 |
 | Settings 文件（`config.json`）损坏、无法读取或结构不合法（包括其他格式写下的文件） | Integrity（启动 fail-fast） | 启动时主进程按 `app.getLocale()` 的语言弹原生错误框（headless / Browser QA 写 stderr），说明数据格式已变更或文件损坏，写出要删除的整个数据目录（userData）与 `config.json` 的路径，说明重启后以默认设置重建，经正常资源释放后以非零状态退出，不留活锁；不转换、不修复、不改写原件。目录已不再列出的 provider 条目原样保留，不进运行时视图，记 `settings_provider_not_in_catalog` 设置诊断 |
 | Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 记录 owner 的进程身份（pid 与 birth），活 owner 永不抢锁；身份证明已退出（pid 不存在或 birth 不同）的锁经独占回收标记串行回收，owner 记录或身份无法读取、回收标记无法安全确认失主时等待并超时，避免抢占正在初始化或新取得的锁；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |
-| Session attachments.json | Integrity | 只读 schemaVersion `'1'` 的 `{ schemaVersion, attachments }`；缺版本、纯数组或其他版本报 `STORAGE_SCHEMA_UNSUPPORTED` 并保留原件；无法解析报 `STORAGE_CORRUPT`，结构不合法报 `STORAGE_SCHEMA` |
-| Session shell-state.json | Integrity | 写入 `{ schemaVersion: '1', state: { cwd } }`；只存 cwd 不存 env；缺版本、未知旧版本、无法解析或结构不合法时读报 `STORAGE_CORRUPT`（旁存损坏副本，原件留在原处）；更高 `schemaVersion` 报 `STORAGE_SCHEMA_UNSUPPORTED` |
+| Session attachments.json | Integrity | 只读严格的 `{ attachments }`；纯数组、其他格式写下的文件、无法解析或结构不合法时读报 `STORAGE_CORRUPT`（旁存损坏副本，原件留在原处） |
+| Session shell-state.json | Integrity | 写入 `{ state: { cwd } }`；只存 cwd 不存 env；其他格式写下的文件、无法解析或结构不合法时读报 `STORAGE_CORRUPT`（旁存损坏副本，原件留在原处） |
 | 非法历史 `workTrace` → null | Integrity | 读边界丢弃 |
 | Context 无法装入 → `CONTEXT_CANNOT_FIT` | Integrity | hard degrade 后仍失败则报错 |
 | 配置文件单文件 invalid + diagnostics | Integrity | 逐文件隔离，不拖垮列表 |

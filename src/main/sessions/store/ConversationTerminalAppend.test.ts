@@ -22,7 +22,6 @@ describe('bounded terminal append transaction', () => {
   } satisfies ConversationMessage;
   // This layer serializes the already-validated context entry, not its provider contract.
   const context = {
-    schemaVersion: 2,
     turnId: 'turn',
     userMessageId: 'user',
     assistantMessageId: 'assistant',

@@ -6,7 +6,6 @@ import type { RdcLifecycleReceipt } from '../rdc/RdcLifecycleReceipts';
 it('accepts only a linked, signed transition for the same approved plan and owning turn', () => {
   const ref = (id: string) => ({ uri: `session://tool-outputs/${id}.json`, expectedHash: `sha256:${'a'.repeat(64)}` });
   const offer: ExecutionOffer = {
-    schemaVersion: '1',
     sourceAgentId: 'analyzer',
     targetAgentId: 'general',
     plan: { uri: 'session://plans/plan.md', hash: 'b'.repeat(64) },
@@ -16,7 +15,6 @@ it('accepts only a linked, signed transition for the same approved plan and owni
     approvedAt: 1,
   };
   const base = {
-    schemaVersion: 1 as const,
     sessionId: 's',
     projectId: 'p',
     turnId: 't',
@@ -100,7 +98,6 @@ it('accepts only a linked, signed transition for the same approved plan and owni
 it('requires a recovery to retain the input and the last verified daemon and worker identity', () => {
   const ref = (id: string) => ({ uri: `session://tool-outputs/${id}.json`, expectedHash: `sha256:${'a'.repeat(64)}` });
   const offer: ExecutionOffer = {
-    schemaVersion: '1',
     sourceAgentId: 'analyzer',
     targetAgentId: 'general',
     plan: { uri: 'session://plans/plan.md', hash: 'b'.repeat(64) },
@@ -110,7 +107,6 @@ it('requires a recovery to retain the input and the last verified daemon and wor
     approvedAt: 1,
   };
   const base = {
-    schemaVersion: 1 as const,
     sessionId: 's',
     projectId: 'p',
     turnId: 't',

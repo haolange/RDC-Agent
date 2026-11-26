@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { EXECUTION_OFFER_SCHEMA } from './executionOffer';
 import { approvedExecutionOfferForAgent, executionOfferRequiredSkillIds } from './handoffSkills';
 
 const mocks = vi.hoisted(() => ({
@@ -17,7 +16,6 @@ vi.mock('./PlanReviewStateStore', () => ({
 }));
 
 const offer = {
-  schemaVersion: EXECUTION_OFFER_SCHEMA,
   sourceAgentId: 'debugger',
   targetAgentId: 'general',
   plan: { uri: 'session://plans/plan-frozen.md', hash: 'a'.repeat(64) },

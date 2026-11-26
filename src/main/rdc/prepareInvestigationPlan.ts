@@ -31,7 +31,7 @@ export async function prepareInvestigationPlan(input: {
   captureScope?: unknown;
   host: InvestigationPlanHost;
 }): Promise<InvestigationPlanContract> {
-  if (input.captureScope === undefined) return { schemaVersion: 1, mission: input.mission };
+  if (input.captureScope === undefined) return { mission: input.mission };
   const proposal = proposalSchema.parse(input.captureScope);
   if (new Set(proposal.inputIds).size !== proposal.inputIds.length)
     throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', 'duplicate inputs.');
@@ -53,7 +53,6 @@ export async function prepareInvestigationPlan(input: {
     inputs.push({ inputId, fileName: capture.fileName, contentSha256: hash });
   }
   return {
-    schemaVersion: 1,
     mission: input.mission,
     captureScope: {
       projectId: input.projectId,

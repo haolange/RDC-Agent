@@ -59,7 +59,6 @@ async function fixture() {
 it('freezes the verified registered capture and selected device for the plan reviewer', async () => {
   const f = await fixture();
   expect(await prepareInvestigationPlan({ ...f.base, captureScope: f.captureScope })).toEqual({
-    schemaVersion: 1,
     mission: 'analyzer',
     captureScope: {
       projectId: 'project',
@@ -68,7 +67,7 @@ it('freezes the verified registered capture and selected device for the plan rev
       inputs: [{ inputId: 'one', fileName: 'one.rdc', contentSha256: f.hash }],
     },
   });
-  expect(await prepareInvestigationPlan(f.base)).toEqual({ schemaVersion: 1, mission: 'analyzer' });
+  expect(await prepareInvestigationPlan(f.base)).toEqual({ mission: 'analyzer' });
 });
 
 it('rejects unregistered, changed, duplicate or wrong-device inputs before approval', async () => {

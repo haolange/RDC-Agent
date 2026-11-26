@@ -82,9 +82,6 @@ export interface SessionModelOverride {
 }
 
 export interface SessionRecord {
-  schemaVersion: '1';
-  /** Main-derived migration notice; not a writable session field. */
-  handoffNotice?: string;
   sessionId: string;
   projectId: string;
   title: string;
@@ -194,7 +191,6 @@ export type RunStatus =
   | 'interrupted';
 
 interface RunRecordBase {
-  schemaVersion: '3';
   runId: string;
   turnId?: string;
   projectId: string;

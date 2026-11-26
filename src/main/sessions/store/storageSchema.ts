@@ -9,14 +9,12 @@ import type { Message } from '../../agent-runtime/core/types';
 import type { SessionContextTurnEntry } from '../../agent-runtime/context/SessionContextJournal';
 import type {
   ConversationDeltaRecord,
-  ConversationTerminalCommitJournal,
   ConversationTerminalAppendJournal,
   ConversationTurnCommitJournal,
 } from './storageCommitTypes';
 
 export const SessionRecordSchema: ZodType<SessionRecord> = z
   .object({
-    schemaVersion: z.unknown().optional(),
     sessionId: z.string().min(1),
     projectId: z.string().min(1),
     title: z.string(),
@@ -43,34 +41,10 @@ export const SessionRecordSchema: ZodType<SessionRecord> = z
       .optional(),
     agentId: z.string().min(1).optional(),
   })
-  .passthrough()
-  .superRefine((value, ctx) => {
-    const allowed = new Set([
-      'schemaVersion',
-      'sessionId',
-      'projectId',
-      'title',
-      'goal',
-      'sessionPath',
-      'createdAt',
-      'updatedAt',
-      'lastRunId',
-      'turnControls',
-      'modelOverride',
-      'agentId',
-    ]);
-    if (value.schemaVersion !== '1' || Object.keys(value).some((key) => !allowed.has(key))) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'session.json requires schemaVersion 1',
-      });
-    }
-  })
-  .transform((value) => ({ ...value, schemaVersion: '1' as const })) as ZodType<SessionRecord>;
+  .strict() as ZodType<SessionRecord>;
 
 export const ConversationTurnCommitSchema = z
   .object({
-    schemaVersion: z.literal('1'),
     requestId: z.string().min(1),
     turnId: z.string().min(1),
     phase: z.enum(['prepared', 'committing', 'committed']),
@@ -82,22 +56,7 @@ export const ConversationTurnCommitSchema = z
     afterAttachments: z.array(z.unknown()),
     importedPaths: z.array(z.string()),
   })
-  .passthrough() as ZodType<ConversationTurnCommitJournal>;
-
-export const ConversationTerminalSnapshotSchema = z
-  .object({
-    schemaVersion: z.literal('1'),
-    requestId: z.string().min(1),
-    turnId: z.string().min(1),
-    phase: z.enum(['prepared', 'committing', 'committed']),
-    beforeHistory: z.array(z.unknown()),
-    beforeBranch: z.unknown().nullable(),
-    beforeContext: z.array(z.unknown()),
-    afterHistory: z.array(z.unknown()),
-    afterBranch: z.unknown().nullable(),
-    afterContext: z.array(z.unknown()),
-  })
-  .passthrough();
+  .strict() as ZodType<ConversationTurnCommitJournal>;
 
 const TerminalAppendFileSchema = z
   .object({
@@ -108,9 +67,8 @@ const TerminalAppendFileSchema = z
   })
   .strict();
 
-export const ConversationTerminalAppendSchema = z
+export const ConversationTerminalAppendSchema: ZodType<ConversationTerminalAppendJournal> = z
   .object({
-    schemaVersion: z.literal('2'),
     requestId: z.string().min(1),
     turnId: z.string().min(1),
     phase: z.enum(['prepared', 'committing', 'committed']),
@@ -118,11 +76,6 @@ export const ConversationTerminalAppendSchema = z
     context: TerminalAppendFileSchema,
   })
   .strict();
-
-export const ConversationTerminalJournalSchema = z.union([
-  ConversationTerminalSnapshotSchema,
-  ConversationTerminalAppendSchema,
-]) as ZodType<ConversationTerminalCommitJournal | ConversationTerminalAppendJournal>;
 
 export const SessionAttachmentRecordSchema = z
   .object({
@@ -147,38 +100,32 @@ export const SessionAttachmentRecordSchema = z
 const SessionAttachmentRecordsSchema = z.array(SessionAttachmentRecordSchema);
 
 export interface SessionAttachmentManifestDocument {
-  schemaVersion: string;
   attachments: SessionAttachmentRecord[];
 }
 
 export function toSessionAttachmentManifest(attachments: SessionAttachmentRecord[]): SessionAttachmentManifestDocument {
-  return { schemaVersion: '1', attachments };
+  return { attachments };
 }
 
 export const SessionAttachmentManifestSchema = z
   .object({
-    schemaVersion: z.literal('1'),
     attachments: SessionAttachmentRecordsSchema,
   })
   .strict()
   .transform((document) => document.attachments) as ZodType<SessionAttachmentRecord[]>;
 
 export interface SessionUsageDocument {
-  schemaVersion: string;
   usage: RunContextUsageSummary;
 }
 
-export const CURRENT_USAGE_SCHEMA_VERSION = '2';
-
 export const SessionUsageSchema = z
   .object({
-    schemaVersion: z.literal('2'),
     usage: RunContextUsageSummarySchema,
   })
   .strict();
 
 export function toSessionUsageManifest(usage: RunContextUsageSummary): SessionUsageDocument {
-  return { schemaVersion: CURRENT_USAGE_SCHEMA_VERSION, usage };
+  return { usage };
 }
 
 export interface SessionShellState {
@@ -186,21 +133,21 @@ export interface SessionShellState {
 }
 
 export interface SessionShellStateDocument {
-  schemaVersion: string;
   state: SessionShellState;
 }
 
-export const CURRENT_SHELL_STATE_SCHEMA_VERSION = '1';
-
-export const SessionShellStateSchema = z.object({
-  schemaVersion: z.literal('1'),
-  state: z.object({
-    cwd: z.string().min(1),
-  }),
-});
+export const SessionShellStateSchema = z
+  .object({
+    state: z
+      .object({
+        cwd: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict();
 
 export function toSessionShellStateManifest(state: SessionShellState): SessionShellStateDocument {
-  return { schemaVersion: CURRENT_SHELL_STATE_SCHEMA_VERSION, state };
+  return { state };
 }
 
 const isObjectValue = (value: unknown): boolean => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -251,27 +198,28 @@ const ExecutionFingerprintSchema = z.object({ fingerprint: nonBlank });
  * One session-context.jsonl line. Its messages and execution identity are the ones the turn committed; they are
  * checked to be the records this store wrote, and every field the journal readers use is validated.
  */
-export const SessionContextTurnEntrySchema: ZodType<SessionContextTurnEntry> = z.object({
-  schemaVersion: z.literal(2),
-  turnId: nonBlank,
-  userMessageId: nonBlank,
-  assistantMessageId: nonBlank,
-  branchId: nonBlank,
-  agentId: z.string(),
-  executionIdentity: z.custom<ExecutionIdentity>(
-    (value) => ExecutionFingerprintSchema.safeParse(value).success,
-    'execution identity requires a fingerprint',
-  ),
-  controls: z.object({
-    reasoningLevel: z.enum(REASONING_SELECTIONS),
-    maxContextMode: z.boolean(),
-    fastModel: z.boolean(),
-  }),
-  status: z.enum(['complete', 'stopped', 'error']),
-  messages: z.array(z.custom<Message>(isObjectValue, 'context message must be an object')),
-  createdAt: z.number(),
-  completedAt: z.number(),
-  approvedExecutionCompletion: z
-    .object({ offerId: z.string().optional(), planUri: z.string(), planHash: z.string() })
-    .optional(),
-});
+export const SessionContextTurnEntrySchema: ZodType<SessionContextTurnEntry> = z
+  .object({
+    turnId: nonBlank,
+    userMessageId: nonBlank,
+    assistantMessageId: nonBlank,
+    branchId: nonBlank,
+    agentId: z.string(),
+    executionIdentity: z.custom<ExecutionIdentity>(
+      (value) => ExecutionFingerprintSchema.safeParse(value).success,
+      'execution identity requires a fingerprint',
+    ),
+    controls: z.object({
+      reasoningLevel: z.enum(REASONING_SELECTIONS),
+      maxContextMode: z.boolean(),
+      fastModel: z.boolean(),
+    }),
+    status: z.enum(['complete', 'stopped', 'error']),
+    messages: z.array(z.custom<Message>(isObjectValue, 'context message must be an object')),
+    createdAt: z.number(),
+    completedAt: z.number(),
+    approvedExecutionCompletion: z
+      .object({ offerId: z.string().optional(), planUri: z.string(), planHash: z.string() })
+      .optional(),
+  })
+  .strict();

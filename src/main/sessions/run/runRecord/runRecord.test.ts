@@ -119,10 +119,7 @@ describe('current Run persistence', () => {
     const run = toPersistedRun(runBase());
     writeRunFiles(storageIo(), runPath, run);
     expect(fs.existsSync(path.join(runPath, 'run.yaml'))).toBe(true);
-    expect(JSON.parse(await readFile(path.join(runPath, 'run.json'), 'utf8'))).toMatchObject({
-      schemaVersion: '3',
-      runId: 'run_c',
-    });
+    expect(JSON.parse(await readFile(path.join(runPath, 'run.json'), 'utf8'))).toMatchObject({ runId: 'run_c' });
     expect(readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toEqual(run);
   });
 
@@ -134,7 +131,7 @@ describe('current Run persistence', () => {
   it('rejects YAML-only data without silently recreating a JSON Run', async () => {
     const runPath = await tempRun();
     const yamlPath = path.join(runPath, 'run.yaml');
-    await writeFile(yamlPath, 'schemaVersion: "2"\nrunId: run_c\n', 'utf8');
+    await writeFile(yamlPath, 'runId: run_c\n', 'utf8');
     expect(() => readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA/);
     expect(await readFile(yamlPath, 'utf8')).toContain('runId');
     expect(fs.existsSync(path.join(runPath, 'run.json'))).toBe(false);

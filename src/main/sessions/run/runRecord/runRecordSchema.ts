@@ -41,7 +41,6 @@ const RuntimeSchema = z
   .strict();
 
 const RunRecordBaseFields = {
-  schemaVersion: z.literal('3'),
   runId: z.string().min(1),
   turnId: z.string().optional(),
   projectId: z.string().min(1),
@@ -101,7 +100,7 @@ export function classifyRunKind(
 }
 
 export function toPersistedRun(
-  base: Omit<PersistedRunRecord, 'schemaVersion' | 'kind' | 'mission' | 'profileId' | 'diagnostics'> & {
+  base: Omit<PersistedRunRecord, 'kind' | 'mission' | 'profileId' | 'diagnostics'> & {
     profileId: string;
     diagnostics?: string[];
     captures?: PersistedRunRecord['captures'];
@@ -115,7 +114,6 @@ export function toPersistedRun(
   });
   const runtime = { ...base.runtime };
   const shared = {
-    schemaVersion: '3' as const,
     runId: base.runId,
     turnId: base.turnId,
     projectId: base.projectId,

@@ -10,13 +10,12 @@ import {
   type ConversationHistoryCacheEntry,
   type ConversationDeltaRecord,
   type ConversationTraceBlocksPatch,
-  type ConversationTerminalCommitJournal,
   type ConversationTerminalAppendJournal,
   type ConversationTurnCommitJournal,
   type ExistingConversationTurnCommit,
 } from './storageCommitTypes';
 import {
-  ConversationTerminalJournalSchema,
+  ConversationTerminalAppendSchema,
   ConversationTurnCommitSchema,
   ConversationHistoryRecordSchema,
   SessionAttachmentManifestSchema,
@@ -135,7 +134,6 @@ export class ConversationHistoryStore {
       plannedAttachments ?? this.planAttachmentsForTurn(session, sourceAttachmentPaths, attachmentsDir);
     const afterAttachments = beforeAttachments.concat(attachments);
     const journal: ConversationTurnCommitJournal = {
-      schemaVersion: '1',
       requestId,
       turnId,
       phase: 'prepared',
@@ -645,7 +643,7 @@ export class ConversationHistoryStore {
     const location = this.host.sessions.findSessionLocation(sessionId);
     if (!location) return;
     const journalPath = this.getConversationTerminalCommitJournalPath(location.sessionPath);
-    const journal = this.host.io.readJson(journalPath, ConversationTerminalJournalSchema);
+    const journal = this.host.io.readJson(journalPath, ConversationTerminalAppendSchema);
     if (!journal) return;
     const session = this.host.io.readJson(path.join(location.sessionPath, 'session.json'), SessionRecordSchema);
     if (!session) return;
@@ -656,29 +654,16 @@ export class ConversationHistoryStore {
 
   applyConversationTerminalJournal(
     session: SessionRecord,
-    journal: ConversationTerminalCommitJournal | ConversationTerminalAppendJournal,
+    journal: ConversationTerminalAppendJournal,
     useAfter: boolean,
   ): void {
-    if (journal.schemaVersion === '2') {
-      const assistant = applyTerminalAppend(session.sessionPath, journal, useAfter);
-      if (useAfter)
-        this.applyConversationMessageToCache(session.sessionId, this.getConversationPath(session.sessionId), assistant);
-      else {
-        this.invalidateConversationHistoryCache(session.sessionId);
-        this.conversationPendingDeltaCounts.delete(session.sessionId);
-      }
-      return;
+    const assistant = applyTerminalAppend(session.sessionPath, journal, useAfter);
+    if (useAfter)
+      this.applyConversationMessageToCache(session.sessionId, this.getConversationPath(session.sessionId), assistant);
+    else {
+      this.invalidateConversationHistoryCache(session.sessionId);
+      this.conversationPendingDeltaCounts.delete(session.sessionId);
     }
-    const history = useAfter ? journal.afterHistory : journal.beforeHistory;
-    const branch = useAfter ? journal.afterBranch : journal.beforeBranch;
-    const context = useAfter ? journal.afterContext : journal.beforeContext;
-    this.host.io.writeJsonlAtomic(path.join(session.sessionPath, 'conversation.jsonl'), history);
-    this.invalidateConversationHistoryCache(session.sessionId);
-    this.conversationPendingDeltaCounts.set(session.sessionId, 0);
-    const branchPath = path.join(session.sessionPath, 'conversation-branches.json');
-    if (branch) this.host.io.writeJsonAtomic(branchPath, branch);
-    else if (fs.existsSync(branchPath)) fs.rmSync(branchPath, { force: true });
-    this.host.io.writeJsonlAtomic(path.join(session.sessionPath, 'session-context.jsonl'), context);
   }
 
   applyConversationTurnJournal(

@@ -67,7 +67,6 @@ vi.mock('../../investigation/InvestigationArtifactService', () => ({
 vi.mock('./DirectTaskTurnLifecycle', () => ({ listActiveDelegations: mock.active }));
 
 const offer: ExecutionOffer = {
-  schemaVersion: '1',
   sourceAgentId: 'analyzer',
   targetAgentId: 'general',
   plan: { uri: 'session://plans/p.md', hash: 'c'.repeat(64) },
@@ -77,7 +76,6 @@ const offer: ExecutionOffer = {
   approvedAt: 1,
 };
 const contract: InvestigationPlanContract = {
-  schemaVersion: 1,
   mission: 'analyzer',
   captureScope: {
     projectId: 'p',

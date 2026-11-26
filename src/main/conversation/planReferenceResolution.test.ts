@@ -33,7 +33,7 @@ beforeEach(() => {
     planUri: 'session://plans/frozen.md',
     planTitle: 'Find the draw',
   };
-  f.state = { schemaVersion: '1', planId: 'plan', revision: 2, ownerTurnId: 'turn', status: 'rejected', updatedAt: 1 };
+  f.state = { planId: 'plan', revision: 2, ownerTurnId: 'turn', status: 'rejected', updatedAt: 1 };
   f.history = [
     {
       id: 'm',

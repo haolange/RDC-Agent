@@ -432,7 +432,7 @@ describe('Agent turn completion boundary', () => {
     };
     preparedRuntime.approvedExecution = {
       offer: {} as never,
-      investigation: { schemaVersion: 1, mission: 'analyzer' },
+      investigation: { mission: 'analyzer' },
     };
     await run();
     expect(validate).toHaveBeenCalledWith(
@@ -458,7 +458,7 @@ describe('Agent turn completion boundary', () => {
     };
     preparedRuntime.approvedExecution = {
       offer: {} as never,
-      investigation: { schemaVersion: 1, mission: 'optimizer' },
+      investigation: { mission: 'optimizer' },
     };
     await run();
     expect(readiness).toHaveBeenCalledWith(
@@ -490,7 +490,7 @@ describe('Agent turn completion boundary', () => {
     };
     preparedRuntime.approvedExecution = {
       offer: {} as never,
-      investigation: { schemaVersion: 1, mission: 'optimizer' },
+      investigation: { mission: 'optimizer' },
     };
     await run();
   });
@@ -520,7 +520,7 @@ describe('Agent turn completion boundary', () => {
     );
     preparedRuntime.approvedExecution = {
       offer: {} as never,
-      investigation: { schemaVersion: 1, mission: 'analyzer' },
+      investigation: { mission: 'analyzer' },
     };
     await run();
     expect(feedback).toContain('session://tool-outputs/baseline.json');
@@ -597,7 +597,7 @@ describe('Agent turn completion boundary', () => {
     );
     preparedRuntime.approvedExecution = {
       offer: {} as never,
-      investigation: { schemaVersion: 1, mission: 'debugger' },
+      investigation: { mission: 'debugger' },
     };
     await run();
   });
@@ -658,7 +658,7 @@ describe('Agent turn completion boundary', () => {
     );
     preparedRuntime.approvedExecution = {
       offer: {} as never,
-      investigation: { schemaVersion: 1, mission: 'analyzer' },
+      investigation: { mission: 'analyzer' },
     };
     await run();
   });

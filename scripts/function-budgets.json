@@ -123,7 +123,7 @@
       "complexity": 90
     },
     "src/main/rdc/executeRdcShell.ts": {
-      "lines": 444,
+      "lines": 443,
       "complexity": 131
     },
     "src/main/rdc/RdcCaptureRecovery.ts": {
