@@ -1,9 +1,5 @@
 import { afterEach, expect, it } from 'vitest';
-import {
-  clearRdcContextLeases,
-  quarantineRdcContext,
-  setRdcRuntimeContextForSession,
-} from './RdcRuntimeContextRegistry';
+import { clearRdcContextLeases, registerRdcFault, setRdcRuntimeContextForSession } from './RdcRuntimeContextRegistry';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import { readRdcRecoverySnapshot, readRdcSwitchSnapshot } from './RdcSwitchSnapshot';
 
@@ -103,10 +99,13 @@ it('permits only recovery inspection of a quarantined binding with an observed f
   const execute = async () => ({ exitCode: 0, stdout: JSON.stringify(payload), stderr: '', duration_ms: 1 });
   const input = { sessionId: 'session', projectId: 'project', binding, execute };
   await expect(readRdcRecoverySnapshot(input)).rejects.toThrow('RDC_RECOVERY_IDENTITY_UNVERIFIED');
-  quarantineRdcContext('session', lease.version, 'uncertain', {
+  registerRdcFault({
+    sessionId: 'session',
+    expectedVersion: lease.version,
     operation: 'rd.test',
-    argsFingerprint: 'a'.repeat(64),
-    code: 'failure',
+    nativeArgs: {},
+    cause: 'failure',
+    reason: 'uncertain',
   });
   await expect(readRdcSwitchSnapshot(input)).rejects.toThrow('RDC_SWITCH_BINDING_CHANGED');
   expect(await readRdcRecoverySnapshot(input)).toMatchObject({ contextId: 'context', eventId: 9, processIdentity });

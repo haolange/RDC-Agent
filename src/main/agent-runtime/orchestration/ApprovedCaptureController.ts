@@ -57,7 +57,12 @@ export interface ApprovedCaptureHost {
   ): Promise<Prepared>;
   appendEpoch(epoch: TaskRuntimeEpoch): Promise<void>;
   writeReceipt(receipt: RdcLifecycleReceipt): InvestigationContentRef;
-  quarantineChanged(previous: RdcLifecyclePoint | null, reason: string, force?: boolean): void;
+  /** A failed transition is a fault of the owning lease it left uncertain (`cause` is the failure's code). */
+  quarantineChanged(
+    previous: RdcLifecyclePoint | null,
+    failure: { cause: string; reason: string },
+    force?: boolean,
+  ): void;
 }
 
 /** One approved goal owns one serial capture transition chain. */
@@ -505,8 +510,8 @@ export class ApprovedCaptureController {
     force = false,
   ): void {
     const message = error instanceof Error ? error.message : String(error);
-    this.input.host.quarantineChanged(from, message, force);
     const code = /^[A-Z][A-Z0-9_]{0,127}/u.exec(message)?.[0] ?? 'RDC_SWITCH_FAILED';
+    this.input.host.quarantineChanged(from, { cause: code, reason: message }, force);
     this.input.host.writeReceipt({ ...base, recordedAt: Date.now(), event: 'failed', intent, code });
   }
   private current(): Prepared {

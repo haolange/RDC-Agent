@@ -15,7 +15,7 @@ import {
   type RdcContextLease,
 } from '../../rdc/RdcRuntimeContextRegistry';
 import { executePreservedPipelineProbe } from '../../rdc/RdcProbePipeline';
-import { quarantineFatalReplayFailure } from '../../rdc/RdcReplayFailure';
+import { registerRdcReplayFailure } from '../../rdc/RdcReplayFailure';
 import type { CLIResult } from '../../tools/ShellInvocationService';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { JsonSchema } from '../core/types';
@@ -318,13 +318,11 @@ export function createRdcProbeTool(
           const expectedContext = compiled.command === 'context' ? lease?.contextId : undefined;
           payload = parseRdcNativeResult(cli, expectedContext, compiled.operation);
         } catch (error) {
-          if (!pipelineLease && lease && compiled.needsContext && error instanceof RdcNativeFailure) {
-            quarantineFatalReplayFailure(
-              lease,
-              error,
-              compiled.operation ?? error.resultKind ?? compiled.command,
-              compiled.args,
-            );
+          // The pipeline probe registers its own faults; every other read of the owning replay does it here.
+          if (!pipelineLease && lease && compiled.needsContext) {
+            const operation =
+              compiled.operation ?? (error instanceof RdcNativeFailure ? error.resultKind : null) ?? compiled.command;
+            registerRdcReplayFailure(lease, error, operation, compiled.args);
           }
           throw error;
         }

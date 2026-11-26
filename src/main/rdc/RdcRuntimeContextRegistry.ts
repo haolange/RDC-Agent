@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { AppError } from '@shared/errors/appError';
+import { rdcDigest } from './RdcOperationCatalog';
 /**
  * Per-session RDC context leases. Tools must verify ownership before reading.
  * Parent sessions may grant one scoped, lifecycle-bound delegated lease to a child.
@@ -24,8 +25,27 @@ export interface RdcContextLease {
   ownerTurnId?: string;
   parentVersion?: number;
   quarantineReason?: string;
-  /** Main-observed native failure used to bound one same-condition recovery attempt. */
-  quarantineCause?: { operation: string; argsFingerprint: string; code: string };
+  /** Main-observed failure used to bound one same-condition recovery attempt; present whenever a reason is. */
+  quarantineCause?: RdcQuarantineCause;
+}
+
+export interface RdcQuarantineCause {
+  operation: string;
+  /** `rdcDigest` of the native arguments the failing call sent. */
+  argsFingerprint: string;
+  /** The observed failure: RDC-Tool's error code or the Agent code that stopped the call. */
+  code: string;
+}
+
+/** One failure that leaves the owning replay uncertain: everything a quarantine must record. */
+export interface RdcFault {
+  sessionId: string;
+  /** The lease version the failing call ran under; a newer binding is left alone. */
+  expectedVersion: number;
+  operation: string;
+  nativeArgs: unknown;
+  cause: string;
+  reason: string;
 }
 
 export interface GrantDelegatedLeaseInput {
@@ -234,11 +254,16 @@ export function revokeDelegatedLease(childSessionId: string, options?: { operati
   if (!trimmed) return false;
   const lease = leasesBySession.get(trimmed);
   if (lease?.delegatedFrom && (options?.operationStopped !== true || lease.quarantineReason)) {
+    // The child's own fault carries over; an unconfirmed exit is a fault of the delegation itself.
     quarantineRdcContext(
       lease.delegatedFrom,
-      undefined,
+      lease.parentVersion,
       lease.quarantineReason ?? 'Delegated operation exit was not confirmed.',
-      lease.quarantineCause,
+      lease.quarantineCause ?? {
+        operation: 'rdc.delegation',
+        argsFingerprint: rdcDigest({ childSessionId: trimmed, ownerTurnId: lease.ownerTurnId ?? null }),
+        code: 'RDC_RECOVERY_CHILD_EXIT_UNCONFIRMED',
+      },
     );
   }
   for (const [parent, child] of delegatedChildByParent) {
@@ -271,16 +296,28 @@ export function listRdcContextLeaseSessionIds(): string[] {
   return Array.from(leasesBySession.keys());
 }
 
-/** Preserve an uncertain binding for inspection, while refusing further execution or delegation. */
-export function quarantineRdcContext(
+/**
+ * The one way an uncertain native outcome is recorded: the owning lease is preserved for inspection but refuses
+ * further execution or delegation, and its cause (operation, `rdcDigest` of the native arguments, observed code) is
+ * what controlled recovery compares against.
+ */
+export function registerRdcFault(fault: RdcFault): void {
+  quarantineRdcContext(fault.sessionId, fault.expectedVersion, fault.reason, {
+    operation: fault.operation,
+    argsFingerprint: rdcDigest(fault.nativeArgs),
+    code: fault.cause,
+  });
+}
+
+function quarantineRdcContext(
   sessionId: string,
   expectedVersion: number | undefined,
   reason: string,
-  cause?: RdcContextLease['quarantineCause'],
+  cause: RdcQuarantineCause,
 ): void {
   const lease = leasesBySession.get(sessionId);
   if (!lease || (expectedVersion !== undefined && lease.version !== expectedVersion)) return;
   lease.quarantineReason = reason;
   // A later cleanup error must not replace the first observed native failure.
-  if (!lease.quarantineCause && cause) lease.quarantineCause = { ...cause };
+  lease.quarantineCause ??= { ...cause };
 }

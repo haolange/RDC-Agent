@@ -327,6 +327,8 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 - 切换、停止和新身份通过主进程签名回执关联。
 - 操作仍受当前权限模式约束，不能用能力声明代替授权。
 
+结果未知的原生调用只经 `RdcRuntimeContextRegistry.registerRdcFault({sessionId, expectedVersion, operation, nativeArgs, cause, reason})` 隔离 lease，`quarantineRdcContext` 是它的私有实现。原因必填：操作、原生参数的 `rdcDigest` 指纹与观察到的码（RDC-Tool 错误码或 Agent 码，取消为 `RDC_OPERATION_CANCELLED`），同一 lease 只保留首个原因。站点包括 `executeRdcShell`（含取消）、`executePreservedPipelineProbe`、`registerRdcReplayFailure`（probe 与 observe：每个没有无效果证明的原生故障与 CLI 协议错误）、`closeOwnedRemoteCapture`、`revokeDelegatedLease` 与获批 capture 切换失败（`quarantineChanged`）。因此每个隔离都带原因，受控恢复的既有身份与进程核验决定能否重建。
+
 原生只读查询返回回放致命故障时，将故障记录在发起查询的冻结 lease 上。
 
 - 同输入、设备及权限的原生故障可请求 `capture_recover`：只处理实际失败而隔离的 lease，中断并 join 持该 lease 的相关子执行，核对原 daemon/worker 身份，按 clear context → 确认 daemon stop → 重开和重新准备的顺序进行。

@@ -11,7 +11,7 @@ vi.mock('./RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: m
 vi.mock('./RdcRuntimeContextRegistry', () => ({
   assertRdcContextLeaseOwnership: mock.lease,
   getRdcContextLease: vi.fn(),
-  quarantineRdcContext: mock.quarantine,
+  registerRdcFault: mock.quarantine,
 }));
 
 const lease = {

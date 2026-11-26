@@ -283,3 +283,14 @@ export function parseRdcNativeResult(
   }
   return envelope;
 }
+
+/** The observed failure a quarantine records: RDC-Tool's error code, or the leading code of an Agent failure. */
+export function rdcFaultCode(error: unknown): string {
+  const reported =
+    error instanceof RdcNativeFailure
+      ? error.nativeError.code
+      : error instanceof Error
+        ? (/^[A-Z][A-Z0-9_]{0,127}/u.exec(error.message)?.[0] ?? error.name)
+        : 'unknown';
+  return /^[A-Za-z][A-Za-z0-9_]{0,127}$/u.test(reported) ? reported : 'unknown';
+}

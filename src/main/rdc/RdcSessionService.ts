@@ -12,7 +12,7 @@ import { assertRdcContextLeaseOwnership } from './RdcRuntimeContextRegistry';
 import { harvestOwnedRdcDaemons } from './OwnedRdcDaemonRegistry';
 import { replayLivePreviewStore } from './captures/replay/ReplayLivePreviewStore';
 import { observeReplay, readReplayEvents } from './RdcReplayObservation';
-import { quarantineFatalReplayFailure, replayObservationLease } from './RdcReplayFailure';
+import { registerRdcReplayFailure, replayObservationLease } from './RdcReplayFailure';
 import { RdcDevicePreparation } from './RdcDevicePreparation';
 import { closedReplayState, keyOf } from './RdcSessionBindings';
 import type { RdcTurnBinding } from './RdcTurnBindings';
@@ -212,7 +212,7 @@ export class RdcSessionService extends RdcDevicePreparation {
               );
             });
           } catch (error) {
-            const fatal = quarantineFatalReplayFailure(lease, error, operation, operationArgs);
+            const fatal = registerRdcReplayFailure(lease, error, operation, operationArgs);
             if (fatal) {
               this.publish(binding, { phase: 'error', error: fatal });
               throw error;
@@ -534,7 +534,7 @@ export class RdcSessionService extends RdcDevicePreparation {
             phase: 'ready',
           });
       } catch (error) {
-        const fatal = quarantineFatalReplayFailure(lease, error, 'rd.session.observe', args);
+        const fatal = registerRdcReplayFailure(lease, error, 'rd.session.observe', args);
         if (generation === binding.state.generation)
           this.publish(binding, {
             operationId,

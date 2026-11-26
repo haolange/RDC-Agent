@@ -4,14 +4,14 @@ import {
   clearRdcContextLeases,
   getRdcContextLease,
   setRdcRuntimeContextForSession,
-  quarantineRdcContext,
+  registerRdcFault,
 } from './RdcRuntimeContextRegistry';
 import { ProjectInputLifecycle, type ProjectInputLifecycleHost } from './captures/ProjectInputLifecycle';
 import { harvestOwnedRdcDaemons } from './OwnedRdcDaemonRegistry';
 import { RdcSessionService } from './RdcSessionService';
 import { selectedProbeDeviceId } from './RdcProbeLifecycle';
 import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
-import { rdcDigest } from './RdcExecutionReceipts';
+import { rdcDigest } from './RdcOperationCatalog';
 import { setRdcInteractionLock, runRdcOperation } from './RdcOperationCoordinator';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import type { OpenProjectInputRequest, ProjectRecord } from '@shared/types/session';
@@ -670,7 +670,14 @@ it('quarantine blocks manual event/refresh but leaves confirmed close available 
     },
     { projectId: 'p' },
   )!;
-  quarantineRdcContext('s1', lease.version, 'uncertain');
+  registerRdcFault({
+    sessionId: 's1',
+    expectedVersion: lease.version,
+    operation: 'rd.test',
+    nativeArgs: {},
+    cause: 'native_failure',
+    reason: 'uncertain',
+  });
   await expect(service.applyEventForSession({ ...scope, bindingGeneration: 1, eventId: 1 })).rejects.toThrow(
     'QUARANTINED',
   );
@@ -703,7 +710,14 @@ it('publishes quarantine on Agent lock release instead of leaving a ready remote
   const listener = vi.fn();
   service.subscribe(listener);
   setRdcInteractionLock('s1', 'test', true);
-  quarantineRdcContext('s1', lease.version, 'native failure');
+  registerRdcFault({
+    sessionId: 's1',
+    expectedVersion: lease.version,
+    operation: 'rd.test',
+    nativeArgs: {},
+    cause: 'native_failure',
+    reason: 'native failure',
+  });
   setRdcInteractionLock('s1', 'test', false);
   expect(listener.mock.lastCall?.[0]).toMatchObject({
     phase: 'error',

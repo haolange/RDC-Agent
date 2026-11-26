@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   clearRdcContextLeases,
-  quarantineRdcContext,
+  registerRdcFault,
   setRdcRuntimeContextForSession,
 } from '../../rdc/RdcRuntimeContextRegistry';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
@@ -161,10 +161,13 @@ beforeEach(() => {
 
 it('checks quarantined process identity and reconnects the same device under unchanged authority', async () => {
   const { host, binding } = fixture();
-  quarantineRdcContext('s', binding.identity!.version, 'fault', {
+  registerRdcFault({
+    sessionId: 's',
+    expectedVersion: binding.identity!.version,
     operation: 'rd.test',
-    argsFingerprint: 'd'.repeat(64),
-    code: 'native_failure',
+    nativeArgs: {},
+    cause: 'native_failure',
+    reason: 'fault',
   });
   const point = {
     ...destination,

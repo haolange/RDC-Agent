@@ -15,6 +15,8 @@ export function canonicalJson(value: unknown): string {
     );
   return JSON.stringify(value);
 }
+/** The canonical SHA-256 of a value: native arguments, results and replacement sets are compared by it. */
+export const rdcDigest = (value: unknown): string => createHash('sha256').update(canonicalJson(value)).digest('hex');
 export function operationFingerprint(definitions: readonly unknown[]): string {
   return createHash('sha256').update(canonicalJson(definitions)).digest('hex');
 }

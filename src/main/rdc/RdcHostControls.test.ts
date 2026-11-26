@@ -5,7 +5,7 @@ import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import {
   clearRdcContextLeases,
   grantDelegatedLease,
-  quarantineRdcContext,
+  registerRdcFault,
   setRdcRuntimeContextForSession,
 } from './RdcRuntimeContextRegistry';
 import { setRdcInteractionLock } from './RdcOperationCoordinator';
@@ -127,7 +127,15 @@ describe('RDC host controls projection', () => {
       });
     if (failure === 'lease') test.scope.leaseVersion += 1;
     if (failure === 'unlocked') setRdcInteractionLock('owner', 'turn', false);
-    if (failure === 'quarantine') quarantineRdcContext('owner', test.lease.version, 'uncertain');
+    if (failure === 'quarantine')
+      registerRdcFault({
+        sessionId: 'owner',
+        expectedVersion: test.lease.version,
+        operation: 'rd.test',
+        nativeArgs: {},
+        cause: 'native_failure',
+        reason: 'uncertain',
+      });
     if (failure === 'delegated')
       grantDelegatedLease({ parentSessionId: 'owner', childSessionId: 'child', ownerTurnId: 'turn' });
     if (failure === 'duplicate')

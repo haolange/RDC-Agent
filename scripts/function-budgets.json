@@ -18,7 +18,7 @@
       "lines": 209
     },
     "src/main/agent-runtime/orchestration/ApprovedCaptureHost.ts": {
-      "lines": 323
+      "lines": 319
     },
     "src/main/agent-runtime/orchestration/BackgroundSubagentService.ts": {
       "lines": 317
@@ -27,7 +27,7 @@
       "lines": 155
     },
     "src/main/agent-runtime/orchestration/RdcProbeTool.ts": {
-      "lines": 170,
+      "lines": 167,
       "complexity": 92
     },
     "src/main/agent-runtime/orchestration/RuntimeToolAssembly.ts": {

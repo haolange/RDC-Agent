@@ -1,9 +1,9 @@
-import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { z, type ZodType } from 'zod';
 import { AppError } from '@shared/errors/appError';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { secretStorageService } from '../settings/settings-core/SecretStorageService';
-import { canonicalJson } from './RdcOperationCatalog';
+import { rdcDigest } from './RdcOperationCatalog';
 import { RdcProcessIdentitySchema } from './RdcProcessIdentity';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import type { RdcValidatedEvidence } from './RdcValidatedEvidence';
@@ -86,7 +86,6 @@ function parseReceiptJson(text: string, code: ReceiptInvalidCode): unknown {
 }
 
 const KEY_REF = 'rdc-execution-receipt-signing';
-export const rdcDigest = (value: unknown): string => createHash('sha256').update(canonicalJson(value)).digest('hex');
 
 /** Main-owned key is never part of a tool result, IPC, prompt, or session artifact. */
 function signingKey(): string {

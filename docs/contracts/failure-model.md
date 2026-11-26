@@ -81,7 +81,8 @@
 | Agent 达到 maxTurns 仍要求 continuation | Integrity | `AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；不得静默完成 |
 | 本回合 direct Task 未结算即声明完成 | Integrity | `turn_complete` 拒绝并指明待结算 Task；获批调查的普通提前终答将可处理的缺口反馈到同一逻辑执行，真实限制、取消或无进展仍按对应原因终止，不误报 Provider failure |
 | Investigation 声明完成时缺 Checkpoint 或没有符合领域合同的 ready report | Integrity | `turn_complete` 返回 `MISSION_COMPLETION_DENIED` 而不记录 completed；报告状态、所需实验和相关 open Challenge 在声明前检查，存储或意外错误直接上报；部分或受阻可按原合同声明，最终答复仍复核实际引用的制品 |
-| RDC delegated lease 退出未确认 | Security + Integrity | 隔离 parent lease（`revokeDelegatedLease` 缺停止证明即 quarantine）；不得回退 parent 或并发第二 owner |
+| RDC delegated lease 退出未确认 | Security + Integrity | 隔离 parent lease（`revokeDelegatedLease` 缺停止证明即 quarantine，原因沿用子 lease 的故障或记为 `RDC_RECOVERY_CHILD_EXIT_UNCONFIRMED`）；不得回退 parent 或并发第二 owner |
+| RDC 结果未知（原生故障、CLI 协议错误、取消、关闭或切换未确认） | Integrity | 唯一入口 `registerRdcFault`：隔离 owning lease，原因必填（操作、原生参数的 `rdcDigest`、观察到的码，取消为 `RDC_OPERATION_CANCELLED`），首个原因不被后续清理错误覆盖；probe 与 observe 路径登记每个没有无效果证明的原生故障与 CLI 协议错误，`executeRdcShell` 保留主进程复核安全的例外 |
 | 获批 capture 切换／恢复的身份或退出无法核实 | Security + Integrity | 停止现场操作并隔离；保留签名 baseline 和未恢复状态，不能将 context clear 当成 daemon 已退出，也不将新现场补入旧实验 |
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
 | JSONL 末尾残行（追加中断） | Integrity | 读取时作为 `tornTail` 返回，之前的完整记录照常可读，会话不因此打不开；下一次追加或回合终态提交前，残行字节原样移入同目录 `<file>.torn-<ts>`（fsync 后）再截断，并经运行日志报告 `JSONL_TORN_TAIL`；只缺换行的完整记录补换行保留 |
@@ -186,7 +187,7 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 
 ## Capture 分阶段失败
 
-Open 失败、图片获取失败、设备显示不支持、Close 未确认分别投影。native context 已打开而图片失败时保留 lease，重试只请求图片。无颜色输出不可复用上一事件图片。关闭和半开恢复失败保留 context/设备占用，必须显式关闭确认；不以清空 UI 模拟释放。历史写失败或达到配额后明确未保存，已有历史保持不变。Remote `unsupported` 是能力边界，不能投影显示成功。
+Open 失败、图片获取失败、设备显示不支持、Close 未确认分别投影。native context 已打开而图片失败时保留 lease，重试只请求图片；但图片失败本身是原生故障或 CLI 协议错误、又没有 RDC-Tool 的无效果证明时，回放状态未知，按下文统一登记故障并提供关闭/恢复。无颜色输出不可复用上一事件图片。关闭和半开恢复失败保留 context/设备占用，必须显式关闭确认；不以清空 UI 模拟释放。历史写失败或达到配额后明确未保存，已有历史保持不变。Remote `unsupported` 是能力边界，不能投影显示成功。
 
 ## 会话取消与执行失败
 

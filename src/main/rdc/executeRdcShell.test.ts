@@ -25,7 +25,7 @@ vi.mock('./RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: m
 vi.mock('./RdcRuntimeContextRegistry', () => ({
   assertRdcContextLeaseOwnership: mock.lease,
   getRdcContextLease: mock.retainedLease,
-  quarantineRdcContext: mock.quarantine,
+  registerRdcFault: mock.quarantine,
 }));
 vi.mock('./RdcExecutionReceipts', async (importOriginal) => {
   const original = await importOriginal<typeof import('./RdcExecutionReceipts')>();
@@ -365,10 +365,12 @@ describe('structured RDC shell', () => {
     expect(mock.execute.mock.calls[0]?.[1]?.[0]).toBe('rd.session.get_context');
     expect(mock.quarantine).toHaveBeenCalledOnce();
     expect(mock.quarantine).toHaveBeenCalledWith(
-      'session',
-      7,
-      expect.any(String),
-      expect.objectContaining({ operation: query.name, code: 'daemon_owner_unavailable' }),
+      expect.objectContaining({
+        sessionId: 'session',
+        expectedVersion: 7,
+        operation: query.name,
+        cause: 'daemon_owner_unavailable',
+      }),
     );
     expect(mock.write).not.toHaveBeenCalled();
     expect(mock.observe).not.toHaveBeenCalled();
@@ -594,10 +596,12 @@ describe('structured RDC shell', () => {
     await expect(executeRdcShell(input, 'call', undefined, context)).rejects.toThrow();
     expect(mock.write).not.toHaveBeenCalled();
     expect(mock.quarantine).toHaveBeenCalledWith(
-      'session',
-      7,
-      expect.stringContaining('uncertain'),
-      expect.objectContaining({ operation: input.operation }),
+      expect.objectContaining({
+        sessionId: 'session',
+        expectedVersion: 7,
+        operation: input.operation,
+        reason: expect.stringContaining('uncertain'),
+      }),
     );
   });
   it.each(['shader_patch_op_unsupported_for_encoding', 'shader_patch_diff_failed'])(
@@ -1169,10 +1173,11 @@ describe('structured RDC shell', () => {
     });
     expect(failure.deliveryResult.details.nativeFailure.proof).not.toHaveProperty('context_preserved');
     expect(mock.quarantine).toHaveBeenCalledWith(
-      'session',
-      7,
-      expect.stringContaining('uncertain'),
-      expect.any(Object),
+      expect.objectContaining({
+        sessionId: 'session',
+        expectedVersion: 7,
+        reason: expect.stringContaining('uncertain'),
+      }),
     );
   });
   it('quarantines when a no-effect proof cannot be tied to the unchanged owning lease', async () => {
@@ -1206,10 +1211,11 @@ describe('structured RDC shell', () => {
       executeRdcShell({ operation: replacement.name, args: {} }, 'edit', undefined, bound),
     ).rejects.toThrow();
     expect(mock.quarantine).toHaveBeenCalledWith(
-      'session',
-      7,
-      expect.stringContaining('uncertain'),
-      expect.any(Object),
+      expect.objectContaining({
+        sessionId: 'session',
+        expectedVersion: 7,
+        reason: expect.stringContaining('uncertain'),
+      }),
     );
   });
   it('does not issue a receipt if cancelled or ownership changes while running', async () => {
@@ -2094,12 +2100,14 @@ describe('stuck and cancelled operations', () => {
     });
     const failure = await executeRdcShell(input, 'stuck', undefined, context).catch((error: unknown) => error);
     expect(failure).toMatchObject({ code: 'RDC_OPERATION_STUCK', params: { operation: input.operation } });
-    expect(mock.quarantine).toHaveBeenCalledExactlyOnceWith(
-      'session',
-      7,
-      expect.stringContaining('outcome is uncertain'),
-      { operation: input.operation, argsFingerprint: expect.any(String), code: 'worker_stuck' },
-    );
+    expect(mock.quarantine).toHaveBeenCalledExactlyOnceWith({
+      sessionId: 'session',
+      expectedVersion: 7,
+      operation: input.operation,
+      nativeArgs: { session_id: 'native-replay' },
+      cause: 'worker_stuck',
+      reason: expect.stringContaining('outcome is uncertain'),
+    });
     const delivered = (failure as { deliveryResult?: { details: Record<string, unknown> } }).deliveryResult?.details;
     expect(delivered).toMatchObject({
       nativeFailure: { code: 'worker_stuck', details: { reason: 'no_progress', replay_requires_restart: true } },
@@ -2135,7 +2143,13 @@ describe('stuck and cancelled operations', () => {
       };
     });
     await expect(executeRdcShell(input, 'cancelled', controller.signal, context)).rejects.toThrow();
-    expect(mock.quarantine).toHaveBeenCalledExactlyOnceWith('session', 7, expect.stringContaining(recorded), undefined);
+    expect(mock.quarantine).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        operation: input.operation,
+        cause: 'RDC_OPERATION_CANCELLED',
+        reason: expect.stringContaining(recorded),
+      }),
+    );
     expect(mock.write).not.toHaveBeenCalled();
   });
 });

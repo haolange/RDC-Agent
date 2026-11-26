@@ -8,14 +8,19 @@ import {
   rdcCatalogCapabilitySummary,
   rdcOperationCapability,
 } from './RdcOperationPolicy';
-import { operationFingerprint } from './RdcOperationCatalog';
+import { operationFingerprint, rdcDigest } from './RdcOperationCatalog';
 import { isUnchangedShaderResult, validateExecutionEvidence, verifyRollbackIdentity } from './RdcValidatedEvidence';
 import { runRdcOperation } from './RdcOperationCoordinator';
 import { assertRdcDiscovery, RdcShellInputSchema, type RdcShellInput } from './RdcShellInput';
-import { assertRdcContextLeaseOwnership, quarantineRdcContext } from './RdcRuntimeContextRegistry';
+import { assertRdcContextLeaseOwnership, registerRdcFault } from './RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
-import { modelVisibleRdcFailureDetails, parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
-import { rdcDigest, rdcExecutionReceipts } from './RdcExecutionReceipts';
+import {
+  modelVisibleRdcFailureDetails,
+  parseRdcNativeResult,
+  rdcFaultCode,
+  RdcNativeFailure,
+} from './RdcNativeProtocol';
+import { rdcExecutionReceipts } from './RdcExecutionReceipts';
 import { rdcInvocationRecord } from './RdcInvocationRecord';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
 import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
@@ -35,17 +40,6 @@ function ownsFrozenReplay(
     current.runtimeContext.replaySessionId === lease.runtimeContext.replaySessionId &&
     current.runtimeContext.captureFileId === frozenCaptureId
   );
-}
-
-/** The observed failure a quarantine records: the native code, or the leading code of an Agent failure. */
-function rdcFaultCode(error: unknown): string {
-  const reported =
-    error instanceof RdcNativeFailure
-      ? error.nativeError.code
-      : error instanceof Error
-        ? (/^[A-Z][A-Z0-9_]{0,127}/u.exec(error.message)?.[0] ?? error.name)
-        : 'unknown';
-  return /^[A-Za-z][A-Za-z0-9_]{0,127}$/u.test(reported) ? reported : 'unknown';
 }
 
 /** Why the lease is quarantined; a cancelled operation names what RDC-Tool's cancel receipt said. */
@@ -520,14 +514,14 @@ export async function executeRdcShell(
         }
       }
       if (!nativeStateVerifiedSafe) {
-        quarantineRdcContext(
+        registerRdcFault({
           sessionId,
-          lease.version,
-          uncertainOutcomeReason(signal, cancellation),
-          signal?.aborted
-            ? undefined
-            : { operation: input.operation, argsFingerprint: rdcDigest(input.args), code: rdcFaultCode(error) },
-        );
+          expectedVersion: lease.version,
+          operation: input.operation,
+          nativeArgs: args,
+          cause: signal?.aborted ? 'RDC_OPERATION_CANCELLED' : rdcFaultCode(error),
+          reason: uncertainOutcomeReason(signal, cancellation),
+        });
       }
       if (error instanceof RdcNativeFailure) {
         // Native details remain distinct from main-qualified proof and lease state.

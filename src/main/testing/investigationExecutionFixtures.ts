@@ -1,4 +1,5 @@
-import { RdcExecutionReceipts, rdcDigest, type RdcExecutionReceipt } from '../rdc/RdcExecutionReceipts';
+import { RdcExecutionReceipts, type RdcExecutionReceipt } from '../rdc/RdcExecutionReceipts';
+import { rdcDigest } from '../rdc/RdcOperationCatalog';
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
 
 /** Signed fixture results model a successful native A-B-A; never a production evidence source. */

@@ -4,7 +4,7 @@ import {
   assertRdcContextLeaseOwnership,
   getDelegatedChildSessionId,
   getRdcContextLease,
-  quarantineRdcContext,
+  registerRdcFault,
 } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
 import { rdcLifecycleReceipts, type RdcLifecyclePoint } from '../../rdc/RdcLifecycleReceipts';
@@ -338,7 +338,7 @@ export function createApprovedCaptureHost(input: {
       );
     },
     writeReceipt: (receipt) => rdcLifecycleReceipts.write(receipt),
-    quarantineChanged(previous, _reason, force) {
+    quarantineChanged(previous, failure, force) {
       const lease = getRdcContextLease(input.sessionId);
       if (
         lease &&
@@ -347,14 +347,27 @@ export function createApprovedCaptureHost(input: {
           lease.contextId !== previous.native.contextId ||
           lease.version !== previous.native.leaseVersion)
       ) {
-        quarantineRdcContext(
-          input.sessionId,
-          lease.version,
-          'Capture transition did not finish with verified identity and receipts.',
-        );
+        registerTransitionFault(input.sessionId, lease.version, previous, failure.cause);
       }
     },
   };
+}
+
+/** A capture transition that did not finish verified leaves its owning lease uncertain. */
+function registerTransitionFault(
+  sessionId: string,
+  expectedVersion: number,
+  previous: RdcLifecyclePoint | null,
+  cause: string,
+): void {
+  registerRdcFault({
+    sessionId,
+    expectedVersion,
+    operation: 'capture_transition',
+    nativeArgs: previous ? destinationOf(previous) : null,
+    cause,
+    reason: 'Capture transition did not finish with verified identity and receipts.',
+  });
 }
 
 function destinationOf(point: RdcLifecyclePoint): Destination {

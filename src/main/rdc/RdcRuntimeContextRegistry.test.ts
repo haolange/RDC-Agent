@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { AppError } from '@shared/errors/appError';
 import {
   setRdcRuntimeContextForSession,
   getRdcContextLease,
@@ -11,8 +12,11 @@ import {
   getDelegatedChildSessionId,
   RDC_LEASE_DELEGATE_DENIED,
   RDC_LEASE_DUAL_OWNER,
-  quarantineRdcContext,
+  registerRdcFault,
 } from './RdcRuntimeContextRegistry';
+import { RdcNativeFailure } from './RdcNativeProtocol';
+import { rdcDigest } from './RdcOperationCatalog';
+import { registerRdcReplayFailure } from './RdcReplayFailure';
 import type { RdcRuntimeContext } from '@shared/types/session';
 
 function ctx(id: string, extras?: Partial<RdcRuntimeContext>): RdcRuntimeContext {
@@ -219,7 +223,77 @@ describe('exclusive delegated control and uncertain release', () => {
   it('late failed calls cannot quarantine a rebound identity', () => {
     const old = setRdcRuntimeContextForSession('s', ctx('c1'))!;
     const current = setRdcRuntimeContextForSession('s', ctx('c2'))!;
-    quarantineRdcContext('s', old.version, 'late timeout');
+    registerRdcFault({
+      sessionId: 's',
+      expectedVersion: old.version,
+      operation: 'rd.test',
+      nativeArgs: {},
+      cause: 'native_failure',
+      reason: 'late timeout',
+    });
     expect(assertRdcContextLeaseOwnership({ sessionId: 's' })?.version).toBe(current.version);
+  });
+});
+
+describe('unified RDC fault registration', () => {
+  const native = (code: string, effectsNotAttempted = false) =>
+    new RdcNativeFailure(`RDC_CLI_FAILED: ${code}`, 'rd.resource.list', effectsNotAttempted, {
+      code,
+      category: effectsNotAttempted ? 'validation' : 'runtime',
+      exitCode: 1,
+    });
+  const nativeArgs = { session_id: 'replay', resource_id: 'ResourceId::7' };
+  beforeEach(() => clearRdcContextLeases());
+
+  it.each([
+    ['a stuck worker', native('worker_stuck'), 'worker_stuck'],
+    ['a fatal controller', native('replay_fatal_error'), 'replay_fatal_error'],
+    ['a lost daemon', native('daemon_lost'), 'daemon_lost'],
+    ['a cancelled request', native('operation_cancelled'), 'operation_cancelled'],
+    ['a malformed CLI result', new AppError('RDC_CLI_PROTOCOL', 'expected a JSON object.'), 'RDC_CLI_PROTOCOL'],
+    ['a CLI exit without a result', new AppError('RDC_CLI_FAILED', 'exited 1'), 'RDC_CLI_FAILED'],
+    [
+      'a silent CLI',
+      new AppError('RDC_DAEMON_UNRESPONSIVE', 'gap', { params: { operation: 'rd.x', seconds: 21 } }),
+      'RDC_DAEMON_UNRESPONSIVE',
+    ],
+    ['a rejection proven free of effects', native('resource_not_found', true), null],
+    ['an Agent check of a valid result', new AppError('RDC_OBSERVATION_METADATA_INVALID'), null],
+    ['an ordinary error', new Error('unrelated'), null],
+  ])('registers %s on the owning lease only when its outcome is unknown', (_case, error, cause) => {
+    const lease = setRdcRuntimeContextForSession('s', ctx('owned'))!;
+    const projected = registerRdcReplayFailure(lease, error, 'rd.resource.list', nativeArgs);
+    const after = getRdcContextLease('s')!;
+    if (cause === null) {
+      expect(projected).toBeNull();
+      expect(after.quarantineReason).toBeUndefined();
+      return;
+    }
+    expect(projected).toMatchObject({ code: cause, retry: 'close' });
+    expect(after.quarantineReason).toEqual(expect.any(String));
+    expect(after.quarantineCause).toEqual({
+      operation: 'rd.resource.list',
+      argsFingerprint: rdcDigest(nativeArgs),
+      code: cause,
+    });
+  });
+
+  it('keeps the first cause, ignores a newer binding and carries a delegated fault to its parent', () => {
+    const parent = setRdcRuntimeContextForSession('parent', ctx('owned'))!;
+    const fault = { operation: 'rd.event.set_active', nativeArgs: { event_id: 3 }, reason: 'uncertain' };
+    registerRdcFault({ ...fault, sessionId: 'parent', expectedVersion: parent.version + 1, cause: 'late' });
+    expect(getRdcContextLease('parent')?.quarantineReason).toBeUndefined();
+    registerRdcFault({ ...fault, sessionId: 'parent', expectedVersion: parent.version, cause: 'worker_lost' });
+    registerRdcFault({ ...fault, sessionId: 'parent', expectedVersion: parent.version, cause: 'cleanup_failed' });
+    expect(getRdcContextLease('parent')?.quarantineCause?.code).toBe('worker_lost');
+
+    clearRdcContextLeases();
+    setRdcRuntimeContextForSession('parent', ctx('owned'));
+    grantDelegatedLease({ parentSessionId: 'parent', childSessionId: 'child', ownerTurnId: 'turn' });
+    revokeDelegatedLease('child', { operationStopped: false });
+    expect(getRdcContextLease('parent')).toMatchObject({
+      quarantineReason: expect.stringContaining('not confirmed'),
+      quarantineCause: { operation: 'rdc.delegation', code: 'RDC_RECOVERY_CHILD_EXIT_UNCONFIRMED' },
+    });
   });
 });
