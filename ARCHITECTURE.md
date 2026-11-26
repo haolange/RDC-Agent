@@ -87,7 +87,7 @@ Settings 的 RDC 安装入口依次是检测安装、选择目录、验证并应
    - 会话工作块与工具的取消记为 cancelled，未执行记为 skipped，真实失败记为 error，不伪造用户拒绝；main 与乐观停止共用同一纯结算。
    - 当前计划携带 owning Turn，修订与决定都核对真实归属。包含审阅交互的 result 不再重复提供 handoff，计划执行动作只位于待审 Composer。
 7. **失败有分类**：安全类 fail-closed；完整性 degrade-safe；可用性 recoverable。跨边界的失败是带登记码的 `AppError`，IPC 以错误结果返回，renderer 按码经 `humanizeError` 出文案。分类与错误契约权威见 `docs/contracts/failure-model.md`。
-8. **无 legacy 双轨**：新结构替代旧结构时直接收敛；不保留兼容 shim。
+8. **无 legacy 双轨**：新结构替代旧结构时直接收敛；不保留兼容 shim。持久化格式不带版本号，格式变更即 fail-fast 并点名文件或目录；不做运行时迁移，也不提供转换工具。
 9. **对话模型**：Composer 底栏与 `/model` 选择的是**当前对话模型**，不写回 Settings。
    - Agent 的模型由 Settings → Agents 决定：用户设置 `agentModels` 保存默认模型与推理档位，加按 Agent 的逐字段覆盖。项目不能指定模型，`.agent.md` 不声明模型。Agent 模型只在用户还没点选时作为种子。
    - 未 override 是显式可选状态（菜单「按 Agent 配置」与 `/model default`）：有 session 时清除写入 `SessionRecord.modelOverride = null`，无 session 时清 Composer 草稿。Agent route 当前不可执行时禁止清除。
@@ -257,7 +257,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
   - 协议与编码细节见 [`docs/architecture/data-flow.md`](docs/architecture/data-flow.md)「Agent Turn」。
 - **存储 fail-closed**：持久化文件只经 `atomicFile` 原语读写（见 `docs/contracts/failure-model.md`「存储原语」）。
   - 写入走原子持久写（temp + fsync + rename）；deepMerge 拒绝危险原型键。
-  - 读取区分不存在与损坏：损坏每次读都报 `STORAGE_CORRUPT` 且不读成空。持久化格式不带版本号，其他格式写下的文件同样按严格 schema 失败并保留原件，不迁移。
+  - 读取区分不存在与损坏：损坏每次读都报 `STORAGE_CORRUPT` 且不读成空。持久化格式不带版本号，其他格式写下的文件同样按严格 schema 失败、点名文件并保留原件，不迁移、不转换。
   - Run 只读 run.json，run.yaml 是写入投影；attachments.json 与 usage.json 都是不带格式版本的严格对象。仅有 YAML 的 Run 报 `STORAGE_SCHEMA`，不自动迁移、改写或隔离原件。
   - Settings 只接受当前格式的严格文档（见「Settings 持久化」）：不符合的文件（包括其他格式写下的）报 `STORAGE_CORRUPT` 并保留原文件，启动时提示删除整个数据目录与设置文件后重启。
   - 目录锁对活 pid 永不回收。owner 无法读取时可能仍在初始化，等待并在超时后报错；只自动回收可识别的死 pid 锁。跨进程回收以独占标记串行化，取得标记后重新读取 owner；标记本身不能安全确认失主时等待并超时，不抢占。

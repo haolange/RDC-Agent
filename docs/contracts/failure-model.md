@@ -89,7 +89,7 @@
 | 审计决定记录写入失败 | Security | `AUDIT_WRITE_FAILED`；记录在动作之前写，写失败则动作不发生（IPC 不执行、工具不执行、批准不生效、权限设置不写盘） |
 | 工具写入应用自有文件（凭据、设置、trust、`state/**`） | Security | 任何挡位 `FILE_WRITE_PROTECTED`；仅 `sessions/**/artifacts/**` 可写 |
 | Storage schema 损坏 | Integrity | 每次读报 `STORAGE_CORRUPT`，原件留在原处并旁存一份损坏副本（见「存储原语」） |
-| Storage 文件由其他格式写下（持久化格式不带版本号） | Integrity | 严格 schema 拒绝，报 `STORAGE_CORRUPT` 或 `STORAGE_SCHEMA` 并点名文件，原件保留；不迁移、不转换、不自动重建。设置文件在启动时最先读取，提示删除整个数据目录与设置文件；数据目录外的知识库文件由用户按报错的文件名清理 |
+| Storage 文件由其他格式写下（持久化格式不带版本号） | Integrity | 严格 schema 拒绝，报 `STORAGE_CORRUPT` 或 `STORAGE_SCHEMA` 并点名文件，原件保留；不迁移、不自动重建，也不提供转换工具。设置文件在启动时最先读取，提示删除整个数据目录与设置文件；数据目录外的知识库文件由用户按报错的文件名清理；用户编写的 `.agent.md` 声明已移走的字段时判无效并点名文件，由用户修改或删除 |
 | Settings 文件（`config.json`）损坏、无法读取或结构不合法（包括其他格式写下的文件） | Integrity（启动 fail-fast） | 启动时主进程按 `app.getLocale()` 的语言弹原生错误框（headless / Browser QA 写 stderr），说明数据格式已变更或文件损坏，写出要删除的整个数据目录（userData）与 `config.json` 的路径，说明重启后以默认设置重建，经正常资源释放后以非零状态退出，不留活锁；不转换、不修复、不改写原件。目录已不再列出的 provider 条目原样保留，不进运行时视图，记 `settings_provider_not_in_catalog` 设置诊断 |
 | Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 记录 owner 的进程身份（pid 与 birth），活 owner 永不抢锁；身份证明已退出（pid 不存在或 birth 不同）的锁经独占回收标记串行回收，owner 记录或身份无法读取、回收标记无法安全确认失主时等待并超时，避免抢占正在初始化或新取得的锁；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |
 | Session attachments.json | Integrity | 只读严格的 `{ attachments }`；纯数组、其他格式写下的文件、无法解析或结构不合法时读报 `STORAGE_CORRUPT`（旁存损坏副本，原件留在原处） |
