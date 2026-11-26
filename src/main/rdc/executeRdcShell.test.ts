@@ -46,6 +46,12 @@ const definition: RdcOperationDefinition = {
   evidence_kind: 'measurement',
   path_inputs: [],
   prerequisites: [{ requires: 'session_id' }],
+  execution_budget: {
+    rule: 'no_progress',
+    default_no_progress_ms: 300_000,
+    min_no_progress_ms: 30_000,
+    max_no_progress_ms: 3_600_000,
+  },
 };
 const context: ToolExecutionContext = {
   workspaceRoot: '/project',

@@ -401,7 +401,6 @@ export const enErrors = {
   'errors.RDC_REMOTE_INSTALLATION_PROTOCOL':
     "The remote device's RenderDoc installation returned an unexpected result.",
   'errors.RDC_REMOTE_MISMATCH': "The remote replay doesn't match the selected connection.",
-  'errors.RDC_REMOTE_TIMEOUT_INVALID': "The remote timeout setting isn't valid.",
   'errors.RDC_REPREPARE_CATALOG_CHANGED': 'RDC-Tool changed since this turn started.',
   'errors.RDC_REPREPARE_FROZEN_PLAN_CHANGED': "This turn's preparation is missing.",
   'errors.RDC_REPREPARE_IDENTITY_MISSING': "This turn's replay identity is missing.",

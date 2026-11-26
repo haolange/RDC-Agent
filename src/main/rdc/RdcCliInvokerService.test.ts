@@ -103,6 +103,12 @@ const operation = {
   effects: [],
   evidence_kind: null,
   path_inputs: [],
+  execution_budget: {
+    rule: 'no_progress',
+    default_no_progress_ms: 300_000,
+    min_no_progress_ms: 30_000,
+    max_no_progress_ms: 3_600_000,
+  },
 };
 const reply = (kind: string, data: unknown) => ({
   exitCode: 0,
@@ -204,6 +210,32 @@ describe('configured CLI contract gate', () => {
     }
     expect(await service.loadCatalog(cli)).toBe(first);
     expect(execute).toHaveBeenCalledTimes(10);
+  });
+});
+
+it.each([
+  ['missing', undefined],
+  ['a fixed duration', { rule: 'timeout', timeout_ms: 60_000 }],
+  ['a default outside its range', { ...operation.execution_budget, default_no_progress_ms: 10_000 }],
+  ['an extra field', { ...operation.execution_budget, grace_ms: 5_000 }],
+])('rejects an operation whose execution budget is %s', async (_name, budget) => {
+  const tools = structuredClone(applicationOperations).map((tool, index) =>
+    index === 0 ? { ...tool, execution_budget: budget } : tool,
+  );
+  const service = invoker();
+  vi.spyOn(service, 'executeCLI')
+    .mockResolvedValueOnce(versionReply())
+    .mockResolvedValueOnce(
+      reply('rdc_tool.tools.list', {
+        schema_version: '1',
+        tools,
+        tool_count: tools.length,
+        fingerprint: operationFingerprint(JSON.parse(JSON.stringify(tools))),
+      }),
+    );
+  await expect(service.loadCatalog(cli)).rejects.toMatchObject({
+    code: 'RDC_UPGRADE_REQUIRED',
+    message: expect.stringContaining('unrecognized operation contract'),
   });
 });
 

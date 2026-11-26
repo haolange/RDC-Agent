@@ -370,16 +370,8 @@ const remoteBinding = () =>
       {
         name: 'rd.remote.connect',
         preparation_policy: 'automatic',
-        timeout_policy: {
-          argument: 'timeout_ms',
-          default_timeout_ms: 200000,
-          worker_grace_ms: 85000,
-          transport_grace_ms: 5000,
-          process_grace_ms: 5000,
-        },
         input_schema: {
           properties: {
-            timeout_ms: { type: 'integer' },
             options: { properties: { transport: { enum: ['adb_android'] } } },
           },
         },

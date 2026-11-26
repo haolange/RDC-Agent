@@ -376,7 +376,6 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.RDC_REMOTE_INSTALLATION_IDENTITY_CHANGED': '远程设备上的 RenderDoc 安装发生了变化。',
   'errors.RDC_REMOTE_INSTALLATION_PROTOCOL': '远程设备上的 RenderDoc 安装返回了意外的结果。',
   'errors.RDC_REMOTE_MISMATCH': '远程回放与所选连接不一致。',
-  'errors.RDC_REMOTE_TIMEOUT_INVALID': '远程超时设置无效。',
   'errors.RDC_REPREPARE_CATALOG_CHANGED': '本回合开始后 RDC-Tool 发生了变化。',
   'errors.RDC_REPREPARE_FROZEN_PLAN_CHANGED': '本回合的准备内容缺失。',
   'errors.RDC_REPREPARE_IDENTITY_MISSING': '本回合的回放身份缺失。',

@@ -114,7 +114,7 @@ Settings 持久化保留 executable、argsPrefix、cwd、env 和 timeout，用�
 
 RDC-Tool 的 session worker 对 `rd.session.*` 统一提供 60 秒操作预算，CLI transport 在此基础上增加 5 秒响应缓冲，实际传输门限为 65 秒；RDC-Agent 常规 CLI 调用的本机默认预算为 120 秒。
 
-- Remote 准备显式传入冻结的本机 native budget，并按 catalog 的 timeout_policy 推导 worker/transport/宿主收口余量，不能把常规120秒外壳门限套在该连接上（见下文 Remote 准备预算）。
+- Remote 准备没有自己的时长参数，和其它操作一样只受请求的无进展预算约束（见下文 Remote 准备预算）。
 - Settings 中显式保存的超时值原样保留，不做默认值迁移。
 - 各层门限由所属边界负责，普通 session 调用不传第二套 session timeout。
 
@@ -375,7 +375,7 @@ Settings 的显式验证执行同安装 doctor，检查 Python、RenderDoc、And
 
 准备阶段仅读取同一 owning daemon 的 status，核验 context、operation、起始时间和已观察 trace 后转发真实 checking/installing/starting/verifying；轮询不与自身重叠，完成或取消时停止并等待最后查询收口。取消后在释放 context 前通过 canonical rd.core.get_operation_history 读取对应已收口操作的安装回执；有事实才投影 installation，缺失回执表示未知，不表示安装回滚。
 
-Remote 准备显式将冻结本机 timeoutMs 作为原生 timeout_ms，不削减用户操作预算。worker、transport 和外壳等待收口的余量来自同一 catalog 定义中的 timeout_policy，由 Tools 唯一策略生成并纳入指纹；主进程按该冻结策略推导单次外壳超时，不复制 Python 常量，也不修改用户设置。缺少此策略的远端契约拒绝执行。原生超时与进程退出是不同事实，必须允许原生先返回结构化结果并收口自有动作。
+Remote 准备预算：`rd.remote.connect` 不再有 `timeout_ms` 参数或 timeout_policy，连接尝试受请求的执行预算约束。RDC-Tool 把 checking、installing、starting、verifying 与等待端点的每个阶段进度都当作进展，协作截止早于栈转储与 daemon 看门狗，所以静默的连接以结构化的 `remote_connect_timeout` 结束并清理已取得的资源。目录的每个条目都发布 `execution_budget`（`rule: no_progress` 与默认、最小、最大无进展毫秒数），`RdcOperationCatalog.validateDefinitions` 逐条严格校验，缺失或形状不符为 `RDC_UPGRADE_REQUIRED`。原生超时与进程退出是不同事实，必须允许原生先返回结构化结果并收口自有动作。
 
 Tools 在同次连接预算内每秒串行核验缺失/矛盾安装回执，只有 PackageManager 结束且目标 APK 身份匹配后才继续启动与握手，不凭退出码或空安装会话宣布成功，不盲目重复安装。
 
