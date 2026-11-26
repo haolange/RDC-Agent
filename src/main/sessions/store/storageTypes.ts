@@ -1,7 +1,6 @@
 import type { ProjectRecord, RunRecord, SessionRecord } from '@shared/types/session';
 
 export interface ProjectRegistry {
-  schemaVersion: '1';
   projects: ProjectRecord[];
 }
 

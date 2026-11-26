@@ -322,7 +322,6 @@ export async function executeRdcShell(
         input.experimentId && evidence
           ? rdcExecutionReceipts.write(
               {
-                schemaVersion: 1,
                 sessionId: sessionId,
                 projectId: projectId,
                 turnId: turnId,

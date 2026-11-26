@@ -34,7 +34,7 @@ describe('native execution evidence', () => {
   );
   it('rejects a signed receipt body that is not an execution receipt', () => {
     const { resolver, store } = harness();
-    const body = JSON.stringify({ schemaVersion: 1, sessionId: SESSION_ID, evidence: { kind: 'guess' }, exitCode: 0 });
+    const body = JSON.stringify({ sessionId: SESSION_ID, evidence: { kind: 'guess' }, exitCode: 0 });
     const signature = createHmac('sha256', 'test-evidence-signing-key').update(body).digest('hex');
     const written = resolver.write(
       SESSION_ID,

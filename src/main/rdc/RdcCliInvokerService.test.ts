@@ -125,7 +125,6 @@ const applicationOperations = Object.entries(RDC_APPLICATION_OPERATIONS).map(([n
 }));
 // The catalog this test build "ships against" is the fixture catalog the fake installation serves.
 const fixtureCatalog = {
-  schemaVersion: '1' as const,
   fingerprint: operationFingerprint(applicationOperations),
   toolCount: applicationOperations.length,
 };

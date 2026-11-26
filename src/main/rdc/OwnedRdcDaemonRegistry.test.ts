@@ -147,7 +147,7 @@ describe('OwnedRdcDaemonRegistry', () => {
   it('reports an unreadable registry without stopping anything or throwing', async () => {
     const root = makeRoot();
     const registryPath = path.join(root, 'owned-rdc-daemons.json');
-    fs.writeFileSync(registryPath, '{"schemaVersion":1,"records":');
+    fs.writeFileSync(registryPath, '{"records":');
     const execute = vi.fn();
     const result = await harvestOwnedRdcDaemons({ registryPath, intermediateRoot: root, execute });
     expect(result.released).toEqual([]);
@@ -161,7 +161,6 @@ describe('OwnedRdcDaemonRegistry', () => {
     fs.writeFileSync(
       registryPath,
       JSON.stringify({
-        schemaVersion: 1,
         records: {
           [contextId]: {
             contextId,

@@ -43,7 +43,6 @@ const recovery = z
   })
   .strict();
 const base = {
-  schemaVersion: z.literal(1),
   sessionId: id,
   projectId: id,
   turnId: id,

@@ -44,7 +44,6 @@ export interface ToolRuntimeMetadata {
   catalog: {
     path: string;
     exists: boolean;
-    schemaVersion: string | null;
     generatedAt: string | null;
     toolCount: number | null;
   };

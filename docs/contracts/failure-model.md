@@ -44,7 +44,7 @@
 
 - **写**：`writeFileAtomic(Sync)` 在目标旁写临时文件 → fsync → 改名覆盖目标 → fsync 目录（POSIX；Windows 由 NTFS 日志保证改名持久）。读者只会看到旧内容或新内容。Windows 上读者、索引或杀毒短暂占用目标时改名报 `EBUSY`/`EPERM`/`EACCES`，有界重试后仍失败才报错；不存在先删目标再改名、也不存在 `.bak` 交换。ESLint 禁止平台层之外调用 `rename`。
 - **读**：`readValidatedSync` 区分三态。文件不存在为 `null`；存在但无法解析或校验为损坏：报 `STORAGE_CORRUPT`（Integrity），**每次读都报**，直到属主重新写入，绝不读成空值；损坏字节按内容哈希在旁边保留一份 `<file>.corrupt-<hash>`，后续写入不会毁掉证据。更高的 schemaVersion 报 `STORAGE_SCHEMA_UNSUPPORTED` 并保留原件；I/O 失败报 `STORAGE_UNREADABLE`（Availability），文件原样保留。
-- **信任记录**：hook、项目 MCP 与项目 Agent 的信任决定共用 `src/main/runtime/TrustStore.ts`（`{ schemaVersion: 3, records }`，原子写）。损坏的信任文件读时报 `STORAGE_CORRUPT`，用户重新 trust 即覆盖它；hook 加载时把它作为无效文件上报，其中的 hook 全部按未信任处理。缺版本或更早版本写下的信任文件读作无信任，用户会被重新询问；更高版本报 `STORAGE_SCHEMA_UNSUPPORTED`。
+- **信任记录**：hook、项目 MCP 与项目 Agent 的信任决定共用 `src/main/runtime/TrustStore.ts`（`{ records }`，原子写）。损坏的信任文件（包括其他格式写下的文件）读时报 `STORAGE_CORRUPT`，用户重新 trust 即覆盖它；hook 加载时把它作为无效文件上报，其中的 hook 全部按未信任处理。
 
 ## 关键点分类标注
 

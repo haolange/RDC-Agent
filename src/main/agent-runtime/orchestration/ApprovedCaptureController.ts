@@ -524,7 +524,6 @@ export class ApprovedCaptureController {
   }
   private base(operationId: string) {
     return {
-      schemaVersion: 1 as const,
       sessionId: this.input.sessionId,
       projectId: this.input.projectId,
       turnId: this.input.turn.turnId,

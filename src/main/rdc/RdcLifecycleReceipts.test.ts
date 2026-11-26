@@ -8,7 +8,6 @@ it('persists a main-signed lifecycle intent and rejects altered or foreign recei
   const { resolver, sessionPath } = createInvestigationHarness();
   const receipts = new RdcLifecycleReceipts(resolver, () => 'test-key');
   const value: RdcLifecycleReceipt = {
-    schemaVersion: 1,
     event: 'intent',
     sessionId: SESSION_ID,
     projectId: 'p',
@@ -38,7 +37,6 @@ it('finds an unresolved signed baseline after restart and closes only the matchi
   const { resolver, sessionPath } = createInvestigationHarness();
   const receipts = new RdcLifecycleReceipts(resolver, () => 'test-key');
   const base = {
-    schemaVersion: 1 as const,
     sessionId: SESSION_ID,
     projectId: 'p',
     turnId: 't',
@@ -102,7 +100,7 @@ it('finds an unresolved signed baseline after restart and closes only the matchi
 
 it('rejects a signed lifecycle body that is not a lifecycle receipt', () => {
   const { resolver, sessionPath } = createInvestigationHarness();
-  const body = JSON.stringify({ schemaVersion: 1, event: 'intent', sessionId: SESSION_ID });
+  const body = JSON.stringify({ event: 'intent', sessionId: SESSION_ID });
   const signature = createHmac('sha256', 'test-key').update(body).digest('hex');
   try {
     const written = resolver.write(

@@ -359,10 +359,7 @@ export class ProjectWorkspaceStore {
       return;
     }
 
-    this.writeRegistry({
-      schemaVersion: '1',
-      projects: [],
-    });
+    this.writeRegistry({ projects: [] });
   }
 
   private ensureSelection(): void {
@@ -380,18 +377,12 @@ export class ProjectWorkspaceStore {
     return this.withRegistryLock(() => {
       const loaded = this.io.readJson(this.registryPath, ProjectRegistrySchema);
       if (!loaded) {
-        const empty: ProjectRegistry = {
-          schemaVersion: '1',
-          projects: [],
-        };
+        const empty: ProjectRegistry = { projects: [] };
         this.persistRegistryUnlocked(empty);
         return empty;
       }
 
-      const registry: ProjectRegistry = {
-        schemaVersion: loaded.schemaVersion,
-        projects: loaded.projects,
-      };
+      const registry: ProjectRegistry = { projects: loaded.projects };
       const normalizedProjects = registry.projects.map((project) => this.normalizeProjectRecord(project));
       const changed = JSON.stringify(normalizedProjects) !== JSON.stringify(registry.projects);
       registry.projects = normalizedProjects;
@@ -420,15 +411,9 @@ export class ProjectWorkspaceStore {
   private loadRegistryUnlocked(): ProjectRegistry {
     const loaded = this.io.readJson(this.registryPath, ProjectRegistrySchema);
     if (!loaded) {
-      return {
-        schemaVersion: '1',
-        projects: [],
-      };
+      return { projects: [] };
     }
-    return {
-      schemaVersion: loaded.schemaVersion,
-      projects: loaded.projects.map((project) => this.normalizeProjectRecord(project)),
-    };
+    return { projects: loaded.projects.map((project) => this.normalizeProjectRecord(project)) };
   }
 
   /** The only registry write; session locations found from the previous registry are dropped with it. */
@@ -468,10 +453,7 @@ export class ProjectWorkspaceStore {
     this.io.ensureDir(this.getProjectDataPath(normalizedProject));
     this.io.writeJsonAtomic(path.join(this.getProjectDataPath(normalizedProject), 'project.json'), normalizedProject);
     const projectPaths = appPathService.initializeProjectRdc(normalizedProject.rootPath);
-    writeYaml(projectPaths.projectMetadataPath, {
-      schema_version: '1',
-      name: normalizedProject.name,
-    });
+    writeYaml(projectPaths.projectMetadataPath, { name: normalizedProject.name });
   }
 
   touchProject(projectId: string, lastSessionId?: string | null, updatedAt: number = nowMs()): void {

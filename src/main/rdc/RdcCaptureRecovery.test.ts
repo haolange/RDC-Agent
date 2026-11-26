@@ -84,7 +84,6 @@ const original = {
 };
 const ref = { uri: 'session://tool-outputs/baseline.json', expectedHash: `sha256:${'b'.repeat(64)}` };
 const baseline = {
-  schemaVersion: 1,
   event: 'baseline',
   sessionId: 's',
   projectId: 'p',

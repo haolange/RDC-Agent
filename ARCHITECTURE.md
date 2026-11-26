@@ -646,8 +646,8 @@ Mission 的禁止面：`shell`、`code_interpreter`、`write` / `edit` / `git` /
 
 Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity。
 
-- 记录在 `hook-trust.json`（`TrustStore`，`schemaVersion: 3`）；任一组成变化 → `needsRetrust`。
-- 缺版本或更早版本的信任文件读作无信任；更高版本报 `STORAGE_SCHEMA_UNSUPPORTED`；当前版本结构不合法报 `STORAGE_CORRUPT`，用户重新 trust 时覆盖。
+- 记录在 `hook-trust.json`（`TrustStore`，`{ records }`）；任一组成变化 → `needsRetrust`。
+- 信任文件不带格式版本；结构不合法（包括其他格式写下的文件）报 `STORAGE_CORRUPT`，用户重新 trust 时覆盖。
 - Project MCP 与项目 Agent profile 的 trust 复用同一文件身份（`src/main/runtime/fileIdentity.ts`）。user/project 必须显式 trust；builtin 默认信任，内容变化随仓库发布。
 - 12 个 canonical events 走单一 `HookEngine` 路径。
 

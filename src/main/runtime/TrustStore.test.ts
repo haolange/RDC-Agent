@@ -27,7 +27,7 @@ describe('TrustStore', () => {
   });
 
   it('reports a damaged file on read and lets a repeated decision replace it', () => {
-    fs.writeFileSync(filePath, '{"schemaVersion":3,"records":');
+    fs.writeFileSync(filePath, '{"records":');
     expect(() => store.isTrusted('project', '/work', 'lint', 'sha-a')).toThrow(
       expect.objectContaining({ code: 'STORAGE_CORRUPT' }),
     );
@@ -36,12 +36,9 @@ describe('TrustStore', () => {
     expect(fs.readdirSync(root).some((name) => name.startsWith('trust.json.corrupt-'))).toBe(true);
   });
 
-  it('honors no decision from another trust version and refuses a newer one', () => {
-    fs.writeFileSync(filePath, JSON.stringify({ schemaVersion: '2', records: { any: { trustFingerprint: 'sha-a' } } }));
-    expect(store.isTrusted('project', '/work', 'any', 'sha-a')).toBe(false);
-    fs.writeFileSync(filePath, JSON.stringify({ schemaVersion: 4, records: {} }));
-    expect(() => store.get('project', '/work', 'any')).toThrow(
-      expect.objectContaining({ code: 'STORAGE_SCHEMA_UNSUPPORTED' }),
-    );
+  it('refuses a trust file that still carries a format version like a damaged one', () => {
+    fs.writeFileSync(filePath, JSON.stringify({ schemaVersion: 3, records: {} }));
+    expect(() => store.get('project', '/work', 'any')).toThrow(expect.objectContaining({ code: 'STORAGE_CORRUPT' }));
+    expect(JSON.parse(fs.readFileSync(filePath, 'utf8'))).toEqual({ schemaVersion: 3, records: {} });
   });
 });

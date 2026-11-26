@@ -21,7 +21,6 @@ export function executionReceiptFixtures(sessionId: string, experimentId: string
           ? { replacement_id: 'replacement-fixture', reverted: true }
           : { event_durations: [{ event_id: 11, duration_us: 2 }] };
     return {
-      schemaVersion: 1,
       sessionId,
       projectId: 'project-fixture',
       turnId: 'turn-fixture',

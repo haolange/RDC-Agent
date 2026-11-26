@@ -69,7 +69,6 @@ export class RdcCliInvokerService {
       catalog: {
         path: '',
         exists: !!catalog?.fingerprint,
-        schemaVersion: catalog?.schema_version ?? null,
         generatedAt: catalog?.generated_at ?? null,
         toolCount: catalog?.tool_count ?? (Array.isArray(catalog?.tools) ? catalog.tools.length : null),
       },

@@ -21,7 +21,6 @@ import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostR
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 
 export const APP_RDC_CONTEXT_ID = /^rdc-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const REGISTRY_SCHEMA = 1;
 const REGISTRY_FILE = 'owned-rdc-daemons.json';
 
 /** Births are the RDC-Tool daemon state tokens; an empty birth was not recorded. */
@@ -56,14 +55,12 @@ export interface OwnedRdcDaemonStoreOptions {
 }
 
 interface RegistryDocument {
-  schemaVersion: number;
   records: Record<string, OwnedRdcDaemonRecord>;
 }
 
 const pid = z.number().int().nonnegative();
 const RegistryDocumentSchema = z
   .object({
-    schemaVersion: z.literal(REGISTRY_SCHEMA),
     records: z.record(
       z.string(),
       z
@@ -89,14 +86,9 @@ const RegistryDocumentSchema = z
         context.addIssue({ code: 'custom', message: `record ${contextId} names ${record.contextId}` });
     }
   });
-const RegistryVersionSchema = z.object({ schemaVersion: z.unknown().optional() });
 
-/** The registry as this build writes it; another schema version is left for the build that wrote it. */
+/** The registry as this build writes it; a file in any other format fails the strict schema. */
 function parseRegistry(value: unknown): RegistryDocument {
-  const { schemaVersion } = RegistryVersionSchema.parse(value);
-  if (schemaVersion !== REGISTRY_SCHEMA) {
-    throw new AppError('STORAGE_SCHEMA_UNSUPPORTED', `owned-rdc-daemons schema ${String(schemaVersion)}`);
-  }
   return RegistryDocumentSchema.parse(value);
 }
 
@@ -320,10 +312,7 @@ function hostIntermediateRoot(settings?: RdcCliInvokerSettings): string {
 /** A missing registry is empty; a damaged one throws `STORAGE_CORRUPT`, so no daemon is treated as ours. */
 function readRegistry(registryPath?: string): RegistryDocument {
   return (
-    readValidatedSync(registryPath ?? ownedRdcDaemonRegistryPath(), parseJsonWith(parseRegistry)) ?? {
-      schemaVersion: REGISTRY_SCHEMA,
-      records: {},
-    }
+    readValidatedSync(registryPath ?? ownedRdcDaemonRegistryPath(), parseJsonWith(parseRegistry)) ?? { records: {} }
   );
 }
 

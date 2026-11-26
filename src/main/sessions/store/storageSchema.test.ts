@@ -212,7 +212,6 @@ const legalUsage = {
 };
 
 const legalRegistry = {
-  schemaVersion: '1',
   projects: [
     {
       projectId: 'p1',
@@ -276,7 +275,7 @@ describe('storage schema store quartet', () => {
       name: 'projects registry',
       file: 'registry.json',
       legal: legalRegistry,
-      corrupt: { schemaVersion: '1', projects: 'nope' },
+      corrupt: { projects: 'nope' },
       read: (filePath: string) => io.readJson(filePath, ProjectRegistrySchema),
     },
     {

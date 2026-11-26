@@ -186,10 +186,7 @@ describe('ScopedRuntimeService', () => {
       hooks.load(path.join(home, '.rdc-agent', 'hooks'), project);
       hooks.trustProjectHook(project, 'verify');
       hookService.delete('hook', 'project', 'verify', project);
-      expect(JSON.parse(fs.readFileSync(trustPath, 'utf8'))).toEqual({
-        schemaVersion: 3,
-        records: {},
-      });
+      expect(JSON.parse(fs.readFileSync(trustPath, 'utf8'))).toEqual({ records: {} });
     } finally {
       fs.rmSync(project, { recursive: true, force: true });
     }
