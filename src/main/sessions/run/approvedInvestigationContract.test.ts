@@ -4,7 +4,6 @@ import { approvedInvestigationContract } from './approvedInvestigationContract';
 import type { ExecutionOffer } from './executionOffer';
 
 const offer: ExecutionOffer = {
-  schemaVersion: '1',
   sourceAgentId: 'analyzer',
   targetAgentId: 'general',
   plan: { uri: 'session://plans/old.md', hash: 'a'.repeat(64) },
@@ -18,11 +17,11 @@ it('keeps historical plans readable but requires a matching reviewed contract fo
   const original = '# Historical plan\n\nInvestigate.';
   expect(() => approvedInvestigationContract(offer, original)).toThrow('APPROVED_PLAN_REVIEW_REQUIRED');
   expect(original).toBe('# Historical plan\n\nInvestigate.');
-  expect(() =>
-    approvedInvestigationContract(offer, renderInvestigationPlanContract({ schemaVersion: 1, mission: 'debugger' })),
-  ).toThrow('APPROVED_PLAN_REVIEW_REQUIRED');
-  expect(
-    approvedInvestigationContract(offer, renderInvestigationPlanContract({ schemaVersion: 1, mission: 'analyzer' })),
-  ).toEqual({ schemaVersion: 1, mission: 'analyzer' });
+  expect(() => approvedInvestigationContract(offer, renderInvestigationPlanContract({ mission: 'debugger' }))).toThrow(
+    'APPROVED_PLAN_REVIEW_REQUIRED',
+  );
+  expect(approvedInvestigationContract(offer, renderInvestigationPlanContract({ mission: 'analyzer' }))).toEqual({
+    mission: 'analyzer',
+  });
   expect(approvedInvestigationContract({ ...offer, sourceAgentId: 'custom' }, original)).toBeNull();
 });

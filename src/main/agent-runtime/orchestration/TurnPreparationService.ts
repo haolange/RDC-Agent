@@ -15,7 +15,7 @@ import { approvedInvestigationContract } from '../../sessions/run/approvedInvest
 import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { approvedExecutionOfferForAgent } from '../../sessions/run/handoffSkills';
 import { assertExecutionOfferSkillCompatibility } from '../interactions/handoffSkillCompatibility';
-import { assertRdcContextLeaseOwnership } from '../../rdc/RdcRuntimeContextRegistry';
+import { assertRdcContextLeaseOwnership, quarantinedRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { withRdcHostRuntimeEnv } from '../../rdc/withRdcHostRuntimeEnv';
 import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
 import { turnPreparationWorkerPool } from '../context/TurnPreparationWorkerPool';
@@ -42,6 +42,7 @@ import {
   type RuntimeToolResolver,
 } from './orchestratorTypes';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { EffectiveAgentProfile } from '../../settings/agent-manifests/agentRuntimeTypes';
 import type { ContextUsageBreakdownEntry, PreparedTurnContextSummary } from '@shared/types/session';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
@@ -164,10 +165,8 @@ export class TurnPreparationService {
     // Invalid policy must not spawn processes or establish network connections.
     const turnSettings = settingsService.snapshot().user;
     const cliSettings = withRdcHostRuntimeEnv(structuredClone(turnSettings.tooling.rdcCli));
-    const leaseIdentity = assertRdcContextLeaseOwnership({ sessionId: input.sessionId, projectId: input.projectId });
-    const catalog = leaseIdentity ? await rdcCliInvokerService.loadCatalog(cliSettings, true) : null;
+    const rdcBinding = await freezeTurnRdcBinding(input.sessionId, input.projectId, cliSettings);
     throwIfCancelled();
-    const rdcBinding = freezeRdcTurnBinding(cliSettings, catalog?.tools ?? [], leaseIdentity);
     const compiledPolicy = compileEffectivePolicy(input.projectRootPath);
     const promptPlan = applyExecutionLimitFacts(input.promptPlan, {
       profileMaxTurns: input.effectiveProfile.maxTurns,
@@ -546,4 +545,20 @@ export class TurnPreparationService {
       throw error;
     }
   }
+}
+
+/**
+ * The turn's RDC binding: the owned lease, or the session's quarantined lease so this turn can run capture_recover on
+ * it (every other native path still refuses a quarantined lease).
+ */
+async function freezeTurnRdcBinding(
+  sessionId: string | null | undefined,
+  projectId: string | null | undefined,
+  cli: RdcCliInvokerSettings,
+) {
+  const lease =
+    assertRdcContextLeaseOwnership({ sessionId, projectId }) ??
+    (sessionId && projectId ? quarantinedRdcContextLease({ sessionId, projectId }) : null);
+  const catalog = lease ? await rdcCliInvokerService.loadCatalog(cli, true) : null;
+  return freezeRdcTurnBinding(cli, catalog?.tools ?? [], lease);
 }

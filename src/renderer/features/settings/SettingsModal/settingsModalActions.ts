@@ -52,7 +52,7 @@ export function createSettingsModalActions({
   adoptView,
   rebaseAgentDrafts,
 }: SettingsModalActionsOptions) {
-  /** Settings main committed outside autosave (import, migration) become the store's view and the Agent drafts. */
+  /** Settings main committed outside autosave (import, override deletion, trust) become the store's view and the Agent drafts. */
   const adoptAgentSettings = (view: SettingsView) => {
     adoptView(view);
     rebaseAgentDrafts(view.agents.definitions);
@@ -161,18 +161,11 @@ export function createSettingsModalActions({
     await patchSettings(ops);
   };
 
-  const previewAgentModelMigration = (sourcePath: string) =>
-    window.electronAPI.settings.previewAgentModelMigration(sourcePath);
+  const previewAgentOverrideFile = (sourcePath: string) =>
+    window.electronAPI.settings.previewAgentOverrideFile(sourcePath);
 
-  const handleCommitAgentOverrideFile = async (
-    action: 'migrate' | 'delete',
-    request: AgentOverrideFileRequest,
-  ): Promise<void> => {
-    const nextSettings =
-      action === 'migrate'
-        ? await window.electronAPI.settings.applyAgentModelMigration(request)
-        : await window.electronAPI.settings.deleteAgentOverrideFile(request);
-    adoptAgentSettings(nextSettings);
+  const handleDeleteAgentOverrideFile = async (request: AgentOverrideFileRequest): Promise<void> => {
+    adoptAgentSettings(await window.electronAPI.settings.deleteAgentOverrideFile(request));
   };
 
   const previewProjectAgentTrust = (sourcePath: string) =>
@@ -224,8 +217,8 @@ export function createSettingsModalActions({
     handleSaveAgentManifests,
     handleImportAgentManifest,
     handleAgentModelOps,
-    previewAgentModelMigration,
-    handleCommitAgentOverrideFile,
+    previewAgentOverrideFile,
+    handleDeleteAgentOverrideFile,
     previewProjectAgentTrust,
     handleTrustProjectAgent,
     loadAgentBuiltinComparison,

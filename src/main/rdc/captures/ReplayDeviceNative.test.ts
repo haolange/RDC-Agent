@@ -8,21 +8,20 @@ import type { ReplayDeviceEntry } from '@shared/types/device';
 const execute = vi.hoisted(() => vi.fn());
 vi.mock('../../settings/settings-core/SettingsService', () => ({ settingsService: {} }));
 vi.mock('../RdcCliInvokerService', () => ({ rdcCliInvokerService: { executeCLI: execute } }));
-const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 };
+const cli = {
+  enabled: true,
+  command: 'rdc',
+  argsPrefix: [],
+  workingDirectory: '',
+  env: {},
+  noProgressTimeoutMs: 30_000,
+};
 const binding = freezeRdcTurnBinding(cli, [
   {
     name: 'rd.remote.connect',
     preparation_policy: 'automatic',
-    timeout_policy: {
-      argument: 'timeout_ms',
-      default_timeout_ms: 200000,
-      worker_grace_ms: 85000,
-      transport_grace_ms: 5000,
-      process_grace_ms: 5000,
-    },
     input_schema: {
       properties: {
-        timeout_ms: { type: 'integer' },
         options: {
           properties: {
             transport: { enum: ['adb_android'] },
@@ -143,12 +142,11 @@ describe('session-owned remote connection', () => {
     expect(command).toBe('call');
     expect(argv[0]).toBe('rd.remote.connect');
     expect(JSON.parse(argv[2])).toEqual({
-      timeout_ms: 30000,
       options: { transport: 'adb_android', device_serial: 'SERIAL-SELECTED' },
     });
     expect(argv.slice(-2)).toEqual(['--daemon-context', 'owned']);
-    expect(options.settings).toEqual(cli);
-    expect(options.timeout).toBe(125000);
+    expect(options).toMatchObject({ contextId: 'owned', abortSignal: undefined, settings: cli });
+    expect(options.onProgress).toEqual(expect.any(Function));
   });
   it.each([
     [{ context_id: 'foreign', remote_id: 'remote' }, 'rd.remote.connect'],
@@ -180,38 +178,4 @@ describe('session-owned remote connection', () => {
       device_serial: device.serial,
     });
   });
-  it('derives process grace from the frozen catalog without changing the configured operation budget', async () => {
-    execute.mockResolvedValue(reply({ context_id: 'owned', remote_id: 'remote' }));
-    const definition = {
-      ...binding.definitions[0],
-      timeout_policy: {
-        argument: 'timeout_ms',
-        default_timeout_ms: 200000,
-        worker_grace_ms: 4000,
-        transport_grace_ms: 2000,
-        process_grace_ms: 1000,
-      },
-    };
-    const configured = { ...cli, timeoutMs: 120000 };
-    await connectSessionReplayDevice(
-      device,
-      'owned',
-      freezeRdcTurnBinding(configured, [definition, binding.definitions[1]]),
-    );
-    expect(JSON.parse(execute.mock.calls[0][1][2]).timeout_ms).toBe(120000);
-    expect(execute.mock.calls[0][2]).toMatchObject({ timeout: 127000, settings: { timeoutMs: 120000 } });
-  });
-  it.each([undefined, { argument: 'timeout_ms', worker_grace_ms: 0 }])(
-    'rejects an absent or incomplete timeout policy before native execution',
-    async (timeout_policy) => {
-      await expect(
-        connectSessionReplayDevice(
-          device,
-          'owned',
-          freezeRdcTurnBinding(cli, [{ ...binding.definitions[0], timeout_policy }]),
-        ),
-      ).rejects.toThrow('UPGRADE_REQUIRED');
-      expect(execute).not.toHaveBeenCalled();
-    },
-  );
 });

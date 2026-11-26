@@ -436,7 +436,6 @@ describe('SessionArtifactResolver', () => {
     fs.writeFileSync(
       path.join(artifactsRoot, SESSION_ARTIFACT_QUOTA_FILENAME),
       `${JSON.stringify({
-        schemaVersion: '1',
         committedBytes: 0,
         committedToolOutputFiles: 0,
         reservations: [
@@ -482,7 +481,6 @@ describe('SessionArtifactResolver', () => {
     fs.writeFileSync(
       path.join(artifactsRoot, SESSION_ARTIFACT_QUOTA_FILENAME),
       `${JSON.stringify({
-        schemaVersion: '1',
         committedBytes: 0,
         committedToolOutputFiles: 0,
         reservations: [

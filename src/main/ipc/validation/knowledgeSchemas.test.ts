@@ -162,7 +162,7 @@ describe('knowledge IPC schemas', () => {
     ).toThrow(IpcValidationError);
   });
 
-  it('accepts import with spaceId and source and no sessionId', () => {
+  it('accepts import with spaceId and source, and refuses a sessionId', () => {
     const [request] = parseIpcArgs(
       KnowledgeImportArgsSchema,
       [
@@ -175,7 +175,13 @@ describe('knowledge IPC schemas', () => {
       { label: 'knowledge:import', maxBytes: 16 * 1024 },
     );
     expect(request.spaceId).toBe('user');
-    expect(request.sessionId).toBeUndefined();
+    expect(() =>
+      parseIpcArgs(
+        KnowledgeImportArgsSchema,
+        [{ spaceId: 'user', source: 'case_id: a\ntitle: A', operationId: 'op-1', sessionId: 'sess' }],
+        { label: 'knowledge:import', maxBytes: 16 * 1024 },
+      ),
+    ).toThrow(IpcValidationError);
   });
 
   it('runs import, export and rebuild only under a well-formed operation id, which cancel names too', () => {

@@ -26,7 +26,6 @@ export function createProviderStateRef(
   if (requestPlan.statePlan.mode !== 'provider-managed' || !normalized || carrier === 'none' || carrier === 'unknown')
     return undefined;
   const envelope = {
-    schemaVersion: 1 as const,
     carrier,
     value: normalized,
     origin: {
@@ -41,15 +40,12 @@ export function createProviderStateRef(
   };
 }
 
-/** Checks a ref read back from stored history, whose fields (its version included) are not schema-checked on read. */
+/** Checks a ref read back from stored history, whose fields are not schema-checked on read. */
 export function verifyProviderStateRef(state: ProviderStateRef): boolean {
-  const storedVersion: number = state.schemaVersion;
   return (
-    storedVersion === 1 &&
     state.originFingerprint === state.origin.fingerprint &&
     state.integrityHash ===
       hashCanonical({
-        schemaVersion: state.schemaVersion,
         carrier: state.carrier,
         value: state.value,
         origin: state.origin,

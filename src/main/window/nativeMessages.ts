@@ -51,9 +51,14 @@ export const nativeEnglish = {
   mcpUrl: 'Connects to: {value}',
   mcpEnvKeys: 'Environment variables it receives: {value}',
   settingsUnusableTitle: 'RDC-Agent cannot start',
-  settingsUnusableMessage: 'The settings file is damaged, unreadable, or from a version this RDC-Agent does not read.',
+  settingsUnusableMessage: "RDC-Agent's data format has changed, or the settings file is damaged or unreadable.",
   settingsUnusableDetail:
-    'Delete this file, then start RDC-Agent again:\n{file}\n\nOn the next start RDC-Agent begins with default settings and recreates the file. Reconnect your model services and set your preferences again in Settings.',
+    'Delete the whole data directory and the settings file, then start RDC-Agent again:\n{dataDirectory}\n{file}\n\nRDC-Agent then starts with default settings and no sessions, and creates both again. Reconnect your model services and set your preferences again in Settings.',
+  rendererFailureTitle: 'RDC-Agent',
+  rendererFailureMessage: "RDC-Agent's window could not start.",
+  rendererFailureDetail: 'Reload to try again, or quit. Your sessions are saved. Technical reason: {reason}.',
+  reload: 'Reload',
+  quit: 'Quit',
 } as const;
 
 export type NativeMessageKey = keyof typeof nativeEnglish;
@@ -109,9 +114,14 @@ export const nativeChinese: Record<NativeMessageKey, string> = {
   mcpUrl: '连接地址：{value}',
   mcpEnvKeys: '传入的环境变量：{value}',
   settingsUnusableTitle: 'RDC-Agent 无法启动',
-  settingsUnusableMessage: '设置文件已损坏、无法读取，或来自当前 RDC-Agent 不读取的版本。',
+  settingsUnusableMessage: 'RDC-Agent 的数据格式已变更，或设置文件已损坏、无法读取。',
   settingsUnusableDetail:
-    '请删除下面这个文件，然后重新启动 RDC-Agent：\n{file}\n\n下次启动时 RDC-Agent 会使用默认设置并重新创建该文件。请在设置中重新连接模型服务、重新设置偏好。',
+    '请删除整个数据目录和设置文件，然后重新启动 RDC-Agent：\n{dataDirectory}\n{file}\n\n之后 RDC-Agent 会以默认设置启动、不含任何会话，并重新创建二者。请在设置中重新连接模型服务、重新设置偏好。',
+  rendererFailureTitle: 'RDC-Agent',
+  rendererFailureMessage: 'RDC-Agent 的窗口无法启动。',
+  rendererFailureDetail: '可以重新加载再试一次，或退出。会话已保存。技术原因：{reason}。',
+  reload: '重新加载',
+  quit: '退出',
 };
 
 /** The language of a native surface shown before settings can be read, from the system locale (`app.getLocale()`). */

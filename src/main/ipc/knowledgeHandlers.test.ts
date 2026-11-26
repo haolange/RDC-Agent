@@ -73,7 +73,6 @@ vi.mock('../knowledge/KnowledgeImportService', () => ({
   knowledgeImportService: {
     importToSpace: vi.fn(async () => ({ candidateCreated: false, verified: false, items: [] })),
     previewImport: vi.fn(async () => ({ candidateCreated: false, verified: false, items: [] })),
-    migrateSessionDrafts: vi.fn(async () => undefined),
   },
 }));
 
@@ -123,7 +122,6 @@ describe('knowledge mutation approval boundaries', () => {
     topicMocks.preview.mockClear();
     topicMocks.apply.mockClear();
     vi.mocked(knowledgeImportService.importToSpace).mockClear();
-    vi.mocked(knowledgeImportService.migrateSessionDrafts).mockClear();
     delete process.env.RDC_AGENT_BROWSER_QA;
     delete process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS;
     electronState.focused = undefined;
@@ -307,7 +305,6 @@ describe('knowledge mutation approval boundaries', () => {
 
     vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ response: 0, checkboxChecked: false });
     await expect(handlers.get('knowledge:import')!({}, request)).resolves.toEqual(imported);
-    expect(knowledgeImportService.migrateSessionDrafts).not.toHaveBeenCalled();
     expect(knowledgeImportService.importToSpace).toHaveBeenCalledWith(
       source,
       expect.objectContaining({ signal: expect.any(AbortSignal) }),

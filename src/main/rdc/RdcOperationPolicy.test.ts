@@ -3,7 +3,14 @@ import { authorizeRdcOperation, validateRdcArguments } from './RdcOperationPolic
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import type { RdcOperationDefinition } from './RdcOperationCatalog';
-const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 };
+const cli = {
+  enabled: true,
+  command: 'rdc',
+  argsPrefix: [],
+  workingDirectory: '',
+  env: {},
+  noProgressTimeoutMs: 30_000,
+};
 function definition(patch: Partial<RdcOperationDefinition> = {}): RdcOperationDefinition {
   return {
     name: 'rd.texture.query',
@@ -14,6 +21,12 @@ function definition(patch: Partial<RdcOperationDefinition> = {}): RdcOperationDe
     evidence_kind: null,
     path_inputs: [],
     prerequisites: [],
+    execution_budget: {
+      rule: 'no_progress',
+      default_no_progress_ms: 300_000,
+      min_no_progress_ms: 30_000,
+      max_no_progress_ms: 3_600_000,
+    },
     input_schema: {
       type: 'object',
       properties: {

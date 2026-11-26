@@ -14,6 +14,7 @@ import { runExecutionService } from '../agent-runtime/orchestration/RunExecution
 import { nativeMessage } from '../window/nativeI18n';
 import { assertSessionModelExecutable } from '../agent-runtime/interactions/sessionModelGate';
 import { rdcSessionService } from '../rdc/RdcSessionService';
+import { interruptionCauseAt } from '../runtime/previousInstanceDiagnosis';
 import {
   ProjectAddArgsSchema,
   ProjectInputsImportArgsSchema,
@@ -54,9 +55,10 @@ async function recoverStaleRunOnSelection(run: RunSummary | null): Promise<RunSu
     return run;
   }
 
+  // The run's launch ended without settling it; the stop reason names how, when this launch diagnosed that one.
   await sessionRecordStore.updateRun(run.sessionId, run.runId, {
     status: 'interrupted',
-    stopReason: 'Recovered after app restart',
+    stopReason: `previous-instance:${interruptionCauseAt(run.startedAt)}`,
     stoppedAt: Date.now(),
     finishedAt: Date.now(),
   });

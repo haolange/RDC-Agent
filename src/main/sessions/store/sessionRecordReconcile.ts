@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { errorCodeOf } from '@shared/errors/appError';
 import { SessionRecordSchema } from './storageSchema';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
@@ -26,24 +25,8 @@ export function readProjectSessions(
     .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
     .map((entry) => {
       const sessionPath = path.join(sessionsRoot, entry.name);
-      try {
-        const session = host.io.readJson(path.join(sessionPath, 'session.json'), SessionRecordSchema);
-        return session ? { session, sessionPath } : null;
-      } catch (error) {
-        if (errorCodeOf(error) !== 'STORAGE_SCHEMA_UNSUPPORTED') throw error;
-        const session: SessionRecord = {
-          schemaVersion: '1',
-          storageDiagnostic: 'unsupported-schema',
-          sessionId: entry.name,
-          projectId: project.projectId,
-          title: entry.name,
-          goal: '',
-          sessionPath,
-          createdAt: 0,
-          updatedAt: 0,
-        };
-        return { session, sessionPath };
-      }
+      const session = host.io.readJson(path.join(sessionPath, 'session.json'), SessionRecordSchema);
+      return session ? { session, sessionPath } : null;
     })
     .filter((entry): entry is { session: SessionRecord; sessionPath: string } => entry !== null);
 }
@@ -86,7 +69,7 @@ export function reconcileProjectSessionTitles(
 
   for (const { sessionPath } of storedSessions) {
     const session = normalizedSessions.find((entry) => entry.sessionPath === sessionPath);
-    if (!session || session.storageDiagnostic) {
+    if (!session) {
       continue;
     }
 

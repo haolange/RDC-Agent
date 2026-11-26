@@ -1,5 +1,4 @@
 import {
-  TASK_SCHEMA_VERSION,
   type TaskExecutionMessage,
   type TaskExecutionRecord,
   type TaskMessageKind,
@@ -75,7 +74,6 @@ export class TaskExecutionLedger extends TaskRegistryCore {
       const existing = await this.store.listMessages(id);
       const sequence = (existing.at(-1)?.sequence ?? 0) + 1;
       const message = {
-        schemaVersion: TASK_SCHEMA_VERSION,
         id: `${id}:${sequence}`,
         taskId: task.id,
         executionId: id,

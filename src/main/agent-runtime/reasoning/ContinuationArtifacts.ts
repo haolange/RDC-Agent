@@ -176,7 +176,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isExecutionIdentity(value: unknown): boolean {
   return (
     isRecord(value) &&
-    value.schemaVersion === 1 &&
     typeof value.providerId === 'string' &&
     typeof value.fingerprint === 'string' &&
     typeof value.contractHash === 'string'

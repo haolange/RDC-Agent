@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "mixlayer",
   "name": "Mixlayer",
   "npm": "@ai-sdk/openai-compatible",

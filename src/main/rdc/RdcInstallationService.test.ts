@@ -24,7 +24,7 @@ function fixture() {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, 'fixture');
   }
-  return { root, env: {}, timeoutMs: 30000 };
+  return { root, env: {}, noProgressTimeoutMs: 30_000 };
 }
 describe('RDC installation for this host layout', () => {
   it('derives a single binding for spaces and Unicode without executing anything', () => {

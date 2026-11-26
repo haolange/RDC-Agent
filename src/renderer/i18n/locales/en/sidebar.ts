@@ -15,8 +15,6 @@ export const enSidebar = {
   'sidebar.renameProjectTitle': 'Rename Project',
   'sidebar.menuNewSession': 'New Session',
   'sidebar.menuDelete': 'Delete',
-  'sidebar.sessionSchemaUnsupported':
-    'This session was saved by an older build and cannot be opened. The file was left unchanged.',
   'sidebar.addSession': 'New Session',
   'sidebar.removeSession': 'Remove Session',
   'sidebar.removeSessionFailed': 'Failed to remove session.',

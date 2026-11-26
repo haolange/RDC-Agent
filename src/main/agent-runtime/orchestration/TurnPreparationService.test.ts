@@ -19,7 +19,10 @@ vi.mock('../permissions/PolicyCompiler', () => ({
     deniedTools: mock.deniedTools,
   }),
 }));
-vi.mock('../../rdc/RdcRuntimeContextRegistry', () => ({ assertRdcContextLeaseOwnership: () => null }));
+vi.mock('../../rdc/RdcRuntimeContextRegistry', () => ({
+  assertRdcContextLeaseOwnership: () => null,
+  quarantinedRdcContextLease: () => null,
+}));
 vi.mock('../../sessions/run/handoffSkills', () => ({ approvedExecutionOfferForAgent: () => null }));
 vi.mock('../../rdc/withRdcHostRuntimeEnv', () => ({ withRdcHostRuntimeEnv: (value: unknown) => value }));
 vi.mock('../../rdc/RdcTurnBindings', () => ({ freezeRdcTurnBinding: () => ({}) }));

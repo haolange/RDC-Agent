@@ -13,7 +13,6 @@ type EventStatus =
 
 // Action事件
 export interface ActionEvent {
-  schema_version: string;
   event_id: string;
   turn_id?: string;
   ts_ms: number;
@@ -28,17 +27,18 @@ export interface ActionEvent {
 }
 
 /** An action event as the session's action chain stores it and `evidence:eventAdded` carries it. */
-export const ActionEventSchema: z.ZodType<ActionEvent> = z.object({
-  schema_version: z.string(),
-  event_id: z.string(),
-  turn_id: z.string().optional(),
-  ts_ms: z.number(),
-  run_id: z.string(),
-  session_id: z.string(),
-  agent_id: z.string(),
-  event_type: z.string(),
-  status: z.enum(['ok', 'error', 'sent', 'pass', 'fail', 'blocked', 'entered', 'warning', 'timeout', 'completed']),
-  duration_ms: z.number(),
-  refs: z.array(z.string()),
-  payload: z.record(z.string(), z.unknown()),
-});
+export const ActionEventSchema: z.ZodType<ActionEvent> = z
+  .object({
+    event_id: z.string(),
+    turn_id: z.string().optional(),
+    ts_ms: z.number(),
+    run_id: z.string(),
+    session_id: z.string(),
+    agent_id: z.string(),
+    event_type: z.string(),
+    status: z.enum(['ok', 'error', 'sent', 'pass', 'fail', 'blocked', 'entered', 'warning', 'timeout', 'completed']),
+    duration_ms: z.number(),
+    refs: z.array(z.string()),
+    payload: z.record(z.string(), z.unknown()),
+  })
+  .strict();

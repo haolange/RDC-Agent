@@ -9,7 +9,7 @@ import {
   type ToolSet,
 } from 'ai';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
-import { normalizeError } from './internal/http';
+import { normalizeError, ProviderTimeoutError } from './internal/http';
 import { startProviderStream, type ProviderStreamFailure } from './internal/providerStreamDriver';
 import { ToolCallAccumulator } from './internal/toolCallAccumulator';
 import { normalizeUsage, type UsageFieldMap } from './internal/usageNormalizer';
@@ -40,9 +40,11 @@ const AI_SDK_USAGE_FIELDS: UsageFieldMap<LanguageModelUsage> = {
 
 /**
  * The SDK owns the transport and reports an aborted request its own way, so any failure after the signal fired is an
- * abort, reported with the error the SDK threw.
+ * abort, reported with the error the SDK threw. A signal the stream watchdog fired is not an abort but a timeout, and
+ * is reported as the timeout error it carries.
  */
 function sdkStreamFailure(thrown: unknown, signal: AbortSignal): ProviderStreamFailure {
+  if (signal.reason instanceof ProviderTimeoutError) return { error: signal.reason, reason: 'error' };
   const error = normalizeError(thrown);
   return { error, reason: signal.aborted || error.name === 'AbortError' ? 'aborted' : 'error' };
 }
@@ -63,7 +65,7 @@ export class AiSdkStreamingProvider implements ProviderStrategy {
   }
   stream(model: Model, context: Context, options: StreamOptions): EventStream<AssistantMessageEvent, AssistantMessage> {
     const request = { providerApi: this.api, model, options, failure: sdkStreamFailure };
-    return startProviderStream(request, async ({ builder, signal }) => {
+    return startProviderStream(request, async ({ builder, signal, touch }) => {
       if (options.requestPlan.effectiveModelId !== model.id)
         throw new Error(`RequestPlan model ${options.requestPlan.effectiveModelId} does not match ${model.id}.`);
       const languageModel = await this.createModel(model, context, options);
@@ -79,7 +81,7 @@ export class AiSdkStreamingProvider implements ProviderStrategy {
         abortSignal: signal,
         maxRetries: 0,
       });
-      return { sawOutput: await consumeFullStream(result.fullStream, builder, model) };
+      return { sawOutput: await consumeFullStream(result.fullStream, builder, model, touch) };
     });
   }
 }
@@ -160,6 +162,7 @@ async function consumeFullStream(
   parts: AsyncIterable<TextStreamPart<ToolSet>>,
   builder: AssistantStreamBuilder,
   model: Model,
+  touch: () => void,
 ): Promise<boolean> {
   const channels = new StreamChannelRefs(model.api);
   const toolCalls = new ToolCallAccumulator<string>(builder);
@@ -176,6 +179,8 @@ async function consumeFullStream(
   };
 
   for await (const part of parts) {
+    // The SDK emits `start` before any request is sent, so it is not evidence that the provider answered.
+    if (part.type !== 'start') touch();
     const partWithId = part as TextStreamPart<ToolSet> & { id?: string };
     if (part.type === 'text-start') {
       builder.startText(refFor(part.id));

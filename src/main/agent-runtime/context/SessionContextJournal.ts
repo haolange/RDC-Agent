@@ -12,11 +12,7 @@ import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapab
 import type { ProviderContinuationArtifact } from '../core/types';
 import type { AssistantMessage, Message, ToolResultMessage } from '../core/types';
 
-/** Work-trace summary of a turn the app's exit interrupted before its terminal context entry was written. */
-export const INTERRUPTED_CONVERSATION_SUMMARY = '请求在应用退出后中断，需重新发起。';
-
 export interface SessionContextTurnEntry {
-  schemaVersion: 2;
   turnId: string;
   userMessageId: string;
   assistantMessageId: string;
@@ -172,23 +168,19 @@ export class SessionContextJournal {
     const history = conversationHistoryStore.readConversationHistory(sessionId);
     const recovered = new Map<string, Message[]>();
     for (const turnId of missingTurnIds) {
-      const pair = history.filter((message) => message.turnId === turnId && message.sessionId === sessionId);
-      if (pair.length !== 2) continue;
-      const user = pair.find((message) => message.role === 'user');
-      const assistant = pair.find((message) => message.role === 'assistant');
+      // System notices (such as the model-switch continuation notice) share the turn id and are not prompt facts.
+      const turnMessages = history.filter((message) => message.turnId === turnId && message.sessionId === sessionId);
+      const users = turnMessages.filter((message) => message.role === 'user');
+      const assistants = turnMessages.filter((message) => message.role === 'assistant');
+      if (users.length !== 1 || assistants.length !== 1) continue;
+      const [user] = users;
+      const [assistant] = assistants;
       if (!user || !assistant || normalizeBranchId(user.branchId) !== normalizeBranchId(assistant.branchId)) continue;
       // A process crash can persist a visible, interrupted turn before its
       // terminal context transaction. Replay only the user's actual text and
       // an explicit gap marker. Tool calls and partial model output remain in
       // the visible trace, but are not silently promoted into prompt facts.
-      if (
-        assistant.status !== 'error' ||
-        !(
-          assistant.diagnostic?.code === 'CONVERSATION_INTERRUPTED' ||
-          assistant.workTrace?.summary === INTERRUPTED_CONVERSATION_SUMMARY
-        )
-      )
-        continue;
+      if (assistant.status !== 'error' || assistant.diagnostic?.code !== 'CONVERSATION_INTERRUPTED') continue;
       recovered.set(turnId, [
         { role: 'user', content: user.content, timestamp: user.createdAt },
         {

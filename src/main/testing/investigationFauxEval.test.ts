@@ -87,7 +87,7 @@ const CLI_SETTINGS = {
   argsPrefix: [],
   workingDirectory: '',
   env: {},
-  timeoutMs: 1000,
+  noProgressTimeoutMs: 300_000,
 };
 
 afterEach(clearRdcContextLeases);
@@ -360,7 +360,6 @@ it('runs a scripted investigation turn through the agent runtime and commits a g
     updatedAt: 3,
   };
   const contextEntry: SessionContextTurnEntry = {
-    schemaVersion: 2,
     turnId: 'turn-1',
     userMessageId: 'user-1',
     assistantMessageId: assistant.id,

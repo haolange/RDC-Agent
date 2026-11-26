@@ -32,7 +32,7 @@ describe.skipIf(!root || !capture || !phase || !output)('native event rejection 
       const settings = {
         ...DEFAULT_RDC_CLI_INVOKER,
         enabled: true,
-        timeoutMs: 30000,
+        noProgressTimeoutMs: 30_000,
         workingDirectory: root!,
         command: rdcInstallationFiles(root!).python,
         argsPrefix: [rdcInstallationFiles(root!).entry],

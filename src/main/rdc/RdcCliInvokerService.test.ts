@@ -16,7 +16,7 @@ vi.mock('../settings/settings-core/SettingsService', () => ({
             argsPrefix: [],
             workingDirectory: '',
             env: {},
-            timeoutMs: 30_000,
+            noProgressTimeoutMs: 30_000,
           },
         },
       },
@@ -25,6 +25,14 @@ vi.mock('../settings/settings-core/SettingsService', () => ({
 }));
 
 import { RdcCliInvokerService } from './RdcCliInvokerService';
+import {
+  RDC_CANCEL_CLOSE_GRACE_MS,
+  RDC_CANCEL_TIMEOUT_MS,
+  RDC_CONTROL_TIMEOUT_MS,
+  RDC_HEARTBEAT_GAP_MS,
+} from './RdcOperationWatcher';
+import { operationFingerprint, RDC_APPLICATION_OPERATIONS } from './RdcOperationCatalog';
+import type { CLIResult, ShellInvocationRequest } from '../tools/ShellInvocationService';
 
 describe('RdcCliInvokerService.getRuntimeSummary', () => {
   it('returns diagnostic fields without recommendedSpecialists', async () => {
@@ -77,7 +85,6 @@ it('tags context-scoped action invocation ownership separately from native argv'
   );
 });
 
-import { operationFingerprint, RDC_APPLICATION_OPERATIONS } from './RdcOperationCatalog';
 const roots = [0, 1].map(() => fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-binding-test-')));
 for (const root of roots) {
   for (const file of [rdcInstallationFiles(root).python, rdcInstallationFiles(root).entry]) {
@@ -92,7 +99,7 @@ const cli = {
   argsPrefix: [rdcInstallationFiles(roots[0]).entry],
   workingDirectory: '',
   env: {},
-  timeoutMs: 30000,
+  noProgressTimeoutMs: 30_000,
 };
 const operation = {
   name: 'rd.event.get_action_tree',
@@ -103,6 +110,12 @@ const operation = {
   effects: [],
   evidence_kind: null,
   path_inputs: [],
+  execution_budget: {
+    rule: 'no_progress',
+    default_no_progress_ms: 300_000,
+    min_no_progress_ms: 30_000,
+    max_no_progress_ms: 3_600_000,
+  },
 };
 const reply = (kind: string, data: unknown) => ({
   exitCode: 0,
@@ -125,7 +138,6 @@ const applicationOperations = Object.entries(RDC_APPLICATION_OPERATIONS).map(([n
 }));
 // The catalog this test build "ships against" is the fixture catalog the fake installation serves.
 const fixtureCatalog = {
-  schemaVersion: '1' as const,
   fingerprint: operationFingerprint(applicationOperations),
   toolCount: applicationOperations.length,
 };
@@ -205,6 +217,32 @@ describe('configured CLI contract gate', () => {
     }
     expect(await service.loadCatalog(cli)).toBe(first);
     expect(execute).toHaveBeenCalledTimes(10);
+  });
+});
+
+it.each([
+  ['missing', undefined],
+  ['a fixed duration', { rule: 'timeout', timeout_ms: 60_000 }],
+  ['a default outside its range', { ...operation.execution_budget, default_no_progress_ms: 10_000 }],
+  ['an extra field', { ...operation.execution_budget, grace_ms: 5_000 }],
+])('rejects an operation whose execution budget is %s', async (_name, budget) => {
+  const tools = structuredClone(applicationOperations).map((tool, index) =>
+    index === 0 ? { ...tool, execution_budget: budget } : tool,
+  );
+  const service = invoker();
+  vi.spyOn(service, 'executeCLI')
+    .mockResolvedValueOnce(versionReply())
+    .mockResolvedValueOnce(
+      reply('rdc_tool.tools.list', {
+        schema_version: '1',
+        tools,
+        tool_count: tools.length,
+        fingerprint: operationFingerprint(JSON.parse(JSON.stringify(tools))),
+      }),
+    );
+  await expect(service.loadCatalog(cli)).rejects.toMatchObject({
+    code: 'RDC_UPGRADE_REQUIRED',
+    message: expect.stringContaining('unrecognized operation contract'),
   });
 });
 
@@ -343,5 +381,172 @@ describe('RDC-Tool catalog identity', () => {
       code: 'RDC_CATALOG_MISMATCH',
       message: expect.stringContaining(`this RDC-Agent needs 222222222222 (${fixtureCatalog.toolCount} operations)`),
     });
+  });
+});
+
+describe('RDC operation watcher', () => {
+  type Run = { request: ShellInvocationRequest; finish: (result?: Partial<CLIResult>) => void };
+  const watched = () => {
+    const runs: Run[] = [];
+    const invoke = vi.fn(
+      (request: ShellInvocationRequest) =>
+        new Promise<CLIResult>((resolve) => {
+          const finish = (result: Partial<CLIResult> = {}) =>
+            resolve({ exitCode: 0, stdout: '', stderr: '', duration_ms: 1, ...result });
+          request.abortSignal?.addEventListener('abort', () => finish({ exitCode: 137, processExitReason: 'abort' }));
+          runs.push({ request, finish });
+        }),
+    );
+    const service = new RdcCliInvokerService({ invoke } as never);
+    vi.spyOn(service, 'loadCatalog').mockResolvedValue({} as never);
+    return { service, runs };
+  };
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+  const call = ['rd.event.get_action_tree', '--args-json', '{}', '--daemon-context', 'rdc-owned'];
+  const requestIdOf = (run: Run) => run.request.args![run.request.args!.indexOf('--request-id') + 1];
+  const envelope = JSON.stringify({
+    ok: true,
+    result_kind: 'rd.event.get_action_tree',
+    data: { context_id: 'rdc-owned' },
+  });
+
+  it('runs an operation without a process wall, carrying the frozen budget, a request id and the stream', async () => {
+    const { service, runs } = watched();
+    const frames: string[] = [];
+    const running = service.executeCLI('call', call, {
+      settings: { ...cli, noProgressTimeoutMs: 45_000 },
+      contextId: 'rdc-owned',
+      onProgress: (frame) => frames.push(frame.kind),
+    });
+    await settle();
+    const [{ request, finish }] = runs;
+    const args = request.args!;
+    expect(request.timeoutMs).toBeNull();
+    expect(args.slice(args.indexOf('call'))).toEqual([
+      ...['call', 'rd.event.get_action_tree', '--args-json', '{}'],
+      ...['--no-progress-ms', '45000', '--request-id', requestIdOf(runs[0]), '--progress-stream'],
+    ]);
+    expect(requestIdOf(runs[0])).toMatch(/^rdc-agent-[0-9a-f-]{36}$/u);
+    const id = requestIdOf(runs[0]);
+    request.onStderrLine!(JSON.stringify({ kind: 'heartbeat', request_id: id, ts_ms: 1, state: 'queued' }));
+    request.onStderrLine!('rdc-tool: plain diagnostic');
+    request.onStderrLine!(
+      JSON.stringify({
+        kind: 'progress',
+        request_id: id,
+        trace_id: 't',
+        operation: 'rd.event.get_action_tree',
+        stage: 'walk',
+        message: 'Walking actions',
+        progress_pct: null,
+        details: {},
+        ts_ms: 2,
+      }),
+    );
+    request.onStderrLine!(
+      JSON.stringify({
+        kind: 'native_call',
+        request_id: id,
+        trace_id: 't',
+        name: 'GetRootActions',
+        phase: 'enter',
+        ts_ms: 3,
+      }),
+    );
+    finish({ stdout: envelope, stderr: 'raw frames and text' });
+    const result = await running;
+    expect(frames).toEqual(['heartbeat', 'progress', 'native_call']);
+    expect(result.stderr).toBe('rdc-tool: plain diagnostic');
+    expect(result.cancellation).toBeUndefined();
+  });
+
+  it('reports a malformed or foreign frame as a protocol failure once the operation ends', async () => {
+    const { service, runs } = watched();
+    const running = service.executeCLI('call', call, { settings: cli, contextId: 'rdc-owned' });
+    await settle();
+    runs[0].request.onStderrLine!(
+      JSON.stringify({ kind: 'heartbeat', request_id: 'someone-else', ts_ms: 1, state: 'running' }),
+    );
+    runs[0].finish({ stdout: envelope });
+    await expect(running).rejects.toMatchObject({ code: 'RDC_CLI_PROTOCOL' });
+  });
+
+  it('treats a frame gap beyond the CLI limit as an unresponsive daemon and stops the CLI', async () => {
+    vi.useFakeTimers();
+    try {
+      const { service, runs } = watched();
+      const running = service.executeCLI('call', call, { settings: cli, contextId: 'rdc-owned' });
+      const outcome = running.catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(0);
+      const id = requestIdOf(runs[0]);
+      runs[0].request.onStderrLine!(JSON.stringify({ kind: 'heartbeat', request_id: id, ts_ms: 1, state: 'running' }));
+      await vi.advanceTimersByTimeAsync(RDC_HEARTBEAT_GAP_MS);
+      expect(runs[0].request.abortSignal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(runs[0].request.abortSignal?.aborted).toBe(true);
+      expect(await outcome).toMatchObject({
+        code: 'RDC_DAEMON_UNRESPONSIVE',
+        params: { operation: 'rd.event.get_action_tree', seconds: 21 },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds control commands by the control deadline and shortcut queries by the frozen patience', async () => {
+    const invoke = vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '', duration_ms: 1 });
+    const service = new RdcCliInvokerService({ invoke } as never);
+    vi.spyOn(service, 'loadCatalog').mockResolvedValue({} as never);
+    await service.executeCLI('daemon', ['status', '--daemon-context', 'rdc-owned'], { settings: cli });
+    await service.executeCLI('pipeline', ['show', '--daemon-context', 'rdc-owned'], { settings: cli });
+    expect(invoke.mock.calls.map(([request]) => request.timeoutMs)).toEqual([
+      RDC_CONTROL_TIMEOUT_MS,
+      cli.noProgressTimeoutMs,
+    ]);
+    expect(invoke.mock.calls.flatMap(([request]) => request.args)).not.toContain('--progress-stream');
+  });
+
+  it.each([
+    ['it closes within the grace after the receipt', true],
+    ['it is killed once that grace ends', false],
+  ])('cancels through the daemon, then waits for the exec CLI: %s', async (_case, closes) => {
+    vi.useFakeTimers();
+    try {
+      const { service, runs } = watched();
+      const controller = new AbortController();
+      const running = service.executeCLI('call', call, {
+        settings: cli,
+        contextId: 'rdc-owned',
+        abortSignal: controller.signal,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      const id = requestIdOf(runs[0]);
+      controller.abort();
+      await vi.advanceTimersByTimeAsync(0);
+      const cancel = runs[1].request;
+      expect(cancel.args!.slice(cancel.args!.indexOf('daemon'))).toEqual(['daemon', 'cancel', '--request-id', id]);
+      expect(cancel.args).toEqual(expect.arrayContaining(['--daemon-context', 'rdc-owned']));
+      expect(cancel.timeoutMs).toBe(RDC_CANCEL_TIMEOUT_MS);
+      expect(cancel.abortSignal).toBeUndefined();
+      expect(runs[0].request.abortSignal?.aborted).toBe(false);
+      runs[1].finish({
+        stdout: JSON.stringify({
+          ok: true,
+          result_kind: 'rdc_tool.daemon.cancel',
+          data: { request_id: id, trace_id: 't', outcome: 'cancelled', settled_at_ms: 5 },
+        }),
+      });
+      await vi.advanceTimersByTimeAsync(RDC_CANCEL_CLOSE_GRACE_MS - 1);
+      expect(runs[0].request.abortSignal?.aborted).toBe(false);
+      if (closes) runs[0].finish({ exitCode: 1, stdout: envelope });
+      await vi.advanceTimersByTimeAsync(1);
+      expect(runs[0].request.abortSignal?.aborted).toBe(!closes);
+      await expect(running).resolves.toMatchObject({
+        exitCode: closes ? 1 : 137,
+        cancellation: { status: 'settled', outcome: 'cancelled', traceId: 't' },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "azure-cognitive-services",
   "name": "Azure Cognitive Services",
   "npm": "@ai-sdk/azure",

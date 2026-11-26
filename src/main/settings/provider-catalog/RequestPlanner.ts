@@ -511,7 +511,6 @@ function buildExecutionIdentity(
     (route.baseUrl ?? `${route.protocol}:default`).trim().replace(/\/+$/u, '').toLowerCase(),
   );
   const identityBase: Omit<ExecutionIdentity, 'fingerprint'> = {
-    schemaVersion: 1,
     providerId: model.providerId,
     credentialScopeHash,
     endpointHash,

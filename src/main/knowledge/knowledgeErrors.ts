@@ -19,11 +19,3 @@ export function knowledgeAssetsMissing(): AppError {
     'all declared Knowledge images must be available in their owning space before creating or verifying a card.',
   );
 }
-
-/** Draft cards whose migration would overwrite a different card; callers list them for the user to resolve. */
-export class KnowledgeDraftMigrationConflictError extends AppError {
-  constructor(readonly cardIds: string[]) {
-    super('KNOWLEDGE_DRAFT_MIGRATION_CONFLICT', cardIds.join(','), { params: { cards: cardIds.length } });
-    this.name = 'KnowledgeDraftMigrationConflictError';
-  }
-}

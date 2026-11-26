@@ -1,6 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './app/App';
+import { RendererFailurePage } from './app/RendererFailurePage';
+import { RootErrorBoundary } from './app/RootErrorBoundary';
+import { readRendererCrashBoot } from './app/rendererCrashBoot';
 import { applyBootTheme } from './app/theme/bootTheme';
 import { enablePseudoLocale } from './i18n/pseudoLocale';
 import { browserAppBridgeInstalled, installRendererApi } from './platform/rendererApi';
@@ -19,9 +22,22 @@ installInteractionPerformanceProbe();
 if (browserAppBridgeInstalled() && new URLSearchParams(window.location.search).has('pseudoLocale'))
   enablePseudoLocale();
 
+// After repeated renderer crashes main boots this renderer into its failure page, which loads nothing else.
+const crashBoot = readRendererCrashBoot(window.location);
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    {crashBoot ? (
+      <RendererFailurePage
+        language={crashBoot.language}
+        kind="crash"
+        facts={crashBoot.facts}
+        onReload={() => window.location.replace(crashBoot.reloadUrl)}
+      />
+    ) : (
+      <RootErrorBoundary>
+        <App />
+      </RootErrorBoundary>
+    )}
   </React.StrictMode>,
 );
 

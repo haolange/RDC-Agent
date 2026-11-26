@@ -2,7 +2,6 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { writeFileAtomic } from '../runtime/atomicFile';
 import { StorageIo } from '../runtime/StorageIo';
-import { KnowledgeDraftMigrationConflictError } from './knowledgeErrors';
 import { assertSafeKnowledgeWriteTarget } from './knowledgeFs';
 import { isKnowledgeImagePathAllowed } from './knowledgeImages';
 import {
@@ -12,15 +11,9 @@ import {
   type KnowledgeImportPathResult,
   type KnowledgeStagedImage,
 } from './knowledgeIngest';
-import {
-  createSessionScopedKnowledgeStore,
-  knowledgeDurableStore,
-  type KnowledgeDurableStore,
-} from './KnowledgeDurableStore';
 import { KnowledgeIndexService } from './KnowledgeIndexService';
 import { KnowledgeQueryService, knowledgeQueryService } from './KnowledgeQueryService';
 import { knowledgeWriteService, KnowledgeWriteService } from './KnowledgeWriteService';
-import type { KnowledgeDurableDraft } from './knowledgeStateSchema';
 import type { KnowledgeOperationOptions } from './knowledgeOperations';
 import type {
   KnowledgeCardDetail,
@@ -60,7 +53,6 @@ export interface KnowledgeImportDependencies {
   listCards(spaceId: string): Promise<KnowledgeCardSummary[]>;
   getCard(spaceId: string, relativePath: string): Promise<KnowledgeCardDetail | null>;
   write: KnowledgeWriteService;
-  store: KnowledgeDurableStore;
 }
 
 function occupantMatches(record: KnowledgeCardRecord, occupant: KnowledgeSpaceOccupant): boolean {
@@ -235,7 +227,6 @@ export class KnowledgeImportService {
       getCard:
         this.overrides.getCard ?? ((spaceId, relativePath) => knowledgeQueryService.getCard(spaceId, relativePath)),
       write: this.overrides.write ?? knowledgeWriteService,
-      store: this.overrides.store ?? knowledgeDurableStore,
     };
   }
 
@@ -323,40 +314,6 @@ export class KnowledgeImportService {
         );
   }
 
-  async migrateSessionDrafts(sessionId: string): Promise<void> {
-    const leftovers = await this.deps.store.listLeftoverDrafts(sessionId);
-    if (leftovers.length === 0) return;
-    const remaining: KnowledgeDurableDraft[] = [];
-    const conflicts: string[] = [];
-    for (const draft of leftovers) {
-      const spaceId = draft.card.spaceId;
-      const occupants = await this.listOccupants(spaceId);
-      const occupant = occupants.find((entry) => occupantMatches(draft.card, entry));
-      const hash = draft.sourceHash ?? draft.card.sourceHash;
-      if (occupant && sameSource(occupant, hash)) continue;
-      if (occupant) {
-        remaining.push(draft);
-        conflicts.push(occupant.cardId);
-        continue;
-      }
-      await this.deps.write.write({
-        spaceId,
-        card: {
-          ...draft.card,
-          lifecycle: 'draft',
-          spaceId,
-          ...(draft.sourceHash ? { sourceHash: draft.sourceHash } : {}),
-        },
-        permissionMode: 'default',
-        confirmation: { explicitHumanConfirmation: true },
-      });
-    }
-    await this.deps.store.replaceLeftoverDrafts(sessionId, remaining);
-    if (conflicts.length > 0) {
-      throw new KnowledgeDraftMigrationConflictError(conflicts);
-    }
-  }
-
   /** The cards already in the space, read one at a time; an import reports this as its reading phase. */
   private async listOccupants(
     spaceId: string,
@@ -385,7 +342,6 @@ export class KnowledgeImportService {
 
 export function createDisposableImportService(options: {
   spaceRoot: string;
-  sessionRoot?: string;
   write?: KnowledgeWriteService;
 }): KnowledgeImportService {
   const space: KnowledgeSpace = {
@@ -420,7 +376,6 @@ export function createDisposableImportService(options: {
     listCards: (spaceId) => query.listCards(spaceId),
     getCard: (spaceId, relativePath) => query.getCard(spaceId, relativePath),
     write,
-    ...(options.sessionRoot ? { store: createSessionScopedKnowledgeStore(options.sessionRoot) } : {}),
   });
 }
 

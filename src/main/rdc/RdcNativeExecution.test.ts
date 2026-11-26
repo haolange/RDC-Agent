@@ -54,7 +54,7 @@ describe.skipIf(!enabled)('native process execution and signed A-B-A (explicit d
       command: files.python,
       argsPrefix: [files.entry],
       env: nativeEnv,
-      timeoutMs: 60_000,
+      noProgressTimeoutMs: 60_000,
     };
     const resolver = new SessionArtifactResolver({ resolveSessionPath: (id) => (id === sessionId ? directory : null) });
     const receipts = new RdcExecutionReceipts(resolver, () => 'isolated-integration-signing-key');

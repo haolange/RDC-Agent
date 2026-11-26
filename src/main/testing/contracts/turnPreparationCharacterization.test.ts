@@ -31,7 +31,6 @@ vi.mock('../../sessions/run/handoffSkills', async (importOriginal) => ({
 }));
 
 import { agentAccessCeiling } from '@shared/types/agentManifest';
-import { EXECUTION_OFFER_SCHEMA } from '../../sessions/run/executionOffer';
 import { renderInvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
 import { getLoadedProviderSurface, loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
 import { parseOllamaInstalledModels } from '../../settings/provider-catalog/LiveProviderCatalogParsers';
@@ -98,7 +97,7 @@ beforeAll(async () => {
   sessionId = sessionRecordStore.createSession(projectId, 'Characterization').sessionId;
   const written = planArtifactWriter.writeLivePlan(
     sessionId,
-    `# Plan\n\n1. Read the hair pass.\n\n${renderInvestigationPlanContract({ schemaVersion: 1, mission: 'debugger' })}`,
+    `# Plan\n\n1. Read the hair pass.\n\n${renderInvestigationPlanContract({ mission: 'debugger' })}`,
   );
   approvedPlan = { uri: written.uri, hash: written.hash };
 });
@@ -113,7 +112,6 @@ async function prepare(agentId: (typeof AGENTS)[number], scenario: Scenario): Pr
   offer.current =
     scenario === 'approved-plan' && agentId === 'general'
       ? {
-          schemaVersion: EXECUTION_OFFER_SCHEMA,
           sourceAgentId: 'debugger',
           targetAgentId: 'general',
           plan: approvedPlan,

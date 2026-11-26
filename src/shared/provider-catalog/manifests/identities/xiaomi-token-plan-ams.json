@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "xiaomi-token-plan-ams",
   "name": "Xiaomi Token Plan (Europe)",
   "npm": "@ai-sdk/openai-compatible",

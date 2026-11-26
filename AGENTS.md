@@ -44,8 +44,8 @@
 
 - `main / preload / renderer / shared` 联动：角色、阶段、IPC、共享类型的改动须同时核对 runtime 与 UI，并覆盖调用方、数据结构、序列化与配置、状态释放和配套测试。
 - 新路径替代旧路径时，同步处理入口、配置、类型、UI、测试和文档，旧路径**当场删除**。不保留 legacy／deprecated alias、兼容 shim、双写双读、平行实现或 feature flag。
-- 确实无法直接迁移时，说明具体约束并按用户明确决定执行，不自行留下双轨。
-- **转换已有数据**：运行时不做迁移，正常运行只读新格式。确需转换时写成用户触发的一次性工具：只处理能可信映射的部分，先备份、预览、验证，再原子替换。历史签名、原始日志和原始记录不改写；无法可信转换的旧记录保留原件。
+- 确实无法当场替换旧路径时，说明具体约束并按用户明确决定执行，不自行留下双轨。
+- **持久化格式不带版本号**：应用写下的文件（设置、trust、目录缓存、会话与 run 记录、Task、调查、知识索引与状态等）不写 `schemaVersion` 一类格式标记。格式变更即 fail-fast：严格 schema 拒绝旧文件或旧目录布局，错误点名该文件或目录（`STORAGE_CORRUPT` / `STORAGE_SCHEMA`），原件保留。不做运行时迁移、兼容读取或自动重建，也不写转换工具；用户编写的资源（`.agent.md` 等）同样如此，不符合当前格式的文件判无效并点名，由用户自行修改或删除。设置文件在启动时最先读取，失败提示要求删除整个数据目录与设置文件后重启；数据目录外的知识库文件由用户按报错的文件名清理。跨程序的公开协议（RDC-Tool 信封与目录的 `schema_version`）和外部名称（第三方包、外部 API、模型 ID）保留各自的版本号。`check:legacy-residue` 拒绝 `src/` 里的格式版本字段、带版本号的标识符、自有 id 与文件名，白名单只收外部名称。
 
 ### 2.4 版本控制与环境红线
 
@@ -134,7 +134,7 @@
 
 **差分渲染**：先 `pnpm run build`，再依次运行 `node scripts/visual-diff/run.mjs capture <head>`、对本轮起点构建运行 `capture <base> --build <base 检出>`、`compare <base> <head>`。有意的可见变化在提交 trailer 写 `Visual-Diff-Allow: <场景 id,…>`。
   - 每个场景按深/浅 × 1440/720 四个变体渲染（场景可用 `variants` 收窄），变体的主题覆盖录制响应里的外观主题。三层比对：L1 DOM 与样式指纹、L2 位图、L3 交互过程——每个动作步骤逐帧采样焦点、浮层栈、`aria-expanded`、各 `data-testid` 元素的 rect 与滚动位置，比对步骤结束时的稳定状态和"闪回"（值回到已离开的旧值，只在屏上停留一帧的中间态不算）。
-  - 场景可以注入迟到响应（`respond`：`delayMs`、`hold` 配合 `release` 步骤，按 `call` 释放可模拟乱序）与失败响应（`error`，或用 `result` 替换某次回答，模拟失败写入后的状态）。产品自身的时序竞争只能用带 `reason` 的 `focus` 步骤或 `l3Ignore` 固定，原因写明竞争点。
+  - 场景可以注入迟到响应（`respond`：`delayMs`、`hold` 配合 `release` 步骤，按 `call` 释放可模拟乱序）与失败响应（`error`，或用 `result` 替换某次回答，模拟失败写入后的状态）；host 不转发主进程事件，需要时用 `emit` 步骤推送一个事件，载荷里的 id 绑定最近的应答或调用参数（见 `scripts/visual-diff/host/main.mjs` 的 `resolveEmit`）。产品自身的时序竞争只能用带 `reason` 的 `focus` 步骤或 `l3Ignore` 固定，原因写明竞争点。
   - IPC 契约变化或新增场景时用 `run.mjs record <id…>` 录制（启动一次性 Browser QA 实例，从真实后端取响应；设 `VISUAL_DIFF_ELECTRON` 时直接用该 Electron 运行当前构建）。定义在 `scripts/visual-diff/scenarios.json`，可复用的准备步骤放在 `presets`；用到 Ollama 的场景需要先运行 `node scripts/qa-ollama-stub.mjs`。
   - `capture` 默认并行 3 个 host（`VISUAL_DIFF_JOBS` 可调），渲染失败时把当时的画面存为 `<id>@<变体>.failed.png`。
 
@@ -260,8 +260,8 @@ Session 右栏是 Tasks / Artifacts / Outputs / Context / Capture 单轨，投�
   - 同一个包在锁文件里只留一个版本；传递依赖的分叉与已知漏洞用 `pnpm-workspace.yaml` 的 `overrides` 收敛，并写明原因。
   - `check:bundle-deps`（在 `check:gates` 内）按实际 import 校验这条归属（运行时依赖的必需 peer 算作被使用）；CI `build` 另以 `--entry-chunk` 校验 renderer 入口 chunk 预算。
 - 禁止恢复独立 `cli/`、Playwright `e2e/`、顶层 `test/`、`docs/handover/`（`check:repository-hygiene` 拒绝）。`designs` 只保留 `rdc-agent-design-system`。
-- 目录与文件按稳定职责命名，不用 v1/v2、new/old、final 等迭代标签建立并行路径；协议或存储版本只在确有语义需要的边界表达。已有带版本名且仍被引用的实现，先核对调用与契约再收敛。不提交乱码。
-- 用户资源根固定 `~/.rdc-agent`，项目资源根固定 `<project-root>/.rdc-agent`；不加可配置根、旧目录 fallback、双写或静默迁移。Project Scope 覆盖 agents／skills／MCP／hooks／policies／knowledge／memory；`plans/<sessionId>/` 只在用户点击「保存到项目」时写入。CLI executable、参数前缀、工作目录、环境、超时和 secret 是本机边界，project 不得覆盖。
+- 目录、文件、标识符与自有 id 按稳定职责命名，不用 v1/v2、new/old、final 等迭代标签建立并行路径；版本号只出现在外部名称与跨程序公开协议里（见 §2.3「持久化格式不带版本号」）。不提交乱码。
+- 用户资源根固定 `~/.rdc-agent`，项目资源根固定 `<project-root>/.rdc-agent`；不加可配置根、旧目录 fallback、双写或静默迁移。Project Scope 覆盖 agents／skills／MCP／hooks／policies／knowledge／memory；`plans/<sessionId>/` 只在用户点击「保存到项目」时写入。CLI executable、参数前缀、工作目录、环境、超时（RDC 为无进展等待 `noProgressTimeoutMs`）和 secret 是本机边界，project 不得覆盖。
 
 ## 10. 本地整洁
 

@@ -1,6 +1,6 @@
 /**
  * Vertical Session Artifact schema for RenderDoc investigation.
- * Namespace `rdc.investigation.v1` — Session Artifact only.
+ * Namespace `rdc.investigation` — Session Artifact only.
  * Do not write these fields into TaskRecord / AgentManifestDefinition / ConversationMessage.
  */
 

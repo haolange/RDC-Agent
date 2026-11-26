@@ -68,7 +68,7 @@ Settings 的 RDC 安装入口依次是检测安装、选择目录、验证并应
 无法满足合同的操作在所属边界失败，并把真实原因交给调用方，由调用方决定放弃、重试或修正输入。局部失败不无依据地扩大影响范围；隔离失败时仍保护数据、释放自有资源，安全与完整性不变量不放宽。失败分类见 `docs/contracts/failure-model.md`。
 
 1. **单一真相**：Session / Conversation / branch / journal 是会话历史权威；Agent slot 是执行配置与缓存，不是私有历史。
-2. **冻结执行**：`EffectiveRuntimePlan`（`schemaVersion: 3`，含 `planId` / fingerprint 与冻结工具/策略约束面）在 `prepareTurn` 冻结；Prompt 与 Executor 共用冻结约束。主进程 mode/revision 在工具准入和每次 Provider 请求前采样，不进入冻结权限约束。
+2. **冻结执行**：`EffectiveRuntimePlan`（含 `planId` / fingerprint 与冻结工具/策略约束面）在 `prepareTurn` 冻结；Prompt 与 Executor 共用冻结约束。主进程 mode/revision 在工具准入和每次 Provider 请求前采样，不进入冻结权限约束。
 3. **主进程权威**：权限、secret、MCP trust、Shell、RDC CLI、IPC 校验均在 `src/main`；preload / renderer / Browser Bridge 只暴露受控面。
    - 需要人确认的变更（trust、知识/记忆/计划写入）由主进程原生对话框确认。
    - 安全决定在生效前只追加写入 `state/audit.jsonl`，写不进去就不生效。
@@ -81,13 +81,14 @@ Settings 的 RDC 安装入口依次是检测安装、选择目录、验证并应
    - `catalogRevision` 只冻结 Effective Catalog 的可执行/可选择语义：刷新只更新 provenance 时间戳时 revision 不变，route、control、availability、quota 等有效语义变化时才更新。
 6. **可取消与可回收**：
    - Turn 经 `TurnCoordinator` 管理 Session ownership：Active → Aborting → Orphaned → Settled。Orphaned 时 `beginTurn` fail-closed `TURN_ORPHANED`；`abortAndJoin` 同时等待 stream terminal **与** producerCompletion。
-   - 子进程经 `ProcessSupervisor`；超时未观察到 close 时标记 `unconfirmed_orphan` 并保留 registry。应用退出经 `ShutdownCoordinator`（`release_owned_runtimes` 先于 `terminate_processes`）。归属 RDC daemon 必须 clear+stop 且有进程回执，失败如实保留。
+   - 子进程经 `ProcessSupervisor`；超时未观察到 close 时标记 `unconfirmed_orphan` 并保留 registry。应用退出经 `ShutdownCoordinator`（`release_owned_runtimes` 先于 `terminate_processes`），起因、超时阶段与结局由 `src/main/index.ts` 注入的观察者写入生命周期账本；干净与超时两条路径走同一个退出。归属 RDC daemon 必须 clear+stop 且有进程回执，失败如实保留。
+   - 生命周期事实只写在 `<appStateRoot>/lifecycle/ledger.jsonl`（`src/main/runtime/LifecycleLedger.ts`，每条 fsync），每类事实只有一个生产者；下次启动由未释放的 `instance.lock` 触发诊断（见 `docs/contracts/failure-model.md`「生命周期账本与崩溃追踪」）。本地 minidump 在 `<appStateRoot>/crash`，不上传、不导出。
    - 迟到 event 按 generation 丢弃。无 durable session 的 turn/slot 使用 ephemeral scope id（禁止 `__anon__` / `__no_session__`）。
    - Conversation Stop 相位语义：`preparing` 干净撤销；`committing` / `running` 单调落停。Renderer 对 monotonic-stopped 的 turn/request 丢弃迟到的 `draft|streaming` patch。
    - 会话工作块与工具的取消记为 cancelled，未执行记为 skipped，真实失败记为 error，不伪造用户拒绝；main 与乐观停止共用同一纯结算。
    - 当前计划携带 owning Turn，修订与决定都核对真实归属。包含审阅交互的 result 不再重复提供 handoff，计划执行动作只位于待审 Composer。
 7. **失败有分类**：安全类 fail-closed；完整性 degrade-safe；可用性 recoverable。跨边界的失败是带登记码的 `AppError`，IPC 以错误结果返回，renderer 按码经 `humanizeError` 出文案。分类与错误契约权威见 `docs/contracts/failure-model.md`。
-8. **无 legacy 双轨**：新结构替代旧结构时直接收敛；不保留兼容 shim。
+8. **无 legacy 双轨**：新结构替代旧结构时直接收敛；不保留兼容 shim。持久化格式不带版本号，格式变更即 fail-fast 并点名文件或目录；不做运行时迁移，也不提供转换工具。
 9. **对话模型**：Composer 底栏与 `/model` 选择的是**当前对话模型**，不写回 Settings。
    - Agent 的模型由 Settings → Agents 决定：用户设置 `agentModels` 保存默认模型与推理档位，加按 Agent 的逐字段覆盖。项目不能指定模型，`.agent.md` 不声明模型。Agent 模型只在用户还没点选时作为种子。
    - 未 override 是显式可选状态（菜单「按 Agent 配置」与 `/model default`）：有 session 时清除写入 `SessionRecord.modelOverride = null`，无 session 时清 Composer 草稿。Agent route 当前不可执行时禁止清除。
@@ -128,7 +129,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 | 主题 | 权威位置 |
 | --- | --- |
 | 产品边界与本文件不变量 | 本文件 |
-| 当前裁决（Profile、Right Rail、Knowledge 六 lane、Handoff、Investigation、并发、Run schema v3、Mission plan-only、Hook trust、Mission 完成合同） | 本文件「当前裁决」A–L |
+| 当前裁决（Profile、Right Rail、Knowledge 六 lane、Handoff、Investigation、并发、Run 记录、Mission plan-only、Hook trust、Mission 完成合同） | 本文件「当前裁决」A–L |
 | 验收记录（真实运行证据） | [`docs/product/acceptance-ledger.md`](docs/product/acceptance-ledger.md) |
 | Runtime / Prompt / Provider / Tool / Session 契约 | [`docs/contracts/runtime-kernel.md`](docs/contracts/runtime-kernel.md) |
 | Session Projection（active UI / 后台 cache / Composer 恢复） | [`docs/contracts/session-projection.md`](docs/contracts/session-projection.md) |
@@ -194,7 +195,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
   - 生产 `connect-src 'self'`：renderer 只经 IPC 或同源 bridge 通信。
   - 生产 `script-src` 无 `unsafe-inline`；`style-src 'self'`（无 `unsafe-inline`）；`style-src-attr 'none'`；`img-src` 只放行 `'self' data: blob:`；`media-src 'self' blob:`。
   - 动态样式经 constructable stylesheet（`useDynStyle` / `assignDynStyle` / Appearance `applyChromeTheme`），不依赖 inline style attributes 或 `<style>` textContent 注入。
-  - Appearance chrome 权威见 [`docs/ui/design-system.md`](docs/ui/design-system.md)；Settings schema 9 保留经校验的用户主题配置。
+  - Appearance chrome 权威见 [`docs/ui/design-system.md`](docs/ui/design-system.md)；Settings 的严格 schema 保留经校验的用户主题配置。
 - **Browser Bridge（debug-only）**：只有未打包构建在 `RDC_AGENT_BROWSER_QA=1`（launcher browser/browser-dev）下才启动它；打包版从不启动。它永远不在发布默认路径上。
   - 每个请求都必须带 bridge 自己的 `Host`。权威入口是 launcher 打印的一次性 `/qa?qaBootstrap=...` URL；bootstrap 成功后签发 HttpOnly、`SameSite=Strict` 的 cookie（HTTPS 时加 `Secure`），并重定向到**同一 bridge origin** 上干净的 `/app`。
   - `browser-dev` 下 Vite 经 bridge 反向代理（含 HMR WebSocket）；浏览器从不直开 Vite 端口，URL query 里从不携带 bridge 凭证或 challenge。反代转发前剥离 `cookie` / `authorization` / `proxy-authorization` / `x-rdc-*`。
@@ -242,7 +243,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 ### 会话、投影与持久化
 
 - **唯一 Turn Preparation**：产品回合经 conversation `prepareTurn` 冻结 `preparedRuntime` 后由 `sendProfileMessage` 执行；Subagent 经 `ProfileTurnRunner.runChildTurn` 用同一个 `prepareTurnContext` 冻结后执行，二者共用 `ProfileTurnRunner` 的阶段。`AgentTurnRunner` 无 preparedRuntime 时抛 `TURN_NOT_PREPARED`，没有 fallback plan。
-- **EffectiveRuntimePlan**：`schemaVersion: 3`，在 `prepareTurn` **完整冻结**。
+- **EffectiveRuntimePlan**：在 `prepareTurn` **完整冻结**。
   - 冻结面：`planId` / fingerprint / tools / skill ∩ / deferred / MCP hash / permissionConstraints / policy / `contextCompactionPercent` / route / request+prompt fingerprints / 附件 manifest 指纹。
   - Prompt 与 Executor 共用；在途 turn 不读可变 Settings。唯一的动态授权输入是主进程成功提交的全局权限挡位 mode/revision，在每个工具最终准入前采样。
 - **AgentState 复合键**：`sessionId|ephemeralScope` + `agentId`；IPC bridge 丢弃无 sessionId 的事件。renderer 不保存 Agent 状态、证据事件或 run 列表的镜像：Agent 胶囊由会话视图派生，证据事件直接进时间线，当前 run 只有 `currentRun`。
@@ -257,9 +258,9 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
   - 协议与编码细节见 [`docs/architecture/data-flow.md`](docs/architecture/data-flow.md)「Agent Turn」。
 - **存储 fail-closed**：持久化文件只经 `atomicFile` 原语读写（见 `docs/contracts/failure-model.md`「存储原语」）。
   - 写入走原子持久写（temp + fsync + rename）；deepMerge 拒绝危险原型键。
-  - 读取区分不存在、损坏和不支持的版本：损坏每次读都报 `STORAGE_CORRUPT` 且不读成空；不支持的版本报 `STORAGE_SCHEMA_UNSUPPORTED` 并保留原件。
-  - Run 只读 run.json v3，run.yaml 是写入投影；attachments.json 只读 schemaVersion 1 的对象；usage.json 只读 schemaVersion 2 的对象。缺版本、旧版本和仅有 YAML 的 Run 明确报 `STORAGE_SCHEMA_UNSUPPORTED`，不自动迁移、改写或隔离原件；当前版本结构不合法报 `STORAGE_SCHEMA`。
-  - Settings 只接受 schemaVersion 9 的严格文档（见「Settings 持久化」）：旧版本同样报错并保留原文件，结构不合法报 `STORAGE_CORRUPT`。其他仍有版本升级责任的文档按各自契约处理。
+  - 读取区分不存在与损坏：损坏每次读都报 `STORAGE_CORRUPT` 且不读成空。持久化格式不带版本号，其他格式写下的文件同样按严格 schema 失败、点名文件并保留原件，不迁移、不转换。
+  - Run 只读 run.json，run.yaml 是写入投影；attachments.json 与 usage.json 都是不带格式版本的严格对象。仅有 YAML 的 Run 报 `STORAGE_SCHEMA`，不自动迁移、改写或隔离原件。
+  - Settings 只接受当前格式的严格文档（见「Settings 持久化」）：不符合的文件（包括其他格式写下的）报 `STORAGE_CORRUPT` 并保留原文件，启动时提示删除整个数据目录与设置文件后重启。
   - 目录锁对活 pid 永不回收。owner 无法读取时可能仍在初始化，等待并在超时后报错；只自动回收可识别的死 pid 锁。跨进程回收以独占标记串行化，取得标记后重新读取 owner；标记本身不能安全确认失主时等待并超时，不抢占。
 - **结构化压缩**：仅自动压缩；产品不提供按钮、菜单、`/compact` 或 `/summary`。
   - 会话准备和执行途中复用 `PromptPlan → RequestEnvelope → adapter` 的单轮、无工具 model-generated `StructuredHandoff`（`derivation: 'model-generated'`）。
@@ -410,13 +411,15 @@ import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
 
 - `ProviderEmptyStreamError`（`PROVIDER_STREAM_EMPTY`）不合成 HTTP 502。
 - `ErrorRecovery` 的 `empty_stream` 最多重试 1 次；真实 5xx 为 `server_error`（3 次）；503 为 `overloaded`；401 立即 abort。
+- Provider 流只有一个看门狗（`providers/internal/streamWatchdog.ts`，由 `startProviderStream` 持有）：首字节从请求发出起算（推理模型 180s，否则 20s），空闲 60s 随每个 chunk 重置，无总时长上限；详见 `docs/contracts/failure-model.md`。
+- 输出后才发生的 `ProviderTimeoutError`（`afterContent`）不被 `ErrorRecovery` 重试；分类规则在 `agent/ErrorClassification.ts`。
 - `AgentRecoveryAbortError` 必带 cause 与结构化字段。
 - `createTurnFailedDiagnostic` 保留 `CONVERSATION_LLM_REQUEST_FAILED`，并按 auth / quota-rate / 5xx / empty_stream / network 分类文案。
 - Work Process Active Signal 与诊断行对齐，见 `check:work-process` + [`docs/ui/work-process-checklist.md`](docs/ui/work-process-checklist.md)。
 
 ### Settings 持久化
 
-Settings 只读 `schemaVersion` **9**（`src/main/settings/settings-core/settingsFileSchema.ts`），每一层都是严格 schema。Settings 读写流程的英文细节见 [`docs/architecture/data-flow.md`](docs/architecture/data-flow.md)「Settings Flow」与「Revisioned Intents」。
+Settings 文件不带格式版本（`src/main/settings/settings-core/settingsFileSchema.ts`），每一层都是严格 schema；其他格式写下的文件同样不符合 schema，在启动时失败。Settings 读写流程的英文细节见 [`docs/architecture/data-flow.md`](docs/architecture/data-flow.md)「Settings Flow」与「Revisioned Intents」。
 
 **文件内容**：
 
@@ -477,7 +480,7 @@ Settings 只读 `schemaVersion` **9**（`src/main/settings/settings-core/setting
   - `read-only` 天花板的 profile（内置 Debugger / Analyzer / Optimizer）不能使用 `shell` 或 `code_interpreter`；它们用 `runtime_context` 读取会话身份，在拥有 lease 时看到其中的 `rdc` 载荷，另用只读 `rdc_probe` 访问 RDC。Full access 不抬高天花板。
 - Knowledge 持久写入仅 human review；`FullAccess` 不可绕过；无自动 Memory / Knowledge / Candidate / Promote。
 - 新结构替代旧结构时直接收敛，不保留 legacy / deprecated shim。
-- 禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding` / `EmbeddingCatalog` / `EmbeddingExecutionService`；Discovery 剔除 embedding modality，Embedding 模型不进入 Agent / Composer / subagent picker，Settings schema 9 的严格 schema 拒绝 embedding 字段。
+- 禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding` / `EmbeddingCatalog` / `EmbeddingExecutionService`；Discovery 剔除 embedding modality，Embedding 模型不进入 Agent / Composer / subagent picker，Settings 的严格 schema 拒绝 embedding 字段。
 - 禁止恢复 ask/plan/edit 或 S0 specialist id 的运行通道与 custom manifest fallback。
 
 ### A. Builtin Profiles
@@ -485,7 +488,7 @@ Settings 只读 `schemaVersion` **9**（`src/main/settings/settings-core/setting
 四个默认顶层入口与八个默认内部 builtin 经同一有效快照加载；Settings、Composer 和 Conversation preflight 使用 project-aware 资源解析，资源读取不创建或改写 user seed。user/project 可覆盖合法 ID 或新增合法自定义 ID。
 
 - **冻结内容**：Profile 冻结身份与默认 Skill。模型与推理档位只来自 Settings → Agents（`agentModels.byAgent[id]` 逐字段覆盖 `agentModels.default`）。
-- **移走的字段**：`.agent.md` 声明 `model` / `reasoning-level` / handoff `model` 时整份判无效（`AGENT_MANIFEST_FIELD_MOVED`），按优先级回落下层。Agents 页提供用户触发的迁移（预览 → 备份 → 写入设置并去字段 → 原子替换）与删除覆盖。
+- **移走的字段**：`.agent.md` 声明 `model` / `reasoning-level` / handoff `model` 时整份判无效（`AGENT_MANIFEST_FIELD_MOVED`），按优先级回落下层，诊断点名该文件；不提供迁移或转换，用户自行去掉字段，或在 Agents 页删除覆盖。
 - **复制内置**：复制时写入 `based-on: <内置 sourceHash>`；内置变化后显示「内置已更新」，并可对比、恢复内置。
 - **内部 Agent**：默认内部 Agent 经 Settings 配置并按需委派，Task 对必需执行和独立核验作真实准入。
 - **保存**：显式保存使用统一原子替换，sourceHash 为当前 Markdown 原始字节的 SHA256。
@@ -497,7 +500,7 @@ Settings 只读 `schemaVersion` **9**（`src/main/settings/settings-core/setting
 
 ### C. 已废止：Independent Embedding Capability
 
-Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 六 lane（裁决 G）。`check:knowledge-system` 为六 lane，并要求 embedding runtime 零命中。Settings 当前 schema 9 不接受未知字段，已删除的 embedding 字段随之被拒绝；其他版本 fail-closed 并保留原件。禁止清单见「当前裁决」开头。
+Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 六 lane（裁决 G）。`check:knowledge-system` 为六 lane，并要求 embedding runtime 零命中。Settings 的严格 schema 不接受未知字段，已删除的 embedding 字段随之被拒绝，原件保留。禁止清单见「当前裁决」开头。
 
 ### D. Declared Continue and Execution Offer
 
@@ -512,12 +515,12 @@ Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 
   - revise 必须是当前被拒版本，且由原规划 Agent 发起。
   - 核验通过的引用持久化在该用户消息上；转录仍按普通用户消息显示交接 prompt，只隐藏编辑重发。没有引用的旧消息照原文显示，不推断。
 - **交接之后**：General 就地终答，不自动回 Mission；用户用 Agent pill 或历史建议行切回 Mission。Pill 切换不写 offer、不预载调查 Skill。
-- **已删除的结构**：`handoff` / `agent` / `agent_handoff` token 拒绝，不静默映射到 `subagent`。不存在 `agent_handoff` 工具与 `prepared → committed → consumed` 状态机。打开会话时若仍有 `handoff-state.json`，只 unlink，不 parse。
+- **已删除的结构**：`handoff` / `agent` / `agent_handoff` token 拒绝，不静默映射到 `subagent`。不存在 `agent_handoff` 工具与 `prepared → committed → consumed` 状态机。
 - 预载规则见「Plan 与 generation」。
 
 ### E. Investigation Vertical Schema
 
-`rdc.investigation.v1` 只存在于垂直 Session Artifact，由 `InvestigationArtifactService` 管理。
+`rdc.investigation` 只存在于垂直 Session Artifact，由 `InvestigationArtifactService` 管理。
 
 - **记录类型**：`WorldState`、`EvidenceRecord`、`ClaimRecord`（Hypothesis 是 `claimKind`，Decision 内嵌）、`ExperimentRecord`、`ChallengeRecord`、`MissionCheckpoint`、`InvestigationArtifactManifest`。
 - **身份与校验**：记录有稳定 id（`claimId` / `experimentId` / `challengeId` / `artifactId`）；`kind` 经闭集 Registry 解析到 `recordType + schema`，且正文通过校验。
@@ -587,7 +590,7 @@ Knowledge 位于 `src/main/knowledge/`。Knowledge Center 为三列 UI（Spaces 
 - 平台级 Investigation Graph、第二 TaskStore、Mailbox / Blackboard。
 - 交互式 Profile 导出选择面、把 `AgentHandoffDefinition` 当成 durable 状态、把 embedding 并入 agent catalog。
 - 三卡或四卡 Right Rail。
-- Ask/Plan/Edit 作为运行时 fallback、ask/plan/edit 运行通道、custom manifest fallback、Run v2 双读、Mission generic `shell`。
+- Ask/Plan/Edit 作为运行时 fallback、ask/plan/edit 运行通道、custom manifest fallback、Run 旧格式双读、Mission generic `shell`。
 - Embedding 相关能力（禁止清单见本节开头）。
 
 保留的相邻结构及其边界：
@@ -599,13 +602,13 @@ Knowledge 位于 `src/main/knowledge/`。Knowledge Center 为三列 UI（Spaces 
 - `ErrorRecovery` 等 recoverable fallback 属 Availability 分类；`MCPManager` name-segment 在 `encode(decode(x)) !== x` 时 fail-closed，是 in-flight 协议需要。
 - 产品状态统一为 Provider `retiring`、Knowledge `retired`；外部模型 ID/来源网址及 OpenAI-compatible 协议名保留原始语义。门禁 `pnpm run check:legacy-residue` 与 `pnpm run check:acceptance-ledger`。
 
-### I. Run Schema v3
+### I. Run 记录
 
-唯一活跃 schema 为 `schemaVersion: '3'`（`src/main/sessions/run/runV3/`）。
+Run 记录的严格 schema 在 `src/main/sessions/run/runRecord/`，不带格式版本。
 
 - Run 无 `lastStage`、`runtime.workflow_stage`、`WorkflowStage` / `WorkflowPhase`、stage constants / event / IPC / update API 与 `recommendedSpecialists`。
 - 职责划分：权限 = effective `profileId` + frozen allowlist；Mission 身份 = `run.kind + mission + profileId`；生命周期 = `RunStatus` + turn transaction；用户进度 = `TaskRegistry` / `taskProjection`；方法进度 = Investigation records / checkpoints；输出阶段 = canonical `outputPhase`。
-- 运行时只读 v3 JSON；旧格式、缺版本、未知版本及仅有 YAML 的目录明确报错并保留原件，不含转换器与双读。
+- 运行时只读当前格式的 JSON；其他格式写下的文件与仅有 YAML 的目录明确报错并保留原件，不含转换器与双读。
 
 ### J. Mission 工具面
 
@@ -638,6 +641,7 @@ Mission runtime allowlist：
   - `probe` 仅允许共享闭集内的只读查询（`context_status`、`resource_list`、`event_list`、`event_search`、`event_show`、`pipeline_show`、`vfs_ls`、`vfs_cat`），不接受任意 argv；`event_list` 按 `offset/limit` 分页，`event_search` 按名称、ActionFlags 与事件范围过滤。
 - 输出：结构化 JSON（exitCode、原生结果、world-state 戳）。`rdc_probe` 不截断原生结果，超阈值时整体制品化并返回 artifact ref，分页依据原生 `pagination.truncated`。raw `.rdc` bytes 永不进入模型上下文或 Provider。
 - capture 切换与恢复要经过当前权限和 policy、批准的输入与设备、资源释放、身份重准备及签名回执；只读 Mission 不获得这些生命周期权限。
+- 恢复准入只有 `classifyRecovery`（keep / rebuild / quarantined），Agent 的 `capture_recover` 与用户在 Capture 的恢复共用；它只读 `context status`（不拉起 worker），按身份链与签名回执里的持久次数预算判断。full 或 auto-review 权限下，获批 capture 上的 `RDC_OPERATION_STUCK` / `RDC_WORKER_LOST` 由工具后步骤在判 rebuild 时同轮自动恢复，否则以具体阻塞码结束该轮；其它模式只报告结论并提供 `capture_recover`（`docs/architecture/rdc-runtime.md`「身份链恢复」）。
 - General 需要 Live RDC mutate（shader replace、replay variant、timing experiment apply）时走 `shell` + Settings action，且必须持有 exclusive lease。
 
 Mission 的禁止面：`shell`、`code_interpreter`、`write` / `edit` / `git` / `file-manage`、`output_register`、`memory_write` / `memory_delete`、session create/delete/rewrite/branch、model/settings mutation、generic filesystem、MCP tools、project/output/external mutation，以及任意不在共享只读查询闭集中的 RDC action。
@@ -646,8 +650,8 @@ Mission 的禁止面：`shell`、`code_interpreter`、`write` / `edit` / `git` /
 
 Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity。
 
-- 记录在 `hook-trust.json`（`TrustStore`，`schemaVersion: 3`）；任一组成变化 → `needsRetrust`。
-- 缺版本或更早版本的信任文件读作无信任；更高版本报 `STORAGE_SCHEMA_UNSUPPORTED`；当前版本结构不合法报 `STORAGE_CORRUPT`，用户重新 trust 时覆盖。
+- 记录在 `hook-trust.json`（`TrustStore`，`{ records }`）；任一组成变化 → `needsRetrust`。
+- 信任文件不带格式版本；结构不合法（包括其他格式写下的文件）报 `STORAGE_CORRUPT`，用户重新 trust 时覆盖。
 - Project MCP 与项目 Agent profile 的 trust 复用同一文件身份（`src/main/runtime/fileIdentity.ts`）。user/project 必须显式 trust；builtin 默认信任，内容变化随仓库发布。
 - 12 个 canonical events 走单一 `HookEngine` 路径。
 
@@ -676,7 +680,7 @@ Session 五卡：
   - 按创建序排列，已完成项就地保留，与 transcript 同序同态；状态与标题分离，完成不划线，行内不显示序号；执行事实只在悬停与详情呈现。
   - 每项带 TaskRegistry 状态 `status` 与展示态 `displayState`：未完成、未取消的 Task 当前执行为 `failed` / `interrupted` 时显示为 `failed`，其余等于 `status`。
   - `execution` 只取当前执行记录的事实（`mode`、`dispatch` wait／background、实际 Agent、模型与推理档位），不从文本推断。
-- **Artifacts** 只投影 main-owned `rdc.investigation.v1` Investigation Artifacts（不是 Working Directory 扫描，也不是 `output_register`）。`InvestigationArtifactRow` 携带完整 `contentHash`（renderer 只缩显）。
+- **Artifacts** 只投影 main-owned `rdc.investigation` Investigation Artifacts（不是 Working Directory 扫描，也不是 `output_register`）。`InvestigationArtifactRow` 携带完整 `contentHash`（renderer 只缩显）。
 - **Outputs** 只接受 `output_register` 发布的用户输出文件，拒绝 inputs 与 plan；Investigation Artifacts 不混进 Outputs。
 - **Context** 只含被冻结 Prompt 段或成功 tool result 证明的具体任务资源。
 - **Capture** 在 session 中始终可见：诚实空态或 owner-session 操作面，保留 scoped `.rdc` 选择、Replay Device、open / close / 单一实际 EID 回放轨道 / refresh；技术标识只经「复制诊断信息」离开界面。

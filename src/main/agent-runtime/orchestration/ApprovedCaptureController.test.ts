@@ -1,12 +1,21 @@
 import { expect, it, vi } from 'vitest';
-import { bindRdcTurn, freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
+import { bindRdcTurn, freezeRdcTurnBinding, getRdcTurnBinding } from '../../rdc/RdcTurnBindings';
+import { noteRdcProcessIdentity } from '../../rdc/RdcProcessIdentity';
 import { TurnHandle } from './TurnCoordinator';
 import { ApprovedCaptureController, type ApprovedCaptureHost } from './ApprovedCaptureController';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { RdcLifecyclePoint, RdcLifecycleReceipt } from '../../rdc/RdcLifecycleReceipts';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
+import type { LifecycleEvent } from '../../runtime/LifecycleLedger';
 
-const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };
+const cli = {
+  enabled: true,
+  command: 'rdc',
+  argsPrefix: [],
+  workingDirectory: '',
+  env: {},
+  noProgressTimeoutMs: 300_000,
+};
 function point(inputId: string, eventId: number): RdcLifecyclePoint {
   const n = inputId === 'a' ? 1 : 2;
   return {
@@ -24,7 +33,7 @@ function point(inputId: string, eventId: number): RdcLifecyclePoint {
       replacementCount: 0,
       replacementFingerprint: '0'.repeat(64),
       processIdentity: {
-        status: 'available',
+        status: 'available' as const,
         daemon: { pid: n * 10, start_generation: 'windows-filetime:1' },
         worker: { pid: n * 10 + 1, start_generation: 'windows-filetime:2' },
       },
@@ -38,13 +47,16 @@ function fixture() {
   const firstBinding = freezeRdcTurnBinding(cli, [], null);
   bindRdcTurn(turn.runtimePlan, firstBinding);
   let current: RdcLifecyclePoint | null = point('a', 42);
+  let quarantined: { contextId: string; leaseVersion: number } | null = null;
   let sequence = 1;
   const receipts: RdcLifecycleReceipt[] = [];
+  const ledger: LifecycleEvent[] = [];
   const host: ApprovedCaptureHost = {
     assertPlan: vi.fn(),
-    assertNoPendingRecovery: vi.fn(),
+    pendingRecord: vi.fn(() => null),
+    quarantinedContext: vi.fn(() => quarantined),
     prepareReceipts: vi.fn(),
-    quiescent: vi.fn(async () => {}),
+    quiescent: vi.fn(async () => ({ openExperiments: [] })) as ApprovedCaptureHost['quiescent'],
     snapshot: vi.fn(async () => (current ? structuredClone(current) : null)),
     verifyDestination: vi.fn(async () => {}),
     open: vi.fn(async (destination, _binding, _signal, onStopped) => {
@@ -56,16 +68,27 @@ function fixture() {
       current = null;
     }),
     restorePosition: vi.fn(async (original) => {
-      current = structuredClone(original);
+      // Moving the position keeps the replay's own native identity.
+      current = current
+        ? { ...structuredClone(original), native: { ...current.native, eventId: original.native.eventId } }
+        : structuredClone(original);
     }),
     recoveryGuard: vi.fn(() => () => {}),
     joinRecoveryChild: vi.fn(async () => {}),
     inspectRecovery: vi.fn(async (original) => ({
       cause: { operation: 'rd.test', argsFingerprint: 'e'.repeat(64), code: 'native_failure' },
-      observed: original.native as import('../../rdc/RdcSwitchSnapshot').RdcSwitchSnapshot,
-    })),
+      observed: {
+        source: 'daemon' as const,
+        daemon: { state: 'alive' as const, ...original.native.processIdentity.daemon },
+        worker: { state: 'alive' as const, ...original.native.processIdentity.worker },
+        replaySession: { isLive: true, requiresRestart: false, workerExit: null },
+      },
+      classification: { decision: 'keep' as const, reason: 'verified-processes-live' as const },
+      attempts: 0,
+    })) as ApprovedCaptureHost['inspectRecovery'],
     reopenAfterFailure: vi.fn(async (destination, _binding, _signal, onStopped) => {
       if (current) onStopped(current.native.contextId);
+      quarantined = null;
       current = point(destination.inputId, 9);
       current.native.contextId += '-reopened';
       current.native.leaseVersion += 10;
@@ -101,14 +124,19 @@ function fixture() {
     },
     turn,
     host,
+    ledger: { record: (event: LifecycleEvent) => ledger.push(event) > 0 },
   });
   return {
+    ledger,
     controller,
     turn,
     host,
     receipts,
     setCurrent: (value: RdcLifecyclePoint | null) => {
       current = value;
+    },
+    quarantine: (value: { contextId: string; leaseVersion: number } | null) => {
+      quarantined = value;
     },
   };
 }
@@ -287,7 +315,7 @@ it('reports the live observed position against the frozen baseline without chang
   });
 });
 
-it('records a same-input recovery epoch and stops if the same native failure recurs', async () => {
+it('records a same-input recovery epoch with the signed admission decision', async () => {
   const f = fixture();
   await f.controller.initialize();
   await f.controller.prepareRecovery(1);
@@ -301,15 +329,13 @@ it('records a same-input recovery epoch and stops if the same native failure rec
     { event: 'baseline', original: { inputId: 'a' } },
     {
       event: 'intent',
-      recovery: { cause: { operation: 'rd.test', code: 'native_failure' }, observed: { contextId: 'context-a' } },
+      recovery: { cause: { operation: 'rd.test', code: 'native_failure' }, observed: { daemon: { pid: 10 } } },
     },
     { event: 'daemon-stopped', contextId: 'context-a' },
     { event: 'transition', restored: false, from: { inputId: 'a' }, to: { inputId: 'a' } },
   ]);
+  expect(f.receipts[1]).toMatchObject({ recovery: { classification: { decision: 'keep' } } });
   expect(f.turn.runtimeEpochs).toHaveLength(1);
-  await f.controller.prepareRecovery(1);
-  await expect(f.controller.recover()).rejects.toThrow('RDC_RECOVERY_REPEATED_FAILURE');
-  expect(f.host.reopenAfterFailure).toHaveBeenCalledOnce();
 });
 
 it('verifies the entry position after recovery without claiming a terminal receipt early', async () => {
@@ -338,9 +364,9 @@ it('verifies the entry position after recovery without claiming a terminal recei
 it('does not reopen when the permission or verification guard fails', async () => {
   const f = fixture();
   await f.controller.initialize();
-  vi.mocked(f.host.inspectRecovery).mockRejectedValueOnce(new Error('RDC_RECOVERY_PROCESS_CHANGED'));
+  vi.mocked(f.host.inspectRecovery).mockRejectedValueOnce(new Error('RDC_RECOVERY_IDENTITY_UNVERIFIED'));
   await f.controller.prepareRecovery(1);
-  await expect(f.controller.recover()).rejects.toThrow('RDC_RECOVERY_PROCESS_CHANGED');
+  await expect(f.controller.recover()).rejects.toThrow('RDC_RECOVERY_IDENTITY_UNVERIFIED');
   expect(f.host.reopenAfterFailure).not.toHaveBeenCalled();
   vi.mocked(f.host.recoveryGuard).mockReturnValueOnce(() => {
     throw new Error('RDC_RECOVERY_PERMISSION_CHANGED');
@@ -351,11 +377,189 @@ it('does not reopen when the permission or verification guard fails', async () =
 
 it('blocks live RDC access if an earlier saved position remains unresolved', async () => {
   const f = fixture();
-  vi.mocked(f.host.assertNoPendingRecovery).mockImplementationOnce(() => {
-    throw new Error('RDC_PREVIOUS_RESTORE_REQUIRED');
-  });
+  vi.mocked(f.host.pendingRecord).mockReturnValue(pendingRecord('session://plans/other.md'));
   await f.controller.initialize();
   expect(() => f.controller.assertLiveAccess()).toThrow('RDC_PREVIOUS_RESTORE_REQUIRED');
   expect(f.host.snapshot).not.toHaveBeenCalled();
   expect(f.receipts).toHaveLength(0);
+});
+
+function pendingRecord(planUri = 'session://plans/p.md') {
+  const original = point('a', 42);
+  return {
+    baseline: {
+      event: 'baseline' as const,
+      sessionId: 's',
+      projectId: 'p',
+      turnId: 'earlier-turn',
+      operationId: 'op',
+      planUri,
+      planHash: 'f'.repeat(64),
+      recordedAt: 1,
+      original,
+    },
+    ref: { uri: 'session://tool-outputs/earlier.json', expectedHash: `sha256:${'b'.repeat(64)}` },
+    count: 1,
+    identities: [],
+    latest: point('a', 7),
+  };
+}
+
+it('lets a quarantined lease recover first, then restores the entry position on the new lease', async () => {
+  const f = fixture();
+  await f.controller.initialize();
+  f.quarantine({ contextId: 'context-a', leaseVersion: 1 });
+  await expect(f.controller.restore()).rejects.toThrow('RDC_CONTEXT_QUARANTINED');
+  expect(() => f.controller.assertLiveAccess()).toThrow('RDC_CONTEXT_QUARANTINED');
+  expect(() => f.controller.assertLiveAccess(true)).not.toThrow();
+  await f.controller.prepareRecovery(1);
+  await f.controller.recover();
+  expect(await f.controller.restore()).toMatchObject({ changed: true });
+  const [restored, binding] = vi.mocked(f.host.restorePosition).mock.calls.at(-1)!;
+  expect(restored.native.eventId).toBe(42);
+  expect(binding).toBe(getRdcTurnBinding(f.turn.runtimePlan!));
+  expect(f.receipts.at(-1)).toMatchObject({
+    event: 'position-restored',
+    from: { native: { contextId: 'context-a-reopened' } },
+  });
+});
+
+it('continues an earlier unresolved chain when a new turn meets its quarantined lease', async () => {
+  const f = fixture();
+  f.quarantine({ contextId: 'context-a', leaseVersion: 1 });
+  vi.mocked(f.host.pendingRecord).mockReturnValue(pendingRecord());
+  await f.controller.initialize();
+  expect(f.host.snapshot).not.toHaveBeenCalled();
+  expect(() => f.controller.assertLiveAccess()).toThrow('RDC_CONTEXT_QUARANTINED');
+  const owner = { sessionId: 's', projectId: 'p', turnId: 't', agentId: 'general', accessCeiling: 'full' } as const;
+  expect(f.controller.restorationBaselineFor(owner)).toMatchObject({
+    available: true,
+    original: { native: { eventId: 42 } },
+    receipt: { uri: 'session://tool-outputs/earlier.json' },
+  });
+  await f.controller.prepareRecovery(1);
+  await f.controller.recover();
+  expect(f.host.inspectRecovery).toHaveBeenCalledWith(
+    expect.objectContaining({ native: expect.objectContaining({ contextId: 'context-a', eventId: 7 }) }),
+    expect.anything(),
+    undefined,
+  );
+  expect(f.receipts.map((value) => [value.event, value.turnId])).toEqual([
+    ['intent', 't'],
+    ['daemon-stopped', 't'],
+    ['transition', 't'],
+  ]);
+  expect(() => f.controller.assertLiveAccess()).not.toThrow();
+  await f.controller.restore();
+  expect(await f.controller.recordTerminalRestoration()).toBe(true);
+  expect(f.receipts.at(-1)).toMatchObject({
+    event: 'resolved',
+    turnId: 'earlier-turn',
+    baseline: { uri: 'session://tool-outputs/earlier.json' },
+  });
+});
+
+it('recovers from the latest process identity a successful result reported, not the turn-start snapshot', async () => {
+  const f = fixture();
+  await f.controller.initialize();
+  const reported = {
+    status: 'available' as const,
+    daemon: { pid: 10, start_generation: 'windows-filetime:1' },
+    worker: { pid: 12, start_generation: 'windows-filetime:3' },
+  };
+  noteRdcProcessIdentity('context-a', reported);
+  await f.controller.prepareRecovery(1);
+  await f.controller.recover();
+  expect(f.host.inspectRecovery).toHaveBeenCalledWith(
+    expect.objectContaining({ native: expect.objectContaining({ processIdentity: reported }) }),
+    expect.anything(),
+    undefined,
+  );
+  expect(f.receipts.find((receipt) => receipt.event === 'intent')).toMatchObject({
+    from: { native: { processIdentity: reported } },
+  });
+});
+
+it('signs an unexplained process change as a failed recovery attempt without reopening', async () => {
+  const f = fixture();
+  await f.controller.initialize();
+  vi.mocked(f.host.inspectRecovery).mockResolvedValueOnce({
+    cause: { operation: 'rd.test', argsFingerprint: 'e'.repeat(64), code: 'worker_stuck' },
+    observed: {
+      source: 'daemon',
+      daemon: { state: 'alive', pid: 10, start_generation: 'windows-filetime:1' },
+      worker: { state: 'alive', pid: 99, start_generation: 'windows-filetime:9' },
+      replaySession: { isLive: false, requiresRestart: true, workerExit: null },
+    },
+    classification: {
+      decision: 'quarantined',
+      code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED',
+      reason: 'a worker change has no confirmed exit receipt of the verified worker.',
+    },
+    attempts: 1,
+  });
+  await f.controller.prepareRecovery(1);
+  await expect(f.controller.recover()).rejects.toThrow('RDC_RECOVERY_PROCESS_UNEXPLAINED');
+  expect(f.host.reopenAfterFailure).not.toHaveBeenCalled();
+  expect(f.receipts.map((value) => value.event)).toEqual(['baseline', 'intent', 'failed']);
+  expect(f.receipts[1]).toMatchObject({ recovery: { classification: { decision: 'quarantined' } } });
+  expect(f.receipts[2]).toMatchObject({ code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED' });
+  expect(f.ledger).toEqual([
+    {
+      kind: 'recovery_step',
+      sessionId: 's',
+      step: 'classified',
+      decision: 'quarantined',
+      reason: 'attempt 2 of 2: a worker change has no confirmed exit receipt of the verified worker.',
+      errorCode: 'RDC_RECOVERY_PROCESS_UNEXPLAINED',
+    },
+  ]);
+  expect(f.host.quarantineChanged).toHaveBeenCalled();
+});
+
+it('records what a rebuild lost with the old process without claiming a rollback', async () => {
+  const f = fixture();
+  const original = point('a', 42);
+  original.native.replacementCount = 1;
+  original.native.replacementFingerprint = '9'.repeat(64);
+  f.setCurrent(original);
+  await f.controller.initialize();
+  vi.mocked(f.host.quiescent).mockResolvedValueOnce({
+    openExperiments: [{ experimentId: 'exp-1', status: 'running' }],
+  });
+  const worker = {
+    pid: 11,
+    start_generation: 'windows-filetime:2',
+    reason: 'no_progress',
+    traceId: 'trace',
+    requestId: 'rdc-agent-1',
+    stackLogPath: '/state/worker.log',
+  };
+  vi.mocked(f.host.inspectRecovery).mockResolvedValueOnce({
+    cause: { operation: 'rd.debug.run_to', argsFingerprint: 'e'.repeat(64), code: 'worker_stuck' },
+    observed: {
+      source: 'daemon',
+      daemon: { state: 'alive', pid: 10, start_generation: 'windows-filetime:1' },
+      worker: { state: 'exited', ...worker },
+      replaySession: { isLive: false, requiresRestart: true, workerExit: null },
+    },
+    classification: { decision: 'rebuild', reason: 'worker-exited', lost: { workers: [worker] } },
+    attempts: 0,
+  });
+  await f.controller.prepareRecovery(1);
+  await f.controller.recover();
+  expect(f.receipts.at(-1)).toMatchObject({
+    event: 'transition',
+    lostWithProcess: {
+      debugHandles: { replaySessionId: 'replay-a', invalidated: 'all' },
+      experiments: [{ experimentId: 'exp-1', status: 'running', disposition: 'interrupted-by-infrastructure' }],
+      replacementsAtLastVerified: { count: 1, fingerprint: '9'.repeat(64), rolledBack: false },
+      workers: [worker],
+      newBaselineRequired: true,
+    },
+  });
+  expect(f.ledger.map((event) => event.kind === 'recovery_step' && [event.step, event.decision])).toEqual([
+    ['classified', 'rebuild'],
+    ['recovered', 'rebuild'],
+  ]);
 });

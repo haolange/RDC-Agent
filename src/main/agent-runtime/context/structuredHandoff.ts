@@ -21,7 +21,6 @@ export interface StructuredHandoffProgress {
 }
 
 export interface StructuredHandoff {
-  schemaVersion: 1;
   handoffId: string;
   kind: StructuredHandoffKind;
   derivation: StructuredHandoffDerivation;
@@ -46,7 +45,6 @@ export interface StructuredHandoff {
 }
 
 export interface DerivedContextView {
-  schemaVersion: 1;
   viewId: string;
   scope: 'ephemeral' | 'session';
   sessionId?: string;

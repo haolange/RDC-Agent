@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "google-interactions",
   "routeMechanics": [
     {
@@ -61,7 +60,6 @@
           "evidence": "https://ai.google.dev/api/interactions-api-v1"
         },
         "semanticContext": {
-          "version": "semantic-context-v1",
           "history": "canonical-messages",
           "toolPairs": "strict",
           "attachments": "fail-closed",

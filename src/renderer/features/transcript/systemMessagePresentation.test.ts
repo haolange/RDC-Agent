@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveCommandLabel, resolveSystemNoticeTone } from './systemMessagePresentation';
+import { resolveCommandLabel, resolveSystemNoticeText, resolveSystemNoticeTone } from './systemMessagePresentation';
 import type { ConversationMessage, ConversationWorkTrace } from '@shared/types/conversation';
 
 const baseMessage = (): ConversationMessage => ({
@@ -38,6 +38,7 @@ describe('resolveSystemNoticeTone', () => {
           code: 'MODEL_CONTINUATION_DROPPED',
           severity: 'warning',
           userMessage: 'switched',
+          continuationDrop: { count: 1, reasons: [{ reason: 'execution-mismatch', count: 1 }] },
         },
       }),
     ).toBe('warning');
@@ -82,5 +83,39 @@ describe('resolveCommandLabel', () => {
         workTrace: commandTrace('   '),
       }),
     ).toBeNull();
+  });
+});
+
+describe('resolveSystemNoticeText', () => {
+  const t = ((key: string, params?: Record<string, string | number>) =>
+    `${key}:${params ? JSON.stringify(params) : ''}`) as unknown as Parameters<typeof resolveSystemNoticeText>[1];
+  const notice = (continuationDrop: { count: number; reasons: Array<{ reason: string; count: number }> }) => ({
+    ...baseMessage(),
+    diagnostic: {
+      code: 'MODEL_CONTINUATION_DROPPED' as const,
+      severity: 'warning' as const,
+      userMessage: 'switched',
+      continuationDrop,
+    },
+  });
+
+  it('localizes the model-switch notice with its count', () => {
+    expect(resolveSystemNoticeText(notice({ count: 3, reasons: [] }), t)).toBe(
+      'chat.modelContinuationDropped:{"count":3}',
+    );
+  });
+
+  it('requires the structured count in the diagnostic shape', () => {
+    // @ts-expect-error a MODEL_CONTINUATION_DROPPED diagnostic without continuationDrop is not a valid shape
+    const invalid: ConversationMessage['diagnostic'] = {
+      code: 'MODEL_CONTINUATION_DROPPED',
+      severity: 'warning',
+      userMessage: 'switched',
+    };
+    expect(invalid).toBeDefined();
+  });
+
+  it('leaves other system messages untouched', () => {
+    expect(resolveSystemNoticeText(baseMessage(), t)).toBe('hello');
   });
 });

@@ -49,7 +49,6 @@ it.each(['en', 'zh-CN'] as const)(
             open: true,
             onClose,
             diagnostics,
-            onMigrate: vi.fn(),
             onDeleteOverride: vi.fn(),
             onReviewTrust: vi.fn(),
           }),
@@ -83,7 +82,7 @@ it.each(['en', 'zh-CN'] as const)(
   },
 );
 
-it('offers migrate and delete only for an override that still declares model fields', async () => {
+it('offers delete only for an override that still declares model fields', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -96,7 +95,6 @@ it('offers migrate and delete only for an override that still declares model fie
     sourcePath: 'C:/user/agents/general.agent.md',
     message: 'model and reasoning-level are set in Settings → Agents.',
   };
-  const onMigrate = vi.fn();
   const onDeleteOverride = vi.fn();
   locale.language = 'en';
   try {
@@ -106,20 +104,15 @@ it('offers migrate and delete only for an override that still declares model fie
           open: true,
           onClose: vi.fn(),
           diagnostics: [moved, issues[1]],
-          onMigrate,
           onDeleteOverride,
           onReviewTrust: vi.fn(),
         }),
       ),
     );
-    expect(document.querySelectorAll('[data-testid="settings-agent-diagnostic-migrate"]')).toHaveLength(1);
-    await act(async () =>
-      document.querySelector<HTMLButtonElement>('[data-testid="settings-agent-diagnostic-migrate"]')!.click(),
-    );
+    expect(document.querySelectorAll('[data-testid="settings-agent-diagnostic-delete"]')).toHaveLength(1);
     await act(async () =>
       document.querySelector<HTMLButtonElement>('[data-testid="settings-agent-diagnostic-delete"]')!.click(),
     );
-    expect(onMigrate).toHaveBeenCalledWith(moved);
     expect(onDeleteOverride).toHaveBeenCalledWith(moved);
   } finally {
     await act(async () => root.unmount());
@@ -150,7 +143,6 @@ it('offers trust review only for a project profile that has not been trusted', a
           open: true,
           onClose: vi.fn(),
           diagnostics: [untrusted, issues[1]],
-          onMigrate: vi.fn(),
           onDeleteOverride: vi.fn(),
           onReviewTrust,
         }),

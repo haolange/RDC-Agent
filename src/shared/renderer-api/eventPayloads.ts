@@ -68,6 +68,7 @@ const AGENT_EVENT_TYPES = enumOf<AgentEventType>()([
   'assistant.completed',
   'tool.requested',
   'tool.started',
+  'tool.progress',
   'tool.completed',
   'tool.denied',
   'task.created',

@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "kimi-for-coding",
   "name": "Kimi For Coding",
   "npm": "@ai-sdk/anthropic",

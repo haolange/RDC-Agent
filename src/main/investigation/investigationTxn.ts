@@ -46,7 +46,6 @@ export interface InvestigationTxnPlanEntry {
 }
 
 export interface InvestigationTxnJournal {
-  schemaVersion: 1;
   txnId: string;
   sessionId: string;
   createdAt: string;
@@ -54,7 +53,6 @@ export interface InvestigationTxnJournal {
 }
 
 export interface InvestigationTxnCommitMarker {
-  schemaVersion: 1;
   txnId: string;
   mutationCount: number;
   planHash: string;
@@ -137,7 +135,6 @@ export function commitInvestigationTxn(
   const txnId = generateEventId('invtxn');
   const plan = ordered.map((mutation, index) => toPlanEntry(mutation, index));
   const journal: InvestigationTxnJournal = {
-    schemaVersion: 1,
     txnId,
     sessionId,
     createdAt: new Date().toISOString(),
@@ -153,7 +150,6 @@ export function commitInvestigationTxn(
     emitBoundary(hooks, `temp:${mutation.role}`, { txnId, uri: mutation.uri, role: mutation.role });
   }
   const commit: InvestigationTxnCommitMarker = {
-    schemaVersion: 1,
     txnId,
     mutationCount: plan.length,
     planHash: planHashOf(plan),
@@ -279,7 +275,6 @@ function parseJournalDocument(raw: string, sessionId: string): InvestigationTxnJ
     return null;
   }
   if (!isRecord(parsed)) return null;
-  if (parsed.schemaVersion !== 1) return null;
   if (!nonEmptyString(parsed.txnId) || !nonEmptyString(parsed.sessionId) || !nonEmptyString(parsed.createdAt)) {
     return null;
   }
@@ -287,7 +282,6 @@ function parseJournalDocument(raw: string, sessionId: string): InvestigationTxnJ
   const mutations = parseMutations(parsed.mutations);
   if (!mutations) return null;
   return {
-    schemaVersion: 1,
     txnId: parsed.txnId,
     sessionId: parsed.sessionId,
     createdAt: parsed.createdAt,
@@ -303,13 +297,12 @@ function parseCommitDocument(raw: string): InvestigationTxnCommitMarker | null {
     return null;
   }
   if (!isRecord(parsed)) return null;
-  if (parsed.schemaVersion !== 1 || !nonEmptyString(parsed.txnId)) return null;
+  if (!nonEmptyString(parsed.txnId)) return null;
   const mutations = parseMutations(parsed.mutations);
   if (!mutations) return null;
   if (parsed.mutationCount !== mutations.length) return null;
   if (!nonEmptyString(parsed.planHash) || parsed.planHash !== planHashOf(mutations)) return null;
   return {
-    schemaVersion: 1,
     txnId: parsed.txnId,
     mutationCount: mutations.length,
     planHash: parsed.planHash,

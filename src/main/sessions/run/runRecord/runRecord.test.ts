@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { StorageIo } from '../../../runtime/StorageIo';
 import { readPersistedRun, writeRunFiles } from '../sessionRunPersistence';
 import { SessionRecordStore } from '../../store/SessionRecordStore';
-import { PersistedRunRecordV3Schema, toPersistedRunV3 } from './runRecordSchema';
+import { PersistedRunRecordSchema, toPersistedRun } from './runRecordSchema';
 import type { SessionRecordHost } from '../../store/SessionRecordStore';
 
 const roots: string[] = [];
@@ -24,7 +24,7 @@ function storageIo(): StorageIo {
   return new StorageIo();
 }
 
-function v3Base() {
+function runBase() {
   return {
     runId: 'run_c',
     projectId: 'p',
@@ -51,19 +51,19 @@ function v3Base() {
 }
 
 async function tempRun() {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-v3-'));
+  const root = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-record-'));
   roots.push(root);
   const runPath = path.join(root, 'sess', 'runs', 'run_c');
   await mkdir(runPath, { recursive: true });
   return runPath;
 }
 
-describe('Run v3 schema', () => {
+describe('Run record schema', () => {
   it('accepts conversation and mission identity and rejects stage-era fields', () => {
-    const conversation = toPersistedRunV3(v3Base());
+    const conversation = toPersistedRun(runBase());
     expect(conversation.kind).toBe('conversation');
     expect(conversation.captures).toEqual([]);
-    expect(PersistedRunRecordV3Schema.safeParse(conversation).success).toBe(true);
+    expect(PersistedRunRecordSchema.safeParse(conversation).success).toBe(true);
     for (const field of [
       'mode',
       'lastStage',
@@ -73,56 +73,53 @@ describe('Run v3 schema', () => {
       'availableStages',
       'currentStage',
     ]) {
-      expect(PersistedRunRecordV3Schema.safeParse({ ...conversation, [field]: 'obsolete' }).success).toBe(false);
+      expect(PersistedRunRecordSchema.safeParse({ ...conversation, [field]: 'obsolete' }).success).toBe(false);
     }
     expect(
-      PersistedRunRecordV3Schema.safeParse({
+      PersistedRunRecordSchema.safeParse({
         ...conversation,
         runtime: { ...runtime, workflow_stage: 'investigate' },
       }).success,
     ).toBe(false);
-    expect(PersistedRunRecordV3Schema.safeParse({ ...conversation, mission: 'debugger' }).success).toBe(false);
-    expect(PersistedRunRecordV3Schema.safeParse({ ...conversation, captures: v3Base().captures }).success).toBe(false);
+    expect(PersistedRunRecordSchema.safeParse({ ...conversation, mission: 'debugger' }).success).toBe(false);
+    expect(PersistedRunRecordSchema.safeParse({ ...conversation, captures: runBase().captures }).success).toBe(false);
 
-    const undeclared = toPersistedRunV3({ ...v3Base(), profileId: 'debugger' });
+    const undeclared = toPersistedRun({ ...runBase(), profileId: 'debugger' });
     expect(undeclared.kind).toBe('conversation');
-    const mission = toPersistedRunV3({
-      ...v3Base(),
+    const mission = toPersistedRun({
+      ...runBase(),
       profileId: 'debugger',
       completionContract: 'investigation-report',
       investigationMission: 'debugger',
     });
     expect(mission.kind).toBe('mission');
     if (mission.kind === 'mission') expect(mission.mission).toBe('debugger');
-    expect(PersistedRunRecordV3Schema.safeParse(mission).success).toBe(true);
-    expect(PersistedRunRecordV3Schema.safeParse({ ...mission, mission: 'analyzer' }).success).toBe(true);
-    expect(PersistedRunRecordV3Schema.safeParse({ ...mission, kind: 'conversation' }).success).toBe(false);
+    expect(PersistedRunRecordSchema.safeParse(mission).success).toBe(true);
+    expect(PersistedRunRecordSchema.safeParse({ ...mission, mission: 'analyzer' }).success).toBe(true);
+    expect(PersistedRunRecordSchema.safeParse({ ...mission, kind: 'conversation' }).success).toBe(false);
   });
 
   it('derives mission from the declared investigation, not from profileId', () => {
-    const mission = toPersistedRunV3({
-      ...v3Base(),
+    const mission = toPersistedRun({
+      ...runBase(),
       profileId: 'gpu-planner',
       completionContract: 'investigation-report',
       investigationMission: 'debugger',
     });
     expect(mission.kind).toBe('mission');
     if (mission.kind === 'mission') expect(mission.mission).toBe('debugger');
-    expect(PersistedRunRecordV3Schema.safeParse(mission).success).toBe(true);
-    expect(PersistedRunRecordV3Schema.safeParse({ ...mission, mission: 'not-a-mission' }).success).toBe(false);
+    expect(PersistedRunRecordSchema.safeParse(mission).success).toBe(true);
+    expect(PersistedRunRecordSchema.safeParse({ ...mission, mission: 'not-a-mission' }).success).toBe(false);
   });
 });
 
 describe('current Run persistence', () => {
   it('writes JSON and YAML projections and reads current JSON', async () => {
     const runPath = await tempRun();
-    const run = toPersistedRunV3(v3Base());
+    const run = toPersistedRun(runBase());
     writeRunFiles(storageIo(), runPath, run);
     expect(fs.existsSync(path.join(runPath, 'run.yaml'))).toBe(true);
-    expect(JSON.parse(await readFile(path.join(runPath, 'run.json'), 'utf8'))).toMatchObject({
-      schemaVersion: '3',
-      runId: 'run_c',
-    });
+    expect(JSON.parse(await readFile(path.join(runPath, 'run.json'), 'utf8'))).toMatchObject({ runId: 'run_c' });
     expect(readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toEqual(run);
   });
 
@@ -134,33 +131,21 @@ describe('current Run persistence', () => {
   it('rejects YAML-only data without silently recreating a JSON Run', async () => {
     const runPath = await tempRun();
     const yamlPath = path.join(runPath, 'run.yaml');
-    await writeFile(yamlPath, 'schemaVersion: "2"\nrunId: run_c\n', 'utf8');
-    expect(() => readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-    expect(await readFile(yamlPath, 'utf8')).toContain('schemaVersion');
+    await writeFile(yamlPath, 'runId: run_c\n', 'utf8');
+    expect(() => readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA/);
+    expect(await readFile(yamlPath, 'utf8')).toContain('runId');
     expect(fs.existsSync(path.join(runPath, 'run.json'))).toBe(false);
   });
 
-  it.each([undefined, '0', '1', '2', '99'])(
-    'rejects unsupported version %s without touching the source',
-    async (version) => {
-      const runPath = await tempRun();
-      const filePath = path.join(runPath, 'run.json');
-      const raw = JSON.stringify({ ...toPersistedRunV3(v3Base()), schemaVersion: version });
-      await writeFile(filePath, raw, 'utf8');
-      expect(() => readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-      expect(await readFile(filePath, 'utf8')).toBe(raw);
-    },
-  );
-
-  it('rejects invalid v3 and mismatched directory identity without rewriting', async () => {
+  it('rejects an invalid run and mismatched directory identity without rewriting', async () => {
     const runPath = await tempRun();
     const filePath = path.join(runPath, 'run.json');
     for (const run of [
-      { ...toPersistedRunV3(v3Base()), status: 'made-up' },
-      { ...toPersistedRunV3(v3Base()), runId: 'other' },
-      { ...toPersistedRunV3(v3Base()), sessionId: 'other' },
-      { ...toPersistedRunV3(v3Base()), caseId: 'other' },
-      { ...toPersistedRunV3(v3Base()), lastStage: 'investigate' },
+      { ...toPersistedRun(runBase()), status: 'made-up' },
+      { ...toPersistedRun(runBase()), runId: 'other' },
+      { ...toPersistedRun(runBase()), sessionId: 'other' },
+      { ...toPersistedRun(runBase()), caseId: 'other' },
+      { ...toPersistedRun(runBase()), lastStage: 'investigate' },
     ]) {
       const raw = JSON.stringify(run);
       await writeFile(filePath, raw, 'utf8');
@@ -171,12 +156,12 @@ describe('current Run persistence', () => {
 
   it('refuses to write an invalid Run instead of persisting a stage field', async () => {
     const runPath = await tempRun();
-    const run = { ...toPersistedRunV3(v3Base()), lastStage: 'investigate' };
-    expect(() => writeRunFiles(storageIo(), runPath, run)).toThrow(/refused to write invalid Run v3/);
+    const run = { ...toPersistedRun(runBase()), lastStage: 'investigate' };
+    expect(() => writeRunFiles(storageIo(), runPath, run)).toThrow(/refused to write an invalid run/);
     expect(fs.existsSync(path.join(runPath, 'run.json'))).toBe(false);
   });
 
-  it('fail-closes leftover stage fields on the live update path', async () => {
+  it('refuses a stage field on the live update path through the strict run schema', async () => {
     const projectsRoot = await mkdtemp(path.join(os.tmpdir(), 'rdc-run-finalize-'));
     roots.push(projectsRoot);
     const sessionPath = path.join(projectsRoot, 'sess');
@@ -206,13 +191,10 @@ describe('current Run persistence', () => {
       }),
       'utf8',
     );
-    writeRunFiles(io, runPath, toPersistedRunV3({ ...v3Base(), runId: 'r-final' }));
-    await expect(store.updateRun('sess', 'r-final', { lastStage: 'finalize', status: 'running' })).rejects.toThrow(
-      /RUN_V3_STAGE_FIELD/,
-    );
+    writeRunFiles(io, runPath, toPersistedRun({ ...runBase(), runId: 'r-final' }));
     await expect(
-      store.updateRun('sess', 'r-final', { runtime: { workflow_stage: 'finalize' }, status: 'running' }),
-    ).rejects.toThrow(/RUN_V3_STAGE_FIELD/);
+      store.updateRun('sess', 'r-final', { runtime: { workflow_stage: 'finalize' }, status: 'stopping' }),
+    ).rejects.toThrow(/refused to write an invalid run/);
     expect(store.readPersistedRun('sess', 'r-final')?.status).toBe('running');
   });
 });

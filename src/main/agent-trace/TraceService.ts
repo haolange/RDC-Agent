@@ -375,7 +375,6 @@ export class TraceService {
     const state = sessionRecordStore.readSession(sessionId)
       ? traceStateStore.read(sessionId)
       : {
-          schemaVersion: '1' as const,
           sessionId,
           activeBranchId: 'branch-main',
           userRequests: [],

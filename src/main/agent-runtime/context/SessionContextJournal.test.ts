@@ -1,13 +1,9 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { createProviderStateRef } from '../reasoning/ProviderStateRefs';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { conversationHistoryStore, sessionContextStore } from '../../sessions/store/sessionStores';
-import { SessionContextStore } from '../../sessions/store/SessionContextStore';
 import {
   canonicalizeTerminalContextMessages,
   filterSessionContextMessageArtifacts,
@@ -18,7 +14,6 @@ import type { AssistantMessage, Message } from '../core/types';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
-import type { SessionContextHost } from '../../sessions/store/SessionContextStore';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -39,7 +34,7 @@ function createPlan(options: PlanOptions): RequestPlan {
   const contracts: ProviderContractBundle = {
     ...fallback,
     protocolDialect: options.protocol,
-    protocolVersion: 'test-v1',
+    protocolVersion: 'test-protocol',
     compatibilityGroup: options.compatibilityGroup,
     reasoning: {
       semantic: options.carrier === 'reasoning-content' ? 'raw' : 'opaque',
@@ -61,8 +56,8 @@ function createPlan(options: PlanOptions): RequestPlan {
   return createTestRequestPlan({
     providerId: options.providerId,
     adapterId: options.adapterId,
-    catalogRevision: 'catalog-v1',
-    routeRevision: 'route-v1',
+    catalogRevision: 'catalog-a',
+    routeRevision: 'route-a',
     selectedModelId: options.modelId,
     effectiveModelId: options.modelId,
     appliedBindingIds: [],
@@ -102,7 +97,7 @@ const responsesPlan = createPlan({
   continuation: 'exact-execution',
   artifactPolicy: 'preserve-exact',
   artifactScope: 'all-assistant-turns',
-  compatibilityGroup: 'openai-responses-v1',
+  compatibilityGroup: 'openai-responses-family',
 });
 
 function providerManagedResponsesPlan(): RequestPlan {
@@ -151,7 +146,7 @@ const anthropicPlan = createPlan({
   continuation: 'exact-execution',
   artifactPolicy: 'preserve-exact',
   artifactScope: 'tool-call-turn',
-  compatibilityGroup: 'anthropic-messages-v1',
+  compatibilityGroup: 'anthropic-messages-family',
 });
 
 const reasoningContentPlan = createPlan({
@@ -163,7 +158,7 @@ const reasoningContentPlan = createPlan({
   continuation: 'same-provider-model',
   artifactPolicy: 'preserve-reasoning-content',
   artifactScope: 'all-assistant-turns',
-  compatibilityGroup: 'deepseek-reasoning-v1',
+  compatibilityGroup: 'deepseek-reasoning-family',
 });
 
 const usage = { inputTokens: 1, outputTokens: 1, totalTokens: 2 };
@@ -197,7 +192,6 @@ function encryptedAssistant(plan = responsesPlan): AssistantMessage {
 
 function entry(overrides: Partial<SessionContextTurnEntry> = {}): SessionContextTurnEntry {
   return {
-    schemaVersion: 2,
     turnId: 'turn-1',
     userMessageId: 'user-1',
     assistantMessageId: 'assistant-1',
@@ -229,7 +223,7 @@ describe('SessionContextJournal v2', () => {
         continuation: 'exact-execution' as const,
         artifactPolicy: 'preserve-exact' as const,
         artifactScope: 'all-assistant-turns' as const,
-        compatibilityGroup: 'openai-responses-v1',
+        compatibilityGroup: 'openai-responses-family',
       },
       modelId: 'gpt-5-mini',
     });
@@ -548,27 +542,6 @@ describe('SessionContextJournal v2', () => {
     expect(() => journal.append('session-1', entry({ status: 'error' }))).toThrow('Conflicting session context entry');
   });
 
-  it('fails closed on legacy v1 entries instead of performing a hot migration', () => {
-    const sessionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-session-context-'));
-    try {
-      fs.writeFileSync(
-        path.join(sessionPath, 'session-context.jsonl'),
-        `${JSON.stringify({ schemaVersion: 1, turnId: 'turn-1' })}\n`,
-      );
-      const store = new SessionContextStore({
-        sessions: { findSessionLocation: () => ({ sessionPath }) },
-      } as unknown as SessionContextHost);
-      expect(() => store.readSessionContextJournal('session-1')).toThrow(
-        expect.objectContaining({ code: 'STORAGE_CORRUPT' }),
-      );
-      expect(() => store.readSessionContextJournal('session-1', () => false)).toThrow(
-        expect.objectContaining({ code: 'STORAGE_CORRUPT' }),
-      );
-    } finally {
-      fs.rmSync(sessionPath, { recursive: true, force: true });
-    }
-  });
-
   it('fails closed when a visible turn is missing from the journal', () => {
     const journal = new SessionContextJournal();
     vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([]);
@@ -610,6 +583,41 @@ describe('SessionContextJournal v2', () => {
     expect(result.messages).toHaveLength(2);
     expect(result.messages[0]).toMatchObject({ role: 'user', content: 'Inspect event 42' });
     expect(JSON.stringify(result.messages)).toContain('interrupted before its context journal committed');
+    expect(JSON.stringify(result.messages)).not.toContain('Unverified partial answer');
+  });
+
+  it('recovers an interrupted turn that also carries a system notice by selecting messages by role', () => {
+    const journal = new SessionContextJournal();
+    vi.spyOn(sessionContextStore, 'readSessionContextJournal').mockReturnValue([]);
+    const base = { turnId: 'interrupted-turn', sessionId: 'session-1', projectId: 'project-1' };
+    vi.spyOn(conversationHistoryStore, 'readConversationHistory').mockReturnValue([
+      { ...base, id: 'user-1', role: 'user', content: 'Inspect event 42', createdAt: 1 },
+      {
+        ...base,
+        id: 'notice-1',
+        role: 'system',
+        content: 'Model switched.',
+        status: 'complete',
+        createdAt: 1,
+        diagnostic: { code: 'MODEL_CONTINUATION_DROPPED', severity: 'warning', userMessage: 'Model switched.' },
+      },
+      {
+        ...base,
+        id: 'assistant-1',
+        role: 'assistant',
+        content: 'Unverified partial answer',
+        status: 'error',
+        createdAt: 2,
+        updatedAt: 3,
+        diagnostic: { code: 'CONVERSATION_INTERRUPTED', severity: 'error', userMessage: 'Interrupted' },
+      },
+    ] as ConversationMessage[]);
+
+    const result = journal.materialize('session-1', ['interrupted-turn'], responsesPlan);
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages[0]).toMatchObject({ role: 'user', content: 'Inspect event 42' });
+    expect(JSON.stringify(result.messages)).toContain('interrupted before its context journal committed');
+    expect(JSON.stringify(result.messages)).not.toContain('Model switched.');
     expect(JSON.stringify(result.messages)).not.toContain('Unverified partial answer');
   });
 

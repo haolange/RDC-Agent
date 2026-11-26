@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "routing-run",
   "name": "routing.run",
   "npm": "@ai-sdk/openai-compatible",

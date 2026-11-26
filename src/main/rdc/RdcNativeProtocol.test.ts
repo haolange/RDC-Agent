@@ -569,3 +569,105 @@ it('retains structured remote repair facts without replacing its native error cl
     details,
   });
 });
+
+describe('operation process failures', () => {
+  const workerDetails = {
+    failure_stage: 'worker_exec',
+    reason: 'no_progress',
+    outcome: 'unknown',
+    worker: { pid: 4243, start_generation: 'linux:boot:1' },
+    worker_exit_confirmed: true,
+    replay_requires_restart: true,
+    stack_log: { path: '/intermediate/worker.log', tail: 'Thread 0x1 (most recent call first)' },
+    trace_id: 't',
+    request_id: 'r',
+    last_progress: { stage: 'replay', native_call: { name: 'SetFrameEvent', phase: 'enter', at_ms: 1 }, at_ms: 1 },
+    no_progress_ms: 300_000,
+  };
+  const failure = (code: string, details: Record<string, unknown>) =>
+    parseRdcNativeResultError({
+      exitCode: 1,
+      stdout: JSON.stringify({
+        schema_version: '3.0.0',
+        result_kind: 'rd.texture.get_pixel_history',
+        ok: false,
+        error: { code, category: 'runtime', message: `${code} happened`, details },
+      }),
+      stderr: '',
+      duration_ms: 1,
+    });
+  it.each([
+    ['worker_stuck', workerDetails, 'RDC_OPERATION_STUCK', { operation: 'rd.texture.get_pixel_history' }],
+    ['worker_lost', { ...workerDetails, reason: 'worker_exited' }, 'RDC_WORKER_LOST', undefined],
+    ['worker_request_failed', { ...workerDetails, reason: 'invalid_frame' }, 'RDC_WORKER_LOST', undefined],
+    [
+      'worker_unavailable',
+      { failure_stage: 'worker_start', reason: 'worker_unavailable', outcome: 'not_started', request_id: 'r' },
+      'RDC_WORKER_UNAVAILABLE',
+      undefined,
+    ],
+    [
+      'operation_cancelled',
+      { failure_stage: 'running', reason: 'cancel_requested', outcome: 'cancelled', request_id: 'r', trace_id: 't' },
+      'RDC_OPERATION_CANCELLED',
+      undefined,
+    ],
+    [
+      'daemon_lost',
+      {
+        failure_stage: 'await_daemon_reply',
+        reason: 'daemon_exited',
+        outcome: 'unknown',
+        operation: 'rd.texture.get_pixel_history',
+        daemon: { pid: 4242, start_generation: 'linux:boot:0' },
+        daemon_exit_confirmed: true,
+      },
+      'RDC_DAEMON_LOST',
+      undefined,
+    ],
+    [
+      'daemon_unresponsive',
+      {
+        failure_stage: 'await_daemon_reply',
+        reason: 'heartbeat_gap',
+        outcome: 'unknown',
+        operation: 'rd.texture.get_pixel_history',
+        daemon: { pid: 4242, start_generation: 'linux:boot:0' },
+        daemon_exit_confirmed: false,
+        heartbeat_gap_ms: 15_400,
+      },
+      'RDC_DAEMON_UNRESPONSIVE',
+      { operation: 'rd.texture.get_pixel_history', seconds: 15 },
+    ],
+  ])('names %s with its own code and parsed details', (native, details, code, params) => {
+    const error = failure(native, details);
+    expect(error).toBeInstanceOf(RdcNativeFailure);
+    expect(error).toMatchObject({
+      code,
+      params: params ?? { operation: 'rd.texture.get_pixel_history' },
+      nativeError: { code: native },
+      processFailure: { code: native, outcome: details.outcome, reason: details.reason },
+      effectsNotAttempted: false,
+    });
+  });
+  it('keeps the code but no parsed details when a process failure breaks the documented shape', () => {
+    const error = failure('worker_stuck', { reason: 'no_progress' });
+    expect(error).toMatchObject({ code: 'RDC_OPERATION_STUCK', processFailure: null });
+  });
+  it('leaves an ordinary native failure under the generic code', () => {
+    expect(failure('shader_binding_lookup_failed', {})).toMatchObject({
+      code: 'RDC_NATIVE_FAILURE',
+      processFailure: null,
+    });
+  });
+});
+
+function parseRdcNativeResultError(result: CLIResult): RdcNativeFailure {
+  try {
+    parseRdcNativeResult(result, undefined, 'rd.texture.get_pixel_history');
+  } catch (error) {
+    if (error instanceof RdcNativeFailure) return error;
+    throw error;
+  }
+  throw new Error('expected a native failure');
+}

@@ -56,7 +56,7 @@ export function useAgentManifestAutosave(options: UseAgentManifestAutosaveOption
     latest.current.onSaveMessageChange(message);
   };
 
-  /** Committed definitions become the saved baseline: on close, and after import or migration. */
+  /** Committed definitions become the saved baseline: on close, and after import or an override deletion. */
   const rebase = (definitions: AgentManifestDefinition[]) => {
     savedDraftsRef.current = definitions.map((entry) => ({ ...entry }));
     failedDraftsRef.current = null;

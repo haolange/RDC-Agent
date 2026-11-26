@@ -2,121 +2,27 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
 import { afterEach } from 'vitest';
 import { readPersistedRun } from '../run/sessionRunPersistence';
 import { createDefaultSettingsFile } from '../../settings/settings-core/settingsDefaults';
-import { parseSettingsFile, SETTINGS_SCHEMA_VERSION } from '../../settings/settings-core/settingsFileSchema';
+import { parseSettingsFile } from '../../settings/settings-core/settingsFileSchema';
 import { parseJsonWith, readValidatedSync } from '../../runtime/atomicFile';
 import { stringifyYaml } from '../../runtime/yaml';
-import { PROJECT_REGISTRY_MIGRATIONS } from '../../runtime/projectRegistrySchema';
-import {
-  parseStoredDocument,
-  readCurrentStoredJson,
-  StorageSchemaError,
-  type StorageMigration,
-} from '../../runtime/storedDocument';
+import { ProjectRegistrySchema } from '../../runtime/projectRegistrySchema';
 import { StorageIo } from '../../runtime/StorageIo';
 import {
   SessionRecordSchema,
   SessionAttachmentManifestSchema,
   toSessionAttachmentManifest,
-  CURRENT_USAGE_SCHEMA_VERSION,
-  SessionUsageV2Schema,
-  SESSION_SHELL_STATE_MIGRATIONS,
+  SessionUsageSchema,
+  SessionShellStateSchema,
   toSessionUsageManifest,
   toSessionShellStateManifest,
-  CONVERSATION_TURN_COMMIT_MIGRATIONS,
-  CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
+  ConversationTurnCommitSchema,
+  ConversationTerminalAppendSchema,
 } from './storageSchema';
 
-describe('storageSchema parseStoredDocument', () => {
-  const current = z.object({
-    schemaVersion: z.literal('1'),
-    name: z.string(),
-    extra: z.boolean().optional(),
-  });
-  const migrations = [
-    {
-      schemaVersion: '0',
-      schema: z.object({ schemaVersion: z.literal('0'), name: z.string() }),
-      migrate: (raw: unknown) => {
-        const record = raw as { name: string };
-        return { schemaVersion: '1', name: record.name, extra: true };
-      },
-    },
-    { schemaVersion: '1', schema: current },
-  ] as StorageMigration<{ schemaVersion: '1'; name: string; extra?: boolean }>[];
-
-  it('accepts a legal current-version document', () => {
-    expect(parseStoredDocument({ schemaVersion: '1', name: 'ok' }, migrations, 'doc.json')).toEqual({
-      schemaVersion: '1',
-      name: 'ok',
-    });
-  });
-
-  it('migrates an old version through the registry', () => {
-    expect(parseStoredDocument({ schemaVersion: '0', name: 'legacy' }, migrations, 'doc.json')).toEqual({
-      schemaVersion: '1',
-      name: 'legacy',
-      extra: true,
-    });
-  });
-
-  it('fail-closes unknown higher versions without mutating the document', () => {
-    expect(() => parseStoredDocument({ schemaVersion: '9', name: 'future' }, migrations, 'doc.json')).toThrow(
-      /STORAGE_SCHEMA_UNSUPPORTED/,
-    );
-  });
-
-  it('fail-closes structurally invalid current documents', () => {
-    expect(() => parseStoredDocument({ schemaVersion: '1', name: 12 }, migrations, 'doc.json')).toThrow(
-      /STORAGE_SCHEMA/,
-    );
-  });
-
-  it('treats unversioned documents as v0 when a v0 migration exists', () => {
-    expect(parseStoredDocument({ name: 'legacy' }, migrations, 'doc.json')).toEqual({
-      schemaVersion: '1',
-      name: 'legacy',
-      extra: true,
-    });
-  });
-
-  it('fail-closes missing schemaVersion when no v0 migration exists', () => {
-    expect(() => parseStoredDocument({ name: 'ok' }, [{ schemaVersion: '1', schema: current }], 'doc.json')).toThrow(
-      /missing schemaVersion/,
-    );
-  });
-
-  it('parses the project registry v1 contract', () => {
-    const parsed = parseStoredDocument(
-      {
-        schemaVersion: '1',
-        projects: [
-          {
-            projectId: 'p1',
-            name: 'Demo',
-            rootPath: 'D:/demo',
-            slug: 'demo',
-            resourcePath: 'D:/demo/.rdc-agent',
-            knowledgePath: 'D:/demo/.rdc-agent/knowledge',
-            inputsPath: 'D:/demo/.rdc-agent/inputs',
-            inputs: [],
-            inputsUpdatedAt: 1,
-            createdAt: 1,
-            updatedAt: 1,
-          },
-        ],
-      },
-      PROJECT_REGISTRY_MIGRATIONS,
-      'projects.json',
-    );
-    expect(parsed.projects).toHaveLength(1);
-  });
-});
-
-describe('session usage schema v2', () => {
+describe('session usage schema', () => {
   const usage = {
     runId: 'run_current',
     providerId: 'deepseek',
@@ -134,29 +40,13 @@ describe('session usage schema v2', () => {
     snapshotAt: 1,
   };
 
-  it('accepts a current { schemaVersion, usage } document', () => {
-    expect(SessionUsageV2Schema.parse(toSessionUsageManifest(usage))).toEqual({ schemaVersion: '2', usage });
+  it('accepts a current { usage } document', () => {
+    expect(SessionUsageSchema.parse(toSessionUsageManifest(usage))).toEqual({ usage });
   });
 
-  it.each([undefined, '0', '1', '9'])('rejects usage version %s and preserves the source bytes', (version) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-usage-version-'));
-    const filePath = path.join(root, 'usage.json');
-    const raw = JSON.stringify({ schemaVersion: version, usage });
-    try {
-      fs.writeFileSync(filePath, raw, 'utf8');
-      expect(() =>
-        readCurrentStoredJson(new StorageIo(), filePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageV2Schema),
-      ).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-      expect(fs.readFileSync(filePath, 'utf8')).toBe(raw);
-    } finally {
-      fs.rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  it('rejects retired usage fields inside a v2 document', () => {
+  it('rejects retired usage fields', () => {
     expect(
-      SessionUsageV2Schema.safeParse({
-        schemaVersion: '2',
+      SessionUsageSchema.safeParse({
         usage: { ...usage, outputReserveTokens: 384_000 },
       }).success,
     ).toBe(false);
@@ -164,46 +54,23 @@ describe('session usage schema v2', () => {
 });
 
 describe('session shell-state schema', () => {
-  it('accepts a current { schemaVersion, state } document', () => {
-    expect(
-      parseStoredDocument(
-        toSessionShellStateManifest({ cwd: 'D:/Projects/app' }),
-        SESSION_SHELL_STATE_MIGRATIONS,
-        'shell-state.json',
-      ),
-    ).toEqual({
-      schemaVersion: '1',
+  it('accepts a current { state } document', () => {
+    expect(SessionShellStateSchema.parse(toSessionShellStateManifest({ cwd: 'D:/Projects/app' }))).toEqual({
       state: { cwd: 'D:/Projects/app' },
     });
-  });
-
-  it('fail-closes a missing schemaVersion', () => {
-    expect(() =>
-      parseStoredDocument({ state: { cwd: 'D:/Projects/app' } }, SESSION_SHELL_STATE_MIGRATIONS, 'shell-state.json'),
-    ).toThrow(/missing schemaVersion/);
   });
 
   it('reports a structurally invalid on-disk document and keeps a copy', () => {
     const io = new StorageIo();
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-shell-state-'));
     const filePath = path.join(root, 'shell-state.json');
-    fs.writeFileSync(filePath, JSON.stringify({ schemaVersion: '1', state: { cwd: 12 } }), 'utf8');
-    expect(() => io.readJson(filePath, SESSION_SHELL_STATE_MIGRATIONS)).toThrow(/STORAGE_CORRUPT|STORAGE_SCHEMA/);
+    fs.writeFileSync(filePath, JSON.stringify({ state: { cwd: 12 } }), 'utf8');
+    expect(() => io.readJson(filePath, SessionShellStateSchema)).toThrow(/STORAGE_CORRUPT|STORAGE_SCHEMA/);
     expect(fs.existsSync(filePath)).toBe(true);
     expect(
       fs.readdirSync(path.dirname(filePath)).some((name) => name.startsWith(`${path.basename(filePath)}.corrupt-`)),
     ).toBe(true);
     fs.rmSync(root, { recursive: true, force: true });
-  });
-
-  it('fail-closes an unknown higher shell-state schemaVersion', () => {
-    expect(() =>
-      parseStoredDocument(
-        { schemaVersion: '9', state: { cwd: 'D:/Projects/app' } },
-        SESSION_SHELL_STATE_MIGRATIONS,
-        'shell-state.json',
-      ),
-    ).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
   });
 });
 
@@ -227,7 +94,6 @@ describe('StorageIo schema-backed readJson', () => {
     const root = tempRoot();
     const filePath = path.join(root, 'session.json');
     const record = {
-      schemaVersion: '1',
       sessionId: 'sess_1',
       projectId: 'proj_1',
       title: 't',
@@ -240,23 +106,6 @@ describe('StorageIo schema-backed readJson', () => {
     expect(io.readJson(filePath, SessionRecordSchema)).toMatchObject({ sessionId: 'sess_1' });
   });
 
-  it('keeps an unversioned session.json and fails closed', () => {
-    const root = tempRoot();
-    const filePath = path.join(root, 'session.json');
-    const legacy = {
-      sessionId: 'sess_1',
-      projectId: 'proj_1',
-      title: 't',
-      goal: '',
-      sessionPath: filePath,
-      createdAt: 1,
-      updatedAt: 1,
-    };
-    fs.writeFileSync(filePath, JSON.stringify(legacy), 'utf8');
-    expect(() => io.readJson(filePath, SessionRecordSchema)).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-    expect(JSON.parse(fs.readFileSync(filePath, 'utf8'))).toEqual(legacy);
-  });
-
   it('reports structurally invalid JSON under a schema and keeps a copy', () => {
     const root = tempRoot();
     const filePath = path.join(root, 'session.json');
@@ -267,20 +116,9 @@ describe('StorageIo schema-backed readJson', () => {
       fs.readdirSync(path.dirname(filePath)).some((name) => name.startsWith(`${path.basename(filePath)}.corrupt-`)),
     ).toBe(true);
   });
-
-  it('does not quarantine unknown higher schema versions', () => {
-    const root = tempRoot();
-    const filePath = path.join(root, 'projects.json');
-    const future = { schemaVersion: '99', projects: [] };
-    fs.writeFileSync(filePath, JSON.stringify(future), 'utf8');
-    expect(() => io.readJson(filePath, PROJECT_REGISTRY_MIGRATIONS)).toThrow(StorageSchemaError);
-    expect(fs.existsSync(filePath)).toBe(true);
-    expect(JSON.parse(fs.readFileSync(filePath, 'utf8'))).toEqual(future);
-  });
 });
 
 const legalSession = {
-  schemaVersion: '1' as const,
   sessionId: 'sess_1',
   projectId: 'proj_1',
   title: 't',
@@ -303,7 +141,6 @@ const legalAttachment = {
 };
 
 const legalRun = {
-  schemaVersion: '3' as const,
   kind: 'mission' as const,
   mission: 'debugger' as const,
   profileId: 'debugger',
@@ -328,7 +165,6 @@ const legalRun = {
 };
 
 const legalTurnCommit = {
-  schemaVersion: '1',
   requestId: 'req_1',
   turnId: 'turn_1',
   phase: 'prepared' as const,
@@ -339,17 +175,13 @@ const legalTurnCommit = {
   importedPaths: [],
 };
 
+const appendFile = { existed: true, bytes: 0, sha256: 'a'.repeat(64), append: '' };
 const legalTerminalCommit = {
-  schemaVersion: '1',
   requestId: 'req_1',
   turnId: 'turn_1',
   phase: 'prepared' as const,
-  beforeHistory: [],
-  beforeBranch: null,
-  beforeContext: [],
-  afterHistory: [],
-  afterBranch: null,
-  afterContext: [],
+  history: appendFile,
+  context: appendFile,
 };
 
 const legalUsage = {
@@ -370,7 +202,6 @@ const legalUsage = {
 };
 
 const legalRegistry = {
-  schemaVersion: '1',
   projects: [
     {
       projectId: 'p1',
@@ -405,15 +236,11 @@ describe('external capture registry boundary', () => {
     projects: legalRegistry.projects.map((project) => ({ ...project, inputs: [input] })),
   });
   it('keeps existing registries readable and round-trips the new exact reference fields', () => {
-    expect(parseStoredDocument(legalRegistry, PROJECT_REGISTRY_MIGRATIONS, 'projects.json')).toEqual(legalRegistry);
-    expect(parseStoredDocument(registry(external), PROJECT_REGISTRY_MIGRATIONS, 'projects.json')).toMatchObject(
-      registry(external),
-    );
+    expect(ProjectRegistrySchema.parse(legalRegistry)).toEqual(legalRegistry);
+    expect(ProjectRegistrySchema.parse(registry(external))).toMatchObject(registry(external));
   });
   it.each(['contentSha256', 'referenceIdentity'])('rejects external references missing %s', (field) => {
-    expect(() =>
-      parseStoredDocument(registry({ ...external, [field]: undefined }), PROJECT_REGISTRY_MIGRATIONS, 'projects.json'),
-    ).toThrow(StorageSchemaError);
+    expect(ProjectRegistrySchema.safeParse(registry({ ...external, [field]: undefined })).success).toBe(false);
   });
 });
 
@@ -438,26 +265,14 @@ describe('storage schema store quartet', () => {
       name: 'projects registry',
       file: 'registry.json',
       legal: legalRegistry,
-      corrupt: { schemaVersion: '1', projects: 'nope' },
-      missingOrLegacy: legalRegistry,
-      higher: { ...legalRegistry, schemaVersion: '99' },
-      read: (filePath: string) => io.readJson(filePath, PROJECT_REGISTRY_MIGRATIONS),
+      corrupt: { projects: 'nope' },
+      read: (filePath: string) => io.readJson(filePath, ProjectRegistrySchema),
     },
     {
       name: 'session record',
       file: 'session.json',
       legal: legalSession,
       corrupt: { sessionId: 1 },
-      missingOrLegacy: {
-        sessionId: 'sess_1',
-        projectId: 'proj_1',
-        title: 't',
-        goal: '',
-        sessionPath: 'D:/sess',
-        createdAt: 1,
-        updatedAt: 1,
-      },
-      higher: { ...legalSession, schemaVersion: '99' },
       read: (filePath: string) => io.readJson(filePath, SessionRecordSchema),
     },
     {
@@ -465,45 +280,34 @@ describe('storage schema store quartet', () => {
       file: 'attachments.json',
       legal: toSessionAttachmentManifest([legalAttachment]),
       corrupt: [{ attachmentId: 1 }],
-      missingOrLegacy: toSessionAttachmentManifest([legalAttachment]),
-      higher: { schemaVersion: '99', attachments: [legalAttachment] },
       read: (filePath: string) => io.readJson(filePath, SessionAttachmentManifestSchema),
     },
     {
       name: 'session usage',
       file: 'usage.json',
       legal: toSessionUsageManifest(legalUsage),
-      corrupt: { schemaVersion: '1', usage: { runId: 1 } },
-      missingOrLegacy: toSessionUsageManifest(legalUsage),
-      higher: { schemaVersion: '99', usage: legalUsage },
-      read: (filePath: string) =>
-        readCurrentStoredJson(io, filePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageV2Schema),
+      corrupt: { usage: { runId: 1 } },
+      read: (filePath: string) => io.readJson(filePath, SessionUsageSchema),
     },
     {
       name: 'turn-commit',
       file: 'conversation-turn-commit.json',
       legal: legalTurnCommit,
-      corrupt: { schemaVersion: '1', requestId: 1 },
-      missingOrLegacy: legalTurnCommit,
-      higher: { ...legalTurnCommit, schemaVersion: '99' },
-      read: (filePath: string) => io.readJson(filePath, CONVERSATION_TURN_COMMIT_MIGRATIONS),
+      corrupt: { requestId: 1 },
+      read: (filePath: string) => io.readJson(filePath, ConversationTurnCommitSchema),
     },
     {
       name: 'terminal-commit',
       file: 'conversation-terminal-commit.json',
       legal: legalTerminalCommit,
-      corrupt: { schemaVersion: '1', requestId: 1 },
-      missingOrLegacy: legalTerminalCommit,
-      higher: { ...legalTerminalCommit, schemaVersion: '99' },
-      read: (filePath: string) => io.readJson(filePath, CONVERSATION_TERMINAL_COMMIT_MIGRATIONS),
+      corrupt: { requestId: 1 },
+      read: (filePath: string) => io.readJson(filePath, ConversationTerminalAppendSchema),
     },
     {
       name: 'run',
       file: 'run.json',
       legal: legalRun,
       corrupt: { runId: 1 },
-      missingOrLegacy: legalRun,
-      higher: { ...legalRun, schemaVersion: '99' },
       read: (filePath: string) => readPersistedRun(io, path.dirname(filePath), 'sess_1', 'run_1'),
     },
     {
@@ -511,8 +315,6 @@ describe('storage schema store quartet', () => {
       file: 'config.json',
       legal: createDefaultSettingsFile(),
       corrupt: { ...createDefaultSettingsFile(), appearance: 12 },
-      missingOrLegacy: { ...createDefaultSettingsFile(), schemaVersion: SETTINGS_SCHEMA_VERSION - 1 },
-      higher: { ...createDefaultSettingsFile(), schemaVersion: SETTINGS_SCHEMA_VERSION + 1 },
       read: (filePath: string) => readValidatedSync(filePath, parseJsonWith(parseSettingsFile)),
     },
   ] as const;
@@ -537,16 +339,9 @@ describe('storage schema store quartet', () => {
         io.writeJsonAtomic(filePath, store.legal);
         const parsed = store.read(filePath);
         expect(parsed).toBeTruthy();
-        if (store.name === 'attachments') {
-          expect(Array.isArray(parsed)).toBe(true);
-          expect((JSON.parse(fs.readFileSync(filePath, 'utf8')) as { schemaVersion?: string }).schemaVersion).toBe('1');
-        }
-        if (store.name === 'session usage') {
-          expect((parsed as { schemaVersion?: string; usage?: { promptBudgetTokens?: number } }).schemaVersion).toBe(
-            '2',
-          );
+        if (store.name === 'attachments') expect(Array.isArray(parsed)).toBe(true);
+        if (store.name === 'session usage')
           expect((parsed as { usage?: { promptBudgetTokens?: number } }).usage?.promptBudgetTokens).toBe(100);
-        }
       });
 
       it('fail-closes a structurally damaged document', () => {
@@ -556,37 +351,16 @@ describe('storage schema store quartet', () => {
         expect(() => store.read(filePath)).toThrow(/STORAGE_CORRUPT|STORAGE_SCHEMA/);
       });
 
-      it('handles a second document according to the current store version contract', () => {
-        const filePath = path.join(tempRoot(), store.file);
-        io.writeJsonAtomic(filePath, store.missingOrLegacy);
-        if (store.name === 'settings' || store.name === 'session record') {
-          const original = fs.readFileSync(filePath, 'utf8');
-          expect(() => store.read(filePath)).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-          expect(fs.readFileSync(filePath, 'utf8')).toBe(original);
-          return;
-        }
-        expect(store.read(filePath)).toBeTruthy();
-      });
-
-      it('fail-closes an unknown higher schemaVersion without quarantine', () => {
+      it('refuses a document that still carries a format version, leaving its bytes in place', () => {
         const filePath = path.join(tempRoot(), store.file);
         fs.mkdirSync(path.dirname(filePath), { recursive: true });
-        fs.writeFileSync(filePath, JSON.stringify(store.higher), 'utf8');
-        expect(() => store.read(filePath)).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-        expect(fs.existsSync(filePath)).toBe(true);
+        const raw = JSON.stringify({ schemaVersion: '1', ...store.legal });
+        fs.writeFileSync(filePath, raw, 'utf8');
+        expect(() => store.read(filePath)).toThrow(/STORAGE_CORRUPT|STORAGE_SCHEMA/);
+        expect(fs.readFileSync(filePath, 'utf8')).toBe(raw);
       });
     });
   }
-
-  it('rejects an old bare attachment array without changing its bytes', () => {
-    const filePath = path.join(tempRoot(), 'attachments.json');
-    const raw = JSON.stringify([legalAttachment]);
-    fs.writeFileSync(filePath, raw, 'utf8');
-    expect(() => readCurrentStoredJson(io, filePath, '1', SessionAttachmentManifestSchema)).toThrow(
-      /STORAGE_SCHEMA_UNSUPPORTED/,
-    );
-    expect(fs.readFileSync(filePath, 'utf8')).toBe(raw);
-  });
 
   it('rejects a YAML-only Run even when its projection claims the current schema', () => {
     const root = tempRoot();
@@ -595,7 +369,7 @@ describe('storage schema store quartet', () => {
     const yamlPath = path.join(runPath, 'run.yaml');
     const original = stringifyYaml({ schema_version: '3', run_id: 'run_1' });
     fs.writeFileSync(yamlPath, original, 'utf8');
-    expect(() => readPersistedRun(io, runPath, 'sess_1', 'run_1')).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+    expect(() => readPersistedRun(io, runPath, 'sess_1', 'run_1')).toThrow(/STORAGE_SCHEMA/);
     expect(fs.readFileSync(yamlPath, 'utf8')).toBe(original);
   });
 });

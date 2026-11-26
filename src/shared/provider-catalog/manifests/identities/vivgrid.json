@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "vivgrid",
   "name": "Vivgrid",
   "npm": "@ai-sdk/openai",

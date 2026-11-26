@@ -80,8 +80,8 @@ export function ProjectAgentTrustDialog({
       ) : null}
       {preview ? (
         <>
-          <dl className="settings-agent-migration-facts">
-            <dt>{t('settings.agentModelMigrationFile')}</dt>
+          <dl className="settings-agent-file-facts">
+            <dt>{t('settings.agentOverrideFile')}</dt>
             <dd>
               <code>{preview.sourcePath}</code>
             </dd>

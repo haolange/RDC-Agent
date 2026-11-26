@@ -9,7 +9,6 @@ const hash = z.string().regex(/^[a-f0-9]{64}$/);
 /** Main-generated facts included in the plan the user reviews and approves. */
 export const InvestigationPlanContractSchema = z
   .object({
-    schemaVersion: z.literal(1),
     mission: z.enum(['debugger', 'analyzer', 'optimizer']),
     captureScope: z
       .object({

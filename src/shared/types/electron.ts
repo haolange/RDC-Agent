@@ -91,6 +91,7 @@ import type { MCPServerStatusSummary } from './mcp';
 import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
 import type { TraceProjectionChangedPayload } from './agenticTrace';
 import type { TraceSessionResult } from './trace';
+import type { CrashFilesSummary, PreviousInstanceNotice, RendererFaultReport } from './lifecycle';
 import type {
   HookEvent,
   RdcRuntimeOverview,
@@ -182,6 +183,8 @@ export interface ElectronAPI {
       version: string;
       productName: string;
       systemTheme: ResolvedTheme;
+      /** Set when the previous launch left its instance lock behind: how it most likely ended. */
+      previousInstance: PreviousInstanceNotice | null;
     }>;
   };
 
@@ -196,6 +199,12 @@ export interface ElectronAPI {
       success: boolean;
       text: string;
     }>;
+    /** The minidumps kept on this machine; they are never uploaded or exported. */
+    getCrashFiles: () => Promise<CrashFilesSummary>;
+    /** Removes every kept minidump and returns what is left. */
+    clearCrashFiles: () => Promise<CrashFilesSummary>;
+    /** A render-time exception the root error boundary caught, for the lifecycle ledger. */
+    reportRendererFault: (report: RendererFaultReport) => Promise<void>;
   };
 
   web: {
@@ -338,7 +347,6 @@ export interface ElectronAPI {
     import: (
       request: KnowledgeOperationRef & {
         spaceId: string;
-        sessionId?: string;
         source?: string;
         filePath?: string;
       },
@@ -460,8 +468,7 @@ export interface ElectronAPI {
     getAgentDefinitionCommit: (
       query: import('./agentManifest').AgentDefinitionCommitQuery,
     ) => Promise<AgentDefinitionCommitSnapshot | null>;
-    previewAgentModelMigration: (sourcePath: string) => Promise<import('./agentManifest').AgentModelMigrationPreview>;
-    applyAgentModelMigration: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
+    previewAgentOverrideFile: (sourcePath: string) => Promise<import('./agentManifest').AgentOverrideFilePreview>;
     deleteAgentOverrideFile: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;
     previewProjectAgentTrust: (sourcePath: string) => Promise<import('./agentManifest').ProjectAgentTrustPreview>;
     trustProjectAgent: (request: import('./agentManifest').AgentOverrideFileRequest) => Promise<SettingsView>;

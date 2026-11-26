@@ -37,7 +37,7 @@ import { onJsonlTailRepair } from './runtime/jsonl';
 import { rendererEventHub } from './runtime/rendererEventHub';
 import { startBrowserAppBridge, stopBrowserAppBridge } from './browserAppBridge/BrowserAppBridgeServer';
 import { isBrowserQaRun } from './runtime/browserQaRun';
-import { shutdownCoordinator } from './lifecycle/ShutdownCoordinator';
+import { shutdownCoordinator, type ShutdownObserver } from './lifecycle/ShutdownCoordinator';
 import { conversationService } from './conversation/ConversationService';
 import { agentOrchestrator } from './agent-runtime/orchestration/agentRuntimeRoot';
 import { processSupervisor } from './runtime/ProcessSupervisor';
@@ -45,12 +45,17 @@ import { turnCoordinator } from './agent-runtime/orchestration/TurnCoordinator';
 import { bindWindowLayoutPersistence, resolveWindowCreationOptions } from './window/windowLayoutPersistence';
 import { bindProductIcon } from './window/productIcon';
 import { reportSettingsStartupFailure } from './window/settingsStartupFailure';
+import { bindRendererRecovery, RENDERER_CRASH_PARAM, type RendererCrash } from './window/rendererRecovery';
 import { resolvedAppearanceMode, windowBackgroundColor } from './window/appearanceChrome';
 import { isTrustedRendererUrl, openExternalHttps, trustRendererEntry } from './runtime/rendererTrust';
 import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
 import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
+import { abnormalSupervisedExit, goneProcessKind, lifecycleLedger } from './runtime/LifecycleLedger';
+import { pruneCrashDumps, startLocalCrashReporter } from './runtime/crashFiles';
+import { adoptPreviousInstanceDiagnosis, diagnosePreviousInstanceFromDisk } from './runtime/previousInstanceDiagnosis';
 import { currentHost } from './platform/host';
 import { currentProcessIdentity } from './platform/process';
+import type { ShutdownCause } from '@shared/types/lifecycle';
 
 /**
  * Lower domains declare the port they need and this composition root binds the implementation from the domain
@@ -74,6 +79,23 @@ const SHUTDOWN_TIMEOUT_MS = 45_000;
 let shutdownStarted = false;
 let shutdownExitCode = 0;
 let settingsInitialized = false;
+/**
+ * What asked the app to quit; a quit without a more specific cause (the menu, the dock, a process signal, which
+ * Electron turns into a quit itself) is `before-quit`.
+ */
+let shutdownCause: ShutdownCause = 'before-quit';
+let shutdownTimedOut = false;
+let instanceExitRecorded = false;
+
+/** The shutdown state machine reports into the ledger; the next launch reads it when this one does not end cleanly. */
+const shutdownLedger: ShutdownObserver = {
+  began: (cause) => lifecycleLedger.record({ kind: 'shutdown_began', cause }),
+  phaseTimedOut: (phase, pending) => lifecycleLedger.record({ kind: 'shutdown_phase_timed_out', phase, pending }),
+  finished: ({ timedOut, durationMs }) => {
+    shutdownTimedOut = timedOut;
+    lifecycleLedger.record({ kind: 'shutdown_finished', timedOut, durationMs });
+  },
+};
 
 function registerShutdownDisposables(): void {
   shutdownCoordinator.register({
@@ -233,10 +255,13 @@ console.log(
   }),
 );
 
+const processIdentity = currentProcessIdentity();
+const instanceMode = isHeadlessMode ? 'browser' : 'desktop';
 const userDataLock = acquireUserDataInstanceLock(userDataPath, {
-  ...currentProcessIdentity(),
-  mode: isHeadlessMode ? 'browser' : 'desktop',
+  ...processIdentity,
+  mode: instanceMode,
   startTs: new Date().toISOString(),
+  instanceId: lifecycleLedger.instanceId,
 });
 if (!userDataLock.acquired) {
   const owner = userDataLock.owner;
@@ -246,6 +271,41 @@ if (!userDataLock.acquired) {
   );
   app.exit(1);
 } else {
+  lifecycleLedger.record({
+    kind: 'instance_started',
+    ...processIdentity,
+    appVersion: app.getVersion(),
+    electronVersion: process.versions.electron,
+    mode: instanceMode,
+  });
+  processSupervisor.observeExits((owner, info) => {
+    const event = abnormalSupervisedExit(owner, info);
+    if (event) lifecycleLedger.record(event);
+  });
+  // A lock the previous launch never released: say how it most likely ended before anything reads a session, and
+  // before crash-file retention runs, so its minidumps still count.
+  if (userDataLock.staleOwner) {
+    const diagnosis = diagnosePreviousInstanceFromDisk(userDataLock.staleOwner);
+    adoptPreviousInstanceDiagnosis(diagnosis);
+    lifecycleLedger.record({
+      kind: 'previous_instance_diagnosed',
+      diagnosedInstanceId: diagnosis.instanceId,
+      classification: diagnosis.classification,
+    });
+    console.warn(
+      '[RDC-Agent] The previous launch did not end cleanly:',
+      JSON.stringify({ ...diagnosis, interruptedTurns: diagnosis.interruptedTurns.length }),
+    );
+  }
+  // Local minidumps only, for the instance that owns this data directory; the disposable Browser QA instance has none.
+  if (!useDisposableBrowserQaUserData) {
+    try {
+      startLocalCrashReporter();
+      pruneCrashDumps();
+    } catch (error) {
+      console.error('[RDC-Agent] Local crash reporting is unavailable:', error);
+    }
+  }
   process.once('exit', userDataLock.release);
   if (cleanupDisposableBrowserQaUserData) {
     app.once('will-quit', () => {
@@ -262,6 +322,10 @@ if (!userDataLock.acquired) {
 }
 
 function exitMainProcess(code: number): void {
+  if (userDataLock.acquired && !instanceExitRecorded) {
+    instanceExitRecorded = true;
+    lifecycleLedger.record({ kind: 'instance_exited', clean: !shutdownTimedOut, exitCode: code });
+  }
   if (userDataLock.acquired) {
     try {
       userDataLock.release();
@@ -370,6 +434,36 @@ function setupKeyboardShortcuts(window: BrowserWindow): void {
 }
 
 /**
+ * Loads the renderer entry. The boot theme rides along so the first paint already uses the chosen light or dark
+ * palette; after repeated crashes the crash facts ride along too and the renderer boots into its failure page.
+ */
+function loadRenderer(window: BrowserWindow, crash?: RendererCrash): void {
+  const { appearance } = settingsService.snapshot().user;
+  const query: Record<string, string> = { theme: resolvedAppearanceMode(appearance) };
+  if (crash) {
+    Object.assign(query, {
+      [RENDERER_CRASH_PARAM]: crash.reason,
+      exitCode: String(crash.exitCode),
+      crashedAt: String(Date.now()),
+      lang: appearance.language,
+    });
+  }
+  const loadFailed = (error: unknown) => reportProcessFault('Renderer failed to load', error);
+  if (isDev) {
+    const rendererUrl = getDevRendererUrl();
+    trustRendererEntry(rendererUrl);
+    const entry = new URL(rendererUrl);
+    for (const [key, value] of Object.entries(query)) entry.searchParams.set(key, value);
+    window.loadURL(entry.href).catch(loadFailed);
+  } else {
+    // Production mode loads the bundled renderer.
+    const rendererEntry = path.join(__dirname, '../renderer/index.html');
+    trustRendererEntry(pathToFileURL(rendererEntry).href);
+    window.loadFile(rendererEntry, { query }).catch(loadFailed);
+  }
+}
+
+/**
  * Create the main window.
  */
 function createMainWindow(): void {
@@ -400,22 +494,16 @@ function createMainWindow(): void {
   });
   bindProductIcon(mainWindow);
 
-  // Load the renderer. The boot theme rides along so the first paint already uses the chosen light or dark palette.
-  const bootTheme = resolvedAppearanceMode(settingsService.snapshot().user.appearance);
-  if (isDev) {
-    const rendererUrl = getDevRendererUrl();
-    trustRendererEntry(rendererUrl);
-    const entry = new URL(rendererUrl);
-    entry.searchParams.set('theme', bootTheme);
-    mainWindow.loadURL(entry.href).catch((error: unknown) => reportProcessFault('Renderer failed to load', error));
-  } else {
-    // Production mode loads the bundled renderer.
-    const rendererEntry = path.join(__dirname, '../renderer/index.html');
-    trustRendererEntry(pathToFileURL(rendererEntry).href);
-    mainWindow
-      .loadFile(rendererEntry, { query: { theme: bootTheme } })
-      .catch((error: unknown) => reportProcessFault('Renderer failed to load', error));
-  }
+  const window = mainWindow;
+  loadRenderer(window);
+  bindRendererRecovery(window, {
+    load: (crash) => loadRenderer(window, crash),
+    quit: () => {
+      if (!shutdownStarted) shutdownCause = 'renderer-failure';
+      app.quit();
+    },
+    isShuttingDown: () => shutdownStarted || shutdownCoordinator.isShuttingDown(),
+  });
 
   // Show after the window is ready.
   mainWindow.once('ready-to-show', () => {
@@ -444,14 +532,6 @@ function createMainWindow(): void {
       line: details.lineNumber,
       sourceId: details.sourceId,
     });
-  });
-
-  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
-    console.error('[RendererLoadFailed]', { errorCode, errorDescription, validatedURL });
-  });
-
-  mainWindow.webContents.on('render-process-gone', (_event, details) => {
-    console.error('[RendererProcessGone]', details);
   });
 
   // Links never open app windows: https pages open in the system browser and everything else is refused.
@@ -485,7 +565,7 @@ app
       settingsService.initialize();
     } catch (error) {
       if (!(error instanceof SettingsFileError)) throw error;
-      // An unusable settings file is never converted or repaired: the user deletes it and reconfigures in Settings.
+      // An unusable settings file is never converted or repaired: the user deletes the data directory and the file.
       console.error('[Main] Settings file cannot be used:', error);
       reportSettingsStartupFailure(error.filePath, isHeadlessMode);
       shutdownExitCode = 1;
@@ -567,12 +647,26 @@ app
     app.quit();
   });
 
+// GPU, utility and other Chromium children: a death other than a clean exit is a lifecycle fact.
+app.on('child-process-gone', (_event, details) => {
+  if (details.reason === 'clean-exit') return;
+  console.error('[ChildProcessGone]', details);
+  lifecycleLedger.record({
+    kind: 'process_gone',
+    process: goneProcessKind(details.type),
+    reason: details.reason,
+    exitCode: details.exitCode,
+    ...(details.serviceName ? { serviceName: details.serviceName } : {}),
+  });
+});
+
 // Quit after all windows close on Windows/Linux.
 app.on('window-all-closed', () => {
   if (isHeadlessMode) {
     return;
   }
   if (!currentHost().isMac) {
+    if (!shutdownStarted) shutdownCause = 'window-close';
     app.quit();
   }
 });
@@ -591,16 +685,15 @@ app.on('before-quit', (event) => {
   }
 
   registerShutdownDisposables();
+  // The clean path and the timed-out path end through the same exit.
   const exitAfterShutdown = () => exitMainProcess(shutdownExitCode);
-  void shutdownCoordinator.shutdownAll(SHUTDOWN_TIMEOUT_MS, exitAfterShutdown).then(exitAfterShutdown);
+  void shutdownCoordinator
+    .shutdownAll(SHUTDOWN_TIMEOUT_MS, { cause: shutdownCause, observer: shutdownLedger, forceExit: exitAfterShutdown })
+    .then(exitAfterShutdown);
 });
 
-// External QA/CLI launchers use process signals; route them through the same shutdown state machine.
-const requestProcessShutdown = () => {
-  if (!shutdownStarted) app.quit();
-};
-process.once('SIGINT', requestProcessShutdown);
-process.once('SIGTERM', requestProcessShutdown);
+// SIGINT and SIGTERM need no listener: Electron's own signal handling quits the app, so a signal from an external QA or
+// CLI launcher reaches the same before-quit shutdown (a Node listener for them never runs) and records as before-quit.
 
 // Only the app's own entry document may load in a window.
 app.on('web-contents-created', (_event, contents) => {

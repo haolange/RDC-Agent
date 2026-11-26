@@ -30,6 +30,8 @@ const ZH = {
   checkpointFailed: '上下文检查点没有建立。原始会话和调查证据都保留着；解决这个问题后可以继续调查。',
   taskUnsettled:
     '模型已经给出答复，但本轮还有没收尾的任务。应用已把它们标为受阻并保留证据；请查看任务状态，说明完成或受阻的原因后继续。',
+  rdcRecoveryBlocked:
+    '回放进程卡住或丢失后，应用没能按记录的进程退出自动重建现场，本轮已停止。capture 保持隔离，复制详情里有具体原因；可以在 Capture 中恢复，或关闭后重新打开。',
   imageUnsupported: '{agent} 当前的模型不接受图片附件。请换一个支持图片输入的模型后重试。',
   attachmentRejected: '附件没能用于本次请求。请移除无效的附件后重试。',
   requestAuth: '{agent} 使用 {model} 时认证或权限失败。请检查账号的 API Key、登录状态或模型权限后重试。',
@@ -85,6 +87,8 @@ const EN: Record<DiagnosticTextKey, string> = {
     'The context checkpoint was not created. The original session and evidence are kept; fix the problem and continue.',
   taskUnsettled:
     'The model answered while tasks in this turn were still open. They are marked blocked with their evidence kept; check the tasks, state why each is done or blocked, and continue.',
+  rdcRecoveryBlocked:
+    "The replay process got stuck or was lost, and its recorded exits didn't allow an automatic rebuild, so this turn stopped. The capture stays isolated and the copied details name the reason. Recover it from Capture, or close and reopen it.",
   imageUnsupported:
     'The current model for {agent} does not accept images. Switch to a model with image input and try again.',
   attachmentRejected: 'An attachment could not be used for this request. Remove it and try again.',

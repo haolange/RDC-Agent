@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { z } from 'zod';
+import { assertFileReadBoundary } from '../../../runtime/FileOperationBoundary';
 import {
   assertFileSizeCap,
   assertTextReadable,
@@ -59,6 +60,7 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
     if (signal?.aborted) throw new Error('Aborted');
     const workspaceRoot = requireMutationWorkspaceRoot(context);
     const absolute = safeResolvePath(params.notebook_path, workspaceRoot, context);
+    assertFileReadBoundary(absolute);
     if (path.extname(absolute).toLowerCase() !== '.ipynb') {
       throw new Error(`notebook_edit requires a .ipynb file: ${absolute}`);
     }

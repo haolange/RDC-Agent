@@ -4,8 +4,71 @@ import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
 import { parseRemoteBootstrap } from './captures/replayDeviceParse';
+import {
+  deviceInstallationIdentity,
+  unconfirmedDeviceAction,
+  type DeviceInstallationIdentity,
+} from './captures/ReplayDeviceIssue';
+import type { RdcOperationFrame } from './RdcOperationWatcher';
 import type { RdcTurnBinding } from './RdcTurnBindings';
-import type { ReplayDeviceEntry, AndroidBootstrapMetadata } from '@shared/types/device';
+import type {
+  AndroidBootstrapMetadata,
+  DevicePreparationPhase,
+  RemoteInstallationReceipt,
+  ReplayDeviceEntry,
+  ReplayDeviceIssue,
+} from '@shared/types/device';
+
+/** What the owning connect reports while it runs, read from its own progress stream. */
+export interface RdcRemoteProgress {
+  onPreparationStage?: (stage: DevicePreparationPhase) => void;
+  onInstallation?: (receipt: RemoteInstallationReceipt) => void;
+  onDeviceAction?: (issue: ReplayDeviceIssue, identity?: DeviceInstallationIdentity) => void;
+}
+const PREPARATION_PHASES = new Set<string>(['checking', 'installing', 'starting', 'verifying']);
+const INSTALL_MODES = new Set<string>(['existing', 'install', 'update', 'force_replace']);
+const record = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+/**
+ * Maps the connect's progress frames onto the preparation UI. Only RDC-Tool's own stages are forwarded; a cancelled
+ * connect reports the facts it settled with (a committed installation, an unconfirmed PackageManager result) in its
+ * final `cancelled` stage, which is never read as a rollback.
+ */
+function remoteConnectProgress(progress: RdcRemoteProgress): (frame: RdcOperationFrame) => void {
+  return (frame) => {
+    if (frame.kind !== 'progress' || frame.operation !== 'rd.remote.connect') return;
+    if (PREPARATION_PHASES.has(frame.stage)) {
+      progress.onPreparationStage?.(frame.stage as DevicePreparationPhase);
+      return;
+    }
+    if (frame.stage !== 'cancelled') return;
+    const deviceAction = unconfirmedDeviceAction(frame.details);
+    const identity = deviceInstallationIdentity(frame.details);
+    if (deviceAction)
+      progress.onDeviceAction?.(
+        {
+          code: 'remote_install_unconfirmed',
+          stage: 'installing',
+          diagnostic: frame.message || 'Native PackageManager result remains unconfirmed.',
+          recovery: identity ? 'retry' : null,
+          deviceAction,
+        },
+        identity,
+      );
+    const receipt = record(frame.details.installation);
+    if (
+      typeof receipt?.installed_apk === 'boolean' &&
+      typeof receipt.uninstalled_existing === 'boolean' &&
+      INSTALL_MODES.has(String(receipt.install_mode))
+    )
+      progress.onInstallation?.({
+        installedApk: receipt.installed_apk,
+        uninstalledExisting: receipt.uninstalled_existing,
+        installMode: receipt.install_mode as RemoteInstallationReceipt['installMode'],
+      });
+  };
+}
 
 export interface RdcRemoteConnection {
   deviceId: string;
@@ -36,28 +99,17 @@ export function assertRemotePreparationContract(binding: RdcTurnBinding): void {
               transport?: { enum?: string[] };
             };
           };
-          timeout_ms?: { type?: string };
         };
       }
     | undefined;
   const inspection = binding.definitions.find((value) => value.name === 'rd.remote.inspect_installation');
   const inspectionSchema = inspection?.input_schema as
     { properties?: { device_serial?: { type?: string } } } | undefined;
-  const policy = definition?.timeout_policy as Record<string, unknown> | undefined;
   if (
     !schema?.properties?.options?.properties?.transport?.enum?.includes('adb_android') ||
     definition?.preparation_policy !== 'automatic'
   ) {
     throw new AppError('RDC_REMOTE_UPGRADE_REQUIRED', 'configured Tools lacks automatic Android preparation.');
-  }
-  if (
-    schema.properties.timeout_ms?.type !== 'integer' ||
-    policy?.argument !== 'timeout_ms' ||
-    !['default_timeout_ms', 'worker_grace_ms', 'transport_grace_ms', 'process_grace_ms'].every(
-      (key) => Number.isSafeInteger(policy[key]) && Number(policy[key]) > 0,
-    )
-  ) {
-    throw new AppError('RDC_REMOTE_UPGRADE_REQUIRED', 'configured Tools lacks the canonical remote timeout policy.');
   }
   if (
     inspection?.scope !== 'global' ||
@@ -124,6 +176,7 @@ export async function connectSessionReplayDevice(
   contextId: string,
   binding: RdcTurnBinding,
   signal?: AbortSignal,
+  progress: RdcRemoteProgress = {},
 ): Promise<RdcRemoteConnection> {
   if (device.type !== 'android' || !device.serial || !contextId || contextId === 'default')
     throw new AppError('RDC_REMOTE_CONTEXT_REQUIRED');
@@ -131,15 +184,8 @@ export async function connectSessionReplayDevice(
   if (device.adbState && device.adbState !== 'device')
     throw new Error(device.adbState === 'unauthorized' ? 'remote_unauthorized' : 'remote_device_offline');
   signal?.throwIfAborted();
-  const policy = binding.definitions.find((value) => value.name === 'rd.remote.connect')!.timeout_policy as Record<
-    string,
-    number
-  >;
-  const timeoutMs = binding.cli.timeoutMs;
-  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw new AppError('RDC_REMOTE_TIMEOUT_INVALID');
-  const processTimeout =
-    Math.ceil(timeoutMs / 1000) * 1000 + policy.worker_grace_ms + policy.transport_grace_ms + policy.process_grace_ms;
-  if (!Number.isSafeInteger(processTimeout)) throw new AppError('RDC_REMOTE_TIMEOUT_INVALID');
+  // The connection has no duration of its own: the request's no-progress budget bounds it (RDC-Tool moves the
+  // deadline forward with every bootstrap stage), so the frozen CLI binding is all this call carries.
   const payload = parseRdcNativeResult(
     await rdcCliInvokerService.executeCLI(
       'call',
@@ -147,7 +193,6 @@ export async function connectSessionReplayDevice(
         'rd.remote.connect',
         '--args-json',
         JSON.stringify({
-          timeout_ms: timeoutMs,
           options: {
             transport: 'adb_android',
             device_serial: device.serial,
@@ -156,7 +201,7 @@ export async function connectSessionReplayDevice(
         '--daemon-context',
         contextId,
       ],
-      { contextId, abortSignal: signal, settings: binding.cli, timeout: processTimeout },
+      { contextId, abortSignal: signal, settings: binding.cli, onProgress: remoteConnectProgress(progress) },
     ),
     contextId,
     'rd.remote.connect',

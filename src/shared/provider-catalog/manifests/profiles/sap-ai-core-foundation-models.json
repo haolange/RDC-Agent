@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "sap-ai-core-foundation-models",
   "routeMechanics": [
     {
@@ -49,7 +48,6 @@
           "errors": "sdk-error"
         },
         "semanticContext": {
-          "version": "semantic-context-v1",
           "history": "canonical-messages",
           "toolPairs": "strict",
           "attachments": "fail-closed",

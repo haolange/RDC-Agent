@@ -15,6 +15,7 @@ import {
 } from '../agent-runtime/providers/internal/http';
 import { MissionCompletionError } from '../investigation/missionCompletionContract';
 import { InvestigationError } from '../investigation/investigationErrors';
+import { RdcRecoveryBlockedError } from '../agent-runtime/orchestration/RdcProcessFaultRecovery';
 import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
 
 const ROUTE = {
@@ -32,6 +33,16 @@ describe('conversation turn failure classification', () => {
     expect(diagnostic.code).toBe('CONVERSATION_AGENT_LOOP_STALLED');
     expect(diagnostic.userMessage).toContain('连续三轮');
     expect(diagnostic.userMessage).not.toContain(String.fromCodePoint(0xfffd));
+  });
+
+  it('ends on the specific blocker of a stuck replay instead of a model request failure', () => {
+    const diagnostic = createTurnFailedDiagnostic(
+      ROUTE,
+      new RdcRecoveryBlockedError('RDC_RECOVERY_PROCESS_UNEXPLAINED', 'the live daemon is not the verified daemon.'),
+    );
+    expect(diagnostic.code).toBe('CONVERSATION_RDC_RECOVERY_BLOCKED');
+    expect(diagnostic.technicalMessage).toContain('RDC_RECOVERY_PROCESS_UNEXPLAINED');
+    expect(diagnostic.userMessage).not.toContain('RDC_');
   });
 
   it('does not describe an unchanged runtime obligation as repeated tool calls', () => {

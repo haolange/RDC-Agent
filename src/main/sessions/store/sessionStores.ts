@@ -25,6 +25,6 @@ export const conversationHistoryStore = new ConversationHistoryStore({
 });
 export const executionOfferStore = new ExecutionOfferStore({ io: storageIo, sessions: sessionRecordStore });
 
-sessionRecordStore.connect({ attachments: conversationHistoryStore, removedHandoffState: executionOfferStore });
+sessionRecordStore.connect({ attachments: conversationHistoryStore });
 projectWorkspaceStore.connect({ sessions: sessionRecordStore, turnCommits: conversationHistoryStore });
 projectWorkspaceStore.syncRuntimePaths();

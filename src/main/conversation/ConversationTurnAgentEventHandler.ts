@@ -108,6 +108,9 @@ export function createAgentEventHandler(turn: AgentEventTurn): (event: AgentEven
         return onToolRequested(turn, event);
       case 'tool.started':
         return onToolStarted(turn, event);
+      case 'tool.progress':
+        // Streamed to the renderer above; progress is never part of the persisted message or the model's view.
+        return;
       case 'tool.denied':
         return onToolDenied(turn, event);
       case 'approval.requested':

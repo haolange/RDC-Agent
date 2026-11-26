@@ -4,7 +4,7 @@ import { generateEventId, generateRunId, generateShortId, nowMs, sanitizeToken }
 import { AppError } from '@shared/errors/appError';
 import { ActionEventSchema } from '@shared/types/evidence';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/jsonl';
-import { assertNoRunV3StageFields, toPersistedRunV3 } from '../run/runV3/runRecordSchema';
+import { toPersistedRun } from '../run/runRecord/runRecordSchema';
 import { appPathService } from '../../runtime/AppPathService';
 import {
   readPersistedRun as loadPersistedRun,
@@ -30,7 +30,6 @@ import type { PersistedRunRecord } from './storageTypes';
 import type { ReservedStagedConversationSession, StagedConversationSessionCommit } from './storageCommitTypes';
 import type { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
 import type { ConversationHistoryStore } from './ConversationHistoryStore';
-import type { ExecutionOfferStore } from '../run/ExecutionOfferStore';
 import type { StorageIo } from '../../runtime/StorageIo';
 
 /** What session records need from storage: file I/O and the project registry that places them. */
@@ -58,8 +57,6 @@ export interface SessionSideChannel {
 export interface SessionRecordLinks {
   /** Copies a staged session's turn attachments. */
   attachments: Pick<ConversationHistoryStore, 'copyAttachmentsForTurn'>;
-  /** Reading a session discards the state file of the removed handoff flow. */
-  removedHandoffState: Pick<ExecutionOfferStore, 'discardRemovedHandoffState'>;
 }
 
 const SAFE_RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -163,7 +160,6 @@ export class SessionRecordStore {
 
     const timestamp = nowMs();
     const session: SessionRecord = {
-      schemaVersion: '1',
       sessionId: `sess_${generateShortId()}`,
       projectId,
       title: this.normalizeSessionTitle(projectId, title),
@@ -215,7 +211,6 @@ export class SessionRecordStore {
     );
     return {
       session: {
-        schemaVersion: '1',
         sessionId,
         projectId,
         title: this.normalizeSessionTitle(projectId, title),
@@ -311,11 +306,8 @@ export class SessionRecordStore {
     if (fs.existsSync(commit.stagingPath)) fs.rmSync(commit.stagingPath, { recursive: true, force: true });
   }
 
-  /** Reads a session for a caller that opens it: the removed handoff flow's state file is discarded first. */
   readSession(sessionId: string): SessionRecord | null {
-    const session = this.readSessionRecord(sessionId);
-    if (session) this.links.removedHandoffState.discardRemovedHandoffState(sessionId);
-    return session;
+    return this.readSessionRecord(sessionId);
   }
 
   readSessionSnapshot(sessionId: string): SessionRecordSnapshot | null {
@@ -506,7 +498,7 @@ export class SessionRecordStore {
     const backend =
       input.backend || (captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local');
     const startedAt = nowMs();
-    const persistedRun = toPersistedRunV3({
+    const persistedRun = toPersistedRun({
       runId,
       turnId: input.turnId,
       projectId: session.projectId,
@@ -555,9 +547,6 @@ export class SessionRecordStore {
       return;
     }
 
-    assertNoRunV3StageFields(data, 'run patch');
-    assertNoRunV3StageFields(existing as unknown as Record<string, unknown>, 'persisted run');
-
     const allowedTopLevel = new Set([
       'status',
       'stopReason',
@@ -605,7 +594,6 @@ export class SessionRecordStore {
     if (existing.kind !== 'mission') {
       delete (merged as { mission?: unknown }).mission;
     }
-    assertNoRunV3StageFields(merged as unknown as Record<string, unknown>, 'merged run');
     merged.updatedAt = nowMs();
 
     persistRunFiles(this.host.io, this.getRunPath(merged.sessionId, merged.runId), merged);
@@ -663,7 +651,6 @@ export class SessionRecordStore {
     refs?: string[];
   }): ActionEvent {
     return {
-      schema_version: '2',
       event_id: generateEventId('evt'),
       turn_id: input.turnId,
       ts_ms: nowMs(),

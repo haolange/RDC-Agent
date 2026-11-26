@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import { createHash } from 'node:crypto';
 import * as readline from 'readline';
 import { AppError } from '@shared/errors/appError';
+import { assertFileReadBoundary } from '../../../runtime/FileOperationBoundary';
 import { assertTextReadable, safeResolvePath, truncateOutput } from '../../../runtime/toolFiles';
 import {
   READ_FILE_DEFAULT_LIMIT,
@@ -116,6 +117,7 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails | FileAudit
     }
 
     const absolute = safeResolvePath(params.path, undefined, context);
+    assertFileReadBoundary(absolute);
     assertTextReadable(absolute, { maxBytes: TEXT_FILE_MAX_BYTES });
 
     const offset = Math.max(1, Math.floor(params.offset ?? 1));

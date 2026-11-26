@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "poe",
   "name": "Poe",
   "npm": "@ai-sdk/openai-compatible",

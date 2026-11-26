@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "alibaba-token-plan",
   "name": "Alibaba Token Plan",
   "npm": "@ai-sdk/openai-compatible",

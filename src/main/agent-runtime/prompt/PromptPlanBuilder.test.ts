@@ -180,7 +180,6 @@ describe('PromptPlanBuilder', () => {
     const offeredPlan = new PromptPlanBuilder().build({
       ...input,
       approvedExecutionOffer: {
-        schemaVersion: '1',
         sourceAgentId: 'reviewer',
         targetAgentId: 'ask',
         plan: { uri: 'session://plans/plan-approved.md', hash: 'a'.repeat(64) },

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
+import { lifecycleLedger } from '../../../runtime/LifecycleLedger';
 import { GREP_REGEX_TIMEOUT_MS } from '../../../runtime/toolLimits';
 import type { GrepWorkerMatch, GrepWorkerRequest, GrepWorkerResponse } from '../../../workers/grepRegexWorker';
 
@@ -51,9 +52,20 @@ export function searchLongLines(
         worker.postMessage(request);
       } else finish(undefined, message.matches);
     });
-    worker.once('error', (error) => finish(error));
+    worker.once('error', (error) => {
+      lifecycleLedger.record({
+        kind: 'worker_thread_exited',
+        worker: 'grep-regex',
+        reason: 'error',
+        message: error.message.slice(0, 500),
+      });
+      finish(error);
+    });
+    // A worker this search terminated has settled already; only an exit nobody asked for is a fault.
     worker.once('exit', (code) => {
-      if (!settled) finish(new Error(`grep worker exited with code ${code}`));
+      if (settled) return;
+      lifecycleLedger.record({ kind: 'worker_thread_exited', worker: 'grep-regex', reason: 'exit', exitCode: code });
+      finish(new Error(`grep worker exited with code ${code}`));
     });
   });
 }

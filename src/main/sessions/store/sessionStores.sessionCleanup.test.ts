@@ -154,33 +154,6 @@ describe('session stores: session locations', () => {
 });
 
 describe('sessionRecordStore.removeSession side-channel cleanup', () => {
-  it('keeps an unsupported session visible without recovering or rewriting it during startup', async () => {
-    const { projectWorkspaceStore, sessionRecordStore } = await import('./sessionStores');
-    const projectRoot = path.join(tempRoot, 'unsupported-startup');
-    fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await projectWorkspaceStore.createProject(projectRoot);
-    const session = sessionRecordStore.createSession(project.projectId, 'Old session');
-    const oldSession = { ...session } as Partial<typeof session>;
-    delete oldSession.schemaVersion;
-    const original = JSON.stringify(oldSession);
-    const file = path.join(session.sessionPath, 'session.json');
-    const journal = path.join(session.sessionPath, 'turn-commit.json');
-    fs.writeFileSync(file, original);
-    fs.writeFileSync(journal, 'Unsupported session journal must remain untouched');
-    await expect(projectWorkspaceStore.initializeWorkspace()).resolves.toBeUndefined();
-    expect(sessionRecordStore.listSessions(project.projectId)).toContainEqual(
-      expect.objectContaining({
-        sessionId: session.sessionId,
-        storageDiagnostic: 'unsupported-schema',
-      }),
-    );
-    expect(() => sessionRecordStore.updateSession(session.sessionId, { title: 'Changed' })).toThrow(
-      'STORAGE_SCHEMA_UNSUPPORTED',
-    );
-    expect(fs.readFileSync(file, 'utf8')).toBe(original);
-    expect(fs.readFileSync(journal, 'utf8')).toBe('Unsupported session journal must remain untouched');
-    fs.rmSync(session.sessionPath, { recursive: true, force: true });
-  });
   it('removes tasks, llm-calls, and matching trace run files for the session', async () => {
     const { projectWorkspaceStore, sessionRecordStore } = await import('./sessionStores');
     // The process composition root binds the agent runtime's per-session files as removal side channels.
@@ -446,30 +419,51 @@ describe('sessionRecordStore.removeSession side-channel cleanup', () => {
     const persisted = await sessionRecordStore.readRun(session.sessionId, run.runId);
     expect(persisted?.captures).toEqual([]);
   });
+
+  it('appends action events without a format version and refuses a stored event that still carries one', async () => {
+    const { projectWorkspaceStore, sessionRecordStore } = await import('./sessionStores');
+    const projectRoot = path.join(tempRoot, 'action-chain-root');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await projectWorkspaceStore.createProject(projectRoot);
+    const session = sessionRecordStore.createSession(project.projectId, 'Action chain');
+    const event = sessionRecordStore.createActionEvent({
+      runId: 'run-a',
+      sessionId: session.sessionId,
+      agentId: 'general',
+      eventType: 'user_message',
+      status: 'ok',
+      payload: { content: 'hi' },
+    });
+    await sessionRecordStore.appendActionEvent(session.sessionId, event);
+    expect(await sessionRecordStore.readActionChain(session.sessionId)).toEqual([event]);
+    expect(event).not.toHaveProperty('schema_version');
+
+    const chain = sessionRecordStore.getActionChainPath(session.sessionId);
+    fs.writeFileSync(chain, `${JSON.stringify({ ...event, schema_version: '2' })}\n`, 'utf8');
+    await expect(sessionRecordStore.readActionChain(session.sessionId)).rejects.toThrow();
+  });
 });
 function makeTerminalContextEntry(): SessionContextTurnEntry {
   return {
-    schemaVersion: 2,
     turnId: 'turn-terminal',
     userMessageId: 'user-terminal',
     assistantMessageId: 'assistant-terminal',
     branchId: 'branch-root',
     agentId: 'ask',
     executionIdentity: {
-      schemaVersion: 1,
       providerId: 'openai',
       credentialScopeHash: 'credential-scope',
       endpointHash: 'endpoint',
       protocolFamily: 'OpenAIResponses',
       protocolDialect: 'OpenAIResponses',
       protocolVersion: 'v1',
-      catalogRevision: 'catalog-v1',
-      routeRevision: 'route-v1',
+      catalogRevision: 'catalog-a',
+      routeRevision: 'route-a',
       selectedModelId: 'gpt-5',
       effectiveModelId: 'gpt-5',
       canonicalModelId: 'gpt-5',
       modelSnapshotId: 'model-snapshot',
-      compatibilityGroup: 'openai-responses-v1',
+      compatibilityGroup: 'openai-responses-family',
       bindingIds: [],
       variantKey: 'default',
       reasoningMode: 'off',
@@ -668,75 +662,8 @@ describe('conversationHistoryStore terminal transaction', () => {
       { id: 'assistant-terminal', content: 'final answer', status: 'complete' },
     ]);
     expect(sessionContextStore.readSessionContextJournal(session.sessionId)).toMatchObject([
-      { turnId: 'turn-terminal', schemaVersion: 2 },
+      { turnId: 'turn-terminal' },
     ]);
-    expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
-  });
-
-  it.each([
-    { phase: 'prepared' as const, rollForward: false },
-    { phase: 'committing' as const, rollForward: true },
-  ])('recovers a $phase terminal transaction without a split state', async ({ phase, rollForward }) => {
-    const { projectWorkspaceStore, sessionRecordStore, conversationHistoryStore, sessionContextStore } =
-      await import('./sessionStores');
-    const projectRoot = path.join(tempRoot, `terminal-recovery-${phase}`);
-    fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await projectWorkspaceStore.createProject(projectRoot);
-    const session = sessionRecordStore.createSession(project.projectId, `Terminal recovery ${phase}`);
-    const beforeHistory: ConversationMessage[] = [
-      {
-        id: 'assistant-terminal',
-        requestId: 'request-terminal',
-        turnId: 'turn-terminal',
-        sessionId: session.sessionId,
-        projectId: project.projectId,
-        branchId: 'branch-root',
-        role: 'assistant',
-        content: 'partial',
-        status: 'streaming',
-        createdAt: 2,
-        updatedAt: 2,
-      },
-    ];
-    const afterHistory: ConversationMessage[] = [
-      {
-        ...beforeHistory[0]!,
-        content: 'final answer',
-        status: 'complete',
-        updatedAt: 3,
-      },
-    ];
-    const afterContext = [makeTerminalContextEntry()];
-    fs.writeFileSync(
-      path.join(session.sessionPath, 'terminal-commit.json'),
-      JSON.stringify(
-        {
-          schemaVersion: '1',
-          requestId: 'request-terminal',
-          turnId: 'turn-terminal',
-          phase,
-          beforeHistory,
-          beforeBranch: null,
-          beforeContext: [],
-          afterHistory,
-          afterBranch: null,
-          afterContext,
-        },
-        null,
-        2,
-      ),
-      'utf8',
-    );
-
-    conversationHistoryStore.writeConversationHistory(session.sessionId, afterHistory);
-    sessionContextStore.appendSessionContextTurn(session.sessionId, afterContext[0]!);
-    await projectWorkspaceStore.initializeWorkspace();
-
-    expect(conversationHistoryStore.readConversationHistory(session.sessionId)[0]).toMatchObject({
-      content: rollForward ? 'final answer' : 'partial',
-      status: rollForward ? 'complete' : 'streaming',
-    });
-    expect(sessionContextStore.readSessionContextJournal(session.sessionId)).toHaveLength(rollForward ? 1 : 0);
     expect(fs.existsSync(path.join(session.sessionPath, 'terminal-commit.json'))).toBe(false);
   });
 });

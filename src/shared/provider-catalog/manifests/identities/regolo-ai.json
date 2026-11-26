@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "regolo-ai",
   "name": "Regolo AI",
   "npm": "@ai-sdk/openai-compatible",

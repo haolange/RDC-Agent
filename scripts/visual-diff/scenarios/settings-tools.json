@@ -23,14 +23,6 @@
  ],
  "settleMs": 1000,
  "responses": {
-  "settings:get": [
-   {
-    "ref": "bd87c4a38a7d5b58606353ed"
-   },
-   {
-    "ref": "bd87c4a38a7d5b58606353ed"
-   }
-  ],
   "settings:getProviderCatalog": [
    {
     "ref": "940d6477c7fd25814c9e78e0"
@@ -50,8 +42,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-969b8f859168-1795681262943",
-       "timestamp": 1795681262943,
+       "id": "rlog-ee3b6326c0fb-1795705507474",
+       "timestamp": 1795705507474,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -65,8 +57,8 @@
        }
       },
       {
-       "id": "rlog-272f500cff6a-1795681262997",
-       "timestamp": 1795681262997,
+       "id": "rlog-d2dd730415eb-1795705507523",
+       "timestamp": 1795705507523,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -78,8 +70,8 @@
        "raw": null
       },
       {
-       "id": "rlog-e4b16d65c44e-1795681262997",
-       "timestamp": 1795681262997,
+       "id": "rlog-8509490ee0aa-1795705507523",
+       "timestamp": 1795705507523,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -91,8 +83,8 @@
        "raw": null
       },
       {
-       "id": "rlog-bbd04d684134-1795681263012",
-       "timestamp": 1795681263012,
+       "id": "rlog-d94698f68686-1795705507540",
+       "timestamp": 1795705507540,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -137,6 +129,14 @@
     }
    }
   ],
+  "settings:get": [
+   {
+    "ref": "c4dcce12b4067ce90568ef1a"
+   },
+   {
+    "ref": "c4dcce12b4067ce90568ef1a"
+   }
+  ],
   "project:list": [
    {
     "result": {
@@ -146,7 +146,7 @@
   ],
   "rdc-runtime:overview": [
    {
-    "ref": "7cffbe35944e643f3f416670"
+    "ref": "fa3f30e8ba6a47bf34aa4e64"
    }
   ],
   "mcp:getStatusSummary": [

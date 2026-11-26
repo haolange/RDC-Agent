@@ -262,7 +262,8 @@ describe('SettingsService provider persistence', () => {
     service.update([{ op: 'appearance', value: { theme: 'light' } }]);
     const written = fs.readFileSync(settingsPathFor(), 'utf8');
     expect(written).not.toContain('\n');
-    expect(JSON.parse(written)).toMatchObject({ schemaVersion: 9, appearance: { theme: 'light' }, providers: {} });
+    expect(JSON.parse(written)).toMatchObject({ appearance: { theme: 'light' }, providers: {} });
+    expect(JSON.parse(written)).not.toHaveProperty('schemaVersion');
   });
 
   it('keeps stored providers byte-identical when saving an unrelated settings patch', async () => {
@@ -340,17 +341,15 @@ describe('SettingsService provider persistence', () => {
     expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
   });
 
-  it('takes a schema 8 file to the startup failure without converting it', async () => {
+  it('takes a settings file that still carries a format version to the startup failure without converting it', async () => {
     const settingsPath = settingsPathFor();
     fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
-    const raw = JSON.stringify(
-      { schemaVersion: 8, appearance: { theme: 'dark' }, llm: { providers: [{ id: 'deepseek', label: 'DeepSeek' }] } },
-      null,
-      2,
-    );
+    const { createDefaultSettingsFile } = await import('./settingsDefaults');
+    const raw = JSON.stringify({ schemaVersion: 9, ...createDefaultSettingsFile() }, null, 2);
     fs.writeFileSync(settingsPath, raw, 'utf8');
     const { SettingsService } = await import('./SettingsService');
     const { SettingsFileError } = await import('./settingsFileSchema');
+    const { settingsStartupFailureText } = await import('../../window/settingsStartupFailure');
 
     const failure = (() => {
       try {
@@ -361,11 +360,15 @@ describe('SettingsService provider persistence', () => {
       return null;
     })();
     expect(failure).toBeInstanceOf(SettingsFileError);
-    expect(failure).toMatchObject({ code: 'STORAGE_SCHEMA_UNSUPPORTED', filePath: settingsPath });
+    expect(failure).toMatchObject({ code: 'STORAGE_CORRUPT', filePath: settingsPath });
     expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
-    expect(fs.readdirSync(path.dirname(settingsPath)).filter((name) => name.startsWith('config.json'))).toEqual([
-      'config.json',
-    ]);
+    const dataDirectory = path.join(os.tmpdir(), 'rdc-agent-user-data');
+    const text = settingsStartupFailureText(
+      'en-US',
+      (failure as InstanceType<typeof SettingsFileError>).filePath,
+      dataDirectory,
+    );
+    expect(text.detail).toContain(`${dataDirectory}\n${settingsPath}`);
   });
 
   it('keeps a configured standard install small and free of catalog facts', async () => {
@@ -1054,39 +1057,27 @@ describe('SettingsService provider persistence', () => {
     expect(fs.readFileSync(settingsPath, 'utf8')).toBe(raw);
   });
 
-  it('rejects missing, older and newer settings schema versions without changing source bytes', async () => {
-    const settingsPath = settingsPathFor();
-    fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+  it.each([30_000, 600_000, 3_600_000])(
+    'preserves an explicit RDC no-progress patience of %ims',
+    async (noProgressTimeoutMs) => {
+      const { DEFAULT_TOOLING } = await import('@shared/constants/appSettingsDefaults');
+      const settingsPath = await writeSettingsFixture({
+        tooling: { ...DEFAULT_TOOLING, rdcCli: { ...DEFAULT_TOOLING.rdcCli, noProgressTimeoutMs } },
+      });
 
-    for (const schemaVersion of [undefined, 0, 1, 2, 3, 4, 5, 6, 7, 8, 10]) {
-      vi.resetModules();
-      const label = schemaVersion === undefined ? 'missing' : String(schemaVersion);
-      const { createDefaultSettingsFile } = await import('./settingsDefaults');
-      const { schemaVersion: _current, ...sections } = createDefaultSettingsFile();
-      const raw = JSON.stringify({ ...(schemaVersion === undefined ? {} : { schemaVersion }), ...sections }, null, 2);
-      fs.writeFileSync(settingsPath, raw, 'utf8');
       const { SettingsService } = await import('./SettingsService');
-      expect(() => new SettingsService().initialize(), label).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-      expect(fs.readFileSync(settingsPath, 'utf8'), label).toBe(raw);
-    }
-  });
-
-  it.each([30000, 60000, 180000])('preserves an explicit current RDC CLI timeout of %ims', async (timeoutMs) => {
-    const { DEFAULT_TOOLING } = await import('@shared/constants/appSettingsDefaults');
-    const settingsPath = await writeSettingsFixture({
-      tooling: { ...DEFAULT_TOOLING, rdcCli: { ...DEFAULT_TOOLING.rdcCli, timeoutMs } },
-    });
-
-    const { SettingsService } = await import('./SettingsService');
-    const runtime = started(new SettingsService());
-    expect(runtime.tooling.rdcCli.timeoutMs).toBe(timeoutMs);
-    expect(JSON.parse(fs.readFileSync(settingsPath, 'utf8')).tooling.rdcCli.timeoutMs).toBe(timeoutMs);
-  });
+      const runtime = started(new SettingsService());
+      expect(runtime.tooling.rdcCli.noProgressTimeoutMs).toBe(noProgressTimeoutMs);
+      expect(JSON.parse(fs.readFileSync(settingsPath, 'utf8')).tooling.rdcCli.noProgressTimeoutMs).toBe(
+        noProgressTimeoutMs,
+      );
+    },
+  );
 
   it('rejects malformed settings JSON without replacing the file with defaults', async () => {
     const settingsPath = settingsPathFor();
     fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
-    const raw = '{"schemaVersion":9,"providers":';
+    const raw = '{"providers":';
     fs.writeFileSync(settingsPath, raw, 'utf8');
 
     const { SettingsService } = await import('./SettingsService');

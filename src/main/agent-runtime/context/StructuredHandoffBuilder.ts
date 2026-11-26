@@ -282,7 +282,6 @@ export const assembleDerivedContextView = (
   };
   const contentHash = hashScopedResource(content);
   const handoff: StructuredHandoff = {
-    schemaVersion: 1,
     handoffId: `handoff-${contentHash.slice(0, 20)}`,
     kind: 'derived-compaction',
     derivation: 'model-generated',
@@ -299,7 +298,6 @@ export const assembleDerivedContextView = (
   };
   const createdAt = options.createdAt ?? Date.now();
   return {
-    schemaVersion: 1,
     viewId: `context-view-${hashScopedResource({ sourceHash, contentHash, scope: options.scope }).slice(0, 20)}`,
     scope: options.scope,
     sessionId: options.sessionId,

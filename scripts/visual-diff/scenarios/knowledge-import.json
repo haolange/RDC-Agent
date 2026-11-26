@@ -46,7 +46,12 @@
  "responses": {
   "settings:get": [
    {
-    "ref": "bd87c4a38a7d5b58606353ed"
+    "ref": "c4dcce12b4067ce90568ef1a"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "app:getMeta": [
@@ -58,18 +63,13 @@
     }
    }
   ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
-   }
-  ],
   "runtimeLog:list": [
    {
     "result": {
      "entries": [
       {
-       "id": "rlog-4337d8edd763-1795681018767",
-       "timestamp": 1795681018768,
+       "id": "rlog-432c265ebf79-1795705259503",
+       "timestamp": 1795705259503,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -83,8 +83,8 @@
        }
       },
       {
-       "id": "rlog-6ec0ab756ffd-1795681018825",
-       "timestamp": 1795681018825,
+       "id": "rlog-19f46345bee4-1795705259571",
+       "timestamp": 1795705259571,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -96,8 +96,8 @@
        "raw": null
       },
       {
-       "id": "rlog-de7522a9cfcf-1795681018826",
-       "timestamp": 1795681018826,
+       "id": "rlog-1db578980524-1795705259571",
+       "timestamp": 1795705259571,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -109,8 +109,8 @@
        "raw": null
       },
       {
-       "id": "rlog-82213ff25f4d-1795681018840",
-       "timestamp": 1795681018840,
+       "id": "rlog-31c930763e70-1795705259585",
+       "timestamp": 1795705259585,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -175,7 +175,7 @@
      ],
      "index": {
       "revision": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "builtAt": "2026-11-26T08:17:00.555Z",
+      "builtAt": "2026-11-26T15:01:01.376Z",
       "cardCount": 0,
       "cardsBySpace": {}
      }
@@ -222,7 +222,7 @@
    {
     "result": {
      "packId": "pack:e2b02937fd0c7754",
-     "compiledAt": "2026-11-26T08:17:00.587Z",
+     "compiledAt": "2026-11-26T15:01:01.498Z",
      "hits": [],
      "conflicts": []
     }

@@ -105,7 +105,7 @@ describe('native owning runtime', () => {
         argsPrefix: [],
         workingDirectory: '',
         env: {},
-        timeoutMs: 30_000,
+        noProgressTimeoutMs: 30_000,
       },
       [],
     );
@@ -365,21 +365,13 @@ const remoteDevice: OpenProjectInputRequest['replayDevice'] = {
 };
 const remoteBinding = () =>
   freezeRdcTurnBinding(
-    { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 30000 },
+    { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, noProgressTimeoutMs: 30_000 },
     [
       {
         name: 'rd.remote.connect',
         preparation_policy: 'automatic',
-        timeout_policy: {
-          argument: 'timeout_ms',
-          default_timeout_ms: 200000,
-          worker_grace_ms: 85000,
-          transport_grace_ms: 5000,
-          process_grace_ms: 5000,
-        },
         input_schema: {
           properties: {
-            timeout_ms: { type: 'integer' },
             options: { properties: { transport: { enum: ['adb_android'] } } },
           },
         },
@@ -583,6 +575,58 @@ describe('selected remote before opening a capture', () => {
     expect(operations).toContain('rd.capture.close_replay');
     await runtime.clearOpenedCaptureForSession(scope);
     expect(getRdcContextLease('session')).toBeNull();
+  });
+  it("reports preparation and transfer stages from the operations' own progress streams", async () => {
+    remoteNative();
+    const native = nativeStop.getMockImplementation()!;
+    const frame = (operation: string, stage: string, details: Record<string, unknown> = {}) => ({
+      kind: 'progress',
+      request_id: 'r',
+      trace_id: 't',
+      operation,
+      stage,
+      message: stage,
+      progress_pct: null,
+      details,
+      ts_ms: 1,
+    });
+    nativeStop.mockImplementation(
+      async (command: string, args: string[], options: { onProgress?: (value: unknown) => void }) => {
+        const emit = (...frames: unknown[]) => frames.forEach((value) => options.onProgress?.(value));
+        if (args[0] === 'rd.remote.connect')
+          emit(
+            { kind: 'heartbeat', request_id: 'r', ts_ms: 1, state: 'queued' },
+            frame('rd.remote.connect', 'checking'),
+            frame('rd.remote.connect', 'installing'),
+            frame('rd.remote.connect', 'bootstrap_detail'),
+            frame('rd.remote.connect', 'cancelled', {
+              installation: { installed_apk: true, uninstalled_existing: false, install_mode: 'update' },
+            }),
+          );
+        if (args[0] === 'rd.capture.open_file')
+          emit(
+            frame('rd.capture.open_file', 'capture_transfer_started'),
+            frame('rd.capture.open_file', 'capture_transfer_done'),
+          );
+        return native(command, args, options);
+      },
+    );
+    const runtime = new RdcSessionRuntime();
+    const binding = remoteBinding();
+    const onPreparationStage = vi.fn();
+    const onInstallation = vi.fn();
+    await runtime.prepareReplayDevice(scope, remoteDevice, { binding, onPreparationStage, onInstallation });
+    expect(onPreparationStage.mock.calls).toEqual([['checking'], ['installing']]);
+    expect(onInstallation).toHaveBeenCalledExactlyOnceWith({
+      installedApk: true,
+      uninstalledExisting: false,
+      installMode: 'update',
+    });
+    const onStage = vi.fn();
+    await runtime.openProjectInput({ ...request, replayDevice: remoteDevice }, { binding, onStage });
+    expect(onStage.mock.calls).toEqual([['opening'], ['transferring'], ['opening']]);
+    expect(nativeStop.mock.calls.some((call) => call[0] === 'daemon' && call[1][0] === 'status')).toBe(false);
+    await runtime.clearOpenedCaptureForSession(scope);
   });
   it('accepts native close acknowledgements without a context only after verifying the owning state', async () => {
     remoteNative();

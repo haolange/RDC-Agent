@@ -281,7 +281,7 @@ function settingsReadChannels(catalogChanges: CatalogChangePublisher): IpcChanne
   };
 }
 
-/** Agent manifests: import, save, commits, model migration, override files and project trust. */
+/** Agent manifests: import, save, commits, override files and project trust. */
 function agentDefinitionChannels(context: WorkbenchIpcContext): IpcChannelTable {
   return {
     'settings:importAgentManifest': async (_event, ...rawArgs: unknown[]) => {
@@ -306,21 +306,12 @@ function agentDefinitionChannels(context: WorkbenchIpcContext): IpcChannelTable 
       });
       return settingsService.getAgentDefinitionCommit(query);
     },
-    'settings:previewAgentModelMigration': async (_event, ...rawArgs: unknown[]) => {
+    'settings:previewAgentOverrideFile': async (_event, ...rawArgs: unknown[]) => {
       const [sourcePath] = parseIpcArgs(SettingsAgentSourcePathArgsSchema, rawArgs, {
-        label: 'settings:previewAgentModelMigration',
+        label: 'settings:previewAgentOverrideFile',
         maxBytes: 8 * 1024,
       });
-      return settingsService.previewAgentModelMigration(sourcePath);
-    },
-    'settings:applyAgentModelMigration': async (_event, ...rawArgs: unknown[]) => {
-      const [request] = parseIpcArgs(SettingsAgentOverrideFileArgsSchema, rawArgs, {
-        label: 'settings:applyAgentModelMigration',
-        maxBytes: 8 * 1024,
-      });
-      await settingsService.applyAgentModelMigration(request);
-      await notifyCommitted(() => context.applyCurrentLlmConfig());
-      return settingsService.settingsView();
+      return settingsService.previewAgentOverrideFile(sourcePath);
     },
     'settings:deleteAgentOverrideFile': async (_event, ...rawArgs: unknown[]) => {
       const [request] = parseIpcArgs(SettingsAgentOverrideFileArgsSchema, rawArgs, {

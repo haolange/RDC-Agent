@@ -22,7 +22,7 @@
  "responses": {
   "settings:get": [
    {
-    "ref": "8b148ecbc5ce686b371940b0"
+    "ref": "79128498f15940f75aff2776"
    }
   ],
   "settings:getProviderCatalog": [
@@ -44,8 +44,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-0916825ddb49-1795681354924",
-       "timestamp": 1795681354924,
+       "id": "rlog-181dae2b37f7-1795705601668",
+       "timestamp": 1795705601668,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -59,8 +59,8 @@
        }
       },
       {
-       "id": "rlog-5c567a21a622-1795681354979",
-       "timestamp": 1795681354979,
+       "id": "rlog-5582e68e34a8-1795705601711",
+       "timestamp": 1795705601711,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -72,8 +72,8 @@
        "raw": null
       },
       {
-       "id": "rlog-60569333eeea-1795681354979",
-       "timestamp": 1795681354979,
+       "id": "rlog-40dd1a208a15-1795705601711",
+       "timestamp": 1795705601711,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -85,8 +85,8 @@
        "raw": null
       },
       {
-       "id": "rlog-3ba09a5cdf4d-1795681354996",
-       "timestamp": 1795681354996,
+       "id": "rlog-3be9565fb8b2-1795705601726",
+       "timestamp": 1795705601726,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -107,8 +107,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-0916825ddb49-1795681354924",
-       "timestamp": 1795681354924,
+       "id": "rlog-181dae2b37f7-1795705601668",
+       "timestamp": 1795705601668,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -122,8 +122,8 @@
        }
       },
       {
-       "id": "rlog-5c567a21a622-1795681354979",
-       "timestamp": 1795681354979,
+       "id": "rlog-5582e68e34a8-1795705601711",
+       "timestamp": 1795705601711,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -135,8 +135,8 @@
        "raw": null
       },
       {
-       "id": "rlog-60569333eeea-1795681354979",
-       "timestamp": 1795681354979,
+       "id": "rlog-40dd1a208a15-1795705601711",
+       "timestamp": 1795705601711,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -148,8 +148,8 @@
        "raw": null
       },
       {
-       "id": "rlog-3ba09a5cdf4d-1795681354996",
-       "timestamp": 1795681354996,
+       "id": "rlog-3be9565fb8b2-1795705601726",
+       "timestamp": 1795705601726,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -205,7 +205,7 @@
     "result": {
      "projects": [
       {
-       "projectId": "proj_aea4c9dc4b2e",
+       "projectId": "proj_e5502d8d8dfe",
        "name": "visual-diff-project",
        "rootPath": "/visual-diff/visual-diff-project",
        "slug": "visual-diff-project",
@@ -213,9 +213,9 @@
        "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
        "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
        "inputs": [],
-       "inputsUpdatedAt": 1795681357018,
-       "createdAt": 1795681356730,
-       "updatedAt": 1795681356730
+       "inputsUpdatedAt": 1795705603748,
+       "createdAt": 1795705603462,
+       "updatedAt": 1795705603462
       }
      ]
     }
@@ -225,7 +225,7 @@
    {
     "result": {
      "project": {
-      "projectId": "proj_aea4c9dc4b2e",
+      "projectId": "proj_e5502d8d8dfe",
       "name": "visual-diff-project",
       "rootPath": "/visual-diff/visual-diff-project",
       "slug": "visual-diff-project",
@@ -233,9 +233,9 @@
       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
       "inputs": [],
-      "inputsUpdatedAt": 1795681357018,
-      "createdAt": 1795681356730,
-      "updatedAt": 1795681356730
+      "inputsUpdatedAt": 1795705603748,
+      "createdAt": 1795705603462,
+      "updatedAt": 1795705603462
      },
      "currentSession": null,
      "currentRun": null

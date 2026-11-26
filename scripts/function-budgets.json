@@ -5,26 +5,20 @@
     "params": 6
   },
   "exceptions": {
-    "src/main/agent-runtime/agent/ErrorRecovery.ts": {
-      "complexity": 41
-    },
-    "src/main/agent-runtime/AgentEventBridge.ts": {
-      "lines": 186
-    },
     "src/main/agent-runtime/context/ExecutionContextWindow.ts": {
-      "lines": 170
+      "lines": 169
     },
     "src/main/agent-runtime/context/RecoverableContextWindow.ts": {
       "complexity": 43
     },
     "src/main/agent-runtime/EffectiveRuntimePlan.ts": {
-      "lines": 155
+      "lines": 153
     },
     "src/main/agent-runtime/orchestration/AgentSlotFactory.ts": {
       "lines": 209
     },
     "src/main/agent-runtime/orchestration/ApprovedCaptureHost.ts": {
-      "lines": 323
+      "lines": 240
     },
     "src/main/agent-runtime/orchestration/BackgroundSubagentService.ts": {
       "lines": 317
@@ -33,7 +27,7 @@
       "lines": 155
     },
     "src/main/agent-runtime/orchestration/RdcProbeTool.ts": {
-      "lines": 170,
+      "lines": 167,
       "complexity": 92
     },
     "src/main/agent-runtime/orchestration/RuntimeToolAssembly.ts": {
@@ -48,15 +42,15 @@
       "complexity": 108
     },
     "src/main/agent-runtime/orchestration/ToolExecutorFactory.ts": {
-      "lines": 175
+      "lines": 165
     },
     "src/main/agent-runtime/orchestration/TurnControlTools.ts": {
       "lines": 166,
       "complexity": 60
     },
     "src/main/agent-runtime/orchestration/TurnPreparationService.ts": {
-      "lines": 436,
-      "complexity": 54
+      "lines": 434,
+      "complexity": 51
     },
     "src/main/agent-runtime/permissions/AgentPermissionPolicy.ts": {
       "lines": 155,
@@ -106,7 +100,7 @@
       "complexity": 58
     },
     "src/main/conversation/TurnRuntimeEpochs.ts": {
-      "complexity": 78
+      "complexity": 74
     },
     "src/main/investigation/investigationExecutionEvidence.ts": {
       "complexity": 41
@@ -123,12 +117,11 @@
       "complexity": 90
     },
     "src/main/rdc/executeRdcShell.ts": {
-      "lines": 444,
-      "complexity": 131
+      "lines": 424,
+      "complexity": 110
     },
     "src/main/rdc/RdcCaptureRecovery.ts": {
-      "lines": 151,
-      "complexity": 53
+      "complexity": 46
     },
     "src/main/rdc/RdcDevicePreparation.ts": {
       "lines": 226,
@@ -144,7 +137,7 @@
       "complexity": 44
     },
     "src/main/rdc/RdcSessionRuntime.ts": {
-      "lines": 172
+      "lines": 165
     },
     "src/main/rdc/RdcSessionService.ts": {
       "lines": 164,
@@ -159,7 +152,7 @@
       "complexity": 48
     },
     "src/main/runtime/ProcessSupervisor.ts": {
-      "lines": 210
+      "lines": 198
     },
     "src/main/sessions/artifacts/SessionArtifactResolver.ts": {
       "lines": 170,
@@ -260,9 +253,6 @@
     "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeExport.ts": {
       "lines": 162
     },
-    "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeImport.ts": {
-      "lines": 151
-    },
     "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeWriteConfirm.ts": {
       "lines": 165
     },
@@ -287,7 +277,7 @@
       "lines": 179
     },
     "src/renderer/features/settings/SettingsModal/sections/AgentsSettings.tsx": {
-      "lines": 212
+      "lines": 211
     },
     "src/renderer/features/settings/SettingsModal/sections/HooksSettings.tsx": {
       "lines": 169
@@ -315,7 +305,7 @@
       "lines": 165
     },
     "src/renderer/features/settings/SettingsModal/settingsModalActions.ts": {
-      "lines": 176
+      "lines": 169
     },
     "src/renderer/features/settings/SettingsModal/SettingsPageContent.tsx": {
       "lines": 165

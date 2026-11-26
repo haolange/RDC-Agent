@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "the-grid-ai",
   "name": "The Grid AI",
   "npm": "@ai-sdk/openai-compatible",

@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "tencent-coding-plan",
   "name": "Tencent Coding Plan (China)",
   "npm": "@ai-sdk/openai-compatible",

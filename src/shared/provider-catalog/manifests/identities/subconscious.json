@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "subconscious",
   "name": "Subconscious",
   "npm": "@ai-sdk/anthropic",

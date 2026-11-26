@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "nearai",
   "name": "NEAR AI Cloud",
   "npm": "@ai-sdk/openai-compatible",

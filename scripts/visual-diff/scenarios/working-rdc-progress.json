@@ -1,0 +1,762 @@
+{
+ "id": "working-rdc-progress",
+ "steps": [
+  {
+   "waitFor": ".composer-textarea"
+  },
+  {
+   "type": "检查这一帧中心像素的历史。",
+   "selector": ".composer-textarea",
+   "waitMs": 300
+  },
+  {
+   "click": true,
+   "testId": "debugger-start-button",
+   "waitMs": 1500
+  },
+  {
+   "emit": {
+    "channel": "conversation:event",
+    "payload": {
+     "type": "message_patched",
+     "sessionId": "$conversation:sendMessage.turn.assistantDraftMessage.sessionId",
+     "turnId": {
+      "$concat": [
+       "turn-",
+       "$call:conversation:sendMessage.0.requestId"
+      ]
+     },
+     "message": {
+      "$merge": "$conversation:sendMessage.turn.assistantDraftMessage",
+      "workTrace": {
+       "status": "running",
+       "blocks": [
+        {
+         "id": "runtime-run",
+         "kind": "reasoning",
+         "title": "Start Agent Loop",
+         "stage": "preflight",
+         "status": "running",
+         "toolCalls": [],
+         "startedAt": {
+          "$now": -100000
+         },
+         "summary": "General started the model and tool loop."
+        },
+        {
+         "id": "runtime-loop-1",
+         "kind": "llm_turn",
+         "title": "LLM turn",
+         "stage": "model",
+         "status": "running",
+         "toolCalls": [
+          {
+           "id": "visual-diff-rdc-call",
+           "toolName": "shell",
+           "status": "running",
+           "argsPreview": "{\"rdc\": {\"operation\": \"rd.texture.get_pixel_history\", \"args\": {\"event_id\": 412, \"x\": 640, \"y\": 360}}}",
+           "executionStartedAt": {
+            "$now": -95000
+           },
+           "displayOrder": 1,
+           "startedAt": {
+            "$now": -95000
+           }
+          }
+         ],
+         "startedAt": {
+          "$now": -98000
+         },
+         "items": []
+        }
+       ]
+      },
+      "updatedAt": {
+       "$add": [
+        {
+         "$max": [
+          "$conversation:sendMessage.turn.assistantDraftMessage.updatedAt",
+          {
+           "$now": 0
+          }
+         ]
+        },
+        1
+       ]
+      },
+      "id": {
+       "$concat": [
+        "msga-",
+        "$call:conversation:sendMessage.0.requestId"
+       ]
+      },
+      "turnId": {
+       "$concat": [
+        "turn-",
+        "$call:conversation:sendMessage.0.requestId"
+       ]
+      },
+      "requestId": "$call:conversation:sendMessage.0.requestId",
+      "createdAt": {
+       "$add": [
+        {
+         "$max": [
+          "$conversation:sendMessage.turn.userMessage.createdAt",
+          {
+           "$now": 0
+          }
+         ]
+        },
+        1
+       ]
+      }
+     }
+    }
+   },
+   "waitMs": 400
+  },
+  {
+   "emit": {
+    "channel": "conversation:event",
+    "payload": {
+     "type": "agent_event",
+     "sessionId": "$conversation:sendMessage.turn.assistantDraftMessage.sessionId",
+     "turnId": {
+      "$concat": [
+       "turn-",
+       "$call:conversation:sendMessage.0.requestId"
+      ]
+     },
+     "event": {
+      "id": "visual-diff-progress",
+      "type": "tool.progress",
+      "timestamp": {
+       "$now": -42000
+      },
+      "sessionId": "$conversation:sendMessage.turn.assistantDraftMessage.sessionId",
+      "turnId": {
+       "$concat": [
+        "turn-",
+        "$call:conversation:sendMessage.0.requestId"
+       ]
+      },
+      "payload": {
+       "toolCallId": "visual-diff-rdc-call",
+       "toolName": "shell",
+       "progress": {
+        "operation": "rd.texture.get_pixel_history",
+        "state": "running",
+        "stage": "pixel_history_replay",
+        "progressPct": null,
+        "nativeCall": "PixelHistory",
+        "startedAt": {
+         "$now": -95000
+        },
+        "lastProgressAt": {
+         "$now": -42000
+        }
+       }
+      }
+     }
+    }
+   },
+   "waitMs": 400
+  },
+  {
+   "waitFor": "[data-testid=\"work-process-rdc-progress\"]"
+  }
+ ],
+ "settleMs": 1000,
+ "responses": {
+  "settings:get": [
+   {
+    "ref": "421e128d82b9b107a04c687b"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
+  "app:getMeta": [
+   {
+    "result": {
+     "version": "0.6.0-rc.8",
+     "productName": "rdc-agent",
+     "systemTheme": "light"
+    }
+   }
+  ],
+  "runtimeLog:list": [
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-e561eebfe9c5-1795709828015",
+       "timestamp": 1795709828015,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-470732d83e77-1795709828052",
+       "timestamp": 1795709828052,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-385687d7de65-1795709828052",
+       "timestamp": 1795709828052,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-5a89ff655838-1795709828065",
+       "timestamp": 1795709828065,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-e561eebfe9c5-1795709828015",
+       "timestamp": 1795709828015,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "info",
+       "title": "App ready",
+       "summary": "RDC Agent 主进程已启动。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "workspaceRoot": "/visual-diff/state"
+       }
+      },
+      {
+       "id": "rlog-470732d83e77-1795709828052",
+       "timestamp": 1795709828052,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "RDC-Tool CLI invoker ready",
+       "summary": "RDC-Tool CLI invoker 诊断已加载。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-385687d7de65-1795709828052",
+       "timestamp": 1795709828052,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Services ready",
+       "summary": "主进程服务初始化完成。",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": null
+      },
+      {
+       "id": "rlog-5a89ff655838-1795709828065",
+       "timestamp": 1795709828065,
+       "scope": "app",
+       "namespace": "system",
+       "severity": "success",
+       "title": "Browser app session ready",
+       "summary": "浏览器真实会话入口已启动：http://127.0.0.1:5127/app",
+       "sessionId": null,
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "bridgeUrl": "http://127.0.0.1:5127",
+        "userDataPath": "/visual-diff"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "result": {
+     "entries": [
+      {
+       "id": "rlog-445266ccb884-1795709852542",
+       "timestamp": 1795709852542,
+       "scope": "app",
+       "namespace": "agent",
+       "severity": "info",
+       "title": "General",
+       "summary": "Status changed to thinking.",
+       "sessionId": "sess_15792c2f4aba",
+       "projectId": null,
+       "runId": null,
+       "raw": {
+        "agentId": "general",
+        "sessionId": "sess_15792c2f4aba",
+        "status": "thinking"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "runtime:getPermissionState": [
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   },
+   {
+    "result": {
+     "mode": "default",
+     "revision": 1
+    }
+   }
+  ],
+  "device:list": [
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   },
+   {
+    "result": {
+     "revision": 0,
+     "devices": [
+      {
+       "id": "local",
+       "label": "Local",
+       "type": "local",
+       "status": "online",
+       "transport": "local"
+      }
+     ],
+     "discovery": {
+      "status": "idle"
+     }
+    }
+   }
+  ],
+  "settings:getEffectiveCatalog": [
+   {
+    "ref": "58e2be32575dd1a0c72ea4b1"
+   },
+   {
+    "ref": "8feafe505244100b83a77ba4"
+   },
+   {
+    "ref": "2ad386b5b34b11ab731fab08"
+   }
+  ],
+  "project:list": [
+   {
+    "result": {
+     "projects": [
+      {
+       "projectId": "proj_2e1ea3820ae3",
+       "name": "visual-diff-project",
+       "rootPath": "/visual-diff/visual-diff-project",
+       "slug": "visual-diff-project",
+       "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+       "inputs": [],
+       "inputsUpdatedAt": 1795709848571,
+       "createdAt": 1795709829803,
+       "updatedAt": 1795709829803
+      }
+     ]
+    }
+   }
+  ],
+  "project:select": [
+   {
+    "result": {
+     "project": {
+      "projectId": "proj_2e1ea3820ae3",
+      "name": "visual-diff-project",
+      "rootPath": "/visual-diff/visual-diff-project",
+      "slug": "visual-diff-project",
+      "resourcePath": "/visual-diff/visual-diff-project/.rdc-agent",
+      "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
+      "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
+      "inputs": [],
+      "inputsUpdatedAt": 1795709848571,
+      "createdAt": 1795709829803,
+      "updatedAt": 1795709829803
+     },
+     "currentSession": null,
+     "currentRun": null
+    }
+   }
+  ],
+  "session:list": [
+   {
+    "result": {
+     "sessions": []
+    }
+   },
+   {
+    "result": {
+     "sessions": [
+      {
+       "record": {
+        "sessionId": "sess_15792c2f4aba",
+        "projectId": "proj_2e1ea3820ae3",
+        "title": "检查这一帧中心像素的历史。",
+        "goal": "检查这一帧中心像素的历史。",
+        "sessionPath": "/visual-diff/state/sessions/proj_2e1ea3820ae3/sess_15792c2f4aba",
+        "createdAt": 1795709852458,
+        "updatedAt": 1795709852531,
+        "lastRunId": "run_cc02e8cf0c0ac66f",
+        "turnControls": {
+         "reasoningLevel": "on",
+         "maxContextMode": false,
+         "fastModel": false
+        },
+        "agentId": "general"
+       },
+       "revision": {
+        "epoch": "3075e943-4cb4-4c5b-8e25-a6ab6cc4f387",
+        "n": 4
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "project:inputs:list": [
+   {
+    "result": {
+     "inputs": []
+    }
+   }
+  ],
+  "settings:getAgentDefinitionCommit": [
+   {
+    "result": null
+   }
+  ],
+  "settings:getProviderDefinitionCommit": [
+   {
+    "result": {
+     "clientRevision": 0,
+     "providerId": "ollama",
+     "commitHash": "8d792714fa479950b22d3d2aa93a40f587cc485c17e40d32fb6426a5bd2c4982",
+     "provider": {
+      "id": "ollama",
+      "authAccountIds": {},
+      "protocol": "OllamaOpenAICompatibleChatCompletions",
+      "routeCount": 2,
+      "authMode": "local",
+      "authModeOptions": [
+       "local"
+      ],
+      "authModeAvailability": {
+       "local": {
+        "state": "unknown"
+       }
+      },
+      "hasStoredSecretByAuthMode": {
+       "local": true
+      },
+      "configuredAuthMode": "local",
+      "lifecycleStatus": "stable",
+      "providerAvailability": {
+       "state": "unknown"
+      },
+      "category": "local",
+      "catalogOwnership": "user-managed",
+      "serviceOperator": "ollama",
+      "endpointClass": "local-service",
+      "catalogProvenance": [
+       {
+        "source": "rdc-agent",
+        "revision": "provider-registry-v4",
+        "refreshedAt": "2026-07-15",
+        "surface": "ollama"
+       }
+      ],
+      "label": "Ollama",
+      "enabled": true,
+      "apiKey": "",
+      "secretRefs": {},
+      "connectionValues": {},
+      "hasStoredConnectionSecrets": {},
+      "connectionSchema": {
+       "fields": []
+      },
+      "hasStoredSecret": true,
+      "baseUrl": "http://127.0.0.1:11434/v1",
+      "baseUrlEditable": true,
+      "models": [
+       {
+        "id": "qa-coder:32b",
+        "label": "qa-coder:32b",
+        "enabled": true
+       },
+       {
+        "id": "qa-stub:4b",
+        "label": "qa-stub:4b",
+        "enabled": true
+       },
+       {
+        "id": "qa-vision:12b",
+        "label": "qa-vision:12b",
+        "enabled": true
+       }
+      ],
+      "recommendedModels": [],
+      "docsUrl": "https://ollama.com/download",
+      "status": "verified",
+      "lastTestedAt": "2026-11-26T16:17:19.074Z",
+      "lastModelRefreshAt": "2026-11-26T16:17:19.074Z",
+      "isConfigured": true,
+      "capabilities": [
+       "chat",
+       "model-discovery"
+      ]
+     },
+     "catalogRevision": "7fe4da969e914b1dd9612471676b32a523d730e12e70f7c23d95126ad6c4550b"
+    }
+   }
+  ],
+  "conversation:sendMessage": [
+   {
+    "ref": "1438b7fe0906130ffd20792c"
+   }
+  ],
+  "capture:getReplayState": [
+   {
+    "result": {
+     "projectId": "proj_2e1ea3820ae3",
+     "sessionId": "sess_15792c2f4aba",
+     "generation": 0,
+     "revision": 0,
+     "operationId": null,
+     "phase": "closed",
+     "preparation": {
+      "targetDeviceId": null,
+      "phase": "idle",
+      "issue": null
+     },
+     "replayDeviceId": null,
+     "inputId": null,
+     "captureHash": null,
+     "contextId": null,
+     "requestedEventId": null,
+     "appliedEventId": null,
+     "imageEventId": null,
+     "events": [],
+     "targets": [],
+     "target": null,
+     "isFinalOutput": false,
+     "image": null,
+     "observation": null,
+     "devicePresentation": {
+      "status": "not_applicable",
+      "eventId": null,
+      "textureId": null,
+      "sequence": null,
+      "reason": null
+     },
+     "warning": null,
+     "interactionLock": "agent_running",
+     "error": null
+    }
+   }
+  ],
+  "workflow:getState": [
+   {
+    "result": {
+     "caseId": "sess_15792c2f4aba",
+     "runId": "run_cc02e8cf0c0ac66f",
+     "sessionId": "sess_15792c2f4aba",
+     "blockers": [],
+     "reasoningSummaries": [],
+     "lastUpdated": "2026-11-26T16:17:32.616Z"
+    }
+   }
+  ],
+  "evidence:getChain": [
+   {
+    "result": {
+     "sessionId": "sess_15792c2f4aba",
+     "runId": "run_cc02e8cf0c0ac66f",
+     "events": [],
+     "isValid": true
+    }
+   }
+  ],
+  "conversation:getHistory": [
+   {
+    "ref": "3c07103b83fa4c677b30004d"
+   }
+  ],
+  "workflow:getRunUsage": [
+   {
+    "result": {
+     "usage": null,
+     "stale": false
+    }
+   }
+  ],
+  "capture:getOpenedState": [
+   {
+    "result": null
+   }
+  ],
+  "context:get": [
+   {
+    "result": null
+   }
+  ],
+  "trace:getProjection": [
+   {
+    "result": {
+     "presentation": {
+      "projectId": "proj_2e1ea3820ae3",
+      "sessionId": "sess_15792c2f4aba",
+      "activeBranchId": "branch-main",
+      "profileId": "general",
+      "runs": [
+       {
+        "run": {
+         "runId": "run_cc02e8cf0c0ac66f",
+         "agentType": "general",
+         "userRequest": "检查这一帧中心像素的历史。",
+         "status": "running",
+         "createdAt": "2026-11-26T16:17:32.480Z",
+         "updatedAt": "2026-11-26T16:17:32.480Z"
+        },
+        "timeline": {
+         "runId": "run_cc02e8cf0c0ac66f",
+         "title": "检查这一帧中心像素的历史。",
+         "status": "running",
+         "nodes": [
+          {
+           "nodeId": "task-76096819352f-1795709852526",
+           "sourceNodeIds": [
+            "task-76096819352f-1795709852526"
+           ],
+           "renderer": "task_frame",
+           "title": "本次任务",
+           "status": "succeeded",
+           "collapsedByDefault": false,
+           "importance": "high",
+           "payload": {
+            "id": "task-76096819352f-1795709852526",
+            "runId": "run_cc02e8cf0c0ac66f",
+            "kind": "task_frame",
+            "title": "本次任务",
+            "userRequest": "检查这一帧中心像素的历史。",
+            "seq": 0,
+            "createdAt": "2026-11-26T16:17:32.526Z",
+            "visibility": "user",
+            "status": "succeeded"
+           }
+          }
+         ]
+        }
+       }
+      ],
+      "rightPanel": {
+       "tasks": [],
+       "artifacts": {
+        "rows": [],
+        "totalCount": 0,
+        "storeDegraded": false
+       },
+       "outputs": {
+        "current": [],
+        "previous": []
+       },
+       "context": {
+        "task": {
+         "projectId": "proj_2e1ea3820ae3",
+         "projectName": "visual-diff-project",
+         "sessionId": "sess_15792c2f4aba",
+         "sessionTitle": "检查这一帧中心像素的历史。",
+         "workingDirectory": "/visual-diff/state/sessions/proj_2e1ea3820ae3/sess_15792c2f4aba",
+         "configurationPhase": "current_turn",
+         "agentProfile": "General",
+         "permission": "default",
+         "resources": [
+          {
+           "id": "prompt-skill:execution-orchestrator:dab7418c0ffbd438a71e2d79e1fd805d77500a844896927952657dc2eb0fa13e",
+           "kind": "skill",
+           "label": "execution-orchestrator",
+           "summary": "SKILL.md",
+           "state": "preloaded",
+           "path": "/visual-diff-repo/resources/agent-runtime/skills/execution-orchestrator/SKILL.md"
+          }
+         ]
+        },
+        "rdc": {
+         "capture": null,
+         "availableCaptures": [],
+         "runtime": {},
+         "diagnostics": []
+        }
+       }
+      },
+      "branchNavigator": null,
+      "rawAuditRefs": [],
+      "updatedAt": "2026-11-26T16:17:32.620Z"
+     }
+    }
+   }
+  ]
+ }
+}

@@ -1,3 +1,4 @@
+import type { InterruptionCause, TurnStopCause } from './lifecycle';
 import type { AgentRole } from './agent';
 import type { TaskDependencyWait } from './taskExecution';
 import type { ConversationTurnControls } from './modelCapability';
@@ -125,6 +126,7 @@ type ConversationMessageDiagnosticCode =
   | 'CONVERSATION_AGENT_LOOP_STALLED'
   | 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED'
   | 'CONVERSATION_TASK_COMPLETION_DENIED'
+  | 'CONVERSATION_RDC_RECOVERY_BLOCKED'
   | 'MISSION_COMPLETION_DENIED'
   | 'CONVERSATION_PROFILE_OVERLAY_INVALID'
   | 'MODEL_CONTINUATION_DROPPED'
@@ -134,8 +136,17 @@ type ConversationMessageDiagnosticCode =
   | 'ATTACHMENT_INVALID'
   | 'VISION_INPUT_UNSUPPORTED';
 
-export interface ConversationMessageDiagnostic {
-  code: ConversationMessageDiagnosticCode;
+/** Reasoning continuation artifacts dropped by a route or model change, with the per-reason breakdown. */
+export interface ConversationContinuationDrop {
+  count: number;
+  reasons: Array<{ reason: string; count: number }>;
+}
+
+/** Codes whose diagnostic carries structured facts the renderer words itself. */
+type StructuredDiagnosticCode = 'MODEL_CONTINUATION_DROPPED' | 'CONVERSATION_INTERRUPTED';
+
+interface ConversationMessageDiagnosticBase {
+  code: Exclude<ConversationMessageDiagnosticCode, StructuredDiagnosticCode>;
   severity: 'warning' | 'error';
   userMessage: string;
   agentId?: AgentRole;
@@ -145,6 +156,24 @@ export interface ConversationMessageDiagnostic {
   technicalMessage?: string;
   recommendations?: Array<{ providerId: string; modelId: string; label: string }>;
 }
+
+/** A model-switch notice always states how many continuation artifacts were dropped. */
+export interface ConversationContinuationDropDiagnostic extends Omit<ConversationMessageDiagnosticBase, 'code'> {
+  code: 'MODEL_CONTINUATION_DROPPED';
+  continuationDrop: ConversationContinuationDrop;
+}
+
+/**
+ * A turn that had no producer after a restart. Its cause is the previous launch's classification when that launch
+ * started the turn, else `unknown`; the renderer words it in the interface language.
+ */
+export interface ConversationInterruptedDiagnostic extends Omit<ConversationMessageDiagnosticBase, 'code'> {
+  code: 'CONVERSATION_INTERRUPTED';
+  interruption: { cause: InterruptionCause };
+}
+
+export type ConversationMessageDiagnostic =
+  ConversationMessageDiagnosticBase | ConversationContinuationDropDiagnostic | ConversationInterruptedDiagnostic;
 
 export interface ConversationToolCall {
   /** Runtime Hook events owned by this exact call, in arrival order. */
@@ -295,9 +324,11 @@ export interface ConversationMessage {
   agentId?: AgentRole;
   content: string;
   status?: ConversationMessageStatus;
+  /** Stopped assistant messages: who stopped the turn, so a stop at app shutdown is not shown as the person's Stop. */
+  stopCause?: TurnStopCause;
   updatedAt?: number;
   workTrace?: ConversationWorkTrace | null;
-  /** The stored process record was written by an older version and is no longer shown. */
+  /** The stored process record does not match the current shape, so it is not shown. */
   workTraceDiscarded?: boolean;
   diagnostic?: ConversationMessageDiagnostic | null;
   attachments?: SessionAttachmentRecord[];

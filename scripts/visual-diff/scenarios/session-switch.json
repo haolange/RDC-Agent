@@ -14,7 +14,7 @@
  "responses": {
   "settings:get": [
    {
-    "ref": "32245dfb02e0d56633cc9b76"
+    "ref": "437bf37a44ba0513d7737d11"
    }
   ],
   "settings:getProviderCatalog": [
@@ -36,8 +36,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-a0bffbdc7aef-1795681804268",
-       "timestamp": 1795681804268,
+       "id": "rlog-677ac7ca27a2-1795706049505",
+       "timestamp": 1795706049505,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -51,8 +51,8 @@
        }
       },
       {
-       "id": "rlog-840c9bb0d9fb-1795681804330",
-       "timestamp": 1795681804330,
+       "id": "rlog-4f63991e2f05-1795706049540",
+       "timestamp": 1795706049540,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -64,8 +64,8 @@
        "raw": null
       },
       {
-       "id": "rlog-a92c2cef6026-1795681804330",
-       "timestamp": 1795681804330,
+       "id": "rlog-1e3381138df1-1795706049540",
+       "timestamp": 1795706049540,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -77,8 +77,8 @@
        "raw": null
       },
       {
-       "id": "rlog-1edcfeacbf95-1795681804346",
-       "timestamp": 1795681804346,
+       "id": "rlog-ee63783e6d7e-1795706049553",
+       "timestamp": 1795706049553,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -93,31 +93,31 @@
        }
       },
       {
-       "id": "rlog-67066aaff65f-1795681828430",
-       "timestamp": 1795681828430,
+       "id": "rlog-30921f8e5ba1-1795706072573",
+       "timestamp": 1795706072573,
        "scope": "app",
        "namespace": "agent",
        "severity": "info",
        "title": "General",
        "summary": "Status changed to thinking.",
-       "sessionId": "sess_72098fb9685e",
+       "sessionId": "sess_512401176fc9",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "general",
-        "sessionId": "sess_72098fb9685e",
+        "sessionId": "sess_512401176fc9",
         "status": "thinking"
        }
       },
       {
-       "id": "rlog-ee2e73a9e2b3-1795681829614",
-       "timestamp": 1795681829614,
+       "id": "rlog-0bba2c063740-1795706073607",
+       "timestamp": 1795706073607,
        "scope": "session",
        "namespace": "agent",
        "severity": "info",
        "title": "General profile turn",
        "summary": "我列出了工作区的文件。\n\n这是 QA 协议桩的固定回复：它验证流式推理、一次工具调用与最终答复在界面上的顺序与折叠。",
-       "sessionId": "sess_72098fb9685e",
+       "sessionId": "sess_512401176fc9",
        "projectId": null,
        "runId": null,
        "raw": {
@@ -127,48 +127,48 @@
        }
       },
       {
-       "id": "rlog-04dfe13845ae-1795681829614",
-       "timestamp": 1795681829614,
+       "id": "rlog-6e4ea0093d2b-1795706073607",
+       "timestamp": 1795706073607,
        "scope": "app",
        "namespace": "agent",
        "severity": "success",
        "title": "General",
        "summary": "Status changed to complete.",
-       "sessionId": "sess_72098fb9685e",
+       "sessionId": "sess_512401176fc9",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "general",
-        "sessionId": "sess_72098fb9685e",
+        "sessionId": "sess_512401176fc9",
         "status": "complete"
        }
       },
       {
-       "id": "rlog-cf4b0ab784a0-1795681848502",
-       "timestamp": 1795681848502,
+       "id": "rlog-bb1c3e555c1c-1795706092728",
+       "timestamp": 1795706092728,
        "scope": "app",
        "namespace": "agent",
        "severity": "info",
        "title": "General",
        "summary": "Status changed to thinking.",
-       "sessionId": "sess_e8ff5ef83a48",
+       "sessionId": "sess_581fc22bd4b7",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "general",
-        "sessionId": "sess_e8ff5ef83a48",
+        "sessionId": "sess_581fc22bd4b7",
         "status": "thinking"
        }
       },
       {
-       "id": "rlog-e9237c450506-1795681851224",
-       "timestamp": 1795681851224,
+       "id": "rlog-806aa573e326-1795706095436",
+       "timestamp": 1795706095436,
        "scope": "session",
        "namespace": "agent",
        "severity": "info",
        "title": "General profile turn",
        "summary": "# 排版样例\n\n这一帧的结论先写在最前面[^1]。\n\n## 关键发现\n\n### 着色阶段\n\n#### 细节\n\n正文段落使用阅读字号，`inline code` 保持等宽。\n\n> [!WARNING]\n> 修改着色器前先备份 capture。\n\n| Pass | 耗时 | 结论 |\n| --- | --- | --- |",
-       "sessionId": "sess_e8ff5ef83a48",
+       "sessionId": "sess_581fc22bd4b7",
        "projectId": null,
        "runId": null,
        "raw": {
@@ -178,19 +178,19 @@
        }
       },
       {
-       "id": "rlog-20a794a7e480-1795681851224",
-       "timestamp": 1795681851224,
+       "id": "rlog-8be2b58ca2d1-1795706095436",
+       "timestamp": 1795706095436,
        "scope": "app",
        "namespace": "agent",
        "severity": "success",
        "title": "General",
        "summary": "Status changed to complete.",
-       "sessionId": "sess_e8ff5ef83a48",
+       "sessionId": "sess_581fc22bd4b7",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "general",
-        "sessionId": "sess_e8ff5ef83a48",
+        "sessionId": "sess_581fc22bd4b7",
         "status": "complete"
        }
       }
@@ -201,31 +201,31 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-cf4b0ab784a0-1795681848502",
-       "timestamp": 1795681848502,
+       "id": "rlog-bb1c3e555c1c-1795706092728",
+       "timestamp": 1795706092728,
        "scope": "app",
        "namespace": "agent",
        "severity": "info",
        "title": "General",
        "summary": "Status changed to thinking.",
-       "sessionId": "sess_e8ff5ef83a48",
+       "sessionId": "sess_581fc22bd4b7",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "general",
-        "sessionId": "sess_e8ff5ef83a48",
+        "sessionId": "sess_581fc22bd4b7",
         "status": "thinking"
        }
       },
       {
-       "id": "rlog-e9237c450506-1795681851224",
-       "timestamp": 1795681851224,
+       "id": "rlog-806aa573e326-1795706095436",
+       "timestamp": 1795706095436,
        "scope": "session",
        "namespace": "agent",
        "severity": "info",
        "title": "General profile turn",
        "summary": "# 排版样例\n\n这一帧的结论先写在最前面[^1]。\n\n## 关键发现\n\n### 着色阶段\n\n#### 细节\n\n正文段落使用阅读字号，`inline code` 保持等宽。\n\n> [!WARNING]\n> 修改着色器前先备份 capture。\n\n| Pass | 耗时 | 结论 |\n| --- | --- | --- |",
-       "sessionId": "sess_e8ff5ef83a48",
+       "sessionId": "sess_581fc22bd4b7",
        "projectId": null,
        "runId": null,
        "raw": {
@@ -235,19 +235,19 @@
        }
       },
       {
-       "id": "rlog-20a794a7e480-1795681851224",
-       "timestamp": 1795681851224,
+       "id": "rlog-8be2b58ca2d1-1795706095436",
+       "timestamp": 1795706095436,
        "scope": "app",
        "namespace": "agent",
        "severity": "success",
        "title": "General",
        "summary": "Status changed to complete.",
-       "sessionId": "sess_e8ff5ef83a48",
+       "sessionId": "sess_581fc22bd4b7",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "general",
-        "sessionId": "sess_e8ff5ef83a48",
+        "sessionId": "sess_581fc22bd4b7",
         "status": "complete"
        }
       }
@@ -258,31 +258,31 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-cf4b0ab784a0-1795681848502",
-       "timestamp": 1795681848502,
+       "id": "rlog-bb1c3e555c1c-1795706092728",
+       "timestamp": 1795706092728,
        "scope": "app",
        "namespace": "agent",
        "severity": "info",
        "title": "General",
        "summary": "Status changed to thinking.",
-       "sessionId": "sess_e8ff5ef83a48",
+       "sessionId": "sess_581fc22bd4b7",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "general",
-        "sessionId": "sess_e8ff5ef83a48",
+        "sessionId": "sess_581fc22bd4b7",
         "status": "thinking"
        }
       },
       {
-       "id": "rlog-e9237c450506-1795681851224",
-       "timestamp": 1795681851224,
+       "id": "rlog-806aa573e326-1795706095436",
+       "timestamp": 1795706095436,
        "scope": "session",
        "namespace": "agent",
        "severity": "info",
        "title": "General profile turn",
        "summary": "# 排版样例\n\n这一帧的结论先写在最前面[^1]。\n\n## 关键发现\n\n### 着色阶段\n\n#### 细节\n\n正文段落使用阅读字号，`inline code` 保持等宽。\n\n> [!WARNING]\n> 修改着色器前先备份 capture。\n\n| Pass | 耗时 | 结论 |\n| --- | --- | --- |",
-       "sessionId": "sess_e8ff5ef83a48",
+       "sessionId": "sess_581fc22bd4b7",
        "projectId": null,
        "runId": null,
        "raw": {
@@ -292,19 +292,19 @@
        }
       },
       {
-       "id": "rlog-20a794a7e480-1795681851224",
-       "timestamp": 1795681851224,
+       "id": "rlog-8be2b58ca2d1-1795706095436",
+       "timestamp": 1795706095436,
        "scope": "app",
        "namespace": "agent",
        "severity": "success",
        "title": "General",
        "summary": "Status changed to complete.",
-       "sessionId": "sess_e8ff5ef83a48",
+       "sessionId": "sess_581fc22bd4b7",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "general",
-        "sessionId": "sess_e8ff5ef83a48",
+        "sessionId": "sess_581fc22bd4b7",
         "status": "complete"
        }
       }
@@ -315,31 +315,31 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-67066aaff65f-1795681828430",
-       "timestamp": 1795681828430,
+       "id": "rlog-30921f8e5ba1-1795706072573",
+       "timestamp": 1795706072573,
        "scope": "app",
        "namespace": "agent",
        "severity": "info",
        "title": "General",
        "summary": "Status changed to thinking.",
-       "sessionId": "sess_72098fb9685e",
+       "sessionId": "sess_512401176fc9",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "general",
-        "sessionId": "sess_72098fb9685e",
+        "sessionId": "sess_512401176fc9",
         "status": "thinking"
        }
       },
       {
-       "id": "rlog-ee2e73a9e2b3-1795681829614",
-       "timestamp": 1795681829614,
+       "id": "rlog-0bba2c063740-1795706073607",
+       "timestamp": 1795706073607,
        "scope": "session",
        "namespace": "agent",
        "severity": "info",
        "title": "General profile turn",
        "summary": "我列出了工作区的文件。\n\n这是 QA 协议桩的固定回复：它验证流式推理、一次工具调用与最终答复在界面上的顺序与折叠。",
-       "sessionId": "sess_72098fb9685e",
+       "sessionId": "sess_512401176fc9",
        "projectId": null,
        "runId": null,
        "raw": {
@@ -349,19 +349,19 @@
        }
       },
       {
-       "id": "rlog-04dfe13845ae-1795681829614",
-       "timestamp": 1795681829614,
+       "id": "rlog-6e4ea0093d2b-1795706073607",
+       "timestamp": 1795706073607,
        "scope": "app",
        "namespace": "agent",
        "severity": "success",
        "title": "General",
        "summary": "Status changed to complete.",
-       "sessionId": "sess_72098fb9685e",
+       "sessionId": "sess_512401176fc9",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "general",
-        "sessionId": "sess_72098fb9685e",
+        "sessionId": "sess_512401176fc9",
         "status": "complete"
        }
       }
@@ -372,31 +372,31 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-67066aaff65f-1795681828430",
-       "timestamp": 1795681828430,
+       "id": "rlog-30921f8e5ba1-1795706072573",
+       "timestamp": 1795706072573,
        "scope": "app",
        "namespace": "agent",
        "severity": "info",
        "title": "General",
        "summary": "Status changed to thinking.",
-       "sessionId": "sess_72098fb9685e",
+       "sessionId": "sess_512401176fc9",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "general",
-        "sessionId": "sess_72098fb9685e",
+        "sessionId": "sess_512401176fc9",
         "status": "thinking"
        }
       },
       {
-       "id": "rlog-ee2e73a9e2b3-1795681829614",
-       "timestamp": 1795681829614,
+       "id": "rlog-0bba2c063740-1795706073607",
+       "timestamp": 1795706073607,
        "scope": "session",
        "namespace": "agent",
        "severity": "info",
        "title": "General profile turn",
        "summary": "我列出了工作区的文件。\n\n这是 QA 协议桩的固定回复：它验证流式推理、一次工具调用与最终答复在界面上的顺序与折叠。",
-       "sessionId": "sess_72098fb9685e",
+       "sessionId": "sess_512401176fc9",
        "projectId": null,
        "runId": null,
        "raw": {
@@ -406,19 +406,19 @@
        }
       },
       {
-       "id": "rlog-04dfe13845ae-1795681829614",
-       "timestamp": 1795681829614,
+       "id": "rlog-6e4ea0093d2b-1795706073607",
+       "timestamp": 1795706073607,
        "scope": "app",
        "namespace": "agent",
        "severity": "success",
        "title": "General",
        "summary": "Status changed to complete.",
-       "sessionId": "sess_72098fb9685e",
+       "sessionId": "sess_512401176fc9",
        "projectId": null,
        "runId": null,
        "raw": {
         "agentId": "general",
-        "sessionId": "sess_72098fb9685e",
+        "sessionId": "sess_512401176fc9",
         "status": "complete"
        }
       }
@@ -501,13 +501,13 @@
   ],
   "settings:getEffectiveCatalog": [
    {
-    "ref": "53d3d46068aca69239e7ce1e"
+    "ref": "a2c9e7fdd7565c3ce6e66765"
    },
    {
-    "ref": "f126ec1b23c625cc8415ad90"
+    "ref": "83b18d1fa3731c3cbf2321cd"
    },
    {
-    "ref": "ac38f01a2bda1673d292593c"
+    "ref": "b6118a82e717cd1d8b7bca97"
    }
   ],
   "project:list": [
@@ -515,7 +515,7 @@
     "result": {
      "projects": [
       {
-       "projectId": "proj_14c9c4167b5e",
+       "projectId": "proj_f2e9541eca15",
        "name": "visual-diff-project",
        "rootPath": "/visual-diff/visual-diff-project",
        "slug": "visual-diff-project",
@@ -523,10 +523,10 @@
        "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
        "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
        "inputs": [],
-       "inputsUpdatedAt": 1795681868563,
-       "createdAt": 1795681806054,
-       "updatedAt": 1795681851243,
-       "lastSessionId": "sess_e8ff5ef83a48"
+       "inputsUpdatedAt": 1795706112834,
+       "createdAt": 1795706050388,
+       "updatedAt": 1795706095449,
+       "lastSessionId": "sess_581fc22bd4b7"
       }
      ]
     }
@@ -536,7 +536,7 @@
    {
     "result": {
      "project": {
-      "projectId": "proj_14c9c4167b5e",
+      "projectId": "proj_f2e9541eca15",
       "name": "visual-diff-project",
       "rootPath": "/visual-diff/visual-diff-project",
       "slug": "visual-diff-project",
@@ -544,22 +544,21 @@
       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
       "inputs": [],
-      "inputsUpdatedAt": 1795681868563,
-      "createdAt": 1795681806054,
-      "updatedAt": 1795681851243,
-      "lastSessionId": "sess_e8ff5ef83a48"
+      "inputsUpdatedAt": 1795706112834,
+      "createdAt": 1795706050388,
+      "updatedAt": 1795706095449,
+      "lastSessionId": "sess_581fc22bd4b7"
      },
      "currentSession": {
       "record": {
-       "schemaVersion": "1",
-       "sessionId": "sess_e8ff5ef83a48",
-       "projectId": "proj_14c9c4167b5e",
+       "sessionId": "sess_581fc22bd4b7",
+       "projectId": "proj_f2e9541eca15",
        "title": "new session 0",
        "goal": "qa:markdown 展示一份排版样例。",
-       "sessionPath": "/visual-diff/state/sessions/proj_14c9c4167b5e/sess_e8ff5ef83a48",
-       "createdAt": 1795681845838,
-       "updatedAt": 1795681851243,
-       "lastRunId": "run_a79176a4e8847603",
+       "sessionPath": "/visual-diff/state/sessions/proj_f2e9541eca15/sess_581fc22bd4b7",
+       "createdAt": 1795706090111,
+       "updatedAt": 1795706095449,
+       "lastRunId": "run_385f3c582d3978fc",
        "turnControls": {
         "reasoningLevel": "on",
         "maxContextMode": false,
@@ -568,22 +567,21 @@
        "agentId": "general"
       },
       "revision": {
-       "epoch": "4e7528b3-45de-4cf9-8db9-74b82a68d8e3",
+       "epoch": "32c5d236-6681-4b56-88fb-997654b01c6f",
        "n": 13
       }
      },
      "currentRun": {
-      "schemaVersion": "3",
-      "runId": "run_a79176a4e8847603",
-      "turnId": "turn-a7a05d41-dda2-4b65-9490-a09fbe8094e9",
-      "projectId": "proj_14c9c4167b5e",
-      "sessionId": "sess_e8ff5ef83a48",
-      "caseId": "sess_e8ff5ef83a48",
+      "runId": "run_385f3c582d3978fc",
+      "turnId": "turn-ebcd12d6-355d-413b-8efb-1b71b46f1657",
+      "projectId": "proj_f2e9541eca15",
+      "sessionId": "sess_581fc22bd4b7",
+      "caseId": "sess_581fc22bd4b7",
       "profileId": "general",
       "goal": "qa:markdown 展示一份排版样例。",
       "captures": [],
-      "startedAt": 1795681848461,
-      "finishedAt": 1795681851239,
+      "startedAt": 1795706092697,
+      "finishedAt": 1795706095445,
       "status": "completed",
       "backend": "local",
       "kind": "conversation"
@@ -597,15 +595,14 @@
      "sessions": [
       {
        "record": {
-        "schemaVersion": "1",
-        "sessionId": "sess_e8ff5ef83a48",
-        "projectId": "proj_14c9c4167b5e",
+        "sessionId": "sess_581fc22bd4b7",
+        "projectId": "proj_f2e9541eca15",
         "title": "new session 0",
         "goal": "qa:markdown 展示一份排版样例。",
-        "sessionPath": "/visual-diff/state/sessions/proj_14c9c4167b5e/sess_e8ff5ef83a48",
-        "createdAt": 1795681845838,
-        "updatedAt": 1795681851243,
-        "lastRunId": "run_a79176a4e8847603",
+        "sessionPath": "/visual-diff/state/sessions/proj_f2e9541eca15/sess_581fc22bd4b7",
+        "createdAt": 1795706090111,
+        "updatedAt": 1795706095449,
+        "lastRunId": "run_385f3c582d3978fc",
         "turnControls": {
          "reasoningLevel": "on",
          "maxContextMode": false,
@@ -614,21 +611,20 @@
         "agentId": "general"
        },
        "revision": {
-        "epoch": "4e7528b3-45de-4cf9-8db9-74b82a68d8e3",
+        "epoch": "32c5d236-6681-4b56-88fb-997654b01c6f",
         "n": 13
        }
       },
       {
        "record": {
-        "schemaVersion": "1",
-        "sessionId": "sess_72098fb9685e",
-        "projectId": "proj_14c9c4167b5e",
+        "sessionId": "sess_512401176fc9",
+        "projectId": "proj_f2e9541eca15",
         "title": "列出工作区的文件。",
         "goal": "列出工作区的文件。",
-        "sessionPath": "/visual-diff/state/sessions/proj_14c9c4167b5e/sess_72098fb9685e",
-        "createdAt": 1795681828333,
-        "updatedAt": 1795681829641,
-        "lastRunId": "run_fb7fe69560a51a1d",
+        "sessionPath": "/visual-diff/state/sessions/proj_f2e9541eca15/sess_512401176fc9",
+        "createdAt": 1795706072508,
+        "updatedAt": 1795706073626,
+        "lastRunId": "run_ac323847da132ddc",
         "turnControls": {
          "reasoningLevel": "on",
          "maxContextMode": false,
@@ -637,7 +633,7 @@
         "agentId": "general"
        },
        "revision": {
-        "epoch": "4e7528b3-45de-4cf9-8db9-74b82a68d8e3",
+        "epoch": "32c5d236-6681-4b56-88fb-997654b01c6f",
         "n": 6
        }
       }
@@ -647,17 +643,17 @@
   ],
   "session:open": [
    {
-    "ref": "fcd41f77f3955eb14a56bfca"
+    "ref": "a312780fd91d22c264d24995"
    },
    {
-    "ref": "319e64440de8ba0340d32e3f"
+    "ref": "3bd1775462fce5dce08fd373"
    }
   ],
   "capture:getReplayState": [
    {
     "result": {
-     "projectId": "proj_14c9c4167b5e",
-     "sessionId": "sess_e8ff5ef83a48",
+     "projectId": "proj_f2e9541eca15",
+     "sessionId": "sess_581fc22bd4b7",
      "generation": 0,
      "revision": 4,
      "operationId": null,
@@ -694,8 +690,8 @@
    },
    {
     "result": {
-     "projectId": "proj_14c9c4167b5e",
-     "sessionId": "sess_72098fb9685e",
+     "projectId": "proj_f2e9541eca15",
+     "sessionId": "sess_512401176fc9",
      "generation": 0,
      "revision": 1,
      "operationId": null,
@@ -734,38 +730,38 @@
   "workflow:getState": [
    {
     "result": {
-     "caseId": "sess_e8ff5ef83a48",
-     "runId": "run_a79176a4e8847603",
-     "sessionId": "sess_e8ff5ef83a48",
+     "caseId": "sess_581fc22bd4b7",
+     "runId": "run_385f3c582d3978fc",
+     "sessionId": "sess_581fc22bd4b7",
      "blockers": [],
      "reasoningSummaries": [],
-     "lastUpdated": "2026-11-26T08:31:11.305Z"
+     "lastUpdated": "2026-11-26T15:15:15.600Z"
     }
    },
    {
     "result": {
-     "caseId": "sess_72098fb9685e",
-     "runId": "run_fb7fe69560a51a1d",
-     "sessionId": "sess_72098fb9685e",
+     "caseId": "sess_512401176fc9",
+     "runId": "run_ac323847da132ddc",
+     "sessionId": "sess_512401176fc9",
      "blockers": [],
      "reasoningSummaries": [],
-     "lastUpdated": "2026-11-26T08:31:11.627Z"
+     "lastUpdated": "2026-11-26T15:15:15.912Z"
     }
    }
   ],
   "evidence:getChain": [
    {
     "result": {
-     "sessionId": "sess_e8ff5ef83a48",
-     "runId": "run_a79176a4e8847603",
+     "sessionId": "sess_581fc22bd4b7",
+     "runId": "run_385f3c582d3978fc",
      "events": [],
      "isValid": true
     }
    },
    {
     "result": {
-     "sessionId": "sess_72098fb9685e",
-     "runId": "run_fb7fe69560a51a1d",
+     "sessionId": "sess_512401176fc9",
+     "runId": "run_ac323847da132ddc",
      "events": [],
      "isValid": true
     }
@@ -775,7 +771,7 @@
    {
     "result": {
      "usage": {
-      "runId": "run_a79176a4e8847603",
+      "runId": "run_385f3c582d3978fc",
       "providerId": "ollama",
       "modelId": "qa-stub:4b",
       "inputTokens": 1200,
@@ -794,11 +790,11 @@
        },
        {
         "id": "skills",
-        "tokens": 107
+        "tokens": 109
        },
        {
         "id": "system_tools",
-        "tokens": 849,
+        "tokens": 847,
         "count": 32
        },
        {
@@ -812,7 +808,7 @@
        },
        {
         "id": "builtin_tools_deferred",
-        "tokens": 5021,
+        "tokens": 5018,
         "count": 23
        },
        {
@@ -820,7 +816,7 @@
         "tokens": 31568
        }
       ],
-      "snapshotAt": 1795681851206
+      "snapshotAt": 1795706095425
      },
      "stale": false
     }
@@ -828,7 +824,7 @@
    {
     "result": {
      "usage": {
-      "runId": "run_a79176a4e8847603",
+      "runId": "run_385f3c582d3978fc",
       "providerId": "ollama",
       "modelId": "qa-stub:4b",
       "inputTokens": 1200,
@@ -847,11 +843,11 @@
        },
        {
         "id": "skills",
-        "tokens": 107
+        "tokens": 109
        },
        {
         "id": "system_tools",
-        "tokens": 849,
+        "tokens": 847,
         "count": 32
        },
        {
@@ -865,7 +861,7 @@
        },
        {
         "id": "builtin_tools_deferred",
-        "tokens": 5021,
+        "tokens": 5018,
         "count": 23
        },
        {
@@ -873,7 +869,7 @@
         "tokens": 31568
        }
       ],
-      "snapshotAt": 1795681851206
+      "snapshotAt": 1795706095425
      },
      "stale": false
     }
@@ -881,7 +877,7 @@
    {
     "result": {
      "usage": {
-      "runId": "run_fb7fe69560a51a1d",
+      "runId": "run_ac323847da132ddc",
       "providerId": "ollama",
       "modelId": "qa-stub:4b",
       "inputTokens": 3600,
@@ -896,15 +892,15 @@
       "breakdown": [
        {
         "id": "system_prompt",
-        "tokens": 188
+        "tokens": 187
        },
        {
         "id": "skills",
-        "tokens": 108
+        "tokens": 110
        },
        {
         "id": "system_tools",
-        "tokens": 854,
+        "tokens": 852,
         "count": 32
        },
        {
@@ -913,12 +909,12 @@
        },
        {
         "id": "conversation",
-        "tokens": 51,
+        "tokens": 50,
         "count": 4
        },
        {
         "id": "builtin_tools_deferred",
-        "tokens": 7203,
+        "tokens": 7200,
         "count": 29
        },
        {
@@ -926,7 +922,7 @@
         "tokens": 31568
        }
       ],
-      "snapshotAt": 1795681829584
+      "snapshotAt": 1795706073589
      },
      "stale": false
     }
@@ -934,7 +930,7 @@
    {
     "result": {
      "usage": {
-      "runId": "run_fb7fe69560a51a1d",
+      "runId": "run_ac323847da132ddc",
       "providerId": "ollama",
       "modelId": "qa-stub:4b",
       "inputTokens": 3600,
@@ -949,15 +945,15 @@
       "breakdown": [
        {
         "id": "system_prompt",
-        "tokens": 188
+        "tokens": 187
        },
        {
         "id": "skills",
-        "tokens": 108
+        "tokens": 110
        },
        {
         "id": "system_tools",
-        "tokens": 854,
+        "tokens": 852,
         "count": 32
        },
        {
@@ -966,12 +962,12 @@
        },
        {
         "id": "conversation",
-        "tokens": 51,
+        "tokens": 50,
         "count": 4
        },
        {
         "id": "builtin_tools_deferred",
-        "tokens": 7203,
+        "tokens": 7200,
         "count": 29
        },
        {
@@ -979,7 +975,7 @@
         "tokens": 31568
        }
       ],
-      "snapshotAt": 1795681829584
+      "snapshotAt": 1795706073589
      },
      "stale": false
     }

@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "siliconflow-cn",
   "name": "SiliconFlow (China)",
   "npm": "@ai-sdk/openai-compatible",

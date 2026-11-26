@@ -1,16 +1,10 @@
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { StorageIo } from '../../runtime/StorageIo';
-import { EXECUTION_OFFER_SCHEMA } from './executionOffer';
-import {
-  EXECUTION_OFFER_FILE,
-  ExecutionOfferStore,
-  REMOVED_HANDOFF_STATE_FILE,
-  executionOfferMatches,
-} from './ExecutionOfferStore';
+import { EXECUTION_OFFER_FILE, ExecutionOfferStore, executionOfferMatches } from './ExecutionOfferStore';
 
 describe('ExecutionOfferStore', () => {
   const roots: string[] = [];
@@ -29,7 +23,6 @@ describe('ExecutionOfferStore', () => {
 
   function offer(overrides: Record<string, unknown> = {}) {
     return {
-      schemaVersion: EXECUTION_OFFER_SCHEMA,
       sourceAgentId: 'debugger',
       targetAgentId: 'general',
       plan: { uri: 'session://plans/plan-frozen.md', hash: 'a'.repeat(64) },
@@ -51,16 +44,6 @@ describe('ExecutionOfferStore', () => {
     store.clear('sess');
     expect(store.read('sess')).toBeNull();
     expect(existsSync(path.join(roots[0]!, EXECUTION_OFFER_FILE))).toBe(false);
-  });
-
-  it('unlinks removed handoff-state.json without parsing it', async () => {
-    roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdc-execution-offer-')));
-    const stale = path.join(roots[0]!, REMOVED_HANDOFF_STATE_FILE);
-    writeFileSync(stale, '{not-json');
-    const store = createStore();
-    store.discardRemovedHandoffState('sess');
-    expect(existsSync(stale)).toBe(false);
-    expect(store.read('sess')).toBeNull();
   });
 
   it('matches only the same target and frozen plan', () => {

@@ -105,6 +105,8 @@ RDC-Agent 是现代精密工作台，参照 Linear / Raycast / Arc 的完成度�
 - **技术原因**只经「复制详情」交给需要的人，不把 `String(error)` 直接上屏。
 - **恢复**保留已有输入与可验证结果，让局部失败停留在对应对象上。未完成或已失败时保持真实状态，不用成功提示掩盖，也不自动扩大操作范围。
 - 界面呈现并触发所属能力的恢复动作，不复制其决策；错误分类与资源清理由工程契约负责。
+- **上次未正常关闭**：启动时一条常驻 `notify.failure`，按归类说明上次怎样结束、正在进行的请求已标为中断；进程、原因、时间与会话/回合只在「复制详情」里。中断的回复与应用关闭时停止的回复各用自己的说法，不冒充用户的停止。
+- **窗口无法显示工作台**：renderer 反复崩溃或渲染期异常时整窗显示 `ui/EmptyState` page：一句标题、一句说明（会话已保存）、主动作「重新加载」与次动作「复制详情」，保留窗口控件，不显示原始原因；连这页也无法启动时由主进程原生对话框接手。
 
 ## Android 设备连接
 
@@ -112,4 +114,4 @@ RDC-Agent 是现代精密工作台，参照 Linear / Raycast / Arc 的完成度�
 
 ## Appearance 与安全呈现
 
-Appearance chrome 和 Composer Agent accent 是两个明确体系。主题配置字段 chromeThemes、支持的 schemaVersion 与持久化约束见工程架构和 Appearance 文档。安全边界由主进程与 CSP 实施；style-src 禁止 inline，样式只走语义 token 和受控样式表（动态坐标经 CSSOM 写入），不以 UI 特效绕过安全要求。正文中的本地媒体与远程图片只经主进程受控通道换成 `blob:`，不放宽 `img-src`。
+Appearance chrome 和 Composer Agent accent 是两个明确体系。主题配置字段 chromeThemes 与持久化约束见工程架构和 Appearance 文档。安全边界由主进程与 CSP 实施；style-src 禁止 inline，样式只走语义 token 和受控样式表（动态坐标经 CSSOM 写入），不以 UI 特效绕过安全要求。正文中的本地媒体与远程图片只经主进程受控通道换成 `blob:`，不放宽 `img-src`。

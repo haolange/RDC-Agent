@@ -49,7 +49,7 @@ export function resolveRdcInstallation(request: RdcInstallationRequest): RdcCliI
     command,
     argsPrefix: [entry],
     workingDirectory: root,
-    timeoutMs: request.timeoutMs,
+    noProgressTimeoutMs: request.noProgressTimeoutMs,
     env: { ...request.env },
   };
   assertRdcCliBinding(settings);
@@ -73,7 +73,11 @@ export function detectRdcInstallations(settings: RdcCliInvokerSettings): RdcInst
     })
     .map((candidate) => {
       try {
-        resolveRdcInstallation({ root: candidate.root, timeoutMs: settings.timeoutMs, env: settings.env });
+        resolveRdcInstallation({
+          root: candidate.root,
+          noProgressTimeoutMs: settings.noProgressTimeoutMs,
+          env: settings.env,
+        });
         return candidate;
       } catch (error) {
         return { ...candidate, problem: error instanceof Error ? error.message : String(error) };

@@ -6,6 +6,7 @@ import { AppError } from '@shared/errors/appError';
 
 import { assertNever } from '@shared/utils/assertNever';
 import { generateEventId, nowMs } from '@shared/utils/id';
+import { isRdcProgressUpdate } from '../rdc/RdcOperationProgress';
 import { toSharedThinkingArtifact } from './reasoning/ReasoningArtifacts';
 import type {
   AgentEvent,
@@ -156,47 +157,10 @@ export function translateCoreToSharedAgentEvent(
         context,
       );
     }
-    case 'tool_execution_end': {
-      const sharedResult = toolResultToSharedResult(event.result, event.durationMs);
-      const approvalReason = getApprovalRequiredReason(event.result);
-      if (approvalReason) {
-        return buildSharedAgentEvent(
-          'approval.requested',
-          {
-            approvalId: `approval-${event.toolCallId}`,
-            title: `Approve ${event.toolName}`,
-            status: 'pending',
-            reason: approvalReason,
-            kind: 'tool',
-            toolCallId: event.toolCallId,
-            toolName: event.toolName,
-          },
-          context,
-        );
-      }
-      const denialReason = getPolicyDenialReason(event.result);
-      if (denialReason) {
-        return buildSharedAgentEvent(
-          'tool.denied',
-          {
-            toolCallId: event.toolCallId,
-            toolName: event.toolName,
-            reason: denialReason,
-            result: sharedResult,
-          },
-          context,
-        );
-      }
-      return buildSharedAgentEvent(
-        'tool.completed',
-        {
-          toolCallId: event.toolCallId,
-          toolName: event.toolName,
-          result: sharedResult,
-        },
-        context,
-      );
-    }
+    case 'tool_execution_end':
+      return translateToolExecutionEnd(event, context);
+    case 'tool_execution_update':
+      return translateToolProgress(event, context);
     case 'approval_requested': {
       return buildSharedAgentEvent(
         'approval.requested',
@@ -265,11 +229,63 @@ export function translateCoreToSharedAgentEvent(
     case 'turn_start':
     case 'turn_end':
     case 'message_start':
-    case 'tool_execution_update':
       return null;
     default:
       return assertNever(event);
   }
+}
+
+/** A finished call is completed, denied by policy, or (when it reports that approval is required) an approval. */
+function translateToolExecutionEnd(
+  event: Extract<AgentLoopEvent, { type: 'tool_execution_end' }>,
+  context: AgentEventBridgeContext,
+): AgentEvent {
+  const sharedResult = toolResultToSharedResult(event.result, event.durationMs);
+  const approvalReason = getApprovalRequiredReason(event.result);
+  if (approvalReason) {
+    return buildSharedAgentEvent(
+      'approval.requested',
+      {
+        approvalId: `approval-${event.toolCallId}`,
+        title: `Approve ${event.toolName}`,
+        status: 'pending',
+        reason: approvalReason,
+        kind: 'tool',
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+      },
+      context,
+    );
+  }
+  const denialReason = getPolicyDenialReason(event.result);
+  if (denialReason) {
+    return buildSharedAgentEvent(
+      'tool.denied',
+      { toolCallId: event.toolCallId, toolName: event.toolName, reason: denialReason, result: sharedResult },
+      context,
+    );
+  }
+  return buildSharedAgentEvent(
+    'tool.completed',
+    { toolCallId: event.toolCallId, toolName: event.toolName, result: sharedResult },
+    context,
+  );
+}
+
+/**
+ * Only an RDC operation's progress crosses over, as the ephemeral `tool.progress`; other partial results (a shell's
+ * live output) stay inside the tool. Progress never reaches the model: it sees the final result only.
+ */
+function translateToolProgress(
+  event: Extract<AgentLoopEvent, { type: 'tool_execution_update' }>,
+  context: AgentEventBridgeContext,
+): AgentEvent | null {
+  if (!isRdcProgressUpdate(event.partialResult)) return null;
+  return buildSharedAgentEvent(
+    'tool.progress',
+    { toolCallId: event.toolCallId, toolName: event.toolName, progress: { ...event.partialResult.progress } },
+    context,
+  );
 }
 
 /** Streamed assistant output; only the semantic boundaries and deltas the conversation projects cross over. */

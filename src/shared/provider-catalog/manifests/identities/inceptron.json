@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "inceptron",
   "name": "Inceptron",
   "npm": "@ai-sdk/openai-compatible",

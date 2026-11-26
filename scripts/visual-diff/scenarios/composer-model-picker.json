@@ -26,7 +26,12 @@
  "responses": {
   "settings:get": [
    {
-    "ref": "08a7685c99f2849518643c46"
+    "ref": "c3eb5107a6db911888bcb215"
+   }
+  ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "app:getMeta": [
@@ -43,8 +48,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-2ac93f453e78-1795681043695",
-       "timestamp": 1795681043695,
+       "id": "rlog-fdc418e4394a-1795705286287",
+       "timestamp": 1795705286287,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -58,8 +63,8 @@
        }
       },
       {
-       "id": "rlog-90435db2acbb-1795681043739",
-       "timestamp": 1795681043739,
+       "id": "rlog-a5deffc921f2-1795705286344",
+       "timestamp": 1795705286344,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -71,8 +76,8 @@
        "raw": null
       },
       {
-       "id": "rlog-4918f4ebb733-1795681043740",
-       "timestamp": 1795681043740,
+       "id": "rlog-40d5ebc74c52-1795705286345",
+       "timestamp": 1795705286345,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -84,8 +89,8 @@
        "raw": null
       },
       {
-       "id": "rlog-0b06560ffe6a-1795681043754",
-       "timestamp": 1795681043754,
+       "id": "rlog-5e5d08617686-1795705286364",
+       "timestamp": 1795705286364,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -106,8 +111,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-2ac93f453e78-1795681043695",
-       "timestamp": 1795681043695,
+       "id": "rlog-fdc418e4394a-1795705286287",
+       "timestamp": 1795705286287,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -121,8 +126,8 @@
        }
       },
       {
-       "id": "rlog-90435db2acbb-1795681043739",
-       "timestamp": 1795681043739,
+       "id": "rlog-a5deffc921f2-1795705286344",
+       "timestamp": 1795705286344,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -134,8 +139,8 @@
        "raw": null
       },
       {
-       "id": "rlog-4918f4ebb733-1795681043740",
-       "timestamp": 1795681043740,
+       "id": "rlog-40d5ebc74c52-1795705286345",
+       "timestamp": 1795705286345,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -147,8 +152,8 @@
        "raw": null
       },
       {
-       "id": "rlog-0b06560ffe6a-1795681043754",
-       "timestamp": 1795681043754,
+       "id": "rlog-5e5d08617686-1795705286364",
+       "timestamp": 1795705286364,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -193,17 +198,12 @@
     }
    }
   ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
-   }
-  ],
   "settings:getEffectiveCatalog": [
    {
-    "ref": "6ef6b155ee8a77e79ab251b2"
+    "ref": "3182665bad78827907ea84be"
    },
    {
-    "ref": "3b423ab9250af5a852b8877d"
+    "ref": "743b2519252e17da6b3b5e0c"
    }
   ],
   "project:list": [
@@ -211,7 +211,7 @@
     "result": {
      "projects": [
       {
-       "projectId": "proj_7ce3d7d49ca3",
+       "projectId": "proj_84768cd17c42",
        "name": "visual-diff-project",
        "rootPath": "/visual-diff/visual-diff-project",
        "slug": "visual-diff-project",
@@ -219,9 +219,9 @@
        "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
        "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
        "inputs": [],
-       "inputsUpdatedAt": 1795681064447,
-       "createdAt": 1795681045629,
-       "updatedAt": 1795681045629
+       "inputsUpdatedAt": 1795705307072,
+       "createdAt": 1795705288158,
+       "updatedAt": 1795705288158
       }
      ]
     }
@@ -231,7 +231,7 @@
    {
     "result": {
      "project": {
-      "projectId": "proj_7ce3d7d49ca3",
+      "projectId": "proj_84768cd17c42",
       "name": "visual-diff-project",
       "rootPath": "/visual-diff/visual-diff-project",
       "slug": "visual-diff-project",
@@ -239,9 +239,9 @@
       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
       "inputs": [],
-      "inputsUpdatedAt": 1795681064447,
-      "createdAt": 1795681045629,
-      "updatedAt": 1795681045629
+      "inputsUpdatedAt": 1795705307072,
+      "createdAt": 1795705288158,
+      "updatedAt": 1795705288158
      },
      "currentSession": null,
      "currentRun": null

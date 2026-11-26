@@ -5,14 +5,14 @@ import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import {
   clearRdcContextLeases,
   grantDelegatedLease,
-  quarantineRdcContext,
+  registerRdcFault,
   setRdcRuntimeContextForSession,
 } from './RdcRuntimeContextRegistry';
 import { setRdcInteractionLock } from './RdcOperationCoordinator';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 
 const scope = { sessionId: 'owner', projectId: 'project', contextId: 'context', leaseVersion: 7 };
-function context(timeoutMs = 120000): ToolExecutionContext {
+function context(noProgressTimeoutMs = 300_000): ToolExecutionContext {
   return {
     sessionId: 'owner',
     projectId: 'project',
@@ -25,7 +25,7 @@ function context(timeoutMs = 120000): ToolExecutionContext {
         argsPrefix: ['private-entry'],
         workingDirectory: 'private-directory',
         env: { SECRET: 'private-secret' },
-        timeoutMs,
+        noProgressTimeoutMs,
       },
       [],
       {
@@ -127,14 +127,22 @@ describe('RDC host controls projection', () => {
       });
     if (failure === 'lease') test.scope.leaseVersion += 1;
     if (failure === 'unlocked') setRdcInteractionLock('owner', 'turn', false);
-    if (failure === 'quarantine') quarantineRdcContext('owner', test.lease.version, 'uncertain');
+    if (failure === 'quarantine')
+      registerRdcFault({
+        sessionId: 'owner',
+        expectedVersion: test.lease.version,
+        operation: 'rd.test',
+        nativeArgs: {},
+        cause: 'native_failure',
+        reason: 'uncertain',
+      });
     if (failure === 'delegated')
       grantDelegatedLease({ parentSessionId: 'owner', childSessionId: 'child', ownerTurnId: 'turn' });
     if (failure === 'duplicate')
       setRdcRuntimeContextForSession('other', test.lease.runtimeContext, { projectId: 'other-project' });
     expect(readRdcHostControls(test.scope, test.execution)).toMatchObject({ replayIsolation: { available: false } });
   });
-  it('exposes current owner quota and the frozen per-invocation policy without private CLI material', () => {
+  it('exposes current owner quota and the frozen no-progress patience without private CLI material', () => {
     const readQuota = quota();
     const execution = context();
     const result = readRdcHostControls(scope, execution);
@@ -143,13 +151,13 @@ describe('RDC host controls projection', () => {
       available: true,
       measuredAt: expect.any(Number),
       artifactCapacity: { available: true, remaining: { bytes: 130, toolOutputFiles: 5 }, isReservation: false },
-      cliProcess: {
+      operationBudget: {
         available: true,
         source: 'frozen-turn-cli',
-        timeoutMs: 120000,
-        termination: { maxTreeKillAttempts: 2, joinTerminationAdditionalWaitMs: 13000 },
+        rule: 'no-progress',
+        noProgressTimeoutMs: 300_000,
+        scope: 'each-rdc-operation',
         wholeOperationDeadline: false,
-        nativeTerminationGuaranteed: false,
         postOperationObservationMayInvokeCli: true,
       },
     });
@@ -163,9 +171,9 @@ describe('RDC host controls projection', () => {
     expect(readQuota).not.toHaveBeenCalled();
   });
 
-  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('does not invent a usable timeout from %s', (value) => {
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('does not invent a usable patience from %s', (value) => {
     quota();
-    expect(readRdcHostControls(scope, context(value))).toMatchObject({ cliProcess: { available: false } });
+    expect(readRdcHostControls(scope, context(value))).toMatchObject({ operationBudget: { available: false } });
   });
 
   it('keeps missing binding, lease drift and failed quota reads explicitly unknown', () => {
@@ -176,14 +184,14 @@ describe('RDC host controls projection', () => {
     expect(noBinding).toMatchObject({
       available: false,
       artifactCapacity: { available: false },
-      cliProcess: { available: false },
+      operationBudget: { available: false },
     });
     expect(JSON.stringify(noBinding)).not.toContain('private-secret');
     expect(readRdcHostControls({ ...scope, leaseVersion: 8 }, context())).toMatchObject({
-      cliProcess: { available: false },
+      operationBudget: { available: false },
     });
     expect(readRdcHostControls({ ...scope, contextId: 'other-context' }, context())).toMatchObject({
-      cliProcess: { available: false },
+      operationBudget: { available: false },
     });
   });
 
@@ -195,6 +203,6 @@ describe('RDC host controls projection', () => {
       [],
       execution.rdcBinding!.identity,
     );
-    expect(readRdcHostControls(scope, execution)).toMatchObject({ cliProcess: { available: false } });
+    expect(readRdcHostControls(scope, execution)).toMatchObject({ operationBudget: { available: false } });
   });
 });

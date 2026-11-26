@@ -354,6 +354,11 @@ export class AssistantStreamBuilder {
     this.stream.error(error);
   }
 
+  /** Whether the stream has opened any text, thinking or tool-call block: output a retry would discard. */
+  get hasOutput(): boolean {
+    return this.blocks.size > 0;
+  }
+
   get isFinished(): boolean {
     return this.finished;
   }

@@ -73,7 +73,7 @@ function hasProviderChannelCollision(block: ConversationWorkBlock): boolean {
   return false;
 }
 
-const LEGACY_BLOCK_FIELDS = ['thinking', 'thinkingStatus', 'thinkingDisplayOrder', 'outputItems'] as const;
+const FOREIGN_BLOCK_FIELDS = ['thinking', 'thinkingStatus', 'thinkingDisplayOrder', 'outputItems'] as const;
 
 const THINKING_ARTIFACT_KINDS: readonly unknown[] = [
   'summary',
@@ -105,7 +105,7 @@ function isStoredLoopItem(item: unknown): item is ConversationLoopItem {
 
 /**
  * The stored trace when it matches the current shape. A record in another shape is dropped and the
- * message is flagged, so the transcript can say the process record came from an older version.
+ * message is flagged, so the transcript can say the process record could not be read.
  */
 export function readStoredWorkTrace(trace: ConversationWorkTrace | null | undefined): {
   workTrace: ConversationWorkTrace | null;
@@ -132,8 +132,8 @@ export function sanitizeStoredWorkTrace(trace: ConversationWorkTrace | null | un
       return null;
     if (block.parentLoopId !== undefined && (typeof block.parentLoopId !== 'string' || !block.parentLoopId))
       return null;
-    // Older process records kept one thinking slot and merged text; they are not read back.
-    if (LEGACY_BLOCK_FIELDS.some((field) => field in block)) return null;
+    // No current block has a single thinking slot or merged output items; a block that does is not read back.
+    if (FOREIGN_BLOCK_FIELDS.some((field) => field in block)) return null;
     if (block.result && 'text' in block.result) return null;
     if (block.items !== undefined && (!Array.isArray(block.items) || !block.items.every(isStoredLoopItem))) return null;
     for (const call of block.toolCalls as (ConversationToolCall | null)[]) {

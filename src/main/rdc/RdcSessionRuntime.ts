@@ -12,8 +12,6 @@ import { closeOwnedRemoteCapture } from './RdcCaptureClose';
  * RdcSessionService - RDC runtime context state and fixed native CLI lifecycle.
  */
 
-import { withRdcOpenProgress } from './RdcOpenProgress';
-import { withRdcRemoteProgress, type RdcRemoteProgress } from './RdcRemoteProgress';
 import {
   assertRemotePreparationContract,
   connectSessionReplayDevice,
@@ -21,6 +19,7 @@ import {
   remotePreparationBindingIdentity,
   revalidateSessionReplayDevice,
   type RdcRemoteConnection,
+  type RdcRemoteProgress,
   type RemoteInstallationInspection,
 } from './RdcRemoteConnection';
 import { setRdcRuntimeContextForSession, getDelegatedChildSessionId } from './RdcRuntimeContextRegistry';
@@ -39,6 +38,7 @@ import type {
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type { RdcTurnBinding } from './RdcTurnBindings';
+import type { RdcOperationFrame } from './RdcOperationWatcher';
 
 interface PreviewLoadResult {
   preview: OpenedCapturePreview | null;
@@ -54,12 +54,13 @@ async function callNative(
   contextId: string,
   binding: RdcTurnBinding,
   signal?: AbortSignal,
+  onProgress?: (frame: RdcOperationFrame) => void,
 ): Promise<{ ok: boolean; data: Record<string, unknown>; error?: string }> {
   signal?.throwIfAborted();
   const result = await rdcCliInvokerService.executeCLI(
     'call',
     [operation, '--args-json', JSON.stringify(args), '--daemon-context', contextId],
-    { contextId, abortSignal: signal, settings: binding.cli },
+    { contextId, abortSignal: signal, settings: binding.cli, onProgress },
   );
   try {
     signal?.throwIfAborted();
@@ -81,6 +82,16 @@ async function callNative(
     if (error instanceof RdcNativeFailure) throw error;
     return { ok: false, data: {}, error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+/** A remote open moves the capture to the device first; only RDC-Tool's own transfer stages change the phase. */
+function captureOpenProgress(onStage: RdcLifecycleOptions['onStage']) {
+  return (frame: RdcOperationFrame) => {
+    if (frame.kind !== 'progress') return;
+    if (frame.stage === 'capture_transfer_started' || frame.stage === 'capture_transfer_progress')
+      onStage?.('transferring');
+    else if (frame.stage === 'capture_transfer_done' || frame.stage === 'capture_open_done') onStage?.('opening');
+  };
 }
 
 const emptyPreviewLoadResult = (): PreviewLoadResult => ({
@@ -189,32 +200,25 @@ export class RdcSessionRuntime {
         if (!preparedRemote?.contextId || !preparedRemote.remoteId || preparedRemote.contextId !== allocatedContextId) {
           throw new Error('Remote replay requires a prepared remote context and remoteId.');
         }
-        const result = await withRdcOpenProgress(
+        const onProgress = captureOpenProgress(options.onStage);
+        const openedFile = await callNative(
+          'rd.capture.open_file',
+          { file_path: request.filePath, read_only: true },
           allocatedContextId,
-          options.binding!.cli,
-          options.onStage,
-          async () => {
-            const openedFile = await callNative(
-              'rd.capture.open_file',
-              { file_path: request.filePath, read_only: true },
-              allocatedContextId,
-              options.binding!,
-              options.signal,
-            );
-            if (!openedFile.ok) return openedFile;
-            const opened = await callNative(
-              'rd.capture.open_replay',
-              {
-                capture_file_id: openedFile.data.capture_file_id,
-                options: { remote_id: preparedRemote.remoteId },
-              },
-              allocatedContextId,
-              options.binding!,
-              options.signal,
-            );
-            return { ok: opened.ok, data: opened.data, error: opened.error };
-          },
+          options.binding!,
+          options.signal,
+          onProgress,
         );
+        const result = openedFile.ok
+          ? await callNative(
+              'rd.capture.open_replay',
+              { capture_file_id: openedFile.data.capture_file_id, options: { remote_id: preparedRemote.remoteId } },
+              allocatedContextId,
+              options.binding!,
+              options.signal,
+              onProgress,
+            )
+          : openedFile;
         if (!result.ok) {
           throw new Error(result.error ?? 'Remote replay open failed.');
         }
@@ -394,9 +398,7 @@ export class RdcSessionRuntime {
     const contextId = 'rdc-' + randomUUID();
     await this.ensureOwnedDaemon(contextId, binding, options.signal);
     this.contextId = contextId;
-    this.remoteConnection = await withRdcRemoteProgress(contextId, binding.cli, options.signal, options, () =>
-      connectSessionReplayDevice(device, contextId, binding, options.signal),
-    );
+    this.remoteConnection = await connectSessionReplayDevice(device, contextId, binding, options.signal, options);
     this.remoteStatus = 'connected';
   }
 

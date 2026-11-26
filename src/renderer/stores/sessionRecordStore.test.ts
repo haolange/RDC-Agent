@@ -3,7 +3,6 @@ import { getSessionView, useSessionRecordStore } from './sessionRecordStore';
 import type { SessionRecord } from '@shared/types/session';
 
 const record = (title: string): SessionRecord => ({
-  schemaVersion: '1',
   sessionId: 's',
   projectId: 'p',
   title,

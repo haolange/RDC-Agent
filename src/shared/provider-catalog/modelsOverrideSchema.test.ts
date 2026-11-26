@@ -4,7 +4,6 @@ import { ModelsOverrideSchema, ModelOverrideSchema, CustomModelSchema } from './
 describe('ModelsOverrideSchema', () => {
   it('accepts a valid minimal override', () => {
     const input = {
-      schemaVersion: 1,
       providers: {
         anthropic: {
           modelOverrides: {
@@ -22,7 +21,6 @@ describe('ModelsOverrideSchema', () => {
 
   it('accepts a valid override with custom models', () => {
     const input = {
-      schemaVersion: 1,
       providers: {
         'custom-openai': {
           baseUrl: 'https://api.example.com/v1',
@@ -48,14 +46,12 @@ describe('ModelsOverrideSchema', () => {
     }
   });
 
-  it('rejects wrong schemaVersion', () => {
-    const input = { schemaVersion: 2, providers: {} };
-    expect(ModelsOverrideSchema.safeParse(input).success).toBe(false);
+  it('rejects a file that still carries a format version', () => {
+    expect(ModelsOverrideSchema.safeParse({ schemaVersion: 1, providers: {} }).success).toBe(false);
   });
 
   it('rejects forbidden fields (security boundary)', () => {
     const input = {
-      schemaVersion: 1,
       providers: {
         anthropic: {
           modelOverrides: {
@@ -72,7 +68,6 @@ describe('ModelsOverrideSchema', () => {
 
   it('rejects authSchemaId override', () => {
     const input = {
-      schemaVersion: 1,
       providers: {
         anthropic: {
           modelOverrides: {
@@ -86,7 +81,6 @@ describe('ModelsOverrideSchema', () => {
 
   it('rejects adapterId override', () => {
     const input = {
-      schemaVersion: 1,
       providers: {
         anthropic: {
           modelOverrides: {
@@ -146,7 +140,6 @@ describe('ModelsOverrideSchema', () => {
 
   it('rejects unknown provider-level fields', () => {
     const input = {
-      schemaVersion: 1,
       providers: {
         anthropic: { evilField: true },
       },

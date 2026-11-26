@@ -186,8 +186,6 @@ Edit-and-resend and branch switches wait for the active turn to finish scheduler
 - The visible transcript is retained.
 - This does not create another Task or grant authority; stable instructions and permissions come from frozen configuration.
 - Terminal entries use the branch, turn, and message identities captured at start; they never infer ownership from a later active leaf.
-- Migration may synthesize provider-neutral entries from canonical conversation/branch data, but never reads old per-Agent thread files.
-- A migration marker is committed only after all journal appends succeed, and partial runs resume idempotently.
 
 Agent/Composer executable models require source-backed `toolCalling.state === 'supported'` plus an implemented structured-tool adapter.
 

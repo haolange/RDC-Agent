@@ -46,9 +46,9 @@ describe('error contract', () => {
 
   it('rejects params outside the code schema where the error is built', () => {
     expect(() => new AppError('PLAN_REVIEW_BUSY', 'busy', { params: { reviews: 2 } })).toThrow();
-    expect(() => new AppError('KNOWLEDGE_DRAFT_MIGRATION_CONFLICT', 'a,b')).toThrow();
-    expect(new AppError('KNOWLEDGE_DRAFT_MIGRATION_CONFLICT', 'a,b', { params: { cards: 2 } }).params).toEqual({
-      cards: 2,
+    expect(() => new AppError('STORAGE_CORRUPT', 'damaged', { params: { file: 2 } })).toThrow();
+    expect(new AppError('STORAGE_CORRUPT', 'damaged', { params: { file: 'config.json' } }).params).toEqual({
+      file: 'config.json',
     });
   });
 

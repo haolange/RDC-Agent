@@ -414,9 +414,10 @@ export interface StreamOptions {
   reasoningVisibility?: ReasoningVisibility;
   /** 用于中止本次生成的信号。 */
   signal?: AbortSignal;
+  /** Silence allowed from request dispatch to the first chunk (connect, headers and first bytes); see `providerFirstByteTimeoutMs`. */
   firstChunkTimeoutMs?: number;
+  /** Silence allowed between chunks once the stream has started; there is no total limit while chunks keep coming. */
   streamIdleTimeoutMs?: number;
-  requestTimeoutMs?: number;
   /** 覆盖 Provider 默认 API key。 */
   apiKey?: string;
   /** 覆盖 Provider 默认 baseUrl。 */
@@ -449,7 +450,6 @@ export interface CustomAgentMessage {
 export type AgentMessage = Message | CustomAgentMessage;
 
 export interface ProviderStateRef {
-  schemaVersion: 1;
   carrier: ProviderContractBundle['state']['carrier'];
   value: string;
   origin: ExecutionIdentity;

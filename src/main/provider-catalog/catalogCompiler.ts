@@ -30,7 +30,6 @@ export function dedicatedToolCallingFactSourceIds(surface: Pick<ProviderSurfaceM
   return surface.factSources.filter((source) => source.id.includes(':tools-')).map((source) => source.id);
 }
 
-export const PROVIDER_CATALOG_SCHEMA_VERSION = 2 as const;
 export const MODELS_DEV_IDENTITY_COUNT = 166 as const;
 export const MODELS_DEV_SNAPSHOT_SHA256 = 'd4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733';
 
@@ -69,7 +68,6 @@ export type ProviderSurfaceSummary = Omit<
 };
 
 export interface CompiledProviderCatalogIndex {
-  schemaVersion: typeof PROVIDER_CATALOG_SCHEMA_VERSION;
   catalogRevision: string;
   identityCount: number;
   surfaceCount: number;
@@ -78,7 +76,6 @@ export interface CompiledProviderCatalogIndex {
 }
 
 export interface CompiledProviderSurface {
-  schemaVersion: typeof PROVIDER_CATALOG_SCHEMA_VERSION;
   catalogRevision: string;
   surface: ProviderSurfaceManifest;
 }
@@ -709,14 +706,12 @@ export function compileProviderCatalog(input: ProviderCatalogCompileInput): Comp
     surfaces.map((surface) => [
       surface.id,
       {
-        schemaVersion: PROVIDER_CATALOG_SCHEMA_VERSION,
         catalogRevision,
         surface,
       },
     ]),
   );
   const summaries = surfaces.map((surface) => ({
-    schemaVersion: surface.schemaVersion,
     id: surface.id,
     vendorId: surface.vendorId,
     label: surface.label,
@@ -758,7 +753,6 @@ export function compileProviderCatalog(input: ProviderCatalogCompileInput): Comp
   }));
   return {
     index: {
-      schemaVersion: PROVIDER_CATALOG_SCHEMA_VERSION,
       catalogRevision,
       identityCount: identities.length,
       surfaceCount: surfaces.length,

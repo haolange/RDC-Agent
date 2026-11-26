@@ -9,7 +9,7 @@ const cli = {
   argsPrefix: [],
   workingDirectory: '',
   env: {} as Record<string, string>,
-  timeoutMs: 30_000,
+  noProgressTimeoutMs: 30_000,
 };
 
 describe('withRdcHostRuntimeEnv', () => {

@@ -3,7 +3,7 @@ import {
   clearRdcContextLeases,
   getDelegatedChildSessionId,
   grantDelegatedLease,
-  quarantineRdcContext,
+  registerRdcFault,
   revokeDelegatedLease,
   setRdcRuntimeContextForSession,
 } from '../../rdc/RdcRuntimeContextRegistry';
@@ -50,10 +50,13 @@ function setup() {
 
 it('joins only the affected execution tree and propagates the observed failure to the owner', async () => {
   const { child, turn } = setup();
-  quarantineRdcContext('child', child.version, 'failed', {
+  registerRdcFault({
+    sessionId: 'child',
+    expectedVersion: child.version,
     operation: 'rd.test',
-    argsFingerprint: 'a'.repeat(64),
-    code: 'fault',
+    nativeArgs: {},
+    cause: 'fault',
+    reason: 'failed',
   });
   mock.scope.mockReturnValue({ ownerSessionId: 's', rootTaskId: 'task', executionId: 'root', generation: 1 });
   const active = [
@@ -74,10 +77,13 @@ it('does not cancel an unrelated live child or claim an aborted join completed',
   const { child, turn } = setup();
   await expect(joinFaultedRdcChild('s', turn)).rejects.toThrow('RDC_RECOVERY_CHILD_ACTIVE');
   expect(mock.interrupt).not.toHaveBeenCalled();
-  quarantineRdcContext('child', child.version, 'failed', {
+  registerRdcFault({
+    sessionId: 'child',
+    expectedVersion: child.version,
     operation: 'rd.test',
-    argsFingerprint: 'a'.repeat(64),
-    code: 'fault',
+    nativeArgs: {},
+    cause: 'fault',
+    reason: 'failed',
   });
   mock.scope.mockReturnValue({ ownerSessionId: 's', rootTaskId: 'task', executionId: 'root', generation: 1 });
   mock.list.mockResolvedValue([{ id: 'root', mode: 'subagent', status: 'running', generation: 1 }]);

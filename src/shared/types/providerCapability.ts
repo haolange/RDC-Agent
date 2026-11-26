@@ -255,7 +255,6 @@ export interface ContextTransitionPlan {
 }
 
 export interface ExecutionIdentity {
-  schemaVersion: 1;
   providerId: string;
   credentialScopeHash: string;
   endpointHash: string;

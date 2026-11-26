@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "model-oracle-ai",
   "name": "Model Oracle AI",
   "npm": "@ai-sdk/openai-compatible",

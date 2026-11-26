@@ -1,11 +1,11 @@
 ---
 name: analyzer-architecture-method
-description: Write Analyzer Architecture Model versions on existing rdc.investigation.v1 kinds without crossing Observed / Reconstructed / Authoring layers.
+description: Write Analyzer Architecture Model versions on existing rdc.investigation kinds without crossing Observed / Reconstructed / Authoring layers.
 ---
 
 # Analyzer Architecture Method
 
-Use this skill during Analyzer execution. Do not invent a new kind, Profile, or TaskStore. Write only `rdc.investigation.v1` Session Artifacts.
+Use this skill during Analyzer execution. Do not invent a new kind, Profile, or TaskStore. Write only `rdc.investigation` Session Artifacts.
 
 ## Three layers
 

@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
 import { settingsService } from '../settings/settings-core/SettingsService';
 import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
+import { probeProcess } from '../platform/process';
+import { lifecycleLedger } from '../runtime/LifecycleLedger';
 import { verifyPlanInput } from './prepareInvestigationPlan';
 import { rdcSessionService } from './RdcSessionService';
 import { replayDeviceService } from './captures/ReplayDeviceService';
@@ -16,9 +18,14 @@ import { listOwnedRdcDaemons } from './OwnedRdcDaemonRegistry';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import { readRdcSwitchSnapshot } from './RdcSwitchSnapshot';
+import { readRdcContextStatus } from './RdcContextStatus';
+import { classifyRecovery } from './RdcRecoveryClassification';
+import { observedRdcProcessIdentity } from './RdcProcessIdentity';
 import { rdcLifecycleReceipts, sameRdcLifecyclePosition, type RdcLifecyclePoint } from './RdcLifecycleReceipts';
 import { withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 import type { SessionScope } from '@shared/types/session';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
+import type { ReplayDeviceEntry } from '@shared/types/device';
 import type {
   CaptureRecoveryStatus,
   CaptureReplayBindingRequest,
@@ -96,6 +103,7 @@ export async function restorePreviousCapture(scope: CaptureReplayBindingRequest)
     const cli =
       priorBinding?.cli ?? withRdcHostRuntimeEnv(structuredClone(settingsService.snapshot().user.tooling.rdcCli));
     const catalog = original ? (await rdcCliInvokerService.loadCatalog(cli, true)).tools : [];
+    await admitQuarantinedContext(scope, initial, cli);
     guard();
     let current = await observedPosition(scope);
     if (
@@ -135,42 +143,7 @@ export async function restorePreviousCapture(scope: CaptureReplayBindingRequest)
       current = null;
     }
     if (original && !sameInput) {
-      const closed = rdcSessionService.snapshotReplayForSession(scope);
-      const newBinding = freezeRdcTurnBinding(cli, catalog, null);
-      const prepared = await rdcSessionService.prepareAgentDevice(
-        { ...scope, deviceId: device!.id, bindingGeneration: closed.generation },
-        { binding: newBinding, turnId: owner, assertAuthorized: guard },
-      );
-      if (!prepared.success)
-        throw new AppError(
-          'RDC_RECOVERY_DEVICE_UNAVAILABLE',
-          prepared.error?.code ?? 'device preparation did not complete',
-        );
-      guard();
-      const liveDevice = replayDeviceService.getDeviceById(device!.id);
-      if (
-        !liveDevice ||
-        liveDevice.status !== 'online' ||
-        liveDevice.type !== device!.type ||
-        liveDevice.serial !== device!.serial
-      ) {
-        throw new AppError('RDC_APPROVED_DEVICE_CHANGED');
-      }
-      await rdcSessionService.openProjectInput(
-        {
-          projectId: scope.projectId,
-          sessionId: scope.sessionId,
-          inputId: capture!.inputId,
-          filePath: capture!.filePath,
-          replayDevice: liveDevice,
-        },
-        {
-          binding: newBinding,
-          expectedGeneration: prepared.state.generation,
-          expectedCaptureSha256: original.contentSha256,
-        },
-      );
-      guard();
+      await reopenOriginal(scope, { original, capture: capture!, device: device!, cli, catalog, owner, guard });
       current = await observedPosition(scope);
     }
     if (original && !sameRdcLifecyclePosition(current, original)) {
@@ -204,6 +177,98 @@ export async function restorePreviousCapture(scope: CaptureReplayBindingRequest)
     setRdcInteractionLock(scope.sessionId, owner, false);
   }
   return rdcSessionService.snapshotReplayForSession(scope);
+}
+
+/** Reopen the saved input on its device under a fresh binding; the caller observes the reopened position. */
+async function reopenOriginal(
+  scope: SessionScope,
+  input: {
+    original: RdcLifecyclePoint;
+    capture: { inputId: string; filePath: string };
+    device: ReplayDeviceEntry;
+    cli: RdcCliInvokerSettings;
+    catalog: readonly Record<string, unknown>[];
+    owner: string;
+    guard: () => void;
+  },
+): Promise<void> {
+  const { original, capture, device, guard } = input;
+  const closed = rdcSessionService.snapshotReplayForSession(scope);
+  const newBinding = freezeRdcTurnBinding(input.cli, input.catalog, null);
+  const prepared = await rdcSessionService.prepareAgentDevice(
+    {
+      projectId: scope.projectId,
+      sessionId: scope.sessionId,
+      deviceId: device.id,
+      bindingGeneration: closed.generation,
+    },
+    { binding: newBinding, turnId: input.owner, assertAuthorized: guard },
+  );
+  if (!prepared.success)
+    throw new AppError(
+      'RDC_RECOVERY_DEVICE_UNAVAILABLE',
+      prepared.error?.code ?? 'device preparation did not complete',
+    );
+  guard();
+  const liveDevice = replayDeviceService.getDeviceById(device.id);
+  if (
+    !liveDevice ||
+    liveDevice.status !== 'online' ||
+    liveDevice.type !== device.type ||
+    liveDevice.serial !== device.serial
+  )
+    throw new AppError('RDC_APPROVED_DEVICE_CHANGED');
+  await rdcSessionService.openProjectInput(
+    {
+      projectId: scope.projectId,
+      sessionId: scope.sessionId,
+      inputId: capture.inputId,
+      filePath: capture.filePath,
+      replayDevice: liveDevice,
+    },
+    {
+      binding: newBinding,
+      expectedGeneration: prepared.state.generation,
+      expectedCaptureSha256: original.contentSha256,
+    },
+  );
+  guard();
+}
+
+/**
+ * A quarantined current context is closed only after the shared recovery admission explains its processes against
+ * the last identity main verified for it. A person starts this restore, so it is not counted against an attempt budget.
+ */
+async function admitQuarantinedContext(
+  scope: SessionScope,
+  pending: NonNullable<ReturnType<typeof rdcLifecycleReceipts.pending>>,
+  cli: RdcCliInvokerSettings,
+): Promise<void> {
+  const lease = getRdcContextLease(scope.sessionId);
+  if (!lease?.quarantineReason) return;
+  const verified =
+    observedRdcProcessIdentity(lease.contextId) ??
+    pending.identities.filter((value) => value.contextId === lease.contextId).at(-1)?.processIdentity;
+  const replaySessionId = lease.runtimeContext.replaySessionId;
+  if (!verified || !replaySessionId)
+    throw new AppError('RDC_RECOVERY_PROCESS_UNEXPLAINED', 'no verified process identity for the quarantined context.');
+  const status = await readRdcContextStatus({ contextId: lease.contextId, settings: cli });
+  const classification = classifyRecovery({
+    verified,
+    replaySessionId,
+    status,
+    deviceActionPending: !!rdcSessionService.snapshotReplayForSession(scope).preparation.issue?.deviceAction,
+    budget: null,
+  });
+  lifecycleLedger.record({
+    kind: 'recovery_step',
+    sessionId: scope.sessionId,
+    step: 'user-restore-classified',
+    decision: classification.decision,
+    reason: classification.reason,
+    ...(classification.decision === 'quarantined' ? { errorCode: classification.code } : {}),
+  });
+  if (classification.decision === 'quarantined') throw new AppError(classification.code, classification.reason);
 }
 
 async function observedPosition(scope: SessionScope): Promise<RdcLifecyclePoint | null> {
@@ -250,12 +315,9 @@ function assertPriorProcessesReleased(
     throw new AppError('RDC_RECOVERY_OLD_OWNER_UNCONFIRMED');
   for (const identity of pending.identities) {
     if (identity.stopped || identity.contextId === currentContext) continue;
+    // pid + birth: a reused pid is a different process, and an unreadable identity is never proof of exit.
     for (const birth of [identity.processIdentity.daemon, identity.processIdentity.worker]) {
-      try {
-        process.kill(birth.pid, 0);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ESRCH') continue;
-      }
+      if (probeProcess({ pid: birth.pid, birth: birth.start_generation }) === 'exited') continue;
       throw new AppError('RDC_RECOVERY_OLD_PROCESS_UNCONFIRMED', 'an earlier daemon or worker may still be alive.');
     }
   }

@@ -173,7 +173,7 @@ describe('canonical renderer API', () => {
     await api.appShell.readClipboardText();
     await api.settings.patch([{ op: 'appearance', value: { language: 'en' } }]);
     await api.settings.getModelsOverride();
-    await api.settings.setModelsOverride({ schemaVersion: 1, providers: {} });
+    await api.settings.setModelsOverride({ providers: {} });
     await api.memory.issueApprovalToken({ action: 'memory.write', scope: 'user' });
     await api.memory.list('user');
     await api.command.execute({ input: '/help' });

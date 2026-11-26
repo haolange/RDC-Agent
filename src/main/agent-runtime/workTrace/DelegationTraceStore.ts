@@ -13,6 +13,7 @@ import {
   createDelegatedProjectionState,
   projectDelegatedEvent,
   type DelegatedProjectionState,
+  type TracedEvent,
 } from './DelegatedWorkProjection';
 import type { ConversationWorkBlock } from '@shared/types/conversation';
 import type {
@@ -47,62 +48,63 @@ interface ParsedTrace {
   invalid: boolean;
 }
 
-const DelegationTraceHeaderSchema: ZodType<DelegationTraceHeader> = z.object({
-  recordVersion: z.literal(2),
-  sentPromptAvailable: z.boolean().optional(),
-  parentToolCallId: z.string(),
-  task: z.string(),
-  taskLength: z.number(),
-  taskAvailable: z.boolean(),
-  invocationAvailable: z.boolean(),
-  profile: z.string(),
-  preparedRoute: z.object({ providerId: z.string(), modelId: z.string(), reasoningLevel: z.string() }).optional(),
-  mode: z.enum(['wait', 'background']),
-  executionId: z.string().optional(),
-  generation: z.number().optional(),
-  taskId: z.string().optional(),
-  childSessionId: z.string(),
-  status: z.enum(['running', 'complete', 'failed', 'cancelled', 'interrupted']),
-  executionStatus: z
-    .enum([
-      'queued',
-      'running',
-      'waiting',
-      'cancelling',
-      'completed',
-      'partial',
-      'blocked',
-      'failed',
-      'cancelled',
-      'interrupted',
-    ])
-    .optional(),
-  startedAt: z.number(),
-  updatedAt: z.number(),
-  completedAt: z.number().optional(),
-  finalPreview: z.string().optional(),
-  finalLength: z.number().optional(),
-  finalAvailable: z.boolean().optional(),
-  finalUnavailableReason: z.string().optional(),
-  error: z.string().optional(),
-  configurationError: z
-    .enum([
-      'MODEL_UNAVAILABLE',
-      'NO_USABLE_CONTEXT_TIER',
-      'PLAN_CONFLICT',
-      'CONSTRAINT_REJECTED',
-      'AGENT_PROFILE_UNAVAILABLE',
-      'MODEL_ROUTE_REQUIRED',
-      'DELEGATION_REASONING_UNSUPPORTED',
-    ])
-    .optional(),
-  parentReceiptPreview: z.string().optional(),
-  parentReceiptAvailable: z.boolean().optional(),
-  latestAction: z.string().optional(),
-  latestActionStatus: z.enum(['pending', 'running', 'complete', 'error', 'skipped', 'cancelled']).optional(),
-  total: z.number(),
-  revision: z.number(),
-});
+const DelegationTraceHeaderSchema: ZodType<DelegationTraceHeader> = z
+  .object({
+    sentPromptAvailable: z.boolean().optional(),
+    parentToolCallId: z.string(),
+    task: z.string(),
+    taskLength: z.number(),
+    taskAvailable: z.boolean(),
+    invocationAvailable: z.boolean(),
+    profile: z.string(),
+    preparedRoute: z.object({ providerId: z.string(), modelId: z.string(), reasoningLevel: z.string() }).optional(),
+    mode: z.enum(['wait', 'background']),
+    executionId: z.string().optional(),
+    generation: z.number().optional(),
+    taskId: z.string().optional(),
+    childSessionId: z.string(),
+    status: z.enum(['running', 'complete', 'failed', 'cancelled', 'interrupted']),
+    executionStatus: z
+      .enum([
+        'queued',
+        'running',
+        'waiting',
+        'cancelling',
+        'completed',
+        'partial',
+        'blocked',
+        'failed',
+        'cancelled',
+        'interrupted',
+      ])
+      .optional(),
+    startedAt: z.number(),
+    updatedAt: z.number(),
+    completedAt: z.number().optional(),
+    finalPreview: z.string().optional(),
+    finalLength: z.number().optional(),
+    finalAvailable: z.boolean().optional(),
+    finalUnavailableReason: z.string().optional(),
+    error: z.string().optional(),
+    configurationError: z
+      .enum([
+        'MODEL_UNAVAILABLE',
+        'NO_USABLE_CONTEXT_TIER',
+        'PLAN_CONFLICT',
+        'CONSTRAINT_REJECTED',
+        'AGENT_PROFILE_UNAVAILABLE',
+        'MODEL_ROUTE_REQUIRED',
+        'DELEGATION_REASONING_UNSUPPORTED',
+      ])
+      .optional(),
+    parentReceiptPreview: z.string().optional(),
+    parentReceiptAvailable: z.boolean().optional(),
+    latestAction: z.string().optional(),
+    latestActionStatus: z.enum(['pending', 'running', 'complete', 'error', 'skipped', 'cancelled']).optional(),
+    total: z.number(),
+    revision: z.number(),
+  })
+  .strict();
 
 /** A projected work block is written by this store from the delegated projection; its id keys the step. */
 const TraceEntrySchema: ZodType<TraceEntry> = z.discriminatedUnion('kind', [
@@ -119,12 +121,8 @@ const TraceEntrySchema: ZodType<TraceEntry> = z.discriminatedUnion('kind', [
     }),
   }),
 ]);
-const HeadVersionSchema = z.object({ recordVersion: z.unknown().optional() });
-
-/** The head of a current record; a record from another version is left as it is. */
+/** The head of a current record; a record in any other format fails the strict schema and is left as it is. */
 function parseHead(value: unknown): DelegationTraceHeader {
-  if (HeadVersionSchema.parse(value).recordVersion !== 2)
-    throw new AppError('STORAGE_SCHEMA_UNSUPPORTED', 'delegation trace head is not recordVersion 2.');
   return DelegationTraceHeaderSchema.parse(value);
 }
 
@@ -266,7 +264,7 @@ function persistBlocks(record: ActiveTrace, target: string): void {
   updateLatestAction(record);
 }
 
-function persistProjectedEvent(sessionId: string, record: ActiveTrace, target: string, event: AgentEvent): void {
+function persistProjectedEvent(sessionId: string, record: ActiveTrace, target: string, event: TracedEvent): void {
   if (event.type === 'tool.completed') {
     writeBody(target, 'tool_receipt', safeText(event.payload.result), event.payload.toolCallId);
   }
@@ -290,7 +288,7 @@ export const delegationTraceStore = {
     sessionId: string,
     input: Omit<
       DelegationTraceHeader,
-      'total' | 'revision' | 'updatedAt' | 'taskAvailable' | 'taskLength' | 'invocationAvailable' | 'recordVersion'
+      'total' | 'revision' | 'updatedAt' | 'taskAvailable' | 'taskLength' | 'invocationAvailable'
     > & { invocation: string },
   ): void {
     const target = location(sessionId, input.parentToolCallId);
@@ -304,7 +302,6 @@ export const delegationTraceStore = {
     const invocationAvailable = writeBody(target, 'invocation', invocation);
     const header: DelegationTraceHeader = {
       ...input,
-      recordVersion: 2,
       task: preview(task),
       taskLength: task.length,
       taskAvailable,
@@ -363,7 +360,8 @@ export const delegationTraceStore = {
   event(sessionId: string, callId: string, childIdentity: string, event: AgentEvent): void {
     const record = active.get(key(sessionId, callId));
     const target = location(sessionId, callId);
-    if (!record || record.identity !== childIdentity || !target) return;
+    // Progress is ephemeral: a delegation's trace keeps what happened, not where a running call stood.
+    if (!record || record.identity !== childIdentity || !target || event.type === 'tool.progress') return;
     if (event.type === 'assistant.delta') {
       const { payload } = event;
       if (!payload.text) return;

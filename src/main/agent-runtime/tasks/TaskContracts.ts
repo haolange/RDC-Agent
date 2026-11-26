@@ -9,8 +9,6 @@ import type { TaskExecutionRequirements, TaskIndependentSource, TaskRuntimeEpoch
 
 export type { TaskExecutionStatus } from '@shared/types/taskExecution';
 
-export const TASK_SCHEMA_VERSION = 2 as const;
-
 export type TaskStatus = ConversationTaskStatus;
 export type TaskDisposition = 'completed' | 'partial' | 'blocked' | 'cancelled';
 export type TaskMessageKind = 'progress' | 'blocked' | 'decision_required' | 'result';
@@ -44,7 +42,6 @@ export interface TaskBudgetState {
 }
 
 export interface TaskRecord {
-  schemaVersion: typeof TASK_SCHEMA_VERSION;
   id: string;
   subject: string;
   description: string;
@@ -69,7 +66,6 @@ export interface TaskRecord {
 }
 
 export interface TaskExecutionRecord {
-  schemaVersion: typeof TASK_SCHEMA_VERSION;
   id: string;
   taskId: string;
   taskRevision: number;
@@ -96,7 +92,6 @@ export interface TaskExecutionRecord {
 }
 
 export interface TaskExecutionMessage {
-  schemaVersion: typeof TASK_SCHEMA_VERSION;
   id: string;
   taskId: string;
   executionId: string;
@@ -177,7 +172,6 @@ const TaskCompletionResultSchema: ZodType<TaskCompletionResult> = z.object({
 
 /** Stored Task records as this store writes them; cross-record invariants are checked by the store. */
 export const TaskRecordSchema: ZodType<TaskRecord> = z.object({
-  schemaVersion: z.literal(TASK_SCHEMA_VERSION),
   id: z.string(),
   subject: z.string(),
   description: z.string(),
@@ -201,7 +195,6 @@ export const TaskRecordSchema: ZodType<TaskRecord> = z.object({
 });
 
 export const TaskExecutionRecordSchema: ZodType<TaskExecutionRecord> = z.object({
-  schemaVersion: z.literal(TASK_SCHEMA_VERSION),
   id: z.string(),
   taskId: z.string(),
   taskRevision: z.number(),
@@ -235,7 +228,6 @@ export const TaskExecutionRecordSchema: ZodType<TaskExecutionRecord> = z.object(
 });
 
 export const TaskExecutionMessageSchema: ZodType<TaskExecutionMessage> = z.object({
-  schemaVersion: z.literal(TASK_SCHEMA_VERSION),
   id: z.string(),
   taskId: z.string(),
   executionId: z.string(),

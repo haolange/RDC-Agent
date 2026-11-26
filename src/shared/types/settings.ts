@@ -281,7 +281,11 @@ export interface RdcCliInvokerSettings {
   argsPrefix: string[];
   workingDirectory: string;
   env: Record<string, string>;
-  timeoutMs: number;
+  /**
+   * RDC operation no-progress patience: an operation that reports no progress for this long is judged stuck and its
+   * worker is stopped. An operation that keeps reporting progress has no total time limit; this is not a process wall.
+   */
+  noProgressTimeoutMs: number;
 }
 
 export interface CodeInterpreterSettings {

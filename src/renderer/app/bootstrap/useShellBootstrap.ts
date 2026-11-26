@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { applyChromeTheme } from '../theme/applyChromeTheme';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useLayoutStore } from '../../stores/layoutStore';
+import { localizedTranslator } from '../../i18n/messages';
+import { announcePreviousInstance } from './previousInstanceNotice';
 import type { ResolvedTheme } from '@shared/types/settings';
 
 export function useShellBootstrap(options: {
@@ -34,6 +36,10 @@ export function useShellBootstrap(options: {
         ]);
         hydrateSettings(view, providerCatalog, appMeta.systemTheme);
         hydrateLayout(useAppSettingsStore.getState().settings);
+        if (appMeta.previousInstance) {
+          const { language } = useAppSettingsStore.getState().settings.appearance;
+          announcePreviousInstance(appMeta.previousInstance, localizedTranslator(language));
+        }
         setShellReady(true);
         setWindowMaximized(isMaximized);
         setConnectionStatus('connected');

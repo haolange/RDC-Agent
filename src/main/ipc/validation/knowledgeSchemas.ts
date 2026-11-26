@@ -95,7 +95,6 @@ export const KnowledgeImportArgsSchema = z.tuple([
   z
     .object({
       ...knowledgeImportSource,
-      sessionId: ipcId(128, 'sessionId').optional(),
       operationId: KnowledgeOperationIdSchema,
     })
     .strict()

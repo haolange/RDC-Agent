@@ -28,7 +28,7 @@ export function nowIso(): string {
 }
 
 /**
- * The one read of the settings file: missing is `null` (defaults, nothing written); anything that is not a valid v9
+ * The one read of the settings file: missing is `null` (defaults, nothing written); anything that is not a valid
  * document is a `SettingsFileError` naming the file, whatever the storage primitive reported.
  */
 export function readSettingsFile(): SettingsFile | null {
@@ -37,7 +37,7 @@ export function readSettingsFile(): SettingsFile | null {
     return readValidatedSync(filePath, parseJsonWith(parseSettingsFile));
   } catch (error) {
     const code = errorCodeOf(error);
-    if (code === 'STORAGE_CORRUPT' || code === 'STORAGE_SCHEMA_UNSUPPORTED' || code === 'STORAGE_UNREADABLE') {
+    if (code === 'STORAGE_CORRUPT' || code === 'STORAGE_UNREADABLE') {
       throw new SettingsFileError(code, filePath, { cause: error });
     }
     throw error;

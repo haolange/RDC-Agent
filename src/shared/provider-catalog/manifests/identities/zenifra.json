@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "zenifra",
   "name": "Zenifra",
   "npm": "@ai-sdk/openai-compatible",

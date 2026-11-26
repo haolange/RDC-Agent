@@ -2,16 +2,13 @@ import * as path from 'node:path';
 import { existsSync, unlinkSync } from 'node:fs';
 import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
-import { EXECUTION_OFFER_SCHEMA } from './executionOffer';
 import type { ExecutionOffer } from './executionOffer';
 import type { StorageIo } from '../../runtime/StorageIo';
 
 export const EXECUTION_OFFER_FILE = 'execution-offer.json';
-export const REMOVED_HANDOFF_STATE_FILE = 'handoff-state.json';
 
 const ExecutionOfferSchema = z
   .object({
-    schemaVersion: z.literal(EXECUTION_OFFER_SCHEMA),
     offerId: z.string().uuid().optional(),
     sourceAgentId: z.string().trim().min(1),
     targetAgentId: z.string().trim().min(1),
@@ -49,14 +46,6 @@ export function executionOfferMatches(
 
 export class ExecutionOfferStore {
   constructor(private readonly host: ExecutionOfferHost) {}
-
-  discardRemovedHandoffState(sessionId: string): void {
-    const location = this.host.sessions.findSessionLocation(sessionId);
-    if (!location) return;
-    const filePath = path.join(location.sessionPath, REMOVED_HANDOFF_STATE_FILE);
-    if (!existsSync(filePath)) return;
-    unlinkSync(filePath);
-  }
 
   read(sessionId: string | null | undefined): ExecutionOffer | null {
     if (!sessionId) return null;

@@ -32,12 +32,7 @@
  "responses": {
   "settings:get": [
    {
-    "ref": "bd87c4a38a7d5b58606353ed"
-   }
-  ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
+    "ref": "c4dcce12b4067ce90568ef1a"
    }
   ],
   "app:getMeta": [
@@ -54,8 +49,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-d55f48696a1c-1795681027783",
-       "timestamp": 1795681027783,
+       "id": "rlog-b79bbedb1cec-1795705269360",
+       "timestamp": 1795705269360,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -69,8 +64,8 @@
        }
       },
       {
-       "id": "rlog-1ead6c0b4dbd-1795681027832",
-       "timestamp": 1795681027832,
+       "id": "rlog-d999d7a97834-1795705269433",
+       "timestamp": 1795705269433,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -82,8 +77,8 @@
        "raw": null
       },
       {
-       "id": "rlog-cb8ee696f621-1795681027833",
-       "timestamp": 1795681027833,
+       "id": "rlog-b17d21c9f542-1795705269433",
+       "timestamp": 1795705269433,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -95,8 +90,8 @@
        "raw": null
       },
       {
-       "id": "rlog-d380b505434f-1795681027846",
-       "timestamp": 1795681027846,
+       "id": "rlog-c0bc401f29f0-1795705269448",
+       "timestamp": 1795705269448,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -111,8 +106,8 @@
        }
       },
       {
-       "id": "rlog-3a2532fbba2f-1795681032685",
-       "timestamp": 1795681032685,
+       "id": "rlog-f659424a4ec9-1795705274310",
+       "timestamp": 1795705274310,
        "scope": "app",
        "namespace": "context",
        "severity": "warning",
@@ -157,6 +152,11 @@
     }
    }
   ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
   "project:list": [
    {
     "result": {
@@ -176,8 +176,8 @@
       }
      ],
      "index": {
-      "revision": "fac9173838feb5f87b8b82b54ea6d07e77b5d9cdf56e5280bc10f6813d306cc6",
-      "builtAt": "2026-11-26T08:17:12.703Z",
+      "revision": "58a10b03e6df8ef718e50be4ad3a28836114d83c13f9c55b66111b5000f7014b",
+      "builtAt": "2026-11-26T15:01:14.367Z",
       "cardCount": 1,
       "cardsBySpace": {
        "user": 1
@@ -199,7 +199,7 @@
        "type": "case",
        "lifecycle": "draft",
        "preview": "调整能量项并在同一 capture 上复核。",
-       "updatedAt": 1795681032693,
+       "updatedAt": 1795705274348,
        "score": 2,
        "lanes": [
         "Lexical",
@@ -234,7 +234,7 @@
          "type": "case",
          "lifecycle": "draft",
          "preview": "调整能量项并在同一 capture 上复核。",
-         "updatedAt": 1795681032693,
+         "updatedAt": 1795705274348,
          "score": 2,
          "lanes": [
           "Lexical",
@@ -261,7 +261,7 @@
          "type": "case",
          "lifecycle": "draft",
          "preview": "调整能量项并在同一 capture 上复核。",
-         "updatedAt": 1795681032693,
+         "updatedAt": 1795705274348,
          "score": 1,
          "lanes": [
           "Structural"
@@ -284,7 +284,7 @@
        "hits": []
       }
      ],
-     "revision": "d265dba83d2396b609336f74fdb6089b15d8db680d7058e69d14ad2cb55e57f6",
+     "revision": "6af2c33329fafd44c3290124e59a5408459632449b0a94f9d77cce729302dc8e",
      "total": 1,
      "queryFingerprint": "df655964509fd4ab3e2a30029a6420050466b5070be6b55e99c483b73156f0aa"
     }
@@ -294,7 +294,7 @@
    {
     "result": {
      "packId": "pack:c5b16ce6bc61e0fa",
-     "compiledAt": "2026-11-26T08:17:17.245Z",
+     "compiledAt": "2026-11-26T15:01:19.032Z",
      "hits": [
       {
        "cardId": "user:cases/qa-hair-darkening.md",
@@ -305,7 +305,7 @@
        "type": "case",
        "lifecycle": "draft",
        "preview": "调整能量项并在同一 capture 上复核。",
-       "updatedAt": 1795681032693,
+       "updatedAt": 1795705274348,
        "score": 2,
        "lanes": [
         "Lexical",
@@ -336,7 +336,7 @@
       "relativePath": "cases/qa-hair-darkening.md",
       "title": "Adreno 740 头发偏暗 / KajiyaDiffuse",
       "preview": "调整能量项并在同一 capture 上复核。",
-      "updatedAt": 1795681032693,
+      "updatedAt": 1795705274348,
       "type": "case",
       "lifecycle": "draft",
       "content": "---\ncardId: \"user:cases/qa-hair-darkening.md\"\ntype: \"case\"\nlifecycle: \"draft\"\ntitle: \"Adreno 740 头发偏暗 / KajiyaDiffuse\"\nscope: {\"platform\":\"Android\",\"api\":\"Vulkan\",\"gpuVendor\":\"Qualcomm\"}\nrelations: []\nsourceStatus: \"fixed\"\ncaseId: \"qa-hair-darkening\"\npreview: \"头发比参考静帧暗一档，只在 Adreno 740 上出现。\"\nsourceHash: \"30f178aa31d826fc0a375e512466f631fd5b9f6226f467bfc4b8098997f53df6\"\nsourceSize: 493\nchapters: {\"claim\":\"Adreno 740 头发偏暗 / KajiyaDiffuse\",\"scopeExclusions\":\"{\\\"platform\\\":\\\"Android\\\",\\\"api\\\":\\\"Vulkan\\\",\\\"gpuVendor\\\":\\\"Qualcomm\\\"}\",\"symptoms\":\"{\\\"visual\\\":\\\"头发比参考静帧暗一档，只在 Adreno 740 上出现。\\\"}\",\"rootCause\":\"{\\\"phenomenon\\\":\\\"输出偏暗\\\",\\\"first_bad_event\\\":\\\"着色阶段\\\",\\\"responsible_layer\\\":\\\"shader\\\"}\",\"experimentVerification\":\"[\\\"回放相同 pass 并与参考图对比\\\"]\",\"fix\":\"调整能量项并在同一 capture 上复核。\",\"derived\":\"{}\"}\n---\n\n# Adreno 740 头发偏暗 / KajiyaDiffuse\n\n## Claim\n\nAdreno 740 头发偏暗 / KajiyaDiffuse\n\n## Scope + Exclusions\n\n{\"platform\":\"Android\",\"api\":\"Vulkan\",\"gpuVendor\":\"Qualcomm\"}\n\n## Symptoms\n\n{\"visual\":\"头发比参考静帧暗一档，只在 Adreno 740 上出现。\"}\n\n## RootCause\n\n{\"phenomenon\":\"输出偏暗\",\"first_bad_event\":\"着色阶段\",\"responsible_layer\":\"shader\"}\n\n## Experiment + Verification\n\n[\"回放相同 pass 并与参考图对比\"]\n\n## Fix\n\n调整能量项并在同一 capture 上复核。\n\n## Derived\n\n{}\n",

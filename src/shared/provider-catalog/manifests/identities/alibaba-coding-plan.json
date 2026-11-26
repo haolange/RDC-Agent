@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "alibaba-coding-plan",
   "name": "Alibaba Coding Plan",
   "npm": "@ai-sdk/openai-compatible",

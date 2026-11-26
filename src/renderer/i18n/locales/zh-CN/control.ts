@@ -24,6 +24,7 @@ export const zhControl = {
   'control.rightRail.tasks.hideCompleted': '收起已完成的 {count} 项',
   'control.rightRail.tasks.reason.parentTurnStopped': '主回合停止，所属执行已结束。',
   'control.rightRail.tasks.reason.createdTurnStopped': '创建此任务的回合已停止，任务尚未开始。',
+  'control.rightRail.tasks.reason.interrupted': 'RDC-Agent 意外停止时被中断，需要显式恢复。',
   'control.rightRail.artifacts.empty': '调查过程中记录的证据、结论与实验会在此显示。',
   'control.rightRail.artifacts.storeDegraded': '调查记录损坏或事务不完整，这不是空列表。',
   'control.rightRail.outputs.empty': '本次任务产生的输出文件会在此显示。',

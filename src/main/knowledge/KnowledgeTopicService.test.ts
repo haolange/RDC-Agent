@@ -106,10 +106,19 @@ it('rejects stale source versions and preserves an invalid taxonomy instead of o
   };
   await writeFile(cardPath, 'changed source', 'utf8');
   await expect(topics.preview(changes)).rejects.toThrow('INDEX_CHANGED');
-  const malformed = '{"schemaVersion":999,"important":"retain"}';
+  const malformed = '{"important":"retain"}';
   await writeFile(path.join(root, '.topics.json'), malformed, 'utf8');
-  await expect(store.read()).rejects.toThrow();
+  await expect(store.read()).rejects.toThrow(expect.objectContaining({ code: 'STORAGE_SCHEMA' }));
   expect(await readFile(path.join(root, '.topics.json'), 'utf8')).toBe(malformed);
+});
+
+it('refuses a topics file that still carries a format version and names it, leaving it in place', async () => {
+  const { root, store } = await fixture();
+  const target = path.join(root, '.topics.json');
+  const old = JSON.stringify({ schemaVersion: 1, topics: [], assignments: [] });
+  await writeFile(target, old, 'utf8');
+  await expect(store.read()).rejects.toThrow(target);
+  expect(await readFile(target, 'utf8')).toBe(old);
 });
 
 it('previews a topic merge, transfers its assignments and synonyms, and rejects merge chains', async () => {

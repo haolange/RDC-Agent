@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "abliteration-ai",
   "name": "abliteration.ai",
   "npm": "@ai-sdk/openai-compatible",

@@ -56,8 +56,8 @@ describe('ShutdownCoordinator', () => {
     });
 
     expect(coordinator.getPhase()).toBe('running');
-    const first = coordinator.shutdownAll(1_000);
-    const second = coordinator.shutdownAll(1_000);
+    const first = coordinator.shutdownAll(1_000, { cause: 'window-close' });
+    const second = coordinator.shutdownAll(1_000, { cause: 'update' });
     await Promise.all([first, second]);
 
     expect(phases).toEqual([
@@ -71,19 +71,47 @@ describe('ShutdownCoordinator', () => {
     expect(coordinator.getPhase()).toBe('exited');
   });
 
-  it('force-exits after the deadline', async () => {
-    const coordinator = new ShutdownCoordinator();
-    const forceExit = vi.fn();
-    coordinator.register({
-      id: 'slow',
-      phase: 'join_producers',
-      dispose: async () => {
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      },
-    });
+  it('tells the observer its cause, the phase that ran out of time with what was pending, and a forced end', async () => {
+    vi.useFakeTimers();
+    try {
+      const coordinator = new ShutdownCoordinator();
+      const events: unknown[] = [];
+      const forceExit = vi.fn(() => events.push('force-exit'));
+      coordinator.register({ id: 'fast', phase: 'join_producers', dispose: () => undefined });
+      coordinator.register({ id: 'slow', phase: 'join_producers', dispose: () => new Promise<void>(() => {}) });
 
-    await coordinator.shutdownAll(20, forceExit);
-    // Either forceExit ran due to deadline, or shutdown completed after racing the timeout.
-    expect(coordinator.getPhase()).toBe('exited');
+      void coordinator.shutdownAll(50, {
+        cause: 'window-close',
+        forceExit,
+        observer: {
+          began: (cause) => events.push(['began', cause]),
+          phaseTimedOut: (phase, pending) => events.push(['timed-out', phase, pending]),
+          finished: ({ timedOut }) => events.push(['finished', timedOut]),
+        },
+      });
+      await vi.advanceTimersByTimeAsync(60);
+
+      expect(events).toEqual([
+        ['began', 'window-close'],
+        ['timed-out', 'join_producers', ['slow']],
+        ['finished', true],
+        'force-exit',
+      ]);
+      expect(forceExit).toHaveBeenCalledOnce();
+      expect(coordinator.getPhase()).toBe('exited');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports a shutdown that finished in time as not timed out', async () => {
+    const coordinator = new ShutdownCoordinator();
+    const finished = vi.fn();
+    coordinator.register({ id: 'flush', phase: 'flush_storage', dispose: () => undefined });
+    await coordinator.shutdownAll(1_000, {
+      cause: 'before-quit',
+      observer: { began: () => undefined, phaseTimedOut: () => undefined, finished },
+    });
+    expect(finished).toHaveBeenCalledWith({ timedOut: false, durationMs: expect.any(Number) });
   });
 });

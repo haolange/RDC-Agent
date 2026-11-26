@@ -1,15 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AppError } from '@shared/errors/appError';
 import { expectMonotonicProgress } from '../testing/knowledgeProgress';
-import { KnowledgeDraftMigrationConflictError } from './knowledgeErrors';
 import { createDisposableImportService } from './KnowledgeImportService';
-import { hashKnowledgeContent } from './KnowledgeDurableStore';
-import { KNOWLEDGE_STATE_FILE } from './knowledgeStateSchema';
-import type { KnowledgeCardRecord } from '@shared/types/knowledge';
 
 const roots: string[] = [];
 
@@ -29,7 +25,7 @@ function caseYaml(caseId: string, title: string, extra = 'darker than reference'
 
 function packageYaml(titles: string[]): string {
   return [
-    'schema: rdc.knowledge-package/1',
+    'schema: rdc.knowledge-package',
     'cards:',
     ...titles.flatMap((title, index) => [
       `  - relativePath: facts/package-${index}.md`,
@@ -49,22 +45,6 @@ function cardFiles(root: string, dir = root): Record<string, string> {
     else if (entry.name.endsWith('.md')) files[path.relative(root, absolute)] = readFileSync(absolute, 'utf8');
   }
   return files;
-}
-
-function leftoverCard(caseId: string, sourceHash: string): KnowledgeCardRecord {
-  return {
-    cardId: `user:cases/${caseId}.md`,
-    spaceId: 'user',
-    relativePath: `cases/${caseId}.md`,
-    type: 'case',
-    lifecycle: 'draft',
-    title: 'Leftover draft',
-    scope: {},
-    relations: [],
-    body: 'Leftover body',
-    caseId,
-    sourceHash,
-  };
 }
 
 describe('KnowledgeImportService', () => {
@@ -197,88 +177,5 @@ describe('KnowledgeImportService', () => {
     expect(leaked.items[0]?.status).toBe('quarantine');
     expect(leaked.items[0]?.reason).toBe('absolute-path');
     expect(readdirSync(spaceRoot)).toEqual([]);
-  });
-
-  it('flushes leftover session drafts into the space once', async () => {
-    const spaceRoot = tempRoot('rdc-know-import-mig-');
-    const sessionRoot = tempRoot('rdc-know-import-sess-');
-    const importer = createDisposableImportService({ spaceRoot, sessionRoot });
-    const sourceHash = 'ab'.repeat(32);
-    const card = leftoverCard('mig-case', sourceHash);
-    const sessionDir = path.join(sessionRoot, 'sess-mig');
-    mkdirSync(sessionDir, { recursive: true });
-    writeFileSync(
-      path.join(sessionDir, KNOWLEDGE_STATE_FILE),
-      `${JSON.stringify(
-        {
-          schemaVersion: '1',
-          drafts: [
-            {
-              revision: 1,
-              contentHash: hashKnowledgeContent(card),
-              card,
-              sourceHash,
-            },
-          ],
-          candidates: [],
-          reviews: [],
-        },
-        null,
-        2,
-      )}\n`,
-      'utf8',
-    );
-    await importer.migrateSessionDrafts('sess-mig');
-    expect(existsSync(path.join(spaceRoot, 'cases', 'mig-case.md'))).toBe(true);
-    const persisted = JSON.parse(readFileSync(path.join(sessionDir, KNOWLEDGE_STATE_FILE), 'utf8')) as {
-      schemaVersion: string;
-      drafts?: unknown[];
-    };
-    expect(persisted.schemaVersion).toBe('1');
-    expect(persisted.drafts).toBeUndefined();
-  });
-
-  it('keeps leftover drafts visible when the space already has a different source', async () => {
-    const spaceRoot = tempRoot('rdc-know-import-mig-conflict-');
-    const sessionRoot = tempRoot('rdc-know-import-sess-conflict-');
-    const importer = createDisposableImportService({ spaceRoot, sessionRoot });
-    await importer.importToSpace({
-      spaceId: 'user',
-      source: caseYaml('clash-case', 'Space card', 'space symptoms'),
-    });
-    const leftoverHash = 'cd'.repeat(32);
-    const card = leftoverCard('clash-case', leftoverHash);
-    const sessionDir = path.join(sessionRoot, 'sess-clash');
-    mkdirSync(sessionDir, { recursive: true });
-    writeFileSync(
-      path.join(sessionDir, KNOWLEDGE_STATE_FILE),
-      `${JSON.stringify(
-        {
-          schemaVersion: '1',
-          drafts: [
-            {
-              revision: 1,
-              contentHash: hashKnowledgeContent(card),
-              card,
-              sourceHash: leftoverHash,
-            },
-          ],
-          candidates: [],
-          reviews: [],
-        },
-        null,
-        2,
-      )}\n`,
-      'utf8',
-    );
-    await expect(importer.migrateSessionDrafts('sess-clash')).rejects.toBeInstanceOf(
-      KnowledgeDraftMigrationConflictError,
-    );
-    const persisted = JSON.parse(readFileSync(path.join(sessionDir, KNOWLEDGE_STATE_FILE), 'utf8')) as {
-      schemaVersion: string;
-      drafts: unknown[];
-    };
-    expect(persisted.schemaVersion).toBe('1');
-    expect(persisted.drafts).toHaveLength(1);
   });
 });

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
 
 export function canonicalJson(value: unknown): string {
@@ -14,6 +15,8 @@ export function canonicalJson(value: unknown): string {
     );
   return JSON.stringify(value);
 }
+/** The canonical SHA-256 of a value: native arguments, results and replacement sets are compared by it. */
+export const rdcDigest = (value: unknown): string => createHash('sha256').update(canonicalJson(value)).digest('hex');
 export function operationFingerprint(definitions: readonly unknown[]): string {
   return createHash('sha256').update(canonicalJson(definitions)).digest('hex');
 }
@@ -37,6 +40,24 @@ const effects = new Set([
   'shader_replacement',
   'artifact_delete',
 ]);
+/**
+ * How long an operation may run without reporting progress before RDC-Tool judges it stuck. Every catalog entry
+ * publishes the range a request may choose from; there is no fixed duration.
+ */
+export const RdcExecutionBudgetSchema = z
+  .strictObject({
+    rule: z.literal('no_progress'),
+    default_no_progress_ms: z.number().int().positive(),
+    min_no_progress_ms: z.number().int().positive(),
+    max_no_progress_ms: z.number().int().positive(),
+  })
+  .refine(
+    (budget) =>
+      budget.min_no_progress_ms <= budget.default_no_progress_ms &&
+      budget.default_no_progress_ms <= budget.max_no_progress_ms,
+  );
+export type RdcExecutionBudget = z.infer<typeof RdcExecutionBudgetSchema>;
+
 export function validateDefinitions(value: unknown, count: unknown, fingerprint: unknown): RdcOperationDefinition[] {
   if (
     !Array.isArray(value) ||
@@ -62,6 +83,7 @@ export function validateDefinitions(value: unknown, count: unknown, fingerprint:
       !Array.isArray(raw.effects) ||
       raw.effects.some((effect: unknown) => typeof effect !== 'string' || !effects.has(effect)) ||
       ![null, 'measurement', 'intervention', 'rollback'].includes(raw.evidence_kind) ||
+      !RdcExecutionBudgetSchema.safeParse(raw.execution_budget).success ||
       raw.input_schema?.type !== 'object' ||
       raw.input_schema?.additionalProperties !== false ||
       !raw.input_schema.properties ||
@@ -149,4 +171,5 @@ export interface RdcOperationDefinition extends Record<string, unknown> {
   effects: string[];
   evidence_kind: 'measurement' | 'intervention' | 'rollback' | null;
   path_inputs: Array<{ name: string; access: 'read' | 'write' | 'read_directory' }>;
+  execution_budget: RdcExecutionBudget;
 }

@@ -64,6 +64,31 @@ describe('ProcessSupervisor bounded join', () => {
     }
   });
 
+  it('bounds an unbounded join once the process is aborted', async () => {
+    vi.useFakeTimers();
+    try {
+      const supervisor = new ProcessSupervisor();
+      const supervised = supervisor.spawn('other', 'fake-command', [], { isolateProcessGroup: false });
+      const joined = supervised.join();
+      let settled = false;
+      void joined.then(() => (settled = true));
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(settled).toBe(false);
+      supervised.abort('abort');
+      await vi.advanceTimersByTimeAsync(2_999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(joined).resolves.toMatchObject({ reason: 'unconfirmed_orphan' });
+      expect(supervised.orphaned).toBe(true);
+      expect(supervisor.size).toBe(1);
+      childState.child.emit('close', null, 'SIGKILL');
+      await expect(supervised.exit).resolves.toMatchObject({ reason: 'abort' });
+      expect(supervised.orphaned).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('bounds the tree-killer itself and never treats its return as observed child exit', () => {
     const supervisor = new ProcessSupervisor();
     const supervised = supervisor.spawn('other', 'fake-command', [], { isolateProcessGroup: false });

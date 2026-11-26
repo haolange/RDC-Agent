@@ -1,10 +1,6 @@
 import { createHash } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
-import {
-  assertRdcContextLeaseOwnership,
-  getDelegatedChildSessionId,
-  getRdcContextLease,
-} from './RdcRuntimeContextRegistry';
+import { assertRdcContextLeaseOwnership } from './RdcRuntimeContextRegistry';
 import { parseRdcNativeResult, type RdcNativeEnvelope } from './RdcNativeProtocol';
 import { parseRdcProcessIdentity, type RdcProcessIdentity } from './RdcProcessIdentity';
 import { runRdcOperation } from './RdcOperationCoordinator';
@@ -121,63 +117,5 @@ export async function readRdcSwitchSnapshot(input: {
       throw new AppError('RDC_SWITCH_BINDING_CHANGED', 'the replay changed during observation.');
     }
     return validateRdcSwitchSnapshot(payload, current);
-  });
-}
-
-/** A quarantined lease may only be observed for recovery, never used for ordinary tools. */
-export async function readRdcRecoverySnapshot(input: {
-  sessionId: string;
-  projectId: string;
-  binding: RdcTurnBinding;
-  signal?: AbortSignal;
-  execute?: (binding: RdcTurnBinding, contextId: string, signal?: AbortSignal) => Promise<CLIResult>;
-}): Promise<RdcSwitchSnapshot> {
-  const check = (): RdcContextLease => {
-    const lease = getRdcContextLease(input.sessionId);
-    const identity = input.binding.identity;
-    if (
-      !lease?.quarantineReason ||
-      !lease.quarantineCause ||
-      lease.delegatedFrom ||
-      getDelegatedChildSessionId(input.sessionId) ||
-      lease.ownerSessionId !== input.sessionId ||
-      lease.ownerProjectId !== input.projectId ||
-      !identity ||
-      identity.ownerSessionId !== input.sessionId ||
-      identity.contextId !== lease.contextId ||
-      identity.version !== lease.version ||
-      identity.runtimeContext?.captureFileId !== lease.runtimeContext.captureFileId ||
-      identity.runtimeContext?.replaySessionId !== lease.runtimeContext.replaySessionId
-    ) {
-      throw new AppError(
-        'RDC_RECOVERY_IDENTITY_UNVERIFIED',
-        'the quarantined owning binding and native failure are required.',
-      );
-    }
-    return lease;
-  };
-  const lease = check();
-  return runRdcOperation(lease.contextId, async () => {
-    input.signal?.throwIfAborted();
-    const result = await (
-      input.execute ??
-      ((binding, contextId, signal) =>
-        rdcCliInvokerService.executeCLI(
-          'call',
-          ['rd.session.get_context', '--args-json', '{}', '--daemon-context', contextId],
-          { contextId, settings: binding.cli, abortSignal: signal },
-        ))
-    )(input.binding, lease.contextId, input.signal);
-    const payload = parseRdcNativeResult(result, lease.contextId, 'rd.session.get_context');
-    input.signal?.throwIfAborted();
-    const after = check();
-    if (
-      after.version !== lease.version ||
-      after.contextId !== lease.contextId ||
-      JSON.stringify(after.quarantineCause) !== JSON.stringify(lease.quarantineCause)
-    ) {
-      throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'the quarantined binding changed during observation.');
-    }
-    return validateRdcSwitchSnapshot(payload, after);
   });
 }

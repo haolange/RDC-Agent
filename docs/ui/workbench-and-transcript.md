@@ -25,7 +25,7 @@
 - 全部完成后清单消失，恢复三张 Agent 卡。
 - 标题栏工具区的「?」（`app/SetupGuideButton.tsx`）随时用浮层重开同一份清单（`patterns/SetupChecklist.tsx`），数据同样读自 `useWorkbenchSetup`，只是临时浮层状态；点任一步的动作先关闭浮层再执行。
 
-RDC Tools 设置通过目录检测/选择和验证并应用完成安装绑定。高级项仅呈现启用、超时和环境；验证错误展示实际原因。普通 General 任务不要求 RDC 已配置。
+RDC Tools 设置通过目录检测/选择和验证并应用完成安装绑定。高级项仅呈现启用、无进展等待（秒，附一句说明：多久没有进展算卡住，持续有进展的操作不会被打断）和环境；验证错误展示实际原因。普通 General 任务不要求 RDC 已配置。
 
 ## 消息结构
 
@@ -55,6 +55,7 @@ Docked 左导航与右检查栏在可见接缝可拖以改变栏宽；进入抽�
 - 运行中标题：`工作中` / `Working` + Active Signal；
 - 运行中的 Working 标题时钟与子代理卡耗时共用一个 1 秒时钟（`useWorkClock`），同一秒一起前进；耗时、发送时间、知识卡日期与终端日志时间（`formatLogTime`，24 小时制带秒）经 `lib/formatTime` 用 `Intl` 按界面语言格式化，英文保持 850ms / 1.2s / 3m 05s 与 09:30；
 - Working 随第一条可见内容出现，请求准备期间不显示空的「工作中」卡；发送时先显示的消息就用主进程消息的 id（由 `requestId` 派生），主进程的版本原位更新同一转录行，行的 DOM、实测高度与开合记忆不变；
+- 运行中的 `shell.rdc` 行在卡头下方用卡片既有的预览行显示 RDC 进度（`tool.progress`，只走渲染流，不持久化，模型只看最终结果）：本地化的阶段（排队、复制到设备、打开 capture、设备准备的四个阶段，其余为「正在 RenderDoc 中执行」，不显示原始阶段名）与进度百分比；距最近一次进展或原生调用满 30 秒后追加「已 N 秒无进展」，随 Working 时钟每秒前进。已用时间就是卡头的耗时，不再重复；RDC 操作名、阶段与原生调用名只经展开后的「复制诊断信息」离开界面；
 - 结束后：`工作过程` / `Work process` + duration/action meta；
 - 禁止用 `执行完成` 做主标题。
 
@@ -228,7 +229,7 @@ Edit-and-resend 使用 Composer 当前 agent + 当前对话模型，编辑框上
 - 分支切换失败时弹一条错误提示，不静默停在原分支。
 - 回复被停止且没有工作过程卡头时，元信息行显示一次「已停止」；有工作过程时卡头已写「已停止」，不再重复。
 - 工具审批面板写工具的人话类别、按风险着色（低绿、中琥珀、高红）与审查方，不显示原始工具 ID。
-- 跨模型导致推理续接不可复用时只写运行日志，transcript 不插入系统提示。
+- 只有本轮准备实际丢弃了推理续接制品、且原因是路由或模型变化（执行不匹配、模型未准入、容器不匹配）时，transcript 才在该轮用户消息后插入一条警告系统提示，写明丢弃条数（如「已切换模型，上一模型的 3 条推理续接无法复用」）。提示只取决于本轮准备的实际决策，不与历史轮次比较：中断或停止后同一模型继续、换了模型但没有制品、作用域结束或保留期过期造成的丢弃，都不提示。编辑重发同样按其准备结果决定。
 
 Effort：能力驱动 reasoning rail + `Max mode` + `Fast mode`，嵌在合并胶囊的弹层里。关档文案统一 `Disabled` / `禁用`。`unknown` / `none` → 同关态外观并灰掉不可调；`always-on` / fixed → 锁定开；wire `xhigh` 显示 `Extra`；产品最高档 `Max`。Max/Fast entitlement 未知时关态灰掉且状态文案亦为 `Disabled`。滑杆 inset 几何，松手 snap。Compose 色跟 agent `accent`（`--composer-effort-*`），禁止只用全局 `--token-border-focus`。
 
@@ -274,7 +275,7 @@ Model/Effort控制状态由Composer稳定父层唯一持有，普通输入区、
 
 ## Appearance（入口）
 
-Settings → Appearance 为权威。双体系：全局 chrome vs Composer agent accent。详见 [`design-system.md`](design-system.md)。禁止 translucent sidebar；分享串 `rdc-theme-v1:`（拒绝 `codex-theme-v1:`）。
+Settings → Appearance 为权威。双体系：全局 chrome vs Composer agent accent。详见 [`design-system.md`](design-system.md)。禁止 translucent sidebar；分享串 `rdc-theme:`（拒绝 `codex-theme-v1:`）。
 
 ## 验证
 
@@ -292,7 +293,7 @@ Settings → Appearance 为权威。双体系：全局 chrome vs Composer agent 
   - 生命周期状态与阻塞原因始终是 TaskRegistry 的事实，即使所属回合已结束也不改写；禁止由阶段、harness 或 UI 合成进度。
   - runtime 自带的 Stop 原因只在显示时翻译，存储值和用户原文不变。
   - Stop 在 producer join 之后把被停止回合创建、尚未开始的任务结算为 cancelled；没有可知回合归属的旧任务保持不变。
-- **Artifacts**：只投影主进程持有的 `rdc.investigation.v1` 记录。
+- **Artifacts**：只投影主进程持有的 `rdc.investigation` 记录。
   - renderer 不得从 action 事件、工作目录扫描或工具目录重建该清单。
   - 行内只显示标题；点击经所属会话的 `investigation:read` 与期望内容 hash 打开只读预览，预览先给人读的内容，ID、sha256、版本时间与状态不显示，只经预览底部的「复制诊断信息」进剪贴板，哈希校验失败在预览顶部明示。
   - 报告预览把既有类型化记录分成七个可读分组（不编号，Claim 等级写人话：已观察 / 已复现 / 推断），缺失数据标为未记录；不新增报告 schema，也不提升 Claim 等级。

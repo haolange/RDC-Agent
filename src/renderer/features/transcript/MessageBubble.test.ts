@@ -118,6 +118,12 @@ it('preserves ordinary handoffs and says once that a reply stopped', () => {
   );
   expect(withWork).not.toContain('conversation-message-status-tag is-stopped');
 });
+it('says a reply stopped when the app closed instead of the person stopping it', () => {
+  const html = (stopCause: ConversationMessage['stopCause']) =>
+    renderToStaticMarkup(createElement(MessageBubble, { message: { ...base, status: 'stopped', stopCause } }));
+  expect(html('app-shutdown')).toContain('chat.messageStoppedAtShutdown');
+  expect(html('user')).toContain('chat.messageStopped<');
+});
 it('shows a plan-executing handoff as a plain user message and keeps it out of edit-and-resend', () => {
   const user: ConversationMessage = {
     id: 'u',

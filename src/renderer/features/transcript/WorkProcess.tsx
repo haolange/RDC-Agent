@@ -12,10 +12,13 @@ import { WorkProcessContent } from './WorkProcessContent';
 import { WorkProcessFoldProvider } from './workProcessFold';
 import { useWorkClock } from './useWorkClock';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
+import type { TurnStopCause } from '@shared/types/lifecycle';
 
 interface WorkProcessProps {
   trace: ConversationWorkTrace;
   sessionId?: string | null;
+  /** Who stopped a stopped turn: a stop at app shutdown reads differently from the person's Stop. */
+  stopCause?: TurnStopCause;
   /** The transcript row's lasting identity (its message id); open and close choices are remembered under it. */
   rowKey: string;
   answer?: string;
@@ -30,7 +33,7 @@ const awaitsPlanReview = (trace: ConversationWorkTrace): boolean =>
  * a stop, and while any of its actions failed. Under "follow latest" it folds once the turn completes cleanly. Opening or closing Working by
  * hand is remembered for this transcript row, from the send through main's answer and across windowed remounts, and always wins.
  */
-const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer }) => {
+const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer, stopCause }) => {
   const { t, language } = useI18n();
   const localized = useMemo(() => withLanguage(t, language), [t, language]);
   // Thinking rows are re-judged once the Markdown parser arrives.
@@ -51,7 +54,11 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer 
 
   const headlineCopy =
     trace.status === 'stopped'
-      ? t('chat.workProcessHeadlineStopped')
+      ? t(
+          stopCause === 'app-shutdown'
+            ? 'chat.workProcessHeadlineStoppedAtShutdown'
+            : 'chat.workProcessHeadlineStopped',
+        )
       : running
         ? t('chat.workProcessHeadlineRunning')
         : t('chat.workProcessTitle');

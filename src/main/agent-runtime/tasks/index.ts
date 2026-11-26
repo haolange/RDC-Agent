@@ -15,7 +15,6 @@ export {
 } from './TaskRegistry';
 
 export {
-  TASK_SCHEMA_VERSION,
   type TaskDisposition,
   type TaskCompletionResult,
   type TaskBudgetState,

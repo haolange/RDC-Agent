@@ -7,6 +7,7 @@ import {
   ProviderEmptyStreamError,
   ProviderHttpError,
   ProviderTimeoutError,
+  registerStreamActivity,
 } from './http';
 
 describe('provider http stream helpers', () => {
@@ -35,70 +36,63 @@ describe('provider http stream helpers', () => {
     });
   });
 
-  it('classifies first-byte timeout before any stream chunk arrives', async () => {
+  it('reads a stream without any timer of its own: the stream watchdog owns every deadline', async () => {
     vi.useFakeTimers();
     const response = new Response(new ReadableStream<Uint8Array>());
-    const iterator = parseSSE(response, undefined, {
-      providerApi: 'test-provider',
-      firstChunkTimeoutMs: 20,
-      streamIdleTimeoutMs: 100,
-    });
+    const pending = parseSSE(response, undefined, { providerApi: 'test-provider' }).next();
+    const settled = vi.fn();
+    void pending.then(settled, settled);
 
-    const pending = iterator.next();
-    vi.advanceTimersByTime(20);
+    await vi.advanceTimersByTimeAsync(3_600_000);
 
-    await expect(pending).rejects.toMatchObject({
-      name: 'ProviderTimeoutError',
-      phase: 'first-byte',
-      timeoutMs: 20,
-      providerApi: 'test-provider',
-    });
+    expect(settled).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 
-  it('classifies idle timeout after the stream has started', async () => {
-    vi.useRealTimers();
+  it('reports every received chunk to the watchdog registered for the signal', async () => {
     const encoder = new TextEncoder();
     const response = new Response(
       new ReadableStream<Uint8Array>({
         start(controller) {
-          controller.enqueue(encoder.encode('data: first\n\n'));
+          controller.enqueue(encoder.encode('data: a\n\n'));
+          controller.enqueue(encoder.encode('data: b\n\n'));
+          controller.close();
         },
       }),
     );
-    const iterator = parseSSE(response, undefined, {
-      providerApi: 'test-provider',
-      firstChunkTimeoutMs: 20,
-      streamIdleTimeoutMs: 5,
-    });
+    const signal = new AbortController().signal;
+    const touch = vi.fn();
+    registerStreamActivity(signal, touch);
 
-    await expect(iterator.next()).resolves.toEqual({ value: 'first', done: false });
+    const out: string[] = [];
+    for await (const data of parseSSE(response, signal, { providerApi: 'test-provider' })) out.push(data);
 
-    const pending = iterator.next();
-
-    await expect(pending).rejects.toMatchObject({
-      name: 'ProviderTimeoutError',
-      phase: 'idle',
-      timeoutMs: 5,
-      providerApi: 'test-provider',
-    });
+    expect(out).toEqual(['a', 'b']);
+    expect(touch.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('aborts the composed signal with a total request timeout reason', () => {
-    vi.useFakeTimers();
+  it('rejects a pending read with the abort reason, so a watchdog timeout surfaces as the timeout', async () => {
+    const controller = new AbortController();
+    const response = new Response(new ReadableStream<Uint8Array>());
+    const pending = parseSSE(response, controller.signal, { providerApi: 'test-provider' }).next();
+
+    const timeout = new ProviderTimeoutError('test-provider', 'first-byte', 20);
+    controller.abort(timeout);
+
+    await expect(pending).rejects.toBe(timeout);
+  });
+
+  it('aborts the composed signal with the reason given to abort and stops following the sources after dispose', () => {
     const internal = new AbortController();
-    const composed = composeAbortSignals(undefined, internal.signal, {
-      providerApi: 'test-provider',
-      requestTimeoutMs: 50,
-    });
+    const composed = composeAbortSignals(undefined, internal.signal);
+    const timeout = new ProviderTimeoutError('test-provider', 'idle', 5, true);
 
-    vi.advanceTimersByTime(50);
+    composed.abort(timeout);
+    composed.abort(new Error('ignored: already aborted'));
 
-    expect(composed.signal.aborted).toBe(true);
-    expect(composed.signal.reason).toBeInstanceOf(ProviderTimeoutError);
-    expect((composed.signal.reason as ProviderTimeoutError).phase).toBe('total');
+    expect(composed.signal.reason).toBe(timeout);
+    expect(timeout.afterContent).toBe(true);
     composed.dispose();
-    vi.useRealTimers();
   });
 
   it('keeps the SSE event name with its data record', async () => {

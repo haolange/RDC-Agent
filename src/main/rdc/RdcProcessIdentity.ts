@@ -23,3 +23,24 @@ export function parseRdcProcessIdentity(value: unknown): RdcProcessIdentity {
     throw new AppError('RDC_PROCESS_IDENTITY_REQUIRED', 'live daemon/worker process birth is unavailable or invalid.');
   return parsed.data;
 }
+
+/** Bounded: one entry per recently used daemon context (each opened replay gets a fresh context id). */
+const MAX_OBSERVED_CONTEXTS = 64;
+const observedByContext = new Map<string, RdcProcessIdentity>();
+
+/**
+ * Remember the process identity a successful canonical result reported for its daemon context. Every successful RDC
+ * result passes through `parseRdcNativeResult`, so this is the latest daemon/worker the app saw complete work there.
+ */
+export function noteRdcProcessIdentity(contextId: string, value: unknown): void {
+  const parsed = RdcProcessIdentitySchema.safeParse(value);
+  if (!parsed.success) return;
+  observedByContext.delete(contextId);
+  observedByContext.set(contextId, parsed.data);
+  if (observedByContext.size > MAX_OBSERVED_CONTEXTS) observedByContext.delete(observedByContext.keys().next().value!);
+}
+
+export function observedRdcProcessIdentity(contextId: string): RdcProcessIdentity | null {
+  const value = observedByContext.get(contextId);
+  return value ? structuredClone(value) : null;
+}

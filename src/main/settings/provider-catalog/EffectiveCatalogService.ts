@@ -9,7 +9,6 @@ import { cloneJson, enforceDiscoveryAdmission, mergeEffectiveCatalog, revisionFo
 import { parsePersistedCatalogState } from './persistedCatalogStateSchema';
 import {
   DISCOVERY_TTL_MS,
-  EFFECTIVE_CATALOG_SCHEMA_VERSION,
   type CatalogLayerContribution,
   type CatalogModelContribution,
   type DiscoveryLayerNormalizer,
@@ -25,7 +24,6 @@ import type { LlmProviderProtocol } from '@shared/types/settings';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 
 const EMPTY_STATE: PersistedCatalogState = {
-  schemaVersion: EFFECTIVE_CATALOG_SCHEMA_VERSION,
   discoveries: {},
   entitlements: {},
   observed: {},
@@ -113,8 +111,7 @@ export class EffectiveCatalogService {
 
   constructor(options: EffectiveCatalogServiceOptions = {}) {
     this.statePath =
-      options.statePath ??
-      path.join(appPathService.getRuntimePaths().appStateRoot, 'provider-catalog', 'catalog-v4.json');
+      options.statePath ?? path.join(appPathService.getRuntimePaths().appStateRoot, 'provider-catalog', 'catalog.json');
     this.now = options.now ?? (() => new Date());
     this.discoveryTtlMs = options.discoveryTtlMs ?? DISCOVERY_TTL_MS;
     const persisted = sanitizePersistedCatalogState(this.readState());
@@ -506,16 +503,16 @@ export class EffectiveCatalogService {
   }
 
   /**
-   * The catalog state is a cache of upstream evidence, rebuilt by the next refresh. A file from another schema
-   * version or a damaged one (whose bytes `readValidatedSync` keeps beside it) starts empty and is rewritten;
-   * an unreadable one starts empty and is left as it is.
+   * The catalog state is a cache of upstream evidence, rebuilt by the next refresh. A damaged file (one written in
+   * another format included; `readValidatedSync` keeps its bytes beside it) starts empty and is rewritten; an
+   * unreadable one starts empty and is left as it is.
    */
   private readState(): PersistedCatalogState {
     try {
       return readValidatedSync(this.statePath, parseJsonWith(parsePersistedCatalogState)) ?? cloneJson(EMPTY_STATE);
     } catch (error) {
       const code = errorCodeOf(error);
-      if (code === 'STORAGE_SCHEMA_UNSUPPORTED' || code === 'STORAGE_CORRUPT') this.stateNeedsRewrite = true;
+      if (code === 'STORAGE_CORRUPT') this.stateNeedsRewrite = true;
       return cloneJson(EMPTY_STATE);
     }
   }

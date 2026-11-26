@@ -43,7 +43,6 @@ export function createFailClosedProviderContracts(protocol: LlmProviderProtocol)
       errors: 'unknown',
     },
     semanticContext: {
-      version: 'semantic-context-v1',
       history: 'canonical-messages',
       toolPairs: 'strict',
       attachments: 'fail-closed',

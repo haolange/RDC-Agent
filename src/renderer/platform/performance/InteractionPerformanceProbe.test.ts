@@ -6,7 +6,6 @@ describe('summarizeInteractionPerformance', () => {
     const snapshot = summarizeInteractionPerformance(20, [24, 40], [51.2346, 63.4567], true, true);
 
     expect(snapshot).toEqual({
-      schemaVersion: 2,
       measurement: 'event-timing-click-to-next-paint',
       interactionCount: 20,
       sampleCount: 20,

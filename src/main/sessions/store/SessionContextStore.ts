@@ -2,12 +2,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { isSubagentScopeId } from '@shared/utils/executionScope';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '../../runtime/jsonl';
-import { readCurrentStoredJson } from '../../runtime/storedDocument';
 import {
-  SESSION_SHELL_STATE_MIGRATIONS,
-  CURRENT_USAGE_SCHEMA_VERSION,
   SessionContextTurnEntrySchema,
-  SessionUsageV2Schema,
+  SessionShellStateSchema,
+  SessionUsageSchema,
   toSessionShellStateManifest,
   toSessionUsageManifest,
 } from './storageSchema';
@@ -36,9 +34,7 @@ export class SessionContextStore {
     }
     const usagePath = this.getSessionUsagePath(sessionId);
     if (!usagePath) return null;
-    return (
-      readCurrentStoredJson(this.host.io, usagePath, CURRENT_USAGE_SCHEMA_VERSION, SessionUsageV2Schema)?.usage ?? null
-    );
+    return this.host.io.readJson(usagePath, SessionUsageSchema)?.usage ?? null;
   }
 
   getSessionShellStatePath(sessionId: string): string | null {
@@ -53,7 +49,7 @@ export class SessionContextStore {
     }
     const statePath = this.getSessionShellStatePath(sessionId);
     if (!statePath) return null;
-    return this.host.io.readJson(statePath, SESSION_SHELL_STATE_MIGRATIONS)?.state.cwd ?? null;
+    return this.host.io.readJson(statePath, SessionShellStateSchema)?.state.cwd ?? null;
   }
 
   writeSessionShellCwd(sessionId: string, cwd: string): void {

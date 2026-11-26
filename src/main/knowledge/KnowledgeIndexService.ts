@@ -5,13 +5,8 @@ import { appPathService } from '../runtime/AppPathService';
 import { projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { StorageIo } from '../runtime/StorageIo';
 import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
-import { KNOWLEDGE_INDEX_MIGRATIONS } from './knowledgeIndexSchema';
-import {
-  KNOWLEDGE_INDEX_SCHEMA_VERSION,
-  knowledgeCorpusHash,
-  type KnowledgeIndexEntry,
-  type KnowledgeIndexSnapshot,
-} from './knowledgeLanes';
+import { KnowledgeIndexSnapshotSchema } from './knowledgeIndexSchema';
+import { knowledgeCorpusHash, type KnowledgeIndexEntry, type KnowledgeIndexSnapshot } from './knowledgeLanes';
 import { extractPreview, toPosixRelative, walkMarkdownFiles } from './knowledgeFs';
 import type { KnowledgeOperationOptions } from './knowledgeOperations';
 import type { KnowledgeSpace } from '@shared/types/knowledge';
@@ -115,7 +110,6 @@ export class KnowledgeIndexService {
     const cards = await this.collectEntries(options);
     options.signal?.throwIfAborted();
     const snapshot: KnowledgeIndexSnapshot = {
-      schemaVersion: KNOWLEDGE_INDEX_SCHEMA_VERSION,
       revision: knowledgeCorpusHash(cards),
       builtAt: this.dependencies.now().toISOString(),
       cards,
@@ -127,7 +121,7 @@ export class KnowledgeIndexService {
   }
 
   getSnapshot(): KnowledgeIndexSnapshot | null {
-    return this.dependencies.storage.readJson(this.dependencies.snapshotPath(), KNOWLEDGE_INDEX_MIGRATIONS);
+    return this.dependencies.storage.readJson(this.dependencies.snapshotPath(), KnowledgeIndexSnapshotSchema);
   }
 
   async computeLiveRevision(): Promise<string> {

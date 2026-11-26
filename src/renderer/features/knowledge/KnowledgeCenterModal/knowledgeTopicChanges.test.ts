@@ -7,7 +7,6 @@ it('prepares only selected cards, edited synonyms and explicit merges for previe
     revision: 'a'.repeat(64),
     corpusRevision: 'b'.repeat(64),
     current: {
-      schemaVersion: 1,
       topics: [
         { id: 'old', label: 'Old', synonyms: [] },
         { id: 'new', label: 'New', synonyms: [] },

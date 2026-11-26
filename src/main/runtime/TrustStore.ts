@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { AppError, errorCodeOf } from '@shared/errors/appError';
-import { readValidatedSync, writeFileAtomicSync } from './atomicFile';
+import { errorCodeOf } from '@shared/errors/appError';
+import { parseJsonWith, readValidatedSync, writeFileAtomicSync } from './atomicFile';
 
 /**
  * The one store behind every trust decision (hooks, project MCP servers, project Agent profiles). A record binds one
@@ -10,12 +10,9 @@ import { readValidatedSync, writeFileAtomicSync } from './atomicFile';
  * - Writes are atomic.
  * - A damaged file is `STORAGE_CORRUPT` on every read, never an empty store; trusting again rewrites it (the damaged
  *   bytes stay kept beside it), so the user can recover by repeating the decision.
- * - A file written by another trust version holds no decision this version honors: nothing in it is trusted and
- *   the user is asked again. A newer version is `STORAGE_SCHEMA_UNSUPPORTED`.
+ * - The file carries no format version: one written in another format fails the strict schema like a damaged file.
  */
 export type TrustScope = 'user' | 'project';
-
-const TRUST_SCHEMA_VERSION = 3;
 
 const TrustRecordSchema = z
   .object({
@@ -31,7 +28,6 @@ export type TrustRecord = z.infer<typeof TrustRecordSchema>;
 
 const TrustFileSchema = z
   .object({
-    schemaVersion: z.literal(TRUST_SCHEMA_VERSION),
     records: z.record(z.string(), TrustRecordSchema),
   })
   .strict();
@@ -76,22 +72,11 @@ export class TrustStore {
   }
 
   private read(): TrustRecords {
-    const path = this.filePath();
     return (
-      readValidatedSync(path, (raw) => {
-        const document = JSON.parse(raw) as unknown;
-        const version =
-          typeof document === 'object' && document !== null
-            ? (document as { schemaVersion?: unknown }).schemaVersion
-            : undefined;
-        if (typeof version === 'number' && version > TRUST_SCHEMA_VERSION) {
-          throw new AppError(
-            'STORAGE_SCHEMA_UNSUPPORTED',
-            `${path} has schemaVersion ${version}; supported up to ${TRUST_SCHEMA_VERSION}`,
-          );
-        }
-        return version === TRUST_SCHEMA_VERSION ? TrustFileSchema.parse(document).records : {};
-      }) ?? {}
+      readValidatedSync(
+        this.filePath(),
+        parseJsonWith((document) => TrustFileSchema.parse(document).records),
+      ) ?? {}
     );
   }
 
@@ -106,9 +91,6 @@ export class TrustStore {
   }
 
   private write(records: TrustRecords): void {
-    writeFileAtomicSync(
-      this.filePath(),
-      `${JSON.stringify({ schemaVersion: TRUST_SCHEMA_VERSION, records }, null, 2)}\n`,
-    );
+    writeFileAtomicSync(this.filePath(), `${JSON.stringify({ records }, null, 2)}\n`);
   }
 }

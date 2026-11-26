@@ -153,8 +153,6 @@ Structural capability, account entitlement, expiring execution evidence, and tra
 
 ## 凭据与请求事务
 
-版本见 `SETTINGS_SCHEMA_VERSION` / `EFFECTIVE_CATALOG_SCHEMA_VERSION`。
-
 - 运行时投影顺序字段不修改缓存 schema。
 - 版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。
 - Settings 只存用户状态，provider/model 目录事实由 manifest 组合：`SettingsService.providerConnections` 在内存里把冻结的目录事实、用户状态与凭据存在性组合一次，只在用户的 provider 状态或凭据 revision 变化时重组；目录 Registry 冻结一次后共享，不按调用克隆；稳定的 provider/model ID、账号 ID（secret ref 由它派生）与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
@@ -383,7 +381,7 @@ Priority 探测回执分别记录冻结请求档位与服务端档位。正常�
 - 取消、所属面板卸载及 shutdown 中止派发并 abort/join 当前请求后释放凭据；迟到结果或配置变化后的结果不入目录。
 - 状态事件使用批次 id 与单调 revision，Renderer 不以旧 IPC 回包覆盖新进度。
 - 实际能力证据沿 EffectiveCatalog 持久化并在 24 小时后失效，UI 结果明细只保留当前内存批次。
-- cache v9 使旧判定产生的能力观察失效，不迁移旧缓存；用户配置和凭据版本不变。
+- 目录缓存不带格式版本：其他格式写下的缓存按损坏处理，从空开始由下次刷新重建（损坏字节旁存），不迁移。
 
 ### ChatGPT Account 窗口字段裁决
 

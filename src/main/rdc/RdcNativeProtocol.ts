@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
 import { redactCredentialLikeText } from '../runtime/secretRedaction';
+import { noteRdcProcessIdentity } from './RdcProcessIdentity';
+import type { ErrorCode } from '@shared/errors/errorCodes';
 import type { CLIResult } from '../tools/ShellInvocationService';
 import type { AgentToolResult } from '../agent-runtime/agent/AgentTool';
 
@@ -59,9 +61,54 @@ const RdcNativeFailureEnvelopeSchema = z
   .passthrough();
 const RdcNativeObjectSchema = z.record(z.string(), z.unknown());
 
+/**
+ * Failures of the process that runs an operation rather than of the operation itself (RDC-Tool public contract,
+ * execution budget): a stuck or lost worker, one that could not start, a cancelled request, and a CLI that lost its
+ * daemon or heard nothing from it. Each carries its own Agent code so callers and copy can tell them apart.
+ */
+const RDC_PROCESS_FAILURE_CODES = {
+  worker_stuck: 'RDC_OPERATION_STUCK',
+  worker_lost: 'RDC_WORKER_LOST',
+  worker_request_failed: 'RDC_WORKER_LOST',
+  worker_unavailable: 'RDC_WORKER_UNAVAILABLE',
+  operation_cancelled: 'RDC_OPERATION_CANCELLED',
+  daemon_lost: 'RDC_DAEMON_LOST',
+  daemon_unresponsive: 'RDC_DAEMON_UNRESPONSIVE',
+} as const satisfies Record<string, ErrorCode>;
+type RdcProcessFailureCode = keyof typeof RDC_PROCESS_FAILURE_CODES;
+const isProcessFailureCode = (code: string): code is RdcProcessFailureCode =>
+  Object.hasOwn(RDC_PROCESS_FAILURE_CODES, code);
+
+const ProcessIdentityDetailSchema = z.object({ pid: z.number().nullable(), start_generation: z.string().nullable() });
+/** The documented details of a process failure; fields RDC-Tool adds later pass through untouched. */
+const RdcProcessFailureDetailsSchema = z
+  .object({
+    failure_stage: z.string(),
+    reason: z.string(),
+    outcome: z.enum(['unknown', 'not_started', 'cancelled']),
+    request_id: z.string().optional(),
+    trace_id: z.string().optional(),
+    operation: z.string().optional(),
+    worker: ProcessIdentityDetailSchema.optional(),
+    worker_exit_confirmed: z.boolean().optional(),
+    replay_requires_restart: z.boolean().optional(),
+    stack_log: z.object({ path: z.string(), tail: z.string() }).optional(),
+    last_progress: z
+      .object({ stage: z.string().nullable(), native_call: z.unknown(), at_ms: z.number().nullable() })
+      .optional(),
+    no_progress_ms: z.number().optional(),
+    daemon: ProcessIdentityDetailSchema.optional(),
+    daemon_exit_confirmed: z.boolean().optional(),
+    heartbeat_gap_ms: z.number().optional(),
+  })
+  .passthrough();
+export type RdcProcessFailure = z.infer<typeof RdcProcessFailureDetailsSchema> & { code: RdcProcessFailureCode };
+
 export class RdcNativeFailure extends AppError {
   /** Bound only after the owning execution path finishes its existing safety checks. */
   deliveryResult?: AgentToolResult;
+  /** Set when the failure is the operation's process (worker, daemon, cancellation) and its details parse. */
+  readonly processFailure: RdcProcessFailure | null;
   constructor(
     message: string,
     readonly resultKind: string | null,
@@ -75,12 +122,28 @@ export class RdcNativeFailure extends AppError {
     readonly screenshotTargetRestoration: { contextId: string; sessionId: string; eventId: number } | null = null,
     readonly inspectionRestoration: { contextId: string; sessionId: string; eventId: number } | null = null,
   ) {
-    super('RDC_NATIVE_FAILURE', message);
+    const processCode = isProcessFailureCode(nativeError.code) ? nativeError.code : null;
+    const parsed = processCode ? RdcProcessFailureDetailsSchema.safeParse(nativeError.details) : null;
+    const processFailure = processCode && parsed?.success ? { ...parsed.data, code: processCode } : null;
+    const operation = processFailure?.operation ?? resultKind ?? 'rdc';
+    super(
+      processCode ? RDC_PROCESS_FAILURE_CODES[processCode] : 'RDC_NATIVE_FAILURE',
+      message,
+      processCode === 'daemon_unresponsive'
+        ? { params: { operation, seconds: Math.round((processFailure?.heartbeat_gap_ms ?? 0) / 1000) } }
+        : processCode
+          ? { params: { operation } }
+          : {},
+    );
     this.name = 'RdcNativeFailure';
+    this.processFailure = processFailure;
   }
 }
 
-/** Fail before any lease/experiment state is committed. Never surface binary stdout. */
+/**
+ * Fail before any lease/experiment state is committed. Never surface binary stdout. Every RDC result is parsed here, so
+ * a success that names its daemon context (expected or reported) also records the process identity that served it.
+ */
 export function parseRdcNativeResult(
   result: CLIResult,
   expectedContext?: string,
@@ -222,5 +285,23 @@ export function parseRdcNativeResult(
   if (expectedContext && envelope.data.context_id !== expectedContext) {
     throw new AppError('RDC_CONTEXT_MISMATCH', 'CLI response does not belong to the owning daemon context.');
   }
+  noteServingProcess(envelope, expectedContext);
   return envelope;
+}
+
+function noteServingProcess(envelope: RdcNativeEnvelope, expectedContext: string | undefined): void {
+  const context = expectedContext ?? envelope.data.context_id;
+  if (typeof context === 'string' && context)
+    noteRdcProcessIdentity(context, (envelope.meta as Record<string, unknown> | undefined)?.process_identity);
+}
+
+/** The observed failure a quarantine records: RDC-Tool's error code, or the leading code of an Agent failure. */
+export function rdcFaultCode(error: unknown): string {
+  const reported =
+    error instanceof RdcNativeFailure
+      ? error.nativeError.code
+      : error instanceof Error
+        ? (/^[A-Z][A-Z0-9_]{0,127}/u.exec(error.message)?.[0] ?? error.name)
+        : 'unknown';
+  return /^[A-Za-z][A-Za-z0-9_]{0,127}$/u.test(reported) ? reported : 'unknown';
 }

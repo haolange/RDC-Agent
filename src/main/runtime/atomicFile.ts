@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { AppError, errorCodeOf } from '@shared/errors/appError';
+import { AppError } from '@shared/errors/appError';
 import { generateShortId } from '@shared/utils/id';
 import { renameWithRetry, renameWithRetrySync, syncDirectory, syncDirectorySync } from '../platform/fileRename';
 
@@ -14,8 +14,8 @@ import { renameWithRetry, renameWithRetrySync, syncDirectory, syncDirectorySync 
  * Reads: a missing file is `null`. A file that exists but cannot be parsed or validated is damaged: the read throws
  * `STORAGE_CORRUPT`, and keeps doing so on every read until the owner writes the file again — it never turns into
  * an empty value. One copy of the damaged bytes is kept beside it (named by content hash) so a later write cannot
- * destroy the evidence. A file this build cannot read (`STORAGE_SCHEMA_UNSUPPORTED`) passes through untouched;
- * an I/O failure is `STORAGE_UNREADABLE`, an availability failure that leaves the file as it is.
+ * destroy the evidence. Persisted formats carry no version, so a file written in another format is damaged in this
+ * sense too. An I/O failure is `STORAGE_UNREADABLE`, an availability failure that leaves the file as it is.
  */
 export interface AtomicWriteOptions {
   /** File mode for a newly created file, for example 0o600 for credentials. */
@@ -115,7 +115,6 @@ export function readValidatedSync<T>(filePath: string, parse: (raw: string) => T
   try {
     return parse(raw);
   } catch (error) {
-    if (errorCodeOf(error) === 'STORAGE_SCHEMA_UNSUPPORTED') throw error;
     const keptAt = keepDamagedCopy(filePath, raw);
     throw new AppError(
       'STORAGE_CORRUPT',

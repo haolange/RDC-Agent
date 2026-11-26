@@ -1,6 +1,5 @@
 import { allowsNativeRdcExecution } from '@shared/constants/toolAccess';
 import { sessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
-import { PROCESS_TERMINATION_POLICY } from '../runtime/ProcessSupervisor';
 import { ownsRdcInteractionLock } from './RdcOperationCoordinator';
 import {
   assertRdcContextLeaseOwnership,
@@ -87,29 +86,30 @@ export function readRdcHostControls(scope: RdcHostControlScope, context?: ToolEx
     identity?.ownerSessionId === scope.sessionId &&
     identity.contextId === scope.contextId &&
     identity.version === scope.leaseVersion;
-  const timeoutMs = matched && binding?.cli.enabled ? binding.cli.timeoutMs : undefined;
-  const cliProcess =
-    typeof timeoutMs === 'number' && Number.isSafeInteger(timeoutMs) && timeoutMs > 0
+  const noProgressTimeoutMs = matched && binding?.cli.enabled ? binding.cli.noProgressTimeoutMs : undefined;
+  // Patience, not a deadline: each RDC operation may run as long as it keeps reporting progress; one that stays silent
+  // this long is judged stuck, its worker is stopped and the owning context is quarantined.
+  const operationBudget =
+    typeof noProgressTimeoutMs === 'number' && Number.isSafeInteger(noProgressTimeoutMs) && noProgressTimeoutMs > 0
       ? {
           available: true as const,
           source: 'frozen-turn-cli' as const,
-          timeoutMs,
-          termination: PROCESS_TERMINATION_POLICY,
-          scope: 'one-cli-invocation' as const,
+          rule: 'no-progress' as const,
+          noProgressTimeoutMs,
+          scope: 'each-rdc-operation' as const,
           wholeOperationDeadline: false,
-          nativeTerminationGuaranteed: false,
           postOperationObservationMayInvokeCli: true,
-          uncertainOutcome: 'quarantine-owning-context' as const,
+          stuckOutcome: 'worker-stopped-and-owning-context-quarantined' as const,
         }
-      : { available: false as const, reason: 'matching_frozen_cli_timeout_unavailable' };
+      : { available: false as const, reason: 'matching_frozen_cli_binding_unavailable' };
   const replayIsolation = readReplayIsolation(scope, context);
-  const available = artifactCapacity.available || cliProcess.available || replayIsolation.available;
+  const available = artifactCapacity.available || operationBudget.available || replayIsolation.available;
   return {
     measuredAt,
     available,
     ...(!available ? { reason: 'host_controls_unavailable' } : {}),
     artifactCapacity,
-    cliProcess,
+    operationBudget,
     replayIsolation,
   };
 }

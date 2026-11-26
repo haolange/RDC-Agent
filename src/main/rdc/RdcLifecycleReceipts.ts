@@ -4,7 +4,9 @@ import { AppError } from '@shared/errors/appError';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { secretStorageService } from '../settings/settings-core/SecretStorageService';
 import { openSignedRdcReceipt } from './RdcExecutionReceipts';
-import { parseRdcProcessIdentity } from './RdcProcessIdentity';
+import { RdcProcessIdentitySchema, type RdcProcessIdentity } from './RdcProcessIdentity';
+import { RdcRecoveryObservationSchema } from './RdcContextStatus';
+import { RdcRecoveryClassificationSchema, RdcRecoveryLostWorkerSchema } from './RdcRecoveryClassification';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -18,7 +20,7 @@ const native = z
     replaySessionId: id,
     captureFileId: id,
     eventId: z.number().int().nonnegative(),
-    processIdentity: z.unknown(),
+    processIdentity: RdcProcessIdentitySchema,
     replacementCount: z.number().int().nonnegative(),
     replacementFingerprint: hash,
   })
@@ -39,11 +41,34 @@ const recovery = z
     cause: z
       .object({ operation: id, argsFingerprint: hash, code: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,127}$/) })
       .strict(),
-    observed: native,
+    observed: RdcRecoveryObservationSchema,
+    classification: RdcRecoveryClassificationSchema,
   })
   .strict();
+/**
+ * What a recovery transition lost with the old replay process. Nothing here was rolled back: debug handles of the old
+ * replay session are invalid, open experiments were interrupted by the infrastructure (their earlier receipts stay
+ * bound to the old process identity, so a new baseline is required), and replacements are gone with the process.
+ */
+const lostWithProcess = z.strictObject({
+  debugHandles: z.strictObject({ replaySessionId: id, invalidated: z.literal('all') }),
+  experiments: z.array(
+    z.strictObject({
+      experimentId: id,
+      status: z.enum(['running', 'polluted']),
+      disposition: z.literal('interrupted-by-infrastructure'),
+    }),
+  ),
+  replacementsAtLastVerified: z.strictObject({
+    count: z.number().int().nonnegative(),
+    fingerprint: hash,
+    rolledBack: z.literal(false),
+  }),
+  workers: z.array(RdcRecoveryLostWorkerSchema),
+  newBaselineRequired: z.literal(true),
+});
+export type RdcLostWithProcess = z.infer<typeof lostWithProcess>;
 const base = {
-  schemaVersion: z.literal(1),
   sessionId: id,
   projectId: id,
   turnId: id,
@@ -79,6 +104,7 @@ const receiptSchema = z.discriminatedUnion('event', [
       runtimeFingerprint: fingerprint,
       daemonStopped: reference.optional(),
       restored: z.boolean(),
+      lostWithProcess: lostWithProcess.optional(),
     })
     .strict(),
   z
@@ -117,7 +143,7 @@ export function sameRdcLifecyclePosition(left: RdcLifecyclePoint | null, right: 
         JSON.stringify(left.target) === JSON.stringify(right.target);
 }
 
-const KEY_REF = 'rdc-lifecycle-receipt-signing-v1';
+const KEY_REF = 'rdc-lifecycle-receipt-signing';
 function signingKey(): string {
   let key = secretStorageService.getSecret(KEY_REF);
   if (!key) {
@@ -140,19 +166,6 @@ export class RdcLifecycleReceipts {
   }
   write(input: RdcLifecycleReceipt): InvestigationContentRef {
     const receipt = receiptSchema.parse(input);
-    for (const value of receipt.event === 'baseline'
-      ? [receipt.original]
-      : receipt.event === 'resolved'
-        ? [receipt.observed]
-        : receipt.event === 'intent'
-          ? [receipt.original, receipt.from]
-          : receipt.event === 'transition' || receipt.event === 'position-restored'
-            ? [receipt.from, receipt.to]
-            : []) {
-      if (value) parseRdcProcessIdentity(value.native.processIdentity);
-    }
-    if (receipt.event === 'intent' && receipt.recovery)
-      parseRdcProcessIdentity(receipt.recovery.observed.processIdentity);
     const body = JSON.stringify(receipt);
     const signature = createHmac('sha256', this.key()).update(body).digest('hex');
     const written = this.resolver.write(
@@ -175,20 +188,46 @@ export class RdcLifecycleReceipts {
       throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', `malformed receipt: ${z.prettifyError(parsed.error)}`);
     const receipt = parsed.data;
     if (receipt.sessionId !== sessionId) throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', 'foreign session.');
-    for (const value of receipt.event === 'baseline'
-      ? [receipt.original]
-      : receipt.event === 'resolved'
-        ? [receipt.observed]
-        : receipt.event === 'intent'
-          ? [receipt.original, receipt.from]
-          : receipt.event === 'transition' || receipt.event === 'position-restored'
-            ? [receipt.from, receipt.to]
-            : []) {
-      if (value) parseRdcProcessIdentity(value.native.processIdentity);
-    }
-    if (receipt.event === 'intent' && receipt.recovery)
-      parseRdcProcessIdentity(receipt.recovery.observed.processIdentity);
     return receipt;
+  }
+
+  /**
+   * Recovery attempts on one approved input, content and device across every turn of the session: each signed recovery
+   * intent is an attempt, and `failed` counts the attempts whose signed failed receipt names that intent.
+   */
+  recoveryAttempts(
+    sessionId: string,
+    projectId: string,
+    destination: { inputId: string; contentSha256: string; deviceId: string },
+  ): { attempts: number; failed: number } {
+    const values = this.readAll(sessionId, projectId);
+    const intents = values.filter(
+      ({ value }) =>
+        value.event === 'intent' &&
+        !!value.recovery &&
+        value.destination?.inputId === destination.inputId &&
+        value.destination.contentSha256 === destination.contentSha256 &&
+        value.destination.deviceId === destination.deviceId,
+    );
+    const refs = new Set(intents.map(({ ref }) => JSON.stringify(ref)));
+    const failed = values.filter(({ value }) => value.event === 'failed' && refs.has(JSON.stringify(value.intent)));
+    return { attempts: intents.length, failed: failed.length };
+  }
+
+  private readAll(
+    sessionId: string,
+    projectId: string,
+  ): Array<{ ref: InvestigationContentRef; value: RdcLifecycleReceipt }> {
+    return this.resolver
+      .list(sessionId, 'tool-outputs')
+      .filter((uri) => /^session:\/\/tool-outputs\/rdc-lifecycle-[0-9a-f-]+\.json$/iu.test(uri))
+      .map((uri) => {
+        const source = this.resolver.read(sessionId, uri);
+        if (source.truncated) throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', 'incomplete receipt.');
+        const ref = { uri, expectedHash: `sha256:${source.hash}` };
+        return { ref, value: this.read(sessionId, ref) };
+      })
+      .filter((item) => item.value.projectId === projectId);
   }
 
   /** Reconstruct unresolved user positions from signed session artifacts, without resuming execution. */
@@ -199,22 +238,11 @@ export class RdcLifecycleReceipts {
     baseline: Extract<RdcLifecycleReceipt, { event: 'baseline' }>;
     ref: InvestigationContentRef;
     count: number;
-    identities: Array<{
-      contextId: string;
-      processIdentity: ReturnType<typeof parseRdcProcessIdentity>;
-      stopped: boolean;
-    }>;
+    identities: Array<{ contextId: string; processIdentity: RdcProcessIdentity; stopped: boolean }>;
+    /** The most recent position main observed and signed in this chain. */
+    latest: RdcLifecyclePoint | null;
   } | null {
-    const values = this.resolver
-      .list(sessionId, 'tool-outputs')
-      .filter((uri) => /^session:\/\/tool-outputs\/rdc-lifecycle-[0-9a-f-]+\.json$/iu.test(uri))
-      .map((uri) => {
-        const source = this.resolver.read(sessionId, uri);
-        if (source.truncated) throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', 'incomplete receipt.');
-        const ref = { uri, expectedHash: `sha256:${source.hash}` };
-        return { ref, value: this.read(sessionId, ref) };
-      })
-      .filter((item) => item.value.projectId === projectId);
+    const values = this.readAll(sessionId, projectId);
     const baselines = values.filter(
       (item): item is typeof item & { value: Extract<RdcLifecycleReceipt, { event: 'baseline' }> } =>
         item.value.event === 'baseline',
@@ -245,28 +273,40 @@ export class RdcLifecycleReceipts {
     if (!outstanding.length) return null;
     const first = outstanding[0];
     const baseline = first.value;
+    // The chain spans every later turn of the same plan: a turn that adopts the record keeps signing under its own id.
     const relevant = values.filter(
       (item) =>
-        item.value.turnId === baseline.turnId &&
+        item.value.recordedAt >= baseline.recordedAt &&
         item.value.planHash === baseline.planHash &&
         item.value.planUri === baseline.planUri,
     );
-    const identities = new Map<
-      string,
-      { contextId: string; processIdentity: ReturnType<typeof parseRdcProcessIdentity>; stopped: boolean }
-    >();
+    const identities = new Map<string, { contextId: string; processIdentity: RdcProcessIdentity; stopped: boolean }>();
     const add = (snapshot: z.infer<typeof native> | null | undefined) => {
       if (!snapshot) return;
-      const processIdentity = parseRdcProcessIdentity(snapshot.processIdentity);
-      const key = JSON.stringify([snapshot.contextId, processIdentity]);
-      if (!identities.has(key)) identities.set(key, { contextId: snapshot.contextId, processIdentity, stopped: false });
+      const key = JSON.stringify([snapshot.contextId, snapshot.processIdentity]);
+      if (!identities.has(key))
+        identities.set(key, {
+          contextId: snapshot.contextId,
+          processIdentity: snapshot.processIdentity,
+          stopped: false,
+        });
     };
     for (const { value } of relevant) {
       if (value.event === 'baseline') add(value.original?.native);
       if (value.event === 'intent') {
         add(value.original?.native);
         add(value.from?.native);
-        add(value.recovery?.observed);
+        // A worker that was live when recovery looked may still hold the context if recovery stopped early.
+        const seen = value.recovery?.observed;
+        const live =
+          seen?.daemon.state === 'alive' && seen.worker.state === 'alive'
+            ? RdcProcessIdentitySchema.safeParse({
+                status: 'available',
+                daemon: { pid: seen.daemon.pid, start_generation: seen.daemon.start_generation },
+                worker: { pid: seen.worker.pid, start_generation: seen.worker.start_generation },
+              })
+            : null;
+        if (value.from && live?.success) add({ ...value.from.native, processIdentity: live.data });
       }
       if (value.event === 'transition' || value.event === 'position-restored') {
         add(value.from?.native);
@@ -283,11 +323,33 @@ export class RdcLifecycleReceipts {
         intent.recordedAt > value.recordedAt
       )
         continue;
-      const key = JSON.stringify([value.contextId, parseRdcProcessIdentity(intent.from.native.processIdentity)]);
+      const key = JSON.stringify([value.contextId, intent.from.native.processIdentity]);
       const identity = identities.get(key);
       if (identity) identity.stopped = true;
     }
-    return { baseline, ref: first.ref, count: outstanding.length, identities: [...identities.values()] };
+    return {
+      baseline,
+      ref: first.ref,
+      count: outstanding.length,
+      identities: [...identities.values()],
+      latest: latestSignedPoint(relevant.map((item) => item.value)),
+    };
   }
+}
+
+function latestSignedPoint(receipts: readonly RdcLifecycleReceipt[]): RdcLifecyclePoint | null {
+  let latest: { at: number; point: RdcLifecyclePoint } | null = null;
+  for (const value of receipts) {
+    const point =
+      value.event === 'baseline'
+        ? value.original
+        : value.event === 'intent'
+          ? value.from
+          : value.event === 'transition' || value.event === 'position-restored'
+            ? value.to
+            : null;
+    if (point && (!latest || value.recordedAt >= latest.at)) latest = { at: value.recordedAt, point };
+  }
+  return latest?.point ?? null;
 }
 export const rdcLifecycleReceipts = new RdcLifecycleReceipts();

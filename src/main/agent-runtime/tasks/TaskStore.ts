@@ -9,10 +9,10 @@ import {
 import { AppError } from '@shared/errors/appError';
 import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
 import { writeFileAtomic } from '../../runtime/atomicFile';
+import { StorageSchemaError } from '../../runtime/storedDocument';
 import { TaskIndependentSourceSchema, TaskRuntimeEpochSchema } from './taskExecutionSchemas';
 import { orderTasks } from './taskProjection';
 import {
-  TASK_SCHEMA_VERSION,
   TaskExecutionMessageSchema,
   TaskExecutionRecordSchema,
   TaskRecordSchema,
@@ -26,7 +26,6 @@ import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirement
 import type { TaskRuntimeEpoch } from './taskExecutionSchemas';
 
 interface TaskStateDocument {
-  schemaVersion: typeof TASK_SCHEMA_VERSION;
   tasks: Record<string, TaskRecord>;
   executions: Record<string, TaskExecutionRecord>;
   messages: Record<string, TaskExecutionMessage[]>;
@@ -35,7 +34,6 @@ interface TaskStateDocument {
 
 const TaskStateDocumentSchema = z
   .object({
-    schemaVersion: z.literal(TASK_SCHEMA_VERSION),
     tasks: z.record(z.string(), TaskRecordSchema),
     executions: z.record(z.string(), TaskExecutionRecordSchema),
     messages: z.record(z.string(), z.array(TaskExecutionMessageSchema)),
@@ -43,22 +41,13 @@ const TaskStateDocumentSchema = z
   })
   .strict();
 
-const TaskStateVersionSchema = z.object({ schemaVersion: z.unknown().optional() });
-
-/** task-state.json as written by this build; another schema version is left untouched for the build that wrote it. */
+/** task-state.json as written by this build; a file in any other format fails the strict schema and is left as it is. */
 function parseTaskState(raw: string, statePath: string): TaskStateDocument {
   let value: unknown;
   try {
     value = JSON.parse(raw);
   } catch (error) {
     throw new AppError('STORAGE_CORRUPT', `${statePath} is not JSON.`, { cause: error });
-  }
-  const versioned = TaskStateVersionSchema.safeParse(value);
-  if (versioned.success && versioned.data.schemaVersion !== TASK_SCHEMA_VERSION) {
-    throw new AppError(
-      'STORAGE_SCHEMA_UNSUPPORTED',
-      `Unsupported task state schema version: ${String(versioned.data.schemaVersion)}.`,
-    );
   }
   const state = TaskStateDocumentSchema.safeParse(value);
   if (!state.success)
@@ -216,12 +205,7 @@ export class FileTaskStore implements TaskStore {
       await current;
       return this.readStateFile();
     }
-    if (entries.length) {
-      throw new AppError(
-        'TASK_STORAGE_REQUIRES_CONVERSION',
-        'nonempty task storage has no current task-state.json; original files were preserved.',
-      );
-    }
+    if (entries.length) throw unknownTaskStorage(this.root);
     return emptyState();
   }
 
@@ -247,12 +231,7 @@ export class FileTaskStore implements TaskStore {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
-    if ((await fs.readdir(this.root)).length) {
-      throw new AppError(
-        'TASK_STORAGE_REQUIRES_CONVERSION',
-        'nonempty task storage has no current task-state.json; original files were preserved.',
-      );
-    }
+    if ((await fs.readdir(this.root)).length) throw unknownTaskStorage(this.root);
     await this.writeState(emptyState());
   }
 
@@ -335,8 +314,13 @@ export class MemoryTaskStore implements TaskStore {
   }
 }
 
+/** Files in a task directory without task-state.json are not a state this store wrote; they are left as they are. */
+function unknownTaskStorage(root: string): StorageSchemaError {
+  return new StorageSchemaError(`${root} holds files but no task-state.json`);
+}
+
 function emptyState(): TaskStateDocument {
-  return { schemaVersion: TASK_SCHEMA_VERSION, tasks: {}, executions: {}, messages: {}, rootBudgets: {} };
+  return { tasks: {}, executions: {}, messages: {}, rootBudgets: {} };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

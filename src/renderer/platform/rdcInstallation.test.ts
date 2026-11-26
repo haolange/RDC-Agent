@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { validateRdcInstallation, selectRdcInstallation } from './rdcInstallation';
-const cli = { root: 'C:/Tools space/工具', env: {}, timeoutMs: 30000 };
+const cli = { root: 'C:/Tools space/工具', env: {}, noProgressTimeoutMs: 300_000 };
 const summary = { cli: { available: true }, runtime: { version: 'installed-build' } };
 const getSummary = vi.fn(async () => summary);
 beforeEach(() => {

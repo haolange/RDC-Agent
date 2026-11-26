@@ -236,7 +236,7 @@ for (const [profile, guideConfig] of Object.entries(members.guides ?? {})) {
     fs.writeFileSync(outputPath, output, 'utf8');
   }
 }
-const identity = `${JSON.stringify({ schemaVersion: catalog.schema_version, fingerprint: catalog.fingerprint, toolCount: catalog.tool_count }, null, 2)}\n`;
+const identity = `${JSON.stringify({ fingerprint: catalog.fingerprint, toolCount: catalog.tool_count }, null, 2)}\n`;
 if (check) {
   if (!fs.existsSync(identityPath) || fs.readFileSync(identityPath, 'utf8').replace(/^\uFEFF/u, '') !== identity)
     fail(`stale catalog identity: ${identityPath}`);

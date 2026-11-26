@@ -10,7 +10,7 @@ const cli = {
   argsPrefix: ['C:\\Tools space\\cli\\run_cli.py'],
   workingDirectory: '',
   env: {},
-  timeoutMs: 30000,
+  noProgressTimeoutMs: 30_000,
 };
 it('accepts one same-installation entry with spaces and relative entry', () => {
   expect(assertRdcCliBinding(cli, windows)).toBe('C:/Tools space');
@@ -62,7 +62,7 @@ describe('retired identity is rejected', () => {
     argsPrefix: ['C:/Tools/rdc-tool/cli/run_cli.py'],
     workingDirectory: '',
     env: {},
-    timeoutMs: 30000,
+    noProgressTimeoutMs: 30_000,
   };
   it('rejects an old install even with a paired Python and CLI', () => {
     expect(() =>

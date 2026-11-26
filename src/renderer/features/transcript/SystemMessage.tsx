@@ -1,7 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
-import { resolveCommandLabel, resolveSystemNoticeTone } from './systemMessagePresentation';
+import { resolveCommandLabel, resolveSystemNoticeText, resolveSystemNoticeTone } from './systemMessagePresentation';
 import type { ConversationMessage } from '@shared/types/conversation';
 
 interface SystemMessageProps {
@@ -12,8 +12,7 @@ export const SystemMessage: React.FC<SystemMessageProps> = ({ message }) => {
   const { t } = useI18n();
   const tone = resolveSystemNoticeTone(message);
   const commandLabel = resolveCommandLabel(message);
-  const text =
-    message.diagnostic?.code === 'MODEL_CONTINUATION_DROPPED' ? t('chat.modelContinuationDropped') : message.content;
+  const text = resolveSystemNoticeText(message, t);
   const toneLabel =
     tone === 'error' ? t('chat.messageError') : tone === 'warning' ? t('chat.messageWarning') : undefined;
   const liveRole = tone === 'error' ? 'alert' : 'status';

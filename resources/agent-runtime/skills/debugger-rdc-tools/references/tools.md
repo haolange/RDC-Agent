@@ -2,7 +2,7 @@
 
 # Debugger RDC 工具参考
 
-Current catalog fingerprint: `a615f313d0f5f8fd27d627e40cf49e3a5d7eebba35c5b4b56452f50c79dc5c13`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
+Current catalog fingerprint: `c04b972c4a957255e62d994190c1b6ef555461906f6c29c43389d44a81d4a2d0`. 本参考只覆盖该专业需要的操作；它提供知识，不授予权限。执行时仍以 prepareTurn 冻结的同一 CLI catalog 和主进程审批为准。
 
 所有 `shell.rdc` 示例都省略由主进程注入的 `session_id` / `capture_file_id` / context 身份。不要把示例补成可覆盖其它会话的身份。共享发现、错误恢复、输出与副作用规则见 `$rdc-tool-shell`。
 
@@ -1347,7 +1347,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `shader_debug_id` | 是 | string; shader_debug_id (str), current owning replay only; stale/foreign handles fail before native effects |
 | `timeout_ms` | 否 | integer; timeout_ms (int, 可选, 默认 10000) |
 
-**结果解释：** ok (bool); data (dict): {state, stopped_reason}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {state, stopped_reason: breakpoint\|finished\|timeout}; a timeout also reports effects_attempted and context_preserved; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 
@@ -1374,7 +1374,7 @@ Read post-transform vertex data from VS or GS at a replay event. view_index sele
 | `target` | 是 | object |
 | `timeout_ms` | 否 | integer; timeout_ms (int, 可选, 默认 10000) |
 
-**结果解释：** ok (bool); data (dict): {state}; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
+**结果解释：** ok (bool); data (dict): {state} once target.pc is reached; {state, stopped_reason=finished} when the trace ends first; when the stepping budget runs out, {state, stopped_reason=timeout, target_pc, target_reached=false, effects_attempted, context_preserved}: the debugger advanced to the reported state and the replay event is not moved by debugger steps; artifacts (list); error (dict\|null); meta (dict); projections (dict, 可选)
 
 **前置条件：** This tool operates on a live replay session.
 

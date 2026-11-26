@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "scaleway",
   "name": "Scaleway",
   "npm": "@ai-sdk/openai-compatible",

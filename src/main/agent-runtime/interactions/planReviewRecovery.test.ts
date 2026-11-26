@@ -94,7 +94,6 @@ beforeEach(() => {
   fixture.failWrite = false;
   fixture.content = 'A verified plan';
   fixture.state = {
-    schemaVersion: '1',
     planId: 'plan',
     ownerTurnId: 'turn',
     revision: 1,
@@ -208,7 +207,6 @@ it('projects an approved but unsent handoff after restart without reopening revi
     updatedAt: 10,
   };
   fixture.readOffer.mockReturnValue({
-    schemaVersion: '1',
     sourceAgentId: 'debugger',
     targetAgentId: 'general',
     plan: { uri: fixture.state.frozenUri, hash },

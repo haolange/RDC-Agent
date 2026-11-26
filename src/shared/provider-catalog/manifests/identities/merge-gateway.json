@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "merge-gateway",
   "name": "Merge Gateway",
   "npm": "merge-gateway-ai-sdk-provider",

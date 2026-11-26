@@ -1,4 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { stuckContextStatus } from '../testing/rdcContextStatusFixture';
+import { currentProcessIdentity } from '../platform/process';
 import { setRdcInteractionLock } from './RdcOperationCoordinator';
 
 const mock = vi.hoisted(() => ({
@@ -21,6 +23,8 @@ const mock = vi.hoisted(() => ({
   owner: vi.fn(),
   native: vi.fn(),
   daemons: vi.fn(),
+  status: vi.fn(),
+  ledger: vi.fn(),
 }));
 vi.mock('./RdcSessionService', () => ({
   rdcSessionService: {
@@ -50,6 +54,11 @@ vi.mock('./RdcRuntimeContextRegistry', () => ({
   assertRdcContextLeaseOwnership: mock.owner,
 }));
 vi.mock('./RdcSwitchSnapshot', () => ({ readRdcSwitchSnapshot: mock.native }));
+vi.mock('../runtime/LifecycleLedger', () => ({ lifecycleLedger: { record: mock.ledger } }));
+vi.mock('./RdcContextStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./RdcContextStatus')>()),
+  readRdcContextStatus: mock.status,
+}));
 vi.mock('./OwnedRdcDaemonRegistry', () => ({ listOwnedRdcDaemons: mock.daemons }));
 vi.mock('./RdcLifecycleReceipts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./RdcLifecycleReceipts')>()),
@@ -58,7 +67,14 @@ vi.mock('./RdcLifecycleReceipts', async (importOriginal) => ({
 
 import { captureRecoveryStatus, restorePreviousCapture } from './RdcCaptureRecovery';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
-const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };
+const cli = {
+  enabled: true,
+  command: 'rdc',
+  argsPrefix: [],
+  workingDirectory: '',
+  env: {},
+  noProgressTimeoutMs: 300_000,
+};
 const processIdentity = {
   status: 'available',
   daemon: { pid: 10, start_generation: 'windows-filetime:1' },
@@ -84,7 +100,6 @@ const original = {
 };
 const ref = { uri: 'session://tool-outputs/baseline.json', expectedHash: `sha256:${'b'.repeat(64)}` };
 const baseline = {
-  schemaVersion: 1,
   event: 'baseline',
   sessionId: 's',
   projectId: 'p',
@@ -207,7 +222,7 @@ it('preserves the current replay when input identity changed or an old process m
   await expect(restorePreviousCapture(scope)).rejects.toThrow('RDC_RECOVERY_INPUT_CHANGED');
   expect(mock.clear).not.toHaveBeenCalled();
   expect(mock.prepare).not.toHaveBeenCalled();
-  mock.pending.mockReturnValue({
+  const withDaemon = (start_generation: string) => ({
     baseline,
     ref,
     count: 1,
@@ -215,13 +230,17 @@ it('preserves the current replay when input identity changed or an old process m
       {
         contextId: 'old',
         stopped: false,
-        processIdentity: { ...processIdentity, daemon: { pid: process.pid, start_generation: 'windows-filetime:1' } },
+        processIdentity: { ...processIdentity, daemon: { pid: process.pid, start_generation } },
       },
     ],
   });
+  mock.pending.mockReturnValue(withDaemon(currentProcessIdentity().birth));
   await expect(restorePreviousCapture(scope)).rejects.toThrow('RDC_RECOVERY_OLD_PROCESS_UNCONFIRMED');
   expect(mock.clear).not.toHaveBeenCalled();
   expect(mock.write).not.toHaveBeenCalled();
+  // The same pid under another birth is a reused pid: the recorded daemon has exited.
+  mock.pending.mockReturnValue(withDaemon('windows-filetime:1'));
+  await expect(restorePreviousCapture(scope)).resolves.toMatchObject({ appliedEventId: 42 });
 });
 
 it('does not take over an active turn or accept a stale UI generation', async () => {
@@ -233,4 +252,43 @@ it('does not take over an active turn or accept a stale UI generation', async ()
   }
   await expect(restorePreviousCapture({ ...scope, bindingGeneration: 7 })).rejects.toThrow('RDC_BINDING_CHANGED');
   expect(mock.prepare).not.toHaveBeenCalled();
+});
+
+it('closes a quarantined replay only when the shared admission explains its processes', async () => {
+  state = {
+    ...state,
+    phase: 'error',
+    contextId: 'old',
+    inputId: 'a',
+    captureHash: 'a'.repeat(64),
+    replayDeviceId: 'local',
+  };
+  lease = {
+    contextId: 'old',
+    version: 1,
+    ownerSessionId: 's',
+    ownerProjectId: 'p',
+    quarantineReason: 'worker stuck',
+    runtimeContext: { captureFileId: 'file', replaySessionId: 'replay' },
+  };
+  const replaced = stuckContextStatus();
+  replaced.worker = { ...replaced.worker, state: 'alive', pid: 12 };
+  replaced.worker_lifecycle = [];
+  replaced.sessions[0]!.recovery.worker_exit = null;
+  mock.status.mockResolvedValueOnce(replaced);
+  await expect(restorePreviousCapture(scope)).rejects.toThrow('RDC_RECOVERY_PROCESS_UNEXPLAINED');
+  expect(mock.clear).not.toHaveBeenCalled();
+  expect(mock.ledger).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      kind: 'recovery_step',
+      step: 'user-restore-classified',
+      decision: 'quarantined',
+      errorCode: 'RDC_RECOVERY_PROCESS_UNEXPLAINED',
+    }),
+  );
+  mock.status.mockResolvedValueOnce(stuckContextStatus());
+  expect((await restorePreviousCapture(scope)).appliedEventId).toBe(42);
+  expect(mock.clear).toHaveBeenCalledOnce();
+  expect(mock.status).toHaveBeenLastCalledWith(expect.objectContaining({ contextId: 'old' }));
+  expect(mock.ledger).toHaveBeenLastCalledWith(expect.objectContaining({ decision: 'rebuild' }));
 });

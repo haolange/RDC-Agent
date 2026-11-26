@@ -5,7 +5,6 @@ import { afterEach, expect, it, vi } from 'vitest';
 vi.mock('electron', () => ({ app: { getPath: () => os.tmpdir(), getAppPath: () => process.cwd() } }));
 import { AgentManifestService } from './AgentManifestService';
 import { AGENT_MANIFEST_FIELD_MOVED } from './agentManifestParse';
-import { planAgentModelFieldMigration } from './agentModelFieldMigration';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -124,14 +123,6 @@ it('keeps an override that still declares a model inactive and migrates it witho
   expect(() =>
     service.resolveDiagnosedOverride(paths, path.join(paths.agentsPath, 'other.agent.md'), AGENT_MANIFEST_FIELD_MOVED),
   ).toThrow('AGENT_OVERRIDE_NOT_DIAGNOSED');
-
-  const plan = planAgentModelFieldMigration(legacy);
-  expect(plan.binding).toEqual({ model: 'chatgpt-account:gpt-6.1-sol', reasoningLevel: 'high' });
-  expect(plan.droppedHandoffModels).toEqual([{ label: 'Verify', agent: 'verifier', model: 'openai:gpt-small' }]);
-  expect(plan.content).toContain('# reviewed handoffs\nhandoffs:');
-  expect(plan.content).toContain('\ntools: [read, search]\n');
-  expect(plan.content).not.toMatch(/model:|reasoning-level:/u);
-  expect(plan.content.endsWith('---\nBody stays as written.\n')).toBe(true);
 });
 
 it('rejects atomic replacement failure and preserves the previously committed bytes', async () => {

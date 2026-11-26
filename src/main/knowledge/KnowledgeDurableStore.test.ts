@@ -231,47 +231,17 @@ const card = JSON.parse(process.env.KNOW_CARD);
     expect(listed).toEqual(['user:facts/proc-a.md', 'user:facts/proc-b.md']);
   }, 20_000);
 
-  it('fail-closes an unknown higher knowledge-state schemaVersion', async () => {
-    const root = tempRoot('rdc-know-schema-');
-    const sessionDir = path.join(root, 'sess-schema');
-    mkdirSync(sessionDir, { recursive: true });
-    writeFileSync(
-      path.join(sessionDir, 'knowledge-state.json'),
-      JSON.stringify({
-        schemaVersion: '99',
-        drafts: [],
-        candidates: [],
-        reviews: [],
-      }),
-      'utf8',
-    );
+  it('refuses a session state that still carries leftover drafts and names the file', async () => {
+    const root = tempRoot('rdc-know-drafts-');
+    const statePath = path.join(root, 'sess-old', 'knowledge-state.json');
+    mkdirSync(path.dirname(statePath), { recursive: true });
+    const old = JSON.stringify({ candidates: [], reviews: [], drafts: [] });
+    writeFileSync(statePath, old, 'utf8');
     const store = createSessionScopedKnowledgeStore(root);
-    await expect(store.listCandidates('sess-schema')).rejects.toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-  });
-
-  it('fail-closes an unknown higher knowledge-index schemaVersion', async () => {
-    const root = tempRoot('rdc-know-index-schema-');
-    const snapshotPath = path.join(root, 'knowledge-index.json');
-    writeFileSync(
-      snapshotPath,
-      JSON.stringify({
-        schemaVersion: 99,
-        revision: 'deadbeef',
-        builtAt: '2026-09-01T00:00:00.000Z',
-        cards: [],
-      }),
-      'utf8',
+    await expect(store.listCandidates('sess-old')).rejects.toThrow(
+      expect.objectContaining({ code: 'STORAGE_CORRUPT', params: { file: 'knowledge-state.json' } }),
     );
-    const index = new KnowledgeIndexService({
-      listSpaces: () => [{ spaceId: 'user', kind: 'user', label: 'User', rootPath: root }],
-      snapshotPath: () => snapshotPath,
-      storage: new StorageIo(),
-      now: () => new Date('2026-09-01T00:00:00.000Z'),
-      readFile: (filePath) => readFile(filePath, 'utf8'),
-      statMtime: async () => 0,
-    });
-    expect(() => index.getSnapshot()).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-    await expect(index.getOrRebuild()).rejects.toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+    expect(readFileSync(statePath, 'utf8')).toBe(old);
   });
 });
 

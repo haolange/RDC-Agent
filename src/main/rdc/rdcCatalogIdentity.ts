@@ -10,7 +10,6 @@ import { appPathService } from '../runtime/AppPathService';
  */
 const CatalogIdentitySchema = z
   .object({
-    schemaVersion: z.literal('1'),
     fingerprint: z.string().regex(/^[0-9a-f]{64}$/u),
     toolCount: z.number().int().positive(),
   })

@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "github-copilot",
   "name": "GitHub Copilot",
   "npm": "@ai-sdk/openai-compatible",

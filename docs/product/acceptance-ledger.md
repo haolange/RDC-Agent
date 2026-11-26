@@ -1,5 +1,22 @@
 # Acceptance Ledger
 
+## 2026-11-27：长任务可靠性收口（无进展预算、身份链恢复、账本、去版本号；云端 Linux，无设备与模型账号）
+
+- 提交：`23acf17a0fa72f6865ec838ed07432bf661a2de0`（RDC-Agent，配对 RDC-Tool 1.2.0 `b2aefbf186c96346c6ff85b4470676e9677cb3e3`）
+- 结果：RDC-Agent typecheck、lint、`check:gates`、`test:coverage`（4205 用例）与 `test:coverage:renderer`（1025 用例）均通过且覆盖率底线 OK，`build` 通过；RDC-Tool 全量 1402 通过，另 3 个失败为 Git-LFS 二进制缺失导致，与改动前一致。
+- 结果：卡死、取消、心跳间隙、worker 被换后的身份链分类与自动重建、持久化重试次数由假 CLI 帧与受控 fixture 覆盖；RDC-Tool 用持有 GIL 的真实子进程验证了调用栈转储、树杀与结构化错误。
+- 证据：本地：`pnpm run typecheck && pnpm run lint && pnpm run check:gates && pnpm run test:coverage && pnpm run test:coverage:renderer && pnpm run build`
+- 人工介入：无。真实 RenderDoc 回放、Android 设备、Windows 进程树行为与真实模型流仍待实机验证。
+
+## 2026-11-26：上次启动诊断与本地崩溃文件（云端 Linux，headless 显式 userData）
+
+- 提交：`d27182daab9ad5a4b23a70a470ac483b7c6888a4`（PF4 起点构建，PF5 只追加 renderer 崩溃策略与文档）
+- 结果：第一次启动后 `kill -9` 主进程，锁未释放；第二次启动归类 `killed-or-power-loss-suspected`，账本记 `previous_instance_diagnosed`，`app:getMeta` 返回 `previousInstance`（未结束回合 0）。
+- 结果：对第二次启动的主进程发 SIGSEGV，Crashpad 在 `state/crash/pending/` 写下一个 minidump；第三次启动归类 `native-crash-suspected`（崩溃文件 1）。随后 SIGTERM 正常关停，账本依次记 `shutdown_began`（`before-quit`）、`shutdown_finished`（未超时）、`instance_exited`（clean），锁已释放。
+- 结果：Electron 自己把 SIGINT/SIGTERM 转成 quit，Node 的信号监听从不运行，因此删除了这两个无效监听，信号关停记为 `before-quit`。
+- 证据：本地：`HOME=<tmp> RDC_AGENT_USER_DATA=<tmp> RDC_AGENT_HEADLESS=1 RDC_AGENT_BROWSER_QA=1 NODE_ENV=production xvfb-run -a electron --no-sandbox .`，`kill -9` / `kill -SEGV` / `kill -TERM` 主进程，读 `state/lifecycle/ledger.jsonl`
+- 人工介入：无。未在回合进行中杀进程（无模型），未结束回合的关联由单元测试覆盖。
+
 ## 2026-11-26：收敛计划收尾 W6/W7 验收（结构瘦身、Prettier、函数预算；云端 Linux Browser QA，桩模型）
 
 - 提交：`1247621fdd7de9fde9289d4d737fc4226d8301bd`（分支 CI）；`fb38204a7e7dc1e96b245356a3234428bbdb95ae`（实测，只多一处差分 harness 修复）

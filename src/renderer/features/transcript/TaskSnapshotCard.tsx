@@ -1,5 +1,5 @@
 import React, { useId } from 'react';
-import { TASK_STATUS_REASONS } from '@shared/constants/taskStatusReasons';
+import { TASK_INTERRUPTED_REASONS, TASK_STATUS_REASONS } from '@shared/constants/taskStatusReasons';
 import { useI18n } from '../../i18n';
 import { TaskStatusMarker } from '../../ui/TaskStatusMarker';
 import { Icon } from '../../ui/Icon';
@@ -21,7 +21,9 @@ export const TaskSnapshotCard: React.FC<{
       ? t('control.rightRail.tasks.reason.parentTurnStopped')
       : reason === TASK_STATUS_REASONS.createdTurnStopped
         ? t('control.rightRail.tasks.reason.createdTurnStopped')
-        : reason;
+        : Object.values(TASK_INTERRUPTED_REASONS).includes(reason)
+          ? t('control.rightRail.tasks.reason.interrupted')
+          : reason;
   const title =
     row.change === 'created'
       ? t('chat.workProcessTaskSnapshotCreated')

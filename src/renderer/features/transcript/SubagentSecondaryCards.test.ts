@@ -34,7 +34,6 @@ const taskText = JSON.stringify({
 });
 
 const header: DelegationTraceHeader = {
-  recordVersion: 2,
   parentToolCallId: 'parent',
   task: 'Inspect the workspace.',
   taskLength: 22,

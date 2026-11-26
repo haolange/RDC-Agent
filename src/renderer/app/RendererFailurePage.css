@@ -1,0 +1,20 @@
+/* The full-window page the renderer shows after repeated crashes or a render-time exception. */
+.renderer-failure-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--token-bg-app);
+}
+
+.renderer-failure-titlebar {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  height: var(--header-height);
+  -webkit-app-region: drag;
+}
+
+.renderer-failure-titlebar > * {
+  -webkit-app-region: no-drag;
+}

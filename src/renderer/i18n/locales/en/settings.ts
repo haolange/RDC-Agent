@@ -113,6 +113,13 @@ export const enSettings = {
   'settings.composerMarkdownHelp':
     'Syntax highlight while typing, preview before send, and render sent prompts as Markdown.',
   'settings.workProcessExpansion': 'Work process',
+  'settings.crashReports': 'Crash reports',
+  'settings.crashFiles': 'Crash files',
+  'settings.crashFilesNone': 'None. Crash files stay on this computer and are never uploaded.',
+  'settings.crashFilesSummaryOne': 'One file ({size}), kept only on this computer and never uploaded.',
+  'settings.crashFilesSummary': '{count} files ({size}), kept only on this computer and never uploaded.',
+  'settings.crashFilesClear': 'Clear',
+  'settings.crashFilesClearFailed': "Couldn't clear the crash files.",
   'settings.workProcessExpansionLatest': 'Follow latest',
   'settings.workProcessExpansionAll': 'Show all',
   'settings.workProcessExpansionLatestHint':
@@ -128,14 +135,14 @@ export const enSettings = {
   'settings.appearanceCopyFailed': 'Copy failed',
   'settings.appearanceApplyImport': 'Apply',
   'settings.appearanceImportTitle': 'Import theme',
-  'settings.appearanceImportHint': 'Paste an rdc-theme-v1 string. Apply stays disabled until it parses.',
+  'settings.appearanceImportHint': 'Paste an rdc-theme string. Apply stays disabled until it parses.',
   'settings.appearanceImportField': 'Theme content',
-  'settings.appearanceImportPlaceholder': 'Paste rdc-theme-v1 theme content',
+  'settings.appearanceImportPlaceholder': 'Paste rdc-theme theme content',
   'settings.appearanceImportEmpty': 'Waiting for theme content',
   'settings.appearanceImportValid': 'Valid. Ready to apply to this theme.',
   'settings.appearanceImportPalette':
     'Theme preview. Accent {accent}, background {surface}, text {ink}, contrast {contrast}.',
-  'settings.appearanceImportPrefixError': 'Paste the complete theme content starting with rdc-theme-v1:.',
+  'settings.appearanceImportPrefixError': 'Paste the complete theme content starting with rdc-theme:.',
   'settings.appearanceImportJsonError': 'The theme JSON is invalid. Check its brackets and quotation marks.',
   'settings.appearanceImportVariantError': 'The theme must declare a light or dark variant.',
   'settings.appearanceImportTargetError':
@@ -209,7 +216,9 @@ export const enSettings = {
   'settings.rdcCliArgsPrefixHint':
     'Enter the path of the launcher script that ships with rdc-tool; spaces in the path are kept.',
   'settings.envLineHint': 'One NAME=value per line.',
-  'settings.rdcCliTimeout': 'Timeout (seconds)',
+  'settings.rdcNoProgressTimeout': 'Wait without progress (seconds)',
+  'settings.rdcNoProgressTimeoutHint':
+    'How long an RDC operation may go without reporting progress before it is treated as stuck and stopped. Operations that keep making progress are never cut off.',
   'settings.rdcCliEnv': 'Environment',
   'settings.disabled': 'Disabled',
   'settings.personalization': 'Personalization',
@@ -438,22 +447,9 @@ export const enSettings = {
   'settings.agentTrustConfirm': 'Trust and use',
   'settings.agentTrustFailed': 'Could not trust this Agent profile.',
   'settings.agentDiagnosticsFieldMoved':
-    'This override still sets a model in the file. Models are now chosen in Settings → Agents, so the builtin applies until you migrate or delete it.',
-  'settings.agentModelMigrationOpen': 'Migrate…',
+    'This override still sets a model in the file, so it is not applied and the builtin is used. Models are chosen in Settings → Agents: remove those fields from the file or delete the override.',
   'settings.agentOverrideDeleteOpen': 'Delete override…',
-  'settings.agentModelMigrationTitle': 'Migrate {id}',
-  'settings.agentModelMigrationDescription':
-    'The model fields move to Settings → Agents and the file is rewritten without them. The original is kept as a backup.',
-  'settings.agentModelMigrationFile': 'File',
-  'settings.agentModelMigrationSettings': 'Settings → Agents',
-  'settings.agentModelMigrationBackup': 'Backup',
-  'settings.agentModelMigrationHandoffs': 'Handoff models',
-  'settings.agentModelMigrationHandoffDropped':
-    '“{label}” → {agent} no longer sets {model}; the target agent’s own model applies.',
-  'settings.agentModelMigrationIgnored': 'Not carried over',
-  'settings.agentModelMigrationNone': 'none',
-  'settings.agentModelMigrationConfirm': 'Migrate',
-  'settings.agentModelMigrationFailed': 'Could not migrate this file.',
+  'settings.agentOverrideFile': 'File',
   'settings.agentOverrideDeleteTitle': 'Delete override of {id}?',
   'settings.agentOverrideDeleteDescription': 'The file is deleted and the builtin applies again.',
   'settings.agentOverrideDeleteDeclared': 'Model fields',

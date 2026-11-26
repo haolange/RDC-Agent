@@ -3,6 +3,7 @@ import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
 import { Tabs } from '../../../../ui/Tabs';
 import { SettingsField, SettingsSection } from '../parts';
 import { useI18n } from '../../../../i18n';
+import { CrashFilesSettings } from './CrashFilesSettings';
 import { PersonalizationSettings } from './PersonalizationSettings';
 import { ProfileSettings } from './ProfileSettings';
 import type { AppSettings } from '@shared/types/settings';
@@ -115,6 +116,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
           onGlobalInstructionsDraftChange={onGlobalInstructionsDraftChange}
           onSavePersonalization={onSavePersonalization}
         />
+        <CrashFilesSettings />
       </div>
     </section>
   );

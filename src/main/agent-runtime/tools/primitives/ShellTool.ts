@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseShellRdcInput, type RdcShellInput } from '../../../rdc/RdcShellInput';
 import { executeRdcShell } from '../../../rdc/executeRdcShell';
+import { createRdcProgressReporter } from '../../../rdc/RdcOperationProgress';
 import { processSupervisor } from '../../../runtime/ProcessSupervisor';
 import { shellResolver, type ShellKind } from '../../../runtime/ShellResolver';
 import { describeResolvedShell, resolveConfiguredShell } from '../../../tools/resolveConfiguredShell';
@@ -225,10 +226,16 @@ export const shellTool: AgentTool<
 
   async execute(_toolCallId, params, signal, onUpdate, context) {
     validateShellInputMode(params);
-    if (params.rdc)
+    if (params.rdc) {
+      const rdc = params.rdc;
+      // The Working row follows the operation's progress; the model only ever sees the final result.
+      const requested: unknown = isRecord(rdc) && 'operation' in rdc ? rdc.operation : null;
+      const operation = typeof requested === 'string' ? requested : null;
+      const progress = onUpdate && operation ? createRdcProgressReporter(operation, onUpdate) : null;
       return withSessionShellLock(context?.sessionId ?? null, () =>
-        executeRdcShell(params.rdc!, _toolCallId, signal, context),
-      );
+        executeRdcShell(rdc, _toolCallId, signal, context, progress?.onFrame),
+      ).finally(() => progress?.dispose());
+    }
     return withSessionShellLock(context?.sessionId ?? null, () =>
       executeShellCommand(params, signal, onUpdate, context),
     );

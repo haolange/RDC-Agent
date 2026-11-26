@@ -5,12 +5,18 @@ import {
   sameRdcLifecyclePosition,
   type RdcLifecyclePoint,
   type RdcLifecycleReceipt,
+  type RdcLifecycleReceipts,
+  type RdcLostWithProcess,
 } from '../../rdc/RdcLifecycleReceipts';
 import { getRdcTurnBinding, type RdcTurnBinding } from '../../rdc/RdcTurnBindings';
+import { observedRdcProcessIdentity } from '../../rdc/RdcProcessIdentity';
+import { lifecycleLedger, type LifecycleLedger } from '../../runtime/LifecycleLedger';
+import { RDC_RECOVERY_ATTEMPT_LIMIT } from '../../rdc/RdcRecoveryClassification';
 import type { InvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import type { TaskRuntimeEpoch } from '../tasks/taskExecutionSchemas';
-import type { RdcSwitchSnapshot } from '../../rdc/RdcSwitchSnapshot';
+import type { RdcRecoveryObservation } from '../../rdc/RdcContextStatus';
+import type { RdcRecoveryClassification } from '../../rdc/RdcRecoveryClassification';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { ToolExecutionContext } from '../agent/AgentTool';
@@ -18,15 +24,24 @@ import type { TurnHandle } from './TurnCoordinator';
 
 type Destination = { inputId: string; contentSha256: string; deviceId: string };
 type Prepared = { plan: EffectiveRuntimePlan; prompt: PromptPlan; binding: RdcTurnBinding };
-type RecoveryFacts = {
+export type RecoveryFacts = {
   cause: { operation: string; argsFingerprint: string; code: string };
-  observed: RdcSwitchSnapshot;
+  observed: RdcRecoveryObservation;
+  classification: RdcRecoveryClassification;
+  /** Signed recovery attempts already made on this input, content and device. */
+  attempts: number;
 };
 export interface ApprovedCaptureHost {
   assertPlan(): void;
-  assertNoPendingRecovery(): void;
+  /** The earliest unresolved signed baseline of this session and project, if any. */
+  pendingRecord(): ReturnType<RdcLifecycleReceipts['pending']>;
+  /** The owning lease when it is quarantined: only recovery may act on it. */
+  quarantinedContext(): { contextId: string; leaseVersion: number } | null;
   prepareReceipts(): void;
-  quiescent(mode?: 'recovery'): Promise<void>;
+  /** Throws while children or experiments are open; in recovery mode it returns the open experiments instead. */
+  quiescent(
+    mode?: 'recovery',
+  ): Promise<{ openExperiments: Array<{ experimentId: string; status: 'running' | 'polluted' }> }>;
   snapshot(binding: RdcTurnBinding, signal?: AbortSignal): Promise<RdcLifecyclePoint | null>;
   verifyDestination(destination: Destination): Promise<void>;
   open(
@@ -57,7 +72,12 @@ export interface ApprovedCaptureHost {
   ): Promise<Prepared>;
   appendEpoch(epoch: TaskRuntimeEpoch): Promise<void>;
   writeReceipt(receipt: RdcLifecycleReceipt): InvestigationContentRef;
-  quarantineChanged(previous: RdcLifecyclePoint | null, reason: string, force?: boolean): void;
+  /** A failed transition is a fault of the owning lease it left uncertain (`cause` is the failure's code). */
+  quarantineChanged(
+    previous: RdcLifecyclePoint | null,
+    failure: { cause: string; reason: string },
+    force?: boolean,
+  ): void;
 }
 
 /** One approved goal owns one serial capture transition chain. */
@@ -65,8 +85,10 @@ export class ApprovedCaptureController {
   private original: RdcLifecyclePoint | null | undefined;
   private baseline: InvestigationContentRef | null = null;
   private lastVerified: RdcLifecyclePoint | null = null;
-  private readonly attemptedRecoveries = new Set<string>();
   private recoveryAdmission: { revision: number; guard: () => void } | null = null;
+  /** Set when this turn adopted an earlier turn's unresolved baseline whose lease is quarantined. */
+  private adoptedBaselineTurnId: string | null = null;
+  private pendingRecovery = false;
   private initialError: string | null = null;
   private lastFailure: string | null = null;
   private restoreError: string | null = null;
@@ -79,6 +101,7 @@ export class ApprovedCaptureController {
       captureScope: NonNullable<InvestigationPlanContract['captureScope']>;
       turn: TurnHandle;
       host: ApprovedCaptureHost;
+      ledger?: Pick<LifecycleLedger, 'record'>;
     },
   ) {}
 
@@ -86,7 +109,13 @@ export class ApprovedCaptureController {
   async initialize(): Promise<void> {
     try {
       this.input.host.assertPlan();
-      this.input.host.assertNoPendingRecovery();
+      const quarantined = this.input.host.quarantinedContext();
+      if (quarantined) return this.adoptPendingRecovery(quarantined);
+      if (this.input.host.pendingRecord())
+        throw new AppError(
+          'RDC_PREVIOUS_RESTORE_REQUIRED',
+          'restore the previous investigation position through Capture first.',
+        );
       this.original = await this.input.host.snapshot(this.current().binding, this.input.turn.signal);
       this.lastVerified = this.original;
       this.input.host.prepareReceipts();
@@ -100,11 +129,35 @@ export class ApprovedCaptureController {
     }
   }
 
+  /**
+   * A new turn of the same plan that meets its quarantined lease continues the unresolved chain instead of failing to
+   * observe a start position: the earlier baseline stays the user's original, the last signed position on that lease
+   * is the last verified one, and only capture_recover may run until the lease is rebuilt.
+   */
+  private adoptPendingRecovery(quarantined: { contextId: string; leaseVersion: number }): void {
+    const record = this.input.host.pendingRecord();
+    if (!record || record.baseline.planUri !== this.input.planUri || record.baseline.planHash !== this.planHash())
+      throw new AppError(
+        'RDC_PREVIOUS_RESTORE_REQUIRED',
+        'restore the previous investigation position through Capture first.',
+      );
+    if (
+      record.latest?.native.contextId !== quarantined.contextId ||
+      record.latest.native.leaseVersion !== quarantined.leaseVersion
+    )
+      throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'no signed position names the quarantined lease.');
+    this.original = record.baseline.original;
+    this.baseline = record.ref;
+    this.adoptedBaselineTurnId = record.baseline.turnId;
+    this.lastVerified = record.latest;
+    this.pendingRecovery = true;
+  }
+
   async select(
     inputId: string,
     signal?: AbortSignal,
   ): Promise<{ changed: boolean; receipt?: InvestigationContentRef; current: RdcLifecyclePoint | null }> {
-    this.assertReady();
+    this.assertRecovered();
     const chosen = this.input.captureScope.inputs.find((item) => item.inputId === inputId);
     if (!chosen) throw new AppError('RDC_CAPTURE_NOT_APPROVED', 'input is not in the approved plan.');
     const destination = { inputId, contentSha256: chosen.contentSha256, deviceId: this.input.captureScope.deviceId };
@@ -123,8 +176,10 @@ export class ApprovedCaptureController {
     return this.restoreError;
   }
 
-  assertLiveAccess(): void {
-    this.assertReady();
+  /** Live capture work is admitted only on a healthy lease; a quarantined one first needs capture_recover. */
+  assertLiveAccess(recovers = false): void {
+    if (recovers) this.assertReady();
+    else this.assertRecovered();
   }
 
   /** The signed entry point belongs only to the approved owning General turn. */
@@ -149,16 +204,24 @@ export class ApprovedCaptureController {
   /** Close the durable recovery record only after the final user position is observed. */
   async recordTerminalRestoration(signal?: AbortSignal): Promise<boolean> {
     if (!this.baseline || this.original === undefined || this.initialError) return false;
-    this.assertReady();
+    this.assertRecovered();
     this.input.host.assertPlan();
     const observed = await this.input.host.snapshot(this.current().binding, signal);
     if (!sameRdcLifecyclePosition(observed, this.original)) return false;
-    this.input.host.writeReceipt({ ...this.base(randomUUID()), event: 'resolved', baseline: this.baseline, observed });
+    // An adopted baseline is closed under the turn that signed it, as the user's own restore does.
+    const turnId = this.adoptedBaselineTurnId ?? this.input.turn.turnId;
+    this.input.host.writeReceipt({
+      ...this.base(randomUUID()),
+      turnId,
+      event: 'resolved',
+      baseline: this.baseline,
+      observed,
+    });
     return true;
   }
 
   async restorationStatus(signal?: AbortSignal) {
-    this.assertReady();
+    this.assertRecovered();
     this.input.host.assertPlan();
     const current = await this.input.host.snapshot(this.current().binding, signal);
     this.lastVerified = current;
@@ -185,7 +248,7 @@ export class ApprovedCaptureController {
   private async restorePosition(
     signal?: AbortSignal,
   ): Promise<{ changed: boolean; receipt?: InvestigationContentRef }> {
-    this.assertReady();
+    this.assertRecovered();
     this.input.host.assertPlan();
     const from = await this.input.host.snapshot(this.current().binding, signal);
     this.lastVerified = from;
@@ -255,6 +318,15 @@ export class ApprovedCaptureController {
     return { changed: true, receipt: transition.receipt };
   }
 
+  /** The admission decision a recovery would take now; read-only, nothing is signed or changed. */
+  async classifyFault(signal?: AbortSignal): Promise<RdcRecoveryClassification> {
+    this.assertReady();
+    this.input.host.assertPlan();
+    const from = this.verified();
+    if (!from) throw new AppError('RDC_RECOVERY_SCOPE_INVALID', 'no verified approved capture is available.');
+    return (await this.input.host.inspectRecovery(from, this.current().binding, signal)).classification;
+  }
+
   /** Join the faulted child before acquiring the shared unsafe-effects lock. */
   async prepareRecovery(permissionRevision: number, signal?: AbortSignal): Promise<void> {
     this.assertReady();
@@ -266,7 +338,7 @@ export class ApprovedCaptureController {
     }
     const guard = this.input.host.recoveryGuard(permissionRevision);
     guard();
-    const from = this.lastVerified;
+    const from = this.verified();
     if (
       !from ||
       !this.input.captureScope.inputs.some(
@@ -299,21 +371,12 @@ export class ApprovedCaptureController {
   ): Promise<{ changed: true; receipt: InvestigationContentRef; current: RdcLifecyclePoint }> {
     this.assertReady();
     guard();
-    const from = this.lastVerified!;
-    await this.input.host.quiescent('recovery');
+    const from = this.verified()!;
+    const { openExperiments } = await this.input.host.quiescent('recovery');
     guard();
     const previous = this.current();
     const facts = await this.input.host.inspectRecovery(from, previous.binding, signal);
     guard();
-    const failureKey = JSON.stringify({
-      inputId: from.inputId,
-      contentSha256: from.contentSha256,
-      deviceId: from.deviceId,
-      ...facts.cause,
-    });
-    if (this.attemptedRecoveries.has(failureKey))
-      throw new AppError('RDC_RECOVERY_REPEATED_FAILURE', 'this failure condition has already been recovered once.');
-    this.attemptedRecoveries.add(failureKey);
     this.input.host.prepareReceipts();
     const operationId = randomUUID();
     const base = this.base(operationId);
@@ -324,8 +387,14 @@ export class ApprovedCaptureController {
       original: this.original!,
       from,
       destination,
-      recovery: { cause: facts.cause, observed: facts.observed },
+      recovery: { cause: facts.cause, observed: facts.observed, classification: facts.classification },
     });
+    this.recordStep('classified', facts);
+    if (facts.classification.decision === 'quarantined') {
+      const refused = new AppError(facts.classification.code, facts.classification.reason);
+      this.fail(intent, base, from, refused, true);
+      throw refused;
+    }
     let stopped: InvestigationContentRef | undefined;
     const onStopped = (contextId: string) => {
       if (stopped || contextId !== from.native.contextId) throw new AppError('RDC_RECOVERY_STOP_RECEIPT_MISMATCH');
@@ -366,6 +435,7 @@ export class ApprovedCaptureController {
         runtimeFingerprint: next.plan.fingerprint,
         daemonStopped: stopped,
         restored: false,
+        lostWithProcess: lostWithProcess(from, facts.classification, openExperiments),
       });
       const epoch: TaskRuntimeEpoch = {
         previousFingerprint: previous.plan.fingerprint,
@@ -383,9 +453,12 @@ export class ApprovedCaptureController {
         };
       this.input.turn.runtimeEpochs.push(epoch);
       this.lastVerified = to;
+      this.pendingRecovery = false;
+      this.recordStep('recovered', facts);
       return { changed: true, receipt, current: to };
     } catch (error) {
       this.fail(intent, base, from, error, true);
+      this.recordStep('recovery-failed', facts, error);
       throw error;
     }
   }
@@ -505,9 +578,29 @@ export class ApprovedCaptureController {
     force = false,
   ): void {
     const message = error instanceof Error ? error.message : String(error);
-    this.input.host.quarantineChanged(from, message, force);
     const code = /^[A-Z][A-Z0-9_]{0,127}/u.exec(message)?.[0] ?? 'RDC_SWITCH_FAILED';
+    this.input.host.quarantineChanged(from, { cause: code, reason: message }, force);
     this.input.host.writeReceipt({ ...base, recordedAt: Date.now(), event: 'failed', intent, code });
+  }
+  /** One ledger fact per recovery step: the decision, the attempt it was and how it ended. */
+  private recordStep(step: string, facts: RecoveryFacts, error?: unknown): void {
+    const { classification } = facts;
+    const code = error instanceof Error ? /^[A-Z][A-Z0-9_]{0,127}/u.exec(error.message)?.[0] : undefined;
+    const errorCode = code ?? (classification.decision === 'quarantined' ? classification.code : undefined);
+    (this.input.ledger ?? lifecycleLedger).record({
+      kind: 'recovery_step',
+      sessionId: this.input.sessionId,
+      step,
+      decision: classification.decision,
+      reason: `attempt ${facts.attempts + 1} of ${RDC_RECOVERY_ATTEMPT_LIMIT}: ${classification.reason}`,
+      ...(errorCode ? { errorCode } : {}),
+    });
+  }
+  /** The last verified point, carrying the latest process identity a successful result reported for its context. */
+  private verified(): RdcLifecyclePoint | null {
+    const point = this.lastVerified;
+    const observed = point && observedRdcProcessIdentity(point.native.contextId);
+    return point && observed ? { ...point, native: { ...point.native, processIdentity: observed } } : point;
   }
   private current(): Prepared {
     const plan = this.input.turn.runtimePlan;
@@ -517,25 +610,50 @@ export class ApprovedCaptureController {
       throw new AppError('RDC_REPREPARE_FROZEN_PLAN_CHANGED', 'prepared turn is missing.');
     return { plan, prompt, binding };
   }
+  /** Ready, and the owning lease is not waiting for capture_recover. */
+  private assertRecovered(): void {
+    this.assertReady();
+    if (this.pendingRecovery || this.input.host.quarantinedContext())
+      throw new AppError('RDC_CONTEXT_QUARANTINED', 'recover the capture with capture_recover first.');
+  }
   private assertReady(): void {
     if (this.initialError || this.original === undefined)
       throw new AppError('RDC_INITIAL_STATE_UNVERIFIED', this.initialError ?? 'initial state was not recorded');
     if (!this.input.turn.isLive(this.input.turn.generation)) throw new AppError('RDC_TURN_NOT_ACTIVE');
   }
+  private planHash(): string {
+    return this.input.planHash.replace(/^sha256:/u, '');
+  }
   private base(operationId: string) {
     return {
-      schemaVersion: 1 as const,
       sessionId: this.input.sessionId,
       projectId: this.input.projectId,
       turnId: this.input.turn.turnId,
       operationId,
       planUri: this.input.planUri,
-      planHash: this.input.planHash.replace(/^sha256:/u, ''),
+      planHash: this.planHash(),
       recordedAt: Date.now(),
     };
   }
 }
 
+function lostWithProcess(
+  from: RdcLifecyclePoint,
+  classification: RdcRecoveryClassification,
+  experiments: Array<{ experimentId: string; status: 'running' | 'polluted' }>,
+): RdcLostWithProcess {
+  return {
+    debugHandles: { replaySessionId: from.native.replaySessionId, invalidated: 'all' },
+    experiments: experiments.map((value) => ({ ...value, disposition: 'interrupted-by-infrastructure' })),
+    replacementsAtLastVerified: {
+      count: from.native.replacementCount,
+      fingerprint: from.native.replacementFingerprint,
+      rolledBack: false,
+    },
+    workers: classification.decision === 'rebuild' ? classification.lost.workers : [],
+    newBaselineRequired: true,
+  };
+}
 function destinationOf(point: RdcLifecyclePoint): Destination {
   return { inputId: point.inputId, contentSha256: point.contentSha256, deviceId: point.deviceId };
 }

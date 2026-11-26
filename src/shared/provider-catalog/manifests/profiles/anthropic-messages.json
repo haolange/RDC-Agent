@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "anthropic-messages",
   "routeMechanics": [
     {
@@ -53,7 +52,6 @@
           "errors": "http-status"
         },
         "semanticContext": {
-          "version": "semantic-context-v1",
           "history": "canonical-messages",
           "toolPairs": "strict",
           "attachments": "fail-closed",

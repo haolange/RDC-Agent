@@ -27,10 +27,7 @@ export interface FrozenHandoffDefinition {
   requiredToolIds?: readonly string[];
 }
 
-export const EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION = 3 as const;
-
 export interface EffectiveRuntimePlan {
-  schemaVersion: typeof EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION;
   planId: string;
   fingerprint: string;
   projectRootPath: string | null;
@@ -259,7 +256,6 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     policy.contextCompactionPercent,
   );
   const fingerprint = stableHash([
-    EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION,
     input.agentId,
     ceiling,
     completionContract,
@@ -291,7 +287,6 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     delegationCapsule,
   ]);
   return {
-    schemaVersion: EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION,
     planId: `plan_${randomBytes(8).toString('hex')}`,
     fingerprint,
     projectRootPath: input.projectRootPath,

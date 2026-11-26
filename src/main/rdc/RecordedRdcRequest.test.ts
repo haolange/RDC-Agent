@@ -30,7 +30,6 @@ const context: ToolExecutionContext = {
 const entry = (
   args: Record<string, unknown> = { shader_debug_id: 'handle', max_variables: 1 },
 ): SessionContextTurnEntry => ({
-  schemaVersion: 2,
   turnId: 'turn',
   branchId: 'branch',
   executionIdentity: { fingerprint: 'execution' } as SessionContextTurnEntry['executionIdentity'],

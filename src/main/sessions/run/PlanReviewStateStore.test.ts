@@ -47,21 +47,14 @@ describe('PlanReviewStateStore', () => {
     expect(nextCycle.planId).not.toBe(first.planId);
     expect(nextCycle.revision).toBe(1);
   });
-  it('rejects invalid documents and preserves unsupported versions', async () => {
+  it('rejects invalid documents', async () => {
     roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdc-plan-state-')));
     const store = createStore();
     const file = store.getStatePath('sess')!;
     for (const patch of [{ revision: -2 }, { status: 'nonsense' }, { approvedHandoff: 42 }, { updatedAt: undefined }]) {
-      await writeFile(
-        file,
-        JSON.stringify({ schemaVersion: '1', planId: 'p', revision: 1, status: 'awaiting', updatedAt: 1, ...patch }),
-      );
+      await writeFile(file, JSON.stringify({ planId: 'p', revision: 1, status: 'awaiting', updatedAt: 1, ...patch }));
       expect(() => store.read('sess')).toThrow(/STORAGE_CORRUPT/);
     }
-    const future = JSON.stringify({ schemaVersion: '99', planId: 'p' });
-    await writeFile(file, future);
-    expect(() => store.read('sess')).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-    expect(await readFile(file, 'utf8')).toBe(future);
   });
   it('starts a new plan cycle when the owning turn changes', async () => {
     roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdc-plan-state-')));
@@ -89,7 +82,6 @@ describe('PlanReviewStateStore', () => {
     expect(store.read('sess')).toMatchObject({ planId: next.planId, status: 'awaiting' });
     const file = store.getStatePath('sess')!;
     const original = JSON.stringify({
-      schemaVersion: '1',
       planId: 'unowned',
       revision: 4,
       status: 'rejected',

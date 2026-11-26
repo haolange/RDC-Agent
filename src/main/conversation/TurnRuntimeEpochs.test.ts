@@ -6,7 +6,6 @@ import type { RdcLifecycleReceipt } from '../rdc/RdcLifecycleReceipts';
 it('accepts only a linked, signed transition for the same approved plan and owning turn', () => {
   const ref = (id: string) => ({ uri: `session://tool-outputs/${id}.json`, expectedHash: `sha256:${'a'.repeat(64)}` });
   const offer: ExecutionOffer = {
-    schemaVersion: '1',
     sourceAgentId: 'analyzer',
     targetAgentId: 'general',
     plan: { uri: 'session://plans/plan.md', hash: 'b'.repeat(64) },
@@ -16,7 +15,6 @@ it('accepts only a linked, signed transition for the same approved plan and owni
     approvedAt: 1,
   };
   const base = {
-    schemaVersion: 1 as const,
     sessionId: 's',
     projectId: 'p',
     turnId: 't',
@@ -32,7 +30,7 @@ it('accepts only a linked, signed transition for the same approved plan and owni
     captureFileId: 'file',
     eventId: 3,
     processIdentity: {
-      status: 'available',
+      status: 'available' as const,
       daemon: { pid: 1, start_generation: 'windows-filetime:1' },
       worker: { pid: 2, start_generation: 'windows-filetime:2' },
     },
@@ -100,7 +98,6 @@ it('accepts only a linked, signed transition for the same approved plan and owni
 it('requires a recovery to retain the input and the last verified daemon and worker identity', () => {
   const ref = (id: string) => ({ uri: `session://tool-outputs/${id}.json`, expectedHash: `sha256:${'a'.repeat(64)}` });
   const offer: ExecutionOffer = {
-    schemaVersion: '1',
     sourceAgentId: 'analyzer',
     targetAgentId: 'general',
     plan: { uri: 'session://plans/plan.md', hash: 'b'.repeat(64) },
@@ -110,7 +107,6 @@ it('requires a recovery to retain the input and the last verified daemon and wor
     approvedAt: 1,
   };
   const base = {
-    schemaVersion: 1 as const,
     sessionId: 's',
     projectId: 'p',
     turnId: 't',
@@ -126,7 +122,7 @@ it('requires a recovery to retain the input and the last verified daemon and wor
     captureFileId: 'file',
     eventId: 3,
     processIdentity: {
-      status: 'available',
+      status: 'available' as const,
       daemon: { pid: 1, start_generation: 'windows-filetime:1' },
       worker: { pid: 2, start_generation: 'windows-filetime:2' },
     },
@@ -151,7 +147,13 @@ it('requires a recovery to retain the input and the last verified daemon and wor
       destination: { inputId: 'a', contentSha256: 'd'.repeat(64), deviceId: 'device' },
       recovery: {
         cause: { operation: 'rd.test', argsFingerprint: 'e'.repeat(64), code: 'failure' },
-        observed: structuredClone(native),
+        observed: {
+          source: 'daemon',
+          daemon: { state: 'alive', pid: 1, start_generation: 'windows-filetime:1' },
+          worker: { state: 'alive', pid: 2, start_generation: 'windows-filetime:2' },
+          replaySession: { isLive: true, requiresRestart: false, workerExit: null },
+        },
+        classification: { decision: 'keep', reason: 'verified-processes-live' },
       },
     },
     stopped: { ...base, event: 'daemon-stopped', intent: ref('intent'), contextId: 'old', stopped: true },
@@ -192,9 +194,6 @@ it('requires a recovery to retain the input and the last verified daemon and wor
   expect(() => assertTurnRuntimeEpochs(input)).not.toThrow();
   const intent = records.intent;
   if (intent.event !== 'intent' || !intent.recovery) throw new Error('fixture');
-  intent.recovery.observed.processIdentity = {
-    ...native.processIdentity,
-    worker: { pid: 3, start_generation: 'windows-filetime:3' },
-  };
+  intent.recovery.observed.daemon = { state: 'alive', pid: 3, start_generation: 'windows-filetime:3' };
   expect(() => assertTurnRuntimeEpochs(input)).toThrow('recovery lacks same-input and process continuity');
 });

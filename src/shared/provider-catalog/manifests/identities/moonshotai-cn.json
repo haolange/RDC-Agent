@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "moonshotai-cn",
   "name": "Moonshot AI (China)",
   "npm": "@ai-sdk/openai-compatible",

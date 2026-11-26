@@ -1,10 +1,11 @@
-import * as crypto from 'crypto';
 import { type TaskExecutionPreparation } from '@shared/types/taskExecution';
 import { AppError } from '@shared/errors/appError';
+import { TASK_INTERRUPTED_REASONS } from '@shared/constants/taskStatusReasons';
+import { lifecycleLedger } from '../../runtime/LifecycleLedger';
+import { interruptionCauseOf } from '../../runtime/previousInstanceDiagnosis';
 import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
 import { TaskRuntimeEpochSchema } from './taskExecutionSchemas';
 import {
-  TASK_SCHEMA_VERSION,
   type SettleTaskExecutionOptions,
   type StartTaskExecutionOptions,
   type TaskCompletionResult,
@@ -39,7 +40,6 @@ import {
 import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirements';
 import type { TaskExecutionRequirements, TaskRuntimeEpoch } from './taskExecutionSchemas';
 
-const TASK_RUNTIME_INSTANCE_ID = crypto.randomUUID();
 export const INVALIDATED_REVIEW_GUIDANCE =
   'To revise a reviewed result, reexecute the source Task with its unchanged definition (for direct work use task_update status=in_progress), settle it with the new resultRef and resultHash, then dispatch the same review Task with that current source; preserve consumption and deadlines.';
 
@@ -111,7 +111,6 @@ export class TaskRegistry extends TaskExecutionLedger {
           }
         }
         prepared.push({
-          schemaVersion: TASK_SCHEMA_VERSION,
           id,
           subject: input.subject.trim(),
           description: input.description ?? '',
@@ -270,12 +269,11 @@ export class TaskRegistry extends TaskExecutionLedger {
       validateBudget(budget, true);
       const now = Date.now();
       const execution: TaskExecutionRecord = {
-        schemaVersion: TASK_SCHEMA_VERSION,
         id: this.id('execution', now),
         taskId,
         taskRevision: task.revision,
         generation,
-        runtimeInstanceId: TASK_RUNTIME_INSTANCE_ID,
+        runtimeInstanceId: lifecycleLedger.instanceId,
         parentExecutionId: options.parentExecutionId,
         rootBudgetId,
         mode: options.mode,
@@ -481,7 +479,7 @@ export class TaskRegistry extends TaskExecutionLedger {
     return this.store.withLock('state', async () => {
       const active = (await this.store.listExecutions()).filter(
         (execution) =>
-          !isTerminalExecutionStatus(execution.status) && execution.runtimeInstanceId !== TASK_RUNTIME_INSTANCE_ID,
+          !isTerminalExecutionStatus(execution.status) && execution.runtimeInstanceId !== lifecycleLedger.instanceId,
       );
       const now = Date.now();
       const changedTasks: TaskRecord[] = [];
@@ -489,7 +487,7 @@ export class TaskRegistry extends TaskExecutionLedger {
         execution.status = 'interrupted';
         execution.result = {
           disposition: 'blocked',
-          summary: 'Execution was interrupted by runtime restart and requires explicit recovery.',
+          summary: TASK_INTERRUPTED_REASONS[interruptionCauseOf(execution.runtimeInstanceId)],
           outputs: {},
         };
         execution.updatedAt = now;

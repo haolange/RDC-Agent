@@ -83,7 +83,6 @@ export function upsertIndexEntry(
   entry: InvestigationIndexEntry,
 ): InvestigationIndexDocument {
   return {
-    schemaVersion: index.schemaVersion,
     artifacts: [...index.artifacts.filter((item) => item.artifactId !== entry.artifactId), entry],
   };
 }

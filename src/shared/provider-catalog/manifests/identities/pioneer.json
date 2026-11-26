@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "pioneer",
   "name": "Pioneer",
   "npm": "@ai-sdk/openai-compatible",

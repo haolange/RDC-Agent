@@ -266,7 +266,7 @@ describe('session:remove slot sync', () => {
       'run_1',
       expect.objectContaining({
         status: 'interrupted',
-        stopReason: 'Recovered after app restart',
+        stopReason: 'previous-instance:unknown',
       }),
     );
   });

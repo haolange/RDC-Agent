@@ -1,4 +1,5 @@
-import { RdcExecutionReceipts, rdcDigest, type RdcExecutionReceipt } from '../rdc/RdcExecutionReceipts';
+import { RdcExecutionReceipts, type RdcExecutionReceipt } from '../rdc/RdcExecutionReceipts';
+import { rdcDigest } from '../rdc/RdcOperationCatalog';
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
 
 /** Signed fixture results model a successful native A-B-A; never a production evidence source. */
@@ -21,7 +22,6 @@ export function executionReceiptFixtures(sessionId: string, experimentId: string
           ? { replacement_id: 'replacement-fixture', reverted: true }
           : { event_durations: [{ event_id: 11, duration_us: 2 }] };
     return {
-      schemaVersion: 1,
       sessionId,
       projectId: 'project-fixture',
       turnId: 'turn-fixture',

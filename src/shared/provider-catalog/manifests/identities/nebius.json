@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "nebius",
   "name": "Nebius Token Factory",
   "npm": "@ai-sdk/openai-compatible",

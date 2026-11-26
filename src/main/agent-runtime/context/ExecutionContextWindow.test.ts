@@ -484,7 +484,6 @@ it('recovers a prior portable-hash mismatch only by matching the archived prefix
   mocks.project.mockImplementation(project);
   mocks.archive.mockReturnValue(project(old.slice(0, 8)));
   const record = {
-    schemaVersion: 1,
     sessionId: 'child',
     routeFingerprint: 'provider-snapshot-a-route-a',
     source: 'session://tool-outputs/source.json',
@@ -538,7 +537,6 @@ it('rejects an installed view of this route that is not the record this module w
     fs.writeFileSync(
       file,
       JSON.stringify({
-        schemaVersion: 1,
         sessionId: 'child',
         routeFingerprint: ROUTE_IDENTITY.fingerprint,
         source: 'session://tool-outputs/source.json',

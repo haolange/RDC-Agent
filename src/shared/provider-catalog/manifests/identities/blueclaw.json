@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "blueclaw",
   "name": "Blue Claw",
   "npm": "@ai-sdk/openai-compatible",

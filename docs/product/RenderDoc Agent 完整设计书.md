@@ -54,7 +54,7 @@
 
 ## 0.2 与实现的对应
 
-- 7.1 的调查对象存放在同一套调查记录里（`rdc.investigation.v1`）：WorldState、Evidence、Claim、Experiment、Challenge、MissionCheckpoint 和 Report 各有记录；Observation 内嵌于 Evidence，Hypothesis 是 Claim 的一种类型，Decision 内嵌于 Claim，Artifact 由记录的清单表达。字段以 `src/shared/types/renderdocInvestigation.ts` 和 `investigation_schema` 工具为准，摘要见 `ARCHITECTURE.md` 裁决 E。
+- 7.1 的调查对象存放在同一套调查记录里（`rdc.investigation`）：WorldState、Evidence、Claim、Experiment、Challenge、MissionCheckpoint 和 Report 各有记录；Observation 内嵌于 Evidence，Hypothesis 是 Claim 的一种类型，Decision 内嵌于 Claim，Artifact 由记录的清单表达。字段以 `src/shared/types/renderdocInvestigation.ts` 和 `investigation_schema` 工具为准，摘要见 `ARCHITECTURE.md` 裁决 E。
 - 领域字段不写入通用的 Task、Agent Profile 或会话消息；调查记录只引用 Task ID。
 - RenderDoc 能力经外部的 RDC-Tool CLI 提供。模型按需发现操作，不把整份目录展开成工具定义。
 - 回放、租约、身份与回执的合同见 `docs/architecture/rdc-runtime.md`。

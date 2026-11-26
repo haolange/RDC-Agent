@@ -96,11 +96,14 @@ function createRecorder(bootstrapUrl) {
       if (!cookie) throw new Error('bridge bootstrap returned no session cookie');
       return cookie;
     }));
+  const latest = { answers: new Map(), calls: new Map() };
   return {
     recorded,
+    latest,
     unanswered: new Set(),
     release() {},
     async answer(channel, args) {
+      latest.calls.set(channel, args);
       const cookie = await login();
       const response = await fetch(`${origin}/invoke`, {
         method: 'POST',
@@ -116,6 +119,7 @@ function createRecorder(bootstrapUrl) {
           : { error: String(body.error ?? `HTTP ${response.status}`) };
       (recorded[channel] ??= []).push(entry);
       if (entry.error) throw new Error(entry.error);
+      latest.answers.set(channel, entry.result);
       return entry.result;
     },
   };
@@ -145,9 +149,11 @@ function createReplayer(responses, respond, theme) {
   const calls = {};
   const unanswered = new Set();
   const held = [];
+  const latest = { answers: new Map(), calls: new Map() };
   let pending = 0;
   return {
     unanswered,
+    latest,
     /** Answers on their way, not counting held ones: those wait for a step, not for time. */
     get pending() {
       return pending - held.length;
@@ -157,7 +163,8 @@ function createReplayer(responses, respond, theme) {
       if (index < 0) throw new Error(`release ${channel}${call ? ` call ${call}` : ''}: no held answer`);
       held.splice(index, 1)[0].resolve();
     },
-    async answer(channel) {
+    async answer(channel, args) {
+      latest.calls.set(channel, args);
       const entries = responses?.[channel];
       if (!entries?.length) {
         unanswered.add(channel);
@@ -177,6 +184,7 @@ function createReplayer(responses, respond, theme) {
       if (change?.error) return { __rdcIpcError: change.error };
       if (change && 'result' in change) return withTheme(change.result, theme);
       if (entry.error) throw new Error(entry.error);
+      latest.answers.set(channel, entry.result);
       return withTheme(entry.result, theme);
     },
   };
@@ -289,9 +297,42 @@ async function waitForSelector(contents, selector, timeoutMs) {
 }
 
 /**
+ * An `emit` payload with its bindings resolved: a string `$<channel>.<path>` is that path in the latest answer the
+ * scenario got on the channel and `$call:<channel>.<path>` that path in the arguments of its latest call (ids the
+ * renderer generates, such as a send's request id, differ between recording and replay), so the payload follows the
+ * page whenever a scenario is re-recorded. `{ "$concat": [...] }` joins its resolved entries, `{ "$now": <ms> }` is
+ * the page clock plus that offset, `{ "$max": [...] }` the largest of its entries (a replayed page runs on the frozen
+ * clock, older than the recorded answers), `{ "$add": [...] }` their sum, and `{ "$merge": "$<channel>.<path>",
+ * ...fields }` that object with the fields replaced.
+ */
+function resolveEmit(value, latest, now) {
+  const bound = (reference) => {
+    const call = reference.startsWith('$call:');
+    const [channel, ...keys] = reference.slice(call ? 6 : 1).split('.');
+    const source = call ? latest.calls : latest.answers;
+    if (!source.has(channel))
+      throw new Error(`emit binds ${reference}, but ${channel} was never ${call ? 'called' : 'answered'}`);
+    return keys.reduce((object, key) => object?.[key], source.get(channel));
+  };
+  if (typeof value === 'string' && value.startsWith('$')) return bound(value);
+  if (Array.isArray(value)) return value.map((entry) => resolveEmit(entry, latest, now));
+  if (!value || typeof value !== 'object') return value;
+  if ('$now' in value) return now + value.$now;
+  if ('$concat' in value) return value.$concat.map((entry) => resolveEmit(entry, latest, now)).join('');
+  if ('$max' in value) return Math.max(...value.$max.map((entry) => resolveEmit(entry, latest, now)));
+  if ('$add' in value) return value.$add.reduce((sum, entry) => sum + resolveEmit(entry, latest, now), 0);
+  const { $merge: base, ...fields } = value;
+  const resolved = Object.fromEntries(
+    Object.entries(fields).map(([key, entry]) => [key, resolveEmit(entry, latest, now)]),
+  );
+  return base ? { ...bound(base), ...resolved } : resolved;
+}
+
+/**
  * Steps address the UI by test id or selector, the same handles Browser QA uses. A step may wait for an element,
  * click (`optional` when only some variants show the target), hover, type, press a key (with `modifiers`), release a
- * held answer, pin focus (`focus` with a `reason`), or reload (setup only, with `project`).
+ * held answer, emit a main-process event (`emit`: channel and payload, see resolveEmit), pin focus (`focus` with a
+ * `reason`), or reload (setup only, with `project`).
  */
 async function runStep(window, step, context) {
   const contents = window.webContents;
@@ -307,6 +348,11 @@ async function runStep(window, step, context) {
   // The host forwards no main-process events, so setup reloads to read what a step changed (a saved provider, a turn).
   if (step.project || step.reload) contents.reload();
   if (step.release) context.answerer.release(step.release, step.call);
+  // A main-process event the host would otherwise never forward (a running tool's progress).
+  if (step.emit) {
+    const now = await contents.executeJavaScript('Date.now()');
+    contents.send(step.emit.channel, resolveEmit(step.emit.payload, context.answerer.latest, now));
+  }
   // Pins focus where the product leaves it to frame timing; the step's `reason` names the race.
   if (step.focus) {
     if (!step.reason) throw new Error(`focus step on ${step.focus} needs a reason`);
@@ -353,7 +399,7 @@ async function runStep(window, step, context) {
   await sleep(context.replay ? Math.min(step.replayWaitMs ?? wait, REPLAY_STEP_WAIT_MS) : wait);
 }
 
-async function openWindow({ theme, width, height, freeze, partition, answerer }) {
+async function openWindow({ theme, width, height, freeze, partition, answerer, query }) {
   const window = new BrowserWindow({
     // Shown on the (virtual) display: a hidden window may hand capturePage its last painted frame instead of the DOM.
     width,
@@ -385,7 +431,8 @@ async function openWindow({ theme, width, height, freeze, partition, answerer })
     await cdp.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: FREEZE_SCRIPT });
     await cdp.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: L3_SCRIPT });
   }
-  await window.loadFile(path.join(root, 'out/renderer/index.html'), { query: { theme } });
+  // A scenario's `query` adds entry parameters main would pass (the failure page's crash facts).
+  await window.loadFile(path.join(root, 'out/renderer/index.html'), { query: { ...query, theme } });
   // Every animation and transition shows its end state at once, and no caret blinks, so a capture is one frame.
   if (freeze) await window.webContents.insertCSS(SETTLE_CSS, { cssOrigin: 'user' });
   return window;
@@ -416,7 +463,14 @@ async function record() {
     setupWindow.destroy();
     for (const key of Object.keys(recorder.recorded)) delete recorder.recorded[key];
   }
-  const window = await openWindow({ theme: 'dark', width, height, freeze: false, answerer: recorder });
+  const window = await openWindow({
+    theme: 'dark',
+    width,
+    height,
+    freeze: false,
+    answerer: recorder,
+    query: scenario.query,
+  });
   for (const step of scenario.steps ?? []) await runStep(window, step, context);
   await sleep(scenario.settleMs ?? 800);
   await window.webContents.executeJavaScript('document.fonts.ready.then(() => true)');
@@ -465,6 +519,7 @@ async function renderVariant(scenario, variant) {
     freeze: true,
     partition: `visual-diff-${(renders += 1)}`,
     answerer,
+    query: scenario.query,
   });
   try {
     const context = { answerer, replay: true };
@@ -472,7 +527,7 @@ async function renderVariant(scenario, variant) {
     await quiesce(answerer);
     for (const [index, step] of (scenario.steps ?? []).entries()) {
       // Only steps that act are sampled: a bare wait covers the page's own start-up, whose frame timing is not intent.
-      const acts = step.click || step.hover || step.type !== undefined || step.key || step.release;
+      const acts = step.click || step.hover || step.type !== undefined || step.key || step.release || step.emit;
       if (!acts) {
         await runStep(window, step, context);
         continue;

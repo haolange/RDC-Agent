@@ -6,6 +6,7 @@ import {
   parseRetryAfterMs,
   ProviderEmptyStreamError,
   ProviderHttpError,
+  ProviderTimeoutError,
   ProviderWireFailureError,
 } from '../providers/internal/http';
 import { AgentRecoveryAbortError, ErrorRecovery, MAX_RETRY_AFTER_MS } from './ErrorRecovery';
@@ -167,6 +168,36 @@ describe('ErrorRecovery', () => {
 
     it('其他错误应返回 false', () => {
       expect(recovery.isPromptTooLong(makeErr('network error'))).toBe(false);
+    });
+  });
+
+  describe('provider timeouts', () => {
+    it('keeps retrying a timeout that fired before any output', () => {
+      const timeout = new ProviderTimeoutError('openai', 'first-byte', 20_000, false);
+      expect(recovery.classifyError(timeout)).toBe('network_error');
+      expect(recovery.decide(timeout).type).toBe('retry');
+    });
+
+    it('does not retry a timeout that fired after the stream produced output, and says why', () => {
+      const timeout = new ProviderTimeoutError('openai', 'idle', 60_000, true);
+      const action = recovery.decide(timeout);
+
+      expect(action).toEqual({ type: 'abort', reason: 'provider stream idle timeout after output; not retried' });
+      expect(recovery.getState().recoveryCount).toBe(0);
+    });
+
+    it('sees the timeout through a wrapping error and reports a single attempt on its abort error', () => {
+      const wrapped = new Error('request failed', { cause: new ProviderTimeoutError('openai', 'idle', 60_000, true) });
+      const action = recovery.decide(wrapped);
+      expect(action.type).toBe('abort');
+
+      const abort = recovery.createAbortError(wrapped, 'x');
+      expect(abort).toMatchObject({ recoveryCategory: 'network_error', attempts: 1, maxAttempts: 1 });
+    });
+
+    it('keeps the full attempt budget on the abort error of a timeout before output', () => {
+      const timeout = new ProviderTimeoutError('openai', 'first-byte', 20_000, false);
+      expect(recovery.createAbortError(timeout, 'x').maxAttempts).toBe(4);
     });
   });
 

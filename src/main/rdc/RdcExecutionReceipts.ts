@@ -1,16 +1,15 @@
-import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { z, type ZodType } from 'zod';
 import { AppError } from '@shared/errors/appError';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { secretStorageService } from '../settings/settings-core/SecretStorageService';
-import { canonicalJson } from './RdcOperationCatalog';
+import { rdcDigest } from './RdcOperationCatalog';
 import { RdcProcessIdentitySchema } from './RdcProcessIdentity';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import type { RdcValidatedEvidence } from './RdcValidatedEvidence';
 import type { RdcProcessIdentity } from './RdcProcessIdentity';
 
 export interface RdcExecutionReceipt {
-  schemaVersion: 1;
   sessionId: string;
   projectId: string;
   turnId: string;
@@ -33,36 +32,37 @@ export interface RdcExecutionReceipt {
   exitCode: 0;
 }
 const sha256Hex = z.string().regex(/^[a-f0-9]{64}$/);
-const RdcExecutionReceiptSchema: ZodType<RdcExecutionReceipt> = z.object({
-  schemaVersion: z.literal(1),
-  sessionId: z.string(),
-  projectId: z.string(),
-  turnId: z.string(),
-  toolCallId: z.string(),
-  experimentId: z.string(),
-  contextId: z.string(),
-  leaseVersion: z.number(),
-  replaySessionId: z.string(),
-  operation: z.string(),
-  definitionsFingerprint: sha256Hex,
-  processIdentity: RdcProcessIdentitySchema.optional(),
-  evidence: z.union([
-    z.object({
-      kind: z.literal('measurement'),
-      method: z.enum(['event_durations', 'counters', 'image', 'frame_timing']),
-      conditionsFingerprint: z.string(),
-      values: z.unknown(),
-    }),
-    z.object({ kind: z.enum(['intervention', 'rollback']), replacementId: z.string() }),
-  ]),
-  argsFingerprint: z.string(),
-  args: z.record(z.string(), z.unknown()),
-  result: z.record(z.string(), z.unknown()),
-  resultHash: z.string(),
-  startedAt: z.number(),
-  completedAt: z.number(),
-  exitCode: z.literal(0),
-});
+const RdcExecutionReceiptSchema: ZodType<RdcExecutionReceipt> = z
+  .object({
+    sessionId: z.string(),
+    projectId: z.string(),
+    turnId: z.string(),
+    toolCallId: z.string(),
+    experimentId: z.string(),
+    contextId: z.string(),
+    leaseVersion: z.number(),
+    replaySessionId: z.string(),
+    operation: z.string(),
+    definitionsFingerprint: sha256Hex,
+    processIdentity: RdcProcessIdentitySchema.optional(),
+    evidence: z.union([
+      z.object({
+        kind: z.literal('measurement'),
+        method: z.enum(['event_durations', 'counters', 'image', 'frame_timing']),
+        conditionsFingerprint: z.string(),
+        values: z.unknown(),
+      }),
+      z.object({ kind: z.enum(['intervention', 'rollback']), replacementId: z.string() }),
+    ]),
+    argsFingerprint: z.string(),
+    args: z.record(z.string(), z.unknown()),
+    result: z.record(z.string(), z.unknown()),
+    resultHash: z.string(),
+    startedAt: z.number(),
+    completedAt: z.number(),
+    exitCode: z.literal(0),
+  })
+  .strict();
 const SignedReceiptSchema = z.object({ body: z.string(), signature: sha256Hex });
 
 type ReceiptInvalidCode = 'RDC_RECEIPT_INVALID' | 'RDC_LIFECYCLE_RECEIPT_INVALID';
@@ -85,8 +85,7 @@ function parseReceiptJson(text: string, code: ReceiptInvalidCode): unknown {
   }
 }
 
-const KEY_REF = 'rdc-execution-receipt-signing-v1';
-export const rdcDigest = (value: unknown): string => createHash('sha256').update(canonicalJson(value)).digest('hex');
+const KEY_REF = 'rdc-execution-receipt-signing';
 
 /** Main-owned key is never part of a tool result, IPC, prompt, or session artifact. */
 function signingKey(): string {

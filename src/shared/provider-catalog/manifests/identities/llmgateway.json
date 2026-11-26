@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "llmgateway",
   "name": "LLM Gateway",
   "npm": "@ai-sdk/openai-compatible",

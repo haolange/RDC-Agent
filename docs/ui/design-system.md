@@ -5,7 +5,7 @@
 实现与预览入口：
 
 - [`src/renderer/styles/design-system.css`](../../src/renderer/styles/design-system.css) 是样式入口；token 在 [`design-tokens.css`](../../src/renderer/styles/design-tokens.css)，动效在 [`design-motion.css`](../../src/renderer/styles/design-motion.css)，基础样式在 [`design-base.css`](../../src/renderer/styles/design-base.css)，系统减少动效在 [`design-reduced-motion.css`](../../src/renderer/styles/design-reduced-motion.css)。
-- [`src/shared/theme/`](../../src/shared/theme/)：preset catalog、`compileThemeChrome`、`rdc-theme-v1`、compose accent 派生。
+- [`src/shared/theme/`](../../src/shared/theme/)：preset catalog、`compileThemeChrome`、`rdc-theme`、compose accent 派生。
 - [`designs/rdc-agent-design-system/index.html`](../../designs/rdc-agent-design-system/index.html)：可交互预览。
 
 ## 视觉定位
@@ -159,7 +159,7 @@ Settings 页标题与正文共用面板内边距。
 
 - Light/Dark（含 system）影响两套体系的亮度调制。
 - 不提供 translucent sidebar。
-- 主题分享格式：`rdc-theme-v1:`（拒绝 `codex-theme-v1:`）。
+- 主题分享格式：`rdc-theme:`（拒绝 `codex-theme-v1:`）。
 - 预设：RDC（默认）+ Absolutely / Ayu / Catppuccin / Dracula / Everforest / GitHub / Gruvbox / Linear。
 
 ## CSS 入口
@@ -171,7 +171,7 @@ Settings 页标题与正文共用面板内边距。
   - 720 与侧栏折叠对齐；feature 选择器留在所属 feature 样式，不写进 global。
 - 禁止恢复 `styles/tokens/*` 或未接线的 `oklch-themes.css`。
 - 生产 CSP：`style-src 'self'`（无 `unsafe-inline`）+ `style-src-attr 'none'`。Appearance chrome（`applyChromeTheme`）与组件动态样式必须走 constructable stylesheet（`adoptedStyleSheets` / `useDynStyle` / `assignDynStyle`），禁止 `<style>.textContent` 或 `element.style` 注入。
-- 当前 Settings 只接受 `schemaVersion` **9**；合法的 `appearance.chromeThemes` 用户配置经严格 schema 校验保留，缺版本或旧版本在启动时明确报错并保留原文件。历史版本升级的主题重置不属于现行读取路径。
+- Settings 文件不带格式版本；合法的 `appearance.chromeThemes` 用户配置经严格 schema 校验保留，其他格式写下的文件在启动时明确报错并保留原文件。
 
 ## Token 使用规则
 
@@ -457,6 +457,7 @@ Tasks 历史卡在主回合每次真实创建或更新后各留一张，卡头�
 | 产物 | Artifacts | 调查记录 |
 | 输出 | Outputs | 用户输出文件 |
 | 事件 | Event | 代替 EID |
+| 无进展 | No progress | RDC 操作多久没有报告进展；设置项「无进展等待」与 Working 行「已 N 秒无进展」 |
 | 知识卡片 | Knowledge card | 知识中心条目 |
 
 ## 启动画面与窗口背景
@@ -495,7 +496,7 @@ Settings → Agents 顶部是「默认模型」：一行普通设置（标签与
 - 配置状态只在出问题时出现一行（无模型、模型不可用、推理档位不受支持、没有工具）。
 - 整页只有一个自动保存标记（转圈、淡出的对勾，失败时一句错误加重试）。
 - 未改动的内置 Agent 不提供删除，只能用「启用」开关停用，General 是默认 Agent，开关禁用且主进程拒绝停用（`AGENT_DEFAULT_REQUIRED`）；自定义 Agent 才有「删除」。
-- 问题列表里仍声明模型字段的覆盖提供「迁移…」「删除覆盖…」，先预览再写入。
+- 问题列表里仍声明模型字段的覆盖只提供「删除覆盖…」，先预览再删除；不提供迁移。
 - 另有「启用」「用户可选」「允许其他智能体调用」三个 Switch，都用正面说法；最后一个写入清单的 `disableModelInvocation` 时取反。
 
 ## 目标目录

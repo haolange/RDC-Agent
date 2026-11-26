@@ -39,6 +39,13 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     target: 'general',
   },
   {
+    id: 'crash-files',
+    section: 'general',
+    titleKey: 'settings.crashFiles',
+    keywords: ['crash', 'minidump', 'dump', 'report', '崩溃', '转储', '报告'],
+    target: 'crash-files',
+  },
+  {
     id: 'appearance',
     section: 'appearance',
     titleKey: 'settings.appearance',

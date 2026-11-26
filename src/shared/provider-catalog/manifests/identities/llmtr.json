@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "llmtr",
   "name": "LLMTR",
   "npm": "@ai-sdk/openai-compatible",

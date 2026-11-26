@@ -24,6 +24,8 @@ export const enControl = {
   'control.rightRail.tasks.hideCompleted': 'Hide {count} completed',
   'control.rightRail.tasks.reason.parentTurnStopped': 'Parent turn stopped after its producers joined.',
   'control.rightRail.tasks.reason.createdTurnStopped': 'Creating turn stopped before this Task started.',
+  'control.rightRail.tasks.reason.interrupted':
+    'Interrupted when RDC-Agent stopped unexpectedly. Recover it explicitly.',
   'control.rightRail.artifacts.empty':
     'Evidence, conclusions, and experiments recorded during investigation appear here.',
   'control.rightRail.artifacts.storeDegraded': 'Investigation store is degraded; this is not an empty artifact list.',

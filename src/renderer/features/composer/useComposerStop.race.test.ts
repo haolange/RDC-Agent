@@ -12,7 +12,6 @@ import type { SessionRecord } from '@shared/types/session';
 import type { ConversationCancelActiveTurnResult, ConversationMessage } from '@shared/types/conversation';
 
 const session: SessionRecord = {
-  schemaVersion: '1',
   sessionId: 'session-a',
   projectId: 'project-a',
   title: 'A',

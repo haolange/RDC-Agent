@@ -9,6 +9,7 @@ import { agentOrchestrator } from '../agent-runtime/orchestration/agentRuntimeRo
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { conversationHistoryStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { lifecycleLedger } from '../runtime/LifecycleLedger';
 import { canonicalizeSessionContextTurnEntry } from '../agent-runtime/context/SessionContextJournal';
 import { finalizeTrace, upsertWorkBlock } from '../agent-runtime/workTrace/ConversationWorkTrace';
 import { hydrateFrozenUserContent } from '../agent-runtime/attachments/ConversationAttachmentMaterializer';
@@ -44,6 +45,7 @@ import type { ProviderOutputRef } from '@shared/types/reasoning';
 import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { AgentRole } from '@shared/types/agent';
+import type { TurnStopCause } from '@shared/types/lifecycle';
 import type {
   ConversationLoopOutputPhase,
   ConversationMessage,
@@ -151,6 +153,8 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
   approvedPlanExit = false;
   /** Set when the kernel reports cancellation (timeout or parent abort) without a session Stop. */
   runWasCancelled = false;
+  /** Who asked this turn to stop; a kernel cancellation without a session Stop is the runtime's. */
+  private stopCause: TurnStopCause | null = null;
   private streamScheduler: ConversationStreamPatchScheduler | null = null;
   private conversationPersistenceError: Error | null = null;
   private deferredTerminalEventType: MessageUpdateType | null = null;
@@ -190,6 +194,16 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
     const stopped = new Promise<void>((resolve) => {
       this.settleStopped = resolve;
     });
+    const { plan } = this.input.planning;
+    const { currentRun } = this.input.context;
+    lifecycleLedger.record({
+      kind: 'turn_started',
+      sessionId: this.sessionId,
+      turnId: this.assistantMessage.turnId,
+      runId: isActiveRun(currentRun) ? currentRun.runId : null,
+      providerId: plan.providerId,
+      modelId: plan.effectiveModelId,
+    });
     this.turns.registerActiveTurn({
       requestId: this.input.requestId,
       turnId: this.assistantMessage.turnId,
@@ -197,8 +211,9 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
       startedAt: nowMs(),
       abortController: this.abortController,
       stopped,
-      stop: () => {
+      stop: (cause) => {
         if (!this.abortController.signal.aborted) {
+          this.stopCause = cause;
           try {
             // Persist pending deltas without broadcasting streaming patches; the
             // terminal stopped commit is the single authoritative UI transition.
@@ -410,10 +425,27 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
       this.commitTerminalTransaction(this.sessionId, this.deferredTerminalEventType);
     }
     this.turns.clearActiveTurn(this.assistantMessage.turnId, this.abortController);
+    this.recordTurnFinished();
     await this.finalizeOwnedRun();
     await this.input.preparedTurn.runtime.mcpLease?.release();
     agentOrchestrator.releaseProviderRuntimeCredentials(this.input.preparedTurn.runtime.credentialHandle);
     this.settleStopped();
+  }
+
+  private recordTurnFinished(): void {
+    const { status } = this.assistantMessage;
+    const terminal = status === 'complete' || status === 'stopped' ? status : 'error';
+    lifecycleLedger.record({
+      kind: 'turn_finished',
+      sessionId: this.sessionId,
+      turnId: this.assistantMessage.turnId,
+      status: terminal,
+      ...(terminal === 'stopped' ? { stopCause: this.resolvedStopCause() } : {}),
+    });
+  }
+
+  private resolvedStopCause(): TurnStopCause {
+    return this.stopCause ?? 'runtime';
   }
 
   /** Writes the terminal message and its session-context entry in one transaction, then publishes it. */
@@ -510,7 +542,6 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
     const { input } = this;
     const approvedExecution = input.preparedTurn.runtime.approvedExecution;
     return canonicalizeSessionContextTurnEntry({
-      schemaVersion: 2,
       turnId: this.assistantMessage.turnId,
       userMessageId: input.userMessage.id,
       assistantMessageId: this.assistantMessage.id,
@@ -549,6 +580,7 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
     try {
       await sessionRecordStore.updateRun(this.sessionId, ownedRun.runId, {
         status: terminalRunStatus,
+        ...(terminalRunStatus === 'cancelled' ? { stopReason: this.resolvedStopCause() } : {}),
         finishedAt: nowMs(),
       });
       this.host.publishRunStatus(this.sessionId, ownedRun.runId, terminalRunStatus);
@@ -653,6 +685,7 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
     );
     this.commitTerminalAssistantMessage('message_completed', {
       status: 'stopped',
+      stopCause: this.resolvedStopCause(),
       content: this.assistantMessage.content,
       workTrace: finalizeTrace(stoppedTrace, 'stopped'),
     });
@@ -734,6 +767,8 @@ function outputSummary(llmDiagnostic: ConversationMessageDiagnostic | null, appr
       return 'Agent loop stopped at the configured turn limit.';
     case 'CONVERSATION_TASK_COMPLETION_DENIED':
       return 'An unfinished direct Task prevented turn completion.';
+    case 'CONVERSATION_RDC_RECOVERY_BLOCKED':
+      return 'A stuck replay could not be rebuilt automatically; the turn stopped on its blocker.';
     case 'CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION':
       return 'Provider stream protocol integrity check failed.';
     case 'MISSION_COMPLETION_DENIED':

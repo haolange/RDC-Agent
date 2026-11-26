@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "lilac",
   "name": "Lilac",
   "npm": "@ai-sdk/openai-compatible",

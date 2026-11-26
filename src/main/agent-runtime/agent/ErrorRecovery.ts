@@ -14,8 +14,10 @@ import {
   isProviderEmptyStreamError,
   parseRetryAfterMs,
   ProviderHttpError,
+  ProviderTimeoutError,
   ProviderWireFailureError,
 } from '../providers/internal/http';
+import { classifyProviderText, extractErrorStatus, type ErrorCategory } from './ErrorClassification';
 import type { Model } from '../core/types';
 
 // =====================================================================
@@ -41,19 +43,6 @@ export type RecoveryAction =
   | { type: 'switch_model'; fallbackModel: Model }
   | { type: 'continue_prompt' }
   | { type: 'abort'; reason: string };
-
-/** 错误分类。 */
-export type ErrorCategory =
-  | 'rate_limit'
-  | 'overloaded'
-  | 'prompt_too_long'
-  | 'max_tokens'
-  | 'auth_error'
-  | 'network_error'
-  | 'server_error'
-  | 'empty_stream'
-  | 'stream_protocol'
-  | 'unknown';
 
 const RECOVERY_ABORT_SNIPPET_MAX = 300;
 
@@ -99,6 +88,14 @@ export class AgentRecoveryAbortError extends AppError {
 
 export function isProviderStreamProtocolError(error: unknown): error is Error & { code?: string } {
   return error instanceof Error && error.name === 'ProviderStreamProtocolError';
+}
+
+function readStreamViolationCode(error: Error): string {
+  return (
+    readProviderStreamCode(error) ??
+    (error instanceof AgentRecoveryAbortError ? error.streamCode : undefined) ??
+    'PROVIDER_STREAM_PROTOCOL_VIOLATION'
+  );
 }
 
 function readProviderStreamCode(error: Error): string | undefined {
@@ -174,70 +171,12 @@ export class ErrorRecovery {
     if (isProviderStreamProtocolError(error)) {
       return 'stream_protocol';
     }
-    const wire = findProviderWireFailureError(error);
-    const raw = `${error.message} ${error.name} ${wire?.bodyText ?? ''}`.toLowerCase();
-    const status = this.extractStatusCode(error);
-
-    // prompt too long / context length
-    if (
-      raw.includes('context_length_exceeded') ||
-      raw.includes('context length') ||
-      raw.includes('maximum context length') ||
-      (raw.includes('prompt') && raw.includes('long')) ||
-      (raw.includes('input') && raw.includes('too') && raw.includes('long'))
-    ) {
-      return 'prompt_too_long';
-    }
-
-    // rate limit
-    if (status === 429 || (raw.includes('rate') && raw.includes('limit'))) {
-      return 'rate_limit';
-    }
-
-    // overloaded
-    if (
-      status === 529 ||
-      status === 503 ||
-      raw.includes('overloaded') ||
-      raw.includes('service unavailable') ||
-      raw.includes('at capacity') ||
-      raw.includes('high demand')
-    ) {
-      return 'overloaded';
-    }
-
-    // auth
-    if (
-      status === 401 ||
-      status === 403 ||
-      raw.includes('unauthorized') ||
-      raw.includes('forbidden') ||
-      raw.includes('invalid api key') ||
-      raw.includes('authentication')
-    ) {
-      return 'auth_error';
-    }
-
-    // network
-    if (
-      raw.includes('econnrefused') ||
-      raw.includes('econnreset') ||
-      raw.includes('etimedout') ||
-      raw.includes('enotfound') ||
-      raw.includes('network') ||
-      raw.includes('timeout') ||
-      raw.includes('aborterror') ||
-      raw.includes('socket')
-    ) {
+    if (findProviderTimeoutError(error)) {
       return 'network_error';
     }
-
-    // server error
-    if ((status !== undefined && status >= 500) || raw.includes('internal server')) {
-      return 'server_error';
-    }
-
-    return 'unknown';
+    const wire = findProviderWireFailureError(error);
+    const raw = `${error.message} ${error.name} ${wire?.bodyText ?? ''}`.toLowerCase();
+    return classifyProviderText(raw, extractErrorStatus(error));
   }
 
   /** 判断是否为 prompt too long 错误。 */
@@ -263,98 +202,78 @@ export class ErrorRecovery {
     const category = this.classifyError(error);
 
     switch (category) {
-      case 'rate_limit': {
-        if (this.state.recoveryCount >= this.maxRetries) {
-          return {
-            type: 'abort',
-            reason: 'rate limit retries exhausted',
-          };
-        }
-        return this.retryHonouringProvider(error, 'rate limit');
-      }
-
-      case 'overloaded': {
-        this.state.consecutiveOverloads += 1;
-        if (
-          this.state.consecutiveOverloads >= OVERLOAD_SWITCH_THRESHOLD &&
-          this.fallbackModel &&
-          this.fallbackModel.id !== this.state.currentModel.id
-        ) {
-          const fallback = this.fallbackModel;
-          this.state.currentModel = fallback;
-          this.state.consecutiveOverloads = 0;
-          return { type: 'switch_model', fallbackModel: fallback };
-        }
-        if (this.state.recoveryCount >= this.maxRetries) {
-          return {
-            type: 'abort',
-            reason: 'overloaded retries exhausted and no fallback available',
-          };
-        }
-        return this.retryHonouringProvider(error, 'overloaded');
-      }
-
-      case 'prompt_too_long': {
-        if (!this.state.hasAttemptedReactiveCompact) {
-          return { type: 'reactive_compact' };
-        }
-        return {
-          type: 'abort',
-          reason: 'prompt too long even after reactive compact',
-        };
-      }
-
-      case 'max_tokens': {
+      case 'rate_limit':
+        return this.decideRateLimit(error);
+      case 'overloaded':
+        return this.decideOverloaded(error);
+      case 'prompt_too_long':
+        return this.decidePromptTooLong();
+      case 'max_tokens':
         return this.decideOutputLimit();
-      }
-
-      case 'auth_error': {
-        return {
-          type: 'abort',
-          reason: 'authentication failed; check API key',
-        };
-      }
-
-      case 'empty_stream': {
-        if (this.state.recoveryCount >= EMPTY_STREAM_MAX_RETRIES) {
-          return {
-            type: 'abort',
-            reason: 'empty_stream retries exhausted',
-          };
-        }
-        return {
-          type: 'retry',
-          delayMs: this.getRetryDelay(this.state.recoveryCount),
-        };
-      }
-
+      case 'auth_error':
+        return { type: 'abort', reason: 'authentication failed; check API key' };
+      case 'empty_stream':
+        return this.decideEmptyStream();
       case 'network_error':
-      case 'server_error': {
-        if (this.state.recoveryCount >= this.maxRetries) {
-          return {
-            type: 'abort',
-            reason: `${category} retries exhausted`,
-          };
-        }
-        return this.retryHonouringProvider(error, category);
-      }
-
-      case 'stream_protocol': {
-        const streamCode =
-          readProviderStreamCode(error) ??
-          (error instanceof AgentRecoveryAbortError ? error.streamCode : undefined) ??
-          'PROVIDER_STREAM_PROTOCOL_VIOLATION';
-        return {
-          type: 'abort',
-          reason: `${streamCode}: ${error.message}`,
-        };
-      }
-
+      case 'server_error':
+        return this.decideTransient(error, category);
+      case 'stream_protocol':
+        return { type: 'abort', reason: `${readStreamViolationCode(error)}: ${error.message}` };
       case 'unknown':
-      default: {
+      default:
         return { type: 'abort', reason: `unrecoverable error: ${error.message}` };
-      }
     }
+  }
+
+  private decideRateLimit(error: Error): RecoveryAction {
+    if (this.state.recoveryCount >= this.maxRetries) return { type: 'abort', reason: 'rate limit retries exhausted' };
+    return this.retryHonouringProvider(error, 'rate limit');
+  }
+
+  private decideOverloaded(error: Error): RecoveryAction {
+    this.state.consecutiveOverloads += 1;
+    const fallback = this.fallbackModel;
+    if (
+      this.state.consecutiveOverloads >= OVERLOAD_SWITCH_THRESHOLD &&
+      fallback &&
+      fallback.id !== this.state.currentModel.id
+    ) {
+      this.state.currentModel = fallback;
+      this.state.consecutiveOverloads = 0;
+      return { type: 'switch_model', fallbackModel: fallback };
+    }
+    if (this.state.recoveryCount >= this.maxRetries) {
+      return { type: 'abort', reason: 'overloaded retries exhausted and no fallback available' };
+    }
+    return this.retryHonouringProvider(error, 'overloaded');
+  }
+
+  private decidePromptTooLong(): RecoveryAction {
+    if (!this.state.hasAttemptedReactiveCompact) return { type: 'reactive_compact' };
+    return { type: 'abort', reason: 'prompt too long even after reactive compact' };
+  }
+
+  private decideEmptyStream(): RecoveryAction {
+    if (this.state.recoveryCount >= EMPTY_STREAM_MAX_RETRIES) {
+      return { type: 'abort', reason: 'empty_stream retries exhausted' };
+    }
+    return { type: 'retry', delayMs: this.getRetryDelay(this.state.recoveryCount) };
+  }
+
+  /**
+   * Network and server failures retry with backoff. A provider timeout that fired after the stream had produced model
+   * output is not retried: a retry would discard that output and re-run the whole request, and the provider has
+   * already shown it was slow, not unreachable.
+   */
+  private decideTransient(error: Error, category: 'network_error' | 'server_error'): RecoveryAction {
+    const timeout = findProviderTimeoutError(error);
+    if (timeout?.afterContent) {
+      return { type: 'abort', reason: `provider stream ${timeout.phase} timeout after output; not retried` };
+    }
+    if (this.state.recoveryCount >= this.maxRetries) {
+      return { type: 'abort', reason: `${category} retries exhausted` };
+    }
+    return this.retryHonouringProvider(error, category);
   }
 
   /** 计算指数退避（含 0–500ms 抖动）。 */
@@ -426,7 +345,7 @@ export class ErrorRecovery {
       cause: original,
       category,
       attempts: this.state.recoveryCount + 1,
-      maxAttempts: this.getMaxAttempts(category),
+      maxAttempts: findProviderTimeoutError(original)?.afterContent ? 1 : this.getMaxAttempts(category),
       lastStatus: http?.status,
       bodySnippet: http?.bodyText ?? wire?.bodyText ?? wire?.message ?? original.message,
       streamCode:
@@ -449,28 +368,6 @@ export class ErrorRecovery {
       reason: 'max_tokens reached and recovery limit exhausted',
     };
   }
-
-  // -------------------------------------------------------------------
-  // 内部
-  // -------------------------------------------------------------------
-
-  private extractStatusCode(error: Error): number | undefined {
-    // 兼容多种 SDK：err.status / err.statusCode / err.response.status
-    const e = error as unknown as Record<string, unknown>;
-    const direct = (e.status ?? e.statusCode) as number | undefined;
-    if (typeof direct === 'number') return direct;
-    const response = e.response as Record<string, unknown> | undefined;
-    if (response && typeof response.status === 'number') {
-      return response.status;
-    }
-    // 从错误消息中尝试解析：例如 "429 Too Many Requests"
-    const match = error.message.match(/\b(4\d{2}|5\d{2})\b/);
-    if (match) {
-      const code = Number(match[1]);
-      if (!Number.isNaN(code)) return code;
-    }
-    return undefined;
-  }
 }
 
 function readErrorCode(error: Error): string | undefined {
@@ -484,6 +381,19 @@ export function findProviderHttpError(error: unknown): ProviderHttpError | undef
   while (current instanceof Error && !seen.has(current)) {
     seen.add(current);
     if (current instanceof ProviderHttpError) {
+      return current;
+    }
+    current = current.cause;
+  }
+  return undefined;
+}
+
+export function findProviderTimeoutError(error: unknown): ProviderTimeoutError | undefined {
+  let current: unknown = error;
+  const seen = new Set<unknown>();
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    if (current instanceof ProviderTimeoutError) {
       return current;
     }
     current = current.cause;

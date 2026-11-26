@@ -1,5 +1,5 @@
 import { AppError } from '../errors/appError';
-import type { AgentModelBinding, AppLanguage, LlmProviderId } from './settings';
+import type { AppLanguage, LlmProviderId } from './settings';
 import type { ModeIconKey } from './layout';
 import type { ModelCost } from '../provider-catalog/modelManifestSchema';
 import type { ReasoningSelection } from './modelCapability';
@@ -179,18 +179,10 @@ export interface AgentOverrideFileRequest {
   sourceHash: string;
 }
 
-/** What migrating a manifest that still declares model fields will change. */
-export interface AgentModelMigrationPreview extends AgentOverrideFileRequest {
+/** An override file that still declares fields moved to Settings → Agents, pinned for the user to delete. */
+export interface AgentOverrideFilePreview extends AgentOverrideFileRequest {
   agentId: string;
   scope: AgentManifestWriteScope;
-  /** Written to Settings → Agents for this Agent, replacing `currentBinding`. */
-  binding: AgentModelBinding;
-  currentBinding: AgentModelBinding;
-  /** Per-handoff models have no replacement: the target Agent's own setting applies. */
-  droppedHandoffModels: Array<{ label: string; agent: string; model: string }>;
-  /** Declared values that are not a canonical model id or a supported reasoning level. */
-  ignoredValues: string[];
-  backupPath: string;
 }
 
 /** A project Agent profile awaiting trust, shown in full before the user trusts these exact bytes. */

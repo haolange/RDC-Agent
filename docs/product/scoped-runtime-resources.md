@@ -104,7 +104,7 @@ Composer 的 context usage 环与弹窗由 `RunContextUsageSummary` 驱动：占
 
 Cache 统计范围是当前 Agent Run：`cacheSavedTokens` 为累计 hit，命中率为 `hit / (hit + miss)`（分母为 0 时缺省）。归一化在 provider usage 出口完成：优先原生 `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`，否则 `hit = cacheRead`、`miss = max(input − hit, 0)`；无原生且无 cacheRead 时不产出 hit/miss，缺遥测时 UI 不伪造 0。分类 breakdown（system_prompt、memory_files、skills、system_tools、mcp_tools、mcp_tools_deferred、builtin_tools_deferred、subagent_definitions、summarized_conversation、conversation、free）为 chars/4 估算并按 provider `inputTokens` 缩放；`memory_files` 覆盖 RDC.md 指令链，两个 deferred 段只计未激活 schema 的估算量，不缩放、不占 free。
 
-`workflow:getRunUsage` 使用唯一对象参数 `{ sessionId, runId? }` 并校验 run/session ownership；`workflow:runUsageChanged` 是 `SessionScopedPayload<RunContextUsageSummary>`。最新快照落盘至 `<sessionDir>/usage.json`（subagent 隔离 session 不落盘），格式 `{ schemaVersion: '2', usage }`；缺版本、旧版本与未知版本一律 `STORAGE_SCHEMA_UNSUPPORTED` fail-closed 并保留原件，不迁移。active 与 background session 经同一 projection reducer，迟到事件按 session + turn/run identity 丢弃；terminal 不清空 `lastKnownUsage`。
+`workflow:getRunUsage` 使用唯一对象参数 `{ sessionId, runId? }` 并校验 run/session ownership；`workflow:runUsageChanged` 是 `SessionScopedPayload<RunContextUsageSummary>`。最新快照落盘至 `<sessionDir>/usage.json`（subagent 隔离 session 不落盘），格式 `{ usage }`，不带格式版本；其他格式写下的文件按严格 schema 失败（`STORAGE_CORRUPT`）并保留原件，不迁移。active 与 background session 经同一 projection reducer，迟到事件按 session + turn/run identity 丢弃；terminal 不清空 `lastKnownUsage`。
 
 ## Reasoning
 

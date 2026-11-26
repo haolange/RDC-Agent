@@ -5,7 +5,7 @@ description: Enforce ready provenance and cite investigation artifacts only by i
 
 # Artifact Provenance
 
-写入、升级或引用 `rdc.investigation.v1` 记录时用这份方法：先按依赖顺序持久化，再满足 ready 的三个条件；委派审查时，把审查需要的材料按精确引用交出去。
+写入、升级或引用 `rdc.investigation` 记录时用这份方法：先按依赖顺序持久化，再满足 ready 的三个条件；委派审查时，把审查需要的材料按精确引用交出去。
 
 ## 按依赖顺序写
 

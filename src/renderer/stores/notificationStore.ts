@@ -44,11 +44,14 @@ export const notify = {
   warning: (title: string, message?: string): string =>
     add({ tone: 'warning', title, ...(message ? { message } : {}) }),
   error: (title: string, message?: string): string => add({ tone: 'error', title, ...(message ? { message } : {}) }),
-  /** A failed operation: worded by `humanizeError`, kept until dismissed, technical facts behind "Copy details". */
-  failure: (error: unknown, t: Translator, contextKey?: TranslationKey): string =>
+  /**
+   * A failed operation: worded by `humanizeError`, kept until dismissed, technical facts behind "Copy details"
+   * (the error's own, then any `facts` the caller knows about it).
+   */
+  failure: (error: unknown, t: Translator, contextKey?: TranslationKey, facts: readonly ErrorDetail[] = []): string =>
     add({
       tone: 'error',
       title: humanizeError(error, t, contextKey),
-      details: errorDetails(error),
+      details: [...errorDetails(error), ...facts],
     }),
 };

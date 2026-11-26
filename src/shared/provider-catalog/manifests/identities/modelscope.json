@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "modelscope",
   "name": "ModelScope",
   "npm": "@ai-sdk/openai-compatible",

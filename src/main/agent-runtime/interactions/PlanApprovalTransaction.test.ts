@@ -69,7 +69,6 @@ const declared = {
   requiredSkillIds: ['renderdoc-execution'],
 };
 const awaiting: PlanReviewStateDocument = {
-  schemaVersion: '1',
   planId: 'plan-1',
   ownerTurnId: 'turn-1',
   revision: 2,
@@ -77,7 +76,6 @@ const awaiting: PlanReviewStateDocument = {
   updatedAt: 100,
 };
 const priorOffer: ExecutionOffer = {
-  schemaVersion: '1',
   sourceAgentId: 'debugger',
   targetAgentId: 'general',
   plan: { uri: 'session://plans/plan-old.md', hash: 'b'.repeat(64) },
@@ -148,7 +146,6 @@ function expectNothingCommitted() {
 beforeEach(() => {
   vi.clearAllMocks();
   disk.session = {
-    schemaVersion: '1',
     sessionId: 'sess',
     projectId: 'proj',
     title: 'S',

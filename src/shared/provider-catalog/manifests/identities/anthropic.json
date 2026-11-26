@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "anthropic",
   "name": "Anthropic",
   "npm": "@ai-sdk/anthropic",

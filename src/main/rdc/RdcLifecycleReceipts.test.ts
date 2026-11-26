@@ -8,7 +8,6 @@ it('persists a main-signed lifecycle intent and rejects altered or foreign recei
   const { resolver, sessionPath } = createInvestigationHarness();
   const receipts = new RdcLifecycleReceipts(resolver, () => 'test-key');
   const value: RdcLifecycleReceipt = {
-    schemaVersion: 1,
     event: 'intent',
     sessionId: SESSION_ID,
     projectId: 'p',
@@ -38,7 +37,6 @@ it('finds an unresolved signed baseline after restart and closes only the matchi
   const { resolver, sessionPath } = createInvestigationHarness();
   const receipts = new RdcLifecycleReceipts(resolver, () => 'test-key');
   const base = {
-    schemaVersion: 1 as const,
     sessionId: SESSION_ID,
     projectId: 'p',
     turnId: 't',
@@ -62,7 +60,7 @@ it('finds an unresolved signed baseline after restart and closes only the matchi
       replacementCount: 0,
       replacementFingerprint: 'c'.repeat(64),
       processIdentity: {
-        status: 'available',
+        status: 'available' as const,
         daemon: { pid: 10, start_generation: 'windows-filetime:1' },
         worker: { pid: 11, start_generation: 'windows-filetime:2' },
       },
@@ -102,7 +100,7 @@ it('finds an unresolved signed baseline after restart and closes only the matchi
 
 it('rejects a signed lifecycle body that is not a lifecycle receipt', () => {
   const { resolver, sessionPath } = createInvestigationHarness();
-  const body = JSON.stringify({ schemaVersion: 1, event: 'intent', sessionId: SESSION_ID });
+  const body = JSON.stringify({ event: 'intent', sessionId: SESSION_ID });
   const signature = createHmac('sha256', 'test-key').update(body).digest('hex');
   try {
     const written = resolver.write(
@@ -117,6 +115,62 @@ it('rejects a signed lifecycle body that is not a lifecycle receipt', () => {
         expectedHash: `sha256:${written.hash}`,
       }),
     ).toThrow(expect.objectContaining({ code: 'RDC_LIFECYCLE_RECEIPT_INVALID' }));
+  } finally {
+    rmSync(sessionPath, { recursive: true, force: true });
+  }
+});
+
+it('counts signed recovery attempts per input, content and device across store instances', () => {
+  const { resolver, sessionPath } = createInvestigationHarness();
+  const receipts = new RdcLifecycleReceipts(resolver, () => 'test-key');
+  const destination = { inputId: 'input', contentSha256: 'b'.repeat(64), deviceId: 'device' };
+  const intent = (operationId: string, target = destination): RdcLifecycleReceipt => ({
+    event: 'intent',
+    sessionId: SESSION_ID,
+    projectId: 'p',
+    turnId: operationId === 'op-1' ? 't1' : 't2',
+    operationId,
+    planUri: 'session://plans/p.md',
+    planHash: 'a'.repeat(64),
+    recordedAt: 1,
+    original: null,
+    from: null,
+    destination: target,
+    recovery: {
+      cause: { operation: 'rd.debug.run_to', argsFingerprint: 'e'.repeat(64), code: 'worker_stuck' },
+      observed: {
+        source: 'daemon',
+        daemon: { state: 'alive', pid: 10, start_generation: 'windows-filetime:1' },
+        worker: { state: 'exited', pid: 11, start_generation: 'windows-filetime:2' },
+        replaySession: null,
+      },
+      classification: { decision: 'quarantined', code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED', reason: 'unexplained' },
+    },
+  });
+  try {
+    const first = receipts.write(intent('op-1'));
+    receipts.write({
+      event: 'failed',
+      sessionId: SESSION_ID,
+      projectId: 'p',
+      turnId: 't1',
+      operationId: 'op-1',
+      planUri: 'session://plans/p.md',
+      planHash: 'a'.repeat(64),
+      recordedAt: 2,
+      intent: first,
+      code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED',
+    });
+    receipts.write(intent('op-2'));
+    receipts.write(intent('op-3', { ...destination, deviceId: 'other' }));
+    const { recovery: _recovery, ...plain } = intent('op-4') as Extract<RdcLifecycleReceipt, { event: 'intent' }>;
+    receipts.write(plain);
+    expect(new RdcLifecycleReceipts(resolver, () => 'test-key').recoveryAttempts(SESSION_ID, 'p', destination)).toEqual(
+      {
+        attempts: 2,
+        failed: 1,
+      },
+    );
   } finally {
     rmSync(sessionPath, { recursive: true, force: true });
   }

@@ -1,8 +1,8 @@
 import { AppError } from '@shared/errors/appError';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
-import { parseRdcNativeResult, type RdcNativeEnvelope } from './RdcNativeProtocol';
+import { parseRdcNativeResult, rdcFaultCode, type RdcNativeEnvelope } from './RdcNativeProtocol';
 import { parseRdcProcessIdentity, type RdcProcessIdentity } from './RdcProcessIdentity';
-import { assertRdcContextLeaseOwnership, quarantineRdcContext } from './RdcRuntimeContextRegistry';
+import { assertRdcContextLeaseOwnership, registerRdcFault } from './RdcRuntimeContextRegistry';
 import { validateRdcSwitchSnapshot } from './RdcSwitchSnapshot';
 import type { SessionScope } from '@shared/types/session';
 import type { RdcTurnBinding } from './RdcTurnBindings';
@@ -41,7 +41,21 @@ export async function closeOwnedRemoteCapture(input: {
     )
       throw new AppError('RDC_SWITCH_BINDING_CHANGED', 'the owning replay lease changed.');
   };
+  // The native call in flight when a close step fails is the cause the quarantine records.
+  let current = { operation: 'rd.session.get_context', args: {} as Record<string, unknown> };
+  const fault = (error: unknown, reason: string) => {
+    registerRdcFault({
+      sessionId: scope.sessionId,
+      expectedVersion: lease.version,
+      operation: current.operation,
+      nativeArgs: current.args,
+      cause: signal?.aborted ? 'RDC_OPERATION_CANCELLED' : rdcFaultCode(error),
+      reason,
+    });
+    input.onUnconfirmed();
+  };
   const invoke = async (operation: string, args: Record<string, unknown>): Promise<RdcNativeEnvelope> => {
+    current = { operation, args };
     signal?.throwIfAborted();
     const result = await rdcCliInvokerService.executeCLI(
       'call',
@@ -89,12 +103,7 @@ export async function closeOwnedRemoteCapture(input: {
     snapshot = validateRdcSwitchSnapshot(await readContext(), lease);
     assertLease();
   } catch (error) {
-    quarantineRdcContext(
-      scope.sessionId,
-      lease.version,
-      'The existing replay identity could not be verified before switching.',
-    );
-    input.onUnconfirmed();
+    fault(error, 'The existing replay identity could not be verified before switching.');
     throw error;
   }
   if (snapshot.replacementCount)
@@ -107,12 +116,7 @@ export async function closeOwnedRemoteCapture(input: {
     checkClosedState(await readContext(), '', snapshot.processIdentity);
     assertLease();
   } catch (error) {
-    quarantineRdcContext(
-      scope.sessionId,
-      lease.version,
-      'The previous capture close could not be verified; close the owning context before continuing.',
-    );
-    input.onUnconfirmed();
+    fault(error, 'The previous capture close could not be verified; close the owning context before continuing.');
     throw error;
   }
   input.onClosed();

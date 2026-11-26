@@ -1,18 +1,51 @@
 import os from 'os';
+import { StringDecoder } from 'string_decoder';
 import { nowMs } from '@shared/utils/id';
 import { requiresCommandInterpreter } from '../platform/shell';
 import { processSupervisor, type SupervisedProcess } from '../runtime/ProcessSupervisor';
+import type { ChildProcess } from 'child_process';
 
 export interface ShellInvocationRequest {
   command: string;
   args?: string[];
   cwd?: string;
   env?: NodeJS.ProcessEnv;
-  timeoutMs?: number;
+  /** The process wall, or `null` for none: the caller then bounds the process itself (and aborts it). */
+  timeoutMs: number | null;
   outputBufferBytes?: number;
   runId?: string;
   contextId?: string;
   abortSignal?: AbortSignal;
+  /** Every complete stderr line as it arrives (UTF-8, without the line break); stderr is still buffered as well. */
+  onStderrLine?: (line: string) => void;
+}
+
+/** A line longer than this is delivered as it stands, so a stream without line breaks cannot grow without bound. */
+const MAX_STDERR_LINE_CHARS = 1024 * 1024;
+
+function streamLines(stream: ChildProcess['stderr'] | undefined, onLine: (line: string) => void): void {
+  if (!stream) return;
+  const decoder = new StringDecoder('utf8');
+  let pending = '';
+  const push = (text: string) => {
+    pending += text;
+    let index = pending.indexOf('\n');
+    while (index >= 0) {
+      onLine(pending.slice(0, index).replace(/\r$/u, ''));
+      pending = pending.slice(index + 1);
+      index = pending.indexOf('\n');
+    }
+    if (pending.length > MAX_STDERR_LINE_CHARS) {
+      onLine(pending);
+      pending = '';
+    }
+  };
+  stream.on('data', (chunk: Buffer | string) => push(typeof chunk === 'string' ? chunk : decoder.write(chunk)));
+  stream.on('end', () => {
+    push(decoder.end());
+    if (pending) onLine(pending);
+    pending = '';
+  });
 }
 
 export function resolveExitCode(code: number | null, signal: NodeJS.Signals | null): number {
@@ -51,16 +84,19 @@ export class ShellInvocationService {
       },
       shell: needsShell,
       windowsHide: true,
-      timeoutMs: request.timeoutMs,
+      timeoutMs: request.timeoutMs ?? undefined,
       ringBufferBytes: request.outputBufferBytes,
       abortSignal: request.abortSignal,
     });
+    // A spawn that threw synchronously has no child; its join reports spawn_failed below.
+    if (request.onStderrLine) streamLines((supervised.child as ChildProcess | null)?.stderr, request.onStderrLine);
 
     const procId = supervised.id;
     this.activeProcesses.set(procId, { supervised, runId: request.runId, contextId: request.contextId });
 
     try {
-      const info = await supervised.join(request.timeoutMs ?? 120_000);
+      // The wall (if any) and every abort end in close or in the supervisor's bounded orphan observation.
+      const info = await supervised.join();
       const stdout = supervised.stdout.toString();
       const stderr = supervised.stderr.toString();
       const outputMetadata = {

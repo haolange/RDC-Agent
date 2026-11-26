@@ -4,7 +4,7 @@ RDC Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测�
 
 ## 原生 CLI 配置与输出边界
 
-- RDC-Tool CLI 安装位置、参数前缀、工作目录、环境与超时是 User/Device 配置，Project 资源不能覆盖本机执行入口。
+- RDC-Tool CLI 安装位置、参数前缀、工作目录、环境与无进展等待是 User/Device 配置，Project 资源不能覆盖本机执行入口。
 - 桌面调用原生 CLI 时，若 Settings `env` 未写 `RDC_TOOL_INTERMEDIATE_ROOT`，主进程注入用户资源根下的 `rdc-tool-intermediate`。
   - Settings 已写则原样使用。
   - CLI 可执行文件仍只来自 Settings，不探测安装包或源码树，不把 Tools 默认 `intermediate` 当作产品 fallback。
@@ -45,20 +45,20 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 - 它不是整批未来空间预留、物理磁盘剩余量或未来写入成功保证；每次写入仍走既有原子预留、限额和事务。
 - 计划据此核算保守材料预算，实际失败时保留已发生效果并按恢复合同处理，不把一个 baseline 导出成功当后续容量证明。
 
-`cliProcess` 只在执行上下文与当前 session/project/context/lease version 的冻结绑定一致、CLI 已启用且 timeout 为有效正整数时提供冻结的 `timeoutMs`，不序列化 executable、argv、cwd 或环境。
+`operationBudget` 只在执行上下文与当前 session/project/context/lease version 的冻结绑定一致、CLI 已启用时提供冻结的 `noProgressTimeoutMs`，不序列化 executable、argv、cwd 或环境。
 
-- 其 scope 是一次 CLI invocation，`wholeOperationDeadline=false`、`nativeTerminationGuaranteed=false`；主进程的前置核验和调用后 replay observation 可能另调用 CLI，排队、模型、存储和后续恢复须另计，不将这个数冒充整个实验或整个操作的绝对墙钟上界。
+- 它是每个 RDC 操作的无进展耐心（`rule: no-progress`、`scope: each-rdc-operation`），不是进程墙钟：持续报告进展的操作没有总时长，静默超过它的操作被判定卡住，worker 被停止，owning context 被隔离（`stuckOutcome`）。
+- `wholeOperationDeadline=false`；主进程的前置核验和调用后 replay observation 可能另调用 CLI，排队、模型、存储和后续恢复须另计，不将这个数冒充整个实验的上界。
 - 缺失、漂移和读取失败显式 unavailable，不补默认零值。
-- 超时或结果不确定依旧隔离 owning context；没有 close/error 回执不能认定子进程退出。
-- Windows 树终止命令自身设置 5 秒 timeout；重复取消、timeout 与 shutdown 合并为一次初始终止和一次升级，保留首个中止原因。
-- `termination.maxTreeKillAttempts=2`，`joinTerminationAdditionalWaitMs=2×5000+2000+1000=13000`，均由同一 ProcessSupervisor 政策导出，供单 CLI join 等待规划；这不覆盖排队、spawn、模型、存储或事件循环停顿，也不承诺目标真实退出。
-- 终止命令返回仍不能替代 close/error。
+- 结果不确定依旧隔离 owning context；没有 close/error 回执不能认定子进程退出。
 
 真实进程连续性使用同一受控 CLI 的 `rd.session.get_context.data.process_identity` 和每次 canonical 结果的 `meta.process_identity`。
 
 - Tool 仅在实际 daemon child 中读取自身与父 daemon 的 OS 进程出生标识，分别返回 `pid + start_generation`；Windows 为进程创建 FILETIME，Linux 为 boot ID 与进程启动 tick。
 - 父身份不符、读取失败或平台不支持时明确 unavailable，不用持久逻辑 ID、缓存或零值替代。
 - 每个实验阶段须比较完整 daemon/worker 身份，PID 复用或任一世代变化使连续性失效；该字段进入既有主进程签名结果，不自动证明因果、恢复或设备呈现，不增加生命周期权限。
+- `parseRdcNativeResult` 是所有结果的唯一解析处：成功结果若能确定所属 daemon context（期望值或结果自报的 `context_id`），其 `meta.process_identity` 记为该 context 最近一次完成工作的进程（`observedRdcProcessIdentity`）；获批 capture 控制器的 `lastVerified` 在恢复时取这个最新身份，而不是回合开始时的快照。生命周期回执里的 `processIdentity` 按 `RdcProcessIdentitySchema` 严格校验。
+- 恢复判断只读 `rdc-tool context status`（`readRdcContextStatus`，经控制命令路径而非 `call`，严格校验 `rdc_tool.context.status` 信封）：它从不启动 daemon 或 worker，也不写状态。已删除的 `readRdcRecoverySnapshot` 用 `rd.session.get_context` 观察隔离 lease，会拉起新 worker 并改变要核对的身份。
 
 状态控制的实现语义随共享 CLI 方法分发，不能要求每次 capture 调查访问上游源码仓库。
 
@@ -108,15 +108,25 @@ Memory 与 Knowledge 使用独立 scoped preload domain（`memory` / `knowledge`
 - 目录不从独立文件配置读取，机器调用统一 canonical JSON；不匹配时明确升级，不回退旧命令。
 - 安装必须在 `version --json` 里报告自己提供的 catalog（`catalog.fingerprint` / `tool_count`，RDC-Tool 1.1.3 起），该报告须与 `tools list` 实际提供的 catalog 一致，且须等于本构建随包的 `resources/agent-runtime/rdc-tool-catalog-identity.json`（由 `scripts/generate-rdc-tool-guides.mjs` 与 skill 指南一同生成）；未报告为 `RDC_UPGRADE_REQUIRED`，不一致为 `RDC_CATALOG_MISMATCH`，错误写明双方指纹。
 
-Settings 持久化保留 executable、argsPrefix、cwd、env 和 timeout，用户通过安装根目录选择配置前三项。main 解析真实路径，检测只访问已配置目录和 Tools 默认安装目录；验证草稿时读取同安装版本/catalog，成功后走既有 Settings 保存。选择取消、验证失败不覆盖原值。高级面保留 env/timeout。四个生命周期命令模板、模板变量、catalogPath 和 JSON 模式配置已移除。接口匹配根据软件所需契约判定，不把工具总数或包版本作为权限条件。
+Settings 持久化保留 executable、argsPrefix、cwd、env 和 `noProgressTimeoutMs`，用户通过安装根目录选择配置前三项。main 解析真实路径，检测只访问已配置目录和 Tools 默认安装目录；验证草稿时读取同安装版本/catalog，成功后走既有 Settings 保存。选择取消、验证失败不覆盖原值。高级面保留启用、无进展等待与 env。四个生命周期命令模板、模板变量、catalogPath 和 JSON 模式配置已移除。接口匹配根据软件所需契约判定，不把工具总数或包版本作为权限条件。
 
 正式安装来源按发布资产 SHA-256、`RELEASE_MANIFEST.json` / `SBOM.json` 的版本与 `source_revision`、安装文件哈希逐层核对，再通过实际主进程的运行摘要、catalog 和安装验证入口确认同安装绑定。升级使用已验证的正式包，不向安装目录混拷开发源码或重写发行清单；包版本用于来源诊断，不能替代实际能力校验。历史发行记录保留其当时版本和验证边界。
 
-RDC-Tool 的 session worker 对 `rd.session.*` 统一提供 60 秒操作预算，CLI transport 在此基础上增加 5 秒响应缓冲，实际传输门限为 65 秒；RDC-Agent 常规 CLI 调用的本机默认预算为 120 秒。
+RDC 操作不受固定时长约束，只受无进展预算约束（RDC-Tool 公共契约的「执行预算、进度与取消」）。Settings `tooling.rdcCli.noProgressTimeoutMs`（默认 300000，范围 30000–3600000，界面以秒编辑）是 RDC 操作的无进展耐心：操作多久没有报告进展就判定卡住；持续报告进展的操作没有总时长。
 
-- Remote 准备显式传入冻结的本机 native budget，并按 catalog 的 timeout_policy 推导 worker/transport/宿主收口余量，不能把常规120秒外壳门限套在该连接上（见下文 Remote 准备预算）。
-- Settings 中显式保存的超时值原样保留，不做默认值迁移。
-- 各层门限由所属边界负责，普通 session 调用不传第二套 session timeout。
+- `prepareTurn` 把它冻结在 turn binding 中；`freezeRdcTurnBinding` 按冻结目录每个操作 `execution_budget` 的最小、最大值校验，超出为 `RDC_NO_PROGRESS_TIMEOUT_UNSUPPORTED`，错误写明可接受的秒数范围。
+- 设置文件严格校验范围；保存越界值报 `IPC_VALIDATION_ERROR`，不钳制、不迁移。
+- 不执行操作的控制命令（daemon start/stop/status、context clear/status、version、tools list、doctor）使用固定的 `RDC_CONTROL_TIMEOUT_MS`，覆盖 RDC-Tool 30 秒 daemon 启动锁、就绪与确认停止；安装验证同样使用它，不借用用户的无进展耐心。CLI 的只读快捷查询（event、pipeline、resource、vfs、session preview）不能输出帧，以冻结的无进展耐心为进程墙。
+
+`RdcCliInvokerService.executeCLI('call')` 是所有 RDC 操作的唯一入口，内置操作监视器 `RdcOperationWatcher`（调用方不变）：
+
+- 追加 `--no-progress-ms <冻结值> --request-id rdc-agent-<uuid> --progress-stream`，进程不设墙钟：静默的原生工作由 RDC-Tool 看门狗按冻结预算终止，以 `worker_stuck` 等规范错误返回。
+- stderr 的 NDJSON 帧（heartbeat、progress、native_call）经 zod 严格解析后交给 `onProgress`；声称是帧却不合规或属于别的 request id 记为 `RDC_CLI_PROTOCOL`（结果未知），普通 stderr 文本原样保留。
+- 首帧之前 CLI 在做控制工作（连接或启动 daemon），受 `RDC_CONTROL_TIMEOUT_MS` 约束；之后帧间隔超过 20 秒（`RDC_HEARTBEAT_GAP_MS`，daemon 每 2 秒心跳、CLI 自身 15 秒报 `daemon_unresponsive`）判为 `RDC_DAEMON_UNRESPONSIVE` 并终止 CLI，结果未知。
+- 中止不直接杀 CLI：先 `daemon cancel --request-id`（控制期限 `RDC_CANCEL_TIMEOUT_MS` 30 秒），等回执，再给 exec CLI 至多 5 秒输出信封并退出，仍未退出才终止；回执（cancelled、completed、terminated、not_found 或不可用原因）随结果返回，`executeRdcShell` 把它写进隔离记录。
+- 帧还驱动 Working 行的进度：`shell.rdc` 把帧折叠成当前状态（每秒至多一次）作为工具的部分结果，`AgentEventBridge` 只把这种部分结果转成临时事件 `tool.progress`，经会话流送到渲染端，不进入持久化消息、委派轨迹或模型可见结果。
+- `RdcNativeProtocol` 把进程级失败映射为各自的码并解析 details（`processFailure`）：`worker_stuck` → `RDC_OPERATION_STUCK`，`worker_lost` / `worker_request_failed` → `RDC_WORKER_LOST`，`worker_unavailable` → `RDC_WORKER_UNAVAILABLE`（未执行），`operation_cancelled` → `RDC_OPERATION_CANCELLED`，`daemon_lost` → `RDC_DAEMON_LOST`，`daemon_unresponsive` → `RDC_DAEMON_UNRESPONSIVE`；其余原生失败仍为 `RDC_NATIVE_FAILURE`。
+- Remote 准备没有自己的时长参数，和其它操作一样只受请求的无进展预算约束（见下文 Remote 准备预算）。
 
 `prepareTurn` 冻结 CLI 配置、完整操作定义及其指纹、owning session/context/replay lease 身份。在途 Settings 变化不影响该轮。General 使用已有 shell 的结构化 RDC 模式，普通 command 与 rdc 互斥；轻量发现只返回匹配操作或单个操作说明，不把完整 catalog 展开进每次模型请求。
 
@@ -196,7 +206,7 @@ shader replacement 返回一致的 `status=noop`（顶层与 replacement 的身�
 - `WorldState.replay.exclusiveLock` 在此受控范围内有该来源支撑，仍须三态分别保存并与阶段回执核对；不是整批 native mutex 或外部进程排除证明，不免除实际变更状态及恢复校验。
 - context 小结果沿既有制品路径保留 inline 正文和持久 URI/hash；不能据新的证明回填旧实验资格。
 
-远程打开期间通过冻结 CLI 查询所属 daemon 的 `active_operation`；只有原生 transfer stage 才显示传输阶段，查询失败不推测进度。足迹记录原生 `revision`、实际替换/恢复状态和显示参数。观察无法确认 EID 时保存无图片的失败事实；人工与 Agent 操作统一更新同一当前回放状态和图片，不再保留 Agent 专属图片镜像；实际 image EID 与 observation 元数据来自同一次原生观察。后台操作证据继续保存，不作为第二套回放 UI。
+远程打开的传输阶段来自 `rd.capture.open_file` 自己的进度帧：只有原生 transfer stage 才显示传输阶段，没有帧不推测进度，也不轮询 daemon status。足迹记录原生 `revision`、实际替换/恢复状态和显示参数。观察无法确认 EID 时保存无图片的失败事实；人工与 Agent 操作统一更新同一当前回放状态和图片，不再保留 Agent 专属图片镜像；实际 image EID 与 observation 元数据来自同一次原生观察。后台操作证据继续保存，不作为第二套回放 UI。
 
 live PNG 由 main 持有、projection 只含 token/尺寸/EID，renderer 经授权 IPC 取字节；关闭或替换时删除 live 文件。每个 session 历史通过 ReplayHistoryStore 原子提交，图片 hash 去重；回看不执行 native call。输入删除关闭所有关联绑定，正常 close 保留历史。
 
@@ -300,7 +310,8 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。
 
 - `runtime_context` 对同一 session/project 的隔离身份返回明确的受控恢复状态，不将仍打开的 capture 误报为未打开，也不向其他 scope 泄露保留的 lease。
-- 新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化。
+- 新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化：`prepareTurn` 把本会话被隔离的 lease 身份冻结进 binding（其余原生路径照旧拒绝它），获批同一计划的新 turn 在 `ApprovedCaptureController.initialize` 中接续上一 turn 未闭合的签名 baseline（仍是用户的原始位置），以该 lease 上最近一次签名位置为 `lastVerified`，进入待恢复状态：只放行 `capture_recover`，其他现场操作返回 `RDC_CONTEXT_QUARANTINED`；恢复成功后正常工作，终态 `resolved` 以原 baseline 的 turn 签署。不同计划的未闭合 baseline 仍要求先在 Capture 恢复。
+- turn 内 lease 被隔离后，`capture_restore` 先要求 `capture_recover`；恢复成功后 restore 在新 lease 上运行，二者不再互相阻塞。
 - 失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
 
 `rdc_probe` 的 `probe` 是只读语义查询闭集：`context_status`、`resource_list`、`event_list`、`event_search`、`event_show`、`pipeline_show`、`vfs_ls`、`vfs_cat`，规划与执行身份都可使用；像素历史、Shader 调试、替换和导出不在其中。
@@ -319,15 +330,35 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 - 切换、停止和新身份通过主进程签名回执关联。
 - 操作仍受当前权限模式约束，不能用能力声明代替授权。
 
+结果未知的原生调用只经 `RdcRuntimeContextRegistry.registerRdcFault({sessionId, expectedVersion, operation, nativeArgs, cause, reason})` 隔离 lease，`quarantineRdcContext` 是它的私有实现。原因必填：操作、原生参数的 `rdcDigest` 指纹与观察到的码（RDC-Tool 错误码或 Agent 码，取消为 `RDC_OPERATION_CANCELLED`），同一 lease 只保留首个原因。站点包括 `executeRdcShell`（含取消）、`executePreservedPipelineProbe`、`registerRdcReplayFailure`（probe 与 observe：每个没有无效果证明的原生故障与 CLI 协议错误）、`closeOwnedRemoteCapture`、`revokeDelegatedLease` 与获批 capture 切换失败（`quarantineChanged`）。因此每个隔离都带原因，受控恢复的既有身份与进程核验决定能否重建。
+
 原生只读查询返回回放致命故障时，将故障记录在发起查询的冻结 lease 上。
 
-- 同输入、设备及权限的原生故障可请求 `capture_recover`：只处理实际失败而隔离的 lease，中断并 join 持该 lease 的相关子执行，核对原 daemon/worker 身份，按 clear context → 确认 daemon stop → 重开和重新准备的顺序进行。
+- 同输入、设备及权限的原生故障可请求 `capture_recover`：只处理实际失败而隔离的 lease，中断并 join 持该 lease 的相关子执行，按身份链分类（见下文「身份链恢复」），再按 clear context → 确认 daemon stop → 重开和重新准备的顺序进行。
 - 清理期间若 ADB 删除命令失败，Tool 用同一 ADB server 的完整协议响应核验旧转发是否仍在。
 - 确认消失才继续释放，无法确认则保留归属。
-- 相同失败条件重复或进程退出、权限、安装状态无法确认时停止并保留隔离，不伪造恢复。
+- 身份链无法解释、权限或安装状态无法确认时停止并保留隔离，不伪造恢复。
 - 任务进入前的位置由签名 baseline 记录；中断或重启后未闭合记录在 Capture 显示，由用户触发恢复，不自动续跑模型。
-- 恢复前复核输入 hash、设备、替换和旧进程，只有重新观察到原位置才签 resolved。
+- 恢复前复核输入 hash、设备、替换和旧进程（`probeProcess` 按 pid + birth 判断，复用的 pid 不算存活，无法读取的身份不算退出），只有重新观察到原位置才签 resolved。
 - 历史结果不被补签，不跨新旧现场拼接实验。
+
+### 身份链恢复
+
+恢复准入只有一个函数 `classifyRecovery`（`src/main/rdc/RdcRecoveryClassification.ts`），Agent 的 `capture_recover`（`ApprovedCaptureHost.inspectRecovery` 经 `inspectQuarantinedCapture`）与用户在 Capture 面板的恢复（`restorePreviousCapture`，关闭隔离 context 之前）都用它。输入是主进程最近核验的 daemon/worker 身份（`lastVerified`，随成功结果的 `meta.process_identity` 刷新）、只读 `context status` 与设备动作是否未决：
+
+| 结论 | 条件 |
+| --- | --- |
+| keep | 核验过的 daemon 与 worker 都存活且身份（pid + start_generation）不变，replay session 存活且没有 `requires_restart` |
+| rebuild | daemon 仍是核验过的那一个；从核验过的 worker 起，每一次 worker 变化都有该 worker 本身的退出回执（`worker_lifecycle` 中 `exit_confirmed` 的 exited 记录，或 session 的 `worker_exit`），replay session 等待重启；`lost` 列出这些已确认退出的 worker 及其原因、trace/request id 与栈日志 |
+| quarantined | 其余一切为 `RDC_RECOVERY_PROCESS_UNEXPLAINED`（daemon 换了或未回答、退出未确认、身份复用、session 自称存活却换了 worker 等）；设备动作未决为 `RDC_DEVICE_ACTION_UNCONFIRMED` |
+
+结论签进恢复 intent 回执；quarantined 立即写 failed 回执并停止，不触碰现场。
+
+恢复的 transition 回执带 `lostWithProcess`，只记事实、从不声称回滚：旧 replay session 的全部 debug handle 失效；恢复时仍开着的实验（running/polluted）记为 `interrupted-by-infrastructure`，恢复不再等待模型先关闭它们，实验记录本身仍由模型更新；最近核验位置上的 replacement 数与指纹（`rolledBack: false`，随进程丢失）；rebuild 时已确认退出的 worker；`newBaselineRequired: true`。旧 baseline/intervention 回执仍绑定旧进程身份，五阶段验收要求同一 context 与 lease，所以重建后必须重新取 baseline，旧实验不会跨新旧现场拼接。
+
+**卡死的自主处置**：`executeRdcShell` 把 `RDC_OPERATION_STUCK` / `RDC_WORKER_LOST` 经 `registerRdcFault` 登记（原因写明 worker 栈日志路径）。失败交付给模型之前，`ToolExecutorFactory` 对获批 capture 运行 `settleRdcProcessFault`（`src/main/agent-runtime/orchestration/RdcProcessFaultRecovery.ts`）：权限为 full-access 或 auto-review 时，`classifyFault` 只读判定，结论为 rebuild 就以与 `capture_recover` 相同的 prepare + recover（独占资源、同样的签名回执与 runtime epoch）重建，并把 `runtimeRecovery`（新回执、当前位置、需要新 baseline）附在该次失败结果上，turn 继续；结论为 quarantined 或恢复失败时，结果带具体阻塞码，turn 在这次调用后结束，诊断为 `CONVERSATION_RDC_RECOVERY_BLOCKED`，复制详情含阻塞码。其它权限模式只附结论：rebuild/keep 时提示可用 `capture_recover`（照常经审批），quarantined 时报告阻塞码，turn 不中止。每一步恢复（判定、成功、失败）在生命周期账本写一条 `recovery_step`（结论、第几次尝试、阻塞码）。
+
+Agent 恢复的次数是持久预算：`RdcLifecycleReceipts.recoveryAttempts` 从会话里已签名的回执统计同一 {输入、内容 hash、设备} 的恢复 intent（每次尝试一条，失败的另有 failed 回执指向它），跨 turn 与重启有效；达到 `RDC_RECOVERY_ATTEMPT_LIMIT`（2）后 `classifyRecovery` 先于身份链判 `RDC_RECOVERY_BUDGET_EXHAUSTED`。没有内存里的"已恢复过"集合。用户在 Capture 面板发起的恢复每次都是人的明确操作，不计入、也不受此预算限制。
 
 获批调查的 `turn_complete` 在记录声明前检查入口位置是否恢复；现场无法核验时，把主进程观察到的错误返回工具调用，让模型据此如实声明 partial／blocked 及剩余恢复，而不是先接受声明再要求它猜测错误。终答仍重新核验恢复状态；已声明的 partial 不升级为成功，恢复回执仍以实际现场为准。
 
@@ -373,9 +404,9 @@ Settings 的显式验证执行同安装 doctor，检查 Python、RenderDoc、And
 
 已有 Capture 变更设备先显示一次确认，取消保持回放和画面；确认后先 clear_context、daemon stop 并核实释放，再连接新设备。准备失败保留目标；取消等待自有原生动作及清理，不声称撤回已完成的 APK 安装。目标辅助程序的必要替换由选择设备授权；未知归属服务和 busy 不抢占。页面切换不释放已准备连接，应用重启不自动连接；明确断开、真实离线、会话删除或退出时清理自有资源，borrowed helper 不关闭。查询发现失败不等于真实断连。
 
-准备阶段仅读取同一 owning daemon 的 status，核验 context、operation、起始时间和已观察 trace 后转发真实 checking/installing/starting/verifying；轮询不与自身重叠，完成或取消时停止并等待最后查询收口。取消后在释放 context 前通过 canonical rd.core.get_operation_history 读取对应已收口操作的安装回执；有事实才投影 installation，缺失回执表示未知，不表示安装回滚。
+准备阶段只读取 `rd.remote.connect` 自己的进度帧（属于本次 request id），转发真实 checking/installing/starting/verifying，不启动 status 轮询进程。取消时 Tools 在原生动作收口后发出最后的 `cancelled` 阶段，其 details 携带已提交的安装回执或未决 PackageManager 事实；有事实才投影 installation 与设备动作，缺失表示未知，不表示安装回滚。
 
-Remote 准备显式将冻结本机 timeoutMs 作为原生 timeout_ms，不削减用户操作预算。worker、transport 和外壳等待收口的余量来自同一 catalog 定义中的 timeout_policy，由 Tools 唯一策略生成并纳入指纹；主进程按该冻结策略推导单次外壳超时，不复制 Python 常量，也不修改用户设置。缺少此策略的远端契约拒绝执行。原生超时与进程退出是不同事实，必须允许原生先返回结构化结果并收口自有动作。
+Remote 准备预算：`rd.remote.connect` 不再有 `timeout_ms` 参数或 timeout_policy，连接尝试受请求的执行预算约束。RDC-Tool 把 checking、installing、starting、verifying 与等待端点的每个阶段进度都当作进展，协作截止早于栈转储与 daemon 看门狗，所以静默的连接以结构化的 `remote_connect_timeout` 结束并清理已取得的资源。目录的每个条目都发布 `execution_budget`（`rule: no_progress` 与默认、最小、最大无进展毫秒数），`RdcOperationCatalog.validateDefinitions` 逐条严格校验，缺失或形状不符为 `RDC_UPGRADE_REQUIRED`。原生超时与进程退出是不同事实，必须允许原生先返回结构化结果并收口自有动作。
 
 Tools 在同次连接预算内每秒串行核验缺失/矛盾安装回执，只有 PackageManager 结束且目标 APK 身份匹配后才继续启动与握手，不凭退出码或空安装会话宣布成功，不盲目重复安装。
 

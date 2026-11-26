@@ -38,7 +38,7 @@ export interface AppSettingsState {
    */
   patchSettings: (ops: SettingsPatchOp[]) => Promise<AppSettings>;
   /**
-   * Adopts a view main returned from a settings command other than `settings:patch` (Agent import, migration, trust).
+   * Adopts a view main returned from a settings command other than `settings:patch` (Agent import, override deletion, trust).
    * It replaces the confirmed settings only when its revision is not older than theirs; intents in flight stay on top.
    */
   adoptView: (view: SettingsView) => void;

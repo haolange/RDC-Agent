@@ -15,7 +15,7 @@ import {
   getRdcContextLease,
   setRdcRuntimeContextForSession,
   grantDelegatedLease,
-  quarantineRdcContext,
+  registerRdcFault,
 } from '../../rdc/RdcRuntimeContextRegistry';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { createRdcProbeTool, type RdcProbeToolDeps } from './RdcProbeTool';
@@ -28,7 +28,7 @@ const settings = {
   argsPrefix: [],
   workingDirectory: '',
   env: {},
-  timeoutMs: 1000,
+  noProgressTimeoutMs: 300_000,
 };
 function context() {
   const lease = setRdcRuntimeContextForSession(
@@ -202,7 +202,14 @@ describe('native RDC probe', () => {
     expect(executeCli).not.toHaveBeenCalled();
     clearRdcContextLeases();
     const next = context();
-    quarantineRdcContext('s', getRdcContextLease('s')!.version, 'uncertain');
+    registerRdcFault({
+      sessionId: 's',
+      expectedVersion: getRdcContextLease('s')!.version,
+      operation: 'rd.test',
+      nativeArgs: {},
+      cause: 'native_failure',
+      reason: 'uncertain',
+    });
     expect((await tool.execute('t', { action: 'probe' }, undefined, undefined, next)).isError).toBe(true);
     expect(executeCli).not.toHaveBeenCalled();
   });

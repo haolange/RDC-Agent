@@ -27,7 +27,7 @@ const forkId = 'msg-user-1';
 branchState.forks.push({
   forkId,
   anchorMessageId: 'msg-user-1',
-  activeBranchId: 'branch-v2',
+  activeBranchId: 'branch-retry',
   branches: [
     {
       branchId: ROOT_BRANCH_ID,
@@ -37,7 +37,7 @@ branchState.forks.push({
       rootTurnId: 'turn-1',
     },
     {
-      branchId: 'branch-v2',
+      branchId: 'branch-retry',
       parentBranchId: ROOT_BRANCH_ID,
       variantIndex: 1,
       anchorUserMessageId: 'msg-user-1b',
@@ -45,7 +45,7 @@ branchState.forks.push({
     },
   ],
 });
-branchState.activeLeafBranchId = 'branch-v2';
+branchState.activeLeafBranchId = 'branch-retry';
 
 const allMessages = [
   {
@@ -97,7 +97,7 @@ const allMessages = [
     projectId: 'proj-1',
     role: 'user',
     content: 'version two question',
-    branchId: 'branch-v2',
+    branchId: 'branch-retry',
     forkId,
     variantIndex: 1,
     createdAt: now + 40,
@@ -109,7 +109,7 @@ const allMessages = [
     projectId: 'proj-1',
     role: 'assistant',
     content: 'answer two',
-    branchId: 'branch-v2',
+    branchId: 'branch-retry',
     createdAt: now + 50,
   },
   {
@@ -119,7 +119,7 @@ const allMessages = [
     projectId: 'proj-1',
     role: 'user',
     content: 'follow up on v2',
-    branchId: 'branch-v2',
+    branchId: 'branch-retry',
     createdAt: now + 60,
   },
   {
@@ -129,7 +129,7 @@ const allMessages = [
     projectId: 'proj-1',
     role: 'assistant',
     content: 'follow up answer v2',
-    branchId: 'branch-v2',
+    branchId: 'branch-retry',
     createdAt: now + 70,
   },
 ];
@@ -142,18 +142,18 @@ assert(
 );
 
 const corruptedBranchState = JSON.parse(JSON.stringify(branchState));
-const corruptedBranch = corruptedBranchState.forks[0].branches.find((entry) => entry.branchId === 'branch-v2');
+const corruptedBranch = corruptedBranchState.forks[0].branches.find((entry) => entry.branchId === 'branch-retry');
 corruptedBranch.anchorUserMessageId = '';
 corruptedBranch.rootTurnId = '';
 const repaired = repairConversationBranchState(allMessages, corruptedBranchState);
 assert(repaired.repaired, 'empty branch anchor/root should be repaired from the matching user turn');
 assert(
-  repaired.branchState.forks[0].branches.find((entry) => entry.branchId === 'branch-v2').anchorUserMessageId ===
+  repaired.branchState.forks[0].branches.find((entry) => entry.branchId === 'branch-retry').anchorUserMessageId ===
     'msg-user-1b',
   'branch repair should restore anchorUserMessageId from the matching variant user message',
 );
 assert(
-  repaired.branchState.forks[0].branches.find((entry) => entry.branchId === 'branch-v2').rootTurnId === 'turn-2',
+  repaired.branchState.forks[0].branches.find((entry) => entry.branchId === 'branch-retry').rootTurnId === 'turn-2',
   'branch repair should restore rootTurnId from the matching variant user message',
 );
 const repairedVisible = resolveVisibleConversationMessages(allMessages, repaired.branchState);
@@ -198,8 +198,8 @@ const {
   findForkForVisibleUserMessage,
 } = require('../src/shared/conversation/conversationBranchResolver.ts');
 
-branchState.forks[0].activeBranchId = 'branch-v2';
-branchState.activeLeafBranchId = 'branch-v2';
+branchState.forks[0].activeBranchId = 'branch-retry';
+branchState.activeLeafBranchId = 'branch-retry';
 assert(
   shouldShowForkNavigatorForMessage(branchState, { id: 'msg-user-1b', forkId, role: 'user' }),
   'navigator must only render on the active variant user message',

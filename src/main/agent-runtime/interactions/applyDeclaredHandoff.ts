@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
 import { parsePlanTaskRequirements } from '../../sessions/run/planTaskRequirements';
-import { EXECUTION_OFFER_SCHEMA } from '../../sessions/run/executionOffer';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import {
   conversationHistoryStore,
@@ -42,7 +41,6 @@ export function declaredExecutionOffer(input: {
   approvedAt: number;
 }): ExecutionOffer {
   return {
-    schemaVersion: EXECUTION_OFFER_SCHEMA,
     offerId: input.offerId,
     sourceAgentId: input.sourceAgentId,
     targetAgentId: input.declared.agent,

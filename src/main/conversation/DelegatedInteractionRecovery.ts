@@ -3,7 +3,7 @@ import { agentToolApprovalRequestService } from '../agent-runtime/permissions/Ag
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPlanReviewRequestService } from '../agent-runtime/interactions/AgentPlanReviewRequestService';
 import { finalizeTrace } from '../agent-runtime/workTrace/ConversationWorkTrace';
-import { INTERRUPTED_CONVERSATION_SUMMARY } from '../agent-runtime/context/SessionContextJournal';
+import { interruptionCauseAt } from '../runtime/previousInstanceDiagnosis';
 import type { ConversationMessage } from '@shared/types/conversation';
 
 /** Persisted requests do not resurrect approval authority after restart. */
@@ -63,7 +63,10 @@ export function reconcileDelegatedInteractionRequests(
     : message;
 }
 
-/** A persisted streaming turn has no producer after restart. Keep its evidence, but settle its UI state. */
+/**
+ * A persisted streaming turn has no producer after restart. Keep its evidence, but settle its UI state. The diagnostic
+ * names how the launch that ran it ended, when that is the previous launch this one diagnosed; the renderer words it.
+ */
 export function reconcileInterruptedConversationTurn(
   message: ConversationMessage,
   isActive: boolean,
@@ -73,6 +76,7 @@ export function reconcileInterruptedConversationTurn(
     return message;
   }
   const recoveredAt = Date.now();
+  const cause = interruptionCauseAt(message.createdAt);
   return {
     ...message,
     status: 'error',
@@ -80,10 +84,9 @@ export function reconcileInterruptedConversationTurn(
     diagnostic: {
       code: 'CONVERSATION_INTERRUPTED',
       severity: 'error',
-      userMessage: INTERRUPTED_CONVERSATION_SUMMARY,
+      userMessage: `The request was interrupted when the app stopped (${cause}); send it again.`,
+      interruption: { cause },
     },
-    workTrace: message.workTrace
-      ? finalizeTrace(message.workTrace, 'error', INTERRUPTED_CONVERSATION_SUMMARY, lastObservedAt)
-      : undefined,
+    workTrace: message.workTrace ? finalizeTrace(message.workTrace, 'error', undefined, lastObservedAt) : undefined,
   };
 }

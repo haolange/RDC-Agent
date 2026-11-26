@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "neuralwatt",
   "name": "Neuralwatt",
   "npm": "@ai-sdk/openai-compatible",

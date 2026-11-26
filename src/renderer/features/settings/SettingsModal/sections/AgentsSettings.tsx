@@ -181,8 +181,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
         open={diagnosticsOpen}
         onClose={() => setDiagnosticsOpen(false)}
         diagnostics={diagnostics}
-        onMigrate={(issue) => models.openOverrideAction('migrate', issue)}
-        onDeleteOverride={(issue) => models.openOverrideAction('delete', issue)}
+        onDeleteOverride={models.openOverrideDelete}
         onReviewTrust={models.openTrustReview}
       />
       {missingAgentId ? (
@@ -245,7 +244,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           </div>
         )}
       </div>
-      <AgentReviewDialogs models={models} options={modelOptions} onRestore={deleteAgent} />
+      <AgentReviewDialogs models={models} onRestore={deleteAgent} />
       {naming ? (
         <NewAgentDialog
           scopeLabel={scope === 'project' ? t('settings.scopeProject') : t('settings.scopeUser')}

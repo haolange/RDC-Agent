@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EventStream } from '../core/EventStream';
-import { ProviderEmptyStreamError, ProviderHttpError } from '../providers/internal/http';
+import { ProviderEmptyStreamError, ProviderHttpError, ProviderTimeoutError } from '../providers/internal/http';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { agentLoop, type AgentContext } from './AgentLoop';
 import { AgentRecoveryAbortError, ErrorRecovery } from './ErrorRecovery';
@@ -416,5 +416,84 @@ describe('AgentLoop recovery diagnostics', () => {
     });
     expect((rejected as AgentRecoveryAbortError).cause).toBe(original);
     expect(rejected).not.toMatchObject({ lastStatus: 502 });
+  });
+
+  describe('provider timeout recovery', () => {
+    function timeoutProvider(timeout: ProviderTimeoutError, partialText: string) {
+      let attempts = 0;
+      const provider: ProviderStrategy = {
+        api: 'openai-completions',
+        stream: () => {
+          attempts += 1;
+          if (attempts > 1) return makeProviderStream(async () => makeAssistantMessage('recovered'));
+          const response = new EventStream<AssistantMessageEvent, AssistantMessage>();
+          void Promise.resolve().then(() => {
+            if (partialText) {
+              const partial: AssistantMessage = { ...makeAssistantMessage(partialText), stopReason: 'error' };
+              response.push({ type: 'start', partial });
+              response.push({ type: 'error', error: timeout, message: partial });
+            }
+            response.error(timeout);
+          });
+          return response;
+        },
+      };
+      return { provider, attempts: () => attempts };
+    }
+
+    async function run(provider: ProviderStrategy) {
+      const recovery = new ErrorRecovery({ primaryModel: TEST_MODEL, maxRetries: 3 });
+      vi.spyOn(recovery, 'getRetryDelay').mockReturnValue(0);
+      const events: AgentLoopEvent[] = [];
+      const { stream, producerCompletion } = agentLoop(
+        [{ role: 'user', content: 'go', timestamp: Date.now() }],
+        { messages: [] },
+        {
+          model: TEST_MODEL,
+          convertToLlm: (messages) => messages as Message[],
+          errorRecovery: recovery,
+          maxTurns: 1,
+          streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+        },
+        provider,
+      );
+      let failure: unknown;
+      try {
+        for await (const event of stream) events.push(event);
+      } catch (error) {
+        failure = error;
+      }
+      await producerCompletion.catch(() => undefined);
+      return { events, failure };
+    }
+
+    it('retries a timeout that fired before any output', async () => {
+      const { provider, attempts } = timeoutProvider(
+        new ProviderTimeoutError('openai', 'first-byte', 20_000, false),
+        '',
+      );
+      const { failure } = await run(provider);
+
+      expect(failure).toBeUndefined();
+      expect(attempts()).toBe(2);
+    });
+
+    it('surfaces a timeout after output without re-requesting, keeping the partial output visible', async () => {
+      const { provider, attempts } = timeoutProvider(
+        new ProviderTimeoutError('openai', 'idle', 60_000, true),
+        'half an ans',
+      );
+      const { events, failure } = await run(provider);
+
+      expect(attempts()).toBe(1);
+      expect(failure).toBeInstanceOf(AgentRecoveryAbortError);
+      expect(failure).toMatchObject({
+        recoveryCategory: 'network_error',
+        cause: { name: 'ProviderTimeoutError', afterContent: true },
+        maxAttempts: 1,
+      });
+      const shown = events.filter((event) => event.type === 'message_start' || event.type === 'message_update');
+      expect(JSON.stringify(shown)).toContain('half an ans');
+    });
   });
 });

@@ -41,6 +41,7 @@ import type {
   ConversationWorkTrace,
 } from '@shared/types/conversation';
 import type { AgentManifestDiagnostic } from '@shared/types/agentManifest';
+import type { TurnStopCause } from '@shared/types/lifecycle';
 
 export interface ConversationBranchTurnContext {
   branchId: string;
@@ -95,7 +96,7 @@ export interface ActiveConversationTurn {
   sessionId: string | null;
   startedAt: number;
   abortController: AbortController;
-  stop: () => void;
+  stop: (cause: TurnStopCause) => void;
   /** Resolves only after completeProfileTurn has fully exited its terminal cleanup. */
   stopped: Promise<void>;
 }
@@ -258,7 +259,7 @@ export function redactTechnicalMessage(error: unknown): string {
 
 export function createConversationDiagnostic(input: {
   agentId: AgentRole;
-  code: ConversationMessageDiagnostic['code'];
+  code: Exclude<ConversationMessageDiagnostic['code'], 'MODEL_CONTINUATION_DROPPED' | 'CONVERSATION_INTERRUPTED'>;
   severity: ConversationMessageDiagnostic['severity'];
   userMessage: string;
   providerId?: string;

@@ -25,12 +25,12 @@ function plan(
   const providerId = options.providerId ?? 'provider-a';
   const modelId = options.modelId ?? 'model-a';
   const protocol = 'OpenAIResponses' as const;
-  const compatibilityGroup = options.compatibilityGroup ?? 'compat-v1';
+  const compatibilityGroup = options.compatibilityGroup ?? 'compat-a';
   const carrier = options.carrier ?? 'reasoning-item';
   const fallback = createFailClosedProviderContracts(protocol);
   const contracts: ProviderContractBundle = {
     ...fallback,
-    protocolDialect: 'responses-v1',
+    protocolDialect: 'responses-dialect',
     protocolVersion: 'v1',
     compatibilityGroup,
     reasoning: {
@@ -63,8 +63,8 @@ function plan(
   return createTestRequestPlan({
     providerId,
     adapterId: 'openai-responses',
-    catalogRevision: 'catalog-v1',
-    routeRevision: 'route-v1',
+    catalogRevision: 'catalog-a',
+    routeRevision: 'route-a',
     selectedModelId: modelId,
     effectiveModelId: modelId,
     appliedBindingIds: [],
@@ -134,12 +134,12 @@ describe('ContinuationReplayPolicy', () => {
     const artifact = createContinuationArtifact(source, { type: 'reasoning', encryptedContent: 'sealed' });
     const nextRevision = {
       ...source,
-      catalogRevision: 'catalog-v2',
-      routeRevision: 'route-v2',
+      catalogRevision: 'catalog-b',
+      routeRevision: 'route-b',
       executionIdentity: {
         ...source.executionIdentity,
-        catalogRevision: 'catalog-v2',
-        routeRevision: 'route-v2',
+        catalogRevision: 'catalog-b',
+        routeRevision: 'route-b',
       },
     };
     expect(decideContinuationReplay(artifact, nextRevision, { sameToolLoop: false }).action).toBe('replay');
@@ -149,11 +149,11 @@ describe('ContinuationReplayPolicy', () => {
   });
 
   it('allows a model change only through an explicit same-compatibility-group contract', () => {
-    const source = plan({ policy: 'same-compatibility-group', compatibilityGroup: 'family-v1' });
+    const source = plan({ policy: 'same-compatibility-group', compatibilityGroup: 'family-a' });
     const artifact = createContinuationArtifact(source, { type: 'reasoning', encryptedContent: 'sealed' });
     const sibling = plan({
       policy: 'same-compatibility-group',
-      compatibilityGroup: 'family-v1',
+      compatibilityGroup: 'family-a',
       modelId: 'model-b',
     });
     expect(decideContinuationReplay(artifact, sibling, { sameToolLoop: false })).toEqual({
@@ -163,7 +163,7 @@ describe('ContinuationReplayPolicy', () => {
 
     const unrelated = plan({
       policy: 'same-compatibility-group',
-      compatibilityGroup: 'family-v2',
+      compatibilityGroup: 'family-b',
       modelId: 'model-b',
     });
     expect(decideContinuationReplay(artifact, unrelated, { sameToolLoop: false }).action).toBe('drop');

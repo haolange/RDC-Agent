@@ -68,7 +68,6 @@ const baseTurn = (): ConversationTurnResult =>
     ],
     session: {
       record: {
-        schemaVersion: '1',
         sessionId: 'session-a',
         projectId: 'project-1',
         title: 'A',

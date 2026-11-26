@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "tencent-tokenhub",
   "name": "Tencent TokenHub",
   "npm": "@ai-sdk/openai-compatible",

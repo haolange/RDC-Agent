@@ -1,15 +1,10 @@
 import { isDeepStrictEqual } from 'node:util';
 import { AppError } from '@shared/errors/appError';
-import { rdcDigest } from './RdcExecutionReceipts';
-import { parseRdcNativeResult, RdcNativeFailure } from './RdcNativeProtocol';
+import { parseRdcNativeResult, rdcFaultCode, RdcNativeFailure } from './RdcNativeProtocol';
 import { runRdcOperation } from './RdcOperationCoordinator';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
-import { quarantineFatalReplayFailure } from './RdcReplayFailure';
-import {
-  assertRdcContextLeaseOwnership,
-  quarantineRdcContext,
-  type RdcContextLease,
-} from './RdcRuntimeContextRegistry';
+import { registerRdcReplayFailure } from './RdcReplayFailure';
+import { assertRdcContextLeaseOwnership, registerRdcFault, type RdcContextLease } from './RdcRuntimeContextRegistry';
 import { validateRdcSwitchSnapshot, type RdcSwitchSnapshot } from './RdcSwitchSnapshot';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { CLIResult } from '../tools/ShellInvocationService';
@@ -59,15 +54,22 @@ export async function executePreservedPipelineProbe(input: {
   };
   const sameReplay = (a: RdcSwitchSnapshot, b: RdcSwitchSnapshot) =>
     isDeepStrictEqual({ ...a, eventId: 0 }, { ...b, eventId: 0 });
-  const quarantineFatal = (error: unknown) =>
-    quarantineFatalReplayFailure(lease, error, 'rd.pipeline.get_state', input.args);
+  const fault = (cause: string, reason: string) =>
+    registerRdcFault({
+      sessionId: lease.ownerSessionId,
+      expectedVersion: lease.version,
+      operation: 'rd.pipeline.get_state',
+      nativeArgs: input.args,
+      cause,
+      reason,
+    });
 
   return runRdcOperation(lease.contextId, async () => {
     let before: RdcSwitchSnapshot;
     try {
       before = await snapshot();
     } catch (error) {
-      quarantineFatal(error);
+      registerRdcReplayFailure(lease, error, 'rd.session.get_context', {});
       throw error;
     }
     signal?.throwIfAborted();
@@ -91,7 +93,14 @@ export async function executePreservedPipelineProbe(input: {
       queryFailure = error;
     }
 
-    if (quarantineFatal(queryFailure)) throw queryFailure;
+    if (
+      queryFailure instanceof RdcNativeFailure &&
+      ['replay_fatal_error', 'replay_health_unavailable'].includes(queryFailure.nativeError.code)
+    ) {
+      // A fatal controller cannot be restored or observed; nothing below could prove the replay unchanged.
+      fault(queryFailure.nativeError.code, 'Native replay health is uncertain; close or recover this capture.');
+      throw queryFailure;
+    }
 
     try {
       const after = await snapshot();
@@ -112,31 +121,14 @@ export async function executePreservedPipelineProbe(input: {
           throw new Error('restored replay state differs');
       }
     } catch (error) {
-      quarantineRdcContext(
-        lease.ownerSessionId,
-        lease.version,
-        'Pipeline probe could not prove restoration of the owning replay.',
-        {
-          operation: 'rd.pipeline.get_state',
-          argsFingerprint: rdcDigest(input.args),
-          code: 'RDC_PROBE_RESTORE_UNCONFIRMED',
-        },
-      );
+      fault('RDC_PROBE_RESTORE_UNCONFIRMED', 'Pipeline probe could not prove restoration of the owning replay.');
       throw new AppError('RDC_PROBE_RESTORE_UNCONFIRMED', error instanceof Error ? error.message : String(error), {
         cause: error,
       });
     }
     if (queryFailed) {
-      if (!(queryFailure instanceof RdcNativeFailure && queryFailure.effectsNotAttempted && unchangedAfterQuery)) {
-        const code =
-          queryFailure instanceof RdcNativeFailure ? queryFailure.nativeError.code : 'RDC_PROBE_QUERY_FAILED';
-        quarantineRdcContext(
-          lease.ownerSessionId,
-          lease.version,
-          'Pipeline probe failed without a proven unchanged replay.',
-          { operation: 'rd.pipeline.get_state', argsFingerprint: rdcDigest(input.args), code },
-        );
-      }
+      if (!(queryFailure instanceof RdcNativeFailure && queryFailure.effectsNotAttempted && unchangedAfterQuery))
+        fault(rdcFaultCode(queryFailure), 'Pipeline probe failed without a proven unchanged replay.');
       throw queryFailure;
     }
     return response!;

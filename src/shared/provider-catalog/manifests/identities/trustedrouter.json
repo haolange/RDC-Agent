@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "trustedrouter",
   "name": "TrustedRouter",
   "npm": "@ai-sdk/openai-compatible",

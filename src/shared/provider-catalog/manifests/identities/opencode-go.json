@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "id": "opencode-go",
   "name": "OpenCode Go",
   "npm": "@ai-sdk/openai-compatible",

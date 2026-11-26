@@ -1,10 +1,8 @@
 import type { ConversationMessage, ConversationWorkBlock, ConversationWorkTrace } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
-import type { SessionContextTurnEntry } from '../../agent-runtime/context/SessionContextJournal';
 
 export interface ConversationTurnCommitJournal {
-  schemaVersion: '1';
   requestId: string;
   turnId: string;
   phase: 'prepared' | 'committing' | 'committed';
@@ -17,22 +15,8 @@ export interface ConversationTurnCommitJournal {
   importedPaths: string[];
 }
 
-export interface ConversationTerminalCommitJournal {
-  schemaVersion: '1';
-  requestId: string;
-  turnId: string;
-  phase: 'prepared' | 'committing' | 'committed';
-  beforeHistory: ConversationMessage[];
-  beforeBranch: ConversationBranchState | null;
-  beforeContext: SessionContextTurnEntry[];
-  afterHistory: ConversationMessage[];
-  afterBranch: ConversationBranchState | null;
-  afterContext: SessionContextTurnEntry[];
-}
-
 /** Append-only terminal WAL; session/history/context formats are unchanged. */
 export interface ConversationTerminalAppendJournal {
-  schemaVersion: '2';
   requestId: string;
   turnId: string;
   phase: 'prepared' | 'committing' | 'committed';

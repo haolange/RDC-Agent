@@ -40,6 +40,18 @@ export const enErrors = {
   'errors.RDC_HOST_UNSUPPORTED': "This isn't supported on this computer.",
   'errors.RDC_DEVICE_IN_USE': 'The device is in use by another session.',
   'errors.RDC_OPEN_FAILED': "The capture couldn't be opened.",
+  'errors.RDC_OPERATION_STUCK':
+    '{operation} stopped making progress, so RDC-Tool stopped its replay worker. Recover the capture before continuing.',
+  'errors.RDC_WORKER_LOST':
+    "RDC-Tool's replay worker ended while {operation} was running; the result is unknown. Recover the capture before continuing.",
+  'errors.RDC_WORKER_UNAVAILABLE': "RDC-Tool couldn't start a replay worker, so {operation} didn't run.",
+  'errors.RDC_OPERATION_CANCELLED': '{operation} was cancelled.',
+  'errors.RDC_DAEMON_LOST':
+    'RDC-Tool stopped while {operation} was running; the result is unknown. Recover the capture before continuing.',
+  'errors.RDC_DAEMON_UNRESPONSIVE':
+    "RDC-Tool didn't respond for {seconds} seconds while {operation} was running; the result is unknown. Recover the capture before continuing.",
+  'errors.RDC_NO_PROGRESS_TIMEOUT_UNSUPPORTED':
+    'The installed RDC-Tool accepts a no-progress wait of {minSeconds}–{maxSeconds} seconds, but Settings has {seconds}. Change it in Settings.',
   'errors.ADB_MISSING': "Android Debug Bridge (adb) wasn't found. Set its location in Settings.",
   'errors.ADB_INVALID': "The configured adb can't be used. Check its location in Settings.",
   'errors.KNOWLEDGE_VERSION_CHANGED': 'This card was changed elsewhere. Reopen it to see the latest version.',
@@ -57,6 +69,7 @@ export const enErrors = {
   'errors.BUILTIN_AGENT_MANIFEST_READONLY': "Built-in agents can't be edited.",
   'errors.AGENT_SLOT_BUSY': 'This agent is busy in another session.',
   'errors.FILE_WRITE_PROTECTED': "That location is protected and can't be written.",
+  'errors.FILE_READ_PROTECTED': "Crash files and stored credentials can't be read by the agent.",
   'errors.PERMISSION_MODE_CHANGED': 'The permission mode changed, so the pending action was cancelled.',
   'errors.AUDIT_WRITE_FAILED': "The security log couldn't be written, so the action wasn't performed.",
   'errors.SECRET_STORAGE_UNAVAILABLE': "Secure credential storage isn't available on this system.",
@@ -155,9 +168,6 @@ export const enErrors = {
   'errors.AGENT_MANIFEST_PROJECT_ROOT_REQUIRED': 'Open the project before saving a project Agent.',
   'errors.AGENT_MANIFEST_PROJECT_UNKNOWN': "This project isn't registered. Add it first.",
   'errors.AGENT_MANIFEST_SOURCE_HASH_CONFLICT': 'This Agent changed since you opened it. Reload and try again.',
-  'errors.AGENT_MODEL_MIGRATION_FRONTMATTER_INVALID': "The Agent file's header can't be read, so it wasn't updated.",
-  'errors.AGENT_MODEL_MIGRATION_NO_FRONTMATTER': 'The Agent file has no header to update.',
-  'errors.AGENT_MODEL_MIGRATION_STILL_INVALID': "Updating wouldn't fix this Agent file, so it wasn't changed.",
   'errors.AGENT_OVERRIDE_CHANGED': 'The file changed after you reviewed it. Open the preview again.',
   'errors.AGENT_OVERRIDE_NOT_DIAGNOSED': 'This file no longer has that problem. Refresh the list.',
   'errors.AGENT_PROJECT_ROOT_REQUIRED': 'Open the project that owns this Agent first.',
@@ -244,8 +254,6 @@ export const enErrors = {
   'errors.KNOWLEDGE_ASSET_PATH_INVALID': "A knowledge attachment path isn't valid.",
   'errors.KNOWLEDGE_CANDIDATE_REQUIRES_INTENT': 'Saving a knowledge candidate needs your explicit request.',
   'errors.KNOWLEDGE_CARD_IDENTITY_CHANGED': 'This card changed since the search. Refresh the search.',
-  'errors.KNOWLEDGE_DRAFT_MIGRATION_CONFLICT':
-    "Drafts weren't moved because {cards} of them conflict with existing cards.",
   'errors.KNOWLEDGE_EXPORT_EMPTY_SELECTION': 'Choose at least one card to export.',
   'errors.KNOWLEDGE_EXPORT_SPACE_REQUIRED': 'Choose a knowledge space to export.',
   'errors.KNOWLEDGE_EXPORT_TARGET_INVALID': "That export location can't be used.",
@@ -393,9 +401,8 @@ export const enErrors = {
   'errors.RDC_RECOVERY_OLD_PROCESS_UNCONFIRMED': 'An earlier replay process may still be running.',
   'errors.RDC_RECOVERY_PERMISSION_CHANGED': 'Permissions changed during recovery.',
   'errors.RDC_RECOVERY_PREPARATION_REQUIRED': 'Prepare the replay device before recovering.',
-  'errors.RDC_RECOVERY_PROCESS_CHANGED': "The replay process isn't the one last verified.",
+  'errors.RDC_RECOVERY_PROCESS_UNEXPLAINED': "The replay process changed in a way its exit records don't explain.",
   'errors.RDC_RECOVERY_RECORD_CHANGED': 'The capture record changed during recovery.',
-  'errors.RDC_RECOVERY_REPEATED_FAILURE': 'This failure was already recovered once. Check the capture and device.',
   'errors.RDC_RECOVERY_REPLACEMENTS_ACTIVE': 'Restore the current replacements before recovering.',
   'errors.RDC_RECOVERY_RESULT_UNVERIFIED': "The recovered capture couldn't be verified.",
   'errors.RDC_RECOVERY_STOP_RECEIPT_MISMATCH': "The replay's stop record doesn't match during recovery.",
@@ -405,7 +412,6 @@ export const enErrors = {
   'errors.RDC_REMOTE_INSTALLATION_PROTOCOL':
     "The remote device's RenderDoc installation returned an unexpected result.",
   'errors.RDC_REMOTE_MISMATCH': "The remote replay doesn't match the selected connection.",
-  'errors.RDC_REMOTE_TIMEOUT_INVALID': "The remote timeout setting isn't valid.",
   'errors.RDC_REPREPARE_CATALOG_CHANGED': 'RDC-Tool changed since this turn started.',
   'errors.RDC_REPREPARE_FROZEN_PLAN_CHANGED': "This turn's preparation is missing.",
   'errors.RDC_REPREPARE_IDENTITY_MISSING': "This turn's replay identity is missing.",
@@ -455,8 +461,6 @@ export const enErrors = {
   'errors.SKILL_REFERENCE_REQUIRED': 'Choose a reference file to read part of.',
   'errors.SKILL_SOURCE_CHANGED': 'This Skill changed since the turn started. Try again.',
   'errors.STORAGE_SCHEMA': "A data file isn't in the expected format. The original was kept.",
-  'errors.STORAGE_SCHEMA_UNSUPPORTED':
-    'A data file was written by a newer version of RDC-Agent. The original was kept.',
   'errors.SUBAGENT_BUDGET': 'The sub-agent limit was reached.',
   'errors.SUBAGENT_PARENT_PLAN_REQUIRED': "Delegating needs the current turn's prepared plan.",
   'errors.SUBAGENT_REPORT_INVALID': "The sub-agent's report isn't valid.",
@@ -472,7 +476,6 @@ export const enErrors = {
   'errors.TASK_RECOVERY_INTERRUPT_OWNER_MISSING': "The Task's runner can't be reached to stop it.",
   'errors.TASK_SCOPE_NOT_DIRECTORY': "A Task location isn't a folder.",
   'errors.TASK_SCOPE_UNVERIFIED': "The Task's run couldn't be identified.",
-  'errors.TASK_STORAGE_REQUIRES_CONVERSION': 'Task records are in an older format. The original files were kept.',
   'errors.TOOL_ARGUMENTS_INVALID': "The model sent tool arguments that couldn't be read.",
   'errors.TOOL_GROUP_NOT_STARTED': "This tool call didn't start because an earlier call in the group failed.",
   'errors.TOOL_NOT_ACTIVATED': "That tool isn't active yet. The model needs to find it first.",
@@ -514,6 +517,7 @@ export const enErrors = {
   'errors.RDC_OWNERSHIP_BUSY': 'Another RDC-Agent process is using the replay.',
   'errors.RDC_RECEIPT_KEY_UNAVAILABLE': "The key for replay records can't be read.",
   'errors.RDC_RECOVERY_BLOCKED': "The replay hasn't exited yet, so it can't be recovered.",
+  'errors.RDC_RECOVERY_BUDGET_EXHAUSTED': 'This capture has used its recovery attempts. Check the capture and device.',
   'errors.RDC_RECOVERY_DEVICE_UNAVAILABLE': "The replay device isn't ready for recovery.",
   'errors.RDC_REMOTE_UPGRADE_REQUIRED': 'RDC-Tool needs an update to prepare Android devices.',
   'errors.RDC_REPLAY_BUSY': 'The capture is opening or closing. Wait for it to finish.',
@@ -530,6 +534,18 @@ export const enErrors = {
   'errors.USER_INPUT_REQUEST_NOT_FOUND': 'This question is no longer waiting for an answer.',
   'errors.TOOL_APPROVAL_REQUEST_NOT_FOUND': 'This approval request is no longer pending.',
   'errors.PUBLIC_REQUEST_FAILED': "The website couldn't be reached.",
+  'errors.PREVIOUS_INSTANCE_JS_FATAL':
+    'RDC-Agent stopped last time after an unexpected internal error. Requests that were running are marked as interrupted.',
+  'errors.PREVIOUS_INSTANCE_NATIVE_CRASH':
+    'RDC-Agent crashed last time. Requests that were running are marked as interrupted.',
+  'errors.PREVIOUS_INSTANCE_RENDERER_GONE':
+    "RDC-Agent's window stopped working last time and the app did not close normally. Requests that were running are marked as interrupted.",
+  'errors.PREVIOUS_INSTANCE_CHILD_PROCESS_GONE':
+    'A helper process of RDC-Agent stopped last time and the app did not close normally. Requests that were running are marked as interrupted.',
+  'errors.PREVIOUS_INSTANCE_SHUTDOWN_INTERRUPTED':
+    'RDC-Agent did not finish closing last time. Requests that were running are marked as interrupted.',
+  'errors.PREVIOUS_INSTANCE_KILLED':
+    'RDC-Agent did not close normally last time; it may have been ended by the system or lost power. Requests that were running are marked as interrupted.',
   'errors.PROVIDER_ACCOUNT_LOGIN_FAILED': 'Signing in to the model provider failed. Check the details and try again.',
   'errors.PROVIDER_CONNECTION_FAILED': "The model provider couldn't be reached or refused the request.",
   'errors.RDC_NATIVE_FAILURE': 'RenderDoc tooling reported a failure.',

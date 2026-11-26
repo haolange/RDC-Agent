@@ -11,7 +11,7 @@ import { TaskDialog } from '../../../../ui/TaskDialog';
 import { useI18n } from '../../../../i18n';
 import './AgentManifestDiagnostics.css';
 
-/** Main reports an override that still declares model fields with this code; it can be migrated. */
+/** Main reports an override that still declares model fields with this code; the user deletes or edits it. */
 const FIELD_MOVED = 'AGENT_MANIFEST_FIELD_MOVED';
 
 const issueSummaryKey = (code: string) => {
@@ -25,14 +25,12 @@ export function AgentManifestDiagnostics({
   open,
   onClose,
   diagnostics,
-  onMigrate,
   onDeleteOverride,
   onReviewTrust,
 }: {
   open: boolean;
   onClose: () => void;
   diagnostics: AgentManifestDiagnostic[];
-  onMigrate: (issue: AgentManifestDiagnostic) => void;
   onDeleteOverride: (issue: AgentManifestDiagnostic) => void;
   onReviewTrust: (issue: AgentManifestDiagnostic) => void;
 }) {
@@ -116,14 +114,6 @@ export function AgentManifestDiagnostics({
                 <div className="agent-diagnostics-actions">
                   <Button
                     variant="secondary"
-                    size="sm"
-                    onClick={() => onMigrate(issue)}
-                    data-testid="settings-agent-diagnostic-migrate"
-                  >
-                    {t('settings.agentModelMigrationOpen')}
-                  </Button>
-                  <Button
-                    variant="ghost"
                     size="sm"
                     onClick={() => onDeleteOverride(issue)}
                     data-testid="settings-agent-diagnostic-delete"

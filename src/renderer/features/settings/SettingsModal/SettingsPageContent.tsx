@@ -43,8 +43,8 @@ type PageState = Pick<
   | 'agentManifestSaveMessage'
   | 'agentManifestSaveBlocked'
   | 'handleAgentModelOps'
-  | 'previewAgentModelMigration'
-  | 'handleCommitAgentOverrideFile'
+  | 'previewAgentOverrideFile'
+  | 'handleDeleteAgentOverrideFile'
   | 'loadAgentBuiltinComparison'
   | 'previewProjectAgentTrust'
   | 'handleTrustProjectAgent'
@@ -104,8 +104,8 @@ export function SettingsPageContent({
     agentManifestSaveMessage,
     agentManifestSaveBlocked,
     handleAgentModelOps,
-    previewAgentModelMigration,
-    handleCommitAgentOverrideFile,
+    previewAgentOverrideFile,
+    handleDeleteAgentOverrideFile,
     previewProjectAgentTrust,
     handleTrustProjectAgent,
     loadAgentBuiltinComparison,
@@ -183,8 +183,8 @@ export function SettingsPageContent({
             agentManifestSaveMessage={agentManifestSaveMessage}
             agentManifestSaveBlocked={agentManifestSaveBlocked}
             onAgentModelOps={handleAgentModelOps}
-            onPreviewAgentModelMigration={previewAgentModelMigration}
-            onCommitAgentOverrideFile={handleCommitAgentOverrideFile}
+            onPreviewAgentOverrideFile={previewAgentOverrideFile}
+            onDeleteAgentOverrideFile={handleDeleteAgentOverrideFile}
             onPreviewProjectAgentTrust={previewProjectAgentTrust}
             onTrustProjectAgent={handleTrustProjectAgent}
             onLoadAgentBuiltinComparison={loadAgentBuiltinComparison}

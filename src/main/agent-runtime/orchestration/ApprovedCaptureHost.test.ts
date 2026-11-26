@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   clearRdcContextLeases,
-  quarantineRdcContext,
+  registerRdcFault,
   setRdcRuntimeContextForSession,
 } from '../../rdc/RdcRuntimeContextRegistry';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { setRdcInteractionLock } from '../../rdc/RdcOperationCoordinator';
+import { liveContextStatus, stuckContextStatus } from '../../testing/rdcContextStatusFixture';
 import { createApprovedCaptureHost } from './ApprovedCaptureHost';
 import { TurnHandle } from './TurnCoordinator';
 import type { InvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
@@ -23,7 +24,8 @@ const mock = vi.hoisted(() => ({
   verifyInput: vi.fn(),
   device: vi.fn(),
   snapshot: vi.fn(),
-  recoverySnapshot: vi.fn(),
+  status: vi.fn(),
+  attempts: vi.fn(),
   permission: vi.fn(),
   active: vi.fn(),
   entries: vi.fn(),
@@ -50,16 +52,17 @@ vi.mock('../../rdc/prepareInvestigationPlan', () => ({ verifyPlanInput: mock.ver
 vi.mock('../../sessions/run/handoffSkills', () => ({ assertApprovedExecutionCurrent: mock.assertOffer }));
 vi.mock('../../sessions/run/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: mock.readPlan } }));
 vi.mock('../../sessions/run/approvedInvestigationContract', () => ({ approvedInvestigationContract: mock.parsePlan }));
-vi.mock('../../rdc/RdcSwitchSnapshot', () => ({
-  readRdcSwitchSnapshot: mock.snapshot,
-  readRdcRecoverySnapshot: mock.recoverySnapshot,
+vi.mock('../../rdc/RdcSwitchSnapshot', () => ({ readRdcSwitchSnapshot: mock.snapshot }));
+vi.mock('../../rdc/RdcContextStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../rdc/RdcContextStatus')>()),
+  readRdcContextStatus: mock.status,
 }));
 vi.mock('../../runtime/RuntimePermissionStateService', () => ({
   runtimePermissionStateService: { getSnapshot: mock.permission },
 }));
 vi.mock('../../rdc/captures/ReplayDeviceService', () => ({ replayDeviceService: { getDeviceById: mock.device } }));
 vi.mock('../../rdc/RdcLifecycleReceipts', () => ({
-  rdcLifecycleReceipts: { prepare: vi.fn(), write: vi.fn(), pending: vi.fn() },
+  rdcLifecycleReceipts: { prepare: vi.fn(), write: vi.fn(), pending: vi.fn(), recoveryAttempts: mock.attempts },
 }));
 vi.mock('../../investigation/InvestigationArtifactService', () => ({
   investigationArtifactService: { list: mock.entries, readRecord: mock.readRecord },
@@ -67,7 +70,6 @@ vi.mock('../../investigation/InvestigationArtifactService', () => ({
 vi.mock('./DirectTaskTurnLifecycle', () => ({ listActiveDelegations: mock.active }));
 
 const offer: ExecutionOffer = {
-  schemaVersion: '1',
   sourceAgentId: 'analyzer',
   targetAgentId: 'general',
   plan: { uri: 'session://plans/p.md', hash: 'c'.repeat(64) },
@@ -77,7 +79,6 @@ const offer: ExecutionOffer = {
   approvedAt: 1,
 };
 const contract: InvestigationPlanContract = {
-  schemaVersion: 1,
   mission: 'analyzer',
   captureScope: {
     projectId: 'p',
@@ -86,7 +87,14 @@ const contract: InvestigationPlanContract = {
     inputs: [{ inputId: 'a', fileName: 'a.rdc', contentSha256: 'a'.repeat(64) }],
   },
 };
-const cli = { enabled: true, command: 'rdc', argsPrefix: [], workingDirectory: '', env: {}, timeoutMs: 1000 };
+const cli = {
+  enabled: true,
+  command: 'rdc',
+  argsPrefix: [],
+  workingDirectory: '',
+  env: {},
+  noProgressTimeoutMs: 300_000,
+};
 const destination = { inputId: 'a', contentSha256: 'a'.repeat(64), deviceId: 'local' };
 const processIdentity = {
   status: 'available' as const,
@@ -134,16 +142,8 @@ beforeEach(() => {
     replacementFingerprint: '0'.repeat(64),
     processIdentity,
   });
-  mock.recoverySnapshot.mockResolvedValue({
-    contextId: 'ctx',
-    leaseVersion: 1,
-    replaySessionId: 'replay',
-    captureFileId: 'file',
-    eventId: 6,
-    replacementCount: 0,
-    replacementFingerprint: '0'.repeat(64),
-    processIdentity,
-  });
+  mock.status.mockResolvedValue(liveContextStatus());
+  mock.attempts.mockReturnValue({ attempts: 0, failed: 0 });
   mock.permission.mockReturnValue({ revision: 1, mode: 'full-access' });
   mock.active.mockResolvedValue([]);
   mock.entries.mockReturnValue([]);
@@ -156,10 +156,13 @@ beforeEach(() => {
 
 it('checks quarantined process identity and reconnects the same device under unchanged authority', async () => {
   const { host, binding } = fixture();
-  quarantineRdcContext('s', binding.identity!.version, 'fault', {
+  registerRdcFault({
+    sessionId: 's',
+    expectedVersion: binding.identity!.version,
     operation: 'rd.test',
-    argsFingerprint: 'd'.repeat(64),
-    code: 'native_failure',
+    nativeArgs: {},
+    cause: 'native_failure',
+    reason: 'fault',
   });
   const point = {
     ...destination,
@@ -178,8 +181,10 @@ it('checks quarantined process identity and reconnects the same device under unc
   };
   expect(await host.inspectRecovery(point, binding)).toMatchObject({
     cause: { code: 'native_failure' },
-    observed: { eventId: 6 },
+    observed: { daemon: { state: 'alive', pid: 10 }, worker: { state: 'alive', pid: 11 } },
+    classification: { decision: 'keep' },
   });
+  expect(mock.status).toHaveBeenCalledWith(expect.objectContaining({ contextId: 'ctx', settings: cli }));
   const guard = host.recoveryGuard(1);
   await host.reopenAfterFailure(destination, binding, undefined, () => {}, guard);
   expect(mock.close).toHaveBeenCalledWith(
@@ -196,11 +201,22 @@ it('checks quarantined process identity and reconnects the same device under unc
   );
   mock.permission.mockReturnValue({ revision: 2, mode: 'custom' });
   expect(guard).toThrow('RDC_RECOVERY_PERMISSION_CHANGED');
-  mock.recoverySnapshot.mockResolvedValueOnce({
-    ...point.native,
-    processIdentity: { ...processIdentity, worker: { pid: 99, start_generation: 'windows-filetime:3' } },
+  mock.status.mockResolvedValueOnce(stuckContextStatus());
+  expect(await host.inspectRecovery(point, binding)).toMatchObject({
+    classification: { decision: 'rebuild', reason: 'worker-exited', lost: { workers: [{ pid: 11 }] } },
   });
-  await expect(host.inspectRecovery(point, binding)).rejects.toThrow('RDC_RECOVERY_PROCESS_CHANGED');
+  const replaced = liveContextStatus();
+  mock.status.mockResolvedValueOnce({ ...replaced, worker: { ...replaced.worker, pid: 99 } });
+  expect(await host.inspectRecovery(point, binding)).toMatchObject({
+    classification: { decision: 'quarantined', code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED' },
+  });
+  // Attempts are counted from the signed receipts of every earlier turn, not from this controller's memory.
+  mock.attempts.mockReturnValueOnce({ attempts: 2, failed: 1 });
+  mock.status.mockResolvedValueOnce(stuckContextStatus());
+  expect(await host.inspectRecovery(point, binding)).toMatchObject({
+    classification: { decision: 'quarantined', code: 'RDC_RECOVERY_BUDGET_EXHAUSTED' },
+  });
+  expect(mock.attempts).toHaveBeenLastCalledWith('s', 'p', destination);
 });
 afterEach(() => {
   clearRdcContextLeases();
@@ -260,6 +276,12 @@ it('refuses switching while a child or experiment is active and detects plan dri
   mock.entries.mockReturnValueOnce([{ artifactId: 'experiment', status: 'draft' }]);
   mock.readRecord.mockReturnValueOnce({ record: { status: 'running', experimentId: 'experiment' } });
   await expect(host.quiescent()).rejects.toThrow('RDC_SWITCH_EXPERIMENT_OPEN');
+  // Recovery does not wait for the model: the open experiment is reported as interrupted with the process.
+  mock.entries.mockReturnValueOnce([{ artifactId: 'experiment', status: 'draft' }]);
+  mock.readRecord.mockReturnValueOnce({ record: { status: 'running', experimentId: 'experiment' } });
+  expect(await host.quiescent('recovery')).toEqual({
+    openExperiments: [{ experimentId: 'experiment', status: 'running' }],
+  });
   mock.parsePlan.mockReturnValueOnce({ ...contract, mission: 'debugger' });
   expect(() => host.assertPlan()).toThrow('APPROVED_PLAN_CHANGED');
 });

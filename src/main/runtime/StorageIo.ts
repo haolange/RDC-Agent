@@ -7,26 +7,13 @@
 import * as fs from 'fs';
 import { parse as parseYamlDocument } from 'yaml';
 import { readValidatedSync, writeFileAtomicSync } from './atomicFile';
-import {
-  assertNoUnsupportedSchemaVersion,
-  CURRENT_STORE_SCHEMA_VERSION,
-  parseStoredDocument,
-  schemaValidationError,
-  StorageSchemaError,
-  type StorageMigration,
-} from './storedDocument';
+import { schemaValidationError, StorageSchemaError } from './storedDocument';
 import type { ZodType } from 'zod';
 
 const DEEP_MERGE_FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
-type StoredDocumentValidator<T> = ZodType<T> | readonly StorageMigration<T>[];
-
-function validateDocument<T>(parsed: unknown, filePath: string, validator: StoredDocumentValidator<T>): T {
-  if (!('safeParse' in validator)) {
-    return parseStoredDocument(parsed, validator, filePath);
-  }
-  assertNoUnsupportedSchemaVersion(parsed, CURRENT_STORE_SCHEMA_VERSION, filePath);
-  const result = validator.safeParse(parsed);
+function validateDocument<T>(parsed: unknown, filePath: string, schema: ZodType<T>): T {
+  const result = schema.safeParse(parsed);
   if (!result.success) throw schemaValidationError(filePath, result.error.issues);
   return result.data;
 }
@@ -36,20 +23,18 @@ export class StorageIo {
     fs.mkdirSync(dirPath, { recursive: true });
   }
 
-  readJson<T>(filePath: string, validator?: StoredDocumentValidator<T>): T | null {
+  readJson<T>(filePath: string, schema?: ZodType<T>): T | null {
     return readValidatedSync(filePath, (raw) => {
       const parsed: unknown = JSON.parse(raw);
-      return validator ? validateDocument(parsed, filePath, validator) : (parsed as T);
+      return schema ? validateDocument(parsed, filePath, schema) : (parsed as T);
     });
   }
 
-  readYaml<T>(filePath: string, validator?: StoredDocumentValidator<T>): T | null {
+  readYaml<T>(filePath: string, schema?: ZodType<T>): T | null {
     return readValidatedSync(filePath, (raw) => {
       const parsed: unknown = parseYamlDocument(raw);
-      if (parsed == null) throw new StorageSchemaError('STORAGE_SCHEMA', `${filePath} is empty or not a YAML document`);
-      if (validator) return validateDocument(parsed, filePath, validator);
-      assertNoUnsupportedSchemaVersion(parsed, CURRENT_STORE_SCHEMA_VERSION, filePath);
-      return parsed as T;
+      if (parsed == null) throw new StorageSchemaError(`${filePath} is empty or not a YAML document`);
+      return schema ? validateDocument(parsed, filePath, schema) : (parsed as T);
     });
   }
 

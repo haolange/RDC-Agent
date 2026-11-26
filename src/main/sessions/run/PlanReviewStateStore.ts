@@ -6,10 +6,7 @@ import { executionOfferStore, sessionRecordStore, storageIo } from '../store/ses
 import type { StorageIo } from '../../runtime/StorageIo';
 import type { PlanReviewHandoffIdentity, PlanReviewStatus } from '@shared/types/planReview';
 
-export const PLAN_REVIEW_STATE_SCHEMA = '1' as const;
-
 export interface PlanReviewStateDocument {
-  schemaVersion: typeof PLAN_REVIEW_STATE_SCHEMA;
   planId: string;
   /** Absence means ownership is unproven; never infer it from the active session. */
   ownerTurnId?: string;
@@ -23,7 +20,6 @@ export interface PlanReviewStateDocument {
 
 const planReviewStateSchema = z
   .object({
-    schemaVersion: z.literal(PLAN_REVIEW_STATE_SCHEMA),
     planId: z.string().trim().min(1),
     ownerTurnId: z.string().trim().min(1).optional(),
     revision: z.number().int().positive(),
@@ -91,7 +87,6 @@ export class PlanReviewStateStore {
       previous.status === 'approved' ||
       previous.status === 'cancelled';
     const next: PlanReviewStateDocument = {
-      schemaVersion: PLAN_REVIEW_STATE_SCHEMA,
       planId: newCycle ? `plan-${generateShortId()}` : previous.planId,
       ownerTurnId,
       revision: newCycle ? 1 : previous.revision + 1,
