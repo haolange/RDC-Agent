@@ -90,7 +90,7 @@
 
 - 提交：`6d1f153e`
 - 证据：本地：`node .local/windows-acceptance-20261127/observe-provider-output.mjs`，隔离 Provider 请求记录和应用生命周期账本。
-- GPT-6.1 Terra Medium 已收到真实 `response.output_text.delta`，随后回环代理断开该 Provider 的上游连接。应用保留已收到的正文并以 `CONVERSATION_LLM_REQUEST_FAILED` 结束，观测窗口内共发出一次 Provider 请求。其余应用的网络连接继续运行。
+- GPT-6.1 Terra Medium 已收到真实 `response.output_text.delta`，随后回环代理断开该 Provider 的上游连接。应用以 `CONVERSATION_LLM_REQUEST_FAILED` 结束，观测窗口内共发出一次 Provider 请求。其余应用的网络连接继续运行。
 
 ## 2026-11-27：真实推理模型跨过普通首字节时限
 
@@ -125,6 +125,12 @@
 - 提交：`21dbd1ef`
 - 证据：本地：`node scripts/request-cache-profile.mjs`、`pnpm run check:request-cache-profile`，真实 Terra Medium 请求的完成元数据。
 - 请求完成用量已由应用单独写入 `.completion.meta`，旧脚本未读到并把空计数总计为零。修复后一次真实 root 请求报告输入 12,344、缓存读取 0；没有用量的未完成请求仍可统计结构，与已测用量分开。
+
+## 2026-11-27：Windows 差分渲染与焦点隔离
+
+- 提交：`33e05400`
+- 证据：本地：`node scripts/visual-diff/run.mjs capture`、`node scripts/visual-diff/run.mjs compare`。
+- 首次比较报告 63 个变体有差异；同一构建的重复采集复现焦点和位图变化。回放宿主隔离页面焦点并关闭后台节流后，三组重复试验的 L1/L2/L3 一致。使用相同宿主和录制数据重新采集基线与当前构建，各 46 个场景、182 个变体，比较通过。
 
 ## 2026-11-27：长任务可靠性收口（无进展预算、身份链恢复、账本、去版本号；云端 Linux，无设备与模型账号）
 
