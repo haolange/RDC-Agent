@@ -12,6 +12,7 @@ import {
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 const { translate } = require('../src/renderer/i18n/messages.ts');
+const { formatDuration } = require('../src/renderer/lib/formatTime.ts');
 const t = (key, params) => translate('zh-CN', key, params);
 
 const { buildWorkProcessPresentation } = require(
@@ -313,7 +314,10 @@ const rawThinkingPresentation = buildWorkProcessPresentation(
 const rawThinkingSection = rawThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(rawThinkingSection?.type === 'section', 'raw thinking loop should render a section');
 const rawThinkingRow = sectionThinking(rawThinkingSection);
-assert(rawThinkingRow?.label === '已思考 · 1.5s', 'settled thinking reports its own streaming time, not the step time');
+assert(
+  rawThinkingRow?.label === t('chat.workProcessThoughtFor', { duration: formatDuration('zh-CN', 1500) }),
+  'settled thinking reports its own streaming time, not the step time',
+);
 const untimedThinking = buildWorkProcessPresentation(
   {
     status: 'complete',
