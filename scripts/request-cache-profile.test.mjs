@@ -98,12 +98,14 @@ function writeFixture() {
       usage: { inputTokens: 900, cacheReadTokens: 0 },
     }),
   ];
-  requests.forEach((value) =>
+  for (const { completedAt, usage, ...request } of requests) {
+    const name = `${String(request.callIndex).padStart(3, '0')}-${request.id}`;
+    fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify(request));
     fs.writeFileSync(
-      path.join(dir, `${String(value.callIndex).padStart(3, '0')}-${value.id}.json`),
-      JSON.stringify(value),
-    ),
-  );
+      path.join(dir, `${name}.completion.meta`),
+      JSON.stringify({ completedAt, usage: { ...usage, outputTokens: 0, estimated: false } }),
+    );
+  }
   fs.writeFileSync(path.join(dir, 'session.json'), JSON.stringify({ unrelated: true }));
   return root;
 }
@@ -133,6 +135,15 @@ test('locates the first canonical difference between adjacent requests and keeps
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('does not count an unfinished request as measured usage', () => {
+  const { completedAt, usage, ...request } = snapshot(0, { segments: [core], messages: [user] });
+  const { summary } = profileRequests([request]);
+  assert.equal(summary.all.requests, 1);
+  assert.equal(summary.all.inputTokens, null);
+  assert.equal(summary.all.cacheReadTokens, null);
+  assert.equal(summary.all.averageInputTokens, null);
 });
 
 test('rejects a malformed snapshot instead of skipping it', () => {

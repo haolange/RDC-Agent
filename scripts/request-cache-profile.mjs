@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 
 const utf8Bytes = (text) => Buffer.byteLength(text, 'utf8');
 const sha = (text) => crypto.createHash('sha256').update(text).digest('hex').slice(0, 16);
@@ -53,6 +54,33 @@ function listJsonFiles(root) {
   return files;
 }
 
+const completionFields = z.object({
+  completedAt: z.string(),
+  usage: z
+    .object({
+      inputTokens: z.number().optional(),
+      cacheReadTokens: z.number().optional(),
+      outputTokens: z.number().optional(),
+    })
+    .optional(),
+});
+
+function readCompletion(snapshotFile) {
+  const file = snapshotFile.replace(/\.json$/u, '.completion.meta');
+  let source;
+  try {
+    source = fs.readFileSync(file, 'utf8');
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+  try {
+    return completionFields.parse(JSON.parse(source));
+  } catch {
+    throw new Error(`Malformed request completion: ${file}`);
+  }
+}
+
 /** Read every request snapshot under the given roots; other JSON files are counted, not parsed further. */
 export function loadSnapshots(roots) {
   const snapshots = [];
@@ -66,7 +94,8 @@ export function loadSnapshots(roots) {
         continue;
       }
       assertSnapshot(value, file);
-      snapshots.push(value);
+      const completion = readCompletion(file);
+      snapshots.push(completion ? { ...value, ...completion } : value);
     }
   }
   return { snapshots, ignoredFiles };
@@ -304,8 +333,15 @@ export function profileRequests(snapshots) {
 }
 
 function summarizeGroup(rows) {
-  const inputTokens = rows.reduce((sum, row) => sum + (row.inputTokens ?? 0), 0);
-  const cacheReadTokens = rows.reduce((sum, row) => sum + (row.cacheReadTokens ?? 0), 0);
+  const inputUsage = rows.flatMap((row) => (row.inputTokens === null ? [] : [row.inputTokens]));
+  const cacheUsage = rows.flatMap((row) => (row.cacheReadTokens === null ? [] : [row.cacheReadTokens]));
+  const paired = rows.filter((row) => row.inputTokens !== null && row.cacheReadTokens !== null);
+  const inputTokens = inputUsage.length > 0 ? inputUsage.reduce((sum, tokens) => sum + tokens, 0) : null;
+  const cacheReadTokens = cacheUsage.length > 0 ? cacheUsage.reduce((sum, tokens) => sum + tokens, 0) : null;
+  const cacheReadRatio = ratio(
+    paired.reduce((sum, row) => sum + row.cacheReadTokens, 0),
+    paired.reduce((sum, row) => sum + row.inputTokens, 0),
+  );
   const compared = rows.filter((row) => row.difference);
   const differences = {};
   for (const row of compared) add(differences, diffClass(row.difference), 1);
@@ -314,7 +350,8 @@ function summarizeGroup(rows) {
     (row) =>
       row.difference.coveredOfPrevious >= 0.9 &&
       row.inputTokens &&
-      ratio(row.cacheReadTokens ?? 0, row.inputTokens) < 0.5,
+      row.cacheReadTokens !== null &&
+      ratio(row.cacheReadTokens, row.inputTokens) < 0.5,
   ).length;
   const share = {
     instructions: 0,
@@ -346,8 +383,8 @@ function summarizeGroup(rows) {
     scopes: new Set(rows.map((row) => row.scope)).size,
     inputTokens,
     cacheReadTokens,
-    cacheReadRatio: ratio(cacheReadTokens, inputTokens),
-    averageInputTokens: rows.length ? Math.round(inputTokens / rows.length) : null,
+    cacheReadRatio,
+    averageInputTokens: inputTokens === null ? null : Math.round(inputTokens / inputUsage.length),
     cacheEnabledRequests: rows.filter((row) => row.cacheEnabled).length,
     firstDifference: differences,
     toolChanges,
@@ -382,7 +419,7 @@ export function renderMarkdown(summary) {
   ];
   for (const [kind, group] of [['all', summary.all], ...Object.entries(summary.byKind)]) {
     lines.push(
-      `| ${kind} | ${group.requests} | ${group.inputTokens} | ${group.cacheReadTokens} | ${percent(group.cacheReadRatio)} | ${group.averageInputTokens ?? 'n/a'} | ${group.toolChanges} | ${percent(group.medianCoveredOfPrevious)} | ${group.stablePrefixButUncached} |`,
+      `| ${kind} | ${group.requests} | ${group.inputTokens ?? 'n/a'} | ${group.cacheReadTokens ?? 'n/a'} | ${percent(group.cacheReadRatio)} | ${group.averageInputTokens ?? 'n/a'} | ${group.toolChanges} | ${percent(group.medianCoveredOfPrevious)} | ${group.stablePrefixButUncached} |`,
     );
   }
   const all = summary.all;
