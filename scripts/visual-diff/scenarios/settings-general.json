@@ -31,18 +31,19 @@
     "ref": "c4dcce12b4067ce90568ef1a"
    }
   ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
   "app:getMeta": [
    {
     "result": {
      "version": "0.6.0-rc.8",
      "productName": "rdc-agent",
-     "systemTheme": "light"
+     "systemTheme": "light",
+     "previousInstance": null
     }
-   }
-  ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
    }
   ],
   "runtimeLog:list": [
@@ -50,8 +51,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-cc92acbf38d0-1795705493599",
-       "timestamp": 1795705493599,
+       "id": "rlog-16791947102f-1795711185916",
+       "timestamp": 1795711185916,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -65,8 +66,8 @@
        }
       },
       {
-       "id": "rlog-28429b93c12a-1795705493643",
-       "timestamp": 1795705493643,
+       "id": "rlog-fffec7e3127d-1795711185976",
+       "timestamp": 1795711185976,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -78,8 +79,8 @@
        "raw": null
       },
       {
-       "id": "rlog-bd1bad842fa8-1795705493643",
-       "timestamp": 1795705493643,
+       "id": "rlog-e305383e4ee4-1795711185976",
+       "timestamp": 1795711185976,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -91,8 +92,8 @@
        "raw": null
       },
       {
-       "id": "rlog-eff8006df8ae-1795705493658",
-       "timestamp": 1795705493658,
+       "id": "rlog-11be8d99a9bd-1795711185994",
+       "timestamp": 1795711185994,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -141,6 +142,14 @@
    {
     "result": {
      "projects": []
+    }
+   }
+  ],
+  "app:getCrashFiles": [
+   {
+    "result": {
+     "count": 0,
+     "bytes": 0
     }
    }
   ],
