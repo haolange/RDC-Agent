@@ -138,22 +138,14 @@ export class ContextManager {
         if (block.continuation) total += this.providerArtifactChars(block.continuation);
         else if (block.text) total += block.text.length;
       } else {
-        try {
-          total += JSON.stringify(block.arguments).length + block.name.length;
-        } catch {
-          total += block.name.length;
-        }
+        total += JSON.stringify(block.arguments).length + block.name.length;
       }
     }
     return total;
   }
 
   private providerArtifactChars(artifact: ProviderContinuationArtifact): number {
-    try {
-      return JSON.stringify(artifact).length;
-    } catch {
-      return 0;
-    }
+    return JSON.stringify(artifact).length;
   }
 
   private toolResultSize(msg: ToolResultMessage): number {

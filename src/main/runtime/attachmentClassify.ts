@@ -121,12 +121,7 @@ function fileExtension(fileName: string): string {
 function looksLikeUtf8(bytes: Buffer): boolean {
   if (bytes.length === 0) return true;
   if (bytes.includes(0)) return false;
-  try {
-    const decoded = bytes.toString('utf8');
-    return Buffer.from(decoded, 'utf8').equals(bytes);
-  } catch {
-    return false;
-  }
+  return Buffer.from(bytes.toString('utf8'), 'utf8').equals(bytes);
 }
 
 function isPng(bytes: Buffer): boolean {

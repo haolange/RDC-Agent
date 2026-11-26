@@ -6,6 +6,7 @@ import { planReviewStateStore, type PlanReviewStateStore } from '../../sessions/
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { TaskRegistry, createSessionTaskStore } from '../tasks';
 import { traceProjectionRefreshService } from '../orchestration/TraceProjectionRefreshService';
+import { reportProcessFault } from '../../runtime/processFaultHandlers';
 import { resolveRecoverablePlan } from './planReviewRecovery';
 import { resolveApprovedHandoff } from './approvedHandoffRecovery';
 import { getDelegatedInteractionOwner, type DelegatedInteractionOwner } from './DelegatedInteractionOwner';
@@ -93,7 +94,8 @@ export class AgentPlanReviewRequestService {
     const next = { ...data, projectionVersion: ++this.version };
     this.heads.set(sessionId, next);
     for (const listener of this.listeners) {
-      try { listener(next); } catch { /* Subscribers cannot reverse a durable decision. */ }
+      // Subscribers cannot reverse a durable decision; a failing one is reported.
+      try { listener(next); } catch (error) { reportProcessFault('Plan review listener failed', error); }
     }
     return next;
   }

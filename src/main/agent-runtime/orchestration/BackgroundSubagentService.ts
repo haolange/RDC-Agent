@@ -5,6 +5,7 @@ import { TaskRegistry, createSessionTaskStore, registerTaskExecutionCancellation
 import { requestSnapshotStore } from '../prompt';
 import { grantDelegatedOutput } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { delegationTraceStore } from '../workTrace/DelegationTraceStore';
+import { reportProcessFault } from '../../runtime/processFaultHandlers';
 import { traceProjectionRefreshService } from './TraceProjectionRefreshService';
 import { policyBudgetChain, registerPolicyBudgetObserver } from './DelegationBudget';
 import { bounded, normalizeSubagentResult, persistSubagentResult, projectSubagentExecution, type DelegationSourceFailure } from './SubagentResultEnvelope';
@@ -62,7 +63,8 @@ export class BackgroundSubagentService {
       registry = this.createRegistry(sessionId, async (execution) => this.cancelAndJoin(execution.id));
       registry.onTaskChange = () => {
         traceProjectionRefreshService.schedule(sessionId);
-        void this.syncTraceStatuses(sessionId, registry!).catch(() => undefined);
+        void this.syncTraceStatuses(sessionId, registry!)
+          .catch((error: unknown) => reportProcessFault('Background subagent trace statuses did not sync', error));
       };
       this.registries.set(sessionId, registry);
       this.ready.set(sessionId, registry.reconcileInterruptedExecutions().then(() => undefined));

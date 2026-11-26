@@ -39,7 +39,9 @@ export const deleteFileTool: AgentTool<DeleteFileParams, DeleteFileDetails> = {
     try {
       await fs.access(absolute);
       existed = true;
-    } catch { /* no-op */ }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
     if (existed) {
       await fs.unlink(absolute);
     }

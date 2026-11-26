@@ -15,6 +15,7 @@ import { generateEventId } from '@shared/utils/id';
 import { isSubagentScopeId, isTransientScopeId } from '@shared/utils/executionScope';
 import { stripRdcLeaseToolsFromAllowlist } from '@shared/constants/rdcLeaseTools';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
+import { reportProcessFault } from '../../runtime/processFaultHandlers';
 import { appPathService } from '../../runtime/AppPathService';
 import { sessionRecordStore } from '../../sessions/store/sessionStores';
 import { settingsService } from '../../settings/settings-core/SettingsService';
@@ -454,7 +455,8 @@ export class ProfileTurnRunner {
       this.deps.slots.purgeAgentStatesForScope(scope.executionScopeId);
     }
     if (scope.preparedLeaseRelease) {
-      await scope.preparedLeaseRelease().catch(() => undefined);
+      await scope.preparedLeaseRelease()
+        .catch((error: unknown) => reportProcessFault('Prepared RDC lease was not released at turn end', error));
     }
     this.deps.credentials.release(scope.ownedCredentialHandle);
   }

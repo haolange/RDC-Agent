@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { reportProcessFault } from '../../runtime/processFaultHandlers';
 import type { SessionRecord, SessionRecordSnapshot, SessionRevision } from '@shared/types/session';
 
 /**
@@ -19,7 +20,8 @@ export class SessionRevisionRegistry {
     this.latest.set(record.sessionId, this.n);
     const snapshot = { record, revision: { epoch: this.epoch, n: this.n } };
     for (const listener of this.listeners) {
-      try { listener(snapshot); } catch { /* A subscriber cannot undo a durable write. */ }
+      // A subscriber cannot undo a durable write; a failing one is reported.
+      try { listener(snapshot); } catch (error) { reportProcessFault('Session record listener failed', error); }
     }
     return snapshot;
   }

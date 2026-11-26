@@ -1,4 +1,5 @@
 import { AppError } from '@shared/errors/appError';
+import { reportProcessFault } from './processFaultHandlers';
 import type { AgentPermissionMode } from '@shared/types/settings';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 
@@ -26,7 +27,8 @@ export class RuntimePermissionStateService {
     if (previous.mode === mode) return previous;
     this.snapshot = Object.freeze({ mode, revision: previous.revision + 1 });
     for (const listener of [...this.listeners]) {
-      try { listener(this.snapshot); } catch { /* Committed state cannot be rolled back by observers. */ }
+      // Committed state cannot be rolled back by observers; a failing one is reported.
+      try { listener(this.snapshot); } catch (error) { reportProcessFault('Permission mode listener failed', error); }
     }
     return this.snapshot;
   }

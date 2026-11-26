@@ -3,6 +3,7 @@ import { errorCodeOf } from '@shared/errors/appError';
 import { appPathService } from '../../runtime/AppPathService';
 import { ProviderConnectionError } from '../provider-auth/providerConnectionErrors';
 import { parseJsonWith, readValidatedSync, writeFileAtomicSync } from '../../runtime/atomicFile';
+import { reportProcessFault } from '../../runtime/processFaultHandlers';
 import { CatalogProjectionClock } from './CatalogProjectionClock';
 import {
   cloneJson,
@@ -451,8 +452,9 @@ export class EffectiveCatalogService {
     for (const listener of this.listeners) {
       try {
         listener(snapshot);
-      } catch {
-        // A renderer subscription must not break catalog persistence or other listeners.
+      } catch (error) {
+        // A renderer subscription must not break catalog persistence or other listeners; it is reported.
+        reportProcessFault('Effective catalog listener failed', error);
       }
     }
   }

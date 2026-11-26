@@ -17,6 +17,7 @@ import {
   resolveVisibleConversationMessages,
 } from '../sessions/store/ConversationBranchResolver';
 import { hashAttachmentContents } from '../agent-runtime/attachments/ConversationAttachmentHashing';
+import { reportProcessFault } from '../runtime/processFaultHandlers';
 import { resolvePlanReference } from './planReferenceResolution';
 import { reconcileDelegatedInteractionRequests, reconcileInterruptedConversationTurn } from './DelegatedInteractionRecovery';
 import { conversationRdcHost } from './conversationRdcHost';
@@ -564,7 +565,8 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
       turnsToStop.length > 0
         ? Promise.allSettled(turnsToStop.map((turn) => turn.stopped))
         : Promise.resolve([]),
-      agentOrchestrator.abortAndJoin(sessionId, { reason: 'edit_resend' }).catch(() => undefined),
+      agentOrchestrator.abortAndJoin(sessionId, { reason: 'edit_resend' })
+        .catch((error: unknown) => reportProcessFault('Agent turn did not join before edit and resend', error)),
     ]);
 
     // Re-read after every stopped turn has fully left completeProfileTurn. Its
@@ -647,7 +649,8 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
     }
     // Branch switch: discard in-memory agent slot cache; next turn rehydrates from disk.
     agentOrchestrator.syncSessionSlots(input.sessionId);
-    await agentOrchestrator.abortAndJoin(input.sessionId, { reason: 'branch_switch' }).catch(() => undefined);
+    await agentOrchestrator.abortAndJoin(input.sessionId, { reason: 'branch_switch' })
+      .catch((error: unknown) => reportProcessFault('Agent turn did not join before the branch switch', error));
 
     const allMessages = conversationHistoryStore.readConversationHistory(input.sessionId);
     const branchState = this.readRepairedBranchState(input.sessionId, allMessages);

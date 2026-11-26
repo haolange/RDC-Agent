@@ -56,11 +56,8 @@ function globMatches(value: string, pattern: string): boolean {
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
     .replace(/\*/g, '.*')
     .replace(/\?/g, '.');
-  try {
-    return new RegExp(`^${escaped}$`, 'i').test(value);
-  } catch {
-    return false;
-  }
+  // Every regex metacharacter but * and ? is escaped above, so the pattern always compiles.
+  return new RegExp(`^${escaped}$`, 'i').test(value);
 }
 
 export function extractDiscoveredModelId(value: unknown): string {

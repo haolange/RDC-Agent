@@ -72,13 +72,8 @@ function clampEntryFields(input: RuntimeLogInput): Pick<
     };
   }
   // Final guard: shrink detail if still over.
-  const measure = (): number => {
-    try {
-      return Buffer.byteLength(JSON.stringify({ title, summary, detail, raw }), 'utf8');
-    } catch {
-      return MAX_ENTRY_BYTES + 1;
-    }
-  };
+  // raw is serializable here: it either stringified above or was replaced with a plain object.
+  const measure = (): number => Buffer.byteLength(JSON.stringify({ title, summary, detail, raw }), 'utf8');
   if (measure() > MAX_ENTRY_BYTES && detail) {
     detail = truncateUtf8(detail, Math.max(0, MAX_ENTRY_BYTES - fixed + Buffer.byteLength(detail, 'utf8') - 256));
   }

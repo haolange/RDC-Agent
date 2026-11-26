@@ -73,7 +73,10 @@ export async function initializeIpcState(): Promise<void> {
       state.currentProjectId = resumable.projectId;
       state.currentRunId = resumable.runId;
     }
-  } catch { /* resume detection is best-effort */ }
+  } catch (error) {
+    // Resume detection is best-effort: the app starts without a resumed session.
+    console.warn('[IPC] Failed to detect a resumable session:', error);
+  }
 }
 
 function broadcastToRenderer(channel: string, ...args: unknown[]): void {
