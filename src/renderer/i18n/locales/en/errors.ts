@@ -468,7 +468,6 @@ export const enErrors = {
   'errors.TASK_RECOVERY_INTERRUPT_OWNER_MISSING': "The Task's runner can't be reached to stop it.",
   'errors.TASK_SCOPE_NOT_DIRECTORY': "A Task location isn't a folder.",
   'errors.TASK_SCOPE_UNVERIFIED': "The Task's run couldn't be identified.",
-  'errors.TASK_STORAGE_REQUIRES_CONVERSION': 'Task records are in an older format. The original files were kept.',
   'errors.TOOL_ARGUMENTS_INVALID': "The model sent tool arguments that couldn't be read.",
   'errors.TOOL_GROUP_NOT_STARTED': "This tool call didn't start because an earlier call in the group failed.",
   'errors.TOOL_NOT_ACTIVATED': "That tool isn't active yet. The model needs to find it first.",

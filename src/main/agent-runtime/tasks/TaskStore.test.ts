@@ -32,21 +32,16 @@ describe('FileTaskStore', () => {
     expect((await fsPromises.readdir(dir)).filter((name) => name.endsWith('.tmp'))).toEqual([]);
   });
 
-  it('never silently converts or overwrites an existing noncurrent store', async () => {
+  it('refuses task files without task-state.json, naming the directory and leaving them in place', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-store-'));
     roots.push(dir);
     const original = '{"id":"task_old","subject":"Old","status":"completed"}';
     await writeFile(path.join(dir, 'task_old.json'), original);
     const store = new FileTaskStore(dir);
-    await expect(store.listTasks()).rejects.toThrow('TASK_STORAGE_REQUIRES_CONVERSION');
+    await expect(store.listTasks()).rejects.toThrow(expect.objectContaining({ code: 'STORAGE_SCHEMA' }));
+    await expect(store.listTasks()).rejects.toThrow(path.resolve(dir));
     expect(await readFile(path.join(dir, 'task_old.json'), 'utf8')).toBe(original);
     await expect(readFile(path.join(dir, 'task-state.json'))).rejects.toMatchObject({ code: 'ENOENT' });
-    // A failed initialization is retryable after an explicit offline conversion.
-    await writeFile(
-      path.join(dir, 'task-state.json'),
-      JSON.stringify({ tasks: {}, executions: {}, messages: {}, rootBudgets: {} }),
-    );
-    await expect(store.listTasks()).resolves.toEqual([]);
   });
 
   it('does not recreate or fail on an empty Task scope removed during a projection read', async () => {

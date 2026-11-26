@@ -9,6 +9,7 @@ import {
 import { AppError } from '@shared/errors/appError';
 import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
 import { writeFileAtomic } from '../../runtime/atomicFile';
+import { StorageSchemaError } from '../../runtime/storedDocument';
 import { TaskIndependentSourceSchema, TaskRuntimeEpochSchema } from './taskExecutionSchemas';
 import { orderTasks } from './taskProjection';
 import {
@@ -204,12 +205,7 @@ export class FileTaskStore implements TaskStore {
       await current;
       return this.readStateFile();
     }
-    if (entries.length) {
-      throw new AppError(
-        'TASK_STORAGE_REQUIRES_CONVERSION',
-        'nonempty task storage has no current task-state.json; original files were preserved.',
-      );
-    }
+    if (entries.length) throw unknownTaskStorage(this.root);
     return emptyState();
   }
 
@@ -235,12 +231,7 @@ export class FileTaskStore implements TaskStore {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
-    if ((await fs.readdir(this.root)).length) {
-      throw new AppError(
-        'TASK_STORAGE_REQUIRES_CONVERSION',
-        'nonempty task storage has no current task-state.json; original files were preserved.',
-      );
-    }
+    if ((await fs.readdir(this.root)).length) throw unknownTaskStorage(this.root);
     await this.writeState(emptyState());
   }
 
@@ -321,6 +312,11 @@ export class MemoryTaskStore implements TaskStore {
     for (const id of changes.deletedTaskIds ?? []) delete next.tasks[id];
     this.state = next;
   }
+}
+
+/** Files in a task directory without task-state.json are not a state this store wrote; they are left as they are. */
+function unknownTaskStorage(root: string): StorageSchemaError {
+  return new StorageSchemaError(`${root} holds files but no task-state.json`);
 }
 
 function emptyState(): TaskStateDocument {

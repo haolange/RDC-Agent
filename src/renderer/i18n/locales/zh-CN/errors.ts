@@ -443,7 +443,6 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.TASK_RECOVERY_INTERRUPT_OWNER_MISSING': '无法联系到 Task 的执行方来停止它。',
   'errors.TASK_SCOPE_NOT_DIRECTORY': '某个 Task 位置不是文件夹。',
   'errors.TASK_SCOPE_UNVERIFIED': '无法识别该 Task 的运行。',
-  'errors.TASK_STORAGE_REQUIRES_CONVERSION': 'Task 记录为旧格式，已保留原文件。',
   'errors.TOOL_ARGUMENTS_INVALID': '模型发送的工具参数无法读取。',
   'errors.TOOL_GROUP_NOT_STARTED': '同组中较早的调用失败，此工具调用未开始。',
   'errors.TOOL_NOT_ACTIVATED': '该工具尚未激活，模型需要先查找它。',
