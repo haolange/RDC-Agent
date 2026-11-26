@@ -6,7 +6,6 @@
 // Started by scripts/visual-diff/run.mjs; never shipped.
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { app, BrowserWindow, ipcMain, nativeImage } from 'electron';
 
@@ -60,10 +59,8 @@ if (mode !== 'diff') {
   app.commandLine.appendSwitch('disable-gpu');
   app.commandLine.appendSwitch('force-device-scale-factor', '1');
   app.commandLine.appendSwitch('lang', scenario.locale ?? 'en-US');
-  // A throwaway Electron profile per run, removed on exit.
-  const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-visual-diff-host-'));
-  app.setPath('userData', profileDir);
-  process.on('exit', () => fs.rmSync(profileDir, { recursive: true, force: true }));
+  // A throwaway Electron profile per run, created and removed by run.mjs.
+  app.setPath('userData', path.resolve(argv.profile));
 }
 
 /** Channel names come from the built preload, which compiles the shared channel table in. */

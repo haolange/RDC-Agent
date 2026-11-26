@@ -27,12 +27,28 @@ const electronBinary = () =>
   process.env.VISUAL_DIFF_ELECTRON ||
   path.join(repoRoot, 'node_modules', 'electron', 'dist', process.platform === 'win32' ? 'electron.exe' : 'electron');
 
+/**
+ * Runs the host once and waits for it. A rendering host gets a throwaway Electron profile that is removed here once
+ * the host is gone, whether it exited, crashed or timed out: the host itself ends with app.exit(), which skips
+ * process exit handlers.
+ */
 function spawnHost(args) {
   const xvfb = process.platform === 'linux' && !process.env.DISPLAY;
   const command = xvfb ? 'xvfb-run' : electronBinary();
-  const hostArgs = [path.join(here, 'host', 'main.mjs'), '--', ...args];
+  const rendering = args[args.indexOf('--mode') + 1] !== 'diff';
+  const profileDir = rendering ? fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-visual-diff-host-')) : null;
+  const hostArgs = [
+    path.join(here, 'host', 'main.mjs'),
+    '--',
+    ...args,
+    ...(profileDir ? ['--profile', profileDir] : []),
+  ];
   const full = xvfb ? ['-a', '-s', '-screen 0 1920x1200x24', electronBinary(), ...hostArgs] : hostArgs;
-  return spawnSync(command, full, { cwd: repoRoot, encoding: 'utf8', timeout: 180_000 });
+  try {
+    return spawnSync(command, full, { cwd: repoRoot, encoding: 'utf8', timeout: 180_000 });
+  } finally {
+    if (profileDir) fs.rmSync(profileDir, { recursive: true, force: true });
+  }
 }
 
 function runHost(args, capture = false) {
