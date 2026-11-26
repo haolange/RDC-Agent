@@ -79,7 +79,7 @@ Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `
   - 任何一步失败即非零退出。
   - 设 `QA_VIDEO_DIR` 时整段走查录成视频，截图日志带相对时间，便于剪出动效片段。
   - 截图目录放在仓库外，只留验收需要的一组。
-- 结果评测：`node scripts/eval-investigation.mjs --print-prompt` 给出 `scripts/evals/vkcube-lavapipe.json` 的问题（基于 RDC-Tool 的 `vkcube_lavapipe.rdc`，答案来自真实回放：唯一 draw 的事件、顶点数、渲染目标格式与尺寸、action 数、present 事件、着色器阶段）。
+- 结果评测：`node scripts/eval-investigation.mjs --print-prompt` 给出 `scripts/evals/vkcube-lavapipe.json` 的评测请求。该请求要求执行指定的回放查询、发布带原始证据引用的就绪报告，并逐题作答。默认用例基于 RDC-Tool 的 `vkcube_lavapipe.rdc`，答案来自真实回放。
   - 在应用里用任一模型完成这次调查后，`node scripts/eval-investigation.mjs <会话目录>` 从三方面判分，任一项不过即失败：
     - 答案：按会话最后的答复与 InvestigationReport 记录逐题判分。
     - 工具调用：套件的 `requiredToolCalls`（工具名加必须包含的参数）都要在 `session-context.jsonl` 里出现，且结果不是错误。
