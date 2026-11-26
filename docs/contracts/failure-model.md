@@ -129,7 +129,7 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 | `first-byte` | 请求发出时（覆盖建连、响应头与首个 chunk） | `providerFirstByteTimeoutMs(plan)`：`reasoningWire.control.kind` 为 `none`，或 `selection` 为 `off` 时 **20s**；否则 **180s**（推理模型可能长时间不出字） | `ProviderTimeoutError`（`PROVIDER_TIMEOUT`，`phase: 'first-byte'`） |
 | `idle` | 每收到一个 chunk / part（含 keepalive 字节；AI SDK 路径按 stream part，`start` 除外）后重置 | **60s** | `ProviderTimeoutError`（`phase: 'idle'`） |
 
-只要持续有进展，流就不会被总时长截断。AI SDK 路径的超时按超时错误报告（`stopReason: 'error'`），不再报成 `aborted`。
+只要持续有进展，流就不会被总时长截断。AI SDK 路径（`AiSdkStreamingProvider`）按 stream part 重置看门狗（SDK 在发请求前就产出的 `start` 除外），看门狗触发的中止按超时错误报告（`stopReason: 'error'`），用户取消仍为 `aborted`。AI SDK 路径的超时按超时错误报告（`stopReason: 'error'`），不再报成 `aborted`。
 
 ### ErrorRecovery 分类与重试
 

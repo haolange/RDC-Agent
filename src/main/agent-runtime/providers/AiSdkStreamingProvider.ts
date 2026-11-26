@@ -9,7 +9,7 @@ import {
   type ToolSet,
 } from 'ai';
 import { StreamChannelRefs } from './internal/streamChannelRefs';
-import { normalizeError } from './internal/http';
+import { normalizeError, ProviderTimeoutError } from './internal/http';
 import { startProviderStream, type ProviderStreamFailure } from './internal/providerStreamDriver';
 import { ToolCallAccumulator } from './internal/toolCallAccumulator';
 import { normalizeUsage, type UsageFieldMap } from './internal/usageNormalizer';
@@ -40,9 +40,11 @@ const AI_SDK_USAGE_FIELDS: UsageFieldMap<LanguageModelUsage> = {
 
 /**
  * The SDK owns the transport and reports an aborted request its own way, so any failure after the signal fired is an
- * abort, reported with the error the SDK threw.
+ * abort, reported with the error the SDK threw. A signal the stream watchdog fired is not an abort but a timeout, and
+ * is reported as the timeout error it carries.
  */
 function sdkStreamFailure(thrown: unknown, signal: AbortSignal): ProviderStreamFailure {
+  if (signal.reason instanceof ProviderTimeoutError) return { error: signal.reason, reason: 'error' };
   const error = normalizeError(thrown);
   return { error, reason: signal.aborted || error.name === 'AbortError' ? 'aborted' : 'error' };
 }

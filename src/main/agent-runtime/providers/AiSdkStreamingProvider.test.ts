@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 
 import { AiSdkStreamingProvider } from './AiSdkStreamingProvider';
+import { ProviderTimeoutError } from './internal/http';
 import type { LanguageModel } from 'ai';
 
 const streamTextMock = vi.hoisted(() => vi.fn());
@@ -180,5 +181,115 @@ describe('AiSdkStreamingProvider', () => {
     );
     expect(createModel).not.toHaveBeenCalled();
     expect(streamTextMock).not.toHaveBeenCalled();
+  });
+
+  describe('watchdog', () => {
+    afterEach(() => vi.useRealTimers());
+    const model = {
+      id: 'duo-chat-opus-4-8',
+      name: 'Opus',
+      provider: 'gitlab',
+      api: 'gitlab-duo',
+      contextWindow: 1_000_000,
+      maxTokens: 128_000,
+      reasoning: true,
+      vision: true,
+    };
+    const provider = () =>
+      new AiSdkStreamingProvider({
+        api: 'gitlab-duo',
+        createModel: async () => ({}) as Exclude<LanguageModel, string>,
+      });
+    /** A fullStream that sends `parts`, then stays silent until the request is aborted, as the SDK does. */
+    function silentAfter(parts: Array<{ type: string } & Record<string, unknown>>, gapMs = 0) {
+      streamTextMock.mockImplementation((input: { abortSignal: AbortSignal }) => ({
+        fullStream: (async function* () {
+          for (const part of parts) {
+            yield part;
+            if (gapMs) await new Promise((resolve) => setTimeout(resolve, gapMs));
+          }
+          await new Promise<void>((resolve) => input.abortSignal.addEventListener('abort', () => resolve()));
+          yield { type: 'abort' };
+        })(),
+      }));
+    }
+    const capture = async (stream: AsyncIterable<{ type: string }>) => {
+      try {
+        for await (const event of stream)
+          if (event.type === 'error') return event as never as { error: Error; message: { stopReason: string } };
+      } catch {
+        // rejects after its error event
+      }
+      return undefined;
+    };
+
+    it('reports a first-byte timeout as the timeout, not as an abort', async () => {
+      vi.useFakeTimers();
+      silentAfter([]);
+      const stream = provider().stream(model, { messages: [] }, { requestPlan, firstChunkTimeoutMs: 100 });
+      const failed = capture(stream);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      const event = await failed;
+      expect(event?.error).toBeInstanceOf(ProviderTimeoutError);
+      expect(event?.error).toMatchObject({ phase: 'first-byte', afterContent: false });
+      expect(event?.message.stopReason).toBe('error');
+    });
+
+    it('touches the watchdog on each part and reports an idle timeout after content', async () => {
+      vi.useFakeTimers();
+      silentAfter(
+        [
+          { type: 'start' },
+          { type: 'text-start', id: 't' },
+          { type: 'text-delta', id: 't', text: 'a' },
+          { type: 'text-delta', id: 't', text: 'b' },
+        ],
+        60,
+      );
+      const stream = provider().stream(
+        model,
+        { messages: [] },
+        { requestPlan, firstChunkTimeoutMs: 100, streamIdleTimeoutMs: 80 },
+      );
+      const failed = capture(stream);
+
+      await vi.advanceTimersByTimeAsync(60 * 4);
+      await vi.advanceTimersByTimeAsync(80);
+
+      const event = await failed;
+      expect(event?.error).toMatchObject({
+        name: 'ProviderTimeoutError',
+        phase: 'idle',
+        timeoutMs: 80,
+        afterContent: true,
+      });
+    });
+
+    it('does not count the SDK start part as the provider answering', async () => {
+      vi.useFakeTimers();
+      silentAfter([{ type: 'start' }]);
+      const stream = provider().stream(model, { messages: [] }, { requestPlan, firstChunkTimeoutMs: 100 });
+      const failed = capture(stream);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect((await failed)?.error).toMatchObject({ phase: 'first-byte' });
+    });
+
+    it('still reports a user abort as aborted', async () => {
+      silentAfter([]);
+      const controller = new AbortController();
+      const stream = provider().stream(model, { messages: [] }, { requestPlan, signal: controller.signal });
+      const failed = capture(stream);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+
+      controller.abort();
+
+      const event = await failed;
+      expect(event?.error).not.toBeInstanceOf(ProviderTimeoutError);
+      expect(event?.message.stopReason).toBe('aborted');
+    });
   });
 });
