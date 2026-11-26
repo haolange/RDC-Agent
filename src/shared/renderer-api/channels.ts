@@ -18,6 +18,8 @@ export const RENDERER_INVOKE_CHANNEL_TABLE = {
   'app:openPath': 'mutation',
   'app:copyText': 'mutation',
   'app:readClipboardText': 'read',
+  'app:getCrashFiles': 'read',
+  'app:clearCrashFiles': 'mutation',
   'web:resolveFavicon': 'desktop-only',
   'web:fetchImage': 'desktop-only',
   'dialog:selectFiles': 'mutation',

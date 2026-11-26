@@ -50,6 +50,7 @@ import { isTrustedRendererUrl, openExternalHttps, trustRendererEntry } from './r
 import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
 import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
 import { abnormalSupervisedExit, goneProcessKind, lifecycleLedger } from './runtime/LifecycleLedger';
+import { pruneCrashDumps, startLocalCrashReporter } from './runtime/crashFiles';
 import { currentHost } from './platform/host';
 import { currentProcessIdentity } from './platform/process';
 import type { ShutdownCause } from '@shared/types/lifecycle';
@@ -275,6 +276,15 @@ if (!userDataLock.acquired) {
     const event = abnormalSupervisedExit(owner, info);
     if (event) lifecycleLedger.record(event);
   });
+  // Local minidumps only, for the instance that owns this data directory; the disposable Browser QA instance has none.
+  if (!useDisposableBrowserQaUserData) {
+    try {
+      startLocalCrashReporter();
+      pruneCrashDumps();
+    } catch (error) {
+      console.error('[RDC-Agent] Local crash reporting is unavailable:', error);
+    }
+  }
   process.once('exit', userDataLock.release);
   if (cleanupDisposableBrowserQaUserData) {
     app.once('will-quit', () => {

@@ -8,3 +8,9 @@ export type ShutdownCause = (typeof SHUTDOWN_CAUSES)[number];
  */
 export const TURN_STOP_CAUSES = ['user', 'app-shutdown', 'runtime'] as const;
 export type TurnStopCause = (typeof TURN_STOP_CAUSES)[number];
+
+/** The minidumps kept on this machine (Settings › Crash files). */
+export interface CrashFilesSummary {
+  count: number;
+  bytes: number;
+}

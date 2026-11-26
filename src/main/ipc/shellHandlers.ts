@@ -4,6 +4,7 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell, typ
 import { nativeMessage } from '../window/nativeI18n';
 
 import { appPathService } from '../runtime/AppPathService';
+import { clearCrashDumps, summarizeCrashFiles } from '../runtime/crashFiles';
 import { samePath } from '../platform/paths';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
@@ -215,6 +216,14 @@ function appChannels(): IpcChannelTable {
         label: 'app:readClipboardText',
       });
       return { success: true, text: clipboard.readText() };
+    },
+    'app:getCrashFiles': async (_event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'app:getCrashFiles', maxBytes: 1024 });
+      return summarizeCrashFiles();
+    },
+    'app:clearCrashFiles': async (_event, ...rawArgs: unknown[]) => {
+      parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'app:clearCrashFiles', maxBytes: 1024 });
+      return clearCrashDumps();
     },
   };
 }

@@ -113,6 +113,13 @@ export const enSettings = {
   'settings.composerMarkdownHelp':
     'Syntax highlight while typing, preview before send, and render sent prompts as Markdown.',
   'settings.workProcessExpansion': 'Work process',
+  'settings.crashReports': 'Crash reports',
+  'settings.crashFiles': 'Crash files',
+  'settings.crashFilesNone': 'None. Crash files stay on this computer and are never uploaded.',
+  'settings.crashFilesSummaryOne': 'One file ({size}), kept only on this computer and never uploaded.',
+  'settings.crashFilesSummary': '{count} files ({size}), kept only on this computer and never uploaded.',
+  'settings.crashFilesClear': 'Clear',
+  'settings.crashFilesClearFailed': "Couldn't clear the crash files.",
   'settings.workProcessExpansionLatest': 'Follow latest',
   'settings.workProcessExpansionAll': 'Show all',
   'settings.workProcessExpansionLatestHint':

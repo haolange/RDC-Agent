@@ -28,6 +28,8 @@ export function createAppShellApi(transport: RendererApiTransport): AppShellApi 
     openPath: (targetPath) => transport.invoke('app:openPath', targetPath),
     copyText: (text) => transport.invoke('app:copyText', text),
     readClipboardText: () => transport.invoke('app:readClipboardText'),
+    getCrashFiles: () => transport.invoke('app:getCrashFiles'),
+    clearCrashFiles: () => transport.invoke('app:clearCrashFiles'),
   };
 }
 

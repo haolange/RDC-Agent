@@ -91,6 +91,7 @@ import type { MCPServerStatusSummary } from './mcp';
 import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
 import type { TraceProjectionChangedPayload } from './agenticTrace';
 import type { TraceSessionResult } from './trace';
+import type { CrashFilesSummary } from './lifecycle';
 import type {
   HookEvent,
   RdcRuntimeOverview,
@@ -196,6 +197,10 @@ export interface ElectronAPI {
       success: boolean;
       text: string;
     }>;
+    /** The minidumps kept on this machine; they are never uploaded or exported. */
+    getCrashFiles: () => Promise<CrashFilesSummary>;
+    /** Removes every kept minidump and returns what is left. */
+    clearCrashFiles: () => Promise<CrashFilesSummary>;
   };
 
   web: {
