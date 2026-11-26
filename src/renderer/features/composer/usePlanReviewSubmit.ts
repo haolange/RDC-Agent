@@ -4,6 +4,7 @@ import { isCurrentPlanReview, usePlanReviewStore } from '../../stores/planReview
 import { useElectronApi } from '../../hooks/useElectronApi';
 import { useProjectStore } from '../../stores/projectStore';
 import { useConversationStore } from '../../stores/conversationStore';
+import { useSessionStore } from '../../stores/sessionStore';
 import { acceptSessionSnapshot, getSessionView, useSessionRecordStore } from '../../stores/sessionRecordStore';
 import { useComposerSessionContextStore } from '../../stores/composerSessionContextStore';
 import { useTurnControlsStore } from '../../stores/turnControlsStore';
@@ -37,7 +38,11 @@ function untilTurnIdle(live: () => boolean): Promise<boolean> {
       offs.forEach((off) => off());
       resolve(outcome);
     };
-    offs.push(useComposerSessionContextStore.subscribe(check), useConversationStore.subscribe(check));
+    offs.push(
+      useComposerSessionContextStore.subscribe(check),
+      useConversationStore.subscribe(check),
+      useSessionStore.subscribe(check),
+    );
     check();
   });
 }

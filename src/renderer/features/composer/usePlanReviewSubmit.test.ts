@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
+import { useSessionStore } from '../../stores/sessionStore';
 import { useTurnControlsStore } from '../../stores/turnControlsStore';
 import { usePlanReviewSubmit } from './usePlanReviewSubmit';
 import type { ConversationMessage } from '@shared/types/conversation';
@@ -188,6 +189,7 @@ beforeEach(() => {
   mock.sessionListeners.clear();
   mock.conversationListeners.clear();
   mock.activeTurn = null;
+  useSessionStore.getState().setCurrentRun(null);
   mock.contextListeners.clear();
   mock.send.mockResolvedValue({ status: 'accepted', requestId: 'execute' });
   mock.answer.mockImplementation(async () => {
@@ -230,6 +232,33 @@ it('sends the execute turn once, after the owning turn has ended', async () => {
   await running;
   expect(mock.send).toHaveBeenCalledExactlyOnceWith(execute);
   expect(mock.contextListeners.size).toBe(0);
+});
+
+it('sends the exact approved plan when the owning run status is the last update', async () => {
+  const run = {
+    kind: 'conversation' as const,
+    runId: 'plan-run',
+    projectId: 'p',
+    sessionId: 's',
+    caseId: 'case',
+    profileId: 'debugger',
+    goal: 'Plan the investigation',
+    captures: [],
+    startedAt: 1,
+    status: 'awaiting_approval' as const,
+    backend: 'remote' as const,
+  };
+  useSessionStore.getState().setCurrentRun(run);
+  mock.activeTurn = { sessionId: 's' };
+  const running = useTestSubmit()(request, approve);
+  await vi.waitFor(() => expect(mock.contextListeners.size).toBe(1));
+  notify();
+  mock.contextListeners.forEach((fn) => fn());
+  expect(mock.send).not.toHaveBeenCalled();
+
+  useSessionStore.getState().setCurrentRun({ ...run, status: 'completed' });
+  await vi.waitFor(() => expect(mock.send).toHaveBeenCalledExactlyOnceWith(execute));
+  await running;
 });
 
 it('drops the execute turn when the session changes before the owning turn ends', async () => {
