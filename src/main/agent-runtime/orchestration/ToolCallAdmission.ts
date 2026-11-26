@@ -154,9 +154,12 @@ export function validateToolArguments(
     tool.validateArgs?.(validatedArgs);
     return { ok: true, value: validatedArgs };
   } catch (error) {
+    // A ToolValidationError already reads `TOOL_SCHEMA_VIOLATION: [tool] path: message`.
     const message =
-      error instanceof ToolValidationError ? error.message : error instanceof Error ? error.message : String(error);
-    return { ok: false, result: errorToolResult(toolCall, `TOOL_SCHEMA_VIOLATION: ${message}`) };
+      error instanceof ToolValidationError
+        ? error.message
+        : `TOOL_SCHEMA_VIOLATION: ${error instanceof Error ? error.message : String(error)}`;
+    return { ok: false, result: errorToolResult(toolCall, message) };
   }
 }
 

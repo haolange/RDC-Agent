@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { AppError } from '@shared/errors/appError';
 import Ajv, { type ErrorObject, type Options, type ValidateFunction } from 'ajv';
 import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
@@ -7,17 +8,19 @@ import type AjvCore from 'ajv/dist/core';
 import type { JsonSchema, ToolDefinition } from './types';
 
 /**
- * 工具参数验证错误。
+ * 工具参数验证错误：`TOOL_SCHEMA_VIOLATION: [tool] path: message`，模型读到的工具结果就是这条消息。
  *
  * 携带 `path` 以便定位失败字段，例如 `args.options.format`。
  */
-export class ToolValidationError extends Error {
+export class ToolValidationError extends AppError {
+  declare readonly code: 'TOOL_SCHEMA_VIOLATION';
+
   constructor(
     message: string,
     public readonly path: string,
     public readonly toolName?: string,
   ) {
-    super(toolName ? `[${toolName}] ${path}: ${message}` : `${path}: ${message}`);
+    super('TOOL_SCHEMA_VIOLATION', toolName ? `[${toolName}] ${path}: ${message}` : `${path}: ${message}`);
     this.name = 'ToolValidationError';
   }
 }
