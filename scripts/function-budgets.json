@@ -5,9 +5,6 @@
     "params": 6
   },
   "exceptions": {
-    "src/main/agent-runtime/agent/ErrorRecovery.ts": {
-      "complexity": 41
-    },
     "src/main/agent-runtime/AgentEventBridge.ts": {
       "lines": 186
     },

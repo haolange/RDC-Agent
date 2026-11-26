@@ -129,7 +129,7 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 | `first-byte` | 请求发出时（覆盖建连、响应头与首个 chunk） | `providerFirstByteTimeoutMs(plan)`：`reasoningWire.control.kind` 为 `none`，或 `selection` 为 `off` 时 **20s**；否则 **180s**（推理模型可能长时间不出字） | `ProviderTimeoutError`（`PROVIDER_TIMEOUT`，`phase: 'first-byte'`） |
 | `idle` | 每收到一个 chunk / part（含 keepalive 字节；AI SDK 路径按 stream part，`start` 除外）后重置 | **60s** | `ProviderTimeoutError`（`phase: 'idle'`） |
 
-只要持续有进展，流就不会被总时长截断。AI SDK 路径（`AiSdkStreamingProvider`）按 stream part 重置看门狗（SDK 在发请求前就产出的 `start` 除外），看门狗触发的中止按超时错误报告（`stopReason: 'error'`），用户取消仍为 `aborted`。AI SDK 路径的超时按超时错误报告（`stopReason: 'error'`），不再报成 `aborted`。
+只要持续有进展，流就不会被总时长截断。`ProviderTimeoutError.afterContent` 记录触发时 `AssistantStreamBuilder` 是否已产出模型输出（正文、thinking 或工具调用）；`ErrorRecovery` 把 `ProviderTimeoutError`（含 cause 链中的）归为 `network_error`，输出前超时沿用该类的 3 次重试，输出后超时不重试（重试会丢弃已产出内容并重发整个请求），直接 abort 并保留 cause，已推送的 partial 消息仍留在 UI。AI SDK 路径（`AiSdkStreamingProvider`）按 stream part 重置看门狗（SDK 在发请求前就产出的 `start` 除外），看门狗触发的中止按超时错误报告（`stopReason: 'error'`），用户取消仍为 `aborted`。AI SDK 路径的超时按超时错误报告（`stopReason: 'error'`），不再报成 `aborted`。
 
 ### ErrorRecovery 分类与重试
 
@@ -137,6 +137,7 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 | --- | --- |
 | `empty_stream` | 最多重试 **1** 次后 abort；**不**归入 `server_error` |
 | `rate_limit` / `network_error` / `server_error` | 均最多 **3** 次重试（`DEFAULT_MAX_RETRIES`），耗尽后 abort；`server_error` 为真实 HTTP 5xx。等待取 `max(指数退避, 服务端 Retry-After)`；服务端要求超过 **60s**（`MAX_RETRY_AFTER_MS`）时直接 abort 并写明要求的等待 |
+| `network_error`（`ProviderTimeoutError` 且 `afterContent`） | 不重试，直接 abort；`maxAttempts` 为 1 |
 | `overloaded` | HTTP **503/529**，或文案含 `at capacity` / `high demand` / `overloaded` / `service unavailable`；最多 **3** 次重试（`DEFAULT_MAX_RETRIES`）；连续 **3** 次（`OVERLOAD_SWITCH_THRESHOLD`）命中且存在不同的 fallback model 时 `switch_model` 并清零计数；无 fallback 则重试耗尽后 abort |
 | `prompt_too_long` | 先做一次 reactive compact；仍超长则 abort |
 | `max_tokens` | 输出上限决策：先 reactive compact（未尝试时），再 `continue_prompt` 最多 **2** 次（`DEFAULT_MAX_RECOVERY_RETRIES`），耗尽后 abort |
@@ -173,7 +174,7 @@ Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空�
 
 ## 相关测试
 
-- Provider 失败保真：`ErrorRecovery.test.ts`、`ConversationTurnDiagnostic.test.ts`、`providers/internal/http.test.ts`、`OpenAIResponsesProvider.test.ts`、`AgentLoop.recoveryDiagnostic.test.ts`
+- Provider 失败保真：`ErrorRecovery.test.ts`、`providers/internal/streamWatchdog.test.ts`、`providers/internal/providerStreamDriver.test.ts`、`AiSdkStreamingProvider.test.ts`、`ConversationTurnDiagnostic.test.ts`、`providers/internal/http.test.ts`、`OpenAIResponsesProvider.test.ts`、`AgentLoop.recoveryDiagnostic.test.ts`
 - Integrity 存储：`src/main/runtime/jsonl.test.ts`、`src/main/testing/contracts/storageFaultContract.test.ts`
 - Availability 取消：`TurnCoordinator.test.ts`、`ProcessSupervisor.test.ts`、`cancellationContract.test.ts`、`KnowledgeImportService.test.ts` / `KnowledgeExportService.test.ts` / `KnowledgeIndexService.test.ts`（知识长任务取消）
 - Security 矩阵：`securityContract.test.ts`

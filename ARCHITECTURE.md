@@ -411,6 +411,7 @@ import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
 - `ProviderEmptyStreamError`（`PROVIDER_STREAM_EMPTY`）不合成 HTTP 502。
 - `ErrorRecovery` 的 `empty_stream` 最多重试 1 次；真实 5xx 为 `server_error`（3 次）；503 为 `overloaded`；401 立即 abort。
 - Provider 流只有一个看门狗（`providers/internal/streamWatchdog.ts`，由 `startProviderStream` 持有）：首字节从请求发出起算（推理模型 180s，否则 20s），空闲 60s 随每个 chunk 重置，无总时长上限；详见 `docs/contracts/failure-model.md`。
+- 输出后才发生的 `ProviderTimeoutError`（`afterContent`）不被 `ErrorRecovery` 重试；分类规则在 `agent/ErrorClassification.ts`。
 - `AgentRecoveryAbortError` 必带 cause 与结构化字段。
 - `createTurnFailedDiagnostic` 保留 `CONVERSATION_LLM_REQUEST_FAILED`，并按 auth / quota-rate / 5xx / empty_stream / network 分类文案。
 - Work Process Active Signal 与诊断行对齐，见 `check:work-process` + [`docs/ui/work-process-checklist.md`](docs/ui/work-process-checklist.md)。

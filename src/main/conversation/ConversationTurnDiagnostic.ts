@@ -4,7 +4,6 @@ import {
   findProviderHttpError,
   isProviderStreamProtocolError,
   redactRecoverySnippet,
-  type ErrorCategory,
 } from '../agent-runtime/agent/ErrorRecovery';
 import {
   isProviderEmptyStreamError,
@@ -21,6 +20,7 @@ import {
   type AgentRoutePreflightOk,
 } from './ConversationRoutePreflight';
 import { diagnosticText } from './diagnosticText';
+import type { ErrorCategory } from '../agent-runtime/agent/ErrorClassification';
 import type { ConversationMessageDiagnostic } from '@shared/types/conversation';
 
 export function createTurnFailedDiagnostic(
