@@ -8,7 +8,6 @@ import {
   isOriginAllowed,
   resolveBridgeAllowedOrigins,
   resolveBridgeCookieToken,
-  resolveProvidedBridgeToken,
   tokensMatch,
   cookieOriginRequiredForPath,
 } from './bridgeSecurity';
@@ -41,41 +40,26 @@ describe('browserAppBridge security', () => {
     expect(tokensMatch(token, extractBearerToken(undefined))).toBe(false);
   });
 
-  it('does not accept bridge tokens from URL query parameters', () => {
-    expect(
-      resolveProvidedBridgeToken({
-        cookieHeader: 'rdcBridgeToken=from-cookie',
-      }),
-    ).toBe('from-cookie');
-    expect(
-      resolveProvidedBridgeToken({
-        cookieHeader: undefined,
-      }),
-    ).toBeNull();
-  });
-
   it('reads an HttpOnly strict bridge auth cookie set by /qa entry', () => {
-    expect(resolveBridgeCookieToken('rdcBridgeToken=abc%2F123; other=1')).toBe('abc/123');
-    expect(resolveBridgeCookieToken('other=1')).toBeNull();
-    expect(buildBridgeAuthCookie('secret')).toContain('rdcBridgeToken=secret');
-    expect(buildBridgeAuthCookie('secret')).toContain('HttpOnly');
-    expect(buildBridgeAuthCookie('secret')).toContain('SameSite=Strict');
-    expect(buildBridgeAuthCookie('secret', { secure: true })).toContain('Secure');
+    const origin = 'http://127.0.0.1:5127';
+    expect(resolveBridgeCookieToken('rdcBridgeToken-5127=abc%2F123; other=1', origin)).toBe('abc/123');
+    expect(resolveBridgeCookieToken('other=1', origin)).toBeNull();
+    const cookie = buildBridgeAuthCookie('secret', origin);
+    expect(cookie).toContain('rdcBridgeToken-5127=secret');
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('SameSite=Strict');
+    expect(buildBridgeAuthCookie('secret', 'https://127.0.0.1:5127')).toContain('Secure');
   });
 
-  it('resolves auth from Bearer before cookie', () => {
-    expect(
-      resolveProvidedBridgeToken({
-        authorizationHeader: 'Bearer from-header',
-        cookieHeader: 'rdcBridgeToken=from-cookie',
-      }),
-    ).toBe('from-header');
-    expect(
-      resolveProvidedBridgeToken({
-        cookieHeader: 'rdcBridgeToken=from-cookie',
-      }),
-    ).toBe('from-cookie');
-    expect(resolveProvidedBridgeToken({})).toBeNull();
+  it('selects only its own cookie from multiple bridges on the same host', () => {
+    const first = 'http://127.0.0.1:5127';
+    const second = 'http://127.0.0.1:6127';
+    const cookieHeader = [buildBridgeAuthCookie('first', first), buildBridgeAuthCookie('second', second)]
+      .map((cookie) => cookie.split(';')[0])
+      .join('; ');
+    expect(resolveBridgeCookieToken(cookieHeader, first)).toBe('first');
+    expect(resolveBridgeCookieToken(cookieHeader, second)).toBe('second');
+    expect(resolveBridgeCookieToken(cookieHeader, 'http://127.0.0.1:7127')).toBeNull();
   });
 
   it('keeps ordinary registered renderer channels available to the browser transport', () => {

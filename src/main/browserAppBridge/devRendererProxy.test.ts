@@ -38,7 +38,7 @@ describe('devRendererProxy upstream header stripping', () => {
       {
         headers: {
           host: '127.0.0.1:5127',
-          cookie: 'rdcBridgeToken=SECRET',
+          cookie: 'rdcBridgeToken-5127=SECRET',
           authorization: 'Bearer SECRET',
           'proxy-authorization': 'Basic SECRET',
           'x-rdc-debug': 'nope',

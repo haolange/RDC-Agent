@@ -125,7 +125,7 @@ function requireBridgeAuth(
   if (bearer && tokensMatch(bridgeToken, bearer)) {
     return { ok: true, authViaCookie: false };
   }
-  const cookieToken = resolveBridgeCookieToken(request.headers.cookie);
+  const cookieToken = resolveBridgeCookieToken(request.headers.cookie, bridgeOrigin);
   if (cookieToken && tokensMatch(bridgeToken, cookieToken)) {
     if (options.requireCookieOrigin) {
       const origin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
@@ -146,7 +146,7 @@ function redirectWithBridgeCookie(
 ): void {
   response.writeHead(302, {
     Location: location,
-    'Set-Cookie': buildBridgeAuthCookie(token, { secure: bridgeOrigin.startsWith('https:') }),
+    'Set-Cookie': buildBridgeAuthCookie(token, bridgeOrigin),
     'Cache-Control': 'no-store',
   });
   response.end();

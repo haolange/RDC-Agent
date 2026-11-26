@@ -47,8 +47,10 @@ async function assertQaSurface(baseUrl, qaUrl) {
     return null;
   }
   const setCookie = qa.response.headers.get('set-cookie') || '';
-  if (!setCookie.includes('rdcBridgeToken=')) {
-    fail('GET /qa missing Set-Cookie rdcBridgeToken');
+  const bridgeAddress = new URL(baseUrl);
+  const port = bridgeAddress.port || (bridgeAddress.protocol === 'https:' ? '443' : '80');
+  if (!setCookie.startsWith(`rdcBridgeToken-${port}=`)) {
+    fail('GET /qa missing the auth cookie for this bridge port');
     return null;
   }
   ok('GET /qa → 302 + Set-Cookie');

@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { buildBridgeAuthCookie, resolveProvidedBridgeToken, tokensMatch } from './bridgeSecurity';
+import { buildBridgeAuthCookie, extractBearerToken, resolveBridgeCookieToken, tokensMatch } from './bridgeSecurity';
 import type { AddressInfo } from 'net';
 
 /**
@@ -20,7 +20,8 @@ function createMinimalQaServer(): Promise<{ server: Server; baseUrl: string }> {
   return new Promise((resolveListen, reject) => {
     let bootstrapToken: string | null = 'qa-bootstrap';
     const server = createServer((request: IncomingMessage, response: ServerResponse) => {
-      const url = new URL(request.url ?? '/', 'http://127.0.0.1');
+      const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      const url = new URL(request.url ?? '/', origin);
       if (url.pathname === '/qa' && (request.method === 'GET' || request.method === 'HEAD')) {
         if (!bootstrapToken || url.searchParams.get('qaBootstrap') !== bootstrapToken) {
           response.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -30,17 +31,15 @@ function createMinimalQaServer(): Promise<{ server: Server; baseUrl: string }> {
         bootstrapToken = null;
         response.writeHead(302, {
           Location: '/app',
-          'Set-Cookie': buildBridgeAuthCookie(EXPECTED),
+          'Set-Cookie': buildBridgeAuthCookie(EXPECTED, origin),
           'Cache-Control': 'no-store',
         });
         response.end();
         return;
       }
       if (url.pathname === '/app') {
-        const provided = resolveProvidedBridgeToken({
-          authorizationHeader: request.headers.authorization,
-          cookieHeader: request.headers.cookie,
-        });
+        const provided =
+          extractBearerToken(request.headers.authorization) ?? resolveBridgeCookieToken(request.headers.cookie, origin);
         if (!tokensMatch(EXPECTED, provided)) {
           response.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
           response.end(JSON.stringify({ success: false, error: 'Unauthorized' }));
@@ -78,7 +77,7 @@ describe('BrowserAppBridge /qa auth contract', () => {
     expect(qaResponse.status).toBe(302);
     expect(qaResponse.headers.get('location')).toBe('/app');
     const setCookie = qaResponse.headers.get('set-cookie') ?? '';
-    expect(setCookie).toContain('rdcBridgeToken=');
+    expect(setCookie).toContain(`rdcBridgeToken-${new URL(started.baseUrl).port}=`);
 
     const cookie = setCookie.split(';')[0] ?? '';
     const appResponse = await fetch(`${started.baseUrl}/app`, {

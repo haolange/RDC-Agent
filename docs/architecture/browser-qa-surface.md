@@ -5,9 +5,11 @@ Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口
 | 路径 | Transport | 鉴权 |
 | --- | --- | --- |
 | Desktop | `preload` → `ipcRenderer` → `ipcMain` | 进程内信任边界 |
-| Browser | `BrowserAppBridge` → localhost HTTP/SSE → IPC handler registry | One-time `/qa` bootstrap → HttpOnly `rdcBridgeToken` cookie（同源 `/app`）；explicit Bearer for programmatic clients |
+| Browser | `BrowserAppBridge` → localhost HTTP/SSE → IPC handler registry | One-time `/qa` bootstrap → HttpOnly `rdcBridgeToken-<port>` cookie（同源 `/app`）；explicit Bearer for programmatic clients |
 
 唯一入口：launcher 记录一次性 `GET /qa?qaBootstrap=...`，消费一次后签发 bridge cookie，并重定向到**同一 bridge origin** 上的干净 `/app`。
+
+同一 loopback 主机上的多个 QA 实例用各自监听端口命名 Cookie。浏览器可同时保留这些认证记录，Bridge 只校验其自身端口对应的 Cookie。
 
 - In `browser-dev`, Vite is reverse-proxied through the bridge（含 HMR WebSocket）；浏览器不得直接打开 Vite 端口，也不再经跨端口 challenge / `rdcBridgeOrigin` query。
 - 仅未打包构建在 `RDC_AGENT_BROWSER_QA=1` 时启动该 surface，打包产物无论环境变量如何都不启动；请求的 `Host` 必须是 bridge 自身（否则 421）；bootstrap 缺失、重复或无效返回 401。

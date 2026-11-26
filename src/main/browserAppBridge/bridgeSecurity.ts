@@ -39,23 +39,19 @@ export function extractBearerToken(authorizationHeader: string | undefined): str
   return null;
 }
 
-/** Resolve Browser QA auth from an explicit Bearer header or HttpOnly auth cookie. */
-export function resolveProvidedBridgeToken(input: {
-  authorizationHeader?: string;
-  cookieHeader?: string;
-}): string | null {
-  return extractBearerToken(input.authorizationHeader) ?? resolveBridgeCookieToken(input.cookieHeader);
+function bridgeCookieName(origin: URL): string {
+  // Browsers share cookies between ports on the same host. Each bridge needs its own name.
+  return `rdcBridgeToken-${origin.port || (origin.protocol === 'https:' ? '443' : '80')}`;
 }
 
-const BRIDGE_COOKIE_NAME = 'rdcBridgeToken';
-
 /** Cookie used by short `/qa` entry so the address bar does not retain the bearer token. */
-export function resolveBridgeCookieToken(cookieHeader: string | undefined): string | null {
+export function resolveBridgeCookieToken(cookieHeader: string | undefined, bridgeOrigin: string): string | null {
   if (!cookieHeader) return null;
+  const prefix = `${bridgeCookieName(new URL(bridgeOrigin))}=`;
   for (const part of cookieHeader.split(';')) {
     const trimmed = part.trim();
-    if (!trimmed.startsWith(`${BRIDGE_COOKIE_NAME}=`)) continue;
-    const raw = trimmed.slice(BRIDGE_COOKIE_NAME.length + 1).trim();
+    if (!trimmed.startsWith(prefix)) continue;
+    const raw = trimmed.slice(prefix.length).trim();
     if (!raw) return null;
     try {
       return decodeURIComponent(raw) || null;
@@ -66,12 +62,11 @@ export function resolveBridgeCookieToken(cookieHeader: string | undefined): stri
   return null;
 }
 
-export function buildBridgeAuthCookie(token: string, options: { secure?: boolean } = {}): string {
-  const secure = options.secure ? '; Secure' : '';
-  return `${BRIDGE_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict${secure}`;
+export function buildBridgeAuthCookie(token: string, bridgeOrigin: string): string {
+  const origin = new URL(bridgeOrigin);
+  const secure = origin.protocol === 'https:' ? '; Secure' : '';
+  return `${bridgeCookieName(origin)}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict${secure}`;
 }
-
-export { BRIDGE_COOKIE_NAME };
 
 export function tokensMatch(expected: string, provided: string | null): boolean {
   if (!provided) return false;
