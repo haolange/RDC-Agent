@@ -6,7 +6,7 @@ import type { KnowledgeExportFormat } from '@shared/types/knowledgeExport';
  * It is the only export format that can be imported again. Markdown export is
  * for reading and is not re-importable.
  */
-export const KNOWLEDGE_PACKAGE_SCHEMA = 'rdc.knowledge-package/1';
+export const KNOWLEDGE_PACKAGE_SCHEMA = 'rdc.knowledge-package';
 
 export const KNOWLEDGE_EXPORT_EXTENSION: Record<KnowledgeExportFormat, string> = { package: 'zip', markdown: 'md' };
 

@@ -81,7 +81,7 @@
   - 同源 `sourceHash` 已在目标空间 → 幂等「已在该空间」，不覆盖。
   - 不同源同 ID → 导入冲突，条目带标题 / `caseId` / 已有 `cardId`，文案是「目标空间已有此卡片」，**禁止**写成 Conflicts 页的 `contradicts`。
   - 导入结果是 `items[]`（每项自带 status / record / missingAssets / reason / existingCardId）。
-- 导出经 `KnowledgeExportService`，格式二选一：**知识包**（标准 zip 载体，内含 `knowledge.yaml` 的 `rdc.knowledge-package/1` 与声明对照图，可再导入）与 **Markdown**（阅读用途，不可再导入，不夹图）。
+- 导出经 `KnowledgeExportService`，格式二选一：**知识包**（标准 zip 载体，内含 `knowledge.yaml` 的 `rdc.knowledge-package` 与声明对照图，可再导入）与 **Markdown**（阅读用途，不可再导入，不夹图）。
   - 范围为选择的卡片 / 当前筛选结果 / 指定空间；`filtered`/`selected` 用当前列表（`selected` 是选卡清单里勾选的卡片，经 `cardRefs` 传给主进程），`space` 计数必须问该 `spaceId` 的 `listCards`/`query`，不得用当前 Cards `hits.filter`。
   - 导出包剔除 `sourceHash` / `sourceMtimeMs` / `sourceSize` 与任何绝对路径，复用导入同一套 secret 扫描；磁盘上不存在的图不写入 yaml 的 `images[]`；绝不导出凭据、provider 配置或会话数据。
   - 导出包的 `lifecycle` 只是元数据，再导入一律落目标空间 draft（`verified: false`）。

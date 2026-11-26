@@ -14,12 +14,12 @@ import {
 describe('knowledgeZip', () => {
   it('round-trips yaml and an image under safe relative names', () => {
     const packed = zipKnowledgeFiles([
-      { name: KNOWLEDGE_PACKAGE_MANIFEST, data: utf8ToZip('schema: rdc.knowledge-package/1\n') },
+      { name: KNOWLEDGE_PACKAGE_MANIFEST, data: utf8ToZip('schema: rdc.knowledge-package\n') },
       { name: 'cases/aird-1/observed.png', data: new Uint8Array([1, 2, 3]) },
     ]);
     expect(isZipBuffer(packed)).toBe(true);
     const files = unzipKnowledgeFiles(packed);
-    expect(utf8FromZip(files.get(KNOWLEDGE_PACKAGE_MANIFEST)!)).toContain('rdc.knowledge-package/1');
+    expect(utf8FromZip(files.get(KNOWLEDGE_PACKAGE_MANIFEST)!)).toContain('rdc.knowledge-package');
     expect([...files.get('cases/aird-1/observed.png')!]).toEqual([1, 2, 3]);
   });
 

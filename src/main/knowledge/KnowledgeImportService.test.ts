@@ -29,7 +29,7 @@ function caseYaml(caseId: string, title: string, extra = 'darker than reference'
 
 function packageYaml(titles: string[]): string {
   return [
-    'schema: rdc.knowledge-package/1',
+    'schema: rdc.knowledge-package',
     'cards:',
     ...titles.flatMap((title, index) => [
       `  - relativePath: facts/package-${index}.md`,

@@ -9,7 +9,7 @@
 //   RDC_AGENT_BROWSER_QA_FULL_ACCESS=1 TMPDIR=/dev/shm pnpm run start:agent-browser > <log> 2>&1 &
 //   node scripts/qa-walkthrough.mjs <log> <shot-dir> [--capture <file.rdc>] [--knowledge <a.zip,b.zip>]
 // Screenshots go to <shot-dir>, which should live outside the repository. --knowledge imports real knowledge
-// packages (rdc.knowledge-package/1 zips kept outside the repository) through the product's import channel, so
+// packages (rdc.knowledge-package zips kept outside the repository) through the product's import channel, so
 // the list, the reader and conflicts are judged on real case cards rather than the two pasted samples.
 import fs from 'node:fs';
 import os from 'node:os';
