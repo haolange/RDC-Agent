@@ -39,9 +39,14 @@ export interface SupervisedProcess {
   readonly stdout: RingBuffer;
   readonly stderr: RingBuffer;
   readonly exit: Promise<ProcessExitInfo>;
+  /**
+   * Terminate the tree and open a bounded observation window: when no close arrives within the kill escalation and
+   * its slack, `join` resolves `unconfirmed_orphan` and the process stays registered until it is actually observed.
+   */
   abort(reason?: ProcessExitReason): void;
+  /** Waits for close; `timeoutMs` aborts first. Never longer than the observation window once aborted. */
   join(timeoutMs?: number): Promise<ProcessExitInfo>;
-  /** True when the last bounded join could not observe child.close yet. */
+  /** True once an aborted process did not report close within its observation window. */
   readonly orphaned: boolean;
 }
 
@@ -106,6 +111,7 @@ interface RegistryEntry {
   exitInfo: ProcessExitInfo | null;
   forcedReason: ProcessExitReason | null;
   killTimer: ReturnType<typeof setTimeout> | null;
+  observationTimer: ReturnType<typeof setTimeout> | null;
   timeoutTimer: ReturnType<typeof setTimeout> | null;
   abortHandler: (() => void) | null;
   abortSignal: AbortSignal | null;
@@ -228,6 +234,11 @@ export class ProcessSupervisor {
     const exitPromise = new Promise<ProcessExitInfo>((resolve) => {
       resolveExit = resolve;
     });
+    // Settles only when an aborted process stays silent past its observation window.
+    let resolveOrphan!: (info: ProcessExitInfo) => void;
+    const orphanPromise = new Promise<ProcessExitInfo>((resolve) => {
+      resolveOrphan = resolve;
+    });
 
     const entry: RegistryEntry = {
       supervised: null as unknown as SupervisedProcess,
@@ -237,6 +248,7 @@ export class ProcessSupervisor {
       exitInfo: null,
       forcedReason: null,
       killTimer: null,
+      observationTimer: null,
       timeoutTimer: null,
       abortHandler: null,
       abortSignal: opts.abortSignal ?? null,
@@ -251,6 +263,10 @@ export class ProcessSupervisor {
       if (entry.killTimer) {
         clearTimeout(entry.killTimer);
         entry.killTimer = null;
+      }
+      if (entry.observationTimer) {
+        clearTimeout(entry.observationTimer);
+        entry.observationTimer = null;
       }
       if (entry.timeoutTimer) {
         clearTimeout(entry.timeoutTimer);
@@ -272,12 +288,21 @@ export class ProcessSupervisor {
       } catch {
         // Parent already exited; the tree-kill path above remains authoritative.
       }
-      if (!entry.killTimer) {
-        entry.killTimer = setTimeout(() => {
-          terminateTree(child.pid, 'SIGKILL');
-        }, DEFAULT_GRACE_MS);
-        entry.killTimer.unref();
-      }
+      entry.killTimer = setTimeout(() => {
+        terminateTree(child.pid, 'SIGKILL');
+      }, DEFAULT_GRACE_MS);
+      entry.killTimer.unref();
+      entry.observationTimer = setTimeout(() => {
+        entry.unconfirmed = true;
+        resolveOrphan({
+          reason: 'unconfirmed_orphan',
+          code: null,
+          signal: null,
+          error: new Error(`Process ${id} did not report close after forced termination.`),
+          durationMs: Date.now() - startedAt,
+        });
+      }, DEFAULT_GRACE_MS + PROCESS_TERMINATION_POLICY.joinObservationSlackMs);
+      entry.observationTimer.unref();
     };
 
     const supervised: SupervisedProcess = {
@@ -297,42 +322,12 @@ export class ProcessSupervisor {
       },
       join: async (timeoutMs?: number) => {
         if (entry.exitInfo) return entry.exitInfo;
-        if (timeoutMs == null || timeoutMs <= 0) return exitPromise;
         let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
-        const deadline = new Promise<ProcessExitInfo>((resolve) => {
-          deadlineTimer = setTimeout(async () => {
-            if (entry.exitInfo) {
-              resolve(entry.exitInfo);
-              return;
-            }
-            abort('timeout');
-            let observationTimer: ReturnType<typeof setTimeout> | undefined;
-            const killObservation = await Promise.race<ProcessExitInfo | null>([
-              exitPromise,
-              new Promise<ProcessExitInfo | null>((orphanResolve) => {
-                observationTimer = setTimeout(() => {
-                  entry.unconfirmed = true;
-                  orphanResolve(null);
-                }, DEFAULT_GRACE_MS + PROCESS_TERMINATION_POLICY.joinObservationSlackMs);
-                observationTimer.unref();
-              }),
-            ]);
-            clearTimeout(observationTimer);
-            if (killObservation) {
-              resolve(killObservation);
-              return;
-            }
-            resolve({
-              reason: 'unconfirmed_orphan',
-              code: null,
-              signal: null,
-              error: new Error(`Process ${id} did not report close after forced termination.`),
-              durationMs: Date.now() - startedAt,
-            });
-          }, timeoutMs);
+        if (timeoutMs != null && timeoutMs > 0) {
+          deadlineTimer = setTimeout(() => abort('timeout'), timeoutMs);
           deadlineTimer.unref();
-        });
-        const observed = await Promise.race([exitPromise, deadline]);
+        }
+        const observed = await Promise.race([exitPromise, orphanPromise]);
         clearTimeout(deadlineTimer);
         if (observed.reason === 'unconfirmed_orphan') retainResourceUntilExit(exitPromise);
         return observed;

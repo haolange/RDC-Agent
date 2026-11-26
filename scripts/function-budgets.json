@@ -156,7 +156,7 @@
       "complexity": 48
     },
     "src/main/runtime/ProcessSupervisor.ts": {
-      "lines": 210
+      "lines": 198
     },
     "src/main/sessions/artifacts/SessionArtifactResolver.ts": {
       "lines": 170,

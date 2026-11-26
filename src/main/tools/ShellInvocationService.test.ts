@@ -56,7 +56,9 @@ it('retains an unconfirmed process until actual close and keeps it cancellable',
   const spawn = vi.spyOn(processSupervisor, 'spawn').mockReturnValue(process);
   try {
     const service = new ShellInvocationService();
-    expect(await service.invoke({ command: 'native', runId: 'run', contextId: 'owned' })).toMatchObject({
+    expect(
+      await service.invoke({ command: 'native', timeoutMs: null, runId: 'run', contextId: 'owned' }),
+    ).toMatchObject({
       processExitReason: 'unconfirmed_orphan',
     });
     expect(service.hasUnconfirmedProcesses()).toBe(true);
@@ -77,9 +79,37 @@ it('preserves a complete machine result above the default process ring limit', a
     command: process.execPath,
     args: ['-e', "process.stdout.write(JSON.stringify({data:'x'.repeat(300000)}))"],
     outputBufferBytes: 8 * 1024 * 1024,
+    timeoutMs: 10_000,
   });
   expect(result.exitCode).toBe(0);
   expect(JSON.parse(result.stdout).data).toHaveLength(300000);
   expect(result.stdoutTruncated).toBe(false);
   expect(result.stdoutByteLength).toBe(Buffer.byteLength(result.stdout, 'utf8'));
+});
+
+it('streams every stderr line, split multibyte characters included, while still buffering stderr', async () => {
+  const lines: string[] = [];
+  const script = [
+    "const bytes = Buffer.from('第一行\\r\\n二', 'utf8');",
+    'process.stderr.write(bytes.subarray(0, 2));',
+    "setTimeout(() => { process.stderr.write(bytes.subarray(2)); process.stderr.write('行\\nlast'); }, 20);",
+  ].join('\n');
+  const result = await new ShellInvocationService().invoke({
+    command: process.execPath,
+    args: ['-e', script],
+    timeoutMs: null,
+    onStderrLine: (line) => lines.push(line),
+  });
+  expect(result.exitCode).toBe(0);
+  expect(lines).toEqual(['第一行', '二行', 'last']);
+  expect(result.stderr).toBe('第一行\r\n二行\nlast');
+});
+
+it('waits for a process without a wall until it closes', async () => {
+  const result = await new ShellInvocationService().invoke({
+    command: process.execPath,
+    args: ['-e', 'setTimeout(() => process.stdout.write("done"), 300)'],
+    timeoutMs: null,
+  });
+  expect(result).toMatchObject({ exitCode: 0, stdout: 'done' });
 });
