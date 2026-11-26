@@ -1,5 +1,131 @@
 # Acceptance Ledger
 
+## 2026-11-27：Windows 桌面入口旧状态拒绝与恢复启动
+
+- 提交：`5dcbea33`
+- 证据：本地：`scripts/start-rdc-agent.cmd`。
+- 真实数据目录的项目注册表含旧的 `schemaVersion`，主进程以 `STORAGE_CORRUPT` 退出。隔离目录复验时，原生错误框显示了注册表和数据目录的完整路径，退出码为 1。
+- 人工介入：用户明确授权删除旧应用状态及其中 14 个会话目录。使用同一批处理入口重启后，窗口可响应，状态重新生成，应用识别到保留的 Provider。用户知识与原始抓帧保留。
+
+## 2026-11-27：Windows ADB 预检、传输进展与取消
+
+- 提交：`a4af312a`。RDC-Tool 使用本地 `d96cbff`。
+- 证据：本地：`rdc-tool call rd.remote.connect`、`rdc-tool call rd.capture.open_replay --progress-stream`、`rdc-tool daemon cancel`。
+- Windows 后台 adb 偶发退出 0 且不写标准输出，但同一 ADB server 连续八次报告设备在线。设备预检改为直接读取完整的 `host:devices-l` 帧，并按显式序列号准入。主机工具的 Windows 启动与父控制台分离。
+- Adreno 650 上使用 WhiteHair 的已校验缓存成功打开回放。用 HairBlack_Mobile 单独验证传输，观察到 11.46% 和 23.86% 两条进展，取消回执为 `cancelled`，操作返回 `operation_cancelled`。清空 context 并停止 daemon 后，转发和设备端临时目录数量恢复到入场值，整次受控运行约 18.2 秒。
+
+## 2026-11-27：WhiteHair 真机像素调试与长步进复验
+
+- 提交：`a4af312a`。RDC-Tool 使用 `d96cbff`。
+- 证据：本地：`pnpm run start:agent-browser`，隔离会话 `sess_343714c2aadd` 的 Working 与生命周期收据。
+- Adreno 650 Android Vulkan，GPT-6.1 Terra Medium、自动审查。EID 1779 的像素 (776, 360) 有通过的片元。`rd.shader.debug_start` 成功，`rd.debug.run_to` 将 trace step 从 0 推进到 5，随后 `rd.debug.finish` 成功并恢复 EID 3029。
+- 第二次请求目标 step 100000，原生结果为 `finished`，最终 step 未报告。关闭回放前验证 EID 3029；两次均未复现卡死。工具设置中的无进展等待保存为 60 秒，关闭并重新打开设置后复核一致。
+
+## 2026-11-27：Windows 原生渲染器崩溃恢复与转储
+
+- 提交：`a4af312a`
+- 证据：本地：`node .local/windows-acceptance-20261127/renderer-crash-acceptance.mjs`。
+- 隔离 Electron 使用 DevTools `Page.crash` 注入两次真实 renderer 崩溃。生命周期账本先记录 `reload`，后记录 `crash-page`；第二次导航到失败视图，生成两份本地 minidump。
+- 以同一隔离应用数据重启，设置 → 通用显示 2 份崩溃报告，清除后显示 0 份。
+
+## 2026-11-27：隔离 Browser QA 并行登录和会话删除
+
+- 提交：`b61908b5`
+- 证据：本地：`pnpm run smoke:agent-browser`、`pnpm run start:agent-browser`。
+- 同一浏览器先后登录两个端口。第二个登录曾覆盖同名 Cookie，导致第一处删除会话返回 401。按桥接端口命名 Cookie 后，刷新第一处仍已认证，旧测试会话及其回放目录消失，第二处仍可操作。
+
+## 2026-11-27：Windows 受控 worker 无进展与日志轮转
+
+- 提交：`a4af312a`。RDC-Tool 使用 `d96cbff`。
+- 证据：本地：`python -m pytest tests -q` 与独立调用 `test_worker_blocked_while_holding_the_gil_is_dumped_killed_and_quarantined`。
+- 受控 worker 卡死后，faulthandler 写入栈，Windows 进程树终止且回执确认 worker 和后代退出。真实 Android 运行留下非空 daemon 日志；对轮转处理器注入受控输出，保留当前文件和一代轮转，每份不超过 2 MiB。
+- 受控栈出现 `Timeout (0:00:03.600000)!` 与 `scripted_worker.py` 的 `scripted_operation`。WhiteHair 原生步进两次均完成，本轮没有原始 Android 卡死栈。
+
+## 2026-11-27：Windows Browser QA 冒烟与两仓单测
+
+- 提交：`a4af312a`。RDC-Tool 使用 `edc9a8c`。
+- 证据：本地：`pnpm run smoke:agent-browser`、`pnpm test --maxWorkers 4`、`python -m pytest tests -q`。
+- Browser QA 冒烟验证 bootstrap、鉴权拒绝和 app metadata。RDC-Agent 为 5231 通过、7 跳过。RDC-Tool 为 1413 通过、19 跳过、2 个 subtest 通过。
+
+## 2026-11-27：真实模型调查评测与就绪证据报告
+
+- 提交：`26d6693c`
+- 证据：本地：`node scripts/eval-investigation.mjs <会话目录> --tasks <Windows 套件> --min-score 1`，隔离会话 `sess_4766765079ce`。
+- 本机 RTX 5090 为 lavapipe 抓帧的 depth attachment 要求 `0x80000` 字节，文件只为其分配 `0x7d000`，原生打开失败。改用 RDC-Tool 的 `vkcube.rdc`，按本机真实回放读数构建 Windows 评测答案。
+- GPT-6.1 Terra Medium 首轮答对 6 题，必需工具均执行，因缺报告退出 1。补充报告请求后复评退出 0，6/6，21 次工具调用，1 份报告，证据引用全部可解析。默认评测请求现在明确要求工具读取和持久化报告。
+
+## 2026-11-27：Windows 主进程异常退出与进行中请求恢复
+
+- 提交：`26d6693c`
+- 证据：本地：`powershell -File .local/windows-acceptance-20261127/interrupt-test-turn.ps1 -Action kill`，真实请求的 Windows 进程回执、启动诊断和 run 记录。
+- GPT-6.1 Terra Medium 请求仍进行时强制终止隔离 Electron 主进程。重启显示上次未正常关闭，原会话显示被系统结束或断电导致请求中断。原 run 为 `interrupted`，原因为 `previous-instance:killed-or-power-loss-suspected`。
+
+## 2026-11-27：真实模型调用文件工具时拒绝访问崩溃目录
+
+- 提交：`26d6693c`
+- 证据：本地：`pnpm run start:agent-browser`，隔离会话 `sess_cae733fd2cdf` 的工具记录。
+- GPT-6.1 Terra Medium 调用 `read_file` 读取应用自身 crash 目录下的无敏感内容测试文件，工具返回 `FILE_READ_PROTECTED`。本轮未读取实际转储或凭据。
+
+## 2026-11-27：活跃模型与浏览器订阅同时存在时的正常退出
+
+- 提交：`6d1f153e`
+- 证据：本地：`node .local/windows-acceptance-20261127/quit-owned-electron.mjs`，隔离应用生命周期账本与重开后的会话。
+- 用 Electron 普通退出结束正在运行的真实 Terra 请求，保留浏览器页连接。修复前 `bridge.stop` 等到约 45 秒上限。修复后 105 毫秒完成、无超时、退出码 0、实例锁释放。重开会话显示“应用关闭时已停止”。
+
+## 2026-11-27：WhiteHair 批准计划后等待 run 终态
+
+- 提交：`427ddc25`
+- 证据：本地：`pnpm run start:agent-browser`、`pnpm exec vitest run src/renderer/features/composer/usePlanReviewSubmit.test.ts`。
+- Debugger 以 Terra Medium 发布 WhiteHair 调查计划。原样批准后计划、交接和目标 Agent 均已持久化，General 请求未启动。回归测试复现 run 终态最后到达时遗漏的通知，并验证修复后恰好发送一次。
+- 在同一隔离会话重开 WhiteHair 和原设备，用持久化批准提供的继续按钮接回，General 启动真实执行并调用原生工具。
+
+## 2026-11-27：Grok 规划切到 Terra 后的正常退出和同模型续接
+
+- 提交：`6d1f153e`
+- 证据：本地：`pnpm run start:agent-browser`，隔离会话 `sess_47f4d73aa698` 的 Grok、Terra、Terra 三条 turn 与会话诊断。
+- Windows 原生 `vkcube.rdc` 上由 Analyzer 使用 Grok 4.7 Medium 完成规划。批准时改为 Terra Medium，General 自动开始执行一次，普通退出完成后重开并发「继续」。两次均没有记录被丢弃的推理续接项，界面均没有切模提示。
+- Analyzer 方案的正式取证仍受阻。冻结计划要求子执行重新读取回放，恢复回合的原生读取触发租约和入口恢复门禁。General 明确交付受阻结果。
+
+## 2026-11-27：真实 Provider 出字后断开传输
+
+- 提交：`6d1f153e`
+- 证据：本地：`node .local/windows-acceptance-20261127/observe-provider-output.mjs`，隔离 Provider 请求记录和应用生命周期账本。
+- GPT-6.1 Terra Medium 已收到真实 `response.output_text.delta`，随后回环代理断开该 Provider 的上游连接。应用保留已收到的正文并以 `CONVERSATION_LLM_REQUEST_FAILED` 结束，观测窗口内共发出一次 Provider 请求。其余应用的网络连接继续运行。
+
+## 2026-11-27：真实推理模型跨过普通首字节时限
+
+- 提交：`6d1f153e`
+- 证据：本地：`node .local/windows-acceptance-20261127/observe-provider-output.mjs --hold-first-byte`，隔离 Provider 请求记录和应用生命周期账本。
+- 对 GPT-6.1 Terra Medium 的真实响应，在交给应用流驱动前延迟 25 秒。请求从发出到交付响应约 27 秒，58.3 秒正常完成，未触发普通模型的 20 秒首字节限制。
+
+## 2026-11-27：交接单 B 的 M1 WhiteHair 调查与恢复
+
+- 提交：`6d1f153e`
+- 证据：本地：`pnpm run start:agent-browser`、`node scripts/request-cache-profile.mjs`，隔离会话 `sess_73801f5629ea` 与签名恢复回执 `rdc-lifecycle-5d75d66d-cef9-434e-ac1d-c600bd3d3125.json`。
+- Terra Medium 自动审查，短症状启动；两次澄清均答“不知道”，原样批准。因计划交接缺陷，经重开并用同一获批计划恢复执行。计划正文交代排查路径、停手条件及权限前置，未暴露内部引用。
+- 报告开头为“已定位到角色头发的绘制事件 1248，但还不能确定发白的根因。”对应 `[Observed：绘制定位；Unresolved：异常原因]`。目标像素受 Vulkan input attachment 限制；自动审查缺少反汇编编辑计划和恢复证明，拒绝精度替换。未取得可逆实验或最终独立核验证据，历史案例仅作线索。签名回执确认恢复入口 EID 3029。
+- 规划约 9 分钟，执行约 17 分 29 秒。评测脚本统计 root 71 个请求，当时未读取完成元数据；执行 run 的用量投影记录输入 7,838,462、缓存读取 7,567,488（96.5%）。本轮以部分结果收尾，未完成整轮成本比较或根因确认。
+- 归档：`.local/vertical-investigation-20261108/evidence/m1-20261127-acceptance-sources.zip`，SHA-256 `f469f3d673751c4bbf7991bdd4e232981bce2e772e64a1f42378bd9e014ed6aa`。
+
+## 2026-11-27：恢复已批准计划后的 Composer 状态释放
+
+- 提交：`620ca4bc`
+- 证据：本地：`pnpm run start:agent-browser`、`pnpm exec vitest run src/renderer/features/composer/useQueuedHandoffSuggestion.test.ts`。
+- M1 恢复计划已执行至终态，Composer 仍显示“正在准备请求”。当主进程先移除已消耗的交接投影时，旧代码跳过随后到达的成功回执。按同一排队请求核对和清除准备状态，回归用例覆盖投影先到的顺序。
+
+## 2026-11-27：Optimizer 本机原生 GPU 样本与独立审查
+
+- 提交：`6d1f153e`
+- 证据：本地：`pnpm run start:agent-browser`，隔离 `vkcube.rdc` 会话的原生工具结果与 Verifier。
+- Terra Medium 规划和获批执行，事件 11 五次原生时长中位数 26.144 微秒，完整回放跨度中位数 243.456 微秒。Verifier 核对了统计与推断范围。恢复入口 EID 14 且 shader 替换数为 0。
+- 范围仅为只读成本调查。由于 VSync 状态无法核实，未填写要求实测设置的 benchmark WorldState，正式调查结果为 `partial`。
+
+## 2026-11-27：真实完成记录的请求用量分析
+
+- 提交：`21dbd1ef`
+- 证据：本地：`node scripts/request-cache-profile.mjs`、`pnpm run check:request-cache-profile`，真实 Terra Medium 请求的完成元数据。
+- 请求完成用量已由应用单独写入 `.completion.meta`，旧脚本未读到并把空计数总计为零。修复后一次真实 root 请求报告输入 12,344、缓存读取 0；没有用量的未完成请求仍可统计结构，与已测用量分开。
+
 ## 2026-11-27：长任务可靠性收口（无进展预算、身份链恢复、账本、去版本号；云端 Linux，无设备与模型账号）
 
 - 提交：`23acf17a0fa72f6865ec838ed07432bf661a2de0`（RDC-Agent，配对 RDC-Tool 1.2.0 `b2aefbf186c96346c6ff85b4470676e9677cb3e3`）
