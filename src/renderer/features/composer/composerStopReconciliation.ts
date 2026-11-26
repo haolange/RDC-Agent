@@ -51,9 +51,10 @@ export async function reconcileConversationStop(options: {
     const latestAssistant =
       selectActiveAssistantForTurn(conversation.conversationMessages, sessionId, activeTurn) ??
       (activeAssistant && ACTIVE_ASSISTANT_STATUSES.has(activeAssistant.status) ? activeAssistant : null);
-    const requestId = turnOwnership?.requestId ?? cancelResult.cancelledRequestId ?? latestAssistant?.requestId;
+    const cancelled = cancelResult.success ? cancelResult : undefined;
+    const requestId = turnOwnership?.requestId ?? cancelled?.cancelledRequestId ?? latestAssistant?.requestId;
     if (requestId) conversation.markRequestMonotonicallyStopped(requestId);
-    const turnId = latestAssistant?.turnId ?? cancelResult.cancelledTurnId;
+    const turnId = latestAssistant?.turnId ?? cancelled?.cancelledTurnId;
     if (turnId) {
       conversation.markTurnMonotonicallyStopped(turnId);
       conversation.updateAssistantMessageByTurnId(turnId, stopWorkTrace);

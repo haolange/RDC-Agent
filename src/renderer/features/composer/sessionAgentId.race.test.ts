@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { AppError } from '@shared/errors/appError';
 import { useProjectStore } from '../../stores/projectStore';
 import { getSessionView, useSessionRecordStore } from '../../stores/sessionRecordStore';
 
@@ -6,13 +7,16 @@ import { getSessionView, useSessionRecordStore } from '../../stores/sessionRecor
  * A transport whose responses the test releases one by one, in any order. Main handles the writes in the order they
  * arrive, so each answer carries the revision of its own write.
  */
-const pending = vi.hoisted(() => [] as Array<{ agentId: string; n: number; resolve: (value: unknown) => void }>);
+const pending = vi.hoisted(
+  () =>
+    [] as Array<{ agentId: string; n: number; resolve: (value: unknown) => void; reject: (reason: unknown) => void }>,
+);
 vi.mock('../../platform/getElectronApi', () => ({
   getElectronApi: () => ({
     session: {
       setAgentId: (_sessionId: string, agentId: string) =>
-        new Promise((resolve) => {
-          pending.push({ agentId, n: pending.length + 2, resolve });
+        new Promise((resolve, reject) => {
+          pending.push({ agentId, n: pending.length + 2, resolve, reject });
         }),
     },
   }),
@@ -66,7 +70,7 @@ it('keeps the latest Agent choice when an earlier switch is answered last', asyn
 it('returns to the Agent main holds when a switch fails', async () => {
   const switching = persistSessionAgentId('session-a', 'debugger');
   expect(getSessionView('session-a')?.agentId).toBe('debugger');
-  request('debugger').resolve({ success: false, error: 'CONVERSATION_AGENT_UNAVAILABLE' });
+  request('debugger').reject(new AppError('CONVERSATION_AGENT_UNAVAILABLE', 'debugger'));
   await expect(switching).resolves.toMatchObject({ ok: false });
 
   expect(getSessionView('session-a')?.agentId).toBe('general');

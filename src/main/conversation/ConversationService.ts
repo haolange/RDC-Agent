@@ -136,8 +136,8 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
   }
 
   async clearHistory(sessionId: string): Promise<ConversationMessage[]> {
-    const stopped = await this.cancelActiveTurn({ sessionId });
-    if (!stopped.success) throw new Error(stopped.error || `Failed to stop session ${sessionId}.`);
+    // With a session id a stop either joins that session's work or rejects; there is no "nothing matched" here.
+    await this.cancelActiveTurn({ sessionId });
     conversationHistoryStore.writeConversationHistory(sessionId, []);
     sessionContextStore.clearSessionContextState(sessionId);
     publishConversationTrace(sessionId, [], sessionId, publishTraceProjection);
@@ -198,7 +198,7 @@ export class ConversationService implements ActiveConversationTurns, PreparingCo
         await agentOrchestrator.backgroundSubagents.abortSession(request.sessionId);
         return { success: true, phase: 'running' };
       }
-      return { success: false, error: 'No active conversation turn.' };
+      return { success: false, reason: 'no-active-turn' };
     }
 
     target.stop();

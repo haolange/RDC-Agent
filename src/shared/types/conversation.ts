@@ -463,13 +463,18 @@ export interface ConversationCancelActiveTurnRequest {
   turnId?: string;
 }
 
-export interface ConversationCancelActiveTurnResult {
-  success: boolean;
-  phase?: 'preparing' | 'committing' | 'running';
-  cancelledRequestId?: string;
-  cancelledTurnId?: string;
-  error?: string;
-}
+/**
+ * What a stop request did. `success: false` only means no turn or preparing request matched (`no-active-turn`);
+ * a stop that fails rejects with its AppError like any other call.
+ */
+export type ConversationCancelActiveTurnResult =
+  | {
+      success: true;
+      phase: 'preparing' | 'committing' | 'running';
+      cancelledRequestId?: string;
+      cancelledTurnId?: string;
+    }
+  | { success: false; reason: 'no-active-turn' };
 
 export interface ConversationAskUserOption {
   optionId: string;

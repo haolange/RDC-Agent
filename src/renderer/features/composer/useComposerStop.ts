@@ -125,13 +125,7 @@ export function useComposerStop(options: {
         void workflowStopPromise.catch(reportWorkflowStopFailure);
       }
 
-      if (!cancelResult.success) {
-        const error = cancelResult.error;
-        if (error && !error.includes('No active conversation')) {
-          notify.failure(error, t, 'app.stopRunFailed');
-          return;
-        }
-      }
+      // Nothing left to stop (`no-active-turn`) reads the same as a sent stop; a failed stop rejected above.
       notify.info(t('app.stopRunSent'));
     } catch (error) {
       notify.failure(error, t, 'app.stopRunFailed');

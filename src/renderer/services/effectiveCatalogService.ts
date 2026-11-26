@@ -1,3 +1,4 @@
+import { AppError } from '@shared/errors/appError';
 import type { EffectiveCatalogChange, EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
 import type { ElectronAPI } from '@shared/types/electron';
 import type { LlmProviderProtocol } from '@shared/types/settings';
@@ -18,7 +19,8 @@ export async function refreshEffectiveCatalog(
 ): Promise<void> {
   if (!api) throw new Error('The application bridge is unavailable.');
   const result = await api.llm.refreshProviderModels(providerId, scope);
-  if (!result.success) throw new Error(result.error || 'The model catalog could not be refreshed.');
+  // The connection result keeps its own technical text; the failure carries a code humanizeError can word.
+  if (!result.success) throw new AppError('PROVIDER_CONNECTION_FAILED', result.error);
 }
 
 export function observeEffectiveCatalog(

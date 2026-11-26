@@ -25,8 +25,7 @@ export const projectInputLifecycle = new ProjectInputLifecycle(
     rebind: (projectId, inputId, input) => rdcSessionService.rebindInput(projectId, inputId, input),
     block: (projectId, inputId, operation) => rdcSessionService.blockInputOperations(projectId, inputId, operation),
     stop: async (sessionId) => {
-      const result = await conversationService.cancelActiveTurn({ sessionId });
-      if (!result.success) throw new Error(result.error || 'PROJECT_INPUT_STOP_FAILED');
+      await conversationService.cancelActiveTurn({ sessionId });
     },
   },
   replayHistoryStore,

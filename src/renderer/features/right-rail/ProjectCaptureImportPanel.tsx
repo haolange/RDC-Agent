@@ -5,8 +5,8 @@ import { EmptyState } from '../../ui/EmptyState';
 import { IconButton } from '../../ui/IconButton';
 import { Icon } from '../../ui/Icon';
 import { Button } from '../../ui/Button';
-import { InlineError } from '../../ui/InlineError';
-import { useI18n } from '../../i18n';
+import { FailureAlert } from '../../patterns/FailureAlert';
+import { useI18n, type TranslationKey } from '../../i18n';
 import { formatBytes } from '../../lib/formatBytes';
 import { errorDetail } from '../../lib/errorDetail';
 import { importProjectInputs, refreshProjectInputs, removeProjectInput } from './projectCaptureActions';
@@ -14,10 +14,15 @@ import { ProjectCaptureReferenceDialog } from './ProjectCaptureReferenceDialog';
 import type { ProjectInputRecord } from '@shared/types/session';
 import './CaptureReplay.css';
 
-const formatImportError = (reason: unknown, sessionExpired: string): string => {
-  const message = errorDetail(reason);
-  return /^unauthorized(?:\s*\(401\))?$/i.test(message.trim()) ? sessionExpired : message;
-};
+type ImportFailure = { reason: unknown; contextKey: TranslationKey };
+
+/** A Browser QA bridge whose session expired answers 401 with no code; it reads as the expired session. */
+const importFailure = (reason: unknown): ImportFailure => ({
+  reason,
+  contextKey: /^unauthorized(?:\s*\(401\))?$/i.test(errorDetail(reason).trim())
+    ? 'projectCapture.sessionExpired'
+    : 'app.error.actionFailed',
+});
 
 const CaptureFileIcon: React.FC = () => <Icon name="file" className="project-capture-input-icon" />;
 
@@ -65,7 +70,7 @@ export const ProjectCaptureImportPanel: React.FC = () => {
   const projectInputs = useProjectStore((state) => state.projectInputs);
   const updateProjectInputs = useProjectStore((state) => state.updateProjectInputs);
   const [activeAction, setActiveAction] = useState<'import' | 'refresh' | 'remove' | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ImportFailure | null>(null);
   const [referenceProjectId, setReferenceProjectId] = useState<string | null>(null);
   const inputs = useMemo(
     () => projectInputs.filter((input) => input.fileName.toLowerCase().endsWith('.rdc')),
@@ -85,12 +90,12 @@ export const ProjectCaptureImportPanel: React.FC = () => {
         if (!result) return;
         updateProjectInputs(currentProject.projectId, result.inputs);
       } catch (reason) {
-        setError(formatImportError(reason, t('projectCapture.sessionExpired')));
+        setError(importFailure(reason));
       } finally {
         setActiveAction(null);
       }
     },
-    [currentProject, updateProjectInputs, t],
+    [currentProject, updateProjectInputs],
   );
 
   const remove = async (inputId: string) => {
@@ -101,10 +106,11 @@ export const ProjectCaptureImportPanel: React.FC = () => {
       const result = await removeProjectInput(currentProject.projectId, inputId);
       if (result) {
         updateProjectInputs(currentProject.projectId, result.inputs);
-        if (!result.success) setError(result.error ?? t('projectCapture.removeFailed'));
+        // A partial removal reports what happened (fileDeleted / cleanupPending) with its own technical reason.
+        if (!result.success) setError({ reason: result.error, contextKey: 'projectCapture.removeFailed' });
       }
     } catch (reason) {
-      setError(formatImportError(reason, t('projectCapture.sessionExpired')));
+      setError(importFailure(reason));
     } finally {
       setActiveAction(null);
     }
@@ -156,7 +162,7 @@ export const ProjectCaptureImportPanel: React.FC = () => {
           }
         />
         <div className="right-rail-section-content">
-          {error ? <InlineError detail={error}>{t('app.error.actionFailed')}</InlineError> : null}
+          {error ? <FailureAlert reason={error.reason} contextKey={error.contextKey} /> : null}
           {inputs.length ? (
             <div className="project-capture-input-list" role="list" aria-label={t('projectCapture.title')}>
               {inputs.map((input) => (
