@@ -13,14 +13,15 @@ function fixture(): { scope: ConversationMediaScope; project: string; outside: s
   const project = path.join(base, 'project');
   const attachments = path.join(base, 'attachments');
   const artifacts = path.join(base, 'artifacts');
-  for (const dir of [project, attachments, artifacts, path.join(project, 'docs')])
+  const outsideDirectory = path.join(base, 'outside');
+  for (const dir of [project, attachments, artifacts, path.join(project, 'docs'), outsideDirectory])
     fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(project, 'docs', 'frame.png'), PNG);
   fs.writeFileSync(path.join(project, 'notes.txt'), 'text');
   fs.writeFileSync(path.join(project, 'fake.png'), 'not an image');
   fs.writeFileSync(path.join(attachments, 'a1-shot.png'), PNG);
   fs.writeFileSync(path.join(artifacts, 'out.png'), PNG);
-  const outside = path.join(base, 'outside.png');
+  const outside = path.join(outsideDirectory, 'outside.png');
   fs.writeFileSync(outside, PNG);
   return {
     project,
@@ -79,10 +80,13 @@ describe('resolveConversationMedia', () => {
 
   it('refuses anything outside the three roots, other schemes, and bytes that do not match an allowed type', () => {
     const { scope, project, outside } = fixture();
-    fs.symlinkSync(outside, path.join(project, 'link.png'));
-    expect(resolveConversationMedia('../outside.png', scope)).toEqual({ dataUrl: null, error: 'MEDIA_SCOPE_DENIED' });
+    fs.symlinkSync(path.dirname(outside), path.join(project, 'link'), 'junction');
+    expect(resolveConversationMedia('../outside/outside.png', scope)).toEqual({
+      dataUrl: null,
+      error: 'MEDIA_SCOPE_DENIED',
+    });
     expect(resolveConversationMedia(outside, scope)).toEqual({ dataUrl: null, error: 'MEDIA_SCOPE_DENIED' });
-    expect(resolveConversationMedia('link.png', scope)).toEqual({ dataUrl: null, error: 'MEDIA_SCOPE_DENIED' });
+    expect(resolveConversationMedia('link/outside.png', scope)).toEqual({ dataUrl: null, error: 'MEDIA_SCOPE_DENIED' });
     expect(resolveConversationMedia('file:///etc/passwd', scope)).toEqual({
       dataUrl: null,
       error: 'MEDIA_SCOPE_DENIED',

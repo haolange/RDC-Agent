@@ -29,7 +29,7 @@ describe('agent file reads stop at crash files and credential stores', () => {
     write(path.join(userRoot, 'secrets', 'token'), 'marker user token\n');
     write(path.join(workspace, 'notes.md'), 'marker ordinary note\n');
     // The data directory as the app spells it goes through a link; the tools see the real path.
-    fs.symlinkSync(userData, path.join(tmp, 'linked-user-data'), 'dir');
+    fs.symlinkSync(userData, path.join(tmp, 'linked-user-data'), 'junction');
     const linked = path.join(tmp, 'linked-user-data');
     vi.spyOn(appPathService, 'getAppStatePaths').mockReturnValue({
       ...appPathService.getAppStatePaths(),
@@ -41,7 +41,7 @@ describe('agent file reads stop at crash files and credential stores', () => {
       userRdcRoot: userRoot,
     });
     // A link the agent could plant inside the workspace, pointing into the crash directory.
-    fs.symlinkSync(path.join(userData, 'state', 'crash'), path.join(workspace, 'crash-link'), 'dir');
+    fs.symlinkSync(path.join(userData, 'state', 'crash'), path.join(workspace, 'crash-link'), 'junction');
     context = { workspaceRoot: workspace, projectRootPath: workspace, projectId: null, sessionId: null };
   });
   afterEach(() => {
