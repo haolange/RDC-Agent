@@ -153,6 +153,7 @@ it('requires a recovery to retain the input and the last verified daemon and wor
           worker: { state: 'alive', pid: 2, start_generation: 'windows-filetime:2' },
           replaySession: { isLive: true, requiresRestart: false, workerExit: null },
         },
+        classification: { decision: 'keep', reason: 'verified-processes-live' },
       },
     },
     stopped: { ...base, event: 'daemon-stopped', intent: ref('intent'), contextId: 'old', stopped: true },

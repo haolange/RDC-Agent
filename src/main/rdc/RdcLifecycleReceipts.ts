@@ -6,6 +6,7 @@ import { secretStorageService } from '../settings/settings-core/SecretStorageSer
 import { openSignedRdcReceipt } from './RdcExecutionReceipts';
 import { RdcProcessIdentitySchema, type RdcProcessIdentity } from './RdcProcessIdentity';
 import { RdcRecoveryObservationSchema } from './RdcContextStatus';
+import { RdcRecoveryClassificationSchema } from './RdcRecoveryClassification';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -41,6 +42,7 @@ const recovery = z
       .object({ operation: id, argsFingerprint: hash, code: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,127}$/) })
       .strict(),
     observed: RdcRecoveryObservationSchema,
+    classification: RdcRecoveryClassificationSchema,
   })
   .strict();
 const base = {

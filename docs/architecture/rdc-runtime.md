@@ -333,13 +333,25 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 
 原生只读查询返回回放致命故障时，将故障记录在发起查询的冻结 lease 上。
 
-- 同输入、设备及权限的原生故障可请求 `capture_recover`：只处理实际失败而隔离的 lease，中断并 join 持该 lease 的相关子执行，核对原 daemon/worker 身份，按 clear context → 确认 daemon stop → 重开和重新准备的顺序进行。
+- 同输入、设备及权限的原生故障可请求 `capture_recover`：只处理实际失败而隔离的 lease，中断并 join 持该 lease 的相关子执行，按身份链分类（见下文「身份链恢复」），再按 clear context → 确认 daemon stop → 重开和重新准备的顺序进行。
 - 清理期间若 ADB 删除命令失败，Tool 用同一 ADB server 的完整协议响应核验旧转发是否仍在。
 - 确认消失才继续释放，无法确认则保留归属。
-- 相同失败条件重复或进程退出、权限、安装状态无法确认时停止并保留隔离，不伪造恢复。
+- 身份链无法解释、权限或安装状态无法确认时停止并保留隔离，不伪造恢复。
 - 任务进入前的位置由签名 baseline 记录；中断或重启后未闭合记录在 Capture 显示，由用户触发恢复，不自动续跑模型。
 - 恢复前复核输入 hash、设备、替换和旧进程，只有重新观察到原位置才签 resolved。
 - 历史结果不被补签，不跨新旧现场拼接实验。
+
+### 身份链恢复
+
+恢复准入只有一个函数 `classifyRecovery`（`src/main/rdc/RdcRecoveryClassification.ts`），Agent 的 `capture_recover`（`ApprovedCaptureHost.inspectRecovery` 经 `inspectQuarantinedCapture`）与用户在 Capture 面板的恢复（`restorePreviousCapture`，关闭隔离 context 之前）都用它。输入是主进程最近核验的 daemon/worker 身份（`lastVerified`，随成功结果的 `meta.process_identity` 刷新）、只读 `context status` 与设备动作是否未决：
+
+| 结论 | 条件 |
+| --- | --- |
+| keep | 核验过的 daemon 与 worker 都存活且身份（pid + start_generation）不变，replay session 存活且没有 `requires_restart` |
+| rebuild | daemon 仍是核验过的那一个；从核验过的 worker 起，每一次 worker 变化都有该 worker 本身的退出回执（`worker_lifecycle` 中 `exit_confirmed` 的 exited 记录，或 session 的 `worker_exit`），replay session 等待重启；`lost` 列出这些已确认退出的 worker 及其原因、trace/request id 与栈日志 |
+| quarantined | 其余一切为 `RDC_RECOVERY_PROCESS_UNEXPLAINED`（daemon 换了或未回答、退出未确认、身份复用、session 自称存活却换了 worker 等）；设备动作未决为 `RDC_DEVICE_ACTION_UNCONFIRMED` |
+
+结论签进恢复 intent 回执；quarantined 立即写 failed 回执并停止，不触碰现场。
 
 获批调查的 `turn_complete` 在记录声明前检查入口位置是否恢复；现场无法核验时，把主进程观察到的错误返回工具调用，让模型据此如实声明 partial／blocked 及剩余恢复，而不是先接受声明再要求它猜测错误。终答仍重新核验恢复状态；已声明的 partial 不升级为成功，恢复回执仍以实际现场为准。
 

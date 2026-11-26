@@ -76,7 +76,8 @@ function fixture() {
         worker: { state: 'alive' as const, ...original.native.processIdentity.worker },
         replaySession: { isLive: true, requiresRestart: false, workerExit: null },
       },
-    })),
+      classification: { decision: 'keep' as const, reason: 'verified-processes-live' as const },
+    })) as ApprovedCaptureHost['inspectRecovery'],
     reopenAfterFailure: vi.fn(async (destination, _binding, _signal, onStopped) => {
       if (current) onStopped(current.native.contextId);
       current = point(destination.inputId, 9);
@@ -351,9 +352,9 @@ it('verifies the entry position after recovery without claiming a terminal recei
 it('does not reopen when the permission or verification guard fails', async () => {
   const f = fixture();
   await f.controller.initialize();
-  vi.mocked(f.host.inspectRecovery).mockRejectedValueOnce(new Error('RDC_RECOVERY_PROCESS_CHANGED'));
+  vi.mocked(f.host.inspectRecovery).mockRejectedValueOnce(new Error('RDC_RECOVERY_IDENTITY_UNVERIFIED'));
   await f.controller.prepareRecovery(1);
-  await expect(f.controller.recover()).rejects.toThrow('RDC_RECOVERY_PROCESS_CHANGED');
+  await expect(f.controller.recover()).rejects.toThrow('RDC_RECOVERY_IDENTITY_UNVERIFIED');
   expect(f.host.reopenAfterFailure).not.toHaveBeenCalled();
   vi.mocked(f.host.recoveryGuard).mockReturnValueOnce(() => {
     throw new Error('RDC_RECOVERY_PERMISSION_CHANGED');
@@ -392,4 +393,30 @@ it('recovers from the latest process identity a successful result reported, not 
   expect(f.receipts.find((receipt) => receipt.event === 'intent')).toMatchObject({
     from: { native: { processIdentity: reported } },
   });
+});
+
+it('signs an unexplained process change as a failed recovery attempt without reopening', async () => {
+  const f = fixture();
+  await f.controller.initialize();
+  vi.mocked(f.host.inspectRecovery).mockResolvedValueOnce({
+    cause: { operation: 'rd.test', argsFingerprint: 'e'.repeat(64), code: 'worker_stuck' },
+    observed: {
+      source: 'daemon',
+      daemon: { state: 'alive', pid: 10, start_generation: 'windows-filetime:1' },
+      worker: { state: 'alive', pid: 99, start_generation: 'windows-filetime:9' },
+      replaySession: { isLive: false, requiresRestart: true, workerExit: null },
+    },
+    classification: {
+      decision: 'quarantined',
+      code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED',
+      reason: 'a worker change has no confirmed exit receipt of the verified worker.',
+    },
+  });
+  await f.controller.prepareRecovery(1);
+  await expect(f.controller.recover()).rejects.toThrow('RDC_RECOVERY_PROCESS_UNEXPLAINED');
+  expect(f.host.reopenAfterFailure).not.toHaveBeenCalled();
+  expect(f.receipts.map((value) => value.event)).toEqual(['baseline', 'intent', 'failed']);
+  expect(f.receipts[1]).toMatchObject({ recovery: { classification: { decision: 'quarantined' } } });
+  expect(f.receipts[2]).toMatchObject({ code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED' });
+  expect(f.host.quarantineChanged).toHaveBeenCalled();
 });

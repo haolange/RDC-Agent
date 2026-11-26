@@ -84,6 +84,7 @@
 | RDC delegated lease 退出未确认 | Security + Integrity | 隔离 parent lease（`revokeDelegatedLease` 缺停止证明即 quarantine，原因沿用子 lease 的故障或记为 `RDC_RECOVERY_CHILD_EXIT_UNCONFIRMED`）；不得回退 parent 或并发第二 owner |
 | RDC 结果未知（原生故障、CLI 协议错误、取消、关闭或切换未确认） | Integrity | 唯一入口 `registerRdcFault`：隔离 owning lease，原因必填（操作、原生参数的 `rdcDigest`、观察到的码，取消为 `RDC_OPERATION_CANCELLED`），首个原因不被后续清理错误覆盖；probe 与 observe 路径登记每个没有无效果证明的原生故障与 CLI 协议错误，`executeRdcShell` 保留主进程复核安全的例外 |
 | 获批 capture 切换／恢复的身份或退出无法核实 | Security + Integrity | 停止现场操作并隔离；保留签名 baseline 和未恢复状态，不能将 context clear 当成 daemon 已退出，也不将新现场补入旧实验 |
+| RDC 恢复的进程变化无法由退出回执解释 | Integrity | `classifyRecovery` 判 `RDC_RECOVERY_PROCESS_UNEXPLAINED`：Agent 与用户恢复共用这一准入，只读 `context status`（不拉起 worker）；写 intent 与 failed 回执后停止，lease 保持隔离（`docs/architecture/rdc-runtime.md`「身份链恢复」） |
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
 | JSONL 末尾残行（追加中断） | Integrity | 读取时作为 `tornTail` 返回，之前的完整记录照常可读，会话不因此打不开；下一次追加或回合终态提交前，残行字节原样移入同目录 `<file>.torn-<ts>`（fsync 后）再截断，并经运行日志报告 `JSONL_TORN_TAIL`；只缺换行的完整记录补换行保留 |
 | 计划批准事务：旧 `expectedPlanHash` / 旧会话 revision / `agent.before-handoff` 否决 / 提交中途失败 | Integrity | 分别报 `PLAN_HASH_MISMATCH`、`SESSION_REVISION_STALE`、`HOOK_DENIED`，或原样抛出提交步骤的错误；提交前任一拒绝都没有副作用，提交中途失败按前像日志逆序撤销已写步骤，会话 Agent、模型、参数、计划状态与 offer 保持原值。`agent.after-handoff` 失败只写会话运行日志诊断，不回滚，与其它 after 事件一致 |

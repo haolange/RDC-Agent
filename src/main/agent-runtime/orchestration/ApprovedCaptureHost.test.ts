@@ -6,7 +6,7 @@ import {
 } from '../../rdc/RdcRuntimeContextRegistry';
 import { freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { setRdcInteractionLock } from '../../rdc/RdcOperationCoordinator';
-import { liveContextStatus } from '../../testing/rdcContextStatusFixture';
+import { liveContextStatus, stuckContextStatus } from '../../testing/rdcContextStatusFixture';
 import { createApprovedCaptureHost } from './ApprovedCaptureHost';
 import { TurnHandle } from './TurnCoordinator';
 import type { InvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
@@ -180,6 +180,7 @@ it('checks quarantined process identity and reconnects the same device under unc
   expect(await host.inspectRecovery(point, binding)).toMatchObject({
     cause: { code: 'native_failure' },
     observed: { daemon: { state: 'alive', pid: 10 }, worker: { state: 'alive', pid: 11 } },
+    classification: { decision: 'keep' },
   });
   expect(mock.status).toHaveBeenCalledWith(expect.objectContaining({ contextId: 'ctx', settings: cli }));
   const guard = host.recoveryGuard(1);
@@ -198,9 +199,15 @@ it('checks quarantined process identity and reconnects the same device under unc
   );
   mock.permission.mockReturnValue({ revision: 2, mode: 'custom' });
   expect(guard).toThrow('RDC_RECOVERY_PERMISSION_CHANGED');
+  mock.status.mockResolvedValueOnce(stuckContextStatus());
+  expect(await host.inspectRecovery(point, binding)).toMatchObject({
+    classification: { decision: 'rebuild', reason: 'worker-exited', lost: { workers: [{ pid: 11 }] } },
+  });
   const replaced = liveContextStatus();
   mock.status.mockResolvedValueOnce({ ...replaced, worker: { ...replaced.worker, pid: 99 } });
-  await expect(host.inspectRecovery(point, binding)).rejects.toThrow('RDC_RECOVERY_PROCESS_CHANGED');
+  expect(await host.inspectRecovery(point, binding)).toMatchObject({
+    classification: { decision: 'quarantined', code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED' },
+  });
 });
 afterEach(() => {
   clearRdcContextLeases();

@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { stuckContextStatus } from '../testing/rdcContextStatusFixture';
 import { setRdcInteractionLock } from './RdcOperationCoordinator';
 
 const mock = vi.hoisted(() => ({
@@ -21,6 +22,7 @@ const mock = vi.hoisted(() => ({
   owner: vi.fn(),
   native: vi.fn(),
   daemons: vi.fn(),
+  status: vi.fn(),
 }));
 vi.mock('./RdcSessionService', () => ({
   rdcSessionService: {
@@ -50,6 +52,10 @@ vi.mock('./RdcRuntimeContextRegistry', () => ({
   assertRdcContextLeaseOwnership: mock.owner,
 }));
 vi.mock('./RdcSwitchSnapshot', () => ({ readRdcSwitchSnapshot: mock.native }));
+vi.mock('./RdcContextStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./RdcContextStatus')>()),
+  readRdcContextStatus: mock.status,
+}));
 vi.mock('./OwnedRdcDaemonRegistry', () => ({ listOwnedRdcDaemons: mock.daemons }));
 vi.mock('./RdcLifecycleReceipts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./RdcLifecycleReceipts')>()),
@@ -239,4 +245,34 @@ it('does not take over an active turn or accept a stale UI generation', async ()
   }
   await expect(restorePreviousCapture({ ...scope, bindingGeneration: 7 })).rejects.toThrow('RDC_BINDING_CHANGED');
   expect(mock.prepare).not.toHaveBeenCalled();
+});
+
+it('closes a quarantined replay only when the shared admission explains its processes', async () => {
+  state = {
+    ...state,
+    phase: 'error',
+    contextId: 'old',
+    inputId: 'a',
+    captureHash: 'a'.repeat(64),
+    replayDeviceId: 'local',
+  };
+  lease = {
+    contextId: 'old',
+    version: 1,
+    ownerSessionId: 's',
+    ownerProjectId: 'p',
+    quarantineReason: 'worker stuck',
+    runtimeContext: { captureFileId: 'file', replaySessionId: 'replay' },
+  };
+  const replaced = stuckContextStatus();
+  replaced.worker = { ...replaced.worker, state: 'alive', pid: 12 };
+  replaced.worker_lifecycle = [];
+  replaced.sessions[0]!.recovery.worker_exit = null;
+  mock.status.mockResolvedValueOnce(replaced);
+  await expect(restorePreviousCapture(scope)).rejects.toThrow('RDC_RECOVERY_PROCESS_UNEXPLAINED');
+  expect(mock.clear).not.toHaveBeenCalled();
+  mock.status.mockResolvedValueOnce(stuckContextStatus());
+  expect((await restorePreviousCapture(scope)).appliedEventId).toBe(42);
+  expect(mock.clear).toHaveBeenCalledOnce();
+  expect(mock.status).toHaveBeenLastCalledWith(expect.objectContaining({ contextId: 'old' }));
 });

@@ -70,7 +70,6 @@ export function assertTurnRuntimeEpochs(input: {
     if (intent.recovery) {
       const from = intent.from;
       const to = transition.to;
-      const observed = intent.recovery.observed;
       if (
         !from ||
         !to ||
@@ -79,7 +78,7 @@ export function assertTurnRuntimeEpochs(input: {
         from.inputId !== intent.destination.inputId ||
         from.contentSha256 !== intent.destination.contentSha256 ||
         from.deviceId !== intent.destination.deviceId ||
-        !recoveryObservedVerifiedProcess(observed, from.native.processIdentity) ||
+        !recoveryAdmitted(intent.recovery, from.native.processIdentity) ||
         to.native.contextId === from.native.contextId ||
         !transition.daemonStopped
       ) {
@@ -139,12 +138,16 @@ export function assertTurnRuntimeEpochs(input: {
     throw new AppError('TURN_COMPLETION_RECEIPT_INVALID', 'final runtime identity differs from its signed chain.');
 }
 
-/** Recovery acted on the daemon and worker the transition started from. */
-function recoveryObservedVerifiedProcess(observed: RdcRecoveryObservation, verified: RdcProcessIdentity): boolean {
-  return (['daemon', 'worker'] as const).every(
-    (role) =>
-      observed[role].state === 'alive' &&
-      observed[role].pid === verified[role].pid &&
-      observed[role].start_generation === verified[role].start_generation,
+/** Recovery was admitted and acted through the daemon the transition started from; the worker chain is signed. */
+function recoveryAdmitted(
+  recovery: { observed: RdcRecoveryObservation; classification: { decision: string } },
+  verified: RdcProcessIdentity,
+): boolean {
+  const { daemon } = recovery.observed;
+  return (
+    recovery.classification.decision !== 'quarantined' &&
+    daemon.state === 'alive' &&
+    daemon.pid === verified.daemon.pid &&
+    daemon.start_generation === verified.daemon.start_generation
   );
 }

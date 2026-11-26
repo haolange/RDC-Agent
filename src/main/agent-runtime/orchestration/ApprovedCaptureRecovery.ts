@@ -3,6 +3,7 @@ import { samePath } from '../../platform/paths';
 import { getDelegatedChildSessionId, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcSessionService } from '../../rdc/RdcSessionService';
 import { readRdcContextStatus, rdcRecoveryObservation } from '../../rdc/RdcContextStatus';
+import { classifyRecovery } from '../../rdc/RdcRecoveryClassification';
 import type { RdcLifecyclePoint } from '../../rdc/RdcLifecycleReceipts';
 import type { RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import type { RecoveryFacts } from './ApprovedCaptureController';
@@ -11,7 +12,8 @@ type Destination = { inputId: string; contentSha256: string; deviceId: string };
 
 /**
  * What recovery may act on: the quarantined owning lease, still the one `point` verified, its projection, the frozen
- * input and the read-only context status. Nothing here starts a worker or changes the replay.
+ * input and the read-only context status, classified by the shared `classifyRecovery` admission. Nothing here starts a
+ * worker or changes the replay; the caller signs the decision into its intent before acting on it.
  */
 export async function inspectQuarantinedCapture(input: {
   sessionId: string;
@@ -44,7 +46,6 @@ export async function inspectQuarantinedCapture(input: {
     state.inputId !== point.inputId ||
     state.captureHash !== point.contentSha256 ||
     state.replayDeviceId !== point.deviceId ||
-    state.preparation.issue?.deviceAction ||
     !opened ||
     opened.inputId !== point.inputId ||
     opened.contextId !== lease.contextId
@@ -74,15 +75,12 @@ export async function inspectQuarantinedCapture(input: {
   )
     throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'the quarantined binding changed during observation.');
   const observed = rdcRecoveryObservation(status, point.native.replaySessionId);
-  const verified = point.native.processIdentity;
-  if (
-    observed.daemon.state !== 'alive' ||
-    observed.worker.state !== 'alive' ||
-    observed.daemon.pid !== verified.daemon.pid ||
-    observed.daemon.start_generation !== verified.daemon.start_generation ||
-    observed.worker.pid !== verified.worker.pid ||
-    observed.worker.start_generation !== verified.worker.start_generation
-  )
-    throw new AppError('RDC_RECOVERY_PROCESS_CHANGED', 'the live daemon or worker is not the last verified process.');
-  return { cause: lease.quarantineCause, observed };
+  const classification = classifyRecovery({
+    verified: point.native.processIdentity,
+    replaySessionId: point.native.replaySessionId,
+    status,
+    deviceActionPending: !!state.preparation.issue?.deviceAction,
+    budget: null,
+  });
+  return { cause: lease.quarantineCause, observed, classification };
 }

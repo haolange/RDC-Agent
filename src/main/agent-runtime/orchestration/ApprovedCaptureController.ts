@@ -12,6 +12,7 @@ import type { InvestigationPlanContract } from '../../sessions/run/investigation
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import type { TaskRuntimeEpoch } from '../tasks/taskExecutionSchemas';
 import type { RdcRecoveryObservation } from '../../rdc/RdcContextStatus';
+import type { RdcRecoveryClassification } from '../../rdc/RdcRecoveryClassification';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { ToolExecutionContext } from '../agent/AgentTool';
@@ -22,6 +23,7 @@ type Prepared = { plan: EffectiveRuntimePlan; prompt: PromptPlan; binding: RdcTu
 export type RecoveryFacts = {
   cause: { operation: string; argsFingerprint: string; code: string };
   observed: RdcRecoveryObservation;
+  classification: RdcRecoveryClassification;
 };
 export interface ApprovedCaptureHost {
   assertPlan(): void;
@@ -330,8 +332,13 @@ export class ApprovedCaptureController {
       original: this.original!,
       from,
       destination,
-      recovery: { cause: facts.cause, observed: facts.observed },
+      recovery: { cause: facts.cause, observed: facts.observed, classification: facts.classification },
     });
+    if (facts.classification.decision === 'quarantined') {
+      const refused = new AppError(facts.classification.code, facts.classification.reason);
+      this.fail(intent, base, from, refused, true);
+      throw refused;
+    }
     let stopped: InvestigationContentRef | undefined;
     const onStopped = (contextId: string) => {
       if (stopped || contextId !== from.native.contextId) throw new AppError('RDC_RECOVERY_STOP_RECEIPT_MISMATCH');

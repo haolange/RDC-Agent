@@ -121,8 +121,7 @@
       "complexity": 110
     },
     "src/main/rdc/RdcCaptureRecovery.ts": {
-      "lines": 151,
-      "complexity": 53
+      "complexity": 46
     },
     "src/main/rdc/RdcDevicePreparation.ts": {
       "lines": 226,
