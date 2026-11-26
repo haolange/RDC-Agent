@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { dialog, ipcMain, shell } from 'electron';
 import { AppError } from '@shared/errors/appError';
-import { confirmResourceTrust } from '../window/trustConfirmation';
+import { confirmMcpTrust, confirmResourceTrust } from '../window/trustConfirmation';
 import { nativeMessage } from '../window/nativeI18n';
 import { hookEngine } from '../hooks/HookEngine';
 import { requestSnapshotStore } from '../agent-runtime/prompt';
@@ -25,7 +25,6 @@ import {
   ScopedResourceImportArgsSchema,
   ScopedResourceWriteArgsSchema,
 } from './validation/rdcRuntimeSchemas';
-import type { AgentRuntimeMcpDescriptor } from '../settings/agent-manifests/agentRuntimeTypes';
 import type {
   HookEvent,
   ScopedResourceImportRequest,
@@ -45,24 +44,6 @@ function ownedProjectRoot(raw: string | null | undefined): string | undefined {
   if (!project) throw new AppError('PROJECT_ROOT_UNKNOWN', 'the folder is not an open project.');
   return project.rootPath;
 }
-
-/** What the person is trusting: where it is defined and exactly what it runs or connects to. Env values stay hidden. */
-function mcpTrustDetail(server: AgentRuntimeMcpDescriptor): string {
-  const envKeys = Object.keys(server.env ?? {});
-  return [
-    server.sourcePath ? nativeMessage('mcpSource', { value: server.sourcePath }) : null,
-    nativeMessage('mcpTransport', { value: server.transport }),
-    server.command
-      ? nativeMessage('mcpCommand', { value: [server.command, ...(server.args ?? [])].map(quoteArgument).join(' ') })
-      : null,
-    server.url ? nativeMessage('mcpUrl', { value: server.url }) : null,
-    envKeys.length ? nativeMessage('mcpEnvKeys', { value: envKeys.join(', ') }) : null,
-  ]
-    .filter((line): line is string => line !== null)
-    .join('\n');
-}
-
-const quoteArgument = (value: string): string => (/^[\w./:=@+-]+$/u.test(value) ? value : JSON.stringify(value));
 
 async function mutateHookTrust(
   projectRoot: string | undefined | null,
@@ -203,8 +184,7 @@ function resourceTrustChannels(): IpcChannelTable {
         .listMcpServers(projectRoot)
         .find((entry) => entry.id === descriptorId && entry.scope === 'project');
       if (!server) throw new AppError('MCP_DESCRIPTOR_UNKNOWN', `${descriptorId} is not a project MCP server here.`);
-      if (!(await confirmResourceTrust('mcp', server.id, mcpTrustDetail(server))))
-        return scopedRuntimeService.overview(projectRoot);
+      if (!(await confirmMcpTrust(server))) return scopedRuntimeService.overview(projectRoot);
       return scopedRuntimeService.trustProjectMcp(projectRoot, descriptorId);
     },
     'rdc-runtime:revokeMcp': (_event, ...rawArgs: unknown[]) => {

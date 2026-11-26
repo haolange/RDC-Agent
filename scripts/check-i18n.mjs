@@ -7,6 +7,7 @@ const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 const { englishTranslations, chineseTranslations } = require('../src/renderer/i18n/messages.ts');
 const { nativeEnglish, nativeChinese } = require('../src/main/window/nativeMessages.ts');
+const { commandEnglish, commandChinese } = require('../src/main/commands/commandMessages.ts');
 const { BUILTIN_AGENT_TOOL_IDS } = require('../src/shared/constants/agentToolTokens.ts');
 const { ERROR_CODES, errorParamsSchema } = require('../src/shared/errors/errorCodes.ts');
 const { WORK_PROCESS_TOOL_DISPLAY_CATALOG } = require('../src/renderer/features/transcript/workProcessToolCatalog.ts');
@@ -76,6 +77,7 @@ for (const code of ERROR_CODES) {
   }
 }
 compare(nativeEnglish, nativeChinese, 'native');
+compare(commandEnglish, commandChinese, 'command');
 
 for (const language of ['en', 'zh-CN']) {
   const keys = new Set();

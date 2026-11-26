@@ -17,7 +17,7 @@ vi.mock('electron', () => ({
   dialog: { showOpenDialog: mocks.showOpenDialog },
   shell: { showItemInFolder: vi.fn() },
 }));
-vi.mock('../window/trustConfirmation', () => ({ confirmResourceTrust: mocks.confirm }));
+vi.mock('../window/mainConfirmation', () => ({ confirmInMainProcess: mocks.confirm }));
 vi.mock('../window/nativeI18n', () => ({
   nativeMessage: (key: string, params?: { value?: string }) => `${key}=${params?.value ?? ''}`,
 }));
@@ -71,7 +71,7 @@ describe('rdc runtime handlers', () => {
     ]);
     mocks.confirm.mockResolvedValue(false);
     await invoke('rdc-runtime:trustMcp', projectRoot, 'probe');
-    const detail = mocks.confirm.mock.calls[0][2] as string;
+    const { detail } = mocks.confirm.mock.calls[0][0] as { detail: string };
     expect(detail).toContain('mcpCommand=node server.js --root "a b"');
     expect(detail).toContain('mcpEnvKeys=API_TOKEN');
     expect(detail).not.toContain('value-never-shown');

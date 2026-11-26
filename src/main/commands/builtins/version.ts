@@ -7,14 +7,14 @@ import type { CommandDefinition } from '../CommandRegistry';
 export const versionCommand: CommandDefinition = {
   id: 'version',
   name: 'version',
-  description: 'Show application version information',
+  descriptionKey: 'version.description',
   aliases: ['v'],
   category: 'system',
 
   async execute() {
     return {
       success: true,
-      message: `RDC Agent v${app.getVersion()}\nElectron: ${process.versions.electron}\nNode: ${process.version}\nChrome: ${process.versions.chrome}`,
+      message: `RDC-Agent v${app.getVersion()}\nElectron: ${process.versions.electron}\nNode: ${process.version}\nChrome: ${process.versions.chrome}`,
     };
   },
 };

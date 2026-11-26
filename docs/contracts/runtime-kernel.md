@@ -378,7 +378,9 @@ Slash 命令是 runtime 输入，不绕过 profile 权限。
 - `/model` 参数为 `[provider:model|modelId|default]`；`default` 跟随当前 Agent 配置，与 Composer 底栏共用 EffectiveCatalog + `isAgentToolExecutableModel` 可选集。
 - 裸 `default` 先于模型 id 解析，真名叫 `default` 的模型用 canonical `provider:model`。
 - `/permissions` 读 runtime 当前强制的档位（`RuntimePermissionStateService`），带参数时经 Composer 同一条档位切换路径。
-- `/mcp` 列出当前项目已配置的 server 与连接池里的实时状态；连接归 runtime 的项目连接池按回合租用，命令不提供手动 connect / disconnect，`/mcp settings` 打开 MCP 设置。
+- `/mcp` 列出当前项目已配置的 server 与连接池里的实时状态；`/mcp settings` 打开 MCP 设置。
+- `/mcp connect <server>` 与 `/mcp disconnect <server>` 经回合使用的同一个 `McpConnectionCoordinator`（`connectServer` / `disconnectServer`）：connect 连入项目当前连接池（没有时为它单开一个），清除该 server 的失败退避后立即重试，连接时照常执行信任检查；未信任的项目 server 先走与设置页相同的信任对话框（`confirmMcpTrust`），拒绝即不连接。disconnect 不动正被运行中回合持有的连接池，进程未确认退出时如实说明；之后需要它的回合会重新连接。失败原样报告，不报成功。
+- 命令输出（结果消息、`/help` 与命令列表的说明）按当时的应用语言生成，文案在 `src/main/commands/commandMessages.ts`，`check:i18n` 校验中英一致。
 
 权限模式：`Default` / `Auto-review` / `Full access` / `Custom`；主进程权威。可读根、可写根和命令前缀只在 Custom 生效，并在 Settings 的 Custom 规则里保存，保存以主进程确认为准。即使 Full access：二进制/`.rdc` 拒绝进对话、realpath 约束、灾难性 shell 硬拒绝（按平台分集）、公网出网（`web_*`、远程图片、favicon）只经 `fetchPublic`，SSRF fail-closed。agent `shell` 每次新进程，不提供 `run_in_background`。
 

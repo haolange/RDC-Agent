@@ -1,15 +1,20 @@
 /**
  * CommandRegistry 单元测试。
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CommandRegistry } from './CommandRegistry';
 import type { CommandDefinition } from './CommandRegistry';
+
+vi.mock('./commandI18n', async () => {
+  const { commandTextFor } = await import('./commandMessages');
+  return { commandText: (key: never, params?: Record<string, string | number>) => commandTextFor('en', key, params) };
+});
 
 function makeCommand(overrides: Partial<CommandDefinition> = {}): CommandDefinition {
   return {
     id: overrides.id ?? 'test-cmd',
     name: overrides.name ?? 'test-cmd',
-    description: overrides.description ?? 'A test command',
+    descriptionKey: overrides.descriptionKey ?? 'test.description',
     aliases: overrides.aliases,
     category: overrides.category ?? 'system',
     execute: overrides.execute ?? (async () => ({ success: true, message: 'ok' })),

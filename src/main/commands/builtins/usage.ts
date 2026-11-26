@@ -1,44 +1,30 @@
 import { sessionRecordStore } from '../../sessions/store/sessionStores';
+import { commandText } from '../commandI18n';
 import type { CommandDefinition } from '../CommandRegistry';
 
 export const usageCommand: CommandDefinition = {
   id: 'usage',
   name: 'usage',
-  description: 'Show persisted run and live usage availability for the current session',
+  descriptionKey: 'usage.description',
   category: 'debug',
 
   async execute(_args, ctx) {
     const sessionId = ctx.sessionId;
-    if (!sessionId) {
-      return {
-        success: true,
-        message: 'No active session. Open or create a session to track usage.',
-      };
-    }
-
+    if (!sessionId) return { success: true, message: commandText('common.noSession') };
     const runs = sessionRecordStore.listRuns(sessionId);
-    if (runs.length === 0) {
-      return {
-        success: true,
-        message: `Session ${sessionId} has no runs yet.`,
-      };
-    }
-
+    if (runs.length === 0) return { success: true, message: commandText('cost.noRuns') };
     const byStatus = new Map<string, number>();
-    for (const run of runs) {
-      byStatus.set(run.status, (byStatus.get(run.status) ?? 0) + 1);
-    }
+    for (const run of runs) byStatus.set(run.status, (byStatus.get(run.status) ?? 0) + 1);
     const statusLines = [...byStatus.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([status, count]) => `  ${status}: ${count}`);
     const lines = [
-      `Session: ${sessionId}`,
-      `Runs: ${runs.length}`,
-      'By status:',
+      commandText('usage.session', { sessionId }),
+      commandText('usage.runs', { count: runs.length }),
+      commandText('usage.byStatus'),
       ...statusLines,
       '',
-      'Session-scoped token usage is available through workflow:getRunUsage({ sessionId, runId? }).',
-      'The latest session usage is retained as Last actual and may be restored from its usage snapshot.',
+      commandText('usage.liveNote'),
     ];
     return { success: true, message: lines.join('\n') };
   },

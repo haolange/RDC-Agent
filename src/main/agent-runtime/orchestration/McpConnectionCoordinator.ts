@@ -171,6 +171,83 @@ export class McpConnectionCoordinator {
     });
   }
 
+  /**
+   * Connects one configured server at the person's request (`/mcp connect`) into the project's active pool, or a pool
+   * of its own when no turn has opened one. Its failure backoff is cleared so a server that failed before is tried
+   * now; trust is enforced at connect time as for a turn. The returned status is the server's live summary.
+   */
+  async connectServer(
+    projectRootPath: string | null,
+    projectId: string | null,
+    descriptor: AgentRuntimeMcpDescriptor,
+  ): Promise<{ alreadyConnected: boolean; status: MCPServerStatusSummary }> {
+    const pool =
+      this.resolveActivePool(projectRootPath, projectId) ??
+      this.openManualPool(projectRootPath, projectId, [descriptor]);
+    if (pool.closing) throw new AppError('MCP_POOL_QUARANTINED', `pool ${pool.key} is closing.`);
+    const alreadyConnected = pool.manager.listServers().includes(descriptor.id);
+    if (!alreadyConnected) {
+      pool.failedMcpServers.delete(descriptor.id);
+      try {
+        await this.ensurePoolServerConnected(pool, descriptor, projectRootPath);
+      } catch (error) {
+        this.recordFailure(pool, descriptor.id, error);
+        throw error;
+      }
+    }
+    const status = pool.manager.getServerStatusSummary().find((entry) => entry.id === descriptor.id)!;
+    return { alreadyConnected, status };
+  }
+
+  /**
+   * Disconnects one server of the project's active pool at the person's request (`/mcp disconnect`). A pool a running
+   * turn holds is left alone, since its tools would vanish mid-turn. A turn that needs the server connects it again.
+   */
+  async disconnectServer(
+    projectRootPath: string | null,
+    projectId: string | null,
+    serverId: string,
+  ): Promise<'disconnected' | 'not-connected' | 'in-use' | 'orphaned'> {
+    const pool = this.resolveActivePool(projectRootPath, projectId);
+    if (!pool || !pool.manager.listServers().includes(serverId)) return 'not-connected';
+    if (pool.activeTurnRefs > 0) return 'in-use';
+    const detail = await pool.manager.disconnect(serverId);
+    this.reportOrphanedDisconnects([detail.status], 'MCP manual disconnect left an orphaned process');
+    return detail.status;
+  }
+
+  /** A pool for a manual connect when no turn has one: keyed by its descriptor set and active for the project. */
+  private openManualPool(
+    projectRootPath: string | null,
+    projectId: string | null,
+    descriptors: readonly AgentRuntimeMcpDescriptor[],
+  ): ProjectMcpPool {
+    const root = projectRootPath ? this.resolveRootPath(projectRootPath) : null;
+    const normalizedProjectId = projectId?.trim() || null;
+    const descriptorHash = this.descriptorSetHash(descriptors);
+    const key = this.poolKey(root, normalizedProjectId, descriptorHash);
+    if (this.orphanedPools.has(key)) {
+      throw new AppError('MCP_POOL_QUARANTINED', `pool ${key} is quarantined until orphaned processes exit.`);
+    }
+    const pool = this.pools.get(key) ?? {
+      key,
+      projectRootPath: root,
+      projectId: normalizedProjectId,
+      descriptorHash,
+      manager: new MCPManager(),
+      connecting: new Map(),
+      failedMcpServers: new Map(),
+      lastUsedAt: Date.now(),
+      activeTurnRefs: 0,
+      closing: false,
+      superseded: false,
+      quarantined: false,
+    };
+    this.pools.set(key, pool);
+    if (root) this.activePoolByProject.set(this.activeProjectMapKey(root, normalizedProjectId), key);
+    return pool;
+  }
+
   async disconnectAll(): Promise<void> {
     const pools = Array.from(this.pools.values());
     for (const pool of pools) pool.closing = true;

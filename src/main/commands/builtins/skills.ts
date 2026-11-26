@@ -1,13 +1,14 @@
 /**
- * /skills — 列出或执行当前工作区的 Markdown Skills。
+ * /skills — 列出当前工作区的 Markdown Skills，或为下一条消息启用其中一个。
  */
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
+import { commandText } from '../commandI18n';
 import type { CommandDefinition } from '../CommandRegistry';
 
 export const skillsCommand: CommandDefinition = {
   id: 'skills',
   name: 'skills',
-  description: 'List available Markdown Skills or run one by id',
+  descriptionKey: 'skills.description',
   aliases: ['skill'],
   category: 'workflow',
 
@@ -20,39 +21,19 @@ export const skillsCommand: CommandDefinition = {
       });
       return {
         success: true,
-        message: lines.length > 0 ? lines.join('\n') : 'No Markdown Skills are available in this workspace.',
+        message: lines.length > 0 ? lines.join('\n') : commandText('skills.none'),
         data: { skills },
       };
     }
-    const action = args[0];
-    const resolveSkill = (rawId: string) =>
-      skills.find((entry) => entry.id === rawId || entry.name === rawId || entry.label === rawId);
-    if (action === 'run') {
-      const skillId = args[1] ?? '';
-      const skill = resolveSkill(skillId);
-      if (!skill) {
-        return {
-          success: false,
-          message: `Skill is not configured: ${skillId || 'unnamed'}`,
-        };
-      }
-      return {
-        success: true,
-        message: `Armed skill for next send: ${skill.id}`,
-        uiAction: { type: 'run-skill', payload: { skillId: skill.id, skillName: skill.label || skill.name } },
-        data: { skill },
-      };
-    }
-    const skill = resolveSkill(action);
-    if (!skill) {
-      return {
-        success: false,
-        message: `Skill is not configured: ${action}`,
-      };
-    }
+    // `/skills run <id>` and `/skills <id>` both arm the Skill for the next message.
+    const requested = args[0] === 'run' ? (args[1] ?? '') : args[0];
+    const skill = skills.find(
+      (entry) => entry.id === requested || entry.name === requested || entry.label === requested,
+    );
+    if (!skill) return { success: false, message: commandText('skills.notConfigured', { skill: requested }) };
     return {
       success: true,
-      message: `Armed skill for next send: ${skill.id}`,
+      message: commandText('skills.armed', { skill: skill.id }),
       uiAction: { type: 'run-skill', payload: { skillId: skill.id, skillName: skill.label || skill.name } },
       data: { skill },
     };

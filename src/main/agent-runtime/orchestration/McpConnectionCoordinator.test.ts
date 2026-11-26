@@ -330,4 +330,32 @@ describe('McpConnectionCoordinator orphan quarantine', () => {
 
     await coordinator2.disconnectAll();
   });
+
+  it('connects one server on request, retrying it after a recorded failure, and still enforces project trust', async () => {
+    const root = path.resolve('manual-project');
+    const d = descriptor('manual-server');
+    vi.spyOn(agentRuntimeConfigService, 'listMcpServers').mockReturnValue([d]);
+    const { MCPManager } = await import('../agent/MCPManager');
+    const connectInternal = vi
+      .spyOn(MCPManager.prototype as unknown as { connectInternal: () => Promise<string[]> }, 'connectInternal')
+      .mockRejectedValueOnce(new Error('spawn manual-mcp ENOENT'))
+      .mockResolvedValueOnce(['tool']);
+    const coordinator = new McpConnectionCoordinator();
+
+    await expect(coordinator.connectServer(root, 'p', d)).rejects.toThrow('spawn manual-mcp ENOENT');
+    expect(coordinator.getRuntimeStatusSummary(root, 'p')).toEqual([
+      expect.objectContaining({ id: d.id, connectionStatus: 'error', lastError: 'spawn manual-mcp ENOENT' }),
+    ]);
+    await expect(coordinator.connectServer(root, 'p', d)).resolves.toMatchObject({
+      alreadyConnected: false,
+      status: { id: d.id, connectionStatus: 'connected' },
+    });
+    expect(await coordinator.disconnectServer(root, 'p', 'another-server')).toBe('not-connected');
+
+    const untrusted = { ...descriptor('project-server'), scope: 'project' as const };
+    vi.spyOn(mcpTrustService, 'isTrusted').mockReturnValue(false);
+    await expect(coordinator.connectServer(root, 'p', untrusted)).rejects.toMatchObject({ code: 'MCP_TRUST_REQUIRED' });
+    expect(connectInternal).toHaveBeenCalledTimes(2);
+    await coordinator.disconnectAll();
+  });
 });

@@ -111,4 +111,9 @@ export class AgentOrchestrator {
   async disconnectAllMcpServers(): Promise<void> {
     await this.mcp.disconnectAll();
   }
+
+  /** Manual `/mcp connect` and `/mcp disconnect`: the connection coordinator that turns use, not a second path. */
+  get mcpConnections(): Pick<McpConnectionCoordinator, 'connectServer' | 'disconnectServer'> {
+    return this.mcp;
+  }
 }
