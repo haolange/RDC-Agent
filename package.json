@@ -32,7 +32,7 @@
     "check:request-cache-profile": "node --test scripts/request-cache-profile.test.mjs",
     "check:renderer-structure": "node --test scripts/renderer-source-analysis.test.mjs && node scripts/check-renderer-structure.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
+    "lint": "eslint src && pnpm run -s check:format",
     "format": "prettier --write .",
     "check:format": "prettier --check . --log-level warn",
     "check:indexed-access": "node scripts/check-indexed-access.mjs",

@@ -93,6 +93,10 @@
 - **验收交互过程**。涉及保存、刷新或动效时，核对点击前、等待中、完成后的位置、焦点和滚动。加入一次迟到响应或失败的代表场景，确认最新意图及回退行为。
 - **Zero Fake-Pass**。不用 mock、硬编码打桩、跳过编译、注释报错代码或旧缓存结果冒充当前代码路径通过。受控 fixture、真实模型请求、真实 RDC 回放是三种不同的证据，互不替代。改动使原有验证失效后重新跑通。
 - **失败先判对错**。测试失败时对照权威合同判断代码、测试或环境哪一方有误。不为通过测试恢复已撤回的行为，不删除仍有效的负向约束。
+- **格式**。Prettier 拥有代码与样式的排版（`.prettierrc.json`：120 列、单引号、分号、两空格缩进、尾逗号、LF）：
+  - `pnpm run lint` 在 ESLint 之后执行 `check:format`（`prettier --check`），CI `build` 的 lint 步骤因此也校验格式；改完代码运行 `pnpm run format`，不手工对齐，也不为排版写 ESLint 规则。
+  - `.prettierignore` 排除字节即契约的内容：`resources/`（内置 agent 与 hook 按原始字节算信任 hash）、`__fixtures__/` 与 `patches/`（逐字回放或应用），以及 JSON、Markdown、YAML、HTML 等数据与文档。
+  - 只改格式的提交单独提交，并把 SHA 追加进 `.git-blame-ignore-revs`；本地 `git config blame.ignoreRevsFile .git-blame-ignore-revs` 后 blame 跳过它们。
 - **文档引用**。`check:gates` 含 `check-doc-references`：
   - 文档里反引号中的仓库路径、相对链接与 IPC 通道名都必须仍然存在；改名、删文件或改通道时同步改文档。
   - 代码位置写文件与符号名，不写行号：`文件.ts:行号` 会随编辑和格式化漂移，门禁直接拒绝。
@@ -136,7 +140,7 @@
 | 开发辅助 | `dev:renderer`、`design:dev`、`design:build`、`brand:icons` |
 | 构建与打包 | `build`、`pack`、`dist` |
 | 测试 | `test`、`test:watch`、`test:coverage`、`test:coverage:renderer` |
-| 类型与 lint | `typecheck`、`lint` |
+| 类型、lint 与格式 | `typecheck`、`lint`（含 `check:format`）、`check:format`、`format` |
 | 门禁总线 | `check:gates` |
 | `check:gates` 串联的仓库与架构门禁 | `check:readme-version`、`check:bundle-deps`、`check:indexed-access`、`check:unnecessary-condition`、`check:module-graph`、`check:repository-hygiene`、`check:architecture`、`check:orchestrator-facade`、`check:qa-ids`、`check:legacy-residue`、`check:acceptance-ledger`、`check:release-config`、`check:identity`、`check:secrets` |
 | `check:gates` 串联的领域与 UI 门禁 | `check:work-process-tool-coverage`、`check:agent-runtime`、`check:tool-system`、`check:session-projection`、`check:right-rail`、`check:knowledge-system`、`check:investigation-system`、`check:provider-system`、`check:design-tokens`、`check:ui-contract`、`check:renderer-structure`、`check:rdc-tool-guides` |
