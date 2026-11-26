@@ -88,6 +88,11 @@ describe('MCP input schema compilation', () => {
     expect(
       compileMcpInputSchema({ type: 'object', properties: { item: { $ref: '#/$defs/Missing' } } }, 'item'),
     ).toMatchObject({ ok: false, reason: expect.stringContaining('#/$defs/Missing') });
+    const wide = Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`f${i}`, { type: 'string' }]));
+    expect(compileMcpInputSchema({ type: 'object', properties: wide }, 'wide')).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('schema 节点数超过上限 256'),
+    });
     expect(
       compileMcpInputSchema({ $schema: 'http://json-schema.org/draft-04/schema#', type: 'object' }, 'old'),
     ).toMatchObject({ ok: false, reason: expect.stringContaining('$schema') });

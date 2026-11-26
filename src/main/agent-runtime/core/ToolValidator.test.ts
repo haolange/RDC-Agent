@@ -214,6 +214,31 @@ describe('ToolValidator', () => {
     expect(() => local.validate(copy, { pair: [1] })).toThrow(/\[copy\] args\.pair\[0\]: 期望 string/);
   });
 
+  it('bounds schema size before compiling and argument size before validating', () => {
+    let deep: ToolDefinition['parameters'] = { type: 'string' };
+    for (let level = 0; level < 13; level += 1) deep = { type: 'object', properties: { next: deep } };
+    expect(() => new ToolValidator().assertCompilable(deep, 'deep')).toThrow(
+      /\[deep\] parameters(\.properties\.next)+: schema 递归深度超过上限 12/,
+    );
+    const wide = {
+      type: 'object',
+      properties: Object.fromEntries(Array.from({ length: 256 }, (_, i) => [`f${i}`, { type: 'string' }])),
+    };
+    expect(() => new ToolValidator().compileExternal(wide, 'wide')).toThrow(
+      /\[wide\] parameters\.properties\.f255: schema 节点数超过上限 256/,
+    );
+
+    const bag = def({ type: 'object', properties: { record: { type: 'object' }, list: { type: 'array' } } });
+    const keys = (count: number) => Object.fromEntries(Array.from({ length: count }, (_, i) => [`k${i}`, i]));
+    expect(validator.validate(bag, { record: keys(64), list: Array.from({ length: 256 }, () => 0) })).toBeTruthy();
+    expect(() => validator.validate(bag, { record: { nested: keys(65) } })).toThrow(
+      /\[demo\] args\.record\.nested: 对象字段数超过上限 64/,
+    );
+    expect(() => validator.validate(bag, { list: Array.from({ length: 257 }, () => 0) })).toThrow(
+      /\[demo\] args\.list: 数组元素数超过硬上限 256/,
+    );
+  });
+
   it('enforces const and numeric minimum/maximum', () => {
     const tool = def({
       type: 'object',

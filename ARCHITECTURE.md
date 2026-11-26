@@ -172,6 +172,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 - **Capability unknown**：`toolCalling.state === unknown` → text-only，不进入 Agent/Composer 可执行集合；仅 `supported` 且具备已实现的 structured-tool adapter 才是 `native-structured`。`unsupported` 保持明确的拒绝诊断，不复用到 unknown。
 - **ToolValidator**（`src/main/agent-runtime/core/ToolValidator.ts`）：工具参数由 Ajv 按 JSON Schema 2020-12 校验，`ajv-formats` 校验 `format`。
   - `$schema` / `$defs` / `$ref`、`anyOf` / `allOf` / `oneOf` / `not`、类型数组、`prefixItems` 与全部边界约束按规范生效；`title`、`description`、`examples`、`$comment`、`deprecated` 等注解关键字允许出现且不约束取值。未知关键字与未知 `format` 使编译失败。
+  - 尺寸上限：编译前拒绝深度超过 12 或子 schema 节点超过 256 的 schema（内置工具使装配失败，MCP 工具记为 `MCP_TOOL_SCHEMA_UNSUPPORTED`）；校验前拒绝含超过 64 个键的对象或超过 256 项的数组的参数（`ToolValidationError`）。
   - 声明了 `properties` 而省略 `additionalProperties` / `unevaluatedProperties` 的对象 schema 拒绝未声明字段；没有 `properties` 的对象是不透明包。缺省字段按 `default` 补齐。
   - 类型转换是显式规则而不是 Ajv `coerceTypes`：校验前沿 `properties` / `items` / `additionalProperties` 路径，把类型不符的标量温和转换（数字串与布尔转数值，`"true"` / `"false"` 与 1 / 0 转布尔，数值与布尔转字符串）；路径、命令、URL 类参数不转换，组合关键字的分支按原值匹配。
   - 校验器按 schema 规范 JSON 的 hash 缓存，与 schema 对象身份无关。内置工具在 `RuntimeToolAssembly.resolveRuntimeTools` 装配工具集时经 `assertCompilable` 以 Ajv strict 模式编译（含 `tool_search`，不论本轮是否放行该工具），编译失败使装配失败；`RuntimeToolAssembly.test.ts` 装配全部内置工具，并验证带未知关键字的内置工具在装配时失败。

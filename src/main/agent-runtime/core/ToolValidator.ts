@@ -74,6 +74,13 @@ const SUBSCHEMA_KEYS = new Set([
 const SUBSCHEMA_LIST_KEYS = new Set(['anyOf', 'oneOf', 'allOf', 'prefixItems']);
 const SUBSCHEMA_MAP_KEYS = new Set(['properties', 'patternProperties', '$defs', 'definitions', 'dependentSchemas']);
 
+/** Schema size bounds, checked before Ajv compiles: an MCP server's schema is external input. */
+const MAX_SCHEMA_DEPTH = 12;
+const MAX_SCHEMA_NODES = 256;
+/** Argument size bounds, checked before validation on every object and array the model sent. */
+const MAX_OBJECT_KEYS = 64;
+const MAX_ARRAY_ITEMS_HARD = 256;
+
 interface CompiledSchema {
   validate: ValidateFunction;
   strict: boolean;
@@ -87,6 +94,8 @@ interface CompiledSchema {
  * - An object schema that declares `properties` without `additionalProperties` / `unevaluatedProperties` rejects
  *   undeclared fields; an object schema without `properties` is an opaque bag.
  * - Missing fields take their declared `default`.
+ * - Size bounds: a schema deeper than 12 or with more than 256 subschemas fails before compiling; arguments with an
+ *   object of more than 64 keys or an array of more than 256 items fail before validating.
  * - Before validation, scalar arguments whose JSON type the schema does not allow are coerced along plain
  *   `properties` / `items` / `additionalProperties` paths (numeric strings and booleans to numbers, `"true"` /
  *   `"false"` and 1 / 0 to booleans, numbers and booleans to strings), except path, command and URL arguments.
@@ -109,6 +118,7 @@ export class ToolValidator {
    */
   validate(toolDef: ToolDefinition, args: Record<string, unknown>): Record<string, unknown> {
     const schema = toolDef.parameters;
+    assertArgumentBounds(args, 'args', toolDef.name);
     const { validate } = this.compiled.get(schemaHash(schema)) ?? this.compileBuiltin(schema, toolDef.name);
     const data = coerceArguments(structuredClone(args), schema, schema, undefined);
     if (!validate(data)) throw validationError(validate.errors ?? [], data, toolDef.name);
@@ -157,6 +167,7 @@ function schemaHash(schema: JsonSchema): string {
  * the validator cache above owns reuse, and two tools may declare different schemas under the same `$id`.
  */
 function compileWith(ajv: AjvCore, schema: JsonSchema, toolName: string): ValidateFunction {
+  assertSchemaBounds(schema, 'parameters', toolName, 0, { nodes: 0 });
   const closed = closeDeclaredObjects(schema) as JsonSchema;
   try {
     return ajv.compile(closed);
@@ -169,6 +180,57 @@ function compileWith(ajv: AjvCore, schema: JsonSchema, toolName: string): Valida
   } finally {
     ajv.removeSchema(closed);
   }
+}
+
+/** The subschemas directly under a schema node, each with its path suffix. */
+function subschemaEntries(node: Record<string, unknown>): Array<[string, unknown]> {
+  const entries: Array<[string, unknown]> = [];
+  for (const [key, value] of Object.entries(node)) {
+    const list = SUBSCHEMA_LIST_KEYS.has(key) || (SUBSCHEMA_KEYS.has(key) && Array.isArray(value));
+    if (list && Array.isArray(value)) value.forEach((child, index) => entries.push([`${key}.${index}`, child]));
+    else if (SUBSCHEMA_KEYS.has(key)) entries.push([key, value]);
+    else if (SUBSCHEMA_MAP_KEYS.has(key) && isRecord(value))
+      for (const [name, child] of Object.entries(value)) entries.push([`${key}.${name}`, child]);
+  }
+  return entries;
+}
+
+/** Rejects a schema nested deeper than MAX_SCHEMA_DEPTH or holding more than MAX_SCHEMA_NODES subschemas. */
+function assertSchemaBounds(
+  node: unknown,
+  path: string,
+  toolName: string,
+  depth: number,
+  counters: { nodes: number },
+): void {
+  if (!isRecord(node)) return;
+  counters.nodes += 1;
+  if (depth > MAX_SCHEMA_DEPTH) {
+    throw new ToolValidationError(`schema 递归深度超过上限 ${MAX_SCHEMA_DEPTH}`, path, toolName);
+  }
+  if (counters.nodes > MAX_SCHEMA_NODES) {
+    throw new ToolValidationError(`schema 节点数超过上限 ${MAX_SCHEMA_NODES}`, path, toolName);
+  }
+  for (const [suffix, child] of subschemaEntries(node)) {
+    assertSchemaBounds(child, `${path}.${suffix}`, toolName, depth + 1, counters);
+  }
+}
+
+/** Rejects arguments holding an object with more than MAX_OBJECT_KEYS keys or an array over MAX_ARRAY_ITEMS_HARD. */
+function assertArgumentBounds(value: unknown, path: string, toolName: string): void {
+  if (Array.isArray(value)) {
+    if (value.length > MAX_ARRAY_ITEMS_HARD) {
+      throw new ToolValidationError(`数组元素数超过硬上限 ${MAX_ARRAY_ITEMS_HARD}`, path, toolName);
+    }
+    value.forEach((item, index) => assertArgumentBounds(item, `${path}[${index}]`, toolName));
+    return;
+  }
+  if (!isRecord(value)) return;
+  const entries = Object.entries(value);
+  if (entries.length > MAX_OBJECT_KEYS) {
+    throw new ToolValidationError(`对象字段数超过上限 ${MAX_OBJECT_KEYS}`, path, toolName);
+  }
+  for (const [key, child] of entries) assertArgumentBounds(child, `${path}.${key}`, toolName);
 }
 
 /** Adds `additionalProperties: false` to every object schema that declares `properties` and leaves extras open. */
