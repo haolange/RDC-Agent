@@ -1,0 +1,405 @@
+{
+  "budget": {
+    "lines": 150,
+    "complexity": 40,
+    "params": 6
+  },
+  "exceptions": {
+    "src/main/agent-runtime/agent/AgentLoop.ts": {
+      "lines": 157,
+      "complexity": 49
+    },
+    "src/main/agent-runtime/agent/ErrorRecovery.ts": {
+      "complexity": 41
+    },
+    "src/main/agent-runtime/AgentEventBridge.ts": {
+      "lines": 186
+    },
+    "src/main/agent-runtime/context/ExecutionContextWindow.ts": {
+      "lines": 170
+    },
+    "src/main/agent-runtime/context/RecoverableContextWindow.ts": {
+      "complexity": 43
+    },
+    "src/main/agent-runtime/core/ToolValidator.ts": {
+      "complexity": 41
+    },
+    "src/main/agent-runtime/EffectiveRuntimePlan.ts": {
+      "lines": 155
+    },
+    "src/main/agent-runtime/interactions/applyDeclaredHandoff.ts": {
+      "complexity": 42
+    },
+    "src/main/agent-runtime/orchestration/AgentSlotFactory.ts": {
+      "lines": 209
+    },
+    "src/main/agent-runtime/orchestration/ApprovedCaptureHost.ts": {
+      "lines": 323
+    },
+    "src/main/agent-runtime/orchestration/BackgroundSubagentService.ts": {
+      "lines": 317
+    },
+    "src/main/agent-runtime/orchestration/BackgroundTaskTools.ts": {
+      "lines": 155
+    },
+    "src/main/agent-runtime/orchestration/RdcProbeTool.ts": {
+      "lines": 170,
+      "complexity": 92
+    },
+    "src/main/agent-runtime/orchestration/RuntimeToolAssembly.ts": {
+      "params": 8
+    },
+    "src/main/agent-runtime/orchestration/SubagentRunner.ts": {
+      "lines": 438,
+      "complexity": 114
+    },
+    "src/main/agent-runtime/orchestration/SubagentTool.ts": {
+      "lines": 367,
+      "complexity": 108
+    },
+    "src/main/agent-runtime/orchestration/ToolExecutorFactory.ts": {
+      "lines": 175
+    },
+    "src/main/agent-runtime/orchestration/TurnControlTools.ts": {
+      "lines": 166,
+      "complexity": 60
+    },
+    "src/main/agent-runtime/orchestration/TurnPreparationService.ts": {
+      "lines": 436,
+      "complexity": 54
+    },
+    "src/main/agent-runtime/permissions/AgentPermissionPolicy.ts": {
+      "lines": 155,
+      "complexity": 50
+    },
+    "src/main/agent-runtime/permissions/PermissionReviewAuthority.ts": {
+      "lines": 190
+    },
+    "src/main/agent-runtime/prompt/PromptPlanBuilder.ts": {
+      "lines": 263
+    },
+    "src/main/agent-runtime/providers/internal/responsesShared.ts": {
+      "lines": 239,
+      "complexity": 81
+    },
+    "src/main/agent-runtime/tasks/TaskRegistry.ts": {
+      "complexity": 55
+    },
+    "src/main/agent-runtime/tasks/TaskStore.ts": {
+      "complexity": 95
+    },
+    "src/main/agent-runtime/tasks/TaskTools.ts": {
+      "lines": 180,
+      "complexity": 50
+    },
+    "src/main/agent-runtime/tools/primitives/GrepTool.ts": {
+      "params": 8
+    },
+    "src/main/agent-runtime/tools/ToolResultSummarizer.ts": {
+      "complexity": 43
+    },
+    "src/main/agent-runtime/workTrace/ConversationWorkTrace.ts": {
+      "complexity": 57
+    },
+    "src/main/agent-runtime/workTrace/DelegatedWorkProjection.ts": {
+      "lines": 272,
+      "complexity": 65
+    },
+    "src/main/agent-trace/TraceService.ts": {
+      "lines": 204,
+      "complexity": 45
+    },
+    "src/main/browserAppBridge/BrowserAppBridgeServer.ts": {
+      "lines": 173
+    },
+    "src/main/conversation/ConversationToolCompletion.ts": {
+      "complexity": 58
+    },
+    "src/main/conversation/TurnRuntimeEpochs.ts": {
+      "complexity": 78
+    },
+    "src/main/investigation/investigationExecutionEvidence.ts": {
+      "complexity": 41
+    },
+    "src/main/ipc/captureDeviceHandlers.ts": {
+      "lines": 174
+    },
+    "src/main/ipc/conversationHandlers.ts": {
+      "lines": 236
+    },
+    "src/main/ipc/projectSessionHandlers.ts": {
+      "lines": 330
+    },
+    "src/main/knowledge/knowledgeIngest.ts": {
+      "lines": 160,
+      "complexity": 57
+    },
+    "src/main/knowledge/KnowledgeQueryService.ts": {
+      "complexity": 43
+    },
+    "src/main/provider-catalog/catalogCompiler.ts": {
+      "lines": 182,
+      "complexity": 90
+    },
+    "src/main/rdc/executeRdcShell.ts": {
+      "lines": 444,
+      "complexity": 131
+    },
+    "src/main/rdc/RdcCaptureRecovery.ts": {
+      "lines": 151,
+      "complexity": 53
+    },
+    "src/main/rdc/RdcDevicePreparation.ts": {
+      "lines": 226,
+      "complexity": 41
+    },
+    "src/main/rdc/RdcNativeProtocol.ts": {
+      "complexity": 80
+    },
+    "src/main/rdc/RdcOperationPolicy.ts": {
+      "complexity": 41
+    },
+    "src/main/rdc/RdcReplayObservation.ts": {
+      "complexity": 44
+    },
+    "src/main/rdc/RdcSessionRuntime.ts": {
+      "lines": 172
+    },
+    "src/main/rdc/RdcSessionService.ts": {
+      "lines": 164,
+      "complexity": 46,
+      "params": 7
+    },
+    "src/main/rdc/RdcValidatedEvidence.ts": {
+      "lines": 157,
+      "complexity": 76
+    },
+    "src/main/rdc/RecordedRdcRequest.ts": {
+      "complexity": 48
+    },
+    "src/main/runtime/ProcessSupervisor.ts": {
+      "lines": 210
+    },
+    "src/main/sessions/artifacts/SessionArtifactResolver.ts": {
+      "lines": 170,
+      "complexity": 74
+    },
+    "src/main/sessions/store/ConversationTerminalAppend.ts": {
+      "params": 7
+    },
+    "src/main/sessions/store/StoredWorkTrace.ts": {
+      "complexity": 51
+    },
+    "src/main/settings/agent-manifests/agentManifestParse.ts": {
+      "complexity": 47
+    },
+    "src/main/settings/provider-auth/CopilotBilling.ts": {
+      "complexity": 41
+    },
+    "src/main/settings/provider-auth/ProviderAccountAuthService.ts": {
+      "complexity": 53
+    },
+    "src/main/settings/provider-catalog/effectiveCatalogMerge.ts": {
+      "complexity": 48
+    },
+    "src/main/settings/provider-catalog/ProviderModelDiscovery.ts": {
+      "lines": 256,
+      "complexity": 52
+    },
+    "src/main/settings/settings-core/providerUserState.ts": {
+      "complexity": 43
+    },
+    "src/main/settings/settings-core/SettingsProviderOps.ts": {
+      "lines": 169,
+      "complexity": 57,
+      "params": 8
+    },
+    "src/main/settings/settings-core/SettingsService.ts": {
+      "params": 8
+    },
+    "src/renderer/app/App.tsx": {
+      "lines": 213
+    },
+    "src/renderer/app/useWorkbenchLayout.ts": {
+      "lines": 191
+    },
+    "src/renderer/app/WorkbenchShell.tsx": {
+      "lines": 171
+    },
+    "src/renderer/features/captures/DeviceSelector/index.tsx": {
+      "lines": 183
+    },
+    "src/renderer/features/composer/ComposerModelEffortControl.tsx": {
+      "lines": 201,
+      "complexity": 43
+    },
+    "src/renderer/features/composer/ComposerModelEffortPanel.tsx": {
+      "lines": 184
+    },
+    "src/renderer/features/composer/ComposerModelPickerPanel.tsx": {
+      "lines": 152
+    },
+    "src/renderer/features/composer/composerSendFlow.ts": {
+      "lines": 239,
+      "complexity": 47
+    },
+    "src/renderer/features/composer/EffortMaxField.tsx": {
+      "params": 9
+    },
+    "src/renderer/features/composer/PlanReviewRequestPanel.tsx": {
+      "lines": 173
+    },
+    "src/renderer/features/composer/useComposer.ts": {
+      "lines": 162
+    },
+    "src/renderer/features/composer/useComposerAttachments.ts": {
+      "lines": 168
+    },
+    "src/renderer/features/composer/useComposerEffortControl.ts": {
+      "lines": 151
+    },
+    "src/renderer/features/composer/UserInputRequestPanel.tsx": {
+      "lines": 253
+    },
+    "src/renderer/features/composer/useTurnControls.ts": {
+      "lines": 152
+    },
+    "src/renderer/features/knowledge/KnowledgeCenterModal/index.tsx": {
+      "lines": 228
+    },
+    "src/renderer/features/knowledge/KnowledgeCenterModal/panels/ExportKnowledgeDialog.tsx": {
+      "lines": 169
+    },
+    "src/renderer/features/knowledge/KnowledgeCenterModal/panels/ImportKnowledgeDialog.tsx": {
+      "lines": 165
+    },
+    "src/renderer/features/knowledge/KnowledgeCenterModal/panels/KnowledgeTopicsDialog.tsx": {
+      "lines": 167
+    },
+    "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeExport.ts": {
+      "lines": 162
+    },
+    "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeImport.ts": {
+      "lines": 151
+    },
+    "src/renderer/features/knowledge/KnowledgeCenterModal/useKnowledgeWriteConfirm.ts": {
+      "lines": 167
+    },
+    "src/renderer/features/right-rail/CapturePanel.tsx": {
+      "lines": 194,
+      "complexity": 71
+    },
+    "src/renderer/features/right-rail/CaptureReplayControls.tsx": {
+      "lines": 164,
+      "complexity": 45
+    },
+    "src/renderer/features/settings/SettingsModal/index.tsx": {
+      "lines": 172
+    },
+    "src/renderer/features/settings/SettingsModal/sections/AgentHandoffCard.tsx": {
+      "lines": 205
+    },
+    "src/renderer/features/settings/SettingsModal/sections/AgentManifestEditor.tsx": {
+      "lines": 165
+    },
+    "src/renderer/features/settings/SettingsModal/sections/AgentModelCascadeSelect.tsx": {
+      "lines": 182
+    },
+    "src/renderer/features/settings/SettingsModal/sections/AgentsSettings.tsx": {
+      "lines": 212
+    },
+    "src/renderer/features/settings/SettingsModal/sections/HooksSettings.tsx": {
+      "lines": 169
+    },
+    "src/renderer/features/settings/SettingsModal/sections/ProviderAccountOAuthPanel.tsx": {
+      "lines": 166,
+      "complexity": 50
+    },
+    "src/renderer/features/settings/SettingsModal/sections/ProviderConnectDialog.tsx": {
+      "lines": 230,
+      "complexity": 43
+    },
+    "src/renderer/features/settings/SettingsModal/sections/ProviderConnectionFields.tsx": {
+      "lines": 223
+    },
+    "src/renderer/features/settings/SettingsModal/sections/ProviderProbeBatchPanel.tsx": {
+      "lines": 157,
+      "complexity": 52
+    },
+    "src/renderer/features/settings/SettingsModal/sections/RuntimeScopePanel.tsx": {
+      "lines": 238,
+      "complexity": 53
+    },
+    "src/renderer/features/settings/SettingsModal/SettingsCenterNav.tsx": {
+      "lines": 167
+    },
+    "src/renderer/features/settings/SettingsModal/settingsModalActions.ts": {
+      "lines": 176
+    },
+    "src/renderer/features/settings/SettingsModal/SettingsPageContent.tsx": {
+      "lines": 165
+    },
+    "src/renderer/features/settings/SettingsModal/useProviderConnectionDraft.ts": {
+      "lines": 151
+    },
+    "src/renderer/features/settings/SettingsModal/useSettingsModal.ts": {
+      "lines": 156
+    },
+    "src/renderer/features/sidebar/Sidebar/index.tsx": {
+      "lines": 181
+    },
+    "src/renderer/features/sidebar/Sidebar/RenamePopoverPanels.tsx": {
+      "lines": 175
+    },
+    "src/renderer/features/transcript/SubagentRowBody.tsx": {
+      "lines": 155
+    },
+    "src/renderer/features/transcript/workProcessCatalogContent.ts": {
+      "complexity": 47
+    },
+    "src/renderer/features/transcript/workProcessFileContent.ts": {
+      "complexity": 44
+    },
+    "src/renderer/features/transcript/WorkProcessRowParts.tsx": {
+      "complexity": 70
+    },
+    "src/renderer/features/transcript/workProcessStandaloneProjection.ts": {
+      "lines": 164,
+      "complexity": 44
+    },
+    "src/renderer/features/transcript/workProcessToolContentShared.ts": {
+      "complexity": 45
+    },
+    "src/renderer/lib/anchoredSurface.ts": {
+      "params": 7
+    },
+    "src/renderer/lib/textareaSizing.ts": {
+      "params": 8
+    },
+    "src/renderer/patterns/ContextBreakdownSheet.tsx": {
+      "lines": 170,
+      "complexity": 66
+    },
+    "src/renderer/patterns/DevicePreparationStatus.tsx": {
+      "complexity": 68
+    },
+    "src/renderer/shell/layoutGeometry.ts": {
+      "params": 7
+    },
+    "src/renderer/ui/ImageViewer.tsx": {
+      "lines": 179
+    },
+    "src/renderer/ui/Popover.tsx": {
+      "lines": 172
+    },
+    "src/renderer/ui/Select/index.tsx": {
+      "lines": 231
+    },
+    "src/shared/utils/agentModelOptions.ts": {
+      "lines": 170
+    },
+    "src/shared/utils/modelControls.ts": {
+      "complexity": 45
+    }
+  }
+}

@@ -88,10 +88,25 @@ export const sourceTextRestrictions = [
   `${readFileCall} TemplateElement[value.raw=${sourceOrDocumentPath}]`,
 ].map((selector) => ({ selector, message: sourceTextMessage }));
 const testSources = ['src/**/*.test.{ts,tsx}', 'src/main/testing/**/*.ts'];
-const productionSources = {
+// Production code, as check-module-graph counts it: everything under src except tests, test support directories
+// (testing/, fixtures/, __fixtures__/) and declaration files.
+export const productionCode = {
   files: ['src/**/*.{ts,tsx}'],
-  ignores: ['src/**/*.test.{ts,tsx}', 'src/main/testing/**', 'src/**/*.d.ts'],
+  ignores: ['src/**/*.test.{ts,tsx}', 'src/**/{testing,fixtures,__fixtures__}/**', 'src/**/*.d.ts'],
 };
+
+// Function budgets (AGENTS.md §5): every production function stays within `budget` in scripts/function-budgets.json
+// (lines without blank lines and comments, cyclomatic complexity, parameters). A file listed in `exceptions` is held
+// at the largest value measured in it, so its functions cannot grow either; scripts/check-function-budgets.mjs keeps
+// each entry at that measured maximum, so the list only shrinks.
+export const functionBudgets = JSON.parse(
+  fs.readFileSync(path.join(import.meta.dirname, 'scripts/function-budgets.json'), 'utf8'),
+);
+export const functionBudgetRules = ({ lines, complexity, params }) => ({
+  'max-lines-per-function': ['error', { max: lines, skipBlankLines: true, skipComments: true, IIFEs: true }],
+  complexity: ['error', complexity],
+  'max-params': ['error', params],
+});
 
 // Dependency direction (ARCHITECTURE.md): shared runs in every process, so it imports no Node
 // builtins and no process code; platform and provider-catalog are main-process leaves; ipc is the
@@ -239,12 +254,10 @@ const typedLintProgram = {
 };
 // Inside the boundaries the types are the contract (ARCHITECTURE.md Verification Gate): production code in every
 // process runs no-unnecessary-condition, so a null check, optional chain, fallback or branch the types already rule out
-// is an error. Production code is what check-module-graph calls production: no tests, testing/, fixtures/,
-// __fixtures__/ or declaration files. UNNECESSARY_CONDITION_PENDING names the files still exempt and why; the list only
-// shrinks, and scripts/check-unnecessary-condition.mjs fails while a listed file is clean, gone or outside the rule.
+// is an error. UNNECESSARY_CONDITION_PENDING names the files still exempt and why; the list only shrinks, and
+// scripts/check-unnecessary-condition.mjs fails while a listed file is clean, gone or outside the rule.
 export const typedLint = {
-  files: ['src/**/*.{ts,tsx}'],
-  ignores: ['src/**/*.test.{ts,tsx}', 'src/**/{testing,fixtures,__fixtures__}/**', 'src/**/*.d.ts'],
+  ...productionCode,
   languageOptions: typedLintProgram,
   rules: {
     '@typescript-eslint/no-unnecessary-condition': ['error', { allowConstantLoopConditions: 'only-allowed-literals' }],
@@ -302,7 +315,7 @@ export default [
     },
   },
   {
-    ...productionSources,
+    ...productionCode,
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -313,6 +326,11 @@ export default [
       'preserve-caught-error': ['error', { requireCatchParameter: false }],
     },
   },
+  { ...productionCode, rules: functionBudgetRules(functionBudgets.budget) },
+  ...Object.entries(functionBudgets.exceptions).map(([file, limits]) => ({
+    files: [file],
+    rules: functionBudgetRules({ ...functionBudgets.budget, ...limits }),
+  })),
   {
     files: ['src/main/**/*.ts'],
     ignores: [
@@ -329,7 +347,7 @@ export default [
   },
   {
     files: ['src/main/**/*.ts', 'src/shared/**/*.ts', 'src/preload/**/*.ts'],
-    ignores: [...productionSources.ignores, 'src/main/platform/**', 'src/preload/index.ts'],
+    ignores: [...productionCode.ignores, 'src/main/platform/**', 'src/preload/index.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',

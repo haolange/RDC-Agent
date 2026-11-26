@@ -379,6 +379,8 @@ import 顺序（`import/order`）与无效的 `eslint-disable` 均为 error。
 
 **文件体量**由 ESLint `max-lines` 执行：`AgentOrchestrator.ts` < 800 行，main 单文件 ≤ 900 行，renderer `.tsx` ≤ 300 行，renderer 的 hooks / services / stores 与 feature `use*.ts` ≤ 200 行。
 
+**函数体量**由 ESLint `max-lines-per-function` / `complexity` / `max-params` 执行：生产函数不超过 150 行（不计空行与注释）、圈复杂度 40、6 个参数（`scripts/function-budgets.json`）。超出的文件逐个按实测最大值封顶，`check:function-budgets` 保证这些条目只减不增。
+
 **CI**（`.github/workflows/ci.yml`）：
 
 | Job | 内容 |
