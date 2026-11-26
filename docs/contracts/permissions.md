@@ -27,7 +27,9 @@ Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom`。主进�
 - 应用根下的 `*-trust.json`：只由授予信任的人写入。
 - `<userData>/state/**`（审计日志、会话记录、trace 等）；唯一例外是 `sessions/**/artifacts/**`，那是工具产出运行制品的位置。
 
-这条边界约束的是声明了路径效果的工具。Shell 在 Full access 下按命令信任执行，命令内部的重定向或子进程写盘不经路径检查，这是 Full access 的系统性局限；需要硬边界时使用 Default、Auto-review 或 Custom。未声明效果的工具按访问类别：observe / record 自动，mutate / execute 需审批。
+这条边界约束的是声明了路径效果的工具。Shell 在 Full access 下按命令信任执行，命令内部的重定向或子进程写盘不经路径检查，这是 Full access 的系统性局限；需要硬边界时使用 Default、Auto-review 或 Custom。
+
+读取另有一条任何挡位都生效的硬边界：`<appStateRoot>/crash` 下的 minidump（进程内存快照，可能含解密后的 provider 密钥）与凭据目录（`<userData>/secrets`、`~/.rdc-agent/secrets`）不经任何 agent 文件工具读取、复制、移动、搜索或列出（`assertFileReadBoundary` / `fileReadProtection`，`FILE_READ_PROTECTED`）。比较用 realpath 拼写，路径中的符号链接另由 `safeResolvePath` 拒绝，目录遍历不跟随链接。Shell 不在这条边界内：Full access 下的命令仍能读取这些文件，这是同一系统性局限。未声明效果的工具按访问类别：observe / record 自动，mutate / execute 需审批。
 
 Browser QA 代答 `conversation:answerPlanReview`、`conversation:answerToolApproval`、`conversation:answerUserInput` 属于 high-impact，只在 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时放行。桌面 IPC 不受该环境变量限制。
 

@@ -15,6 +15,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { expandHomePath } from '../../../platform/paths';
+import { assertFileReadBoundary, fileReadProtection } from '../../../runtime/FileOperationBoundary';
 import { getWorkspaceRoot, safeResolvePath, truncateOutput } from '../../../runtime/toolFiles';
 import { GLOB_MAX_OUTPUT_BYTES } from '../../../runtime/toolLimits';
 import type { AgentTool } from '../../agent/AgentTool';
@@ -87,6 +88,7 @@ export const globTool: AgentTool<GlobParams, GlobDetails> = {
       : externalPattern
         ? safeResolvePath(externalPattern.baseDir, workspaceRoot, context)
         : workspaceRoot;
+    assertFileReadBoundary(baseDir);
     const pattern = externalPattern?.pattern ?? params.pattern;
 
     const regex = compileGlob(pattern);
@@ -255,6 +257,7 @@ async function walk(
   root: string,
   current: string,
   visit: (relativePath: string) => Promise<boolean>,
+  readProtected = fileReadProtection(),
 ): Promise<boolean> {
   let entries: import('fs').Dirent[];
   try {
@@ -265,11 +268,13 @@ async function walk(
 
   for (const entry of entries) {
     const abs = path.join(current, entry.name);
+    // Crash files and credential stores are never listed, even from a directory above them.
+    if (readProtected(abs)) continue;
     if (entry.isDirectory()) {
       if (DEFAULT_IGNORED_DIRS.has(entry.name)) {
         continue;
       }
-      const cont = await walk(root, abs, visit);
+      const cont = await walk(root, abs, visit, readProtected);
       if (!cont) return false;
     } else if (entry.isFile()) {
       const rel = path.relative(root, abs);

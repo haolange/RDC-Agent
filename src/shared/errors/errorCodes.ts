@@ -45,6 +45,7 @@ const ERROR_REGISTRY = {
   EXTERNAL_URL_REJECTED: security(),
   FILE_AUDIT_CAPTURE_DENIED: security(),
   FILE_AUDIT_PAGING_DENIED: security(),
+  FILE_READ_PROTECTED: security(),
   FILE_WRITE_PROTECTED: security(),
   GIT_REPOSITORY_CONFIG_EXECUTABLE: security(),
   HOOK_DENIED: security(),

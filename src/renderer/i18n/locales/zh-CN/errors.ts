@@ -49,6 +49,7 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.BUILTIN_AGENT_MANIFEST_READONLY': '内置 Agent 不可编辑。',
   'errors.AGENT_SLOT_BUSY': '该 Agent 正在其他会话中运行。',
   'errors.FILE_WRITE_PROTECTED': '该位置受保护，无法写入。',
+  'errors.FILE_READ_PROTECTED': '崩溃文件和已保存的凭据不允许智能体读取。',
   'errors.PERMISSION_MODE_CHANGED': '权限模式已变更，待执行的操作已取消。',
   'errors.AUDIT_WRITE_FAILED': '无法写入安全日志，操作未执行。',
   'errors.SECRET_STORAGE_UNAVAILABLE': '系统的安全凭据存储不可用。',

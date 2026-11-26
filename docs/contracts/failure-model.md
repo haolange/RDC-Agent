@@ -88,6 +88,7 @@
 | 计划批准事务：旧 `expectedPlanHash` / 旧会话 revision / `agent.before-handoff` 否决 / 提交中途失败 | Integrity | 分别报 `PLAN_HASH_MISMATCH`、`SESSION_REVISION_STALE`、`HOOK_DENIED`，或原样抛出提交步骤的错误；提交前任一拒绝都没有副作用，提交中途失败按前像日志逆序撤销已写步骤，会话 Agent、模型、参数、计划状态与 offer 保持原值。`agent.after-handoff` 失败只写会话运行日志诊断，不回滚，与其它 after 事件一致 |
 | 审计决定记录写入失败 | Security | `AUDIT_WRITE_FAILED`；记录在动作之前写，写失败则动作不发生（IPC 不执行、工具不执行、批准不生效、权限设置不写盘） |
 | 工具写入应用自有文件（凭据、设置、trust、`state/**`） | Security | 任何挡位 `FILE_WRITE_PROTECTED`；仅 `sessions/**/artifacts/**` 可写 |
+| 工具读取 minidump 或凭据目录 | Security | 任何挡位 `FILE_READ_PROTECTED`：读、grep（含长行 worker 的输入）、glob、文件审计、复制/移动的源、notebook 与输出登记都在 realpath 处拒绝，目录遍历跳过这些目录；Shell 不受此约束（见 `permissions.md`） |
 | Storage schema 损坏 | Integrity | 每次读报 `STORAGE_CORRUPT`，原件留在原处并旁存一份损坏副本（见「存储原语」） |
 | Storage 文件由其他格式写下（持久化格式不带版本号） | Integrity | 严格 schema 拒绝，报 `STORAGE_CORRUPT` 或 `STORAGE_SCHEMA` 并点名文件，原件保留；不迁移、不自动重建，也不提供转换工具。设置文件在启动时最先读取，提示删除整个数据目录与设置文件；数据目录外的知识库文件由用户按报错的文件名清理；用户编写的 `.agent.md` 声明已移走的字段时判无效并点名文件，由用户修改或删除 |
 | Settings 文件（`config.json`）损坏、无法读取或结构不合法（包括其他格式写下的文件） | Integrity（启动 fail-fast） | 启动时主进程按 `app.getLocale()` 的语言弹原生错误框（headless / Browser QA 写 stderr），说明数据格式已变更或文件损坏，写出要删除的整个数据目录（userData）与 `config.json` 的路径，说明重启后以默认设置重建，经正常资源释放后以非零状态退出，不留活锁；不转换、不修复、不改写原件。目录已不再列出的 provider 条目原样保留，不进运行时视图，记 `settings_provider_not_in_catalog` 设置诊断 |

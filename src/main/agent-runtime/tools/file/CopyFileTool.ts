@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { assertFileReadBoundary } from '../../../runtime/FileOperationBoundary';
 import {
   assertFileSizeCap,
   isPathExisting,
@@ -54,6 +55,7 @@ export const copyFileTool: AgentTool<CopyFileParams, CopyFileDetails> = {
     if (signal?.aborted) throw new Error('Aborted');
     const workspaceRoot = requireMutationWorkspaceRoot(context);
     const src = safeResolvePath(params.source, workspaceRoot, context);
+    assertFileReadBoundary(src);
     const dest = safeResolvePath(params.destination, workspaceRoot, context);
     assertFileSizeCap(src, COPY_MOVE_MAX_BYTES, 'Source file');
     const destDir = path.dirname(dest);

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { TextDecoder } from 'node:util';
 import { AppError } from '@shared/errors/appError';
+import { assertFileReadBoundary } from '../../../runtime/FileOperationBoundary';
 import { safeResolvePath, truncateOutput } from '../../../runtime/toolFiles';
 import { TEXT_FILE_MAX_BYTES } from '../../../runtime/toolLimits';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
@@ -71,6 +72,7 @@ function expectedDigest(value: string | undefined): string {
 async function readBoundFile(input: string, expected: string, context?: ToolExecutionContext, signal?: AbortSignal) {
   signal?.throwIfAborted();
   const absolute = safeResolvePath(input, undefined, context);
+  assertFileReadBoundary(absolute);
   if (path.extname(absolute).toLowerCase() === '.rdc') throw new AppError('FILE_AUDIT_CAPTURE_DENIED');
   const stat = await fs.promises.stat(absolute);
   if (!stat.isFile() || stat.size > TEXT_FILE_MAX_BYTES) throw new AppError('FILE_AUDIT_SIZE_OR_TYPE_REJECTED');

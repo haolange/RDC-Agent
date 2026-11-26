@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { generateEventId, nowIso } from '@shared/utils/id';
 import { runScopedStore } from '../sessions/store/RunScopedStore';
+import { assertFileReadBoundary } from '../runtime/FileOperationBoundary';
 import { safeResolvePath } from '../runtime/toolFiles';
 import { artifactStore } from './ArtifactStore';
 import type { ArtifactKind, ArtifactRecord } from './artifactRecord';
@@ -86,6 +87,7 @@ export function createOutputRegistrationTool(
       try {
         // Rejects symlinks and junctions and re-checks the project boundary after realpath.
         sourcePath = safeResolvePath(requestedPath, root);
+        assertFileReadBoundary(sourcePath);
       } catch {
         return {
           content: [{ type: 'text', text: 'Only regular files inside the active project can be published.' }],

@@ -5,6 +5,7 @@ import { nativeImage } from 'electron';
 import { AppError } from '@shared/errors/appError';
 import { assertSafeImageAttachment } from '../../attachments/ConversationAttachmentMaterializer';
 import { recordToolImagePreview } from '../../attachments/ToolImagePreviewStore';
+import { assertFileReadBoundary } from '../../../runtime/FileOperationBoundary';
 import { safeResolvePath } from '../../../runtime/toolFiles';
 import type { AgentTool } from '../../agent/AgentTool';
 
@@ -88,6 +89,7 @@ export const readImageTool: AgentTool<ReadImageParams, ReadImageDetails> = {
       throw new AppError('VISION_INPUT_UNSUPPORTED', 'the selected model route does not accept image attachments.');
     }
     const absolute = safeResolvePath(params.path, undefined, context);
+    assertFileReadBoundary(absolute);
     const fileName = path.basename(absolute);
     const extension = path.extname(absolute).toLowerCase();
     const mimeType = extension ? (MIME_BY_EXT[extension] ?? 'application/octet-stream') : null;

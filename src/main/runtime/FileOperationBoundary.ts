@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { AppError } from '@shared/errors/appError';
 import { appPathService } from './AppPathService';
@@ -62,4 +63,49 @@ export function fileOperationBoundary(target: string): { readOnly: boolean; prot
 export function assertFileWriteBoundary(target: string): void {
   const boundary = fileOperationBoundary(target);
   if (boundary.readOnly) throw new AppError('FILE_WRITE_PROTECTED', boundary.reason);
+}
+
+/** The comparison spelling of a path: the realpath of its longest existing ancestor plus the rest, normalized. */
+function canonical(target: string): string {
+  let current = path.resolve(target);
+  const missing: string[] = [];
+  while (!fs.existsSync(current)) {
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    missing.unshift(path.basename(current));
+    current = parent;
+  }
+  let resolved = current;
+  try {
+    resolved = fs.realpathSync.native(current);
+  } catch {
+    // An ancestor that vanished meanwhile keeps its lexical spelling; the comparison stays on the resolved prefix.
+  }
+  return normalize(path.join(resolved, ...missing));
+}
+
+/**
+ * What no agent file tool reads, copies or enumerates in any permission mode: the minidumps under
+ * `<appStateRoot>/crash` (plain snapshots of process memory, which can hold decrypted provider keys) and the
+ * credential stores. The roots are compared in their realpath spelling; the returned check takes a path already in
+ * that spelling (what `safeResolvePath` returns, or an entry a walk listed under such a path without following links).
+ */
+export function fileReadProtection(): (resolvedTarget: string) => boolean {
+  const state = appPathService.getAppStatePaths();
+  const roots = [
+    path.join(state.appStateRoot, 'crash'),
+    state.secretsPath,
+    path.join(appPathService.getUserRdcPaths().userRdcRoot, 'secrets'),
+  ].map(canonical);
+  return (resolvedTarget) => {
+    const resolved = normalize(resolvedTarget);
+    return roots.some((root) => within(resolved, root));
+  };
+}
+
+/** Read boundary of every agent file-reading primitive, applied to the realpath `safeResolvePath` returns. */
+export function assertFileReadBoundary(target: string): void {
+  if (fileReadProtection()(canonical(target))) {
+    throw new AppError('FILE_READ_PROTECTED', 'crash files and credential stores are never read by agent tools.');
+  }
 }

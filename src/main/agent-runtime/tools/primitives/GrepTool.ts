@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { assertFileReadBoundary, fileReadProtection } from '../../../runtime/FileOperationBoundary';
 import { getWorkspaceRoot, safeResolvePath, truncateOutput } from '../../../runtime/toolFiles';
 import {
   GREP_MAX_FILE_BYTES,
@@ -80,11 +81,12 @@ export const grepTool: AgentTool<GrepParams, GrepDetails> = {
     throwIfAborted(signal);
     const workspaceRoot = getWorkspaceRoot(context);
     const root = params.path ? safeResolvePath(params.path, workspaceRoot, context) : workspaceRoot;
+    assertFileReadBoundary(root);
     const maxMatches = Math.max(1, Math.min(1000, Math.floor(params.maxMatches ?? DEFAULT_MAX_MATCHES)));
     const regex = compilePattern(params.pattern, params.caseSensitive === true);
     const matches: string[] = [];
     const matchedFiles = new Set<string>();
-    const output = { clippedLine: false };
+    const output: GrepScan = { clippedLine: false, readProtected: fileReadProtection() };
 
     const stat = await fs.stat(root);
     if (stat.isFile()) {
@@ -128,6 +130,12 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** What one search carries through the walk: whether a line was clipped, and the paths it must not read. */
+interface GrepScan {
+  clippedLine: boolean;
+  readProtected: (target: string) => boolean;
+}
+
 async function walkAndSearch(
   current: string,
   workspaceRoot: string,
@@ -135,7 +143,7 @@ async function walkAndSearch(
   matches: string[],
   matchedFiles: Set<string>,
   maxMatches: number,
-  output: { clippedLine: boolean },
+  output: GrepScan,
   signal?: AbortSignal,
 ): Promise<void> {
   throwIfAborted(signal);
@@ -143,6 +151,8 @@ async function walkAndSearch(
   for (const entry of entries) {
     if (matches.length >= maxMatches) return;
     const absolute = path.join(current, entry.name);
+    // Crash files and credential stores are never searched, even from a directory above them.
+    if (output.readProtected(absolute)) continue;
     if (entry.isDirectory()) {
       if (!DEFAULT_IGNORED_DIRS.has(entry.name))
         await walkAndSearch(absolute, workspaceRoot, regex, matches, matchedFiles, maxMatches, output, signal);
@@ -159,7 +169,7 @@ async function searchFile(
   matches: string[],
   matchedFiles: Set<string>,
   maxMatches: number,
-  output: { clippedLine: boolean },
+  output: GrepScan,
   signal?: AbortSignal,
 ): Promise<void> {
   throwIfAborted(signal);

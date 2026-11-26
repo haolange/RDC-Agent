@@ -57,6 +57,7 @@ export const enErrors = {
   'errors.BUILTIN_AGENT_MANIFEST_READONLY': "Built-in agents can't be edited.",
   'errors.AGENT_SLOT_BUSY': 'This agent is busy in another session.',
   'errors.FILE_WRITE_PROTECTED': "That location is protected and can't be written.",
+  'errors.FILE_READ_PROTECTED': "Crash files and stored credentials can't be read by the agent.",
   'errors.PERMISSION_MODE_CHANGED': 'The permission mode changed, so the pending action was cancelled.',
   'errors.AUDIT_WRITE_FAILED': "The security log couldn't be written, so the action wasn't performed.",
   'errors.SECRET_STORAGE_UNAVAILABLE': "Secure credential storage isn't available on this system.",
