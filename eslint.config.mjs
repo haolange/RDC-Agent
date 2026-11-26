@@ -163,31 +163,30 @@ const NODE_BUILTINS = [
 ];
 const mainTestFiles = ['src/main/**/*.test.ts', 'src/main/testing/**'];
 
-// Inside the renderer's boundaries the types are the contract (ARCHITECTURE.md Verification Gate): renderer production
-// code runs no-unnecessary-condition, so a null check, optional chain, fallback or branch the types already rule out is
-// an error. Its program adds noUncheckedIndexedAccess (src/renderer/tsconfig.lint.json), so a lookup that can miss
-// stays guarded. UNNECESSARY_CONDITION_PENDING names the files still exempt and why; the list only shrinks, and
-// scripts/check-unnecessary-condition.mjs fails while a listed file is clean, gone or outside the rule.
-export const rendererTypedLint = {
-  files: ['src/renderer/**/*.{ts,tsx}'],
-  ignores: ['src/renderer/**/*.test.{ts,tsx}', 'src/renderer/testing/**', 'src/renderer/**/*.d.ts'],
-  languageOptions: {
-    parserOptions: {
-      project: './src/renderer/tsconfig.lint.json',
-      tsconfigRootDir: import.meta.dirname,
-    },
+// One typed program for all of src (src/tsconfig.lint.json, read only by ESLint): the repository settings plus
+// noUncheckedIndexedAccess, so a lookup that can miss stays guarded. Every typed rule below uses it, so no file is
+// parsed by two TypeScript programs.
+const typedLintProgram = {
+  parserOptions: {
+    project: './src/tsconfig.lint.json',
+    tsconfigRootDir: import.meta.dirname,
   },
-  rules: { '@typescript-eslint/no-unnecessary-condition': 'error' },
 };
-const BOOTSTRAP_PENDING = 'waits for the IPC boundary pass that owns src/renderer/app/bootstrap';
+// Inside the boundaries the types are the contract (ARCHITECTURE.md Verification Gate): production code in every
+// process runs no-unnecessary-condition, so a null check, optional chain, fallback or branch the types already rule out
+// is an error. Production code is what check-module-graph calls production: no tests, testing/, fixtures/,
+// __fixtures__/ or declaration files. UNNECESSARY_CONDITION_PENDING names the files still exempt and why; the list only
+// shrinks, and scripts/check-unnecessary-condition.mjs fails while a listed file is clean, gone or outside the rule.
+export const typedLint = {
+  files: ['src/**/*.{ts,tsx}'],
+  ignores: ['src/**/*.test.{ts,tsx}', 'src/**/{testing,fixtures,__fixtures__}/**', 'src/**/*.d.ts'],
+  languageOptions: typedLintProgram,
+  rules: { '@typescript-eslint/no-unnecessary-condition': ['error', { allowConstantLoopConditions: 'only-allowed-literals' }] },
+};
 export const UNNECESSARY_CONDITION_PENDING = {
-  'src/renderer/app/bootstrap/useCatalogBootstrap.ts': `optional chains on the installed bridge; ${BOOTSTRAP_PENDING}`,
-  'src/renderer/app/bootstrap/useIpcEventBridge.ts': `bridge presence check and fallbacks for required capture descriptors; ${BOOTSTRAP_PENDING}`,
-  'src/renderer/app/bootstrap/useProjectInputsBootstrap.ts': `bridge presence check and fallbacks for required project inputs; ${BOOTSTRAP_PENDING}`,
-  'src/renderer/app/bootstrap/useSessionSurfaceBootstrap.ts': `bridge presence checks and fallbacks for required history fields; ${BOOTSTRAP_PENDING}`,
-  'src/renderer/app/bootstrap/useShellBootstrap.ts': `bridge presence check; ${BOOTSTRAP_PENDING}`,
-  'src/renderer/features/transcript/workProcessTracePresentation.ts': 'stored loop items are read back without checking '
-    + 'thinking.kind (isStoredLoopItem in src/main/sessions/store/StoredWorkTrace.ts), so an unknown kind still reads as none',
+  'src/main/runtime/AppPathService.ts': 'Electron types app and process.resourcesPath as always present, but main-process '
+    + 'modules also run under vitest without Electron, where both are undefined; the guards stay until those runs '
+    + 'provide them',
 };
 
 export default [
@@ -379,19 +378,14 @@ export default [
       'src/shared/constants/rdcProbe.ts',
     ],
     ignores: ['src/main/**/*.test.ts'],
-    languageOptions: {
-      parserOptions: {
-        projectService: true,
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
+    languageOptions: typedLintProgram,
     rules: {
       '@typescript-eslint/no-floating-promises': 'error',
     },
   },
   {
-    ...rendererTypedLint,
-    ignores: [...rendererTypedLint.ignores, ...Object.keys(UNNECESSARY_CONDITION_PENDING)],
+    ...typedLint,
+    ignores: [...typedLint.ignores, ...Object.keys(UNNECESSARY_CONDITION_PENDING)],
   },
   {
     files: testSources,

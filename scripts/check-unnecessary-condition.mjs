@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * no-unnecessary-condition ratchet (AGENTS.md §5). Renderer production code lints with
- * @typescript-eslint/no-unnecessary-condition (eslint.config.mjs `rendererTypedLint`); the files in
+ * no-unnecessary-condition ratchet (AGENTS.md §5). Production code in main, shared, preload and renderer lints with
+ * @typescript-eslint/no-unnecessary-condition (eslint.config.mjs `typedLint`); the files in
  * UNNECESSARY_CONDITION_PENDING are exempt, each with its reason. That list only shrinks: an entry whose file is
  * gone, falls outside the rule, or no longer has a violation fails the gate, so it leaves the list in the same change
  * that cleaned it.
@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import { ESLint } from 'eslint';
-import { UNNECESSARY_CONDITION_PENDING, rendererTypedLint } from '../eslint.config.mjs';
+import { UNNECESSARY_CONDITION_PENDING, typedLint } from '../eslint.config.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RULE = '@typescript-eslint/no-unnecessary-condition';
@@ -23,14 +23,14 @@ const eslint = new ESLint({
   cwd: repoRoot,
   overrideConfigFile: true,
   overrideConfig: [{
-    files: rendererTypedLint.files,
-    ignores: rendererTypedLint.ignores,
+    files: typedLint.files,
+    ignores: typedLint.ignores,
     languageOptions: {
       parser: tsParser,
-      parserOptions: { ...rendererTypedLint.languageOptions.parserOptions, ecmaFeatures: { jsx: true } },
+      parserOptions: { ...typedLint.languageOptions.parserOptions, ecmaFeatures: { jsx: true } },
     },
     plugins: { '@typescript-eslint': tsPlugin },
-    rules: rendererTypedLint.rules,
+    rules: typedLint.rules,
   }],
 });
 
@@ -44,7 +44,7 @@ for (const [file, reason] of Object.entries(UNNECESSARY_CONDITION_PENDING)) {
   }
   const config = await eslint.calculateConfigForFile(file);
   if (!config?.rules?.[RULE]) {
-    failures.push(`${file} is not renderer production code under ${RULE}; remove it from UNNECESSARY_CONDITION_PENDING.`);
+    failures.push(`${file} is not production code under ${RULE}; remove it from UNNECESSARY_CONDITION_PENDING.`);
     continue;
   }
   lintable.push(file);

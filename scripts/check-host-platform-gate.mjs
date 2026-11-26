@@ -10,8 +10,8 @@ const eslint = new ESLint({
   cwd: process.cwd(),
   overrideConfig: {
     files: ['**/*.ts'],
-    languageOptions: { parserOptions: { projectService: false } },
-    rules: { '@typescript-eslint/no-floating-promises': 'off' },
+    languageOptions: { parserOptions: { project: null, projectService: false } },
+    rules: { '@typescript-eslint/no-floating-promises': 'off', '@typescript-eslint/no-unnecessary-condition': 'off' },
   },
 });
 const GATE_RULE = 'no-restricted-syntax';

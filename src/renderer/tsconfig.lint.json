@@ -1,8 +1,0 @@
-{
-  // ESLint's typed program for renderer production code (eslint.config.mjs rendererTypedLint): the repository
-  // settings plus noUncheckedIndexedAccess, so no-unnecessary-condition knows an index lookup can miss.
-  "extends": "../../tsconfig.json",
-  "compilerOptions": { "noUncheckedIndexedAccess": true },
-  "include": ["./**/*.ts", "./**/*.tsx"],
-  "exclude": ["./**/*.test.ts", "./**/*.test.tsx", "./testing/**"]
-}
