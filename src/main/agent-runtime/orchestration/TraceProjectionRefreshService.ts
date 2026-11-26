@@ -21,9 +21,15 @@ export function bindTraceProjectionSource(source: TraceProjectionSource): void {
   projectionSource = source;
 }
 
-/** Coalesces task-driven trace refreshes without creating a second task projection path. */
+/**
+ * Coalesces task-driven trace refreshes without creating a second task projection path. One build runs per session
+ * at a time: a refresh asked for while one is building runs once after it, so an older build never publishes over a
+ * newer one.
+ */
 export class TraceProjectionRefreshService {
   private readonly pending = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly building = new Set<string>();
+  private readonly again = new Set<string>();
 
   constructor(private readonly deps: TraceProjectionRefreshDeps) {}
 
@@ -33,16 +39,29 @@ export class TraceProjectionRefreshService {
     }
     const timer = setTimeout(() => {
       this.pending.delete(sessionId);
-      void this.flush(sessionId);
+      this.build(sessionId);
     }, 40);
     this.pending.set(sessionId, timer);
   }
 
   clear(sessionId: string): void {
+    this.again.delete(sessionId);
     const timer = this.pending.get(sessionId);
     if (!timer) return;
     clearTimeout(timer);
     this.pending.delete(sessionId);
+  }
+
+  private build(sessionId: string): void {
+    if (this.building.has(sessionId)) {
+      this.again.add(sessionId);
+      return;
+    }
+    this.building.add(sessionId);
+    void this.flush(sessionId).finally(() => {
+      this.building.delete(sessionId);
+      if (this.again.delete(sessionId)) this.build(sessionId);
+    });
   }
 
   private async flush(sessionId: string): Promise<void> {

@@ -38,9 +38,11 @@
 | `trace:projectionChanged` | `payload.sessionId` | `setTracePresentation` | cache workflow.trace |
 | workflow 状态 | 无 push | `workflow.getState` / restore → `setWorkflowState` | 无 push |
 | `workflow:runStatusChanged` / `workflow:runUsageChanged` | `runId` 或 `sessionId` | 已有 currentRun/session 比对 | ignore / cache |
-| tool / evidence patches | turn 所属 `sessionId` 或 message 归属 | 仅更新 active message | cache |
+| `tool:executionComplete` / `evidence:eventAdded` | turn 所属 `sessionId` 或 message 归属 | 仅追加 active timeline，不改写消息 | ignore |
 
 `conversation:*` 的流式更新以 `message_delta` 到达。renderer 先由 `conversationMessageAssembler` 重建整条消息，再经上表门控进入 active 或后台路径；接续不上上次已应用更新的增量被丢弃，消息经 `conversation:getMessageSnapshot` 续流（协议见 [`../architecture/data-flow.md`](../architecture/data-flow.md)「Agent Turn」）。
+
+消息的 `workTrace` 只由主进程产出（`message_delta` / `message_snapshot` / `message_completed`），renderer 不按工具或证据事件改写它。trace 投影的 `updatedAt` 取其来源（trace state、runs、消息、证据链）中最新的变更时间，同样的来源重建得到同样的值；`TraceProjectionRefreshService` 每会话同时只构建一次，构建期间再次请求的刷新在其后补跑一次。
 
 **禁止**未门控直接 `upsertConversationMessage` / `setTracePresentation` / `setWorkflowState`。门禁：`pnpm run check:session-projection`。
 

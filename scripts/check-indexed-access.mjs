@@ -55,7 +55,6 @@ const PENDING_DIRECTORIES = new Set([
   'src/renderer/lib',
   'src/renderer/patterns/Markdown',
   'src/renderer/patterns/attachments',
-  'src/renderer/services',
   'src/renderer/stores',
   'src/renderer/ui',
   'src/renderer/ui/ContextMenu',

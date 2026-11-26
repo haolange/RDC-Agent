@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { RevisionLanes } from '../../lib/revisionLanes';
-import { hydrateMessagesWithActionEvents, mapActionEventToTimelineEntry } from '../../services/conversationTimeline';
+import { mapActionEventToTimelineEntry } from '../../services/conversationTimeline';
 import { hydrateLoadedSessionSurface } from '../../stores/sessionProjectionHydration';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -9,7 +9,6 @@ import { useTerminalStore } from '../../stores/terminalStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { AgentTimelineEntry } from '@shared/types/agent';
-import type { ConversationMessage } from '@shared/types/conversation';
 import type { WorkflowState } from '@shared/types/workflow';
 
 /**
@@ -18,7 +17,8 @@ import type { WorkflowState } from '@shared/types/workflow';
  */
 const reads = new RevisionLanes();
 
-function applyEvidence(events: ActionEvent[], messagesFrom: () => ConversationMessage[]): ConversationMessage[] {
+/** The session's action chain is the timeline; messages and their Working trace come from main as they are. */
+function applyEvidence(events: ActionEvent[]): void {
   useConversationStore
     .getState()
     .setTimeline(
@@ -26,7 +26,6 @@ function applyEvidence(events: ActionEvent[], messagesFrom: () => ConversationMe
         .map((event) => mapActionEventToTimelineEntry(event))
         .filter((entry): entry is AgentTimelineEntry => entry !== null),
     );
-  return hydrateMessagesWithActionEvents(messagesFrom(), events);
 }
 
 /**
@@ -77,12 +76,7 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
     const conversation = useConversationStore.getState();
     if (conversation.surfaceSessionId === sessionId || conversation.historyLoadingSessionId === sessionId) {
       void evidence.then((events) => {
-        if (!live()) return;
-        useConversationStore
-          .getState()
-          .setConversationMessages(
-            applyEvidence(events, () => useConversationStore.getState().allConversationMessages),
-          );
+        if (live()) applyEvidence(events);
       });
     } else {
       conversation.setHistoryLoadingSessionId(sessionId);
@@ -96,9 +90,10 @@ export function useSessionSurfaceBootstrap(shellReady: boolean): void {
         ]);
         if (!reads.isLatest('surface', read)) return;
         useConversationStore.getState().setHistoryLoadingSessionId(null);
+        applyEvidence(events);
         hydrateLoadedSessionSurface({
           sessionId,
-          messages: applyEvidence(events, () => historyResult.messages),
+          messages: historyResult.messages,
           branchState: historyResult.branchState ?? null,
           planReview: historyResult.planReview ?? null,
           tracePresentation: traceResult.presentation ?? null,

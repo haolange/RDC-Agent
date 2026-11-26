@@ -23,6 +23,23 @@ const toIso = (value: number | string | undefined): string => {
   return nowIso();
 };
 
+/**
+ * The projection's revision is the newest change among its sources (trace state, runs, messages, action events), so
+ * rebuilding unchanged sources yields the same `updatedAt` instead of the build's wall-clock time.
+ */
+function sourceRevision(
+  state: { updatedAt: string },
+  runs: RunSummary[],
+  conversations: ConversationMessage[],
+  events: ActionEvent[],
+): string {
+  let newest = Date.parse(state.updatedAt);
+  for (const run of runs) newest = Math.max(newest, run.finishedAt ?? run.stoppedAt ?? run.startedAt);
+  for (const message of conversations) newest = Math.max(newest, message.updatedAt ?? message.createdAt);
+  for (const event of events) newest = Math.max(newest, event.ts_ms);
+  return toIso(newest);
+}
+
 const collectExplicitThinking = (
   blocks: ConversationWorkBlock[] | undefined,
 ): Array<{ blockId: string; thinking: ThinkingArtifact }> =>
@@ -182,7 +199,7 @@ export class TraceService {
         this.runStore.save(agentRun);
       } else {
         agentRun.status = runStatusFromSummary(run);
-        agentRun.updatedAt = toIso(run.finishedAt ?? Date.now());
+        agentRun.updatedAt = toIso(run.finishedAt ?? run.startedAt);
         this.runStore.save(agentRun);
       }
 
@@ -354,7 +371,7 @@ export class TraceService {
       rightPanel,
       branchNavigator: null,
       rawAuditRefs,
-      updatedAt: nowIso(),
+      updatedAt: sourceRevision(state, runs, conversations, events),
     };
   }
 
@@ -371,7 +388,8 @@ export class TraceService {
           userRequests: [],
           branches: [],
           plans: [],
-          updatedAt: nowIso(),
+          // No trace state yet: the messages alone date the projection.
+          updatedAt: toIso(0),
         };
     const events: ActionEvent[] = [];
     return this.buildPresentationFromData(sessionId, [], conversations, events, state);

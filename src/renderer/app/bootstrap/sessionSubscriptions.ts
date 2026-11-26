@@ -1,4 +1,4 @@
-import { applyActionEventToMessage, mapActionEventToTimelineEntry } from '../../services/conversationTimeline';
+import { mapActionEventToTimelineEntry } from '../../services/conversationTimeline';
 import { acceptsContextUsage } from '../../stores/contextUsageProjectionModel';
 import { useConversationStore } from '../../stores/conversationStore';
 import { notify } from '../../stores/notificationStore';
@@ -53,11 +53,6 @@ export function subscribeEvidenceEventAdded(electronAPI: ElectronAPI) {
     const entry = mapActionEventToTimelineEntry(event);
     if (entry) {
       useConversationStore.getState().addTimelineEntry(entry);
-    }
-    if (event.turn_id) {
-      useConversationStore
-        .getState()
-        .updateAssistantMessageByTurnId(event.turn_id, (message) => applyActionEventToMessage(message, event));
     }
   });
 }

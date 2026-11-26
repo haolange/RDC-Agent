@@ -1,4 +1,3 @@
-import { applyToolTraceToMessage } from '../../services/conversationTimeline';
 import { useConversationStore } from '../../stores/conversationStore';
 import { isActiveSessionEvent } from '../../stores/sessionEventGate';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
@@ -38,9 +37,6 @@ export function subscribeToolExecutionComplete(electronAPI: ElectronAPI) {
         toolTrace: trace,
         timestamp: trace.timestamp,
       });
-    }
-    if (trace.turnId) {
-      conversation.updateAssistantMessageByTurnId(trace.turnId, (entry) => applyToolTraceToMessage(entry, trace));
     }
   });
 }

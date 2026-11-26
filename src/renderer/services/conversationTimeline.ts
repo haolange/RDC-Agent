@@ -2,12 +2,6 @@ import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { CaptureDescriptor, ContextSnapshot } from '@shared/types/session';
 
-export {
-  applyActionEventToMessage,
-  applyToolTraceToMessage,
-  hydrateMessagesWithActionEvents,
-} from './conversationMessageMerge';
-
 export const mergeCapturesWithSnapshot = (
   currentCaptures: CaptureDescriptor[],
   snapshot: ContextSnapshot,
