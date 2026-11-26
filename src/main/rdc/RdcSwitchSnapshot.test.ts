@@ -1,7 +1,7 @@
 import { afterEach, expect, it } from 'vitest';
-import { clearRdcContextLeases, registerRdcFault, setRdcRuntimeContextForSession } from './RdcRuntimeContextRegistry';
+import { clearRdcContextLeases, setRdcRuntimeContextForSession } from './RdcRuntimeContextRegistry';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
-import { readRdcRecoverySnapshot, readRdcSwitchSnapshot } from './RdcSwitchSnapshot';
+import { readRdcSwitchSnapshot } from './RdcSwitchSnapshot';
 
 const processIdentity = {
   status: 'available' as const,
@@ -67,48 +67,4 @@ it('binds the native snapshot to the owning lease, capture, event and actual pro
     { projectId: 'project' },
   );
   await expect(readRdcSwitchSnapshot(input)).rejects.toThrow('RDC_SWITCH_BINDING_CHANGED');
-});
-
-it('permits only recovery inspection of a quarantined binding with an observed failure', async () => {
-  const lease = setRdcRuntimeContextForSession(
-    'session',
-    {
-      contextId: 'context',
-      runtimeOwner: 'owner',
-      ownerLeaseId: 'lease',
-      captureFileId: 'capture',
-      replaySessionId: 'replay',
-      backend: 'local',
-      updatedAt: 1,
-    },
-    { projectId: 'project' },
-  )!;
-  const binding = freezeRdcTurnBinding(cli, [], lease);
-  const payload = {
-    ok: true,
-    result_kind: 'rd.session.get_context',
-    meta: { process_identity: processIdentity },
-    data: {
-      context_id: 'context',
-      current_session_id: 'replay',
-      process_identity: processIdentity,
-      runtime: { session_id: 'replay', capture_file_id: 'capture', active_event_id: 9 },
-      sessions: [{ session_id: 'replay', capture_file_id: 'capture', shader_replacements: [] }],
-    },
-  };
-  const execute = async () => ({ exitCode: 0, stdout: JSON.stringify(payload), stderr: '', duration_ms: 1 });
-  const input = { sessionId: 'session', projectId: 'project', binding, execute };
-  await expect(readRdcRecoverySnapshot(input)).rejects.toThrow('RDC_RECOVERY_IDENTITY_UNVERIFIED');
-  registerRdcFault({
-    sessionId: 'session',
-    expectedVersion: lease.version,
-    operation: 'rd.test',
-    nativeArgs: {},
-    cause: 'failure',
-    reason: 'uncertain',
-  });
-  await expect(readRdcSwitchSnapshot(input)).rejects.toThrow('RDC_SWITCH_BINDING_CHANGED');
-  expect(await readRdcRecoverySnapshot(input)).toMatchObject({ contextId: 'context', eventId: 9, processIdentity });
-  payload.data.runtime.session_id = 'other';
-  await expect(readRdcRecoverySnapshot(input)).rejects.toThrow('RDC_SWITCH_IDENTITY_INVALID');
 });

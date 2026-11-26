@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
 import { redactCredentialLikeText } from '../runtime/secretRedaction';
+import { noteRdcProcessIdentity } from './RdcProcessIdentity';
 import type { ErrorCode } from '@shared/errors/errorCodes';
 import type { CLIResult } from '../tools/ShellInvocationService';
 import type { AgentToolResult } from '../agent-runtime/agent/AgentTool';
@@ -139,7 +140,10 @@ export class RdcNativeFailure extends AppError {
   }
 }
 
-/** Fail before any lease/experiment state is committed. Never surface binary stdout. */
+/**
+ * Fail before any lease/experiment state is committed. Never surface binary stdout. Every RDC result is parsed here, so
+ * a success that names its daemon context (expected or reported) also records the process identity that served it.
+ */
 export function parseRdcNativeResult(
   result: CLIResult,
   expectedContext?: string,
@@ -281,7 +285,14 @@ export function parseRdcNativeResult(
   if (expectedContext && envelope.data.context_id !== expectedContext) {
     throw new AppError('RDC_CONTEXT_MISMATCH', 'CLI response does not belong to the owning daemon context.');
   }
+  noteServingProcess(envelope, expectedContext);
   return envelope;
+}
+
+function noteServingProcess(envelope: RdcNativeEnvelope, expectedContext: string | undefined): void {
+  const context = expectedContext ?? envelope.data.context_id;
+  if (typeof context === 'string' && context)
+    noteRdcProcessIdentity(context, (envelope.meta as Record<string, unknown> | undefined)?.process_identity);
 }
 
 /** The observed failure a quarantine records: RDC-Tool's error code, or the leading code of an Agent failure. */

@@ -4,7 +4,8 @@ import { AppError } from '@shared/errors/appError';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
 import { secretStorageService } from '../settings/settings-core/SecretStorageService';
 import { openSignedRdcReceipt } from './RdcExecutionReceipts';
-import { parseRdcProcessIdentity } from './RdcProcessIdentity';
+import { RdcProcessIdentitySchema, type RdcProcessIdentity } from './RdcProcessIdentity';
+import { RdcRecoveryObservationSchema } from './RdcContextStatus';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -18,7 +19,7 @@ const native = z
     replaySessionId: id,
     captureFileId: id,
     eventId: z.number().int().nonnegative(),
-    processIdentity: z.unknown(),
+    processIdentity: RdcProcessIdentitySchema,
     replacementCount: z.number().int().nonnegative(),
     replacementFingerprint: hash,
   })
@@ -39,7 +40,7 @@ const recovery = z
     cause: z
       .object({ operation: id, argsFingerprint: hash, code: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,127}$/) })
       .strict(),
-    observed: native,
+    observed: RdcRecoveryObservationSchema,
   })
   .strict();
 const base = {
@@ -139,19 +140,6 @@ export class RdcLifecycleReceipts {
   }
   write(input: RdcLifecycleReceipt): InvestigationContentRef {
     const receipt = receiptSchema.parse(input);
-    for (const value of receipt.event === 'baseline'
-      ? [receipt.original]
-      : receipt.event === 'resolved'
-        ? [receipt.observed]
-        : receipt.event === 'intent'
-          ? [receipt.original, receipt.from]
-          : receipt.event === 'transition' || receipt.event === 'position-restored'
-            ? [receipt.from, receipt.to]
-            : []) {
-      if (value) parseRdcProcessIdentity(value.native.processIdentity);
-    }
-    if (receipt.event === 'intent' && receipt.recovery)
-      parseRdcProcessIdentity(receipt.recovery.observed.processIdentity);
     const body = JSON.stringify(receipt);
     const signature = createHmac('sha256', this.key()).update(body).digest('hex');
     const written = this.resolver.write(
@@ -174,19 +162,6 @@ export class RdcLifecycleReceipts {
       throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', `malformed receipt: ${z.prettifyError(parsed.error)}`);
     const receipt = parsed.data;
     if (receipt.sessionId !== sessionId) throw new AppError('RDC_LIFECYCLE_RECEIPT_INVALID', 'foreign session.');
-    for (const value of receipt.event === 'baseline'
-      ? [receipt.original]
-      : receipt.event === 'resolved'
-        ? [receipt.observed]
-        : receipt.event === 'intent'
-          ? [receipt.original, receipt.from]
-          : receipt.event === 'transition' || receipt.event === 'position-restored'
-            ? [receipt.from, receipt.to]
-            : []) {
-      if (value) parseRdcProcessIdentity(value.native.processIdentity);
-    }
-    if (receipt.event === 'intent' && receipt.recovery)
-      parseRdcProcessIdentity(receipt.recovery.observed.processIdentity);
     return receipt;
   }
 
@@ -198,11 +173,7 @@ export class RdcLifecycleReceipts {
     baseline: Extract<RdcLifecycleReceipt, { event: 'baseline' }>;
     ref: InvestigationContentRef;
     count: number;
-    identities: Array<{
-      contextId: string;
-      processIdentity: ReturnType<typeof parseRdcProcessIdentity>;
-      stopped: boolean;
-    }>;
+    identities: Array<{ contextId: string; processIdentity: RdcProcessIdentity; stopped: boolean }>;
   } | null {
     const values = this.resolver
       .list(sessionId, 'tool-outputs')
@@ -250,22 +221,33 @@ export class RdcLifecycleReceipts {
         item.value.planHash === baseline.planHash &&
         item.value.planUri === baseline.planUri,
     );
-    const identities = new Map<
-      string,
-      { contextId: string; processIdentity: ReturnType<typeof parseRdcProcessIdentity>; stopped: boolean }
-    >();
+    const identities = new Map<string, { contextId: string; processIdentity: RdcProcessIdentity; stopped: boolean }>();
     const add = (snapshot: z.infer<typeof native> | null | undefined) => {
       if (!snapshot) return;
-      const processIdentity = parseRdcProcessIdentity(snapshot.processIdentity);
-      const key = JSON.stringify([snapshot.contextId, processIdentity]);
-      if (!identities.has(key)) identities.set(key, { contextId: snapshot.contextId, processIdentity, stopped: false });
+      const key = JSON.stringify([snapshot.contextId, snapshot.processIdentity]);
+      if (!identities.has(key))
+        identities.set(key, {
+          contextId: snapshot.contextId,
+          processIdentity: snapshot.processIdentity,
+          stopped: false,
+        });
     };
     for (const { value } of relevant) {
       if (value.event === 'baseline') add(value.original?.native);
       if (value.event === 'intent') {
         add(value.original?.native);
         add(value.from?.native);
-        add(value.recovery?.observed);
+        // A worker that was live when recovery looked may still hold the context if recovery stopped early.
+        const seen = value.recovery?.observed;
+        const live =
+          seen?.daemon.state === 'alive' && seen.worker.state === 'alive'
+            ? RdcProcessIdentitySchema.safeParse({
+                status: 'available',
+                daemon: { pid: seen.daemon.pid, start_generation: seen.daemon.start_generation },
+                worker: { pid: seen.worker.pid, start_generation: seen.worker.start_generation },
+              })
+            : null;
+        if (value.from && live?.success) add({ ...value.from.native, processIdentity: live.data });
       }
       if (value.event === 'transition' || value.event === 'position-restored') {
         add(value.from?.native);
@@ -282,7 +264,7 @@ export class RdcLifecycleReceipts {
         intent.recordedAt > value.recordedAt
       )
         continue;
-      const key = JSON.stringify([value.contextId, parseRdcProcessIdentity(intent.from.native.processIdentity)]);
+      const key = JSON.stringify([value.contextId, intent.from.native.processIdentity]);
       const identity = identities.get(key);
       if (identity) identity.stopped = true;
     }

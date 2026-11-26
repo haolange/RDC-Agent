@@ -57,6 +57,8 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 - Tool 仅在实际 daemon child 中读取自身与父 daemon 的 OS 进程出生标识，分别返回 `pid + start_generation`；Windows 为进程创建 FILETIME，Linux 为 boot ID 与进程启动 tick。
 - 父身份不符、读取失败或平台不支持时明确 unavailable，不用持久逻辑 ID、缓存或零值替代。
 - 每个实验阶段须比较完整 daemon/worker 身份，PID 复用或任一世代变化使连续性失效；该字段进入既有主进程签名结果，不自动证明因果、恢复或设备呈现，不增加生命周期权限。
+- `parseRdcNativeResult` 是所有结果的唯一解析处：成功结果若能确定所属 daemon context（期望值或结果自报的 `context_id`），其 `meta.process_identity` 记为该 context 最近一次完成工作的进程（`observedRdcProcessIdentity`）；获批 capture 控制器的 `lastVerified` 在恢复时取这个最新身份，而不是回合开始时的快照。生命周期回执里的 `processIdentity` 按 `RdcProcessIdentitySchema` 严格校验。
+- 恢复判断只读 `rdc-tool context status`（`readRdcContextStatus`，经控制命令路径而非 `call`，严格校验 `rdc_tool.context.status` 信封）：它从不启动 daemon 或 worker，也不写状态。已删除的 `readRdcRecoverySnapshot` 用 `rd.session.get_context` 观察隔离 lease，会拉起新 worker 并改变要核对的身份。
 
 状态控制的实现语义随共享 CLI 方法分发，不能要求每次 capture 调查访问上游源码仓库。
 

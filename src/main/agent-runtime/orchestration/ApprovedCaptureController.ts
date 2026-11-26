@@ -7,10 +7,11 @@ import {
   type RdcLifecycleReceipt,
 } from '../../rdc/RdcLifecycleReceipts';
 import { getRdcTurnBinding, type RdcTurnBinding } from '../../rdc/RdcTurnBindings';
+import { observedRdcProcessIdentity } from '../../rdc/RdcProcessIdentity';
 import type { InvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import type { TaskRuntimeEpoch } from '../tasks/taskExecutionSchemas';
-import type { RdcSwitchSnapshot } from '../../rdc/RdcSwitchSnapshot';
+import type { RdcRecoveryObservation } from '../../rdc/RdcContextStatus';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { ToolExecutionContext } from '../agent/AgentTool';
@@ -18,9 +19,9 @@ import type { TurnHandle } from './TurnCoordinator';
 
 type Destination = { inputId: string; contentSha256: string; deviceId: string };
 type Prepared = { plan: EffectiveRuntimePlan; prompt: PromptPlan; binding: RdcTurnBinding };
-type RecoveryFacts = {
+export type RecoveryFacts = {
   cause: { operation: string; argsFingerprint: string; code: string };
-  observed: RdcSwitchSnapshot;
+  observed: RdcRecoveryObservation;
 };
 export interface ApprovedCaptureHost {
   assertPlan(): void;
@@ -271,7 +272,7 @@ export class ApprovedCaptureController {
     }
     const guard = this.input.host.recoveryGuard(permissionRevision);
     guard();
-    const from = this.lastVerified;
+    const from = this.verified();
     if (
       !from ||
       !this.input.captureScope.inputs.some(
@@ -304,7 +305,7 @@ export class ApprovedCaptureController {
   ): Promise<{ changed: true; receipt: InvestigationContentRef; current: RdcLifecyclePoint }> {
     this.assertReady();
     guard();
-    const from = this.lastVerified!;
+    const from = this.verified()!;
     await this.input.host.quiescent('recovery');
     guard();
     const previous = this.current();
@@ -513,6 +514,12 @@ export class ApprovedCaptureController {
     const code = /^[A-Z][A-Z0-9_]{0,127}/u.exec(message)?.[0] ?? 'RDC_SWITCH_FAILED';
     this.input.host.quarantineChanged(from, { cause: code, reason: message }, force);
     this.input.host.writeReceipt({ ...base, recordedAt: Date.now(), event: 'failed', intent, code });
+  }
+  /** The last verified point, carrying the latest process identity a successful result reported for its context. */
+  private verified(): RdcLifecyclePoint | null {
+    const point = this.lastVerified;
+    const observed = point && observedRdcProcessIdentity(point.native.contextId);
+    return point && observed ? { ...point, native: { ...point.native, processIdentity: observed } } : point;
   }
   private current(): Prepared {
     const plan = this.input.turn.runtimePlan;

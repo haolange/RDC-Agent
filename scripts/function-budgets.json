@@ -18,7 +18,7 @@
       "lines": 209
     },
     "src/main/agent-runtime/orchestration/ApprovedCaptureHost.ts": {
-      "lines": 319
+      "lines": 280
     },
     "src/main/agent-runtime/orchestration/BackgroundSubagentService.ts": {
       "lines": 317
@@ -100,7 +100,7 @@
       "complexity": 58
     },
     "src/main/conversation/TurnRuntimeEpochs.ts": {
-      "complexity": 78
+      "complexity": 74
     },
     "src/main/investigation/investigationExecutionEvidence.ts": {
       "complexity": 41

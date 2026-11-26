@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { bindRdcTurn, freezeRdcTurnBinding } from '../../rdc/RdcTurnBindings';
+import { noteRdcProcessIdentity } from '../../rdc/RdcProcessIdentity';
 import { TurnHandle } from './TurnCoordinator';
 import { ApprovedCaptureController, type ApprovedCaptureHost } from './ApprovedCaptureController';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
@@ -31,7 +32,7 @@ function point(inputId: string, eventId: number): RdcLifecyclePoint {
       replacementCount: 0,
       replacementFingerprint: '0'.repeat(64),
       processIdentity: {
-        status: 'available',
+        status: 'available' as const,
         daemon: { pid: n * 10, start_generation: 'windows-filetime:1' },
         worker: { pid: n * 10 + 1, start_generation: 'windows-filetime:2' },
       },
@@ -69,7 +70,12 @@ function fixture() {
     joinRecoveryChild: vi.fn(async () => {}),
     inspectRecovery: vi.fn(async (original) => ({
       cause: { operation: 'rd.test', argsFingerprint: 'e'.repeat(64), code: 'native_failure' },
-      observed: original.native as import('../../rdc/RdcSwitchSnapshot').RdcSwitchSnapshot,
+      observed: {
+        source: 'daemon' as const,
+        daemon: { state: 'alive' as const, ...original.native.processIdentity.daemon },
+        worker: { state: 'alive' as const, ...original.native.processIdentity.worker },
+        replaySession: { isLive: true, requiresRestart: false, workerExit: null },
+      },
     })),
     reopenAfterFailure: vi.fn(async (destination, _binding, _signal, onStopped) => {
       if (current) onStopped(current.native.contextId);
@@ -308,7 +314,7 @@ it('records a same-input recovery epoch and stops if the same native failure rec
     { event: 'baseline', original: { inputId: 'a' } },
     {
       event: 'intent',
-      recovery: { cause: { operation: 'rd.test', code: 'native_failure' }, observed: { contextId: 'context-a' } },
+      recovery: { cause: { operation: 'rd.test', code: 'native_failure' }, observed: { daemon: { pid: 10 } } },
     },
     { event: 'daemon-stopped', contextId: 'context-a' },
     { event: 'transition', restored: false, from: { inputId: 'a' }, to: { inputId: 'a' } },
@@ -365,4 +371,25 @@ it('blocks live RDC access if an earlier saved position remains unresolved', asy
   expect(() => f.controller.assertLiveAccess()).toThrow('RDC_PREVIOUS_RESTORE_REQUIRED');
   expect(f.host.snapshot).not.toHaveBeenCalled();
   expect(f.receipts).toHaveLength(0);
+});
+
+it('recovers from the latest process identity a successful result reported, not the turn-start snapshot', async () => {
+  const f = fixture();
+  await f.controller.initialize();
+  const reported = {
+    status: 'available' as const,
+    daemon: { pid: 10, start_generation: 'windows-filetime:1' },
+    worker: { pid: 12, start_generation: 'windows-filetime:3' },
+  };
+  noteRdcProcessIdentity('context-a', reported);
+  await f.controller.prepareRecovery(1);
+  await f.controller.recover();
+  expect(f.host.inspectRecovery).toHaveBeenCalledWith(
+    expect.objectContaining({ native: expect.objectContaining({ processIdentity: reported }) }),
+    expect.anything(),
+    undefined,
+  );
+  expect(f.receipts.find((receipt) => receipt.event === 'intent')).toMatchObject({
+    from: { native: { processIdentity: reported } },
+  });
 });

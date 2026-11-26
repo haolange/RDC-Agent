@@ -60,7 +60,7 @@ it('finds an unresolved signed baseline after restart and closes only the matchi
       replacementCount: 0,
       replacementFingerprint: 'c'.repeat(64),
       processIdentity: {
-        status: 'available',
+        status: 'available' as const,
         daemon: { pid: 10, start_generation: 'windows-filetime:1' },
         worker: { pid: 11, start_generation: 'windows-filetime:2' },
       },

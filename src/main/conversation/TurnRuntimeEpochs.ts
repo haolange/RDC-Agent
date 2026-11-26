@@ -4,6 +4,8 @@ import type { ExecutionOffer } from '../sessions/run/executionOffer';
 import type { TaskRuntimeEpoch } from '../agent-runtime/tasks/taskExecutionSchemas';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import type { TurnCompletionReceipt } from '../agent-runtime/agent/TurnCompletionValidator';
+import type { RdcRecoveryObservation } from '../rdc/RdcContextStatus';
+import type { RdcProcessIdentity } from '../rdc/RdcProcessIdentity';
 
 /** Verify the signed transition chain instead of equating the final and initial replay identities. */
 export function assertTurnRuntimeEpochs(input: {
@@ -77,11 +79,7 @@ export function assertTurnRuntimeEpochs(input: {
         from.inputId !== intent.destination.inputId ||
         from.contentSha256 !== intent.destination.contentSha256 ||
         from.deviceId !== intent.destination.deviceId ||
-        observed.contextId !== from.native.contextId ||
-        observed.leaseVersion !== from.native.leaseVersion ||
-        observed.replaySessionId !== from.native.replaySessionId ||
-        observed.captureFileId !== from.native.captureFileId ||
-        JSON.stringify(observed.processIdentity) !== JSON.stringify(from.native.processIdentity) ||
+        !recoveryObservedVerifiedProcess(observed, from.native.processIdentity) ||
         to.native.contextId === from.native.contextId ||
         !transition.daemonStopped
       ) {
@@ -139,4 +137,14 @@ export function assertTurnRuntimeEpochs(input: {
   }
   if (input.receipt.runtimePlanFingerprint !== previous)
     throw new AppError('TURN_COMPLETION_RECEIPT_INVALID', 'final runtime identity differs from its signed chain.');
+}
+
+/** Recovery acted on the daemon and worker the transition started from. */
+function recoveryObservedVerifiedProcess(observed: RdcRecoveryObservation, verified: RdcProcessIdentity): boolean {
+  return (['daemon', 'worker'] as const).every(
+    (role) =>
+      observed[role].state === 'alive' &&
+      observed[role].pid === verified[role].pid &&
+      observed[role].start_generation === verified[role].start_generation,
+  );
 }
