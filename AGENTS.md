@@ -154,7 +154,7 @@
 `check:gates` 的精确组成以 `package.json` 为准：
 
 - 它运行整个 `src/main/testing/gates/behaviorChecks.test.ts`，所以行为门禁的各子集都在其中。
-- 它另含没有脚本别名的 `check-doc-references`。
+- 它另含没有脚本别名的 `check-doc-references` 与 `check-preload-imports`。后者沿 `src/preload/index.ts` 的值 import（`import type` 不计）检查：sandbox 中的 preload 只能加载 `electron`，所以依赖图只能落在 `src/preload` 与 `src/shared` 内，任何 npm 包或 Node builtin 都让 preload 脚本整个加载失败。preload 引用的 shared 模块因此不能经值 import 牵出带依赖的模块（例如以 zod 定义 params schema 的错误登记表）。
 - `check:renderer-structure` 的两半（`renderer-source-analysis` 的 `node --test` 与 `check-renderer-structure.mjs`）都在 `check:gates` 里。
 
 **依赖方向与宿主**：行数、分层与依赖方向由 ESLint `max-lines` / `no-restricted-imports` / `main-domains/direction` 执行（规则见 `ARCHITECTURE.md`「进程间与主进程依赖方向」）。宿主判断只在 `src/main/platform`，由 ESLint 宿主平台门禁（自检 `pnpm run check:host-platform`）执行，见 `docs/architecture/host-platform.md`。
