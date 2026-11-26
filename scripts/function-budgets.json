@@ -117,15 +117,6 @@
     "src/main/investigation/investigationExecutionEvidence.ts": {
       "complexity": 41
     },
-    "src/main/ipc/captureDeviceHandlers.ts": {
-      "lines": 174
-    },
-    "src/main/ipc/conversationHandlers.ts": {
-      "lines": 236
-    },
-    "src/main/ipc/projectSessionHandlers.ts": {
-      "lines": 330
-    },
     "src/main/knowledge/knowledgeIngest.ts": {
       "lines": 160,
       "complexity": 57

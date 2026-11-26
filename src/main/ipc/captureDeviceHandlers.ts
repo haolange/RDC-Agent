@@ -85,7 +85,10 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
   };
   const channels: IpcChannelTable = {
     ...replayChannels(channelContext),
-    ...captureChannels(channelContext),
+    ...captureRecoveryChannels(channelContext),
+    ...captureContextChannels(channelContext),
+    ...openProjectInputChannel(channelContext),
+    ...openedCaptureChannels(channelContext),
     ...deviceChannels(channelContext),
   };
   for (const [channel, handler] of Object.entries(channels)) ipcMain.handle(channel, handler);
@@ -121,8 +124,8 @@ function replayChannels({ authorizeReplayScope }: CaptureChannelContext): IpcCha
   };
 }
 
-/** Capture recovery, opening, selection and clearing, with the context and opened-state broadcasts they cause. */
-function captureChannels({
+/** Capture recovery status and restoring the previous capture. */
+function captureRecoveryChannels({
   context,
   authorizeReplayScope,
   broadcastContext,
@@ -152,6 +155,12 @@ function captureChannels({
         return { success: false, error: error instanceof Error ? error.message : String(error) };
       }
     },
+  };
+}
+
+/** The RDC context of a session scope, its captures, and switching the active capture. */
+function captureContextChannels({ context, broadcastContext }: CaptureChannelContext): IpcChannelTable {
+  return {
     'context:get': async (_event, ...rawArgs: unknown[]) => {
       const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, { label: 'context:get', maxBytes: 1024 });
       return rdcSessionService.snapshotContextForSession(scope);
@@ -160,6 +169,34 @@ function captureChannels({
       const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, { label: 'capture:list', maxBytes: 1024 });
       return { captures: rdcSessionService.snapshotContextForSession(scope)?.captureDescriptors ?? [] };
     },
+    'capture:select': async (_event, ...rawArgs: unknown[]) => {
+      try {
+        const [request] = parseIpcArgs(CaptureSelectArgsSchema, rawArgs, {
+          label: 'capture:select',
+          maxBytes: 4 * 1024,
+        });
+        const scope: SessionScope = { projectId: request.projectId, sessionId: request.sessionId };
+        const snapshot = rdcSessionService.snapshotContextForSession(scope);
+        if (!snapshot?.captureDescriptors.some((capture) => capture.id === request.captureId)) {
+          return { success: false, error: 'Capture is not owned by this session.' };
+        }
+        await rdcSessionService.switchActiveCapture(request, request.captureId);
+        context.broadcastToRenderer(
+          'capture:statusChanged',
+          envelope(scope, { captureId: request.captureId, status: 'selected' }),
+        );
+        broadcastContext(scope, rdcSessionService.snapshotContextForSession(scope));
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  };
+}
+
+/** Opening a project input on a replay device, logged and broadcast whether it succeeds or fails. */
+function openProjectInputChannel({ broadcastContext, broadcastOpenedCapture }: CaptureChannelContext): IpcChannelTable {
+  return {
     'capture:openProjectInput': async (_event, ...rawArgs: unknown[]) => {
       let request:
         | (Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string; bindingGeneration: number })
@@ -245,6 +282,12 @@ function captureChannels({
         };
       }
     },
+  };
+}
+
+/** The opened-capture state of a session scope and clearing it. */
+function openedCaptureChannels({ broadcastContext, broadcastOpenedCapture }: CaptureChannelContext): IpcChannelTable {
+  return {
     'capture:getOpenedState': async (_event, ...rawArgs: unknown[]) => {
       const [scope] = parseIpcArgs(SessionScopeArgsSchema, rawArgs, {
         label: 'capture:getOpenedState',
@@ -273,28 +316,6 @@ function captureChannels({
         projectId: scope.projectId,
       });
       return { success: true };
-    },
-    'capture:select': async (_event, ...rawArgs: unknown[]) => {
-      try {
-        const [request] = parseIpcArgs(CaptureSelectArgsSchema, rawArgs, {
-          label: 'capture:select',
-          maxBytes: 4 * 1024,
-        });
-        const scope: SessionScope = { projectId: request.projectId, sessionId: request.sessionId };
-        const snapshot = rdcSessionService.snapshotContextForSession(scope);
-        if (!snapshot?.captureDescriptors.some((capture) => capture.id === request.captureId)) {
-          return { success: false, error: 'Capture is not owned by this session.' };
-        }
-        await rdcSessionService.switchActiveCapture(request, request.captureId);
-        context.broadcastToRenderer(
-          'capture:statusChanged',
-          envelope(scope, { captureId: request.captureId, status: 'selected' }),
-        );
-        broadcastContext(scope, rdcSessionService.snapshotContextForSession(scope));
-        return { success: true };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
     },
   };
 }
