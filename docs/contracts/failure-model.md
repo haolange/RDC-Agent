@@ -58,7 +58,7 @@
 | Sandbox / permission deny-by-default | Security | Electron 面 |
 | CSP 绕过（`style-src`/`script-src` unsafe-inline、style attr） | Security | 生产无 unsafe-inline；`style-src-attr 'none'`；动态样式走 `useDynStyle` |
 | RDC context 无 session / lease 所有权不匹配 | Security | 仅 per-session lease；禁止 global mirror |
-| 在途 turn 读可变 Settings / 未冻结 plan | Integrity | `EffectiveRuntimePlan` schemaVersion 3 冻结权限约束、路由、工具面；当前 permission mode/revision 由主进程动态发布 |
+| 在途 turn 读可变 Settings / 未冻结 plan | Integrity | `EffectiveRuntimePlan` 冻结权限约束、路由、工具面；当前 permission mode/revision 由主进程动态发布 |
 | SSRF / private DNS（`web_fetch`/`web_search`/远程图片/favicon） | Security | 全部经 `runtime/net/publicEgress.fetchPublic`：每跳按统一地址表校验并 DNS pin，任一解析地址非公网即拒绝，请求不发出 |
 | Web 来源超完整字节界 / 非法 UTF-8 / 续页来源 hash 不符 | Integrity | 明确拒绝；不将前缀、替换字符或变化后的来源拼为完整资料。页面截断有可校验续读游标，不是不存在匹配资料的证据 |
 | Attachment SVG 脚本 / 超限媒体 | Security | `ATTACHMENT_MEDIA_UNSUPPORTED` |

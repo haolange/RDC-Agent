@@ -449,7 +449,6 @@ export interface CustomAgentMessage {
 export type AgentMessage = Message | CustomAgentMessage;
 
 export interface ProviderStateRef {
-  schemaVersion: 1;
   carrier: ProviderContractBundle['state']['carrier'];
   value: string;
   origin: ExecutionIdentity;

@@ -48,9 +48,8 @@ const portableContextMessages = (messages: AgentMessage[]): AgentMessage[] =>
 const portableContextHash = (messages: AgentMessage[]): string => hashScopedResource(portableContextMessages(messages));
 type WindowMedia = { messageIndex: number; blockIndex: number; uri: string; hash: string; mimeType: string };
 const index = z.number().int().nonnegative().safe();
-/** Which execution installed a persisted view; a view of another session, version or route is not a candidate. */
+/** Which execution installed a persisted view; a view of another session or route is not a candidate. */
 const WindowStateOwnerSchema = z.object({
-  schemaVersion: z.literal(1),
   sessionId: z.string(),
   routeFingerprint: z.string(),
 });
@@ -286,7 +285,6 @@ export function createExecutionContextWindow(input: {
         owner,
         uri,
         JSON.stringify({
-          schemaVersion: 1,
           sessionId: input.sessionId,
           routeFingerprint,
           source: checkpoint.uri,

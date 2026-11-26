@@ -68,7 +68,7 @@ Settings 的 RDC 安装入口依次是检测安装、选择目录、验证并应
 无法满足合同的操作在所属边界失败，并把真实原因交给调用方，由调用方决定放弃、重试或修正输入。局部失败不无依据地扩大影响范围；隔离失败时仍保护数据、释放自有资源，安全与完整性不变量不放宽。失败分类见 `docs/contracts/failure-model.md`。
 
 1. **单一真相**：Session / Conversation / branch / journal 是会话历史权威；Agent slot 是执行配置与缓存，不是私有历史。
-2. **冻结执行**：`EffectiveRuntimePlan`（`schemaVersion: 3`，含 `planId` / fingerprint 与冻结工具/策略约束面）在 `prepareTurn` 冻结；Prompt 与 Executor 共用冻结约束。主进程 mode/revision 在工具准入和每次 Provider 请求前采样，不进入冻结权限约束。
+2. **冻结执行**：`EffectiveRuntimePlan`（含 `planId` / fingerprint 与冻结工具/策略约束面）在 `prepareTurn` 冻结；Prompt 与 Executor 共用冻结约束。主进程 mode/revision 在工具准入和每次 Provider 请求前采样，不进入冻结权限约束。
 3. **主进程权威**：权限、secret、MCP trust、Shell、RDC CLI、IPC 校验均在 `src/main`；preload / renderer / Browser Bridge 只暴露受控面。
    - 需要人确认的变更（trust、知识/记忆/计划写入）由主进程原生对话框确认。
    - 安全决定在生效前只追加写入 `state/audit.jsonl`，写不进去就不生效。
@@ -242,7 +242,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 ### 会话、投影与持久化
 
 - **唯一 Turn Preparation**：产品回合经 conversation `prepareTurn` 冻结 `preparedRuntime` 后由 `sendProfileMessage` 执行；Subagent 经 `ProfileTurnRunner.runChildTurn` 用同一个 `prepareTurnContext` 冻结后执行，二者共用 `ProfileTurnRunner` 的阶段。`AgentTurnRunner` 无 preparedRuntime 时抛 `TURN_NOT_PREPARED`，没有 fallback plan。
-- **EffectiveRuntimePlan**：`schemaVersion: 3`，在 `prepareTurn` **完整冻结**。
+- **EffectiveRuntimePlan**：在 `prepareTurn` **完整冻结**。
   - 冻结面：`planId` / fingerprint / tools / skill ∩ / deferred / MCP hash / permissionConstraints / policy / `contextCompactionPercent` / route / request+prompt fingerprints / 附件 manifest 指纹。
   - Prompt 与 Executor 共用；在途 turn 不读可变 Settings。唯一的动态授权输入是主进程成功提交的全局权限挡位 mode/revision，在每个工具最终准入前采样。
 - **AgentState 复合键**：`sessionId|ephemeralScope` + `agentId`；IPC bridge 丢弃无 sessionId 的事件。renderer 不保存 Agent 状态、证据事件或 run 列表的镜像：Agent 胶囊由会话视图派生，证据事件直接进时间线，当前 run 只有 `currentRun`。

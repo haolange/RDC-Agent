@@ -57,7 +57,6 @@ describe('applyDeclaredHandoff', () => {
       agentId: patch.agentId,
     }));
     mocks.offerRead.mockReturnValue({
-      schemaVersion: '1',
       sourceAgentId: 'debugger',
       targetAgentId: 'general',
       plan: { uri: 'session://plans/plan-frozen.md', hash: 'a'.repeat(64) },

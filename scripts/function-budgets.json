@@ -12,13 +12,13 @@
       "lines": 186
     },
     "src/main/agent-runtime/context/ExecutionContextWindow.ts": {
-      "lines": 170
+      "lines": 169
     },
     "src/main/agent-runtime/context/RecoverableContextWindow.ts": {
       "complexity": 43
     },
     "src/main/agent-runtime/EffectiveRuntimePlan.ts": {
-      "lines": 155
+      "lines": 153
     },
     "src/main/agent-runtime/orchestration/AgentSlotFactory.ts": {
       "lines": 209

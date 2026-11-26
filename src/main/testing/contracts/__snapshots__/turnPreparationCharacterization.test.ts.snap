@@ -102,7 +102,6 @@ exports[`turn preparation characterization > analyzer · approved-plan 1`] = `
     "projectId": "<project>",
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -317,7 +316,6 @@ exports[`turn preparation characterization > analyzer · attachment 1`] = `
     "projectId": "<project>",
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -532,7 +530,6 @@ exports[`turn preparation characterization > analyzer · no-session 1`] = `
     "projectId": null,
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -747,7 +744,6 @@ exports[`turn preparation characterization > analyzer · session 1`] = `
     "projectId": "<project>",
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -966,7 +962,6 @@ exports[`turn preparation characterization > analyzer · subagent 1`] = `
     "projectId": null,
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -1181,7 +1176,6 @@ exports[`turn preparation characterization > debugger · approved-plan 1`] = `
     "projectId": "<project>",
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -1397,7 +1391,6 @@ exports[`turn preparation characterization > debugger · attachment 1`] = `
     "projectId": "<project>",
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -1613,7 +1606,6 @@ exports[`turn preparation characterization > debugger · no-session 1`] = `
     "projectId": null,
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -1829,7 +1821,6 @@ exports[`turn preparation characterization > debugger · session 1`] = `
     "projectId": "<project>",
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -2049,7 +2040,6 @@ exports[`turn preparation characterization > debugger · subagent 1`] = `
     "projectId": null,
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -2243,7 +2233,6 @@ exports[`turn preparation characterization > general · approved-plan 1`] = `
     "projectId": "<project>",
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -2458,7 +2447,6 @@ exports[`turn preparation characterization > general · attachment 1`] = `
     "projectId": "<project>",
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -2672,7 +2660,6 @@ exports[`turn preparation characterization > general · no-session 1`] = `
     "projectId": null,
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -2886,7 +2873,6 @@ exports[`turn preparation characterization > general · session 1`] = `
     "projectId": "<project>",
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -3104,7 +3090,6 @@ exports[`turn preparation characterization > general · subagent 1`] = `
     "projectId": null,
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -3337,7 +3322,6 @@ exports[`turn preparation characterization > optimizer · approved-plan 1`] = `
     "projectId": "<project>",
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -3552,7 +3536,6 @@ exports[`turn preparation characterization > optimizer · attachment 1`] = `
     "projectId": "<project>",
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -3767,7 +3750,6 @@ exports[`turn preparation characterization > optimizer · no-session 1`] = `
     "projectId": null,
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -3982,7 +3964,6 @@ exports[`turn preparation characterization > optimizer · session 1`] = `
     "projectId": "<project>",
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",
@@ -4201,7 +4182,6 @@ exports[`turn preparation characterization > optimizer · subagent 1`] = `
     "projectId": null,
     "projectRootPath": "<root>/project",
     "requestPlanFingerprint": "35ce01d20ff84ce1ae4c0a20b650dae1f30aead8c2d33f56f5f9648197d389a2",
-    "schemaVersion": 3,
     "skillIntersection": null,
     "toolAllowlist": [
       "read_file",

@@ -71,7 +71,6 @@ describe('ProviderStateRefs', () => {
   it('creates integrity-bound main-process state and rejects tampering', () => {
     const state = createProviderStateRef(plan('model-a'), ' response_1 ');
     expect(state).toMatchObject({
-      schemaVersion: 1,
       carrier: 'previous-response-id',
       value: 'response_1',
       originFingerprint: 'test-execution',

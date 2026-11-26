@@ -36,7 +36,7 @@ Work Process 的工具摘要只由 runtime tool result 计算 `succeeded / faile
 
 | 模块 | 职责 |
 | --- | --- |
-| `EffectiveRuntimePlan` | `schemaVersion: 3`；project-aware effective profile snapshot（definition + scope/provenance/sourceHash + compiled route）+ 冻结 `profileDelegates`（effective `agents`）；tools/skill intersection, deferred/MCP lease, permission/policy/route/request+prompt fingerprints, attachment manifest fingerprint；Prompt and Executor share it。`settings.llm.agentRoutes` 只是 `compiledRoute` 的 Settings 派生镜像；`getEffectiveModel` / `applyLlmConfig` / preflight 只读 snapshot 的 `compiledRoute`。 |
+| `EffectiveRuntimePlan` | project-aware effective profile snapshot（definition + scope/provenance/sourceHash + compiled route）+ 冻结 `profileDelegates`（effective `agents`）；tools/skill intersection, deferred/MCP lease, permission/policy/route/request+prompt fingerprints, attachment manifest fingerprint；Prompt and Executor share it。`settings.llm.agentRoutes` 只是 `compiledRoute` 的 Settings 派生镜像；`getEffectiveModel` / `applyLlmConfig` / preflight 只读 snapshot 的 `compiledRoute`。 |
 | `AgentOrchestrator` | façade（少于 800 行，协作者由 `agentRuntimeRoot.ts` 构造）；产品回合经 conversation `prepareTurnContext` 冻结后由 `sendProfileMessage` 执行（只接收已准备的回合）；子执行经 `ProfileTurnRunner.runChildTurn` 在自有凭据租约下准备并执行；二者共用 `ProfileTurnRunner` 的同一组阶段；无 `preparedRuntime` → `TURN_NOT_PREPARED` |
 | `TurnCoordinator` / `TurnHandle` | Session ownership Active→Aborting→Orphaned→Settled；Orphaned 时 `beginTurn` → `TURN_ORPHANED`；同一 session 的 `beginTurn` 串行执行，并发发送只留最后一个为 active、之前的全部 abort；`abortSession` 只移除它停下的那个 handle，不会删掉期间新开的 turn；`abortAndJoin` 等 stream + producerCompletion；late producer join |
 | `ProcessSupervisor` | spawn/joinAll；POSIX pgid；Windows `taskkill /T` 自身有有限 timeout；close-observed registry；timeout yields `unconfirmed_orphan`，不以终止命令返回冒充目标退出 |
@@ -486,7 +486,7 @@ RDC runtime context 仅绑定 per-session lease（`RdcRuntimeContextRegistry`）
 ## 相关源码
 
 - `src/main/agent-runtime/orchestration/` — Orchestrator façade、TurnCoordinator、DeferredTools
-- `src/main/agent-runtime/EffectiveRuntimePlan.ts` — schemaVersion 3 冻结 plan
+- `src/main/agent-runtime/EffectiveRuntimePlan.ts` — 冻结 plan
 - `src/main/rdc/RdcRuntimeContextRegistry.ts` — per-session RDC lease
 - `src/main/runtime/ProcessSupervisor.ts`、`src/main/lifecycle/ShutdownCoordinator.ts`
 - `src/main/agent-runtime/` — prompt、providers、permissions、tools
@@ -581,7 +581,7 @@ Task 可声明严格类型的 `executionRequirements`（`mode: direct|subagent`�
 - 原 execution、root、消费及期限不修改，新执行仍从原记录继承预算。
 - 取消或持久化失败不得发布迟到批准；已获用户点击授权但尚未完成批准发布的定义变更保持不可执行，正常重提计划可恢复，不手改状态。
 
-单一 TaskStore 的 canonical 文件为 `task-state.json`（仅当前 schema）。
+单一 TaskStore 的 canonical 文件为 `task-state.json`（不带格式版本，严格 schema）。
 
 - Task 保存目标、依赖、父任务、完成要求、修订与执行关联；TaskExecution 独立保存 executionId、taskRevision、generation、父执行、运行状态、共享预算快照、结果及可选冻结计划引用。
 - 取消或修订不会让旧结果覆盖新实例。
@@ -600,7 +600,7 @@ Stop 后的 cancelled execution 保持不可变。用户在后续回合明确要
 
 续跑的 root 归属从该 Task 的前次执行恢复，不因前次为 direct 或 subagent 而丢失；不能从同 session 的其他任务推断或重建新根。父回合改为自己执行同一目标时，当前 live policy 与持久执行必须绑定同一原 root，并继续合并新增消费；委派的 child-local 账本与 root 的上限仍分别保留。
 
-旧格式不由 TaskStore 自动迁移。转换须先逐文件备份原字节与 hash，再验证当前文档、依赖和状态后安装 `task-state.json` 并移除被替代的活动文件；历史完成状态不伪造执行证明。正常运行只有当前格式，无法读取时明确拒绝。runtimeInstanceId 变化使未结束执行转 interrupted；持久化恢复不自动启动模型、工具或重置预算。显式重试/恢复创建新执行，并继承限制与已消费预算。
+TaskStore 不迁移、不转换：正常运行只有当前格式，其他格式写下的 `task-state.json` 或缺少它的非空任务目录明确拒绝并保留原件。runtimeInstanceId 变化使未结束执行转 interrupted；持久化恢复不自动启动模型、工具或重置预算。显式重试/恢复创建新执行，并继承限制与已消费预算。
 
 subagent（mode=background） 必须绑定 Task，持久化启动状态后返回执行标识。subagent 执行记录写入 `dispatch`（`wait` 或 `background`），供投影显示；缺省表示该执行写入时尚未记录此事实。query/result 读取状态与结果；wait/join 等待既有执行；message 提交有限补充；cancel 和 task_stop 取消执行树并 join。父回复可以结束而 Task 继续托管；父 Task 正式完成检查子任务、阻塞、失败及结果。用户 Stop、会话删除和应用退出清理运行树；未观察进程退出不能声明清理完成。
 

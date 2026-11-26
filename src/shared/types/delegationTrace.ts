@@ -9,7 +9,6 @@ export interface DelegationTraceStep {
 export type DelegationContentKind = 'task' | 'final' | 'invocation' | 'parent_receipt' | 'tool_receipt' | 'sent_prompt';
 
 export interface DelegationTraceHeader {
-  recordVersion: 2;
   sentPromptAvailable?: boolean;
   parentToolCallId: string;
   /** First paragraph only; the structured task and exact sent prompt are separate owned bodies. */

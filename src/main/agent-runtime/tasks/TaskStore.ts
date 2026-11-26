@@ -12,7 +12,6 @@ import { writeFileAtomic } from '../../runtime/atomicFile';
 import { TaskIndependentSourceSchema, TaskRuntimeEpochSchema } from './taskExecutionSchemas';
 import { orderTasks } from './taskProjection';
 import {
-  TASK_SCHEMA_VERSION,
   TaskExecutionMessageSchema,
   TaskExecutionRecordSchema,
   TaskRecordSchema,
@@ -26,7 +25,6 @@ import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirement
 import type { TaskRuntimeEpoch } from './taskExecutionSchemas';
 
 interface TaskStateDocument {
-  schemaVersion: typeof TASK_SCHEMA_VERSION;
   tasks: Record<string, TaskRecord>;
   executions: Record<string, TaskExecutionRecord>;
   messages: Record<string, TaskExecutionMessage[]>;
@@ -35,7 +33,6 @@ interface TaskStateDocument {
 
 const TaskStateDocumentSchema = z
   .object({
-    schemaVersion: z.literal(TASK_SCHEMA_VERSION),
     tasks: z.record(z.string(), TaskRecordSchema),
     executions: z.record(z.string(), TaskExecutionRecordSchema),
     messages: z.record(z.string(), z.array(TaskExecutionMessageSchema)),
@@ -43,22 +40,13 @@ const TaskStateDocumentSchema = z
   })
   .strict();
 
-const TaskStateVersionSchema = z.object({ schemaVersion: z.unknown().optional() });
-
-/** task-state.json as written by this build; another schema version is left untouched for the build that wrote it. */
+/** task-state.json as written by this build; a file in any other format fails the strict schema and is left as it is. */
 function parseTaskState(raw: string, statePath: string): TaskStateDocument {
   let value: unknown;
   try {
     value = JSON.parse(raw);
   } catch (error) {
     throw new AppError('STORAGE_CORRUPT', `${statePath} is not JSON.`, { cause: error });
-  }
-  const versioned = TaskStateVersionSchema.safeParse(value);
-  if (versioned.success && versioned.data.schemaVersion !== TASK_SCHEMA_VERSION) {
-    throw new AppError(
-      'STORAGE_SCHEMA_UNSUPPORTED',
-      `Unsupported task state schema version: ${String(versioned.data.schemaVersion)}.`,
-    );
   }
   const state = TaskStateDocumentSchema.safeParse(value);
   if (!state.success)
@@ -336,7 +324,7 @@ export class MemoryTaskStore implements TaskStore {
 }
 
 function emptyState(): TaskStateDocument {
-  return { schemaVersion: TASK_SCHEMA_VERSION, tasks: {}, executions: {}, messages: {}, rootBudgets: {} };
+  return { tasks: {}, executions: {}, messages: {}, rootBudgets: {} };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

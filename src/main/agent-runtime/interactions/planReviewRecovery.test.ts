@@ -207,7 +207,6 @@ it('projects an approved but unsent handoff after restart without reopening revi
     updatedAt: 10,
   };
   fixture.readOffer.mockReturnValue({
-    schemaVersion: '1',
     sourceAgentId: 'debugger',
     targetAgentId: 'general',
     plan: { uri: fixture.state.frozenUri, hash },

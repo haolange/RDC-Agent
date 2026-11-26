@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { TASK_SCHEMA_VERSION } from './TaskContracts';
 import { createdAtFromTaskId, orderTasks, projectTaskItems } from './taskProjection';
 import type { TaskRecord, TaskStatus } from './TaskRegistry';
 import type { TaskExecutionRecord } from './TaskContracts';
 
 const task = (id: string, status: TaskStatus, createdAt: number, extras: Partial<TaskRecord> = {}): TaskRecord => ({
-  schemaVersion: TASK_SCHEMA_VERSION,
   id,
   subject: extras.subject ?? id,
   description: '',
@@ -99,7 +97,6 @@ it('uses current execution proof without changing task lifecycle or clearing a r
 it("shows an open Task whose current execution failed as failed and carries that execution's facts", () => {
   const execution = (id: string, status: TaskExecutionRecord['status'], extras: Partial<TaskExecutionRecord> = {}) =>
     ({
-      schemaVersion: TASK_SCHEMA_VERSION,
       id,
       taskId: 'unused',
       taskRevision: 1,

@@ -44,7 +44,7 @@ describe('FileTaskStore', () => {
     // A failed initialization is retryable after an explicit offline conversion.
     await writeFile(
       path.join(dir, 'task-state.json'),
-      JSON.stringify({ schemaVersion: 2, tasks: {}, executions: {}, messages: {}, rootBudgets: {} }),
+      JSON.stringify({ tasks: {}, executions: {}, messages: {}, rootBudgets: {} }),
     );
     await expect(store.listTasks()).resolves.toEqual([]);
   });
@@ -174,10 +174,8 @@ describe('FileTaskStore', () => {
     await writeFile(
       path.join(dir, 'task-state.json'),
       JSON.stringify({
-        schemaVersion: 2,
         tasks: {
           broken: {
-            schemaVersion: 2,
             id: 'broken',
             subject: 'Broken',
             blockedBy: [],

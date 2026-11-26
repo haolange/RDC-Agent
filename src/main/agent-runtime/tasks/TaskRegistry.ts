@@ -4,7 +4,6 @@ import { AppError } from '@shared/errors/appError';
 import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
 import { TaskRuntimeEpochSchema } from './taskExecutionSchemas';
 import {
-  TASK_SCHEMA_VERSION,
   type SettleTaskExecutionOptions,
   type StartTaskExecutionOptions,
   type TaskCompletionResult,
@@ -111,7 +110,6 @@ export class TaskRegistry extends TaskExecutionLedger {
           }
         }
         prepared.push({
-          schemaVersion: TASK_SCHEMA_VERSION,
           id,
           subject: input.subject.trim(),
           description: input.description ?? '',
@@ -270,7 +268,6 @@ export class TaskRegistry extends TaskExecutionLedger {
       validateBudget(budget, true);
       const now = Date.now();
       const execution: TaskExecutionRecord = {
-        schemaVersion: TASK_SCHEMA_VERSION,
         id: this.id('execution', now),
         taskId,
         taskRevision: task.revision,

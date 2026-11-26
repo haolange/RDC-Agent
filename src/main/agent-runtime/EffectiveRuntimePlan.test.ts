@@ -124,7 +124,6 @@ describe('EffectiveRuntimePlan', () => {
       mcpDescriptorHash: 'mcp-hash-1',
     });
 
-    expect(plan.schemaVersion).toBe(3);
     expect(plan.planId).toMatch(/^plan_/);
     expect(plan.fingerprint).toHaveLength(24);
     expect(plan.policy.deniedTools).toContain('shell');
@@ -287,7 +286,6 @@ describe('EffectiveRuntimePlan', () => {
       knowledgeReadRoots: ['D:/Users/me/.rdc-agent/knowledge', 'D:/Project/.rdc-agent/knowledge'],
     });
 
-    expect(empty.schemaVersion).toBe(3);
     expect(empty.knowledgeReadRoots).toEqual([]);
     expect(withRoots.knowledgeReadRoots).toEqual([
       'D:/Users/me/.rdc-agent/knowledge',

@@ -10,7 +10,6 @@ import type { RequestBranch } from '@shared/types/trace';
 const STORE_FILE = 'agentic-trace-state.json';
 
 export interface TracePersistedState {
-  schemaVersion: '1';
   sessionId: string;
   activeBranchId: string;
   userRequests: UserRequest[];
@@ -42,7 +41,6 @@ const RequestBranchSchema = z
 
 const TracePersistedStateSchema: ZodType<TracePersistedState> = z
   .object({
-    schemaVersion: z.literal('1'),
     sessionId: z.string(),
     activeBranchId: z.string(),
     userRequests: z.array(
@@ -71,7 +69,6 @@ const TracePersistedStateSchema: ZodType<TracePersistedState> = z
   .strict();
 
 const defaultState = (sessionId: string): TracePersistedState => ({
-  schemaVersion: '1',
   sessionId,
   activeBranchId: 'branch-main',
   userRequests: [],
