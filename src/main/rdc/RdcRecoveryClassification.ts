@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { RdcContextStatus } from './RdcContextStatus';
 import type { RdcProcessIdentity } from './RdcProcessIdentity';
 
-const exitedWorker = z.strictObject({
+export const RdcRecoveryLostWorkerSchema = z.strictObject({
   pid: z.number().int().positive(),
   start_generation: z.string().min(1),
   reason: z.string(),
@@ -17,7 +17,7 @@ export const RdcRecoveryClassificationSchema = z.discriminatedUnion('decision', 
     decision: z.literal('rebuild'),
     reason: z.enum(['worker-exited', 'replay-requires-restart']),
     /** Workers that served the verified lineage and whose exit RDC-Tool confirmed, oldest first. */
-    lost: z.strictObject({ workers: z.array(exitedWorker) }),
+    lost: z.strictObject({ workers: z.array(RdcRecoveryLostWorkerSchema) }),
   }),
   z.strictObject({
     decision: z.literal('quarantined'),
@@ -30,7 +30,7 @@ export const RdcRecoveryClassificationSchema = z.discriminatedUnion('decision', 
   }),
 ]);
 export type RdcRecoveryClassification = z.infer<typeof RdcRecoveryClassificationSchema>;
-type ExitedWorker = z.infer<typeof exitedWorker>;
+type ExitedWorker = z.infer<typeof RdcRecoveryLostWorkerSchema>;
 type Birth = { pid: number; start_generation: string };
 
 /** Recovery attempts allowed per approved input, content and device, counted from signed receipts across turns. */

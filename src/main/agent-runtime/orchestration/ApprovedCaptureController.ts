@@ -6,6 +6,7 @@ import {
   type RdcLifecyclePoint,
   type RdcLifecycleReceipt,
   type RdcLifecycleReceipts,
+  type RdcLostWithProcess,
 } from '../../rdc/RdcLifecycleReceipts';
 import { getRdcTurnBinding, type RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import { observedRdcProcessIdentity } from '../../rdc/RdcProcessIdentity';
@@ -33,7 +34,10 @@ export interface ApprovedCaptureHost {
   /** The owning lease when it is quarantined: only recovery may act on it. */
   quarantinedContext(): { contextId: string; leaseVersion: number } | null;
   prepareReceipts(): void;
-  quiescent(mode?: 'recovery'): Promise<void>;
+  /** Throws while children or experiments are open; in recovery mode it returns the open experiments instead. */
+  quiescent(
+    mode?: 'recovery',
+  ): Promise<{ openExperiments: Array<{ experimentId: string; status: 'running' | 'polluted' }> }>;
   snapshot(binding: RdcTurnBinding, signal?: AbortSignal): Promise<RdcLifecyclePoint | null>;
   verifyDestination(destination: Destination): Promise<void>;
   open(
@@ -354,7 +358,7 @@ export class ApprovedCaptureController {
     this.assertReady();
     guard();
     const from = this.verified()!;
-    await this.input.host.quiescent('recovery');
+    const { openExperiments } = await this.input.host.quiescent('recovery');
     guard();
     const previous = this.current();
     const facts = await this.input.host.inspectRecovery(from, previous.binding, signal);
@@ -416,6 +420,7 @@ export class ApprovedCaptureController {
         runtimeFingerprint: next.plan.fingerprint,
         daemonStopped: stopped,
         restored: false,
+        lostWithProcess: lostWithProcess(from, facts.classification, openExperiments),
       });
       const epoch: TaskRuntimeEpoch = {
         previousFingerprint: previous.plan.fingerprint,
@@ -601,6 +606,23 @@ export class ApprovedCaptureController {
   }
 }
 
+function lostWithProcess(
+  from: RdcLifecyclePoint,
+  classification: RdcRecoveryClassification,
+  experiments: Array<{ experimentId: string; status: 'running' | 'polluted' }>,
+): RdcLostWithProcess {
+  return {
+    debugHandles: { replaySessionId: from.native.replaySessionId, invalidated: 'all' },
+    experiments: experiments.map((value) => ({ ...value, disposition: 'interrupted-by-infrastructure' })),
+    replacementsAtLastVerified: {
+      count: from.native.replacementCount,
+      fingerprint: from.native.replacementFingerprint,
+      rolledBack: false,
+    },
+    workers: classification.decision === 'rebuild' ? classification.lost.workers : [],
+    newBaselineRequired: true,
+  };
+}
 function destinationOf(point: RdcLifecyclePoint): Destination {
   return { inputId: point.inputId, contentSha256: point.contentSha256, deviceId: point.deviceId };
 }

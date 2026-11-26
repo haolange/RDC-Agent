@@ -18,7 +18,7 @@
       "lines": 209
     },
     "src/main/agent-runtime/orchestration/ApprovedCaptureHost.ts": {
-      "lines": 244
+      "lines": 240
     },
     "src/main/agent-runtime/orchestration/BackgroundSubagentService.ts": {
       "lines": 317

@@ -54,7 +54,7 @@ function fixture() {
     pendingRecord: vi.fn(() => null),
     quarantinedContext: vi.fn(() => quarantined),
     prepareReceipts: vi.fn(),
-    quiescent: vi.fn(async () => {}),
+    quiescent: vi.fn(async () => ({ openExperiments: [] })) as ApprovedCaptureHost['quiescent'],
     snapshot: vi.fn(async () => (current ? structuredClone(current) : null)),
     verifyDestination: vi.fn(async () => {}),
     open: vi.fn(async (destination, _binding, _signal, onStopped) => {
@@ -499,4 +499,46 @@ it('signs an unexplained process change as a failed recovery attempt without reo
   expect(f.receipts[1]).toMatchObject({ recovery: { classification: { decision: 'quarantined' } } });
   expect(f.receipts[2]).toMatchObject({ code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED' });
   expect(f.host.quarantineChanged).toHaveBeenCalled();
+});
+
+it('records what a rebuild lost with the old process without claiming a rollback', async () => {
+  const f = fixture();
+  const original = point('a', 42);
+  original.native.replacementCount = 1;
+  original.native.replacementFingerprint = '9'.repeat(64);
+  f.setCurrent(original);
+  await f.controller.initialize();
+  vi.mocked(f.host.quiescent).mockResolvedValueOnce({
+    openExperiments: [{ experimentId: 'exp-1', status: 'running' }],
+  });
+  const worker = {
+    pid: 11,
+    start_generation: 'windows-filetime:2',
+    reason: 'no_progress',
+    traceId: 'trace',
+    requestId: 'rdc-agent-1',
+    stackLogPath: '/state/worker.log',
+  };
+  vi.mocked(f.host.inspectRecovery).mockResolvedValueOnce({
+    cause: { operation: 'rd.debug.run_to', argsFingerprint: 'e'.repeat(64), code: 'worker_stuck' },
+    observed: {
+      source: 'daemon',
+      daemon: { state: 'alive', pid: 10, start_generation: 'windows-filetime:1' },
+      worker: { state: 'exited', ...worker },
+      replaySession: { isLive: false, requiresRestart: true, workerExit: null },
+    },
+    classification: { decision: 'rebuild', reason: 'worker-exited', lost: { workers: [worker] } },
+  });
+  await f.controller.prepareRecovery(1);
+  await f.controller.recover();
+  expect(f.receipts.at(-1)).toMatchObject({
+    event: 'transition',
+    lostWithProcess: {
+      debugHandles: { replaySessionId: 'replay-a', invalidated: 'all' },
+      experiments: [{ experimentId: 'exp-1', status: 'running', disposition: 'interrupted-by-infrastructure' }],
+      replacementsAtLastVerified: { count: 1, fingerprint: '9'.repeat(64), rolledBack: false },
+      workers: [worker],
+      newBaselineRequired: true,
+    },
+  });
 });

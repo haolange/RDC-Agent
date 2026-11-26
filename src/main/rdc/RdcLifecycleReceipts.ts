@@ -6,7 +6,7 @@ import { secretStorageService } from '../settings/settings-core/SecretStorageSer
 import { openSignedRdcReceipt } from './RdcExecutionReceipts';
 import { RdcProcessIdentitySchema, type RdcProcessIdentity } from './RdcProcessIdentity';
 import { RdcRecoveryObservationSchema } from './RdcContextStatus';
-import { RdcRecoveryClassificationSchema } from './RdcRecoveryClassification';
+import { RdcRecoveryClassificationSchema, RdcRecoveryLostWorkerSchema } from './RdcRecoveryClassification';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -45,6 +45,29 @@ const recovery = z
     classification: RdcRecoveryClassificationSchema,
   })
   .strict();
+/**
+ * What a recovery transition lost with the old replay process. Nothing here was rolled back: debug handles of the old
+ * replay session are invalid, open experiments were interrupted by the infrastructure (their earlier receipts stay
+ * bound to the old process identity, so a new baseline is required), and replacements are gone with the process.
+ */
+const lostWithProcess = z.strictObject({
+  debugHandles: z.strictObject({ replaySessionId: id, invalidated: z.literal('all') }),
+  experiments: z.array(
+    z.strictObject({
+      experimentId: id,
+      status: z.enum(['running', 'polluted']),
+      disposition: z.literal('interrupted-by-infrastructure'),
+    }),
+  ),
+  replacementsAtLastVerified: z.strictObject({
+    count: z.number().int().nonnegative(),
+    fingerprint: hash,
+    rolledBack: z.literal(false),
+  }),
+  workers: z.array(RdcRecoveryLostWorkerSchema),
+  newBaselineRequired: z.literal(true),
+});
+export type RdcLostWithProcess = z.infer<typeof lostWithProcess>;
 const base = {
   sessionId: id,
   projectId: id,
@@ -81,6 +104,7 @@ const receiptSchema = z.discriminatedUnion('event', [
       runtimeFingerprint: fingerprint,
       daemonStopped: reference.optional(),
       restored: z.boolean(),
+      lostWithProcess: lostWithProcess.optional(),
     })
     .strict(),
   z

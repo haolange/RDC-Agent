@@ -105,17 +105,14 @@ export function createApprovedCaptureHost(input: {
       ) {
         throw new AppError('RDC_SWITCH_CHILD_ACTIVE', 'join delegated executions before changing capture.');
       }
-      const entries = investigationArtifactService.list(input.sessionId, { kind: 'experiment' });
-      for (const entry of entries.filter((value) => value.status === 'ready' || value.status === 'draft')) {
-        const record = investigationArtifactService.readRecord(input.sessionId, entry.artifactId)
-          .record as ExperimentRecord;
-        if (record.status === 'running' || record.status === 'polluted') {
-          throw new AppError(
-            'RDC_SWITCH_EXPERIMENT_OPEN',
-            `close experiment ${record.experimentId} before changing capture.`,
-          );
-        }
-      }
+      const open = openExperiments(input.sessionId);
+      // Recovery cannot wait for the model to close them: they are interrupted by the replay process itself.
+      if (open.length && mode !== 'recovery')
+        throw new AppError(
+          'RDC_SWITCH_EXPERIMENT_OPEN',
+          `close experiment ${open[0]!.experimentId} before changing capture.`,
+        );
+      return { openExperiments: open };
     },
     async snapshot(binding, signal) {
       assertOwningTurn();
@@ -278,6 +275,19 @@ export function createApprovedCaptureHost(input: {
       }
     },
   };
+}
+
+/** Experiments the model left running or polluted on the current replay. */
+function openExperiments(sessionId: string): Array<{ experimentId: string; status: 'running' | 'polluted' }> {
+  return investigationArtifactService
+    .list(sessionId, { kind: 'experiment' })
+    .filter((value) => value.status === 'ready' || value.status === 'draft')
+    .map((entry) => investigationArtifactService.readRecord(sessionId, entry.artifactId).record as ExperimentRecord)
+    .filter(
+      (record): record is ExperimentRecord & { status: 'running' | 'polluted' } =>
+        record.status === 'running' || record.status === 'polluted',
+    )
+    .map((record) => ({ experimentId: record.experimentId, status: record.status }));
 }
 
 /** A capture transition that did not finish verified leaves its owning lease uncertain. */

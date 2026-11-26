@@ -276,6 +276,12 @@ it('refuses switching while a child or experiment is active and detects plan dri
   mock.entries.mockReturnValueOnce([{ artifactId: 'experiment', status: 'draft' }]);
   mock.readRecord.mockReturnValueOnce({ record: { status: 'running', experimentId: 'experiment' } });
   await expect(host.quiescent()).rejects.toThrow('RDC_SWITCH_EXPERIMENT_OPEN');
+  // Recovery does not wait for the model: the open experiment is reported as interrupted with the process.
+  mock.entries.mockReturnValueOnce([{ artifactId: 'experiment', status: 'draft' }]);
+  mock.readRecord.mockReturnValueOnce({ record: { status: 'running', experimentId: 'experiment' } });
+  expect(await host.quiescent('recovery')).toEqual({
+    openExperiments: [{ experimentId: 'experiment', status: 'running' }],
+  });
   mock.parsePlan.mockReturnValueOnce({ ...contract, mission: 'debugger' });
   expect(() => host.assertPlan()).toThrow('APPROVED_PLAN_CHANGED');
 });
