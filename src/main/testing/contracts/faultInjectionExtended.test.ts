@@ -91,20 +91,20 @@ describe('faultInjectionContract: two processes writing project registry', () =>
     const registerPath = path.resolve(__dirname, '../../../../scripts/register-ts-source.cjs');
     const lockPath = path.resolve(__dirname, '../../sessions/store/directoryFileLock.ts');
     const ioPath = path.resolve(__dirname, '../../runtime/StorageIo.ts');
-    const schemaPath = path.resolve(__dirname, '../../sessions/store/storageSchema.ts');
+    const schemaPath = path.resolve(__dirname, '../../runtime/projectRegistrySchema.ts');
     fs.writeFileSync(
       workerPath,
       `
 require(${JSON.stringify(registerPath)});
 const { withDirectoryFileLockSync } = require(${JSON.stringify(lockPath)});
 const { StorageIo } = require(${JSON.stringify(ioPath)});
-const { PROJECT_REGISTRY_MIGRATIONS } = require(${JSON.stringify(schemaPath)});
+const { ProjectRegistrySchema } = require(${JSON.stringify(schemaPath)});
 const filePath = process.env.REGISTRY_FILE;
 const project = JSON.parse(process.env.REGISTRY_PROJECT);
 const dir = require('path').dirname(filePath);
 withDirectoryFileLockSync(dir, { lockFileName: '.registry.lock', timeoutCode: 'PROJECT_REGISTRY_LOCK_TIMEOUT' }, () => {
   const io = new StorageIo();
-  const current = io.readJson(filePath, PROJECT_REGISTRY_MIGRATIONS) || { schemaVersion: '1', projects: [] };
+  const current = io.readJson(filePath, ProjectRegistrySchema) || { schemaVersion: '1', projects: [] };
   current.projects.push(project);
   io.writeJsonAtomic(filePath, current);
 });
@@ -147,13 +147,8 @@ withDirectoryFileLockSync(dir, { lockFileName: '.registry.lock', timeoutCode: 'P
     const [first, second] = await Promise.all([spawnWorker('proj_a'), spawnWorker('proj_b')]);
     expect(first.code, first.stderr).toBe(0);
     expect(second.code, second.stderr).toBe(0);
-    const { parseStoredDocument } = await import('../../runtime/storedDocument');
-    const { PROJECT_REGISTRY_MIGRATIONS } = await import('../../runtime/projectRegistrySchema');
-    const parsed = parseStoredDocument(
-      JSON.parse(fs.readFileSync(filePath, 'utf8')),
-      PROJECT_REGISTRY_MIGRATIONS,
-      filePath,
-    );
+    const { ProjectRegistrySchema } = await import('../../runtime/projectRegistrySchema');
+    const parsed = ProjectRegistrySchema.parse(JSON.parse(fs.readFileSync(filePath, 'utf8')));
     expect(parsed.projects.map((project) => project.projectId).sort()).toEqual(['proj_a', 'proj_b']);
   }, 20_000);
 });

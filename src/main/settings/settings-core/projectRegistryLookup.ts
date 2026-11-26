@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { appPathService } from '../../runtime/AppPathService';
 import { StorageIo } from '../../runtime/StorageIo';
-import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from '../../runtime/projectRegistrySchema';
+import { ProjectRegistrySchema, SelectionStateSchema } from '../../runtime/projectRegistrySchema';
 import { StampedValue, fileStamp } from '../../runtime/externalInput';
 
 const io = new StorageIo();
@@ -32,7 +32,7 @@ function projectSelectionPath(): string {
 
 export function lookupProjectById(projectId: string): { projectId: string; rootPath: string } | null {
   const filePath = projectRegistryPath();
-  const registry = readStamped(filePath, () => io.readJson(filePath, PROJECT_REGISTRY_MIGRATIONS));
+  const registry = readStamped(filePath, () => io.readJson(filePath, ProjectRegistrySchema));
   const project = registry?.projects.find((entry) => entry.projectId === projectId);
   if (!project?.rootPath) return null;
   return { projectId: project.projectId, rootPath: project.rootPath };

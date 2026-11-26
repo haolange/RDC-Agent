@@ -5,7 +5,6 @@
 
 import { z } from 'zod';
 import { ProjectInputRecordSchema } from '@shared/types/session';
-import type { StorageMigration } from './storedDocument';
 
 const ProjectRecordSchema = z
   .object({
@@ -35,10 +34,6 @@ export const ProjectRegistrySchema = z.object({
   schemaVersion: z.literal('1'),
   projects: z.array(ProjectRecordSchema),
 });
-
-export const PROJECT_REGISTRY_MIGRATIONS: StorageMigration<z.infer<typeof ProjectRegistrySchema>>[] = [
-  { schemaVersion: '1', schema: ProjectRegistrySchema },
-];
 
 export const SelectionStateSchema = z.object({
   projectId: z.string().nullable(),

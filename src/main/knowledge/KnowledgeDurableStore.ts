@@ -3,14 +3,12 @@ import path from 'node:path';
 import { AppError } from '@shared/errors/appError';
 import { sessionRecordStore } from '../sessions/store/sessionStores';
 import { StorageIo } from '../runtime/StorageIo';
-import { assertNoUnsupportedSchemaVersion } from '../runtime/storedDocument';
 import { withDirectoryFileLock } from '../sessions/store/directoryFileLock';
 import {
   emptyKnowledgeStateDocument,
   KNOWLEDGE_STATE_FILE,
   KNOWLEDGE_STATE_LOCK_FILE,
   KNOWLEDGE_STATE_LOCK_TIMEOUT,
-  KNOWLEDGE_STATE_SCHEMA_VERSION,
   parseKnowledgeStatePayload,
   serializeKnowledgeStateDocument,
   type KnowledgeDurableCandidate,
@@ -173,7 +171,6 @@ export class KnowledgeDurableStore {
     if (raw == null) {
       return { document: emptyKnowledgeStateDocument(), leftoverDrafts: [] };
     }
-    assertNoUnsupportedSchemaVersion(raw, KNOWLEDGE_STATE_SCHEMA_VERSION, statePath);
     return parseKnowledgeStatePayload(raw);
   }
 
@@ -189,7 +186,6 @@ export class KnowledgeDurableStore {
     if (!written) {
       throw new AppError('KNOWLEDGE_WRITE_INTEGRITY', 'durable knowledge-state.json vanished after atomic replace.');
     }
-    assertNoUnsupportedSchemaVersion(written, KNOWLEDGE_STATE_SCHEMA_VERSION, statePath);
     parseKnowledgeStatePayload(written);
   }
 

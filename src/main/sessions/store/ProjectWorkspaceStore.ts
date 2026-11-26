@@ -7,7 +7,7 @@ import { appPathService } from '../../runtime/AppPathService';
 import { hashCaptureFile } from '../../runtime/captureContentHash';
 import { safePath } from '../../runtime/replayFileSafety';
 import { createExternalCaptureReference, verifyExternalCaptureReference } from '../../runtime/ExternalCaptureReference';
-import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from '../../runtime/projectRegistrySchema';
+import { ProjectRegistrySchema, SelectionStateSchema } from '../../runtime/projectRegistrySchema';
 import { withDirectoryFileLockSync } from './directoryFileLock';
 import type { ProjectRegistry, SelectionState } from './storageTypes';
 import type { ProjectInputRecord, ProjectRecord, SessionRecord } from '@shared/types/session';
@@ -378,7 +378,7 @@ export class ProjectWorkspaceStore {
 
   readRegistry(): ProjectRegistry {
     return this.withRegistryLock(() => {
-      const loaded = this.io.readJson(this.registryPath, PROJECT_REGISTRY_MIGRATIONS);
+      const loaded = this.io.readJson(this.registryPath, ProjectRegistrySchema);
       if (!loaded) {
         const empty: ProjectRegistry = {
           schemaVersion: '1',
@@ -418,7 +418,7 @@ export class ProjectWorkspaceStore {
   }
 
   private loadRegistryUnlocked(): ProjectRegistry {
-    const loaded = this.io.readJson(this.registryPath, PROJECT_REGISTRY_MIGRATIONS);
+    const loaded = this.io.readJson(this.registryPath, ProjectRegistrySchema);
     if (!loaded) {
       return {
         schemaVersion: '1',

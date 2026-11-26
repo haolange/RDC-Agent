@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AppError } from '@shared/errors/appError';
 import { stringifyYaml } from '../../runtime/yaml';
-import { readCurrentStoredJson, StorageSchemaError } from '../../runtime/storedDocument';
+import { StorageSchemaError } from '../../runtime/storedDocument';
 import { PersistedRunRecordSchema } from './runRecord/runRecordSchema';
 import type { RunSummary } from '@shared/types/session';
 import type { PersistedRunRecord } from '../store/storageTypes';
@@ -35,14 +35,14 @@ export function readPersistedRun(
   const filePath = path.join(runPath, 'run.json');
   if (!fs.existsSync(filePath)) {
     if (fs.existsSync(path.join(runPath, 'run.yaml'))) {
-      throw new StorageSchemaError('STORAGE_SCHEMA_UNSUPPORTED', `${runPath} has run.yaml without run.json`);
+      throw new StorageSchemaError(`${runPath} has run.yaml without run.json`);
     }
     return null;
   }
-  const parsed = readCurrentStoredJson(io, filePath, '3', PersistedRunRecordSchema);
+  const parsed = io.readJson(filePath, PersistedRunRecordSchema);
   if (parsed === null) return null;
   if (parsed.runId !== runId || parsed.sessionId !== sessionId || parsed.caseId !== sessionId) {
-    throw new StorageSchemaError('STORAGE_SCHEMA', `${filePath} Run identity does not match its session or directory`);
+    throw new StorageSchemaError(`${filePath} Run identity does not match its session or directory`);
   }
   return parsed;
 }

@@ -5,7 +5,7 @@ import { appPathService } from '../runtime/AppPathService';
 import { projectWorkspaceStore } from '../sessions/store/sessionStores';
 import { StorageIo } from '../runtime/StorageIo';
 import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
-import { KNOWLEDGE_INDEX_MIGRATIONS } from './knowledgeIndexSchema';
+import { KnowledgeIndexSnapshotSchema } from './knowledgeIndexSchema';
 import {
   KNOWLEDGE_INDEX_SCHEMA_VERSION,
   knowledgeCorpusHash,
@@ -127,7 +127,7 @@ export class KnowledgeIndexService {
   }
 
   getSnapshot(): KnowledgeIndexSnapshot | null {
-    return this.dependencies.storage.readJson(this.dependencies.snapshotPath(), KNOWLEDGE_INDEX_MIGRATIONS);
+    return this.dependencies.storage.readJson(this.dependencies.snapshotPath(), KnowledgeIndexSnapshotSchema);
   }
 
   async computeLiveRevision(): Promise<string> {

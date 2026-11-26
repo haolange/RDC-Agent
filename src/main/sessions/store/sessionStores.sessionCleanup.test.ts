@@ -154,33 +154,6 @@ describe('session stores: session locations', () => {
 });
 
 describe('sessionRecordStore.removeSession side-channel cleanup', () => {
-  it('keeps an unsupported session visible without recovering or rewriting it during startup', async () => {
-    const { projectWorkspaceStore, sessionRecordStore } = await import('./sessionStores');
-    const projectRoot = path.join(tempRoot, 'unsupported-startup');
-    fs.mkdirSync(projectRoot, { recursive: true });
-    const project = await projectWorkspaceStore.createProject(projectRoot);
-    const session = sessionRecordStore.createSession(project.projectId, 'Old session');
-    const oldSession = { ...session } as Partial<typeof session>;
-    delete oldSession.schemaVersion;
-    const original = JSON.stringify(oldSession);
-    const file = path.join(session.sessionPath, 'session.json');
-    const journal = path.join(session.sessionPath, 'turn-commit.json');
-    fs.writeFileSync(file, original);
-    fs.writeFileSync(journal, 'Unsupported session journal must remain untouched');
-    await expect(projectWorkspaceStore.initializeWorkspace()).resolves.toBeUndefined();
-    expect(sessionRecordStore.listSessions(project.projectId)).toContainEqual(
-      expect.objectContaining({
-        sessionId: session.sessionId,
-        storageDiagnostic: 'unsupported-schema',
-      }),
-    );
-    expect(() => sessionRecordStore.updateSession(session.sessionId, { title: 'Changed' })).toThrow(
-      'STORAGE_SCHEMA_UNSUPPORTED',
-    );
-    expect(fs.readFileSync(file, 'utf8')).toBe(original);
-    expect(fs.readFileSync(journal, 'utf8')).toBe('Unsupported session journal must remain untouched');
-    fs.rmSync(session.sessionPath, { recursive: true, force: true });
-  });
   it('removes tasks, llm-calls, and matching trace run files for the session', async () => {
     const { projectWorkspaceStore, sessionRecordStore } = await import('./sessionStores');
     // The process composition root binds the agent runtime's per-session files as removal side channels.

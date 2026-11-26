@@ -1,8 +1,7 @@
-import { z, type ZodType } from 'zod';
+import { z } from 'zod';
 import { KNOWLEDGE_CARD_TYPES, KNOWLEDGE_LIFECYCLES } from '@shared/types/knowledge';
 import { KnowledgeRelationSchema, KnowledgeScopeSchema } from './knowledgeCardSchema';
-import { KNOWLEDGE_INDEX_SCHEMA_VERSION, type KnowledgeIndexSnapshot } from './knowledgeLanes';
-import type { StorageMigration } from '../runtime/storedDocument';
+import { KNOWLEDGE_INDEX_SCHEMA_VERSION } from './knowledgeLanes';
 
 export const KnowledgeIndexEntrySchema = z
   .object({
@@ -34,10 +33,3 @@ export const KnowledgeIndexSnapshotSchema = z
     cards: z.array(KnowledgeIndexEntrySchema),
   })
   .strict();
-
-export const KNOWLEDGE_INDEX_MIGRATIONS: StorageMigration<KnowledgeIndexSnapshot>[] = [
-  {
-    schemaVersion: String(KNOWLEDGE_INDEX_SCHEMA_VERSION),
-    schema: KnowledgeIndexSnapshotSchema as ZodType<KnowledgeIndexSnapshot>,
-  },
-];

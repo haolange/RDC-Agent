@@ -2,7 +2,6 @@ import { z, type ZodType } from 'zod';
 import { MaterialContextSchema } from '@shared/types/materialContext';
 import { RunContextUsageSummarySchema } from '@shared/types/session';
 import { REASONING_SELECTIONS } from '@shared/types/modelCapability';
-import { CURRENT_STORE_SCHEMA_VERSION, type StorageMigration } from '../../runtime/storedDocument';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ExecutionIdentity } from '@shared/types/providerCapability';
 import type { RunContextUsageSummary, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
@@ -64,7 +63,6 @@ export const SessionRecordSchema: ZodType<SessionRecord> = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'session.json requires schemaVersion 1',
-        params: { storageCode: 'STORAGE_SCHEMA_UNSUPPORTED' },
       });
     }
   })
@@ -84,11 +82,7 @@ export const ConversationTurnCommitSchema = z
     afterAttachments: z.array(z.unknown()),
     importedPaths: z.array(z.string()),
   })
-  .passthrough();
-
-export const CONVERSATION_TURN_COMMIT_MIGRATIONS: StorageMigration<ConversationTurnCommitJournal>[] = [
-  { schemaVersion: '1', schema: ConversationTurnCommitSchema as ZodType<ConversationTurnCommitJournal> },
-];
+  .passthrough() as ZodType<ConversationTurnCommitJournal>;
 
 export const ConversationTerminalSnapshotSchema = z
   .object({
@@ -125,18 +119,10 @@ export const ConversationTerminalAppendSchema = z
   })
   .strict();
 
-export const CONVERSATION_TERMINAL_COMMIT_MIGRATIONS: StorageMigration<
-  ConversationTerminalCommitJournal | ConversationTerminalAppendJournal
->[] = [
-  { schemaVersion: '1', schema: ConversationTerminalSnapshotSchema as ZodType<ConversationTerminalCommitJournal> },
-  // Both versions are valid recovery protocols; no session-data migration occurs.
-  {
-    schemaVersion: '2',
-    schema: z.union([ConversationTerminalSnapshotSchema, ConversationTerminalAppendSchema]) as ZodType<
-      ConversationTerminalCommitJournal | ConversationTerminalAppendJournal
-    >,
-  },
-];
+export const ConversationTerminalJournalSchema = z.union([
+  ConversationTerminalSnapshotSchema,
+  ConversationTerminalAppendSchema,
+]) as ZodType<ConversationTerminalCommitJournal | ConversationTerminalAppendJournal>;
 
 export const SessionAttachmentRecordSchema = z
   .object({
@@ -166,12 +152,12 @@ export interface SessionAttachmentManifestDocument {
 }
 
 export function toSessionAttachmentManifest(attachments: SessionAttachmentRecord[]): SessionAttachmentManifestDocument {
-  return { schemaVersion: CURRENT_STORE_SCHEMA_VERSION, attachments };
+  return { schemaVersion: '1', attachments };
 }
 
 export const SessionAttachmentManifestSchema = z
   .object({
-    schemaVersion: z.literal(CURRENT_STORE_SCHEMA_VERSION),
+    schemaVersion: z.literal('1'),
     attachments: SessionAttachmentRecordsSchema,
   })
   .strict()
@@ -216,13 +202,6 @@ export const SessionShellStateSchema = z.object({
 export function toSessionShellStateManifest(state: SessionShellState): SessionShellStateDocument {
   return { schemaVersion: CURRENT_SHELL_STATE_SCHEMA_VERSION, state };
 }
-
-export const SESSION_SHELL_STATE_MIGRATIONS: StorageMigration<SessionShellStateDocument>[] = [
-  {
-    schemaVersion: '1',
-    schema: SessionShellStateSchema as ZodType<SessionShellStateDocument>,
-  },
-];
 
 const isObjectValue = (value: unknown): boolean => typeof value === 'object' && value !== null && !Array.isArray(value);
 const nonBlank = z.string().refine((value) => value.trim().length > 0, 'must not be blank');

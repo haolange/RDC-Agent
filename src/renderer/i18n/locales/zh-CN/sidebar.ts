@@ -15,7 +15,6 @@ export const zhSidebar = {
   'sidebar.renameProjectTitle': '重命名项目',
   'sidebar.menuNewSession': '新建会话',
   'sidebar.menuDelete': '删除',
-  'sidebar.sessionSchemaUnsupported': '这个会话来自旧版本，当前无法打开。原文件已保留，没有改写。',
   'sidebar.addSession': '新建会话',
   'sidebar.removeSession': '删除会话',
   'sidebar.removeSessionFailed': '删除会话失败。',

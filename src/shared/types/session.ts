@@ -85,8 +85,6 @@ export interface SessionRecord {
   schemaVersion: '1';
   /** Main-derived migration notice; not a writable session field. */
   handoffNotice?: string;
-  /** In-memory list row for a session.json this build will not load. Never written back. */
-  storageDiagnostic?: 'unsupported-schema';
   sessionId: string;
   projectId: string;
   title: string;

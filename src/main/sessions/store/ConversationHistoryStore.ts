@@ -4,7 +4,6 @@ import { generateShortId, nowMs } from '@shared/utils/id';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '../../runtime/jsonl';
 import { classifyAttachmentBytes } from '../../runtime/attachmentClassify';
 import { copyFileAtomicSync } from '../../runtime/atomicFile';
-import { readCurrentStoredJson, CURRENT_STORE_SCHEMA_VERSION } from '../../runtime/storedDocument';
 import { readStoredWorkTrace, sanitizeStoredWorkTrace } from './StoredWorkTrace';
 import {
   CONVERSATION_COMPACTION_DELTA_THRESHOLD,
@@ -17,8 +16,8 @@ import {
   type ExistingConversationTurnCommit,
 } from './storageCommitTypes';
 import {
-  CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
-  CONVERSATION_TURN_COMMIT_MIGRATIONS,
+  ConversationTerminalJournalSchema,
+  ConversationTurnCommitSchema,
   ConversationHistoryRecordSchema,
   SessionAttachmentManifestSchema,
   SessionRecordSchema,
@@ -172,7 +171,7 @@ export class ConversationHistoryStore {
     branchState: ConversationBranchState | null,
   ): void {
     const journalPath = this.getConversationTurnCommitJournalPath(commit.session.sessionPath);
-    const journal = this.host.io.readJson(journalPath, CONVERSATION_TURN_COMMIT_MIGRATIONS);
+    const journal = this.host.io.readJson(journalPath, ConversationTurnCommitSchema);
     if (!journal || journal.requestId !== commit.requestId || journal.turnId !== commit.turnId) {
       throw new Error('Conversation turn commit journal is missing or belongs to another turn.');
     }
@@ -620,7 +619,6 @@ export class ConversationHistoryStore {
         }
       }
       for (const { session } of readProjectSessions(this.host, project)) {
-        if (session.storageDiagnostic) continue;
         this.recoverSessionTurnCommit(session.sessionId);
         this.recoverSessionTerminalCommit(session.sessionId);
       }
@@ -631,7 +629,7 @@ export class ConversationHistoryStore {
     const location = this.host.sessions.findSessionLocation(sessionId);
     if (!location) return;
     const journalPath = this.getConversationTurnCommitJournalPath(location.sessionPath);
-    const journal = this.host.io.readJson(journalPath, CONVERSATION_TURN_COMMIT_MIGRATIONS);
+    const journal = this.host.io.readJson(journalPath, ConversationTurnCommitSchema);
     if (!journal) return;
     const session = this.host.io.readJson(path.join(location.sessionPath, 'session.json'), SessionRecordSchema);
     if (!session) return;
@@ -647,7 +645,7 @@ export class ConversationHistoryStore {
     const location = this.host.sessions.findSessionLocation(sessionId);
     if (!location) return;
     const journalPath = this.getConversationTerminalCommitJournalPath(location.sessionPath);
-    const journal = this.host.io.readJson(journalPath, CONVERSATION_TERMINAL_COMMIT_MIGRATIONS);
+    const journal = this.host.io.readJson(journalPath, ConversationTerminalJournalSchema);
     if (!journal) return;
     const session = this.host.io.readJson(path.join(location.sessionPath, 'session.json'), SessionRecordSchema);
     if (!session) return;
@@ -715,10 +713,8 @@ export class ConversationHistoryStore {
 
   readSessionAttachments(sessionId: string): SessionAttachmentRecord[] {
     return (
-      readCurrentStoredJson(
-        this.host.io,
+      this.host.io.readJson(
         this.host.sessions.getSessionAttachmentsManifestPath(sessionId),
-        CURRENT_STORE_SCHEMA_VERSION,
         SessionAttachmentManifestSchema,
       ) ?? []
     );

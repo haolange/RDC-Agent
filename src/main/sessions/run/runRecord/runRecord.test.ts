@@ -135,22 +135,10 @@ describe('current Run persistence', () => {
     const runPath = await tempRun();
     const yamlPath = path.join(runPath, 'run.yaml');
     await writeFile(yamlPath, 'schemaVersion: "2"\nrunId: run_c\n', 'utf8');
-    expect(() => readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-    expect(await readFile(yamlPath, 'utf8')).toContain('schemaVersion');
+    expect(() => readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA/);
+    expect(await readFile(yamlPath, 'utf8')).toContain('runId');
     expect(fs.existsSync(path.join(runPath, 'run.json'))).toBe(false);
   });
-
-  it.each([undefined, '0', '1', '2', '99'])(
-    'rejects unsupported version %s without touching the source',
-    async (version) => {
-      const runPath = await tempRun();
-      const filePath = path.join(runPath, 'run.json');
-      const raw = JSON.stringify({ ...toPersistedRun(runBase()), schemaVersion: version });
-      await writeFile(filePath, raw, 'utf8');
-      expect(() => readPersistedRun(storageIo(), runPath, 'sess', 'run_c')).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
-      expect(await readFile(filePath, 'utf8')).toBe(raw);
-    },
-  );
 
   it('rejects an invalid run and mismatched directory identity without rewriting', async () => {
     const runPath = await tempRun();
