@@ -46,10 +46,10 @@
  "responses": {
   "settings:get": [
    {
-    "ref": "5b30b91f29310b843499cba4"
+    "ref": "1c6220ed0af0b7d67957b7d5"
    },
    {
-    "ref": "5b30b91f29310b843499cba4"
+    "ref": "1c6220ed0af0b7d67957b7d5"
    }
   ],
   "app:getMeta": [
@@ -61,18 +61,13 @@
     }
    }
   ],
-  "settings:getProviderCatalog": [
-   {
-    "ref": "940d6477c7fd25814c9e78e0"
-   }
-  ],
   "runtimeLog:list": [
    {
     "result": {
      "entries": [
       {
-       "id": "rlog-114aa6ec8c3b-1795681878170",
-       "timestamp": 1795681878170,
+       "id": "rlog-a3a75a1ba682-1795700920857",
+       "timestamp": 1795700920857,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -86,8 +81,8 @@
        }
       },
       {
-       "id": "rlog-e1f310fe7024-1795681878229",
-       "timestamp": 1795681878229,
+       "id": "rlog-db7b4fdc416f-1795700920913",
+       "timestamp": 1795700920913,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -99,8 +94,8 @@
        "raw": null
       },
       {
-       "id": "rlog-7b8744811925-1795681878229",
-       "timestamp": 1795681878229,
+       "id": "rlog-003041ac1db9-1795700920914",
+       "timestamp": 1795700920914,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -112,8 +107,8 @@
        "raw": null
       },
       {
-       "id": "rlog-c30eee37010f-1795681878243",
-       "timestamp": 1795681878243,
+       "id": "rlog-c8523e51ad06-1795700920930",
+       "timestamp": 1795700920930,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -134,8 +129,8 @@
     "result": {
      "entries": [
       {
-       "id": "rlog-114aa6ec8c3b-1795681878170",
-       "timestamp": 1795681878170,
+       "id": "rlog-a3a75a1ba682-1795700920857",
+       "timestamp": 1795700920857,
        "scope": "app",
        "namespace": "system",
        "severity": "info",
@@ -149,8 +144,8 @@
        }
       },
       {
-       "id": "rlog-e1f310fe7024-1795681878229",
-       "timestamp": 1795681878229,
+       "id": "rlog-db7b4fdc416f-1795700920913",
+       "timestamp": 1795700920913,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -162,8 +157,8 @@
        "raw": null
       },
       {
-       "id": "rlog-7b8744811925-1795681878229",
-       "timestamp": 1795681878229,
+       "id": "rlog-003041ac1db9-1795700920914",
+       "timestamp": 1795700920914,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -175,8 +170,8 @@
        "raw": null
       },
       {
-       "id": "rlog-c30eee37010f-1795681878243",
-       "timestamp": 1795681878243,
+       "id": "rlog-c8523e51ad06-1795700920930",
+       "timestamp": 1795700920930,
        "scope": "app",
        "namespace": "system",
        "severity": "success",
@@ -221,12 +216,17 @@
     }
    }
   ],
+  "settings:getProviderCatalog": [
+   {
+    "ref": "940d6477c7fd25814c9e78e0"
+   }
+  ],
   "settings:getEffectiveCatalog": [
    {
-    "ref": "a133edc7ae1031b7ed1aaa1e"
+    "ref": "28942f12b1f037db595e0411"
    },
    {
-    "ref": "25a4358d0b54df5c7a2d6e0d"
+    "ref": "85f37d2cb7bfefc3e31128f2"
    }
   ],
   "project:list": [
@@ -234,7 +234,7 @@
     "result": {
      "projects": [
       {
-       "projectId": "proj_80d7a2469ad4",
+       "projectId": "proj_c9a0b66999da",
        "name": "visual-diff-project",
        "rootPath": "/visual-diff/visual-diff-project",
        "slug": "visual-diff-project",
@@ -242,9 +242,9 @@
        "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
        "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
        "inputs": [],
-       "inputsUpdatedAt": 1795681898912,
-       "createdAt": 1795681880063,
-       "updatedAt": 1795681880063
+       "inputsUpdatedAt": 1795700941595,
+       "createdAt": 1795700922801,
+       "updatedAt": 1795700922801
       }
      ]
     }
@@ -254,7 +254,7 @@
    {
     "result": {
      "project": {
-      "projectId": "proj_80d7a2469ad4",
+      "projectId": "proj_c9a0b66999da",
       "name": "visual-diff-project",
       "rootPath": "/visual-diff/visual-diff-project",
       "slug": "visual-diff-project",
@@ -262,9 +262,9 @@
       "knowledgePath": "/visual-diff/visual-diff-project/.rdc-agent/knowledge",
       "inputsPath": "/visual-diff/visual-diff-project/.rdc-agent/inputs",
       "inputs": [],
-      "inputsUpdatedAt": 1795681898912,
-      "createdAt": 1795681880063,
-      "updatedAt": 1795681880063
+      "inputsUpdatedAt": 1795700941595,
+      "createdAt": 1795700922801,
+      "updatedAt": 1795700922801
      },
      "currentSession": null,
      "currentRun": null
@@ -287,7 +287,7 @@
   ],
   "rdc-runtime:overview": [
    {
-    "ref": "39f5fd8130adde2ef1c0863d"
+    "ref": "5c53e4671817f2713b5da79e"
    }
   ],
   "llm:getProbeBatch": [
@@ -301,10 +301,10 @@
   "settings:saveProviderDefinition": [
    {
     "result": {
-     "clientRevision": 1795681903925000,
+     "clientRevision": 1795700946601000,
      "providerId": "ollama",
      "status": "committed",
-     "commitHash": "8db7945776a67309c7613e890a257e4c09af07322bca669bcbfd10f393fe3481",
+     "commitHash": "1a4f07392c0332f0a73dcdcd7b871e40aff6c8ddf90da97bbf158dd93d7acce3",
      "provider": {
       "id": "ollama",
       "authAccountIds": {},
@@ -371,19 +371,19 @@
       "recommendedModels": [],
       "docsUrl": "https://ollama.com/download",
       "status": "verified",
-      "lastTestedAt": "2026-11-26T08:31:29.364Z",
-      "lastModelRefreshAt": "2026-11-26T08:31:29.364Z",
+      "lastTestedAt": "2026-11-26T13:48:52.072Z",
+      "lastModelRefreshAt": "2026-11-26T13:48:52.072Z",
       "isConfigured": true,
       "capabilities": [
        "chat",
        "model-discovery"
       ]
      },
-     "catalogRevision": "6658769d0a0da873f86c2c09e467d5618d03b3196ac17bc55992bac3c2520671",
+     "catalogRevision": "f8e593f42b28ddf52da4bff26c7505aa906cd186b984230065653299a0c6109f",
      "lastSuccessful": {
-      "clientRevision": 1795681903925000,
+      "clientRevision": 1795700946601000,
       "providerId": "ollama",
-      "commitHash": "8db7945776a67309c7613e890a257e4c09af07322bca669bcbfd10f393fe3481",
+      "commitHash": "1a4f07392c0332f0a73dcdcd7b871e40aff6c8ddf90da97bbf158dd93d7acce3",
       "provider": {
        "id": "ollama",
        "authAccountIds": {},
@@ -450,25 +450,25 @@
        "recommendedModels": [],
        "docsUrl": "https://ollama.com/download",
        "status": "verified",
-       "lastTestedAt": "2026-11-26T08:31:29.364Z",
-       "lastModelRefreshAt": "2026-11-26T08:31:29.364Z",
+       "lastTestedAt": "2026-11-26T13:48:52.072Z",
+       "lastModelRefreshAt": "2026-11-26T13:48:52.072Z",
        "isConfigured": true,
        "capabilities": [
         "chat",
         "model-discovery"
        ]
       },
-      "catalogRevision": "6658769d0a0da873f86c2c09e467d5618d03b3196ac17bc55992bac3c2520671"
+      "catalogRevision": "f8e593f42b28ddf52da4bff26c7505aa906cd186b984230065653299a0c6109f"
      },
      "revision": 4
     }
    },
    {
     "result": {
-     "clientRevision": 1795681904536000,
+     "clientRevision": 1795700947214000,
      "providerId": "ollama",
      "status": "committed",
-     "commitHash": "8db7945776a67309c7613e890a257e4c09af07322bca669bcbfd10f393fe3481",
+     "commitHash": "1a4f07392c0332f0a73dcdcd7b871e40aff6c8ddf90da97bbf158dd93d7acce3",
      "provider": {
       "id": "ollama",
       "authAccountIds": {},
@@ -535,19 +535,19 @@
       "recommendedModels": [],
       "docsUrl": "https://ollama.com/download",
       "status": "verified",
-      "lastTestedAt": "2026-11-26T08:31:29.364Z",
-      "lastModelRefreshAt": "2026-11-26T08:31:29.364Z",
+      "lastTestedAt": "2026-11-26T13:48:52.072Z",
+      "lastModelRefreshAt": "2026-11-26T13:48:52.072Z",
       "isConfigured": true,
       "capabilities": [
        "chat",
        "model-discovery"
       ]
      },
-     "catalogRevision": "6658769d0a0da873f86c2c09e467d5618d03b3196ac17bc55992bac3c2520671",
+     "catalogRevision": "f8e593f42b28ddf52da4bff26c7505aa906cd186b984230065653299a0c6109f",
      "lastSuccessful": {
-      "clientRevision": 1795681904536000,
+      "clientRevision": 1795700947214000,
       "providerId": "ollama",
-      "commitHash": "8db7945776a67309c7613e890a257e4c09af07322bca669bcbfd10f393fe3481",
+      "commitHash": "1a4f07392c0332f0a73dcdcd7b871e40aff6c8ddf90da97bbf158dd93d7acce3",
       "provider": {
        "id": "ollama",
        "authAccountIds": {},
@@ -614,15 +614,15 @@
        "recommendedModels": [],
        "docsUrl": "https://ollama.com/download",
        "status": "verified",
-       "lastTestedAt": "2026-11-26T08:31:29.364Z",
-       "lastModelRefreshAt": "2026-11-26T08:31:29.364Z",
+       "lastTestedAt": "2026-11-26T13:48:52.072Z",
+       "lastModelRefreshAt": "2026-11-26T13:48:52.072Z",
        "isConfigured": true,
        "capabilities": [
         "chat",
         "model-discovery"
        ]
       },
-      "catalogRevision": "6658769d0a0da873f86c2c09e467d5618d03b3196ac17bc55992bac3c2520671"
+      "catalogRevision": "f8e593f42b28ddf52da4bff26c7505aa906cd186b984230065653299a0c6109f"
      },
      "revision": 4
     }
