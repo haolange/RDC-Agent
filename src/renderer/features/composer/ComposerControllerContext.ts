@@ -1,8 +1,9 @@
 import { createContext, useContext } from 'react';
-import type { ComposerMarkdownMode } from './ComposerMarkdownInput';
 import type { ComposerController } from './useComposer';
 import type { useSlashCommand } from './useSlashCommand';
 import type { SessionRecord } from '@shared/types/session';
+
+export type ComposerMarkdownMode = 'write' | 'preview';
 
 /** What the Composer's parts read: the controller and what the shell derives from the current session around it. */
 export interface ComposerView {

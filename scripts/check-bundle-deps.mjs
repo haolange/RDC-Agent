@@ -12,8 +12,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-/** Bytes the renderer entry chunk may reach; heavy renderers load on demand (markdownEnhancers, mermaid). */
-const ENTRY_CHUNK_BUDGET = 4_400_000;
+/** Bytes the renderer entry chunk may reach; heavy renderers load on demand (markdownEnhancers, mermaid, CodeMirror). */
+const ENTRY_CHUNK_BUDGET = 3_100_000;
 /** Provided by the Electron runtime itself, never shipped from node_modules. */
 const RUNTIME_PROVIDED = new Set(['electron']);
 

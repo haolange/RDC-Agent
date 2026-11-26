@@ -6,6 +6,7 @@ import { Chevron } from '../../ui/Chevron';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { ScopedWorkDisclosure, useScopedWorkDisclosure } from './ScopedWorkDisclosure';
 import { buildWorkProcessPresentation, formatTraceDuration } from './workProcessTracePresentation';
+import { useThinkingMarkdownParser } from './workProcessThinkingContent';
 import { WorkProcessContent } from './WorkProcessContent';
 import { WorkProcessFoldProvider } from './workProcessFold';
 import { useWorkClock } from './useWorkClock';
@@ -31,9 +32,12 @@ const awaitsPlanReview = (trace: ConversationWorkTrace): boolean =>
 const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer }) => {
   const { t, language } = useI18n();
   const localized = useMemo(() => withLanguage(t, language), [t, language]);
+  // Thinking rows are re-judged once the Markdown parser arrives.
+  const thinkingParser = useThinkingMarkdownParser();
   const presentation = useMemo(
     () => buildWorkProcessPresentation(trace, localized, { reply: answer ?? '' }),
-    [trace, localized, answer],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- thinkingParser changes what the build reads
+    [trace, localized, answer, thinkingParser],
   );
   const inProgress = trace.status === 'running';
   // Waiting on the person is not work: the header stops its signal, but the window keeps following the plan card.

@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkProcess } from './WorkProcess';
+import { loadThinkingMarkdownParser } from './workProcessThinkingContent';
 import type { ConversationThinkingItem, ConversationWorkTrace } from '@shared/types/conversation';
 
 vi.mock('../../i18n', () => ({
@@ -128,9 +129,13 @@ describe('Work Process thinking markdown', () => {
     expect(html).toContain('work-process-thinking-preview');
   });
 
-  it.each(['   \n', '[ref]: https://example.com', '## ###'])('omits an empty thinking row for %j', (value) => {
-    expect(renderThinking(value)).not.toContain('data-testid="work-process-thinking"');
-  });
+  it.each(['   \n', '[ref]: https://example.com', '## ###'])(
+    'omits an empty thinking row for %j once the Markdown parser has loaded',
+    async (value) => {
+      await loadThinkingMarkdownParser();
+      expect(renderThinking(value)).not.toContain('data-testid="work-process-thinking"');
+    },
+  );
 
   it('omits hidden thinking before Markdown rendering', () => {
     expect(renderThinking('# Hidden reasoning', 'hidden')).not.toContain('Hidden reasoning');

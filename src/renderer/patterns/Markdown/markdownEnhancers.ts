@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
+import { whenIdle } from '../../lib/whenIdle';
 import type { HLJSApi } from 'highlight.js';
 import type { Options } from 'react-markdown';
 
@@ -61,9 +62,7 @@ export function useMarkdownEnhancers(): MarkdownEnhancers | null {
 }
 
 export function prefetchMarkdownEnhancers(): void {
-  const start = () => {
+  whenIdle(() => {
     void loadMarkdownEnhancers();
-  };
-  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(start, { timeout: 2000 });
-  else window.setTimeout(start, 200);
+  });
 }

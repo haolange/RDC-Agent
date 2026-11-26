@@ -194,7 +194,7 @@ Settings 页标题与正文共用面板内边距。
 
 共享 `Textarea` 是多行纯文本输入唯一实现。`sizing="content"` 从一行随内容增长，默认最多八行再内部滚动，清空后收缩；初始/异步值、宽度和字体变化及折叠展开均重新测量。动态尺寸使用 CSP 允许的 constructable stylesheet，不使用内联样式，不提供手动拖拽角。
 
-`sizing="fill"` 用于技能、策略等全文编辑：上级 flex/grid 传递剩余高度，标题、标识与操作栏按内容占位，正文吸收余高并内部滚动，不叠固定像素上限。窄屏资源列表限高、正文保留可用编辑面积。Composer 的发送、IME、快捷键保持领域所有权；CodeMirror 是专用 Markdown 编辑实现，不复制普通 textarea 的测量逻辑。
+`sizing="fill"` 用于技能、策略等全文编辑：上级 flex/grid 传递剩余高度，标题、标识与操作栏按内容占位，正文吸收余高并内部滚动，不叠固定像素上限。窄屏资源列表限高、正文保留可用编辑面积。Composer 的发送、IME、快捷键保持领域所有权；CodeMirror 是专用 Markdown 编辑实现，不复制普通 textarea 的测量逻辑。CodeMirror 不进入口 chunk：它按需加载（`features/composer/composerMarkdownLoader.ts`，应用空闲时预取），加载完成前 Markdown Composer 显示同尺寸的普通输入框并绑定同一草稿，编辑器接管时若输入框有焦点则把焦点与光标（末尾）交给编辑器；思考行是否可见所用的 Markdown 解析器同样按需加载，加载前非空文本一律可见，加载后重新判定。
 
 ## 颜色使用规则
 

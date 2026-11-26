@@ -6,6 +6,8 @@ import { enablePseudoLocale } from './i18n/pseudoLocale';
 import { browserAppBridgeInstalled, installRendererApi } from './platform/rendererApi';
 import { installInteractionPerformanceProbe } from './platform/performance/InteractionPerformanceProbe';
 import { prefetchMarkdownEnhancers } from './patterns/Markdown/markdownEnhancers';
+import { prefetchComposerMarkdownInput } from './features/composer/composerMarkdownLoader';
+import { prefetchThinkingMarkdownParser } from './features/transcript/workProcessThinkingContent';
 import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
 import './styles/global.css';
@@ -23,5 +25,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>,
 );
 
-// Code highlighting and math rendering are not needed for the first paint; fetch them once the app is idle.
+// Code highlighting, math rendering and CodeMirror (the Markdown Composer's editor and the parser that decides which
+// thinking text renders) are not needed for the first paint; fetch them once the app is idle.
 prefetchMarkdownEnhancers();
+prefetchComposerMarkdownInput();
+prefetchThinkingMarkdownParser();

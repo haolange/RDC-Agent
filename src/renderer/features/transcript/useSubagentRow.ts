@@ -9,6 +9,7 @@ import { getToolVerb } from './workProcessToolRows';
 import { formatDurationMs } from './workProcessFormat';
 import { useWorkClock } from './useWorkClock';
 import { buildWorkProcessPresentation } from './workProcessTracePresentation';
+import { useThinkingMarkdownParser } from './workProcessThinkingContent';
 import { useDelegationTrace } from './useDelegationTrace';
 import { isActiveSubagentStatus, subagentStatus, subagentTraceStatus, type SubagentWorkRow } from './subagentRowModel';
 import type { AgentMode } from '@shared/types/layout';
@@ -46,7 +47,13 @@ export function useSubagentRow(
     [status, page.steps, header?.completedAt],
   );
   const localized = React.useMemo(() => withLanguage(t, language), [t, language]);
-  const presentation = React.useMemo(() => buildWorkProcessPresentation(trace, localized), [trace, localized]);
+  // Thinking rows are re-judged once the Markdown parser arrives.
+  const thinkingParser = useThinkingMarkdownParser();
+  const presentation = React.useMemo(
+    () => buildWorkProcessPresentation(trace, localized),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- thinkingParser changes what the build reads
+    [trace, localized, thinkingParser],
+  );
   const route = header?.preparedRoute;
   const modelLabel = useModelDisplayLabel(route?.providerId, route?.modelId);
   return {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs } from '../../ui/Tabs';
 import { useI18n } from '../../i18n';
-import type { ComposerMarkdownMode } from './ComposerMarkdownInput';
+import type { ComposerMarkdownMode } from './ComposerControllerContext';
 import './ComposerMarkdownInput.css';
 
 interface ComposerMarkdownModeTabsProps {

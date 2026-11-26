@@ -1,5 +1,3 @@
-import { redo, redoDepth, undo, undoDepth } from '@codemirror/commands';
-import { EditorView } from '@codemirror/view';
 import { sanitizePastedText } from './contextMenuSanitize';
 import { resolveReadonlySurface } from './contextMenuTarget';
 import type { ContextMenuTarget } from './contextMenuTarget';
@@ -27,19 +25,43 @@ function runExec(command: string, value?: string): boolean {
   }
 }
 
-const registeredViews = new WeakMap<HTMLElement, EditorView>();
-
-export function registerCodeMirrorView(host: HTMLElement, view: EditorView | null): void {
-  if (view) {
-    registeredViews.set(host, view);
-    registeredViews.set(view.contentDOM, view);
-    return;
-  }
-  registeredViews.delete(host);
+/**
+ * What the context menu does to a CodeMirror editor. The editor registers it when it mounts, so the menu runs editor
+ * commands without loading CodeMirror itself: CodeMirror is only in the bundle once an editor needs it.
+ */
+export interface CodeMirrorCommandSurface {
+  undoDepth: () => number;
+  redoDepth: () => number;
+  undo: () => void;
+  redo: () => void;
+  focus: () => void;
+  selectAll: () => void;
+  selectedText: () => string;
+  replaceSelection: (text: string) => void;
 }
 
-function findCodeMirrorView(element: HTMLElement): EditorView | null {
-  return registeredViews.get(element) ?? EditorView.findFromDOM(element) ?? null;
+const registeredSurfaces = new WeakMap<HTMLElement, CodeMirrorCommandSurface>();
+
+/** Registers an editor under its host and content elements; a null surface unregisters the host. */
+export function registerCodeMirrorSurface(
+  host: HTMLElement,
+  content: HTMLElement | null,
+  surface: CodeMirrorCommandSurface | null,
+): void {
+  if (surface && content) {
+    registeredSurfaces.set(host, surface);
+    registeredSurfaces.set(content, surface);
+    return;
+  }
+  registeredSurfaces.delete(host);
+}
+
+function findCodeMirrorSurface(element: HTMLElement): CodeMirrorCommandSurface | null {
+  for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+    const surface = registeredSurfaces.get(node);
+    if (surface) return surface;
+  }
+  return null;
 }
 
 function focusTarget(element: HTMLElement): void {
@@ -50,8 +72,8 @@ function focusTarget(element: HTMLElement): void {
 
 export function canUndo(target: ContextMenuTarget): boolean {
   if (target.kind === 'codemirror' && target.element) {
-    const view = findCodeMirrorView(target.element);
-    return Boolean(view && undoDepth(view.state) > 0);
+    const surface = findCodeMirrorSurface(target.element);
+    return Boolean(surface && surface.undoDepth() > 0);
   }
   if (target.kind === 'editable') return queryEnabled('undo');
   return false;
@@ -59,8 +81,8 @@ export function canUndo(target: ContextMenuTarget): boolean {
 
 export function canRedo(target: ContextMenuTarget): boolean {
   if (target.kind === 'codemirror' && target.element) {
-    const view = findCodeMirrorView(target.element);
-    return Boolean(view && redoDepth(view.state) > 0);
+    const surface = findCodeMirrorSurface(target.element);
+    return Boolean(surface && surface.redoDepth() > 0);
   }
   if (target.kind === 'editable') return queryEnabled('redo');
   return false;
@@ -82,35 +104,35 @@ async function runCodeMirrorCommand(
   host: ContextMenuCommandHost,
 ): Promise<void> {
   if (!target.element) return;
-  const view = findCodeMirrorView(target.element);
-  if (!view) return;
-  view.focus();
+  const surface = findCodeMirrorSurface(target.element);
+  if (!surface) return;
+  surface.focus();
   if (id === 'undo') {
-    undo(view);
+    surface.undo();
     return;
   }
   if (id === 'redo') {
-    redo(view);
+    surface.redo();
     return;
   }
   if (id === 'selectAll') {
-    view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } });
+    surface.selectAll();
     return;
   }
-  const selected = view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to);
+  const selected = surface.selectedText();
   if (id === 'copy') {
     await host.copyText(selected);
     return;
   }
   if (id === 'cut' && target.writable) {
     await host.copyText(selected);
-    view.dispatch(view.state.replaceSelection(''));
+    surface.replaceSelection('');
     return;
   }
   if ((id === 'paste' || id === 'pasteSanitized') && target.writable) {
     const raw = await host.readText();
     const text = id === 'pasteSanitized' ? sanitizePastedText(raw) : raw;
-    view.dispatch(view.state.replaceSelection(text));
+    surface.replaceSelection(text);
   }
 }
 
