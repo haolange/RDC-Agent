@@ -121,6 +121,26 @@ describe('missionCompletionContract', () => {
     expect(() => enforceMissionTurnReadiness({ ...input, disposition: 'partial', sessionId: null })).not.toThrow();
   });
 
+  it('reports a record that breaks an invariant on read as a completion denial, not a turn failure', () => {
+    const { service } = createInvestigationHarness();
+    const broken = Object.assign(Object.create(service), {
+      list: () => {
+        throw new InvestigationError('INVESTIGATION_INVARIANT_VIOLATION', 'S-CLAIM-01: projection no longer matches.');
+      },
+    });
+    const input = {
+      profileId: 'general',
+      completionContract: 'investigation-report' as const,
+      investigationMission: 'debugger' as const,
+      sessionId: SESSION_ID,
+      disposition: 'completed' as const,
+      service: broken,
+    };
+    expect(() => enforceMissionTurnReadiness(input)).toThrow(
+      expect.objectContaining({ code: 'MISSION_COMPLETION_DENIED', reason: 'record_invalid' }),
+    );
+  });
+
   it('does not constrain General', () => {
     expect(
       enforceMissionTurnCompletion({

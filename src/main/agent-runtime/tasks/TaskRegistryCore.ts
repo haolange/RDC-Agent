@@ -2,7 +2,7 @@ import * as crypto from 'crypto';
 import { AppError } from '@shared/errors/appError';
 import { FileTaskStore, type TaskStore } from './TaskStore';
 import { projectTaskItems, type ProjectedTaskItem } from './taskProjection';
-import { taskDependencyWait } from './taskDependencies';
+import { isPartialDelivery, taskDependencyWait } from './taskDependencies';
 import {
   assertApprovedTaskRequirement,
   assertTaskExecutionCompletion,
@@ -95,7 +95,7 @@ export class TaskRegistryCore {
         ? await this.store.loadExecution(dependency.currentExecutionId)
         : undefined;
       if (taskDependencyWait(dependencyId, dependency, proof)) return false;
-      if (dependency) {
+      if (dependency && !isPartialDelivery(dependency, proof)) {
         try {
           await this.assertCanComplete(dependency, undefined, new Set([task.id]));
         } catch (error) {
@@ -200,7 +200,8 @@ export class TaskRegistryCore {
         : undefined;
       if (taskDependencyWait(id, dependency, proof))
         throw new TaskCompletionUnavailable('Task dependencies are not completed with verified results.');
-      if (dependency) await this.assertCanComplete(dependency, undefined, visiting);
+      if (dependency && !isPartialDelivery(dependency, proof))
+        await this.assertCanComplete(dependency, undefined, visiting);
     }
     const children = (await this.store.listTasks()).filter((candidate) => candidate.parentTaskId === task.id);
     const unresolved = children.filter((child) => child.status !== 'completed' && child.status !== 'cancelled');

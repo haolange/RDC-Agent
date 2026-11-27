@@ -25,7 +25,8 @@ export type MissionCompletionDenialReason =
   | 'non_complete_status'
   | 'open_challenge'
   | 'budget_evidence'
-  | 'mission_method';
+  | 'mission_method'
+  | 'record_invalid';
 
 export class MissionCompletionError extends AppError {
   readonly reason: MissionCompletionDenialReason;
@@ -91,15 +92,31 @@ export function enforceMissionTurnCompletion(input: MissionCompletionInput): Mis
       'budget pause requires a current root limit and a referenced current checkpoint with unresolved work.',
     );
   }
-  return assertMissionTurnCompletion(input);
+  return asCompletionDenial(() => assertMissionTurnCompletion(input));
+}
+
+/**
+ * A record that breaks an investigation invariant when it is read back is a reason the mission cannot complete yet,
+ * which the model can repair; it is not a failure of the turn.
+ */
+function asCompletionDenial<T>(check: () => T): T {
+  try {
+    return check();
+  } catch (error) {
+    if (error instanceof InvestigationError)
+      throw new MissionCompletionError('record_invalid', error.message, { code: error.code });
+    throw error;
+  }
 }
 
 /** Check the declared report before completion and check it again at the terminal boundary. */
 export function enforceMissionTurnReadiness(input: MissionReadinessInput): void {
   if (!declaredMission(input) || input.disposition !== 'completed') return;
-  const { mission, sessionId, service, readyReports } = requireMissionCompletionArtifacts(input);
-  const report = requireReferencedReport(input, mission, readyReports);
-  assertReportEligible(report, mission, service, sessionId);
+  asCompletionDenial(() => {
+    const { mission, sessionId, service, readyReports } = requireMissionCompletionArtifacts(input);
+    const report = requireReferencedReport(input, mission, readyReports);
+    assertReportEligible(report, mission, service, sessionId);
+  });
 }
 
 function requireMissionCompletionArtifacts(input: MissionReadinessInput): {
