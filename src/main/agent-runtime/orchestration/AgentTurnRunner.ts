@@ -511,7 +511,13 @@ export class AgentTurnRunner {
       turn: turnHandle,
       host,
     });
-    await turnHandle.captureControl.initialize();
+    try {
+      await turnHandle.captureControl.initialize();
+    } catch (error) {
+      // A replay the host could not recover ends the turn before the model runs, under the recovery's own code.
+      if (error instanceof AppError) throw new RdcRecoveryBlockedError(error.code, error.message);
+      throw error;
+    }
   }
 
   /** Run the prompt, enforce the turn's completion contract, and finalize whatever the outcome. */

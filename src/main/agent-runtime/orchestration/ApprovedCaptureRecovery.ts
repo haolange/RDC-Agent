@@ -1,6 +1,11 @@
 import { AppError } from '@shared/errors/appError';
 import { samePath } from '../../platform/paths';
-import { getDelegatedChildSessionId, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
+import {
+  getDelegatedChildSessionId,
+  getRdcContextLease,
+  quarantinedRdcContextLease,
+} from '../../rdc/RdcRuntimeContextRegistry';
+import { recoverSessionCapture, sessionCaptureFaulted } from '../../rdc/RdcCaptureRecovery';
 import { rdcSessionService } from '../../rdc/RdcSessionService';
 import { replayDeviceService } from '../../rdc/captures/ReplayDeviceService';
 import { readRdcContextStatus, rdcRecoveryObservation } from '../../rdc/RdcContextStatus';
@@ -19,6 +24,20 @@ import type { RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import type { RecoveryFacts } from './ApprovedCaptureController';
 
 type Destination = { inputId: string; contentSha256: string; deviceId: string };
+
+/** The session-level recovery members of the capture host: the quarantined lease, the fault, the host's recovery. */
+export function sessionRecoveryHost(scope: { sessionId: string; projectId: string }, turnId: string) {
+  return {
+    quarantinedContext() {
+      const lease = quarantinedRdcContextLease(scope);
+      return lease ? { contextId: lease.contextId, leaseVersion: lease.version } : null;
+    },
+    sessionFaulted: () => sessionCaptureFaulted(scope),
+    async recoverSession() {
+      await recoverSessionCapture(scope, { kind: 'turn', turnId });
+    },
+  };
+}
 
 /**
  * What recovery may act on: the quarantined owning lease, still the one `point` verified, its projection, the frozen

@@ -18,7 +18,7 @@
       "lines": 209
     },
     "src/main/agent-runtime/orchestration/ApprovedCaptureHost.ts": {
-      "lines": 240
+      "lines": 237
     },
     "src/main/agent-runtime/orchestration/BackgroundSubagentService.ts": {
       "lines": 317
@@ -119,9 +119,6 @@
     "src/main/rdc/executeRdcShell.ts": {
       "lines": 343,
       "complexity": 49
-    },
-    "src/main/rdc/RdcCaptureRecovery.ts": {
-      "complexity": 46
     },
     "src/main/rdc/RdcDevicePreparation.ts": {
       "lines": 226,

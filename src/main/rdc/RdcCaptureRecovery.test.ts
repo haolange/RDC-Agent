@@ -25,6 +25,7 @@ const mock = vi.hoisted(() => ({
   daemons: vi.fn(),
   status: vi.fn(),
   ledger: vi.fn(),
+  observed: vi.fn(),
 }));
 vi.mock('./RdcSessionService', () => ({
   rdcSessionService: {
@@ -65,12 +66,16 @@ vi.mock('./OwnedRdcDaemonRegistry', () => ({
   ownsRdcContextDaemon: () => false,
   releaseFaultedRdcContext: () => undefined,
 }));
+vi.mock('./RdcProcessIdentity', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./RdcProcessIdentity')>()),
+  observedRdcProcessIdentity: mock.observed,
+}));
 vi.mock('./RdcLifecycleReceipts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./RdcLifecycleReceipts')>()),
   rdcLifecycleReceipts: { pending: mock.pending, write: mock.write },
 }));
 
-import { captureRecoveryStatus, restorePreviousCapture } from './RdcCaptureRecovery';
+import { captureRecoveryStatus, recoverSessionCapture, restorePreviousCapture } from './RdcCaptureRecovery';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 const cli = {
   enabled: true,
@@ -155,6 +160,7 @@ beforeEach(() => {
   mock.device.mockReturnValue({ id: 'local', type: 'local', status: 'online' });
   mock.catalog.mockResolvedValue({ tools: [] });
   mock.daemons.mockReturnValue([]);
+  mock.observed.mockReturnValue(null);
   mock.deviceOwner.mockReturnValue(null);
   mock.snapshot.mockImplementation(() => structuredClone(state));
   mock.opened.mockImplementation(() => opened);
@@ -296,4 +302,45 @@ it('closes a quarantined replay only when the shared admission explains its proc
   expect(mock.clear).toHaveBeenCalledOnce();
   expect(mock.status).toHaveBeenLastCalledWith(expect.objectContaining({ contextId: 'old' }));
   expect(mock.ledger).toHaveBeenLastCalledWith(expect.objectContaining({ decision: 'rebuild' }));
+});
+
+it('rebuilds a quarantined replay with no signed baseline for the owning turn before its model starts', async () => {
+  unresolved = false;
+  state = {
+    ...state,
+    phase: 'error',
+    contextId: 'old',
+    inputId: 'a',
+    captureHash: 'a'.repeat(64),
+    replayDeviceId: 'local',
+  };
+  lease = {
+    contextId: 'old',
+    version: 1,
+    ownerSessionId: 's',
+    ownerProjectId: 'p',
+    quarantineReason: 'worker stuck',
+    runtimeContext: { captureFileId: 'file', replaySessionId: 'replay' },
+  };
+  mock.observed.mockReturnValue(processIdentity);
+  mock.status.mockResolvedValueOnce(stuckContextStatus());
+  // The turn recovers under its own lock; nothing else may hold the session meanwhile.
+  await expect(recoverSessionCapture(scope, { kind: 'turn', turnId: 'turn-1' })).rejects.toThrow(
+    'RDC_RECOVERY_OWNER_INVALID',
+  );
+  setRdcInteractionLock('s', 'turn-1', true);
+  try {
+    mock.status.mockResolvedValueOnce(stuckContextStatus());
+    const result = await recoverSessionCapture(scope, { kind: 'turn', turnId: 'turn-1' });
+    expect(result).toMatchObject({ phase: 'ready', contextId: 'new', inputId: 'a' });
+    expect(mock.clear).toHaveBeenCalledOnce();
+    expect(mock.open).toHaveBeenCalledOnce();
+    expect(mock.write).not.toHaveBeenCalled();
+    expect(mock.ledger).toHaveBeenLastCalledWith(expect.objectContaining({ decision: 'rebuild' }));
+  } finally {
+    setRdcInteractionLock('s', 'turn-1', false);
+  }
+  await expect(recoverSessionCapture(scope, { kind: 'turn', turnId: 'turn-1' })).rejects.toThrow(
+    'RDC_RECOVERY_NOT_REQUIRED',
+  );
 });

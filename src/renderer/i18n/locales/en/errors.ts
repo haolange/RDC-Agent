@@ -383,7 +383,6 @@ export const enErrors = {
   'errors.RDC_ORIGINAL_REPLACEMENTS_UNRESTORABLE':
     "The original capture has active replacements, so it can't be restored.",
   'errors.RDC_PERMISSION_UNREGISTERED': "This RenderDoc operation has no permission rule, so it wasn't run.",
-  'errors.RDC_PREVIOUS_RESTORE_REQUIRED': 'Restore the previous position in Capture first.',
   'errors.RDC_PROBE_DEVICE_MISMATCH': 'The selected and prepared devices differ.',
   'errors.RDC_PROBE_DEVICE_REQUIRED': 'Prepare the replay device in Capture first.',
   'errors.RDC_PROBE_LIFECYCLE': "Opening and closing captures isn't a query.",

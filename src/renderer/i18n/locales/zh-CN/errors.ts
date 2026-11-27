@@ -355,7 +355,6 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.RDC_OBSERVATION_TARGET_INVALID': '观测目标无效。',
   'errors.RDC_ORIGINAL_REPLACEMENTS_UNRESTORABLE': '原 capture 仍有生效的替换，无法恢复。',
   'errors.RDC_PERMISSION_UNREGISTERED': '此 RenderDoc 操作没有权限规则，未执行。',
-  'errors.RDC_PREVIOUS_RESTORE_REQUIRED': '请先在 Capture 中恢复之前的位置。',
   'errors.RDC_PROBE_DEVICE_MISMATCH': '所选设备与已准备的设备不同。',
   'errors.RDC_PROBE_DEVICE_REQUIRED': '请先在 Capture 中准备回放设备。',
   'errors.RDC_PROBE_LIFECYCLE': '打开和关闭 capture 不属于查询操作。',

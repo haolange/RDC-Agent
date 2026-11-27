@@ -4,7 +4,6 @@ import {
   assertRdcContextLeaseOwnership,
   getDelegatedChildSessionId,
   getRdcContextLease,
-  quarantinedRdcContextLease,
   registerRdcFault,
 } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
@@ -25,7 +24,7 @@ import { TaskRegistry, createSessionTaskStore } from '../tasks';
 import { listActiveDelegations } from './DirectTaskTurnLifecycle';
 import { prepareRdcRuntimeEpoch } from './RdcRuntimeReprepare';
 import { joinFaultedRdcChild } from './RdcRecoveryChildren';
-import { inspectQuarantinedCapture, reopenQuarantinedCapture } from './ApprovedCaptureRecovery';
+import { inspectQuarantinedCapture, reopenQuarantinedCapture, sessionRecoveryHost } from './ApprovedCaptureRecovery';
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
 import type { InvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
 import type { ExecutionOffer } from '../../sessions/run/executionOffer';
@@ -92,10 +91,7 @@ export function createApprovedCaptureHost(input: {
   return {
     assertPlan,
     pendingRecord: () => rdcLifecycleReceipts.pending(input.sessionId, input.projectId),
-    quarantinedContext() {
-      const lease = quarantinedRdcContextLease(scope);
-      return lease ? { contextId: lease.contextId, leaseVersion: lease.version } : null;
-    },
+    ...sessionRecoveryHost(scope, input.turn.turnId),
     prepareReceipts: () => rdcLifecycleReceipts.prepare(),
     async quiescent(mode) {
       assertOwningTurn();
