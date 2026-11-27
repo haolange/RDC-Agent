@@ -6,6 +6,7 @@ import { IconButton } from '../../ui/IconButton';
 import { InlineError } from '../../ui/InlineError';
 import { FailureAlert } from '../../patterns/FailureAlert';
 import { HandoffActionRow } from '../../patterns/HandoffActionRow/HandoffActionRow';
+import { PlanAuthorizationList } from '../../patterns/PlanAuthorizationList/PlanAuthorizationList';
 import { cancelPlanReview } from '../../services/planReviewService';
 import { useElectronApi } from '../../hooks/useElectronApi';
 import { ComposerModelEffortControl, type ComposerModelSaveState } from './ComposerModelEffortControl';
@@ -25,9 +26,8 @@ export const PlanReviewRequestPanel: React.FC<{
   const { t } = useI18n();
   const api = useElectronApi();
   const submit = usePlanReviewSubmit(continuation);
-  const { capabilityState, retryCapability } = useComposerTurnControls();
+  const { capabilityState } = useComposerTurnControls();
   const modelAvailable = capabilityState.status === 'ready' || capabilityState.status === 'refreshing';
-  const modelStatus = capabilityStatusPresentation(capabilityState);
   const [feedback, setFeedback] = useState('');
   const feedbackRef = useRef<HTMLTextAreaElement>(null);
   const [multiline, setMultiline] = useState(false);
@@ -106,6 +106,7 @@ export const PlanReviewRequestPanel: React.FC<{
         </IconButton>
       </div>
       <div className="composer-plan-review__body">
+        <PlanAuthorizationList authorizations={request.planReview.authorizations ?? []} />
         <HandoffActionRow
           presentation="decisions"
           options={request.planReview.handoffOptions}
@@ -155,19 +156,7 @@ export const PlanReviewRequestPanel: React.FC<{
           {isSubmitting ? t('composer.handoff.confirming') : ''}
         </span>
         {error ? <FailureAlert reason={error.reason} contextKey="app.error.actionFailed" /> : null}
-        {modelStatus.labelKey && (capabilityState.status === 'error' || capabilityState.status === 'unavailable') ? (
-          <InlineError
-            detail={capabilityState.message}
-            onRetry={retryCapability}
-            retryLabel={t('composer.effort.capabilityRetry')}
-          >
-            {t(modelStatus.labelKey)}
-          </InlineError>
-        ) : modelStatus.labelKey ? (
-          <p className="composer-transition-status" role="status">
-            {t(modelStatus.labelKey)}
-          </p>
-        ) : null}
+        <PlanReviewModelStatus />
       </div>
       <div className="composer-plan-review__footer">
         <ComposerModelEffortControl
@@ -178,5 +167,26 @@ export const PlanReviewRequestPanel: React.FC<{
         />
       </div>
     </section>
+  );
+};
+
+/** The selected model's capability, shown only while it delays or blocks approving the plan. */
+const PlanReviewModelStatus: React.FC = () => {
+  const { t } = useI18n();
+  const { capabilityState, retryCapability } = useComposerTurnControls();
+  const { labelKey } = capabilityStatusPresentation(capabilityState);
+  if (!labelKey) return null;
+  return capabilityState.status === 'error' || capabilityState.status === 'unavailable' ? (
+    <InlineError
+      detail={capabilityState.message}
+      onRetry={retryCapability}
+      retryLabel={t('composer.effort.capabilityRetry')}
+    >
+      {t(labelKey)}
+    </InlineError>
+  ) : (
+    <p className="composer-transition-status" role="status">
+      {t(labelKey)}
+    </p>
   );
 };

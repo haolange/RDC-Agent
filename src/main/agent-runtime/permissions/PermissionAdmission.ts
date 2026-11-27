@@ -6,6 +6,7 @@ import type { ToolCall } from '@shared/types/tool';
 import type { AgentTool, ToolExecutionContext } from '../agent/AgentTool';
 import type { AgentPermissionDecision } from './AgentPermissionPolicy';
 import type { PermissionReviewVerdict } from './PermissionReviewRuntime';
+import type { InvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
 
 /**
  * Admission: a pending action under auto-review is decided by host-verified facts first. The review model only sees
@@ -26,10 +27,10 @@ export interface AdmissionAssessment {
   facts: AdmissionFact[];
 }
 
-/** What the approved plan of this execution froze for admission. */
+/** What the approved plan of this execution froze for admission: when it was approved and its contract. */
 export interface ApprovedAdmissionScope {
   approvedAt: number;
-  captureInputIds: readonly string[] | null;
+  contract: InvestigationPlanContract | null;
 }
 
 /** The turn an action belongs to: identity, the approved plan, and the verified entry position on demand. */

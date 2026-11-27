@@ -80,6 +80,7 @@ function cloneToolCall(toolCall: ConversationToolCall): ConversationToolCall {
             ...(option.labelTranslations ? { labelTranslations: { ...option.labelTranslations } } : {}),
           })),
           decision: toolCall.planReview.decision ? { ...toolCall.planReview.decision } : undefined,
+          authorizations: toolCall.planReview.authorizations?.map((item) => ({ ...item, target: { ...item.target } })),
         }
       : undefined,
     resourceRefs: toolCall.resourceRefs?.map((resource) => ({ ...resource })),

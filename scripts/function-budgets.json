@@ -220,9 +220,6 @@
     "src/renderer/features/composer/EffortMaxField.tsx": {
       "params": 9
     },
-    "src/renderer/features/composer/PlanReviewRequestPanel.tsx": {
-      "lines": 156
-    },
     "src/renderer/features/composer/useComposer.ts": {
       "lines": 159
     },

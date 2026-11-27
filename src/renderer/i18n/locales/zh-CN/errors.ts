@@ -109,6 +109,7 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.PERMISSION_REVIEW_TIMEOUT': '审核未及时答复，操作未执行。',
   'errors.PERMISSION_REVIEW_UNAVAILABLE': '没有可用的审核者，操作未执行。',
   'errors.PERMISSION_STATE_UNINITIALIZED': '权限设置仍在加载，请稍后重试。',
+  'errors.PLAN_AUTHORIZATION_INVALID': '计划中的某项干预无法按所写内容授权。',
   'errors.PLAN_CAPTURE_SCOPE_INVALID': '只有调查计划可以选择 capture。',
   'errors.PLAN_REFERENCE_DENIED': '该计划不能在此使用。',
   'errors.PLAN_SESSION_DENIED': '此计划审阅属于其他对话。',

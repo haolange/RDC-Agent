@@ -20,7 +20,7 @@ Debugger、Analyzer、Optimizer 三个 Mission 共用这份方法：把用户的
 
 ## 查历史知识
 
-提交计划前，用症状、capture 范围和可见事件做一次有界的 Knowledge 检索（工具未激活时先 `tool_search`）。多词查询要求词项共同匹配，没有命中就拆成对象、症状或领域概念的短查询再试。读命中的来源、适用设备与渲染路径、反例和冲突；查不到就如实记下，不当成用户输入不足。历史案例只提供待核对的解释和区分检查，不是当前 capture 的观察或原因。检索复杂时委派 knowledge-scout。
+提交计划前，用症状、capture 范围和可见事件做一次有界的 Knowledge 检索。多词查询要求词项共同匹配，没有命中就拆成对象、症状或领域概念的短查询再试。读命中的来源、适用设备与渲染路径、反例和冲突；查不到就如实记下，不当成用户输入不足。历史案例只提供待核对的解释和区分检查，不是当前 capture 的观察或原因。检索复杂时委派 knowledge-scout。
 
 ## 计划怎么写
 
@@ -41,14 +41,15 @@ Debugger、Analyzer、Optimizer 三个 Mission 共用这份方法：把用户的
 结构化字段：
 
 - 本回合建了未完成的 Task：填 `requiredTaskIds`，确无必需 Task 填 `[]`。正文里写 Task 名称不会冻结要求。
-- 要用实时回放：填 `captureScope`（已登记的 `inputIds`、当前 `deviceId` 和调查目标，取自 `runtime_context.capturePlanning`）。只读调查也会临时切换事件并在结束时恢复入口位置，计划允许这类导航；只禁止未批准的 shader／data 修改、替换和干预。
+- 要用实时回放：填 `captureScope`（已登记的 `inputIds`、当前 `deviceId` 和调查目标，取自 `runtime_context.capturePlanning`）。临时切换事件并在结束时恢复入口位置属于导航，不需另批。
+- 要做可逆干预：在 `authorizations` 逐项写操作、目标、效果、可逆性和被授权的修改次数；用户批准的就是这份清单，没写的干预不做。
 - 已批准的 Task 定义或用户限制需要变更：经 `plan_artifact.taskRevisions` 正常修订，不静默删除。
 
 额度权威在 Harness：请求上限见 `runtime:execution-limits`，Task root 与 Capsule 的工具数、子执行数和期限由主进程冻结执行，实际消费与余量读 `task_get.budgetSnapshot`／`requestUsage`。计划只引用这些真实限制和用户明确规定的限制，可以给可调整的估算，但不自编阶段配额，也不把估算写成停止条件。
 
 ## 提交
 
-提交前写一份可解析的 Checkpoint。用 `plan_artifact` 提交，被拒绝就按意见修订同一份。批准后本回合结束；用户点执行按钮后由 General 执行，所需方法由按钮声明的 `requiredSkillIds` 预载。
+提交前写一份可解析的 Checkpoint。用 `plan_artifact` 提交，被拒绝就按意见修订同一份。批准后本回合结束；用户点执行按钮后由 General 执行。
 
 ## 用户切回后
 

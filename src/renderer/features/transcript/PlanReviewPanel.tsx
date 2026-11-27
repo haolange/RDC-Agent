@@ -4,6 +4,7 @@ import { useI18n } from '../../i18n';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
 import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
+import { PlanAuthorizationList } from '../../patterns/PlanAuthorizationList/PlanAuthorizationList';
 import { Details } from '../../ui/Details';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../../ui/Button';
@@ -159,6 +160,7 @@ export const PlanReviewPanel: React.FC<{
         ) : markdown ? (
           <>
             <MessageMarkdown content={parts.body} />
+            <PlanAuthorizationList authorizations={plan.authorizations ?? []} />
             {parts.appendix ? (
               <Details
                 variant="panel"

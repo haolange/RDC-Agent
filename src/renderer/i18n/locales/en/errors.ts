@@ -127,6 +127,7 @@ export const enErrors = {
   'errors.PERMISSION_REVIEW_TIMEOUT': "The reviewer didn't answer in time, so the action wasn't run.",
   'errors.PERMISSION_REVIEW_UNAVAILABLE': "No reviewer is available, so the action wasn't run.",
   'errors.PERMISSION_STATE_UNINITIALIZED': 'Permission settings are still loading. Try again in a moment.',
+  'errors.PLAN_AUTHORIZATION_INVALID': "An intervention in the plan can't be authorized as written.",
   'errors.PLAN_CAPTURE_SCOPE_INVALID': 'Only an investigation plan can choose captures.',
   'errors.PLAN_REFERENCE_DENIED': "That plan can't be used here.",
   'errors.PLAN_SESSION_DENIED': 'This plan review belongs to another conversation.',

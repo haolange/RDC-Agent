@@ -55,6 +55,23 @@ beforeEach(() => {
 });
 
 describe('auto-review admission', () => {
+  it('admits an action the approved plan covers, with every host fact holding, by rule and with no model request', async () => {
+    assessment = {
+      coverage: 'covered',
+      facts: [
+        { check: 'authorized', state: 'holds', basis: 'Covered.' },
+        { check: 'target-matches', state: 'holds', basis: 'Same target.' },
+        { check: 'rollback-available', state: 'holds', basis: 'Revertible.' },
+      ],
+    };
+    const reviewer = vi.fn<PermissionReviewer>();
+    await expect(flow(reviewer)).resolves.toMatchObject({ action: 'auto_review' });
+    expect(reviewer).not.toHaveBeenCalled();
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ decidedBy: 'auto-review', reviewMethod: 'rule', verdict: 'allow', approved: true }),
+    );
+  });
+
   it('refuses a failing host fact by rule and names it, with no model request', async () => {
     assessment = {
       coverage: 'covered',

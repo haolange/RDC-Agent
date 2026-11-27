@@ -17,7 +17,6 @@ export function createTurnPermissionReview(run: AgentTurnRun): {
 } {
   const { input, preparedRuntime, requestPlan, turnHandle, executionScopeId } = run;
   const { promptPlan, routeCapability, effectivePlan, approvedExecution } = preparedRuntime;
-  const captureInputs = approvedExecution?.investigation?.captureScope?.inputs ?? null;
   const admission = new TurnAdmission({
     sessionId: executionScopeId,
     projectId: input.projectId ?? null,
@@ -25,10 +24,7 @@ export function createTurnPermissionReview(run: AgentTurnRun): {
     agentId: input.agentId,
     accessCeiling: effectivePlan.accessCeiling,
     approved: approvedExecution
-      ? {
-          approvedAt: approvedExecution.offer.approvedAt,
-          captureInputIds: captureInputs ? captureInputs.map((entry) => entry.inputId) : null,
-        }
+      ? { approvedAt: approvedExecution.offer.approvedAt, contract: approvedExecution.investigation }
       : null,
     captureBaseline: () =>
       verifiedCaptureBaseline({

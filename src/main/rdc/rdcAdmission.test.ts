@@ -9,13 +9,17 @@ import { createRdcAdmissionAdapter, type RdcAdmissionHost } from './rdcAdmission
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import type { RdcExecutionReceipt } from './RdcExecutionReceipts';
 import type { RdcOperationDefinition } from './RdcOperationCatalog';
+import type { PlanAuthorization } from '@shared/types/planInvestigation';
 import type { ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 
 const replacement: RdcOperationDefinition = {
   name: 'rd.shader.edit_and_replace',
   namespace: 'rd.shader',
   description: 'Replace a shader in the replay.',
-  input_schema: { type: 'object', properties: {} },
+  input_schema: {
+    type: 'object',
+    properties: { event_id: { type: 'integer' }, stage: { type: 'string' }, expected_source_hash: { type: 'string' } },
+  },
   scope: 'replay',
   effects: ['shader_replacement', 'replay_position', 'artifact_write'],
   evidence_kind: 'intervention',
@@ -72,7 +76,18 @@ const turn: AdmissionTurn = {
   turnId: 'turn',
   agentId: 'general',
   accessCeiling: 'full',
-  approved: { approvedAt: 1, captureInputIds: ['capture-a'] },
+  approved: {
+    approvedAt: 1,
+    contract: {
+      mission: 'debugger',
+      captureScope: {
+        projectId: 'project',
+        deviceId: 'device',
+        comparisonGoal: 'Find the bad write.',
+        inputs: [{ inputId: 'capture-a', fileName: 'a.rdc', contentSha256: 'f'.repeat(64) }],
+      },
+    },
+  },
   captureBaseline: () => ({ available: true }),
 };
 const shell = { spec: { capture: { nativeOperation: (args: Record<string, unknown>) => args.rdc !== undefined } } };
@@ -112,12 +127,12 @@ describe('shader replacement facts', () => {
     const assessment = createRdcAdmissionAdapter(host())(shaderRequest(boundArgs, 'experiment'), turn);
     expect(assessment?.coverage).toBe('uncovered');
     expect(route(assessment)).toMatchObject({ route: 'model' });
-    expect(assessment?.facts.filter((fact) => fact.state === 'holds').map((fact) => fact.check)).toEqual([
-      'identity-current',
-      'baseline-recorded',
-      'source-bound',
-      'rollback-available',
-    ]);
+    expect(
+      assessment?.facts
+        .filter((fact) => fact.state === 'holds')
+        .map((fact) => fact.check)
+        .sort(),
+    ).toEqual(['baseline-recorded', 'identity-current', 'rollback-available', 'source-bound']);
   });
 
   it.each([
@@ -199,5 +214,80 @@ describe('replay lifecycle facts', () => {
       captureBaseline: () => ({ available: false, reason: 'RDC_INITIAL_STATE_UNVERIFIED' }),
     };
     expect(route(adapter(lifecycleRequest({ action: 'capture_restore' }), unverified)).route).toBe('model');
+  });
+});
+
+describe('authorized interventions', () => {
+  const authorization: PlanAuthorization = {
+    operation: replacement.name,
+    target: { eventId: 1248, stage: 'ps' },
+    effect: 'shader_replacement',
+    reversibility: 'rollback-available',
+    maxInstances: 2,
+  };
+  const authorizedTurn = (overrides: Partial<PlanAuthorization> = {}): AdmissionTurn => ({
+    ...turn,
+    approved: {
+      approvedAt: 1,
+      contract: { ...turn.approved!.contract!, authorizations: [{ ...authorization, ...overrides }] },
+    },
+  });
+  const applied = (replacementId: string) =>
+    ({
+      ...baselineReceipt,
+      operation: replacement.name,
+      args: { event_id: 1248, stage: 'ps' },
+      completedAt: 5,
+      evidence: { kind: 'intervention', replacementId },
+    }) as RdcExecutionReceipt;
+  const reverted = (replacementId: string) =>
+    ({ ...applied(replacementId), evidence: { kind: 'rollback', replacementId } }) as RdcExecutionReceipt;
+
+  it('admits a covered, reversible replacement whose facts all hold by rule, without the model', () => {
+    const assessment = createRdcAdmissionAdapter(host())(shaderRequest(boundArgs, 'experiment'), authorizedTurn());
+    expect(assessment?.coverage).toBe('covered');
+    expect(route(assessment)).toMatchObject({ route: 'rule', verdict: { verdict: 'allow', failedChecks: [] } });
+  });
+
+  it.each([
+    ['another target', { ...boundArgs, event_id: 999 }, [baselineReceipt], {}, ['target-matches']],
+    [
+      'no approved changes left',
+      boundArgs,
+      [baselineReceipt, applied('r1'), reverted('r1'), applied('r2')],
+      {},
+      ['instances-remaining'],
+    ],
+    [
+      'an unreverted previous change',
+      boundArgs,
+      [baselineReceipt, applied('r1')],
+      { reversibility: 'rollback-before-next' },
+      ['prior-reverted'],
+    ],
+    ['an unbound source', { stage: 'ps', event_id: 1248 }, [baselineReceipt], {}, ['source-bound']],
+  ] as const)('refuses a covered replacement by rule for %s', (_name, args, receipts, overrides, checks) => {
+    expect(
+      route(
+        createRdcAdmissionAdapter(host([...receipts]))(shaderRequest(args, 'experiment'), authorizedTurn(overrides)),
+      ),
+    ).toMatchObject({ route: 'rule', verdict: { verdict: 'deny', failedChecks: checks } });
+  });
+
+  it('admits the next change once the previous one is reverted, and counts only changes since approval', () => {
+    const receipts = [baselineReceipt, applied('r1'), reverted('r1'), { ...applied('old'), completedAt: 0 }];
+    expect(
+      route(
+        createRdcAdmissionAdapter(host(receipts))(
+          shaderRequest(boundArgs, 'experiment'),
+          authorizedTurn({ reversibility: 'rollback-before-next' }),
+        ),
+      ),
+    ).toMatchObject({ route: 'rule', verdict: { verdict: 'allow' } });
+  });
+
+  it('leaves an intervention no authorization item names to the model, with its host facts', () => {
+    const other = authorizedTurn({ operation: 'rd.shader.other_change' });
+    expect(route(createRdcAdmissionAdapter(host())(shaderRequest(boundArgs, 'experiment'), other)).route).toBe('model');
   });
 });

@@ -1,7 +1,7 @@
 import { AppError } from '@shared/errors/appError';
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { parseShellRdcInput } from './RdcShellInput';
-import { rdcOperationCapability } from './RdcOperationPolicy';
+import { reviewableEffects, rollbackFor, targetMatches } from './rdcInterventionAuthorization';
 import { readReplayIsolation } from './RdcHostControls';
 import { rdcExecutionReceipts, type RdcExecutionReceipts } from './RdcExecutionReceipts';
 import { hasProtectedPathInput } from './rdcShellPermission';
@@ -14,8 +14,6 @@ import type {
   AdmissionTurn,
 } from '../agent-runtime/permissions/PermissionAdmission';
 
-/** The effect a reversible intervention changes; position moves and artifact writes are routine within a replay. */
-const REVERSIBLE_EFFECT = 'shader_replacement';
 const SHA256 = /^[a-f0-9]{64}$/i;
 
 const fact = (check: AdmissionFact['check'], holds: boolean, basis: string): AdmissionFact => ({
@@ -25,11 +23,16 @@ const fact = (check: AdmissionFact['check'], holds: boolean, basis: string): Adm
 });
 
 /**
- * Host facts for a shader replacement: the owning replay is exclusively held, the experiment's baseline was measured
- * on this replay, the edit is bound to the source it changes, and the frozen catalog can revert it. Coverage by an
- * approved authorization is added by the plan's authorization list.
+ * Host facts for a reversible intervention such as a shader replacement: the owning replay is exclusively held, the
+ * experiment's baseline was measured on this replay, the edit is bound to the source it changes and the frozen catalog
+ * can revert it. When the approved plan authorizes the operation, the target, effects, approved count and, if asked,
+ * the revert of the previous change are checked against it.
  */
-function assessShaderReplacement(request: AdmissionRequest, host: RdcAdmissionHost): AdmissionAssessment | null {
+function assessIntervention(
+  request: AdmissionRequest,
+  turn: AdmissionTurn,
+  host: RdcAdmissionHost,
+): AdmissionAssessment | null {
   if (!request.tool.spec.capture?.nativeOperation?.(request.toolCall.arguments)) return null;
   const context = request.executionContext;
   const binding = context?.rdcBinding;
@@ -38,13 +41,15 @@ function assessShaderReplacement(request: AdmissionRequest, host: RdcAdmissionHo
   if (!context?.sessionId || !context.projectId || !binding || !identity || !input || 'discovery' in input) return null;
   const definitions = binding.definitions as readonly RdcOperationDefinition[];
   const definition = definitions.find((item) => item.name === input.operation);
+  const effects = definition ? reviewableEffects(definition) : [];
   if (
     !definition ||
     definition.evidence_kind !== 'intervention' ||
-    !definition.effects.includes(REVERSIBLE_EFFECT) ||
+    !effects.length ||
     hasProtectedPathInput(definition, input.args)
   )
     return null;
+  const receipts = host.receipts.list(context.sessionId);
   const replaySessionId = identity.runtimeContext?.replaySessionId;
   const isolation = host.replayIsolation(
     {
@@ -58,63 +63,118 @@ function assessShaderReplacement(request: AdmissionRequest, host: RdcAdmissionHo
   const experimentId = input.experimentId;
   const baseline =
     experimentId !== undefined &&
-    host.receipts
-      .list(context.sessionId)
-      .some(
-        (receipt) =>
-          receipt.evidence.kind === 'measurement' &&
-          receipt.experimentId === experimentId &&
-          receipt.contextId === identity.contextId &&
-          receipt.leaseVersion === identity.version &&
-          receipt.replaySessionId === replaySessionId,
-      );
-  const rollback = definitions.some(
-    (item) =>
-      item.evidence_kind === 'rollback' &&
-      item.effects.includes(REVERSIBLE_EFFECT) &&
-      rdcOperationCapability(item).available,
-  );
-  const sourceHash = input.args.expected_source_hash;
-  return {
-    coverage: 'uncovered',
-    facts: [
-      {
-        check: 'authorized',
-        state: 'unavailable',
-        basis: 'No approved authorization names this intervention; decide from the user request and approved plan.',
-      },
-      fact(
-        'identity-current',
-        isolation.available,
-        isolation.available
-          ? 'This turn holds the owning replay exclusively.'
-          : 'This turn does not hold the owning replay exclusively.',
-      ),
-      fact(
-        'baseline-recorded',
-        baseline,
-        baseline
-          ? 'A signed baseline measurement of this experiment exists on the current replay.'
-          : experimentId === undefined
-            ? 'The intervention names no experiment; record its baseline under an experiment first.'
-            : 'No signed baseline measurement of this experiment exists on the current replay.',
-      ),
+    receipts.some(
+      (receipt) =>
+        receipt.evidence.kind === 'measurement' &&
+        receipt.experimentId === experimentId &&
+        receipt.contextId === identity.contextId &&
+        receipt.leaseVersion === identity.version &&
+        receipt.replaySessionId === replaySessionId,
+    );
+  const rollback = effects.every((effect) => rollbackFor(definitions, effect));
+  const facts: AdmissionFact[] = [
+    fact(
+      'identity-current',
+      isolation.available,
+      isolation.available
+        ? 'This turn holds the owning replay exclusively.'
+        : 'This turn does not hold the owning replay exclusively.',
+    ),
+    fact(
+      'baseline-recorded',
+      baseline,
+      baseline
+        ? 'A signed baseline measurement of this experiment exists on the current replay.'
+        : experimentId === undefined
+          ? 'The intervention names no experiment; record its baseline under an experiment first.'
+          : 'No signed baseline measurement of this experiment exists on the current replay.',
+    ),
+    fact(
+      'rollback-available',
+      rollback,
+      rollback ? 'The frozen catalog can revert this change.' : 'The frozen catalog has no way to revert this change.',
+    ),
+  ];
+  const properties = (definition.input_schema as { properties?: Record<string, unknown> }).properties ?? {};
+  if ('expected_source_hash' in properties) {
+    const sourceHash = input.args.expected_source_hash;
+    const bound = typeof sourceHash === 'string' && SHA256.test(sourceHash);
+    facts.push(
       fact(
         'source-bound',
-        typeof sourceHash === 'string' && SHA256.test(sourceHash),
-        typeof sourceHash === 'string' && SHA256.test(sourceHash)
+        bound,
+        bound
           ? 'The edit names the hash of the source it replaces; a different source is refused before any change.'
           : 'The edit does not name the hash of the source it replaces.',
       ),
+    );
+  }
+  const approved = turn.approved;
+  const authorizations = (approved?.contract?.authorizations ?? []).filter(
+    (item) => item.operation === input.operation,
+  );
+  if (!approved || !authorizations.length)
+    return {
+      coverage: 'uncovered',
+      facts: [
+        {
+          check: 'authorized',
+          state: 'unavailable',
+          basis: 'No approved authorization names this intervention; decide from the user request and approved plan.',
+        },
+        ...facts,
+      ],
+    };
+  const authorization = authorizations.find((item) => targetMatches(item.target, input.args));
+  if (!authorization)
+    return {
+      coverage: 'covered',
+      facts: [
+        fact('authorized', true, 'The approved plan authorizes this intervention.'),
+        fact('target-matches', false, 'The action changes a different target than the approved plan names.'),
+        ...facts,
+      ],
+    };
+  const applied = receipts.filter(
+    (receipt) =>
+      receipt.evidence.kind === 'intervention' &&
+      receipt.operation === authorization.operation &&
+      receipt.completedAt >= approved.approvedAt &&
+      targetMatches(authorization.target, receipt.args),
+  );
+  const reverted = new Set(
+    receipts.flatMap((receipt) => (receipt.evidence.kind === 'rollback' ? [receipt.evidence.replacementId] : [])),
+  );
+  const bounded = effects.every((effect) => effect === authorization.effect);
+  facts.push(
+    fact('authorized', true, 'The approved plan authorizes this intervention.'),
+    fact('target-matches', true, 'The action changes the target the approved plan names.'),
+    fact(
+      'effects-bounded',
+      bounded,
+      bounded ? 'The change stays within the approved effect.' : 'The change reaches beyond the approved effect.',
+    ),
+    fact(
+      'instances-remaining',
+      applied.length < authorization.maxInstances,
+      `${applied.length} of ${authorization.maxInstances} approved changes have been made.`,
+    ),
+  );
+  if (authorization.reversibility === 'rollback-before-next') {
+    const outstanding = applied.some(
+      (receipt) => receipt.evidence.kind === 'intervention' && !reverted.has(receipt.evidence.replacementId),
+    );
+    facts.push(
       fact(
-        'rollback-available',
-        rollback,
-        rollback
-          ? 'The frozen catalog can revert this change.'
-          : 'The frozen catalog has no way to revert this change.',
+        'prior-reverted',
+        !outstanding,
+        outstanding
+          ? 'The previous approved change is still applied; revert it before the next one.'
+          : 'No earlier approved change is still applied.',
       ),
-    ],
-  };
+    );
+  }
+  return { coverage: 'covered', facts };
 }
 
 /**
@@ -124,7 +184,7 @@ function assessShaderReplacement(request: AdmissionRequest, host: RdcAdmissionHo
 function assessReplayLifecycle(request: AdmissionRequest, turn: AdmissionTurn): AdmissionAssessment | null {
   const step = request.tool.spec.capture?.replayLifecycle?.(request.toolCall.arguments) ?? null;
   if (!step) return null;
-  const scope = turn.approved?.captureInputIds ?? null;
+  const scope = turn.approved?.contract?.captureScope?.inputs.map((entry) => entry.inputId) ?? null;
   const facts: AdmissionFact[] = [
     scope
       ? fact('authorized', true, "The approved plan's capture scope covers changing the owning replay.")
@@ -183,5 +243,5 @@ export interface RdcAdmissionHost {
 export function createRdcAdmissionAdapter(
   host: RdcAdmissionHost = { receipts: rdcExecutionReceipts, replayIsolation: readReplayIsolation },
 ): AdmissionAdapter {
-  return (request, turn) => assessReplayLifecycle(request, turn) ?? assessShaderReplacement(request, host);
+  return (request, turn) => assessReplayLifecycle(request, turn) ?? assessIntervention(request, turn, host);
 }

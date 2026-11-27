@@ -101,6 +101,7 @@ export class RuntimeToolAssembly implements RuntimeToolResolver, RuntimeToolPoli
       requiredTaskIds?: string[];
       taskRevisions?: unknown[];
       captureScope?: unknown;
+      authorizations?: unknown[];
     },
     { sessionId: string | null }
   > {
@@ -139,6 +140,34 @@ export class RuntimeToolAssembly implements RuntimeToolResolver, RuntimeToolPoli
               inputIds: { type: 'array', minItems: 1, maxItems: 32, items: { type: 'string', minLength: 1 } },
               deviceId: { type: 'string', minLength: 1 },
               comparisonGoal: { type: 'string', minLength: 1, maxLength: 4000 },
+            },
+          },
+          authorizations: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 16,
+            description:
+              'Reversible interventions the user approves with this plan, so auto-review can admit them without asking again. Each names a catalog intervention operation, the target it may change (eventId, stage and/or shaderId, each matching the action argument), the effect it changes, whether each change must be reverted before the next, and how many changes are approved. Requires captureScope; the host refuses items beyond the execution profile, policy or catalog. Omit when the plan changes nothing.',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['operation', 'target', 'effect', 'reversibility', 'maxInstances'],
+              properties: {
+                operation: { type: 'string', minLength: 1 },
+                target: {
+                  type: 'object',
+                  additionalProperties: false,
+                  minProperties: 1,
+                  properties: {
+                    eventId: { type: 'integer', minimum: 0 },
+                    stage: { type: 'string', minLength: 1 },
+                    shaderId: { type: 'string', minLength: 1 },
+                  },
+                },
+                effect: { type: 'string', minLength: 1 },
+                reversibility: { type: 'string', enum: ['rollback-available', 'rollback-before-next'] },
+                maxInstances: { type: 'integer', minimum: 1, maximum: 16 },
+              },
             },
           },
           taskRevisions: {
