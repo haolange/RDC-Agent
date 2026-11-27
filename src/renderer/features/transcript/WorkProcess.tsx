@@ -88,7 +88,8 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer,
             <ActiveSignalText active={running} tone="info" className={`work-process-label status-${trace.status}`}>
               {headlineCopy}
             </ActiveSignalText>
-            {durationMeta ? <span className="work-process-meta">{durationMeta}</span> : null}
+            {/* The clock starts with the first block; before it there is no start time to count from. */}
+            {trace.blocks.length > 0 && durationMeta ? <span className="work-process-meta">{durationMeta}</span> : null}
           </span>
         </div>
       </section>

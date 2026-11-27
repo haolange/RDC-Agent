@@ -66,8 +66,9 @@ it.each<PlanReviewStatus>(['awaiting', 'approved', 'rejected', 'superseded', 'ca
     const html = renderToStaticMarkup(createElement(MessageBubble, { message }));
     expect(html).toContain('Original result');
     expect(html).not.toContain('Continue handoff');
-    // The plan card lives inside Working only; the reply never repeats it.
-    expect(html).not.toContain('plan-card');
+    // Working keeps the reviewable card; a settled reply carries its own card only for the approved plan.
+    expect(html).not.toContain('data-testid="plan-card"');
+    expect(html.includes('data-testid="plan-reply-card"')).toBe(status === 'approved');
   },
 );
 it('shows Working while a request runs, and none for a settled reply whose trace holds nothing', () => {

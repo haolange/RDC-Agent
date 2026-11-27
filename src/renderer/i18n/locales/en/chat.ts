@@ -340,6 +340,8 @@ export const enChat = {
   'chat.planReviewStatusSuperseded': 'Updated',
   'chat.planReviewStatusCancelled': 'Review cancelled',
   'chat.planReviewReadFull': 'Read full plan',
+  'chat.planReplyKind': 'Plan',
+  'chat.planReplyCollapse': 'Collapse plan',
   'chat.planReviewImplement': 'Implement this plan?',
   'chat.planReviewRevision': 'Revision {revision}',
   'chat.planReviewExecutionReferences': 'Execution references',

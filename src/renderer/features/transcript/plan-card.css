@@ -13,7 +13,8 @@
   cursor: var(--cursor-pointer, pointer);
 }
 
-.plan-card:hover {
+/* An opened reply card is reading, not a target: no hover outline. */
+.plan-card:not(.is-expanded):hover {
   border-color: var(--token-border-focus);
 }
 .plan-card:focus-visible {
@@ -70,4 +71,46 @@
 }
 .plan-card__preview .markdown-body > :last-child {
   margin-bottom: 0;
+}
+
+/* The approved plan a reply delivers: folded like Working's card, opened in place as the full plan. */
+.plan-reply-card__toggle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: var(--cursor-pointer, pointer);
+}
+.plan-reply-card__toggle:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.plan-reply-card__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.plan-reply-card.is-expanded {
+  cursor: auto;
+}
+
+.plan-reply-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.plan-reply-card__fold {
+  align-self: flex-start;
 }

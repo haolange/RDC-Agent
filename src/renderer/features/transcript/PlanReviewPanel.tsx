@@ -1,11 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { splitPlanAppendix } from '@shared/utils/planAppendix';
+import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { Icon } from '../../ui/Icon';
 import { IconButton } from '../../ui/IconButton';
-import { MessageMarkdown } from '../../patterns/Markdown/MessageMarkdown';
-import { PlanAuthorizationList } from '../../patterns/PlanAuthorizationList/PlanAuthorizationList';
-import { Details } from '../../ui/Details';
 import { useProjectStore } from '../../stores/projectStore';
 import { Button } from '../../ui/Button';
 import { ReadingSheet } from '../../ui/ReadingSheet';
@@ -14,10 +10,8 @@ import { FailureAlert } from '../../patterns/FailureAlert';
 import { usePlanReviewStore } from '../../stores/planReviewStore';
 import { reopenPlanReview } from '../../services/planReviewService';
 import { useElectronApi } from '../../hooks/useElectronApi';
-import { useAsyncValue } from '../../lib/useAsyncValue';
-import { Skeleton } from '../../ui/Skeleton';
 import { usePlanReviewActions } from './usePlanReviewActions';
-import { planAppendixMarkdown } from './planPreview';
+import { PlanDocumentBody, usePlanDocument } from './PlanDocument';
 import type { ConversationPlanReview } from '@shared/types/planReview';
 import './plan-review-panel.css';
 
@@ -33,7 +27,7 @@ export const PlanReviewPanel: React.FC<{
   const projection = usePlanReviewStore((state) => (sessionId ? state.bySession[sessionId] : undefined));
   const canReopen =
     projection?.recoverable?.planId === plan.planId && projection.recoverable.revision === plan.revision;
-  const { readPlan, copyPlan, saveToProject, exportPlan } = usePlanReviewActions();
+  const { copyPlan, saveToProject, exportPlan } = usePlanReviewActions();
   const [actionError, setActionError] = useState<{ reason: unknown } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -43,21 +37,9 @@ export const PlanReviewPanel: React.FC<{
   useEffect(() => {
     if (!ownSession) onClose();
   }, [ownSession, onClose]);
-  const planRead = useAsyncValue(
-    ownSession ? JSON.stringify([sessionId, plan.planId, plan.revision, plan.uri, plan.hash]) : null,
-    () =>
-      readPlan({
-        sessionId: sessionId!,
-        planId: plan.planId,
-        revision: plan.revision,
-        uri: plan.uri,
-        expectedHash: plan.hash,
-      }),
-  );
-  const markdown = planRead.status === 'ready' ? planRead.value.markdown : '';
-  const loading = planRead.status === 'loading';
-  const failure = actionError ?? (planRead.status === 'error' ? { reason: planRead.error } : null);
-  const parts = useMemo(() => splitPlanAppendix(markdown), [markdown]);
+  const document = usePlanDocument(plan, ownSession ? sessionId : null);
+  const { markdown, loading } = document;
+  const failure = actionError ?? (document.error ? { reason: document.error } : null);
   const reference = {
     sessionId: sessionId!,
     planId: plan.planId,
@@ -152,28 +134,7 @@ export const PlanReviewPanel: React.FC<{
         ) : undefined
       }
     >
-      <div className="plan-review-panel__body" aria-busy={loading}>
-        {loading ? (
-          <div role="status" aria-label={t('chat.planReviewLoading')}>
-            <Skeleton shape="line" count={5} />
-          </div>
-        ) : markdown ? (
-          <>
-            <MessageMarkdown content={parts.body} />
-            <PlanAuthorizationList authorizations={plan.authorizations ?? []} />
-            {parts.appendix ? (
-              <Details
-                variant="panel"
-                className="plan-review-panel__appendix"
-                data-testid="plan-review-appendix"
-                summary={t('chat.planReviewExecutionReferences')}
-              >
-                <MessageMarkdown content={planAppendixMarkdown(parts.appendix)} />
-              </Details>
-            ) : null}
-          </>
-        ) : null}
-      </div>
+      <PlanDocumentBody plan={plan} document={document} />
     </ReadingSheet>
   );
 };

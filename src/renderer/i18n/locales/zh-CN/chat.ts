@@ -331,6 +331,8 @@ export const zhChat = {
   'chat.planReviewStatusSuperseded': '已更新',
   'chat.planReviewStatusCancelled': '审阅已取消',
   'chat.planReviewReadFull': '阅读完整计划',
+  'chat.planReplyKind': '计划',
+  'chat.planReplyCollapse': '收起计划',
   'chat.planReviewImplement': '实施此计划？',
   'chat.planReviewRevision': '版本 {revision}',
   'chat.planReviewExecutionReferences': '执行引用',

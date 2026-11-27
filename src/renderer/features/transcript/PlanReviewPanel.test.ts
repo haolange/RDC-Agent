@@ -71,7 +71,7 @@ it('shows the reader-facing body and keeps the execution appendix collapsed', as
     const [body, references] = [...panel.querySelectorAll('[data-markdown]')].map((node) => node.textContent ?? '');
     expect(body).toContain('先读阴影 pass 前后的同一区域读数');
     expect(body).not.toContain('task_1795001979310_9f3a2b1c');
-    const appendix = panel.querySelector<HTMLDetailsElement>('[data-testid="plan-review-appendix"]')!;
+    const appendix = panel.querySelector<HTMLDetailsElement>('[data-testid="plan-appendix"]')!;
     expect(appendix.open).toBe(false);
     expect(appendix.querySelector('summary')?.textContent).toBe('chat.planReviewExecutionReferences');
     expect(references).toContain('task_1795001979310_9f3a2b1c');

@@ -21,6 +21,8 @@ import { MessageAttachments } from './MessageAttachments';
 import { HandoffSuggestionRow } from './HandoffSuggestionRow';
 import { SystemMessage } from './SystemMessage';
 import { answerSources } from './answerSources';
+import { planDeliverables } from './planDeliverables';
+import { PlanReplyCard } from './PlanReplyCard';
 import { resolveDiagnosticText } from './systemMessagePresentation';
 import type { ConversationMessage, ConversationMessageStatus } from '@shared/types/conversation';
 
@@ -185,6 +187,8 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   );
   // Links to pages this turn read become citations, in the Work Process final answer and in the bubble alike.
   const sources = useMemo(() => answerSources(trace), [trace]);
+  // A settled reply that delivered an approved plan carries it as its own card, below Working.
+  const plans = useMemo(() => (isInProgress ? [] : planDeliverables(trace)), [isInProgress, trace]);
   return (
     <MarkdownSourceProvider sources={sources} sessionId={message.sessionId}>
       <article
@@ -218,6 +222,9 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
                 {renderContentWithCursor(message.content, status)}
               </div>
             ) : null}
+            {plans.map((plan) => (
+              <PlanReplyCard key={plan.planId} plan={plan} sessionId={message.sessionId} />
+            ))}
             {!isInProgress &&
             !hasPlanReviewInteraction(trace) &&
             message.handoffSuggestions &&
