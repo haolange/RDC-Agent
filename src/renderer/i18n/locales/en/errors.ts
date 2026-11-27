@@ -119,6 +119,7 @@ export const enErrors = {
   'errors.PERMISSION_REVIEW_CONTEXT_LIMIT':
     "The action is too large for the reviewer model to check, so it wasn't run.",
   'errors.PERMISSION_REVIEW_EVIDENCE_INVALID': "The review evidence doesn't match this run, so the action wasn't run.",
+  'errors.PERMISSION_REVIEW_FAILED': "The review request failed, so the action wasn't run.",
   'errors.PERMISSION_REVIEW_INCOMPLETE': "The reviewer didn't reach a decision, so the action wasn't run.",
   'errors.PERMISSION_REVIEW_INVALID': "The reviewer's answer couldn't be read, so the action wasn't run.",
   'errors.PERMISSION_REVIEW_SENSITIVE_INPUT':

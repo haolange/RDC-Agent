@@ -45,19 +45,39 @@ function providerResult(text: string, stopReason: AssistantMessage['stopReason']
 }
 beforeEach(() => vi.clearAllMocks());
 it.each([
-  '{"approved":true}',
-  '{"approved":"true","reason":"x"}',
-  '{"approved":true,"reason":"x","tools":[]}',
-  '{"approved":true,"reason":"ok","reviewMethod":"rule"}',
-  '{"approved":false,"reason":"no","errorCode":"forged"}',
+  '{"approved":true,"reason":"x"}',
+  '{"verdict":"allow","reason":"x"}',
+  '{"verdict":"allow","failedChecks":[],"reason":"x","tools":[]}',
+  '{"verdict":"allow","failedChecks":[],"reason":"ok","reviewMethod":"rule"}',
+  '{"verdict":"deny","failedChecks":["authorized"],"reason":"no","errorCode":"forged"}',
+  '{"verdict":"maybe","failedChecks":["authorized"],"reason":"x"}',
+  '{"verdict":"deny","failedChecks":[],"reason":"no check named"}',
+  '{"verdict":"undecidable","failedChecks":[],"reason":"no check named"}',
+  '{"verdict":"allow","failedChecks":["authorized"],"reason":"allow names a failure"}',
+  '{"verdict":"deny","failedChecks":["looks-risky"],"reason":"unknown check"}',
+  '{"verdict":"deny","failedChecks":["authorized","authorized"],"reason":"repeated"}',
   '```json\n{}\n```',
-  '{"approved":true,"reason":""}',
+  '{"verdict":"allow","failedChecks":[],"reason":"   "}',
 ])('rejects malformed or permissive verdict %s', (text) => {
-  expect(() => parsePermissionReview(text)).toThrow();
+  expect(() => parsePermissionReview(text)).toThrow('PERMISSION_REVIEW_INVALID');
+});
+it.each([
+  { verdict: 'allow', failedChecks: [] },
+  { verdict: 'deny', failedChecks: ['target-matches', 'source-bound'] },
+  { verdict: 'undecidable', failedChecks: ['baseline-recorded'] },
+] as const)('accepts the closed $verdict verdict with its named checks', (value) => {
+  expect(parsePermissionReview(JSON.stringify({ ...value, reason: ' Plain reason. ' }))).toEqual({
+    ...value,
+    reason: 'Plain reason.',
+  });
 });
 it('uses frozen Low route with no tools, records usage, and excludes credentials from snapshots', async () => {
-  providerResult('{"approved":true,"reason":"Authorized bounded edit."}');
-  await expect(executePermissionReview(input)).resolves.toEqual({ approved: true, reason: 'Authorized bounded edit.' });
+  providerResult('{"verdict":"allow","failedChecks":[],"reason":"Authorized bounded edit."}');
+  await expect(executePermissionReview(input)).resolves.toEqual({
+    verdict: 'allow',
+    failedChecks: [],
+    reason: 'Authorized bounded edit.',
+  });
   expect(mock.stream).toHaveBeenCalledOnce();
   expect(mock.stream).toHaveBeenCalledWith(
     'frozen-route',
@@ -79,16 +99,17 @@ it('uses frozen Low route with no tools, records usage, and excludes credentials
   );
 });
 it('retains a denied verdict and actual explanation', async () => {
-  providerResult('{"approved":false,"reason":"Unrelated destructive operation."}');
+  providerResult('{"verdict":"deny","failedChecks":["effects-bounded"],"reason":"Unrelated destructive operation."}');
   await expect(executePermissionReview(input)).resolves.toMatchObject({
-    approved: false,
+    verdict: 'deny',
+    failedChecks: ['effects-bounded'],
     reason: 'Unrelated destructive operation.',
   });
 });
 it.each(['length', 'toolUse', 'error', 'aborted'] as const)(
   'refuses incomplete termination %s without retry',
   async (stop) => {
-    providerResult('{"approved":true,"reason":"ok"}', stop);
+    providerResult('{"verdict":"allow","failedChecks":[],"reason":"ok"}', stop);
     await expect(executePermissionReview(input)).rejects.toThrow('PERMISSION_REVIEW_INCOMPLETE');
     expect(mock.stream).toHaveBeenCalledOnce();
     expect(mock.complete).toHaveBeenCalledOnce();
@@ -116,7 +137,7 @@ it('fails closed before provider dispatch when exact authority exceeds the fixed
   expect(mock.stream).not.toHaveBeenCalled();
 });
 it('fits a full approved authority above the old 16k limit without dropping evidence or adding tools', async () => {
-  providerResult('{"approved":false,"reason":"Reviewed the complete authority; unrelated action."}');
+  providerResult('{"verdict":"deny","failedChecks":["authorized"],"reason":"Reviewed the complete authority."}');
   await executePermissionReview({
     ...input,
     authority: 'a'.repeat(72000),

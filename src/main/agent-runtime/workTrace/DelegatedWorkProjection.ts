@@ -211,16 +211,11 @@ export function projectDelegatedEvent(state: DelegatedProjectionState, event: Tr
       trace = upsertRuntimeToolApproval(
         trace,
         {
-          approvalId: payload.approvalId,
+          ...payload,
           toolCallId: payload.toolCallId ?? payload.approvalId,
           toolName: payload.toolName ?? 'approval',
-          status: payload.status,
           reason: safeText(payload.reason ?? ''),
           answer: safeText(payload.answer ?? ''),
-          risk: payload.risk,
-          reviewer: payload.reviewer,
-          reviewMethod: payload.reviewMethod,
-          errorCode: payload.errorCode,
         },
         loopOptions(),
       );

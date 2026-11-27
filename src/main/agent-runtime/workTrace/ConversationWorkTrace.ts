@@ -1,6 +1,7 @@
 import { cancelWorkTrace } from '@shared/conversation/cancelWorkTrace';
 import { loopTextItems, loopThinkingItems, sameProviderBlock, settleTextPhase } from '@shared/conversation/loopItems';
 import { nowMs } from '@shared/utils/id';
+import { isAdmissionCheck, isPermissionReviewVerdict } from '@shared/constants/admissionChecks';
 import { normalizeToolName } from '../orchestration/RuntimeToolPolicy';
 import { normalizeWorkBlockKind, providerOutputRefKey } from '../../sessions/store/StoredWorkTrace';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
@@ -552,6 +553,8 @@ export function upsertRuntimeToolApproval(
     risk?: unknown;
     reviewer?: unknown;
     reviewMethod?: unknown;
+    verdict?: unknown;
+    failedChecks?: unknown;
     errorCode?: unknown;
     answer?: unknown;
   },
@@ -576,6 +579,8 @@ export function upsertRuntimeToolApproval(
   const reviewer = stringifyApprovalField(input.reviewer);
   if (reviewer) approval.reviewer = reviewer as NonNullable<ConversationToolCall['approval']>['reviewer'];
   if (input.reviewMethod === 'rule' || input.reviewMethod === 'model') approval.reviewMethod = input.reviewMethod;
+  if (isPermissionReviewVerdict(input.verdict)) approval.verdict = input.verdict;
+  if (Array.isArray(input.failedChecks)) approval.failedChecks = input.failedChecks.filter(isAdmissionCheck);
   if (typeof input.errorCode === 'string' && input.errorCode) approval.errorCode = input.errorCode;
   const answer = stringifyApprovalField(input.answer);
   if (answer) approval.answer = answer;

@@ -1,3 +1,4 @@
+import type { AdmissionCheck, PermissionReviewVerdictKind } from '../constants/admissionChecks';
 import type { InterruptionCause, TurnStopCause } from './lifecycle';
 import type { AgentRole } from './agent';
 import type { TaskDependencyWait } from './taskExecution';
@@ -226,6 +227,9 @@ export interface ConversationToolApproval {
   reviewer?: 'auto_review' | (string & {});
   /** Host-selected route; absent in historical records means unknown. */
   reviewMethod?: 'rule' | 'model';
+  /** Auto-review only: the settled verdict and the admission checks it named. */
+  verdict?: PermissionReviewVerdictKind;
+  failedChecks?: AdmissionCheck[];
   /** Host-confirmed review failure, never parsed from the model's reason. */
   errorCode?: string;
   answer?: string;

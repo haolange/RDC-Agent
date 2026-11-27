@@ -6,6 +6,7 @@ import { AgentToolApprovalRequestService } from './AgentToolApprovalRequestServi
 import type { AgentPermissionMode } from '@shared/types/settings';
 import type { AgentPermissionDecision } from './AgentPermissionPolicy';
 import type { AgentEvent } from '@shared/types/agentRuntime';
+import type { PermissionReviewVerdict } from './PermissionReviewRuntime';
 
 /** The approval payloads among the events an approval service emitted. */
 const approvalPayloads = (events: AgentEvent[]) =>
@@ -226,7 +227,7 @@ describe('final tool permission admission', () => {
     state.initialize('auto-review');
     const approvals = new AgentToolApprovalRequestService();
     const reviewerStarted = deferred();
-    const review = deferred<{ approved: boolean; reason: string }>();
+    const review = deferred<PermissionReviewVerdict>();
     const events: AgentEvent[] = [];
     const effect = vi.fn(async () => 'ok');
     const execution = executeWithPermissionAdmission({
@@ -255,14 +256,14 @@ describe('final tool permission admission', () => {
             return review.promise;
           },
         });
-        if (!verdict.approved) throw new Error('REVIEW_DENIED');
+        if (verdict.verdict !== 'allow') throw new Error('REVIEW_DENIED');
         return allow;
       },
     });
     await reviewerStarted.promise;
     state.commitMode('full-access');
     expect(await execution).toBe('ok');
-    review.resolve({ approved: true, reason: 'late' });
+    review.resolve({ verdict: 'allow', failedChecks: [], reason: 'late' });
     await Promise.resolve();
     expect(effect).toHaveBeenCalledOnce();
     expect(events.filter((event) => event.type === 'approval.answered')).toHaveLength(1);

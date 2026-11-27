@@ -86,7 +86,7 @@
       "complexity": 57
     },
     "src/main/agent-runtime/workTrace/DelegatedWorkProjection.ts": {
-      "lines": 272,
+      "lines": 267,
       "complexity": 65
     },
     "src/main/agent-trace/TraceService.ts": {

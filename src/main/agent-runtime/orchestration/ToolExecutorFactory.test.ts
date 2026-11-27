@@ -123,7 +123,12 @@ vi.mock('../permissions/AgentPermissionPolicy', () => ({
 vi.mock('../permissions/AgentToolApprovalRequestService', () => ({
   agentToolApprovalRequestService: {
     request: approvalRequest,
-    autoReview: vi.fn(async () => ({ approved: false, reason: 'Native mutation requires review.' })),
+    autoReview: vi.fn(async () => ({
+      verdict: 'deny',
+      failedChecks: ['source-bound'],
+      reason: 'Native mutation requires review.',
+      reviewMethod: 'model',
+    })),
   },
 }));
 vi.mock('../interactions/AgentUserInputRequestService', () => ({
@@ -500,7 +505,14 @@ describe('ToolExecutorFactory', () => {
       started,
     );
     expect(result.isError).toBe(true);
-    expect(JSON.stringify(result.content)).toContain('AUTO_REVIEW_DENIED: risk=high; Native mutation requires review.');
+    expect(result.details).toEqual({
+      code: 'AUTO_REVIEW_DENIED',
+      risk: 'high',
+      failedChecks: [{ check: 'source-bound', remedy: 'agent' }],
+      exits: ['human-approval', 'permission-mode'],
+      reason: 'Native mutation requires review.',
+    });
+    expect(JSON.stringify(result.content)).toContain('AUTO_REVIEW_DENIED');
     expect(execute).not.toHaveBeenCalled();
     expect(started).not.toHaveBeenCalled();
   });

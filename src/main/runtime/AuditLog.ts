@@ -5,6 +5,7 @@ import { AppError } from '@shared/errors/appError';
 import { appPathService } from './AppPathService';
 import { hashScopedResource } from './ScopedResourceResolver';
 import type { AgentPermissionSettings } from '@shared/types/settings';
+import type { AdmissionCheck, PermissionReviewVerdictKind } from '@shared/constants/admissionChecks';
 
 /** Who asked: the desktop window, the unpackaged Browser QA bridge, or main itself. */
 export type AuditOrigin = 'desktop' | 'browser-qa' | 'runtime';
@@ -22,6 +23,10 @@ export type AuditEvent =
       sessionId?: string | null;
       turnId?: string;
       reason?: string;
+      /** Auto-review only: the settled verdict, the checks it named and whether the host or the model decided. */
+      verdict?: PermissionReviewVerdictKind;
+      failedChecks?: readonly AdmissionCheck[];
+      reviewMethod?: 'rule' | 'model';
     }
   | { kind: 'permission-settings'; from: AgentPermissionSettings; to: AgentPermissionSettings }
   /** An outbound request the person asked for: an image the model linked whose URL no non-model source supplied. */

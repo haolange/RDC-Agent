@@ -102,6 +102,7 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.PERMISSION_REVIEW_CANCELLED': '权限审核已取消。',
   'errors.PERMISSION_REVIEW_CONTEXT_LIMIT': '操作内容超出审核模型的处理范围，因此未执行。',
   'errors.PERMISSION_REVIEW_EVIDENCE_INVALID': '审核依据与本次运行不一致，操作未执行。',
+  'errors.PERMISSION_REVIEW_FAILED': '审核请求失败，操作未执行。',
   'errors.PERMISSION_REVIEW_INCOMPLETE': '审核未得出结论，操作未执行。',
   'errors.PERMISSION_REVIEW_INVALID': '无法读取审核结果，操作未执行。',
   'errors.PERMISSION_REVIEW_SENSITIVE_INPUT': '操作包含凭据，不能送去自动审核。',

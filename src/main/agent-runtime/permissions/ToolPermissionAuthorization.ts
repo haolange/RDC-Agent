@@ -1,18 +1,54 @@
 import { AppError } from '@shared/errors/appError';
+import { ADMISSION_CHECK_REMEDY, type AdmissionCheck, type AdmissionRemedy } from '@shared/constants/admissionChecks';
 import { auditArgumentsHash, auditLog } from '../../runtime/AuditLog';
-import { agentPermissionPolicyService, type AgentPermissionDecisionInput } from './AgentPermissionPolicy';
-import { agentToolApprovalRequestService, type ToolApprovalRequestInput } from './AgentToolApprovalRequestService';
+import {
+  agentPermissionPolicyService,
+  type AgentPermissionDecision,
+  type AgentPermissionDecisionInput,
+} from './AgentPermissionPolicy';
+import {
+  agentToolApprovalRequestService,
+  type AutoReviewOutcome,
+  type ToolApprovalRequestInput,
+} from './AgentToolApprovalRequestService';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { PermissionReviewer } from './PermissionReviewRuntime';
+
+/** What the agent reads when auto-review refuses: which checks failed, who can make each hold, and the way out. */
+export interface AutoReviewDenial {
+  code: 'AUTO_REVIEW_DENIED';
+  risk: AgentPermissionDecision['risk'];
+  failedChecks: { check: AdmissionCheck; remedy: AdmissionRemedy }[];
+  exits: ['human-approval', 'permission-mode'];
+  reason: string;
+  errorCode?: string;
+}
 
 export class ToolPermissionDenied extends AppError {
   constructor(
     message: string,
     readonly requiresApproval = false,
+    readonly details?: AutoReviewDenial,
   ) {
     super('TOOL_PERMISSION_DENIED', message);
     this.name = 'ToolPermissionDenied';
   }
+}
+
+function autoReviewDenial(risk: AgentPermissionDecision['risk'], outcome: AutoReviewOutcome): ToolPermissionDenied {
+  const details: AutoReviewDenial = {
+    code: 'AUTO_REVIEW_DENIED',
+    risk,
+    failedChecks: outcome.failedChecks.map((check) => ({ check, remedy: ADMISSION_CHECK_REMEDY[check] })),
+    exits: ['human-approval', 'permission-mode'],
+    reason: outcome.reason,
+    ...(outcome.errorCode ? { errorCode: outcome.errorCode } : {}),
+  };
+  return new ToolPermissionDenied(
+    `AUTO_REVIEW_DENIED: the action was not executed.\n${JSON.stringify(details)}`,
+    false,
+    details,
+  );
 }
 
 export interface ToolPermissionAuthorizationInput {
@@ -82,8 +118,7 @@ export async function authorizeToolPermission(
       risk: decision.risk,
       signal,
     });
-    if (!verdict.approved)
-      throw new ToolPermissionDenied(`AUTO_REVIEW_DENIED: risk=${decision.risk}; ${verdict.reason}`);
+    if (verdict.verdict !== 'allow') throw autoReviewDenial(decision.risk, verdict);
   }
   input.assertLive();
   return decision;

@@ -45,6 +45,12 @@ interface PendingToolApprovalRequest extends ToolApprovalRequestInput {
   abortListener?: () => void;
 }
 
+/** What the auto-review settled: the verdict, the host-selected route, and a host-confirmed review failure if any. */
+export interface AutoReviewOutcome extends PermissionReviewVerdict {
+  reviewMethod: 'rule' | 'model';
+  errorCode?: string;
+}
+
 const keyFor = (turnId: string, approvalId: string): string => `${turnId}::${approvalId}`;
 
 export class AgentToolApprovalRequestService {
@@ -107,7 +113,7 @@ export class AgentToolApprovalRequestService {
       reviewer?: PermissionReviewer;
       tool?: Pick<AgentTool, 'spec'>;
     },
-  ): Promise<PermissionReviewVerdict> {
+  ): Promise<AutoReviewOutcome> {
     const reviewMethod = input.risk === 'low' ? ('rule' as const) : ('model' as const);
     let errorCode: string | undefined;
     const approvalId = `auto-review-${input.toolCallId}-${randomUUID()}`;
@@ -138,16 +144,16 @@ export class AgentToolApprovalRequestService {
     try {
       input.signal?.throwIfAborted();
       if (input.risk === 'low') {
-        verdict = { approved: true, reason: `RULE_APPROVED: ${input.reason}` };
+        verdict = { verdict: 'allow', failedChecks: [], reason: `RULE_APPROVED: ${input.reason}` };
       } else {
         if (!input.reviewer || !input.action)
           throw new PermissionReviewError('PERMISSION_REVIEW_UNAVAILABLE', 'no frozen reviewer is available.');
         const result = await awaitReview(input.reviewer(input.action, input.signal, input.tool), input.signal);
         // Only the strict verdict crosses this boundary; route/failure metadata belongs to the host.
-        verdict = { approved: result.approved, reason: result.reason };
+        verdict = { verdict: result.verdict, failedChecks: [...result.failedChecks], reason: result.reason };
       }
       // A rejection that settled before the abort stands; an approval is withdrawn by a later abort.
-      if (verdict.approved) input.signal?.throwIfAborted();
+      if (verdict.verdict === 'allow') input.signal?.throwIfAborted();
     } catch (error) {
       modeCancelled = error instanceof PermissionModeChangedError;
       reviewCancelled = input.signal?.aborted === true && error === input.signal.reason;
@@ -159,7 +165,8 @@ export class AgentToolApprovalRequestService {
             ? error.code
             : 'PERMISSION_REVIEW_FAILED';
       verdict = {
-        approved: false,
+        verdict: 'deny',
+        failedChecks: [],
         reason:
           error instanceof PermissionReviewError && !reviewCancelled
             ? error.message
@@ -170,7 +177,10 @@ export class AgentToolApprovalRequestService {
       auditLog.record({
         kind: 'tool-decision',
         decidedBy: 'auto-review',
-        approved: verdict.approved,
+        approved: verdict.verdict === 'allow',
+        verdict: verdict.verdict,
+        failedChecks: verdict.failedChecks,
+        reviewMethod,
         tool: input.toolName,
         toolCallId: input.toolCallId,
         argumentsSha256: input.argumentsSha256,
@@ -183,25 +193,27 @@ export class AgentToolApprovalRequestService {
       if (!(error instanceof AuditWriteFailedError)) throw error;
       // An unrecorded approval is no approval; the card settles as rejected with the audit failure as its reason.
       errorCode = error.code;
-      verdict = { approved: false, reason: error.message };
+      verdict = { verdict: 'deny', failedChecks: [], reason: error.message };
     }
-    const { approved, reason } = verdict;
+    const approved = verdict.verdict === 'allow';
     this.emit(synthetic, 'approval.answered', {
       approvalId,
       title: `Auto-review ${input.toolName}`,
       status: reviewCancelled ? 'cancelled' : approved ? 'approved' : 'rejected',
-      reason,
+      reason: verdict.reason,
       kind: 'tool',
       toolCallId: input.toolCallId,
       toolName: input.toolName,
-      answer: reason,
+      answer: verdict.reason,
       risk: input.risk,
       reviewer: 'auto_review',
       reviewMethod,
+      verdict: verdict.verdict,
+      failedChecks: verdict.failedChecks,
       errorCode,
     });
     if (modeCancelled) throw new PermissionModeChangedError();
-    return verdict;
+    return { ...verdict, reviewMethod, ...(errorCode ? { errorCode } : {}) };
   }
 
   isPending(sessionId: string, turnId: string, approvalId: string): boolean {
