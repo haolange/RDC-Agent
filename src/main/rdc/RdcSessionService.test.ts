@@ -907,6 +907,21 @@ it('uses one replay projection for Agent and human operations and reports unsave
     image: null,
     error: { code: 'RDC_OBSERVE_FAILED' },
   });
+  // A lifecycle snapshot observes the ready but unobserved replay again instead of reporting it unverifiable.
+  mocks.observe.mockResolvedValueOnce({ appliedEventId: 12, imageEventId: 12, image, observation });
+  const frozenCli = {
+    enabled: true,
+    command: 'rdc',
+    argsPrefix: [],
+    workingDirectory: '',
+    env: {},
+    noProgressTimeoutMs: 300_000,
+  };
+  await expect(service.currentAgentObservation(scope, frozenCli)).resolves.toMatchObject({
+    phase: 'ready',
+    appliedEventId: 12,
+    observation,
+  });
 });
 it('correlates lifecycle stages with one main-owned operation ID and assigns fresh mutation IDs', async () => {
   const service = new RdcSessionService();

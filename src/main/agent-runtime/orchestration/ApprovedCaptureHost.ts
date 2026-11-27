@@ -115,8 +115,8 @@ export function createApprovedCaptureHost(input: {
       return { openExperiments: open };
     },
     async snapshot(binding, signal) {
+      const state = await rdcSessionService.currentAgentObservation(scope, binding.cli);
       assertOwningTurn();
-      const state = rdcSessionService.snapshotReplayForSession(scope);
       const lease = getRdcContextLease(input.sessionId);
       const opened = rdcSessionService.snapshotOpenedCaptureForSession(scope);
       if (!lease && !opened && !binding.identity && !state.inputId) return null;

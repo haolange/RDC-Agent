@@ -42,7 +42,7 @@ export function assertRdcBindingOwnership(context?: ToolExecutionContext) {
   if (retained?.ownerProjectId === context.projectId && retained.quarantineReason) {
     throw new AppError(
       'RDC_CONTEXT_QUARANTINED',
-      'replay outcome is uncertain; close and reopen the capture before execution.',
+      'replay outcome is uncertain, so the replay is isolated; the runtime rebuilds it, or recover it with rdc_probe capture_recover.',
     );
   }
   const binding = context.rdcBinding;

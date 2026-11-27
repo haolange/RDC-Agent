@@ -22,6 +22,23 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 
 管线 stage 拒绝与其他操作共用同一无效果证明判定；主进程不按错误 category 或错误码推断保全。它仍须核对 canonical 结果种类、冻结 owning lease 的版本、context、capture 和 replay 身份；缺失证明、取消或身份漂移仍隔离，失败不产生实验回执。
 
+### 何时隔离 owning lease
+
+隔离只用于回放状态真正不确定的情形。判定集中在 `src/main/rdc/rdcQuarantineDecision.ts` 的 `rdcFailureQuarantines`，依据是调用所处的阶段和冻结目录声明的效果，不看错误 category。
+
+- **不隔离**：
+  - 纯读操作（效果只有 `artifact_write`）收到同一操作的 canonical 原生错误；
+  - 操作开始之前的位置预读收到 canonical 错误；
+  - 调用被取消，RDC-Tool 以未终止 worker 的回执结束，并且被取消的是预读或纯读；
+  - 结果已证明回放状态之后，主进程自身的校验、回执或观测失败。
+- **隔离**：
+  - 进程类失败（worker 卡住或丢失、daemon 丢失或不应答、取消）以及 `daemon_owner_unavailable`；
+  - 会改变位置或 shader 的操作缺少结果或恢复证明；
+  - 结果身份不符；
+  - shader 替换成功，但主进程没能签成回执（这个替换无法经回执回滚）。
+- 保留 lease 的失败在 `mainValidation.basis` 写明依据：`pure-read`、`operation-not-run` 或 `result-proven`。下文的无效果证明与恢复证明规则继续适用。
+- 隔离之后由宿主自动恢复，见「回放隔离与恢复投影」。
+
 ## runtime_context 与宿主控制事实
 
 `runtime_context` 在确认 owning lease 后，按同一 project/session（合法委托使用父 session）核对主进程已打开的 context、captureFileId 和 replaySessionId，并返回 `captureContentSha256`。

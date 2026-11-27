@@ -23,8 +23,10 @@ import {
 import { rdcExecutionReceipts } from './RdcExecutionReceipts';
 import { rdcInvocationRecord } from './RdcInvocationRecord';
 import { parseRdcProcessIdentity } from './RdcProcessIdentity';
+import { rdcFailureQuarantines, type RdcCallPhase } from './rdcQuarantineDecision';
 import type { AgentToolResult, ToolExecutionContext } from '../agent-runtime/agent/AgentTool';
 import type { RdcOperationDefinition } from './RdcOperationCatalog';
+import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { RdcCancellation, RdcOperationFrame } from './RdcOperationWatcher';
 
 /** The owning lease, its context and its replay/capture identity are still the ones this call was admitted with. */
@@ -139,6 +141,139 @@ function searchRdcDefinitions(definitions: readonly RdcOperationDefinition[], qu
   };
 }
 
+type ReplayState = { process: ReturnType<typeof parseRdcProcessIdentity>; replacements: string };
+type PreservationBasis = 'pure-read' | 'operation-not-run' | 'result-proven' | 'native-proof';
+
+/**
+ * Whether a failed call leaves the owning lease usable, and on what basis: a failure that by its kind cannot have
+ * changed the replay, RDC-Tool's no-effect proof, a verified restoration of the original event, or a truncated
+ * buffer read whose replay is verified. Anything else is quarantined by the caller.
+ */
+async function qualifyRdcFailure(input: {
+  error: unknown;
+  phase: RdcCallPhase;
+  definition: RdcOperationDefinition;
+  args: Record<string, unknown>;
+  toolCallId: string;
+  cli: RdcCliInvokerSettings;
+  aborted: boolean;
+  cancellation: RdcCancellation | undefined;
+  scope: { sessionId: string; projectId: string };
+  lease: { version: number; contextId: string; runtimeContext: { replaySessionId?: string } };
+  frozenCaptureId: string | undefined;
+  originalEvent: number | undefined;
+  originalReplayState: ReplayState | null;
+  truncatedBufferRead: boolean;
+  readReplayEvent: () => Promise<number>;
+  currentReplayState: () => ReplayState | null;
+}): Promise<{ retained: boolean; basis?: PreservationBasis }> {
+  const { error, phase, definition, scope, lease, originalEvent, originalReplayState } = input;
+  const owns = () => {
+    try {
+      return ownsFrozenReplay(scope, lease, input.frozenCaptureId);
+    } catch {
+      return false;
+    }
+  };
+  const replayUnchanged = !rdcFailureQuarantines({
+    phase,
+    definition,
+    error,
+    aborted: input.aborted,
+    cancellation: input.cancellation,
+  });
+  if (replayUnchanged && owns())
+    return {
+      retained: true,
+      basis: phase === 'settled' ? 'result-proven' : phase === 'preflight' ? 'operation-not-run' : 'pure-read',
+    };
+  if (input.aborted || !(error instanceof Error)) return { retained: false };
+  const native = error instanceof RdcNativeFailure ? error : null;
+  if (native?.resultKind === definition.name && native.effectsNotAttempted && owns())
+    return { retained: true, basis: 'native-proof' };
+  const sameReplayState = () => {
+    const current = input.currentReplayState();
+    return current !== null && originalReplayState !== null && rdcDigest(current) === rdcDigest(originalReplayState);
+  };
+  const restoration =
+    (definition.name === 'rd.export.screenshot' ? native?.screenshotTargetRestoration : null) ??
+    native?.inspectionRestoration;
+  if (
+    restoration &&
+    originalEvent !== undefined &&
+    originalEvent > 0 &&
+    restoration.eventId === originalEvent &&
+    restoration.contextId === lease.contextId &&
+    restoration.sessionId === lease.runtimeContext.replaySessionId &&
+    originalReplayState
+  ) {
+    try {
+      if (owns() && (await input.readReplayEvent()) === originalEvent && sameReplayState())
+        return { retained: true, basis: 'native-proof' };
+    } catch {
+      /* An unverified restoration remains quarantined. */
+    }
+  }
+  if (!input.truncatedBufferRead || !originalReplayState) return { retained: false };
+  try {
+    const event = await input.readReplayEvent();
+    if (!owns() || !sameReplayState() || (event !== originalEvent && event !== input.args.event_id))
+      return { retained: false };
+    const { rdcSessionService } = await import('./RdcSessionService');
+    await rdcSessionService.observeAgentOperation(scope, definition.name, input.toolCallId, input.cli, true);
+    const observed = assertRdcContextLeaseOwnership(scope);
+    if (observed?.version !== lease.version || observed.contextId !== lease.contextId) return { retained: false };
+    error.message += ` Replay verified at event ${event}; select a reflection slot.`;
+    return { retained: true, basis: 'native-proof' };
+  } catch {
+    return { retained: false };
+  }
+}
+
+/** The main-qualified failure the model and UI receive: native details apart from what main verified. */
+function qualifiedNativeFailure(
+  error: RdcNativeFailure,
+  input: {
+    operation: string;
+    preservation: { retained: boolean; basis?: PreservationBasis };
+    replayIdentity: Record<string, unknown>;
+    invocation: ReturnType<typeof rdcInvocationRecord> | undefined;
+  },
+): AgentToolResult {
+  const { retained, basis } = input.preservation;
+  const proof: Record<string, unknown> = {};
+  if (retained) {
+    if (error.effectsNotAttempted) Object.assign(proof, { effects_attempted: false, context_preserved: true });
+    const restored = error.screenshotTargetRestoration ?? error.inspectionRestoration;
+    if (restored) Object.assign(proof, { replay_state_restored: true, restored_event_id: restored.eventId });
+  }
+  const nativeDetails = error.nativeError.details && modelVisibleRdcFailureDetails(error.nativeError.details);
+  const details = {
+    ok: false,
+    source: 'main-qualified-native-failure',
+    operation: input.operation,
+    exitCode: error.nativeError.exitCode,
+    nativeFailure: {
+      code: error.nativeError.code,
+      category: error.nativeError.category,
+      resultKind: error.resultKind,
+      message: error.message,
+      proof,
+      ...(nativeDetails
+        ? { details: nativeDetails.value, ...(nativeDetails.redacted ? { detailsRedacted: true } : {}) }
+        : {}),
+    },
+    mainValidation: {
+      preservationVerified: retained,
+      leaseState: retained ? 'retained' : 'quarantined',
+      ...(basis && basis !== 'native-proof' ? { basis } : {}),
+    },
+    rdcExecutionIdentity: input.replayIdentity,
+    invocation: input.invocation,
+  };
+  return { isError: true, content: [{ type: 'text', text: JSON.stringify(details) }], details };
+}
+
 export async function executeRdcShell(
   raw: RdcShellInput,
   toolCallId: string,
@@ -249,13 +384,16 @@ export async function executeRdcShell(
     const startedAt = Date.now();
     let lastInvocation: ReturnType<typeof rdcInvocationRecord> | undefined;
     // Set by readReplayEvent on every replay read.
-    let lastReplayState = null as { process: ReturnType<typeof parseRdcProcessIdentity>; replacements: string } | null;
+    let lastReplayState = null as ReplayState | null;
     const verifyTruncatedBufferRead =
       input.operation === 'rd.pipeline.get_constant_buffers' &&
       args.include_contents === true &&
       definition.effects.length === 1 &&
       definition.effects[0] === 'replay_position';
     let truncatedBufferRead = false;
+    let phase: RdcCallPhase = 'preflight';
+    // The receipt `daemon cancel` settled the operation with, when the turn was cancelled while it ran.
+    let cancellation: RdcCancellation | undefined;
     const readReplayEvent = async (): Promise<number> => {
       lastInvocation = rdcInvocationRecord('rd.session.get_context', {});
       const response = await rdcCliInvokerService.executeCLI(
@@ -263,6 +401,7 @@ export async function executeRdcShell(
         ['rd.session.get_context', '--args-json', '{}', '--daemon-context', lease.contextId],
         { abortSignal: signal, contextId: lease.contextId, settings: cli },
       );
+      if (response.cancellation) cancellation = response.cancellation;
       const snapshot = parseRdcNativeResult(response, undefined, 'rd.session.get_context');
       const runtime = snapshot.data.runtime as Record<string, unknown> | undefined;
       if (
@@ -293,8 +432,6 @@ export async function executeRdcShell(
     };
     let originalEvent: number | undefined;
     let originalReplayState: typeof lastReplayState = null;
-    // The receipt `daemon cancel` settled the operation with, when the turn was cancelled while it ran.
-    let cancellation: RdcCancellation | undefined;
     try {
       const temporaryReplayRead = definition.effects.includes('replay_position_temporary');
       originalEvent =
@@ -317,6 +454,7 @@ export async function executeRdcShell(
           : undefined;
       originalReplayState = lastReplayState;
       lastInvocation = rdcInvocationRecord(input.operation, args);
+      phase = 'native';
       const result = await rdcCliInvokerService.executeCLI(
         'call',
         [input.operation, '--args-json', JSON.stringify(args), '--daemon-context', lease.contextId],
@@ -326,6 +464,7 @@ export async function executeRdcShell(
       truncatedBufferRead = verifyTruncatedBufferRead && result.exitCode === 0 && result.stdoutTruncated === true;
       signal?.throwIfAborted();
       const payload = parseRdcNativeResult(result, undefined, input.operation);
+      phase = 'verifying';
       if (
         payload.result_kind !== input.operation ||
         (payload.data.context_id !== undefined && payload.data.context_id !== lease.contextId) ||
@@ -350,6 +489,7 @@ export async function executeRdcShell(
       ) {
         throw new AppError('RDC_CLI_PROTOCOL', 'temporary replay operation did not prove restoration.');
       }
+      phase = 'settled';
       const unchangedShader = isUnchangedShaderResult(definition, payload.data);
       const evidence =
         input.experimentId && !unchangedShader
@@ -436,91 +576,33 @@ export async function executeRdcShell(
         },
       };
     } catch (error) {
+      // Restoration checks read the replay again; the failure keeps the call that actually failed.
       const failedInvocation = lastInvocation;
-      let nativeStateVerifiedSafe = false;
-      if (
-        error instanceof RdcNativeFailure &&
-        error.resultKind === input.operation &&
-        error.effectsNotAttempted &&
-        !signal?.aborted
-      ) {
-        try {
-          nativeStateVerifiedSafe = ownsFrozenReplay({ sessionId, projectId }, lease, frozenCaptureId);
-        } catch {
-          /* An unverified lease remains quarantined. */
-        }
-      }
-      if (
-        !nativeStateVerifiedSafe &&
-        error instanceof RdcNativeFailure &&
-        input.operation === 'rd.export.screenshot' &&
-        originalEvent !== undefined &&
-        originalEvent > 0 &&
-        error.screenshotTargetRestoration?.eventId === originalEvent &&
-        error.screenshotTargetRestoration.contextId === lease.contextId &&
-        error.screenshotTargetRestoration.sessionId === replaySessionId &&
-        originalReplayState &&
-        !signal?.aborted
-      ) {
-        try {
-          nativeStateVerifiedSafe =
-            ownsFrozenReplay({ sessionId, projectId }, lease, frozenCaptureId) &&
-            (await readReplayEvent()) === originalEvent &&
-            lastReplayState !== null &&
-            rdcDigest(lastReplayState) === rdcDigest(originalReplayState);
-        } catch {
-          /* An unverified restoration remains quarantined. */
-        }
-      }
-      if (
-        !nativeStateVerifiedSafe &&
-        error instanceof RdcNativeFailure &&
-        originalEvent !== undefined &&
-        originalEvent > 0 &&
-        error.inspectionRestoration?.eventId === originalEvent &&
-        error.inspectionRestoration.contextId === lease.contextId &&
-        error.inspectionRestoration.sessionId === replaySessionId &&
-        originalReplayState &&
-        !signal?.aborted
-      ) {
-        try {
-          nativeStateVerifiedSafe =
-            ownsFrozenReplay({ sessionId, projectId }, lease, frozenCaptureId) &&
-            (await readReplayEvent()) === originalEvent &&
-            lastReplayState !== null &&
-            rdcDigest(lastReplayState) === rdcDigest(originalReplayState);
-        } catch {
-          /* An unverified restoration remains quarantined. */
-        }
-      }
-      if (!nativeStateVerifiedSafe && truncatedBufferRead && originalReplayState && !signal?.aborted) {
-        try {
-          const event = await readReplayEvent();
-          nativeStateVerifiedSafe =
-            ownsFrozenReplay({ sessionId, projectId }, lease, frozenCaptureId) &&
-            lastReplayState !== null &&
-            rdcDigest(lastReplayState) === rdcDigest(originalReplayState) &&
-            (event === originalEvent || event === args.event_id);
-          if (nativeStateVerifiedSafe) {
-            const { rdcSessionService } = await import('./RdcSessionService');
-            await rdcSessionService.observeAgentOperation(
-              { sessionId, projectId },
-              input.operation,
-              toolCallId,
-              cli,
-              true,
-            );
-            const observed = assertRdcContextLeaseOwnership({ sessionId, projectId });
-            nativeStateVerifiedSafe =
-              !signal?.aborted && observed?.version === lease.version && observed.contextId === lease.contextId;
-            if (nativeStateVerifiedSafe && error instanceof Error)
-              error.message += ` Replay verified at event ${event}; select a reflection slot.`;
-          }
-        } catch {
-          nativeStateVerifiedSafe = false;
-        }
-      }
-      if (!nativeStateVerifiedSafe) {
+      const replayIdentity = {
+        productSessionId: sessionId,
+        contextId: lease.contextId,
+        replaySessionId,
+        captureFileId: frozenCaptureId,
+      };
+      const preservation = await qualifyRdcFailure({
+        error,
+        phase,
+        definition,
+        args,
+        toolCallId,
+        cli,
+        aborted: signal?.aborted === true,
+        cancellation,
+        scope: { sessionId, projectId },
+        lease,
+        frozenCaptureId,
+        originalEvent,
+        originalReplayState,
+        truncatedBufferRead,
+        readReplayEvent,
+        currentReplayState: () => lastReplayState,
+      });
+      if (!preservation.retained) {
         registerRdcFault({
           sessionId,
           expectedVersion: lease.version,
@@ -530,44 +612,13 @@ export async function executeRdcShell(
           reason: uncertainOutcomeReason(signal, cancellation, error),
         });
       }
-      if (error instanceof RdcNativeFailure) {
-        // Native details remain distinct from main-qualified proof and lease state.
-        const proof: Record<string, unknown> = {};
-        if (nativeStateVerifiedSafe) {
-          if (error.effectsNotAttempted) Object.assign(proof, { effects_attempted: false, context_preserved: true });
-          const restored = error.screenshotTargetRestoration ?? error.inspectionRestoration;
-          if (restored) Object.assign(proof, { replay_state_restored: true, restored_event_id: restored.eventId });
-        }
-        const nativeDetails = error.nativeError.details && modelVisibleRdcFailureDetails(error.nativeError.details);
-        const details = {
-          ok: false,
-          source: 'main-qualified-native-failure',
+      if (error instanceof RdcNativeFailure)
+        error.deliveryResult = qualifiedNativeFailure(error, {
           operation: input.operation,
-          exitCode: error.nativeError.exitCode,
-          nativeFailure: {
-            code: error.nativeError.code,
-            category: error.nativeError.category,
-            resultKind: error.resultKind,
-            message: error.message,
-            proof,
-            ...(nativeDetails
-              ? { details: nativeDetails.value, ...(nativeDetails.redacted ? { detailsRedacted: true } : {}) }
-              : {}),
-          },
-          mainValidation: {
-            preservationVerified: nativeStateVerifiedSafe,
-            leaseState: nativeStateVerifiedSafe ? 'retained' : 'quarantined',
-          },
-          rdcExecutionIdentity: {
-            productSessionId: sessionId,
-            contextId: lease.contextId,
-            replaySessionId,
-            captureFileId: frozenCaptureId,
-          },
+          preservation,
+          replayIdentity,
           invocation: failedInvocation,
-        };
-        error.deliveryResult = { isError: true, content: [{ type: 'text', text: JSON.stringify(details) }], details };
-      }
+        });
       throw error;
     }
   });

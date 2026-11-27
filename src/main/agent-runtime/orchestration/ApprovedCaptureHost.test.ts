@@ -37,6 +37,7 @@ const mock = vi.hoisted(() => ({
 vi.mock('../../rdc/RdcSessionService', () => ({
   rdcSessionService: {
     snapshotReplayForSession: mock.state,
+    currentAgentObservation: async (scope: unknown) => mock.state(scope),
     snapshotOpenedCaptureForSession: mock.opened,
     openProjectInput: mock.open,
     clearOpenedCaptureForSession: mock.close,
