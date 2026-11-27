@@ -196,7 +196,7 @@ function scriptedModel(context: Context): ToolCallContent | string {
         worldStateId,
         kind: 'baseline',
         captureRef: 'vkcube_lavapipe.rdc',
-        replay: { adapter: 'vk', driver: 'lavapipe', device: 'local', exclusiveLock: false },
+        replay: { adapter: 'vk', driver: 'lavapipe', device: 'local' },
         shaderReplacement: null,
         patchStack: [],
         focus: { event: String(draw.event_id) },

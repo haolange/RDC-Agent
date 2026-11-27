@@ -729,27 +729,26 @@ describe('investigation system contract', () => {
       record: { validity: 'polluted' },
       manifest: { status: 'superseded' },
     });
-    // Without an exclusive lock the closure does not isolate the change.
-    const polluted = writeDraft(service, 'world_state', {
-      ...exclusiveWorld('ws-dirty', true),
-      replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
-    });
+    // An experiment that only claims a rollback, without closing on signed receipts, isolates nothing.
+    const polluted = writeDraft(service, 'world_state', exclusiveWorld('ws-dirty', true));
     expect(polluted.record).toMatchObject({ validity: 'polluted' });
     const stale = writeDraft(service, 'evidence', evidenceOf('ws-dirty', note, 'ev-stale'));
     expect(stale.record).toMatchObject({ stale: true });
-    writeDraft(
-      service,
-      'experiment',
-      recordedExperiment({
-        experimentId: 'exp-unlocked',
+    writeDraft(service, 'experiment', {
+      ...recordedExperiment({
+        experimentId: 'exp-claimed',
         hypothesisClaimId: 'claim-hyp',
         baselineWorldStateId: 'ws-base',
         variantWorldStateId: 'ws-dirty',
         restoredWorldStateId: 'ws-restored',
         verifyEvidenceIds: ['ev-rdc'],
       }),
-    );
-    expect(current('ws-dirty')?.record).toMatchObject({ validity: 'polluted' });
+      status: 'running',
+    });
+    const rewritten = writeDraft(service, 'world_state', exclusiveWorld('ws-dirty', true), {
+      supersedes: polluted.manifest.artifactId,
+    });
+    expect(rewritten.record).toMatchObject({ validity: 'polluted' });
     expect(current('ev-stale')?.record).toMatchObject({ stale: true });
   });
 

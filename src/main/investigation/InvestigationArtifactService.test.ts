@@ -609,6 +609,17 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
         benchmark: { status: 'not_measured' },
       }),
     ).toThrow(/INVESTIGATION_SCHEMA_INVALID/);
+    // A replayed frame has no presentation: an optimizer baseline may state vsync as unverified, with its reason.
+    const replayed = {
+      ...baselineWorld('ws-replayed'),
+      benchmark: {
+        warmup: 3,
+        resolution: '1920x1080',
+        vsync: { status: 'unverified' as const, reason: 'GPU-timed replay of a captured frame does not present.' },
+        samplingProtocol: 'median-of-5',
+      },
+    };
+    expect(writeDraft(service, 'world_state', replayed, { mission: 'optimizer' }).record).toMatchObject(replayed);
   });
 
   it('lets a report cite an existing claimId without superseding the source claim', () => {
@@ -814,7 +825,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       'world_state',
       {
         ...exclusiveWorld('ws-stale-src', true),
-        replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
+        replay: { adapter: 'vk', driver: 'adreno', device: 'device-0' },
       },
       { supersedes: world.manifest.artifactId },
     );
@@ -1550,7 +1561,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
     expect(evidence.record).toMatchObject({ stale: false });
     const polluted = {
       ...exclusiveWorld('ws-p1a', true),
-      replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
+      replay: { adapter: 'vk', driver: 'adreno', device: 'device-0' },
     };
     expect(() => writeDraft(service, 'world_state', polluted, { artifactId: world.manifest.artifactId })).toThrow(
       /INVESTIGATION_DUPLICATE_ID/,
@@ -1861,7 +1872,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       'world_state',
       {
         ...exclusiveWorld('ws-pack-stale', true),
-        replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
+        replay: { adapter: 'vk', driver: 'adreno', device: 'device-0' },
       },
       { supersedes: world.manifest.artifactId },
     );
@@ -1909,7 +1920,7 @@ describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
       'world_state',
       {
         ...exclusiveWorld('ws-ready-src', true),
-        replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
+        replay: { adapter: 'vk', driver: 'adreno', device: 'device-0' },
       },
       { supersedes: world.manifest.artifactId },
     );

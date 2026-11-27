@@ -92,7 +92,7 @@ export function baselineWorld(id = 'ws-baseline'): WorldState {
     worldStateId: id,
     kind: 'baseline',
     captureRef: 'captures/sample.rdc',
-    replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
+    replay: { adapter: 'vk', driver: 'adreno', device: 'device-0' },
     shaderReplacement: null,
     patchStack: [],
     focus: { event: 'E1' },
@@ -105,7 +105,7 @@ export function exclusiveWorld(id: string, mutated = false): WorldState {
   return {
     ...baselineWorld(id),
     kind: 'experiment',
-    replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: true },
+    replay: { adapter: 'vk', driver: 'adreno', device: 'device-0' },
     shaderReplacement: mutated ? { shaderId: 'ps-0', replacementRef: 'shaders/ps-patched.spv' } : null,
     patchStack: mutated ? [{ patchId: 'p1', summary: 'replace PS' }] : [],
   };

@@ -220,7 +220,7 @@ shader replacement 返回一致的 `status=noop`（顶层与 replacement 的身�
 `runtime_context.rdc.hostControls.replayIsolation` 是 Main 对当前受控 context 的点时排他证明，读取实际 owning lease、冻结身份和该 turn 持有的交互锁；非 owning General、漂移、隔离、委派、同 context 重复 lease 或未持锁均返回 unavailable。
 
 - 成功来源固定为 main-owned-lease-and-turn-lock，绑定 session/project/turn/context/leaseVersion/capture/replay，范围仅 rdc-agent-context。
-- `WorldState.replay.exclusiveLock` 在此受控范围内有该来源支撑，仍须三态分别保存并与阶段回执核对；不是整批 native mutex 或外部进程排除证明，不免除实际变更状态及恢复校验。
+- WorldState 不记录 Agent 自报的排他标记：S-RDC-01 的隔离由同一实验通过验签的五份阶段回执证明（同一 owning lease、进程与交互锁），只认 `recorded`／`rolled_back` 的实验（`experimentSatisfiesRdcIsolation`）。
 - context 小结果沿既有制品路径保留 inline 正文和持久 URI/hash；不能据新的证明回填旧实验资格。
 
 远程打开的传输阶段来自 `rd.capture.open_file` 自己的进度帧：只有原生 transfer stage 才显示传输阶段，没有帧不推测进度，也不轮询 daemon status。足迹记录原生 `revision`、实际替换/恢复状态和显示参数。观察无法确认 EID 时保存无图片的失败事实；人工与 Agent 操作统一更新同一当前回放状态和图片，不再保留 Agent 专属图片镜像；实际 image EID 与 observation 元数据来自同一次原生观察。后台操作证据继续保存，不作为第二套回放 UI。

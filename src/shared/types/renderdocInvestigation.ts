@@ -134,7 +134,6 @@ interface WorldStateReplay {
   adapter: string;
   driver: string;
   device: string;
-  exclusiveLock: boolean;
 }
 
 interface WorldStateShaderReplacement {
@@ -157,7 +156,7 @@ interface WorldStateFocus {
 interface WorldStateBenchmark {
   warmup: number;
   resolution: string;
-  vsync: boolean;
+  vsync: boolean | { status: 'unverified'; reason: string };
   samplingProtocol: string;
 }
 
