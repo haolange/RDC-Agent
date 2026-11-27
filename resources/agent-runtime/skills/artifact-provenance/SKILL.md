@@ -11,7 +11,7 @@ description: Enforce ready provenance and cite investigation artifacts only by i
 
 1. 原始工具输出可以先采集。写 Evidence 前，先持久化与实际观察状态相符的 WorldState，Evidence 再绑定它的 `worldStateId`；draft 也一样要能解析。WorldState 可以如实留下未知或未测量的字段，不为凑必填项编造安全性、排他性、读数或零值，也不把新观察挂到无关的旧 WorldState 上。
 2. Evidence 先于派生的 Claim，在它的 WorldState 之后。
-3. Experiment 引用的 WorldState 和 hypothesis Claim 要先持久化。设计阶段的 variant／restored 锚点写成合法的"未测量"，variant 观察先写会被判 `polluted`；回滚验证证据持久后，用 `supersedes` 重写 variant WorldState 及其 Evidence。schema 表示不了某个锚点时，在计划门解决，不写虚构的前向引用或占位回执。计划要求的设计记录要在正式签名阶段之前写成功。
+3. Experiment 引用的 WorldState 和 hypothesis Claim 要先持久化。设计阶段的 variant／restored 锚点写成合法的"未测量"。schema 表示不了某个锚点时，在计划门解决，不写虚构的前向引用或占位回执。计划要求的设计记录要在正式签名阶段之前写成功。
 4. 能解析的引用不等于状态等价，也不足以让记录 ready。
 
 ## ready 的三个条件
