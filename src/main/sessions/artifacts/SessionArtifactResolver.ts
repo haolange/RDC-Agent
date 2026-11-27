@@ -720,24 +720,6 @@ export class SessionArtifactResolver {
     return uris.sort();
   }
 
-  sweepToolOutputs(sessionId: string | null | undefined): void {
-    if (!sessionId?.trim()) {
-      throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', 'an owning session is required.');
-    }
-    this.ensureReconciled(sessionId.trim());
-    const sessionPath = this.resolveSessionPath(sessionId.trim());
-    if (!sessionPath) {
-      throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', `session not found: ${sessionId}`);
-    }
-    const toolOutputsRoot = path.join(path.resolve(sessionPath), SESSION_ARTIFACT_ROOT_DIR, 'tool-outputs');
-    if (!fs.existsSync(toolOutputsRoot)) return;
-    assertNoSymlinkPath(toolOutputsRoot);
-    if (!isWithinRoot(path.resolve(toolOutputsRoot), path.resolve(sessionPath))) {
-      throw new SessionArtifactError('ARTIFACT_PATH_ESCAPE', 'sweep target escaped the owning session.');
-    }
-    fs.rmSync(toolOutputsRoot, { recursive: true, force: true });
-  }
-
   private assertAllowedBytes(relativePath: string, bytes: Buffer, declaredMime?: string): string {
     const ext = path.extname(relativePath).toLowerCase();
     if (ext === '.rdc' || ext === '.svg' || ext === '.exe' || EXECUTABLE_EXTENSIONS.has(ext)) {

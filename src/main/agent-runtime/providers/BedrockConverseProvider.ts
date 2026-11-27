@@ -4,7 +4,7 @@
  * Bedrock Converse uses a DIFFERENT wire format from OpenAI/Anthropic:
  * - Request: { system, messages, toolConfig, inferenceConfig }
  * - Response streaming: messageStart, contentBlockStart, contentBlockDelta, contentBlockStop, messageStop events
- * - Cache: cachePoint: { type: 'default' } placed in system/messages
+ * - Cache: cachePoint: { type: 'default' } after the stable system prefix, only when the compiled cache plan is enabled
  * - SigV4 signing via ProviderRequestAuthorizer
  * - Endpoint: https://bedrock-runtime.{region}.amazonaws.com/model/{modelId}/converse-stream
  *
@@ -221,7 +221,11 @@ export class BedrockConverseProvider implements ProviderStrategy {
     const prompt = partitionSystemPrompt(context);
     const system: BedrockSystemBlock[] = [];
     if (prompt.stableText) {
-      system.push({ text: prompt.stableText, cachePoint: { type: 'default' } });
+      // A cache breakpoint is a request the route must support; the compiled plan says whether it does.
+      system.push({
+        text: prompt.stableText,
+        ...(options.promptCache?.enabled ? { cachePoint: { type: 'default' as const } } : {}),
+      });
     }
     if (prompt.volatileText) {
       system.push({ text: prompt.volatileText });
