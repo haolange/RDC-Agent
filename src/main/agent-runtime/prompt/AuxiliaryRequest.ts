@@ -29,10 +29,13 @@ export interface AuxiliaryRequest {
   maxTokens: number;
   reasoning: ProviderReasoningContract;
   /**
-   * Auxiliary requests do not write the prompt cache, so they never evict the conversation's prefix.
-   * A capability probe compiles the route's real cache behaviour because that is what it checks.
+   * Compaction does not write the prompt cache, so it never evicts the conversation's prefix. A capability probe
+   * compiles the route's real cache behaviour because that is what it checks. A permission review caches its own
+   * stable prefix under its own affinity scope, apart from the conversation's.
    */
   writesPromptCache: boolean;
+  /** The cache affinity of a request that writes the cache on a route keyed by session; never the conversation's. */
+  cacheAffinityScopeId?: string;
   /** Extra snapshot controls beyond the purpose flag, reasoning selection and output limit. */
   controls?: Record<string, unknown>;
   signal?: AbortSignal;
@@ -49,7 +52,12 @@ export async function executeAuxiliaryRequest(request: AuxiliaryRequest): Promis
   const turnId = generateEventId(request.purpose);
   const messages = [{ role: 'user' as const, content: request.userContent, timestamp: Date.now() }];
   const tools = [...request.tools];
-  const compiledCache = promptCacheCompiler.compile({ promptPlan, requestPlan: plan, tools });
+  const compiledCache = promptCacheCompiler.compile({
+    promptPlan,
+    requestPlan: plan,
+    tools,
+    ...(request.cacheAffinityScopeId ? { affinityScopeId: request.cacheAffinityScopeId } : {}),
+  });
   const promptCache = request.writesPromptCache
     ? compiledCache
     : { ...compiledCache, enabled: false, reason: `${request.purpose}-no-cache-write` };

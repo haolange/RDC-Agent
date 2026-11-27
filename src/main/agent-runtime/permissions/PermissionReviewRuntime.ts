@@ -64,6 +64,20 @@ const PermissionReviewVerdictSchema = z
     message: 'failed checks are listed once.',
   });
 
+function stableSegment(id: string, sourcePath: string, content: string): PromptPlan['segments'][number] {
+  return {
+    id,
+    kind: 'runtime-fact',
+    scope: 'runtime',
+    sourcePath,
+    sourceHash: hashScopedResource(content),
+    content,
+    stability: 'stable',
+    precedence: 0,
+    tokenEstimate: charsToTokens(content.length),
+  };
+}
+
 export function parsePermissionReview(text: string): PermissionReviewVerdict {
   let value: unknown;
   try {
@@ -76,7 +90,11 @@ export function parsePermissionReview(text: string): PermissionReviewVerdict {
   return parsed.data;
 }
 
-/** One bounded auxiliary provider request, using the frozen route and opaque credential. */
+/**
+ * One bounded auxiliary request. The stable prefix (the rules, then the turn's authority with its approved plan and
+ * authorizations) leads and is cached under the review's own affinity scope, so successive reviews of one plan reuse
+ * it; only the pending action, its host facts and the slot's observations follow.
+ */
 export async function executePermissionReview(input: {
   sessionId: string;
   plan: RequestPlan;
@@ -94,12 +112,13 @@ export async function executePermissionReview(input: {
       'PERMISSION_REVIEW_SENSITIVE_INPUT',
       'exact pending action contains protected credential material; it cannot be sent for automatic review.',
     );
+  const authority = `# Authority\n${String(redactSecretsDeep(input.authority).value)}`;
   const content = JSON.stringify({
-    authority: redactSecretsDeep(input.authority).value,
     pendingAction: safeAction.value,
     evidence: redactSecretsDeep(input.evidence).value,
   });
-  const requiredTokens = charsToTokens(SYSTEM.length + content.length);
+  const systemPrompt = `${SYSTEM}\n\n${authority}`;
+  const requiredTokens = charsToTokens(systemPrompt.length + content.length);
   const inputBudget = Math.min(32768, input.plan.contextBudgetTokens, input.plan.contextWindowTokens - 1024);
   if (!Number.isFinite(inputBudget) || inputBudget <= 0 || requiredTokens > inputBudget) {
     throw new PermissionReviewError(
@@ -109,29 +128,22 @@ export async function executePermissionReview(input: {
   }
   const timeout = AbortSignal.timeout(30000);
   const signal = input.signal ? AbortSignal.any([input.signal, timeout]) : timeout;
-  const segment = {
-    id: 'runtime:permission-review',
-    kind: 'runtime-fact' as const,
-    scope: 'runtime' as const,
-    sourcePath: 'runtime://permission-review',
-    sourceHash: hashScopedResource(SYSTEM),
-    content: SYSTEM,
-    stability: 'stable' as const,
-    precedence: 0,
-    tokenEstimate: charsToTokens(SYSTEM.length),
-  };
+  const segments = [
+    stableSegment('runtime:permission-review', 'runtime://permission-review', SYSTEM),
+    stableSegment('runtime:permission-review-authority', 'runtime://permission-review/authority', authority),
+  ];
   const promptPlan: PromptPlan = {
     id: generateEventId('prompt-plan'),
-    segments: [segment],
-    systemPrompt: SYSTEM,
-    totalTokenEstimate: charsToTokens(SYSTEM.length + content.length),
+    segments,
+    systemPrompt,
+    totalTokenEstimate: charsToTokens(systemPrompt.length + content.length),
     diagnostics: [],
-    metrics: { systemPrompt: SYSTEM.length, scopedInstructions: 0, skills: 0 },
+    metrics: { systemPrompt: systemPrompt.length, scopedInstructions: 0, skills: 0 },
     stablePrefix: {
-      fingerprint: hashScopedResource(SYSTEM),
-      segmentIds: [segment.id],
-      sourceHashes: [segment.sourceHash],
-      tokenEstimate: segment.tokenEstimate,
+      fingerprint: hashScopedResource(systemPrompt),
+      segmentIds: segments.map((segment) => segment.id),
+      sourceHashes: segments.map((segment) => segment.sourceHash),
+      tokenEstimate: charsToTokens(systemPrompt.length),
       volatileSegmentIds: [],
     },
   };
@@ -147,7 +159,8 @@ export async function executePermissionReview(input: {
       tools: [],
       maxTokens: 1024,
       reasoning: input.reasoning,
-      writesPromptCache: false,
+      writesPromptCache: true,
+      cacheAffinityScopeId: `${input.sessionId}#permission-review`,
       signal,
     });
     signal.throwIfAborted();

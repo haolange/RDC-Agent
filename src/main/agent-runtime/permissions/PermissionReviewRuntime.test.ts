@@ -2,7 +2,12 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { executePermissionReview, parsePermissionReview } from './PermissionReviewRuntime';
 import type { AssistantMessage } from '../core/types';
 
-const mock = vi.hoisted(() => ({ stream: vi.fn(), write: vi.fn(), complete: vi.fn() }));
+const mock = vi.hoisted(() => ({
+  stream: vi.fn(),
+  write: vi.fn(),
+  complete: vi.fn(),
+  compile: vi.fn(() => ({ enabled: true })),
+}));
 vi.mock('../providers/ConfiguredRuntimeProvider', () => ({
   configuredRuntimeProvider: { stream: mock.stream },
   encodeAgentModel: () => 'frozen-route',
@@ -13,7 +18,9 @@ vi.mock('../prompt/RequestEnvelopeBuilder', () => ({
 vi.mock('../prompt/RequestSnapshotStore', () => ({
   requestSnapshotStore: { nextCallIndex: () => 1, write: mock.write, complete: mock.complete },
 }));
-vi.mock('../prompt/PromptCacheCompiler', () => ({ promptCacheCompiler: { compile: () => ({ enabled: true }) } }));
+vi.mock('../prompt/PromptCacheCompiler', () => ({
+  promptCacheCompiler: { compile: mock.compile },
+}));
 const input: Parameters<typeof executePermissionReview>[0] = {
   sessionId: 'owner',
   plan: {
@@ -71,7 +78,7 @@ it.each([
     reason: 'Plain reason.',
   });
 });
-it('uses frozen Low route with no tools, records usage, and excludes credentials from snapshots', async () => {
+it('uses the frozen review route with no tools, records usage, and excludes credentials from snapshots', async () => {
   providerResult('{"verdict":"allow","failedChecks":[],"reason":"Authorized bounded edit."}');
   await expect(executePermissionReview(input)).resolves.toEqual({
     verdict: 'allow',
@@ -87,9 +94,10 @@ it('uses frozen Low route with no tools, records usage, and excludes credentials
       credentialHandle: input.credentialHandle,
       reasoning: { selection: 'low' },
       maxTokens: 1024,
-      promptCache: expect.objectContaining({ enabled: false }),
+      promptCache: expect.objectContaining({ enabled: true }),
     }),
   );
+  expect(mock.compile).toHaveBeenCalledWith(expect.objectContaining({ affinityScopeId: 'owner#permission-review' }));
   expect(JSON.stringify(mock.write.mock.calls)).not.toContain(input.credentialHandle);
   expect(mock.complete).toHaveBeenCalledWith(
     'snapshot',
@@ -173,4 +181,20 @@ it('rejects credential-bearing actions before sending any automatic review reque
   ).rejects.toThrow('SENSITIVE_INPUT');
   expect(mock.stream).not.toHaveBeenCalled();
   expect(mock.write).not.toHaveBeenCalled();
+});
+
+it('keeps the cached prefix byte-identical for two different actions under the same plan', async () => {
+  providerResult('{"verdict":"allow","failedChecks":[],"reason":"Within the plan."}');
+  await executePermissionReview({ ...input, action: { tool: 'edit_file', arguments: { path: 'a.txt' }, reason: 'a' } });
+  await executePermissionReview({
+    ...input,
+    action: { tool: 'shell', arguments: { rdc: { operation: 'rd.shader.edit_and_replace' } }, reason: 'b' },
+    evidence: { recent: ['different'] },
+  });
+  const [first, second] = mock.write.mock.calls.map(([snapshot]) => snapshot.value);
+  expect(first.promptPlan.systemPrompt).toBe(second.promptPlan.systemPrompt);
+  expect(first.promptPlan.stablePrefix).toEqual(second.promptPlan.stablePrefix);
+  expect(first.promptPlan.systemPrompt).toContain(input.authority);
+  expect(first.messages[0].content).not.toBe(second.messages[0].content);
+  expect(first.messages[0].content).not.toContain(input.authority);
 });
