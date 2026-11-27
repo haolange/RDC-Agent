@@ -9,7 +9,16 @@ const verified = {
   worker: { pid: 11, start_generation: 'windows-filetime:2' },
 };
 const classify = (status: RdcContextStatus, extra: Partial<Parameters<typeof classifyRecovery>[0]> = {}) =>
-  classifyRecovery({ verified, replaySessionId: 'replay', status, deviceActionPending: false, budget: null, ...extra });
+  classifyRecovery({
+    verified,
+    replaySessionId: 'replay',
+    status,
+    deviceActionPending: false,
+    budget: null,
+    processesExited: false,
+    ownsDaemon: false,
+    ...extra,
+  });
 
 /** Worker 11 exited under the watchdog and a later request started worker 12, which never served the replay. */
 function replacedStatus(): RdcContextStatus {
@@ -72,6 +81,22 @@ it('quarantines a worker change without an exit receipt of exactly the verified 
   };
   restart.sessions[0]!.is_live = false;
   expect(classify(restart)).toMatchObject(unexplained);
+});
+
+it('rebuilds after a silent daemon only when its processes exited or this application can stop it', () => {
+  const silent: RdcContextStatus = { ...liveContextStatus(), source: 'state_files' };
+  expect(classify(silent)).toMatchObject({ decision: 'quarantined', code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED' });
+  expect(classify(silent, { processesExited: true })).toEqual({
+    decision: 'rebuild',
+    reason: 'daemon-exited',
+    lost: { workers: [] },
+  });
+  expect(classify(silent, { ownsDaemon: true })).toMatchObject({ decision: 'rebuild', reason: 'daemon-stopped' });
+  // A different daemon answering is never stopped on ownership alone.
+  const replaced = liveContextStatus();
+  const other: RdcContextStatus = { ...replaced, daemon: { ...replaced.daemon, pid: 77 } };
+  expect(classify(other, { ownsDaemon: true })).toMatchObject({ decision: 'quarantined' });
+  expect(classify(other, { processesExited: true })).toMatchObject({ reason: 'daemon-exited' });
 });
 
 it('stops before reading the chain when the attempt budget is spent or a device action is pending', () => {

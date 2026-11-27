@@ -14,7 +14,13 @@ import {
   setRdcInteractionLock,
 } from './RdcOperationCoordinator';
 import { assertRdcContextLeaseOwnership, getRdcContextLease } from './RdcRuntimeContextRegistry';
-import { listOwnedRdcDaemons } from './OwnedRdcDaemonRegistry';
+import {
+  listOwnedRdcDaemons,
+  ownsRdcContextDaemon,
+  rdcContextProcessesExited,
+  releaseFaultedRdcContext,
+  type RdcContextProcesses,
+} from './OwnedRdcDaemonRegistry';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 import { readRdcSwitchSnapshot } from './RdcSwitchSnapshot';
@@ -103,7 +109,7 @@ export async function restorePreviousCapture(scope: CaptureReplayBindingRequest)
     const cli =
       priorBinding?.cli ?? withRdcHostRuntimeEnv(structuredClone(settingsService.snapshot().user.tooling.rdcCli));
     const catalog = original ? (await rdcCliInvokerService.loadCatalog(cli, true)).tools : [];
-    await admitQuarantinedContext(scope, initial, cli);
+    const exitedProcesses = await admitQuarantinedContext(scope, initial, cli);
     guard();
     let current = await observedPosition(scope);
     if (
@@ -135,6 +141,7 @@ export async function restorePreviousCapture(scope: CaptureReplayBindingRequest)
         !(await rdcSessionService.clearOpenedCaptureForSession(scope, {
           binding: priorBinding,
           expectedGeneration: latest.generation,
+          exitedProcesses,
         }))
       ) {
         throw new AppError('RDC_RECOVERY_CLOSE_UNCONFIRMED');
@@ -238,14 +245,15 @@ async function reopenOriginal(
 /**
  * A quarantined current context is closed only after the shared recovery admission explains its processes against
  * the last identity main verified for it. A person starts this restore, so it is not counted against an attempt budget.
+ * Returns the processes a daemon-side rebuild left gone, which the close then confirms instead of stopping them.
  */
 async function admitQuarantinedContext(
   scope: SessionScope,
   pending: NonNullable<ReturnType<typeof rdcLifecycleReceipts.pending>>,
   cli: RdcCliInvokerSettings,
-): Promise<void> {
+): Promise<RdcContextProcesses | undefined> {
   const lease = getRdcContextLease(scope.sessionId);
-  if (!lease?.quarantineReason) return;
+  if (!lease?.quarantineReason) return undefined;
   const verified =
     observedRdcProcessIdentity(lease.contextId) ??
     pending.identities.filter((value) => value.contextId === lease.contextId).at(-1)?.processIdentity;
@@ -259,6 +267,8 @@ async function admitQuarantinedContext(
     status,
     deviceActionPending: !!rdcSessionService.snapshotReplayForSession(scope).preparation.issue?.deviceAction,
     budget: null,
+    processesExited: rdcContextProcessesExited(verified),
+    ownsDaemon: ownsRdcContextDaemon(lease.contextId),
   });
   lifecycleLedger.record({
     kind: 'recovery_step',
@@ -269,6 +279,7 @@ async function admitQuarantinedContext(
     ...(classification.decision === 'quarantined' ? { errorCode: classification.code } : {}),
   });
   if (classification.decision === 'quarantined') throw new AppError(classification.code, classification.reason);
+  return releaseFaultedRdcContext(lease.contextId, classification, verified);
 }
 
 async function observedPosition(scope: SessionScope): Promise<RdcLifecyclePoint | null> {

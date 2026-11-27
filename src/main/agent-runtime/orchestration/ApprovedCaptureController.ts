@@ -17,6 +17,7 @@ import type { InvestigationContentRef } from '@shared/types/renderdocInvestigati
 import type { TaskRuntimeEpoch } from '../tasks/taskExecutionSchemas';
 import type { RdcRecoveryObservation } from '../../rdc/RdcContextStatus';
 import type { RdcRecoveryClassification } from '../../rdc/RdcRecoveryClassification';
+import type { RdcProcessIdentity } from '../../rdc/RdcProcessIdentity';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { ToolExecutionContext } from '../agent/AgentTool';
@@ -59,12 +60,14 @@ export interface ApprovedCaptureHost {
   recoveryGuard(expectedRevision: number): () => void;
   joinRecoveryChild(signal?: AbortSignal): Promise<void>;
   inspectRecovery(point: RdcLifecyclePoint, binding: RdcTurnBinding, signal?: AbortSignal): Promise<RecoveryFacts>;
+  /** `fault` is the classified process failure, so a silent daemon is stopped or an exited one closed without it. */
   reopenAfterFailure(
     destination: Destination,
     binding: RdcTurnBinding,
     signal: AbortSignal | undefined,
     onStopped: (contextId: string) => void,
     guard: () => void,
+    fault: { classification: RdcRecoveryClassification; processes: RdcProcessIdentity },
   ): Promise<void>;
   reprepare(
     previous: { plan: EffectiveRuntimePlan; prompt: PromptPlan; binding: RdcTurnBinding },
@@ -377,6 +380,10 @@ export class ApprovedCaptureController {
     const previous = this.current();
     const facts = await this.input.host.inspectRecovery(from, previous.binding, signal);
     guard();
+    this.recordStep('classified', facts);
+    // A refusal acts on nothing, so it signs no intent and spends none of the turn's recovery attempts.
+    if (facts.classification.decision === 'quarantined')
+      throw new AppError(facts.classification.code, facts.classification.reason);
     this.input.host.prepareReceipts();
     const operationId = randomUUID();
     const base = this.base(operationId);
@@ -389,12 +396,6 @@ export class ApprovedCaptureController {
       destination,
       recovery: { cause: facts.cause, observed: facts.observed, classification: facts.classification },
     });
-    this.recordStep('classified', facts);
-    if (facts.classification.decision === 'quarantined') {
-      const refused = new AppError(facts.classification.code, facts.classification.reason);
-      this.fail(intent, base, from, refused, true);
-      throw refused;
-    }
     let stopped: InvestigationContentRef | undefined;
     const onStopped = (contextId: string) => {
       if (stopped || contextId !== from.native.contextId) throw new AppError('RDC_RECOVERY_STOP_RECEIPT_MISMATCH');
@@ -410,7 +411,10 @@ export class ApprovedCaptureController {
     try {
       signal?.throwIfAborted();
       guard();
-      await this.input.host.reopenAfterFailure(destination, previous.binding, signal, onStopped, guard);
+      await this.input.host.reopenAfterFailure(destination, previous.binding, signal, onStopped, guard, {
+        classification: facts.classification,
+        processes: from.native.processIdentity,
+      });
       signal?.throwIfAborted();
       guard();
       const next = await this.input.host.reprepare(previous, signal);

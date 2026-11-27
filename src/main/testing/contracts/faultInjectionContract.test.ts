@@ -493,6 +493,8 @@ describe('faultInjectionContract: stuck RDC worker on an approved capture', () =
           status,
           deviceActionPending: false,
           budget: { attempts: 0, limit: 2 },
+          processesExited: false,
+          ownsDaemon: false,
         }),
         attempts: 0,
       }),

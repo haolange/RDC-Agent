@@ -15,7 +15,7 @@ export const RdcRecoveryClassificationSchema = z.discriminatedUnion('decision', 
   z.strictObject({ decision: z.literal('keep'), reason: z.literal('verified-processes-live') }),
   z.strictObject({
     decision: z.literal('rebuild'),
-    reason: z.enum(['worker-exited', 'replay-requires-restart']),
+    reason: z.enum(['worker-exited', 'replay-requires-restart', 'daemon-exited', 'daemon-stopped']),
     /** Workers that served the verified lineage and whose exit RDC-Tool confirmed, oldest first. */
     lost: z.strictObject({ workers: z.array(RdcRecoveryLostWorkerSchema) }),
   }),
@@ -33,7 +33,7 @@ export type RdcRecoveryClassification = z.infer<typeof RdcRecoveryClassification
 type ExitedWorker = z.infer<typeof RdcRecoveryLostWorkerSchema>;
 type Birth = { pid: number; start_generation: string };
 
-/** Recovery attempts allowed per approved input, content and device, counted from signed receipts across turns. */
+/** Recovery attempts allowed per turn on one approved input, content and device, counted from signed receipts. */
 export const RDC_RECOVERY_ATTEMPT_LIMIT = 2;
 
 const same = (left: Birth, right: Birth) => left.pid === right.pid && left.start_generation === right.start_generation;
@@ -50,6 +50,9 @@ const unexplained = (reason: string): RdcRecoveryClassification => ({
  * - rebuild: the verified daemon is alive, and every worker change since the verified worker is explained by an exit
  *   receipt (a `worker_lifecycle` exit with `exit_confirmed`, or the session's `worker_exit`) of exactly that worker
  *   (pid + start_generation); the replay session is waiting for a restart.
+ * - rebuild, daemon side: the verified daemon does not answer (or another one does) and both verified processes
+ *   have exited (`daemon-exited`), or it does not answer, is still running and was started by this application,
+ *   which then stops it before rebuilding (`daemon-stopped`).
  * - quarantined: anything else is RDC_RECOVERY_PROCESS_UNEXPLAINED; a spent attempt budget or a device action still
  *   pending its confirmation stop recovery before the chain is even read.
  *
@@ -61,6 +64,10 @@ export function classifyRecovery(input: {
   status: RdcContextStatus;
   deviceActionPending: boolean;
   budget: { attempts: number; limit: number } | null;
+  /** The verified daemon and worker are both gone, probed by pid and birth. */
+  processesExited: boolean;
+  /** The verified daemon was started by this application process. */
+  ownsDaemon: boolean;
 }): RdcRecoveryClassification {
   const { verified, status } = input;
   if (input.budget && input.budget.attempts >= input.budget.limit)
@@ -71,9 +78,15 @@ export function classifyRecovery(input: {
     };
   if (input.deviceActionPending)
     return { decision: 'quarantined', code: 'RDC_DEVICE_ACTION_UNCONFIRMED', reason: 'a device action is pending.' };
-  if (status.source !== 'daemon') return unexplained('the context daemon did not answer the status read.');
+  const daemonGone = (silent: boolean, why: string): RdcRecoveryClassification =>
+    input.processesExited
+      ? { decision: 'rebuild', reason: 'daemon-exited', lost: { workers: [] } }
+      : silent && input.ownsDaemon
+        ? { decision: 'rebuild', reason: 'daemon-stopped', lost: { workers: [] } }
+        : unexplained(why);
+  if (status.source !== 'daemon') return daemonGone(true, 'the context daemon did not answer the status read.');
   if (status.daemon.state !== 'alive' || !same(status.daemon, verified.daemon))
-    return unexplained('the live daemon is not the verified daemon.');
+    return daemonGone(false, 'the live daemon is not the verified daemon.');
   const session = status.sessions.find((value) => value.session_id === input.replaySessionId);
   if (!session) return unexplained('the replay session is not in the context status.');
   const chain = workerChain(verified.worker, status);

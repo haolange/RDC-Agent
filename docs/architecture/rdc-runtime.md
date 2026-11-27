@@ -366,16 +366,17 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 | 结论 | 条件 |
 | --- | --- |
 | keep | 核验过的 daemon 与 worker 都存活且身份（pid + start_generation）不变，replay session 存活且没有 `requires_restart` |
-| rebuild | daemon 仍是核验过的那一个；从核验过的 worker 起，每一次 worker 变化都有该 worker 本身的退出回执（`worker_lifecycle` 中 `exit_confirmed` 的 exited 记录，或 session 的 `worker_exit`），replay session 等待重启；`lost` 列出这些已确认退出的 worker 及其原因、trace/request id 与栈日志 |
-| quarantined | 其余一切为 `RDC_RECOVERY_PROCESS_UNEXPLAINED`（daemon 换了或未回答、退出未确认、身份复用、session 自称存活却换了 worker 等）；设备动作未决为 `RDC_DEVICE_ACTION_UNCONFIRMED` |
+| rebuild（worker） | daemon 仍是核验过的那一个；从核验过的 worker 起，每一次 worker 变化都有该 worker 本身的退出回执（`worker_lifecycle` 中 `exit_confirmed` 的 exited 记录，或 session 的 `worker_exit`），replay session 等待重启；`lost` 列出这些已确认退出的 worker 及其原因、trace/request id 与栈日志 |
+| rebuild（daemon） | 核验过的 daemon 未回答状态读取或已被另一个取代：用 pid + 启动世代探测到它与 worker 都已退出为 `daemon-exited`；它未回答、仍在运行且由本应用进程启动（`OwnedRdcDaemonRegistry` 有记录）为 `daemon-stopped`，恢复先按命令行核对后终止它，再确认两者退出（`terminateOwnedRdcContext`） |
+| quarantined | 其余一切为 `RDC_RECOVERY_PROCESS_UNEXPLAINED`（退出未确认、身份复用、session 自称存活却换了 worker、非本应用的 daemon 未回答等）；设备动作未决为 `RDC_DEVICE_ACTION_UNCONFIRMED` |
 
-结论签进恢复 intent 回执；quarantined 立即写 failed 回执并停止，不触碰现场。
+rebuild 的结论签进恢复 intent 回执。quarantined 不触碰现场，也不签 intent，只在生命周期账本记一条判定。daemon 侧的 rebuild 关闭旧 context 时不再调用原生 clear 与 stop：关闭流程以 `exitedProcesses` 重新探测两个进程确已退出，以此代替原生关闭的确认（`releaseFaultedRdcContext`）。
 
 恢复的 transition 回执带 `lostWithProcess`，只记事实、从不声称回滚：旧 replay session 的全部 debug handle 失效；恢复时仍开着的实验（running/polluted）记为 `interrupted-by-infrastructure`，恢复不再等待模型先关闭它们，实验记录本身仍由模型更新；最近核验位置上的 replacement 数与指纹（`rolledBack: false`，随进程丢失）；rebuild 时已确认退出的 worker；`newBaselineRequired: true`。旧 baseline/intervention 回执仍绑定旧进程身份，五阶段验收要求同一 context 与 lease，所以重建后必须重新取 baseline，旧实验不会跨新旧现场拼接。
 
 **卡死的自主处置**：`executeRdcShell` 把 `RDC_OPERATION_STUCK` / `RDC_WORKER_LOST` 经 `registerRdcFault` 登记（原因写明 worker 栈日志路径）。失败交付给模型之前，`ToolExecutorFactory` 对获批 capture 运行 `settleRdcProcessFault`（`src/main/agent-runtime/orchestration/RdcProcessFaultRecovery.ts`）：权限为 full-access 或 auto-review 时，`classifyFault` 只读判定，结论为 rebuild 就以与 `capture_recover` 相同的 prepare + recover（独占资源、同样的签名回执与 runtime epoch）重建，并把 `runtimeRecovery`（新回执、当前位置、需要新 baseline）附在该次失败结果上，turn 继续；结论为 quarantined 或恢复失败时，结果带具体阻塞码，turn 在这次调用后结束，诊断为 `CONVERSATION_RDC_RECOVERY_BLOCKED`，复制详情含阻塞码。其它权限模式只附结论：rebuild/keep 时提示可用 `capture_recover`（照常经审批），quarantined 时报告阻塞码，turn 不中止。每一步恢复（判定、成功、失败）在生命周期账本写一条 `recovery_step`（结论、第几次尝试、阻塞码）。
 
-Agent 恢复的次数是持久预算：`RdcLifecycleReceipts.recoveryAttempts` 从会话里已签名的回执统计同一 {输入、内容 hash、设备} 的恢复 intent（每次尝试一条，失败的另有 failed 回执指向它），跨 turn 与重启有效；达到 `RDC_RECOVERY_ATTEMPT_LIMIT`（2）后 `classifyRecovery` 先于身份链判 `RDC_RECOVERY_BUDGET_EXHAUSTED`。没有内存里的"已恢复过"集合。用户在 Capture 面板发起的恢复每次都是人的明确操作，不计入、也不受此预算限制。
+Agent 恢复的次数按回合计：`RdcLifecycleReceipts.recoveryAttempts` 从会话里已签名的回执统计本回合对同一 {输入、内容 hash、设备} 签下的恢复 intent（每次实际动手一条，失败的另有 failed 回执指向它），重启后仍然有效；达到 `RDC_RECOVERY_ATTEMPT_LIMIT`（2）后 `classifyRecovery` 先于身份链判 `RDC_RECOVERY_BUDGET_EXHAUSTED`。被拒的判定不签 intent，因此不消耗次数。新回合重新计数。没有内存里的"已恢复过"集合。用户在 Capture 面板发起的恢复每次都是人的明确操作，不计入、也不受此预算限制。
 
 获批调查的 `turn_complete` 在记录声明前检查入口位置是否恢复；现场无法核验时，把主进程观察到的错误返回工具调用，让模型据此如实声明 partial／blocked 及剩余恢复，而不是先接受声明再要求它猜测错误。终答仍重新核验恢复状态；已声明的 partial 不升级为成功，恢复回执仍以实际现场为准。
 

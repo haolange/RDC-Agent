@@ -120,7 +120,7 @@ it('rejects a signed lifecycle body that is not a lifecycle receipt', () => {
   }
 });
 
-it('counts signed recovery attempts per input, content and device across store instances', () => {
+it('counts signed recovery attempts per turn, input, content and device across store instances', () => {
   const { resolver, sessionPath } = createInvestigationHarness();
   const receipts = new RdcLifecycleReceipts(resolver, () => 'test-key');
   const destination = { inputId: 'input', contentSha256: 'b'.repeat(64), deviceId: 'device' };
@@ -165,12 +165,10 @@ it('counts signed recovery attempts per input, content and device across store i
     receipts.write(intent('op-3', { ...destination, deviceId: 'other' }));
     const { recovery: _recovery, ...plain } = intent('op-4') as Extract<RdcLifecycleReceipt, { event: 'intent' }>;
     receipts.write(plain);
-    expect(new RdcLifecycleReceipts(resolver, () => 'test-key').recoveryAttempts(SESSION_ID, 'p', destination)).toEqual(
-      {
-        attempts: 2,
-        failed: 1,
-      },
-    );
+    const reread = new RdcLifecycleReceipts(resolver, () => 'test-key');
+    expect(reread.recoveryAttempts(SESSION_ID, 'p', destination, 't1')).toEqual({ attempts: 1, failed: 1 });
+    // A new turn starts its own budget; another device and a plain intent are not recoveries of this destination.
+    expect(reread.recoveryAttempts(SESSION_ID, 'p', destination, 't2')).toEqual({ attempts: 1, failed: 0 });
   } finally {
     rmSync(sessionPath, { recursive: true, force: true });
   }

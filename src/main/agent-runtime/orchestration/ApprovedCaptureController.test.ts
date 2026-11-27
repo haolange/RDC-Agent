@@ -480,7 +480,7 @@ it('recovers from the latest process identity a successful result reported, not 
   });
 });
 
-it('signs an unexplained process change as a failed recovery attempt without reopening', async () => {
+it('refuses an unexplained process change without reopening, signing or spending an attempt', async () => {
   const f = fixture();
   await f.controller.initialize();
   vi.mocked(f.host.inspectRecovery).mockResolvedValueOnce({
@@ -501,9 +501,7 @@ it('signs an unexplained process change as a failed recovery attempt without reo
   await f.controller.prepareRecovery(1);
   await expect(f.controller.recover()).rejects.toThrow('RDC_RECOVERY_PROCESS_UNEXPLAINED');
   expect(f.host.reopenAfterFailure).not.toHaveBeenCalled();
-  expect(f.receipts.map((value) => value.event)).toEqual(['baseline', 'intent', 'failed']);
-  expect(f.receipts[1]).toMatchObject({ recovery: { classification: { decision: 'quarantined' } } });
-  expect(f.receipts[2]).toMatchObject({ code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED' });
+  expect(f.receipts.map((value) => value.event)).toEqual(['baseline']);
   expect(f.ledger).toEqual([
     {
       kind: 'recovery_step',
@@ -514,7 +512,6 @@ it('signs an unexplained process change as a failed recovery attempt without reo
       errorCode: 'RDC_RECOVERY_PROCESS_UNEXPLAINED',
     },
   ]);
-  expect(f.host.quarantineChanged).toHaveBeenCalled();
 });
 
 it('records what a rebuild lost with the old process without claiming a rollback', async () => {

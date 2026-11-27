@@ -211,20 +211,20 @@ export function createApprovedCaptureHost(input: {
     },
     async inspectRecovery(point, binding, signal) {
       assertPlan();
-      return inspectQuarantinedCapture({ ...scope, point, binding, signal, resolve });
+      return inspectQuarantinedCapture({ ...scope, turnId: input.turn.turnId, point, binding, signal, resolve });
     },
-    async reopenAfterFailure(destination, binding, signal, onStopped, guard) {
+    async reopenAfterFailure(destination, binding, signal, onStopped, guard, fault) {
       guard();
-      const resolved = await resolve(destination);
       await reopenQuarantinedCapture({
         ...scope,
         turnId: input.turn.turnId,
         destination,
-        resolved,
+        resolved: await resolve(destination),
         binding,
         signal,
         onStopped,
         guard,
+        fault,
       });
     },
     async reprepare(previous, signal) {

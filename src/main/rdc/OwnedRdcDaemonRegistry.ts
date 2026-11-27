@@ -19,6 +19,7 @@ import { parseRdcNativeResult } from './RdcNativeProtocol';
 import { rdcCliInvokerService } from './RdcCliInvokerService';
 import { RDC_INTERMEDIATE_ROOT_ENV, withRdcHostRuntimeEnv } from './withRdcHostRuntimeEnv';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
+import type { RdcRecoveryClassification } from './RdcRecoveryClassification';
 
 export const APP_RDC_CONTEXT_ID = /^rdc-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REGISTRY_FILE = 'owned-rdc-daemons.json';
@@ -278,14 +279,21 @@ async function stopOwnedDaemon(record: OwnedRdcDaemonRecord, options: OwnedRdcDa
   }
 }
 
-function killVerifiedOwnedPids(record: OwnedRdcDaemonRecord, options: OwnedRdcDaemonHarvestOptions): void {
+function killVerifiedOwnedPids(
+  record: OwnedRdcDaemonRecord,
+  options: OwnedRdcDaemonHarvestOptions,
+  identities: { daemon: ProcessIdentity; worker: ProcessIdentity } = {
+    daemon: daemonIdentity(record),
+    worker: workerIdentity(record),
+  },
+): void {
   const probe = options.probeProcess ?? probeProcess;
   const readCommandLine = options.readCommandLine ?? readProcessCommandLine;
   const terminate = options.terminateProcess ?? terminateProcessTree;
   const remaining: number[] = [];
   for (const [identity, expected] of [
-    [daemonIdentity(record), 'rdc_tool.daemon.server'],
-    [workerIdentity(record), 'rdc_tool.runtime.worker_main'],
+    [identities.daemon, 'rdc_tool.daemon.server'],
+    [identities.worker, 'rdc_tool.runtime.worker_main'],
   ] as const) {
     const liveness = probe(identity);
     if (liveness === 'exited') continue;
@@ -300,6 +308,69 @@ function killVerifiedOwnedPids(record: OwnedRdcDaemonRecord, options: OwnedRdcDa
     if (terminate(identity) === 'unconfirmed') remaining.push(identity.pid);
   }
   if (remaining.length) throw new AppError('RDC_CLOSE_FAILED', `owned pids still running: ${remaining.join(', ')}`);
+}
+
+/** The daemon and worker main last verified for a context, as RDC-Tool reports their births. */
+export interface RdcContextProcesses {
+  daemon: { pid: number; start_generation: string };
+  worker: { pid: number; start_generation: string };
+}
+
+const identityOf = (birth: { pid: number; start_generation: string }): ProcessIdentity => ({
+  pid: birth.pid,
+  birth: birth.start_generation,
+});
+
+/** The context's daemon was started by this application process, so main may stop what it verifies as that daemon. */
+export function ownsRdcContextDaemon(contextId: string, options: OwnedRdcDaemonStoreOptions = {}): boolean {
+  return listOwnedRdcDaemons(options).some(
+    (record) => record.contextId === contextId && record.ownerPid === process.pid,
+  );
+}
+
+/** Both verified processes are gone, by pid and birth; an unreadable identity is never proof of exit. */
+export function rdcContextProcessesExited(
+  processes: RdcContextProcesses,
+  probe: (identity: ProcessIdentity) => ProcessLiveness = probeProcess,
+): boolean {
+  return probe(identityOf(processes.daemon)) === 'exited' && probe(identityOf(processes.worker)) === 'exited';
+}
+
+/**
+ * Stops an owned daemon that no longer answers: each verified process still running must be confirmed by its command
+ * line as this context's RDC-Tool daemon or worker before it is terminated, and both must then be gone.
+ */
+export function terminateOwnedRdcContext(
+  contextId: string,
+  processes: RdcContextProcesses,
+  options: OwnedRdcDaemonHarvestOptions = {},
+): void {
+  const record = listOwnedRdcDaemons(options).find(
+    (entry) => entry.contextId === contextId && entry.ownerPid === process.pid,
+  );
+  if (!record) throw new AppError('RDC_OWNERSHIP_DENIED', `${contextId} was not started by this application.`);
+  killVerifiedOwnedPids(record, options, {
+    daemon: identityOf(processes.daemon),
+    worker: identityOf(processes.worker),
+  });
+  if (!rdcContextProcessesExited(processes, options.probeProcess))
+    throw new AppError('RDC_CLOSE_FAILED', `the processes of ${contextId} did not exit.`);
+}
+
+/**
+ * What closing a faulted context needs after a daemon-side rebuild decision: a silent owned daemon is stopped first,
+ * and the processes that are now gone are returned so the close confirms their exit instead of asking them to stop.
+ */
+export function releaseFaultedRdcContext(
+  contextId: string,
+  classification: RdcRecoveryClassification,
+  processes: RdcContextProcesses,
+): RdcContextProcesses | undefined {
+  if (classification.decision !== 'rebuild') return undefined;
+  if (classification.reason === 'daemon-stopped') terminateOwnedRdcContext(contextId, processes);
+  return classification.reason === 'daemon-stopped' || classification.reason === 'daemon-exited'
+    ? processes
+    : undefined;
 }
 
 function hostIntermediateRoot(settings?: RdcCliInvokerSettings): string {

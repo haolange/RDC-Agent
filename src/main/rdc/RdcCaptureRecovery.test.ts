@@ -59,7 +59,12 @@ vi.mock('./RdcContextStatus', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./RdcContextStatus')>()),
   readRdcContextStatus: mock.status,
 }));
-vi.mock('./OwnedRdcDaemonRegistry', () => ({ listOwnedRdcDaemons: mock.daemons }));
+vi.mock('./OwnedRdcDaemonRegistry', () => ({
+  listOwnedRdcDaemons: mock.daemons,
+  rdcContextProcessesExited: () => false,
+  ownsRdcContextDaemon: () => false,
+  releaseFaultedRdcContext: () => undefined,
+}));
 vi.mock('./RdcLifecycleReceipts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./RdcLifecycleReceipts')>()),
   rdcLifecycleReceipts: { pending: mock.pending, write: mock.write },
