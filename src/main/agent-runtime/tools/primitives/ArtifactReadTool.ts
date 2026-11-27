@@ -4,7 +4,10 @@ import {
   ARTIFACT_TOOL_PAGE_BYTES,
   ARTIFACT_READ_MAX_OUTPUT_LINES,
 } from '../../../sessions/artifacts/sessionArtifactContract';
-import { resolveDelegatedArtifactRead } from '../../../sessions/artifacts/DelegatedArtifactAccess';
+import {
+  assertGrantBindsVersion,
+  resolveDelegatedArtifactRead,
+} from '../../../sessions/artifacts/DelegatedArtifactAccess';
 import { sessionArtifactResolver } from '../../../sessions/artifacts/SessionArtifactResolver';
 import {
   ARTIFACT_TEXT_SEARCH_MAX_MATCHES,
@@ -54,7 +57,7 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
   description:
     'Read a session-owned artifact by session:// URI. Only the owning session can be read. ' +
     `Returns at most ${ARTIFACT_TOOL_PAGE_BYTES} bytes / ${ARTIFACT_READ_MAX_OUTPUT_LINES} lines. Follow the returned next offset and column with the same expectedHash; concatenate page bodies without adding separators. ` +
-    'For image or plain-text reads, omit JSON selectors entirely. Ordinary search on a tool result with one text block searches that decoded text and returns its separate hash and provenance; multiple text blocks require an explicit textPointer. jsonTextPointers parses JSON-encoded strings at successive RFC 6901 pointers after decoding json-chunks; [] validates the document itself. With textPointer, select a final plain string instead of JSON statistics: page/search its exact decoded text, with separate UTF-8 hash and decoding provenance. search is a case-sensitive single-line literal over the complete selected text, not a regex; returns bounded excerpts, total non-overlapping match count and a next cursor. Keep all selectors/search unchanged when continuing. JSON inspection, text selection and search require expectedHash. No code is executed; matches and statistics do not prove domain or control-flow claims.',
+    'For image or plain-text reads, omit JSON selectors entirely. Ordinary search on a tool result with one text block searches that decoded text and returns its separate hash and provenance; multiple text blocks require an explicit textPointer. jsonTextPointers parses JSON-encoded strings at successive RFC 6901 pointers after decoding json-chunks; [] validates the document itself. With textPointer, select a final plain string instead of JSON statistics: page/search its exact decoded text, with separate UTF-8 hash and decoding provenance. search is a case-sensitive single-line literal over the complete selected text, not a regex; returns bounded excerpts, total non-overlapping match count and a next cursor. Keep all selectors/search unchanged when continuing. JSON inspection, text selection and search require expectedHash, except in a delegated execution, which omits it: the grant binds the version. No code is executed; matches and statistics do not prove domain or control-flow claims.',
   parameters: {
     type: 'object',
     properties: {
@@ -89,7 +92,7 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
       expectedHash: {
         type: 'string',
         description:
-          'Optional SHA-256: 64 hex digits or sha256:<64 hex> from an Investigation record. Fail-closed with ARTIFACT_HASH_MISMATCH on mismatch.',
+          'Optional SHA-256: 64 hex digits or sha256:<64 hex> from an Investigation record. Fail-closed with ARTIFACT_HASH_MISMATCH on mismatch. Omit in a delegated execution: the grant binds the version.',
       },
       jsonTextPointers: {
         type: 'array',
@@ -146,6 +149,7 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
           'ARTIFACT_REQUEST_UNAVAILABLE',
           'Choose either one recorded request or the operation index, not both.',
         );
+      assertGrantBindsVersion(context.sessionId, params.expectedHash);
       const scope = resolveDelegatedArtifactRead(context.sessionId, params.uri, params.expectedHash);
       const result = sessionArtifactResolver.read(scope.sessionId, params.uri, {
         offset: params.offset,

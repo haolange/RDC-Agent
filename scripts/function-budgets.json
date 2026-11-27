@@ -73,7 +73,7 @@
       "complexity": 95
     },
     "src/main/agent-runtime/tasks/TaskTools.ts": {
-      "lines": 180,
+      "lines": 175,
       "complexity": 50
     },
     "src/main/agent-runtime/tools/primitives/GrepTool.ts": {

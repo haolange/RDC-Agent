@@ -13,13 +13,13 @@ import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirement
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 async function fixture(
-  verifyArtifact: (uri: string, hash: string) => Promise<boolean> = async () => true,
+  artifactHash: (uri: string) => Promise<string | null> = async (uri) => KNOWN_ARTIFACTS.get(uri) ?? null,
   verifyEpoch: NonNullable<FileTaskStore['verifyRuntimeEpoch']> = async () => true,
 ) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'task-requirements-'));
   roots.push(root);
   let approved: PlanTaskRequirement[] = [];
-  const store = new FileTaskStore(root, async () => approved, verifyArtifact, verifyEpoch);
+  const store = new FileTaskStore(root, async () => approved, artifactHash, verifyEpoch);
   return {
     store,
     registry: new TaskRegistry(store),
@@ -47,11 +47,12 @@ const result = {
   outputs: { analysis: 'Bounded conclusion, counterevidence and limitations.' },
 };
 const sourceArtifact = { uri: 'session://tool-outputs/findings.json', hash: 'd'.repeat(64) };
+const KNOWN_ARTIFACTS = new Map([[sourceArtifact.uri, sourceArtifact.hash]]);
 const sourceResult = { ...result, resultRef: sourceArtifact.uri, resultHash: sourceArtifact.hash };
 const reviewPreparation = (sessionId = 'reviewer') => ({ ...preparation(sessionId), inputArtifacts: [sourceArtifact] });
 
 it('does not settle a review source until its exact result artifact is verifiable', async () => {
-  const { registry } = await fixture(async (uri, hash) => uri === sourceArtifact.uri && hash === sourceArtifact.hash);
+  const { registry } = await fixture(async (uri) => (uri === sourceArtifact.uri ? sourceArtifact.hash : null));
   const source = await registry.createTask('Generate findings');
   const review = await registry.createTask('Independent review', {
     blockedBy: [source.id],
@@ -123,10 +124,7 @@ it('distinguishes the runtime fingerprint from full artifact and method hashes',
 
 it('appends signed runtime epochs to current direct work without rewriting preparation or budget', async () => {
   let authentic = true;
-  const { registry } = await fixture(
-    async () => true,
-    async () => authentic,
-  );
+  const { registry } = await fixture(undefined, async () => authentic);
   const task = await registry.createTask('Compare captures');
   const run = await registry.startExecution(task.id, {
     mode: 'direct',
@@ -310,8 +308,8 @@ it('binds independent review to the actual generating revision and generation', 
 
 it('rechecks the reviewed artifact when settling and when closing an approved goal', async () => {
   let current = true;
-  const { registry, approve } = await fixture(
-    async (uri, hash) => current && uri === sourceArtifact.uri && hash === sourceArtifact.hash,
+  const { registry, approve } = await fixture(async (uri) =>
+    current && uri === sourceArtifact.uri ? sourceArtifact.hash : null,
   );
   const source = await registry.createTask('Generate findings');
   const generated = await registry.startExecution(source.id, { mode: 'direct', preparation: preparation('parent') });
@@ -336,7 +334,7 @@ it('rechecks the reviewed artifact when settling and when closing an approved go
 it('reexecutes only invalidated source and review Tasks, preserving their history and budget', async () => {
   const nextArtifact = { uri: 'session://tool-outputs/findings-next.json', hash: 'e'.repeat(64) };
   let live = sourceArtifact;
-  const { registry, approve } = await fixture(async (uri, hash) => uri === live.uri && hash === live.hash);
+  const { registry, approve } = await fixture(async (uri) => (uri === live.uri ? live.hash : null));
   const source = await registry.createTask('Generate findings');
   const generated = await registry.startExecution(source.id, {
     mode: 'direct',
@@ -412,8 +410,8 @@ it('reexecutes only invalidated source and review Tasks, preserving their histor
 
 it('continues a reviewed source when both its original and revised snapshots remain readable', async () => {
   const revised = { uri: 'session://tool-outputs/findings-revised.json', hash: 'e'.repeat(64) };
-  const { registry, approve } = await fixture(async (uri, hash) =>
-    [sourceArtifact, revised].some((artifact) => artifact.uri === uri && artifact.hash === hash),
+  const { registry, approve } = await fixture(
+    async (uri) => [sourceArtifact, revised].find((artifact) => artifact.uri === uri)?.hash ?? null,
   );
   const source = await registry.createTask('Generate findings');
   const deadlineAt = Date.now() + 60_000;
@@ -505,7 +503,7 @@ it('continues a source after an independent partial review returns useful findin
 it('revalidates and repairs stale review work inside a completed parent without rerunning unrelated work', async () => {
   const nextArtifact = { uri: 'session://tool-outputs/findings-next.json', hash: 'e'.repeat(64) };
   let live = sourceArtifact;
-  const { registry, approve } = await fixture(async (uri, hash) => uri === live.uri && hash === live.hash);
+  const { registry, approve } = await fixture(async (uri) => (uri === live.uri ? live.hash : null));
   const parent = await registry.createTask('Investigation');
   const parentRun = await registry.startExecution(parent.id, { mode: 'direct' });
   const source = await registry.createTask('Findings', { parentTaskId: parent.id });

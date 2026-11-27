@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createInvestigationHarness, SESSION_ID } from '../../testing/investigationTestFixtures';
 import {
+  assertGrantBindsVersion,
   grantDelegatedArtifactAccess,
   resolveDelegatedArtifactRead,
   assertDelegatedArtifactWrite,
@@ -56,5 +58,26 @@ describe('delegated artifact grants', () => {
     }) as unknown as SessionArtifactResolver['read'];
     expect(() => grantDelegatedArtifactAccess('child', 'root', [uri], { read })).toThrow(/hash/);
     expect(resolveDelegatedArtifactRead('child', uri).sessionId).toBe('child');
+  });
+  it('reads granted material by URI alone, refuses a copied hash and refuses material changed after the grant', () => {
+    const { resolver } = createInvestigationHarness();
+    const granted = resolver.write(SESSION_ID, 'session://tool-outputs/review-input.json', '{"reading":1}', {
+      mimeType: 'application/json',
+    });
+    const release = grantDelegatedArtifactAccess('reviewer', SESSION_ID, [granted.uri], resolver);
+    try {
+      expect(() => assertGrantBindsVersion('reviewer', granted.hash)).toThrow(/ARTIFACT_SESSION_DENIED/);
+      expect(() => assertGrantBindsVersion(SESSION_ID, granted.hash)).not.toThrow();
+      const scope = resolveDelegatedArtifactRead('reviewer', granted.uri);
+      expect(resolver.read(scope.sessionId, granted.uri, { expectedHash: scope.expectedHash }).text).toBe(
+        '{"reading":1}',
+      );
+      resolver.write(SESSION_ID, granted.uri, '{"reading":2}', { mimeType: 'application/json' });
+      expect(() => resolver.read(scope.sessionId, granted.uri, { expectedHash: scope.expectedHash })).toThrow(
+        /ARTIFACT_HASH_MISMATCH/,
+      );
+    } finally {
+      release();
+    }
   });
 });

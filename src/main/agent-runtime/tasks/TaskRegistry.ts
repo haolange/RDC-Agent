@@ -41,7 +41,7 @@ import type { PlanTaskRequirement } from '../../sessions/run/planTaskRequirement
 import type { TaskExecutionRequirements, TaskRuntimeEpoch } from './taskExecutionSchemas';
 
 export const INVALIDATED_REVIEW_GUIDANCE =
-  'To revise a reviewed result, reexecute the source Task with its unchanged definition (for direct work use task_update status=in_progress), settle it with the new resultRef and resultHash, then dispatch the same review Task with that current source; preserve consumption and deadlines.';
+  'To revise a reviewed result, reexecute the source Task with its unchanged definition (for direct work use task_update status=in_progress), settle it with the new resultRef, then dispatch the same review Task with that current source; preserve consumption and deadlines.';
 
 export type {
   TaskCompletionResult,

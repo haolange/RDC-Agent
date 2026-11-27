@@ -18,7 +18,6 @@ import { AppError } from '@shared/errors/appError';
  */
 
 import { TaskExecutionRequirementsSchema } from '../../sessions/run/planTaskRequirements';
-import { normalizeSha256 } from '../../runtime/contentHash';
 import { TASK_EXECUTION_REQUIREMENTS_JSON_SCHEMA } from './taskExecutionSchemas';
 import { INVALIDATED_REVIEW_GUIDANCE, TaskRegistry, type TaskRecord, type TaskStatus } from './TaskRegistry';
 import { readTaskBudgetSnapshot, type TaskLiveBudgetSnapshot } from './TaskBudgetSnapshot';
@@ -182,7 +181,6 @@ interface TaskUpdateParams {
     outputs: Record<string, string>;
     missingRequirements?: string[];
     resultRef?: string;
-    resultHash?: string;
   };
 }
 
@@ -201,7 +199,7 @@ export function createTaskUpdateTool(
     name: 'task_update',
     label: 'Update Task',
     description:
-      'Update an existing Task. Unfinished prerequisites keep a Task pending; blocked records a real obstacle or incomplete execution result, not ordinary dependency waiting. status=in_progress starts a new direct execution; call it once per execution, never as a progress note or before dispatching Task-owned delegated work. After the user explicitly requests continuation in a later turn, resumeCancelled=true can continue the same cancelled goal after all producers joined; history and consumed budgets remain. A completed source Task may run again after its actual result has been independently reviewed, including when the original snapshot remains readable; settle the new execution with the revised resultRef and resultHash, then dispatch the same review Task against that version. A source that became invalid or a review bound to a superseded source can also be reexecuted. Prior executions, consumption and deadlines remain. The delegated runner claims its own execution in both wait and background modes. Do the Task work before status=completed or blocked settles its direct execution; a partial result leaves the Task blocked. Send result in the same call as status=completed or blocked; a settled execution cannot be rewritten. To continue useful work, start a new execution of the same Task with its existing consumption and deadline. For independent review, result.resultRef and result.resultHash must identify the actual result being reviewed, not merely a supporting receipt. For a workspace text result, a permitted read_file with pinEvidence=true can provide a session URI/hash for the returned window; verify completeness and explicitly grant every needed window. A later revision is a different result version. status=pending cannot release an active execution. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
+      'Update an existing Task. Unfinished prerequisites keep a Task pending; blocked records a real obstacle or incomplete execution result, not ordinary dependency waiting. status=in_progress starts a new direct execution; call it once per execution, never as a progress note or before dispatching Task-owned delegated work. After the user explicitly requests continuation in a later turn, resumeCancelled=true can continue the same cancelled goal after all producers joined; history and consumed budgets remain. A completed source Task may run again after its actual result has been independently reviewed, including when the original snapshot remains readable; settle the new execution with the revised resultRef, then dispatch the same review Task against that version. A source that became invalid or a review bound to a superseded source can also be reexecuted. Prior executions, consumption and deadlines remain. The delegated runner claims its own execution in both wait and background modes. Do the Task work before status=completed or blocked settles its direct execution; a partial result leaves the Task blocked. Send result in the same call as status=completed or blocked; a settled execution cannot be rewritten. To continue useful work, start a new execution of the same Task with its existing consumption and deadline. For independent review, result.resultRef must identify the actual result being reviewed, not merely a supporting receipt; the runtime binds its current hash. For a workspace text result, a permitted read_file with pinEvidence=true can provide a session URI for the returned window; verify completeness and explicitly grant every needed window. A later revision is a different result version. status=pending cannot release an active execution. Use task_get to inspect currentExecutionId before starting again. Omit status for description or metadata edits.',
     parameters: {
       type: 'object',
       properties: {
@@ -238,12 +236,7 @@ export function createTaskUpdateTool(
             resultRef: {
               type: 'string',
               description:
-                'Owning-session reference to the actual result under review, not an unrelated supporting receipt.',
-            },
-            resultHash: {
-              type: 'string',
-              description:
-                'Exact SHA-256 of that result reference, with or without the sha256: prefix; do not substitute a source capture or another artifact hash.',
+                'Exact session:// URI of the actual result under review, not an unrelated supporting receipt. The runtime reads and binds its current hash.',
             },
           },
           required: ['disposition', 'summary', 'outputs'],
@@ -298,7 +291,7 @@ export function createTaskUpdateTool(
           ? (params.metadata as Record<string, unknown>)
           : undefined;
 
-      const result = readCompletionResult(params.result);
+      const result = await withResultHash(registry, readCompletionResult(params.result));
       if (result && status !== 'completed' && status !== 'blocked') {
         throw new Error(
           'Task result must accompany status=completed or blocked when settling a direct execution. A settled execution cannot be rewritten; start a new execution of the same Task to continue.',
@@ -627,6 +620,15 @@ function readTaskItems(params: object): TaskCreateItem[] {
   });
 }
 
+/** The model names its result by URI; the host reads the bytes now behind it and binds their hash. */
+async function withResultHash(
+  registry: TaskRegistry,
+  result: TaskUpdateParams['result'],
+): Promise<(TaskUpdateParams['result'] & { resultHash?: string }) | undefined> {
+  if (!result?.resultRef) return result;
+  return { ...result, resultHash: await registry.resolveResultReference(result.resultRef) };
+}
+
 function readCompletionResult(value: unknown): TaskUpdateParams['result'] {
   if (value === undefined) return undefined;
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('参数 "result" 必须是对象');
@@ -642,14 +644,12 @@ function readCompletionResult(value: unknown): TaskUpdateParams['result'] {
     if (typeof item !== 'string') throw new Error('参数 "result.outputs" 的值必须是字符串');
     outputs[key] = item;
   }
-  const resultHash = readString(record, 'resultHash', false);
   return {
     disposition,
     summary,
     outputs,
     missingRequirements: readStringArray(record, 'missingRequirements'),
     resultRef: readString(record, 'resultRef', false),
-    resultHash: resultHash ? normalizeSha256(resultHash) : undefined,
   };
 }
 

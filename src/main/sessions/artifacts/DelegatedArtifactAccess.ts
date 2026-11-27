@@ -43,6 +43,18 @@ export function delegatedArtifactReferences(sessionId: string): Array<{ uri: str
   const grant = grants.get(sessionId);
   return grant ? [...grant.refs].map(([uri, hash]) => ({ uri, hash })) : null;
 }
+/**
+ * A delegated execution names granted artifacts by URI only: the grant already binds the exact version it may read,
+ * so a hash copied by the model is refused rather than compared.
+ */
+export function assertGrantBindsVersion(sessionId: string | null | undefined, expectedHash: string | undefined): void {
+  if (expectedHash && sessionId && grants.has(sessionId))
+    throw new SessionArtifactError(
+      'ARTIFACT_SESSION_DENIED',
+      'a delegated execution reads granted artifacts by URI; omit expectedHash, the grant binds the version.',
+    );
+}
+
 export function resolveDelegatedArtifactRead(
   sessionId: string,
   uri: string,

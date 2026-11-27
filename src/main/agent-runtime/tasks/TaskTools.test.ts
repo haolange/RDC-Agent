@@ -3,11 +3,17 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { TaskRegistry } from './TaskRegistry';
+import { FileTaskStore } from './TaskStore';
 import { createTaskTools } from './TaskTools';
 import { snapshotTaskRequirement } from './TaskExecutionRequirements';
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
+
+const RESULT_URI = 'session://tool-outputs/result.json';
+/** A store whose host resolves the one saved result and nothing else. */
+const resolvingStore = (dir: string) =>
+  new FileTaskStore(dir, undefined, async (uri) => (uri === RESULT_URI ? 'a'.repeat(64) : null));
 
 function textOf(result: { content: Array<{ type: string; text?: string }> }): string {
   const first = result.content[0];
@@ -18,15 +24,14 @@ describe('TaskTools', () => {
   it('does not acknowledge a result without settling its execution', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-tools-'));
     roots.push(dir);
-    const registry = new TaskRegistry(dir);
+    const registry = new TaskRegistry(resolvingStore(dir));
     const task = await registry.createTask('Investigate before review');
     const update = createTaskTools(registry).find((tool) => tool.name === 'task_update')!;
     const result = {
       disposition: 'partial' as const,
       summary: 'Observed a limited result',
       outputs: { investigation: 'partial evidence' },
-      resultRef: 'session://tool-outputs/result.json',
-      resultHash: 'a'.repeat(64),
+      resultRef: RESULT_URI,
     };
 
     await update.execute('start', { taskId: task.id, status: 'in_progress' });
@@ -41,7 +46,9 @@ describe('TaskTools', () => {
     await expect(update.execute('result-alone-running', { taskId: task.id, result })).rejects.toThrow(
       'result must accompany',
     );
-    await expect(registry.updateTask(task.id, { result })).rejects.toThrow('execution');
+    await expect(registry.updateTask(task.id, { result: { ...result, resultHash: 'a'.repeat(64) } })).rejects.toThrow(
+      'execution',
+    );
     expect(await registry.getExecution(firstId)).toMatchObject({ status: 'running' });
     expect((await registry.getTask(task.id))?.disposition).toBeUndefined();
     const pending = await registry.createTask('Not started');
@@ -66,19 +73,16 @@ describe('TaskTools', () => {
     expect(await registry.getExecution(resumedId)).toMatchObject({
       generation: 2,
       status: 'partial',
-      result,
+      result: { ...result, resultHash: 'a'.repeat(64) },
       budget: { toolCalls: 4, maxToolCalls: 10, deadlineAt: deadline },
     });
     expect(await registry.getTask(task.id)).toMatchObject({ status: 'blocked', disposition: 'partial' });
   });
 
-  it('keeps a direct Task active when its result reference is invalid and allows correction', async () => {
+  it('binds the host-read hash of a result URI and keeps the Task active for a reference naming no result', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-task-tools-'));
     roots.push(dir);
-    const registry = new TaskRegistry(dir, {
-      validateResultRef: async (_task, result) =>
-        result.resultRef === 'session://tool-outputs/result.json' && result.resultHash === 'a'.repeat(64),
-    });
+    const registry = new TaskRegistry(resolvingStore(dir));
     const task = await registry.createTask('Produce reviewable result');
     const update = createTaskTools(registry).find((tool) => tool.name === 'task_update')!;
     await update.execute('start', { taskId: task.id, status: 'in_progress' });
@@ -87,24 +91,19 @@ describe('TaskTools', () => {
       summary: 'Result prepared',
       outputs: { result: 'actual result' },
       resultRef: 'reports/result.md',
-      resultHash: 'a'.repeat(64),
     };
     await expect(update.execute('invalid', { taskId: task.id, status: 'completed', result })).rejects.toThrow(
-      'result being reviewed',
+      'names no current session result',
     );
     expect((await registry.getTask(task.id))?.status).toBe('in_progress');
     await update.execute('corrected', {
       taskId: task.id,
       status: 'completed',
-      result: {
-        ...result,
-        resultRef: 'session://tool-outputs/result.json',
-        resultHash: `sha256:${'A'.repeat(64)}`,
-      },
+      result: { ...result, resultRef: RESULT_URI },
     });
     expect((await registry.getTask(task.id))?.status).toBe('completed');
     const execution = await registry.getExecution((await registry.getTask(task.id))!.currentExecutionId!);
-    expect(execution?.result?.resultHash).toBe('a'.repeat(64));
+    expect(execution?.result).toMatchObject({ resultRef: RESULT_URI, resultHash: 'a'.repeat(64) });
   });
 
   it('explains and preserves dependencies between tasks created in the same batch', async () => {

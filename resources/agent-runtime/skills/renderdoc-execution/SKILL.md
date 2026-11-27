@@ -41,7 +41,7 @@ General 执行已批准的调查计划时用这份方法：读冻结的计划和
 
 独立审查（委派与续审的通用做法见 execution-orchestrator）：
 
-- 审查 Task 绑定 `profileId=verifier` 和独立的来源 Task；Capsule 的 `inputArtifactRefs` 授予被审记录的 URI/hash，运行时会补授它们依赖的证据和实验回执。General 自己读取 skeptic-review 不等于独立审查。
+- 审查 Task 绑定 `profileId=verifier` 和独立的来源 Task；Capsule 的 `inputArtifactRefs` 授予被审记录的 URI，运行时会补授它们依赖的证据和实验回执。General 自己读取 skeptic-review 不等于独立审查。
 - 审查返回两类意见。Challenge 是"不处理，结论就不能按现在的措辞成立"的缺口，在最终接受前要有真实补证，或范围修订：把主张收窄到证据能支撑的范围，用收窄后的 Claim 作 `resolutionClaimId` 收口。审查结果 `unresolved` 里标 `not_required` 的是备注，写进交付的未知项，不改结论措辞。计划要求 typed Challenge 而审查只返回文字时，由 General 核对目标与来源后用 `investigation_write` 保存。
 - 交付审查的范围要兑现冻结计划的必要目标，不能只审一个较弱的局部主张就结束。
 

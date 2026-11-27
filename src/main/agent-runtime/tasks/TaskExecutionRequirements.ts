@@ -161,7 +161,7 @@ export async function readIndependentTaskSources(task: TaskRecord, store: TaskSt
     }
     const resultRef = execution!.result!.resultRef!;
     const resultHash = execution!.result!.resultHash!;
-    if (!store.verifyReviewArtifact || !(await store.verifyReviewArtifact(resultRef, resultHash))) {
+    if (!(await isCurrentReviewArtifact(store, resultRef, resultHash))) {
       denied('Independent source result is unavailable, changed or no longer current.');
     }
     sources.push({
@@ -188,9 +188,13 @@ export async function assertIndependentReviewResult(
   if (!dependedOn) return;
   if (!result.resultRef || !result.resultHash)
     denied('A Task used by independent review requires resultRef and resultHash in its execution result.');
-  if (!store.verifyReviewArtifact || !(await store.verifyReviewArtifact(result.resultRef!, result.resultHash!))) {
+  if (!(await isCurrentReviewArtifact(store, result.resultRef!, result.resultHash!))) {
     denied('The independent review result reference is unavailable, changed or cannot be verified.');
   }
+}
+
+async function isCurrentReviewArtifact(store: TaskStore, uri: string, hash: string): Promise<boolean> {
+  return Boolean(store.reviewArtifactHash) && (await store.reviewArtifactHash!(uri)) === hash;
 }
 
 /** A completed Task can run again to repair an invalidated review dependency. */
@@ -214,7 +218,7 @@ export async function canReexecuteInvalidatedTask(task: TaskRecord, store: TaskS
   );
   if (!dependedOn) return false;
   if (!ref || !hash) return true;
-  return Boolean(store.verifyReviewArtifact && !(await store.verifyReviewArtifact(ref, hash)));
+  return Boolean(store.reviewArtifactHash && !(await isCurrentReviewArtifact(store, ref, hash)));
 }
 
 /** Continue an incomplete review when the caller supplies a previously ungranted source. */

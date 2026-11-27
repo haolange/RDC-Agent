@@ -10,7 +10,7 @@ allowed-tools: [subagent_report, turn_complete, artifact_read, investigation_sch
 
 ## 怎样审
 
-1. 读被引用的 Claim、Evidence、Experiment，以及运行时随之补授的依赖。优先用给定的精确 URI 和 hash，不做大范围搜索。
+1. 读被引用的 Claim、Evidence、Experiment，以及运行时随之补授的依赖。优先用给定的精确 URI，不做大范围搜索。
 2. 逐条先判：证据最多撑到哪一级、哪个范围？因果或反事实主张的实验合格吗（`S-CAUSAL-01`，定义见 `$debugger-causal-method`）？等级和范围与证据一致的主张不动。
 3. 只有三种情形写 Challenge：记录里的读数与主张矛盾；记录里已有某个观察，被某个替代解释预测得比主张更好；主张的范围或等级超出证据能支撑的部分。`statement` 写明收窄到什么范围即可成立，`requiredFollowUp` 在"收窄到该范围"和"具体的区分检查"里选更便宜的。
 4. 其余是备注：替代解释只是逻辑上可能而记录里没有对应观察，或多一个对照更好。写进结果的 `unresolved`，`blocker: not_required`，`gap` 写清是什么，`resumeWhen` 写在什么条件下值得补。

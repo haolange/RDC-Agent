@@ -85,14 +85,14 @@ describe('ArtifactReadTool', () => {
       expect(denied.content[0]).toMatchObject({ text: expect.stringContaining('ARTIFACT_SESSION_DENIED') });
       expect(read).not.toHaveBeenCalled();
       const changed = await artifactReadTool.execute(
-        'changed',
+        'copied-hash',
         { uri, expectedHash: '0'.repeat(64), textPointer: '/source', search: 'needle' },
         undefined,
         undefined,
         context,
       );
       expect(changed.isError).toBe(true);
-      expect(changed.content[0]).toMatchObject({ text: expect.stringContaining('ARTIFACT_HASH_MISMATCH') });
+      expect(changed.content[0]).toMatchObject({ text: expect.stringContaining('ARTIFACT_SESSION_DENIED') });
       expect(read).not.toHaveBeenCalled();
     } finally {
       release();

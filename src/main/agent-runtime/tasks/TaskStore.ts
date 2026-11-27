@@ -69,7 +69,8 @@ export interface TaskStoreCommit {
 
 export interface TaskStore {
   readApprovedRequirements?: () => Promise<PlanTaskRequirement[]>;
-  verifyReviewArtifact?: (uri: string, hash: string) => Promise<boolean>;
+  /** The current hash of a reviewable result, resolved by the host; null when nothing reviewable is there. */
+  reviewArtifactHash?: (uri: string) => Promise<string | null>;
   verifyRuntimeEpoch?: (epoch: TaskRuntimeEpoch, preparation: TaskExecutionPreparation) => Promise<boolean>;
   loadTask(id: string): Promise<TaskRecord | null>;
   saveTask(task: TaskRecord): Promise<void>;
@@ -96,7 +97,7 @@ export class FileTaskStore implements TaskStore {
   constructor(
     tasksDir: string,
     readonly readApprovedRequirements?: () => Promise<PlanTaskRequirement[]>,
-    readonly verifyReviewArtifact?: (uri: string, hash: string) => Promise<boolean>,
+    readonly reviewArtifactHash?: (uri: string) => Promise<string | null>,
     readonly verifyRuntimeEpoch?: (epoch: TaskRuntimeEpoch, preparation: TaskExecutionPreparation) => Promise<boolean>,
   ) {
     this.root = path.resolve(tasksDir);

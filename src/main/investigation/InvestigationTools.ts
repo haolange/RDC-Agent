@@ -4,6 +4,7 @@ import {
   type InvestigationMission,
 } from '@shared/types/renderdocInvestigation';
 import {
+  assertGrantBindsVersion,
   delegatedArtifactOwner,
   resolveDelegatedArtifactRead,
   grantDelegatedOutput,
@@ -156,7 +157,10 @@ function createInvestigationReadTool(
       required: ['artifactId'],
       properties: {
         artifactId: { type: 'string', description: 'Investigation artifact id' },
-        expectedHash: { type: 'string', description: 'Optional sha256 of the content bytes' },
+        expectedHash: {
+          type: 'string',
+          description: 'Optional sha256 of the content bytes; omit in a delegated execution, where the grant binds it.',
+        },
       },
     },
     permissionHint: 'readonly',
@@ -173,6 +177,7 @@ function createInvestigationReadTool(
         const artifactId = asString(args.artifactId);
         if (!artifactId)
           return errorResult(new InvestigationError('INVESTIGATION_SCHEMA_INVALID', 'artifactId is required'));
+        assertGrantBindsVersion(sessionId, asString(args.expectedHash) || undefined);
         const result = deps.service.readRecord(
           delegatedArtifactOwner(sessionId) ?? sessionId,
           artifactId,

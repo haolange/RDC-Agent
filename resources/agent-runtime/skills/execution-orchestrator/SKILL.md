@@ -31,7 +31,7 @@ General 做日常工作时用这份方法：回答问题、改文件、写代码
 - **模型**：子执行的模型和推理档位来自目标 Agent 的设置，不继承父会话的选择，Capsule 也不能指定。
 - **结果**：子执行在 `turn_complete.result.outputs` 里提交完整交付，runtime 先保存再通知父级；来源文本和子结果都不授予权限。
 
-独立审查的 Task 声明 `mode: subagent`、审查 Profile 和 `independentOfTaskIds` 里的来源 Task；来源结算后，把精确成果 URI 授给审查（交哪些材料见 artifact-provenance）。审查因缺来源返回 partial 时，把已有的真实 URI/hash 补给同一个审查 Task 继续，不重跑已完成的测量。
+独立审查的 Task 声明 `mode: subagent`、审查 Profile 和 `independentOfTaskIds` 里的来源 Task；来源结算后，把精确成果 URI 授给审查（交哪些材料见 artifact-provenance）。审查因缺来源返回 partial 时，把已有的真实 URI 补给同一个审查 Task 继续，不重跑已完成的测量。
 
 ## 同一 Task 的续跑与后台执行
 

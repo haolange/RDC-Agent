@@ -299,8 +299,8 @@ it(
           extraSegments: [...(options!.extraPromptSegments ?? [])],
         });
         const steps: Step[] = [
-          () => ({ name: 'artifact_read', args: { uri: raw.uri, expectedHash: raw.hash } }),
-          () => ({ name: 'artifact_read', args: { uri: image.uri, expectedHash: image.hash } }),
+          () => ({ name: 'artifact_read', args: { uri: raw.uri } }),
+          () => ({ name: 'artifact_read', args: { uri: image.uri } }),
         ];
         if (skillId === 'skeptic-review')
           steps.push(() => ({
@@ -380,7 +380,7 @@ it(
         [
           () => ({ name: 'subagent', args: { ...makeCapsule('knowledge-scout') } }),
           () => ({ name: 'subagent', args: { ...makeCapsule('skeptic-review') } }),
-          () => ({ name: 'artifact_read', args: { uri: raw.uri, expectedHash: raw.hash } }),
+          () => ({ name: 'artifact_read', args: { uri: raw.uri } }),
           () => ({
             name: 'investigation_write',
             args: {
