@@ -4,7 +4,7 @@
 
 ## Active Session
 
-工具审批的 `reviewMethod` / `verdict` / `failedChecks` / `escalatedFrom` / `errorCode` 来自主进程，随 owning session / turn / toolCall 的现有 workTrace 持久化及 delegated 投影传递。规则检查、独立模型判定、审核异常、转交人工与人工审批分别显示；缺字段时不依据 risk 或 reason 补造来源。拒绝与审核异常明确当前动作未执行，已批准后的工具错误按实际执行结果展示。Composer 的“模型思考”与审批的“操作风险”分开标识，不改变原有 generation、取消及 currentSession 隔离。
+工具调用的 `runtimeRecovery`（宿主对这次调用隔离的回放做了什么：已重建，或没能重建及其出口）从工具结果的 details 经严格解析投影，Work Process 在卡片上用一句话显示。工具审批的 `reviewMethod` / `verdict` / `failedChecks` / `escalatedFrom` / `errorCode` 来自主进程，随 owning session / turn / toolCall 的现有 workTrace 持久化及 delegated 投影传递。规则检查、独立模型判定、审核异常、转交人工与人工审批分别显示；缺字段时不依据 risk 或 reason 补造来源。拒绝与审核异常明确当前动作未执行，已批准后的工具错误按实际执行结果展示。Composer 的“模型思考”与审批的“操作风险”分开标识，不改变原有 generation、取消及 currentSession 隔离。
 
 - `projectStore.currentSessionId` 是 renderer 唯一 active session；`projectStore` 只另存侧栏列表行，会话事实读 `useSessionView`（见「Session 记录与 revision」）。
 - 跨项目选择项目根而不选会话时，先缓存并清空旧 session 的 transcript、运行态、右栏与 Composer 上下文，再投影目标项目；此时 `currentSession=null` 不代表旧 turn 又成为前台。旧 turn 的流事件及最终返回留在所属 session cache，不能重新选择旧项目或会话。仅从当前所选项目的无会话 Composer 发出的首轮结果可以建立前台新 session。

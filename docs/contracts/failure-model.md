@@ -86,7 +86,7 @@
 | 获批 capture 切换／恢复的身份或退出无法核实 | Security + Integrity | 停止现场操作并隔离；保留签名 baseline 和未恢复状态，不能将 context clear 当成 daemon 已退出，也不将新现场补入旧实验 |
 | RDC 恢复的进程变化无法由退出回执解释 | Integrity | `classifyRecovery` 判 `RDC_RECOVERY_PROCESS_UNEXPLAINED`：Agent 与用户恢复共用这一准入，只读 `context status`（不拉起 worker）；写 intent 与 failed 回执后停止，lease 保持隔离（`docs/architecture/rdc-runtime.md`「身份链恢复」） |
 | 获批 capture 上 RDC worker 卡死或丢失 | Availability | 故障照常登记并附栈日志；full-access / auto-review 下判 rebuild 即同轮自动恢复并继续，否则该轮以具体阻塞码结束（`CONVERSATION_RDC_RECOVERY_BLOCKED`，不报成模型请求失败）；其它模式报告结论并提供 `capture_recover` |
-| RDC 恢复次数用尽 | Availability | 同一 {输入、内容、设备} 的 Agent 恢复按签名回执计数，跨 turn 至多 2 次，之后 `RDC_RECOVERY_BUDGET_EXHAUSTED`；用户在 Capture 面板的恢复不计入 |
+| RDC 恢复次数用尽 | Availability | 同一 {输入、内容、设备} 的 Agent 恢复按本回合签下的 intent 计数，每回合至多 2 次，之后 `RDC_RECOVERY_BUDGET_EXHAUSTED`；被拒的判定不计数，新回合重新计数；用户在 Capture 面板的恢复不计入 |
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
 | JSONL 末尾残行（追加中断） | Integrity | 读取时作为 `tornTail` 返回，之前的完整记录照常可读，会话不因此打不开；下一次追加或回合终态提交前，残行字节原样移入同目录 `<file>.torn-<ts>`（fsync 后）再截断，并经运行日志报告 `JSONL_TORN_TAIL`；只缺换行的完整记录补换行保留 |
 | 计划批准事务：旧 `expectedPlanHash` / 旧会话 revision / `agent.before-handoff` 否决 / 提交中途失败 | Integrity | 分别报 `PLAN_HASH_MISMATCH`、`SESSION_REVISION_STALE`、`HOOK_DENIED`，或原样抛出提交步骤的错误；提交前任一拒绝都没有副作用，提交中途失败按前像日志逆序撤销已写步骤，会话 Agent、模型、参数、计划状态与 offer 保持原值。`agent.after-handoff` 失败只写会话运行日志诊断，不回滚，与其它 after 事件一致 |

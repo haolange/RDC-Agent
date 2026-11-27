@@ -6,7 +6,7 @@ import { rdcSessionService } from '../rdc/RdcSessionService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { projectWorkspaceStore, sessionRecordStore } from '../sessions/store/sessionStores';
 import { replayDeviceIssue } from '../rdc/captures/ReplayDeviceIssue';
-import { captureRecoveryStatus, restorePreviousCapture } from '../rdc/RdcCaptureRecovery';
+import { captureRecoveryStatus, recoverSessionCapture } from '../rdc/RdcCaptureRecovery';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { registerCaptureReplayReadHandlers } from './captureReplayReadHandlers';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
@@ -124,7 +124,7 @@ function replayChannels({ authorizeReplayScope }: CaptureChannelContext): IpcCha
   };
 }
 
-/** Capture recovery status and restoring the previous capture. */
+/** Capture recovery status and the person's recovery of the session's replay. */
 function captureRecoveryChannels({
   context,
   authorizeReplayScope,
@@ -137,14 +137,15 @@ function captureRecoveryChannels({
       authorizeReplayScope(scope);
       return captureRecoveryStatus(scope);
     },
-    'capture:restorePrevious': async (_event, ...rawArgs: unknown[]) => {
+    'capture:recover': async (_event, ...rawArgs: unknown[]) => {
       const [scope] = parseIpcArgs(CaptureReplayBindingArgsSchema, rawArgs, {
-        label: 'capture:restorePrevious',
+        label: 'capture:recover',
         maxBytes: 1024,
       });
       authorizeReplayScope(scope);
       try {
-        const state = await restorePreviousCapture(scope);
+        // A person's click recovers the session's replay; it never starts an Agent.
+        const state = await recoverSessionCapture(scope, { kind: 'user', bindingGeneration: scope.bindingGeneration });
         broadcastOpenedCapture(scope, rdcSessionService.snapshotOpenedCaptureForSession(scope));
         broadcastContext(scope, rdcSessionService.snapshotContextForSession(scope));
         context.broadcastToRenderer('capture:replayChanged', state);

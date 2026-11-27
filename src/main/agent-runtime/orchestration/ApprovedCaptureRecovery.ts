@@ -1,17 +1,43 @@
 import { AppError } from '@shared/errors/appError';
 import { samePath } from '../../platform/paths';
-import { getDelegatedChildSessionId, getRdcContextLease } from '../../rdc/RdcRuntimeContextRegistry';
+import {
+  getDelegatedChildSessionId,
+  getRdcContextLease,
+  quarantinedRdcContextLease,
+} from '../../rdc/RdcRuntimeContextRegistry';
+import { recoverSessionCapture, sessionCaptureFaulted } from '../../rdc/RdcCaptureRecovery';
 import { rdcSessionService } from '../../rdc/RdcSessionService';
 import { replayDeviceService } from '../../rdc/captures/ReplayDeviceService';
 import { readRdcContextStatus, rdcRecoveryObservation } from '../../rdc/RdcContextStatus';
 import { classifyRecovery, RDC_RECOVERY_ATTEMPT_LIMIT } from '../../rdc/RdcRecoveryClassification';
 import { rdcLifecycleReceipts } from '../../rdc/RdcLifecycleReceipts';
+import {
+  ownsRdcContextDaemon,
+  rdcContextProcessesExited,
+  releaseFaultedRdcContext,
+  type RdcContextProcesses,
+} from '../../rdc/OwnedRdcDaemonRegistry';
+import type { RdcRecoveryClassification } from '../../rdc/RdcRecoveryClassification';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type { RdcLifecyclePoint } from '../../rdc/RdcLifecycleReceipts';
 import type { RdcTurnBinding } from '../../rdc/RdcTurnBindings';
 import type { RecoveryFacts } from './ApprovedCaptureController';
 
 type Destination = { inputId: string; contentSha256: string; deviceId: string };
+
+/** The session-level recovery members of the capture host: the quarantined lease, the fault, the host's recovery. */
+export function sessionRecoveryHost(scope: { sessionId: string; projectId: string }, turnId: string) {
+  return {
+    quarantinedContext() {
+      const lease = quarantinedRdcContextLease(scope);
+      return lease ? { contextId: lease.contextId, leaseVersion: lease.version } : null;
+    },
+    sessionFaulted: () => sessionCaptureFaulted(scope),
+    async recoverSession() {
+      await recoverSessionCapture(scope, { kind: 'turn', turnId });
+    },
+  };
+}
 
 /**
  * What recovery may act on: the quarantined owning lease, still the one `point` verified, its projection, the frozen
@@ -21,6 +47,7 @@ type Destination = { inputId: string; contentSha256: string; deviceId: string };
 export async function inspectQuarantinedCapture(input: {
   sessionId: string;
   projectId: string;
+  turnId: string;
   point: RdcLifecyclePoint;
   binding: RdcTurnBinding;
   signal?: AbortSignal;
@@ -75,13 +102,20 @@ export async function inspectQuarantinedCapture(input: {
   )
     throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'the quarantined binding changed during observation.');
   const observed = rdcRecoveryObservation(status, point.native.replaySessionId);
-  const { attempts } = rdcLifecycleReceipts.recoveryAttempts(input.sessionId, input.projectId, destination);
+  const { attempts } = rdcLifecycleReceipts.recoveryAttempts(
+    input.sessionId,
+    input.projectId,
+    destination,
+    input.turnId,
+  );
   const classification = classifyRecovery({
     verified: point.native.processIdentity,
     replaySessionId: point.native.replaySessionId,
     status,
     deviceActionPending: !!state.preparation.issue?.deviceAction,
     budget: { attempts, limit: RDC_RECOVERY_ATTEMPT_LIMIT },
+    processesExited: rdcContextProcessesExited(point.native.processIdentity),
+    ownsDaemon: ownsRdcContextDaemon(lease.contextId),
   });
   return { cause: lease.quarantineCause, observed, classification, attempts };
 }
@@ -97,17 +131,23 @@ export async function reopenQuarantinedCapture(input: {
   signal: AbortSignal | undefined;
   onStopped: (contextId: string) => void;
   guard: () => void;
+  /** The classified failure: a silent daemon is stopped, and an exited one is closed without native calls. */
+  fault: { classification: RdcRecoveryClassification; processes: RdcContextProcesses };
 }): Promise<void> {
   const { binding, signal, guard } = input;
   const { capture, device } = input.resolved;
   const scope = { sessionId: input.sessionId, projectId: input.projectId };
   const old = rdcSessionService.snapshotReplayForSession(scope);
+  const faulted = getRdcContextLease(input.sessionId)?.contextId;
+  if (!faulted) throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'the faulted lease is gone.');
+  const exitedProcesses = releaseFaultedRdcContext(faulted, input.fault.classification, input.fault.processes);
   if (
     !(await rdcSessionService.clearOpenedCaptureForSession(scope, {
       binding,
       signal,
       expectedGeneration: old.generation,
       onDaemonStopped: (receipt) => input.onStopped(receipt.contextId),
+      exitedProcesses,
     }))
   )
     throw new AppError('RDC_RECOVERY_CLOSE_UNCONFIRMED');

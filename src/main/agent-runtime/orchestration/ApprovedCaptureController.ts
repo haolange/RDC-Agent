@@ -12,11 +12,13 @@ import { getRdcTurnBinding, type RdcTurnBinding } from '../../rdc/RdcTurnBinding
 import { observedRdcProcessIdentity } from '../../rdc/RdcProcessIdentity';
 import { lifecycleLedger, type LifecycleLedger } from '../../runtime/LifecycleLedger';
 import { RDC_RECOVERY_ATTEMPT_LIMIT } from '../../rdc/RdcRecoveryClassification';
+import type { CaptureExit, CaptureReadiness } from '@shared/types/captureReplay';
 import type { InvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
 import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 import type { TaskRuntimeEpoch } from '../tasks/taskExecutionSchemas';
 import type { RdcRecoveryObservation } from '../../rdc/RdcContextStatus';
 import type { RdcRecoveryClassification } from '../../rdc/RdcRecoveryClassification';
+import type { RdcProcessIdentity } from '../../rdc/RdcProcessIdentity';
 import type { EffectiveRuntimePlan } from '../EffectiveRuntimePlan';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { ToolExecutionContext } from '../agent/AgentTool';
@@ -37,6 +39,10 @@ export interface ApprovedCaptureHost {
   pendingRecord(): ReturnType<RdcLifecycleReceipts['pending']>;
   /** The owning lease when it is quarantined: only recovery may act on it. */
   quarantinedContext(): { contextId: string; leaseVersion: number } | null;
+  /** The session's replay is quarantined or failed into the error phase. */
+  sessionFaulted(): boolean;
+  /** Restores an unresolved baseline of any plan, or rebuilds a faulted replay, under this turn's lock. */
+  recoverSession(): Promise<void>;
   prepareReceipts(): void;
   /** Throws while children or experiments are open; in recovery mode it returns the open experiments instead. */
   quiescent(
@@ -59,12 +65,14 @@ export interface ApprovedCaptureHost {
   recoveryGuard(expectedRevision: number): () => void;
   joinRecoveryChild(signal?: AbortSignal): Promise<void>;
   inspectRecovery(point: RdcLifecyclePoint, binding: RdcTurnBinding, signal?: AbortSignal): Promise<RecoveryFacts>;
+  /** `fault` is the classified process failure, so a silent daemon is stopped or an exited one closed without it. */
   reopenAfterFailure(
     destination: Destination,
     binding: RdcTurnBinding,
     signal: AbortSignal | undefined,
     onStopped: (contextId: string) => void,
     guard: () => void,
+    fault: { classification: RdcRecoveryClassification; processes: RdcProcessIdentity },
   ): Promise<void>;
   reprepare(
     previous: { plan: EffectiveRuntimePlan; prompt: PromptPlan; binding: RdcTurnBinding },
@@ -80,6 +88,11 @@ export interface ApprovedCaptureHost {
   ): void;
 }
 
+/** The one exit a recovery failure leaves: only an unexplained process change needs the app restarted. */
+export function captureExitFor(code: string): CaptureExit {
+  return code === 'RDC_RECOVERY_PROCESS_UNEXPLAINED' ? 'restart' : 'ask-user';
+}
+
 /** One approved goal owns one serial capture transition chain. */
 export class ApprovedCaptureController {
   private original: RdcLifecyclePoint | null | undefined;
@@ -89,7 +102,8 @@ export class ApprovedCaptureController {
   /** Set when this turn adopted an earlier turn's unresolved baseline whose lease is quarantined. */
   private adoptedBaselineTurnId: string | null = null;
   private pendingRecovery = false;
-  private initialError: string | null = null;
+  /** The failure the last recovery rebuilt from; the same failure right after it is not rebuilt again. */
+  private lastRecoveredCause: string | null = null;
   private lastFailure: string | null = null;
   private restoreError: string | null = null;
   constructor(
@@ -105,47 +119,46 @@ export class ApprovedCaptureController {
     },
   ) {}
 
-  /** Capture the user's original position before the model starts; errors only block switching. */
+  /**
+   * Before the model starts: a faulted replay or an unresolved baseline left by any earlier turn is recovered by the
+   * host first, then the user's original position is observed and signed as this turn's baseline. A recovery that
+   * fails ends the turn here, before any tool runs against a replay that cannot be used.
+   */
   async initialize(): Promise<void> {
-    try {
-      this.input.host.assertPlan();
-      const quarantined = this.input.host.quarantinedContext();
-      if (quarantined) return this.adoptPendingRecovery(quarantined);
-      if (this.input.host.pendingRecord())
-        throw new AppError(
-          'RDC_PREVIOUS_RESTORE_REQUIRED',
-          'restore the previous investigation position through Capture first.',
-        );
-      this.original = await this.input.host.snapshot(this.current().binding, this.input.turn.signal);
-      this.lastVerified = this.original;
-      this.input.host.prepareReceipts();
-      this.baseline = this.input.host.writeReceipt({
-        ...this.base(randomUUID()),
-        event: 'baseline',
-        original: this.original,
-      });
-    } catch (error) {
-      this.initialError = error instanceof Error ? error.message : String(error);
-    }
+    this.input.host.assertPlan();
+    const quarantined = this.input.host.quarantinedContext();
+    const record = this.input.host.pendingRecord();
+    if (quarantined && record && this.continuesChain(record, quarantined)) return this.adoptPendingRecovery(record);
+    if (record || this.input.host.sessionFaulted()) await this.input.host.recoverSession();
+    this.original = await this.input.host.snapshot(this.current().binding, this.input.turn.signal);
+    this.lastVerified = this.original;
+    this.input.host.prepareReceipts();
+    this.baseline = this.input.host.writeReceipt({
+      ...this.base(randomUUID()),
+      event: 'baseline',
+      original: this.original,
+    });
+  }
+
+  /** The unresolved chain is this plan's, and its last signed position names the quarantined lease. */
+  private continuesChain(
+    record: NonNullable<ReturnType<ApprovedCaptureHost['pendingRecord']>>,
+    quarantined: { contextId: string; leaseVersion: number },
+  ): boolean {
+    return (
+      record.baseline.planUri === this.input.planUri &&
+      record.baseline.planHash === this.planHash() &&
+      record.latest?.native.contextId === quarantined.contextId &&
+      record.latest.native.leaseVersion === quarantined.leaseVersion
+    );
   }
 
   /**
-   * A new turn of the same plan that meets its quarantined lease continues the unresolved chain instead of failing to
-   * observe a start position: the earlier baseline stays the user's original, the last signed position on that lease
-   * is the last verified one, and only capture_recover may run until the lease is rebuilt.
+   * A new turn of the same plan that meets its quarantined lease continues the unresolved chain: the earlier
+   * baseline stays the user's original, the last signed position on that lease is the last verified one, and only
+   * recovery may act until the lease is rebuilt.
    */
-  private adoptPendingRecovery(quarantined: { contextId: string; leaseVersion: number }): void {
-    const record = this.input.host.pendingRecord();
-    if (!record || record.baseline.planUri !== this.input.planUri || record.baseline.planHash !== this.planHash())
-      throw new AppError(
-        'RDC_PREVIOUS_RESTORE_REQUIRED',
-        'restore the previous investigation position through Capture first.',
-      );
-    if (
-      record.latest?.native.contextId !== quarantined.contextId ||
-      record.latest.native.leaseVersion !== quarantined.leaseVersion
-    )
-      throw new AppError('RDC_RECOVERY_IDENTITY_UNVERIFIED', 'no signed position names the quarantined lease.');
+  private adoptPendingRecovery(record: NonNullable<ReturnType<ApprovedCaptureHost['pendingRecord']>>): void {
     this.original = record.baseline.original;
     this.baseline = record.ref;
     this.adoptedBaselineTurnId = record.baseline.turnId;
@@ -182,6 +195,23 @@ export class ApprovedCaptureController {
     else this.assertRecovered();
   }
 
+  /**
+   * Whether live capture work can run now, and if not, who can change that: an uninitialized or ended turn needs a
+   * new turn, and a quarantined lease needs a recovery, which the host runs itself after the call that caused it.
+   */
+  readiness(): CaptureReadiness {
+    if (this.original === undefined) return { state: 'blocked', code: 'RDC_INITIAL_STATE_UNVERIFIED', exit: 'restart' };
+    if (!this.input.turn.isLive(this.input.turn.generation))
+      return { state: 'blocked', code: 'RDC_TURN_NOT_ACTIVE', exit: 'restart' };
+    if (this.quarantined()) return { state: 'blocked', code: 'RDC_CONTEXT_QUARANTINED', exit: 'agent-recover' };
+    return { state: 'ready' };
+  }
+
+  /** The owning lease is quarantined, or this turn adopted one that still waits for its recovery. */
+  quarantined(): boolean {
+    return this.pendingRecovery || this.input.host.quarantinedContext() !== null;
+  }
+
   /** The signed entry point belongs only to the approved owning General turn. */
   restorationBaselineFor(
     scope: Pick<ToolExecutionContext, 'sessionId' | 'projectId' | 'turnId' | 'agentId' | 'accessCeiling'>,
@@ -196,14 +226,14 @@ export class ApprovedCaptureController {
       return null;
     if (!this.input.turn.isLive(this.input.turn.generation))
       return { available: false as const, reason: 'RDC_TURN_NOT_ACTIVE' };
-    if (this.initialError || this.original === undefined || !this.baseline)
+    if (this.original === undefined || !this.baseline)
       return { available: false as const, reason: 'RDC_INITIAL_STATE_UNVERIFIED' };
     return { available: true as const, original: structuredClone(this.original), receipt: { ...this.baseline } };
   }
 
   /** Close the durable recovery record only after the final user position is observed. */
   async recordTerminalRestoration(signal?: AbortSignal): Promise<boolean> {
-    if (!this.baseline || this.original === undefined || this.initialError) return false;
+    if (!this.baseline || this.original === undefined) return false;
     this.assertRecovered();
     this.input.host.assertPlan();
     const observed = await this.input.host.snapshot(this.current().binding, signal);
@@ -377,6 +407,12 @@ export class ApprovedCaptureController {
     const previous = this.current();
     const facts = await this.input.host.inspectRecovery(from, previous.binding, signal);
     guard();
+    if (JSON.stringify(facts.cause) === this.lastRecoveredCause)
+      throw new AppError('RDC_RECOVERY_REPEATED_FAULT', 'the same failure returned right after a rebuild.');
+    this.recordStep('classified', facts);
+    // A refusal acts on nothing, so it signs no intent and spends none of the turn's recovery attempts.
+    if (facts.classification.decision === 'quarantined')
+      throw new AppError(facts.classification.code, facts.classification.reason);
     this.input.host.prepareReceipts();
     const operationId = randomUUID();
     const base = this.base(operationId);
@@ -389,12 +425,6 @@ export class ApprovedCaptureController {
       destination,
       recovery: { cause: facts.cause, observed: facts.observed, classification: facts.classification },
     });
-    this.recordStep('classified', facts);
-    if (facts.classification.decision === 'quarantined') {
-      const refused = new AppError(facts.classification.code, facts.classification.reason);
-      this.fail(intent, base, from, refused, true);
-      throw refused;
-    }
     let stopped: InvestigationContentRef | undefined;
     const onStopped = (contextId: string) => {
       if (stopped || contextId !== from.native.contextId) throw new AppError('RDC_RECOVERY_STOP_RECEIPT_MISMATCH');
@@ -410,7 +440,10 @@ export class ApprovedCaptureController {
     try {
       signal?.throwIfAborted();
       guard();
-      await this.input.host.reopenAfterFailure(destination, previous.binding, signal, onStopped, guard);
+      await this.input.host.reopenAfterFailure(destination, previous.binding, signal, onStopped, guard, {
+        classification: facts.classification,
+        processes: from.native.processIdentity,
+      });
       signal?.throwIfAborted();
       guard();
       const next = await this.input.host.reprepare(previous, signal);
@@ -454,6 +487,7 @@ export class ApprovedCaptureController {
       this.input.turn.runtimeEpochs.push(epoch);
       this.lastVerified = to;
       this.pendingRecovery = false;
+      this.lastRecoveredCause = JSON.stringify(facts.cause);
       this.recordStep('recovered', facts);
       return { changed: true, receipt, current: to };
     } catch (error) {
@@ -612,14 +646,14 @@ export class ApprovedCaptureController {
   }
   /** Ready, and the owning lease is not waiting for capture_recover. */
   private assertRecovered(): void {
-    this.assertReady();
-    if (this.pendingRecovery || this.input.host.quarantinedContext())
-      throw new AppError('RDC_CONTEXT_QUARANTINED', 'recover the capture with capture_recover first.');
+    const readiness = this.readiness();
+    if (readiness.state === 'blocked') throw new AppError(readiness.code, readinessMessage(readiness));
   }
+  /** Ready apart from a quarantine, which is what a recovery itself acts on. */
   private assertReady(): void {
-    if (this.initialError || this.original === undefined)
-      throw new AppError('RDC_INITIAL_STATE_UNVERIFIED', this.initialError ?? 'initial state was not recorded');
-    if (!this.input.turn.isLive(this.input.turn.generation)) throw new AppError('RDC_TURN_NOT_ACTIVE');
+    const readiness = this.readiness();
+    if (readiness.state === 'blocked' && readiness.exit !== 'agent-recover')
+      throw new AppError(readiness.code, readinessMessage(readiness));
   }
   private planHash(): string {
     return this.input.planHash.replace(/^sha256:/u, '');
@@ -635,6 +669,12 @@ export class ApprovedCaptureController {
       recordedAt: Date.now(),
     };
   }
+}
+
+function readinessMessage(readiness: Extract<CaptureReadiness, { state: 'blocked' }>): string {
+  return readiness.exit === 'agent-recover'
+    ? 'the replay is isolated; the runtime recovers it, or recover it with capture_recover.'
+    : 'live capture work needs a new turn.';
 }
 
 function lostWithProcess(

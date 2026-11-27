@@ -147,6 +147,8 @@ export const ToolRow: React.FC<{
             </PlainButton>
           ) : null}
 
+          <RecoveryLine recovery={row.recovery} />
+
           {hookAttention && !expanded ? (
             <div className={`work-process-tool-hook-attention severity-${hookAttention.severity}`}>
               {hookAttention.message}
@@ -186,3 +188,13 @@ export const ToolRow: React.FC<{
 };
 
 export type { ToolRowModel };
+
+/** The host's recovery of the replay this call left isolated, as one sentence under the card header. */
+function RecoveryLine({ recovery }: { recovery: ToolRowModel['recovery'] }) {
+  if (!recovery) return null;
+  return (
+    <p className={`work-process-tool-recovery is-${recovery.tone}`} role="status">
+      {recovery.text}
+    </p>
+  );
+}

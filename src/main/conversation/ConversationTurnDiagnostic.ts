@@ -11,7 +11,7 @@ import {
   ProviderTimeoutError,
 } from '../agent-runtime/providers/internal/http';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
-import { RdcRecoveryBlockedError } from '../agent-runtime/orchestration/RdcProcessFaultRecovery';
+import { RdcRecoveryBlockedError } from '../agent-runtime/orchestration/RuntimeCaptureRecovery';
 import { isMissionCompletionError } from '../investigation/missionCompletionContract';
 import { InvestigationError } from '../investigation/investigationErrors';
 import {

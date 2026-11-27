@@ -496,6 +496,16 @@ export class RdcSessionService extends RdcDevicePreparation {
         });
     }
   }
+  /**
+   * The current position for a lifecycle snapshot. An agent observation that failed without a fault leaves the replay
+   * ready but unobserved; it is observed again here instead of being reported as an unverifiable position.
+   */
+  async currentAgentObservation(scope: SessionScope, frozenCli: RdcCliInvokerSettings): Promise<CaptureReplayState> {
+    const state = this.snapshotReplayForSession(scope);
+    if (state.phase !== 'ready' || state.observation || !this.snapshotOpenedCaptureForSession(scope)) return state;
+    return this.observe(scope, {}, false, frozenCli);
+  }
+
   private async observe(
     scope: SessionScope,
     args: Record<string, unknown>,

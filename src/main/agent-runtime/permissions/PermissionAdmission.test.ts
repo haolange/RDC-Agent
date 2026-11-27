@@ -10,11 +10,6 @@ import {
 
 const holds = (check: AdmissionFact['check']): AdmissionFact => ({ check, state: 'holds', basis: `${check} holds.` });
 const fails = (check: AdmissionFact['check']): AdmissionFact => ({ check, state: 'fails', basis: `${check} fails.` });
-const unavailable = (check: AdmissionFact['check']): AdmissionFact => ({
-  check,
-  state: 'unavailable',
-  basis: `${check} unknown.`,
-});
 
 describe('admission decision order', () => {
   it('admits a low-risk action without an adapter by rule and sends any other to the model without facts', () => {
@@ -28,12 +23,7 @@ describe('admission decision order', () => {
   it('refuses by rule and names every failing check, whatever the coverage', () => {
     const assessment: AdmissionAssessment = {
       coverage: 'covered',
-      facts: [
-        holds('authorized'),
-        fails('source-bound'),
-        fails('rollback-available'),
-        unavailable('baseline-recorded'),
-      ],
+      facts: [holds('authorized'), fails('source-bound'), fails('rollback-available')],
     };
     expect(decideAdmission(assessment, 'medium', 'x')).toMatchObject({
       route: 'rule',
@@ -41,25 +31,24 @@ describe('admission decision order', () => {
     });
   });
 
-  it('admits a covered action by rule only when every fact holds', () => {
+  it('admits a covered action by rule when every fact holds, and never sends a host fact to the model', () => {
     expect(
       decideAdmission({ coverage: 'covered', facts: [holds('authorized'), holds('target-matches')] }, 'medium', 'x'),
     ).toMatchObject({ route: 'rule', verdict: { verdict: 'allow', failedChecks: [] } });
-    const open = [holds('authorized'), unavailable('baseline-recorded')];
-    expect(decideAdmission({ coverage: 'covered', facts: open }, 'medium', 'x')).toEqual({
-      route: 'model',
-      facts: open,
-    });
+    // A fact the host cannot verify fails; the model is never asked to settle host state.
+    expect(
+      decideAdmission({ coverage: 'covered', facts: [holds('authorized'), fails('baseline-recorded')] }, 'low', 'x'),
+    ).toMatchObject({ route: 'rule', verdict: { verdict: 'deny', failedChecks: ['baseline-recorded'] } });
   });
 
   it('never admits an uncovered action by rule, even when every fact it has holds', () => {
-    const facts = [unavailable('authorized'), holds('source-bound'), holds('identity-current')];
+    const facts = [holds('source-bound'), holds('identity-current')];
     expect(decideAdmission({ coverage: 'uncovered', facts }, 'low', 'x')).toEqual({ route: 'model', facts });
   });
 });
 
 describe('turn admission memory', () => {
-  let current: AdmissionAssessment = { coverage: 'uncovered', facts: [unavailable('authorized')] };
+  let current: AdmissionAssessment = { coverage: 'uncovered', facts: [holds('identity-current')] };
   registerAdmissionAdapter((request) => (request.toolCall.name === 'memory-probe' ? current : null));
   const turn = new TurnAdmission({
     sessionId: 'session',
@@ -68,7 +57,7 @@ describe('turn admission memory', () => {
     agentId: 'general',
     accessCeiling: 'full',
     approved: null,
-    captureBaseline: () => ({ available: false, reason: 'none' }),
+    captureReadiness: () => null,
   });
   const request = {
     decision: { action: 'auto_review', risk: 'medium', reason: 'Probe', temporaryPathRoots: [] },
@@ -86,13 +75,13 @@ describe('turn admission memory', () => {
       verdict: { verdict: 'deny', failedChecks: ['authorized'] },
     });
     expect(turn.assess(request, 'b'.repeat(64)).route.route).toBe('model');
-    current = { coverage: 'uncovered', facts: [unavailable('authorized'), holds('source-bound')] };
+    current = { coverage: 'uncovered', facts: [holds('identity-current'), holds('source-bound')] };
     expect(turn.assess(request, 'a'.repeat(64)).route.route).toBe('model');
   });
 
   it("keeps the user's refusal final for the turn even after the facts change", () => {
     turn.assess(request, 'c'.repeat(64)).settle({ ...refused, failedChecks: ['authorized'] }, { byUser: true });
-    current = { coverage: 'uncovered', facts: [unavailable('authorized'), holds('identity-current')] };
+    current = { coverage: 'uncovered', facts: [holds('identity-current'), holds('rollback-available')] };
     expect(turn.assess(request, 'c'.repeat(64)).route).toMatchObject({ route: 'rule', verdict: { verdict: 'deny' } });
   });
 });

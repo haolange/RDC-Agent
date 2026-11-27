@@ -140,6 +140,11 @@ export class RdcNativeFailure extends AppError {
   }
 }
 
+/** The failure is the operation's own worker, daemon or cancellation, whether or not its details parse. */
+export function isRdcProcessFailure(error: RdcNativeFailure): boolean {
+  return isProcessFailureCode(error.nativeError.code);
+}
+
 /**
  * Fail before any lease/experiment state is committed. Never surface binary stdout. Every RDC result is parsed here, so
  * a success that names its daemon context (expected or reported) also records the process identity that served it.

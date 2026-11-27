@@ -408,6 +408,17 @@
   text-underline-offset: 2px;
 }
 
+/* The host's recovery of an isolated replay: one sentence, quiet when rebuilt, a warning when it needs someone. */
+.work-process-tool-recovery {
+  margin: 0;
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  overflow-wrap: anywhere;
+}
+.work-process-tool-recovery.is-warning {
+  color: var(--token-status-warning);
+}
 .work-process-tool-hook-attention {
   padding: var(--space-1) var(--space-3) var(--space-2);
   color: var(--token-status-warning);

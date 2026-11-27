@@ -27,7 +27,7 @@ import {
   ApprovedCaptureController,
   type ApprovedCaptureHost,
 } from '../../agent-runtime/orchestration/ApprovedCaptureController';
-import { settleRdcProcessFault } from '../../agent-runtime/orchestration/RdcProcessFaultRecovery';
+import { recoverQuarantinedCapture } from '../../agent-runtime/orchestration/RuntimeCaptureRecovery';
 import { TurnHandle } from '../../agent-runtime/orchestration/TurnCoordinator';
 import { parseRdcNativeResult, RdcNativeFailure } from '../../rdc/RdcNativeProtocol';
 import { classifyRecovery } from '../../rdc/RdcRecoveryClassification';
@@ -475,6 +475,8 @@ describe('faultInjectionContract: stuck RDC worker on an approved capture', () =
       assertPlan: () => {},
       pendingRecord: () => null,
       quarantinedContext: () => null,
+      sessionFaulted: () => false,
+      recoverSession: async () => {},
       prepareReceipts: () => {},
       quiescent: async () => ({ openExperiments: [{ experimentId: 'exp', status: 'running' }] }),
       snapshot: async () => structuredClone(current),
@@ -493,6 +495,8 @@ describe('faultInjectionContract: stuck RDC worker on an approved capture', () =
           status,
           deviceActionPending: false,
           budget: { attempts: 0, limit: 2 },
+          processesExited: false,
+          ownsDaemon: false,
         }),
         attempts: 0,
       }),
@@ -532,16 +536,15 @@ describe('faultInjectionContract: stuck RDC worker on an approved capture', () =
   }
   const exclusive = <T>(operation: () => Promise<T>) => operation();
 
-  it('rebuilds the replay in the same turn under full access when the worker exit explains the change', async () => {
+  it('rebuilds the replay in the same turn when the worker exit explains the change', async () => {
     const f = approvedCapture(stuckContextStatus());
     await f.control.initialize();
     const error = stuckFailure();
     expect(error.code).toBe('RDC_OPERATION_STUCK');
     expect(error.processFailure?.stack_log?.path).toBe('/state/worker.log');
-    const outcome = await settleRdcProcessFault({
-      error,
+    const outcome = await recoverQuarantinedCapture({
       control: f.control,
-      permission: { mode: 'full-access', revision: 1 },
+      permissionRevision: 1,
       runExclusive: exclusive,
     });
     expect(outcome).toMatchObject({
@@ -557,7 +560,7 @@ describe('faultInjectionContract: stuck RDC worker on an approved capture', () =
     expect(f.ledger.map((event) => event.kind === 'recovery_step' && event.step)).toEqual(['classified', 'recovered']);
   });
 
-  it('stops an autonomous turn on an unexplained change and only offers recovery in ask mode', async () => {
+  it('reports an unexplained change with the restart exit and keeps the turn going', async () => {
     const replaced = liveContextStatus();
     replaced.worker = { ...replaced.worker, pid: 99 };
     replaced.sessions[0]!.is_live = false;
@@ -565,25 +568,9 @@ describe('faultInjectionContract: stuck RDC worker on an approved capture', () =
     const blocked = approvedCapture(replaced);
     await blocked.control.initialize();
     expect(
-      await settleRdcProcessFault({
-        error: stuckFailure(),
-        control: blocked.control,
-        permission: { mode: 'auto-review', revision: 1 },
-        runExclusive: exclusive,
-      }),
-    ).toMatchObject({ status: 'blocked', code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED', stopsTurn: true });
+      await recoverQuarantinedCapture({ control: blocked.control, permissionRevision: 1, runExclusive: exclusive }),
+    ).toMatchObject({ status: 'blocked', code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED', exit: 'restart' });
     expect(blocked.host.reopenAfterFailure).not.toHaveBeenCalled();
-    const ask = approvedCapture(stuckContextStatus());
-    await ask.control.initialize();
-    expect(
-      await settleRdcProcessFault({
-        error: stuckFailure(),
-        control: ask.control,
-        permission: { mode: 'default', revision: 1 },
-        runExclusive: exclusive,
-      }),
-    ).toEqual({ status: 'recovery-available', action: 'capture_recover', decision: 'rebuild' });
-    expect(ask.receipts.map((receipt) => receipt.event)).toEqual(['baseline']);
-    expect(ask.host.reopenAfterFailure).not.toHaveBeenCalled();
+    expect(blocked.receipts.map((receipt) => receipt.event)).toEqual(['baseline']);
   });
 });

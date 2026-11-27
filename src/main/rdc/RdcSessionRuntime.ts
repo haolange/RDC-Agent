@@ -23,7 +23,12 @@ import {
   type RemoteInstallationInspection,
 } from './RdcRemoteConnection';
 import { setRdcRuntimeContextForSession, getDelegatedChildSessionId } from './RdcRuntimeContextRegistry';
-import { forgetOwnedRdcDaemon, rememberOwnedRdcDaemon } from './OwnedRdcDaemonRegistry';
+import {
+  forgetOwnedRdcDaemon,
+  rdcContextProcessesExited,
+  rememberOwnedRdcDaemon,
+  type RdcContextProcesses,
+} from './OwnedRdcDaemonRegistry';
 import { hostRdcIntermediateRoot, RDC_INTERMEDIATE_ROOT_ENV } from './withRdcHostRuntimeEnv';
 import type {
   CaptureDescriptor,
@@ -105,6 +110,8 @@ export interface RdcLifecycleOptions extends RdcRemoteProgress {
   expectedCaptureSha256?: string;
   onStage?: (stage: 'connecting' | 'opening' | 'transferring') => void;
   onDaemonStopped?: (receipt: { contextId: string; stopped: true }) => void | Promise<void>;
+  /** The context's daemon and worker the caller verified as gone; closing re-verifies them and runs nothing native. */
+  exitedProcesses?: RdcContextProcesses;
   binding?: RdcTurnBinding;
   signal?: AbortSignal;
   expectedBindingIdentity?: string;
@@ -597,6 +604,14 @@ export class RdcSessionRuntime {
     if (this.contextId && shellInvocationService.hasUnconfirmedProcesses(this.contextId))
       throw new AppError('RDC_RECOVERY_BLOCKED', 'native process exit has not been observed.');
     const previousContext = this.runtimeContext;
+    if (options.exitedProcesses && this.contextId) {
+      // A daemon that is gone cannot clear or stop itself; its exit is the confirmation the native close would give.
+      if (!rdcContextProcessesExited(options.exitedProcesses))
+        throw new AppError('RDC_CLOSE_FAILED', 'the replay processes are still running; ownership is retained.');
+      await options.onDaemonStopped?.({ contextId: this.contextId, stopped: true });
+      forgetOwnedRdcDaemon(this.contextId);
+      return;
+    }
 
     let closeOk = true;
     let closeError = '';

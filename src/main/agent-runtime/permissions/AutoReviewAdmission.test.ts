@@ -26,7 +26,7 @@ const turn = () =>
     agentId: 'general',
     accessCeiling: 'full',
     approved: null,
-    captureBaseline: () => ({ available: false, reason: 'none' }),
+    captureReadiness: () => null,
   });
 function flow(reviewer: PermissionReviewer, admission = turn(), onEvent: (event: AgentEvent) => void = () => {}) {
   return authorizeToolPermission(
@@ -95,8 +95,8 @@ describe('auto-review admission', () => {
     );
   });
 
-  it('gives the model the host facts it cannot settle and does not resample an unchanged refusal', async () => {
-    assessment = { coverage: 'uncovered', facts: [{ check: 'authorized', state: 'unavailable', basis: 'Open.' }] };
+  it('gives the model the host facts of an uncovered action and does not resample an unchanged refusal', async () => {
+    assessment = { coverage: 'uncovered', facts: [{ check: 'identity-current', state: 'holds', basis: 'Held.' }] };
     const reviewer = vi.fn<PermissionReviewer>(async () => ({
       verdict: 'deny',
       failedChecks: ['authorized'],
@@ -130,7 +130,7 @@ describe('auto-review admission', () => {
       );
     };
     beforeEach(() => {
-      assessment = { coverage: 'uncovered', facts: [{ check: 'authorized', state: 'unavailable', basis: 'Open.' }] };
+      assessment = { coverage: 'uncovered', facts: [{ check: 'identity-current', state: 'holds', basis: 'Held.' }] };
     });
 
     it('asks the user exactly once, naming what it could not establish, and runs the approved call', async () => {
@@ -151,7 +151,7 @@ describe('auto-review admission', () => {
       const cards: AgentEvent[] = [];
       const admission = turn();
       await expect(flow(undecidable, admission, answering(false, cards))).rejects.toBeInstanceOf(ToolPermissionDenied);
-      assessment = { coverage: 'uncovered', facts: [{ check: 'authorized', state: 'unavailable', basis: 'Changed.' }] };
+      assessment = { coverage: 'uncovered', facts: [{ check: 'source-bound', state: 'holds', basis: 'Changed.' }] };
       await expect(flow(undecidable, admission, answering(true, cards))).rejects.toBeInstanceOf(ToolPermissionDenied);
       expect(cards).toHaveLength(1);
       expect(undecidable).toHaveBeenCalledOnce();

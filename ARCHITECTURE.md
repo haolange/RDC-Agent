@@ -213,6 +213,12 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 - **RDC context lease**：仅 per-session lease（`setRdcRuntimeContextForSession` / `getRdcContextLease` / `assertRdcContextLeaseOwnership`）。
 - **禁止** RDC global mirror、`legacyGlobalMirror`、`getRdcRuntimeContext` 全局 API。
 - **Capture 所有权**：`ownerSessionId` 不匹配则 fail-closed；不跨 session 继承已打开的 capture。
+- **隔离与自愈**：
+  - 只有回放状态真正不确定时才隔离 owning lease：可能改变回放的调用缺少结果或恢复证明，或进程不再应答（`rdcFailureQuarantines`）。纯读失败如实返回。
+  - 获批回合内，一次调用让 lease 被隔离后，宿主在同一调用里自动恢复（`recoverQuarantinedCapture`）。
+  - 回合启动时，任何计划留下的未闭合位置或故障回放，在模型开跑前由宿主收口（`recoverSessionCapture`）。
+  - `classifyRecovery` 是唯一判官，确认已退出的 daemon 和本应用拥有的卡死 daemon 都可重建；Agent 的恢复次数按回合计。
+  - capture 能否改变的唯一答案是控制器的 `readiness()`，准入、执行与 Capture 面板都读它。
 
 ### 媒体、附件与会话制品
 
@@ -531,7 +537,7 @@ Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 
 - **`S-CLAIM-01`**：compact / report / view 投影 Claim 必须带 `compactProvenance`。
 - **`S-EVIDENCE-01`**：以 `ready` 写入的非投影 observed Claim（含 ClaimSet 各项）必须在 `evidenceIds` 引用至少一条可解引用的 EvidenceRecord；`ready` report 的投影结论经 `compactProvenance` 回指的 observed 源 Claim 同样须满足。草稿可先写后补证据；读回的记录不追溯判定。
 - **`S-CAUSAL-01`**：causal / counterfactual Claim 必须引用可解引用的 `ExperimentRecord`，且该实验 `intervention.type != none`、`status ∈ {recorded, rolled_back}`、`rollback.executed === true`、`rollback.baselineRestored === true`，并存在 verify evidence。
-- **`S-RDC-01`**：mutate 必有 Experiment + exclusive world state + rollback / restored 验证，否则 `polluted` / `stale`。写入时判定一次；实验以已核验的执行证据收口（`recorded` / `rolled_back`）时在同一事务内重判，隔离成立则经 `supersedes` 给 WorldState 与随之 stale 的 Evidence 写新版本，历史版本保留。
+- **`S-RDC-01`**：mutate 必有收口的 Experiment（`recorded` / `rolled_back`，即五份阶段回执已验签，属于同一 owning lease、进程与交互锁）与 rollback / restored 验证，否则 `polluted` / `stale`；WorldState 不记录 Agent 自报的排他标记。写入时判定一次；实验以已核验的执行证据收口（`recorded` / `rolled_back`）时在同一事务内重判，隔离成立则经 `supersedes` 给 WorldState 与随之 stale 的 Evidence 写新版本，历史版本保留。
 - **领域边界**：Analyzer `claimKind` 不越 Observed / Reconstructed / Authoring 层；Optimizer 无 rollback 的 mutate 不得关闭。
 - **事务**：record / manifest / index / supersede / stale-propagation 经 journal / temp-set / commit marker / atomic replace 同一事务；启动恢复只见完整旧版或完整新版；损坏/部分事务显式 `degraded`，不伪装 empty。
 - **读取**：renderer 读取正文的唯一通道是 `investigation:read`；投影携带完整 `contentHash`。
@@ -667,6 +673,7 @@ Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件
   - 终答提交时重新核验相同的引用与合同；用户正文不必重复内部标识。
 - **未完成**：提前终答的缺口返回同一执行；真实停止或阻塞保留对应 disposition。`partial` / `inconclusive` / `blocked` / `cancelled` / `budget_paused` 不伪装 completed，也不能只靠 Hook、模型文本或 `output_register` 完成。
 - **交付**：合同闭合后 General 就地交付报告；需要战略改变时保存缺口，由用户切回 Mission。未继承调查合同的普通 General 不受垂直门禁约束。
+- **结局**：`completed` 与 `partial` 都关闭已批准的执行（partial 是写明不确定点的交付，是否开新一轮由用户决定）。需要用户才能解决的事在回合内用 `ask_user` 解决，`blocked` 不关闭计划，以便继续。
 
 ## Right Rail Authority
 

@@ -22,6 +22,23 @@ RDC-Tool 的 canonical JSON 对原生非有限浮点值使用字符串 `"NaN"`�
 
 管线 stage 拒绝与其他操作共用同一无效果证明判定；主进程不按错误 category 或错误码推断保全。它仍须核对 canonical 结果种类、冻结 owning lease 的版本、context、capture 和 replay 身份；缺失证明、取消或身份漂移仍隔离，失败不产生实验回执。
 
+### 何时隔离 owning lease
+
+隔离只用于回放状态真正不确定的情形。判定集中在 `src/main/rdc/rdcQuarantineDecision.ts` 的 `rdcFailureQuarantines`，依据是调用所处的阶段和冻结目录声明的效果，不看错误 category。
+
+- **不隔离**：
+  - 纯读操作（效果只有 `artifact_write`）收到同一操作的 canonical 原生错误；
+  - 操作开始之前的位置预读收到 canonical 错误；
+  - 调用被取消，RDC-Tool 以未终止 worker 的回执结束，并且被取消的是预读或纯读；
+  - 结果已证明回放状态之后，主进程自身的校验、回执或观测失败。
+- **隔离**：
+  - 进程类失败（worker 卡住或丢失、daemon 丢失或不应答、取消）以及 `daemon_owner_unavailable`；
+  - 会改变位置或 shader 的操作缺少结果或恢复证明；
+  - 结果身份不符；
+  - shader 替换成功，但主进程没能签成回执（这个替换无法经回执回滚）。
+- 保留 lease 的失败在 `mainValidation.basis` 写明依据：`pure-read`、`operation-not-run` 或 `result-proven`。下文的无效果证明与恢复证明规则继续适用。
+- 隔离之后由宿主自动恢复，见「回放隔离与恢复投影」。
+
 ## runtime_context 与宿主控制事实
 
 `runtime_context` 在确认 owning lease 后，按同一 project/session（合法委托使用父 session）核对主进程已打开的 context、captureFileId 和 replaySessionId，并返回 `captureContentSha256`。
@@ -203,7 +220,7 @@ shader replacement 返回一致的 `status=noop`（顶层与 replacement 的身�
 `runtime_context.rdc.hostControls.replayIsolation` 是 Main 对当前受控 context 的点时排他证明，读取实际 owning lease、冻结身份和该 turn 持有的交互锁；非 owning General、漂移、隔离、委派、同 context 重复 lease 或未持锁均返回 unavailable。
 
 - 成功来源固定为 main-owned-lease-and-turn-lock，绑定 session/project/turn/context/leaseVersion/capture/replay，范围仅 rdc-agent-context。
-- `WorldState.replay.exclusiveLock` 在此受控范围内有该来源支撑，仍须三态分别保存并与阶段回执核对；不是整批 native mutex 或外部进程排除证明，不免除实际变更状态及恢复校验。
+- WorldState 不记录 Agent 自报的排他标记：S-RDC-01 的隔离由同一实验通过验签的五份阶段回执证明（同一 owning lease、进程与交互锁），只认 `recorded`／`rolled_back` 的实验（`experimentSatisfiesRdcIsolation`）。
 - context 小结果沿既有制品路径保留 inline 正文和持久 URI/hash；不能据新的证明回填旧实验资格。
 
 远程打开的传输阶段来自 `rd.capture.open_file` 自己的进度帧：只有原生 transfer stage 才显示传输阶段，没有帧不推测进度，也不轮询 daemon status。足迹记录原生 `revision`、实际替换/恢复状态和显示参数。观察无法确认 EID 时保存无图片的失败事实；人工与 Agent 操作统一更新同一当前回放状态和图片，不再保留 Agent 专属图片镜像；实际 image EID 与 observation 元数据来自同一次原生观察。后台操作证据继续保存，不作为第二套回放 UI。
@@ -307,10 +324,15 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 - 历史结果不回填；原模型请求只能通过 owning root General 的 hash-bound `artifact_read.includeRecordedRequest` 从已提交的 SessionContextJournal 生成独立限定来源凭据，再显式授予审查者。
 - 正在执行的 turn 尚未提交，同一 turn 内重复查询不能取回其原请求；不可用时不从 native 参数或其他来源伪造模型请求。
 
-原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。
+原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态。`captureRecoveryStatus` 给出两种入口，都经 `capture:recover` 调用同一个 `recoverSessionCapture`：有未闭合的签名位置时为「恢复原位置」（`restore`）；没有位置可回、但回放被隔离或进入 error 时为「重建回放」（`rebuild`）。获批回合持锁时入口禁用，由宿主自动恢复。
 
 - `runtime_context` 对同一 session/project 的隔离身份返回明确的受控恢复状态，不将仍打开的 capture 误报为未打开，也不向其他 scope 泄露保留的 lease。
-- 新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化：`prepareTurn` 把本会话被隔离的 lease 身份冻结进 binding（其余原生路径照旧拒绝它），获批同一计划的新 turn 在 `ApprovedCaptureController.initialize` 中接续上一 turn 未闭合的签名 baseline（仍是用户的原始位置），以该 lease 上最近一次签名位置为 `lastVerified`，进入待恢复状态：只放行 `capture_recover`，其他现场操作返回 `RDC_CONTEXT_QUARANTINED`；恢复成功后正常工作，终态 `resolved` 以原 baseline 的 turn 签署。不同计划的未闭合 baseline 仍要求先在 Capture 恢复。
+- 新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化：`prepareTurn` 把本会话被隔离的 lease 身份冻结进 binding（其余原生路径照旧拒绝它），获批同一计划的新 turn 在 `ApprovedCaptureController.initialize` 中接续上一 turn 未闭合的签名 baseline（仍是用户的原始位置），以该 lease 上最近一次签名位置为 `lastVerified`，进入待恢复状态：只放行 `capture_recover`，其他现场操作返回 `RDC_CONTEXT_QUARANTINED`；恢复成功后正常工作，终态 `resolved` 以原 baseline 的 turn 签署。
+- 其余情形由宿主在模型开跑之前自愈（`ApprovedCaptureController.initialize` 调用 `RdcCaptureRecovery.recoverSessionCapture`，以本回合持有的交互锁执行）：
+  - 任何计划留下的未闭合 baseline，恢复到它签名的原始位置并写 `resolved`；
+  - 没有 baseline、但 lease 被隔离或打开的回放进入 error 阶段时，按身份链判定后，在同一输入和设备上以新 context 重建；
+  - 之后再观察入口位置，签本回合的 baseline。
+- 自愈失败时回合在模型开跑之前结束（`RdcRecoveryBlockedError`，诊断为 `CONVERSATION_RDC_RECOVERY_BLOCKED`），不让模型对一个不可用的回放调用注定失败的工具。
 - turn 内 lease 被隔离后，`capture_restore` 先要求 `capture_recover`；恢复成功后 restore 在新 lease 上运行，二者不再互相阻塞。
 - 失败没有取得可信恢复证明时仍 fail-closed；恢复通过应用生命周期重新建立 owning capture/replay/context 身份。
 
@@ -338,27 +360,32 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 - 清理期间若 ADB 删除命令失败，Tool 用同一 ADB server 的完整协议响应核验旧转发是否仍在。
 - 确认消失才继续释放，无法确认则保留归属。
 - 身份链无法解释、权限或安装状态无法确认时停止并保留隔离，不伪造恢复。
-- 任务进入前的位置由签名 baseline 记录；中断或重启后未闭合记录在 Capture 显示，由用户触发恢复，不自动续跑模型。
+- 任务进入前的位置由签名 baseline 记录；中断或重启后未闭合记录在 Capture 显示，用户可以直接恢复，下一个获批回合也会在开始时由宿主恢复；恢复不会自动续跑模型。
 - 恢复前复核输入 hash、设备、替换和旧进程（`probeProcess` 按 pid + birth 判断，复用的 pid 不算存活，无法读取的身份不算退出），只有重新观察到原位置才签 resolved。
 - 历史结果不被补签，不跨新旧现场拼接实验。
 
 ### 身份链恢复
 
-恢复准入只有一个函数 `classifyRecovery`（`src/main/rdc/RdcRecoveryClassification.ts`），Agent 的 `capture_recover`（`ApprovedCaptureHost.inspectRecovery` 经 `inspectQuarantinedCapture`）与用户在 Capture 面板的恢复（`restorePreviousCapture`，关闭隔离 context 之前）都用它。输入是主进程最近核验的 daemon/worker 身份（`lastVerified`，随成功结果的 `meta.process_identity` 刷新）、只读 `context status` 与设备动作是否未决：
+恢复准入只有一个函数 `classifyRecovery`（`src/main/rdc/RdcRecoveryClassification.ts`），Agent 的 `capture_recover`（`ApprovedCaptureHost.inspectRecovery` 经 `inspectQuarantinedCapture`）与用户在 Capture 面板的恢复（`recoverSessionCapture`，经 `capture:recover`，关闭隔离 context 之前）都用它。输入是主进程最近核验的 daemon/worker 身份（`lastVerified`，随成功结果的 `meta.process_identity` 刷新）、只读 `context status` 与设备动作是否未决：
 
 | 结论 | 条件 |
 | --- | --- |
 | keep | 核验过的 daemon 与 worker 都存活且身份（pid + start_generation）不变，replay session 存活且没有 `requires_restart` |
-| rebuild | daemon 仍是核验过的那一个；从核验过的 worker 起，每一次 worker 变化都有该 worker 本身的退出回执（`worker_lifecycle` 中 `exit_confirmed` 的 exited 记录，或 session 的 `worker_exit`），replay session 等待重启；`lost` 列出这些已确认退出的 worker 及其原因、trace/request id 与栈日志 |
-| quarantined | 其余一切为 `RDC_RECOVERY_PROCESS_UNEXPLAINED`（daemon 换了或未回答、退出未确认、身份复用、session 自称存活却换了 worker 等）；设备动作未决为 `RDC_DEVICE_ACTION_UNCONFIRMED` |
+| rebuild（worker） | daemon 仍是核验过的那一个；从核验过的 worker 起，每一次 worker 变化都有该 worker 本身的退出回执（`worker_lifecycle` 中 `exit_confirmed` 的 exited 记录，或 session 的 `worker_exit`），replay session 等待重启；`lost` 列出这些已确认退出的 worker 及其原因、trace/request id 与栈日志 |
+| rebuild（daemon） | 核验过的 daemon 未回答状态读取或已被另一个取代：用 pid + 启动世代探测到它与 worker 都已退出为 `daemon-exited`；它未回答、仍在运行且由本应用进程启动（`OwnedRdcDaemonRegistry` 有记录）为 `daemon-stopped`，恢复先按命令行核对后终止它，再确认两者退出（`terminateOwnedRdcContext`） |
+| quarantined | 其余一切为 `RDC_RECOVERY_PROCESS_UNEXPLAINED`（退出未确认、身份复用、session 自称存活却换了 worker、非本应用的 daemon 未回答等）；设备动作未决为 `RDC_DEVICE_ACTION_UNCONFIRMED` |
 
-结论签进恢复 intent 回执；quarantined 立即写 failed 回执并停止，不触碰现场。
+rebuild 的结论签进恢复 intent 回执。quarantined 不触碰现场，也不签 intent，只在生命周期账本记一条判定。daemon 侧的 rebuild 关闭旧 context 时不再调用原生 clear 与 stop：关闭流程以 `exitedProcesses` 重新探测两个进程确已退出，以此代替原生关闭的确认（`releaseFaultedRdcContext`）。
 
 恢复的 transition 回执带 `lostWithProcess`，只记事实、从不声称回滚：旧 replay session 的全部 debug handle 失效；恢复时仍开着的实验（running/polluted）记为 `interrupted-by-infrastructure`，恢复不再等待模型先关闭它们，实验记录本身仍由模型更新；最近核验位置上的 replacement 数与指纹（`rolledBack: false`，随进程丢失）；rebuild 时已确认退出的 worker；`newBaselineRequired: true`。旧 baseline/intervention 回执仍绑定旧进程身份，五阶段验收要求同一 context 与 lease，所以重建后必须重新取 baseline，旧实验不会跨新旧现场拼接。
 
-**卡死的自主处置**：`executeRdcShell` 把 `RDC_OPERATION_STUCK` / `RDC_WORKER_LOST` 经 `registerRdcFault` 登记（原因写明 worker 栈日志路径）。失败交付给模型之前，`ToolExecutorFactory` 对获批 capture 运行 `settleRdcProcessFault`（`src/main/agent-runtime/orchestration/RdcProcessFaultRecovery.ts`）：权限为 full-access 或 auto-review 时，`classifyFault` 只读判定，结论为 rebuild 就以与 `capture_recover` 相同的 prepare + recover（独占资源、同样的签名回执与 runtime epoch）重建，并把 `runtimeRecovery`（新回执、当前位置、需要新 baseline）附在该次失败结果上，turn 继续；结论为 quarantined 或恢复失败时，结果带具体阻塞码，turn 在这次调用后结束，诊断为 `CONVERSATION_RDC_RECOVERY_BLOCKED`，复制详情含阻塞码。其它权限模式只附结论：rebuild/keep 时提示可用 `capture_recover`（照常经审批），quarantined 时报告阻塞码，turn 不中止。每一步恢复（判定、成功、失败）在生命周期账本写一条 `recovery_step`（结论、第几次尝试、阻塞码）。
+**宿主自动恢复**：一次工具调用让 owning lease 进入隔离时（不论原因是卡死的 worker、丢失的 daemon 还是不确定的原生结果），`ToolExecutorFactory` 在这次调用的结果返回之前对获批 capture 运行 `recoverQuarantinedCapture`（`src/main/agent-runtime/orchestration/RuntimeCaptureRecovery.ts`），与权限模式无关：
+- 它以与 `capture_recover` 相同的 prepare + recover（独占资源、同样的签名回执与 runtime epoch）重建，并把 `runtimeRecovery`（新回执、当前位置、需要新 baseline）附在该次结果上，turn 继续。
+- 判定为 quarantined 或恢复失败时，结果带具体阻塞码与出口（`agent-recover`、`ask-user` 或 `restart`，见 `captureExitFor`）。turn 不中止，由 Agent 按出口用 `ask_user` 请用户处理，或稍后再调用 `capture_recover`。
+- 恢复刚重建过的同一故障（操作、参数指纹与错误码相同）紧接着再次出现时，不再重建（`RDC_RECOVERY_REPEATED_FAULT`），出口为 `ask-user`。
+- 每一步恢复（判定、成功、失败）在生命周期账本写一条 `recovery_step`（结论、第几次尝试、阻塞码）。
 
-Agent 恢复的次数是持久预算：`RdcLifecycleReceipts.recoveryAttempts` 从会话里已签名的回执统计同一 {输入、内容 hash、设备} 的恢复 intent（每次尝试一条，失败的另有 failed 回执指向它），跨 turn 与重启有效；达到 `RDC_RECOVERY_ATTEMPT_LIMIT`（2）后 `classifyRecovery` 先于身份链判 `RDC_RECOVERY_BUDGET_EXHAUSTED`。没有内存里的"已恢复过"集合。用户在 Capture 面板发起的恢复每次都是人的明确操作，不计入、也不受此预算限制。
+Agent 恢复的次数按回合计：`RdcLifecycleReceipts.recoveryAttempts` 从会话里已签名的回执统计本回合对同一 {输入、内容 hash、设备} 签下的恢复 intent（每次实际动手一条，失败的另有 failed 回执指向它），重启后仍然有效；达到 `RDC_RECOVERY_ATTEMPT_LIMIT`（2）后 `classifyRecovery` 先于身份链判 `RDC_RECOVERY_BUDGET_EXHAUSTED`。被拒的判定不签 intent，因此不消耗次数。新回合重新计数。没有内存里的"已恢复过"集合。用户在 Capture 面板发起的恢复每次都是人的明确操作，不计入、也不受此预算限制。
 
 获批调查的 `turn_complete` 在记录声明前检查入口位置是否恢复；现场无法核验时，把主进程观察到的错误返回工具调用，让模型据此如实声明 partial／blocked 及剩余恢复，而不是先接受声明再要求它猜测错误。终答仍重新核验恢复状态；已声明的 partial 不升级为成功，恢复回执仍以实际现场为准。
 

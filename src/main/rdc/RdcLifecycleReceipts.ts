@@ -195,16 +195,19 @@ export class RdcLifecycleReceipts {
    * Recovery attempts on one approved input, content and device across every turn of the session: each signed recovery
    * intent is an attempt, and `failed` counts the attempts whose signed failed receipt names that intent.
    */
+  /** Recoveries this turn started on the destination; a refused classification signs no intent and is not one. */
   recoveryAttempts(
     sessionId: string,
     projectId: string,
     destination: { inputId: string; contentSha256: string; deviceId: string },
+    turnId: string,
   ): { attempts: number; failed: number } {
     const values = this.readAll(sessionId, projectId);
     const intents = values.filter(
       ({ value }) =>
         value.event === 'intent' &&
         !!value.recovery &&
+        value.turnId === turnId &&
         value.destination?.inputId === destination.inputId &&
         value.destination.contentSha256 === destination.contentSha256 &&
         value.destination.deviceId === destination.deviceId,

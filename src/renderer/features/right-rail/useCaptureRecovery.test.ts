@@ -4,9 +4,9 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { AppError, errorCodeOf } from '@shared/errors/appError';
 import { useCaptureRecovery } from './useCaptureRecovery';
-import { getCaptureRecovery, restorePreviousCapture } from './capturePanelActions';
+import { getCaptureRecovery, recoverCapture } from './capturePanelActions';
 
-vi.mock('./capturePanelActions', () => ({ getCaptureRecovery: vi.fn(), restorePreviousCapture: vi.fn() }));
+vi.mock('./capturePanelActions', () => ({ getCaptureRecovery: vi.fn(), recoverCapture: vi.fn() }));
 const scope = { projectId: 'p', sessionId: 's' };
 
 it('discards stale status reads and only requests recovery on explicit action', async () => {
@@ -22,10 +22,11 @@ it('discards stale status reads and only requests recovery on explicit action', 
       }),
     )
     .mockResolvedValue({
+      kind: 'restore',
       pendingCount: 1,
       original: { inputId: 'new', fileName: 'new.rdc', deviceId: 'local', eventId: 7 },
     });
-  vi.mocked(restorePreviousCapture)
+  vi.mocked(recoverCapture)
     .mockReset()
     .mockRejectedValue(new AppError('RDC_RECOVERY_OLD_PROCESS_UNCONFIRMED', 'old process still alive'));
   function Probe({ revision }: { revision: number }) {
@@ -34,10 +35,14 @@ it('discards stale status reads and only requests recovery on explicit action', 
       'button',
       {
         onClick: () => {
-          void recovery.restore(3);
+          void recovery.recover(3);
         },
       },
-      recovery.error ? errorCodeOf(recovery.error.reason) : (recovery.status?.original?.fileName ?? 'none'),
+      recovery.error
+        ? errorCodeOf(recovery.error.reason)
+        : recovery.status?.kind === 'restore'
+          ? (recovery.status.original?.fileName ?? 'none')
+          : 'none',
     );
   }
   try {
@@ -45,12 +50,16 @@ it('discards stale status reads and only requests recovery on explicit action', 
     await act(async () => root.render(createElement(Probe, { revision: 2 })));
     expect(host.textContent).toBe('new.rdc');
     await act(async () =>
-      finish({ pendingCount: 1, original: { inputId: 'old', fileName: 'old.rdc', deviceId: 'local', eventId: 1 } }),
+      finish({
+        kind: 'restore',
+        pendingCount: 1,
+        original: { inputId: 'old', fileName: 'old.rdc', deviceId: 'local', eventId: 1 },
+      }),
     );
     expect(host.textContent).toBe('new.rdc');
-    expect(restorePreviousCapture).not.toHaveBeenCalled();
+    expect(recoverCapture).not.toHaveBeenCalled();
     await act(async () => host.querySelector('button')!.click());
-    expect(restorePreviousCapture).toHaveBeenCalledExactlyOnceWith({ ...scope, bindingGeneration: 3 });
+    expect(recoverCapture).toHaveBeenCalledExactlyOnceWith({ ...scope, bindingGeneration: 3 });
     expect(host.textContent).toBe('RDC_RECOVERY_OLD_PROCESS_UNCONFIRMED');
   } finally {
     act(() => root.unmount());

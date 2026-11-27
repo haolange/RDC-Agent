@@ -37,6 +37,7 @@ const mock = vi.hoisted(() => ({
 vi.mock('../../rdc/RdcSessionService', () => ({
   rdcSessionService: {
     snapshotReplayForSession: mock.state,
+    currentAgentObservation: async (scope: unknown) => mock.state(scope),
     snapshotOpenedCaptureForSession: mock.opened,
     openProjectInput: mock.open,
     clearOpenedCaptureForSession: mock.close,
@@ -186,7 +187,10 @@ it('checks quarantined process identity and reconnects the same device under unc
   });
   expect(mock.status).toHaveBeenCalledWith(expect.objectContaining({ contextId: 'ctx', settings: cli }));
   const guard = host.recoveryGuard(1);
-  await host.reopenAfterFailure(destination, binding, undefined, () => {}, guard);
+  await host.reopenAfterFailure(destination, binding, undefined, () => {}, guard, {
+    classification: { decision: 'keep', reason: 'verified-processes-live' },
+    processes: processIdentity,
+  });
   expect(mock.close).toHaveBeenCalledWith(
     expect.objectContaining({ sessionId: 's' }),
     expect.objectContaining({ binding, expectedGeneration: 3 }),
@@ -210,13 +214,13 @@ it('checks quarantined process identity and reconnects the same device under unc
   expect(await host.inspectRecovery(point, binding)).toMatchObject({
     classification: { decision: 'quarantined', code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED' },
   });
-  // Attempts are counted from the signed receipts of every earlier turn, not from this controller's memory.
+  // Attempts are counted from this turn's signed receipts, not from the controller's memory.
   mock.attempts.mockReturnValueOnce({ attempts: 2, failed: 1 });
   mock.status.mockResolvedValueOnce(stuckContextStatus());
   expect(await host.inspectRecovery(point, binding)).toMatchObject({
     classification: { decision: 'quarantined', code: 'RDC_RECOVERY_BUDGET_EXHAUSTED' },
   });
-  expect(mock.attempts).toHaveBeenLastCalledWith('s', 'p', destination);
+  expect(mock.attempts).toHaveBeenLastCalledWith('s', 'p', destination, 't');
 });
 afterEach(() => {
   clearRdcContextLeases();

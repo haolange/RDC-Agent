@@ -39,7 +39,7 @@ vi.mock('./useCaptureReplay', () => ({
   }),
 }));
 vi.mock('./useCaptureRecovery', () => ({
-  useCaptureRecovery: () => ({ status: state.recovery, error: null, restore: state.restoreRecovery }),
+  useCaptureRecovery: () => ({ status: state.recovery, error: null, recover: state.restoreRecovery }),
 }));
 vi.mock('./useCapturePreview', () => ({
   useCapturePreview: (_scope: unknown, source: { imagePath?: string | null }) => ({
@@ -148,6 +148,7 @@ beforeEach(() => {
 describe('populated session rail', () => {
   it('shows the saved position and requires an explicit unlocked restore action', async () => {
     state.recovery = {
+      kind: 'restore',
       pendingCount: 1,
       original: { inputId: 'input', fileName: 'Scene.rdc', deviceId: 'local', eventId: 21 },
     };
@@ -167,6 +168,28 @@ describe('populated session rail', () => {
       state.replay = { ...replay(), interactionLock: null, revision: 2 };
       await act(async () => root.render(createElement(SessionRightRail)));
       expect(button()?.disabled).toBe(false);
+      await act(async () => button()!.click());
+      expect(state.restoreRecovery).toHaveBeenCalledExactlyOnceWith(1);
+    } finally {
+      act(() => root.unmount());
+    }
+  });
+  it('offers a rebuild for an isolated replay with no saved position, held back while the investigation owns it', async () => {
+    state.recovery = { kind: 'rebuild', input: { inputId: 'input', fileName: 'Scene.rdc', deviceId: 'local' } };
+    state.replay = { ...replay(), interactionLock: 'agent_running' };
+    const host = document.createElement('div');
+    const root = createRoot(host);
+    const button = () =>
+      [...host.querySelectorAll('button')].find((entry) => entry.textContent === 'control.replay.rebuildAction');
+    try {
+      await act(async () => root.render(createElement(SessionRightRail)));
+      openRailTab(host, 4);
+      expect(host.textContent).toContain('control.replay.rebuildOwned');
+      expect(button()?.disabled).toBe(true);
+      state.replay = { ...replay(), interactionLock: null, revision: 2 };
+      await act(async () => root.render(createElement(SessionRightRail)));
+      expect(host.textContent).toContain('control.replay.rebuildPending');
+      expect(host.textContent).toContain('control.replay.rebuildDescription');
       await act(async () => button()!.click());
       expect(state.restoreRecovery).toHaveBeenCalledExactlyOnceWith(1);
     } finally {

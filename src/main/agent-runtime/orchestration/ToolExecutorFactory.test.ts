@@ -246,6 +246,76 @@ describe('ToolExecutorFactory', () => {
     }
   });
 
+  it('has the host recover a replay the call left quarantined and reports it beside the result', async () => {
+    runtimePermissionStateService.commitMode('auto-review');
+    let isolated = false;
+    const recover = vi.fn(async () => ({
+      changed: true,
+      receipt: { uri: 'session://tool-outputs/rebuilt.json', expectedHash: `sha256:${'a'.repeat(64)}` },
+      current: { inputId: 'a', deviceId: 'local', native: { eventId: 9 } },
+    }));
+    const turn = {
+      generation: 1,
+      isLive: () => true,
+      captureControl: {
+        assertLiveAccess: vi.fn(),
+        quarantined: () => isolated,
+        prepareRecovery: vi.fn(async () => {}),
+        recover,
+      },
+      runtimePlan: null,
+    };
+    const tool = {
+      name: 'rdc_probe',
+      description: 'probe',
+      parameters: { type: 'object', properties: {} },
+      spec: RDC_PROBE_TOOL_SPEC,
+      execute: vi.fn(async () => {
+        isolated = true;
+        throw new Error('RDC_CLI_PROTOCOL: native result was truncated.');
+      }),
+    };
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as never,
+      deferredActivation: {} as never,
+      activeTurns: { getActiveTurn: () => turn as never },
+      tools: {
+        resolveRuntimeTools: () => ({
+          toolMap: new Map([['rdc_probe', tool]]) as never,
+          definitions: [],
+          deferredDefinitions: [],
+        }),
+      },
+      toolPolicy: { isAllowedForRuntime: () => true, matchesToolAllowlist: () => true },
+    });
+    vi.spyOn(factory, 'triggerRuntimeHooks').mockResolvedValue({ allowed: true });
+    permissionEvaluate.mockReturnValue({ action: 'allow', risk: 'low', temporaryPathRoots: [] } as never);
+    const executor = preparedExecutor(factory, 'general', ['rdc_probe'], 'auto-recovery', {
+      sessionId: 'auto-recovery',
+      turnId: 'turn',
+      projectId: 'p',
+      projectRootPath: process.cwd(),
+      effectivePlan: {
+        routeCapability: TEST_ROUTE_CAPABILITY,
+        toolAllowlist: ['rdc_probe'],
+        skillIntersection: null,
+        activatedDeferredTools: ['rdc_probe'],
+        accessCeiling: 'full',
+      } as never,
+    });
+    const result = await executor.execute({
+      id: 'probe',
+      type: 'toolCall',
+      name: 'rdc_probe',
+      arguments: { action: 'probe', args: { action: 'event_list' } },
+    });
+    expect(result.isError).toBe(true);
+    expect(recover).toHaveBeenCalledOnce();
+    expect(result.details).toMatchObject({
+      runtimeRecovery: { status: 'rebuilt', current: { eventId: 9 }, newBaselineRequired: true },
+    });
+  });
+
   it('joins a faulted child only after authorization and before waiting for the recovery resource', async () => {
     runtimePermissionStateService.commitMode('full-access');
     const prepareRecovery = vi.fn(async () => {});
@@ -253,7 +323,7 @@ describe('ToolExecutorFactory', () => {
     const turn = {
       generation: 1,
       isLive: () => true,
-      captureControl: { prepareRecovery, assertLiveAccess: vi.fn() },
+      captureControl: { prepareRecovery, assertLiveAccess: vi.fn(), quarantined: vi.fn(() => false) },
       runtimePlan: null,
     };
     const tool = {

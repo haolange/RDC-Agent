@@ -60,7 +60,7 @@ export function createCaptureApi(transport: RendererApiTransport): CaptureApi {
     readLivePreview: (scope) => transport.invoke('capture:readLivePreview', scope),
     getReplayState: (scope) => transport.invoke('capture:getReplayState', scope),
     getRecovery: (scope) => transport.invoke('capture:getRecovery', scope),
-    restorePrevious: (scope) => transport.invoke('capture:restorePrevious', scope),
+    recover: (scope) => transport.invoke('capture:recover', scope),
     applyReplayEvent: (request) => transport.invoke('capture:applyReplayEvent', request),
     refreshFrame: (scope) => transport.invoke('capture:refreshFrame', scope),
     list: (scope) => transport.invoke('capture:list', scope),

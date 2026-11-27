@@ -96,7 +96,7 @@ describe('InvestigationArtifactService transactions', () => {
           summary: 'txn fault',
           record: {
             ...exclusiveWorld('ws-txn', true),
-            replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
+            replay: { adapter: 'vk', driver: 'adreno', device: 'device-0' },
           },
           supersedes: world.manifest.artifactId,
         }),

@@ -1,15 +1,10 @@
 import path from 'node:path';
 import { beforeEach, expect, it, vi } from 'vitest';
-const mock = vi.hoisted(() => ({ offer: vi.fn(), plan: vi.fn(), receipt: vi.fn(), lifecycle: vi.fn() }));
+const mock = vi.hoisted(() => ({ offer: vi.fn(), plan: vi.fn(), receipt: vi.fn() }));
 vi.mock('../../sessions/store/sessionStores', () => ({ executionOfferStore: { read: mock.offer } }));
 vi.mock('../../sessions/run/sessionPlanArtifact', () => ({ planArtifactWriter: { readMarkdown: mock.plan } }));
 vi.mock('../../rdc/RdcExecutionReceipts', () => ({ rdcExecutionReceipts: { read: mock.receipt } }));
-vi.mock('../../rdc/RdcLifecycleReceipts', () => ({ rdcLifecycleReceipts: { read: mock.lifecycle } }));
-import {
-  permissionReviewAuthority,
-  verifiedCaptureBaseline,
-  permissionReviewEvidence,
-} from './PermissionReviewAuthority';
+import { permissionReviewAuthority, permissionReviewEvidence } from './PermissionReviewAuthority';
 const input: Parameters<typeof permissionReviewAuthority>[0] = {
   sessionId: 'isolated-child',
   messages: [
@@ -23,37 +18,6 @@ const input: Parameters<typeof permissionReviewAuthority>[0] = {
   agentId: 'general',
 };
 beforeEach(() => vi.clearAllMocks());
-it("admits only the owning turn's signature-verified capture baseline", () => {
-  const ref = { uri: 'session://tool-outputs/baseline.json', expectedHash: `sha256:${'a'.repeat(64)}` };
-  const original = { inputId: 'capture', target: null };
-  const controller = { restorationBaselineFor: vi.fn(() => ({ available: true, receipt: ref, original })) } as never;
-  const scope = {
-    controller,
-    sessionId: 'session',
-    projectId: 'project',
-    turnId: 'turn',
-    agentId: 'general',
-    accessCeiling: 'full' as const,
-  };
-  mock.lifecycle.mockReturnValue({ event: 'baseline', projectId: 'project', turnId: 'turn', original });
-  expect(verifiedCaptureBaseline(scope)).toEqual({ available: true, ref, original });
-  expect(mock.lifecycle).toHaveBeenCalledWith('session', ref);
-  mock.lifecycle.mockReturnValueOnce({ event: 'baseline', projectId: 'project', turnId: 'other', original });
-  expect(() => verifiedCaptureBaseline(scope)).toThrow('PERMISSION_REVIEW_EVIDENCE_INVALID');
-  mock.lifecycle.mockImplementationOnce(() => {
-    throw new Error('RDC_LIFECYCLE_RECEIPT_INVALID');
-  });
-  expect(() => verifiedCaptureBaseline(scope)).toThrow('RDC_LIFECYCLE_RECEIPT_INVALID');
-  vi.mocked(
-    (controller as unknown as { restorationBaselineFor: ReturnType<typeof vi.fn> }).restorationBaselineFor,
-  ).mockReturnValueOnce(null);
-  mock.lifecycle.mockClear();
-  expect(verifiedCaptureBaseline({ ...scope, agentId: 'verifier' })).toEqual({
-    available: false,
-    reason: 'RDC_EXECUTION_DENIED',
-  });
-  expect(mock.lifecycle).not.toHaveBeenCalled();
-});
 it('excludes model claims and derived context and never reads another session history', () => {
   const authority = permissionReviewAuthority(input);
   expect(authority).toContain('Actual request');

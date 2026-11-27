@@ -55,6 +55,8 @@ function fixture() {
     assertPlan: vi.fn(),
     pendingRecord: vi.fn(() => null),
     quarantinedContext: vi.fn(() => quarantined),
+    sessionFaulted: vi.fn(() => false),
+    recoverSession: vi.fn(async () => {}),
     prepareReceipts: vi.fn(),
     quiescent: vi.fn(async () => ({ openExperiments: [] })) as ApprovedCaptureHost['quiescent'],
     snapshot: vi.fn(async () => (current ? structuredClone(current) : null)),
@@ -290,7 +292,7 @@ it('distinguishes a verified empty baseline from an initialization failure', asy
   vi.mocked(failed.host.prepareReceipts).mockImplementationOnce(() => {
     throw new Error('signing failed');
   });
-  await failed.controller.initialize();
+  await expect(failed.controller.initialize()).rejects.toThrow('signing failed');
   expect(failed.controller.restorationBaselineFor(owner)).toEqual({
     available: false,
     reason: 'RDC_INITIAL_STATE_UNVERIFIED',
@@ -375,13 +377,22 @@ it('does not reopen when the permission or verification guard fails', async () =
   expect(f.receipts.map((value) => value.event)).toEqual(['baseline']);
 });
 
-it('blocks live RDC access if an earlier saved position remains unresolved', async () => {
+it('has the host recover an earlier plan position or a faulted replay before signing its own baseline', async () => {
   const f = fixture();
-  vi.mocked(f.host.pendingRecord).mockReturnValue(pendingRecord('session://plans/other.md'));
+  vi.mocked(f.host.pendingRecord).mockReturnValueOnce(pendingRecord('session://plans/other.md'));
   await f.controller.initialize();
-  expect(() => f.controller.assertLiveAccess()).toThrow('RDC_PREVIOUS_RESTORE_REQUIRED');
-  expect(f.host.snapshot).not.toHaveBeenCalled();
-  expect(f.receipts).toHaveLength(0);
+  expect(f.host.recoverSession).toHaveBeenCalledOnce();
+  expect(f.receipts.map((value) => value.event)).toEqual(['baseline']);
+  expect(() => f.controller.assertLiveAccess()).not.toThrow();
+
+  const faulted = fixture();
+  vi.mocked(faulted.host.sessionFaulted).mockReturnValueOnce(true);
+  vi.mocked(faulted.host.recoverSession).mockRejectedValueOnce(new Error('RDC_RECOVERY_PROCESS_UNEXPLAINED'));
+  // A recovery that fails ends the turn before any tool runs; nothing is signed.
+  await expect(faulted.controller.initialize()).rejects.toThrow('RDC_RECOVERY_PROCESS_UNEXPLAINED');
+  expect(faulted.host.snapshot).not.toHaveBeenCalled();
+  expect(faulted.receipts).toHaveLength(0);
+  expect(() => faulted.controller.assertLiveAccess()).toThrow('RDC_INITIAL_STATE_UNVERIFIED');
 });
 
 function pendingRecord(planUri = 'session://plans/p.md') {
@@ -480,7 +491,7 @@ it('recovers from the latest process identity a successful result reported, not 
   });
 });
 
-it('signs an unexplained process change as a failed recovery attempt without reopening', async () => {
+it('refuses an unexplained process change without reopening, signing or spending an attempt', async () => {
   const f = fixture();
   await f.controller.initialize();
   vi.mocked(f.host.inspectRecovery).mockResolvedValueOnce({
@@ -501,9 +512,7 @@ it('signs an unexplained process change as a failed recovery attempt without reo
   await f.controller.prepareRecovery(1);
   await expect(f.controller.recover()).rejects.toThrow('RDC_RECOVERY_PROCESS_UNEXPLAINED');
   expect(f.host.reopenAfterFailure).not.toHaveBeenCalled();
-  expect(f.receipts.map((value) => value.event)).toEqual(['baseline', 'intent', 'failed']);
-  expect(f.receipts[1]).toMatchObject({ recovery: { classification: { decision: 'quarantined' } } });
-  expect(f.receipts[2]).toMatchObject({ code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED' });
+  expect(f.receipts.map((value) => value.event)).toEqual(['baseline']);
   expect(f.ledger).toEqual([
     {
       kind: 'recovery_step',
@@ -514,7 +523,6 @@ it('signs an unexplained process change as a failed recovery attempt without reo
       errorCode: 'RDC_RECOVERY_PROCESS_UNEXPLAINED',
     },
   ]);
-  expect(f.host.quarantineChanged).toHaveBeenCalled();
 });
 
 it('records what a rebuild lost with the old process without claiming a rollback', async () => {

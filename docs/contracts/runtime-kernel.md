@@ -445,6 +445,7 @@ handoff 名称来自声明的 `label` 与可选 `labelTranslations`（`zh-CN` / 
 - 提交成功后写入 `TurnHandle.approvedPlan`（`approvedHash` + target + frozenUri），返回 `{ session: { record, revision }, planReview, handoff: { prompt, send } }`；失败经 IPC 统一错误出口返回登记码，renderer 不再为批准另发 Agent 切换、模型保存或配置提交请求。
 - 审批决定的时间权威是匹配 `plan-state` 在 approved 状态下的 `updatedAt`；offer 的 `approvedAt` 从该值生成，后续声明交接必须保留同一批准的时间，不能用点击交接的当前时间补写。
 - prepareTurn 在核对批准状态、target 与计划 URI/hash 后，从该决定投影原时间（epoch milliseconds 与 UTC）到已批准交接事实；历史 offer 的错误交接时间不覆盖审批决定，也不重写历史记录，供执行者核对计划期限，后续回合、重试和重启不续预算。
+- 执行回合以 `completed` 或 `partial` 结束时，会话上下文日志写入 `approvedExecutionCompletion`，offer 随之关闭（`ConversationTurnRunner.terminalContextEntry`）。partial 是写明了不确定点的交付，是否开新一轮由用户决定。`blocked` 不关闭 offer，计划保持开启以便继续。
 - 回合成功终态把冻结 `profileHandoffs` 中 `surface` 为 `turn-end`（或省略）的声明快照到 assistant `handoffSuggestions`。
 - `plan-gate` 只出现在计划门。
 - 无声明即无按钮。
@@ -725,7 +726,7 @@ Agent 只绑定同安装捆绑 Python（按宿主布局，见 docs/architecture/
 
 主子可见工作过程共享终态收束：完成、失败和停止冻结所属 loop 与思考状态；未执行工具标为 skipped，已启动但无回执的工具明确失败，不推造成功。独立 Task 生命周期不因父执行完成而终止。模型输入包装不承担产品标题或正文的结构契约。
 
-任务依赖准入与等待投影共用 taskDependencyWait：依赖须 completed/disposition=completed，需要执行的任务还须匹配当前任务 ID、revision、currentExecutionId 的 completed 执行与结果。waitingOn 只描述 pending 的依赖等待，不转换为 blocked，不放宽准入。事件快照在已有写锁中读取任务/执行，右栏通过一致性读取获取同一对数据，不嵌套存储锁。blockedBy 表示先后依赖；正常等待不应写成 blocked。
+任务依赖准入与等待投影共用 taskDependencyWait：依赖须 completed/disposition=completed，需要执行的任务还须匹配当前任务 ID、revision、currentExecutionId 的 completed 执行与结果；当前 revision 的 partial 执行若带有效结果引用（`isPartialDelivery`），同样满足依赖，下游带着它写明的不确定点继续。waitingOn 只描述 pending 的依赖等待，不转换为 blocked，不放宽准入。事件快照在已有写锁中读取任务/执行，右栏通过一致性读取获取同一对数据，不嵌套存储锁。blockedBy 表示先后依赖；正常等待不应写成 blocked。
 
 自动审查见 [permissions.md](permissions.md)「自动审查」；硬性 policy/user floor、Task 准入、Skill 工具交集与 owning lease 均不被准入或审核批准替代。有效 profile 的声明交接及 requiredSkillIds 必须呈现在 PromptPlan，批准后的声明变更需重新审阅，不能沿用旧 offer 改写准备合同。
 

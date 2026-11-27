@@ -537,7 +537,10 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
     };
   }
 
-  /** The turn's session-context entry; a completed approved execution records the plan it completed. */
+  /**
+   * The turn's session-context entry. An approved execution that delivered, completed or partial, records the plan it
+   * closed: a partial answer is a delivery whose uncertainty is stated, and whether to start a new round is the user's.
+   */
   private terminalContextEntry(terminalStatus: TurnTerminalContext['status'], capturedContext: TurnTerminalContext) {
     const { input } = this;
     const approvedExecution = input.preparedTurn.runtime.approvedExecution;
@@ -555,7 +558,7 @@ class ConversationTurnCompletion implements AgentEventTurn, TurnStreamState {
       completedAt: this.assistantMessage.updatedAt ?? nowMs(),
       ...(terminalStatus === 'complete' &&
       capturedContext.status === 'complete' &&
-      this.terminalContext?.completionDeclaration?.disposition === 'completed' &&
+      deliversApprovedGoal(this.terminalContext?.completionDeclaration?.disposition) &&
       approvedExecution
         ? {
             approvedExecutionCompletion: {
@@ -768,7 +771,7 @@ function outputSummary(llmDiagnostic: ConversationMessageDiagnostic | null, appr
     case 'CONVERSATION_TASK_COMPLETION_DENIED':
       return 'An unfinished direct Task prevented turn completion.';
     case 'CONVERSATION_RDC_RECOVERY_BLOCKED':
-      return 'A stuck replay could not be rebuilt automatically; the turn stopped on its blocker.';
+      return 'The replay could not be recovered before the model started; the turn stopped on its blocker.';
     case 'CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION':
       return 'Provider stream protocol integrity check failed.';
     case 'MISSION_COMPLETION_DENIED':
@@ -792,4 +795,9 @@ export async function completeProfileTurn(
   } finally {
     await turn.finish();
   }
+}
+
+/** Dispositions that close an approved execution; a blocked turn leaves the plan open to continue. */
+function deliversApprovedGoal(disposition: string | undefined): boolean {
+  return disposition === 'completed' || disposition === 'partial';
 }

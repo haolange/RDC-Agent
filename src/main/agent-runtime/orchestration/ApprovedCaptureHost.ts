@@ -4,7 +4,6 @@ import {
   assertRdcContextLeaseOwnership,
   getDelegatedChildSessionId,
   getRdcContextLease,
-  quarantinedRdcContextLease,
   registerRdcFault,
 } from '../../rdc/RdcRuntimeContextRegistry';
 import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
@@ -25,7 +24,7 @@ import { TaskRegistry, createSessionTaskStore } from '../tasks';
 import { listActiveDelegations } from './DirectTaskTurnLifecycle';
 import { prepareRdcRuntimeEpoch } from './RdcRuntimeReprepare';
 import { joinFaultedRdcChild } from './RdcRecoveryChildren';
-import { inspectQuarantinedCapture, reopenQuarantinedCapture } from './ApprovedCaptureRecovery';
+import { inspectQuarantinedCapture, reopenQuarantinedCapture, sessionRecoveryHost } from './ApprovedCaptureRecovery';
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
 import type { InvestigationPlanContract } from '../../sessions/run/investigationPlanContract';
 import type { ExecutionOffer } from '../../sessions/run/executionOffer';
@@ -92,10 +91,7 @@ export function createApprovedCaptureHost(input: {
   return {
     assertPlan,
     pendingRecord: () => rdcLifecycleReceipts.pending(input.sessionId, input.projectId),
-    quarantinedContext() {
-      const lease = quarantinedRdcContextLease(scope);
-      return lease ? { contextId: lease.contextId, leaseVersion: lease.version } : null;
-    },
+    ...sessionRecoveryHost(scope, input.turn.turnId),
     prepareReceipts: () => rdcLifecycleReceipts.prepare(),
     async quiescent(mode) {
       assertOwningTurn();
@@ -115,8 +111,8 @@ export function createApprovedCaptureHost(input: {
       return { openExperiments: open };
     },
     async snapshot(binding, signal) {
+      const state = await rdcSessionService.currentAgentObservation(scope, binding.cli);
       assertOwningTurn();
-      const state = rdcSessionService.snapshotReplayForSession(scope);
       const lease = getRdcContextLease(input.sessionId);
       const opened = rdcSessionService.snapshotOpenedCaptureForSession(scope);
       if (!lease && !opened && !binding.identity && !state.inputId) return null;
@@ -211,20 +207,20 @@ export function createApprovedCaptureHost(input: {
     },
     async inspectRecovery(point, binding, signal) {
       assertPlan();
-      return inspectQuarantinedCapture({ ...scope, point, binding, signal, resolve });
+      return inspectQuarantinedCapture({ ...scope, turnId: input.turn.turnId, point, binding, signal, resolve });
     },
-    async reopenAfterFailure(destination, binding, signal, onStopped, guard) {
+    async reopenAfterFailure(destination, binding, signal, onStopped, guard, fault) {
       guard();
-      const resolved = await resolve(destination);
       await reopenQuarantinedCapture({
         ...scope,
         turnId: input.turn.turnId,
         destination,
-        resolved,
+        resolved: await resolve(destination),
         binding,
         signal,
         onStopped,
         guard,
+        fault,
       });
     },
     async reprepare(previous, signal) {

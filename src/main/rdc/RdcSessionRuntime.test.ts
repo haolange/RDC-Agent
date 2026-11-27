@@ -28,10 +28,11 @@ vi.mock('../runtime/RuntimeLogService', () => ({ runtimeLogService: { log: vi.fn
 vi.mock('../tools/ShellInvocationService', () => ({
   shellInvocationService: { hasUnconfirmedProcesses: () => false },
 }));
-const ownership = vi.hoisted(() => ({ remember: vi.fn(), forget: vi.fn() }));
+const ownership = vi.hoisted(() => ({ remember: vi.fn(), forget: vi.fn(), exited: vi.fn(() => true) }));
 vi.mock('./OwnedRdcDaemonRegistry', () => ({
   rememberOwnedRdcDaemon: ownership.remember,
   forgetOwnedRdcDaemon: ownership.forget,
+  rdcContextProcessesExited: ownership.exited,
 }));
 const request: OpenProjectInputRequest = {
   projectId: 'project',
@@ -289,6 +290,26 @@ it('retains ownership when daemon stop fails after replay clear', async () => {
     expect.objectContaining({ contextId: id }),
   );
   expect(ownership.forget).toHaveBeenCalledWith(id);
+});
+
+it('closes a context whose verified processes exited without native calls, and only when they did', async () => {
+  const runtime = new RdcSessionRuntime();
+  await runtime.openProjectInput(request);
+  const id = runtime.getContextId();
+  const exitedProcesses = {
+    daemon: { pid: 10, start_generation: 'linux-boot:1' },
+    worker: { pid: 11, start_generation: 'linux-boot:2' },
+  };
+  nativeStop.mockClear();
+  ownership.exited.mockReturnValueOnce(false);
+  await expect(runtime.clearOpenedCaptureForSession(scope, { exitedProcesses })).rejects.toThrow('still running');
+  expect(runtime.getContextId()).toBe(id);
+  const onDaemonStopped = vi.fn();
+  await runtime.clearOpenedCaptureForSession(scope, { exitedProcesses, onDaemonStopped });
+  expect(nativeStop).not.toHaveBeenCalled();
+  expect(onDaemonStopped).toHaveBeenCalledWith({ contextId: id, stopped: true });
+  expect(ownership.forget).toHaveBeenCalledWith(id);
+  expect(runtime.getContextId()).toBeNull();
 });
 
 it('rejects wrong-context clear without stopping any daemon', async () => {

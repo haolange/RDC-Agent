@@ -119,6 +119,8 @@ export type WorkProcessRow =
       /** Human-readable one-line diagnostic for failed tools (never the raw JSON envelope). */
       diagnosticCaption?: string;
       hookDiagnostics?: import('@shared/types/conversation').ConversationToolCall['hookDiagnostics'];
+      /** One sentence on the host's recovery of the replay this call left isolated. */
+      recovery?: { text: string; tone: 'success' | 'warning' };
       approval?: WorkProcessToolApproval;
       /** Search results, or the one page a read targets; each renders as a pill (favicon + title). */
       webPages?: WorkProcessWebPage[];

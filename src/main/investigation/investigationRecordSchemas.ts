@@ -58,7 +58,6 @@ export const WorldStateSchema: ZodType<WorldState> = z
         adapter: nonEmpty,
         driver: nonEmpty,
         device: nonEmpty,
-        exclusiveLock: z.boolean(),
       })
       .strict(),
     shaderReplacement: z
@@ -89,7 +88,8 @@ export const WorldStateSchema: ZodType<WorldState> = z
         .object({
           warmup: z.number().nonnegative(),
           resolution: nonEmpty,
-          vsync: z.boolean(),
+          // A replayed frame has no presentation, so its vsync may be stated as unverified rather than guessed.
+          vsync: z.union([z.boolean(), z.object({ status: z.literal('unverified'), reason: nonEmpty }).strict()]),
           samplingProtocol: nonEmpty,
         })
         .strict(),

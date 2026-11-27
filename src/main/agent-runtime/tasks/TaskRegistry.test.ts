@@ -176,6 +176,33 @@ describe('TaskRegistry', () => {
     expect(unblocked.map((task) => task.id)).toEqual([b.id]);
   });
 
+  it('unlocks dependents of a partial result that carries a deliverable reference', async () => {
+    const registry = await createRegistry();
+    const a = await registry.createTask('A');
+    const b = await registry.createTask('B', { blockedBy: [a.id] });
+    const execution = await registry.startExecution(a.id, { mode: 'direct' });
+    await registry.settleExecution(execution.id, {
+      status: 'partial',
+      expectedGeneration: execution.generation,
+      result: { disposition: 'partial', summary: 'Located the draw; cause uncertain.', outputs: {} },
+    });
+    // Without a deliverable reference there is nothing for the dependent to build on.
+    expect(await registry.canStart(b.id)).toBe(false);
+    const again = await registry.startExecution(a.id, { mode: 'direct' });
+    await registry.settleExecution(again.id, {
+      status: 'partial',
+      expectedGeneration: again.generation,
+      result: {
+        disposition: 'partial',
+        summary: 'Located the draw; cause uncertain.',
+        outputs: {},
+        resultRef: 'session://investigation/report.json',
+        resultHash: `sha256:${'a'.repeat(64)}`,
+      },
+    });
+    expect(await registry.canStart(b.id)).toBe(true);
+  });
+
   it('rejects dependency cycles on update addBlockedBy', async () => {
     const registry = await createRegistry();
     const a = await registry.createTask('A');

@@ -1,9 +1,29 @@
+import { z } from 'zod';
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
 import { redactCredentialLikeText } from '../runtime/secretRedaction';
 import { normalizeToolName } from '../agent-runtime/orchestration/RuntimeToolPolicy';
 import { extractConversationToolResourceRefs, extractToolImagePreviews } from './ConversationToolResourceRefs';
 import type { ToolCallResult } from '@shared/types/tool';
-import type { ConversationToolCall } from '@shared/types/conversation';
+import type { ConversationRuntimeRecovery, ConversationToolCall } from '@shared/types/conversation';
+
+/** The host's recovery outcome riding on a tool result; anything else there is not projected. */
+const RuntimeRecoverySchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('rebuilt') }).transform(() => ({ status: 'rebuilt' as const })),
+  z
+    .object({
+      status: z.literal('blocked'),
+      code: z.string().min(1),
+      exit: z.enum(['agent-recover', 'ask-user', 'restart']),
+    })
+    .transform(({ status, code, exit }) => ({ status, code, exit })),
+]);
+
+function runtimeRecoveryOf(result: ToolCallResult | undefined): { runtimeRecovery?: ConversationRuntimeRecovery } {
+  const details = result?.ok ? result.data?.details : result?.error?.details;
+  if (!details || typeof details !== 'object' || !('runtimeRecovery' in details)) return {};
+  const parsed = RuntimeRecoverySchema.safeParse(details.runtimeRecovery);
+  return parsed.success ? { runtimeRecovery: parsed.data } : {};
+}
 
 /** Shared projection for streamed and stopped-turn canonical tool completions. */
 export function buildConversationToolCompletion(
@@ -22,6 +42,7 @@ export function buildConversationToolCompletion(
     status: skipped ? 'skipped' : cancelled ? 'cancelled' : result?.ok ? 'complete' : 'error',
     error: skipped || cancelled || result?.ok ? undefined : result?.error?.message,
     completedAt: cancelled ? (existing?.completedAt ?? completedAt) : completedAt,
+    ...runtimeRecoveryOf(result),
   };
   if (normalized === 'subagent') {
     const details = (result?.data?.details ?? result?.error?.details) as Record<string, unknown> | undefined;

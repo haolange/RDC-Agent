@@ -185,8 +185,8 @@ describe('completeProfileTurn kernel cancellation', () => {
     expect(messageOf(events.at(-1))).toMatchObject({ status: 'complete', content: 'Canonical final' });
   });
 
-  it.each(['completed', 'partial'] as const)(
-    'commits the approved execution receipt only for %s',
+  it.each(['completed', 'partial', 'blocked'] as const)(
+    'closes the approved execution on delivery, keeping it open when blocked: %s',
     async (disposition) => {
       storage.commitConversationTerminal.mockClear();
       orchestrator.sendProfileMessage.mockImplementationOnce(async (turn) => {
@@ -202,7 +202,7 @@ describe('completeProfileTurn kernel cancellation', () => {
       await done;
       const contextEntry = storage.commitConversationTerminal.mock.calls[0]?.[4];
       expect(contextEntry).toBeDefined();
-      if (disposition === 'completed')
+      if (disposition !== 'blocked')
         expect(contextEntry.approvedExecutionCompletion).toEqual({
           offerId: '11111111-1111-4111-8111-111111111111',
           planUri: 'session://plans/frozen.md',

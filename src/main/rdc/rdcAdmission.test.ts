@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { AppError } from '@shared/errors/appError';
 import {
   decideAdmission,
   type AdmissionRequest,
@@ -88,7 +87,7 @@ const turn: AdmissionTurn = {
       },
     },
   },
-  captureBaseline: () => ({ available: true }),
+  captureReadiness: () => ({ state: 'ready' }),
 };
 const shell = { spec: { capture: { nativeOperation: (args: Record<string, unknown>) => args.rdc !== undefined } } };
 const probe = {
@@ -189,31 +188,31 @@ describe('replay lifecycle facts', () => {
     });
   });
 
-  it('refuses an input outside the scope and a mismatched entry record by rule', () => {
+  it('refuses an input outside the scope by rule', () => {
     expect(route(adapter(lifecycleRequest({ action: 'capture_select', inputId: 'capture-b' }), turn))).toMatchObject({
       route: 'rule',
       verdict: { verdict: 'deny', failedChecks: ['target-matches'] },
     });
-    const mismatched: AdmissionTurn = {
-      ...turn,
-      captureBaseline: () => {
-        throw new AppError('PERMISSION_REVIEW_EVIDENCE_INVALID', 'capture baseline does not match.');
-      },
-    };
-    expect(route(adapter(lifecycleRequest({ action: 'capture_restore' }), mismatched))).toMatchObject({
-      route: 'rule',
-      verdict: { verdict: 'deny', failedChecks: ['baseline-recorded'] },
-    });
   });
 
-  it('sends lifecycle changes without an approved capture scope, or with an unverified entry, to the model', () => {
-    const unscoped: AdmissionTurn = { ...turn, approved: null };
-    expect(route(adapter(lifecycleRequest({ action: 'capture_recover' }), unscoped)).route).toBe('model');
-    const unverified: AdmissionTurn = {
+  it('reads the capture readiness: a quarantine admits only the recovery, and nothing goes to the model', () => {
+    const isolated: AdmissionTurn = {
       ...turn,
-      captureBaseline: () => ({ available: false, reason: 'RDC_INITIAL_STATE_UNVERIFIED' }),
+      captureReadiness: () => ({ state: 'blocked', code: 'RDC_CONTEXT_QUARANTINED', exit: 'agent-recover' }),
     };
-    expect(route(adapter(lifecycleRequest({ action: 'capture_restore' }), unverified)).route).toBe('model');
+    expect(route(adapter(lifecycleRequest({ action: 'capture_recover' }), isolated))).toMatchObject({
+      route: 'rule',
+      verdict: { verdict: 'allow' },
+    });
+    expect(route(adapter(lifecycleRequest({ action: 'capture_restore' }), isolated))).toMatchObject({
+      route: 'rule',
+      verdict: { verdict: 'deny', failedChecks: ['identity-current'] },
+    });
+    const unscoped: AdmissionTurn = { ...turn, approved: null, captureReadiness: () => null };
+    expect(route(adapter(lifecycleRequest({ action: 'capture_recover' }), unscoped))).toMatchObject({
+      route: 'rule',
+      verdict: { verdict: 'deny', failedChecks: ['authorized', 'identity-current'] },
+    });
   });
 });
 
@@ -250,7 +249,6 @@ describe('authorized interventions', () => {
   });
 
   it.each([
-    ['another target', { ...boundArgs, event_id: 999 }, [baselineReceipt], {}, ['target-matches']],
     [
       'no approved changes left',
       boundArgs,
@@ -286,8 +284,14 @@ describe('authorized interventions', () => {
     ).toMatchObject({ route: 'rule', verdict: { verdict: 'allow' } });
   });
 
-  it('leaves an intervention no authorization item names to the model, with its host facts', () => {
+  it('leaves an intervention no authorization item names, or names for another target, to the model', () => {
     const other = authorizedTurn({ operation: 'rd.shader.other_change' });
     expect(route(createRdcAdmissionAdapter(host())(shaderRequest(boundArgs, 'experiment'), other)).route).toBe('model');
+    const elsewhere = createRdcAdmissionAdapter(host())(
+      shaderRequest({ ...boundArgs, event_id: 999 }, 'experiment'),
+      authorizedTurn(),
+    );
+    expect(elsewhere?.coverage).toBe('uncovered');
+    expect(route(elsewhere).route).toBe('model');
   });
 });

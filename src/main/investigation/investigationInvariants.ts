@@ -18,14 +18,6 @@ const ANALYZER_LAYER_RANK: Record<AnalyzerExplanationLayer, number> = {
   observed: 2,
 };
 
-export function isOptimizerExperimentRecord(experiment: ExperimentRecord, mission?: InvestigationMission): boolean {
-  if (mission === 'optimizer') return true;
-  if (experiment.actionClass != null) return true;
-  if (experiment.protocol.kind === 'ABABAB') return true;
-  if (experiment.visualValidation != null) return true;
-  return false;
-}
-
 export type InvestigationLookup = {
   getWorldState(worldStateId: string): WorldState | null;
   getClaim(claimId: string): ClaimRecord | null;
@@ -337,7 +329,8 @@ export function assertReportRecordRefs(
     if (!experiment) {
       throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `report experiment ${experimentId}`);
     }
-    if (mission === 'optimizer' || isOptimizerExperimentRecord(experiment, mission)) {
+    // The mission decides whose closing rules apply, not optional fields a debugger experiment may also carry.
+    if (mission === 'optimizer') {
       if (!isClosedExperimentStatus(experiment.status)) {
         throw new InvestigationError(
           'INVESTIGATION_INVARIANT_VIOLATION',
@@ -450,7 +443,9 @@ export function experimentSatisfiesRdcIsolation(
   experiment: ExperimentRecord | null,
   lookup: InvestigationLookup,
 ): boolean {
-  if (!experiment) return false;
+  // Only a closed experiment passed the signed-receipt check, whose five stages share one owning lease, process and
+  // interaction lock: that, not a flag the agent writes, is the proof the replay was held exclusively.
+  if (!experiment || (experiment.status !== 'recorded' && experiment.status !== 'rolled_back')) return false;
   if (experiment.intervention.type === 'none') return false;
   const rollback = experiment.rollback;
   return (
@@ -468,8 +463,7 @@ export function evaluateSRdc01(input: {
   if (!isWorldStateMutated(input.worldState)) {
     return { polluted: false, staleEvidence: false };
   }
-  const isolated =
-    input.worldState.replay.exclusiveLock === true && experimentSatisfiesRdcIsolation(input.experiment, input.lookup);
+  const isolated = experimentSatisfiesRdcIsolation(input.experiment, input.lookup);
   if (isolated) return { polluted: false, staleEvidence: false };
   return { polluted: true, staleEvidence: true };
 }

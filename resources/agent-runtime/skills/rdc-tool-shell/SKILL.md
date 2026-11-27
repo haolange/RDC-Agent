@@ -52,6 +52,5 @@ audience:
 - 实验前先 `describe` 所选操作的 `evidence_kind`：baseline、variant、restored 用受支持的 measurement，干预和撤销分别是 intervention 和 rollback；普通像素查询只作补充观察。三次 measurement 用相同的操作、参数和采样条件。
 - 每次真实调用传同一个 `experimentId`，保存结果返回的 `receipt.uri` 和 `receipt.expectedHash`，填进 `Experiment.executionEvidence` 对应阶段。外层 `session://tool-outputs/call_*.json` 是工具输出，不是签名回执；缺签名的阶段保留为不合格尝试，不补签。
 - `rd.shader.edit_and_replace` 把变更登记到所属 replay；`rd.shader.list_replacements` 枚举同一活动集合，`rd.shader.revert_replacement` 撤销指定项。WorldState 的 `shaderReplacement`／`patchStack` 引用的是同一状态在基线、变体、恢复态各自的枚举回执。
-- 排他性从 `runtime_context.hostControls.replayIsolation` 读：`available=true`、`exclusive=true` 且各身份与当前执行和阶段回执一致时，才把该受控范围的 `WorldState.replay.exclusiveLock` 记为 true。它不是全局锁，也不授予权限。
 - 确认冻结目录在本次权限下没有可达的数据写入或替换操作时，只能把该范围的 `dataState` 记为不适用；不可枚举、effects 未知或查询失败都保持 unknown。
 - `runtime_context.hostControls` 的 `artifactCapacity` 是点时余量，不是预留；`operationBudget.noProgressTimeoutMs` 是每个 RDC 操作的无进展耐心，持续有进展的操作没有总时长，静默超过它的操作被判定卡住。字段 unavailable 时保持未知。

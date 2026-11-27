@@ -1,5 +1,4 @@
 import path from 'node:path';
-import { isDeepStrictEqual } from 'node:util';
 import { AppError } from '@shared/errors/appError';
 import { pathComparisonKey } from '../../platform/paths';
 import { executionOfferStore } from '../../sessions/store/sessionStores';
@@ -7,13 +6,9 @@ import { planArtifactWriter } from '../../sessions/run/sessionPlanArtifact';
 import { redactSecretsDeep } from '../../runtime/secretRedaction';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { rdcExecutionReceipts } from '../../rdc/RdcExecutionReceipts';
-import { rdcLifecycleReceipts } from '../../rdc/RdcLifecycleReceipts';
 import { fileOperationBoundary } from '../../runtime/FileOperationBoundary';
 import type { AgentMessage, AssistantMessage, Message, ToolResultMessage } from '../core/types';
 import type { PromptPlan } from '@shared/types/rdcRuntime';
-import type { AgentAccessCeiling } from '@shared/types/agentManifest';
-import type { ApprovedCaptureController } from '../orchestration/ApprovedCaptureController';
-import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 
 function boundedObservation(value: unknown, maxChars: number): unknown {
   const safe = redactSecretsDeep(value).value;
@@ -34,34 +29,6 @@ function observedText(message: ToolResultMessage): unknown[] {
         return block.text;
       }
     });
-}
-
-/**
- * The owning turn's signed entry position, as an admission fact. A record that does not match its owner throws; an
- * entry position that was never verified is reported unavailable with its reason.
- */
-export function verifiedCaptureBaseline(input: {
-  controller: ApprovedCaptureController | null;
-  sessionId: string;
-  projectId: string | null | undefined;
-  turnId: string;
-  agentId: string;
-  accessCeiling: AgentAccessCeiling;
-}): { available: true; ref: InvestigationContentRef; original: unknown } | { available: false; reason: string } {
-  if (!input.controller || !input.projectId) return { available: false, reason: 'RDC_INITIAL_STATE_UNVERIFIED' };
-  const baseline = input.controller.restorationBaselineFor({ ...input, projectId: input.projectId });
-  if (!baseline) return { available: false, reason: 'RDC_EXECUTION_DENIED' };
-  if (!baseline.available) return { available: false, reason: baseline.reason };
-  const receipt = rdcLifecycleReceipts.read(input.sessionId, baseline.receipt);
-  if (
-    receipt.event !== 'baseline' ||
-    receipt.projectId !== input.projectId ||
-    receipt.turnId !== input.turnId ||
-    !isDeepStrictEqual(receipt.original, baseline.original)
-  ) {
-    throw new AppError('PERMISSION_REVIEW_EVIDENCE_INVALID', 'capture baseline does not match the owning execution.');
-  }
-  return { available: true, ref: baseline.receipt, original: receipt.original };
 }
 
 /** Observations from the actual slot, never assistant claims or inherited parent history. */
