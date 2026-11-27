@@ -29,6 +29,13 @@
   color: var(--token-text-primary);
 }
 
+/* The header alone, while a running turn has nothing to show yet: a status line, not a control. */
+.work-process-header.is-static,
+.work-process-header.is-static:hover {
+  color: var(--token-text-secondary);
+  cursor: default;
+}
+
 .work-process-header:focus-visible {
   outline: 0;
   box-shadow: 0 0 0 2px var(--token-border-focus);

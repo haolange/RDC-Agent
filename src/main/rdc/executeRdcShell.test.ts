@@ -1897,6 +1897,8 @@ it.each([
       mainValidation: { preservationVerified: after === 11, leaseState: after === 11 ? 'retained' : 'quarantined' },
     });
     expect(mock.quarantine).toHaveBeenCalledTimes(after === 11 ? 0 : 1);
+    // The model is told why a retry cannot help and which equivalent reads remain.
+    expect(failure.message).toContain('cannot inspect the input attachment');
   },
 );
 

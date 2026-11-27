@@ -27,6 +27,12 @@ const glyphs: Record<TaskDisplayState, React.ReactNode> = {
       <path className="task-status-marker-mark" d="m5.25 8.25 1.9 1.9 3.6-3.9" />
     </>
   ),
+  partial: (
+    <>
+      <circle className="task-status-marker-ring" cx="8" cy="8" r="5.5" />
+      <path className="task-status-marker-fill" d="M8 2.5a5.5 5.5 0 0 0 0 11z" />
+    </>
+  ),
   blocked: (
     <>
       <circle className="task-status-marker-ring" cx="8" cy="8" r="5.5" />

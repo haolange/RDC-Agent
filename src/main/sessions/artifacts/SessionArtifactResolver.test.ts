@@ -267,7 +267,7 @@ describe('SessionArtifactResolver', () => {
     );
   });
 
-  it('fail-closes on hash mismatch and supports sweepToolOutputs', () => {
+  it('fail-closes on hash mismatch', () => {
     const a = makeSession('hash');
     const resolver = createResolver({ [a.sessionId]: a.sessionPath });
     const written = resolver.write(a.sessionId, 'session://tool-outputs/hashed.json', '{"n":1}');
@@ -283,8 +283,6 @@ describe('SessionArtifactResolver', () => {
     ).toThrow(/ARTIFACT_HASH_MISMATCH/);
     expect(resolver.read(a.sessionId, written.uri, { expectedHash: written.hash }).text).toContain('"n":1');
     expect(resolver.read(a.sessionId, written.uri, { expectedHash: `sha256:${written.hash}` }).text).toContain('"n":1');
-    resolver.sweepToolOutputs(a.sessionId);
-    expect(() => resolver.read(a.sessionId, written.uri)).toThrow(/ARTIFACT_NOT_FOUND/);
   });
 
   it('reserves plans and investigation categories without requiring content writers', () => {

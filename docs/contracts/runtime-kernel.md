@@ -559,6 +559,8 @@ Task 可声明严格类型的 `executionRequirements`（`mode: direct|subagent`�
 
 运行时核对所选引用的可读性、内容 hash、来源执行代次和授予范围；它不能仅凭这些事实判断模型所选引用在语义上确实是待审成果。
 
+Task 转为 `completed` 时（执行结算或 `task_update`），主进程沿结果的 `resultRef` 与 `evidenceRefs` 找到它引用的调查记录（报告、Claim、证据、实验及其集合），连同来源闭包，检查其上有没有开放的 Challenge；有就拒绝完成，错误点名 challengeId 与 `requiredFollowUp`，执行保持未结算，可以改为结算 partial（设计书 5.7：审查指出的缺口，父任务不能当作已解决）。判断范围由 Challenge 的口径限定：审查备注不阻塞，结果没有引用调查记录的 Task 不受影响。只在转为完成的那一刻检查：审查前已结算的来源保持完成，审查打开的 Challenge 成为后续工作；声明 `independentOfTaskIds` 的审查 Task 核查完自己的范围即可完成，即使 Challenge 仍开放。实现见 `src/main/investigation/challengeEligibility.ts`，回合级 `completed` 声明沿用同一套闭包。
+
 - 执行者须固定并授予实际成果版本，不能用辅助回执代替报告；修改成果后，原版本的审查不自动覆盖新版本。
 - 来源已被实际独立审查后，执行者可以在原来源 Task 上显式开始下一执行代，即使原始不可变快照仍可读取；结算新成果后必须由原审查 Task 针对新来源重新独立核验。
 - 旧执行和审查保持不变，原消费与期限继续生效。

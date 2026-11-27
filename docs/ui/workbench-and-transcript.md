@@ -54,7 +54,7 @@ Docked 左导航与右检查栏在可见接缝可拖以改变栏宽；进入抽�
 
 - 运行中标题：`工作中` / `Working` + Active Signal；
 - 运行中的 Working 标题时钟与子代理卡耗时共用一个 1 秒时钟（`useWorkClock`），同一秒一起前进；耗时、发送时间、知识卡日期与终端日志时间（`formatLogTime`，24 小时制带秒）经 `lib/formatTime` 用 `Intl` 按界面语言格式化，英文保持 850ms / 1.2s / 3m 05s 与 09:30；
-- Working 随第一条可见内容出现，请求准备期间不显示空的「工作中」卡；发送时先显示的消息就用主进程消息的 id（由 `requestId` 派生），主进程的版本原位更新同一转录行，行的 DOM、实测高度与开合记忆不变；
+- 请求运行而还没有可见内容时（准备期间或只有运行时簿记），只显示一行不可点的「工作中」标题加 Working 时钟，没有展开箭头和卡体；有了第一条可见内容才成为可展开的 Working。结束时仍没有可见内容的回合不留下「工作过程」。发送时先显示的消息就用主进程消息的 id（由 `requestId` 派生），主进程的版本原位更新同一转录行，行的 DOM、实测高度与开合记忆不变；
 - 运行中的 `shell.rdc` 行在卡头下方用卡片既有的预览行显示 RDC 进度（`tool.progress`，只走渲染流，不持久化，模型只看最终结果）：本地化的阶段（排队、复制到设备、打开 capture、设备准备的四个阶段，其余为「正在 RenderDoc 中执行」，不显示原始阶段名）与进度百分比；距最近一次进展或原生调用满 30 秒后追加「已 N 秒无进展」，随 Working 时钟每秒前进。已用时间就是卡头的耗时，不再重复；RDC 操作名、阶段与原生调用名只经展开后的「复制诊断信息」离开界面；
 - 结束后：`工作过程` / `Work process` + duration/action meta；
 - 禁止用 `执行完成` 做主标题。
@@ -151,7 +151,7 @@ Active Signal：`active-signal-shimmer` clipped-gradient 能量扫光（`1.6s li
 
 `plan_artifact` 与 `ask_user` 同构停顿。
 
-- 三个表面：Working 里的计划卡（`planReview` 行 → `PlanCard`：当前修订——待审或已批准——显示成唯一的一张卡，约 4 行高，越到底部越透明，随每次修订更新；被取代、打回或取消的修订收成一行紧凑工具壳「已更新 / 已提出修改 / 审阅已取消」；回复流里不再重复这张卡）、只读阅读面板（`PlanReviewPanel`，在共享 `ReadingSheet` 中）、Composer 待审门（`PlanReviewRequestPanel` + `HandoffActionRow`）。
+- 四个表面：Working 里的计划卡（`planReview` 行 → `PlanCard`：当前修订——待审或已批准——显示成唯一的一张卡，约 4 行高，越到底部越透明，随每次修订更新；被取代、打回或取消的修订收成一行紧凑工具壳「已更新 / 已提出修改 / 审阅已取消」）、回复中的计划卡（`PlanReplyCard`：回合结束且计划已批准后，这条回复在 Working 下方带一张独立的卡，点开在转录里就地展开全文）、只读阅读面板（`PlanReviewPanel`，在共享 `ReadingSheet` 中）、Composer 待审门（`PlanReviewRequestPanel` + `HandoffActionRow`）。
 - 批准后交接 prompt 作为一条普通用户消息出现：消息上持久化核验过的 `planReference`，但转录不把它包成卡片，也不加双向跳转；只隐藏「编辑重发」，因为改写不能携带引用。
 - 交接未能发出时，Composer 上方显示用户定的「计划已批准」面板（一句话 + 交接按钮）。
 - Composer 优先级 `pendingToolApproval > pendingPlanReview > pendingUserInput`。
@@ -338,12 +338,18 @@ Agent preparing/running、委派和原生退出未确认均以主进程 interact
 
 项目 RDC 为零时保持改造前原空态，不显示选择器、画面或历史。右栏宽度、drawer、五个标签的顺序不变；不恢复独立 preview 窗口，不加最小窗口宽度。Tasks 只展示任务与定位入口，不提供额外的「停止此会话全部工作」按钮；停止执行沿用 Composer 的会话级 Stop 生命周期。
 
-计划卡只在 Working 内出现，以次级表面、正文字号标题和四行摘要呈现当前修订及真实决定状态。
+Working 内的计划卡以次级表面、正文字号标题和四行摘要呈现当前修订及真实决定状态。
 
 - 整卡打开阅读器，提供左对齐标题和有界 Markdown 摘录。
 - 摘录只取正文章节；正文之后的执行引用（规划者写的 `## Execution references` 与主进程生成的合同）不进入卡片，在阅读器里收进默认折叠的「执行引用」披露。
 - 短内容自然收缩，长内容裁切且不产生卡内滚动；预览不含链接、代码复制等次级交互，点击或键盘（Tab/Enter/Space）打开阅读器，选择文字不触发打开。
 - 不展示内部 URI，不在卡片内批准或折叠分节。
+
+回复中的计划卡（`PlanReplyCard`）只出现在已结束、计划已批准的回复里，每份计划取最新修订一张；待审的计划只在 Working 与 Composer 计划门里。
+
+- 折叠时与 Working 的卡同一外观：类型「计划」、状态「已批准」、标题和带底部渐隐的四行摘录，整卡点击展开。
+- 展开时不开阅读器：在转录里就地显示经 URI 与 hash 核验读取的全文、授权清单和默认折叠的「执行引用」，用户自己滚动阅读；全文只在第一次展开时读取。卡头只留类型、状态和箭头，标题由计划正文自己的标题承担，不重复两次。
+- 展开后只有卡头（带 `aria-expanded` 与 `Chevron`）和末尾的「收起计划」能收起，正文里的选择、链接与披露不触发开合。
 
 Composer 计划门只显示“实施此计划？”、当前计划声明的全部执行目标及常驻的修改意见 Textarea。`HandoffActionRow` 的 decisions 展示逐项列出目标；普通续跑建议保留 buttons 展示。空意见不可提交，提交期间禁止重复操作，失败保留意见。会话、turn/tool call 和计划 revision/hash 共同隔离本地状态；切换会话、Stop、替换或撤销请求后丢弃迟到续跑，批准事件先于 IPC 返回也不误丢合法续跑。
 

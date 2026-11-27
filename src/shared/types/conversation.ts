@@ -29,9 +29,10 @@ export type ConversationTaskStatus = 'pending' | 'in_progress' | 'blocked' | 'co
 
 /**
  * What a Task shows: its TaskRegistry status, or `failed` while the logical Task is still open but its current
- * execution ended `failed` / `interrupted` (TaskRegistry records such a Task as `blocked` with the error as reason).
+ * execution ended `failed` / `interrupted` (TaskRegistry records such a Task as `blocked` with the error as reason),
+ * or `partial` for a Task settled with a partial result (also recorded as `blocked`, with its gaps as reason).
  */
-export type TaskDisplayState = ConversationTaskStatus | 'failed';
+export type TaskDisplayState = ConversationTaskStatus | 'failed' | 'partial';
 
 export type ConversationDiagnosticSeverity = 'info' | 'warning' | 'error';
 

@@ -66,11 +66,12 @@ it.each<PlanReviewStatus>(['awaiting', 'approved', 'rejected', 'superseded', 'ca
     const html = renderToStaticMarkup(createElement(MessageBubble, { message }));
     expect(html).toContain('Original result');
     expect(html).not.toContain('Continue handoff');
-    // The plan card lives inside Working only; the reply never repeats it.
-    expect(html).not.toContain('plan-card');
+    // Working keeps the reviewable card; a settled reply carries its own card only for the approved plan.
+    expect(html).not.toContain('data-testid="plan-card"');
+    expect(html.includes('data-testid="plan-reply-card"')).toBe(status === 'approved');
   },
 );
-it('shows no Working for a request that has produced nothing yet', () => {
+it('shows Working while a request runs, and none for a settled reply whose trace holds nothing', () => {
   const draft = {
     ...base,
     content: '',
@@ -78,24 +79,14 @@ it('shows no Working for a request that has produced nothing yet', () => {
     handoffSuggestions: undefined,
     workTrace: { status: 'running' as const, updatedAt: 1, blocks: [] },
   };
-  expect(renderToStaticMarkup(createElement(MessageBubble, { message: draft }))).not.toContain('work-process');
-  const started = {
+  expect(renderToStaticMarkup(createElement(MessageBubble, { message: draft }))).toContain('work-process');
+  const settled = {
     ...draft,
-    workTrace: {
-      ...draft.workTrace,
-      blocks: [
-        {
-          id: 'loop',
-          kind: 'llm_turn' as const,
-          title: 'Turn',
-          status: 'running' as const,
-          startedAt: 1,
-          toolCalls: [],
-        },
-      ],
-    },
+    content: 'Answer',
+    status: 'complete' as const,
+    workTrace: { status: 'complete' as const, updatedAt: 1, blocks: [] },
   };
-  expect(renderToStaticMarkup(createElement(MessageBubble, { message: started }))).toContain('work-process');
+  expect(renderToStaticMarkup(createElement(MessageBubble, { message: settled }))).not.toContain('work-process');
 });
 
 it('preserves ordinary handoffs and says once that a reply stopped', () => {

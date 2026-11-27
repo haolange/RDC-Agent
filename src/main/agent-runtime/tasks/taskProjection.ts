@@ -18,13 +18,17 @@ export interface ProjectedTaskItem {
   waitingOn?: TaskDependencyWait[];
 }
 
-/** An open Task whose current execution failed or was interrupted shows as failed; otherwise its status. */
+/**
+ * An open Task whose current execution failed or was interrupted shows as failed. A Task settled partial is stored as
+ * blocked (it cannot complete as is), but it delivered something of value with gaps listed, so it shows as partial.
+ */
 export function taskDisplayState(
-  task: Pick<TaskRecord, 'status'>,
+  task: Pick<TaskRecord, 'status' | 'disposition'>,
   current: Pick<TaskExecutionRecord, 'status'> | undefined,
 ): TaskDisplayState {
   const open = task.status !== 'completed' && task.status !== 'cancelled';
-  return open && (current?.status === 'failed' || current?.status === 'interrupted') ? 'failed' : task.status;
+  if (open && (current?.status === 'failed' || current?.status === 'interrupted')) return 'failed';
+  return task.status === 'blocked' && task.disposition === 'partial' ? 'partial' : task.status;
 }
 
 export function taskExecutionFacts(execution: TaskExecutionRecord): TaskExecutionFacts {

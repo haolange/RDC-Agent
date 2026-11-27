@@ -40,6 +40,8 @@ const isCompletionUnavailable = (error: unknown): error is Error =>
 export interface TaskRegistryOptions {
   onCancelExecution?: (execution: TaskExecutionRecord) => Promise<void>;
   validateResultRef?: (task: TaskRecord, result: TaskCompletionResult) => Promise<boolean>;
+  /** Open Challenges against the investigation records this result cites; they keep the Task from completing. */
+  openChallengesForResult?: (result: TaskCompletionResult) => Promise<Array<{ challengeId: string; followUp: string }>>;
 }
 
 /**
@@ -191,6 +193,25 @@ export class TaskRegistryCore {
     } finally {
       visiting.delete(task.id);
     }
+  }
+  /**
+   * A Task completes only while no open Challenge disputes what its result cites (design 5.7: a review that found a gap
+   * does not leave the parent free to treat it as settled). Checked when the Task becomes completed, never afterwards:
+   * a source settled before its review stays completed, and the Challenges the review opens become follow-up work.
+   * The review itself is complete when it has checked its scope, open Challenges included.
+   */
+  protected async assertResultUnchallenged(task: TaskRecord, result?: TaskCompletionResult): Promise<void> {
+    const check = this.options.openChallengesForResult;
+    if (!check || task.status === 'completed' || task.executionRequirements?.independentOfTaskIds.length) return;
+    const effective =
+      result ??
+      (task.currentExecutionId ? (await this.store.loadExecution(task.currentExecutionId))?.result : undefined);
+    if (!effective) return;
+    const open = await check(effective);
+    if (!open.length) return;
+    throw new TaskCompletionUnavailable(
+      `Open Challenges dispute what this Task's result cites: ${open.map((item) => `${item.challengeId} (${item.followUp})`).join('; ')}. Close each one first: perform its follow-up and resolve it with the Claim that answers it, narrow the claim it targets, or set it to wont_fix with the reason. Otherwise settle the Task partial with the open Challenges as missing requirements.`,
+    );
   }
   protected async assertCompletionClosure(task: TaskRecord, visiting = new Set([task.id])): Promise<void> {
     for (const id of task.blockedBy) {

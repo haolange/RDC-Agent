@@ -9,6 +9,8 @@ import {
   getDelegatedTaskScope,
 } from '../tasks';
 import { sessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
+import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
+import { openChallengesForCitedRecords } from '../../investigation/challengeEligibility';
 import { requestSnapshotStore } from '../prompt/RequestSnapshotStore';
 import { traceProjectionRefreshService } from './TraceProjectionRefreshService';
 import { bindTaskRootBudget } from './TaskRootBudget';
@@ -41,6 +43,13 @@ export function createTaskRuntimeTools(input: {
         return false;
       }
     },
+    openChallengesForResult: async (result) =>
+      ownerSessionId
+        ? openChallengesForCitedRecords(investigationArtifactService, ownerSessionId, [
+            ...(result.resultRef ? [result.resultRef] : []),
+            ...(result.evidenceRefs ?? []).map((ref) => ref.uri),
+          ])
+        : [],
   });
   registry.onTaskChange = ({ type, task, snapshot }) => {
     if (resolvedSessionId && !isSubagent) traceProjectionRefreshService.schedule(resolvedSessionId);

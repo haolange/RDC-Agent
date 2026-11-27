@@ -187,6 +187,47 @@ it('folds Working when its turn completes and keeps a manual choice across updat
   }
 });
 
+it('says it is working while a turn has nothing to show, and leaves no Working once it settles empty', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const render = (status: ConversationWorkTrace['status']) =>
+    act(async () =>
+      root.render(
+        React.createElement(WorkProcess, {
+          trace: {
+            status,
+            updatedAt: 2,
+            blocks: [
+              {
+                id: 'loop',
+                kind: 'llm_turn' as const,
+                title: 'Loop',
+                status: status === 'running' ? ('running' as const) : ('complete' as const),
+                startedAt: 1,
+                toolCalls: [],
+              },
+            ],
+          },
+          sessionId: 'empty-session',
+          rowKey: 'empty-turn',
+        }),
+      ),
+    );
+  try {
+    await render('running');
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('chat.workProcessHeadlineRunning');
+    expect(host.querySelector('button')).toBeNull();
+    await render('complete');
+    expect(host.querySelector('.work-process')).toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
 it('keeps streamed text in the same DOM node when its phase is confirmed', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');

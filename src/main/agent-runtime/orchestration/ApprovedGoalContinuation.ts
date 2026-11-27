@@ -94,7 +94,7 @@ export function createApprovedGoalContinuation(
         : '';
       return `# Approved Goal Reassessment\n${changed}${gap.message}${status}\nCompare the unfinished approved work with the actual evidence; an unproved result or a partial Task is not itself a blocker. Resume the same Task if the next check needs it. If a derived context may have omitted approved work, reread the frozen plan by its verified URI and hash before deciding. ${next}${openWork()}`;
     }
-    return `# Approved Goal Reassessment\n${changed}The approved Tasks are settled, but the partial result still lists unresolved work. Compare it with the approved goal and actual evidence. ${next}${openWork()}`;
+    return `# Approved Goal Reassessment\n${changed}The approved Tasks are settled, but the partial result still lists unresolved work. Compare it with the approved goal and actual evidence. A completed Task cannot be reopened: the reply states which part each completed Task covers and lists the remaining work. ${next}${openWork()}`;
   };
 
   const closingCheck: ApprovedGoalContinuation['closingCheck'] = async (validate) => {

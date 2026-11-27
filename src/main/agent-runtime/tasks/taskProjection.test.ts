@@ -18,6 +18,18 @@ const task = (id: string, status: TaskStatus, createdAt: number, extras: Partial
   createdAt,
   updatedAt: extras.updatedAt ?? createdAt,
   ...(extras.currentExecutionId ? { currentExecutionId: extras.currentExecutionId } : {}),
+  ...(extras.disposition ? { disposition: extras.disposition } : {}),
+});
+
+it('shows a Task settled partial as partly done, not as blocked', () => {
+  const items = projectTaskItems([
+    task('partial', 'blocked', 1, { disposition: 'partial', statusReason: 'Shader debug is unsupported here.' }),
+    task('blocked', 'blocked', 2, { disposition: 'blocked' }),
+  ]);
+  expect(items.map((item) => [item.displayState, item.statusReason])).toEqual([
+    ['partial', 'Shader debug is unsupported here.'],
+    ['blocked', undefined],
+  ]);
 });
 
 describe('taskProjection', () => {

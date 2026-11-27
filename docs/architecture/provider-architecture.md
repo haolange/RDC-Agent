@@ -316,7 +316,7 @@ Effective Catalog 的模型事实来自三层合并（优先级递增）：
 
 Anthropic 的 `cache_control` 由断点模式决定（automatic 在顶层，explicit 落在 stable system block）。回合内 instructions 保持冻结：只作用于单次请求的宿主事实（运行时续跑提示、无进展提示、余量提醒）作为不落盘的尾消息追加在请求末尾，压缩窗口只覆盖持久历史。
 
-Bedrock 使用 `cachePoint: { type: 'default' }` 标记 stable prefix。`partitionSystemPrompt()` 将 PromptPlan segments 按 stable/volatile 分割，stable 前缀锚定缓存断点；不匹配时 fail-closed（`PROMPT_PLAN_CONTEXT_MISMATCH`）。
+Bedrock 使用 `cachePoint: { type: 'default' }` 标记 stable prefix，只在编译出的缓存计划启用时附加；manifest 的缓存契约为 `unknown` 时不发缓存标记。`partitionSystemPrompt()` 将 PromptPlan segments 按 stable/volatile 分割，stable 前缀锚定缓存断点；不匹配时 fail-closed（`PROMPT_PLAN_CONTEXT_MISMATCH`）。
 
 ## 验证门禁
 

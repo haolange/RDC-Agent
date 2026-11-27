@@ -1,0 +1,14 @@
+.plan-document .markdown-body {
+  min-width: 0;
+}
+.plan-document pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.plan-document__appendix {
+  margin-top: var(--space-5);
+}
+.plan-document__appendix > summary {
+  color: var(--token-text-secondary);
+}

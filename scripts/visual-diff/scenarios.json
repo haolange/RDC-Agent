@@ -1385,6 +1385,112 @@
    "settleMs": 1200
   },
   {
+   "id": "plan-reply",
+   "setup": [
+    {
+     "preset": "plan-gate"
+    }
+   ],
+   "steps": [
+    {
+     "waitFor": "[data-testid=\"plan-review-request-panel\"] [data-testid=\"handoff-action-row\"] button"
+    },
+    {
+     "click": true,
+     "selector": "[data-testid=\"plan-review-request-panel\"] [data-testid=\"handoff-action-row\"] button",
+     "waitMs": 1500
+    },
+    {
+     "emit": {
+      "channel": "conversation:event",
+      "payload": {
+       "type": "message_patched",
+       "sessionId": "$session:open.history.messages.1.sessionId",
+       "turnId": "$session:open.history.messages.1.turnId",
+       "message": {
+        "$merge": "$session:open.history.messages.1",
+        "status": "complete",
+        "updatedAt": {
+         "$add": [
+          {
+           "$max": [
+            "$session:open.history.messages.1.updatedAt",
+            {
+             "$now": 0
+            }
+           ]
+          },
+          1
+         ]
+        },
+        "workTrace": {
+         "$merge": "$session:open.history.messages.1.workTrace",
+         "status": "complete",
+         "updatedAt": {
+          "$add": [
+           {
+            "$max": [
+             "$session:open.history.messages.1.workTrace.updatedAt",
+             {
+              "$now": 0
+             }
+            ]
+           },
+           1
+          ]
+         },
+         "blocks": [
+          "$session:open.history.messages.1.workTrace.blocks.0",
+          "$session:open.history.messages.1.workTrace.blocks.1",
+          {
+           "$merge": "$session:open.history.messages.1.workTrace.blocks.2",
+           "status": "complete",
+           "completedAt": {
+            "$now": 0
+           },
+           "toolCalls": [
+            {
+             "$merge": "$session:open.history.messages.1.workTrace.blocks.2.toolCalls.0",
+             "status": "complete",
+             "completedAt": {
+              "$now": 0
+             },
+             "planReview": {
+              "$merge": "$session:open.history.messages.1.workTrace.blocks.2.toolCalls.0.planReview",
+              "status": "approved"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    {
+     "waitFor": "[data-testid=\"plan-reply-card\"]"
+    },
+    {
+     "click": true,
+     "testId": "plan-reply-card",
+     "waitMs": 1200
+    }
+   ],
+   "settleMs": 1200,
+   "respond": [
+    {
+     "channel": "plan:read",
+     "call": 1,
+     "result": {
+      "markdown": "# 定位 vkcube 帧的唯一 draw 调用\n\n## 目标\n\n确认这一帧只有一次 draw 调用，并说明它画了什么。\n\n## 步骤\n\n1. 列出事件树并确认唯一的 draw 调用。\n2. 读取该调用的管线状态。\n3. 用三句话总结这一帧画了什么。\n\n## 完成标准\n\n每一步都有回放证据；无法确认的部分单独列出。\n\n## Execution references\n\n- 冻结计划由主进程绑定。\n\n## Task execution requirements\n\n```json\n{\"tasks\":[]}\n```\n",
+      "uri": "session://plans/visual-diff-frozen.md",
+      "hash": "visual-diff-frozen"
+     }
+    }
+   ]
+  },
+  {
    "id": "session-switch",
    "setup": [
     {

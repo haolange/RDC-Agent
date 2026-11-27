@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { AnthropicProvider } from './AnthropicProvider';
+import { BedrockConverseProvider } from './BedrockConverseProvider';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
 import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
 import * as responsesTesting from './OpenAIResponsesProvider';
@@ -249,6 +250,30 @@ describe('provider prompt cache wire', () => {
       cacheMissTokens: 25,
       speed: 'fast',
     });
+  });
+
+  it('places a Bedrock cache point only when the compiled cache plan is enabled', async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    vi.stubGlobal('fetch', async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return new Response('unavailable', { status: 503 });
+    });
+    const provider = new BedrockConverseProvider({
+      region: 'us-east-1',
+      requestAuthorizer: async (request) => request.headers,
+    });
+    const requestPlan = plan('BedrockConverseStream', 'bedrock-converse-stream');
+    for (const promptCache of [undefined, { ...anthropicCache, enabled: false }, anthropicCache]) {
+      const stream = provider.stream({ ...model, api: 'bedrock-converse-stream' }, context, {
+        requestPlan,
+        promptCache,
+      } as StreamOptions);
+      // The stubbed route answers 503; the request body sent before it is what this test reads.
+      await expect(stream.result()).rejects.toThrow('HTTP 503');
+    }
+    const firstSystemBlock = (body: Record<string, unknown>) => (body.system as Array<Record<string, unknown>>)[0];
+    expect(bodies.map((body) => 'cachePoint' in firstSystemBlock(body))).toEqual([false, false, true]);
+    expect(firstSystemBlock(bodies[2]).cachePoint).toEqual({ type: 'default' });
   });
 
   it('keeps ordinary Responses instructions unchanged when explicit caching is unavailable', () => {
