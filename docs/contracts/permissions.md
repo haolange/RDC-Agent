@@ -7,7 +7,7 @@
 Composer 暴露：`Default`、`Auto-review`、`Full access`、`Custom`。主进程 `AgentPermissionPolicy` 为权威，结合 profile 天花板、permission mode、workspace root、tool metadata、`CompiledPolicy`。可读根、可写根、允许/拒绝命令前缀只在 Custom 生效，在 Settings 的 Custom 规则中编辑；保存等待主进程确认，不乐观生效。
 
 - `Default`：例行 workspace 只读可自动；外部文件、网络、变更、破坏性 shell、未知命令需审批。没有打开项目时不存在 workspace，任何文件读取与 shell 都需审批。
-- `Auto-review`：先执行确定性规则；已验证的低风险操作记录规则批准，其余可审操作提交一次独立、无工具的模型审核。没有有效批准不执行；不自动切人工或 Full access。
+- `Auto-review`：先由宿主准入。确定性规则与准入事实能定的按规则批准或拒绝，已批准计划的授权覆盖且事实全部成立的动作直接执行；其余提交一次独立、无工具的模型审核，模型无法判断时只弹一张绑定本次调用的人工批准卡。没有有效批准不执行；不切换到 Full access，也不改动权限模式（见「自动审查」）。
 - `Full access`：显式信任本地文件与命令；仍受 primitive 硬约束（二进制/`.rdc`、realpath、灾难 shell、SSRF）。capture、Git 元数据、规范 Knowledge 与应用自有文件在任何挡位都不是写入目标；写入受保护的配置或凭据路径在 Full access 下仍需用户确认。
 - `Custom`：在 Default 的审批规则之外，使用已确认的可读根、可写根和命令前缀。这些列表对 Default 与 Auto-review 无效；网络工具仍需审批。Full access 仍不能越过 profile 天花板。
 
@@ -69,10 +69,10 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 |---|---|
 | `shellCommand` | 该参数的命令文本先过灾难硬拒绝与文件工具绕行检查（任何模式都先于权限求值），再按自定义拒绝/允许前缀、风险分析、工作区外路径与例行命令集分级；内置只有 `shell` 声明 |
 | `capture.nativeOperation` | 原生 RDC 操作（`shell.rdc`）交给注册的 RDC 操作策略判定，再取 policy 审批下限 |
-| `capture.replayLifecycle` | 改变 owning 回放的步骤（`rdc_probe` 的 `capture_select` / `capture_restore` / `capture_recover`）要求 `full` 天花板，按模式审批，并把该步骤的冻结操作合同交给审核；`capture_restore` 的自动审核另附 owning 回合已验证的入口位置基线 |
+| `capture.replayLifecycle` | 改变 owning 回放的步骤（`rdc_probe` 的 `capture_select` / `capture_restore` / `capture_recover`）要求 `full` 天花板，按模式审批；自动审查时由准入事实判定，已批准计划的 `captureScope` 即其授权，`capture_restore` 另核验 owning 回合已签名的入口位置基线 |
 | `knowledgeRoots: 'read-access'` | 冻结的 Knowledge 读根并入本次调用的免审批读根 |
 
-自动审核把待审动作（工具名、参数、原因、事实）原样发给审核模型；宿主另外读取被审工具的 spec 收集证据，spec 本身不发送。工具访问分类（`src/shared/constants/toolAccess.ts`）与 policy 的工具名单仍按名称，它们是按名称声明的配置而非工具行为。
+自动审查先按被审工具的 spec 交给领域适配器计算准入事实；送审时把待审动作（工具名、参数、原因、操作事实与准入事实）原样发给审核模型，spec 本身不发送。工具访问分类（`src/shared/constants/toolAccess.ts`）与 policy 的工具名单仍按名称，它们是按名称声明的配置而非工具行为。
 
 ## Electron Sandbox
 
@@ -185,7 +185,7 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 - **风险分类器不是安全边界**；真正边界是 PermissionPolicy + `shellHardDeny` + 原生身份/路径等执行检查与操作系统权限。Electron renderer sandbox 不隔离主进程派生的普通 shell；不得宣称存在命令级 OS sandbox。
 - shell.rdc 与 shell.command 互斥。
   - 严格合法的 search/describe/list 仅读冻结目录，按 low risk 审核；原生操作先复用执行边界验证 owning root 的 full 天花板 profile、冻结 binding/catalog、lease、scope/effects、参数与路径。
-  - 已验证的读取、测量、受控 artifact 写入及可恢复 replay 位置操作按 low risk；shader replacement 按 medium 进入独立审核，敏感配置路径按 high。
+  - 已验证的读取、测量、受控 artifact 写入及可恢复 replay 位置操作按 low risk；shader replacement 等可逆干预按 medium 进入准入（见「自动审查」），敏感配置路径按 high。
   - 未知效果、身份覆盖、非法参数或越权直接拒绝，不由审核模型补授权。
   - 实际执行再次验证，保留串行、取消、恢复及签名证据合同。
 - 普通 shell 的例行/允许前缀必须覆盖每个静态简单子命令；用户允许 `git status` 不授权后续 `git reset --hard`。
@@ -194,17 +194,65 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
   - 专用 Git 工具以命令行配置覆盖 fsmonitor、hooks、外部 diff 与 sshCommand，仓库本地配置声明可执行程序（fsmonitor、hooksPath、textconv、filter、include 等）时拒绝执行；shell 不增加 Git 权限。
 - project 内普通 write_file/edit_file 可按 low risk 自动批准；执行层仍要求 realpath、无链接写入、文本大小及覆盖前同 session 成功读取。capture 输入、Git 元数据与 canonical knowledge 不作为通用写入目标；Agent/Skill/Hook/Policy/MCP/Memory、secret 与环境配置需要明确审核，不获得通用自动编辑许可。
 
-### 独立权限审核
+### 自动审查
 
-原生动作同时传递已经验证的冻结操作合同：说明、完整 input schema、路径参数及前置条件。审核据此解释参数的 before/after 身份语义，不从字段名称猜测；合同仅说明动作，不建立用户授权，也不替代实际执行校验。
+准入决定发生在人在场的时候：用户批准计划时，就决定了调查和其中的干预要不要做。之后每次动作只做宿主的确定性检查，模型只处理检查覆盖不到的语义余量，上下文小而稳定。
 
-审核复用冻结 RequestPlan、opaque credential、PromptPlan、Provider adapter 与请求快照；没有工具、Agent 身份、Task 或 RDC lease。
+| 关口 | 回答的问题 | 依据 |
+|---|---|---|
+| 计划批准（人） | 这次调查和其中的干预要不要做 | 计划正文与授权清单 |
+| 准入（规则为主，模型处理余量） | 这个具体动作是否在已批准授权内且可逆 | 宿主核验的结构化事实（文本） |
+| 独立审查员 | 证据是否支撑结论 | 原始证据，含图像 |
 
-- 输入包含当前精确动作、当前主进程控制与预算事实、真实 user 消息、经 hash 验证的已批准计划，以及当前隔离 slot 的有界工具观察。
+**决定链**（`src/main/agent-runtime/permissions/PermissionAdmission.ts`）只在决策为 `auto_review` 时运行，决策格与 floor 不变：
+
+1. 本回合同一动作（工具名与参数 sha256）此前被拒且事实未变，或曾被人工拒绝：按规则拒绝，不再送审。
+2. 没有领域适配器认得的动作：已验证的低风险动作按规则批准，其余送模型。
+3. 任一事实不成立：按规则拒绝，并指名不成立的检查项。
+4. 授权覆盖且全部事实成立：按规则批准。
+5. 其余（授权未覆盖，或某项事实在结构上不可得）送模型，事实随动作一起提交。
+
+检查项是封闭枚举（`src/shared/constants/admissionChecks.ts`），每项带补救方：`agent` 是 Agent 能补上的事实，`host-or-user` 是宿主或用户的前置条件。拒绝以结构化工具结果返回：`AUTO_REVIEW_DENIED`、每个检查项及其补救方、出口（人工批准或调整权限模式）。
+
+| 检查项 | 含义 | 补救方 |
+|---|---|---|
+| `authorized` | 计划授权该动作 | host-or-user |
+| `target-matches` | 目标与授权一致 | host-or-user |
+| `effects-bounded` | 效果在授权范围内 | host-or-user |
+| `identity-current` | 现场身份有效、独占 owning 回放 | host-or-user |
+| `baseline-recorded` | 基线有效 | agent |
+| `source-bound` | 修改绑定所替换的源 | agent |
+| `rollback-available` | 冻结目录可以回滚 | host-or-user |
+| `prior-reverted` | 上一次批准的修改已撤回 | agent |
+| `instances-remaining` | 仍有授权次数 | host-or-user |
+
+**领域适配器**由 RDC 模块在启动时注册（`src/main/rdc/rdcAdmission.ts`），领域词汇只出现在适配器里：
+
+- 回放生命周期：已批准计划的 `captureScope` 就是授权。`capture_select` 的输入须在范围内；`capture_restore` 须有 owning 回合已签名、归属匹配的入口位置基线；只有获批 General 的 owning 回合在 `full` 天花板下才能改变回放。实际恢复准入仍由执行时的 `classifyRecovery` 判定。没有获批计划时交给模型。
+- 可逆干预（如 shader 替换）：本回合独占 owning 回放；同一 experimentId 在当前回放上有已签名的基线测量；操作合同声明源 hash 参数时，修改须绑定所替换源的 hash；冻结目录有可用回滚覆盖该效果。授权项覆盖时另查目标一致、效果不超出授权、批准之后已签名的干预回执数低于上限，以及 `rollback-before-next` 下上一次修改已撤回。
+- 带受保护路径输入的原生操作不由适配器判定，按原审核路径处理。
+
+**计划授权清单**：`plan_artifact.authorizations` 逐项声明冻结目录中的 intervention 操作、目标（`eventId`／`stage`／`shaderId`，各须等于动作参数）、效果类别、可逆性要求（`rollback-available` 或 `rollback-before-next`）和授权次数上限（1–16；是被授权的效果实例数，不是阶段配额）。
+
+- 计划门逐项核对它不超过静态策略：每个声明的执行目标都是 `full` 天花板；policy 不拒绝原生操作，也不对其设 user floor；操作在冻结目录中、是 replay 范围的 intervention 且能力可用；授权的效果覆盖它的全部非例行效果；有可用回滚；目标字段是该操作的合法参数；计划同时声明 `captureScope`。任一不满足即以 `PLAN_AUTHORIZATION_INVALID` 拒绝整份计划并说明原因。
+- 授权项写入宿主生成的调查合同附录，随计划 hash 冻结；修订计划会清除 offer，授权随之失效。计数由宿主从持久的签名回执推导。
+- 授权只收窄自动审查可以直接放行的范围，不抬高 profile 天花板、policy、权限模式或工具元数据；Default 下仍逐次询问。计划门与计划阅读器用人话列出授权项，目录名与标识不上界面。
+
+**模型审核**（`src/main/agent-runtime/permissions/PermissionReviewRuntime.ts`）是一次独立、无工具的请求，没有 Agent 身份、Task 或 RDC lease。
+
+- 规则只判断动作与已批准授权一致且可逆：已批准计划的前提采信，不重新验证；输入只有文本和截断摘录，不得因看不到图像或完整反汇编而拒绝；宿主事实是权威。
+- 判决是严格封闭的 `{ verdict: allow | deny | undecidable, failedChecks, reason }`：allow 不列检查项，deny 与 undecidable 至少列一项；reason 写给用户，不含 ID、哈希或 URI。界面以本地化的检查项呈现拒绝，模型原文只进原始回执。
+- 原生动作同时传递已验证的冻结操作合同（说明、完整 input schema、路径参数及前置条件），审核据此解释参数语义，不从字段名猜测；合同不建立用户授权，也不替代执行校验。
+
+**无法判断**：判决为 `undecidable` 时弹一张人工批准卡，说明审核无法确认的检查项，绑定本次调用、单次有效。人工拒绝即终局，同一动作在本回合不再送审，也不再弹卡。任何情形都不切换到 Full access，也不改动权限模式。审计分两阶段：自动审查记录 `verdict: undecidable`，人工决定记录 `escalatedFrom: auto-review`。
+
+**审核模型与路由**：模型取 Settings → Agents 的「自动审查模型」（`agentModels.review`），逐字段回落到默认模型，见 [`../product/agent-manifest-models.md`](../product/agent-manifest-models.md)。路由、RequestPlan 与推理合同在 prepareTurn 随回合冻结（`src/main/agent-runtime/permissions/PermissionReviewRoute.ts`）；每次审核按该路由的 provider 单独租用凭据并在请求结束后释放，与回合同一 provider 时复用回合凭据。路由不可用或凭据租用失败以 `PERMISSION_REVIEW_ROUTE_UNAVAILABLE` 拒绝，从不回落到回合模型。
+
+**输入与缓存**：稳定前缀在前，即规则段和授权段（真实 user 消息、经 hash 核验的已批准计划及其授权清单）；单个动作的载荷在后（待审动作、操作事实与准入事实、当前隔离 slot 的有界工具观察）。同一计划下不同动作的前缀逐字节相同；审核以独立的缓存亲和（`<session>#permission-review`）写入 prompt cache，不触及对话缓存。
+
 - 历史原生回执须先由主进程校验签名、hash 和归属，保留原 context/time；持久记录仅证明 bytes/schema/存在，不把其正文或 intent 自述升级为执行证明。
 - 敏感文件观察不进入审核，凭据型动作在发送前拒绝；模型的工具参数和授权自述均不是用户许可。
 - 父执行历史不泄露给隔离子执行。
-- 原生变更审核还直接取得同一冻结目录的完整能力摘要和其中已准入的 rollback 定义，复用目录查询的规范投影，不依赖历史正文是否仍在窗口内；这些只证明声明的能力边界和接口合同，不能证明当前状态、实际回滚成功或科学结论。
 
 工具观察最多保留 16 种不同实际调用的最后结果，以工具名和实际调用参数区分；只有相同调用可替代旧观察，不把不同文件、审计选择器或目录目标合并。
 
@@ -217,16 +265,11 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 
 待审命令字面引用的文件，其同执行槽成功 `read_file` 观察优先保留并以 8192 字符为正文上限；超限仍明确截断，受保护路径与凭据脱敏规则不变。读取是历史观察，不证明文件当前字节，也不构成执行授权。
 
-审核必须使用现有回执合同：签名 `evidence.kind` 只有 measurement、intervention、rollback；Experiment.executionEvidence 中的 baseline、variant、restored 是三个不同 measurement 回执的引用角色，不存在额外的 baseline kind 或工具 phase 参数。
-
-- 介入前核验当前实验、归属、采样条件及时间匹配的真实基线和来源/安全控制，不索取未来阶段回执；不能因为合法基线的 kind 为 measurement 就拒绝。
-- 该准入判断不追认未来执行，实验关闭仍由现有门禁检查五个不同引用、真实签名、时序、采样条件和 daemon/worker 身份。
-
-每个待审批调用最多一次审核，30 秒上限；输入最多 32768 估算 tokens，并服从冻结模型的更紧输入预算及扣除1024输出预留后的窗口；输出最多1024 tokens。只接受终态、无工具的严格 approved/reason JSON。超限、缺路由、服务失败、非法响应、超时、取消或过期 generation 均拒绝，保留原因；不重试、不静默 fallback、不自动重启 Turn。明确 user policy floor 仍人工审批，deny 仍不可覆写。
+每个待审批调用最多一次模型审核，30 秒上限；输入最多 32768 估算 tokens，并服从审核路由的更紧输入预算及扣除 1024 输出预留后的窗口；输出最多 1024 tokens。超限、缺路由、服务失败、非法响应、超时、取消或过期 generation 均拒绝并保留原因；不重试、不静默 fallback、不自动重启 Turn。明确的 user policy floor 仍人工审批，deny 仍不可覆写。
 
 请求尝试及实测 token 计入同 session/child 的既有 RequestSnapshot 用量；待审批工具在审核前已预留原预算，审核后重查原期限，不重置 Task、消费或批准历史。审核记录及工具结果均传递实际 rule/model/error/cancel 原因；模型批准只属于当前精确调用，不能授权后续命令或绕过执行验证。
 
-审批事件和会话投影的可选reviewMethod只由主进程标记rule/model；errorCode只来自宿主确认的审核故障。模型仍只能返回approved/reason，理由中的代码文字不构成宿主故障。旧记录缺字段保持来源未知，不补造；不修改存储版本、风险分档、一次审核、policy floor或执行门禁。界面区分规则检查、独立审核和审核未完成，对本调用的审批拒绝/审核异常说明操作未执行；审批通过后的工具失败仍保留实际错因。模型思考强度与操作风险分别标注。
+审批事件与会话投影的可选 `reviewMethod`（rule／model）、`verdict`、`failedChecks` 与 `escalatedFrom` 只由主进程标记；`errorCode` 只来自宿主确认的审核故障，理由中的代码文字不构成宿主故障，缺字段时不补造来源。界面区分规则检查、独立审核、审核未完成与转交人工；对本调用的拒绝或审核异常说明操作未执行，审批通过后的工具失败仍保留实际错因。模型思考强度与操作风险分别标注。
 
 ## Policy 编译
 
@@ -265,7 +308,7 @@ shell 的 command 与 rdc 互斥；ToolValidator oneOf/not 与执行入口双重
 - 回放生命周期自动审查接收主进程定义的操作目标和效果；当前权限模式、审批下限及执行时的归属检查仍然适用。
 - Skill 仅提供知识，不能扩权。
 
-执行回执仅由主进程在真实原生成功调用后签名，key 在 safeStorage；模型提交的 result JSON、普通 shell 输出或 artifact hash 本身不具备 provenance。签名校验与 SessionArtifactResolver 所有权/hash 同时成立才可引用。实验关闭和新完成必须满足五阶段真实调用与同 replacement 的回滚；旧记录只保留可读性。详见 docs/architecture/rdc-runtime.md。
+执行回执仅由主进程在真实原生成功调用后签名，key 在 safeStorage；模型提交的 result JSON、普通 shell 输出或 artifact hash 本身不具备 provenance。签名校验与 SessionArtifactResolver 所有权/hash 同时成立才可引用。实验关闭和新完成必须满足五阶段真实调用与同 replacement 的回滚；每份回执都带 daemon／worker 进程身份。详见 docs/architecture/rdc-runtime.md。
 
 Skill 权限只在 prepareTurn 对预载集合取交集；skill_read 只读方法。RenderDoc 方法技能没有局部执行工具白名单；profile/policy/lease 仍强制授权。Knowledge Scout 仍只有四个 Knowledge 只读工具，文件补证属于调用方独立步骤。
 
@@ -290,7 +333,7 @@ Agent 只绑定同安装捆绑 Python（按宿主布局，见 docs/architecture/
 
 ### 自动审查展示
 
-自动审查以主进程 reviewer=auto_review 识别，只在 Work Process 展示规则/独立审核及真实结论，不是人工待回答请求。Composer 只提供真实人工请求的批准入口，混合请求分别结算，不改变人工 policy floor。审核来源不从命令文本、风险或 ID 格式推测。
+自动审查以主进程 reviewer=auto_review 识别，只在 Work Process 展示规则/独立审核及真实结论，不是人工待回答请求。审核无法判断时转交的人工批准带 `escalatedFrom`：Work Process 显示「自动审查无法判断 · 询问你」，Composer 的批准卡说明审核无法确认的检查项。Composer 只提供真实人工请求的批准入口，混合请求分别结算，不改变人工 policy floor。审核来源不从命令文本、风险或 ID 格式推测。
 
 ## 会话 Remote 自动准备
 

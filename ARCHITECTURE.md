@@ -188,6 +188,7 @@ Grok 订阅只有系统默认浏览器 PKCE 自动回调入口；独立 xAI API 
 ### 安全与信任
 
 - **Secret**：`safeStorage` 不可用则 fail-closed；secret 不进入 renderer / IPC 明文 / Trace / RequestPlan。
+- **自动审查**：准入先由宿主决定。适配器计算的事实不成立即按规则拒绝，已批准计划的授权覆盖且事实全部成立即按规则批准，其余才交给独立、无工具的审核模型；模型判定 `undecidable` 时只弹一张绑定本次调用的人工卡。授权清单只收窄、不超过静态策略；审核模型取自 Settings、随回合冻结，不沿用被审回合的路由；任何情形不切换 Full access。细节见 [`docs/contracts/permissions.md`](docs/contracts/permissions.md)「自动审查」。
 - **IPC Zod**：全部 IPC handler 经 `parseIpcArgs`；非法 payload fail-closed；`approvalToken` 单次消费。
   - 反方向同样在边界校验一次：main 推送给 renderer 的每个事件在任何监听器之前按 `src/shared/renderer-api/eventPayloads.ts` 的通道 schema 检查，非法 payload 丢弃并记一条 renderer console 警告（只含通道与失败路径）。
   - 流式 `conversation:event` 与体量大的投影只校验信封。
@@ -530,7 +531,7 @@ Embedding capability 与 Semantic lane 已删除，Knowledge 走 markdown-first 
 - **`S-CLAIM-01`**：compact / report / view 投影 Claim 必须带 `compactProvenance`。
 - **`S-EVIDENCE-01`**：以 `ready` 写入的非投影 observed Claim（含 ClaimSet 各项）必须在 `evidenceIds` 引用至少一条可解引用的 EvidenceRecord；`ready` report 的投影结论经 `compactProvenance` 回指的 observed 源 Claim 同样须满足。草稿可先写后补证据；读回的记录不追溯判定。
 - **`S-CAUSAL-01`**：causal / counterfactual Claim 必须引用可解引用的 `ExperimentRecord`，且该实验 `intervention.type != none`、`status ∈ {recorded, rolled_back}`、`rollback.executed === true`、`rollback.baselineRestored === true`，并存在 verify evidence。
-- **`S-RDC-01`**：mutate 必有 Experiment + exclusive world state + rollback / restored 验证，否则 `polluted` / `stale`。
+- **`S-RDC-01`**：mutate 必有 Experiment + exclusive world state + rollback / restored 验证，否则 `polluted` / `stale`。写入时判定一次；实验以已核验的执行证据收口（`recorded` / `rolled_back`）时在同一事务内重判，隔离成立则经 `supersedes` 给 WorldState 与随之 stale 的 Evidence 写新版本，历史版本保留。
 - **领域边界**：Analyzer `claimKind` 不越 Observed / Reconstructed / Authoring 层；Optimizer 无 rollback 的 mutate 不得关闭。
 - **事务**：record / manifest / index / supersede / stale-propagation 经 journal / temp-set / commit marker / atomic replace 同一事务；启动恢复只见完整旧版或完整新版；损坏/部分事务显式 `degraded`，不伪装 empty。
 - **读取**：renderer 读取正文的唯一通道是 `investigation:read`；投影携带完整 `contentHash`。
@@ -780,3 +781,9 @@ Task 可通过通用 `executionRequirements` 声明必要的执行方式、必�
 - 批准与交接是同一主进程事务，执行回合经 Composer 发送链只发一次，无新增的持久状态机。
 - 审批授权来自 main-owned PlanReviewProjection 与运行时 reviewId，以持久 plan-state/历史/文件证明来源，不依赖仍存活的 Promise 或历史 streaming。
 - 正常、重开和重启恢复共用决定链，不自动执行或复活旧回合；活跃反馈返回原循环，恢复反馈是携带已核验计划引用的新用户规划请求。恢复边界见 session-projection 契约。
+
+计划批准同时是干预的准入：
+
+- 计划用 `plan_artifact.authorizations` 列出要用户批准的可逆干预；计划门按 profile 天花板、policy、冻结目录与 `captureScope` 校验，不合格整份退回。授权项随计划 hash 冻结，修订即失效，计划卡用人话列出它们。
+- 执行回合的自动审查先按授权项与宿主事实确定性判定；模型只判断授权覆盖不到的语义余量，判不了就转交一次人工批准。
+- 三道关口各答一个问题：计划批准决定做什么，准入决定这个动作是否在授权内且可逆，独立审查员判断证据是否支撑结论；准入层不看图像、不判断结论真伪。
